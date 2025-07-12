@@ -110,11 +110,11 @@ func TestRetryCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			start := time.Now()
 			err := RetryCommand(rc, tt.Input.maxAttempts, tt.Input.delay, tt.Input.command, tt.Input.args...)
 			elapsed := time.Since(start)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 				// Check that it actually retried (should take at least delay * (attempts-1))
@@ -138,22 +138,22 @@ func TestRetryCaptureOutput(t *testing.T) {
 	}
 
 	tests := []testutil.TableTest[struct {
-		retries     int
-		delay       time.Duration
-		command     string
-		args        []string
-		wantErr     bool
-		expectOut   string
+		retries   int
+		delay     time.Duration
+		command   string
+		args      []string
+		wantErr   bool
+		expectOut string
 	}]{
 		{
 			Name: "capture successful command output",
 			Input: struct {
-				retries     int
-				delay       time.Duration
-				command     string
-				args        []string
-				wantErr     bool
-				expectOut   string
+				retries   int
+				delay     time.Duration
+				command   string
+				args      []string
+				wantErr   bool
+				expectOut string
 			}{
 				retries:   3,
 				delay:     10 * time.Millisecond,
@@ -166,12 +166,12 @@ func TestRetryCaptureOutput(t *testing.T) {
 		{
 			Name: "capture output from failing command",
 			Input: struct {
-				retries     int
-				delay       time.Duration
-				command     string
-				args        []string
-				wantErr     bool
-				expectOut   string
+				retries   int
+				delay     time.Duration
+				command   string
+				args      []string
+				wantErr   bool
+				expectOut string
 			}{
 				retries:   2,
 				delay:     5 * time.Millisecond,
@@ -184,12 +184,12 @@ func TestRetryCaptureOutput(t *testing.T) {
 		{
 			Name: "capture from nonexistent command",
 			Input: struct {
-				retries     int
-				delay       time.Duration
-				command     string
-				args        []string
-				wantErr     bool
-				expectOut   string
+				retries   int
+				delay     time.Duration
+				command   string
+				args      []string
+				wantErr   bool
+				expectOut string
 			}{
 				retries:   2,
 				delay:     5 * time.Millisecond,
@@ -202,12 +202,12 @@ func TestRetryCaptureOutput(t *testing.T) {
 		{
 			Name: "single retry capture",
 			Input: struct {
-				retries     int
-				delay       time.Duration
-				command     string
-				args        []string
-				wantErr     bool
-				expectOut   string
+				retries   int
+				delay     time.Duration
+				command   string
+				args      []string
+				wantErr   bool
+				expectOut string
 			}{
 				retries:   1,
 				delay:     0,
@@ -222,11 +222,11 @@ func TestRetryCaptureOutput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			start := time.Now()
 			output, err := RetryCommandCaptureRefactored(rc, tt.Input.retries, tt.Input.delay, tt.Input.command, tt.Input.args...)
 			elapsed := time.Since(start)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 				// For failing commands, check that retries actually happened
@@ -237,7 +237,7 @@ func TestRetryCaptureOutput(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			
+
 			if tt.Input.expectOut != "" {
 				assert.Contains(t, string(output), tt.Input.expectOut)
 			}
@@ -311,10 +311,10 @@ func TestRetryCommandSecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// RetryCommand should handle malicious input safely
 			err := RetryCommand(rc, 1, 0, tt.Input.command, tt.Input.args...)
-			
+
 			// Should complete without security issues (may succeed or fail)
 			// The important thing is no command injection occurs
 			_ = err
@@ -375,10 +375,10 @@ func TestRetryCaptureOutputSecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Should handle malicious input safely
 			output, err := RetryCommandCaptureRefactored(rc, 1, 0, tt.Input.command, tt.Input.args...)
-			
+
 			// Check that malicious content appears as literal text if command succeeds
 			if err == nil && tt.Input.command == "echo" {
 				for _, arg := range tt.Input.args {
@@ -500,9 +500,9 @@ func TestRetryCommandEdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := RetryCommand(rc, tt.Input.maxAttempts, tt.Input.delay, tt.Input.command, tt.Input.args...)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {

@@ -27,16 +27,16 @@ import (
 // It returns an error if either step fails.
 func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	// ASSESS - Check if systemd is available
 	logger.Info("Assessing systemd availability")
 	if _, err := exec.LookPath("systemctl"); err != nil {
 		return fmt.Errorf("systemctl not found: %w", err)
 	}
-	
+
 	// INTERVENE - Reload and enable
 	logger.Info("Reloading systemd daemon")
-	
+
 	// 1) reload systemd
 	if _, err := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
@@ -51,7 +51,7 @@ func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 	// 2) enable & start the unit
 	logger.Info("Enabling and starting systemd unit",
 		zap.String("unit", unit))
-		
+
 	if _, err := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"enable", "--now", unit},
@@ -66,7 +66,7 @@ func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 	// EVALUATE - Verify service is active
 	logger.Info("Evaluating systemd unit status",
 		zap.String("unit", unit))
-		
+
 	if err := CheckServiceStatus(ctx, unit); err != nil {
 		logger.Error("Service is not active after enable",
 			zap.String("unit", unit),
@@ -83,18 +83,18 @@ func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 // Uses a safe command that won't fail due to non-existent services.
 func CanSudoSystemctl(ctx context.Context, action, unit string) bool {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Debug("Checking sudo systemctl permissions",
 		zap.String("action", action),
 		zap.String("unit", unit))
-	
+
 	// Test with a safe systemctl command that always exists
 	_, err := execute.Run(ctx, execute.Options{
 		Command: "sudo",
 		Args:    []string{"-n", "systemctl", "--version"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		logger.Debug("sudo -n systemctl --version failed",
 			zap.Error(err))
@@ -106,15 +106,15 @@ func CanSudoSystemctl(ctx context.Context, action, unit string) bool {
 // PromptAndRunInteractiveSystemctl prompts for sudo password and runs systemctl
 func PromptAndRunInteractiveSystemctl(ctx context.Context, action, unit string) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	// Log the prompt for audit trail
 	logger.Info("terminal prompt: Privilege escalation required for systemctl")
-	
+
 	// Use stderr for user prompts to preserve stdout
 	if _, err := fmt.Fprintf(os.Stderr, "Privilege escalation required to run 'systemctl %s %s'\n", action, unit); err != nil {
 		return fmt.Errorf("failed to write prompt: %w", err)
 	}
-	
+
 	logger.Info("terminal prompt: You will be prompted for your password")
 	if _, err := fmt.Fprintln(os.Stderr, "\nYou will be prompted for your password."); err != nil {
 		return fmt.Errorf("failed to write prompt: %w", err)
@@ -133,18 +133,18 @@ func PromptAndRunInteractiveSystemctl(ctx context.Context, action, unit string) 
 			zap.Error(err))
 		return err
 	}
-	
+
 	logger.Info("Interactive systemctl completed successfully",
 		zap.String("action", action),
 		zap.String("unit", unit))
-	
+
 	return nil
 }
 
 // RunSystemctlWithRetry runs systemctl with retries and enhanced logging
 func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, delaySeconds int) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	// ASSESS - Check prerequisites
 	logger.Info("Assessing systemctl operation requirements",
 		zap.String("action", action),
@@ -176,7 +176,7 @@ func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, de
 				zap.Int("delay_seconds", delaySeconds))
 			time.Sleep(time.Duration(delaySeconds) * time.Second)
 		}
-		
+
 		output, err := execute.Run(ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{action, unit},
@@ -212,7 +212,7 @@ func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, de
 		zap.String("unit", unit),
 		zap.Int("total_attempts", retries),
 		zap.Error(lastErr))
-		
+
 	logger.Info("Run diagnostics commands for troubleshooting",
 		zap.String("status_cmd", fmt.Sprintf("systemctl status %s -l", unit)),
 		zap.String("journal_cmd", fmt.Sprintf("journalctl -u %s", unit)))
@@ -237,7 +237,7 @@ func RestartSystemdUnitWithRetry(ctx context.Context, unit string, retries int, 
 func CanInteractiveSudoWithContext(ctx context.Context) bool {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Checking if interactive sudo is available")
-	
+
 	// Check if we have a TTY
 	if _, err := os.Stdin.Stat(); err != nil {
 		logger.Debug("No TTY available for interactive sudo")
@@ -249,21 +249,21 @@ func CanInteractiveSudoWithContext(ctx context.Context) bool {
 // ServiceExists checks if a systemd service unit file exists
 func ServiceExists(ctx context.Context, unit string) bool {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Debug("Checking if service exists",
 		zap.String("unit", unit))
-		
+
 	_, err := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"cat", unit},
 		Capture: true,
 	})
-	
+
 	exists := err == nil
 	logger.Debug("Service existence check result",
 		zap.String("unit", unit),
 		zap.Bool("exists", exists))
-		
+
 	return exists
 }
 

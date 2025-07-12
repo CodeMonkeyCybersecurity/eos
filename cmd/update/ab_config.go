@@ -45,6 +45,7 @@ Example experiment workflow:
 Configuration file: /opt/delphi/ab-test-config.json`,
 	Aliases: []string{"ab", "abtest"},
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for ab-config create command
 var (
@@ -162,6 +163,7 @@ Examples:
 		return nil
 	}),
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for ab-config status command
 var abConfigStatusDetailed bool
@@ -398,7 +400,7 @@ func init() {
 	// TODO: Pattern 1 - Need to determine correct parent command for registration
 	// Currently not registered with UpdateCmd - may need to be under a delphi services structure
 	// UpdateCmd.AddCommand(abConfigCmd)
-	
+
 	// Add subcommands to ab-config command
 	abConfigCmd.AddCommand(abConfigCreateCmd)
 	abConfigCmd.AddCommand(abConfigListCmd)

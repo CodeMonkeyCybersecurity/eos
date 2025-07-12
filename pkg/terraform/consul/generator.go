@@ -14,19 +14,19 @@ import (
 // Migrated from cmd/create/consul_terraform.go generateConsulClusterVariables
 func GenerateClusterVariables(rc *eos_io.RuntimeContext, outputDir string, data *TemplateData) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Validate input parameters
 	log.Info("Assessing Terraform variables generation requirements",
 		zap.String("output_dir", outputDir),
 		zap.String("cluster_name", data.ClusterName))
-	
+
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
-	
+
 	// INTERVENE - Generate variables file content
 	log.Info("Generating Terraform variables file")
-	
+
 	variables := fmt.Sprintf(`
 variable "vault_addr" {
   description = "Vault server address"
@@ -87,20 +87,20 @@ variable "ssh_key_name" {
 	if err := os.WriteFile(variablesPath, []byte(variables), 0644); err != nil {
 		return fmt.Errorf("failed to write variables file: %w", err)
 	}
-	
+
 	// EVALUATE - Verify file was written correctly
 	log.Info("Evaluating Terraform variables file generation")
-	
+
 	info, err := os.Stat(variablesPath)
 	if err != nil {
 		return fmt.Errorf("failed to verify variables file: %w", err)
 	}
-	
+
 	log.Info("Terraform variables file generated successfully",
 		zap.String("path", variablesPath),
 		zap.Int64("size", info.Size()),
 		zap.String("datacenter", data.ConsulDatacenter),
 		zap.String("cluster_name", data.ClusterName))
-	
+
 	return nil
 }

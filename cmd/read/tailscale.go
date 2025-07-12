@@ -8,6 +8,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	showHeadscaleStatus bool
@@ -75,7 +76,7 @@ Headscale server information includes:
 			logger.Info("Version", zap.String("version", status.Version))
 			logger.Info("Config Exists", zap.Bool("config_exists", status.ConfigExists))
 			logger.Info("Database Ready", zap.Bool("database_ready", status.DatabaseReady))
-			
+
 			if len(status.Users) > 0 {
 				logger.Info("Users:")
 				for _, user := range status.Users {
@@ -86,7 +87,7 @@ Headscale server information includes:
 			if len(status.PreAuthKeys) > 0 {
 				logger.Info("Pre-Auth Keys:")
 				for _, key := range status.PreAuthKeys {
-					logger.Info("", 
+					logger.Info("",
 						zap.String("id", key.ID),
 						zap.Bool("reusable", key.Reusable),
 						zap.String("expiration", key.Expiration),
@@ -102,7 +103,6 @@ Headscale server information includes:
 		return network.DisplayTailscaleStatus(rc)
 	}),
 }
-
 
 func init() {
 	ReadCmd.AddCommand(ReadTailscaleCmd)

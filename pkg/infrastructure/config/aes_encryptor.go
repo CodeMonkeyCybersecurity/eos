@@ -46,7 +46,7 @@ func (e *AESEncryptor) Encrypt(ctx context.Context, data []byte) ([]byte, error)
 	}
 
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-	
+
 	// Encode to base64 for safe storage
 	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(ciphertext)))
 	base64.StdEncoding.Encode(encoded, ciphertext)
@@ -102,7 +102,7 @@ func (e *AESEncryptor) IsEncrypted(ctx context.Context, data []byte) bool {
 	// Real encrypted data should be base64 encoded
 	decoded := make([]byte, base64.StdEncoding.DecodedLen(len(data)))
 	_, err := base64.StdEncoding.Decode(decoded, data)
-	
+
 	// If it's valid base64 and looks like encrypted data, assume it's encrypted
 	return err == nil && len(data) > 32 // Minimum size for AES-GCM
 }

@@ -224,4 +224,3 @@ func printServiceHealthTable(services map[string]monitoring.ServiceHealth) {
 		}
 	}
 }
-

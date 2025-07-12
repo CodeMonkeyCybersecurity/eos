@@ -13,10 +13,10 @@ import (
 // Migrated from cmd/create/consul.go detectVaultInstallation
 func VaultInstallation(rc *eos_io.RuntimeContext) bool {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check if Vault integration is possible
 	log.Info("Assessing Vault installation for Consul integration")
-	
+
 	// Check if VAULT_ADDR is set
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if vaultAddr == "" {
@@ -26,7 +26,7 @@ func VaultInstallation(rc *eos_io.RuntimeContext) bool {
 
 	// INTERVENE - Try to create a Vault client
 	log.Debug("Attempting to connect to Vault", zap.String("vault_addr", vaultAddr))
-	
+
 	client, err := vault.NewClient(rc)
 	if err != nil {
 		log.Debug("Failed to create Vault client", zap.Error(err))
@@ -35,7 +35,7 @@ func VaultInstallation(rc *eos_io.RuntimeContext) bool {
 
 	// EVALUATE - Check if Vault is healthy
 	log.Debug("Checking Vault health")
-	
+
 	_, err = client.Sys().Health()
 	if err != nil {
 		log.Debug("Vault health check failed", zap.Error(err))
@@ -44,6 +44,6 @@ func VaultInstallation(rc *eos_io.RuntimeContext) bool {
 
 	log.Info("Vault detected and healthy, enabling integration",
 		zap.String("vault_addr", vaultAddr))
-	
+
 	return true
 }

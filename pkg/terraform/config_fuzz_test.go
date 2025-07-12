@@ -105,8 +105,8 @@ func FuzzTerraformResourceGeneration(f *testing.F) {
 	f.Add("", "")
 	f.Add("resource${injection}", "name")
 	f.Add("resource_type", "name${injection}")
-	f.Add("very_long_" + strings.Repeat("type", 50), "name")
-	f.Add("type", "very_long_" + strings.Repeat("name", 50))
+	f.Add("very_long_"+strings.Repeat("type", 50), "name")
+	f.Add("type", "very_long_"+strings.Repeat("name", 50))
 	f.Add("type\nwith\nnewlines", "name")
 	f.Add("type", "name\nwith\nnewlines")
 
@@ -133,7 +133,7 @@ func FuzzTerraformResourceGeneration(f *testing.F) {
 		}
 
 		if containsDangerousHCLInterpolation(block) {
-			t.Errorf("Generated resource block contains dangerous interpolation: type=%q, name=%q, block=%q", 
+			t.Errorf("Generated resource block contains dangerous interpolation: type=%q, name=%q, block=%q",
 				resourceType, resourceName, block)
 		}
 	})
@@ -186,18 +186,18 @@ func FuzzTerraformStateFileHandling(f *testing.F) {
 func SanitizeHCLValue(value string) string {
 	// Remove dangerous interpolations
 	value = removeDangerousHCLInterpolations(value)
-	
+
 	// Remove null bytes
 	value = strings.ReplaceAll(value, "\x00", "")
-	
+
 	// Limit length
 	if len(value) > 1000 {
 		value = value[:1000] + "[TRUNCATED]"
 	}
-	
+
 	// Escape quotes properly
 	value = strings.ReplaceAll(value, `"`, `\"`)
-	
+
 	return value
 }
 
@@ -206,15 +206,15 @@ func ValidateTerraformVariableName(name string) error {
 	if name == "" {
 		return fmt.Errorf("variable name cannot be empty")
 	}
-	
+
 	if len(name) > 64 {
 		return fmt.Errorf("variable name too long")
 	}
-	
+
 	if !isValidTerraformIdentifier(name) {
 		return fmt.Errorf("invalid Terraform identifier")
 	}
-	
+
 	return nil
 }
 
@@ -224,25 +224,25 @@ func GenerateTerraformResourceBlock(resourceType, resourceName string, attribute
 	if err := ValidateTerraformVariableName(resourceType); err != nil {
 		return "", fmt.Errorf("invalid resource type: %w", err)
 	}
-	
+
 	if err := ValidateTerraformVariableName(resourceName); err != nil {
 		return "", fmt.Errorf("invalid resource name: %w", err)
 	}
-	
+
 	// Generate resource block (simplified)
 	block := fmt.Sprintf(`resource "%s" "%s" {`, resourceType, resourceName)
-	
+
 	for key, value := range attributes {
 		if err := ValidateTerraformVariableName(key); err != nil {
 			continue // Skip invalid attribute names
 		}
-		
+
 		sanitizedValue := SanitizeHCLValue(fmt.Sprintf("%v", value))
 		block += fmt.Sprintf(`\n  %s = "%s"`, key, sanitizedValue)
 	}
-	
+
 	block += "\n}"
-	
+
 	return block, nil
 }
 
@@ -252,16 +252,16 @@ func ValidateAndSanitizeTerraformState(stateData string) (string, error) {
 	if len(stateData) > 10*1024*1024 { // 10MB limit
 		return "", fmt.Errorf("state file too large")
 	}
-	
+
 	if !utf8.ValidString(stateData) {
 		return "", fmt.Errorf("invalid UTF-8 in state data")
 	}
-	
+
 	// Check for dangerous content
 	if containsDangerousStateData(stateData) {
 		return "", fmt.Errorf("dangerous content in state data")
 	}
-	
+
 	return stateData, nil
 }
 
@@ -272,7 +272,7 @@ func containsDangerousHCLInterpolation(s string) bool {
 		"rm -rf", "system(", "exec(", "popen(",
 		"/etc/passwd", "/etc/shadow", "$HOME",
 	}
-	
+
 	lower := strings.ToLower(s)
 	for _, pattern := range dangerousPatterns {
 		if strings.Contains(lower, strings.ToLower(pattern)) {
@@ -288,7 +288,7 @@ func containsDangerousStateData(s string) bool {
 		"rm -rf", "system(", "exec(", "popen(",
 		"../../../", "/etc/passwd", "/etc/shadow",
 	}
-	
+
 	lower := strings.ToLower(s)
 	for _, pattern := range dangerousPatterns {
 		if strings.Contains(lower, strings.ToLower(pattern)) {
@@ -304,11 +304,11 @@ func removeDangerousHCLInterpolations(s string) string {
 		"${exec(", "${file(", "${env.", "${system(",
 		"${shell(", "${command(", "${eval(",
 	}
-	
+
 	for _, pattern := range dangerousPatterns {
 		s = strings.ReplaceAll(s, pattern, "${sanitized(")
 	}
-	
+
 	return s
 }
 
@@ -317,20 +317,20 @@ func isValidHCLValue(s string) bool {
 	if s == "" {
 		return true
 	}
-	
+
 	// Check for unmatched quotes
 	quoteCount := strings.Count(s, `"`) - strings.Count(s, `\"`)
 	if quoteCount%2 != 0 {
 		return false
 	}
-	
+
 	// Check for unmatched interpolations
 	openCount := strings.Count(s, "${")
 	closeCount := strings.Count(s, "}")
 	if openCount != closeCount {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -338,18 +338,18 @@ func isValidTerraformIdentifier(s string) bool {
 	if s == "" {
 		return false
 	}
-	
+
 	// Must start with letter or underscore
 	if !((s[0] >= 'a' && s[0] <= 'z') || (s[0] >= 'A' && s[0] <= 'Z') || s[0] == '_') {
 		return false
 	}
-	
+
 	// Rest must be letters, digits, or underscores
 	for _, r := range s[1:] {
 		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_') {
 			return false
 		}
 	}
-	
+
 	return true
 }

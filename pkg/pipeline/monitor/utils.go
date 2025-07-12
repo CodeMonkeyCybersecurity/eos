@@ -21,7 +21,7 @@ func FormatRelativeTime(t time.Time) string {
 	} else {
 		return fmt.Sprintf("%dd", int(diff.Hours()/24))
 	}
-	
+
 	// EVALUATE - Return formatted time string
 }
 
@@ -46,7 +46,7 @@ func GetAgentStatusColor(status *string) string {
 	if status == nil {
 		return "\033[90m" // Gray
 	}
-	
+
 	switch *status {
 	case "active":
 		return "\033[92m" // Green

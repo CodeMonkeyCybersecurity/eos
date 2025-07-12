@@ -11,29 +11,29 @@ import (
 // Config holds the configuration for Penpot deployment
 type Config struct {
 	// Network configuration
-	Port         int    `yaml:"port" json:"port"`
-	Host         string `yaml:"host" json:"host"`
-	PublicURI    string `yaml:"public_uri" json:"public_uri"`
-	
+	Port      int    `yaml:"port" json:"port"`
+	Host      string `yaml:"host" json:"host"`
+	PublicURI string `yaml:"public_uri" json:"public_uri"`
+
 	// Service configuration
 	DatabasePort int `yaml:"database_port" json:"database_port"`
 	RedisPort    int `yaml:"redis_port" json:"redis_port"`
-	
+
 	// External service addresses
 	NomadAddr  string `yaml:"nomad_addr" json:"nomad_addr"`
 	VaultAddr  string `yaml:"vault_addr" json:"vault_addr"`
 	VaultToken string `yaml:"vault_token" json:"vault_token"`
-	
+
 	// Deployment configuration
-	Namespace     string `yaml:"namespace" json:"namespace"`
-	Datacenters   []string `yaml:"datacenters" json:"datacenters"`
-	WorkDir       string `yaml:"work_dir" json:"work_dir"`
-	
+	Namespace   string   `yaml:"namespace" json:"namespace"`
+	Datacenters []string `yaml:"datacenters" json:"datacenters"`
+	WorkDir     string   `yaml:"work_dir" json:"work_dir"`
+
 	// Feature flags
 	EnableRegistration bool `yaml:"enable_registration" json:"enable_registration"`
 	EnableLogin        bool `yaml:"enable_login" json:"enable_login"`
 	DisableEmailVerif  bool `yaml:"disable_email_verification" json:"disable_email_verification"`
-	
+
 	// Resource limits
 	Resources ResourceConfig `yaml:"resources" json:"resources"`
 }
@@ -73,10 +73,10 @@ type Manager struct {
 // SecretConfig holds vault secret configuration
 type SecretConfig struct {
 	DatabasePassword string `json:"database_password"`
-	SecretKey       string `json:"secret_key"`
-	DatabaseURI     string `json:"database_uri"`
-	RedisURI        string `json:"redis_uri"`
-	PublicURI       string `json:"public_uri"`
+	SecretKey        string `json:"secret_key"`
+	DatabaseURI      string `json:"database_uri"`
+	RedisURI         string `json:"redis_uri"`
+	PublicURI        string `json:"public_uri"`
 }
 
 // PostgresSecretConfig holds postgres-specific secrets
@@ -88,11 +88,11 @@ type PostgresSecretConfig struct {
 
 // DeploymentStep represents a single deployment step
 type DeploymentStep struct {
-	Name        string
-	Description string
-	AssessFunc  func(ctx context.Context, mgr *Manager) error
+	Name          string
+	Description   string
+	AssessFunc    func(ctx context.Context, mgr *Manager) error
 	InterventFunc func(ctx context.Context, mgr *Manager) error
-	EvaluateFunc func(ctx context.Context, mgr *Manager) error
+	EvaluateFunc  func(ctx context.Context, mgr *Manager) error
 }
 
 // TerraformConfig holds Terraform configuration
@@ -123,24 +123,24 @@ type HealthCheckConfig struct {
 
 // ServiceCheck represents a service health check
 type ServiceCheck struct {
-	Name        string            `json:"name"`
-	Type        string            `json:"type"`
-	Path        string            `json:"path,omitempty"`
-	Interval    time.Duration     `json:"interval"`
-	Timeout     time.Duration     `json:"timeout"`
-	PortLabel   string            `json:"port_label,omitempty"`
-	Method      string            `json:"method,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
+	Name      string            `json:"name"`
+	Type      string            `json:"type"`
+	Path      string            `json:"path,omitempty"`
+	Interval  time.Duration     `json:"interval"`
+	Timeout   time.Duration     `json:"timeout"`
+	PortLabel string            `json:"port_label,omitempty"`
+	Method    string            `json:"method,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
 }
 
 // PenpotFeatureFlags defines Penpot feature configuration
 type PenpotFeatureFlags struct {
-	EnableRegistration     bool `yaml:"enable_registration" json:"enable_registration"`
-	EnableLogin           bool `yaml:"enable_login" json:"enable_login"`
+	EnableRegistration       bool `yaml:"enable_registration" json:"enable_registration"`
+	EnableLogin              bool `yaml:"enable_login" json:"enable_login"`
 	DisableEmailVerification bool `yaml:"disable_email_verification" json:"disable_email_verification"`
-	EnableEmailAuth       bool `yaml:"enable_email_auth" json:"enable_email_auth"`
-	EnableDemoUsers       bool `yaml:"enable_demo_users" json:"enable_demo_users"`
-	EnableTelemetry       bool `yaml:"enable_telemetry" json:"enable_telemetry"`
+	EnableEmailAuth          bool `yaml:"enable_email_auth" json:"enable_email_auth"`
+	EnableDemoUsers          bool `yaml:"enable_demo_users" json:"enable_demo_users"`
+	EnableTelemetry          bool `yaml:"enable_telemetry" json:"enable_telemetry"`
 }
 
 // PenpotTaskConfig defines configuration for individual Nomad tasks
@@ -189,18 +189,18 @@ func (e *DeploymentError) Error() string {
 // DefaultConfig returns a default Penpot configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Port:         8239,
-		Host:         "0.0.0.0",
-		DatabasePort: 5432,
-		RedisPort:    6379,
-		NomadAddr:    "http://localhost:4646",
-		VaultAddr:    "http://localhost:8200",
-		Namespace:    "penpot",
-		Datacenters:  []string{"dc1"},
-		WorkDir:      "/tmp/penpot-deploy",
+		Port:               8239,
+		Host:               "0.0.0.0",
+		DatabasePort:       5432,
+		RedisPort:          6379,
+		NomadAddr:          "http://localhost:4646",
+		VaultAddr:          "http://localhost:8200",
+		Namespace:          "penpot",
+		Datacenters:        []string{"dc1"},
+		WorkDir:            "/tmp/penpot-deploy",
 		EnableRegistration: true,
-		EnableLogin:       true,
-		DisableEmailVerif: true,
+		EnableLogin:        true,
+		DisableEmailVerif:  true,
 		Resources: ResourceConfig{
 			Frontend: PenpotResourceLimits{CPU: 500, Memory: 512},
 			Backend:  PenpotResourceLimits{CPU: 1000, Memory: 2048},
@@ -221,7 +221,7 @@ func (c *Config) Validate() error {
 			Details: map[string]interface{}{"port": c.Port},
 		}
 	}
-	
+
 	if c.Host == "" {
 		return &DeploymentError{
 			Type:    ErrorTypeValidation,
@@ -229,7 +229,7 @@ func (c *Config) Validate() error {
 			Message: "host cannot be empty",
 		}
 	}
-	
+
 	if c.NomadAddr == "" {
 		return &DeploymentError{
 			Type:    ErrorTypeValidation,
@@ -237,7 +237,7 @@ func (c *Config) Validate() error {
 			Message: "nomad address cannot be empty",
 		}
 	}
-	
+
 	if c.VaultAddr == "" {
 		return &DeploymentError{
 			Type:    ErrorTypeValidation,
@@ -245,6 +245,6 @@ func (c *Config) Validate() error {
 			Message: "vault address cannot be empty",
 		}
 	}
-	
+
 	return nil
 }

@@ -19,7 +19,7 @@ import (
 // ValidateFilePermissions checks if a file has the expected secure permissions
 func ValidateFilePermissions(rc *eos_io.RuntimeContext, filePath string, expectedPerm os.FileMode) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	stat, err := os.Stat(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to stat file %s: %w", filePath, err)
@@ -31,7 +31,7 @@ func ValidateFilePermissions(rc *eos_io.RuntimeContext, filePath string, expecte
 			zap.String("file_path", filePath),
 			zap.String("actual_permissions", fmt.Sprintf("%04o", actualPerm)),
 			zap.String("expected_permissions", fmt.Sprintf("%04o", expectedPerm)))
-		return fmt.Errorf("file %s has insecure permissions %04o, expected %04o", 
+		return fmt.Errorf("file %s has insecure permissions %04o, expected %04o",
 			filePath, actualPerm, expectedPerm)
 	}
 
@@ -193,10 +193,10 @@ func ValidateCredentialPath(rc *eos_io.RuntimeContext, credentialPath string) er
 	}
 
 	// For tests, also allow temp directories (including macOS temp dirs)
-	if strings.Contains(absPath, "/tmp/") || 
-	   strings.Contains(absPath, "TestDir") ||
-	   strings.Contains(absPath, "/var/folders/") || // macOS temp directories
-	   strings.Contains(absPath, os.TempDir()) {
+	if strings.Contains(absPath, "/tmp/") ||
+		strings.Contains(absPath, "TestDir") ||
+		strings.Contains(absPath, "/var/folders/") || // macOS temp directories
+		strings.Contains(absPath, os.TempDir()) {
 		allowed = true
 	}
 
@@ -214,12 +214,12 @@ func ValidateCredentialPath(rc *eos_io.RuntimeContext, credentialPath string) er
 func CreateSanitizedError(message, sensitiveData string) error {
 	// Replace sensitive data with placeholder if present
 	sanitizedMessage := strings.ReplaceAll(message, sensitiveData, "[REDACTED]")
-	
+
 	// If no replacement occurred, append a redaction notice to ensure tests pass
 	if sanitizedMessage == message && sensitiveData != "" {
 		sanitizedMessage = message + " [REDACTED]"
 	}
-	
+
 	return fmt.Errorf("%s", sanitizedMessage)
 }
 
@@ -349,7 +349,7 @@ func ConstantTimeCredentialCompare(expected, actual string) bool {
 	// Convert to bytes for constant-time comparison
 	expectedBytes := []byte(expected)
 	actualBytes := []byte(actual)
-	
+
 	// Use crypto/subtle for constant-time comparison
 	return subtle.ConstantTimeCompare(expectedBytes, actualBytes) == 1
 }
@@ -360,7 +360,7 @@ func SecureZeroCredential(data []byte) {
 	for i := range data {
 		data[i] = 0
 	}
-	
+
 	// Note: In a production system, you might want to call runtime.GC()
 	// and potentially use more advanced techniques to ensure memory is zeroed
 }
@@ -374,6 +374,6 @@ func SecureCredentialRead(credentialPath string) ([]byte, error) {
 
 	// Remove any trailing whitespace that might have been added
 	data = []byte(strings.TrimSpace(string(data)))
-	
+
 	return data, nil
 }

@@ -22,12 +22,12 @@ func TestSecureErase(t *testing.T) {
 			setupFn: func(t *testing.T) string {
 				tmpDir := testutil.TempDir(t)
 				filePath := filepath.Join(tmpDir, "test-file.txt")
-				
+
 				// Create file with sensitive content
 				content := "sensitive data that should be securely erased"
 				err := os.WriteFile(filePath, []byte(content), 0600)
 				testutil.AssertNoError(t, err)
-				
+
 				return filePath
 			},
 			wantErr: false,
@@ -45,11 +45,11 @@ func TestSecureErase(t *testing.T) {
 			setupFn: func(t *testing.T) string {
 				tmpDir := testutil.TempDir(t)
 				filePath := filepath.Join(tmpDir, "empty.txt")
-				
+
 				// Create empty file
 				err := os.WriteFile(filePath, []byte{}, 0600)
 				testutil.AssertNoError(t, err)
-				
+
 				return filePath
 			},
 			wantErr: false,
@@ -59,16 +59,16 @@ func TestSecureErase(t *testing.T) {
 			setupFn: func(t *testing.T) string {
 				tmpDir := testutil.TempDir(t)
 				filePath := filepath.Join(tmpDir, "large.txt")
-				
+
 				// Create file with large content (10KB)
 				content := make([]byte, 10240)
 				for i := range content {
 					content[i] = byte(i % 256)
 				}
-				
+
 				err := os.WriteFile(filePath, content, 0600)
 				testutil.AssertNoError(t, err)
-				
+
 				return filePath
 			},
 			wantErr: false,
@@ -89,7 +89,7 @@ func TestSecureErase(t *testing.T) {
 				}
 			} else {
 				testutil.AssertNoError(t, err)
-				
+
 				// Verify file was deleted (if it existed)
 				_, err := os.Stat(filePath)
 				if !os.IsNotExist(err) && tc.name != "erase non-existent file" {
@@ -103,7 +103,7 @@ func TestSecureErase(t *testing.T) {
 func TestSecureEraseConcurrency(t *testing.T) {
 	t.Run("concurrent erase operations", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t)
-		
+
 		// Create multiple files
 		filePaths := make([]string, 10)
 		for i := 0; i < 10; i++ {
@@ -134,7 +134,7 @@ func TestSecureEraseSecurity(t *testing.T) {
 	t.Run("handles context cancellation", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t)
 		filePath := filepath.Join(tmpDir, "context-test.txt")
-		
+
 		err := os.WriteFile(filePath, []byte("test content"), 0600)
 		testutil.AssertNoError(t, err)
 
@@ -150,7 +150,7 @@ func TestSecureEraseSecurity(t *testing.T) {
 
 	t.Run("handles malicious file names", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t)
-		
+
 		// Test with safe file in temp directory
 		safePath := filepath.Join(tmpDir, "safe-file.txt")
 		err := os.WriteFile(safePath, []byte("test"), 0600)
@@ -165,20 +165,20 @@ func TestSecureEraseSecurity(t *testing.T) {
 func BenchmarkSecureErase(b *testing.B) {
 	// Test different file sizes
 	fileSizes := []int{
-		1024,      // 1KB
-		10240,     // 10KB  
-		102400,    // 100KB
+		1024,   // 1KB
+		10240,  // 10KB
+		102400, // 100KB
 	}
 
 	for _, size := range fileSizes {
 		b.Run(fmt.Sprintf("size_%dB", size), func(b *testing.B) {
 			tmpDir := b.TempDir()
 			ctx := context.Background()
-			
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				
+
 				// Create file
 				filePath := filepath.Join(tmpDir, fmt.Sprintf("bench_%d.txt", i))
 				content := make([]byte, size)
@@ -186,7 +186,7 @@ func BenchmarkSecureErase(b *testing.B) {
 					content[j] = byte(j % 256)
 				}
 				_ = os.WriteFile(filePath, content, 0600)
-				
+
 				b.StartTimer()
 				_ = SecureErase(ctx, filePath)
 			}
@@ -196,17 +196,17 @@ func BenchmarkSecureErase(b *testing.B) {
 
 func BenchmarkConcurrentSecureErase(b *testing.B) {
 	tmpDir := b.TempDir()
-	
+
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
 		ctx := context.Background()
 		for pb.Next() {
 			// Create file
-			filePath := filepath.Join(tmpDir, fmt.Sprintf("concurrent_%d_%d.txt", 
+			filePath := filepath.Join(tmpDir, fmt.Sprintf("concurrent_%d_%d.txt",
 				os.Getpid(), i))
 			content := []byte("benchmark concurrent erase test content")
 			_ = os.WriteFile(filePath, content, 0600)
-			
+
 			// Erase file
 			_ = SecureErase(ctx, filePath)
 			i++

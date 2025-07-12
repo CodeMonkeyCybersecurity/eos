@@ -37,9 +37,9 @@ func FuzzValidateDomainName(f *testing.F) {
 	f.Add("example.com.")
 	f.Add(strings.Repeat("a", 300) + ".com")
 	f.Add(strings.Repeat("a", 64) + ".com")
-	
+
 	// Unicode attack vectors
-	f.Add("example.com\uFF1Brm") // Fullwidth semicolon
+	f.Add("example.com\uFF1Brm")  // Fullwidth semicolon
 	f.Add("test.com\uFF5Cwhoami") // Fullwidth pipe
 	f.Add("example\u200B.com")    // Zero-width space
 	f.Add("еxample.com")          // Cyrillic е
@@ -58,7 +58,7 @@ func FuzzValidateDomainName(f *testing.F) {
 		}()
 
 		err := ValidateDomainName(domain)
-		
+
 		// If validation passes, ensure the domain meets basic safety requirements
 		if err == nil {
 			// Must not contain dangerous characters
@@ -67,7 +67,7 @@ func FuzzValidateDomainName(f *testing.F) {
 					t.Errorf("Domain validation passed but contains dangerous character '%s': %s", char, domain)
 				}
 			}
-			
+
 			// Must not be suspicious domain
 			lowerDomain := strings.ToLower(domain)
 			suspiciousDomains := []string{"localhost", "127.0.0.1", "::1", "0.0.0.0", "internal", "local"}
@@ -76,17 +76,17 @@ func FuzzValidateDomainName(f *testing.F) {
 					t.Errorf("Domain validation passed but contains suspicious pattern '%s': %s", suspicious, domain)
 				}
 			}
-			
+
 			// Must not exceed length limits
 			if len(domain) > MaxDomainLength {
 				t.Errorf("Domain validation passed but exceeds max length %d: %s (len=%d)", MaxDomainLength, domain, len(domain))
 			}
-			
+
 			// Must not have consecutive dots
 			if strings.Contains(domain, "..") {
 				t.Errorf("Domain validation passed but contains consecutive dots: %s", domain)
 			}
-			
+
 			// Must not start/end with invalid characters
 			if len(domain) > 0 {
 				if domain[0] == '-' || domain[0] == '.' {
@@ -97,7 +97,7 @@ func FuzzValidateDomainName(f *testing.F) {
 				}
 			}
 		}
-		
+
 		// Ensure error messages don't leak dangerous input
 		if err != nil {
 			errorMsg := err.Error()
@@ -137,7 +137,7 @@ func FuzzValidateEmailAddress(f *testing.F) {
 	f.Add("user.@example.com")
 	f.Add(strings.Repeat("a", 300) + "@example.com")
 	f.Add("user@" + strings.Repeat("a", 300) + ".com")
-	
+
 	// Unicode attacks
 	f.Add("user@example.com\uFF1Bcurl") // Fullwidth semicolon
 	f.Add("user\u200B@test.com")        // Zero-width space
@@ -145,7 +145,7 @@ func FuzzValidateEmailAddress(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, email string) {
 		err := ValidateEmailAddress(email)
-		
+
 		// If validation passes, ensure email meets safety requirements
 		if err == nil {
 			// Must contain exactly one @
@@ -153,24 +153,24 @@ func FuzzValidateEmailAddress(f *testing.F) {
 			if atCount != 1 {
 				t.Errorf("Email validation passed but has %d @ symbols: %s", atCount, email)
 			}
-			
+
 			// Must not contain dangerous characters (except allowed ones)
 			for _, char := range dangerousChars {
 				if strings.Contains(email, char) && char != "." && char != "+" && char != "-" && char != "_" {
 					t.Errorf("Email validation passed but contains dangerous character '%s': %s", char, email)
 				}
 			}
-			
+
 			// Must not exceed length limits
 			if len(email) > MaxEmailLength {
 				t.Errorf("Email validation passed but exceeds max length %d: %s (len=%d)", MaxEmailLength, email, len(email))
 			}
-			
+
 			// Must not have consecutive dots
 			if strings.Contains(email, "..") {
 				t.Errorf("Email validation passed but contains consecutive dots: %s", email)
 			}
-			
+
 			// Validate parts
 			parts := strings.Split(email, "@")
 			if len(parts) == 2 {
@@ -183,7 +183,7 @@ func FuzzValidateEmailAddress(f *testing.F) {
 				}
 			}
 		}
-		
+
 		// Ensure error messages don't leak dangerous input
 		if err != nil {
 			errorMsg := err.Error()
@@ -221,11 +221,11 @@ func FuzzValidateAppName(f *testing.F) {
 	f.Add("app-")
 	f.Add(strings.Repeat("a", 100))
 	f.Add(strings.Repeat("a", 64))
-	
+
 	// Unicode attacks
-	f.Add("myapp\uFF1Brm")    // Fullwidth semicolon
-	f.Add("app\u200B")        // Zero-width space
-	f.Add("my\u200Bapp")      // Zero-width space in middle
+	f.Add("myapp\uFF1Brm") // Fullwidth semicolon
+	f.Add("app\u200B")     // Zero-width space
+	f.Add("my\u200Bapp")   // Zero-width space in middle
 
 	f.Fuzz(func(t *testing.T, appName string) {
 		// Set production environment for reserved name checking
@@ -240,7 +240,7 @@ func FuzzValidateAppName(f *testing.F) {
 		}()
 
 		err := ValidateAppName(appName)
-		
+
 		// If validation passes, ensure app name meets safety requirements
 		if err == nil {
 			// Must not contain dangerous characters (except hyphens)
@@ -249,19 +249,19 @@ func FuzzValidateAppName(f *testing.F) {
 					t.Errorf("App name validation passed but contains dangerous character '%s': %s", char, appName)
 				}
 			}
-			
+
 			// Must not exceed length limits
 			if len(appName) > MaxAppNameLength {
 				t.Errorf("App name validation passed but exceeds max length %d: %s (len=%d)", MaxAppNameLength, appName, len(appName))
 			}
-			
+
 			// Must not start/end with hyphen
 			if len(appName) > 0 {
 				if appName[0] == '-' || appName[len(appName)-1] == '-' {
 					t.Errorf("App name validation passed but starts/ends with hyphen: %s", appName)
 				}
 			}
-			
+
 			// Must not be critical reserved names
 			lowerAppName := strings.ToLower(appName)
 			criticalReservedNames := []string{"admin", "root", "system", "daemon", "www", "ftp", "mail"}
@@ -270,7 +270,7 @@ func FuzzValidateAppName(f *testing.F) {
 					t.Errorf("App name validation passed but is critical reserved name: %s", appName)
 				}
 			}
-			
+
 			// In production, must not be production reserved names
 			productionReservedNames := []string{"api", "app", "web", "db", "database", "cache", "redis", "vault", "consul", "docker", "kubernetes", "k8s"}
 			for _, reserved := range productionReservedNames {
@@ -279,7 +279,7 @@ func FuzzValidateAppName(f *testing.F) {
 				}
 			}
 		}
-		
+
 		// Ensure error messages don't leak dangerous input
 		if err != nil {
 			errorMsg := err.Error()
@@ -308,10 +308,10 @@ func FuzzSanitizeInputForCommand(f *testing.F) {
 	f.Add("cmd\x00test")
 	f.Add("safe-input.txt")
 	f.Add("")
-	
+
 	f.Fuzz(func(t *testing.T, input string) {
 		sanitized := SanitizeInputForCommand(input)
-		
+
 		// Ensure all dangerous characters are removed
 		dangerousChars := []string{";", "&", "|", "`", "$", "\\", "'", "\"", "\n", "\r", "\t", "\x00"}
 		for _, char := range dangerousChars {
@@ -319,12 +319,12 @@ func FuzzSanitizeInputForCommand(f *testing.F) {
 				t.Errorf("Sanitization failed to remove dangerous character '%s' from: %s -> %s", char, input, sanitized)
 			}
 		}
-		
+
 		// Ensure sanitized output is not longer than input (only removal, no addition)
 		if len(sanitized) > len(input) {
 			t.Errorf("Sanitized output longer than input: %s (%d) -> %s (%d)", input, len(input), sanitized, len(sanitized))
 		}
-		
+
 		// Ensure safe characters are preserved
 		safeChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._"
 		for _, r := range input {
@@ -352,7 +352,7 @@ func FuzzValidateAllCertificateInputs(f *testing.F) {
 	f.Add("admin", "localhost", "root@internal")
 	f.Add("", "", "")
 	f.Add(strings.Repeat("a", 100), strings.Repeat("b", 200)+".com", "user@test.com")
-	
+
 	f.Fuzz(func(t *testing.T, appName, baseDomain, email string) {
 		// Set production environment
 		originalEnv := os.Getenv("GO_ENV")
@@ -366,7 +366,7 @@ func FuzzValidateAllCertificateInputs(f *testing.F) {
 		}()
 
 		err := ValidateAllCertificateInputs(appName, baseDomain, email)
-		
+
 		// If validation passes, ensure all components are safe
 		if err == nil {
 			// Individual validations should also pass
@@ -379,13 +379,13 @@ func FuzzValidateAllCertificateInputs(f *testing.F) {
 			if err := ValidateEmailAddress(email); err != nil {
 				t.Errorf("Combined validation passed but email validation failed: %v", err)
 			}
-			
+
 			// Constructed FQDN should be valid
 			fqdn := appName + "." + baseDomain
 			if err := ValidateDomainName(fqdn); err != nil {
 				t.Errorf("Combined validation passed but constructed FQDN invalid: %v", err)
 			}
-			
+
 			// Total length should be reasonable
 			if len(fqdn) > MaxDomainLength {
 				t.Errorf("Combined validation passed but FQDN too long: %s (len=%d)", fqdn, len(fqdn))
@@ -402,29 +402,29 @@ func FuzzRegexPatterns(f *testing.F) {
 	f.Add(strings.Repeat("a+", 20))
 	f.Add(strings.Repeat(".*", 15))
 	f.Add("a" + strings.Repeat("a?", 20) + "a")
-	
+
 	f.Fuzz(func(t *testing.T, input string) {
 		// Test each regex pattern individually with timeout
 		done := make(chan bool, 3)
-		
+
 		// Test domain pattern
 		go func() {
 			ValidDomainPattern.MatchString(input)
 			done <- true
 		}()
-		
-		// Test email pattern  
+
+		// Test email pattern
 		go func() {
 			ValidEmailPattern.MatchString(input)
 			done <- true
 		}()
-		
+
 		// Test app name pattern
 		go func() {
 			ValidAppNamePattern.MatchString(input)
 			done <- true
 		}()
-		
+
 		// Wait for all regex tests with timeout
 		timeout := Timeout(t, "1s")
 		for i := 0; i < 3; i++ {
@@ -460,17 +460,17 @@ func Timeout(t *testing.T, duration string) <-chan struct{} {
 // FuzzUnicodeNormalization specifically tests Unicode-based attacks
 func FuzzUnicodeNormalization(f *testing.F) {
 	// Seed with Unicode normalization attack vectors
-	f.Add("test\uFF1B")      // Fullwidth semicolon
-	f.Add("test\uFF5C")      // Fullwidth vertical bar
-	f.Add("test\u200B")      // Zero-width space
-	f.Add("test\u200C")      // Zero-width non-joiner
-	f.Add("test\u200D")      // Zero-width joiner
-	f.Add("test\u202E")      // Right-to-left override
-	f.Add("test\u202D")      // Left-to-right override
-	f.Add("test\u2063")      // Invisible separator
-	f.Add("test\u2062")      // Invisible times
-	f.Add("tеst")            // Cyrillic е
-	
+	f.Add("test\uFF1B") // Fullwidth semicolon
+	f.Add("test\uFF5C") // Fullwidth vertical bar
+	f.Add("test\u200B") // Zero-width space
+	f.Add("test\u200C") // Zero-width non-joiner
+	f.Add("test\u200D") // Zero-width joiner
+	f.Add("test\u202E") // Right-to-left override
+	f.Add("test\u202D") // Left-to-right override
+	f.Add("test\u2063") // Invisible separator
+	f.Add("test\u2062") // Invisible times
+	f.Add("tеst")       // Cyrillic е
+
 	f.Fuzz(func(t *testing.T, input string) {
 		// Test if input contains non-ASCII characters
 		hasNonASCII := false
@@ -480,20 +480,20 @@ func FuzzUnicodeNormalization(f *testing.F) {
 				break
 			}
 		}
-		
+
 		if hasNonASCII {
 			// All Unicode inputs should be rejected by domain validation
 			err := ValidateDomainName(input)
 			if err == nil {
 				t.Errorf("Domain validation should reject Unicode input: %s", input)
 			}
-			
+
 			// Unicode in app names should also be rejected
 			err = ValidateAppName(input)
 			if err == nil {
 				t.Errorf("App name validation should reject Unicode input: %s", input)
 			}
-			
+
 			// Unicode in email local part should be rejected (basic email validation)
 			if strings.Contains(input, "@") {
 				err = ValidateEmailAddress(input)

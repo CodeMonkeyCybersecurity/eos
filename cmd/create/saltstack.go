@@ -121,7 +121,7 @@ Common State Functions:
 		testMode, _ := cmd.Flags().GetBool("test")
 		pillarStrings, _ := cmd.Flags().GetStringArray("pillar")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
-		
+
 		// Convert pillar strings to map
 		pillarData := make(map[string]interface{})
 		for _, pillarStr := range pillarStrings {
@@ -161,7 +161,7 @@ Common State Functions:
 			zap.String("target", target),
 			zap.String("function", function),
 			zap.Bool("test_mode", testMode))
-		
+
 		return nil
 	}),
 }
@@ -288,7 +288,7 @@ Target Types:
 		cmdParts := []string{function}
 		cmdParts = append(cmdParts, functionArgs...)
 		command := strings.Join(cmdParts, " ")
-		
+
 		result, err := saltClient.CmdRun(ctx, target, command)
 
 		if err != nil {

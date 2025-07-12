@@ -85,12 +85,12 @@ func removeCustomerDeployment(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 		logger.Info("terminal prompt: WARNING: This will permanently remove the customer and all associated data.")
 		logger.Info("terminal prompt: Customer ID: " + customerID)
 		logger.Info("terminal prompt: Type the customer ID to confirm removal:")
-		
+
 		confirm, err := func() (string, error) { return "", fmt.Errorf("interactive input not implemented") }()
 		if err != nil {
 			return fmt.Errorf("failed to read confirmation: %w", err)
 		}
-		
+
 		if confirm != customerID {
 			logger.Info("Customer ID mismatch, removal cancelled")
 			return nil
@@ -102,7 +102,7 @@ func removeCustomerDeployment(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 		if err != nil {
 			return fmt.Errorf("failed to read final confirmation: %w", err)
 		}
-		
+
 		if finalConfirm != "yes" {
 			logger.Info("Removal cancelled")
 			return nil
@@ -179,12 +179,12 @@ func removePlatformComponent(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	logger.Info("terminal prompt: WARNING: Removing platform components may affect all customers.")
 	logger.Info("terminal prompt: Component: " + component)
 	logger.Info("terminal prompt: Are you sure you want to remove this component? (yes/no)")
-	
+
 	confirm, err := func() (string, error) { return "", fmt.Errorf("interactive input not implemented") }()
 	if err != nil {
 		return fmt.Errorf("failed to read confirmation: %w", err)
 	}
-	
+
 	if confirm != "yes" {
 		logger.Info("Component removal cancelled")
 		return nil

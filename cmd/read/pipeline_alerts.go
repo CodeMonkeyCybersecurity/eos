@@ -79,4 +79,5 @@ func init() {
 	pipelineAlertsCmd.Flags().IntVarP(&pipelineAlertsRefresh, "refresh", "r", 5, "Refresh interval in seconds")
 	pipelineAlertsCmd.Flags().StringVarP(&pipelineAlertsDsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
 }
+
 // All helper functions have been migrated to pkg/pipeline/alerts/

@@ -5,9 +5,9 @@ package update
 import (
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config_loader"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config_loader"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/security_config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system_display"

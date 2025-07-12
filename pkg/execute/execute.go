@@ -181,7 +181,6 @@ func shellQuote(args []string) string {
 	return strings.Join(quoted, " ")
 }
 
-
 // RunShell executes a shell command (deprecated for security reasons)
 func RunShell(ctx context.Context, cmdStr string) (string, error) {
 	// Shell execution is disabled for security

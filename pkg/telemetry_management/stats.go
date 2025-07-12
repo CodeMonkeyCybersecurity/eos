@@ -37,11 +37,11 @@ type CommandCount struct {
 // Migrated from cmd/self/telemetry.go getTelemetryStats
 func GetTelemetryStats(rc *eos_io.RuntimeContext, filePath string) (*TelemetryStats, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare telemetry statistics analysis
 	logger.Info("Assessing telemetry statistics analysis",
 		zap.String("file_path", filePath))
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		logger.Error("Failed to open telemetry file",
@@ -64,7 +64,7 @@ func GetTelemetryStats(rc *eos_io.RuntimeContext, filePath string) (*TelemetrySt
 
 	// INTERVENE - Process telemetry data
 	logger.Debug("Processing telemetry data")
-	
+
 	stats := &TelemetryStats{
 		FileSize: FormatFileSize(fileInfo.Size()),
 	}
@@ -159,11 +159,11 @@ func GetTelemetryStats(rc *eos_io.RuntimeContext, filePath string) (*TelemetrySt
 // Migrated from cmd/self/telemetry.go showTelemetryStatus
 func ShowTelemetryStatus(rc *eos_io.RuntimeContext, stateFile string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check telemetry status
 	logger.Info("Assessing telemetry status",
 		zap.String("state_file", stateFile))
-	
+
 	// Check if telemetry is enabled
 	enabled := false
 	if _, err := os.Stat(stateFile); err == nil {
@@ -214,10 +214,10 @@ func ShowTelemetryStatus(rc *eos_io.RuntimeContext, stateFile string) error {
 	}
 
 	ShowTelemetryInfo(rc)
-	
+
 	// EVALUATE - Log successful status display
 	logger.Info("Telemetry status displayed successfully")
-	
+
 	return nil
 }
 
@@ -229,14 +229,14 @@ func FormatFileSize(bytes int64) string {
 	if bytes < unit {
 		return fmt.Sprintf("%d B", bytes)
 	}
-	
+
 	// INTERVENE - Calculate and format file size
 	div, exp := int64(unit), 0
 	for n := bytes / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++
 	}
-	
+
 	// EVALUATE - Return formatted file size
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

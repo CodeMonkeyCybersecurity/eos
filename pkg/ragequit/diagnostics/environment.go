@@ -18,24 +18,24 @@ import (
 // Migrated from cmd/ragequit/ragequit.go detectEnvironment
 func DetectEnvironment(rc *eos_io.RuntimeContext) (*ragequit.EnvironmentInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare for environment detection
 	logger.Info("Assessing system environment")
-	
+
 	homeDir := system.GetHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-environment.txt")
-	
+
 	envInfo := &ragequit.EnvironmentInfo{
 		Type:     "Unknown",
 		Metadata: make(map[string]string),
 	}
-	
+
 	var output strings.Builder
 	output.WriteString("=== Environment Detection ===\n")
-	
+
 	// INTERVENE - Detect container environment
 	logger.Debug("Detecting container environment")
-	
+
 	if system.FileExists("/.dockerenv") {
 		envInfo.Type = "Docker"
 		output.WriteString("Environment: Docker Container\n")
@@ -57,10 +57,10 @@ func DetectEnvironment(rc *eos_io.RuntimeContext) (*ragequit.EnvironmentInfo, er
 		envInfo.Type = "BareMetal"
 		output.WriteString("Environment: Bare Metal/VM\n")
 	}
-	
+
 	// Detect cloud provider
 	logger.Debug("Detecting cloud provider")
-	
+
 	if system.CommandExists("ec2-metadata") {
 		envInfo.CloudProvider = "AWS"
 		output.WriteString("Cloud: AWS EC2\n")
@@ -77,16 +77,16 @@ func DetectEnvironment(rc *eos_io.RuntimeContext) (*ragequit.EnvironmentInfo, er
 	} else {
 		envInfo.CloudProvider = "None"
 	}
-	
+
 	// EVALUATE - Write results
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write environment detection results: %w", err)
 	}
-	
+
 	logger.Info("Environment detection completed",
 		zap.String("type", envInfo.Type),
 		zap.String("cloud", envInfo.CloudProvider),
 		zap.String("output_file", outputFile))
-	
+
 	return envInfo, nil
 }

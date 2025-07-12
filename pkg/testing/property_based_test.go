@@ -25,11 +25,11 @@ type PropertyTestSuite struct {
 
 // PropertyFailure represents a property violation
 type PropertyFailure struct {
-	Property    string
-	Input       interface{}
-	Expected    string
-	Actual      string
-	Timestamp   time.Time
+	Property  string
+	Input     interface{}
+	Expected  string
+	Actual    string
+	Timestamp time.Time
 }
 
 // NewPropertyTestSuite creates a new property testing suite
@@ -58,7 +58,7 @@ func (pts *PropertyTestSuite) RunProperties(t *testing.T, iterations int) {
 func (pts *PropertyTestSuite) runProperty(t *testing.T, prop Property, iterations int) {
 	for i := 0; i < iterations; i++ {
 		input := prop.Generator()
-		
+
 		if !prop.Predicate(input) {
 			failure := PropertyFailure{
 				Property:  prop.Name,
@@ -126,12 +126,12 @@ func OrchestrationConsistencyProperty() Property {
 			if !ok {
 				return false
 			}
-			
+
 			// Test that app names are consistently processed across all layers
 			saltName := processAppNameForSalt(appName)
 			terraformName := processAppNameForTerraform(appName)
 			nomadName := processAppNameForNomad(appName)
-			
+
 			// All layers should produce equivalent names
 			return saltName == terraformName && terraformName == nomadName
 		},
@@ -161,7 +161,7 @@ func VaultDegradationProperty() Property {
 			if !ok {
 				return false
 			}
-			
+
 			// Test that system handles Vault unavailability gracefully
 			switch vaultStatus {
 			case "available":
@@ -196,7 +196,7 @@ func ResourceAllocationProperty() Property {
 			if !ok {
 				return false
 			}
-			
+
 			// Test resource allocation properties
 			return validateResourceAllocation(resources)
 		},
@@ -220,12 +220,12 @@ func ConfigurationValidityProperty() Property {
 			if !ok {
 				return false
 			}
-			
+
 			// Test that generated configurations are valid
 			saltConfig := generateSaltConfig(config)
 			terraformConfig := generateTerraformConfig(config)
 			nomadConfig := generateNomadConfig(config)
-			
+
 			return isValidSaltConfig(saltConfig) &&
 				isValidTerraformConfig(terraformConfig) &&
 				isValidNomadConfig(nomadConfig)
@@ -246,12 +246,12 @@ func ConfigurationValidityProperty() Property {
 // TestOrchestrationProperties runs property tests for orchestration workflows
 func TestOrchestrationProperties(t *testing.T) {
 	suite := NewPropertyTestSuite()
-	
+
 	suite.AddProperty(OrchestrationConsistencyProperty())
 	suite.AddProperty(ConfigurationValidityProperty())
-	
+
 	suite.RunProperties(t, 100) // Run 100 iterations of each property
-	
+
 	if len(suite.failures) > 0 {
 		t.Errorf("Property violations detected: %d", len(suite.failures))
 		for _, failure := range suite.failures {
@@ -263,16 +263,16 @@ func TestOrchestrationProperties(t *testing.T) {
 // TestSecurityProperties runs property tests for security invariants
 func TestSecurityProperties(t *testing.T) {
 	suite := NewPropertyTestSuite()
-	
+
 	suite.AddProperty(SecurityInvariantProperty())
 	suite.AddProperty(VaultDegradationProperty())
-	
+
 	suite.RunProperties(t, 200) // More iterations for security properties
-	
+
 	if len(suite.failures) > 0 {
 		t.Errorf("Security property violations detected: %d", len(suite.failures))
 		for _, failure := range suite.failures {
-			t.Errorf("SECURITY VIOLATION: Property %s failed with input %v", 
+			t.Errorf("SECURITY VIOLATION: Property %s failed with input %v",
 				failure.Property, failure.Input)
 		}
 	}
@@ -281,16 +281,16 @@ func TestSecurityProperties(t *testing.T) {
 // TestStateConsistencyProperties runs property tests for state consistency
 func TestStateConsistencyProperties(t *testing.T) {
 	suite := NewPropertyTestSuite()
-	
+
 	suite.AddProperty(ResourceAllocationProperty())
 	// Add more state consistency properties as needed
-	
+
 	suite.RunProperties(t, 150)
-	
+
 	if len(suite.failures) > 0 {
 		t.Errorf("State consistency violations detected: %d", len(suite.failures))
 		for _, failure := range suite.failures {
-			t.Logf("Consistency violation: Property %s failed with input %v", 
+			t.Logf("Consistency violation: Property %s failed with input %v",
 				failure.Property, failure.Input)
 		}
 	}
@@ -319,7 +319,7 @@ func containsInjectionAttempts(s string) bool {
 		"system(", "exec(", "eval(", "{{", "}}", "{%", "%}",
 		"<script>", "javascript:", "' OR ", "'; DROP",
 	}
-	
+
 	lower := strings.ToLower(s)
 	for _, pattern := range injectionPatterns {
 		if strings.Contains(lower, pattern) {
@@ -349,19 +349,19 @@ func sanitizeAppName(name string) string {
 	if name == "" {
 		return "default"
 	}
-	
+
 	// Remove dangerous characters
 	sanitized := strings.ReplaceAll(name, " ", "_")
 	sanitized = strings.ReplaceAll(sanitized, "/", "_")
 	sanitized = strings.ReplaceAll(sanitized, "$(", "")
 	sanitized = strings.ReplaceAll(sanitized, "`", "")
 	sanitized = strings.ReplaceAll(sanitized, "\x00", "")
-	
+
 	// Limit length
 	if len(sanitized) > 64 {
 		sanitized = sanitized[:64]
 	}
-	
+
 	return sanitized
 }
 

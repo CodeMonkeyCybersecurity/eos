@@ -29,21 +29,21 @@ Examples:
   eos update process --restart-policy always nginx  # Set restart policy`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		if len(args) < 1 {
 			logger.Error("Process name is required")
 			return fmt.Errorf("process name is required")
 		}
-		
+
 		processName := args[0]
 		priority, _ := cmd.Flags().GetString("priority")
 		restartPolicy, _ := cmd.Flags().GetString("restart-policy")
-		
+
 		logger.Info("Updating process configuration",
 			zap.String("process", processName),
 			zap.String("priority", priority),
 			zap.String("restart_policy", restartPolicy))
-		
+
 		// TODO: Implement actual process update logic here
 		// This is a placeholder implementation
 		logger.Info("Process update completed successfully", zap.String("process", processName))
@@ -53,7 +53,7 @@ Examples:
 
 func init() {
 	UpdateCmd.AddCommand(UpdateProcessCmd)
-	
+
 	UpdateProcessCmd.Flags().String("priority", "", "Process priority (low, normal, high)")
 	UpdateProcessCmd.Flags().String("restart-policy", "", "Process restart policy (always, on-failure, never)")
 }

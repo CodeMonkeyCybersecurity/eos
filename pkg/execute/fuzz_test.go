@@ -452,7 +452,7 @@ func FuzzCommandChaining(f *testing.F) {
 
 			// Verify dangerous patterns are detected
 			chainPatterns := []string{";", "&&", "||", "|", ">", "<", "&", "\n", "\r", "$(", "`"}
-			
+
 			for _, pattern := range chainPatterns {
 				if strings.Contains(input, pattern) && !hasChaining {
 					t.Errorf("Command chaining pattern %q not detected in: %q", pattern, input)

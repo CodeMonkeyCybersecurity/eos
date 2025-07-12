@@ -22,6 +22,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
+
 // Configuration flags moved to pkg/delphi/config
 var delphiFlags = config.DefaultFlags()
 
@@ -210,7 +211,7 @@ func init() {
 	DeployCmd.AddCommand(dockerDeployCmd)
 	DeployCmd.AddCommand(delphiCredentialsCmd)
 	DeployCmd.AddCommand(cleanupCmd)
-	
+
 	// Set up flags for dockerDeployCmd
 	dockerDeployCmd.Flags().StringP("version", "v", "", "Wazuh version to deploy (e.g., 4.10.1)")
 	dockerDeployCmd.Flags().Bool("single-node", false, "Deploy as single-node")
@@ -218,14 +219,14 @@ func init() {
 	dockerDeployCmd.Flags().String("proxy", "", "Proxy address for certificate generation")
 	dockerDeployCmd.Flags().IntP("port", "p", 8011, "External port for Wazuh dashboard")
 	dockerDeployCmd.Flags().BoolP("force", "f", false, "Force deployment without prompts")
-	
+
 	// Set up flags for delphiCredentialsCmd
 	delphiCredentialsCmd.Flags().String("admin-password", "", "New admin password")
 	delphiCredentialsCmd.Flags().String("kibana-password", "", "New Kibana dashboard password")
 	delphiCredentialsCmd.Flags().String("api-password", "", "New API password")
 	delphiCredentialsCmd.Flags().String("deploy-type", "", "Deployment type (single-node or multi-node)")
 	delphiCredentialsCmd.Flags().BoolP("interactive", "i", false, "Interactive mode with prompts")
-	
+
 	// Set up flags for cleanupCmd
 	cleanupCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompts")
 	cleanupCmd.Flags().Bool("remove-data", false, "Remove volumes and persistent data")

@@ -14,7 +14,7 @@ func TestNewSystemHardener(t *testing.T) {
 		Ctx: context.Background(),
 		Log: logger,
 	}
-	
+
 	auditLogger := &AuditLogger{
 		logger:     logger,
 		logDir:     "/tmp/test-audit",
@@ -23,15 +23,15 @@ func TestNewSystemHardener(t *testing.T) {
 
 	t.Run("create system hardener", func(t *testing.T) {
 		hardener := NewSystemHardener(rc, auditLogger)
-		
+
 		if hardener == nil {
 			t.Fatal("SystemHardener should not be nil")
 		}
-		
+
 		if hardener.logger == nil {
 			t.Error("SystemHardener logger should not be nil")
 		}
-		
+
 		if hardener.auditLogger == nil {
 			t.Error("SystemHardener auditLogger should not be nil")
 		}
@@ -44,7 +44,7 @@ func TestSystemHardener_HardenSystem(t *testing.T) {
 		Ctx: context.Background(),
 		Log: logger,
 	}
-	
+
 	auditLogger := &AuditLogger{
 		logger:     logger,
 		logDir:     "/tmp/test-audit",
@@ -58,7 +58,7 @@ func TestSystemHardener_HardenSystem(t *testing.T) {
 		// Test that hardening steps are defined and valid
 		expectedSteps := []string{
 			"kernel_parameters",
-			"network_stack", 
+			"network_stack",
 			"file_permissions",
 			"user_accounts",
 			"ssh_configuration",
@@ -69,12 +69,12 @@ func TestSystemHardener_HardenSystem(t *testing.T) {
 
 		for _, step := range expectedSteps {
 			t.Logf("Validating hardening step: %s", step)
-			
+
 			// Each step should be a non-empty string
 			if step == "" {
 				t.Error("Hardening step should not be empty")
 			}
-			
+
 			// Check for dangerous characters in step names
 			if containsDangerousChars(step) {
 				t.Errorf("Hardening step name contains dangerous characters: %s", step)
@@ -85,7 +85,7 @@ func TestSystemHardener_HardenSystem(t *testing.T) {
 	t.Run("system hardening execution", func(t *testing.T) {
 		// This will likely fail in test environment, which is expected
 		err := hardener.HardenSystem(ctx)
-		
+
 		if err != nil {
 			t.Logf("System hardening failed (expected in test): %v", err)
 		} else {
@@ -100,7 +100,7 @@ func TestHardeningStepsValidation(t *testing.T) {
 		Ctx: context.Background(),
 		Log: logger,
 	}
-	
+
 	auditLogger := &AuditLogger{
 		logger:     logger,
 		logDir:     "/tmp/test-audit",
@@ -122,7 +122,7 @@ func TestHardeningStepsValidation(t *testing.T) {
 		},
 		{
 			name:     "network stack hardening",
-			stepName: "network_stack", 
+			stepName: "network_stack",
 			testFunc: hardener.hardenNetworkStack,
 		},
 		{
@@ -161,7 +161,7 @@ func TestHardeningStepsValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test that each hardening function exists and can be called
 			err := tt.testFunc(ctx)
-			
+
 			// Most will fail in test environment, which is expected
 			if err != nil {
 				t.Logf("Hardening step %s failed (expected in test): %v", tt.stepName, err)
@@ -187,15 +187,15 @@ func TestSystemHardeningValidation(t *testing.T) {
 		if event.EventType == "" {
 			t.Error("EventType should not be empty")
 		}
-		
+
 		if event.Actor == "" {
 			t.Error("Actor should not be empty")
 		}
-		
+
 		if event.Action == "" {
 			t.Error("Action should not be empty")
 		}
-		
+
 		if event.Resource == "" {
 			t.Error("Resource should not be empty")
 		}
@@ -231,17 +231,17 @@ func TestSecurityHardeningConfiguration(t *testing.T) {
 	t.Run("hardening configuration validation", func(t *testing.T) {
 		// Test security hardening configuration parameters
 		securityConfigs := map[string]interface{}{
-			"kernel.dmesg_restrict":                    1,
-			"kernel.kptr_restrict":                     2,
-			"kernel.yama.ptrace_scope":                 1,
-			"net.ipv4.conf.all.accept_redirects":       0,
-			"net.ipv4.conf.all.send_redirects":         0,
-			"net.ipv4.conf.all.accept_source_route":    0,
-			"net.ipv4.conf.all.log_martians":          1,
-			"net.ipv4.conf.default.accept_redirects":   0,
-			"net.ipv4.conf.default.send_redirects":     0,
-			"net.ipv4.tcp_syncookies":                  1,
-			"net.ipv4.ip_forward":                      0,
+			"kernel.dmesg_restrict":                  1,
+			"kernel.kptr_restrict":                   2,
+			"kernel.yama.ptrace_scope":               1,
+			"net.ipv4.conf.all.accept_redirects":     0,
+			"net.ipv4.conf.all.send_redirects":       0,
+			"net.ipv4.conf.all.accept_source_route":  0,
+			"net.ipv4.conf.all.log_martians":         1,
+			"net.ipv4.conf.default.accept_redirects": 0,
+			"net.ipv4.conf.default.send_redirects":   0,
+			"net.ipv4.tcp_syncookies":                1,
+			"net.ipv4.ip_forward":                    0,
 		}
 
 		for param, value := range securityConfigs {
@@ -303,7 +303,7 @@ func TestSecurityHardeningAudit(t *testing.T) {
 		// Test audit rule configurations
 		auditRules := []string{
 			"-w /etc/passwd -p wa -k identity",
-			"-w /etc/group -p wa -k identity", 
+			"-w /etc/group -p wa -k identity",
 			"-w /etc/shadow -p wa -k identity",
 			"-w /etc/sudoers -p wa -k privilege_escalation",
 			"-w /var/log/auth.log -p wa -k authentication",

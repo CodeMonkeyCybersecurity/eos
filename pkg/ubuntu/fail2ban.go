@@ -12,7 +12,7 @@ func configureFail2ban(rc *eos_io.RuntimeContext) error {
 
 	// Use default configuration with sane defaults
 	config := DefaultFail2banConfig()
-	
+
 	// Call the enhanced implementation
 	return ConfigureFail2banEnhanced(rc, config)
 }

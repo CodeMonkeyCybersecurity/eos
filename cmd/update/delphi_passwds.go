@@ -17,6 +17,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	username      string

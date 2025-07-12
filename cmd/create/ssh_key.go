@@ -114,13 +114,13 @@ var CreateSSHCmd = &cobra.Command{
 and configures it in your ~/.ssh/config for easy reuse.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// Get flags
 		targetLogin, _ := cmd.Flags().GetString("user")
 		keyName, _ := cmd.Flags().GetString("key-name")
 		force, _ := cmd.Flags().GetBool("force")
 		alias, _ := cmd.Flags().GetString("alias")
-		
+
 		// Create options
 		opts := &ssh.SSHKeyOptions{
 			TargetLogin: targetLogin,
@@ -128,11 +128,11 @@ and configures it in your ~/.ssh/config for easy reuse.`,
 			Force:       force,
 			Alias:       alias,
 		}
-		
+
 		logger.Info("Creating SSH key with remote host setup",
 			zap.String("target", targetLogin),
 			zap.String("key_name", keyName))
-		
+
 		return ssh.CreateSSHWithRemote(rc, opts)
 	}),
 }
@@ -150,23 +150,23 @@ var SshKeyCmd = &cobra.Command{
 	Short: "Create and store an SSH key securely",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// Get flags
 		nameOverride, _ := cmd.Flags().GetString("name")
 		printPrivate, _ := cmd.Flags().GetBool("print-private")
 		diskFallback, _ := cmd.Flags().GetBool("disk-fallback")
-		
+
 		// Create options
 		opts := &ssh.VaultSSHKeyOptions{
 			NameOverride: nameOverride,
 			PrintPrivate: printPrivate,
 			DiskFallback: diskFallback,
 		}
-		
+
 		logger.Info("Creating SSH key with Vault storage",
 			zap.String("name", nameOverride),
 			zap.Bool("disk_fallback", diskFallback))
-		
+
 		return ssh.CreateSSHKeyWithVault(rc, opts)
 	}),
 }
@@ -194,23 +194,23 @@ Examples:
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// Get flags
 		nameOverride, _ := cmd.Flags().GetString("name")
 		printPrivate, _ := cmd.Flags().GetBool("print-private")
 		diskFallback, _ := cmd.Flags().GetBool("disk-fallback")
-		
+
 		// Create options
 		opts := &ssh.VaultSSHKeyOptions{
 			NameOverride: nameOverride,
 			PrintPrivate: printPrivate,
 			DiskFallback: diskFallback,
 		}
-		
+
 		logger.Info("Creating Pandora SSH key",
 			zap.String("name", nameOverride),
 			zap.Bool("disk_fallback", diskFallback))
-		
+
 		return ssh.CreateSSHKeyWithVault(rc, opts)
 	}),
 }

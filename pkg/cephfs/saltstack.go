@@ -18,25 +18,25 @@ import (
 // GenerateSaltStackConfig generates SaltStack configuration for CephFS deployment
 func GenerateSaltStackConfig(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS: Check if SaltStack is available and prerequisites are met
 	logger.Info("Assessing SaltStack prerequisites for CephFS deployment")
 	if err := assessSaltStackPrerequisites(rc); err != nil {
 		return fmt.Errorf("failed to assess SaltStack prerequisites: %w", err)
 	}
-	
+
 	// INTERVENE: Generate SaltStack configuration
 	logger.Info("Generating SaltStack configuration for CephFS")
 	if err := generateSaltStackConfiguration(rc, config); err != nil {
 		return fmt.Errorf("failed to generate SaltStack configuration: %w", err)
 	}
-	
+
 	// EVALUATE: Verify configuration was generated correctly
 	logger.Info("Verifying SaltStack configuration generation")
 	if err := verifySaltStackConfiguration(rc, config); err != nil {
 		return fmt.Errorf("failed to verify SaltStack configuration: %w", err)
 	}
-	
+
 	logger.Info("SaltStack configuration generated successfully")
 	return nil
 }
@@ -44,7 +44,7 @@ func GenerateSaltStackConfig(rc *eos_io.RuntimeContext, config *Config) error {
 // assessSaltStackPrerequisites checks if SaltStack is available and configured
 func assessSaltStackPrerequisites(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if salt-call is available
 	logger.Debug("Checking for salt-call executable")
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -56,7 +56,7 @@ func assessSaltStackPrerequisites(rc *eos_io.RuntimeContext) error {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("salt-call not found: please install SaltStack first using 'eos create saltstack'"))
 	}
 	logger.Debug("salt-call found", zap.String("path", strings.TrimSpace(output)))
-	
+
 	// Check if Salt directories exist
 	logger.Debug("Checking Salt directory structure")
 	requiredDirs := []string{
@@ -64,13 +64,13 @@ func assessSaltStackPrerequisites(rc *eos_io.RuntimeContext) error {
 		"/srv/pillar",
 		"/etc/salt",
 	}
-	
+
 	for _, dir := range requiredDirs {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("salt directory %s does not exist", dir))
 		}
 	}
-	
+
 	logger.Debug("SaltStack prerequisites satisfied")
 	return nil
 }
@@ -78,33 +78,33 @@ func assessSaltStackPrerequisites(rc *eos_io.RuntimeContext) error {
 // generateSaltStackConfiguration creates the SaltStack configuration files
 func generateSaltStackConfiguration(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create directory structure
 	if err := createSaltDirectoryStructure(rc); err != nil {
 		return fmt.Errorf("failed to create Salt directory structure: %w", err)
 	}
-	
+
 	// Generate pillar data
 	pillarData, err := generatePillarData(rc, config)
 	if err != nil {
 		return fmt.Errorf("failed to generate pillar data: %w", err)
 	}
-	
+
 	// Write pillar file
 	if err := writePillarFile(rc, pillarData); err != nil {
 		return fmt.Errorf("failed to write pillar file: %w", err)
 	}
-	
+
 	// Generate state files
 	if err := generateStateFiles(rc, config); err != nil {
 		return fmt.Errorf("failed to generate state files: %w", err)
 	}
-	
+
 	// Generate Terraform templates
 	if err := generateTerraformTemplates(rc, config); err != nil {
 		return fmt.Errorf("failed to generate Terraform templates: %w", err)
 	}
-	
+
 	logger.Info("SaltStack configuration generated successfully")
 	return nil
 }
@@ -112,30 +112,30 @@ func generateSaltStackConfiguration(rc *eos_io.RuntimeContext, config *Config) e
 // createSaltDirectoryStructure creates the necessary Salt directories
 func createSaltDirectoryStructure(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	directories := []string{
 		SaltCephStatesDir,
 		SaltCephPillarDir,
 		SaltCephTemplateDir,
 		TerraformCephDir,
 	}
-	
+
 	for _, dir := range directories {
 		logger.Debug("Creating directory", zap.String("path", dir))
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
-	
+
 	return nil
 }
 
 // generatePillarData creates the pillar data for CephFS configuration
 func generatePillarData(rc *eos_io.RuntimeContext, config *Config) (map[string]any, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Generating pillar data for CephFS deployment")
-	
+
 	// Generate cluster FSID if not provided
 	clusterFSID := config.ClusterFSID
 	if clusterFSID == "" {
@@ -146,45 +146,45 @@ func generatePillarData(rc *eos_io.RuntimeContext, config *Config) (map[string]a
 		clusterFSID = fsid
 		config.ClusterFSID = fsid
 	}
-	
+
 	pillarData := map[string]any{
 		"ceph": map[string]any{
-			"cluster_fsid":    clusterFSID,
-			"admin_host":      config.AdminHost,
-			"ssh_user":        config.SSHUser,
-			"ceph_image":      config.CephImage,
-			"public_network":  config.PublicNetwork,
-			"cluster_network": config.ClusterNetwork,
-			"osd_devices":     config.OSDDevices,
-			"objectstore":     config.GetObjectStore(),
+			"cluster_fsid":      clusterFSID,
+			"admin_host":        config.AdminHost,
+			"ssh_user":          config.SSHUser,
+			"ceph_image":        config.CephImage,
+			"public_network":    config.PublicNetwork,
+			"cluster_network":   config.ClusterNetwork,
+			"osd_devices":       config.OSDDevices,
+			"objectstore":       config.GetObjectStore(),
 			"osd_memory_target": config.GetOSDMemoryTarget(),
-			"mon_count":       config.GetMONCount(),
-			"mgr_count":       config.GetMGRCount(),
-			"terraform_path":  TerraformCephDir,
+			"mon_count":         config.GetMONCount(),
+			"mgr_count":         config.GetMGRCount(),
+			"terraform_path":    TerraformCephDir,
 		},
 	}
-	
+
 	return pillarData, nil
 }
 
 // writePillarFile writes the pillar data to the pillar file
 func writePillarFile(rc *eos_io.RuntimeContext, pillarData map[string]any) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	pillarPath := GetSaltCephPillarPath()
 	logger.Debug("Writing pillar file", zap.String("path", pillarPath))
-	
+
 	// Convert to YAML
 	yamlData, err := yaml.Marshal(pillarData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal pillar data: %w", err)
 	}
-	
+
 	// Write to file
 	if err := os.WriteFile(pillarPath, yamlData, 0644); err != nil {
 		return fmt.Errorf("failed to write pillar file: %w", err)
 	}
-	
+
 	logger.Debug("Pillar file written successfully")
 	return nil
 }
@@ -192,7 +192,7 @@ func writePillarFile(rc *eos_io.RuntimeContext, pillarData map[string]any) error
 // generateStateFiles creates the SaltStack state files
 func generateStateFiles(rc *eos_io.RuntimeContext, _ *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create main state file
 	stateContent := `# CephFS deployment state
 ceph_terraform_generation:
@@ -227,21 +227,21 @@ ceph_terraform_directory:
     - mode: 755
     - makedirs: True
 `
-	
+
 	stateFile := filepath.Join(SaltCephStatesDir, "init.sls")
 	logger.Debug("Writing state file", zap.String("path", stateFile))
-	
+
 	if err := os.WriteFile(stateFile, []byte(stateContent), 0644); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
-	
+
 	return nil
 }
 
 // generateTerraformTemplates creates the Jinja2 templates for Terraform
 func generateTerraformTemplates(rc *eos_io.RuntimeContext, _ *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	templateContent := `terraform {
   required_version = ">= 1.6.0"
   required_providers {
@@ -371,45 +371,45 @@ output "osd_spec_content" {
   value = local.osd_spec
 }
 `
-	
+
 	templateFile := filepath.Join(SaltCephTemplateDir, "terraform.hcl.j2")
 	logger.Debug("Writing Terraform template", zap.String("path", templateFile))
-	
+
 	if err := os.WriteFile(templateFile, []byte(templateContent), 0644); err != nil {
 		return fmt.Errorf("failed to write Terraform template: %w", err)
 	}
-	
+
 	return nil
 }
 
 // verifySaltStackConfiguration verifies the generated configuration
 func verifySaltStackConfiguration(rc *eos_io.RuntimeContext, _ *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Verify pillar file exists and is valid
 	pillarPath := GetSaltCephPillarPath()
 	if _, err := os.Stat(pillarPath); os.IsNotExist(err) {
 		return fmt.Errorf("pillar file was not created")
 	}
-	
+
 	// Verify state file exists
 	stateFile := filepath.Join(SaltCephStatesDir, "init.sls")
 	if _, err := os.Stat(stateFile); os.IsNotExist(err) {
 		return fmt.Errorf("state file was not created")
 	}
-	
+
 	// Verify Terraform template exists
 	templateFile := filepath.Join(SaltCephTemplateDir, "terraform.hcl.j2")
 	if _, err := os.Stat(templateFile); os.IsNotExist(err) {
 		return fmt.Errorf("terraform template was not created")
 	}
-	
+
 	// Test pillar data syntax
 	logger.Debug("Testing pillar data syntax")
 	if err := testPillarSyntax(rc); err != nil {
 		return fmt.Errorf("pillar syntax test failed: %w", err)
 	}
-	
+
 	logger.Debug("SaltStack configuration verification completed")
 	return nil
 }
@@ -417,9 +417,9 @@ func verifySaltStackConfiguration(rc *eos_io.RuntimeContext, _ *Config) error {
 // testPillarSyntax tests the pillar data syntax using salt-call
 func testPillarSyntax(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Testing pillar data syntax with salt-call")
-	
+
 	// Use salt-call to test pillar data
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "salt-call",
@@ -429,11 +429,11 @@ func testPillarSyntax(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("pillar syntax test failed: %w", err)
 	}
-	
+
 	if !strings.Contains(output, "ceph:") {
 		return fmt.Errorf("pillar syntax test failed: ceph pillar not found in output")
 	}
-	
+
 	logger.Debug("Pillar syntax test passed")
 	return nil
 }
@@ -441,9 +441,9 @@ func testPillarSyntax(rc *eos_io.RuntimeContext) error {
 // generateClusterFSID generates a new cluster FSID (UUID)
 func generateClusterFSID(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Generating cluster FSID")
-	
+
 	// Use uuidgen to generate a UUID
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "uuidgen",
@@ -453,10 +453,9 @@ func generateClusterFSID(rc *eos_io.RuntimeContext) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to generate UUID: %w", err)
 	}
-	
+
 	fsid := strings.TrimSpace(output)
 	logger.Debug("Generated cluster FSID", zap.String("fsid", fsid))
-	
+
 	return fsid, nil
 }
-

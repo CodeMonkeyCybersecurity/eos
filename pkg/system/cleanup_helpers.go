@@ -10,7 +10,7 @@ import (
 // RunOrphansOnlyCleanup handles orphaned packages only following the Assess → Intervene → Evaluate pattern
 func RunOrphansOnlyCleanup(rc *eos_io.RuntimeContext, cleanup *PackageCleanup, interactive bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Ensure deborphan is available
 	logger.Info("Assessing orphaned packages cleanup prerequisites")
 	if err := cleanup.EnsureDeborphan(); err != nil {
@@ -34,7 +34,7 @@ func RunOrphansOnlyCleanup(rc *eos_io.RuntimeContext, cleanup *PackageCleanup, i
 		// In interactive mode, the RemoveOrphanedPackages method will prompt
 		return cleanup.RemoveOrphanedPackages(orphans)
 	}
-	
+
 	// In non-interactive mode, proceed directly
 	return cleanup.RemoveOrphanedPackages(orphans)
 }
@@ -42,7 +42,7 @@ func RunOrphansOnlyCleanup(rc *eos_io.RuntimeContext, cleanup *PackageCleanup, i
 // RunKernelsOnlyCleanup handles unused kernels only following the Assess → Intervene → Evaluate pattern
 func RunKernelsOnlyCleanup(rc *eos_io.RuntimeContext, cleanup *PackageCleanup, interactive bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Find unused kernels
 	logger.Info("Assessing unused kernel cleanup")
 	kernels, err := cleanup.FindUnusedKernels()
@@ -57,13 +57,13 @@ func RunKernelsOnlyCleanup(rc *eos_io.RuntimeContext, cleanup *PackageCleanup, i
 
 	// INTERVENE - Remove unused kernels
 	logger.Info("Found unused kernels", zap.Int("count", len(kernels)))
-	
+
 	// For safety, skip kernel removal in non-interactive mode
 	if !interactive {
 		logger.Info("Skipping kernel removal in non-interactive mode for safety")
 		return nil
 	}
-	
+
 	// In interactive mode, proceed with removal
 	return cleanup.RemoveUnusedKernels(kernels)
 }

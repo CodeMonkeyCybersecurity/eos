@@ -15,8 +15,8 @@ import (
 
 // MetricsCollector collects and aggregates metrics from various sources
 type MetricsCollector struct {
-	rc          *eos_io.RuntimeContext
-	caddyURL    string
+	rc           *eos_io.RuntimeContext
+	caddyURL     string
 	authentikURL string
 }
 
@@ -257,7 +257,7 @@ func (mc *MetricsCollector) collectServiceHealth() (map[string]ServiceHealth, er
 // checkServiceHealth checks the health of a specific service
 func (mc *MetricsCollector) checkServiceHealth(name, url string) ServiceHealth {
 	logger := otelzap.Ctx(mc.rc.Ctx)
-	
+
 	start := time.Now()
 	client := &http.Client{Timeout: 5 * time.Second}
 
@@ -417,7 +417,7 @@ func MonitorRoutes(ctx context.Context, rc *eos_io.RuntimeContext, routes []*hec
 						logger.Warn("Route is unhealthy",
 							zap.String("domain", r.Domain),
 							zap.String("error", status.ErrorMessage))
-						
+
 						// TODO: Trigger alerts
 					}
 				}(route)
@@ -445,7 +445,7 @@ func CollectPrometheusMetrics(rc *eos_io.RuntimeContext) (string, error) {
 	prometheus.WriteString("# TYPE hecate_route_requests_total counter\n")
 
 	for domain, metrics := range snapshot.Routes {
-		prometheus.WriteString(fmt.Sprintf("hecate_route_requests_total{domain=\"%s\"} %d\n", 
+		prometheus.WriteString(fmt.Sprintf("hecate_route_requests_total{domain=\"%s\"} %d\n",
 			domain, metrics.RequestCount))
 	}
 
@@ -453,7 +453,7 @@ func CollectPrometheusMetrics(rc *eos_io.RuntimeContext) (string, error) {
 	prometheus.WriteString("# TYPE hecate_route_errors_total counter\n")
 
 	for domain, metrics := range snapshot.Routes {
-		prometheus.WriteString(fmt.Sprintf("hecate_route_errors_total{domain=\"%s\"} %d\n", 
+		prometheus.WriteString(fmt.Sprintf("hecate_route_errors_total{domain=\"%s\"} %d\n",
 			domain, metrics.ErrorCount))
 	}
 
@@ -461,7 +461,7 @@ func CollectPrometheusMetrics(rc *eos_io.RuntimeContext) (string, error) {
 	prometheus.WriteString("# TYPE hecate_route_response_time_seconds gauge\n")
 
 	for domain, metrics := range snapshot.Routes {
-		prometheus.WriteString(fmt.Sprintf("hecate_route_response_time_seconds{domain=\"%s\"} %f\n", 
+		prometheus.WriteString(fmt.Sprintf("hecate_route_response_time_seconds{domain=\"%s\"} %f\n",
 			domain, metrics.ResponseTime.Seconds()))
 	}
 

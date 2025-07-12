@@ -23,10 +23,10 @@ var (
 
 // infoCmd provides comprehensive Git repository information
 var infoCmd = &cobra.Command{
-		Use:     "info",
-		Aliases: []string{"information"},
-		Short:   "Get comprehensive Git repository information",
-		Long: `Get comprehensive information about a Git repository.
+	Use:     "info",
+	Aliases: []string{"information"},
+	Short:   "Get comprehensive Git repository information",
+	Long: `Get comprehensive information about a Git repository.
 
 This command provides detailed repository information including:
 - Repository path and remotes
@@ -40,36 +40,36 @@ Examples:
   eos git info --json              # JSON output
   eos git info --detailed          # Detailed information`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if infoPath == "" {
-				var err error
-				infoPath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
-			}
-
-			manager := git_management.NewGitManager()
-			
-			if !manager.IsGitRepository(rc, infoPath) {
-				return fmt.Errorf("not a git repository: %s", infoPath)
-			}
-
-			logger.Info("Getting Git repository information", zap.String("path", infoPath))
-
-			repo, err := manager.GetRepositoryInfo(rc, infoPath)
+		if infoPath == "" {
+			var err error
+			infoPath, err = os.Getwd()
 			if err != nil {
-				return fmt.Errorf("failed to get repository info: %w", err)
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
+		}
 
-			if infoOutputJSON {
-				return outputJSONInfo(repo)
-			}
+		manager := git_management.NewGitManager()
 
-			return outputTableInfo(repo, infoDetailed)
-		}),
+		if !manager.IsGitRepository(rc, infoPath) {
+			return fmt.Errorf("not a git repository: %s", infoPath)
+		}
+
+		logger.Info("Getting Git repository information", zap.String("path", infoPath))
+
+		repo, err := manager.GetRepositoryInfo(rc, infoPath)
+		if err != nil {
+			return fmt.Errorf("failed to get repository info: %w", err)
+		}
+
+		if infoOutputJSON {
+			return outputJSONInfo(repo)
+		}
+
+		return outputTableInfo(repo, infoDetailed)
+	}),
 }
 
 func init() {
@@ -77,6 +77,7 @@ func init() {
 	infoCmd.Flags().BoolVar(&infoOutputJSON, "json", false, "Output in JSON format")
 	infoCmd.Flags().BoolVarP(&infoDetailed, "detailed", "d", false, "Show detailed information")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJSONInfo(repo *git_management.GitRepository) error {
 	data, err := json.MarshalIndent(repo, "", "  ")
@@ -86,6 +87,7 @@ func outputJSONInfo(repo *git_management.GitRepository) error {
 	fmt.Println(string(data))
 	return nil
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -96,7 +98,7 @@ func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 
 	// Basic repository info
 	fmt.Fprintf(w, "Repository Path:\t%s\n", repo.Path)
-	
+
 	// Status information
 	if repo.Status != nil {
 		fmt.Fprintf(w, "Current Branch:\t%s\n", repo.Status.Branch)
@@ -106,7 +108,7 @@ func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 		} else {
 			fmt.Fprintf(w, "Has Changes\n")
 		}
-		
+
 		if repo.Status.LastCommitHash != "" {
 			fmt.Fprintf(w, "Last Commit:\t%s\n", repo.Status.LastCommitHash[:8])
 			if repo.Status.LastCommitDate != "" {

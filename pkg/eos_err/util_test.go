@@ -11,13 +11,13 @@ func TestSetDebugMode(t *testing.T) {
 	// Save original state
 	originalDebug := debugMode
 	defer func() { debugMode = originalDebug }()
-	
+
 	// Test enabling debug mode
 	SetDebugMode(true)
 	if !DebugEnabled() {
 		t.Error("Debug mode should be enabled")
 	}
-	
+
 	// Test disabling debug mode
 	SetDebugMode(false)
 	if DebugEnabled() {
@@ -27,7 +27,7 @@ func TestSetDebugMode(t *testing.T) {
 
 func TestExtractSummary(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name          string
 		output        string
@@ -95,7 +95,7 @@ func TestExtractSummary(t *testing.T) {
 			want:          "Error 1 - Error 2 - Error 3",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ExtractSummary(ctx, tt.output, tt.maxCandidates)
@@ -108,26 +108,26 @@ func TestExtractSummary(t *testing.T) {
 
 func TestNewExpectedError(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Test with nil error
 	if err := NewExpectedError(ctx, nil); err != nil {
 		t.Error("NewExpectedError(nil) should return nil")
 	}
-	
+
 	// Test with actual error
 	originalErr := errors.New("user configuration error")
 	wrappedErr := NewExpectedError(ctx, originalErr)
-	
+
 	if wrappedErr == nil {
 		t.Fatal("NewExpectedError should not return nil for non-nil error")
 	}
-	
+
 	// Verify it's a UserError
 	var userErr *UserError
 	if !errors.As(wrappedErr, &userErr) {
 		t.Error("NewExpectedError should return a UserError")
 	}
-	
+
 	// Verify the cause is preserved
 	if !errors.Is(wrappedErr, originalErr) {
 		t.Error("Wrapped error should preserve the original error")
@@ -161,7 +161,7 @@ func TestIsExpectedUserError(t *testing.T) {
 			want: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IsExpectedUserError(tt.err); got != tt.want {
@@ -173,32 +173,32 @@ func TestIsExpectedUserError(t *testing.T) {
 
 func TestExtractSummary_EdgeCases(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Test with very long lines
 	longLine := strings.Repeat("x", 1000) + " error: " + strings.Repeat("y", 1000)
 	summary := ExtractSummary(ctx, longLine, 1)
 	if !strings.Contains(summary, "error:") {
 		t.Error("Should extract long lines with error keywords")
 	}
-	
+
 	// Test with only newlines
 	summary = ExtractSummary(ctx, "\n\n\n\n", 1)
 	if summary != "No output provided." {
 		t.Errorf("Expected 'No output provided.', got %q", summary)
 	}
-	
+
 	// Test with unicode
 	summary = ExtractSummary(ctx, "错误: 连接失败\nError: connection failed", 2)
 	if !strings.Contains(summary, "Error: connection failed") {
 		t.Error("Should handle unicode and extract error lines")
 	}
-	
+
 	// Test fallback to first non-empty line when no error keywords found
 	summary = ExtractSummary(ctx, "\n\nOperation completed successfully\nAll good\n", 3)
 	if summary != "Operation completed successfully" {
 		t.Errorf("Expected 'Operation completed successfully', got %q", summary)
 	}
-	
+
 	// Test with maxCandidates = 0 (should truncate error candidates to empty slice)
 	summary = ExtractSummary(ctx, "Error: test\nFailed: test", 0)
 	if summary != "" { // Empty slice joined becomes empty string

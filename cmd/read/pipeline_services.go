@@ -135,4 +135,5 @@ Examples:
 func init() {
 	pipelineServicesCmd.Flags().BoolVarP(&pipelineServicesShowConfig, "show-config", "c", false, "Display service configuration file content")
 }
+
 // All helper functions have been migrated to pkg/pipeline/services/

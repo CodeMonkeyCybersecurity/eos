@@ -15,8 +15,8 @@ type DelphiServiceDefinition struct {
 	Name            string            `json:"name"`
 	WorkerScript    string            `json:"worker_script"`
 	ServiceFile     string            `json:"service_file"`
-	SourceWorker    string            `json:"source_worker"`    // Source path in assets/
-	SourceService   string            `json:"source_service"`   // Source service file in assets/
+	SourceWorker    string            `json:"source_worker"`  // Source path in assets/
+	SourceService   string            `json:"source_service"` // Source service file in assets/
 	Description     string            `json:"description"`
 	PipelineStage   string            `json:"pipeline_stage"`
 	Dependencies    []string          `json:"dependencies"`
@@ -44,15 +44,15 @@ type ConfigFile struct {
 type ServiceCategory string
 
 const (
-	CategoryIngestion   ServiceCategory = "ingestion"
-	CategoryEnrichment  ServiceCategory = "enrichment"
-	CategoryProcessing  ServiceCategory = "processing"
-	CategoryAnalysis    ServiceCategory = "analysis"
-	CategoryFormatting  ServiceCategory = "formatting"
-	CategoryDelivery    ServiceCategory = "delivery"
-	CategoryMonitoring  ServiceCategory = "monitoring"
-	CategoryTesting     ServiceCategory = "testing"
-	CategoryDeprecated  ServiceCategory = "deprecated"
+	CategoryIngestion  ServiceCategory = "ingestion"
+	CategoryEnrichment ServiceCategory = "enrichment"
+	CategoryProcessing ServiceCategory = "processing"
+	CategoryAnalysis   ServiceCategory = "analysis"
+	CategoryFormatting ServiceCategory = "formatting"
+	CategoryDelivery   ServiceCategory = "delivery"
+	CategoryMonitoring ServiceCategory = "monitoring"
+	CategoryTesting    ServiceCategory = "testing"
+	CategoryDeprecated ServiceCategory = "deprecated"
 )
 
 // ServiceInstallationStatus represents the installation state of a service
@@ -81,7 +81,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 	registry := &DelphiServiceRegistry{
 		services: make(map[string]DelphiServiceDefinition),
 	}
-	
+
 	// Core pipeline services - centralized definitions
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "delphi-listener",
@@ -96,13 +96,13 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database and webhook configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "WEBHOOK_PORT"},
-		Ports:          []int{8080},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		Categories:     []ServiceCategory{CategoryIngestion},
+		Ports:           []int{8080},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		Categories:      []ServiceCategory{CategoryIngestion},
 	})
-	
+
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "delphi-agent-enricher",
 		WorkerScript:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py",
@@ -116,13 +116,12 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		Categories:     []ServiceCategory{CategoryEnrichment},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		Categories:      []ServiceCategory{CategoryEnrichment},
 	})
-	
-	
+
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "prompt-ab-tester",
 		WorkerScript:  "/usr/local/bin/prompt-ab-tester.py",
@@ -138,13 +137,13 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/opt/stackstorm/packs/delphi/prompts/", Required: true, Description: "Prompt template directory"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "EXPERIMENT_CONFIG_FILE", "PROMPTS_BASE_DIR"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		ABTestEnabled:  true,
-		Categories:     []ServiceCategory{CategoryTesting, CategoryAnalysis},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		ABTestEnabled:   true,
+		Categories:      []ServiceCategory{CategoryTesting, CategoryAnalysis},
 	})
-	
+
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "llm-worker",
 		WorkerScript:  "/opt/stackstorm/packs/delphi/llm-worker.py",
@@ -159,14 +158,13 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/srv/eos/system-prompts/default.txt", Required: true, Description: "Default system prompt"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "OPENAI_API_KEY", "DEFAULT_PROMPT_TYPE"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		ABTestEnabled:  true,
-		Categories:     []ServiceCategory{CategoryAnalysis, CategoryProcessing},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		ABTestEnabled:   true,
+		Categories:      []ServiceCategory{CategoryAnalysis, CategoryProcessing},
 	})
-	
-	
+
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "email-structurer",
 		WorkerScript:  "/usr/local/bin/email-structurer.py",
@@ -180,12 +178,12 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		Categories:     []ServiceCategory{CategoryFormatting},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		Categories:      []ServiceCategory{CategoryFormatting},
 	})
-	
+
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "email-formatter",
 		WorkerScript:  "/usr/local/bin/email-formatter.py",
@@ -200,12 +198,12 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/opt/stackstorm/packs/delphi/email.html", Required: true, Description: "Email HTML template"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "EMAIL_TEMPLATE_PATH"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		Categories:     []ServiceCategory{CategoryFormatting},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		Categories:      []ServiceCategory{CategoryFormatting},
 	})
-	
+
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "email-sender",
 		WorkerScript:  "/usr/local/bin/email-sender.py",
@@ -219,12 +217,12 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database and SMTP configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		Categories:     []ServiceCategory{CategoryDelivery},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		Categories:      []ServiceCategory{CategoryDelivery},
 	})
-	
+
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "parser-monitor",
 		WorkerScript:  "/usr/local/bin/parser-monitor.py",
@@ -238,12 +236,12 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		Categories:     []ServiceCategory{CategoryMonitoring},
+		User:            "stanley",
+		Group:           "stanley",
+		Permissions:     "0750",
+		Categories:      []ServiceCategory{CategoryMonitoring},
 	})
-	
+
 	// Deprecated services
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "delphi-emailer",
@@ -261,7 +259,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		ReplacedBy:    "email-structurer + email-formatter + email-sender",
 		Categories:    []ServiceCategory{CategoryDeprecated},
 	})
-	
+
 	return registry
 }
 
@@ -318,7 +316,7 @@ func (r *DelphiServiceRegistry) CheckServiceInstallationStatus(serviceName strin
 	if !exists {
 		return ServiceInstallationStatus{}, fmt.Errorf("service %s not found in registry", serviceName)
 	}
-	
+
 	status := ServiceInstallationStatus{
 		ServiceName:       serviceName,
 		WorkerPath:        service.WorkerScript,
@@ -326,21 +324,21 @@ func (r *DelphiServiceRegistry) CheckServiceInstallationStatus(serviceName strin
 		SourceWorkerPath:  service.SourceWorker,
 		SourceServicePath: service.SourceService,
 	}
-	
+
 	// Check if worker file exists
 	workerStart := time.Now()
 	if _, err := os.Stat(service.WorkerScript); err == nil {
 		status.WorkerInstalled = true
 	}
 	workerDuration := time.Since(workerStart)
-	
+
 	// Check if service file exists
 	serviceStart := time.Now()
 	if _, err := os.Stat(service.ServiceFile); err == nil {
 		status.ServiceInstalled = true
 	}
 	serviceDuration := time.Since(serviceStart)
-	
+
 	// Log slow file system operations
 	if workerDuration > 2*time.Second {
 		fmt.Printf("SLOW: os.Stat(%s) took %v\n", service.WorkerScript, workerDuration)
@@ -348,28 +346,28 @@ func (r *DelphiServiceRegistry) CheckServiceInstallationStatus(serviceName strin
 	if serviceDuration > 2*time.Second {
 		fmt.Printf("SLOW: os.Stat(%s) took %v\n", service.ServiceFile, serviceDuration)
 	}
-	
+
 	// Check if service is enabled and active (would require systemctl calls)
 	// This is handled by eos_unix.ServiceExists and eos_unix.CheckServiceStatus
-	
+
 	return status, nil
 }
 
 // GetServicesRequiringInstallation returns services that need installation
 func (r *DelphiServiceRegistry) GetServicesRequiringInstallation() ([]string, error) {
 	var needingInstallation []string
-	
+
 	for serviceName := range r.GetActiveServices() {
 		status, err := r.CheckServiceInstallationStatus(serviceName)
 		if err != nil {
 			continue
 		}
-		
+
 		if !status.WorkerInstalled || !status.ServiceInstalled {
 			needingInstallation = append(needingInstallation, serviceName)
 		}
 	}
-	
+
 	return needingInstallation, nil
 }
 
@@ -385,18 +383,18 @@ func (r *DelphiServiceRegistry) ValidateService(name string) error {
 		}
 		return nil
 	}
-	
+
 	var suggestions []string
 	for serviceName := range r.services {
 		if strings.Contains(serviceName, name) || strings.Contains(name, serviceName) {
 			suggestions = append(suggestions, serviceName)
 		}
 	}
-	
+
 	if len(suggestions) > 0 {
 		return fmt.Errorf("service %s not found. Did you mean: %s", name, strings.Join(suggestions, ", "))
 	}
-	
+
 	return fmt.Errorf("service %s not found. Use 'eos delphi services list' to see available services", name)
 }
 
@@ -404,7 +402,7 @@ func (r *DelphiServiceRegistry) ValidateService(name string) error {
 func (r *DelphiServiceRegistry) GetPipelineOrder() []string {
 	stageOrder := []string{"ingestion", "enrichment", "processing", "analysis", "formatting", "delivery"}
 	var orderedServices []string
-	
+
 	for _, stage := range stageOrder {
 		for name, service := range r.services {
 			if service.PipelineStage == stage && !service.Deprecated {
@@ -412,31 +410,31 @@ func (r *DelphiServiceRegistry) GetPipelineOrder() []string {
 			}
 		}
 	}
-	
+
 	return orderedServices
 }
 
 // GetMissingServices returns services that exist in python_workers but not deployed
 func (r *DelphiServiceRegistry) GetMissingServices(pythonWorkersPath string) ([]string, error) {
 	var missing []string
-	
+
 	files, err := filepath.Glob(filepath.Join(pythonWorkersPath, "*.py"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read python workers directory: %w", err)
 	}
-	
+
 	for _, file := range files {
 		workerName := strings.TrimSuffix(filepath.Base(file), ".py")
 		// Skip test files
 		if strings.HasPrefix(workerName, "test_") {
 			continue
 		}
-		
+
 		if _, exists := r.GetService(workerName); !exists {
 			missing = append(missing, workerName)
 		}
 	}
-	
+
 	return missing, nil
 }
 

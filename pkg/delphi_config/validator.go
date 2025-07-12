@@ -185,8 +185,8 @@ func (v *ConfigValidator) validateRequiredEnvVars() {
 
 	// LLM configuration (at least one provider required)
 	hasOpenAI := os.Getenv("OPENAI_API_KEY") != ""
-	hasAzure := os.Getenv("AZURE_OPENAI_API_KEY") != "" && 
-		os.Getenv("ENDPOINT_URL") != "" && 
+	hasAzure := os.Getenv("AZURE_OPENAI_API_KEY") != "" &&
+		os.Getenv("ENDPOINT_URL") != "" &&
 		os.Getenv("DEPLOYMENT_NAME") != ""
 
 	if !hasOpenAI && !hasAzure {
@@ -255,10 +255,10 @@ func (v *ConfigValidator) validateSMTPConfig() {
 // validateFilePaths checks file and directory paths
 func (v *ConfigValidator) validateFilePaths() {
 	paths := map[string]string{
-		"Log directory":     v.config.FilePaths.LogDirectory,
-		"Email template":    v.config.FilePaths.EmailTemplatePath,
-		"Data directory":    v.config.FilePaths.DataDirectory,
-		"Backup directory":  v.config.FilePaths.BackupDirectory,
+		"Log directory":    v.config.FilePaths.LogDirectory,
+		"Email template":   v.config.FilePaths.EmailTemplatePath,
+		"Data directory":   v.config.FilePaths.DataDirectory,
+		"Backup directory": v.config.FilePaths.BackupDirectory,
 	}
 
 	for desc, path := range paths {
@@ -301,7 +301,7 @@ func (v *ConfigValidator) validateParserConfig() {
 		}
 	}
 
-	v.addInfo("parser", fmt.Sprintf("✓ Circuit breaker: %d failures, %v timeout", 
+	v.addInfo("parser", fmt.Sprintf("✓ Circuit breaker: %d failures, %v timeout",
 		v.config.Parser.FailureThreshold, v.config.Parser.FailureTimeout))
 	v.addInfo("parser", fmt.Sprintf("✓ A/B testing: %d%%", v.config.Parser.ABTestPercentage))
 }

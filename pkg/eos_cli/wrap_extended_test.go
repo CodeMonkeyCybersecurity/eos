@@ -91,7 +91,7 @@ func TestWrapExtended(t *testing.T) {
 				if !ok {
 					t.Error("Expected context to have deadline")
 				}
-				
+
 				// Check timeout is approximately correct (within 1 second)
 				expectedDeadline := time.Now().Add(10 * time.Minute)
 				diff := deadline.Sub(expectedDeadline)
@@ -112,7 +112,7 @@ func TestWrapExtended(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := tt.setupCmd()
 			wrappedFn := WrapExtended(tt.timeout, tt.fn)
-			
+
 			err := wrappedFn(cmd, tt.args)
 
 			if tt.expectError {
@@ -192,7 +192,7 @@ func TestSanitizeCommandInputsExtended(t *testing.T) {
 		},
 		{
 			name:    "command injection in args",
-			cmdName: "execute", 
+			cmdName: "execute",
 			args:    []string{"test; rm -rf /"},
 			setupFlags: func(cmd *cobra.Command) {
 				// No flags
@@ -216,7 +216,7 @@ func TestSanitizeCommandInputsExtended(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := eos_io.NewContext(context.Background(), "test")
 			cmd := &cobra.Command{Use: tt.cmdName}
-			
+
 			if tt.setupFlags != nil {
 				tt.setupFlags(cmd)
 			}
@@ -290,33 +290,32 @@ func TestArgsModified(t *testing.T) {
 	}
 }
 
-
 // TestWrapExtendedIntegration tests the full integration
 func TestWrapExtendedIntegration(t *testing.T) {
 	t.Run("full command execution flow", func(t *testing.T) {
 		executionSteps := []string{}
-		
+
 		fn := func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			executionSteps = append(executionSteps, "function executed")
-			
+
 			// Verify context setup
 			assert.NotNil(t, rc)
 			assert.NotNil(t, rc.Ctx)
 			assert.NotNil(t, rc.Log)
 			assert.Equal(t, "integration-test", cmd.Name())
 			assert.Equal(t, []string{"arg1", "arg2"}, args)
-			
+
 			// Check attributes
 			assert.NotNil(t, rc.Attributes)
-			
+
 			return nil
 		}
-		
+
 		cmd := &cobra.Command{Use: "integration-test"}
 		wrapped := WrapExtended(2*time.Minute, fn)
-		
+
 		err := wrapped(cmd, []string{"arg1", "arg2"})
-		
+
 		assert.NoError(t, err)
 		assert.Contains(t, executionSteps, "function executed")
 	})
@@ -331,13 +330,13 @@ func TestWrapExtendedIntegration(t *testing.T) {
 				return rc.Ctx.Err()
 			}
 		}
-		
+
 		cmd := &cobra.Command{Use: "cancel-test"}
 		// Use very short timeout to trigger cancellation
 		wrapped := WrapExtended(10*time.Millisecond, fn)
-		
+
 		err := wrapped(cmd, []string{})
-		
+
 		// Should timeout
 		assert.Error(t, err)
 	})
@@ -349,10 +348,10 @@ func BenchmarkWrapExtended(b *testing.B) {
 		// Minimal work
 		return nil
 	}
-	
+
 	cmd := &cobra.Command{Use: "bench-cmd"}
 	wrapped := WrapExtended(1*time.Minute, fn)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = wrapped(cmd, []string{"arg1", "arg2"})
@@ -363,7 +362,7 @@ func BenchmarkSanitizeCommandInputs(b *testing.B) {
 	ctx := eos_io.NewContext(context.Background(), "bench")
 	cmd := &cobra.Command{Use: "bench-cmd"}
 	args := []string{"normal", "args", "without", "issues"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = sanitizeCommandInputs(ctx, cmd, args)

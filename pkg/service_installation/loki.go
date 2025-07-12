@@ -71,7 +71,7 @@ func (sim *ServiceInstallationManager) installLoki(rc *eos_io.RuntimeContext, op
 
 	composePath := filepath.Join(workDir, "docker-compose.yaml")
 	downloadURL := fmt.Sprintf("https://raw.githubusercontent.com/grafana/loki/%s/production/docker-compose.yaml", options.Version)
-	
+
 	if err := sim.runCommand(rc, "Download config", "wget", downloadURL, "-O", composePath); err != nil {
 		// Fallback to curl if wget is not available
 		if err := sim.runCommand(rc, "Download config", "curl", "-L", downloadURL, "-o", composePath); err != nil {
@@ -123,10 +123,10 @@ func (sim *ServiceInstallationManager) installLoki(rc *eos_io.RuntimeContext, op
 	result.Port = 3100 // Default Loki port
 	result.Message = "Loki installed successfully via Docker Compose"
 	result.Endpoints = []string{
-		"http://localhost:3100",     // Loki API
-		"http://localhost:3000",     // Grafana (if included in compose)
-		"http://localhost:9093",     // Alertmanager (if included)
-		"http://localhost:9090",     // Prometheus (if included)
+		"http://localhost:3100", // Loki API
+		"http://localhost:3000", // Grafana (if included in compose)
+		"http://localhost:9093", // Alertmanager (if included)
+		"http://localhost:9090", // Prometheus (if included)
 	}
 	result.ConfigFiles = []string{
 		composePath,
@@ -178,7 +178,7 @@ func (sim *ServiceInstallationManager) getLokiStatus(rc *eos_io.RuntimeContext, 
 
 	if err == nil && len(output) > 0 {
 		status.Status = "running"
-		
+
 		// Try to get Loki version from container
 		cmd = sim.createCommandInDir(workDir, "docker", "compose", "exec", "-T", "loki", "loki", "--version")
 		if versionOutput, err := cmd.Output(); err == nil {

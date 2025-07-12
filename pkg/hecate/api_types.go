@@ -34,13 +34,13 @@ type CreateRouteResponse struct {
 
 // UpdateRouteRequest represents a request to update an existing route
 type UpdateRouteRequest struct {
-	Domain      string            `json:"domain"`
-	Upstreams   []string          `json:"upstreams,omitempty"`
-	AuthPolicy  string            `json:"auth_policy,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Middleware  []string          `json:"middleware,omitempty"`
-	EnableSSL   bool              `json:"enable_ssl,omitempty"`
-	WorkflowID  string            `json:"workflow_id,omitempty"`
+	Domain     string            `json:"domain"`
+	Upstreams  []string          `json:"upstreams,omitempty"`
+	AuthPolicy string            `json:"auth_policy,omitempty"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	Middleware []string          `json:"middleware,omitempty"`
+	EnableSSL  bool              `json:"enable_ssl,omitempty"`
+	WorkflowID string            `json:"workflow_id,omitempty"`
 }
 
 // UpdateRouteResponse represents the response after updating a route
@@ -113,22 +113,22 @@ type ReconciliationChange struct {
 
 // RotateSecretsRequest represents a request to rotate secrets
 type RotateSecretsRequest struct {
-	SecretType       string `json:"secret_type" validate:"required"`
-	Strategy         string `json:"strategy" validate:"required"`
-	ContinueOnError  bool   `json:"continue_on_error"`
-	NotificationURL  string `json:"notification_url,omitempty"`
+	SecretType      string `json:"secret_type" validate:"required"`
+	Strategy        string `json:"strategy" validate:"required"`
+	ContinueOnError bool   `json:"continue_on_error"`
+	NotificationURL string `json:"notification_url,omitempty"`
 }
 
 // RotateSecretsResponse represents the response after secret rotation
 type RotateSecretsResponse struct {
-	SecretType      string    `json:"secret_type"`
-	Strategy        string    `json:"strategy"`
-	WorkflowID      string    `json:"workflow_id"`
-	Status          string    `json:"status"`
-	RotatedSecrets  []string  `json:"rotated_secrets"`
-	FailedSecrets   []string  `json:"failed_secrets"`
-	StartedAt       time.Time `json:"started_at"`
-	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	SecretType     string     `json:"secret_type"`
+	Strategy       string     `json:"strategy"`
+	WorkflowID     string     `json:"workflow_id"`
+	Status         string     `json:"status"`
+	RotatedSecrets []string   `json:"rotated_secrets"`
+	FailedSecrets  []string   `json:"failed_secrets"`
+	StartedAt      time.Time  `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at,omitempty"`
 }
 
 // ListRoutesRequest represents a request to list routes
@@ -150,16 +150,16 @@ type ListRoutesResponse struct {
 
 // RouteListItem represents a route in the list
 type RouteListItem struct {
-	Domain      string            `json:"domain"`
-	Upstream    string            `json:"upstream"`
-	AuthPolicy  string            `json:"auth_policy,omitempty"`
-	Status      string            `json:"status"`
-	TLSEnabled  bool              `json:"tls_enabled"`
-	DNSManaged  bool              `json:"dns_managed"`
-	Monitoring  bool              `json:"monitoring"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	Domain     string            `json:"domain"`
+	Upstream   string            `json:"upstream"`
+	AuthPolicy string            `json:"auth_policy,omitempty"`
+	Status     string            `json:"status"`
+	TLSEnabled bool              `json:"tls_enabled"`
+	DNSManaged bool              `json:"dns_managed"`
+	Monitoring bool              `json:"monitoring"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
 // ListAuthPoliciesResponse represents the response with auth policy list
@@ -182,19 +182,19 @@ type AuthPolicyListItem struct {
 
 // StatusResponse represents the status of Hecate components
 type StatusResponse struct {
-	Overall    string                    `json:"overall"`
+	Overall    string                     `json:"overall"`
 	Components map[string]ComponentStatus `json:"components"`
-	Timestamp  time.Time                 `json:"timestamp"`
+	Timestamp  time.Time                  `json:"timestamp"`
 }
 
 // ComponentStatus represents the status of a single component
 type ComponentStatus struct {
-	Status      string                 `json:"status"`
-	Healthy     bool                   `json:"healthy"`
-	Version     string                 `json:"version,omitempty"`
-	LastCheck   time.Time              `json:"last_check"`
-	Details     map[string]interface{} `json:"details,omitempty"`
-	ErrorMessage string                `json:"error_message,omitempty"`
+	Status       string                 `json:"status"`
+	Healthy      bool                   `json:"healthy"`
+	Version      string                 `json:"version,omitempty"`
+	LastCheck    time.Time              `json:"last_check"`
+	Details      map[string]interface{} `json:"details,omitempty"`
+	ErrorMessage string                 `json:"error_message,omitempty"`
 }
 
 // ErrorResponse represents an API error response
@@ -206,22 +206,22 @@ type ErrorResponse struct {
 
 // WorkflowStatusResponse represents the status of a workflow
 type WorkflowStatusResponse struct {
-	WorkflowID   string                 `json:"workflow_id"`
-	Status       string                 `json:"status"`
-	Result       interface{}            `json:"result,omitempty"`
-	Error        string                 `json:"error,omitempty"`
-	StartedAt    time.Time              `json:"started_at"`
-	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
-	Progress     *WorkflowProgress      `json:"progress,omitempty"`
-	History      []WorkflowHistoryEvent `json:"history,omitempty"`
+	WorkflowID  string                 `json:"workflow_id"`
+	Status      string                 `json:"status"`
+	Result      interface{}            `json:"result,omitempty"`
+	Error       string                 `json:"error,omitempty"`
+	StartedAt   time.Time              `json:"started_at"`
+	CompletedAt *time.Time             `json:"completed_at,omitempty"`
+	Progress    *WorkflowProgress      `json:"progress,omitempty"`
+	History     []WorkflowHistoryEvent `json:"history,omitempty"`
 }
 
 // WorkflowProgress represents the progress of a workflow
 type WorkflowProgress struct {
-	CurrentStep   string  `json:"current_step"`
-	TotalSteps    int     `json:"total_steps"`
-	CompletedSteps int    `json:"completed_steps"`
-	Percentage    float64 `json:"percentage"`
+	CurrentStep    string  `json:"current_step"`
+	TotalSteps     int     `json:"total_steps"`
+	CompletedSteps int     `json:"completed_steps"`
+	Percentage     float64 `json:"percentage"`
 }
 
 // WorkflowHistoryEvent represents an event in workflow history

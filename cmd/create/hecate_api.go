@@ -63,6 +63,6 @@ func runCreateHecateAPI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	logger.Info("Hecate API server started",
 		zap.String("address", host+":"+strconv.Itoa(port)))
-	
+
 	return handler.StartServer(serverCtx, port)
 }

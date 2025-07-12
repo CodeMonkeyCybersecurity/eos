@@ -51,15 +51,15 @@ func GetPipOnlyPackages() []string {
 // Migrated from cmd/list/preflight-install.go (part of verifyAllPackages)
 func VerifyPackage(rc *eos_io.RuntimeContext, pkg Package) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare verification
 	logger.Debug("Assessing package verification",
 		zap.String("package", pkg.PipName),
 		zap.String("import_name", pkg.ImportName))
-	
+
 	// INTERVENE - Try to import the package
 	verifyCmd := exec.Command("python3", "-c", "import "+pkg.ImportName)
-	
+
 	// EVALUATE - Check if import succeeded
 	if err := verifyCmd.Run(); err != nil {
 		logger.Warn("Package verification failed",
@@ -68,11 +68,11 @@ func VerifyPackage(rc *eos_io.RuntimeContext, pkg Package) error {
 			zap.Error(err))
 		return err
 	}
-	
+
 	logger.Info("Package verified",
 		zap.String("package", pkg.PipName),
 		zap.String("import_name", pkg.ImportName))
-	
+
 	return nil
 }
 
@@ -80,19 +80,19 @@ func VerifyPackage(rc *eos_io.RuntimeContext, pkg Package) error {
 // Migrated from cmd/list/preflight-install.go verifyAllPackages
 func VerifyAllPackages(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Get all packages to verify
 	logger.Info("Assessing package verification requirements")
-	
+
 	packages := GetDelphiPackages()
-	
+
 	// INTERVENE - Verify each package
 	logger.Info("Verifying package installation",
 		zap.Int("total_packages", len(packages)))
-	
+
 	var failedPackages []string
 	var successPackages []string
-	
+
 	for _, pkg := range packages {
 		if err := VerifyPackage(rc, pkg); err != nil {
 			failedPackages = append(failedPackages, pkg.PipName)
@@ -100,18 +100,18 @@ func VerifyAllPackages(rc *eos_io.RuntimeContext) error {
 			successPackages = append(successPackages, pkg.PipName)
 		}
 	}
-	
+
 	// EVALUATE - Report results
 	logger.Info("Package verification summary",
 		zap.Int("total", len(packages)),
 		zap.Int("successful", len(successPackages)),
 		zap.Int("failed", len(failedPackages)))
-	
+
 	if len(failedPackages) > 0 {
 		logger.Warn("Some packages failed verification",
 			zap.Strings("failed_packages", failedPackages))
 	}
-	
+
 	// Show next steps
 	logger.Info("Delphi Python dependencies installation complete")
 	logger.Info("Next steps:")
@@ -119,6 +119,6 @@ func VerifyAllPackages(rc *eos_io.RuntimeContext) error {
 	logger.Info("  2. Configure .env file at /opt/stackstorm/packs/delphi/.env")
 	logger.Info("  3. Deploy Delphi services: eos create delphi")
 	logger.Info("  4. Start services: eos delphi services start --all")
-	
+
 	return nil
 }

@@ -18,13 +18,13 @@ import (
 
 func TestNewClient(t *testing.T) {
 	tests := []struct {
-		name        string
-		envVars     map[string]string
-		wantErr     bool
-		validateFn  func(t *testing.T, client *api.Client)
+		name       string
+		envVars    map[string]string
+		wantErr    bool
+		validateFn func(t *testing.T, client *api.Client)
 	}{
 		{
-			name: "default configuration",
+			name:    "default configuration",
 			envVars: map[string]string{},
 			wantErr: false,
 			validateFn: func(t *testing.T, client *api.Client) {
@@ -75,7 +75,7 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "with multiple TLS settings",
 			envVars: map[string]string{
-				"VAULT_CACERT":     "/path/to/ca.crt",
+				"VAULT_CACERT":      "/path/to/ca.crt",
 				"VAULT_CLIENT_CERT": "/path/to/client.crt",
 				"VAULT_CLIENT_KEY":  "/path/to/client.key",
 				"VAULT_SKIP_VERIFY": "true",
@@ -119,7 +119,7 @@ func TestGetVaultClient(t *testing.T) {
 		// Create and set a test client
 		testClient, err := api.NewClient(nil)
 		testutil.AssertNoError(t, err)
-		
+
 		// Set the client
 		SetVaultClient(rc, testClient)
 
@@ -179,7 +179,7 @@ func TestGetVaultClient(t *testing.T) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				
+
 				if idx%2 == 0 {
 					SetVaultClient(rc, testClient)
 				} else {
@@ -203,7 +203,7 @@ func TestGetVaultClient(t *testing.T) {
 				successCount++
 			}
 		}
-		
+
 		// Clean up
 		shared.VaultClient = nil
 	})
@@ -274,7 +274,7 @@ func TestTryEnvOrFallback(t *testing.T) {
 			setupFn: func(t *testing.T) {
 				// No VAULT_TOKEN in env
 				testutil.WithoutEnvVar(t, "VAULT_TOKEN")
-				
+
 				// Create vault init file with root token
 				tmpDir := testutil.TempDir(t)
 				secretsDir := filepath.Join(tmpDir, "secrets")
@@ -369,7 +369,7 @@ func TestLoadPrivilegedToken(t *testing.T) {
 			name: "falls back to agent token",
 			setupFn: func(t *testing.T) string {
 				tmpDir := testutil.TempDir(t)
-				
+
 				// No init file, but create agent token file
 				agentTokenFile := filepath.Join(tmpDir, "agent-token")
 				err := os.WriteFile(agentTokenFile, []byte("agent-token-67890"), 0600)
@@ -470,9 +470,9 @@ func TestLoadPrivilegedToken(t *testing.T) {
 
 func TestReadTokenFromInitFile(t *testing.T) {
 	tests := []struct {
-		name         string
-		setupFn      func(t *testing.T) string // returns expected token
-		wantErr      bool
+		name          string
+		setupFn       func(t *testing.T) string // returns expected token
+		wantErr       bool
 		errorContains string
 	}{
 		{
@@ -723,7 +723,7 @@ func TestClientConcurrency(t *testing.T) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				
+
 				// Alternate between get and set operations
 				if idx%3 == 0 {
 					SetVaultClient(rc, testClient)

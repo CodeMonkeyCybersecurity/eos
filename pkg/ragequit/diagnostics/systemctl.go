@@ -15,20 +15,20 @@ import (
 // Migrated from cmd/ragequit/ragequit.go systemctlDiagnostics
 func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check if systemd is available
 	logger.Info("Assessing systemctl diagnostics requirements")
-	
+
 	if !system.CommandExists("systemctl") {
 		logger.Info("Systemctl not available, skipping systemd diagnostics")
 		return nil
 	}
-	
+
 	homeDir := system.GetHomeDir()
-	
+
 	// INTERVENE - Collect systemd information
 	logger.Debug("Collecting systemd diagnostics")
-	
+
 	// Failed units
 	if failedUnits := system.RunCommandWithTimeout("systemctl", []string{"list-units", "--failed", "--no-pager"}, 5*time.Second); failedUnits != "" {
 		outputFile := filepath.Join(homeDir, "ragequit-systemctl-failed.txt")
@@ -41,7 +41,7 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 				zap.String("file", outputFile))
 		}
 	}
-	
+
 	// Pending jobs
 	if pendingJobs := system.RunCommandWithTimeout("systemctl", []string{"list-jobs", "--no-pager"}, 5*time.Second); pendingJobs != "" {
 		outputFile := filepath.Join(homeDir, "ragequit-systemctl-jobs.txt")
@@ -54,7 +54,7 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 				zap.String("file", outputFile))
 		}
 	}
-	
+
 	// Recent journal errors
 	if system.CommandExists("journalctl") {
 		if journalErrors := system.RunCommandWithTimeout("journalctl", []string{"-p", "err", "-n", "100", "--no-pager"}, 10*time.Second); journalErrors != "" {
@@ -69,7 +69,7 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 			}
 		}
 	}
-	
+
 	// System status
 	if systemStatus := system.RunCommandWithTimeout("systemctl", []string{"status", "--no-pager"}, 5*time.Second); systemStatus != "" {
 		outputFile := filepath.Join(homeDir, "ragequit-systemctl-status.txt")
@@ -82,9 +82,9 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 				zap.String("file", outputFile))
 		}
 	}
-	
+
 	// EVALUATE - Log completion
 	logger.Info("Systemctl diagnostics completed")
-	
+
 	return nil
 }

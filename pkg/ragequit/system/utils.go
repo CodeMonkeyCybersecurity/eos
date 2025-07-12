@@ -25,7 +25,7 @@ func GetHomeDir() string {
 	if home := os.Getenv("HOME"); home != "" {
 		return home
 	}
-	
+
 	user, err := user.Current()
 	if err != nil {
 		return "/tmp"
@@ -89,16 +89,16 @@ func ReadFile(path string) string {
 func RunCommandWithTimeout(command string, args []string, timeout time.Duration) string {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, command, args...)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return "Command timed out"
 		}
 		return ""
 	}
-	
+
 	return string(output)
 }

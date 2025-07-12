@@ -143,10 +143,10 @@ func showPlatformStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, format st
 			},
 		},
 		Customers: CustomersSummary{
-			Total:         15,
-			Active:        14,
-			Suspended:     1,
-			ByTier:        map[string]int{"starter": 5, "pro": 7, "enterprise": 3},
+			Total:     15,
+			Active:    14,
+			Suspended: 1,
+			ByTier:    map[string]int{"starter": 5, "pro": 7, "enterprise": 3},
 		},
 		LastUpdated: time.Now(),
 	}
@@ -229,7 +229,7 @@ func showCustomerStatus(rc *eos_io.RuntimeContext, customerID string, format str
 
 func showCustomerDetails(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	customerID, _ := cmd.Flags().GetString("customer-id")
 	if customerID == "" {
 		return fmt.Errorf("customer-id flag is required")
@@ -294,39 +294,39 @@ func showPlatformHealth(rc *eos_io.RuntimeContext, cmd *cobra.Command, format st
 		Overall: "healthy",
 		Checks: []HealthCheck{
 			{
-				Name:   "Nomad Cluster",
-				Status: "passed",
-				Message: "Cluster is healthy with leader elected",
+				Name:     "Nomad Cluster",
+				Status:   "passed",
+				Message:  "Cluster is healthy with leader elected",
 				Duration: 150 * time.Millisecond,
 			},
 			{
-				Name:   "Temporal Service",
-				Status: "passed",
-				Message: "Temporal is running and accessible",
+				Name:     "Temporal Service",
+				Status:   "passed",
+				Message:  "Temporal is running and accessible",
 				Duration: 230 * time.Millisecond,
 			},
 			{
-				Name:   "NATS Service",
-				Status: "passed",
-				Message: "NATS is running with all required streams",
+				Name:     "NATS Service",
+				Status:   "passed",
+				Message:  "NATS is running with all required streams",
 				Duration: 180 * time.Millisecond,
 			},
 			{
-				Name:   "CCS Services",
-				Status: "passed",
-				Message: "CCS indexer and dashboard are healthy",
+				Name:     "CCS Services",
+				Status:   "passed",
+				Message:  "CCS indexer and dashboard are healthy",
 				Duration: 340 * time.Millisecond,
 			},
 			{
-				Name:   "Network Configuration",
-				Status: "passed",
-				Message: "Network configured with 14 customer VLANs",
+				Name:     "Network Configuration",
+				Status:   "passed",
+				Message:  "Network configured with 14 customer VLANs",
 				Duration: 120 * time.Millisecond,
 			},
 			{
-				Name:   "Storage Capacity",
-				Status: "warning",
-				Message: "Storage usage at 78%",
+				Name:     "Storage Capacity",
+				Status:   "warning",
+				Message:  "Storage usage at 78%",
 				Duration: 90 * time.Millisecond,
 			},
 		},
@@ -336,13 +336,13 @@ func showPlatformHealth(rc *eos_io.RuntimeContext, cmd *cobra.Command, format st
 	if detailed {
 		// Add more detailed information
 		health.Details = map[string]interface{}{
-			"nomad_servers":      3,
-			"nomad_clients":      5,
-			"active_customers":   14,
-			"total_agents":       2150,
-			"events_per_second":  3500,
-			"storage_used_gb":    780,
-			"storage_total_gb":   1000,
+			"nomad_servers":     3,
+			"nomad_clients":     5,
+			"active_customers":  14,
+			"total_agents":      2150,
+			"events_per_second": 3500,
+			"storage_used_gb":   780,
+			"storage_total_gb":  1000,
 		}
 	}
 
@@ -473,7 +473,7 @@ func showEventStatistics(rc *eos_io.RuntimeContext, cmd *cobra.Command, format s
 			},
 			{
 				CustomerID:  "cust_67890",
-				CompanyName: "TechCorp Inc",  
+				CompanyName: "TechCorp Inc",
 				Events:      285000,
 				AlertsHigh:  42,
 				AlertsMed:   580,
@@ -499,10 +499,10 @@ func showEventStatistics(rc *eos_io.RuntimeContext, cmd *cobra.Command, format s
 // Data structures for output
 
 type PlatformStatus struct {
-	Platform    ComponentStatus  `json:"platform"`
+	Platform    ComponentStatus   `json:"platform"`
 	Components  []ComponentStatus `json:"components"`
 	Customers   CustomersSummary  `json:"customers"`
-	LastUpdated time.Time        `json:"last_updated"`
+	LastUpdated time.Time         `json:"last_updated"`
 }
 
 type ComponentStatus struct {
@@ -522,14 +522,14 @@ type CustomersSummary struct {
 }
 
 type CustomerDeploymentStatus struct {
-	CustomerID   string            `json:"customer_id"`
-	CompanyName  string            `json:"company_name"`
-	Tier         string            `json:"tier"`
-	Status       string            `json:"status"`
-	Components   []ComponentStatus `json:"components"`
-	Resources    ResourceUsage     `json:"resources"`
-	Network      NetworkInfo       `json:"network"`
-	LastUpdated  time.Time         `json:"last_updated"`
+	CustomerID  string            `json:"customer_id"`
+	CompanyName string            `json:"company_name"`
+	Tier        string            `json:"tier"`
+	Status      string            `json:"status"`
+	Components  []ComponentStatus `json:"components"`
+	Resources   ResourceUsage     `json:"resources"`
+	Network     NetworkInfo       `json:"network"`
+	LastUpdated time.Time         `json:"last_updated"`
 }
 
 type ResourceUsage struct {
@@ -591,9 +591,9 @@ type HealthCheck struct {
 }
 
 type PlatformResources struct {
-	Total       ResourceUsage              `json:"total"`
-	ByComponent map[string]ResourceUsage   `json:"by_component"`
-	Timestamp   time.Time                  `json:"timestamp"`
+	Total       ResourceUsage            `json:"total"`
+	ByComponent map[string]ResourceUsage `json:"by_component"`
+	Timestamp   time.Time                `json:"timestamp"`
 }
 
 type CustomerResources struct {
@@ -610,13 +610,13 @@ type CustomerResourceUsage struct {
 }
 
 type EventStatistics struct {
-	TimeRange       string                `json:"time_range"`
-	Total           int                   `json:"total"`
-	ByType          map[string]int        `json:"by_type"`
-	ByCustomer      []CustomerEventStats  `json:"by_customer"`
-	EventsPerSecond int                   `json:"events_per_second"`
-	PeakEPS         int                   `json:"peak_eps"`
-	Timestamp       time.Time             `json:"timestamp"`
+	TimeRange       string               `json:"time_range"`
+	Total           int                  `json:"total"`
+	ByType          map[string]int       `json:"by_type"`
+	ByCustomer      []CustomerEventStats `json:"by_customer"`
+	EventsPerSecond int                  `json:"events_per_second"`
+	PeakEPS         int                  `json:"peak_eps"`
+	Timestamp       time.Time            `json:"timestamp"`
 }
 
 type CustomerEventStats struct {
@@ -658,13 +658,13 @@ func outputStatusTable(status PlatformStatus) error {
 	fmt.Println(strings.Repeat("-", 60))
 	fmt.Printf("%-20s %-10s %-10s %s\n", "Component", "Status", "Health", "Details")
 	fmt.Println(strings.Repeat("-", 60))
-	
+
 	for _, comp := range status.Components {
 		fmt.Printf("%-20s %-10s %-10s %s\n", comp.Name, comp.Status, comp.Health, comp.Details)
 	}
 
 	fmt.Printf("\nCustomers Summary:\n")
-	fmt.Printf("Total: %d (Active: %d, Suspended: %d)\n", 
+	fmt.Printf("Total: %d (Active: %d, Suspended: %d)\n",
 		status.Customers.Total, status.Customers.Active, status.Customers.Suspended)
 	fmt.Printf("By Tier: ")
 	for tier, count := range status.Customers.ByTier {
@@ -685,14 +685,14 @@ func outputCustomerStatusTable(status CustomerDeploymentStatus) error {
 	fmt.Println(strings.Repeat("-", 80))
 	fmt.Printf("%-20s %-10s %-10s %-30s %s\n", "Component", "Status", "Health", "Endpoint", "Details")
 	fmt.Println(strings.Repeat("-", 80))
-	
+
 	for _, comp := range status.Components {
-		fmt.Printf("%-20s %-10s %-10s %-30s %s\n", 
+		fmt.Printf("%-20s %-10s %-10s %-30s %s\n",
 			comp.Name, comp.Status, comp.Health, comp.Endpoint, comp.Details)
 	}
 
 	fmt.Printf("\nResource Usage:\n")
-	fmt.Printf("CPU: %.1f / %.1f %s (%.1f%%)\n", 
+	fmt.Printf("CPU: %.1f / %.1f %s (%.1f%%)\n",
 		status.Resources.CPU.Used, status.Resources.CPU.Total, status.Resources.CPU.Unit,
 		(status.Resources.CPU.Used/status.Resources.CPU.Total)*100)
 	fmt.Printf("Memory: %.0f / %.0f %s (%.1f%%)\n",
@@ -749,9 +749,9 @@ func outputHealthTable(health PlatformHealth) error {
 	fmt.Println(strings.Repeat("-", 80))
 	fmt.Printf("%-30s %-10s %-30s %s\n", "Check", "Status", "Message", "Duration")
 	fmt.Println(strings.Repeat("-", 80))
-	
+
 	for _, check := range health.Checks {
-		fmt.Printf("%-30s %-10s %-30s %v\n", 
+		fmt.Printf("%-30s %-10s %-30s %v\n",
 			check.Name, check.Status, check.Message, check.Duration)
 	}
 
@@ -802,7 +802,7 @@ func outputCustomerResourcesTable(resources CustomerResources) error {
 	fmt.Printf("Timestamp: %s\n\n", resources.Timestamp.Format(time.RFC3339))
 
 	fmt.Println(strings.Repeat("-", 100))
-	fmt.Printf("%-15s %-20s %-10s %-15s %-15s %-15s\n", 
+	fmt.Printf("%-15s %-20s %-10s %-15s %-15s %-15s\n",
 		"Customer ID", "Company", "Tier", "CPU", "Memory", "Disk")
 	fmt.Println(strings.Repeat("-", 100))
 

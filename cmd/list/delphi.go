@@ -194,9 +194,9 @@ func init() {
 }
 
 var delphiValidateCmd = &cobra.Command{
-	Use:   "delphi-validate",
+	Use:     "delphi-validate",
 	Aliases: []string{"delphi-check", "validate-delphi", "delphi-validation"},
-	Short: "Validate Delphi pipeline configuration",
+	Short:   "Validate Delphi pipeline configuration",
 	Long: `Validate the complete Delphi pipeline configuration including:
 - Database connectivity and schema
 - Environment variables and LLM configuration
@@ -215,9 +215,9 @@ Examples:
 }
 
 var delphiConfigValidateCmd = &cobra.Command{
-	Use:   "delphi-config-validate",
+	Use:     "delphi-config-validate",
 	Aliases: []string{"delphi-config", "validate-delphi-config"},
-	Short: "Validate Delphi configuration and environment",
+	Short:   "Validate Delphi configuration and environment",
 	Long: `Validates the complete Delphi pipeline configuration including database schema,
 environment variables, notification channels, file paths, and external service connectivity.
 
@@ -274,6 +274,7 @@ errors, warnings, and informational messages about the configuration state.`,
 		}
 	}),
 }
+
 // TODO
 // loadEnvFile loads environment variables from a file
 func loadEnvFile(filename string) error {
@@ -307,6 +308,7 @@ func loadEnvFile(filename string) error {
 
 	return nil
 }
+
 // TODO
 // createConfigFromEnvironment creates a DelphiConfig from environment variables
 func createConfigFromEnvironment() *delphi_config.DelphiConfig {
@@ -377,6 +379,7 @@ func createConfigFromEnvironment() *delphi_config.DelphiConfig {
 
 	return config
 }
+
 // TODO
 // outputJSONResults outputs validation results in JSON format
 func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) error {
@@ -403,6 +406,7 @@ func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) e
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(summary)
 }
+
 // TODO
 // outputTextResults outputs validation results in human-readable format
 func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkOnly bool) error {

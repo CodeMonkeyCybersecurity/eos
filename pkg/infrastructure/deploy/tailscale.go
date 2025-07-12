@@ -12,10 +12,10 @@ import (
 // Migrated from cmd/create/infrastructure.go deployTailscaleInfrastructure
 func DeployTailscale(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Get configuration from command flags
 	logger.Info("Assessing Tailscale deployment configuration")
-	
+
 	// Get command flags
 	hostname, _ := cmd.Flags().GetString("hostname")
 	advertiseRoutes, _ := cmd.Flags().GetStringSlice("advertise-routes")
@@ -25,7 +25,7 @@ func DeployTailscale(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	vaultPath, _ := cmd.Flags().GetString("vault-path")
 	useExitNode, _ := cmd.Flags().GetBool("exit-node")
 	useShield, _ := cmd.Flags().GetBool("shield")
-	
+
 	// Set defaults
 	if hostname == "" {
 		hostname = "eos-node"
@@ -33,7 +33,7 @@ func DeployTailscale(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	if vaultPath == "" {
 		vaultPath = "tailscale"
 	}
-	
+
 	// INTERVENE - Build configuration
 	config := &network.TailscaleConfig{
 		Hostname:         hostname,
@@ -49,13 +49,13 @@ func DeployTailscale(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 			"component":   "tailscale",
 		},
 	}
-	
+
 	logger.Info("Tailscale configuration prepared",
 		zap.String("hostname", config.Hostname),
 		zap.Strings("advertise_routes", config.AdvertiseRoutes),
 		zap.String("vault_path", config.VaultPath),
 		zap.Bool("use_terraform", terraformDir != ""))
-	
+
 	// EVALUATE - Deploy using the network package
 	logger.Info("Deploying Tailscale infrastructure")
 	return network.DeployTailscaleInfrastructure(rc, config)

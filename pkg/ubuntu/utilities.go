@@ -17,17 +17,17 @@ func installLynis(rc *eos_io.RuntimeContext) error {
 
 	// Add Lynis repository key using wget and gpg commands
 	keyURL := "https://packages.cisofy.com/keys/cisofy-software-public.key"
-	
+
 	// Download the key first
 	if err := execute.RunSimple(rc.Ctx, "wget", "-O", "/tmp/cisofy-key.asc", keyURL); err != nil {
 		return fmt.Errorf("download Lynis GPG key: %w", err)
 	}
-	
+
 	// Dearmor and install the key
 	if err := execute.RunSimple(rc.Ctx, "gpg", "--dearmor", "--output", "/usr/share/keyrings/cisofy-archive-keyring.gpg", "/tmp/cisofy-key.asc"); err != nil {
 		return fmt.Errorf("add Lynis GPG key: %w", err)
 	}
-	
+
 	// Clean up temporary file
 	_ = os.Remove("/tmp/cisofy-key.asc") // Ignore error for cleanup
 

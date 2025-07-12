@@ -19,31 +19,31 @@ type MetricsCollector struct {
 
 // ClusterMetric represents cluster-level metrics
 type ClusterMetric struct {
-	NodesTotal    int       `json:"nodes_total"`
-	NodesHealthy  int       `json:"nodes_healthy"`
-	ServicesTotal int       `json:"services_total"`
-	ChecksPassing int       `json:"checks_passing"`
-	ChecksCritical int      `json:"checks_critical"`
-	LastUpdate    time.Time `json:"last_update"`
+	NodesTotal     int       `json:"nodes_total"`
+	NodesHealthy   int       `json:"nodes_healthy"`
+	ServicesTotal  int       `json:"services_total"`
+	ChecksPassing  int       `json:"checks_passing"`
+	ChecksCritical int       `json:"checks_critical"`
+	LastUpdate     time.Time `json:"last_update"`
 }
 
 // PerformanceMetric represents performance metrics
 type PerformanceMetric struct {
-	RequestLatencyP50  float64   `json:"request_latency_p50_ms"`
-	RequestLatencyP95  float64   `json:"request_latency_p95_ms"`
-	RequestLatencyP99  float64   `json:"request_latency_p99_ms"`
-	RequestsPerSecond  float64   `json:"requests_per_second"`
-	ErrorRate          float64   `json:"error_rate_percent"`
-	LastUpdate         time.Time `json:"last_update"`
+	RequestLatencyP50 float64   `json:"request_latency_p50_ms"`
+	RequestLatencyP95 float64   `json:"request_latency_p95_ms"`
+	RequestLatencyP99 float64   `json:"request_latency_p99_ms"`
+	RequestsPerSecond float64   `json:"requests_per_second"`
+	ErrorRate         float64   `json:"error_rate_percent"`
+	LastUpdate        time.Time `json:"last_update"`
 }
 
 // SecurityMetric represents security-related metrics
 type SecurityMetric struct {
-	ACLsEnabled         bool      `json:"acls_enabled"`
-	TLSEnabled          bool      `json:"tls_enabled"`
-	EncryptionEnabled   bool      `json:"encryption_enabled"`
-	UnauthorizedAttempts int      `json:"unauthorized_attempts"`
-	LastSecurityEvent   time.Time `json:"last_security_event"`
+	ACLsEnabled          bool      `json:"acls_enabled"`
+	TLSEnabled           bool      `json:"tls_enabled"`
+	EncryptionEnabled    bool      `json:"encryption_enabled"`
+	UnauthorizedAttempts int       `json:"unauthorized_attempts"`
+	LastSecurityEvent    time.Time `json:"last_security_event"`
 }
 
 // NewMetricsCollector creates a new metrics collector

@@ -41,10 +41,10 @@ Examples:
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		force, _ := cmd.Flags().GetBool("force")
 		validate, _ := cmd.Flags().GetBool("validate")
-		
+
 		logger.Info("Creating A/B testing configuration")
 
 		// Create file service container

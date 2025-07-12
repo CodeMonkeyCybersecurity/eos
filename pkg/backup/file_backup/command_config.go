@@ -4,15 +4,15 @@ package file_backup
 // Migrated from cmd/backup/file.go package-level variables
 type CommandConfig struct {
 	// Backup command flags
-	BackupDir        string
-	CustomName       string
-	Interactive      bool
-	Force            bool
-	DryRun           bool
-	NoVerify         bool
-	NoPreserve       bool
-	CreateSymlink    bool
-	OutputJSON       bool
+	BackupDir     string
+	CustomName    string
+	Interactive   bool
+	Force         bool
+	DryRun        bool
+	NoVerify      bool
+	NoPreserve    bool
+	CreateSymlink bool
+	OutputJSON    bool
 
 	// List command flags
 	ListBackupDir  string

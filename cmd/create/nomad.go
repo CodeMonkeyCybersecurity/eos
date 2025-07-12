@@ -33,7 +33,7 @@ Examples:
 func init() {
 	// Register the nomad command
 	CreateCmd.AddCommand(CreateNomadCmd)
-	
+
 	// Add command flags
 	CreateNomadCmd.Flags().String("role", "", "Node role: server or client")
 	CreateNomadCmd.Flags().String("datacenter", "dc1", "Nomad datacenter name")

@@ -231,7 +231,7 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 	if user == "" {
 		user = os.Getenv("USER")
 	}
-	
+
 	// Additional fallback: check who actually invoked sudo
 	originalUser := ""
 	if logname, err := execute.Run(rc.Ctx, execute.Options{
@@ -278,7 +278,7 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 
 	logger.Info(" User added to docker group successfully",
 		zap.String("user", user))
-	
+
 	// Verify the user was added to the group
 	if output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "groups",
@@ -293,7 +293,7 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 				zap.String("groups", output))
 		}
 	}
-	
+
 	logger.Info(" IMPORTANT: To use Docker without sudo, you must:")
 	logger.Info("   1. Log out and log back in (recommended), OR")
 	logger.Info("   2. Run 'newgrp docker' in your current shell")

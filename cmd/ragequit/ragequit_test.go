@@ -86,7 +86,7 @@ func TestUtilityFunctions(t *testing.T) {
 		tempFile := filepath.Join(t.TempDir(), "test-file")
 		err := os.WriteFile(tempFile, []byte("test"), 0644)
 		require.NoError(t, err)
-		
+
 		assert.True(t, system.FileExists(tempFile))
 		assert.False(t, system.FileExists("/nonexistent/file"))
 	})

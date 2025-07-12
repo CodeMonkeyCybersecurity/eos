@@ -689,11 +689,11 @@ func runUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args 
 	return GrantSSHAccess(rc, username)
 }
 
-// RunUpdateUserSSHAccess handles SSH access grant operations  
+// RunUpdateUserSSHAccess handles SSH access grant operations
 func RunUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting SSH access grant operation")
-	
+
 	// ASSESS - Determine username
 	var username string
 	if len(args) > 0 {
@@ -707,13 +707,13 @@ func RunUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args 
 			return fmt.Errorf("failed to read username: %w", err)
 		}
 	}
-	
+
 	if username == "" {
 		return fmt.Errorf("username cannot be empty")
 	}
-	
+
 	logger.Info("Granting SSH access to user", zap.String("username", username))
-	
+
 	// INTERVENE - Grant SSH access using existing function
 	return GrantSSHAccess(rc, username)
 }

@@ -24,7 +24,7 @@ func TestGetOSPlatform(t *testing.T) {
 			}{
 				expected: map[string]string{
 					"darwin":  "macos",
-					"linux":   "linux", 
+					"linux":   "linux",
 					"windows": "windows",
 				}[runtime.GOOS],
 			},
@@ -114,14 +114,14 @@ func TestOSDetectionFunctions(t *testing.T) {
 
 func TestGetArch(t *testing.T) {
 	t.Parallel()
-	
+
 	result := GetArch()
 	assert.Equal(t, runtime.GOARCH, result)
 }
 
 func TestIsARM(t *testing.T) {
 	t.Parallel()
-	
+
 	result := IsARM()
 	expected := runtime.GOARCH == "arm" || runtime.GOARCH == "arm64"
 	assert.Equal(t, expected, result)
@@ -241,14 +241,14 @@ func TestGetShellType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Save original environment
 			originalShell := os.Getenv("SHELL")
 			defer os.Setenv("SHELL", originalShell)
-			
+
 			// Set test environment
 			os.Setenv("SHELL", tt.Input.shellEnv)
-			
+
 			result := GetShellType()
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -259,26 +259,26 @@ func TestGetHomeDir(t *testing.T) {
 	t.Parallel()
 
 	tests := []testutil.TableTest[struct {
-		homeEnv     string
+		homeEnv        string
 		expectFallback bool
 	}]{
 		{
 			Name: "HOME environment variable set",
 			Input: struct {
-				homeEnv     string
+				homeEnv        string
 				expectFallback bool
 			}{
-				homeEnv:     "/custom/home",
+				homeEnv:        "/custom/home",
 				expectFallback: false,
 			},
 		},
 		{
 			Name: "HOME environment variable empty",
 			Input: struct {
-				homeEnv     string
+				homeEnv        string
 				expectFallback bool
 			}{
-				homeEnv:     "",
+				homeEnv:        "",
 				expectFallback: true,
 			},
 		},
@@ -287,20 +287,20 @@ func TestGetHomeDir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Save original environment
 			originalHome := os.Getenv("HOME")
 			defer os.Setenv("HOME", originalHome)
-			
+
 			// Set test environment
 			if tt.Input.homeEnv != "" {
 				os.Setenv("HOME", tt.Input.homeEnv)
 			} else {
 				os.Unsetenv("HOME")
 			}
-			
+
 			result := GetHomeDir()
-			
+
 			if tt.Input.expectFallback {
 				// Should return either user.Current().HomeDir or "/root"
 				assert.NotEmpty(t, result)
@@ -315,64 +315,64 @@ func TestGetShellInitFile(t *testing.T) {
 	t.Parallel()
 
 	tests := []testutil.TableTest[struct {
-		homeDir     string
-		shell       string
-		override    string
+		homeDir        string
+		shell          string
+		override       string
 		expectedSuffix string
 	}]{
 		{
 			Name: "zsh init file",
 			Input: struct {
-				homeDir     string
-				shell       string
-				override    string
+				homeDir        string
+				shell          string
+				override       string
 				expectedSuffix string
 			}{
-				homeDir:     "/home/test",
-				shell:       "/bin/zsh",
-				override:    "",
+				homeDir:        "/home/test",
+				shell:          "/bin/zsh",
+				override:       "",
 				expectedSuffix: "/.zshrc",
 			},
 		},
 		{
 			Name: "bash init file",
 			Input: struct {
-				homeDir     string
-				shell       string
-				override    string
+				homeDir        string
+				shell          string
+				override       string
 				expectedSuffix string
 			}{
-				homeDir:     "/home/test",
-				shell:       "/bin/bash",
-				override:    "",
+				homeDir:        "/home/test",
+				shell:          "/bin/bash",
+				override:       "",
 				expectedSuffix: "/.bashrc",
 			},
 		},
 		{
 			Name: "fish init file",
 			Input: struct {
-				homeDir     string
-				shell       string
-				override    string
+				homeDir        string
+				shell          string
+				override       string
 				expectedSuffix string
 			}{
-				homeDir:     "/home/test",
-				shell:       "/usr/bin/fish",
-				override:    "",
+				homeDir:        "/home/test",
+				shell:          "/usr/bin/fish",
+				override:       "",
 				expectedSuffix: "/.config/fish/config.fish",
 			},
 		},
 		{
 			Name: "override environment variable",
 			Input: struct {
-				homeDir     string
-				shell       string
-				override    string
+				homeDir        string
+				shell          string
+				override       string
 				expectedSuffix string
 			}{
-				homeDir:     "/home/test",
-				shell:       "/bin/bash",
-				override:    "/custom/shell/config",
+				homeDir:        "/home/test",
+				shell:          "/bin/bash",
+				override:       "/custom/shell/config",
 				expectedSuffix: "",
 			},
 		},
@@ -381,7 +381,7 @@ func TestGetShellInitFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Save original environment
 			originalHome := os.Getenv("HOME")
 			originalShell := os.Getenv("SHELL")
@@ -395,7 +395,7 @@ func TestGetShellInitFile(t *testing.T) {
 					os.Unsetenv("Eos_SHELL_RC")
 				}
 			}()
-			
+
 			// Set test environment
 			os.Setenv("HOME", tt.Input.homeDir)
 			os.Setenv("SHELL", tt.Input.shell)
@@ -404,9 +404,9 @@ func TestGetShellInitFile(t *testing.T) {
 			} else {
 				os.Unsetenv("Eos_SHELL_RC")
 			}
-			
+
 			result := GetShellInitFile()
-			
+
 			if tt.Input.override != "" {
 				assert.Equal(t, tt.Input.override, result)
 			} else if tt.Input.expectedSuffix != "" {
@@ -447,7 +447,7 @@ func TestSecurityGetShellInitFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Save original environment
 			originalOverride := os.Getenv("Eos_SHELL_RC")
 			defer func() {
@@ -457,10 +457,10 @@ func TestSecurityGetShellInitFile(t *testing.T) {
 					os.Unsetenv("Eos_SHELL_RC")
 				}
 			}()
-			
+
 			// Set malicious environment
 			os.Setenv("Eos_SHELL_RC", tt.Input.maliciousOverride)
-			
+
 			// Function should still return the override value
 			// Security should be handled at usage time
 			result := GetShellInitFile()
@@ -501,7 +501,7 @@ func contains(slice []string, item string) bool {
 // Linux Distribution Tests
 func TestDetectLinuxDistro(t *testing.T) {
 	t.Parallel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
@@ -521,13 +521,13 @@ func TestDetectLinuxDistro(t *testing.T) {
 
 func TestIsDebian(t *testing.T) {
 	t.Parallel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
 
 	result := IsDebian(rc)
-	
+
 	if IsLinux() {
 		// Should be consistent with DetectLinuxDistro
 		distro := DetectLinuxDistro(rc)
@@ -540,13 +540,13 @@ func TestIsDebian(t *testing.T) {
 
 func TestIsRHEL(t *testing.T) {
 	t.Parallel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
 
 	result := IsRHEL(rc)
-	
+
 	if IsLinux() {
 		// Should be consistent with DetectLinuxDistro
 		distro := DetectLinuxDistro(rc)
@@ -613,9 +613,9 @@ func TestRequireLinuxDistro(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := RequireLinuxDistro(rc, tt.Input.allowed)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -630,13 +630,13 @@ func TestGuessAdminGroup(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	
+
 	result := GuessAdminGroup(ctx)
-	
+
 	// Should return either "sudo" or "wheel"
 	validGroups := []string{"sudo", "wheel"}
 	assert.Contains(t, validGroups, result)
-	
+
 	// Default should be "sudo" for most systems
 	if !IsLinux() {
 		assert.Equal(t, "sudo", result)
@@ -676,7 +676,7 @@ func TestIsProcessRunning(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := IsProcessRunning(tt.Input.processName)
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -736,9 +736,9 @@ func TestOpenBrowser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := OpenBrowser(tt.Input.url)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -788,11 +788,11 @@ func TestOpenBrowserSecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Function should handle malicious input safely
 			// exec.Command properly escapes arguments
 			err := OpenBrowser(tt.Input.maliciousURL)
-			
+
 			// Should not panic or cause security issues
 			// The actual command may fail but that's expected
 			_ = err

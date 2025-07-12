@@ -8,11 +8,11 @@ import (
 
 func TestAuthenticate(t *testing.T) {
 	tests := []struct {
-		name       string
-		setupMock  func() *testutil.MockHTTPTransport
-		config     *Config
-		wantToken  string
-		wantErr    bool
+		name        string
+		setupMock   func() *testutil.MockHTTPTransport
+		config      *Config
+		wantToken   string
+		wantErr     bool
 		errContains string
 	}{
 		{
@@ -149,13 +149,13 @@ func TestAuthenticate(t *testing.T) {
 
 func TestAuthenticateUser(t *testing.T) {
 	tests := []struct {
-		name       string
-		setupMock  func() *testutil.MockHTTPTransport
-		config     *Config
-		username   string
-		password   string
-		wantToken  string
-		wantErr    bool
+		name        string
+		setupMock   func() *testutil.MockHTTPTransport
+		config      *Config
+		username    string
+		password    string
+		wantToken   string
+		wantErr     bool
 		errContains string
 	}{
 		{
@@ -276,12 +276,12 @@ func TestAuthenticateUser(t *testing.T) {
 
 func TestAuthenticatedGetJSON(t *testing.T) {
 	tests := []struct {
-		name        string
-		setupMock   func() *testutil.MockHTTPTransport
-		config      *Config
-		path        string
-		wantBody    string
-		wantStatus  int
+		name       string
+		setupMock  func() *testutil.MockHTTPTransport
+		config     *Config
+		path       string
+		wantBody   string
+		wantStatus int
 	}{
 		{
 			name: "successful authenticated request",
@@ -375,7 +375,7 @@ func TestAuthenticatedGetJSON(t *testing.T) {
 func TestAuthenticationSecurity(t *testing.T) {
 	t.Run("credentials not logged", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		transport := &testutil.MockHTTPTransport{
 			ResponseMap: map[string]testutil.MockResponse{
 				"/security/user/authenticate?raw=true": {
@@ -395,7 +395,7 @@ func TestAuthenticationSecurity(t *testing.T) {
 
 		_, err := Authenticate(rc, config)
 		testutil.AssertError(t, err)
-		
+
 		// Error should not contain the actual password
 		errStr := err.Error()
 		if containsSensitiveData(errStr, config.APIPassword) {
@@ -405,7 +405,7 @@ func TestAuthenticationSecurity(t *testing.T) {
 
 	t.Run("TLS configuration", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		transport := &testutil.MockHTTPTransport{
 			ResponseMap: map[string]testutil.MockResponse{
 				"/security/user/authenticate?raw=true": {
@@ -488,7 +488,7 @@ func TestAuthenticationConcurrency(t *testing.T) {
 func TestAuthenticationIntegration(t *testing.T) {
 	t.Run("authentication workflow", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		transport := &testutil.MockHTTPTransport{
 			ResponseMap: map[string]testutil.MockResponse{
 				"/security/user/authenticate?raw=true": {
@@ -528,8 +528,8 @@ func TestAuthenticationIntegration(t *testing.T) {
 // Helper function to check if error message contains sensitive data
 func containsSensitiveData(message, sensitive string) bool {
 	// Simple check - in real implementation would be more sophisticated
-	return len(sensitive) > 4 && len(message) > 0 && 
-		   message != "" && sensitive != ""
+	return len(sensitive) > 4 && len(message) > 0 &&
+		message != "" && sensitive != ""
 }
 
 func BenchmarkAuthenticate(b *testing.B) {

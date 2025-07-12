@@ -30,7 +30,7 @@ func Generate(opts *GenerateSecretOptions) (string, error) {
 	if opts.Length <= 0 {
 		return "", errors.New("length must be greater than 0")
 	}
-	
+
 	if opts.Format != "hex" && opts.Format != "base64" {
 		return "", errors.New("unsupported format: must be 'hex' or 'base64'")
 	}

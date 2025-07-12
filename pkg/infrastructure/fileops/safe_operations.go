@@ -1,5 +1,3 @@
-
-
 package fileops
 
 import (

@@ -364,7 +364,7 @@ Examples:
 func init() {
 	// Register services command with update command
 	UpdateCmd.AddCommand(servicesCmd)
-	
+
 	// Add subcommands to services command
 	servicesCmd.AddCommand(servicesListCmd)
 	servicesCmd.AddCommand(servicesStartCmd)

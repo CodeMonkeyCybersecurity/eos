@@ -594,10 +594,13 @@ var (
 )
 
 type errPasswordLength struct{}
+
 func (errPasswordLength) Error() string { return "password must be between 8 and 128 characters" }
 
 type errPasswordInvalid struct{}
+
 func (errPasswordInvalid) Error() string { return "password contains invalid characters" }
 
 type errPasswordWeak struct{}
+
 func (errPasswordWeak) Error() string { return "password is too weak" }

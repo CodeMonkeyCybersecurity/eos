@@ -90,7 +90,7 @@ func TestDockerImageSecurity(t *testing.T) {
 		for _, image := range validImages {
 			service := Service{Image: image}
 			assert.NotEmpty(t, service.Image)
-			
+
 			// Basic image name validation
 			assert.NotContains(t, image, " ", "Image name should not contain spaces")
 			assert.NotContains(t, image, ";", "Image name should not contain semicolons")
@@ -125,8 +125,8 @@ func TestDockerImageSecurity(t *testing.T) {
 	t.Run("image_tag_security", func(t *testing.T) {
 		// Test image tag security
 		insecureTags := []string{
-			"latest",    // Not pinned version
-			"",          // No tag specified
+			"latest", // Not pinned version
+			"",       // No tag specified
 		}
 
 		secureTags := []string{
@@ -175,19 +175,19 @@ func TestContainerPortSecurity(t *testing.T) {
 	t.Run("dangerous_port_exposure", func(t *testing.T) {
 		// Test dangerous port exposures
 		dangerousPorts := []string{
-			"22:22",     // SSH
-			"3389:3389", // RDP
-			"5432:5432", // PostgreSQL
-			"3306:3306", // MySQL
-			"6379:6379", // Redis
+			"22:22",       // SSH
+			"3389:3389",   // RDP
+			"5432:5432",   // PostgreSQL
+			"3306:3306",   // MySQL
+			"6379:6379",   // Redis
 			"27017:27017", // MongoDB
-			"9200:9200", // Elasticsearch
+			"9200:9200",   // Elasticsearch
 		}
 
 		for _, port := range dangerousPorts {
 			// These ports should trigger security warnings when exposed
 			assert.Contains(t, port, ":", "Port mapping format check")
-			
+
 			// Extract port number for validation
 			parts := strings.Split(port, ":")
 			if len(parts) >= 2 {
@@ -246,20 +246,20 @@ func TestContainerVolumeSecurity(t *testing.T) {
 	t.Run("dangerous_volume_mounts", func(t *testing.T) {
 		// Test dangerous volume mounts
 		dangerousVolumes := []string{
-			"/:/hostroot",                    // Root filesystem
-			"/etc:/host/etc",                 // System configuration
+			"/:/hostroot",    // Root filesystem
+			"/etc:/host/etc", // System configuration
 			"/var/run/docker.sock:/var/run/docker.sock", // Docker socket
-			"/proc:/host/proc",               // Process information
-			"/sys:/host/sys",                 // System information
-			"/home:/host/home",               // User home directories
-			"/root:/host/root",               // Root home directory
+			"/proc:/host/proc",                          // Process information
+			"/sys:/host/sys",                            // System information
+			"/home:/host/home",                          // User home directories
+			"/root:/host/root",                          // Root home directory
 		}
 
 		for _, volume := range dangerousVolumes {
 			parts := strings.Split(volume, ":")
 			if len(parts) >= 2 {
 				hostPath := parts[0]
-				
+
 				// Check for dangerous mount points
 				isDangerous := hostPath == "/" ||
 					hostPath == "/etc" ||
@@ -298,15 +298,15 @@ func TestContainerEnvironmentSecurity(t *testing.T) {
 	t.Run("environment_variable_validation", func(t *testing.T) {
 		// Test valid environment variables
 		validEnv := map[string]string{
-			"APP_ENV":     "production",
-			"LOG_LEVEL":   "info",
-			"PORT":        "3000",
+			"APP_ENV":      "production",
+			"LOG_LEVEL":    "info",
+			"PORT":         "3000",
 			"DATABASE_URL": "postgres://user:pass@db:5432/app",
 		}
 
 		service := Service{Environment: validEnv}
 		assert.NotEmpty(t, service.Environment)
-		
+
 		for key, value := range validEnv {
 			assert.NotEmpty(t, key, "Environment key should not be empty")
 			assert.NotEmpty(t, value, "Environment value should not be empty")
@@ -367,7 +367,7 @@ func TestDockerCommandSecurity(t *testing.T) {
 		Ctx: ctx,
 		Log: logger,
 	}
-	
+
 	// Use rc to verify runtime context is properly initialized
 	assert.NotNil(t, rc.Ctx)
 	assert.NotNil(t, rc.Log)
@@ -425,11 +425,11 @@ func TestDockerCommandSecurity(t *testing.T) {
 		}
 
 		maliciousArgs := []string{
-			"--privileged",           // Dangerous flag
-			"--user=root",           // Running as root
-			"--pid=host",            // Host PID namespace
-			"--network=host",        // Host networking
-			"--volume=/:/hostroot",  // Root filesystem mount
+			"--privileged",         // Dangerous flag
+			"--user=root",          // Running as root
+			"--pid=host",           // Host PID namespace
+			"--network=host",       // Host networking
+			"--volume=/:/hostroot", // Root filesystem mount
 		}
 
 		for _, arg := range validArgs {
@@ -464,7 +464,7 @@ func TestContainerIsolationSecurity(t *testing.T) {
 		for _, policy := range validPolicies {
 			service := Service{Restart: policy}
 			assert.NotEmpty(t, service.Restart)
-			
+
 			// Validate restart policy format
 			isValid := policy == "no" ||
 				policy == "always" ||
@@ -485,12 +485,12 @@ func TestContainerIsolationSecurity(t *testing.T) {
 		}
 
 		invalidNames := []string{
-			"",                      // Empty
-			"name with spaces",      // Spaces
-			"name/with/slashes",     // Slashes
-			"name;with;semicolons",  // Semicolons
-			"UPPERCASE",             // Should be lowercase
-			"../../../etc/passwd",   // Path traversal
+			"",                     // Empty
+			"name with spaces",     // Spaces
+			"name/with/slashes",    // Slashes
+			"name;with;semicolons", // Semicolons
+			"UPPERCASE",            // Should be lowercase
+			"../../../etc/passwd",  // Path traversal
 		}
 
 		for _, name := range validNames {
@@ -521,8 +521,8 @@ func TestContainerIsolationSecurity(t *testing.T) {
 		}
 
 		insecureNetworks := []string{
-			"host",     // Host networking (no isolation)
-			"bridge",   // Default bridge (less secure)
+			"host",   // Host networking (no isolation)
+			"bridge", // Default bridge (less secure)
 		}
 
 		for _, network := range secureNetworks {
@@ -547,7 +547,7 @@ func TestContainerResourceSecurity(t *testing.T) {
 		}
 
 		assert.NotEmpty(t, service.DependsOn)
-		
+
 		for _, dep := range service.DependsOn {
 			assert.NotEmpty(t, dep, "Dependency name should not be empty")
 			assert.NotContains(t, dep, " ", "Dependency should not contain spaces")
@@ -570,7 +570,7 @@ func TestContainerResourceSecurity(t *testing.T) {
 		}
 
 		assert.NotEmpty(t, compose.Services)
-		
+
 		for name, service := range compose.Services {
 			assert.NotEmpty(t, name, "Service name should not be empty")
 			assert.NotEmpty(t, service.Image, "Service image should not be empty")

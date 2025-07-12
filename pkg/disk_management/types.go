@@ -63,15 +63,15 @@ type PartitionOperation struct {
 
 // PartitionOptions contains options for partition operations
 type PartitionOptions struct {
-	PartitionType   string `json:"partition_type"`   // primary, extended, logical
-	FileSystem      string `json:"filesystem"`       // ext4, xfs, btrfs, etc.
-	Label           string `json:"label"`
-	MountPoint      string `json:"mount_point"`
-	MountOptions    string `json:"mount_options"`
-	Force           bool   `json:"force"`
-	DryRun          bool   `json:"dry_run"`
-	AddToFstab      bool   `json:"add_to_fstab"`
-	CreateMountDir  bool   `json:"create_mount_dir"`
+	PartitionType  string `json:"partition_type"` // primary, extended, logical
+	FileSystem     string `json:"filesystem"`     // ext4, xfs, btrfs, etc.
+	Label          string `json:"label"`
+	MountPoint     string `json:"mount_point"`
+	MountOptions   string `json:"mount_options"`
+	Force          bool   `json:"force"`
+	DryRun         bool   `json:"dry_run"`
+	AddToFstab     bool   `json:"add_to_fstab"`
+	CreateMountDir bool   `json:"create_mount_dir"`
 }
 
 // DefaultPartitionOptions returns options with sensible defaults
@@ -88,13 +88,13 @@ func DefaultPartitionOptions() *PartitionOptions {
 
 // DiskManagerConfig contains configuration for disk management
 type DiskManagerConfig struct {
-	RequireConfirmation bool     `json:"require_confirmation" mapstructure:"require_confirmation"`
-	SafetyChecks        bool     `json:"safety_checks" mapstructure:"safety_checks"`
-	BackupPartitionTable bool    `json:"backup_partition_table" mapstructure:"backup_partition_table"`
-	AllowRemovableMedia bool     `json:"allow_removable_media" mapstructure:"allow_removable_media"`
-	ExcludedDevices     []string `json:"excluded_devices" mapstructure:"excluded_devices"`
-	DefaultFileSystem   string   `json:"default_filesystem" mapstructure:"default_filesystem"`
-	DefaultMountBase    string   `json:"default_mount_base" mapstructure:"default_mount_base"`
+	RequireConfirmation  bool     `json:"require_confirmation" mapstructure:"require_confirmation"`
+	SafetyChecks         bool     `json:"safety_checks" mapstructure:"safety_checks"`
+	BackupPartitionTable bool     `json:"backup_partition_table" mapstructure:"backup_partition_table"`
+	AllowRemovableMedia  bool     `json:"allow_removable_media" mapstructure:"allow_removable_media"`
+	ExcludedDevices      []string `json:"excluded_devices" mapstructure:"excluded_devices"`
+	DefaultFileSystem    string   `json:"default_filesystem" mapstructure:"default_filesystem"`
+	DefaultMountBase     string   `json:"default_mount_base" mapstructure:"default_mount_base"`
 }
 
 // DefaultDiskManagerConfig returns a configuration with sensible defaults

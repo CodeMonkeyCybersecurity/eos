@@ -17,7 +17,7 @@ import (
 func TestFullSecurityPipeline(t *testing.T) {
 	corpus := GetSecurityCorpus()
 	ctx := context.Background()
-	
+
 	testCases := []struct {
 		name         string
 		attacks      []string
@@ -58,7 +58,7 @@ func TestFullSecurityPipeline(t *testing.T) {
 			} else {
 				sanitizer = NewInputSanitizer()
 			}
-			
+
 			output := NewSecureOutput(ctx)
 			rejectedCount := 0
 			processedCount := 0
@@ -74,14 +74,14 @@ func TestFullSecurityPipeline(t *testing.T) {
 						}
 						return
 					}
-					
+
 					processedCount++
-					
+
 					// Validate sanitized input
 					if !utf8.ValidString(sanitized) {
 						t.Errorf("Sanitizer produced invalid UTF-8 for attack %q", attack)
 					}
-					
+
 					// Phase 2: Use sanitized input in argument processing
 					args := []string{"command", sanitized, "additional_arg"}
 					cleanArgs, err := sanitizer.SanitizeArguments(args)
@@ -89,7 +89,7 @@ func TestFullSecurityPipeline(t *testing.T) {
 						t.Errorf("Argument sanitization failed for %q: %v", sanitized, err)
 						return
 					}
-					
+
 					// Phase 3: Generate secure output
 					output.Info("Processing attack", zap.String("original", attack), zap.String("sanitized", sanitized))
 					output.Result("attack_processing", map[string]interface{}{
@@ -98,7 +98,7 @@ func TestFullSecurityPipeline(t *testing.T) {
 						"sanitized":   sanitized,
 						"args":        cleanArgs,
 					})
-					
+
 					// Phase 4: Validate the entire pipeline worked
 					for _, arg := range cleanArgs {
 						if strings.ContainsRune(arg, CSI) {
@@ -112,7 +112,7 @@ func TestFullSecurityPipeline(t *testing.T) {
 			if tc.expectReject && rejectedCount == 0 {
 				t.Errorf("Expected some rejections in strict mode for %s, but none occurred", tc.name)
 			}
-			
+
 			t.Logf("%s: Processed %d attacks, rejected %d", tc.name, processedCount, rejectedCount)
 		})
 	}
@@ -208,13 +208,13 @@ func TestRegressionPrevention(t *testing.T) {
 
 				t.Run(sanitizerName, func(t *testing.T) {
 					result, err := sanitizer.SanitizeInput(test.attack)
-					
+
 					// Strict mode may reject dangerous input
 					if i == 1 && err != nil {
 						t.Logf("Strict mode rejected %s attack (expected): %v", test.vulnType, err)
 						return
 					}
-					
+
 					if err != nil {
 						t.Errorf("Sanitizer failed on %s attack: %v", test.vulnType, err)
 						return
@@ -232,10 +232,10 @@ func TestRegressionPrevention(t *testing.T) {
 func TestPerformanceRegression(t *testing.T) {
 	// This is a basic performance regression test
 	// More detailed benchmarks are in performance_test.go
-	
+
 	sanitizer := NewInputSanitizer()
 	normalInput := "normal command with some parameters"
-	
+
 	// Baseline timing for normal input
 	iterations := 10000
 	start := testing.Benchmark(func(b *testing.B) {
@@ -243,7 +243,7 @@ func TestPerformanceRegression(t *testing.T) {
 			_, _ = sanitizer.SanitizeInput(normalInput)
 		}
 	})
-	
+
 	// Timing for malicious input
 	maliciousInput := strings.Repeat(string(rune(0x9b))+"[31m", 100) + "text"
 	malicious := testing.Benchmark(func(b *testing.B) {
@@ -251,13 +251,13 @@ func TestPerformanceRegression(t *testing.T) {
 			_, _ = sanitizer.SanitizeInput(maliciousInput)
 		}
 	})
-	
+
 	// Performance should not degrade more than 10x for malicious input
 	if malicious.NsPerOp() > start.NsPerOp()*10 {
 		t.Errorf("Performance regression: malicious input processing is %dx slower than normal input",
 			malicious.NsPerOp()/start.NsPerOp())
 	}
-	
+
 	t.Logf("Performance: normal=%dns/op, malicious=%dns/op", start.NsPerOp(), malicious.NsPerOp())
 }
 
@@ -273,7 +273,7 @@ func TestCompleteWorkflowSecurity(t *testing.T) {
 			name:    "File_Operation_With_CSI",
 			command: "create",
 			args: []string{
-				"file", 
+				"file",
 				"/tmp/test" + string(rune(0x9b)) + "6n.txt",
 				"content\x1b[31mwith\x1b[0mformatting",
 			},
@@ -284,7 +284,7 @@ func TestCompleteWorkflowSecurity(t *testing.T) {
 			command: "create",
 			args: []string{
 				"user",
-				"admin\xc0\x80", // Overlong encoding
+				"admin\xc0\x80",    // Overlong encoding
 				"password\xff\xfe", // Invalid UTF-8
 			},
 			description: "User creation with UTF-8 attacks",
@@ -304,8 +304,8 @@ func TestCompleteWorkflowSecurity(t *testing.T) {
 			command: "update",
 			args: []string{
 				"config\x1b]0;$(whoami)\x07", // OSC command injection
-				"key\x9b[31m", // CSI with color
-				"value\xff\xfe\x00\x1b[2J", // Mixed UTF-8, null, and ANSI
+				"key\x9b[31m",                // CSI with color
+				"value\xff\xfe\x00\x1b[2J",   // Mixed UTF-8, null, and ANSI
 			},
 			description: "Complex attack combining multiple vectors",
 		},
@@ -318,7 +318,7 @@ func TestCompleteWorkflowSecurity(t *testing.T) {
 			output := NewSecureOutput(ctx)
 
 			// Simulate command processing pipeline
-			
+
 			// Step 1: Validate command name
 			err := ValidateCommandName(workflow.command)
 			if err != nil {
@@ -334,7 +334,7 @@ func TestCompleteWorkflowSecurity(t *testing.T) {
 			}
 
 			// Step 3: Process and generate output
-			output.Info("Processing command", 
+			output.Info("Processing command",
 				zap.String("command", workflow.command),
 				zap.Strings("original_args", workflow.args),
 				zap.Strings("sanitized_args", cleanArgs))
@@ -358,7 +358,7 @@ func TestCompleteWorkflowSecurity(t *testing.T) {
 				// Check for unescaped control characters
 				for _, r := range arg {
 					if r < 32 && r != '\n' && r != '\t' {
-						t.Errorf("Workflow %s: argument %d contains control character 0x%02x", 
+						t.Errorf("Workflow %s: argument %d contains control character 0x%02x",
 							workflow.name, i, r)
 					}
 				}
@@ -388,7 +388,7 @@ func TestSecurityComplianceValidation(t *testing.T) {
 		// Here we just validate that our secure output works
 		ctx := context.Background()
 		output := NewSecureOutput(ctx)
-		
+
 		// Test that all output methods work without panicking
 		output.Info("Compliance test")
 		output.Success("Test passed")
@@ -403,7 +403,7 @@ func TestSecurityComplianceValidation(t *testing.T) {
 	t.Run("All_Input_Sanitized", func(t *testing.T) {
 		// Validate that the sanitization system handles all input types
 		sanitizer := NewInputSanitizer()
-		
+
 		// Test various input types that might occur in CLI
 		inputs := []string{
 			"command argument",
@@ -414,7 +414,7 @@ func TestSecurityComplianceValidation(t *testing.T) {
 			"--flag-name",
 			"environment=production",
 		}
-		
+
 		for _, input := range inputs {
 			result, err := sanitizer.SanitizeInput(input)
 			if err != nil {
@@ -430,7 +430,7 @@ func TestSecurityComplianceValidation(t *testing.T) {
 		// Validate integration with structured logging
 		ctx := context.Background()
 		output := NewSecureOutput(ctx)
-		
+
 		// Test complex structured data
 		complexData := map[string]interface{}{
 			"users": []string{"alice", "bob"},
@@ -444,7 +444,7 @@ func TestSecurityComplianceValidation(t *testing.T) {
 				"uptime":   "99.95%",
 			},
 		}
-		
+
 		output.Result("compliance_test", complexData,
 			zap.String("test_type", "structured_logging"),
 			zap.Bool("passed", true))

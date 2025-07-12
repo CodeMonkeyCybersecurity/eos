@@ -21,19 +21,19 @@ type ScriptData struct {
 // Migrated from cmd/create/consul_terraform.go generateConsulVaultSecretsSetup
 func GenerateVaultSecretsSetup(rc *eos_io.RuntimeContext, outputDir string, data *ScriptData) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Validate input parameters
 	log.Info("Assessing Vault secrets setup script generation requirements",
 		zap.String("output_dir", outputDir),
 		zap.String("vault_addr", data.VaultAddr))
-	
+
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
-	
+
 	// INTERVENE - Generate setup script
 	log.Info("Generating Vault and Consul secrets setup script")
-	
+
 	script := fmt.Sprintf(`#!/bin/bash
 # Setup Vault and Consul secrets for Terraform deployment
 
@@ -110,25 +110,25 @@ echo "You can now run: eos create consul-vault . --services --consul-kv"
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
 		return fmt.Errorf("failed to write setup script: %w", err)
 	}
-	
+
 	// EVALUATE - Verify script was created with correct permissions
 	log.Info("Evaluating setup script generation")
-	
+
 	info, err := os.Stat(scriptPath)
 	if err != nil {
 		return fmt.Errorf("failed to verify setup script: %w", err)
 	}
-	
+
 	if info.Mode().Perm() != 0755 {
 		log.Warn("Setup script permissions not as expected",
 			zap.String("expected", "0755"),
 			zap.String("actual", info.Mode().Perm().String()))
 	}
-	
+
 	log.Info("Vault and Consul secrets setup script generated successfully",
 		zap.String("path", scriptPath),
 		zap.String("datacenter", data.ConsulDatacenter),
 		zap.String("secrets_mount", data.SecretsMount))
-	
+
 	return nil
 }

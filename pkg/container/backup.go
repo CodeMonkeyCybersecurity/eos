@@ -36,23 +36,23 @@ type BackupConfig struct {
 
 // BackupInventory represents the current state of Docker resources
 type BackupInventory struct {
-	Containers       []ContainerInfo
-	Images           []ImageInfo
-	Volumes          []VolumeInfo
-	Networks         []NetworkInfo
-	ComposeFiles     []string
-	SwarmNodes       []SwarmNodeInfo
-	TotalSizeBytes   int64
-	BackupEstimate   time.Duration
+	Containers     []ContainerInfo
+	Images         []ImageInfo
+	Volumes        []VolumeInfo
+	Networks       []NetworkInfo
+	ComposeFiles   []string
+	SwarmNodes     []SwarmNodeInfo
+	TotalSizeBytes int64
+	BackupEstimate time.Duration
 }
 
 // BackupResult represents the outcome of a backup operation
 type BackupResult struct {
-	Success          bool
-	BackupPath       string
-	ComponentResults map[string]ComponentBackupResult
-	TotalSize        int64
-	Duration         time.Duration
+	Success           bool
+	BackupPath        string
+	ComponentResults  map[string]ComponentBackupResult
+	TotalSize         int64
+	Duration          time.Duration
 	ErrorsEncountered []string
 }
 
@@ -104,7 +104,7 @@ type SwarmNodeInfo struct {
 // BackupDockerEnvironment performs a comprehensive Docker backup following assessment→intervention→evaluation
 func BackupDockerEnvironment(rc *eos_io.RuntimeContext, config *BackupConfig) (*BackupResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Docker environment backup", 
+	logger.Info("Starting Docker environment backup",
 		zap.String("backup_dir", config.BackupDir),
 		zap.String("timestamp", config.Timestamp))
 
@@ -134,13 +134,13 @@ func AssessDockerEnvironment(rc *eos_io.RuntimeContext, config *BackupConfig) (*
 	logger.Info("Assessing Docker environment for backup")
 
 	inventory := &BackupInventory{
-		Containers:       []ContainerInfo{},
-		Images:           []ImageInfo{},
-		Volumes:          []VolumeInfo{},
-		Networks:         []NetworkInfo{},
-		ComposeFiles:     []string{},
-		SwarmNodes:       []SwarmNodeInfo{},
-		TotalSizeBytes:   0,
+		Containers:     []ContainerInfo{},
+		Images:         []ImageInfo{},
+		Volumes:        []VolumeInfo{},
+		Networks:       []NetworkInfo{},
+		ComposeFiles:   []string{},
+		SwarmNodes:     []SwarmNodeInfo{},
+		TotalSizeBytes: 0,
 	}
 
 	// Verify Docker is accessible
@@ -218,7 +218,7 @@ func AssessDockerEnvironment(rc *eos_io.RuntimeContext, config *BackupConfig) (*
 	inventory.TotalSizeBytes = calculateTotalSize(inventory)
 	inventory.BackupEstimate = estimateBackupDuration(inventory, config)
 
-	logger.Info("Docker environment assessment completed", 
+	logger.Info("Docker environment assessment completed",
 		zap.Int64("total_size_bytes", inventory.TotalSizeBytes),
 		zap.Duration("estimated_duration", inventory.BackupEstimate))
 
@@ -268,7 +268,7 @@ func interventionExecuteDockerBackup(rc *eos_io.RuntimeContext, config *BackupCo
 	result.Duration = time.Since(startTime)
 	result.TotalSize = calculateBackupSize(result.BackupPath)
 
-	logger.Info("Docker backup intervention completed", 
+	logger.Info("Docker backup intervention completed",
 		zap.Bool("success", result.Success),
 		zap.Duration("duration", result.Duration),
 		zap.Int64("total_size", result.TotalSize))
@@ -289,7 +289,7 @@ func EvaluateDockerBackup(rc *eos_io.RuntimeContext, config *BackupConfig, resul
 	// Verify each component was backed up successfully
 	for componentType, componentResult := range result.ComponentResults {
 		if !componentResult.Success {
-			logger.Error("Component backup failed", 
+			logger.Error("Component backup failed",
 				zap.String("component", componentType),
 				zap.String("error", componentResult.ErrorMessage))
 			return cerr.New(fmt.Sprintf("component backup failed: %s", componentType))
@@ -301,7 +301,7 @@ func EvaluateDockerBackup(rc *eos_io.RuntimeContext, config *BackupConfig, resul
 			return cerr.New(fmt.Sprintf("component directory missing: %s", componentType))
 		}
 
-		logger.Info("Component backup verified", 
+		logger.Info("Component backup verified",
 			zap.String("component", componentType),
 			zap.Int("items", componentResult.ItemsBackedUp),
 			zap.Duration("duration", componentResult.Duration))
@@ -358,7 +358,7 @@ func inventoryContainers(rc *eos_io.RuntimeContext) ([]ContainerInfo, error) {
 		if line == "" {
 			continue
 		}
-		
+
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 4 {
 			containers = append(containers, ContainerInfo{
@@ -389,7 +389,7 @@ func inventoryImages(rc *eos_io.RuntimeContext) ([]ImageInfo, error) {
 		if line == "" {
 			continue
 		}
-		
+
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 4 {
 			images = append(images, ImageInfo{
@@ -420,7 +420,7 @@ func inventoryVolumes(rc *eos_io.RuntimeContext) ([]VolumeInfo, error) {
 		if line == "" {
 			continue
 		}
-		
+
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 2 {
 			volumes = append(volumes, VolumeInfo{
@@ -449,7 +449,7 @@ func inventoryNetworks(rc *eos_io.RuntimeContext) ([]NetworkInfo, error) {
 		if line == "" {
 			continue
 		}
-		
+
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 3 {
 			networks = append(networks, NetworkInfo{
@@ -467,7 +467,7 @@ func findComposeFilesRecursive(rc *eos_io.RuntimeContext) ([]string, error) {
 	// Find docker-compose files in common locations
 	patterns := []string{
 		"docker-compose.yml",
-		"docker-compose.yaml", 
+		"docker-compose.yaml",
 		"compose.yml",
 		"compose.yaml",
 	}
@@ -508,7 +508,7 @@ func inventorySwarmNodes(rc *eos_io.RuntimeContext) ([]SwarmNodeInfo, error) {
 		if line == "" {
 			continue
 		}
-		
+
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 3 {
 			nodes = append(nodes, SwarmNodeInfo{
@@ -525,23 +525,23 @@ func inventorySwarmNodes(rc *eos_io.RuntimeContext) ([]SwarmNodeInfo, error) {
 func calculateTotalSize(inventory *BackupInventory) int64 {
 	// This would calculate actual sizes in production
 	var total int64
-	
+
 	// Estimate based on counts for now
-	total += int64(len(inventory.Containers)) * 100 * 1024 * 1024    // 100MB per container
-	total += int64(len(inventory.Images)) * 500 * 1024 * 1024       // 500MB per image
-	total += int64(len(inventory.Volumes)) * 50 * 1024 * 1024       // 50MB per volume
-	
+	total += int64(len(inventory.Containers)) * 100 * 1024 * 1024 // 100MB per container
+	total += int64(len(inventory.Images)) * 500 * 1024 * 1024     // 500MB per image
+	total += int64(len(inventory.Volumes)) * 50 * 1024 * 1024     // 50MB per volume
+
 	return total
 }
 
 func estimateBackupDuration(inventory *BackupInventory, config *BackupConfig) time.Duration {
 	// Estimate based on component counts and whether parallel execution is enabled
 	baseTime := time.Duration(len(inventory.Containers)+len(inventory.Images)+len(inventory.Volumes)) * time.Minute
-	
+
 	if config.Parallel {
 		baseTime = baseTime / 2 // Rough estimate for parallel execution
 	}
-	
+
 	return baseTime
 }
 
@@ -568,7 +568,7 @@ func createBackupDirectoryStructure(rc *eos_io.RuntimeContext, backupPath string
 func executeSequentialBackups(rc *eos_io.RuntimeContext, config *BackupConfig, inventory *BackupInventory, result *BackupResult) error {
 	// Execute each backup operation sequentially
 	operations := getBackupOperations(config, inventory, result.BackupPath)
-	
+
 	for _, op := range operations {
 		if err := op.execute(rc); err != nil {
 			result.ComponentResults[op.componentType] = ComponentBackupResult{
@@ -585,7 +585,7 @@ func executeSequentialBackups(rc *eos_io.RuntimeContext, config *BackupConfig, i
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -631,36 +631,36 @@ func getBackupOperations(config *BackupConfig, inventory *BackupInventory, backu
 
 func backupContainers(rc *eos_io.RuntimeContext, containers []ContainerInfo, backupDir string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	for _, container := range containers {
 		logger.Info("Backing up container", zap.String("container", container.Name), zap.String("id", container.ID))
-		
+
 		backupPath := filepath.Join(backupDir, fmt.Sprintf("%s_%s.tar", container.Name, container.ID))
-		err := execute.RunSimple(rc.Ctx, "sh", "-c", 
+		err := execute.RunSimple(rc.Ctx, "sh", "-c",
 			fmt.Sprintf("docker export %s > %s", container.ID, backupPath))
-		
+
 		if err != nil {
 			logger.Error("Container backup failed", zap.String("container", container.Name), zap.Error(err))
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
 func backupVolumes(rc *eos_io.RuntimeContext, volumes []VolumeInfo, backupDir string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	timestamp := time.Now().Format("20060102150405")
-	
+
 	for _, volume := range volumes {
 		logger.Info("Backing up volume", zap.String("volume", volume.Name))
-		
+
 		volumeBackupDir := filepath.Join(backupDir, fmt.Sprintf("%s_%s", volume.Name, timestamp))
-		
+
 		if err := os.MkdirAll(volumeBackupDir, 0755); err != nil {
 			return err
 		}
-		
+
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "docker",
 			Args: []string{
@@ -671,25 +671,25 @@ func backupVolumes(rc *eos_io.RuntimeContext, volumes []VolumeInfo, backupDir st
 				"sh", "-c", "cp -r /volume/. /backup/",
 			},
 		})
-		
+
 		if err != nil {
 			logger.Error("Volume backup failed", zap.String("volume", volume.Name), zap.Error(err))
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
 func createBackupManifest(rc *eos_io.RuntimeContext, backupPath string, inventory *BackupInventory, result *BackupResult) error {
 	// Create a manifest file with backup details
 	manifest := struct {
-		Timestamp   string                           `json:"timestamp"`
-		BackupPath  string                           `json:"backup_path"`
-		Inventory   *BackupInventory                 `json:"inventory"`
-		Results     map[string]ComponentBackupResult `json:"results"`
-		Duration    string                           `json:"duration"`
-		Success     bool                             `json:"success"`
+		Timestamp  string                           `json:"timestamp"`
+		BackupPath string                           `json:"backup_path"`
+		Inventory  *BackupInventory                 `json:"inventory"`
+		Results    map[string]ComponentBackupResult `json:"results"`
+		Duration   string                           `json:"duration"`
+		Success    bool                             `json:"success"`
 	}{
 		Timestamp:  time.Now().Format(time.RFC3339),
 		BackupPath: backupPath,
@@ -703,7 +703,7 @@ func createBackupManifest(rc *eos_io.RuntimeContext, backupPath string, inventor
 	// In production, would marshal manifest to JSON and write to file
 	_ = manifest
 	_ = manifestPath
-	
+
 	return nil
 }
 
@@ -726,12 +726,12 @@ func validateContainerBackups(rc *eos_io.RuntimeContext, backupPath string) erro
 	if err != nil {
 		return err
 	}
-	
+
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
-		
+
 		filePath := filepath.Join(containerDir, file.Name())
 		// Verify tar file integrity
 		_, err := execute.Run(rc.Ctx, execute.Options{
@@ -739,12 +739,12 @@ func validateContainerBackups(rc *eos_io.RuntimeContext, backupPath string) erro
 			Args:    []string{"-tf", filePath},
 			Capture: true,
 		})
-		
+
 		if err != nil {
 			return fmt.Errorf("invalid container backup file: %s", file.Name())
 		}
 	}
-	
+
 	return nil
 }
 
@@ -755,35 +755,35 @@ func validateVolumeBackups(rc *eos_io.RuntimeContext, backupPath string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	for _, dir := range dirs {
 		if !dir.IsDir() {
 			continue
 		}
-		
+
 		dirPath := filepath.Join(volumeDir, dir.Name())
 		entries, err := os.ReadDir(dirPath)
 		if err != nil {
 			return err
 		}
-		
+
 		if len(entries) == 0 {
 			return fmt.Errorf("empty volume backup: %s", dir.Name())
 		}
 	}
-	
+
 	return nil
 }
 
 func cleanupOldBackups(rc *eos_io.RuntimeContext, backupDir string, retention int) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Remove old backup directories beyond retention policy
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {
 		return err
 	}
-	
+
 	// Sort by modification time and remove oldest
 	// This is simplified - production would implement proper sorting and cleanup
 	if len(entries) > retention {
@@ -791,12 +791,12 @@ func cleanupOldBackups(rc *eos_io.RuntimeContext, backupDir string, retention in
 		for i := 0; i < len(entries)-retention; i++ {
 			oldPath := filepath.Join(backupDir, entries[i].Name())
 			if err := os.RemoveAll(oldPath); err != nil {
-				logger.Warn("Failed to remove old backup", 
+				logger.Warn("Failed to remove old backup",
 					zap.String("path", oldPath),
 					zap.Error(err))
 			}
 		}
 	}
-	
+
 	return nil
 }

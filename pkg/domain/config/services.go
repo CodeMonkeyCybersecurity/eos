@@ -315,7 +315,7 @@ func (s *service) Watch(ctx context.Context, path string, callback WatchCallback
 		delete(s.watchers, path)
 		s.watchMutex.Unlock()
 		if err := watcher.Stop(); err != nil {
-			s.logger.Warn("Failed to stop watcher", 
+			s.logger.Warn("Failed to stop watcher",
 				zap.String("path", path),
 				zap.Error(err))
 		}
@@ -512,11 +512,11 @@ func (w *fileWatcher) Start(ctx context.Context) error {
 	// This is a simplified implementation
 	// In a real implementation, you'd use fsnotify or similar
 	w.logger.Info("File watcher started", zap.String("path", w.path))
-	
+
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-w.stop:
@@ -527,7 +527,7 @@ func (w *fileWatcher) Start(ctx context.Context) error {
 			}
 		}
 	}()
-	
+
 	return nil
 }
 

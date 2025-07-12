@@ -65,7 +65,7 @@ func TestAuthenticationFallbackSecurity(t *testing.T) {
 		if os.Getenv("CI") != "" || os.Getenv("AUTOMATED_TESTING") != "" {
 			t.Skip("Skipping interactive test in automated environment")
 		}
-		
+
 		// Mock vault client that fails all auth methods
 		mockTransport := &testutil.MockHTTPTransport{
 			ResponseMap: map[string]testutil.MockResponse{
@@ -304,19 +304,19 @@ func TestAppRoleAuthenticationSecurity(t *testing.T) {
 		// Create temporary mock credential files
 		tempDir := t.TempDir()
 		originalSecretsDir := shared.SecretsDir
-		
+
 		// Temporarily override the secrets directory
 		shared.SecretsDir = tempDir
 		shared.AppRolePaths.RoleID = filepath.Join(tempDir, "role_id")
 		shared.AppRolePaths.SecretID = filepath.Join(tempDir, "secret_id")
-		
+
 		defer func() {
 			// Restore original paths
 			shared.SecretsDir = originalSecretsDir
 			shared.AppRolePaths.RoleID = filepath.Join(originalSecretsDir, "role_id")
 			shared.AppRolePaths.SecretID = filepath.Join(originalSecretsDir, "secret_id")
 		}()
-		
+
 		// Write mock credential files
 		err := os.WriteFile(shared.AppRolePaths.RoleID, []byte("mock-role-id"), 0600)
 		testutil.AssertNoError(t, err)

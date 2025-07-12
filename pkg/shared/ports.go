@@ -6,51 +6,49 @@ package shared
 
 // Port constants following prime number convention starting from 8000
 const (
-	PortHelen       = 8009
-	PortWazuh       = 8011
-	PortMattermost  = 8017
-	PortMailcow     = 8053
-	PortGrafana     = 8069
-	PortKeycloak    = 8080
-	PortElk         = 8081
-	PortStack       = 8087
-	PortArachne     = 8089
-	PortSoc         = 8093
-	PortRestic      = 8101
-	PortUmami       = 8117
-	PortMinio       = 8123
-	PortN8n         = 8147 // Planned
-	PortConsul      = 8161 // Not 8500
-	PortGitea       = 8167 // Planned
-	PortGophish     = 8171 // Planned, migrating from 8080
-	PortVault       = 8179 // Not 8200
-	PortConsulWeb   = 8191
-	PortConsulAPI   = 8209
-	PortGophishAPI  = 8209 // Legacy Gophish port 3333→8209
-	PortZabbix      = 8233
-	PortZabbixAPI   = 8237
-	PortPenpot      = 8239 // Design platform
-	PortNomad       = 8243 // Nomad API server (not 4646)
+	PortHelen      = 8009
+	PortWazuh      = 8011
+	PortMattermost = 8017
+	PortMailcow    = 8053
+	PortGrafana    = 8069
+	PortKeycloak   = 8080
+	PortElk        = 8081
+	PortStack      = 8087
+	PortArachne    = 8089
+	PortSoc        = 8093
+	PortRestic     = 8101
+	PortUmami      = 8117
+	PortMinio      = 8123
+	PortN8n        = 8147 // Planned
+	PortConsul     = 8161 // Not 8500
+	PortGitea      = 8167 // Planned
+	PortGophish    = 8171 // Planned, migrating from 8080
+	PortVault      = 8179 // Not 8200
+	PortConsulWeb  = 8191
+	PortConsulAPI  = 8209
+	PortGophishAPI = 8209 // Legacy Gophish port 3333→8209
+	PortZabbix     = 8233
+	PortZabbixAPI  = 8237
+	PortPenpot     = 8239 // Design platform
+	PortNomad      = 8243 // Nomad API server (not 4646)
 
-//	Next available:
-// 	1.	8263
-// 	3.	8269
-// 	4.	8273
-// 	5.	8287
-// 	6.	8291
-// 	7.	8293
-// 	8.	8297
-// 	9.	8311
-
-
+	//	Next available:
+	// 	1.	8263
+	// 	3.	8269
+	// 	4.	8273
+	// 	5.	8287
+	// 	6.	8291
+	// 	7.	8293
+	// 	8.	8297
+	// 	9.	8311
 
 	// Next available primes: 8219, 8221, 8231, 8233, 8237, 8243, 8263, 8269...
-	
+
 	// Legacy ports to be migrated
-	PortJenkinsLegacy   = 55000  // Should move to 8xxx range
-	PortNextcloudLegacy = 11000  // Should move to 8xxx range
-	PortResticAPI       = 9101   // Should move to 8xxx range
-	PortMinioAPI        = 9123   // Should move to 8xxx range
+	PortJenkinsLegacy   = 55000 // Should move to 8xxx range
+	PortNextcloudLegacy = 11000 // Should move to 8xxx range
+	PortResticAPI       = 9101  // Should move to 8xxx range
+	PortMinioAPI        = 9123  // Should move to 8xxx range
 )
 
 type AppProxy struct {
@@ -83,7 +81,7 @@ var AppProxies = []AppProxy{
 	{AppName: "nextcloud", Subdomain: "cloud", BackendPort: PortNextcloudLegacy},
 }
 
-// n8n 8147 
+// n8n 8147
 // 8167 gitea
 // 8171:80 , 8209:3333  gophish
 //    8219, 8221, 8231

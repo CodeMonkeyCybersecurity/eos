@@ -179,7 +179,7 @@ func verifyPlatformInstallation(rc *eos_io.RuntimeContext, config *PlatformConfi
 
 func checkOSVersion(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "lsb_release",
 		Args:    []string{"-rs"},
@@ -245,7 +245,7 @@ func checkVaultConnectivity(rc *eos_io.RuntimeContext) error {
 
 func checkDiskSpace(rc *eos_io.RuntimeContext, path string, requiredBytes uint64) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "df",
 		Args:    []string{"-B1", path},
@@ -269,7 +269,7 @@ func checkNetworkConfiguration(rc *eos_io.RuntimeContext, config *PlatformConfig
 
 	// Check if network ranges don't conflict
 	// This would include actual network validation logic
-	
+
 	return nil
 }
 
@@ -306,13 +306,13 @@ func initializeVaultSecrets(rc *eos_io.RuntimeContext, config *PlatformConfig) e
 	// Create secret paths for platform
 	secretPaths := map[string]map[string]interface{}{
 		"wazuh-mssp/platform/config": {
-			"platform_name":   config.Name,
-			"environment":     config.Environment,
-			"datacenter":      config.Datacenter,
-			"domain":          config.Domain,
+			"platform_name": config.Name,
+			"environment":   config.Environment,
+			"datacenter":    config.Datacenter,
+			"domain":        config.Domain,
 		},
 		"wazuh-mssp/platform/encryption": {
-			"nomad_gossip_key": generateGossipKey(),
+			"nomad_gossip_key":  generateGossipKey(),
 			"temporal_tls_cert": "placeholder", // Would generate actual certs
 			"temporal_tls_key":  "placeholder",
 		},
@@ -470,7 +470,7 @@ func configureSaltStates(rc *eos_io.RuntimeContext, config *PlatformConfig) erro
 	logger.Info("Configuring Salt states")
 
 	// Copy Salt states to appropriate directory
-	if err := execute.RunSimple(rc.Ctx, "cp", "-r", 
+	if err := execute.RunSimple(rc.Ctx, "cp", "-r",
 		filepath.Join("assets", "salt", "wazuh-mssp"),
 		"/srv/salt/wazuh-mssp"); err != nil {
 		return fmt.Errorf("failed to copy salt states: %w", err)
@@ -494,7 +494,7 @@ func initializeTemporal(rc *eos_io.RuntimeContext, config *PlatformConfig) error
 	}
 
 	// Create default namespace
-	if err := execute.RunSimple(rc.Ctx, "temporal", "operator", "namespace", "create", 
+	if err := execute.RunSimple(rc.Ctx, "temporal", "operator", "namespace", "create",
 		"default", "--retention", "30"); err != nil {
 		logger.Debug("Namespace might already exist", zap.Error(err))
 	}
@@ -536,13 +536,13 @@ func configureNATS(rc *eos_io.RuntimeContext, config *PlatformConfig) error {
 
 	for _, stream := range streams {
 		// Create stream using NATS CLI
-		args := []string{"stream", "add", stream.name, 
+		args := []string{"stream", "add", stream.name,
 			"--subjects", stream.subjects[0],
 			"--storage", "file",
 			"--retention", "limits",
 			"--max-age", "7d",
 			"-f"} // force non-interactive
-		
+
 		if err := execute.RunSimple(rc.Ctx, "nats", args...); err != nil {
 			return fmt.Errorf("failed to create stream %s: %w", stream.name, err)
 		}
@@ -570,7 +570,7 @@ func setupCCSEnvironment(rc *eos_io.RuntimeContext, config *PlatformConfig) erro
 
 func waitForService(rc *eos_io.RuntimeContext, service string, port int, timeoutSeconds int) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Waiting for service", 
+	logger.Info("Waiting for service",
 		zap.String("service", service),
 		zap.Int("port", port),
 		zap.Int("timeout", timeoutSeconds))
@@ -595,7 +595,7 @@ func verifyNomadJobs(rc *eos_io.RuntimeContext, config *PlatformConfig) error {
 
 	expectedJobs := []string{
 		"temporal-server",
-		"nats-cluster", 
+		"nats-cluster",
 		"ccs-indexer",
 		"ccs-dashboard",
 		"benthos-router",
@@ -616,8 +616,8 @@ func verifyNomadJobs(rc *eos_io.RuntimeContext, config *PlatformConfig) error {
 		if output == "" || !strings.Contains(output, "running") {
 			return fmt.Errorf("job %s is not running", jobName)
 		}
-		
-		logger.Info("Nomad job verified", 
+
+		logger.Info("Nomad job verified",
 			zap.String("job", jobName))
 	}
 

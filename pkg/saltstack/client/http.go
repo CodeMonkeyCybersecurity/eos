@@ -21,7 +21,7 @@ import (
 // NewHTTPSaltClient creates a new HTTP Salt client
 func NewHTTPSaltClient(rc *eos_io.RuntimeContext, config *ClientConfig) (*HTTPSaltClient, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if config.BaseURL == "" {
 		return nil, &SaltError{
 			Code:    400,
@@ -71,7 +71,7 @@ func NewHTTPSaltClient(rc *eos_io.RuntimeContext, config *ClientConfig) (*HTTPSa
 // Login authenticates with Salt API and retrieves token
 func (c *HTTPSaltClient) Login(ctx context.Context, credentials *Credentials) (*AuthResponse, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	if credentials == nil {
 		credentials = &Credentials{
 			Username: c.config.Username,
@@ -126,7 +126,7 @@ func (c *HTTPSaltClient) Login(ctx context.Context, credentials *Credentials) (*
 // Logout invalidates the current session
 func (c *HTTPSaltClient) Logout(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	if c.token == "" {
 		return nil
 	}
@@ -146,7 +146,7 @@ func (c *HTTPSaltClient) Logout(ctx context.Context) error {
 // RefreshToken refreshes the authentication token
 func (c *HTTPSaltClient) RefreshToken(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	if time.Until(c.tokenExpiry) > c.config.TokenRefreshTime {
 		return nil // Token still valid
 	}
@@ -159,7 +159,7 @@ func (c *HTTPSaltClient) RefreshToken(ctx context.Context) error {
 // ValidateConnection tests the connection to Salt API
 func (c *HTTPSaltClient) ValidateConnection(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	// Try to get Salt status
 	status, err := c.GetStatus(ctx)
 	if err != nil {
@@ -176,7 +176,7 @@ func (c *HTTPSaltClient) ValidateConnection(ctx context.Context) error {
 // RunCommand executes a Salt command
 func (c *HTTPSaltClient) RunCommand(ctx context.Context, req *CommandRequest) (*CommandResponse, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Executing Salt command",
 		zap.String("client", req.Client),
 		zap.String("target", req.Target),
@@ -205,7 +205,7 @@ func (c *HTTPSaltClient) RunCommand(ctx context.Context, req *CommandRequest) (*
 // RunState executes a Salt state
 func (c *HTTPSaltClient) RunState(ctx context.Context, req *StateRequest) (*StateResponse, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Executing Salt state",
 		zap.String("target", req.Target),
 		zap.String("function", req.Function),
@@ -234,7 +234,7 @@ func (c *HTTPSaltClient) RunState(ctx context.Context, req *StateRequest) (*Stat
 // RunOrchestrate executes Salt orchestration
 func (c *HTTPSaltClient) RunOrchestrate(ctx context.Context, req *OrchestrationRequest) (*OrchestrationResponse, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Executing Salt orchestration",
 		zap.String("function", req.Function),
 		zap.Strings("mods", req.Mods))
@@ -262,7 +262,7 @@ func (c *HTTPSaltClient) RunOrchestrate(ctx context.Context, req *OrchestrationR
 // GetJob retrieves job information
 func (c *HTTPSaltClient) GetJob(ctx context.Context, jobID string) (*JobResult, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	req := &CommandRequest{
 		Client:   ClientTypeRunner,
 		Function: "jobs.lookup_jid",
@@ -293,7 +293,7 @@ func (c *HTTPSaltClient) GetJob(ctx context.Context, jobID string) (*JobResult, 
 
 	jobData := cmdResp.Return[0]
 	jobBytes, _ := json.Marshal(jobData)
-	
+
 	var job JobResult
 	if err := json.Unmarshal(jobBytes, &job); err != nil {
 		return nil, &SaltError{
@@ -339,7 +339,7 @@ func (c *HTTPSaltClient) ListJobs(ctx context.Context, opts *JobListOptions) (*J
 	}
 
 	jobList := &JobList{Jobs: []JobResult{}}
-	
+
 	if len(cmdResp.Return) > 0 {
 		jobsData := cmdResp.Return[0]
 		for _, jobData := range jobsData {
@@ -392,7 +392,7 @@ func (c *HTTPSaltClient) ListMinions(ctx context.Context, opts *MinionListOption
 	}
 
 	minionList := &MinionList{Minions: []MinionInfo{}}
-	
+
 	if len(cmdResp.Return) > 0 {
 		statusData := cmdResp.Return[0]
 		if upMinions, ok := statusData["up"].([]interface{}); ok {
@@ -558,7 +558,7 @@ func (c *HTTPSaltClient) GetStatus(ctx context.Context) (*SaltStatus, error) {
 // makeRequest handles HTTP requests to Salt API
 func (c *HTTPSaltClient) makeRequest(ctx context.Context, method, path string, data interface{}, requireAuth bool) ([]byte, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	if requireAuth && c.token == "" {
 		if _, err := c.Login(ctx, nil); err != nil {
 			return nil, fmt.Errorf("authentication required: %w", err)
@@ -611,7 +611,7 @@ func (c *HTTPSaltClient) makeRequest(ctx context.Context, method, path string, d
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	
+
 	if requireAuth && c.token != "" {
 		req.Header.Set("X-Auth-Token", c.token)
 	}
@@ -638,7 +638,7 @@ func (c *HTTPSaltClient) makeRequest(ctx context.Context, method, path string, d
 				zap.Int("retry", retry),
 				zap.String("method", method),
 				zap.String("path", path))
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -894,7 +894,7 @@ func (c *HTTPSaltClient) ListFiles(ctx context.Context, path string, env string)
 	}
 
 	fileList := &FileList{Files: []FileInfo{}}
-	
+
 	if len(cmdResp.Return) > 0 {
 		returnData := cmdResp.Return[0]
 		if files, ok := returnData["files"].([]interface{}); ok {

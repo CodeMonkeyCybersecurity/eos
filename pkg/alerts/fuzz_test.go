@@ -40,8 +40,8 @@ func FuzzRenderEmail(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, title, description, host, ruleID, htmlDetails string) {
 		// Skip invalid UTF-8
-		if !utf8.ValidString(title) || !utf8.ValidString(description) || 
-		   !utf8.ValidString(host) || !utf8.ValidString(ruleID) || !utf8.ValidString(htmlDetails) {
+		if !utf8.ValidString(title) || !utf8.ValidString(description) ||
+			!utf8.ValidString(host) || !utf8.ValidString(ruleID) || !utf8.ValidString(htmlDetails) {
 			t.Skip("Skipping non-UTF8 input")
 		}
 
@@ -54,7 +54,7 @@ func FuzzRenderEmail(f *testing.F) {
 			Host:        host,
 			Meta:        map[string]any{"fuzz": true},
 		}
-		
+
 		if htmlDetails != "" {
 			alert.HTMLDetails = template.HTML(htmlDetails)
 		}
@@ -63,25 +63,25 @@ func FuzzRenderEmail(f *testing.F) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					t.Fatalf("RenderEmail panicked with inputs: title=%q, desc=%q, host=%q: %v", 
+					t.Fatalf("RenderEmail panicked with inputs: title=%q, desc=%q, host=%q: %v",
 						title, description, host, r)
 				}
 			}()
 
 			rendered, err := RenderEmail(alert)
-			
+
 			// Check basic invariants
 			if err == nil {
 				// Must have text output
 				if rendered.Text == "" {
 					t.Errorf("Empty text output for alert: %+v", alert)
 				}
-				
+
 				// Subject should not be empty (unless title is empty)
 				if title != "" && rendered.Subject == "" {
 					t.Errorf("Empty subject for non-empty title: %q", title)
 				}
-				
+
 				// Check for potential security issues in output
 				checkSecurityInvariants(t, rendered, alert)
 			}
@@ -93,13 +93,13 @@ func FuzzRenderEmail(f *testing.F) {
 func FuzzBuildMime(f *testing.F) {
 	// Add seed corpus
 	seeds := []struct {
-		fromName  string
-		fromAddr  string
-		toName    string
-		toAddr    string
-		subject   string
-		text      string
-		html      string
+		fromName string
+		fromAddr string
+		toName   string
+		toAddr   string
+		subject  string
+		text     string
+		html     string
 	}{
 		{"Sender", "sender@example.com", "Recipient", "recipient@example.com", "Subject", "Text", "<p>HTML</p>"},
 		{"", "minimal@example.com", "", "minimal@example.com", "", "", ""},
@@ -116,8 +116,8 @@ func FuzzBuildMime(f *testing.F) {
 	f.Fuzz(func(t *testing.T, fromName, fromAddr, toName, toAddr, subject, text, html string) {
 		// Skip invalid UTF-8
 		if !utf8.ValidString(fromName) || !utf8.ValidString(fromAddr) ||
-		   !utf8.ValidString(toName) || !utf8.ValidString(toAddr) ||
-		   !utf8.ValidString(subject) || !utf8.ValidString(text) || !utf8.ValidString(html) {
+			!utf8.ValidString(toName) || !utf8.ValidString(toAddr) ||
+			!utf8.ValidString(subject) || !utf8.ValidString(text) || !utf8.ValidString(html) {
 			t.Skip("Skipping non-UTF8 input")
 		}
 
@@ -144,11 +144,11 @@ func FuzzBuildMime(f *testing.F) {
 			if !strings.Contains(mimeStr, "MIME-Version: 1.0") {
 				t.Error("Missing MIME-Version header")
 			}
-			
+
 			if !strings.Contains(mimeStr, "Content-Type: multipart/alternative") {
 				t.Error("Missing multipart/alternative content type")
 			}
-			
+
 			// Check for header injection
 			checkHeaderInjection(t, mimeStr, subject, fromName, toName)
 		}()
@@ -181,8 +181,8 @@ func FuzzSMTPConfig(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, host, user, pass, from, to string, port int) {
 		// Skip invalid UTF-8
-		if !utf8.ValidString(host) || !utf8.ValidString(user) || 
-		   !utf8.ValidString(pass) || !utf8.ValidString(from) || !utf8.ValidString(to) {
+		if !utf8.ValidString(host) || !utf8.ValidString(user) ||
+			!utf8.ValidString(pass) || !utf8.ValidString(from) || !utf8.ValidString(to) {
 			t.Skip("Skipping non-UTF8 input")
 		}
 
@@ -217,7 +217,7 @@ func FuzzSMTPConfig(f *testing.F) {
 			}()
 
 			sender := NewSMTPSender(config)
-			
+
 			// Type assert to verify internal state
 			if s, ok := sender.(*smtpSender); ok {
 				// Verify address formatting
@@ -225,7 +225,7 @@ func FuzzSMTPConfig(f *testing.F) {
 				if s.addr != expectedAddr {
 					t.Errorf("Unexpected address: got %q, want %q", s.addr, expectedAddr)
 				}
-				
+
 				// Check for potential security issues
 				if strings.Contains(pass, "\n") || strings.Contains(pass, "\r") {
 					t.Log("Warning: Password contains newline characters")
@@ -247,7 +247,7 @@ func FuzzAlertMeta(f *testing.F) {
 	f.Fuzz(func(t *testing.T, key1, value1, key2, value2 string) {
 		// Skip invalid UTF-8
 		if !utf8.ValidString(key1) || !utf8.ValidString(value1) ||
-		   !utf8.ValidString(key2) || !utf8.ValidString(value2) {
+			!utf8.ValidString(key2) || !utf8.ValidString(value2) {
 			t.Skip("Skipping non-UTF8 input")
 		}
 
@@ -321,11 +321,11 @@ func checkSecurityInvariants(t *testing.T, rendered Rendered, alert Alert) {
 			t.Log("Warning: Plain text contains script tags")
 		}
 	}
-	
+
 	// Check for null bytes
 	if strings.Contains(rendered.Subject, "\x00") ||
-	   strings.Contains(rendered.Text, "\x00") ||
-	   strings.Contains(rendered.HTML, "\x00") {
+		strings.Contains(rendered.Text, "\x00") ||
+		strings.Contains(rendered.HTML, "\x00") {
 		t.Error("Output contains null bytes")
 	}
 }
@@ -337,9 +337,9 @@ func checkHeaderInjection(t *testing.T, mimeStr, subject, fromName, toName strin
 		t.Error("Invalid MIME structure: no header/body separator")
 		return
 	}
-	
+
 	headers := mimeStr[:headerEnd]
-	
+
 	// Check if user input added extra headers
 	if strings.Contains(subject, "\n") || strings.Contains(subject, "\r") {
 		// Subject should be properly encoded

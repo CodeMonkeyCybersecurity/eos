@@ -383,7 +383,6 @@ var (
 	generateAnsible      bool
 )
 
-
 func RunCreateTailscaleHosts(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating Tailscale hosts configuration")

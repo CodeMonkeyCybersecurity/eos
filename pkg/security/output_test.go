@@ -45,7 +45,7 @@ func TestSecureOutput_Info(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Test that the function doesn't panic
 			output.Info(tc.message, tc.fields...)
-			
+
 			// Test the sanitization directly
 			sanitized := EscapeOutput(tc.message)
 			if sanitized != tc.expected {
@@ -61,9 +61,9 @@ func TestSecureOutput_Success(t *testing.T) {
 
 	// Test basic success logging
 	output.Success("Operation completed", zap.String("operation", "test"))
-	
+
 	// Test with dangerous content
-	output.Success("Completed \x1b[32msuccessfully\x1b[0m", 
+	output.Success("Completed \x1b[32msuccessfully\x1b[0m",
 		zap.String("result", "data\x9bwith\x00control"))
 }
 
@@ -183,7 +183,7 @@ func TestSanitizeFields(t *testing.T) {
 		zap.String("message", "test\x1b[31mwith\x1b[0mcolors"),
 		zap.String("user", "admin\x9b"),
 		zap.Error(errors.New("error\x00message")),
-		zap.Int("count", 42), // Should remain unchanged
+		zap.Int("count", 42),     // Should remain unchanged
 		zap.Bool("active", true), // Should remain unchanged
 		zap.Any("data", "string\x1b[32mdata"),
 	}
@@ -244,7 +244,7 @@ func TestSanitizeData(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := output.sanitizeData(tc.input)
-			
+
 			switch expected := tc.expected.(type) {
 			case string:
 				if result != expected {
@@ -296,7 +296,7 @@ func TestPackageLevelFunctions(t *testing.T) {
 	LogResult(ctx, "operation\x1b[m", "result\x9bdata", zap.String("type", "test\x00"))
 	LogProgress(ctx, "step\x1b[32m", 3, 5, zap.String("file", "test\x9b.txt"))
 	LogList(ctx, "title\x1b[33m", []string{"item1\x9b", "item2\x00"}, zap.String("source", "db\x07"))
-	LogTable(ctx, "table\x1b[35m", []string{"col1\x9b", "col2\x00"}, 
+	LogTable(ctx, "table\x1b[35m", []string{"col1\x9b", "col2\x00"},
 		[][]string{{"val1\x1b[31m", "val2\x9b"}}, zap.String("format", "csv\x00"))
 }
 

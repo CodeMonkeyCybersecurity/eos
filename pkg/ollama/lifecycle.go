@@ -60,20 +60,20 @@ func StartServeProcess(rc *eos_io.RuntimeContext, serveLog string) error {
 	cmd := exec.CommandContext(rc.Ctx, "ollama", "serve")
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
-	
+
 	// Start the process in background
 	err = cmd.Start()
 	if err != nil {
 		zap.L().Warn("Ollama serve may not have started", zap.Error(err))
 		return err
 	}
-	
+
 	// Detach from the process so it continues running
 	err = cmd.Process.Release()
 	if err != nil {
 		zap.L().Warn("Failed to detach ollama serve process", zap.Error(err))
 	}
-	
+
 	zap.L().Info(" Ollama logs: " + serveLog)
 	return nil
 }

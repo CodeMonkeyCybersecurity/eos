@@ -7,24 +7,24 @@ import (
 
 // PlatformConfig represents the overall MSSP platform configuration
 type PlatformConfig struct {
-	Name        string            `json:"platform_name"`
-	Environment string            `json:"environment"` // dev, staging, production
-	Datacenter  string            `json:"datacenter"`
-	Domain      string            `json:"platform_domain"`
-	Network     NetworkConfig     `json:"network_config"`
-	Storage     StorageConfig     `json:"storage_config"`
-	Nomad       NomadConfig       `json:"nomad_config"`
-	Temporal    TemporalConfig    `json:"temporal_config"`
-	NATS        NATSConfig        `json:"nats_config"`
-	CCS         CCSConfig         `json:"ccs_config"`
-	Authentik   AuthentikConfig   `json:"authentik_config"`
+	Name        string          `json:"platform_name"`
+	Environment string          `json:"environment"` // dev, staging, production
+	Datacenter  string          `json:"datacenter"`
+	Domain      string          `json:"platform_domain"`
+	Network     NetworkConfig   `json:"network_config"`
+	Storage     StorageConfig   `json:"storage_config"`
+	Nomad       NomadConfig     `json:"nomad_config"`
+	Temporal    TemporalConfig  `json:"temporal_config"`
+	NATS        NATSConfig      `json:"nats_config"`
+	CCS         CCSConfig       `json:"ccs_config"`
+	Authentik   AuthentikConfig `json:"authentik_config"`
 }
 
 // NetworkConfig defines network configuration for the platform
 type NetworkConfig struct {
-	PlatformCIDR string     `json:"platform_cidr"`
-	CustomerCIDR string     `json:"customer_cidr"`
-	VLANRange    VLANRange  `json:"vlan_range"`
+	PlatformCIDR string    `json:"platform_cidr"`
+	CustomerCIDR string    `json:"customer_cidr"`
+	VLANRange    VLANRange `json:"vlan_range"`
 }
 
 // VLANRange defines the VLAN range for customer isolation
@@ -46,26 +46,26 @@ type StoragePool struct {
 
 // NomadConfig defines Nomad cluster configuration
 type NomadConfig struct {
-	ServerCount      int              `json:"server_count"`
-	ClientCount      int              `json:"client_count"`
-	ServerResources  ResourceConfig   `json:"server_resources"`
-	ClientResources  ResourceConfig   `json:"client_resources"`
+	ServerCount     int            `json:"server_count"`
+	ClientCount     int            `json:"client_count"`
+	ServerResources ResourceConfig `json:"server_resources"`
+	ClientResources ResourceConfig `json:"client_resources"`
 }
 
 // TemporalConfig defines Temporal cluster configuration
 type TemporalConfig struct {
-	ServerCount       int              `json:"server_count"`
-	ServerResources   ResourceConfig   `json:"server_resources"`
-	DatabaseResources ResourceConfig   `json:"database_resources"`
-	Namespace         string           `json:"namespace"`
+	ServerCount       int            `json:"server_count"`
+	ServerResources   ResourceConfig `json:"server_resources"`
+	DatabaseResources ResourceConfig `json:"database_resources"`
+	Namespace         string         `json:"namespace"`
 }
 
 // NATSConfig defines NATS cluster configuration
 type NATSConfig struct {
-	ServerCount       int              `json:"server_count"`
-	ServerResources   ResourceConfig   `json:"server_resources"`
-	EnableJetStream   bool             `json:"enable_jetstream"`
-	JetStreamConfig   JetStreamConfig  `json:"jetstream_config"`
+	ServerCount     int             `json:"server_count"`
+	ServerResources ResourceConfig  `json:"server_resources"`
+	EnableJetStream bool            `json:"enable_jetstream"`
+	JetStreamConfig JetStreamConfig `json:"jetstream_config"`
 }
 
 // JetStreamConfig defines NATS JetStream configuration
@@ -82,9 +82,9 @@ type CCSConfig struct {
 
 // AuthentikConfig defines Authentik SSO configuration
 type AuthentikConfig struct {
-	URL      string `json:"url"`
-	Token    string `json:"token"`
-	Enabled  bool   `json:"enabled"`
+	URL     string `json:"url"`
+	Token   string `json:"token"`
+	Enabled bool   `json:"enabled"`
 }
 
 // ResourceConfig defines resource allocation
@@ -96,18 +96,18 @@ type ResourceConfig struct {
 
 // CustomerConfig represents a customer configuration
 type CustomerConfig struct {
-	ID           string                 `json:"customer_id"`
-	CompanyName  string                 `json:"company_name"`
-	Subdomain    string                 `json:"subdomain"`
-	Tier         CustomerTier           `json:"tier"`
-	AdminEmail   string                 `json:"admin_email"`
-	AdminName    string                 `json:"admin_name"`
+	ID            string                `json:"customer_id"`
+	CompanyName   string                `json:"company_name"`
+	Subdomain     string                `json:"subdomain"`
+	Tier          CustomerTier          `json:"tier"`
+	AdminEmail    string                `json:"admin_email"`
+	AdminName     string                `json:"admin_name"`
 	AuthentikData AuthentikCustomerData `json:"authentik_data"`
-	Resources    CustomerResources      `json:"resources"`
-	WazuhConfig  WazuhDeploymentConfig  `json:"wazuh_config"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
-	Status       CustomerStatus         `json:"status"`
+	Resources     CustomerResources     `json:"resources"`
+	WazuhConfig   WazuhDeploymentConfig `json:"wazuh_config"`
+	CreatedAt     time.Time             `json:"created_at"`
+	UpdatedAt     time.Time             `json:"updated_at"`
+	Status        CustomerStatus        `json:"status"`
 }
 
 // CustomerTier represents the customer subscription tier
@@ -154,10 +154,10 @@ type ResourceAllocation struct {
 
 // WazuhDeploymentConfig contains Wazuh-specific deployment configuration
 type WazuhDeploymentConfig struct {
-	Version           string `json:"version"`
-	IndexerEnabled    bool   `json:"indexer_enabled"`
-	ServerEnabled     bool   `json:"server_enabled"`
-	DashboardEnabled  bool   `json:"dashboard_enabled"`
+	Version          string `json:"version"`
+	IndexerEnabled   bool   `json:"indexer_enabled"`
+	ServerEnabled    bool   `json:"server_enabled"`
+	DashboardEnabled bool   `json:"dashboard_enabled"`
 }
 
 // GetResourcesByTier returns resource allocation based on customer tier
@@ -264,10 +264,10 @@ const (
 
 // DeploymentStatus represents the deployment status
 type DeploymentStatus struct {
-	CustomerID       string                    `json:"customer_id"`
-	Status           CustomerStatus            `json:"status"`
+	CustomerID        string                     `json:"customer_id"`
+	Status            CustomerStatus             `json:"status"`
 	ComponentStatuses map[string]ComponentStatus `json:"component_statuses"`
-	LastUpdated      time.Time                 `json:"last_updated"`
+	LastUpdated       time.Time                  `json:"last_updated"`
 }
 
 // ComponentStatus represents individual component status
@@ -281,13 +281,13 @@ type ComponentStatus struct {
 
 // Constants for common configurations
 const (
-	DefaultWazuhVersion   = "4.8.2"
-	DefaultDatacenter     = "dc1"
-	DefaultEnvironment    = "production"
-	DefaultPlatformCIDR   = "10.0.0.0/16"
-	DefaultCustomerCIDR   = "10.100.0.0/16"
-	DefaultVLANStart      = 100
-	DefaultVLANEnd        = 999
+	DefaultWazuhVersion = "4.8.2"
+	DefaultDatacenter   = "dc1"
+	DefaultEnvironment  = "production"
+	DefaultPlatformCIDR = "10.0.0.0/16"
+	DefaultCustomerCIDR = "10.100.0.0/16"
+	DefaultVLANStart    = 100
+	DefaultVLANEnd      = 999
 )
 
 // Validation constants

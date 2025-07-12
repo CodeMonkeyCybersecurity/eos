@@ -65,7 +65,7 @@ Job States:
 			logger.Error("Failed to list Salt jobs", zap.Error(err))
 			return fmt.Errorf("failed to list Salt jobs: %w", err)
 		}
-		
+
 		// For now, just return the raw output as jobs
 		jobs := map[string]interface{}{"output": cmdOutput}
 
@@ -77,11 +77,11 @@ Job States:
 		// Create table output
 		tw := out.NewTable().
 			WithHeaders("JOB ID", "STATE", "FUNCTION", "START TIME", "TARGET")
-		
+
 		// TODO: Add actual job data once Salt client response format is known
 		logger.Info("Recent Salt Jobs")
 		tw.AddRow("(Job listing implementation pending Salt client structure)", "", "", "", "")
-		
+
 		return tw.Render()
 	}),
 }

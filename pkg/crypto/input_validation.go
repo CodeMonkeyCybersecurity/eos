@@ -72,12 +72,12 @@ func ValidateDomainName(domain string) error {
 
 	// Check individual label lengths and count (DNS labels limited to 63 characters)
 	labels := strings.Split(domain, ".")
-	
+
 	// Limit number of labels to prevent DoS attacks
 	if len(labels) > 10 {
 		return fmt.Errorf("domain has too many labels: %d (max 10)", len(labels))
 	}
-	
+
 	maxLengthLabels := 0
 	for _, label := range labels {
 		if len(label) > 63 {
@@ -91,7 +91,7 @@ func ValidateDomainName(domain string) error {
 			maxLengthLabels++
 		}
 	}
-	
+
 	// Prevent domains with multiple near-maximum length labels (DoS prevention)
 	if maxLengthLabels >= 2 {
 		return fmt.Errorf("domain has too many long labels")
@@ -114,7 +114,7 @@ func ValidateDomainName(domain string) error {
 	if strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
 		return fmt.Errorf("domain name cannot start or end with dot")
 	}
-	
+
 	// Check for test domains that should only be blocked in production
 	// Allow example.com in test environments as it's commonly used for testing
 	if os.Getenv("GO_ENV") != "test" && os.Getenv("CI") == "" {
@@ -220,28 +220,28 @@ func ValidateAppName(appName string) error {
 	criticalReservedNames := []string{
 		"admin", "root", "system", "daemon", "www", "ftp", "mail",
 	}
-	
+
 	testAllowedReservedNames := []string{
 		"api", "app", "web", "db", "database", "cache", "redis",
 		"vault", "consul", "docker", "kubernetes", "k8s",
 	}
 
 	lowerAppName := strings.ToLower(appName)
-	
+
 	// Always block critical reserved names
 	for _, reserved := range criticalReservedNames {
 		if lowerAppName == reserved {
 			return fmt.Errorf("application name is reserved")
 		}
 	}
-	
+
 	// Block test-allowed reserved names only in production
 	// Use testing.Testing() to detect if we're in a test, but it's not available here
 	// So we'll check for common test indicators
-	isInTest := os.Getenv("GO_ENV") == "test" || 
-	           os.Getenv("CI") != "" || 
-	           os.Getenv("TESTING") == "true"
-	           
+	isInTest := os.Getenv("GO_ENV") == "test" ||
+		os.Getenv("CI") != "" ||
+		os.Getenv("TESTING") == "true"
+
 	if !isInTest {
 		for _, reserved := range testAllowedReservedNames {
 			if lowerAppName == reserved {
@@ -261,13 +261,13 @@ func SanitizeInputForCommand(input string) string {
 
 	// Remove dangerous characters that could be used for injection
 	dangerousReplacements := map[string]string{
-		";": "",
-		"&": "",
-		"|": "",
-		"`": "",
-		"$": "",
+		";":  "",
+		"&":  "",
+		"|":  "",
+		"`":  "",
+		"$":  "",
 		"\\": "",
-		"'": "",
+		"'":  "",
 		"\"": "",
 		"\n": "",
 		"\r": "",

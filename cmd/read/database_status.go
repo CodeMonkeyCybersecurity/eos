@@ -100,6 +100,7 @@ func init() {
 	// Register with parent command
 	ReadCmd.AddCommand(databaseStatusCmd)
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJSONDatabaseStatus(status *database_management.DatabaseStatus) error {
 	data, err := json.MarshalIndent(status, "", "  ")
@@ -109,6 +110,7 @@ func outputJSONDatabaseStatus(status *database_management.DatabaseStatus) error 
 	fmt.Println(string(data))
 	return nil
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableDatabaseStatus(status *database_management.DatabaseStatus) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)

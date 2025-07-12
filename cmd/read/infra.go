@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	infraTerraformFlag bool
@@ -308,5 +309,3 @@ func init() {
 	infraCmd.Flags().BoolVar(&infraTerraformFlag, "terraform", false, "Output in Terraform format (.tf) instead of YAML")
 	infraCmd.Flags().StringVar(&infraOutputPath, "output", "", "Custom output path (default: /etc/eos/<date>_<hostname>_infra_status.<ext>)")
 }
-
-

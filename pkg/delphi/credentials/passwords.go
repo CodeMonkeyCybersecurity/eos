@@ -18,31 +18,31 @@ import (
 // Migrated from cmd/create/delphi.go extractWazuhPasswords
 func ExtractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Search for password files
 	log.Info("Assessing Wazuh installation for password files")
-	
+
 	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
 	var passwordFiles []string
-	
+
 	for _, basePath := range searchPaths {
 		matches, _ := filepath.Glob(filepath.Join(basePath, "*passwords*.txt"))
 		passwordFiles = append(passwordFiles, matches...)
 		matches, _ = filepath.Glob(filepath.Join(basePath, "*passwords*.tar"))
 		passwordFiles = append(passwordFiles, matches...)
 	}
-	
+
 	if len(passwordFiles) == 0 {
 		log.Warn("No password files found in standard locations")
 		return nil
 	}
-	
+
 	// INTERVENE - Extract and display passwords
 	log.Info("Found password files", zap.Int("count", len(passwordFiles)))
-	
+
 	for _, file := range passwordFiles {
 		log.Info("Processing password file", zap.String("file", file))
-		
+
 		if strings.HasSuffix(file, ".tar") {
 			// Extract tar file
 			cmd := exec.CommandContext(rc.Ctx, "tar", "-xf", file, "-O")
@@ -62,7 +62,7 @@ func ExtractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 			fmt.Printf("\n=== Passwords from %s ===\n%s\n", file, string(content))
 		}
 	}
-	
+
 	// EVALUATE - Log completion
 	log.Info("Password extraction completed")
 	return nil
@@ -72,21 +72,21 @@ func ExtractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 // Migrated from cmd/create/delphi.go runCredentialsChange
 func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPassword, apiPassword, deployType string, interactive bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Validate deployment exists
 	logger.Info("Assessing credentials change requirements",
 		zap.String("deploy_type", deployType),
 		zap.Bool("interactive", interactive))
-	
+
 	// Check if docker-compose.yml exists
 	if _, err := os.Stat("docker-compose.yml"); os.IsNotExist(err) {
 		return fmt.Errorf("docker-compose.yml not found. Please deploy first")
 	}
-	
+
 	// INTERVENE - Change passwords
 	if interactive || adminPassword == "" || kibanaPassword == "" || apiPassword == "" {
 		logger.Info("Interactive mode: prompting for passwords")
-		
+
 		if adminPassword == "" {
 			logger.Info("terminal prompt: Enter new admin password")
 			input, err := readInput()
@@ -95,7 +95,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 			}
 			adminPassword = input
 		}
-		
+
 		if kibanaPassword == "" {
 			logger.Info("terminal prompt: Enter new kibana password")
 			input, err := readInput()
@@ -104,7 +104,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 			}
 			kibanaPassword = input
 		}
-		
+
 		if apiPassword == "" {
 			logger.Info("terminal prompt: Enter new API password")
 			input, err := readInput()
@@ -114,7 +114,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 			apiPassword = input
 		}
 	}
-	
+
 	// Stop containers
 	logger.Info("Stopping containers")
 	stopCmd := exec.Command("docker-compose", "down")
@@ -123,22 +123,22 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	if err := stopCmd.Run(); err != nil {
 		return fmt.Errorf("failed to stop containers: %w", err)
 	}
-	
+
 	// Update passwords
 	logger.Info("Updating passwords")
-	
+
 	if err := UpdateAdminPassword(adminPassword); err != nil {
 		return fmt.Errorf("failed to update admin password: %w", err)
 	}
-	
+
 	if err := UpdateKibanaPassword(kibanaPassword); err != nil {
 		return fmt.Errorf("failed to update kibana password: %w", err)
 	}
-	
+
 	if err := UpdateAPIPassword(apiPassword); err != nil {
 		return fmt.Errorf("failed to update API password: %w", err)
 	}
-	
+
 	// Restart containers
 	logger.Info("Starting containers with new credentials")
 	startCmd := exec.Command("docker-compose", "up", "-d")
@@ -147,11 +147,11 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	if err := startCmd.Run(); err != nil {
 		return fmt.Errorf("failed to start containers: %w", err)
 	}
-	
+
 	// EVALUATE - Verify changes
 	logger.Info("Credentials updated successfully")
 	fmt.Println("\nCredentials have been updated. Please wait for services to restart.")
-	
+
 	return nil
 }
 
@@ -162,13 +162,13 @@ func UpdateAdminPassword(password string) error {
 	if err := updateComposeFile("INDEXER_PASSWORD=SecretPassword", fmt.Sprintf("INDEXER_PASSWORD=%s", password)); err != nil {
 		return err
 	}
-	
+
 	// Generate password hash
 	hash, err := generatePasswordHash(password)
 	if err != nil {
 		return err
 	}
-	
+
 	// Update internal users
 	return updateInternalUsers("$2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO", hash)
 }
@@ -180,13 +180,13 @@ func UpdateKibanaPassword(password string) error {
 	if err := updateComposeFile("DASHBOARD_PASSWORD=kibanaserver", fmt.Sprintf("DASHBOARD_PASSWORD=%s", password)); err != nil {
 		return err
 	}
-	
+
 	// Generate password hash
 	hash, err := generatePasswordHash(password)
 	if err != nil {
 		return err
 	}
-	
+
 	// Update internal users
 	return updateInternalUsers("$2a$12$4AcgAt3xwOWadA5s5blL6ev39OXDNhmOesEoo33eZtrq2N0YrU3H.", hash)
 }
@@ -198,7 +198,7 @@ func UpdateAPIPassword(password string) error {
 	if err := updateComposeFile("API_PASSWORD=MyS3cr37P450r.*-", fmt.Sprintf("API_PASSWORD=%s", password)); err != nil {
 		return err
 	}
-	
+
 	// Update wazuh.yml
 	return updateWazuhYML("API_PASSWORD=MyS3cr37P450r.*-", fmt.Sprintf("API_PASSWORD=%s", password))
 }
@@ -222,7 +222,7 @@ func replaceInFile(filename, oldValue, newValue string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	newContent := strings.ReplaceAll(string(content), oldValue, newValue)
 	return os.WriteFile(filename, []byte(newContent), 0644)
 }
@@ -231,18 +231,18 @@ func generatePasswordHash(password string) (string, error) {
 	// Use Docker to generate hash
 	cmd := exec.Command("docker", "run", "--rm", "-ti", "opensearchproject/opensearch:latest",
 		"bash", "-c", fmt.Sprintf("plugins/opensearch-security/tools/hash.sh -p '%s'", password))
-	
+
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	
+
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to generate hash: %w", err)
 	}
-	
+
 	output := out.String()
 	lines := strings.Split(output, "\n")
-	
+
 	// Extract hash from output
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -250,7 +250,7 @@ func generatePasswordHash(password string) (string, error) {
 			return line, nil
 		}
 	}
-	
+
 	return "", fmt.Errorf("failed to extract hash from output")
 }
 

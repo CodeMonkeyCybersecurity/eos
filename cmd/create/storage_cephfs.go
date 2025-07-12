@@ -150,7 +150,7 @@ Examples:
   
   # Create a volume with more placement groups for larger deployments
   eos create storage-cephfs volume bigdata --pg-num 256 --replication 3`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
@@ -209,7 +209,7 @@ Examples:
   
   # Mount with custom options
   eos create storage-cephfs mount readonly /mnt/readonly --mount-options noatime,ro`,
-	Args:  cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
@@ -262,4 +262,3 @@ func init() {
 	createCephFSMountCmd.Flags().StringSlice("mount-options", []string{}, "Additional mount options")
 	createCephFSMountCmd.Flags().Bool("performance", false, "Use performance-optimized mount options")
 }
-

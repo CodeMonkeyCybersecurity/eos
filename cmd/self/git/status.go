@@ -36,35 +36,35 @@ Examples:
 		path, _ := cmd.Flags().GetString("path")
 		outputJSON, _ := cmd.Flags().GetBool("json")
 		detailed, _ := cmd.Flags().GetBool("detailed")
-			logger := otelzap.Ctx(rc.Ctx)
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if path == "" {
-				var err error
-				path, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
-			}
-
-			logger.Info("Getting Git repository status", zap.String("path", path))
-
-			manager := git_management.NewGitManager()
-			
-			if !manager.IsGitRepository(rc, path) {
-				return fmt.Errorf("not a git repository: %s", path)
-			}
-
-			status, err := manager.GetStatus(rc, path)
+		if path == "" {
+			var err error
+			path, err = os.Getwd()
 			if err != nil {
-				return fmt.Errorf("failed to get repository status: %w", err)
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
+		}
 
-			if outputJSON {
-				return outputJSONStatus(status)
-			}
+		logger.Info("Getting Git repository status", zap.String("path", path))
 
-			return outputTableStatus(status, detailed)
-		}),
+		manager := git_management.NewGitManager()
+
+		if !manager.IsGitRepository(rc, path) {
+			return fmt.Errorf("not a git repository: %s", path)
+		}
+
+		status, err := manager.GetStatus(rc, path)
+		if err != nil {
+			return fmt.Errorf("failed to get repository status: %w", err)
+		}
+
+		if outputJSON {
+			return outputJSONStatus(status)
+		}
+
+		return outputTableStatus(status, detailed)
+	}),
 }
 
 func init() {
@@ -72,6 +72,7 @@ func init() {
 	StatusCmd.Flags().Bool("json", false, "Output in JSON format")
 	StatusCmd.Flags().BoolP("detailed", "d", false, "Show detailed file information")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJSONStatus(status *git_management.GitStatus) error {
 	data, err := json.MarshalIndent(status, "", "  ")
@@ -81,6 +82,7 @@ func outputJSONStatus(status *git_management.GitStatus) error {
 	fmt.Println(string(data))
 	return nil
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -91,7 +93,7 @@ func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 
 	// Branch information
 	fmt.Fprintf(w, "Branch:\t%s\n", status.Branch)
-	
+
 	if status.AheadCount > 0 || status.BehindCount > 0 {
 		fmt.Fprintf(w, "Tracking:\t")
 		if status.AheadCount > 0 {
@@ -107,7 +109,7 @@ func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 	}
 
 	fmt.Fprintf(w, "Clean:\t%t\n", status.IsClean)
-	
+
 	if status.LastCommitHash != "" {
 		fmt.Fprintf(w, "Last Commit:\t%s\n", status.LastCommitHash[:8])
 		if status.LastCommitDate != "" {

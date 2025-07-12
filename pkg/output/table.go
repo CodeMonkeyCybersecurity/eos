@@ -72,7 +72,7 @@ func (t *TableWriter) Render() error {
 		}
 		fmt.Fprintln(t.writer, strings.Repeat(t.separator, totalWidth))
 	}
-	
+
 	// Write headers
 	if len(t.headers) > 0 {
 		fmt.Fprintln(t.writer, strings.Join(t.headers, "\t"))
@@ -85,12 +85,12 @@ func (t *TableWriter) Render() error {
 			fmt.Fprintln(t.writer, strings.Join(separators, "\t"))
 		}
 	}
-	
+
 	// Write rows
 	for _, row := range t.rows {
 		fmt.Fprintln(t.writer, strings.Join(row, "\t"))
 	}
-	
+
 	return t.writer.Flush()
 }
 

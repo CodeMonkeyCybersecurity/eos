@@ -125,13 +125,13 @@ func TestAlertMetaTypes(t *testing.T) {
 		RuleID:   "meta-test",
 		Title:    "Meta Test",
 		Meta: map[string]any{
-			"string":  "value",
-			"int":     42,
-			"float":   3.14,
-			"bool":    true,
-			"slice":   []string{"a", "b", "c"},
-			"map":     map[string]int{"x": 1, "y": 2},
-			"nil":     nil,
+			"string": "value",
+			"int":    42,
+			"float":  3.14,
+			"bool":   true,
+			"slice":  []string{"a", "b", "c"},
+			"map":    map[string]int{"x": 1, "y": 2},
+			"nil":    nil,
 		},
 	}
 
@@ -165,7 +165,7 @@ func TestAlertHTMLSafety(t *testing.T) {
 		Severity:    3,
 		RuleID:      "xss-test",
 		Title:       "XSS Test",
-		Description: dangerousHTML, // This should be escaped when rendered
+		Description: dangerousHTML,                // This should be escaped when rendered
 		HTMLDetails: template.HTML(dangerousHTML), // This is marked as safe HTML
 		Host:        "test",
 	}

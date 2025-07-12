@@ -91,6 +91,7 @@ func init() {
 	SetupToolsCmd.Flags().Bool("sensors", false, "Setup hardware sensors monitoring")
 	SetupToolsCmd.Flags().StringSlice("packages", nil, "Custom package list (overrides defaults)")
 }
+
 // TODO
 func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
 	fmt.Printf("Interactive System Tools Setup\n")

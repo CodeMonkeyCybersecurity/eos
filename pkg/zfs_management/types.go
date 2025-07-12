@@ -6,15 +6,15 @@ import (
 
 // ZFSPool represents a ZFS storage pool
 type ZFSPool struct {
-	Name     string `json:"name"`
-	Size     string `json:"size"`
-	Alloc    string `json:"alloc"`
-	Free     string `json:"free"`
-	Frag     string `json:"frag"`
-	Cap      string `json:"cap"`
-	Dedup    string `json:"dedup"`
-	Health   string `json:"health"`
-	AltRoot  string `json:"altroot"`
+	Name    string `json:"name"`
+	Size    string `json:"size"`
+	Alloc   string `json:"alloc"`
+	Free    string `json:"free"`
+	Frag    string `json:"frag"`
+	Cap     string `json:"cap"`
+	Dedup   string `json:"dedup"`
+	Health  string `json:"health"`
+	AltRoot string `json:"altroot"`
 }
 
 // ZFSFilesystem represents a ZFS filesystem or dataset
@@ -29,13 +29,13 @@ type ZFSFilesystem struct {
 
 // ZFSOperationResult represents the result of a ZFS operation
 type ZFSOperationResult struct {
-	Timestamp   time.Time `json:"timestamp"`
-	Operation   string    `json:"operation"`
-	Target      string    `json:"target"`
-	Success     bool      `json:"success"`
-	Output      string    `json:"output"`
-	Error       string    `json:"error,omitempty"`
-	DryRun      bool      `json:"dry_run"`
+	Timestamp time.Time `json:"timestamp"`
+	Operation string    `json:"operation"`
+	Target    string    `json:"target"`
+	Success   bool      `json:"success"`
+	Output    string    `json:"output"`
+	Error     string    `json:"error,omitempty"`
+	DryRun    bool      `json:"dry_run"`
 }
 
 // ZFSListResult contains the results of listing ZFS resources
@@ -48,10 +48,10 @@ type ZFSListResult struct {
 
 // ZFSConfig contains configuration for ZFS management operations
 type ZFSConfig struct {
-	DryRun       bool     `json:"dry_run" mapstructure:"dry_run"`
-	Verbose      bool     `json:"verbose" mapstructure:"verbose"`
-	Force        bool     `json:"force" mapstructure:"force"`
-	Recursive    bool     `json:"recursive" mapstructure:"recursive"`
+	DryRun             bool `json:"dry_run" mapstructure:"dry_run"`
+	Verbose            bool `json:"verbose" mapstructure:"verbose"`
+	Force              bool `json:"force" mapstructure:"force"`
+	Recursive          bool `json:"recursive" mapstructure:"recursive"`
 	ConfirmDestructive bool `json:"confirm_destructive" mapstructure:"confirm_destructive"`
 }
 

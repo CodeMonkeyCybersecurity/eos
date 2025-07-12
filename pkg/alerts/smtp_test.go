@@ -150,10 +150,10 @@ func TestRateLimiterCleanup(t *testing.T) {
 	now := time.Now()
 	failMu.Lock()
 	failTimes = []time.Time{
-		now.Add(-2 * time.Minute), // Old
+		now.Add(-2 * time.Minute),  // Old
 		now.Add(-90 * time.Second), // Old
 		now.Add(-30 * time.Second), // Recent
-		now,                         // Recent
+		now,                        // Recent
 	}
 	failMu.Unlock()
 
@@ -260,7 +260,7 @@ func TestContextCancellation(t *testing.T) {
 
 func TestConcurrentSends(t *testing.T) {
 	mock := &mockSMTPSender{}
-	
+
 	var wg sync.WaitGroup
 	numGoroutines := 10
 
@@ -276,7 +276,7 @@ func TestConcurrentSends(t *testing.T) {
 	}
 
 	wg.Wait()
-	
+
 	emails := mock.getSentEmails()
 	assert.Len(t, emails, numGoroutines)
 }
@@ -314,7 +314,7 @@ func TestEmailAddressParsing(t *testing.T) {
 func TestBuildMimeStructure(t *testing.T) {
 	from := mail.Address{Name: "Test Sender", Address: "sender@example.com"}
 	to := []mail.Address{{Name: "Test Recipient", Address: "recipient@example.com"}}
-	
+
 	mime := buildMime(from, to, "Test Subject", "Plain Text", "<p>HTML</p>")
 	mimeStr := string(mime)
 
@@ -322,10 +322,10 @@ func TestBuildMimeStructure(t *testing.T) {
 	assert.Contains(t, mimeStr, "MIME-Version: 1.0")
 	assert.Contains(t, mimeStr, "Content-Type: multipart/alternative")
 	assert.Contains(t, mimeStr, "boundary=")
-	
+
 	// Verify proper line endings
 	assert.Contains(t, mimeStr, "\r\n")
-	
+
 	// Check that boundary is consistent
 	lines := strings.Split(mimeStr, "\r\n")
 	var boundary string
@@ -342,8 +342,8 @@ func TestBuildMimeStructure(t *testing.T) {
 
 func TestPortHandling(t *testing.T) {
 	tests := []struct {
-		host string
-		port int
+		host     string
+		port     int
 		expected string
 	}{
 		{"localhost", 25, "localhost:25"},

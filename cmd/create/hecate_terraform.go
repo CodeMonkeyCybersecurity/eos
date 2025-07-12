@@ -160,4 +160,5 @@ func init() {
 	hecateTerraformCmd.Flags().String("location", "nbg1", "Location for cloud instance")
 	hecateTerraformCmd.Flags().String("domain", "", "Domain name for the mail server")
 }
+
 // All helper functions have been migrated to pkg/hecate/

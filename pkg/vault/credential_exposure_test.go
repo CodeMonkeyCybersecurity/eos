@@ -18,7 +18,7 @@ func TestCredentialFilePermissions(t *testing.T) {
 	t.Run("role_id_file_permissions", func(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		roleIDPath := filepath.Join(tempDir, "role_id")
-		
+
 		// Create a role ID file
 		roleID := "test-role-id-12345"
 		err := os.WriteFile(roleIDPath, []byte(roleID), 0644) // Intentionally insecure
@@ -40,7 +40,7 @@ func TestCredentialFilePermissions(t *testing.T) {
 	t.Run("secret_id_file_permissions", func(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		secretIDPath := filepath.Join(tempDir, "secret_id")
-		
+
 		// Create a secret ID file
 		secretID := "test-secret-id-67890"
 		err := os.WriteFile(secretIDPath, []byte(secretID), 0644) // Intentionally insecure
@@ -61,7 +61,7 @@ func TestCredentialFilePermissions(t *testing.T) {
 	t.Run("world_readable_detection", func(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		credentialPath := filepath.Join(tempDir, "credential")
-		
+
 		// Test various insecure permission combinations
 		insecurePerms := []os.FileMode{
 			0644, // World readable
@@ -84,7 +84,7 @@ func TestCredentialFilePermissions(t *testing.T) {
 	t.Run("group_writable_detection", func(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		credentialPath := filepath.Join(tempDir, "credential")
-		
+
 		// Test group writable permissions (also insecure for credentials)
 		groupWritablePerms := []os.FileMode{
 			0620, // Group writable
@@ -117,8 +117,8 @@ func TestCredentialContentValidation(t *testing.T) {
 			"01234567-89ab-cdef-0123-456789abcdef-extra",
 			"01234567-89ab-cdef-0123-456789abcdeg", // Invalid hex character
 			"01234567_89ab_cdef_0123_456789abcdef", // Wrong separator
-			"role_id_injection; rm -rf /",            // Injection attempt
-			"../../../etc/passwd",                    // Path traversal
+			"role_id_injection; rm -rf /",          // Injection attempt
+			"../../../etc/passwd",                  // Path traversal
 		}
 
 		for _, roleID := range validRoleIDs {
@@ -143,9 +143,9 @@ func TestCredentialContentValidation(t *testing.T) {
 			"not-a-uuid",
 			"fedcba98-7654-3210-fedc-ba9876543210-extra",
 			"fedcba98-7654-3210-fedc-ba9876543210x", // Invalid hex character
-			"secret_injection; curl evil.com",        // Injection attempt
-			"$(whoami)",                              // Command substitution
-			"\x00secret",                             // Null bytes
+			"secret_injection; curl evil.com",       // Injection attempt
+			"$(whoami)",                             // Command substitution
+			"\x00secret",                            // Null bytes
 		}
 
 		for _, secretID := range validSecretIDs {
@@ -171,10 +171,10 @@ func TestCredentialContentValidation(t *testing.T) {
 			"not-a-token",
 			"hvs.", // Too short
 			"hvs.invalid-base64-characters!@#$",
-			"token_injection; rm -rf /",          // Injection attempt
-			"../../etc/passwd",                   // Path traversal
-			"hvs.token\nrm -rf /",               // Newline injection
-			"\x00hvs.token",                      // Null bytes
+			"token_injection; rm -rf /", // Injection attempt
+			"../../etc/passwd",          // Path traversal
+			"hvs.token\nrm -rf /",       // Newline injection
+			"\x00hvs.token",             // Null bytes
 		}
 
 		for _, token := range validTokens {
@@ -216,7 +216,7 @@ func TestCredentialPathTraversalPrevention(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		credentialPath := filepath.Join(tempDir, "credential")
 		symlinkPath := filepath.Join(tempDir, "symlink_credential")
-		
+
 		// Create a legitimate credential file
 		err := os.WriteFile(credentialPath, []byte("test-credential"), shared.OwnerReadOnly)
 		testutil.AssertNoError(t, err)
@@ -235,10 +235,10 @@ func TestCredentialPathTraversalPrevention(t *testing.T) {
 
 	t.Run("directory_traversal_in_filenames", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		maliciousFilenames := []string{
 			"../role_id",
-			"../../secret_id", 
+			"../../secret_id",
 			"role_id/../../etc/passwd",
 			".\\..\\role_id",
 		}
@@ -264,13 +264,13 @@ func TestCredentialLeakageInLogs(t *testing.T) {
 		for _, sensitive := range sensitiveData {
 			// Simulate an error that might contain sensitive data
 			err := CreateSanitizedError("credential validation failed", sensitive)
-			
+
 			// Error message should not contain the sensitive data
 			errorMsg := err.Error()
 			if strings.Contains(errorMsg, sensitive) {
 				t.Errorf("Error message contains sensitive data: %s", errorMsg)
 			}
-			
+
 			// Should contain a safe placeholder or redacted message
 			if !strings.Contains(errorMsg, "[REDACTED]") && !strings.Contains(errorMsg, "***") {
 				t.Errorf("Error message should contain redaction placeholder: %s", errorMsg)
@@ -288,12 +288,12 @@ func TestCredentialLeakageInLogs(t *testing.T) {
 		for _, credential := range sensitiveCredentials {
 			// Test that logging functions sanitize credentials
 			sanitized := SanitizeForLogging(credential)
-			
+
 			// Original credential should not appear in sanitized version
 			if strings.Contains(sanitized, credential) {
 				t.Errorf("Sanitized log message contains original credential: %s -> %s", credential, sanitized)
 			}
-			
+
 			// Should be replaced with safe placeholder
 			if sanitized == credential {
 				t.Errorf("Credential was not sanitized: %s", credential)
@@ -309,7 +309,7 @@ func TestCredentialRotationSecurity(t *testing.T) {
 	t.Run("old_credential_cleanup", func(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		credentialPath := filepath.Join(tempDir, "credential")
-		
+
 		// Create old credential
 		oldCredential := "old-credential-data"
 		err := os.WriteFile(credentialPath, []byte(oldCredential), shared.OwnerReadOnly)
@@ -335,7 +335,7 @@ func TestCredentialRotationSecurity(t *testing.T) {
 	t.Run("atomic_credential_replacement", func(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		credentialPath := filepath.Join(tempDir, "credential")
-		
+
 		// Create initial credential
 		initialCredential := "initial-credential"
 		err := os.WriteFile(credentialPath, []byte(initialCredential), shared.OwnerReadOnly)
@@ -361,7 +361,7 @@ func TestCredentialRotationSecurity(t *testing.T) {
 		tempDir := testutil.TempDir(t)
 		credentialPath := filepath.Join(tempDir, "credential")
 		backupPath := filepath.Join(tempDir, "credential.backup")
-		
+
 		// Create credential file
 		credential := "backup-test-credential"
 		err := os.WriteFile(credentialPath, []byte(credential), shared.OwnerReadOnly)
@@ -387,7 +387,7 @@ func TestCredentialRotationSecurity(t *testing.T) {
 func TestCredentialTimingAttacks(t *testing.T) {
 	t.Run("constant_time_comparison", func(t *testing.T) {
 		validCredential := "hvs.AAAAAQKLwI_VgPyvmn_dV7wR8xOz"
-		
+
 		// Test various invalid credentials of different lengths
 		invalidCredentials := []string{
 			"",
@@ -395,7 +395,7 @@ func TestCredentialTimingAttacks(t *testing.T) {
 			"ab",
 			"abc",
 			"hvs.invalid",
-			"hvs.AAAAAQKLwI_VgPyvmn_dV7wR8xO", // One character short
+			"hvs.AAAAAQKLwI_VgPyvmn_dV7wR8xO",   // One character short
 			"hvs.AAAAAQKLwI_VgPyvmn_dV7wR8xOzX", // One character long
 			"hvs.WRONG_TOKEN_ENTIRELY_DIFFERENT",
 		}
@@ -435,7 +435,7 @@ func TestCredentialTimingAttacks(t *testing.T) {
 			// Allow for some variance due to system noise, but flag significant differences
 			maxAllowedDiff := time.Microsecond * 100
 			if timingDiff > maxAllowedDiff {
-				t.Errorf("Timing attack possible: valid=%v, invalid=%v, diff=%v for credential length %d", 
+				t.Errorf("Timing attack possible: valid=%v, invalid=%v, diff=%v for credential length %d",
 					validAvg, invalidAvg, timingDiff, len(invalid))
 			}
 		}
@@ -447,7 +447,7 @@ func TestCredentialMemorySecurity(t *testing.T) {
 	t.Run("credential_zeroing", func(t *testing.T) {
 		sensitiveData := "hvs.AAAAAQKLwI_VgPyvmn_dV7wR8xOz"
 		credentialBytes := []byte(sensitiveData)
-		
+
 		// Verify data is initially present
 		testutil.AssertEqual(t, sensitiveData, string(credentialBytes))
 
@@ -466,7 +466,7 @@ func TestCredentialMemorySecurity(t *testing.T) {
 		// Test that credentials are not kept in memory longer than necessary
 		tempDir := testutil.TempDir(t)
 		credentialPath := filepath.Join(tempDir, "credential")
-		
+
 		credential := "temporary-credential-for-testing"
 		err := os.WriteFile(credentialPath, []byte(credential), shared.OwnerReadOnly)
 		testutil.AssertNoError(t, err)
@@ -474,14 +474,14 @@ func TestCredentialMemorySecurity(t *testing.T) {
 		// Read credential with secure handling
 		credentialData, err := SecureCredentialRead(credentialPath)
 		testutil.AssertNoError(t, err)
-		
+
 		// Verify credential was read correctly
 		testutil.AssertEqual(t, credential, string(credentialData))
 
 		// Credential should be automatically zeroed when no longer needed
 		// This test validates the function exists and works
 		SecureZeroCredential(credentialData)
-		
+
 		// Verify zeroing worked
 		for i, b := range credentialData {
 			if b != 0 {

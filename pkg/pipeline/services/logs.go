@@ -23,7 +23,7 @@ func ShowRecentLogs(rc *eos_io.RuntimeContext, serviceName string) error {
 
 	// INTERVENE - Retrieve and display logs
 	logger.Debug("Retrieving service logs from journalctl")
-	
+
 	cmd := exec.Command("journalctl", "-u", serviceName, "-n", "10", "--no-pager")
 	output, err := cmd.Output()
 	if err != nil {

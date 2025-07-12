@@ -17,38 +17,38 @@ import (
 func TestReadAppRoleCredsFromDisk_Success(t *testing.T) {
 	// Create temporary directory for test
 	tempDir := t.TempDir()
-	
+
 	// Override the shared paths for testing
 	originalRoleID := shared.AppRolePaths.RoleID
 	originalSecretID := shared.AppRolePaths.SecretID
-	
+
 	shared.AppRolePaths.RoleID = filepath.Join(tempDir, "role_id")
 	shared.AppRolePaths.SecretID = filepath.Join(tempDir, "secret_id")
-	
+
 	defer func() {
 		shared.AppRolePaths.RoleID = originalRoleID
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
-	
+
 	// Create test credentials
 	testRoleID := "test-role-id-12345"
 	testSecretID := "test-secret-id-67890"
-	
+
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte(testRoleID+"\n"), 0600))
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.SecretID, []byte(testSecretID+"\n"), 0600))
-	
+
 	// Create runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 	}
-	
+
 	// Test reading (without actual Vault client)
 	roleID, secretID, err := readAppRoleCredsFromDisk(rc, nil)
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, testRoleID, roleID)
 	assert.Equal(t, testSecretID, secretID)
 }
@@ -56,35 +56,35 @@ func TestReadAppRoleCredsFromDisk_Success(t *testing.T) {
 func TestReadAppRoleCredsFromDisk_MissingFiles(t *testing.T) {
 	// Create temporary directory for test
 	tempDir := t.TempDir()
-	
+
 	// Override the shared paths for testing
 	originalRoleID := shared.AppRolePaths.RoleID
 	originalSecretID := shared.AppRolePaths.SecretID
-	
+
 	shared.AppRolePaths.RoleID = filepath.Join(tempDir, "role_id")
 	shared.AppRolePaths.SecretID = filepath.Join(tempDir, "secret_id")
-	
+
 	defer func() {
 		shared.AppRolePaths.RoleID = originalRoleID
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
-	
+
 	// Create runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 	}
-	
+
 	// Test reading missing role_id file
 	_, _, err := readAppRoleCredsFromDisk(rc, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "read credential from disk")
-	
+
 	// Create only role_id file
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte("test-role-id"), 0600))
-	
+
 	// Test reading missing secret_id file
 	_, _, err = readAppRoleCredsFromDisk(rc, nil)
 	require.Error(t, err)
@@ -94,34 +94,34 @@ func TestReadAppRoleCredsFromDisk_MissingFiles(t *testing.T) {
 func TestReadAppRoleCredsFromDisk_WrappedToken(t *testing.T) {
 	// Create temporary directory for test
 	tempDir := t.TempDir()
-	
+
 	// Override the shared paths for testing
 	originalRoleID := shared.AppRolePaths.RoleID
 	originalSecretID := shared.AppRolePaths.SecretID
-	
+
 	shared.AppRolePaths.RoleID = filepath.Join(tempDir, "role_id")
 	shared.AppRolePaths.SecretID = filepath.Join(tempDir, "secret_id")
-	
+
 	defer func() {
 		shared.AppRolePaths.RoleID = originalRoleID
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
-	
+
 	// Create test credentials with wrapped token
 	testRoleID := "test-role-id-12345"
 	testWrappedToken := "s.1234567890abcdef"
-	
+
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte(testRoleID), 0600))
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.SecretID, []byte(testWrappedToken), 0600))
-	
+
 	// Create runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 	}
-	
+
 	// Test reading wrapped token (will fail because we don't have a real Vault client)
 	_, _, err := readAppRoleCredsFromDisk(rc, nil)
 	require.Error(t, err)
@@ -132,30 +132,30 @@ func TestReadAppRoleCredsFromDisk_WrappedToken(t *testing.T) {
 func TestWriteAppRoleFiles_Success(t *testing.T) {
 	// Create temporary directory for test
 	tempDir := t.TempDir()
-	
+
 	// Override the shared paths for testing
 	originalRoleID := shared.AppRolePaths.RoleID
 	originalSecretID := shared.AppRolePaths.SecretID
-	
+
 	shared.AppRolePaths.RoleID = filepath.Join(tempDir, "role_id")
 	shared.AppRolePaths.SecretID = filepath.Join(tempDir, "secret_id")
-	
+
 	defer func() {
 		shared.AppRolePaths.RoleID = originalRoleID
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
-	
+
 	// Create runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 	}
-	
+
 	testRoleID := "test-role-id-12345"
 	testSecretID := "test-secret-id-67890"
-	
+
 	// This will fail due to user lookup, but we can test file creation
 	err := WriteAppRoleFiles(rc, testRoleID, testSecretID)
 	// Expected to fail due to eos user lookup in test environment
@@ -165,7 +165,7 @@ func TestWriteAppRoleFiles_Success(t *testing.T) {
 
 func TestDefaultAppRoleOptions(t *testing.T) {
 	opts := shared.DefaultAppRoleOptions()
-	
+
 	assert.Equal(t, shared.AppRoleName, opts.RoleName)
 	assert.Equal(t, []string{shared.EosDefaultPolicyName}, opts.Policies)
 	assert.Equal(t, "1h", opts.TokenTTL)
@@ -178,9 +178,9 @@ func TestDefaultAppRoleOptions(t *testing.T) {
 func TestBuildAppRoleLoginPayload(t *testing.T) {
 	roleID := "test-role-id"
 	secretID := "test-secret-id"
-	
+
 	payload := shared.BuildAppRoleLoginPayload(roleID, secretID)
-	
+
 	assert.Equal(t, roleID, payload["role_id"])
 	assert.Equal(t, secretID, payload["secret_id"])
 	assert.Len(t, payload, 2)
@@ -189,9 +189,9 @@ func TestBuildAppRoleLoginPayload(t *testing.T) {
 func TestBuildAppRoleLoginPayload_WithWhitespace(t *testing.T) {
 	roleID := "  test-role-id  "
 	secretID := "\ttest-secret-id\n"
-	
+
 	payload := shared.BuildAppRoleLoginPayload(roleID, secretID)
-	
+
 	// Should trim whitespace
 	assert.Equal(t, "test-role-id", payload["role_id"])
 	assert.Equal(t, "test-secret-id", payload["secret_id"])
@@ -201,14 +201,14 @@ func TestPhaseCreateAppRole_InvalidOptions(t *testing.T) {
 	// Create runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 	}
-	
+
 	// Test with nil client (should fail gracefully)
 	opts := shared.DefaultAppRoleOptions()
-	
+
 	// This will fail because we don't have a real Vault client
 	_, _, err := PhaseCreateAppRole(rc, nil, nil, opts)
 	require.Error(t, err)
@@ -226,7 +226,7 @@ func TestAppRolePathConstants(t *testing.T) {
 func TestUserDataTemplate(t *testing.T) {
 	password := "test-password-123"
 	data := shared.UserDataTemplate(password)
-	
+
 	assert.Equal(t, password, data["password"])
 	assert.Equal(t, []string{shared.EosDefaultPolicyName}, data["policies"])
 	assert.Len(t, data, 2)
@@ -235,14 +235,14 @@ func TestUserDataTemplate(t *testing.T) {
 func TestFallbackSecretsTemplate(t *testing.T) {
 	password := "test-password-123"
 	data := shared.FallbackSecretsTemplate(password)
-	
+
 	assert.Equal(t, password, data[shared.FallbackPasswordKey])
 	assert.Len(t, data, 1)
 }
 
 func TestAppRoleCredentialSecurity(t *testing.T) {
 	// Test that credentials are handled securely
-	
+
 	// Test that role IDs and secret IDs are properly validated
 	testCases := []struct {
 		name     string
@@ -270,12 +270,12 @@ func TestAppRoleCredentialSecurity(t *testing.T) {
 			expected: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			trimmed := strings.TrimSpace(tc.input)
 			isEmpty := trimmed == ""
-			
+
 			if tc.expected {
 				assert.NotEmpty(t, trimmed, "valid credentials should not be empty after trimming")
 			} else {
@@ -288,13 +288,13 @@ func TestAppRoleCredentialSecurity(t *testing.T) {
 func TestAppRoleFilePermissions(t *testing.T) {
 	// Test that AppRole files are created with secure permissions
 	expectedMode := shared.FilePermOwnerReadWrite // Should be 0600
-	
+
 	// Verify the constant is set correctly for security
 	assert.Equal(t, os.FileMode(0600), os.FileMode(expectedMode), "AppRole files should be owner read/write only")
-	
+
 	// Test that the mode provides appropriate security
 	assert.Equal(t, os.FileMode(0600), os.FileMode(expectedMode)&0777, "File mode should mask to 0600")
-	
+
 	// Verify no group or world access
 	assert.Equal(t, os.FileMode(0), os.FileMode(expectedMode)&0077, "No group or world access should be allowed")
 }

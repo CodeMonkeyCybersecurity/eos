@@ -464,7 +464,7 @@ func (am *AlertManager) sendWebhookNotification(alert *Alert, config map[string]
 
 	// Create webhook payload
 	payload := map[string]interface{}{
-		"alert": alert,
+		"alert":     alert,
 		"timestamp": time.Now().Unix(),
 	}
 

@@ -301,7 +301,7 @@ func configureNetworkSettings(rc *eos_io.RuntimeContext, config *PlatformConfig)
 	}
 
 	// Set up platform network
-	if err := execute.RunSimple(rc.Ctx, "ip", "addr", "add", 
+	if err := execute.RunSimple(rc.Ctx, "ip", "addr", "add",
 		fmt.Sprintf("%s", config.Network.PlatformCIDR), "dev", "br-platform"); err != nil {
 		logger.Debug("Address might already be assigned", zap.Error(err))
 	}
@@ -342,17 +342,17 @@ func configureAuthentikIntegration(rc *eos_io.RuntimeContext, config *PlatformCo
 
 	// Create Authentik provider configuration
 	providerConfig := map[string]interface{}{
-		"name":          fmt.Sprintf("Wazuh MSSP - %s", config.Name),
+		"name":               fmt.Sprintf("Wazuh MSSP - %s", config.Name),
 		"authorization_flow": "default-provider-authorization-implicit-consent",
 		"property_mappings": []string{
 			"authentik-default-saml-mapping-upn",
-			"authentik-default-saml-mapping-name", 
+			"authentik-default-saml-mapping-name",
 			"authentik-default-saml-mapping-email",
 			"authentik-default-saml-mapping-username",
 		},
-		"assertion_valid_not_before": "minutes=-5",
+		"assertion_valid_not_before":      "minutes=-5",
 		"assertion_valid_not_on_or_after": "minutes=5",
-		"session_valid_not_on_or_after": "hours=8",
+		"session_valid_not_on_or_after":   "hours=8",
 	}
 
 	// Store provider configuration
@@ -436,30 +436,30 @@ scrape_configs:
 func assessNomadConfigurations(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {
 	// Check current Nomad job configurations
 	configs := make(map[string]interface{})
-	
+
 	// This would query Nomad API for current job configs
 	configs["jobs_count"] = 6 // placeholder
 	configs["namespaces"] = []string{"default", "platform", "temporal"}
-	
+
 	return configs, nil
 }
 
 func assessNetworkConfiguration(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {
 	// Check current network configuration
 	networkConfig := make(map[string]interface{})
-	
+
 	// Check if platform bridge exists
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "ip",
 		Args:    []string{"link", "show", "br-platform"},
 		Capture: true,
 	})
-	
+
 	networkConfig["platform_bridge_exists"] = err == nil
 	if err == nil {
 		networkConfig["platform_bridge_state"] = output
 	}
-	
+
 	return networkConfig, nil
 }
 
@@ -467,7 +467,7 @@ func assessNetworkConfiguration(rc *eos_io.RuntimeContext) (map[string]interface
 
 func createCustomerDirectories(rc *eos_io.RuntimeContext, customer *CustomerConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	dirs := []string{
 		fmt.Sprintf("/opt/wazuh-mssp/customers/%s", customer.ID),
 		fmt.Sprintf("/opt/wazuh-mssp/customers/%s/configs", customer.ID),
@@ -494,12 +494,12 @@ func storeCustomerSecrets(rc *eos_io.RuntimeContext, customer *CustomerConfig) e
 	// Store in Vault
 	secretPaths := map[string]map[string]interface{}{
 		fmt.Sprintf("wazuh-mssp/customers/%s/config", customer.ID): {
-			"customer_id":   customer.ID,
-			"company_name":  customer.CompanyName,
-			"subdomain":     customer.Subdomain,
-			"tier":          string(customer.Tier),
-			"admin_email":   customer.AdminEmail,
-			"admin_name":    customer.AdminName,
+			"customer_id":  customer.ID,
+			"company_name": customer.CompanyName,
+			"subdomain":    customer.Subdomain,
+			"tier":         string(customer.Tier),
+			"admin_email":  customer.AdminEmail,
+			"admin_name":   customer.AdminName,
 		},
 		fmt.Sprintf("wazuh-mssp/customers/%s/wazuh/credentials", customer.ID): {
 			"admin_password":  adminPassword,
@@ -523,7 +523,7 @@ func storeCustomerSecrets(rc *eos_io.RuntimeContext, customer *CustomerConfig) e
 func generateCustomerConfigs(rc *eos_io.RuntimeContext, customer *CustomerConfig) error {
 	// Generate Nomad job specifications for customer
 	resources := GetResourcesByTier(customer.Tier)
-	
+
 	// Create indexer job config
 	indexerJob := generateIndexerJobSpec(customer, resources.Indexer)
 	indexerPath := fmt.Sprintf("/opt/wazuh-mssp/customers/%s/configs/indexer.nomad", customer.ID)
@@ -553,10 +553,10 @@ func generateCustomerConfigs(rc *eos_io.RuntimeContext, customer *CustomerConfig
 func configureCustomerNetwork(rc *eos_io.RuntimeContext, customer *CustomerConfig) error {
 	// Allocate VLAN for customer
 	vlan := allocateCustomerVLAN(customer.ID)
-	
+
 	// Create VLAN interface
 	vlanIface := fmt.Sprintf("br-platform.%d", vlan)
-	if err := execute.RunSimple(rc.Ctx, "ip", "link", "add", "link", "br-platform", 
+	if err := execute.RunSimple(rc.Ctx, "ip", "link", "add", "link", "br-platform",
 		"name", vlanIface, "type", "vlan", "id", fmt.Sprintf("%d", vlan)); err != nil {
 		return fmt.Errorf("failed to create VLAN interface: %w", err)
 	}
@@ -567,9 +567,9 @@ func configureCustomerNetwork(rc *eos_io.RuntimeContext, customer *CustomerConfi
 	}
 
 	// Store VLAN allocation
-	return WriteSecret(rc, fmt.Sprintf("wazuh-mssp/customers/%s/network", customer.ID), 
+	return WriteSecret(rc, fmt.Sprintf("wazuh-mssp/customers/%s/network", customer.ID),
 		map[string]interface{}{
-			"vlan_id": vlan,
+			"vlan_id":   vlan,
 			"interface": vlanIface,
 		})
 }
@@ -577,13 +577,13 @@ func configureCustomerNetwork(rc *eos_io.RuntimeContext, customer *CustomerConfi
 func applyResourceQuotas(rc *eos_io.RuntimeContext, customer *CustomerConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	resources := GetResourcesByTier(customer.Tier)
-	
+
 	// Create Nomad namespace with quotas
 	// This would use the Nomad client to create the quota
 	_ = fmt.Sprintf("customer-%s", customer.ID) // namespace
-	_ = resources // Use resources variable
+	_ = resources                               // Use resources variable
 	logger.Debug("Resource quotas would be applied here for customer", zap.String("customer_id", customer.ID))
-	
+
 	return nil
 }
 
@@ -626,7 +626,7 @@ func verifyPlatformNetworkConfiguration(rc *eos_io.RuntimeContext, config *Platf
 func verifyServiceConfigurations(rc *eos_io.RuntimeContext, config *PlatformConfig) error {
 	// Verify each service has proper configuration
 	services := []string{"temporal", "nats", "ccs-indexer", "ccs-dashboard"}
-	
+
 	for _, service := range services {
 		// This would check service-specific configurations
 		// For now, just log
@@ -641,7 +641,7 @@ func verifyAuthentikIntegration(rc *eos_io.RuntimeContext, config *PlatformConfi
 	// Test Authentik API connectivity
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
-		Args:    []string{"-s", "-o", "/dev/null", "-w", "%{http_code}", 
+		Args: []string{"-s", "-o", "/dev/null", "-w", "%{http_code}",
 			fmt.Sprintf("%s/api/v3/", config.Authentik.URL),
 			"-H", fmt.Sprintf("Authorization: Bearer %s", config.Authentik.Token)},
 		Capture: true,
@@ -702,11 +702,10 @@ func allocateCustomerVLAN(customerID string) int {
 	// For now, hash customer ID to get a VLAN in range
 	hash := 0
 	for _, c := range customerID {
-		hash = (hash * 31 + int(c)) % 800
+		hash = (hash*31 + int(c)) % 800
 	}
 	return 100 + hash
 }
-
 
 func generateIndexerJobSpec(customer *CustomerConfig, resources ResourceAllocation) string {
 	// Generate Nomad job specification for Wazuh indexer
@@ -732,7 +731,7 @@ func generateIndexerJobSpec(customer *CustomerConfig, resources ResourceAllocati
       }
     }
   }
-}`, customer.ID, customer.ID, resources.Count, 
+}`, customer.ID, customer.ID, resources.Count,
 		customer.WazuhConfig.Version, resources.CPU, resources.Memory)
 }
 
@@ -759,7 +758,7 @@ func generateServerJobSpec(customer *CustomerConfig, resources ResourceAllocatio
       }
     }
   }
-}`, customer.ID, customer.ID, resources.Count, 
+}`, customer.ID, customer.ID, resources.Count,
 		customer.WazuhConfig.Version, resources.CPU, resources.Memory)
 }
 
@@ -786,6 +785,6 @@ func generateDashboardJobSpec(customer *CustomerConfig, resources ResourceAlloca
       }
     }
   }
-}`, customer.ID, customer.ID, resources.Count, 
+}`, customer.ID, customer.ID, resources.Count,
 		customer.WazuhConfig.Version, resources.CPU, resources.Memory)
 }

@@ -13,14 +13,14 @@ func TestLDAPSecurityInputValidation(t *testing.T) {
 
 		// Test LDAP injection attempts in various contexts
 		maliciousInputs := []string{
-			"*)(uid=*",                    // LDAP wildcard injection
-			"admin)(|(uid=*",              // Boolean injection
-			"*)(objectClass=*",           // Object class enumeration
-			"*))%00",                     // Null byte injection
-			"*)(cn=*)(|(uid=*",           // Complex boolean injection
+			"*)(uid=*",                          // LDAP wildcard injection
+			"admin)(|(uid=*",                    // Boolean injection
+			"*)(objectClass=*",                  // Object class enumeration
+			"*))%00",                            // Null byte injection
+			"*)(cn=*)(|(uid=*",                  // Complex boolean injection
 			"\\\\2a\\\\29\\\\28uid\\\\3d\\\\2a", // Encoded injection
-			"admin*",                     // Simple wildcard
-			")(|(objectClass=*",          // Object enumeration
+			"admin*",                            // Simple wildcard
+			")(|(objectClass=*",                 // Object enumeration
 		}
 
 		for _, input := range maliciousInputs {
@@ -30,7 +30,7 @@ func TestLDAPSecurityInputValidation(t *testing.T) {
 				// In test environment, they'll fail due to no LDAP server
 				// but importantly they should not process malicious filters
 				_ = input
-				
+
 				// Test that functions with user input validate properly
 				_, err := ReadUser(rc)
 				testutil.AssertError(t, err) // Expected to fail in test env
@@ -55,7 +55,7 @@ func TestLDAPSecurityInputValidation(t *testing.T) {
 			t.Run("malicious_dn", func(t *testing.T) {
 				// Test that DN processing handles malicious input safely
 				_ = dn // The functions should validate DN format
-				
+
 				// Operations should fail safely in test environment
 				_, err := ReadUser(rc)
 				testutil.AssertError(t, err)
@@ -127,7 +127,7 @@ func TestLDAPAuthenticationSecurity(t *testing.T) {
 			t.Run(pt.name, func(t *testing.T) {
 				// Test auth probe with potentially malicious passwords
 				err := RunLDAPAuthProbe("testuser", pt.password)
-				
+
 				// Should fail in test environment but handle input safely
 				if pt.wantErr {
 					testutil.AssertError(t, err)
@@ -154,7 +154,7 @@ func TestLDAPAuthenticationSecurity(t *testing.T) {
 			t.Run("malicious_bind_dn", func(t *testing.T) {
 				// Test that bind DN is properly validated
 				_ = bindDN
-				
+
 				// Connection should fail safely
 				_, err := Connect(rc)
 				testutil.AssertError(t, err)
@@ -284,7 +284,7 @@ func TestLDAPConcurrency(t *testing.T) {
 		testutil.ParallelTest(t, 3, func(t *testing.T, i int) {
 			rc := testutil.TestRuntimeContext(t)
 			config := DefaultLDAPConfig()
-			
+
 			if i%2 == 0 {
 				user := LDAPUser{
 					UID:  "testuser",
@@ -313,11 +313,11 @@ func TestLDAPEdgeCases(t *testing.T) {
 		// Test operations with nil config should handle gracefully
 		user := LDAPUser{
 			UID:  "testuser",
-			CN:   "Test User", 
+			CN:   "Test User",
 			Mail: "test@example.com",
 			DN:   "uid=testuser,ou=Users,dc=domain,dc=com",
 		}
-		
+
 		// This should handle nil config appropriately
 		err := CreateUser(nil, user, "testpass")
 		testutil.AssertError(t, err)
@@ -326,7 +326,7 @@ func TestLDAPEdgeCases(t *testing.T) {
 	t.Run("empty user creation", func(t *testing.T) {
 		config := DefaultLDAPConfig()
 		emptyUser := LDAPUser{}
-		
+
 		// Should validate required fields
 		err := CreateUser(config, emptyUser, "")
 		testutil.AssertError(t, err)
@@ -336,7 +336,7 @@ func TestLDAPEdgeCases(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
 		config := DefaultLDAPConfig()
 		emptyGroup := LDAPGroup{}
-		
+
 		// Should validate required fields
 		err := CreateGroup(rc, config, emptyGroup)
 		testutil.AssertError(t, err)
@@ -349,7 +349,7 @@ func TestLDAPEdgeCases(t *testing.T) {
 				Port: -1, // Invalid negative port
 			},
 			{
-				FQDN: "localhost", 
+				FQDN: "localhost",
 				Port: 65536, // Port too high
 			},
 			{

@@ -201,13 +201,13 @@ func ConvertToSystemDeployment(deployment *ServiceDeployment) *system.ServiceDep
 		Type:        deployment.DeploymentType,
 		Environment: deployment.Environment,
 		// Map other fields as needed
-		Dependencies: []string{},
-		HealthChecks: []system.HealthCheck{},
-		Secrets:      make(map[string]string),
-		Volumes:      []system.VolumeMount{},
-		Networks:     []system.NetworkConfig{},
-		Resources:    system.ResourceRequirements{},
-		Scaling:      system.ScalingConfig{},
+		Dependencies:   []string{},
+		HealthChecks:   []system.HealthCheck{},
+		Secrets:        make(map[string]string),
+		Volumes:        []system.VolumeMount{},
+		Networks:       []system.NetworkConfig{},
+		Resources:      system.ResourceRequirements{},
+		Scaling:        system.ScalingConfig{},
 		UpdateStrategy: system.UpdateStrategy{},
 	}
 }
@@ -217,15 +217,21 @@ func ConvertFromSystemDeploymentResult(systemResult *system.DeploymentResult) *D
 	return &DeploymentResult{
 		ServiceName: systemResult.ServiceName,
 		Status:      systemResult.Type,
-		Message:     fmt.Sprintf("Deployment %s", func() string { if systemResult.Success { return "successful" } else { return "failed" } }()),
+		Message: fmt.Sprintf("Deployment %s", func() string {
+			if systemResult.Success {
+				return "successful"
+			} else {
+				return "failed"
+			}
+		}()),
 		Metadata: map[string]interface{}{
-			"job_id":               systemResult.JobID,
-			"allocations_created":  systemResult.AllocationsCreated,
-			"health_status":        systemResult.HealthStatus,
-			"endpoints":            systemResult.Endpoints,
-			"duration":             systemResult.Duration,
-			"errors":               systemResult.Errors,
-			"rollback":             systemResult.Rollback,
+			"job_id":              systemResult.JobID,
+			"allocations_created": systemResult.AllocationsCreated,
+			"health_status":       systemResult.HealthStatus,
+			"endpoints":           systemResult.Endpoints,
+			"duration":            systemResult.Duration,
+			"errors":              systemResult.Errors,
+			"rollback":            systemResult.Rollback,
 		},
 		Success: systemResult.Success,
 	}

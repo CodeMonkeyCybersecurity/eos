@@ -75,7 +75,7 @@ func CreateRouteWithWorkflow(rc *eos_io.RuntimeContext, request RouteCreationReq
 	if request.AuthPolicy != "" {
 		logger.Info("Configuring authentication policy",
 			zap.String("policy", request.AuthPolicy))
-		
+
 		if err := validateAuthPolicyExists(rc, request.AuthPolicy); err != nil {
 			return fmt.Errorf("auth policy validation failed: %w", err)
 		}
@@ -157,7 +157,7 @@ func RotateSecretsWithWorkflow(rc *eos_io.RuntimeContext, request SecretRotation
 	// Step 1: Generate new secret
 	state.CurrentPhase = "generating"
 	logger.Info("Generating new secret")
-	
+
 	newSecret, err := generateSecret(rc, request.SecretType)
 	if err != nil {
 		state.Error = err.Error()
@@ -212,7 +212,7 @@ func manageDNSRecord(rc *eos_io.RuntimeContext, domain, target string) error {
 	logger.Info("Managing DNS record",
 		zap.String("domain", domain),
 		zap.String("target", target))
-	
+
 	// TODO: Implement DNS management via Hetzner API
 	return nil
 }
@@ -221,7 +221,7 @@ func cleanupDNSRecord(rc *eos_io.RuntimeContext, domain string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Cleaning up DNS record",
 		zap.String("domain", domain))
-	
+
 	// TODO: Implement DNS cleanup
 	return nil
 }
@@ -231,7 +231,7 @@ func manageSSLCertificate(rc *eos_io.RuntimeContext, domain, provider string) er
 	logger.Info("Managing SSL certificate",
 		zap.String("domain", domain),
 		zap.String("provider", provider))
-	
+
 	// TODO: Implement SSL certificate management
 	return nil
 }
@@ -240,7 +240,7 @@ func validateAuthPolicyExists(rc *eos_io.RuntimeContext, policyName string) erro
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Validating auth policy exists",
 		zap.String("policy", policyName))
-	
+
 	// TODO: Check if auth policy exists in Authentik
 	return nil
 }
@@ -250,14 +250,14 @@ func configureRouteMonitoring(rc *eos_io.RuntimeContext, domain, healthPath stri
 	logger.Info("Configuring route monitoring",
 		zap.String("domain", domain),
 		zap.String("health_path", healthPath))
-	
+
 	// TODO: Implement monitoring configuration
 	return nil
 }
 
 func rollbackRouteCreation(rc *eos_io.RuntimeContext, state RouteCreationState) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Rolling back route creation", 
+	logger.Info("Rolling back route creation",
 		zap.String("domain", state.Domain))
 
 	// Clean up in reverse order
@@ -278,7 +278,7 @@ func generateSecret(rc *eos_io.RuntimeContext, secretType string) (string, error
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating secret",
 		zap.String("type", secretType))
-	
+
 	// TODO: Implement secret generation based on type
 	return "generated-secret-placeholder", nil
 }
@@ -289,26 +289,26 @@ func executeDualSecretRotation(rc *eos_io.RuntimeContext, secretType, newSecret 
 	// Phase 1: Store both secrets
 	state.CurrentPhase = "dual-secret"
 	logger.Info("Storing dual secrets")
-	
+
 	// TODO: Implement dual secret storage
-	
+
 	// Phase 2: Update services to accept both secrets
 	state.CurrentPhase = "updating-services"
 	logger.Info("Updating services for dual secret support")
-	
+
 	// TODO: Update service configurations
-	
+
 	// Phase 3: Wait for grace period
 	state.CurrentPhase = "grace-period"
 	logger.Info("Waiting for grace period")
 	time.Sleep(1 * time.Minute) // Shortened for demo
-	
+
 	// Phase 4: Switch to new secret only
 	state.CurrentPhase = "finalizing"
 	logger.Info("Finalizing secret rotation")
-	
+
 	// TODO: Finalize rotation
-	
+
 	return nil
 }
 
@@ -318,14 +318,14 @@ func executeImmediateRotation(rc *eos_io.RuntimeContext, secretType, newSecret s
 	// Phase 1: Replace secret immediately
 	state.CurrentPhase = "replacing"
 	logger.Info("Replacing secret immediately")
-	
+
 	// TODO: Replace secret immediately
-	
+
 	// Phase 2: Update services
 	state.CurrentPhase = "updating-services"
 	logger.Info("Updating services with new secret")
-	
+
 	// TODO: Update services
-	
+
 	return nil
 }

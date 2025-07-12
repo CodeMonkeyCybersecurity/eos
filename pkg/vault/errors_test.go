@@ -108,7 +108,7 @@ func TestIsSecretNotFoundEdgeCases(t *testing.T) {
 			err = fmt.Errorf("wrapper %d: %w", i, err)
 		}
 		finalErr := fmt.Errorf("final: %w", eos_err.ErrSecretNotFound)
-		
+
 		result := IsSecretNotFound(finalErr)
 		testutil.AssertEqual(t, true, result)
 	})

@@ -31,10 +31,10 @@ Examples:
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		outputJSON, _ := cmd.Flags().GetBool("json")
 		verbose, _ := cmd.Flags().GetBool("verbose")
-		
+
 		logger.Info("Checking Delphi webhook status", zap.Bool("verbose", verbose))
 
 		status := webhook.CheckWebhookStatus(rc, verbose)
@@ -53,4 +53,5 @@ func init() {
 
 	ReadCmd.AddCommand(pipelineWebhookStatusCmd)
 }
+
 // All helper functions have been migrated to pkg/pipeline/webhook/

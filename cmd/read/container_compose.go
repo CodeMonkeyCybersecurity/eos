@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container_management"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -30,11 +30,11 @@ Examples:
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		searchPaths, _ := cmd.Flags().GetStringSlice("path")
 		outputJSON, _ := cmd.Flags().GetBool("json")
 
-		logger.Info("Finding Docker Compose projects", 
+		logger.Info("Finding Docker Compose projects",
 			zap.Strings("search_paths", searchPaths),
 			zap.Bool("json", outputJSON))
 
@@ -60,6 +60,7 @@ func init() {
 	// Register with parent command
 	ReadCmd.AddCommand(containerComposeCmd)
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Output formatting functions
 func outputComposeSearchJSON(result *container_management.ComposeSearchResult) error {
@@ -67,6 +68,7 @@ func outputComposeSearchJSON(result *container_management.ComposeSearchResult) e
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputComposeSearchTable(result *container_management.ComposeSearchResult) error {
 	fmt.Printf("Searched paths: %s\n", strings.Join(result.SearchPaths, ", "))

@@ -28,7 +28,7 @@ func (gm *GitManager) IsGitRepository(rc *eos_io.RuntimeContext, path string) bo
 	if path == "" {
 		path = "."
 	}
-	
+
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 	cmd.Dir = path
 	err := cmd.Run()
@@ -38,7 +38,7 @@ func (gm *GitManager) IsGitRepository(rc *eos_io.RuntimeContext, path string) bo
 // GetRepositoryInfo retrieves comprehensive information about a Git repository
 func (gm *GitManager) GetRepositoryInfo(rc *eos_io.RuntimeContext, path string) (*GitRepository, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if !gm.IsGitRepository(rc, path) {
 		return nil, fmt.Errorf("not a git repository: %s", path)
 	}
@@ -154,13 +154,13 @@ func (gm *GitManager) GetStatus(rc *eos_io.RuntimeContext, path string) (*GitSta
 // ConfigureGit sets up Git configuration
 func (gm *GitManager) ConfigureGit(rc *eos_io.RuntimeContext, config *GitConfig, global bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	scope := "--local"
 	if global {
 		scope = "--global"
 	}
 
-	logger.Info("Configuring Git", 
+	logger.Info("Configuring Git",
 		zap.String("scope", scope),
 		zap.String("name", config.Name),
 		zap.String("email", config.Email))
@@ -218,7 +218,7 @@ func (gm *GitManager) ConfigureGit(rc *eos_io.RuntimeContext, config *GitConfig,
 // InitRepository initializes a new Git repository
 func (gm *GitManager) InitRepository(rc *eos_io.RuntimeContext, options *GitInitOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if options.Path == "" {
 		options.Path = "."
 	}
@@ -275,12 +275,12 @@ func (gm *GitManager) InitRepository(rc *eos_io.RuntimeContext, options *GitInit
 // CommitAndPush commits changes and optionally pushes to remote
 func (gm *GitManager) CommitAndPush(rc *eos_io.RuntimeContext, path string, options *GitCommitOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if path == "" {
 		path = "."
 	}
 
-	logger.Info("Committing and pushing changes", 
+	logger.Info("Committing and pushing changes",
 		zap.String("path", path),
 		zap.String("message", options.Message),
 		zap.Bool("push", options.Push))
@@ -325,12 +325,12 @@ func (gm *GitManager) CommitAndPush(rc *eos_io.RuntimeContext, path string, opti
 // ManageRemote manages Git remotes (add, remove, set-url, etc.)
 func (gm *GitManager) ManageRemote(rc *eos_io.RuntimeContext, path string, operation *GitRemoteOperation) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if path == "" {
 		path = "."
 	}
 
-	logger.Info("Managing Git remote", 
+	logger.Info("Managing Git remote",
 		zap.String("operation", operation.Operation),
 		zap.String("name", operation.Name),
 		zap.String("url", operation.URL))
@@ -352,8 +352,8 @@ func (gm *GitManager) ManageRemote(rc *eos_io.RuntimeContext, path string, opera
 // DeployWithGit performs Git-based deployment operations
 func (gm *GitManager) DeployWithGit(rc *eos_io.RuntimeContext, options *GitDeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	logger.Info("Starting Git deployment", 
+
+	logger.Info("Starting Git deployment",
 		zap.String("repository", options.RepositoryPath),
 		zap.String("branch", options.Branch),
 		zap.Bool("dry_run", options.DryRun))

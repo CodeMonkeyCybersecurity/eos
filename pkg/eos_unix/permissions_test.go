@@ -10,14 +10,14 @@ import (
 func TestCheckSudo(t *testing.T) {
 	// Note: This test may behave differently in CI environments
 	// where sudo might not be available or configured
-	
+
 	t.Run("sudo check", func(t *testing.T) {
 		result := CheckSudo()
-		
+
 		// Log the result rather than asserting, since sudo availability
 		// varies by environment
 		t.Logf("Sudo available: %v", result)
-		
+
 		// The function should not panic and should return a boolean
 		if result != true && result != false {
 			t.Error("CheckSudo should return a boolean value")
@@ -27,7 +27,7 @@ func TestCheckSudo(t *testing.T) {
 
 func TestIsPrivilegedUser(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name        string
 		description string
@@ -41,14 +41,14 @@ func TestIsPrivilegedUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := IsPrivilegedUser(ctx)
-			
+
 			// Log the result for debugging
 			currentUser, err := user.Current()
 			if err == nil {
-				t.Logf("Current user: %s, Privileged: %v, EUID: %d", 
+				t.Logf("Current user: %s, Privileged: %v, EUID: %d",
 					currentUser.Username, result, os.Geteuid())
 			} else {
-				t.Logf("Could not get current user: %v, Privileged: %v, EUID: %d", 
+				t.Logf("Could not get current user: %v, Privileged: %v, EUID: %d",
 					err, result, os.Geteuid())
 			}
 
@@ -67,7 +67,7 @@ func TestIsPrivilegedUser(t *testing.T) {
 
 func TestEnforceSecretsAccess(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name           string
 		show           bool
@@ -91,8 +91,8 @@ func TestEnforceSecretsAccess(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := EnforceSecretsAccess(ctx, tt.show)
-			
-			t.Logf("Show secrets: %v, Result: %v, Expected: %v", 
+
+			t.Logf("Show secrets: %v, Result: %v, Expected: %v",
 				tt.show, result, tt.expectedResult)
 
 			// For the non-secrets case, should always allow
@@ -116,15 +116,15 @@ func TestEnforceSecretsAccess(t *testing.T) {
 
 func TestRequireRoot(t *testing.T) {
 	ctx := context.Background()
-	
+
 	t.Run("require root call", func(t *testing.T) {
 		// This function calls os.Exit(1) if not privileged
 		// We can't easily test the exit behavior in a unit test
 		// But we can verify it doesn't panic when called
-		
+
 		isPrivileged := IsPrivilegedUser(ctx)
 		t.Logf("User is privileged: %v", isPrivileged)
-		
+
 		// Only test the function if we're actually privileged
 		// to avoid the test process exiting
 		if isPrivileged {
@@ -134,7 +134,7 @@ func TestRequireRoot(t *testing.T) {
 					t.Errorf("RequireRoot panicked: %v", r)
 				}
 			}()
-			
+
 			RequireRoot(ctx)
 			t.Log("RequireRoot completed successfully for privileged user")
 		} else {
@@ -145,12 +145,12 @@ func TestRequireRoot(t *testing.T) {
 
 func TestPrivilegeEscalation(t *testing.T) {
 	ctx := context.Background()
-	
+
 	t.Run("privilege validation consistency", func(t *testing.T) {
 		// Test that privilege checks are consistent
 		isPrivileged1 := IsPrivilegedUser(ctx)
 		isPrivileged2 := IsPrivilegedUser(ctx)
-		
+
 		if isPrivileged1 != isPrivileged2 {
 			t.Error("Privilege check should be consistent between calls")
 		}
@@ -164,16 +164,16 @@ func TestPrivilegeEscalation(t *testing.T) {
 	t.Run("environment security", func(t *testing.T) {
 		// Verify that privilege checks don't rely on environment variables
 		// that could be manipulated
-		
+
 		originalUser := os.Getenv("USER")
 		originalHome := os.Getenv("HOME")
-		
+
 		// Temporarily modify environment
 		os.Setenv("USER", "root")
 		os.Setenv("HOME", "/root")
-		
+
 		result1 := IsPrivilegedUser(ctx)
-		
+
 		// Restore environment
 		if originalUser != "" {
 			os.Setenv("USER", originalUser)
@@ -185,14 +185,14 @@ func TestPrivilegeEscalation(t *testing.T) {
 		} else {
 			os.Unsetenv("HOME")
 		}
-		
+
 		result2 := IsPrivilegedUser(ctx)
-		
+
 		// Results should be the same regardless of environment manipulation
 		if result1 != result2 {
 			t.Error("Privilege check should not be affected by environment variable manipulation")
 		}
-		
+
 		t.Logf("Privilege check consistent despite env manipulation: %v", result1 == result2)
 	})
 }

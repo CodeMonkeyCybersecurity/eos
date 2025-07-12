@@ -294,7 +294,6 @@ func GetProviderDefaults(provider string) *AIConfig {
 	}
 }
 
-
 // Helper functions
 
 func ContainsTechnicalTerms(text string) bool {

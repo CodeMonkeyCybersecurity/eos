@@ -16,7 +16,7 @@ import (
 func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Installing Caddy", 
+	logger.Info("Installing Caddy",
 		zap.String("version", options.Version),
 		zap.String("method", string(options.Method)))
 
@@ -34,7 +34,7 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 	}
 	step1Start := time.Now()
 
-	if err := sim.runCommand(rc, "Install prerequisites", "sudo", "apt", "install", "-y", 
+	if err := sim.runCommand(rc, "Install prerequisites", "sudo", "apt", "install", "-y",
 		"debian-keyring", "debian-archive-keyring", "apt-transport-https", "curl"); err != nil {
 		step1.Status = "failed"
 		step1.Error = err.Error()
@@ -154,10 +154,10 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 	// Set result details
 	result.Success = true
 	result.Version = "latest" // Repository installs latest
-	result.Port = 80 // Default HTTP port
+	result.Port = 80          // Default HTTP port
 	result.Message = "Caddy installed successfully from official repository"
 	result.Endpoints = []string{"http://localhost"}
-	
+
 	// Add configuration note
 	result.ConfigFiles = []string{"/etc/caddy/Caddyfile"}
 
@@ -229,7 +229,7 @@ func (sim *ServiceInstallationManager) getCaddyStatus(rc *eos_io.RuntimeContext,
 		}
 	}
 
-	logger.Info("Caddy status retrieved", 
+	logger.Info("Caddy status retrieved",
 		zap.String("status", status.Status),
 		zap.String("version", status.Version))
 

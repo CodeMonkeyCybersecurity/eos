@@ -256,7 +256,7 @@ func FuzzTimeoutHandling(f *testing.F) {
 
 			// Create context with timeout
 			timeout := normalizeTimeout(timeoutMs)
-			
+
 			// Timeout should never be negative (normalized to default)
 			if timeout < 0 {
 				t.Errorf("Timeout should never be negative, got: %v", timeout)
@@ -296,15 +296,15 @@ func FuzzTimeoutHandling(f *testing.F) {
 func processInput(input string) string {
 	// Trim spaces
 	input = strings.TrimSpace(input)
-	
+
 	// Remove null bytes
 	input = strings.ReplaceAll(input, "\x00", "")
-	
+
 	// Limit length
 	if len(input) > 4096 {
 		input = input[:4096]
 	}
-	
+
 	return input
 }
 
@@ -339,18 +339,18 @@ func normalizeTimeout(ms int64) time.Duration {
 	if ms <= 0 {
 		return 3 * time.Minute // Default timeout
 	}
-	
+
 	duration := time.Duration(ms) * time.Millisecond
-	
+
 	// Handle overflow cases
 	if duration < 0 {
 		return 3 * time.Minute // Default for overflow
 	}
-	
+
 	// Cap at 24 hours
 	if duration > 24*time.Hour {
 		return 24 * time.Hour
 	}
-	
+
 	return duration
 }

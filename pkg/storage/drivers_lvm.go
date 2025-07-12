@@ -108,7 +108,7 @@ func (d *LVMDriver) List(ctx context.Context) ([]StorageInfo, error) {
 	// TODO: Use existing lvm package functionality
 	// For now, return empty list
 	return []StorageInfo{}, nil
-	
+
 	/* When properly implemented:
 	vgs, err := lvm.GetVolumeGroups(d.rc)
 	if err != nil {
@@ -203,8 +203,8 @@ func (d *LVMDriver) Resize(ctx context.Context, id string, newSize int64) error 
 	saltState := map[string]interface{}{
 		"lvm.lv_resize": []map[string]interface{}{
 			{
-				"name": id,
-				"size": sizeStr,
+				"name":     id,
+				"size":     sizeStr,
 				"resizefs": true,
 			},
 		},
@@ -233,10 +233,10 @@ func (d *LVMDriver) Mount(ctx context.Context, id string, mountPoint string, opt
 	saltState := map[string]interface{}{
 		"mount.mounted": []map[string]interface{}{
 			{
-				"name":   mountPoint,
-				"device": id,
-				"fstype": "auto",
-				"opts":   options,
+				"name":    mountPoint,
+				"device":  id,
+				"fstype":  "auto",
+				"opts":    options,
 				"persist": true,
 			},
 		},
@@ -300,7 +300,7 @@ func (d *LVMDriver) CheckHealth(ctx context.Context, id string) (*HealthStatus, 
 
 	// Check usage percentage
 	status := HealthStatusFromUsage(info.UsagePercent)
-	
+
 	return &status, nil
 }
 
@@ -317,9 +317,9 @@ func (d *LVMDriver) CreateSnapshot(ctx context.Context, id string, snapshotName 
 	saltState := map[string]interface{}{
 		"lvm.lv_snapshot": []map[string]interface{}{
 			{
-				"name":     snapshotName,
-				"origin":   id,
-				"size":     "10%ORIGIN", // 10% of origin size
+				"name":   snapshotName,
+				"origin": id,
+				"size":   "10%ORIGIN", // 10% of origin size
 			},
 		},
 	}

@@ -48,6 +48,7 @@ Examples:
 		}
 	}),
 }
+
 // Helper functions have been migrated to:
 // - pkg/infrastructure/deploy/tailscale.go (DeployTailscale)
 // - pkg/infrastructure/deploy/traefik.go (DeployTraefik)

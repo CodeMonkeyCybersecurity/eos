@@ -16,13 +16,13 @@ import (
 // Migrated from cmd/create/consul.go createConsulSystemdService
 func CreateService(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare service configuration
 	log.Info("Assessing Consul systemd service requirements")
-	
+
 	// INTERVENE - Create systemd service file
 	log.Info("Creating Consul systemd service")
-	
+
 	serviceContent := fmt.Sprintf(`[Unit]
 Description=Consul Service Discovery and Configuration
 Documentation=https://www.consul.io/
@@ -55,22 +55,22 @@ WantedBy=multi-user.target`, shared.PortConsul)
 	if err := execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload"); err != nil {
 		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
-	
+
 	// EVALUATE - Verify service file was created
 	log.Info("Evaluating Consul systemd service creation")
-	
+
 	// Check if service file exists
 	info, err := os.Stat(servicePath)
 	if err != nil {
 		return fmt.Errorf("failed to verify service file: %w", err)
 	}
-	
+
 	if info.Mode().Perm() != 0644 {
 		log.Warn("Service file permissions not as expected",
 			zap.String("expected", "0644"),
 			zap.String("actual", info.Mode().Perm().String()))
 	}
-	
+
 	// Verify systemd recognizes the service
 	checkCmd := execute.Options{
 		Command: "systemctl",
@@ -80,14 +80,14 @@ WantedBy=multi-user.target`, shared.PortConsul)
 	if err != nil {
 		return fmt.Errorf("failed to verify systemd service registration: %w", err)
 	}
-	
+
 	if !strings.Contains(output, "consul.service") {
 		return fmt.Errorf("systemd did not recognize consul.service after creation")
 	}
-	
+
 	log.Info("Consul systemd service created successfully",
 		zap.String("path", servicePath),
 		zap.Int("consul_port", shared.PortConsul))
-	
+
 	return nil
 }

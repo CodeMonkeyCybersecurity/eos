@@ -49,7 +49,7 @@ func (skm *SSHKeyManager) Validate() error {
 	// Validate key type
 	validKeyTypes := []string{"rsa", "dsa", "ecdsa", "ed25519"}
 	if !contains(validKeyTypes, skm.config.KeyType) {
-		return fmt.Errorf("invalid key type: %s, must be one of: %s", 
+		return fmt.Errorf("invalid key type: %s, must be one of: %s",
 			skm.config.KeyType, strings.Join(validKeyTypes, ", "))
 	}
 
@@ -100,7 +100,7 @@ func (skm *SSHKeyManager) Validate() error {
 // Backup creates a backup of existing SSH keys
 func (skm *SSHKeyManager) Backup() (*ConfigurationBackup, error) {
 	logger := otelzap.Ctx(skm.rc.Ctx)
-	
+
 	backup := &ConfigurationBackup{
 		ID:        fmt.Sprintf("ssh-key-%d", time.Now().Unix()),
 		Type:      ConfigTypeSSHKey,
@@ -141,7 +141,7 @@ func (skm *SSHKeyManager) Backup() (*ConfigurationBackup, error) {
 // Apply generates the SSH key
 func (skm *SSHKeyManager) Apply() (*ConfigurationResult, error) {
 	logger := otelzap.Ctx(skm.rc.Ctx)
-	
+
 	start := time.Now()
 	result := &ConfigurationResult{
 		Type:      ConfigTypeSSHKey,
@@ -200,7 +200,7 @@ func (skm *SSHKeyManager) createSSHDirectory(result *ConfigurationResult) error 
 	stepStart := time.Now()
 
 	sshDir := filepath.Dir(skm.config.FilePath)
-	
+
 	if err := EnsureDirectory(sshDir); err != nil {
 		step.Status = "failed"
 		step.Error = err.Error()
@@ -336,7 +336,7 @@ func (skm *SSHKeyManager) setPermissions(result *ConfigurationResult) error {
 // Rollback removes generated SSH keys
 func (skm *SSHKeyManager) Rollback(backup *ConfigurationBackup) error {
 	logger := otelzap.Ctx(skm.rc.Ctx)
-	
+
 	logger.Info("Rolling back SSH key generation", zap.String("backup_id", backup.ID))
 
 	// Restore backed up files

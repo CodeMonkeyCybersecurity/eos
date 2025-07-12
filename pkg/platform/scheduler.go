@@ -24,7 +24,7 @@ func scheduleCron(rc *eos_io.RuntimeContext, cmd string, osPlatform string) erro
 		return fmt.Errorf("failed to generate random hour: %w", err)
 	}
 	hour := int(hourBig.Int64())
-	
+
 	minuteBig, err := rand.Int(rand.Reader, big.NewInt(60))
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to generate random minute", zap.Error(err))

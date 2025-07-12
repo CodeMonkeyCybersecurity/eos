@@ -79,7 +79,7 @@ func ConfigureFail2banEnhanced(rc *eos_io.RuntimeContext, config *Fail2banConfig
 			zap.Int("step_number", i+1),
 			zap.Int("total_steps", len(steps)),
 			zap.String("description", step.desc))
-		
+
 		stepStart := time.Now()
 		if err := step.fn(); err != nil {
 			logger.Error(" Step failed",
@@ -88,7 +88,7 @@ func ConfigureFail2banEnhanced(rc *eos_io.RuntimeContext, config *Fail2banConfig
 				zap.Duration("step_duration", time.Since(stepStart)))
 			return fmt.Errorf("%s: %w", step.desc, err)
 		}
-		
+
 		logger.Info(" Step completed",
 			zap.String("step", step.desc),
 			zap.Duration("step_duration", time.Since(stepStart)))
@@ -97,6 +97,6 @@ func ConfigureFail2banEnhanced(rc *eos_io.RuntimeContext, config *Fail2banConfig
 	logger.Info(" Fail2Ban installation completed successfully",
 		zap.Duration("total_duration", time.Since(startTime)),
 		zap.String("config_location", "/etc/fail2ban/jail.local"))
-	
+
 	return nil
 }

@@ -8,8 +8,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 var terraformGraphCmd = &cobra.Command{
@@ -50,18 +50,18 @@ Examples:
   eos inspect terraform-graph --vault-addr http://vault.example.com:8179`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		logger.Info("Starting Terraform graph generation",
 			zap.String("command", "inspect terraform-graph"),
 			zap.String("component", rc.Component))
-		
+
 		// Parse command line flags
 		config, err := parseTerraformGraphFlags(cmd)
 		if err != nil {
 			logger.Error("Failed to parse command flags", zap.Error(err))
 			return fmt.Errorf("flag parsing failed: %w", err)
 		}
-		
+
 		// Log configuration
 		logger.Info("Terraform graph configuration",
 			zap.String("terraform_path", config.TerraformPath),
@@ -70,74 +70,75 @@ Examples:
 			zap.String("output_file", config.OutputFile),
 			zap.String("vault_addr", config.VaultAddr),
 			zap.String("namespace", config.Namespace))
-		
+
 		// Execute graph generation
 		if err := terraform.GenerateGraph(rc, config); err != nil {
 			logger.Error("Terraform graph generation failed", zap.Error(err))
 			return fmt.Errorf("terraform graph generation failed: %w", err)
 		}
-		
+
 		// Display success information
 		logger.Info("Terraform graph generation completed successfully",
 			zap.String("output_file", config.OutputFile),
 			zap.String("format", config.OutputFormat),
 			zap.String("namespace", config.Namespace))
-		
+
 		logger.Info("Graph details",
 			zap.String("file_path", config.OutputFile),
 			zap.String("terraform_dir", config.WorkingDir),
 			zap.String("vault_metadata", fmt.Sprintf("secret/data/terraform-graph/%s", config.Namespace)))
-		
+
 		return nil
 	}),
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // parseTerraformGraphFlags parses command line flags and returns a Terraform graph configuration
 func parseTerraformGraphFlags(cmd *cobra.Command) (*terraform.GraphConfig, error) {
 	// Start with default configuration
 	config := terraform.DefaultGraphConfig()
-	
+
 	// Parse flags
 	if terraformPath, err := cmd.Flags().GetString("terraform-path"); err == nil && terraformPath != "" {
 		config.TerraformPath = terraformPath
 	}
-	
+
 	if workingDir, err := cmd.Flags().GetString("terraform-dir"); err == nil && workingDir != "" {
 		config.WorkingDir = workingDir
 	}
-	
+
 	if outputFormat, err := cmd.Flags().GetString("format"); err == nil && outputFormat != "" {
 		config.OutputFormat = outputFormat
 	}
-	
+
 	if outputFile, err := cmd.Flags().GetString("output"); err == nil && outputFile != "" {
 		config.OutputFile = outputFile
 	}
-	
+
 	if vaultAddr, err := cmd.Flags().GetString("vault-addr"); err == nil && vaultAddr != "" {
 		config.VaultAddr = vaultAddr
 	}
-	
+
 	if nomadAddr, err := cmd.Flags().GetString("nomad-addr"); err == nil && nomadAddr != "" {
 		config.NomadAddr = nomadAddr
 	}
-	
+
 	if namespace, err := cmd.Flags().GetString("namespace"); err == nil && namespace != "" {
 		config.Namespace = namespace
 	}
-	
+
 	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
-	
+
 	return config, nil
 }
 
 func init() {
 	// Add terraform-graph command to inspect
 	InspectCmd.AddCommand(terraformGraphCmd)
-	
+
 	// Basic configuration flags
 	terraformGraphCmd.Flags().String("terraform-path", "terraform", "Path to terraform binary")
 	terraformGraphCmd.Flags().String("terraform-dir", ".", "Directory containing Terraform configuration")
@@ -146,7 +147,7 @@ func init() {
 	terraformGraphCmd.Flags().String("vault-addr", fmt.Sprintf("http://localhost:%d", shared.PortVault), "Vault server address")
 	terraformGraphCmd.Flags().String("nomad-addr", fmt.Sprintf("http://localhost:%d", shared.PortNomad), "Nomad server address")
 	terraformGraphCmd.Flags().String("namespace", "terraform-graph", "Namespace for metadata storage")
-	
+
 	// Set flag usage examples
 	terraformGraphCmd.Example = `  # Generate ASCII graph in current directory
   eos inspect terraform-graph

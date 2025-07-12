@@ -45,6 +45,7 @@ var CreateLDAPCmd = &cobra.Command{
 		return nil
 	}),
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var noTest bool
 

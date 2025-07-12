@@ -15,12 +15,12 @@ import (
 
 // MockSaltClient implements saltstack.ClientInterface for testing
 type MockSaltClient struct {
-	TestPingResult     bool
-	TestPingError      error
-	CmdRunResults      map[string]string
-	CmdRunErrors       map[string]error
-	StateApplyError    error
-	StateApplyCalls    []StateApplyCall
+	TestPingResult  bool
+	TestPingError   error
+	CmdRunResults   map[string]string
+	CmdRunErrors    map[string]error
+	StateApplyError error
+	StateApplyCalls []StateApplyCall
 }
 
 type StateApplyCall struct {
@@ -167,7 +167,7 @@ func TestUserExistenceCheck_Intervene_UserExists(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -195,7 +195,7 @@ func TestUserExistenceCheck_Intervene_UserNotExists(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -215,7 +215,7 @@ func TestUserExistenceCheck_Evaluate(t *testing.T) {
 		Success: true,
 		Message: "check completed",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -230,9 +230,9 @@ func TestUserCreationOperation_Assess_GroupsExist(t *testing.T) {
 	saltClient := &MockSaltClient{
 		TestPingResult: true,
 		CmdRunResults: map[string]string{
-			"id newuser": "id: newuser: no such user", // User doesn't exist
-			"getent group sudo":   "sudo:x:27:user1,user2",
-			"getent group docker": "docker:x:999:user1",
+			"id newuser":                       "id: newuser: no such user", // User doesn't exist
+			"getent group sudo":                "sudo:x:27:user1,user2",
+			"getent group docker":              "docker:x:999:user1",
 			"test -f /bin/bash && echo exists": "exists",
 		},
 	}
@@ -280,7 +280,7 @@ func TestUserCreationOperation_Intervene_Success(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -317,7 +317,7 @@ func TestUserCreationOperation_Intervene_SaltFails(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	assert.Error(t, err)
@@ -347,7 +347,7 @@ func TestUserCreationOperation_Evaluate_Success(t *testing.T) {
 		Success: true,
 		Message: "user created",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -377,7 +377,7 @@ func TestUserCreationOperation_Evaluate_UserNotCreated(t *testing.T) {
 		Success: true,
 		Message: "user created",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -406,7 +406,7 @@ func TestPasswordUpdateOperation_Assess_UserExists(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Should succeed with proper salt client mocking
 	_, err := operation.Assess(ctx)
 	assert.NoError(t, err)
@@ -434,7 +434,7 @@ func TestPasswordUpdateOperation_Intervene_Success(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -460,7 +460,7 @@ func TestPasswordUpdateOperation_Evaluate(t *testing.T) {
 		Success: true,
 		Message: "password updated",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -475,7 +475,7 @@ func TestUserDeletionOperation_Assess_UserHasActiveProcesses(t *testing.T) {
 	saltClient := &MockSaltClient{
 		TestPingResult: true,
 		CmdRunResults: map[string]string{
-			"id testuser": "uid=1001(testuser) gid=1001(testuser) groups=1001(testuser)",
+			"id testuser":            "uid=1001(testuser) gid=1001(testuser) groups=1001(testuser)",
 			"ps -u testuser | wc -l": "5", // User has active processes
 		},
 	}
@@ -489,7 +489,7 @@ func TestUserDeletionOperation_Assess_UserHasActiveProcesses(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Should succeed with proper mocking
 	_, err := operation.Assess(ctx)
 	assert.NoError(t, err)
@@ -514,7 +514,7 @@ func TestUserDeletionOperation_Intervene_Success(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -528,7 +528,7 @@ func TestUserDeletionOperation_Evaluate_Success(t *testing.T) {
 	logger := createTestLogger(t)
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"id testuser 2>&1":                               "id: testuser: no such user",
+			"id testuser 2>&1": "id: testuser: no such user",
 			"test -d /home/testuser && echo exists || echo removed": "removed",
 		},
 	}
@@ -546,7 +546,7 @@ func TestUserDeletionOperation_Evaluate_Success(t *testing.T) {
 		Success: true,
 		Message: "user deleted",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -583,7 +583,7 @@ func TestGenerateSecurePassword(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			password, err := users.GenerateSecurePassword(tt.length)
-			
+
 			require.NoError(t, err)
 			assert.NotEmpty(t, password)
 			// The actual length might be trimmed due to base64 encoding
@@ -594,12 +594,12 @@ func TestGenerateSecurePassword(t *testing.T) {
 
 func TestGenerateSecurePassword_Uniqueness(t *testing.T) {
 	passwords := make(map[string]bool)
-	
+
 	// Generate 100 passwords and ensure they're all unique
 	for i := 0; i < 100; i++ {
 		password, err := users.GenerateSecurePassword(16)
 		require.NoError(t, err)
-		
+
 		// Check uniqueness
 		assert.False(t, passwords[password], "Generated duplicate password: %s", password)
 		passwords[password] = true
@@ -698,9 +698,9 @@ func TestUserOperations_Integration(t *testing.T) {
 	saltClient := &MockSaltClient{
 		TestPingResult: true,
 		CmdRunResults: map[string]string{
-			"getent group sudo":                             "sudo:x:27:",
-			"test -f /bin/bash && echo exists":              "exists",
-			"id testuser":                                   "uid=1001(testuser) gid=1001(testuser) groups=1001(testuser),27(sudo)",
+			"getent group sudo":                "sudo:x:27:",
+			"test -f /bin/bash && echo exists": "exists",
+			"id testuser":                      "uid=1001(testuser) gid=1001(testuser) groups=1001(testuser),27(sudo)",
 			"groups testuser | grep -q sudo && echo yes || echo no": "yes",
 		},
 	}
@@ -737,7 +737,7 @@ func TestUserOperations_Integration(t *testing.T) {
 
 		// Skip full assessment due to embedded executor
 		createAssessment := &patterns.AssessmentResult{CanProceed: true}
-		
+
 		intervention, err := createOp.Intervene(ctx, createAssessment)
 		require.NoError(t, err)
 		assert.True(t, intervention.Success)
@@ -745,7 +745,7 @@ func TestUserOperations_Integration(t *testing.T) {
 		// 3. Verify creation
 		// Update mock to return user exists
 		saltClient.CmdRunResults["id testuser"] = "uid=1001(testuser) gid=1001(testuser) groups=1001(testuser),27(sudo)"
-		
+
 		evaluation, err := createOp.Evaluate(ctx, intervention)
 		require.NoError(t, err)
 		assert.True(t, evaluation.Success)

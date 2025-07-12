@@ -39,7 +39,7 @@ func NewDeployer() *Deployer {
 // Deploy executes the full MinIO deployment workflow
 func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Step 1: Apply SaltStack states
 	if !opts.SkipSalt {
 		logger.Info("Applying SaltStack states for MinIO")
@@ -120,7 +120,7 @@ func (d *Deployer) generateDeploymentFiles(rc *eos_io.RuntimeContext, opts *Depl
 	// Create subdirectories
 	terraformDir := filepath.Join(deployDir, "terraform", "minio")
 	nomadDir := filepath.Join(deployDir, "nomad")
-	
+
 	if err := os.MkdirAll(terraformDir, 0755); err != nil {
 		return "", err
 	}
@@ -130,11 +130,11 @@ func (d *Deployer) generateDeploymentFiles(rc *eos_io.RuntimeContext, opts *Depl
 
 	// Generate files from templates
 	files := map[string]string{
-		"templates/main.tf.tmpl":           filepath.Join(terraformDir, "main.tf"),
-		"templates/variables.tf.tmpl":      filepath.Join(terraformDir, "variables.tf"),
-		"templates/outputs.tf.tmpl":        filepath.Join(terraformDir, "outputs.tf"),
-		"templates/terraform.tfvars.tmpl":  filepath.Join(terraformDir, "terraform.tfvars"),
-		"templates/minio.nomad.hcl.tmpl":   filepath.Join(nomadDir, "minio.nomad.hcl"),
+		"templates/main.tf.tmpl":          filepath.Join(terraformDir, "main.tf"),
+		"templates/variables.tf.tmpl":     filepath.Join(terraformDir, "variables.tf"),
+		"templates/outputs.tf.tmpl":       filepath.Join(terraformDir, "outputs.tf"),
+		"templates/terraform.tfvars.tmpl": filepath.Join(terraformDir, "terraform.tfvars"),
+		"templates/minio.nomad.hcl.tmpl":  filepath.Join(nomadDir, "minio.nomad.hcl"),
 	}
 
 	for tmplPath, outputPath := range files {

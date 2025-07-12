@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var Cron bool
 

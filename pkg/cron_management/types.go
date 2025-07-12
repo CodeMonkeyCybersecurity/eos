@@ -6,24 +6,24 @@ import (
 
 // CronJob represents a crontab entry
 type CronJob struct {
-	ID          string    `json:"id"`
-	Schedule    string    `json:"schedule"`
-	Command     string    `json:"command"`
-	Comment     string    `json:"comment,omitempty"`
-	Environment []string  `json:"environment,omitempty"`
-	User        string    `json:"user"`
-	Enabled     bool      `json:"enabled"`
+	ID          string     `json:"id"`
+	Schedule    string     `json:"schedule"`
+	Command     string     `json:"command"`
+	Comment     string     `json:"comment,omitempty"`
+	Environment []string   `json:"environment,omitempty"`
+	User        string     `json:"user"`
+	Enabled     bool       `json:"enabled"`
 	LastRun     *time.Time `json:"last_run,omitempty"`
 	NextRun     *time.Time `json:"next_run,omitempty"`
 }
 
 // CronListResult contains results of listing cron jobs
 type CronListResult struct {
-	Jobs      []CronJob `json:"jobs"`
-	Count     int       `json:"count"`
-	User      string    `json:"user"`
-	Timestamp time.Time `json:"timestamp"`
-	HasCrontab bool     `json:"has_crontab"`
+	Jobs       []CronJob `json:"jobs"`
+	Count      int       `json:"count"`
+	User       string    `json:"user"`
+	Timestamp  time.Time `json:"timestamp"`
+	HasCrontab bool      `json:"has_crontab"`
 }
 
 // CronOperation represents a cron management operation
@@ -40,11 +40,11 @@ type CronOperation struct {
 
 // CronConfig contains configuration for cron management
 type CronConfig struct {
-	DryRun      bool   `json:"dry_run" mapstructure:"dry_run"`
-	User        string `json:"user" mapstructure:"user"`
+	DryRun       bool   `json:"dry_run" mapstructure:"dry_run"`
+	User         string `json:"user" mapstructure:"user"`
 	CreateBackup bool   `json:"create_backup" mapstructure:"create_backup"`
-	BackupDir   string `json:"backup_dir" mapstructure:"backup_dir"`
-	Verbose     bool   `json:"verbose" mapstructure:"verbose"`
+	BackupDir    string `json:"backup_dir" mapstructure:"backup_dir"`
+	Verbose      bool   `json:"verbose" mapstructure:"verbose"`
 }
 
 // DefaultCronConfig returns a configuration with sensible defaults
@@ -71,11 +71,11 @@ var CronSchedulePresets = map[string]string{
 
 // CronValidationResult represents the result of validating a cron expression
 type CronValidationResult struct {
-	Valid       bool      `json:"valid"`
-	Expression  string    `json:"expression"`
-	Description string    `json:"description"`
+	Valid       bool        `json:"valid"`
+	Expression  string      `json:"expression"`
+	Description string      `json:"description"`
 	NextRuns    []time.Time `json:"next_runs,omitempty"`
-	Error       string    `json:"error,omitempty"`
+	Error       string      `json:"error,omitempty"`
 }
 
 // CronBackup represents a backup of crontab

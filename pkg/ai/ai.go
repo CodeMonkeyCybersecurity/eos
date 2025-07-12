@@ -494,7 +494,7 @@ func generateConversationID() string {
 		// Fallback to timestamp if random generation fails
 		return fmt.Sprintf("eos-ai-%d", time.Now().UnixNano())
 	}
-	
+
 	// Combine timestamp and random bytes for uniqueness
 	timestamp := time.Now().Unix()
 	randomHex := hex.EncodeToString(randomBytes)

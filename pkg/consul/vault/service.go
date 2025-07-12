@@ -16,34 +16,34 @@ import (
 // Migrated from cmd/create/consul.go generateVaultServiceConfig
 func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check prerequisites
 	log.Info("Assessing Vault service registration requirements")
-	
+
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if vaultAddr == "" {
 		return fmt.Errorf("VAULT_ADDR not set")
 	}
-	
+
 	hostname := eos_unix.GetInternalHostname()
-	
+
 	// Extract hostname and port from VAULT_ADDR
 	vaultURL := strings.TrimPrefix(vaultAddr, "https://")
 	vaultURL = strings.TrimPrefix(vaultURL, "http://")
-	
+
 	parts := strings.Split(vaultURL, ":")
 	vaultHost := parts[0]
 	vaultPort := "8200" // default
 	if len(parts) > 1 {
 		vaultPort = parts[1]
 	}
-	
+
 	// INTERVENE - Generate and write service configuration
 	log.Info("Generating Vault service registration for Consul",
 		zap.String("vault_addr", vaultAddr),
 		zap.String("vault_host", vaultHost),
 		zap.String("vault_port", vaultPort))
-	
+
 	serviceConfig := fmt.Sprintf(`{
   "service": {
     "name": "vault",
@@ -90,24 +90,24 @@ func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
 	if err := execute.RunSimple(rc.Ctx, "chown", "consul:consul", servicePath); err != nil {
 		return fmt.Errorf("failed to set service config ownership: %w", err)
 	}
-	
+
 	// EVALUATE - Verify service configuration was written
 	log.Info("Evaluating Vault service registration")
-	
+
 	info, err := os.Stat(servicePath)
 	if err != nil {
 		return fmt.Errorf("failed to verify service config file: %w", err)
 	}
-	
+
 	if info.Mode().Perm() != 0640 {
 		log.Warn("Service config file permissions not as expected",
 			zap.String("expected", "0640"),
 			zap.String("actual", info.Mode().Perm().String()))
 	}
-	
+
 	log.Info("Vault service registration created successfully",
 		zap.String("path", servicePath),
 		zap.String("service_id", fmt.Sprintf("vault-%s", hostname)))
-	
+
 	return nil
 }

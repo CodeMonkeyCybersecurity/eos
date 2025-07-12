@@ -56,7 +56,7 @@ Examples:
 
 		// For now, pass nil for Salt client - in production this would be properly initialized
 		// TODO: Initialize proper Salt client from configuration
-		
+
 		// Initialize unified storage manager
 		storageManager, err := storage.NewUnifiedStorageManager(rc, nil)
 		if err != nil {
@@ -185,4 +185,3 @@ func init() {
 	createStorageVolumeCmd.MarkFlagRequired("name")
 	createStorageVolumeCmd.MarkFlagRequired("size")
 }
-

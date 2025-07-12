@@ -20,7 +20,7 @@ const (
 	PromptConfirmPassword = "Confirm password: "
 	PromptUsernameInput   = "Enter username (default: eos): "
 	// #nosec G101 - This is a filename, not a hardcoded credential
-	SecretsFilename       = "eos-passwd.json"
+	SecretsFilename = "eos-passwd.json"
 )
 
 type UserpassCreds struct {

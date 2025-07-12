@@ -42,7 +42,7 @@ func TestHashPassword(t *testing.T) {
 		{
 			name:        "very long password",
 			password:    strings.Repeat("a", 100), // over bcrypt max
-			expectError: true, // bcrypt errors on passwords over 72 bytes
+			expectError: true,                     // bcrypt errors on passwords over 72 bytes
 		},
 		{
 			name:        "password with special chars",
@@ -59,7 +59,7 @@ func TestHashPassword(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hash, err := HashPassword(tt.password)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Empty(t, hash)
@@ -67,7 +67,7 @@ func TestHashPassword(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotEmpty(t, hash)
 				assert.True(t, strings.HasPrefix(hash, "$2a$"), "Hash should start with bcrypt prefix")
-				
+
 				// Verify hash can be used to verify password
 				err = ComparePassword(hash, tt.password)
 				assert.NoError(t, err)
@@ -130,7 +130,7 @@ func TestHashPasswordWithCost(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hash, err := HashPasswordWithCost(tt.password, tt.cost)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Empty(t, hash)
@@ -138,12 +138,12 @@ func TestHashPasswordWithCost(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotEmpty(t, hash)
-				
+
 				// Verify the hash uses the expected cost
 				actualCost, err := bcrypt.Cost([]byte(hash))
 				assert.NoError(t, err)
 				assert.Equal(t, tt.cost, actualCost)
-				
+
 				// Verify hash can verify password
 				err = ComparePassword(hash, tt.password)
 				assert.NoError(t, err)
@@ -205,7 +205,7 @@ func TestComparePassword(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ComparePassword(tt.hash, tt.password)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -272,10 +272,10 @@ func TestIsHashCostWeak(t *testing.T) {
 	password := "test123"
 	lowCostHash, err := HashPasswordWithCost(password, bcrypt.MinCost)
 	require.NoError(t, err)
-	
+
 	mediumCostHash, err := HashPasswordWithCost(password, 8)
 	require.NoError(t, err)
-	
+
 	highCostHash, err := HashPasswordWithCost(password, 12)
 	require.NoError(t, err)
 
@@ -390,27 +390,27 @@ func TestComparePasswordLogging(t *testing.T) {
 func TestBcryptIntegration(t *testing.T) {
 	// Test a complete workflow
 	originalPassword := "MySecurePassword123!"
-	
+
 	// Hash the password
 	hash, err := HashPassword(originalPassword)
 	require.NoError(t, err)
-	
+
 	// Verify the password works
 	assert.True(t, ComparePasswordBool(hash, originalPassword))
-	
+
 	// Verify wrong passwords don't work
 	assert.False(t, ComparePasswordBool(hash, "WrongPassword"))
-	
+
 	// Check if the hash might be considered weak
 	isWeak := IsHashCostWeak(hash, 12)
 	if isWeak {
 		// Upgrade to higher cost
 		newHash, err := HashPasswordWithCost(originalPassword, 12)
 		require.NoError(t, err)
-		
+
 		// Verify new hash still works
 		assert.True(t, ComparePasswordBool(newHash, originalPassword))
-		
+
 		// Verify new hash is not weak
 		assert.False(t, IsHashCostWeak(newHash, 12))
 	}
@@ -418,16 +418,16 @@ func TestBcryptIntegration(t *testing.T) {
 
 func TestBcryptSecurityProperties(t *testing.T) {
 	password := "testpassword"
-	
+
 	// Test that same password produces different hashes (salt)
 	hash1, err := HashPassword(password)
 	require.NoError(t, err)
-	
+
 	hash2, err := HashPassword(password)
 	require.NoError(t, err)
-	
+
 	assert.NotEqual(t, hash1, hash2, "Same password should produce different hashes due to salt")
-	
+
 	// Both hashes should verify the same password
 	assert.True(t, ComparePasswordBool(hash1, password))
 	assert.True(t, ComparePasswordBool(hash2, password))
@@ -437,15 +437,15 @@ func TestBcryptErrorHandling(t *testing.T) {
 	// Test ComparePassword error cases
 	err := ComparePassword("", "password")
 	assert.Error(t, err)
-	
+
 	err = ComparePassword("invalid", "password")
 	assert.Error(t, err)
-	
+
 	// Test extremely long passwords (over bcrypt limit)
 	veryLongPassword := strings.Repeat("a", 1000)
 	hash, err := HashPassword(veryLongPassword)
 	assert.NoError(t, err) // bcrypt should handle this gracefully
-	
+
 	// The hash should verify the truncated version
 	truncated := veryLongPassword[:72] // bcrypt truncates at 72 bytes
 	assert.True(t, ComparePasswordBool(hash, truncated))

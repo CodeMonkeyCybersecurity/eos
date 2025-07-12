@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 var CrontabCmd = &cobra.Command{
 	Use:   "crontab",
 	Short: "Update the crontab to send email alerts on job failures",
@@ -74,4 +75,3 @@ func init() {
 	CrontabCmd.Flags().String("email", "", "Email address for cron failure alerts")
 	UpdateCmd.AddCommand(CrontabCmd)
 }
-

@@ -21,8 +21,8 @@ func DeployZabbix(rc *eos_io.RuntimeContext) error {
 	timeZone := "auto"
 	zabbixWebPort := strconv.Itoa(shared.PortZabbix)
 	zabbixWebSSLPort := strconv.Itoa(shared.PortZabbix + 1) // Next port for SSL
-	zabbixServerPort := "10051" // Standard Zabbix server port
-	zabbixAgentPort := "10050"  // Standard Zabbix agent port
+	zabbixServerPort := "10051"                             // Standard Zabbix server port
+	zabbixAgentPort := "10050"                              // Standard Zabbix agent port
 	postgresPassword := "zabbix_secure_pwd"
 
 	// Ensure Docker is installed and running (install if needed)

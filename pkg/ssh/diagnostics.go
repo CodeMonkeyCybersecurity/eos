@@ -33,10 +33,10 @@ type SSHCredentials struct {
 func ParseSSHPath(sshPath string) (*SSHCredentials, error) {
 	// Remove any quotes
 	sshPath = strings.Trim(sshPath, "'\"")
-	
+
 	// Default SSH port
 	port := "22"
-	
+
 	// Check for port specification (user@host:port)
 	if strings.Contains(sshPath, ":") && strings.Count(sshPath, ":") == 2 {
 		parts := strings.Split(sshPath, ":")
@@ -45,24 +45,24 @@ func ParseSSHPath(sshPath string) (*SSHCredentials, error) {
 			port = parts[2]
 		}
 	}
-	
+
 	// Split user@host
 	if !strings.Contains(sshPath, "@") {
 		return nil, fmt.Errorf("invalid SSH path format, expected user@host")
 	}
-	
+
 	parts := strings.Split(sshPath, "@")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid SSH path format, expected user@host")
 	}
-	
+
 	user := strings.TrimSpace(parts[0])
 	host := strings.TrimSpace(parts[1])
-	
+
 	if user == "" || host == "" {
 		return nil, fmt.Errorf("empty user or host in SSH path")
 	}
-	
+
 	return &SSHCredentials{
 		User: user,
 		Host: host,
@@ -74,13 +74,13 @@ func ParseSSHPath(sshPath string) (*SSHCredentials, error) {
 func CheckSSHCredentials(rc *eos_io.RuntimeContext, creds *SSHCredentials) error {
 	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHCredentials")
 	defer span.End()
-	
+
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Checking SSH credentials",
 		zap.String("user", creds.User),
 		zap.String("host", creds.Host),
 		zap.String("port", creds.Port))
-	
+
 	// Build SSH command
 	args := []string{
 		"-o", "BatchMode=yes",
@@ -88,18 +88,18 @@ func CheckSSHCredentials(rc *eos_io.RuntimeContext, creds *SSHCredentials) error
 		"-o", "StrictHostKeyChecking=no",
 		"-p", creds.Port,
 	}
-	
+
 	if creds.KeyPath != "" {
 		args = append(args, "-i", creds.KeyPath)
 	}
-	
+
 	target := fmt.Sprintf("%s@%s", creds.User, creds.Host)
 	args = append(args, target, "exit")
-	
+
 	cmd := exec.CommandContext(ctx, "ssh", args...)
-	
+
 	logger.Debug("Executing SSH test command", zap.Strings("args", args))
-	
+
 	if err := cmd.Run(); err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			if exitError.ExitCode() != 0 {
@@ -110,7 +110,7 @@ func CheckSSHCredentials(rc *eos_io.RuntimeContext, creds *SSHCredentials) error
 		logger.Error("SSH command execution failed", zap.Error(err))
 		return fmt.Errorf("SSH command failed: %w", err)
 	}
-	
+
 	logger.Info("SSH credentials validated successfully")
 	return nil
 }
@@ -119,42 +119,42 @@ func CheckSSHCredentials(rc *eos_io.RuntimeContext, creds *SSHCredentials) error
 func CheckSSHKeyPermissions(rc *eos_io.RuntimeContext, keyPath string) error {
 	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHKeyPermissions")
 	defer span.End()
-	
+
 	logger := otelzap.Ctx(ctx)
-	
+
 	// Check if file exists
 	info, err := os.Stat(keyPath)
 	if err != nil {
 		logger.Error("SSH key file not found", zap.Error(err))
 		return fmt.Errorf("SSH key file not found: %w", err)
 	}
-	
+
 	// Get current permissions
 	mode := info.Mode()
 	perms := mode.Perm()
-	
-	logger.Info("Checking SSH key permissions", 
+
+	logger.Info("Checking SSH key permissions",
 		zap.String("key_path", keyPath),
 		zap.String("current_perms", fmt.Sprintf("%o", perms)),
 		zap.String("expected_perms", "600"))
-	
+
 	// Check if permissions are correct (600)
 	expectedPerms := os.FileMode(0600)
 	if perms != expectedPerms {
 		logger.Warn("SSH key permissions are incorrect, fixing",
 			zap.String("current", fmt.Sprintf("%o", perms)),
 			zap.String("expected", fmt.Sprintf("%o", expectedPerms)))
-		
+
 		if err := os.Chmod(keyPath, expectedPerms); err != nil {
 			logger.Error("Failed to fix SSH key permissions", zap.Error(err))
 			return fmt.Errorf("failed to fix SSH key permissions: %w", err)
 		}
-		
+
 		logger.Info("SSH key permissions corrected")
 	} else {
 		logger.Info("SSH key permissions are correct")
 	}
-	
+
 	return nil
 }
 
@@ -162,35 +162,35 @@ func CheckSSHKeyPermissions(rc *eos_io.RuntimeContext, keyPath string) error {
 func ListSSHKeys(rc *eos_io.RuntimeContext) ([]string, error) {
 	ctx, span := telemetry.Start(rc.Ctx, "ssh.ListSSHKeys")
 	defer span.End()
-	
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		otelzap.Ctx(ctx).Error("Failed to get user home directory", zap.Error(err))
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	
+
 	sshDir := filepath.Join(homeDir, ".ssh")
-	
+
 	// Find all .pub files and return their corresponding private keys
 	pubFiles, err := filepath.Glob(filepath.Join(sshDir, "*.pub"))
 	if err != nil {
 		otelzap.Ctx(ctx).Error("Failed to list SSH public keys", zap.Error(err))
 		return nil, fmt.Errorf("failed to list SSH keys: %w", err)
 	}
-	
+
 	var privateKeys []string
 	for _, pubFile := range pubFiles {
 		// Remove .pub extension to get private key path
 		privateKey := strings.TrimSuffix(pubFile, ".pub")
-		
+
 		// Check if private key exists
 		if _, err := os.Stat(privateKey); err == nil {
 			privateKeys = append(privateKeys, privateKey)
 		}
 	}
-	
+
 	otelzap.Ctx(ctx).Info("Found SSH keys", zap.Int("count", len(privateKeys)), zap.Strings("keys", privateKeys))
-	
+
 	return privateKeys, nil
 }
 
@@ -198,44 +198,44 @@ func ListSSHKeys(rc *eos_io.RuntimeContext) ([]string, error) {
 func SelectSSHKey(rc *eos_io.RuntimeContext) (string, error) {
 	ctx, span := telemetry.Start(rc.Ctx, "ssh.SelectSSHKey")
 	defer span.End()
-	
+
 	keys, err := ListSSHKeys(rc)
 	if err != nil {
 		return "", err
 	}
-	
+
 	if len(keys) == 0 {
 		otelzap.Ctx(ctx).Error("No SSH keys found")
 		return "", eos_err.NewExpectedError(ctx, fmt.Errorf("no SSH keys found in ~/.ssh/, please generate or add an SSH key"))
 	}
-	
+
 	if len(keys) == 1 {
 		otelzap.Ctx(ctx).Info("Using only available SSH key", zap.String("key", keys[0]))
 		return keys[0], nil
 	}
-	
+
 	// Display available keys
 	otelzap.Ctx(ctx).Info("Available SSH keys:")
 	for i, key := range keys {
 		otelzap.Ctx(ctx).Info(fmt.Sprintf("%d. %s", i+1, key))
 	}
-	
+
 	// Prompt for selection
 	choice, err := interaction.PromptUser(rc, "Select an SSH key by number: ")
 	if err != nil {
 		return "", fmt.Errorf("failed to get user input: %w", err)
 	}
-	
+
 	// Parse choice
 	choiceNum, err := strconv.Atoi(strings.TrimSpace(choice))
 	if err != nil || choiceNum < 1 || choiceNum > len(keys) {
 		otelzap.Ctx(ctx).Error("Invalid choice", zap.String("input", choice))
 		return "", eos_err.NewExpectedError(ctx, fmt.Errorf("invalid choice, please enter a number between 1 and %d", len(keys)))
 	}
-	
+
 	selectedKey := keys[choiceNum-1]
 	otelzap.Ctx(ctx).Info("Selected SSH key", zap.String("key", selectedKey))
-	
+
 	return selectedKey, nil
 }
 
@@ -243,13 +243,13 @@ func SelectSSHKey(rc *eos_io.RuntimeContext) (string, error) {
 func CheckSSHService(rc *eos_io.RuntimeContext, creds *SSHCredentials) error {
 	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHService")
 	defer span.End()
-	
+
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Checking SSH service status on remote host",
 		zap.String("user", creds.User),
 		zap.String("host", creds.Host),
 		zap.String("port", creds.Port))
-	
+
 	// Build SSH command to check service status
 	args := []string{
 		"-o", "BatchMode=yes",
@@ -257,21 +257,21 @@ func CheckSSHService(rc *eos_io.RuntimeContext, creds *SSHCredentials) error {
 		"-o", "StrictHostKeyChecking=no",
 		"-p", creds.Port,
 	}
-	
+
 	if creds.KeyPath != "" {
 		args = append(args, "-i", creds.KeyPath)
 	}
-	
+
 	target := fmt.Sprintf("%s@%s", creds.User, creds.Host)
 	args = append(args, target, "systemctl is-active ssh || systemctl is-active sshd")
-	
+
 	cmd := exec.CommandContext(ctx, "ssh", args...)
-	
+
 	if err := cmd.Run(); err != nil {
 		logger.Error("SSH service check failed", zap.Error(err))
 		return fmt.Errorf("SSH service is not running on %s or permission denied: %w", creds.Host, err)
 	}
-	
+
 	logger.Info("SSH service is running on remote host")
 	return nil
 }
@@ -280,16 +280,16 @@ func CheckSSHService(rc *eos_io.RuntimeContext, creds *SSHCredentials) error {
 func TroubleshootSSH(rc *eos_io.RuntimeContext, sshPath string, keyPath string) error {
 	ctx, span := telemetry.Start(rc.Ctx, "ssh.TroubleshootSSH")
 	defer span.End()
-	
+
 	otelzap.Ctx(ctx).Info("Starting SSH troubleshooting", zap.String("ssh_path", sshPath))
-	
+
 	// Parse SSH path
 	creds, err := ParseSSHPath(sshPath)
 	if err != nil {
 		otelzap.Ctx(ctx).Error("Failed to parse SSH path", zap.Error(err))
 		return eos_err.NewExpectedError(ctx, fmt.Errorf("invalid SSH path format: %v", err))
 	}
-	
+
 	// Select SSH key if not provided
 	if keyPath == "" {
 		keyPath, err = SelectSSHKey(rc)
@@ -297,34 +297,34 @@ func TroubleshootSSH(rc *eos_io.RuntimeContext, sshPath string, keyPath string) 
 			return err
 		}
 	}
-	
+
 	creds.KeyPath = keyPath
-	
+
 	// Check SSH key permissions
 	otelzap.Ctx(ctx).Info("Step 1: Checking SSH key permissions")
 	if err := CheckSSHKeyPermissions(rc, keyPath); err != nil {
 		return err
 	}
-	
+
 	// Check basic connectivity
 	otelzap.Ctx(ctx).Info("Step 2: Testing network connectivity")
 	if err := checkNetworkConnectivity(rc, creds); err != nil {
 		return err
 	}
-	
+
 	// Check SSH connection
 	otelzap.Ctx(ctx).Info("Step 3: Testing SSH connection")
 	if err := CheckSSHCredentials(rc, creds); err != nil {
 		return err
 	}
-	
+
 	// Check SSH service status
 	otelzap.Ctx(ctx).Info("Step 4: Checking SSH service status")
 	if err := CheckSSHService(rc, creds); err != nil {
 		// This is non-fatal, log as warning
 		otelzap.Ctx(ctx).Warn("SSH service check failed", zap.Error(err))
 	}
-	
+
 	otelzap.Ctx(ctx).Info("SSH troubleshooting completed successfully")
 	return nil
 }
@@ -333,19 +333,19 @@ func TroubleshootSSH(rc *eos_io.RuntimeContext, sshPath string, keyPath string) 
 func checkNetworkConnectivity(rc *eos_io.RuntimeContext, creds *SSHCredentials) error {
 	ctx, span := telemetry.Start(rc.Ctx, "ssh.checkNetworkConnectivity")
 	defer span.End()
-	
+
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Testing network connectivity",
 		zap.String("host", creds.Host),
 		zap.String("port", creds.Port))
-	
+
 	timeout := 5 * time.Second
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(creds.Host, creds.Port), timeout)
 	if err != nil {
 		logger.Error("Network connectivity failed", zap.Error(err))
 		return fmt.Errorf("cannot connect to %s:%s - %w", creds.Host, creds.Port, err)
 	}
-	
+
 	_ = conn.Close()
 	logger.Info("Network connectivity successful")
 	return nil
@@ -394,7 +394,7 @@ func backupSSHConfig(rc *eos_io.RuntimeContext, configFile string) error {
 	logger := otelzap.Ctx(ctx)
 	backupFile := configFile + ".bak"
 
-	logger.Info("Creating backup of SSH configuration", 
+	logger.Info("Creating backup of SSH configuration",
 		zap.String("source", configFile),
 		zap.String("backup", backupFile))
 
@@ -528,10 +528,10 @@ func restartSSHService(rc *eos_io.RuntimeContext) error {
 
 	for _, cmdArgs := range commands {
 		logger.Debug("Attempting SSH restart command", zap.Strings("command", cmdArgs))
-		
+
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 		if err := cmd.Run(); err != nil {
-			logger.Warn("SSH restart command failed", 
+			logger.Warn("SSH restart command failed",
 				zap.Strings("command", cmdArgs),
 				zap.Error(err))
 			continue
@@ -597,13 +597,13 @@ func copySSHKeyToHost(rc *eos_io.RuntimeContext, host, username string) error {
 
 	logger := otelzap.Ctx(ctx)
 	target := fmt.Sprintf("%s@%s", username, host)
-	
+
 	logger.Info("Copying SSH key to host",
 		zap.String("target", target))
 
 	// Use ssh-copy-id to copy the SSH key
 	cmd := exec.CommandContext(ctx, "ssh-copy-id", target)
-	
+
 	// Capture both stdout and stderr
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -614,7 +614,7 @@ func copySSHKeyToHost(rc *eos_io.RuntimeContext, host, username string) error {
 		return fmt.Errorf("failed to copy SSH key to %s: %w", target, err)
 	}
 
-	logger.Debug("ssh-copy-id output", 
+	logger.Debug("ssh-copy-id output",
 		zap.String("target", target),
 		zap.ByteString("output", output))
 
@@ -690,7 +690,7 @@ func getSSHPublicKey(rc *eos_io.RuntimeContext) (string, error) {
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
-	
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		logger.Error("Failed to get user home directory", zap.Error(err))
@@ -710,7 +710,7 @@ func getSSHPublicKey(rc *eos_io.RuntimeContext) (string, error) {
 				logger.Warn("Failed to read SSH public key", zap.String("path", keyPath), zap.Error(err))
 				continue
 			}
-			
+
 			logger.Info("Found SSH public key", zap.String("path", keyPath))
 			return strings.TrimSpace(string(keyData)), nil
 		}
@@ -730,9 +730,9 @@ func distributeKeyToTailscaleHost(rc *eos_io.RuntimeContext, host, publicKey str
 
 	// SSH command to set up the key on the remote host
 	sshCmd := fmt.Sprintf("mkdir -p ~/.ssh && echo '%s' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh", publicKey)
-	
+
 	cmd := exec.CommandContext(ctx, "ssh", fmt.Sprintf("root@%s", host), sshCmd)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Error("Failed to distribute SSH key",
@@ -799,7 +799,7 @@ func GetTailscalePeers(rc *eos_io.RuntimeContext) ([]string, error) {
 		}
 	}
 
-	logger.Info("Found Tailscale peers", 
+	logger.Info("Found Tailscale peers",
 		zap.Int("count", len(peers)),
 		zap.Strings("peers", peers))
 

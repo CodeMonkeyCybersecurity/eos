@@ -28,7 +28,7 @@ func ShowServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.Service
 	// INTERVENE - Display configuration content
 	if eos_unix.FileExists(config.ServiceFile) {
 		logger.Debug("Reading service configuration file")
-		
+
 		content, err := os.ReadFile(config.ServiceFile)
 		if err != nil {
 			logger.Error("Failed to read service configuration file",
@@ -42,7 +42,7 @@ func ShowServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.Service
 		for _, line := range lines {
 			logger.Info("  " + line)
 		}
-		
+
 		// EVALUATE - Log successful configuration display
 		logger.Info("Service configuration displayed successfully",
 			zap.String("service", config.Name),

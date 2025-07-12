@@ -45,7 +45,7 @@ func HTTPClientScenario() TestScenario {
 					if rc.Timestamp.IsZero() {
 						return fmt.Errorf("context missing required field: timestamp")
 					}
-					
+
 					// Test that attributes map is initialized
 					if rc.Attributes == nil {
 						return fmt.Errorf("context attributes map is nil")

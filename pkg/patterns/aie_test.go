@@ -14,8 +14,8 @@ import (
 
 // MockOperation implements AIEOperation for testing
 type MockOperation struct {
-	AssessResult      *patterns.AssessmentResult
-	AssessError       error
+	AssessResult       *patterns.AssessmentResult
+	AssessError        error
 	InterventionResult *patterns.InterventionResult
 	InterventionError  error
 	EvaluationResult   *patterns.EvaluationResult
@@ -516,7 +516,7 @@ func TestExecutor_Execute_ComplexValidations(t *testing.T) {
 					Passed:  true,
 					Message: "database file is accessible",
 					Details: map[string]interface{}{
-						"file_size": "1024KB",
+						"file_size":   "1024KB",
 						"permissions": "600",
 					},
 				},
@@ -524,7 +524,7 @@ func TestExecutor_Execute_ComplexValidations(t *testing.T) {
 					Passed:  true,
 					Message: "service is responding on configured port",
 					Details: map[string]interface{}{
-						"port": 8080,
+						"port":          8080,
 						"response_time": "50ms",
 					},
 				},
@@ -532,7 +532,7 @@ func TestExecutor_Execute_ComplexValidations(t *testing.T) {
 					Passed:  true,
 					Message: "security requirements met",
 					Details: map[string]interface{}{
-						"tls_enabled": true,
+						"tls_enabled":   true,
 						"auth_required": true,
 					},
 				},

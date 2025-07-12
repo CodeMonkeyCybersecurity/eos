@@ -41,7 +41,7 @@ func ExecCommandInContainer(rc *eos_io.RuntimeContext, cfg ExecConfig) (string, 
 		rego.Query("data.exec.allow"),
 		rego.Module("policy.rego", policy),
 	).PrepareForEval(rc.Ctx)
-	
+
 	if prepErr != nil {
 		// Log but don't fail - allow execution if policy setup fails
 		zap.L().Warn("OPA policy setup failed, proceeding without policy enforcement", zap.Error(prepErr))

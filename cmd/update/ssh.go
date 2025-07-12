@@ -12,12 +12,13 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
-	sshHost      string
-	sshKeyPath   string
-	sshHosts     string
-	sshUsername  string
+	sshHost     string
+	sshKeyPath  string
+	sshHosts    string
+	sshUsername string
 )
 
 var SecureSSHCmd = &cobra.Command{
@@ -35,7 +36,7 @@ Examples:
   eos secure ssh  # Interactive mode`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("Starting SSH security diagnostics")
-		
+
 		// Get SSH host if not provided
 		if sshHost == "" {
 			var err error
@@ -44,13 +45,13 @@ Examples:
 				return fmt.Errorf("failed to get SSH host: %w", err)
 			}
 		}
-		
+
 		// Perform comprehensive troubleshooting
 		if err := ssh.TroubleshootSSH(rc, sshHost, sshKeyPath); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("SSH troubleshooting failed", zap.Error(err))
 			return err
 		}
-		
+
 		otelzap.Ctx(rc.Ctx).Info("SSH security diagnostics completed successfully")
 		return nil
 	}),
@@ -67,7 +68,7 @@ Examples:
   eos secure ssh check-credentials --host user@hostname --key ~/.ssh/id_rsa`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("Checking SSH credentials")
-		
+
 		// Get SSH host if not provided
 		if sshHost == "" {
 			var err error
@@ -76,14 +77,14 @@ Examples:
 				return fmt.Errorf("failed to get SSH host: %w", err)
 			}
 		}
-		
+
 		// Parse SSH path
 		creds, err := ssh.ParseSSHPath(sshHost)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to parse SSH path", zap.Error(err))
 			return fmt.Errorf("invalid SSH path format: %w", err)
 		}
-		
+
 		// Select SSH key if not provided
 		if sshKeyPath == "" {
 			sshKeyPath, err = ssh.SelectSSHKey(rc)
@@ -91,15 +92,15 @@ Examples:
 				return err
 			}
 		}
-		
+
 		creds.KeyPath = sshKeyPath
-		
+
 		// Check credentials
 		if err := ssh.CheckSSHCredentials(rc, creds); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("SSH credential check failed", zap.Error(err))
 			return err
 		}
-		
+
 		otelzap.Ctx(rc.Ctx).Info("SSH credentials are valid")
 		return nil
 	}),
@@ -122,13 +123,13 @@ Examples:
   sudo eos secure ssh disable-root`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("Starting SSH root login disable process")
-		
+
 		// Disable SSH root login
 		if err := ssh.DisableRootLogin(rc); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to disable SSH root login", zap.Error(err))
 			return err
 		}
-		
+
 		otelzap.Ctx(rc.Ctx).Info("SSH root login disabled successfully")
 		return nil
 	}),
@@ -248,15 +249,14 @@ func init() {
 	SecureSSHCmd.AddCommand(DisableRootCmd)
 	SecureSSHCmd.AddCommand(CopyKeysCmd)
 	SecureSSHCmd.AddCommand(DistributeKeysCmd)
-	
+
 	// Add flags to commands that need SSH connection
 	for _, cmd := range []*cobra.Command{SecureSSHCmd, CheckSSHCredsCmd} {
 		cmd.Flags().StringVar(&sshHost, "host", "", "SSH host in format user@hostname[:port]")
 		cmd.Flags().StringVar(&sshKeyPath, "key", "", "Path to SSH private key (auto-detected if not specified)")
 	}
-	
+
 	// Add flags for copy-keys command
 	CopyKeysCmd.Flags().StringVar(&sshHosts, "hosts", "", "Comma-separated list of hosts to copy keys to")
 	CopyKeysCmd.Flags().StringVar(&sshUsername, "user", "", "SSH username for remote hosts")
 }
-

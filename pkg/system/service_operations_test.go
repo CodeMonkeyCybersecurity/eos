@@ -74,10 +74,10 @@ func TestServiceOperation_Assess_SystemdAvailable(t *testing.T) {
 	logger := createTestLogger(t)
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"systemctl --version":           "systemd 249",
+			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
-			"systemctl is-active nginx 2>/dev/null || echo inactive":               "inactive",
-			"systemctl is-enabled nginx 2>/dev/null || echo disabled":              "disabled",
+			"systemctl is-active nginx 2>/dev/null || echo inactive":              "inactive",
+			"systemctl is-enabled nginx 2>/dev/null || echo disabled":             "disabled",
 		},
 	}
 
@@ -154,9 +154,9 @@ func TestServiceOperation_Assess_AlreadyActive(t *testing.T) {
 	logger := createTestLogger(t)
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"systemctl --version":           "systemd 249",
+			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
-			"systemctl is-active nginx 2>/dev/null || echo inactive":               "active",
+			"systemctl is-active nginx 2>/dev/null || echo inactive":              "active",
 		},
 	}
 
@@ -385,7 +385,7 @@ func TestServiceOperation_AllActions(t *testing.T) {
 				CmdRunResults: map[string]string{
 					"systemctl --version": "systemd 249",
 					"systemctl cat testservice >/dev/null 2>&1 && echo exists || echo notfound": "exists",
-					"systemctl is-active testservice 2>/dev/null || echo inactive":               tt.currentState,
+					"systemctl is-active testservice 2>/dev/null || echo inactive":              tt.currentState,
 					"systemctl is-enabled testservice 2>/dev/null || echo disabled":             tt.enabledState,
 				},
 			}
@@ -415,10 +415,10 @@ func TestSleepDisableOperation_Assess(t *testing.T) {
 	logger := createTestLogger(t)
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"systemctl --version":                         "systemd 249",
-			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":     "enabled",
-			"systemctl is-enabled suspend.target 2>/dev/null || echo not-found":   "enabled",
-			"systemctl is-enabled hibernate.target 2>/dev/null || echo not-found": "disabled",
+			"systemctl --version": "systemd 249",
+			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":        "enabled",
+			"systemctl is-enabled suspend.target 2>/dev/null || echo not-found":      "enabled",
+			"systemctl is-enabled hibernate.target 2>/dev/null || echo not-found":    "disabled",
 			"systemctl is-enabled hybrid-sleep.target 2>/dev/null || echo not-found": "not-found",
 		},
 	}
@@ -444,9 +444,9 @@ func TestSleepDisableOperation_Intervene(t *testing.T) {
 	logger := createTestLogger(t)
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"systemctl mask sleep.target":       "",
-			"systemctl mask suspend.target":     "",
-			"systemctl mask hibernate.target":   "",
+			"systemctl mask sleep.target":        "",
+			"systemctl mask suspend.target":      "",
+			"systemctl mask hibernate.target":    "",
 			"systemctl mask hybrid-sleep.target": "",
 			"echo '[Login]\nHandleLidSwitch=ignore\nHandleLidSwitchExternalPower=ignore\nHandleLidSwitchDocked=ignore\nHandleSuspendKey=ignore\nHandleHibernateKey=ignore\nHandlePowerKey=poweroff' > /etc/systemd/logind.conf.d/disable-sleep.conf": "",
 			"systemctl restart systemd-logind": "",
@@ -474,9 +474,9 @@ func TestSleepDisableOperation_Evaluate(t *testing.T) {
 	logger := createTestLogger(t)
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"systemctl is-enabled sleep.target":       "masked",
-			"systemctl is-enabled suspend.target":     "masked",
-			"systemctl is-enabled hibernate.target":   "masked",
+			"systemctl is-enabled sleep.target":        "masked",
+			"systemctl is-enabled suspend.target":      "masked",
+			"systemctl is-enabled hibernate.target":    "masked",
 			"systemctl is-enabled hybrid-sleep.target": "masked",
 			"grep -q 'HandleSuspendKey=ignore' /etc/systemd/logind.conf.d/disable-sleep.conf && echo configured || echo missing": "configured",
 		},
@@ -649,12 +649,12 @@ func TestManageService(t *testing.T) {
 	logger := createTestLogger(t)
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"systemctl --version":           "systemd 249",
+			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
-			"systemctl is-active nginx 2>/dev/null || echo inactive":               "inactive",
-			"systemctl is-enabled nginx 2>/dev/null || echo disabled":              "disabled",
-			"systemctl start nginx":         "",
-			"systemctl is-active nginx":     "active",
+			"systemctl is-active nginx 2>/dev/null || echo inactive":              "inactive",
+			"systemctl is-enabled nginx 2>/dev/null || echo disabled":             "disabled",
+			"systemctl start nginx":     "",
+			"systemctl is-active nginx": "active",
 		},
 	}
 
@@ -676,19 +676,19 @@ func TestDisableSystemSleep(t *testing.T) {
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
-			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":     "enabled",
-			"systemctl is-enabled suspend.target 2>/dev/null || echo not-found":   "enabled",
-			"systemctl is-enabled hibernate.target 2>/dev/null || echo not-found": "enabled",
+			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":        "enabled",
+			"systemctl is-enabled suspend.target 2>/dev/null || echo not-found":      "enabled",
+			"systemctl is-enabled hibernate.target 2>/dev/null || echo not-found":    "enabled",
 			"systemctl is-enabled hybrid-sleep.target 2>/dev/null || echo not-found": "enabled",
-			"systemctl mask sleep.target":       "",
-			"systemctl mask suspend.target":     "",
-			"systemctl mask hibernate.target":   "",
-			"systemctl mask hybrid-sleep.target": "",
+			"systemctl mask sleep.target":                                            "",
+			"systemctl mask suspend.target":                                          "",
+			"systemctl mask hibernate.target":                                        "",
+			"systemctl mask hybrid-sleep.target":                                     "",
 			"echo '[Login]\\nHandleLidSwitch=ignore\\nHandleLidSwitchExternalPower=ignore\\nHandleLidSwitchDocked=ignore\\nHandleSuspendKey=ignore\\nHandleHibernateKey=ignore\\nHandlePowerKey=poweroff' > /etc/systemd/logind.conf.d/disable-sleep.conf": "",
-			"systemctl restart systemd-logind": "",
-			"systemctl is-enabled sleep.target":       "masked",
-			"systemctl is-enabled suspend.target":     "masked",
-			"systemctl is-enabled hibernate.target":   "masked",
+			"systemctl restart systemd-logind":         "",
+			"systemctl is-enabled sleep.target":        "masked",
+			"systemctl is-enabled suspend.target":      "masked",
+			"systemctl is-enabled hibernate.target":    "masked",
 			"systemctl is-enabled hybrid-sleep.target": "masked",
 			"grep -q 'HandleSuspendKey=ignore' /etc/systemd/logind.conf.d/disable-sleep.conf && echo configured || echo missing": "configured",
 		},
@@ -722,10 +722,10 @@ func BenchmarkServiceOperation_Assess(b *testing.B) {
 	otelLogger := otelzap.New(logger).Ctx(context.Background())
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
-			"systemctl --version":           "systemd 249",
+			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
-			"systemctl is-active nginx 2>/dev/null || echo inactive":               "inactive",
-			"systemctl is-enabled nginx 2>/dev/null || echo disabled":              "disabled",
+			"systemctl is-active nginx 2>/dev/null || echo inactive":              "inactive",
+			"systemctl is-enabled nginx 2>/dev/null || echo disabled":             "disabled",
 		},
 	}
 
@@ -759,27 +759,27 @@ func TestSystemOperations_Integration(t *testing.T) {
 	saltClient := &MockSaltClient{
 		CmdRunResults: map[string]string{
 			// Service operation sequence
-			"systemctl --version":           "systemd 249",
+			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
-			"systemctl is-active nginx 2>/dev/null || echo inactive":               "inactive",
-			"systemctl is-enabled nginx 2>/dev/null || echo disabled":              "disabled",
-			"systemctl start nginx":         "",
-			"systemctl is-active nginx":     "active",
-			
+			"systemctl is-active nginx 2>/dev/null || echo inactive":              "inactive",
+			"systemctl is-enabled nginx 2>/dev/null || echo disabled":             "disabled",
+			"systemctl start nginx":     "",
+			"systemctl is-active nginx": "active",
+
 			// Sleep disable sequence
-			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":     "enabled",
-			"systemctl is-enabled suspend.target 2>/dev/null || echo not-found":   "enabled",
-			"systemctl is-enabled hibernate.target 2>/dev/null || echo not-found": "enabled",
+			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":        "enabled",
+			"systemctl is-enabled suspend.target 2>/dev/null || echo not-found":      "enabled",
+			"systemctl is-enabled hibernate.target 2>/dev/null || echo not-found":    "enabled",
 			"systemctl is-enabled hybrid-sleep.target 2>/dev/null || echo not-found": "enabled",
-			"systemctl mask sleep.target":       "",
-			"systemctl mask suspend.target":     "",
-			"systemctl mask hibernate.target":   "",
-			"systemctl mask hybrid-sleep.target": "",
+			"systemctl mask sleep.target":                                            "",
+			"systemctl mask suspend.target":                                          "",
+			"systemctl mask hibernate.target":                                        "",
+			"systemctl mask hybrid-sleep.target":                                     "",
 			"echo '[Login]\\nHandleLidSwitch=ignore\\nHandleLidSwitchExternalPower=ignore\\nHandleLidSwitchDocked=ignore\\nHandleSuspendKey=ignore\\nHandleHibernateKey=ignore\\nHandlePowerKey=poweroff' > /etc/systemd/logind.conf.d/disable-sleep.conf": "",
-			"systemctl restart systemd-logind": "",
-			"systemctl is-enabled sleep.target":       "masked",
-			"systemctl is-enabled suspend.target":     "masked",
-			"systemctl is-enabled hibernate.target":   "masked",
+			"systemctl restart systemd-logind":         "",
+			"systemctl is-enabled sleep.target":        "masked",
+			"systemctl is-enabled suspend.target":      "masked",
+			"systemctl is-enabled hibernate.target":    "masked",
 			"systemctl is-enabled hybrid-sleep.target": "masked",
 			"grep -q 'HandleSuspendKey=ignore' /etc/systemd/logind.conf.d/disable-sleep.conf && echo configured || echo missing": "configured",
 		},

@@ -77,4 +77,3 @@ The tool detects common PATH problems such as:
 func init() {
 	ReadCmd.AddCommand(systemPathCmd)
 }
-

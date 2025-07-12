@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 // DatabaseManager provides database management functionality
@@ -29,7 +29,7 @@ func NewDatabaseManager() *DatabaseManager {
 // SetupVaultPostgreSQL sets up Vault dynamic PostgreSQL credentials
 func (dm *DatabaseManager) SetupVaultPostgreSQL(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Setting up Vault dynamic PostgreSQL credentials",
 		zap.String("connection_name", options.ConnectionName),
 		zap.String("engine_mount", options.EngineMount))
@@ -63,7 +63,7 @@ func (dm *DatabaseManager) SetupVaultPostgreSQL(rc *eos_io.RuntimeContext, optio
 // GetDatabaseStatus retrieves database status information
 func (dm *DatabaseManager) GetDatabaseStatus(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*DatabaseStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Getting database status", zap.String("database", config.Database))
 
 	switch config.Type {
@@ -77,7 +77,7 @@ func (dm *DatabaseManager) GetDatabaseStatus(rc *eos_io.RuntimeContext, config *
 // ExecuteQuery executes a database query
 func (dm *DatabaseManager) ExecuteQuery(rc *eos_io.RuntimeContext, config *DatabaseConfig, operation *DatabaseOperation) (*DatabaseOperationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	start := time.Now()
 	result := &DatabaseOperationResult{
 		Timestamp: start,
@@ -113,7 +113,7 @@ func (dm *DatabaseManager) ExecuteQuery(rc *eos_io.RuntimeContext, config *Datab
 // GetSchemaInfo retrieves database schema information
 func (dm *DatabaseManager) GetSchemaInfo(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*SchemaInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Getting database schema information", zap.String("database", config.Database))
 
 	switch config.Type {
@@ -127,7 +127,7 @@ func (dm *DatabaseManager) GetSchemaInfo(rc *eos_io.RuntimeContext, config *Data
 // GenerateCredentials generates dynamic database credentials using Vault
 func (dm *DatabaseManager) GenerateCredentials(rc *eos_io.RuntimeContext, options *VaultOperationOptions) (*DatabaseCredential, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Generating dynamic database credentials",
 		zap.String("role", options.RoleName),
 		zap.String("engine_mount", options.EngineMount))
@@ -147,7 +147,7 @@ func (dm *DatabaseManager) GenerateCredentials(rc *eos_io.RuntimeContext, option
 // RevokeCredentials revokes dynamic database credentials
 func (dm *DatabaseManager) RevokeCredentials(rc *eos_io.RuntimeContext, leaseID string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Revoking database credentials", zap.String("lease_id", leaseID))
 
 	cmd := exec.Command("vault", "lease", "revoke", leaseID)
@@ -164,7 +164,7 @@ func (dm *DatabaseManager) RevokeCredentials(rc *eos_io.RuntimeContext, leaseID 
 // PerformHealthCheck performs a comprehensive database health check
 func (dm *DatabaseManager) PerformHealthCheck(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*DatabaseHealthCheck, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	start := time.Now()
 	healthCheck := &DatabaseHealthCheck{
 		Database:  config.Database,
@@ -234,7 +234,7 @@ func (dm *DatabaseManager) PerformHealthCheck(rc *eos_io.RuntimeContext, config 
 	}
 
 	healthCheck.ResponseTime = time.Since(start)
-	logger.Info("Health check completed", 
+	logger.Info("Health check completed",
 		zap.Bool("healthy", healthCheck.Healthy),
 		zap.Duration("response_time", healthCheck.ResponseTime))
 
@@ -342,7 +342,7 @@ func (dm *DatabaseManager) createVaultRole(rc *eos_io.RuntimeContext, connection
 	logger.Info("Creating Vault database role", zap.String("role", role.Name))
 
 	creationStatements := strings.Join(role.CreationStatements, "; ")
-	
+
 	args := []string{
 		"write", fmt.Sprintf("database/roles/%s", role.Name),
 		fmt.Sprintf("db_name=%s", connectionName),
@@ -382,7 +382,7 @@ func (dm *DatabaseManager) testDynamicCredentials(rc *eos_io.RuntimeContext, opt
 			return fmt.Errorf("failed to parse credential response: %w", err)
 		}
 
-		logger.Info("Dynamic credentials generated successfully", 
+		logger.Info("Dynamic credentials generated successfully",
 			zap.String("role", role.Name),
 			zap.Any("lease_duration", credResp["lease_duration"]))
 	}
@@ -391,9 +391,9 @@ func (dm *DatabaseManager) testDynamicCredentials(rc *eos_io.RuntimeContext, opt
 }
 
 func (dm *DatabaseManager) generateVaultCredentials(rc *eos_io.RuntimeContext, options *VaultOperationOptions) (*DatabaseCredential, error) {
-	cmd := exec.Command("vault", "read", "-format=json", 
+	cmd := exec.Command("vault", "read", "-format=json",
 		fmt.Sprintf("%s/creds/%s", strings.TrimSuffix(options.EngineMount, "/"), options.RoleName))
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate credentials: %w", err)

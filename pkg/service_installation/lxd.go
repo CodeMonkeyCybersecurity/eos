@@ -107,7 +107,7 @@ func (sim *ServiceInstallationManager) installLxd(rc *eos_io.RuntimeContext, opt
 		output, _ := cmd.Output()
 		if !strings.Contains(string(output), currentUser) {
 			if err := sim.runCommand(rc, "Add user to group", "sudo", "usermod", "-aG", "lxd", currentUser); err != nil {
-				logger.Warn("Failed to add user to lxd group", 
+				logger.Warn("Failed to add user to lxd group",
 					zap.String("user", currentUser),
 					zap.Error(err))
 			} else {

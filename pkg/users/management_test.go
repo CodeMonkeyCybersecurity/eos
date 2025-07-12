@@ -48,7 +48,7 @@ func TestUserCreationOptions_Validation(t *testing.T) {
 			if tt.options.Username == "" && !tt.wantErr {
 				t.Error("Expected error for empty username")
 			}
-			
+
 			if tt.options.Shell == "" && tt.options.Username != "" {
 				// Should default to /bin/bash
 				if tt.wantErr {
@@ -61,57 +61,57 @@ func TestUserCreationOptions_Validation(t *testing.T) {
 
 func TestUsernameValidation(t *testing.T) {
 	tests := []struct {
-		name     string
-		username string
-		wantErr  bool
+		name         string
+		username     string
+		wantErr      bool
 		expectations string
 	}{
 		{
-			name:     "valid username",
-			username: "testuser",
-			wantErr:  false,
+			name:         "valid username",
+			username:     "testuser",
+			wantErr:      false,
 			expectations: "should accept alphanumeric usernames",
 		},
 		{
-			name:     "valid with numbers",
-			username: "user123",
-			wantErr:  false,
+			name:         "valid with numbers",
+			username:     "user123",
+			wantErr:      false,
 			expectations: "should accept usernames with numbers",
 		},
 		{
-			name:     "valid with underscore",
-			username: "test_user",
-			wantErr:  false,
+			name:         "valid with underscore",
+			username:     "test_user",
+			wantErr:      false,
 			expectations: "should accept usernames with underscores",
 		},
 		{
-			name:     "empty username",
-			username: "",
-			wantErr:  true,
+			name:         "empty username",
+			username:     "",
+			wantErr:      true,
 			expectations: "should reject empty usernames",
 		},
 		{
-			name:     "starts with number",
-			username: "123user",
-			wantErr:  false, // Linux actually allows this
+			name:         "starts with number",
+			username:     "123user",
+			wantErr:      false, // Linux actually allows this
 			expectations: "Linux allows usernames starting with numbers",
 		},
 		{
-			name:     "contains spaces",
-			username: "test user",
-			wantErr:  true,
+			name:         "contains spaces",
+			username:     "test user",
+			wantErr:      true,
 			expectations: "should reject usernames with spaces",
 		},
 		{
-			name:     "special characters",
-			username: "test@user",
-			wantErr:  true,
+			name:         "special characters",
+			username:     "test@user",
+			wantErr:      true,
 			expectations: "should reject usernames with special characters",
 		},
 		{
-			name:     "too long",
-			username: "thisusernameiswaytoologandshouldfailvalidation",
-			wantErr:  true,
+			name:         "too long",
+			username:     "thisusernameiswaytoologandshouldfailvalidation",
+			wantErr:      true,
 			expectations: "should reject usernames longer than 32 characters",
 		},
 	}

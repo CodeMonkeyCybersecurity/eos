@@ -2,7 +2,6 @@
 // This includes webhook management, service workers, alerts, prompts, and A/B testing.
 package pipeline
 
-
 // WebhookStatus represents the status of a webhook configuration
 type WebhookStatus struct {
 	URL        string `json:"url"`

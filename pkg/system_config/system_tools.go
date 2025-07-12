@@ -77,7 +77,7 @@ func (stm *SystemToolsManager) Validate() error {
 // Backup creates a backup of system state before modifications
 func (stm *SystemToolsManager) Backup() (*ConfigurationBackup, error) {
 	logger := otelzap.Ctx(stm.rc.Ctx)
-	
+
 	backup := &ConfigurationBackup{
 		ID:        fmt.Sprintf("system-tools-%d", time.Now().Unix()),
 		Type:      ConfigTypeSystemTools,
@@ -104,7 +104,7 @@ func (stm *SystemToolsManager) Backup() (*ConfigurationBackup, error) {
 	// Backup service states for packages that install services
 	servicePackages := map[string]string{
 		"nginx":             "nginx",
-		"ufw":              "ufw",
+		"ufw":               "ufw",
 		"nfs-kernel-server": "nfs-kernel-server",
 		"prometheus":        "prometheus",
 	}
@@ -125,7 +125,7 @@ func (stm *SystemToolsManager) Backup() (*ConfigurationBackup, error) {
 // Apply applies the system tools configuration
 func (stm *SystemToolsManager) Apply() (*ConfigurationResult, error) {
 	logger := otelzap.Ctx(stm.rc.Ctx)
-	
+
 	start := time.Now()
 	result := &ConfigurationResult{
 		Type:      ConfigTypeSystemTools,
@@ -390,7 +390,7 @@ func (stm *SystemToolsManager) setupSensors(result *ConfigurationResult) error {
 // Rollback reverts system tools configuration changes
 func (stm *SystemToolsManager) Rollback(backup *ConfigurationBackup) error {
 	logger := otelzap.Ctx(stm.rc.Ctx)
-	
+
 	logger.Info("Rolling back system tools configuration", zap.String("backup_id", backup.ID))
 
 	// Note: Full rollback of package installation is complex and potentially dangerous

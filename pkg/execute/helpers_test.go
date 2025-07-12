@@ -93,7 +93,7 @@ func TestMax(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := max(tt.Input.a, tt.Input.b)
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -162,7 +162,7 @@ func TestDefaultTimeout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := defaultTimeout(tt.Input.input)
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -254,7 +254,7 @@ func TestBuildCommandString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := buildCommandString(tt.Input.command, tt.Input.args...)
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -347,16 +347,16 @@ func TestBuildCommandStringSecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// buildCommandString should concatenate safely without interpretation
 			result := buildCommandString(tt.Input.command, tt.Input.args...)
-			
+
 			// Result should contain the literal strings
 			assert.Contains(t, result, tt.Input.command)
 			for _, arg := range tt.Input.args {
 				assert.Contains(t, result, arg)
 			}
-			
+
 			// Function should not execute or interpret the strings
 			// It's just string concatenation
 		})
@@ -369,19 +369,19 @@ func TestHelpersEdgeCases(t *testing.T) {
 
 	t.Run("max with large numbers", func(t *testing.T) {
 		t.Parallel()
-		
+
 		result := max(2147483647, 2147483646) // Max int32 values
 		assert.Equal(t, 2147483647, result)
 	})
 
 	t.Run("defaultTimeout with duration edge cases", func(t *testing.T) {
 		t.Parallel()
-		
+
 		// Test with maximum duration
 		maxDuration := time.Duration(1<<63 - 1)
 		result := defaultTimeout(maxDuration)
 		assert.Equal(t, maxDuration, result)
-		
+
 		// Test with minimum duration
 		minDuration := time.Duration(-1 << 63)
 		result = defaultTimeout(minDuration)
@@ -390,17 +390,17 @@ func TestHelpersEdgeCases(t *testing.T) {
 
 	t.Run("buildCommandString with nil args slice", func(t *testing.T) {
 		t.Parallel()
-		
+
 		result := buildCommandString("echo", nil...)
 		assert.Equal(t, "echo ", result)
 	})
 
 	t.Run("buildCommandString with very long strings", func(t *testing.T) {
 		t.Parallel()
-		
+
 		longCommand := string(make([]byte, 1000))
 		longArg := string(make([]byte, 1000))
-		
+
 		result := buildCommandString(longCommand, longArg)
 		assert.Contains(t, result, longCommand)
 		assert.Contains(t, result, longArg)
@@ -416,7 +416,7 @@ func BenchmarkMax(b *testing.B) {
 
 func BenchmarkDefaultTimeout(b *testing.B) {
 	timeout := 5 * time.Second
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		defaultTimeout(timeout)
@@ -431,7 +431,7 @@ func BenchmarkDefaultTimeoutZero(b *testing.B) {
 
 func BenchmarkBuildCommandString(b *testing.B) {
 	args := []string{"arg1", "arg2", "arg3"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buildCommandString("command", args...)
@@ -444,7 +444,7 @@ func BenchmarkBuildCommandStringLarge(b *testing.B) {
 	for i := range args {
 		args[i] = "argument"
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		buildCommandString("command", args...)

@@ -230,4 +230,5 @@ func init() {
 	fileRestoreCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 	fileRestoreCmd.Flags().Bool("json", false, "Output in JSON format")
 }
+
 // All helper functions have been migrated to pkg/backup/file_backup/

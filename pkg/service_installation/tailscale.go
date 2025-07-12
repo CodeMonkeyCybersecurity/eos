@@ -105,7 +105,7 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 	result.Success = true
 	result.Message = "Tailscale installed successfully"
 	result.Method = MethodNative
-	
+
 	// Note about authentication
 	result.Credentials = map[string]string{
 		"Note": "Run 'sudo tailscale up' to authenticate and connect to your Tailscale network",

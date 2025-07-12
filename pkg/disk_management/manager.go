@@ -116,17 +116,17 @@ func (dm *DiskManager) ListDisks(rc *eos_io.RuntimeContext) (*DiskListResult, er
 // listDisksLinux lists disks on Linux using lsblk
 func (dm *DiskManager) listDisksLinux(rc *eos_io.RuntimeContext) ([]DiskInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	var output []byte
 	var err error
-	
+
 	if dm.useSalt && dm.saltClient != nil {
 		// Execute through Salt
 		logger.Info("Executing lsblk through Salt")
 		cmdStr := "lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,RM,FSTYPE,LABEL,UUID"
 		outputStr, err := dm.saltClient.CmdRun(rc.Ctx, "*", cmdStr)
 		if err != nil {
-			logger.Error("Failed to run lsblk through Salt", 
+			logger.Error("Failed to run lsblk through Salt",
 				zap.Error(err),
 				zap.String("output", outputStr))
 			return nil, fmt.Errorf("lsblk failed through Salt: %w", err)
@@ -138,15 +138,15 @@ func (dm *DiskManager) listDisksLinux(rc *eos_io.RuntimeContext) ([]DiskInfo, er
 		cmd := exec.CommandContext(rc.Ctx, "lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,RM,FSTYPE,LABEL,UUID")
 		output, err = cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("Failed to run lsblk directly", 
+			logger.Error("Failed to run lsblk directly",
 				zap.Error(err),
 				zap.String("output", string(output)))
-			
+
 			// Check if lsblk exists
 			if _, lookupErr := exec.LookPath("lsblk"); lookupErr != nil {
 				return nil, fmt.Errorf("lsblk command not found. This command requires the lsblk utility which is typically part of util-linux package")
 			}
-			
+
 			return nil, fmt.Errorf("lsblk failed: %w (output: %s)", err, string(output))
 		}
 	}
@@ -157,17 +157,17 @@ func (dm *DiskManager) listDisksLinux(rc *eos_io.RuntimeContext) ([]DiskInfo, er
 // listDisksDarwin lists disks on macOS using diskutil
 func (dm *DiskManager) listDisksDarwin(rc *eos_io.RuntimeContext) ([]DiskInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	var output []byte
 	var err error
-	
+
 	if dm.useSalt && dm.saltClient != nil {
 		// Execute through Salt
 		logger.Info("Executing diskutil through Salt")
 		cmdStr := "diskutil list -plist"
 		outputStr, err := dm.saltClient.CmdRun(rc.Ctx, "*", cmdStr)
 		if err != nil {
-			logger.Error("Failed to run diskutil through Salt", 
+			logger.Error("Failed to run diskutil through Salt",
 				zap.Error(err),
 				zap.String("output", outputStr))
 			return nil, fmt.Errorf("diskutil failed through Salt: %w", err)
@@ -179,15 +179,15 @@ func (dm *DiskManager) listDisksDarwin(rc *eos_io.RuntimeContext) ([]DiskInfo, e
 		cmd := exec.CommandContext(rc.Ctx, "diskutil", "list", "-plist")
 		output, err = cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("Failed to run diskutil directly", 
+			logger.Error("Failed to run diskutil directly",
 				zap.Error(err),
 				zap.String("output", string(output)))
-			
+
 			// Check if diskutil exists
 			if _, lookupErr := exec.LookPath("diskutil"); lookupErr != nil {
 				return nil, fmt.Errorf("diskutil command not found. This is a system command that should be available on macOS")
 			}
-			
+
 			return nil, fmt.Errorf("diskutil failed: %w (output: %s)", err, string(output))
 		}
 	}
@@ -555,7 +555,7 @@ func (dm *DiskManager) parseDiskutilOutput(output string) ([]DiskInfo, error) {
 	// For a simple implementation, parse the text output from diskutil list
 	// A production implementation would parse the plist XML format
 	var disks []DiskInfo
-	
+
 	// Run diskutil info for each disk to get detailed information
 	// First, get list of disks
 	cmd := exec.Command("diskutil", "list")
@@ -563,7 +563,7 @@ func (dm *DiskManager) parseDiskutilOutput(output string) ([]DiskInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get disk list: %w", err)
 	}
-	
+
 	// Parse the output to find disk identifiers
 	lines := strings.Split(string(listOutput), "\n")
 	for _, line := range lines {
@@ -573,14 +573,14 @@ func (dm *DiskManager) parseDiskutilOutput(output string) ([]DiskInfo, error) {
 			parts := strings.Fields(line)
 			if len(parts) > 0 {
 				diskID := parts[0]
-				
+
 				// Get detailed info for this disk
 				infoCmd := exec.Command("diskutil", "info", diskID)
 				infoOutput, err := infoCmd.Output()
 				if err != nil {
 					continue // Skip disks we can't get info for
 				}
-				
+
 				disk := parseDiskutilInfo(diskID, string(infoOutput))
 				if disk != nil {
 					disks = append(disks, *disk)
@@ -588,7 +588,7 @@ func (dm *DiskManager) parseDiskutilOutput(output string) ([]DiskInfo, error) {
 			}
 		}
 	}
-	
+
 	return disks, nil
 }
 
@@ -601,7 +601,7 @@ func parseDiskutilInfo(device string, output string) *DiskInfo {
 		Partitions:  make([]PartitionInfo, 0),
 		Properties:  make(map[string]string),
 	}
-	
+
 	// Parse the diskutil info output
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
@@ -609,13 +609,13 @@ func parseDiskutilInfo(device string, output string) *DiskInfo {
 		if line == "" {
 			continue
 		}
-		
+
 		// Parse key-value pairs
 		colonIndex := strings.Index(line, ":")
 		if colonIndex > 0 {
 			key := strings.TrimSpace(line[:colonIndex])
 			value := strings.TrimSpace(line[colonIndex+1:])
-			
+
 			switch key {
 			case "Device / Media Name":
 				disk.Name = value
@@ -657,14 +657,14 @@ func parseDiskutilInfo(device string, output string) *DiskInfo {
 			}
 		}
 	}
-	
+
 	// Set a description
 	if mediaName, ok := disk.Properties["volume_name"]; ok && mediaName != "" {
 		disk.Description = mediaName
 	} else {
 		disk.Description = fmt.Sprintf("Disk %s", disk.Name)
 	}
-	
+
 	return disk
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 var cleanupCmd = &cobra.Command{
 	Use:   "cleanup",
 	Short: "Clean up unused packages and system files",
@@ -33,7 +34,7 @@ Examples:
 		nonInteractive, _ := cmd.Flags().GetBool("yes")
 		orphansOnly, _ := cmd.Flags().GetBool("orphans-only")
 		kernelsOnly, _ := cmd.Flags().GetBool("kernels-only")
-		
+
 		logger.Info("Starting system cleanup",
 			zap.Bool("non_interactive", nonInteractive),
 			zap.Bool("orphans_only", orphansOnly),

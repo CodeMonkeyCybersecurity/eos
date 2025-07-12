@@ -37,9 +37,9 @@ func TestAPITokenSecurity(t *testing.T) {
 
 		// Test token format validation
 		testTokens := []struct {
-			name     string
-			token    string
-			isValid  bool
+			name    string
+			token   string
+			isValid bool
 		}{
 			{"valid_token", "abcdef1234567890abcdef1234567890abcdef12", true},
 			{"empty_token", "", false},
@@ -55,8 +55,8 @@ func TestAPITokenSecurity(t *testing.T) {
 					assert.Greater(t, len(tt.token), 20)
 					assert.False(t, strings.Contains(tt.token, " "))
 				} else {
-					isInvalid := tt.token == "" || 
-						len(tt.token) < 10 || 
+					isInvalid := tt.token == "" ||
+						len(tt.token) < 10 ||
 						strings.Contains(tt.token, " ") ||
 						strings.ContainsAny(tt.token, "!@#$%^&*()")
 					assert.True(t, isInvalid)
@@ -68,7 +68,7 @@ func TestAPITokenSecurity(t *testing.T) {
 	t.Run("token_exposure_prevention", func(t *testing.T) {
 		// Test that tokens are not accidentally logged or exposed
 		testToken := "secret-hetzner-token-12345678901234567890"
-		
+
 		// Simulate token usage
 		os.Setenv("HCLOUD_TOKEN", testToken)
 		defer os.Unsetenv("HCLOUD_TOKEN")
@@ -127,17 +127,17 @@ func TestSSHKeySecurityValidation(t *testing.T) {
 		}
 
 		invalidKeys := []string{
-			"",                               // Empty
-			"not-a-ssh-key",                 // Invalid format
-			"ssh-rsa short",                 // Too short
+			"",                                // Empty
+			"not-a-ssh-key",                   // Invalid format
+			"ssh-rsa short",                   // Too short
 			"-----BEGIN RSA PRIVATE KEY-----", // Private key
-			"password123",                   // Not a key
+			"password123",                     // Not a key
 			"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDTgvwjlRHZ; rm -rf /", // Injection
 		}
 
 		for _, key := range validKeys {
 			// Valid SSH keys should pass basic validation
-			assert.True(t, strings.HasPrefix(key, "ssh-") || 
+			assert.True(t, strings.HasPrefix(key, "ssh-") ||
 				strings.HasPrefix(key, "ecdsa-"))
 			assert.Greater(t, len(key), 50)
 			assert.Contains(t, key, " ")
@@ -147,18 +147,18 @@ func TestSSHKeySecurityValidation(t *testing.T) {
 			// Invalid keys should be caught
 			isInvalid := key == "" ||
 				!strings.HasPrefix(key, "ssh-") &&
-				!strings.HasPrefix(key, "ecdsa-") ||
+					!strings.HasPrefix(key, "ecdsa-") ||
 				len(key) < 50 ||
 				strings.Contains(key, "PRIVATE") ||
 				strings.Contains(key, ";")
 
 			if !isInvalid && len(key) > 10 {
 				// For edge cases, check if it looks like a real SSH key
-				hasValidPrefix := strings.HasPrefix(key, "ssh-") || 
+				hasValidPrefix := strings.HasPrefix(key, "ssh-") ||
 					strings.HasPrefix(key, "ecdsa-")
 				hasSpaces := strings.Contains(key, " ")
 				isLongEnough := len(key) > 50
-				
+
 				// Should be valid if it has all characteristics
 				if hasValidPrefix && hasSpaces && isLongEnough {
 					assert.True(t, true) // This is actually valid
@@ -193,7 +193,7 @@ func TestSSHKeySecurityValidation(t *testing.T) {
 		for _, name := range maliciousNames {
 			// Malicious names should be handled safely
 			err := CreateSshKey(rc, name, "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDTgvwjlRHZ user@host")
-			
+
 			// Should either succeed (storing name as-is) or fail safely
 			if err != nil {
 				// Error should not contain evidence of code execution
@@ -239,7 +239,7 @@ func TestSSHKeySecurityValidation(t *testing.T) {
 		for _, id := range validIDs {
 			// Valid IDs should be positive
 			assert.Greater(t, id, int64(0))
-			
+
 			// Test operations with valid IDs (will fail due to non-existent keys)
 			err := GetAnSshKey(rc, id)
 			// Should fail because key doesn't exist, not because ID is invalid
@@ -366,12 +366,12 @@ func TestDNSSecurityValidation(t *testing.T) {
 			ttl   int
 			valid bool
 		}{
-			{60, true},     // 1 minute
-			{3600, true},   // 1 hour
-			{86400, true},  // 1 day
-			{604800, true}, // 1 week
-			{0, false},     // Zero
-			{-1, false},    // Negative
+			{60, true},          // 1 minute
+			{3600, true},        // 1 hour
+			{86400, true},       // 1 day
+			{604800, true},      // 1 week
+			{0, false},          // Zero
+			{-1, false},         // Negative
 			{2147483648, false}, // Overflow
 		}
 
@@ -478,9 +478,9 @@ func TestServerSpecSecurityValidation(t *testing.T) {
 		}
 
 		invalidNames := []string{
-			"",                    // Empty
-			"server with spaces",  // Spaces
-			"server/with/slashes", // Slashes
+			"",                       // Empty
+			"server with spaces",     // Spaces
+			"server/with/slashes",    // Slashes
 			strings.Repeat("a", 100), // Too long
 		}
 

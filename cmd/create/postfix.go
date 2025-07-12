@@ -58,6 +58,7 @@ var CreatePostfixCmd = &cobra.Command{
 		return nil
 	}),
 }
+
 // TODO
 func installPostfix(rc *eos_io.RuntimeContext, osType string) error {
 	switch osType {
@@ -65,7 +66,7 @@ func installPostfix(rc *eos_io.RuntimeContext, osType string) error {
 		// Set environment variable for non-interactive install
 		_ = os.Setenv("DEBIAN_FRONTEND", "noninteractive")
 		defer func() { _ = os.Unsetenv("DEBIAN_FRONTEND") }()
-		
+
 		// Update package lists
 		err := execute.RunSimple(rc.Ctx, "apt", "update")
 		if err != nil {
@@ -90,10 +91,12 @@ func installPostfix(rc *eos_io.RuntimeContext, osType string) error {
 		return nil
 	}
 }
+
 // TODO
 func formatSaslCredentials(host, user, pass string) string {
 	return fmt.Sprintf("[%s]:587 %s:%s\n", host, user, pass)
 }
+
 // TODO
 func generatePostfixConfig(host, osType string) string {
 	if osType == "debian" {
@@ -116,6 +119,7 @@ smtp_tls_CAfile = /etc/ssl/certs/ca-bundle.crt
 smtp_use_tls = yes
 `, host)
 }
+
 // TODO
 func configurePostfixRelay(rc *eos_io.RuntimeContext, smtpHost, email, password, osType string) error {
 	for _, path := range []string{"/etc/postfix/main.cf", "/etc/postfix/sasl_passwd"} {
@@ -158,6 +162,7 @@ func configurePostfixRelay(rc *eos_io.RuntimeContext, smtpHost, email, password,
 
 	return nil
 }
+
 // TODO
 func appendPostfixConfig(smtpHost, osType string) error {
 	return os.WriteFile(
@@ -166,12 +171,14 @@ func appendPostfixConfig(smtpHost, osType string) error {
 		0644,
 	)
 }
+
 // TODO
 func sendTestMail(from, to string) error {
 	cmd := exec.Command("mail", "-s", "Test Postfix", "-r", from, to)
 	cmd.Stdin = strings.NewReader("Test mail from postfix")
 	return cmd.Run()
 }
+
 // TODO
 func restartPostfix(rc *eos_io.RuntimeContext, osType string) error {
 	switch osType {

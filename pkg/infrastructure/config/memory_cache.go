@@ -49,7 +49,7 @@ func (c *MemoryCache) Get(key string) (config.CachedConfig, bool) {
 		c.stats.Evictions++
 		c.mutex.Unlock()
 		c.mutex.RLock()
-		
+
 		c.stats.Misses++
 		return config.CachedConfig{}, false
 	}

@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // CreateTrivyCmd represents the Trivy installation command.
 var CreateTrivyCmd = &cobra.Command{
 	Use:   "trivy",

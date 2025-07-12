@@ -41,7 +41,7 @@ Examples:
   
   # Create a physical volume with data alignment
   eos create storage-lvm pv /dev/sde --data-alignment 1m`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
@@ -82,7 +82,7 @@ Examples:
   
   # Create a volume group with limits
   eos create storage-lvm vg limitedvg /dev/sde1 --max-lv 10 --max-pv 5`,
-	Args:  cobra.MinimumNArgs(2),
+	Args: cobra.MinimumNArgs(2),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
@@ -137,7 +137,7 @@ Examples:
   
   # Create a database volume with optimized settings
   eos create storage-lvm lv postgres_data -g dbvg -L 100G -f xfs -m /var/lib/postgresql`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
@@ -210,5 +210,3 @@ func init() {
 	createLVMLVCmd.MarkFlagRequired("volume-group")
 	createLVMLVCmd.MarkFlagRequired("size")
 }
-
-

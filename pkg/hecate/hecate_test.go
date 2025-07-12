@@ -81,7 +81,7 @@ func TestDomainValidation(t *testing.T) {
 
 		for _, domain := range validDomains {
 			config := HecateBasicConfig{BaseDomain: domain}
-			
+
 			// Verify domain is valid
 			assert.NotEmpty(t, config.BaseDomain)
 			assert.NotContains(t, config.BaseDomain, " ")
@@ -95,14 +95,14 @@ func TestDomainValidation(t *testing.T) {
 	t.Run("invalid_domain_names", func(t *testing.T) {
 		// Test invalid domain names
 		invalidDomains := []string{
-			"",                      // Empty
-			"invalid..domain",       // Double dots
-			".starts-with-dot",      // Starts with dot
-			"-starts-with-dash",     // Starts with dash
-			"has spaces.com",        // Contains spaces
-			"special!chars.com",     // Special characters
-			"../../etc/passwd",      // Path traversal
-			"<script>alert()</script>", // XSS attempt
+			"",                                // Empty
+			"invalid..domain",                 // Double dots
+			".starts-with-dot",                // Starts with dot
+			"-starts-with-dash",               // Starts with dash
+			"has spaces.com",                  // Contains spaces
+			"special!chars.com",               // Special characters
+			"../../etc/passwd",                // Path traversal
+			"<script>alert()</script>",        // XSS attempt
 			strings.Repeat("a", 300) + ".com", // Too long
 		}
 
@@ -131,13 +131,13 @@ func TestDomainValidation(t *testing.T) {
 		}
 
 		invalidSubdomains := []string{
-			"",                   // Empty
-			"sub domain",         // Space
-			"sub/domain",         // Slash
-			"-subdomain",         // Starts with dash
-			"subdomain-",         // Ends with dash
-			"../../../etc",       // Path traversal
-			"<script>",           // XSS
+			"",             // Empty
+			"sub domain",   // Space
+			"sub/domain",   // Slash
+			"-subdomain",   // Starts with dash
+			"subdomain-",   // Ends with dash
+			"../../../etc", // Path traversal
+			"<script>",     // XSS
 		}
 
 		for _, subdomain := range validSubdomains {
@@ -217,7 +217,7 @@ func TestIPAddressValidation(t *testing.T) {
 		for _, ip := range validIPs {
 			config := HecateBasicConfig{BackendIP: ip}
 			assert.NotEmpty(t, config.BackendIP)
-			
+
 			// Basic IP validation
 			parts := strings.Split(config.BackendIP, ".")
 			assert.Len(t, parts, 4, "IP should have 4 octets")
@@ -227,20 +227,20 @@ func TestIPAddressValidation(t *testing.T) {
 	t.Run("invalid_ip_addresses", func(t *testing.T) {
 		// Test invalid IP addresses
 		invalidIPs := []string{
-			"",                  // Empty
-			"256.256.256.256",   // Out of range
-			"192.168.1",         // Missing octet
-			"192.168.1.1.1",     // Too many octets
-			"not.an.ip.address", // Not numeric
-			"192.168.1.1; rm -rf /", // Command injection
+			"",                         // Empty
+			"256.256.256.256",          // Out of range
+			"192.168.1",                // Missing octet
+			"192.168.1.1.1",            // Too many octets
+			"not.an.ip.address",        // Not numeric
+			"192.168.1.1; rm -rf /",    // Command injection
 			"<script>alert()</script>", // XSS
-			"../../etc/passwd",  // Path traversal
+			"../../etc/passwd",         // Path traversal
 		}
 
 		for _, ip := range invalidIPs {
 			// Basic IP validation
 			isInvalid := ip == ""
-			
+
 			if !isInvalid {
 				parts := strings.Split(ip, ".")
 				if len(parts) != 4 {
@@ -280,7 +280,7 @@ func TestPortValidation(t *testing.T) {
 		for _, port := range validPorts {
 			bundle := ServiceBundle{BackendPort: port}
 			assert.NotEmpty(t, bundle.BackendPort)
-			
+
 			// Check if numeric
 			for _, ch := range bundle.BackendPort {
 				assert.True(t, ch >= '0' && ch <= '9', "Port should be numeric: %s", port)
@@ -303,7 +303,7 @@ func TestPortValidation(t *testing.T) {
 		for _, port := range invalidPorts {
 			// Basic port validation
 			isInvalid := port == "" || port == "0"
-			
+
 			if !isInvalid {
 				// Check if numeric and in range
 				for _, ch := range port {
@@ -330,14 +330,14 @@ func TestFileOperationsSecurity(t *testing.T) {
 		// Test file creation with secure permissions
 		testFile := filepath.Join(tempDir, "test-config.conf")
 		content := "test configuration"
-		
+
 		err := os.WriteFile(testFile, []byte(content), 0644)
 		require.NoError(t, err)
 
 		// Check file permissions
 		info, err := os.Stat(testFile)
 		require.NoError(t, err)
-		
+
 		mode := info.Mode().Perm()
 		assert.Equal(t, os.FileMode(0644), mode, "File should have 0644 permissions")
 	})
@@ -421,7 +421,7 @@ func TestConfigurationSecurity(t *testing.T) {
 	t.Run("missing_config_handling", func(t *testing.T) {
 		// Test handling of missing configuration
 		emptyConfig := &HecateBasicConfig{}
-		
+
 		// Check that all fields are empty
 		assert.Empty(t, emptyConfig.BaseDomain)
 		assert.Empty(t, emptyConfig.BackendIP)
@@ -442,24 +442,24 @@ func TestReverseProxySecurityValidation(t *testing.T) {
 		}
 
 		invalidUpstreams := []string{
-			"",                        // Empty
-			"not-a-url",              // Invalid URL
-			"javascript:alert()",     // XSS
-			"file:///etc/passwd",     // File access
-			"http://;rm -rf /",       // Command injection
+			"",                   // Empty
+			"not-a-url",          // Invalid URL
+			"javascript:alert()", // XSS
+			"file:///etc/passwd", // File access
+			"http://;rm -rf /",   // Command injection
 		}
 
 		for _, upstream := range validUpstreams {
 			// Valid upstreams should have proper format
-			assert.True(t, strings.HasPrefix(upstream, "http://") || 
+			assert.True(t, strings.HasPrefix(upstream, "http://") ||
 				strings.HasPrefix(upstream, "https://"))
 		}
 
 		for _, upstream := range invalidUpstreams {
 			// Invalid upstreams should be caught
 			isInvalid := upstream == "" ||
-				(!strings.HasPrefix(upstream, "http://") && 
-				 !strings.HasPrefix(upstream, "https://")) ||
+				(!strings.HasPrefix(upstream, "http://") &&
+					!strings.HasPrefix(upstream, "https://")) ||
 				strings.Contains(upstream, ";") ||
 				strings.Contains(upstream, "javascript:") ||
 				strings.Contains(upstream, "file:")
@@ -492,15 +492,15 @@ func TestReverseProxySecurityValidation(t *testing.T) {
 		}
 
 		invalidCertPaths := []string{
-			"",                          // Empty
-			"../../../etc/passwd",       // Path traversal
+			"",                                  // Empty
+			"../../../etc/passwd",               // Path traversal
 			"/etc/ssl/certs/cert.crt; rm -rf /", // Command injection
-			"<script>alert()</script>",  // XSS
+			"<script>alert()</script>",          // XSS
 		}
 
 		for _, path := range validCertPaths {
 			// Valid paths should end with expected extensions
-			assert.True(t, strings.HasSuffix(path, ".crt") || 
+			assert.True(t, strings.HasSuffix(path, ".crt") ||
 				strings.HasSuffix(path, ".pem"))
 		}
 

@@ -109,6 +109,7 @@ SSH access detection includes:
 		return nil
 	}),
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // getSystemUsers reads the /etc/passwd file and returns a list of usernames
 func getSystemUsers(rc *eos_io.RuntimeContext) ([]string, error) {
@@ -138,11 +139,10 @@ func getSystemUsers(rc *eos_io.RuntimeContext) ([]string, error) {
 	return users, nil
 }
 
-
 // init registers subcommands for the read command
 func init() {
 	ReadCmd.AddCommand(InspectUsersCmd)
-	
+
 	// Add flags for SSH and stamp functionality
 	InspectUsersCmd.Flags().Bool("ssh-only", false, "List only users with SSH access")
 	InspectUsersCmd.Flags().Bool("stamp", false, "Show user-hostname stamp")

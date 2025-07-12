@@ -8,10 +8,10 @@ import (
 type ServiceState string
 
 const (
-	ServiceStateActive     ServiceState = "active"
-	ServiceStateInactive   ServiceState = "inactive"
-	ServiceStateFailed     ServiceState = "failed"
-	ServiceStateActivating ServiceState = "activating"
+	ServiceStateActive       ServiceState = "active"
+	ServiceStateInactive     ServiceState = "inactive"
+	ServiceStateFailed       ServiceState = "failed"
+	ServiceStateActivating   ServiceState = "activating"
 	ServiceStateDeactivating ServiceState = "deactivating"
 )
 
@@ -81,13 +81,13 @@ type ServiceFilterOptions struct {
 
 // LogsOptions defines options for viewing service logs
 type LogsOptions struct {
-	Follow    bool   `json:"follow"`
-	Lines     int    `json:"lines"`
-	Since     string `json:"since,omitempty"`
-	Until     string `json:"until,omitempty"`
-	Priority  string `json:"priority,omitempty"`
-	Unit      string `json:"unit"`
-	Grep      string `json:"grep,omitempty"`
-	Reverse   bool   `json:"reverse"`
-	NoHostname bool  `json:"no_hostname"`
+	Follow     bool   `json:"follow"`
+	Lines      int    `json:"lines"`
+	Since      string `json:"since,omitempty"`
+	Until      string `json:"until,omitempty"`
+	Priority   string `json:"priority,omitempty"`
+	Unit       string `json:"unit"`
+	Grep       string `json:"grep,omitempty"`
+	Reverse    bool   `json:"reverse"`
+	NoHostname bool   `json:"no_hostname"`
 }

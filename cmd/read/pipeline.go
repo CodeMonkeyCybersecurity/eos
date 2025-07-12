@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 var (
 	pipelineAllAlertLimit int
 	pipelineAllAgentLimit int
@@ -80,4 +81,5 @@ func init() {
 	pipelineAllCmd.Flags().IntVarP(&pipelineAllRefresh, "refresh", "r", 5, "Refresh interval in seconds")
 	pipelineAllCmd.Flags().StringVarP(&pipelineAllDsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
 }
+
 // All helper functions have been migrated to pkg/pipeline/monitor/

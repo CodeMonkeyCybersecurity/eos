@@ -33,7 +33,7 @@ Examples:
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		targetDir, _ := cmd.Flags().GetString("target-dir")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		forceInstall, _ := cmd.Flags().GetBool("force")
@@ -88,12 +88,12 @@ func init() {
 	// Register webhook commands with CreateCmd
 	CreateCmd.AddCommand(delphiWebhookCmd)
 	CreateCmd.AddCommand(pipelineWebhookCmd)
-	
+
 	// Set up flags for delphiWebhookCmd
 	delphiWebhookCmd.Flags().StringP("target-dir", "t", "/var/ossec/integrations", "Target directory for webhook scripts")
 	delphiWebhookCmd.Flags().BoolP("dry-run", "n", false, "Show what would be done without making changes")
 	delphiWebhookCmd.Flags().BoolP("force", "f", false, "Overwrite existing files")
-	
+
 	// Set up flags for pipelineWebhookCmd
 	pipelineWebhookCmd.Flags().String("target-dir", "/var/ossec/integrations", "Target directory for webhook scripts")
 	pipelineWebhookCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")

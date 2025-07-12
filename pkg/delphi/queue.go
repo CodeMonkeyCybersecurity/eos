@@ -46,11 +46,11 @@ func NewStreamHandler(redisURL, consumerGroup string, logger *zap.Logger) (*Stre
 	}
 
 	streams := map[string]string{
-		"new_alert":       "delphi:alerts:new",
-		"agent_enriched":  "delphi:alerts:enriched",
-		"new_response":    "delphi:alerts:analyzed",
+		"new_alert":        "delphi:alerts:new",
+		"agent_enriched":   "delphi:alerts:enriched",
+		"new_response":     "delphi:alerts:analyzed",
 		"alert_structured": "delphi:alerts:structured",
-		"alert_formatted": "delphi:alerts:formatted",
+		"alert_formatted":  "delphi:alerts:formatted",
 	}
 
 	sh := &StreamHandler{
@@ -79,7 +79,7 @@ func (sh *StreamHandler) initConsumerGroups(ctx context.Context) error {
 				zap.Error(err))
 			return err
 		}
-		
+
 		sh.logger.Debug("Consumer group initialized",
 			zap.String("stream", streamName),
 			zap.String("group", sh.consumerGroup))
@@ -256,14 +256,14 @@ func (sh *StreamHandler) GetPendingMessages(ctx context.Context, channel, consum
 				MinIdle:  30 * time.Second,
 				Messages: []string{pending.ID},
 			}).Result()
-			
+
 			if err != nil {
 				sh.logger.Error("Failed to claim pending message",
 					zap.String("message_id", pending.ID),
 					zap.Error(err))
 				continue
 			}
-			
+
 			messages = append(messages, claimed...)
 		}
 	}
@@ -293,7 +293,7 @@ type HybridMessageBus struct {
 	useRedis      bool
 	streamHandler *StreamHandler
 	// PostgreSQL handler would be added here
-	logger        *zap.Logger
+	logger *zap.Logger
 }
 
 // NewHybridMessageBus creates a message bus that can use either transport
@@ -310,12 +310,12 @@ func (hmb *HybridMessageBus) PublishMessage(ctx context.Context, channel string,
 	if hmb.useRedis && hmb.streamHandler != nil {
 		return hmb.streamHandler.PublishMessage(ctx, channel, msg)
 	}
-	
+
 	// Fallback to PostgreSQL NOTIFY (implementation would go here)
 	hmb.logger.Warn("Redis not available, falling back to PostgreSQL NOTIFY",
 		zap.String("channel", channel),
 		zap.String("alert_id", msg.AlertID))
-	
+
 	// TODO: Implement PostgreSQL fallback
 	return fmt.Errorf("PostgreSQL fallback not yet implemented")
 }
@@ -325,12 +325,12 @@ func (hmb *HybridMessageBus) ConsumeMessages(ctx context.Context, channel, consu
 	if hmb.useRedis && hmb.streamHandler != nil {
 		return hmb.streamHandler.ConsumeMessages(ctx, channel, consumerName, handler)
 	}
-	
+
 	// Fallback to PostgreSQL LISTEN (implementation would go here)
 	hmb.logger.Warn("Redis not available, falling back to PostgreSQL LISTEN",
 		zap.String("channel", channel),
 		zap.String("consumer", consumerName))
-	
+
 	// TODO: Implement PostgreSQL fallback
 	return fmt.Errorf("PostgreSQL fallback not yet implemented")
 }

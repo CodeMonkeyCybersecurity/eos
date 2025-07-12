@@ -6,14 +6,14 @@ const (
 	EosSudoersPath      = "/etc/sudoers.d/eos"
 	SystemctlVaultStart = "/usr/bin/systemctl start vault*"
 	// #nosec G101 - This is a command to read a token file, not a hardcoded credential
-	CatVaultAgentToken  = "/bin/cat /run/eos/vault_agent_eos.token"
-	SudoersLine         = "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
-	EosLogDir           = "/var/log/eos/"
-	EosLogs             = EosLogDir + "eos.log"
+	CatVaultAgentToken = "/bin/cat /run/eos/vault_agent_eos.token"
+	SudoersLine        = "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
+	EosLogDir          = "/var/log/eos/"
+	EosLogs            = EosLogDir + "eos.log"
 	// #nosec G101 - This is a log file path, not a hardcoded credential
-	EosLogsPWD          = "./eos.log"
-	EosShellNoLogin     = "/usr/sbin/nologin"
-	EosShellBash        = "/bin/bash"
+	EosLogsPWD      = "./eos.log"
+	EosShellNoLogin = "/usr/sbin/nologin"
+	EosShellBash    = "/bin/bash"
 )
 
 const SudoersEosEntry = `eos ALL=(ALL) NOPASSWD: ` + SystemctlVaultStart + `, ` + CatVaultAgentToken

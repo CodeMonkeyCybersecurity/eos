@@ -33,21 +33,21 @@ type TailscaleConfig struct {
 
 // TailscaleDeployment represents a Tailscale deployment state
 type TailscaleDeployment struct {
-	Config          *TailscaleConfig
-	IsInstalled     bool
-	IsConnected     bool
-	NodeKey         string
-	TailnetLocked   bool
-	AuthKeyValid    bool
+	Config           *TailscaleConfig
+	IsInstalled      bool
+	IsConnected      bool
+	NodeKey          string
+	TailnetLocked    bool
+	AuthKeyValid     bool
 	AdvertisedRoutes []string
-	Tags            []string
-	ExitNode        bool
+	Tags             []string
+	ExitNode         bool
 }
 
 // DeployTailscaleInfrastructure implements the complete Tailscale deployment following assessment→intervention→evaluation
 func DeployTailscaleInfrastructure(rc *eos_io.RuntimeContext, config *TailscaleConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Tailscale infrastructure deployment", 
+	logger.Info("Starting Tailscale infrastructure deployment",
 		zap.String("hostname", config.Hostname),
 		zap.Strings("advertise_routes", config.AdvertiseRoutes))
 
@@ -77,7 +77,7 @@ func AssessTailscaleState(rc *eos_io.RuntimeContext, config *TailscaleConfig) (*
 		IsConnected:      false,
 		AuthKeyValid:     false,
 		AdvertisedRoutes: []string{},
-		Tags:            []string{},
+		Tags:             []string{},
 	}
 
 	// Check if Tailscale is installed
@@ -95,7 +95,7 @@ func AssessTailscaleState(rc *eos_io.RuntimeContext, config *TailscaleConfig) (*
 			deployment.Tags = status.Tags
 			deployment.ExitNode = status.ExitNode
 
-			logger.Info("Tailscale status retrieved", 
+			logger.Info("Tailscale status retrieved",
 				zap.Bool("connected", deployment.IsConnected),
 				zap.String("node_key", deployment.NodeKey),
 				zap.Strings("advertised_routes", deployment.AdvertisedRoutes))
@@ -120,7 +120,7 @@ func AssessTailscaleState(rc *eos_io.RuntimeContext, config *TailscaleConfig) (*
 		logger.Warn("System prerequisites check failed", zap.Error(err))
 	}
 
-	logger.Info("Tailscale state assessment completed", 
+	logger.Info("Tailscale state assessment completed",
 		zap.Bool("installed", deployment.IsInstalled),
 		zap.Bool("connected", deployment.IsConnected),
 		zap.Bool("auth_key_valid", deployment.AuthKeyValid))
@@ -199,7 +199,7 @@ func EvaluateTailscaleDeployment(rc *eos_io.RuntimeContext, config *TailscaleCon
 				return cerr.New(fmt.Sprintf("route %s is not being advertised", route))
 			}
 		}
-		logger.Info("All specified routes are being advertised", 
+		logger.Info("All specified routes are being advertised",
 			zap.Strings("routes", config.AdvertiseRoutes))
 	}
 
@@ -217,7 +217,7 @@ func EvaluateTailscaleDeployment(rc *eos_io.RuntimeContext, config *TailscaleCon
 		return cerr.Wrap(err, "Tailscale connectivity test failed")
 	}
 
-	logger.Info("Tailscale deployment evaluation completed successfully", 
+	logger.Info("Tailscale deployment evaluation completed successfully",
 		zap.String("node_key", status.NodeKey),
 		zap.Bool("exit_node", status.ExitNode),
 		zap.Strings("advertised_routes", status.AdvertisedRoutes))
@@ -228,7 +228,7 @@ func EvaluateTailscaleDeployment(rc *eos_io.RuntimeContext, config *TailscaleCon
 // Helper functions and types
 
 type TailscaleStatus struct {
-	Connected         bool
+	Connected        bool
 	NodeKey          string
 	TailnetLocked    bool
 	AdvertisedRoutes []string
@@ -257,7 +257,7 @@ func getTailscaleStatus(rc *eos_io.RuntimeContext) (*TailscaleStatus, error) {
 
 	// Parse JSON output (simplified for this example)
 	status := &TailscaleStatus{
-		Connected:         strings.Contains(output, `"Online":true`),
+		Connected:        strings.Contains(output, `"Online":true`),
 		NodeKey:          extractFieldFromJSON(output, "NodeKey"),
 		TailnetLocked:    strings.Contains(output, `"Locked":true`),
 		AdvertisedRoutes: []string{}, // Would parse from JSON
@@ -424,15 +424,15 @@ output "device_id" {
 
 	// Create Terraform manager and generate configuration
 	tfManager := terraform.NewManager(rc, config.TerraformDir)
-	
+
 	templateData := struct {
-		Hostname           string
+		Hostname            string
 		AdvertiseRoutesJSON string
-		TagsJSON           string
+		TagsJSON            string
 	}{
-		Hostname:           config.Hostname,
+		Hostname:            config.Hostname,
 		AdvertiseRoutesJSON: formatStringSliceAsJSON(config.AdvertiseRoutes),
-		TagsJSON:           formatStringSliceAsJSON(config.Tags),
+		TagsJSON:            formatStringSliceAsJSON(config.Tags),
 	}
 
 	if err := tfManager.GenerateFromString(mainTF, "main.tf", templateData); err != nil {
@@ -578,9 +578,9 @@ func storeTailscaleConfigInVault(rc *eos_io.RuntimeContext, config *TailscaleCon
 	}
 
 	configData := map[string]interface{}{
-		"hostname":          config.Hostname,
-		"advertise_routes":  config.AdvertiseRoutes,
-		"accept_routes":     config.AcceptRoutes,
+		"hostname":         config.Hostname,
+		"advertise_routes": config.AdvertiseRoutes,
+		"accept_routes":    config.AcceptRoutes,
 		"tags":             config.Tags,
 		"use_exit_node":    config.UseAdvertiseExit,
 		"use_shield":       config.UseShield,
@@ -619,11 +619,11 @@ func formatStringSliceAsJSON(slice []string) string {
 	if len(slice) == 0 {
 		return "[]"
 	}
-	
+
 	quoted := make([]string, len(slice))
 	for i, s := range slice {
 		quoted[i] = fmt.Sprintf(`"%s"`, s)
 	}
-	
+
 	return fmt.Sprintf("[%s]", strings.Join(quoted, ", "))
 }

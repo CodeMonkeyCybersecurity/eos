@@ -93,31 +93,31 @@ func CheckIfDockerComposeInstalled(rc *eos_io.RuntimeContext) error {
 // This provides a seamless experience for commands that depend on Docker.
 func EnsureDockerInstalled(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	log.Info("Checking Docker installation")
-	
+
 	// First check if Docker is already available
 	if err := CheckIfDockerInstalled(rc); err == nil {
 		log.Info("Docker is already installed")
-		
+
 		// Also check if Docker is running
 		if err := CheckRunning(rc); err != nil {
 			log.Warn("Docker is installed but not running", zap.Error(err))
 			return cerr.WithHint(err, "Please start Docker and try again")
 		}
-		
+
 		log.Info("Docker is installed and running")
 		return nil
 	}
-	
+
 	log.Info("Docker not found, proceeding with installation")
-	
+
 	// Docker is not installed, so install it
 	if err := InstallDocker(rc); err != nil {
 		log.Error("Docker installation failed", zap.Error(err))
 		return cerr.Wrap(err, "install Docker")
 	}
-	
+
 	log.Info("Docker installation completed successfully")
 	return nil
 }

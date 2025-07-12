@@ -219,7 +219,6 @@ func (km *KeyManager) DeleteKeys(ctx context.Context, keys []string) (interface{
 	return result, nil
 }
 
-
 // DeleteKeyPattern is a legacy wrapper for the new DeleteKeys method
 func (km *KeyManager) DeleteKeyPattern(ctx context.Context, pattern string) (interface{}, error) {
 	rc := &eos_io.RuntimeContext{Ctx: ctx}

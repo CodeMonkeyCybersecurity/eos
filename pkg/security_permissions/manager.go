@@ -19,7 +19,7 @@ func NewPermissionManager(config *SecurityConfig) *PermissionManager {
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
-	
+
 	return &PermissionManager{
 		config: config,
 	}
@@ -41,11 +41,11 @@ func (pm *PermissionManager) CheckPermissions(categories []string) (*PermissionF
 	for _, category := range categories {
 		scanResult, err := pm.checkCategoryPermissions(category)
 		if err != nil {
-			result.Summary.Errors = append(result.Summary.Errors, 
+			result.Summary.Errors = append(result.Summary.Errors,
 				fmt.Sprintf("Error checking %s: %v", category, err))
 			continue
 		}
-		
+
 		result.Results[category] = *scanResult
 		result.Summary.TotalFiles += scanResult.TotalChecks
 		result.Summary.FilesSkipped += scanResult.Passed
@@ -80,11 +80,11 @@ func (pm *PermissionManager) FixPermissions(categories []string) (*PermissionFix
 	for _, category := range categories {
 		scanResult, err := pm.fixCategoryPermissions(category)
 		if err != nil {
-			result.Summary.Errors = append(result.Summary.Errors, 
+			result.Summary.Errors = append(result.Summary.Errors,
 				fmt.Sprintf("Error fixing %s: %v", category, err))
 			continue
 		}
-		
+
 		result.Results[category] = *scanResult
 		result.Summary.TotalFiles += scanResult.TotalChecks
 		result.Summary.FilesFixed += scanResult.Fixed
@@ -140,7 +140,7 @@ func (pm *PermissionManager) ScanSSHDirectory(sshDir string) (*PermissionScanRes
 		// Determine appropriate permissions
 		var expectedMode os.FileMode
 		var description string
-		
+
 		if info.IsDir() {
 			expectedMode = 0700
 			description = "SSH subdirectory"
@@ -150,6 +150,9 @@ func (pm *PermissionManager) ScanSSHDirectory(sshDir string) (*PermissionScanRes
 		} else if strings.HasSuffix(info.Name(), ".pub") {
 			expectedMode = 0644
 			description = "SSH public key"
+		} else if info.Name() == "known_hosts" {
+			expectedMode = 0644
+			description = "SSH known hosts"
 		} else {
 			expectedMode = 0600
 			description = "SSH configuration file"
@@ -192,7 +195,7 @@ func (pm *PermissionManager) checkCategoryPermissions(category string) (*Permiss
 
 	// Get rules for this category
 	rules := GetPermissionRules([]string{category})
-	
+
 	for _, rule := range rules {
 		expandedPath := os.ExpandEnv(rule.Path)
 		check := pm.checkSinglePath(expandedPath, rule.Mode, rule.Description, rule.Required)
@@ -226,7 +229,7 @@ func (pm *PermissionManager) fixCategoryPermissions(category string) (*Permissio
 
 	// Get rules for this category
 	rules := GetPermissionRules([]string{category})
-	
+
 	for _, rule := range rules {
 		expandedPath := os.ExpandEnv(rule.Path)
 		check := pm.fixSinglePath(expandedPath, rule.Mode, rule.Description, rule.Required)
@@ -290,7 +293,7 @@ func (pm *PermissionManager) fixSSHDirectory(sshDir string) (*PermissionScanResu
 		// Determine appropriate permissions
 		var expectedMode os.FileMode
 		var description string
-		
+
 		if info.IsDir() {
 			expectedMode = 0700
 			description = "SSH subdirectory"
@@ -300,6 +303,9 @@ func (pm *PermissionManager) fixSSHDirectory(sshDir string) (*PermissionScanResu
 		} else if strings.HasSuffix(info.Name(), ".pub") {
 			expectedMode = 0644
 			description = "SSH public key"
+		} else if info.Name() == "known_hosts" {
+			expectedMode = 0644
+			description = "SSH known hosts"
 		} else {
 			expectedMode = 0600
 			description = "SSH configuration file"
@@ -364,7 +370,7 @@ func (pm *PermissionManager) checkSinglePath(path string, expectedMode os.FileMo
 // fixSinglePath fixes permissions for a single path
 func (pm *PermissionManager) fixSinglePath(path string, expectedMode os.FileMode, description string, required bool) PermissionCheck {
 	check := pm.checkSinglePath(path, expectedMode, description, required)
-	
+
 	// If the path doesn't exist or there's an error, return as-is
 	if !check.Exists || check.Error != "" {
 		return check
@@ -389,7 +395,7 @@ func (pm *PermissionManager) fixSinglePath(path string, expectedMode os.FileMode
 			check.Error = fmt.Sprintf("Failed to change permissions: %v", err)
 			return check
 		}
-		
+
 		// Update the current mode to reflect the change
 		check.CurrentMode = expectedMode
 		check.NeedsChange = false
@@ -415,23 +421,23 @@ func (pm *PermissionManager) createBackup(path string) error {
 		return err
 	}
 
-	backupFile := filepath.Join(pm.config.BackupDirectory, 
+	backupFile := filepath.Join(pm.config.BackupDirectory,
 		fmt.Sprintf("permissions_%d.log", time.Now().Unix()))
-	
+
 	backupData := fmt.Sprintf("%s: %o\n", path, stat.Mode()&os.ModePerm)
-	
+
 	return os.WriteFile(backupFile, []byte(backupData), 0600)
 }
 
 // shouldExcludePath checks if a path should be excluded based on patterns
 func (pm *PermissionManager) shouldExcludePath(path string) bool {
 	filename := filepath.Base(path)
-	
+
 	for _, pattern := range pm.config.ExcludePatterns {
 		if matched, _ := filepath.Match(pattern, filename); matched {
 			return true
 		}
 	}
-	
+
 	return false
 }

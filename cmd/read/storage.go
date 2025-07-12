@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	showDevices  bool
@@ -73,7 +74,7 @@ while legacy mode offers traditional Unix command output for script compatibilit
   # - Standard df -h filesystem usage`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		if legacyOutput {
 			logger.Info("Reading storage information...")
 
@@ -92,13 +93,13 @@ while legacy mode offers traditional Unix command output for script compatibilit
 			}
 			return nil
 		}
-		
+
 		if showAll || (!showDevices && !showLVM && !showUsage) {
 			showDevices = true
 			showLVM = true
 			showUsage = true
 		}
-		
+
 		if showDevices {
 			logger.Info("=== Block Devices ===")
 			devices, err := storage.ListBlockDevices(rc)
@@ -116,25 +117,25 @@ while legacy mode offers traditional Unix command output for script compatibilit
 			}
 			logger.Info("")
 		}
-		
+
 		if showLVM {
 			logger.Info("=== LVM Information ===")
-			
+
 			// Show volume groups
 			if err := storage.DisplayVolumeGroups(rc); err != nil {
 				logger.Error("Failed to display volume groups", zap.Error(err))
 			}
-			
+
 			logger.Info("")
-			
+
 			// Show logical volumes
 			if err := storage.DisplayLogicalVolumes(rc); err != nil {
 				logger.Error("Failed to display logical volumes", zap.Error(err))
 			}
-			
+
 			logger.Info("")
 		}
-		
+
 		if showUsage {
 			logger.Info("=== Disk Usage ===")
 			usage, err := storage.GetDiskUsage(rc)
@@ -144,11 +145,10 @@ while legacy mode offers traditional Unix command output for script compatibilit
 				logger.Info(usage)
 			}
 		}
-		
+
 		return nil
 	}),
 }
-
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // runCommand executes a system command and prints its output
@@ -165,7 +165,7 @@ func runCommand(command string, args ...string) error {
 // init registers subcommands for the read command
 func init() {
 	ReadCmd.AddCommand(ReadStorageCmd)
-	
+
 	ReadStorageCmd.Flags().BoolVar(&showDevices, "devices", false, "Show block devices and filesystems")
 	ReadStorageCmd.Flags().BoolVar(&showLVM, "lvm", false, "Show LVM volume groups and logical volumes")
 	ReadStorageCmd.Flags().BoolVar(&showUsage, "usage", false, "Show disk usage")

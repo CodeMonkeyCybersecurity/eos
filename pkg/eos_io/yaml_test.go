@@ -98,7 +98,7 @@ func TestWriteYAML(t *testing.T) {
 
 	t.Run("overwrites_existing_file", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "overwrite.yaml")
-		
+
 		// Create initial file
 		initialData := struct {
 			Value string `yaml:"value"`
@@ -149,7 +149,7 @@ func TestWriteYAML(t *testing.T) {
 	t.Run("handles_context_cancellation", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "cancelled.yaml")
 		data := struct{ Test string }{Test: "value"}
-		
+
 		// Create cancelled context
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately
@@ -349,7 +349,7 @@ config:
 		if result["enabled"] != false {
 			t.Errorf("expected enabled false, got %v", result["enabled"])
 		}
-		
+
 		// Check items array
 		items, ok := result["items"].([]interface{})
 		if !ok {
@@ -358,7 +358,7 @@ config:
 		if len(items) != 3 {
 			t.Errorf("expected 3 items, got %d", len(items))
 		}
-		
+
 		// Check config map
 		config, ok := result["config"].(map[string]interface{})
 		if !ok {

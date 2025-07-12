@@ -157,8 +157,8 @@ func (b *BackupOperation) Assess(ctx context.Context) (*patterns.AssessmentResul
 		if _, err := os.Stat(path); err != nil {
 			prerequisites[fmt.Sprintf("path_%s", path)] = false
 			return &patterns.AssessmentResult{
-				CanProceed: false,
-				Reason:     fmt.Sprintf("backup path does not exist: %s", path),
+				CanProceed:    false,
+				Reason:        fmt.Sprintf("backup path does not exist: %s", path),
 				Prerequisites: prerequisites,
 			}, nil
 		}

@@ -11,7 +11,7 @@ func TestIsDockerRunning(t *testing.T) {
 		// Test the function - in test environment it will likely return false
 		// since docker may not be running
 		result := IsDockerRunning()
-		
+
 		// The result depends on the test environment
 		// We just ensure the function can be called without panic
 		_ = result

@@ -19,20 +19,20 @@ func ServiceListToStdout(result *system_services.ServiceListResult, asJSON bool)
 	// Text output
 	tw := NewTable().
 		WithHeaders("NAME", "LOAD", "ACTIVE", "SUB", "DESCRIPTION")
-	
+
 	fmt.Printf("Systemd Services (found %d):\n", result.Count)
-	
+
 	for _, service := range result.Services {
 		// Truncate description if too long
 		desc := service.Description
 		if len(desc) > 35 {
 			desc = desc[:32] + "..."
 		}
-		
+
 		tw.AddRow(service.Name, service.LoadState, service.ActiveState,
 			service.SubState, desc)
 	}
-	
+
 	return tw.Render()
 }
 
@@ -63,7 +63,7 @@ func ServiceOperationToStdout(result *system_services.ServiceOperation, asJSON b
 	return nil
 }
 
-// ServiceStatusToStdout outputs a service status to stdout  
+// ServiceStatusToStdout outputs a service status to stdout
 func ServiceStatusToStdout(result *system_services.ServiceInfo, asJSON bool) error {
 	if asJSON {
 		return JSONToStdout(result)

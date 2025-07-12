@@ -10,7 +10,7 @@ import (
 
 func TestMkdirP(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "eos_unix_test_*")
 	if err != nil {
@@ -58,7 +58,7 @@ func TestMkdirP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := MkdirP(ctx, tt.path, tt.perm)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MkdirP() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -85,7 +85,7 @@ func TestMkdirP(t *testing.T) {
 
 func TestMkdirP_ErrorCases(t *testing.T) {
 	ctx := context.Background()
-	
+
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "eos_unix_test_error_*")
 	if err != nil {
@@ -117,7 +117,7 @@ func TestMkdirP_ErrorCases(t *testing.T) {
 
 func TestMkdirP_Concurrency(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tmpDir, err := os.MkdirTemp("", "eos_unix_concurrent_*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -126,7 +126,7 @@ func TestMkdirP_Concurrency(t *testing.T) {
 
 	// Test concurrent creation of the same directory
 	targetDir := filepath.Join(tmpDir, "concurrent_dir")
-	
+
 	done := make(chan bool, 10)
 	for i := 0; i < 10; i++ {
 		go func() {
@@ -156,7 +156,7 @@ func TestMkdirP_Concurrency(t *testing.T) {
 
 func TestAbsolutePath(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name string
 		path string
@@ -180,7 +180,7 @@ func TestAbsolutePath(t *testing.T) {
 
 			testPath := filepath.Join(tmpDir, tt.path)
 			err = MkdirP(ctx, testPath, 0755)
-			
+
 			// Log the result rather than asserting, since behavior
 			// may vary based on the path type and system
 			t.Logf("Path %q result: %v", tt.path, err)

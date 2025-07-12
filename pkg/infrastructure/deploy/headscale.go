@@ -11,24 +11,24 @@ import (
 // Migrated from cmd/create/infrastructure.go deployHeadscaleInfrastructure
 func DeployHeadscale(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Get configuration from command flags
 	logger.Info("Assessing Headscale deployment configuration")
-	
+
 	// Get command flags
 	domain, _ := cmd.Flags().GetString("domain")
 	database, _ := cmd.Flags().GetString("database")
-	
+
 	// Set defaults
 	if database == "" {
 		database = "sqlite"
 	}
-	
+
 	// INTERVENE - Log configuration
 	logger.Info("Headscale configuration prepared",
 		zap.String("domain", domain),
 		zap.String("database", database))
-	
+
 	// TODO: Implement actual Headscale deployment logic
 	// This would involve:
 	// 1. Installing Headscale binary
@@ -36,7 +36,7 @@ func DeployHeadscale(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	// 3. Configuring OIDC if needed
 	// 4. Setting up systemd service
 	// 5. Configuring reverse proxy integration
-	
+
 	// EVALUATE - Log completion
 	logger.Info("Headscale infrastructure deployment completed")
 	return nil

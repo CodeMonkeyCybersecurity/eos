@@ -52,7 +52,7 @@ func (m *MockSaltClient) CheckMinion(ctx context.Context, minion string) (bool, 
 	return args.Bool(0), args.Error(1)
 }
 
-// MockVaultClient for testing Vault integration  
+// MockVaultClient for testing Vault integration
 type MockVaultClient struct {
 	mock.Mock
 }
@@ -104,7 +104,7 @@ func createTestRuntimeContext(t *testing.T) *eos_io.RuntimeContext {
 	logger := zaptest.NewLogger(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
-	
+
 	return &eos_io.RuntimeContext{
 		Ctx:        ctx,
 		Log:        logger,
@@ -129,8 +129,8 @@ func TestBackupRunCommandIntegration(t *testing.T) {
 			profileName: "test-profile",
 			mockSetup: func(mc *MockBackupClient) {
 				mc.On("CheckRepository").Return(nil)
-				mc.On("Backup", 
-					[]string{"/test/path"}, 
+				mc.On("Backup",
+					[]string{"/test/path"},
 					[]string{"manual", "test"}).Return(&BackupResult{
 					SnapshotID: "snap123",
 					Files:      []string{"/test/path/file1.txt"},
@@ -141,7 +141,7 @@ func TestBackupRunCommandIntegration(t *testing.T) {
 		},
 		{
 			name:        "backup fails during execution",
-			profileName: "fail-profile", 
+			profileName: "fail-profile",
 			mockSetup: func(mc *MockBackupClient) {
 				mc.On("CheckRepository").Return(nil)
 				mc.On("Backup", mock.Anything, mock.Anything).
@@ -170,7 +170,7 @@ func TestBackupRunCommandIntegration(t *testing.T) {
 			// Create temporary config for testing
 			tmpDir := t.TempDir()
 			_ = filepath.Join(tmpDir, "backup.yaml")
-			
+
 			testConfig := &backup.Config{
 				DefaultRepository: "test-repo",
 				Repositories: map[string]backup.Repository{
@@ -308,18 +308,18 @@ func TestUserCreationCommandIntegration(t *testing.T) {
 			mockSetup: func(salt *MockSaltClient, vault *MockVaultClient) {
 				// UserExistenceCheck assessment phase
 				salt.On("TestPing", mock.Anything, "*").Return(true, nil).Maybe()
-				
-				// UserExistenceCheck intervention phase  
+
+				// UserExistenceCheck intervention phase
 				salt.On("CmdRun", mock.Anything, "*", "id testuser").
 					Return("id: testuser: no such user", fmt.Errorf("user not found")).Once()
-				
+
 				// UserCreationOperation assessment phase
 				// Second ping test for main operation
 				salt.On("TestPing", mock.Anything, "*").Return(true, nil).Maybe()
 				// User existence check again during main assessment
 				salt.On("CmdRun", mock.Anything, "*", "id testuser").
 					Return("id: testuser: no such user", fmt.Errorf("user not found")).Once()
-				
+
 				// Group checks during assessment
 				salt.On("CmdRun", mock.Anything, "*", "getent group sudo").
 					Return("sudo:x:27:", nil)
@@ -527,30 +527,30 @@ func TestCommandArgumentValidation(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:    "backup run with valid profile",
-			command: createMockBackupRunCommand(),
-			args:    []string{"system"},
-			flags:   map[string]string{},
+			name:          "backup run with valid profile",
+			command:       createMockBackupRunCommand(),
+			args:          []string{"system"},
+			flags:         map[string]string{},
 			expectedError: false,
 		},
 		{
-			name:    "backup run without profile",
-			command: createMockBackupRunCommand(),
-			args:    []string{},
+			name:          "backup run without profile",
+			command:       createMockBackupRunCommand(),
+			args:          []string{},
 			expectedError: true,
 			errorContains: "requires exactly 1 arg",
 		},
 		{
-			name:    "user creation with username",
-			command: createMockUserCreateCommand(),
-			args:    []string{"testuser"},
-			flags:   map[string]string{},
+			name:          "user creation with username",
+			command:       createMockUserCreateCommand(),
+			args:          []string{"testuser"},
+			flags:         map[string]string{},
 			expectedError: false,
 		},
 		{
-			name:    "user creation without username",
-			command: createMockUserCreateCommand(),
-			args:    []string{},
+			name:          "user creation without username",
+			command:       createMockUserCreateCommand(),
+			args:          []string{},
 			expectedError: true,
 			errorContains: "username must be specified",
 		},
@@ -567,7 +567,7 @@ func TestCommandArgumentValidation(t *testing.T) {
 
 			// Test argument validation
 			err := tt.command.Args(tt.command, tt.args)
-			
+
 			if tt.expectedError {
 				require.Error(t, err)
 				if tt.errorContains != "" {
@@ -613,11 +613,11 @@ func createMockUserCreateCommand() *cobra.Command {
 // Test error handling and recovery
 func TestErrorHandlingIntegration(t *testing.T) {
 	tests := []struct {
-		name           string
-		operation      string
-		mockSetup      func(*MockSaltClient)
-		expectedPhase  string // Which phase should fail
-		expectedError  bool
+		name          string
+		operation     string
+		mockSetup     func(*MockSaltClient)
+		expectedPhase string // Which phase should fail
+		expectedError bool
 	}{
 		{
 			name:      "assessment failure - connectivity",

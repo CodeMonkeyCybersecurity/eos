@@ -142,7 +142,7 @@ func TestLoadWithDefaults(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
-	
+
 	// Write config with some values
 	configData := `
 database:
@@ -168,7 +168,7 @@ database:
 	// Check that file values override defaults
 	assert.Equal(t, "prod-host", Config.GetString("database.host"))
 	assert.Equal(t, 5432, Config.GetInt("database.port"))
-	
+
 	// Check that defaults are used for missing values
 	assert.Equal(t, "default-user", Config.GetString("database.user"))
 	assert.Equal(t, "default-pass", Config.GetString("database.password"))
@@ -262,7 +262,7 @@ func TestWatchConfig(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
-	
+
 	// Write initial config
 	initialData := "test_key: initial_value"
 	err := ioutil.WriteFile(configFile, []byte(initialData), 0644)
@@ -308,7 +308,7 @@ func TestGetConfigHelpers(t *testing.T) {
 		Config.Set("test.string", "value")
 		assert.Equal(t, "value", GetString("test.string", false))
 		assert.Equal(t, "", GetString("nonexistent", false))
-		
+
 		// Test required flag
 		assert.Panics(t, func() {
 			GetString("nonexistent", true)
@@ -328,7 +328,7 @@ func TestGetConfigHelpers(t *testing.T) {
 		Config.Set("test.bool", true)
 		Config.Set("test.int", 42)
 		Config.Set("test.slice", []string{"a", "b", "c"})
-		
+
 		assert.Equal(t, true, Config.GetBool("test.bool"))
 		assert.Equal(t, 42, Config.GetInt("test.int"))
 		assert.Equal(t, []string{"a", "b", "c"}, Config.GetStringSlice("test.slice"))
@@ -351,7 +351,7 @@ func TestRequiredConfig(t *testing.T) {
 		err = Require("missing.key")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing.key")
-		
+
 		// Test empty value
 		Config.Set("empty.key", "")
 		err = Require("empty.key")
@@ -360,12 +360,12 @@ func TestRequiredConfig(t *testing.T) {
 
 	t.Run("MustRequire", func(t *testing.T) {
 		Config.Set("test.key", "value")
-		
+
 		// Should not panic
 		assert.NotPanics(t, func() {
 			MustRequire("test.key")
 		})
-		
+
 		// Should panic
 		assert.Panics(t, func() {
 			MustRequire("missing.key")
@@ -387,7 +387,7 @@ func TestGetAllSettings(t *testing.T) {
 
 	settings := Config.AllSettings()
 	assert.NotNil(t, settings)
-	
+
 	// Check nested structure
 	app, ok := settings["app"].(map[string]interface{})
 	assert.True(t, ok)
@@ -471,7 +471,7 @@ func TestConcurrentAccess(t *testing.T) {
 // TestConfigPriority tests configuration source priority
 func TestConfigPriority(t *testing.T) {
 	t.Skip("Viper's environment binding behavior is complex and varies by version")
-	
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -552,7 +552,7 @@ func TestWatchAndHotReload(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
-	
+
 	// Write initial config
 	initialData := "test_key: initial_value"
 	err := ioutil.WriteFile(configFile, []byte(initialData), 0644)
@@ -579,7 +579,7 @@ func TestWatchAndHotReload(t *testing.T) {
 
 	// Wait for reload
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Note: File watching is filesystem-dependent and may not work in all test environments
 	// So we don't assert that reloadCalled is true
 }
@@ -593,7 +593,7 @@ func TestReload(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
-	
+
 	// Write initial config
 	initialData := "test_key: initial_value"
 	err := ioutil.WriteFile(configFile, []byte(initialData), 0644)

@@ -36,7 +36,7 @@ func WatchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 
 	// INTERVENE - Create and configure PostgreSQL listener
 	logger.Debug("Setting up PostgreSQL listener for real-time notifications")
-	
+
 	// Create a listener for PostgreSQL notifications
 	listener := pq.NewListener(connStr, 10*time.Second, time.Minute, func(ev pq.ListenerEventType, err error) {
 		if err != nil {
@@ -72,7 +72,7 @@ func WatchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 
 	// EVALUATE - Start monitoring loop
 	logger.Info("Real-time monitoring started successfully")
-	
+
 	for {
 		select {
 		case <-ctx.Done():

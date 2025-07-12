@@ -13,14 +13,14 @@ import (
 // Migrated from cmd/backup/schedule.go cronToOnCalendar
 func CronToOnCalendar(rc *eos_io.RuntimeContext, cron string) string {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Analyze the cron expression
 	logger.Debug("Assessing cron expression for conversion",
 		zap.String("cron", cron))
-	
+
 	// INTERVENE - Convert to OnCalendar format
 	logger.Debug("Converting cron to OnCalendar format")
-	
+
 	// Simple conversion for common patterns
 	switch cron {
 	case "0 0 * * *":
@@ -47,7 +47,7 @@ func CronToOnCalendar(rc *eos_io.RuntimeContext, cron string) string {
 				return onCalendar
 			}
 		}
-		
+
 		// EVALUATE - Fallback to daily
 		logger.Warn("Could not convert cron expression, falling back to daily",
 			zap.String("cron", cron))

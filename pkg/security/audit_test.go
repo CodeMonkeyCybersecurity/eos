@@ -271,7 +271,7 @@ func TestAuditEventValidation(t *testing.T) {
 
 		for _, event := range events {
 			score := calculateRiskScore(event)
-			
+
 			if score < 0 || score > 100 {
 				t.Errorf("Risk score should be 0-100, got %d for event %s", score, event.EventType)
 			}
@@ -283,7 +283,7 @@ func TestAuditEventValidation(t *testing.T) {
 
 	t.Run("timestamp handling", func(t *testing.T) {
 		now := time.Now()
-		
+
 		// Test with zero timestamp
 		event1 := AuditEvent{
 			EventType: "test",
@@ -294,7 +294,7 @@ func TestAuditEventValidation(t *testing.T) {
 		// Test with existing timestamp
 		event2 := AuditEvent{
 			EventType: "test",
-			Actor:     "user", 
+			Actor:     "user",
 			Action:    "test",
 			Timestamp: now,
 		}
@@ -379,7 +379,7 @@ func TestAuditEventSecurity(t *testing.T) {
 
 		for _, path := range invalidPaths {
 			// Check for path traversal and injection
-			isDangerous := containsStringAudit(path, "..") || 
+			isDangerous := containsStringAudit(path, "..") ||
 				containsDangerousCharsAudit(path) ||
 				containsStringAudit(path, "/etc/")
 

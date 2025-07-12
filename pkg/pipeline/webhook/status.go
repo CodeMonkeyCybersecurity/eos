@@ -15,11 +15,11 @@ import (
 // Migrated from cmd/read/pipeline_webhook_status.go checkWebhookStatus
 func CheckWebhookStatus(rc *eos_io.RuntimeContext, verbose bool) *WebhookStatus {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare webhook status check
 	logger.Info("Assessing webhook deployment status",
 		zap.Bool("verbose", verbose))
-	
+
 	status := &WebhookStatus{
 		Timestamp:       time.Now(),
 		FilesPresent:    make(map[string]bool),
@@ -30,7 +30,7 @@ func CheckWebhookStatus(rc *eos_io.RuntimeContext, verbose bool) *WebhookStatus 
 
 	// INTERVENE - Check webhook deployment components
 	logger.Debug("Checking webhook files deployment")
-	
+
 	// Check if webhook files are deployed
 	integrationDir := "/var/ossec/integrations"
 	requiredFiles := []string{
@@ -60,12 +60,12 @@ func CheckWebhookStatus(rc *eos_io.RuntimeContext, verbose bool) *WebhookStatus 
 
 	// Check environment configuration
 	logger.Debug("Checking environment configuration")
-	
+
 	envFile := filepath.Join(integrationDir, ".env")
 	if _, err := os.Stat(envFile); err == nil {
 		status.ConfigPresent = true
 		logger.Debug("Environment file found", zap.String("file", envFile))
-		
+
 		// Check for required environment variables
 		status.EnvironmentVars["HOOK_URL"] = CheckEnvVar(rc, envFile, "HOOK_URL")
 		status.EnvironmentVars["WEBHOOK_TOKEN"] = CheckEnvVar(rc, envFile, "WEBHOOK_TOKEN")

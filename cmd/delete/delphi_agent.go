@@ -101,6 +101,7 @@ func uninstallMacOS(rc *eos_io.RuntimeContext) {
 		otelzap.Ctx(rc.Ctx).Warn("Uninstall script not found", zap.String("path", scriptPath))
 	}
 }
+
 // TODO
 func uninstallLinux(rc *eos_io.RuntimeContext) {
 	data, err := os.ReadFile("/etc/os-release")
@@ -121,6 +122,7 @@ func uninstallLinux(rc *eos_io.RuntimeContext) {
 		uninstallDeb(rc)
 	}
 }
+
 // TODO
 func uninstallDeb(rc *eos_io.RuntimeContext) {
 	otelzap.Ctx(rc.Ctx).Info("Uninstalling with apt-get purge...")
@@ -133,6 +135,7 @@ func uninstallDeb(rc *eos_io.RuntimeContext) {
 		otelzap.Ctx(rc.Ctx).Info("Wazuh agent uninstalled via apt-get")
 	}
 }
+
 // TODO
 func uninstallRpm(rc *eos_io.RuntimeContext) {
 	var manager string
@@ -157,6 +160,7 @@ func uninstallRpm(rc *eos_io.RuntimeContext) {
 		otelzap.Ctx(rc.Ctx).Info("Wazuh agent uninstalled via RPM-based manager")
 	}
 }
+
 // TODO
 func uninstallWindows(rc *eos_io.RuntimeContext) {
 	otelzap.Ctx(rc.Ctx).Info("Querying WMIC for Wazuh agent")

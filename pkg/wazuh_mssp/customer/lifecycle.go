@@ -424,7 +424,7 @@ func generateComponentCertificate(rc *eos_io.RuntimeContext, config *wazuh_mssp.
 	if err := execute.RunSimple(rc.Ctx, "openssl", "req", "-new",
 		"-key", keyPath,
 		"-out", csrPath,
-		"-subj", fmt.Sprintf("/C=US/ST=State/L=City/O=%s/CN=%s-%s", 
+		"-subj", fmt.Sprintf("/C=US/ST=State/L=City/O=%s/CN=%s-%s",
 			config.CompanyName, component, config.ID)); err != nil {
 		return fmt.Errorf("failed to generate CSR: %w", err)
 	}
@@ -446,7 +446,7 @@ func generateComponentCertificate(rc *eos_io.RuntimeContext, config *wazuh_mssp.
 
 func storeCertificatesInVault(rc *eos_io.RuntimeContext, config *wazuh_mssp.CustomerConfig, certDir string) error {
 	// Read certificates and store in Vault
-	certFiles := []string{"ca.pem", "ca-key.pem", "indexer.pem", "indexer-key.pem", 
+	certFiles := []string{"ca.pem", "ca-key.pem", "indexer.pem", "indexer-key.pem",
 		"server.pem", "server-key.pem", "dashboard.pem", "dashboard-key.pem"}
 
 	for _, certFile := range certFiles {
@@ -496,8 +496,8 @@ func allocateCustomerNetwork(rc *eos_io.RuntimeContext, config *wazuh_mssp.Custo
 	}
 
 	// Allocate subnet for customer
-	subnet := fmt.Sprintf("10.%d.%d.0/24", (vlanID/256), (vlanID%256))
-	
+	subnet := fmt.Sprintf("10.%d.%d.0/24", (vlanID / 256), (vlanID % 256))
+
 	// Store network configuration
 	networkData := map[string]interface{}{
 		"vlan_id":   vlanID,
@@ -910,7 +910,7 @@ func verifyCustomerScaling(rc *eos_io.RuntimeContext, config *wazuh_mssp.Custome
 func hasActiveConnections(rc *eos_io.RuntimeContext, customerID string) (bool, error) {
 	// Check if customer has active agent connections
 	// This would query the Wazuh API to check for connected agents
-	
+
 	// For now, return false (no active connections)
 	return false, nil
 }
@@ -1092,12 +1092,12 @@ func createCustomerBackup(rc *eos_io.RuntimeContext, config *wazuh_mssp.Customer
 
 	// Create backup manifest
 	manifest := map[string]interface{}{
-		"backup_id":    backupID,
-		"backup_type":  string(backupType),
-		"customer_id":  config.ID,
-		"created_at":   time.Now().Format(time.RFC3339),
-		"size_bytes":   0, // Would calculate actual size
-		"files_count":  0, // Would count files
+		"backup_id":   backupID,
+		"backup_type": string(backupType),
+		"customer_id": config.ID,
+		"created_at":  time.Now().Format(time.RFC3339),
+		"size_bytes":  0, // Would calculate actual size
+		"files_count": 0, // Would count files
 	}
 
 	manifestPath := fmt.Sprintf("wazuh-mssp/customers/%s/backups/%s", config.ID, backupID)
@@ -1135,7 +1135,7 @@ func backupVaultSecrets(rc *eos_io.RuntimeContext, config *wazuh_mssp.CustomerCo
 func backupWazuhData(rc *eos_io.RuntimeContext, config *wazuh_mssp.CustomerConfig, backupDir string) error {
 	// Create snapshots of Wazuh indexer data
 	// This would use the Wazuh API to create snapshots
-	
+
 	// For now, just create a placeholder
 	dataPath := fmt.Sprintf("%s/wazuh-data", backupDir)
 	return execute.RunSimple(rc.Ctx, "mkdir", "-p", dataPath)
@@ -1185,7 +1185,7 @@ func restoreCustomerFromBackup(rc *eos_io.RuntimeContext, customerID, backupID s
 	// Extract customer config
 	configInterface := configBackup["config"]
 	configJSON, _ := json.Marshal(configInterface)
-	
+
 	var config wazuh_mssp.CustomerConfig
 	if err := json.Unmarshal(configJSON, &config); err != nil {
 		return fmt.Errorf("failed to parse customer config: %w", err)
@@ -1228,7 +1228,7 @@ func restoreCustomerFromBackup(rc *eos_io.RuntimeContext, customerID, backupID s
 func restoreWazuhData(rc *eos_io.RuntimeContext, config *wazuh_mssp.CustomerConfig, backupDir string) error {
 	// Restore Wazuh indexer snapshots
 	// This would use the Wazuh API to restore from snapshots
-	
+
 	return nil
 }
 

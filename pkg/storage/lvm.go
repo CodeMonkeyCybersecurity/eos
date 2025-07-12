@@ -90,13 +90,13 @@ func ExtendLogicalVolume(rc *eos_io.RuntimeContext, lvPath string) error {
 	cmd := exec.CommandContext(ctx, "lvextend", "-l", "+100%FREE", lvPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("Failed to extend logical volume", 
-			zap.Error(err), 
+		logger.Error("Failed to extend logical volume",
+			zap.Error(err),
 			zap.String("output", string(output)))
 		return fmt.Errorf("failed to extend logical volume %s: %w", lvPath, err)
 	}
 
-	logger.Info("Logical volume extended successfully", 
+	logger.Info("Logical volume extended successfully",
 		zap.String("lv_path", lvPath),
 		zap.String("output", string(output)))
 	return nil
@@ -114,13 +114,13 @@ func ResizeExt4Filesystem(rc *eos_io.RuntimeContext, devicePath string) error {
 	cmd := exec.CommandContext(ctx, "resize2fs", devicePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("Failed to resize filesystem", 
-			zap.Error(err), 
+		logger.Error("Failed to resize filesystem",
+			zap.Error(err),
 			zap.String("output", string(output)))
 		return fmt.Errorf("failed to resize filesystem %s: %w", devicePath, err)
 	}
 
-	logger.Info("Filesystem resized successfully", 
+	logger.Info("Filesystem resized successfully",
 		zap.String("device_path", devicePath),
 		zap.String("output", string(output)))
 	return nil
@@ -138,13 +138,13 @@ func ResizeXfsFilesystem(rc *eos_io.RuntimeContext, mountpoint string) error {
 	cmd := exec.CommandContext(ctx, "xfs_growfs", mountpoint)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("Failed to resize XFS filesystem", 
-			zap.Error(err), 
+		logger.Error("Failed to resize XFS filesystem",
+			zap.Error(err),
 			zap.String("output", string(output)))
 		return fmt.Errorf("failed to resize XFS filesystem %s: %w", mountpoint, err)
 	}
 
-	logger.Info("XFS filesystem resized successfully", 
+	logger.Info("XFS filesystem resized successfully",
 		zap.String("mountpoint", mountpoint),
 		zap.String("output", string(output)))
 	return nil
@@ -181,7 +181,7 @@ func AutoResizeUbuntuLVM(rc *eos_io.RuntimeContext) error {
 
 	// Display updated information
 	logger.Info("Step 3: Displaying updated information")
-	
+
 	// Show disk usage
 	usage, err := GetDiskUsage(rc)
 	if err != nil {
@@ -233,13 +233,13 @@ func GetVolumeGroups(rc *eos_io.RuntimeContext) ([]VolumeGroup, error) {
 
 	var vgs []VolumeGroup
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		fields := strings.Split(line, ",")
 		if len(fields) >= 6 {
 			vg := VolumeGroup{
@@ -275,13 +275,13 @@ func GetLogicalVolumes(rc *eos_io.RuntimeContext) ([]LogicalVolume, error) {
 
 	var lvs []LogicalVolume
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		fields := strings.Split(line, ",")
 		if len(fields) >= 3 {
 			lv := LogicalVolume{

@@ -16,10 +16,10 @@ import (
 
 // UserExistenceCheck implements AIE pattern for checking user existence
 type UserExistenceCheck struct {
-	Username  string
-	Target    string
+	Username   string
+	Target     string
 	SaltClient saltstack.ClientInterface
-	Logger    otelzap.LoggerWithCtx
+	Logger     otelzap.LoggerWithCtx
 }
 
 // Assess checks if we can verify user existence
@@ -40,7 +40,7 @@ func (u *UserExistenceCheck) Assess(ctx context.Context) (*patterns.AssessmentRe
 	return &patterns.AssessmentResult{
 		CanProceed: true,
 		Prerequisites: map[string]bool{
-			"salt_connected": true,
+			"salt_connected":   true,
 			"target_reachable": true,
 		},
 	}, nil
@@ -84,15 +84,15 @@ func (u *UserExistenceCheck) Evaluate(ctx context.Context, intervention *pattern
 
 // UserCreationOperation implements AIE pattern for user creation
 type UserCreationOperation struct {
-	Username   string
-	Password   string
-	Groups     []string
-	Shell      string
-	HomeDir    string
-	Target     string
-	SaltClient saltstack.ClientInterface
+	Username    string
+	Password    string
+	Groups      []string
+	Shell       string
+	HomeDir     string
+	Target      string
+	SaltClient  saltstack.ClientInterface
 	VaultClient VaultClient
-	Logger     otelzap.LoggerWithCtx
+	Logger      otelzap.LoggerWithCtx
 }
 
 // Assess checks if user can be created
@@ -110,7 +110,7 @@ func (u *UserCreationOperation) Assess(ctx context.Context) (*patterns.Assessmen
 		SaltClient: u.SaltClient,
 		Logger:     u.Logger,
 	}
-	
+
 	executor := patterns.NewExecutor(u.Logger)
 	err := executor.Execute(ctx, existCheck, "user_existence_precheck")
 	if err != nil {
@@ -126,8 +126,8 @@ func (u *UserCreationOperation) Assess(ctx context.Context) (*patterns.Assessmen
 		if err != nil || output == "" {
 			prerequisites[fmt.Sprintf("group_%s_exists", group)] = false
 			return &patterns.AssessmentResult{
-				CanProceed: false,
-				Reason:     fmt.Sprintf("group %s does not exist", group),
+				CanProceed:    false,
+				Reason:        fmt.Sprintf("group %s does not exist", group),
 				Prerequisites: prerequisites,
 			}, nil
 		}
@@ -140,8 +140,8 @@ func (u *UserCreationOperation) Assess(ctx context.Context) (*patterns.Assessmen
 		if err != nil || !strings.Contains(output, "exists") {
 			prerequisites["shell_exists"] = false
 			return &patterns.AssessmentResult{
-				CanProceed: false,
-				Reason:     fmt.Sprintf("shell %s does not exist", u.Shell),
+				CanProceed:    false,
+				Reason:        fmt.Sprintf("shell %s does not exist", u.Shell),
 				Prerequisites: prerequisites,
 			}, nil
 		}
@@ -164,10 +164,10 @@ func (u *UserCreationOperation) Intervene(ctx context.Context, assessment *patte
 	pillar := map[string]interface{}{
 		"users": map[string]interface{}{
 			u.Username: map[string]interface{}{
-				"password": u.Password,
-				"groups":   u.Groups,
-				"shell":    u.Shell,
-				"home":     u.HomeDir,
+				"password":   u.Password,
+				"groups":     u.Groups,
+				"shell":      u.Shell,
+				"home":       u.HomeDir,
 				"createhome": true,
 			},
 		},
@@ -189,7 +189,7 @@ func (u *UserCreationOperation) Intervene(ctx context.Context, assessment *patte
 			"created":  "true",
 			"target":   u.Target,
 		}
-		
+
 		if err := u.VaultClient.Write(vaultPath, data); err != nil {
 			u.Logger.Warn("Failed to store password in Vault",
 				zap.String("username", u.Username),
@@ -242,7 +242,7 @@ func (u *UserCreationOperation) Evaluate(ctx context.Context, intervention *patt
 
 	// Verify groups
 	for _, group := range u.Groups {
-		groupCheck, _ := u.SaltClient.CmdRun(ctx, u.Target, 
+		groupCheck, _ := u.SaltClient.CmdRun(ctx, u.Target,
 			fmt.Sprintf("groups %s | grep -q %s && echo yes || echo no", u.Username, group))
 		if strings.TrimSpace(groupCheck) == "yes" {
 			validations[fmt.Sprintf("group_%s", group)] = patterns.ValidationResult{
@@ -299,7 +299,7 @@ func GetSystemUsers(ctx context.Context, saltClient saltstack.ClientInterface, t
 	logger.Info("Getting system users",
 		zap.String("target", target))
 
-	output, err := saltClient.CmdRun(ctx, target, 
+	output, err := saltClient.CmdRun(ctx, target,
 		"getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 { print $1 }'")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %w", err)
@@ -335,7 +335,7 @@ func (p *PasswordUpdateOperation) Assess(ctx context.Context) (*patterns.Assessm
 		SaltClient: p.SaltClient,
 		Logger:     p.Logger,
 	}
-	
+
 	executor := patterns.NewExecutor(p.Logger)
 	if err := executor.Execute(ctx, existCheck, "user_existence_check"); err != nil {
 		return &patterns.AssessmentResult{
@@ -375,7 +375,7 @@ func (p *PasswordUpdateOperation) Intervene(ctx context.Context, assessment *pat
 			"updated":  "true",
 			"target":   p.Target,
 		}
-		
+
 		if err := p.VaultClient.Write(vaultPath, data); err != nil {
 			p.Logger.Warn("Failed to update password in Vault",
 				zap.String("username", p.Username),
@@ -429,7 +429,7 @@ func (d *UserDeletionOperation) Assess(ctx context.Context) (*patterns.Assessmen
 		SaltClient: d.SaltClient,
 		Logger:     d.Logger,
 	}
-	
+
 	executor := patterns.NewExecutor(d.Logger)
 	if err := executor.Execute(ctx, existCheck, "user_existence_check"); err != nil {
 		return &patterns.AssessmentResult{
@@ -450,7 +450,7 @@ func (d *UserDeletionOperation) Assess(ctx context.Context) (*patterns.Assessmen
 	return &patterns.AssessmentResult{
 		CanProceed: true,
 		Prerequisites: map[string]bool{
-			"user_exists":      true,
+			"user_exists":     true,
 			"no_active_procs": true,
 		},
 	}, nil
@@ -517,7 +517,7 @@ func (d *UserDeletionOperation) Evaluate(ctx context.Context, intervention *patt
 
 	// Verify home directory if requested
 	if d.RemoveHome {
-		homeCheck, _ := d.SaltClient.CmdRun(ctx, d.Target, 
+		homeCheck, _ := d.SaltClient.CmdRun(ctx, d.Target,
 			fmt.Sprintf("test -d /home/%s && echo exists || echo removed", d.Username))
 		if strings.TrimSpace(homeCheck) == "removed" {
 			validations["home_removed"] = patterns.ValidationResult{
@@ -538,4 +538,3 @@ func (d *UserDeletionOperation) Evaluate(ctx context.Context, intervention *patt
 		Validations: validations,
 	}, nil
 }
-

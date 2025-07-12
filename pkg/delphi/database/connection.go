@@ -24,12 +24,12 @@ type ConnectionConfig struct {
 	Password string
 	SSLMode  string
 	// Dynamic credentials info
-	LeaseID    string    `json:"lease_id,omitempty"`
-	LeaseTTL   int       `json:"lease_duration,omitempty"`
-	Renewable  bool      `json:"renewable,omitempty"`
-	CreatedAt  time.Time `json:"created_at,omitempty"`
-	ExpiresAt  time.Time `json:"expires_at,omitempty"`
-	IsDynamic  bool      `json:"is_dynamic"`
+	LeaseID   string    `json:"lease_id,omitempty"`
+	LeaseTTL  int       `json:"lease_duration,omitempty"`
+	Renewable bool      `json:"renewable,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	ExpiresAt time.Time `json:"expires_at,omitempty"`
+	IsDynamic bool      `json:"is_dynamic"`
 }
 
 // GetConnectionFromVault retrieves database connection details from Vault
@@ -76,19 +76,19 @@ func GetConnectionFromVault(rc *eos_io.RuntimeContext) (*ConnectionConfig, error
 // getDynamicCredentials requests dynamic PostgreSQL credentials from Vault's database secrets engine
 func getDynamicCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (*ConnectionConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Get database connection info (static part)
 	baseConfig, err := getDatabaseConfig(rc, facade)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database configuration: %w", err)
 	}
-	
+
 	// Request dynamic credentials from Vault database engine
-	logger.Info("Requesting dynamic database credentials", 
+	logger.Info("Requesting dynamic database credentials",
 		zap.String("vault_role", "delphi-readonly"))
-	
+
 	secretStore := facade.GetSecretStore()
-	
+
 	// Request dynamic credentials using the database secrets engine
 	// Path format: database/creds/{role_name}
 	credSecret, err := secretStore.Get(rc.Ctx, "database/creds/delphi-readonly")
@@ -110,7 +110,7 @@ func getDynamicCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacad
 	// For the dynamic credentials, we need to parse additional metadata
 	// This is a simplified version - in reality, Vault's database engine returns
 	// both username and password along with lease information
-	
+
 	// Try to get the password from the secret (vault typically returns both)
 	passwordSecret, err := secretStore.Get(rc.Ctx, "database/creds/delphi-readonly/password")
 	if err != nil {
@@ -133,7 +133,7 @@ func getDynamicCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacad
 // getStaticCredentials retrieves static database credentials (fallback method)
 func getStaticCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (*ConnectionConfig, error) {
 	secretStore := facade.GetSecretStore()
-	
+
 	// Retrieve database connection details from Vault
 	config := &ConnectionConfig{
 		SSLMode:   "disable", // Default
@@ -179,7 +179,7 @@ func getStaticCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade
 // getDatabaseConfig retrieves static database connection parameters (host, port, database name)
 func getDatabaseConfig(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (*ConnectionConfig, error) {
 	secretStore := facade.GetSecretStore()
-	
+
 	config := &ConnectionConfig{
 		SSLMode: "disable", // Default
 	}
@@ -265,7 +265,7 @@ func Connect(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 
 	// Create connection string
 	connStr := config.ToConnectionString()
-	
+
 	logger.Info("Connecting to PostgreSQL database",
 		zap.String("host", config.Host),
 		zap.String("port", config.Port),
@@ -394,12 +394,12 @@ func (c *ConnectionConfig) ShouldRenew() bool {
 	if !c.IsDynamic || !c.Renewable {
 		return false
 	}
-	
+
 	// Renew when 75% of the lease time has elapsed
 	totalTTL := time.Duration(c.LeaseTTL) * time.Second
 	renewThreshold := totalTTL * 75 / 100
 	elapsed := time.Since(c.CreatedAt)
-	
+
 	return elapsed >= renewThreshold
 }
 
@@ -407,11 +407,11 @@ func (c *ConnectionConfig) ShouldRenew() bool {
 func ParsePGDSN(dsn string) (*ConnectionConfig, error) {
 	// This is a simplified parser - in production you might want to use a proper DSN parser
 	// For now, we'll assume the format is: postgres://username:password@host:port/database?options
-	
+
 	// TODO: Implement proper DSN parsing if needed
 	return &ConnectionConfig{
 		Host:     "localhost",
-		Port:     "5432", 
+		Port:     "5432",
 		Database: "delphi",
 		Username: "delphi",
 		Password: "",

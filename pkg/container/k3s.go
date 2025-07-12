@@ -293,7 +293,7 @@ func startK3sAgent(rc *eos_io.RuntimeContext, options *K3sInstallOptions) error 
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("K3S_URL=%s", options.ServerURL))
 	env = append(env, fmt.Sprintf("K3S_TOKEN=%s", options.Token))
-	
+
 	// Convert args to environment variable for K3s installer
 	if len(args) > 1 { // Skip the first "agent" argument
 		argsStr := strings.Join(args[1:], " ")

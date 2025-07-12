@@ -45,27 +45,27 @@ type DashboardModule interface {
 	Name() string
 	Type() ModuleType
 	Description() string
-	
+
 	// Bubble Tea lifecycle
 	Init() tea.Cmd
 	Update(tea.Msg) (DashboardModule, tea.Cmd)
 	View() string
-	
+
 	// Navigation and keyboard controls
 	KeyMap() []key.Binding
 	ShortHelp() []key.Binding
 	FullHelp() [][]key.Binding
-	
+
 	// Module lifecycle
-	OnEnter() tea.Cmd   // Called when module becomes active
-	OnExit() tea.Cmd    // Called when leaving module
+	OnEnter() tea.Cmd // Called when module becomes active
+	OnExit() tea.Cmd  // Called when leaving module
 	OnResize(width, height int)
-	
+
 	// Status and health
 	IsHealthy() bool
 	GetStatus() string
 	GetLastError() error
-	
+
 	// Data refresh
 	Refresh() tea.Cmd
 	CanRefresh() bool
@@ -172,7 +172,7 @@ func NewModuleRegistry() *ModuleRegistry {
 func (r *ModuleRegistry) Register(module DashboardModule) {
 	moduleType := module.Type()
 	r.modules[moduleType] = module
-	
+
 	// Add to order if not already present
 	for _, existing := range r.order {
 		if existing == moduleType {

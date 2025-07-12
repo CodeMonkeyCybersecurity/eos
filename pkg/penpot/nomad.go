@@ -306,7 +306,7 @@ func (m *Manager) createPenpotExporterTask() *api.Task {
 			"ports": []string{"exporter"},
 		},
 		Env: map[string]string{
-			"PENPOT_PUBLIC_URI":       fmt.Sprintf("http://localhost:%d", m.config.Port),
+			"PENPOT_PUBLIC_URI":           fmt.Sprintf("http://localhost:%d", m.config.Port),
 			"PENPOT_EXPORTER_CONCURRENCY": "2",
 		},
 		Resources: &api.Resources{
@@ -340,19 +340,19 @@ func (m *Manager) createPenpotExporterTask() *api.Task {
 // buildFeatureFlags builds the feature flags string based on configuration
 func (m *Manager) buildFeatureFlags() string {
 	var flags []string
-	
+
 	if m.config.EnableRegistration {
 		flags = append(flags, "enable-registration")
 	}
-	
+
 	if m.config.EnableLogin {
 		flags = append(flags, "enable-login")
 	}
-	
+
 	if m.config.DisableEmailVerif {
 		flags = append(flags, "disable-email-verification")
 	}
-	
+
 	// Join flags with spaces
 	result := ""
 	for i, flag := range flags {
@@ -361,7 +361,7 @@ func (m *Manager) buildFeatureFlags() string {
 		}
 		result += flag
 	}
-	
+
 	return result
 }
 

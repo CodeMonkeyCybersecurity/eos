@@ -49,7 +49,7 @@ func NewClient(rc *eos_io.RuntimeContext, repoName string) (*Client, error) {
 // RunRestic executes restic with proper environment and logging
 func (c *Client) RunRestic(args ...string) ([]byte, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	// Get password from Vault
 	password, err := c.getRepositoryPassword()
 	if err != nil {
@@ -58,17 +58,17 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 
 	// Build command
 	cmd := exec.CommandContext(c.rc.Ctx, "restic", args...)
-	
+
 	// Set environment
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("RESTIC_REPOSITORY=%s", c.repository.URL))
 	env = append(env, fmt.Sprintf("RESTIC_PASSWORD=%s", password))
-	
+
 	// Add backend-specific environment variables
 	for k, v := range c.repository.Environment {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
-	
+
 	cmd.Env = env
 
 	// Log command execution (without password)
@@ -103,7 +103,7 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 // getRepositoryPassword retrieves password from Vault
 func (c *Client) getRepositoryPassword() (string, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	vaultPath := fmt.Sprintf("eos/backup/repositories/%s", c.repository.Name)
 	logger.Info("Retrieving repository password from Vault",
 		zap.String("path", vaultPath))
@@ -113,12 +113,12 @@ func (c *Client) getRepositoryPassword() (string, error) {
 		// Fall back to local password file if Vault unavailable
 		logger.Warn("Vault unavailable, checking local password file",
 			zap.Error(err))
-		
+
 		passwordFile := fmt.Sprintf("/var/lib/eos/secrets/backup/%s.password", c.repository.Name)
 		if data, err := os.ReadFile(passwordFile); err == nil {
 			return strings.TrimSpace(string(data)), nil
 		}
-		
+
 		return "", fmt.Errorf("vault unavailable and no local password found")
 	}
 
@@ -130,7 +130,7 @@ func (c *Client) getRepositoryPassword() (string, error) {
 	if secret == nil || secret.Data == nil {
 		return "", fmt.Errorf("no secret found at %s", vaultPath)
 	}
-	
+
 	password, ok := secret.Data["password"].(string)
 	if !ok {
 		return "", fmt.Errorf("invalid password format in vault")
@@ -163,7 +163,7 @@ func (c *Client) InitRepository() error {
 // Backup performs a backup using the specified profile
 func (c *Client) Backup(profileName string) error {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	profile, exists := c.config.Profiles[profileName]
 	if !exists {
 		return fmt.Errorf("profile %q not found", profileName)
@@ -176,28 +176,28 @@ func (c *Client) Backup(profileName string) error {
 
 	// Build backup command
 	args := []string{"backup"}
-	
+
 	// Add paths
 	args = append(args, profile.Paths...)
-	
+
 	// Add excludes
 	for _, exclude := range profile.Excludes {
 		args = append(args, "--exclude", exclude)
 	}
-	
+
 	// Add tags
 	for _, tag := range profile.Tags {
 		args = append(args, "--tag", tag)
 	}
-	
+
 	// Add host if specified
 	if profile.Host != "" {
 		args = append(args, "--host", profile.Host)
 	}
-	
+
 	// Progress reporting
 	args = append(args, "--json")
-	
+
 	// Run backup with progress monitoring
 	if err := c.runBackupWithProgress(args); err != nil {
 		return fmt.Errorf("backup failed: %w", err)
@@ -217,15 +217,15 @@ func (c *Client) Backup(profileName string) error {
 // runBackupWithProgress executes backup with JSON progress parsing
 func (c *Client) runBackupWithProgress(args []string) error {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	cmd := exec.CommandContext(c.rc.Ctx, "restic", args...)
-	
+
 	// Set environment
 	password, err := c.getRepositoryPassword()
 	if err != nil {
 		return err
 	}
-	
+
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("RESTIC_REPOSITORY=%s", c.repository.URL))
 	env = append(env, fmt.Sprintf("RESTIC_PASSWORD=%s", password))
@@ -265,7 +265,7 @@ func (c *Client) runBackupWithProgress(args []string) error {
 	// Parse JSON progress
 	decoder := json.NewDecoder(stdout)
 	var lastProgress time.Time
-	
+
 	for {
 		var msg map[string]interface{}
 		if err := decoder.Decode(&msg); err != nil {
@@ -273,7 +273,7 @@ func (c *Client) runBackupWithProgress(args []string) error {
 		}
 
 		msgType, _ := msg["message_type"].(string)
-		
+
 		switch msgType {
 		case "status":
 			// Throttle progress updates to once per second
@@ -281,15 +281,15 @@ func (c *Client) runBackupWithProgress(args []string) error {
 				percentDone, _ := msg["percent_done"].(float64)
 				totalFiles, _ := msg["total_files"].(float64)
 				totalBytes, _ := msg["total_bytes"].(float64)
-				
+
 				logger.Info("Backup progress",
 					zap.Float64("percent", percentDone*100),
 					zap.Int("total_files", int(totalFiles)),
 					zap.String("total_size", humanizeBytes(int64(totalBytes))))
-				
+
 				lastProgress = time.Now()
 			}
-			
+
 		case "summary":
 			filesNew, _ := msg["files_new"].(float64)
 			filesChanged, _ := msg["files_changed"].(float64)
@@ -297,7 +297,7 @@ func (c *Client) runBackupWithProgress(args []string) error {
 			dataSizeInRepo, _ := msg["data_size_in_repo"].(float64)
 			totalDuration, _ := msg["total_duration"].(float64)
 			snapshotID, _ := msg["snapshot_id"].(string)
-			
+
 			logger.Info("Backup completed",
 				zap.String("snapshot_id", snapshotID),
 				zap.Int("files_new", int(filesNew)),
@@ -305,12 +305,12 @@ func (c *Client) runBackupWithProgress(args []string) error {
 				zap.Int("files_unmodified", int(filesUnmodified)),
 				zap.String("repo_size", humanizeBytes(int64(dataSizeInRepo))),
 				zap.Duration("duration", time.Duration(totalDuration)*time.Second))
-				
+
 		case "error":
 			item, _ := msg["item"].(string)
 			during, _ := msg["during"].(string)
 			errMsg, _ := msg["error"].(string)
-			
+
 			logger.Error("Backup error",
 				zap.String("item", item),
 				zap.String("during", during),
@@ -386,9 +386,9 @@ func (c *Client) Verify(snapshotID string) error {
 // applyRetention applies retention policy to the repository
 func (c *Client) applyRetention(profile *Profile) error {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	args := []string{"forget", "--prune"}
-	
+
 	if profile.Retention.KeepLast > 0 {
 		args = append(args, "--keep-last", fmt.Sprintf("%d", profile.Retention.KeepLast))
 	}
@@ -404,7 +404,7 @@ func (c *Client) applyRetention(profile *Profile) error {
 	if profile.Retention.KeepYearly > 0 {
 		args = append(args, "--keep-yearly", fmt.Sprintf("%d", profile.Retention.KeepYearly))
 	}
-	
+
 	// Add tags from profile
 	for _, tag := range profile.Tags {
 		args = append(args, "--tag", tag)

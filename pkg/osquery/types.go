@@ -33,7 +33,7 @@ type PlatformConfig struct {
 
 // OsqueryVersion represents osquery version information
 type OsqueryVersion struct {
-	Version string
-	Build   string
+	Version  string
+	Build    string
 	Platform string
 }

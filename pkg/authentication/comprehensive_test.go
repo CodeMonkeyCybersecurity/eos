@@ -709,7 +709,7 @@ func TestSessionManagement(t *testing.T) {
 	t.Run("create session", func(t *testing.T) {
 		userID := "user123"
 		session, err := CreateSession(userID)
-		
+
 		assert.NoError(t, err)
 		assert.NotNil(t, session)
 		assert.NotEmpty(t, session.ID)

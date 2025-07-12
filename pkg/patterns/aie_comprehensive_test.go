@@ -106,14 +106,14 @@ func TestExecutor_SuccessfulExecution(t *testing.T) {
 // TestExecutor_AssessmentFailure tests failure during assessment phase
 func TestExecutor_AssessmentFailure(t *testing.T) {
 	tests := []struct {
-		name           string
-		assessment     *AssessmentResult
-		assessmentErr  error
-		expectedError  string
+		name          string
+		assessment    *AssessmentResult
+		assessmentErr error
+		expectedError string
 	}{
 		{
-			name: "assessment_error",
-			assessment: nil,
+			name:          "assessment_error",
+			assessment:    nil,
 			assessmentErr: errors.New("assessment failed"),
 			expectedError: "assessment failed",
 		},
@@ -127,8 +127,8 @@ func TestExecutor_AssessmentFailure(t *testing.T) {
 			expectedError: "assessment failed: prerequisites not met",
 		},
 		{
-			name: "nil_assessment_result",
-			assessment: nil,
+			name:          "nil_assessment_result",
+			assessment:    nil,
 			assessmentErr: nil,
 			expectedError: "assessment returned nil result",
 		},
@@ -161,10 +161,10 @@ func TestExecutor_InterventionFailure(t *testing.T) {
 		expectedError   string
 	}{
 		{
-			name: "intervention_error",
-			intervention: nil,
+			name:            "intervention_error",
+			intervention:    nil,
 			interventionErr: errors.New("intervention failed"),
-			expectedError: "intervention failed",
+			expectedError:   "intervention failed",
 		},
 		{
 			name: "intervention_unsuccessful",
@@ -173,13 +173,13 @@ func TestExecutor_InterventionFailure(t *testing.T) {
 				Message: "operation failed",
 			},
 			interventionErr: nil,
-			expectedError: "intervention failed: operation failed",
+			expectedError:   "intervention failed: operation failed",
 		},
 		{
-			name: "nil_intervention_result",
-			intervention: nil,
+			name:            "nil_intervention_result",
+			intervention:    nil,
 			interventionErr: nil,
-			expectedError: "intervention returned nil result",
+			expectedError:   "intervention returned nil result",
 		},
 	}
 
@@ -210,14 +210,14 @@ func TestExecutor_InterventionFailure(t *testing.T) {
 // TestExecutor_EvaluationFailure tests failure during evaluation phase
 func TestExecutor_EvaluationFailure(t *testing.T) {
 	tests := []struct {
-		name           string
-		evaluation     *EvaluationResult
-		evaluationErr  error
-		expectedError  string
+		name          string
+		evaluation    *EvaluationResult
+		evaluationErr error
+		expectedError string
 	}{
 		{
-			name: "evaluation_error",
-			evaluation: nil,
+			name:          "evaluation_error",
+			evaluation:    nil,
 			evaluationErr: errors.New("evaluation failed"),
 			expectedError: "evaluation failed",
 		},
@@ -231,8 +231,8 @@ func TestExecutor_EvaluationFailure(t *testing.T) {
 			expectedError: "evaluation failed: validation failed",
 		},
 		{
-			name: "nil_evaluation_result",
-			evaluation: nil,
+			name:          "nil_evaluation_result",
+			evaluation:    nil,
 			evaluationErr: nil,
 			expectedError: "evaluation returned nil result",
 		},
@@ -404,7 +404,7 @@ func TestInterventionResult_ChangeTracking(t *testing.T) {
 			},
 		},
 		RollbackData: map[string]interface{}{
-			"backup_path": "/tmp/backup",
+			"backup_path":   "/tmp/backup",
 			"service_state": "running",
 		},
 	}
@@ -482,11 +482,11 @@ func TestExecutor_RollbackScenario(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "evaluation failed: validation failed")
-	
+
 	// Verify that rollback data was available
 	assert.NotNil(t, intervention.RollbackData)
 	assert.True(t, evaluation.NeedsRollback)
-	
+
 	mockOp.AssertExpectations(t)
 }
 
@@ -580,7 +580,7 @@ func BenchmarkExecutor_SuccessfulExecution(b *testing.B) {
 	executor := NewExecutor(logger)
 
 	assessment := &AssessmentResult{
-		CanProceed: true,
+		CanProceed:    true,
 		Prerequisites: map[string]bool{"req1": true},
 	}
 

@@ -26,7 +26,7 @@ func NewSchemaValidator(logger *zap.Logger) config.Validator {
 func (v *SchemaValidator) ValidateSchema(ctx context.Context, data interface{}, schema config.Schema) error {
 	// Basic validation implementation
 	// In a real implementation, you might use a proper JSON schema validator
-	
+
 	if err := v.ValidateRequired(ctx, data, schema.Required); err != nil {
 		return err
 	}

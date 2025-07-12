@@ -50,24 +50,24 @@ var StandardWorkerConfigs = map[string]WorkerConfig{
 
 // ChannelChange represents a change made to a worker file
 type ChannelChange struct {
-	File        string    `json:"file"`
-	Type        string    `json:"type"` // listen_channel, notify_channel, pg_notify, listen_statement
-	OldValue    string    `json:"old_value"`
-	NewValue    string    `json:"new_value"`
-	LineNumber  int       `json:"line_number,omitempty"`
-	Timestamp   time.Time `json:"timestamp"`
+	File       string    `json:"file"`
+	Type       string    `json:"type"` // listen_channel, notify_channel, pg_notify, listen_statement
+	OldValue   string    `json:"old_value"`
+	NewValue   string    `json:"new_value"`
+	LineNumber int       `json:"line_number,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 // StandardizationResult contains the results of channel standardization
 type StandardizationResult struct {
-	Success       bool            `json:"success"`
-	Timestamp     time.Time       `json:"timestamp"`
-	WorkersDir    string          `json:"workers_dir"`
-	Changes       []ChannelChange `json:"changes"`
-	Errors        []string        `json:"errors"`
-	FilesUpdated  []string        `json:"files_updated"`
-	FilesSkipped  []string        `json:"files_skipped"`
-	BackupsCreated []string       `json:"backups_created"`
+	Success        bool            `json:"success"`
+	Timestamp      time.Time       `json:"timestamp"`
+	WorkersDir     string          `json:"workers_dir"`
+	Changes        []ChannelChange `json:"changes"`
+	Errors         []string        `json:"errors"`
+	FilesUpdated   []string        `json:"files_updated"`
+	FilesSkipped   []string        `json:"files_skipped"`
+	BackupsCreated []string        `json:"backups_created"`
 }
 
 // ChannelPattern represents a regex pattern for finding and replacing channel references

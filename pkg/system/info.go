@@ -16,19 +16,19 @@ import (
 
 // SystemInfo represents collected system information
 type SystemInfo struct {
-	Timestamp        time.Time
-	Processes        string
-	Users            []string
-	TempFiles        string
+	Timestamp         time.Time
+	Processes         string
+	Users             []string
+	TempFiles         string
 	InstalledPackages string
-	SnapPackages     string
-	DiskUsage        string
-	BlockDevices     string
-	BashHistory      string
-	CrontabSystem    string
-	CrontabUser      string
-	DmesgOutput      string
-	NetworkInfo      string
+	SnapPackages      string
+	DiskUsage         string
+	BlockDevices      string
+	BashHistory       string
+	CrontabSystem     string
+	CrontabUser       string
+	DmesgOutput       string
+	NetworkInfo       string
 }
 
 // CollectSystemInfo gathers comprehensive system information for diagnostics
@@ -249,7 +249,7 @@ func collectBashHistory(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	}
 
 	historyFile := fmt.Sprintf("%s/.bash_history", homeDir)
-	
+
 	// Check if history file exists and is readable
 	if _, err := os.Stat(historyFile); os.IsNotExist(err) {
 		logger.Info("Bash history file does not exist")
@@ -380,7 +380,7 @@ func DisplaySystemInfo(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 
 	for _, section := range sections {
 		logger.Info(fmt.Sprintf("\n=== %s ===", section.title))
-		
+
 		if section.content == "" {
 			logger.Info("No data available")
 		} else {

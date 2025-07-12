@@ -45,7 +45,7 @@ func init() {
 	CreateWazuhCCSCmd.Flags().String("environment", "production", "Environment (dev/staging/production)")
 	CreateWazuhCCSCmd.Flags().String("datacenter", "dc1", "Datacenter name")
 	CreateWazuhCCSCmd.Flags().String("domain", "", "Platform domain (required)")
-	
+
 	// Network configuration
 	CreateWazuhCCSCmd.Flags().String("platform-cidr", "10.0.0.0/16", "Platform network CIDR")
 	CreateWazuhCCSCmd.Flags().String("customer-cidr", "10.100.0.0/16", "Customer network CIDR")

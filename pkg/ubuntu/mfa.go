@@ -262,7 +262,6 @@ func createMFABackupScript(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-
 // disableMFAFunction removes MFA configuration and restores original PAM settings
 func disableMFAFunction(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)

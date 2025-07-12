@@ -22,11 +22,11 @@ func TestSystemConfigManagerCreation(t *testing.T) {
 
 func TestSystemConfigManagerRegistration(t *testing.T) {
 	scm := NewSystemConfigManager()
-	
+
 	// Create a test runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rc := eos_io.NewContext(ctx, "test")
 
 	// Create a test manager
@@ -66,7 +66,7 @@ func TestSystemConfigManagerUnregisteredType(t *testing.T) {
 
 func TestListAvailableConfigurations(t *testing.T) {
 	scm := NewSystemConfigManager()
-	
+
 	// Initially should be empty
 	configs := scm.ListAvailableConfigurations()
 	if len(configs) != 0 {
@@ -76,7 +76,7 @@ func TestListAvailableConfigurations(t *testing.T) {
 	// Create test runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rc := eos_io.NewContext(ctx, "test")
 
 	// Register a manager

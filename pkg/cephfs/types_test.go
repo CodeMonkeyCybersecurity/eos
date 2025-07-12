@@ -164,7 +164,7 @@ func TestGetCephMGRPort(t *testing.T) {
 	if port <= 0 {
 		t.Errorf("GetCephMGRPort() returned invalid port: %d", port)
 	}
-	
+
 	// Should return the expected port
 	if port != 8263 {
 		t.Errorf("GetCephMGRPort() = %d, want %d", port, 8263)

@@ -66,7 +66,7 @@ func TestUserExists(t *testing.T) {
 			}()
 
 			exists := UserExists(rc, tt.username)
-			
+
 			if tt.wantErr && exists {
 				t.Errorf("UserExists() = true, expected false for %s", tt.username)
 			}
@@ -119,7 +119,7 @@ func TestGetUserShell(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			shell, err := GetUserShell(rc, tt.username)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetUserShell() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -127,18 +127,18 @@ func TestGetUserShell(t *testing.T) {
 
 			if !tt.wantErr {
 				t.Logf("User %s shell: %s", tt.username, shell)
-				
+
 				// Validate shell path format
 				if shell == "" {
 					t.Error("Shell should not be empty for existing user")
 				}
-				
+
 				// Common shells
 				validShells := []string{
-					"/bin/bash", "/bin/sh", "/bin/zsh", "/bin/tcsh", 
+					"/bin/bash", "/bin/sh", "/bin/zsh", "/bin/tcsh",
 					"/bin/csh", "/bin/fish", "/usr/bin/bash", "/usr/bin/zsh",
 				}
-				
+
 				isValidShell := false
 				for _, validShell := range validShells {
 					if shell == validShell {
@@ -146,7 +146,7 @@ func TestGetUserShell(t *testing.T) {
 						break
 					}
 				}
-				
+
 				if !isValidShell {
 					t.Logf("Note: Shell %s is not in common shells list (might be valid)", shell)
 				}
@@ -158,11 +158,11 @@ func TestGetUserShell(t *testing.T) {
 func TestSecretsExist(t *testing.T) {
 	// Note: This test depends on the shared package configuration
 	// We'll test the behavior without modifying the actual secrets
-	
+
 	t.Run("secrets file check", func(t *testing.T) {
 		exists := SecretsExist()
 		t.Logf("Secrets file exists: %v", exists)
-		
+
 		// The function should not panic
 		// The actual return value depends on system state
 	})
@@ -171,7 +171,7 @@ func TestSecretsExist(t *testing.T) {
 func TestSetPassword_Validation(t *testing.T) {
 	// Note: We're testing input validation, not actual password setting
 	// to avoid modifying system state
-	
+
 	tests := []struct {
 		name     string
 		username string
@@ -265,13 +265,13 @@ func TestUserSecurity(t *testing.T) {
 				// Test UserExists with injection attempts
 				// The function should handle these safely (return false)
 				exists := UserExists(rc, username)
-				
+
 				// These should all return false (user doesn't exist)
 				// and shouldn't cause command injection
 				if exists {
 					t.Errorf("UserExists should return false for injection attempt: %s", username)
 				}
-				
+
 				t.Logf("Safely handled injection attempt: %s", username)
 			})
 		}
@@ -281,16 +281,16 @@ func TestUserSecurity(t *testing.T) {
 		// Test shell path validation
 		validShells := []string{
 			"/bin/bash",
-			"/bin/sh", 
+			"/bin/sh",
 			"/bin/zsh",
 			"/usr/bin/bash",
 		}
 
 		invalidShells := []string{
 			"",
-			"bash", // relative path
+			"bash",                // relative path
 			"/bin/bash; rm -rf /", // injection
-			"../../../bin/bash", // path traversal
+			"../../../bin/bash",   // path traversal
 		}
 
 		for _, shell := range validShells {
@@ -302,11 +302,11 @@ func TestUserSecurity(t *testing.T) {
 		}
 
 		for _, shell := range invalidShells {
-			hasIssue := shell == "" || 
-				!filepath.IsAbs(shell) || 
+			hasIssue := shell == "" ||
+				!filepath.IsAbs(shell) ||
 				containsStringUser(shell, ";") ||
 				containsStringUser(shell, "../")
-				
+
 			if hasIssue {
 				t.Logf("Correctly identified invalid shell: %s", shell)
 			} else {
@@ -324,7 +324,7 @@ func TestUserOperationsSafety(t *testing.T) {
 	t.Run("concurrent user operations", func(t *testing.T) {
 		// Test that user existence checks can be done concurrently safely
 		username := "root" // Should exist on most systems
-		
+
 		done := make(chan bool, 5)
 		for i := 0; i < 5; i++ {
 			go func() {
@@ -369,7 +369,7 @@ func TestUserOperationsSafety(t *testing.T) {
 
 				isValid := len(tt.username) > 0 && len(tt.username) <= 32
 				if isValid != tt.valid {
-					t.Errorf("Username length validation mismatch for %s (len=%d)", 
+					t.Errorf("Username length validation mismatch for %s (len=%d)",
 						tt.name, len(tt.username))
 				}
 			})

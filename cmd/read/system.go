@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	outputFile   string
@@ -21,6 +22,7 @@ var (
 	includeNet   bool
 	includeHist  bool
 )
+
 // ReadSystemCmd represents the read system command
 var ReadSystemCmd = &cobra.Command{
 	Use:   "system",

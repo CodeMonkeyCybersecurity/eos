@@ -431,7 +431,7 @@ func (h *Handler) respondJSON(w http.ResponseWriter, code int, data interface{})
 // respondError sends an error response
 func (h *Handler) respondError(w http.ResponseWriter, code int, message string, err error) {
 	logger := otelzap.Ctx(h.rc.Ctx)
-	
+
 	response := ErrorResponse{
 		Error: message,
 	}
@@ -449,7 +449,7 @@ func (h *Handler) respondError(w http.ResponseWriter, code int, message string, 
 				"error": err.Error(),
 			}
 		}
-		
+
 		logger.Error("API error",
 			zap.String("message", message),
 			zap.Error(err))

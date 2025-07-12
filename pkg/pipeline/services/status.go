@@ -13,16 +13,16 @@ import (
 // Migrated from cmd/read/pipeline_services.go getServiceStatus
 func GetServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (*ServiceStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare service status retrieval
 	logger.Info("Assessing service status retrieval",
 		zap.String("service", serviceName))
-	
+
 	status := &ServiceStatus{}
 
 	// INTERVENE - Gather service status information
 	logger.Debug("Gathering service status information")
-	
+
 	// Get service status
 	cmd := exec.Command("systemctl", "is-active", serviceName)
 	output, err := cmd.Output()

@@ -340,7 +340,7 @@ func TestConfigurationValidation(t *testing.T) {
 	t.Run("provider_validation", func(t *testing.T) {
 		// Test provider validation and defaults
 		validProviders := []string{"anthropic", "azure-openai"}
-		
+
 		for _, provider := range validProviders {
 			defaults := GetProviderDefaults(provider)
 			assert.Equal(t, provider, defaults.Provider)
@@ -357,11 +357,11 @@ func TestConfigurationValidation(t *testing.T) {
 	t.Run("url_validation", func(t *testing.T) {
 		// Test URL validation for security
 		testURLs := []string{
-			"https://api.anthropic.com/v1",              // Valid HTTPS
-			"http://localhost:8080",                     // Local HTTP (might be ok for dev)
-			"ftp://malicious.com/api",                   // Invalid protocol
-			"javascript:alert('xss')",                   // XSS attempt
-			"file:///etc/passwd",                        // File access attempt
+			"https://api.anthropic.com/v1", // Valid HTTPS
+			"http://localhost:8080",        // Local HTTP (might be ok for dev)
+			"ftp://malicious.com/api",      // Invalid protocol
+			"javascript:alert('xss')",      // XSS attempt
+			"file:///etc/passwd",           // File access attempt
 		}
 
 		for _, url := range testURLs {
@@ -371,7 +371,7 @@ func TestConfigurationValidation(t *testing.T) {
 
 			// In a real implementation, we might validate URLs
 			assert.NotEmpty(t, config.BaseURL)
-			
+
 			// Could implement URL validation here:
 			// - Ensure HTTPS for production
 			// - Block file:// and javascript: schemes
@@ -449,10 +449,10 @@ func TestConfigurationValidation(t *testing.T) {
 
 		// Test Azure endpoint validation
 		maliciousEndpoints := []string{
-			"http://malicious.com",           // Non-HTTPS
-			"javascript:alert('xss')",        // XSS attempt
-			"file:///etc/passwd",             // File access
-			"ldap://malicious.com",           // LDAP injection
+			"http://malicious.com",    // Non-HTTPS
+			"javascript:alert('xss')", // XSS attempt
+			"file:///etc/passwd",      // File access
+			"ldap://malicious.com",    // LDAP injection
 		}
 
 		for _, endpoint := range maliciousEndpoints {
@@ -506,10 +506,10 @@ func TestConfigurationUpdateSecurity(t *testing.T) {
 
 		// Test invalid type updates
 		invalidUpdates := map[string]any{
-			"provider":   123,        // Should be string
-			"max_tokens": "invalid",  // Should be int
-			"timeout":    "invalid",  // Should be int
-			"unknown":    "value",    // Unknown field
+			"provider":   123,       // Should be string
+			"max_tokens": "invalid", // Should be int
+			"timeout":    "invalid", // Should be int
+			"unknown":    "value",   // Unknown field
 		}
 
 		err := configManager.UpdateConfig(invalidUpdates)
@@ -529,11 +529,11 @@ func TestConfigurationUpdateSecurity(t *testing.T) {
 
 		// Test case-insensitive field names
 		caseInsensitiveUpdates := map[string]any{
-			"PROVIDER":    "anthropic",
-			"Api_Key":     "test-key",
-			"BASE_URL":    "https://api.example.com",
-			"MaxTokens":   1024,
-			"TIMEOUT":     45,
+			"PROVIDER":  "anthropic",
+			"Api_Key":   "test-key",
+			"BASE_URL":  "https://api.example.com",
+			"MaxTokens": 1024,
+			"TIMEOUT":   45,
 		}
 
 		err := configManager.UpdateConfig(caseInsensitiveUpdates)
@@ -555,12 +555,12 @@ func TestConfigurationUpdateSecurity(t *testing.T) {
 
 		// Test malicious configuration values
 		maliciousUpdates := map[string]any{
-			"provider":     "'; DROP TABLE config; --",
-			"api_key":      "<script>alert('xss')</script>",
-			"base_url":     "javascript:alert('xss')",
-			"model":        "../../../etc/passwd",
-			"max_tokens":   -999999,
-			"timeout":      0,
+			"provider":   "'; DROP TABLE config; --",
+			"api_key":    "<script>alert('xss')</script>",
+			"base_url":   "javascript:alert('xss')",
+			"model":      "../../../etc/passwd",
+			"max_tokens": -999999,
+			"timeout":    0,
 		}
 
 		err := configManager.UpdateConfig(maliciousUpdates)

@@ -49,7 +49,7 @@ LOGO=ubuntu-logo`
 	// Temporarily replace the /etc/os-release path in the function
 	// This is a bit of a hack but necessary for testing
 	originalOSRelease := "/etc/os-release"
-	
+
 	// Read the temporary file instead
 	data, err := os.ReadFile(tmpFile.Name())
 	if err != nil {
@@ -58,25 +58,25 @@ LOGO=ubuntu-logo`
 
 	// Test parsing the content manually
 	info := &OSReleaseInfo{}
-	
+
 	// Parse each line
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		
+
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		
+
 		// Remove quotes if present (handles both "value" and value formats)
 		value = strings.Trim(value, "\"'")
-		
+
 		switch key {
 		case "NAME":
 			info.Name = value
@@ -101,11 +101,11 @@ LOGO=ubuntu-logo`
 	if info.VersionID != "24.04" {
 		t.Errorf("Expected VERSION_ID=24.04, got %s", info.VersionID)
 	}
-	
+
 	if info.VersionCodename != "noble" {
 		t.Errorf("Expected VERSION_CODENAME=noble, got %s", info.VersionCodename)
 	}
-	
+
 	if info.ID != "ubuntu" {
 		t.Errorf("Expected ID=ubuntu, got %s", info.ID)
 	}
@@ -128,7 +128,7 @@ LOGO=ubuntu-logo`
 	}
 
 	t.Log("All tests passed!")
-	
+
 	// Avoid unused variable warning
 	_ = originalOSRelease
 }
@@ -159,7 +159,7 @@ func TestGetSaltRepoURL(t *testing.T) {
 	for _, test := range tests {
 		result := GetSaltRepoURL(test.version, test.codename)
 		if result != test.expected {
-			t.Errorf("GetSaltRepoURL(%s, %s) = %s, expected %s", 
+			t.Errorf("GetSaltRepoURL(%s, %s) = %s, expected %s",
 				test.version, test.codename, result, test.expected)
 		}
 	}

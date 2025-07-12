@@ -45,9 +45,9 @@ func TestPackageUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := PackageUpdate(rc, tt.Input.cron)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -93,9 +93,9 @@ func TestRunDnfWithRetry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := runDnfWithRetry(rc, tt.Input.pkgName)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -179,9 +179,9 @@ func TestRunAndLog(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := runAndLog(rc, tt.Input.cmd, tt.Input.shell, tt.Input.shellArg)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -202,11 +202,11 @@ func TestPackageUpdateSecurity(t *testing.T) {
 	// Test that PackageUpdate handles different OS platforms
 	// This is important for security to ensure no unintended command execution
 	originalGOOS := GetOSPlatform()
-	
+
 	// Function should handle all supported platforms safely
 	err := PackageUpdate(rc, false)
 	assert.Error(t, err) // Will error in test environment
-	
+
 	// Ensure original platform detection still works
 	assert.Equal(t, originalGOOS, GetOSPlatform())
 }
@@ -267,11 +267,11 @@ func TestRunAndLogSecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// runAndLog should execute the malicious command as-is
 			// Security should be handled by the caller or at a higher level
 			err := runAndLog(rc, tt.Input.maliciousCmd, "bash", "-c")
-			
+
 			// The function may succeed or fail, but shouldn't panic
 			// Command injection is possible with exec.Command as designed
 			_ = err
@@ -325,9 +325,9 @@ func TestRunDnfWithRetrySecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := runDnfWithRetry(rc, tt.Input.maliciousPkg)
-			
+
 			// Should handle malicious input safely
 			// dnf will treat the entire string as a package name argument
 			assert.Error(t, err) // Will error in test env without dnf
@@ -340,7 +340,7 @@ func BenchmarkPackageUpdate(b *testing.B) {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		PackageUpdate(rc, true) // Use cron mode to avoid actual package updates
@@ -351,7 +351,7 @@ func BenchmarkRunAndLog(b *testing.B) {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		runAndLog(rc, "echo 'benchmark'", "bash", "-c")

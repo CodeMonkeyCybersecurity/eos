@@ -10,25 +10,25 @@ import (
 // ParseSize parses size strings like "100G", "1T", "500M" to bytes
 func ParseSize(sizeStr string) (int64, error) {
 	sizeStr = strings.TrimSpace(strings.ToUpper(sizeStr))
-	
+
 	// Regular expression to match size format
 	re := regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*([KMGTPE]?)(?:I?B)?$`)
 	matches := re.FindStringSubmatch(sizeStr)
-	
+
 	if len(matches) != 3 {
 		return 0, fmt.Errorf("invalid size format: %s (expected format: 100G, 1.5T, etc.)", sizeStr)
 	}
-	
+
 	// Parse the numeric value
 	value, err := strconv.ParseFloat(matches[1], 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid numeric value: %s", matches[1])
 	}
-	
+
 	// Parse the unit
 	unit := matches[2]
 	var multiplier float64
-	
+
 	switch unit {
 	case "", "B":
 		multiplier = 1
@@ -47,18 +47,18 @@ func ParseSize(sizeStr string) (int64, error) {
 	default:
 		return 0, fmt.Errorf("invalid unit: %s", unit)
 	}
-	
+
 	bytes := int64(value * multiplier)
-	
+
 	// Validate size is within reasonable bounds
 	if bytes < MinVolumeSize {
 		return 0, fmt.Errorf("size too small: minimum is %s", FormatSize(MinVolumeSize))
 	}
-	
+
 	if bytes > MaxVolumeSize {
 		return 0, fmt.Errorf("size too large: maximum is %s", FormatSize(MaxVolumeSize))
 	}
-	
+
 	return bytes, nil
 }
 
@@ -71,7 +71,7 @@ func FormatSize(bytes int64) string {
 		TB = 1024 * GB
 		PB = 1024 * TB
 	)
-	
+
 	switch {
 	case bytes >= PB:
 		return fmt.Sprintf("%.2f PB", float64(bytes)/float64(PB))
@@ -137,15 +137,15 @@ func ValidateMountPath(path string) error {
 	if path == "" {
 		return nil // Empty path is valid (no mount)
 	}
-	
+
 	if !strings.HasPrefix(path, "/") {
 		return fmt.Errorf("mount path must be absolute: %s", path)
 	}
-	
+
 	if len(path) > MaxMountPathLength {
 		return fmt.Errorf("mount path too long: maximum %d characters", MaxMountPathLength)
 	}
-	
+
 	// Check for invalid characters
 	invalidChars := []string{"..", "//", " ", "\t", "\n", "\r"}
 	for _, char := range invalidChars {
@@ -153,7 +153,7 @@ func ValidateMountPath(path string) error {
 			return fmt.Errorf("mount path contains invalid characters: %s", path)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -162,42 +162,42 @@ func ValidateLabel(label string) error {
 	if label == "" {
 		return nil // Empty label is valid
 	}
-	
+
 	if len(label) > MaxLabelLength {
 		return fmt.Errorf("label too long: maximum %d characters", MaxLabelLength)
 	}
-	
+
 	// Check for valid characters (alphanumeric, dash, underscore)
 	validLabel := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !validLabel.MatchString(label) {
 		return fmt.Errorf("label contains invalid characters: %s", label)
 	}
-	
+
 	return nil
 }
 
 // GetStorageTypeFromDevice attempts to determine storage type from device path
 func GetStorageTypeFromDevice(device string) (StorageType, error) {
 	device = strings.ToLower(device)
-	
+
 	// LVM logical volumes
 	if strings.Contains(device, "/dev/mapper/") || strings.Contains(device, "/dev/") && strings.Count(device, "/") > 2 {
 		return StorageTypeLVM, nil
 	}
-	
+
 	// ZFS datasets
 	if strings.HasPrefix(device, "zfs:") || strings.Contains(device, "zpool") {
 		return StorageTypeZFS, nil
 	}
-	
+
 	// CephFS
 	if strings.Contains(device, "ceph") || strings.Contains(device, "rbd") {
 		return StorageTypeCephFS, nil
 	}
-	
+
 	// BTRFS (harder to detect from device alone)
 	// Would need to check filesystem type
-	
+
 	return "", fmt.Errorf("unable to determine storage type from device: %s", device)
 }
 
@@ -205,21 +205,21 @@ func GetStorageTypeFromDevice(device string) (StorageType, error) {
 func MergeStringSlices(a, b []string) []string {
 	seen := make(map[string]bool)
 	result := []string{}
-	
+
 	for _, s := range a {
 		if !seen[s] {
 			seen[s] = true
 			result = append(result, s)
 		}
 	}
-	
+
 	for _, s := range b {
 		if !seen[s] {
 			seen[s] = true
 			result = append(result, s)
 		}
 	}
-	
+
 	return result
 }
 
@@ -228,13 +228,13 @@ func ParseMountOptions(options string) []string {
 	if options == "" {
 		return []string{}
 	}
-	
+
 	// Split by comma and trim spaces
 	opts := strings.Split(options, ",")
 	for i := range opts {
 		opts[i] = strings.TrimSpace(opts[i])
 	}
-	
+
 	return opts
 }
 

@@ -88,6 +88,7 @@ func init() {
 	readStorageMetricsCmd.Flags().Bool("watch", false, "Continuously monitor metrics")
 	readStorageMetricsCmd.Flags().Duration("interval", 5*time.Second, "Update interval for watch mode")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displayMetrics(metrics []storage_monitor.IOMetrics) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -107,6 +108,7 @@ func displayMetrics(metrics []storage_monitor.IOMetrics) error {
 
 	return w.Flush()
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Duration) error {
 	ticker := time.NewTicker(interval)

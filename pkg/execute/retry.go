@@ -24,7 +24,7 @@ import (
 // RetryCommand retries execution with structured logging and proper error handling
 func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting command retry execution",
 		zap.String("command", name),
 		zap.Strings("args", args),
@@ -37,7 +37,7 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 			zap.Int("attempt", i),
 			zap.String("command", name),
 			zap.Strings("args", args))
-		
+
 		// Display attempt info to user via stderr
 		if _, err := fmt.Fprintf(os.Stderr, "[Attempt %d] %s %s\n", i, name, joinArgs(args)); err != nil {
 			logger.Warn("Failed to write attempt info to stderr", zap.Error(err))
@@ -54,7 +54,7 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 			logger.Info("Command attempt succeeded",
 				zap.Int("attempt", i),
 				zap.String("command", name))
-				
+
 			// Display success info to user via stderr
 			if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command succeeded\n", i); writeErr != nil {
 				logger.Warn("Failed to write success info to stderr", zap.Error(writeErr))
@@ -67,7 +67,7 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 			zap.Int("attempt", i),
 			zap.String("command", name),
 			zap.Error(err))
-		
+
 		// Display failure info to user via stderr
 		if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command failed: %v\n", i, err); writeErr != nil {
 			logger.Warn("Failed to write failure info to stderr", zap.Error(writeErr))
@@ -86,14 +86,14 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 		zap.String("command", name),
 		zap.Int("total_attempts", maxAttempts),
 		zap.Error(lastErr))
-	
+
 	return fmt.Errorf("command failed after %d attempts: %v", maxAttempts, lastErr)
 }
 
 // RetryCommandCaptureRefactored retries execution with output capture and structured logging
 func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting command retry execution with capture",
 		zap.String("command", name),
 		zap.Strings("args", args),
@@ -102,13 +102,13 @@ func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, d
 
 	var lastErr error
 	var output string
-	
+
 	for i := 1; i <= maxAttempts; i++ {
 		logger.Info("Executing command attempt with capture",
 			zap.Int("attempt", i),
 			zap.String("command", name),
 			zap.Strings("args", args))
-		
+
 		// Display attempt info to user via stderr
 		if _, err := fmt.Fprintf(os.Stderr, "[Capturing Attempt %d] %s %s\n", i, name, joinArgs(args)); err != nil {
 			logger.Warn("Failed to write attempt info to stderr", zap.Error(err))
@@ -121,7 +121,7 @@ func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, d
 
 		err := cmd.Run()
 		output = buf.String()
-		
+
 		if err == nil {
 			logger.Info("Command attempt with capture succeeded",
 				zap.Int("attempt", i),
@@ -136,7 +136,7 @@ func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, d
 			zap.String("command", name),
 			zap.Error(err),
 			zap.String("output", output))
-		
+
 		// Display failure info to user via stderr
 		if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command failed: %v\n", i, err); writeErr != nil {
 			logger.Warn("Failed to write failure info to stderr", zap.Error(writeErr))
@@ -155,6 +155,6 @@ func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, d
 		zap.String("command", name),
 		zap.Int("total_attempts", maxAttempts),
 		zap.Error(lastErr))
-	
+
 	return output, fmt.Errorf("command failed after %d attempts: %v", maxAttempts, lastErr)
 }

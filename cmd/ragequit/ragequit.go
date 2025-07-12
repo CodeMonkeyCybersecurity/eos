@@ -64,7 +64,7 @@ Examples:
 			Force:    force,
 			Actions:  actions,
 		}
-		
+
 		if !emergency.ConfirmRagequit(rc, config) {
 			logger.Info("Ragequit cancelled by user")
 			return nil

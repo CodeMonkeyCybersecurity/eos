@@ -11,23 +11,23 @@ import (
 // Config holds the configuration for Helen nginx deployment
 type Config struct {
 	// Basic configuration
-	ProjectName    string `yaml:"project_name" json:"project_name"`
-	Port           int    `yaml:"port" json:"port"`
-	Host           string `yaml:"host" json:"host"`
-	
+	ProjectName string `yaml:"project_name" json:"project_name"`
+	Port        int    `yaml:"port" json:"port"`
+	Host        string `yaml:"host" json:"host"`
+
 	// Paths and directories
 	PublicHTMLPath string `yaml:"public_html_path" json:"public_html_path"`
 	WorkDir        string `yaml:"work_dir" json:"work_dir"`
-	
+
 	// Service configuration
 	NomadAddr  string `yaml:"nomad_addr" json:"nomad_addr"`
 	VaultAddr  string `yaml:"vault_addr" json:"vault_addr"`
 	VaultToken string `yaml:"vault_token" json:"vault_token"`
-	
+
 	// Deployment configuration
-	Namespace     string   `yaml:"namespace" json:"namespace"`
-	Datacenters   []string `yaml:"datacenters" json:"datacenters"`
-	
+	Namespace   string   `yaml:"namespace" json:"namespace"`
+	Datacenters []string `yaml:"datacenters" json:"datacenters"`
+
 	// Resource limits
 	Resources ResourceConfig `yaml:"resources" json:"resources"`
 }
@@ -62,20 +62,20 @@ type Manager struct {
 
 // SecretConfig holds vault secret configuration for Helen
 type SecretConfig struct {
-	ProjectName     string `json:"project_name"`
-	DeploymentTime  string `json:"deployment_time"`
-	ContainerPort   int    `json:"container_port"`
-	HostPort        int    `json:"host_port"`
-	PublicHTMLPath  string `json:"public_html_path"`
+	ProjectName    string `json:"project_name"`
+	DeploymentTime string `json:"deployment_time"`
+	ContainerPort  int    `json:"container_port"`
+	HostPort       int    `json:"host_port"`
+	PublicHTMLPath string `json:"public_html_path"`
 }
 
 // DeploymentStep represents a single deployment step
 type DeploymentStep struct {
-	Name         string
-	Description  string
-	AssessFunc   func(ctx context.Context, mgr *Manager) error
+	Name          string
+	Description   string
+	AssessFunc    func(ctx context.Context, mgr *Manager) error
 	InterventFunc func(ctx context.Context, mgr *Manager) error
-	EvaluateFunc func(ctx context.Context, mgr *Manager) error
+	EvaluateFunc  func(ctx context.Context, mgr *Manager) error
 }
 
 // NomadJobConfig holds Nomad job configuration
@@ -98,14 +98,14 @@ type HealthCheckConfig struct {
 
 // ServiceCheck represents a service health check
 type ServiceCheck struct {
-	Name        string            `json:"name"`
-	Type        string            `json:"type"`
-	Path        string            `json:"path,omitempty"`
-	Interval    time.Duration     `json:"interval"`
-	Timeout     time.Duration     `json:"timeout"`
-	PortLabel   string            `json:"port_label,omitempty"`
-	Method      string            `json:"method,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
+	Name      string            `json:"name"`
+	Type      string            `json:"type"`
+	Path      string            `json:"path,omitempty"`
+	Interval  time.Duration     `json:"interval"`
+	Timeout   time.Duration     `json:"timeout"`
+	PortLabel string            `json:"port_label,omitempty"`
+	Method    string            `json:"method,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
 }
 
 // HelenTaskConfig defines configuration for the nginx task
@@ -178,7 +178,7 @@ func (c *Config) Validate() error {
 			Details: map[string]interface{}{"port": c.Port},
 		}
 	}
-	
+
 	if c.Host == "" {
 		return &DeploymentError{
 			Type:    ErrorTypeValidation,
@@ -186,7 +186,7 @@ func (c *Config) Validate() error {
 			Message: "host cannot be empty",
 		}
 	}
-	
+
 	if c.PublicHTMLPath == "" {
 		return &DeploymentError{
 			Type:    ErrorTypeValidation,
@@ -194,7 +194,7 @@ func (c *Config) Validate() error {
 			Message: "public HTML path cannot be empty",
 		}
 	}
-	
+
 	if c.NomadAddr == "" {
 		return &DeploymentError{
 			Type:    ErrorTypeValidation,
@@ -202,7 +202,7 @@ func (c *Config) Validate() error {
 			Message: "nomad address cannot be empty",
 		}
 	}
-	
+
 	if c.VaultAddr == "" {
 		return &DeploymentError{
 			Type:    ErrorTypeValidation,
@@ -210,23 +210,23 @@ func (c *Config) Validate() error {
 			Message: "vault address cannot be empty",
 		}
 	}
-	
+
 	return nil
 }
 
 // DeploymentInfo represents information about a Helen deployment
 type DeploymentInfo struct {
-	Namespace   string            `json:"namespace"`
-	Status      string            `json:"status"`
-	Healthy     bool              `json:"healthy"`
-	Port        int               `json:"port"`
-	Services    []ServiceInfo     `json:"services"`
-	Resources   ResourceConfig    `json:"resources"`
-	CreatedAt   string            `json:"created_at"`
-	UpdatedAt   string            `json:"updated_at"`
-	URL         string            `json:"url"`
-	Version     string            `json:"version"`
-	HTMLPath    string            `json:"html_path"`
+	Namespace string         `json:"namespace"`
+	Status    string         `json:"status"`
+	Healthy   bool           `json:"healthy"`
+	Port      int            `json:"port"`
+	Services  []ServiceInfo  `json:"services"`
+	Resources ResourceConfig `json:"resources"`
+	CreatedAt string         `json:"created_at"`
+	UpdatedAt string         `json:"updated_at"`
+	URL       string         `json:"url"`
+	Version   string         `json:"version"`
+	HTMLPath  string         `json:"html_path"`
 }
 
 // ServiceInfo represents information about a service
@@ -240,22 +240,22 @@ type ServiceInfo struct {
 
 // HealthStatus represents the health status of a deployment
 type HealthStatus struct {
-	Namespace     string               `json:"namespace"`
-	OverallStatus string               `json:"overall_status"`
-	Healthy       bool                 `json:"healthy"`
-	Services      []ServiceHealthInfo  `json:"services"`
-	LastCheck     string               `json:"last_check"`
-	CheckDuration string               `json:"check_duration"`
-	WebsiteCheck  bool                 `json:"website_check"`
+	Namespace     string              `json:"namespace"`
+	OverallStatus string              `json:"overall_status"`
+	Healthy       bool                `json:"healthy"`
+	Services      []ServiceHealthInfo `json:"services"`
+	LastCheck     string              `json:"last_check"`
+	CheckDuration string              `json:"check_duration"`
+	WebsiteCheck  bool                `json:"website_check"`
 }
 
 // ServiceHealthInfo represents health information for a service
 type ServiceHealthInfo struct {
-	Name        string `json:"name"`
-	Status      string `json:"status"`
-	Healthy     bool   `json:"healthy"`
-	ChecksPassing int  `json:"checks_passing"`
-	ChecksTotal   int  `json:"checks_total"`
+	Name          string `json:"name"`
+	Status        string `json:"status"`
+	Healthy       bool   `json:"healthy"`
+	ChecksPassing int    `json:"checks_passing"`
+	ChecksTotal   int    `json:"checks_total"`
 	LastCheck     string `json:"last_check"`
 	Message       string `json:"message,omitempty"`
 }

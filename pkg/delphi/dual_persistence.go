@@ -14,13 +14,13 @@ import (
 
 // DualPersistenceManager handles both Redis (speed) and PostgreSQL (audit) persistence
 type DualPersistenceManager struct {
-	redis    *redis.Client
-	db       *gorm.DB
-	logger   *zap.Logger
-	
+	redis  *redis.Client
+	db     *gorm.DB
+	logger *zap.Logger
+
 	// Configuration
 	config DualPersistenceConfig
-	
+
 	// Async processing
 	auditQueue chan AuditEntry
 	wg         sync.WaitGroup
@@ -32,23 +32,23 @@ type DualPersistenceConfig struct {
 	// Redis configuration
 	EnableRedisQueue bool
 	RedisFailover    bool // Fallback to PostgreSQL if Redis fails
-	
+
 	// PostgreSQL audit configuration
-	EnableAuditLog        bool
-	AuditBufferSize      int
-	AuditFlushInterval   time.Duration
-	AuditRetentionDays   int
-	
+	EnableAuditLog     bool
+	AuditBufferSize    int
+	AuditFlushInterval time.Duration
+	AuditRetentionDays int
+
 	// Performance tuning
-	AsyncAuditWrites     bool
-	MaxConcurrentAudits  int
-	AuditWriteTimeout    time.Duration
+	AsyncAuditWrites    bool
+	MaxConcurrentAudits int
+	AuditWriteTimeout   time.Duration
 }
 
 // DefaultDualPersistenceConfig returns sensible defaults
 func DefaultDualPersistenceConfig() DualPersistenceConfig {
 	return DualPersistenceConfig{
-		EnableRedisQueue:     true,
+		EnableRedisQueue:    true,
 		RedisFailover:       true,
 		EnableAuditLog:      true,
 		AuditBufferSize:     1000,
@@ -62,29 +62,29 @@ func DefaultDualPersistenceConfig() DualPersistenceConfig {
 
 // AuditEntry represents an audit log entry for PostgreSQL
 type AuditEntry struct {
-	ID          string                 `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	AlertID     string                 `gorm:"index;not null" json:"alert_id"`
-	Stage       string                 `gorm:"index;not null" json:"stage"`
-	Action      string                 `gorm:"index;not null" json:"action"` // RECEIVED, PROCESSED, FORWARDED, FAILED
-	Timestamp   time.Time              `gorm:"index;not null" json:"timestamp"`
-	WorkerName  string                 `gorm:"index" json:"worker_name,omitempty"`
-	
+	ID         string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	AlertID    string    `gorm:"index;not null" json:"alert_id"`
+	Stage      string    `gorm:"index;not null" json:"stage"`
+	Action     string    `gorm:"index;not null" json:"action"` // RECEIVED, PROCESSED, FORWARDED, FAILED
+	Timestamp  time.Time `gorm:"index;not null" json:"timestamp"`
+	WorkerName string    `gorm:"index" json:"worker_name,omitempty"`
+
 	// Detailed audit data
-	AlertData   map[string]interface{} `gorm:"type:jsonb" json:"alert_data,omitempty"`
+	AlertData          map[string]interface{} `gorm:"type:jsonb" json:"alert_data,omitempty"`
 	ProcessingMetadata map[string]interface{} `gorm:"type:jsonb" json:"processing_metadata,omitempty"`
-	
+
 	// Performance metrics
 	ProcessingDuration *time.Duration `json:"processing_duration,omitempty"`
-	QueueDepth        *int           `json:"queue_depth,omitempty"`
-	RetryCount        int            `json:"retry_count"`
-	
+	QueueDepth         *int           `json:"queue_depth,omitempty"`
+	RetryCount         int            `json:"retry_count"`
+
 	// Error information
-	ErrorMessage      string         `json:"error_message,omitempty"`
-	ErrorDetails      map[string]interface{} `gorm:"type:jsonb" json:"error_details,omitempty"`
-	
+	ErrorMessage string                 `json:"error_message,omitempty"`
+	ErrorDetails map[string]interface{} `gorm:"type:jsonb" json:"error_details,omitempty"`
+
 	// Circuit breaker state
-	CircuitBreakerState string        `json:"circuit_breaker_state,omitempty"`
-	
+	CircuitBreakerState string `json:"circuit_breaker_state,omitempty"`
+
 	// Database fields
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
@@ -92,27 +92,27 @@ type AuditEntry struct {
 
 // AlertStatistics represents aggregated statistics for reporting
 type AlertStatistics struct {
-	ID              string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Date            time.Time `gorm:"index;not null"`
-	Hour            int       `gorm:"index"`
-	
+	ID   string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Date time.Time `gorm:"index;not null"`
+	Hour int       `gorm:"index"`
+
 	// Volume metrics
 	TotalAlerts     int64 `json:"total_alerts"`
 	ProcessedAlerts int64 `json:"processed_alerts"`
 	FailedAlerts    int64 `json:"failed_alerts"`
 	RetriedAlerts   int64 `json:"retried_alerts"`
-	
+
 	// Performance metrics
 	AvgProcessingTime float64 `json:"avg_processing_time_seconds"`
 	MaxProcessingTime float64 `json:"max_processing_time_seconds"`
 	MinProcessingTime float64 `json:"min_processing_time_seconds"`
-	
+
 	// Stage breakdown
 	StageBreakdown map[string]int64 `gorm:"type:jsonb" json:"stage_breakdown"`
-	
+
 	// Top error categories
 	TopErrors map[string]int64 `gorm:"type:jsonb" json:"top_errors"`
-	
+
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
@@ -123,7 +123,7 @@ func NewDualPersistenceManager(redis *redis.Client, db *gorm.DB, config DualPers
 	if err := db.AutoMigrate(&AuditEntry{}, &AlertStatistics{}); err != nil {
 		return nil, fmt.Errorf("failed to migrate audit tables: %w", err)
 	}
-	
+
 	dpm := &DualPersistenceManager{
 		redis:    redis,
 		db:       db,
@@ -131,21 +131,21 @@ func NewDualPersistenceManager(redis *redis.Client, db *gorm.DB, config DualPers
 		config:   config,
 		shutdown: make(chan struct{}),
 	}
-	
+
 	if config.AsyncAuditWrites {
 		dpm.auditQueue = make(chan AuditEntry, config.AuditBufferSize)
 		dpm.startAsyncAuditProcessor()
 	}
-	
+
 	// Start statistics aggregation
 	dpm.startStatisticsAggregator()
-	
+
 	logger.Info("Dual persistence manager initialized",
 		zap.Bool("redis_queue", config.EnableRedisQueue),
 		zap.Bool("audit_log", config.EnableAuditLog),
 		zap.Bool("async_audit", config.AsyncAuditWrites),
 		zap.Int("audit_buffer_size", config.AuditBufferSize))
-	
+
 	return dpm, nil
 }
 
@@ -163,7 +163,7 @@ func (dpm *DualPersistenceManager) PublishAlert(ctx context.Context, alert *Aler
 			"alert_state":   alert.State,
 		},
 	}
-	
+
 	// Primary: Try Redis for speed
 	var redisErr error
 	if dpm.config.EnableRedisQueue {
@@ -175,13 +175,13 @@ func (dpm *DualPersistenceManager) PublishAlert(ctx context.Context, alert *Aler
 				"alert": alert,
 			},
 		}
-		
+
 		redisErr = dpm.publishToRedis(ctx, msg, stage)
 		if redisErr == nil {
 			auditEntry.ProcessingMetadata["published_to"] = "redis"
 		}
 	}
-	
+
 	// Fallback: PostgreSQL NOTIFY if Redis fails
 	var pgErr error
 	if redisErr != nil && dpm.config.RedisFailover {
@@ -192,22 +192,22 @@ func (dpm *DualPersistenceManager) PublishAlert(ctx context.Context, alert *Aler
 			auditEntry.ErrorMessage = redisErr.Error()
 		}
 	}
-	
+
 	// Audit the operation
 	if dpm.config.EnableAuditLog {
 		if redisErr != nil && pgErr != nil {
 			auditEntry.Action = "PUBLISH_FAILED"
 			auditEntry.ErrorMessage = fmt.Sprintf("Redis: %v, PostgreSQL: %v", redisErr, pgErr)
 		}
-		
+
 		dpm.auditOperation(auditEntry)
 	}
-	
+
 	// Return appropriate error
 	if redisErr != nil && pgErr != nil {
 		return fmt.Errorf("failed to publish to both Redis (%v) and PostgreSQL (%v)", redisErr, pgErr)
 	}
-	
+
 	return nil
 }
 
@@ -216,7 +216,7 @@ func (dpm *DualPersistenceManager) AuditProcessing(alert *Alert, stage, action, 
 	if !dpm.config.EnableAuditLog {
 		return
 	}
-	
+
 	auditEntry := AuditEntry{
 		AlertID:            alert.ID,
 		Stage:              stage,
@@ -232,19 +232,19 @@ func (dpm *DualPersistenceManager) AuditProcessing(alert *Alert, stage, action, 
 			"processed_by":  alert.ProcessedBy,
 		},
 	}
-	
+
 	if err != nil {
 		auditEntry.ErrorMessage = err.Error()
 		if delphiErr, ok := err.(*DelphiError); ok {
 			auditEntry.ErrorDetails = map[string]interface{}{
-				"error_code":   delphiErr.Code,
-				"retryable":    delphiErr.IsRetryable(),
-				"error_stage":  delphiErr.Stage,
+				"error_code":    delphiErr.Code,
+				"retryable":     delphiErr.IsRetryable(),
+				"error_stage":   delphiErr.Stage,
 				"error_context": delphiErr.Context,
 			}
 		}
 	}
-	
+
 	dpm.auditOperation(auditEntry)
 }
 
@@ -253,7 +253,7 @@ func (dpm *DualPersistenceManager) AuditCircuitBreakerEvent(circuitName string, 
 	if !dpm.config.EnableAuditLog {
 		return
 	}
-	
+
 	auditEntry := AuditEntry{
 		AlertID:             "SYSTEM",
 		Stage:               "CIRCUIT_BREAKER",
@@ -271,7 +271,7 @@ func (dpm *DualPersistenceManager) AuditCircuitBreakerEvent(circuitName string, 
 			"success_threshold":   stats.Config.SuccessThreshold,
 		},
 	}
-	
+
 	dpm.auditOperation(auditEntry)
 }
 
@@ -281,9 +281,9 @@ func (dpm *DualPersistenceManager) publishToRedis(ctx context.Context, msg *Stre
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
-	
+
 	streamName := fmt.Sprintf("delphi:alerts:%s", stage)
-	
+
 	_, err = dpm.redis.XAdd(ctx, &redis.XAddArgs{
 		Stream: streamName,
 		Values: map[string]interface{}{
@@ -292,7 +292,7 @@ func (dpm *DualPersistenceManager) publishToRedis(ctx context.Context, msg *Stre
 			"data":     string(data),
 		},
 	}).Result()
-	
+
 	return err
 }
 
@@ -304,12 +304,12 @@ func (dpm *DualPersistenceManager) publishToPostgreSQL(ctx context.Context, aler
 		"action":   "new_alert",
 		"data":     alert.Data,
 	}
-	
+
 	notificationJSON, err := json.Marshal(notification)
 	if err != nil {
 		return fmt.Errorf("failed to marshal notification: %w", err)
 	}
-	
+
 	channel := fmt.Sprintf("delphi_%s", stage)
 	return dpm.db.WithContext(ctx).Exec("SELECT pg_notify(?, ?)", channel, string(notificationJSON)).Error
 }
@@ -336,7 +336,7 @@ func (dpm *DualPersistenceManager) auditOperation(entry AuditEntry) {
 func (dpm *DualPersistenceManager) writeAuditEntry(entry AuditEntry) {
 	ctx, cancel := context.WithTimeout(context.Background(), dpm.config.AuditWriteTimeout)
 	defer cancel()
-	
+
 	if err := dpm.db.WithContext(ctx).Create(&entry).Error; err != nil {
 		dpm.logger.Error("Failed to write audit entry",
 			zap.String("alert_id", entry.AlertID),
@@ -351,10 +351,10 @@ func (dpm *DualPersistenceManager) startAsyncAuditProcessor() {
 		dpm.wg.Add(1)
 		go func(workerID int) {
 			defer dpm.wg.Done()
-			
+
 			dpm.logger.Debug("Starting audit processor worker",
 				zap.Int("worker_id", workerID))
-			
+
 			for {
 				select {
 				case entry := <-dpm.auditQueue:
@@ -374,10 +374,10 @@ func (dpm *DualPersistenceManager) startStatisticsAggregator() {
 	dpm.wg.Add(1)
 	go func() {
 		defer dpm.wg.Done()
-		
+
 		ticker := time.NewTicker(1 * time.Hour) // Aggregate hourly
 		defer ticker.Stop()
-		
+
 		for {
 			select {
 			case <-ticker.C:
@@ -397,11 +397,11 @@ func (dpm *DualPersistenceManager) aggregateStatistics() error {
 	now := time.Now()
 	startHour := time.Date(now.Year(), now.Month(), now.Day(), now.Hour()-1, 0, 0, 0, now.Location())
 	endHour := startHour.Add(time.Hour)
-	
+
 	dpm.logger.Debug("Aggregating statistics",
 		zap.Time("start_hour", startHour),
 		zap.Time("end_hour", endHour))
-	
+
 	// Aggregate metrics
 	var stats AlertStatistics
 	err := dpm.db.Raw(`
@@ -416,39 +416,39 @@ func (dpm *DualPersistenceManager) aggregateStatistics() error {
 		FROM audit_entries
 		WHERE timestamp >= ? AND timestamp < ?
 	`, startHour, endHour).Scan(&stats).Error
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to aggregate basic statistics: %w", err)
 	}
-	
+
 	// Get stage breakdown
 	var stageResults []struct {
 		Stage string `json:"stage"`
 		Count int64  `json:"count"`
 	}
-	
+
 	err = dpm.db.Raw(`
 		SELECT stage, COUNT(*) as count
 		FROM audit_entries
 		WHERE timestamp >= ? AND timestamp < ?
 		GROUP BY stage
 	`, startHour, endHour).Scan(&stageResults).Error
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to aggregate stage breakdown: %w", err)
 	}
-	
+
 	stats.StageBreakdown = make(map[string]int64)
 	for _, result := range stageResults {
 		stats.StageBreakdown[result.Stage] = result.Count
 	}
-	
+
 	// Get top errors
 	var errorResults []struct {
 		ErrorMessage string `json:"error_message"`
 		Count        int64  `json:"count"`
 	}
-	
+
 	err = dpm.db.Raw(`
 		SELECT error_message, COUNT(*) as count
 		FROM audit_entries
@@ -457,20 +457,20 @@ func (dpm *DualPersistenceManager) aggregateStatistics() error {
 		ORDER BY count DESC
 		LIMIT 10
 	`, startHour, endHour).Scan(&errorResults).Error
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to aggregate error breakdown: %w", err)
 	}
-	
+
 	stats.TopErrors = make(map[string]int64)
 	for _, result := range errorResults {
 		stats.TopErrors[result.ErrorMessage] = result.Count
 	}
-	
+
 	// Set metadata
 	stats.Date = startHour
 	stats.Hour = startHour.Hour()
-	
+
 	// Save aggregated statistics
 	return dpm.db.Create(&stats).Error
 }
@@ -478,19 +478,19 @@ func (dpm *DualPersistenceManager) aggregateStatistics() error {
 // GetStatistics retrieves statistics for a date range
 func (dpm *DualPersistenceManager) GetStatistics(ctx context.Context, startDate, endDate time.Time) ([]AlertStatistics, error) {
 	var stats []AlertStatistics
-	
+
 	err := dpm.db.WithContext(ctx).
 		Where("date >= ? AND date <= ?", startDate, endDate).
 		Order("date ASC, hour ASC").
 		Find(&stats).Error
-	
+
 	return stats, err
 }
 
 // SearchAuditLogs provides flexible audit log searching
 func (dpm *DualPersistenceManager) SearchAuditLogs(ctx context.Context, criteria AuditSearchCriteria) ([]AuditEntry, int64, error) {
 	query := dpm.db.WithContext(ctx).Model(&AuditEntry{})
-	
+
 	// Apply filters
 	if criteria.AlertID != "" {
 		query = query.Where("alert_id = ?", criteria.AlertID)
@@ -513,13 +513,13 @@ func (dpm *DualPersistenceManager) SearchAuditLogs(ctx context.Context, criteria
 	if criteria.HasError {
 		query = query.Where("error_message != ''")
 	}
-	
+
 	// Get total count
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	
+
 	// Apply pagination and ordering
 	var entries []AuditEntry
 	err := query.
@@ -527,7 +527,7 @@ func (dpm *DualPersistenceManager) SearchAuditLogs(ctx context.Context, criteria
 		Limit(criteria.Limit).
 		Offset(criteria.Offset).
 		Find(&entries).Error
-	
+
 	return entries, total, err
 }
 
@@ -547,10 +547,10 @@ type AuditSearchCriteria struct {
 // Close gracefully shuts down the dual persistence manager
 func (dpm *DualPersistenceManager) Close() error {
 	dpm.logger.Info("Shutting down dual persistence manager")
-	
+
 	// Signal shutdown
 	close(dpm.shutdown)
-	
+
 	// Drain audit queue if async
 	if dpm.config.AsyncAuditWrites {
 		close(dpm.auditQueue)
@@ -558,10 +558,10 @@ func (dpm *DualPersistenceManager) Close() error {
 			dpm.writeAuditEntry(entry)
 		}
 	}
-	
+
 	// Wait for workers to finish
 	dpm.wg.Wait()
-	
+
 	dpm.logger.Info("Dual persistence manager shutdown complete")
 	return nil
 }

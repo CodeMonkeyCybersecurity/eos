@@ -98,11 +98,11 @@ func DeleteSecretRecursive(rc *eos_io.RuntimeContext, path string) error {
 		for _, key := range keys {
 			keyStr := key.(string)
 			fullPath := fmt.Sprintf("%s/%s", path, keyStr)
-			
+
 			if keyStr[len(keyStr)-1] == '/' {
 				// It's a directory, recurse
 				if err := DeleteSecretRecursive(rc, fullPath[:len(fullPath)-1]); err != nil {
-					logger.Warn("Failed to delete directory", 
+					logger.Warn("Failed to delete directory",
 						zap.String("path", fullPath),
 						zap.Error(err))
 				}

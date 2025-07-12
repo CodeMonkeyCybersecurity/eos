@@ -36,10 +36,10 @@ func TestJenkinsOptions(t *testing.T) {
 
 func TestWriteAndUpJenkins(t *testing.T) {
 	tests := []struct {
-		name       string
-		appName    string
-		opts       JenkinsOptions
-		wantErr    bool
+		name        string
+		appName     string
+		opts        JenkinsOptions
+		wantErr     bool
 		errContains string
 	}{
 		{

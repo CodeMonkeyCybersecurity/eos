@@ -15,12 +15,11 @@ import (
 // Global flags
 var (
 	resizeFilesystem bool
-	lvPath          string
-	devicePath      string
-	mountpoint      string
-	fsType          string
+	lvPath           string
+	devicePath       string
+	mountpoint       string
+	fsType           string
 )
-
 
 // updateStorageCmd handles updating storage information
 var UpdateStorageCmd = &cobra.Command{
@@ -37,9 +36,9 @@ Examples:
   eos update storage --device /dev/mapper/lv    # Resize specific filesystem`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		logger.Info("Starting storage update operation")
-		
+
 		if resizeFilesystem {
 			logger.Info("Auto-resizing Ubuntu LVM")
 			if err := storage.AutoResizeUbuntuLVM(rc); err != nil {
@@ -48,7 +47,7 @@ Examples:
 			logger.Info("LVM auto-resize completed successfully")
 			return nil
 		}
-		
+
 		if lvPath != "" {
 			logger.Info("Extending logical volume", zap.String("lv_path", lvPath))
 			if err := storage.ExtendLogicalVolume(rc, lvPath); err != nil {
@@ -56,9 +55,9 @@ Examples:
 			}
 			logger.Info("Logical volume extended successfully")
 		}
-		
+
 		if devicePath != "" {
-			logger.Info("Resizing filesystem", 
+			logger.Info("Resizing filesystem",
 				zap.String("device", devicePath),
 				zap.String("fs_type", fsType))
 			if err := storage.ResizeFilesystem(rc, devicePath, fsType, mountpoint); err != nil {
@@ -66,12 +65,12 @@ Examples:
 			}
 			logger.Info("Filesystem resized successfully")
 		}
-		
+
 		if lvPath == "" && devicePath == "" && !resizeFilesystem {
 			logger.Info("No storage operations specified")
 			return fmt.Errorf("no storage operation specified. Use --resize, --lv-path, or --device")
 		}
-		
+
 		return nil
 	}),
 }

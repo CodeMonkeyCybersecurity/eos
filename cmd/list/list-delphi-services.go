@@ -10,12 +10,14 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO
 // ServiceStatus represents the status of a service
 type ServiceStatus struct {
 	Active  string
 	Enabled string
 }
+
 // TODO
 // getServiceStatus returns the status of a service
 func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (ServiceStatus, error) {
@@ -43,9 +45,9 @@ func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (ServiceSta
 }
 
 var delphiServicesListCmd = &cobra.Command{
-	Use:   "delphi-services-list",
+	Use:     "delphi-services-list",
 	Aliases: []string{"delphi-services", "list-delphi-services"},
-	Short: "List all Delphi services and their status",
+	Short:   "List all Delphi services and their status",
 	Long: `List all available Delphi services with their current status.
 
 Shows for each service:

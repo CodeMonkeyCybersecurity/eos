@@ -24,7 +24,7 @@ func TestCommandInjectionPrevention(t *testing.T) {
 
 		// Shell mode should be discouraged and logged as dangerous
 		_, err := Run(ctx, opts)
-		
+
 		// The function might succeed but should log warnings
 		// In a production system, we might want to block shell mode entirely
 		if err == nil {
@@ -54,7 +54,7 @@ func TestCommandInjectionPrevention(t *testing.T) {
 
 			// Commands should execute safely without shell interpretation
 			output, err := Run(ctx, opts)
-			
+
 			// Even if command succeeds, output should not indicate command execution
 			if err == nil {
 				// Output should contain the arguments as literal text, not executed
@@ -85,13 +85,13 @@ func TestCommandInjectionPrevention(t *testing.T) {
 			}
 
 			output, err := Run(ctx, opts)
-			
+
 			if err == nil {
 				// Output should contain the literal string, not the result of substitution
 				if !strings.Contains(output, attempt) {
 					t.Errorf("Command substitution may have occurred for: %s, output: %s", attempt, output)
 				}
-				
+
 				// Should not contain typical command output
 				suspiciousOutputs := []string{"uid=", "gid=", "root", "/bin/", "/usr/"}
 				for _, suspicious := range suspiciousOutputs {
@@ -121,7 +121,7 @@ func TestCommandInjectionPrevention(t *testing.T) {
 
 			// These should fail to execute or execute safely without traversal
 			output, err := Run(ctx, opts)
-			
+
 			if err == nil {
 				// If command succeeds, it should not show signs of shell access
 				if strings.Contains(output, "root") || strings.Contains(output, "uid=") {
@@ -140,7 +140,7 @@ func TestResourceExhaustionPrevention(t *testing.T) {
 		// Test that timeouts are enforced to prevent indefinite execution
 		opts := Options{
 			Command: "sleep",
-			Args:    []string{"10"}, // 10 seconds
+			Args:    []string{"10"},  // 10 seconds
 			Timeout: 1 * time.Second, // 1 second timeout
 		}
 
@@ -228,7 +228,7 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 
 		// This should either fail or execute without elevated privileges
 		output, err := Run(ctx, opts)
-		
+
 		if err == nil {
 			// If sudo succeeds, it should not return "root" unless legitimately elevated
 			if strings.Contains(output, "root") {
@@ -255,7 +255,7 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 
 			// These should execute safely or fail gracefully
 			_, err := Run(ctx, opts)
-			
+
 			// We mainly want to ensure no panics or security issues
 			if err != nil {
 				t.Logf("Binary %s failed (expected): %v", binary, err)
@@ -278,7 +278,7 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 
 		// Command should still execute safely despite malicious PATH
 		output, err := Run(ctx, opts)
-		
+
 		if err != nil {
 			t.Logf("Command failed with modified PATH (this might be expected): %v", err)
 		} else {
@@ -335,7 +335,7 @@ func TestCommandValidation(t *testing.T) {
 
 		// Should either fail or sanitize the null byte
 		output, err := Run(ctx, opts)
-		
+
 		if err == nil {
 			// Output should not contain null bytes
 			for i, b := range []byte(output) {
@@ -349,7 +349,7 @@ func TestCommandValidation(t *testing.T) {
 	t.Run("unicode_normalization_in_commands", func(t *testing.T) {
 		// Test handling of Unicode characters in commands
 		unicodeCommands := []string{
-			"еcho", // Cyrillic е instead of e
+			"еcho",       // Cyrillic е instead of e
 			"ech\u200Bo", // Zero-width space
 			"echo\uFF1B", // Fullwidth semicolon
 		}
@@ -395,7 +395,7 @@ func TestSecureCommandExecution(t *testing.T) {
 
 			// These should execute without security issues
 			_, err := Run(ctx, opts)
-			
+
 			// Some commands might fail (e.g., if not available), but should not cause security issues
 			if err != nil {
 				t.Logf("Safe command %s failed (might be expected): %v", safe.command, err)
@@ -411,7 +411,7 @@ func TestSecureCommandExecution(t *testing.T) {
 		}
 
 		output, err := Run(ctx, opts)
-		
+
 		if err == nil {
 			// Output should not contain dangerous control characters
 			dangerousChars := []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}

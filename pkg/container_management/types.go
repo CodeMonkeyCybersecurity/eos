@@ -25,14 +25,14 @@ type ComposeSearchResult struct {
 
 // ComposeOperation represents a compose management operation
 type ComposeOperation struct {
-	Operation  string         `json:"operation"` // up, down, stop, start, restart
-	Project    ComposeProject `json:"project"`
-	Success    bool           `json:"success"`
-	Message    string         `json:"message"`
-	Output     string         `json:"output,omitempty"`
-	Timestamp  time.Time      `json:"timestamp"`
-	Duration   time.Duration  `json:"duration"`
-	DryRun     bool           `json:"dry_run"`
+	Operation string         `json:"operation"` // up, down, stop, start, restart
+	Project   ComposeProject `json:"project"`
+	Success   bool           `json:"success"`
+	Message   string         `json:"message"`
+	Output    string         `json:"output,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
+	Duration  time.Duration  `json:"duration"`
+	DryRun    bool           `json:"dry_run"`
 }
 
 // ContainerInfo represents information about a running container
@@ -58,15 +58,15 @@ type ContainerListResult struct {
 
 // ComposeStopOptions contains options for stopping compose projects
 type ComposeStopOptions struct {
-	SearchPaths      []string `json:"search_paths"`
-	ConfirmEach      bool     `json:"confirm_each"`
-	Force            bool     `json:"force"`
-	StopContainers   bool     `json:"stop_containers"`
-	IgnoreRunning    bool     `json:"ignore_running"`
-	DryRun           bool     `json:"dry_run"`
-	RemoveVolumes    bool     `json:"remove_volumes"`
-	RemoveImages     bool     `json:"remove_images"`
-	Timeout          int      `json:"timeout"` // seconds
+	SearchPaths    []string `json:"search_paths"`
+	ConfirmEach    bool     `json:"confirm_each"`
+	Force          bool     `json:"force"`
+	StopContainers bool     `json:"stop_containers"`
+	IgnoreRunning  bool     `json:"ignore_running"`
+	DryRun         bool     `json:"dry_run"`
+	RemoveVolumes  bool     `json:"remove_volumes"`
+	RemoveImages   bool     `json:"remove_images"`
+	Timeout        int      `json:"timeout"` // seconds
 }
 
 // DefaultComposeStopOptions returns options with sensible defaults
@@ -104,8 +104,8 @@ func DefaultComposeConfig() *ComposeConfig {
 			"/srv",
 			"/home",
 		},
-		MaxDepth:        5,
-		FollowSymlinks:  false,
+		MaxDepth:       5,
+		FollowSymlinks: false,
 		ExcludePatterns: []string{
 			".git",
 			"node_modules",
@@ -126,14 +126,14 @@ func DefaultComposeConfig() *ComposeConfig {
 
 // ComposeStopSummary provides a summary of stop operations
 type ComposeStopSummary struct {
-	TotalProjects    int      `json:"total_projects"`
-	ProjectsStopped  int      `json:"projects_stopped"`
-	ProjectsSkipped  int      `json:"projects_skipped"`
-	ProjectsFailed   int      `json:"projects_failed"`
-	ContainersStopped int     `json:"containers_stopped"`
-	Errors           []string `json:"errors"`
-	Duration         time.Duration `json:"duration"`
-	Success          bool     `json:"success"`
+	TotalProjects     int           `json:"total_projects"`
+	ProjectsStopped   int           `json:"projects_stopped"`
+	ProjectsSkipped   int           `json:"projects_skipped"`
+	ProjectsFailed    int           `json:"projects_failed"`
+	ContainersStopped int           `json:"containers_stopped"`
+	Errors            []string      `json:"errors"`
+	Duration          time.Duration `json:"duration"`
+	Success           bool          `json:"success"`
 }
 
 // ComposeMultiStopResult contains results of stopping multiple projects

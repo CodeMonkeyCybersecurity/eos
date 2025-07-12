@@ -139,12 +139,12 @@ func TestConfig_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Config.Validate() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if tt.wantErr && !strings.Contains(err.Error(), tt.errMsg) {
 				t.Errorf("Config.Validate() error = %v, should contain %q", err, tt.errMsg)
 			}
@@ -166,21 +166,21 @@ func TestLoadConfig(t *testing.T) {
 			t.Errorf("LoadConfig() should not error when no config file exists: %v", err)
 			return
 		}
-		
+
 		if config == nil {
 			t.Error("LoadConfig() should return default config")
 			return
 		}
-		
+
 		// Verify default config structure
 		if len(config.Repositories) == 0 {
 			t.Error("Default config should have repositories")
 		}
-		
+
 		if len(config.Profiles) == 0 {
 			t.Error("Default config should have profiles")
 		}
-		
+
 		if config.DefaultRepository == "" {
 			t.Error("Default config should have a default repository")
 		}
@@ -261,7 +261,7 @@ func TestSaveConfig(t *testing.T) {
 		invalidConfig := &Config{
 			Repositories: map[string]Repository{},
 		}
-		
+
 		err := SaveConfig(rc, invalidConfig)
 		if err == nil {
 			t.Error("SaveConfig should fail for invalid config")
@@ -273,7 +273,7 @@ func TestSaveConfig(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	config := defaultConfig()
-	
+
 	if config == nil {
 		t.Fatal("defaultConfig() should not return nil")
 	}
@@ -301,11 +301,11 @@ func TestDefaultConfig(t *testing.T) {
 		if repo.Name == "" {
 			t.Errorf("Repository %q should have a name", name)
 		}
-		
+
 		if repo.Backend == "" {
 			t.Errorf("Repository %q should have a backend", name)
 		}
-		
+
 		if repo.URL == "" {
 			t.Errorf("Repository %q should have a URL", name)
 		}
@@ -316,11 +316,11 @@ func TestDefaultConfig(t *testing.T) {
 		if profile.Name == "" {
 			t.Errorf("Profile %q should have a name", name)
 		}
-		
+
 		if len(profile.Paths) == 0 {
 			t.Errorf("Profile %q should have paths", name)
 		}
-		
+
 		if profile.Repository == "" {
 			t.Errorf("Profile %q should reference a repository", name)
 		}
@@ -336,10 +336,10 @@ func TestConfigSecurityValidation(t *testing.T) {
 	t.Run("repository URL validation", func(t *testing.T) {
 		// Test various repository URL formats for security issues
 		testURLs := []struct {
-			name     string
-			url      string
-			backend  string
-			valid    bool
+			name    string
+			url     string
+			backend string
+			valid   bool
 		}{
 			{
 				name:    "valid local path",
@@ -393,18 +393,18 @@ func TestConfigSecurityValidation(t *testing.T) {
 				}
 
 				err := config.Validate()
-				
+
 				// Check for dangerous patterns in URL
 				containsDangerous := containsAnyDangerousBackup(tt.url)
-				
+
 				if !tt.valid && !containsDangerous {
 					t.Logf("URL might need additional validation: %s", tt.url)
 				}
-				
+
 				if tt.valid && containsDangerous {
 					t.Errorf("Valid URL flagged as dangerous: %s", tt.url)
 				}
-				
+
 				if tt.valid && err != nil {
 					t.Errorf("Valid config should not error: %v", err)
 				}
@@ -446,11 +446,11 @@ func TestConfigSecurityValidation(t *testing.T) {
 				// Check for dangerous patterns in paths
 				for _, path := range tt.paths {
 					containsDangerous := containsAnyDangerousBackup(path)
-					
+
 					if !tt.valid && !containsDangerous {
 						t.Logf("Path might need additional validation: %s", path)
 					}
-					
+
 					if tt.valid && containsDangerous {
 						t.Errorf("Valid path flagged as dangerous: %s", path)
 					}
@@ -495,11 +495,11 @@ func TestConfigSecurityValidation(t *testing.T) {
 				for key, value := range tt.env {
 					keyDangerous := containsAnyDangerousBackup(key)
 					valueDangerous := containsAnyDangerousBackup(value)
-					
+
 					if !tt.safe && !keyDangerous && !valueDangerous {
 						t.Logf("Environment variable might need validation: %s=%s", key, value)
 					}
-					
+
 					if tt.safe && (keyDangerous || valueDangerous) {
 						t.Errorf("Safe environment variable flagged as dangerous: %s=%s", key, value)
 					}
@@ -555,25 +555,25 @@ func TestRetentionPolicy(t *testing.T) {
 						t.Errorf("Retention KeepLast should be reasonable: %d", tt.retention.KeepLast)
 					}
 				}
-				
+
 				if tt.retention.KeepDaily < 0 || tt.retention.KeepDaily > 365 {
 					if tt.valid {
 						t.Errorf("Retention KeepDaily should be reasonable: %d", tt.retention.KeepDaily)
 					}
 				}
-				
+
 				if tt.retention.KeepWeekly < 0 || tt.retention.KeepWeekly > 52 {
 					if tt.valid {
 						t.Errorf("Retention KeepWeekly should be reasonable: %d", tt.retention.KeepWeekly)
 					}
 				}
-				
+
 				if tt.retention.KeepMonthly < 0 || tt.retention.KeepMonthly > 120 {
 					if tt.valid {
 						t.Errorf("Retention KeepMonthly should be reasonable: %d", tt.retention.KeepMonthly)
 					}
 				}
-				
+
 				if tt.retention.KeepYearly < 0 || tt.retention.KeepYearly > 100 {
 					if tt.valid {
 						t.Errorf("Retention KeepYearly should be reasonable: %d", tt.retention.KeepYearly)
@@ -608,7 +608,7 @@ func TestNotificationSettings(t *testing.T) {
 			"https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
 			"https://webhook.example.com/backup-notifications",
 		}
-		
+
 		invalidTargets := []string{
 			"admin@example.com; rm -rf /",
 			"https://webhook.example.com/backup-notifications && curl evil.com",
@@ -631,10 +631,10 @@ func TestNotificationSettings(t *testing.T) {
 // Helper function for backup package security validation
 func containsAnyDangerousBackup(s string) bool {
 	dangerous := []string{
-		";", "&", "|", "`", "$", "$(", "&&", "||", 
+		";", "&", "|", "`", "$", "$(", "&&", "||",
 		"\n", "\r", "\x00", "..", "rm -rf", "curl", "wget", "nc",
 	}
-	
+
 	for _, d := range dangerous {
 		if strings.Contains(s, d) {
 			return true

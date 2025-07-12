@@ -25,7 +25,7 @@ func NewServiceManager(config *ServiceConfig) *ServiceManager {
 	if config == nil {
 		config = DefaultServiceConfig()
 	}
-	
+
 	return &ServiceManager{
 		config: config,
 	}
@@ -34,7 +34,7 @@ func NewServiceManager(config *ServiceConfig) *ServiceManager {
 // ListServices lists systemd services based on filter options
 func (sm *ServiceManager) ListServices(rc *eos_io.RuntimeContext, filter *ServiceFilterOptions) (*ServiceListResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Listing systemd services", 
+	logger.Info("Listing systemd services",
 		zap.Bool("show_all", sm.config.ShowAll),
 		zap.Any("filter", filter))
 
@@ -99,7 +99,7 @@ func (sm *ServiceManager) GetServiceStatus(rc *eos_io.RuntimeContext, serviceNam
 // StartService starts and optionally enables a service
 func (sm *ServiceManager) StartService(rc *eos_io.RuntimeContext, serviceName string, enable bool) (*ServiceOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting service", 
+	logger.Info("Starting service",
 		zap.String("service", serviceName),
 		zap.Bool("enable", enable),
 		zap.Bool("dry_run", sm.config.DryRun))
@@ -164,7 +164,7 @@ func (sm *ServiceManager) StartService(rc *eos_io.RuntimeContext, serviceName st
 		operation.Message = fmt.Sprintf("Successfully started service: %s", serviceName)
 	}
 
-	logger.Info("Service operation completed", 
+	logger.Info("Service operation completed",
 		zap.String("service", serviceName),
 		zap.String("operation", operation.Operation))
 
@@ -174,7 +174,7 @@ func (sm *ServiceManager) StartService(rc *eos_io.RuntimeContext, serviceName st
 // StopService stops and optionally disables a service
 func (sm *ServiceManager) StopService(rc *eos_io.RuntimeContext, serviceName string, disable bool) (*ServiceOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Stopping service", 
+	logger.Info("Stopping service",
 		zap.String("service", serviceName),
 		zap.Bool("disable", disable),
 		zap.Bool("dry_run", sm.config.DryRun))
@@ -239,7 +239,7 @@ func (sm *ServiceManager) StopService(rc *eos_io.RuntimeContext, serviceName str
 		operation.Message = fmt.Sprintf("Successfully stopped service: %s", serviceName)
 	}
 
-	logger.Info("Service operation completed", 
+	logger.Info("Service operation completed",
 		zap.String("service", serviceName),
 		zap.String("operation", operation.Operation))
 
@@ -249,7 +249,7 @@ func (sm *ServiceManager) StopService(rc *eos_io.RuntimeContext, serviceName str
 // RestartService restarts a service
 func (sm *ServiceManager) RestartService(rc *eos_io.RuntimeContext, serviceName string) (*ServiceOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Restarting service", 
+	logger.Info("Restarting service",
 		zap.String("service", serviceName),
 		zap.Bool("dry_run", sm.config.DryRun))
 
@@ -291,7 +291,7 @@ func (sm *ServiceManager) RestartService(rc *eos_io.RuntimeContext, serviceName 
 // ViewLogs displays logs for a service
 func (sm *ServiceManager) ViewLogs(rc *eos_io.RuntimeContext, serviceName string, options *LogsOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Viewing service logs", 
+	logger.Info("Viewing service logs",
 		zap.String("service", serviceName),
 		zap.Any("options", options))
 
@@ -323,12 +323,12 @@ func (sm *ServiceManager) ViewLogs(rc *eos_io.RuntimeContext, serviceName string
 	}
 
 	cmd := exec.CommandContext(rc.Ctx, "journalctl", args...)
-	
+
 	if options != nil && options.Follow {
 		// For following logs, we need to handle the output differently
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		
+
 		logger.Info("Starting to follow logs (press Ctrl+C to stop)")
 		return cmd.Run()
 	} else {
@@ -354,7 +354,7 @@ func (sm *ServiceManager) ViewLogs(rc *eos_io.RuntimeContext, serviceName string
 func (sm *ServiceManager) parseServiceList(output string) ([]ServiceInfo, error) {
 	var services []ServiceInfo
 	scanner := bufio.NewScanner(strings.NewReader(output))
-	
+
 	// Skip header line
 	if scanner.Scan() {
 		// Skip the header
@@ -475,7 +475,7 @@ func (sm *ServiceManager) applyFilters(services []ServiceInfo, filter *ServiceFi
 func (sm *ServiceManager) filterLogs(logs string, grepPattern string) []byte {
 	var result strings.Builder
 	scanner := bufio.NewScanner(strings.NewReader(logs))
-	
+
 	regex, err := regexp.Compile(grepPattern)
 	if err != nil {
 		// If regex compilation fails, fall back to simple string matching

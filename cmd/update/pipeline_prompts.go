@@ -19,6 +19,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for prompts update command
 var (
@@ -30,7 +31,7 @@ var (
 
 // promptsUpdateCmd updates an existing system prompt
 var promptsUpdateCmd = &cobra.Command{
-	Use:   "prompts-update <prompt-name>",  // TODO: Pattern 1 - Renamed from "update" to avoid conflict
+	Use:   "prompts-update <prompt-name>", // TODO: Pattern 1 - Renamed from "update" to avoid conflict
 	Short: "Update an existing system prompt",
 	Long: `Update an existing system prompt file in the assets/system-prompts directory.
 
@@ -260,7 +261,7 @@ func init() {
 	// TODO: Pattern 1 - Need to determine correct parent command for registration
 	// Based on examples showing "eos delphi prompts update", this needs a prompts parent command
 	// UpdateCmd.AddCommand(promptsUpdateCmd)
-	
+
 	// Add flags for prompts update command
 	promptsUpdateCmd.Flags().StringVarP(&promptsUpdateFromFile, "from-file", "f", "", "Update prompt from existing file")
 	promptsUpdateCmd.Flags().BoolVarP(&promptsUpdateInteractive, "interactive", "i", false, "Update content interactively")

@@ -51,4 +51,3 @@ func ResizeFilesystem(rc *eos_io.RuntimeContext, devicePath, fsType, mountpoint 
 
 	return nil
 }
-

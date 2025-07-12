@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/enrollment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/enrollment"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -54,15 +54,15 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		startTime := time.Now()
-		
+
 		logger.Info("Starting eos self enrollment process")
-		
+
 		// Parse command line flags
 		config, err := enrollment.ParseEnrollmentFlags(cmd)
 		if err != nil {
 			return eos_err.NewUserError("failed to parse enrollment flags: %s", err.Error())
 		}
-		
+
 		// Set dry-run in runtime context attributes
 		if config.DryRun {
 			if rc.Attributes == nil {
@@ -71,30 +71,30 @@ Examples:
 			rc.Attributes["dry_run"] = "true"
 			logger.Info("Running in dry-run mode - no changes will be made")
 		}
-		
+
 		// Validate configuration
 		if err := enrollment.ValidateEnrollmentConfig(config); err != nil {
 			return eos_err.NewUserError("invalid enrollment configuration: %s", err.Error())
 		}
-		
+
 		// ASSESS - System Discovery Phase
 		logger.Info("Phase 1: Discovering system configuration")
 		systemInfo, err := enrollment.DiscoverSystem(rc)
 		if err != nil {
 			return fmt.Errorf("system discovery failed: %w", err)
 		}
-		
+
 		logger.Info("System discovered successfully",
 			zap.String("hostname", systemInfo.Hostname),
 			zap.String("platform", systemInfo.Platform),
 			zap.Int("cpu_cores", systemInfo.CPUCores),
 			zap.Int("memory_gb", systemInfo.MemoryGB))
-		
+
 		// Verify prerequisites
 		if err := enrollment.VerifyPrerequisites(rc, systemInfo); err != nil {
 			return fmt.Errorf("prerequisite verification failed: %w", err)
 		}
-		
+
 		// Auto-detect role if requested
 		if config.AutoDetect {
 			logger.Info("Auto-detecting role based on system characteristics")
@@ -105,27 +105,27 @@ Examples:
 			config.Role = detectedRole
 			logger.Info("Role detected", zap.String("role", detectedRole))
 		}
-		
+
 		// Create backup before making changes
 		logger.Info("Creating backup of current configuration")
 		if err := enrollment.CreateInventoryBackup(rc); err != nil {
 			logger.Warn("Failed to create backup", zap.Error(err))
 		}
-		
+
 		// INTERVENE - Configuration Phase
 		logger.Info("Phase 2: Configuring system for enrollment")
-		
+
 		// Validate network requirements
 		if err := enrollment.ValidateNetworkRequirements(rc, config, systemInfo); err != nil {
 			return fmt.Errorf("network validation failed: %w", err)
 		}
-		
+
 		// Setup network configuration
 		logger.Info("Setting up network configuration")
 		if err := enrollment.SetupNetwork(rc, config, systemInfo); err != nil {
 			return fmt.Errorf("network setup failed: %w", err)
 		}
-		
+
 		// Handle transition from masterless if needed
 		if config.TransitionMode || systemInfo.SaltMode == enrollment.SaltModeMasterless {
 			logger.Info("Handling transition from masterless mode")
@@ -133,32 +133,32 @@ Examples:
 				return fmt.Errorf("masterless transition failed: %w", err)
 			}
 		}
-		
+
 		// Configure Salt
 		logger.Info("Configuring Salt")
 		if err := enrollment.ConfigureSalt(rc, config); err != nil {
 			return fmt.Errorf("Salt configuration failed: %w", err)
 		}
-		
+
 		// EVALUATE - Verification Phase
 		logger.Info("Phase 3: Verifying enrollment")
-		
+
 		// Verify enrollment
 		if err := enrollment.VerifyEnrollment(rc, config); err != nil {
 			return fmt.Errorf("enrollment verification failed: %w", err)
 		}
-		
+
 		// Export system information
 		logger.Info("Exporting system information to inventory")
 		if err := enrollment.ExportToEosInventory(rc, systemInfo); err != nil {
 			return fmt.Errorf("inventory export failed: %w", err)
 		}
-		
+
 		// Validate inventory export
 		if err := enrollment.ValidateInventoryExport(rc, systemInfo); err != nil {
 			logger.Warn("Inventory export validation failed", zap.Error(err))
 		}
-		
+
 		// Generate final report
 		result, err := enrollment.GenerateVerificationReport(rc, config, systemInfo)
 		if err != nil {
@@ -167,13 +167,13 @@ Examples:
 			result.Duration = time.Since(startTime)
 			enrollment.LogEnrollmentResults(logger, result)
 		}
-		
+
 		duration := time.Since(startTime)
 		logger.Info("Eos self enrollment completed successfully",
 			zap.String("role", config.Role),
 			zap.String("datacenter", config.Datacenter),
 			zap.Duration("duration", duration))
-		
+
 		return nil
 	}),
 }
@@ -188,13 +188,14 @@ func init() {
 
 	// Network configuration
 	EnrollCmd.Flags().String("network-mode", "direct", "Network mode: direct, consul-connect, or wireguard")
-	
+
 	// Enrollment options
 	EnrollCmd.Flags().Bool("auto-detect", false, "Auto-detect role based on infrastructure")
 	EnrollCmd.Flags().Bool("transition-mode", false, "Force transition from masterless mode")
 	EnrollCmd.Flags().Bool("dry-run", false, "Preview changes without applying them")
-	
+
 	// Mark required flags
 	EnrollCmd.MarkFlagRequired("datacenter")
 }
+
 // All helper functions have been migrated to pkg/enrollment/

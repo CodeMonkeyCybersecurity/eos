@@ -12,30 +12,30 @@ import (
 
 // SecurityConfig represents a comprehensive security configuration
 type SecurityConfig struct {
-	Profile               system.SecurityProfile    `json:"profile"`
-	FirewallConfig        *FirewallConfig          `json:"firewall_config"`
-	AuditConfig           *AuditConfig             `json:"audit_config"`
-	TwoFactorAuthConfig   *TwoFactorAuthConfig     `json:"two_factor_auth_config"`
-	AccessControlConfig   *AccessControlConfig     `json:"access_control_config"`
-	EncryptionConfig      *EncryptionConfig        `json:"encryption_config"`
-	ComplianceRequirements []string                `json:"compliance_requirements"`
+	Profile                system.SecurityProfile `json:"profile"`
+	FirewallConfig         *FirewallConfig        `json:"firewall_config"`
+	AuditConfig            *AuditConfig           `json:"audit_config"`
+	TwoFactorAuthConfig    *TwoFactorAuthConfig   `json:"two_factor_auth_config"`
+	AccessControlConfig    *AccessControlConfig   `json:"access_control_config"`
+	EncryptionConfig       *EncryptionConfig      `json:"encryption_config"`
+	ComplianceRequirements []string               `json:"compliance_requirements"`
 }
 
 // FirewallConfig represents firewall configuration
 type FirewallConfig struct {
-	Enabled     bool     `json:"enabled"`
-	DefaultDeny bool     `json:"default_deny"`
-	AllowedPorts []int   `json:"allowed_ports"`
-	AllowedIPs  []string `json:"allowed_ips"`
+	Enabled      bool     `json:"enabled"`
+	DefaultDeny  bool     `json:"default_deny"`
+	AllowedPorts []int    `json:"allowed_ports"`
+	AllowedIPs   []string `json:"allowed_ips"`
 }
 
 // AuditConfig represents audit logging configuration
 type AuditConfig struct {
-	Enabled       bool     `json:"enabled"`
-	LogLevel      string   `json:"log_level"`
-	LogRetention  int      `json:"log_retention_days"`
-	MonitorPaths  []string `json:"monitor_paths"`
-	AuditRules    []string `json:"audit_rules"`
+	Enabled      bool     `json:"enabled"`
+	LogLevel     string   `json:"log_level"`
+	LogRetention int      `json:"log_retention_days"`
+	MonitorPaths []string `json:"monitor_paths"`
+	AuditRules   []string `json:"audit_rules"`
 }
 
 // TwoFactorAuthConfig represents 2FA configuration
@@ -50,20 +50,20 @@ type TwoFactorAuthConfig struct {
 
 // AccessControlConfig represents access control configuration
 type AccessControlConfig struct {
-	StrictSSHConfig bool     `json:"strict_ssh_config"`
-	DisableRootLogin bool    `json:"disable_root_login"`
+	StrictSSHConfig  bool            `json:"strict_ssh_config"`
+	DisableRootLogin bool            `json:"disable_root_login"`
 	PasswordPolicy   *PasswordPolicy `json:"password_policy"`
-	SudoRestrictions []string `json:"sudo_restrictions"`
+	SudoRestrictions []string        `json:"sudo_restrictions"`
 }
 
 // PasswordPolicy represents password requirements
 type PasswordPolicy struct {
-	MinLength       int  `json:"min_length"`
-	RequireUpper    bool `json:"require_upper"`
-	RequireLower    bool `json:"require_lower"`
-	RequireNumbers  bool `json:"require_numbers"`
-	RequireSymbols  bool `json:"require_symbols"`
-	MaxAge          int  `json:"max_age_days"`
+	MinLength      int  `json:"min_length"`
+	RequireUpper   bool `json:"require_upper"`
+	RequireLower   bool `json:"require_lower"`
+	RequireNumbers bool `json:"require_numbers"`
+	RequireSymbols bool `json:"require_symbols"`
+	MaxAge         int  `json:"max_age_days"`
 }
 
 // EncryptionConfig represents encryption settings
@@ -162,8 +162,8 @@ func generateBaselineConfig() *SecurityConfig {
 	return &SecurityConfig{
 		Profile: "baseline",
 		FirewallConfig: &FirewallConfig{
-			Enabled:     true,
-			DefaultDeny: false,
+			Enabled:      true,
+			DefaultDeny:  false,
 			AllowedPorts: []int{22, 80, 443},
 		},
 		AuditConfig: &AuditConfig{

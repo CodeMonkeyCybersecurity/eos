@@ -135,7 +135,7 @@ func TestHetznerTokenSecurity(t *testing.T) {
 		// Store original token
 		originalToken := os.Getenv("HCLOUD_TOKEN")
 		originalHetznerToken := os.Getenv("HETZNER_TOKEN")
-		
+
 		defer func() {
 			// Restore original tokens
 			if originalToken != "" {
@@ -152,11 +152,11 @@ func TestHetznerTokenSecurity(t *testing.T) {
 
 		// Test with valid token
 		_ = os.Setenv("HCLOUD_TOKEN", "test-token-12345")
-		
+
 		// Test token is read correctly
 		token := os.Getenv("HCLOUD_TOKEN")
 		assert.Equal(t, "test-token-12345", token)
-		
+
 		// Clear token
 		_ = os.Unsetenv("HCLOUD_TOKEN")
 		token = os.Getenv("HCLOUD_TOKEN")
@@ -203,10 +203,10 @@ func TestHetznerTokenSecurity(t *testing.T) {
 		}
 
 		invalidTokens := []string{
-			"",                    // Empty
-			"short",              // Too short
-			"invalid-chars-!@#",  // Invalid characters
-			"spaces in token",    // Spaces
+			"",                  // Empty
+			"short",             // Too short
+			"invalid-chars-!@#", // Invalid characters
+			"spaces in token",   // Spaces
 		}
 
 		for _, token := range validTokens {
@@ -223,7 +223,7 @@ func TestHetznerTokenSecurity(t *testing.T) {
 				assert.Less(t, len(token), 10)
 			} else {
 				// Check for invalid characters or patterns
-				assert.True(t, strings.Contains(token, " ") || 
+				assert.True(t, strings.Contains(token, " ") ||
 					strings.ContainsAny(token, "!@#$%^&*()"))
 			}
 		}
@@ -260,10 +260,10 @@ func TestSSHKeySecurity(t *testing.T) {
 		}
 
 		invalidNames := []string{
-			"",                    // Empty
-			"key with spaces",     // Spaces
-			"key/with/slashes",    // Slashes
-			"key@with@symbols",    // Special chars
+			"",                       // Empty
+			"key with spaces",        // Spaces
+			"key/with/slashes",       // Slashes
+			"key@with@symbols",       // Special chars
 			strings.Repeat("a", 100), // Too long
 		}
 
@@ -295,18 +295,18 @@ func TestSSHKeySecurity(t *testing.T) {
 		}
 
 		invalidKeys := []string{
-			"",                           // Empty
-			"not-a-ssh-key",             // Invalid format
-			"ssh-rsa invalidbase64",     // Invalid base64
-			"BEGIN RSA PRIVATE KEY",     // Private key (security issue)
-			"password123",               // Plain text
+			"",                      // Empty
+			"not-a-ssh-key",         // Invalid format
+			"ssh-rsa invalidbase64", // Invalid base64
+			"BEGIN RSA PRIVATE KEY", // Private key (security issue)
+			"password123",           // Plain text
 		}
 
 		for _, key := range validKeys {
 			// Valid SSH keys should start with algorithm identifier
-			assert.True(t, strings.HasPrefix(key, "ssh-") || 
+			assert.True(t, strings.HasPrefix(key, "ssh-") ||
 				strings.HasPrefix(key, "ecdsa-"))
-			assert.Contains(t, key, " ") // Should have spaces separating parts
+			assert.Contains(t, key, " ")    // Should have spaces separating parts
 			assert.Greater(t, len(key), 50) // Should be reasonably long
 		}
 
@@ -461,12 +461,12 @@ func TestZoneSecurityValidation(t *testing.T) {
 		}
 
 		invalidZones := []string{
-			"",                    // Empty
-			"invalid..domain",     // Double dots
-			".starts-with-dot",    // Starts with dot
-			"ends-with-dot.",      // Ends with dot (might be valid)
+			"",                 // Empty
+			"invalid..domain",  // Double dots
+			".starts-with-dot", // Starts with dot
+			"ends-with-dot.",   // Ends with dot (might be valid)
 			"toolong" + strings.Repeat("a", 250) + ".com", // Too long
-			"spaces in domain.com", // Spaces
+			"spaces in domain.com",                        // Spaces
 		}
 
 		for _, zone := range validZones {
@@ -480,9 +480,9 @@ func TestZoneSecurityValidation(t *testing.T) {
 
 		for _, zone := range invalidZones {
 			// Invalid zones should be caught
-			isInvalid := zone == "" || 
-				strings.Contains(zone, "..") || 
-				strings.Contains(zone, " ") || 
+			isInvalid := zone == "" ||
+				strings.Contains(zone, "..") ||
+				strings.Contains(zone, " ") ||
 				strings.HasPrefix(zone, ".") ||
 				len(zone) > 253
 
@@ -537,7 +537,7 @@ func TestServerSpecSecurity(t *testing.T) {
 		// Both should be stored but unsafe should be flagged in real implementation
 		assert.Contains(t, safeUserData, "apt update")
 		assert.Contains(t, unsafeUserData, "curl")
-		
+
 		// In real implementation, would validate user data for security
 	})
 

@@ -84,9 +84,9 @@ func TestInstallK3sServer(t *testing.T) {
 
 func TestInstallK3sAgent(t *testing.T) {
 	tests := []struct {
-		name    string
-		options *K3sInstallOptions
-		wantErr bool
+		name        string
+		options     *K3sInstallOptions
+		wantErr     bool
 		errContains string
 	}{
 		{

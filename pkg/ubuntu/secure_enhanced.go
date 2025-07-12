@@ -26,26 +26,26 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 
 	// ASSESS - Check system state and prerequisites
 	logger.Info("Assessing system security requirements")
-	
+
 	// Check Ubuntu version
 	if err := checkUbuntuVersion(rc); err != nil {
 		logger.Warn("Ubuntu version check failed, continuing anyway",
 			zap.Error(err))
 	}
-	
+
 	// Check if security tools are already installed
 	installedTools, err := assessSecurityTools(rc)
 	if err != nil {
 		logger.Warn("Failed to assess installed security tools",
 			zap.Error(err))
 	}
-	
+
 	logger.Info("Security assessment complete",
 		zap.Any("installed_tools", installedTools))
 
 	// INTERVENE - Apply security configurations
 	logger.Info("Applying security hardening configurations")
-	
+
 	// Update system first
 	if err := updateSystem(rc); err != nil {
 		return fmt.Errorf("update system: %w", err)
@@ -130,7 +130,7 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 
 	// EVALUATE - Verify security hardening was successful
 	logger.Info("Evaluating security hardening results")
-	
+
 	if err := verifySecurityHardening(rc, mfaMode); err != nil {
 		logger.Error("Security hardening verification failed",
 			zap.Error(err))
@@ -153,7 +153,7 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 // assessSecurityTools checks which security tools are already installed
 func assessSecurityTools(rc *eos_io.RuntimeContext) (map[string]bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	tools := map[string]bool{
 		"auditd":              false,
 		"osquery":             false,
@@ -163,23 +163,23 @@ func assessSecurityTools(rc *eos_io.RuntimeContext) (map[string]bool, error) {
 		"unattended-upgrades": false,
 		"restic":              false,
 	}
-	
+
 	// Check each tool
 	for tool := range tools {
 		// This would use the actual check functions
 		logger.Debug("Checking if tool is installed",
 			zap.String("tool", tool))
 	}
-	
+
 	return tools, nil
 }
 
 // verifySecurityHardening verifies that all security configurations were applied
 func verifySecurityHardening(rc *eos_io.RuntimeContext, mfaMode string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Verifying security configurations")
-	
+
 	// Verify each component
 	verifications := []struct {
 		name   string
@@ -191,7 +191,7 @@ func verifySecurityHardening(rc *eos_io.RuntimeContext, mfaMode string) error {
 		{"kernel parameters", func() error { return nil }},
 		{"file permissions", func() error { return nil }},
 	}
-	
+
 	for _, v := range verifications {
 		if err := v.verify(); err != nil {
 			logger.Error("Verification failed",
@@ -202,13 +202,13 @@ func verifySecurityHardening(rc *eos_io.RuntimeContext, mfaMode string) error {
 		logger.Debug("Verification passed",
 			zap.String("component", v.name))
 	}
-	
+
 	if mfaMode == "enforced" || mfaMode == "standard" {
 		// Verify MFA configuration
 		logger.Info("Verifying MFA configuration")
 		// Would check PAM configuration
 	}
-	
+
 	logger.Info("All security verifications passed")
 	return nil
 }
@@ -216,19 +216,19 @@ func verifySecurityHardening(rc *eos_io.RuntimeContext, mfaMode string) error {
 // displaySecuritySummary displays a comprehensive security status summary to the user
 func displaySecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Log that we're displaying the summary
 	logger.Info("terminal prompt: Ubuntu security hardening completed - displaying summary")
-	
+
 	// Build the summary message
 	var summary strings.Builder
-	
+
 	summary.WriteString("\n")
 	summary.WriteString("╔═══════════════════════════════════════════════════════════════════════╗\n")
 	summary.WriteString("║          UBUNTU SECURITY HARDENING COMPLETED                          ║\n")
 	summary.WriteString("╚═══════════════════════════════════════════════════════════════════════╝\n")
 	summary.WriteString("\n")
-	
+
 	// Security tools section
 	summary.WriteString("🛡️  Security Tools Installed & Configured:\n")
 	summary.WriteString("   • auditd - Enhanced system activity monitoring and logging\n")
@@ -239,7 +239,7 @@ func displaySecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) error {
 	summary.WriteString("   • unattended-upgrades - Automatic security updates\n")
 	summary.WriteString("   • restic - Backup solution\n")
 	summary.WriteString("\n")
-	
+
 	// MFA status section
 	switch mfaMode {
 	case "enforced", "standard":
@@ -253,22 +253,22 @@ func displaySecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) error {
 		summary.WriteString("⚠️  Multi-Factor Authentication: DISABLED\n")
 		summary.WriteString("   • Consider enabling: eos secure ubuntu --enforce-mfa --mfa-only\n")
 	}
-	
+
 	summary.WriteString("\n")
 	summary.WriteString("📋 Available Commands:\n")
 	summary.WriteString("   • security-report     - Generate comprehensive security report\n")
-	
+
 	if mfaMode == "enforced" || mfaMode == "standard" {
 		summary.WriteString("   • google-authenticator - Configure MFA for additional users\n")
 	}
-	
+
 	summary.WriteString("\n")
 	summary.WriteString("🔒 System Hardening Applied:\n")
 	summary.WriteString("   • Kernel security parameters optimized\n")
 	summary.WriteString("   • Network security settings configured\n")
 	summary.WriteString("   • File permissions hardened\n")
 	summary.WriteString("   • Security monitoring enabled\n")
-	
+
 	// Important next steps for MFA
 	if mfaMode == "enforced" || mfaMode == "standard" {
 		summary.WriteString("\n")
@@ -279,19 +279,19 @@ func displaySecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) error {
 		summary.WriteString("   4. Configure MFA for other users: sudo -u username google-authenticator\n")
 		summary.WriteString("   5. Store the MFA secret key securely for backup purposes\n")
 	}
-	
+
 	summary.WriteString("\n")
-	
+
 	// Display to user
 	// Since this is informational output for the user, we use stderr to preserve stdout
 	// This follows the pattern from the interaction package
 	if _, err := fmt.Fprint(os.Stderr, summary.String()); err != nil {
 		return fmt.Errorf("failed to display summary: %w", err)
 	}
-	
+
 	logger.Info("Security summary displayed to user",
 		zap.String("mfa_mode", mfaMode),
 		zap.Int("summary_lines", strings.Count(summary.String(), "\n")))
-	
+
 	return nil
 }

@@ -14,12 +14,12 @@ func FuzzRun(f *testing.F) {
 	f.Add("echo hello")
 	f.Add("ls -la")
 	f.Add("true")
-	
+
 	// Seed with potentially dangerous patterns
 	f.Add("echo $(id)")      // Command substitution
 	f.Add("cat /etc/passwd") // Sensitive file access
 	f.Add("sh -c echo test") // Shell invocation
-	
+
 	f.Fuzz(func(t *testing.T, commandLine string) {
 		// Parse command line into command and args
 		parts := strings.Fields(commandLine)
@@ -35,7 +35,7 @@ func FuzzRun(f *testing.F) {
 		if command == "" {
 			return
 		}
-		
+
 		// Skip obviously dangerous commands in fuzzing
 		dangerousCommands := []string{"rm", "mkfs", "dd", "format", "del", "deltree"}
 		for _, dangerous := range dangerousCommands {
@@ -43,18 +43,18 @@ func FuzzRun(f *testing.F) {
 				return
 			}
 		}
-		
+
 		// Create context with timeout to prevent hanging
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		
+
 		// Test command execution
 		defer func() {
 			if r := recover(); r != nil {
 				t.Errorf("Run panicked on command '%s' with args %v: %v", command, args, r)
 			}
 		}()
-		
+
 		// Test with Options struct
 		options := Options{
 			Ctx:     ctx,
@@ -63,7 +63,7 @@ func FuzzRun(f *testing.F) {
 			Capture: true,
 			Timeout: 1 * time.Second,
 		}
-		
+
 		// Execute command - expect most to fail, we're testing for crashes/hangs
 		Run(ctx, options)
 	})
@@ -73,19 +73,19 @@ func FuzzRun(f *testing.F) {
 func FuzzShellMode(f *testing.F) {
 	f.Add("echo hello")
 	f.Add("ls -la")
-	
+
 	// Injection patterns
 	f.Add("echo test; id")
 	f.Add("ls $(whoami)")
 	f.Add("echo `id`")
 	f.Add("echo $USER")
 	f.Add("echo test\nid")
-	
+
 	f.Fuzz(func(t *testing.T, shellCommand string) {
 		if shellCommand == "" {
 			return
 		}
-		
+
 		// Skip obviously dangerous commands
 		dangerousPatterns := []string{"rm -rf", "mkfs", "format", "dd if=", ">/dev/", "chmod 777"}
 		for _, dangerous := range dangerousPatterns {
@@ -93,16 +93,16 @@ func FuzzShellMode(f *testing.F) {
 				return
 			}
 		}
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		
+
 		defer func() {
 			if r := recover(); r != nil {
 				t.Errorf("Shell execution panicked on command '%s': %v", shellCommand, r)
 			}
 		}()
-		
+
 		// Test shell mode execution
 		options := Options{
 			Ctx:     ctx,
@@ -111,7 +111,7 @@ func FuzzShellMode(f *testing.F) {
 			Capture: true,
 			Timeout: 1 * time.Second,
 		}
-		
+
 		Run(ctx, options)
 	})
 }

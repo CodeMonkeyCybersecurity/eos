@@ -19,6 +19,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Agent represents an agent record for display
 type Agent struct {
@@ -34,6 +35,7 @@ type Agent struct {
 	DisconnectionTime *time.Time `json:"disconnection_time"`
 	APIFetchTimestamp *time.Time `json:"api_fetch_timestamp"`
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	delphiAgentsLimit   int

@@ -128,7 +128,7 @@ Examples:
 
 		if err := manager.RevokeCredentials(rc, leaseID); err != nil {
 			return fmt.Errorf("failed to revoke credentials: %w", err)
-			}
+		}
 
 		logger.Info("Credentials revoked successfully")
 		return nil
@@ -138,21 +138,22 @@ Examples:
 func init() {
 	// Register credentialsCmd with CreateCmd
 	CreateCmd.AddCommand(credentialsCmd)
-	
+
 	// Add subcommands to credentialsCmd
 	credentialsCmd.AddCommand(generateCredentialsCmd)
 	credentialsCmd.AddCommand(revokeCredentialsCmd)
-	
+
 	// Set up flags for generateCredentialsCmd
 	generateCredentialsCmd.Flags().StringP("role", "r", "", "Database role name")
 	generateCredentialsCmd.Flags().String("engine-mount", "database", "Vault database engine mount point")
 	generateCredentialsCmd.Flags().Bool("json", false, "Output in JSON format")
 	generateCredentialsCmd.Flags().Bool("show-password", false, "Show password in output")
-	
+
 	// Set up flags for revokeCredentialsCmd
 	revokeCredentialsCmd.Flags().StringP("lease-id", "l", "", "Vault lease ID to revoke")
 	revokeCredentialsCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJSONCredential(credential *database_management.DatabaseCredential, showPassword bool) error {
 	output := map[string]interface{}{
@@ -177,6 +178,7 @@ func outputJSONCredential(credential *database_management.DatabaseCredential, sh
 	fmt.Println(string(data))
 	return nil
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableCredential(credential *database_management.DatabaseCredential, showPassword bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)

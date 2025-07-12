@@ -361,11 +361,11 @@ func (sv *SecurityValidator) validateConnect(connectConfig *ConnectConfiguration
 // validateMetadata checks service metadata for sensitive information
 func (sv *SecurityValidator) validateMetadata(meta map[string]string, result *ValidationResult) {
 	sensitiveKeys := []string{"password", "secret", "key", "token", "credential"}
-	
+
 	for key, value := range meta {
 		keyLower := strings.ToLower(key)
 		valueLower := strings.ToLower(value)
-		
+
 		// Check for sensitive information in metadata
 		for _, sensitive := range sensitiveKeys {
 			if strings.Contains(keyLower, sensitive) || strings.Contains(valueLower, sensitive) {

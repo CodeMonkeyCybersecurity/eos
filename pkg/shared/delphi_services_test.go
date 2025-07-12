@@ -10,11 +10,11 @@ import (
 
 func TestDelphiServiceRegistry_GetService(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	tests := []struct {
-		name        string
-		serviceName string
-		shouldExist bool
+		name            string
+		serviceName     string
+		shouldExist     bool
 		expectedService DelphiServiceDefinition
 	}{
 		{
@@ -77,9 +77,9 @@ func TestDelphiServiceRegistry_GetService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service, exists := registry.GetService(tt.serviceName)
-			
+
 			assert.Equal(t, tt.shouldExist, exists)
-			
+
 			if tt.shouldExist {
 				assert.Equal(t, tt.expectedService.Name, service.Name)
 				assert.Equal(t, tt.expectedService.WorkerScript, service.WorkerScript)
@@ -89,7 +89,7 @@ func TestDelphiServiceRegistry_GetService(t *testing.T) {
 				assert.Equal(t, tt.expectedService.User, service.User)
 				assert.Equal(t, tt.expectedService.Group, service.Group)
 				assert.Equal(t, tt.expectedService.Permissions, service.Permissions)
-				
+
 				// Validate required fields are not empty
 				assert.NotEmpty(t, service.SourceWorker)
 				assert.NotEmpty(t, service.SourceService)
@@ -102,32 +102,32 @@ func TestDelphiServiceRegistry_GetService(t *testing.T) {
 
 func TestDelphiServiceRegistry_GetActiveServices(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	services := registry.GetActiveServices()
-	
+
 	// Should have all the core services we expect
 	assert.NotEmpty(t, services)
-	
+
 	// Convert to map for easier testing
 	serviceMap := make(map[string]DelphiServiceDefinition)
 	for _, service := range services {
 		serviceMap[service.Name] = service
 	}
-	
+
 	// Check that critical services from the crash are present
 	criticalServices := []string{
 		"delphi-listener",
 		"alert-to-db",
-		"ab-test-analyzer", 
+		"ab-test-analyzer",
 		"llm-worker",
 		"prompt-ab-tester",
 		"delphi-agent-enricher",
 	}
-	
+
 	for _, serviceName := range criticalServices {
 		service, found := serviceMap[serviceName]
 		assert.True(t, found, "Critical service %s not found", serviceName)
-		
+
 		// Validate service has required fields
 		assert.NotEmpty(t, service.Name)
 		assert.NotEmpty(t, service.WorkerScript)
@@ -146,12 +146,12 @@ func TestDelphiServiceRegistry_GetActiveServices(t *testing.T) {
 
 func TestDelphiServiceRegistry_GetActiveServiceNames(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	serviceNames := registry.GetActiveServiceNames()
-	
+
 	// Should not be empty
 	assert.NotEmpty(t, serviceNames)
-	
+
 	// Check for duplicates
 	nameSet := make(map[string]bool)
 	for _, name := range serviceNames {
@@ -159,22 +159,22 @@ func TestDelphiServiceRegistry_GetActiveServiceNames(t *testing.T) {
 		nameSet[name] = true
 		assert.NotEmpty(t, name, "Empty service name found")
 	}
-	
+
 	// Check that critical services are present
 	criticalServices := []string{
 		"alert-to-db",
 		"ab-test-analyzer",
 	}
-	
+
 	for _, criticalService := range criticalServices {
-		assert.Contains(t, serviceNames, criticalService, 
+		assert.Contains(t, serviceNames, criticalService,
 			"Critical service %s missing from active service names", criticalService)
 	}
 }
 
 func TestDelphiServiceRegistry_ValidateService(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	tests := []struct {
 		name        string
 		serviceName string
@@ -213,7 +213,7 @@ func TestDelphiServiceRegistry_ValidateService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := registry.ValidateService(tt.serviceName)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				if tt.errorMsg != "" {
@@ -228,12 +228,12 @@ func TestDelphiServiceRegistry_ValidateService(t *testing.T) {
 
 func TestDelphiServiceRegistry_GetPipelineOrder(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	pipelineOrder := registry.GetPipelineOrder()
-	
+
 	// Should not be empty
 	assert.NotEmpty(t, pipelineOrder)
-	
+
 	// Check for duplicates
 	orderSet := make(map[string]bool)
 	for _, stage := range pipelineOrder {
@@ -241,15 +241,15 @@ func TestDelphiServiceRegistry_GetPipelineOrder(t *testing.T) {
 		orderSet[stage] = true
 		assert.NotEmpty(t, stage, "Empty pipeline stage found")
 	}
-	
+
 	// Check expected pipeline stages are present
 	expectedStages := []string{
 		"ingestion",
-		"enrichment", 
+		"enrichment",
 		"processing",
 		"analysis",
 	}
-	
+
 	for _, expectedStage := range expectedStages {
 		assert.Contains(t, pipelineOrder, expectedStage,
 			"Expected pipeline stage %s not found", expectedStage)
@@ -258,30 +258,30 @@ func TestDelphiServiceRegistry_GetPipelineOrder(t *testing.T) {
 
 func TestDelphiServiceRegistry_GetServicePipelineStage(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	tests := []struct {
-		name         string
-		serviceName  string
+		name          string
+		serviceName   string
 		expectedStage string
-		shouldExist  bool
+		shouldExist   bool
 	}{
 		{
-			name:         "delphi-listener stage",
-			serviceName:  "delphi-listener",
+			name:          "delphi-listener stage",
+			serviceName:   "delphi-listener",
 			expectedStage: "ingestion",
-			shouldExist:  true,
+			shouldExist:   true,
 		},
 		{
-			name:         "alert-to-db stage", 
-			serviceName:  "alert-to-db",
+			name:          "alert-to-db stage",
+			serviceName:   "alert-to-db",
 			expectedStage: "processing",
-			shouldExist:  true,
+			shouldExist:   true,
 		},
 		{
-			name:         "ab-test-analyzer stage",
-			serviceName:  "ab-test-analyzer", 
+			name:          "ab-test-analyzer stage",
+			serviceName:   "ab-test-analyzer",
 			expectedStage: "analysis",
-			shouldExist:  true,
+			shouldExist:   true,
 		},
 		{
 			name:        "non-existent service",
@@ -293,9 +293,9 @@ func TestDelphiServiceRegistry_GetServicePipelineStage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service, exists := registry.GetService(tt.serviceName)
-			
+
 			assert.Equal(t, tt.shouldExist, exists)
-			
+
 			if tt.shouldExist {
 				assert.Equal(t, tt.expectedStage, service.PipelineStage)
 			}
@@ -316,11 +316,11 @@ func TestServiceCategory(t *testing.T) {
 		CategoryTesting,
 		CategoryDeprecated,
 	}
-	
+
 	for _, category := range expectedCategories {
 		assert.NotEmpty(t, string(category), "Category should not be empty")
 	}
-	
+
 	// Test specific category values
 	assert.Equal(t, "ingestion", string(CategoryIngestion))
 	assert.Equal(t, "enrichment", string(CategoryEnrichment))
@@ -336,7 +336,7 @@ func TestServiceCategory(t *testing.T) {
 func TestDelphiServiceDefinition_Structure(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
 	services := registry.GetActiveServices()
-	
+
 	for _, service := range services {
 		t.Run("validate_"+service.Name, func(t *testing.T) {
 			// Required fields should not be empty
@@ -350,40 +350,40 @@ func TestDelphiServiceDefinition_Structure(t *testing.T) {
 			assert.NotEmpty(t, service.User)
 			assert.NotEmpty(t, service.Group)
 			assert.NotEmpty(t, service.Permissions)
-			
+
 			// Dependencies should be a non-empty slice
 			assert.NotEmpty(t, service.Dependencies)
 			for _, dep := range service.Dependencies {
 				assert.NotEmpty(t, dep, "Dependency should not be empty for service %s", service.Name)
 			}
-			
+
 			// Categories should be a non-empty slice
 			assert.NotEmpty(t, service.Categories)
 			for _, category := range service.Categories {
 				assert.NotEmpty(t, string(category), "Category should not be empty for service %s", service.Name)
 			}
-			
+
 			// Config files should have valid structure if present
 			for _, configFile := range service.ConfigFiles {
 				assert.NotEmpty(t, configFile.Path, "Config file path should not be empty for service %s", service.Name)
 				assert.NotEmpty(t, configFile.Description, "Config file description should not be empty for service %s", service.Name)
 			}
-			
+
 			// Environment vars should not be empty strings if present
 			for _, envVar := range service.EnvironmentVars {
 				assert.NotEmpty(t, envVar, "Environment variable should not be empty for service %s", service.Name)
 			}
-			
+
 			// Paths should be absolute paths
 			assert.True(t, service.WorkerScript[0] == '/', "Worker script should be absolute path for %s", service.Name)
 			assert.True(t, service.ServiceFile[0] == '/', "Service file should be absolute path for %s", service.Name)
 			assert.True(t, service.SourceWorker[0] == '/', "Source worker should be absolute path for %s", service.Name)
 			assert.True(t, service.SourceService[0] == '/', "Source service should be absolute path for %s", service.Name)
-			
+
 			// User and group should be stanley for security services
 			assert.Equal(t, "stanley", service.User)
 			assert.Equal(t, "stanley", service.Group)
-			
+
 			// Permissions should be valid octal
 			assert.Contains(t, []string{"0750", "0755", "0644"}, service.Permissions)
 		})
@@ -394,30 +394,30 @@ func TestGlobalServiceRegistryConsistency(t *testing.T) {
 	// Test that the global registry functions return consistent data
 	globalRegistry := GetGlobalDelphiServiceRegistry()
 	newRegistry := GetDelphiServiceRegistry()
-	
+
 	// Both should return the same services
 	globalServices := globalRegistry.GetActiveServices()
 	newServices := newRegistry.GetActiveServices()
-	
+
 	assert.Equal(t, len(globalServices), len(newServices))
-	
+
 	// Convert to maps for comparison
 	globalMap := make(map[string]DelphiServiceDefinition)
 	newMap := make(map[string]DelphiServiceDefinition)
-	
+
 	for _, service := range globalServices {
 		globalMap[service.Name] = service
 	}
-	
+
 	for _, service := range newServices {
 		newMap[service.Name] = service
 	}
-	
+
 	// Compare each service
 	for name, globalService := range globalMap {
 		newService, exists := newMap[name]
 		assert.True(t, exists, "Service %s exists in global but not in new registry", name)
-		
+
 		if exists {
 			assert.Equal(t, globalService.Name, newService.Name)
 			assert.Equal(t, globalService.WorkerScript, newService.WorkerScript)
@@ -430,7 +430,7 @@ func TestGlobalServiceRegistryConsistency(t *testing.T) {
 // Benchmark service registry operations
 func BenchmarkGetActiveServices(b *testing.B) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = registry.GetActiveServices()
@@ -439,7 +439,7 @@ func BenchmarkGetActiveServices(b *testing.B) {
 
 func BenchmarkGetService(b *testing.B) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = registry.GetService("delphi-listener")
@@ -448,7 +448,7 @@ func BenchmarkGetService(b *testing.B) {
 
 func BenchmarkValidateService(b *testing.B) {
 	registry := GetDelphiServiceRegistry()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = registry.ValidateService("delphi-listener")

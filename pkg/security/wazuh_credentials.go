@@ -24,15 +24,15 @@ type WazuhCredentialConfig struct {
 
 // WazuhCredentials represents the three main Wazuh credentials
 type WazuhCredentials struct {
-	AdminPassword   string
-	KibanaPassword  string
-	APIPassword     string
+	AdminPassword  string
+	KibanaPassword string
+	APIPassword    string
 }
 
 // ManageWazuhCredentials replaces the changeDefaultCredentials.sh functionality
 func ManageWazuhCredentials(rc *eos_io.RuntimeContext, config WazuhCredentialConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Wazuh credential management", 
+	logger.Info("Starting Wazuh credential management",
 		zap.String("version", config.Version),
 		zap.String("deployment_type", config.DeploymentType))
 
@@ -96,7 +96,7 @@ func assessWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialConf
 	internalUsersPath := filepath.Join(workingDir, "config/wazuh_indexer/internal_users.yml")
 	if exists, _ := fileExists(internalUsersPath); exists {
 		assessment.ConfigFiles = append(assessment.ConfigFiles, internalUsersPath)
-		
+
 		if hasDefaultHashes, _ := checkForDefaultWazuhHashes(internalUsersPath); hasDefaultHashes {
 			assessment.WeakCredentials = append(assessment.WeakCredentials, internalUsersPath)
 		}
@@ -110,7 +110,7 @@ func assessWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialConf
 		logger.Info("Found running Wazuh containers", zap.Strings("containers", runningContainers))
 	}
 
-	logger.Info("Wazuh deployment assessment completed", 
+	logger.Info("Wazuh deployment assessment completed",
 		zap.Int("config_files", len(assessment.ConfigFiles)),
 		zap.Int("weak_credentials", len(assessment.WeakCredentials)),
 		zap.Int("plaintext_found", len(assessment.PlaintextFound)))
@@ -128,9 +128,9 @@ func generateAndStoreWazuhCredentials(rc *eos_io.RuntimeContext, config WazuhCre
 		Service:   "wazuh",
 		VaultPath: "wazuh/credentials",
 		Credentials: map[string]string{
-			"admin":   "admin_password",
-			"kibana":  "kibana_password", 
-			"api":     "api_password",
+			"admin":  "admin_password",
+			"kibana": "kibana_password",
+			"api":    "api_password",
 		},
 		HashRequired: true,
 		Policies:     []string{"wazuh-admin", "wazuh-operator"},
@@ -163,21 +163,21 @@ func updateWazuhConfiguration(rc *eos_io.RuntimeContext, config WazuhCredentialC
 
 	// Update docker-compose.yml with new passwords
 	dockerComposePath := filepath.Join(workingDir, "docker-compose.yml")
-	
+
 	// Admin password
-	if err := replaceInFile(rc, dockerComposePath, "INDEXER_PASSWORD=SecretPassword", 
+	if err := replaceInFile(rc, dockerComposePath, "INDEXER_PASSWORD=SecretPassword",
 		"INDEXER_PASSWORD=${WAZUH_ADMIN_PASSWORD}"); err != nil {
 		return cerr.Wrap(err, "failed to update admin password in docker-compose.yml")
 	}
 
 	// Kibana password
-	if err := replaceInFile(rc, dockerComposePath, "DASHBOARD_PASSWORD=kibanaserver", 
+	if err := replaceInFile(rc, dockerComposePath, "DASHBOARD_PASSWORD=kibanaserver",
 		"DASHBOARD_PASSWORD=${WAZUH_KIBANA_PASSWORD}"); err != nil {
 		return cerr.Wrap(err, "failed to update kibana password in docker-compose.yml")
 	}
 
 	// API password
-	if err := replaceInFile(rc, dockerComposePath, "API_PASSWORD=MyS3cr37P450r.*-", 
+	if err := replaceInFile(rc, dockerComposePath, "API_PASSWORD=MyS3cr37P450r.*-",
 		"API_PASSWORD=${WAZUH_API_PASSWORD}"); err != nil {
 		return cerr.Wrap(err, "failed to update API password in docker-compose.yml")
 	}
@@ -207,14 +207,14 @@ WAZUH_API_PASSWORD=%s
 
 	// Update internal_users.yml
 	internalUsersPath := filepath.Join(workingDir, "config/wazuh_indexer/internal_users.yml")
-	
+
 	// Replace default admin hash
-	if err := replaceInFile(rc, internalUsersPath, 
+	if err := replaceInFile(rc, internalUsersPath,
 		"$2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO", adminHash); err != nil {
 		return cerr.Wrap(err, "failed to update admin hash in internal_users.yml")
 	}
 
-	// Replace default kibana hash  
+	// Replace default kibana hash
 	if err := replaceInFile(rc, internalUsersPath,
 		"$2a$12$4AcgAt3xwOWadA5s5blL6ev39OXDNhmOesEoo33eZtrq2N0YrU3H.", kibanaHash); err != nil {
 		return cerr.Wrap(err, "failed to update kibana hash in internal_users.yml")
@@ -297,7 +297,7 @@ func checkForDefaultWazuhCredentials(filePath string) (bool, error) {
 
 	defaultPatterns := []string{
 		"INDEXER_PASSWORD=SecretPassword",
-		"DASHBOARD_PASSWORD=kibanaserver", 
+		"DASHBOARD_PASSWORD=kibanaserver",
 		"API_PASSWORD=MyS3cr37P450r.*-",
 	}
 
@@ -360,7 +360,7 @@ func retrieveWazuhCredentialsFromVault(rc *eos_io.RuntimeContext, vaultPath stri
 	// For now, return placeholder - in real implementation would call vault.ReadSecret
 	return &WazuhCredentials{
 		AdminPassword:  "placeholder-will-retrieve-from-vault",
-		KibanaPassword: "placeholder-will-retrieve-from-vault", 
+		KibanaPassword: "placeholder-will-retrieve-from-vault",
 		APIPassword:    "placeholder-will-retrieve-from-vault",
 	}, nil
 }
@@ -385,7 +385,7 @@ func generateWazuhPasswordHash(rc *eos_io.RuntimeContext, password, version stri
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args: []string{
-			"run", "--rm", 
+			"run", "--rm",
 			fmt.Sprintf("wazuh/wazuh-indexer:%s", version),
 			"bash", "-c",
 			fmt.Sprintf("echo '%s' | /usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh", password),
@@ -404,7 +404,7 @@ func applyWazuhSecurityConfiguration(rc *eos_io.RuntimeContext, config WazuhCred
 	logger.Info("Applying Wazuh security configuration")
 
 	containerName := getIndexerContainerName(config.DeploymentType)
-	
+
 	// Apply security admin configuration
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
@@ -433,7 +433,7 @@ func getExpectedWazuhContainers(deploymentType string) []string {
 	if deploymentType == "single-node" {
 		return []string{
 			"single-node-wazuh.indexer-1",
-			"single-node-wazuh.manager-1", 
+			"single-node-wazuh.manager-1",
 			"single-node-wazuh.dashboard-1",
 		}
 	}

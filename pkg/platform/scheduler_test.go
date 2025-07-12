@@ -86,9 +86,9 @@ func TestScheduleCron(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := scheduleCron(rc, tt.Input.cmd, tt.Input.osPlatform)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 				if tt.Input.osPlatform == "unsupported" {
@@ -188,13 +188,13 @@ func TestScheduleCronSecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Test on Linux platform
 			err := scheduleCron(rc, tt.Input.maliciousCmd, "linux")
-			
+
 			// Should handle malicious input but will error in test env
 			assert.Error(t, err) // Will error without crontab in test env
-			
+
 			// The function should not panic or cause security issues
 			// Actual command execution safety depends on the shell execution
 		})
@@ -210,7 +210,7 @@ func TestScheduleCronRandomTimeGeneration(t *testing.T) {
 
 	// Test that the function generates different random times
 	// This is important for distributing cron load
-	
+
 	// Run the function multiple times and check it doesn't panic
 	for i := 0; i < 10; i++ {
 		err := scheduleCron(rc, "test command", "linux")
@@ -279,7 +279,7 @@ func TestScheduleCronInvalidPlatform(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := scheduleCron(rc, "test command", tt.Input.platform)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "not supported")
@@ -308,7 +308,7 @@ func BenchmarkScheduleCron(b *testing.B) {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		scheduleCron(rc, "eos update packages", "linux")
@@ -319,7 +319,7 @@ func BenchmarkScheduleCronRandomGeneration(b *testing.B) {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Focus on the random number generation part

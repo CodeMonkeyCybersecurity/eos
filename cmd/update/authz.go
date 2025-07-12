@@ -154,7 +154,7 @@ func init() {
 	// TODO: Pattern 1 - Need to determine correct parent command for registration
 	// Based on examples showing "eos secure permissions", this might need a "secure" parent command
 	// UpdateCmd.AddCommand(permissionsCmd)
-	
+
 	// Add subcommands to permissions command
 	permissionsCmd.AddCommand(permissionsCheckCmd)
 	permissionsCmd.AddCommand(permissionsFixCmd)

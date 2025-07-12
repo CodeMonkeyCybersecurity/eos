@@ -31,7 +31,7 @@ func NewServiceInstallationManager() *ServiceInstallationManager {
 // InstallService installs a service based on the provided options
 func (sim *ServiceInstallationManager) InstallService(rc *eos_io.RuntimeContext, options *ServiceInstallOptions) (*InstallationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	start := time.Now()
 	result := &InstallationResult{
 		Service:   string(options.Type),
@@ -124,7 +124,7 @@ func (sim *ServiceInstallationManager) InstallService(rc *eos_io.RuntimeContext,
 	}
 
 	result.Duration = time.Since(start)
-	
+
 	if result.Success {
 		logger.Info("Service installation completed successfully",
 			zap.String("service", string(options.Type)),
@@ -142,7 +142,7 @@ func (sim *ServiceInstallationManager) InstallService(rc *eos_io.RuntimeContext,
 // GetServiceStatus retrieves the status of an installed service
 func (sim *ServiceInstallationManager) GetServiceStatus(rc *eos_io.RuntimeContext, serviceType ServiceType) (*ServiceStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Getting service status", zap.String("service", string(serviceType)))
 
 	status := &ServiceStatus{
@@ -178,7 +178,7 @@ func (sim *ServiceInstallationManager) GetServiceStatus(rc *eos_io.RuntimeContex
 // PerformHealthCheck performs a health check on a service
 func (sim *ServiceInstallationManager) PerformHealthCheck(rc *eos_io.RuntimeContext, serviceType ServiceType, endpoint string) (*HealthCheckResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	start := time.Now()
 	result := &HealthCheckResult{
 		Endpoint:  endpoint,
@@ -186,7 +186,7 @@ func (sim *ServiceInstallationManager) PerformHealthCheck(rc *eos_io.RuntimeCont
 		Checks:    make([]HealthCheck, 0),
 	}
 
-	logger.Info("Performing health check", 
+	logger.Info("Performing health check",
 		zap.String("service", string(serviceType)),
 		zap.String("endpoint", endpoint))
 
@@ -205,13 +205,13 @@ func (sim *ServiceInstallationManager) PerformHealthCheck(rc *eos_io.RuntimeCont
 			defer resp.Body.Close()
 			result.StatusCode = resp.StatusCode
 			result.Healthy = resp.StatusCode >= 200 && resp.StatusCode < 400
-			
+
 			status := "PASSED"
 			message := fmt.Sprintf("HTTP %d", resp.StatusCode)
 			if !result.Healthy {
 				status = "FAILED"
 			}
-			
+
 			result.Checks = append(result.Checks, HealthCheck{
 				Name:    "HTTP Check",
 				Status:  status,
@@ -232,7 +232,7 @@ func (sim *ServiceInstallationManager) PerformHealthCheck(rc *eos_io.RuntimeCont
 	}
 
 	result.ResponseTime = time.Since(start)
-	
+
 	// Determine overall health
 	if result.Healthy {
 		for _, check := range result.Checks {
@@ -402,7 +402,7 @@ func (sim *ServiceInstallationManager) performPreInstallationChecks(rc *eos_io.R
 			portStep.Error = fmt.Sprintf("Port %d is already in use", options.Port)
 			portStep.Duration = time.Since(portStepStart)
 			result.Steps = append(result.Steps, portStep)
-			
+
 			if !options.Force {
 				return fmt.Errorf("port %d is already in use", options.Port)
 			}
@@ -544,17 +544,17 @@ func (sim *ServiceInstallationManager) checkServicePort(port int) HealthCheck {
 
 func (sim *ServiceInstallationManager) runCommand(rc *eos_io.RuntimeContext, step string, command string, args ...string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	logger.Info("Executing command", 
+
+	logger.Info("Executing command",
 		zap.String("step", step),
 		zap.String("command", command),
 		zap.Strings("args", args))
 
 	cmd := exec.Command(command, args...)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
-		logger.Error("Command failed", 
+		logger.Error("Command failed",
 			zap.String("step", step),
 			zap.String("command", command),
 			zap.String("output", string(output)),
@@ -562,7 +562,7 @@ func (sim *ServiceInstallationManager) runCommand(rc *eos_io.RuntimeContext, ste
 		return fmt.Errorf("command failed: %w", err)
 	}
 
-	logger.Info("Command completed successfully", 
+	logger.Info("Command completed successfully",
 		zap.String("step", step),
 		zap.String("output", string(output)))
 
@@ -582,4 +582,3 @@ func (sim *ServiceInstallationManager) createCommandInDir(dir string, name strin
 	cmd.Dir = dir
 	return cmd
 }
-

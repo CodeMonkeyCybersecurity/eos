@@ -6,7 +6,7 @@ package utils
 func IsPseudoFilesystem(fs string) bool {
 	// ASSESS - Define known pseudo filesystems
 	pseudo := []string{"proc", "sysfs", "devfs", "devpts", "tmpfs", "securityfs", "cgroup", "debugfs"}
-	
+
 	// INTERVENE - Check if the given filesystem matches any pseudo filesystem
 	for _, p := range pseudo {
 		if fs == p {
@@ -14,7 +14,7 @@ func IsPseudoFilesystem(fs string) bool {
 			return true
 		}
 	}
-	
+
 	// EVALUATE - No match found
 	return false
 }

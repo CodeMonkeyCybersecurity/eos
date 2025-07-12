@@ -188,7 +188,6 @@ type ConsulVaultTemplate struct {
 	UseVaultSecrets bool
 }
 
-
 // UpstreamService represents an upstream service configuration
 type UpstreamService struct {
 	Name       string

@@ -102,12 +102,12 @@ func TestRenderEmail(t *testing.T) {
 				Title:    "Complex Meta Alert",
 				Host:     "server",
 				Meta: map[string]any{
-					"string":  "value",
-					"number":  42,
-					"float":   3.14,
-					"bool":    true,
-					"slice":   []string{"a", "b", "c"},
-					"nested":  map[string]any{"key": "value"},
+					"string": "value",
+					"number": 42,
+					"float":  3.14,
+					"bool":   true,
+					"slice":  []string{"a", "b", "c"},
+					"nested": map[string]any{"key": "value"},
 				},
 			},
 			checkFunc: func(t *testing.T, r Rendered, err error) {
@@ -219,7 +219,7 @@ func TestRenderEmailErrorCases(t *testing.T) {
 	// Since we can't easily force template execution errors with valid Alert structs,
 	// we'll test the error path by checking that empty text returns an error
 	// This would require modifying the templates to fail on certain inputs
-	
+
 	// For now, we'll test that the function handles various edge cases gracefully
 	edgeCases := []Alert{
 		{
@@ -259,7 +259,7 @@ func TestTemplateInitialization(t *testing.T) {
 func TestMimeEncoding(t *testing.T) {
 	from := mail.Address{Address: "test@example.com"}
 	to := []mail.Address{{Address: "recipient@example.com"}}
-	
+
 	// Test with Unicode subject
 	subject := "Test 测试 Тест"
 	text := "Body"
@@ -279,7 +279,7 @@ func TestMultipleRecipients(t *testing.T) {
 		{Address: "recipient2@example.com"},
 		{Address: "recipient3@example.com"},
 	}
-	
+
 	mime := buildMime(from, to, "Subject", "Text", "")
 	mimeStr := string(mime)
 

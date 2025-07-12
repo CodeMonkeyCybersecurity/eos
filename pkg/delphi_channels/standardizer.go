@@ -22,7 +22,7 @@ func NewChannelStandardizer(config *ChannelStandardizerConfig) *ChannelStandardi
 	if config == nil {
 		config = DefaultChannelStandardizerConfig()
 	}
-	
+
 	return &ChannelStandardizer{
 		config:  config,
 		changes: make([]ChannelChange, 0),
@@ -51,7 +51,7 @@ func (cs *ChannelStandardizer) StandardizeAll() *StandardizationResult {
 	// Process each worker file
 	for workerFile, expectedConfig := range StandardWorkerConfigs {
 		workerPath := filepath.Join(cs.config.WorkersDir, workerFile)
-		
+
 		if _, err := os.Stat(workerPath); os.IsNotExist(err) {
 			result.FilesSkipped = append(result.FilesSkipped, workerFile+" (not found)")
 			continue
@@ -92,7 +92,7 @@ func (cs *ChannelStandardizer) AnalyzeWorkers() ([]WorkerChannelInfo, error) {
 
 	for workerFile, expectedConfig := range StandardWorkerConfigs {
 		workerPath := filepath.Join(cs.config.WorkersDir, workerFile)
-		
+
 		info := WorkerChannelInfo{
 			Filename:       workerFile,
 			ListenChannels: make([]string, 0),
@@ -175,7 +175,7 @@ func (cs *ChannelStandardizer) standardizeWorkerFile(workerPath string, expected
 	// Write changes if any were made and not in dry-run mode
 	if hasChanges && !cs.config.DryRun {
 		var backupPath string
-		
+
 		// Create backup if enabled
 		if cs.config.CreateBackups {
 			backupPath = workerPath + ".bak"
@@ -209,7 +209,7 @@ func (cs *ChannelStandardizer) updateListenChannelVariable(content, channel, fil
 		if re.MatchString(content) {
 			oldMatches := re.FindAllString(content, -1)
 			newContent := re.ReplaceAllString(content, replacement)
-			
+
 			if newContent != content {
 				// Record the change
 				for _, oldMatch := range oldMatches {
@@ -242,7 +242,7 @@ func (cs *ChannelStandardizer) updateNotifyChannelVariable(content, channel, fil
 		if re.MatchString(content) {
 			oldMatches := re.FindAllString(content, -1)
 			newContent := re.ReplaceAllString(content, replacement)
-			
+
 			if newContent != content {
 				// Record the change
 				for _, oldMatch := range oldMatches {
@@ -267,12 +267,12 @@ func (cs *ChannelStandardizer) updatePgNotifyCalls(content, channel, filepath st
 	// Pattern to match pg_notify calls with different channel names
 	pattern := `pg_notify\s*\(\s*['"](?!` + regexp.QuoteMeta(channel) + `)[^'"]*['"]`
 	re := regexp.MustCompile(pattern)
-	
+
 	if re.MatchString(content) {
 		oldMatches := re.FindAllString(content, -1)
 		replacement := fmt.Sprintf(`pg_notify('%s'`, channel)
 		newContent := re.ReplaceAllString(content, replacement)
-		
+
 		if newContent != content {
 			// Record the change
 			for _, oldMatch := range oldMatches {
@@ -305,7 +305,7 @@ func (cs *ChannelStandardizer) updateListenStatements(content, channel, filepath
 		re := regexp.MustCompile(pattern)
 		if re.MatchString(updatedContent) {
 			oldMatches := re.FindAllString(updatedContent, -1)
-			
+
 			if strings.Contains(pattern, "cur.execute") {
 				replacement := fmt.Sprintf(`cur.execute("LISTEN %s")`, channel)
 				updatedContent = re.ReplaceAllString(updatedContent, replacement)
@@ -313,7 +313,7 @@ func (cs *ChannelStandardizer) updateListenStatements(content, channel, filepath
 				replacement := fmt.Sprintf(`LISTEN %s`, channel)
 				updatedContent = re.ReplaceAllString(updatedContent, replacement)
 			}
-			
+
 			if len(oldMatches) > 0 {
 				hasChanges = true
 				// Record the change
@@ -344,17 +344,17 @@ func (cs *ChannelStandardizer) analyzeWorkerFile(workerPath string, info *Worker
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Extract LISTEN_CHANNEL
 		if match := regexp.MustCompile(`LISTEN_CHANNEL\s*=\s*["']([^"']+)["']`).FindStringSubmatch(line); len(match) > 1 {
 			info.ListenChannels = append(info.ListenChannels, match[1])
 		}
-		
+
 		// Extract NOTIFY_CHANNEL
 		if match := regexp.MustCompile(`NOTIFY_CHANNEL\s*=\s*["']([^"']+)["']`).FindStringSubmatch(line); len(match) > 1 {
 			info.NotifyChannels = append(info.NotifyChannels, match[1])
 		}
-		
+
 		// Extract pg_notify calls
 		if match := regexp.MustCompile(`pg_notify\s*\(\s*["']([^"']+)["']`).FindStringSubmatch(line); len(match) > 1 {
 			channel := match[1]
@@ -362,7 +362,7 @@ func (cs *ChannelStandardizer) analyzeWorkerFile(workerPath string, info *Worker
 				info.NotifyChannels = append(info.NotifyChannels, channel)
 			}
 		}
-		
+
 		// Extract LISTEN statements
 		if match := regexp.MustCompile(`LISTEN\s+(\w+)`).FindStringSubmatch(line); len(match) > 1 {
 			channel := match[1]
@@ -383,14 +383,14 @@ func (cs *ChannelStandardizer) isConfigurationCorrect(info WorkerChannelInfo, ex
 			return false
 		}
 	}
-	
+
 	// Check notify channels
 	for _, expectedChannel := range expected.NotifyChannels {
 		if !contains(info.NotifyChannels, expectedChannel) {
 			return false
 		}
 	}
-	
+
 	// Check for unexpected channels
 	if len(info.ListenChannels) != len(expected.ListenChannels) ||
 		len(info.NotifyChannels) != len(expected.NotifyChannels) {
@@ -408,21 +408,21 @@ func (cs *ChannelStandardizer) addConfigurationIssues(info *WorkerChannelInfo, e
 			info.Issues = append(info.Issues, fmt.Sprintf("Missing listen channel: %s", expectedChannel))
 		}
 	}
-	
+
 	// Check for missing notify channels
 	for _, expectedChannel := range expected.NotifyChannels {
 		if !contains(info.NotifyChannels, expectedChannel) {
 			info.Issues = append(info.Issues, fmt.Sprintf("Missing notify channel: %s", expectedChannel))
 		}
 	}
-	
+
 	// Check for unexpected listen channels
 	for _, actualChannel := range info.ListenChannels {
 		if !contains(expected.ListenChannels, actualChannel) {
 			info.Issues = append(info.Issues, fmt.Sprintf("Unexpected listen channel: %s", actualChannel))
 		}
 	}
-	
+
 	// Check for unexpected notify channels
 	for _, actualChannel := range info.NotifyChannels {
 		if !contains(expected.NotifyChannels, actualChannel) {

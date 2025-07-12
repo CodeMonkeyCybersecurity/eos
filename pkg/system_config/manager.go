@@ -45,7 +45,7 @@ func (scm *SystemConfigManager) GetManager(configType ConfigurationType) (Config
 // ApplyConfiguration applies a configuration using the appropriate manager
 func (scm *SystemConfigManager) ApplyConfiguration(rc *eos_io.RuntimeContext, options *ConfigurationOptions) (*ConfigurationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Applying system configuration",
 		zap.String("type", string(options.Type)),
 		zap.Bool("dry_run", options.DryRun))
@@ -155,7 +155,7 @@ func (scm *SystemConfigManager) ApplyConfiguration(rc *eos_io.RuntimeContext, op
 // GetConfigurationStatus retrieves the status of a configuration
 func (scm *SystemConfigManager) GetConfigurationStatus(rc *eos_io.RuntimeContext, configType ConfigurationType) (*ConfigurationStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Getting configuration status", zap.String("type", string(configType)))
 
 	manager, err := scm.GetManager(configType)
@@ -180,17 +180,17 @@ func (scm *SystemConfigManager) ListAvailableConfigurations() []ConfigurationTyp
 // RunCommand executes a system command with proper logging
 func RunCommand(rc *eos_io.RuntimeContext, step string, command string, args ...string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	logger.Info("Executing command", 
+
+	logger.Info("Executing command",
 		zap.String("step", step),
 		zap.String("command", command),
 		zap.Strings("args", args))
 
 	cmd := exec.Command(command, args...)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
-		logger.Error("Command failed", 
+		logger.Error("Command failed",
 			zap.String("step", step),
 			zap.String("command", command),
 			zap.String("output", string(output)),
@@ -198,7 +198,7 @@ func RunCommand(rc *eos_io.RuntimeContext, step string, command string, args ...
 		return fmt.Errorf("command failed: %w", err)
 	}
 
-	logger.Info("Command completed successfully", 
+	logger.Info("Command completed successfully",
 		zap.String("step", step),
 		zap.String("output", string(output)))
 
@@ -289,7 +289,7 @@ func CheckPackageInstalled(packageName string) (PackageState, error) {
 	output, err := cmd.Output()
 	if err == nil && strings.Contains(string(output), "ii  "+packageName) {
 		state.Installed = true
-		
+
 		// Extract version
 		lines := strings.Split(string(output), "\n")
 		for _, line := range lines {
@@ -310,7 +310,7 @@ func CheckPackageInstalled(packageName string) (PackageState, error) {
 func GenerateSecureToken(length int) (string, error) {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	token := make([]byte, length)
-	
+
 	for i := range token {
 		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 		if err != nil {
@@ -318,7 +318,7 @@ func GenerateSecureToken(length int) (string, error) {
 		}
 		token[i] = charset[num.Int64()]
 	}
-	
+
 	return string(token), nil
 }
 
@@ -327,37 +327,37 @@ func ValidateEmail(email string) error {
 	if email == "" {
 		return fmt.Errorf("email cannot be empty")
 	}
-	
+
 	// Basic email format validation
 	parts := strings.Split(email, "@")
 	if len(parts) != 2 {
 		return fmt.Errorf("email must contain exactly one @ symbol")
 	}
-	
+
 	localPart := parts[0]
 	domainPart := parts[1]
-	
+
 	if localPart == "" {
 		return fmt.Errorf("email local part cannot be empty")
 	}
-	
+
 	if domainPart == "" {
 		return fmt.Errorf("email domain part cannot be empty")
 	}
-	
+
 	if !strings.Contains(domainPart, ".") {
 		return fmt.Errorf("email domain must contain at least one dot")
 	}
-	
+
 	// Check for invalid characters at the beginning or end
 	if strings.HasPrefix(localPart, ".") || strings.HasSuffix(localPart, ".") {
 		return fmt.Errorf("email local part cannot start or end with a dot")
 	}
-	
+
 	if strings.HasPrefix(domainPart, ".") || strings.HasSuffix(domainPart, ".") {
 		return fmt.Errorf("email domain cannot start or end with a dot")
 	}
-	
+
 	return nil
 }
 

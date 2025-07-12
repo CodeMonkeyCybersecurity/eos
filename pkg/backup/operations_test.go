@@ -87,7 +87,7 @@ func TestHookOperation_Intervene_Success(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := hook.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -106,7 +106,7 @@ func TestHookOperation_Intervene_CommandFails(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := hook.Intervene(ctx, assessment)
 
 	assert.Error(t, err)
@@ -126,7 +126,7 @@ func TestHookOperation_Evaluate_Success(t *testing.T) {
 		Success: true,
 		Message: "hook executed successfully",
 	}
-	
+
 	result, err := hook.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestHookOperation_Evaluate_Failure(t *testing.T) {
 		Success: false,
 		Message: "hook failed",
 	}
-	
+
 	result, err := hook.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestRunHook_Integration(t *testing.T) {
 func TestBackupOperation_Assess_ValidPaths(t *testing.T) {
 	logger := createTestLogger(t)
 	tempDir := t.TempDir()
-	
+
 	// Create test files
 	testFile := filepath.Join(tempDir, "test.txt")
 	require.NoError(t, os.WriteFile(testFile, []byte("test"), 0644))
@@ -205,7 +205,7 @@ func TestBackupOperation_Assess_ValidPaths(t *testing.T) {
 
 func TestBackupOperation_Assess_InvalidPaths(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	profile := backup.Profile{
 		Paths: []string{"/nonexistent/path"},
 		Tags:  []string{"test"},
@@ -231,7 +231,7 @@ func TestBackupOperation_Assess_InvalidPaths(t *testing.T) {
 
 func TestBackupOperation_Intervene_DryRun(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	profile := backup.Profile{
 		Paths: []string{"/tmp"},
 		Tags:  []string{"test"},
@@ -249,7 +249,7 @@ func TestBackupOperation_Intervene_DryRun(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -262,7 +262,7 @@ func TestBackupOperation_Intervene_DryRun(t *testing.T) {
 
 func TestBackupOperation_Intervene_ActualBackup(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	profile := backup.Profile{
 		Paths: []string{"/tmp"},
 		Tags:  []string{"test"},
@@ -280,7 +280,7 @@ func TestBackupOperation_Intervene_ActualBackup(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -293,7 +293,7 @@ func TestBackupOperation_Intervene_ActualBackup(t *testing.T) {
 
 func TestBackupOperation_Intervene_BackupFails(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	profile := backup.Profile{
 		Paths: []string{"/tmp"},
 		Tags:  []string{"test"},
@@ -313,7 +313,7 @@ func TestBackupOperation_Intervene_BackupFails(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	assert.Error(t, err)
@@ -333,7 +333,7 @@ func TestBackupOperation_Evaluate_Success(t *testing.T) {
 		Success: true,
 		Message: "backup completed",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestBackupOperation_Evaluate_Failure(t *testing.T) {
 		Success: false,
 		Message: "backup failed",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -365,7 +365,7 @@ func TestBackupOperation_Evaluate_Failure(t *testing.T) {
 
 func TestNotificationOperation_Assess_ValidMethod(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	config := backup.Notifications{
 		Method: "email",
 		Target: "test@example.com",
@@ -389,7 +389,7 @@ func TestNotificationOperation_Assess_ValidMethod(t *testing.T) {
 
 func TestNotificationOperation_Assess_InvalidMethod(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	config := backup.Notifications{
 		Method: "invalid_method",
 		Target: "test@example.com",
@@ -412,7 +412,7 @@ func TestNotificationOperation_Assess_InvalidMethod(t *testing.T) {
 
 func TestNotificationOperation_Assess_MissingTarget(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	config := backup.Notifications{
 		Method: "email",
 		Target: "",
@@ -435,7 +435,7 @@ func TestNotificationOperation_Assess_MissingTarget(t *testing.T) {
 
 func TestNotificationOperation_Intervene_Email(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	config := backup.Notifications{
 		Method: "email",
 		Target: "test@example.com",
@@ -450,7 +450,7 @@ func TestNotificationOperation_Intervene_Email(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -463,7 +463,7 @@ func TestNotificationOperation_Intervene_Email(t *testing.T) {
 
 func TestNotificationOperation_Intervene_Slack(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	config := backup.Notifications{
 		Method: "slack",
 		Target: "#backups",
@@ -478,7 +478,7 @@ func TestNotificationOperation_Intervene_Slack(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -488,7 +488,7 @@ func TestNotificationOperation_Intervene_Slack(t *testing.T) {
 
 func TestNotificationOperation_Intervene_Webhook(t *testing.T) {
 	logger := createTestLogger(t)
-	
+
 	config := backup.Notifications{
 		Method: "webhook",
 		Target: "https://hooks.example.com/backup",
@@ -503,7 +503,7 @@ func TestNotificationOperation_Intervene_Webhook(t *testing.T) {
 
 	ctx := context.Background()
 	assessment := &patterns.AssessmentResult{CanProceed: true}
-	
+
 	result, err := operation.Intervene(ctx, assessment)
 
 	require.NoError(t, err)
@@ -522,7 +522,7 @@ func TestNotificationOperation_Evaluate(t *testing.T) {
 		Success: true,
 		Message: "notification sent",
 	}
-	
+
 	result, err := operation.Evaluate(ctx, intervention)
 
 	require.NoError(t, err)
@@ -537,8 +537,8 @@ func TestSendNotification_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name   string
-		config backup.Notifications
+		name        string
+		config      backup.Notifications
 		expectError bool
 	}{
 		{
@@ -613,7 +613,7 @@ func BenchmarkBackupOperation_Assess(b *testing.B) {
 	logger := zaptest.NewLogger(b)
 	otelLogger := otelzap.New(logger).Ctx(context.Background())
 	tempDir := b.TempDir()
-	
+
 	profile := backup.Profile{
 		Paths: []string{tempDir},
 		Tags:  []string{"benchmark"},

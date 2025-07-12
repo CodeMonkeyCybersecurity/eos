@@ -45,7 +45,7 @@ Examples:
 			logger.Info("Salt not configured, falling back to direct execution")
 			manager = disk_management.NewDiskManager(nil)
 		}
-		
+
 		result, err := manager.ListDisks(rc)
 		if err != nil {
 			logger.Error("Failed to list disks", zap.Error(err))
@@ -66,13 +66,15 @@ func init() {
 
 	ListCmd.AddCommand(disksCmd)
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos 
+
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
 func outputDiskListJSON(result *disk_management.DiskListResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos 
+
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
 func outputDiskListTable(result *disk_management.DiskListResult) error {
 	if result.Total == 0 {
 		fmt.Println("No disk devices found.")

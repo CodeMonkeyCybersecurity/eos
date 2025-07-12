@@ -51,7 +51,7 @@ func TestHasBinary(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := hasBinary(tt.Input.binaryName)
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -114,9 +114,9 @@ func TestAllowPorts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := AllowPorts(rc, tt.Input.ports)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 				// Should indicate no supported firewall backend
@@ -186,9 +186,9 @@ func TestAllowPortsUFW(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := allowPortsUFW(rc, tt.Input.ports)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -244,9 +244,9 @@ func TestAllowPortsFirewalld(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := allowPortsFirewalld(rc, tt.Input.ports)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -323,18 +323,18 @@ func TestFirewallSecurityPortValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Test with main AllowPorts function
 			err := AllowPorts(rc, tt.Input.maliciousPorts)
 			// Should error (no firewall backend) but not panic or cause security issues
 			assert.Error(t, err)
-			
+
 			// Test UFW function directly
 			err = allowPortsUFW(rc, tt.Input.maliciousPorts)
 			// Should handle malicious input safely
 			_ = err // May succeed or fail, but shouldn't cause security issues
-			
-			// Test Firewalld function directly  
+
+			// Test Firewalld function directly
 			err = allowPortsFirewalld(rc, tt.Input.maliciousPorts)
 			// Should handle malicious input safely
 			_ = err // May succeed or fail, but shouldn't cause security issues
@@ -354,7 +354,7 @@ func BenchmarkAllowPorts(b *testing.B) {
 		Ctx: context.Background(),
 	}
 	ports := []string{"8080", "8443"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		AllowPorts(rc, ports)

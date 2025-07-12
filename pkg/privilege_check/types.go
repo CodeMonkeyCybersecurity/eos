@@ -15,15 +15,15 @@ const (
 
 // PrivilegeCheck represents the result of checking privileges
 type PrivilegeCheck struct {
-	UserID      int            `json:"user_id"`
-	Username    string         `json:"username"`
-	GroupID     int            `json:"group_id"`
-	Groupname   string         `json:"groupname"`
-	Level       PrivilegeLevel `json:"level"`
-	IsRoot      bool           `json:"is_root"`
-	HasSudo     bool           `json:"has_sudo"`
-	Timestamp   time.Time      `json:"timestamp"`
-	Error       string         `json:"error,omitempty"`
+	UserID    int            `json:"user_id"`
+	Username  string         `json:"username"`
+	GroupID   int            `json:"group_id"`
+	Groupname string         `json:"groupname"`
+	Level     PrivilegeLevel `json:"level"`
+	IsRoot    bool           `json:"is_root"`
+	HasSudo   bool           `json:"has_sudo"`
+	Timestamp time.Time      `json:"timestamp"`
+	Error     string         `json:"error,omitempty"`
 }
 
 // SudoCheckResult represents the result of a sudo check operation

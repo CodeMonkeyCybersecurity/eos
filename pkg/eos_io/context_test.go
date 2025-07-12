@@ -339,7 +339,7 @@ func TestNewExtendedContext(t *testing.T) {
 		if !ok {
 			t.Error("expected context to have a deadline")
 		}
-		
+
 		// The deadline should be approximately timeout from now
 		expectedDeadline := time.Now().Add(timeout)
 		if deadline.Before(expectedDeadline.Add(-time.Second)) || deadline.After(expectedDeadline.Add(time.Second)) {
@@ -356,7 +356,7 @@ func TestNewExtendedContext(t *testing.T) {
 		if rc == nil {
 			t.Fatal("expected non-nil runtime context")
 		}
-		
+
 		// Verify context will timeout
 		select {
 		case <-rc.Ctx.Done():
@@ -378,7 +378,7 @@ func TestNewExtendedContext(t *testing.T) {
 		if rc == nil {
 			t.Fatal("expected non-nil runtime context")
 		}
-		
+
 		// Context should be immediately cancelled with zero timeout
 		select {
 		case <-rc.Ctx.Done():
@@ -402,8 +402,8 @@ func TestValidateAll(t *testing.T) {
 
 	t.Run("validates_context_with_nil_validate", func(t *testing.T) {
 		rc := &RuntimeContext{
-			Ctx: context.Background(),
-			Log: NewContext(context.Background(), "test").Log,
+			Ctx:      context.Background(),
+			Log:      NewContext(context.Background(), "test").Log,
 			Validate: nil, // This should return nil
 		}
 
@@ -415,8 +415,8 @@ func TestValidateAll(t *testing.T) {
 
 	t.Run("validates_context_with_empty_context", func(t *testing.T) {
 		rc := &RuntimeContext{
-			Ctx: context.Background(),
-			Log: nil,
+			Ctx:      context.Background(),
+			Log:      nil,
 			Validate: nil, // ValidateAll returns nil when Validate is nil
 		}
 
@@ -553,7 +553,7 @@ func TestClassifyError(t *testing.T) {
 func TestGetCallContext(t *testing.T) {
 	t.Run("returns caller info", func(t *testing.T) {
 		component, action, err := getCallContext(1)
-		
+
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -563,7 +563,7 @@ func TestGetCallContext(t *testing.T) {
 		if action == "" || action == "unknown" {
 			t.Error("expected non-empty action")
 		}
-		
+
 		// Action should be the function name (just the last part)
 		// For test functions, it would be something like "func1" due to closure
 		if action == "" || action == "unknown" {
@@ -574,15 +574,15 @@ func TestGetCallContext(t *testing.T) {
 	t.Run("different skip levels", func(t *testing.T) {
 		component1, action1, err1 := getCallContext(1)
 		component2, action2, err2 := getCallContext(2)
-		
+
 		if err1 != nil || err2 != nil {
 			t.Errorf("unexpected errors: %v, %v", err1, err2)
 		}
-		
+
 		// Log components to use them
 		t.Logf("skip 1: component=%q, action=%q", component1, action1)
 		t.Logf("skip 2: component=%q, action=%q", component2, action2)
-		
+
 		// Different skip levels should give different results
 		if action1 == action2 {
 			t.Error("expected different actions for different skip levels")
@@ -592,7 +592,7 @@ func TestGetCallContext(t *testing.T) {
 	t.Run("invalid skip level", func(t *testing.T) {
 		// Very high skip level might fail
 		component, action, err := getCallContext(100)
-		
+
 		// Should handle gracefully
 		if err == nil {
 			// If no error, should have default values

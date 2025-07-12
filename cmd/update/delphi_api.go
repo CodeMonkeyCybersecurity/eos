@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	localOnly  bool

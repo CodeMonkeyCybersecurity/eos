@@ -23,18 +23,20 @@ query-filters:
       
 # Path filters to focus analysis on critical security components
 paths:
-  - include: "pkg/vault/**"     # Vault integration (high security impact)
-  - include: "pkg/crypto/**"    # Cryptographic operations
-  - include: "pkg/delphi/**"    # Security monitoring platform
-  - include: "pkg/hecate/**"    # Reverse proxy management
-  - include: "pkg/shared/**"    # Shared security utilities
-  - include: "cmd/**"           # CLI entry points
-  - include: "pkg/eos_io/**"    # I/O operations with potential security impact
-  - include: "pkg/eos_unix/**"  # Unix system operations
-  - exclude: "**/*_test.go"     # Exclude test files from security analysis
-  - exclude: "**/testutil/**"   # Exclude test utilities
-  - exclude: "**/testdata/**"   # Exclude test data
-  - exclude: "**/.git/**"       # Exclude git metadata
+  - "pkg/vault/**"     # Vault integration (high security impact)
+  - "pkg/crypto/**"    # Cryptographic operations
+  - "pkg/delphi/**"    # Security monitoring platform
+  - "pkg/hecate/**"    # Reverse proxy management
+  - "pkg/shared/**"    # Shared security utilities
+  - "cmd/**"           # CLI entry points
+  - "pkg/eos_io/**"    # I/O operations with potential security impact
+  - "pkg/eos_unix/**"  # Unix system operations
+  
+paths-ignore:
+  - "**/*_test.go"     # Exclude test files from security analysis
+  - "**/testutil/**"   # Exclude test utilities
+  - "**/testdata/**"   # Exclude test data
+  - "**/.git/**"       # Exclude git metadata
 
 # Custom extraction configuration
 extraction:

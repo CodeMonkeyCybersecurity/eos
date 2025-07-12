@@ -13,11 +13,11 @@ import (
 // Migrated from cmd/read/pipeline_services.go getFileInfo
 func GetFileInfo(rc *eos_io.RuntimeContext, path string) FileInfo {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare file information retrieval
 	logger.Debug("Assessing file information retrieval",
 		zap.String("path", path))
-	
+
 	info := FileInfo{
 		Permissions: "unknown",
 		Size:        "unknown",

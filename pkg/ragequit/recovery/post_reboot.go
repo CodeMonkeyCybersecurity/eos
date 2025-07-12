@@ -16,16 +16,16 @@ import (
 // Migrated from cmd/ragequit/ragequit.go createPostRebootRecovery
 func CreatePostRebootRecovery(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare recovery script creation
 	logger.Info("Assessing post-reboot recovery requirements")
-	
+
 	homeDir := system.GetHomeDir()
 	scriptFile := filepath.Join(homeDir, "post-ragequit-recovery.sh")
-	
+
 	// INTERVENE - Create recovery script
 	logger.Debug("Creating post-reboot recovery script")
-	
+
 	script := `#!/bin/bash
 # Auto-run after ragequit reboot
 
@@ -64,18 +64,18 @@ else
     echo "Normal boot detected (no ragequit timestamp found)"
 fi
 `
-	
+
 	if err := os.WriteFile(scriptFile, []byte(script), 0755); err != nil {
 		return fmt.Errorf("failed to create post-reboot recovery script: %w", err)
 	}
-	
+
 	logger.Info("Post-reboot recovery script created",
 		zap.String("script_file", scriptFile))
-	
+
 	// Add to user's profile for auto-execution
 	profileFile := filepath.Join(homeDir, ".bashrc")
 	profileEntry := "\n# Auto-run ragequit recovery check\n[ -f ~/ragequit-timestamp.txt ] && ~/post-ragequit-recovery.sh\n"
-	
+
 	// Check if entry already exists
 	if content := system.ReadFile(profileFile); content != "" && !strings.Contains(content, "post-ragequit-recovery.sh") {
 		file, err := os.OpenFile(profileFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
@@ -89,7 +89,7 @@ fi
 					logger.Error("Failed to close .bashrc file", zap.Error(closeErr))
 				}
 			}()
-			
+
 			if _, err := file.WriteString(profileEntry); err != nil {
 				logger.Warn("Failed to write to .bashrc",
 					zap.String("file", profileFile),
@@ -102,11 +102,11 @@ fi
 	} else if strings.Contains(content, "post-ragequit-recovery.sh") {
 		logger.Debug("Post-reboot hook already exists in .bashrc")
 	}
-	
+
 	// EVALUATE - Log completion
 	logger.Info("Post-reboot recovery setup completed",
 		zap.String("script", scriptFile),
 		zap.String("profile", profileFile))
-	
+
 	return nil
 }

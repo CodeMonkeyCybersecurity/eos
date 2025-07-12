@@ -15,10 +15,10 @@ import (
 )
 
 var delphiServicesStatusCmd = &cobra.Command{
-		Use:   "delphi-services-status [service-name]",
-		Aliases: []string{"delphi-status", "delphi-svc-status", "delphi-services-check"},
-		Short: "Check status of Delphi pipeline services",
-		Long: `Check the status of one or more Delphi pipeline services.
+	Use:     "delphi-services-status [service-name]",
+	Aliases: []string{"delphi-status", "delphi-svc-status", "delphi-services-check"},
+	Short:   "Check status of Delphi pipeline services",
+	Long: `Check the status of one or more Delphi pipeline services.
 
 Available services:
 - delphi-listener: Webhook listener for Wazuh alerts
@@ -34,73 +34,73 @@ Available services:
 Examples:
   eos list delphi-services-status delphi-listener
   eos list delphi-services-status --all`,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			// Use the DelphiServices slice for autocompletion
-			return shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames(), cobra.ShellCompDirectiveNoFileComp
-		},
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("Checking Delphi services status")
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// Use the DelphiServices slice for autocompletion
+		return shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames(), cobra.ShellCompDirectiveNoFileComp
+	},
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Checking Delphi services status")
 
-			all, _ := cmd.Flags().GetBool("all")
-			var services []string
-			if all {
-				services = shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames()
-			} else if len(args) == 0 {
-				return fmt.Errorf("specify a service name or use --all")
-			} else {
-				// Validate service name
-				service := args[0]
-				valid := false
-				for _, s := range shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames() {
-					if s == service {
-						valid = true
-						break
-					}
+		all, _ := cmd.Flags().GetBool("all")
+		var services []string
+		if all {
+			services = shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames()
+		} else if len(args) == 0 {
+			return fmt.Errorf("specify a service name or use --all")
+		} else {
+			// Validate service name
+			service := args[0]
+			valid := false
+			for _, s := range shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames() {
+				if s == service {
+					valid = true
+					break
 				}
-				if !valid {
-					return fmt.Errorf("invalid service: %s. Valid services: %s", service, strings.Join(shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames(), ", "))
-				}
-				services = []string{service}
 			}
+			if !valid {
+				return fmt.Errorf("invalid service: %s. Valid services: %s", service, strings.Join(shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames(), ", "))
+			}
+			services = []string{service}
+		}
 
-			// Check status of services
-			for _, service := range services {
-				logger.Info("Checking service status",
-					zap.String("service", service))
+		// Check status of services
+		for _, service := range services {
+			logger.Info("Checking service status",
+				zap.String("service", service))
 
-				// Check if service exists first
-				if !eos_unix.ServiceExists(rc.Ctx, service) {
-					logger.Info("Service status",
-						zap.String("service", service),
-						zap.String("status", "⚫ not installed"),
-						zap.Bool("active", false))
-					continue
-				}
-
-				err := eos_unix.CheckServiceStatus(rc.Ctx, service)
-
-				status := "🔴 inactive"
-				isActive := false
-				if err == nil {
-					status = "🟢 active"
-					isActive = true
-				}
-
+			// Check if service exists first
+			if !eos_unix.ServiceExists(rc.Ctx, service) {
 				logger.Info("Service status",
 					zap.String("service", service),
-					zap.String("status", status),
-					zap.Bool("active", isActive))
-
-				if err != nil {
-					logger.Debug("Service status details",
-						zap.String("service", service),
-						zap.Error(err))
-				}
+					zap.String("status", "⚫ not installed"),
+					zap.Bool("active", false))
+				continue
 			}
 
-			return nil
-		}),
+			err := eos_unix.CheckServiceStatus(rc.Ctx, service)
+
+			status := "🔴 inactive"
+			isActive := false
+			if err == nil {
+				status = "🟢 active"
+				isActive = true
+			}
+
+			logger.Info("Service status",
+				zap.String("service", service),
+				zap.String("status", status),
+				zap.Bool("active", isActive))
+
+			if err != nil {
+				logger.Debug("Service status details",
+					zap.String("service", service),
+					zap.Error(err))
+			}
+		}
+
+		return nil
+	}),
 }
 
 func init() {

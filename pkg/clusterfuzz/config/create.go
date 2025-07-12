@@ -15,7 +15,7 @@ import (
 func CreateConfig(nomadAddress, consulAddress, storageBackend, databaseBackend, queueBackend string,
 	botCount, preemptibleBotCount int, domain, configDir string, useVault bool, vaultPath string,
 	s3Endpoint, s3AccessKey, s3SecretKey, s3Bucket string) *clusterfuzz.Config {
-	
+
 	// ASSESS - Initialize base configuration
 	config := &clusterfuzz.Config{
 		NomadAddress:        nomadAddress,

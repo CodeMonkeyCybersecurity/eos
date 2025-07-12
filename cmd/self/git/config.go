@@ -44,42 +44,42 @@ Examples:
 		interactive, _ := cmd.Flags().GetBool("interactive")
 		outputJSON, _ := cmd.Flags().GetBool("json")
 		showConfig, _ := cmd.Flags().GetBool("show")
-			logger := otelzap.Ctx(rc.Ctx)
+		logger := otelzap.Ctx(rc.Ctx)
 
-			manager := git_management.NewGitManager()
+		manager := git_management.NewGitManager()
 
-			// Show current configuration if requested
-			if showConfig {
-				return showCurrentConfig(rc, manager, global, outputJSON)
-			}
+		// Show current configuration if requested
+		if showConfig {
+			return showCurrentConfig(rc, manager, global, outputJSON)
+		}
 
-			// Interactive mode
-			if interactive {
-				return runInteractiveConfig(rc, manager, global)
-			}
+		// Interactive mode
+		if interactive {
+			return runInteractiveConfig(rc, manager, global)
+		}
 
-			// Build configuration from flags
-			config := &git_management.GitConfig{
-				Name:          name,
-				Email:         email,
-				DefaultBranch: defaultBranch,
-				PullRebase:    pullRebase,
-				ColorUI:       !noColorUI,
-				Custom:        make(map[string]string),
-			}
+		// Build configuration from flags
+		config := &git_management.GitConfig{
+			Name:          name,
+			Email:         email,
+			DefaultBranch: defaultBranch,
+			PullRebase:    pullRebase,
+			ColorUI:       !noColorUI,
+			Custom:        make(map[string]string),
+		}
 
-			// Only configure if at least one setting is provided
-			if name == "" && email == "" && defaultBranch == "" && !cmd.Flags().Changed("pull-rebase") && !cmd.Flags().Changed("no-color") {
-				return showCurrentConfig(rc, manager, global, outputJSON)
-			}
+		// Only configure if at least one setting is provided
+		if name == "" && email == "" && defaultBranch == "" && !cmd.Flags().Changed("pull-rebase") && !cmd.Flags().Changed("no-color") {
+			return showCurrentConfig(rc, manager, global, outputJSON)
+		}
 
-			logger.Info("Configuring Git", 
-				zap.Bool("global", global),
-				zap.String("name", name),
-				zap.String("email", email))
+		logger.Info("Configuring Git",
+			zap.Bool("global", global),
+			zap.String("name", name),
+			zap.String("email", email))
 
-			return manager.ConfigureGit(rc, config, global)
-		}),
+		return manager.ConfigureGit(rc, config, global)
+	}),
 }
 
 func init() {
@@ -93,6 +93,7 @@ func init() {
 	ConfigCmd.Flags().Bool("json", false, "Output configuration in JSON format")
 	ConfigCmd.Flags().Bool("show", false, "Show current configuration")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitManager, global, outputJSON bool) error {
 	path := "."
@@ -140,6 +141,7 @@ func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitMan
 
 	return nil
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.GitManager, global bool) error {
 	logger := otelzap.Ctx(rc.Ctx)

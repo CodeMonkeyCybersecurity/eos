@@ -28,7 +28,7 @@ Prerequisites:
 
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		logger.Info("Starting MinIO deployment")
 
 		// Get deployment options from flags

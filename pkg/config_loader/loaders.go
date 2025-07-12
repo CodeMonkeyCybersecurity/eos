@@ -15,13 +15,13 @@ import (
 
 // SystemState represents comprehensive system state configuration
 type SystemState struct {
-	Services []system.ServiceConfig   `json:"services"`
-	CronJobs []system.CronJobConfig   `json:"cron_jobs"`
-	Users    []system.UserConfig      `json:"users"`
-	Packages []system.PackageConfig   `json:"packages"`
-	Files    []system.FileConfig      `json:"files"`
-	Security map[string]interface{}   `json:"security"`
-	Metadata map[string]interface{}   `json:"metadata"`
+	Services []system.ServiceConfig `json:"services"`
+	CronJobs []system.CronJobConfig `json:"cron_jobs"`
+	Users    []system.UserConfig    `json:"users"`
+	Packages []system.PackageConfig `json:"packages"`
+	Files    []system.FileConfig    `json:"files"`
+	Security map[string]interface{} `json:"security"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 // StateApplicationResult represents the result of applying system state

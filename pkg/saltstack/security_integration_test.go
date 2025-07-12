@@ -470,7 +470,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 
 		err := client.StateApply(cancelCtx, "test", "test.state", nil)
 		assert.Error(t, err)
-		// Note: In test environment, salt command doesn't exist, 
+		// Note: In test environment, salt command doesn't exist,
 		// so we get exec error instead of context canceled error
 		assert.NotNil(t, err)
 	})

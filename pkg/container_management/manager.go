@@ -530,4 +530,3 @@ func parsePortString(portStr string) map[string]string {
 
 	return ports
 }
-

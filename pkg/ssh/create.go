@@ -46,7 +46,7 @@ func CreateSSHWithRemote(rc *eos_io.RuntimeContext, opts *SSHKeyOptions) error {
 
 	// ASSESS - Check prerequisites
 	logger.Info("Assessing SSH key creation prerequisites")
-	
+
 	// Resolve user home directory and SSH paths
 	currentUser, err := user.Current()
 	if err != nil {
@@ -109,7 +109,7 @@ func CreateSSHWithRemote(rc *eos_io.RuntimeContext, opts *SSHKeyOptions) error {
 
 	// EVALUATE - Verify the setup worked
 	logger.Info("Verifying SSH key setup")
-	
+
 	// Check that files exist with correct permissions
 	if info, err := os.Stat(keyPath); err != nil {
 		return fmt.Errorf("private key verification failed: %w", err)
@@ -136,7 +136,7 @@ func CreateSSHKeyWithVault(rc *eos_io.RuntimeContext, opts *VaultSSHKeyOptions) 
 
 	// ASSESS - Check prerequisites
 	logger.Info("Assessing Vault SSH key creation prerequisites")
-	
+
 	keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
 	const mount = "secret"
 	const baseDir = "pandora"
@@ -238,7 +238,7 @@ func CreateSSHKeyWithVault(rc *eos_io.RuntimeContext, opts *VaultSSHKeyOptions) 
 
 	// EVALUATE - Verify the keys were stored correctly
 	logger.Info("Verifying SSH key storage")
-	
+
 	if _, err := os.Stat(privPath); err != nil {
 		return fmt.Errorf("private key verification failed: %w", err)
 	}

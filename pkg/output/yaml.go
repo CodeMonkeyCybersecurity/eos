@@ -4,7 +4,7 @@ package output
 import (
 	"io"
 	"os"
-	
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -12,9 +12,10 @@ import (
 // This is the standard way to output YAML data in Eos commands.
 //
 // Example usage:
-//   if outputYAML {
-//       return output.YAMLToStdout(result)
-//   }
+//
+//	if outputYAML {
+//	    return output.YAMLToStdout(result)
+//	}
 func YAMLToStdout(data interface{}) error {
 	return YAMLTo(os.Stdout, data)
 }
@@ -24,10 +25,10 @@ func YAMLToStdout(data interface{}) error {
 func YAMLTo(w io.Writer, data interface{}) error {
 	encoder := yaml.NewEncoder(w)
 	defer encoder.Close()
-	
+
 	// Set indent to 2 spaces for readability
 	encoder.SetIndent(2)
-	
+
 	return encoder.Encode(data)
 }
 
@@ -39,7 +40,7 @@ func YAMLToFile(filename string, data interface{}) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	return YAMLTo(file, data)
 }
 

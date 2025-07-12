@@ -34,7 +34,7 @@ var verifyRepoCmd = &cobra.Command{
 	Short: "Verify repository integrity",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		repoName, _ := cmd.Flags().GetString("repo")
 		readData, _ := cmd.Flags().GetBool("read-data")
 		readDataSubset, _ := cmd.Flags().GetString("read-data-subset")
@@ -64,7 +64,7 @@ var verifyRepoCmd = &cobra.Command{
 
 		// Build check command
 		checkArgs := []string{"check"}
-		
+
 		if readData {
 			checkArgs = append(checkArgs, "--read-data")
 		} else if readDataSubset != "" {
@@ -99,7 +99,7 @@ var verifySnapshotCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		snapshotID := args[0]
 		repoName, _ := cmd.Flags().GetString("repo")
 		readData, _ := cmd.Flags().GetBool("read-data")

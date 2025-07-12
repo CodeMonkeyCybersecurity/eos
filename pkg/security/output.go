@@ -26,7 +26,7 @@ func NewSecureOutput(ctx context.Context) *SecureOutput {
 func (so *SecureOutput) Info(message string, fields ...zap.Field) {
 	sanitizedMessage := EscapeOutput(message)
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	otelzap.Ctx(so.ctx).Info(sanitizedMessage, sanitizedFields...)
 }
 
@@ -34,7 +34,7 @@ func (so *SecureOutput) Info(message string, fields ...zap.Field) {
 func (so *SecureOutput) Success(message string, fields ...zap.Field) {
 	sanitizedMessage := EscapeOutput(message)
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	// Add success indicator
 	allFields := append(sanitizedFields, zap.String("status", "success"))
 	otelzap.Ctx(so.ctx).Info(sanitizedMessage, allFields...)
@@ -44,7 +44,7 @@ func (so *SecureOutput) Success(message string, fields ...zap.Field) {
 func (so *SecureOutput) Warning(message string, fields ...zap.Field) {
 	sanitizedMessage := EscapeOutput(message)
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	otelzap.Ctx(so.ctx).Warn(sanitizedMessage, sanitizedFields...)
 }
 
@@ -52,11 +52,11 @@ func (so *SecureOutput) Warning(message string, fields ...zap.Field) {
 func (so *SecureOutput) Error(message string, err error, fields ...zap.Field) {
 	sanitizedMessage := EscapeOutput(message)
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	// Sanitize error message
 	sanitizedError := fmt.Errorf("%s", EscapeOutput(err.Error()))
 	allFields := append(sanitizedFields, zap.Error(sanitizedError))
-	
+
 	otelzap.Ctx(so.ctx).Error(sanitizedMessage, allFields...)
 }
 
@@ -64,13 +64,13 @@ func (so *SecureOutput) Error(message string, err error, fields ...zap.Field) {
 func (so *SecureOutput) Result(operation string, data interface{}, fields ...zap.Field) {
 	sanitizedMessage := EscapeOutput(fmt.Sprintf("%s completed", operation))
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	// Sanitize the data field
 	sanitizedData := so.sanitizeData(data)
-	allFields := append(sanitizedFields, 
+	allFields := append(sanitizedFields,
 		zap.String("operation", EscapeOutput(operation)),
 		zap.Any("result", sanitizedData))
-	
+
 	otelzap.Ctx(so.ctx).Info(sanitizedMessage, allFields...)
 }
 
@@ -78,13 +78,13 @@ func (so *SecureOutput) Result(operation string, data interface{}, fields ...zap
 func (so *SecureOutput) Progress(step string, current, total int, fields ...zap.Field) {
 	sanitizedStep := EscapeOutput(step)
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	allFields := append(sanitizedFields,
 		zap.String("step", sanitizedStep),
 		zap.Int("current", current),
 		zap.Int("total", total),
 		zap.Float64("progress_percent", float64(current)/float64(total)*100))
-	
+
 	otelzap.Ctx(so.ctx).Info("Progress update", allFields...)
 }
 
@@ -92,17 +92,17 @@ func (so *SecureOutput) Progress(step string, current, total int, fields ...zap.
 func (so *SecureOutput) List(title string, items []string, fields ...zap.Field) {
 	sanitizedTitle := EscapeOutput(title)
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	// Sanitize all items
 	sanitizedItems := make([]string, len(items))
 	for i, item := range items {
 		sanitizedItems[i] = EscapeOutput(item)
 	}
-	
+
 	allFields := append(sanitizedFields,
 		zap.Strings("items", sanitizedItems),
 		zap.Int("count", len(sanitizedItems)))
-	
+
 	otelzap.Ctx(so.ctx).Info(sanitizedTitle, allFields...)
 }
 
@@ -110,13 +110,13 @@ func (so *SecureOutput) List(title string, items []string, fields ...zap.Field) 
 func (so *SecureOutput) Table(title string, headers []string, rows [][]string, fields ...zap.Field) {
 	sanitizedTitle := EscapeOutput(title)
 	sanitizedFields := so.sanitizeFields(fields)
-	
+
 	// Sanitize headers
 	sanitizedHeaders := make([]string, len(headers))
 	for i, header := range headers {
 		sanitizedHeaders[i] = EscapeOutput(header)
 	}
-	
+
 	// Sanitize all rows
 	sanitizedRows := make([][]string, len(rows))
 	for i, row := range rows {
@@ -125,12 +125,12 @@ func (so *SecureOutput) Table(title string, headers []string, rows [][]string, f
 			sanitizedRows[i][j] = EscapeOutput(cell)
 		}
 	}
-	
+
 	allFields := append(sanitizedFields,
 		zap.Strings("headers", sanitizedHeaders),
 		zap.Any("rows", sanitizedRows),
 		zap.Int("row_count", len(sanitizedRows)))
-	
+
 	otelzap.Ctx(so.ctx).Info(sanitizedTitle, allFields...)
 }
 
@@ -149,7 +149,7 @@ func (so *SecureOutput) sanitizeField(field zap.Field) zap.Field {
 	if field.String != "" {
 		return zap.String(field.Key, EscapeOutput(field.String))
 	}
-	
+
 	// Handle interface fields (errors, any types)
 	if field.Interface != nil {
 		switch v := field.Interface.(type) {
@@ -163,7 +163,7 @@ func (so *SecureOutput) sanitizeField(field zap.Field) zap.Field {
 			return zap.Any(field.Key, so.sanitizeData(v))
 		}
 	}
-	
+
 	// For numeric, boolean, and other simple types, return as-is
 	return field
 }

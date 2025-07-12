@@ -74,7 +74,7 @@ func TestPromptSecurePassword(t *testing.T) {
 			// Restore stdout
 			w.Close()
 			os.Stdout = oldStdout
-			
+
 			// Read captured output
 			var buf bytes.Buffer
 			io.Copy(&buf, r)
@@ -126,8 +126,8 @@ func TestPromptSecurePasswordEdgeCases(t *testing.T) {
 			oldStdin := os.Stdin
 			r, _, _ := os.Pipe()
 			os.Stdin = r
-			defer func() { 
-				os.Stdin = oldStdin 
+			defer func() {
+				os.Stdin = oldStdin
 				r.Close()
 			}()
 

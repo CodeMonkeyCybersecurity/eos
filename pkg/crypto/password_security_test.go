@@ -149,7 +149,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 		commonPasswords := []string{
 			"password",
 			"123456",
-			"qwerty", 
+			"qwerty",
 			"abc123",
 			"password123",
 			"admin",
@@ -194,11 +194,11 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	t.Run("unicode_attack_rejection", func(t *testing.T) {
 		// Test that Unicode-based attacks are handled properly
 		unicodePasswords := []string{
-			"password\u200B123",  // Zero-width space
-			"admin\uFF1Btest",    // Fullwidth semicolon
-			"secret\u202Etest",   // RTL override
-			"pwd\u0000test",      // Null byte
-			"tеst123!@#",         // Cyrillic е instead of e
+			"password\u200B123", // Zero-width space
+			"admin\uFF1Btest",   // Fullwidth semicolon
+			"secret\u202Etest",  // RTL override
+			"pwd\u0000test",     // Null byte
+			"tеst123!@#",        // Cyrillic е instead of e
 		}
 
 		for _, pwd := range unicodePasswords {
@@ -214,10 +214,10 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 			"",
 			"a",
 			"abc",
-			"Abc1!",          // 5 chars
-			"Abc123!",        // 7 chars  
-			"Abcdef1!",       // 8 chars
-			"Abcdefgh1!",     // 10 chars
+			"Abc1!",      // 5 chars
+			"Abc123!",    // 7 chars
+			"Abcdef1!",   // 8 chars
+			"Abcdefgh1!", // 10 chars
 		}
 
 		for _, pwd := range shortPasswords {
@@ -312,11 +312,11 @@ func TestPasswordMemorySecurity(t *testing.T) {
 	t.Run("secure_zero_edge_cases", func(t *testing.T) {
 		// Test edge cases
 		testCases := [][]byte{
-			{},                    // Empty slice
-			{0},                   // Already zero
-			{255},                 // Max byte value
-			{1, 2, 3, 4, 5},      // Small slice
-			make([]byte, 1000),    // Large slice
+			{},                 // Empty slice
+			{0},                // Already zero
+			{255},              // Max byte value
+			{1, 2, 3, 4, 5},    // Small slice
+			make([]byte, 1000), // Large slice
 		}
 
 		for i, data := range testCases {
@@ -334,13 +334,13 @@ func TestPasswordMemorySecurity(t *testing.T) {
 		// doesn't leave sensitive data in memory longer than necessary
 		pwd, err := GeneratePassword(32)
 		testutil.AssertNoError(t, err)
-		
+
 		// Convert to bytes for zeroing
 		pwdBytes := []byte(pwd)
-		
+
 		// Verify we can zero the password data
 		SecureZero(pwdBytes)
-		
+
 		for i, b := range pwdBytes {
 			if b != 0 {
 				t.Errorf("Failed to zero password byte at index %d: got %d, want 0", i, b)
@@ -366,12 +366,12 @@ func TestPasswordRedactionSecurity(t *testing.T) {
 
 		for _, sensitive := range sensitiveStrings {
 			redacted := Redact(sensitive)
-			
+
 			// Redacted version should not contain the original
 			if redacted == sensitive {
 				t.Errorf("Redact failed to redact sensitive string: %s", sensitive)
 			}
-			
+
 			// Should return a safe placeholder
 			if redacted != "[REDACTED]" && !strings.Contains(redacted, "*") {
 				t.Errorf("Redact returned unexpected format: %s -> %s", sensitive, redacted)
@@ -443,7 +443,7 @@ func validatePasswordComplexityExtended(t *testing.T, password string) {
 // BenchmarkPasswordGeneration benchmarks password generation performance
 func BenchmarkPasswordGeneration(b *testing.B) {
 	lengths := []int{12, 16, 24, 32, 64}
-	
+
 	for _, length := range lengths {
 		b.Run(fmt.Sprintf("length_%d", length), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
@@ -482,7 +482,7 @@ func TestPasswordSecurityConstants(t *testing.T) {
 		if MinPasswordLen < 12 {
 			t.Errorf("MinPasswordLen too low for security: %d (recommended: 12+)", MinPasswordLen)
 		}
-		
+
 		// Warn if below current best practices
 		if MinPasswordLen < 14 {
 			t.Logf("Warning: MinPasswordLen is %d, modern best practice is 14+", MinPasswordLen)

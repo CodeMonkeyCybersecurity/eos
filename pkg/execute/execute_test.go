@@ -124,9 +124,9 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			output, err := Run(ctx, tt.Input.opts)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -245,7 +245,7 @@ func TestJoinArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := joinArgs(tt.Input.args)
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -294,7 +294,7 @@ func TestShellQuote(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			result := shellQuote(tt.Input.args)
 			assert.Equal(t, tt.Input.expected, result)
 		})
@@ -352,10 +352,10 @@ func TestCmd(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			fn := Cmd(ctx, tt.Input.command, tt.Input.args...)
 			err := fn()
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -428,9 +428,9 @@ func TestRunSimple(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			err := RunSimple(ctx, tt.Input.command, tt.Input.args...)
-			
+
 			if tt.Input.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -538,10 +538,10 @@ func TestRunSecurityValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			t.Parallel()
-			
+
 			// Commands should execute safely without shell interpretation
 			output, err := Run(ctx, tt.Input.opts)
-			
+
 			// Check that malicious content appears as literal text in output
 			if err == nil && tt.Input.opts.Command == "echo" {
 				// Malicious characters should appear literally, not be executed

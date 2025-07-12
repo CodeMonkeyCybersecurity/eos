@@ -11,9 +11,9 @@ import (
 )
 
 var delphiPromptsValidateCmd = &cobra.Command{
-	Use:   "delphi-prompts-validate [prompt-name]",
+	Use:     "delphi-prompts-validate [prompt-name]",
 	Aliases: []string{"delphi-prompts", "validate-delphi-prompts"},
-	Short: "Validate system prompt formatting and content",
+	Short:   "Validate system prompt formatting and content",
 	Long: `Validate system prompt files for proper formatting, content quality, and adherence to best practices.
 
 If no prompt name is specified, all prompts in the directory will be validated.

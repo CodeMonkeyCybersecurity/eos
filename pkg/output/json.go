@@ -13,9 +13,10 @@ import (
 // This is the standard way to output JSON data in Eos commands.
 //
 // Example usage:
-//   if outputJSON {
-//       return output.JSONToStdout(result)
-//   }
+//
+//	if outputJSON {
+//	    return output.JSONToStdout(result)
+//	}
 func JSONToStdout(data interface{}) error {
 	return JSONTo(os.Stdout, data)
 }
@@ -43,6 +44,6 @@ func JSONToFile(filename string, data interface{}) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	return JSONTo(file, data)
 }

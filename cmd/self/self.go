@@ -8,11 +8,11 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/ai"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/test"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/ai"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/test"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"

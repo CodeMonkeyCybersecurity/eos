@@ -39,32 +39,32 @@ type PermissionScanResult struct {
 
 // PermissionFixResult contains results of permission fixes
 type PermissionFixResult struct {
-	Timestamp   time.Time                      `json:"timestamp"`
-	DryRun      bool                           `json:"dry_run"`
-	Categories  []string                       `json:"categories"`
-	Results     map[string]PermissionScanResult `json:"results"`
-	Summary     PermissionSummary              `json:"summary"`
+	Timestamp  time.Time                       `json:"timestamp"`
+	DryRun     bool                            `json:"dry_run"`
+	Categories []string                        `json:"categories"`
+	Results    map[string]PermissionScanResult `json:"results"`
+	Summary    PermissionSummary               `json:"summary"`
 }
 
 // PermissionSummary provides an overall summary of permission operations
 type PermissionSummary struct {
-	TotalFiles    int      `json:"total_files"`
-	FilesFixed    int      `json:"files_fixed"`
-	FilesSkipped  int      `json:"files_skipped"`
-	Errors        []string `json:"errors"`
-	Success       bool     `json:"success"`
+	TotalFiles   int      `json:"total_files"`
+	FilesFixed   int      `json:"files_fixed"`
+	FilesSkipped int      `json:"files_skipped"`
+	Errors       []string `json:"errors"`
+	Success      bool     `json:"success"`
 }
 
 // SecurityConfig contains configuration for permission management
 type SecurityConfig struct {
-	SSHDirectory      string   `json:"ssh_directory" mapstructure:"ssh_directory"`
-	IncludeSystem     bool     `json:"include_system" mapstructure:"include_system"`
-	CreateBackups     bool     `json:"create_backups" mapstructure:"create_backups"`
-	DryRun            bool     `json:"dry_run" mapstructure:"dry_run"`
-	ExcludePatterns   []string `json:"exclude_patterns" mapstructure:"exclude_patterns"`
-	CustomRules       []PermissionRule `json:"custom_rules,omitempty" mapstructure:"custom_rules"`
-	VerifyOwnership   bool     `json:"verify_ownership" mapstructure:"verify_ownership"`
-	BackupDirectory   string   `json:"backup_directory,omitempty" mapstructure:"backup_directory"`
+	SSHDirectory    string           `json:"ssh_directory" mapstructure:"ssh_directory"`
+	IncludeSystem   bool             `json:"include_system" mapstructure:"include_system"`
+	CreateBackups   bool             `json:"create_backups" mapstructure:"create_backups"`
+	DryRun          bool             `json:"dry_run" mapstructure:"dry_run"`
+	ExcludePatterns []string         `json:"exclude_patterns" mapstructure:"exclude_patterns"`
+	CustomRules     []PermissionRule `json:"custom_rules,omitempty" mapstructure:"custom_rules"`
+	VerifyOwnership bool             `json:"verify_ownership" mapstructure:"verify_ownership"`
+	BackupDirectory string           `json:"backup_directory,omitempty" mapstructure:"backup_directory"`
 }
 
 // DefaultSecurityConfig returns a configuration with sensible defaults
@@ -209,7 +209,7 @@ var (
 // GetPermissionRules returns permission rules for the specified categories
 func GetPermissionRules(categories []string) []PermissionRule {
 	var rules []PermissionRule
-	
+
 	for _, category := range categories {
 		switch category {
 		case "ssh":
@@ -220,7 +220,7 @@ func GetPermissionRules(categories []string) []PermissionRule {
 			rules = append(rules, SSLPermissionRules...)
 		}
 	}
-	
+
 	return rules
 }
 
@@ -231,18 +231,36 @@ func IsPrivateKey(filename string) bool {
 		"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
 		"private", "key", "pem",
 	}
-	
+
 	// If file ends with .pub, it's likely a public key
-	if strings.HasSuffix(filename, ".pub") {
+	lowerFilename := strings.ToLower(filename)
+	if strings.HasSuffix(lowerFilename, ".pub") {
 		return false
 	}
-	
+
+	// Also check if .pub appears before any backup extension
+	baseName := lowerFilename
+	// Remove common backup extensions to check the original name
+	for _, ext := range []string{".backup", ".bak", ".old", ".orig"} {
+		if strings.HasSuffix(baseName, ext) {
+			baseName = strings.TrimSuffix(baseName, ext)
+			break
+		}
+	}
+	if strings.HasSuffix(baseName, ".pub") {
+		return false
+	}
+
 	// Check if filename contains private key indicators
 	for _, pattern := range privateKeyPatterns {
-		if strings.Contains(filename, pattern) {
+		if strings.Contains(lowerFilename, pattern) {
+			// Special cases to exclude
+			if pattern == "key" && strings.Contains(lowerFilename, "authorized_keys") {
+				return false
+			}
 			return true
 		}
 	}
-	
+
 	return false
 }

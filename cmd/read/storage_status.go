@@ -99,4 +99,3 @@ func init() {
 	readStorageStatusCmd.Flags().Bool("inodes", false, "Show inode usage")
 	readStorageStatusCmd.Flags().String("format", "table", "Output format: table, json, yaml")
 }
-

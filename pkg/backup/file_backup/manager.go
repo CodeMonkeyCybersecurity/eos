@@ -24,7 +24,7 @@ func NewFileBackupManager(config *FileBackupConfig) *FileBackupManager {
 	if config == nil {
 		config = DefaultFileBackupConfig()
 	}
-	
+
 	return &FileBackupManager{
 		config: config,
 	}
@@ -45,7 +45,7 @@ func (fbm *FileBackupManager) BackupFile(rc *eos_io.RuntimeContext, sourcePath s
 		DryRun:     options.DryRun,
 	}
 
-	logger.Info("Starting file backup operation", 
+	logger.Info("Starting file backup operation",
 		zap.String("source_path", sourcePath),
 		zap.Bool("dry_run", options.DryRun))
 
@@ -122,7 +122,7 @@ func (fbm *FileBackupManager) BackupFile(rc *eos_io.RuntimeContext, sourcePath s
 		operation.Success = true
 		operation.Message = fmt.Sprintf("Would backup %s to %s", sourcePath, backupPath)
 		operation.Duration = time.Since(startTime)
-		logger.Info("Dry run: would backup file", 
+		logger.Info("Dry run: would backup file",
 			zap.String("source", sourcePath),
 			zap.String("backup", backupPath))
 		return operation, nil
@@ -165,7 +165,7 @@ func (fbm *FileBackupManager) BackupFile(rc *eos_io.RuntimeContext, sourcePath s
 	operation.Message = fmt.Sprintf("Successfully backed up %s to %s", sourcePath, backupPath)
 	operation.Duration = time.Since(startTime)
 
-	logger.Info("File backup completed successfully", 
+	logger.Info("File backup completed successfully",
 		zap.String("source", sourcePath),
 		zap.String("backup", backupPath),
 		zap.Duration("duration", operation.Duration),
@@ -240,7 +240,7 @@ func (fbm *FileBackupManager) ListBackups(rc *eos_io.RuntimeContext, backupDir s
 
 	result.TotalBackups = len(result.Backups)
 
-	logger.Info("Backup listing completed", 
+	logger.Info("Backup listing completed",
 		zap.Int("total_backups", result.TotalBackups),
 		zap.Int64("total_size", result.TotalSize))
 
@@ -259,7 +259,7 @@ func (fbm *FileBackupManager) RestoreFile(rc *eos_io.RuntimeContext, backupPath,
 		DryRun:      dryRun,
 	}
 
-	logger.Info("Starting file restore operation", 
+	logger.Info("Starting file restore operation",
 		zap.String("backup_path", backupPath),
 		zap.String("restore_path", restorePath),
 		zap.Bool("dry_run", dryRun))
@@ -316,7 +316,7 @@ func (fbm *FileBackupManager) RestoreFile(rc *eos_io.RuntimeContext, backupPath,
 	operation.Message = fmt.Sprintf("Successfully restored %s to %s", backupPath, restorePath)
 	operation.Duration = time.Since(startTime)
 
-	logger.Info("File restore completed successfully", 
+	logger.Info("File restore completed successfully",
 		zap.String("backup", backupPath),
 		zap.String("restore", restorePath),
 		zap.Duration("duration", operation.Duration))
@@ -328,7 +328,7 @@ func (fbm *FileBackupManager) RestoreFile(rc *eos_io.RuntimeContext, backupPath,
 
 func (fbm *FileBackupManager) generateBackupName(sourcePath, customName string) string {
 	filename := filepath.Base(sourcePath)
-	
+
 	if customName != "" {
 		filename = customName
 	}

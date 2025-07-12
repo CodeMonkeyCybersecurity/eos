@@ -205,7 +205,7 @@ func TestDockerInstallationFlow(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("Skipping Docker installation flow test on non-Linux system")
 	}
-	
+
 	// This test verifies the logical flow without actually executing commands
 	// In a real implementation, we'd use dependency injection to mock execute.Run
 

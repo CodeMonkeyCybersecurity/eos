@@ -79,9 +79,9 @@ Examples:
 			return cerr.Wrap(err, "failed to generate service deployment configuration")
 		}
 
-		// Convert to system deployment type  
+		// Convert to system deployment type
 		systemDeployment := service_deployment.ConvertToSystemDeployment(deployment)
-		
+
 		// Deploy service
 		result, err := orchestrationManager.DeployService(rc, systemDeployment)
 		if err != nil {

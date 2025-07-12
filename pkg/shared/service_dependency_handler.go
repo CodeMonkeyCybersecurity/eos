@@ -7,7 +7,7 @@ import "time"
 // getDependencyWorkers returns additional workers for dependencies that need file updates
 func (sm *ServiceManager) getDependencyWorkers(service DelphiServiceDefinition, timestamp string) []ServiceWorkerInfo {
 	var dependencyWorkers []ServiceWorkerInfo
-	
+
 	for _, dep := range service.Dependencies {
 		switch dep {
 		case "alert-to-db":
@@ -16,7 +16,7 @@ func (sm *ServiceManager) getDependencyWorkers(service DelphiServiceDefinition, 
 				ServiceName:  "alert-to-db",
 				SourcePath:   "/opt/eos/assets/python_workers/alert-to-db.py",
 				TargetPath:   "/usr/local/bin/alert-to-db.py", // delphi-listener expects it here
-				ServiceFile:  "", // No systemd service file
+				ServiceFile:  "",                              // No systemd service file
 				Dependencies: []string{},
 				BackupPath:   "/usr/local/bin/alert-to-db.py." + timestamp + ".bak",
 			})
@@ -32,7 +32,7 @@ func (sm *ServiceManager) getDependencyWorkers(service DelphiServiceDefinition, 
 			})
 		}
 	}
-	
+
 	return dependencyWorkers
 }
 
@@ -52,7 +52,7 @@ func (sm *ServiceManager) UpdateGetServiceWorkersForUpdate() []ServiceWorkerInfo
 			Dependencies: service.Dependencies,
 			BackupPath:   backupPath,
 		})
-		
+
 		// Add dependency workers that need to be updated together
 		workers = append(workers, sm.getDependencyWorkers(service, timestamp)...)
 	}

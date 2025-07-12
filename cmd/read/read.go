@@ -32,7 +32,7 @@ var ReadCmd = &cobra.Command{
 
 func init() {
 	// Initialize the shared logger for the entire install package
-	
+
 	// Add the major sub-commands
 	ReadCmd.AddCommand(readDelphiCmd)
 	ReadCmd.AddCommand(readHecateCmd)

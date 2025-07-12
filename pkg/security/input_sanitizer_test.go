@@ -10,7 +10,7 @@ import (
 
 func TestInputSanitizer_CSIVulnerability(t *testing.T) {
 	sanitizer := NewInputSanitizer()
-	
+
 	// Test the critical CSI vulnerability (0x9b)
 	testCases := []struct {
 		name     string
@@ -43,18 +43,18 @@ func TestInputSanitizer_CSIVulnerability(t *testing.T) {
 			expected: "red normal",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := sanitizer.SanitizeInput(tc.input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			
+
 			if result != tc.expected {
 				t.Errorf("expected %q, got %q", tc.expected, result)
 			}
-			
+
 			// Ensure no CSI characters remain
 			if strings.ContainsRune(result, CSI) {
 				t.Errorf("CSI character still present in result: %q", result)
@@ -65,7 +65,7 @@ func TestInputSanitizer_CSIVulnerability(t *testing.T) {
 
 func TestInputSanitizer_UTF8Validation(t *testing.T) {
 	sanitizer := NewInputSanitizer()
-	
+
 	testCases := []struct {
 		name      string
 		input     string
@@ -97,18 +97,18 @@ func TestInputSanitizer_UTF8Validation(t *testing.T) {
 			checkUTF8: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := sanitizer.SanitizeInput(tc.input)
-			
+
 			if tc.expectErr && err == nil {
 				t.Errorf("expected error but got none")
 			}
 			if !tc.expectErr && err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			
+
 			if tc.checkUTF8 && !utf8.ValidString(result) {
 				t.Errorf("result is not valid UTF-8: %q", result)
 			}
@@ -118,7 +118,7 @@ func TestInputSanitizer_UTF8Validation(t *testing.T) {
 
 func TestInputSanitizer_ControlCharacters(t *testing.T) {
 	sanitizer := NewInputSanitizer()
-	
+
 	testCases := []struct {
 		name     string
 		input    string
@@ -160,14 +160,14 @@ func TestInputSanitizer_ControlCharacters(t *testing.T) {
 			expected: "testdelete",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := sanitizer.SanitizeInput(tc.input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			
+
 			if result != tc.expected {
 				t.Errorf("expected %q, got %q", tc.expected, result)
 			}
@@ -177,7 +177,7 @@ func TestInputSanitizer_ControlCharacters(t *testing.T) {
 
 func TestInputSanitizer_ANSISequences(t *testing.T) {
 	sanitizer := NewInputSanitizer()
-	
+
 	testCases := []struct {
 		name     string
 		input    string
@@ -209,14 +209,14 @@ func TestInputSanitizer_ANSISequences(t *testing.T) {
 			expected: "", // Security: DCS sequences completely removed
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := sanitizer.SanitizeInput(tc.input)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			
+
 			if result != tc.expected {
 				t.Errorf("expected %q, got %q", tc.expected, result)
 			}
@@ -226,14 +226,14 @@ func TestInputSanitizer_ANSISequences(t *testing.T) {
 
 func TestInputSanitizer_LengthLimits(t *testing.T) {
 	sanitizer := NewInputSanitizer()
-	
+
 	// Test maximum length enforcement
 	longInput := strings.Repeat("A", MaxInputLength+1)
 	_, err := sanitizer.SanitizeInput(longInput)
 	if err == nil {
 		t.Errorf("expected error for input exceeding max length")
 	}
-	
+
 	// Test at the limit
 	limitInput := strings.Repeat("A", MaxInputLength)
 	result, err := sanitizer.SanitizeInput(limitInput)
@@ -247,18 +247,18 @@ func TestInputSanitizer_LengthLimits(t *testing.T) {
 
 func TestInputSanitizer_ArgumentValidation(t *testing.T) {
 	sanitizer := NewInputSanitizer()
-	
+
 	// Test too many arguments
 	tooManyArgs := make([]string, MaxArgumentCount+1)
 	for i := range tooManyArgs {
 		tooManyArgs[i] = "arg"
 	}
-	
+
 	_, err := sanitizer.SanitizeArguments(tooManyArgs)
 	if err == nil {
 		t.Errorf("expected error for too many arguments")
 	}
-	
+
 	// Test normal arguments with dangerous content
 	dangerousArgs := []string{
 		"normal",
@@ -266,19 +266,19 @@ func TestInputSanitizer_ArgumentValidation(t *testing.T) {
 		"with\x1b[31mcolor",
 		"with\x00null",
 	}
-	
+
 	cleaned, err := sanitizer.SanitizeArguments(dangerousArgs)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	
+
 	expected := []string{
 		"normal",
 		"withCSI", // CSI character removed
 		"withcolor",
 		"withnull",
 	}
-	
+
 	for i, arg := range cleaned {
 		if arg != expected[i] {
 			t.Errorf("argument %d: expected %q, got %q", i, expected[i], arg)
@@ -288,7 +288,7 @@ func TestInputSanitizer_ArgumentValidation(t *testing.T) {
 
 func TestInputSanitizer_StrictMode(t *testing.T) {
 	sanitizer := NewStrictSanitizer()
-	
+
 	testCases := []struct {
 		name      string
 		input     string
@@ -325,11 +325,11 @@ func TestInputSanitizer_StrictMode(t *testing.T) {
 			expectErr: false,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := sanitizer.SanitizeInput(tc.input)
-			
+
 			if tc.expectErr && err == nil {
 				t.Errorf("expected error for dangerous input: %q", tc.input)
 			}
@@ -342,7 +342,7 @@ func TestInputSanitizer_StrictMode(t *testing.T) {
 
 func TestInputSanitizer_UnicodeNormalization(t *testing.T) {
 	sanitizer := NewInputSanitizer()
-	
+
 	// Test Unicode normalization to prevent homograph attacks
 	testCases := []struct {
 		name  string
@@ -357,7 +357,7 @@ func TestInputSanitizer_UnicodeNormalization(t *testing.T) {
 			input: "\u00e9", // é (precomposed)
 		},
 	}
-	
+
 	var results []string
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -368,7 +368,7 @@ func TestInputSanitizer_UnicodeNormalization(t *testing.T) {
 			results = append(results, result)
 		})
 	}
-	
+
 	// After normalization, both should be the same
 	if len(results) == 2 && results[0] != results[1] {
 		t.Errorf("Unicode normalization failed: %q != %q", results[0], results[1])
@@ -402,7 +402,7 @@ func TestEscapeOutput(t *testing.T) {
 			expected: "",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := EscapeOutput(tc.input)
@@ -445,7 +445,7 @@ func TestEscapeForLogging(t *testing.T) {
 			expected: strings.Repeat("A", 500) + "...[TRUNCATED]",
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := EscapeForLogging(tc.input)
@@ -498,11 +498,11 @@ func TestValidateCommandName(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ValidateCommandName(tc.input)
-			
+
 			if tc.expectErr && err == nil {
 				t.Errorf("expected error for command name: %q", tc.input)
 			}
@@ -550,11 +550,11 @@ func TestValidateFlagName(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ValidateFlagName(tc.input)
-			
+
 			if tc.expectErr && err == nil {
 				t.Errorf("expected error for flag name: %q", tc.input)
 			}
@@ -569,7 +569,7 @@ func TestValidateFlagName(t *testing.T) {
 func BenchmarkSanitizeInput(b *testing.B) {
 	sanitizer := NewInputSanitizer()
 	input := "normal text with some\x1b[31mcolors\x1b[0m and unicode: 🌍"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = sanitizer.SanitizeInput(input)
@@ -579,7 +579,7 @@ func BenchmarkSanitizeInput(b *testing.B) {
 func BenchmarkSanitizeInputWithCSI(b *testing.B) {
 	sanitizer := NewInputSanitizer()
 	input := "text with CSI" + string(rune(0x9b)) + "characters"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = sanitizer.SanitizeInput(input)
@@ -588,7 +588,7 @@ func BenchmarkSanitizeInputWithCSI(b *testing.B) {
 
 func BenchmarkEscapeOutput(b *testing.B) {
 	input := "output with\x1b[31mcolor\x1b[0m and CSI" + string(rune(0x9b))
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = EscapeOutput(input)

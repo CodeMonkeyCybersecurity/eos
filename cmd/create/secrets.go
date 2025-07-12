@@ -27,7 +27,7 @@ var CreateSecretCmd = &cobra.Command{
 		// Get flags
 		length, _ := cmd.Flags().GetInt("length")
 		format, _ := cmd.Flags().GetString("format")
-		
+
 		// Set defaults
 		if length <= 0 {
 			length = 32 // Default to openssl rand -hex 32
@@ -41,12 +41,12 @@ var CreateSecretCmd = &cobra.Command{
 			Length: length,
 			Format: format,
 		}
-		
+
 		secret, err := secrets.Generate(opts)
 		if err != nil {
 			return err
 		}
-		
+
 		fmt.Println(secret)
 		return nil
 	}),
@@ -167,5 +167,3 @@ func init() {
 
 	CreateCmd.AddCommand(CreateVaultEnhancedCmd)
 }
-
-

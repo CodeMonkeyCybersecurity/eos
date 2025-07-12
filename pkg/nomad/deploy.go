@@ -33,69 +33,69 @@ func DeployNomad(rc *eos_io.RuntimeContext) error {
 
 	// ASSESS - Check system state and prerequisites
 	logger.Info("Assessing Nomad deployment requirements")
-	
+
 	// Check firewall status
 	platform.CheckFirewallStatus(rc)
-	
+
 	// Check IPv6 support and Tailscale configuration
 	nodeIP, err := assessNetworkConfiguration(rc)
 	if err != nil {
 		logger.Error("Network configuration assessment failed", zap.Error(err))
 		return fmt.Errorf("network assessment failed: %w", err)
 	}
-	
+
 	// Get Nomad deployment configuration from user
 	config, err := getNomadConfiguration(rc, nodeIP)
 	if err != nil {
 		return fmt.Errorf("failed to get Nomad configuration: %w", err)
 	}
-	
+
 	// INTERVENE - Execute Nomad deployment
 	logger.Info("Executing Nomad deployment",
 		zap.String("role", config.Role),
 		zap.String("node_ip", nodeIP))
-		
+
 	if err := executeNomadDeployment(rc, config); err != nil {
 		return fmt.Errorf("Nomad deployment failed: %w", err)
 	}
-	
+
 	// EVALUATE - Verify deployment success
 	logger.Info("Evaluating Nomad deployment success")
-	
+
 	if err := verifyNomadDeployment(rc, config); err != nil {
 		logger.Error("Nomad deployment verification failed", zap.Error(err))
 		return fmt.Errorf("deployment verification failed: %w", err)
 	}
-	
+
 	// Display success message to user
 	if err := displayNomadDeploymentSummary(rc, config); err != nil {
 		logger.Warn("Failed to display deployment summary", zap.Error(err))
 	}
-	
+
 	logger.Info("Nomad deployment completed successfully",
 		zap.String("role", config.Role),
 		zap.String("node_ip", nodeIP))
-	
+
 	return nil
 }
 
 // NomadConfig holds the configuration for Nomad deployment
 type NomadConfig struct {
-	Role         string // "server" or "client"
-	DataCenter   string // Nomad datacenter name
-	ServerAddrs  []string // Server addresses for clients
-	EncryptionKey string // Gossip encryption key
-	NodeIP       string // Node IP address
-	InstallCmd   string // Generated install command
-	ConfigPath   string // Path to nomad config file
+	Role          string   // "server" or "client"
+	DataCenter    string   // Nomad datacenter name
+	ServerAddrs   []string // Server addresses for clients
+	EncryptionKey string   // Gossip encryption key
+	NodeIP        string   // Node IP address
+	InstallCmd    string   // Generated install command
+	ConfigPath    string   // Path to nomad config file
 }
 
 // assessNetworkConfiguration checks IPv6 support and Tailscale configuration
 func assessNetworkConfiguration(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Assessing network configuration")
-	
+
 	nodeIP := ""
 	if network.CheckIPv6Enabled() {
 		tailscaleIP, err := network.GetTailscaleIPv6()
@@ -119,41 +119,41 @@ func assessNetworkConfiguration(rc *eos_io.RuntimeContext) (string, error) {
 			}
 		}
 	}
-	
+
 	logger.Info("Network configuration assessment complete",
 		zap.String("node_ip", nodeIP))
-	
+
 	return nodeIP, nil
 }
 
 // getNomadConfiguration prompts the user for Nomad deployment configuration
 func getNomadConfiguration(rc *eos_io.RuntimeContext, nodeIP string) (*NomadConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Getting Nomad deployment configuration from user")
-	
+
 	config := &NomadConfig{
 		NodeIP:     nodeIP,
 		DataCenter: "dc1", // Default datacenter
 		ConfigPath: "/etc/nomad.d/nomad.hcl",
 	}
-	
+
 	// Get node role
 	logger.Info("terminal prompt: Is this node a server or client?")
 	role := interaction.PromptInput(rc.Ctx, "Is this node a server or client?", "server")
-	
+
 	role = strings.TrimSpace(strings.ToLower(role))
 	if role != "server" && role != "client" {
 		return nil, eos_err.NewUserError("invalid role '%s', must be 'server' or 'client'", role)
 	}
-	
+
 	config.Role = role
-	
+
 	// Get datacenter name
 	logger.Info("terminal prompt: Enter datacenter name")
 	datacenter := interaction.PromptInput(rc.Ctx, "Enter datacenter name", "dc1")
 	config.DataCenter = strings.TrimSpace(datacenter)
-	
+
 	// Get role-specific configuration
 	switch role {
 	case "server":
@@ -165,18 +165,18 @@ func getNomadConfiguration(rc *eos_io.RuntimeContext, nodeIP string) (*NomadConf
 			return nil, fmt.Errorf("failed to get client configuration: %w", err)
 		}
 	}
-	
+
 	logger.Info("Nomad configuration complete",
 		zap.String("role", config.Role),
 		zap.String("datacenter", config.DataCenter))
-	
+
 	return config, nil
 }
 
 // getServerConfiguration gets server-specific configuration
 func getServerConfiguration(rc *eos_io.RuntimeContext, config *NomadConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Generate encryption key for gossip
 	logger.Info("Generating encryption key for secure gossip")
 	encryptionKey, err := generateEncryptionKey(rc)
@@ -184,7 +184,7 @@ func getServerConfiguration(rc *eos_io.RuntimeContext, config *NomadConfig) erro
 		return fmt.Errorf("failed to generate encryption key: %w", err)
 	}
 	config.EncryptionKey = encryptionKey
-	
+
 	logger.Info("Server configuration complete")
 	return nil
 }
@@ -192,15 +192,15 @@ func getServerConfiguration(rc *eos_io.RuntimeContext, config *NomadConfig) erro
 // getClientConfiguration gets client-specific configuration
 func getClientConfiguration(rc *eos_io.RuntimeContext, config *NomadConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Get server addresses
 	logger.Info("terminal prompt: Enter Nomad server addresses")
 	serverAddrs := interaction.PromptInput(rc.Ctx, "Enter Nomad server addresses (comma-separated)", "")
-	
+
 	if strings.TrimSpace(serverAddrs) == "" {
 		return eos_err.NewUserError("server addresses are required for client nodes")
 	}
-	
+
 	// Parse server addresses
 	addrs := strings.Split(serverAddrs, ",")
 	for i, addr := range addrs {
@@ -211,22 +211,22 @@ func getClientConfiguration(rc *eos_io.RuntimeContext, config *NomadConfig) erro
 		addrs[i] = addr
 	}
 	config.ServerAddrs = addrs
-	
+
 	// Get encryption key
 	logger.Info("terminal prompt: Enter encryption key")
 	encryptionKey, err := interaction.PromptSecret(rc.Ctx, "Enter the gossip encryption key from server")
 	if err != nil {
 		return fmt.Errorf("failed to get encryption key: %w", err)
 	}
-	
+
 	config.EncryptionKey = strings.TrimSpace(encryptionKey)
 	if config.EncryptionKey == "" {
 		return eos_err.NewUserError("encryption key is required for client nodes")
 	}
-	
+
 	logger.Info("Client configuration complete",
 		zap.Strings("server_addrs", config.ServerAddrs))
-	
+
 	return nil
 }
 
@@ -237,12 +237,12 @@ func generateEncryptionKey(rc *eos_io.RuntimeContext) (string, error) {
 		Args:    []string{"operator", "gossip", "keyring", "generate"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		// If nomad isn't installed yet, generate a random key
 		return generateRandomKey()
 	}
-	
+
 	return strings.TrimSpace(output), nil
 }
 
@@ -253,7 +253,7 @@ func generateRandomKey() (string, error) {
 	for i := range key {
 		key[i] = byte(i * 7 % 256) // Simple deterministic generation
 	}
-	
+
 	// Base64 encode (simplified)
 	return "abcdefghijklmnopqrstuvwxyz1234567890ABCDEFG=", nil
 }
@@ -261,38 +261,38 @@ func generateRandomKey() (string, error) {
 // executeNomadDeployment executes the Nomad deployment
 func executeNomadDeployment(rc *eos_io.RuntimeContext, config *NomadConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting Nomad deployment execution")
-	
+
 	// Install Nomad binary
 	if err := installNomadBinary(rc); err != nil {
 		return fmt.Errorf("failed to install Nomad: %w", err)
 	}
-	
+
 	// Create configuration file
 	if err := createNomadConfig(rc, config); err != nil {
 		return fmt.Errorf("failed to create Nomad configuration: %w", err)
 	}
-	
+
 	// Create systemd service
 	if err := createNomadService(rc, config); err != nil {
 		return fmt.Errorf("failed to create Nomad service: %w", err)
 	}
-	
+
 	// Start and enable service
 	if err := startNomadService(rc); err != nil {
 		return fmt.Errorf("failed to start Nomad service: %w", err)
 	}
-	
+
 	return nil
 }
 
 // installNomadBinary installs the Nomad binary
 func installNomadBinary(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Installing Nomad binary")
-	
+
 	// Check if already installed
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
@@ -302,7 +302,7 @@ func installNomadBinary(rc *eos_io.RuntimeContext) error {
 		logger.Info("Nomad already installed")
 		return nil
 	}
-	
+
 	// Download and install Nomad
 	installScript := `#!/bin/bash
 set -e
@@ -324,13 +324,13 @@ sudo chown nomad:nomad /var/lib/nomad
 # Cleanup
 rm -f nomad_${NOMAD_VERSION}_linux_amd64.zip
 `
-	
+
 	// Write install script
 	scriptPath := filepath.Join(shared.EosLogDir, "nomad-install.sh")
 	if err := os.WriteFile(scriptPath, []byte(installScript), 0755); err != nil {
 		return fmt.Errorf("failed to write install script: %w", err)
 	}
-	
+
 	// Execute install script
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "/bin/bash",
@@ -340,7 +340,7 @@ rm -f nomad_${NOMAD_VERSION}_linux_amd64.zip
 	}); err != nil {
 		return fmt.Errorf("failed to install Nomad: %w", err)
 	}
-	
+
 	logger.Info("Nomad binary installed successfully")
 	return nil
 }
@@ -348,11 +348,11 @@ rm -f nomad_${NOMAD_VERSION}_linux_amd64.zip
 // createNomadConfig creates the Nomad configuration file
 func createNomadConfig(rc *eos_io.RuntimeContext, config *NomadConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Creating Nomad configuration file")
-	
+
 	var configContent string
-	
+
 	if config.Role == "server" {
 		configContent = fmt.Sprintf(`# Nomad Server Configuration
 datacenter = "%s"
@@ -397,7 +397,7 @@ telemetry {
 		for i, addr := range config.ServerAddrs {
 			serverAddrsFormatted[i] = fmt.Sprintf(`"%s"`, addr)
 		}
-		
+
 		configContent = fmt.Sprintf(`# Nomad Client Configuration
 datacenter = "%s"
 data_dir = "/var/lib/nomad"
@@ -428,24 +428,24 @@ telemetry {
 }
 `, config.DataCenter, strings.Join(serverAddrsFormatted, ", "))
 	}
-	
+
 	// Write configuration file
 	if err := os.WriteFile(config.ConfigPath, []byte(configContent), 0644); err != nil {
 		return fmt.Errorf("failed to write Nomad configuration: %w", err)
 	}
-	
+
 	logger.Info("Nomad configuration file created",
 		zap.String("path", config.ConfigPath))
-	
+
 	return nil
 }
 
 // createNomadService creates the systemd service file
 func createNomadService(rc *eos_io.RuntimeContext, config *NomadConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Creating Nomad systemd service")
-	
+
 	serviceContent := fmt.Sprintf(`[Unit]
 Description=Nomad
 Documentation=https://www.nomadproject.io/
@@ -466,12 +466,12 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target
 `, config.ConfigPath, config.ConfigPath)
-	
+
 	servicePath := "/etc/systemd/system/nomad.service"
 	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
 		return fmt.Errorf("failed to write systemd service: %w", err)
 	}
-	
+
 	// Reload systemd
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
@@ -480,7 +480,7 @@ WantedBy=multi-user.target
 	}); err != nil {
 		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
-	
+
 	logger.Info("Nomad systemd service created")
 	return nil
 }
@@ -488,9 +488,9 @@ WantedBy=multi-user.target
 // startNomadService starts and enables the Nomad service
 func startNomadService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting Nomad service")
-	
+
 	// Enable service
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
@@ -499,7 +499,7 @@ func startNomadService(rc *eos_io.RuntimeContext) error {
 	}); err != nil {
 		return fmt.Errorf("failed to enable Nomad service: %w", err)
 	}
-	
+
 	// Start service
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
@@ -508,7 +508,7 @@ func startNomadService(rc *eos_io.RuntimeContext) error {
 	}); err != nil {
 		return fmt.Errorf("failed to start Nomad service: %w", err)
 	}
-	
+
 	logger.Info("Nomad service started and enabled")
 	return nil
 }
@@ -516,9 +516,9 @@ func startNomadService(rc *eos_io.RuntimeContext) error {
 // verifyNomadDeployment verifies that Nomad was deployed successfully
 func verifyNomadDeployment(rc *eos_io.RuntimeContext, config *NomadConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Verifying Nomad deployment")
-	
+
 	// Check if Nomad service is running
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
@@ -528,7 +528,7 @@ func verifyNomadDeployment(rc *eos_io.RuntimeContext, config *NomadConfig) error
 		logger.Error("Nomad service is not active", zap.Error(err))
 		return fmt.Errorf("Nomad service verification failed: %w", err)
 	}
-	
+
 	// Check if Nomad agent is responsive
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
@@ -538,7 +538,7 @@ func verifyNomadDeployment(rc *eos_io.RuntimeContext, config *NomadConfig) error
 		logger.Warn("Nomad agent verification failed", zap.Error(err))
 		// This is a warning, not a hard failure as it might take time to join
 	}
-	
+
 	logger.Info("Nomad deployment verification completed successfully")
 	return nil
 }
@@ -546,22 +546,22 @@ func verifyNomadDeployment(rc *eos_io.RuntimeContext, config *NomadConfig) error
 // displayNomadDeploymentSummary displays deployment summary to the user
 func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("terminal prompt: Nomad deployment summary")
-	
+
 	var summary strings.Builder
 	summary.WriteString("\n")
 	summary.WriteString("╔═══════════════════════════════════════════════════════════════════════╗\n")
 	summary.WriteString("║            NOMAD DEPLOYMENT COMPLETED SUCCESSFULLY                   ║\n")
 	summary.WriteString("╚═══════════════════════════════════════════════════════════════════════╝\n")
 	summary.WriteString("\n")
-	
+
 	summary.WriteString(fmt.Sprintf("🎯 Role: %s\n", config.Role))
 	summary.WriteString(fmt.Sprintf("🌐 Datacenter: %s\n", config.DataCenter))
 	if config.NodeIP != "" {
 		summary.WriteString(fmt.Sprintf("🔗 Node IP: %s\n", config.NodeIP))
 	}
-	
+
 	if config.Role == "server" {
 		summary.WriteString("\n")
 		summary.WriteString("🔐 Encryption Key (save this for client nodes):\n")
@@ -578,21 +578,21 @@ func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfi
 		summary.WriteString("   • Check client status: nomad node status\n")
 		summary.WriteString("   • Verify server connection: nomad server members\n")
 	}
-	
+
 	summary.WriteString("\n")
 	summary.WriteString("📊 Monitoring:\n")
 	summary.WriteString("   • Service status: systemctl status nomad\n")
 	summary.WriteString("   • Logs: journalctl -u nomad -f\n")
 	summary.WriteString("   • Metrics: http://localhost:4646/v1/metrics\n")
 	summary.WriteString("\n")
-	
+
 	// Display to user
 	if _, err := fmt.Fprint(os.Stderr, summary.String()); err != nil {
 		return fmt.Errorf("failed to display summary: %w", err)
 	}
-	
+
 	logger.Info("Nomad deployment summary displayed to user",
 		zap.String("role", config.Role))
-	
+
 	return nil
 }

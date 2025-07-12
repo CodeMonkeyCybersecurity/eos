@@ -18,7 +18,7 @@ func TestLDAPConfig(t *testing.T) {
 				config   *LDAPConfig
 				expected *LDAPConfig
 			}{
-				config:   DefaultLDAPConfig(),
+				config: DefaultLDAPConfig(),
 				expected: &LDAPConfig{
 					FQDN:         "localhost",
 					Port:         389,

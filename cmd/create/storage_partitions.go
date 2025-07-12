@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -39,7 +39,7 @@ Examples:
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		outputJSON, _ := cmd.Flags().GetBool("json")
 
-		logger.Info("Creating partition", 
+		logger.Info("Creating partition",
 			zap.String("device", device),
 			zap.String("type", partitionType),
 			zap.Bool("dry_run", dryRun))
@@ -69,7 +69,7 @@ func init() {
 	diskPartitionCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompts")
 	diskPartitionCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 	diskPartitionCmd.Flags().Bool("json", false, "Output in JSON format")
-	
+
 	CreateCmd.AddCommand(diskPartitionCmd)
 }
 
@@ -79,6 +79,7 @@ func outputPartitionOpJSON(result *disk_management.PartitionOperation) error {
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
+
 // TODO
 func outputPartitionOpText(result *disk_management.PartitionOperation) error {
 	if result.DryRun {

@@ -4,13 +4,13 @@ package storage
 type StorageState string
 
 const (
-	StorageStateActive    StorageState = "active"
-	StorageStateInactive  StorageState = "inactive"
-	StorageStateDegraded  StorageState = "degraded"
-	StorageStateFailed    StorageState = "failed"
-	StorageStateCreating  StorageState = "creating"
-	StorageStateDeleting  StorageState = "deleting"
-	StorageStateUnknown   StorageState = "unknown"
+	StorageStateActive   StorageState = "active"
+	StorageStateInactive StorageState = "inactive"
+	StorageStateDegraded StorageState = "degraded"
+	StorageStateFailed   StorageState = "failed"
+	StorageStateCreating StorageState = "creating"
+	StorageStateDeleting StorageState = "deleting"
+	StorageStateUnknown  StorageState = "unknown"
 )
 
 // HealthStatus represents health status of storage resources

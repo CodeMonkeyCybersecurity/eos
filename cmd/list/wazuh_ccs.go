@@ -186,40 +186,40 @@ func listDeployments(rc *eos_io.RuntimeContext, cmd *cobra.Command, format strin
 	// Get deployment list
 	deployments := []DeploymentListItem{
 		{
-			JobName:      "wazuh-indexer-cust_12345",
-			CustomerID:   "cust_12345",
-			CompanyName:  "ACME Corporation",
-			Type:         "indexer",
-			Status:       "running",
-			Instances:    3,
-			Version:      "4.8.2",
-			CPUUsage:     45.2,
-			MemoryUsage:  78.5,
-			LastUpdated:  time.Now().Add(-2 * time.Hour),
+			JobName:     "wazuh-indexer-cust_12345",
+			CustomerID:  "cust_12345",
+			CompanyName: "ACME Corporation",
+			Type:        "indexer",
+			Status:      "running",
+			Instances:   3,
+			Version:     "4.8.2",
+			CPUUsage:    45.2,
+			MemoryUsage: 78.5,
+			LastUpdated: time.Now().Add(-2 * time.Hour),
 		},
 		{
-			JobName:      "wazuh-server-cust_12345",
-			CustomerID:   "cust_12345",
-			CompanyName:  "ACME Corporation",
-			Type:         "server",
-			Status:       "running",
-			Instances:    2,
-			Version:      "4.8.2",
-			CPUUsage:     32.1,
-			MemoryUsage:  65.3,
-			LastUpdated:  time.Now().Add(-2 * time.Hour),
+			JobName:     "wazuh-server-cust_12345",
+			CustomerID:  "cust_12345",
+			CompanyName: "ACME Corporation",
+			Type:        "server",
+			Status:      "running",
+			Instances:   2,
+			Version:     "4.8.2",
+			CPUUsage:    32.1,
+			MemoryUsage: 65.3,
+			LastUpdated: time.Now().Add(-2 * time.Hour),
 		},
 		{
-			JobName:      "wazuh-dashboard-cust_12345",
-			CustomerID:   "cust_12345",
-			CompanyName:  "ACME Corporation",
-			Type:         "dashboard",
-			Status:       "running",
-			Instances:    1,
-			Version:      "4.8.2",
-			CPUUsage:     15.7,
-			MemoryUsage:  42.1,
-			LastUpdated:  time.Now().Add(-2 * time.Hour),
+			JobName:     "wazuh-dashboard-cust_12345",
+			CustomerID:  "cust_12345",
+			CompanyName: "ACME Corporation",
+			Type:        "dashboard",
+			Status:      "running",
+			Instances:   1,
+			Version:     "4.8.2",
+			CPUUsage:    15.7,
+			MemoryUsage: 42.1,
+			LastUpdated: time.Now().Add(-2 * time.Hour),
 		},
 	}
 
@@ -236,9 +236,9 @@ func listDeployments(rc *eos_io.RuntimeContext, cmd *cobra.Command, format strin
 		Deployments: filtered,
 		Total:       len(filtered),
 		Summary: DeploymentSummary{
-			TotalJobs:     45,
-			RunningJobs:   42,
-			FailedJobs:    3,
+			TotalJobs:      45,
+			RunningJobs:    42,
+			FailedJobs:     3,
 			TotalInstances: 125,
 		},
 		Timestamp: time.Now(),
@@ -311,10 +311,10 @@ func listBackups(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) e
 		Backups: filtered,
 		Total:   len(filtered),
 		Summary: BackupSummary{
-			TotalBackups:    25,
-			TotalSizeGB:     1250.5,
-			OldestBackup:    time.Now().Add(-30 * 24 * time.Hour),
-			LatestBackup:    time.Now().Add(-2 * time.Hour),
+			TotalBackups: 25,
+			TotalSizeGB:  1250.5,
+			OldestBackup: time.Now().Add(-30 * 24 * time.Hour),
+			LatestBackup: time.Now().Add(-2 * time.Hour),
 		},
 		Timestamp: time.Now(),
 	}
@@ -405,15 +405,15 @@ func listEvents(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) er
 // Data structures
 
 type CustomerListItem struct {
-	CustomerID   string                 `json:"customer_id"`
-	CompanyName  string                 `json:"company_name"`
-	Subdomain    string                 `json:"subdomain"`
-	Tier         string                 `json:"tier"`
-	Status       string                 `json:"status"`
-	AdminEmail   string                 `json:"admin_email"`
-	CreatedAt    time.Time              `json:"created_at"`
-	AgentCount   int                    `json:"agent_count"`
-	EventsPerDay int                    `json:"events_per_day"`
+	CustomerID   string                  `json:"customer_id"`
+	CompanyName  string                  `json:"company_name"`
+	Subdomain    string                  `json:"subdomain"`
+	Tier         string                  `json:"tier"`
+	Status       string                  `json:"status"`
+	AdminEmail   string                  `json:"admin_email"`
+	CreatedAt    time.Time               `json:"created_at"`
+	AgentCount   int                     `json:"agent_count"`
+	EventsPerDay int                     `json:"events_per_day"`
 	Resources    CustomerResourceSummary `json:"resources"`
 }
 
@@ -424,10 +424,10 @@ type CustomerResourceSummary struct {
 }
 
 type CustomerList struct {
-	Customers []CustomerListItem   `json:"customers"`
-	Total     int                  `json:"total"`
-	Summary   CustomerListSummary  `json:"summary"`
-	Timestamp time.Time            `json:"timestamp"`
+	Customers []CustomerListItem  `json:"customers"`
+	Total     int                 `json:"total"`
+	Summary   CustomerListSummary `json:"summary"`
+	Timestamp time.Time           `json:"timestamp"`
 }
 
 type CustomerListSummary struct {
@@ -436,16 +436,16 @@ type CustomerListSummary struct {
 }
 
 type DeploymentListItem struct {
-	JobName      string    `json:"job_name"`
-	CustomerID   string    `json:"customer_id"`
-	CompanyName  string    `json:"company_name"`
-	Type         string    `json:"type"`
-	Status       string    `json:"status"`
-	Instances    int       `json:"instances"`
-	Version      string    `json:"version"`
-	CPUUsage     float64   `json:"cpu_usage"`
-	MemoryUsage  float64   `json:"memory_usage"`
-	LastUpdated  time.Time `json:"last_updated"`
+	JobName     string    `json:"job_name"`
+	CustomerID  string    `json:"customer_id"`
+	CompanyName string    `json:"company_name"`
+	Type        string    `json:"type"`
+	Status      string    `json:"status"`
+	Instances   int       `json:"instances"`
+	Version     string    `json:"version"`
+	CPUUsage    float64   `json:"cpu_usage"`
+	MemoryUsage float64   `json:"memory_usage"`
+	LastUpdated time.Time `json:"last_updated"`
 }
 
 type DeploymentList struct {

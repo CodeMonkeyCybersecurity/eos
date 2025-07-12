@@ -40,51 +40,51 @@ Examples:
 		force, _ := cmd.Flags().GetBool("force")
 		interactive, _ := cmd.Flags().GetBool("interactive")
 		path, _ := cmd.Flags().GetString("path")
-			logger := otelzap.Ctx(rc.Ctx)
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if path == "" {
-				var err error
-				path, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+		if path == "" {
+			var err error
+			path, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
+		}
 
-			manager := git_management.NewGitManager()
-			
-			if !manager.IsGitRepository(rc, path) {
-				return fmt.Errorf("not a git repository: %s", path)
-			}
+		manager := git_management.NewGitManager()
 
-			// Interactive mode
-			if interactive {
-				return runInteractiveCommit(rc, manager, path)
-			}
+		if !manager.IsGitRepository(rc, path) {
+			return fmt.Errorf("not a git repository: %s", path)
+		}
 
-			// Validate commit message
-			if message == "" {
-				return fmt.Errorf("commit message is required (use --message or --interactive)")
-			}
+		// Interactive mode
+		if interactive {
+			return runInteractiveCommit(rc, manager, path)
+		}
 
-			// Build commit options
-			options := &git_management.GitCommitOptions{
-				Message:     message,
-				AddAll:      addAll,
-				Push:        push,
-				Remote:      remote,
-				Branch:      branch,
-				Force:       force,
-				Interactive: interactive,
-			}
+		// Validate commit message
+		if message == "" {
+			return fmt.Errorf("commit message is required (use --message or --interactive)")
+		}
 
-			logger.Info("Committing changes", 
-				zap.String("path", path),
-				zap.String("message", message),
-				zap.Bool("add_all", addAll),
-				zap.Bool("push", push))
+		// Build commit options
+		options := &git_management.GitCommitOptions{
+			Message:     message,
+			AddAll:      addAll,
+			Push:        push,
+			Remote:      remote,
+			Branch:      branch,
+			Force:       force,
+			Interactive: interactive,
+		}
 
-			return manager.CommitAndPush(rc, path, options)
-		}),
+		logger.Info("Committing changes",
+			zap.String("path", path),
+			zap.String("message", message),
+			zap.Bool("add_all", addAll),
+			zap.Bool("push", push))
+
+		return manager.CommitAndPush(rc, path, options)
+	}),
 }
 
 func init() {
@@ -97,6 +97,7 @@ func init() {
 	CommitCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 	CommitCmd.Flags().String("path", "", "Path to Git repository (default: current directory)")
 }
+
 // TODO: HELPER_REFACTOR - Move to pkg/git_management/interactive or pkg/cli/interactive
 // Type: Business Logic
 // Related functions: None visible in this file
@@ -161,7 +162,7 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 		Force:   force,
 	}
 
-	logger.Info("Executing interactive commit", 
+	logger.Info("Executing interactive commit",
 		zap.String("message", message),
 		zap.Bool("add_all", addAll),
 		zap.Bool("push", push),

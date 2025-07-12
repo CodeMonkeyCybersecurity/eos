@@ -40,41 +40,41 @@ Examples:
 		commitMessage, _ := cmd.Flags().GetString("commit-message")
 		setupGitHub, _ := cmd.Flags().GetBool("setup-github")
 		interactive, _ := cmd.Flags().GetBool("interactive")
-			logger := otelzap.Ctx(rc.Ctx)
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if path == "" {
-				var err error
-				path, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+		if path == "" {
+			var err error
+			path, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
+		}
 
-			manager := git_management.NewGitManager()
+		manager := git_management.NewGitManager()
 
-			// Interactive mode
-			if interactive {
-				return runInteractiveInit(rc, manager)
-			}
+		// Interactive mode
+		if interactive {
+			return runInteractiveInit(rc, manager)
+		}
 
-			// Build initialization options
-			options := &git_management.GitInitOptions{
-				Path:           path,
-				InitialCommit:  initialCommit,
-				CommitMessage:  commitMessage,
-				RemoteURL:      remoteURL,
-				RemoteName:     remoteName,
-				DefaultBranch:  defaultBranch,
-				SetupGitHub:    setupGitHub,
-			}
+		// Build initialization options
+		options := &git_management.GitInitOptions{
+			Path:          path,
+			InitialCommit: initialCommit,
+			CommitMessage: commitMessage,
+			RemoteURL:     remoteURL,
+			RemoteName:    remoteName,
+			DefaultBranch: defaultBranch,
+			SetupGitHub:   setupGitHub,
+		}
 
-			logger.Info("Initializing Git repository", 
-				zap.String("path", path),
-				zap.String("remote_url", remoteURL),
-				zap.Bool("initial_commit", initialCommit))
+		logger.Info("Initializing Git repository",
+			zap.String("path", path),
+			zap.String("remote_url", remoteURL),
+			zap.Bool("initial_commit", initialCommit))
 
-			return manager.InitRepository(rc, options)
-		}),
+		return manager.InitRepository(rc, options)
+	}),
 }
 
 func init() {
@@ -87,6 +87,7 @@ func init() {
 	InitCmd.Flags().Bool("setup-github", false, "Setup GitHub repository using gh CLI")
 	InitCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -173,7 +174,7 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 		options.SetupGitHub = githubResponse == "y" || githubResponse == "Y"
 	}
 
-	logger.Info("Starting interactive repository initialization", 
+	logger.Info("Starting interactive repository initialization",
 		zap.String("path", options.Path),
 		zap.String("remote", options.RemoteURL))
 

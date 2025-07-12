@@ -100,7 +100,7 @@ func TestSSHConfigBackup(t *testing.T) {
 	t.Run("backup creation", func(t *testing.T) {
 		configFile := filepath.Join(tmpDir, "sshd_config")
 		originalContent := "# Original SSH Config\nPort 22\n"
-		
+
 		if err := os.WriteFile(configFile, []byte(originalContent), 0644); err != nil {
 			t.Fatalf("Failed to create test config: %v", err)
 		}
@@ -161,7 +161,7 @@ func TestSSHServiceRestart(t *testing.T) {
 	t.Run("restart service logic", func(t *testing.T) {
 		// This tests the restart logic without actually calling system commands
 		err := restartSSHService(rc)
-		
+
 		// This will likely fail in test environment, which is expected
 		if err != nil {
 			t.Logf("SSH service restart failed (expected in test): %v", err)
@@ -250,7 +250,7 @@ func TestTailscaleIntegration(t *testing.T) {
 	t.Run("tailscale status check", func(t *testing.T) {
 		// Test Tailscale status checking without requiring Tailscale
 		err := checkTailscaleStatus(rc)
-		
+
 		// This will likely fail if Tailscale is not installed/running
 		if err != nil {
 			t.Logf("Tailscale status check failed (expected if not installed): %v", err)
@@ -261,12 +261,12 @@ func TestTailscaleIntegration(t *testing.T) {
 
 	t.Run("get tailscale peers", func(t *testing.T) {
 		peers, err := GetTailscalePeers(rc)
-		
+
 		if err != nil {
 			t.Logf("Get Tailscale peers failed (expected if not available): %v", err)
 		} else {
 			t.Logf("Found %d Tailscale peers", len(peers))
-			
+
 			// Validate peer information format
 			for _, peer := range peers {
 				if peer == "" {
@@ -279,7 +279,7 @@ func TestTailscaleIntegration(t *testing.T) {
 
 	t.Run("ssh public key retrieval", func(t *testing.T) {
 		publicKey, err := getSSHPublicKey(rc)
-		
+
 		if err != nil {
 			t.Logf("SSH public key retrieval failed (expected if no keys): %v", err)
 		} else {
@@ -287,12 +287,12 @@ func TestTailscaleIntegration(t *testing.T) {
 			if publicKey == "" {
 				t.Error("Public key should not be empty")
 			}
-			
+
 			// Basic SSH public key format validation
 			if !strings.Contains(publicKey, "ssh-") {
 				t.Error("Public key should contain SSH key type identifier")
 			}
-			
+
 			t.Logf("Successfully retrieved SSH public key (length: %d)", len(publicKey))
 		}
 	})
@@ -302,16 +302,16 @@ func TestSSHSecurityHardening(t *testing.T) {
 	t.Run("ssh configuration security settings", func(t *testing.T) {
 		// Test security-focused SSH configuration recommendations
 		securitySettings := map[string]string{
-			"PermitRootLogin":           "no",
-			"PasswordAuthentication":    "no",
-			"PermitEmptyPasswords":      "no",
+			"PermitRootLogin":                 "no",
+			"PasswordAuthentication":          "no",
+			"PermitEmptyPasswords":            "no",
 			"ChallengeResponseAuthentication": "no",
-			"UsePAM":                    "yes",
-			"X11Forwarding":             "no",
-			"PrintMotd":                 "no",
-			"TCPKeepAlive":              "yes",
-			"ClientAliveInterval":       "300",
-			"ClientAliveCountMax":       "2",
+			"UsePAM":                          "yes",
+			"X11Forwarding":                   "no",
+			"PrintMotd":                       "no",
+			"TCPKeepAlive":                    "yes",
+			"ClientAliveInterval":             "300",
+			"ClientAliveCountMax":             "2",
 		}
 
 		for setting, value := range securitySettings {
@@ -319,7 +319,7 @@ func TestSSHSecurityHardening(t *testing.T) {
 			if containsAnyDangerous(setting) || containsAnyDangerous(value) {
 				t.Errorf("Security setting contains dangerous characters: %s=%s", setting, value)
 			}
-			
+
 			t.Logf("Security setting: %s = %s", setting, value)
 		}
 	})
@@ -366,7 +366,7 @@ func TestSSHConnectionSecurity(t *testing.T) {
 			if i+1 < len(secureOptions) {
 				option := secureOptions[i]
 				value := secureOptions[i+1]
-				
+
 				// Check for injection attempts
 				if containsAnyDangerous(option) || containsAnyDangerous(value) {
 					t.Errorf("SSH option contains dangerous characters: %s %s", option, value)
@@ -415,7 +415,7 @@ func simulateSSHConfigModification(configFile, content string) (string, error) {
 
 	for _, line := range lines {
 		stripped := strings.TrimSpace(line)
-		
+
 		if strings.HasPrefix(stripped, "PermitRootLogin") || strings.HasPrefix(stripped, "#PermitRootLogin") {
 			modifiedLines = append(modifiedLines, "PermitRootLogin no")
 			found = true
@@ -435,21 +435,21 @@ func validateKeyDistributionInputs(hosts []string, username string) error {
 	if len(hosts) == 0 {
 		return fmt.Errorf("no hosts specified")
 	}
-	
+
 	if username == "" {
 		return fmt.Errorf("username is required")
 	}
-	
+
 	// Check for dangerous characters in inputs
 	for _, host := range hosts {
 		if containsAnyDangerous(host) {
 			return fmt.Errorf("dangerous characters in hostname: %s", host)
 		}
 	}
-	
+
 	if containsAnyDangerous(username) {
 		return fmt.Errorf("dangerous characters in username: %s", username)
 	}
-	
+
 	return nil
 }

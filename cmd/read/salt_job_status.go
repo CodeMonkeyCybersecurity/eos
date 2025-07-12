@@ -66,12 +66,14 @@ func init() {
 
 	ReadCmd.AddCommand(saltJobStatusCmd)
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJobStatusJSON(status interface{}) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(status)
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJobStatusText(status interface{}, jobID string, includeDetails bool) error {
 	fmt.Printf("Salt Job Status: %s\n", jobID)

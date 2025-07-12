@@ -8,33 +8,33 @@ import (
 
 // ReconciliationRequest represents a request for state reconciliation
 type ReconciliationRequest struct {
-	Component             string   `json:"component"`
-	DryRun                bool     `json:"dry_run"`
-	Source                string   `json:"source"` // "git" or "consul"
-	GitRepository         string   `json:"git_repository,omitempty"`
-	GitBranch             string   `json:"git_branch,omitempty"`
-	GitPath               string   `json:"git_path,omitempty"`
-	CaddyAdminEndpoints   []string `json:"caddy_admin_endpoints,omitempty"`
-	AuthentikURL          string   `json:"authentik_url,omitempty"`
-	AuthentikToken        string   `json:"authentik_token,omitempty"`
-	Force                 bool     `json:"force"`
+	Component           string   `json:"component"`
+	DryRun              bool     `json:"dry_run"`
+	Source              string   `json:"source"` // "git" or "consul"
+	GitRepository       string   `json:"git_repository,omitempty"`
+	GitBranch           string   `json:"git_branch,omitempty"`
+	GitPath             string   `json:"git_path,omitempty"`
+	CaddyAdminEndpoints []string `json:"caddy_admin_endpoints,omitempty"`
+	AuthentikURL        string   `json:"authentik_url,omitempty"`
+	AuthentikToken      string   `json:"authentik_token,omitempty"`
+	Force               bool     `json:"force"`
 }
 
 // ReconciliationState tracks the progress of a reconciliation workflow
 type ReconciliationState struct {
-	ID                string                   `json:"id"`
-	StartTime         time.Time                `json:"start_time"`
-	CompletedAt       time.Time                `json:"completed_at,omitempty"`
-	Component         string                   `json:"component"`
-	DesiredItemCount  int                      `json:"desired_item_count"`
-	RuntimeItemCount  int                      `json:"runtime_item_count"`
-	ToCreate          int                      `json:"to_create"`
-	ToUpdate          int                      `json:"to_update"`
-	ToDelete          int                      `json:"to_delete"`
-	Success           bool                     `json:"success"`
-	DryRun            bool                     `json:"dry_run"`
-	ChangeReport      ChangeReport             `json:"change_report,omitempty"`
-	Error             string                   `json:"error,omitempty"`
+	ID               string       `json:"id"`
+	StartTime        time.Time    `json:"start_time"`
+	CompletedAt      time.Time    `json:"completed_at,omitempty"`
+	Component        string       `json:"component"`
+	DesiredItemCount int          `json:"desired_item_count"`
+	RuntimeItemCount int          `json:"runtime_item_count"`
+	ToCreate         int          `json:"to_create"`
+	ToUpdate         int          `json:"to_update"`
+	ToDelete         int          `json:"to_delete"`
+	Success          bool         `json:"success"`
+	DryRun           bool         `json:"dry_run"`
+	ChangeReport     ChangeReport `json:"change_report,omitempty"`
+	Error            string       `json:"error,omitempty"`
 }
 
 // DesiredState represents the desired configuration state
@@ -63,12 +63,12 @@ type StateDiff struct {
 
 // StateChange represents a single state change
 type StateChange struct {
-	Type        string      `json:"type"`        // "route", "upstream", "auth_policy"
-	Name        string      `json:"name"`
-	Action      string      `json:"action"`      // "create", "update", "delete"
-	OldValue    interface{} `json:"old_value,omitempty"`
-	NewValue    interface{} `json:"new_value,omitempty"`
-	Dependencies []string   `json:"dependencies,omitempty"`
+	Type         string      `json:"type"` // "route", "upstream", "auth_policy"
+	Name         string      `json:"name"`
+	Action       string      `json:"action"` // "create", "update", "delete"
+	OldValue     interface{} `json:"old_value,omitempty"`
+	NewValue     interface{} `json:"new_value,omitempty"`
+	Dependencies []string    `json:"dependencies,omitempty"`
 }
 
 // ChangeReport provides a summary of changes to be made
@@ -101,24 +101,24 @@ type RouteCreationRequest struct {
 
 // RouteCreationState tracks the progress of route creation
 type RouteCreationState struct {
-	Domain              string    `json:"domain"`
-	StartTime           time.Time `json:"start_time"`
-	CompletedAt         time.Time `json:"completed_at,omitempty"`
-	DNSCreated          bool      `json:"dns_created"`
-	CertificateCreated  bool      `json:"certificate_created"`
-	CertificateID       string    `json:"certificate_id,omitempty"`
-	AuthConfigured      bool      `json:"auth_configured"`
-	RouteCreated        bool      `json:"route_created"`
-	MonitoringConfigured bool     `json:"monitoring_configured"`
-	Success             bool      `json:"success"`
-	Error               string    `json:"error,omitempty"`
+	Domain               string    `json:"domain"`
+	StartTime            time.Time `json:"start_time"`
+	CompletedAt          time.Time `json:"completed_at,omitempty"`
+	DNSCreated           bool      `json:"dns_created"`
+	CertificateCreated   bool      `json:"certificate_created"`
+	CertificateID        string    `json:"certificate_id,omitempty"`
+	AuthConfigured       bool      `json:"auth_configured"`
+	RouteCreated         bool      `json:"route_created"`
+	MonitoringConfigured bool      `json:"monitoring_configured"`
+	Success              bool      `json:"success"`
+	Error                string    `json:"error,omitempty"`
 }
 
 // RouteValidation represents route validation results
 type RouteValidation struct {
-	Valid              bool   `json:"valid"`
-	Reason             string `json:"reason,omitempty"`
-	HasValidCertificate bool  `json:"has_valid_certificate"`
+	Valid               bool   `json:"valid"`
+	Reason              string `json:"reason,omitempty"`
+	HasValidCertificate bool   `json:"has_valid_certificate"`
 }
 
 // DNSStatus represents DNS record status
@@ -186,21 +186,21 @@ type SecretRotationRequest struct {
 
 // SecretRotationState tracks secret rotation progress
 type SecretRotationState struct {
-	SecretType    string    `json:"secret_type"`
-	Strategy      string    `json:"strategy"`
-	StartTime     time.Time `json:"start_time"`
-	CompletedAt   time.Time `json:"completed_at,omitempty"`
-	CurrentPhase  string    `json:"current_phase"`
-	Success       bool      `json:"success"`
-	Error         string    `json:"error,omitempty"`
+	SecretType   string    `json:"secret_type"`
+	Strategy     string    `json:"strategy"`
+	StartTime    time.Time `json:"start_time"`
+	CompletedAt  time.Time `json:"completed_at,omitempty"`
+	CurrentPhase string    `json:"current_phase"`
+	Success      bool      `json:"success"`
+	Error        string    `json:"error,omitempty"`
 }
 
 // DistributedLock represents a distributed lock
 type DistributedLock struct {
-	Key       string    `json:"key"`
-	Owner     string    `json:"owner"`
-	TTL       time.Duration `json:"ttl"`
-	AcquiredAt time.Time `json:"acquired_at"`
+	Key        string        `json:"key"`
+	Owner      string        `json:"owner"`
+	TTL        time.Duration `json:"ttl"`
+	AcquiredAt time.Time     `json:"acquired_at"`
 }
 
 // LockRequest represents a lock acquisition request
@@ -243,8 +243,8 @@ type DiffRequest struct {
 
 // ConsulRouteConfig represents route configuration stored in Consul
 type ConsulRouteConfig struct {
-	Key   string        `json:"key"`
-	Route hecate.Route  `json:"route"`
+	Key   string       `json:"key"`
+	Route hecate.Route `json:"route"`
 }
 
 // AlertRequest represents an alert request

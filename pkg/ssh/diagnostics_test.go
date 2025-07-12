@@ -63,10 +63,10 @@ func TestSSHCredentials(t *testing.T) {
 
 func TestParseSSHPath(t *testing.T) {
 	tests := []struct {
-		name     string
-		sshPath  string
-		want     *SSHCredentials
-		wantErr  bool
+		name    string
+		sshPath string
+		want    *SSHCredentials
+		wantErr bool
 	}{
 		{
 			name:    "basic user@host",
@@ -143,12 +143,12 @@ func TestParseSSHPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseSSHPath(tt.sshPath)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseSSHPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr {
 				if got.User != tt.want.User {
 					t.Errorf("ParseSSHPath() User = %v, want %v", got.User, tt.want.User)
@@ -206,7 +206,7 @@ func TestParseSSHPath_SecurityValidation(t *testing.T) {
 	for _, tt := range maliciousInputs {
 		t.Run(tt.name, func(t *testing.T) {
 			creds, err := ParseSSHPath(tt.sshPath)
-			
+
 			if err == nil {
 				// If parsing succeeds, check that dangerous characters were handled
 				if containsAnyDangerous(creds.User) || containsAnyDangerous(creds.Host) {
@@ -281,7 +281,7 @@ func TestCheckSSHKeyPermissions(t *testing.T) {
 			}
 
 			err = CheckSSHKeyPermissions(rc, keyPath)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CheckSSHKeyPermissions() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -309,13 +309,13 @@ func TestListSSHKeys(t *testing.T) {
 	t.Run("ssh keys listing logic", func(t *testing.T) {
 		// The function should not panic and should return a slice
 		keys, err := ListSSHKeys(rc)
-		
+
 		// This may fail if no SSH directory exists, which is okay
 		if err != nil {
 			t.Logf("Expected error in test environment: %v", err)
 		} else {
 			t.Logf("Found %d SSH keys", len(keys))
-			
+
 			// Validate that returned keys are absolute paths
 			for _, key := range keys {
 				if !filepath.IsAbs(key) {
@@ -534,7 +534,7 @@ func validateSSHCredentials(creds *SSHCredentials) bool {
 	if creds == nil {
 		return false
 	}
-	
+
 	return isValidUsername(creds.User) &&
 		isValidHostname(creds.Host) &&
 		isValidPort(creds.Port)
@@ -544,12 +544,12 @@ func isValidPort(port string) bool {
 	if port == "" {
 		return false
 	}
-	
+
 	// Check for injection attempts
 	if containsAnyDangerous(port) {
 		return false
 	}
-	
+
 	// Simple port range validation (simplified for testing)
 	return len(port) <= 5 && port != "0"
 }
@@ -558,12 +558,12 @@ func isValidHostname(host string) bool {
 	if host == "" {
 		return false
 	}
-	
+
 	// Check for injection attempts
 	if containsAnyDangerous(host) {
 		return false
 	}
-	
+
 	// Basic hostname validation
 	return len(host) > 0 && len(host) <= 255
 }
@@ -572,12 +572,12 @@ func isValidUsername(user string) bool {
 	if user == "" {
 		return false
 	}
-	
+
 	// Check for injection attempts
 	if containsAnyDangerous(user) {
 		return false
 	}
-	
+
 	// Basic username validation
 	return len(user) > 0 && len(user) <= 32
 }
@@ -586,12 +586,12 @@ func isValidNetworkAddress(addr string) bool {
 	if addr == "" {
 		return false
 	}
-	
+
 	// Check for injection attempts
 	if containsAnyDangerous(addr) {
 		return false
 	}
-	
+
 	// Basic network address validation (host:port format)
 	return len(addr) > 0 && containsSubstring(addr, ":")
 }

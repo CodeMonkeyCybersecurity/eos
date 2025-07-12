@@ -24,7 +24,7 @@ func NewPrivilegeManager(config *PrivilegeConfig) *PrivilegeManager {
 	if config == nil {
 		config = DefaultPrivilegeConfig()
 	}
-	
+
 	return &PrivilegeManager{
 		config: config,
 	}
@@ -52,7 +52,7 @@ func (pm *PrivilegeManager) CheckPrivileges(rc *eos_io.RuntimeContext) (*Privile
 	}
 
 	check.Username = currentUser.Username
-	
+
 	// Get group information
 	group, err := user.LookupGroupId(strconv.Itoa(check.GroupID))
 	if err != nil {
@@ -64,7 +64,7 @@ func (pm *PrivilegeManager) CheckPrivileges(rc *eos_io.RuntimeContext) (*Privile
 
 	// Determine privilege level
 	check.IsRoot = (check.UserID == 0)
-	
+
 	if check.IsRoot {
 		check.Level = PrivilegeLevelRoot
 		check.HasSudo = true // Root inherently has sudo
@@ -91,14 +91,14 @@ func (pm *PrivilegeManager) CheckPrivileges(rc *eos_io.RuntimeContext) (*Privile
 // RequireSudo performs a sudo check with specified requirements
 func (pm *PrivilegeManager) RequireSudo(rc *eos_io.RuntimeContext, options *CheckOptions) (*SudoCheckResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if options == nil {
 		options = &CheckOptions{
 			Requirement: SudoRequired,
 		}
 	}
 
-	logger.Info("Performing sudo requirement check", 
+	logger.Info("Performing sudo requirement check",
 		zap.String("requirement", string(options.Requirement)),
 		zap.Bool("silent", options.SilentMode))
 
@@ -122,7 +122,7 @@ func (pm *PrivilegeManager) RequireSudo(rc *eos_io.RuntimeContext, options *Chec
 	case SudoNotRequired:
 		result.Success = true
 		result.Message = "No elevated privileges required"
-		
+
 	case SudoPreferred:
 		result.Success = true
 		if check.IsRoot || check.HasSudo {
@@ -130,7 +130,7 @@ func (pm *PrivilegeManager) RequireSudo(rc *eos_io.RuntimeContext, options *Chec
 		} else {
 			result.Message = "Running with regular privileges (elevated privileges preferred but not required)"
 		}
-		
+
 	case SudoRequired:
 		if check.IsRoot {
 			result.Success = true
@@ -168,15 +168,15 @@ func (pm *PrivilegeManager) CheckSudoOnly(rc *eos_io.RuntimeContext) error {
 		Requirement: SudoRequired,
 		SilentMode:  false,
 	})
-	
+
 	if err != nil {
 		return err
 	}
-	
+
 	if !result.Success {
 		return fmt.Errorf("sudo privileges required")
 	}
-	
+
 	return nil
 }
 
@@ -184,29 +184,29 @@ func (pm *PrivilegeManager) CheckSudoOnly(rc *eos_io.RuntimeContext) error {
 
 func (pm *PrivilegeManager) checkSudoAccess(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Try to run 'sudo -n true' to check if we have passwordless sudo
 	cmd := exec.CommandContext(rc.Ctx, "sudo", "-n", "true")
 	err := cmd.Run()
-	
+
 	if err == nil {
 		logger.Debug("User has passwordless sudo access")
 		return true
 	}
-	
+
 	// Check if user is in sudo group (Linux) or wheel group (BSD/macOS)
 	currentUser, err := user.Current()
 	if err != nil {
 		logger.Debug("Failed to get current user for group check", zap.Error(err))
 		return false
 	}
-	
+
 	groups, err := currentUser.GroupIds()
 	if err != nil {
 		logger.Debug("Failed to get user groups", zap.Error(err))
 		return false
 	}
-	
+
 	// Check common sudo groups
 	sudoGroups := []string{"sudo", "wheel", "admin"}
 	for _, groupID := range groups {
@@ -214,7 +214,7 @@ func (pm *PrivilegeManager) checkSudoAccess(rc *eos_io.RuntimeContext) bool {
 		if err != nil {
 			continue
 		}
-		
+
 		for _, sudoGroup := range sudoGroups {
 			if group.Name == sudoGroup {
 				logger.Debug("User is in sudo group", zap.String("group", sudoGroup))
@@ -222,7 +222,7 @@ func (pm *PrivilegeManager) checkSudoAccess(rc *eos_io.RuntimeContext) bool {
 			}
 		}
 	}
-	
+
 	logger.Debug("User does not appear to have sudo access")
 	return false
 }
@@ -245,13 +245,13 @@ func (pm *PrivilegeManager) GetPrivilegeInfo(rc *eos_io.RuntimeContext) (string,
 	if err != nil {
 		return "", err
 	}
-	
+
 	var info strings.Builder
 	info.WriteString(fmt.Sprintf("User: %s (UID: %d)\n", check.Username, check.UserID))
 	info.WriteString(fmt.Sprintf("Group: %s (GID: %d)\n", check.Groupname, check.GroupID))
 	info.WriteString(fmt.Sprintf("Privilege Level: %s\n", check.Level))
 	info.WriteString(fmt.Sprintf("Is Root: %t\n", check.IsRoot))
 	info.WriteString(fmt.Sprintf("Has Sudo: %t\n", check.HasSudo))
-	
+
 	return info.String(), nil
 }

@@ -17,20 +17,20 @@ import (
 // Migrated from cmd/ragequit/ragequit.go networkDiagnostics
 func NetworkDiagnostics(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare for network diagnostics
 	logger.Info("Assessing network diagnostics requirements")
-	
+
 	homeDir := system.GetHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-network.txt")
-	
+
 	var output strings.Builder
 	output.WriteString("=== Network Diagnostics ===\n")
 	output.WriteString(fmt.Sprintf("Timestamp: %s\n", time.Now().Format(time.RFC3339)))
-	
+
 	// INTERVENE - Collect network information
 	logger.Debug("Collecting network information")
-	
+
 	// Network listeners
 	output.WriteString("\n--- Network Listeners ---\n")
 	if netListeners := system.RunCommandWithTimeout("ss", []string{"-tlnp"}, 5*time.Second); netListeners != "" {
@@ -40,7 +40,7 @@ func NetworkDiagnostics(rc *eos_io.RuntimeContext) error {
 		output.WriteString(netListeners)
 		output.WriteString("\n")
 	}
-	
+
 	// Network interfaces
 	output.WriteString("\n--- Network Interfaces ---\n")
 	if netInterfaces := system.RunCommandWithTimeout("ip", []string{"addr"}, 5*time.Second); netInterfaces != "" {
@@ -50,7 +50,7 @@ func NetworkDiagnostics(rc *eos_io.RuntimeContext) error {
 		output.WriteString(netInterfaces)
 		output.WriteString("\n")
 	}
-	
+
 	// Routing table
 	output.WriteString("\n--- Routing Table ---\n")
 	if routes := system.RunCommandWithTimeout("ip", []string{"route"}, 5*time.Second); routes != "" {
@@ -60,14 +60,14 @@ func NetworkDiagnostics(rc *eos_io.RuntimeContext) error {
 		output.WriteString(routes)
 		output.WriteString("\n")
 	}
-	
+
 	// DNS configuration
 	output.WriteString("\n--- DNS Configuration ---\n")
 	if resolv := system.ReadFile("/etc/resolv.conf"); resolv != "" {
 		output.WriteString(resolv)
 		output.WriteString("\n")
 	}
-	
+
 	// Active connections
 	output.WriteString("\n--- Active Connections ---\n")
 	if activeConns := system.RunCommandWithTimeout("ss", []string{"-anp"}, 5*time.Second); activeConns != "" {
@@ -81,21 +81,21 @@ func NetworkDiagnostics(rc *eos_io.RuntimeContext) error {
 		}
 		output.WriteString("\n")
 	}
-	
+
 	// Connection statistics
 	output.WriteString("\n--- Connection Statistics ---\n")
 	if connStats := system.RunCommandWithTimeout("ss", []string{"-s"}, 5*time.Second); connStats != "" {
 		output.WriteString(connStats)
 		output.WriteString("\n")
 	}
-	
+
 	// EVALUATE - Write results
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write network diagnostics: %w", err)
 	}
-	
+
 	logger.Info("Network diagnostics completed",
 		zap.String("output_file", outputFile))
-	
+
 	return nil
 }

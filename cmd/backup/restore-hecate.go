@@ -34,7 +34,6 @@ func init() {
 		"Backup timestamp (YYYYMMDD-HHMMSS). Omit for interactive mode.")
 }
 
-
 // TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/hecate/backup
 // Type: Business Logic
 // Related functions: interactiveRestore, restoreResource

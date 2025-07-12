@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Package-level variables for deploy command flags
 var (
@@ -24,10 +25,10 @@ var (
 
 // deployCmd handles Git deployment workflows
 var deployCmd = &cobra.Command{
-		Use:     "deploy",
-		Aliases: []string{"dp"},
-		Short:   "Automated Git deployment workflow",
-		Long: `Automated Git deployment workflow for code deployment.
+	Use:     "deploy",
+	Aliases: []string{"dp"},
+	Short:   "Automated Git deployment workflow",
+	Long: `Automated Git deployment workflow for code deployment.
 
 This command provides automated deployment functionality:
 - Pull latest changes from remote
@@ -42,54 +43,54 @@ Examples:
   eos git deploy --branch main --merge-branch development
   eos git deploy --dry-run                       # Test deployment without changes`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if deployRepositoryPath == "" {
-				var err error
-				deployRepositoryPath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+		if deployRepositoryPath == "" {
+			var err error
+			deployRepositoryPath, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
+		}
 
-			manager := git_management.NewGitManager()
-			
-			if !manager.IsGitRepository(rc, deployRepositoryPath) {
-				return fmt.Errorf("not a git repository: %s", deployRepositoryPath)
-			}
+		manager := git_management.NewGitManager()
 
-			// Set defaults
-			if deployBranch == "" {
-				deployBranch = "main"
-			}
-			if deployLogFile == "" {
-				deployLogFile = fmt.Sprintf("%s/deploy.log", deployRepositoryPath)
-			}
+		if !manager.IsGitRepository(rc, deployRepositoryPath) {
+			return fmt.Errorf("not a git repository: %s", deployRepositoryPath)
+		}
 
-			// Build deployment options
-			options := &git_management.GitDeploymentOptions{
-				RepositoryPath: deployRepositoryPath,
-				Branch:         deployBranch,
-				MergeBranch:    deployMergeBranch,
-				LogFile:        deployLogFile,
-				DryRun:         deployDryRun,
-				Force:          deployForce,
-			}
+		// Set defaults
+		if deployBranch == "" {
+			deployBranch = "main"
+		}
+		if deployLogFile == "" {
+			deployLogFile = fmt.Sprintf("%s/deploy.log", deployRepositoryPath)
+		}
 
-			logger.Info("Starting Git deployment", 
-				zap.String("repository", deployRepositoryPath),
-				zap.String("branch", deployBranch),
-				zap.String("merge_branch", deployMergeBranch),
-				zap.Bool("dry_run", deployDryRun),
-				zap.Bool("force", deployForce))
+		// Build deployment options
+		options := &git_management.GitDeploymentOptions{
+			RepositoryPath: deployRepositoryPath,
+			Branch:         deployBranch,
+			MergeBranch:    deployMergeBranch,
+			LogFile:        deployLogFile,
+			DryRun:         deployDryRun,
+			Force:          deployForce,
+		}
 
-			if deployDryRun {
-				return runDryRunDeployment(rc, manager, options)
-			}
+		logger.Info("Starting Git deployment",
+			zap.String("repository", deployRepositoryPath),
+			zap.String("branch", deployBranch),
+			zap.String("merge_branch", deployMergeBranch),
+			zap.Bool("dry_run", deployDryRun),
+			zap.Bool("force", deployForce))
 
-			return manager.DeployWithGit(rc, options)
-		}),
+		if deployDryRun {
+			return runDryRunDeployment(rc, manager, options)
+		}
+
+		return manager.DeployWithGit(rc, options)
+	}),
 }
 
 func init() {
@@ -100,6 +101,7 @@ func init() {
 	deployCmd.Flags().BoolVar(&deployDryRun, "dry-run", false, "Simulate deployment without making changes")
 	deployCmd.Flags().BoolVarP(&deployForce, "force", "f", false, "Force push changes")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runDryRunDeployment(rc *eos_io.RuntimeContext, manager *git_management.GitManager, options *git_management.GitDeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)

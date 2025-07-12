@@ -28,7 +28,6 @@ and removes it by running the appropriate uninstall scripts in the correct order
 	}),
 }
 
-
 func init() {
 	DeleteCmd.AddCommand(DeleteK3sCmd)
 }

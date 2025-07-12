@@ -14,10 +14,10 @@ import (
 
 // DriverRegistry manages storage driver registration and creation
 type DriverRegistry struct {
-	mu       sync.RWMutex
-	drivers  map[StorageType]StorageDriverFactory
-	rc       *eos_io.RuntimeContext
-	salt     SaltClient
+	mu      sync.RWMutex
+	drivers map[StorageType]StorageDriverFactory
+	rc      *eos_io.RuntimeContext
+	salt    SaltClient
 }
 
 // NewDriverRegistry creates a new driver registry
@@ -204,12 +204,12 @@ func (f *DockerVolumeDriverFactory) SupportsType(storageType StorageType) bool {
 // UnifiedStorageManager provides high-level storage management
 // by coordinating between different storage drivers
 type UnifiedStorageManager struct {
-	rc           *eos_io.RuntimeContext
-	registry     *DriverRegistry
-	diskManager  *disk_management.DiskManager
-	salt         SaltClient
-	drivers      map[StorageType]StorageDriver
-	mu           sync.RWMutex
+	rc          *eos_io.RuntimeContext
+	registry    *DriverRegistry
+	diskManager *disk_management.DiskManager
+	salt        SaltClient
+	drivers     map[StorageType]StorageDriver
+	mu          sync.RWMutex
 }
 
 // NewUnifiedStorageManager creates a new unified storage manager
@@ -239,7 +239,7 @@ func NewUnifiedStorageManager(rc *eos_io.RuntimeContext, salt SaltClient) (*Unif
 // initializeDrivers initializes all available storage drivers
 func (m *UnifiedStorageManager) initializeDrivers() error {
 	logger := otelzap.Ctx(m.rc.Ctx)
-	
+
 	for _, storageType := range m.registry.GetSupportedTypes() {
 		logger.Info("Initializing storage driver",
 			zap.String("type", string(storageType)))
@@ -272,7 +272,7 @@ func (m *UnifiedStorageManager) CreateVolume(ctx context.Context, name string, c
 
 	// ASSESS - Validate configuration and select optimal storage type
 	storageType := m.selectOptimalStorageType(config)
-	
+
 	driver, exists := m.drivers[storageType]
 	if !exists {
 		return nil, fmt.Errorf("no driver available for storage type: %s", storageType)
@@ -372,19 +372,19 @@ func (m *UnifiedStorageManager) selectOptimalStorageType(config VolumeConfig) St
 	case "database":
 		// XFS on LVM for databases
 		return StorageTypeLVM
-	
+
 	case "backup":
 		// BTRFS for compression and deduplication
 		return StorageTypeBTRFS
-	
+
 	case "distributed":
 		// CephFS for distributed workloads
 		return StorageTypeCephFS
-	
+
 	case "container":
 		// Docker volumes for containers
 		return StorageType("docker")
-	
+
 	default:
 		// Default to LVM
 		return StorageTypeLVM
@@ -452,54 +452,54 @@ func GetOptimalStorageForWorkload(workload string) VolumeConfig {
 	switch workload {
 	case "database":
 		return VolumeConfig{
-			Type:       StorageTypeLVM,
-			Filesystem: FilesystemXFS,
+			Type:         StorageTypeLVM,
+			Filesystem:   FilesystemXFS,
 			MountOptions: []string{"noatime", "nodiratime", "nobarrier"},
-			Workload:   workload,
+			Workload:     workload,
 		}
-	
+
 	case "backup":
 		return VolumeConfig{
-			Type:       StorageTypeBTRFS,
-			Filesystem: FilesystemBTRFS,
+			Type:         StorageTypeBTRFS,
+			Filesystem:   FilesystemBTRFS,
 			MountOptions: []string{"compress=zstd:3", "noatime", "space_cache=v2"},
-			Workload:   workload,
+			Workload:     workload,
 			DriverConfig: map[string]interface{}{
-				"compression": "zstd",
+				"compression":       "zstd",
 				"compression_level": 3,
 			},
 		}
-	
+
 	case "container":
 		return VolumeConfig{
-			Type:       StorageTypeLVM,
-			Filesystem: FilesystemExt4,
+			Type:         StorageTypeLVM,
+			Filesystem:   FilesystemExt4,
 			MountOptions: []string{"defaults", "noatime"},
-			Workload:   workload,
+			Workload:     workload,
 		}
-	
+
 	case "media":
 		return VolumeConfig{
-			Type:       StorageTypeBTRFS,
-			Filesystem: FilesystemBTRFS,
+			Type:         StorageTypeBTRFS,
+			Filesystem:   FilesystemBTRFS,
 			MountOptions: []string{"compress=zstd:1", "noatime"},
-			Workload:   workload,
+			Workload:     workload,
 		}
-	
+
 	case "distributed":
 		return VolumeConfig{
 			Type:       StorageTypeCephFS,
 			Filesystem: FilesystemType("cephfs"),
 			Workload:   workload,
 		}
-	
+
 	default:
 		// General purpose
 		return VolumeConfig{
-			Type:       StorageTypeLVM,
-			Filesystem: FilesystemExt4,
+			Type:         StorageTypeLVM,
+			Filesystem:   FilesystemExt4,
 			MountOptions: []string{"defaults", "noatime"},
-			Workload:   "general",
+			Workload:     "general",
 		}
 	}
 }

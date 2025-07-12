@@ -62,6 +62,7 @@ func init() {
 
 	ListCmd.AddCommand(zfsFilesystemsCmd)
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputZFSFilesystemsResult(result *zfs_management.ZFSListResult, outputJSON bool) error {
 	if outputJSON {

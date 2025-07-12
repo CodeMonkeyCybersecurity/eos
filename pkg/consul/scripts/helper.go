@@ -14,13 +14,13 @@ import (
 // Migrated from cmd/create/consul.go createConsulHelperScript
 func CreateHelper(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare helper script
 	log.Info("Assessing Consul helper script requirements")
-	
+
 	// INTERVENE - Create helper script
 	log.Info("Creating Consul helper script")
-	
+
 	helperScript := fmt.Sprintf(`#!/bin/bash
 # /usr/local/bin/consul-vault-helper
 # Consul and Vault integration helper script
@@ -106,28 +106,28 @@ esac`, shared.PortConsul)
 	if err := os.WriteFile(scriptPath, []byte(helperScript), 0755); err != nil {
 		return fmt.Errorf("failed to write helper script: %w", err)
 	}
-	
+
 	// EVALUATE - Verify script was created properly
 	log.Info("Evaluating Consul helper script creation")
-	
+
 	// Check if script exists with correct permissions
 	info, err := os.Stat(scriptPath)
 	if err != nil {
 		return fmt.Errorf("failed to verify helper script: %w", err)
 	}
-	
+
 	if info.Mode().Perm() != 0755 {
 		return fmt.Errorf("helper script has incorrect permissions: expected 0755, got %s", info.Mode().Perm())
 	}
-	
+
 	// Verify script is executable
 	if info.Mode()&0111 == 0 {
 		return fmt.Errorf("helper script is not executable")
 	}
-	
+
 	log.Info("Consul helper script created successfully",
 		zap.String("path", scriptPath),
 		zap.String("permissions", info.Mode().String()))
-	
+
 	return nil
 }

@@ -182,12 +182,12 @@ type HetznerDNSConfig struct {
 
 // TemporalConfig represents Temporal workflow engine configuration
 type TemporalConfig struct {
-	Enabled      bool   `json:"enabled" yaml:"enabled"`
-	HostPort     string `json:"host_port" yaml:"host_port"`
-	Namespace    string `json:"namespace" yaml:"namespace"`
-	TaskQueue    string `json:"task_queue" yaml:"task_queue"`
-	WorkerCount  int    `json:"worker_count" yaml:"worker_count"`
-	RetentionDays int   `json:"retention_days" yaml:"retention_days"`
+	Enabled       bool   `json:"enabled" yaml:"enabled"`
+	HostPort      string `json:"host_port" yaml:"host_port"`
+	Namespace     string `json:"namespace" yaml:"namespace"`
+	TaskQueue     string `json:"task_queue" yaml:"task_queue"`
+	WorkerCount   int    `json:"worker_count" yaml:"worker_count"`
+	RetentionDays int    `json:"retention_days" yaml:"retention_days"`
 }
 
 // MonitoringConfig represents monitoring and alerting configuration
@@ -202,10 +202,10 @@ type MonitoringConfig struct {
 
 // APIConfig represents Hecate API server configuration
 type APIConfig struct {
-	Enabled     bool   `json:"enabled" yaml:"enabled"`
-	Port        int    `json:"port" yaml:"port"`
-	TLSCertFile string `json:"tls_cert_file" yaml:"tls_cert_file"`
-	TLSKeyFile  string `json:"tls_key_file" yaml:"tls_key_file"`
-	AuthEnabled bool   `json:"auth_enabled" yaml:"auth_enabled"`
+	Enabled      bool   `json:"enabled" yaml:"enabled"`
+	Port         int    `json:"port" yaml:"port"`
+	TLSCertFile  string `json:"tls_cert_file" yaml:"tls_cert_file"`
+	TLSKeyFile   string `json:"tls_key_file" yaml:"tls_key_file"`
+	AuthEnabled  bool   `json:"auth_enabled" yaml:"auth_enabled"`
 	APIKeyHeader string `json:"api_key_header" yaml:"api_key_header"`
 }

@@ -32,26 +32,26 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Listing backup repositories")
-		
+
 		config, err := backup.LoadConfig(rc)
 		if err != nil {
 			return fmt.Errorf("loading configuration: %w", err)
 		}
-		
+
 		if len(config.Repositories) == 0 {
 			logger.Info("No repositories configured")
 			return nil
 		}
-		
+
 		logger.Info("Configured repositories",
 			zap.Int("count", len(config.Repositories)))
-		
+
 		// Display repositories
 		fmt.Println("\nConfigured Repositories:")
 		fmt.Println(strings.Repeat("-", 80))
 		fmt.Printf("%-20s %-10s %-40s\n", "NAME", "BACKEND", "URL")
 		fmt.Println(strings.Repeat("-", 80))
-		
+
 		for name, repo := range config.Repositories {
 			isDefault := ""
 			if name == config.DefaultRepository {
@@ -61,7 +61,7 @@ Examples:
 				name, repo.Backend, repo.URL, isDefault)
 		}
 		fmt.Println()
-		
+
 		return nil
 	}),
 }
@@ -79,38 +79,38 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Listing backup profiles")
-		
+
 		config, err := backup.LoadConfig(rc)
 		if err != nil {
 			return fmt.Errorf("loading configuration: %w", err)
 		}
-		
+
 		if len(config.Profiles) == 0 {
 			logger.Info("No profiles configured")
 			return nil
 		}
-		
+
 		logger.Info("Configured profiles",
 			zap.Int("count", len(config.Profiles)))
-		
+
 		// Display profiles
 		fmt.Println("\nConfigured Profiles:")
 		fmt.Println(strings.Repeat("-", 100))
 		fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
 			"NAME", "REPOSITORY", "PATHS", "SCHEDULE", "RETENTION")
 		fmt.Println(strings.Repeat("-", 100))
-		
+
 		for name, profile := range config.Profiles {
 			paths := strings.Join(profile.Paths, ", ")
 			if len(paths) > 30 {
 				paths = paths[:27] + "..."
 			}
-			
+
 			schedule := "-"
 			if profile.Schedule != nil && profile.Schedule.Cron != "" {
 				schedule = profile.Schedule.Cron
 			}
-			
+
 			retention := "-"
 			if profile.Retention != nil {
 				parts := []string{}
@@ -128,12 +128,12 @@ Examples:
 				}
 				retention = strings.Join(parts, " ")
 			}
-			
+
 			fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
 				name, profile.Repository, paths, schedule, retention)
 		}
 		fmt.Println()
-		
+
 		return nil
 	}),
 }
@@ -160,12 +160,12 @@ Examples:
   eos backup list snapshots --host server01`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		repoName, _ := cmd.Flags().GetString("repo")
 		filterTags, _ := cmd.Flags().GetStringSlice("tags")
 		filterHost, _ := cmd.Flags().GetString("host")
 		filterPath, _ := cmd.Flags().GetString("path")
-		
+
 		// Use default repository if not specified
 		if repoName == "" {
 			config, err := backup.LoadConfig(rc)
@@ -177,24 +177,24 @@ Examples:
 				return fmt.Errorf("no repository specified and no default configured")
 			}
 		}
-		
+
 		logger.Info("Listing snapshots",
 			zap.String("repository", repoName),
 			zap.Strings("filter_tags", filterTags),
 			zap.String("filter_host", filterHost))
-		
+
 		// Create backup client
 		client, err := backup.NewClient(rc, repoName)
 		if err != nil {
 			return fmt.Errorf("creating backup client: %w", err)
 		}
-		
+
 		// List snapshots
 		snapshots, err := client.ListSnapshots()
 		if err != nil {
 			return fmt.Errorf("listing snapshots: %w", err)
 		}
-		
+
 		// Apply filters
 		filtered := []backup.Snapshot{}
 		for _, snap := range snapshots {
@@ -216,12 +216,12 @@ Examples:
 					continue
 				}
 			}
-			
+
 			// Host filter
 			if filterHost != "" && snap.Hostname != filterHost {
 				continue
 			}
-			
+
 			// Path filter
 			if filterPath != "" {
 				hasPath := false
@@ -235,46 +235,46 @@ Examples:
 					continue
 				}
 			}
-			
+
 			filtered = append(filtered, snap)
 		}
-		
+
 		logger.Info("Found snapshots",
 			zap.Int("total", len(snapshots)),
 			zap.Int("filtered", len(filtered)))
-		
+
 		if len(filtered) == 0 {
 			fmt.Println("No snapshots found matching criteria")
 			return nil
 		}
-		
+
 		// Display snapshots
 		fmt.Println("\nSnapshots:")
 		fmt.Println(strings.Repeat("-", 120))
 		fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
 			"ID", "TIME", "HOST", "PATHS", "TAGS")
 		fmt.Println(strings.Repeat("-", 120))
-		
+
 		for _, snap := range filtered {
 			id := snap.ID
 			if len(id) > 16 {
 				id = id[:16]
 			}
-			
+
 			timeStr := snap.Time.Format("2006-01-02 15:04:05")
-			
+
 			paths := strings.Join(snap.Paths, ", ")
 			if len(paths) > 40 {
 				paths = paths[:37] + "..."
 			}
-			
+
 			tags := strings.Join(snap.Tags, ", ")
-			
+
 			fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
 				id, timeStr, snap.Hostname, paths, tags)
 		}
 		fmt.Println()
-		
+
 		return nil
 	}),
 }
@@ -290,6 +290,3 @@ func init() {
 	listSnapshotsCmd.Flags().String("host", "", "Filter by hostname")
 	listSnapshotsCmd.Flags().String("path", "", "Filter by path")
 }
-
-
-

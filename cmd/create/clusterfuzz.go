@@ -88,14 +88,14 @@ EXAMPLES:
 			zap.String("database_backend", databaseBackend))
 
 		// Validate configuration
-		if err := validation.ValidateConfig(storageBackend, databaseBackend, queueBackend, 
+		if err := validation.ValidateConfig(storageBackend, databaseBackend, queueBackend,
 			botCount, preemptibleBotCount, s3Endpoint, s3AccessKey, s3SecretKey); err != nil {
 			return fmt.Errorf("invalid configuration: %w", err)
 		}
 
 		// Create configuration
-		cfg := config.CreateConfig(nomadAddress, consulAddress, storageBackend, databaseBackend, 
-			queueBackend, botCount, preemptibleBotCount, domain, configDir, useVault, 
+		cfg := config.CreateConfig(nomadAddress, consulAddress, storageBackend, databaseBackend,
+			queueBackend, botCount, preemptibleBotCount, domain, configDir, useVault,
 			vaultPath, s3Endpoint, s3AccessKey, s3SecretKey, s3Bucket)
 
 		// Check prerequisites
@@ -189,10 +189,6 @@ func init() {
 	clusterfuzzCmd.Flags().StringVar(&s3Bucket, "s3-bucket", "clusterfuzz", "S3 bucket name")
 	clusterfuzzCmd.Flags().BoolVar(&skipPrereqCheck, "skip-prereq-check", false, "Skip prerequisite checks")
 }
-
-
-
-
 
 // TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/nomad or pkg/clusterfuzz/generator
 // Type: Business Logic

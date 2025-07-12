@@ -85,16 +85,16 @@ Examples:
 	}),
 }
 
-
 // _performStatusChecks demonstrates status checking using domain services
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
 //
-//nolint:unused
 // TODO: HELPER_REFACTOR - Move to pkg/vault/status or pkg/vault/health
 // Type: Validation
 // Related functions: _demonstrateVaultOperations
 // Dependencies: eos_io, vaultpkg, zap, context, time
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos 
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
+//
+//nolint:unused
 func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
 	logger.Info(" Performing comprehensive status checks")
 
@@ -149,7 +149,7 @@ func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.Enhance
 // Type: Business Logic
 // Related functions: _performStatusChecks
 // Dependencies: eos_io, vaultpkg, zap, context, time
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos 
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
 
 func _demonstrateVaultOperations(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
 	logger.Info(" Demonstrating vault operations with clean architecture")

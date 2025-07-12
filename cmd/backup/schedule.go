@@ -48,35 +48,35 @@ The profile must have a schedule configured with either cron or OnCalendar forma
 Examples:
   # Enable daily backups for system profile
   eos backup schedule enable system`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		profileName := args[0]
 		logger.Info("Enabling scheduled backup",
 			zap.String("profile", profileName))
-		
+
 		// Load configuration
 		config, err := backup.LoadConfig(rc)
 		if err != nil {
 			return fmt.Errorf("loading configuration: %w", err)
 		}
-		
+
 		// Get profile
 		profile, exists := config.Profiles[profileName]
 		if !exists {
 			return fmt.Errorf("profile %q not found", profileName)
 		}
-		
+
 		// Check if schedule is configured
 		if profile.Schedule == nil || (profile.Schedule.Cron == "" && profile.Schedule.OnCalendar == "") {
 			return fmt.Errorf("profile %q has no schedule configured", profileName)
 		}
-		
+
 		// Create systemd service file
 		serviceName := fmt.Sprintf("eos-backup-%s.service", profileName)
 		servicePath := filepath.Join("/etc/systemd/system", serviceName)
-		
+
 		serviceContent := fmt.Sprintf(`[Unit]
 Description=Eos Backup - %s
 After=network.target
@@ -91,24 +91,24 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 `, profileName, profileName)
-		
+
 		logger.Info("Creating systemd service",
 			zap.String("path", servicePath))
-		
+
 		if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
 			return fmt.Errorf("writing service file: %w", err)
 		}
-		
+
 		// Create systemd timer file
 		timerName := fmt.Sprintf("eos-backup-%s.timer", profileName)
 		timerPath := filepath.Join("/etc/systemd/system", timerName)
-		
+
 		// Convert cron to OnCalendar if needed
 		onCalendar := profile.Schedule.OnCalendar
 		if onCalendar == "" && profile.Schedule.Cron != "" {
 			onCalendar = schedule.CronToOnCalendar(rc, profile.Schedule.Cron)
 		}
-		
+
 		timerContent := fmt.Sprintf(`[Unit]
 Description=Eos Backup Timer - %s
 Requires=%s
@@ -120,34 +120,34 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 `, profileName, serviceName, onCalendar)
-		
+
 		logger.Info("Creating systemd timer",
 			zap.String("path", timerPath),
 			zap.String("schedule", onCalendar))
-		
+
 		if err := os.WriteFile(timerPath, []byte(timerContent), 0644); err != nil {
 			return fmt.Errorf("writing timer file: %w", err)
 		}
-		
+
 		// Reload systemd and enable timer
 		logger.Info("Enabling systemd timer")
-		
+
 		cmds := [][]string{
 			{"systemctl", "daemon-reload"},
 			{"systemctl", "enable", timerName},
 			{"systemctl", "start", timerName},
 		}
-		
+
 		for _, cmdArgs := range cmds {
 			if err := systemd.RunSystemctl(rc, cmdArgs...); err != nil {
 				return fmt.Errorf("running %s: %w", strings.Join(cmdArgs, " "), err)
 			}
 		}
-		
+
 		logger.Info("Scheduled backup enabled successfully",
 			zap.String("profile", profileName),
 			zap.String("timer", timerName))
-		
+
 		return nil
 	}),
 }
@@ -162,23 +162,23 @@ Stops and disables the systemd timer, removes service and timer files.
 Examples:
   # Disable scheduled backups for system profile
   eos backup schedule disable system`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		profileName := args[0]
 		logger.Info("Disabling scheduled backup",
 			zap.String("profile", profileName))
-		
+
 		timerName := fmt.Sprintf("eos-backup-%s.timer", profileName)
 		serviceName := fmt.Sprintf("eos-backup-%s.service", profileName)
-		
+
 		// Stop and disable timer
 		cmds := [][]string{
 			{"systemctl", "stop", timerName},
 			{"systemctl", "disable", timerName},
 		}
-		
+
 		for _, cmdArgs := range cmds {
 			if err := systemd.RunSystemctl(rc, cmdArgs...); err != nil {
 				logger.Warn("Failed to run systemctl command",
@@ -186,13 +186,13 @@ Examples:
 					zap.Error(err))
 			}
 		}
-		
+
 		// Remove service and timer files
 		files := []string{
 			filepath.Join("/etc/systemd/system", timerName),
 			filepath.Join("/etc/systemd/system", serviceName),
 		}
-		
+
 		for _, file := range files {
 			if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
 				logger.Warn("Failed to remove file",
@@ -200,16 +200,16 @@ Examples:
 					zap.Error(err))
 			}
 		}
-		
+
 		// Reload systemd
 		if err := systemd.RunSystemctl(rc, "systemctl", "daemon-reload"); err != nil {
 			logger.Warn("Failed to reload systemd",
 				zap.Error(err))
 		}
-		
+
 		logger.Info("Scheduled backup disabled successfully",
 			zap.String("profile", profileName))
-		
+
 		return nil
 	}),
 }
@@ -227,18 +227,18 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Checking backup schedule status")
-		
+
 		// Load configuration to get profiles
 		config, err := backup.LoadConfig(rc)
 		if err != nil {
 			return fmt.Errorf("loading configuration: %w", err)
 		}
-		
+
 		fmt.Println("\nBackup Schedule Status:")
 		fmt.Println(strings.Repeat("-", 80))
 		fmt.Printf("%-20s %-20s %-20s %s\n", "PROFILE", "SCHEDULE", "TIMER STATUS", "NEXT RUN")
 		fmt.Println(strings.Repeat("-", 80))
-		
+
 		for profileName, profile := range config.Profiles {
 			schedule := "-"
 			if profile.Schedule != nil {
@@ -248,11 +248,11 @@ Examples:
 					schedule = profile.Schedule.OnCalendar
 				}
 			}
-			
+
 			// timerName := fmt.Sprintf("eos-backup-%s.timer", profileName)
 			status := "Not scheduled"
 			nextRun := "-"
-			
+
 			// Check systemd timer status
 			timerName := fmt.Sprintf("eos-backup-%s.timer", profileName)
 			if timerStatus, nextRunTime, err := systemd.GetTimerStatus(rc, timerName); err != nil {
@@ -263,12 +263,12 @@ Examples:
 				status = timerStatus
 				nextRun = nextRunTime
 			}
-			
+
 			fmt.Printf("%-20s %-20s %-20s %s\n",
 				profileName, schedule, status, nextRun)
 		}
 		fmt.Println()
-		
+
 		return nil
 	}),
 }
@@ -284,28 +284,28 @@ without waiting for the next scheduled run.
 Examples:
   # Run system backup immediately
   eos backup schedule run system`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		profileName := args[0]
 		logger.Info("Running scheduled backup immediately",
 			zap.String("profile", profileName))
-		
+
 		serviceName := fmt.Sprintf("eos-backup-%s.service", profileName)
-		
+
 		// Start the service
 		if err := systemd.RunSystemctl(rc, "systemctl", "start", serviceName); err != nil {
 			return fmt.Errorf("starting backup service: %w", err)
 		}
-		
+
 		logger.Info("Backup service started",
 			zap.String("service", serviceName))
-		
+
 		// Show service status
 		fmt.Printf("Started %s\n", serviceName)
 		fmt.Println("Use 'journalctl -u " + serviceName + " -f' to follow the backup progress")
-		
+
 		return nil
 	}),
 }
@@ -316,10 +316,6 @@ func init() {
 	scheduleCmd.AddCommand(scheduleStatusCmd)
 	scheduleCmd.AddCommand(scheduleRunCmd)
 }
-
-
-
-
 
 // Helper functions have been migrated to:
 // - pkg/backup/schedule/converter.go (cronToOnCalendar)

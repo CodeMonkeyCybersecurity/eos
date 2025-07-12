@@ -36,7 +36,7 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		profileName := args[0]
 		extraTags, _ := cmd.Flags().GetStringSlice("tags")
 		hostOverride, _ := cmd.Flags().GetString("host")
@@ -139,7 +139,7 @@ Examples:
 
 		// Send notifications if configured
 		if config.Settings.Notifications.OnSuccess {
-			if err := backup.SendNotification(rc.Ctx, logger, config.Settings.Notifications, 
+			if err := backup.SendNotification(rc.Ctx, logger, config.Settings.Notifications,
 				"Backup completed successfully", profileName); err != nil {
 				logger.Warn("Failed to send notification", zap.Error(err))
 			}
@@ -233,7 +233,7 @@ var updateProfileCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		profileName := args[0]
 		logger.Info("Updating backup profile",
 			zap.String("profile", profileName))

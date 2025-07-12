@@ -62,7 +62,7 @@ func TestServiceManager_GetEnhancedServiceStatus_BasicFlow(t *testing.T) {
 
 	// Test case: service not found
 	mockRegistry.On("CheckServiceInstallationStatus", "non-existent-service").Return(
-		ServiceInstallationStatus{}, 
+		ServiceInstallationStatus{},
 		assert.AnError,
 	)
 
@@ -92,22 +92,22 @@ func TestServiceManager_GetServicesRequiringInstallation_BasicFlow(t *testing.T)
 	// Mock return values
 	mockServices := map[string]DelphiServiceDefinition{
 		"test-service": {
-			Name: "test-service",
+			Name:         "test-service",
 			WorkerScript: "/opt/test-service.py",
-			ServiceFile: "/etc/systemd/system/test-service.service",
+			ServiceFile:  "/etc/systemd/system/test-service.service",
 		},
 	}
-	
+
 	mockRegistry.On("GetActiveServices").Return(mockServices)
 	mockRegistry.On("GetActiveServiceNames").Return([]string{"test-service"})
-	
+
 	// Mock that service needs installation
 	mockRegistry.On("CheckServiceInstallationStatus", "test-service").Return(
 		ServiceInstallationStatus{
-			ServiceName: "test-service",
-			WorkerInstalled: true,
+			ServiceName:      "test-service",
+			WorkerInstalled:  true,
 			ServiceInstalled: false, // Needs installation
-		}, 
+		},
 		nil,
 	)
 
@@ -123,7 +123,7 @@ func TestServiceManager_GetServicesRequiringInstallation_BasicFlow(t *testing.T)
 }
 
 func TestServiceManager_AutoInstallServices_BasicFlow(t *testing.T) {
-	// Setup logger 
+	// Setup logger
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync()
 	otelLogger := otelzap.New(logger)
@@ -141,7 +141,7 @@ func TestServiceManager_AutoInstallServices_BasicFlow(t *testing.T) {
 
 func TestServiceManager_CrashPrevention(t *testing.T) {
 	// Test scenarios that previously caused crashes
-	
+
 	// Setup logger
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync()
@@ -154,7 +154,7 @@ func TestServiceManager_CrashPrevention(t *testing.T) {
 	// Test with services that previously caused crashes
 	crashCausingServices := []string{
 		"alert-to-db",
-		"ab-test-analyzer", 
+		"ab-test-analyzer",
 		"non-existent-service",
 		"",
 	}
@@ -177,7 +177,7 @@ func TestServiceManager_CrashPrevention(t *testing.T) {
 
 func TestServiceManager_Integration_CrashPrevention(t *testing.T) {
 	// Integration test for crash prevention during full workflow
-	
+
 	// Setup logger
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync()
@@ -198,7 +198,7 @@ func TestServiceManager_Integration_CrashPrevention(t *testing.T) {
 		// 1. Get services requiring installation
 		missingServices, err := sm.GetServicesRequiringInstallation(ctx)
 		_ = err // Ignore errors, just testing for crashes
-		
+
 		// 2. Try auto-installation (should not crash even if services are missing)
 		if missingServices != nil {
 			// Convert map to slice of service names

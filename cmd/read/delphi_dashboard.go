@@ -5,10 +5,10 @@ package read
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/dashboard"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/database"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -96,32 +96,32 @@ Navigation:
 		// Create dashboard hub
 		logger.Info("Initializing dashboard hub",
 			zap.String("start_module", startModule.String()))
-		
+
 		hub := dashboard.NewHub(rc, db)
-		
+
 		// Register available modules
 		logger.Info("Registering dashboard modules")
-		
+
 		// Register services module
 		servicesModule := dashboard.NewServicesModule(rc, db)
 		hub.RegisterModule(servicesModule)
-		
+
 		// TODO: Register other modules as they are implemented
 		// pipelineModule := dashboard.NewPipelineModule(rc, db)
 		// hub.RegisterModule(pipelineModule)
-		
+
 		// parsersModule := dashboard.NewParsersModule(rc, db)
 		// hub.RegisterModule(parsersModule)
-		
+
 		// alertsModule := dashboard.NewAlertsModule(rc, db)
 		// hub.RegisterModule(alertsModule)
-		
+
 		// performanceModule := dashboard.NewPerformanceModule(rc, db)
 		// hub.RegisterModule(performanceModule)
-		
+
 		// overviewModule := dashboard.NewOverviewModule(rc, db)
 		// hub.RegisterModule(overviewModule)
-		
+
 		// Switch to requested starting module
 		if startModule != dashboard.ModuleOverview {
 			hub.SwitchToModule(startModule)
@@ -129,9 +129,9 @@ Navigation:
 
 		// Start the Bubble Tea program
 		logger.Info("Launching dashboard interface")
-		
+
 		program := tea.NewProgram(
-			hub, 
+			hub,
 			tea.WithAltScreen(),
 			tea.WithMouseCellMotion(),
 		)

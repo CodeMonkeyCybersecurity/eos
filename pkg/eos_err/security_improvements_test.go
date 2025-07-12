@@ -7,59 +7,59 @@ import (
 
 func TestSanitizeErrorMessage(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       error
+		name           string
+		input          error
 		shouldSanitize bool
-		description string
+		description    string
 	}{
 		{
-			name:        "nil_error",
-			input:       nil,
+			name:           "nil_error",
+			input:          nil,
 			shouldSanitize: false,
-			description: "nil error should return empty string",
+			description:    "nil error should return empty string",
 		},
 		{
-			name:        "simple_error",
-			input:       errors.New("connection failed"),
+			name:           "simple_error",
+			input:          errors.New("connection failed"),
 			shouldSanitize: false,
-			description: "simple error should be passed through",
+			description:    "simple error should be passed through",
 		},
 		{
-			name:        "error_with_potential_secret",
-			input:       errors.New("auth failed with token abc123"),
+			name:           "error_with_potential_secret",
+			input:          errors.New("auth failed with token abc123"),
 			shouldSanitize: true,
-			description: "error containing potential secrets should be sanitized",
+			description:    "error containing potential secrets should be sanitized",
 		},
 		{
-			name:        "vault_error",
-			input:       errors.New("vault authentication failed"),
+			name:           "vault_error",
+			input:          errors.New("vault authentication failed"),
 			shouldSanitize: false,
-			description: "vault error without secrets should be passed through",
+			description:    "vault error without secrets should be passed through",
 		},
 		{
-			name:        "database_connection_error",
-			input:       errors.New("database connection failed: timeout"),
+			name:           "database_connection_error",
+			input:          errors.New("database connection failed: timeout"),
 			shouldSanitize: false,
-			description: "database error should be passed through",
+			description:    "database error should be passed through",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SanitizeErrorMessage(tt.input)
-			
+
 			if tt.input == nil {
 				if result != "" {
 					t.Errorf("expected empty string for nil error, got %q", result)
 				}
 				return
 			}
-			
+
 			// Verify result is not empty for non-nil errors
 			if result == "" {
 				t.Error("sanitized message should not be empty for non-nil error")
 			}
-			
+
 			// The result should be a string (shared.SanitizeForLogging handles the actual sanitization)
 			if len(result) == 0 {
 				t.Error("sanitized result should have length > 0")
@@ -194,10 +194,10 @@ func TestSafeErrorSummary_Integration(t *testing.T) {
 	t.Run("sanitize_then_categorize", func(t *testing.T) {
 		// Create an error that might contain sensitive data
 		sensitiveErr := errors.New("permission denied for user secret_token_123")
-		
+
 		// Get safe summary
 		result := SafeErrorSummary(sensitiveErr)
-		
+
 		// Should categorize as authentication required
 		if result != "authentication_required" {
 			t.Errorf("expected 'authentication_required', got %q", result)

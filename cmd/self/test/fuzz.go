@@ -121,7 +121,6 @@ func init() {
 		"Save detailed report to file")
 }
 
-
 // countFailedTests counts the number of failed tests
 func countFailedTests(tests []testing.FuzzResult) int {
 	count := 0

@@ -52,7 +52,7 @@ func Check(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 // CheckVaultConnectivity verifies Vault is accessible and unsealed
 func CheckVaultConnectivity(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if VAULT_ADDR is set
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if vaultAddr == "" {
@@ -78,6 +78,6 @@ func CheckVaultConnectivity(rc *eos_io.RuntimeContext) error {
 
 	logger.Info("Vault is accessible",
 		zap.String("output", output))
-	
+
 	return nil
 }

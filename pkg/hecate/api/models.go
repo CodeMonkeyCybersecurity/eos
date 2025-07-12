@@ -197,20 +197,20 @@ func (req *ReconcileStateRequest) Validate() error {
 
 // ReconcileStateResponse represents the response from state reconciliation
 type ReconcileStateResponse struct {
-	ID         string              `json:"id"`
-	Component  string              `json:"component"`
-	Status     string              `json:"status"`
-	DryRun     bool                `json:"dry_run"`
-	Changes    *ReconcileChanges   `json:"changes,omitempty"`
-	WorkflowID string              `json:"workflow_id"`
-	StartedAt  time.Time           `json:"started_at"`
+	ID         string            `json:"id"`
+	Component  string            `json:"component"`
+	Status     string            `json:"status"`
+	DryRun     bool              `json:"dry_run"`
+	Changes    *ReconcileChanges `json:"changes,omitempty"`
+	WorkflowID string            `json:"workflow_id"`
+	StartedAt  time.Time         `json:"started_at"`
 }
 
 // ReconcileChanges represents changes from reconciliation
 type ReconcileChanges struct {
-	ToCreate int                    `json:"to_create"`
-	ToUpdate int                    `json:"to_update"`
-	ToDelete int                    `json:"to_delete"`
+	ToCreate int                     `json:"to_create"`
+	ToUpdate int                     `json:"to_update"`
+	ToDelete int                     `json:"to_delete"`
 	Details  []ReconcileChangeDetail `json:"details,omitempty"`
 }
 
@@ -263,9 +263,9 @@ type RotateSecretsResponse struct {
 
 // HealthCheckResponse represents system health status
 type HealthCheckResponse struct {
-	Status    string                 `json:"status"`
-	Timestamp time.Time              `json:"timestamp"`
-	Version   string                 `json:"version"`
+	Status    string                   `json:"status"`
+	Timestamp time.Time                `json:"timestamp"`
+	Version   string                   `json:"version"`
 	Services  map[string]ServiceHealth `json:"services"`
 }
 
@@ -279,9 +279,9 @@ type ServiceHealth struct {
 
 // MetricsResponse represents metrics data
 type MetricsResponse struct {
-	Timestamp time.Time              `json:"timestamp"`
+	Timestamp time.Time               `json:"timestamp"`
 	Routes    map[string]RouteMetrics `json:"routes"`
-	System    SystemMetrics          `json:"system"`
+	System    SystemMetrics           `json:"system"`
 }
 
 // RouteMetrics represents metrics for a specific route
@@ -296,13 +296,13 @@ type RouteMetrics struct {
 
 // SystemMetrics represents system-wide metrics
 type SystemMetrics struct {
-	TotalRoutes       int     `json:"total_routes"`
-	HealthyRoutes     int     `json:"healthy_routes"`
-	UnhealthyRoutes   int     `json:"unhealthy_routes"`
-	TotalRequests     int64   `json:"total_requests"`
+	TotalRoutes         int           `json:"total_routes"`
+	HealthyRoutes       int           `json:"healthy_routes"`
+	UnhealthyRoutes     int           `json:"unhealthy_routes"`
+	TotalRequests       int64         `json:"total_requests"`
 	AverageResponseTime time.Duration `json:"average_response_time"`
-	SystemLoad        float64 `json:"system_load"`
-	MemoryUsage       float64 `json:"memory_usage"`
+	SystemLoad          float64       `json:"system_load"`
+	MemoryUsage         float64       `json:"memory_usage"`
 }
 
 // ErrorResponse represents an error response

@@ -91,8 +91,8 @@ type ServicesState struct {
 
 // NetworkState represents network configuration
 type NetworkState struct {
-	PlatformBridge BridgeState  `json:"platform_bridge"`
-	CustomerVLANs  []VLANState  `json:"customer_vlans"`
+	PlatformBridge BridgeState `json:"platform_bridge"`
+	CustomerVLANs  []VLANState `json:"customer_vlans"`
 }
 
 // StorageState represents storage configuration
@@ -104,10 +104,10 @@ type StorageState struct {
 
 // ClusterState represents a cluster's state
 type ClusterState struct {
-	Healthy       bool   `json:"healthy"`
-	Leader        string `json:"leader"`
-	ServerCount   int    `json:"server_count"`
-	ClientCount   int    `json:"client_count"`
+	Healthy     bool   `json:"healthy"`
+	Leader      string `json:"leader"`
+	ServerCount int    `json:"server_count"`
+	ClientCount int    `json:"client_count"`
 }
 
 // ServiceState represents a service's state
@@ -136,11 +136,11 @@ type VLANState struct {
 
 // VerificationResult represents verification check results
 type VerificationResult struct {
-	Check       string        `json:"check"`
-	Status      string        `json:"status"` // "passed", "failed", "warning"
-	Message     string        `json:"message"`
-	Details     interface{}   `json:"details,omitempty"`
-	Duration    time.Duration `json:"duration"`
+	Check    string        `json:"check"`
+	Status   string        `json:"status"` // "passed", "failed", "warning"
+	Message  string        `json:"message"`
+	Details  interface{}   `json:"details,omitempty"`
+	Duration time.Duration `json:"duration"`
 }
 
 // assessPlatformState gathers the current platform state
@@ -218,7 +218,7 @@ func runPlatformVerifications(rc *eos_io.RuntimeContext, state *PlatformState) (
 // evaluateVerificationResults analyzes and reports verification results
 func evaluateVerificationResults(rc *eos_io.RuntimeContext, results []VerificationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	var failed, warning, passed int
 	for _, result := range results {
 		switch result.Status {
@@ -296,10 +296,10 @@ func assessServices(rc *eos_io.RuntimeContext) (*ServicesState, error) {
 	// Assess CCS services
 	state.CCSIndexer = assessServiceHealth(rc, "ccs-indexer", 9200)
 	state.CCSDashboard = assessServiceHealth(rc, "ccs-dashboard", 443)
-	
+
 	// Assess platform API
 	state.PlatformAPI = assessServiceHealth(rc, "platform-api", 8080)
-	
+
 	// Assess Benthos
 	state.BenthosRouter = assessServiceHealth(rc, "benthos-router", 4195)
 
@@ -342,7 +342,7 @@ func assessStorage(rc *eos_io.RuntimeContext) (*StorageState, error) {
 	})
 	if err == nil {
 		// Parse df output (simplified)
-		state.TotalSpace = 1000000000000  // 1TB placeholder
+		state.TotalSpace = 1000000000000    // 1TB placeholder
 		state.AvailableSpace = 800000000000 // 800GB placeholder
 		state.UsedSpace = 200000000000      // 200GB placeholder
 	}
@@ -354,7 +354,7 @@ func assessStorage(rc *eos_io.RuntimeContext) (*StorageState, error) {
 
 func verifyNomadCluster(rc *eos_io.RuntimeContext, cluster ClusterState) VerificationResult {
 	start := time.Now()
-	
+
 	if !cluster.Healthy {
 		return VerificationResult{
 			Check:    "Nomad Cluster Health",
@@ -812,9 +812,9 @@ func verifyCustomerNomadJobs(rc *eos_io.RuntimeContext, customer *CustomerConfig
 		})
 		if err != nil || !strings.Contains(output, "running") {
 			return VerificationResult{
-				Check:   "Customer Nomad Jobs",
-				Status:  "failed",
-				Message: fmt.Sprintf("Job %s is not running", jobName),
+				Check:    "Customer Nomad Jobs",
+				Status:   "failed",
+				Message:  fmt.Sprintf("Job %s is not running", jobName),
 				Duration: time.Since(start),
 			}
 		}
@@ -884,7 +884,7 @@ func verifyCustomerWazuhComponents(rc *eos_io.RuntimeContext, customer *Customer
 
 	// Check Wazuh API connectivity
 	apiEndpoint := fmt.Sprintf("https://%s.%s:55000", customer.Subdomain, "wazuh.local") // Simplified
-	
+
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
 		Args:    []string{"-k", "-s", "-o", "/dev/null", "-w", "%{http_code}", apiEndpoint},
@@ -986,7 +986,7 @@ func listCustomerVLANs(rc *eos_io.RuntimeContext) ([]VLANState, error) {
 				iface := strings.TrimSuffix(parts[1], ":")
 				vlanID := 0
 				fmt.Sscanf(iface, "br-platform.%d", &vlanID)
-				
+
 				vlans = append(vlans, VLANState{
 					ID:        vlanID,
 					Interface: iface,

@@ -36,13 +36,13 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		// SECURITY: Sanitize command arguments before processing
 		sanitizedArgs, sanitizeErr := sanitizeCommandInputs(ctx, cmd, args)
 		if sanitizeErr != nil {
-			ctx.Log.Error("Input sanitization failed", 
+			ctx.Log.Error("Input sanitization failed",
 				zap.Error(sanitizeErr),
 				zap.Strings("raw_args", args),
 				zap.String("command", cmd.Name()))
 			return eos_err.NewExpectedError(ctx.Ctx, cerr.Wrap(sanitizeErr, "invalid input"))
 		}
-		
+
 		// Replace original args with sanitized version
 		args = sanitizedArgs
 
@@ -90,13 +90,13 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 		// SECURITY: Sanitize command arguments before processing
 		sanitizedArgs, sanitizeErr := sanitizeCommandInputs(ctx, cmd, args)
 		if sanitizeErr != nil {
-			ctx.Log.Error("Input sanitization failed", 
+			ctx.Log.Error("Input sanitization failed",
 				zap.Error(sanitizeErr),
 				zap.Strings("raw_args", args),
 				zap.String("command", cmd.Name()))
 			return eos_err.NewExpectedError(ctx.Ctx, cerr.Wrap(sanitizeErr, "invalid input"))
 		}
-		
+
 		// Replace original args with sanitized version
 		args = sanitizedArgs
 
@@ -127,7 +127,7 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 func sanitizeCommandInputs(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) ([]string, error) {
 	// Create sanitizer with appropriate strictness
 	var sanitizer *security.InputSanitizer
-	
+
 	// Use strict mode for sensitive commands
 	if isSensitiveCommand(cmd.Name()) {
 		sanitizer = security.NewStrictSanitizer()
@@ -191,11 +191,11 @@ func sanitizeFlagValues(ctx *eos_io.RuntimeContext, cmd *cobra.Command, sanitize
 	// This is a simplified approach - in practice, we would need to walk through
 	// all flags and sanitize their values, but Cobra makes this challenging
 	// because flags are parsed before we get here.
-	
+
 	// For now, we log that flag sanitization should be implemented at the flag level
 	ctx.Log.Info("Flag sanitization should be implemented at individual command level",
 		zap.String("command", cmd.Name()),
 		zap.String("note", "Consider using security.ValidateFlagName for flag validation"))
-	
+
 	return nil
 }

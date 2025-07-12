@@ -31,7 +31,7 @@ type TestRepository struct {
 func createTestRepository(t *testing.T) *TestRepository {
 	tempDir := t.TempDir()
 	repoDir := filepath.Join(tempDir, "test-repo")
-	
+
 	return &TestRepository{
 		Name:     "test-repo",
 		Backend:  "local",
@@ -106,14 +106,14 @@ type MockExecutor struct {
 func (m *MockExecutor) Execute(ctx context.Context, cmd string, args ...string) ([]byte, error) {
 	call := MockCommand{Cmd: cmd, Args: args}
 	m.Called = append(m.Called, call)
-	
+
 	// Find matching mock command
 	for _, mock := range m.Commands {
 		if mock.Cmd == cmd && equalStringSlices(mock.Args, args) {
 			return []byte(mock.Output), mock.Error
 		}
 	}
-	
+
 	// Default to actual command execution if no mock found
 	actualCmd := exec.CommandContext(ctx, cmd, args...)
 	return actualCmd.CombinedOutput()
@@ -142,7 +142,7 @@ func TestClientCreation(t *testing.T) {
 		configFile := filepath.Join(repo.TempDir, "backup.yaml")
 		err := saveTestConfig(configFile, config)
 		require.NoError(t, err)
-		
+
 		// Override config path for test
 		originalConfigFile := configFile
 		defer func() {
@@ -170,7 +170,7 @@ func TestClientCreation(t *testing.T) {
 			Backend: "local",
 			URL:     "/tmp/nonexistent",
 		}
-		
+
 		client := &Client{
 			rc:         rc,
 			config:     config,
@@ -180,7 +180,7 @@ func TestClientCreation(t *testing.T) {
 		// Test that the repository doesn't exist in config
 		_, exists := config.Repositories["nonexistent"]
 		assert.False(t, exists)
-		
+
 		// Client can still be created but repository won't be in config
 		assert.NotNil(t, client)
 	})
@@ -205,7 +205,7 @@ func TestPasswordRetrievalIntegration(t *testing.T) {
 		secretsDir := filepath.Join(repo.TempDir, "secrets", "backup")
 		err := os.MkdirAll(secretsDir, 0700)
 		require.NoError(t, err)
-		
+
 		passwordFile := filepath.Join(secretsDir, fmt.Sprintf("%s.password", repo.Name))
 		err = os.WriteFile(passwordFile, []byte(repo.Password), 0600)
 		require.NoError(t, err)
@@ -213,11 +213,11 @@ func TestPasswordRetrievalIntegration(t *testing.T) {
 		// Mock the local password file path
 		originalClient := *client
 		client.repository.Name = repo.Name
-		
+
 		// This would test the actual getRepositoryPassword method
 		// but it requires vault setup. For now, test the file existence
 		assert.FileExists(t, passwordFile)
-		
+
 		// Restore original client
 		*client = originalClient
 	})
@@ -225,12 +225,12 @@ func TestPasswordRetrievalIntegration(t *testing.T) {
 	t.Run("no password available", func(t *testing.T) {
 		// Test case where neither Vault nor local file is available
 		client.repository.Name = "nonexistent-repo"
-		
+
 		// This should result in an error when getRepositoryPassword is called
 		// Since we can't easily mock Vault here, we test the error conditions
 		secretsDir := "/var/lib/eos/secrets/backup"
 		passwordFile := filepath.Join(secretsDir, "nonexistent-repo.password")
-		
+
 		// Verify file doesn't exist
 		_, err := os.Stat(passwordFile)
 		assert.True(t, os.IsNotExist(err))
@@ -281,17 +281,17 @@ func TestRepositoryInitialization(t *testing.T) {
 
 		// Test initialization logic (without actual restic)
 		args := []string{"init", "--repository-version", "2"}
-		
+
 		// Verify the arguments are correct
 		assert.Contains(t, args, "init")
 		assert.Contains(t, args, "--repository-version")
 		assert.Contains(t, args, "2")
-		
+
 		// Test environment setup
 		env := os.Environ()
 		env = append(env, fmt.Sprintf("RESTIC_REPOSITORY=%s", repo.URL))
 		env = append(env, fmt.Sprintf("RESTIC_PASSWORD=%s", repo.Password))
-		
+
 		// Verify environment variables are set correctly
 		repoEnvFound := false
 		passEnvFound := false
@@ -311,7 +311,7 @@ func TestRepositoryInitialization(t *testing.T) {
 	t.Run("already initialized repository", func(t *testing.T) {
 		// Test handling of already initialized repository
 		errorOutput := "Fatal: repository already initialized"
-		
+
 		// Test that the error is handled correctly
 		if strings.Contains(errorOutput, "already initialized") {
 			// This should not be treated as an error
@@ -338,25 +338,25 @@ func TestBackupExecution(t *testing.T) {
 	t.Run("backup command construction", func(t *testing.T) {
 		_ = client // Use client variable
 		profile := config.Profiles["test-profile"]
-		
+
 		// Test backup argument construction
 		args := []string{"backup"}
 		args = append(args, profile.Paths...)
-		
+
 		for _, exclude := range profile.Excludes {
 			args = append(args, "--exclude", exclude)
 		}
-		
+
 		for _, tag := range profile.Tags {
 			args = append(args, "--tag", tag)
 		}
-		
+
 		if profile.Host != "" {
 			args = append(args, "--host", profile.Host)
 		}
-		
+
 		args = append(args, "--json")
-		
+
 		// Verify command structure
 		assert.Contains(t, args, "backup")
 		assert.Contains(t, args, repo.TempDir)
@@ -381,32 +381,32 @@ func TestBackupExecution(t *testing.T) {
 			require.NoError(t, err)
 
 			msgType, _ := msg["message_type"].(string)
-			
+
 			switch msgType {
 			case "status":
 				percentDone, _ := msg["percent_done"].(float64)
 				totalFiles, _ := msg["total_files"].(float64)
 				totalBytes, _ := msg["total_bytes"].(float64)
-				
+
 				assert.GreaterOrEqual(t, percentDone, 0.0)
 				assert.LessOrEqual(t, percentDone, 1.0)
 				assert.Greater(t, totalFiles, 0.0)
 				assert.Greater(t, totalBytes, 0.0)
-				
+
 			case "summary":
 				snapshotID, _ := msg["snapshot_id"].(string)
 				filesNew, _ := msg["files_new"].(float64)
 				totalDuration, _ := msg["total_duration"].(float64)
-				
+
 				assert.NotEmpty(t, snapshotID)
 				assert.GreaterOrEqual(t, filesNew, 0.0)
 				assert.Greater(t, totalDuration, 0.0)
-				
+
 			case "error":
 				item, _ := msg["item"].(string)
 				during, _ := msg["during"].(string)
 				errMsg, _ := msg["error"].(string)
-				
+
 				assert.NotEmpty(t, item)
 				assert.NotEmpty(t, during)
 				assert.NotEmpty(t, errMsg)
@@ -416,10 +416,10 @@ func TestBackupExecution(t *testing.T) {
 
 	t.Run("retention policy application", func(t *testing.T) {
 		profile := config.Profiles["test-profile"]
-		
+
 		// Test retention argument construction
 		args := []string{"forget", "--prune"}
-		
+
 		if profile.Retention.KeepLast > 0 {
 			args = append(args, "--keep-last", fmt.Sprintf("%d", profile.Retention.KeepLast))
 		}
@@ -435,7 +435,7 @@ func TestBackupExecution(t *testing.T) {
 		if profile.Retention.KeepYearly > 0 {
 			args = append(args, "--keep-yearly", fmt.Sprintf("%d", profile.Retention.KeepYearly))
 		}
-		
+
 		for _, tag := range profile.Tags {
 			args = append(args, "--tag", tag)
 		}
@@ -497,7 +497,7 @@ func TestSnapshotManagement(t *testing.T) {
 
 		// Verify snapshot parsing
 		assert.Len(t, snapshots, 2)
-		
+
 		snapshot1 := snapshots[0]
 		assert.Equal(t, "abc123def456", snapshot1.ID)
 		assert.Equal(t, "server1", snapshot1.Hostname)
@@ -565,16 +565,16 @@ func TestRestoreOperations(t *testing.T) {
 		_ = client // Use client variable
 		snapshotID := "abc123def456"
 		targetDir := filepath.Join(repo.TempDir, "restore")
-		
+
 		// Test restore argument construction
 		args := []string{"restore", snapshotID, "--target", targetDir}
-		
+
 		// Verify restore arguments
 		assert.Contains(t, args, "restore")
 		assert.Contains(t, args, snapshotID)
 		assert.Contains(t, args, "--target")
 		assert.Contains(t, args, targetDir)
-		
+
 		// Verify argument order
 		assert.Equal(t, "restore", args[0])
 		assert.Equal(t, snapshotID, args[1])
@@ -584,16 +584,16 @@ func TestRestoreOperations(t *testing.T) {
 
 	t.Run("target directory creation", func(t *testing.T) {
 		targetDir := filepath.Join(repo.TempDir, "restore", "subdir")
-		
+
 		// Test directory creation
 		err := os.MkdirAll(targetDir, 0755)
 		require.NoError(t, err)
-		
+
 		// Verify directory exists and has correct permissions
 		info, err := os.Stat(targetDir)
 		require.NoError(t, err)
 		assert.True(t, info.IsDir())
-		
+
 		// Check permissions (0755)
 		assert.Equal(t, os.FileMode(0755), info.Mode().Perm())
 	})
@@ -642,15 +642,15 @@ func TestVerificationOperations(t *testing.T) {
 	t.Run("verification command construction", func(t *testing.T) {
 		_ = client // Use client variable
 		snapshotID := "abc123def456"
-		
+
 		// Test verification argument construction
 		args := []string{"check", "--read-data-subset=1/10", snapshotID}
-		
+
 		// Verify check arguments
 		assert.Contains(t, args, "check")
 		assert.Contains(t, args, "--read-data-subset=1/10")
 		assert.Contains(t, args, snapshotID)
-		
+
 		// Verify argument order
 		assert.Equal(t, "check", args[0])
 		assert.Equal(t, "--read-data-subset=1/10", args[1])
@@ -660,9 +660,9 @@ func TestVerificationOperations(t *testing.T) {
 	t.Run("verification modes", func(t *testing.T) {
 		// Test different verification modes
 		verificationModes := map[string][]string{
-			"full":    {"check"},
-			"quick":   {"check", "--read-data-subset=1/100"},
-			"sample":  {"check", "--read-data-subset=1/10"},
+			"full":     {"check"},
+			"quick":    {"check", "--read-data-subset=1/100"},
+			"sample":   {"check", "--read-data-subset=1/10"},
 			"metadata": {"check", "--read-data=false"},
 		}
 
@@ -736,9 +736,9 @@ func TestErrorHandling(t *testing.T) {
 		for _, scenario := range errorScenarios {
 			t.Run(scenario.name, func(t *testing.T) {
 				// Test error message parsing and handling
-				errorMsg := fmt.Sprintf("restic %s: exit status %d\n%s", 
+				errorMsg := fmt.Sprintf("restic %s: exit status %d\n%s",
 					scenario.args[0], scenario.exitCode, scenario.stderr)
-				
+
 				// Verify error contains relevant information
 				assert.Contains(t, errorMsg, scenario.command)
 				assert.Contains(t, errorMsg, scenario.stderr)
@@ -818,7 +818,7 @@ func TestEnvironmentHandling(t *testing.T) {
 				"AZURE_ACCOUNT_KEY":  "test-key",
 			},
 			"gcs": {
-				"GOOGLE_PROJECT_ID":               "test-project",
+				"GOOGLE_PROJECT_ID":              "test-project",
 				"GOOGLE_APPLICATION_CREDENTIALS": "/path/to/credentials.json",
 			},
 		}
@@ -901,7 +901,7 @@ func TestConcurrentOperations(t *testing.T) {
 		// Test that multiple clients can be created concurrently
 		const numClients = 5
 		clients := make([]*Client, numClients)
-		
+
 		for i := 0; i < numClients; i++ {
 			clients[i] = &Client{
 				rc:         rc,
@@ -929,7 +929,7 @@ func TestConcurrentOperations(t *testing.T) {
 			t.Run(fmt.Sprintf("command_%d", i), func(t *testing.T) {
 				// Test command argument validation
 				for _, arg := range cmd {
-					assert.False(t, containsAnyDangerousBackup(arg), 
+					assert.False(t, containsAnyDangerousBackup(arg),
 						"Command argument should be safe: %s", arg)
 				}
 			})
@@ -956,17 +956,17 @@ func TestPerformanceConsiderations(t *testing.T) {
 		// Test progress update throttling
 		lastProgress := time.Now().Add(-2 * time.Second) // 2 seconds ago
 		currentTime := time.Now()
-		
+
 		timeSinceLastProgress := currentTime.Sub(lastProgress)
 		shouldUpdate := timeSinceLastProgress > time.Second
-		
+
 		assert.True(t, shouldUpdate, "Progress should be updated after 1 second")
-		
+
 		// Test throttling (less than 1 second)
 		recentProgress := time.Now().Add(-500 * time.Millisecond)
 		timeSinceRecent := currentTime.Sub(recentProgress)
 		shouldNotUpdate := timeSinceRecent <= time.Second
-		
+
 		assert.True(t, shouldNotUpdate, "Progress should be throttled within 1 second")
 	})
 
@@ -991,12 +991,12 @@ func TestPerformanceConsiderations(t *testing.T) {
 	t.Run("command execution timing", func(t *testing.T) {
 		// Test command execution timing
 		start := time.Now()
-		
+
 		// Simulate command execution
 		time.Sleep(10 * time.Millisecond)
-		
+
 		duration := time.Since(start)
-		
+
 		assert.Greater(t, duration, 10*time.Millisecond)
 		assert.Less(t, duration, 100*time.Millisecond, "Command should complete quickly in test")
 	})
@@ -1048,7 +1048,7 @@ func TestIntegrationWorkflow(t *testing.T) {
 			backupArgs = append(backupArgs, "--exclude", exclude)
 		}
 		backupArgs = append(backupArgs, "--json")
-		
+
 		assert.Contains(t, backupArgs, "backup")
 		assert.Contains(t, backupArgs, "--json")
 

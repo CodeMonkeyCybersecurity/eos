@@ -102,6 +102,7 @@ Examples:
 		return nil
 	}),
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // parsePenpotFlags parses command line flags and returns a Penpot configuration
 func parsePenpotFlags(cmd *cobra.Command) (*penpot.Config, error) {

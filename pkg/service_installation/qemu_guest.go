@@ -104,7 +104,7 @@ func (sim *ServiceInstallationManager) installQemuGuest(rc *eos_io.RuntimeContex
 	result.Success = true
 	result.Message = "QEMU Guest Agent installed successfully"
 	result.Method = MethodNative
-	
+
 	logger.Info("QEMU Guest Agent installation completed successfully",
 		zap.String("version", result.Version))
 

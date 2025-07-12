@@ -28,12 +28,12 @@ type CredentialConfig struct {
 
 // CredentialAssessment represents the current state of credentials
 type CredentialAssessment struct {
-	Service           string
+	Service             string
 	HasVaultIntegration bool
-	PlaintextFound    []string
-	WeakCredentials   []string
-	ConfigFiles       []string
-	VaultPolicies     []string
+	PlaintextFound      []string
+	WeakCredentials     []string
+	ConfigFiles         []string
+	VaultPolicies       []string
 }
 
 // AssessCredentialSecurity checks the current credential security state
@@ -72,12 +72,12 @@ func AssessCredentialSecurity(rc *eos_io.RuntimeContext, config CredentialConfig
 	for _, file := range credentialFiles {
 		if exists, _ := fileExists(file); exists {
 			assessment.ConfigFiles = append(assessment.ConfigFiles, file)
-			
+
 			// Check for common password patterns
 			if hasWeakCredentials, _ := scanForWeakCredentials(file); hasWeakCredentials {
 				assessment.WeakCredentials = append(assessment.WeakCredentials, file)
 			}
-			
+
 			if hasPlaintextCredentials, _ := scanForPlaintextCredentials(file); hasPlaintextCredentials {
 				assessment.PlaintextFound = append(assessment.PlaintextFound, file)
 			}
@@ -94,7 +94,7 @@ func AssessCredentialSecurity(rc *eos_io.RuntimeContext, config CredentialConfig
 		}
 	}
 
-	logger.Info("Credential security assessment completed", 
+	logger.Info("Credential security assessment completed",
 		zap.String("service", config.Service),
 		zap.Bool("vault_available", assessment.HasVaultIntegration),
 		zap.Int("config_files", len(assessment.ConfigFiles)),
@@ -121,9 +121,9 @@ func MigrateCredentialsToVault(rc *eos_io.RuntimeContext, config CredentialConfi
 
 	// Intervention: Generate and store secure credentials
 	generatedCredentials := make(map[string]string)
-	
+
 	for credName, credType := range config.Credentials {
-		logger.Info("Generating secure credential", 
+		logger.Info("Generating secure credential",
 			zap.String("service", config.Service),
 			zap.String("credential", credName),
 			zap.String("type", credType))
@@ -131,7 +131,7 @@ func MigrateCredentialsToVault(rc *eos_io.RuntimeContext, config CredentialConfi
 		// Generate secure password (simplified implementation for now)
 		password := fmt.Sprintf("eos-generated-%d", time.Now().Unix())
 		// In production, would use crypto.GenerateStrongPassword(32)
-		
+
 		if password == "" {
 			return cerr.Wrap(fmt.Errorf("password generation failed"), fmt.Sprintf("failed to generate password for %s", credName))
 		}
@@ -154,7 +154,7 @@ func MigrateCredentialsToVault(rc *eos_io.RuntimeContext, config CredentialConfi
 		}
 
 		generatedCredentials[credName] = password
-		logger.Info("Credential stored in Vault", 
+		logger.Info("Credential stored in Vault",
 			zap.String("service", config.Service),
 			zap.String("credential", credName),
 			zap.String("vault_path", vaultPath))
@@ -187,7 +187,7 @@ func MigrateCredentialsToVault(rc *eos_io.RuntimeContext, config CredentialConfi
 				return cerr.Wrap(err, fmt.Sprintf("failed to store hashed credential %s in Vault", credName))
 			}
 
-			logger.Info("Hashed credential stored in Vault", 
+			logger.Info("Hashed credential stored in Vault",
 				zap.String("service", config.Service),
 				zap.String("credential", credName),
 				zap.String("vault_path", vaultPath))
@@ -220,7 +220,7 @@ func ValidateVaultCredentials(rc *eos_io.RuntimeContext, config CredentialConfig
 	// Verify each credential can be retrieved
 	for credName := range config.Credentials {
 		vaultPath := fmt.Sprintf("secret/data/%s/%s", config.VaultPath, credName)
-		
+
 		secret, err := vault.ReadSecret(rc, vaultPath)
 		if err != nil {
 			return cerr.Wrap(err, fmt.Sprintf("failed to retrieve credential %s from Vault", credName))
@@ -241,7 +241,7 @@ func ValidateVaultCredentials(rc *eos_io.RuntimeContext, config CredentialConfig
 			return cerr.New(fmt.Sprintf("invalid password for credential %s in Vault", credName))
 		}
 
-		logger.Info("Credential validated in Vault", 
+		logger.Info("Credential validated in Vault",
 			zap.String("service", config.Service),
 			zap.String("credential", credName),
 			zap.String("vault_path", vaultPath))
@@ -251,7 +251,7 @@ func ValidateVaultCredentials(rc *eos_io.RuntimeContext, config CredentialConfig
 	if config.HashRequired {
 		for credName := range config.Credentials {
 			vaultPath := fmt.Sprintf("secret/data/%s/%s_hash", config.VaultPath, credName)
-			
+
 			secret, err := vault.ReadSecret(rc, vaultPath)
 			if err != nil {
 				return cerr.Wrap(err, fmt.Sprintf("failed to retrieve hashed credential %s from Vault", credName))
@@ -272,7 +272,7 @@ func ValidateVaultCredentials(rc *eos_io.RuntimeContext, config CredentialConfig
 				return cerr.New(fmt.Sprintf("invalid hash for credential %s in Vault", credName))
 			}
 
-			logger.Info("Hashed credential validated in Vault", 
+			logger.Info("Hashed credential validated in Vault",
 				zap.String("service", config.Service),
 				zap.String("credential", credName),
 				zap.String("vault_path", vaultPath))
@@ -288,7 +288,7 @@ func ValidateVaultCredentials(rc *eos_io.RuntimeContext, config CredentialConfig
 		}
 	}
 
-	logger.Info("Vault credential validation completed successfully", 
+	logger.Info("Vault credential validation completed successfully",
 		zap.String("service", config.Service),
 		zap.Int("credentials_validated", len(config.Credentials)))
 
@@ -299,19 +299,19 @@ func ValidateVaultCredentials(rc *eos_io.RuntimeContext, config CredentialConfig
 
 func checkVaultConnectivity(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if Vault is running and accessible
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "vault",
 		Args:    []string{"status"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		logger.Debug("Vault status check failed", zap.Error(err))
 		return cerr.Wrap(err, "Vault is not accessible")
 	}
-	
+
 	return nil
 }
 
@@ -384,14 +384,14 @@ func scanForPlaintextCredentials(filename string) (bool, error) {
 
 func generateBcryptHash(rc *eos_io.RuntimeContext, password string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Use Docker to generate bcrypt hash via Wazuh indexer
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"run", "--rm", "-e", fmt.Sprintf("PASSWORD=%s", password), "wazuh/wazuh-indexer:latest", "bash", "-c", "echo $PASSWORD | /usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		logger.Error("Failed to generate bcrypt hash", zap.Error(err))
 		return "", cerr.Wrap(err, "bcrypt hash generation failed")
@@ -411,7 +411,7 @@ func getVaultPolicies(rc *eos_io.RuntimeContext, service string) ([]string, erro
 		Args:    []string{"policy", "list"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return nil, cerr.Wrap(err, "failed to list Vault policies")
 	}
@@ -430,7 +430,7 @@ func getVaultPolicies(rc *eos_io.RuntimeContext, service string) ([]string, erro
 
 func createVaultPolicy(rc *eos_io.RuntimeContext, policyName, vaultPath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create policy content
 	policyContent := fmt.Sprintf(`
 path "%s/*" {
@@ -453,7 +453,7 @@ path "%s_hash/*" {
 		Command: "vault",
 		Args:    []string{"policy", "write", policyName, policyFile},
 	})
-	
+
 	if err != nil {
 		return cerr.Wrap(err, fmt.Sprintf("failed to create Vault policy %s", policyName))
 	}
@@ -461,7 +461,7 @@ path "%s_hash/*" {
 	// Clean up temporary file
 	execute.RunSimple(rc.Ctx, "rm", "-f", policyFile)
 
-	logger.Info("Vault policy created successfully", 
+	logger.Info("Vault policy created successfully",
 		zap.String("policy", policyName),
 		zap.String("vault_path", vaultPath))
 
@@ -474,7 +474,7 @@ func validateVaultPolicy(rc *eos_io.RuntimeContext, policyName string) error {
 		Args:    []string{"policy", "read", policyName},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return cerr.Wrap(err, fmt.Sprintf("failed to validate policy %s", policyName))
 	}

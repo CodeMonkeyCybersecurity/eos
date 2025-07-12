@@ -157,11 +157,11 @@ func (sim *ServiceInstallationManager) installGuacamole(rc *eos_io.RuntimeContex
 	step3Start := time.Now()
 
 	composeContent := fmt.Sprintf(guacamoleComposeContent,
-		options.Version,    // guacd version
-		dbPassword,         // postgres password
-		options.Version,    // guacamole version
-		options.Port,       // exposed port
-		dbPassword,         // postgres password for guacamole
+		options.Version, // guacd version
+		dbPassword,      // postgres password
+		options.Version, // guacamole version
+		options.Port,    // exposed port
+		dbPassword,      // postgres password for guacamole
 	)
 
 	composePath := filepath.Join(workDir, "docker-compose.yml")
@@ -255,10 +255,10 @@ func (sim *ServiceInstallationManager) downloadGuacamoleSchema(rc *eos_io.Runtim
 
 	// Use docker to extract the schema from the guacamole image
 	cmd := fmt.Sprintf(`docker run --rm guacamole/guacamole:%s /opt/guacamole/bin/initdb.sh --postgres > %s`, version, outputPath)
-	
+
 	if err := sim.runCommand(rc, "Extract database schema", "bash", "-c", cmd); err != nil {
 		logger.Error("Failed to extract schema, using fallback method", zap.Error(err))
-		
+
 		// Fallback: create a basic schema
 		basicSchema := `--
 -- PostgreSQL database dump for Guacamole
@@ -298,7 +298,7 @@ SELECT 'guacadmin',
        decode('FE24ADC5E11E2B25288D1704ABE67A79E342ECC26064CE69C5B3177795A82264', 'hex')
 WHERE NOT EXISTS (SELECT 1 FROM guacamole_user WHERE username = 'guacadmin');
 `
-		
+
 		if err := sim.createFile(outputPath, basicSchema); err != nil {
 			return fmt.Errorf("failed to create fallback schema: %w", err)
 		}

@@ -149,9 +149,9 @@ type StorageStatus struct {
 	State string `json:"state"`
 
 	// Size information
-	TotalSize     int64 `json:"total_size"`
-	UsedSize      int64 `json:"used_size"`
-	AvailableSize int64 `json:"available_size"`
+	TotalSize     int64   `json:"total_size"`
+	UsedSize      int64   `json:"used_size"`
+	AvailableSize int64   `json:"available_size"`
 	UsagePercent  float64 `json:"usage_percent"`
 
 	// Mount information
@@ -417,7 +417,7 @@ const (
 	CriticalThreshold = 85.0
 
 	// Performance thresholds
-	HighIOPSThreshold = 10000
+	HighIOPSThreshold    = 10000
 	HighLatencyThreshold = 10000 // microseconds
 
 	// Health states (moved to types_constants.go with proper type)
@@ -431,8 +431,8 @@ const (
 
 // Validation constants
 const (
-	MinVolumeSize = 1 << 30  // 1GB minimum
-	MaxVolumeSize = 1 << 50  // 1PB maximum
-	MaxLabelLength = 255
+	MinVolumeSize      = 1 << 30 // 1GB minimum
+	MaxVolumeSize      = 1 << 50 // 1PB maximum
+	MaxLabelLength     = 255
 	MaxMountPathLength = 4096
 )

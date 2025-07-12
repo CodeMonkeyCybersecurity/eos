@@ -97,7 +97,7 @@ func validateFilePath(path string) error {
 
 	// Clean the path and check if it's trying to escape
 	cleanPath := filepath.Clean(path)
-	
+
 	// If the clean path starts with .. or contains .., it's trying to escape
 	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/..") {
 		return fmt.Errorf("path contains traversal elements: %s", path)

@@ -56,7 +56,7 @@ func (tw *TextWriter) WritePermissionResult(result *security_permissions.Permiss
 	}
 
 	// Summary
-	fmt.Fprintln(tw.writer, "\n" + strings.Repeat("=", 50))
+	fmt.Fprintln(tw.writer, "\n"+strings.Repeat("=", 50))
 	fmt.Fprintf(tw.writer, " Summary: %d files processed, %d fixed, %d skipped\n",
 		result.Summary.TotalFiles, result.Summary.FilesFixed, result.Summary.FilesSkipped)
 
