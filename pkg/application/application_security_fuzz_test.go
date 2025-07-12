@@ -221,9 +221,9 @@ func FuzzUserSelectionSecurity(f *testing.F) {
 		// Write user input
 		go func() {
 			defer func() { _ = w.Close() }()
-			io.WriteString(w, userInput+"\n")
+			_, _ = io.WriteString(w, userInput+"\n") // Test input, error not critical
 			// Write a valid selection to avoid infinite loop
-			io.WriteString(w, "1\n")
+			_, _ = io.WriteString(w, "1\n") // Test input, error not critical
 		}()
 
 		// Call GetUserSelection

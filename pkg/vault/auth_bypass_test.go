@@ -226,12 +226,12 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 		originalUser := os.Getenv("USER")
 
 		// Test with non-root user
-		os.Setenv("USER", "testuser")
+		_ = os.Setenv("USER", "testuser") // Test setup, error not critical
 		defer func() {
 			if originalUser == "" {
-				os.Unsetenv("USER")
+				_ = os.Unsetenv("USER") // Test cleanup, error not critical
 			} else {
-				os.Setenv("USER", originalUser)
+				_ = os.Setenv("USER", originalUser) // Test cleanup, error not critical
 			}
 		}()
 

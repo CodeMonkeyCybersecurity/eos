@@ -10,7 +10,7 @@ func TestSetDebugMode(t *testing.T) {
 	originalDebug := os.Getenv("Eos_DEBUG")
 	defer func() {
 		if originalDebug != "" {
-			os.Setenv("Eos_DEBUG", originalDebug)
+			_ = os.Setenv("Eos_DEBUG", originalDebug) // Test cleanup, error not critical
 		} else {
 			os.Unsetenv("Eos_DEBUG")
 		}

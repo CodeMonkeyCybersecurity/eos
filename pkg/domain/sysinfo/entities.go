@@ -810,7 +810,7 @@ func DetectHostTimeZone(rc *eos_io.RuntimeContext) (string, error) {
 		zoneinfoPath := "/usr/share/zoneinfo"
 		var foundZone string
 
-		filepath.Walk(zoneinfoPath, func(path string, info os.FileInfo, err error) error {
+		if err := filepath.Walk(zoneinfoPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() {
 				return nil
 			}
@@ -831,7 +831,9 @@ func DetectHostTimeZone(rc *eos_io.RuntimeContext) (string, error) {
 				}
 			}
 			return nil
-		})
+		}); err != nil {
+			logger.Warn("Failed to walk zoneinfo directory", zap.Error(err))
+		}
 
 		if foundZone != "" {
 			logger.Debug(" Detected timezone by comparing /etc/localtime", zap.String("timezone", foundZone))

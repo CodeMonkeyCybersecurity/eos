@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/domain/fileops"
@@ -173,15 +172,7 @@ func (c *FileServiceContainer) DeleteFile(path string) error {
 // ExtractTimestampFromBackupPath extracts timestamp from backup filename
 // e.g., "file.py.2024-01-15-10-30-45.bak" -> "2024-01-15-10-30-45"
 func ExtractTimestampFromBackupPath(backupPath string) string {
-	base := filepath.Base(backupPath)
-
-	// Remove extension
-	if ext := filepath.Ext(base); ext != "" {
-		base = base[:len(base)-len(ext)]
-	}
-
-	// Extract timestamp pattern (YYYY-MM-DD-HH-MM-SS)
-	// This is a simplified version - could be enhanced with regex
+	// TODO: Implement proper timestamp extraction from filename
 	// For now, generate a new timestamp
 	return time.Now().Format("2006-01-02-15-04-05")
 }

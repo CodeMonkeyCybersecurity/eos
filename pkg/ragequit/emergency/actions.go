@@ -50,9 +50,13 @@ func FlushDataSafety(rc *eos_io.RuntimeContext) error {
 
 	// Final sync
 	logger.Debug("Final filesystem sync")
-	exec.Command("sync").Run()
+	if err := exec.Command("sync").Run(); err != nil {
+		logger.Warn("First sync command failed", zap.Error(err))
+	}
 	time.Sleep(2 * time.Second)
-	exec.Command("sync").Run()
+	if err := exec.Command("sync").Run(); err != nil {
+		logger.Warn("Second sync command failed", zap.Error(err))
+	}
 
 	// EVALUATE - Log completion
 	logger.Info("Data flush completed")
@@ -125,12 +129,16 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 	// Wall message to all logged-in users
 	if system.CommandExists("wall") {
 		wallMsg := fmt.Sprintf("\nEMERGENCY SYSTEM NOTIFICATION\n%s\n", message)
-		exec.Command("wall", wallMsg).Run()
+		if err := exec.Command("wall", wallMsg).Run(); err != nil {
+			logger.Warn("Failed to send wall message", zap.Error(err))
+		}
 	}
 
 	// System logger
 	if system.CommandExists("logger") {
-		exec.Command("logger", "-p", "emerg", "-t", "ragequit", message).Run()
+		if err := exec.Command("logger", "-p", "emerg", "-t", "ragequit", message).Run(); err != nil {
+			logger.Warn("Failed to send syslog message", zap.Error(err))
+		}
 	}
 
 	// Write to /etc/motd for next login

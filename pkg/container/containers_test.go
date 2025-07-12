@@ -96,17 +96,17 @@ func TestStopContainersBySubstring(t *testing.T) {
 		{
 			name:      "valid substring",
 			substring: "webapp",
-			wantErr:   true, // Will fail in test env since docker command not available
+			wantErr:   false, // Valid input - should pass validation (may fail at docker level)
 		},
 		{
 			name:      "empty substring",
 			substring: "",
-			wantErr:   true, // Will fail in test env since docker command not available
+			wantErr:   true, // Should fail validation
 		},
 		{
 			name:      "substring with special characters",
 			substring: "test_app-123",
-			wantErr:   true, // Will fail in test env since docker command not available
+			wantErr:   false, // Valid input - should pass validation (may fail at docker level)
 		},
 	}
 

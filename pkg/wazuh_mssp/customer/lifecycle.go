@@ -170,7 +170,7 @@ func RestoreCustomer(rc *eos_io.RuntimeContext, customerID string, backupID stri
 		return fmt.Errorf("failed to verify backup: %w", err)
 	}
 	if !backupExists {
-		return eos_err.NewUserError(fmt.Sprintf("backup %s not found for customer %s", backupID, customerID))
+		return eos_err.NewUserError("backup not found for customer")
 	}
 
 	// INTERVENE - Restore from backup
@@ -200,14 +200,12 @@ func validateCustomerConfig(rc *eos_io.RuntimeContext, config *wazuh_mssp.Custom
 
 	// Validate customer ID
 	if len(config.ID) < wazuh_mssp.MinCustomerIDLength || len(config.ID) > wazuh_mssp.MaxCustomerIDLength {
-		return eos_err.NewUserError(fmt.Sprintf("customer ID must be between %d and %d characters",
-			wazuh_mssp.MinCustomerIDLength, wazuh_mssp.MaxCustomerIDLength))
+		return eos_err.NewUserError("customer ID length is invalid")
 	}
 
 	// Validate subdomain
 	if len(config.Subdomain) < wazuh_mssp.MinSubdomainLength || len(config.Subdomain) > wazuh_mssp.MaxSubdomainLength {
-		return eos_err.NewUserError(fmt.Sprintf("subdomain must be between %d and %d characters",
-			wazuh_mssp.MinSubdomainLength, wazuh_mssp.MaxSubdomainLength))
+		return eos_err.NewUserError("subdomain length is invalid")
 	}
 
 	// Validate tier
@@ -215,7 +213,7 @@ func validateCustomerConfig(rc *eos_io.RuntimeContext, config *wazuh_mssp.Custom
 	case wazuh_mssp.TierStarter, wazuh_mssp.TierPro, wazuh_mssp.TierEnterprise:
 		// Valid tier
 	default:
-		return eos_err.NewUserError(fmt.Sprintf("invalid tier: %s", config.Tier))
+		return eos_err.NewUserError("invalid tier specified")
 	}
 
 	// Set defaults if not provided

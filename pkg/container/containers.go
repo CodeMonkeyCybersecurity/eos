@@ -5,6 +5,7 @@ package container
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -15,7 +16,31 @@ import (
 //---------------------------- STOP FUNCTIONS ---------------------------- //
 //
 
+// validateContainerName validates that a container name/substring is safe for shell commands
+func validateContainerName(name string) error {
+	if name == "" {
+		return fmt.Errorf("container name cannot be empty")
+	}
+	
+	// Check for shell metacharacters that could be used for injection
+	// Allow alphanumeric, hyphens, underscores, dots (valid container name chars)
+	if matched, _ := regexp.MatchString(`[^a-zA-Z0-9._-]`, name); matched {
+		return fmt.Errorf("container name contains forbidden characters")
+	}
+	
+	// Check length to prevent DoS
+	if len(name) > 253 {
+		return fmt.Errorf("container name too long (max 253 characters)")
+	}
+	
+	return nil
+}
+
 func StopContainersBySubstring(rc *eos_io.RuntimeContext, substring string) error {
+	// Validate input to prevent command injection
+	if err := validateContainerName(substring); err != nil {
+		return fmt.Errorf("invalid container substring: %w", err)
+	}
 	out, err := exec.Command("docker", "ps", "--filter", "name="+substring, "--format", "{{.Names}}").Output()
 	if err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
@@ -35,6 +60,11 @@ func StopContainersBySubstring(rc *eos_io.RuntimeContext, substring string) erro
 }
 
 func StopContainer(rc *eos_io.RuntimeContext, containerName string) error {
+	// Validate input to prevent command injection
+	if err := validateContainerName(containerName); err != nil {
+		return fmt.Errorf("invalid container name: %w", err)
+	}
+	
 	out, err := exec.Command("docker", "ps", "--filter", "name="+containerName, "--format", "{{.Names}}").Output()
 	if err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)

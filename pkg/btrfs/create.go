@@ -228,7 +228,9 @@ func GetVolumeInfo(rc *eos_io.RuntimeContext, device string) (*VolumeInfo, error
 			fields := strings.Fields(line)
 			for i, field := range fields {
 				if field == "devices" && i > 0 {
-					fmt.Sscanf(fields[i-1], "%d", &info.DeviceCount)
+					if _, err := fmt.Sscanf(fields[i-1], "%d", &info.DeviceCount); err != nil {
+						fmt.Printf("Warning: Failed to parse device count '%s': %v\n", fields[i-1], err)
+					}
 				}
 			}
 		} else if strings.Contains(line, "devid") && strings.Contains(line, "size") {

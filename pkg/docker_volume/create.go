@@ -28,7 +28,11 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() {
+		if err := cli.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close Docker client: %v\n", err)
+		}
+	}()
 
 	// Check if volume already exists
 	volumes, err := cli.VolumeList(rc.Ctx, volume.ListOptions{})

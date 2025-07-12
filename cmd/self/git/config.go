@@ -116,7 +116,11 @@ func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitMan
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		if err := w.Flush(); err != nil {
+			fmt.Printf("Warning: Failed to flush tabwriter: %v\n", err)
+		}
+	}()
 
 	scope := "Local"
 	if global {

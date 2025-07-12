@@ -114,7 +114,7 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	case "enterprise":
 		newTier = wazuh_mssp.TierEnterprise
 	default:
-		return eos_err.NewUserError(fmt.Sprintf("invalid tier: %s", newTierStr))
+		return eos_err.NewUserError("invalid tier specified")
 	}
 
 	// Confirm scaling

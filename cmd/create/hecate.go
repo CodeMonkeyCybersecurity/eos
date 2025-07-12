@@ -203,7 +203,9 @@ func runInteractiveCaddySetup(options *service_installation.ServiceInstallOption
 	if domain == "" {
 		fmt.Printf("HTTP port [%d]: ", options.Port)
 		var portStr string
-		fmt.Scanln(&portStr)
+		if _, err := fmt.Scanln(&portStr); err != nil {
+			fmt.Printf("Warning: Failed to read port input, using default: %v\n", err)
+		}
 		if portStr != "" {
 			var port int
 			if _, err := fmt.Sscanf(portStr, "%d", &port); err == nil {
@@ -215,12 +217,17 @@ func runInteractiveCaddySetup(options *service_installation.ServiceInstallOption
 	// Admin API
 	fmt.Print("Enable admin API? [y/N]: ")
 	var adminAPI string
-	fmt.Scanln(&adminAPI)
+	if _, err := fmt.Scanln(&adminAPI); err != nil {
+		fmt.Printf("Warning: Failed to read admin API input, defaulting to disabled: %v\n", err)
+		adminAPI = "N"
+	}
 	if adminAPI == "y" || adminAPI == "Y" {
 		options.Config["admin_api"] = "true"
 		fmt.Print("Admin API port [2019]: ")
 		var adminPortStr string
-		fmt.Scanln(&adminPortStr)
+		if _, err := fmt.Scanln(&adminPortStr); err != nil {
+			fmt.Printf("Warning: Failed to read admin port input, using default: %v\n", err)
+		}
 		if adminPortStr != "" {
 			options.Config["admin_port"] = adminPortStr
 		} else {
@@ -231,11 +238,15 @@ func runInteractiveCaddySetup(options *service_installation.ServiceInstallOption
 	// File server
 	fmt.Print("Set up as file server? [y/N]: ")
 	var fileServer string
-	fmt.Scanln(&fileServer)
+	if _, err := fmt.Scanln(&fileServer); err != nil {
+		fmt.Printf("Warning: Failed to read file server input, using default: %v\n", err)
+	}
 	if fileServer == "y" || fileServer == "Y" {
 		fmt.Print("Root directory [/var/www/html]: ")
 		var rootDir string
-		fmt.Scanln(&rootDir)
+		if _, err := fmt.Scanln(&rootDir); err != nil {
+			fmt.Printf("Warning: Failed to read root directory input, using default: %v\n", err)
+		}
 		if rootDir == "" {
 			rootDir = "/var/www/html"
 		}
@@ -254,7 +265,9 @@ func runInteractiveCaddySetup(options *service_installation.ServiceInstallOption
 
 	fmt.Print("\nProceed with installation? [Y/n]: ")
 	var proceed string
-	fmt.Scanln(&proceed)
+	if _, err := fmt.Scanln(&proceed); err != nil {
+		fmt.Printf("Warning: Failed to read proceed input, using default: %v\n", err)
+	}
 	if proceed == "n" || proceed == "N" {
 		return fmt.Errorf("installation cancelled by user")
 	}

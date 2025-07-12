@@ -91,7 +91,11 @@ func outputJSONInfo(repo *git_management.GitRepository) error {
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		if err := w.Flush(); err != nil {
+			fmt.Printf("Warning: Failed to flush tabwriter: %v\n", err)
+		}
+	}()
 
 	fmt.Printf("Git Repository Information\n")
 	fmt.Printf("=========================\n\n")

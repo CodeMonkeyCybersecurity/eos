@@ -182,6 +182,10 @@ func init() {
 	createStorageVolumeCmd.Flags().BoolVar(&volumeCompress, "compress", false, "Enable compression (if supported)")
 
 	// Mark required flags
-	createStorageVolumeCmd.MarkFlagRequired("name")
-	createStorageVolumeCmd.MarkFlagRequired("size")
+	if err := createStorageVolumeCmd.MarkFlagRequired("name"); err != nil {
+		panic(fmt.Sprintf("failed to mark name flag as required: %v", err))
+	}
+	if err := createStorageVolumeCmd.MarkFlagRequired("size"); err != nil {
+		panic(fmt.Sprintf("failed to mark size flag as required: %v", err))
+	}
 }

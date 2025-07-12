@@ -324,7 +324,7 @@ func TestFileOperationsSecurity(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "hecate-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }() // Test cleanup, error not critical
 
 	t.Run("file_permissions", func(t *testing.T) {
 		// Test file creation with secure permissions
@@ -386,7 +386,7 @@ func TestConfigurationSecurity(t *testing.T) {
 	// Create temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "hecate-config-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }() // Test cleanup, error not critical
 
 	t.Run("config_file_security", func(t *testing.T) {
 		// Test configuration file security

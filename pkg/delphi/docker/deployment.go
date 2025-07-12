@@ -73,10 +73,14 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 		fmt.Scanln(&response)
 		if response != "n" && response != "N" {
 			logger.Info("🗑️ Removing existing wazuh-docker directory")
-			exec.Command("rm", "-rf", "wazuh-docker").Run()
+			if err := exec.Command("rm", "-rf", "wazuh-docker").Run(); err != nil {
+				logger.Warn("Failed to remove wazuh-docker directory", zap.Error(err))
+			}
 		}
 	} else {
-		exec.Command("rm", "-rf", "wazuh-docker").Run()
+		if err := exec.Command("rm", "-rf", "wazuh-docker").Run(); err != nil {
+			logger.Warn("Failed to remove wazuh-docker directory", zap.Error(err))
+		}
 	}
 
 	// Set vm.max_map_count for Elasticsearch
@@ -172,7 +176,11 @@ func ConfigureProxy(proxyAddress string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	// EVALUATE - Write configuration
 	_, err = file.WriteString(proxyConfig)

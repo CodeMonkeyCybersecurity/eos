@@ -512,10 +512,10 @@ func FuzzPackageListSecurity(f *testing.F) {
 			// Validate package name format (basic)
 			validPkg := true
 			for _, char := range pkg {
-				if !((char >= 'a' && char <= 'z') ||
-					(char >= 'A' && char <= 'Z') ||
-					(char >= '0' && char <= '9') ||
-					char == '-' || char == '.' || char == '_' || char == '+') {
+				if (char < 'a' || char > 'z') &&
+					(char < 'A' || char > 'Z') &&
+					(char < '0' || char > '9') &&
+					char != '-' && char != '.' && char != '_' && char != '+' {
 					validPkg = false
 					break
 				}

@@ -195,7 +195,11 @@ func (r *VersionResolver) getSaltVersionFromGitHub(resolver *VersionResolver) (s
 	if err != nil {
 		return "", fmt.Errorf("failed to query GitHub API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close response body: %v\n", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -246,7 +250,11 @@ func (r *VersionResolver) getLatestStableFromAllReleases() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to query GitHub API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close response body: %v\n", err)
+		}
+	}()
 
 	var releases []GitHubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {

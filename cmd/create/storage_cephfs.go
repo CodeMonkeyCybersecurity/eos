@@ -1,6 +1,8 @@
 package create
 
 import (
+	"fmt"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/cephfs"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -112,9 +114,15 @@ func init() {
 	cephfsCmd.Flags().Bool("terraform-only", false, "Only run Terraform deployment, skip SaltStack generation")
 
 	// Mark required flags
-	cephfsCmd.MarkFlagRequired("admin-host")
-	cephfsCmd.MarkFlagRequired("public-network")
-	cephfsCmd.MarkFlagRequired("cluster-network")
+	if err := cephfsCmd.MarkFlagRequired("admin-host"); err != nil {
+		panic(fmt.Sprintf("Failed to mark admin-host flag as required: %v", err))
+	}
+	if err := cephfsCmd.MarkFlagRequired("public-network"); err != nil {
+		panic(fmt.Sprintf("Failed to mark public-network flag as required: %v", err))
+	}
+	if err := cephfsCmd.MarkFlagRequired("cluster-network"); err != nil {
+		panic(fmt.Sprintf("Failed to mark cluster-network flag as required: %v", err))
+	}
 
 	// Register with parent command
 	CreateCmd.AddCommand(cephfsCmd)

@@ -302,7 +302,9 @@ func loadEnvFile(filename string) error {
 				value = value[1 : len(value)-1]
 			}
 
-			os.Setenv(key, value)
+			if err := os.Setenv(key, value); err != nil {
+				fmt.Printf("Warning: Failed to set environment variable %s: %v\n", key, err)
+			}
 		}
 	}
 

@@ -103,7 +103,10 @@ func init() {
 	SetupSSHKeyCmd.Flags().Bool("overwrite", false, "Overwrite existing key")
 
 	// Mark email as required
-	SetupSSHKeyCmd.MarkFlagRequired("email")
+	if err := SetupSSHKeyCmd.MarkFlagRequired("email"); err != nil {
+		// This is a programming error, not a runtime error
+		panic(fmt.Sprintf("Failed to mark email flag as required: %v", err))
+	}
 }
 
 var CreateSSHCmd = &cobra.Command{

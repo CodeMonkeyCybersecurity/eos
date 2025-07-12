@@ -122,7 +122,11 @@ func (sbi *SimpleBootstrapInstaller) downloadScript(rc *eos_io.RuntimeContext) (
 			logger.Warn("Download failed, trying next URL", zap.Error(lastErr))
 			continue
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Printf("Warning: Failed to close response body: %v\n", err)
+			}
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("download failed with status %d from %s", resp.StatusCode, url)
@@ -233,7 +237,11 @@ func (sbi *SimpleBootstrapInstaller) verifyChecksum(rc *eos_io.RuntimeContext, s
 		logger.Warn("Proceeding without checksum verification")
 		return nil // Don't fail installation for checksum issues
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close response body: %v\n", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		logger.Warn("Checksum download failed",

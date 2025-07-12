@@ -92,7 +92,9 @@ that require access to secrets, including the Delphi dashboard.`,
 		}
 
 		// Set environment variable for this session
-		os.Setenv("VAULT_ADDR", vaultAddr)
+		if err := os.Setenv("VAULT_ADDR", vaultAddr); err != nil {
+			logger.Warn("Failed to set VAULT_ADDR environment variable", zap.Error(err))
+		}
 		logger.Info("Vault address configured", zap.String("address", vaultAddr))
 
 		// Step 2: Test connection

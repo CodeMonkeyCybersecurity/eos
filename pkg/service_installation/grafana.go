@@ -22,7 +22,9 @@ func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 	// Version
 	fmt.Printf("Grafana version [%s]: ", options.Version)
 	var version string
-	fmt.Scanln(&version)
+	if _, err := fmt.Scanln(&version); err != nil {
+		fmt.Printf("Warning: Failed to read version input, using default: %v\n", err)
+	}
 	if version != "" {
 		options.Version = version
 	}
@@ -30,7 +32,9 @@ func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 	// Port
 	fmt.Printf("Port [%d]: ", options.Port)
 	var portStr string
-	fmt.Scanln(&portStr)
+	if _, err := fmt.Scanln(&portStr); err != nil {
+		fmt.Printf("Warning: Failed to read port input, using default: %v\n", err)
+	}
 	if portStr != "" {
 		var port int
 		if _, err := fmt.Sscanf(portStr, "%d", &port); err == nil {
@@ -41,7 +45,9 @@ func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 	// Admin password
 	fmt.Print("Set custom admin password? [y/N]: ")
 	var setPassword string
-	fmt.Scanln(&setPassword)
+	if _, err := fmt.Scanln(&setPassword); err != nil {
+		fmt.Printf("Warning: Failed to read password option, using default: %v\n", err)
+	}
 	if setPassword == "y" || setPassword == "Y" {
 		fmt.Print("Admin password: ")
 		var password string

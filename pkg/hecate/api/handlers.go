@@ -425,7 +425,10 @@ func (h *Handler) GetWorkflowStatus(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) respondJSON(w http.ResponseWriter, code int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		logger := otelzap.Ctx(h.rc.Ctx)
+		logger.Error("Failed to encode JSON response", zap.Error(err))
+	}
 }
 
 // respondError sends an error response
@@ -457,7 +460,9 @@ func (h *Handler) respondError(w http.ResponseWriter, code int, message string, 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("Failed to encode JSON error response", zap.Error(err))
+	}
 }
 
 // SetupRoutes sets up the API routes

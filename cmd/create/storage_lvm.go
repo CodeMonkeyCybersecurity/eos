@@ -1,6 +1,7 @@
 package create
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -207,6 +208,10 @@ func init() {
 	createLVMLVCmd.Flags().Int("stripes", 0, "Number of stripes for striped volumes")
 	createLVMLVCmd.Flags().String("stripe-size", "64K", "Stripe size for striped volumes")
 
-	createLVMLVCmd.MarkFlagRequired("volume-group")
-	createLVMLVCmd.MarkFlagRequired("size")
+	if err := createLVMLVCmd.MarkFlagRequired("volume-group"); err != nil {
+		panic(fmt.Sprintf("failed to mark volume-group flag as required: %v", err))
+	}
+	if err := createLVMLVCmd.MarkFlagRequired("size"); err != nil {
+		panic(fmt.Sprintf("failed to mark size flag as required: %v", err))
+	}
 }

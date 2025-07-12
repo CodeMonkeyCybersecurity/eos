@@ -192,7 +192,11 @@ func (dm *DatabaseManager) PerformHealthCheck(rc *eos_io.RuntimeContext, config 
 		})
 		return healthCheck, err
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+		}
+	}()
 
 	healthCheck.Checks = append(healthCheck.Checks, HealthCheckItem{
 		Name:   "Connection Test",
@@ -470,7 +474,11 @@ func (dm *DatabaseManager) getPostgreSQLStatus(rc *eos_io.RuntimeContext, config
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+		}
+	}()
 
 	status := &DatabaseStatus{
 		Type: DatabaseTypePostgreSQL,
@@ -513,7 +521,11 @@ func (dm *DatabaseManager) getPostgreSQLSchemaInfo(rc *eos_io.RuntimeContext, co
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+		}
+	}()
 
 	schemaInfo := &SchemaInfo{
 		Database: config.Database,
@@ -532,7 +544,11 @@ func (dm *DatabaseManager) getPostgreSQLSchemaInfo(rc *eos_io.RuntimeContext, co
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tables: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close database rows: %v\n", err)
+		}
+	}()
 
 	for rows.Next() {
 		var tableName, tableSchema string
@@ -569,7 +585,11 @@ func (dm *DatabaseManager) getTableColumns(db *sql.DB, tableName, tableSchema st
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close database rows: %v\n", err)
+		}
+	}()
 
 	var columns []ColumnInfo
 	for rows.Next() {
@@ -607,7 +627,11 @@ func (dm *DatabaseManager) executeSimpleQuery(db *sql.DB, operation *DatabaseOpe
 		result.Duration = time.Since(start)
 		return result, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close database rows: %v\n", err)
+		}
+	}()
 
 	columns, err := rows.Columns()
 	if err != nil {

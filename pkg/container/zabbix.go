@@ -88,7 +88,11 @@ func generateZabbixComposeFile(filePath string, vars map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("create compose file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	if err := templates.ZabbixComposeTemplate.Execute(file, vars); err != nil {
 		return fmt.Errorf("execute template: %w", err)

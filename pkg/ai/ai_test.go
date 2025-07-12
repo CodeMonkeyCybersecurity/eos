@@ -57,7 +57,7 @@ func TestAIAssistantCreation(t *testing.T) {
 
 	t.Run("azure_openai_configuration", func(t *testing.T) {
 		// Set up Azure OpenAI environment
-		os.Setenv("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com")
+		_ = os.Setenv("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com") // Test setup, error not critical
 		os.Setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4-deployment")
 		os.Setenv("AZURE_OPENAI_API_KEY", "test-azure-key")
 		defer func() {

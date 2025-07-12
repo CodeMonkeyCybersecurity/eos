@@ -266,10 +266,10 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 	t.Run("environment_variable_injection", func(t *testing.T) {
 		// Test that environment variables cannot be used for privilege escalation
 		originalPath := os.Getenv("PATH")
-		defer os.Setenv("PATH", originalPath)
+		defer func() { _ = os.Setenv("PATH", originalPath) }() // Test cleanup, error not critical
 
 		// Set malicious PATH
-		os.Setenv("PATH", "/tmp:/malicious/path:"+originalPath)
+		_ = os.Setenv("PATH", "/tmp:/malicious/path:"+originalPath) // Test setup, error not critical
 
 		opts := Options{
 			Command: "echo",

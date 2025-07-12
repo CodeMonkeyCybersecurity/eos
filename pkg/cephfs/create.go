@@ -358,7 +358,11 @@ func addToFstab(rc *eos_io.RuntimeContext, config *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to open /etc/fstab: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	if _, err := f.WriteString(entry); err != nil {
 		return fmt.Errorf("failed to write to /etc/fstab: %w", err)

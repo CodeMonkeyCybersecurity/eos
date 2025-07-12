@@ -237,12 +237,14 @@ func FindLargeDirectories(rc *eos_io.RuntimeContext, path string, topN int) ([]D
 
 		// Count files
 		fileCount := 0
-		filepath.Walk(dirs[i].Path, func(path string, info os.FileInfo, err error) error {
+		if err := filepath.Walk(dirs[i].Path, func(path string, info os.FileInfo, err error) error {
 			if err == nil && !info.IsDir() {
 				fileCount++
 			}
 			return nil
-		})
+		}); err != nil {
+			fmt.Printf("Warning: Failed to walk directory %s: %v\n", dirs[i].Path, err)
+		}
 		dirs[i].FileCount = fileCount
 	}
 

@@ -32,7 +32,11 @@ func ConfigureLogRotation(rc *eos_io.RuntimeContext, config *ContainerLogConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() {
+		if err := cli.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close Docker client: %v\n", err)
+		}
+	}()
 
 	// Get container info
 	containerInfo, err := cli.ContainerInspect(rc.Ctx, config.ContainerID)
@@ -171,7 +175,11 @@ func MonitorLogSizes(rc *eos_io.RuntimeContext) (map[string]*LogRotationStats, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() {
+		if err := cli.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close Docker client: %v\n", err)
+		}
+	}()
 
 	// List all containers
 	containers, err := cli.ContainerList(rc.Ctx, container.ListOptions{All: true})
@@ -298,13 +306,21 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
+	defer func() {
+		if err := sourceFile.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close source file: %v\n", err)
+		}
+	}()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
+	defer func() {
+		if err := destFile.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close destination file: %v\n", err)
+		}
+	}()
 
 	_, err = io.Copy(destFile, sourceFile)
 	return err

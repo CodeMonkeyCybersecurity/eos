@@ -377,7 +377,7 @@ func parseCustomerConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_
 		case "enterprise":
 			config.Tier = wazuh_mssp.TierEnterprise
 		default:
-			return nil, eos_err.NewUserError(fmt.Sprintf("invalid tier: %s (must be starter/pro/enterprise)", tierStr))
+			return nil, eos_err.NewUserError("invalid tier specified (must be starter/pro/enterprise)")
 		}
 	}
 

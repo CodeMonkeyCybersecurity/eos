@@ -225,7 +225,11 @@ func readDiskStats() (map[string]diskStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close disk stats file: %v\n", err)
+		}
+	}()
 
 	stats := make(map[string]diskStats)
 	scanner := bufio.NewScanner(file)

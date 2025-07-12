@@ -25,19 +25,28 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 		if deployType == "" {
 			logger.Info("🤔 terminal prompt: Deployment type (single-node or multi-node):")
 			fmt.Print("Deployment type (single-node or multi-node): ")
-			fmt.Scanln(&deployType)
+			if _, err := fmt.Scanln(&deployType); err != nil {
+				fmt.Printf("Warning: Failed to read deployment type: %v\n", err)
+				deployType = "single-node" // Use default
+			}
 		}
 
 		if adminPassword == "" {
 			logger.Info("🔐 terminal prompt: Enter new admin password")
 			fmt.Print("Enter new admin password: ")
-			fmt.Scanln(&adminPassword)
+			if _, err := fmt.Scanln(&adminPassword); err != nil {
+				fmt.Printf("Warning: Failed to read admin password: %v\n", err)
+				return fmt.Errorf("admin password is required")
+			}
 		}
 
 		if kibanaPassword == "" {
 			logger.Info("🔐 terminal prompt: Enter new Kibana password")
 			fmt.Print("Enter new Kibana password: ")
-			fmt.Scanln(&kibanaPassword)
+			if _, err := fmt.Scanln(&kibanaPassword); err != nil {
+				fmt.Printf("Warning: Failed to read Kibana password: %v\n", err)
+				return fmt.Errorf("Kibana password is required")
+			}
 		}
 
 		if apiPassword == "" {

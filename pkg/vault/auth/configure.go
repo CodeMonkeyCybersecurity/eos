@@ -138,7 +138,11 @@ func SaveVaultConfig(rc *eos_io.RuntimeContext, vaultAddr, authMethod string) er
 			zap.Error(err))
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	if _, err := fmt.Fprintf(file, "VAULT_ADDR=%s\n", vaultAddr); err != nil {
 		return fmt.Errorf("failed to write VAULT_ADDR: %w", err)

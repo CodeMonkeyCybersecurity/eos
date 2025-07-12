@@ -343,7 +343,10 @@ func estimateCompressionStats(rc *eos_io.RuntimeContext, path string, stats *Com
 	if output, err := duCmd.Output(); err == nil {
 		fields := strings.Fields(string(output))
 		if len(fields) >= 1 {
-			fmt.Sscanf(fields[0], "%d", &stats.UncompressedSize)
+			if _, err := fmt.Sscanf(fields[0], "%d", &stats.UncompressedSize); err != nil {
+				// Log warning but continue - this is not critical for operation
+				fmt.Printf("Warning: Failed to parse uncompressed size '%s': %v\n", fields[0], err)
+			}
 		}
 	}
 
@@ -352,7 +355,10 @@ func estimateCompressionStats(rc *eos_io.RuntimeContext, path string, stats *Com
 	if output, err := duCmd.Output(); err == nil {
 		fields := strings.Fields(string(output))
 		if len(fields) >= 1 {
-			fmt.Sscanf(fields[0], "%d", &stats.CompressedSize)
+			if _, err := fmt.Sscanf(fields[0], "%d", &stats.CompressedSize); err != nil {
+				// Log warning but continue - this is not critical for operation
+				fmt.Printf("Warning: Failed to parse compressed size '%s': %v\n", fields[0], err)
+			}
 		}
 	}
 

@@ -143,7 +143,9 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 			}
 
 			fmt.Printf("Storage Metrics - %s\n\n", time.Now().Format("15:04:05"))
-			displayMetrics(metrics)
+			if err := displayMetrics(metrics); err != nil {
+				fmt.Printf("Warning: Failed to display metrics: %v\n", err)
+			}
 		}
 	}
 }

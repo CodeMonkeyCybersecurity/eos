@@ -356,7 +356,10 @@ func (v *ConfigValidator) tableExists(db *sql.DB, tableName string) bool {
 		SELECT 1 FROM information_schema.tables 
 		WHERE table_name = $1
 	)`
-	db.QueryRow(query, tableName).Scan(&exists)
+	if err := db.QueryRow(query, tableName).Scan(&exists); err != nil {
+		fmt.Printf("Warning: Failed to check table existence: %v\n", err)
+		return false
+	}
 	return exists
 }
 
@@ -410,7 +413,10 @@ func (v *ConfigValidator) functionExists(db *sql.DB, functionName string) bool {
 		SELECT 1 FROM information_schema.routines 
 		WHERE routine_name = $1 AND routine_type = 'FUNCTION'
 	)`
-	db.QueryRow(query, functionName).Scan(&exists)
+	if err := db.QueryRow(query, functionName).Scan(&exists); err != nil {
+		fmt.Printf("Warning: Failed to check function existence: %v\n", err)
+		return false
+	}
 	return exists
 }
 

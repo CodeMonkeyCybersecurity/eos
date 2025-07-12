@@ -114,14 +114,18 @@ func outputJSONDatabaseStatus(status *database_management.DatabaseStatus) error 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableDatabaseStatus(status *database_management.DatabaseStatus) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		if err := w.Flush(); err != nil {
+			fmt.Printf("Warning: Failed to flush output: %v\n", err)
+		}
+	}()
 
 	fmt.Printf("Database Status\n")
 	fmt.Printf("===============\n\n")
 
-	fmt.Fprintf(w, "Type:\t%s\n", status.Type)
-	fmt.Fprintf(w, "Version:\t%s\n", status.Version)
-	fmt.Fprintf(w, "Status:\t%s\n", status.Status)
+	_, _ = fmt.Fprintf(w, "Type:\t%s\n", status.Type)
+	_, _ = fmt.Fprintf(w, "Version:\t%s\n", status.Version)
+	_, _ = fmt.Fprintf(w, "Status:\t%s\n", status.Status)
 
 	if status.Uptime > 0 {
 		fmt.Fprintf(w, "Uptime:\t%s\n", status.Uptime.String())

@@ -126,14 +126,19 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 	if status != nil && (len(status.Modified) > 0 || len(status.Untracked) > 0) {
 		fmt.Print("Add all modified and untracked files? [Y/n]: ")
 		var response string
-		fmt.Scanln(&response)
+		if _, err := fmt.Scanln(&response); err != nil {
+			fmt.Printf("Warning: Failed to read input, using default: %v\n", err)
+		}
 		addAll = response != "n" && response != "N"
 	}
 
 	// Get commit message
 	fmt.Print("Enter commit message: ")
 	var message string
-	fmt.Scanln(&message)
+	if _, err := fmt.Scanln(&message); err != nil {
+		fmt.Printf("Warning: Failed to read commit message: %v\n", err)
+		return fmt.Errorf("failed to read commit message: %w", err)
+	}
 	if message == "" {
 		return fmt.Errorf("commit message cannot be empty")
 	}
@@ -141,7 +146,9 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 	// Ask about pushing
 	fmt.Print("Push after commit? [y/N]: ")
 	var pushResponse string
-	fmt.Scanln(&pushResponse)
+	if _, err := fmt.Scanln(&pushResponse); err != nil {
+		fmt.Printf("Warning: Failed to read push input, using default: %v\n", err)
+	}
 	push := pushResponse == "y" || pushResponse == "Y"
 
 	var force bool

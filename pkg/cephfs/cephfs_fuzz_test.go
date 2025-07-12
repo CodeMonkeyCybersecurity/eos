@@ -533,12 +533,12 @@ func createTempCephFile(content string) (string, error) {
 
 	_, err = tmpFile.WriteString(content)
 	if err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close() // Test cleanup, error not critical
 		os.Remove(tmpFile.Name())
 		return "", err
 	}
 
-	tmpFile.Close()
+	_ = tmpFile.Close() // Test cleanup, error not critical
 	return tmpFile.Name(), nil
 }
 

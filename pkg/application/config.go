@@ -152,7 +152,7 @@ func validateAppOption(option string) error {
 
 	// Only allow alphanumeric characters for app options
 	for _, char := range option {
-		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')) {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') {
 			return fmt.Errorf("app option can only contain alphanumeric characters")
 		}
 	}

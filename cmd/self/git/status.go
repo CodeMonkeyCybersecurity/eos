@@ -86,7 +86,11 @@ func outputJSONStatus(status *git_management.GitStatus) error {
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		if err := w.Flush(); err != nil {
+			fmt.Printf("Warning: Failed to flush tabwriter: %v\n", err)
+		}
+	}()
 
 	fmt.Printf("Git Repository Status\n")
 	fmt.Printf("=====================\n\n")
