@@ -180,7 +180,7 @@ func TestFixSinglePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset file permissions for each test
-			os.Chmod(testFile, 0644)
+			_ = os.Chmod(testFile, 0644)
 
 			backupDir := filepath.Join(tempDir, "backups", tt.name)
 
@@ -257,11 +257,11 @@ func TestScanSSHDirectory(t *testing.T) {
 	sshDir := filepath.Join(tempDir, ".ssh")
 
 	// Create SSH directory structure with correct permissions
-	os.Mkdir(sshDir, 0700)
-	os.WriteFile(filepath.Join(sshDir, "id_rsa"), []byte("private"), 0600)
-	os.WriteFile(filepath.Join(sshDir, "id_rsa.pub"), []byte("public"), 0644)
-	os.WriteFile(filepath.Join(sshDir, "config"), []byte("config"), 0644)     // Wrong permission
-	os.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte("hosts"), 0644) // Correct permission
+	_ = os.Mkdir(sshDir, 0700)
+	_ = os.WriteFile(filepath.Join(sshDir, "id_rsa"), []byte("private"), 0600)
+	_ = os.WriteFile(filepath.Join(sshDir, "id_rsa.pub"), []byte("public"), 0644)
+	_ = os.WriteFile(filepath.Join(sshDir, "config"), []byte("config"), 0644)     // Wrong permission
+	_ = os.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte("hosts"), 0644) // Correct permission
 
 	pm := NewPermissionManager(nil)
 	result, err := pm.ScanSSHDirectory(sshDir)
@@ -307,7 +307,7 @@ func TestCheckPermissions(t *testing.T) {
 
 	// Create test SSH directory
 	sshDir := filepath.Join(tempDir, ".ssh")
-	os.Mkdir(sshDir, 0755) // Wrong permission
+	_ = os.Mkdir(sshDir, 0755) // Wrong permission
 
 	pm := NewPermissionManager(&SecurityConfig{
 		SSHDirectory: sshDir,
@@ -338,7 +338,7 @@ func TestPermissionManagerConcurrency(t *testing.T) {
 	// Create multiple test files
 	for i := 0; i < 10; i++ {
 		path := filepath.Join(tempDir, fmt.Sprintf("file%d.txt", i))
-		os.WriteFile(path, []byte("test"), 0644)
+		_ = os.WriteFile(path, []byte("test"), 0644)
 	}
 
 	pm := NewPermissionManager(&SecurityConfig{
@@ -443,7 +443,7 @@ func TestBackupCreation(t *testing.T) {
 	testFile := filepath.Join(tempDir, "test.txt")
 
 	// Create test file
-	os.WriteFile(testFile, []byte("test"), 0644)
+	_ = os.WriteFile(testFile, []byte("test"), 0644)
 
 	pm := NewPermissionManager(&SecurityConfig{
 		DryRun:          false,

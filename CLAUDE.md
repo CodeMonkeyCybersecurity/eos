@@ -553,16 +553,18 @@ go test -v -run "Security|Validation|Auth" ./pkg/...
    - use version resolver in pkg/platform/version_resolver.go when deciding what version of something to download (eg. saltstack, nomad, etc.) to programatically make sure the most recent version of something is downloaded and installed when using `eos create ...` 
 
 
-7. **High-level 'strategic' changes in the codebase**
-    - should be documented in a .md file in the docs/ directory.
-    - this includes things like the declaration of a new standard (eg essential eight compliance, the software stack being used)
-    - it does not include specific changes to the codebase which are planned (eg. refactoring logic, tests which need to be written, notes to self)
+7. **Strategic documentation in docs/**
+    - **ONLY** create documentation files in docs/ for high-level strategic changes
+    - Examples: new standards (Essential Eight compliance), software stack decisions, architectural changes
+    - Examples: migration guides for major framework changes, security policy updates
+    - **DO NOT** create documentation for tactical implementation details, pre-commit checklists, or temporary work notes
 
-8. **More specific 'tactical' changes in the codebase**
-    - these changes need to be marked inline in the codebase with a // TODO: describing what needs to be done or considerations 
-    - if a // TODO is not really appropriate, then a // Comment is fine
-    - Eg. // TODO: More tests needed here, or // This has been done this way because ...
-    - Does not include higher level decisions like "Oh I want to add some completely new bit of software to the stack" or "We should rewrite this whole thing in Powershell".  
+8. **Tactical documentation as inline comments**
+    - Use `// TODO:` comments for specific code improvements needed
+    - Use `// Comment` for implementation explanations and context
+    - Use structured logging for operational notes and debugging information
+    - Examples: `// TODO: Add validation for edge case`, `// Using exponential backoff due to API rate limits`
+    - **NEVER** create separate .md files for tactical notes, implementation reminders, or temporary checklists  
 
 
 ## Common Pitfalls
@@ -617,6 +619,19 @@ go test -v -run "Security|Validation|Auth" ./pkg/...
    if _, err := exec.LookPath("terraform"); err != nil {
        return eos_err.NewUserError("terraform not found in PATH")
    }
+   ```
+
+7. **NEVER create documentation files unless strategically necessary**
+   ```go
+   // WRONG - Creating files for tactical notes
+   // docs/PRECOMMIT_CHECKLIST.md
+   // docs/IMPLEMENTATION_NOTES.md
+   // docs/TODO_LIST.md
+   
+   // CORRECT - Use inline comments for tactical documentation
+   // TODO: Add input validation for edge cases
+   // This uses exponential backoff to handle rate limits
+   logger.Debug("Retrying after backoff", zap.Duration("wait", delay))
    ```
 
 ## Integration Guidelines
@@ -743,3 +758,11 @@ func checkPrerequisites(rc *eos_io.RuntimeContext) error {
 ## Memories
 
 - No use of emojis in code or documentation
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create documentation files unless they're absolutely necessary for strategic changes.
+ALWAYS prefer inline comments (//TODO:, //Comment) for tactical documentation.
+NEVER create .md files for implementation notes, checklists, or temporary work notes.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+// TODO: Add JSON report generation - currently returns placeholder in generateJSONReport
+// TODO: Consider adding XML report format for CI integration  
+// TODO: Add fuzz corpus management for persistent test cases
+
 // Config represents the configuration for fuzzing operations
 type Config struct {
 	// Test execution settings

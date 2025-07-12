@@ -13,6 +13,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// Note: All subprocess executions in this package use #nosec G204 comments
+// as they execute only hardcoded commands with controlled inputs, not user data
+
 // Configure sets up the fuzzing environment and validates configuration
 func Configure(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)

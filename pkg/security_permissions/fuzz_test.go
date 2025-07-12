@@ -319,8 +319,8 @@ func FuzzPathExpansion(f *testing.F) {
 	}
 
 	// Set some environment variables for testing
-	os.Setenv("FUZZ_TEST_VAR", "/fuzzy")
-	defer os.Unsetenv("FUZZ_TEST_VAR")
+	_ = os.Setenv("FUZZ_TEST_VAR", "/fuzzy")
+	defer func() { _ = os.Unsetenv("FUZZ_TEST_VAR") }()
 
 	f.Fuzz(func(t *testing.T, path string) {
 		// os.ExpandEnv should not panic
@@ -378,7 +378,7 @@ func FuzzBackupFileNaming(f *testing.F) {
 		// Create a test file if path is valid
 		if testPath != "" && !strings.Contains(testPath, "\x00") {
 			fullPath := filepath.Join(tempDir, "testfile")
-			os.WriteFile(fullPath, []byte("test"), 0644)
+			_ = os.WriteFile(fullPath, []byte("test"), 0644)
 
 			pm := NewPermissionManager(&SecurityConfig{
 				CreateBackups:   true,
