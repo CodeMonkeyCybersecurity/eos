@@ -10,8 +10,4 @@ type WrapValidation struct {
 	PolicyInput func() any
 }
 
-var (
-	nonInteractive bool
-	orphansOnly    bool
-	kernelsOnly    bool
-)
+// TODO: Remove unused variables - functionality appears to be deprecated

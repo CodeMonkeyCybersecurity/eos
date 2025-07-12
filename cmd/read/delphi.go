@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	tea "github.com/charmbracelet/bubbletea"
@@ -91,7 +90,7 @@ defined in schema.sql to provide comprehensive visibility into your alert proces
   # - Performance bottleneck analysis
   # - Error rate monitoring
   # - Historical trend analysis`,
-	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info(" Starting Delphi pipeline functionality dashboard")
 
@@ -201,7 +200,7 @@ to ensure your database schema is properly configured.`,
   # - Table structures match expectations
   # - Performance optimizations are in place
   # - Monitoring infrastructure is configured`,
-	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Verifying Delphi pipeline database schema")
 

@@ -16,7 +16,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/docker"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/privilege_check"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -152,25 +151,6 @@ EXAMPLES:
 	}),
 }
 
-// extractWazuhPasswords moved to pkg/delphi/credentials
-// DEPRECATED: Use credentials.ExtractWazuhPasswords instead
-func extractWazuhPasswords(rc *eos_io.RuntimeContext) error {
-	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
-	for _, dir := range searchPaths {
-		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
-		if eos_unix.Exists(tarPath) {
-			otelzap.Ctx(rc.Ctx).Info(" Found Wazuh tar file", zap.String("path", tarPath))
-			cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("failed to extract passwords: %w", err)
-			}
-			return nil
-		}
-	}
-	return fmt.Errorf("wazuh-install-files.tar not found in expected paths")
-}
 
 var mappingCmd = &cobra.Command{
 	Use:   "mapping",

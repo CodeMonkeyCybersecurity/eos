@@ -96,9 +96,7 @@ func GenerateSecurityConfig(rc *eos_io.RuntimeContext, profile system.SecurityPr
 	// INTERVENE - Generate configuration based on profile
 	logger.Info("Generating security configuration")
 
-	config := &SecurityConfig{
-		Profile: profile,
-	}
+	var config *SecurityConfig
 
 	switch profile {
 	case "baseline":
@@ -112,6 +110,9 @@ func GenerateSecurityConfig(rc *eos_io.RuntimeContext, profile system.SecurityPr
 	default:
 		return nil, fmt.Errorf("unsupported security profile: %s", profile)
 	}
+
+	// Set the profile in the generated config
+	config.Profile = profile
 
 	// EVALUATE - Validate configuration
 	logger.Info("Validating security configuration")

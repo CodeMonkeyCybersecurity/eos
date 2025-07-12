@@ -1,7 +1,6 @@
 package cloudinit
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -690,24 +689,4 @@ func FuzzWriteConfigSecurity(f *testing.F) {
 	})
 }
 
-// Helper function to create test files
-func createTestCloudInitFile(content string) (string, error) {
-	tmpFile, err := os.CreateTemp("", "cloudinit-fuzz-*")
-	if err != nil {
-		return "", err
-	}
-
-	_, err = tmpFile.WriteString(content)
-	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return "", err
-	}
-
-	tmpFile.Close()
-	return tmpFile.Name(), nil
-}
-
-func removeTestCloudInitFile(path string) {
-	os.Remove(path)
-}
+// TODO: Remove unused test helper functions - functionality not used in current tests

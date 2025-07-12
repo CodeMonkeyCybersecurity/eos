@@ -2,10 +2,7 @@
 package read
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -67,25 +64,3 @@ func init() {
 	ReadCmd.AddCommand(saltJobStatusCmd)
 }
 
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputJobStatusJSON(status interface{}) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(status)
-}
-
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputJobStatusText(status interface{}, jobID string, includeDetails bool) error {
-	fmt.Printf("Salt Job Status: %s\n", jobID)
-	fmt.Println(strings.Repeat("=", 50))
-
-	// TODO: Implement actual status formatting based on Salt client response format
-	fmt.Println("(Job status formatting implementation pending Salt client structure)")
-
-	if includeDetails {
-		fmt.Println("\nDetailed Response Data:")
-		fmt.Println("(Detailed formatting implementation pending)")
-	}
-
-	return nil
-}

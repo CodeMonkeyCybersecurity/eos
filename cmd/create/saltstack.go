@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
@@ -33,7 +32,7 @@ This command uses the official Salt bootstrap script method - the most reliable 
 After installation, other Eos commands can use Salt for configuration management
 by placing state files in /srv/salt/eos/ and applying them with salt-call.`,
 
-	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
 		logger.Info("Starting SaltStack installation")
@@ -176,34 +175,6 @@ func init() {
 	CreateCmd.AddCommand(saltStateCmd)
 }
 
-// TODO
-func outputStateResultsJSON(result interface{}) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
-}
-
-// TODO
-func outputStateResultsText(result interface{}, target, function string, testMode bool) error {
-	fmt.Printf("Salt State Application Results\n")
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Target: %s\n", target)
-	fmt.Printf("Function: %s\n", function)
-
-	if testMode {
-		fmt.Printf("Mode: Test (no changes made)\n")
-	} else {
-		fmt.Printf("Mode: Apply (changes enforced)\n")
-	}
-
-	fmt.Println("\nResults:")
-	fmt.Println(strings.Repeat("-", 30))
-
-	// TODO: Implement proper result formatting based on Salt client response format
-	fmt.Printf("%v\n", result)
-
-	return nil
-}
 
 var saltExecutionCmd = &cobra.Command{
 	Use:     "salt-execution [target] [function] [args...]",

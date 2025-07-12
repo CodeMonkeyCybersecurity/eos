@@ -126,9 +126,10 @@ Examples:
 				fmt.Printf("\nInstallation Steps:\n")
 				for _, step := range result.Steps {
 					status := ""
-					if step.Status == "failed" {
+					switch step.Status {
+					case "failed":
 						status = "❌"
-					} else if step.Status == "running" {
+					case "running":
 						status = "⏳"
 					}
 					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)

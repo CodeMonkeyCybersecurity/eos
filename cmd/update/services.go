@@ -80,25 +80,27 @@ Examples:
 		// Parse enabled/running flags
 		var enabled, running *bool
 		if enabledStr != "" {
-			if enabledStr == "true" {
+			switch enabledStr {
+			case "true":
 				val := true
 				enabled = &val
-			} else if enabledStr == "false" {
+			case "false":
 				val := false
 				enabled = &val
-			} else {
+			default:
 				return fmt.Errorf("invalid value for --enabled: %s (use true or false)", enabledStr)
 			}
 		}
 
 		if runningStr != "" {
-			if runningStr == "true" {
+			switch runningStr {
+			case "true":
 				val := true
 				running = &val
-			} else if runningStr == "false" {
+			case "false":
 				val := false
 				running = &val
-			} else {
+			default:
 				return fmt.Errorf("invalid value for --running: %s (use true or false)", runningStr)
 			}
 		}

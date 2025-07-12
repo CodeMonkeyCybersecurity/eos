@@ -234,8 +234,7 @@ func CreateProfile(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 func generateSecurePassword() (string, error) {
 	// Generate a secure 32-character password
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
-	// Implementation would use crypto/rand
+	// TODO: Implementation would use crypto/rand with proper charset
 	// Placeholder for demonstration
 	return "generated-secure-password-here", nil
 }

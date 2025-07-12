@@ -32,15 +32,6 @@ Use --terraform flag to generate Terraform configuration instead of direct insta
 	}),
 }
 
-var k3sTerraformCmd = &cobra.Command{
-	Use:   "k3s-terraform",
-	Short: "Generate Terraform configuration for K3s deployment",
-	Long: `Generate Terraform configuration for K3s deployment on cloud infrastructure.
-Supports Hetzner Cloud provider with automated server provisioning and K3s installation.`,
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return kubernetes.GenerateK3sTerraform(rc, cmd)
-	}),
-}
 
 var CreateKubeadmCmd = &cobra.Command{
 	Use:   "kubeadm",
