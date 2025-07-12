@@ -31,7 +31,7 @@ Example:
   eos create consul-vault ./infrastructure --services --consul-kv`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// Get flags
 		useServices, _ := cmd.Flags().GetBool("services")
 		useConsulKV, _ := cmd.Flags().GetBool("consul-kv")
@@ -76,23 +76,23 @@ Example:
 		// Validate connectivity
 		logger.Info("Validating Consul connectivity",
 			zap.String("consul_addr", consulAddr))
-		
+
 		// TODO: Add actual Consul connectivity check here
-		
+
 		logger.Info("Validating Vault connectivity",
 			zap.String("vault_addr", vaultAddr))
-		
+
 		// TODO: Add actual Vault connectivity check here
 
 		// Create configuration template
 		templateData := terraform.ConsulVaultTemplate{
-			ConsulAddr:     consulAddr,
-			VaultAddr:      vaultAddr,
-			Datacenter:     datacenter,
-			ServicePrefix:  servicePrefix,
-			KVPrefix:       kvPrefix,
-			UseServices:    useServices,
-			UseConsulKV:    useConsulKV,
+			ConsulAddr:      consulAddr,
+			VaultAddr:       vaultAddr,
+			Datacenter:      datacenter,
+			ServicePrefix:   servicePrefix,
+			KVPrefix:        kvPrefix,
+			UseServices:     useServices,
+			UseConsulKV:     useConsulKV,
 			UseVaultSecrets: useVaultSecrets,
 		}
 
@@ -137,7 +137,7 @@ fi`
 			zap.String("directory", targetDir),
 			zap.String("deploy_script", deployPath))
 
-		fmt.Printf("\n✅ Consul-Vault integrated infrastructure generated!\n")
+		fmt.Printf("\n Consul-Vault integrated infrastructure generated!\n")
 		fmt.Printf("\nTo deploy:\n")
 		fmt.Printf("  cd %s\n", targetDir)
 		fmt.Printf("  ./deploy-consul-vault.sh\n")
@@ -164,7 +164,7 @@ Example:
   eos create consul-cluster ./consul-infra --servers=3 --clients=2`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// Get configuration from flags
 		serverCount, _ := cmd.Flags().GetInt("servers")
 		clientCount, _ := cmd.Flags().GetInt("clients")
@@ -204,20 +204,20 @@ Example:
 
 		// Create template data
 		templateData := terraform.ConsulTemplateData{
-			ClusterName:       "consul-cluster",
-			ConsulDatacenter:  datacenter,
-			ServerCount:       serverCount,
-			ClientCount:       clientCount,
-			ServerType:        serverType,
-			Location:          location,
-			SSHKeyName:        sshKeyName,
-			VaultAddr:         vaultAddr,
-			EncryptKey:        encryptKey,
-			EnableACL:         enableACL,
-			EnableTLS:         enableTLS,
-			SecretsMount:      "consul-terraform",
-			ConsulVersion:     "1.16.1",
-			ConsulPort:        shared.PortConsul,
+			ClusterName:      "consul-cluster",
+			ConsulDatacenter: datacenter,
+			ServerCount:      serverCount,
+			ClientCount:      clientCount,
+			ServerType:       serverType,
+			Location:         location,
+			SSHKeyName:       sshKeyName,
+			VaultAddr:        vaultAddr,
+			EncryptKey:       encryptKey,
+			EnableACL:        enableACL,
+			EnableTLS:        enableTLS,
+			SecretsMount:     "consul-terraform",
+			ConsulVersion:    "1.16.1",
+			ConsulPort:       shared.PortConsul,
 		}
 
 		// Generate main Terraform configuration
@@ -312,7 +312,7 @@ Example:
   eos create consul-mesh ./mesh-config --service=web --upstream=api`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// Get configuration from flags
 		serviceName, _ := cmd.Flags().GetString("service")
 		upstreams, _ := cmd.Flags().GetStringSlice("upstream")
@@ -341,11 +341,11 @@ Example:
 
 		// Create template data
 		templateData := terraform.ServiceMeshTemplateData{
-			ServiceName:    serviceName,
-			Datacenter:     datacenter,
-			EnableMetrics:  enableMetrics,
-			EnableTracing:  enableTracing,
-			ConsulPort:     shared.PortConsul,
+			ServiceName:   serviceName,
+			Datacenter:    datacenter,
+			EnableMetrics: enableMetrics,
+			EnableTracing: enableTracing,
+			ConsulPort:    shared.PortConsul,
 			Upstreams: func() []terraform.UpstreamService {
 				var ups []terraform.UpstreamService
 				for i, upstream := range upstreams {

@@ -884,7 +884,7 @@ This is a 3-6 month journey to get really solid. Start with the basics, but plan
 okay i notice youre defining restic in a container but cephfs is deployed on bare metal for bootstrapping related issues. this can be changed but id really rather not because that will break a bunch of other deliberate decsions.
 are these restic containers ephemeral JUST for the backups? do these run in containers on top of the cephfs ? say for my scenario hypothetically sda is cephfs and sdb is lvm, i need to run postgresSQL in containers (my default runtime config for postgres) on top of the lvm  and restic and other backend stuff eg nextcloud storage containervolumes on top of sda so just in the nomad/terraform i just declare yes that storage stuff goes on sda, in essence? i appreciate we'll need to assign a file directory yadda yadda but just as a first approximation to help me wrap my head around this, is the above correct?
 Yes, you've got it EXACTLY right! Your mental model is spot-on. Let me confirm and add the practical details:
-Your Architecture Understanding ✅
+Your Architecture Understanding 
 ┌──────────────────────────────────────────────┐
 │          Container Layer (Ephemeral)          │
 │  ┌─────────┐ ┌─────────┐ ┌────────────┐    │

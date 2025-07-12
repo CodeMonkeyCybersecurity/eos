@@ -55,9 +55,12 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 	}
 
 	if err := SaveInitResult(rc, initRes); err != nil {
-		// If save fails, advise user to rescue init material manually
-		otelzap.Ctx(rc.Ctx).Warn("Failed to persist Vault init result — printing keys to console")
-		fmt.Printf("\n\nUNSEAL KEYS:\n%v\n\nROOT TOKEN:\n%s\n\n", initRes.KeysB64, initRes.RootToken)
+		// CRITICAL: Never print vault tokens/keys to console - security violation
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Error("Failed to persist Vault init result - initialization data lost",
+			zap.Error(err),
+			zap.String("security_note", "vault tokens and keys not saved"))
+		logger.Info("terminal prompt: Vault initialization failed - keys and tokens could not be saved securely")
 		return nil, fmt.Errorf("save vault init result: %w", err)
 	}
 

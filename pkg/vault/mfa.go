@@ -618,24 +618,30 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	qrCode, ok := secret.Data["qr_code"].(string)
 	if ok && qrCode != "" {
 		log.Info(" QR code available for authenticator app")
-		fmt.Printf("\n Scan this QR code with your authenticator app:\n%s\n", qrCode)
+		log.Info("terminal prompt: QR code available for authenticator app setup")
+		// SECURITY: QR codes contain sensitive secrets - use secure display method
+		// TODO: Implement secure QR code display mechanism
 	}
 
 	url, ok := secret.Data["url"].(string)
 	if ok && url != "" {
 		log.Info("🔗 Manual URL available for authenticator app")
-		fmt.Printf("\n🔗 Or manually enter this URL in your authenticator app:\n%s\n", url)
+		log.Info("terminal prompt: Manual URL available for authenticator app setup")
+		// SECURITY: URLs contain sensitive secrets - use secure display method
+		// TODO: Implement secure URL display mechanism
 	}
 
 	key, ok := secret.Data["key"].(string)
 	if ok && key != "" {
 		log.Info(" Backup key generated for TOTP")
-		fmt.Printf("\n Backup key (store securely): %s\n", key)
+		log.Info("terminal prompt: Backup key generated - store securely")
+		// SECURITY: Backup keys are sensitive secrets - use secure display method
+		// TODO: Implement secure backup key display mechanism
 	}
 
 	log.Info(" TOTP MFA setup completed - prompting for test code")
-	fmt.Println("\n TOTP MFA setup completed!")
-	fmt.Println(" Please test your TOTP code before completing the setup.")
+	log.Info("terminal prompt: TOTP MFA setup completed!")
+	log.Info("terminal prompt: Please test your TOTP code before completing the setup")
 
 	// Prompt for test code
 	if interaction.PromptYesNo(rc.Ctx, "Do you want to test your TOTP code now?", true) {

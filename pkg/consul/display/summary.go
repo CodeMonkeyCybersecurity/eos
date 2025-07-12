@@ -14,15 +14,15 @@ import (
 // Migrated from cmd/create/consul.go displayInstallationSummary
 func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	hostname := eos_unix.GetInternalHostname()
-	
+
 	// Log structured summary
 	log.Info("Consul installation completed successfully",
 		zap.String("hostname", hostname),
 		zap.Int("http_port", shared.PortConsul),
 		zap.Bool("vault_integration", vaultAvailable))
-	
+
 	// Display user-friendly summary
 	log.Info(" ")
 	log.Info("╔══════════════════════════════════════════════════════════════════╗")
@@ -39,16 +39,16 @@ func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	log.Info("   • List services:     consul-vault-helper services")
 	log.Info("   • Register service:  consul-vault-helper register-app <name> <port>")
 	log.Info(" ")
-	
+
 	if vaultAvailable {
-		log.Info("✅ Vault Integration: ENABLED")
+		log.Info(" Vault Integration: ENABLED")
 		log.Info("   • Vault is registered as a Consul service")
 		log.Info("   • Service discovery: consul-vault-helper discover")
 	} else {
 		log.Info("ℹ️  Vault Integration: Not configured")
 		log.Info("   • Install Vault to enable service discovery integration")
 	}
-	
+
 	log.Info(" ")
 	log.Info("📚 Configuration Files:")
 	log.Info("   • Main config:    /etc/consul.d/consul.hcl")
@@ -61,11 +61,11 @@ func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	log.Info("   1. Access the Web UI to explore service discovery")
 	log.Info("   2. Register your applications with Consul")
 	log.Info("   3. Use DNS interface for service lookups: dig @localhost -p 8600 <service>.service.consul")
-	
+
 	if !vaultAvailable {
 		log.Info("   4. Consider installing Vault for secrets management integration")
 	}
-	
+
 	log.Info(" ")
 	log.Info("═══════════════════════════════════════════════════════════════════")
 }

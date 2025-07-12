@@ -159,7 +159,7 @@ skipped_tests=0
 
 if [ -f "${REPORT_FILE}" ]; then
     total_tests=$(grep -c "^- " "${REPORT_FILE}" || echo "0")
-    passed_tests=$(grep -c "✅" "${REPORT_FILE}" || echo "0")
+    passed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
     failed_tests=$(grep -c "❌" "${REPORT_FILE}" || echo "0")
     skipped_tests=$(grep -c "⚠️" "${REPORT_FILE}" || echo "0")
 fi

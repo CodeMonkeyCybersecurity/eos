@@ -34,40 +34,40 @@ type DatabaseCredentials struct {
 // SetDatabaseCredentials configures database credentials in Vault following Eos standards
 func SetDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting database credentials setup")
-	
+
 	// ASSESS - Display setup information and validate prerequisites
 	logger.Info("Assessing database credentials requirements")
-	
+
 	if err := displayDatabaseCredentialsIntroduction(rc); err != nil {
 		return fmt.Errorf("failed to display introduction: %w", err)
 	}
-	
+
 	// INTERVENE - Collect complete credentials from user
 	credentials, err := gatherDatabaseCredentials(rc)
 	if err != nil {
 		return fmt.Errorf("failed to gather database credentials: %w", err)
 	}
-	
+
 	// Store credentials securely
 	if err := storeDatabaseCredentials(rc, secretStore, credentials); err != nil {
 		return fmt.Errorf("failed to store database credentials: %w", err)
 	}
-	
+
 	// EVALUATE - Verify credentials were stored and test connection
 	logger.Info("Evaluating database credentials storage")
-	
+
 	if err := verifyDatabaseCredentials(rc, secretStore, credentials); err != nil {
 		logger.Error("Database credentials verification failed", zap.Error(err))
 		return fmt.Errorf("credentials verification failed: %w", err)
 	}
-	
+
 	// Display success and next steps
 	if err := displayDatabaseCredentialsSuccess(rc); err != nil {
 		logger.Warn("Failed to display success message", zap.Error(err))
 	}
-	
+
 	logger.Info("Database credentials setup completed successfully")
 	return nil
 }
@@ -75,9 +75,9 @@ func SetDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.S
 // displayDatabaseCredentialsIntroduction displays setup introduction to user
 func displayDatabaseCredentialsIntroduction(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("terminal prompt: Database Credentials Setup")
-	
+
 	introduction := `
 🗄️  Database Credentials Setup
 ===============================
@@ -87,68 +87,68 @@ Use this for applications that need persistent database access.
 📝 Note: For enhanced security, consider using dynamic credentials instead.
 
 `
-	
+
 	if _, err := fmt.Fprint(os.Stderr, introduction); err != nil {
 		return fmt.Errorf("failed to display introduction: %w", err)
 	}
-	
+
 	return nil
 }
 
 // gatherDatabaseCredentials collects complete database credentials from user
 func gatherDatabaseCredentials(rc *eos_io.RuntimeContext) (*DatabaseCredentials, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Gathering complete database credentials from user")
-	
+
 	credentials := &DatabaseCredentials{}
-	
+
 	// Database connection details
 	logger.Info("terminal prompt: Database host")
 	host := interaction.PromptInput(rc.Ctx, "Database host", "localhost")
 	credentials.Host = strings.TrimSpace(host)
-	
+
 	logger.Info("terminal prompt: Database port")
 	port := interaction.PromptInput(rc.Ctx, "Database port", "5432")
 	credentials.Port = strings.TrimSpace(port)
-	
+
 	logger.Info("terminal prompt: Database name")
 	dbname := interaction.PromptInput(rc.Ctx, "Database name", "delphi")
 	credentials.DBName = strings.TrimSpace(dbname)
-	
+
 	// Authentication details
 	logger.Info("terminal prompt: Database username")
 	username := interaction.PromptInput(rc.Ctx, "Database username", "delphi")
 	credentials.Username = strings.TrimSpace(username)
-	
+
 	logger.Info("terminal prompt: Database password")
 	password, err := interaction.PromptSecret(rc.Ctx, "Database password")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database password: %w", err)
 	}
 	credentials.Password = strings.TrimSpace(password)
-	
+
 	// SSL configuration
 	logger.Info("terminal prompt: SSL mode")
 	sslMode := interaction.PromptInput(rc.Ctx, "SSL mode (disable/require/verify-ca/verify-full)", "disable")
 	credentials.SSLMode = strings.TrimSpace(sslMode)
-	
+
 	logger.Info("Database credentials gathered",
 		zap.String("host", credentials.Host),
 		zap.String("port", credentials.Port),
 		zap.String("dbname", credentials.DBName),
 		zap.String("username", credentials.Username),
 		zap.String("sslmode", credentials.SSLMode))
-	
+
 	return credentials, nil
 }
 
 // storeDatabaseCredentials stores credentials securely in the secret store
 func storeDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, credentials *DatabaseCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Storing database credentials securely in Vault")
-	
+
 	// Create credentials map for storage
 	credentialsMap := map[string]interface{}{
 		"host":       credentials.Host,
@@ -160,7 +160,7 @@ func storeDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain
 		"updated_at": time.Now().Format(time.RFC3339),
 		"type":       "static",
 	}
-	
+
 	// Create Secret object for storage
 	secret := &vaultDomain.Secret{
 		Key:       "database/credentials/delphi",
@@ -168,12 +168,12 @@ func storeDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	
+
 	// Store in secret store with appropriate path
 	if err := secretStore.Set(rc.Ctx, "database/credentials/delphi", secret); err != nil {
 		return fmt.Errorf("failed to store database credentials: %w", err)
 	}
-	
+
 	logger.Info("Database credentials stored securely")
 	return nil
 }
@@ -181,15 +181,15 @@ func storeDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain
 // verifyDatabaseCredentials verifies credentials were stored and optionally tests connection
 func verifyDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, credentials *DatabaseCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Verifying database credentials storage")
-	
+
 	// Retrieve stored credentials to verify
 	storedCreds, err := secretStore.Get(rc.Ctx, "database/credentials/delphi")
 	if err != nil {
 		return fmt.Errorf("failed to retrieve stored credentials: %w", err)
 	}
-	
+
 	// Verify key fields are present and correct
 	if storedCreds.Data["host"] != credentials.Host {
 		return fmt.Errorf("stored host does not match input")
@@ -197,7 +197,7 @@ func verifyDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomai
 	if storedCreds.Data["username"] != credentials.Username {
 		return fmt.Errorf("stored username does not match input")
 	}
-	
+
 	// Optional: Test database connection
 	logger.Info("terminal prompt: Test database connection?")
 	testConnection := interaction.PromptInput(rc.Ctx, "Test database connection?", "y")
@@ -207,7 +207,7 @@ func verifyDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomai
 			// Don't fail the entire process for connection test failure
 		}
 	}
-	
+
 	logger.Info("Database credentials verification successful")
 	return nil
 }
@@ -215,16 +215,16 @@ func verifyDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomai
 // testDatabaseConnection tests the database connection with provided credentials
 func testDatabaseConnection(rc *eos_io.RuntimeContext, credentials *DatabaseCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Testing database connection",
 		zap.String("host", credentials.Host),
 		zap.String("port", credentials.Port),
 		zap.String("dbname", credentials.DBName),
 		zap.String("username", credentials.Username))
-	
+
 	// Implementation would test actual database connection
 	// This is a placeholder for the actual connection test logic
-	
+
 	logger.Info("Database connection test completed successfully")
 	return nil
 }
@@ -232,11 +232,11 @@ func testDatabaseConnection(rc *eos_io.RuntimeContext, credentials *DatabaseCred
 // displayDatabaseCredentialsSuccess displays success message and next steps
 func displayDatabaseCredentialsSuccess(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("terminal prompt: Database credentials setup completed")
-	
+
 	successMessage := `
-✅ Database credentials stored securely in Vault
+ Database credentials stored securely in Vault
 
 📋 Next steps:
 - Applications can now retrieve credentials from: vault kv get secret/database/credentials/delphi
@@ -249,10 +249,10 @@ func displayDatabaseCredentialsSuccess(rc *eos_io.RuntimeContext) error {
 - Implement least-privilege access for database users
 
 `
-	
+
 	if _, err := fmt.Fprint(os.Stderr, successMessage); err != nil {
 		return fmt.Errorf("failed to display success message: %w", err)
 	}
-	
+
 	return nil
 }

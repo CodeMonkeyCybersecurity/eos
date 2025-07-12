@@ -670,7 +670,7 @@ echo "Running quick fuzz validation..."
     echo "❌ Fuzz tests failed - commit blocked"
     exit 1
 }
-echo "✅ Fuzz tests passed"
+echo " Fuzz tests passed"
 ```
 
 #### Pull Request Validation

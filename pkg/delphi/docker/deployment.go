@@ -16,19 +16,19 @@ import (
 // Migrated from cmd/create/delphi.go runDockerDeployment
 func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress string, port int, force bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check prerequisites
 	logger.Info("🔍 Assessing Docker deployment prerequisites",
 		zap.String("version", version),
 		zap.String("deploy_type", deployType),
 		zap.String("proxy_address", proxyAddress),
 		zap.Int("port", port))
-	
+
 	// Check if Docker is installed
 	if _, err := exec.LookPath("docker"); err != nil {
 		return fmt.Errorf("docker is not installed: %w", err)
 	}
-	
+
 	// Interactive prompts if needed
 	if version == "" {
 		logger.Info("🔤 terminal prompt: Enter Wazuh version (e.g., 4.10.1)")
@@ -59,7 +59,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 
 	// INTERVENE - Deploy Docker configuration
 	logger.Info("🚀 Starting Docker deployment")
-	
+
 	// Change to /opt directory
 	if err := os.Chdir("/opt"); err != nil {
 		return fmt.Errorf("failed to change to /opt directory: %w", err)
@@ -84,7 +84,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	if err := exec.Command("sysctl", "-w", "vm.max_map_count=262144").Run(); err != nil {
 		logger.Warn("⚠️ Failed to set vm.max_map_count", zap.Error(err))
 	}
-	
+
 	// Clone repository
 	logger.Info("📥 Cloning Wazuh Docker repository", zap.String("version", version))
 	cloneCmd := exec.Command("git", "clone", "https://github.com/wazuh/wazuh-docker.git", "-b", "v"+version)
@@ -93,13 +93,13 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	if err := cloneCmd.Run(); err != nil {
 		return fmt.Errorf("failed to clone repository: %w", err)
 	}
-	
+
 	// Navigate to correct directory
 	deployDir := fmt.Sprintf("wazuh-docker/%s", deployType)
 	if err := os.Chdir(deployDir); err != nil {
 		return fmt.Errorf("failed to change directory: %w", err)
 	}
-	
+
 	// Apply customizations
 	if proxyAddress != "" {
 		logger.Info("🔧 Configuring proxy settings", zap.String("proxy", proxyAddress))
@@ -107,14 +107,14 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 			logger.Warn("⚠️ Failed to configure proxy", zap.Error(err))
 		}
 	}
-	
+
 	if port != 443 {
 		logger.Info("🔧 Configuring custom port for Hecate compatibility", zap.Int("port", port))
 		if err := ConfigurePortMapping(port); err != nil {
 			logger.Warn("⚠️ Failed to configure port mapping", zap.Error(err))
 		}
 	}
-	
+
 	// Generate certificates
 	logger.Info("🔐 Generating indexer certificates")
 	genCertsCmd := exec.Command("docker", "compose", "-f", "generate-indexer-certs.yml", "run", "--rm", "generator")
@@ -123,7 +123,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	if err := genCertsCmd.Run(); err != nil {
 		return fmt.Errorf("failed to generate certificates: %w", err)
 	}
-	
+
 	// Start containers
 	logger.Info("🐳 Starting Wazuh containers")
 	upCmd := exec.Command("docker", "compose", "up", "-d")
@@ -132,28 +132,28 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	if err := upCmd.Run(); err != nil {
 		return fmt.Errorf("failed to start containers: %w", err)
 	}
-	
+
 	// Set file permissions
 	if err := exec.Command("chmod", "660", "*.conf").Run(); err != nil {
 		logger.Warn("⚠️ Failed to set file permissions", zap.Error(err))
 	}
-	
+
 	// Wait for services to be ready
 	logger.Info("⏳ Waiting for services to become ready...")
 	time.Sleep(30 * time.Second)
-	
+
 	// EVALUATE - Check deployment status
 	logger.Info("📊 Evaluating deployment status")
-	
+
 	statusCmd := exec.Command("docker", "compose", "ps")
 	statusCmd.Stdout = os.Stdout
 	statusCmd.Stderr = os.Stderr
 	if err := statusCmd.Run(); err != nil {
 		logger.Warn("⚠️ Failed to check container status", zap.Error(err))
 	}
-	
-	logger.Info("✅ Wazuh Docker deployment completed successfully")
-	
+
+	logger.Info(" Wazuh Docker deployment completed successfully")
+
 	return nil
 }
 

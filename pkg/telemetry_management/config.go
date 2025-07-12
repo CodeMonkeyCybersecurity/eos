@@ -28,14 +28,14 @@ func GetTelemetryFilePath() string {
 // Migrated from cmd/self/telemetry.go showTelemetryInfo
 func ShowTelemetryInfo(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Prepare telemetry configuration display
 	logger.Info("Assessing telemetry configuration display")
-	
+
 	telemetryPath := GetTelemetryFilePath()
-	
+
 	// INTERVENE - Display telemetry configuration information
-	logger.Info("✅ Telemetry configuration",
+	logger.Info(" Telemetry configuration",
 		zap.String("file_path", telemetryPath),
 		zap.String("format", "JSONL (JSON Lines)"),
 		zap.String("privacy", "Local storage only - no external transmission"))
@@ -44,7 +44,7 @@ func ShowTelemetryInfo(rc *eos_io.RuntimeContext) {
 		zap.String("command_frequency", "jq -r '.name' "+telemetryPath+" | sort | uniq -c | sort -nr"),
 		zap.String("success_rate", "jq -r 'select(.attributes.success == true) | .name' "+telemetryPath+" | wc -l"),
 		zap.String("avg_duration", "jq -r 'select(.attributes.duration_ms) | \"\\(.name) \\(.attributes.duration_ms)\"' "+telemetryPath))
-	
+
 	// EVALUATE - Log successful configuration display
 	logger.Info("Telemetry configuration displayed successfully")
 }

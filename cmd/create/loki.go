@@ -95,7 +95,7 @@ Examples:
 			if len(result.Steps) > 0 {
 				fmt.Printf("\nInstallation Steps:\n")
 				for _, step := range result.Steps {
-					status := "✅"
+					status := ""
 					if step.Status == "failed" {
 						status = "❌"
 					} else if step.Status == "running" {

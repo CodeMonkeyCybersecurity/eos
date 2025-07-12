@@ -18,25 +18,25 @@ func NewConfig() *RemoteConfig {
 // Migrated from cmd/self/git/remote.go repeated path resolution logic
 func (c *RemoteConfig) SetDefaultPath(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check if path needs to be set
 	if c.Path != "" {
 		logger.Debug("🗂️ Path already configured", zap.String("path", c.Path))
 		return nil
 	}
-	
+
 	// INTERVENE - Set default path to current directory
 	logger.Debug("🗂️ Setting default path to current working directory")
-	
+
 	var err error
 	c.Path, err = os.Getwd()
 	if err != nil {
 		logger.Error("❌ Failed to get current directory", zap.Error(err))
 		return err
 	}
-	
+
 	// EVALUATE - Log successful path resolution
-	logger.Debug("✅ Default path set successfully", zap.String("path", c.Path))
+	logger.Debug(" Default path set successfully", zap.String("path", c.Path))
 	return nil
 }
 
@@ -48,7 +48,7 @@ func (c *RemoteConfig) ValidateAddOperation(args []string) error {
 		c.AddName = args[0]
 		c.AddURL = args[1]
 	}
-	
+
 	// EVALUATE - Validate required fields
 	if c.AddName == "" || c.AddURL == "" {
 		return &ValidationError{
@@ -56,7 +56,7 @@ func (c *RemoteConfig) ValidateAddOperation(args []string) error {
 			Message:   "both remote name and URL are required",
 		}
 	}
-	
+
 	return nil
 }
 
@@ -68,7 +68,7 @@ func (c *RemoteConfig) ValidateSetURLOperation(args []string) error {
 		c.SetURLName = args[0]
 		c.SetURLURL = args[1]
 	}
-	
+
 	// EVALUATE - Validate required fields
 	if c.SetURLName == "" || c.SetURLURL == "" {
 		return &ValidationError{
@@ -76,7 +76,7 @@ func (c *RemoteConfig) ValidateSetURLOperation(args []string) error {
 			Message:   "both remote name and new URL are required",
 		}
 	}
-	
+
 	return nil
 }
 
@@ -87,7 +87,7 @@ func (c *RemoteConfig) ValidateRemoveOperation(args []string) error {
 	if len(args) >= 1 && c.RemoveName == "" {
 		c.RemoveName = args[0]
 	}
-	
+
 	// EVALUATE - Validate required fields
 	if c.RemoveName == "" {
 		return &ValidationError{
@@ -95,7 +95,7 @@ func (c *RemoteConfig) ValidateRemoveOperation(args []string) error {
 			Message:   "remote name is required",
 		}
 	}
-	
+
 	return nil
 }
 
@@ -107,7 +107,7 @@ func (c *RemoteConfig) ValidateRenameOperation(args []string) error {
 		c.RenameOldName = args[0]
 		c.RenameNewName = args[1]
 	}
-	
+
 	// EVALUATE - Validate required fields
 	if c.RenameOldName == "" || c.RenameNewName == "" {
 		return &ValidationError{
@@ -115,7 +115,7 @@ func (c *RemoteConfig) ValidateRenameOperation(args []string) error {
 			Message:   "both old and new remote names are required",
 		}
 	}
-	
+
 	return nil
 }
 

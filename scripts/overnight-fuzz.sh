@@ -258,7 +258,7 @@ done
 
 # Count passed/failed from report file
 if [ -f "${REPORT_FILE}" ]; then
-    passed_tests=$(grep -c "✅" "${REPORT_FILE}" || echo "0")
+    passed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
     failed_tests=$(grep -c "❌" "${REPORT_FILE}" || echo "0")
 fi
 

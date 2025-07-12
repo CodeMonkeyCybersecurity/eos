@@ -122,7 +122,7 @@ func UpdateServiceWorker(rc *eos_io.RuntimeContext, worker shared.ServiceWorkerI
 		}
 	}
 
-	logger.Info("✅ Service worker deployment completed",
+	logger.Info(" Service worker deployment completed",
 		zap.String("service", worker.ServiceName),
 		zap.String("target", worker.TargetPath))
 

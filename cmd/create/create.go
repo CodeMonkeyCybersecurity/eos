@@ -40,6 +40,7 @@ func init() {
 	// Initialize the shared logger for the entire deploy package
 
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Global flags
 var (
@@ -74,7 +75,7 @@ Examples:
 func init() {
 	// Register SetupCmd as a subcommand of CreateCmd
 	CreateCmd.AddCommand(SetupCmd)
-	
+
 	// Add global flags
 	SetupCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Simulate setup without making changes")
 	SetupCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "Force setup even if already configured")
@@ -82,6 +83,7 @@ func init() {
 	SetupCmd.PersistentFlags().BoolVar(&backup, "backup", true, "Create backup before making changes")
 	SetupCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 }
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // setupConfiguration is a helper function to apply configuration
 func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.ConfigurationType, manager system_config.ConfigurationManager, options *system_config.ConfigurationOptions) error {
@@ -128,7 +130,7 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 		if len(result.Steps) > 0 {
 			fmt.Printf("\nSteps Completed:\n")
 			for _, step := range result.Steps {
-				status := "✅"
+				status := ""
 				if step.Status == "failed" {
 					status = "❌"
 				} else if step.Status == "running" {

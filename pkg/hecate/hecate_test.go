@@ -51,8 +51,8 @@ func TestHecateTypes(t *testing.T) {
 	})
 
 	t.Run("hecate_config_structure", func(t *testing.T) {
-		// Test HecateConfig structure
-		config := HecateConfig{
+		// Test HecateBasicConfig structure
+		config := HecateBasicConfig{
 			BaseDomain: "example.com",
 			BackendIP:  "192.168.1.100",
 			Subdomain:  "test",
@@ -80,7 +80,7 @@ func TestDomainValidation(t *testing.T) {
 		}
 
 		for _, domain := range validDomains {
-			config := HecateConfig{BaseDomain: domain}
+			config := HecateBasicConfig{BaseDomain: domain}
 			
 			// Verify domain is valid
 			assert.NotEmpty(t, config.BaseDomain)
@@ -141,7 +141,7 @@ func TestDomainValidation(t *testing.T) {
 		}
 
 		for _, subdomain := range validSubdomains {
-			config := HecateConfig{Subdomain: subdomain}
+			config := HecateBasicConfig{Subdomain: subdomain}
 			assert.NotEmpty(t, config.Subdomain)
 			assert.NotContains(t, config.Subdomain, " ")
 			assert.NotContains(t, config.Subdomain, "/")
@@ -180,7 +180,7 @@ func TestDomainValidation(t *testing.T) {
 		}
 
 		for _, email := range validEmails {
-			config := HecateConfig{Email: email}
+			config := HecateBasicConfig{Email: email}
 			assert.NotEmpty(t, config.Email)
 			assert.Contains(t, config.Email, "@")
 			assert.True(t, strings.Index(config.Email, "@") > 0)
@@ -215,7 +215,7 @@ func TestIPAddressValidation(t *testing.T) {
 		}
 
 		for _, ip := range validIPs {
-			config := HecateConfig{BackendIP: ip}
+			config := HecateBasicConfig{BackendIP: ip}
 			assert.NotEmpty(t, config.BackendIP)
 			
 			// Basic IP validation
@@ -390,7 +390,7 @@ func TestConfigurationSecurity(t *testing.T) {
 
 	t.Run("config_file_security", func(t *testing.T) {
 		// Test configuration file security
-		config := &HecateConfig{
+		config := &HecateBasicConfig{
 			BaseDomain: "example.com",
 			BackendIP:  "192.168.1.100",
 			Subdomain:  "test",
@@ -420,7 +420,7 @@ func TestConfigurationSecurity(t *testing.T) {
 
 	t.Run("missing_config_handling", func(t *testing.T) {
 		// Test handling of missing configuration
-		emptyConfig := &HecateConfig{}
+		emptyConfig := &HecateBasicConfig{}
 		
 		// Check that all fields are empty
 		assert.Empty(t, emptyConfig.BaseDomain)

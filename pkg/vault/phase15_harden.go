@@ -27,7 +27,8 @@ import (
 
 // ConfirmSecureStorage prompts user to re-enter keys to confirm they've been saved.
 func ConfirmSecureStorage(rc *eos_io.RuntimeContext, original *api.InitResponse) error {
-	fmt.Println(" Please re-enter 3 unseal keys and the root token to confirm you've saved them.")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("terminal prompt: Please re-enter 3 unseal keys and the root token to confirm you've saved them")
 
 	rekeys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
 	if err != nil {

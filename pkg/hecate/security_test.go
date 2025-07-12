@@ -30,7 +30,7 @@ func TestDomainSecurityValidation(t *testing.T) {
 		}
 
 		for _, domain := range maliciousDomains {
-			config := HecateConfig{BaseDomain: domain}
+			config := HecateBasicConfig{BaseDomain: domain}
 			
 			// Domain should be stored as-is but validated when used
 			assert.Equal(t, domain, config.BaseDomain)
@@ -59,7 +59,7 @@ func TestDomainSecurityValidation(t *testing.T) {
 		}
 
 		for _, subdomain := range maliciousSubdomains {
-			_ = HecateConfig{Subdomain: subdomain}
+			_ = HecateBasicConfig{Subdomain: subdomain}
 			
 			// Check for dangerous patterns
 			isDangerous := strings.ContainsAny(subdomain, ";'\"<>&|{}") ||
@@ -83,7 +83,7 @@ func TestDomainSecurityValidation(t *testing.T) {
 		}
 
 		for _, domain := range wildcardDomains {
-			_ = HecateConfig{BaseDomain: domain}
+			_ = HecateBasicConfig{BaseDomain: domain}
 			
 			// Check wildcard usage
 			wildcardCount := strings.Count(domain, "*")

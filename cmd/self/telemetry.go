@@ -44,7 +44,7 @@ Commands:
 				log.Error("Failed to write telemetry toggle file", zap.Error(err))
 				return fmt.Errorf("enable telemetry: %w", err)
 			}
-			log.Info("✅ Telemetry enabled")
+			log.Info(" Telemetry enabled")
 			telemetry_management.ShowTelemetryInfo(rc)
 		case "off":
 			if err := os.Remove(stateFile); err != nil && !os.IsNotExist(err) {
@@ -62,6 +62,7 @@ Commands:
 		return nil
 	}),
 }
+
 // All helper functions have been migrated to pkg/telemetry/
 
 func init() {

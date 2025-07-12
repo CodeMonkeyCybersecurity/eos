@@ -16,10 +16,10 @@ import (
 // Migrated from cmd/create/delphi.go runMapping
 func RunMapping(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check configuration and connectivity
 	log.Info("🔍 Assessing Delphi configuration for agent mapping")
-	
+
 	cfg, err := delphi.ResolveConfig(rc)
 	if err != nil {
 		return fmt.Errorf("failed to resolve config: %w", err)
@@ -29,20 +29,20 @@ func RunMapping(rc *eos_io.RuntimeContext) error {
 		zap.String("fqdn", cfg.FQDN),
 		zap.String("port", utils.DefaultStr(cfg.Port, "55000")))
 
-	baseURL := fmt.Sprintf("%s://%s:%s", 
-		utils.DefaultStr(cfg.Protocol, "https"), 
-		cfg.FQDN, 
+	baseURL := fmt.Sprintf("%s://%s:%s",
+		utils.DefaultStr(cfg.Protocol, "https"),
+		cfg.FQDN,
 		utils.DefaultStr(cfg.Port, "55000"))
 
 	// INTERVENE - Fetch and process agent data
 	log.Info("🚀 Fetching agents from API")
-	
+
 	// Authenticate first
 	token, err := delphi.Authenticate(rc, cfg)
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
-	
+
 	agentsResp, err := FetchAgents(rc, baseURL, token)
 	if err != nil {
 		return fmt.Errorf("failed to fetch agents: %w", err)
@@ -57,7 +57,7 @@ func RunMapping(rc *eos_io.RuntimeContext) error {
 
 	for _, agent := range agentsResp.Data.AffectedItems {
 		PrintAgentInfo(agent)
-		
+
 		majorVersion, err := GetMajorVersion(agent.OS.Version)
 		if err != nil {
 			log.Warn("Could not parse version",
@@ -71,19 +71,19 @@ func RunMapping(rc *eos_io.RuntimeContext) error {
 			fmt.Printf("❓ No mapping for distribution: %s\n", agent.OS.Name)
 			continue
 		}
-		
+
 		pkgName := MatchPackage(mappings, strings.ToLower(agent.OS.Architecture), majorVersion)
-		
+
 		if pkgName != "" {
-			fmt.Printf("✅ Recommended package: %s\n", pkgName)
+			fmt.Printf(" Recommended package: %s\n", pkgName)
 		} else {
-			fmt.Printf("❌ No suitable package for version %s (%s)\n", 
+			fmt.Printf("❌ No suitable package for version %s (%s)\n",
 				agent.OS.Version, agent.OS.Architecture)
 		}
 	}
 
 	// EVALUATE - Log completion
-	log.Info("✅ Agent mapping completed successfully")
+	log.Info(" Agent mapping completed successfully")
 	return nil
 }
 

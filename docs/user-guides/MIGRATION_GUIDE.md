@@ -28,7 +28,7 @@ func runCommand(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
     return nil
 }
 
-// ✅ GOOD: Command orchestration only
+//  GOOD: Command orchestration only
 func runCommand(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
     config := parseFlags(cmd)
     return toolpkg.Install(rc, config)
@@ -74,7 +74,7 @@ func Operation(rc *eos_io.RuntimeContext, config *Config) error {
 // ❌ BAD: Using fmt for output
 fmt.Printf("Installing %s...\n", packageName)
 
-// ✅ GOOD: Using structured logging
+//  GOOD: Using structured logging
 logger := otelzap.Ctx(rc.Ctx)
 logger.Info("Installing package",
     zap.String("package", packageName),
@@ -90,7 +90,7 @@ Always use `*eos_io.RuntimeContext` for:
 - Operation coordination
 
 ```go
-// ✅ GOOD: Proper RuntimeContext usage
+//  GOOD: Proper RuntimeContext usage
 func ProcessData(rc *eos_io.RuntimeContext, data []byte) error {
     logger := otelzap.Ctx(rc.Ctx)
     
@@ -122,7 +122,7 @@ func NewServiceCmd() *cobra.Command {
     }
 }
 
-// ✅ NEW: Variable-based command
+//  NEW: Variable-based command
 var serviceCmd = &cobra.Command{
     Use:   "service",
     Short: "Manage services",
@@ -151,7 +151,7 @@ func init() {
     cmd.Flags().BoolVar(&flagDryRun, "dry-run", false, "Dry run mode")
 }
 
-// ✅ NEW: Parse flags in function
+//  NEW: Parse flags in function
 func runCommand(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
     outputJSON, _ := cmd.Flags().GetBool("json")
     dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -176,7 +176,7 @@ func installTool(toolName string) error {
     return exec.Command("apt-get", "install", toolName).Run()
 }
 
-// ✅ NEW: Helper in pkg/
+//  NEW: Helper in pkg/
 // pkg/toolpkg/install.go
 func Install(rc *eos_io.RuntimeContext, config *Config) error {
     logger := otelzap.Ctx(rc.Ctx)
@@ -209,7 +209,7 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 Organize commands by action (verb-first), not by noun:
 
 ```go
-// ✅ GOOD: Verb-first structure
+//  GOOD: Verb-first structure
 cmd/
 ├── create/
 │   ├── create.go      // Root create command
@@ -528,7 +528,7 @@ func Install(name string) error {
     return exec.Command("apt-get", "install", name).Run()
 }
 
-// ✅ AFTER: pkg/mytool/install.go
+//  AFTER: pkg/mytool/install.go
 package mytool
 
 import (

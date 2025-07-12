@@ -37,7 +37,8 @@ func PromptForEosPassword(rc *eos_io.RuntimeContext) (*shared.UserpassCreds, err
 // Returns an error if any prompt fails or input is blank.
 func PromptForInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
 	otelzap.Ctx(rc.Ctx).Info("Prompting for unseal keys and root token (fallback path)")
-	fmt.Println(" Please enter 3 unseal keys and the root token")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("terminal prompt: Please enter 3 unseal keys and the root token")
 
 	keys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
 	if err != nil {

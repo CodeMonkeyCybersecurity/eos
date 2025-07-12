@@ -20,7 +20,7 @@ func ParseEnrollmentFlags(cmd *cobra.Command) (*EnrollmentConfig, error) {
 	autoDetect, _ := cmd.Flags().GetBool("auto-detect")
 	transitionMode, _ := cmd.Flags().GetBool("transition-mode")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	
+
 	// INTERVENE - Create configuration
 	config := &EnrollmentConfig{
 		Role:           role,
@@ -31,7 +31,7 @@ func ParseEnrollmentFlags(cmd *cobra.Command) (*EnrollmentConfig, error) {
 		TransitionMode: transitionMode,
 		DryRun:         dryRun,
 	}
-	
+
 	// EVALUATE - Return parsed configuration
 	return config, nil
 }
@@ -43,20 +43,20 @@ func ValidateEnrollmentConfig(config *EnrollmentConfig) error {
 	if config.Datacenter == "" {
 		return fmt.Errorf("datacenter is required")
 	}
-	
+
 	if !config.AutoDetect && config.Role == "" {
 		return fmt.Errorf("role is required unless --auto-detect is specified")
 	}
-	
+
 	// INTERVENE - Validate role-specific requirements
 	if config.Role == RoleMinion && config.MasterAddress == "" {
 		return fmt.Errorf("master-address is required for minion role")
 	}
-	
+
 	if config.Role == RoleMaster && config.MasterAddress != "" {
 		return fmt.Errorf("master-address should not be specified for master role")
 	}
-	
+
 	// Validate network mode
 	validNetworkModes := []string{NetworkModeDirect, NetworkModeConsul, NetworkModeWireGuard}
 	if config.NetworkMode != "" {
@@ -71,7 +71,7 @@ func ValidateEnrollmentConfig(config *EnrollmentConfig) error {
 			return fmt.Errorf("invalid network-mode: %s (valid options: %v)", config.NetworkMode, validNetworkModes)
 		}
 	}
-	
+
 	// EVALUATE - Configuration is valid
 	return nil
 }
@@ -80,19 +80,19 @@ func ValidateEnrollmentConfig(config *EnrollmentConfig) error {
 // Migrated from cmd/self/enroll.go detectRole
 func DetectRole(rc *eos_io.RuntimeContext, info *SystemInfo) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Analyze system characteristics
 	logger.Info("🔍 Assessing system characteristics for role detection",
 		zap.Int("cpu_cores", info.CPUCores),
 		zap.Int("memory_gb", info.MemoryGB),
 		zap.Int("disk_gb", info.DiskSpaceGB))
-	
+
 	// INTERVENE - Apply role detection heuristics
 	logger.Debug("Analyzing system resources for role detection",
 		zap.Int("cpu_cores", info.CPUCores),
 		zap.Int("memory_gb", info.MemoryGB),
 		zap.Int("disk_gb", info.DiskSpaceGB))
-	
+
 	// Simple heuristics for role detection
 	// TODO: 2025-01-09T22:00:00Z - Implement more sophisticated role detection
 	// Could check for:
@@ -101,15 +101,15 @@ func DetectRole(rc *eos_io.RuntimeContext, info *SystemInfo) (string, error) {
 	// - System resources
 	// - Environment variables
 	// - Configuration files
-	
+
 	// High-resource systems default to master
 	if info.CPUCores >= 4 && info.MemoryGB >= 8 {
-		logger.Info("✅ Detected high-resource system, suggesting master role",
+		logger.Info(" Detected high-resource system, suggesting master role",
 			zap.Int("cpu_cores", info.CPUCores),
 			zap.Int("memory_gb", info.MemoryGB))
 		return RoleMaster, nil
 	}
-	
+
 	// EVALUATE - Lower-resource systems default to minion
 	logger.Info("📊 Detected standard system, suggesting minion role",
 		zap.Int("cpu_cores", info.CPUCores),

@@ -14,32 +14,33 @@ import (
 	"go.uber.org/zap"
 )
 
-// UpdateCmd represents the "update" command.
+// updateHecateCmd represents the "update hecate" command.
 var updateHecateCmd = &cobra.Command{
-	Use:   "update",
-	Short: "Update configurations and services",
+	Use:   "hecate",
+	Short: "Update Hecate configurations and services",
 	Long: `Update Hecate configurations, renew certificates, or update specific services.
 
 Examples:
-  hecate update certs
-  hecate update eos
-  hecate update http
-  hecate update docker-compose`,
+  eos update hecate certs
+  eos update hecate eos
+  eos update hecate http
+  eos update hecate k3s`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for update command.", zap.String("command", cmd.Use))
+		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for update hecate command.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
 	}),
 }
 
 func init() {
-	// Initialize the shared global logger.
+	// Add updateHecateCmd to the main UpdateCmd
+	UpdateCmd.AddCommand(updateHecateCmd)
 
-	// Attach subcommands to UpdateCmd.
-	UpdateCmd.AddCommand(runCertsCmd)
-	UpdateCmd.AddCommand(runEosCmd)
-	UpdateCmd.AddCommand(runHttpCmd)
-	UpdateCmd.AddCommand(runK3sCmd)
+	// Attach subcommands to updateHecateCmd.
+	updateHecateCmd.AddCommand(runCertsCmd)
+	updateHecateCmd.AddCommand(runEosCmd)
+	updateHecateCmd.AddCommand(runHttpCmd)
+	updateHecateCmd.AddCommand(runK3sCmd)
 }
 
 // runK3sCmd updates the k3s deployment configuration.

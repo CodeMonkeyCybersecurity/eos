@@ -91,7 +91,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 		return fmt.Errorf("failed to restart containers: %w", err)
 	}
 
-	logger.Info("✅ Credentials updated successfully")
+	logger.Info(" Credentials updated successfully")
 	return nil
 }
 
@@ -194,4 +194,3 @@ func GeneratePasswordHash(password string) (string, error) {
 
 	return "", fmt.Errorf("failed to extract hash from output")
 }
-

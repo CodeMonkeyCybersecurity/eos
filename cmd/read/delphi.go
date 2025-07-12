@@ -18,6 +18,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	showSecrets bool
@@ -238,7 +239,7 @@ to ensure your database schema is properly configured.`,
 			fmt.Printf("\n⚠️  Schema verification found %d missing objects.\n", result.MissingCount)
 			fmt.Println("Run 'eos create delphi deploy' to deploy the complete schema.")
 		} else {
-			fmt.Println("\n✅ All schema objects are present and verified.")
+			fmt.Println("\n All schema objects are present and verified.")
 		}
 
 		return nil
@@ -250,16 +251,15 @@ func init() {
 	readDelphiCmd.AddCommand(delphiAgentsCmd)
 	readDelphiCmd.AddCommand(delphiDashboardCmd)
 	readDelphiCmd.AddCommand(ReadKeepAliveCmd)
-	
+
 	// Add the inspect command with its subcommands
 	inspectCmd.AddCommand(pipelineFunctionalityCmd)
 	inspectCmd.AddCommand(verifyPipelineSchemaCmd)
 	readDelphiCmd.AddCommand(inspectCmd)
-	
+
 	// Add any flags specific to 'read' itself, if it were a terminal command or had persistent flags.
 	// ReadCmd.Flags().BoolVarP(&showSecrets, "show-secrets", "s", false, "Show sensitive secret values (use with caution)")
 }
-
 
 // displaySchemaObjects displays verification results for a specific object type
 // TODO: Move to pkg/delphi/display or pkg/delphi/output
@@ -274,7 +274,7 @@ func displaySchemaObjects(objectType string, objects []delphi.SchemaObject) {
 		if obj.Status != "OK" {
 			statusSymbol = "✗"
 		}
-		
+
 		fmt.Printf("  %s %s", statusSymbol, obj.Name)
 		if obj.Details != "" {
 			fmt.Printf(" - %s", obj.Details)

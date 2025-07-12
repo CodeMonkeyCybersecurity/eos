@@ -15,13 +15,13 @@ import (
 
 // Flag variables for Tailscale hosts command
 var (
-	hostsOutputFile       string
-	hostsFormat           string
-	hostsExcludeOffline   bool
-	hostsExcludeSelf      bool
-	hostsIncludeComments  bool
-	hostsFilterHosts      []string
-	generateAnsible       bool
+	hostsOutputFile      string
+	hostsFormat          string
+	hostsExcludeOffline  bool
+	hostsExcludeSelf     bool
+	hostsIncludeComments bool
+	hostsFilterHosts     []string
+	generateAnsible      bool
 )
 
 // CreateTailscaleCmd installs Tailscale VPN
@@ -102,7 +102,7 @@ Examples:
 			if len(result.Steps) > 0 {
 				fmt.Printf("\nInstallation Steps:\n")
 				for _, step := range result.Steps {
-					status := "✅"
+					status := ""
 					if step.Status == "failed" {
 						status = "❌"
 					} else if step.Status == "running" {

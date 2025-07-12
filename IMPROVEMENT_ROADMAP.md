@@ -253,4 +253,6 @@ grep -r "mapstructure" pkg/ cmd/ --include="*.go"
 
 This roadmap provides a systematic approach to improving the Eos codebase across security, documentation, and code quality dimensions. The immediate focus on security and critical fixes ensures system stability while the longer-term improvements build a more maintainable and scalable architecture.
 
-The implementation timeline balances urgency with thoroughness, ensuring that critical security issues are addressed immediately while building a foundation for long-term code quality and maintainability.
+The implementation timeline balances urgency with thoroughness, ensuring that critical security issues are addressed immediately while building a foun
+dation for long-term code quality and maintainability.
+

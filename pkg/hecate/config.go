@@ -18,15 +18,15 @@ import (
 //
 // ---------------------------- HECATE CONFIGURATION ---------------------------- //
 
-type HecateConfig struct {
+type HecateBasicConfig struct {
 	BaseDomain string
 	BackendIP  string
 	Subdomain  string
 	Email      string
 }
 
-func LoadConfig(rc *eos_io.RuntimeContext, defaultSubdomain string) (*HecateConfig, error) {
-	cfg := &HecateConfig{}
+func LoadConfig(rc *eos_io.RuntimeContext, defaultSubdomain string) (*HecateBasicConfig, error) {
+	cfg := &HecateBasicConfig{}
 
 	if _, err := os.Stat(shared.HecateLastValuesFile); err == nil {
 		file, err := os.Open(shared.HecateLastValuesFile)
