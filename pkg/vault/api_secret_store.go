@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/domain"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )

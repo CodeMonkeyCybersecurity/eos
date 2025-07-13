@@ -22,7 +22,7 @@ func LoginAppRole(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info(" Creating Vault client for AppRole login")
-	client, err := NewClient(rc)
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		log.Error(" Failed to create vault client", zap.Error(err))
 		return nil, cerr.Wrap(err, "failed to create vault client")

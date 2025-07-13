@@ -26,7 +26,7 @@ func NewVaultAuthProvider(client *api.Client, logger *zap.Logger) *VaultAuthProv
 }
 
 // Authenticate performs user authentication using various methods
-func (v *VaultAuthProvider) Authenticate(ctx context.Context, method string, credentials map[string]string) (*vault.AuthResult, error) {
+func (v *VaultAuthProvider) Authenticate(ctx context.Context, method string, credentials map[string]string) (*AuthResult, error) {
 	v.logger.Info("Performing vault authentication",
 		zap.String("method", method),
 		zap.String("user", credentials["username"]))
@@ -39,7 +39,7 @@ func (v *VaultAuthProvider) Authenticate(ctx context.Context, method string, cre
 	default:
 		err := fmt.Errorf("unsupported authentication method: %s", method)
 		v.logger.Error("Authentication failed", zap.Error(err))
-		return &vault.AuthResult{
+		return &AuthResult{
 			Success:      false,
 			ErrorMessage: err.Error(),
 			Timestamp:    time.Now(),
@@ -49,7 +49,7 @@ func (v *VaultAuthProvider) Authenticate(ctx context.Context, method string, cre
 }
 
 // authenticateUserpass handles userpass authentication
-func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credentials map[string]string) (*vault.AuthResult, error) {
+func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credentials map[string]string) (*AuthResult, error) {
 	username, ok := credentials["username"]
 	if !ok {
 		return nil, fmt.Errorf("username is required for userpass authentication")
@@ -72,7 +72,7 @@ func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credential
 		v.logger.Error("Userpass authentication failed",
 			zap.String("username", username),
 			zap.Error(err))
-		return &vault.AuthResult{
+		return &AuthResult{
 			Success:      false,
 			ErrorMessage: err.Error(),
 			Timestamp:    time.Now(),
@@ -82,7 +82,7 @@ func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credential
 
 	if secret == nil || secret.Auth == nil {
 		err := fmt.Errorf("no authentication data returned")
-		return &vault.AuthResult{
+		return &AuthResult{
 			Success:      false,
 			ErrorMessage: err.Error(),
 			Timestamp:    time.Now(),
@@ -97,7 +97,7 @@ func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credential
 		zap.String("username", username),
 		zap.Duration("token_ttl", time.Duration(secret.Auth.LeaseDuration)*time.Second))
 
-	return &vault.AuthResult{
+	return &AuthResult{
 		Success:   true,
 		Token:     secret.Auth.ClientToken,
 		TokenTTL:  time.Duration(secret.Auth.LeaseDuration) * time.Second,
@@ -110,7 +110,7 @@ func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credential
 }
 
 // authenticateAppRole handles approle authentication
-func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials map[string]string) (*vault.AuthResult, error) {
+func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials map[string]string) (*AuthResult, error) {
 	roleID, ok := credentials["role_id"]
 	if !ok {
 		return nil, fmt.Errorf("role_id is required for approle authentication")
@@ -133,7 +133,7 @@ func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials
 		v.logger.Error("AppRole authentication failed",
 			zap.String("role_id", roleID),
 			zap.Error(err))
-		return &vault.AuthResult{
+		return &AuthResult{
 			Success:      false,
 			ErrorMessage: err.Error(),
 			Timestamp:    time.Now(),
@@ -143,7 +143,7 @@ func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials
 
 	if secret == nil || secret.Auth == nil {
 		err := fmt.Errorf("no authentication data returned")
-		return &vault.AuthResult{
+		return &AuthResult{
 			Success:      false,
 			ErrorMessage: err.Error(),
 			Timestamp:    time.Now(),
@@ -158,7 +158,7 @@ func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials
 		zap.String("role_id", roleID),
 		zap.Duration("token_ttl", time.Duration(secret.Auth.LeaseDuration)*time.Second))
 
-	return &vault.AuthResult{
+	return &AuthResult{
 		Success:   true,
 		Token:     secret.Auth.ClientToken,
 		TokenTTL:  time.Duration(secret.Auth.LeaseDuration) * time.Second,
@@ -171,9 +171,9 @@ func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials
 }
 
 // GetAuthStatus returns current authentication status
-func (v *VaultAuthProvider) GetAuthStatus(ctx context.Context) (*vault.AuthStatus, error) {
+func (v *VaultAuthProvider) GetAuthStatus(ctx context.Context) (*AuthStatus, error) {
 	if v.client.Token() == "" {
-		return &vault.AuthStatus{
+		return &AuthStatus{
 			Authenticated: false,
 		}, nil
 	}
@@ -182,13 +182,13 @@ func (v *VaultAuthProvider) GetAuthStatus(ctx context.Context) (*vault.AuthStatu
 	secret, err := v.client.Auth().Token().LookupSelfWithContext(ctx)
 	if err != nil {
 		v.logger.Warn("Token lookup failed", zap.Error(err))
-		return &vault.AuthStatus{
+		return &AuthStatus{
 			Authenticated: false,
 		}, nil
 	}
 
 	if secret == nil || secret.Data == nil {
-		return &vault.AuthStatus{
+		return &AuthStatus{
 			Authenticated: false,
 		}, nil
 	}
@@ -224,7 +224,7 @@ func (v *VaultAuthProvider) GetAuthStatus(ctx context.Context) (*vault.AuthStatu
 		displayName = name
 	}
 
-	return &vault.AuthStatus{
+	return &AuthStatus{
 		Authenticated: true,
 		UserID:        displayName,
 		Policies:      policies,
@@ -234,7 +234,7 @@ func (v *VaultAuthProvider) GetAuthStatus(ctx context.Context) (*vault.AuthStatu
 }
 
 // RefreshToken refreshes the current authentication token
-func (v *VaultAuthProvider) RefreshToken(ctx context.Context) (*vault.AuthResult, error) {
+func (v *VaultAuthProvider) RefreshToken(ctx context.Context) (*AuthResult, error) {
 	if v.client.Token() == "" {
 		return nil, fmt.Errorf("no token to refresh")
 	}
@@ -243,7 +243,7 @@ func (v *VaultAuthProvider) RefreshToken(ctx context.Context) (*vault.AuthResult
 	secret, err := v.client.Auth().Token().RenewSelfWithContext(ctx, 0)
 	if err != nil {
 		v.logger.Error("Token refresh failed", zap.Error(err))
-		return &vault.AuthResult{
+		return &AuthResult{
 			Success:      false,
 			ErrorMessage: err.Error(),
 			Timestamp:    time.Now(),
@@ -252,7 +252,7 @@ func (v *VaultAuthProvider) RefreshToken(ctx context.Context) (*vault.AuthResult
 
 	if secret == nil || secret.Auth == nil {
 		err := fmt.Errorf("no auth data returned from token refresh")
-		return &vault.AuthResult{
+		return &AuthResult{
 			Success:      false,
 			ErrorMessage: err.Error(),
 			Timestamp:    time.Now(),
@@ -262,7 +262,7 @@ func (v *VaultAuthProvider) RefreshToken(ctx context.Context) (*vault.AuthResult
 	v.logger.Info("Token refreshed successfully",
 		zap.Duration("new_ttl", time.Duration(secret.Auth.LeaseDuration)*time.Second))
 
-	return &vault.AuthResult{
+	return &AuthResult{
 		Success:   true,
 		Token:     secret.Auth.ClientToken,
 		TokenTTL:  time.Duration(secret.Auth.LeaseDuration) * time.Second,

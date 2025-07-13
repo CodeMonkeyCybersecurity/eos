@@ -64,7 +64,7 @@ func (r *FileAuditRepository) openLogFile() error {
 }
 
 // Record records an audit event
-func (r *FileAuditRepository) Record(ctx context.Context, event *vault.AuditEvent) error {
+func (r *FileAuditRepository) Record(ctx context.Context, event *AuditEvent) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -122,7 +122,7 @@ func (r *FileAuditRepository) Record(ctx context.Context, event *vault.AuditEven
 }
 
 // Query retrieves audit events based on filter criteria
-func (r *FileAuditRepository) Query(ctx context.Context, filter *vault.AuditFilter) ([]*vault.AuditEvent, error) {
+func (r *FileAuditRepository) Query(ctx context.Context, filter *AuditFilter) ([]*AuditEvent, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -153,7 +153,7 @@ func (r *FileAuditRepository) Query(ctx context.Context, filter *vault.AuditFilt
 }
 
 // GetStats returns audit statistics
-func (r *FileAuditRepository) GetStats(ctx context.Context) (*vault.AuditStats, error) {
+func (r *FileAuditRepository) GetStats(ctx context.Context) (*AuditStats, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 
@@ -162,7 +162,7 @@ func (r *FileAuditRepository) GetStats(ctx context.Context) (*vault.AuditStats, 
 		return nil, fmt.Errorf("failed to read audit log: %w", err)
 	}
 
-	stats := &vault.AuditStats{
+	stats := &AuditStats{
 		TotalEvents:  int64(len(events)),
 		EventsByType: make(map[string]int64),
 		EventsByPath: make(map[string]int64),
@@ -190,7 +190,7 @@ func (r *FileAuditRepository) GetStats(ctx context.Context) (*vault.AuditStats, 
 
 	if latest != nil {
 		stats.LastEvent = latest
-		stats.TimeRange = &vault.AuditTimeRange{
+		stats.TimeRange = AuditTimeRange{
 			Earliest: earliest,
 			Latest:   latest,
 		}
@@ -203,11 +203,11 @@ func (r *FileAuditRepository) GetStats(ctx context.Context) (*vault.AuditStats, 
 }
 
 // readLogFile reads and parses the entire audit log file
-func (r *FileAuditRepository) readLogFile() ([]*vault.AuditEvent, error) {
+func (r *FileAuditRepository) readLogFile() ([]*AuditEvent, error) {
 	file, err := os.Open(r.logFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []*vault.AuditEvent{}, nil
+			return []*AuditEvent{}, nil
 		}
 		return nil, fmt.Errorf("failed to open audit log for reading: %w", err)
 	}
@@ -217,7 +217,7 @@ func (r *FileAuditRepository) readLogFile() ([]*vault.AuditEvent, error) {
 		}
 	}()
 
-	var events []*vault.AuditEvent
+	var events []*AuditEvent
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -226,7 +226,7 @@ func (r *FileAuditRepository) readLogFile() ([]*vault.AuditEvent, error) {
 			continue
 		}
 
-		var event vault.AuditEvent
+		var event AuditEvent
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			r.logger.Warn("Failed to parse audit log line",
 				zap.String("line", line),
@@ -250,12 +250,12 @@ func (r *FileAuditRepository) readLogFile() ([]*vault.AuditEvent, error) {
 }
 
 // applyFilter applies filter criteria to events
-func (r *FileAuditRepository) applyFilter(events []*vault.AuditEvent, filter *vault.AuditFilter) []*vault.AuditEvent {
+func (r *FileAuditRepository) applyFilter(events []*AuditEvent, filter *AuditFilter) []*AuditEvent {
 	if filter == nil {
 		return events
 	}
 
-	var filtered []*vault.AuditEvent
+	var filtered []*AuditEvent
 
 	for _, event := range events {
 		// Time range filter

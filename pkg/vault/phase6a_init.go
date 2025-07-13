@@ -21,7 +21,7 @@ import (
 //--------------------------------------------------------------------
 
 func InitializeVault(rc *eos_io.RuntimeContext) error {
-	client, err := NewClient(rc)
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		return fmt.Errorf("create Vault client: %w", err)
 	}

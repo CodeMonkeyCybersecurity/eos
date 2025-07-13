@@ -45,4 +45,5 @@ var (
 
 var ErrIncompleteSnapshot = cerr.New("incomplete snapshot, unable to read SHA256SUMS.sealed file")
 
-var ErrSecretNotFound = cerr.New("secret not found")
+// Use the one defined in types.go instead
+// var ErrSecretNotFound = cerr.New("secret not found")

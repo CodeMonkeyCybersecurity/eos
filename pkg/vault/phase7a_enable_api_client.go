@@ -30,7 +30,7 @@ func GetRootClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 	//  Create a Vault API client from config
 	log.Info(" Creating new Vault client from config")
-	client, err := NewClient(rc)
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		log.Error(" Failed to create Vault API client", zap.Error(err))
 		return nil, fmt.Errorf("create Vault client: %w", err)
@@ -46,7 +46,7 @@ func GetRootClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 	//  Load root token from init file or fallback
 	log.Info(" Loading privileged token (ignoring any VAULT_TOKEN)")
-	rootToken, err := loadPrivilegedToken(rc)
+	rootToken, err := tryRootToken(rc, client)
 	if err != nil {
 		log.Error(" Failed to load root token", zap.Error(err))
 		return nil, fmt.Errorf("load root token: %w", err)

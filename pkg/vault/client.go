@@ -39,14 +39,14 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 	}
 
 	if health.Sealed {
-		return vault.ErrVaultSealed
+		return ErrVaultSealed
 	}
 
 	return nil
 }
 
 // GetSecret implements VaultService.GetSecret
-func (c *Client) GetSecret(ctx context.Context, path string) (*vault.Secret, error) {
+func (c *Client) GetSecret(ctx context.Context, path string) (*Secret, error) {
 	c.logger.Debug("getting secret", zap.String("path", path))
 
 	secret, err := c.client.Logical().Read(path)
@@ -55,10 +55,10 @@ func (c *Client) GetSecret(ctx context.Context, path string) (*vault.Secret, err
 	}
 
 	if secret == nil {
-		return nil, vault.ErrSecretNotFound
+		return nil, ErrSecretNotFound
 	}
 
-	return &vault.Secret{
+	return &Secret{
 		Path:    path,
 		Data:    secret.Data,
 		Version: 1, // Would extract from metadata

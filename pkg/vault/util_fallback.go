@@ -73,7 +73,7 @@ func handleVaultUnavailable(rc *eos_io.RuntimeContext, name string, secrets map[
 
 // mustNewClient attempts to create a Vault client and logs any error.
 func mustNewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
-	client, err := NewClient(rc)
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to create Vault client", zap.Error(err))
 	}

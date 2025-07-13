@@ -10,10 +10,13 @@ import (
 	cerr "github.com/cockroachdb/errors"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 )
+
+var tracer = otel.Tracer("github.com/CodeMonkeyCybersecurity/eos/pkg/vault")
 
 // GetTLSCertPath resolves the Vault TLS client certificate path.
 // Priority:

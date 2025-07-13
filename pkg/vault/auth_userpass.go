@@ -15,7 +15,7 @@ import (
 // EnableVaultUserpass sets up userpass auth, creates the "eos" user, and verifies login.
 func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	// 1) Build a Vault API client
-	client, err := NewClient(rc)
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		return cerr.Wrap(err, "create Vault client")
 	}

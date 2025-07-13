@@ -26,7 +26,7 @@ func NewVaultManager(client *api.Client, logger *zap.Logger) *VaultManagerImpl {
 }
 
 // Initialize initializes a new vault instance
-func (v *VaultManagerImpl) Initialize(ctx context.Context, config *vault.InitConfig) (*vault.InitResult, error) {
+func (v *VaultManagerImpl) Initialize(ctx context.Context, config *InitConfig) (*InitResult, error) {
 	v.logger.Info("Initializing vault",
 		zap.Int("secret_shares", config.SecretShares),
 		zap.Int("secret_threshold", config.SecretThreshold))
@@ -40,7 +40,7 @@ func (v *VaultManagerImpl) Initialize(ctx context.Context, config *vault.InitCon
 
 	if status {
 		v.logger.Info("Vault is already initialized")
-		return &vault.InitResult{
+		return &InitResult{
 			Initialized: true,
 			Timestamp:   time.Now(),
 		}, nil
@@ -68,7 +68,7 @@ func (v *VaultManagerImpl) Initialize(ctx context.Context, config *vault.InitCon
 		zap.Int("key_shares", len(initResp.Keys)),
 		zap.Int("key_threshold", config.SecretThreshold))
 
-	return &vault.InitResult{
+	return &InitResult{
 		Keys:         initResp.Keys,
 		KeysBase64:   []string{}, // KeysBase64 not available in current API
 		RootToken:    initResp.RootToken,
@@ -132,7 +132,7 @@ func (v *VaultManagerImpl) Seal(ctx context.Context) error {
 }
 
 // GetStatus returns vault health and status
-func (v *VaultManagerImpl) GetStatus(ctx context.Context) (*vault.VaultStatus, error) {
+func (v *VaultManagerImpl) GetStatus(ctx context.Context) (*VaultStatus, error) {
 	// Get seal status
 	sealStatus, err := v.client.Sys().SealStatusWithContext(ctx)
 	if err != nil {
@@ -147,7 +147,7 @@ func (v *VaultManagerImpl) GetStatus(ctx context.Context) (*vault.VaultStatus, e
 		v.logger.Debug("Health check returned error", zap.Error(err))
 	}
 
-	status := &vault.VaultStatus{
+	status := &VaultStatus{
 		Initialized: sealStatus.Initialized,
 		Sealed:      sealStatus.Sealed,
 		Timestamp:   time.Now(),

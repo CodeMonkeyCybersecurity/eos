@@ -179,13 +179,13 @@ func (r *FileConfigRepository) saveToFile() error {
 
 // VaultConfigRepository implements vault.ConfigRepository using Vault's KV store
 type VaultConfigRepository struct {
-	secretStore vault.SecretStore
+	secretStore SecretStore
 	keyPrefix   string
 	logger      *zap.Logger
 }
 
 // NewVaultConfigRepository creates a new vault-based configuration repository
-func NewVaultConfigRepository(secretStore vault.SecretStore, keyPrefix string, logger *zap.Logger) *VaultConfigRepository {
+func NewVaultConfigRepository(secretStore SecretStore, keyPrefix string, logger *zap.Logger) *VaultConfigRepository {
 	return &VaultConfigRepository{
 		secretStore: secretStore,
 		keyPrefix:   keyPrefix,
@@ -217,7 +217,7 @@ func (r *VaultConfigRepository) GetConfig(ctx context.Context, key string) (stri
 func (r *VaultConfigRepository) SetConfig(ctx context.Context, key, value string) error {
 	fullKey := r.keyPrefix + "/" + key
 
-	secret := &vault.Secret{
+	secret := &Secret{
 		Key:   fullKey,
 		Value: value,
 		Metadata: map[string]string{
@@ -246,10 +246,19 @@ func (r *VaultConfigRepository) GetAllConfig(ctx context.Context) (map[string]st
 	}
 
 	result := make(map[string]string)
-	for _, secret := range secrets {
+	for _, secretPath := range secrets {
+		// Get the actual secret value
+		secret, err := r.secretStore.Get(ctx, secretPath)
+		if err != nil {
+			r.logger.Warn("Failed to get secret during list", 
+				zap.String("path", secretPath),
+				zap.Error(err))
+			continue
+		}
+		
 		// Extract key name from full key path
-		if len(secret.Key) > len(r.keyPrefix)+1 {
-			key := secret.Key[len(r.keyPrefix)+1:]
+		if len(secretPath) > len(r.keyPrefix)+1 {
+			key := secretPath[len(r.keyPrefix)+1:]
 			result[key] = secret.Value
 		}
 	}

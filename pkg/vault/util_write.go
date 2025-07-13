@@ -23,7 +23,7 @@ import (
 func Write(rc *eos_io.RuntimeContext, client *api.Client, name string, data any) error {
 	var err error
 	if client == nil {
-		client, err = NewClient(rc)
+		client, err = GetVaultClient(rc)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Warn("Vault client creation failed", zap.Error(err))
 			return WriteToDisk(rc, name, data)

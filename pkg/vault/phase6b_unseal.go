@@ -19,7 +19,7 @@ import (
 func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	otelzap.Ctx(rc.Ctx).Info(" Entering UnsealVault")
 
-	client, err := NewClient(rc)
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to create Vault client", zap.Error(err))
 		return nil, fmt.Errorf("create vault client: %w", err)

@@ -11,6 +11,7 @@ import (
 
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 
@@ -20,8 +21,12 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
+// tracer is the OpenTelemetry tracer for this package
+// Note: This duplicates the one in tls.go but avoids import cycles
+var vaultCheckTracer = otel.Tracer("github.com/CodeMonkeyCybersecurity/eos/pkg/vault")
+
 func Check(rc *eos_io.RuntimeContext, client *api.Client, storedHashes []string, hashedRoot string) (*shared.CheckReport, *api.Client) {
-	_, span := tracer.Start(context.Background(), "vault.Check")
+	_, span := vaultCheckTracer.Start(context.Background(), "vault.Check")
 	defer span.End()
 
 	report := &shared.CheckReport{}
@@ -43,7 +48,7 @@ func Check(rc *eos_io.RuntimeContext, client *api.Client, storedHashes []string,
 	report.Installed = true
 
 	if client == nil {
-		c, err := NewClient(rc)
+		c, err := GetVaultClient(rc)
 		if err != nil {
 			return failReport(rc, report, "Vault client initialization failed")
 		}
@@ -150,7 +155,7 @@ func RunVaultTestQuery(rc *eos_io.RuntimeContext) error {
 }
 
 func EnsureVaultReady(rc *eos_io.RuntimeContext) (*api.Client, error) {
-	client, err := NewClient(rc)
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		return nil, err
 	}
