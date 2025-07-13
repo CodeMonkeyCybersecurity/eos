@@ -5,7 +5,7 @@ package create
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/infrastructure/deploy"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/deploy"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -50,9 +50,9 @@ Examples:
 }
 
 // Helper functions have been migrated to:
-// - pkg/infrastructure/deploy/tailscale.go (DeployTailscale)
-// - pkg/infrastructure/deploy/traefik.go (DeployTraefik)
-// - pkg/infrastructure/deploy/headscale.go (DeployHeadscale)
+// - pkg/deploy/tailscale.go (DeployTailscale)
+// - pkg/deploy/traefik.go (DeployTraefik)
+// - pkg/deploy/headscale.go (DeployHeadscale)
 
 func init() {
 	// Add infrastructure command to create

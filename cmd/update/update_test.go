@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -324,10 +323,9 @@ func TestFileExists(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create file service container
 			rc := &eos_io.RuntimeContext{Ctx: context.Background()}
-			fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
 			require.NoError(t, err)
 
-			result := fileContainer.FileExists(tt.path)
+			result := _, err := os.Stat(tt.path); err == nil
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -399,7 +397,6 @@ func TestCopyFile(t *testing.T) {
 			src, dst := tt.setupFunc()
 			// Create file service container
 			rc := &eos_io.RuntimeContext{Ctx: context.Background()}
-			fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
 			require.NoError(t, err)
 
 			err = fileContainer.CopyFile(src, dst)

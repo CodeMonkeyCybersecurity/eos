@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
-	vaultDomain "github.com/CodeMonkeyCybersecurity/eos/pkg/domain/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -32,7 +31,7 @@ type DatabaseCredentials struct {
 }
 
 // SetDatabaseCredentials configures database credentials in Vault following Eos standards
-func SetDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore) error {
+func SetDatabaseCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Starting database credentials setup")
@@ -51,14 +50,14 @@ func SetDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.S
 	}
 
 	// Store credentials securely
-	if err := storeDatabaseCredentials(rc, secretStore, credentials); err != nil {
+	if err := storeDatabaseCredentials(rc, facade, credentials); err != nil {
 		return fmt.Errorf("failed to store database credentials: %w", err)
 	}
 
 	// EVALUATE - Verify credentials were stored and test connection
 	logger.Info("Evaluating database credentials storage")
 
-	if err := verifyDatabaseCredentials(rc, secretStore, credentials); err != nil {
+	if err := verifyDatabaseCredentials(rc, facade, credentials); err != nil {
 		logger.Error("Database credentials verification failed", zap.Error(err))
 		return fmt.Errorf("credentials verification failed: %w", err)
 	}
@@ -144,34 +143,25 @@ func gatherDatabaseCredentials(rc *eos_io.RuntimeContext) (*DatabaseCredentials,
 }
 
 // storeDatabaseCredentials stores credentials securely in the secret store
-func storeDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, credentials *DatabaseCredentials) error {
+func storeDatabaseCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade, credentials *DatabaseCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Storing database credentials securely in Vault")
 
-	// Create credentials map for storage
-	credentialsMap := map[string]interface{}{
-		"host":       credentials.Host,
-		"port":       credentials.Port,
-		"dbname":     credentials.DBName,
-		"username":   credentials.Username,
-		"password":   credentials.Password,
-		"sslmode":    credentials.SSLMode,
-		"updated_at": time.Now().Format(time.RFC3339),
-		"type":       "static",
+	// Store credentials using simplified facade - store each credential separately for easier retrieval
+	credentialPaths := map[string]map[string]interface{}{
+		"secret/data/delphi/database/host":     {"data": map[string]interface{}{"value": credentials.Host}},
+		"secret/data/delphi/database/port":     {"data": map[string]interface{}{"value": credentials.Port}},
+		"secret/data/delphi/database/name":     {"data": map[string]interface{}{"value": credentials.DBName}},
+		"secret/data/delphi/database/username": {"data": map[string]interface{}{"value": credentials.Username}},
+		"secret/data/delphi/database/password": {"data": map[string]interface{}{"value": credentials.Password}},
 	}
 
-	// Create Secret object for storage
-	secret := &vaultDomain.Secret{
-		Key:       "database/credentials/delphi",
-		Data:      credentialsMap,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	// Store in secret store with appropriate path
-	if err := secretStore.Set(rc.Ctx, "database/credentials/delphi", secret); err != nil {
-		return fmt.Errorf("failed to store database credentials: %w", err)
+	// Store each credential separately
+	for path, data := range credentialPaths {
+		if err := facade.StoreSecret(rc.Ctx, path, data); err != nil {
+			return fmt.Errorf("failed to store credential at %s: %w", path, err)
+		}
 	}
 
 	logger.Info("Database credentials stored securely")
@@ -179,23 +169,38 @@ func storeDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain
 }
 
 // verifyDatabaseCredentials verifies credentials were stored and optionally tests connection
-func verifyDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, credentials *DatabaseCredentials) error {
+func verifyDatabaseCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade, credentials *DatabaseCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Verifying database credentials storage")
 
-	// Retrieve stored credentials to verify
-	storedCreds, err := secretStore.Get(rc.Ctx, "database/credentials/delphi")
-	if err != nil {
-		return fmt.Errorf("failed to retrieve stored credentials: %w", err)
+	// Verify each stored credential
+	credentialPaths := map[string]string{
+		"secret/data/delphi/database/host":     credentials.Host,
+		"secret/data/delphi/database/port":     credentials.Port,
+		"secret/data/delphi/database/name":     credentials.DBName,
+		"secret/data/delphi/database/username": credentials.Username,
+		"secret/data/delphi/database/password": credentials.Password,
 	}
 
-	// Verify key fields are present and correct
-	if storedCreds.Data["host"] != credentials.Host {
-		return fmt.Errorf("stored host does not match input")
-	}
-	if storedCreds.Data["username"] != credentials.Username {
-		return fmt.Errorf("stored username does not match input")
+	for path, expectedValue := range credentialPaths {
+		storedData, err := facade.RetrieveSecret(rc.Ctx, path)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve stored credential at %s: %w", path, err)
+		}
+
+		// Extract value from KV v2 structure and verify
+		if data, ok := storedData["data"].(map[string]interface{}); ok {
+			if value, ok := data["value"].(string); ok {
+				if value != expectedValue {
+					return fmt.Errorf("stored value at %s does not match input: got %s, expected %s", path, value, expectedValue)
+				}
+			} else {
+				return fmt.Errorf("invalid data structure at %s: missing value field", path)
+			}
+		} else {
+			return fmt.Errorf("invalid data structure at %s: missing data field", path)
+		}
 	}
 
 	// Optional: Test database connection

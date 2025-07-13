@@ -2,7 +2,7 @@
 package update
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/domain/sysinfo"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/sysinfo"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"

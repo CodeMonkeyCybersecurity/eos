@@ -3,7 +3,7 @@ package create
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/infrastructure/network"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
 	"github.com/spf13/cobra"
 )
 

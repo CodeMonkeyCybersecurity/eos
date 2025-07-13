@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
-	vaultDomain "github.com/CodeMonkeyCybersecurity/eos/pkg/domain/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -29,7 +28,7 @@ type DatabaseConfig struct {
 }
 
 // SetDatabaseConfig sets database connection parameters following Eos standards
-func SetDatabaseConfig(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore) error {
+func SetDatabaseConfig(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Starting database configuration setup")
@@ -47,15 +46,15 @@ func SetDatabaseConfig(rc *eos_io.RuntimeContext, secretStore vaultDomain.Secret
 		return fmt.Errorf("failed to gather database configuration: %w", err)
 	}
 
-	// Store configuration in secret store
-	if err := storeDatabaseConfiguration(rc, secretStore, config); err != nil {
+	// Store configuration in vault using simplified facade
+	if err := storeDatabaseConfiguration(rc, facade, config); err != nil {
 		return fmt.Errorf("failed to store database configuration: %w", err)
 	}
 
 	// EVALUATE - Verify configuration was stored successfully
 	logger.Info("Evaluating database configuration storage")
 
-	if err := verifyDatabaseConfigurationStorage(rc, secretStore, config); err != nil {
+	if err := verifyDatabaseConfigurationStorage(rc, facade, config); err != nil {
 		logger.Error("Database configuration verification failed", zap.Error(err))
 		return fmt.Errorf("configuration verification failed: %w", err)
 	}
@@ -121,31 +120,24 @@ func gatherDatabaseConfiguration(rc *eos_io.RuntimeContext) (*DatabaseConfig, er
 	return config, nil
 }
 
-// storeDatabaseConfiguration stores the configuration in the secret store
-func storeDatabaseConfiguration(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, config *DatabaseConfig) error {
+// storeDatabaseConfiguration stores the configuration using simplified vault facade
+func storeDatabaseConfiguration(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade, config *DatabaseConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Storing database configuration in secret store")
+	logger.Info("Storing database configuration in Vault")
 
-	// Create configuration map for storage
-	configMap := map[string]interface{}{
-		"host":       config.Host,
-		"port":       config.Port,
-		"dbname":     config.DBName,
-		"updated_at": time.Now().Format(time.RFC3339),
+	// Store each config value individually for easier retrieval
+	configPaths := map[string]map[string]interface{}{
+		"secret/data/delphi/config/host":     {"data": map[string]interface{}{"value": config.Host}},
+		"secret/data/delphi/config/port":     {"data": map[string]interface{}{"value": config.Port}},
+		"secret/data/delphi/config/database": {"data": map[string]interface{}{"value": config.DBName}},
 	}
 
-	// Create Secret object for storage
-	secret := &vaultDomain.Secret{
-		Key:       "database/config",
-		Data:      configMap,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	// Store in secret store
-	if err := secretStore.Set(rc.Ctx, "database/config", secret); err != nil {
-		return fmt.Errorf("failed to store database configuration: %w", err)
+	// Store each configuration value
+	for path, data := range configPaths {
+		if err := facade.StoreSecret(rc.Ctx, path, data); err != nil {
+			return fmt.Errorf("failed to store config at %s: %w", path, err)
+		}
 	}
 
 	logger.Info("Database configuration stored successfully")
@@ -153,26 +145,36 @@ func storeDatabaseConfiguration(rc *eos_io.RuntimeContext, secretStore vaultDoma
 }
 
 // verifyDatabaseConfigurationStorage verifies the configuration was stored correctly
-func verifyDatabaseConfigurationStorage(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, config *DatabaseConfig) error {
+func verifyDatabaseConfigurationStorage(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade, config *DatabaseConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Verifying database configuration storage")
 
-	// Retrieve stored configuration to verify
-	storedConfig, err := secretStore.Get(rc.Ctx, "database/config")
-	if err != nil {
-		return fmt.Errorf("failed to retrieve stored configuration: %w", err)
+	// Verify each stored configuration value
+	configPaths := map[string]string{
+		"secret/data/delphi/config/host":     config.Host,
+		"secret/data/delphi/config/port":     config.Port,
+		"secret/data/delphi/config/database": config.DBName,
 	}
 
-	// Verify key fields are present
-	if storedConfig.Data["host"] != config.Host {
-		return fmt.Errorf("stored host does not match input")
-	}
-	if storedConfig.Data["port"] != config.Port {
-		return fmt.Errorf("stored port does not match input")
-	}
-	if storedConfig.Data["dbname"] != config.DBName {
-		return fmt.Errorf("stored database name does not match input")
+	for path, expectedValue := range configPaths {
+		storedData, err := facade.RetrieveSecret(rc.Ctx, path)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve stored configuration at %s: %w", path, err)
+		}
+
+		// Extract value from KV v2 structure
+		if data, ok := storedData["data"].(map[string]interface{}); ok {
+			if value, ok := data["value"].(string); ok {
+				if value != expectedValue {
+					return fmt.Errorf("stored value at %s does not match input: got %s, expected %s", path, value, expectedValue)
+				}
+			} else {
+				return fmt.Errorf("invalid data structure at %s: missing value field", path)
+			}
+		} else {
+			return fmt.Errorf("invalid data structure at %s: missing data field", path)
+		}
 	}
 
 	logger.Info("Database configuration verification successful")
@@ -208,7 +210,7 @@ type DatabaseAdminCredentials struct {
 }
 
 // SetDatabaseEngine sets up Vault database secrets engine following Eos standards
-func SetDatabaseEngine(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore) error {
+func SetDatabaseEngine(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Starting Vault database secrets engine setup")
@@ -227,14 +229,14 @@ func SetDatabaseEngine(rc *eos_io.RuntimeContext, secretStore vaultDomain.Secret
 	}
 
 	// Configure the database secrets engine
-	if err := configureDatabaseEngine(rc, secretStore, credentials); err != nil {
+	if err := configureDatabaseEngine(rc, facade, credentials); err != nil {
 		return fmt.Errorf("failed to configure database engine: %w", err)
 	}
 
 	// EVALUATE - Verify engine configuration
 	logger.Info("Evaluating database engine configuration")
 
-	if err := verifyDatabaseEngine(rc, secretStore); err != nil {
+	if err := verifyDatabaseEngine(rc, facade); err != nil {
 		logger.Error("Database engine verification failed", zap.Error(err))
 		return fmt.Errorf("engine verification failed: %w", err)
 	}
@@ -300,7 +302,7 @@ func gatherDatabaseAdminCredentials(rc *eos_io.RuntimeContext) (*DatabaseAdminCr
 }
 
 // configureDatabaseEngine configures the Vault database secrets engine
-func configureDatabaseEngine(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, credentials *DatabaseAdminCredentials) error {
+func configureDatabaseEngine(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade, credentials *DatabaseAdminCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Configuring Vault database secrets engine")
@@ -322,7 +324,7 @@ func configureDatabaseEngine(rc *eos_io.RuntimeContext, secretStore vaultDomain.
 }
 
 // verifyDatabaseEngine verifies the database engine is configured correctly
-func verifyDatabaseEngine(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore) error {
+func verifyDatabaseEngine(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Verifying database engine configuration")

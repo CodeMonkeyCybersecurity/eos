@@ -199,15 +199,13 @@ Examples:
 			return fmt.Errorf("vault service not available")
 		}
 
-		secretStore := facade.GetSecretStore()
-
 		switch secretName {
 		case "delphi-db":
-			return secrets.SetDatabaseCredentials(rc, secretStore)
+			return secrets.SetDatabaseCredentials(rc, facade)
 		case "delphi-db-config":
-			return secrets.SetDatabaseConfig(rc, secretStore)
+			return secrets.SetDatabaseConfig(rc, facade)
 		case "delphi-db-engine":
-			return secrets.SetDatabaseEngine(rc, secretStore)
+			return secrets.SetDatabaseEngine(rc, facade)
 		case "smtp":
 			return fmt.Errorf("smtp secrets not yet migrated - use legacy version")
 		case "openai":
@@ -260,11 +258,9 @@ This command will:
 			return fmt.Errorf("vault service not available")
 		}
 
-		secretStore := facade.GetSecretStore()
-
-		// Try to read a test secret
-		testKey := "delphi/database/username"
-		_, err := secretStore.Get(rc.Ctx, testKey)
+		// Try to read a test secret using the simplified facade
+		testPath := "secret/data/delphi/database/username"
+		_, err := facade.RetrieveSecret(rc.Ctx, testPath)
 		if err != nil {
 			fmt.Printf("  Secret access test: %v\n", err)
 			fmt.Printf("   This is normal if no secrets have been set yet\n")
@@ -319,27 +315,25 @@ Shows:
 
 		facade := vault.GetServiceFacade()
 		if facade != nil {
-			secretStore := facade.GetSecretStore()
-
-			// Check for common secrets
+			// Check for common secrets using simplified facade
 			staticSecrets := []string{
-				"delphi/database/username",
-				"delphi/database/password",
-				"delphi/database/host",
-				"smtp/username",
-				"smtp/password",
-				"openai/api_key",
+				"secret/data/delphi/database/username",
+				"secret/data/delphi/database/password", 
+				"secret/data/delphi/database/host",
+				"secret/data/smtp/username",
+				"secret/data/smtp/password",
+				"secret/data/openai/api_key",
 			}
 
 			configSecrets := []string{
-				"delphi/config/host",
-				"delphi/config/port",
-				"delphi/config/database",
+				"secret/data/delphi/config/host",
+				"secret/data/delphi/config/port",
+				"secret/data/delphi/config/database",
 			}
 
 			fmt.Printf("Static Credentials:\n")
 			for _, secretPath := range staticSecrets {
-				_, err := secretStore.Get(rc.Ctx, secretPath)
+				_, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 				if err != nil {
 					fmt.Printf("    %s (not set)\n", secretPath)
 				} else {
@@ -349,7 +343,7 @@ Shows:
 
 			fmt.Printf("\nDatabase Configuration:\n")
 			for _, secretPath := range configSecrets {
-				_, err := secretStore.Get(rc.Ctx, secretPath)
+				_, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 				if err != nil {
 					fmt.Printf("    %s (not set)\n", secretPath)
 				} else {
@@ -359,7 +353,7 @@ Shows:
 
 			fmt.Printf("\nDynamic Database Engine:\n")
 			// Test if dynamic credentials are available
-			_, err := secretStore.Get(rc.Ctx, "database/creds/delphi-readonly")
+			_, err := facade.RetrieveSecret(rc.Ctx, "database/creds/delphi-readonly")
 			if err != nil {
 				fmt.Printf("    database/creds/delphi-readonly (not configured)\n")
 				fmt.Printf("    Run: eos self secrets set delphi-db-engine\n")
@@ -402,17 +396,17 @@ Examples:
 			return fmt.Errorf("vault service not available")
 		}
 
-		secretStore := facade.GetSecretStore()
-
-		value, err := secretStore.Get(rc.Ctx, secretPath)
+		// Use the simplified facade to retrieve secrets  
+		secretData, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve secret %s: %w", secretPath, err)
 		}
 
+		// secretData is map[string]interface{} from vault
 		if showValue {
-			fmt.Printf("Secret: %s\nValue: %s\n", secretPath, value.Value)
+			fmt.Printf("Secret: %s\nData: %v\n", secretPath, secretData)
 		} else {
-			fmt.Printf("Secret: %s\nValue: %s\n", secretPath, strings.Repeat("*", len(value.Value)))
+			fmt.Printf("Secret: %s\nData: [REDACTED]\n", secretPath)
 			fmt.Printf("Use --show-value to display the actual value\n")
 		}
 

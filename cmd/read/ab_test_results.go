@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -55,14 +54,13 @@ Examples:
 			zap.Bool("quiet", quiet))
 
 		// Create file service container
-		fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
 		if err != nil {
 			return fmt.Errorf("failed to initialize file operations: %w", err)
 		}
 
 		// Verify analyzer script exists
 		analyzerScript := "/usr/local/bin/ab-test-analyzer.py"
-		if !fileContainer.FileExists(analyzerScript) {
+		if !_, err := os.Stat(analyzerScript); err == nil {
 			return fmt.Errorf("A/B testing analyzer not found: %s (deploy with: eos create delphi-services prompt-ab-tester)", analyzerScript)
 		}
 

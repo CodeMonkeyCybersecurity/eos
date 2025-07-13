@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/domain/sysinfo"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"

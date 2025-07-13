@@ -87,39 +87,35 @@ func getDynamicCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacad
 	logger.Info("Requesting dynamic database credentials",
 		zap.String("vault_role", "delphi-readonly"))
 
-	secretStore := facade.GetSecretStore()
-
 	// Request dynamic credentials using the database secrets engine
 	// Path format: database/creds/{role_name}
-	credSecret, err := secretStore.Get(rc.Ctx, "database/creds/delphi-readonly")
+	credData, err := facade.RetrieveSecret(rc.Ctx, "database/creds/delphi-readonly")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dynamic credentials: %w", err)
 	}
 
-	// Parse the dynamic credentials response
+	// Parse the dynamic credentials response - credData is map[string]interface{}
+	// Vault database engine typically returns username and password in the data
 	config := &ConnectionConfig{
 		Host:      baseConfig.Host,
 		Port:      baseConfig.Port,
 		Database:  baseConfig.Database,
 		SSLMode:   "disable",
-		Username:  credSecret.Value, // This would be the dynamic username
 		IsDynamic: true,
 		CreatedAt: time.Now(),
 	}
 
-	// For the dynamic credentials, we need to parse additional metadata
-	// This is a simplified version - in reality, Vault's database engine returns
-	// both username and password along with lease information
-
-	// Try to get the password from the secret (vault typically returns both)
-	passwordSecret, err := secretStore.Get(rc.Ctx, "database/creds/delphi-readonly/password")
-	if err != nil {
-		// If separate password endpoint doesn't exist, the username secret might contain both
-		// This depends on how the Vault database engine is configured
-		logger.Debug("No separate password endpoint, using credential from main response")
-		config.Password = credSecret.Value // Fallback - may need adjustment based on actual Vault response
+	// Extract username and password from the vault response
+	if username, ok := credData["username"].(string); ok {
+		config.Username = username
 	} else {
-		config.Password = passwordSecret.Value
+		return nil, fmt.Errorf("dynamic credentials missing username field")
+	}
+
+	if password, ok := credData["password"].(string); ok {
+		config.Password = password
+	} else {
+		return nil, fmt.Errorf("dynamic credentials missing password field")
 	}
 
 	// Set lease information (this would come from Vault's lease metadata)
@@ -132,32 +128,35 @@ func getDynamicCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacad
 
 // getStaticCredentials retrieves static database credentials (fallback method)
 func getStaticCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (*ConnectionConfig, error) {
-	secretStore := facade.GetSecretStore()
-
-	// Retrieve database connection details from Vault
+	// Retrieve database connection details from Vault using simplified facade
 	config := &ConnectionConfig{
 		SSLMode:   "disable", // Default
 		IsDynamic: false,
 		CreatedAt: time.Now(),
 	}
 
-	// Get each component of the connection
+	// Get each component of the connection using vault KV v2 paths
 	secrets := map[string]*string{
-		"delphi/database/host":     &config.Host,
-		"delphi/database/port":     &config.Port,
-		"delphi/database/name":     &config.Database,
-		"delphi/database/username": &config.Username,
-		"delphi/database/password": &config.Password,
+		"secret/data/delphi/database/host":     &config.Host,
+		"secret/data/delphi/database/port":     &config.Port,
+		"secret/data/delphi/database/name":     &config.Database,
+		"secret/data/delphi/database/username": &config.Username,
+		"secret/data/delphi/database/password": &config.Password,
 	}
 
 	allFound := true
 	for secretPath, target := range secrets {
-		secret, err := secretStore.Get(rc.Ctx, secretPath)
+		secretData, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 		if err != nil {
 			allFound = false
 			continue
 		}
-		*target = secret.Value
+		// Extract the value from the vault KV v2 data structure
+		if data, ok := secretData["data"].(map[string]interface{}); ok {
+			if value, ok := data["value"].(string); ok {
+				*target = value
+			}
+		}
 	}
 
 	// Check if we got all required secrets
@@ -178,26 +177,29 @@ func getStaticCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade
 
 // getDatabaseConfig retrieves static database connection parameters (host, port, database name)
 func getDatabaseConfig(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (*ConnectionConfig, error) {
-	secretStore := facade.GetSecretStore()
-
 	config := &ConnectionConfig{
 		SSLMode: "disable", // Default
 	}
 
-	// Get database connection parameters (not credentials)
+	// Get database connection parameters (not credentials) using KV v2 paths
 	configSecrets := map[string]*string{
-		"delphi/config/host":     &config.Host,
-		"delphi/config/port":     &config.Port,
-		"delphi/config/database": &config.Database,
+		"secret/data/delphi/config/host":     &config.Host,
+		"secret/data/delphi/config/port":     &config.Port,
+		"secret/data/delphi/config/database": &config.Database,
 	}
 
 	for secretPath, target := range configSecrets {
-		secret, err := secretStore.Get(rc.Ctx, secretPath)
+		secretData, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 		if err != nil {
 			// Use defaults if config not found
 			continue
 		}
-		*target = secret.Value
+		// Extract the value from the vault KV v2 data structure
+		if data, ok := secretData["data"].(map[string]interface{}); ok {
+			if value, ok := data["value"].(string); ok {
+				*target = value
+			}
+		}
 	}
 
 	// Set defaults for missing values

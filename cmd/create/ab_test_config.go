@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -47,12 +46,6 @@ Examples:
 
 		logger.Info("Creating A/B testing configuration")
 
-		// Create file service container
-		fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
-		if err != nil {
-			return fmt.Errorf("failed to initialize file operations: %w", err)
-		}
-
 		// Get Eos root directory
 		eosRoot := os.Getenv("Eos_ROOT")
 		if eosRoot == "" {
@@ -66,7 +59,7 @@ Examples:
 		reportsDir := "/var/log/stackstorm/ab-test-reports"
 
 		// Validate source file exists
-		if !fileContainer.FileExists(sourceConfig) {
+		if _, err := os.Stat(sourceConfig); os.IsNotExist(err) {
 			return fmt.Errorf("source A/B config file not found: %s", sourceConfig)
 		}
 
@@ -83,7 +76,7 @@ Examples:
 		}
 
 		// Check if target already exists
-		if fileContainer.FileExists(targetConfig) && !force {
+		if _, err := os.Stat(targetConfig); err == nil && !force {
 			return fmt.Errorf("target configuration already exists: %s (use --force to overwrite)", targetConfig)
 		}
 
@@ -103,8 +96,15 @@ Examples:
 			zap.String("source", sourceConfig),
 			zap.String("target", targetConfig))
 
-		if err := fileContainer.CopyFile(sourceConfig, targetConfig); err != nil {
-			return fmt.Errorf("failed to deploy configuration: %w", err)
+		// Read source file
+		sourceData, err := os.ReadFile(sourceConfig)
+		if err != nil {
+			return fmt.Errorf("failed to read source config: %w", err)
+		}
+		
+		// Write to target
+		if err := os.WriteFile(targetConfig, sourceData, 0644); err != nil {
+			return fmt.Errorf("failed to write target config: %w", err)
 		}
 
 		// Set permissions

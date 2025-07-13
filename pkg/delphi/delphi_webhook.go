@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -15,12 +14,8 @@ import (
 
 // DeployDelphiWebhook deploys Delphi webhook scripts to target directory
 func DeployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targetDir string, dryRun, force bool) error {
-	// Create file service container
+	// Use direct file operations
 	rc := &eos_io.RuntimeContext{Ctx: ctx, Log: logger.Logger().Logger}
-	fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
-	if err != nil {
-		return fmt.Errorf("failed to initialize file operations: %w", err)
-	}
 
 	// Define script paths - updated to match actual file locations
 	pythonScript := "assets/python_workers/custom-delphi-webhook.py"
