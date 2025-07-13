@@ -30,7 +30,7 @@ func (r *RandomOperationsImpl) GenerateRandomBytes(ctx context.Context, length i
 // GenerateRandomString generates a random string with specified character set
 func (r *RandomOperationsImpl) GenerateRandomString(ctx context.Context, length int, charset string) (string, error) {
 	if len(charset) == 0 {
-		charset = crypto.CharsetAlphaNum
+		charset = CharsetAlphaNum
 	}
 
 	result := make([]byte, length)
@@ -58,9 +58,9 @@ func (r *RandomOperationsImpl) GenerateUUID(ctx context.Context) (string, error)
 
 // GeneratePassword generates a secure random password
 func (r *RandomOperationsImpl) GeneratePassword(ctx context.Context, length int, includeSpecial bool) (string, error) {
-	charset := crypto.CharsetAlphaNum
+	charset := CharsetAlphaNum
 	if includeSpecial {
-		charset = crypto.CharsetAll
+		charset = CharsetAll
 	}
 
 	return r.GenerateRandomString(ctx, length, charset)

@@ -57,7 +57,7 @@ func (s *SecureOperationsImpl) RedactString(ctx context.Context, input string, p
 func (s *SecureOperationsImpl) SanitizeInput(ctx context.Context, input string, allowedChars string) (string, error) {
 	if allowedChars == "" {
 		// Default safe character set
-		allowedChars = crypto.CharsetSafe
+		allowedChars = CharsetSafe
 	}
 
 	result := make([]byte, 0, len(input))

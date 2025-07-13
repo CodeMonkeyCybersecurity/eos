@@ -3,11 +3,35 @@ package fileops
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 )
+
+// FileOperationType represents the type of file operation
+type FileOperationType string
+
+const (
+	OpCreate FileOperationType = "create"
+	OpCopy   FileOperationType = "copy"
+	OpMove   FileOperationType = "move"
+	OpDelete FileOperationType = "delete"
+	OpMkdir  FileOperationType = "mkdir"
+)
+
+// FileOperation represents a file operation to be performed
+type FileOperation struct {
+	Type       FileOperationType `json:"type"`
+	Source     string            `json:"source,omitempty"`
+	Target     string            `json:"target"`
+	Content    []byte            `json:"content,omitempty"`
+	Data       []byte            `json:"data,omitempty"`
+	Mode       os.FileMode       `json:"mode,omitempty"`
+	Completed  bool              `json:"completed"`
+	BackupPath string            `json:"backup_path,omitempty"`
+}
 
 // SafeFileOperations provides safe file operations with transactions and backups
 type SafeFileOperations struct {

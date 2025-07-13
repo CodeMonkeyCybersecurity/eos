@@ -9,17 +9,38 @@ import (
 	"go.uber.org/zap"
 )
 
+// FileOperations interface for file operations
+type FileOperations interface {
+	CreateDirectory(ctx context.Context, path string, mode int) error
+	WriteFile(ctx context.Context, path string, data []byte, mode int) error
+	ReadFile(ctx context.Context, path string) ([]byte, error)
+	DeleteFile(ctx context.Context, path string) error
+	FileExists(ctx context.Context, path string) (bool, error)
+	Exists(ctx context.Context, path string) (bool, error)
+	CopyFile(ctx context.Context, src, dst string, mode int) error
+	ListDirectory(ctx context.Context, path string) ([]string, error)
+}
+
+// PathOperations interface for path operations
+type PathOperations interface {
+	JoinPath(elements ...string) string
+}
+
 // FileBasedKeyManagement provides file-based key management
 type FileBasedKeyManagement struct {
 	keyDir  string
 	logger  *zap.Logger
+	fileOps FileOperations
+	pathOps PathOperations
 }
 
 // NewFileBasedKeyManagement creates a new file-based key management implementation
-func NewFileBasedKeyManagement(keyDir string, logger *zap.Logger) *FileBasedKeyManagement {
+func NewFileBasedKeyManagement(keyDir string, logger *zap.Logger, fileOps FileOperations, pathOps PathOperations) *FileBasedKeyManagement {
 	return &FileBasedKeyManagement{
 		keyDir:  keyDir,
 		logger:  logger,
+		fileOps: fileOps,
+		pathOps: pathOps,
 	}
 }
 
@@ -151,10 +172,10 @@ func (f *FileBasedKeyManagement) ListKeys(ctx context.Context) ([]string, error)
 	}
 
 	var keyIDs []string
-	for _, entry := range entries {
-		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".key" {
+	for _, filename := range entries {
+		if filepath.Ext(filename) == ".key" {
 			// Remove .key extension to get key ID
-			keyID := entry.Name()[:len(entry.Name())-4]
+			keyID := filename[:len(filename)-4]
 			keyIDs = append(keyIDs, keyID)
 		}
 	}

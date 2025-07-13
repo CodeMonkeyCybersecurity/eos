@@ -11,7 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 )
 
-// PlatformDetectorImpl implements sysinfo.PlatformDetector using existing platform package
+// PlatformDetectorImpl implements PlatformDetector using existing platform package
 type PlatformDetectorImpl struct {
 	rc     *eos_io.RuntimeContext
 	logger *zap.Logger
@@ -21,29 +21,29 @@ type PlatformDetectorImpl struct {
 func NewPlatformDetector(rc *eos_io.RuntimeContext, logger *zap.Logger) *PlatformDetectorImpl {
 	return &PlatformDetectorImpl{
 		rc:     rc,
-		logger: logger.Named("sysinfo.platform"),
+		logger: logger.Named("platform"),
 	}
 }
 
 // DetectOS detects the operating system type
-func (p *PlatformDetectorImpl) DetectOS(ctx context.Context) (sysinfo.OSType, error) {
+func (p *PlatformDetectorImpl) DetectOS(ctx context.Context) (OSType, error) {
 	p.logger.Debug("Detecting operating system")
 
 	switch runtime.GOOS {
 	case "linux":
-		return sysinfo.OSTypeLinux, nil
+		return OSTypeLinux, nil
 	case "darwin":
-		return sysinfo.OSTypeMacOS, nil
+		return OSTypeMacOS, nil
 	case "windows":
-		return sysinfo.OSTypeWindows, nil
+		return OSTypeWindows, nil
 	default:
 		p.logger.Warn("Unknown operating system", zap.String("goos", runtime.GOOS))
-		return sysinfo.OSTypeUnknown, nil
+		return OSTypeUnknown, nil
 	}
 }
 
 // DetectDistribution detects Linux distribution information
-func (p *PlatformDetectorImpl) DetectDistribution(ctx context.Context) (*sysinfo.DistributionInfo, error) {
+func (p *PlatformDetectorImpl) DetectDistribution(ctx context.Context) (*DistributionInfo, error) {
 	p.logger.Debug("Detecting Linux distribution")
 
 	if !platform.IsLinux() {
@@ -53,12 +53,12 @@ func (p *PlatformDetectorImpl) DetectDistribution(ctx context.Context) (*sysinfo
 	distro := platform.DetectLinuxDistro(p.rc)
 
 	// Create distribution info based on detected distro
-	distroInfo := &sysinfo.DistributionInfo{
+	distroInfo := &DistributionInfo{
 		ID:             distro,
 		Name:           distro,
 		Family:         p.mapDistroFamily(distro),
 		PackageManager: p.mapPackageManager(distro),
-		ServiceManager: sysinfo.ServiceManagerSystemd, // Most modern distros use systemd
+		ServiceManager: ServiceManagerSystemd, // Most modern distros use systemd
 	}
 
 	// Try to get more detailed info from /etc/os-release if available
@@ -134,50 +134,50 @@ func (p *PlatformDetectorImpl) IsCentOS(ctx context.Context) (bool, error) {
 // Helper methods
 
 // mapDistroFamily maps distro names to families
-func (p *PlatformDetectorImpl) mapDistroFamily(distro string) sysinfo.DistroFamily {
+func (p *PlatformDetectorImpl) mapDistroFamily(distro string) DistroFamily {
 	switch distro {
 	case "debian", "ubuntu":
-		return sysinfo.DistroFamilyDebian
+		return DistroFamilyDebian
 	case "rhel", "centos", "fedora":
-		return sysinfo.DistroFamilyRedHat
+		return DistroFamilyRedHat
 	case "arch", "manjaro":
-		return sysinfo.DistroFamilyArch
+		return DistroFamilyArch
 	case "opensuse", "sles":
-		return sysinfo.DistroFamilySUSE
+		return DistroFamilySUSE
 	case "gentoo":
-		return sysinfo.DistroFamilyGentoo
+		return DistroFamilyGentoo
 	case "alpine":
-		return sysinfo.DistroFamilyAlpine
+		return DistroFamilyAlpine
 	default:
-		return sysinfo.DistroFamilyUnknown
+		return DistroFamilyUnknown
 	}
 }
 
 // mapPackageManager maps distro families to package managers
-func (p *PlatformDetectorImpl) mapPackageManager(distro string) sysinfo.PackageManagerType {
+func (p *PlatformDetectorImpl) mapPackageManager(distro string) PackageManagerType {
 	switch distro {
 	case "debian", "ubuntu":
-		return sysinfo.PackageManagerAPT
+		return PackageManagerAPT
 	case "rhel", "centos":
-		return sysinfo.PackageManagerYUM
+		return PackageManagerYUM
 	case "fedora":
-		return sysinfo.PackageManagerDNF
+		return PackageManagerDNF
 	case "opensuse", "sles":
-		return sysinfo.PackageManagerZypper
+		return PackageManagerZypper
 	case "arch", "manjaro":
-		return sysinfo.PackageManagerPacman
+		return PackageManagerPacman
 	case "gentoo":
-		return sysinfo.PackageManagerPortage
+		return PackageManagerPortage
 	case "alpine":
-		return sysinfo.PackageManagerAPK
+		return PackageManagerAPK
 	default:
-		return sysinfo.PackageManagerUnknown
+		return PackageManagerUnknown
 	}
 }
 
 // parseOSRelease parses /etc/os-release for detailed distribution information
 // This is a simplified version - a full implementation would parse the actual file
-func (p *PlatformDetectorImpl) parseOSRelease() *sysinfo.DistributionInfo {
+func (p *PlatformDetectorImpl) parseOSRelease() *DistributionInfo {
 	// This would read and parse /etc/os-release
 	// For now, return nil to use the basic detection above
 	return nil
@@ -212,8 +212,8 @@ func (p *PlatformDetectorImpl) IsVirtualEnvironment(ctx context.Context) bool {
 }
 
 // GetSystemArchitecture returns detailed architecture information
-func (p *PlatformDetectorImpl) GetSystemArchitecture() *sysinfo.ArchitectureInfo {
-	return &sysinfo.ArchitectureInfo{
+func (p *PlatformDetectorImpl) GetSystemArchitecture() *ArchitectureInfo {
+	return &ArchitectureInfo{
 		CPU:        runtime.GOARCH,
 		Platform:   runtime.GOOS,
 		Bits:       64,       // Most systems are 64-bit today
