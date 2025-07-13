@@ -35,7 +35,13 @@ func DetectContention(rc *eos_io.RuntimeContext) ([]ContentionMetrics, error) {
 	var metrics []ContentionMetrics
 
 	if hasIostat {
-		metrics, _ = detectContentionWithIostat(rc)
+		iostatMetrics, err := detectContentionWithIostat(rc)
+		if err != nil {
+			logger.Warn("Failed to detect contention with iostat, falling back to /proc/stat",
+				zap.Error(err))
+		} else {
+			metrics = iostatMetrics
+		}
 	}
 
 	// Always supplement with /proc/stat data
@@ -329,7 +335,8 @@ func readCPUStat() (*cpuStats, error) {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close file: %v\n", err)
+			// Note: Non-critical error that can be silently handled
+			_ = err
 		}
 	}()
 

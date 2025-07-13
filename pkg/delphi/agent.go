@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -67,6 +68,7 @@ func UpgradeAgents(rc *eos_io.RuntimeContext, cfg *Config, token string, agentID
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
+		Timeout: 30 * time.Second, // Add timeout to prevent indefinite hangs
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
 		},
@@ -476,6 +478,7 @@ func makeRequest(rc *eos_io.RuntimeContext, cfg *Config, token, method, endpoint
 	}
 
 	client := &http.Client{
+		Timeout: 30 * time.Second, // Add timeout to prevent indefinite hangs
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
 		},

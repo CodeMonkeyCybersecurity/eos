@@ -2,10 +2,12 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"time"
 )
 
 func DownloadFile(filepath string, url string) error {
@@ -19,7 +21,19 @@ func DownloadFile(filepath string, url string) error {
 		}
 	}()
 
-	resp, err := http.Get(url)
+	// Create HTTP client with timeout to prevent indefinite hangs
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute) // Allow longer timeout for large downloads
+	defer cancel()
+	
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	
+	client := &http.Client{
+		Timeout: 5 * time.Minute, // Match context timeout
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http get: %w", err)
 	}

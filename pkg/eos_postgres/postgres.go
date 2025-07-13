@@ -33,8 +33,7 @@ func Open(ctx context.Context, dsn string) (*sql.DB, error) {
 func Connect() (*gorm.DB, error) {
 	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {
-		dsn = "host=localhost user=postgres password=postgres " +
-			"dbname=eos_kvm port=5432 sslmode=disable"
+		return nil, errors.New("POSTGRES_DSN environment variable is required - refusing to use default credentials for security")
 	}
 	return gorm.Open(postgres.Open(dsn), &gorm.Config{})
 }
@@ -118,7 +117,11 @@ func Migrate(db *gorm.DB) error {
 
 // NewPGHashStore is the legacy name used elsewhere; now just a shim.
 func NewPGHashStore(ctx context.Context) (HashStore, error) {
-	db, err := Open(ctx, os.Getenv("POSTGRES_DSN"))
+	dsn := os.Getenv("POSTGRES_DSN")
+	if dsn == "" {
+		return nil, errors.New("POSTGRES_DSN environment variable is required - refusing to use default credentials for security")
+	}
+	db, err := Open(ctx, dsn)
 	if err != nil {
 		return nil, err
 	}

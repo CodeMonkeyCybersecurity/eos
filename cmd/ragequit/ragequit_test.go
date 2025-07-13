@@ -147,7 +147,7 @@ func TestCreateTimestampFile(t *testing.T) {
 	rc := eos_io.NewContext(context.Background(), "test")
 
 	testReason := "test emergency"
-	emergency.CreateTimestampFile(rc, testReason)
+	_ = emergency.CreateTimestampFile(rc, testReason)
 
 	timestampFile := filepath.Join(tempDir, "ragequit-timestamp.txt")
 	assert.True(t, system.FileExists(timestampFile))
@@ -172,7 +172,7 @@ func TestGenerateRecoveryPlan(t *testing.T) {
 
 	rc := eos_io.NewContext(context.Background(), "test")
 
-	recovery.GenerateRecoveryPlan(rc)
+	_ = recovery.GenerateRecoveryPlan(rc)
 
 	recoveryFile := filepath.Join(tempDir, "RAGEQUIT-RECOVERY-PLAN.md")
 	assert.True(t, system.FileExists(recoveryFile))
@@ -197,7 +197,7 @@ func TestEnvironmentDetection(t *testing.T) {
 
 	rc := eos_io.NewContext(context.Background(), "test")
 
-	diagnostics.DetectEnvironment(rc)
+	_, _ = diagnostics.DetectEnvironment(rc)
 
 	envFile := filepath.Join(tempDir, "ragequit-environment.txt")
 	assert.True(t, system.FileExists(envFile))

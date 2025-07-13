@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -101,7 +102,20 @@ func CheckVaultHealth(rc *eos_io.RuntimeContext) (bool, error) {
 	url := strings.TrimRight(addr, "/") + shared.VaultHealthPath
 	otelzap.Ctx(rc.Ctx).Debug("🌐 Performing raw Vault health check", zap.String("url", url))
 
-	resp, err := http.Get(url)
+	// Create HTTP client with timeout to prevent indefinite hangs
+	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
+	defer cancel()
+	
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error(" Failed to create Vault health request", zap.Error(err))
+		return false, fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Vault health endpoint not responding", zap.String("url", url), zap.Error(err))
 		return false, fmt.Errorf("vault not responding: %w", err)

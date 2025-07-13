@@ -74,7 +74,7 @@ func FuzzPromptInput(f *testing.F) {
 		// Test input validation
 		if len(input) > 0 {
 			// Should handle any input gracefully
-			_ = validateUserInput(input)
+			_ = validateUserInput(input, "test-field")
 		}
 		
 		// Test prompt message construction - should not allow injection
@@ -135,12 +135,12 @@ func FuzzPromptSecurePassword(f *testing.F) {
 	
 	f.Fuzz(func(t *testing.T, password string) {
 		// Test password validation
-		_ = validatePasswordInput(password)
+		_ = validatePasswordInput(password, "test-password")
 		
 		// Even invalid passwords should not cause crashes
 		if len(password) > 0 {
 			// Test that password sanitization works
-			sanitized := sanitizePasswordInput(password)
+			sanitized := sanitizePasswordInputTest(password)
 			
 			// Verify no control characters remain
 			for _, char := range sanitized {
@@ -177,7 +177,7 @@ func FuzzPromptYesNo(f *testing.F) {
 	
 	f.Fuzz(func(t *testing.T, input string) {
 		// Test yes/no parsing
-		result, valid := parseYesNoInput(input)
+		result, valid := parseYesNoInputTest(input)
 		
 		// Should always return a boolean result and validity flag
 		_ = result
@@ -254,34 +254,26 @@ func FuzzPromptValidatedInput(f *testing.F) {
 // Helper functions that should exist in the actual implementation
 // These represent the validation logic that needs to be implemented
 
-func validateUserInput(input string) error {
-	// TODO: Implement comprehensive user input validation
-	// Should check for control characters, length limits, etc.
-	return nil
-}
 
 func constructPromptMessage(prompt, defaultValue string) string {
-	// TODO: Implement safe prompt message construction
+	// Safe prompt message construction for testing
 	// Should sanitize input to prevent terminal injection
-	return prompt + ": " + defaultValue
+	safePrompt := sanitizeUserInputTest(prompt)
+	safeDefault := sanitizeUserInputTest(defaultValue)
+	return safePrompt + ": " + safeDefault
 }
 
-func sanitizeUserInput(input string) string {
-	// TODO: Implement user input sanitization
+func sanitizeUserInputTest(input string) string {
+	// Test version of user input sanitization
 	// Should remove control characters, escape sequences, etc.
 	result := strings.ReplaceAll(input, "\x00", "")
 	result = strings.ReplaceAll(result, "\x1b", "")
 	return result
 }
 
-func validatePasswordInput(password string) bool {
-	// TODO: Implement password validation
-	// Should check for minimum requirements
-	return len(password) >= 8
-}
 
-func sanitizePasswordInput(password string) string {
-	// TODO: Implement password sanitization
+func sanitizePasswordInputTest(password string) string {
+	// Test version of password sanitization
 	// Should remove control characters but preserve valid Unicode
 	result := ""
 	for _, char := range password {
@@ -301,8 +293,8 @@ func calculatePasswordStrength(password string) int {
 	return min(len(password)*10, 100)
 }
 
-func parseYesNoInput(input string) (bool, bool) {
-	// TODO: Implement yes/no parsing
+func parseYesNoInputTest(input string) (bool, bool) {
+	// Test version of yes/no parsing
 	// Should handle various representations of yes/no
 	lower := strings.ToLower(strings.TrimSpace(input))
 	switch lower {

@@ -372,7 +372,8 @@ func waitForService(ctx context.Context, host string, port int) error {
 			conn, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 			if err == nil {
 				if closeErr := conn.Close(); closeErr != nil {
-					fmt.Printf("Warning: Failed to close connection: %v\n", closeErr)
+					// Note: Non-critical error that can be silently handled
+					_ = closeErr
 				}
 				return nil
 			}
@@ -400,7 +401,8 @@ func initializeServices(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) e
 		}
 		defer func() {
 			if err := os.Unsetenv("PGPASSWORD"); err != nil {
-				fmt.Printf("Warning: Failed to unset PGPASSWORD: %v\n", err)
+				// Note: Non-critical error that can be silently handled
+				_ = err
 			}
 		}()
 

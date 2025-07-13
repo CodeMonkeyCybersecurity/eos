@@ -128,13 +128,13 @@ func outputTableDatabaseStatus(status *database_management.DatabaseStatus) error
 	_, _ = fmt.Fprintf(w, "Status:\t%s\n", status.Status)
 
 	if status.Uptime > 0 {
-		fmt.Fprintf(w, "Uptime:\t%s\n", status.Uptime.String())
+		_, _ = fmt.Fprintf(w, "Uptime:\t%s\n", status.Uptime.String())
 	}
 
-	fmt.Fprintf(w, "Connections:\t%d/%d\n", status.Connections, status.MaxConnections)
+	_, _ = fmt.Fprintf(w, "Connections:\t%d/%d\n", status.Connections, status.MaxConnections)
 
 	if status.DatabaseSize != "" {
-		fmt.Fprintf(w, "Database Size:\t%s\n", status.DatabaseSize)
+		_, _ = fmt.Fprintf(w, "Database Size:\t%s\n", status.DatabaseSize)
 	}
 
 	if status.Memory != "" {

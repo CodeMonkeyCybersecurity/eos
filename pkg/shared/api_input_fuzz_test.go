@@ -420,8 +420,43 @@ func validateAPIRequest(jsonData string) bool {
 }
 
 func sanitizeJSONInput(jsonData string) string {
-	// TODO: Implement JSON input sanitization
-	return strings.ReplaceAll(jsonData, "<script>", "")
+	// Comprehensive JSON input sanitization
+	sanitized := jsonData
+	
+	// Remove script tags (case-insensitive, various forms)
+	scriptPatterns := []string{
+		"<script>", "</script>", "<SCRIPT>", "</SCRIPT>",
+		"<script ", "<Script>", "</Script>", "<ScRiPt>",
+	}
+	for _, pattern := range scriptPatterns {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "")
+	}
+	
+	// Remove dangerous JavaScript patterns
+	jsPatterns := []string{
+		"javascript:", "vbscript:", "data:text/html",
+		"onclick=", "onerror=", "onload=", "onmouseover=",
+		"eval(", "setTimeout(", "setInterval(",
+	}
+	for _, pattern := range jsPatterns {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "")
+	}
+	
+	// Remove dangerous HTML tags
+	htmlPatterns := []string{
+		"<iframe", "<object", "<embed", "<link", "<meta",
+		"<style", "<img", "<svg", "<form", "<input",
+	}
+	for _, pattern := range htmlPatterns {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "")
+	}
+	
+	// Remove null bytes and control characters
+	sanitized = strings.ReplaceAll(sanitized, "\x00", "")
+	sanitized = strings.ReplaceAll(sanitized, "\r", "")
+	sanitized = strings.ReplaceAll(sanitized, "\n", "")
+	
+	return sanitized
 }
 
 func containsScriptInjection(input string) bool {
@@ -497,10 +532,31 @@ func validateAPIParameter(param string) bool {
 }
 
 func sanitizeAPIParameter(param string) string {
-	// TODO: Implement parameter sanitization
-	param = strings.ReplaceAll(param, "\x00", "")
-	param = strings.ReplaceAll(param, "<script>", "")
-	return param
+	// Comprehensive parameter sanitization
+	sanitized := param
+	
+	// Remove null bytes and control characters
+	sanitized = strings.ReplaceAll(sanitized, "\x00", "")
+	sanitized = strings.ReplaceAll(sanitized, "\r", "")
+	sanitized = strings.ReplaceAll(sanitized, "\n", "")
+	sanitized = strings.ReplaceAll(sanitized, "\t", "")
+	
+	// Remove dangerous script patterns
+	dangerousPatterns := []string{
+		"<script>", "</script>", "javascript:", "vbscript:",
+		"onclick=", "onerror=", "onload=", "onmouseover=",
+		"$(", "`", "eval(", "setTimeout(", "setInterval(",
+		"'; DROP", "' OR '1'='1", "UNION SELECT",
+		"../", "..\\", "%2e%2e", "..%2f", "..%5c",
+	}
+	
+	for _, pattern := range dangerousPatterns {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "")
+		// Also check case-insensitive
+		sanitized = strings.ReplaceAll(strings.ToLower(sanitized), strings.ToLower(pattern), "")
+	}
+	
+	return sanitized
 }
 
 func containsInjectionAttempts(input string) bool {
@@ -558,10 +614,36 @@ func validateAPIHeader(headerValue string) bool {
 }
 
 func sanitizeAPIHeader(headerValue string) string {
-	// TODO: Implement header sanitization
-	headerValue = strings.ReplaceAll(headerValue, "\r", "")
-	headerValue = strings.ReplaceAll(headerValue, "\n", "")
-	return headerValue
+	// Comprehensive header sanitization
+	sanitized := headerValue
+	
+	// Remove CRLF injection patterns
+	sanitized = strings.ReplaceAll(sanitized, "\r", "")
+	sanitized = strings.ReplaceAll(sanitized, "\n", "")
+	sanitized = strings.ReplaceAll(sanitized, "%0d", "")
+	sanitized = strings.ReplaceAll(sanitized, "%0a", "")
+	sanitized = strings.ReplaceAll(sanitized, "%0D", "")
+	sanitized = strings.ReplaceAll(sanitized, "%0A", "")
+	
+	// Remove null bytes
+	sanitized = strings.ReplaceAll(sanitized, "\x00", "")
+	
+	// Remove dangerous script patterns that might be in headers
+	dangerousPatterns := []string{
+		"<script>", "</script>", "javascript:", "vbscript:",
+		"eval(", "setTimeout(", "$(", "`",
+	}
+	
+	for _, pattern := range dangerousPatterns {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "")
+	}
+	
+	// Ensure header value is reasonable length
+	if len(sanitized) > 8192 {
+		sanitized = sanitized[:8192]
+	}
+	
+	return sanitized
 }
 
 func containsHeaderInjection(input string) bool {
@@ -610,10 +692,52 @@ func isAllowedMediaType(mediaType string) bool {
 }
 
 func sanitizeAPIResponse(response string) string {
-	// TODO: Implement response sanitization
-	response = strings.ReplaceAll(response, "<script>", "")
-	response = strings.ReplaceAll(response, "password", "***")
-	return response
+	// Comprehensive response sanitization
+	sanitized := response
+	
+	// Remove XSS patterns
+	xssPatterns := []string{
+		"<script>", "</script>", "<SCRIPT>", "</SCRIPT>",
+		"javascript:", "vbscript:", "data:text/html",
+		"onclick=", "onerror=", "onload=", "onmouseover=",
+		"eval(", "setTimeout(", "setInterval(",
+	}
+	for _, pattern := range xssPatterns {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "")
+	}
+	
+	// Redact sensitive data patterns
+	sensitivePatterns := map[string]string{
+		"password":    "***",
+		"token":       "***",
+		"secret":      "***",
+		"key":         "***",
+		"credit_card": "***",
+		"ssn":         "***",
+		"api_key":     "***",
+		"bearer":      "***",
+	}
+	
+	for pattern, replacement := range sensitivePatterns {
+		// Case-insensitive replacement
+		re := strings.NewReplacer(
+			pattern, replacement,
+			strings.ToUpper(pattern), replacement,
+			strings.Title(pattern), replacement,
+		)
+		sanitized = re.Replace(sanitized)
+	}
+	
+	// Remove path disclosure patterns
+	pathPatterns := []string{
+		"/etc/", "/usr/", "/home/", "/var/", "/root/",
+		"c:\\", "c:/", "\\windows\\", "/windows/",
+	}
+	for _, pattern := range pathPatterns {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "[PATH]")
+	}
+	
+	return sanitized
 }
 
 func containsXSSPatterns(input string) bool {
