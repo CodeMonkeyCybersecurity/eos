@@ -45,8 +45,6 @@ Examples:
 			zap.Bool("interactive", interactive),
 			zap.Bool("dry_run", dryRun))
 
-		manager := service_installation.NewServiceInstallationManager()
-
 		// Build installation options
 		options := &service_installation.ServiceInstallOptions{
 			Name:            "grafana",
@@ -78,7 +76,7 @@ Examples:
 		}
 
 		// Perform installation
-		result, err := manager.InstallService(rc, options)
+		result, err := service_installation.InstallService(rc, options)
 		if err != nil {
 			return fmt.Errorf("grafana installation failed: %w", err)
 		}

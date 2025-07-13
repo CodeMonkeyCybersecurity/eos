@@ -33,8 +33,7 @@ Examples:
 			zap.Bool("json", outputJSON),
 			zap.Bool("all", showAll))
 
-		manager := container_management.NewContainerManager(nil)
-		result, err := manager.ListRunningContainers(rc)
+		result, err := container_management.ListRunningContainers(rc, nil)
 		if err != nil {
 			logger.Error("Failed to list containers", zap.Error(err))
 			return err
@@ -70,8 +69,7 @@ Examples:
 		logger.Info("Listing Docker Compose projects",
 			zap.Strings("search_paths", searchPaths))
 
-		manager := container_management.NewContainerManager(nil)
-		result, err := manager.FindComposeProjects(rc, searchPaths)
+		result, err := container_management.FindComposeProjects(rc, nil, searchPaths)
 		if err != nil {
 			logger.Error("Failed to list compose projects", zap.Error(err))
 			return err

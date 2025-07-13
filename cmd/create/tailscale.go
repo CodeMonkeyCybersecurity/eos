@@ -48,7 +48,6 @@ Examples:
 			zap.Bool("dry_run", dryRun),
 			zap.Bool("auto_start", autoStart))
 
-		manager := service_installation.NewServiceInstallationManager()
 
 		// Build installation options
 		options := &service_installation.ServiceInstallOptions{
@@ -65,7 +64,7 @@ Examples:
 		}
 
 		// Perform installation
-		result, err := manager.InstallService(rc, options)
+		result, err := service_installation.InstallService(rc, options)
 		if err != nil {
 			return fmt.Errorf("tailscale installation failed: %w", err)
 		}

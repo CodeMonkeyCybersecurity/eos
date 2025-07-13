@@ -55,8 +55,7 @@ Examples:
 			zap.Bool("force", force),
 			zap.Bool("dry_run", dryRun))
 
-		manager := container_management.NewContainerManager(nil)
-		result, err := manager.StopAllComposeProjects(rc, options)
+		result, err := container_management.StopAllComposeProjects(rc, nil, options)
 		if err != nil {
 			logger.Error("Failed to stop compose projects", zap.Error(err))
 			return err

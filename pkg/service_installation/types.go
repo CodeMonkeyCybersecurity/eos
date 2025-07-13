@@ -18,6 +18,7 @@ const (
 	ServiceTypeGuacamole  ServiceType = "guacamole"
 	ServiceTypeOpenStack  ServiceType = "openstack"
 	ServiceTypeQemuGuest  ServiceType = "qemu-guest-agent"
+	ServiceTypeHecate     ServiceType = "hecate"
 )
 
 // InstallationMethod represents how the service is installed

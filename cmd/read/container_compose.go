@@ -38,8 +38,7 @@ Examples:
 			zap.Strings("search_paths", searchPaths),
 			zap.Bool("json", outputJSON))
 
-		manager := container_management.NewContainerManager(nil)
-		result, err := manager.FindComposeProjects(rc, searchPaths)
+		result, err := container_management.FindComposeProjects(rc, nil, searchPaths)
 		if err != nil {
 			logger.Error("Failed to find compose projects", zap.Error(err))
 			return err
