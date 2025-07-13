@@ -62,33 +62,33 @@ Examples:
 				zap.String("version", result.Version),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\nQEMU Guest Agent Installation Complete!\n\n")
-			fmt.Printf(" Service Details:\n")
-			fmt.Printf("   Method: %s\n", result.Method)
-			fmt.Printf("   Duration: %s\n", result.Duration)
+			logger.Info("terminal prompt: QEMU Guest Agent Installation Complete!\n")
+			logger.Info("terminal prompt:  Service Details:")
+			logger.Info("terminal prompt:    Method: %s", result.Method)
+			logger.Info("terminal prompt:    Duration: %s", result.Duration)
 
 			if result.Version != "" {
-				fmt.Printf("   Version: %s\n", result.Version)
+				logger.Info("terminal prompt:    Version: %s", result.Version)
 			}
 
-			fmt.Printf("\n📝 Features Enabled:\n")
-			fmt.Printf("   - Guest shutdown/reboot from host\n")
-			fmt.Printf("   - File system freeze/thaw for snapshots\n")
-			fmt.Printf("   - Guest network information\n")
-			fmt.Printf("   - Guest exec commands\n")
-			fmt.Printf("   - Time synchronization\n")
+			logger.Info("terminal prompt: 📝 Features Enabled:")
+			logger.Info("terminal prompt:    - Guest shutdown/reboot from host")
+			logger.Info("terminal prompt:    - File system freeze/thaw for snapshots")
+			logger.Info("terminal prompt:    - Guest network information")
+			logger.Info("terminal prompt:    - Guest exec commands")
+			logger.Info("terminal prompt:    - Time synchronization")
 
-			fmt.Printf("\n💡 Hypervisor Configuration:\n")
-			fmt.Printf("   - For Proxmox: Enable QEMU Guest Agent in VM options\n")
-			fmt.Printf("   - For libvirt: Add channel device for guest agent\n")
-			fmt.Printf("   - Check status: eos status qemu-guest-agent\n")
+			logger.Info("terminal prompt: 💡 Hypervisor Configuration:")
+			logger.Info("terminal prompt:    - For Proxmox: Enable QEMU Guest Agent in VM options")
+			logger.Info("terminal prompt:    - For libvirt: Add channel device for guest agent")
+			logger.Info("terminal prompt:    - Check status: eos status qemu-guest-agent")
 		} else {
 			logger.Error("QEMU Guest Agent installation failed", zap.String("error", result.Error))
-			fmt.Printf("\n❌ QEMU Guest Agent Installation Failed!\n")
-			fmt.Printf("Error: %s\n", result.Error)
+			logger.Info("terminal prompt: ❌ QEMU Guest Agent Installation Failed!")
+			logger.Info("terminal prompt: Error: %s", result.Error)
 
 			if len(result.Steps) > 0 {
-				fmt.Printf("\nInstallation Steps:\n")
+				logger.Info("terminal prompt: Installation Steps:")
 				for _, step := range result.Steps {
 					status := ""
 					switch step.Status {
@@ -97,9 +97,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
 					if step.Error != "" {
-						fmt.Printf("      Error: %s\n", step.Error)
+						logger.Info("terminal prompt:       Error: %s", step.Error)
 					}
 				}
 			}

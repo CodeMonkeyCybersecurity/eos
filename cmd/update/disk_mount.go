@@ -39,8 +39,8 @@ Examples:
 			zap.String("options", options),
 			zap.Bool("dry_run", dryRun))
 
-		manager := disk_management.NewDiskManager(nil)
-		result, err := manager.MountPartition(rc, device, mountPoint, options, dryRun)
+		// Use simplified function instead of manager pattern
+		result, err := disk_management.MountPartition(rc, device, mountPoint, options, dryRun)
 		if err != nil {
 			logger.Error("Failed to mount partition", zap.Error(err))
 			return err

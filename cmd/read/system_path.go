@@ -63,7 +63,7 @@ The tool detects common PATH problems such as:
 		}
 
 		report := diag.GenerateReport(info)
-		fmt.Println(report)
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", report)))
 
 		logger.Info("PATH diagnostics completed successfully",
 			zap.Int("duplicate_entries", len(info.DuplicateEntries)),

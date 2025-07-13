@@ -130,16 +130,16 @@ func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx
 	)
 
 	// Header
-	fmt.Printf("%s%s═══════════════════════════════════════════════════════════════════════════════════════%s\n", colorBold, colorCyan, colorReset)
-	fmt.Printf("%s%s                              DELPHI SERVICES LOGS%s\n", colorBold, colorBlue, colorReset)
-	fmt.Printf("%s%s═══════════════════════════════════════════════════════════════════════════════════════%s\n\n", colorBold, colorCyan, colorReset)
+	logger.Info("terminal prompt: %s%s═══════════════════════════════════════════════════════════════════════════════════════%s", colorBold, colorCyan, colorReset)
+	logger.Info("terminal prompt: %s%s                              DELPHI SERVICES LOGS%s", colorBold, colorBlue, colorReset)
+	logger.Info("terminal prompt: %s%s═══════════════════════════════════════════════════════════════════════════════════════%s\n", colorBold, colorCyan, colorReset)
 
 	for i, service := range services {
 		// Service header with decorative separator
-		fmt.Printf("%s%s┌─────────────────────────────────────────────────────────────────────────────────────────┐%s\n", colorBold, colorGreen, colorReset)
-		fmt.Printf("%s%s│   Service: %-70s  │%s\n", colorBold, colorGreen, service, colorReset)
-		fmt.Printf("%s%s│   Showing last %-60d lines  │%s\n", colorBold, colorGreen, lines, colorReset)
-		fmt.Printf("%s%s└─────────────────────────────────────────────────────────────────────────────────────────┘%s\n", colorBold, colorGreen, colorReset)
+		logger.Info("terminal prompt: %s%s┌─────────────────────────────────────────────────────────────────────────────────────────┐%s", colorBold, colorGreen, colorReset)
+		logger.Info("terminal prompt: %s%s│   Service: %-70s  │%s", colorBold, colorGreen, service, colorReset)
+		logger.Info("terminal prompt: %s%s│   Showing last %-60d lines  │%s", colorBold, colorGreen, lines, colorReset)
+		logger.Info("terminal prompt: %s%s└─────────────────────────────────────────────────────────────────────────────────────────┘%s", colorBold, colorGreen, colorReset)
 
 		logger.Info("Fetching logs for service",
 			zap.String("service", service),
@@ -161,7 +161,7 @@ func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx
 		})
 
 		if err != nil {
-			fmt.Printf("%s%s Failed to fetch logs for %s: %v%s\n\n", colorBold, colorRed, service, err, colorReset)
+			logger.Info("terminal prompt: %s%s Failed to fetch logs for %s: %v%s\n", colorBold, colorRed, service, err, colorReset)
 			logger.Warn("Failed to fetch logs for service",
 				zap.String("service", service),
 				zap.Error(err))
@@ -169,25 +169,25 @@ func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx
 		}
 
 		if strings.TrimSpace(output) == "" {
-			fmt.Printf("%s%s No recent logs found for %s%s\n\n", colorBold, colorYellow, service, colorReset)
+			logger.Info("terminal prompt: %s%s No recent logs found for %s%s\n", colorBold, colorYellow, service, colorReset)
 		} else {
 			// Display the logs with subtle formatting
-			fmt.Printf("%s", output)
+			logger.Info("terminal prompt: %s", output)
 			if !strings.HasSuffix(output, "\n") {
-				fmt.Println()
+				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 			}
 		}
 
 		// Add separator between services (except for the last one)
 		if i < len(services)-1 {
-			fmt.Printf("%s%s───────────────────────────────────────────────────────────────────────────────────────────%s\n\n", colorBold, colorCyan, colorReset)
+			logger.Info("terminal prompt: %s%s───────────────────────────────────────────────────────────────────────────────────────────%s\n", colorBold, colorCyan, colorReset)
 		}
 	}
 
 	// Footer
-	fmt.Printf("\n%s%s═══════════════════════════════════════════════════════════════════════════════════════%s\n", colorBold, colorCyan, colorReset)
-	fmt.Printf("%s%s   Completed viewing logs for %d Delphi services%s\n", colorBold, colorGreen, len(services), colorReset)
-	fmt.Printf("%s%s═══════════════════════════════════════════════════════════════════════════════════════%s\n", colorBold, colorCyan, colorReset)
+	logger.Info("terminal prompt: \n%s%s═══════════════════════════════════════════════════════════════════════════════════════%s", colorBold, colorCyan, colorReset)
+	logger.Info("terminal prompt: %s%s   Completed viewing logs for %d Delphi services%s", colorBold, colorGreen, len(services), colorReset)
+	logger.Info("terminal prompt: %s%s═══════════════════════════════════════════════════════════════════════════════════════%s", colorBold, colorCyan, colorReset)
 
 	logger.Info("Successfully displayed logs for all Delphi services",
 		zap.Int("services_count", len(services)),

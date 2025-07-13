@@ -104,27 +104,27 @@ func outputKeysJSON(keys interface{}) error {
 
 // TODO
 func outputKeysTable(keys interface{}, pattern, statusFilter string) error {
-	fmt.Printf("Salt Minion Keys")
+	logger.Info("terminal prompt: Salt Minion Keys")
 	if pattern != "" {
-		fmt.Printf(" (pattern: %s)", pattern)
+		logger.Info("terminal prompt:  (pattern: %s)", pattern)
 	}
 	if statusFilter != "all" {
-		fmt.Printf(" (status: %s)", statusFilter)
+		logger.Info("terminal prompt:  (status: %s)", statusFilter)
 	}
-	fmt.Println()
-	fmt.Println(strings.Repeat("=", 60))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 60))))
 
 	// TODO: Implement actual key listing based on Salt client response format
-	fmt.Println("Accepted Keys:")
-	fmt.Println("  (key listing implementation pending Salt client structure)")
-	fmt.Println()
+	logger.Info("terminal prompt: Accepted Keys:")
+	logger.Info("terminal prompt:   (key listing implementation pending Salt client structure)")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
-	fmt.Println("Unaccepted Keys:")
-	fmt.Println("  (key listing implementation pending Salt client structure)")
-	fmt.Println()
+	logger.Info("terminal prompt: Unaccepted Keys:")
+	logger.Info("terminal prompt:   (key listing implementation pending Salt client structure)")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
-	fmt.Println("Rejected Keys:")
-	fmt.Println("  (key listing implementation pending Salt client structure)")
+	logger.Info("terminal prompt: Rejected Keys:")
+	logger.Info("terminal prompt:   (key listing implementation pending Salt client structure)")
 
 	return nil
 }

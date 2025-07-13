@@ -211,7 +211,7 @@ Examples:
 		// Stop the container if it's running.
 		if err := container.StopContainersBySubstring(rc, "hecate"); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Error stopping container", zap.String("substring", "hecate"), zap.Error(err))
-			fmt.Printf("Error stopping container: %v\n", err)
+			logger.Info("terminal prompt: Error stopping container: %v", err)
 			return err
 		}
 		otelzap.Ctx(rc.Ctx).Info("Containers with 'hecate' in the name stopped successfully")
@@ -219,7 +219,7 @@ Examples:
 		// Organize assets for Jenkins.
 		if err := utils.OrganizeAssetsForDeployment("jenkins"); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to organize assets", zap.Error(err))
-			fmt.Printf("Failed to organize assets: %v\n", err)
+			logger.Info("terminal prompt: Failed to organize assets: %v", err)
 			return err
 		}
 		otelzap.Ctx(rc.Ctx).Info("Assets organized successfully for Jenkins")
@@ -228,7 +228,7 @@ Examples:
 		cfg, err := hecate.LoadConfig(rc, "jenkins")
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Configuration error", zap.Error(err))
-			fmt.Printf("Configuration error: %v\n", err)
+			logger.Info("terminal prompt: Configuration error: %v", err)
 			return err
 		}
 		otelzap.Ctx(rc.Ctx).Info("Configuration loaded", zap.Any("config", cfg))
@@ -238,7 +238,7 @@ Examples:
 		assetsDir := "./assets" // or the appropriate directory
 		if err := utils.ReplaceTokensInAllFiles(assetsDir, cfg.BaseDomain, cfg.BackendIP); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to replace tokens in assets", zap.Error(err))
-			fmt.Printf("Error replacing tokens: %v\n", err)
+			logger.Info("terminal prompt: Error replacing tokens: %v", err)
 			return err
 		}
 		otelzap.Ctx(rc.Ctx).Info("Tokens replaced successfully in all files under assets")
@@ -248,7 +248,7 @@ Examples:
 
 		if err := crypto.EnsureCertificates(cfg.Subdomain, cfg.BaseDomain, cfg.Email); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Certificate generation failed", zap.Error(err))
-			fmt.Printf("Certificate generation failed: %v\n", err)
+			logger.Info("terminal prompt: Certificate generation failed: %v", err)
 			return err
 		}
 		otelzap.Ctx(rc.Ctx).Info("Certificate retrieved successfully", zap.String("domain", fullDomain))
@@ -256,7 +256,7 @@ Examples:
 		// Uncomment lines in docker-compose.yml relevant to Jenkins.
 		if err := container.UncommentSegment("uncomment if using Jenkins behind Hecate"); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to uncomment Jenkins section", zap.Error(err))
-			fmt.Printf("Failed to uncomment Jenkins section: %v\n", err)
+			logger.Info("terminal prompt: Failed to uncomment Jenkins section: %v", err)
 			return err
 		}
 		otelzap.Ctx(rc.Ctx).Info("Successfully uncommented Jenkins lines")
@@ -264,11 +264,11 @@ Examples:
 		// Now use the compose file for starting the services.
 		if err := container.RunDockerComposeAllServices(shared.DefaultComposeYML, "jenkins"); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to start Docker services", zap.Error(err))
-			fmt.Printf("Failed to run docker compose up: %v\n", err)
+			logger.Info("terminal prompt: Failed to run docker compose up: %v", err)
 			return err
 		}
 
-		fmt.Println(" Jenkins reverse proxy deployed successfully.")
+		logger.Info("terminal prompt:  Jenkins reverse proxy deployed successfully.")
 		return nil
 	}),
 }

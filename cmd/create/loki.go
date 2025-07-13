@@ -70,30 +70,30 @@ Examples:
 				zap.String("version", result.Version),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\nLoki Installation Complete!\n\n")
-			fmt.Printf("📊 Service Details:\n")
-			fmt.Printf("   Version: %s\n", result.Version)
-			fmt.Printf("   Method: %s\n", result.Method)
-			fmt.Printf("   Duration: %s\n", result.Duration)
+			logger.Info("terminal prompt: Loki Installation Complete!\n")
+			logger.Info("terminal prompt: 📊 Service Details:")
+			logger.Info("terminal prompt:    Version: %s", result.Version)
+			logger.Info("terminal prompt:    Method: %s", result.Method)
+			logger.Info("terminal prompt:    Duration: %s", result.Duration)
 
 			if len(result.Endpoints) > 0 {
-				fmt.Printf("\n🌐 Access URLs:\n")
+				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					fmt.Printf("   %s\n", endpoint)
+					logger.Info("terminal prompt:    %s", endpoint)
 				}
 			}
 
-			fmt.Printf("\n📝 Next Steps:\n")
-			fmt.Printf("   1. Configure promtail or other log shippers to send logs to Loki\n")
-			fmt.Printf("   2. Access Grafana (if included) to view logs\n")
-			fmt.Printf("   3. Check status: docker compose ps\n")
+			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:    1. Configure promtail or other log shippers to send logs to Loki")
+			logger.Info("terminal prompt:    2. Access Grafana (if included) to view logs")
+			logger.Info("terminal prompt:    3. Check status: docker compose ps")
 		} else {
 			logger.Error("Loki installation failed", zap.String("error", result.Error))
-			fmt.Printf("\n❌ Loki Installation Failed!\n")
-			fmt.Printf("Error: %s\n", result.Error)
+			logger.Info("terminal prompt: ❌ Loki Installation Failed!")
+			logger.Info("terminal prompt: Error: %s", result.Error)
 
 			if len(result.Steps) > 0 {
-				fmt.Printf("\nInstallation Steps:\n")
+				logger.Info("terminal prompt: Installation Steps:")
 				for _, step := range result.Steps {
 					status := ""
 					switch step.Status {
@@ -102,9 +102,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
 					if step.Error != "" {
-						fmt.Printf("      Error: %s\n", step.Error)
+						logger.Info("terminal prompt:       Error: %s", step.Error)
 					}
 				}
 			}

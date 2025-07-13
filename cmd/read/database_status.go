@@ -47,8 +47,6 @@ Examples:
 			zap.String("host", host),
 			zap.String("database", database))
 
-		manager := database_management.NewDatabaseManager()
-
 		// Build database configuration
 		config := &database_management.DatabaseConfig{
 			Type:     database_management.DatabaseTypePostgreSQL,
@@ -75,7 +73,7 @@ Examples:
 		}
 
 		// Get database status
-		status, err := manager.GetDatabaseStatus(rc, config)
+		status, err := database_management.GetDatabaseStatus(rc, config)
 		if err != nil {
 			return fmt.Errorf("failed to get database status: %w", err)
 		}
@@ -107,7 +105,7 @@ func outputJSONDatabaseStatus(status *database_management.DatabaseStatus) error 
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	fmt.Println(string(data))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
 	return nil
 }
 
@@ -116,12 +114,12 @@ func outputTableDatabaseStatus(status *database_management.DatabaseStatus) error
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() {
 		if err := w.Flush(); err != nil {
-			fmt.Printf("Warning: Failed to flush output: %v\n", err)
+			logger.Info("terminal prompt: Warning: Failed to flush output: %v", err)
 		}
 	}()
 
-	fmt.Printf("Database Status\n")
-	fmt.Printf("===============\n\n")
+	logger.Info("terminal prompt: Database Status")
+	logger.Info("terminal prompt: ===============\n")
 
 	_, _ = fmt.Fprintf(w, "Type:\t%s\n", status.Type)
 	_, _ = fmt.Fprintf(w, "Version:\t%s\n", status.Version)

@@ -158,7 +158,7 @@ func runCommand(command string, args ...string) error {
 	if err != nil {
 		return fmt.Errorf("command failed: %v\nOutput: %s", err, string(output))
 	}
-	fmt.Println(string(output))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
 	return nil
 }
 

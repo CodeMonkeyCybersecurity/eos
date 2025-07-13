@@ -84,7 +84,7 @@ func outputJSONInfo(repo *git_management.GitRepository) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	fmt.Println(string(data))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
 	return nil
 }
 
@@ -93,12 +93,12 @@ func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() {
 		if err := w.Flush(); err != nil {
-			fmt.Printf("Warning: Failed to flush tabwriter: %v\n", err)
+			logger.Info("terminal prompt: Warning: Failed to flush tabwriter: %v", err)
 		}
 	}()
 
-	fmt.Printf("Git Repository Information\n")
-	fmt.Printf("=========================\n\n")
+	logger.Info("terminal prompt: Git Repository Information")
+	logger.Info("terminal prompt: =========================\n")
 
 	// Basic repository info
 	fmt.Fprintf(w, "Repository Path:\t%s\n", repo.Path)
@@ -138,61 +138,61 @@ func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 	fmt.Fprintf(w, "\n")
 
 	// Remote information
-	fmt.Printf("Remotes:\n")
+	logger.Info("terminal prompt: Remotes:")
 	if len(repo.RemoteURLs) == 0 {
-		fmt.Printf("  No remotes configured\n")
+		logger.Info("terminal prompt:   No remotes configured")
 	} else {
 		for name, url := range repo.RemoteURLs {
-			fmt.Printf("  %s: %s\n", name, url)
+			logger.Info("terminal prompt:   %s: %s", name, url)
 		}
 	}
 
 	// Branch information
 	if len(repo.Branches) > 0 {
-		fmt.Printf("\nBranches:\n")
+		logger.Info("terminal prompt: Branches:")
 		for _, branch := range repo.Branches {
 			if detailed {
-				fmt.Printf("  %s\n", branch)
+				logger.Info("terminal prompt:   %s", branch)
 			} else {
 				// Show only first few branches if not detailed
 				if len(repo.Branches) <= 5 {
-					fmt.Printf("  %s\n", branch)
+					logger.Info("terminal prompt:   %s", branch)
 				}
 			}
 		}
 		if !detailed && len(repo.Branches) > 5 {
-			fmt.Printf("  ... and %d more (use --detailed to see all)\n", len(repo.Branches)-5)
+			logger.Info("terminal prompt:   ... and %d more (use --detailed to see all)", len(repo.Branches)-5)
 		}
 	}
 
 	// File status details
 	if detailed && repo.Status != nil {
 		if len(repo.Status.Staged) > 0 {
-			fmt.Printf("\nStaged Files (%d):\n", len(repo.Status.Staged))
+			logger.Info("terminal prompt: \nStaged Files (%d):", len(repo.Status.Staged))
 			for _, file := range repo.Status.Staged {
-				fmt.Printf("  + %s\n", file)
+				logger.Info("terminal prompt:   + %s", file)
 			}
 		}
 
 		if len(repo.Status.Modified) > 0 {
-			fmt.Printf("\nModified Files (%d):\n", len(repo.Status.Modified))
+			logger.Info("terminal prompt: \nModified Files (%d):", len(repo.Status.Modified))
 			for _, file := range repo.Status.Modified {
-				fmt.Printf("  M %s\n", file)
+				logger.Info("terminal prompt:   M %s", file)
 			}
 		}
 
 		if len(repo.Status.Untracked) > 0 {
-			fmt.Printf("\nUntracked Files (%d):\n", len(repo.Status.Untracked))
+			logger.Info("terminal prompt: \nUntracked Files (%d):", len(repo.Status.Untracked))
 			for _, file := range repo.Status.Untracked {
-				fmt.Printf("  ? %s\n", file)
+				logger.Info("terminal prompt:   ? %s", file)
 			}
 		}
 	} else if repo.Status != nil && (!repo.Status.IsClean) {
-		fmt.Printf("\nFile Changes:\n")
-		fmt.Printf("  Staged: %d files\n", len(repo.Status.Staged))
-		fmt.Printf("  Modified: %d files\n", len(repo.Status.Modified))
-		fmt.Printf("  Untracked: %d files\n", len(repo.Status.Untracked))
-		fmt.Printf("  (use --detailed to see file names)\n")
+		logger.Info("terminal prompt: File Changes:")
+		logger.Info("terminal prompt:   Staged: %d files", len(repo.Status.Staged))
+		logger.Info("terminal prompt:   Modified: %d files", len(repo.Status.Modified))
+		logger.Info("terminal prompt:   Untracked: %d files", len(repo.Status.Untracked))
+		logger.Info("terminal prompt:   (use --detailed to see file names)")
 	}
 
 	return nil

@@ -47,7 +47,7 @@ var CreateSecretCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println(secret)
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", secret)))
 		return nil
 	}),
 }

@@ -22,6 +22,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - role sync
 - securityadmin reload`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		cfg, err := delphi.PromptLDAPDetails(rc)
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)
@@ -55,8 +56,8 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 			return fmt.Errorf("failed to restart wazuh-dashboard: %w", err)
 		}
 
-		fmt.Println(" LDAP configuration synced to Delphi successfully!")
-		fmt.Println(" Please test logging in to the Wazuh dashboard using your LDAP credentials.")
+		logger.Info("terminal prompt:  LDAP configuration synced to Delphi successfully!")
+		logger.Info("terminal prompt:  Please test logging in to the Wazuh dashboard using your LDAP credentials.")
 		return nil
 	}),
 }

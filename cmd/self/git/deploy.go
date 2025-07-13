@@ -106,8 +106,8 @@ func init() {
 func runDryRunDeployment(rc *eos_io.RuntimeContext, manager *git_management.GitManager, options *git_management.GitDeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	fmt.Printf("Git Deployment Dry Run\n")
-	fmt.Printf("=====================\n\n")
+	logger.Info("terminal prompt: Git Deployment Dry Run")
+	logger.Info("terminal prompt: =====================\n")
 
 	// Get repository info
 	repo, err := manager.GetRepositoryInfo(rc, options.RepositoryPath)
@@ -115,50 +115,50 @@ func runDryRunDeployment(rc *eos_io.RuntimeContext, manager *git_management.GitM
 		return fmt.Errorf("failed to get repository info: %w", err)
 	}
 
-	fmt.Printf("Repository: %s\n", options.RepositoryPath)
-	fmt.Printf("Target Branch: %s\n", options.Branch)
+	logger.Info("terminal prompt: Repository: %s", options.RepositoryPath)
+	logger.Info("terminal prompt: Target Branch: %s", options.Branch)
 	if options.MergeBranch != "" {
-		fmt.Printf("Merge Branch: %s\n", options.MergeBranch)
+		logger.Info("terminal prompt: Merge Branch: %s", options.MergeBranch)
 	}
-	fmt.Printf("Current Branch: %s\n", repo.Status.Branch)
-	fmt.Printf("Repository Status: ")
+	logger.Info("terminal prompt: Current Branch: %s", repo.Status.Branch)
+	logger.Info("terminal prompt: Repository Status: ")
 	if repo.Status.IsClean {
-		fmt.Printf("Clean\n")
+		logger.Info("terminal prompt: Clean")
 	} else {
-		fmt.Printf("Has changes\n")
-		fmt.Printf("  - Staged: %d files\n", len(repo.Status.Staged))
-		fmt.Printf("  - Modified: %d files\n", len(repo.Status.Modified))
-		fmt.Printf("  - Untracked: %d files\n", len(repo.Status.Untracked))
+		logger.Info("terminal prompt: Has changes")
+		logger.Info("terminal prompt:   - Staged: %d files", len(repo.Status.Staged))
+		logger.Info("terminal prompt:   - Modified: %d files", len(repo.Status.Modified))
+		logger.Info("terminal prompt:   - Untracked: %d files", len(repo.Status.Untracked))
 	}
 
 	if repo.Status.AheadCount > 0 || repo.Status.BehindCount > 0 {
-		fmt.Printf("Sync Status: ")
+		logger.Info("terminal prompt: Sync Status: ")
 		if repo.Status.AheadCount > 0 {
-			fmt.Printf("%d ahead", repo.Status.AheadCount)
+			logger.Info("terminal prompt: %d ahead", repo.Status.AheadCount)
 		}
 		if repo.Status.BehindCount > 0 {
 			if repo.Status.AheadCount > 0 {
-				fmt.Printf(", ")
+				logger.Info("terminal prompt: , ")
 			}
-			fmt.Printf("%d behind", repo.Status.BehindCount)
+			logger.Info("terminal prompt: %d behind", repo.Status.BehindCount)
 		}
-		fmt.Printf("\n")
+		logger.Info("terminal prompt: \n")
 	}
 
-	fmt.Printf("\nRemotes:\n")
+	logger.Info("terminal prompt: Remotes:")
 	for name, url := range repo.RemoteURLs {
-		fmt.Printf("  %s: %s\n", name, url)
+		logger.Info("terminal prompt:   %s: %s", name, url)
 	}
 
-	fmt.Printf("\nDeployment Plan:\n")
-	fmt.Printf("1. Pull latest changes from origin/%s\n", options.Branch)
+	logger.Info("terminal prompt: Deployment Plan:")
+	logger.Info("terminal prompt: 1. Pull latest changes from origin/%s", options.Branch)
 	if options.MergeBranch != "" {
-		fmt.Printf("2. Merge %s into %s\n", options.MergeBranch, options.Branch)
+		logger.Info("terminal prompt: 2. Merge %s into %s", options.MergeBranch, options.Branch)
 	}
 	if options.Force {
-		fmt.Printf("3. Force push to origin/%s\n", options.Branch)
+		logger.Info("terminal prompt: 3. Force push to origin/%s", options.Branch)
 	} else {
-		fmt.Printf("3. Push to origin/%s\n", options.Branch)
+		logger.Info("terminal prompt: 3. Push to origin/%s", options.Branch)
 	}
 
 	logger.Info("Dry run deployment completed", zap.String("repository", options.RepositoryPath))

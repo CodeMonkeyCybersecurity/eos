@@ -111,14 +111,14 @@ func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitMan
 		if err != nil {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
-		fmt.Println(string(data))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
 		return nil
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() {
 		if err := w.Flush(); err != nil {
-			fmt.Printf("Warning: Failed to flush tabwriter: %v\n", err)
+			logger.Info("terminal prompt: Warning: Failed to flush tabwriter: %v", err)
 		}
 	}()
 
@@ -127,8 +127,8 @@ func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitMan
 		scope = "Global"
 	}
 
-	fmt.Printf("Git Configuration (%s)\n", scope)
-	fmt.Printf("========================\n\n")
+	logger.Info("terminal prompt: Git Configuration (%s)", scope)
+	logger.Info("terminal prompt: ========================\n")
 
 	fmt.Fprintf(w, "Name:\t%s\n", config.Name)
 	fmt.Fprintf(w, "Email:\t%s\n", config.Email)
@@ -137,7 +137,7 @@ func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitMan
 	fmt.Fprintf(w, "Color UI:\t%t\n", config.ColorUI)
 
 	if len(config.Custom) > 0 {
-		fmt.Printf("\nCustom Settings:\n")
+		logger.Info("terminal prompt: Custom Settings:")
 		for key, value := range config.Custom {
 			fmt.Fprintf(w, "%s:\t%s\n", key, value)
 		}
@@ -165,12 +165,12 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 		currentConfig = &git_management.GitConfig{}
 	}
 
-	fmt.Printf("Interactive Git Configuration\n")
-	fmt.Printf("============================\n\n")
+	logger.Info("terminal prompt: Interactive Git Configuration")
+	logger.Info("terminal prompt: ============================\n")
 
 	// Name
-	fmt.Printf("Current name: %s\n", currentConfig.Name)
-	fmt.Print("Enter your name (or press Enter to keep current): ")
+	logger.Info("terminal prompt: Current name: %s", currentConfig.Name)
+	logger.Info("terminal prompt: Enter your name (or press Enter to keep current): ")
 	var name string
 	fmt.Scanln(&name)
 	if name != "" {
@@ -180,8 +180,8 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 	}
 
 	// Email
-	fmt.Printf("Current email: %s\n", currentConfig.Email)
-	fmt.Print("Enter your email (or press Enter to keep current): ")
+	logger.Info("terminal prompt: Current email: %s", currentConfig.Email)
+	logger.Info("terminal prompt: Enter your email (or press Enter to keep current): ")
 	var email string
 	fmt.Scanln(&email)
 	if email != "" {
@@ -191,8 +191,8 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 	}
 
 	// Default branch
-	fmt.Printf("Current default branch: %s\n", currentConfig.DefaultBranch)
-	fmt.Print("Enter default branch name [main] (or press Enter to keep current): ")
+	logger.Info("terminal prompt: Current default branch: %s", currentConfig.DefaultBranch)
+	logger.Info("terminal prompt: Enter default branch name [main] (or press Enter to keep current): ")
 	var branch string
 	fmt.Scanln(&branch)
 	if branch != "" {
@@ -204,15 +204,15 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 	}
 
 	// Pull rebase
-	fmt.Printf("Current pull rebase: %t\n", currentConfig.PullRebase)
-	fmt.Print("Use rebase for git pull? [y/N]: ")
+	logger.Info("terminal prompt: Current pull rebase: %t", currentConfig.PullRebase)
+	logger.Info("terminal prompt: Use rebase for git pull? [y/N]: ")
 	var rebaseResponse string
 	fmt.Scanln(&rebaseResponse)
 	config.PullRebase = rebaseResponse == "y" || rebaseResponse == "Y"
 
 	// Color UI
-	fmt.Printf("Current color UI: %t\n", currentConfig.ColorUI)
-	fmt.Print("Enable color output? [Y/n]: ")
+	logger.Info("terminal prompt: Current color UI: %t", currentConfig.ColorUI)
+	logger.Info("terminal prompt: Enable color output? [Y/n]: ")
 	var colorResponse string
 	fmt.Scanln(&colorResponse)
 	config.ColorUI = colorResponse != "n" && colorResponse != "N"

@@ -152,11 +152,11 @@ func initializePlatform(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 		zap.String("domain", config.Domain))
 
 	// Show next steps
-	fmt.Println("\nPlatform initialized successfully!")
-	fmt.Println("\nNext steps:")
-	fmt.Println("1. Add customers: eos create wazuh-ccs --add-customer --customer-config customer.json")
-	fmt.Println("2. Check status: eos read wazuh-ccs --status")
-	fmt.Println("3. List customers: eos list wazuh-ccs")
+	logger.Info("terminal prompt: \nPlatform initialized successfully!")
+	logger.Info("terminal prompt: \nNext steps:")
+	logger.Info("terminal prompt: 1. Add customers: eos create wazuh-ccs --add-customer --customer-config customer.json")
+	logger.Info("terminal prompt: 2. Check status: eos read wazuh-ccs --status")
+	logger.Info("terminal prompt: 3. List customers: eos list wazuh-ccs")
 
 	return nil
 }
@@ -245,13 +245,13 @@ func addNewCustomer(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 		zap.String("tier", string(customerConfig.Tier)))
 
 	// Show access information
-	fmt.Printf("\nCustomer provisioned successfully!\n")
-	fmt.Printf("\nAccess Details:\n")
-	fmt.Printf("- Customer ID: %s\n", customerConfig.ID)
-	fmt.Printf("- Dashboard URL: https://%s.<platform-domain>\n", customerConfig.Subdomain)
-	fmt.Printf("- Admin Email: %s\n", customerConfig.AdminEmail)
-	fmt.Printf("\nCredentials have been stored in Vault at:\n")
-	fmt.Printf("- wazuh-mssp/customers/%s/wazuh/credentials\n", customerConfig.ID)
+	logger.Info("terminal prompt: Customer provisioned successfully!")
+	logger.Info("terminal prompt: Access Details:")
+	logger.Info("terminal prompt: - Customer ID: %s", customerConfig.ID)
+	logger.Info("terminal prompt: - Dashboard URL: https://%s.<platform-domain>", customerConfig.Subdomain)
+	logger.Info("terminal prompt: - Admin Email: %s", customerConfig.AdminEmail)
+	logger.Info("terminal prompt: Credentials have been stored in Vault at:")
+	logger.Info("terminal prompt: - wazuh-mssp/customers/%s/wazuh/credentials", customerConfig.ID)
 
 	return nil
 }

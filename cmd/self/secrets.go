@@ -67,15 +67,15 @@ that require access to secrets, including the Delphi dashboard.`,
 		reader := bufio.NewReader(os.Stdin)
 
 		// Step 1: Vault Address
-		fmt.Printf("\n Vault Configuration Setup\n")
-		fmt.Printf("================================\n\n")
+		logger.Info("terminal prompt:  Vault Configuration Setup")
+		logger.Info("terminal prompt: ================================\n")
 
 		currentAddr := os.Getenv("VAULT_ADDR")
 		if currentAddr != "" {
-			fmt.Printf("Current VAULT_ADDR: %s\n", currentAddr)
+			logger.Info("terminal prompt: Current VAULT_ADDR: %s", currentAddr)
 		}
 
-		fmt.Printf("Enter Vault server address (e.g., https://vhost11:8200): ")
+		logger.Info("terminal prompt: Enter Vault server address (e.g., https://vhost11:8200): ")
 		vaultAddr, err := reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("failed to read vault address: %w", err)
@@ -85,7 +85,7 @@ that require access to secrets, including the Delphi dashboard.`,
 		if vaultAddr == "" {
 			if currentAddr != "" {
 				vaultAddr = currentAddr
-				fmt.Printf("Using current address: %s\n", vaultAddr)
+				logger.Info("terminal prompt: Using current address: %s", vaultAddr)
 			} else {
 				return fmt.Errorf("vault address is required")
 			}
@@ -98,29 +98,29 @@ that require access to secrets, including the Delphi dashboard.`,
 		logger.Info("Vault address configured", zap.String("address", vaultAddr))
 
 		// Step 2: Test connection
-		fmt.Printf("\n📡 Testing Vault connectivity...\n")
+		logger.Info("terminal prompt: 📡 Testing Vault connectivity...")
 
 		// Initialize Vault service facade
 		if err := vault.InitializeServiceFacade(rc); err != nil {
 			logger.Warn("Failed to initialize Vault service", zap.Error(err))
-			fmt.Printf(" Vault connection failed: %v\n", err)
-			fmt.Printf("\nTroubleshooting:\n")
-			fmt.Printf("- Check if Vault server is running at %s\n", vaultAddr)
-			fmt.Printf("- Verify network connectivity\n")
-			fmt.Printf("- Check TLS certificate configuration\n")
+			logger.Info("terminal prompt:  Vault connection failed: %v", err)
+			logger.Info("terminal prompt: Troubleshooting:")
+			logger.Info("terminal prompt: - Check if Vault server is running at %s", vaultAddr)
+			logger.Info("terminal prompt: - Verify network connectivity")
+			logger.Info("terminal prompt: - Check TLS certificate configuration")
 			return fmt.Errorf("vault connection failed")
 		}
 
-		fmt.Printf(" Vault server is reachable\n")
+		logger.Info("terminal prompt:  Vault server is reachable")
 
 		// Step 3: Authentication setup
-		fmt.Printf("\nAuthentication Setup\n")
-		fmt.Printf("Available authentication methods:\n")
-		fmt.Printf("1. Token (recommended for initial setup)\n")
-		fmt.Printf("2. Username/Password (userpass)\n")
-		fmt.Printf("3. AppRole (for production services)\n")
+		logger.Info("terminal prompt: Authentication Setup")
+		logger.Info("terminal prompt: Available authentication methods:")
+		logger.Info("terminal prompt: 1. Token (recommended for initial setup)")
+		logger.Info("terminal prompt: 2. Username/Password (userpass)")
+		logger.Info("terminal prompt: 3. AppRole (for production services)")
 
-		fmt.Printf("Select authentication method [1-3]: ")
+		logger.Info("terminal prompt: Select authentication method [1-3]: ")
 		authMethod, err := reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("failed to read authentication method: %w", err)
@@ -145,17 +145,17 @@ that require access to secrets, including the Delphi dashboard.`,
 		}
 
 		// Step 4: Create environment file
-		fmt.Printf("\n💾 Saving configuration...\n")
+		logger.Info("terminal prompt: 💾 Saving configuration...")
 		if err := auth.SaveVaultConfig(rc, vaultAddr, authMethod); err != nil {
 			logger.Error("Failed to save Vault configuration", zap.Error(err))
 			return fmt.Errorf("failed to save configuration: %w", err)
 		}
 
-		fmt.Printf(" Vault configuration saved successfully\n")
-		fmt.Printf("\nNext steps:\n")
-		fmt.Printf("- Test the configuration: eos self secrets test\n")
-		fmt.Printf("- Set database credentials: eos self secrets set delphi-db\n")
-		fmt.Printf("- Run the dashboard: eos delphi dashboard\n")
+		logger.Info("terminal prompt:  Vault configuration saved successfully")
+		logger.Info("terminal prompt: Next steps:")
+		logger.Info("terminal prompt: - Test the configuration: eos self secrets test")
+		logger.Info("terminal prompt: - Set database credentials: eos self secrets set delphi-db")
+		logger.Info("terminal prompt: - Run the dashboard: eos delphi dashboard")
 
 		logger.Info("Vault configuration completed successfully")
 		return nil
@@ -232,29 +232,29 @@ This command will:
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Testing Vault connectivity")
 
-		fmt.Printf(" Vault Connectivity Test\n")
-		fmt.Printf("===========================\n\n")
+		logger.Info("terminal prompt:  Vault Connectivity Test")
+		logger.Info("terminal prompt: ===========================\n")
 
 		// Test 1: Check environment variables
 		vaultAddr := os.Getenv("VAULT_ADDR")
 		if vaultAddr == "" {
-			fmt.Printf(" VAULT_ADDR not set\n")
-			fmt.Printf("   Run: eos self secrets configure\n\n")
+			logger.Info("terminal prompt:  VAULT_ADDR not set")
+			logger.Info("terminal prompt:    Run: eos self secrets configure\n")
 			return fmt.Errorf("VAULT_ADDR environment variable not set")
 		}
-		fmt.Printf(" VAULT_ADDR: %s\n", vaultAddr)
+		logger.Info("terminal prompt:  VAULT_ADDR: %s", vaultAddr)
 
 		// Test 2: Initialize Vault service
 		if err := vault.InitializeServiceFacade(rc); err != nil {
-			fmt.Printf(" Vault service initialization failed: %v\n", err)
+			logger.Info("terminal prompt:  Vault service initialization failed: %v", err)
 			return fmt.Errorf("vault initialization failed: %w", err)
 		}
-		fmt.Printf(" Vault service initialized\n")
+		logger.Info("terminal prompt:  Vault service initialized")
 
 		// Test 3: Test secret access
 		facade := vault.GetServiceFacade()
 		if facade == nil {
-			fmt.Printf(" Vault service facade not available\n")
+			logger.Info("terminal prompt:  Vault service facade not available")
 			return fmt.Errorf("vault service not available")
 		}
 
@@ -262,14 +262,14 @@ This command will:
 		testPath := "secret/data/delphi/database/username"
 		_, err := facade.RetrieveSecret(rc.Ctx, testPath)
 		if err != nil {
-			fmt.Printf("  Secret access test: %v\n", err)
-			fmt.Printf("   This is normal if no secrets have been set yet\n")
+			logger.Info("terminal prompt:   Secret access test: %v", err)
+			logger.Info("terminal prompt:    This is normal if no secrets have been set yet")
 		} else {
-			fmt.Printf(" Secret access working\n")
+			logger.Info("terminal prompt:  Secret access working")
 		}
 
-		fmt.Printf("\n Vault connectivity test completed\n")
-		fmt.Printf("Vault is ready for use with Eos services\n")
+		logger.Info("terminal prompt:  Vault connectivity test completed")
+		logger.Info("terminal prompt: Vault is ready for use with Eos services")
 
 		return nil
 	}),
@@ -289,29 +289,29 @@ Shows:
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Checking Vault status")
 
-		fmt.Printf(" Vault Status\n")
-		fmt.Printf("===============\n\n")
+		logger.Info("terminal prompt:  Vault Status")
+		logger.Info("terminal prompt: ===============\n")
 
 		// Check basic configuration
 		vaultAddr := os.Getenv("VAULT_ADDR")
 		if vaultAddr == "" {
-			fmt.Printf(" Vault not configured\n")
-			fmt.Printf("   Run: eos self secrets configure\n")
+			logger.Info("terminal prompt:  Vault not configured")
+			logger.Info("terminal prompt:    Run: eos self secrets configure")
 			return nil
 		}
 
-		fmt.Printf("Server: %s\n", vaultAddr)
+		logger.Info("terminal prompt: Server: %s", vaultAddr)
 
 		// Check Vault service
 		if err := vault.InitializeServiceFacade(rc); err != nil {
-			fmt.Printf("Status:  Connection failed (%v)\n", err)
+			logger.Info("terminal prompt: Status:  Connection failed (%v)", err)
 			return nil
 		}
 
-		fmt.Printf("Status:  Connected\n\n")
+		logger.Info("terminal prompt: Status:  Connected\n")
 
 		// Check available secrets
-		fmt.Printf(" Available Secrets:\n")
+		logger.Info("terminal prompt:  Available Secrets:")
 
 		facade := vault.GetServiceFacade()
 		if facade != nil {
@@ -331,42 +331,42 @@ Shows:
 				"secret/data/delphi/config/database",
 			}
 
-			fmt.Printf("Static Credentials:\n")
+			logger.Info("terminal prompt: Static Credentials:")
 			for _, secretPath := range staticSecrets {
 				_, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 				if err != nil {
-					fmt.Printf("    %s (not set)\n", secretPath)
+					logger.Info("terminal prompt:     %s (not set)", secretPath)
 				} else {
-					fmt.Printf("    %s\n", secretPath)
+					logger.Info("terminal prompt:     %s", secretPath)
 				}
 			}
 
-			fmt.Printf("\nDatabase Configuration:\n")
+			logger.Info("terminal prompt: Database Configuration:")
 			for _, secretPath := range configSecrets {
 				_, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 				if err != nil {
-					fmt.Printf("    %s (not set)\n", secretPath)
+					logger.Info("terminal prompt:     %s (not set)", secretPath)
 				} else {
-					fmt.Printf("    %s\n", secretPath)
+					logger.Info("terminal prompt:     %s", secretPath)
 				}
 			}
 
-			fmt.Printf("\nDynamic Database Engine:\n")
+			logger.Info("terminal prompt: Dynamic Database Engine:")
 			// Test if dynamic credentials are available
 			_, err := facade.RetrieveSecret(rc.Ctx, "database/creds/delphi-readonly")
 			if err != nil {
-				fmt.Printf("    database/creds/delphi-readonly (not configured)\n")
-				fmt.Printf("    Run: eos self secrets set delphi-db-engine\n")
+				logger.Info("terminal prompt:     database/creds/delphi-readonly (not configured)")
+				logger.Info("terminal prompt:     Run: eos self secrets set delphi-db-engine")
 			} else {
-				fmt.Printf("    database/creds/delphi-readonly (dynamic credentials available)\n")
+				logger.Info("terminal prompt:     database/creds/delphi-readonly (dynamic credentials available)")
 			}
 		}
 
-		fmt.Printf("\nCommands:\n")
-		fmt.Printf("- Set static database credentials: eos self secrets set delphi-db\n")
-		fmt.Printf("- Set database configuration: eos self secrets set delphi-db-config\n")
-		fmt.Printf("- Setup dynamic credentials: eos self secrets set delphi-db-engine\n")
-		fmt.Printf("- Test connectivity: eos self secrets test\n")
+		logger.Info("terminal prompt: Commands:")
+		logger.Info("terminal prompt: - Set static database credentials: eos self secrets set delphi-db")
+		logger.Info("terminal prompt: - Set database configuration: eos self secrets set delphi-db-config")
+		logger.Info("terminal prompt: - Setup dynamic credentials: eos self secrets set delphi-db-engine")
+		logger.Info("terminal prompt: - Test connectivity: eos self secrets test")
 
 		return nil
 	}),
@@ -404,10 +404,10 @@ Examples:
 
 		// secretData is map[string]interface{} from vault
 		if showValue {
-			fmt.Printf("Secret: %s\nData: %v\n", secretPath, secretData)
+			logger.Info("terminal prompt: Secret: %s\nData: %v", secretPath, secretData)
 		} else {
-			fmt.Printf("Secret: %s\nData: [REDACTED]\n", secretPath)
-			fmt.Printf("Use --show-value to display the actual value\n")
+			logger.Info("terminal prompt: Secret: %s\nData: [REDACTED]", secretPath)
+			logger.Info("terminal prompt: Use --show-value to display the actual value")
 		}
 
 		return nil

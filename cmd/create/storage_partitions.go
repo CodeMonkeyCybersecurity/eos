@@ -3,7 +3,6 @@ package create
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
@@ -49,8 +48,8 @@ Examples:
 		options.Force = force
 		options.DryRun = dryRun
 
-		manager := disk_management.NewDiskManager(nil)
-		result, err := manager.CreatePartition(rc, device, options)
+		// Use simplified function instead of manager pattern
+		result, err := disk_management.CreatePartition(rc, device, options)
 		if err != nil {
 			logger.Error("Failed to create partition", zap.Error(err))
 			return err
@@ -83,14 +82,14 @@ func outputPartitionOpJSON(result *disk_management.PartitionOperation) error {
 // TODO
 func outputPartitionOpText(result *disk_management.PartitionOperation) error {
 	if result.DryRun {
-		fmt.Printf("[DRY RUN] %s\n", result.Message)
+		logger.Info("terminal prompt: [DRY RUN] %s", result.Message)
 	} else if result.Success {
-		fmt.Printf("✓ %s\n", result.Message)
+		logger.Info("terminal prompt: ✓ %s", result.Message)
 		if result.Duration > 0 {
-			fmt.Printf("  Duration: %v\n", result.Duration)
+			logger.Info("terminal prompt:   Duration: %v", result.Duration)
 		}
 	} else {
-		fmt.Printf("✗ %s\n", result.Message)
+		logger.Info("terminal prompt: ✗ %s", result.Message)
 	}
 	return nil
 }

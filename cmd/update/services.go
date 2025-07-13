@@ -69,8 +69,6 @@ Examples:
 			ShowAll: showAll,
 		}
 
-		manager := system_services.NewServiceManager(config)
-
 		// Get flag values
 		pattern, _ := cmd.Flags().GetString("pattern")
 		stateFilter, _ := cmd.Flags().GetStringSlice("state")
@@ -125,7 +123,8 @@ Examples:
 			zap.Bool("show_all", showAll),
 			zap.String("pattern", pattern))
 
-		result, err := manager.ListServices(rc, filter)
+		// Use simplified function instead of manager pattern
+		result, err := system_services.ListServices(rc, config, filter)
 		if err != nil {
 			return err
 		}
@@ -163,14 +162,13 @@ Examples:
 			Sudo:   sudo,
 		}
 
-		manager := system_services.NewServiceManager(config)
-
 		logger.Info("Starting service",
 			zap.String("service", serviceName),
 			zap.Bool("enable", enable),
 			zap.Bool("dry_run", dryRun))
 
-		result, err := manager.StartService(rc, serviceName, enable)
+		// Use simplified function instead of manager pattern
+		result, err := system_services.StartService(rc, config, serviceName, enable)
 		if err != nil {
 			return err
 		}
@@ -208,14 +206,13 @@ Examples:
 			Sudo:   sudo,
 		}
 
-		manager := system_services.NewServiceManager(config)
-
 		logger.Info("Stopping service",
 			zap.String("service", serviceName),
 			zap.Bool("disable", disable),
 			zap.Bool("dry_run", dryRun))
 
-		result, err := manager.StopService(rc, serviceName, disable)
+		// Use simplified function instead of manager pattern
+		result, err := system_services.StopService(rc, config, serviceName, disable)
 		if err != nil {
 			return err
 		}
@@ -251,13 +248,12 @@ Examples:
 			Sudo:   sudo,
 		}
 
-		manager := system_services.NewServiceManager(config)
-
 		logger.Info("Restarting service",
 			zap.String("service", serviceName),
 			zap.Bool("dry_run", dryRun))
 
-		result, err := manager.RestartService(rc, serviceName)
+		// Use simplified function instead of manager pattern
+		result, err := system_services.RestartService(rc, config, serviceName)
 		if err != nil {
 			return err
 		}
@@ -288,11 +284,10 @@ Examples:
 		outputJSON, _ := cmd.Flags().GetBool("json")
 		serviceName := args[0]
 
-		manager := system_services.NewServiceManager(nil)
-
 		logger.Info("Getting service status", zap.String("service", serviceName))
 
-		result, err := manager.GetServiceStatus(rc, serviceName)
+		// Use simplified function instead of manager pattern
+		result, err := system_services.GetServiceStatus(rc, serviceName)
 		if err != nil {
 			return err
 		}
@@ -350,13 +345,12 @@ Examples:
 			NoHostname: noHostname,
 		}
 
-		manager := system_services.NewServiceManager(nil)
-
 		logger.Info("Viewing service logs",
 			zap.String("service", serviceName),
 			zap.Bool("follow", follow))
 
-		return manager.ViewLogs(rc, serviceName, options)
+		// Use simplified function instead of manager pattern
+		return system_services.ViewLogs(rc, serviceName, options)
 	}),
 }
 

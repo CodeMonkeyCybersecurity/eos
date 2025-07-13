@@ -36,7 +36,7 @@ Supported OS uninstallers:
 
 		if agentID == "" {
 			otelzap.Ctx(rc.Ctx).Error("Agent ID is required")
-			fmt.Println(" Please provide an agent ID using --agent-id")
+			logger.Info("terminal prompt:  Please provide an agent ID using --agent-id")
 			return nil
 		}
 
@@ -61,7 +61,7 @@ Supported OS uninstallers:
 		}
 
 		prettyJSON, _ := json.MarshalIndent(resp, "", "  ")
-		fmt.Println("\n Agent deleted successfully from Wazuh:\n" + string(prettyJSON))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n Agent deleted successfully from Wazuh:\n" + string(prettyJSON))))
 
 		otelzap.Ctx(rc.Ctx).Info("🧹 Attempting local Wazuh agent uninstall...")
 		switch runtime.GOOS {

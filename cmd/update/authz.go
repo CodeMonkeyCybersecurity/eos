@@ -77,8 +77,7 @@ Available categories: ssh, system, ssl`,
 			DryRun:       true, // Check is always dry-run
 		}
 
-		manager := security_permissions.NewPermissionManager(config)
-		result, err := manager.CheckPermissions(args)
+		result, err := security_permissions.CheckPermissions(rc, config, args)
 		if err != nil {
 			logger.Error("Permission check failed", zap.Error(err))
 			return fmt.Errorf("permission check failed: %v", err)
@@ -132,8 +131,7 @@ Creates backups by default before making changes.`,
 			DryRun:        permissionsFixDryRun,
 		}
 
-		manager := security_permissions.NewPermissionManager(config)
-		result, err := manager.FixPermissions(args)
+		result, err := security_permissions.FixPermissions(rc, config, args)
 		if err != nil {
 			logger.Error("Permission fix failed", zap.Error(err))
 			return fmt.Errorf("permission fix failed: %v", err)

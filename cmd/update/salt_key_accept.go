@@ -62,20 +62,20 @@ Security Notice:
 			zap.Bool("dry_run", dryRun))
 
 		if dryRun {
-			fmt.Println("DRY RUN: Would accept Salt keys")
+			logger.Info("terminal prompt: DRY RUN: Would accept Salt keys")
 			if acceptAll {
-				fmt.Println("  Target: All pending keys")
+				logger.Info("terminal prompt:   Target: All pending keys")
 			} else if pattern != "" {
-				fmt.Printf("  Pattern: %s\n", pattern)
+				logger.Info("terminal prompt:   Pattern: %s", pattern)
 			} else if includeList != "" {
-				fmt.Printf("  Include List: %s\n", includeList)
+				logger.Info("terminal prompt:   Include List: %s", includeList)
 			}
 			return nil
 		}
 
 		// Security confirmation for --all
 		if acceptAll && !force {
-			fmt.Print("WARNING: This will accept ALL pending keys. Continue? [y/N]: ")
+			logger.Info("terminal prompt: WARNING: This will accept ALL pending keys. Continue? [y/N]: ")
 			var response string
 			if _, err := fmt.Scanln(&response); err != nil {
 				// If we can't read user input, default to cancel for security

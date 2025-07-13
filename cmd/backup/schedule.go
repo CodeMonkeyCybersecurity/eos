@@ -234,10 +234,10 @@ Examples:
 			return fmt.Errorf("loading configuration: %w", err)
 		}
 
-		fmt.Println("\nBackup Schedule Status:")
-		fmt.Println(strings.Repeat("-", 80))
-		fmt.Printf("%-20s %-20s %-20s %s\n", "PROFILE", "SCHEDULE", "TIMER STATUS", "NEXT RUN")
-		fmt.Println(strings.Repeat("-", 80))
+		logger.Info("terminal prompt: \nBackup Schedule Status:")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+		logger.Info("terminal prompt: %-20s %-20s %-20s %s", "PROFILE", "SCHEDULE", "TIMER STATUS", "NEXT RUN")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
 
 		for profileName, profile := range config.Profiles {
 			schedule := "-"
@@ -267,7 +267,7 @@ Examples:
 			fmt.Printf("%-20s %-20s %-20s %s\n",
 				profileName, schedule, status, nextRun)
 		}
-		fmt.Println()
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
 		return nil
 	}),
@@ -303,8 +303,8 @@ Examples:
 			zap.String("service", serviceName))
 
 		// Show service status
-		fmt.Printf("Started %s\n", serviceName)
-		fmt.Println("Use 'journalctl -u " + serviceName + " -f' to follow the backup progress")
+		logger.Info("terminal prompt: Started %s", serviceName)
+		logger.Info("terminal prompt: Use 'journalctl -u " + serviceName + " -f' to follow the backup progress")
 
 		return nil
 	}),

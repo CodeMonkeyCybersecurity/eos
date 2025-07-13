@@ -102,11 +102,11 @@ This creates Terraform configuration that:
 		logger.Info("Vault-integrated K3s configuration generated successfully",
 			zap.String("directory", outputDir))
 
-		fmt.Printf(" K3s configuration with Vault integration generated in: %s\n", outputDir)
-		fmt.Printf(" Next steps:\n")
-		fmt.Printf("   1. Review and customize the generated configuration\n")
-		fmt.Printf("   2. Run: ./setup-vault-secrets.sh to configure Vault secrets\n")
-		fmt.Printf("   3. Deploy with: eos create terraform-vault %s --vault-secrets\n", outputDir)
+		logger.Info("terminal prompt:  K3s configuration with Vault integration generated in: %s", outputDir)
+		logger.Info("terminal prompt:  Next steps:")
+		logger.Info("terminal prompt:    1. Review and customize the generated configuration")
+		logger.Info("terminal prompt:    2. Run: ./setup-vault-secrets.sh to configure Vault secrets")
+		logger.Info("terminal prompt:    3. Deploy with: eos create terraform-vault %s --vault-secrets", outputDir)
 
 		return nil
 	}),
@@ -185,7 +185,7 @@ var generateVaultHetznerCmd = &cobra.Command{
 		logger.Info("Vault-integrated Hetzner configuration generated successfully",
 			zap.String("directory", outputDir))
 
-		fmt.Printf(" Hetzner configuration with Vault integration generated in: %s\n", outputDir)
+		logger.Info("terminal prompt:  Hetzner configuration with Vault integration generated in: %s", outputDir)
 
 		return nil
 	}),

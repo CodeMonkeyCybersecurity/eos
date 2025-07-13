@@ -47,10 +47,10 @@ Examples:
 			zap.Int("count", len(config.Repositories)))
 
 		// Display repositories
-		fmt.Println("\nConfigured Repositories:")
-		fmt.Println(strings.Repeat("-", 80))
-		fmt.Printf("%-20s %-10s %-40s\n", "NAME", "BACKEND", "URL")
-		fmt.Println(strings.Repeat("-", 80))
+		logger.Info("terminal prompt: \nConfigured Repositories:")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+		logger.Info("terminal prompt: %-20s %-10s %-40s", "NAME", "BACKEND", "URL")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
 
 		for name, repo := range config.Repositories {
 			isDefault := ""
@@ -60,7 +60,7 @@ Examples:
 			fmt.Printf("%-20s %-10s %-40s%s\n",
 				name, repo.Backend, repo.URL, isDefault)
 		}
-		fmt.Println()
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
 		return nil
 	}),
@@ -94,11 +94,11 @@ Examples:
 			zap.Int("count", len(config.Profiles)))
 
 		// Display profiles
-		fmt.Println("\nConfigured Profiles:")
-		fmt.Println(strings.Repeat("-", 100))
+		logger.Info("terminal prompt: \nConfigured Profiles:")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
 		fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
 			"NAME", "REPOSITORY", "PATHS", "SCHEDULE", "RETENTION")
-		fmt.Println(strings.Repeat("-", 100))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
 
 		for name, profile := range config.Profiles {
 			paths := strings.Join(profile.Paths, ", ")
@@ -132,7 +132,7 @@ Examples:
 			fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
 				name, profile.Repository, paths, schedule, retention)
 		}
-		fmt.Println()
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
 		return nil
 	}),
@@ -244,16 +244,16 @@ Examples:
 			zap.Int("filtered", len(filtered)))
 
 		if len(filtered) == 0 {
-			fmt.Println("No snapshots found matching criteria")
+			logger.Info("terminal prompt: No snapshots found matching criteria")
 			return nil
 		}
 
 		// Display snapshots
-		fmt.Println("\nSnapshots:")
-		fmt.Println(strings.Repeat("-", 120))
+		logger.Info("terminal prompt: \nSnapshots:")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
 		fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
 			"ID", "TIME", "HOST", "PATHS", "TAGS")
-		fmt.Println(strings.Repeat("-", 120))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
 
 		for _, snap := range filtered {
 			id := snap.ID
@@ -273,7 +273,7 @@ Examples:
 			fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
 				id, timeStr, snap.Hostname, paths, tags)
 		}
-		fmt.Println()
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
 		return nil
 	}),

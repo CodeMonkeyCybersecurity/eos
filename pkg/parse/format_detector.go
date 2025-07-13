@@ -27,27 +27,27 @@ func NewFormatDetector(logger *zap.Logger) *FormatDetectorImpl {
 }
 
 // DetectFormat detects the format of input data
-func (f *FormatDetectorImpl) DetectFormat(ctx context.Context, input string) (parse.DataFormat, float64, error) {
+func (f *FormatDetectorImpl) DetectFormat(ctx context.Context, input string) (DataFormat, float64, error) {
 	input = strings.TrimSpace(input)
 
 	if input == "" {
-		return parse.FormatUnknown, 0.0, nil
+		return FormatUnknown, 0.0, nil
 	}
 
 	// Try each format detection method
 	detectors := []struct {
-		format   parse.DataFormat
+		format   DataFormat
 		detector func(string) float64
 	}{
-		{parse.FormatJSON, f.detectJSON},
-		{parse.FormatXML, f.detectXML},
-		{parse.FormatYAML, f.detectYAML},
-		{parse.FormatCSV, f.detectCSV},
-		{parse.FormatTOML, f.detectTOML},
-		{parse.FormatINI, f.detectINI},
+		{FormatJSON, f.detectJSON},
+		{FormatXML, f.detectXML},
+		{FormatYAML, f.detectYAML},
+		{FormatCSV, f.detectCSV},
+		{FormatTOML, f.detectTOML},
+		{FormatINI, f.detectINI},
 	}
 
-	bestFormat := parse.FormatUnknown
+	bestFormat := FormatUnknown
 	bestConfidence := 0.0
 
 	for _, detector := range detectors {
@@ -66,60 +66,60 @@ func (f *FormatDetectorImpl) DetectFormat(ctx context.Context, input string) (pa
 }
 
 // DetectFromBytes detects format from byte data
-func (f *FormatDetectorImpl) DetectFromBytes(ctx context.Context, data []byte) (parse.DataFormat, float64, error) {
+func (f *FormatDetectorImpl) DetectFromBytes(ctx context.Context, data []byte) (DataFormat, float64, error) {
 	return f.DetectFormat(ctx, string(data))
 }
 
 // DetectFromReader detects format from an io.Reader
-func (f *FormatDetectorImpl) DetectFromReader(ctx context.Context, reader io.Reader) (parse.DataFormat, float64, error) {
+func (f *FormatDetectorImpl) DetectFromReader(ctx context.Context, reader io.Reader) (DataFormat, float64, error) {
 	data, err := io.ReadAll(reader)
 	if err != nil {
-		return parse.FormatUnknown, 0.0, err
+		return FormatUnknown, 0.0, err
 	}
 
 	return f.DetectFormat(ctx, string(data))
 }
 
 // DetectFromFilename detects format from filename extension
-func (f *FormatDetectorImpl) DetectFromFilename(filename string) (parse.DataFormat, float64, error) {
+func (f *FormatDetectorImpl) DetectFromFilename(filename string) (DataFormat, float64, error) {
 	ext := strings.ToLower(filepath.Ext(filename))
 
 	switch ext {
 	case ".json":
-		return parse.FormatJSON, 1.0, nil
+		return FormatJSON, 1.0, nil
 	case ".yaml", ".yml":
-		return parse.FormatYAML, 1.0, nil
+		return FormatYAML, 1.0, nil
 	case ".xml":
-		return parse.FormatXML, 1.0, nil
+		return FormatXML, 1.0, nil
 	case ".csv":
-		return parse.FormatCSV, 1.0, nil
+		return FormatCSV, 1.0, nil
 	case ".toml":
-		return parse.FormatTOML, 1.0, nil
+		return FormatTOML, 1.0, nil
 	case ".ini", ".cfg", ".conf":
-		return parse.FormatINI, 1.0, nil
+		return FormatINI, 1.0, nil
 	case ".tsv":
-		return parse.FormatTSV, 1.0, nil
+		return FormatTSV, 1.0, nil
 	case ".html", ".htm":
-		return parse.FormatHTML, 1.0, nil
+		return FormatHTML, 1.0, nil
 	case ".txt":
-		return parse.FormatTXT, 0.5, nil
+		return FormatTXT, 0.5, nil
 	default:
-		return parse.FormatUnknown, 0.0, nil
+		return FormatUnknown, 0.0, nil
 	}
 }
 
 // SupportedFormats returns the list of supported formats
-func (f *FormatDetectorImpl) SupportedFormats() []parse.DataFormat {
-	return []parse.DataFormat{
-		parse.FormatJSON,
-		parse.FormatYAML,
-		parse.FormatXML,
-		parse.FormatCSV,
-		parse.FormatTOML,
-		parse.FormatINI,
-		parse.FormatTSV,
-		parse.FormatHTML,
-		parse.FormatTXT,
+func (f *FormatDetectorImpl) SupportedFormats() []DataFormat {
+	return []DataFormat{
+		FormatJSON,
+		FormatYAML,
+		FormatXML,
+		FormatCSV,
+		FormatTOML,
+		FormatINI,
+		FormatTSV,
+		FormatHTML,
+		FormatTXT,
 	}
 }
 

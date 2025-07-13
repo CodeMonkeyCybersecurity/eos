@@ -65,16 +65,16 @@ func outputDiskUsageJSON(usage map[string]disk_management.DiskUsageInfo) error {
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputDiskUsageTable(usage map[string]disk_management.DiskUsageInfo) error {
 	if len(usage) == 0 {
-		fmt.Println("No mounted filesystems found.")
+		logger.Info("terminal prompt: No mounted filesystems found.")
 		return nil
 	}
 
-	fmt.Printf("Disk Usage Information (%d filesystems)\n\n", len(usage))
+	logger.Info("terminal prompt: Disk Usage Information (%d filesystems)\n", len(usage))
 
 	// Print header
 	fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n",
 		"FILESYSTEM", "SIZE", "USED", "AVAIL", "USE%", "MOUNTED ON")
-	fmt.Println(strings.Repeat("-", 80))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
 
 	// Print usage information
 	for _, info := range usage {

@@ -2,7 +2,6 @@
 package read
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -36,7 +35,7 @@ var ReadAPICmd = &cobra.Command{
 		if cfg.Token == "" {
 			token, err := delphi.Authenticate(rc, cfg)
 			if err != nil {
-				fmt.Printf(" Authentication failed: %v\n", err)
+				logger.Info("terminal prompt:  Authentication failed: %v", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
@@ -58,7 +57,7 @@ var ReadAPICmd = &cobra.Command{
 			body, code := delphi.AuthenticatedGetJSON(rc, cfg, "/manager/status")
 			delphi.HandleAPIResponse("Wazuh Manager Version", []byte(body), code)
 		} else {
-			fmt.Println(" No flags provided. Use --permissions or --version to query specific information.")
+			logger.Info("terminal prompt:  No flags provided. Use --permissions or --version to query specific information.")
 		}
 		return nil
 	}),

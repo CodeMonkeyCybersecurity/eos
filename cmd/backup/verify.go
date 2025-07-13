@@ -84,9 +84,9 @@ var verifyRepoCmd = &cobra.Command{
 		logger.Info("Repository verification completed successfully",
 			zap.String("output", string(output)))
 
-		fmt.Println("Repository verified successfully!")
+		logger.Info("terminal prompt: Repository verified successfully!")
 		if readData || readDataSubset != "" {
-			fmt.Println("Data integrity check: PASSED")
+			logger.Info("terminal prompt: Data integrity check: PASSED")
 		}
 
 		return nil
@@ -154,7 +154,7 @@ var verifySnapshotCmd = &cobra.Command{
 		}
 
 		logger.Info("Snapshot verification completed successfully")
-		fmt.Printf("Snapshot %s verified successfully!\n", snapshotID)
+		logger.Info("terminal prompt: Snapshot %s verified successfully!", snapshotID)
 
 		return nil
 	}),

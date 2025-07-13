@@ -99,7 +99,7 @@ Examples:
 		case pipelinePromptInteractive:
 			// Interactive mode
 			logger.Info("terminal prompt: Enter prompt content (press Ctrl+D when done):")
-			fmt.Println("Enter prompt content (press Ctrl+D when done):")
+			logger.Info("terminal prompt: Enter prompt content (press Ctrl+D when done):")
 
 			scanner := bufio.NewScanner(os.Stdin)
 			var lines []string
@@ -131,7 +131,7 @@ Examples:
 		}
 
 		logger.Info("Successfully created prompt", zap.String("name", promptName), zap.String("path", promptPath))
-		fmt.Printf("Successfully created prompt '%s' at %s\n", promptName, promptPath)
+		logger.Info("terminal prompt: Successfully created prompt '%s' at %s", promptName, promptPath)
 
 		// TODO: Check if the prompts directory is already mounted to Delphi containers
 		// This functionality needs to be implemented in the pipeline package
@@ -139,8 +139,8 @@ Examples:
 		// if err != nil {
 		// 	logger.Warn("Failed to check if prompts directory is mounted", zap.Error(err))
 		// } else if !mounted {
-		// 	fmt.Println("\nNote: The prompts directory is not currently mounted to Delphi containers.")
-		// 	fmt.Println("Run 'eos update delphi services' to mount the prompts directory.")
+		// 	logger.Info("terminal prompt: \nNote: The prompts directory is not currently mounted to Delphi containers.")
+		// 	logger.Info("terminal prompt: Run 'eos update delphi services' to mount the prompts directory.")
 		// }
 
 		return nil

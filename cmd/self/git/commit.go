@@ -106,37 +106,37 @@ func init() {
 func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.GitManager, path string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	fmt.Printf("Interactive Git Commit\n")
-	fmt.Printf("=====================\n\n")
+	logger.Info("terminal prompt: Interactive Git Commit")
+	logger.Info("terminal prompt: =====================\n")
 
 	// Show current status
 	status, err := manager.GetStatus(rc, path)
 	if err != nil {
 		logger.Warn("Could not get repository status", zap.Error(err))
 	} else {
-		fmt.Printf("Repository Status:\n")
-		fmt.Printf("- Staged files: %d\n", len(status.Staged))
-		fmt.Printf("- Modified files: %d\n", len(status.Modified))
-		fmt.Printf("- Untracked files: %d\n", len(status.Untracked))
-		fmt.Printf("\n")
+		logger.Info("terminal prompt: Repository Status:")
+		logger.Info("terminal prompt: - Staged files: %d", len(status.Staged))
+		logger.Info("terminal prompt: - Modified files: %d", len(status.Modified))
+		logger.Info("terminal prompt: - Untracked files: %d", len(status.Untracked))
+		logger.Info("terminal prompt: \n")
 	}
 
 	// Ask if user wants to add all files
 	var addAll bool
 	if status != nil && (len(status.Modified) > 0 || len(status.Untracked) > 0) {
-		fmt.Print("Add all modified and untracked files? [Y/n]: ")
+		logger.Info("terminal prompt: Add all modified and untracked files? [Y/n]: ")
 		var response string
 		if _, err := fmt.Scanln(&response); err != nil {
-			fmt.Printf("Warning: Failed to read input, using default: %v\n", err)
+			logger.Info("terminal prompt: Warning: Failed to read input, using default: %v", err)
 		}
 		addAll = response != "n" && response != "N"
 	}
 
 	// Get commit message
-	fmt.Print("Enter commit message: ")
+	logger.Info("terminal prompt: Enter commit message: ")
 	var message string
 	if _, err := fmt.Scanln(&message); err != nil {
-		fmt.Printf("Warning: Failed to read commit message: %v\n", err)
+		logger.Info("terminal prompt: Warning: Failed to read commit message: %v", err)
 		return fmt.Errorf("failed to read commit message: %w", err)
 	}
 	if message == "" {
@@ -144,16 +144,16 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 	}
 
 	// Ask about pushing
-	fmt.Print("Push after commit? [y/N]: ")
+	logger.Info("terminal prompt: Push after commit? [y/N]: ")
 	var pushResponse string
 	if _, err := fmt.Scanln(&pushResponse); err != nil {
-		fmt.Printf("Warning: Failed to read push input, using default: %v\n", err)
+		logger.Info("terminal prompt: Warning: Failed to read push input, using default: %v", err)
 	}
 	push := pushResponse == "y" || pushResponse == "Y"
 
 	var force bool
 	if push {
-		fmt.Print("Force push? [y/N]: ")
+		logger.Info("terminal prompt: Force push? [y/N]: ")
 		var forceResponse string
 		fmt.Scanln(&forceResponse)
 		force = forceResponse == "y" || forceResponse == "Y"

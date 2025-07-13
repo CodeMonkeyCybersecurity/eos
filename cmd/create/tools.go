@@ -58,19 +58,6 @@ Examples:
 			config.Packages = customPackages
 		}
 
-		// Create manager
-		manager := system_config.NewSystemToolsManager(rc, config)
-
-		// Build options
-		options := &system_config.ConfigurationOptions{
-			Type:        system_config.ConfigTypeSystemTools,
-			DryRun:      dryRun,
-			Force:       force,
-			Interactive: interactive,
-			Backup:      backup,
-			Validate:    true,
-		}
-
 		// Interactive configuration
 		if interactive {
 			if err := runInteractiveToolsSetup(config); err != nil {
@@ -78,7 +65,42 @@ Examples:
 			}
 		}
 
-		return setupConfiguration(rc, system_config.ConfigTypeSystemTools, manager, options)
+		// Use simplified function instead of manager pattern
+		result, err := system_config.ConfigureSystemTools(rc, config)
+		if err != nil {
+			return fmt.Errorf("system tools configuration failed: %w", err)
+		}
+
+		// Display results
+		if result.Success {
+			logger.Info("System tools setup completed successfully",
+				zap.Duration("duration", result.Duration),
+				zap.Int("changes", len(result.Changes)),
+				zap.Int("warnings", len(result.Warnings)))
+
+			// Log completion information
+			logger.Info("terminal prompt: System Tools Setup Complete!")
+			logger.Info(fmt.Sprintf("terminal prompt: ⏱️ Duration: %s", result.Duration))
+
+			if len(result.Changes) > 0 {
+				logger.Info("terminal prompt: 📝 Changes Made:")
+				for _, change := range result.Changes {
+					logger.Info(fmt.Sprintf("terminal prompt:    • %s: %s (%s)", 
+						change.Type, change.Target, change.Action))
+				}
+			}
+
+			if len(result.Warnings) > 0 {
+				logger.Info("terminal prompt: ⚠️ Warnings:")
+				for _, warning := range result.Warnings {
+					logger.Info(fmt.Sprintf("terminal prompt:    • %s", warning))
+				}
+			}
+		} else {
+			return fmt.Errorf("system tools configuration failed: %s", result.Error)
+		}
+
+		return nil
 	}),
 }
 
@@ -94,11 +116,11 @@ func init() {
 
 // TODO
 func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
-	fmt.Printf("Interactive System Tools Setup\n")
-	fmt.Printf("=================================\n\n")
+	logger.Info("terminal prompt: Interactive System Tools Setup")
+	logger.Info("terminal prompt: =================================\n")
 
 	// System update
-	fmt.Print("Update system packages? [Y/n]: ")
+	logger.Info("terminal prompt: Update system packages? [Y/n]: ")
 	var updateSystem string
 	fmt.Scanln(&updateSystem)
 	if updateSystem == "n" || updateSystem == "N" {
@@ -106,7 +128,7 @@ func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
 	}
 
 	// Package installation
-	fmt.Print("Install essential packages? [Y/n]: ")
+	logger.Info("terminal prompt: Install essential packages? [Y/n]: ")
 	var installPackages string
 	fmt.Scanln(&installPackages)
 	if installPackages == "n" || installPackages == "N" {
@@ -114,14 +136,14 @@ func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
 	}
 
 	// NPM installation
-	fmt.Print("Install npm and Node.js tools? [y/N]: ")
+	logger.Info("terminal prompt: Install npm and Node.js tools? [y/N]: ")
 	var installNpm string
 	fmt.Scanln(&installNpm)
 	if installNpm == "y" || installNpm == "Y" {
 		config.InstallNpm = true
 
 		// ZX installation
-		fmt.Print("Install zx scripting tool? [y/N]: ")
+		logger.Info("terminal prompt: Install zx scripting tool? [y/N]: ")
 		var installZx string
 		fmt.Scanln(&installZx)
 		if installZx == "y" || installZx == "Y" {
@@ -130,7 +152,7 @@ func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
 	}
 
 	// UFW configuration
-	fmt.Print("Configure UFW firewall? [y/N]: ")
+	logger.Info("terminal prompt: Configure UFW firewall? [y/N]: ")
 	var configureUFW string
 	fmt.Scanln(&configureUFW)
 	if configureUFW == "y" || configureUFW == "Y" {
@@ -138,22 +160,22 @@ func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
 	}
 
 	// Sensors setup
-	fmt.Print("Setup hardware sensors monitoring? [y/N]: ")
+	logger.Info("terminal prompt: Setup hardware sensors monitoring? [y/N]: ")
 	var setupSensors string
 	fmt.Scanln(&setupSensors)
 	if setupSensors == "y" || setupSensors == "Y" {
 		config.SetupSensors = true
 	}
 
-	fmt.Printf("\nConfiguration Summary:\n")
-	fmt.Printf("   Update System: %t\n", config.UpdateSystem)
-	fmt.Printf("   Install Packages: %t\n", config.InstallPackages)
-	fmt.Printf("   Install NPM: %t\n", config.InstallNpm)
-	fmt.Printf("   Install ZX: %t\n", config.InstallZx)
-	fmt.Printf("   Configure UFW: %t\n", config.ConfigureUFW)
-	fmt.Printf("   Setup Sensors: %t\n", config.SetupSensors)
+	logger.Info("terminal prompt: Configuration Summary:")
+	logger.Info("terminal prompt:    Update System: %t", config.UpdateSystem)
+	logger.Info("terminal prompt:    Install Packages: %t", config.InstallPackages)
+	logger.Info("terminal prompt:    Install NPM: %t", config.InstallNpm)
+	logger.Info("terminal prompt:    Install ZX: %t", config.InstallZx)
+	logger.Info("terminal prompt:    Configure UFW: %t", config.ConfigureUFW)
+	logger.Info("terminal prompt:    Setup Sensors: %t", config.SetupSensors)
 
-	fmt.Print("\nProceed with setup? [Y/n]: ")
+	logger.Info("terminal prompt: \nProceed with setup? [Y/n]: ")
 	var proceed string
 	fmt.Scanln(&proceed)
 	if proceed == "n" || proceed == "N" {

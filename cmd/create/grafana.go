@@ -90,40 +90,40 @@ Examples:
 				zap.Int("port", result.Port),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\nGrafana Installation Complete!\n\n")
-			fmt.Printf("📊 Service Details:\n")
-			fmt.Printf("   Version: %s\n", result.Version)
-			fmt.Printf("   Port: %d\n", result.Port)
-			fmt.Printf("   Method: %s\n", result.Method)
-			fmt.Printf("   Duration: %s\n", result.Duration)
+			logger.Info("terminal prompt: Grafana Installation Complete!\n")
+			logger.Info("terminal prompt: 📊 Service Details:")
+			logger.Info("terminal prompt:    Version: %s", result.Version)
+			logger.Info("terminal prompt:    Port: %d", result.Port)
+			logger.Info("terminal prompt:    Method: %s", result.Method)
+			logger.Info("terminal prompt:    Duration: %s", result.Duration)
 
 			if len(result.Endpoints) > 0 {
-				fmt.Printf("\n🌐 Access URLs:\n")
+				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					fmt.Printf("   %s\n", endpoint)
+					logger.Info("terminal prompt:    %s", endpoint)
 				}
 			}
 
 			if len(result.Credentials) > 0 {
-				fmt.Printf("\n Default Credentials:\n")
+				logger.Info("terminal prompt:  Default Credentials:")
 				for key, value := range result.Credentials {
-					fmt.Printf("   %s: %s\n", key, value)
+					logger.Info("terminal prompt:    %s: %s", key, value)
 				}
 			}
 
-			fmt.Printf("\n📝 Next Steps:\n")
-			fmt.Printf("   1. Open Grafana in your browser: http://localhost:%d\n", result.Port)
-			fmt.Printf("   2. Login with default credentials (admin/admin)\n")
-			fmt.Printf("   3. Change the default password\n")
-			fmt.Printf("   4. Configure data sources and dashboards\n")
-			fmt.Printf("   5. Check status: eos status grafana\n")
+			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:    1. Open Grafana in your browser: http://localhost:%d", result.Port)
+			logger.Info("terminal prompt:    2. Login with default credentials (admin/admin)")
+			logger.Info("terminal prompt:    3. Change the default password")
+			logger.Info("terminal prompt:    4. Configure data sources and dashboards")
+			logger.Info("terminal prompt:    5. Check status: eos status grafana")
 		} else {
 			logger.Error("Grafana installation failed", zap.String("error", result.Error))
-			fmt.Printf("\n❌ Grafana Installation Failed!\n")
-			fmt.Printf("Error: %s\n", result.Error)
+			logger.Info("terminal prompt: ❌ Grafana Installation Failed!")
+			logger.Info("terminal prompt: Error: %s", result.Error)
 
 			if len(result.Steps) > 0 {
-				fmt.Printf("\nInstallation Steps:\n")
+				logger.Info("terminal prompt: Installation Steps:")
 				for _, step := range result.Steps {
 					status := ""
 					switch step.Status {
@@ -132,9 +132,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
 					if step.Error != "" {
-						fmt.Printf("      Error: %s\n", step.Error)
+						logger.Info("terminal prompt:       Error: %s", step.Error)
 					}
 				}
 			}

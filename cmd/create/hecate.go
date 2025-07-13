@@ -105,40 +105,40 @@ Examples:
 				zap.String("version", result.Version),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\nCaddy Installation Complete!\n\n")
-			fmt.Printf("🌐 Service Details:\n")
-			fmt.Printf("   Version: %s\n", result.Version)
-			fmt.Printf("   Method: %s (repository)\n", result.Method)
-			fmt.Printf("   Duration: %s\n", result.Duration)
+			logger.Info("terminal prompt: Caddy Installation Complete!")
+			logger.Info("terminal prompt: Service Details:",
+				zap.String("version", result.Version),
+				zap.String("method", result.Method+" (repository)"),
+				zap.Duration("duration", result.Duration))
 
 			if len(result.Endpoints) > 0 {
-				fmt.Printf("\n🌐 Access URLs:\n")
+				logger.Info("terminal prompt: Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					fmt.Printf("   %s\n", endpoint)
+					logger.Info("terminal prompt: "+endpoint)
 				}
 			}
 
 			if len(result.ConfigFiles) > 0 {
-				fmt.Printf("\n Configuration Files:\n")
+				logger.Info("terminal prompt:  Configuration Files:")
 				for _, configFile := range result.ConfigFiles {
-					fmt.Printf("   %s\n", configFile)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s", configFile))
 				}
 			}
 
-			fmt.Printf("\n📝 Next Steps:\n")
-			fmt.Printf("   1. Edit the Caddyfile: sudo nano /etc/caddy/Caddyfile\n")
-			fmt.Printf("   2. Add your site configuration\n")
-			fmt.Printf("   3. Reload configuration: sudo systemctl reload caddy\n")
-			fmt.Printf("   4. Check status: sudo systemctl status caddy\n")
-			fmt.Printf("   5. View logs: sudo journalctl -u caddy -f\n")
-			fmt.Printf("   6. Check service status: eos status caddy\n")
+			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:    1. Edit the Caddyfile: sudo nano /etc/caddy/Caddyfile")
+			logger.Info("terminal prompt:    2. Add your site configuration")
+			logger.Info("terminal prompt:    3. Reload configuration: sudo systemctl reload caddy")
+			logger.Info("terminal prompt:    4. Check status: sudo systemctl status caddy")
+			logger.Info("terminal prompt:    5. View logs: sudo journalctl -u caddy -f")
+			logger.Info("terminal prompt:    6. Check service status: eos status caddy")
 		} else {
 			logger.Error("Caddy installation failed", zap.String("error", result.Error))
-			fmt.Printf("\n❌ Caddy Installation Failed!\n")
-			fmt.Printf("Error: %s\n", result.Error)
+			logger.Info("terminal prompt: ❌ Caddy Installation Failed!")
+			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
-				fmt.Printf("\nInstallation Steps:\n")
+				logger.Info("terminal prompt: Installation Steps:")
 				for _, step := range result.Steps {
 					status := ""
 					switch step.Status {
@@ -147,9 +147,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration))
 					if step.Error != "" {
-						fmt.Printf("      Error: %s\n", step.Error)
+						logger.Info(fmt.Sprintf("terminal prompt:       Error: %s", step.Error))
 					}
 				}
 			}
@@ -170,7 +170,7 @@ func init() {
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveCaddySetup(options *service_installation.ServiceInstallOptions) error {
-	fmt.Printf("Interactive Caddy Setup\n")
+	fmt.Printf("\nInteractive Caddy Setup\n")
 	fmt.Printf("==========================\n\n")
 
 	// Domain configuration

@@ -38,7 +38,7 @@ Supports both local Docker deployment and cloud infrastructure provisioning.`,
 		if domain == "" {
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info(" Domain name required for mail server configuration")
-			fmt.Print("Enter domain name for mail server: ")
+			logger.Info("terminal prompt: Enter domain name for mail server: ")
 			if _, err := fmt.Scanln(&domain); err != nil {
 				logger.Error(" Failed to read domain input", zap.Error(err))
 				return fmt.Errorf("failed to read domain: %w", err)
@@ -50,7 +50,7 @@ Supports both local Docker deployment and cloud infrastructure provisioning.`,
 		if useCloud {
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info(" Server name configuration for cloud deployment")
-			fmt.Printf("Enter server name [%s]: ", serverName)
+			logger.Info("terminal prompt: Enter server name [%s]: ", serverName)
 			var input string
 			if _, err := fmt.Scanln(&input); err != nil {
 				// Empty input is acceptable (use default), but actual read errors should be handled
@@ -137,15 +137,15 @@ location = "%s"`, serverType, location)
 			logger.Warn("Failed to format terraform files", zap.Error(err))
 		}
 
-		fmt.Printf("\n Hecate Terraform configuration generated in: %s\n", outputDir)
-		fmt.Println("\nNext steps:")
+		logger.Info("terminal prompt: \n Hecate Terraform configuration generated in: %s", outputDir)
+		logger.Info("terminal prompt: \nNext steps:")
 		if useCloud {
-			fmt.Println("1. Set your Hetzner Cloud token: export HCLOUD_TOKEN='your-token'")
-			fmt.Println("2. Update terraform.tfvars with your SSH key name")
+			logger.Info("terminal prompt: 1. Set your Hetzner Cloud token: export HCLOUD_TOKEN='your-token'")
+			logger.Info("terminal prompt: 2. Update terraform.tfvars with your SSH key name")
 		}
-		fmt.Printf("3. Review the configuration: cd %s\n", outputDir)
-		fmt.Println("4. Plan the deployment: terraform plan")
-		fmt.Println("5. Apply the configuration: terraform apply")
+		logger.Info("terminal prompt: 3. Review the configuration: cd %s", outputDir)
+		logger.Info("terminal prompt: 4. Plan the deployment: terraform plan")
+		logger.Info("terminal prompt: 5. Apply the configuration: terraform apply")
 
 		return nil
 	}),

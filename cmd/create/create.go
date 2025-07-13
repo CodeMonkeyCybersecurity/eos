@@ -110,25 +110,25 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 			zap.String("type", string(configType)),
 			zap.Duration("duration", result.Duration))
 
-		fmt.Printf("\n%s Setup Complete!\n\n", configType)
-		fmt.Printf("⏱️ Duration: %s\n", result.Duration)
+		logger.Info("terminal prompt: \n%s Setup Complete!\n", configType)
+		logger.Info("terminal prompt: ⏱️ Duration: %s", result.Duration)
 
 		if len(result.Changes) > 0 {
-			fmt.Printf("\n📝 Changes Made:\n")
+			logger.Info("terminal prompt: 📝 Changes Made:")
 			for _, change := range result.Changes {
-				fmt.Printf("   • %s: %s (%s)\n", change.Type, change.Target, change.Action)
+				logger.Info("terminal prompt:    • %s: %s (%s)", change.Type, change.Target, change.Action)
 			}
 		}
 
 		if len(result.Warnings) > 0 {
-			fmt.Printf("\nWarnings:\n")
+			logger.Info("terminal prompt: Warnings:")
 			for _, warning := range result.Warnings {
-				fmt.Printf("   • %s\n", warning)
+				logger.Info("terminal prompt:    • %s", warning)
 			}
 		}
 
 		if len(result.Steps) > 0 {
-			fmt.Printf("\nSteps Completed:\n")
+			logger.Info("terminal prompt: Steps Completed:")
 			for _, step := range result.Steps {
 				status := ""
 				switch step.Status {
@@ -137,16 +137,16 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 				case "running":
 					status = "⏳"
 				}
-				fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+				logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
 				if step.Error != "" {
-					fmt.Printf("      Error: %s\n", step.Error)
+					logger.Info("terminal prompt:       Error: %s", step.Error)
 				}
 			}
 		}
 	} else {
 		logger.Error("Setup failed", zap.String("error", result.Error))
-		fmt.Printf("\n❌ %s Setup Failed!\n", configType)
-		fmt.Printf("Error: %s\n", result.Error)
+		logger.Info("terminal prompt: \n❌ %s Setup Failed!", configType)
+		logger.Info("terminal prompt: Error: %s", result.Error)
 	}
 
 	return nil

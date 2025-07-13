@@ -71,23 +71,23 @@ func outputComposeSearchJSON(result *container_management.ComposeSearchResult) e
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputComposeSearchTable(result *container_management.ComposeSearchResult) error {
-	fmt.Printf("Searched paths: %s\n", strings.Join(result.SearchPaths, ", "))
-	fmt.Printf("Search duration: %v\n", result.SearchDuration)
-	fmt.Printf("Projects found: %d\n\n", result.TotalFound)
+	logger.Info("terminal prompt: Searched paths: %s", strings.Join(result.SearchPaths, ", "))
+	logger.Info("terminal prompt: Search duration: %v", result.SearchDuration)
+	logger.Info("terminal prompt: Projects found: %d\n", result.TotalFound)
 
 	if result.TotalFound == 0 {
-		fmt.Println("No compose projects found.")
+		logger.Info("terminal prompt: No compose projects found.")
 		return nil
 	}
 
 	for _, project := range result.Projects {
-		fmt.Printf("Path: %s\n", project.Path)
-		fmt.Printf("  Compose file: %s\n", project.ComposeFile)
+		logger.Info("terminal prompt: Path: %s", project.Path)
+		logger.Info("terminal prompt:   Compose file: %s", project.ComposeFile)
 		if project.Status != "" {
-			fmt.Printf("  Status: %s\n", project.Status)
+			logger.Info("terminal prompt:   Status: %s", project.Status)
 		}
-		fmt.Printf("  Last seen: %s\n", project.LastSeen.Format("2006-01-02 15:04:05"))
-		fmt.Println()
+		logger.Info("terminal prompt:   Last seen: %s", project.LastSeen.Format("2006-01-02 15:04:05"))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 	}
 
 	return nil

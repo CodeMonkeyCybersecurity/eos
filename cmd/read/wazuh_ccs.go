@@ -158,7 +158,7 @@ func showPlatformStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, format st
 	case "yaml":
 		return outputYAML(status)
 	default:
-		return outputStatusTable(status)
+		return outputStatusTable(logger, status)
 	}
 }
 
@@ -223,7 +223,7 @@ func showCustomerStatus(rc *eos_io.RuntimeContext, customerID string, format str
 	case "yaml":
 		return outputYAML(status)
 	default:
-		return outputCustomerStatusTable(status)
+		return outputCustomerStatusTable(logger, status)
 	}
 }
 
@@ -274,7 +274,7 @@ func showCustomerDetails(rc *eos_io.RuntimeContext, cmd *cobra.Command, format s
 	case "yaml":
 		return outputYAML(details)
 	default:
-		return outputCustomerDetailsTable(details)
+		return outputCustomerDetailsTable(logger, details)
 	}
 }
 
@@ -353,7 +353,7 @@ func showPlatformHealth(rc *eos_io.RuntimeContext, cmd *cobra.Command, format st
 	case "yaml":
 		return outputYAML(health)
 	default:
-		return outputHealthTable(health)
+		return outputHealthTable(logger, health)
 	}
 }
 
@@ -396,7 +396,7 @@ func showResourceUsage(rc *eos_io.RuntimeContext, cmd *cobra.Command, format str
 	case "yaml":
 		return outputYAML(usage)
 	default:
-		return outputResourcesTable(usage)
+		return outputResourcesTable(logger, usage)
 	}
 }
 
@@ -440,7 +440,7 @@ func showResourcesByCustomer(rc *eos_io.RuntimeContext, format string) error {
 	case "yaml":
 		return outputYAML(resources)
 	default:
-		return outputCustomerResourcesTable(resources)
+		return outputCustomerResourcesTable(logger, resources)
 	}
 }
 
@@ -492,7 +492,7 @@ func showEventStatistics(rc *eos_io.RuntimeContext, cmd *cobra.Command, format s
 	case "yaml":
 		return outputYAML(stats)
 	default:
-		return outputEventStatsTable(stats)
+		return outputEventStatsTable(logger, stats)
 	}
 }
 
@@ -635,7 +635,7 @@ func outputJSON(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	fmt.Println(string(output))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
 	return nil
 }
 
@@ -645,213 +645,215 @@ func outputYAML(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
-	fmt.Println(string(output))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
 	return nil
 }
 
-func outputStatusTable(status PlatformStatus) error {
-	fmt.Printf("Platform Status: %s\n", status.Platform.Status)
-	fmt.Printf("Health: %s\n", status.Platform.Health)
-	fmt.Printf("Version: %s\n\n", status.Platform.Version)
+func outputStatusTable(logger *zap.Logger, status PlatformStatus) error {
+	logger.Info("terminal prompt: Platform Status: %s", status.Platform.Status)
+	logger.Info("terminal prompt: Health: %s", status.Platform.Health)
+	logger.Info("terminal prompt: Version: %s\n", status.Platform.Version)
 
-	fmt.Println("Components:")
-	fmt.Println(strings.Repeat("-", 60))
-	fmt.Printf("%-20s %-10s %-10s %s\n", "Component", "Status", "Health", "Details")
-	fmt.Println(strings.Repeat("-", 60))
+	logger.Info("terminal prompt: Components:")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 60))))
+	logger.Info("terminal prompt: %-20s %-10s %-10s %s", "Component", "Status", "Health", "Details")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 60))))
 
 	for _, comp := range status.Components {
-		fmt.Printf("%-20s %-10s %-10s %s\n", comp.Name, comp.Status, comp.Health, comp.Details)
+		logger.Info("terminal prompt: %-20s %-10s %-10s %s", comp.Name, comp.Status, comp.Health, comp.Details)
 	}
 
-	fmt.Printf("\nCustomers Summary:\n")
-	fmt.Printf("Total: %d (Active: %d, Suspended: %d)\n",
-		status.Customers.Total, status.Customers.Active, status.Customers.Suspended)
-	fmt.Printf("By Tier: ")
+	logger.Info("terminal prompt: Customers Summary:")
+	logger.Info("terminal prompt: Total", 
+		zap.Int("total", status.Customers.Total),
+		zap.Int("active", status.Customers.Active),
+		zap.Int("suspended", status.Customers.Suspended))
+	logger.Info("terminal prompt: By Tier: ")
 	for tier, count := range status.Customers.ByTier {
-		fmt.Printf("%s: %d  ", tier, count)
+		logger.Info("terminal prompt: %s: %d  ", tier, count)
 	}
-	fmt.Println()
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
-	fmt.Printf("\nLast Updated: %s\n", status.LastUpdated.Format(time.RFC3339))
+	logger.Info("terminal prompt: \nLast Updated: %s", status.LastUpdated.Format(time.RFC3339))
 	return nil
 }
 
-func outputCustomerStatusTable(status CustomerDeploymentStatus) error {
-	fmt.Printf("Customer: %s (%s)\n", status.CompanyName, status.CustomerID)
-	fmt.Printf("Tier: %s\n", status.Tier)
-	fmt.Printf("Status: %s\n\n", status.Status)
+func outputCustomerStatusTable(logger *zap.Logger, status CustomerDeploymentStatus) error {
+	logger.Info("terminal prompt: Customer: %s (%s)", status.CompanyName, status.CustomerID)
+	logger.Info("terminal prompt: Tier: %s", status.Tier)
+	logger.Info("terminal prompt: Status: %s\n", status.Status)
 
-	fmt.Println("Components:")
-	fmt.Println(strings.Repeat("-", 80))
-	fmt.Printf("%-20s %-10s %-10s %-30s %s\n", "Component", "Status", "Health", "Endpoint", "Details")
-	fmt.Println(strings.Repeat("-", 80))
+	logger.Info("terminal prompt: Components:")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info("terminal prompt: %-20s %-10s %-10s %-30s %s", "Component", "Status", "Health", "Endpoint", "Details")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
 
 	for _, comp := range status.Components {
-		fmt.Printf("%-20s %-10s %-10s %-30s %s\n",
-			comp.Name, comp.Status, comp.Health, comp.Endpoint, comp.Details)
+		logger.Info(fmt.Sprintf("terminal prompt: %-20s %-10s %-10s %-30s %s",
+			comp.Name, comp.Status, comp.Health, comp.Endpoint, comp.Details))
 	}
 
-	fmt.Printf("\nResource Usage:\n")
-	fmt.Printf("CPU: %.1f / %.1f %s (%.1f%%)\n",
+	logger.Info("terminal prompt: Resource Usage:")
+	logger.Info(fmt.Sprintf("terminal prompt: CPU: %.1f / %.1f %s (%.1f%%)",
 		status.Resources.CPU.Used, status.Resources.CPU.Total, status.Resources.CPU.Unit,
-		(status.Resources.CPU.Used/status.Resources.CPU.Total)*100)
-	fmt.Printf("Memory: %.0f / %.0f %s (%.1f%%)\n",
+		(status.Resources.CPU.Used/status.Resources.CPU.Total)*100))
+	logger.Info(fmt.Sprintf("terminal prompt: Memory: %.0f / %.0f %s (%.1f%%)",
 		status.Resources.Memory.Used, status.Resources.Memory.Total, status.Resources.Memory.Unit,
-		(status.Resources.Memory.Used/status.Resources.Memory.Total)*100)
-	fmt.Printf("Disk: %.0f / %.0f %s (%.1f%%)\n",
+		(status.Resources.Memory.Used/status.Resources.Memory.Total)*100))
+	logger.Info(fmt.Sprintf("terminal prompt: Disk: %.0f / %.0f %s (%.1f%%)",
 		status.Resources.Disk.Used, status.Resources.Disk.Total, status.Resources.Disk.Unit,
-		(status.Resources.Disk.Used/status.Resources.Disk.Total)*100)
+		(status.Resources.Disk.Used/status.Resources.Disk.Total)*100))
 
-	fmt.Printf("\nNetwork:\n")
-	fmt.Printf("VLAN ID: %d\n", status.Network.VLANID)
-	fmt.Printf("Subnet: %s\n", status.Network.Subnet)
-	fmt.Printf("Interface: %s\n", status.Network.Interface)
+	logger.Info("terminal prompt: Network:")
+	logger.Info("terminal prompt: VLAN ID: %d", status.Network.VLANID)
+	logger.Info("terminal prompt: Subnet: %s", status.Network.Subnet)
+	logger.Info("terminal prompt: Interface: %s", status.Network.Interface)
 
-	fmt.Printf("\nLast Updated: %s\n", status.LastUpdated.Format(time.RFC3339))
+	logger.Info("terminal prompt: \nLast Updated: %s", status.LastUpdated.Format(time.RFC3339))
 	return nil
 }
 
-func outputCustomerDetailsTable(details CustomerDetails) error {
-	fmt.Printf("Customer Details\n")
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Customer ID:    %s\n", details.CustomerID)
-	fmt.Printf("Company Name:   %s\n", details.CompanyName)
-	fmt.Printf("Subdomain:      %s\n", details.Subdomain)
-	fmt.Printf("Tier:           %s\n", details.Tier)
-	fmt.Printf("Status:         %s\n", details.Status)
-	fmt.Printf("Admin Email:    %s\n", details.AdminEmail)
-	fmt.Printf("Admin Name:     %s\n", details.AdminName)
-	fmt.Printf("Wazuh Version:  %s\n", details.WazuhVersion)
-	fmt.Printf("Created:        %s\n", details.CreatedAt.Format("2006-01-02 15:04:05"))
-	fmt.Printf("Updated:        %s\n", details.UpdatedAt.Format("2006-01-02 15:04:05"))
+func outputCustomerDetailsTable(logger *zap.Logger, details CustomerDetails) error {
+	logger.Info("terminal prompt: Customer Details")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
+	logger.Info("terminal prompt: Customer ID:    %s", details.CustomerID)
+	logger.Info("terminal prompt: Company Name:   %s", details.CompanyName)
+	logger.Info("terminal prompt: Subdomain:      %s", details.Subdomain)
+	logger.Info("terminal prompt: Tier:           %s", details.Tier)
+	logger.Info("terminal prompt: Status:         %s", details.Status)
+	logger.Info("terminal prompt: Admin Email:    %s", details.AdminEmail)
+	logger.Info("terminal prompt: Admin Name:     %s", details.AdminName)
+	logger.Info("terminal prompt: Wazuh Version:  %s", details.WazuhVersion)
+	logger.Info("terminal prompt: Created:        %s", details.CreatedAt.Format("2006-01-02 15:04:05"))
+	logger.Info("terminal prompt: Updated:        %s", details.UpdatedAt.Format("2006-01-02 15:04:05"))
 
-	fmt.Printf("\nAccess URLs:\n")
-	fmt.Printf("Dashboard:      %s\n", details.URLs.Dashboard)
-	fmt.Printf("API:            %s\n", details.URLs.API)
+	logger.Info("terminal prompt: Access URLs:")
+	logger.Info("terminal prompt: Dashboard:      %s", details.URLs.Dashboard)
+	logger.Info("terminal prompt: API:            %s", details.URLs.API)
 
 	if details.Credentials != nil {
-		fmt.Printf("\nCredentials:\n")
-		fmt.Printf("Admin Username: %s\n", details.Credentials.AdminUsername)
-		fmt.Printf("API Username:   %s\n", details.Credentials.APIUsername)
-		fmt.Printf("Vault Path:     %s\n", details.Credentials.VaultPath)
-		fmt.Printf("\nRetrieve passwords with:\n")
-		fmt.Printf("vault kv get %s\n", details.Credentials.VaultPath)
+		logger.Info("terminal prompt: Credentials:")
+		logger.Info("terminal prompt: Admin Username: %s", details.Credentials.AdminUsername)
+		logger.Info("terminal prompt: API Username:   %s", details.Credentials.APIUsername)
+		logger.Info("terminal prompt: Vault Path:     %s", details.Credentials.VaultPath)
+		logger.Info("terminal prompt: Retrieve passwords with:")
+		logger.Info("terminal prompt: vault kv get %s", details.Credentials.VaultPath)
 	}
 
 	return nil
 }
 
-func outputHealthTable(health PlatformHealth) error {
-	fmt.Printf("Platform Health: %s\n", health.Overall)
-	fmt.Printf("Last Check: %s\n\n", health.LastCheck.Format(time.RFC3339))
+func outputHealthTable(logger *zap.Logger, health PlatformHealth) error {
+	logger.Info("terminal prompt: Platform Health: %s", health.Overall)
+	logger.Info("terminal prompt: Last Check: %s\n", health.LastCheck.Format(time.RFC3339))
 
-	fmt.Println("Health Checks:")
-	fmt.Println(strings.Repeat("-", 80))
-	fmt.Printf("%-30s %-10s %-30s %s\n", "Check", "Status", "Message", "Duration")
-	fmt.Println(strings.Repeat("-", 80))
+	logger.Info("terminal prompt: Health Checks:")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info("terminal prompt: %-30s %-10s %-30s %s", "Check", "Status", "Message", "Duration")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
 
 	for _, check := range health.Checks {
-		fmt.Printf("%-30s %-10s %-30s %v\n",
-			check.Name, check.Status, check.Message, check.Duration)
+		logger.Info(fmt.Sprintf("terminal prompt: %-30s %-10s %-30s %v",
+			check.Name, check.Status, check.Message, check.Duration))
 	}
 
 	if health.Details != nil {
-		fmt.Printf("\nDetails:\n")
+		logger.Info("terminal prompt: Details:")
 		for key, value := range health.Details {
-			fmt.Printf("  %s: %v\n", key, value)
+			logger.Info("terminal prompt:   %s: %v", key, value)
 		}
 	}
 
 	return nil
 }
 
-func outputResourcesTable(resources PlatformResources) error {
-	fmt.Printf("Platform Resource Usage\n")
-	fmt.Printf("Timestamp: %s\n\n", resources.Timestamp.Format(time.RFC3339))
+func outputResourcesTable(logger *zap.Logger, resources PlatformResources) error {
+	logger.Info("terminal prompt: Platform Resource Usage")
+	logger.Info("terminal prompt: Timestamp: %s\n", resources.Timestamp.Format(time.RFC3339))
 
-	fmt.Printf("Total Usage:\n")
-	fmt.Printf("  CPU:    %.1f / %.1f %s (%.1f%%)\n",
+	logger.Info("terminal prompt: Total Usage:")
+	logger.Info(fmt.Sprintf("terminal prompt:   CPU:    %.1f / %.1f %s (%.1f%%)",
 		resources.Total.CPU.Used, resources.Total.CPU.Total, resources.Total.CPU.Unit,
-		(resources.Total.CPU.Used/resources.Total.CPU.Total)*100)
-	fmt.Printf("  Memory: %.0f / %.0f %s (%.1f%%)\n",
+		(resources.Total.CPU.Used/resources.Total.CPU.Total)*100))
+	logger.Info(fmt.Sprintf("terminal prompt:   Memory: %.0f / %.0f %s (%.1f%%)",
 		resources.Total.Memory.Used, resources.Total.Memory.Total, resources.Total.Memory.Unit,
-		(resources.Total.Memory.Used/resources.Total.Memory.Total)*100)
-	fmt.Printf("  Disk:   %.0f / %.0f %s (%.1f%%)\n",
+		(resources.Total.Memory.Used/resources.Total.Memory.Total)*100))
+	logger.Info(fmt.Sprintf("terminal prompt:   Disk:   %.0f / %.0f %s (%.1f%%)",
 		resources.Total.Disk.Used, resources.Total.Disk.Total, resources.Total.Disk.Unit,
-		(resources.Total.Disk.Used/resources.Total.Disk.Total)*100)
+		(resources.Total.Disk.Used/resources.Total.Disk.Total)*100))
 
-	fmt.Printf("\nBy Component:\n")
+	logger.Info("terminal prompt: By Component:")
 	for component, usage := range resources.ByComponent {
-		fmt.Printf("\n%s:\n", component)
-		fmt.Printf("  CPU:    %.1f / %.1f %s (%.1f%%)\n",
+		logger.Info("terminal prompt: \n%s:", component)
+		logger.Info(fmt.Sprintf("terminal prompt:   CPU:    %.1f / %.1f %s (%.1f%%)",
 			usage.CPU.Used, usage.CPU.Total, usage.CPU.Unit,
-			(usage.CPU.Used/usage.CPU.Total)*100)
-		fmt.Printf("  Memory: %.0f / %.0f %s (%.1f%%)\n",
+			(usage.CPU.Used/usage.CPU.Total)*100))
+		logger.Info(fmt.Sprintf("terminal prompt:   Memory: %.0f / %.0f %s (%.1f%%)",
 			usage.Memory.Used, usage.Memory.Total, usage.Memory.Unit,
-			(usage.Memory.Used/usage.Memory.Total)*100)
-		fmt.Printf("  Disk:   %.0f / %.0f %s (%.1f%%)\n",
+			(usage.Memory.Used/usage.Memory.Total)*100))
+		logger.Info(fmt.Sprintf("terminal prompt:   Disk:   %.0f / %.0f %s (%.1f%%)",
 			usage.Disk.Used, usage.Disk.Total, usage.Disk.Unit,
-			(usage.Disk.Used/usage.Disk.Total)*100)
+			(usage.Disk.Used/usage.Disk.Total)*100))
 	}
 
 	return nil
 }
 
-func outputCustomerResourcesTable(resources CustomerResources) error {
-	fmt.Printf("Customer Resource Usage\n")
-	fmt.Printf("Timestamp: %s\n\n", resources.Timestamp.Format(time.RFC3339))
+func outputCustomerResourcesTable(logger *zap.Logger, resources CustomerResources) error {
+	logger.Info("terminal prompt: Customer Resource Usage")
+	logger.Info("terminal prompt: Timestamp: %s\n", resources.Timestamp.Format(time.RFC3339))
 
-	fmt.Println(strings.Repeat("-", 100))
-	fmt.Printf("%-15s %-20s %-10s %-15s %-15s %-15s\n",
-		"Customer ID", "Company", "Tier", "CPU", "Memory", "Disk")
-	fmt.Println(strings.Repeat("-", 100))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
+	logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10s %-15s %-15s %-15s",
+		"Customer ID", "Company", "Tier", "CPU", "Memory", "Disk"))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
 
 	for _, customer := range resources.Customers {
-		fmt.Printf("%-15s %-20s %-10s %.0f/%.0f %-6s %.0f/%.0f %-4s %.0f/%.0f %s\n",
+		logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10s %.0f/%.0f %-6s %.0f/%.0f %-4s %.0f/%.0f %s",
 			customer.CustomerID,
 			customer.CompanyName,
 			customer.Tier,
 			customer.Usage.CPU.Used, customer.Usage.CPU.Total, customer.Usage.CPU.Unit,
 			customer.Usage.Memory.Used, customer.Usage.Memory.Total, customer.Usage.Memory.Unit,
-			customer.Usage.Disk.Used, customer.Usage.Disk.Total, customer.Usage.Disk.Unit)
+			customer.Usage.Disk.Used, customer.Usage.Disk.Total, customer.Usage.Disk.Unit))
 	}
 
-	fmt.Println(strings.Repeat("-", 100))
-	fmt.Printf("%-47s %.0f/%.0f %-6s %.0f/%.0f %-4s %.0f/%.0f %s\n",
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
+	logger.Info(fmt.Sprintf("terminal prompt: %-47s %.0f/%.0f %-6s %.0f/%.0f %-4s %.0f/%.0f %s",
 		"TOTAL",
 		resources.Total.CPU.Used, resources.Total.CPU.Total, resources.Total.CPU.Unit,
 		resources.Total.Memory.Used, resources.Total.Memory.Total, resources.Total.Memory.Unit,
-		resources.Total.Disk.Used, resources.Total.Disk.Total, resources.Total.Disk.Unit)
+		resources.Total.Disk.Used, resources.Total.Disk.Total, resources.Total.Disk.Unit))
 
 	return nil
 }
 
-func outputEventStatsTable(stats EventStatistics) error {
-	fmt.Printf("Event Statistics (%s)\n", stats.TimeRange)
-	fmt.Printf("Timestamp: %s\n\n", stats.Timestamp.Format(time.RFC3339))
+func outputEventStatsTable(logger *zap.Logger, stats EventStatistics) error {
+	logger.Info("terminal prompt: Event Statistics (%s)", stats.TimeRange)
+	logger.Info("terminal prompt: Timestamp: %s\n", stats.Timestamp.Format(time.RFC3339))
 
-	fmt.Printf("Total Events: %d\n", stats.Total)
-	fmt.Printf("Events/Second: %d (Peak: %d)\n\n", stats.EventsPerSecond, stats.PeakEPS)
+	logger.Info("terminal prompt: Total Events: %d", stats.Total)
+	logger.Info("terminal prompt: Events/Second: %d (Peak: %d)\n", stats.EventsPerSecond, stats.PeakEPS)
 
-	fmt.Println("By Event Type:")
+	logger.Info("terminal prompt: By Event Type:")
 	for eventType, count := range stats.ByType {
-		fmt.Printf("  %-20s: %d\n", eventType, count)
+		logger.Info("terminal prompt:   %-20s: %d", eventType, count)
 	}
 
-	fmt.Printf("\nBy Customer:\n")
-	fmt.Println(strings.Repeat("-", 80))
-	fmt.Printf("%-15s %-20s %-10s %-10s %-10s %-10s\n",
-		"Customer ID", "Company", "Events", "High", "Medium", "Low")
-	fmt.Println(strings.Repeat("-", 80))
+	logger.Info("terminal prompt: By Customer:")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10s %-10s %-10s %-10s",
+		"Customer ID", "Company", "Events", "High", "Medium", "Low"))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
 
 	for _, customer := range stats.ByCustomer {
-		fmt.Printf("%-15s %-20s %-10d %-10d %-10d %-10d\n",
+		logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10d %-10d %-10d %-10d",
 			customer.CustomerID,
 			customer.CompanyName,
 			customer.Events,
 			customer.AlertsHigh,
 			customer.AlertsMed,
-			customer.AlertsLow)
+			customer.AlertsLow))
 	}
 
 	return nil

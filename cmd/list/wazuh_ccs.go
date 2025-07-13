@@ -511,7 +511,7 @@ func outputJSON(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	fmt.Println(string(output))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
 	return nil
 }
 
@@ -521,16 +521,16 @@ func outputYAML(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
-	fmt.Println(string(output))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
 	return nil
 }
 
 func outputCustomerTable(list CustomerList) error {
-	fmt.Printf("Customers (%d total)\n", list.Total)
-	fmt.Println(strings.Repeat("-", 100))
+	logger.Info("terminal prompt: Customers (%d total)", list.Total)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
 	fmt.Printf("%-15s %-25s %-15s %-10s %-10s %-20s\n",
 		"Customer ID", "Company", "Subdomain", "Tier", "Status", "Created")
-	fmt.Println(strings.Repeat("-", 100))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
 
 	for _, customer := range list.Customers {
 		fmt.Printf("%-15s %-25s %-15s %-10s %-10s %-20s\n",
@@ -542,49 +542,49 @@ func outputCustomerTable(list CustomerList) error {
 			customer.CreatedAt.Format("2006-01-02"))
 	}
 
-	fmt.Printf("\nSummary:\n")
-	fmt.Printf("By Tier: ")
+	logger.Info("terminal prompt: Summary:")
+	logger.Info("terminal prompt: By Tier: ")
 	for tier, count := range list.Summary.ByTier {
-		fmt.Printf("%s=%d ", tier, count)
+		logger.Info("terminal prompt: %s=%d ", tier, count)
 	}
-	fmt.Printf("\nBy Status: ")
+	logger.Info("terminal prompt: \nBy Status: ")
 	for status, count := range list.Summary.ByStatus {
-		fmt.Printf("%s=%d ", status, count)
+		logger.Info("terminal prompt: %s=%d ", status, count)
 	}
-	fmt.Println()
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
 	return nil
 }
 
 func outputDetailedCustomerTable(list CustomerList) error {
-	fmt.Printf("Customers - Detailed View (%d total)\n", list.Total)
-	fmt.Println(strings.Repeat("=", 120))
+	logger.Info("terminal prompt: Customers - Detailed View (%d total)", list.Total)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 120))))
 
 	for _, customer := range list.Customers {
-		fmt.Printf("\nCustomer: %s (%s)\n", customer.CompanyName, customer.CustomerID)
-		fmt.Printf("  Subdomain:    %s\n", customer.Subdomain)
-		fmt.Printf("  Tier:         %s\n", customer.Tier)
-		fmt.Printf("  Status:       %s\n", customer.Status)
-		fmt.Printf("  Admin Email:  %s\n", customer.AdminEmail)
-		fmt.Printf("  Created:      %s\n", customer.CreatedAt.Format("2006-01-02 15:04:05"))
-		fmt.Printf("  Agents:       %d\n", customer.AgentCount)
-		fmt.Printf("  Events/Day:   %d\n", customer.EventsPerDay)
+		logger.Info("terminal prompt: \nCustomer: %s (%s)", customer.CompanyName, customer.CustomerID)
+		logger.Info("terminal prompt:   Subdomain:    %s", customer.Subdomain)
+		logger.Info("terminal prompt:   Tier:         %s", customer.Tier)
+		logger.Info("terminal prompt:   Status:       %s", customer.Status)
+		logger.Info("terminal prompt:   Admin Email:  %s", customer.AdminEmail)
+		logger.Info("terminal prompt:   Created:      %s", customer.CreatedAt.Format("2006-01-02 15:04:05"))
+		logger.Info("terminal prompt:   Agents:       %d", customer.AgentCount)
+		logger.Info("terminal prompt:   Events/Day:   %d", customer.EventsPerDay)
 		fmt.Printf("  Resources:    %d CPU, %d GB RAM, %d GB Disk\n",
 			customer.Resources.CPUCores,
 			customer.Resources.MemoryGB,
 			customer.Resources.DiskGB)
-		fmt.Println(strings.Repeat("-", 120))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
 	}
 
 	return nil
 }
 
 func outputDeploymentTable(list DeploymentList) error {
-	fmt.Printf("Deployments (%d total)\n", list.Total)
-	fmt.Println(strings.Repeat("-", 120))
+	logger.Info("terminal prompt: Deployments (%d total)", list.Total)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
 	fmt.Printf("%-30s %-15s %-20s %-10s %-10s %-5s %-10s %-10s\n",
 		"Job Name", "Customer ID", "Company", "Type", "Status", "Inst", "CPU%", "Mem%")
-	fmt.Println(strings.Repeat("-", 120))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
 
 	for _, deployment := range list.Deployments {
 		fmt.Printf("%-30s %-15s %-20s %-10s %-10s %-5d %-10.1f %-10.1f\n",
@@ -598,22 +598,22 @@ func outputDeploymentTable(list DeploymentList) error {
 			deployment.MemoryUsage)
 	}
 
-	fmt.Printf("\nSummary:\n")
+	logger.Info("terminal prompt: Summary:")
 	fmt.Printf("Total Jobs: %d (Running: %d, Failed: %d)\n",
 		list.Summary.TotalJobs,
 		list.Summary.RunningJobs,
 		list.Summary.FailedJobs)
-	fmt.Printf("Total Instances: %d\n", list.Summary.TotalInstances)
+	logger.Info("terminal prompt: Total Instances: %d", list.Summary.TotalInstances)
 
 	return nil
 }
 
 func outputBackupTable(list BackupList) error {
-	fmt.Printf("Backups (%d total)\n", list.Total)
-	fmt.Println(strings.Repeat("-", 100))
+	logger.Info("terminal prompt: Backups (%d total)", list.Total)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
 	fmt.Printf("%-30s %-15s %-20s %-10s %-10s %-10s %-20s\n",
 		"Backup ID", "Customer ID", "Company", "Type", "Status", "Size (GB)", "Created")
-	fmt.Println(strings.Repeat("-", 100))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
 
 	for _, backup := range list.Backups {
 		fmt.Printf("%-30s %-15s %-20s %-10s %-10s %-10.1f %-20s\n",
@@ -626,21 +626,21 @@ func outputBackupTable(list BackupList) error {
 			backup.CreatedAt.Format("2006-01-02 15:04"))
 	}
 
-	fmt.Printf("\nSummary:\n")
-	fmt.Printf("Total Backups: %d\n", list.Summary.TotalBackups)
-	fmt.Printf("Total Size: %.1f GB\n", list.Summary.TotalSizeGB)
-	fmt.Printf("Oldest: %s\n", list.Summary.OldestBackup.Format("2006-01-02"))
-	fmt.Printf("Latest: %s\n", list.Summary.LatestBackup.Format("2006-01-02"))
+	logger.Info("terminal prompt: Summary:")
+	logger.Info("terminal prompt: Total Backups: %d", list.Summary.TotalBackups)
+	logger.Info("terminal prompt: Total Size: %.1f GB", list.Summary.TotalSizeGB)
+	logger.Info("terminal prompt: Oldest: %s", list.Summary.OldestBackup.Format("2006-01-02"))
+	logger.Info("terminal prompt: Latest: %s", list.Summary.LatestBackup.Format("2006-01-02"))
 
 	return nil
 }
 
 func outputEventTable(list EventList) error {
-	fmt.Printf("Recent Events (%d total)\n", list.Total)
-	fmt.Println(strings.Repeat("-", 120))
+	logger.Info("terminal prompt: Recent Events (%d total)", list.Total)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
 	fmt.Printf("%-20s %-20s %-15s %-20s %s\n",
 		"Timestamp", "Type", "Customer ID", "Company", "Message")
-	fmt.Println(strings.Repeat("-", 120))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
 
 	for _, event := range list.Events {
 		fmt.Printf("%-20s %-20s %-15s %-20s %s\n",

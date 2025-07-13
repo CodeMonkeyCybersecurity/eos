@@ -63,9 +63,9 @@ Examples:
 		}
 
 		log.Info(" Crontab updated successfully", zap.String("mailto", email))
-		fmt.Println("\n New crontab:\n==============================")
-		fmt.Println(updated)
-		fmt.Println("==============================")
+		logger.Info("terminal prompt: \n New crontab:\n==============================")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", updated)))
+		logger.Info("terminal prompt: ==============================")
 
 		return nil
 	}),

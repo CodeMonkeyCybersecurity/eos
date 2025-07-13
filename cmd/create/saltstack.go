@@ -238,11 +238,11 @@ Target Types:
 			zap.Bool("dry_run", dryRun))
 
 		if dryRun {
-			fmt.Printf("DRY RUN: Would execute Salt function\n")
-			fmt.Printf("  Target: %s (%s)\n", target, targetType)
-			fmt.Printf("  Function: %s\n", function)
+			logger.Info("terminal prompt: DRY RUN: Would execute Salt function")
+			logger.Info("terminal prompt:   Target: %s (%s)", target, targetType)
+			logger.Info("terminal prompt:   Function: %s", function)
 			if len(functionArgs) > 0 {
-				fmt.Printf("  Arguments: %s\n", strings.Join(functionArgs, " "))
+				logger.Info("terminal prompt:   Arguments: %s", strings.Join(functionArgs, " "))
 			}
 			return nil
 		}
@@ -298,22 +298,22 @@ func outputExecutionResultsJSON(result interface{}) error {
 
 // TODO
 func outputExecutionResultsText(result interface{}, target, function string, async bool) error {
-	fmt.Printf("Salt Execution Results\n")
-	fmt.Println(strings.Repeat("=", 50))
-	fmt.Printf("Target: %s\n", target)
-	fmt.Printf("Function: %s\n", function)
+	logger.Info("terminal prompt: Salt Execution Results")
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
+	logger.Info("terminal prompt: Target: %s", target)
+	logger.Info("terminal prompt: Function: %s", function)
 
 	if async {
-		fmt.Printf("Execution Mode: Asynchronous\n")
-		fmt.Printf("Job ID: %v\n", result)
-		fmt.Println("\nUse 'eos read salt-job-status <job-id>' to check progress")
+		logger.Info("terminal prompt: Execution Mode: Asynchronous")
+		logger.Info("terminal prompt: Job ID: %v", result)
+		logger.Info("terminal prompt: \nUse 'eos read salt-job-status <job-id>' to check progress")
 	} else {
-		fmt.Printf("Execution Mode: Synchronous\n")
-		fmt.Println("\nResults:")
-		fmt.Println(strings.Repeat("-", 30))
+		logger.Info("terminal prompt: Execution Mode: Synchronous")
+		logger.Info("terminal prompt: \nResults:")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 30))))
 
 		// TODO: Implement proper result formatting based on Salt client response format
-		fmt.Printf("%v\n", result)
+		logger.Info("terminal prompt: %v", result)
 	}
 
 	return nil

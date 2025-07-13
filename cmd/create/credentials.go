@@ -112,7 +112,7 @@ Examples:
 
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Printf("Are you sure you want to revoke lease %s? [y/N]: ", leaseID)
+			logger.Info("terminal prompt: Are you sure you want to revoke lease %s? [y/N]: ", leaseID)
 			var response string
 			if _, err := fmt.Scanln(&response); err != nil {
 				logger.Warn("Failed to read user input", zap.Error(err))
@@ -175,7 +175,7 @@ func outputJSONCredential(credential *database_management.DatabaseCredential, sh
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	fmt.Println(string(data))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
 	return nil
 }
 
@@ -189,8 +189,8 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 		}
 	}()
 
-	fmt.Printf("Dynamic Database Credentials\n")
-	fmt.Printf("============================\n\n")
+	logger.Info("terminal prompt: Dynamic Database Credentials")
+	logger.Info("terminal prompt: ============================\n")
 
 	if _, err := fmt.Fprintf(w, "Username:\t%s\n", credential.Username); err != nil {
 		return fmt.Errorf("failed to write username: %w", err)
@@ -222,13 +222,13 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 		return fmt.Errorf("failed to write expires at: %w", err)
 	}
 
-	fmt.Printf("\nConnection String Example:\n")
+	logger.Info("terminal prompt: Connection String Example:")
 	if showPassword {
-		fmt.Printf("psql -h localhost -U %s -d delphi\n", credential.Username)
-		fmt.Printf("Password: %s\n", credential.Password)
+		logger.Info("terminal prompt: psql -h localhost -U %s -d delphi", credential.Username)
+		logger.Info("terminal prompt: Password: %s", credential.Password)
 	} else {
-		fmt.Printf("psql -h localhost -U %s -d delphi\n", credential.Username)
-		fmt.Printf("Password: [Use --show-password to display]\n")
+		logger.Info("terminal prompt: psql -h localhost -U %s -d delphi", credential.Username)
+		logger.Info("terminal prompt: Password: [Use --show-password to display]")
 	}
 
 	return nil

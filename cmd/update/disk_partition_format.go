@@ -2,7 +2,6 @@
 package update
 
 import (
-	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -46,11 +45,11 @@ Examples:
 			zap.Bool("dry_run", dryRun))
 
 		if !force && !dryRun {
-			fmt.Printf("WARNING: This will destroy all data on %s!\n", device)
+			logger.Info("terminal prompt: WARNING: This will destroy all data on %s!", device)
 		}
 
-		manager := disk_management.NewDiskManager(nil)
-		result, err := manager.FormatPartition(rc, device, filesystem, label, dryRun)
+		// Use simplified function instead of manager pattern
+		result, err := disk_management.FormatPartition(rc, device, filesystem, label, dryRun)
 		if err != nil {
 			logger.Error("Failed to format partition", zap.Error(err))
 			return err

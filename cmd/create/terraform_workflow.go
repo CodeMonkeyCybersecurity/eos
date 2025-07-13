@@ -120,7 +120,7 @@ var terraformOutputCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println(output)
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", output)))
 		return nil
 	}),
 }
@@ -221,7 +221,7 @@ var terraformFullWorkflowCmd = &cobra.Command{
 
 		// Step 4: Apply (if auto-approve or user confirms)
 		if !autoApprove {
-			fmt.Print("\nDo you want to apply these changes? [y/N]: ")
+			logger.Info("terminal prompt: \nDo you want to apply these changes? [y/N]: ")
 			var response string
 			if _, err := fmt.Scanln(&response); err != nil {
 				logger.Warn("Failed to read user input, cancelling deployment", zap.Error(err))
@@ -239,7 +239,7 @@ var terraformFullWorkflowCmd = &cobra.Command{
 		}
 
 		logger.Info("Terraform deployment completed successfully")
-		fmt.Println("\n Deployment completed successfully!")
+		logger.Info("terminal prompt: \n Deployment completed successfully!")
 
 		return nil
 	}),

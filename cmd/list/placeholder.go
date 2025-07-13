@@ -3,7 +3,6 @@
 package list
 
 import (
-	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -22,7 +21,7 @@ var placeholderListExample = &cobra.Command{
 		log.Info(" Executing placeholder list subcommand", zap.String("subcommand", "example"))
 
 		// Placeholder output
-		fmt.Println("This is a placeholder output for `eos list example`.")
+		logger.Info("terminal prompt: This is a placeholder output for `eos list example`.")
 
 		return nil
 	}),

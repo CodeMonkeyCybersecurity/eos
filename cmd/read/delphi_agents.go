@@ -138,10 +138,10 @@ func watchAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 // TODO: Move to pkg/delphi/display or pkg/delphi/output
 func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
 	// Clear screen and move cursor to top
-	fmt.Print("\033[2J\033[H")
+	logger.Info("terminal prompt: \033[2J\033[H")
 
-	fmt.Printf("  Delphi Agents Monitor - Last %d agents (Updated: %s)\n", limit, time.Now().Format("15:04:05"))
-	fmt.Println(strings.Repeat("=", 140))
+	logger.Info("terminal prompt:   Delphi Agents Monitor - Last %d agents (Updated: %s)", limit, time.Now().Format("15:04:05"))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 140))))
 
 	// Query recent agents
 	query := `
@@ -171,7 +171,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	// Print header
 	fmt.Printf("%-8s %-15s %-15s %-20s %-12s %-12s %-15s %-12s %-15s %-12s\n",
 		"ID", "Name", "IP", "OS", "Status", "Last Seen", "Version", "Node", "Registered", "API Fetch")
-	fmt.Println(strings.Repeat("-", 140))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 140))))
 
 	agents := make([]Agent, 0, limit)
 	for rows.Next() {
@@ -215,7 +215,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	}
 
 	if len(agents) == 0 {
-		fmt.Println("No agents found.")
+		logger.Info("terminal prompt: No agents found.")
 	}
 
 	// Count active/inactive agents
@@ -329,8 +329,8 @@ var ReadKeepAliveCmd = &cobra.Command{
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to format JSON", zap.Error(err))
 		}
-		fmt.Println("Disconnected agents:")
-		fmt.Println(string(pretty))
+		logger.Info("terminal prompt: Disconnected agents:")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(pretty))))
 		return nil
 	}),
 }

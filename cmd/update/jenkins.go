@@ -2,7 +2,6 @@
 package update
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
@@ -34,8 +33,9 @@ Example configuration:
 Usage:
   hecate update jenkins --backendIP <new-ip>`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		if backendIP == "" {
-			fmt.Println("Error: please provide a new backend IP using the --backendIP flag")
+			logger.Info("terminal prompt: Error: please provide a new backend IP using the --backendIP flag")
 			return nil
 		}
 
@@ -44,23 +44,23 @@ Usage:
 		// #nosec G101 - This is a template placeholder, not a hardcoded credential
 		token := "{{BACKEND_IP}}" // Make sure this token matches what you use in your asset files
 
-		fmt.Printf("Updating backend IP to %s in assets directory...\n", backendIP)
+		logger.Info("terminal prompt: Updating backend IP to %s in assets directory...", backendIP)
 		if err := fileops.UpdateFilesInDir(assetsDir, token, backendIP); err != nil {
-			fmt.Printf("Error updating files: %v\n", err)
+			logger.Info("terminal prompt: Error updating files: %v", err)
 			return nil
 		}
-		fmt.Println("Assets updated successfully with new backend IP.")
+		logger.Info("terminal prompt: Assets updated successfully with new backend IP.")
 
 		// Redeploy Hecate via docker compose up -d
-		fmt.Println("Redeploying Hecate using docker compose up -d...")
+		logger.Info("terminal prompt: Redeploying Hecate using docker compose up -d...")
 		cmdDocker := exec.Command("docker-compose", "up", "-d")
 		cmdDocker.Stdout = os.Stdout
 		cmdDocker.Stderr = os.Stderr
 		if err := cmdDocker.Run(); err != nil {
-			fmt.Printf("Error redeploying Hecate: %v\n", err)
+			logger.Info("terminal prompt: Error redeploying Hecate: %v", err)
 			return err
 		}
-		fmt.Println("Hecate redeployed successfully with new Jenkins backend IP.")
+		logger.Info("terminal prompt: Hecate redeployed successfully with new Jenkins backend IP.")
 		shared.SafeHelp(cmd)
 		return nil
 	}),

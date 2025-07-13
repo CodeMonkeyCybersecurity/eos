@@ -84,7 +84,7 @@ Examples:
 
 		// Analyze environment if requested or if it's a technical question
 		if analyze || ai.ContainsTechnicalTerms(question) {
-			fmt.Println(" Analyzing current environment...")
+			logger.Info("terminal prompt:  Analyzing current environment...")
 
 			analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 			env, err := analyzer.AnalyzeEnvironment(rc)
@@ -93,10 +93,10 @@ Examples:
 			} else {
 				ctx.Environment = env
 				if verbose {
-					fmt.Printf(" Environment analysis completed: %d files, %d containers, %d services\n",
-						len(env.FileSystem.ComposeFiles)+len(env.FileSystem.TerraformFiles)+len(env.FileSystem.ConfigFiles),
-						len(env.Services.DockerContainers),
-						len(env.Services.SystemdServices))
+					logger.Info("terminal prompt: Environment analysis completed",
+						zap.Int("files", len(env.FileSystem.ComposeFiles)+len(env.FileSystem.TerraformFiles)+len(env.FileSystem.ConfigFiles)),
+						zap.Int("containers", len(env.Services.DockerContainers)),
+						zap.Int("services", len(env.Services.SystemdServices)))
 				}
 			}
 		}
@@ -104,7 +104,7 @@ Examples:
 		// Build comprehensive prompt with environment context
 		fullPrompt := ai.BuildEnvironmentPrompt(ctx, question)
 
-		fmt.Println(" Thinking...")
+		logger.Info("terminal prompt:  Thinking...")
 
 		// Get AI response
 		response, err := assistant.Chat(rc, ctx, fullPrompt)
@@ -117,29 +117,29 @@ Examples:
 		}
 
 		// Display response
-		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Println(" AI Assistant Response")
-		fmt.Println(strings.Repeat("=", 80))
-		fmt.Println()
-		fmt.Println(response.Choices[0].Message.Content)
-		fmt.Println()
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+		logger.Info("terminal prompt:  AI Assistant Response")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
+		logger.Info("")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", response.Choices[0].Message.Content)))
+		logger.Info("")
 
 		// Check for suggested actions
 		actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content)
 		if err == nil && len(actions) > 0 {
-			fmt.Printf(" I found %d suggested action(s). Run 'eos ai implement' to execute them.\n", len(actions))
+			logger.Info(fmt.Sprintf("terminal prompt:  I found %d suggested action(s). Run 'eos ai implement' to execute them.", len(actions)))
 
 			// Store actions for later implementation (simplified - would use proper storage)
 			if verbose {
-				fmt.Println("\nSuggested actions:")
+				logger.Info("terminal prompt: \nSuggested actions:")
 				for i, action := range actions {
-					fmt.Printf("  %d. %s (%s)\n", i+1, action.Description, action.Type)
+					logger.Info(fmt.Sprintf("terminal prompt:   %d. %s (%s)", i+1, action.Description, action.Type))
 				}
 			}
 		}
 
 		// Ask if user wants to continue conversation
-		fmt.Print("\n Do you have any follow-up questions? [y/N]: ")
+		logger.Info("terminal prompt: \n Do you have any follow-up questions? [y/N]: ")
 		reader := bufio.NewReader(os.Stdin)
 		if response, _ := reader.ReadString('\n'); strings.ToLower(strings.TrimSpace(response)) == "y" {
 			return ai.StartInteractiveChat(rc, assistant, ctx)
@@ -180,8 +180,8 @@ Examples:
 
 		logger.Info("Starting infrastructure analysis", zap.String("directory", workingDir))
 
-		fmt.Println(" Analyzing infrastructure environment...")
-		fmt.Printf(" Working directory: %s\n\n", workingDir)
+		logger.Info("terminal prompt:  Analyzing infrastructure environment...")
+		logger.Info(fmt.Sprintf("terminal prompt:  Working directory: %s", workingDir))
 
 		// Analyze environment
 		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
@@ -195,7 +195,7 @@ Examples:
 
 		// Get AI analysis if requested
 		if askAI {
-			fmt.Println("\n Getting AI analysis...")
+			logger.Info("terminal prompt: \n Getting AI analysis...")
 
 			assistant, err := ai.NewAIAssistant(rc)
 			if err != nil {
@@ -211,11 +211,11 @@ Examples:
 			if err != nil {
 				logger.Warn("AI analysis failed", zap.Error(err))
 			} else if len(response.Choices) > 0 {
-				fmt.Println("\n" + strings.Repeat("=", 80))
-				fmt.Println(" AI Analysis & Recommendations")
-				fmt.Println(strings.Repeat("=", 80))
-				fmt.Println()
-				fmt.Println(response.Choices[0].Message.Content)
+				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+				logger.Info("terminal prompt:  AI Analysis & Recommendations")
+				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
+				logger.Info("")
+				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", response.Choices[0].Message.Content)))
 			}
 		}
 
@@ -249,7 +249,7 @@ Examples:
 			workingDir, _ = os.Getwd()
 		}
 
-		fmt.Printf(" Analyzing issue: %s\n\n", issue)
+		logger.Info(fmt.Sprintf("terminal prompt:  Analyzing issue: %s", issue))
 
 		// Initialize AI assistant
 		assistant, err := ai.NewAIAssistant(rc)
@@ -259,7 +259,7 @@ Examples:
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 
 		// Always analyze environment for fix requests
-		fmt.Println(" Gathering environment context...")
+		logger.Info("terminal prompt:  Gathering environment context...")
 		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 		env, err := analyzer.AnalyzeEnvironment(rc)
 		if err != nil {
@@ -280,7 +280,7 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 
 		fullPrompt := ai.BuildEnvironmentPrompt(ctx, diagnosticPrompt)
 
-		fmt.Println(" Diagnosing issue...")
+		logger.Info("terminal prompt:  Diagnosing issue...")
 
 		// Get AI response
 		response, err := assistant.Chat(rc, ctx, fullPrompt)
@@ -293,23 +293,23 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 		}
 
 		// Display response
-		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Println(" Diagnostic Results & Fix Recommendations")
-		fmt.Println(strings.Repeat("=", 80))
-		fmt.Println()
-		fmt.Println(response.Choices[0].Message.Content)
-		fmt.Println()
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+		logger.Info("terminal prompt:  Diagnostic Results & Fix Recommendations")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
+		logger.Info("")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", response.Choices[0].Message.Content)))
+		logger.Info("")
 
 		// Parse and offer to implement actions
 		actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content)
 		if err == nil && len(actions) > 0 {
-			fmt.Printf(" Found %d suggested fix action(s).\n", len(actions))
+			logger.Info(fmt.Sprintf("terminal prompt:  Found %d suggested fix action(s).", len(actions)))
 
 			if autoFix {
-				fmt.Println(" Auto-fix enabled, implementing suggestions...")
+				logger.Info("terminal prompt:  Auto-fix enabled, implementing suggestions...")
 				return ai.ImplementActions(rc, actions, workingDir, false)
 			} else {
-				fmt.Print(" Would you like me to implement these fixes? [y/N]: ")
+				logger.Info("terminal prompt:  Would you like me to implement these fixes? [y/N]: ")
 				reader := bufio.NewReader(os.Stdin)
 				if response, _ := reader.ReadString('\n'); strings.ToLower(strings.TrimSpace(response)) == "y" {
 					return ai.ImplementActions(rc, actions, workingDir, false)
@@ -342,10 +342,10 @@ Example:
 			workingDir, _ = os.Getwd()
 		}
 
-		fmt.Println(" AI Assistant Chat Mode")
-		fmt.Println("Type 'exit', 'quit', or 'bye' to end the conversation.")
-		fmt.Printf("Working directory: %s\n", workingDir)
-		fmt.Println(strings.Repeat("-", 60))
+		logger.Info("terminal prompt:  AI Assistant Chat Mode")
+		logger.Info("terminal prompt: Type 'exit', 'quit', or 'bye' to end the conversation.")
+		logger.Info("terminal prompt: Working directory", zap.String("dir", workingDir))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 60))))
 
 		// Initialize AI assistant
 		assistant, err := ai.NewAIAssistant(rc)
@@ -355,16 +355,16 @@ Example:
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 
 		// Initial environment analysis
-		fmt.Println(" Analyzing environment...")
+		logger.Info("terminal prompt:  Analyzing environment...")
 		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 		env, err := analyzer.AnalyzeEnvironment(rc)
 		if err != nil {
-			fmt.Printf(" Environment analysis failed: %v\n", err)
+			logger.Info(fmt.Sprintf("terminal prompt:  Environment analysis failed: %v", err))
 		} else {
 			ctx.Environment = env
-			fmt.Println(" Environment analysis complete.")
+			logger.Info("terminal prompt:  Environment analysis complete.")
 		}
-		fmt.Println()
+		logger.Info("")
 
 		return ai.StartInteractiveChat(rc, assistant, ctx)
 	}),
@@ -395,12 +395,12 @@ Examples:
 		}
 
 		// For now, implement a placeholder that shows how it would work
-		fmt.Println(" AI Action Implementation")
-		fmt.Printf("Working directory: %s\n", workingDir)
+		logger.Info("terminal prompt:  AI Action Implementation")
+		logger.Info("terminal prompt: Working directory", zap.String("dir", workingDir))
 		if dryRun {
-			fmt.Println(" DRY RUN MODE - No actual changes will be made")
+			logger.Info("terminal prompt:  DRY RUN MODE - No actual changes will be made")
 		}
-		fmt.Println()
+		logger.Info("")
 
 		// In a full implementation, this would:
 		// 1. Load actions from storage or file
@@ -411,13 +411,13 @@ Examples:
 		// var actions []*ai.Action // Reserved for future implementation
 
 		if actionFile != "" {
-			fmt.Printf(" Loading actions from: %s\n", actionFile)
+			logger.Info("terminal prompt:  Loading actions from", zap.String("file", actionFile))
 			// Would load actions from JSON file
-			fmt.Println(" Action file loading not yet implemented")
+			logger.Info("terminal prompt:  Action file loading not yet implemented")
 			return nil
 		} else {
-			fmt.Println(" No previous AI suggestions found.")
-			fmt.Println("Run 'eos ai ask' or 'eos ai fix' first to get suggestions.")
+			logger.Info("terminal prompt:  No previous AI suggestions found.")
+			logger.Info("terminal prompt: Run 'eos ai ask' or 'eos ai fix' first to get suggestions.")
 			return nil
 		}
 
@@ -469,57 +469,57 @@ Examples:
 		// Show current configuration if requested
 		if showConfig {
 			config := configManager.GetConfig()
-			fmt.Println(" Current AI Configuration")
-			fmt.Println(strings.Repeat("-", 40))
-			fmt.Printf("Config file: %s\n", configManager.GetConfigPath())
+			logger.Info("terminal prompt:  Current AI Configuration")
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 40))))
+			logger.Info("terminal prompt: Config file", zap.String("path", configManager.GetConfigPath()))
 
 			provider := config.Provider
 			if provider == "" {
 				provider = "anthropic"
 			}
-			fmt.Printf("Provider: %s\n", provider)
+			logger.Info("terminal prompt: Provider", zap.String("provider", provider))
 
-			fmt.Printf("API Key: %s\n", ai.MaskAPIKey(config.APIKey))
+			logger.Info("terminal prompt: API Key", zap.String("key", ai.MaskAPIKey(config.APIKey)))
 			if config.APIKeyVault != "" {
-				fmt.Printf("API Key Vault Path: %s\n", config.APIKeyVault)
+				logger.Info(fmt.Sprintf("terminal prompt: API Key Vault Path: %s", config.APIKeyVault))
 			}
 
 			if provider == "azure-openai" {
 				if config.AzureEndpoint != "" {
-					fmt.Printf("Azure Endpoint: %s\n", config.AzureEndpoint)
+					logger.Info(fmt.Sprintf("terminal prompt: Azure Endpoint: %s", config.AzureEndpoint))
 				}
 				if config.AzureAPIVersion != "" {
-					fmt.Printf("Azure API Version: %s\n", config.AzureAPIVersion)
+					logger.Info(fmt.Sprintf("terminal prompt: Azure API Version: %s", config.AzureAPIVersion))
 				}
 				if config.AzureDeployment != "" {
-					fmt.Printf("Azure Deployment: %s\n", config.AzureDeployment)
+					logger.Info(fmt.Sprintf("terminal prompt: Azure Deployment: %s", config.AzureDeployment))
 				}
 			} else {
 				if config.BaseURL != "" {
-					fmt.Printf("Base URL: %s\n", config.BaseURL)
+					logger.Info(fmt.Sprintf("terminal prompt: Base URL: %s", config.BaseURL))
 				}
 			}
 
-			fmt.Printf("Model: %s\n", config.Model)
-			fmt.Printf("Max Tokens: %d\n", config.MaxTokens)
-			fmt.Printf("Timeout: %d seconds\n", config.Timeout)
+			logger.Info(fmt.Sprintf("terminal prompt: Model: %s", config.Model))
+			logger.Info(fmt.Sprintf("terminal prompt: Max Tokens: %d", config.MaxTokens))
+			logger.Info(fmt.Sprintf("terminal prompt: Timeout: %d seconds", config.Timeout))
 			return nil
 		}
 
 		// Interactive mode if no flags provided
 		if provider == "" && apiKey == "" && vaultPath == "" && model == "" && baseURL == "" && azureEndpoint == "" {
-			fmt.Println(" AI Assistant Configuration")
-			fmt.Println(strings.Repeat("-", 40))
-			fmt.Printf("Config file: %s\n\n", configManager.GetConfigPath())
+			logger.Info("terminal prompt:  AI Assistant Configuration")
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 40))))
+			logger.Info(fmt.Sprintf("terminal prompt: Config file: %s", configManager.GetConfigPath()))
 
 			reader := bufio.NewReader(os.Stdin)
 
 			// Provider selection
-			fmt.Println("1. Provider Selection")
-			fmt.Println("   Choose your AI provider:")
-			fmt.Println("   a) Anthropic Claude (default)")
-			fmt.Println("   b) Azure OpenAI")
-			fmt.Print("\nYour choice [a/b]: ")
+			logger.Info("terminal prompt: 1. Provider Selection")
+			logger.Info("terminal prompt:    Choose your AI provider:")
+			logger.Info("terminal prompt:    a) Anthropic Claude (default)")
+			logger.Info("terminal prompt:    b) Azure OpenAI")
+			logger.Info("terminal prompt: \nYour choice [a/b]: ")
 
 			providerChoice, _ := reader.ReadString('\n')
 			providerChoice = strings.TrimSpace(strings.ToLower(providerChoice))
@@ -536,12 +536,12 @@ Examples:
 			}
 
 			// API Key configuration
-			fmt.Printf("\n2. API Key Configuration (%s)\n", selectedProvider)
-			fmt.Println("   Choose how to provide your API key:")
-			fmt.Println("   a) Enter API key directly (stored in config file)")
-			fmt.Println("   b) Use Vault path (recommended for production)")
-			fmt.Println("   c) Skip (use environment variable)")
-			fmt.Print("\nYour choice [a/b/c]: ")
+			logger.Info(fmt.Sprintf("terminal prompt: \n2. API Key Configuration (%s)", selectedProvider))
+			logger.Info("terminal prompt:    Choose how to provide your API key:")
+			logger.Info("terminal prompt:    a) Enter API key directly (stored in config file)")
+			logger.Info("terminal prompt:    b) Use Vault path (recommended for production)")
+			logger.Info("terminal prompt:    c) Skip (use environment variable)")
+			logger.Info("terminal prompt: \nYour choice [a/b/c]: ")
 
 			choice, _ := reader.ReadString('\n')
 			choice = strings.TrimSpace(strings.ToLower(choice))
@@ -549,25 +549,25 @@ Examples:
 			switch choice {
 			case "a":
 				if selectedProvider == "azure-openai" {
-					fmt.Print("\nEnter your Azure OpenAI API key: ")
+					logger.Info("terminal prompt: \nEnter your Azure OpenAI API key: ")
 				} else {
-					fmt.Print("\nEnter your Anthropic API key: ")
+					logger.Info("terminal prompt: \nEnter your Anthropic API key: ")
 				}
 				apiKeyInput, _ := reader.ReadString('\n')
 				apiKeyInput = strings.TrimSpace(apiKeyInput)
 
 				if apiKeyInput != "" {
 					if err := ai.ValidateAPIKey(apiKeyInput); err != nil {
-						fmt.Printf(" Warning: %v\n", err)
+						logger.Info(fmt.Sprintf("terminal prompt:  Warning: %v", err))
 					}
 					if err := configManager.SetAPIKey(apiKeyInput); err != nil {
 						return fmt.Errorf("failed to save API key: %w", err)
 					}
-					fmt.Println(" API key saved to config file")
+					logger.Info("terminal prompt:  API key saved to config file")
 				}
 
 			case "b":
-				fmt.Print("\nEnter Vault path for API key (e.g., secret/ai/api-key): ")
+				logger.Info("terminal prompt: \nEnter Vault path for API key (e.g., secret/ai/api-key): ")
 				vaultInput, _ := reader.ReadString('\n')
 				vaultInput = strings.TrimSpace(vaultInput)
 
@@ -575,28 +575,28 @@ Examples:
 					if err := configManager.SetAPIKeyVault(vaultInput); err != nil {
 						return fmt.Errorf("failed to save Vault path: %w", err)
 					}
-					fmt.Println(" Vault path saved to config file")
-					fmt.Println(" Note: Make sure to store your API key at this Vault path")
+					logger.Info("terminal prompt:  Vault path saved to config file")
+					logger.Info("terminal prompt:  Note: Make sure to store your API key at this Vault path")
 				}
 
 			case "c":
-				fmt.Println(" Skipping API key configuration")
-				fmt.Println("   Set one of these environment variables:")
+				logger.Info("terminal prompt:  Skipping API key configuration")
+				logger.Info("terminal prompt:    Set one of these environment variables:")
 				if selectedProvider == "azure-openai" {
-					fmt.Println("   - AZURE_OPENAI_API_KEY")
-					fmt.Println("   - OPENAI_API_KEY")
+					logger.Info("terminal prompt:    - AZURE_OPENAI_API_KEY")
+					logger.Info("terminal prompt:    - OPENAI_API_KEY")
 				} else {
-					fmt.Println("   - ANTHROPIC_API_KEY")
-					fmt.Println("   - CLAUDE_API_KEY")
+					logger.Info("terminal prompt:    - ANTHROPIC_API_KEY")
+					logger.Info("terminal prompt:    - CLAUDE_API_KEY")
 				}
-				fmt.Println("   - AI_API_KEY")
+				logger.Info("terminal prompt:    - AI_API_KEY")
 			}
 
 			// Azure OpenAI specific configuration
 			if selectedProvider == "azure-openai" {
-				fmt.Println("\n3. Azure OpenAI Configuration")
+				logger.Info("terminal prompt: \n3. Azure OpenAI Configuration")
 
-				fmt.Print("Enter your Azure OpenAI endpoint (e.g., https://myresource.openai.azure.com): ")
+				logger.Info("terminal prompt: Enter your Azure OpenAI endpoint (e.g., https://myresource.openai.azure.com): ")
 				endpointInput, _ := reader.ReadString('\n')
 				endpointInput = strings.TrimSpace(endpointInput)
 
@@ -605,10 +605,10 @@ Examples:
 					if err := configManager.UpdateConfig(updates); err != nil {
 						return fmt.Errorf("failed to save Azure endpoint: %w", err)
 					}
-					fmt.Println(" Azure endpoint saved")
+					logger.Info("terminal prompt:  Azure endpoint saved")
 				}
 
-				fmt.Print("Enter your deployment name (e.g., gpt-4): ")
+				logger.Info("terminal prompt: Enter your deployment name (e.g., gpt-4): ")
 				deploymentInput, _ := reader.ReadString('\n')
 				deploymentInput = strings.TrimSpace(deploymentInput)
 
@@ -617,10 +617,10 @@ Examples:
 					if err := configManager.UpdateConfig(updates); err != nil {
 						return fmt.Errorf("failed to save Azure deployment: %w", err)
 					}
-					fmt.Println(" Azure deployment saved")
+					logger.Info("terminal prompt:  Azure deployment saved")
 				}
 
-				fmt.Print("Enter API version (press Enter for default 2024-02-15-preview): ")
+				logger.Info("terminal prompt: Enter API version (press Enter for default 2024-02-15-preview): ")
 				versionInput, _ := reader.ReadString('\n')
 				versionInput = strings.TrimSpace(versionInput)
 
@@ -629,12 +629,12 @@ Examples:
 					if err := configManager.UpdateConfig(updates); err != nil {
 						return fmt.Errorf("failed to save Azure API version: %w", err)
 					}
-					fmt.Printf(" Azure API version set to: %s\n", versionInput)
+					logger.Info(fmt.Sprintf("terminal prompt:  Azure API version set to: %s", versionInput))
 				}
 			}
 
 			// Model selection
-			fmt.Print("\nSelect AI model (press Enter for default): ")
+			logger.Info("terminal prompt: \nSelect AI model (press Enter for default): ")
 			modelInput, _ := reader.ReadString('\n')
 			modelInput = strings.TrimSpace(modelInput)
 
@@ -643,11 +643,11 @@ Examples:
 				if err := configManager.UpdateConfig(updates); err != nil {
 					return fmt.Errorf("failed to update model: %w", err)
 				}
-				fmt.Printf(" Model set to: %s\n", modelInput)
+				logger.Info(fmt.Sprintf("terminal prompt:  Model set to: %s", modelInput))
 			}
 
-			fmt.Println("\n Configuration complete!")
-			fmt.Println("You can now use 'eos ai ask' and other AI commands.")
+			logger.Info("terminal prompt: \n Configuration complete!")
+			logger.Info("terminal prompt: You can now use 'eos ai ask' and other AI commands.")
 			return nil
 		}
 
@@ -656,24 +656,24 @@ Examples:
 
 		if provider != "" {
 			updates["provider"] = provider
-			fmt.Printf(" Provider set to: %s\n", provider)
+			logger.Info(fmt.Sprintf("terminal prompt:  Provider set to: %s", provider))
 		}
 
 		if apiKey != "" {
 			if err := ai.ValidateAPIKey(apiKey); err != nil {
-				fmt.Printf(" Warning: %v\n", err)
+				logger.Info(fmt.Sprintf("terminal prompt:  Warning: %v", err))
 			}
 			if err := configManager.SetAPIKey(apiKey); err != nil {
 				return fmt.Errorf("failed to save API key: %w", err)
 			}
-			fmt.Println(" API key saved")
+			logger.Info("terminal prompt:  API key saved")
 		}
 
 		if vaultPath != "" {
 			if err := configManager.SetAPIKeyVault(vaultPath); err != nil {
 				return fmt.Errorf("failed to save Vault path: %w", err)
 			}
-			fmt.Println(" Vault path saved")
+			logger.Info("terminal prompt:  Vault path saved")
 		}
 
 		if model != "" {
@@ -700,7 +700,7 @@ Examples:
 			if err := configManager.UpdateConfig(updates); err != nil {
 				return fmt.Errorf("failed to update configuration: %w", err)
 			}
-			fmt.Println(" Configuration updated")
+			logger.Info("terminal prompt:  Configuration updated")
 		}
 
 		return nil

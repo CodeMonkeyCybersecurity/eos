@@ -24,6 +24,7 @@ var UpdateLDAPCmd = &cobra.Command{
 	Long: `Regenerates the TLS certificate for your LDAP server, including the IP address
 in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		if ipSAN == "" {
 			return fmt.Errorf("--ip flag is required to set SAN IP")
 		}
@@ -43,7 +44,7 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 		}
 
 		for _, c := range cmds {
-			fmt.Printf(" Executing: %s\n", c)
+			logger.Info("terminal prompt:  Executing: %s", c)
 			if !dryRun {
 				cmd := exec.Command("bash", "-c", c)
 				cmd.Stdout = cmd.Stderr
@@ -53,9 +54,9 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 			}
 		}
 
-		fmt.Println(" LDAP TLS certificate regenerated with IP SAN.")
-		fmt.Println(" Path: /etc/ldap/certs/ldap.crt and ldap.key")
-		fmt.Println("🧠 Reminder: Restart your LDAP server to use the new certificate.")
+		logger.Info("terminal prompt:  LDAP TLS certificate regenerated with IP SAN.")
+		logger.Info("terminal prompt:  Path: /etc/ldap/certs/ldap.crt and ldap.key")
+		logger.Info("terminal prompt: 🧠 Reminder: Restart your LDAP server to use the new certificate.")
 
 		return nil
 	}),

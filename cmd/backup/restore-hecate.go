@@ -22,6 +22,7 @@ var RestoreCmd = &cobra.Command{
 	Use:   "restore",
 	Short: "Restore configuration and files from backup",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		if timestampFlag != "" {
 			return autoRestore(rc, timestampFlag)
 		}
@@ -70,11 +71,11 @@ func interactiveRestore(rc *eos_io.RuntimeContext) error {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Select resource to restore:")
+	logger.Info("terminal prompt: Select resource to restore:")
 	for _, m := range menu[:3] {
-		fmt.Println(m.label)
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", m.label)))
 	}
-	fmt.Print("Enter choice (1-4): ")
+	logger.Info("terminal prompt: Enter choice (1-4): ")
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
 

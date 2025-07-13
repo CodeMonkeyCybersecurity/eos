@@ -115,7 +115,7 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 	defer ticker.Stop()
 
 	// Clear screen
-	fmt.Print("\033[2J\033[H")
+	logger.Info("terminal prompt: \033[2J\033[H")
 
 	for {
 		select {
@@ -123,11 +123,11 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 			return nil
 		case <-ticker.C:
 			// Clear screen and move cursor to top
-			fmt.Print("\033[2J\033[H")
+			logger.Info("terminal prompt: \033[2J\033[H")
 
 			metrics, err := storage_monitor.CollectIOMetrics(rc)
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
+				logger.Info("terminal prompt: Error: %v", err)
 				continue
 			}
 
@@ -142,9 +142,9 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 				metrics = filtered
 			}
 
-			fmt.Printf("Storage Metrics - %s\n\n", time.Now().Format("15:04:05"))
+			logger.Info("terminal prompt: Storage Metrics - %s\n", time.Now().Format("15:04:05"))
 			if err := displayMetrics(metrics); err != nil {
-				fmt.Printf("Warning: Failed to display metrics: %v\n", err)
+				logger.Info("terminal prompt: Warning: Failed to display metrics: %v", err)
 			}
 		}
 	}

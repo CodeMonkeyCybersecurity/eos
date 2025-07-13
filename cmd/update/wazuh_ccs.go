@@ -139,8 +139,8 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 
 	// Show new resource allocation
 	resources := wazuh_mssp.GetResourcesByTier(newTier)
-	fmt.Printf("\nCustomer scaled to %s tier\n", newTierStr)
-	fmt.Printf("\nNew resource allocation:\n")
+	logger.Info("terminal prompt: \nCustomer scaled to %s tier", newTierStr)
+	logger.Info("terminal prompt: New resource allocation:")
 	fmt.Printf("- Indexer: %d instances, %d CPU, %d MB memory\n",
 		resources.Indexer.Count, resources.Indexer.CPU, resources.Indexer.Memory)
 	fmt.Printf("- Server: %d instances, %d CPU, %d MB memory\n",
@@ -313,13 +313,13 @@ func applySecurityUpdates(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger.Info("Security updates applied successfully")
 
 	// Show summary
-	fmt.Println("\nSecurity updates completed:")
+	logger.Info("terminal prompt: \nSecurity updates completed:")
 	if wazuhVersion != "" {
-		fmt.Printf("- Wazuh updated to version %s\n", wazuhVersion)
+		logger.Info("terminal prompt: - Wazuh updated to version %s", wazuhVersion)
 	}
 	if rotateSecrets {
-		fmt.Println("- All secrets rotated")
-		fmt.Println("- Customers will be notified of credential changes")
+		logger.Info("terminal prompt: - All secrets rotated")
+		logger.Info("terminal prompt: - Customers will be notified of credential changes")
 	}
 
 	return nil

@@ -48,6 +48,21 @@ type DiskListResult struct {
 	Timestamp time.Time  `json:"timestamp"`
 }
 
+// PartitionListResult contains results of listing partitions
+type PartitionListResult struct {
+	DiskPath   string          `json:"disk_path"`
+	Partitions []PartitionInfo `json:"partitions"`
+	Timestamp  time.Time       `json:"timestamp"`
+}
+
+// MountedVolume represents a currently mounted volume
+type MountedVolume struct {
+	Device     string `json:"device"`
+	MountPoint string `json:"mount_point"`
+	Filesystem string `json:"filesystem"`
+	Options    string `json:"options"`
+}
+
 // PartitionOperation represents a partition management operation
 type PartitionOperation struct {
 	Operation string        `json:"operation"` // create, format, mount, unmount

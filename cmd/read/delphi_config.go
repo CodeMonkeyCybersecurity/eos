@@ -26,7 +26,7 @@ var ReadConfigCmd = &cobra.Command{
 		cfg, err := delphi.ReadConfig(rc)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to load Delphi config", zap.Error(err))
-			fmt.Println(" Error loading Delphi config:", err)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", " Error loading Delphi config:", err)))
 			return err
 		}
 
@@ -43,12 +43,12 @@ var ReadConfigCmd = &cobra.Command{
 		cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to marshal Delphi config", zap.Error(err))
-			fmt.Println(" Error printing config:", err)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", " Error printing config:", err)))
 			return err
 		}
 
-		fmt.Println(" Delphi Configuration:")
-		fmt.Println(string(cfgJSON))
+		logger.Info("terminal prompt:  Delphi Configuration:")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(cfgJSON))))
 		return nil
 	}),
 }

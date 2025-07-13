@@ -391,17 +391,17 @@ func executeFuzzing(rc *eos_io.RuntimeContext, config *fuzzing.Config, mode stri
 	
 	// Print summary to user
 	if config.Verbose {
-		fmt.Printf("\n=== Fuzzing Session Summary ===\n")
-		fmt.Printf("Mode: %s\n", mode)
+		logger.Info("terminal prompt: === Fuzzing Session Summary ===")
+		logger.Info("terminal prompt: Mode: %s", mode)
 		fmt.Printf("Tests: %d/%d passed (%.1f%%)\n", 
 			session.Summary.PassedTests, 
 			session.Summary.TotalTests,
 			session.Summary.SuccessRate*100)
-		fmt.Printf("Duration: %s\n", session.Summary.TotalDuration)
-		fmt.Printf("Report: %s\n", reportPath)
+		logger.Info("terminal prompt: Duration: %s", session.Summary.TotalDuration)
+		logger.Info("terminal prompt: Report: %s", reportPath)
 		
 		if session.Summary.SecurityAlert {
-			fmt.Printf("⚠️  Security Alert: %d crashes detected\n", session.Summary.CrashesFound)
+			logger.Info("terminal prompt: ⚠️  Security Alert: %d crashes detected", session.Summary.CrashesFound)
 		}
 	}
 	

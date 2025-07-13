@@ -131,7 +131,7 @@ Example:
 
 		// Apply (with confirmation if not auto-approved)
 		if !autoApprove {
-			fmt.Print("\nDo you want to apply these changes? [y/N]: ")
+			logger.Info("terminal prompt: \nDo you want to apply these changes? [y/N]: ")
 			var response string
 			if _, err := fmt.Scanln(&response); err != nil {
 				logger.Warn("Failed to read user input, cancelling deployment", zap.Error(err))
@@ -161,7 +161,7 @@ Example:
 		}
 
 		logger.Info("Terraform-Vault deployment completed successfully")
-		fmt.Println("\n Infrastructure deployed successfully with Vault integration!")
+		logger.Info("terminal prompt: \n Infrastructure deployed successfully with Vault integration!")
 
 		return nil
 	}),
@@ -226,7 +226,7 @@ var syncOutputsCmd = &cobra.Command{
 		}
 
 		if len(outputs) == 0 {
-			fmt.Println("No outputs found to sync")
+			logger.Info("terminal prompt: No outputs found to sync")
 			return nil
 		}
 

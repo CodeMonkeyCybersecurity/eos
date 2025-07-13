@@ -73,15 +73,15 @@ func outputZFSFilesystemsResult(result *zfs_management.ZFSListResult, outputJSON
 
 	// Text output
 	if len(result.Filesystems) == 0 {
-		fmt.Println("No ZFS filesystems found.")
+		logger.Info("terminal prompt: No ZFS filesystems found.")
 		return nil
 	}
 
-	fmt.Printf("ZFS Filesystems (found %d):\n", result.Count)
-	fmt.Println(strings.Repeat("=", 80))
+	logger.Info("terminal prompt: ZFS Filesystems (found %d):", result.Count)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
 	fmt.Printf("%-30s %-10s %-10s %-10s %-15s\n",
 		"NAME", "USED", "AVAIL", "REFER", "MOUNTPOINT")
-	fmt.Println(strings.Repeat("-", 80))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
 
 	for _, fs := range result.Filesystems {
 		mountpoint := fs.Mountpoint

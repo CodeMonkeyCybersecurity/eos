@@ -3,7 +3,6 @@
 package create
 
 import (
-	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -21,7 +20,7 @@ var CreateProcessCmd = &cobra.Command{
 			otelzap.Ctx(rc.Ctx).Fatal("Please provide details to create a process.")
 		}
 		processDetails := args[0]
-		fmt.Printf("Creating process: %s...\n", processDetails)
+		logger.Info("terminal prompt: Creating process: %s...", processDetails)
 		// Add your logic to create a process
 		return nil
 	}),

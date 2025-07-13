@@ -22,6 +22,7 @@ var ParseCmd = &cobra.Command{
 	Use:   "parse",
 	Short: "Split a ChatGPT-style conversations.json into individual files",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
 		if !jsonMode {
 			return fmt.Errorf("only --json mode is currently supported")
@@ -61,7 +62,7 @@ var ParseCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf(" Parsed %d conversations into ./%s/\n", len(conversations), outDir)
+		logger.Info("terminal prompt:  Parsed %d conversations into ./%s/", len(conversations), outDir)
 		return nil
 	}),
 }

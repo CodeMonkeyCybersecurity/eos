@@ -38,8 +38,8 @@ Subcommands are required to specify which type of information to read.`,
 		// then its RunE should indicate missing subcommand and display its own help.
 		otelzap.Ctx(rc.Ctx).Info("'eos delphi read' was called without a subcommand")
 
-		fmt.Println(" Missing subcommand for 'eos delphi read'.")                                // More specific message
-		fmt.Println("  Run `eos delphi read --help` to see available options for reading data.") // More specific advice
+		logger.Info("terminal prompt:  Missing subcommand for 'eos delphi read'.")                                // More specific message
+		logger.Info("terminal prompt:   Run `eos delphi read --help` to see available options for reading data.") // More specific advice
 		_ = cmd.Help()                                                                           // Print built-in help for 'read' command
 		return nil
 	}),
@@ -211,7 +211,7 @@ to ensure your database schema is properly configured.`,
 		}
 		defer func() {
 			if err := db.Close(); err != nil {
-				fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+				logger.Info("terminal prompt: Warning: Failed to close database connection: %v", err)
 			}
 		}()
 
@@ -225,10 +225,10 @@ to ensure your database schema is properly configured.`,
 		}
 
 		// Display results
-		fmt.Printf("\n=== Delphi Pipeline Schema Verification ===\n")
-		fmt.Printf("Timestamp: %s\n", result.Timestamp.Format(time.RFC3339))
-		fmt.Printf("Overall Status: %s\n", result.OverallStatus)
-		fmt.Printf("Missing Objects: %d\n\n", result.MissingCount)
+		logger.Info("terminal prompt: === Delphi Pipeline Schema Verification ===")
+		logger.Info("terminal prompt: Timestamp: %s", result.Timestamp.Format(time.RFC3339))
+		logger.Info("terminal prompt: Overall Status: %s", result.OverallStatus)
+		logger.Info("terminal prompt: Missing Objects: %d\n", result.MissingCount)
 
 		// Display detailed results for each object type
 		displaySchemaObjects("Enum Types", result.EnumTypes)
@@ -239,10 +239,10 @@ to ensure your database schema is properly configured.`,
 		displaySchemaObjects("Triggers", result.Triggers)
 
 		if result.MissingCount > 0 {
-			fmt.Printf("\n⚠️  Schema verification found %d missing objects.\n", result.MissingCount)
-			fmt.Println("Run 'eos create delphi deploy' to deploy the complete schema.")
+			logger.Info("terminal prompt: \n⚠️  Schema verification found %d missing objects.", result.MissingCount)
+			logger.Info("terminal prompt: Run 'eos create delphi deploy' to deploy the complete schema.")
 		} else {
-			fmt.Println("\n All schema objects are present and verified.")
+			logger.Info("terminal prompt: \n All schema objects are present and verified.")
 		}
 
 		return nil
@@ -271,21 +271,21 @@ func displaySchemaObjects(objectType string, objects []delphi.SchemaObject) {
 		return
 	}
 
-	fmt.Printf("\n%s:\n", objectType)
+	logger.Info("terminal prompt: \n%s:", objectType)
 	for _, obj := range objects {
 		statusSymbol := "✓"
 		if obj.Status != "OK" {
 			statusSymbol = "✗"
 		}
 
-		fmt.Printf("  %s %s", statusSymbol, obj.Name)
+		logger.Info("terminal prompt:   %s %s", statusSymbol, obj.Name)
 		if obj.Details != "" {
-			fmt.Printf(" - %s", obj.Details)
+			logger.Info("terminal prompt:  - %s", obj.Details)
 		}
 		if obj.ActionNeeded != "" {
-			fmt.Printf("\n    Action: %s", obj.ActionNeeded)
+			logger.Info("terminal prompt: \n    Action: %s", obj.ActionNeeded)
 		}
-		fmt.Println()
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 	}
 }
 

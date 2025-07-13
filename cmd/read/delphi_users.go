@@ -2,7 +2,6 @@
 package read
 
 import (
-	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -29,9 +28,9 @@ var ReadUsersCmd = &cobra.Command{
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to fetch users", zap.Error(err))
 		}
 
-		fmt.Println("Wazuh Users:")
+		logger.Info("terminal prompt: Wazuh Users:")
 		for _, user := range users {
-			fmt.Printf("• %s (ID: %d)\n", user.Username, user.ID)
+			logger.Info("terminal prompt: • %s (ID: %d)", user.Username, user.ID)
 		}
 		return nil
 	}),

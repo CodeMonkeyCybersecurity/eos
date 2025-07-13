@@ -17,6 +17,7 @@ type Config struct {
 	S3Config            S3Config
 	DatabaseConfig      DatabaseConfig
 	QueueConfig         QueueConfig
+	StorageConfig       StorageConfig
 	Timestamp           string
 }
 
@@ -26,6 +27,7 @@ type S3Config struct {
 	AccessKey string
 	SecretKey string
 	Bucket    string
+	Region    string
 	UseSSL    bool
 }
 
@@ -46,4 +48,11 @@ type QueueConfig struct {
 	Port     int
 	Username string
 	Password string
+}
+
+// StorageConfig holds storage configuration
+type StorageConfig struct {
+	Type      string // "minio", "s3", "local"
+	S3Config  S3Config
+	LocalPath string
 }

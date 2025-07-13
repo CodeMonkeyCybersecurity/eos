@@ -3,7 +3,6 @@ package read
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 
@@ -34,7 +33,7 @@ var ReadCredentialsCmd = &cobra.Command{
 		if cfg.Token == "" {
 			token, err := delphi.Authenticate(rc, cfg)
 			if err != nil {
-				fmt.Printf(" Authentication failed: %v\n", err)
+				logger.Info("terminal prompt:  Authentication failed: %v", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
@@ -45,13 +44,13 @@ var ReadCredentialsCmd = &cobra.Command{
 
 		resp, err := delphi.AuthenticatedGet(cfg, "/security/users")
 		if err != nil {
-			fmt.Printf(" Failed to fetch users: %v\n", err)
+			logger.Info("terminal prompt:  Failed to fetch users: %v", err)
 			os.Exit(1)
 		}
 		defer shared.SafeClose(rc.Ctx, resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf(" Failed with status code: %d\n", resp.StatusCode)
+			logger.Info("terminal prompt:  Failed with status code: %d", resp.StatusCode)
 			os.Exit(1)
 		}
 
@@ -65,17 +64,17 @@ var ReadCredentialsCmd = &cobra.Command{
 			} `json:"data"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			fmt.Printf(" Failed to parse response: %v\n", err)
+			logger.Info("terminal prompt:  Failed to parse response: %v", err)
 			os.Exit(1)
 		}
 
-		fmt.Println(" Delphi API Users:")
+		logger.Info("terminal prompt:  Delphi API Users:")
 		for _, user := range result.Data.Users {
 			status := "disabled"
 			if user.Active {
 				status = "active"
 			}
-			fmt.Printf("  • %-15s | Role: %-10s | Status: %s\n", user.Username, user.Role, status)
+			logger.Info("terminal prompt:   • %-15s | Role: %-10s | Status: %s", user.Username, user.Role, status)
 		}
 		return nil
 	}),

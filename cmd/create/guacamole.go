@@ -77,56 +77,56 @@ Examples:
 				zap.Int("port", result.Port),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\nApache Guacamole Installation Complete!\n\n")
-			fmt.Printf(" Service Details:\n")
-			fmt.Printf("   Version: %s\n", result.Version)
-			fmt.Printf("   Port: %d\n", result.Port)
-			fmt.Printf("   Method: %s\n", result.Method)
-			fmt.Printf("   Duration: %s\n", result.Duration)
+			logger.Info("terminal prompt: Apache Guacamole Installation Complete!\n")
+			logger.Info("terminal prompt:  Service Details:")
+			logger.Info("terminal prompt:    Version: %s", result.Version)
+			logger.Info("terminal prompt:    Port: %d", result.Port)
+			logger.Info("terminal prompt:    Method: %s", result.Method)
+			logger.Info("terminal prompt:    Duration: %s", result.Duration)
 
 			if len(result.Endpoints) > 0 {
-				fmt.Printf("\n🌐 Access URLs:\n")
+				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					fmt.Printf("   %s\n", endpoint)
+					logger.Info("terminal prompt:    %s", endpoint)
 				}
 			}
 
 			if len(result.Credentials) > 0 {
-				fmt.Printf("\n Default Credentials:\n")
+				logger.Info("terminal prompt:  Default Credentials:")
 				for key, value := range result.Credentials {
 					if key != "DB_PASSWORD" && key != "DB_USER" && key != "DB_NAME" {
-						fmt.Printf("   %s: %s\n", key, value)
+						logger.Info("terminal prompt:    %s: %s", key, value)
 					}
 				}
 			}
 
-			fmt.Printf("\n📝 Next Steps:\n")
-			fmt.Printf("   1. Open Guacamole: http://localhost:%d/guacamole\n", result.Port)
-			fmt.Printf("   2. Login with: guacadmin / guacadmin\n")
-			fmt.Printf("   3. IMMEDIATELY change the default password\n")
-			fmt.Printf("   4. Configure connections (RDP, VNC, SSH)\n")
-			fmt.Printf("   5. Set up SSL/TLS for production use\n")
-			fmt.Printf("   6. Check status: eos status guacamole\n")
+			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:    1. Open Guacamole: http://localhost:%d/guacamole", result.Port)
+			logger.Info("terminal prompt:    2. Login with: guacadmin / guacadmin")
+			logger.Info("terminal prompt:    3. IMMEDIATELY change the default password")
+			logger.Info("terminal prompt:    4. Configure connections (RDP, VNC, SSH)")
+			logger.Info("terminal prompt:    5. Set up SSL/TLS for production use")
+			logger.Info("terminal prompt:    6. Check status: eos status guacamole")
 
-			fmt.Printf("\n🛡️ Security Notes:\n")
-			fmt.Printf("   - Change default admin credentials immediately\n")
-			fmt.Printf("   - Use strong passwords for connections\n")
-			fmt.Printf("   - Consider setting up reverse proxy with SSL\n")
-			fmt.Printf("   - Regularly update Guacamole for security patches\n")
+			logger.Info("terminal prompt: 🛡️ Security Notes:")
+			logger.Info("terminal prompt:    - Change default admin credentials immediately")
+			logger.Info("terminal prompt:    - Use strong passwords for connections")
+			logger.Info("terminal prompt:    - Consider setting up reverse proxy with SSL")
+			logger.Info("terminal prompt:    - Regularly update Guacamole for security patches")
 
-			fmt.Printf("\n📚 Supported Protocols:\n")
-			fmt.Printf("   - RDP (Remote Desktop Protocol)\n")
-			fmt.Printf("   - VNC (Virtual Network Computing)\n")
-			fmt.Printf("   - SSH (Secure Shell)\n")
-			fmt.Printf("   - Telnet\n")
-			fmt.Printf("   - Kubernetes\n")
+			logger.Info("terminal prompt: 📚 Supported Protocols:")
+			logger.Info("terminal prompt:    - RDP (Remote Desktop Protocol)")
+			logger.Info("terminal prompt:    - VNC (Virtual Network Computing)")
+			logger.Info("terminal prompt:    - SSH (Secure Shell)")
+			logger.Info("terminal prompt:    - Telnet")
+			logger.Info("terminal prompt:    - Kubernetes")
 		} else {
 			logger.Error("Apache Guacamole installation failed", zap.String("error", result.Error))
-			fmt.Printf("\n❌ Apache Guacamole Installation Failed!\n")
-			fmt.Printf("Error: %s\n", result.Error)
+			logger.Info("terminal prompt: ❌ Apache Guacamole Installation Failed!")
+			logger.Info("terminal prompt: Error: %s", result.Error)
 
 			if len(result.Steps) > 0 {
-				fmt.Printf("\nInstallation Steps:\n")
+				logger.Info("terminal prompt: Installation Steps:")
 				for _, step := range result.Steps {
 					status := ""
 					switch step.Status {
@@ -135,9 +135,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
 					if step.Error != "" {
-						fmt.Printf("      Error: %s\n", step.Error)
+						logger.Info("terminal prompt:       Error: %s", step.Error)
 					}
 				}
 			}

@@ -76,20 +76,20 @@ var remoteListCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to marshal JSON: %w", err)
 			}
-			fmt.Println(string(data))
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
 			return nil
 		}
 
-		fmt.Printf("Git Remotes\n")
-		fmt.Printf("===========\n\n")
+		logger.Info("terminal prompt: Git Remotes")
+		logger.Info("terminal prompt: ===========\n")
 
 		if len(repo.RemoteURLs) == 0 {
-			fmt.Println("No remotes configured")
+			logger.Info("terminal prompt: No remotes configured")
 			return nil
 		}
 
 		for name, url := range repo.RemoteURLs {
-			fmt.Printf("%s\t%s\n", name, url)
+			logger.Info("terminal prompt: %s\t%s", name, url)
 		}
 
 		return nil

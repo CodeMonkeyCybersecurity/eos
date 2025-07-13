@@ -36,8 +36,8 @@ Subcommands are required to specify which type of resource to list.`,
 			zap.String("command", "eos delphi list"),
 		)
 
-		fmt.Println(" Missing subcommand for 'eos delphi list'.")
-		fmt.Println("  Run `eos delphi list --help` to see available options for listing resources.")
+		logger.Info("terminal prompt:  Missing subcommand for 'eos delphi list'.")
+		logger.Info("terminal prompt:   Run `eos delphi list --help` to see available options for listing resources.")
 		_ = cmd.Help() // Print built-in help for 'list' command
 		return nil
 	}),
@@ -303,7 +303,7 @@ func loadEnvFile(filename string) error {
 			}
 
 			if err := os.Setenv(key, value); err != nil {
-				fmt.Printf("Warning: Failed to set environment variable %s: %v\n", key, err)
+				logger.Info("terminal prompt: Warning: Failed to set environment variable %s: %v", key, err)
 			}
 		}
 	}
@@ -413,54 +413,54 @@ func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) e
 // outputTextResults outputs validation results in human-readable format
 func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkOnly bool) error {
 	if !checkOnly {
-		fmt.Println(" Delphi Configuration Validator")
-		fmt.Println(strings.Repeat("=", 50))
+		logger.Info("terminal prompt:  Delphi Configuration Validator")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
 	}
 
 	// Show errors
 	if len(summary.Errors) > 0 {
 		if !checkOnly {
-			fmt.Printf("\n❌ ERRORS (%d):\n", len(summary.Errors))
+			logger.Info("terminal prompt: \n❌ ERRORS (%d):", len(summary.Errors))
 			for _, err := range summary.Errors {
-				fmt.Printf("   • [%s] %s\n", err.Source, err.Message)
+				logger.Info("terminal prompt:    • [%s] %s", err.Source, err.Message)
 			}
 		}
 	}
 
 	// Show warnings
 	if len(summary.Warnings) > 0 && !checkOnly {
-		fmt.Printf("\nWARNINGS (%d):\n", len(summary.Warnings))
+		logger.Info("terminal prompt: \nWARNINGS (%d):", len(summary.Warnings))
 		for _, warn := range summary.Warnings {
-			fmt.Printf("   • [%s] %s\n", warn.Source, warn.Message)
+			logger.Info("terminal prompt:    • [%s] %s", warn.Source, warn.Message)
 		}
 	}
 
 	// Show info messages if verbose
 	if verbose && len(summary.Info) > 0 && !checkOnly {
-		fmt.Printf("\n SUCCESS (%d):\n", len(summary.Info))
+		logger.Info("terminal prompt: \n SUCCESS (%d):", len(summary.Info))
 		for _, info := range summary.Info {
-			fmt.Printf("   • [%s] %s\n", info.Source, info.Message)
+			logger.Info("terminal prompt:    • [%s] %s", info.Source, info.Message)
 		}
 	}
 
 	// Summary
 	if !checkOnly {
-		fmt.Println("\n" + strings.Repeat("=", 50))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 50))))
 	}
 
 	if summary.Success {
-		fmt.Println(" ALL CHECKS PASSED - Delphi is ready for production!")
+		logger.Info("terminal prompt:  ALL CHECKS PASSED - Delphi is ready for production!")
 	} else if len(summary.Errors) == 0 {
-		fmt.Println("WARNINGS FOUND - Delphi should work but check warnings")
+		logger.Info("terminal prompt: WARNINGS FOUND - Delphi should work but check warnings")
 	} else {
-		fmt.Println("❌ CRITICAL ERRORS FOUND - Fix errors before running Delphi")
+		logger.Info("terminal prompt: ❌ CRITICAL ERRORS FOUND - Fix errors before running Delphi")
 
 		// Return error exit code for CI/CD integration
 		os.Exit(1)
 	}
 
 	if !checkOnly {
-		fmt.Println(strings.Repeat("=", 50))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
 	}
 
 	return nil

@@ -2,7 +2,6 @@
 package create
 
 import (
-	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -20,7 +19,7 @@ var CreateStorageCmd = &cobra.Command{
 			otelzap.Ctx(rc.Ctx).Fatal("Please specify the storage details to create.")
 		}
 		storageDetails := args[0]
-		fmt.Printf("Creating storage: %s...\n", storageDetails)
+		logger.Info("terminal prompt: Creating storage: %s...", storageDetails)
 		// Add your logic to create storage resources
 		return nil
 	}),

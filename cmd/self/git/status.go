@@ -79,7 +79,7 @@ func outputJSONStatus(status *git_management.GitStatus) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	fmt.Println(string(data))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
 	return nil
 }
 
@@ -88,12 +88,12 @@ func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() {
 		if err := w.Flush(); err != nil {
-			fmt.Printf("Warning: Failed to flush tabwriter: %v\n", err)
+			logger.Info("terminal prompt: Warning: Failed to flush tabwriter: %v", err)
 		}
 	}()
 
-	fmt.Printf("Git Repository Status\n")
-	fmt.Printf("=====================\n\n")
+	logger.Info("terminal prompt: Git Repository Status")
+	logger.Info("terminal prompt: =====================\n")
 
 	// Branch information
 	fmt.Fprintf(w, "Branch:\t%s\n", status.Branch)
@@ -131,23 +131,23 @@ func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 	// Detailed file listing if requested
 	if detailed {
 		if len(status.Staged) > 0 {
-			fmt.Printf("\nStaged Files:\n")
+			logger.Info("terminal prompt: Staged Files:")
 			for _, file := range status.Staged {
-				fmt.Printf("  + %s\n", file)
+				logger.Info("terminal prompt:   + %s", file)
 			}
 		}
 
 		if len(status.Modified) > 0 {
-			fmt.Printf("\nModified Files:\n")
+			logger.Info("terminal prompt: Modified Files:")
 			for _, file := range status.Modified {
-				fmt.Printf("  M %s\n", file)
+				logger.Info("terminal prompt:   M %s", file)
 			}
 		}
 
 		if len(status.Untracked) > 0 {
-			fmt.Printf("\nUntracked Files:\n")
+			logger.Info("terminal prompt: Untracked Files:")
 			for _, file := range status.Untracked {
-				fmt.Printf("  ? %s\n", file)
+				logger.Info("terminal prompt:   ? %s", file)
 			}
 		}
 	}

@@ -75,32 +75,32 @@ Examples:
 			logger.Info("Tailscale installation completed successfully",
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\nTailscale Installation Complete!\n\n")
-			fmt.Printf(" Service Details:\n")
-			fmt.Printf("   Method: %s\n", result.Method)
-			fmt.Printf("   Duration: %s\n", result.Duration)
+			logger.Info("terminal prompt: Tailscale Installation Complete!\n")
+			logger.Info("terminal prompt:  Service Details:")
+			logger.Info("terminal prompt:    Method: %s", result.Method)
+			logger.Info("terminal prompt:    Duration: %s", result.Duration)
 
 			if result.Version != "" {
-				fmt.Printf("   Version: %s\n", result.Version)
+				logger.Info("terminal prompt:    Version: %s", result.Version)
 			}
 
-			fmt.Printf("\n📝 Next Steps:\n")
-			fmt.Printf("   1. Authenticate: sudo tailscale up\n")
-			fmt.Printf("   2. Check status: tailscale status\n")
-			fmt.Printf("   3. View IP: tailscale ip -4\n")
-			fmt.Printf("   4. Manage at: https://login.tailscale.com/admin\n")
+			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:    1. Authenticate: sudo tailscale up")
+			logger.Info("terminal prompt:    2. Check status: tailscale status")
+			logger.Info("terminal prompt:    3. View IP: tailscale ip -4")
+			logger.Info("terminal prompt:    4. Manage at: https://login.tailscale.com/admin")
 
-			fmt.Printf("\n💡 Tips:\n")
-			fmt.Printf("   - Use 'tailscale up --ssh' to enable SSH access\n")
-			fmt.Printf("   - Use 'tailscale up --advertise-routes=192.168.1.0/24' to share local networks\n")
-			fmt.Printf("   - Check service: eos status tailscale\n")
+			logger.Info("terminal prompt: 💡 Tips:")
+			logger.Info("terminal prompt:    - Use 'tailscale up --ssh' to enable SSH access")
+			logger.Info("terminal prompt:    - Use 'tailscale up --advertise-routes=192.168.1.0/24' to share local networks")
+			logger.Info("terminal prompt:    - Check service: eos status tailscale")
 		} else {
 			logger.Error("Tailscale installation failed", zap.String("error", result.Error))
-			fmt.Printf("\n❌ Tailscale Installation Failed!\n")
-			fmt.Printf("Error: %s\n", result.Error)
+			logger.Info("terminal prompt: ❌ Tailscale Installation Failed!")
+			logger.Info("terminal prompt: Error: %s", result.Error)
 
 			if len(result.Steps) > 0 {
-				fmt.Printf("\nInstallation Steps:\n")
+				logger.Info("terminal prompt: Installation Steps:")
 				for _, step := range result.Steps {
 					status := ""
 					switch step.Status {
@@ -109,9 +109,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
 					if step.Error != "" {
-						fmt.Printf("      Error: %s\n", step.Error)
+						logger.Info("terminal prompt:       Error: %s", step.Error)
 					}
 				}
 			}

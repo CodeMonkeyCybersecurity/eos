@@ -88,40 +88,40 @@ Examples:
 				zap.Int("port", result.Port),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\nMattermost Installation Complete!\n\n")
-			fmt.Printf("💬 Service Details:\n")
-			fmt.Printf("   Version: %s\n", result.Version)
-			fmt.Printf("   Port: %d\n", result.Port)
-			fmt.Printf("   Method: %s\n", result.Method)
-			fmt.Printf("   Duration: %s\n", result.Duration)
+			logger.Info("terminal prompt: Mattermost Installation Complete!\n")
+			logger.Info("terminal prompt: 💬 Service Details:")
+			logger.Info("terminal prompt:    Version: %s", result.Version)
+			logger.Info("terminal prompt:    Port: %d", result.Port)
+			logger.Info("terminal prompt:    Method: %s", result.Method)
+			logger.Info("terminal prompt:    Duration: %s", result.Duration)
 
 			if len(result.Endpoints) > 0 {
-				fmt.Printf("\n🌐 Access URLs:\n")
+				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					fmt.Printf("   %s\n", endpoint)
+					logger.Info("terminal prompt:    %s", endpoint)
 				}
 			}
 
 			if len(result.Credentials) > 0 {
-				fmt.Printf("\n Database Credentials:\n")
+				logger.Info("terminal prompt:  Database Credentials:")
 				for key, value := range result.Credentials {
-					fmt.Printf("   %s: %s\n", key, value)
+					logger.Info("terminal prompt:    %s: %s", key, value)
 				}
 			}
 
-			fmt.Printf("\n📝 Next Steps:\n")
-			fmt.Printf("   1. Open Mattermost in your browser: http://localhost:%d\n", result.Port)
-			fmt.Printf("   2. Create the first admin account\n")
-			fmt.Printf("   3. Configure team settings and integrations\n")
-			fmt.Printf("   4. Invite team members\n")
-			fmt.Printf("   5. Check status: eos status mattermost\n")
+			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:    1. Open Mattermost in your browser: http://localhost:%d", result.Port)
+			logger.Info("terminal prompt:    2. Create the first admin account")
+			logger.Info("terminal prompt:    3. Configure team settings and integrations")
+			logger.Info("terminal prompt:    4. Invite team members")
+			logger.Info("terminal prompt:    5. Check status: eos status mattermost")
 		} else {
 			logger.Error("Mattermost installation failed", zap.String("error", result.Error))
-			fmt.Printf("\n❌ Mattermost Installation Failed!\n")
-			fmt.Printf("Error: %s\n", result.Error)
+			logger.Info("terminal prompt: ❌ Mattermost Installation Failed!")
+			logger.Info("terminal prompt: Error: %s", result.Error)
 
 			if len(result.Steps) > 0 {
-				fmt.Printf("\nInstallation Steps:\n")
+				logger.Info("terminal prompt: Installation Steps:")
 				for _, step := range result.Steps {
 					status := ""
 					switch step.Status {
@@ -130,9 +130,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
+					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
 					if step.Error != "" {
-						fmt.Printf("      Error: %s\n", step.Error)
+						logger.Info("terminal prompt:       Error: %s", step.Error)
 					}
 				}
 			}
@@ -154,11 +154,11 @@ func init() {
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveMattermostSetup(options *service_installation.ServiceInstallOptions) error {
-	fmt.Printf("Interactive Mattermost Setup\n")
-	fmt.Printf("================================\n\n")
+	logger.Info("terminal prompt: Interactive Mattermost Setup")
+	logger.Info("terminal prompt: ================================\n")
 
 	// Version
-	fmt.Printf("Mattermost version [%s]: ", options.Version)
+	logger.Info("terminal prompt: Mattermost version [%s]: ", options.Version)
 	var version string
 	fmt.Scanln(&version)
 	if version != "" {
@@ -166,7 +166,7 @@ func runInteractiveMattermostSetup(options *service_installation.ServiceInstallO
 	}
 
 	// Port
-	fmt.Printf("Port [%d]: ", options.Port)
+	logger.Info("terminal prompt: Port [%d]: ", options.Port)
 	var portStr string
 	fmt.Scanln(&portStr)
 	if portStr != "" {
@@ -177,11 +177,11 @@ func runInteractiveMattermostSetup(options *service_installation.ServiceInstallO
 	}
 
 	// Database password
-	fmt.Print("Set custom database password? [y/N]: ")
+	logger.Info("terminal prompt: Set custom database password? [y/N]: ")
 	var setPassword string
 	fmt.Scanln(&setPassword)
 	if setPassword == "y" || setPassword == "Y" {
-		fmt.Print("Database password: ")
+		logger.Info("terminal prompt: Database password: ")
 		var password string
 		fmt.Scanln(&password)
 		if password != "" {
@@ -190,11 +190,11 @@ func runInteractiveMattermostSetup(options *service_installation.ServiceInstallO
 	}
 
 	// Site URL
-	fmt.Print("Set site URL (e.g., https://mattermost.example.com)? [y/N]: ")
+	logger.Info("terminal prompt: Set site URL (e.g., https://mattermost.example.com)? [y/N]: ")
 	var setSiteURL string
 	fmt.Scanln(&setSiteURL)
 	if setSiteURL == "y" || setSiteURL == "Y" {
-		fmt.Print("Site URL: ")
+		logger.Info("terminal prompt: Site URL: ")
 		var siteURL string
 		fmt.Scanln(&siteURL)
 		if siteURL != "" {
@@ -202,14 +202,14 @@ func runInteractiveMattermostSetup(options *service_installation.ServiceInstallO
 		}
 	}
 
-	fmt.Printf("\nConfiguration Summary:\n")
-	fmt.Printf("   Version: %s\n", options.Version)
-	fmt.Printf("   Port: %d\n", options.Port)
+	logger.Info("terminal prompt: Configuration Summary:")
+	logger.Info("terminal prompt:    Version: %s", options.Version)
+	logger.Info("terminal prompt:    Port: %d", options.Port)
 	if siteURL, exists := options.Config["SITE_URL"]; exists {
-		fmt.Printf("   Site URL: %s\n", siteURL)
+		logger.Info("terminal prompt:    Site URL: %s", siteURL)
 	}
 
-	fmt.Print("\nProceed with installation? [Y/n]: ")
+	logger.Info("terminal prompt: \nProceed with installation? [Y/n]: ")
 	var proceed string
 	fmt.Scanln(&proceed)
 	if proceed == "n" || proceed == "N" {

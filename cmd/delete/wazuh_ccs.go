@@ -132,12 +132,12 @@ func removeCustomerDeployment(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 	logger.Info("Customer removed successfully", zap.String("customer_id", customerID))
 
 	// Show summary
-	fmt.Printf("\nCustomer %s has been removed.\n", customerID)
+	logger.Info("terminal prompt: \nCustomer %s has been removed.", customerID)
 	if archive {
-		fmt.Println("\nData has been archived and can be found in:")
-		fmt.Printf("/var/lib/wazuh-mssp/archive/%s-*\n", customerID)
-		fmt.Println("\nTo restore this customer later, use:")
-		fmt.Printf("eos create wazuh-ccs --restore-customer %s <backup-id>\n", customerID)
+		logger.Info("terminal prompt: \nData has been archived and can be found in:")
+		logger.Info("terminal prompt: /var/lib/wazuh-mssp/archive/%s-*", customerID)
+		logger.Info("terminal prompt: \nTo restore this customer later, use:")
+		logger.Info("terminal prompt: eos create wazuh-ccs --restore-customer %s <backup-id>", customerID)
 	}
 
 	return nil
@@ -200,10 +200,10 @@ func removePlatformComponent(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	// 3. Remove configurations
 	// 4. Update platform state
 
-	fmt.Printf("\nComponent %s has been removed.\n", component)
-	fmt.Println("\nWARNING: Platform functionality may be degraded.")
-	fmt.Println("To restore this component, run:")
-	fmt.Printf("eos create wazuh-ccs --restore-component %s\n", component)
+	logger.Info("terminal prompt: \nComponent %s has been removed.", component)
+	logger.Info("terminal prompt: \nWARNING: Platform functionality may be degraded.")
+	logger.Info("terminal prompt: To restore this component, run:")
+	logger.Info("terminal prompt: eos create wazuh-ccs --restore-component %s", component)
 
 	return nil
 }
