@@ -31,7 +31,7 @@ After=network-online.target
 ConditionFileNotEmpty=/etc/consul.d/consul.hcl
 
 [Service]
-Type=notify
+Type=simple
 User=consul
 Group=consul
 ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d/
@@ -42,6 +42,7 @@ Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
 Environment="CONSUL_HTTP_ADDR=127.0.0.1:%d"
+TimeoutStartSec=60
 
 [Install]
 WantedBy=multi-user.target`, shared.PortConsul)

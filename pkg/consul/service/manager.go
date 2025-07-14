@@ -121,7 +121,7 @@ func Start(rc *eos_io.RuntimeContext) error {
 
 	steps := []execute.Options{
 		{Command: "systemctl", Args: []string{"enable", "consul"}},
-		{Command: "systemctl", Args: []string{"start", "consul"}},
+		{Command: "systemctl", Args: []string{"start", "consul"}, Timeout: 90000}, // 90 second timeout
 	}
 
 	for _, step := range steps {
@@ -203,8 +203,9 @@ func Start(rc *eos_io.RuntimeContext) error {
 	
 	if err != nil {
 		// Check if it's just not active yet
-		if strings.TrimSpace(statusOutput) == "activating" {
-			log.Info("Consul service is still activating", zap.String("status", statusOutput))
+		status := strings.TrimSpace(statusOutput)
+		if status == "activating" {
+			log.Info("Consul service is still activating", zap.String("status", status))
 			return nil
 		}
 		log.Error("Failed to verify service is active", 
@@ -213,8 +214,15 @@ func Start(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to verify service is active: %w", err)
 	}
 
-	if strings.TrimSpace(statusOutput) != "active" {
-		return fmt.Errorf("consul service is not active: %s", statusOutput)
+	status := strings.TrimSpace(statusOutput)
+	if status != "active" {
+		// Accept "activating" as a valid state - service is starting up
+		if status == "activating" {
+			log.Info("Consul service is activating - this is normal during startup", 
+				zap.String("status", status))
+			return nil
+		}
+		return fmt.Errorf("consul service is not active: %s", status)
 	}
 
 	log.Info("Consul service started and enabled successfully",
