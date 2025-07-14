@@ -45,7 +45,7 @@ vault_config:
         }
         {% elif backend == 'consul' %}
         storage "consul" {
-          address = "{{ vault.get('consul_address', '127.0.0.1:8500') }}"
+          address = "{{ vault.get('consul_address', '127.0.0.1:8161') }}"
           path    = "{{ vault.get('consul_path', 'vault/') }}"
           {% if vault.get('consul_token') %}
           token   = "{{ vault.consul_token }}"

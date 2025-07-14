@@ -43,7 +43,7 @@ Salt Pillar Data → Salt States → Terraform Configs → Terraform Apply → N
 ```hcl
 terraform {
   backend "consul" {
-    address = "localhost:8500"
+    address = "localhost:8161"
     path    = "terraform/minio/{app_name}"
     lock    = true
   }

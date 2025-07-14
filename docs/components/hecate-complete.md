@@ -1199,7 +1199,7 @@ job "hecate-api" {
             
             upstreams {
               destination_name = "consul"
-              local_bind_port  = 8500
+              local_bind_port  = 8161
             }
             
             upstreams {
@@ -1308,7 +1308,7 @@ AUTHENTIK_TOKEN="{{ .Data.data.authentik_token }}"
 HETZNER_API_TOKEN="{{ .Data.data.hetzner_api_token }}"
 {{- end }}
 
-CONSUL_HTTP_ADDR="http://localhost:8500"
+CONSUL_HTTP_ADDR="http://localhost:8161"
 VAULT_ADDR="http://localhost:8200"
 TEMPORAL_ADDRESS="localhost:7233"
 TEMPORAL_NAMESPACE="default"
@@ -1357,7 +1357,7 @@ auth:
     prefix: "hct_"
 
 consul:
-  address: localhost:8500
+  address: localhost:8161
   datacenter: dc1
   namespace: default
   
@@ -1548,7 +1548,7 @@ job "hecate-temporal-workers" {
             
             upstreams {
               destination_name = "consul"
-              local_bind_port  = 8500
+              local_bind_port  = 8161
             }
             
             upstreams {
@@ -1619,7 +1619,7 @@ CADDY_ADMIN_TOKEN="{{ .Data.data.caddy_admin_token }}"
 AUTHENTIK_TOKEN="{{ .Data.data.authentik_token }}"
 {{- end }}
 
-CONSUL_HTTP_ADDR=http://localhost:8500
+CONSUL_HTTP_ADDR=http://localhost:8161
 VAULT_ADDR=http://localhost:8200
 CADDY_ADMIN_URL=http://localhost:2019
 AUTHENTIK_URL=http://localhost:9000
@@ -1669,7 +1669,7 @@ EOF
             
             upstreams {
               destination_name = "consul"
-              local_bind_port  = 8500
+              local_bind_port  = 8161
             }
             
             upstreams {
@@ -2070,7 +2070,7 @@ EOF
             
             upstreams {
               destination_name = "consul"
-              local_bind_port  = 8500
+              local_bind_port  = 8161
             }
             
             upstreams {
@@ -2109,7 +2109,7 @@ NATS_URL=nats://localhost:4222
 {{- with secret "kv/data/nats/creds/hecate" }}
 NATS_CREDS={{ .Data.data.creds | toJSON }}
 {{- end }}
-CONSUL_HTTP_ADDR=http://localhost:8500
+CONSUL_HTTP_ADDR=http://localhost:8161
 {{- with secret "kv/data/hecate/notifications" }}
 SMTP_HOST=localhost
 SMTP_PORT=25
@@ -2403,7 +2403,7 @@ caddy:
         
         # Environment variables
         Environment="CADDY_CLUSTERING_CONSUL=true"
-        Environment="CADDY_CLUSTERING_CONSUL_ADDR={{ salt['pillar.get']('consul:addr', 'localhost:8500') }}"
+        Environment="CADDY_CLUSTERING_CONSUL_ADDR={{ salt['pillar.get']('consul:addr', 'localhost:8161') }}"
         Environment="CADDY_ADMIN=0.0.0.0:2019"
         
         # Restart configuration
@@ -4496,7 +4496,7 @@ consul_health_cron:
                 
         - job_name: 'hecate-api'
           consul_sd_configs:
-            - server: 'localhost:8500'
+            - server: 'localhost:8161'
               services: ['hecate-api-metrics']
 
 # Grafana dashboard for Hecate

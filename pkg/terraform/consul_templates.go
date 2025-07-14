@@ -115,7 +115,7 @@ resource "hcloud_firewall" "consul_firewall" {
   rule {
     direction = "in"
     protocol  = "tcp"
-    port      = "8500"
+    port      = "8161"
     source_ips = ["0.0.0.0/0"]
   }
   
@@ -230,7 +230,7 @@ provider "hcloud" {
 }
 
 provider "consul" {
-  address    = "http://${hcloud_server.consul_servers[0].ipv4_address}:8500"
+  address    = "http://${hcloud_server.consul_servers[0].ipv4_address}:8161"
   datacenter = var.consul_datacenter
 }
 
@@ -377,7 +377,7 @@ resource "hcloud_firewall" "consul" {
   # Consul HTTP API
   rule {
     direction = "in"
-    port      = "8500"
+    port      = "8161"
     protocol  = "tcp"
     source_ips = ["0.0.0.0/0", "::/0"]
   }
@@ -468,7 +468,7 @@ resource "vault_kv_secret_v2" "consul_cluster_info" {
     client_ips       = hcloud_server.consul_clients[*].ipv4_address
     server_ids       = hcloud_server.consul_servers[*].id
     client_ids       = hcloud_server.consul_clients[*].id
-    consul_url       = "http://${hcloud_server.consul_servers[0].ipv4_address}:8500"
+    consul_url       = "http://${hcloud_server.consul_servers[0].ipv4_address}:8161"
     created_at       = timestamp()
   })
 }
@@ -476,11 +476,11 @@ resource "vault_kv_secret_v2" "consul_cluster_info" {
 # Register services in Consul
 resource "consul_service" "consul_ui" {
   name = "consul-ui"
-  port = 8500
+  port = 8161
   tags = ["ui", "management"]
 
   check {
-    http     = "http://${hcloud_server.consul_servers[0].ipv4_address}:8500/ui/"
+    http     = "http://${hcloud_server.consul_servers[0].ipv4_address}:8161/ui/"
     interval = "10s"
     timeout  = "3s"
   }
@@ -519,12 +519,12 @@ output "consul_client_ips" {
 
 output "consul_ui_url" {
   description = "Consul UI URL"
-  value       = "http://${hcloud_server.consul_servers[0].ipv4_address}:8500/ui/"
+  value       = "http://${hcloud_server.consul_servers[0].ipv4_address}:8161/ui/"
 }
 
 output "consul_api_url" {
   description = "Consul API URL"
-  value       = "http://${hcloud_server.consul_servers[0].ipv4_address}:8500"
+  value       = "http://${hcloud_server.consul_servers[0].ipv4_address}:8161"
 }
 `
 

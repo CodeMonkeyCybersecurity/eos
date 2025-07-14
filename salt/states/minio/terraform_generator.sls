@@ -50,7 +50,7 @@ minio_terraform_tfvars:
         console_port = {{ minio.get('console_port', 8123) }}
         vault_addr   = "{{ minio.get('vault_addr', salt['pillar.get']('vault:api_addr', 'http://localhost:8200')) }}"
         nomad_addr   = "{{ minio.get('nomad_addr', salt['pillar.get']('nomad:api_addr', 'http://localhost:4646')) }}"
-        consul_addr  = "{{ minio.get('consul_addr', salt['pillar.get']('consul:api_addr', 'http://localhost:8500')) }}"
+        consul_addr  = "{{ minio.get('consul_addr', salt['pillar.get']('consul:api_addr', 'http://localhost:8161')) }}"
         
         # Application-specific settings
         app_name     = "{{ app_name }}"
@@ -87,7 +87,7 @@ minio_terraform_backend:
     - contents: |
         terraform {
           backend "consul" {
-            address = "{{ salt['pillar.get']('consul:api_addr', 'localhost:8500') }}"
+            address = "{{ salt['pillar.get']('consul:api_addr', 'localhost:8161') }}"
             scheme  = "http"
             path    = "terraform/minio/{{ app_name }}"
             lock    = true

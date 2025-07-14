@@ -1104,7 +1104,7 @@ job "temporal-workers" {
             
             upstreams {
               destination_name = "consul"
-              local_bind_port  = 8500
+              local_bind_port  = 8161
             }
             
             upstreams {
@@ -3459,7 +3459,7 @@ init_infrastructure() {
     
     # Export for later use
     export NOMAD_ADDR="http://${nomad_addr}:4646"
-    export CONSUL_HTTP_ADDR="http://${consul_addr}:8500"
+    export CONSUL_HTTP_ADDR="http://${consul_addr}:8161"
     export VAULT_ADDR="http://${vault_addr}:8200"
     
     success "Infrastructure initialized"

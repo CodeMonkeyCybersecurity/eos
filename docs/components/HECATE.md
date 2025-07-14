@@ -496,7 +496,7 @@ Runtime State (Caddy/Authentik)
 The State Controller continuously monitors all state sources and reconciles differences according to configurable policies.
 Concrete eos Commands
 # Initialize state synchronization
-eos state hecate init --store consul://localhost:8500/hecate/state
+eos state hecate init --store consul://localhost:8161/hecate/state
 eos state hecate config --sync-interval 60s --drift-threshold 5%
 
 # State observation commands
@@ -522,7 +522,7 @@ eos transaction hecate rollback --id deploy-123 --reason "caddy rejected config"
 Implementation Steps
 First, establish your state store. I recommend Consul for its strong consistency guarantees and watch capabilities:
 # Step 1: Configure state store
-eos state hecate store init --type consul --endpoint localhost:8500
+eos state hecate store init --type consul --endpoint localhost:8161
 eos state hecate store test --write-read-verify
 
 # Step 2: Import current state
