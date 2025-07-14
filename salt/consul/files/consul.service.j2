@@ -1,0 +1,41 @@
+[Unit]
+Description=Consul
+Documentation=https://www.consul.io/
+Requires=network-online.target
+After=network-online.target
+ConditionFileNotEmpty=/etc/consul.d/consul.hcl
+
+[Service]
+Type=simple
+User={{ consul_user }}
+Group={{ consul_group }}
+ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d/
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStop=/usr/local/bin/consul leave
+KillMode=process
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+TimeoutStartSec=60
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/consul /var/log/consul
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+PrivateMounts=yes
+
+# Environment
+Environment="CONSUL_HTTP_ADDR=127.0.0.1:{{ pillar.get('consul:ports:http', 8161) }}"
+Environment="GOMAXPROCS=2"
+
+[Install]
+WantedBy=multi-user.target
