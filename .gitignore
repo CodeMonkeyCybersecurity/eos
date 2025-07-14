@@ -70,3 +70,6 @@ coverage.*
 gosec-report.*
 
 .aider*
+
+#claude
+*this-session-is-being-continued-from-a-previous-co.txt
