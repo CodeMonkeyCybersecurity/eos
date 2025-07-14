@@ -1,5 +1,7 @@
 # Eos Security Compliance Framework
 
+*Last Updated: 2025-01-14*
+
 ## Executive Summary
 
 This document establishes the security compliance framework for the Eos codebase, documenting current security posture, implemented controls, and ongoing requirements for maintaining security standards.

@@ -1,5 +1,7 @@
 # Comprehensive Testing Guide for Eos
 
+*Last Updated: 2025-01-14*
+
 This guide provides a complete strategy for implementing security-first testing, integration testing, and comprehensive fuzzing in the Eos project. It combines unit testing, integration testing, security testing, and advanced fuzzing techniques to ensure robust validation of the entire system.
 
 ## Table of Contents

@@ -1,5 +1,7 @@
 # Eos as an Infrastructure Compiler - Architecture Summary
 
+*Last Updated: 2025-01-14*
+
 ## 1. Vision and Declarative Overview
 
 ### What Eos Is

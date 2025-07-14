@@ -1,5 +1,7 @@
 # Eos Command Documentation
 
+*Last Updated: 2025-01-14*
+
 ## Security Commands
 
 ### eos secure ubuntu

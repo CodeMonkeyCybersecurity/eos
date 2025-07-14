@@ -1,4 +1,6 @@
-Planning for data management
+# Storage Operations - Data Management Planning
+
+*Last Updated: 2025-01-14*
 
 okay ive now got  legit ssh access into my things 
 Last login: Wed Jul  9 02:08:12 on ttys000

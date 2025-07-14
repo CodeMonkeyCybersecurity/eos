@@ -1,5 +1,7 @@
 # STACK.md - Infrastructure Architecture Documentation
 
+*Last Updated: 2025-01-14*
+
 ## Table of Contents
 
 1. [Architectural Decisions Declaration](#1-architectural-decisions-declaration)

@@ -1,5 +1,7 @@
 # Logger Package
 
+*Last Updated: 2025-01-14*
+
 The `logger` package provides centralized logging functionality for the Eos CLI application with dual-output capabilities (console + file), structured logging, and OpenTelemetry integration.
 
 ## Overview

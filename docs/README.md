@@ -4,9 +4,10 @@ This directory contains comprehensive documentation for the Eos Ubuntu server ad
 
 ## Documentation Structure
 
-### Core Concepts
+### Core Entry Points
+- **[INDEX.md](INDEX.md)** - Complete documentation index and navigation
 - **[CLAUDE.md](../CLAUDE.md)** - Complete development guide and coding standards
-- **[STACK.md](user-guides/STACK.md)** - Technology stack and architectural principles
+- **[DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md)** - Documentation standards and guidelines
 
 ### Components
 - **[components/](./components/)** - Component-specific documentation
@@ -35,6 +36,14 @@ This directory contains comprehensive documentation for the Eos Ubuntu server ad
   - **[IMPROVEMENT_ROADMAP.md](./development/IMPROVEMENT_ROADMAP.md)** - Current improvement priorities
   - **[BOOTSTRAP_ARCHITECTURE.md](./development/BOOTSTRAP_ARCHITECTURE.md)** - Bootstrap architecture
   - **[REFACTORING_GUIDE.md](./development/REFACTORING_GUIDE.md)** - Refactoring guidelines
+  - **[LOGGER_README.md](./development/LOGGER_README.md)** - Logging system documentation
+
+### Operations & Deployment
+- **[operations/](./operations/)** - Operational guides and procedures
+  - **[PIPELINE.md](./operations/PIPELINE.md)** - Pipeline architecture and usage
+  - **[TELEMETRY.md](./operations/TELEMETRY.md)** - Observability and telemetry setup
+  - **[README-terraform-integration.md](./operations/README-terraform-integration.md)** - Terraform integration
+  - **[auto-commit-guide.md](./operations/auto-commit-guide.md)** - Automated commit procedures
 
 ### User Guides
 - **[user-guides/](./user-guides/)** - User and migration guides
@@ -48,22 +57,35 @@ This directory contains comprehensive documentation for the Eos Ubuntu server ad
   - **[hcl.md](./commands/hcl.md)** - HCL operations
   - **[secure-ubuntu.md](./commands/secure-ubuntu.md)** - Ubuntu hardening
 
-### Archive
-- **[archive/](./archive/)** - Historical documentation and consolidated files
+### Guides & Emergency Procedures
+- **[guides/](./guides/)** - Specialized guides
+  - **[emergency-recovery.md](./guides/emergency-recovery.md)** - Emergency recovery procedures
+  - **[mfa-implementation.md](./guides/mfa-implementation.md)** - Multi-factor authentication setup
+  - **[mfa-user-guide.md](./guides/mfa-user-guide.md)** - User guide for MFA
+
+### Architecture
+- **[architecture/](./architecture/)** - Architectural documentation
+  - **[CLEAN_ARCHITECTURE.md](./architecture/CLEAN_ARCHITECTURE.md)** - Clean architecture principles
+
+### Historical & Migration
+- **[CONSOLIDATION_COMPLETION_REPORT.md](CONSOLIDATION_COMPLETION_REPORT.md)** - Final consolidation status
+- **[REMAINING_MIGRATION_PLAN.md](REMAINING_MIGRATION_PLAN.md)** - Future migration opportunities
+- **[archive/](./archive/)** - Historical documentation and completed analyses
 
 ## Quick Start
 
-1. **New Users**: Start with [CLAUDE.md](../CLAUDE.md) and explore component documentation
-2. **Developers**: Read [CLAUDE.md](../CLAUDE.md) and [development/](./development/) guides
+1. **New Users**: Start with [INDEX.md](INDEX.md) for complete navigation, then [CLAUDE.md](../CLAUDE.md)
+2. **Developers**: Read [CLAUDE.md](../CLAUDE.md) and explore [development/](./development/) guides
 3. **Security Teams**: Review [security/](./security/) documentation and compliance frameworks
-4. **Testing**: See [testing/](./testing/) directory for comprehensive testing documentation
+4. **Operations**: Check [operations/](./operations/) and [guides/](./guides/) directories
+5. **Testing**: See [testing/](./testing/) directory for comprehensive testing documentation
 
 ## Getting Help
 
 - **CLI Help**: `eos --help` or `eos [command] --help`
 - **Issues**: Report bugs and request features via the project repository
-- **Documentation**: This directory contains comprehensive guides for all aspects of Eos
+- **Documentation**: Use [INDEX.md](INDEX.md) for complete navigation
 
 ---
 
-*This documentation is actively maintained and updated. Last reorganized: 2025-01-12*
+*This documentation structure has been simplified and consolidated. Historical documents are preserved in the archive/ directory. Last updated: 2025-01-14*

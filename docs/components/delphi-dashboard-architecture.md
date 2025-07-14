@@ -1,5 +1,7 @@
 # Delphi Pipeline Dashboard Architecture
 
+*Last Updated: 2025-01-14*
+
 ## Overview
 
 The Delphi Dashboard is a unified, interactive terminal-based observability platform built with Bubble Tea that provides comprehensive monitoring and management of the Delphi security alert processing pipeline. It replaces multiple disparate monitoring tools with a single, cohesive interface that offers real-time visibility into all aspects of the system.

@@ -1,5 +1,7 @@
 # Vault Dynamic Database Credentials for Delphi Dashboard
 
+*Last Updated: 2025-01-14*
+
 ## Overview
 
 This document describes the enhanced Vault integration that supports dynamic PostgreSQL credentials using Vault's database secrets engine. This approach provides superior security by generating temporary database credentials on-demand rather than storing static passwords.

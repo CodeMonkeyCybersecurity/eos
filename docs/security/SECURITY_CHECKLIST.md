@@ -1,5 +1,7 @@
 # Security Development Checklist
 
+*Last Updated: 2025-01-14*
+
 ## Pre-Development Security Checklist
 
 Before writing any code, developers must verify:

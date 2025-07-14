@@ -1,5 +1,7 @@
 # Read Commands
 
+*Last Updated: 2025-01-14*
+
 This directory contains commands for reading, inspecting, and retrieving information from various system resources, services, and infrastructure components. These commands provide comprehensive visibility into system state, configurations, and operational data.
 
 ## Overview

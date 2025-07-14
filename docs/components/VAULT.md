@@ -1,5 +1,7 @@
 # Vault Package Documentation
 
+*Last Updated: 2025-01-14*
+
 This package provides comprehensive HashiCorp Vault integration for Eos with safe, high-quality and effective security features.
 
 ## Core Modules

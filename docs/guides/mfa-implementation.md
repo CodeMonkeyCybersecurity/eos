@@ -1,5 +1,7 @@
 # MFA Implementation Technical Guide
 
+*Last Updated: 2025-01-14*
+
 ## Architecture Overview
 
 The Eos MFA implementation for Ubuntu follows a safety-first approach that ensures administrators can never be locked out while implementing strong multi-factor authentication across all privilege escalation paths.

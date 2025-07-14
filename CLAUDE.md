@@ -566,6 +566,20 @@ go test -v -run "Security|Validation|Auth" ./pkg/...
     - Examples: `// TODO: Add validation for edge case`, `// Using exponential backoff due to API rate limits`
     - **NEVER** create separate .md files for tactical notes, implementation reminders, or temporary checklists  
 
+9. **Documentation Dating Requirements**
+    - **MANDATORY**: Every time a documentation file (.md) is created or modified, add or update the date in the format: `*Last Updated: YYYY-MM-DD*`
+    - Place the date immediately after the main heading (`# Title`) and before the first content section
+    - This eliminates the need to dig through git history to understand when documentation was last current
+    - Example format:
+      ```markdown
+      # Documentation Title
+      
+      *Last Updated: 2025-01-14*
+      
+      ## First Content Section
+      ```
+    - Apply this to ALL documentation files: README.md, component docs, guides, architecture docs, etc.
+
 
 ## Common Pitfalls
 
@@ -766,3 +780,4 @@ ALWAYS prefer inline comments (//TODO:, //Comment) for tactical documentation.
 NEVER create .md files for implementation notes, checklists, or temporary work notes.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+MANDATORY: When creating or modifying any .md file, always add "*Last Updated: YYYY-MM-DD*" after the main heading.

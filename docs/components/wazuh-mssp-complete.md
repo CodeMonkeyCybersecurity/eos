@@ -1,5 +1,7 @@
 # Wazuh MSSP Platform - Complete Implementation
 
+*Last Updated: 2025-01-14*
+
 This implementation provides all the files and configurations needed for the Wazuh MSSP platform. Each file is ready to be placed in the eos repository under `modules/wazuh-mssp/`.
 
 ## Directory Structure

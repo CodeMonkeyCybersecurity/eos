@@ -1,5 +1,7 @@
 # Hecate Advanced Management Functions
 
+*Last Updated: 2025-01-14*
+
 This document describes how to use the advanced helper functions integrated into the Eos framework for managing your Hecate reverse proxy infrastructure.
 
 ## Overview

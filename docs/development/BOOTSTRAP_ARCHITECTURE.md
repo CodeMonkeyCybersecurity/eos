@@ -1,5 +1,7 @@
 # Bootstrap Architecture for Eos
 
+*Last Updated: 2025-01-14*
+
 ## Problem Statement
 
 Eos is designed to orchestrate infrastructure through Salt, but faces a chicken-and-egg problem:

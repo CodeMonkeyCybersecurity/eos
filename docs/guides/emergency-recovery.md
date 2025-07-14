@@ -1,5 +1,7 @@
 # Emergency MFA Recovery Guide
 
+*Last Updated: 2025-01-14*
+
 ## Overview
 
 This guide provides step-by-step procedures for recovering from MFA lockouts. The Eos MFA implementation includes multiple independent recovery methods to ensure administrators are never permanently locked out.

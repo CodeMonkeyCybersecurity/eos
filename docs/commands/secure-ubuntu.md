@@ -1,5 +1,7 @@
 # Eos Secure Ubuntu Command
 
+*Last Updated: 2025-01-14*
+
 ## Overview
 
 The `eos secure ubuntu` command provides comprehensive security hardening for Ubuntu 24.04 LTS servers, with a focus on implementing Multi-Factor Authentication (MFA) for all privileged access while maintaining system usability and preventing lockouts.

@@ -1,5 +1,7 @@
 # Eos Documentation Standards
 
+*Last Updated: 2025-01-14*
+
 This document establishes standards for all documentation in the Eos project to ensure consistency, maintainability, and ease of navigation.
 
 ## File Organization

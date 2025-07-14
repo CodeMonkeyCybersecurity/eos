@@ -1,5 +1,7 @@
 # Eos Improvement Roadmap
 
+*Last Updated: 2025-01-14*
+
 ## Executive Summary
 
 This roadmap addresses three critical areas identified in the Eos codebase analysis:

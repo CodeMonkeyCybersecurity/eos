@@ -1,5 +1,7 @@
 # Cobra Command Functions to Convert to Variables
 
+*Last Updated: 2025-01-14*
+
 This document lists all functions that return `*cobra.Command` and need to be converted from function form to variable form.
 
 ## Summary

@@ -1,5 +1,7 @@
 # HCL Command Documentation
 
+*Last Updated: 2025-01-14*
+
 ## Overview
 
 The `eos create hcl` command installs HashiCorp tools using their official APT repository. This ensures you get the latest stable versions with proper package management and security verification.

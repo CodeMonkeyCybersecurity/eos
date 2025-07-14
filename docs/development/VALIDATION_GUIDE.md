@@ -1,5 +1,7 @@
 # Vault HCL Policy Validation
 
+*Last Updated: 2025-01-14*
+
 This module provides comprehensive HCL validation for HashiCorp Vault policies to prevent parsing errors and ensure best practices.
 
 ## Problem Solved

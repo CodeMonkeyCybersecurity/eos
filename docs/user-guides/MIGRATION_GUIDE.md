@@ -1,5 +1,7 @@
 # Eos Migration Guide
 
+*Last Updated: 2025-01-14*
+
 This document provides comprehensive guidance for migrating the Eos codebase to follow modern architectural patterns, security best practices, and maintainability standards.
 
 ## Table of Contents

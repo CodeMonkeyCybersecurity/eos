@@ -1,5 +1,7 @@
 # Eos Cryptographic Implementation Guide
 
+*Last Updated: 2025-01-14*
+
 ## Overview
 
 Eos implements a comprehensive cryptographic framework with a focus on quantum-resistant algorithms and security best practices. This document outlines the cryptographic components, their usage, and the transition to post-quantum cryptography.

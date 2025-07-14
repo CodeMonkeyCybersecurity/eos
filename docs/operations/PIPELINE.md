@@ -1,5 +1,7 @@
 # PIPELINE.md
 
+*Last Updated: 2025-01-14*
+
 ## 1. Declarative Architecture Overview
 
 | Component | Purpose | Key Configuration / Links |

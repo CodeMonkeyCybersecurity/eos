@@ -1,5 +1,7 @@
 # Telemetry Package
 
+*Last Updated: 2025-01-14*
+
 This package provides local telemetry collection for Eos CLI usage statistics and performance metrics.
 
 ## Overview

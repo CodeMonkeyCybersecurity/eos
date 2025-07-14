@@ -8,8 +8,6 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 
 ## Architecture & Design
 - [Clean Architecture](architecture/CLEAN_ARCHITECTURE.md) - Architecture principles
-- [Improved Architecture](improved_architecture.md) - Architecture improvements
-- [Infrastructure Compiler](components/EOS_INFRASTRUCTURE_COMPILER.md) - Infrastructure compiler design
 
 ## Development
 - [Improvement Roadmap](development/IMPROVEMENT_ROADMAP.md) - Development roadmap
@@ -17,11 +15,12 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 - [Shared Utilities Migration](development/SHARED_UTILITIES_MIGRATION.md) - Migration guide for shared utilities
 - [Bootstrap Architecture](development/BOOTSTRAP_ARCHITECTURE.md) - Bootstrap architecture design
 - [Validation Guide](development/VALIDATION_GUIDE.md) - Input validation guidelines
+- [Logger Documentation](development/LOGGER_README.md) - Logging system documentation
 
 ## Testing
 - [Testing Guide](testing/TESTING_GUIDE.md) - General testing guidelines
 - [Comprehensive Testing](testing/COMPREHENSIVE_TESTING.md) - Comprehensive testing approach
-- [Fuzzing Guide](testing/FUZZING_GUIDE.md) - Complete fuzzing test guidelines (consolidated)
+- [Fuzzing Guide](testing/FUZZING_GUIDE.md) - Complete fuzzing test guidelines
 - [Test Coverage Report](testing/TEST_COVERAGE_REPORT.md) - Test coverage analysis
 
 ## Security
@@ -30,7 +29,7 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 - [Implementation Summary](security/implementation-summary.md) - Security implementation status
 - [Secure Output Migration](security/secure-output-migration.md) - Secure output migration guide
 - [Crypto Guide](security/CRYPTO_GUIDE.md) - Cryptography implementation guide
-- [Security Analysis](SECURITY_ANALYSIS.md) - Security analysis report
+- [Security Analysis](security/SECURITY_ANALYSIS.md) - Security analysis report
 
 ## Commands & Usage
 - [Command README](commands/README.md) - Command documentation overview
@@ -41,6 +40,7 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 
 ## Components
 - [Delphi](components/DELPHI.md) - Delphi monitoring component
+- [Delphi Commands](components/DELPHI_COMMANDS.md) - Delphi-specific command reference
 - [Hecate](components/HECATE.md) - Hecate reverse proxy component
 - [Hecate Complete Setup](components/hecate-complete.md) - Complete Hecate setup guide
 - [Hecate Advanced Usage](components/hecate_advanced_usage.md) - Advanced Hecate management
@@ -50,6 +50,7 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 - [Vault Database Dynamic Credentials](components/vault-database-dynamic-credentials.md) - Vault database integration
 - [Vault Delphi Integration](components/vault-delphi-integration.md) - Vault and Delphi integration
 - [Wazuh MSSP Complete](components/wazuh-mssp-complete.md) - Complete Wazuh MSSP setup
+- [Infrastructure Compiler](components/EOS_INFRASTRUCTURE_COMPILER.md) - Infrastructure compiler design
 
 ## Guides & Tutorials
 - [Emergency Recovery](guides/emergency-recovery.md) - Emergency recovery procedures
@@ -59,31 +60,20 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 - [Stack Guide](user-guides/STACK.md) - Technology stack overview
 
 ## Operations & Deployment
-- [Auto Commit Guide](auto-commit-guide.md) - Automated commit procedures
-- [Terraform Integration](README-terraform-integration.md) - Terraform integration guide
-- [Pipeline Documentation](PIPELINE.md) - Pipeline architecture and usage
-- [Telemetry](TELEMETRY.md) - Observability and telemetry setup
-
-## Specialized Topics
-- [Delphi Commands](DELPHI_COMMANDS.md) - Delphi-specific command reference
-- [Delphi Dashboard Architecture](delphi-dashboard-architecture.md) - Dashboard architecture
-
-## Analysis & Reports
-- [Consolidation Summary](consolidation-summary.md) - Codebase consolidation analysis
-- [Consolidation Completion Report](CONSOLIDATION_COMPLETION_REPORT.md) - Final consolidation status
-- [Documentation Consolidation Summary](DOCUMENTATION_CONSOLIDATION_SUMMARY.md) - Documentation reorganization results
-- [Remaining Migration Plan](REMAINING_MIGRATION_PLAN.md) - Future migration opportunities
-- [Documentation Reorganization Plan](DOCUMENTATION_REORGANIZATION_PLAN.md) - Documentation restructuring
-- [Scripts Migration Analysis](scripts_migration_analysis.md) - Script migration analysis
-- [Test Summary](test_summary.md) - Testing summary and status
-- [Parser Monitoring](PARSER_MONITORING.md) - Parser monitoring setup
-- [Consul Enhancement Summary](CONSUL_ENHANCEMENT_SUMMARY.md) - Consul improvements
-- [MinIO Deployment Analysis](MINIO_DEPLOYMENT_ANALYSIS.md) - MinIO deployment analysis
-- [Backup Example](BACKUP_EXAMPLE.md) - Backup procedure examples
-- [Logger README](LOGGER_README.md) - Logging system documentation
+- [Auto Commit Guide](operations/auto-commit-guide.md) - Automated commit procedures
+- [Terraform Integration](operations/README-terraform-integration.md) - Terraform integration guide
+- [Pipeline Documentation](operations/PIPELINE.md) - Pipeline architecture and usage
+- [Telemetry](operations/TELEMETRY.md) - Observability and telemetry setup
+- [Backup Example](operations/BACKUP_EXAMPLE.md) - Backup procedure examples
+- [Parser Monitoring](operations/PARSER_MONITORING.md) - Parser monitoring setup
 
 ## Migration Plans
 - [Script Migration Plan](migration/script-migration-plan.md) - Script migration procedures
+- [Remaining Migration Plan](REMAINING_MIGRATION_PLAN.md) - Future migration opportunities
+
+## Historical Records
+- [Consolidation Completion Report](CONSOLIDATION_COMPLETION_REPORT.md) - Final consolidation status
+- [Phase 10 Migration Completion](PHASE_10_MIGRATION_COMPLETION_REPORT.md) - Final phase completion
 
 ## Archive
 Historical documents and deprecated guides are stored in the [archive](archive/) directory.

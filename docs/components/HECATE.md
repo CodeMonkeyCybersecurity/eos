@@ -1,3 +1,6 @@
+# Hecate Reverse Proxy Framework
+
+*Last Updated: 2025-01-14*
 
 I use caddy and authentik as the basis for my frontend identity aware reverse proxy framework , hecate. this is designed to be modular and pluggable and extensible and gitops-y  and closely integrated with hetzners dns api. I want manage this as IaC via the eos framework's saltstack -> terraform -> nomad structure. what prompt do I need to give you to get you to create a comprehensive set of helper functions which leverage saltstack/terraform and/or the HTTP APIs of caddy and authentik with eos [create | list | read | update | delete ] hecate   . also what prompt do I need to give you to help me clarify my thinking about what commands eos really needs to be able to handle and how would you recommend using eos to handle this reverse proxy config? what specific commands will eos need to handle to ensure this reverse proxy framework is comprehensively and safely managed?
 

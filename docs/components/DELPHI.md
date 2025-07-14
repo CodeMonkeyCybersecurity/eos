@@ -1,5 +1,7 @@
 # Delphi Domain - Security Monitoring Platform
 
+*Last Updated: 2025-01-14*
+
 This package contains the domain layer for Delphi, a comprehensive security monitoring and tenant management platform.
 
 ##  Fixed Issues

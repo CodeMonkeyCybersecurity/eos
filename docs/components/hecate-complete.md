@@ -1,5 +1,7 @@
 # Hecate Reverse Proxy Framework - Complete Implementation
 
+*Last Updated: 2025-01-14*
+
 This implementation provides all the files and configurations needed for the Hecate reverse proxy framework. Each file is ready to be placed in the eos repository under `modules/hecate/`.
 
 ## Directory Structure

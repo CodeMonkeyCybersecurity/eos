@@ -1,5 +1,7 @@
 # Comprehensive Fuzzing Guide for Eos
 
+*Last Updated: 2025-01-14*
+
 This guide provides complete instructions for implementing, deploying, and running comprehensive fuzz testing for the Eos framework. It combines deployment procedures, overnight fuzzing operations, and security-focused testing to ensure robust vulnerability discovery and edge case detection.
 
 ## Table of Contents

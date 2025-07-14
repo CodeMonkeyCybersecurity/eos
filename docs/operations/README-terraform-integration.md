@@ -1,5 +1,7 @@
 # Eos Terraform Integration
 
+*Last Updated: 2025-01-14*
+
 Eos provides comprehensive Terraform integration for infrastructure automation and deployment. This allows you to use familiar tools (Caddy, Nginx) with modern orchestration (K3s) and infrastructure as code (Terraform).
 
 ##  Quick Start

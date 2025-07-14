@@ -1,5 +1,7 @@
 # ClusterFuzz Deployment Guide
 
+*Last Updated: 2025-01-14*
+
 The `eos create clusterfuzz` command deploys Google's ClusterFuzz fuzzing infrastructure on HashiCorp Nomad, providing a scalable solution for continuous security testing.
 
 ## Overview

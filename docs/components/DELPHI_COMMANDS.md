@@ -1,5 +1,7 @@
 # Delphi Read Commands
 
+*Last Updated: 2025-01-14*
+
 This directory contains the read and diagnostic commands for Delphi (Wazuh) security monitoring platform integration. These commands provide comprehensive visibility into Wazuh manager configuration, users, API status, and agent connectivity.
 
 ## Commands Overview

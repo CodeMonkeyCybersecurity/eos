@@ -1,5 +1,7 @@
 # Parser Health Monitoring
 
+*Last Updated: 2025-01-14*
+
 The `parser-monitor` service provides comprehensive observability for the Delphi prompt-aware parsing system.
 
 ## Overview

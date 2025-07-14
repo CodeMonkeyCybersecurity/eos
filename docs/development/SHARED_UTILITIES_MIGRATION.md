@@ -1,5 +1,7 @@
 # Shared Utilities Migration Guide
 
+*Last Updated: 2025-01-14*
+
 This guide documents the migration to consolidated shared utilities in the Eos codebase.
 
 ## Overview

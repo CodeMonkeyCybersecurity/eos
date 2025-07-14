@@ -1,5 +1,7 @@
 # Secure Output Migration Guide
 
+*Last Updated: 2025-01-14*
+
 This guide helps developers migrate from direct output functions (`fmt.Printf`, `fmt.Println`) to the secure output system that prevents terminal manipulation vulnerabilities.
 
 ## Overview

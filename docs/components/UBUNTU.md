@@ -1,5 +1,7 @@
 # Ubuntu Security Hardening Package
 
+*Last Updated: 2025-01-14*
+
 This package provides comprehensive security hardening for Ubuntu systems through the `eos secure ubuntu` command.
 
 ## Features

@@ -1,5 +1,7 @@
 # Vault Integration for Delphi Dashboard
 
+*Last Updated: 2025-01-14*
+
 ## Overview
 
 The Eos Delphi dashboard now supports secure credential management through HashiCorp Vault integration. This ensures that database passwords and other sensitive configuration data are stored securely and retrieved dynamically, rather than being hardcoded or stored in environment files.

@@ -1,5 +1,7 @@
 # MFA Setup User Guide
 
+*Last Updated: 2025-01-14*
+
 ## Quick Start
 
 If your system administrator has enabled MFA, you need to set up two-factor authentication for sudo access. This guide walks you through the process.
