@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -10,6 +11,68 @@ import (
 	"go.uber.org/zap"
 )
 
+// validateConsulConfig validates the Consul configuration before starting the service
+func validateConsulConfig(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
+	
+	log.Info("Validating Consul configuration before service start")
+	
+	// Check if Consul binary exists
+	consulBinary := "/usr/local/bin/consul"
+	if _, err := os.Stat(consulBinary); err != nil {
+		return fmt.Errorf("consul binary not found at %s: %w", consulBinary, err)
+	}
+	
+	// Check if config directory exists
+	configDir := "/etc/consul.d"
+	if _, err := os.Stat(configDir); err != nil {
+		return fmt.Errorf("consul config directory not found at %s: %w", configDir, err)
+	}
+	
+	// Check if main config file exists
+	mainConfigFile := "/etc/consul.d/consul.hcl"
+	if _, err := os.Stat(mainConfigFile); err != nil {
+		log.Warn("Main consul config file not found", 
+			zap.String("config_file", mainConfigFile),
+			zap.Error(err))
+		// Don't fail here, there might be other config files
+	}
+	
+	// Check if consul user exists (required for service to start)
+	userCheckCmd := execute.Options{
+		Command: "id",
+		Args:    []string{"consul"},
+		Capture: true,
+	}
+	
+	if _, err := execute.Run(rc.Ctx, userCheckCmd); err != nil {
+		log.Error("Consul user does not exist", zap.Error(err))
+		return fmt.Errorf("consul user does not exist: %w", err)
+	}
+	
+	// Validate configuration using consul validate command
+	validateCmd := execute.Options{
+		Command: consulBinary,
+		Args:    []string{"validate", configDir},
+		Capture: true,
+	}
+	
+	output, err := execute.Run(rc.Ctx, validateCmd)
+	if err != nil {
+		log.Error("Consul configuration validation failed", 
+			zap.String("config_dir", configDir),
+			zap.String("validation_output", output),
+			zap.Error(err))
+		return fmt.Errorf("consul configuration validation failed: %w", err)
+	}
+	
+	log.Info("Consul configuration validation passed", 
+		zap.String("config_dir", configDir),
+		zap.String("validation_output", output))
+	
+	return nil
+}
+
 // Start enables and starts the Consul service
 // Migrated from cmd/create/consul.go startConsulService
 func Start(rc *eos_io.RuntimeContext) error {
@@ -17,6 +80,11 @@ func Start(rc *eos_io.RuntimeContext) error {
 
 	// ASSESS - Check service state
 	log.Info("Assessing Consul service state")
+	
+	// Validate Consul configuration before attempting to start
+	if err := validateConsulConfig(rc); err != nil {
+		return fmt.Errorf("consul configuration validation failed: %w", err)
+	}
 
 	// Check if service exists
 	checkCmd := execute.Options{
@@ -64,6 +132,54 @@ func Start(rc *eos_io.RuntimeContext) error {
 			log.Error("systemctl command failed", 
 				zap.String("command", cmdStr),
 				zap.Error(err))
+			
+			// If this is a start command that failed, get systemd logs for better error reporting
+			if step.Command == "systemctl" && len(step.Args) > 0 && step.Args[0] == "start" {
+				serviceName := "consul"
+				if len(step.Args) > 1 {
+					serviceName = step.Args[1]
+				}
+				
+				log.Error("Service failed to start, checking systemd logs",
+					zap.String("service", serviceName))
+				
+				// Get recent systemd logs for this service
+				logsCmd := execute.Options{
+					Command: "journalctl",
+					Args:    []string{"-u", serviceName + ".service", "--no-pager", "--lines=20", "--since=1min ago"},
+					Capture: true,
+				}
+				
+				logsOutput, logsErr := execute.Run(rc.Ctx, logsCmd)
+				if logsErr != nil {
+					log.Warn("Failed to retrieve systemd logs", 
+						zap.String("service", serviceName),
+						zap.Error(logsErr))
+				} else {
+					log.Error("Systemd service logs", 
+						zap.String("service", serviceName),
+						zap.String("logs", logsOutput))
+				}
+				
+				// Also check service status for more details
+				statusCmd := execute.Options{
+					Command: "systemctl",
+					Args:    []string{"status", serviceName},
+					Capture: true,
+				}
+				
+				statusOutput, statusErr := execute.Run(rc.Ctx, statusCmd)
+				if statusErr != nil {
+					log.Warn("Failed to retrieve service status", 
+						zap.String("service", serviceName),
+						zap.Error(statusErr))
+				} else {
+					log.Error("Service status details", 
+						zap.String("service", serviceName),
+						zap.String("status", statusOutput))
+				}
+			}
+			
 			return fmt.Errorf("%s failed: %w", cmdStr, err)
 		}
 		
