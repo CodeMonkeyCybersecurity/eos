@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
@@ -266,7 +267,7 @@ func testMinimalConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	}
 	
 	// Create minimal configuration
-	minimalConfig := `datacenter = "dc1"
+	minimalConfig := fmt.Sprintf(`datacenter = "dc1"
 data_dir = "/opt/consul"
 log_level = "DEBUG"
 node_name = "consul-debug-test"
@@ -279,9 +280,9 @@ addresses {
   http = "0.0.0.0"
 }
 ports {
-  http = 8161
+  http = %d
 }
-`
+`, shared.PortConsul)
 	
 	minimalPath := "/etc/consul.d/consul-minimal.hcl"
 	if err := os.WriteFile(minimalPath, []byte(minimalConfig), 0644); err != nil {

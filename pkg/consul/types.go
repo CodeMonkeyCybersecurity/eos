@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // Config holds the complete Consul configuration (legacy - deprecated)
@@ -51,8 +52,8 @@ type ConsulConfig struct {
 
 // PortConfig defines port configuration for Consul
 type PortConfig struct {
-	DNS     int `json:"dns"`      // 8600
-	HTTP    int `json:"http"`     // 8500
+	DNS     int `json:"dns"`      // 8600 (standard Consul DNS port)
+	HTTP    int `json:"http"`     // shared.PortConsul (8161)
 	HTTPS   int `json:"https"`    // 8501
 	GRPC    int `json:"grpc"`     // 8502
 	SerfLAN int `json:"serf_lan"` // 8301
@@ -133,7 +134,7 @@ type ACLToken struct {
 func DefaultPortConfig() PortConfig {
 	return PortConfig{
 		DNS:     8600,
-		HTTP:    8500,
+		HTTP:    shared.PortConsul, // 8161
 		HTTPS:   8501,
 		GRPC:    8502,
 		SerfLAN: 8301,

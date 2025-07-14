@@ -24,10 +24,10 @@ func checkPortConflicts(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 	
-	// Check HTTP port (8161) and DNS port (8600)
+	// Check HTTP port and DNS port
 	ports := map[string]int{
-		"HTTP": shared.PortConsul,     // 8161
-		"DNS":  8600,
+		"HTTP": shared.PortConsul, // 8161 from shared/ports.go
+		"DNS":  8600,              // Standard Consul DNS port
 	}
 	
 	for name, port := range ports {

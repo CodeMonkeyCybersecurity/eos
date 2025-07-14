@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/deploy"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // Environment represents a deployment environment (dev, staging, prod, etc.)
@@ -576,7 +577,7 @@ func DefaultDevelopmentEnvironment() *Environment {
 				Namespace:  "development",
 			},
 			Consul: ConsulConfig{
-				Address:    "localhost:8500",
+				Address:    fmt.Sprintf("localhost:%d", shared.PortConsul),
 				Datacenter: "dc1",
 			},
 			Vault: VaultConfig{
@@ -585,7 +586,7 @@ func DefaultDevelopmentEnvironment() *Environment {
 			Terraform: TerraformConfig{
 				Backend: "consul",
 				BackendConfig: map[string]string{
-					"address": "localhost:8500",
+					"address": fmt.Sprintf("localhost:%d", shared.PortConsul),
 					"path":    "terraform/development/state",
 				},
 				Workspace: "development",
@@ -658,7 +659,7 @@ func DefaultProductionEnvironment() *Environment {
 				Namespace:  "production",
 			},
 			Consul: ConsulConfig{
-				Address:    "consul-prod.cybermonkey.net.au:8500",
+				Address:    fmt.Sprintf("consul-prod.cybermonkey.net.au:%d", shared.PortConsul),
 				Datacenter: "prod",
 			},
 			Vault: VaultConfig{
@@ -667,7 +668,7 @@ func DefaultProductionEnvironment() *Environment {
 			Terraform: TerraformConfig{
 				Backend: "consul",
 				BackendConfig: map[string]string{
-					"address": "consul-prod.cybermonkey.net.au:8500",
+					"address": fmt.Sprintf("consul-prod.cybermonkey.net.au:%d", shared.PortConsul),
 					"path":    "terraform/production/state",
 				},
 				Workspace: "production",

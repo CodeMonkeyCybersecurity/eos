@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -94,8 +96,8 @@ func (sv *SecurityValidator) validateAddress(address string, result *ValidationR
 	}
 
 	// Check for default Consul port (potential security issue)
-	if port == "8500" {
-		result.Warnings = append(result.Warnings, "Using default Consul port 8500 - consider using a custom port for security")
+	if port == "8500" || port == strconv.Itoa(shared.PortConsul) {
+		result.Warnings = append(result.Warnings, fmt.Sprintf("Using default Consul port %s - consider using a custom port for security", port))
 		result.Score -= 5
 	}
 

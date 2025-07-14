@@ -32,7 +32,7 @@ func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	log.Info("🎯 Access Points:")
 	log.Info(fmt.Sprintf("   • Web UI:        http://%s:%d/ui", hostname, shared.PortConsul))
 	log.Info(fmt.Sprintf("   • HTTP API:      http://%s:%d", hostname, shared.PortConsul))
-	log.Info("   • DNS Interface: port 8600")
+	log.Info("   • DNS Interface: port 8600") // Standard Consul DNS port
 	log.Info(" ")
 	log.Info("🔧 Quick Commands:")
 	log.Info("   • Check status:      consul-vault-helper status")

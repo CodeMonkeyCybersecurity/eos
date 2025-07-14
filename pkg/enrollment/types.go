@@ -132,8 +132,8 @@ const (
 	SaltPublisherPort = 4505
 	SaltRequestPort   = 4506
 
-	// Consul ports
-	ConsulHTTPPort = 8500
+	// Consul ports - deprecated, use shared.Port* constants instead
+	// ConsulHTTPPort = 8500 // Use shared.PortConsul (8161) instead
 	ConsulDNSPort  = 8600
 	ConsulSerfPort = 8301
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // DeploymentManager orchestrates deployments through the Salt → Terraform → Nomad hierarchy
@@ -411,7 +413,7 @@ func DefaultDeploymentConfig() *DeploymentConfig {
 			WorkingDir:  "/srv/terraform",
 			StateBackend: "consul",
 			BackendConfig: map[string]string{
-				"address": "localhost:8500",
+				"address": fmt.Sprintf("localhost:%d", shared.PortConsul),
 				"path":    "terraform/state",
 				"lock":    "true",
 			},
@@ -429,7 +431,7 @@ func DefaultDeploymentConfig() *DeploymentConfig {
 			Timeout: 30 * time.Second,
 		},
 		ConsulConfig: ConsulClientConfig{
-			Address:    "localhost:8500",
+			Address:    fmt.Sprintf("localhost:%d", shared.PortConsul),
 			Datacenter: "dc1",
 			Timeout:    30 * time.Second,
 		},

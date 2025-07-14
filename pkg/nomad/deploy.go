@@ -381,7 +381,7 @@ connect {
 }
 
 consul {
-  address = "127.0.0.1:8500"
+  address = "127.0.0.1:%d"
 }
 
 telemetry {
@@ -391,7 +391,7 @@ telemetry {
   publish_allocation_metrics = true
   publish_node_metrics = true
 }
-`, config.DataCenter, config.EncryptionKey)
+`, config.DataCenter, config.EncryptionKey, shared.PortConsul)
 	} else {
 		serverAddrsFormatted := make([]string, len(config.ServerAddrs))
 		for i, addr := range config.ServerAddrs {
@@ -416,7 +416,7 @@ client {
 }
 
 consul {
-  address = "127.0.0.1:8500"
+  address = "127.0.0.1:%d"
 }
 
 telemetry {
@@ -426,7 +426,7 @@ telemetry {
   publish_allocation_metrics = true
   publish_node_metrics = true
 }
-`, config.DataCenter, strings.Join(serverAddrsFormatted, ", "))
+`, config.DataCenter, strings.Join(serverAddrsFormatted, ", "), shared.PortConsul)
 	}
 
 	// Write configuration file

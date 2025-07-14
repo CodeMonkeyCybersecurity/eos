@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -222,7 +223,7 @@ func DiscoverBackendServices(rc *eos_io.RuntimeContext) ([]*Backend, error) {
 func getLocalConsulClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	config := api.DefaultConfig()
 	// TODO: Make this configurable
-	config.Address = "localhost:8500"
+	config.Address = fmt.Sprintf("localhost:%d", shared.PortConsul)
 	
 	client, err := api.NewClient(config)
 	if err != nil {
@@ -241,7 +242,7 @@ func getLocalConsulClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 func getFrontendConsulClient(rc *eos_io.RuntimeContext, frontendDC string) (*api.Client, error) {
 	config := api.DefaultConfig()
 	// TODO: Make this configurable based on frontendDC
-	config.Address = "frontend-consul.example.com:8500"
+	config.Address = fmt.Sprintf("frontend-consul.example.com:%d", shared.PortConsul)
 	config.Datacenter = frontendDC
 	
 	client, err := api.NewClient(config)

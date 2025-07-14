@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -398,7 +399,7 @@ func configureMonitoring(rc *eos_io.RuntimeContext, config *PlatformConfig) erro
 	logger.Info("Configuring monitoring")
 
 	// Configure Prometheus scrape configs
-	prometheusConfig := `
+	prometheusConfig := fmt.Sprintf(`
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -410,18 +411,18 @@ scrape_configs:
   
   - job_name: 'nomad'
     consul_sd_configs:
-      - server: 'localhost:8500'
+      - server: 'localhost:%d'
         services: ['nomad']
   
   - job_name: 'temporal'
     consul_sd_configs:
-      - server: 'localhost:8500'
+      - server: 'localhost:%d'
         services: ['temporal']
   
   - job_name: 'nats'
     static_configs:
       - targets: ['localhost:8222']
-`
+`, shared.PortConsul, shared.PortConsul)
 
 	configPath := "/opt/wazuh-mssp/monitoring/prometheus.yml"
 	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/deploy"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -151,7 +152,7 @@ func init() {
 	// Service addresses
 	cicdCmd.Flags().String("salt-master", "salt-master.cybermonkey.net.au", "Salt master address")
 	cicdCmd.Flags().String("nomad-addr", "http://localhost:4646", "Nomad server address")
-	cicdCmd.Flags().String("consul-addr", "localhost:8500", "Consul server address")
+	cicdCmd.Flags().String("consul-addr", fmt.Sprintf("localhost:%d", shared.PortConsul), "Consul server address")
 	cicdCmd.Flags().String("vault-addr", "http://localhost:8179", "Vault server address")
 
 	cicdCmd.Example = `  # Set up basic CI/CD pipeline for Helen
@@ -537,7 +538,7 @@ terraform {
   required_version = ">= 1.0"
   
   backend "consul" {
-    address = "localhost:8500"
+    address = "localhost:%d"
     path    = "terraform/%s/state"
     lock    = true
   }
@@ -561,7 +562,7 @@ variable "domain" {
   type        = string
   default     = "%s"
 }
-`, config.AppName, config.AppName, config.AppName, config.Deployment.Environment, config.Deployment.Domain)
+`, config.AppName, shared.PortConsul, config.AppName, config.AppName, config.Deployment.Environment, config.Deployment.Domain)
 
 	_, err = file.WriteString(content)
 	return err

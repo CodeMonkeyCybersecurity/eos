@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz/validation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -160,7 +161,7 @@ func init() {
 	CreateCmd.AddCommand(clusterfuzzCmd)
 
 	clusterfuzzCmd.Flags().StringVar(&nomadAddress, "nomad-address", "http://localhost:4646", "Nomad server address")
-	clusterfuzzCmd.Flags().StringVar(&consulAddress, "consul-address", "http://localhost:8500", "Consul server address")
+	clusterfuzzCmd.Flags().StringVar(&consulAddress, "consul-address", fmt.Sprintf("http://localhost:%d", shared.PortConsul), "Consul server address")
 	clusterfuzzCmd.Flags().StringVar(&storageBackend, "storage-backend", "minio", "Storage backend (minio, s3, local)")
 	clusterfuzzCmd.Flags().StringVar(&databaseBackend, "database-backend", "postgresql", "Database backend (postgresql, mongodb)")
 	clusterfuzzCmd.Flags().StringVar(&queueBackend, "queue-backend", "redis", "Queue backend (redis, rabbitmq)")

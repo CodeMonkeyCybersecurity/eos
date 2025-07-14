@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // PipelineConfig represents the configuration for a CI/CD pipeline
@@ -531,7 +533,7 @@ func DefaultPipelineConfig(appName string) *PipelineConfig {
 			ServerType: "cx21",
 			Image:      "ubuntu-22.04",
 			Consul: ConsulConfig{
-				Address:    "localhost:8500",
+				Address:    fmt.Sprintf("localhost:%d", shared.PortConsul),
 				Datacenter: "dc1",
 			},
 			Nomad: NomadConfig{

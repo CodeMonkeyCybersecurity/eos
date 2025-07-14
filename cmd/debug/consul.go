@@ -13,7 +13,7 @@ var consulCmd = &cobra.Command{
 	Long: `Debug Consul provides comprehensive troubleshooting for Consul service issues.
 
 This command will:
-- Check for port conflicts on Consul ports (8161 HTTP, 8600 DNS)
+- Check for port conflicts on Consul ports (HTTP and DNS)
 - Identify and optionally clean up lingering processes
 - Analyze Consul configuration for common issues
 - Test manual startup with detailed error reporting
