@@ -83,6 +83,9 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		}
 
 		var buf bytes.Buffer
+		// TODO: Remove os.Stdout from MultiWriter to prevent raw command output in logs
+		// This causes unstructured output mixed with structured logs (issue flagged 2025-07-14)
+		// Should only capture to buffer and use structured logging for command output
 		writer := io.MultiWriter(os.Stdout, &buf)
 		cmd.Stdout = writer
 		cmd.Stderr = writer
