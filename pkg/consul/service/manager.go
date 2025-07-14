@@ -22,15 +22,31 @@ func Start(rc *eos_io.RuntimeContext) error {
 	checkCmd := execute.Options{
 		Command: "systemctl",
 		Args:    []string{"list-unit-files", "consul.service"},
+		Capture: true, // Ensure we capture the output
 	}
 	output, err := execute.Run(rc.Ctx, checkCmd)
+	
+	log.Debug("systemctl list-unit-files output", 
+		zap.String("command", "systemctl list-unit-files consul.service"),
+		zap.String("output", output),
+		zap.Error(err))
+	
 	if err != nil {
+		log.Error("Failed to check service existence", 
+			zap.Error(err),
+			zap.String("output", output))
 		return fmt.Errorf("failed to check service existence: %w", err)
 	}
 
 	if !strings.Contains(output, "consul.service") {
+		log.Error("consul.service not found in systemd output",
+			zap.String("expected", "consul.service"),
+			zap.String("actual_output", output),
+			zap.Int("output_length", len(output)))
 		return fmt.Errorf("consul.service not found in systemd")
 	}
+	
+	log.Info("consul.service found in systemd", zap.String("output", output))
 
 	// INTERVENE - Enable and start service
 	log.Info("Starting Consul service")
@@ -41,13 +57,17 @@ func Start(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, step := range steps {
+		cmdStr := strings.Join(append([]string{step.Command}, step.Args...), " ")
+		log.Info("Executing systemctl command", zap.String("command", cmdStr))
+		
 		if err := execute.RunSimple(rc.Ctx, step.Command, step.Args...); err != nil {
-			cmdStr := strings.Join(append([]string{step.Command}, step.Args...), " ")
+			log.Error("systemctl command failed", 
+				zap.String("command", cmdStr),
+				zap.Error(err))
 			return fmt.Errorf("%s failed: %w", cmdStr, err)
 		}
-		log.Debug("Executed systemctl command",
-			zap.String("command", step.Command),
-			zap.Strings("args", step.Args))
+		
+		log.Info("systemctl command succeeded", zap.String("command", cmdStr))
 	}
 
 	// EVALUATE - Verify service is running
@@ -56,14 +76,24 @@ func Start(rc *eos_io.RuntimeContext) error {
 	statusCmd := execute.Options{
 		Command: "systemctl",
 		Args:    []string{"is-active", "consul"},
+		Capture: true, // Ensure we capture the output
 	}
 	statusOutput, err := execute.Run(rc.Ctx, statusCmd)
+	
+	log.Debug("systemctl is-active output", 
+		zap.String("command", "systemctl is-active consul"),
+		zap.String("output", statusOutput),
+		zap.Error(err))
+	
 	if err != nil {
 		// Check if it's just not active yet
 		if strings.TrimSpace(statusOutput) == "activating" {
-			log.Info("Consul service is still activating")
+			log.Info("Consul service is still activating", zap.String("status", statusOutput))
 			return nil
 		}
+		log.Error("Failed to verify service is active", 
+			zap.Error(err),
+			zap.String("status_output", statusOutput))
 		return fmt.Errorf("failed to verify service is active: %w", err)
 	}
 
