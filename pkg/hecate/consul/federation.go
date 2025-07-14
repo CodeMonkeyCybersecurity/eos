@@ -14,25 +14,25 @@ import (
 
 // FederationConfig represents WAN federation configuration
 type FederationConfig struct {
-	PrimaryDatacenter   string            `json:"primary_datacenter"`
-	Datacenter          string            `json:"datacenter"`
-	RetryJoinWAN        []string          `json:"retry_join_wan"`
-	EncryptionKey       string            `json:"encryption_key"`
-	CAFile              string            `json:"ca_file"`
-	CertFile            string            `json:"cert_file"`
-	KeyFile             string            `json:"key_file"`
-	VerifyIncoming      bool              `json:"verify_incoming"`
-	VerifyOutgoing      bool              `json:"verify_outgoing"`
-	VerifyServerHostname bool             `json:"verify_server_hostname"`
-	Ports               map[string]int    `json:"ports"`
-	ConnectEnabled      bool              `json:"connect_enabled"`
-	MeshGateway         MeshGatewayConfig `json:"mesh_gateway"`
+	PrimaryDatacenter    string            `json:"primary_datacenter"`
+	Datacenter           string            `json:"datacenter"`
+	RetryJoinWAN         []string          `json:"retry_join_wan"`
+	EncryptionKey        string            `json:"encryption_key"`
+	CAFile               string            `json:"ca_file"`
+	CertFile             string            `json:"cert_file"`
+	KeyFile              string            `json:"key_file"`
+	VerifyIncoming       bool              `json:"verify_incoming"`
+	VerifyOutgoing       bool              `json:"verify_outgoing"`
+	VerifyServerHostname bool              `json:"verify_server_hostname"`
+	Ports                map[string]int    `json:"ports"`
+	ConnectEnabled       bool              `json:"connect_enabled"`
+	MeshGateway          MeshGatewayConfig `json:"mesh_gateway"`
 }
 
 // MeshGatewayConfig represents mesh gateway configuration
 type MeshGatewayConfig struct {
-	Mode                        string `json:"mode"`
-	Port                        int    `json:"port"`
+	Mode                           string `json:"mode"`
+	Port                           int    `json:"port"`
 	EnableMeshGatewayWANFederation bool   `json:"enable_mesh_gateway_wan_federation"`
 }
 
@@ -110,12 +110,12 @@ func GetFederationStatus(rc *eos_io.RuntimeContext, datacenter string) (*Federat
 	}
 
 	status := &FederationStatus{
-		Datacenter:    datacenter,
-		Datacenters:   members,
-		WANMembers:    len(wanMembers),
-		Connected:     len(members) > 1,
-		LastChecked:   time.Now(),
-		MeshGateways:  make(map[string]MeshGatewayStatus),
+		Datacenter:   datacenter,
+		Datacenters:  members,
+		WANMembers:   len(wanMembers),
+		Connected:    len(members) > 1,
+		LastChecked:  time.Now(),
+		MeshGateways: make(map[string]MeshGatewayStatus),
 	}
 
 	// Get mesh gateway status for each datacenter
@@ -157,7 +157,7 @@ func validateFederationPrerequisites(rc *eos_io.RuntimeContext, config *Federati
 
 	// Check if Connect is enabled
 	if config.ConnectEnabled {
-		connectConfig, _, err := client.Connect().CAConfiguration(nil)
+		connectConfig, _, err := client.Connect().CAGetConfig(nil)
 		if err != nil {
 			return fmt.Errorf("failed to get Connect CA configuration: %w", err)
 		}
@@ -210,17 +210,17 @@ func configureWANFederation(rc *eos_io.RuntimeContext, config *FederationConfig)
 
 func generateConsulConfig(config *FederationConfig) map[string]interface{} {
 	consulConfig := map[string]interface{}{
-		"datacenter":         config.Datacenter,
-		"primary_datacenter": config.PrimaryDatacenter,
-		"retry_join_wan":     config.RetryJoinWAN,
-		"encrypt":            config.EncryptionKey,
-		"ca_file":            config.CAFile,
-		"cert_file":          config.CertFile,
-		"key_file":           config.KeyFile,
-		"verify_incoming":    config.VerifyIncoming,
-		"verify_outgoing":    config.VerifyOutgoing,
+		"datacenter":             config.Datacenter,
+		"primary_datacenter":     config.PrimaryDatacenter,
+		"retry_join_wan":         config.RetryJoinWAN,
+		"encrypt":                config.EncryptionKey,
+		"ca_file":                config.CAFile,
+		"cert_file":              config.CertFile,
+		"key_file":               config.KeyFile,
+		"verify_incoming":        config.VerifyIncoming,
+		"verify_outgoing":        config.VerifyOutgoing,
 		"verify_server_hostname": config.VerifyServerHostname,
-		"ports":              config.Ports,
+		"ports":                  config.Ports,
 	}
 
 	if config.ConnectEnabled {
@@ -308,12 +308,12 @@ func getMeshGatewayStatus(rc *eos_io.RuntimeContext, client *api.Client, datacen
 
 // FederationStatus represents the status of WAN federation
 type FederationStatus struct {
-	Datacenter    string                       `json:"datacenter"`
-	Datacenters   []string                     `json:"datacenters"`
-	WANMembers    int                          `json:"wan_members"`
-	Connected     bool                         `json:"connected"`
-	LastChecked   time.Time                    `json:"last_checked"`
-	MeshGateways  map[string]MeshGatewayStatus `json:"mesh_gateways"`
+	Datacenter   string                       `json:"datacenter"`
+	Datacenters  []string                     `json:"datacenters"`
+	WANMembers   int                          `json:"wan_members"`
+	Connected    bool                         `json:"connected"`
+	LastChecked  time.Time                    `json:"last_checked"`
+	MeshGateways map[string]MeshGatewayStatus `json:"mesh_gateways"`
 }
 
 // MeshGatewayStatus represents the status of a mesh gateway
@@ -340,7 +340,7 @@ func JoinWANFederation(rc *eos_io.RuntimeContext, existingWANAddress string) err
 	}
 
 	// Join WAN
-	err = client.Agent().JoinWAN(existingWANAddress)
+	err = client.Agent().Join(existingWANAddress, true)
 	if err != nil {
 		return fmt.Errorf("failed to join WAN: %w", err)
 	}
@@ -364,7 +364,7 @@ func LeaveWANFederation(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Leave WAN
-	err = client.Agent().LeaveWAN()
+	err = client.Agent().Leave()
 	if err != nil {
 		return fmt.Errorf("failed to leave WAN: %w", err)
 	}

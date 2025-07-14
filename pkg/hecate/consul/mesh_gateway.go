@@ -199,7 +199,7 @@ func validateMeshGatewayPrerequisites(rc *eos_io.RuntimeContext, deployment *Mes
 		return fmt.Errorf("failed to create Consul client: %w", err)
 	}
 
-	connectConfig, _, err := client.Connect().CAConfiguration(nil)
+	connectConfig, _, err := client.Connect().CAGetConfig(nil)
 	if err != nil {
 		return fmt.Errorf("failed to get Connect CA configuration: %w", err)
 	}

@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -420,31 +422,84 @@ type MemoryInfo struct {
 }
 
 func getMemoryInfo() (*MemoryInfo, error) {
-	//TODO: This would need to read /proc/meminfo on Linux systems
-	// For now, return a reasonable default
-	return &MemoryInfo{
-		TotalMB: 2048, // 2GB default
-		FreeMB:  1024, // 1GB free
-	}, nil
+	// Read /proc/meminfo on Linux systems
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		// Fallback to default if /proc/meminfo is not available
+		return &MemoryInfo{
+			TotalMB: 2048, // 2GB default
+			FreeMB:  1024, // 1GB free
+		}, nil
+	}
+
+	memInfo := &MemoryInfo{}
+	lines := strings.Split(string(data), "\n")
+	
+	for _, line := range lines {
+		if strings.HasPrefix(line, "MemTotal:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				if kb, err := strconv.ParseInt(fields[1], 10, 64); err == nil {
+					memInfo.TotalMB = int(kb / 1024)
+				}
+			}
+		} else if strings.HasPrefix(line, "MemAvailable:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				if kb, err := strconv.ParseInt(fields[1], 10, 64); err == nil {
+					memInfo.FreeMB = int(kb / 1024)
+				}
+			}
+		}
+	}
+
+	// Fallback if parsing failed
+	if memInfo.TotalMB == 0 {
+		memInfo.TotalMB = 2048
+		memInfo.FreeMB = 1024
+	}
+
+	return memInfo, nil
 }
 
 func getCPUCount() int {
-	//TODO: This would read /proc/cpuinfo or use runtime.NumCPU()
-	// For now, return a reasonable default
-	return 2
+	// Use runtime.NumCPU() which is cross-platform
+	return runtime.NumCPU()
 }
 
 func checkOSCompatibility() error {
-	//TODO: Check for supported OS versions (Ubuntu 18.04+, CentOS 7+, etc.)
+	// Check if running on Linux
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("unsupported operating system: %s (Linux required)", runtime.GOOS)
+	}
+
+	// Check for systemd (required for service management)
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		return fmt.Errorf("systemctl not found - systemd is required")
+	}
+
+	// Check for basic Unix tools
+	requiredTools := []string{"useradd", "chown", "chmod"}
+	for _, tool := range requiredTools {
+		if _, err := exec.LookPath(tool); err != nil {
+			return fmt.Errorf("required tool not found: %s", tool)
+		}
+	}
+
 	return nil
 }
 
 func isConsulServiceRunning() bool {
-	//TODO: Check systemctl status consul or similar
-	// For now, check if process exists
+	// Check systemctl status first
+	if err := exec.Command("systemctl", "is-active", "consul").Run(); err == nil {
+		return true
+	}
+
+	// Fallback to process check
 	if _, err := exec.Command("pgrep", "consul").Output(); err == nil {
 		return true
 	}
+
 	return false
 }
 

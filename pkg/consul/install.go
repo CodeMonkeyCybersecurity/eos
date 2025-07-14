@@ -3,7 +3,16 @@
 package consul
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io"
+	"math/big"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -496,13 +505,71 @@ func setupTLS(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 
 	logger.Info("Setting up TLS configuration")
 
-	// TODO: Implement TLS setup
-	// This would involve:
-	// 1. Generate or import CA certificate
-	// 2. Generate server certificates
-	// 3. Configure TLS in Consul
-	// 4. Set up certificate rotation
+	// Create TLS directory
+	tlsDir := "/etc/consul.d/tls"
+	if err := os.MkdirAll(tlsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create TLS directory: %w", err)
+	}
 
+	// If certificates are provided, validate and copy them
+	if config.CACert != "" && config.ServerCert != "" && config.ServerKey != "" {
+		logger.Info("Using provided TLS certificates")
+		
+		// Validate certificate files exist
+		certFiles := map[string]string{
+			"CA certificate":     config.CACert,
+			"Server certificate": config.ServerCert,
+			"Server key":         config.ServerKey,
+		}
+		
+		for name, path := range certFiles {
+			if _, err := os.Stat(path); err != nil {
+				return fmt.Errorf("%s not found at %s: %w", name, path, err)
+			}
+		}
+		
+		// Copy certificates to TLS directory
+		caCertDest := filepath.Join(tlsDir, "ca.pem")
+		serverCertDest := filepath.Join(tlsDir, "server.pem")
+		serverKeyDest := filepath.Join(tlsDir, "server-key.pem")
+		
+		if err := copyFile(config.CACert, caCertDest); err != nil {
+			return fmt.Errorf("failed to copy CA certificate: %w", err)
+		}
+		
+		if err := copyFile(config.ServerCert, serverCertDest); err != nil {
+			return fmt.Errorf("failed to copy server certificate: %w", err)
+		}
+		
+		if err := copyFile(config.ServerKey, serverKeyDest); err != nil {
+			return fmt.Errorf("failed to copy server key: %w", err)
+		}
+		
+		// Update config paths to point to copied files
+		config.CACert = caCertDest
+		config.ServerCert = serverCertDest
+		config.ServerKey = serverKeyDest
+		
+		// Set proper permissions
+		if err := os.Chmod(serverKeyDest, 0600); err != nil {
+			return fmt.Errorf("failed to set server key permissions: %w", err)
+		}
+		
+	} else {
+		logger.Info("Generating self-signed TLS certificates")
+		
+		// Generate self-signed certificates
+		if err := generateSelfSignedCerts(rc, config, tlsDir); err != nil {
+			return fmt.Errorf("failed to generate self-signed certificates: %w", err)
+		}
+	}
+
+	// Set ownership of TLS directory
+	if err := exec.Command("chown", "-R", "consul:consul", tlsDir).Run(); err != nil {
+		return fmt.Errorf("failed to set ownership on TLS directory: %w", err)
+	}
+
+	logger.Info("TLS configuration completed")
 	return nil
 }
 
@@ -511,13 +578,44 @@ func setupACL(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 
 	logger.Info("Setting up ACL configuration")
 
-	// TODO: Implement ACL setup
-	// This would involve:
-	// 1. Enable ACL in configuration
-	// 2. Bootstrap ACL system
-	// 3. Create initial policies and tokens
-	// 4. Configure agent tokens
+	// ACL setup is primarily handled in configuration generation
+	// and bootstrap process. This function prepares the environment
+	// for ACL bootstrapping.
 
+	// Create ACL directory for tokens
+	aclDir := "/etc/consul.d/acl"
+	if err := os.MkdirAll(aclDir, 0755); err != nil {
+		return fmt.Errorf("failed to create ACL directory: %w", err)
+	}
+
+	// Set ownership
+	if err := exec.Command("chown", "-R", "consul:consul", aclDir).Run(); err != nil {
+		return fmt.Errorf("failed to set ownership on ACL directory: %w", err)
+	}
+
+	// Create ACL configuration file
+	aclConfig := map[string]interface{}{
+		"acl": map[string]interface{}{
+			"enabled":                    true,
+			"default_policy":             "deny",
+			"enable_token_persistence":   true,
+			"enable_token_replication":   config.Mode == "server",
+			"down_policy":               "extend-cache",
+			"token_ttl":                 "30s",
+		},
+	}
+
+	aclConfigPath := filepath.Join(aclDir, "acl.json")
+	if err := writeConfigFile(aclConfigPath, aclConfig); err != nil {
+		return fmt.Errorf("failed to write ACL configuration: %w", err)
+	}
+
+	// Set proper permissions
+	if err := os.Chmod(aclConfigPath, 0644); err != nil {
+		return fmt.Errorf("failed to set ACL config permissions: %w", err)
+	}
+
+	logger.Info("ACL configuration setup completed")
 	return nil
 }
 
@@ -590,40 +688,239 @@ func configureMonitoring(rc *eos_io.RuntimeContext, config *ConsulConfig) error 
 
 	logger.Info("Configuring monitoring")
 
-	// TODO: Implement monitoring configuration
-	// This would involve:
-	// 1. Configure telemetry
-	// 2. Set up health checks
-	// 3. Configure logging
-	// 4. Set up metrics collection
+	// Create monitoring directory
+	monitoringDir := "/etc/consul.d/monitoring"
+	if err := os.MkdirAll(monitoringDir, 0755); err != nil {
+		return fmt.Errorf("failed to create monitoring directory: %w", err)
+	}
 
+	// Configure telemetry
+	telemetryConfig := map[string]interface{}{
+		"telemetry": map[string]interface{}{
+			"prometheus_retention_time": config.Telemetry.PrometheusRetentionTime,
+			"disable_hostname":          config.Telemetry.DisableHostname,
+			"statsd_address":           config.Telemetry.StatsdAddr,
+			"dogstatsd_address":        config.Telemetry.DogstatsdAddr,
+			"metrics_prefix":           "consul",
+			"filter_default":           true,
+			"prefix_filter": []string{
+				"+consul.runtime",
+				"+consul.raft",
+				"+consul.serf",
+				"+consul.catalog",
+				"+consul.health",
+				"+consul.http",
+				"+consul.acl",
+				"+consul.autopilot",
+				"+consul.txn",
+				"+consul.kvs",
+				"+consul.connect",
+				"+consul.leader",
+				"+consul.dns",
+				"+consul.rpc",
+			},
+		},
+	}
+
+	telemetryConfigPath := filepath.Join(monitoringDir, "telemetry.json")
+	if err := writeConfigFile(telemetryConfigPath, telemetryConfig); err != nil {
+		return fmt.Errorf("failed to write telemetry configuration: %w", err)
+	}
+
+	// Configure logging
+	loggingConfig := map[string]interface{}{
+		"log_level":        config.Logging.LogLevel,
+		"log_file":         config.Logging.LogFile,
+		"log_rotate_bytes": 10485760, // 10MB
+		"log_rotate_duration": "24h",
+		"log_rotate_max_files": 5,
+		"enable_syslog":    config.Logging.EnableSyslog,
+		"enable_json_logs": config.Logging.EnableJSON,
+	}
+
+	loggingConfigPath := filepath.Join(monitoringDir, "logging.json")
+	if err := writeConfigFile(loggingConfigPath, loggingConfig); err != nil {
+		return fmt.Errorf("failed to write logging configuration: %w", err)
+	}
+
+	// Configure health checks
+	healthConfig := map[string]interface{}{
+		"checks": []map[string]interface{}{
+			{
+				"id":                  "consul-health",
+				"name":               "Consul Health Check",
+				"http":               fmt.Sprintf("http://localhost:%d/v1/status/leader", config.Ports.HTTP),
+				"interval":           "10s",
+				"timeout":            "5s",
+				"deregister_critical_service_after": "30s",
+			},
+		},
+	}
+
+	healthConfigPath := filepath.Join(monitoringDir, "health.json")
+	if err := writeConfigFile(healthConfigPath, healthConfig); err != nil {
+		return fmt.Errorf("failed to write health configuration: %w", err)
+	}
+
+	// Set ownership
+	if err := exec.Command("chown", "-R", "consul:consul", monitoringDir).Run(); err != nil {
+		return fmt.Errorf("failed to set ownership on monitoring directory: %w", err)
+	}
+
+	logger.Info("Monitoring configuration completed")
 	return nil
 }
 
 func writeConfigFile(path string, content interface{}) error {
-	// TODO: Implement configuration file writing
-	// This would serialize the configuration to JSON and write to file
+	// Serialize configuration to JSON
+	jsonData, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal configuration: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(path, jsonData, 0644); err != nil {
+		return fmt.Errorf("failed to write configuration file: %w", err)
+	}
+
 	return nil
 }
 
 func generateMainConfig(config *ConsulConfig) interface{} {
-	// TODO: Generate main Consul configuration
-	return nil
+	mainConfig := map[string]interface{}{
+		"datacenter":    config.Datacenter,
+		"data_dir":      "/opt/consul/data",
+		"log_level":     config.Logging.LogLevel,
+		"node_name":     config.NodeName,
+		"bind_addr":     config.BindAddr,
+		"client_addr":   config.ClientAddr,
+		"server":        config.Mode == "server",
+		"ui_config": map[string]interface{}{
+			"enabled": config.EnableUI,
+		},
+		"connect": map[string]interface{}{
+			"enabled": config.ConnectEnabled,
+		},
+		"ports": map[string]interface{}{
+			"grpc":     config.Ports.GRPC,
+			"http":     config.Ports.HTTP,
+			"https":    config.Ports.HTTPS,
+			"serf_lan": config.Ports.SerfLAN,
+			"serf_wan": config.Ports.SerfWAN,
+			"server":   config.Ports.Server,
+			"dns":      config.Ports.DNS,
+		},
+		"performance": map[string]interface{}{
+			"raft_multiplier": config.Performance.RaftMultiplier,
+		},
+		"telemetry": map[string]interface{}{
+			"prometheus_retention_time": config.Telemetry.PrometheusRetentionTime,
+			"disable_hostname":          config.Telemetry.DisableHostname,
+		},
+	}
+
+	// Add advertise address if specified
+	if config.AdvertiseAddr != "" {
+		mainConfig["advertise_addr"] = config.AdvertiseAddr
+	}
+
+	// Add gossip encryption if enabled
+	if config.GossipKey != "" {
+		mainConfig["encrypt"] = config.GossipKey
+	}
+
+	// Add ACL configuration if enabled
+	if config.EnableACL {
+		mainConfig["acl"] = map[string]interface{}{
+			"enabled":        true,
+			"default_policy": "deny",
+			"enable_token_persistence": true,
+		}
+	}
+
+	// Add TLS configuration if enabled
+	if config.EnableTLS {
+		mainConfig["tls"] = map[string]interface{}{
+			"defaults": map[string]interface{}{
+				"ca_file":         config.CACert,
+				"cert_file":       config.ServerCert,
+				"key_file":        config.ServerKey,
+				"verify_incoming": true,
+				"verify_outgoing": true,
+			},
+			"internal_rpc": map[string]interface{}{
+				"verify_server_hostname": true,
+			},
+		}
+	}
+
+	// Add retry join if specified
+	if len(config.RetryJoin) > 0 {
+		mainConfig["retry_join"] = config.RetryJoin
+	}
+
+	return mainConfig
 }
 
 func generateServerConfig(config *ConsulConfig) interface{} {
-	// TODO: Generate server-specific configuration
-	return nil
+	serverConfig := map[string]interface{}{
+		"bootstrap_expect": config.BootstrapExpect,
+		"leave_on_terminate": config.Performance.LeaveOnTerm,
+		"skip_leave_on_interrupt": config.Performance.SkipLeaveOnInt,
+		"rejoin_after_leave": config.Performance.RejoinAfterLeave,
+	}
+
+	// Add join addresses if specified
+	if len(config.JoinAddresses) > 0 {
+		serverConfig["start_join"] = config.JoinAddresses
+	}
+
+	// Add mesh gateway configuration if enabled
+	if config.MeshGateway {
+		serverConfig["mesh_gateway"] = map[string]interface{}{
+			"mode": "local",
+		}
+	}
+
+	// Add ingress gateway configuration if enabled
+	if config.IngressGateway {
+		serverConfig["ingress_gateway"] = map[string]interface{}{
+			"enabled": true,
+		}
+	}
+
+	return serverConfig
 }
 
 func generateClientConfig(config *ConsulConfig) interface{} {
-	// TODO: Generate client-specific configuration
-	return nil
+	clientConfig := map[string]interface{}{
+		"leave_on_terminate": config.Performance.LeaveOnTerm,
+		"skip_leave_on_interrupt": config.Performance.SkipLeaveOnInt,
+		"rejoin_after_leave": config.Performance.RejoinAfterLeave,
+	}
+
+	// Add join addresses if specified
+	if len(config.JoinAddresses) > 0 {
+		clientConfig["start_join"] = config.JoinAddresses
+	}
+
+	// Add retry join if specified
+	if len(config.RetryJoin) > 0 {
+		clientConfig["retry_join"] = config.RetryJoin
+	}
+
+	return clientConfig
 }
 
 func generateBootstrapConfig(config *ConsulConfig) interface{} {
-	// TODO: Generate bootstrap configuration
-	return nil
+	bootstrapConfig := map[string]interface{}{
+		"bootstrap_expect": config.BootstrapExpect,
+		"server": true,
+	}
+
+	// Bootstrap config typically has minimal settings
+	// to avoid conflicts during cluster formation
+	return bootstrapConfig
 }
 
 func generateSystemdService(config *ConsulConfig) string {
@@ -704,5 +1001,204 @@ func validateConsulConfig(rc *eos_io.RuntimeContext, config *ConsulConfig) error
 	}
 
 	logger.Info("Configuration validation completed successfully")
+	return nil
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	return nil
+}
+
+// generateSelfSignedCerts generates self-signed certificates for Consul
+func generateSelfSignedCerts(rc *eos_io.RuntimeContext, config *ConsulConfig, tlsDir string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Generating self-signed certificates")
+
+	// Generate CA certificate
+	caKey, caCert, err := generateCA(config.NodeName)
+	if err != nil {
+		return fmt.Errorf("failed to generate CA: %w", err)
+	}
+
+	// Generate server certificate
+	serverKey, serverCert, err := generateServerCert(caCert, caKey, config.NodeName)
+	if err != nil {
+		return fmt.Errorf("failed to generate server certificate: %w", err)
+	}
+
+	// Write CA certificate
+	caCertPath := filepath.Join(tlsDir, "ca.pem")
+	if err := writeCertToPEM(caCert, caCertPath); err != nil {
+		return fmt.Errorf("failed to write CA certificate: %w", err)
+	}
+
+	// Write server certificate
+	serverCertPath := filepath.Join(tlsDir, "server.pem")
+	if err := writeCertToPEM(serverCert, serverCertPath); err != nil {
+		return fmt.Errorf("failed to write server certificate: %w", err)
+	}
+
+	// Write server key
+	serverKeyPath := filepath.Join(tlsDir, "server-key.pem")
+	if err := writeKeyToPEM(serverKey, serverKeyPath); err != nil {
+		return fmt.Errorf("failed to write server key: %w", err)
+	}
+
+	// Update config paths
+	config.CACert = caCertPath
+	config.ServerCert = serverCertPath
+	config.ServerKey = serverKeyPath
+
+	logger.Info("Self-signed certificates generated successfully")
+	return nil
+}
+
+// generateCA generates a CA certificate and private key
+func generateCA(commonName string) (*rsa.PrivateKey, *x509.Certificate, error) {
+	// Generate CA private key
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate CA key: %w", err)
+	}
+
+	// Create CA certificate template
+	caTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization:  []string{"Consul"},
+			Country:       []string{"US"},
+			Province:      []string{""},
+			Locality:      []string{""},
+			StreetAddress: []string{""},
+			PostalCode:    []string{""},
+			CommonName:    fmt.Sprintf("Consul CA %s", commonName),
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+
+	// Create CA certificate
+	caCertBytes, err := x509.CreateCertificate(rand.Reader, &caTemplate, &caTemplate, &caKey.PublicKey, caKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create CA certificate: %w", err)
+	}
+
+	// Parse CA certificate
+	caCert, err := x509.ParseCertificate(caCertBytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse CA certificate: %w", err)
+	}
+
+	return caKey, caCert, nil
+}
+
+// generateServerCert generates a server certificate signed by the CA
+func generateServerCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, commonName string) (*rsa.PrivateKey, *x509.Certificate, error) {
+	// Generate server private key
+	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate server key: %w", err)
+	}
+
+	// Create server certificate template
+	serverTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject: pkix.Name{
+			Organization:  []string{"Consul"},
+			Country:       []string{"US"},
+			Province:      []string{""},
+			Locality:      []string{""},
+			StreetAddress: []string{""},
+			PostalCode:    []string{""},
+			CommonName:    commonName,
+		},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		DNSNames:     []string{commonName, "localhost", "consul.service.consul"},
+		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+	}
+
+	// Create server certificate
+	serverCertBytes, err := x509.CreateCertificate(rand.Reader, &serverTemplate, caCert, &serverKey.PublicKey, caKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create server certificate: %w", err)
+	}
+
+	// Parse server certificate
+	serverCert, err := x509.ParseCertificate(serverCertBytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse server certificate: %w", err)
+	}
+
+	return serverKey, serverCert, nil
+}
+
+// writeCertToPEM writes a certificate to a PEM file
+func writeCertToPEM(cert *x509.Certificate, path string) error {
+	certPEM := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create certificate file: %w", err)
+	}
+	defer file.Close()
+
+	if err := pem.Encode(file, certPEM); err != nil {
+		return fmt.Errorf("failed to encode certificate: %w", err)
+	}
+
+	return nil
+}
+
+// writeKeyToPEM writes a private key to a PEM file
+func writeKeyToPEM(key *rsa.PrivateKey, path string) error {
+	keyPEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("failed to create key file: %w", err)
+	}
+	defer file.Close()
+
+	if err := pem.Encode(file, keyPEM); err != nil {
+		return fmt.Errorf("failed to encode key: %w", err)
+	}
+
+	// Set restricted permissions on the key file
+	if err := os.Chmod(path, 0600); err != nil {
+		return fmt.Errorf("failed to set key file permissions: %w", err)
+	}
+
 	return nil
 }

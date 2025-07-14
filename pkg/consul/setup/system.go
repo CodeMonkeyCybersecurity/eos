@@ -45,6 +45,19 @@ func SystemUser(rc *eos_io.RuntimeContext) error {
 				log.Debug("Consul user already exists")
 				continue
 			}
+			// Ignore mkdir errors if directories already exist  
+			if step.Command == "mkdir" && strings.Contains(err.Error(), "File exists") {
+				log.Debug("Consul directories already exist")
+				continue
+			}
+			// For chown/chmod errors, log but don't fail immediately - we'll verify later
+			if step.Command == "chown" || step.Command == "chmod" {
+				log.Warn("Setup step had issues, will verify and fix later",
+					zap.String("command", step.Command),
+					zap.Strings("args", step.Args),
+					zap.Error(err))
+				continue
+			}
 			return fmt.Errorf("setup step failed for command %s: %w", step.Command, err)
 		}
 	}
@@ -64,22 +77,81 @@ func SystemUser(rc *eos_io.RuntimeContext) error {
 	// Verify directories exist with correct permissions
 	dirs := []string{"/etc/consul.d", "/opt/consul", "/var/log/consul"}
 	for _, dir := range dirs {
-		checkCmd := execute.Options{
+		// First check if directory exists
+		statCmd := execute.Options{
 			Command: "stat",
-			Args:    []string{"-c", "%U:%G", dir},
+			Args:    []string{dir},
+		}
+		if _, err := execute.Run(rc.Ctx, statCmd); err != nil {
+			return fmt.Errorf("directory %s does not exist or is not accessible: %w", dir, err)
+		}
+
+		// Check ownership using ls -ld which is more reliable
+		checkCmd := execute.Options{
+			Command: "ls",
+			Args:    []string{"-ld", dir},
 		}
 		output, err := execute.Run(rc.Ctx, checkCmd)
 		if err != nil {
-			return fmt.Errorf("failed to verify directory %s: %w", dir, err)
+			return fmt.Errorf("failed to verify directory %s ownership: %w", dir, err)
 		}
 
+		// Parse ls output to get owner:group (3rd and 4th fields)
+		fields := strings.Fields(strings.TrimSpace(output))
+		if len(fields) < 4 {
+			log.Warn("Unexpected ls output format, attempting to fix ownership",
+				zap.String("directory", dir),
+				zap.String("output", output))
+			
+			// Attempt to fix ownership if parsing fails
+			fixCmd := execute.Options{
+				Command: "chown",
+				Args:    []string{"consul:consul", dir},
+			}
+			if _, err := execute.Run(rc.Ctx, fixCmd); err != nil {
+				return fmt.Errorf("failed to fix ownership for directory %s: %w", dir, err)
+			}
+			continue
+		}
+
+		owner := fields[2]
+		group := fields[3]
+		actualOwnership := owner + ":" + group
 		expectedOwner := "consul:consul"
-		if strings.TrimSpace(output) != expectedOwner {
-			return fmt.Errorf("directory %s has incorrect ownership: expected %s, got %s", dir, expectedOwner, output)
+		
+		if actualOwnership != expectedOwner {
+			log.Warn("Directory ownership mismatch, attempting to fix",
+				zap.String("directory", dir),
+				zap.String("expected", expectedOwner),
+				zap.String("actual", actualOwnership))
+			
+			// Attempt to fix ownership
+			fixCmd := execute.Options{
+				Command: "chown",
+				Args:    []string{"consul:consul", dir},
+			}
+			if _, err := execute.Run(rc.Ctx, fixCmd); err != nil {
+				return fmt.Errorf("failed to fix ownership for directory %s: %w", dir, err)
+			}
+			
+			log.Info("Fixed directory ownership",
+				zap.String("directory", dir),
+				zap.String("ownership", expectedOwner))
 		}
 	}
 
-	log.Info("Consul system user and directories created successfully",
+	// Final verification - double check one key directory
+	finalCheck := execute.Options{
+		Command: "ls",
+		Args:    []string{"-ld", "/etc/consul.d"},
+	}
+	if output, err := execute.Run(rc.Ctx, finalCheck); err != nil {
+		return fmt.Errorf("final verification failed for /etc/consul.d: %w", err)
+	} else {
+		log.Debug("Final verification passed", zap.String("ls_output", strings.TrimSpace(output)))
+	}
+
+	log.Info("Consul system user and directories verified successfully",
 		zap.String("user", "consul"),
 		zap.String("home", "/etc/consul.d"),
 		zap.Strings("directories", dirs))
