@@ -70,7 +70,11 @@ func (h *HTTPHealthChecker) Check(target string, config map[string]interface{}) 
 		return result, nil
 	}
 	
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log error but don't fail the health check
+		}
+	}()
 	
 	// Check status code
 	if resp.StatusCode == expectedStatus {

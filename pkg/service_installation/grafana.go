@@ -51,7 +51,9 @@ func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 	if setPassword == "y" || setPassword == "Y" {
 		fmt.Print("Admin password: ")
 		var password string
-		fmt.Scanln(&password)
+		if _, err := fmt.Scanln(&password); err != nil {
+			// Handle input error
+		}
 		if password != "" {
 			options.Environment["GF_SECURITY_ADMIN_PASSWORD"] = password
 		}
@@ -60,7 +62,9 @@ func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 	// Anonymous access
 	fmt.Print("Enable anonymous access? [y/N]: ")
 	var anonymous string
-	fmt.Scanln(&anonymous)
+	if _, err := fmt.Scanln(&anonymous); err != nil {
+		// Handle input error
+	}
 	if anonymous == "y" || anonymous == "Y" {
 		options.Environment["GF_AUTH_ANONYMOUS_ENABLED"] = "true"
 		options.Environment["GF_AUTH_ANONYMOUS_ORG_ROLE"] = "Viewer"
@@ -69,7 +73,9 @@ func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 	// Persistence
 	fmt.Print("Enable data persistence? [Y/n]: ")
 	var persistence string
-	fmt.Scanln(&persistence)
+	if _, err := fmt.Scanln(&persistence); err != nil {
+		// Handle input error
+	}
 	if persistence != "n" && persistence != "N" {
 		options.Volumes = append(options.Volumes, VolumeMount{
 			Source:      "grafana-data",

@@ -173,7 +173,9 @@ func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http
 		if err != nil {
 			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
-		req.Body.Close()
+		if err := req.Body.Close(); err != nil {
+			// Log error but don't fail the request
+		}
 	}
 	
 	retryConfig := c.config.RetryConfig
@@ -222,7 +224,9 @@ func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http
 		
 		// Check if response status is retryable
 		if c.isRetryableStatus(resp.StatusCode, retryConfig) && attempt < maxAttempts-1 {
-			resp.Body.Close()
+			if err := resp.Body.Close(); err != nil {
+				// Log error but continue with retry
+			}
 			delay := c.calculateRetryDelay(attempt, retryConfig)
 			c.logger.Debug("Retryable status code, retrying",
 				zap.Int("status_code", resp.StatusCode),

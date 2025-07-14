@@ -266,7 +266,9 @@ func (em *EnvironmentManager) CreateEnvironment(rc *eos_io.RuntimeContext, env *
 		// Mark as inactive but don't delete
 		env.Status = EnvironmentStatusInactive
 		em.context.Environments[env.Name] = *env
-		em.saveContext()
+		if err := em.saveContext(); err != nil {
+			logger.Warn("Failed to save context after marking environment inactive", zap.Error(err))
+		}
 		return fmt.Errorf("environment infrastructure initialization failed: %w", err)
 	}
 
@@ -274,7 +276,9 @@ func (em *EnvironmentManager) CreateEnvironment(rc *eos_io.RuntimeContext, env *
 	env.Status = EnvironmentStatusActive
 	env.UpdatedAt = time.Now()
 	em.context.Environments[env.Name] = *env
-	em.saveContext()
+	if err := em.saveContext(); err != nil {
+		logger.Warn("Failed to save context after environment creation", zap.Error(err))
+	}
 
 	logger.Info("Environment created successfully",
 		zap.String("environment", env.Name),
@@ -334,7 +338,9 @@ func (em *EnvironmentManager) UpdateEnvironment(rc *eos_io.RuntimeContext, env *
 			zap.Error(err))
 		// Rollback
 		em.context.Environments[env.Name] = existing
-		em.saveContext()
+		if err := em.saveContext(); err != nil {
+			logger.Warn("Failed to save context during rollback", zap.Error(err))
+		}
 		return fmt.Errorf("failed to apply environment changes: %w", err)
 	}
 

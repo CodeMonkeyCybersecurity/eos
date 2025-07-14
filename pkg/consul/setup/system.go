@@ -41,9 +41,16 @@ func SystemUser(rc *eos_io.RuntimeContext) error {
 	for _, step := range steps {
 		if _, err := execute.Run(rc.Ctx, step); err != nil {
 			// Ignore user creation error if user already exists
-			if step.Command == "useradd" && strings.Contains(err.Error(), "already exists") {
-				log.Debug("Consul user already exists")
-				continue
+			if step.Command == "useradd" {
+				errStr := err.Error()
+				// Check for exit status 9 (user already exists) or text indicators
+				if strings.Contains(errStr, "exit status 9") || 
+				   strings.Contains(errStr, "already exists") || 
+				   strings.Contains(errStr, "user 'consul' already exists") ||
+				   strings.Contains(errStr, "useradd: user 'consul' already exists") {
+					log.Debug("Consul user already exists", zap.String("error", errStr))
+					continue
+				}
 			}
 			// Ignore mkdir errors if directories already exist  
 			if step.Command == "mkdir" && strings.Contains(err.Error(), "File exists") {

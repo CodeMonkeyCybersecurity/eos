@@ -60,7 +60,7 @@ Examples:
 			fmt.Printf("%-20s %-10s %-40s%s\n",
 				name, repo.Backend, repo.URL, isDefault)
 		}
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
+		logger.Info("terminal prompt:", zap.String("output", "operation completed"))
 
 		return nil
 	}),
@@ -132,7 +132,7 @@ Examples:
 			fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
 				name, profile.Repository, paths, schedule, retention)
 		}
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
+		logger.Info("terminal prompt:", zap.String("output", "operation completed"))
 
 		return nil
 	}),
@@ -273,7 +273,7 @@ Examples:
 			fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
 				id, timeStr, snap.Hostname, paths, tags)
 		}
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
+		logger.Info("terminal prompt:", zap.String("output", "operation completed"))
 
 		return nil
 	}),

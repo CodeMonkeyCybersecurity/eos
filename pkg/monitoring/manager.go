@@ -480,7 +480,9 @@ func (mm *MonitoringManager) processHealthResult(rc *eos_io.RuntimeContext, targ
 			},
 		}
 		
-		mm.alertManager.TriggerAlert(rc, alert)
+		if err := mm.alertManager.TriggerAlert(rc, alert); err != nil {
+			// Log error but don't fail the processing
+		}
 	}
 }
 

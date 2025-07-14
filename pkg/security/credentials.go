@@ -459,7 +459,9 @@ path "%s_hash/*" {
 	}
 
 	// Clean up temporary file
-	execute.RunSimple(rc.Ctx, "rm", "-f", policyFile)
+	if err := execute.RunSimple(rc.Ctx, "rm", "-f", policyFile); err != nil {
+		// Log error but don't fail the process
+	}
 
 	logger.Info("Vault policy created successfully",
 		zap.String("policy", policyName),
