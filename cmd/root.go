@@ -17,6 +17,7 @@ import (
 	// Subcommands - Core verb-first architecture
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 
 	// "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi" // TODO: Migrate to verb directories
@@ -67,6 +68,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		list.ListCmd,     // VERB-FIRST ARCHITECTURE
 		update.UpdateCmd, // VERB-FIRST ARCHITECTURE
 		delete.DeleteCmd, // VERB-FIRST ARCHITECTURE
+		debug.GetDebugCmd(), // VERB-FIRST ARCHITECTURE (debugging tools)
 		self.SelfCmd,     // SPECIAL CASE (Eos self-management)
 		backup.BackupCmd, // SPECIAL CASE (Complex nomenclature)
 
