@@ -46,8 +46,17 @@ func (h *Handler) CreateRoute(w http.ResponseWriter, r *http.Request) {
 	// Convert to hecate route
 	route := ConvertToHecateRoute(req)
 
-	// Create the route using the existing hecate functions
-	if err := hecate.CreateRoute(h.rc, route); err != nil {
+	// Load config and create the route using the existing hecate functions
+	config, err := hecate.LoadRouteConfig(h.rc)
+	if err != nil {
+		logger.Error("Failed to load config",
+			zap.String("domain", req.Domain),
+			zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "Failed to load config", err)
+		return
+	}
+	
+	if err := hecate.CreateRoute(h.rc, config, route); err != nil {
 		logger.Error("Failed to create route",
 			zap.String("domain", req.Domain),
 			zap.Error(err))
@@ -79,9 +88,11 @@ func (h *Handler) GetRoute(w http.ResponseWriter, r *http.Request) {
 	// In a full implementation, this would fetch from the state store
 	route := &hecate.Route{
 		Domain:     domain,
-		Upstream:   "localhost:8080",
-		AuthPolicy: "",
+		Upstream:   &hecate.Upstream{URL: "localhost:8080"},
+		AuthPolicy: nil,
 		Headers:    make(map[string]string),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
 	}
 
 	response := ConvertFromHecateRoute(route)
@@ -104,8 +115,45 @@ func (h *Handler) UpdateRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update the route using the existing hecate functions
-	if err := hecate.UpdateRoute(h.rc, domain, req.Updates); err != nil {
+	// Load config and update the route using the existing hecate functions
+	config, err := hecate.LoadRouteConfig(h.rc)
+	if err != nil {
+		logger.Error("Failed to load config",
+			zap.String("domain", domain),
+			zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "Failed to load config", err)
+		return
+	}
+	
+	// Convert updates to Route object
+	updatedRoute := &hecate.Route{
+		Domain: domain,
+	}
+	
+	// Apply updates from the request
+	if upstreams, ok := req.Updates["upstreams"].([]interface{}); ok && len(upstreams) > 0 {
+		if upstreamURL, ok := upstreams[0].(string); ok {
+			updatedRoute.Upstream = &hecate.Upstream{URL: upstreamURL}
+		}
+	}
+	
+	if authPolicy, ok := req.Updates["auth_policy"].(string); ok {
+		if authPolicy != "" {
+			updatedRoute.AuthPolicy = &hecate.AuthPolicy{Name: authPolicy}
+		}
+	}
+	
+	if headers, ok := req.Updates["headers"].(map[string]interface{}); ok {
+		stringHeaders := make(map[string]string)
+		for k, v := range headers {
+			if str, ok := v.(string); ok {
+				stringHeaders[k] = str
+			}
+		}
+		updatedRoute.Headers = stringHeaders
+	}
+	
+	if err := hecate.UpdateRoute(h.rc, config, domain, updatedRoute); err != nil {
 		logger.Error("Failed to update route",
 			zap.String("domain", domain),
 			zap.Error(err))
@@ -132,8 +180,24 @@ func (h *Handler) DeleteRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	domain := vars["domain"]
 
-	// Delete the route using the existing hecate functions
-	if err := hecate.DeleteRoute(h.rc, domain); err != nil {
+	// Load config and delete the route using the existing hecate functions
+	config, err := hecate.LoadRouteConfig(h.rc)
+	if err != nil {
+		logger.Error("Failed to load config",
+			zap.String("domain", domain),
+			zap.Error(err))
+		h.respondError(w, http.StatusInternalServerError, "Failed to load config", err)
+		return
+	}
+	
+	// Use default delete options
+	deleteOptions := &hecate.DeleteOptions{
+		Force:     false,
+		Backup:    true,
+		RemoveDNS: true,
+	}
+	
+	if err := hecate.DeleteRoute(h.rc, config, domain, deleteOptions); err != nil {
 		logger.Error("Failed to delete route",
 			zap.String("domain", domain),
 			zap.Error(err))

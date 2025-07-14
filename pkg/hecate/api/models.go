@@ -345,16 +345,26 @@ type WorkflowStatusResponse struct {
 
 // ConvertFromHecateRoute converts a hecate.Route to RouteResponse
 func ConvertFromHecateRoute(route *hecate.Route) RouteResponse {
+	var upstreams []string
+	if route.Upstream != nil {
+		upstreams = []string{route.Upstream.URL}
+	}
+	
+	var authPolicy string
+	if route.AuthPolicy != nil {
+		authPolicy = route.AuthPolicy.Name
+	}
+	
 	return RouteResponse{
 		ID:         route.Domain, // Use domain as ID for now
 		Domain:     route.Domain,
-		Upstreams:  []string{route.Upstream},
-		AuthPolicy: route.AuthPolicy,
+		Upstreams:  upstreams,
+		AuthPolicy: authPolicy,
 		Headers:    route.Headers,
-		Middleware: route.Middleware,
+		Middleware: []string{}, // This field doesn't exist in Route type
 		Status:     "active",
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		CreatedAt:  route.CreatedAt,
+		UpdatedAt:  route.UpdatedAt,
 	}
 }
 
@@ -377,30 +387,38 @@ func ConvertFromHecateAuthPolicy(policy *hecate.AuthPolicy) AuthPolicyResponse {
 // ConvertToHecateRoute converts a CreateRouteRequest to hecate.Route
 func ConvertToHecateRoute(req CreateRouteRequest) *hecate.Route {
 	route := &hecate.Route{
-		Domain:     req.Domain,
-		AuthPolicy: req.AuthPolicy,
-		Headers:    req.Headers,
-		Middleware: req.Middleware,
+		Domain:    req.Domain,
+		Headers:   req.Headers,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	if len(req.Upstreams) > 0 {
-		route.Upstream = req.Upstreams[0]
+		route.Upstream = &hecate.Upstream{
+			URL: req.Upstreams[0],
+		}
+	}
+	
+	if req.AuthPolicy != "" {
+		route.AuthPolicy = &hecate.AuthPolicy{
+			Name: req.AuthPolicy,
+		}
 	}
 
 	if req.HealthCheckPath != "" {
 		route.HealthCheck = &hecate.HealthCheck{
-			Path:               req.HealthCheckPath,
-			Interval:           30 * time.Second,
-			Timeout:            5 * time.Second,
-			UnhealthyThreshold: 3,
-			HealthyThreshold:   2,
+			Path:             req.HealthCheckPath,
+			Interval:         30 * time.Second,
+			Timeout:          5 * time.Second,
+			FailureThreshold: 3,
+			SuccessThreshold: 2,
+			Enabled:          true,
 		}
 	}
 
 	if req.EnableSSL {
 		route.TLS = &hecate.TLSConfig{
-			AutoHTTPS:  true,
-			ForceHTTPS: true,
+			Enabled: true,
 		}
 	}
 

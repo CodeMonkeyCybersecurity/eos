@@ -85,13 +85,15 @@ func CreateRouteWithWorkflow(rc *eos_io.RuntimeContext, request RouteCreationReq
 	// Step 5: Create the route
 	route := &hecate.Route{
 		Domain:     request.Domain,
-		AuthPolicy: request.AuthPolicy,
+		// TODO: Convert string to AuthPolicy if needed
+		// AuthPolicy: request.AuthPolicy,
 		Headers:    request.Headers,
-		Middleware: request.Middleware,
+		// TODO: Add middleware field to Route type if needed
+		// Middleware: request.Middleware,
 	}
 
 	if len(request.Upstreams) > 0 {
-		route.Upstream = request.Upstreams[0]
+		route.Upstream = &hecate.Upstream{URL: request.Upstreams[0]}
 	}
 
 	if request.HealthCheckPath != "" {
@@ -99,20 +101,22 @@ func CreateRouteWithWorkflow(rc *eos_io.RuntimeContext, request RouteCreationReq
 			Path:               request.HealthCheckPath,
 			Interval:           30 * time.Second,
 			Timeout:            5 * time.Second,
-			UnhealthyThreshold: 3,
-			HealthyThreshold:   2,
+			FailureThreshold: 3,
+			SuccessThreshold: 2,
 		}
 	}
 
 	if request.EnableSSL {
 		route.TLS = &hecate.TLSConfig{
-			AutoHTTPS:  true,
-			ForceHTTPS: true,
+			Enabled:    true,
+			MinVersion: "1.2",
 		}
 	}
 
 	logger.Info("Creating route in Caddy")
-	if err := hecate.CreateRoute(rc, route); err != nil {
+	// TODO: Get config from context or parameter
+	config := &hecate.HecateConfig{} // Placeholder
+	if err := hecate.CreateRoute(rc, config, route); err != nil {
 		// Rollback on failure
 		rollbackRouteCreation(rc, state)
 		return fmt.Errorf("failed to create Caddy route: %w", err)
@@ -262,7 +266,10 @@ func rollbackRouteCreation(rc *eos_io.RuntimeContext, state RouteCreationState) 
 
 	// Clean up in reverse order
 	if state.RouteCreated {
-		_ = hecate.DeleteRoute(rc, state.Domain)
+		// TODO: Get config from context or parameter
+		config := &hecate.HecateConfig{} // Placeholder
+		deleteOpts := &hecate.DeleteOptions{Force: true}
+		_ = hecate.DeleteRoute(rc, config, state.Domain, deleteOpts)
 	}
 
 	if state.CertificateCreated {

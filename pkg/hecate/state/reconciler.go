@@ -363,11 +363,14 @@ func applyChangesInOrder(rc *eos_io.RuntimeContext, tx *Transaction, changes *St
 		if change.Type == "route" {
 			logger.Info("Creating route",
 				zap.String("name", change.Name))
-			if err := hecate.CreateRoute(rc, change.NewValue.(*hecate.Route)); err != nil {
+			// TODO: Get config from context or parameter
+			config := &hecate.HecateConfig{} // Placeholder
+			if err := hecate.CreateRoute(rc, config, change.NewValue.(*hecate.Route)); err != nil {
 				return fmt.Errorf("failed to create route %s: %w", change.Name, err)
 			}
 			tx.AddRollback(func() error {
-				return hecate.DeleteRoute(rc, change.Name)
+				deleteOpts := &hecate.DeleteOptions{Force: true}
+				return hecate.DeleteRoute(rc, config, change.Name, deleteOpts)
 			})
 		}
 	}
@@ -402,9 +405,9 @@ func applyChangesInOrder(rc *eos_io.RuntimeContext, tx *Transaction, changes *St
 		if change.Type == "route" {
 			logger.Info("Updating route",
 				zap.String("name", change.Name))
-			// Convert to update map
-			updates := routeToUpdateMap(change.NewValue.(*hecate.Route))
-			if err := hecate.UpdateRoute(rc, change.Name, updates); err != nil {
+			// TODO: Get config from context or parameter
+			config := &hecate.HecateConfig{} // Placeholder
+			if err := hecate.UpdateRoute(rc, config, change.Name, change.NewValue.(*hecate.Route)); err != nil {
 				return fmt.Errorf("failed to update route %s: %w", change.Name, err)
 			}
 			// TODO: Add rollback
@@ -416,7 +419,10 @@ func applyChangesInOrder(rc *eos_io.RuntimeContext, tx *Transaction, changes *St
 		if change.Type == "route" {
 			logger.Info("Deleting route",
 				zap.String("name", change.Name))
-			if err := hecate.DeleteRoute(rc, change.Name); err != nil {
+			// TODO: Get config from context or parameter
+			config := &hecate.HecateConfig{} // Placeholder
+			deleteOpts := &hecate.DeleteOptions{Force: true}
+			if err := hecate.DeleteRoute(rc, config, change.Name, deleteOpts); err != nil {
 				return fmt.Errorf("failed to delete route %s: %w", change.Name, err)
 			}
 		}
@@ -540,20 +546,22 @@ func routesEqual(r1, r2 *hecate.Route) bool {
 }
 
 func upstreamsEqual(u1, u2 *hecate.Upstream) bool {
-	if u1.Name != u2.Name ||
-		u1.LoadBalancer != u2.LoadBalancer ||
+	if u1.URL != u2.URL ||
+		u1.LoadBalancePolicy != u2.LoadBalancePolicy ||
 		u1.Timeout != u2.Timeout {
 		return false
 	}
 
-	// Compare servers
-	if len(u1.Servers) != len(u2.Servers) {
+	// Compare TLS settings
+	if u1.TLSSkipVerify != u2.TLSSkipVerify {
 		return false
 	}
-	for i, server := range u1.Servers {
-		if u2.Servers[i] != server {
-			return false
-		}
+
+	// Compare other settings
+	if u1.MaxIdleConns != u2.MaxIdleConns ||
+		u1.MaxConnsPerHost != u2.MaxConnsPerHost ||
+		u1.KeepAlive != u2.KeepAlive {
+		return false
 	}
 
 	return true
@@ -617,6 +625,8 @@ func routeToUpdateMap(route *hecate.Route) map[string]interface{} {
 		"upstream":    route.Upstream,
 		"auth_policy": route.AuthPolicy,
 		"headers":     route.Headers,
-		"middleware":  route.Middleware,
+		"tls":         route.TLS,
+		"rate_limit":  route.RateLimit,
+		"health_check": route.HealthCheck,
 	}
 }

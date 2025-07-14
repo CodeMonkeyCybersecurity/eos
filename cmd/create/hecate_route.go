@@ -33,8 +33,8 @@ func init() {
 	CreateHecateCmd.AddCommand(createHecateRouteCmd)
 
 	// Define flags
-	createHecateRouteCmd.Flags().String("domain", "", "Domain name for the route (required)")
-	createHecateRouteCmd.Flags().String("upstream", "", "Upstream backend address (required)")
+	createHecateRouteCmd.Flags().String("domain", "", "Domain name for the route (prompted if not provided)")
+	createHecateRouteCmd.Flags().String("upstream", "", "Upstream backend address (prompted if not provided)")
 	createHecateRouteCmd.Flags().String("auth-policy", "", "Authentication policy name")
 	createHecateRouteCmd.Flags().StringSlice("headers", []string{}, "Custom headers in key=value format")
 	createHecateRouteCmd.Flags().Bool("auto-https", true, "Enable automatic HTTPS via Let's Encrypt")
@@ -43,9 +43,7 @@ func init() {
 	createHecateRouteCmd.Flags().String("health-check-interval", "30s", "Health check interval")
 	createHecateRouteCmd.Flags().Bool("require-mfa", false, "Require MFA for authentication")
 
-	// Mark required flags
-	_ = createHecateRouteCmd.MarkFlagRequired("domain")
-	_ = createHecateRouteCmd.MarkFlagRequired("upstream")
+	// Domain and upstream are required but will be prompted if not provided
 }
 
 func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -57,10 +55,34 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	authPolicy, _ := cmd.Flags().GetString("auth-policy")
 	headersList, _ := cmd.Flags().GetStringSlice("headers")
 	autoHTTPS, _ := cmd.Flags().GetBool("auto-https")
-	forceHTTPS, _ := cmd.Flags().GetBool("force-https")
+	_, _ = cmd.Flags().GetBool("force-https") // Not used in current implementation
 	healthCheckPath, _ := cmd.Flags().GetString("health-check-path")
 	healthCheckInterval, _ := cmd.Flags().GetString("health-check-interval")
 	requireMFA, _ := cmd.Flags().GetBool("require-mfa")
+
+	// Prompt for domain if not provided
+	if domain == "" {
+		logger.Info("Domain not provided via flag, prompting user")
+		logger.Info("terminal prompt: Please enter the domain name for the route")
+
+		input, err := eos_io.PromptInput(rc, "Domain", "Enter domain name")
+		if err != nil {
+			return fmt.Errorf("failed to read domain: %w", err)
+		}
+		domain = input
+	}
+
+	// Prompt for upstream if not provided
+	if upstream == "" {
+		logger.Info("Upstream not provided via flag, prompting user")
+		logger.Info("terminal prompt: Please enter the upstream backend address")
+
+		input, err := eos_io.PromptInput(rc, "Upstream", "Enter upstream address")
+		if err != nil {
+			return fmt.Errorf("failed to read upstream: %w", err)
+		}
+		upstream = input
+	}
 
 	logger.Info("Creating new Hecate route",
 		zap.String("domain", domain),
@@ -84,12 +106,11 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	// Build route configuration
 	route := &hecate.Route{
 		Domain:     domain,
-		Upstream:   upstream,
-		AuthPolicy: authPolicy,
+		Upstream:   &hecate.Upstream{URL: upstream},
+		AuthPolicy: nil, // Will be set below if needed
 		Headers:    headers,
 		TLS: &hecate.TLSConfig{
-			AutoHTTPS:  autoHTTPS,
-			ForceHTTPS: forceHTTPS,
+			Enabled: autoHTTPS,
 		},
 	}
 
@@ -103,12 +124,13 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		}
 
 		route.HealthCheck = &hecate.HealthCheck{
-			Path:               healthCheckPath,
-			Interval:           interval,
-			Timeout:            5 * time.Second,
-			UnhealthyThreshold: 3,
-			HealthyThreshold:   2,
-			ExpectedStatus:     []int{200, 204},
+			Path:             healthCheckPath,
+			Interval:         interval,
+			Timeout:          5 * time.Second,
+			FailureThreshold: 3,
+			SuccessThreshold: 2,
+			HealthyStatus:    []int{200, 204},
+			Enabled:          true,
 		}
 	}
 
@@ -131,11 +153,21 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 			return fmt.Errorf("failed to create auth policy: %w", err)
 		}
 
-		route.AuthPolicy = policyName
+		route.AuthPolicy = &hecate.AuthPolicy{
+			Name:       policyName,
+			Provider:   "authentik", // Default provider
+			RequireMFA: requireMFA,
+		}
+	}
+
+	// Load Hecate configuration
+	config, err := hecate.LoadRouteConfig(rc)
+	if err != nil {
+		return fmt.Errorf("failed to load Hecate config: %w", err)
 	}
 
 	// Create the route
-	if err := hecate.CreateRoute(rc, route); err != nil {
+	if err := hecate.CreateRoute(rc, config, route); err != nil {
 		return err
 	}
 
@@ -147,10 +179,10 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	logger.Info("terminal prompt: Route created successfully!")
 	logger.Info("terminal prompt: Domain", zap.String("value", domain))
 	logger.Info("terminal prompt: Upstream", zap.String("value", upstream))
-	if route.AuthPolicy != "" {
-		logger.Info("terminal prompt: Auth Policy", zap.String("value", route.AuthPolicy))
+	if route.AuthPolicy != nil {
+		logger.Info("terminal prompt: Auth Policy", zap.String("value", route.AuthPolicy.Name))
 	}
-	if route.TLS.AutoHTTPS {
+	if route.TLS.Enabled {
 		logger.Info("terminal prompt: 🔒 HTTPS will be automatically configured via Let's Encrypt")
 	}
 	logger.Info("terminal prompt: You can now access your service at", zap.String("url", "https://"+domain))

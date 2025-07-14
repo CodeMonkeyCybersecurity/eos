@@ -15,93 +15,92 @@ func CreateUpstream(rc *eos_io.RuntimeContext, upstream *Upstream) error {
 
 	// ASSESS
 	logger.Info("Assessing upstream creation prerequisites",
-		zap.String("name", upstream.Name))
+		zap.String("url", upstream.URL))
 
 	// Check if upstream already exists
-	exists, err := upstreamExists(rc, upstream.Name)
+	exists, err := upstreamExists(rc, upstream.URL)
 	if err != nil {
 		return fmt.Errorf("failed to check upstream existence: %w", err)
 	}
 	if exists {
-		return eos_err.NewUserError("upstream %s already exists", upstream.Name)
+		return eos_err.NewUserError("upstream %s already exists", upstream.URL)
 	}
 
-	// Validate servers
-	if len(upstream.Servers) == 0 {
-		return eos_err.NewUserError("upstream must have at least one server")
+	// Validate URL
+	if upstream.URL == "" {
+		return eos_err.NewUserError("upstream must have a URL")
 	}
 
 	// INTERVENE
 	logger.Info("Creating upstream configuration",
-		zap.String("name", upstream.Name),
-		zap.Strings("servers", upstream.Servers))
+		zap.String("url", upstream.URL))
 
 	// TODO: Implement actual upstream creation in Caddy
 	// This would involve updating Caddy's configuration
 
 	// Update state store
-	if err := updateStateStore(rc, "upstreams", upstream.Name, upstream); err != nil {
+	if err := updateStateStore(rc, "upstreams", upstream.URL, upstream); err != nil {
 		logger.Warn("Failed to update state store",
 			zap.Error(err))
 	}
 
 	// EVALUATE
 	logger.Info("Verifying upstream functionality",
-		zap.String("name", upstream.Name))
+		zap.String("url", upstream.URL))
 
 	if err := verifyUpstream(rc, upstream); err != nil {
 		return fmt.Errorf("upstream verification failed: %w", err)
 	}
 
 	logger.Info("Upstream created successfully",
-		zap.String("name", upstream.Name))
+		zap.String("url", upstream.URL))
 
 	return nil
 }
 
 // DeleteUpstream removes an upstream configuration
-func DeleteUpstream(rc *eos_io.RuntimeContext, upstreamName string) error {
+func DeleteUpstream(rc *eos_io.RuntimeContext, upstreamURL string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS
 	logger.Info("Assessing upstream deletion prerequisites",
-		zap.String("name", upstreamName))
+		zap.String("url", upstreamURL))
 
 	// Check if upstream exists
-	exists, err := upstreamExists(rc, upstreamName)
+	exists, err := upstreamExists(rc, upstreamURL)
 	if err != nil {
 		return fmt.Errorf("failed to check upstream existence: %w", err)
 	}
 	if !exists {
-		return eos_err.NewUserError("upstream %s not found", upstreamName)
+		return eos_err.NewUserError("upstream %s not found", upstreamURL)
 	}
 
 	// Check if upstream is in use by any routes
-	inUse, routes, err := checkUpstreamUsage(rc, upstreamName)
+	inUse, routes, err := checkUpstreamUsage(rc, upstreamURL)
 	if err != nil {
 		return fmt.Errorf("failed to check upstream usage: %w", err)
 	}
 	if inUse {
-		return eos_err.NewUserError("upstream %s is in use by routes: %v", upstreamName, routes)
+		return eos_err.NewUserError("upstream %s is in use by routes: %v", upstreamURL, routes)
 	}
 
 	// INTERVENE
 	logger.Info("Deleting upstream configuration",
-		zap.String("name", upstreamName))
+		zap.String("url", upstreamURL))
 
 	// TODO: Implement actual upstream deletion from Caddy
 
 	// Delete from state store
-	if err := deleteFromStateStore(rc, "upstreams", upstreamName); err != nil {
+	if err := deleteFromStateStore(rc, "upstreams", upstreamURL); err != nil {
 		logger.Warn("Failed to delete from state store",
 			zap.Error(err))
 	}
 
 	// EVALUATE
 	logger.Info("Verifying upstream deletion",
-		zap.String("name", upstreamName))
+		zap.String("url", upstreamURL))
 
-	exists, err = upstreamExists(rc, upstreamName)
+	exists, err = upstreamExists(rc, upstreamURL)
 	if err != nil {
 		return fmt.Errorf("failed to verify upstream deletion: %w", err)
 	}
@@ -110,14 +109,14 @@ func DeleteUpstream(rc *eos_io.RuntimeContext, upstreamName string) error {
 	}
 
 	logger.Info("Upstream deleted successfully",
-		zap.String("name", upstreamName))
+		zap.String("url", upstreamURL))
 
 	return nil
 }
 
 // Helper functions
 
-func upstreamExists(rc *eos_io.RuntimeContext, upstreamName string) (bool, error) {
+func upstreamExists(rc *eos_io.RuntimeContext, upstreamURL string) (bool, error) {
 	// TODO: Implement checking if upstream exists
 	return false, nil
 }
@@ -128,7 +127,7 @@ func verifyUpstream(rc *eos_io.RuntimeContext, upstream *Upstream) error {
 	return nil
 }
 
-func checkUpstreamUsage(rc *eos_io.RuntimeContext, upstreamName string) (bool, []string, error) {
+func checkUpstreamUsage(rc *eos_io.RuntimeContext, upstreamURL string) (bool, []string, error) {
 	// TODO: Check all routes to see if any use this upstream
 	return false, nil, nil
 }

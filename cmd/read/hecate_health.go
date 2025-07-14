@@ -70,7 +70,7 @@ func runSingleHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, service
 		if routeFilter != "" {
 			route := &hecate.Route{
 				Domain:   routeFilter,
-				Upstream: "localhost:8080", // Placeholder
+				Upstream: &hecate.Upstream{URL: "http://localhost:8080"}, // Placeholder
 			}
 
 			status, err := monitoring.CheckRouteHealth(rc, route)
@@ -82,9 +82,9 @@ func runSingleHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, service
 		} else {
 			// TODO: Get all routes from state store
 			mockRoutes := []*hecate.Route{
-				{Domain: "api.example.com", Upstream: "localhost:8080"},
-				{Domain: "app.example.com", Upstream: "localhost:3000"},
-				{Domain: "admin.example.com", Upstream: "localhost:9000"},
+				{Domain: "api.example.com", Upstream: &hecate.Upstream{URL: "http://localhost:8080"}},
+				{Domain: "app.example.com", Upstream: &hecate.Upstream{URL: "http://localhost:3000"}},
+				{Domain: "admin.example.com", Upstream: &hecate.Upstream{URL: "http://localhost:9000"}},
 			}
 
 			logger.Info("terminal prompt: 🔍 Route Health Check")
@@ -101,7 +101,7 @@ func runSingleHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, service
 				}
 
 				printRouteHealthStatus(logger, route.Domain, status)
-				if !status.Healthy {
+				if status.Health != hecate.RouteHealthHealthy {
 					allHealthy = false
 				}
 			}
@@ -183,23 +183,23 @@ func printSingleRouteHealth(logger otelzap.LoggerWithCtx, domain string, status 
 	logger.Info("terminal prompt: ==================")
 
 	healthIcon := "🟢"
-	if !status.Healthy {
+	if status.Health != hecate.RouteHealthHealthy {
 		healthIcon = "🔴"
 	}
 
-	logger.Info("terminal prompt: Status", zap.String("icon", healthIcon), zap.String("status", getHealthText(status.Healthy)))
-	logger.Info("terminal prompt: Response Time", zap.Duration("time", status.ResponseTime))
-	logger.Info("terminal prompt: Last Check", zap.String("time", status.LastCheck.Format("2006-01-02 15:04:05")))
+	logger.Info("terminal prompt: Status", zap.String("icon", healthIcon), zap.String("status", getHealthText(status.Health == hecate.RouteHealthHealthy)))
+	logger.Info("terminal prompt: Response Time", zap.String("time", "N/A"))
+	logger.Info("terminal prompt: Last Check", zap.String("time", status.LastChecked.Format("2006-01-02 15:04:05")))
 
-	if status.ErrorMessage != "" {
-		logger.Info("terminal prompt: Error", zap.String("message", status.ErrorMessage))
+	if status.Message != "" {
+		logger.Info("terminal prompt: Error", zap.String("message", status.Message))
 	}
 }
 
 func printRouteHealthStatus(logger otelzap.LoggerWithCtx, domain string, status *hecate.RouteStatus) {
 	healthIcon := "🟢"
 	healthText := "Healthy"
-	if !status.Healthy {
+	if status.Health != hecate.RouteHealthHealthy {
 		healthIcon = "🔴"
 		healthText = "Unhealthy"
 	}
@@ -208,10 +208,10 @@ func printRouteHealthStatus(logger otelzap.LoggerWithCtx, domain string, status 
 		zap.String("domain", domain),
 		zap.String("icon", healthIcon),
 		zap.String("status", healthText),
-		zap.Duration("response_time", status.ResponseTime))
+		zap.String("response_time", "N/A"))
 
-	if status.ErrorMessage != "" {
-		logger.Info("terminal prompt: Error", zap.String("error", status.ErrorMessage))
+	if status.Message != "" {
+		logger.Info("terminal prompt: Error", zap.String("error", status.Message))
 	}
 
 	// Empty line for formatting

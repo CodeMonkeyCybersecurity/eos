@@ -331,11 +331,11 @@ func CheckRouteHealth(rc *eos_io.RuntimeContext, route *hecate.Route) (*hecate.R
 	req, err := http.NewRequestWithContext(rc.Ctx, "GET", healthURL, nil)
 	if err != nil {
 		return &hecate.RouteStatus{
-			Domain:       route.Domain,
-			Healthy:      false,
-			LastCheck:    time.Now(),
-			ResponseTime: 0,
-			ErrorMessage: fmt.Sprintf("Failed to create request: %v", err),
+			State:        hecate.RouteStateError,
+			Health:       hecate.RouteHealthUnhealthy,
+			LastChecked:  time.Now(),
+			ErrorCount:   1,
+			Message:      fmt.Sprintf("Failed to create request: %v", err),
 		}, nil
 	}
 
@@ -343,14 +343,18 @@ func CheckRouteHealth(rc *eos_io.RuntimeContext, route *hecate.Route) (*hecate.R
 	responseTime := time.Since(start)
 
 	status := &hecate.RouteStatus{
-		Domain:       route.Domain,
-		LastCheck:    time.Now(),
-		ResponseTime: responseTime,
+		State:       hecate.RouteStateActive,
+		Health:      hecate.RouteHealthHealthy,
+		LastChecked: time.Now(),
+		ErrorCount:  0,
+		Message:     "",
 	}
 
 	if err != nil {
-		status.Healthy = false
-		status.ErrorMessage = err.Error()
+		status.State = hecate.RouteStateError
+		status.Health = hecate.RouteHealthUnhealthy
+		status.ErrorCount = 1
+		status.Message = err.Error()
 		logger.Warn("Route health check failed",
 			zap.String("domain", route.Domain),
 			zap.Error(err))
@@ -367,21 +371,36 @@ func CheckRouteHealth(rc *eos_io.RuntimeContext, route *hecate.Route) (*hecate.R
 				break
 			}
 		}
-		status.Healthy = statusOK
-		if !statusOK {
-			status.ErrorMessage = fmt.Sprintf("Unexpected status code: %d", resp.StatusCode)
+		if statusOK {
+			status.Health = hecate.RouteHealthHealthy
+			status.State = hecate.RouteStateActive
+			status.ErrorCount = 0
+			status.Message = ""
+		} else {
+			status.Health = hecate.RouteHealthUnhealthy
+			status.State = hecate.RouteStateError
+			status.ErrorCount = 1
+			status.Message = fmt.Sprintf("Unexpected status code: %d", resp.StatusCode)
 		}
 	} else {
 		// Default: accept 2xx and 3xx
-		status.Healthy = resp.StatusCode < 400
-		if !status.Healthy {
-			status.ErrorMessage = fmt.Sprintf("HTTP error: %d", resp.StatusCode)
+		isHealthy := resp.StatusCode < 400
+		if isHealthy {
+			status.Health = hecate.RouteHealthHealthy
+			status.State = hecate.RouteStateActive
+			status.ErrorCount = 0
+			status.Message = ""
+		} else {
+			status.Health = hecate.RouteHealthUnhealthy
+			status.State = hecate.RouteStateError
+			status.ErrorCount = 1
+			status.Message = fmt.Sprintf("HTTP error: %d", resp.StatusCode)
 		}
 	}
 
 	logger.Debug("Route health check completed",
 		zap.String("domain", route.Domain),
-		zap.Bool("healthy", status.Healthy),
+		zap.String("health", status.Health),
 		zap.Duration("response_time", responseTime))
 
 	return status, nil
@@ -413,10 +432,10 @@ func MonitorRoutes(ctx context.Context, rc *eos_io.RuntimeContext, routes []*hec
 						return
 					}
 
-					if !status.Healthy {
+					if status.Health != hecate.RouteHealthHealthy {
 						logger.Warn("Route is unhealthy",
 							zap.String("domain", r.Domain),
-							zap.String("error", status.ErrorMessage))
+							zap.String("error", status.Message))
 
 						// TODO: Trigger alerts
 					}
