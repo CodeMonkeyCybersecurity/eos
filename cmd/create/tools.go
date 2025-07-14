@@ -60,7 +60,7 @@ Examples:
 
 		// Interactive configuration
 		if interactive {
-			if err := runInteractiveToolsSetup(config); err != nil {
+			if err := runInteractiveToolsSetup(rc, config); err != nil {
 				return fmt.Errorf("interactive setup failed: %w", err)
 			}
 		}
@@ -115,7 +115,8 @@ func init() {
 }
 
 // TODO
-func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
+func runInteractiveToolsSetup(rc *eos_io.RuntimeContext, config *system_config.SystemToolsConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("terminal prompt: Interactive System Tools Setup")
 	logger.Info("terminal prompt: =================================\n")
 
@@ -168,12 +169,12 @@ func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
 	}
 
 	logger.Info("terminal prompt: Configuration Summary:")
-	logger.Info("terminal prompt:    Update System: %t", config.UpdateSystem)
-	logger.Info("terminal prompt:    Install Packages: %t", config.InstallPackages)
-	logger.Info("terminal prompt:    Install NPM: %t", config.InstallNpm)
-	logger.Info("terminal prompt:    Install ZX: %t", config.InstallZx)
-	logger.Info("terminal prompt:    Configure UFW: %t", config.ConfigureUFW)
-	logger.Info("terminal prompt:    Setup Sensors: %t", config.SetupSensors)
+	logger.Info(fmt.Sprintf("terminal prompt:    Update System: %t", config.UpdateSystem))
+	logger.Info(fmt.Sprintf("terminal prompt:    Install Packages: %t", config.InstallPackages))
+	logger.Info(fmt.Sprintf("terminal prompt:    Install NPM: %t", config.InstallNpm))
+	logger.Info(fmt.Sprintf("terminal prompt:    Install ZX: %t", config.InstallZx))
+	logger.Info(fmt.Sprintf("terminal prompt:    Configure UFW: %t", config.ConfigureUFW))
+	logger.Info(fmt.Sprintf("terminal prompt:    Setup Sensors: %t", config.SetupSensors))
 
 	logger.Info("terminal prompt: \nProceed with setup? [Y/n]: ")
 	var proceed string

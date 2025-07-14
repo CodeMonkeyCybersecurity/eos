@@ -48,9 +48,9 @@ Examples:
 
 		// Display repositories
 		logger.Info("terminal prompt: \nConfigured Repositories:")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
-		logger.Info("terminal prompt: %-20s %-10s %-40s", "NAME", "BACKEND", "URL")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
+		fmt.Printf("%-20s %-10s %-40s\n", "NAME", "BACKEND", "URL")
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
 
 		for name, repo := range config.Repositories {
 			isDefault := ""

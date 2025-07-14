@@ -75,17 +75,17 @@ func outputDiskListJSON(result *disk_management.DiskListResult) error {
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
 func outputDiskListTable(result *disk_management.DiskListResult) error {
 	if result.Total == 0 {
-		logger.Info("terminal prompt: No disk devices found.")
+		fmt.Println("No disk devices found.")
 		return nil
 	}
 
-	logger.Info("terminal prompt: Found %d disk devices", result.Total)
-	logger.Info("terminal prompt: Listed at: %s\n", result.Timestamp.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Found %d disk devices\n", result.Total)
+	fmt.Printf("Listed at: %s\n", result.Timestamp.Format("2006-01-02 15:04:05"))
 
 	// Print header
 	fmt.Printf("%-12s %-15s %-10s %-15s %-15s %s\n",
 		"DEVICE", "NAME", "SIZE", "VENDOR", "MODEL", "MOUNT POINTS")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 90))))
+	fmt.Println(strings.Repeat("-", 90))
 
 	// Print disks
 	for _, disk := range result.Disks {

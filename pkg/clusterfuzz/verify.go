@@ -103,9 +103,6 @@ func verifyDatabaseConnection(rc *eos_io.RuntimeContext, config *Config) error {
 				"-d", config.DatabaseConfig.Database,
 				"-c", "SELECT 1",
 			},
-			Environment: map[string]string{
-				"PGPASSWORD": config.DatabaseConfig.Password,
-			},
 		})
 		if err != nil {
 			return fmt.Errorf("database connection failed: %w", err)
@@ -186,7 +183,7 @@ func verifyBotRegistration(rc *eos_io.RuntimeContext, config *Config) error {
 
 // DisplaySuccessInfo displays deployment success information to the user
 func DisplaySuccessInfo(config *Config) {
-	logger := otelzap.NewLogger(zap.NewNop()) // Use a no-op logger for display
+	logger := zap.NewNop() // Use a no-op logger for display
 	
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: 🎉 ClusterFuzz Deployment Successful!")

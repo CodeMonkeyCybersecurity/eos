@@ -100,6 +100,7 @@ var terraformOutputCmd = &cobra.Command{
 	Short: "Get terraform output from a directory",
 	Args:  cobra.MaximumNArgs(2),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		workingDir := "."
 		outputName := ""
 
@@ -120,7 +121,7 @@ var terraformOutputCmd = &cobra.Command{
 			return err
 		}
 
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", output)))
+		logger.Info(fmt.Sprintf("terminal prompt: %v", output))
 		return nil
 	}),
 }

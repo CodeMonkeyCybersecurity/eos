@@ -66,9 +66,9 @@ Security Notice:
 			if acceptAll {
 				logger.Info("terminal prompt:   Target: All pending keys")
 			} else if pattern != "" {
-				logger.Info("terminal prompt:   Pattern: %s", pattern)
+				logger.Info("terminal prompt:   Pattern", zap.String("pattern", pattern))
 			} else if includeList != "" {
-				logger.Info("terminal prompt:   Include List: %s", includeList)
+				logger.Info("terminal prompt:   Include List", zap.String("include_list", includeList))
 			}
 			return nil
 		}

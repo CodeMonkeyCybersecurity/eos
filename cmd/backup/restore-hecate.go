@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +23,6 @@ var RestoreCmd = &cobra.Command{
 	Use:   "restore",
 	Short: "Restore configuration and files from backup",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
-		logger := otelzap.Ctx(rc.Ctx)
 		if timestampFlag != "" {
 			return autoRestore(rc, timestampFlag)
 		}
@@ -61,6 +61,7 @@ func autoRestore(rc *eos_io.RuntimeContext, ts string) error {
 // Dependencies: eos_io, bufio, fmt, strings, os
 // TODO: Move to pkg/backup or pkg/hecate/backup
 func interactiveRestore(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	menu := []struct {
 		label, prefix, dest string
 	}{

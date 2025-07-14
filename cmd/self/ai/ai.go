@@ -239,6 +239,7 @@ Examples:
 
 	Args: cobra.MinimumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		issue := strings.Join(args, " ")
 
 		// Get flags
@@ -335,6 +336,7 @@ Example:
   eos ai chat`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		// Get flags
 		workingDir, _ := cmd.Flags().GetString("directory")
 
@@ -384,6 +386,7 @@ Examples:
   eos ai implement --action-file suggestions.json`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		// Get flags
 		workingDir, _ := cmd.Flags().GetString("directory")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")

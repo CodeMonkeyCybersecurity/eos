@@ -27,6 +27,7 @@ Examples:
 	hecate inspect`,
 	Aliases: []string{"read", "get"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("terminal prompt:  Please use a subcommand (e.g. 'inspect config') to inspect a resource.")
 		return nil
 	}),

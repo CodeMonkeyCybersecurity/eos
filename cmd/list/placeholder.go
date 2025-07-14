@@ -21,7 +21,7 @@ var placeholderListExample = &cobra.Command{
 		log.Info(" Executing placeholder list subcommand", zap.String("subcommand", "example"))
 
 		// Placeholder output
-		logger.Info("terminal prompt: This is a placeholder output for `eos list example`.")
+		log.Info("terminal prompt: This is a placeholder output for `eos list example`.")
 
 		return nil
 	}),

@@ -4,6 +4,21 @@ import (
 	"time"
 )
 
+// Format represents the configuration file format
+type Format string
+
+// DataType represents the data type for configuration values
+type DataType string
+
+// FilePermission represents file permissions
+type FilePermission int
+
+// TransformFunc is a function that transforms configuration data
+type TransformFunc func(map[string]interface{}) (map[string]interface{}, error)
+
+// TypeMap represents a mapping of field names to their expected data types
+type TypeMap map[string]DataType
+
 // Format constants
 const (
 	FormatJSON Format = "json"

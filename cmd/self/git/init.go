@@ -113,7 +113,7 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 
 	// Check if directory already has Git
 	if manager.IsGitRepository(rc, options.Path) {
-		logger.Info("terminal prompt: Warning: %s is already a Git repository", options.Path)
+		logger.Info(fmt.Sprintf("terminal prompt: Warning: %s is already a Git repository", options.Path))
 		logger.Info("terminal prompt: Continue anyway? [y/N]: ")
 		var response string
 		fmt.Scanln(&response)

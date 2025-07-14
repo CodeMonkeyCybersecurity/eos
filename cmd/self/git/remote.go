@@ -49,6 +49,7 @@ var remoteListCmd = &cobra.Command{
 	Long:    "List all configured Git remotes for the repository.",
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		config := remote.NewConfig()
 		config.OutputJSON, _ = cmd.Flags().GetBool("json")
 
@@ -76,7 +77,7 @@ var remoteListCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to marshal JSON: %w", err)
 			}
-			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
+			logger.Info("terminal prompt: " + string(data))
 			return nil
 		}
 
@@ -89,7 +90,7 @@ var remoteListCmd = &cobra.Command{
 		}
 
 		for name, url := range repo.RemoteURLs {
-			logger.Info("terminal prompt: %s\t%s", name, url)
+			logger.Info(fmt.Sprintf("terminal prompt: %s\t%s", name, url))
 		}
 
 		return nil

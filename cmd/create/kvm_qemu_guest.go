@@ -61,13 +61,13 @@ Examples:
 				zap.String("version", result.Version),
 				zap.Duration("duration", result.Duration))
 
-			logger.Info("terminal prompt: QEMU Guest Agent Installation Complete!\n")
+			logger.Info("terminal prompt: QEMU Guest Agent Installation Complete!")
 			logger.Info("terminal prompt:  Service Details:")
-			logger.Info("terminal prompt:    Method: %s", result.Method)
-			logger.Info("terminal prompt:    Duration: %s", result.Duration)
+			logger.Info(fmt.Sprintf("terminal prompt:    Method: %s", result.Method))
+			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))
 
 			if result.Version != "" {
-				logger.Info("terminal prompt:    Version: %s", result.Version)
+				logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
 			}
 
 			logger.Info("terminal prompt: 📝 Features Enabled:")
@@ -84,7 +84,7 @@ Examples:
 		} else {
 			logger.Error("QEMU Guest Agent installation failed", zap.String("error", result.Error))
 			logger.Info("terminal prompt: ❌ QEMU Guest Agent Installation Failed!")
-			logger.Info("terminal prompt: Error: %s", result.Error)
+			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
 				logger.Info("terminal prompt: Installation Steps:")
@@ -96,9 +96,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration))
 					if step.Error != "" {
-						logger.Info("terminal prompt:       Error: %s", step.Error)
+						logger.Info(fmt.Sprintf("terminal prompt:       Error: %s", step.Error))
 					}
 				}
 			}

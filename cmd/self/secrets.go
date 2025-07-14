@@ -72,7 +72,7 @@ that require access to secrets, including the Delphi dashboard.`,
 
 		currentAddr := os.Getenv("VAULT_ADDR")
 		if currentAddr != "" {
-			logger.Info("terminal prompt: Current VAULT_ADDR: %s", currentAddr)
+			logger.Info("terminal prompt: Current VAULT_ADDR", zap.String("addr", currentAddr))
 		}
 
 		logger.Info("terminal prompt: Enter Vault server address (e.g., https://vhost11:8200): ")
@@ -85,7 +85,7 @@ that require access to secrets, including the Delphi dashboard.`,
 		if vaultAddr == "" {
 			if currentAddr != "" {
 				vaultAddr = currentAddr
-				logger.Info("terminal prompt: Using current address: %s", vaultAddr)
+				logger.Info("terminal prompt: Using current address", zap.String("addr", vaultAddr))
 			} else {
 				return fmt.Errorf("vault address is required")
 			}
@@ -103,9 +103,9 @@ that require access to secrets, including the Delphi dashboard.`,
 		// Initialize Vault service facade
 		if err := vault.InitializeServiceFacade(rc); err != nil {
 			logger.Warn("Failed to initialize Vault service", zap.Error(err))
-			logger.Info("terminal prompt:  Vault connection failed: %v", err)
+			logger.Info("terminal prompt:  Vault connection failed", zap.Error(err))
 			logger.Info("terminal prompt: Troubleshooting:")
-			logger.Info("terminal prompt: - Check if Vault server is running at %s", vaultAddr)
+			logger.Info("terminal prompt: - Check if Vault server is running", zap.String("addr", vaultAddr))
 			logger.Info("terminal prompt: - Verify network connectivity")
 			logger.Info("terminal prompt: - Check TLS certificate configuration")
 			return fmt.Errorf("vault connection failed")
@@ -242,11 +242,11 @@ This command will:
 			logger.Info("terminal prompt:    Run: eos self secrets configure\n")
 			return fmt.Errorf("VAULT_ADDR environment variable not set")
 		}
-		logger.Info("terminal prompt:  VAULT_ADDR: %s", vaultAddr)
+		logger.Info("terminal prompt:  VAULT_ADDR", zap.String("addr", vaultAddr))
 
 		// Test 2: Initialize Vault service
 		if err := vault.InitializeServiceFacade(rc); err != nil {
-			logger.Info("terminal prompt:  Vault service initialization failed: %v", err)
+			logger.Info("terminal prompt:  Vault service initialization failed", zap.Error(err))
 			return fmt.Errorf("vault initialization failed: %w", err)
 		}
 		logger.Info("terminal prompt:  Vault service initialized")
@@ -262,7 +262,7 @@ This command will:
 		testPath := "secret/data/delphi/database/username"
 		_, err := facade.RetrieveSecret(rc.Ctx, testPath)
 		if err != nil {
-			logger.Info("terminal prompt:   Secret access test: %v", err)
+			logger.Info("terminal prompt:   Secret access test failed", zap.Error(err))
 			logger.Info("terminal prompt:    This is normal if no secrets have been set yet")
 		} else {
 			logger.Info("terminal prompt:  Secret access working")
@@ -300,11 +300,11 @@ Shows:
 			return nil
 		}
 
-		logger.Info("terminal prompt: Server: %s", vaultAddr)
+		logger.Info("terminal prompt: Server", zap.String("address", vaultAddr))
 
 		// Check Vault service
 		if err := vault.InitializeServiceFacade(rc); err != nil {
-			logger.Info("terminal prompt: Status:  Connection failed (%v)", err)
+			logger.Info("terminal prompt: Status: Connection failed", zap.Error(err))
 			return nil
 		}
 
@@ -335,9 +335,9 @@ Shows:
 			for _, secretPath := range staticSecrets {
 				_, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 				if err != nil {
-					logger.Info("terminal prompt:     %s (not set)", secretPath)
+					logger.Info("terminal prompt: Secret not set", zap.String("path", secretPath))
 				} else {
-					logger.Info("terminal prompt:     %s", secretPath)
+					logger.Info("terminal prompt: Secret available", zap.String("path", secretPath))
 				}
 			}
 
@@ -345,9 +345,9 @@ Shows:
 			for _, secretPath := range configSecrets {
 				_, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 				if err != nil {
-					logger.Info("terminal prompt:     %s (not set)", secretPath)
+					logger.Info("terminal prompt: Secret not set", zap.String("path", secretPath))
 				} else {
-					logger.Info("terminal prompt:     %s", secretPath)
+					logger.Info("terminal prompt: Secret available", zap.String("path", secretPath))
 				}
 			}
 
@@ -383,6 +383,7 @@ Examples:
   eos self secrets get openai/api_key`,
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		secretPath := args[0]
 		showValue, _ := cmd.Flags().GetBool("show-value")
 
@@ -404,9 +405,9 @@ Examples:
 
 		// secretData is map[string]interface{} from vault
 		if showValue {
-			logger.Info("terminal prompt: Secret: %s\nData: %v", secretPath, secretData)
+			logger.Info("terminal prompt: Secret data", zap.String("path", secretPath), zap.Any("data", secretData))
 		} else {
-			logger.Info("terminal prompt: Secret: %s\nData: [REDACTED]", secretPath)
+			logger.Info("terminal prompt: Secret data [REDACTED]", zap.String("path", secretPath))
 			logger.Info("terminal prompt: Use --show-value to display the actual value")
 		}
 

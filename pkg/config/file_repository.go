@@ -10,15 +10,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// FileRepository implements config.Repository using the filesystem
+// FileRepository implements Repository using the filesystem
 type FileRepository struct {
 	logger *zap.Logger
 }
 
 // NewFileRepository creates a new file-based repository
-func NewFileRepository(logger *zap.Logger) config.Repository {
+func NewFileRepository(logger *zap.Logger) *FileRepository {
 	return &FileRepository{
-		logger: logger.Named("config.file_repository"),
+		logger: logger.Named("file_repository"),
 	}
 }
 
@@ -40,7 +40,7 @@ func (r *FileRepository) Read(ctx context.Context, path string) ([]byte, error) 
 }
 
 // Write writes raw configuration data to a file
-func (r *FileRepository) Write(ctx context.Context, path string, data []byte, perm config.FilePermission) error {
+func (r *FileRepository) Write(ctx context.Context, path string, data []byte, perm FilePermission) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -89,39 +89,39 @@ func (r *FileRepository) Delete(ctx context.Context, path string) error {
 }
 
 // Stat returns file information
-func (r *FileRepository) Stat(ctx context.Context, path string) (config.FileInfo, error) {
+func (r *FileRepository) Stat(ctx context.Context, path string) (FileInfo, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return config.FileInfo{}, fmt.Errorf("failed to stat config file %s: %w", path, err)
+		return FileInfo{}, fmt.Errorf("failed to stat config file %s: %w", path, err)
 	}
 
-	return config.FileInfo{
+	return FileInfo{
 		Path:        path,
 		Size:        info.Size(),
 		ModTime:     info.ModTime(),
-		Permissions: config.FilePermission(info.Mode()),
+		Permissions: FilePermission(info.Mode()),
 	}, nil
 }
 
 // List lists configuration files in a directory
-func (r *FileRepository) List(ctx context.Context, dir string) ([]config.FileInfo, error) {
+func (r *FileRepository) List(ctx context.Context, dir string) ([]FileInfo, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list directory %s: %w", dir, err)
 	}
 
-	var fileInfos []config.FileInfo
+	var fileInfos []FileInfo
 	for _, entry := range entries {
 		info, err := entry.Info()
 		if err != nil {
 			continue
 		}
 
-		fileInfos = append(fileInfos, config.FileInfo{
+		fileInfos = append(fileInfos, FileInfo{
 			Path:        filepath.Join(dir, info.Name()),
 			Size:        info.Size(),
 			ModTime:     info.ModTime(),
-			Permissions: config.FilePermission(info.Mode()),
+			Permissions: FilePermission(info.Mode()),
 		})
 	}
 

@@ -107,7 +107,7 @@ Examples:
 			logger.Info("terminal prompt: Caddy Installation Complete!")
 			logger.Info("terminal prompt: Service Details:",
 				zap.String("version", result.Version),
-				zap.String("method", result.Method+" (repository)"),
+				zap.String("method", string(result.Method)+" (repository)"),
 				zap.Duration("duration", result.Duration))
 
 			if len(result.Endpoints) > 0 {

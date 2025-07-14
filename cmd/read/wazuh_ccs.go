@@ -401,6 +401,7 @@ func showResourceUsage(rc *eos_io.RuntimeContext, cmd *cobra.Command, format str
 }
 
 func showResourcesByCustomer(rc *eos_io.RuntimeContext, format string) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	// Get resource usage by customer
 	resources := CustomerResources{
 		Customers: []CustomerResourceUsage{
@@ -635,7 +636,7 @@ func outputJSON(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
+	fmt.Printf("%s\n", string(output))
 	return nil
 }
 
@@ -645,55 +646,59 @@ func outputYAML(data interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
+	fmt.Printf("%s\n", string(output))
 	return nil
 }
 
-func outputStatusTable(logger *zap.Logger, status PlatformStatus) error {
-	logger.Info("terminal prompt: Platform Status: %s", status.Platform.Status)
-	logger.Info("terminal prompt: Health: %s", status.Platform.Health)
-	logger.Info("terminal prompt: Version: %s\n", status.Platform.Version)
+func outputStatusTable(logger otelzap.LoggerWithCtx, status PlatformStatus) error {
+	logger.Info("Platform status",
+		zap.String("status", status.Platform.Status),
+		zap.String("health", status.Platform.Health),
+		zap.String("version", status.Platform.Version))
 
-	logger.Info("terminal prompt: Components:")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 60))))
-	logger.Info("terminal prompt: %-20s %-10s %-10s %s", "Component", "Status", "Health", "Details")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 60))))
+	logger.Info("Components header")
+	logger.Info(strings.Repeat("-", 60))
+	logger.Info(fmt.Sprintf("%-20s %-10s %-10s %s", "Component", "Status", "Health", "Details"))
+	logger.Info(strings.Repeat("-", 60))
 
 	for _, comp := range status.Components {
-		logger.Info("terminal prompt: %-20s %-10s %-10s %s", comp.Name, comp.Status, comp.Health, comp.Details)
+		logger.Info(fmt.Sprintf("%-20s %-10s %-10s %s", comp.Name, comp.Status, comp.Health, comp.Details))
 	}
 
-	logger.Info("terminal prompt: Customers Summary:")
-	logger.Info("terminal prompt: Total", 
+	logger.Info("Customers summary",
 		zap.Int("total", status.Customers.Total),
 		zap.Int("active", status.Customers.Active),
 		zap.Int("suspended", status.Customers.Suspended))
-	logger.Info("terminal prompt: By Tier: ")
+	
 	for tier, count := range status.Customers.ByTier {
-		logger.Info("terminal prompt: %s: %d  ", tier, count)
+		logger.Info("Customer tier count",
+			zap.String("tier", tier),
+			zap.Int("count", count))
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 
-	logger.Info("terminal prompt: \nLast Updated: %s", status.LastUpdated.Format(time.RFC3339))
+	logger.Info("Last updated",
+		zap.String("timestamp", status.LastUpdated.Format(time.RFC3339)))
 	return nil
 }
 
-func outputCustomerStatusTable(logger *zap.Logger, status CustomerDeploymentStatus) error {
-	logger.Info("terminal prompt: Customer: %s (%s)", status.CompanyName, status.CustomerID)
-	logger.Info("terminal prompt: Tier: %s", status.Tier)
-	logger.Info("terminal prompt: Status: %s\n", status.Status)
+func outputCustomerStatusTable(logger otelzap.LoggerWithCtx, status CustomerDeploymentStatus) error {
+	logger.Info("Customer status",
+		zap.String("company_name", status.CompanyName),
+		zap.String("customer_id", status.CustomerID),
+		zap.String("tier", status.Tier),
+		zap.String("status", status.Status))
 
-	logger.Info("terminal prompt: Components:")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
-	logger.Info("terminal prompt: %-20s %-10s %-10s %-30s %s", "Component", "Status", "Health", "Endpoint", "Details")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info("Components header")
+	logger.Info(strings.Repeat("-", 80))
+	logger.Info(fmt.Sprintf("%-20s %-10s %-10s %-30s %s", "Component", "Status", "Health", "Endpoint", "Details"))
+	logger.Info(strings.Repeat("-", 80))
 
 	for _, comp := range status.Components {
 		logger.Info(fmt.Sprintf("terminal prompt: %-20s %-10s %-10s %-30s %s",
 			comp.Name, comp.Status, comp.Health, comp.Endpoint, comp.Details))
 	}
 
-	logger.Info("terminal prompt: Resource Usage:")
+	logger.Info("Resource usage")
 	logger.Info(fmt.Sprintf("terminal prompt: CPU: %.1f / %.1f %s (%.1f%%)",
 		status.Resources.CPU.Used, status.Resources.CPU.Total, status.Resources.CPU.Unit,
 		(status.Resources.CPU.Used/status.Resources.CPU.Total)*100))
@@ -704,53 +709,54 @@ func outputCustomerStatusTable(logger *zap.Logger, status CustomerDeploymentStat
 		status.Resources.Disk.Used, status.Resources.Disk.Total, status.Resources.Disk.Unit,
 		(status.Resources.Disk.Used/status.Resources.Disk.Total)*100))
 
-	logger.Info("terminal prompt: Network:")
-	logger.Info("terminal prompt: VLAN ID: %d", status.Network.VLANID)
-	logger.Info("terminal prompt: Subnet: %s", status.Network.Subnet)
-	logger.Info("terminal prompt: Interface: %s", status.Network.Interface)
+	logger.Info("Network configuration",
+		zap.Int("vlan_id", status.Network.VLANID),
+		zap.String("subnet", status.Network.Subnet),
+		zap.String("interface", status.Network.Interface))
 
-	logger.Info("terminal prompt: \nLast Updated: %s", status.LastUpdated.Format(time.RFC3339))
+	logger.Info("Last updated",
+		zap.String("timestamp", status.LastUpdated.Format(time.RFC3339)))
 	return nil
 }
 
-func outputCustomerDetailsTable(logger *zap.Logger, details CustomerDetails) error {
-	logger.Info("terminal prompt: Customer Details")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
-	logger.Info("terminal prompt: Customer ID:    %s", details.CustomerID)
-	logger.Info("terminal prompt: Company Name:   %s", details.CompanyName)
-	logger.Info("terminal prompt: Subdomain:      %s", details.Subdomain)
-	logger.Info("terminal prompt: Tier:           %s", details.Tier)
-	logger.Info("terminal prompt: Status:         %s", details.Status)
-	logger.Info("terminal prompt: Admin Email:    %s", details.AdminEmail)
-	logger.Info("terminal prompt: Admin Name:     %s", details.AdminName)
-	logger.Info("terminal prompt: Wazuh Version:  %s", details.WazuhVersion)
-	logger.Info("terminal prompt: Created:        %s", details.CreatedAt.Format("2006-01-02 15:04:05"))
-	logger.Info("terminal prompt: Updated:        %s", details.UpdatedAt.Format("2006-01-02 15:04:05"))
+func outputCustomerDetailsTable(logger otelzap.LoggerWithCtx, details CustomerDetails) error {
+	logger.Info("Customer details",
+		zap.String("customer_id", details.CustomerID),
+		zap.String("company_name", details.CompanyName),
+		zap.String("subdomain", details.Subdomain),
+		zap.String("tier", details.Tier),
+		zap.String("status", details.Status),
+		zap.String("admin_email", details.AdminEmail),
+		zap.String("admin_name", details.AdminName),
+		zap.String("wazuh_version", details.WazuhVersion),
+		zap.String("created_at", details.CreatedAt.Format("2006-01-02 15:04:05")),
+		zap.String("updated_at", details.UpdatedAt.Format("2006-01-02 15:04:05")))
 
-	logger.Info("terminal prompt: Access URLs:")
-	logger.Info("terminal prompt: Dashboard:      %s", details.URLs.Dashboard)
-	logger.Info("terminal prompt: API:            %s", details.URLs.API)
+	logger.Info("Access URLs",
+		zap.String("dashboard", details.URLs.Dashboard),
+		zap.String("api", details.URLs.API))
 
 	if details.Credentials != nil {
-		logger.Info("terminal prompt: Credentials:")
-		logger.Info("terminal prompt: Admin Username: %s", details.Credentials.AdminUsername)
-		logger.Info("terminal prompt: API Username:   %s", details.Credentials.APIUsername)
-		logger.Info("terminal prompt: Vault Path:     %s", details.Credentials.VaultPath)
-		logger.Info("terminal prompt: Retrieve passwords with:")
-		logger.Info("terminal prompt: vault kv get %s", details.Credentials.VaultPath)
+		logger.Info("Credentials",
+			zap.String("admin_username", details.Credentials.AdminUsername),
+			zap.String("api_username", details.Credentials.APIUsername),
+			zap.String("vault_path", details.Credentials.VaultPath))
+		logger.Info("Retrieve passwords with",
+			zap.String("command", fmt.Sprintf("vault kv get %s", details.Credentials.VaultPath)))
 	}
 
 	return nil
 }
 
-func outputHealthTable(logger *zap.Logger, health PlatformHealth) error {
-	logger.Info("terminal prompt: Platform Health: %s", health.Overall)
-	logger.Info("terminal prompt: Last Check: %s\n", health.LastCheck.Format(time.RFC3339))
+func outputHealthTable(logger otelzap.LoggerWithCtx, health PlatformHealth) error {
+	logger.Info("Platform health",
+		zap.String("overall", health.Overall),
+		zap.String("last_check", health.LastCheck.Format(time.RFC3339)))
 
-	logger.Info("terminal prompt: Health Checks:")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
-	logger.Info("terminal prompt: %-30s %-10s %-30s %s", "Check", "Status", "Message", "Duration")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info("Health checks header")
+	logger.Info(strings.Repeat("-", 80))
+	logger.Info(fmt.Sprintf("%-30s %-10s %-30s %s", "Check", "Status", "Message", "Duration"))
+	logger.Info(strings.Repeat("-", 80))
 
 	for _, check := range health.Checks {
 		logger.Info(fmt.Sprintf("terminal prompt: %-30s %-10s %-30s %v",
@@ -758,20 +764,22 @@ func outputHealthTable(logger *zap.Logger, health PlatformHealth) error {
 	}
 
 	if health.Details != nil {
-		logger.Info("terminal prompt: Details:")
+		logger.Info("Health details")
 		for key, value := range health.Details {
-			logger.Info("terminal prompt:   %s: %v", key, value)
+			logger.Info("Health detail",
+				zap.String("key", key),
+				zap.Any("value", value))
 		}
 	}
 
 	return nil
 }
 
-func outputResourcesTable(logger *zap.Logger, resources PlatformResources) error {
-	logger.Info("terminal prompt: Platform Resource Usage")
-	logger.Info("terminal prompt: Timestamp: %s\n", resources.Timestamp.Format(time.RFC3339))
+func outputResourcesTable(logger otelzap.LoggerWithCtx, resources PlatformResources) error {
+	logger.Info("Platform resource usage",
+		zap.String("timestamp", resources.Timestamp.Format(time.RFC3339)))
 
-	logger.Info("terminal prompt: Total Usage:")
+	logger.Info("Total usage")
 	logger.Info(fmt.Sprintf("terminal prompt:   CPU:    %.1f / %.1f %s (%.1f%%)",
 		resources.Total.CPU.Used, resources.Total.CPU.Total, resources.Total.CPU.Unit,
 		(resources.Total.CPU.Used/resources.Total.CPU.Total)*100))
@@ -782,9 +790,10 @@ func outputResourcesTable(logger *zap.Logger, resources PlatformResources) error
 		resources.Total.Disk.Used, resources.Total.Disk.Total, resources.Total.Disk.Unit,
 		(resources.Total.Disk.Used/resources.Total.Disk.Total)*100))
 
-	logger.Info("terminal prompt: By Component:")
+	logger.Info("By component")
 	for component, usage := range resources.ByComponent {
-		logger.Info("terminal prompt: \n%s:", component)
+		logger.Info("Component usage",
+			zap.String("component", component))
 		logger.Info(fmt.Sprintf("terminal prompt:   CPU:    %.1f / %.1f %s (%.1f%%)",
 			usage.CPU.Used, usage.CPU.Total, usage.CPU.Unit,
 			(usage.CPU.Used/usage.CPU.Total)*100))
@@ -799,14 +808,14 @@ func outputResourcesTable(logger *zap.Logger, resources PlatformResources) error
 	return nil
 }
 
-func outputCustomerResourcesTable(logger *zap.Logger, resources CustomerResources) error {
-	logger.Info("terminal prompt: Customer Resource Usage")
-	logger.Info("terminal prompt: Timestamp: %s\n", resources.Timestamp.Format(time.RFC3339))
+func outputCustomerResourcesTable(logger otelzap.LoggerWithCtx, resources CustomerResources) error {
+	logger.Info("Customer resource usage",
+		zap.String("timestamp", resources.Timestamp.Format(time.RFC3339)))
 
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
+	logger.Info(strings.Repeat("-", 100))
 	logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10s %-15s %-15s %-15s",
 		"Customer ID", "Company", "Tier", "CPU", "Memory", "Disk"))
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
+	logger.Info(strings.Repeat("-", 100))
 
 	for _, customer := range resources.Customers {
 		logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10s %.0f/%.0f %-6s %.0f/%.0f %-4s %.0f/%.0f %s",
@@ -818,7 +827,7 @@ func outputCustomerResourcesTable(logger *zap.Logger, resources CustomerResource
 			customer.Usage.Disk.Used, customer.Usage.Disk.Total, customer.Usage.Disk.Unit))
 	}
 
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
+	logger.Info(strings.Repeat("-", 100))
 	logger.Info(fmt.Sprintf("terminal prompt: %-47s %.0f/%.0f %-6s %.0f/%.0f %-4s %.0f/%.0f %s",
 		"TOTAL",
 		resources.Total.CPU.Used, resources.Total.CPU.Total, resources.Total.CPU.Unit,
@@ -828,23 +837,28 @@ func outputCustomerResourcesTable(logger *zap.Logger, resources CustomerResource
 	return nil
 }
 
-func outputEventStatsTable(logger *zap.Logger, stats EventStatistics) error {
-	logger.Info("terminal prompt: Event Statistics (%s)", stats.TimeRange)
-	logger.Info("terminal prompt: Timestamp: %s\n", stats.Timestamp.Format(time.RFC3339))
+func outputEventStatsTable(logger otelzap.LoggerWithCtx, stats EventStatistics) error {
+	logger.Info("Event statistics",
+		zap.String("time_range", stats.TimeRange),
+		zap.String("timestamp", stats.Timestamp.Format(time.RFC3339)))
 
-	logger.Info("terminal prompt: Total Events: %d", stats.Total)
-	logger.Info("terminal prompt: Events/Second: %d (Peak: %d)\n", stats.EventsPerSecond, stats.PeakEPS)
+	logger.Info("Event summary",
+		zap.Int("total", stats.Total),
+		zap.Int("events_per_second", stats.EventsPerSecond),
+		zap.Int("peak_eps", stats.PeakEPS))
 
-	logger.Info("terminal prompt: By Event Type:")
+	logger.Info("By event type")
 	for eventType, count := range stats.ByType {
-		logger.Info("terminal prompt:   %-20s: %d", eventType, count)
+		logger.Info("Event type count",
+			zap.String("type", eventType),
+			zap.Int("count", count))
 	}
 
-	logger.Info("terminal prompt: By Customer:")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info("By customer")
+	logger.Info(strings.Repeat("-", 80))
 	logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10s %-10s %-10s %-10s",
 		"Customer ID", "Company", "Events", "High", "Medium", "Low"))
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info(strings.Repeat("-", 80))
 
 	for _, customer := range stats.ByCustomer {
 		logger.Info(fmt.Sprintf("terminal prompt: %-15s %-20s %-10d %-10d %-10d %-10d",

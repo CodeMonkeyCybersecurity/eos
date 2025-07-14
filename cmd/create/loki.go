@@ -71,14 +71,14 @@ Examples:
 
 			logger.Info("terminal prompt: Loki Installation Complete!\n")
 			logger.Info("terminal prompt: 📊 Service Details:")
-			logger.Info("terminal prompt:    Version: %s", result.Version)
-			logger.Info("terminal prompt:    Method: %s", result.Method)
-			logger.Info("terminal prompt:    Duration: %s", result.Duration)
+			logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
+			logger.Info(fmt.Sprintf("terminal prompt:    Method: %s", result.Method))
+			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))
 
 			if len(result.Endpoints) > 0 {
 				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					logger.Info("terminal prompt:    %s", endpoint)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s", endpoint))
 				}
 			}
 
@@ -89,7 +89,7 @@ Examples:
 		} else {
 			logger.Error("Loki installation failed", zap.String("error", result.Error))
 			logger.Info("terminal prompt: ❌ Loki Installation Failed!")
-			logger.Info("terminal prompt: Error: %s", result.Error)
+			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
 				logger.Info("terminal prompt: Installation Steps:")
@@ -101,9 +101,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration))
 					if step.Error != "" {
-						logger.Info("terminal prompt:       Error: %s", step.Error)
+						logger.Info(fmt.Sprintf("terminal prompt:       Error: %s", step.Error))
 					}
 				}
 			}

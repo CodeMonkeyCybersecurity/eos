@@ -10,6 +10,8 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
@@ -44,7 +46,7 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 		}
 
 		for _, c := range cmds {
-			logger.Info("terminal prompt:  Executing: %s", c)
+			logger.Info("terminal prompt:  Executing command", zap.String("cmd", c))
 			if !dryRun {
 				cmd := exec.Command("bash", "-c", c)
 				cmd.Stdout = cmd.Stderr

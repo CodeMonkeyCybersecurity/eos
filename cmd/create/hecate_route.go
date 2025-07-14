@@ -144,16 +144,16 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		zap.String("upstream", upstream))
 
 	// Print success message
-	logger.Info("terminal prompt:  Route created successfully!")
-	logger.Info("terminal prompt: Domain: %s", domain)
-	logger.Info("terminal prompt: Upstream: %s", upstream)
+	logger.Info("terminal prompt: Route created successfully!")
+	logger.Info("terminal prompt: Domain", zap.String("value", domain))
+	logger.Info("terminal prompt: Upstream", zap.String("value", upstream))
 	if route.AuthPolicy != "" {
-		logger.Info("terminal prompt: Auth Policy: %s", route.AuthPolicy)
+		logger.Info("terminal prompt: Auth Policy", zap.String("value", route.AuthPolicy))
 	}
 	if route.TLS.AutoHTTPS {
 		logger.Info("terminal prompt: 🔒 HTTPS will be automatically configured via Let's Encrypt")
 	}
-	logger.Info("terminal prompt: \nYou can now access your service at: https://%s", domain)
+	logger.Info("terminal prompt: You can now access your service at", zap.String("url", "https://"+domain))
 
 	return nil
 }

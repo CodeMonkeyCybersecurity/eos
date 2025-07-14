@@ -139,7 +139,7 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 
 	// Show new resource allocation
 	resources := wazuh_mssp.GetResourcesByTier(newTier)
-	logger.Info("terminal prompt: \nCustomer scaled to %s tier", newTierStr)
+	logger.Info("terminal prompt: Customer scaled to tier", zap.String("tier", newTierStr))
 	logger.Info("terminal prompt: New resource allocation:")
 	fmt.Printf("- Indexer: %d instances, %d CPU, %d MB memory\n",
 		resources.Indexer.Count, resources.Indexer.CPU, resources.Indexer.Memory)
@@ -315,7 +315,7 @@ func applySecurityUpdates(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	// Show summary
 	logger.Info("terminal prompt: \nSecurity updates completed:")
 	if wazuhVersion != "" {
-		logger.Info("terminal prompt: - Wazuh updated to version %s", wazuhVersion)
+		logger.Info("terminal prompt: - Wazuh updated to version", zap.String("version", wazuhVersion))
 	}
 	if rotateSecrets {
 		logger.Info("terminal prompt: - All secrets rotated")

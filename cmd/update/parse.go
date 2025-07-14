@@ -10,6 +10,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
@@ -62,7 +64,7 @@ var ParseCmd = &cobra.Command{
 			}
 		}
 
-		logger.Info("terminal prompt:  Parsed %d conversations into ./%s/", len(conversations), outDir)
+		logger.Info("terminal prompt:  Parsed conversations", zap.Int("count", len(conversations)), zap.String("dir", outDir))
 		return nil
 	}),
 }

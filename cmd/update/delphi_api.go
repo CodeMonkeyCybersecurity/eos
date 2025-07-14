@@ -37,12 +37,12 @@ var UpdateDelphiApiCmd = &cobra.Command{
 		case localOnly:
 			otelzap.Ctx(rc.Ctx).Info("Upgrading Wazuh API config on local node...")
 			// TODO: insert local upgrade logic here
-			logger.Info("terminal prompt: ✓ Local Wazuh API config upgrade complete")
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: ✓ Local Wazuh API config upgrade complete")
 
 		case upgradeAll:
 			otelzap.Ctx(rc.Ctx).Info("Upgrading Wazuh API config on all nodes...")
 			// TODO: insert distributed upgrade logic here
-			logger.Info("terminal prompt: ✓ Cluster-wide Wazuh API config upgrade complete")
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: ✓ Cluster-wide Wazuh API config upgrade complete")
 
 		default:
 			return fmt.Errorf("unknown upgrade target")

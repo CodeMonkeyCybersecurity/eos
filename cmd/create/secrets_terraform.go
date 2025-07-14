@@ -215,6 +215,7 @@ var syncOutputsCmd = &cobra.Command{
 	Short: "Sync Terraform outputs to Vault",
 	Args:  cobra.ExactArgs(2),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		workingDir := args[0]
 		vaultPath := args[1]
 

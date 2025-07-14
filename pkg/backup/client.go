@@ -108,7 +108,20 @@ func (c *Client) getRepositoryPassword() (string, error) {
 	logger.Info("Retrieving repository password from Vault",
 		zap.String("path", vaultPath))
 
-	vClient, err := vault.NewClient(c.rc)
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	if vaultAddr == "" {
+		// Fall back to local password file if Vault not configured
+		logger.Warn("VAULT_ADDR not set, checking local password file")
+		
+		passwordFile := fmt.Sprintf("/var/lib/eos/secrets/backup/%s.password", c.repository.Name)
+		if data, err := os.ReadFile(passwordFile); err == nil {
+			return strings.TrimSpace(string(data)), nil
+		}
+
+		return "", fmt.Errorf("vault not configured and no local password found")
+	}
+
+	vClient, err := vault.NewClient(vaultAddr, logger.Logger().Logger)
 	if err != nil {
 		// Fall back to local password file if Vault unavailable
 		logger.Warn("Vault unavailable, checking local password file",
@@ -122,7 +135,7 @@ func (c *Client) getRepositoryPassword() (string, error) {
 		return "", fmt.Errorf("vault unavailable and no local password found")
 	}
 
-	secret, err := vClient.Logical().Read(vaultPath)
+	secret, err := vClient.GetSecret(c.rc.Ctx, vaultPath)
 	if err != nil {
 		return "", fmt.Errorf("reading from vault: %w", err)
 	}

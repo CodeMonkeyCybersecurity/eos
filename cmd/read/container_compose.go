@@ -3,7 +3,6 @@ package read
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container_management"
@@ -45,10 +44,10 @@ Examples:
 		}
 
 		if outputJSON {
-			return outputComposeSearchJSON(result)
+			return outputComposeSearchJSON(logger, result)
 		}
 
-		return outputComposeSearchTable(result)
+		return outputComposeSearchTable(logger, result)
 	}),
 }
 
@@ -62,17 +61,20 @@ func init() {
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Output formatting functions
-func outputComposeSearchJSON(result *container_management.ComposeSearchResult) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
+func outputComposeSearchJSON(logger otelzap.LoggerWithCtx, result *container_management.ComposeSearchResult) error {
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	logger.Info("terminal prompt: JSON output", zap.String("data", string(data)))
+	return nil
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputComposeSearchTable(result *container_management.ComposeSearchResult) error {
-	logger.Info("terminal prompt: Searched paths: %s", strings.Join(result.SearchPaths, ", "))
-	logger.Info("terminal prompt: Search duration: %v", result.SearchDuration)
-	logger.Info("terminal prompt: Projects found: %d\n", result.TotalFound)
+func outputComposeSearchTable(logger otelzap.LoggerWithCtx, result *container_management.ComposeSearchResult) error {
+	logger.Info("terminal prompt: Searched paths", zap.String("paths", strings.Join(result.SearchPaths, ", ")))
+	logger.Info("terminal prompt: Search duration", zap.Duration("duration", result.SearchDuration))
+	logger.Info("terminal prompt: Projects found", zap.Int("count", result.TotalFound))
 
 	if result.TotalFound == 0 {
 		logger.Info("terminal prompt: No compose projects found.")
@@ -80,13 +82,12 @@ func outputComposeSearchTable(result *container_management.ComposeSearchResult) 
 	}
 
 	for _, project := range result.Projects {
-		logger.Info("terminal prompt: Path: %s", project.Path)
-		logger.Info("terminal prompt:   Compose file: %s", project.ComposeFile)
+		logger.Info("terminal prompt: Path", zap.String("path", project.Path))
+		logger.Info("terminal prompt:   Compose file", zap.String("file", project.ComposeFile))
 		if project.Status != "" {
-			logger.Info("terminal prompt:   Status: %s", project.Status)
+			logger.Info("terminal prompt:   Status", zap.String("status", project.Status))
 		}
-		logger.Info("terminal prompt:   Last seen: %s", project.LastSeen.Format("2006-01-02 15:04:05"))
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
+		logger.Info("terminal prompt:   Last seen", zap.String("time", project.LastSeen.Format("2006-01-02 15:04:05")))
 	}
 
 	return nil

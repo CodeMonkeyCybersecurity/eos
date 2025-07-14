@@ -115,9 +115,9 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 		logger.Warn("Could not get repository status", zap.Error(err))
 	} else {
 		logger.Info("terminal prompt: Repository Status:")
-		logger.Info("terminal prompt: - Staged files: %d", len(status.Staged))
-		logger.Info("terminal prompt: - Modified files: %d", len(status.Modified))
-		logger.Info("terminal prompt: - Untracked files: %d", len(status.Untracked))
+		logger.Info(fmt.Sprintf("terminal prompt: - Staged files: %d", len(status.Staged)))
+		logger.Info(fmt.Sprintf("terminal prompt: - Modified files: %d", len(status.Modified)))
+		logger.Info(fmt.Sprintf("terminal prompt: - Untracked files: %d", len(status.Untracked)))
 		logger.Info("terminal prompt: \n")
 	}
 
@@ -127,7 +127,7 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 		logger.Info("terminal prompt: Add all modified and untracked files? [Y/n]: ")
 		var response string
 		if _, err := fmt.Scanln(&response); err != nil {
-			logger.Info("terminal prompt: Warning: Failed to read input, using default: %v", err)
+			logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to read input, using default: %v", err))
 		}
 		addAll = response != "n" && response != "N"
 	}
@@ -136,7 +136,7 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 	logger.Info("terminal prompt: Enter commit message: ")
 	var message string
 	if _, err := fmt.Scanln(&message); err != nil {
-		logger.Info("terminal prompt: Warning: Failed to read commit message: %v", err)
+		logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to read commit message: %v", err))
 		return fmt.Errorf("failed to read commit message: %w", err)
 	}
 	if message == "" {
@@ -147,7 +147,7 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 	logger.Info("terminal prompt: Push after commit? [y/N]: ")
 	var pushResponse string
 	if _, err := fmt.Scanln(&pushResponse); err != nil {
-		logger.Info("terminal prompt: Warning: Failed to read push input, using default: %v", err)
+		logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to read push input, using default: %v", err))
 	}
 	push := pushResponse == "y" || pushResponse == "Y"
 

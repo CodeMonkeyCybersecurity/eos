@@ -7,6 +7,18 @@ import (
 
 // Core domain entities
 
+// ContainerStatus represents the status of a container
+type ContainerStatus string
+
+const (
+	StatusCreated    ContainerStatus = "created"
+	StatusRunning    ContainerStatus = "running"
+	StatusPaused     ContainerStatus = "paused"
+	StatusRestarting ContainerStatus = "restarting"
+	StatusExited     ContainerStatus = "exited"
+	StatusDead       ContainerStatus = "dead"
+)
+
 // Container represents a container instance
 type Container struct {
 	ID          string            `json:"id"`
@@ -226,21 +238,7 @@ type NetworkEndpoint struct {
 	IPv6Address string `json:"ipv6_address,omitempty"`
 }
 
-// Service represents a Docker Compose service
-type Service struct {
-	Name        string            `json:"name"`
-	Image       string            `json:"image,omitempty"`
-	Build       *BuildConfig      `json:"build,omitempty"`
-	Command     interface{}       `json:"command,omitempty"` // string or []string
-	Environment []string          `json:"environment,omitempty"`
-	Ports       []string          `json:"ports,omitempty"`
-	Volumes     []string          `json:"volumes,omitempty"`
-	Networks    []string          `json:"networks,omitempty"`
-	DependsOn   []string          `json:"depends_on,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Restart     string            `json:"restart,omitempty"`
-	Deploy      *DeployConfig     `json:"deploy,omitempty"`
-}
+// Note: Service type is defined in config.go to avoid duplication
 
 // BuildConfig defines build configuration for a service
 type BuildConfig struct {
@@ -287,15 +285,7 @@ type UpdateConfig struct {
 	MaxFailureRatio *float64      `json:"max_failure_ratio,omitempty"`
 }
 
-// ComposeConfig represents a Docker Compose configuration
-type ComposeConfig struct {
-	Version  string                    `json:"version"`
-	Services map[string]*Service       `json:"services"`
-	Volumes  map[string]*VolumeConfig  `json:"volumes,omitempty"`
-	Networks map[string]*NetworkConfig `json:"networks,omitempty"`
-	Secrets  map[string]*SecretConfig  `json:"secrets,omitempty"`
-	Configs  map[string]*ConfigFile    `json:"configs,omitempty"`
-}
+// Note: ComposeConfig type is defined in compose.go to avoid duplication
 
 // VolumeConfig defines volume configuration in compose
 type VolumeConfig struct {
@@ -334,21 +324,7 @@ type ConfigFile struct {
 
 // Execution and result types
 
-// ExecConfig defines command execution configuration
-type ExecConfig struct {
-	Command      []string `json:"command"`
-	Environment  []string `json:"environment,omitempty"`
-	WorkingDir   string   `json:"working_dir,omitempty"`
-	User         string   `json:"user,omitempty"`
-	Privileged   bool     `json:"privileged,omitempty"`
-	Tty          bool     `json:"tty,omitempty"`
-	AttachStdin  bool     `json:"attach_stdin,omitempty"`
-	AttachStdout bool     `json:"attach_stdout,omitempty"`
-	AttachStderr bool     `json:"attach_stderr,omitempty"`
-	Detach       bool     `json:"detach,omitempty"`
-	DetachKeys   string   `json:"detach_keys,omitempty"`
-	PolicyRules  []string `json:"policy_rules,omitempty"`
-}
+// Note: ExecConfig type is defined in exec.go to avoid duplication
 
 // ExecResult represents the result of command execution
 type ExecResult struct {

@@ -139,14 +139,14 @@ Examples:
 		// Print user-friendly output
 		logger.Info("terminal prompt: ✓ Storage volume created successfully!\n")
 		logger.Info("terminal prompt: Volume Details:")
-		logger.Info("terminal prompt:   Name:       %s", volume.Name)
-		logger.Info("terminal prompt:   Type:       %s", volume.Type)
-		logger.Info("terminal prompt:   Device:     %s", volume.Device)
-		logger.Info("terminal prompt:   Size:       %s", storage.FormatSize(volume.TotalSize))
-		logger.Info("terminal prompt:   Filesystem: %s", volume.Filesystem)
+		logger.Info(fmt.Sprintf("terminal prompt:   Name:       %s", volume.Name))
+		logger.Info(fmt.Sprintf("terminal prompt:   Type:       %s", volume.Type))
+		logger.Info(fmt.Sprintf("terminal prompt:   Device:     %s", volume.Device))
+		logger.Info(fmt.Sprintf("terminal prompt:   Size:       %s", storage.FormatSize(volume.TotalSize)))
+		logger.Info(fmt.Sprintf("terminal prompt:   Filesystem: %s", volume.Filesystem))
 
 		if volume.MountPoint != "" {
-			logger.Info("terminal prompt:   Mount:      %s", volume.MountPoint)
+			logger.Info(fmt.Sprintf("terminal prompt:   Mount:      %s", volume.MountPoint))
 		}
 
 		if volume.IsEncrypted {
@@ -154,15 +154,15 @@ Examples:
 		}
 
 		if config.DriverConfig["compression"] != nil {
-			logger.Info("terminal prompt:   Compression: %s", config.DriverConfig["compression"])
+			logger.Info(fmt.Sprintf("terminal prompt:   Compression: %v", config.DriverConfig["compression"]))
 		}
 
 		logger.Info("terminal prompt: Next steps:")
 		if volume.MountPoint == "" {
-			logger.Info("terminal prompt:   - Mount the volume: eos update storage mount %s --path /desired/path", volume.Name)
+			logger.Info(fmt.Sprintf("terminal prompt:   - Mount the volume: eos update storage mount %s --path /desired/path", volume.Name))
 		}
-		logger.Info("terminal prompt:   - Check status: eos read storage status %s", volume.Name)
-		logger.Info("terminal prompt:   - Monitor health: eos read storage health %s", volume.Name)
+		logger.Info(fmt.Sprintf("terminal prompt:   - Check status: eos read storage status %s", volume.Name))
+		logger.Info(fmt.Sprintf("terminal prompt:   - Monitor health: eos read storage health %s", volume.Name))
 
 		return nil
 	}),

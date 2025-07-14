@@ -35,7 +35,7 @@ var ReadAPICmd = &cobra.Command{
 		if cfg.Token == "" {
 			token, err := delphi.Authenticate(rc, cfg)
 			if err != nil {
-				logger.Info("terminal prompt:  Authentication failed: %v", err)
+				otelzap.Ctx(rc.Ctx).Info("terminal prompt: Authentication failed", zap.Error(err))
 				os.Exit(1)
 			}
 			cfg.Token = token
@@ -57,7 +57,7 @@ var ReadAPICmd = &cobra.Command{
 			body, code := delphi.AuthenticatedGetJSON(rc, cfg, "/manager/status")
 			delphi.HandleAPIResponse("Wazuh Manager Version", []byte(body), code)
 		} else {
-			logger.Info("terminal prompt:  No flags provided. Use --permissions or --version to query specific information.")
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: No flags provided. Use --permissions or --version to query specific information.")
 		}
 		return nil
 	}),

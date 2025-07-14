@@ -90,27 +90,27 @@ Examples:
 
 			logger.Info("terminal prompt: Grafana Installation Complete!\n")
 			logger.Info("terminal prompt: 📊 Service Details:")
-			logger.Info("terminal prompt:    Version: %s", result.Version)
-			logger.Info("terminal prompt:    Port: %d", result.Port)
-			logger.Info("terminal prompt:    Method: %s", result.Method)
-			logger.Info("terminal prompt:    Duration: %s", result.Duration)
+			logger.Info("terminal prompt:    Version", zap.String("version", result.Version))
+			logger.Info("terminal prompt:    Port", zap.Int("port", result.Port))
+			logger.Info("terminal prompt:    Method", zap.String("method", string(result.Method)))
+			logger.Info("terminal prompt:    Duration", zap.Duration("duration", result.Duration))
 
 			if len(result.Endpoints) > 0 {
 				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					logger.Info("terminal prompt:    %s", endpoint)
+					logger.Info("terminal prompt:    Endpoint", zap.String("url", endpoint))
 				}
 			}
 
 			if len(result.Credentials) > 0 {
 				logger.Info("terminal prompt:  Default Credentials:")
 				for key, value := range result.Credentials {
-					logger.Info("terminal prompt:    %s: %s", key, value)
+					logger.Info("terminal prompt:    Credential", zap.String("key", key), zap.String("value", value))
 				}
 			}
 
 			logger.Info("terminal prompt: 📝 Next Steps:")
-			logger.Info("terminal prompt:    1. Open Grafana in your browser: http://localhost:%d", result.Port)
+			logger.Info("terminal prompt:    1. Open Grafana in your browser", zap.String("url", fmt.Sprintf("http://localhost:%d", result.Port)))
 			logger.Info("terminal prompt:    2. Login with default credentials (admin/admin)")
 			logger.Info("terminal prompt:    3. Change the default password")
 			logger.Info("terminal prompt:    4. Configure data sources and dashboards")
@@ -118,7 +118,7 @@ Examples:
 		} else {
 			logger.Error("Grafana installation failed", zap.String("error", result.Error))
 			logger.Info("terminal prompt: ❌ Grafana Installation Failed!")
-			logger.Info("terminal prompt: Error: %s", result.Error)
+			logger.Info("terminal prompt: Error", zap.String("error", result.Error))
 
 			if len(result.Steps) > 0 {
 				logger.Info("terminal prompt: Installation Steps:")
@@ -130,9 +130,12 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
+					logger.Info("terminal prompt:    Step", 
+						zap.String("status", status),
+						zap.String("name", step.Name),
+						zap.Duration("duration", step.Duration))
 					if step.Error != "" {
-						logger.Info("terminal prompt:       Error: %s", step.Error)
+						logger.Info("terminal prompt:       Error", zap.String("error", step.Error))
 					}
 				}
 			}

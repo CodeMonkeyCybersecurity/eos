@@ -2,15 +2,11 @@
 package list
 
 import (
-	"context"
-	"time"
-
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	vaultpkg "github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 // _vaultStatusEnhancedCmd demonstrates using enhanced vault container for status operations
@@ -46,24 +42,17 @@ Examples:
 
 		logger.Info(" Starting enhanced vault status check")
 
-		// Create enhanced vault container with dependency injection
-		vaultContainer, err := vaultpkg.NewEnhancedVaultContainer(rc)
-		if err != nil {
-			logger.Error(" Failed to create enhanced vault container", zap.Error(err))
-			return err
-		}
+		// TODO: This is demo code that requires vaultpkg.NewEnhancedVaultContainer which doesn't exist yet
+		logger.Info("Demo function - vault container creation would go here")
+		// Create mock container for demo purposes
+		vaultContainer := map[string]interface{}{"mock": "container"}
 
-		// Start container to initialize all services
-		if err := vaultContainer.Start(); err != nil {
-			logger.Error(" Failed to start vault container", zap.Error(err))
-			return err
-		}
-
-		// Ensure proper cleanup
+		// TODO: This is demo code that requires container Start/Stop methods which don't exist yet
+		logger.Info("Demo function - container start would go here")
+		
+		// Mock cleanup for demo purposes
 		defer func() {
-			if err := vaultContainer.Stop(); err != nil {
-				logger.Error(" Failed to stop vault container", zap.Error(err))
-			}
+			logger.Info("Demo function - container stop would go here")
 		}()
 
 		logger.Info(" Enhanced vault container started successfully")
@@ -95,48 +84,12 @@ Examples:
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
 //
 //nolint:unused
-func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
+func _performStatusChecks(rc *eos_io.RuntimeContext, container interface{}, logger *zap.Logger) error {
 	logger.Info(" Performing comprehensive status checks")
 
-	// Check container health
-	if err := container.Health(); err != nil {
-		logger.Warn("Container health check failed", zap.Error(err))
-	} else {
-		logger.Info("💚 Container health check passed")
-	}
-
-	// Get vault manager for status operations
-	vaultService, err := container.GetVaultService()
-	if err != nil {
-		logger.Error(" Failed to get vault service", zap.Error(err))
-		return err
-	}
-
-	if vaultService != nil {
-		logger.Info(" Vault service available")
-		// TODO: Add domain service status check methods when available
-		// For now, this demonstrates the pattern
-	} else {
-		logger.Info(" Vault service not available (running in fallback mode)")
-	}
-
-	// Get secret store for basic operations
-	secretStore, err := container.GetSecretStore()
-	if err != nil {
-		logger.Error(" Failed to get secret store", zap.Error(err))
-		return err
-	}
-
-	// Test secret store availability (without actually reading secrets)
-	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
-	defer cancel()
-
-	exists, err := secretStore.Exists(ctx, "health-check")
-	if err != nil {
-		logger.Debug("Secret store health check failed (expected if no health-check secret)", zap.Error(err))
-	} else {
-		logger.Info(" Secret store responding", zap.Bool("health_check_exists", exists))
-	}
+	// TODO: This is demo code that requires EnhancedVaultContainer which doesn't exist yet
+	logger.Info("Demo function - container health check would go here")
+	_ = container // Avoid unused parameter warning
 
 	return nil
 }
@@ -151,52 +104,12 @@ func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.Enhance
 // Dependencies: eos_io, vaultpkg, zap, context, time
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
 
-func _demonstrateVaultOperations(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
+func _demonstrateVaultOperations(rc *eos_io.RuntimeContext, container interface{}, logger *zap.Logger) error {
 	logger.Info(" Demonstrating vault operations with clean architecture")
-
-	// Get services from container
-	secretStore, err := container.GetSecretStore()
-	if err != nil {
-		return err
-	}
-
-	vaultService, err := container.GetVaultService()
-	if err != nil {
-		return err
-	}
-
-	// Demonstrate secret operations with timeout
-	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
-	defer cancel()
-
-	// Example 1: List available secrets (safe operation)
-	logger.Info(" Listing available secrets")
-	secrets, err := secretStore.List(ctx, "eos/")
-	if err != nil {
-		logger.Warn("Failed to list secrets (may be expected)", zap.Error(err))
-	} else {
-		logger.Info(" Secrets listed successfully", zap.Int("count", len(secrets)))
-	}
-
-	// Example 2: Check secret existence (safe operation)
-	testKeys := []string{"eos/config", "eos/ldap", "eos/test"}
-	for _, key := range testKeys {
-		exists, err := secretStore.Exists(ctx, key)
-		if err != nil {
-			logger.Debug("Secret existence check failed", zap.String("key", key), zap.Error(err))
-		} else {
-			logger.Debug("Secret existence checked", zap.String("key", key), zap.Bool("exists", exists))
-		}
-	}
-
-	// Example 3: Domain service operations (when available)
-	if vaultService != nil {
-		logger.Info("💼 Domain service available for business operations")
-		// TODO: Add actual domain service operations when implemented
-		// This demonstrates where business logic would go
-	} else {
-		logger.Info(" Operating in fallback mode - limited functionality available")
-	}
+	
+	// TODO: This is demo code that requires EnhancedVaultContainer which doesn't exist yet
+	logger.Info("Demo function - vault operations would go here")
+	_ = container // Avoid unused parameter warning
 
 	logger.Info(" Vault operations demonstration completed")
 	return nil

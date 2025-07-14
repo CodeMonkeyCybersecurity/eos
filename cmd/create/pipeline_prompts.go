@@ -131,7 +131,7 @@ Examples:
 		}
 
 		logger.Info("Successfully created prompt", zap.String("name", promptName), zap.String("path", promptPath))
-		logger.Info("terminal prompt: Successfully created prompt '%s' at %s", promptName, promptPath)
+		logger.Info(fmt.Sprintf("terminal prompt: Successfully created prompt '%s' at %s", promptName, promptPath))
 
 		// TODO: Check if the prompts directory is already mounted to Delphi containers
 		// This functionality needs to be implemented in the pipeline package

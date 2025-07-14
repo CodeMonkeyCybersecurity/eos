@@ -1,10 +1,9 @@
-// cmd/delphi/list/list.go
+// cmd/list/delphi.go
 
 package list
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -32,7 +31,8 @@ Subcommands are required to specify which type of resource to list.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// If this command is meant to be a parent (requiring subcommands like 'eos delphi list agents'),
 		// then its RunE should indicate missing subcommand and display its own help.
-		otelzap.Ctx(rc.Ctx).Info("Command called without subcommand",
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Command called without subcommand",
 			zap.String("command", "eos delphi list"),
 		)
 
@@ -188,9 +188,9 @@ func init() {
 
 	delphiValidateCmd.AddCommand(delphiConfigValidateCmd)
 
-	ListCmd.AddCommand(delphiValidateCmd)
-	ListCmd.AddCommand(delphiConfigValidateCmd)
-	ListCmd.AddCommand(checkCmd)
+	DelphiCmd.AddCommand(delphiValidateCmd)
+	DelphiCmd.AddCommand(delphiConfigValidateCmd)
+	DelphiCmd.AddCommand(checkCmd)
 }
 
 var delphiValidateCmd = &cobra.Command{
@@ -250,7 +250,7 @@ errors, warnings, and informational messages about the configuration state.`,
 
 		// Load environment file if specified
 		if envFile != "" {
-			if err := loadEnvFile(envFile); err != nil {
+			if err := loadEnvFile(logger, envFile); err != nil {
 				logger.Warn("Failed to load environment file",
 					zap.String("file", envFile),
 					zap.Error(err))
@@ -270,14 +270,14 @@ errors, warnings, and informational messages about the configuration state.`,
 		if outputJSON {
 			return outputJSONResults(summary, verbose)
 		} else {
-			return outputTextResults(summary, verbose, checkOnly)
+			return outputTextResults(logger, summary, verbose, checkOnly)
 		}
 	}),
 }
 
 // TODO
 // loadEnvFile loads environment variables from a file
-func loadEnvFile(filename string) error {
+func loadEnvFile(logger otelzap.LoggerWithCtx, filename string) error {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		return err
@@ -303,7 +303,9 @@ func loadEnvFile(filename string) error {
 			}
 
 			if err := os.Setenv(key, value); err != nil {
-				logger.Info("terminal prompt: Warning: Failed to set environment variable %s: %v", key, err)
+				logger.Warn("terminal prompt: Warning: Failed to set environment variable",
+					zap.String("key", key),
+					zap.Error(err))
 			}
 		}
 	}
@@ -411,41 +413,47 @@ func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) e
 
 // TODO
 // outputTextResults outputs validation results in human-readable format
-func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkOnly bool) error {
+func outputTextResults(logger otelzap.LoggerWithCtx, summary *delphi_config.ValidationSummary, verbose, checkOnly bool) error {
 	if !checkOnly {
 		logger.Info("terminal prompt:  Delphi Configuration Validator")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
+		logger.Info("terminal prompt: " + strings.Repeat("=", 50))
 	}
 
 	// Show errors
 	if len(summary.Errors) > 0 {
 		if !checkOnly {
-			logger.Info("terminal prompt: \n❌ ERRORS (%d):", len(summary.Errors))
+			logger.Info("terminal prompt: ❌ ERRORS", zap.Int("count", len(summary.Errors)))
 			for _, err := range summary.Errors {
-				logger.Info("terminal prompt:    • [%s] %s", err.Source, err.Message)
+				logger.Info("terminal prompt:    • Validation error",
+					zap.String("source", err.Source),
+					zap.String("message", err.Message))
 			}
 		}
 	}
 
 	// Show warnings
 	if len(summary.Warnings) > 0 && !checkOnly {
-		logger.Info("terminal prompt: \nWARNINGS (%d):", len(summary.Warnings))
+		logger.Info("terminal prompt: WARNINGS", zap.Int("count", len(summary.Warnings)))
 		for _, warn := range summary.Warnings {
-			logger.Info("terminal prompt:    • [%s] %s", warn.Source, warn.Message)
+			logger.Info("terminal prompt:    • Warning",
+				zap.String("source", warn.Source),
+				zap.String("message", warn.Message))
 		}
 	}
 
 	// Show info messages if verbose
 	if verbose && len(summary.Info) > 0 && !checkOnly {
-		logger.Info("terminal prompt: \n SUCCESS (%d):", len(summary.Info))
+		logger.Info("terminal prompt:  SUCCESS", zap.Int("count", len(summary.Info)))
 		for _, info := range summary.Info {
-			logger.Info("terminal prompt:    • [%s] %s", info.Source, info.Message)
+			logger.Info("terminal prompt:    • Success",
+				zap.String("source", info.Source),
+				zap.String("message", info.Message))
 		}
 	}
 
 	// Summary
 	if !checkOnly {
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 50))))
+		logger.Info("terminal prompt: " + strings.Repeat("=", 50))
 	}
 
 	if summary.Success {
@@ -460,7 +468,7 @@ func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkO
 	}
 
 	if !checkOnly {
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
+		logger.Info("terminal prompt: " + strings.Repeat("=", 50))
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package create
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
@@ -59,7 +60,7 @@ Examples:
 			return outputPartitionOpJSON(result)
 		}
 
-		return outputPartitionOpText(result)
+		return outputPartitionOpText(rc, result)
 	}),
 }
 
@@ -80,16 +81,17 @@ func outputPartitionOpJSON(result *disk_management.PartitionOperation) error {
 }
 
 // TODO
-func outputPartitionOpText(result *disk_management.PartitionOperation) error {
+func outputPartitionOpText(rc *eos_io.RuntimeContext, result *disk_management.PartitionOperation) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	if result.DryRun {
-		logger.Info("terminal prompt: [DRY RUN] %s", result.Message)
+		logger.Info(fmt.Sprintf("terminal prompt: [DRY RUN] %s", result.Message))
 	} else if result.Success {
-		logger.Info("terminal prompt: ✓ %s", result.Message)
+		logger.Info(fmt.Sprintf("terminal prompt: ✓ %s", result.Message))
 		if result.Duration > 0 {
-			logger.Info("terminal prompt:   Duration: %v", result.Duration)
+			logger.Info(fmt.Sprintf("terminal prompt:   Duration: %v", result.Duration))
 		}
 	} else {
-		logger.Info("terminal prompt: ✗ %s", result.Message)
+		logger.Info(fmt.Sprintf("terminal prompt: ✗ %s", result.Message))
 	}
 	return nil
 }

@@ -3,8 +3,6 @@ package read
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"text/tabwriter"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -79,10 +77,10 @@ Examples:
 		}
 
 		if outputJSON {
-			return outputJSONDatabaseStatus(status)
+			return outputJSONDatabaseStatus(rc, status)
 		}
 
-		return outputTableDatabaseStatus(status)
+		return outputTableDatabaseStatus(rc, status)
 	}),
 }
 
@@ -100,47 +98,43 @@ func init() {
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputJSONDatabaseStatus(status *database_management.DatabaseStatus) error {
+func outputJSONDatabaseStatus(rc *eos_io.RuntimeContext, status *database_management.DatabaseStatus) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	data, err := json.MarshalIndent(status, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
+	logger.Info("terminal prompt: JSON output", zap.String("data", string(data)))
 	return nil
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputTableDatabaseStatus(status *database_management.DatabaseStatus) error {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer func() {
-		if err := w.Flush(); err != nil {
-			logger.Info("terminal prompt: Warning: Failed to flush output: %v", err)
-		}
-	}()
+func outputTableDatabaseStatus(rc *eos_io.RuntimeContext, status *database_management.DatabaseStatus) error {
+	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("terminal prompt: Database Status")
-	logger.Info("terminal prompt: ===============\n")
+	logger.Info("terminal prompt: ===============")
 
-	_, _ = fmt.Fprintf(w, "Type:\t%s\n", status.Type)
-	_, _ = fmt.Fprintf(w, "Version:\t%s\n", status.Version)
-	_, _ = fmt.Fprintf(w, "Status:\t%s\n", status.Status)
+	logger.Info("terminal prompt: Type", zap.String("value", string(status.Type)))
+	logger.Info("terminal prompt: Version", zap.String("value", status.Version))
+	logger.Info("terminal prompt: Status", zap.String("value", status.Status))
 
 	if status.Uptime > 0 {
-		_, _ = fmt.Fprintf(w, "Uptime:\t%s\n", status.Uptime.String())
+		logger.Info("terminal prompt: Uptime", zap.String("value", status.Uptime.String()))
 	}
 
-	_, _ = fmt.Fprintf(w, "Connections:\t%d/%d\n", status.Connections, status.MaxConnections)
+	logger.Info("terminal prompt: Connections", zap.String("value", fmt.Sprintf("%d/%d", status.Connections, status.MaxConnections)))
 
 	if status.DatabaseSize != "" {
-		_, _ = fmt.Fprintf(w, "Database Size:\t%s\n", status.DatabaseSize)
+		logger.Info("terminal prompt: Database Size", zap.String("value", status.DatabaseSize))
 	}
 
 	if status.Memory != "" {
-		fmt.Fprintf(w, "Memory Usage:\t%s\n", status.Memory)
+		logger.Info("terminal prompt: Memory Usage", zap.String("value", status.Memory))
 	}
 
 	if status.CPU > 0 {
-		fmt.Fprintf(w, "CPU Usage:\t%.2f%%\n", status.CPU)
+		logger.Info("terminal prompt: CPU Usage", zap.String("value", fmt.Sprintf("%.2f%%", status.CPU)))
 	}
 
 	return nil

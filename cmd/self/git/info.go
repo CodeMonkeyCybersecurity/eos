@@ -68,7 +68,7 @@ Examples:
 			return outputJSONInfo(repo)
 		}
 
-		return outputTableInfo(repo, infoDetailed)
+		return outputTableInfo(logger, repo, infoDetailed)
 	}),
 }
 
@@ -84,21 +84,22 @@ func outputJSONInfo(repo *git_management.GitRepository) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
+	// For JSON output, we still need to print to stdout
+	fmt.Println(string(data))
 	return nil
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
+func outputTableInfo(logger otelzap.LoggerWithCtx, repo *git_management.GitRepository, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() {
 		if err := w.Flush(); err != nil {
-			logger.Info("terminal prompt: Warning: Failed to flush tabwriter: %v", err)
+			logger.Warn("Failed to flush tabwriter", zap.Error(err))
 		}
 	}()
 
 	logger.Info("terminal prompt: Git Repository Information")
-	logger.Info("terminal prompt: =========================\n")
+	logger.Info("terminal prompt: =========================")
 
 	// Basic repository info
 	fmt.Fprintf(w, "Repository Path:\t%s\n", repo.Path)
@@ -143,56 +144,60 @@ func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 		logger.Info("terminal prompt:   No remotes configured")
 	} else {
 		for name, url := range repo.RemoteURLs {
-			logger.Info("terminal prompt:   %s: %s", name, url)
+			logger.Info("terminal prompt: Remote", 
+				zap.String("name", name),
+				zap.String("url", url))
 		}
 	}
 
 	// Branch information
 	if len(repo.Branches) > 0 {
 		logger.Info("terminal prompt: Branches:")
-		for _, branch := range repo.Branches {
+		for i, branch := range repo.Branches {
 			if detailed {
-				logger.Info("terminal prompt:   %s", branch)
+				logger.Info("terminal prompt: Branch", zap.String("branch", branch))
 			} else {
 				// Show only first few branches if not detailed
-				if len(repo.Branches) <= 5 {
-					logger.Info("terminal prompt:   %s", branch)
+				if i < 5 {
+					logger.Info("terminal prompt: Branch", zap.String("branch", branch))
 				}
 			}
 		}
 		if !detailed && len(repo.Branches) > 5 {
-			logger.Info("terminal prompt:   ... and %d more (use --detailed to see all)", len(repo.Branches)-5)
+			logger.Info("terminal prompt: More branches available", 
+				zap.Int("additional", len(repo.Branches)-5))
 		}
 	}
 
 	// File status details
 	if detailed && repo.Status != nil {
 		if len(repo.Status.Staged) > 0 {
-			logger.Info("terminal prompt: \nStaged Files (%d):", len(repo.Status.Staged))
+			logger.Info("terminal prompt: Staged Files", zap.Int("count", len(repo.Status.Staged)))
 			for _, file := range repo.Status.Staged {
-				logger.Info("terminal prompt:   + %s", file)
+				logger.Info("terminal prompt: + Staged", zap.String("file", file))
 			}
 		}
 
 		if len(repo.Status.Modified) > 0 {
-			logger.Info("terminal prompt: \nModified Files (%d):", len(repo.Status.Modified))
+			logger.Info("terminal prompt: Modified Files", zap.Int("count", len(repo.Status.Modified)))
 			for _, file := range repo.Status.Modified {
-				logger.Info("terminal prompt:   M %s", file)
+				logger.Info("terminal prompt: M Modified", zap.String("file", file))
 			}
 		}
 
 		if len(repo.Status.Untracked) > 0 {
-			logger.Info("terminal prompt: \nUntracked Files (%d):", len(repo.Status.Untracked))
+			logger.Info("terminal prompt: Untracked Files", zap.Int("count", len(repo.Status.Untracked)))
 			for _, file := range repo.Status.Untracked {
-				logger.Info("terminal prompt:   ? %s", file)
+				logger.Info("terminal prompt: ? Untracked", zap.String("file", file))
 			}
 		}
 	} else if repo.Status != nil && (!repo.Status.IsClean) {
 		logger.Info("terminal prompt: File Changes:")
-		logger.Info("terminal prompt:   Staged: %d files", len(repo.Status.Staged))
-		logger.Info("terminal prompt:   Modified: %d files", len(repo.Status.Modified))
-		logger.Info("terminal prompt:   Untracked: %d files", len(repo.Status.Untracked))
-		logger.Info("terminal prompt:   (use --detailed to see file names)")
+		logger.Info("terminal prompt: File counts",
+			zap.Int("staged", len(repo.Status.Staged)),
+			zap.Int("modified", len(repo.Status.Modified)),
+			zap.Int("untracked", len(repo.Status.Untracked)))
+		logger.Info("terminal prompt: (use --detailed to see file names)")
 	}
 
 	return nil

@@ -235,9 +235,9 @@ Examples:
 		}
 
 		logger.Info("terminal prompt: \nBackup Schedule Status:")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
-		logger.Info("terminal prompt: %-20s %-20s %-20s %s", "PROFILE", "SCHEDULE", "TIMER STATUS", "NEXT RUN")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
+		fmt.Printf("%-20s %-20s %-20s %s\n", "PROFILE", "SCHEDULE", "TIMER STATUS", "NEXT RUN")
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
 
 		for profileName, profile := range config.Profiles {
 			schedule := "-"
@@ -303,7 +303,7 @@ Examples:
 			zap.String("service", serviceName))
 
 		// Show service status
-		logger.Info("terminal prompt: Started %s", serviceName)
+		logger.Info("terminal prompt: Started service", zap.String("service", serviceName))
 		logger.Info("terminal prompt: Use 'journalctl -u " + serviceName + " -f' to follow the backup progress")
 
 		return nil

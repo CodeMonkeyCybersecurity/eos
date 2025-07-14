@@ -63,7 +63,7 @@ Examples:
 			return outputJSONStatus(status)
 		}
 
-		return outputTableStatus(status, detailed)
+		return outputTableStatus(logger, status, detailed)
 	}),
 }
 
@@ -79,21 +79,22 @@ func outputJSONStatus(status *git_management.GitStatus) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
+	// For JSON output, print directly to stdout
+	fmt.Println(string(data))
 	return nil
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
+func outputTableStatus(logger otelzap.LoggerWithCtx, status *git_management.GitStatus, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() {
 		if err := w.Flush(); err != nil {
-			logger.Info("terminal prompt: Warning: Failed to flush tabwriter: %v", err)
+			logger.Warn("Failed to flush tabwriter", zap.Error(err))
 		}
 	}()
 
 	logger.Info("terminal prompt: Git Repository Status")
-	logger.Info("terminal prompt: =====================\n")
+	logger.Info("terminal prompt: =====================")
 
 	// Branch information
 	fmt.Fprintf(w, "Branch:\t%s\n", status.Branch)
@@ -133,21 +134,21 @@ func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 		if len(status.Staged) > 0 {
 			logger.Info("terminal prompt: Staged Files:")
 			for _, file := range status.Staged {
-				logger.Info("terminal prompt:   + %s", file)
+				logger.Info("terminal prompt:   + Staged", zap.String("file", file))
 			}
 		}
 
 		if len(status.Modified) > 0 {
 			logger.Info("terminal prompt: Modified Files:")
 			for _, file := range status.Modified {
-				logger.Info("terminal prompt:   M %s", file)
+				logger.Info("terminal prompt:   M Modified", zap.String("file", file))
 			}
 		}
 
 		if len(status.Untracked) > 0 {
 			logger.Info("terminal prompt: Untracked Files:")
 			for _, file := range status.Untracked {
-				logger.Info("terminal prompt:   ? %s", file)
+				logger.Info("terminal prompt:   ? Untracked", zap.String("file", file))
 			}
 		}
 	}

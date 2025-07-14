@@ -8,21 +8,21 @@ import (
 	"go.uber.org/zap"
 )
 
-// MemoryCache implements config.Cache using in-memory storage
+// MemoryCache implements Cache using in-memory storage
 type MemoryCache struct {
 	data   map[string]cacheEntry
 	mutex  sync.RWMutex
-	stats  config.CacheStats
+	stats  CacheStats
 	logger *zap.Logger
 }
 
 type cacheEntry struct {
-	config   config.CachedConfig
+	config   CachedConfig
 	expireAt time.Time
 }
 
 // NewMemoryCache creates a new memory-based cache
-func NewMemoryCache(logger *zap.Logger) config.Cache {
+func NewMemoryCache(logger *zap.Logger) *MemoryCache {
 	return &MemoryCache{
 		data:   make(map[string]cacheEntry),
 		logger: logger.Named("config.memory_cache"),
@@ -30,14 +30,14 @@ func NewMemoryCache(logger *zap.Logger) config.Cache {
 }
 
 // Get retrieves a cached configuration
-func (c *MemoryCache) Get(key string) (config.CachedConfig, bool) {
+func (c *MemoryCache) Get(key string) (CachedConfig, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
 	entry, exists := c.data[key]
 	if !exists {
 		c.stats.Misses++
-		return config.CachedConfig{}, false
+		return CachedConfig{}, false
 	}
 
 	// Check if expired
@@ -50,7 +50,7 @@ func (c *MemoryCache) Get(key string) (config.CachedConfig, bool) {
 		c.mutex.RLock()
 
 		c.stats.Misses++
-		return config.CachedConfig{}, false
+		return CachedConfig{}, false
 	}
 
 	c.stats.Hits++
@@ -61,7 +61,7 @@ func (c *MemoryCache) Get(key string) (config.CachedConfig, bool) {
 }
 
 // Set stores a configuration in cache
-func (c *MemoryCache) Set(key string, conf config.CachedConfig) error {
+func (c *MemoryCache) Set(key string, conf CachedConfig) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -118,7 +118,7 @@ func (c *MemoryCache) Clear() error {
 }
 
 // Stats returns cache statistics
-func (c *MemoryCache) Stats() config.CacheStats {
+func (c *MemoryCache) Stats() CacheStats {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 

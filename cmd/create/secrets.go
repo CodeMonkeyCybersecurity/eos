@@ -24,6 +24,7 @@ var CreateSecretCmd = &cobra.Command{
   eos create secret --length 64
   eos create secret --length 24 --format base64`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 		// Get flags
 		length, _ := cmd.Flags().GetInt("length")
 		format, _ := cmd.Flags().GetString("format")
@@ -47,7 +48,7 @@ var CreateSecretCmd = &cobra.Command{
 			return err
 		}
 
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", secret)))
+		logger.Info("terminal prompt: " + secret)
 		return nil
 	}),
 }

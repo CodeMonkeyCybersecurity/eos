@@ -13,14 +13,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// AESEncryptor implements config.Encryptor using AES encryption
+// AESEncryptor implements Encryptor using AES encryption
 type AESEncryptor struct {
 	key    []byte
 	logger *zap.Logger
 }
 
 // NewAESEncryptor creates a new AES encryptor
-func NewAESEncryptor(key []byte, logger *zap.Logger) config.Encryptor {
+func NewAESEncryptor(key []byte, logger *zap.Logger) *AESEncryptor {
 	return &AESEncryptor{
 		key:    key,
 		logger: logger.Named("config.aes_encryptor"),

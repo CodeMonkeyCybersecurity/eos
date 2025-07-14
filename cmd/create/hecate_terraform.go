@@ -50,7 +50,7 @@ Supports both local Docker deployment and cloud infrastructure provisioning.`,
 		if useCloud {
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info(" Server name configuration for cloud deployment")
-			logger.Info("terminal prompt: Enter server name [%s]: ", serverName)
+			logger.Info("terminal prompt: Enter server name", zap.String("default", serverName))
 			var input string
 			if _, err := fmt.Scanln(&input); err != nil {
 				// Empty input is acceptable (use default), but actual read errors should be handled
@@ -137,13 +137,13 @@ location = "%s"`, serverType, location)
 			logger.Warn("Failed to format terraform files", zap.Error(err))
 		}
 
-		logger.Info("terminal prompt: \n Hecate Terraform configuration generated in: %s", outputDir)
+		logger.Info("terminal prompt: Hecate Terraform configuration generated in", zap.String("directory", outputDir))
 		logger.Info("terminal prompt: \nNext steps:")
 		if useCloud {
 			logger.Info("terminal prompt: 1. Set your Hetzner Cloud token: export HCLOUD_TOKEN='your-token'")
 			logger.Info("terminal prompt: 2. Update terraform.tfvars with your SSH key name")
 		}
-		logger.Info("terminal prompt: 3. Review the configuration: cd %s", outputDir)
+		logger.Info("terminal prompt: 3. Review the configuration", zap.String("command", "cd "+outputDir))
 		logger.Info("terminal prompt: 4. Plan the deployment: terraform plan")
 		logger.Info("terminal prompt: 5. Apply the configuration: terraform apply")
 

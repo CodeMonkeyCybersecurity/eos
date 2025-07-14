@@ -154,7 +154,7 @@ var verifySnapshotCmd = &cobra.Command{
 		}
 
 		logger.Info("Snapshot verification completed successfully")
-		logger.Info("terminal prompt: Snapshot %s verified successfully!", snapshotID)
+		logger.Info("terminal prompt: Snapshot verified successfully", zap.String("snapshot", snapshotID))
 
 		return nil
 	}),

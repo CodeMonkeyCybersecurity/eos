@@ -80,14 +80,14 @@ while legacy mode offers traditional Unix command output for script compatibilit
 
 			// Run lsblk
 			logger.Info("\nBlock Devices (lsblk):")
-			if err := runCommand("lsblk", "--all", "--output", "NAME,SIZE,TYPE,MOUNTPOINT"); err != nil {
+			if err := runCommand(rc, "lsblk", "--all", "--output", "NAME,SIZE,TYPE,MOUNTPOINT"); err != nil {
 				logger.Error("Error running lsblk", zap.Error(err))
 				return err
 			}
 
 			// Run df -h
 			logger.Info("\nFilesystem Usage (df -h):")
-			if err := runCommand("df", "-h"); err != nil {
+			if err := runCommand(rc, "df", "-h"); err != nil {
 				logger.Error("Error running df -h", zap.Error(err))
 				return err
 			}
@@ -152,13 +152,14 @@ while legacy mode offers traditional Unix command output for script compatibilit
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // runCommand executes a system command and prints its output
-func runCommand(command string, args ...string) error {
+func runCommand(rc *eos_io.RuntimeContext, command string, args ...string) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	cmd := exec.Command(command, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("command failed: %v\nOutput: %s", err, string(output))
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(output))))
+	logger.Info("terminal prompt: " + string(output))
 	return nil
 }
 

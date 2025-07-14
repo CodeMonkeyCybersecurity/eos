@@ -162,13 +162,8 @@ func ReadConfig(rc *eos_io.RuntimeContext) (*LDAPConfig, string, error) {
 }
 
 func readFromVault(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
-	client, err := vault.NewClient(rc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Vault client: %w", err)
-	}
-
 	var cfg LDAPConfig
-	if err := vault.Read(rc, client, "ldap", cfg); err != nil || cfg.FQDN == "" {
+	if err := vault.ReadFromVault(rc, "ldap", &cfg); err != nil || cfg.FQDN == "" {
 		return nil, errors.New("LDAP config not found in Vault")
 	}
 	return &cfg, nil

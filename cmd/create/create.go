@@ -110,20 +110,23 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 			zap.String("type", string(configType)),
 			zap.Duration("duration", result.Duration))
 
-		logger.Info("terminal prompt: \n%s Setup Complete!\n", configType)
-		logger.Info("terminal prompt: ⏱️ Duration: %s", result.Duration)
+		logger.Info("terminal prompt: Setup Complete!", zap.String("type", string(configType)))
+		logger.Info("terminal prompt: ⏱️ Duration", zap.Duration("duration", result.Duration))
 
 		if len(result.Changes) > 0 {
 			logger.Info("terminal prompt: 📝 Changes Made:")
 			for _, change := range result.Changes {
-				logger.Info("terminal prompt:    • %s: %s (%s)", change.Type, change.Target, change.Action)
+				logger.Info("terminal prompt:    • Change", 
+					zap.String("type", change.Type),
+					zap.String("target", change.Target),
+					zap.String("action", change.Action))
 			}
 		}
 
 		if len(result.Warnings) > 0 {
 			logger.Info("terminal prompt: Warnings:")
 			for _, warning := range result.Warnings {
-				logger.Info("terminal prompt:    • %s", warning)
+				logger.Info("terminal prompt:    • Warning", zap.String("warning", warning))
 			}
 		}
 
@@ -137,16 +140,19 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 				case "running":
 					status = "⏳"
 				}
-				logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
+				logger.Info("terminal prompt:    Step", 
+					zap.String("status", status),
+					zap.String("name", step.Name),
+					zap.Duration("duration", step.Duration))
 				if step.Error != "" {
-					logger.Info("terminal prompt:       Error: %s", step.Error)
+					logger.Info("terminal prompt:       Error", zap.String("error", step.Error))
 				}
 			}
 		}
 	} else {
 		logger.Error("Setup failed", zap.String("error", result.Error))
-		logger.Info("terminal prompt: \n❌ %s Setup Failed!", configType)
-		logger.Info("terminal prompt: Error: %s", result.Error)
+		logger.Info("terminal prompt: ❌ Setup Failed!", zap.String("type", string(configType)))
+		logger.Info("terminal prompt: Error", zap.String("error", result.Error))
 	}
 
 	return nil

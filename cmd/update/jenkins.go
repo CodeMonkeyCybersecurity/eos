@@ -10,6 +10,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/fileops"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
@@ -44,9 +46,9 @@ Usage:
 		// #nosec G101 - This is a template placeholder, not a hardcoded credential
 		token := "{{BACKEND_IP}}" // Make sure this token matches what you use in your asset files
 
-		logger.Info("terminal prompt: Updating backend IP to %s in assets directory...", backendIP)
+		logger.Info("terminal prompt: Updating backend IP in assets directory...", zap.String("ip", backendIP))
 		if err := fileops.UpdateFilesInDir(assetsDir, token, backendIP); err != nil {
-			logger.Info("terminal prompt: Error updating files: %v", err)
+			logger.Info("terminal prompt: Error updating files", zap.Error(err))
 			return nil
 		}
 		logger.Info("terminal prompt: Assets updated successfully with new backend IP.")
@@ -57,7 +59,7 @@ Usage:
 		cmdDocker.Stdout = os.Stdout
 		cmdDocker.Stderr = os.Stderr
 		if err := cmdDocker.Run(); err != nil {
-			logger.Info("terminal prompt: Error redeploying Hecate: %v", err)
+			logger.Info("terminal prompt: Error redeploying Hecate", zap.Error(err))
 			return err
 		}
 		logger.Info("terminal prompt: Hecate redeployed successfully with new Jenkins backend IP.")

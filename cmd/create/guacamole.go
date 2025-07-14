@@ -78,15 +78,15 @@ Examples:
 
 			logger.Info("terminal prompt: Apache Guacamole Installation Complete!\n")
 			logger.Info("terminal prompt:  Service Details:")
-			logger.Info("terminal prompt:    Version: %s", result.Version)
-			logger.Info("terminal prompt:    Port: %d", result.Port)
-			logger.Info("terminal prompt:    Method: %s", result.Method)
-			logger.Info("terminal prompt:    Duration: %s", result.Duration)
+			logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
+			logger.Info(fmt.Sprintf("terminal prompt:    Port: %d", result.Port))
+			logger.Info(fmt.Sprintf("terminal prompt:    Method: %s", result.Method))
+			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))
 
 			if len(result.Endpoints) > 0 {
 				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					logger.Info("terminal prompt:    %s", endpoint)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s", endpoint))
 				}
 			}
 
@@ -94,13 +94,13 @@ Examples:
 				logger.Info("terminal prompt:  Default Credentials:")
 				for key, value := range result.Credentials {
 					if key != "DB_PASSWORD" && key != "DB_USER" && key != "DB_NAME" {
-						logger.Info("terminal prompt:    %s: %s", key, value)
+						logger.Info(fmt.Sprintf("terminal prompt:    %s: %s", key, value))
 					}
 				}
 			}
 
 			logger.Info("terminal prompt: 📝 Next Steps:")
-			logger.Info("terminal prompt:    1. Open Guacamole: http://localhost:%d/guacamole", result.Port)
+			logger.Info(fmt.Sprintf("terminal prompt:    1. Open Guacamole: http://localhost:%d/guacamole", result.Port))
 			logger.Info("terminal prompt:    2. Login with: guacadmin / guacadmin")
 			logger.Info("terminal prompt:    3. IMMEDIATELY change the default password")
 			logger.Info("terminal prompt:    4. Configure connections (RDP, VNC, SSH)")
@@ -122,7 +122,7 @@ Examples:
 		} else {
 			logger.Error("Apache Guacamole installation failed", zap.String("error", result.Error))
 			logger.Info("terminal prompt: ❌ Apache Guacamole Installation Failed!")
-			logger.Info("terminal prompt: Error: %s", result.Error)
+			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
 				logger.Info("terminal prompt: Installation Steps:")
@@ -134,9 +134,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration))
 					if step.Error != "" {
-						logger.Info("terminal prompt:       Error: %s", step.Error)
+						logger.Info(fmt.Sprintf("terminal prompt:       Error: %s", step.Error))
 					}
 				}
 			}

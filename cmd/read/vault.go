@@ -126,52 +126,10 @@ This command demonstrates:
 
 		logger.Info(" Starting vault secrets inspection with enhanced architecture")
 
-		// Create enhanced vault container
-		vaultContainer, err := vault.NewEnhancedVaultContainer(rc)
-		if err != nil {
-			logger.Error(" Failed to create enhanced vault container", zap.Error(err))
-			return fmt.Errorf("failed to create vault container: %w", err)
-		}
-
-		// Start container
-		if err := vaultContainer.Start(); err != nil {
-			logger.Error(" Failed to start vault container", zap.Error(err))
-			return fmt.Errorf("failed to start vault container: %w", err)
-		}
-
-		// Ensure proper cleanup
-		defer func() {
-			if err := vaultContainer.Stop(); err != nil {
-				logger.Error(" Failed to stop vault container", zap.Error(err))
-			}
-		}()
-
-		logger.Info(" Enhanced vault container started successfully")
-
-		// Get secret store for operations
-		secretStore, err := vaultContainer.GetSecretStore()
-		if err != nil {
-			logger.Error(" Failed to get secret store", zap.Error(err))
-			return fmt.Errorf("failed to get secret store: %w", err)
-		}
-
-		// List secrets under eos prefix
-		logger.Info(" Listing secrets under secret/eos")
-		secrets, err := secretStore.List(rc.Ctx, shared.EosID+"/")
-		if err != nil {
-			logger.Error(" Failed to list vault secrets", zap.Error(err))
-			return fmt.Errorf("could not list vault contents: %w", err)
-		}
-
-		// Display results
-		for _, secret := range secrets {
-			// Only show the key, not the value for security
-			secretPath := "secret/eos/" + strings.TrimPrefix(secret.Key, shared.EosID+"/")
-			logger.Info(" Found vault entry", zap.String("entry", secretPath))
-		}
-
-		logger.Info(" Vault entries inspection complete", zap.Int("count", len(secrets)))
-		return nil
+		// TODO: Fix vault container implementation
+		// The NewEnhancedVaultContainer function needs to be implemented
+		logger.Error("Vault inspection is temporarily disabled due to missing implementation")
+		return fmt.Errorf("vault inspection not yet implemented")
 	}),
 }
 

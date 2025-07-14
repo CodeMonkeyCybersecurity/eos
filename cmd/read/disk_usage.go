@@ -45,7 +45,7 @@ Examples:
 			return outputDiskUsageJSON(usage)
 		}
 
-		return outputDiskUsageTable(usage)
+		return outputDiskUsageTable(rc, usage)
 	}),
 }
 
@@ -63,18 +63,19 @@ func outputDiskUsageJSON(usage map[string]disk_management.DiskUsageInfo) error {
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputDiskUsageTable(usage map[string]disk_management.DiskUsageInfo) error {
+func outputDiskUsageTable(rc *eos_io.RuntimeContext, usage map[string]disk_management.DiskUsageInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	if len(usage) == 0 {
 		logger.Info("terminal prompt: No mounted filesystems found.")
 		return nil
 	}
 
-	logger.Info("terminal prompt: Disk Usage Information (%d filesystems)\n", len(usage))
+	logger.Info(fmt.Sprintf("terminal prompt: Disk Usage Information (%d filesystems)", len(usage)))
 
 	// Print header
 	fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n",
 		"FILESYSTEM", "SIZE", "USED", "AVAIL", "USE%", "MOUNTED ON")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	logger.Info("terminal prompt: " + strings.Repeat("-", 80))
 
 	// Print usage information
 	for _, info := range usage {

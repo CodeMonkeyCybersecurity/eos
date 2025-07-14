@@ -36,11 +36,12 @@ Subcommands are required to specify which type of information to read.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// If this command is meant to be a parent (requiring subcommands like 'eos delphi inspect alerts'),
 		// then its RunE should indicate missing subcommand and display its own help.
-		otelzap.Ctx(rc.Ctx).Info("'eos delphi read' was called without a subcommand")
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("'eos delphi read' was called without a subcommand")
 
-		logger.Info("terminal prompt:  Missing subcommand for 'eos delphi read'.")                                // More specific message
-		logger.Info("terminal prompt:   Run `eos delphi read --help` to see available options for reading data.") // More specific advice
-		_ = cmd.Help()                                                                           // Print built-in help for 'read' command
+		logger.Info("terminal prompt: Missing subcommand for 'eos delphi read'.")                                // More specific message
+		logger.Info("terminal prompt: Run `eos delphi read --help` to see available options for reading data.") // More specific advice
+		_ = cmd.Help()                                                                                            // Print built-in help for 'read' command
 		return nil
 	}),
 }
@@ -211,7 +212,7 @@ to ensure your database schema is properly configured.`,
 		}
 		defer func() {
 			if err := db.Close(); err != nil {
-				logger.Info("terminal prompt: Warning: Failed to close database connection: %v", err)
+				logger.Warn("Failed to close database connection", zap.Error(err))
 			}
 		}()
 
@@ -226,20 +227,20 @@ to ensure your database schema is properly configured.`,
 
 		// Display results
 		logger.Info("terminal prompt: === Delphi Pipeline Schema Verification ===")
-		logger.Info("terminal prompt: Timestamp: %s", result.Timestamp.Format(time.RFC3339))
-		logger.Info("terminal prompt: Overall Status: %s", result.OverallStatus)
-		logger.Info("terminal prompt: Missing Objects: %d\n", result.MissingCount)
+		logger.Info("terminal prompt: Timestamp: " + result.Timestamp.Format(time.RFC3339))
+		logger.Info("terminal prompt: Overall Status: " + result.OverallStatus)
+		logger.Info("terminal prompt: Missing Objects: " + fmt.Sprintf("%d", result.MissingCount))
 
 		// Display detailed results for each object type
-		displaySchemaObjects("Enum Types", result.EnumTypes)
-		displaySchemaObjects("Tables", result.Tables)
-		displaySchemaObjects("Indexes", result.Indexes)
-		displaySchemaObjects("Views", result.Views)
-		displaySchemaObjects("Functions", result.Functions)
-		displaySchemaObjects("Triggers", result.Triggers)
+		displaySchemaObjects(rc, "Enum Types", result.EnumTypes)
+		displaySchemaObjects(rc, "Tables", result.Tables)
+		displaySchemaObjects(rc, "Indexes", result.Indexes)
+		displaySchemaObjects(rc, "Views", result.Views)
+		displaySchemaObjects(rc, "Functions", result.Functions)
+		displaySchemaObjects(rc, "Triggers", result.Triggers)
 
 		if result.MissingCount > 0 {
-			logger.Info("terminal prompt: \n⚠️  Schema verification found %d missing objects.", result.MissingCount)
+			logger.Info(fmt.Sprintf("terminal prompt: \n⚠️  Schema verification found %d missing objects.", result.MissingCount))
 			logger.Info("terminal prompt: Run 'eos create delphi deploy' to deploy the complete schema.")
 		} else {
 			logger.Info("terminal prompt: \n All schema objects are present and verified.")
@@ -266,26 +267,26 @@ func init() {
 
 // displaySchemaObjects displays verification results for a specific object type
 // TODO: Move to pkg/delphi/display or pkg/delphi/output
-func displaySchemaObjects(objectType string, objects []delphi.SchemaObject) {
+func displaySchemaObjects(rc *eos_io.RuntimeContext, objectType string, objects []delphi.SchemaObject) {
+	logger := otelzap.Ctx(rc.Ctx)
 	if len(objects) == 0 {
 		return
 	}
 
-	logger.Info("terminal prompt: \n%s:", objectType)
+	logger.Info("terminal prompt:", zap.String("object_type", objectType))
 	for _, obj := range objects {
 		statusSymbol := "✓"
 		if obj.Status != "OK" {
 			statusSymbol = "✗"
 		}
 
-		logger.Info("terminal prompt:   %s %s", statusSymbol, obj.Name)
+		logger.Info("terminal prompt:", zap.String("status", statusSymbol), zap.String("name", obj.Name))
 		if obj.Details != "" {
-			logger.Info("terminal prompt:  - %s", obj.Details)
+			logger.Info("terminal prompt: - ", zap.String("details", obj.Details))
 		}
 		if obj.ActionNeeded != "" {
-			logger.Info("terminal prompt: \n    Action: %s", obj.ActionNeeded)
+			logger.Info("terminal prompt: Action:", zap.String("action", obj.ActionNeeded))
 		}
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
 	}
 }
 

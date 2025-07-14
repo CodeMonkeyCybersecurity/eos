@@ -60,9 +60,11 @@ Examples:
 			zap.Duration("duration", duration),
 			zap.Int("parallel", fuzzParallel))
 
-		logger.Info("terminal prompt: 🧪 Running fuzz tests with %s duration...", duration)
-		logger.Info("terminal prompt: 📍 Parallel execution: %d tests", fuzzParallel)
-		logger.Info("terminal prompt:  Working directory: %s\n", rc.Ctx.Value("workdir"))
+		logger.Info("terminal prompt: 🧪 Running fuzz tests", zap.Duration("duration", duration))
+		logger.Info("terminal prompt: 📍 Parallel execution", zap.Int("tests", fuzzParallel))
+		if wd := rc.Ctx.Value("workdir"); wd != nil {
+			logger.Info("terminal prompt: Working directory", zap.String("dir", fmt.Sprintf("%v", wd)))
+		}
 
 		report, err := runner.RunAll(duration)
 		if err != nil {
@@ -79,7 +81,7 @@ Examples:
 					zap.String("file", reportFile),
 					zap.Error(err))
 			} else {
-				logger.Info("terminal prompt: \n📊 Detailed report saved to: %s", reportFile)
+				logger.Info("terminal prompt: 📊 Detailed report saved", zap.String("file", reportFile))
 			}
 		}
 
@@ -97,8 +99,8 @@ Examples:
 			zap.Int("total_tests", len(report.Tests)),
 			zap.Duration("total_duration", report.Duration))
 
-		logger.Info("terminal prompt: \nAll fuzz tests completed successfully!")
-		logger.Info("terminal prompt: 🎯 No issues found during fuzzing with %s duration.", duration)
+		logger.Info("terminal prompt: All fuzz tests completed successfully!")
+		logger.Info("terminal prompt: 🎯 No issues found during fuzzing", zap.Duration("duration", duration))
 
 		return nil
 	}),

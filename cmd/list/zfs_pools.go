@@ -73,15 +73,15 @@ func outputZFSPoolsResult(result *zfs_management.ZFSListResult, outputJSON bool)
 
 	// Text output
 	if len(result.Pools) == 0 {
-		logger.Info("terminal prompt: No ZFS pools found.")
+		fmt.Println("No ZFS pools found.")
 		return nil
 	}
 
-	logger.Info("terminal prompt: ZFS Pools (found %d):", result.Count)
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
+	fmt.Printf("ZFS Pools (found %d):\n", result.Count)
+	fmt.Println(strings.Repeat("=", 80))
 	fmt.Printf("%-15s %-8s %-8s %-8s %-5s %-5s %-8s %-10s\n",
 		"NAME", "SIZE", "ALLOC", "FREE", "FRAG", "CAP", "DEDUP", "HEALTH")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 80))))
+	fmt.Println(strings.Repeat("-", 80))
 
 	for _, pool := range result.Pools {
 		fmt.Printf("%-15s %-8s %-8s %-8s %-5s %-5s %-8s %-10s\n",

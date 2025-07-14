@@ -4,6 +4,7 @@ package backup
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -82,25 +83,35 @@ func CreateRepository(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	logger.Info("Storing repository password in Vault",
 		zap.String("path", vaultPath))
 
-	vClient, err := vault.NewClient(rc)
-	if err != nil {
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	if vaultAddr == "" {
 		// Fall back to local storage
-		logger.Warn("Vault unavailable, storing password locally",
-			zap.Error(err))
-
+		logger.Warn("VAULT_ADDR not set, storing password locally")
+		
 		if err := storeLocalPassword(name, password); err != nil {
 			return fmt.Errorf("storing password locally: %w", err)
 		}
 	} else {
-		secret := map[string]interface{}{
-			"password": password,
-			"backend":  backend,
-			"url":      url,
-		}
-
-		_, err = vClient.Logical().Write(vaultPath, secret)
+		_, err := vault.NewClient(vaultAddr, logger.Logger().Logger)
 		if err != nil {
-			return fmt.Errorf("storing password in vault: %w", err)
+			// Fall back to local storage
+			logger.Warn("Vault unavailable, storing password locally",
+				zap.Error(err))
+
+			if err := storeLocalPassword(name, password); err != nil {
+				return fmt.Errorf("storing password locally: %w", err)
+			}
+		} else {
+			secretData := map[string]interface{}{
+				"password": password,
+				"backend":  backend,
+				"url":      url,
+			}
+
+			err = vault.WriteToVault(rc, vaultPath, secretData)
+			if err != nil {
+				return fmt.Errorf("storing password in vault: %w", err)
+			}
 		}
 	}
 

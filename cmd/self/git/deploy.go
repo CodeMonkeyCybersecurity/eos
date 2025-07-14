@@ -115,50 +115,50 @@ func runDryRunDeployment(rc *eos_io.RuntimeContext, manager *git_management.GitM
 		return fmt.Errorf("failed to get repository info: %w", err)
 	}
 
-	logger.Info("terminal prompt: Repository: %s", options.RepositoryPath)
-	logger.Info("terminal prompt: Target Branch: %s", options.Branch)
+	logger.Info(fmt.Sprintf("terminal prompt: Repository: %s", options.RepositoryPath))
+	logger.Info(fmt.Sprintf("terminal prompt: Target Branch: %s", options.Branch))
 	if options.MergeBranch != "" {
-		logger.Info("terminal prompt: Merge Branch: %s", options.MergeBranch)
+		logger.Info(fmt.Sprintf("terminal prompt: Merge Branch: %s", options.MergeBranch))
 	}
-	logger.Info("terminal prompt: Current Branch: %s", repo.Status.Branch)
+	logger.Info(fmt.Sprintf("terminal prompt: Current Branch: %s", repo.Status.Branch))
 	logger.Info("terminal prompt: Repository Status: ")
 	if repo.Status.IsClean {
 		logger.Info("terminal prompt: Clean")
 	} else {
 		logger.Info("terminal prompt: Has changes")
-		logger.Info("terminal prompt:   - Staged: %d files", len(repo.Status.Staged))
-		logger.Info("terminal prompt:   - Modified: %d files", len(repo.Status.Modified))
-		logger.Info("terminal prompt:   - Untracked: %d files", len(repo.Status.Untracked))
+		logger.Info(fmt.Sprintf("terminal prompt:   - Staged: %d files", len(repo.Status.Staged)))
+		logger.Info(fmt.Sprintf("terminal prompt:   - Modified: %d files", len(repo.Status.Modified)))
+		logger.Info(fmt.Sprintf("terminal prompt:   - Untracked: %d files", len(repo.Status.Untracked)))
 	}
 
 	if repo.Status.AheadCount > 0 || repo.Status.BehindCount > 0 {
 		logger.Info("terminal prompt: Sync Status: ")
 		if repo.Status.AheadCount > 0 {
-			logger.Info("terminal prompt: %d ahead", repo.Status.AheadCount)
+			logger.Info(fmt.Sprintf("terminal prompt: %d ahead", repo.Status.AheadCount))
 		}
 		if repo.Status.BehindCount > 0 {
 			if repo.Status.AheadCount > 0 {
 				logger.Info("terminal prompt: , ")
 			}
-			logger.Info("terminal prompt: %d behind", repo.Status.BehindCount)
+			logger.Info(fmt.Sprintf("terminal prompt: %d behind", repo.Status.BehindCount))
 		}
 		logger.Info("terminal prompt: \n")
 	}
 
 	logger.Info("terminal prompt: Remotes:")
 	for name, url := range repo.RemoteURLs {
-		logger.Info("terminal prompt:   %s: %s", name, url)
+		logger.Info(fmt.Sprintf("terminal prompt:   %s: %s", name, url))
 	}
 
 	logger.Info("terminal prompt: Deployment Plan:")
-	logger.Info("terminal prompt: 1. Pull latest changes from origin/%s", options.Branch)
+	logger.Info(fmt.Sprintf("terminal prompt: 1. Pull latest changes from origin/%s", options.Branch))
 	if options.MergeBranch != "" {
-		logger.Info("terminal prompt: 2. Merge %s into %s", options.MergeBranch, options.Branch)
+		logger.Info(fmt.Sprintf("terminal prompt: 2. Merge %s into %s", options.MergeBranch, options.Branch))
 	}
 	if options.Force {
-		logger.Info("terminal prompt: 3. Force push to origin/%s", options.Branch)
+		logger.Info(fmt.Sprintf("terminal prompt: 3. Force push to origin/%s", options.Branch))
 	} else {
-		logger.Info("terminal prompt: 3. Push to origin/%s", options.Branch)
+		logger.Info(fmt.Sprintf("terminal prompt: 3. Push to origin/%s", options.Branch))
 	}
 
 	logger.Info("Dry run deployment completed", zap.String("repository", options.RepositoryPath))

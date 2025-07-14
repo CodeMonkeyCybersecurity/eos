@@ -194,7 +194,7 @@ type AuditRequest struct {
 	Path             string            `json:"path"`
 	Data             map[string]interface{} `json:"-"` // Don't log sensitive data
 	PolicyOverride   bool              `json:"policy_override,omitempty"`
-	RemoteAddr       string            `json:"remote_address,omitempty"`
+	RemoteAddr       string            `json:"remote_addr,omitempty"`
 	RemoteAddress    string            `json:"remote_address,omitempty"` // Alias for compatibility
 	WrapTTL          int               `json:"wrap_ttl,omitempty"`
 	Headers          map[string][]string `json:"headers,omitempty"`

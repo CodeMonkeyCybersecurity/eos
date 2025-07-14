@@ -69,7 +69,7 @@ func runReadHecateMetrics(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	// Output based on format
 	switch format {
 	case "json":
-		return outputMetricsJSON(snapshot, routeFilter, systemOnly, servicesOnly)
+		return outputMetricsJSON(rc, snapshot, routeFilter, systemOnly, servicesOnly)
 	case "prometheus":
 		return outputMetricsPrometheus(rc, routeFilter)
 	case "table":
@@ -79,7 +79,7 @@ func runReadHecateMetrics(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	}
 }
 
-func outputMetricsJSON(snapshot *monitoring.MetricsSnapshot, routeFilter string, systemOnly, servicesOnly bool) error {
+func outputMetricsJSON(rc *eos_io.RuntimeContext, snapshot *monitoring.MetricsSnapshot, routeFilter string, systemOnly, servicesOnly bool) error {
 	output := make(map[string]interface{})
 
 	if !systemOnly && !servicesOnly {
@@ -109,7 +109,8 @@ func outputMetricsJSON(snapshot *monitoring.MetricsSnapshot, routeFilter string,
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(jsonData))))
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("terminal prompt: " + string(jsonData))
 	return nil
 }
 
@@ -152,15 +153,15 @@ func outputMetricsTable(snapshot *monitoring.MetricsSnapshot, routeFilter string
 
 func printRouteMetricsTable(routes map[string]monitoring.RouteMetrics) {
 	if len(routes) == 0 {
-		logger.Info("terminal prompt: No routes found")
+		fmt.Println("No routes found")
 		return
 	}
 
-	logger.Info("terminal prompt: \n📊 Route Metrics")
-	logger.Info("terminal prompt: ================")
+	fmt.Println("\n📊 Route Metrics")
+	fmt.Println("================")
 	fmt.Printf("%-25s %-12s %-12s %-15s %-12s %-10s\n",
 		"Domain", "Requests", "Errors", "Response Time", "Health", "Error Rate")
-	logger.Info("terminal prompt: -----------------------------------------------------------------------------------------")
+	fmt.Println("-----------------------------------------------------------------------------------------")
 
 	for domain, metrics := range routes {
 		healthIcon := "🟢"
@@ -179,33 +180,33 @@ func printRouteMetricsTable(routes map[string]monitoring.RouteMetrics) {
 }
 
 func printSystemMetricsTable(system monitoring.SystemMetrics) {
-	logger.Info("terminal prompt: \n🖥️  System Metrics")
-	logger.Info("terminal prompt: =================")
-	logger.Info("terminal prompt: Total Routes:        %d", system.TotalRoutes)
-	logger.Info("terminal prompt: Healthy Routes:      %d", system.HealthyRoutes)
-	logger.Info("terminal prompt: Unhealthy Routes:    %d", system.UnhealthyRoutes)
-	logger.Info("terminal prompt: Total Requests:      %d", system.TotalRequests)
-	logger.Info("terminal prompt: Total Errors:        %d", system.TotalErrors)
-	logger.Info("terminal prompt: Avg Response Time:   %s", system.AverageResponseTime)
-	logger.Info("terminal prompt: System Load:         %.2f", system.SystemLoad)
-	logger.Info("terminal prompt: Memory Usage:        %.1f%%", system.MemoryUsage*100)
-	logger.Info("terminal prompt: CPU Usage:           %.1f%%", system.CPUUsage*100)
-	logger.Info("terminal prompt: Disk Usage:          %.1f%%", system.DiskUsage*100)
-	logger.Info("terminal prompt: Network In:          %d bytes", system.NetworkIn)
-	logger.Info("terminal prompt: Network Out:         %d bytes", system.NetworkOut)
-	logger.Info("terminal prompt: Uptime:              %s", system.Uptime)
+	fmt.Println("\n🖥️  System Metrics")
+	fmt.Println("=================")
+	fmt.Printf("Total Routes:        %d\n", system.TotalRoutes)
+	fmt.Printf("Healthy Routes:      %d\n", system.HealthyRoutes)
+	fmt.Printf("Unhealthy Routes:    %d\n", system.UnhealthyRoutes)
+	fmt.Printf("Total Requests:      %d\n", system.TotalRequests)
+	fmt.Printf("Total Errors:        %d\n", system.TotalErrors)
+	fmt.Printf("Avg Response Time:   %s\n", system.AverageResponseTime)
+	fmt.Printf("System Load:         %.2f\n", system.SystemLoad)
+	fmt.Printf("Memory Usage:        %.1f%%\n", system.MemoryUsage*100)
+	fmt.Printf("CPU Usage:           %.1f%%\n", system.CPUUsage*100)
+	fmt.Printf("Disk Usage:          %.1f%%\n", system.DiskUsage*100)
+	fmt.Printf("Network In:          %d bytes\n", system.NetworkIn)
+	fmt.Printf("Network Out:         %d bytes\n", system.NetworkOut)
+	fmt.Printf("Uptime:              %s\n", system.Uptime)
 }
 
 func printServiceHealthTable(services map[string]monitoring.ServiceHealth) {
 	if len(services) == 0 {
-		logger.Info("terminal prompt: No services found")
+		fmt.Println("No services found")
 		return
 	}
 
-	logger.Info("terminal prompt: \n🔧 Service Health")
-	logger.Info("terminal prompt: =================")
-	logger.Info("terminal prompt: %-15s %-10s %-15s %-25s", "Service", "Status", "Response Time", "Last Check")
-	logger.Info("terminal prompt: -----------------------------------------------------------------------")
+	fmt.Println("\n🔧 Service Health")
+	fmt.Println("=================")
+	fmt.Printf("%-15s %-10s %-15s %-25s\n", "Service", "Status", "Response Time", "Last Check")
+	fmt.Println("-----------------------------------------------------------------------")
 
 	for name, health := range services {
 		statusIcon := "🟢"
@@ -220,7 +221,7 @@ func printServiceHealthTable(services map[string]monitoring.ServiceHealth) {
 			health.LastCheck.Format("2006-01-02 15:04:05"))
 
 		if health.ErrorMessage != "" {
-			logger.Info("terminal prompt:                 Error: %s", health.ErrorMessage)
+			fmt.Printf("                 Error: %s\n", health.ErrorMessage)
 		}
 	}
 }

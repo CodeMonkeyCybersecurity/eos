@@ -4,7 +4,6 @@ package read
 
 import (
 	"encoding/json"
-	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -26,7 +25,7 @@ var ReadConfigCmd = &cobra.Command{
 		cfg, err := delphi.ReadConfig(rc)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to load Delphi config", zap.Error(err))
-			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", " Error loading Delphi config:", err)))
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: Error loading Delphi config", zap.Error(err))
 			return err
 		}
 
@@ -43,12 +42,12 @@ var ReadConfigCmd = &cobra.Command{
 		cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to marshal Delphi config", zap.Error(err))
-			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", " Error printing config:", err)))
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: Error printing config", zap.Error(err))
 			return err
 		}
 
-		logger.Info("terminal prompt:  Delphi Configuration:")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(cfgJSON))))
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Delphi Configuration")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: JSON output", zap.String("data", string(cfgJSON)))
 		return nil
 	}),
 }

@@ -111,6 +111,7 @@ func displayMetrics(metrics []storage_monitor.IOMetrics) error {
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Duration) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -127,7 +128,7 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 
 			metrics, err := storage_monitor.CollectIOMetrics(rc)
 			if err != nil {
-				logger.Info("terminal prompt: Error: %v", err)
+				logger.Info(fmt.Sprintf("terminal prompt: Error: %v", err))
 				continue
 			}
 
@@ -142,9 +143,9 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 				metrics = filtered
 			}
 
-			logger.Info("terminal prompt: Storage Metrics - %s\n", time.Now().Format("15:04:05"))
+			logger.Info(fmt.Sprintf("terminal prompt: Storage Metrics - %s\n", time.Now().Format("15:04:05")))
 			if err := displayMetrics(metrics); err != nil {
-				logger.Info("terminal prompt: Warning: Failed to display metrics: %v", err)
+				logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to display metrics: %v", err))
 			}
 		}
 	}

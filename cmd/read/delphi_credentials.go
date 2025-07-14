@@ -33,7 +33,7 @@ var ReadCredentialsCmd = &cobra.Command{
 		if cfg.Token == "" {
 			token, err := delphi.Authenticate(rc, cfg)
 			if err != nil {
-				logger.Info("terminal prompt:  Authentication failed: %v", err)
+				otelzap.Ctx(rc.Ctx).Info("terminal prompt: Authentication failed", zap.Error(err))
 				os.Exit(1)
 			}
 			cfg.Token = token
@@ -44,13 +44,13 @@ var ReadCredentialsCmd = &cobra.Command{
 
 		resp, err := delphi.AuthenticatedGet(cfg, "/security/users")
 		if err != nil {
-			logger.Info("terminal prompt:  Failed to fetch users: %v", err)
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: Failed to fetch users", zap.Error(err))
 			os.Exit(1)
 		}
 		defer shared.SafeClose(rc.Ctx, resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
-			logger.Info("terminal prompt:  Failed with status code: %d", resp.StatusCode)
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: Failed with status code", zap.Int("code", resp.StatusCode))
 			os.Exit(1)
 		}
 
@@ -64,17 +64,20 @@ var ReadCredentialsCmd = &cobra.Command{
 			} `json:"data"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			logger.Info("terminal prompt:  Failed to parse response: %v", err)
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: Failed to parse response", zap.Error(err))
 			os.Exit(1)
 		}
 
-		logger.Info("terminal prompt:  Delphi API Users:")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Delphi API Users")
 		for _, user := range result.Data.Users {
 			status := "disabled"
 			if user.Active {
 				status = "active"
 			}
-			logger.Info("terminal prompt:   • %-15s | Role: %-10s | Status: %s", user.Username, user.Role, status)
+			otelzap.Ctx(rc.Ctx).Info("terminal prompt: User", 
+				zap.String("username", user.Username),
+				zap.String("role", user.Role),
+				zap.String("status", status))
 		}
 		return nil
 	}),

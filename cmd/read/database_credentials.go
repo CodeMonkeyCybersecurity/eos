@@ -3,8 +3,6 @@ package read
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"text/tabwriter"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -61,10 +59,10 @@ Examples:
 		}
 
 		if outputJSON {
-			return outputJSONCredential(credential, showPassword)
+			return outputJSONCredential(logger, credential, showPassword)
 		}
 
-		return outputTableCredential(credential, showPassword)
+		return outputTableCredential(logger, credential, showPassword)
 	}),
 }
 
@@ -79,7 +77,7 @@ func init() {
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputJSONCredential(credential *database_management.DatabaseCredential, showPassword bool) error {
+func outputJSONCredential(logger otelzap.LoggerWithCtx, credential *database_management.DatabaseCredential, showPassword bool) error {
 	output := map[string]interface{}{
 		"username":       credential.Username,
 		"lease_id":       credential.LeaseID,
@@ -99,59 +97,35 @@ func outputJSONCredential(credential *database_management.DatabaseCredential, sh
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
+	logger.Info("terminal prompt: JSON output", zap.String("data", string(data)))
 	return nil
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputTableCredential(credential *database_management.DatabaseCredential, showPassword bool) error {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer func() {
-		if err := w.Flush(); err != nil {
-			// Best effort - log but don't fail
-			fmt.Fprintf(os.Stderr, "Warning: failed to flush output: %v\n", err)
-		}
-	}()
-
+func outputTableCredential(logger otelzap.LoggerWithCtx, credential *database_management.DatabaseCredential, showPassword bool) error {
 	logger.Info("terminal prompt: Dynamic Database Credentials")
-	logger.Info("terminal prompt: ============================\n")
+	logger.Info("terminal prompt: ============================")
 
-	if _, err := fmt.Fprintf(w, "Username:\t%s\n", credential.Username); err != nil {
-		return fmt.Errorf("failed to write username: %w", err)
-	}
+	logger.Info("terminal prompt: Username", zap.String("value", credential.Username))
 
 	if showPassword {
-		if _, err := fmt.Fprintf(w, "Password:\t%s\n", credential.Password); err != nil {
-			return fmt.Errorf("failed to write password: %w", err)
-		}
+		logger.Info("terminal prompt: Password", zap.String("value", credential.Password))
 	} else {
-		if _, err := fmt.Fprintf(w, "Password:\t[REDACTED - use --show-password to display]\n"); err != nil {
-			return fmt.Errorf("failed to write password placeholder: %w", err)
-		}
+		logger.Info("terminal prompt: Password", zap.String("value", "[REDACTED - use --show-password to display]"))
 	}
 
-	if _, err := fmt.Fprintf(w, "Lease ID:\t%s\n", credential.LeaseID); err != nil {
-		return fmt.Errorf("failed to write lease ID: %w", err)
-	}
-	if _, err := fmt.Fprintf(w, "Lease Duration:\t%d seconds\n", credential.LeaseDuration); err != nil {
-		return fmt.Errorf("failed to write lease duration: %w", err)
-	}
-	if _, err := fmt.Fprintf(w, "Renewable:\t%t\n", credential.Renewable); err != nil {
-		return fmt.Errorf("failed to write renewable: %w", err)
-	}
-	if _, err := fmt.Fprintf(w, "Created At:\t%s\n", credential.CreatedAt.Format("2006-01-02 15:04:05")); err != nil {
-		return fmt.Errorf("failed to write created at: %w", err)
-	}
-	if _, err := fmt.Fprintf(w, "Expires At:\t%s\n", credential.ExpiresAt.Format("2006-01-02 15:04:05")); err != nil {
-		return fmt.Errorf("failed to write expires at: %w", err)
-	}
+	logger.Info("terminal prompt: Lease ID", zap.String("value", credential.LeaseID))
+	logger.Info("terminal prompt: Lease Duration", zap.Int("seconds", credential.LeaseDuration))
+	logger.Info("terminal prompt: Renewable", zap.Bool("value", credential.Renewable))
+	logger.Info("terminal prompt: Created At", zap.String("value", credential.CreatedAt.Format("2006-01-02 15:04:05")))
+	logger.Info("terminal prompt: Expires At", zap.String("value", credential.ExpiresAt.Format("2006-01-02 15:04:05")))
 
 	logger.Info("terminal prompt: Connection String Example:")
 	if showPassword {
-		logger.Info("terminal prompt: psql -h localhost -U %s -d delphi", credential.Username)
-		logger.Info("terminal prompt: Password: %s", credential.Password)
+		logger.Info("terminal prompt: psql -h localhost -U X -d delphi", zap.String("username", credential.Username))
+		logger.Info("terminal prompt: Password", zap.String("password", credential.Password))
 	} else {
-		logger.Info("terminal prompt: psql -h localhost -U %s -d delphi", credential.Username)
+		logger.Info("terminal prompt: psql -h localhost -U X -d delphi", zap.String("username", credential.Username))
 		logger.Info("terminal prompt: Password: [Use --show-password to display]")
 	}
 

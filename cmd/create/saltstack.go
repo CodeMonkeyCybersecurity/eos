@@ -239,10 +239,10 @@ Target Types:
 
 		if dryRun {
 			logger.Info("terminal prompt: DRY RUN: Would execute Salt function")
-			logger.Info("terminal prompt:   Target: %s (%s)", target, targetType)
-			logger.Info("terminal prompt:   Function: %s", function)
+			logger.Info(fmt.Sprintf("terminal prompt:   Target: %s (%s)", target, targetType))
+			logger.Info(fmt.Sprintf("terminal prompt:   Function: %s", function))
 			if len(functionArgs) > 0 {
-				logger.Info("terminal prompt:   Arguments: %s", strings.Join(functionArgs, " "))
+				logger.Info(fmt.Sprintf("terminal prompt:   Arguments: %s", strings.Join(functionArgs, " ")))
 			}
 			return nil
 		}
@@ -275,7 +275,7 @@ Target Types:
 			return outputExecutionResultsJSON(result)
 		}
 
-		return outputExecutionResultsText(result, target, function, async)
+		return outputExecutionResultsText(rc, result, target, function, async)
 	}),
 }
 
@@ -297,23 +297,24 @@ func outputExecutionResultsJSON(result interface{}) error {
 }
 
 // TODO
-func outputExecutionResultsText(result interface{}, target, function string, async bool) error {
+func outputExecutionResultsText(rc *eos_io.RuntimeContext, result interface{}, target, function string, async bool) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("terminal prompt: Salt Execution Results")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
-	logger.Info("terminal prompt: Target: %s", target)
-	logger.Info("terminal prompt: Function: %s", function)
+	logger.Info("terminal prompt: " + strings.Repeat("=", 50))
+	logger.Info(fmt.Sprintf("terminal prompt: Target: %s", target))
+	logger.Info(fmt.Sprintf("terminal prompt: Function: %s", function))
 
 	if async {
 		logger.Info("terminal prompt: Execution Mode: Asynchronous")
-		logger.Info("terminal prompt: Job ID: %v", result)
+		logger.Info(fmt.Sprintf("terminal prompt: Job ID: %v", result))
 		logger.Info("terminal prompt: \nUse 'eos read salt-job-status <job-id>' to check progress")
 	} else {
 		logger.Info("terminal prompt: Execution Mode: Synchronous")
 		logger.Info("terminal prompt: \nResults:")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 30))))
+		logger.Info("terminal prompt: " + strings.Repeat("-", 30))
 
 		// TODO: Implement proper result formatting based on Salt client response format
-		logger.Info("terminal prompt: %v", result)
+		logger.Info(fmt.Sprintf("terminal prompt: %v", result))
 	}
 
 	return nil

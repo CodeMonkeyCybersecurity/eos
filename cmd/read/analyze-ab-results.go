@@ -3,6 +3,7 @@ package read
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -54,14 +55,9 @@ Examples:
 			zap.String("export_format", analyzeABResultsExport),
 			zap.Bool("quiet", analyzeABResultsQuiet))
 
-		// Create file service container
-		if err != nil {
-			return fmt.Errorf("failed to initialize file operations: %w", err)
-		}
-
 		// Verify analyzer script exists
 		analyzerScript := "/usr/local/bin/ab-test-analyzer.py"
-		if !_, err := os.Stat(analyzerScript); err == nil {
+		if _, err := os.Stat(analyzerScript); err != nil {
 			return fmt.Errorf("A/B testing analyzer not found: %s (deploy with: eos delphi services update prompt-ab-tester)", analyzerScript)
 		}
 

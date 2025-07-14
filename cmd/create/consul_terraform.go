@@ -143,10 +143,10 @@ fi`
 
 		logger.Info("terminal prompt:  Consul-Vault integrated infrastructure generated!")
 		logger.Info("terminal prompt: To deploy:")
-		logger.Info("terminal prompt:   cd %s", targetDir)
+		logger.Info("terminal prompt:   cd to directory", zap.String("dir", targetDir))
 		logger.Info("terminal prompt:   ./deploy-consul-vault.sh")
-		logger.Info("terminal prompt: \nConsul Address: %s", consulAddr)
-		logger.Info("terminal prompt: Vault Address: %s", vaultAddr)
+		logger.Info("terminal prompt: Consul Address", zap.String("address", consulAddr))
+		logger.Info("terminal prompt: Vault Address", zap.String("address", vaultAddr))
 
 		return nil
 	}),
@@ -288,14 +288,14 @@ Example:
 
 		logger.Info("terminal prompt:  Consul cluster configuration generated!\n")
 		logger.Info("terminal prompt: Next steps:")
-		logger.Info("terminal prompt: 1. Set up secrets: cd %s && ./setup-consul-vault-secrets.sh", outputDir)
+		logger.Info("terminal prompt: 1. Set up secrets: cd to dir && ./setup-consul-vault-secrets.sh", zap.String("dir", outputDir))
 		logger.Info("terminal prompt: 2. Review configuration: terraform plan")
 		logger.Info("terminal prompt: 3. Deploy cluster: terraform apply\n")
 		logger.Info("terminal prompt: Cluster details:")
-		logger.Info("terminal prompt: - Datacenter: %s", datacenter)
-		logger.Info("terminal prompt: - Servers: %d", serverCount)
-		logger.Info("terminal prompt: - Clients: %d", clientCount)
-		logger.Info("terminal prompt: - Location: %s", location)
+		logger.Info("terminal prompt: - Datacenter", zap.String("datacenter", datacenter))
+		logger.Info("terminal prompt: - Servers", zap.Int("count", serverCount))
+		logger.Info("terminal prompt: - Clients", zap.Int("count", clientCount))
+		logger.Info("terminal prompt: - Location", zap.String("location", location))
 
 		return nil
 	}),
@@ -382,7 +382,7 @@ Example:
 		logger.Info("Service mesh configuration generated successfully",
 			zap.String("directory", outputDir))
 
-		logger.Info("terminal prompt:  Service mesh configuration generated in: %s", outputDir)
+		logger.Info("terminal prompt:  Service mesh configuration generated in directory", zap.String("dir", outputDir))
 
 		return nil
 	}),

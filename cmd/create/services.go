@@ -3,6 +3,7 @@
 package create
 
 import (
+	"fmt"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -91,7 +92,7 @@ Examples:
 		// Display deployment results
 		convertedResult := service_deployment.ConvertFromSystemDeploymentResult(result)
 		if err := service_deployment.DisplayDeploymentResult(rc, convertedResult); err != nil {
-			logger.Info("terminal prompt: Warning: Failed to display deployment results: %v", err)
+			logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to display deployment results: %v", err))
 		}
 
 		return nil
@@ -164,7 +165,7 @@ Examples:
 
 		convertedResult := service_deployment.ConvertFromSystemDeploymentResult(result)
 		if err := service_deployment.DisplayDeploymentResult(rc, convertedResult); err != nil {
-			logger.Info("terminal prompt: Warning: Failed to display deployment results: %v", err)
+			logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to display deployment results: %v", err))
 		}
 
 		return nil
@@ -238,7 +239,7 @@ Examples:
 
 		convertedResult := service_deployment.ConvertFromSystemDeploymentResult(result)
 		if err := service_deployment.DisplayDeploymentResult(rc, convertedResult); err != nil {
-			logger.Info("terminal prompt: Warning: Failed to display deployment results: %v", err)
+			logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to display deployment results: %v", err))
 		}
 
 		return nil

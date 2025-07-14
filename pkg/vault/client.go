@@ -45,6 +45,17 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 	return nil
 }
 
+// APIClient returns the underlying HashiCorp Vault API client
+// This is needed for functions that expect *api.Client directly
+func (c *Client) APIClient() *vaultapi.Client {
+	return c.client
+}
+
+// Address returns the Vault server address
+func (c *Client) Address() string {
+	return c.client.Address()
+}
+
 // GetSecret implements VaultService.GetSecret
 func (c *Client) GetSecret(ctx context.Context, path string) (*Secret, error) {
 	c.logger.Debug("getting secret", zap.String("path", path))

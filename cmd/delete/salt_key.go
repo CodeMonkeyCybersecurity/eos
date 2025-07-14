@@ -67,9 +67,9 @@ Security Notice:
 		if dryRun {
 			logger.Info("terminal prompt: DRY RUN: Would delete Salt keys")
 			if pattern != "" {
-				logger.Info("terminal prompt:   Pattern: %s", pattern)
+				logger.Info("terminal prompt:   Pattern", zap.String("pattern", pattern))
 			} else {
-				logger.Info("terminal prompt:   Include List: %s", includeList)
+				logger.Info("terminal prompt:   Include List", zap.String("include_list", includeList))
 			}
 			return nil
 		}
@@ -113,14 +113,14 @@ Security Notice:
 		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 40))))
 
 		if pattern != "" {
-			logger.Info("terminal prompt: Pattern: %s", pattern)
+			logger.Info("terminal prompt: Pattern", zap.String("pattern", pattern))
 		} else {
-			logger.Info("terminal prompt: Include List: %s", includeList)
+			logger.Info("terminal prompt: Include List", zap.String("include_list", includeList))
 		}
-		logger.Info("terminal prompt: Message: %s", result.Message)
-		logger.Info("terminal prompt: Deleted Keys: %v", result.DeletedKeys)
+		logger.Info("terminal prompt: Message", zap.String("message", result.Message))
+		logger.Info("terminal prompt: Deleted Keys", zap.Strings("keys", result.DeletedKeys))
 		if len(result.ErrorKeys) > 0 {
-			logger.Info("terminal prompt: Failed Keys: %v", result.ErrorKeys)
+			logger.Info("terminal prompt: Failed Keys", zap.Strings("keys", result.ErrorKeys))
 		}
 
 		logger.Info("Salt keys deleted successfully",

@@ -247,11 +247,11 @@ func addNewCustomer(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	// Show access information
 	logger.Info("terminal prompt: Customer provisioned successfully!")
 	logger.Info("terminal prompt: Access Details:")
-	logger.Info("terminal prompt: - Customer ID: %s", customerConfig.ID)
-	logger.Info("terminal prompt: - Dashboard URL: https://%s.<platform-domain>", customerConfig.Subdomain)
-	logger.Info("terminal prompt: - Admin Email: %s", customerConfig.AdminEmail)
+	logger.Info(fmt.Sprintf("terminal prompt: - Customer ID: %s", customerConfig.ID))
+	logger.Info(fmt.Sprintf("terminal prompt: - Dashboard URL: https://%s.<platform-domain>", customerConfig.Subdomain))
+	logger.Info(fmt.Sprintf("terminal prompt: - Admin Email: %s", customerConfig.AdminEmail))
 	logger.Info("terminal prompt: Credentials have been stored in Vault at:")
-	logger.Info("terminal prompt: - wazuh-mssp/customers/%s/wazuh/credentials", customerConfig.ID)
+	logger.Info(fmt.Sprintf("terminal prompt: - wazuh-mssp/customers/%s/wazuh/credentials", customerConfig.ID))
 
 	return nil
 }

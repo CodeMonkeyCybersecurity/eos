@@ -112,7 +112,7 @@ Examples:
 
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			logger.Info("terminal prompt: Are you sure you want to revoke lease %s? [y/N]: ", leaseID)
+			logger.Info("terminal prompt: Are you sure you want to revoke lease? [y/N]", zap.String("lease_id", leaseID))
 			var response string
 			if _, err := fmt.Scanln(&response); err != nil {
 				logger.Warn("Failed to read user input", zap.Error(err))
@@ -175,7 +175,7 @@ func outputJSONCredential(credential *database_management.DatabaseCredential, sh
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(data))))
+	fmt.Println(string(data))
 	return nil
 }
 
@@ -189,8 +189,8 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 		}
 	}()
 
-	logger.Info("terminal prompt: Dynamic Database Credentials")
-	logger.Info("terminal prompt: ============================\n")
+	fmt.Println("Dynamic Database Credentials")
+	fmt.Println("============================")
 
 	if _, err := fmt.Fprintf(w, "Username:\t%s\n", credential.Username); err != nil {
 		return fmt.Errorf("failed to write username: %w", err)
@@ -222,13 +222,13 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 		return fmt.Errorf("failed to write expires at: %w", err)
 	}
 
-	logger.Info("terminal prompt: Connection String Example:")
+	fmt.Println("\nConnection String Example:")
 	if showPassword {
-		logger.Info("terminal prompt: psql -h localhost -U %s -d delphi", credential.Username)
-		logger.Info("terminal prompt: Password: %s", credential.Password)
+		fmt.Printf("psql -h localhost -U %s -d delphi\n", credential.Username)
+		fmt.Printf("Password: %s\n", credential.Password)
 	} else {
-		logger.Info("terminal prompt: psql -h localhost -U %s -d delphi", credential.Username)
-		logger.Info("terminal prompt: Password: [Use --show-password to display]")
+		fmt.Printf("psql -h localhost -U %s -d delphi\n", credential.Username)
+		fmt.Println("Password: [Use --show-password to display]")
 	}
 
 	return nil

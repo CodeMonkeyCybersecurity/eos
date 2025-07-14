@@ -301,10 +301,9 @@ var DeleteTestDataCmd = &cobra.Command{
 			return vault.DeleteTestDataFromDisk(rc)
 		}
 
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
-		logger.Info("terminal prompt:   Test Data Deletion Summary")
-		logger.Info("terminal prompt:    Vault: SUCCESS")
-		logger.Info("terminal prompt:      Path: secret/data/%s\n", shared.TestDataVaultPath)
+		log.Info("terminal prompt: Test Data Deletion Summary")
+		log.Info("terminal prompt: Vault: SUCCESS")
+		log.Info("terminal prompt: Path", zap.String("path", "secret/data/"+shared.TestDataVaultPath))
 		log.Info(" Test-data deleted successfully (Vault)")
 		return nil
 	}),

@@ -145,9 +145,9 @@ var CreateHeraCmd = &cobra.Command{
 			otelzap.Ctx(rc.Ctx).Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}
 
-		logger.Info("terminal prompt: \n Hera (Authentik) is deploying.")
-		logger.Info("terminal prompt: Visit: http://<your-server>:9000/if/flow/initial-setup/")
-		logger.Info("terminal prompt: Be sure to include the trailing slash or you may see a 404.")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Hera (Authentik) is deploying.")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Visit: http://<your-server>:9000/if/flow/initial-setup/")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Be sure to include the trailing slash or you may see a 404.")
 		return nil
 	}),
 }

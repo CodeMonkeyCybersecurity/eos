@@ -45,7 +45,7 @@ Examples:
 			zap.Bool("dry_run", dryRun))
 
 		if !force && !dryRun {
-			logger.Info("terminal prompt: WARNING: This will destroy all data on %s!", device)
+			logger.Info("terminal prompt: WARNING: This will destroy all data on device!", zap.String("device", device))
 		}
 
 		// Use simplified function instead of manager pattern

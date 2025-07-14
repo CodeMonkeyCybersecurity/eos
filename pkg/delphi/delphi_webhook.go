@@ -5,17 +5,15 @@ package delphi
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // DeployDelphiWebhook deploys Delphi webhook scripts to target directory
 func DeployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targetDir string, dryRun, force bool) error {
-	// Use direct file operations
-	rc := &eos_io.RuntimeContext{Ctx: ctx, Log: logger.Logger().Logger}
 
 	// Define script paths - updated to match actual file locations
 	pythonScript := "assets/python_workers/custom-delphi-webhook.py"
@@ -31,13 +29,13 @@ func DeployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 
 	// Check if source files exist
 	for _, src := range []string{pythonScript, bashScript} {
-		if !fileContainer.FileExists(src) {
+		if _, err := os.Stat(src); os.IsNotExist(err) {
 			return fmt.Errorf("source file not found: %s (ensure Eos assets are properly installed)", src)
 		}
 	}
 
 	// Validate target directory
-	if !fileContainer.FileExists(targetDir) {
+	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 		logger.Info("Creating target directory", zap.String("dir", targetDir))
 		if !dryRun {
 			if err := os.MkdirAll(targetDir, 0755); err != nil {
@@ -47,10 +45,8 @@ func DeployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 	}
 
 	// Check for existing files
-	// OLD: if fileExists(dest) && !force {
-	// NEW:
 	for _, dest := range []string{pythonDest, bashDest} {
-		if fileContainer.FileExists(dest) && !force {
+		if _, err := os.Stat(dest); err == nil && !force {
 			return fmt.Errorf("file already exists: %s (use --force to overwrite)", dest)
 		}
 	}
@@ -65,13 +61,20 @@ func DeployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 			return nil
 		}
 
-		data, err := fileContainer.Service.ReadFile(ctx, src)
+		srcFile, err := os.Open(src)
 		if err != nil {
-			return fmt.Errorf("failed to read source file %s: %w", src, err)
+			return fmt.Errorf("failed to open source file %s: %w", src, err)
 		}
+		defer srcFile.Close()
 
-		if err := fileContainer.Service.WriteFile(ctx, dst, data, perm); err != nil {
-			return fmt.Errorf("failed to write destination file %s: %w", dst, err)
+		dstFile, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, perm)
+		if err != nil {
+			return fmt.Errorf("failed to create destination file %s: %w", dst, err)
+		}
+		defer dstFile.Close()
+
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return fmt.Errorf("failed to copy file from %s to %s: %w", src, dst, err)
 		}
 
 		logger.Info("File deployed successfully",

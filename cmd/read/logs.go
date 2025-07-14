@@ -39,7 +39,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 				if path == active {
 					prefix = "⭐"
 				}
-				logger.Info("terminal prompt: \n%s %s", prefix, path)
+				log.Info(fmt.Sprintf("terminal prompt: \n%s %s", prefix, path))
 
 				logger.PrintLastNLines(content, 100) // <--- Only last 100 lines printed
 				found = true

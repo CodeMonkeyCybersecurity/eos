@@ -9,20 +9,20 @@ import (
 	"go.uber.org/zap"
 )
 
-// SchemaValidator implements config.Validator
+// SchemaValidator implements Validator
 type SchemaValidator struct {
 	logger *zap.Logger
 }
 
 // NewSchemaValidator creates a new schema validator
-func NewSchemaValidator(logger *zap.Logger) config.Validator {
+func NewSchemaValidator(logger *zap.Logger) *SchemaValidator {
 	return &SchemaValidator{
-		logger: logger.Named("config.schema_validator"),
+		logger: logger.Named("schema_validator"),
 	}
 }
 
 // ValidateSchema validates data against a JSON schema
-func (v *SchemaValidator) ValidateSchema(ctx context.Context, data interface{}, schema config.Schema) error {
+func (v *SchemaValidator) ValidateSchema(ctx context.Context, data interface{}, schema Schema) error {
 	// Basic validation implementation
 	// In a real implementation, you might use a proper JSON schema validator
 
@@ -56,7 +56,7 @@ func (v *SchemaValidator) ValidateRequired(ctx context.Context, data interface{}
 }
 
 // ValidateTypes validates field types match expectations
-func (v *SchemaValidator) ValidateTypes(ctx context.Context, data interface{}, types config.TypeMap) error {
+func (v *SchemaValidator) ValidateTypes(ctx context.Context, data interface{}, types TypeMap) error {
 	dataMap, ok := data.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("data must be a map for type validation")
@@ -79,7 +79,7 @@ func (v *SchemaValidator) ValidateTypes(ctx context.Context, data interface{}, t
 }
 
 // ValidateConstraints validates business rule constraints
-func (v *SchemaValidator) ValidateConstraints(ctx context.Context, data interface{}, constraints []config.Constraint) error {
+func (v *SchemaValidator) ValidateConstraints(ctx context.Context, data interface{}, constraints []Constraint) error {
 	dataMap, ok := data.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("data must be a map for constraint validation")
@@ -98,34 +98,34 @@ func (v *SchemaValidator) ValidateConstraints(ctx context.Context, data interfac
 }
 
 // validateFieldType validates a single field type
-func (v *SchemaValidator) validateFieldType(field string, value interface{}, expectedType config.DataType) error {
+func (v *SchemaValidator) validateFieldType(field string, value interface{}, expectedType DataType) error {
 	actualType := reflect.TypeOf(value)
 	if actualType == nil {
 		return nil // nil values are allowed
 	}
 
 	switch expectedType {
-	case config.TypeString:
+	case TypeString:
 		if actualType.Kind() != reflect.String {
 			return fmt.Errorf("field %s: expected string, got %s", field, actualType.Kind())
 		}
-	case config.TypeInt:
+	case TypeInt:
 		if actualType.Kind() != reflect.Int && actualType.Kind() != reflect.Int64 && actualType.Kind() != reflect.Float64 {
 			return fmt.Errorf("field %s: expected integer, got %s", field, actualType.Kind())
 		}
-	case config.TypeFloat:
+	case TypeFloat:
 		if actualType.Kind() != reflect.Float32 && actualType.Kind() != reflect.Float64 {
 			return fmt.Errorf("field %s: expected float, got %s", field, actualType.Kind())
 		}
-	case config.TypeBool:
+	case TypeBool:
 		if actualType.Kind() != reflect.Bool {
 			return fmt.Errorf("field %s: expected boolean, got %s", field, actualType.Kind())
 		}
-	case config.TypeArray:
+	case TypeArray:
 		if actualType.Kind() != reflect.Slice && actualType.Kind() != reflect.Array {
 			return fmt.Errorf("field %s: expected array, got %s", field, actualType.Kind())
 		}
-	case config.TypeObject:
+	case TypeObject:
 		if actualType.Kind() != reflect.Map && actualType.Kind() != reflect.Struct {
 			return fmt.Errorf("field %s: expected object, got %s", field, actualType.Kind())
 		}
@@ -135,18 +135,18 @@ func (v *SchemaValidator) validateFieldType(field string, value interface{}, exp
 }
 
 // validateConstraint validates a single constraint
-func (v *SchemaValidator) validateConstraint(data map[string]interface{}, constraint config.Constraint) error {
+func (v *SchemaValidator) validateConstraint(data map[string]interface{}, constraint Constraint) error {
 	value, exists := data[constraint.Field]
 	if !exists {
 		return nil // Skip validation for missing fields
 	}
 
 	switch constraint.Operator {
-	case config.OpEquals:
+	case OpEquals:
 		if !reflect.DeepEqual(value, constraint.Value) {
 			return fmt.Errorf("constraint failed: %s", constraint.Message)
 		}
-	case config.OpNotEquals:
+	case OpNotEquals:
 		if reflect.DeepEqual(value, constraint.Value) {
 			return fmt.Errorf("constraint failed: %s", constraint.Message)
 		}

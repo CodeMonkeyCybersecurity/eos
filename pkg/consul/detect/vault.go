@@ -27,7 +27,7 @@ func VaultInstallation(rc *eos_io.RuntimeContext) bool {
 	// INTERVENE - Try to create a Vault client
 	log.Debug("Attempting to connect to Vault", zap.String("vault_addr", vaultAddr))
 
-	client, err := vault.NewClient(rc)
+	client, err := vault.NewClient(vaultAddr, log.Logger().Logger)
 	if err != nil {
 		log.Debug("Failed to create Vault client", zap.Error(err))
 		return false
@@ -36,7 +36,7 @@ func VaultInstallation(rc *eos_io.RuntimeContext) bool {
 	// EVALUATE - Check if Vault is healthy
 	log.Debug("Checking Vault health")
 
-	_, err = client.Sys().Health()
+	err = client.CheckHealth(rc.Ctx)
 	if err != nil {
 		log.Debug("Vault health check failed", zap.Error(err))
 		return false

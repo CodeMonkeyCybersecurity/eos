@@ -260,7 +260,7 @@ func TestSecureAuthenticationOrchestrator(t *testing.T) {
 		cleanup := testutil.WithMockHTTPClient(t, mockTransport)
 		defer cleanup()
 
-		client, err := NewClient(rc)
+		client, err := mustNewClient(rc)
 		testutil.AssertNoError(t, err)
 
 		// Should fail gracefully without exposing sensitive information
@@ -325,7 +325,7 @@ func TestEnhancedTokenVerification(t *testing.T) {
 				cleanup := testutil.WithMockHTTPClient(t, testutil.VaultMockTransport())
 				defer cleanup()
 
-				client, err := NewClient(rc)
+				client, err := mustNewClient(rc)
 				if err != nil {
 					// If client creation fails, return false (expected behavior)
 					result := false
@@ -353,7 +353,7 @@ func TestSecureRootTokenFallback(t *testing.T) {
 		cleanup := testutil.WithMockHTTPClient(t, testutil.VaultMockTransport())
 		defer cleanup()
 
-		client, err := NewClient(rc)
+		client, err := mustNewClient(rc)
 		testutil.AssertNoError(t, err)
 
 		// Should fail because we don't have actual root token files in test environment

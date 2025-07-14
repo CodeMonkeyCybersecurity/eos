@@ -140,7 +140,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	// Clear screen and move cursor to top
 	logger.Info("terminal prompt: \033[2J\033[H")
 
-	logger.Info("terminal prompt:   Delphi Agents Monitor - Last %d agents (Updated: %s)", limit, time.Now().Format("15:04:05"))
+	logger.Info("terminal prompt: Delphi Agents Monitor", zap.Int("limit", limit), zap.String("updated", time.Now().Format("15:04:05")))
 	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 140))))
 
 	// Query recent agents
@@ -168,10 +168,8 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		}
 	}()
 
-	// Print header
-	fmt.Printf("%-8s %-15s %-15s %-20s %-12s %-12s %-15s %-12s %-15s %-12s\n",
-		"ID", "Name", "IP", "OS", "Status", "Last Seen", "Version", "Node", "Registered", "API Fetch")
-	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 140))))
+	// Log header
+	logger.Info("terminal prompt: Headers", zap.Strings("columns", []string{"ID", "Name", "IP", "OS", "Status", "Last Seen", "Version", "Node", "Registered", "API Fetch"}))
 
 	agents := make([]Agent, 0, limit)
 	for rows.Next() {
@@ -206,12 +204,20 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		registeredTime := formatOptionalTimeShort(agent.Registered)
 		apiFetchTime := formatOptionalTimeShort(agent.APIFetchTimestamp)
 
-		// Color-code status
-		statusColor := getAgentStatusColor(agent.StatusText)
+		// Color-code status (not used in structured logging)
+		_ = getAgentStatusColor(agent.StatusText)
 
-		fmt.Printf("%-8s %-15s %-15s %-20s %s%-12s\033[0m %-12s %-15s %-15s %-12s %-12s\n",
-			agent.ID, name, ip, os, statusColor, status, lastSeenTime,
-			version, node, registeredTime, apiFetchTime)
+		logger.Info("terminal prompt: Agent", 
+			zap.String("id", agent.ID),
+			zap.String("name", name),
+			zap.String("ip", ip),
+			zap.String("os", os),
+			zap.String("status", status),
+			zap.String("last_seen", lastSeenTime),
+			zap.String("version", version),
+			zap.String("node", node),
+			zap.String("registered", registeredTime),
+			zap.String("api_fetch", apiFetchTime))
 	}
 
 	if len(agents) == 0 {
@@ -220,8 +226,10 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 
 	// Count active/inactive agents
 	activeCount, totalCount := countAgentsByStatus(ctx, db)
-	fmt.Printf("\n Active: %d | Total: %d | Showing: %d | Press Ctrl+C to exit\n",
-		activeCount, totalCount, len(agents))
+	logger.Info("terminal prompt: Agent Summary", 
+		zap.Int("active", activeCount),
+		zap.Int("total", totalCount),
+		zap.Int("showing", len(agents)))
 }
 
 // TODO: Move to pkg/shared/format or pkg/eos_io
@@ -329,8 +337,8 @@ var ReadKeepAliveCmd = &cobra.Command{
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to format JSON", zap.Error(err))
 		}
-		logger.Info("terminal prompt: Disconnected agents:")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", string(pretty))))
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Disconnected agents")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: JSON output", zap.String("data", string(pretty)))
 		return nil
 	}),
 }

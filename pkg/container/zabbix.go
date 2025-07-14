@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -44,11 +45,12 @@ func DeployZabbix(rc *eos_io.RuntimeContext) error {
 	// Auto-detect timezone if not explicitly set
 	effectiveTimeZone := timeZone
 	if timeZone == "auto" || timeZone == "" {
-		if detectedTZ, err := sysinfo.DetectHostTimeZone(rc); err != nil {
+		// Simple timezone detection using /etc/timezone or fallback to UTC
+		if timezone, err := detectHostTimeZone(); err != nil {
 			logger.Warn(" Failed to detect host timezone, using UTC", zap.Error(err))
 			effectiveTimeZone = "UTC"
 		} else {
-			effectiveTimeZone = detectedTZ
+			effectiveTimeZone = timezone
 			logger.Info(" Auto-detected host timezone", zap.String("timezone", effectiveTimeZone))
 		}
 	}
@@ -98,4 +100,18 @@ func generateZabbixComposeFile(filePath string, vars map[string]string) error {
 	}
 
 	return nil
+}
+
+// detectHostTimeZone attempts to detect the host timezone
+func detectHostTimeZone() (string, error) {
+	// Try to read /etc/timezone first
+	if data, err := os.ReadFile("/etc/timezone"); err == nil {
+		timezone := strings.TrimSpace(string(data))
+		if timezone != "" {
+			return timezone, nil
+		}
+	}
+
+	// Fallback to UTC
+	return "UTC", nil
 }

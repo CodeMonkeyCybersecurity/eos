@@ -68,7 +68,7 @@ Examples:
 
 		// Interactive mode
 		if interactive {
-			if err := runInteractiveMattermostSetup(options); err != nil {
+			if err := runInteractiveMattermostSetup(rc, options); err != nil {
 				return fmt.Errorf("interactive setup failed: %w", err)
 			}
 		}
@@ -88,27 +88,27 @@ Examples:
 
 			logger.Info("terminal prompt: Mattermost Installation Complete!\n")
 			logger.Info("terminal prompt: 💬 Service Details:")
-			logger.Info("terminal prompt:    Version: %s", result.Version)
-			logger.Info("terminal prompt:    Port: %d", result.Port)
-			logger.Info("terminal prompt:    Method: %s", result.Method)
-			logger.Info("terminal prompt:    Duration: %s", result.Duration)
+			logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
+			logger.Info(fmt.Sprintf("terminal prompt:    Port: %d", result.Port))
+			logger.Info(fmt.Sprintf("terminal prompt:    Method: %s", result.Method))
+			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))
 
 			if len(result.Endpoints) > 0 {
 				logger.Info("terminal prompt: 🌐 Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					logger.Info("terminal prompt:    %s", endpoint)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s", endpoint))
 				}
 			}
 
 			if len(result.Credentials) > 0 {
 				logger.Info("terminal prompt:  Database Credentials:")
 				for key, value := range result.Credentials {
-					logger.Info("terminal prompt:    %s: %s", key, value)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s: %s", key, value))
 				}
 			}
 
 			logger.Info("terminal prompt: 📝 Next Steps:")
-			logger.Info("terminal prompt:    1. Open Mattermost in your browser: http://localhost:%d", result.Port)
+			logger.Info(fmt.Sprintf("terminal prompt:    1. Open Mattermost in your browser: http://localhost:%d", result.Port))
 			logger.Info("terminal prompt:    2. Create the first admin account")
 			logger.Info("terminal prompt:    3. Configure team settings and integrations")
 			logger.Info("terminal prompt:    4. Invite team members")
@@ -116,7 +116,7 @@ Examples:
 		} else {
 			logger.Error("Mattermost installation failed", zap.String("error", result.Error))
 			logger.Info("terminal prompt: ❌ Mattermost Installation Failed!")
-			logger.Info("terminal prompt: Error: %s", result.Error)
+			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
 				logger.Info("terminal prompt: Installation Steps:")
@@ -128,9 +128,9 @@ Examples:
 					case "running":
 						status = "⏳"
 					}
-					logger.Info("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration)
+					logger.Info(fmt.Sprintf("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration))
 					if step.Error != "" {
-						logger.Info("terminal prompt:       Error: %s", step.Error)
+						logger.Info(fmt.Sprintf("terminal prompt:       Error: %s", step.Error))
 					}
 				}
 			}
@@ -151,12 +151,13 @@ func init() {
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func runInteractiveMattermostSetup(options *service_installation.ServiceInstallOptions) error {
+func runInteractiveMattermostSetup(rc *eos_io.RuntimeContext, options *service_installation.ServiceInstallOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("terminal prompt: Interactive Mattermost Setup")
 	logger.Info("terminal prompt: ================================\n")
 
 	// Version
-	logger.Info("terminal prompt: Mattermost version [%s]: ", options.Version)
+	logger.Info(fmt.Sprintf("terminal prompt: Mattermost version [%s]: ", options.Version))
 	var version string
 	fmt.Scanln(&version)
 	if version != "" {
@@ -164,7 +165,7 @@ func runInteractiveMattermostSetup(options *service_installation.ServiceInstallO
 	}
 
 	// Port
-	logger.Info("terminal prompt: Port [%d]: ", options.Port)
+	logger.Info(fmt.Sprintf("terminal prompt: Port [%d]: ", options.Port))
 	var portStr string
 	fmt.Scanln(&portStr)
 	if portStr != "" {
@@ -201,10 +202,10 @@ func runInteractiveMattermostSetup(options *service_installation.ServiceInstallO
 	}
 
 	logger.Info("terminal prompt: Configuration Summary:")
-	logger.Info("terminal prompt:    Version: %s", options.Version)
-	logger.Info("terminal prompt:    Port: %d", options.Port)
+	logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", options.Version))
+	logger.Info(fmt.Sprintf("terminal prompt:    Port: %d", options.Port))
 	if siteURL, exists := options.Config["SITE_URL"]; exists {
-		logger.Info("terminal prompt:    Site URL: %s", siteURL)
+		logger.Info(fmt.Sprintf("terminal prompt:    Site URL: %s", siteURL))
 	}
 
 	logger.Info("terminal prompt: \nProceed with installation? [Y/n]: ")
