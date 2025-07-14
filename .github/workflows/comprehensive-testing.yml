@@ -116,7 +116,7 @@ jobs:
         ./scripts/comprehensive-fuzz-runner.sh ${{ env.FUZZ_DURATION }}
     
     - name: Upload security test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: security-fuzz-results-${{ matrix.focus }}
@@ -162,7 +162,7 @@ jobs:
         ./scripts/comprehensive-fuzz-runner.sh ${{ env.FUZZ_DURATION }}
     
     - name: Upload architecture test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: architecture-test-results
@@ -199,7 +199,7 @@ jobs:
         ./scripts/comprehensive-fuzz-runner.sh ${{ env.FUZZ_DURATION }}
     
     - name: Upload chaos test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: chaos-engineering-results
@@ -228,7 +228,7 @@ jobs:
         go test -v -run TestStateConsistencyProperties ./pkg/testing
     
     - name: Upload property test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: property-test-results
@@ -262,7 +262,7 @@ jobs:
         cat benchmark_analysis.txt
     
     - name: Upload benchmark results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-benchmarks
         path: |
@@ -290,7 +290,7 @@ jobs:
         go tool cover -func=coverage.out | grep total | awk '{print "Total coverage:", $3}'
     
     - name: Upload coverage results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report
         path: |
@@ -337,7 +337,7 @@ jobs:
         go test -v -timeout=30m ./test/integration_scenarios_test.go
     
     - name: Upload integration test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: integration-test-results
@@ -391,7 +391,7 @@ jobs:
         cat security_report.md
     
     - name: Upload security report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: comprehensive-security-report
         path: security_report.md
@@ -440,7 +440,7 @@ jobs:
         ./scripts/comprehensive-fuzz-runner.sh 30m
     
     - name: Upload extended test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: nightly-extended-fuzzing-results
