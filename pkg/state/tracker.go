@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -310,10 +311,14 @@ func (s *StateTracker) GatherOutOfBand(rc *eos_io.RuntimeContext) error {
 
 // getServiceStatus gets the status of a systemd service
 func (s *StateTracker) getServiceStatus(rc *eos_io.RuntimeContext, service string) string {
-	cmd := eos_cli.New(rc)
-	
-	output, err := cmd.ExecString("systemctl", "is-active", service)
+	// Use execute directly to avoid error logging for inactive services
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", service},
+		Capture: true,
+	})
 	if err != nil {
+		// systemctl is-active returns exit code 3 for inactive services - this is normal
 		return "inactive"
 	}
 	

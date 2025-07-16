@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
 	"github.com/spf13/cobra"
@@ -310,11 +311,21 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	// EVALUATE - Verify cleanup
 	logger.Info("Verifying cleanup")
 
-	// Check for remaining processes
+	// Check for remaining processes (using execute directly to avoid error logging)
 	remainingProcesses := []string{}
 	for _, proc := range []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd"} {
-		if output, err := cli.ExecString("pgrep", "-f", proc); err == nil && strings.TrimSpace(output) != "" {
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "pgrep",
+			Args:    []string{"-f", proc},
+			Capture: true,
+		})
+		// pgrep returns exit code 1 when no processes found - this is normal, not an error
+		if err == nil && strings.TrimSpace(output) != "" {
 			remainingProcesses = append(remainingProcesses, proc)
+			logger.Debug("Process still running", zap.String("process", proc))
+		} else {
+			logger.Debug("No processes found for service (this is normal during cleanup)",
+				zap.String("process", proc))
 		}
 	}
 
@@ -324,9 +335,16 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 		// Force kill if needed
 		for _, proc := range remainingProcesses {
-			if _, err := cli.ExecString("pkill", "-9", "-f", proc); err != nil {
+			_, err := execute.Run(rc.Ctx, execute.Options{
+				Command: "pkill",
+				Args:    []string{"-9", "-f", proc},
+				Capture: true,
+			})
+			if err != nil {
 				logger.Debug("Failed to kill process (may have already exited)",
 					zap.String("process", proc), zap.Error(err))
+			} else {
+				logger.Info("Force killed process", zap.String("process", proc))
 			}
 		}
 	}
