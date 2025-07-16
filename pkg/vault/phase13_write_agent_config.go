@@ -37,7 +37,8 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 	}
 
 	// 1) prepare /run/eos and the sink file
-	if err := prepareTokenSink(rc, shared.AgentToken, shared.EosID); err != nil {
+	// Use vault user instead of deprecated eos user
+	if err := prepareTokenSink(rc, shared.AgentToken, "vault"); err != nil {
 		return fmt.Errorf("prepare token sink: %w", err)
 	}
 
@@ -160,8 +161,8 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 func writeAgentUnit() error {
 	data := shared.AgentSystemdData{
 		Description: "Vault Agent (Eos)",
-		User:        shared.EosID,
-		Group:       shared.EosID,
+		User:        "vault",
+		Group:       "vault",
 		RuntimeDir:  "eos", // fix: use relative path for RuntimeDirectory, not absolute
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
 		RuntimeMode: "0700",
@@ -190,7 +191,8 @@ func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	tmpfilesPath := "/etc/tmpfiles.d/eos.conf"
-	tmpfilesContent := "d /run/eos 0755 eos eos -\n"
+	// Use vault user instead of deprecated eos user
+	tmpfilesContent := "d /run/eos 0755 vault vault -\n"
 
 	log.Info(" Creating systemd tmpfiles configuration", zap.String("path", tmpfilesPath))
 
@@ -226,7 +228,8 @@ func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 // cleanupStaleHCPDirectory removes the HCP directory that vault binary creates despite VAULT_SKIP_HCP=true
 func cleanupStaleHCPDirectory(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	hcpDir := "/home/eos/.config/hcp"
+	// Use vault user's home instead of deprecated eos user
+	hcpDir := "/home/vault/.config/hcp"
 
 	// Check if directory exists
 	if _, err := os.Stat(hcpDir); os.IsNotExist(err) {

@@ -140,11 +140,11 @@ func WriteAppRoleFiles(rc *eos_io.RuntimeContext, roleID, secretID string) error
 	dir := filepath.Dir(shared.AppRolePaths.RoleID)
 	otelzap.Ctx(rc.Ctx).Info(" Ensuring AppRole directory", zap.String("path", dir))
 
-	// Lookup eos UID/GID
-	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("lookup eos user failed", zap.String("user", shared.EosID), zap.Error(err))
-		return cerr.Wrapf(err, "lookup user %q", shared.EosID)
+		otelzap.Ctx(rc.Ctx).Error("lookup vault user failed", zap.String("user", "vault"), zap.Error(err))
+		return cerr.Wrapf(err, "lookup user %q", "vault")
 	}
 
 	// Recursively chown the directory
@@ -156,14 +156,14 @@ func WriteAppRoleFiles(rc *eos_io.RuntimeContext, roleID, secretID string) error
 	// Write RoleID
 	rolePath := shared.AppRolePaths.RoleID
 	otelzap.Ctx(rc.Ctx).Debug(" Writing RoleID", zap.String("path", rolePath))
-	if err := eos_unix.WriteFile(rc.Ctx, rolePath, []byte(roleID), 0o600, shared.EosID); err != nil {
+	if err := eos_unix.WriteFile(rc.Ctx, rolePath, []byte(roleID), 0o600, "vault"); err != nil {
 		return cerr.Wrapf(err, "write file %s", rolePath)
 	}
 
 	// Write SecretID
 	secretPath := shared.AppRolePaths.SecretID
 	otelzap.Ctx(rc.Ctx).Debug(" Writing SecretID", zap.String("path", secretPath))
-	if err := eos_unix.WriteFile(rc.Ctx, secretPath, []byte(secretID), 0o600, shared.EosID); err != nil {
+	if err := eos_unix.WriteFile(rc.Ctx, secretPath, []byte(secretID), 0o600, "vault"); err != nil {
 		return cerr.Wrapf(err, "write file %s", secretPath)
 	}
 

@@ -154,13 +154,13 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 		return cerr.New("AppRole auth method is required but not enabled")
 	}
 
-	// Verify eos user exists
-	log.Info(" Verifying eos system user exists")
-	if _, _, err := eos_unix.LookupUser(rc.Ctx, shared.EosID); err != nil {
-		log.Error(" eos system user not found",
-			zap.String("user", shared.EosID),
+	// Verify vault user exists
+	log.Info(" Verifying vault system user exists")
+	if _, _, err := eos_unix.LookupUser(rc.Ctx, "vault"); err != nil {
+		log.Error(" vault system user not found",
+			zap.String("user", "vault"),
 			zap.Error(err))
-		return cerr.Wrap(err, "eos system user not found")
+		return cerr.Wrap(err, "vault system user not found")
 	}
 
 	log.Info(" All prerequisites verified")
@@ -291,12 +291,13 @@ func writeAppRoleCredentialsToDisk(rc *eos_io.RuntimeContext, roleID, secretID s
 
 	// Set proper ownership
 	log.Info(" Setting proper ownership for credential files")
-	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		log.Error(" Failed to lookup eos user",
-			zap.String("user", shared.EosID),
+		log.Error(" Failed to lookup vault user",
+			zap.String("user", "vault"),
 			zap.Error(err))
-		return cerr.Wrap(err, "failed to lookup eos user")
+		return cerr.Wrap(err, "failed to lookup vault user")
 	}
 
 	if err := os.Chown(shared.AppRolePaths.RoleID, uid, gid); err != nil {
@@ -476,8 +477,8 @@ After=` + shared.VaultAgentService + `
 [Service]
 Type=oneshot
 ExecStart=` + healthCheckPath + `
-User=eos
-Group=eos
+User=vault
+Group=vault
 `
 
 	// Write timer and service files

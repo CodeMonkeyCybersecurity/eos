@@ -137,8 +137,8 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 				zap.Int64("size", stat.Size()))
 		}
 
-		// Use sudo -u eos to read the token file since /run/eos is owned by eos user
-		cmd := exec.Command("sudo", "-u", shared.EosID, "cat", path)
+		// Use sudo -u vault to read the token file since /run/eos is now owned by vault user
+		cmd := exec.Command("sudo", "-u", "vault", "cat", path)
 		if data, err := cmd.Output(); err == nil && len(data) > 0 {
 			log.Info(" Token acquired successfully",
 				zap.Int("attempt", attempt),
@@ -234,7 +234,8 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 			zap.String("mode", stat.Mode().String()))
 
 		// Verify ownership
-		uid, gid, userErr := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+		// Use vault user instead of deprecated eos user
+		uid, gid, userErr := eos_unix.LookupUser(rc.Ctx, "vault")
 		if userErr == nil {
 			if chownErr := os.Chown(runDir, uid, gid); chownErr != nil {
 				log.Warn("Could not update ownership of existing runtime directory",
@@ -257,7 +258,8 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Set proper ownership (eos user)
-	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
 		log.Warn("Could not lookup eos user, using root ownership", zap.Error(err))
 		return nil // Continue with root ownership rather than failing
@@ -266,14 +268,14 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 	if err := os.Chown(runDir, uid, gid); err != nil {
 		log.Warn("Could not change ownership of runtime directory",
 			zap.String("dir", runDir),
-			zap.String("user", shared.EosID),
+			zap.String("user", "vault"),
 			zap.Error(err))
 		return nil // Continue rather than failing
 	}
 
 	log.Info(" Runtime directory created and configured",
 		zap.String("path", runDir),
-		zap.String("owner", shared.EosID),
+		zap.String("owner", "vault"),
 		zap.String("mode", "0755"))
 	return nil
 }

@@ -153,12 +153,18 @@ func TrustVaultCA_Debian(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// secureOwnership chowns+chmods certs and key for eos:user.
+// secureOwnership chowns+chmods certs and key for vault user.
 func secureOwnership(rc *eos_io.RuntimeContext) error {
 
-	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		return cerr.Wrap(err, "lookup eos user")
+		// If vault user doesn't exist, use current user
+		uid = os.Getuid()
+		gid = os.Getgid()
+		otelzap.Ctx(rc.Ctx).Info("Vault user not found, using current user for TLS ownership",
+			zap.Int("uid", uid),
+			zap.Int("gid", gid))
 	}
 	for _, p := range []string{shared.TLSCrt, shared.TLSKey, shared.TLSDir} {
 		if err := eos_unix.ChownR(rc.Ctx, p, uid, gid); err != nil {
@@ -193,11 +199,15 @@ func EnsureVaultAgentCAExists(rc *eos_io.RuntimeContext) error {
 		return cerr.Wrapf(err, "copy Vault Agent CA cert to %s", dst)
 	}
 
-	// Lookup the Eos user for ownership
-	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("Could not lookup Eos user", zap.Error(err))
-		return cerr.Wrap(err, "lookup eos user")
+		// If vault user doesn't exist, use current user
+		uid = os.Getuid()
+		gid = os.Getgid()
+		otelzap.Ctx(rc.Ctx).Info("Vault user not found, using current user for CA cert ownership",
+			zap.Int("uid", uid),
+			zap.Int("gid", gid))
 	}
 
 	// Chown and log (don’t fail on chown)

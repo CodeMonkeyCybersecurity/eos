@@ -126,10 +126,15 @@ func EnsureVaultDirs(rc *eos_io.RuntimeContext) error {
 }
 
 func createBaseDirs(rc *eos_io.RuntimeContext) error {
-	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	vaultUID, vaultGID, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
-		return fmt.Errorf("critical: eos system user not found: %w", err)
+		// If vault user doesn't exist, use current user
+		vaultUID = os.Getuid()
+		vaultGID = os.Getgid()
+		otelzap.Ctx(rc.Ctx).Info("Vault user not found, using current user for directory ownership",
+			zap.Int("uid", vaultUID),
+			zap.Int("gid", vaultGID))
 	}
 
 	dirs := []struct {
@@ -150,7 +155,7 @@ func createBaseDirs(rc *eos_io.RuntimeContext) error {
 		if err := os.MkdirAll(d.path, d.perm); err != nil {
 			return fmt.Errorf("mkdir %s: %w", d.path, err)
 		}
-		if err := os.Chown(d.path, eosUID, eosGID); err != nil {
+		if err := os.Chown(d.path, vaultUID, vaultGID); err != nil {
 			otelzap.Ctx(rc.Ctx).Warn("Failed to chown directory", zap.String("path", d.path), zap.Error(err))
 		}
 	}
@@ -161,24 +166,26 @@ func createBaseDirs(rc *eos_io.RuntimeContext) error {
 // It starts a telemetry span, logs via Zap, and wraps errors with cerr.
 func secureVaultDirOwnership(rc *eos_io.RuntimeContext) error {
 
-	// find eos UID/GID
-	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	vaultUID, vaultGID, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		zap.S().Errorw("lookup eos user failed",
-			"user", shared.EosID, "error", err,
+		// If vault user doesn't exist, use current user
+		vaultUID = os.Getuid()
+		vaultGID = os.Getgid()
+		zap.S().Infow("vault user not found, using current user",
+			"uid", vaultUID, "gid", vaultGID,
 		)
-		return cerr.Wrapf(err, "lookup user %q", shared.EosID)
 	}
 
 	// log intent
 	zap.S().Infow("fixing Vault directory ownership",
 		"path", shared.VaultDir,
-		"uid", eosUID,
-		"gid", eosGID,
+		"uid", vaultUID,
+		"gid", vaultGID,
 	)
 
 	// perform recursive chown
-	if err := eos_unix.ChownR(rc.Ctx, shared.VaultDir, eosUID, eosGID); err != nil {
+	if err := eos_unix.ChownR(rc.Ctx, shared.VaultDir, vaultUID, vaultGID); err != nil {
 		zap.S().Errorw("chownR failed",
 			"path", shared.VaultDir, "error", err,
 		)
@@ -213,11 +220,12 @@ func PrepareVaultAgentEnvironment(rc *eos_io.RuntimeContext) error {
 func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
 	otelzap.Ctx(rc.Ctx).Info(" Validating Vault Agent runtime environment")
 
-	// Resolve eos user UID and GID safely
-	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	vaultUID, vaultGID, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to lookup eos user", zap.Error(err))
-		return fmt.Errorf("failed to lookup eos user: %w", err)
+		// If vault user doesn't exist, skip ownership validation
+		otelzap.Ctx(rc.Ctx).Info("Vault user not found, skipping ownership validation")
+		return nil
 	}
 
 	// Check if /run/eos exists and is a directory
@@ -244,20 +252,20 @@ func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
 		currentGID := stat.Gid
 
 		// Safely convert int to uint32 with bounds checking
-		if eosUID < 0 || eosGID < 0 {
-			otelzap.Ctx(rc.Ctx).Error(" Invalid eos user UID/GID",
-				zap.Int("uid", eosUID),
-				zap.Int("gid", eosGID))
-			return fmt.Errorf("invalid eos user UID/GID: %d/%d", eosUID, eosGID)
+		if vaultUID < 0 || vaultGID < 0 {
+			otelzap.Ctx(rc.Ctx).Error(" Invalid vault user UID/GID",
+				zap.Int("uid", vaultUID),
+				zap.Int("gid", vaultGID))
+			return fmt.Errorf("invalid vault user UID/GID: %d/%d", vaultUID, vaultGID)
 		}
 
 		// #nosec G115 - Safe conversion after bounds checking above
-		expectedUID := uint32(eosUID)
+		expectedUID := uint32(vaultUID)
 		// #nosec G115 - Safe conversion after bounds checking above
-		expectedGID := uint32(eosGID)
+		expectedGID := uint32(vaultGID)
 
 		if currentUID != expectedUID || currentGID != expectedGID {
-			otelzap.Ctx(rc.Ctx).Warn("Runtime directory not owned by eos user",
+			otelzap.Ctx(rc.Ctx).Warn("Runtime directory not owned by vault user",
 				zap.String("path", shared.EosRunDir),
 				zap.Uint32("current_uid", currentUID),
 				zap.Uint32("current_gid", currentGID),

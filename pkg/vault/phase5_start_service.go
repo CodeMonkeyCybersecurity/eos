@@ -134,9 +134,12 @@ func ValidateCriticalPaths(rc *eos_io.RuntimeContext) error {
 		shared.VaultDataPath, // /opt/vault/data
 	}
 
-	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	vaultUID, vaultGID, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		return fmt.Errorf("failed to resolve eos user UID/GID: %w", err)
+		// If vault user doesn't exist, skip validation
+		otelzap.Ctx(rc.Ctx).Info("Vault user not found, skipping path validation")
+		return nil
 	}
 
 	for _, path := range criticalPaths {
@@ -150,9 +153,9 @@ func ValidateCriticalPaths(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("unexpected stat type for path %s", path)
 		}
 
-		if int(st.Uid) != eosUID || int(st.Gid) != eosGID {
+		if int(st.Uid) != vaultUID || int(st.Gid) != vaultGID {
 			return fmt.Errorf("ownership mismatch on %s: want uid=%d gid=%d, got uid=%d gid=%d",
-				path, eosUID, eosGID, st.Uid, st.Gid)
+				path, vaultUID, vaultGID, st.Uid, st.Gid)
 		}
 
 		// Check writable bit

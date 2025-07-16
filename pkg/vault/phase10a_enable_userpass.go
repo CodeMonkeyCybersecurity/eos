@@ -104,15 +104,16 @@ func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string
 		shared.EosUserPassPasswordFile,
 		[]byte(password+"\n"),
 		0o600,
-		shared.EosID,
+		"vault",
 	); err != nil {
 		return cerr.Wrapf(err, "write file %s", shared.EosUserPassPasswordFile)
 	}
 	zap.S().Infow("fallback file written", "path", shared.EosUserPassPasswordFile)
 
-	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	// Use vault user instead of deprecated eos user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		return cerr.Wrapf(err, "lookup user %s", shared.EosID)
+		return cerr.Wrapf(err, "lookup user %s", "vault")
 	}
 	if err := eos_unix.ChownR(rc.Ctx, shared.SecretsDir, uid, gid); err != nil {
 		zap.S().Warnw("chownR failed; continuing", "dir", shared.SecretsDir, "err", err)
