@@ -73,3 +73,4 @@ gosec-report.*
 
 #claude
 *this-session-is-being-continued-from-a-previous-co.txt
+*.nomad

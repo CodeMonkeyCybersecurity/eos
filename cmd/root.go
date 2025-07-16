@@ -16,12 +16,14 @@ import (
 
 	// Subcommands - Core verb-first architecture
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 
 	// "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi" // TODO: Migrate to verb directories
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/nuke"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
@@ -71,6 +73,10 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		debug.GetDebugCmd(), // VERB-FIRST ARCHITECTURE (debugging tools)
 		self.SelfCmd,     // SPECIAL CASE (Eos self-management)
 		backup.BackupCmd, // SPECIAL CASE (Complex nomenclature)
+		
+		// Top-level aliases for convenience
+		bootstrap.BootstrapCmd, // Alias for create bootstrap
+		nuke.NukeCmd,           // Alias for delete nuke
 
 		// TODO: Migrate these to verb directories (Phase 4)
 		// delphi.DelphiCmd,    // TODO: Migrate to verb directories (Phase 4)
