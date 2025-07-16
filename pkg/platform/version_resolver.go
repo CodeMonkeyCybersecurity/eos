@@ -90,6 +90,27 @@ func (r *VersionResolver) initializeStrategies() {
 				Fn:          r.getSaltFallbackVersion,
 			},
 		}
+	case "minio":
+		r.strategies = []VersionStrategy{
+			{
+				Name:        "GitHub API",
+				Description: "Query MinIO's GitHub releases API",
+				Timeout:     10 * time.Second,
+				Fn:          r.getMinIOVersionFromGitHub,
+			},
+			{
+				Name:        "MinIO Update Service",
+				Description: "Check MinIO's official update service",
+				Timeout:     10 * time.Second,
+				Fn:          r.getMinIOVersionFromUpdateService,
+			},
+			{
+				Name:        "Fallback to Known Good",
+				Description: "Use hardcoded fallback version",
+				Timeout:     1 * time.Second,
+				Fn:          r.getMinIOFallbackVersion,
+			},
+		}
 	default:
 		// Generic strategies for other software
 		r.strategies = []VersionStrategy{
@@ -413,4 +434,90 @@ func SortVersions(versions []string) {
 	sort.Slice(versions, func(i, j int) bool {
 		return CompareVersions(versions[i], versions[j]) > 0
 	})
+}
+
+// getMinIOVersionFromGitHub queries MinIO's GitHub releases API
+func (r *VersionResolver) getMinIOVersionFromGitHub(resolver *VersionResolver) (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+	
+	apiURL := "https://api.github.com/repos/minio/minio/releases/latest"
+	
+	client := &http.Client{Timeout: 10 * time.Second}
+	
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	// GitHub API prefers this header
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "EOS-MinIO-Installer/1.0")
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to query GitHub API: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+	
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+	
+	// MinIO tags are like "RELEASE.2024-01-16T16-07-38Z"
+	// Extract the version part
+	version := strings.TrimPrefix(release.TagName, "RELEASE.")
+	
+	logger.Info("Retrieved MinIO version from GitHub",
+		zap.String("version", version),
+		zap.String("tag", release.TagName),
+		zap.Time("released", release.CreatedAt))
+	
+	return version, nil
+}
+
+// getMinIOVersionFromUpdateService queries MinIO's update service
+func (r *VersionResolver) getMinIOVersionFromUpdateService(resolver *VersionResolver) (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+	
+	// MinIO provides an update endpoint
+	updateURL := "https://dl.min.io/server/minio/release/linux-amd64/minio.sha256sum"
+	
+	client := &http.Client{Timeout: 10 * time.Second}
+	
+	resp, err := client.Get(updateURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to query MinIO update service: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("MinIO update service returned status %d", resp.StatusCode)
+	}
+	
+	// The URL typically contains the version in the path when redirected
+	// For now, we'll use the GitHub API as primary method
+	logger.Debug("MinIO update service check completed")
+	
+	// Fallback to GitHub method
+	return "", fmt.Errorf("update service parsing not implemented, use GitHub API")
+}
+
+// getMinIOFallbackVersion returns a known good MinIO version
+func (r *VersionResolver) getMinIOFallbackVersion(resolver *VersionResolver) (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+	
+	// Updated fallback version - check MinIO's releases for current stable
+	fallbackVersion := "2024-01-16T16-07-38Z"
+	
+	logger.Warn("Using hardcoded fallback version",
+		zap.String("software", r.software),
+		zap.String("version", fallbackVersion),
+		zap.String("note", "Update this periodically"))
+	
+	return fallbackVersion, nil
 }

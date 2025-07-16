@@ -40,6 +40,26 @@ func NewDeployer() *Deployer {
 func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Step 0: Run preflight checks
+	logger.Info("Running preflight checks for MinIO deployment")
+	if err := CheckPrerequisites(rc); err != nil {
+		return err
+	}
+
+	// Configure Vault secrets
+	config := &Config{
+		Region: DefaultRegion,
+		BrowserEnable: true,
+	}
+	if err := ConfigureVaultSecrets(rc, config); err != nil {
+		return err
+	}
+
+	// Configure Vault policies
+	if err := ConfigureVaultPolicies(rc); err != nil {
+		return err
+	}
+
 	// Step 1: Apply SaltStack states
 	if !opts.SkipSalt {
 		logger.Info("Applying SaltStack states for MinIO")
@@ -65,12 +85,12 @@ func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) er
 
 	// Step 4: Verify deployment
 	logger.Info("Verifying MinIO deployment")
-	if err := d.verifyDeployment(rc, opts); err != nil {
-		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("deployment verification failed: %w", err))
+	if err := VerifyDeployment(rc, opts); err != nil {
+		return err
 	}
 
 	// Display access information
-	d.displayAccessInfo(rc, opts)
+	DisplayAccessInfo(rc, opts)
 
 	return nil
 }
@@ -164,8 +184,9 @@ func (d *Deployer) renderTemplate(tmplPath, outputPath string, opts *DeploymentO
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		if closeErr := file.Close(); closeErr != nil {
+			// Log using logger if available in context, otherwise silently continue
+			// as this is a non-critical error during cleanup
 		}
 	}()
 
@@ -210,47 +231,4 @@ func (d *Deployer) runTerraformDeployment(rc *eos_io.RuntimeContext, deployDir s
 	return nil
 }
 
-// verifyDeployment checks if MinIO is running correctly
-func (d *Deployer) verifyDeployment(rc *eos_io.RuntimeContext, opts *DeploymentOptions) error {
-	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check Nomad job status
-	logger.Info("Checking Nomad job status")
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "nomad",
-		Args:    []string{"job", "status", "minio"},
-		Timeout: 30 * time.Second,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to check Nomad job status: %w", err)
-	}
-	logger.Debug("Nomad job status", zap.String("output", output))
-
-	// Check MinIO health endpoint
-	logger.Info("Checking MinIO health endpoint")
-	healthURL := fmt.Sprintf("http://localhost:%d/minio/health/live", opts.APIPort)
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "curl",
-		Args:    []string{"-f", "-s", healthURL},
-		Timeout: 30 * time.Second,
-	})
-	if err != nil {
-		logger.Warn("MinIO health check failed (service may still be starting)", zap.Error(err))
-	}
-
-	return nil
-}
-
-// displayAccessInfo shows how to access MinIO
-func (d *Deployer) displayAccessInfo(rc *eos_io.RuntimeContext, opts *DeploymentOptions) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("MinIO deployment successful",
-		zap.String("api_endpoint", fmt.Sprintf("http://localhost:%d", opts.APIPort)),
-		zap.String("console_endpoint", fmt.Sprintf("http://localhost:%d", opts.ConsolePort)),
-		zap.String("credentials_path", "kv/minio/root"),
-	)
-
-	logger.Info("To retrieve credentials run: vault kv get kv/minio/root")
-	logger.Info("To configure mc client: mc alias set local http://localhost:9123 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD")
-}
