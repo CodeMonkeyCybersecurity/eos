@@ -149,8 +149,8 @@ Description=Vault Server (Eos)
 After=network.target
 
 [Service]
-User=eos
-Group=eos
+User=vault
+Group=vault
 ExecStart=/usr/bin/vault server -config=/etc/vault.d/vault.hcl
 Restart=on-failure
 LimitNOFILE=65536

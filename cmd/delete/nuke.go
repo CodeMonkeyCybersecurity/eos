@@ -194,6 +194,10 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		{"/opt/vault", "vault", false},
 		{"/opt/vault/data", "vault", true},
 		{"/etc/vault.d", "vault", false},
+		{"/etc/vault-agent-eos.hcl", "vault", false},
+		{"/run/eos", "vault", false},  // Runtime directory for vault agent
+		{"/home/vault/.config", "vault", false},  // Vault user config
+		{"/etc/tmpfiles.d/eos.conf", "vault", false},  // Tmpfiles config
 		{"/opt/nomad", "nomad", false},
 		{"/opt/nomad/data", "nomad", true},
 		{"/etc/nomad.d", "nomad", false},
@@ -224,7 +228,15 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	logger.Info("Phase 6: Cleaning up systemd services")
 
 	serviceFiles := []string{
+		// Vault services
 		"/etc/systemd/system/vault.service",
+		"/etc/systemd/system/vault-agent-eos.service",
+		"/etc/systemd/system/vault-backup.service",
+		"/etc/systemd/system/vault-backup.timer",
+		"/etc/systemd/system/vault-agent-health-check.service",
+		"/etc/systemd/system/vault-agent-health-check.timer",
+		"/etc/systemd/system/vault.service.d/",  // Directory for overrides
+		// Other services
 		"/etc/systemd/system/nomad.service",
 		"/etc/systemd/system/consul.service",
 	}
@@ -232,7 +244,13 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	for _, file := range serviceFiles {
 		if fileExists(file) {
 			logger.Info("Removing service file", zap.String("file", file))
-			os.Remove(file)
+			// Check if it's a directory (like vault.service.d)
+			fileInfo, err := os.Stat(file)
+			if err == nil && fileInfo.IsDir() {
+				os.RemoveAll(file)
+			} else {
+				os.Remove(file)
+			}
 		}
 	}
 

@@ -99,7 +99,7 @@ type AgentSystemdData struct {
 const (
 	VaultAgentService      = "vault-agent-eos.service"
 	VaultAgentConfigPath   = "/etc/vault-agent-eos.hcl"
-	VaultAgentCACopyPath   = "/home/eos/.config/vault/ca.crt"
+	VaultAgentCACopyPath   = "/etc/vault.d/ca.crt"
 	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt"
 	VaultAgentServicePath  = "/etc/systemd/system/vault-agent-eos.service"
 )
