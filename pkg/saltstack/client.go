@@ -153,6 +153,61 @@ func (c *Client) CheckMinion(ctx context.Context, minion string) (bool, error) {
 	return strings.Contains(output, minion), nil
 }
 
+// StateApplyLocal applies a Salt state using salt-call (masterless mode)
+func (c *Client) StateApplyLocal(ctx context.Context, state string, pillar map[string]interface{}) error {
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Applying Salt state locally",
+		zap.String("state", state))
+
+	args := []string{"--local", "state.apply", state}
+
+	if len(pillar) > 0 {
+		pillarJSON, err := json.Marshal(pillar)
+		if err != nil {
+			return fmt.Errorf("marshaling pillar data: %w", err)
+		}
+		args = append(args, fmt.Sprintf("pillar='%s'", string(pillarJSON)))
+	}
+
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "salt-call",
+		Args:    args,
+		Capture: true,
+	})
+
+	if err != nil {
+		logger.Error("Failed to apply state locally",
+			zap.String("state", state),
+			zap.Error(err),
+			zap.String("output", output))
+		return fmt.Errorf("applying state %s locally: %w", state, err)
+	}
+
+	logger.Info("State applied successfully locally",
+		zap.String("state", state))
+
+	return nil
+}
+
+// CmdRunLocal runs a command locally using salt-call
+func (c *Client) CmdRunLocal(ctx context.Context, command string) (string, error) {
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Running command locally via Salt",
+		zap.String("command", command))
+
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "salt-call",
+		Args:    []string{"--local", "cmd.run", command},
+		Capture: true,
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("running command locally: %w", err)
+	}
+
+	return output, nil
+}
+
 // Compatibility wrapper methods for existing code
 
 // ApplyState is a wrapper for StateApply to maintain compatibility

@@ -6,10 +6,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -77,7 +79,11 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	// 1.1 Bootstrap Salt
 	logger.Info("Bootstrapping Salt (master-minion mode)")
-	if err := bootstrap.BootstrapSalt(rc, &bootstrap.SaltConfig{MasterMode: true}); err != nil {
+	saltConfig := &saltstack.Config{
+		MasterMode: true,
+		LogLevel:   "warning",
+	}
+	if err := saltstack.Install(rc, saltConfig); err != nil {
 		return fmt.Errorf("failed to bootstrap Salt: %w", err)
 	}
 	tracker.AddComponent(state.Component{
@@ -89,7 +95,7 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	// 1.2 Bootstrap Vault
 	logger.Info("Bootstrapping Vault")
-	if err := bootstrap.BootstrapVault(rc); err != nil {
+	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
 		return fmt.Errorf("failed to bootstrap Vault: %w", err)
 	}
 	tracker.AddComponent(state.Component{
@@ -101,7 +107,7 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	// 1.3 Bootstrap OSQuery
 	logger.Info("Bootstrapping OSQuery")
-	if err := bootstrap.BootstrapOSQuery(rc); err != nil {
+	if err := osquery.InstallOsquery(rc); err != nil {
 		return fmt.Errorf("failed to bootstrap OSQuery: %w", err)
 	}
 	tracker.AddComponent(state.Component{

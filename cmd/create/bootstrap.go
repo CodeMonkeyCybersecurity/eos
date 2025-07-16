@@ -2,9 +2,12 @@ package create
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
@@ -13,17 +16,19 @@ var bootstrapCmd = &cobra.Command{
 	Use:   "bootstrap [component]",
 	Short: "Bootstrap infrastructure components from scratch",
 	Long: `Bootstrap infrastructure components on a fresh system.
-This command installs and configures core infrastructure without requiring Salt.
+This command installs and configures core infrastructure using Salt states.
 
 Available components:
   salt     - Install and configure Salt (master/minion or masterless)
-  vault    - Install and configure HashiCorp Vault
+  vault    - Install and configure HashiCorp Vault using Salt states
+  nomad    - Install and configure HashiCorp Nomad using Salt states
   osquery  - Install and configure OSQuery for system monitoring
   all      - Bootstrap all components in the correct order
 
 Examples:
   eos create bootstrap salt      # Bootstrap Salt infrastructure
-  eos create bootstrap vault     # Bootstrap Vault (requires Salt)
+  eos create bootstrap vault     # Bootstrap Vault via Salt
+  eos create bootstrap nomad     # Bootstrap Nomad via Salt
   eos create bootstrap all       # Bootstrap everything`,
 }
 
@@ -37,8 +42,15 @@ var bootstrapSaltCmd = &cobra.Command{
 var bootstrapVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Bootstrap HashiCorp Vault",
-	Long:  `Install and configure HashiCorp Vault. Requires Salt to be already installed.`,
+	Long:  `Install and configure HashiCorp Vault using Salt states. Requires Salt to be already installed.`,
 	RunE:  eos_cli.Wrap(runBootstrapVault),
+}
+
+var bootstrapNomadCmd = &cobra.Command{
+	Use:   "nomad",
+	Short: "Bootstrap HashiCorp Nomad",
+	Long:  `Install and configure HashiCorp Nomad using Salt states. Requires Salt to be already installed.`,
+	RunE:  eos_cli.Wrap(runBootstrapNomad),
 }
 
 var bootstrapOsqueryCmd = &cobra.Command{
@@ -51,7 +63,7 @@ var bootstrapOsqueryCmd = &cobra.Command{
 var bootstrapAllCmd = &cobra.Command{
 	Use:   "all",
 	Short: "Bootstrap all infrastructure components",
-	Long:  `Bootstrap all infrastructure components in the correct order: Salt, Vault, OSQuery.`,
+	Long:  `Bootstrap all infrastructure components in the correct order: Salt, Vault, Nomad, OSQuery.`,
 	RunE:  eos_cli.Wrap(runBootstrapAll),
 }
 
@@ -59,6 +71,7 @@ func init() {
 	CreateCmd.AddCommand(bootstrapCmd)
 	bootstrapCmd.AddCommand(bootstrapSaltCmd)
 	bootstrapCmd.AddCommand(bootstrapVaultCmd)
+	bootstrapCmd.AddCommand(bootstrapNomadCmd)
 	bootstrapCmd.AddCommand(bootstrapOsqueryCmd)
 	bootstrapCmd.AddCommand(bootstrapAllCmd)
 
@@ -71,12 +84,14 @@ func runBootstrapSalt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Salt bootstrap")
 
-	config := &bootstrap.SaltConfig{
-		MasterMode:    cmd.Flag("master-mode").Value.String() == "true",
-		MasterAddress: cmd.Flag("master-address").Value.String(),
+	masterMode := cmd.Flag("master-mode").Value.String() == "true"
+
+	config := &saltstack.Config{
+		MasterMode: masterMode,
+		LogLevel:   "warning",
 	}
 
-	if err := bootstrap.BootstrapSalt(rc, config); err != nil {
+	if err := saltstack.Install(rc, config); err != nil {
 		return err
 	}
 
@@ -88,7 +103,8 @@ func runBootstrapVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault bootstrap")
 
-	if err := bootstrap.BootstrapVault(rc); err != nil {
+	// Use the Salt-based Vault deployment for architectural consistency
+	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
 		return err
 	}
 
@@ -96,11 +112,24 @@ func runBootstrapVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	return nil
 }
 
+func runBootstrapNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting Nomad bootstrap")
+
+	// Use the bootstrap-specific Salt deployment (no interactive prompts)
+	if err := nomad.DeployNomadViaSaltBootstrap(rc); err != nil {
+		return err
+	}
+
+	logger.Info("Nomad bootstrap completed successfully")
+	return nil
+}
+
 func runBootstrapOsquery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting OSQuery bootstrap")
 
-	if err := bootstrap.BootstrapOSQuery(rc); err != nil {
+	if err := osquery.InstallOsquery(rc); err != nil {
 		return err
 	}
 
@@ -112,19 +141,28 @@ func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting full infrastructure bootstrap")
 
-	// Bootstrap in order: Salt -> Vault -> OSQuery
-	logger.Info("Phase 1: Bootstrapping Salt", zap.Int("phase", 1), zap.Int("total_phases", 3))
-	if err := bootstrap.BootstrapSalt(rc, &bootstrap.SaltConfig{MasterMode: true}); err != nil {
+	// Bootstrap in order: Salt -> Vault -> Nomad -> OSQuery
+	logger.Info("Phase 1: Bootstrapping Salt", zap.Int("phase", 1), zap.Int("total_phases", 4))
+	saltConfig := &saltstack.Config{
+		MasterMode: true,
+		LogLevel:   "warning",
+	}
+	if err := saltstack.Install(rc, saltConfig); err != nil {
 		return err
 	}
 
-	logger.Info("Phase 2: Bootstrapping Vault", zap.Int("phase", 2), zap.Int("total_phases", 3))
-	if err := bootstrap.BootstrapVault(rc); err != nil {
+	logger.Info("Phase 2: Bootstrapping Vault", zap.Int("phase", 2), zap.Int("total_phases", 4))
+	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
 		return err
 	}
 
-	logger.Info("Phase 3: Bootstrapping OSQuery", zap.Int("phase", 3), zap.Int("total_phases", 3))
-	if err := bootstrap.BootstrapOSQuery(rc); err != nil {
+	logger.Info("Phase 3: Bootstrapping Nomad", zap.Int("phase", 3), zap.Int("total_phases", 4))
+	if err := nomad.DeployNomadViaSaltBootstrap(rc); err != nil {
+		return err
+	}
+
+	logger.Info("Phase 4: Bootstrapping OSQuery", zap.Int("phase", 4), zap.Int("total_phases", 4))
+	if err := osquery.InstallOsquery(rc); err != nil {
 		return err
 	}
 

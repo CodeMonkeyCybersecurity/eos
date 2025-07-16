@@ -25,34 +25,44 @@ vault_user:
     - require:
       - group: vault_group
 
-# Create directories
+# Create comprehensive directory structure (following phase2_env_setup.go)
 vault_directories:
   file.directory:
     - names:
       - {{ install_dir }}
       - {{ vault.get('config_path', '/etc/vault.d') }}
       - {{ vault.get('data_path', '/opt/vault/data') }}
-      - {{ vault.get('log_path', '/var/log/vault') }}
+      - {{ vault.get('log_path', '/opt/vault/logs') }}
+      - {{ vault.get('tls_path', '/opt/vault/tls') }}
+      - /var/lib/eos
+      - /var/lib/eos/secret
+      - /run/eos
     - user: {{ vault_user }}
     - group: {{ vault_group }}
-    - mode: 755
+    - mode: 700  # More restrictive permissions for security
     - makedirs: True
     - require:
       - user: vault_user
 
-# Add HashiCorp repository
-hashicorp_gpg_key:
-  cmd.run:
-    - name: |
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
-        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-    - unless: test -f /usr/share/keyrings/hashicorp-archive-keyring.gpg
+# Set specific permissions for config directory (needs to be readable by service)
+vault_config_directory:
+  file.directory:
+    - name: {{ vault.get('config_path', '/etc/vault.d') }}
+    - user: root
+    - group: {{ vault_group }}
+    - mode: 755
+    - require:
+      - file: vault_directories
 
-# Update package cache
+# Include shared HashiCorp repository setup
+include:
+  - hashicorp
+
+# Update package cache after repository setup
 update_package_cache:
   pkg.refresh_db:
     - require:
-      - cmd: hashicorp_gpg_key
+      - pkgrepo: hashicorp_repo
 
 # Install Vault
 {% if version == 'latest' %}

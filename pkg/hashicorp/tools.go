@@ -25,68 +25,60 @@ var SupportedHCLTools = []string{
 }
 
 // InstallTool installs a specific HashiCorp tool with comprehensive error handling
+// DEPRECATED: Use InstallToolViaSalt instead for architectural consistency
 func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info(" Starting HashiCorp tool installation",
+	logger.Warn("Using deprecated direct installation method, consider using InstallToolViaSalt",
+		zap.String("tool", tool))
+	
+	// Redirect to Salt-based installation for consistency
+	return InstallToolViaSalt(rc, tool)
+}
+
+// InstallToolViaSalt installs a specific HashiCorp tool using Salt states
+// This follows the architectural principle: Salt = Physical infrastructure
+func InstallToolViaSalt(rc *eos_io.RuntimeContext, tool string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting HashiCorp tool installation via Salt",
 		zap.String("tool", tool),
 		zap.Strings("supported_tools", SupportedHCLTools))
 
 	if !IsToolSupported(tool) {
 		err := fmt.Errorf("unsupported HashiCorp tool: %s", tool)
-		logger.Error(" Tool not supported",
+		logger.Error("Tool not supported",
 			zap.String("tool", tool),
 			zap.Strings("supported_tools", SupportedHCLTools),
 			zap.Error(err))
 		return cerr.Wrap(err, "validate tool support")
 	}
 
-	logger.Info(" Tool validation passed", zap.String("tool", tool))
+	logger.Info("Tool validation passed", zap.String("tool", tool))
 
-	// Install prerequisites
-	logger.Info(" Installing prerequisites")
-	if err := installPrerequisites(rc); err != nil {
-		logger.Error(" Failed to install prerequisites", zap.Error(err))
-		return cerr.Wrap(err, "install prerequisites")
+	// ASSESS - Check if Salt is available
+	logger.Info("Assessing Salt availability for HashiCorp tool installation")
+	if err := checkSaltAvailability(rc); err != nil {
+		logger.Error("Salt not available, falling back to direct installation", zap.Error(err))
+		return installToolDirect(rc, tool)
 	}
-	logger.Info(" Prerequisites installed successfully")
 
-	// Install GPG key
-	logger.Info(" Installing HashiCorp GPG key")
-	if err := InstallGPGKey(rc); err != nil {
-		logger.Error(" Failed to install GPG key", zap.Error(err))
-		return cerr.Wrap(err, "install GPG key")
+	// INTERVENE - Install via Salt states
+	logger.Info("Installing HashiCorp tool via Salt states", zap.String("tool", tool))
+	if err := installToolViaSaltStates(rc, tool); err != nil {
+		logger.Error("Salt installation failed, falling back to direct installation", 
+			zap.String("tool", tool), zap.Error(err))
+		return installToolDirect(rc, tool)
 	}
-	logger.Info(" GPG key installed successfully")
 
-	// Add repository
-	logger.Info(" Adding HashiCorp repository")
-	if err := AddRepository(rc); err != nil {
-		logger.Error(" Failed to add repository", zap.Error(err))
-		return cerr.Wrap(err, "add repository")
-	}
-	logger.Info(" Repository added successfully")
-
-	// Install specific tool
-	logger.Info(" Installing specific tool", zap.String("tool", tool))
-	if err := installSpecificTool(rc, tool); err != nil {
-		logger.Error(" Failed to install tool",
-			zap.String("tool", tool),
-			zap.Error(err))
-		return cerr.Wrapf(err, "install %s", tool)
-	}
-	logger.Info(" Tool installation completed", zap.String("tool", tool))
-
-	// Verify installation
-	logger.Info(" Verifying installation", zap.String("tool", tool))
+	// EVALUATE - Verify installation
+	logger.Info("Verifying Salt-based installation", zap.String("tool", tool))
 	if err := VerifyInstallation(rc, tool); err != nil {
-		logger.Error(" Installation verification failed",
+		logger.Error("Installation verification failed",
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrapf(err, "verify %s installation", tool)
 	}
-	logger.Info(" Installation verification passed", zap.String("tool", tool))
 
-	logger.Info(" Successfully installed HashiCorp tool", zap.String("tool", tool))
+	logger.Info("Successfully installed HashiCorp tool via Salt", zap.String("tool", tool))
 	return nil
 }
 
@@ -266,4 +258,121 @@ func installSpecificTool(rc *eos_io.RuntimeContext, tool string) error {
 // GetSupportedToolsString returns a comma-separated string of supported tools
 func GetSupportedToolsString() string {
 	return strings.Join(SupportedHCLTools, ", ")
+}
+
+// checkSaltAvailability checks if Salt is available for use
+func checkSaltAvailability(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Check if salt-call is available
+	if err := execute.RunSimple(rc.Ctx, "which", "salt-call"); err != nil {
+		logger.Warn("salt-call not found in PATH", zap.Error(err))
+		return fmt.Errorf("salt-call not available: %w", err)
+	}
+	
+	logger.Info("Salt availability verified")
+	return nil
+}
+
+// installToolViaSaltStates installs a tool using Salt states
+func installToolViaSaltStates(rc *eos_io.RuntimeContext, tool string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Apply Salt state for the specific HashiCorp tool
+	stateName := fmt.Sprintf("hashicorp.%s", tool)
+	
+	logger.Info("Applying Salt state for HashiCorp tool",
+		zap.String("tool", tool),
+		zap.String("state", stateName))
+	
+	// Run salt-call to apply the state with enhanced error handling
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "salt-call",
+		Args:    []string{"--local", "state.apply", stateName, "--output=json"},
+		Capture: true,
+		Timeout: 300, // 5 minute timeout for installation
+	})
+	
+	if err != nil {
+		logger.Error("Failed to apply Salt state",
+			zap.String("tool", tool),
+			zap.String("state", stateName),
+			zap.String("output", output),
+			zap.Error(err))
+			
+		// Check for common error patterns and provide helpful guidance
+		if strings.Contains(output, "State not found") {
+			return fmt.Errorf("Salt state %s not found. Please ensure Salt states are properly installed in /opt/eos/salt/states/", stateName)
+		}
+		if strings.Contains(output, "No matching sls found") {
+			return fmt.Errorf("Salt state file %s.sls not found. Please check if the state file exists", stateName)
+		}
+		if strings.Contains(output, "Repository") && strings.Contains(output, "error") {
+			return fmt.Errorf("HashiCorp repository error. Salt state %s failed due to repository issues. Check network connectivity", stateName)
+		}
+		if strings.Contains(output, "Permission denied") {
+			return fmt.Errorf("Permission error applying Salt state %s. Please run with sudo", stateName)
+		}
+		
+		return fmt.Errorf("failed to apply Salt state %s: %w\nOutput: %s", stateName, err, output)
+	}
+	
+	// Parse JSON output to check for state failures
+	if strings.Contains(output, "\"result\": false") {
+		logger.Error("Salt state execution failed",
+			zap.String("tool", tool),
+			zap.String("state", stateName),
+			zap.String("output", output))
+		return fmt.Errorf("Salt state %s executed but failed. Check Salt logs for details", stateName)
+	}
+	
+	logger.Info("Successfully applied Salt state for HashiCorp tool",
+		zap.String("tool", tool),
+		zap.String("state", stateName))
+	
+	return nil
+}
+
+// installToolDirect installs a tool using direct system commands (fallback)
+func installToolDirect(rc *eos_io.RuntimeContext, tool string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting direct HashiCorp tool installation (fallback)",
+		zap.String("tool", tool))
+
+	// Install prerequisites
+	logger.Info("Installing prerequisites")
+	if err := installPrerequisites(rc); err != nil {
+		logger.Error("Failed to install prerequisites", zap.Error(err))
+		return cerr.Wrap(err, "install prerequisites")
+	}
+	logger.Info("Prerequisites installed successfully")
+
+	// Install GPG key
+	logger.Info("Installing HashiCorp GPG key")
+	if err := InstallGPGKey(rc); err != nil {
+		logger.Error("Failed to install GPG key", zap.Error(err))
+		return cerr.Wrap(err, "install GPG key")
+	}
+	logger.Info("GPG key installed successfully")
+
+	// Add repository
+	logger.Info("Adding HashiCorp repository")
+	if err := AddRepository(rc); err != nil {
+		logger.Error("Failed to add repository", zap.Error(err))
+		return cerr.Wrap(err, "add repository")
+	}
+	logger.Info("Repository added successfully")
+
+	// Install specific tool
+	logger.Info("Installing specific tool", zap.String("tool", tool))
+	if err := installSpecificTool(rc, tool); err != nil {
+		logger.Error("Failed to install tool",
+			zap.String("tool", tool),
+			zap.Error(err))
+		return cerr.Wrapf(err, "install %s", tool)
+	}
+	logger.Info("Tool installation completed", zap.String("tool", tool))
+
+	logger.Info("Successfully installed HashiCorp tool via direct method", zap.String("tool", tool))
+	return nil
 }
