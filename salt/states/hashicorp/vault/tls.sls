@@ -23,6 +23,7 @@ vault_tls_private_key:
     - creates: {{ tls_path }}/tls.key
     - require:
       - file: vault_tls_directory
+      - pkg: eos_dependencies
   file.managed:
     - name: {{ tls_path }}/tls.key
     - user: {{ vault_user }}

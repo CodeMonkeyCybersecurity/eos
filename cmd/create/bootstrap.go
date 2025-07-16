@@ -82,7 +82,7 @@ func init() {
 
 func runBootstrapSalt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Salt bootstrap")
+	logger.Info("Starting Salt bootstrap with integrated file_roots setup")
 
 	masterMode := cmd.Flag("master-mode").Value.String() == "true"
 
@@ -91,11 +91,14 @@ func runBootstrapSalt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		LogLevel:   "warning",
 	}
 
+	logger.Info("Installing Salt and configuring file_roots for eos state management")
 	if err := saltstack.Install(rc, config); err != nil {
 		return err
 	}
 
 	logger.Info("Salt bootstrap completed successfully")
+	logger.Info("Salt states are now accessible via file_roots configuration")
+	logger.Info("Test with: salt-call --local state.show_sls dependencies")
 	return nil
 }
 

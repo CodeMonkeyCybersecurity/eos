@@ -3,6 +3,7 @@
 # This orchestrates all phases: Install -> Environment -> TLS -> Config -> Service -> Initialize
 
 include:
+  - dependencies                   # Ensure all system dependencies are installed
   - hashicorp.vault.install        # Phase 1: PhaseInstallVault + PrepareEnvironment  
   - hashicorp.vault.tls            # Phase 2: GenerateTLS
   - hashicorp.vault.config_eos     # Phase 3: WriteAndValidateConfig  

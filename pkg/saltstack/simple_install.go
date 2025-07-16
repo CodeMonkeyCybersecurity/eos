@@ -16,14 +16,21 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 	// Use only the bootstrap method - it's the most reliable when using the correct URL
 	installer := NewSimpleBootstrapInstaller(config)
 
-	// Simple flow: Install -> done
+	// Simple flow: Install -> Setup file_roots -> done
 	// All configuration and verification is handled within the installer
 	if err := installer.Install(rc); err != nil {
 		logger.Error("Salt installation failed", zap.Error(err))
 		return err
 	}
 
-	logger.Info("Salt installation completed successfully!")
+	// Set up file_roots for eos state management
+	logger.Info("Setting up Salt file_roots for eos state management")
+	if err := SetupFileRoots(rc); err != nil {
+		logger.Error("File_roots setup failed", zap.Error(err))
+		return err
+	}
+
+	logger.Info("Salt installation and file_roots setup completed successfully!")
 	logger.Info("Salt is now ready for use by other Eos commands")
 
 	if !config.MasterMode {

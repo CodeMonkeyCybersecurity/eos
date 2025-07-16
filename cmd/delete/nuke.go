@@ -131,6 +131,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		"nomad",
 		"consul",
 		"vault",
+		"boundary",
 		"salt-minion",
 		"salt-master",
 		"docker",
@@ -141,11 +142,21 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			continue
 		}
 
-		// Check if service exists
-		if _, err := cli.ExecString("systemctl", "status", service); err == nil {
+		// Check if service exists before attempting to stop
+		if output, err := cli.ExecString("systemctl", "list-units", "--all", "--type=service", "--quiet", service+".service"); err == nil && strings.Contains(output, service+".service") {
 			logger.Info("Stopping service", zap.String("service", service))
-			cli.ExecToSuccess("systemctl", "stop", service)
-			cli.ExecToSuccess("systemctl", "disable", service)
+			// Stop service (ignore errors for already stopped services)
+			if _, err := cli.ExecString("systemctl", "stop", service); err != nil {
+				logger.Debug("Service stop failed (may already be stopped)", 
+					zap.String("service", service), zap.Error(err))
+			}
+			// Disable service (ignore errors for already disabled services)  
+			if _, err := cli.ExecString("systemctl", "disable", service); err != nil {
+				logger.Debug("Service disable failed (may already be disabled)",
+					zap.String("service", service), zap.Error(err))
+			}
+		} else {
+			logger.Debug("Service not found, skipping", zap.String("service", service))
 		}
 	}
 
@@ -166,9 +177,12 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	logger.Info("Phase 4: Removing binaries")
 
 	binaries := map[string]string{
-		"vault":  "/usr/local/bin/vault",
-		"nomad":  "/usr/local/bin/nomad",
-		"consul": "/usr/local/bin/consul",
+		"vault":    "/usr/local/bin/vault",
+		"nomad":    "/usr/local/bin/nomad",
+		"consul":   "/usr/local/bin/consul",
+		"terraform": "/usr/local/bin/terraform",
+		"packer":   "/usr/local/bin/packer",
+		"boundary": "/usr/local/bin/boundary",
 	}
 
 	for component, path := range binaries {
@@ -201,6 +215,13 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		{"/opt/nomad", "nomad", false},
 		{"/opt/nomad/data", "nomad", true},
 		{"/etc/nomad.d", "nomad", false},
+		{"/opt/consul", "consul", false},
+		{"/opt/consul/data", "consul", true},
+		{"/etc/consul.d", "consul", false},
+		{"/opt/terraform", "terraform", false},
+		{"/opt/packer", "packer", false},
+		{"/opt/boundary", "boundary", false},
+		{"/etc/boundary.d", "boundary", false},
 		{"/etc/osquery", "osquery", false},
 		{"/var/osquery", "osquery", true},
 		{"/var/log/osquery", "osquery", true},
@@ -239,6 +260,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		// Other services
 		"/etc/systemd/system/nomad.service",
 		"/etc/systemd/system/consul.service",
+		"/etc/systemd/system/boundary.service",
 	}
 
 	for _, file := range serviceFiles {
@@ -290,8 +312,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	// Check for remaining processes
 	remainingProcesses := []string{}
-	for _, proc := range []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "osqueryd"} {
-		if output, err := cli.ExecString("pgrep", "-f", proc); err == nil && output != "" {
+	for _, proc := range []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd"} {
+		if output, err := cli.ExecString("pgrep", "-f", proc); err == nil && strings.TrimSpace(output) != "" {
 			remainingProcesses = append(remainingProcesses, proc)
 		}
 	}
@@ -302,7 +324,10 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 		// Force kill if needed
 		for _, proc := range remainingProcesses {
-			cli.ExecToSuccess("pkill", "-9", "-f", proc)
+			if _, err := cli.ExecString("pkill", "-9", "-f", proc); err != nil {
+				logger.Debug("Failed to kill process (may have already exited)",
+					zap.String("process", proc), zap.Error(err))
+			}
 		}
 	}
 

@@ -43,6 +43,7 @@ vault_init_check:
         exit 1  # This will trigger the initialization
     - require:
       - cmd: vault_health_check_tcp
+      - pkg: eos_dependencies
     # This check should always run but only fail if we can't determine status
 
 # Initialize Vault (only if not already initialized)

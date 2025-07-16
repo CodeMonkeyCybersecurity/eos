@@ -9,6 +9,10 @@
 # - hashicorp.packer
 # - hashicorp.boundary
 
+# Include common dependencies
+include:
+  - dependencies
+
 # HashiCorp repository setup (shared by all tools)
 hashicorp_gpg_key:
   cmd.run:
@@ -16,6 +20,8 @@ hashicorp_gpg_key:
         wget -qO- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
         gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
     - unless: test -f /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    - require:
+      - pkg: eos_dependencies
     - require_in:
       - pkgrepo: hashicorp_repo
 
