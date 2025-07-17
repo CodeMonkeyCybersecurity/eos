@@ -113,22 +113,29 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 			logger.Warn("Failed to update state", zap.Error(err))
 		}
 		
-		// Apply Salt state with retry logic
+		// Apply Salt state with enhanced retry logic and better error handling
 		retries := 3
 		var lastErr error
+		baseBackoff := 10 * time.Second
 		
 		for attempt := 1; attempt <= retries; attempt++ {
-			logger.Debug("Applying Salt state",
+			logger.Info("Applying Salt state",
+				zap.String("phase", phase.name),
 				zap.String("state", phase.state),
-				zap.Int("attempt", attempt))
+				zap.Int("attempt", attempt),
+				zap.Int("max_attempts", retries))
 			
+			// Enhanced Salt arguments for better output and debugging
 			args := []string{
 				"state.apply",
 				phase.state,
 				"--output=json",
 				"--log-level=info",
+				"--state-output=changes",
+				"--timeout=300", // 5 minute timeout per state
 			}
 
+			// Run Salt state with timeout protection
 			output, err := execute.Run(rc.Ctx, execute.Options{
 				Command: "salt-call",
 				Args:    args,
@@ -136,28 +143,51 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 			})
 			
 			if err == nil {
+				logger.Info("Salt state execution succeeded",
+					zap.String("phase", phase.name),
+					zap.String("state", phase.state))
+				
+				// Log detailed output for debugging (but only in debug mode)
 				logger.Debug("Salt state execution result",
 					zap.String("phase", phase.name),
 					zap.String("output", output))
 				
-				// Run health check for this phase
+				// Run health check for this phase with retry logic
 				if phase.healthCheck != nil {
 					logger.Info("Running health check for phase",
 						zap.String("phase", phase.name))
 					
-					if err := phase.healthCheck(rc); err != nil {
-						lastErr = fmt.Errorf("health check failed for %s: %w", phase.name, err)
-						if attempt < retries {
+					healthCheckRetries := 3
+					var healthErr error
+					
+					for healthAttempt := 1; healthAttempt <= healthCheckRetries; healthAttempt++ {
+						healthErr = phase.healthCheck(rc)
+						if healthErr == nil {
+							logger.Info("Health check passed",
+								zap.String("phase", phase.name),
+								zap.Int("health_attempt", healthAttempt))
+							break
+						}
+						
+						if healthAttempt < healthCheckRetries {
 							logger.Warn("Health check failed, retrying",
 								zap.String("phase", phase.name),
-								zap.Error(err),
+								zap.Error(healthErr),
+								zap.Int("health_attempt", healthAttempt))
+							time.Sleep(time.Duration(healthAttempt*5) * time.Second)
+						}
+					}
+					
+					if healthErr != nil {
+						lastErr = fmt.Errorf("health check failed for %s after %d attempts: %w", phase.name, healthCheckRetries, healthErr)
+						if attempt < retries {
+							logger.Warn("Health check failed after all retries, retrying entire phase",
+								zap.String("phase", phase.name),
+								zap.Error(healthErr),
 								zap.Int("attempt", attempt))
-							time.Sleep(time.Duration(attempt*10) * time.Second)
+							time.Sleep(baseBackoff * time.Duration(attempt))
 							continue
 						}
-					} else {
-						logger.Info("Health check passed",
-							zap.String("phase", phase.name))
 					}
 				}
 				
@@ -166,16 +196,36 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 				if err := stateManager.UpdatePhase(phase.name, "completed"); err != nil {
 					logger.Warn("Failed to update state", zap.Error(err))
 				}
+				
+				logger.Info("Phase completed successfully",
+					zap.String("phase", phase.name),
+					zap.Duration("total_time", time.Since(time.Now())))
 				break
 			}
 			
-			lastErr = err
+			// Salt state execution failed
+			lastErr = fmt.Errorf("salt state %s failed: %w", phase.state, err)
+			logger.Error("Salt state execution failed",
+				zap.String("phase", phase.name),
+				zap.String("state", phase.state),
+				zap.Error(err),
+				zap.String("output", output),
+				zap.Int("attempt", attempt))
+			
 			if attempt < retries {
-				logger.Warn("Salt state failed, retrying",
+				backoffDuration := baseBackoff * time.Duration(attempt)
+				logger.Warn("Retrying phase after backoff",
 					zap.String("phase", phase.name),
-					zap.Error(err),
+					zap.Duration("backoff", backoffDuration),
 					zap.Int("attempt", attempt))
-				time.Sleep(time.Duration(attempt*10) * time.Second)
+				time.Sleep(backoffDuration)
+				
+				// Try to recover by checking service states
+				if err := recoverPhase(rc, phase.name); err != nil {
+					logger.Warn("Phase recovery failed", 
+						zap.String("phase", phase.name),
+						zap.Error(err))
+				}
 			}
 		}
 		
@@ -224,20 +274,41 @@ func assessPrerequisites(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Assessing prerequisites for Hecate deployment")
 
-	// Check for required services
+	// Check for required services with detailed diagnostics
 	requiredServices := []string{"nomad", "consul", "vault", "salt-minion"}
 	
 	for _, service := range requiredServices {
 		logger.Debug("Checking service", zap.String("service", service))
 		
+		// First check if service is installed
 		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"list-unit-files", service + ".service"},
+			Capture: true,
+		})
+		if err != nil || !strings.Contains(output, service + ".service") {
+			return eos_err.NewUserError("Required service %s is not installed. Please install the HashiCorp stack first:\n  eos create vault\n  eos create consul\n  eos create nomad\n  eos create saltstack", service)
+		}
+		
+		// Check if service is active
+		output, err = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"is-active", service},
 			Capture: true,
 		})
 		if err != nil || strings.TrimSpace(output) != "active" {
-			return eos_err.NewUserError("required service %s is not active", service)
+			// Get detailed status for better error reporting
+			statusOutput, _ := execute.Run(rc.Ctx, execute.Options{
+				Command: "systemctl",
+				Args:    []string{"status", service, "--no-pager", "-l"},
+				Capture: true,
+			})
+			
+			return eos_err.NewUserError("Required service %s is not running.\nCurrent status: %s\n\nService details:\n%s\n\nTo start the service: sudo systemctl start %s", 
+				service, strings.TrimSpace(output), statusOutput, service)
 		}
+		
+		logger.Info("Service check passed", zap.String("service", service))
 	}
 
 	// Check for SaltStack states
@@ -855,5 +926,157 @@ func rollbackDeployment(rc *eos_io.RuntimeContext, completedPhases []string) err
 	}
 	
 	logger.Info("Rollback completed")
+	return nil
+}
+
+// recoverPhase attempts to recover from a failed phase by checking and restarting services
+func recoverPhase(rc *eos_io.RuntimeContext, phaseName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Attempting phase recovery", zap.String("phase", phaseName))
+	
+	switch phaseName {
+	case "hashicorp_stack":
+		// Check and restart HashiCorp services
+		services := []string{"consul", "vault", "nomad"}
+		for _, service := range services {
+			if err := restartServiceIfNeeded(rc, service); err != nil {
+				logger.Warn("Failed to restart service during recovery",
+					zap.String("service", service),
+					zap.Error(err))
+			}
+		}
+		
+	case "vault_secrets":
+		// Check Vault seal status and try to unseal if needed
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "vault",
+			Args:    []string{"status", "-format=json"},
+			Capture: true,
+		})
+		if err != nil {
+			return fmt.Errorf("vault status check failed: %w", err)
+		}
+		
+		if strings.Contains(output, `"sealed":true`) {
+			logger.Info("Vault is sealed, attempting unseal during recovery")
+			// Note: In production, you'd need unseal keys stored securely
+			logger.Warn("Vault is sealed - manual intervention may be required")
+		}
+		
+	case "postgres", "redis", "authentik", "caddy":
+		// For container-based services, check if Nomad jobs are healthy
+		jobName := "hecate-" + phaseName
+		if phaseName == "authentik" {
+			// Authentik has multiple jobs
+			jobs := []string{"hecate-authentik-server", "hecate-authentik-worker"}
+			for _, job := range jobs {
+				if err := checkNomadJobRecovery(rc, job); err != nil {
+					logger.Warn("Nomad job recovery check failed",
+						zap.String("job", job),
+						zap.Error(err))
+				}
+			}
+		} else {
+			if err := checkNomadJobRecovery(rc, jobName); err != nil {
+				logger.Warn("Nomad job recovery check failed",
+					zap.String("job", jobName),
+					zap.Error(err))
+			}
+		}
+	}
+	
+	logger.Info("Phase recovery attempt completed", zap.String("phase", phaseName))
+	return nil
+}
+
+// restartServiceIfNeeded checks service status and restarts if not active
+func restartServiceIfNeeded(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", serviceName},
+		Capture: true,
+	})
+	
+	if err != nil || strings.TrimSpace(output) != "active" {
+		logger.Info("Service not active, attempting restart",
+			zap.String("service", serviceName),
+			zap.String("current_status", strings.TrimSpace(output)))
+		
+		_, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"restart", serviceName},
+			Capture: true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to restart %s: %w", serviceName, err)
+		}
+		
+		// Wait a moment for service to start
+		time.Sleep(5 * time.Second)
+		
+		// Verify restart was successful
+		output, err = execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"is-active", serviceName},
+			Capture: true,
+		})
+		if err != nil || strings.TrimSpace(output) != "active" {
+			return fmt.Errorf("service %s failed to start after restart", serviceName)
+		}
+		
+		logger.Info("Service restarted successfully", zap.String("service", serviceName))
+	}
+	
+	return nil
+}
+
+// checkNomadJobRecovery checks Nomad job status and attempts basic recovery
+func checkNomadJobRecovery(rc *eos_io.RuntimeContext, jobName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Check job status
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "nomad",
+		Args:    []string{"job", "status", "-json", jobName},
+		Capture: true,
+	})
+	
+	if err != nil {
+		logger.Debug("Nomad job not found or failed to check",
+			zap.String("job", jobName),
+			zap.Error(err))
+		return err
+	}
+	
+	// Check if any allocations are failing
+	if strings.Contains(output, `"ClientStatus":"failed"`) {
+		logger.Info("Detected failed Nomad allocations, attempting job restart",
+			zap.String("job", jobName))
+		
+		// Stop and restart the job
+		execute.Run(rc.Ctx, execute.Options{
+			Command: "nomad",
+			Args:    []string{"job", "stop", jobName},
+			Capture: true,
+		})
+		
+		// Wait a moment
+		time.Sleep(3 * time.Second)
+		
+		// Start the job again
+		_, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "nomad",
+			Args:    []string{"job", "run", "/opt/hecate/nomad/" + jobName + ".hcl"},
+			Capture: true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to restart Nomad job %s: %w", jobName, err)
+		}
+		
+		logger.Info("Nomad job restarted", zap.String("job", jobName))
+	}
+	
 	return nil
 }

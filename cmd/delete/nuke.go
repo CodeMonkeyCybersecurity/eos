@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -99,6 +100,16 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	// Phase 1: Stop application services
 	logger.Info("Phase 1: Stopping application services")
+
+	// Remove Hecate completely if exists
+	if !excluded["hecate"] {
+		logger.Info("Removing Hecate reverse proxy framework")
+		if err := hecate.RemoveHecateCompletely(rc, keepData); err != nil {
+			logger.Warn("Failed to remove Hecate completely", zap.Error(err))
+		} else {
+			logger.Info("Hecate removed successfully")
+		}
+	}
 
 	// Stop ClusterFuzz if exists
 	if !excluded["clusterfuzz"] {
@@ -237,6 +248,12 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		{"/var/osquery", "osquery", true},
 		{"/var/log/osquery", "osquery", true},
 		{"/opt/clusterfuzz", "clusterfuzz", false},
+		{"/opt/hecate", "hecate", false},
+		{"/etc/hecate", "hecate", false},
+		{"/var/lib/hecate", "hecate", true},
+		{"/var/log/hecate", "hecate", true},
+		{"/srv/salt/hecate", "hecate", false},
+		{"/srv/pillar/hecate", "hecate", false},
 		{"/var/lib/eos", "eos", false},
 	}
 
@@ -268,6 +285,10 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		"/etc/systemd/system/vault-agent-health-check.service",
 		"/etc/systemd/system/vault-agent-health-check.timer",
 		"/etc/systemd/system/vault.service.d/",  // Directory for overrides
+		// Hecate services
+		"/etc/systemd/system/hecate.service",
+		"/etc/systemd/system/hecate-caddy.service",
+		"/etc/systemd/system/hecate-authentik.service",
 		// Other services
 		"/etc/systemd/system/nomad.service",
 		"/etc/systemd/system/consul.service",
@@ -323,7 +344,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	// Check for remaining processes (using execute directly to avoid error logging)
 	remainingProcesses := []string{}
-	for _, proc := range []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd"} {
+	for _, proc := range []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd", "caddy", "authentik"} {
 		output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "pgrep",
 			Args:    []string{"-f", proc},
