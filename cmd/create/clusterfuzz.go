@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz/prerequisites"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz/validation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
@@ -70,12 +71,38 @@ EXAMPLES:
   eos create clusterfuzz --bot-count 5 --preemptible-bot-count 10`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("Starting ClusterFuzz deployment on Nomad",
+		
+		// ASSESS - Check prerequisites and validate configuration
+		logger.Info("Assessing ClusterFuzz deployment requirements",
 			zap.String("nomad_address", nomadAddress),
 			zap.String("storage_backend", storageBackend),
 			zap.String("database_backend", databaseBackend))
 
-		// Validate configuration
+		// Prompt for S3 credentials if needed and not provided
+		if (storageBackend == "s3" || storageBackend == "minio") && (s3AccessKey == "" || s3SecretKey == "") {
+			logger.Info("S3 credentials required for storage backend",
+				zap.String("backend", storageBackend))
+			
+			if s3AccessKey == "" {
+				logger.Info("terminal prompt: Please enter S3 access key")
+				accessKey, err := eos_io.PromptInput(rc, "S3 Access Key: ", "s3_access_key")
+				if err != nil {
+					return eos_err.NewUserError("failed to read S3 access key: " + err.Error())
+				}
+				s3AccessKey = accessKey
+			}
+			
+			if s3SecretKey == "" {
+				logger.Info("terminal prompt: Please enter S3 secret key")
+				secretKey, err := eos_io.PromptSecurePassword(rc, "S3 Secret Key: ")
+				if err != nil {
+					return eos_err.NewUserError("failed to read S3 secret key: " + err.Error())
+				}
+				s3SecretKey = secretKey
+			}
+		}
+
+		// Validate configuration after prompting
 		if err := validation.ValidateConfig(storageBackend, databaseBackend, queueBackend,
 			botCount, preemptibleBotCount, s3Endpoint, s3AccessKey, s3SecretKey); err != nil {
 			return fmt.Errorf("invalid configuration: %w", err)
@@ -94,7 +121,12 @@ EXAMPLES:
 			}
 		}
 
+		// INTERVENE - Perform the deployment operations
+		logger.Info("Starting ClusterFuzz deployment intervention")
+
 		// Create configuration directory
+		logger.Info("Creating configuration directory",
+			zap.String("path", configDir))
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}
@@ -143,8 +175,9 @@ EXAMPLES:
 			return fmt.Errorf("failed to deploy bots: %w", err)
 		}
 
-		// Verify deployment
-		logger.Info("Verifying deployment...")
+		// EVALUATE - Verify the deployment was successful
+		logger.Info("Evaluating ClusterFuzz deployment success")
+		
 		if err := clusterfuzz.VerifyDeployment(rc, cfg); err != nil {
 			return fmt.Errorf("deployment verification failed: %w", err)
 		}
@@ -160,8 +193,10 @@ EXAMPLES:
 func init() {
 	CreateCmd.AddCommand(clusterfuzzCmd)
 
-	clusterfuzzCmd.Flags().StringVar(&nomadAddress, "nomad-address", "http://localhost:4646", "Nomad server address")
-	clusterfuzzCmd.Flags().StringVar(&consulAddress, "consul-address", fmt.Sprintf("http://localhost:%d", shared.PortConsul), "Consul server address")
+	// Use the same hostname resolution pattern as Vault
+	hostname := shared.GetInternalHostname()
+	clusterfuzzCmd.Flags().StringVar(&nomadAddress, "nomad-address", fmt.Sprintf("http://%s:%d", hostname, shared.PortNomad), "Nomad server address")
+	clusterfuzzCmd.Flags().StringVar(&consulAddress, "consul-address", fmt.Sprintf("http://%s:%d", hostname, shared.PortConsul), "Consul server address")
 	clusterfuzzCmd.Flags().StringVar(&storageBackend, "storage-backend", "minio", "Storage backend (minio, s3, local)")
 	clusterfuzzCmd.Flags().StringVar(&databaseBackend, "database-backend", "postgresql", "Database backend (postgresql, mongodb)")
 	clusterfuzzCmd.Flags().StringVar(&queueBackend, "queue-backend", "redis", "Queue backend (redis, rabbitmq)")

@@ -49,7 +49,7 @@ Examples:
   eos create penpot --namespace production
 
   # Deploy with custom Vault/Nomad addresses
-  eos create penpot --vault-addr https://vault.example.com:8200 --nomad-addr https://nomad.example.com:4646
+  eos create penpot --vault-addr https://vault.example.com:8179 --nomad-addr https://nomad.example.com:8243
 
   # Deploy with disabled registration
   eos create penpot --disable-registration
@@ -86,12 +86,13 @@ Examples:
 		}
 
 		// Display success information
+		hostname := shared.GetInternalHostname()
 		logger.Info(" Penpot deployment completed successfully",
-			zap.String("url", fmt.Sprintf("http://localhost:%d", config.Port)),
+			zap.String("url", fmt.Sprintf("http://%s:%d", hostname, config.Port)),
 			zap.String("namespace", config.Namespace))
 
 		logger.Info("🌐 Access Penpot",
-			zap.String("web_interface", fmt.Sprintf("http://localhost:%d", config.Port)),
+			zap.String("web_interface", fmt.Sprintf("http://%s:%d", hostname, config.Port)),
 			zap.String("default_credentials", "Create account via registration form"))
 
 		logger.Info("📚 Next steps",
@@ -173,7 +174,8 @@ func parsePenpotFlags(cmd *cobra.Command) (*penpot.Config, error) {
 	}
 
 	// Set public URI based on final port configuration
-	config.PublicURI = fmt.Sprintf("http://localhost:%d", config.Port)
+	hostname := shared.GetInternalHostname()
+	config.PublicURI = fmt.Sprintf("http://%s:%d", hostname, config.Port)
 
 	return config, nil
 }
@@ -183,10 +185,11 @@ func init() {
 	CreateCmd.AddCommand(penpotCmd)
 
 	// Basic configuration flags
+	hostname := shared.GetInternalHostname()
 	penpotCmd.Flags().IntP("port", "p", shared.PortPenpot, "Port to expose Penpot on")
 	penpotCmd.Flags().String("namespace", "penpot", "Nomad namespace for deployment")
-	penpotCmd.Flags().String("vault-addr", "http://localhost:8200", "Vault server address")
-	penpotCmd.Flags().String("nomad-addr", "http://localhost:4646", "Nomad server address")
+	penpotCmd.Flags().String("vault-addr", fmt.Sprintf("https://%s:%d", hostname, shared.PortVault), "Vault server address")
+	penpotCmd.Flags().String("nomad-addr", fmt.Sprintf("http://%s:%d", hostname, shared.PortNomad), "Nomad server address")
 	penpotCmd.Flags().String("work-dir", "/tmp/penpot-deploy", "Working directory for deployment files")
 	penpotCmd.Flags().String("host", "0.0.0.0", "Host to bind services to")
 

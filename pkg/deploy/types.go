@@ -413,7 +413,7 @@ func DefaultDeploymentConfig() *DeploymentConfig {
 			WorkingDir:  "/srv/terraform",
 			StateBackend: "consul",
 			BackendConfig: map[string]string{
-				"address": fmt.Sprintf("localhost:%d", shared.PortConsul),
+				"address": shared.GetConsulAddr(),
 				"path":    "terraform/state",
 				"lock":    "true",
 			},
@@ -422,16 +422,16 @@ func DefaultDeploymentConfig() *DeploymentConfig {
 			Timeout:     30 * time.Minute,
 		},
 		NomadConfig: NomadClientConfig{
-			Address: "http://localhost:4646",
+			Address: shared.GetNomadAddr(),
 			Region:  "global",
 			Timeout: 5 * time.Minute,
 		},
 		VaultConfig: VaultClientConfig{
-			Address: "http://localhost:8179",
+			Address: shared.GetServiceAddr(shared.PortVault, true), // Vault uses HTTPS
 			Timeout: 30 * time.Second,
 		},
 		ConsulConfig: ConsulClientConfig{
-			Address:    fmt.Sprintf("localhost:%d", shared.PortConsul),
+			Address:    shared.GetConsulAddr(),
 			Datacenter: "dc1",
 			Timeout:    30 * time.Second,
 		},

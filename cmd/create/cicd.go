@@ -150,10 +150,11 @@ func init() {
 	cicdCmd.Flags().Int("health-retries", 3, "Number of health check retries")
 
 	// Service addresses
+	hostname := shared.GetInternalHostname()
 	cicdCmd.Flags().String("salt-master", "salt-master.cybermonkey.net.au", "Salt master address")
-	cicdCmd.Flags().String("nomad-addr", "http://localhost:4646", "Nomad server address")
-	cicdCmd.Flags().String("consul-addr", fmt.Sprintf("localhost:%d", shared.PortConsul), "Consul server address")
-	cicdCmd.Flags().String("vault-addr", "http://localhost:8179", "Vault server address")
+	cicdCmd.Flags().String("nomad-addr", fmt.Sprintf("http://%s:%d", hostname, shared.PortNomad), "Nomad server address")
+	cicdCmd.Flags().String("consul-addr", fmt.Sprintf("http://%s:%d", hostname, shared.PortConsul), "Consul server address")
+	cicdCmd.Flags().String("vault-addr", fmt.Sprintf("https://%s:%d", hostname, shared.PortVault), "Vault server address")
 
 	cicdCmd.Example = `  # Set up basic CI/CD pipeline for Helen
   eos create cicd helen
@@ -538,7 +539,7 @@ terraform {
   required_version = ">= 1.0"
   
   backend "consul" {
-    address = "localhost:%d"
+    address = "%s:%d"
     path    = "terraform/%s/state"
     lock    = true
   }
@@ -562,7 +563,7 @@ variable "domain" {
   type        = string
   default     = "%s"
 }
-`, config.AppName, shared.PortConsul, config.AppName, config.AppName, config.Deployment.Environment, config.Deployment.Domain)
+`, config.AppName, shared.GetInternalHostname(), shared.PortConsul, config.AppName, config.AppName, config.Deployment.Environment, config.Deployment.Domain)
 
 	_, err = file.WriteString(content)
 	return err
