@@ -23,6 +23,15 @@ import (
 func OrchestrateVaultCreate(rc *eos_io.RuntimeContext) error {
 	otelzap.Ctx(rc.Ctx).Info(" Starting full Vault create lifecycle")
 
+	// Check if Salt is available and use it if possible
+	if err := checkSaltAvailability(rc); err == nil {
+		otelzap.Ctx(rc.Ctx).Info("Salt is available, using Salt-based deployment")
+		return OrchestrateVaultCreateViaSalt(rc)
+	}
+
+	// Fall back to direct deployment
+	otelzap.Ctx(rc.Ctx).Info("Salt not available, using direct deployment")
+
 	if err := PhaseInstallVault(rc); err != nil {
 		return fmt.Errorf("install vault binary: %w", err)
 	}

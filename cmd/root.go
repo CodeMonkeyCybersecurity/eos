@@ -111,6 +111,20 @@ func Execute(rc *eos_io.RuntimeContext) {
 			done <- true
 		}()
 
+		// Log execution context for debugging
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Command execution started",
+			zap.String("command", os.Args[0]),
+			zap.Strings("args", os.Args[1:]),
+			zap.String("working_dir", func() string {
+				if wd, err := os.Getwd(); err == nil {
+					return wd
+				}
+				return "unknown"
+			}()),
+			zap.Int("uid", os.Getuid()),
+			zap.Int("gid", os.Getgid()))
+
 		// Execute the command
 		if err := RootCmd.Execute(); err != nil {
 			if eos_err.IsExpectedUserError(err) {

@@ -23,6 +23,15 @@ func VaultAddress() string {
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
 	log.Info(" Starting Vault enablement flow")
 
+	// Check if Salt is available and use it if possible
+	if err := checkSaltAvailability(rc); err == nil {
+		log.Info("Salt is available, using Salt-based enablement")
+		return OrchestrateVaultEnableViaSalt(rc)
+	}
+
+	// Fall back to direct enablement
+	log.Info("Salt not available, using direct enablement")
+
 	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
 		log.Info("🧹 Clearing existing VAULT_TOKEN environment variable for fresh setup")

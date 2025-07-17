@@ -61,37 +61,6 @@ func (c *CaddyClient) GetRoutes(ctx context.Context) ([]*Route, error) {
 	return []*Route{}, nil
 }
 
-// AuthentikClient represents a client for Authentik API
-type AuthentikClient struct {
-	baseURL   string
-	apiToken  string
-}
-
-// NewAuthentikClient creates a new Authentik API client
-func NewAuthentikClient(baseURL, apiToken string) *AuthentikClient {
-	return &AuthentikClient{
-		baseURL:  baseURL,
-		apiToken: apiToken,
-	}
-}
-
-// CreateAuthPolicy creates an authentication policy in Authentik
-func (a *AuthentikClient) CreateAuthPolicy(ctx context.Context, policy *AuthPolicy) error {
-	// TODO: Implement Authentik API integration
-	return nil
-}
-
-// UpdateAuthPolicy updates an authentication policy in Authentik
-func (a *AuthentikClient) UpdateAuthPolicy(ctx context.Context, policy *AuthPolicy) error {
-	// TODO: Implement Authentik API integration
-	return nil
-}
-
-// DeleteAuthPolicy deletes an authentication policy from Authentik
-func (a *AuthentikClient) DeleteAuthPolicy(ctx context.Context, policyName string) error {
-	// TODO: Implement Authentik API integration
-	return nil
-}
 
 // GenerateRouteID generates a unique ID for a route
 func GenerateRouteID(domain string) string {

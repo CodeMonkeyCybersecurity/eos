@@ -498,19 +498,6 @@ func deleteRouteState(rc *eos_io.RuntimeContext, config *HecateConfig, domain st
 	return nil
 }
 
-// Generic state store functions
-
-func updateStateStore(rc *eos_io.RuntimeContext, collection, key string, value interface{}) error {
-	// TODO: Implement state store updates
-	// This would save the value to the configured state backend (consul, file, etc.)
-	return nil
-}
-
-func deleteFromStateStore(rc *eos_io.RuntimeContext, collection, key string) error {
-	// TODO: Implement state store deletion
-	// This would delete the value from the configured state backend
-	return nil
-}
 
 func getFromStateStore(rc *eos_io.RuntimeContext, collection, key string, dest interface{}) error {
 	// TODO: Implement state store retrieval

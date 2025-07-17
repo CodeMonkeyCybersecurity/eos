@@ -73,6 +73,15 @@ func ComprehensiveHardening(rc *eos_io.RuntimeContext, client *api.Client, confi
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Starting comprehensive Vault hardening")
 
+	// Check if Salt is available and use it if possible
+	if err := checkSaltAvailability(rc); err == nil {
+		log.Info("Salt is available, using Salt-based hardening")
+		return OrchestrateVaultHardenViaSalt(rc)
+	}
+
+	// Fall back to direct hardening
+	log.Info("Salt not available, using direct hardening")
+
 	if config == nil {
 		config = DefaultHardeningConfig()
 	}

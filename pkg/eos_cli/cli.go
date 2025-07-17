@@ -30,6 +30,14 @@ func New(rc *eos_io.RuntimeContext) *CLI {
 }
 
 // WithTimeout creates a new CLI instance with a custom timeout
+func WithTimeout(rc *eos_io.RuntimeContext, timeout time.Duration) *CLI {
+	return &CLI{
+		rc:      rc,
+		timeout: timeout,
+	}
+}
+
+// WithTimeout creates a new CLI instance with a custom timeout
 func (c *CLI) WithTimeout(timeout time.Duration) *CLI {
 	return &CLI{
 		rc:      c.rc,

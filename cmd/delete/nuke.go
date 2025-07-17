@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -174,11 +175,20 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		cli.ExecToSuccess("apt-get", "remove", "-y", "--purge", "salt-master", "salt-minion", "salt-common")
 	}
 
-	// Phase 4: Remove binaries
-	logger.Info("Phase 4: Removing binaries")
+	// Phase 4: Comprehensive Vault removal via Salt
+	if !excluded["vault"] {
+		logger.Info("Phase 4: Comprehensive Vault removal via Salt")
+		if err := vault.RemoveVaultViaSalt(rc); err != nil {
+			logger.Warn("Salt-based Vault removal failed, skipping", zap.Error(err))
+		} else {
+			logger.Info("Vault completely removed via Salt")
+		}
+	}
+
+	// Phase 5: Remove remaining binaries
+	logger.Info("Phase 5: Removing remaining binaries")
 
 	binaries := map[string]string{
-		"vault":    "/usr/local/bin/vault",
 		"nomad":    "/usr/local/bin/nomad",
 		"consul":   "/usr/local/bin/consul",
 		"terraform": "/usr/local/bin/terraform",
@@ -193,8 +203,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		}
 	}
 
-	// Phase 5: Remove directories
-	logger.Info("Phase 5: Removing directories")
+	// Phase 6: Remove directories
+	logger.Info("Phase 6: Removing directories")
 
 	directories := []struct {
 		path      string
@@ -246,8 +256,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		}
 	}
 
-	// Phase 6: Remove systemd service files
-	logger.Info("Phase 6: Cleaning up systemd services")
+	// Phase 7: Remove systemd service files
+	logger.Info("Phase 7: Cleaning up systemd services")
 
 	serviceFiles := []string{
 		// Vault services
@@ -279,8 +289,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	cli.ExecToSuccess("systemctl", "daemon-reload")
 
-	// Phase 7: Clean up APT sources
-	logger.Info("Phase 7: Cleaning up APT sources")
+	// Phase 8: Clean up APT sources
+	logger.Info("Phase 8: Cleaning up APT sources")
 
 	aptSources := []string{
 		"/etc/apt/sources.list.d/salt.list",
@@ -296,7 +306,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	// Remove eos itself if --all
 	if removeAll && !excluded["eos"] {
-		logger.Info("Phase 8: Removing eos itself")
+		logger.Info("Phase 9: Removing eos itself")
 
 		eosBinary := "/usr/local/bin/eos"
 		if fileExists(eosBinary) {

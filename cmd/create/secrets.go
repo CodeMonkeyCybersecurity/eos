@@ -64,6 +64,11 @@ var CreateVaultCmd = &cobra.Command{
 	Short: "Installs Vault with TLS, systemd service, and initial configuration",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
+		// Run pre-flight checks before attempting installation
+		if err := vault.PreflightChecks(rc); err != nil {
+			return err
+		}
+
 		err := vault.OrchestrateVaultCreate(rc)
 		if err != nil {
 			return logger.LogErrAndWrap(rc, "vault create failed: %w", err)

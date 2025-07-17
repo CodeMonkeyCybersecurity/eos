@@ -18,26 +18,58 @@ func init() {
 	// Attach the hetzner-dns subcommand here
 	CreateCmd.AddCommand(hetznerWildcardCmd)
 	CreateCmd.AddCommand(CreateHecateCmd)
+	
+	// Add flags for Hecate deployment
+	CreateHecateCmd.Flags().Bool("legacy", false, "Use legacy Docker Compose deployment method")
 }
 
 // CreateHecateCmd creates the `create hecate` subcommand
 var CreateHecateCmd = &cobra.Command{
 	Use:   "hecate",
-	Short: "Fetch and set up Hecate reverse proxy framework",
-	Long: `This command downloads the Hecate reverse proxy framework from its repository,
-places it in /opt/hecate, and prepares it for use with Eos.`,
+	Short: "Deploy Hecate reverse proxy framework with SaltStack",
+	Long: `Deploy Hecate reverse proxy framework using SaltStack orchestration.
+This command deploys a complete reverse proxy stack with:
+- Caddy reverse proxy
+- Authentik identity provider
+- PostgreSQL database
+- Redis cache
+- Nomad job orchestration
+
+The deployment requires a working HashiCorp stack (Consul, Vault, Nomad).
+
+Prerequisites:
+- Running Consul cluster
+- Running Vault server
+- Running Nomad cluster
+- SaltStack minion configured
+
+The deployment follows a phased approach:
+1. HashiCorp stack verification
+2. Vault secrets creation
+3. PostgreSQL deployment
+4. Redis deployment
+5. Authentik deployment
+6. Caddy deployment
+7. Integration configuration
+
+Examples:
+  eos create hecate                    # Full deployment
+  eos create hecate --legacy          # Use legacy Docker Compose method`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
-		log.Info(" Starting full Hecate setup wizard...")
+		log.Info("Starting Hecate deployment with SaltStack")
 
-		//  Call the full prompt + orchestrator flow
-		if err := hecate.OrchestrateHecateWizard(rc); err != nil {
-			log.Error(" Hecate setup failed", zap.Error(err))
-			return err
+		// Check for legacy flag
+		useLegacy, _ := cmd.Flags().GetBool("legacy")
+		
+		if useLegacy {
+			log.Info("Using legacy Docker Compose deployment method")
+			return hecate.OrchestrateHecateWizard(rc)
 		}
-
-		log.Info(" Hecate setup completed successfully!")
-		return nil
+		
+		// Default to SaltStack deployment
+		log.Info("Using SaltStack deployment method")
+		return hecate.DeployWithSaltStack(rc)
 	}),
 }
 

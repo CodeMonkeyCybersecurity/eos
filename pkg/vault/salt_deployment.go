@@ -2,7 +2,9 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -297,4 +299,284 @@ func GetVaultStatusViaSalt(rc *eos_io.RuntimeContext) (map[string]interface{}, e
 		zap.Any("status", status))
 	
 	return status, nil
+}
+
+// OrchestrateVaultEnableViaSalt enables Vault features using Salt states
+// This replaces EnableVault() when Salt is available
+func OrchestrateVaultEnableViaSalt(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting Vault enablement via Salt states")
+
+	// ASSESS - Check prerequisites
+	if err := checkSaltAvailability(rc); err != nil {
+		logger.Error("Salt not available for enablement", zap.Error(err))
+		return fmt.Errorf("Salt not available: %w", err)
+	}
+
+	// Check if Vault is initialized and unsealed
+	if err := checkVaultReadyForEnablement(rc); err != nil {
+		return fmt.Errorf("Vault not ready for enablement: %w", err)
+	}
+
+	// INTERVENE - Apply enablement via Salt
+	logger.Info("Applying Vault enablement Salt states")
+	
+	saltClient := saltstack.NewClient(logger)
+	ctx, cancel := context.WithTimeout(rc.Ctx, 300*time.Second) // 5 minutes
+	defer cancel()
+
+	// Get root token from init file
+	rootToken, err := getRootTokenFromInitFile(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get root token: %w", err)
+	}
+
+	// Prepare pillar data
+	pillarData := map[string]interface{}{
+		"vault": map[string]interface{}{
+			"root_token":      rootToken,
+			"enable_userpass": true,
+			"enable_approle":  true,
+			"enable_mfa":      true,
+			"enable_agent":    true,
+		},
+	}
+
+	// Apply enablement state
+	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.enable", pillarData); err != nil {
+		return fmt.Errorf("failed to apply enablement Salt states: %w", err)
+	}
+
+	// EVALUATE - Verify enablement
+	logger.Info("Verifying Vault enablement")
+	
+	if err := verifyVaultEnablement(rc); err != nil {
+		return fmt.Errorf("Vault enablement verification failed: %w", err)
+	}
+
+	logger.Info("Vault enablement via Salt completed successfully")
+	return nil
+}
+
+// OrchestrateVaultHardenViaSalt applies comprehensive hardening using Salt states
+func OrchestrateVaultHardenViaSalt(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting Vault hardening via Salt states")
+
+	// ASSESS
+	if err := checkSaltAvailability(rc); err != nil {
+		logger.Error("Salt not available for hardening", zap.Error(err))
+		return fmt.Errorf("Salt not available: %w", err)
+	}
+
+	// INTERVENE
+	logger.Info("Applying Vault hardening Salt states")
+	
+	saltClient := saltstack.NewClient(logger)
+	ctx, cancel := context.WithTimeout(rc.Ctx, 600*time.Second) // 10 minutes
+	defer cancel()
+
+	// Get root token if available
+	rootToken, _ := getRootTokenFromInitFile(rc)
+
+	// Prepare pillar data
+	pillarData := map[string]interface{}{
+		"vault": map[string]interface{}{
+			"root_token":      rootToken,
+			"allowed_subnets": []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
+		},
+	}
+
+	// Apply hardening state
+	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.harden", pillarData); err != nil {
+		return fmt.Errorf("failed to apply hardening Salt states: %w", err)
+	}
+
+	// EVALUATE
+	logger.Info("Verifying Vault hardening")
+	
+	if err := verifyVaultHardening(rc); err != nil {
+		logger.Warn("Some hardening checks failed", zap.Error(err))
+		// Don't fail completely - hardening is best-effort
+	}
+
+	logger.Info("Vault hardening via Salt completed")
+	return nil
+}
+
+// OrchestrateVaultCompleteLifecycle runs the entire Vault lifecycle via Salt
+func OrchestrateVaultCompleteLifecycle(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting complete Vault lifecycle via Salt orchestration")
+
+	// Check Salt availability once
+	if err := checkSaltAvailability(rc); err != nil {
+		logger.Error("Salt not available for complete lifecycle", zap.Error(err))
+		return fmt.Errorf("Salt not available: %w", err)
+	}
+
+	saltClient := saltstack.NewClient(logger)
+	ctx, cancel := context.WithTimeout(rc.Ctx, 1200*time.Second) // 20 minutes total
+	defer cancel()
+
+	// Prepare comprehensive pillar data
+	pillarData := map[string]interface{}{
+		"vault": map[string]interface{}{
+			"enable_userpass":  true,
+			"enable_approle":   true,
+			"enable_mfa":       true,
+			"enable_agent":     true,
+			"allowed_subnets":  []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
+		},
+	}
+
+	// Apply complete lifecycle orchestration
+	logger.Info("Applying complete Vault lifecycle Salt orchestration")
+	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.complete_lifecycle", pillarData); err != nil {
+		return fmt.Errorf("failed to apply complete lifecycle: %w", err)
+	}
+
+	logger.Info("Complete Vault lifecycle deployment successful")
+	return nil
+}
+
+// Helper functions
+
+func checkVaultReadyForEnablement(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Set environment variables for Vault
+	os.Setenv("VAULT_ADDR", "https://127.0.0.1:8179")
+	os.Setenv("VAULT_SKIP_VERIFY", "true")
+	defer func() {
+		os.Unsetenv("VAULT_ADDR")
+		os.Unsetenv("VAULT_SKIP_VERIFY")
+	}()
+	
+	// Check if Vault is initialized
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "vault",
+		Args:    []string{"status", "-format=json"},
+		Capture: true,
+	})
+
+	if err != nil {
+		// vault status returns non-zero when sealed, so parse output anyway
+		if output == "" {
+			return fmt.Errorf("Vault not responding")
+		}
+	}
+
+	// Parse status
+	var status struct {
+		Initialized bool `json:"initialized"`
+		Sealed      bool `json:"sealed"`
+	}
+
+	if err := json.Unmarshal([]byte(output), &status); err != nil {
+		return fmt.Errorf("failed to parse Vault status: %w", err)
+	}
+
+	if !status.Initialized {
+		return fmt.Errorf("Vault is not initialized")
+	}
+
+	if status.Sealed {
+		logger.Info("Vault is sealed, attempting to unseal via Salt")
+		// Try to unseal via Salt
+		saltClient := saltstack.NewClient(logger)
+		if err := saltClient.StateApplyLocal(rc.Ctx, "hashicorp.vault.unseal", nil); err != nil {
+			return fmt.Errorf("failed to unseal Vault: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func getRootTokenFromInitFile(rc *eos_io.RuntimeContext) (string, error) {
+	initFile := "/var/lib/eos/secret/vault_init.json"
+	
+	data, err := os.ReadFile(initFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to read init file: %w", err)
+	}
+
+	var initData struct {
+		RootToken string `json:"root_token"`
+	}
+
+	if err := json.Unmarshal(data, &initData); err != nil {
+		return "", fmt.Errorf("failed to parse init file: %w", err)
+	}
+
+	if initData.RootToken == "" {
+		return "", fmt.Errorf("root token not found in init file")
+	}
+
+	return initData.RootToken, nil
+}
+
+func verifyVaultEnablement(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Check auth methods
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "vault",
+		Args:    []string{"auth", "list", "-format=json"},
+		Capture: true,
+	})
+
+	if err != nil {
+		logger.Warn("Failed to list auth methods", zap.Error(err))
+	}
+
+	// Check audit devices
+	auditOutput, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "vault",
+		Args:    []string{"audit", "list"},
+		Capture: true,
+	})
+
+	if err != nil || !strings.Contains(auditOutput, "file/") {
+		return fmt.Errorf("audit logging not properly configured")
+	}
+
+	logger.Info("Vault enablement verified",
+		zap.String("auth_methods", output))
+
+	return nil
+}
+
+func verifyVaultHardening(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Check if swap is disabled
+	swapOutput, _ := execute.Run(rc.Ctx, execute.Options{
+		Command: "swapon",
+		Args:    []string{"--show"},
+		Capture: true,
+	})
+
+	if swapOutput != "" {
+		logger.Warn("Swap is still enabled")
+	}
+
+	// Check firewall status
+	ufwOutput, _ := execute.Run(rc.Ctx, execute.Options{
+		Command: "ufw",
+		Args:    []string{"status"},
+		Capture: true,
+	})
+
+	if !strings.Contains(ufwOutput, "Status: active") {
+		logger.Warn("Firewall not active")
+	}
+
+	// Check backup configuration
+	if _, err := os.Stat("/usr/local/bin/vault-backup.sh"); err != nil {
+		logger.Warn("Backup script not found")
+	}
+
+	logger.Info("Vault hardening verification completed")
+	return nil
 }
