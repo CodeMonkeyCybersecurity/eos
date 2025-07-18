@@ -781,3 +781,111 @@ NEVER create .md files for implementation notes, checklists, or temporary work n
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 MANDATORY: When creating or modifying any .md file, always add "*Last Updated: YYYY-MM-DD*" after the main heading.
+
+CRITICAL IMPLEMENTATION PATTERN: Helper Function Self-Checks
+
+  Every helper function MUST internally implement the Assess → 
+  Intervene → Evaluate pattern:
+
+  1. ASSESS (Can I Execute?)
+
+  - Check permissions (e.g., "do I need sudo?")
+  - Check dependencies exist (e.g., "is the required command
+  available?")
+  - Check preconditions (e.g., "is the service I need to interact
+  with running?")
+  - Check resources (e.g., "is there enough disk space?")
+  - FAIL FAST with clear error messages if unable to proceed
+
+  2. INTERVENE (Execute)
+
+  - Only execute after all checks pass
+  - Log what is being attempted
+  - Handle errors gracefully
+  - Use appropriate error wrapping
+
+  3. EVALUATE (Did it work?)
+
+  - Verify the action completed successfully
+  - Check expected outputs/side effects
+  - Validate state changes occurred
+  - Return meaningful errors if verification fails
+
+  Example Pattern:
+
+  func InstallPackage(rc *eos_io.RuntimeContext, pkgName string) 
+  error {
+      logger := otelzap.Ctx(rc.Ctx)
+
+      // ASSESS - Can I execute?
+      logger.Info("Checking if we can install package",
+  zap.String("package", pkgName))
+
+      // Check if running as root
+      if os.Geteuid() != 0 {
+          return eos_err.NewUserError("package installation requires 
+  root privileges, please run with sudo")
+      }
+
+      // Check if apt-get exists
+      if _, err := exec.LookPath("apt-get"); err != nil {
+          return eos_err.NewUserError("apt-get not found - this 
+  command requires Ubuntu")
+      }
+
+      // Check if package manager is not locked
+      if _, err := os.Stat("/var/lib/dpkg/lock"); err == nil {
+          return eos_err.NewUserError("package manager is locked by 
+  another process")
+      }
+
+      // INTERVENE - Execute
+      logger.Info("Installing package", zap.String("package",
+  pkgName))
+
+      output, err := execute.Run(rc.Ctx, execute.Options{
+          Command: "apt-get",
+          Args:    []string{"install", "-y", pkgName},
+          Capture: true,
+      })
+      if err != nil {
+          return fmt.Errorf("package installation failed: %w", err)
+      }
+
+      // EVALUATE - Verify it worked
+      logger.Info("Verifying package installation")
+
+      // Check if package is now installed
+      output, err = execute.Run(rc.Ctx, execute.Options{
+          Command: "dpkg",
+          Args:    []string{"-l", pkgName},
+          Capture: true,
+      })
+      if err != nil || !strings.Contains(output, "ii") {
+          return fmt.Errorf("package verification failed - package 
+  may not be installed correctly")
+      }
+
+      logger.Info("Package installed successfully",
+  zap.String("package", pkgName))
+      return nil
+  }
+
+  Key Checks to Include:
+
+  - Permission checks: os.Geteuid(), file permissions
+  - Command availability: exec.LookPath()
+  - Service status: systemctl is-active
+  - File/directory existence: os.Stat()
+  - Resource availability: disk space, memory
+  - Lock files: dpkg lock, apt lock, etc.
+  - Network connectivity: for downloads
+  - Configuration validity: before applying
+
+  REMEMBER:
+
+  - Each function is self-contained and defensive
+  - Don't assume anything about the environment
+  - Provide clear, actionable error messages
+  - Log at each phase for debugging
+  - The main command orchestrates, but each helper validates itself
