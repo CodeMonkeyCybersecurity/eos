@@ -7,6 +7,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/service_installation"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -72,7 +73,7 @@ Examples:
 			options.Version = "latest"
 		}
 		if options.Port == 0 {
-			options.Port = 3000
+			options.Port = shared.PortGrafana
 		}
 
 		// Perform installation
@@ -149,8 +150,8 @@ func init() {
 	CreateCmd.AddCommand(CreateGrafanaCmd)
 
 	CreateGrafanaCmd.Flags().StringP("version", "v", "latest", "Grafana version to install")
-	CreateGrafanaCmd.Flags().IntP("port", "p", 3000, "Port to expose Grafana on")
-	CreateGrafanaCmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive setup mode")
+	CreateGrafanaCmd.Flags().IntP("port", "p", shared.PortGrafana, "Port to expose Grafana on")
+	CreateGrafanaCmd.Flags().BoolP("interactive", "i", false, "Interactive setup mode")
 	CreateGrafanaCmd.Flags().Bool("dry-run", false, "Simulate installation without making changes")
 	CreateGrafanaCmd.Flags().BoolP("force", "f", false, "Force installation even if port is in use")
 	CreateGrafanaCmd.Flags().Bool("skip-health-check", false, "Skip post-installation health check")

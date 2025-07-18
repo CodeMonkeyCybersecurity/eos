@@ -4,6 +4,8 @@
 
 package shared
 
+import "fmt"
+
 // Port constants following prime number convention starting from 8000
 const (
 	PortHelen      = 8009
@@ -31,24 +33,81 @@ const (
 	PortZabbixAPI  = 8237
 	PortPenpot     = 8239 // Design platform
 	PortNomad      = 8243 // Nomad API server (not 4646)
-
-	//	Next available:
-	// 	1.	8263
-	// 	3.	8269
-	// 	4.	8273
-	// 	5.	8287
-	// 	6.	8291
-	// 	7.	8293
-	// 	8.	8297
-	// 	9.	8311
-
-	// Next available primes: 8219, 8221, 8231, 8233, 8237, 8243, 8263, 8269...
+	
+	// New port definitions using next available primes
+	PortPostgreSQL     = 8263 // PostgreSQL database (not 5432)
+	PortRedis          = 8269 // Redis cache (not 6379)
+	PortPrometheus     = 8273 // Prometheus metrics (not 9090)
+	PortGuacamole      = 8287 // Apache Guacamole (not 8080)
+	PortJenkins        = 8291 // Jenkins UI (not 8080)
+	PortJenkinsAgent   = 8293 // Jenkins agent (not 50000)
+	PortOllama         = 8297 // Ollama web UI (not 3000)
+	PortKubernetesAPI  = 8311 // Kubernetes API server (not 6443)
+	PortKubelet        = 8317 // Kubelet API (not 10250)
+	PortFlannel        = 8329 // Flannel VXLAN (not 8472)
+	PortZabbixServer   = 8353 // Zabbix server (not 10051)
+	PortZabbixAgent    = 8363 // Zabbix agent (not 10050)
+	PortHecateAPI      = 8369 // Hecate API server (not 8080)
+	PortNomadSerf      = 8377 // Nomad Serf (not 4648)
+	PortHeadscaleGRPC  = 8387 // Headscale GRPC (not 50443)
+	PortConsulDNS      = 8389 // Consul DNS (not 8600)
+	PortConsulRPC      = 8419 // Consul server RPC (not 8300)
+	PortConsulSerfLAN  = 8423 // Consul Serf LAN (not 8301)
+	PortConsulSerfWAN  = 8429 // Consul Serf WAN (not 8302)
+	PortBuildService   = 8431 // Build orchestrator service (not 8080)
+	PortCaddyAdmin     = 8443 // Caddy admin API (not 2019)
+	PortAuthentik      = 8447 // Authentik identity provider (not 9000)
+	PortPenpotBackend  = 8461 // Penpot backend API (not 6060)
+	PortPenpotExporter = 8467 // Penpot exporter (not 6061)
+	
+	// Well-known ports that should remain standard
+	PortHTTP        = 80   // Standard HTTP
+	PortHTTPS       = 443  // Standard HTTPS
+	PortSSH         = 22   // Standard SSH
+	PortSMTP        = 25   // Standard SMTP
+	PortPOP3        = 110  // Standard POP3
+	PortIMAP        = 143  // Standard IMAP
+	PortSMTPS       = 465  // Standard SMTPS
+	PortSubmission  = 587  // Standard mail submission
+	PortIMAPSSL     = 993  // Standard IMAPS
+	PortPOP3SSL     = 995  // Standard POP3S
+	
+	// Next available primes: 8501, 8513, 8521, 8527, 8537, 8539, 8543, 8563...
 
 	// Legacy ports to be migrated
-	PortJenkinsLegacy   = 55000 // Should move to 8xxx range
+	PortJenkinsLegacy   = 55000 // Should move to 8291
 	PortNextcloudLegacy = 11000 // Should move to 8xxx range
 	PortResticAPI       = 9101  // Should move to 8xxx range
 	PortMinioAPI        = 9123  // Should move to 8xxx range
+	
+	// Original well-known ports (for reference/migration)
+	PortVaultOriginal      = 8200 // Original Vault port
+	PortConsulOriginal     = 8500 // Original Consul HTTP port
+	PortNomadOriginal      = 4646 // Original Nomad HTTP port
+	PortNomadRPCOriginal   = 4647 // Original Nomad RPC port
+	PortPostgreSQLOriginal = 5432 // Original PostgreSQL port
+	PortRedisOriginal      = 6379 // Original Redis port
+	PortGrafanaOriginal    = 3000 // Original Grafana port
+	
+	// Additional port constants for legacy services
+	PortWazuh1514  = 1514  // Wazuh manager port
+	PortWazuh1515  = 1515  // Wazuh manager port
+	PortWazuh55000 = 55000 // Wazuh web port (legacy)
+)
+
+// Port string conversion helpers
+func PortToString(port int) string {
+	return fmt.Sprintf("%d", port)
+}
+
+// Common port string constants for convenience
+var (
+	PortVaultStr      = PortToString(PortVault)
+	PortConsulStr     = PortToString(PortConsul)
+	PortNomadStr      = PortToString(PortNomad)
+	PortPostgreSQLStr = PortToString(PortPostgreSQL)
+	PortRedisStr      = PortToString(PortRedis)
+	PortGrafanaStr    = PortToString(PortGrafana)
 )
 
 type AppProxy struct {
@@ -89,41 +148,56 @@ var AppProxies = []AppProxy{
 // Centralized service stream blocks.
 var (
 	MailcowStreamBlocks = []NginxStreamBlock{
-		{UpstreamName: "mailcow_smtp", BackendPort: "25", ListenPort: "25"},
-		{UpstreamName: "mailcow_submission", BackendPort: "587", ListenPort: "587"},
-		{UpstreamName: "mailcow_smtps", BackendPort: "465", ListenPort: "465"},
-		{UpstreamName: "mailcow_pop3", BackendPort: "110", ListenPort: "110"},
-		{UpstreamName: "mailcow_pop3s", BackendPort: "995", ListenPort: "995"},
-		{UpstreamName: "mailcow_imap", BackendPort: "143", ListenPort: "143"},
-		{UpstreamName: "mailcow_imaps", BackendPort: "993", ListenPort: "993"},
+		{UpstreamName: "mailcow_smtp", BackendPort: PortToString(PortSMTP), ListenPort: PortToString(PortSMTP)},
+		{UpstreamName: "mailcow_submission", BackendPort: PortToString(PortSubmission), ListenPort: PortToString(PortSubmission)},
+		{UpstreamName: "mailcow_smtps", BackendPort: PortToString(PortSMTPS), ListenPort: PortToString(PortSMTPS)},
+		{UpstreamName: "mailcow_pop3", BackendPort: PortToString(PortPOP3), ListenPort: PortToString(PortPOP3)},
+		{UpstreamName: "mailcow_pop3s", BackendPort: PortToString(PortPOP3SSL), ListenPort: PortToString(PortPOP3SSL)},
+		{UpstreamName: "mailcow_imap", BackendPort: PortToString(PortIMAP), ListenPort: PortToString(PortIMAP)},
+		{UpstreamName: "mailcow_imaps", BackendPort: PortToString(PortIMAPSSL), ListenPort: PortToString(PortIMAPSSL)},
 	}
 
 	JenkinsStreamBlocks = []NginxStreamBlock{
-		{UpstreamName: "jenkins_agent", BackendPort: "8059", ListenPort: "50000"},
+		{UpstreamName: "jenkins_agent", BackendPort: PortToString(PortJenkinsAgent), ListenPort: PortToString(PortJenkinsAgent)},
 	}
 
 	WazuhStreamBlocks = []NginxStreamBlock{
-		{UpstreamName: "wazuh_manager_1515", BackendPort: "1515", ListenPort: "1515"},
-		{UpstreamName: "wazuh_manager_1514", BackendPort: "1514", ListenPort: "1514"},
-		{UpstreamName: "wazuh_manager_55000", BackendPort: "55000", ListenPort: "55000"},
+		{UpstreamName: "wazuh_manager_1515", BackendPort: PortToString(PortWazuh1515), ListenPort: PortToString(PortWazuh1515)},
+		{UpstreamName: "wazuh_manager_1514", BackendPort: PortToString(PortWazuh1514), ListenPort: PortToString(PortWazuh1514)},
+		{UpstreamName: "wazuh_manager_55000", BackendPort: PortToString(PortWazuh55000), ListenPort: PortToString(PortWazuh55000)},
 	}
 )
 
-// Centralized port maps (unchanged).
+// Centralized port maps
 var (
 	MailcowPorts = ServicePorts{
-		TCP: []string{"25", "587", "465", "110", "995", "143", "993"},
+		TCP: []string{
+			PortToString(PortSMTP),
+			PortToString(PortSubmission),
+			PortToString(PortSMTPS),
+			PortToString(PortPOP3),
+			PortToString(PortPOP3SSL),
+			PortToString(PortIMAP),
+			PortToString(PortIMAPSSL),
+		},
 		UDP: []string{},
 	}
 
 	JenkinsPorts = ServicePorts{
-		TCP: []string{"50000"},
+		TCP: []string{PortToString(PortJenkinsAgent)},
 		UDP: []string{},
 	}
 
 	WazuhPorts = ServicePorts{
-		TCP: []string{"1515", "1514", "55000"},
-		UDP: []string{"1515", "1514"},
+		TCP: []string{
+			PortToString(PortWazuh1515),
+			PortToString(PortWazuh1514),
+			PortToString(PortWazuh55000),
+		},
+		UDP: []string{
+			PortToString(PortWazuh1515),
+			PortToString(PortWazuh1514),
+		},
 	}
 )
 

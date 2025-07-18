@@ -30,12 +30,6 @@ const (
 	VaultDefaultTokenMaxTTL   = "24h"
 	VaultDefaultSecretIDTTL   = "24h"
 	LocalhostSAN              = "127.0.0.1"
-	VaultDefaultPort          = "8179"
-	VaultDefaultPortInt       = 8179
-	VaultWebPortTCP           = VaultDefaultPort + "/tcp"
-	ListenerAddr              = "127.0.0.1:" + VaultDefaultPort
-	VaultDefaultAddr          = "https://%s:" + VaultDefaultPort
-	VaultDefaultLocalAddr     = "https://127.0.0.1:" + VaultDefaultPort
 	VaultDir                  = "/opt/vault/"
 	VaultDataPath             = VaultDir + "data/"
 	TLSDir                    = VaultDir + "tls/"
@@ -62,6 +56,16 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 	FallbackDeploy FallbackCode = "deploy"
 	FallbackDisk   FallbackCode = "disk"
 	FallbackAbort  FallbackCode = "abort"
+)
+
+// Computed Vault port constants
+var (
+	VaultDefaultPort      = fmt.Sprintf("%d", PortVault)
+	VaultDefaultPortInt   = PortVault
+	VaultWebPortTCP       = VaultDefaultPort + "/tcp"
+	ListenerAddr          = "127.0.0.1:" + VaultDefaultPort
+	VaultDefaultAddr      = "https://%s:" + VaultDefaultPort
+	VaultDefaultLocalAddr = "https://127.0.0.1:" + VaultDefaultPort
 )
 
 // File paths and Vault client

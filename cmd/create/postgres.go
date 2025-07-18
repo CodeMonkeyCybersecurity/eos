@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -124,7 +125,7 @@ Examples:
 
 func init() {
 	databaseVaultPostgresCmd.Flags().String("host", "localhost", "Database host")
-	databaseVaultPostgresCmd.Flags().Int("port", 5432, "Database port")
+	databaseVaultPostgresCmd.Flags().Int("port", shared.PortPostgreSQL, "Database port")
 	databaseVaultPostgresCmd.Flags().String("database", "delphi", "Database name")
 	databaseVaultPostgresCmd.Flags().String("admin-username", "postgres", "Database admin username")
 	databaseVaultPostgresCmd.Flags().String("admin-password", "", "Database admin password")

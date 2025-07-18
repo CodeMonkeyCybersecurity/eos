@@ -3,6 +3,7 @@
 package hecate
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -28,7 +30,7 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 
 	// Initialize state manager for tracking deployment progress
 	stateManager := NewStateManager(rc)
-	
+
 	// Set up rollback handler
 	var completedPhases []string
 	defer func() {
@@ -42,7 +44,7 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 
 	// INTERVENE - Apply Salt states in phases
 	logger.Info("Applying SaltStack states for Hecate deployment")
-	
+
 	// Define deployment phases in order
 	phases := []struct {
 		name        string
@@ -107,24 +109,24 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 		logger.Info("Executing deployment phase",
 			zap.String("phase", phase.name),
 			zap.String("description", phase.description))
-		
+
 		// Update state manager
 		if err := stateManager.UpdatePhase(phase.name, "in_progress"); err != nil {
 			logger.Warn("Failed to update state", zap.Error(err))
 		}
-		
+
 		// Apply Salt state with enhanced retry logic and better error handling
 		retries := 3
 		var lastErr error
 		baseBackoff := 10 * time.Second
-		
+
 		for attempt := 1; attempt <= retries; attempt++ {
 			logger.Info("Applying Salt state",
 				zap.String("phase", phase.name),
 				zap.String("state", phase.state),
 				zap.Int("attempt", attempt),
 				zap.Int("max_attempts", retries))
-			
+
 			// Enhanced Salt arguments for better output and debugging
 			args := []string{
 				"state.apply",
@@ -141,25 +143,25 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 				Args:    args,
 				Capture: true,
 			})
-			
+
 			if err == nil {
 				logger.Info("Salt state execution succeeded",
 					zap.String("phase", phase.name),
 					zap.String("state", phase.state))
-				
+
 				// Log detailed output for debugging (but only in debug mode)
 				logger.Debug("Salt state execution result",
 					zap.String("phase", phase.name),
 					zap.String("output", output))
-				
+
 				// Run health check for this phase with retry logic
 				if phase.healthCheck != nil {
 					logger.Info("Running health check for phase",
 						zap.String("phase", phase.name))
-					
+
 					healthCheckRetries := 3
 					var healthErr error
-					
+
 					for healthAttempt := 1; healthAttempt <= healthCheckRetries; healthAttempt++ {
 						healthErr = phase.healthCheck(rc)
 						if healthErr == nil {
@@ -168,7 +170,7 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 								zap.Int("health_attempt", healthAttempt))
 							break
 						}
-						
+
 						if healthAttempt < healthCheckRetries {
 							logger.Warn("Health check failed, retrying",
 								zap.String("phase", phase.name),
@@ -177,7 +179,7 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 							time.Sleep(time.Duration(healthAttempt*5) * time.Second)
 						}
 					}
-					
+
 					if healthErr != nil {
 						lastErr = fmt.Errorf("health check failed for %s after %d attempts: %w", phase.name, healthCheckRetries, healthErr)
 						if attempt < retries {
@@ -190,19 +192,19 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 						}
 					}
 				}
-				
+
 				// Phase completed successfully
 				completedPhases = append(completedPhases, phase.name)
 				if err := stateManager.UpdatePhase(phase.name, "completed"); err != nil {
 					logger.Warn("Failed to update state", zap.Error(err))
 				}
-				
+
 				logger.Info("Phase completed successfully",
 					zap.String("phase", phase.name),
 					zap.Duration("total_time", time.Since(time.Now())))
 				break
 			}
-			
+
 			// Salt state execution failed
 			lastErr = fmt.Errorf("salt state %s failed: %w", phase.state, err)
 			logger.Error("Salt state execution failed",
@@ -211,7 +213,7 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 				zap.Error(err),
 				zap.String("output", output),
 				zap.Int("attempt", attempt))
-			
+
 			if attempt < retries {
 				backoffDuration := baseBackoff * time.Duration(attempt)
 				logger.Warn("Retrying phase after backoff",
@@ -219,32 +221,32 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 					zap.Duration("backoff", backoffDuration),
 					zap.Int("attempt", attempt))
 				time.Sleep(backoffDuration)
-				
+
 				// Try to recover by checking service states
 				if err := recoverPhase(rc, phase.name); err != nil {
-					logger.Warn("Phase recovery failed", 
+					logger.Warn("Phase recovery failed",
 						zap.String("phase", phase.name),
 						zap.Error(err))
 				}
 			}
 		}
-		
+
 		// Check if phase failed after all retries
 		if lastErr != nil {
 			if err := stateManager.UpdatePhase(phase.name, "failed"); err != nil {
 				logger.Warn("Failed to update state", zap.Error(err))
 			}
-			
+
 			if phase.critical {
 				// Critical phase failed, initiate rollback
 				logger.Error("Critical phase failed, initiating rollback",
 					zap.String("phase", phase.name),
 					zap.Error(lastErr))
-				
+
 				if err := rollbackDeployment(rc, completedPhases); err != nil {
 					logger.Error("Rollback failed", zap.Error(err))
 				}
-				
+
 				return fmt.Errorf("deployment failed at phase %s: %w", phase.name, lastErr)
 			} else {
 				// Non-critical phase failed, continue
@@ -269,46 +271,103 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// assessPrerequisites checks that all required services are available
+// assessPrerequisites checks that all required services are available and installs them if missing
 func assessPrerequisites(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Assessing prerequisites for Hecate deployment")
 
 	// Check for required services with detailed diagnostics
-	requiredServices := []string{"nomad", "consul", "vault", "salt-minion"}
-	
+	requiredServices := []struct {
+		name        string
+		installCmd  string
+		description string
+	}{
+		{name: "nomad", installCmd: "nomad", description: "HashiCorp Nomad orchestrator"},
+		{name: "consul", installCmd: "consul", description: "HashiCorp Consul service mesh"},
+		{name: "vault", installCmd: "vault", description: "HashiCorp Vault secrets management"},
+		{name: "salt-minion", installCmd: "saltstack", description: "SaltStack configuration management"},
+	}
+
 	for _, service := range requiredServices {
-		logger.Debug("Checking service", zap.String("service", service))
-		
+		logger.Debug("Checking service", zap.String("service", service.name))
+
 		// First check if service is installed
 		output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
-			Args:    []string{"list-unit-files", service + ".service"},
+			Args:    []string{"list-unit-files", service.name + ".service"},
 			Capture: true,
 		})
-		if err != nil || !strings.Contains(output, service + ".service") {
-			return eos_err.NewUserError("Required service %s is not installed. Please install the HashiCorp stack first:\n  eos create vault\n  eos create consul\n  eos create nomad\n  eos create saltstack", service)
+		if err != nil || !strings.Contains(output, service.name+".service") {
+			// Service not installed - attempt to install it
+			logger.Warn("Required service not installed, attempting automatic installation",
+				zap.String("service", service.name),
+				zap.String("description", service.description))
+
+			// Install the missing service
+			logger.Info("terminal prompt: ⚠️  Missing dependency detected: " + service.description)
+			logger.Info("terminal prompt: Installing " + service.name + " automatically...")
+
+			if err := installMissingService(rc, service.installCmd); err != nil {
+				logger.Error("Failed to install service automatically",
+					zap.String("service", service.name),
+					zap.Error(err))
+				return eos_err.NewUserError("Failed to install %s automatically: %v\n\nPlease install manually:\n  eos create %s",
+					service.name, err, service.installCmd)
+			}
+
+			// Wait a moment for service to stabilize
+			time.Sleep(5 * time.Second)
 		}
-		
+
 		// Check if service is active
 		output, err = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
-			Args:    []string{"is-active", service},
+			Args:    []string{"is-active", service.name},
 			Capture: true,
 		})
 		if err != nil || strings.TrimSpace(output) != "active" {
-			// Get detailed status for better error reporting
-			statusOutput, _ := execute.Run(rc.Ctx, execute.Options{
+			// Try to start the service
+			logger.Warn("Service not active, attempting to start",
+				zap.String("service", service.name),
+				zap.String("status", strings.TrimSpace(output)))
+
+			_, startErr := execute.Run(rc.Ctx, execute.Options{
 				Command: "systemctl",
-				Args:    []string{"status", service, "--no-pager", "-l"},
+				Args:    []string{"start", service.name},
 				Capture: true,
 			})
-			
-			return eos_err.NewUserError("Required service %s is not running.\nCurrent status: %s\n\nService details:\n%s\n\nTo start the service: sudo systemctl start %s", 
-				service, strings.TrimSpace(output), statusOutput, service)
+
+			if startErr != nil {
+				// Get detailed status for better error reporting
+				statusOutput, _ := execute.Run(rc.Ctx, execute.Options{
+					Command: "systemctl",
+					Args:    []string{"status", service.name, "--no-pager", "-l"},
+					Capture: true,
+				})
+
+				logger.Error("Failed to start service",
+					zap.String("service", service.name),
+					zap.Error(startErr))
+
+				return eos_err.NewUserError("Required service %s could not be started.\nCurrent status: %s\n\nService details:\n%s\n\nPlease resolve the issue and try again",
+					service.name, strings.TrimSpace(output), statusOutput)
+			}
+
+			// Wait for service to fully start
+			time.Sleep(3 * time.Second)
+
+			// Verify it's now active
+			output, err = execute.Run(rc.Ctx, execute.Options{
+				Command: "systemctl",
+				Args:    []string{"is-active", service.name},
+				Capture: true,
+			})
+			if err != nil || strings.TrimSpace(output) != "active" {
+				return eos_err.NewUserError("Service %s failed to start properly", service.name)
+			}
 		}
-		
-		logger.Info("Service check passed", zap.String("service", service))
+
+		logger.Info("Service check passed", zap.String("service", service.name))
 	}
 
 	// Check for SaltStack states
@@ -320,7 +379,7 @@ func assessPrerequisites(rc *eos_io.RuntimeContext) error {
 	})
 	if err != nil {
 		logger.Info("SaltStack states not found, synchronizing from repository")
-		
+
 		// Sync Salt states from the Eos repository
 		syncOutput, syncErr := execute.Run(rc.Ctx, execute.Options{
 			Command: "salt-call",
@@ -333,16 +392,22 @@ func assessPrerequisites(rc *eos_io.RuntimeContext) error {
 		logger.Debug("Salt sync result", zap.String("output", syncOutput))
 	}
 
-	// Check Vault is unsealed
-	vaultOutput, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "vault",
-		Args:    []string{"status", "-format=json"},
-		Capture: true,
-	})
+	// Check Vault is unsealed (using correct port 8179)
+	vaultOutput, err := executeVaultCommand(rc, []string{"status", "-format=json"}, true)
 	if err != nil {
-		return eos_err.NewUserError("vault is not accessible - ensure it is running and unsealed")
+		// Check if it's just sealed (exit code 2) vs actually down
+		if strings.Contains(err.Error(), "exit status 2") {
+			logger.Warn("Vault is sealed, attempting to handle this condition")
+			// In dev mode, we can continue as vault will auto-unseal
+			// In production, this would need manual intervention
+			logger.Info("terminal prompt: ⚠️  Vault is sealed. For production deployments, please unseal Vault manually.")
+			logger.Info("terminal prompt: For dev mode, Vault should auto-unseal.")
+		} else {
+			return eos_err.NewUserError("vault is not accessible - ensure it is running")
+		}
+	} else {
+		logger.Debug("Vault status", zap.String("output", vaultOutput))
 	}
-	logger.Debug("Vault status", zap.String("output", vaultOutput))
 
 	// Check for existing Hecate deployment
 	_, err = execute.Run(rc.Ctx, execute.Options{
@@ -353,16 +418,16 @@ func assessPrerequisites(rc *eos_io.RuntimeContext) error {
 	if err == nil {
 		logger.Warn("Existing Hecate deployment detected")
 		logger.Info("terminal prompt: An existing Hecate deployment was found. Would you like to redeploy? [y/N]")
-		
+
 		response, err := eos_io.ReadInput(rc)
 		if err != nil {
 			return fmt.Errorf("failed to read user input: %w", err)
 		}
-		
+
 		if response != "y" && response != "Y" {
 			return eos_err.NewUserError("deployment cancelled by user")
 		}
-		
+
 		// Stop existing jobs
 		logger.Info("Stopping existing Hecate jobs")
 		jobs := []string{"hecate-caddy", "hecate-authentik-server", "hecate-authentik-worker", "hecate-redis", "hecate-postgres"}
@@ -373,7 +438,7 @@ func assessPrerequisites(rc *eos_io.RuntimeContext) error {
 				Capture: true,
 			})
 		}
-		
+
 		// Wait for cleanup
 		time.Sleep(10 * time.Second)
 	}
@@ -397,15 +462,15 @@ func verifyDeployment(rc *eos_io.RuntimeContext) error {
 	jobs := []jobCheck{
 		{name: "hecate-postgres", endpoint: "", required: true},
 		{name: "hecate-redis", endpoint: "", required: true},
-		{name: "hecate-authentik-server", endpoint: "http://localhost:9000/-/health/ready/", required: true},
+		{name: "hecate-authentik-server", endpoint: fmt.Sprintf("http://localhost:%d/-/health/ready/", shared.PortAuthentik), required: true},
 		{name: "hecate-authentik-worker", endpoint: "", required: true},
-		{name: "hecate-caddy", endpoint: "http://localhost:2019/health", required: true},
+		{name: "hecate-caddy", endpoint: fmt.Sprintf("http://localhost:%d/health", shared.PortCaddyAdmin), required: true},
 	}
 
 	// Check each job status
 	for _, job := range jobs {
 		logger.Debug("Checking job status", zap.String("job", job.name))
-		
+
 		// Check Nomad job status
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "nomad",
@@ -422,10 +487,10 @@ func verifyDeployment(rc *eos_io.RuntimeContext) error {
 
 		// Check health endpoint if defined
 		if job.endpoint != "" {
-			logger.Debug("Checking health endpoint", 
+			logger.Debug("Checking health endpoint",
 				zap.String("job", job.name),
 				zap.String("endpoint", job.endpoint))
-			
+
 			// Retry health check with backoff
 			maxRetries := 30
 			for i := 0; i < maxRetries; i++ {
@@ -438,11 +503,11 @@ func verifyDeployment(rc *eos_io.RuntimeContext) error {
 					logger.Debug("Health check passed", zap.String("job", job.name))
 					break
 				}
-				
+
 				if i == maxRetries-1 {
 					return fmt.Errorf("health check failed for %s after %d attempts", job.name, maxRetries)
 				}
-				
+
 				logger.Debug("Health check failed, retrying",
 					zap.String("job", job.name),
 					zap.Int("attempt", i+1))
@@ -454,7 +519,7 @@ func verifyDeployment(rc *eos_io.RuntimeContext) error {
 	// Verify Consul service registration
 	logger.Info("Verifying Consul service registrations")
 	services := []string{"hecate-postgres", "hecate-redis", "hecate-authentik-server", "hecate-caddy"}
-	
+
 	for _, service := range services {
 		output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "consul",
@@ -477,13 +542,9 @@ func verifyDeployment(rc *eos_io.RuntimeContext) error {
 		"secret/hecate/authentik/secret_key",
 		"secret/hecate/authentik/admin",
 	}
-	
+
 	for _, secret := range secrets {
-		_, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "vault",
-			Args:    []string{"kv", "get", "-field=value", secret},
-			Capture: true,
-		})
+		_, err := executeVaultCommand(rc, []string{"kv", "get", "-field=value", secret}, true)
 		if err != nil {
 			logger.Warn("Secret not found in Vault", zap.String("secret", secret))
 		} else {
@@ -496,17 +557,13 @@ func verifyDeployment(rc *eos_io.RuntimeContext) error {
 	logger.Info("terminal prompt: ✅ Hecate Deployment Successful!")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Access URLs:")
-	logger.Info("terminal prompt:   - Caddy Admin: http://localhost:2019")
-	logger.Info("terminal prompt:   - Authentik: http://localhost:9000")
+	logger.Info(fmt.Sprintf("terminal prompt:   - Caddy Admin: http://localhost:%d", shared.PortCaddyAdmin))
+	logger.Info(fmt.Sprintf("terminal prompt:   - Authentik: http://localhost:%d", shared.PortAuthentik))
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Admin Credentials:")
-	
+
 	// Retrieve and display admin credentials
-	_, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "vault",
-		Args:    []string{"kv", "get", "-format=json", "secret/hecate/authentik/admin"},
-		Capture: true,
-	})
+	_, err := executeVaultCommand(rc, []string{"kv", "get", "-format=json", "secret/hecate/authentik/admin"}, true)
 	if err == nil {
 		logger.Info("terminal prompt:   - Username: akadmin")
 		logger.Info("terminal prompt:   - Password: (stored in Vault at secret/hecate/authentik/admin)")
@@ -542,7 +599,7 @@ func ConfigureRoute(rc *eos_io.RuntimeContext, route *Route) error {
 
 	// Generate Caddy configuration for the route
 	caddyConfig := generateCaddyRoute(route)
-	
+
 	// Write route configuration
 	routeFile := filepath.Join("/opt/hecate/caddy/routes", fmt.Sprintf("%s.caddy", route.ID))
 	if err := os.WriteFile(routeFile, []byte(caddyConfig), 0644); err != nil {
@@ -553,7 +610,7 @@ func ConfigureRoute(rc *eos_io.RuntimeContext, route *Route) error {
 	logger.Info("Reloading Caddy configuration")
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
-		Args:    []string{"-X", "POST", "http://localhost:2019/reload"},
+		Args:    []string{"-X", "POST", fmt.Sprintf("http://localhost:%d/reload", shared.PortCaddyAdmin)},
 		Capture: true,
 	})
 	if err != nil {
@@ -567,6 +624,109 @@ func ConfigureRoute(rc *eos_io.RuntimeContext, route *Route) error {
 	return nil
 }
 
+// executeVaultCommand executes a vault command with the correct VAULT_ADDR set
+func executeVaultCommand(rc *eos_io.RuntimeContext, args []string, capture bool) (string, error) {
+	// Save current VAULT_ADDR
+	oldVaultAddr := os.Getenv("VAULT_ADDR")
+
+	// Set correct VAULT_ADDR for port 8179
+	os.Setenv("VAULT_ADDR", "https://127.0.0.1:8179")
+
+	// Execute the command
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "vault",
+		Args:    args,
+		Capture: capture,
+	})
+
+	// Restore original VAULT_ADDR
+	if oldVaultAddr != "" {
+		os.Setenv("VAULT_ADDR", oldVaultAddr)
+	} else {
+		os.Unsetenv("VAULT_ADDR")
+	}
+
+	return output, err
+}
+
+// installMissingService attempts to install a missing dependency using eos create commands
+func installMissingService(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing missing service",
+		zap.String("service", serviceName))
+
+	// Build the command to install the service
+	// We'll call the eos binary directly to leverage existing installation logic
+	eosPath, err := os.Executable()
+	if err != nil {
+		// Fallback to standard path
+		eosPath = "/usr/local/bin/eos"
+	}
+
+	// Execute the installation command
+	args := []string{"create", serviceName}
+
+	// Special handling for certain services that need additional flags
+	switch serviceName {
+	case "vault":
+		// Vault needs to be installed in dev mode for quick setup
+		args = append(args, "--dev-mode")
+	case "consul":
+		// Consul can use default settings
+		args = append(args, "--dev-mode")
+	case "nomad":
+		// Nomad can use default settings
+		args = append(args, "--node-role=both")
+	case "saltstack":
+		// SaltStack needs masterless mode for single-node setup
+		args = append(args, "--masterless")
+	}
+
+	logger.Info("Executing installation command",
+		zap.String("command", eosPath),
+		zap.Strings("args", args))
+
+	// Run the installation with a longer timeout
+	installCtx, cancel := context.WithTimeout(rc.Ctx, 10*time.Minute)
+	defer cancel()
+
+	output, err := execute.Run(installCtx, execute.Options{
+		Command: eosPath,
+		Args:    args,
+		Capture: true,
+	})
+
+	if err != nil {
+		logger.Error("Installation failed",
+			zap.String("service", serviceName),
+			zap.Error(err),
+			zap.String("output", output))
+		return fmt.Errorf("failed to install %s: %w", serviceName, err)
+	}
+
+	logger.Info("Service installed successfully",
+		zap.String("service", serviceName))
+
+	// Give the service a moment to fully initialize
+	time.Sleep(5 * time.Second)
+
+	// For Vault, we need to handle unsealing in dev mode and set correct VAULT_ADDR
+	if serviceName == "vault" {
+		logger.Info("Handling Vault post-installation setup")
+
+		// Set the correct VAULT_ADDR with port 8179
+		os.Setenv("VAULT_ADDR", "https://127.0.0.1:8179")
+
+		// In dev mode, Vault should auto-unseal, but let's verify
+		_, err := executeVaultCommand(rc, []string{"status"}, true)
+		if err != nil {
+			logger.Warn("Vault status check failed after installation", zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
 // generateCaddyRoute creates a Caddy configuration snippet for a route
 func generateCaddyRoute(route *Route) string {
 	var config strings.Builder
@@ -574,44 +734,44 @@ func generateCaddyRoute(route *Route) string {
 	config.WriteString(fmt.Sprintf("# Route: %s\n", route.ID))
 	config.WriteString(fmt.Sprintf("# Created: %s\n", time.Now().Format(time.RFC3339)))
 	config.WriteString(fmt.Sprintf("\n%s {\n", route.Domain))
-	
+
 	// Add common headers
 	config.WriteString("  import common_headers\n")
-	
+
 	// Add authentication if required
 	if route.AuthPolicy != nil && route.AuthPolicy.Provider == "authentik" {
 		config.WriteString("  import authentik_auth\n")
 	}
-	
+
 	// Configure reverse proxy
 	if route.Upstream != nil {
 		config.WriteString(fmt.Sprintf("\n  reverse_proxy %s {\n", route.Upstream.URL))
-	
-	// Add health checks
-	if route.HealthCheck != nil {
-		config.WriteString(fmt.Sprintf("    health_uri %s\n", route.HealthCheck.Path))
-		config.WriteString(fmt.Sprintf("    health_interval %s\n", route.HealthCheck.Interval))
-		config.WriteString(fmt.Sprintf("    health_timeout %s\n", route.HealthCheck.Timeout))
-	}
-	
+
+		// Add health checks
+		if route.HealthCheck != nil {
+			config.WriteString(fmt.Sprintf("    health_uri %s\n", route.HealthCheck.Path))
+			config.WriteString(fmt.Sprintf("    health_interval %s\n", route.HealthCheck.Interval))
+			config.WriteString(fmt.Sprintf("    health_timeout %s\n", route.HealthCheck.Timeout))
+		}
+
 		// Add load balancing policy if specified
 		if route.Upstream.LoadBalancePolicy != "" {
 			config.WriteString(fmt.Sprintf("    lb_policy %s\n", route.Upstream.LoadBalancePolicy))
 			config.WriteString("    lb_try_duration 30s\n")
 		}
-		
+
 		config.WriteString("  }\n")
 	}
-	
+
 	// Add rate limiting
 	if route.RateLimit != nil {
 		config.WriteString(fmt.Sprintf("\n  rate_limit {\n"))
 		config.WriteString(fmt.Sprintf("    zone static %drps %s\n", route.RateLimit.RequestsPerSecond, route.RateLimit.WindowSize))
 		config.WriteString("  }\n")
 	}
-	
+
 	config.WriteString("}\n")
-	
+
 	return config.String()
 }
 
@@ -620,7 +780,7 @@ func generateCaddyRoute(route *Route) string {
 func checkHashiCorpStack(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking HashiCorp stack health")
-	
+
 	// Check Consul
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "consul",
@@ -631,18 +791,14 @@ func checkHashiCorpStack(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("consul not healthy: %w", err)
 	}
 	logger.Debug("Consul health check passed", zap.String("output", output))
-	
-	// Check Vault
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "vault",
-		Args:    []string{"status", "-format=json"},
-		Capture: true,
-	})
+
+	// Check Vault (using correct port 8179)
+	output, err = executeVaultCommand(rc, []string{"status", "-format=json"}, true)
 	if err != nil {
 		return fmt.Errorf("vault not healthy: %w", err)
 	}
 	logger.Debug("Vault health check passed", zap.String("output", output))
-	
+
 	// Check Nomad
 	output, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
@@ -653,14 +809,14 @@ func checkHashiCorpStack(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("nomad not healthy: %w", err)
 	}
 	logger.Debug("Nomad health check passed", zap.String("output", output))
-	
+
 	return nil
 }
 
 func checkVaultSecrets(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking Vault secrets")
-	
+
 	requiredSecrets := []string{
 		"secret/hecate/postgres/root_password",
 		"secret/hecate/postgres/password",
@@ -668,26 +824,22 @@ func checkVaultSecrets(rc *eos_io.RuntimeContext) error {
 		"secret/hecate/authentik/secret_key",
 		"secret/hecate/authentik/admin",
 	}
-	
+
 	for _, secret := range requiredSecrets {
-		_, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "vault",
-			Args:    []string{"kv", "get", "-field=value", secret},
-			Capture: true,
-		})
+		_, err := executeVaultCommand(rc, []string{"kv", "get", "-field=value", secret}, true)
 		if err != nil {
 			return fmt.Errorf("secret %s not found: %w", secret, err)
 		}
 		logger.Debug("Secret verified", zap.String("secret", secret))
 	}
-	
+
 	return nil
 }
 
 func checkPostgres(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking PostgreSQL deployment")
-	
+
 	// Check Nomad job status
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
@@ -697,7 +849,7 @@ func checkPostgres(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("postgres job not running: %w", err)
 	}
-	
+
 	// Wait for allocation to be healthy
 	maxRetries := 30
 	for i := 0; i < maxRetries; i++ {
@@ -710,20 +862,20 @@ func checkPostgres(rc *eos_io.RuntimeContext) error {
 			logger.Debug("PostgreSQL allocation running")
 			return nil
 		}
-		
+
 		logger.Debug("Waiting for PostgreSQL allocation",
 			zap.Int("attempt", i+1),
 			zap.Int("max_attempts", maxRetries))
 		time.Sleep(5 * time.Second)
 	}
-	
+
 	return fmt.Errorf("postgres allocation not healthy after %d attempts", maxRetries)
 }
 
 func checkRedis(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking Redis deployment")
-	
+
 	// Check Nomad job status
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
@@ -733,7 +885,7 @@ func checkRedis(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("redis job not running: %w", err)
 	}
-	
+
 	// Wait for allocation to be healthy
 	maxRetries := 30
 	for i := 0; i < maxRetries; i++ {
@@ -746,23 +898,23 @@ func checkRedis(rc *eos_io.RuntimeContext) error {
 			logger.Debug("Redis allocation running")
 			return nil
 		}
-		
+
 		logger.Debug("Waiting for Redis allocation",
 			zap.Int("attempt", i+1),
 			zap.Int("max_attempts", maxRetries))
 		time.Sleep(5 * time.Second)
 	}
-	
+
 	return fmt.Errorf("redis allocation not healthy after %d attempts", maxRetries)
 }
 
 func checkAuthentik(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking Authentik deployment")
-	
+
 	// Check both server and worker jobs
 	jobs := []string{"hecate-authentik-server", "hecate-authentik-worker"}
-	
+
 	for _, job := range jobs {
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "nomad",
@@ -774,7 +926,7 @@ func checkAuthentik(rc *eos_io.RuntimeContext) error {
 		}
 		logger.Debug("Job status verified", zap.String("job", job))
 	}
-	
+
 	// Check Authentik health endpoint
 	maxRetries := 60 // Authentik can take a while to start
 	for i := 0; i < maxRetries; i++ {
@@ -787,20 +939,20 @@ func checkAuthentik(rc *eos_io.RuntimeContext) error {
 			logger.Debug("Authentik health check passed")
 			return nil
 		}
-		
+
 		logger.Debug("Waiting for Authentik to be ready",
 			zap.Int("attempt", i+1),
 			zap.Int("max_attempts", maxRetries))
 		time.Sleep(5 * time.Second)
 	}
-	
+
 	return fmt.Errorf("authentik not healthy after %d attempts", maxRetries)
 }
 
 func checkCaddy(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking Caddy deployment")
-	
+
 	// Check Nomad job status
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
@@ -810,33 +962,33 @@ func checkCaddy(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("caddy job not running: %w", err)
 	}
-	
+
 	// Check Caddy admin API
 	maxRetries := 30
 	for i := 0; i < maxRetries; i++ {
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "curl",
-			Args:    []string{"-sf", "http://localhost:2019/health"},
+			Args:    []string{"-sf", fmt.Sprintf("http://localhost:%d/health", shared.PortCaddyAdmin)},
 			Capture: true,
 		})
 		if err == nil {
 			logger.Debug("Caddy health check passed")
 			return nil
 		}
-		
+
 		logger.Debug("Waiting for Caddy to be ready",
 			zap.Int("attempt", i+1),
 			zap.Int("max_attempts", maxRetries))
 		time.Sleep(5 * time.Second)
 	}
-	
+
 	return fmt.Errorf("caddy not healthy after %d attempts", maxRetries)
 }
 
 func checkIntegration(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking Caddy-Authentik integration")
-	
+
 	// Check if Caddy can reach Authentik
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
@@ -846,21 +998,21 @@ func checkIntegration(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("caddy cannot reach authentik: %w", err)
 	}
-	
+
 	// Check if authentication flow is configured
 	configOutput, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
-		Args:    []string{"-sf", "http://localhost:2019/config/"},
+		Args:    []string{"-sf", fmt.Sprintf("http://localhost:%d/config/", shared.PortCaddyAdmin)},
 		Capture: true,
 	})
 	if err != nil {
 		return fmt.Errorf("cannot retrieve caddy config: %w", err)
 	}
-	
+
 	if !strings.Contains(configOutput, "authentik") {
 		return fmt.Errorf("authentik integration not found in caddy config")
 	}
-	
+
 	logger.Debug("Integration check passed")
 	return nil
 }
@@ -870,12 +1022,12 @@ func rollbackDeployment(rc *eos_io.RuntimeContext, completedPhases []string) err
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting deployment rollback",
 		zap.Strings("completed_phases", completedPhases))
-	
+
 	// Rollback in reverse order
 	for i := len(completedPhases) - 1; i >= 0; i-- {
 		phase := completedPhases[i]
 		logger.Info("Rolling back phase", zap.String("phase", phase))
-		
+
 		switch phase {
 		case "caddy":
 			execute.Run(rc.Ctx, execute.Options{
@@ -916,15 +1068,11 @@ func rollbackDeployment(rc *eos_io.RuntimeContext, completedPhases []string) err
 				"secret/hecate/authentik/admin",
 			}
 			for _, secret := range secrets {
-				execute.Run(rc.Ctx, execute.Options{
-					Command: "vault",
-					Args:    []string{"kv", "delete", secret},
-					Capture: true,
-				})
+				executeVaultCommand(rc, []string{"kv", "delete", secret}, true)
 			}
 		}
 	}
-	
+
 	logger.Info("Rollback completed")
 	return nil
 }
@@ -933,7 +1081,7 @@ func rollbackDeployment(rc *eos_io.RuntimeContext, completedPhases []string) err
 func recoverPhase(rc *eos_io.RuntimeContext, phaseName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Attempting phase recovery", zap.String("phase", phaseName))
-	
+
 	switch phaseName {
 	case "hashicorp_stack":
 		// Check and restart HashiCorp services
@@ -945,24 +1093,20 @@ func recoverPhase(rc *eos_io.RuntimeContext, phaseName string) error {
 					zap.Error(err))
 			}
 		}
-		
+
 	case "vault_secrets":
 		// Check Vault seal status and try to unseal if needed
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "vault",
-			Args:    []string{"status", "-format=json"},
-			Capture: true,
-		})
+		output, err := executeVaultCommand(rc, []string{"status", "-format=json"}, true)
 		if err != nil {
 			return fmt.Errorf("vault status check failed: %w", err)
 		}
-		
+
 		if strings.Contains(output, `"sealed":true`) {
 			logger.Info("Vault is sealed, attempting unseal during recovery")
 			// Note: In production, you'd need unseal keys stored securely
 			logger.Warn("Vault is sealed - manual intervention may be required")
 		}
-		
+
 	case "postgres", "redis", "authentik", "caddy":
 		// For container-based services, check if Nomad jobs are healthy
 		jobName := "hecate-" + phaseName
@@ -984,7 +1128,7 @@ func recoverPhase(rc *eos_io.RuntimeContext, phaseName string) error {
 			}
 		}
 	}
-	
+
 	logger.Info("Phase recovery attempt completed", zap.String("phase", phaseName))
 	return nil
 }
@@ -992,18 +1136,18 @@ func recoverPhase(rc *eos_io.RuntimeContext, phaseName string) error {
 // restartServiceIfNeeded checks service status and restarts if not active
 func restartServiceIfNeeded(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"is-active", serviceName},
 		Capture: true,
 	})
-	
+
 	if err != nil || strings.TrimSpace(output) != "active" {
 		logger.Info("Service not active, attempting restart",
 			zap.String("service", serviceName),
 			zap.String("current_status", strings.TrimSpace(output)))
-		
+
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"restart", serviceName},
@@ -1012,10 +1156,10 @@ func restartServiceIfNeeded(rc *eos_io.RuntimeContext, serviceName string) error
 		if err != nil {
 			return fmt.Errorf("failed to restart %s: %w", serviceName, err)
 		}
-		
+
 		// Wait a moment for service to start
 		time.Sleep(5 * time.Second)
-		
+
 		// Verify restart was successful
 		output, err = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
@@ -1025,46 +1169,46 @@ func restartServiceIfNeeded(rc *eos_io.RuntimeContext, serviceName string) error
 		if err != nil || strings.TrimSpace(output) != "active" {
 			return fmt.Errorf("service %s failed to start after restart", serviceName)
 		}
-		
+
 		logger.Info("Service restarted successfully", zap.String("service", serviceName))
 	}
-	
+
 	return nil
 }
 
 // checkNomadJobRecovery checks Nomad job status and attempts basic recovery
 func checkNomadJobRecovery(rc *eos_io.RuntimeContext, jobName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check job status
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
 		Args:    []string{"job", "status", "-json", jobName},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		logger.Debug("Nomad job not found or failed to check",
 			zap.String("job", jobName),
 			zap.Error(err))
 		return err
 	}
-	
+
 	// Check if any allocations are failing
 	if strings.Contains(output, `"ClientStatus":"failed"`) {
 		logger.Info("Detected failed Nomad allocations, attempting job restart",
 			zap.String("job", jobName))
-		
+
 		// Stop and restart the job
 		execute.Run(rc.Ctx, execute.Options{
 			Command: "nomad",
 			Args:    []string{"job", "stop", jobName},
 			Capture: true,
 		})
-		
+
 		// Wait a moment
 		time.Sleep(3 * time.Second)
-		
+
 		// Start the job again
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "nomad",
@@ -1074,9 +1218,9 @@ func checkNomadJobRecovery(rc *eos_io.RuntimeContext, jobName string) error {
 		if err != nil {
 			return fmt.Errorf("failed to restart Nomad job %s: %w", jobName, err)
 		}
-		
+
 		logger.Info("Nomad job restarted", zap.String("job", jobName))
 	}
-	
+
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -898,8 +899,8 @@ func generateSecurityConfig(profile SecurityProfile) *SecurityConfiguration {
 		DefaultPolicy: "deny",
 		Rules: []FirewallRule{
 			{Action: "allow", Protocol: "tcp", Port: fmt.Sprintf("%d", config.SSHConfig.Port), Source: "any", Comment: "SSH access"},
-			{Action: "allow", Protocol: "tcp", Port: "80", Source: "any", Comment: "HTTP"},
-			{Action: "allow", Protocol: "tcp", Port: "443", Source: "any", Comment: "HTTPS"},
+			{Action: "allow", Protocol: "tcp", Port: fmt.Sprintf("%d", shared.PortHTTP), Source: "any", Comment: "HTTP"},
+			{Action: "allow", Protocol: "tcp", Port: fmt.Sprintf("%d", shared.PortHTTPS), Source: "any", Comment: "HTTPS"},
 		},
 	}
 

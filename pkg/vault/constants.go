@@ -2,6 +2,11 @@
 
 package vault
 
+import (
+	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+)
+
 const (
 	EnvVaultAddress          = "VAULT_ADDR"
 	EnvVaultAgentAddr        = "VAULT_AGENT_ADDR"
@@ -52,6 +57,8 @@ const (
 const (
 	EnvVaultAgentAddress = "VAULT_AGENT_ADDR"
 	EnvVaultInsecure     = "VAULT_SKIP_VERIFY"
+)
 
-	DefaultAddress = "https://127.0.0.1:8200"
+var (
+	DefaultAddress = fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault)
 )
