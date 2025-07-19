@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/sizing"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -29,6 +30,33 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Hecate deployment with SaltStack",
 		zap.Strings("additional_services", requestedServices))
+
+	// ASSESS - Perform hardware sizing preflight check
+	logger.Info("Performing hardware sizing validation")
+	
+	// Determine which services will be deployed
+	deploymentServices := []sizing.ServiceType{
+		sizing.ServiceTypeProxy,      // Caddy
+		sizing.ServiceTypeDatabase,   // PostgreSQL
+		sizing.ServiceTypeCache,      // Redis
+		sizing.ServiceTypeWebServer,  // Authentik
+	}
+	
+	// Add any additional requested services
+	for _, svc := range requestedServices {
+		// Map service names to sizing types
+		if svcType := mapServiceToSizingType(svc); svcType != "" {
+			deploymentServices = append(deploymentServices, svcType)
+		}
+	}
+	
+	// Use medium workload profile as default for Hecate
+	workloadProfile := sizing.DefaultWorkloadProfiles["medium"]
+	
+	// Run preflight check
+	if err := sizing.PreflightCheck(rc, deploymentServices, workloadProfile); err != nil {
+		return fmt.Errorf("hardware sizing validation failed: %w", err)
+	}
 
 	// ASSESS - Check prerequisites
 	if err := assessPrerequisites(rc); err != nil {
@@ -319,6 +347,13 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 	// Update final state
 	if err := stateManager.SetDeploymentComplete(); err != nil {
 		logger.Warn("Failed to update deployment state", zap.Error(err))
+	}
+
+	// EVALUATE - Run postflight validation to ensure services are running within expected resources
+	logger.Info("Running postflight resource validation")
+	if err := sizing.PostflightValidation(rc, deploymentServices); err != nil {
+		logger.Warn("Postflight validation detected issues", zap.Error(err))
+		// Don't fail deployment, just warn user
 	}
 
 	logger.Info("Hecate deployment completed successfully")
@@ -1437,3 +1472,56 @@ func createServiceRoute(rc *eos_io.RuntimeContext, service terraform.ServiceDefi
 	
 	return nil
 }
+
+// mapServiceToSizingType maps service names to sizing types
+func mapServiceToSizingType(serviceName string) sizing.ServiceType {
+	// Map common service names to sizing types
+	serviceMap := map[string]sizing.ServiceType{
+		"postgres":     sizing.ServiceTypeDatabase,
+		"postgresql":   sizing.ServiceTypeDatabase,
+		"mysql":        sizing.ServiceTypeDatabase,
+		"mariadb":      sizing.ServiceTypeDatabase,
+		"mongodb":      sizing.ServiceTypeDatabase,
+		"redis":        sizing.ServiceTypeCache,
+		"memcached":    sizing.ServiceTypeCache,
+		"nginx":        sizing.ServiceTypeWebServer,
+		"apache":       sizing.ServiceTypeWebServer,
+		"caddy":        sizing.ServiceTypeProxy,
+		"haproxy":      sizing.ServiceTypeProxy,
+		"traefik":      sizing.ServiceTypeProxy,
+		"rabbitmq":     sizing.ServiceTypeQueue,
+		"kafka":        sizing.ServiceTypeQueue,
+		"prometheus":   sizing.ServiceTypeMonitoring,
+		"grafana":      sizing.ServiceTypeMonitoring,
+		"elasticsearch": sizing.ServiceTypeLogging,
+		"logstash":     sizing.ServiceTypeLogging,
+		"kibana":       sizing.ServiceTypeLogging,
+		"vault":        sizing.ServiceTypeVault,
+		"consul":       sizing.ServiceTypeOrchestrator,
+		"nomad":        sizing.ServiceTypeOrchestrator,
+		"kubernetes":   sizing.ServiceTypeOrchestrator,
+		"k3s":          sizing.ServiceTypeOrchestrator,
+		"docker":       sizing.ServiceTypeContainer,
+		"containerd":   sizing.ServiceTypeContainer,
+		"minio":        sizing.ServiceTypeStorage,
+		"ceph":         sizing.ServiceTypeStorage,
+		"glusterfs":    sizing.ServiceTypeStorage,
+	}
+
+	// Check direct mapping
+	if svcType, exists := serviceMap[strings.ToLower(serviceName)]; exists {
+		return svcType
+	}
+
+	// Check if service name contains known keywords
+	lowerName := strings.ToLower(serviceName)
+	for keyword, svcType := range serviceMap {
+		if strings.Contains(lowerName, keyword) {
+			return svcType
+		}
+	}
+
+	// Default to empty string if no match
+	return ""
+}
+
