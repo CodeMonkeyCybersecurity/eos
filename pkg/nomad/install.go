@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -27,6 +29,11 @@ func CheckPrerequisites(rc *eos_io.RuntimeContext) error {
 		return eos_err.NewUserError("systemctl not found - this command requires systemd")
 	}
 	
+	// Check if we have root permissions
+	if os.Geteuid() != 0 {
+		return eos_err.NewUserError("Nomad installation requires root privileges, please run with sudo")
+	}
+	
 	// ASSESS - Check if we're on Ubuntu
 	ubuntuRelease, err := platform.DetectUbuntuRelease(rc)
 	if err != nil {
@@ -34,19 +41,42 @@ func CheckPrerequisites(rc *eos_io.RuntimeContext) error {
 	}
 	logger.Debug("Detected Ubuntu release", zap.String("version", ubuntuRelease.Version))
 	
-	// Check if SaltStack is installed and running
-	// First check if salt-call exists
-	if _, err := exec.LookPath("salt-call"); err != nil {
-		return eos_err.NewUserError("salt-call not found - please install SaltStack minion first")
+	// Check if SaltStack is installed
+	saltInstalled := false
+	if _, err := exec.LookPath("salt-call"); err == nil {
+		// Verify it's working
+		_, err = execute.Run(rc.Ctx, execute.Options{
+			Command: "salt-call",
+			Args:    []string{"--version"},
+			Capture: true,
+			Timeout: 5 * time.Second,
+		})
+		saltInstalled = err == nil
 	}
 	
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--version"},
-		Capture: true,
-	})
-	if err != nil {
-		return fmt.Errorf("SaltStack minion is not installed or not running: %w", err)
+	if !saltInstalled {
+		logger.Info("SaltStack is not installed, installing it first")
+		
+		// Install SaltStack using the existing installer
+		saltInstaller := saltstack.NewInstaller()
+		saltConfig := &saltstack.Config{
+			MasterMode: false, // Install as masterless
+			LogLevel:   "warning",
+		}
+		
+		if err := saltInstaller.Install(rc, saltConfig); err != nil {
+			return fmt.Errorf("failed to install SaltStack: %w", err)
+		}
+		
+		if err := saltInstaller.Configure(rc, saltConfig); err != nil {
+			return fmt.Errorf("failed to configure SaltStack: %w", err)
+		}
+		
+		if err := saltInstaller.Verify(rc); err != nil {
+			return fmt.Errorf("failed to verify SaltStack installation: %w", err)
+		}
+		
+		logger.Info("SaltStack installed successfully")
 	}
 	
 	// Check if Consul is running (required for Nomad integration)
@@ -101,27 +131,23 @@ func InstallWithSaltStack(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("Installing Nomad using SaltStack")
 	
 	// ASSESS - Check if we can execute this function
-	// Check if we have necessary permissions for SaltStack operations
+	// Check if we have necessary permissions
 	if os.Geteuid() != 0 {
-		// Check if we can at least run salt-call without root
-		if _, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "salt-call",
-			Args:    []string{"--help"},
-			Capture: true,
-		}); err != nil {
-			return eos_err.NewUserError("SaltStack operations require root privileges, please run with sudo")
-		}
+		return eos_err.NewUserError("Nomad installation requires root privileges, please run with sudo")
 	}
 	
 	// Check if salt-call command exists
 	if _, err := exec.LookPath("salt-call"); err != nil {
-		return eos_err.NewUserError("salt-call not found - please install SaltStack minion first")
+		return eos_err.NewUserError("salt-call not found - SaltStack should have been installed by CheckPrerequisites")
 	}
 	
-	// Check if we can write to temp directory for pillar files
-	tempDir := "/tmp"
-	if _, err := os.Stat(tempDir); err != nil {
-		return fmt.Errorf("cannot access temp directory: %w", err)
+	// Check if Salt states directory exists
+	statesDir := "/srv/salt"
+	if _, err := os.Stat(statesDir); os.IsNotExist(err) {
+		logger.Info("Creating Salt states directory")
+		if err := os.MkdirAll(statesDir, 0755); err != nil {
+			return fmt.Errorf("failed to create Salt states directory: %w", err)
+		}
 	}
 	
 	// ASSESS - Check if Nomad is already installed
@@ -199,155 +225,57 @@ func InstallWithSaltStack(rc *eos_io.RuntimeContext, config *Config) error {
 		return fmt.Errorf("failed to write pillar data: %w", err)
 	}
 	
-	// Since we don't have a pre-existing Salt state for Nomad, we'll use Salt to execute the installation commands
-	// First, download and install Nomad binary
-	logger.Info("Downloading and installing Nomad binary")
+	// INTERVENE - Create and apply Salt state for Nomad installation
+	logger.Info("Creating Salt state for Nomad installation")
 	
-	// Determine version to install
-	version := config.Version
-	if version == "latest" {
-		// Get latest version from HashiCorp
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "curl",
-			Args:    []string{"-s", "https://api.github.com/repos/hashicorp/nomad/releases/latest"},
-			Capture: true,
-		})
-		if err == nil {
-			// Parse version from output (simplified - in production would use JSON parsing)
-			logger.Debug("Latest version check", zap.String("output", output))
-		}
-		version = "1.7.2" // Default fallback version
+	// Create the Nomad Salt state
+	if err := createNomadSaltState(rc, config); err != nil {
+		return fmt.Errorf("failed to create Nomad Salt state: %w", err)
 	}
 	
-	// Download Nomad
-	downloadURL := fmt.Sprintf("https://releases.hashicorp.com/nomad/%s/nomad_%s_linux_amd64.zip", version, version)
+	// Apply the Salt state
+	logger.Info("Applying Nomad Salt state")
+	
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "salt-call",
-		Args: []string{
-			"--local", "cmd.run",
-			fmt.Sprintf("cd /tmp && wget -q %s && unzip -o nomad_%s_linux_amd64.zip && mv nomad /usr/local/bin/ && chmod +x /usr/local/bin/nomad", downloadURL, version),
-		},
+		Args:    []string{"--local", "state.apply", "nomad"},
+		Capture: true,
+		Timeout: 10 * time.Minute, // Give enough time for download and installation
+	})
+	if err != nil {
+		return fmt.Errorf("failed to apply Nomad Salt state: %w", err)
+	}
+	
+	logger.Debug("Salt state execution result", zap.String("output", output))
+	
+	// EVALUATE - Verify installation immediately
+	logger.Info("Verifying Nomad installation")
+	
+	// Check if Nomad binary exists
+	if _, err := exec.LookPath("nomad"); err != nil {
+		return fmt.Errorf("Nomad binary not found after installation")
+	}
+	
+	// Check Nomad version
+	output, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "nomad",
+		Args:    []string{"version"},
 		Capture: true,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to download and install Nomad: %w", err)
+		return fmt.Errorf("failed to check Nomad version: %w", err)
 	}
+	logger.Info("Nomad installed", zap.String("version", strings.TrimSpace(output)))
 	
-	logger.Debug("Nomad binary installation result", zap.String("output", output))
-	
-	// Create Nomad configuration directory
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "cmd.run", "mkdir -p /etc/nomad.d /opt/nomad/data"},
-		Capture: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create Nomad directories: %w", err)
-	}
-	
-	// Create Nomad configuration file
-	nomadConfig := fmt.Sprintf(`datacenter = "%s"
-data_dir = "%s"
-log_level = "%s"
-region = "%s"
-
-server {
-  enabled = %t
-  bootstrap_expect = %d
-}
-
-client {
-  enabled = %t
-}
-
-ui {
-  enabled = %t
-}
-
-plugin "docker" {
-  config {
-    enabled = %t
-  }
-}
-
-plugin "raw_exec" {
-  config {
-    enabled = %t
-  }
-}`,
-		config.Datacenter,
-		config.DataDir,
-		config.LogLevel,
-		config.Region,
-		config.NodeRole == NodeRoleServer || config.NodeRole == NodeRoleBoth,
-		config.ServerBootstrapExpect,
-		config.NodeRole == NodeRoleClient || config.NodeRole == NodeRoleBoth,
-		config.EnableUI,
-		config.DockerEnabled,
-		config.RawExecEnabled,
-	)
-	
-	// Write configuration file
-	configFile := "/etc/nomad.d/nomad.hcl"
-	if err := os.WriteFile(configFile, []byte(nomadConfig), 0644); err != nil {
-		return fmt.Errorf("failed to write Nomad configuration: %w", err)
-	}
-	
-	// Create systemd service file
-	systemdService := `[Unit]
-Description=Nomad
-Documentation=https://nomadproject.io/
-Wants=network-online.target
-After=network-online.target
-ConditionFileNotEmpty=/etc/nomad.d/nomad.hcl
-
-[Service]
-Type=notify
-ExecReload=/bin/kill -HUP $MAINPID
-ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
-KillMode=process
-Restart=on-failure
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target`
-	
-	if err := os.WriteFile("/etc/systemd/system/nomad.service", []byte(systemdService), 0644); err != nil {
-		return fmt.Errorf("failed to write systemd service file: %w", err)
-	}
-	
-	// Reload systemd and enable service
+	// Check if service is running
 	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"daemon-reload"},
+		Args:    []string{"is-active", "nomad"},
 		Capture: true,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to reload systemd: %w", err)
+		logger.Debug("Nomad service not yet active, will be started during configuration")
 	}
-	
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"enable", "nomad"},
-		Capture: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to enable Nomad service: %w", err)
-	}
-	
-	// Start Nomad service
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"start", "nomad"},
-		Capture: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to start Nomad service: %w", err)
-	}
-	
-	// Clean up
-	os.Remove(pillarFile)
-	os.Remove(fmt.Sprintf("/tmp/nomad_%s_linux_amd64.zip", version))
 	
 	// EVALUATE - Verify installation
 	logger.Info("Verifying Nomad installation")
@@ -565,5 +493,215 @@ func Verify(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 	
 	logger.Info("Nomad verification completed successfully")
+	return nil
+}
+
+// createNomadSaltState creates the Salt state files for Nomad installation
+func createNomadSaltState(rc *eos_io.RuntimeContext, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Creating Nomad Salt state files")
+	
+	// ASSESS - Check if we can create Salt state files
+	// Check if we have permission to write to Salt states directory
+	statesDir := "/srv/salt"
+	if _, err := os.Stat(statesDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(statesDir, 0755); err != nil {
+			if os.IsPermission(err) {
+				return eos_err.NewUserError("cannot create Salt states directory - insufficient permissions")
+			}
+			return fmt.Errorf("failed to create Salt states directory: %w", err)
+		}
+	}
+	
+	// INTERVENE - Create the Salt state file
+	stateContent := `# Nomad installation state
+nomad_prereqs:
+  pkg.installed:
+    - pkgs:
+      - curl
+      - unzip
+      - gnupg
+
+nomad_download:
+  cmd.run:
+    - name: |
+        NOMAD_VERSION="{{ salt['pillar.get']('nomad:version', 'latest') }}"
+        if [ "$NOMAD_VERSION" = "latest" ]; then
+          NOMAD_VERSION=$(curl -s https://api.github.com/repos/hashicorp/nomad/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
+          NOMAD_VERSION=${NOMAD_VERSION#v}
+        fi
+        curl -sLo /tmp/nomad.zip https://releases.hashicorp.com/nomad/${NOMAD_VERSION}/nomad_${NOMAD_VERSION}_linux_amd64.zip
+        unzip -o /tmp/nomad.zip -d /usr/local/bin
+        chmod +x /usr/local/bin/nomad
+        rm -f /tmp/nomad.zip
+    - unless: test -f /usr/local/bin/nomad
+    - require:
+      - pkg: nomad_prereqs
+
+nomad_directories:
+  file.directory:
+    - names:
+      - {{ salt['pillar.get']('nomad:data_dir', '/var/lib/nomad') }}
+      - {{ salt['pillar.get']('nomad:config_dir', '/etc/nomad') }}
+      - /etc/nomad/certs
+    - makedirs: True
+    - mode: 755
+
+nomad_config:
+  file.managed:
+    - name: /etc/nomad/nomad.hcl
+    - contents: |
+        datacenter = "{{ salt['pillar.get']('nomad:datacenter', 'dc1') }}"
+        region = "{{ salt['pillar.get']('nomad:region', 'global') }}"
+        data_dir = "{{ salt['pillar.get']('nomad:data_dir', '/var/lib/nomad') }}"
+        log_level = "{{ salt['pillar.get']('nomad:log_level', 'INFO') }}"
+        
+        bind_addr = "0.0.0.0"
+        
+        advertise {
+          http = "{{ salt['grains.get']('ipv4')[0] }}"
+          rpc = "{{ salt['grains.get']('ipv4')[0] }}"
+          serf = "{{ salt['grains.get']('ipv4')[0] }}"
+        }
+        
+        ports {
+          http = {{ salt['pillar.get']('nomad:http_port', 4646) }}
+          rpc = {{ salt['pillar.get']('nomad:rpc_port', 4647) }}
+          serf = {{ salt['pillar.get']('nomad:serf_port', 4648) }}
+        }
+        
+        {%- if salt['pillar.get']('nomad:node_role') in ['server', 'both'] %}
+        server {
+          enabled = true
+          bootstrap_expect = {{ salt['pillar.get']('nomad:server_bootstrap_expect', 1) }}
+          
+          {%- if salt['pillar.get']('nomad:enable_gossip', false) %}
+          encrypt = "{{ salt['pillar.get']('nomad:gossip_key', '') }}"
+          {%- endif %}
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:node_role') in ['client', 'both'] %}
+        client {
+          enabled = true
+          
+          options {
+            "driver.raw_exec.enable" = "{{ salt['pillar.get']('nomad:raw_exec_enabled', false)|lower }}"
+            "docker.volumes.enabled" = "true"
+          }
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:enable_ui', true) %}
+        ui {
+          enabled = true
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:enable_acl', false) %}
+        acl {
+          enabled = true
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:consul_integration', true) %}
+        consul {
+          address = "{{ salt['pillar.get']('nomad:consul_address', '127.0.0.1:8500') }}"
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:vault_integration', true) %}
+        vault {
+          enabled = true
+          address = "{{ salt['pillar.get']('nomad:vault_address', 'http://127.0.0.1:8200') }}"
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:enable_telemetry', false) %}
+        telemetry {
+          collection_interval = "1s"
+          disable_hostname = true
+          publish_allocation_metrics = true
+          publish_node_metrics = true
+          prometheus_metrics = true
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:docker_enabled', true) %}
+        plugin "docker" {
+          config {
+            volumes {
+              enabled = true
+            }
+          }
+        }
+        {%- endif %}
+        
+        {%- if salt['pillar.get']('nomad:exec_enabled', true) %}
+        plugin "exec" {
+          config {
+            allowed = true
+          }
+        }
+        {%- endif %}
+    - require:
+      - file: nomad_directories
+
+nomad_systemd_service:
+  file.managed:
+    - name: /etc/systemd/system/nomad.service
+    - contents: |
+        [Unit]
+        Description=Nomad
+        Documentation=https://www.nomadproject.io/docs/
+        Wants=network-online.target
+        After=network-online.target
+        {%- if salt['pillar.get']('nomad:consul_integration', true) %}
+        Wants=consul.service
+        After=consul.service
+        {%- endif %}
+        
+        [Service]
+        Type=notify
+        ExecStart=/usr/local/bin/nomad agent -config={{ salt['pillar.get']('nomad:config_dir', '/etc/nomad') }}
+        ExecReload=/bin/kill -HUP $MAINPID
+        KillMode=process
+        Restart=on-failure
+        LimitNOFILE=65536
+        LimitNPROC=infinity
+        TasksMax=infinity
+        OOMScoreAdjust=-1000
+        
+        [Install]
+        WantedBy=multi-user.target
+
+nomad_service:
+  service.running:
+    - name: nomad
+    - enable: True
+    - watch:
+      - file: nomad_config
+      - file: nomad_systemd_service
+    - require:
+      - cmd: nomad_download
+      - file: nomad_config
+      - file: nomad_systemd_service
+`
+	
+	// Write the state file
+	stateFile := "/srv/salt/nomad.sls"
+	if err := os.WriteFile(stateFile, []byte(stateContent), 0644); err != nil {
+		if os.IsPermission(err) {
+			return eos_err.NewUserError("cannot write Salt state file - insufficient permissions")
+		}
+		return fmt.Errorf("failed to write Nomad Salt state: %w", err)
+	}
+	
+	// EVALUATE - Verify the state file was created
+	if _, err := os.Stat(stateFile); os.IsNotExist(err) {
+		return fmt.Errorf("Salt state file was not created successfully")
+	}
+	
+	logger.Info("Nomad Salt state created successfully")
 	return nil
 }
