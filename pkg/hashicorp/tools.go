@@ -5,6 +5,7 @@ package hashicorp
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -290,7 +291,7 @@ func installToolViaSaltStates(rc *eos_io.RuntimeContext, tool string) error {
 		Command: "salt-call",
 		Args:    []string{"--local", "state.apply", stateName, "--output=json"},
 		Capture: true,
-		Timeout: 300, // 5 minute timeout for installation
+		Timeout: 300 * time.Second, // 5 minute timeout for installation
 	})
 	
 	if err != nil {

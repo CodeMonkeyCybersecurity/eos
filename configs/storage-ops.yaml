@@ -1,0 +1,138 @@
+# Storage Operations Configuration
+# Default configuration for EOS storage management
+
+storage:
+  monitor:
+    # Default monitoring interval
+    interval: 5m
+    # How long to retain historical data
+    history_retention: 7d
+    # Enable prometheus metrics export
+    metrics_enabled: true
+    
+  # Data classification rules
+  classification:
+    critical:
+      - /etc
+      - /var/lib/mysql
+      - /var/lib/postgresql
+      - /var/lib/vault
+      - /home
+      - "*.key"
+      - "*.crt"
+      - "*.pem"
+    important:
+      - /var/log
+      - /var/backups
+      - /opt
+      - /usr/local
+      - "*.conf"
+      - "*.config"
+    standard:
+      - /var/cache
+      - /var/spool
+      - /usr/share
+    expendable:
+      - /tmp
+      - /var/tmp
+      - "*.tmp"
+      - "*.cache"
+      - "*.swp"
+      - "*~"
+      - .trash
+      - .Trash
+      
+  cleanup:
+    # Docker cleanup settings
+    docker:
+      log_max_size: 100m
+      log_max_files: 3
+      prune_until: 72h
+      prune_volumes: true
+    # Log rotation settings
+    logs:
+      compress_after: 7d
+      delete_after: 30d
+      max_size: 100m
+    # Package cache settings
+    packages:
+      apt_clean: true
+      apt_autoremove: true
+      snap_refresh: true
+      
+  emergency:
+    # Services to stop in emergency
+    stop_services:
+      - jenkins
+      - gitlab-runner
+      - elasticsearch
+      - grafana
+      - prometheus
+      - minio
+    # Paths to preserve at all costs
+    preserve_paths:
+      - /etc
+      - /home/*/Documents
+      - /var/lib/vault
+      - /var/lib/mysql
+      - /var/lib/postgresql
+    # Emergency space target (MB)
+    min_free_space: 1000
+      
+  # Filesystem-specific settings
+  filesystems:
+    ext4:
+      mount_options: "noatime,nodiratime"
+      reserved_blocks_percentage: 5
+    xfs:
+      mount_options: "noatime,nodiratime,nobarrier"
+      log_size: 256m
+    btrfs:
+      mount_options: "noatime,compress=zstd,space_cache=v2"
+      compression: zstd
+    zfs:
+      compression: lz4
+      atime: off
+      snapshots: true
+      
+  # Backup integration
+  backup:
+    enabled: false  # Enable when backup system is configured
+    restic:
+      repository: /mnt/backup/restic-repo
+      password_file: /etc/eos/restic-password
+      schedule: "0 3 * * *"
+      retention:
+        daily: 7
+        weekly: 4
+        monthly: 12
+        yearly: 2
+    # Paths to always backup before cleanup
+    pre_cleanup_backup:
+      - /etc
+      - /var/lib/mysql
+      - /var/lib/postgresql
+      
+  # Threshold overrides (environment defaults are used if not specified)
+  thresholds:
+    # Override example:
+    # warning: 65
+    # compress: 75
+    # cleanup: 80
+    # degraded: 85
+    # emergency: 90
+    # critical: 95
+    
+  # Environment-specific overrides
+  environments:
+    single:
+      cleanup_policy: aggressive
+      monitoring_interval: 5m
+    small:
+      cleanup_policy: balanced
+      monitoring_interval: 5m
+    distributed:
+      cleanup_policy: conservative
+      monitoring_interval: 1m
+      # Enable cross-node balancing
+      enable_balancing: true

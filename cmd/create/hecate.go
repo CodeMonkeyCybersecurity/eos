@@ -21,6 +21,22 @@ func init() {
 	
 	// Add flags for Hecate deployment
 	CreateHecateCmd.Flags().Bool("legacy", false, "Use legacy Docker Compose deployment method")
+	
+	// Add service-specific flags for monitoring and observability
+	CreateHecateCmd.Flags().Bool("wazuh", false, "Deploy Wazuh SIEM for security monitoring")
+	CreateHecateCmd.Flags().Bool("grafana", false, "Deploy Grafana with Prometheus and Loki for monitoring")
+	CreateHecateCmd.Flags().Bool("elk", false, "Deploy Elasticsearch, Logstash, and Kibana stack")
+	CreateHecateCmd.Flags().Bool("prometheus", false, "Deploy Prometheus monitoring (included with --grafana)")
+	CreateHecateCmd.Flags().Bool("loki", false, "Deploy Loki log aggregation (included with --grafana)")
+	
+	// Add flags for other services
+	CreateHecateCmd.Flags().Bool("mattermost", false, "Deploy Mattermost team chat")
+	CreateHecateCmd.Flags().Bool("vault", false, "Deploy HashiCorp Vault for secrets management")
+	CreateHecateCmd.Flags().Bool("consul", false, "Deploy HashiCorp Consul for service discovery")
+	
+	// Add flags for deployment options
+	CreateHecateCmd.Flags().Bool("all-monitoring", false, "Deploy all monitoring services (Grafana, Prometheus, Loki, Elasticsearch)")
+	CreateHecateCmd.Flags().Bool("minimal", false, "Deploy minimal Hecate stack without additional services")
 }
 
 // CreateHecateCmd creates the `create hecate` subcommand
@@ -52,9 +68,21 @@ The deployment follows a phased approach:
 6. Caddy deployment
 7. Integration configuration
 
+Optional services can be deployed alongside Hecate:
+- Wazuh SIEM for security monitoring
+- Grafana, Prometheus, and Loki for observability
+- Elasticsearch and Kibana for log analysis
+- Mattermost for team collaboration
+- Additional HashiCorp stack components
+
 Examples:
-  eos create hecate                    # Full deployment
-  eos create hecate --legacy          # Use legacy Docker Compose method`,
+  eos create hecate                           # Core Hecate deployment
+  eos create hecate --wazuh                   # Deploy with Wazuh SIEM
+  eos create hecate --grafana                 # Deploy with Grafana, Prometheus, Loki
+  eos create hecate --elk                     # Deploy with Elasticsearch and Kibana
+  eos create hecate --all-monitoring          # Deploy all monitoring services
+  eos create hecate --wazuh --grafana         # Deploy with multiple services
+  eos create hecate --legacy                  # Use legacy Docker Compose method`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 		log.Info("Starting Hecate deployment with SaltStack")
@@ -67,9 +95,61 @@ Examples:
 			return hecate.OrchestrateHecateWizard(rc)
 		}
 		
-		// Default to SaltStack deployment
+		// Collect requested services
+		var requestedServices []string
+		
+		// Check individual service flags
+		if wazuh, _ := cmd.Flags().GetBool("wazuh"); wazuh {
+			requestedServices = append(requestedServices, "wazuh")
+		}
+		if grafana, _ := cmd.Flags().GetBool("grafana"); grafana {
+			requestedServices = append(requestedServices, "grafana", "prometheus", "loki")
+		}
+		if elk, _ := cmd.Flags().GetBool("elk"); elk {
+			requestedServices = append(requestedServices, "elasticsearch", "kibana")
+		}
+		if prometheus, _ := cmd.Flags().GetBool("prometheus"); prometheus {
+			requestedServices = append(requestedServices, "prometheus")
+		}
+		if loki, _ := cmd.Flags().GetBool("loki"); loki {
+			requestedServices = append(requestedServices, "loki")
+		}
+		if mattermost, _ := cmd.Flags().GetBool("mattermost"); mattermost {
+			requestedServices = append(requestedServices, "mattermost")
+		}
+		if vault, _ := cmd.Flags().GetBool("vault"); vault {
+			requestedServices = append(requestedServices, "vault")
+		}
+		if consul, _ := cmd.Flags().GetBool("consul"); consul {
+			requestedServices = append(requestedServices, "consul")
+		}
+		
+		// Check aggregate flags
+		if allMonitoring, _ := cmd.Flags().GetBool("all-monitoring"); allMonitoring {
+			requestedServices = append(requestedServices, "grafana", "prometheus", "loki", "elasticsearch", "kibana")
+		}
+		
+		// Remove duplicates
+		serviceMap := make(map[string]bool)
+		for _, service := range requestedServices {
+			serviceMap[service] = true
+		}
+		
+		// Convert back to slice
+		var services []string
+		for service := range serviceMap {
+			services = append(services, service)
+		}
+		
+		// Log requested services
+		if len(services) > 0 {
+			log.Info("Deploying Hecate with additional services",
+				zap.Strings("services", services))
+		}
+		
+		// Default to SaltStack deployment with services
 		log.Info("Using SaltStack deployment method")
-		return hecate.DeployWithSaltStack(rc)
+		return hecate.DeployWithSaltStackAndServices(rc, services)
 	}),
 }
 

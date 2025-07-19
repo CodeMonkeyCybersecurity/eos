@@ -14,14 +14,21 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // DeployWithSaltStack deploys Hecate using SaltStack orchestration
 func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
+	return DeployWithSaltStackAndServices(rc, nil)
+}
+
+// DeployWithSaltStackAndServices deploys Hecate with optional additional services
+func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Hecate deployment with SaltStack")
+	logger.Info("Starting Hecate deployment with SaltStack",
+		zap.Strings("additional_services", requestedServices))
 
 	// ASSESS - Check prerequisites
 	if err := assessPrerequisites(rc); err != nil {
@@ -254,6 +261,53 @@ func DeployWithSaltStack(rc *eos_io.RuntimeContext) error {
 					zap.String("phase", phase.name),
 					zap.Error(lastErr))
 			}
+		}
+	}
+
+	// Deploy additional services if requested
+	if len(requestedServices) > 0 {
+		logger.Info("Deploying additional services",
+			zap.Strings("services", requestedServices))
+		
+		// Resolve service dependencies
+		allServices := resolveServiceDependencies(requestedServices)
+		logger.Info("Resolved service dependencies",
+			zap.Strings("all_services", allServices))
+		
+		// Deploy each service
+		for _, serviceName := range allServices {
+			service, exists := GetService(serviceName)
+			if !exists {
+				logger.Warn("Unknown service requested, skipping",
+					zap.String("service", serviceName))
+				continue
+			}
+			
+			logger.Info("Deploying service",
+				zap.String("service", serviceName),
+				zap.String("display_name", service.DisplayName))
+			
+			// Deploy service using Nomad if job path is specified
+			if service.NomadJobPath != "" {
+				if err := deployServiceWithNomad(rc, service); err != nil {
+					logger.Error("Failed to deploy service",
+						zap.String("service", serviceName),
+						zap.Error(err))
+					// Continue with other services even if one fails
+					continue
+				}
+			}
+			
+			// Create Hecate route for the service
+			if service.Subdomain != "" {
+				if err := createServiceRoute(rc, service); err != nil {
+					logger.Error("Failed to create route for service",
+						zap.String("service", serviceName),
+						zap.Error(err))
+				}
+			}
+			
+			completedPhases = append(completedPhases, "service_"+serviceName)
 		}
 	}
 
@@ -1222,5 +1276,164 @@ func checkNomadJobRecovery(rc *eos_io.RuntimeContext, jobName string) error {
 		logger.Info("Nomad job restarted", zap.String("job", jobName))
 	}
 
+	return nil
+}
+
+// resolveServiceDependencies resolves all dependencies for the requested services
+func resolveServiceDependencies(requestedServices []string) []string {
+	// Use a map to track all services to deploy (avoiding duplicates)
+	servicesToDeploy := make(map[string]bool)
+	
+	// Process each requested service
+	for _, service := range requestedServices {
+		// Add the service itself
+		servicesToDeploy[service] = true
+		
+		// Add all its dependencies
+		deps := GetServiceDependencies(service)
+		for _, dep := range deps {
+			servicesToDeploy[dep] = true
+		}
+	}
+	
+	// Convert map to sorted slice
+	var result []string
+	for service := range servicesToDeploy {
+		result = append(result, service)
+	}
+	
+	// Sort by dependency order (dependencies first)
+	// Simple approach: put databases first, then other services
+	var databases, others []string
+	for _, service := range result {
+		if svc, exists := GetService(service); exists {
+			if svc.Category == terraform.CategoryDatabase {
+				databases = append(databases, service)
+			} else {
+				others = append(others, service)
+			}
+		}
+	}
+	
+	// Combine: databases first, then others
+	result = append(databases, others...)
+	return result
+}
+
+// deployServiceWithNomad deploys a service using Nomad
+func deployServiceWithNomad(rc *eos_io.RuntimeContext, service terraform.ServiceDefinition) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Deploying service with Nomad",
+		zap.String("service", service.Name),
+		zap.String("job_path", service.NomadJobPath))
+	
+	// Check if Nomad job file exists
+	jobPath := filepath.Join("/opt/eos", service.NomadJobPath)
+	if _, err := os.Stat(jobPath); os.IsNotExist(err) {
+		return fmt.Errorf("Nomad job file not found: %s", jobPath)
+	}
+	
+	// Run Nomad job
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "nomad",
+		Args:    []string{"job", "run", jobPath},
+		Capture: true,
+		Timeout: 5 * time.Minute,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to deploy Nomad job: %w\nOutput: %s", err, output)
+	}
+	
+	// Wait for the job to be healthy
+	logger.Info("Waiting for service to be healthy",
+		zap.String("service", service.Name))
+	
+	maxRetries := 30
+	for i := 0; i < maxRetries; i++ {
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "nomad",
+			Args:    []string{"job", "status", service.Name},
+			Capture: true,
+		})
+		
+		if err == nil && strings.Contains(output, "running") {
+			logger.Info("Service deployment successful",
+				zap.String("service", service.Name))
+			return nil
+		}
+		
+		logger.Debug("Waiting for service to start",
+			zap.String("service", service.Name),
+			zap.Int("attempt", i+1))
+		time.Sleep(10 * time.Second)
+	}
+	
+	return fmt.Errorf("service failed to become healthy after %d attempts", maxRetries)
+}
+
+// createServiceRoute creates a Hecate route for a service
+func createServiceRoute(rc *eos_io.RuntimeContext, service terraform.ServiceDefinition) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Creating Hecate route for service",
+		zap.String("service", service.Name),
+		zap.String("subdomain", service.Subdomain))
+	
+	// Get the base domain from configuration or environment
+	baseDomain := os.Getenv("HECATE_BASE_DOMAIN")
+	if baseDomain == "" {
+		baseDomain = "eos.local"
+	}
+	
+	// Construct the full domain
+	fullDomain := fmt.Sprintf("%s.%s", service.Subdomain, baseDomain)
+	
+	// Determine the upstream address
+	upstream := fmt.Sprintf("%s.service.consul:%d", service.Name, service.Ports[0].Port)
+	
+	// Create the upstream configuration
+	upstreamConfig := &Upstream{
+		URL:             fmt.Sprintf("http://%s", upstream),
+		HealthCheckPath: service.HealthEndpoint,
+		Timeout:         30 * time.Second,
+	}
+	
+	// Create the route configuration
+	route := &Route{
+		Domain:   fullDomain,
+		Upstream: upstreamConfig,
+		Headers:  make(map[string]string),
+		Metadata: map[string]string{
+			"service": service.Name,
+			"managed": "true",
+		},
+	}
+	
+	// Add auth policy if specified
+	if service.AuthPolicy != "" {
+		route.AuthPolicy = &AuthPolicy{
+			Name:     service.AuthPolicy,
+			Provider: "authentik",
+		}
+	}
+	
+	// Create default Hecate config (this should be loaded from configuration)
+	hecateConfig := &HecateConfig{
+		DefaultDomain:        baseDomain,
+		CaddyAPIEndpoint:     "http://localhost:2019",
+		AuthentikAPIEndpoint: "http://authentik.service.consul:9000",
+		StateBackend:         "consul",
+		Environment:          "production",
+	}
+	
+	// Use Hecate's route creation API
+	if err := CreateRoute(rc, hecateConfig, route); err != nil {
+		return fmt.Errorf("failed to create route for service %s: %w", service.Name, err)
+	}
+	
+	logger.Info("Route created successfully",
+		zap.String("service", service.Name),
+		zap.String("domain", fullDomain),
+		zap.String("upstream", upstream))
+	
 	return nil
 }
