@@ -1,0 +1,26 @@
+terraform {
+  required_providers {
+    hetznerdns = {
+      source  = "timohirt/hetznerdns"
+      version = "~> 2.2"
+    }
+  }
+  
+  backend "consul" {
+    address = "{{ salt['pillar.get']('consul:address', 'localhost:8500') }}"
+    scheme  = "http"
+    path    = "terraform/hecate-dns"
+  }
+}
+
+provider "hetznerdns" {
+  apitoken = var.hetzner_token
+}
+
+# DNS Zone data source
+data "hetznerdns_zone" "main" {
+  name = var.dns_zone
+}
+
+# Individual DNS record files will be created dynamically
+# This ensures proper provider configuration and data sources are available

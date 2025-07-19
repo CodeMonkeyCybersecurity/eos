@@ -1,0 +1,72 @@
+terraform {
+  required_providers {
+    hetzner = {
+      source  = "hetznercloud/hcloud"
+      version = "~> 1.45"
+    }
+    hetznerdns = {
+      source  = "timohirt/hetznerdns"
+      version = "~> 2.2"
+    }
+  }
+  
+  backend "consul" {
+    address = "{{ salt['pillar.get']('consul:address', 'localhost:8500') }}"
+    scheme  = "http"
+    path    = "terraform/hecate"
+  }
+}
+
+provider "hetzner" {
+  token = var.hetzner_token
+}
+
+provider "hetznerdns" {
+  apitoken = var.hetzner_token
+}
+
+# Variables
+variable "hetzner_token" {
+  description = "Hetzner Cloud API token"
+  type        = string
+  sensitive   = true
+  default     = "{{ hetzner_token }}"
+}
+
+variable "dns_zone" {
+  description = "DNS zone name"
+  type        = string
+  default     = "{{ dns_zone }}"
+}
+
+variable "ingress_ip" {
+  description = "Ingress IP address for DNS records"
+  type        = string
+  default     = "{{ ingress_ip }}"
+}
+
+# DNS Zone data source
+data "hetznerdns_zone" "main" {
+  name = var.dns_zone
+}
+
+# Dynamic DNS records managed by Hecate
+{% set routes = salt['consul.get']('hecate/routes', default={}) %}
+{% for domain, config in routes.items() %}
+resource "hetznerdns_record" "{{ domain | replace('.', '_') | replace('-', '_') }}" {
+  zone_id = data.hetznerdns_zone.main.id
+  name    = "{{ domain | regex_replace('\\.' + dns_zone + '$', '') }}"
+  type    = "A"
+  value   = var.ingress_ip
+  ttl     = 300
+}
+{% endfor %}
+
+# Wildcard record for dynamic subdomains
+resource "hetznerdns_record" "wildcard" {
+  zone_id = data.hetznerdns_zone.main.id
+  name    = "*"
+  type    = "A"
+  value   = var.ingress_ip
+  ttl     = 300
+}

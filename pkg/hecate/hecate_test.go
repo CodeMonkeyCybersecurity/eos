@@ -211,16 +211,16 @@ func TestIPAddressValidation(t *testing.T) {
 			"172.16.0.1",
 			"8.8.8.8",
 			"127.0.0.1",
-			"255.255.255.0",
+			"255.255.255.255",
 		}
 
 		for _, ip := range validIPs {
 			config := HecateBasicConfig{BackendIP: ip}
 			assert.NotEmpty(t, config.BackendIP)
 
-			// Basic IP validation
-			parts := strings.Split(config.BackendIP, ".")
-			assert.Len(t, parts, 4, "IP should have 4 octets")
+			// Use proper IP validation
+			err := ValidateIPAddress(ip)
+			assert.NoError(t, err, "Valid IP should pass validation: %s", ip)
 		}
 	})
 
@@ -238,28 +238,9 @@ func TestIPAddressValidation(t *testing.T) {
 		}
 
 		for _, ip := range invalidIPs {
-			// Basic IP validation
-			isInvalid := ip == ""
-
-			if !isInvalid {
-				parts := strings.Split(ip, ".")
-				if len(parts) != 4 {
-					isInvalid = true
-				} else {
-					// Check each octet
-					for _, part := range parts {
-						// Check if numeric
-						for _, ch := range part {
-							if ch < '0' || ch > '9' {
-								isInvalid = true
-								break
-							}
-						}
-					}
-				}
-			}
-
-			assert.True(t, isInvalid, "IP should be invalid: %s", ip)
+			// Use proper IP validation
+			err := ValidateIPAddress(ip)
+			assert.Error(t, err, "Invalid IP should fail validation: %s", ip)
 		}
 	})
 }
@@ -281,10 +262,9 @@ func TestPortValidation(t *testing.T) {
 			bundle := ServiceBundle{BackendPort: port}
 			assert.NotEmpty(t, bundle.BackendPort)
 
-			// Check if numeric
-			for _, ch := range bundle.BackendPort {
-				assert.True(t, ch >= '0' && ch <= '9', "Port should be numeric: %s", port)
-			}
+			// Use proper port validation
+			err := ValidatePort(port)
+			assert.NoError(t, err, "Valid port should pass validation: %s", port)
 		}
 	})
 
@@ -301,20 +281,9 @@ func TestPortValidation(t *testing.T) {
 		}
 
 		for _, port := range invalidPorts {
-			// Basic port validation
-			isInvalid := port == "" || port == "0"
-
-			if !isInvalid {
-				// Check if numeric and in range
-				for _, ch := range port {
-					if ch < '0' || ch > '9' {
-						isInvalid = true
-						break
-					}
-				}
-			}
-
-			assert.True(t, isInvalid, "Port should be invalid: %s", port)
+			// Use proper port validation
+			err := ValidatePort(port)
+			assert.Error(t, err, "Invalid port should fail validation: %s", port)
 		}
 	})
 }

@@ -1,0 +1,27 @@
+[Unit]
+Description=EOS Storage Monitoring Service
+After=network.target salt-minion.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/eos read storage-monitor --daemon --interval=5m
+Restart=always
+RestartSec=30
+User=root
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eos-storage-monitor
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=512M
+
+# Security settings
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/log/eos /etc/eos
+
+[Install]
+WantedBy=multi-user.target

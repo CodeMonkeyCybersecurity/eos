@@ -8,7 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-	"go.uber.org/zap"
+	// "go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
@@ -141,34 +141,6 @@ func runBootstrapOsquery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 }
 
 func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting full infrastructure bootstrap")
-
-	// Bootstrap in order: Salt -> Vault -> Nomad -> OSQuery
-	logger.Info("Phase 1: Bootstrapping Salt", zap.Int("phase", 1), zap.Int("total_phases", 4))
-	saltConfig := &saltstack.Config{
-		MasterMode: true,
-		LogLevel:   "warning",
-	}
-	if err := saltstack.Install(rc, saltConfig); err != nil {
-		return err
-	}
-
-	logger.Info("Phase 2: Bootstrapping Vault", zap.Int("phase", 2), zap.Int("total_phases", 4))
-	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
-		return err
-	}
-
-	logger.Info("Phase 3: Bootstrapping Nomad", zap.Int("phase", 3), zap.Int("total_phases", 4))
-	if err := nomad.DeployNomadViaSaltBootstrap(rc); err != nil {
-		return err
-	}
-
-	logger.Info("Phase 4: Bootstrapping OSQuery", zap.Int("phase", 4), zap.Int("total_phases", 4))
-	if err := osquery.InstallOsquery(rc); err != nil {
-		return err
-	}
-
-	logger.Info("Full infrastructure bootstrap completed successfully")
-	return nil
+	// Redirect to enhanced version that includes storage ops and clustering
+	return runBootstrapAllEnhanced(rc, cmd, args)
 }

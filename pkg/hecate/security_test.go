@@ -362,15 +362,9 @@ func TestConfigurationInjectionSecurity(t *testing.T) {
 		for key, value := range maliciousEnvVars {
 			env[key] = value
 
-			// Check for command injection patterns
-			hasInjection := strings.ContainsAny(value, ";|&$") ||
-				strings.Contains(value, "$(") ||
-				strings.Contains(value, "&&") ||
-				strings.Contains(value, "||") ||
-				strings.Contains(value, "nc ") ||
-				strings.Contains(value, "curl ")
-
-			assert.True(t, hasInjection, "Environment variable %s should contain injection: %s", key, value)
+			// Use proper validation function
+			err := ValidateEnvironmentVariable(key, value)
+			assert.Error(t, err, "Environment variable %s should fail validation: %s", key, value)
 		}
 	})
 

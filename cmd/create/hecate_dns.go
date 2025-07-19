@@ -1,5 +1,3 @@
-// cmd/create/hecate-dns.go
-
 package create
 
 import (
@@ -8,6 +6,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hetzner"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -131,4 +130,89 @@ Then, run this command again.
 func init() {
 	hetznerWildcardCmd.Flags().StringVar(&hetznerDNSDomain, "domain", "", "Root domain name (e.g. example.com)")
 	hetznerWildcardCmd.Flags().StringVar(&hetznerDNSIP, "ip", "", "IP address for the A record")
+	
+	// Add the modern DNS command to Hecate
+	CreateHecateCmd.AddCommand(createHecateDNSCmd)
+	
+	// Add flags for the DNS command
+	createHecateDNSCmd.Flags().String("domain", "", "Domain name for the DNS record (prompted if not provided)")
+	createHecateDNSCmd.Flags().String("target", "", "Target IP address (prompted if not provided)")
+	createHecateDNSCmd.Flags().String("type", "A", "DNS record type")
+	createHecateDNSCmd.Flags().Int("ttl", 300, "DNS record TTL in seconds")
 }
+
+// createHecateDNSCmd creates DNS records using the new Terraform-based DNS manager
+var createHecateDNSCmd = &cobra.Command{
+	Use:   "dns",
+	Short: "Create DNS record using Hecate DNS manager",
+	Long: `Create a DNS record using the Hecate DNS manager with Terraform integration.
+
+This command creates DNS records via Terraform with automatic reconciliation and tracking.
+DNS records are managed in Consul and automatically deployed via SaltStack.
+
+Examples:
+  eos create hecate dns --domain app.example.com --target 1.2.3.4
+  eos create hecate dns --domain api.example.com --target 5.6.7.8 --ttl 600`,
+	RunE: eos.Wrap(runCreateHecateDNS),
+}
+
+func runCreateHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Creating Hecate DNS record")
+
+	// Get flags
+	domain, _ := cmd.Flags().GetString("domain")
+	target, _ := cmd.Flags().GetString("target")
+
+	// Interactive prompts for required fields
+	if domain == "" {
+		logger.Info("terminal prompt: Enter domain name for DNS record")
+		var err error
+		domain, err = eos_io.PromptInput(rc, "Enter domain name for DNS record", "")
+		if err != nil {
+			return err
+		}
+	}
+
+	if target == "" {
+		logger.Info("terminal prompt: Enter target IP address")
+		var err error
+		target, err = eos_io.PromptInput(rc, "Enter target IP address", "")
+		if err != nil {
+			return err
+		}
+	}
+
+	// Initialize Hecate client
+	config := &hecate.ClientConfig{
+		CaddyAdminAddr:     getEnvOrDefault("CADDY_ADMIN_ADDR", "http://localhost:2019"),
+		ConsulAddr:         getEnvOrDefault("CONSUL_ADDR", "localhost:8500"),
+		VaultAddr:          getEnvOrDefault("VAULT_ADDR", "http://localhost:8200"),
+		VaultToken:         getEnvOrDefault("VAULT_TOKEN", ""),
+		TerraformWorkspace: getEnvOrDefault("TERRAFORM_WORKSPACE", "/var/lib/hecate/terraform"),
+	}
+
+	client, err := hecate.NewHecateClient(rc, config)
+	if err != nil {
+		return err
+	}
+
+	// Create DNS manager and record
+	dm := hecate.NewDNSManager(client)
+	
+	logger.Info("Creating DNS record",
+		zap.String("domain", domain),
+		zap.String("target", target))
+
+	if err := dm.CreateDNSRecord(rc.Ctx, domain, target); err != nil {
+		return err
+	}
+
+	logger.Info("DNS record created successfully",
+		zap.String("domain", domain),
+		zap.String("target", target))
+
+	return nil
+}
+
+// getEnvOrDefault is defined in hecate_example.go
