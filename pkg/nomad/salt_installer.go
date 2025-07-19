@@ -26,6 +26,7 @@ func NewSaltInstaller(logger otelzap.LoggerWithCtx) *SaltInstaller {
 }
 
 // SaltNomadConfig holds Salt-specific Nomad configuration
+// This replaces K3s configuration for container orchestration
 type SaltNomadConfig struct {
 	Version         string
 	ServerMode      bool
@@ -55,6 +56,13 @@ type SaltNomadConfig struct {
 	SerfPort        int
 	Servers         []string
 	EncryptionKey   string
+	
+	// Migration-specific fields for K3s replacement
+	IngressDomain   string   `json:"ingress_domain,omitempty"`
+	EnableIngress   bool     `json:"enable_ingress"`
+	EnableMailProxy bool     `json:"enable_mail_proxy"`
+	MailPorts       []int    `json:"mail_ports,omitempty"`
+	MigratedFromK3s bool     `json:"migrated_from_k3s"`
 }
 
 // InstallNomadViaSalt installs Nomad using Salt states

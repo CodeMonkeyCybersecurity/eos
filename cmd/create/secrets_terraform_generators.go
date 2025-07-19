@@ -17,14 +17,19 @@ import (
 )
 
 var generateVaultK3sCmd = &cobra.Command{
-	Use:   "vault-k3s [directory]",
-	Short: "Generate Vault-integrated K3s Terraform configuration",
-	Long: `Generate a complete K3s cluster deployment with Vault integration.
-This creates Terraform configuration that:
-- Retrieves Hetzner API token from Vault
-- Uses Vault-stored SSH keys
-- Stores cluster information back to Vault
-- Includes proper firewall and networking`,
+	Use:        "vault-k3s [directory]",
+	Short:      "Generate Vault-integrated K3s Terraform configuration (DEPRECATED - use 'vault-nomad' instead)",
+	Deprecated: "K3s support is deprecated. Use 'eos create vault-nomad' for Vault + Nomad integration instead.",
+	Long: `DEPRECATED: This command is deprecated and will be removed in a future version.
+Use 'eos create vault-nomad' for Vault + Nomad integration instead.
+
+K3s has been replaced with HashiCorp Nomad for simpler container orchestration.
+
+Migration:
+  # Instead of: eos create vault-k3s --cluster-name=prod
+  # Use:        eos create vault-nomad --cluster-name=prod
+
+The Nomad-based vault integration provides the same capabilities but with simpler orchestration.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)

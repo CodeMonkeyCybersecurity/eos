@@ -22,9 +22,23 @@ var (
 )
 
 var KeycloakCmd = &cobra.Command{
-	Use:   "keycloak",
-	Short: "Export a Keycloak realm (partial-export) to JSON",
-	Long: `Export a Keycloak realm configuration to JSON format.
+	Use:        "keycloak",
+	Short:      "Export a Keycloak realm (partial-export) to JSON (DEPRECATED - use 'authentik' instead)",
+	Deprecated: "Keycloak support is deprecated. Use 'eos read authentik' for reading Authentik configurations instead.",
+	Long: `DEPRECATED: This command is deprecated and will be removed in a future version.
+Use 'eos read authentik' for reading Authentik configurations instead.
+
+Keycloak has been replaced with Authentik for identity and access management.
+
+Migration:
+  # Instead of: eos read keycloak --realm=master
+  # Use:        eos read authentik --tenant=default
+
+This command will still work for existing Keycloak installations but shows a deprecation warning.
+
+---
+
+Export a Keycloak realm configuration to JSON format.
 
 This command performs a partial export of a Keycloak realm, which includes
 the realm settings, authentication flows, identity providers, and optionally

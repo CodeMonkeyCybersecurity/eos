@@ -21,8 +21,14 @@ var UninstallScripts = map[string]string{
 // Uninstall removes K3s from the system following the Assess → Intervene → Evaluate pattern.
 // It detects whether this machine is running a K3s server or agent and removes it
 // by running the appropriate uninstall scripts in the correct order.
+//
+// DEPRECATED: K3s support is deprecated. Use Nomad instead.
 func Uninstall(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	
+	// DEPRECATED: Show deprecation warning
+	logger.Warn("K3s support is deprecated and has been replaced with Nomad")
+	logger.Info("For removing Nomad clusters, use 'eos delete nomad' instead")
 
 	// ASSESS - Check which scripts are present
 	logger.Info("Assessing K3s installation")

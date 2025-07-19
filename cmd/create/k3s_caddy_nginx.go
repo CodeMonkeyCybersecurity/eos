@@ -10,17 +10,20 @@ import (
 )
 
 var k3sCaddyNginxCmd = &cobra.Command{
-	Use:   "k3s-caddy-nginx",
-	Short: "Deploy K3s with Caddy (HTTP/HTTPS) and Nginx (mail) instead of Traefik",
-	Long: `Deploy K3s cluster with Caddy as HTTP/HTTPS ingress controller and Nginx as mail proxy.
-This replaces the default Traefik ingress with a familiar Caddy + Nginx setup.
+	Use:        "k3s-caddy-nginx",
+	Short:      "Deploy K3s with Caddy and Nginx (DEPRECATED - use 'nomad-ingress' instead)",
+	Deprecated: "K3s support is deprecated. Use 'eos create nomad-ingress' for ingress instead.",
+	Long: `DEPRECATED: This command is deprecated and will be removed in a future version.
+Use 'eos create nomad-ingress' for ingress instead.
 
-Features:
-- K3s without Traefik
-- Caddy for HTTP/HTTPS with automatic SSL
-- Nginx for mail proxy (SMTP/IMAP/POP3)
-- MetalLB for LoadBalancer services
-- Cloud deployment support (Hetzner)`,
+K3s has been replaced with HashiCorp Nomad. The equivalent functionality is now available as:
+
+Migration:
+  # Instead of: eos create k3s-caddy-nginx --domain=example.com
+  # Use:        eos create nomad-ingress --domain=example.com --enable-mail
+
+The Nomad-based ingress provides the same Caddy + Nginx functionality but with
+simpler deployment and better resource efficiency.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return kubernetes.GenerateK3sCaddyNginx(rc, cmd)
 	}),

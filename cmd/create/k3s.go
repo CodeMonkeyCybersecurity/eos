@@ -10,18 +10,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// DEPRECATED: K3s support is deprecated. Use Nomad instead.
 // k3sCmd is the subcommand for deploying K3s.
 var CreateK3sCmd = &cobra.Command{
-	Use:   "k3s",
-	Short: "Deploy K3s on a server or worker node",
-	Long: `Deploy K3s on a node with interactive prompts.
-For server nodes, you'll be prompted for the TLS SAN.
-For worker nodes, you'll be prompted for the server URL and node token.
-Additional checks for IPv6 and Tailscale are performed.
-The generated install command is previewed and saved to a script file
-for safe, human-approved execution.
+	Use:        "k3s",
+	Short:      "Deploy K3s on a server or worker node (DEPRECATED - use 'nomad' instead)",
+	Deprecated: "K3s support is deprecated. Use 'eos create nomad' for container orchestration instead.",
+	Long: `DEPRECATED: This command is deprecated and will be removed in a future version.
+Use 'eos create nomad' for container orchestration instead.
 
-Use --terraform flag to generate Terraform configuration instead of direct installation.`,
+K3s has been replaced with HashiCorp Nomad for simpler container orchestration.
+Nomad provides the same capabilities as K3s but with lower overhead and easier management.
+
+Migration:
+  # Instead of: eos create k3s
+  # Use:        eos create nomad
+
+  # Migrate existing K3s cluster:
+  eos create migrate-k3s --domain=your-domain.com
+
+For Terraform-based deployment, use:
+  eos create nomad-terraform --domain=your-domain.com`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		useTerraform, _ := cmd.Flags().GetBool("terraform")
 		if useTerraform {

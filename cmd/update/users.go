@@ -86,23 +86,27 @@ var SyncUsersCmd = &cobra.Command{
 			return err
 		}
 
-		client, err := hera.NewClient(kcURL, clientID, clientSecret, realm)
+		// DEPRECATED: This command still uses Keycloak for backward compatibility
+		// but users should migrate to Authentik
+		otelzap.Ctx(rc.Ctx).Warn("Keycloak support is deprecated - please migrate to Authentik")
+		otelzap.Ctx(rc.Ctx).Info("Use 'eos update authentik-users' for new Authentik-based user management")
+		
+		// For Authentik, we use the clientSecret as token since it's a different auth model
+		client, err := hera.NewAuthentikClient(kcURL, clientSecret)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Error("Failed to initialize Keycloak client",
+			otelzap.Ctx(rc.Ctx).Error("Failed to initialize Authentik client",
 				zap.String("url", kcURL),
-				zap.String("clientID", clientID),
-				zap.String("realm", realm),
 				zap.Error(err),
 			)
-			err := fmt.Errorf("keycloak login failed (check client ID/secret/realm)")
-			otelzap.Ctx(rc.Ctx).Error("Failed to initialize Keycloak client", zap.Error(err))
+			err := fmt.Errorf("authentik login failed (check URL and token)")
+			otelzap.Ctx(rc.Ctx).Error("Failed to initialize Authentik client", zap.Error(err))
 			return err
 		}
 
 		cutoff := time.Now().Add(-sinceDur)
 		otelzap.Ctx(rc.Ctx).Info("Fetching registration events", zap.Time("since", cutoff))
 
-		events, err := client.GetRegistrationEvents(realm, cutoff)
+		events, err := client.GetRegistrationEvents(cutoff)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to fetch registration events", zap.Error(err))
 			return err
@@ -110,7 +114,18 @@ var SyncUsersCmd = &cobra.Command{
 
 		otelzap.Ctx(rc.Ctx).Info("Processing registration events", zap.Int("count", len(events)))
 		for _, ev := range events {
-			username := ev.Details["username"]
+			// For Authentik events, username comes from Context instead of Details
+			username, ok := ev.Context["username"].(string)
+			if !ok {
+				// Fallback: try to get username from User field
+				if userMap, userOk := ev.User["username"]; userOk {
+					username, _ = userMap.(string)
+				}
+			}
+			if username == "" {
+				otelzap.Ctx(rc.Ctx).Warn("Skipping event without username", zap.String("action", ev.Action))
+				continue
+			}
 			groupName := fmt.Sprintf("tenant-%s", username)
 
 			exists, err := client.GroupExists(groupName)
