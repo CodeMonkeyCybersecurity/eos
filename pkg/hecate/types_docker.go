@@ -11,6 +11,14 @@ type DockerConfig struct {
 	NginxEnabled          bool
 	CoturnEnabled         bool
 	CoturnAuthSecret      string
+	AuthentikEnabled      bool
+	AuthentikDomain       string
+	AuthentikDBName       string
+	AuthentikDBUser       string
+	AuthentikDBPassword   string
+	AuthentikSecretKey    string
+	AuthentikRedisPassword string
+	// Deprecated: Use Authentik instead
 	KeycloakEnabled       bool
 	KeycloakDomain        string
 	KeycloakDBName        string
@@ -132,6 +140,95 @@ const DockerCoturnService = `
       - hecate-net
 `
 
+const DockerAuthentikService = `
+  authentik-postgres:
+    image: postgres:16
+    container_name: hecate-authentik-postgres
+    environment:
+      POSTGRES_DB: {{ .AuthentikDBName }}
+      POSTGRES_USER: {{ .AuthentikDBUser }}
+      POSTGRES_PASSWORD: {{ .AuthentikDBPassword }}
+    volumes:
+      - authentik-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    networks:
+      - hecate-net
+
+  authentik-redis:
+    image: redis:alpine
+    container_name: hecate-authentik-redis
+    command: --save 60 1 --loglevel warning --requirepass {{ .AuthentikRedisPassword }}
+    volumes:
+      - authentik-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a $${AUTHENTIK_REDIS_PASSWORD:-{{ .AuthentikRedisPassword }}} ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    networks:
+      - hecate-net
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: hecate-authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_REDIS__PASSWORD: {{ .AuthentikRedisPassword }}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: {{ .AuthentikDBUser }}
+      AUTHENTIK_POSTGRESQL__NAME: {{ .AuthentikDBName }}
+      AUTHENTIK_POSTGRESQL__PASSWORD: {{ .AuthentikDBPassword }}
+      AUTHENTIK_SECRET_KEY: {{ .AuthentikSecretKey }}
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_LOG_LEVEL: info
+    volumes:
+      - ./authentik/media:/media
+      - ./authentik/custom-templates:/templates
+    depends_on:
+      - authentik-postgres
+      - authentik-redis
+    networks:
+      - hecate-net
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:latest
+    container_name: hecate-authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_REDIS__PASSWORD: {{ .AuthentikRedisPassword }}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: {{ .AuthentikDBUser }}
+      AUTHENTIK_POSTGRESQL__NAME: {{ .AuthentikDBName }}
+      AUTHENTIK_POSTGRESQL__PASSWORD: {{ .AuthentikDBPassword }}
+      AUTHENTIK_SECRET_KEY: {{ .AuthentikSecretKey }}
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_LOG_LEVEL: info
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./authentik/media:/media
+      - ./authentik/certs:/certs
+      - ./authentik/custom-templates:/templates
+    depends_on:
+      - authentik-postgres
+      - authentik-redis
+    networks:
+      - hecate-net
+`
+
+// Deprecated: Use DockerAuthentikService instead
 const DockerKeycloakService = `
   kc-db:
     image: postgres:15
@@ -166,7 +263,10 @@ const DockerKeycloakService = `
 
 // Centralized constants for Docker Compose sections
 const (
-	DockerNetworkName    = "hecate-net"
+	DockerNetworkName                = "hecate-net"
+	DockerVolumeAuthentikPostgresName = "authentik-postgres-data"
+	DockerVolumeAuthentikRedisName   = "authentik-redis-data"
+	// Deprecated: Use Authentik volumes instead
 	DockerVolumeKCDBName = "kc-db-data"
 
 	DockerNetworkSection = `
@@ -176,6 +276,14 @@ networks:
 `
 
 	DockerVolumesSection = `
+
+volumes:
+  ` + DockerVolumeAuthentikPostgresName + `:
+  ` + DockerVolumeAuthentikRedisName + `:
+`
+
+	// Deprecated: Use DockerVolumesSection instead
+	DockerVolumesKeycloakSection = `
 
 volumes:
   ` + DockerVolumeKCDBName + `:

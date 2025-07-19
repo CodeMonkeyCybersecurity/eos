@@ -35,12 +35,12 @@ func CheckExecutablePermissions(rc *eos_io.RuntimeContext) error {
 		logger.Error("Eos executable not found",
 			zap.String("path", execPath))
 		
-		return eos_err.NewUserError("Eos executable not found at: " + execPath + "\n\n" +
+		return eos_err.NewUserError("Eos executable not found at: %s\n\n" +
 			"This usually means:\n" +
 			"• The binary was moved or deleted\n" +
 			"• You're running from the wrong directory\n" +
 			"• The installation is corrupted\n\n" +
-			"Try reinstalling eos or check the installation path.")
+			"Try reinstalling eos or check the installation path.", execPath)
 	}
 	
 	// Check file permissions
@@ -60,12 +60,12 @@ func CheckExecutablePermissions(rc *eos_io.RuntimeContext) error {
 			zap.String("path", execPath),
 			zap.String("current_permissions", mode.String()))
 		
-		return eos_err.NewUserError("Eos binary is not executable: " + execPath + "\n" +
-			"Current permissions: " + mode.String() + "\n\n" +
+		return eos_err.NewUserError("Eos binary is not executable: %s\n" +
+			"Current permissions: %s\n\n" +
 			"To fix this, run:\n" +
-			"  chmod +x " + execPath + "\n\n" +
+			"  chmod +x %s\n\n" +
 			"Or if you installed via package manager:\n" +
-			"  sudo chmod +x /usr/local/bin/eos")
+			"  sudo chmod +x /usr/local/bin/eos", execPath, mode.String(), execPath)
 	}
 	
 	// Check ownership and suggest solutions

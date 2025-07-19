@@ -43,7 +43,7 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 
 	// Phase 2: Caddy (this one does take context+spec)
 	spec := CaddySpec{
-		KeycloakDomain: config.KeycloakDomain,
+		AuthentikDomain: config.AuthentikDomain,
 		Proxies:        config.Proxies,
 	}
 	log.Info(" Running Phase Caddy setup…")
@@ -64,12 +64,17 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 }
 
 // ShouldExitNoServicesSelected checks if no services were selected and logs a friendly exit message.
-func ShouldExitNoServicesSelected(rc *eos_io.RuntimeContext, keycloak, nextcloud, wazuh, jenkins bool) bool {
-	if !keycloak && !nextcloud && !wazuh && !jenkins {
+func ShouldExitNoServicesSelected(rc *eos_io.RuntimeContext, authentik, nextcloud, wazuh, jenkins bool) bool {
+	if !authentik && !nextcloud && !wazuh && !jenkins {
 		otelzap.Ctx(rc.Ctx).Warn(" No services selected. Exiting without making any changes.")
 		return true
 	}
 	return false
+}
+
+// Deprecated: Use ShouldExitNoServicesSelected with authentik parameter instead
+func ShouldExitNoServicesSelectedKeycloak(rc *eos_io.RuntimeContext, keycloak, nextcloud, wazuh, jenkins bool) bool {
+	return ShouldExitNoServicesSelected(rc, keycloak, nextcloud, wazuh, jenkins)
 }
 
 func CollateAndWriteFile[T any](
@@ -120,10 +125,12 @@ func CollateAndWriteFile[T any](
 // HecateConfiguration holds the user-provided configuration for Hecate setup
 type HecateConfiguration struct {
 	DomainName      string
-	KeycloakDomain  string
+	AuthentikDomain string
 	BackendIP       string
 	Proxies         []CaddyAppProxy
 	EnabledServices map[string]bool
+	// Deprecated: Use AuthentikDomain instead
+	KeycloakDomain  string
 }
 
 // collectHecateConfiguration interactively collects configuration from the user
@@ -168,7 +175,8 @@ func collectHecateConfiguration(rc *eos_io.RuntimeContext) (*HecateConfiguration
 
 	// For now, we'll set up a basic vanilla reverse proxy
 	// Future versions can add more service selection
-	config.KeycloakDomain = "" // No Keycloak for vanilla setup
+	config.AuthentikDomain = "" // No Authentik for vanilla setup
+	config.KeycloakDomain = ""  // Deprecated, for backward compatibility
 
 	logger.Info(" Configuration collected successfully",
 		zap.String("domain", config.DomainName),

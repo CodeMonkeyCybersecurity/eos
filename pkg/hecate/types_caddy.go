@@ -36,8 +36,10 @@ func NewCaddyAppProxy(appName, domain, backendIP, backendPort string, extra stri
 }
 
 type CaddySpec struct {
-	KeycloakDomain string          // Only 1 expected (special case)
-	Proxies        []CaddyAppProxy // All proxies (Wazuh, Jenkins, Nextcloud, etc.)
+	AuthentikDomain string          // Only 1 expected (special case)
+	Proxies         []CaddyAppProxy // All proxies (Wazuh, Jenkins, Nextcloud, etc.)
+	// Deprecated: Use AuthentikDomain instead
+	KeycloakDomain string
 }
 
 // Template for reverse proxy block.

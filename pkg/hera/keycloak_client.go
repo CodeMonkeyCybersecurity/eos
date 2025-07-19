@@ -8,6 +8,9 @@ import (
 	"github.com/Nerzal/gocloak/v13"
 )
 
+// Ensure Client (Keycloak) implements AuthClient interface
+var _ AuthClient = (*Client)(nil)
+
 func NewClient(url, clientID, clientSecret string, realm string) (*Client, error) {
 	ctx := context.Background()
 	kc := gocloak.NewClient(url)
@@ -42,7 +45,7 @@ func (c *Client) GetRegistrationEvents(realm string, since time.Time) ([]gocloak
 	return filtered, nil
 }
 
-func (c *Client) GroupExists(realm, groupName string) (bool, error) {
+func (c *Client) GroupExistsInRealm(realm, groupName string) (bool, error) {
 	groups, err := c.client.GetGroups(c.ctx, c.token.AccessToken, realm, gocloak.GetGroupsParams{Search: &groupName})
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch groups: %w", err)
@@ -55,7 +58,12 @@ func (c *Client) GroupExists(realm, groupName string) (bool, error) {
 	return false, nil
 }
 
-func (c *Client) CreateGroup(realm, groupName string) error {
+// GroupExists implements AuthClient interface for Keycloak client
+func (c *Client) GroupExists(groupName string) (bool, error) {
+	return c.GroupExistsInRealm(c.realm, groupName)
+}
+
+func (c *Client) CreateGroupInRealm(realm, groupName string) error {
 	_, err := c.client.CreateGroup(c.ctx, c.token.AccessToken, realm, gocloak.Group{
 		Name: &groupName,
 	})
@@ -87,4 +95,18 @@ func (c *Client) AssignUserToGroup(realm, userID, groupName string) error {
 		return fmt.Errorf("group not found: %s", groupName)
 	}
 	return c.client.AddUserToGroup(c.ctx, c.token.AccessToken, realm, userID, *groups[0].ID)
+}
+
+// CreateGroup implements AuthClient interface for Keycloak client
+func (c *Client) CreateGroup(groupName string) error {
+	return c.CreateGroupInRealm(c.realm, groupName)
+}
+
+// AddUserToGroup implements AuthClient interface for Keycloak client
+func (c *Client) AddUserToGroup(username, groupName string) error {
+	userID, err := c.GetUserID(c.realm, username)
+	if err != nil {
+		return err
+	}
+	return c.AssignUserToGroup(c.realm, userID, groupName)
 }

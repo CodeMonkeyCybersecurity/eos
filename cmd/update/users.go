@@ -113,7 +113,7 @@ var SyncUsersCmd = &cobra.Command{
 			username := ev.Details["username"]
 			groupName := fmt.Sprintf("tenant-%s", username)
 
-			exists, err := client.GroupExists(realm, groupName)
+			exists, err := client.GroupExists(groupName)
 			if err != nil {
 				otelzap.Ctx(rc.Ctx).Warn("Failed to check group existence", zap.String("group", groupName), zap.Error(err))
 				continue
@@ -121,7 +121,7 @@ var SyncUsersCmd = &cobra.Command{
 
 			if !exists {
 				otelzap.Ctx(rc.Ctx).Info("Creating new group", zap.String("group", groupName))
-				if err := client.CreateGroup(realm, groupName); err != nil {
+				if err := client.CreateGroup(groupName); err != nil {
 					otelzap.Ctx(rc.Ctx).Warn("Failed to create group", zap.String("group", groupName), zap.Error(err))
 					continue
 				}
@@ -129,14 +129,8 @@ var SyncUsersCmd = &cobra.Command{
 				otelzap.Ctx(rc.Ctx).Debug("Group already exists", zap.String("group", groupName))
 			}
 
-			userID, err := client.GetUserID(realm, username)
-			if err != nil {
-				otelzap.Ctx(rc.Ctx).Warn("Failed to fetch user ID", zap.String("user", username), zap.Error(err))
-				continue
-			}
-
 			otelzap.Ctx(rc.Ctx).Info("Assigning user to group", zap.String("user", username), zap.String("group", groupName))
-			if err := client.AssignUserToGroup(realm, userID, groupName); err != nil {
+			if err := client.AddUserToGroup(username, groupName); err != nil {
 				otelzap.Ctx(rc.Ctx).Warn("Failed to assign user to group", zap.String("user", username), zap.String("group", groupName), zap.Error(err))
 				continue
 			}

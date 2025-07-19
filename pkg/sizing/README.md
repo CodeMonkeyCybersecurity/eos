@@ -2,7 +2,29 @@
 
 *Last Updated: 2025-01-19*
 
-The `sizing` package provides comprehensive infrastructure sizing calculations for Eos deployments. It helps determine the optimal number of nodes, resource allocations, and service placements based on workload characteristics and requirements.
+The `sizing` package provides comprehensive infrastructure sizing calculations for Eos deployments. It helps determine the optimal number of nodes, resource allocations, and service placements based on **documented, researched requirements** and workload characteristics.
+
+## NEW: Systematic Requirements Calculator V2
+
+The package now includes a **systematic, evidence-based calculator** that replaces the previous "finger in the air" approach with documented requirements from official sources, community benchmarks, and measured data.
+
+### Key Features of V2:
+- **Documented Requirements Database**: All component requirements are researched and referenced
+- **Calculation Transparency**: Shows exactly how requirements are calculated step-by-step
+- **Source Attribution**: Every requirement includes references to official documentation
+- **Dependency Bundling**: Related services are bundled to avoid double-counting (e.g., Authentik includes PostgreSQL + Redis)
+- **Hecate Integration**: Pre-configured profiles for common Hecate deployments
+- **Extensible Framework**: Easy to add new services and deployment profiles
+
+### Dependency Bundling Strategy
+
+To avoid inflated requirements from double-counting dependencies, the sizing system bundles related services:
+
+- **`authentik_sso`**: Includes Authentik application (2GB RAM, official minimum) + PostgreSQL database (1.5GB RAM) + Redis cache (0.5GB RAM) = **4GB total**
+- **`consul_cluster`**: Includes all Consul services and dependencies in a single calculation
+- **`vault_cluster`**: Includes Vault server and backend storage requirements
+
+This prevents the common mistake of sizing PostgreSQL and Redis as standalone enterprise services when they're actually lightweight dependencies for a specific application.
 
 ## Features
 
@@ -15,7 +37,82 @@ The `sizing` package provides comprehensive infrastructure sizing calculations f
 
 ## Usage
 
-### Integration with Eos Create Commands (NEW)
+## Quick Start: Hecate Sizing
+
+For Hecate deployments, use the pre-configured profiles:
+
+```go
+import (
+    "github.com/CodeMonkeyCybersecurity/eos/pkg/sizing"
+    "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+)
+
+func calculateHecateRequirements(rc *eos_io.RuntimeContext) error {
+    // Calculate requirements for small production Hecate deployment
+    breakdown, err := sizing.CalculateHecateRequirements(rc, "small_production")
+    if err != nil {
+        return err
+    }
+    
+    // Generate human-readable report
+    report, err := sizing.GenerateHecateRecommendationReport(rc, "small_production")
+    if err != nil {
+        return err
+    }
+    
+    logger.Info("Hecate requirements calculated",
+        "cpu_cores", breakdown.FinalRequirements.CPU,
+        "memory_gb", breakdown.FinalRequirements.Memory,
+        "recommended_nodes", breakdown.NodeRecommendation.RecommendedNodes)
+    
+    return nil
+}
+```
+
+Available Hecate profiles:
+- `development`: Single-node development (10 users)
+- `small_production`: Small production (50 users) 
+- `medium_production`: Medium production (200 users)
+- `large_production`: Large production (500+ users, includes HashiCorp stack)
+
+## Systematic Calculator V2
+
+For custom deployments or other services, use the systematic calculator:
+
+```go
+func calculateCustomRequirements(rc *eos_io.RuntimeContext) error {
+    // Create calculator for production environment
+    calc := sizing.NewCalculatorV2(sizing.WorkloadMedium, "production")
+    
+    // Add components with documented requirements
+    calc.AddComponent("ubuntu_server_24.04")
+    calc.AddComponent("postgresql_16")
+    calc.AddComponent("redis_7")
+    
+    // Define workload characteristics
+    workload := sizing.WorkloadCharacteristics{
+        ConcurrentUsers:   100,
+        RequestsPerSecond: 50,
+        DataGrowthGB:      25.0,
+        PeakMultiplier:    2.5,
+        Type:             sizing.WorkloadMedium,
+    }
+    
+    // Calculate with full breakdown
+    breakdown, err := calc.Calculate(rc, workload)
+    if err != nil {
+        return err
+    }
+    
+    // Get human-readable report showing calculation steps
+    report := calc.GenerateHumanReadableReport()
+    fmt.Println(report)
+    
+    return nil
+}
+```
+
+### Integration with Eos Create Commands (Original)
 
 The easiest way to add sizing checks to your create commands is using the `RunWithSizingChecks` wrapper:
 
