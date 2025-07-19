@@ -730,7 +730,7 @@ func installMissingService(rc *eos_io.RuntimeContext, serviceName string) error 
 		args = append(args, "--dev-mode")
 	case "nomad":
 		// Nomad can use default settings
-		args = append(args, "--node-role=both")
+		args = append(args, "--node-role", "both")
 	case "saltstack":
 		// SaltStack needs masterless mode for single-node setup
 		args = append(args, "--masterless")
