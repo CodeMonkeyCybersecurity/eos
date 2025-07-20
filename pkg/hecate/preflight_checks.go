@@ -456,12 +456,19 @@ func analyzeResults(result *PreflightCheckResult) {
 		result.CanProceed = false
 	}
 
-	// NAT is a critical issue for Caddy/ACME
+	// Hecate requires cloud deployment with public IP
 	if result.NetworkCheck.BehindNAT {
 		result.CriticalIssues = append(result.CriticalIssues,
-			"Server is behind NAT - Caddy's ACME/Let's Encrypt will not work properly")
+			"Hecate must be deployed on a cloud server with a public IP address")
 		result.CriticalIssues = append(result.CriticalIssues,
-			"Consider: 1) Using a cloud deployment with public IP, 2) Using DNS challenge instead of HTTP, or 3) Using a cloud load balancer")
+			"NAT/private networks are not supported. Please deploy on: AWS EC2, Hetzner Cloud, DigitalOcean, GCP, Azure, etc.")
+		result.CanProceed = false
+	}
+	
+	// Also check if we have a public IP at all
+	if result.NetworkCheck.PublicIP == "" {
+		result.CriticalIssues = append(result.CriticalIssues,
+			"No public IP detected - Hecate requires a cloud deployment with public IP")
 		result.CanProceed = false
 	}
 }

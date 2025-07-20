@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -159,11 +160,35 @@ func (cm *ConfigManager) GetAPIKey(rc *eos_io.RuntimeContext) (string, error) {
 	// Check Vault if configured
 	if cm.config.APIKeyVault != "" {
 		logger.Debug("Attempting to retrieve API key from Vault", zap.String("path", cm.config.APIKeyVault))
-		// TODO: Implement Vault retrieval
-		// apiKey, err := vault.GetSecret(rc, cm.config.APIKeyVault)
-		// if err == nil && apiKey != "" {
-		//     return apiKey, nil
-		// }
+		
+		// Get Vault address
+		vaultAddr := os.Getenv("VAULT_ADDR")
+		if vaultAddr == "" {
+			vaultAddr = "http://127.0.0.1:8200"
+		}
+		
+		// Try to get secret from Vault
+		vaultClient, err := vault.NewClient(vaultAddr, logger.Logger().Logger)
+		if err != nil {
+			logger.Debug("Failed to create Vault client", zap.Error(err))
+		} else {
+			secret, err := vaultClient.GetSecret(rc.Ctx, cm.config.APIKeyVault)
+			if err == nil && secret != nil && secret.Data != nil {
+				// Check for 'value' field first (standard convention)
+				if apiKey, ok := secret.Data["value"].(string); ok && apiKey != "" {
+					logger.Debug("Successfully retrieved API key from Vault")
+					return apiKey, nil
+				}
+				// Check for 'api_key' field as fallback
+				if apiKey, ok := secret.Data["api_key"].(string); ok && apiKey != "" {
+					logger.Debug("Successfully retrieved API key from Vault")
+					return apiKey, nil
+				}
+			}
+			if err != nil {
+				logger.Debug("Failed to retrieve API key from Vault", zap.Error(err))
+			}
+		}
 	}
 
 	// Check config file

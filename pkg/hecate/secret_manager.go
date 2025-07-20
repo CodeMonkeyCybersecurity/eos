@@ -155,6 +155,10 @@ func (sm *SecretManager) getVaultSecret(service, key string) (string, error) {
 		default:
 			return "", fmt.Errorf("unknown authentik secret key: %s", key)
 		}
+	case "dns":
+		// DNS provider credentials
+		vaultPath = fmt.Sprintf("secret/hecate/dns/%s", key)
+		field = "value"
 	default:
 		return "", fmt.Errorf("unknown service: %s", service)
 	}
@@ -223,6 +227,13 @@ func (sm *SecretManager) getSaltSecret(service, key string) (string, error) {
 			envKey = "AUTHENTIK_ADMIN_USERNAME"
 		default:
 			return "", fmt.Errorf("unknown authentik secret key: %s", key)
+		}
+	case "dns":
+		envFile = "/opt/hecate/secrets/dns.env"
+		// DNS provider tokens use the key as-is in uppercase
+		envKey = strings.ToUpper(strings.ReplaceAll(key, "_", "_"))
+		if envKey == "" {
+			return "", fmt.Errorf("invalid DNS secret key: %s", key)
 		}
 	default:
 		return "", fmt.Errorf("unknown service: %s", service)

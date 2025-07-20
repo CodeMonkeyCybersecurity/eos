@@ -14,33 +14,28 @@ configure_caddy_admin:
           sleep 5
         done
 
-# Configure automatic HTTPS
-configure_auto_https:
+# Create Caddyfile from template
+create_caddyfile:
   file.managed:
-    - name: /opt/hecate/caddy/auto-https.json
-    - contents: |
-        {
-          "apps": {
-            "tls": {
-              "automation": {
-                "policies": [{
-                  "subjects": ["*.{{ grains.domain | default('example.com') }}"],
-                  "issuers": [{
-                    "module": "acme",
-                    "challenges": {
-                      "dns": {
-                        "provider": {
-                          "name": "hetzner",
-                          "api_token": "{{ salt['vault'].read('secret/hecate/hetzner/dns_token').get('value', '') }}"
-                        }
-                      }
-                    }
-                  }]
-                }]
-              }
-            }
-          }
-        }
+    - name: /opt/hecate/caddy/Caddyfile
+    - source: salt://hecate/files/caddy/Caddyfile.j2
+    - template: jinja
+    - mode: 644
+    - makedirs: True
+
+# Configure automatic HTTPS with DNS challenge
+configure_auto_https:
+  cmd.run:
+    - name: |
+        # Check if DNS provider is configured
+        {% if pillar.get('hecate:dns_provider') %}
+        echo "DNS challenge configured for provider: {{ pillar.get('hecate:dns_provider') }}"
+        {% else %}
+        echo "WARNING: No DNS provider configured. HTTPS may not work properly on cloud deployments."
+        echo "Please set hecate:dns_provider in pillar (e.g., cloudflare, hetzner, route53)"
+        {% endif %}
+    - require:
+      - file: create_caddyfile
 
 # Load automatic HTTPS configuration
 load_auto_https_config:

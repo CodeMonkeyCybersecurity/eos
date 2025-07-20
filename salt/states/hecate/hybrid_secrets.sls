@@ -79,6 +79,27 @@ hecate_caddy_config:
     - require:
       - file: hecate_secrets_directory
 
+# Store DNS provider credentials (if configured)
+{% if pillar.get('hecate:dns_provider') %}
+hecate_dns_secrets:
+  file.managed:
+    - name: /opt/hecate/secrets/dns.env
+    - mode: 600
+    - contents: |
+        {%- if pillar.get('hecate:dns_provider') == 'cloudflare' %}
+        CLOUDFLARE_API_TOKEN={{ pillar.get('hecate:dns_credentials:cloudflare_api_token', '') }}
+        {%- elif pillar.get('hecate:dns_provider') == 'hetzner' %}
+        HETZNER_API_TOKEN={{ pillar.get('hecate:dns_credentials:hetzner_api_token', '') }}
+        {%- elif pillar.get('hecate:dns_provider') == 'route53' %}
+        AWS_ACCESS_KEY_ID={{ pillar.get('hecate:dns_credentials:aws_access_key_id', '') }}
+        AWS_SECRET_ACCESS_KEY={{ pillar.get('hecate:dns_credentials:aws_secret_access_key', '') }}
+        {%- elif pillar.get('hecate:dns_provider') == 'digitalocean' %}
+        DIGITALOCEAN_TOKEN={{ pillar.get('hecate:dns_credentials:digitalocean_token', '') }}
+        {%- endif %}
+    - require:
+      - file: hecate_secrets_directory
+{% endif %}
+
 # Create a secrets summary for debugging
 hecate_secrets_summary:
   file.managed:

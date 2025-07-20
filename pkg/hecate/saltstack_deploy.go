@@ -214,7 +214,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 		baseBackoff := 10 * time.Second
 
 		for attempt := 1; attempt <= retries; attempt++ {
-			logger.Info("Applying Salt state",
+			logger.Debug("Applying Salt state",
 				zap.String("phase", phase.name),
 				zap.String("state", phase.state),
 				zap.Int("attempt", attempt),
@@ -238,7 +238,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 			})
 
 			if err == nil {
-				logger.Info("Salt state execution succeeded",
+				logger.Debug("Salt state execution succeeded",
 					zap.String("phase", phase.name),
 					zap.String("state", phase.state))
 
@@ -249,7 +249,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 
 				// Run health check for this phase with retry logic
 				if phase.healthCheck != nil {
-					logger.Info("Running health check for phase",
+					logger.Debug("Running health check for phase",
 						zap.String("phase", phase.name))
 
 					healthCheckRetries := 3
