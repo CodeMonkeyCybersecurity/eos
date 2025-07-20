@@ -2,14 +2,15 @@
 # This pillar contains auto-generated secrets for Hecate services
 # Used as fallback when Vault is not available
 
-{% set redis_password = salt['random.get_str'](32) %}
+{#- Use our custom random module for secure generation -#}
+{%- set redis_password = salt['eos_random.get_or_create']('hecate_redis_password', 32) -%}
 
 hecate:
   secrets:
     # PostgreSQL secrets
     postgres:
-      root_password: {{ salt['random.get_str'](32) }}
-      user_password: {{ salt['random.get_str'](32) }}
+      root_password: {{ salt['eos_random.get_or_create']('hecate_postgres_root', 32) }}
+      user_password: {{ salt['eos_random.get_or_create']('hecate_postgres_user', 32) }}
       database: "authentik"
       username: "authentik"
       host: "hecate-postgres.service.consul"
@@ -23,10 +24,10 @@ hecate:
     
     # Authentik secrets
     authentik:
-      secret_key: {{ salt['random.hex_str'](64) }}
+      secret_key: {{ salt['eos_random.get_or_create']('hecate_authentik_secret', 64) }}
       admin:
         username: "akadmin"
-        password: {{ salt['random.get_str'](16) }}
+        password: {{ salt['eos_random.get_or_create']('hecate_authentik_admin', 16) }}
       redis_password: {{ redis_password }}
     
     # Caddy configuration
@@ -45,7 +46,7 @@ hecate:
       
   # Metadata about secret generation
   meta:
-    generated_at: {{ salt['cmd.run']('date -Iseconds') }}
+    generated_at: "pillar-render-time"
     generated_by: "salt-pillar"
     vault_fallback: true
     version: "1.0"

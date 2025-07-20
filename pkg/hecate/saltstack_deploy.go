@@ -138,16 +138,48 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 	// INTERVENE - Apply Salt states in phases
 	logger.Info("Applying SaltStack states for Hecate deployment")
 
+	// Check if we should use bundled deployment
+	useBundled := os.Getenv("HECATE_BUNDLED_DEPLOY") != "false"
+	
 	// Define deployment phases in order
-	phases := []struct {
+	var phases []struct {
 		name        string
 		state       string
 		description string
 		critical    bool
 		healthCheck func(*eos_io.RuntimeContext) error
-	}{
-		{
-			name:        "hashicorp_stack",
+	}
+	
+	if useBundled {
+		// Use single bundled state that includes all dependencies
+		logger.Info("Using bundled deployment approach")
+		phases = []struct {
+			name        string
+			state       string
+			description string
+			critical    bool
+			healthCheck func(*eos_io.RuntimeContext) error
+		}{
+			{
+				name:        "bundle",
+				state:       "hecate_bundle",
+				description: "Installing all dependencies and deploying Hecate",
+				critical:    true,
+				healthCheck: checkAllServices,
+			},
+		}
+	} else {
+		// Use original phased approach
+		logger.Info("Using phased deployment approach")
+		phases = []struct {
+			name        string
+			state       string
+			description string
+			critical    bool
+			healthCheck func(*eos_io.RuntimeContext) error
+		}{
+			{
+				name:        "hashicorp_stack",
 			state:       "hecate.prereqs",
 			description: "Ensuring HashiCorp stack (Consul, Vault, Nomad) is ready",
 			critical:    true,
@@ -195,6 +227,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 			critical:    true,
 			healthCheck: checkIntegration,
 		},
+	}
 	}
 
 	// Execute each phase with error handling and health checks
@@ -1616,6 +1649,45 @@ func checkManualHecateRequirements(rc *eos_io.RuntimeContext) error {
 		}
 	}
 	
+	return nil
+}
+
+// checkAllServices performs comprehensive health checks for bundled deployment
+func checkAllServices(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking all Hecate services")
+
+	// Check HashiCorp stack
+	if err := checkHashiCorpStack(rc); err != nil {
+		return fmt.Errorf("HashiCorp stack check failed: %w", err)
+	}
+
+	// Check PostgreSQL
+	if err := checkPostgres(rc); err != nil {
+		return fmt.Errorf("PostgreSQL check failed: %w", err)
+	}
+
+	// Check Redis
+	if err := checkRedis(rc); err != nil {
+		return fmt.Errorf("Redis check failed: %w", err)
+	}
+
+	// Check Authentik
+	if err := checkAuthentik(rc); err != nil {
+		return fmt.Errorf("Authentik check failed: %w", err)
+	}
+
+	// Check Caddy
+	if err := checkCaddy(rc); err != nil {
+		return fmt.Errorf("Caddy check failed: %w", err)
+	}
+
+	// Check integration
+	if err := checkIntegration(rc); err != nil {
+		return fmt.Errorf("Integration check failed: %w", err)
+	}
+
+	logger.Info("All Hecate services are healthy")
 	return nil
 }
 

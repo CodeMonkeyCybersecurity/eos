@@ -2,6 +2,7 @@ package helen
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/nomad/api"
@@ -30,6 +31,9 @@ type Config struct {
 
 	// Resource limits
 	Resources ResourceConfig `yaml:"resources" json:"resources"`
+	
+	// Hecate integration
+	Domain string `yaml:"domain" json:"domain"`
 }
 
 // ResourceConfig defines resource allocation for Helen services
@@ -214,6 +218,19 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// GetServiceName returns the Consul service name based on configuration
+func (c *Config) GetServiceName() string {
+	if c.ProjectName != "" {
+		return fmt.Sprintf("%s-%s", c.ProjectName, c.Namespace)
+	}
+	return fmt.Sprintf("helen-%s", c.Namespace)
+}
+
+// GetJobName returns the Nomad job name based on configuration
+func (c *Config) GetJobName() string {
+	return c.GetServiceName()
+}
+
 // DeploymentInfo represents information about a Helen deployment
 type DeploymentInfo struct {
 	Namespace string         `json:"namespace"`
@@ -259,3 +276,88 @@ type ServiceHealthInfo struct {
 	LastCheck     string `json:"last_check"`
 	Message       string `json:"message,omitempty"`
 }
+
+// DeploymentMode represents the deployment type
+type DeploymentMode string
+
+const (
+	ModeStatic DeploymentMode = "static"
+	ModeGhost  DeploymentMode = "ghost"
+)
+
+// HealthCheck represents a service health check configuration
+type HealthCheck struct {
+	Path     string `json:"path"`
+	Interval string `json:"interval"`
+	Timeout  string `json:"timeout"`
+	Retries  int    `json:"retries"`
+}
+
+// ServiceRegistration represents Consul service registration
+type ServiceRegistration struct {
+	Name        string            `json:"name"`
+	Port        int               `json:"port"`
+	Tags        []string          `json:"tags"`
+	Meta        map[string]string `json:"meta"`
+	HealthCheck *HealthCheck      `json:"health_check"`
+}
+
+
+// UpdateStrategy defines how services are updated
+type UpdateStrategy struct {
+	MaxParallel     int    `json:"max_parallel"`
+	MinHealthyTime  string `json:"min_healthy_time"`
+	HealthyDeadline string `json:"healthy_deadline"`
+	AutoRevert      bool   `json:"auto_revert"`
+	AutoPromote     bool   `json:"auto_promote"`
+	Canary          int    `json:"canary"`
+}
+
+// Constraint represents a Nomad job constraint
+type Constraint struct {
+	Attribute string `json:"attribute"`
+	Operator  string `json:"operator"`
+	Value     string `json:"value"`
+}
+
+// Volume represents a persistent volume configuration
+type Volume struct {
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Source    string `json:"source"`
+	ReadOnly  bool   `json:"read_only"`
+	MountPath string `json:"mount_path"`
+}
+
+// Network represents network configuration
+type Network struct {
+	Mode  string        `json:"mode"`
+	Ports []PortMapping `json:"ports"`
+}
+
+// PortMapping represents port configuration
+type PortMapping struct {
+	Label  string `json:"label"`
+	To     int    `json:"to"`
+	Static int    `json:"static,omitempty"`
+}
+
+// BackupConfig represents backup configuration
+type BackupConfig struct {
+	Enabled      bool   `json:"enabled"`
+	Schedule     string `json:"schedule"`
+	Retention    int    `json:"retention_days"`
+	BackupPath   string `json:"backup_path"`
+	IncludeDB    bool   `json:"include_db"`
+	IncludeMedia bool   `json:"include_media"`
+}
+
+// WebhookConfig represents CI/CD webhook configuration
+type WebhookConfig struct {
+	Enabled  bool              `json:"enabled"`
+	Endpoint string            `json:"endpoint"`
+	Secret   string            `json:"secret"`
+	Events   []string          `json:"events"`
+	Actions  map[string]string `json:"actions"`
+}
+

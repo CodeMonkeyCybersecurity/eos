@@ -1,0 +1,263 @@
+job "helen-{{ mode }}-{{ environment }}" {
+  datacenters = ["dc1"]
+  type = "service"
+  namespace = "{{ namespace }}"
+  
+  # Update strategy for zero-downtime deployments
+  update {
+    max_parallel      = 1
+    min_healthy_time  = "30s"
+    healthy_deadline  = "5m"
+    progress_deadline = "10m"
+    auto_revert       = true
+    auto_promote      = true
+    canary           = 1
+  }
+
+  # Ensure we run on appropriate nodes
+  constraint {
+    attribute = "${attr.kernel.name}"
+    value     = "linux"
+  }
+
+  group "helen-static" {
+    count = {{ instance_count }}
+
+    # Spread instances across nodes
+    spread {
+      attribute = "${node.unique.id}"
+      weight    = 100
+    }
+
+    # Restart policy
+    restart {
+      interval = "5m"
+      attempts = 3
+      delay    = "30s"
+      mode     = "delay"
+    }
+
+    # Volume for static content
+    volume "helen-content" {
+      type      = "host"
+      read_only = true
+      source    = "helen-static-{{ environment }}"
+    }
+
+    network {
+      mode = "bridge"
+      
+      port "http" {
+        static = {{ port }}
+        to     = 80
+      }
+    }
+
+    # Service registration for Consul
+    service {
+      name = "helen-{{ mode }}-{{ environment }}"
+      port = "http"
+      
+      tags = [
+        "helen",
+        "static",
+        "nginx",
+        "{{ environment }}",
+        "domain:{{ domain }}",
+        "version:{{ git_commit }}"
+      ]
+
+      check {
+        type     = "http"
+        path     = "/"
+        interval = "10s"
+        timeout  = "2s"
+        
+        check_restart {
+          limit = 3
+          grace = "90s"
+        }
+      }
+
+      # Enable Connect sidecar for service mesh
+      connect {
+        sidecar_service {}
+      }
+    }
+
+    # Main nginx task
+    task "nginx" {
+      driver = "docker"
+
+      # Mount the static content volume
+      volume_mount {
+        volume      = "helen-content"
+        destination = "/usr/share/nginx/html"
+        read_only   = true
+      }
+
+      config {
+        image = "{{ docker_image }}"
+        ports = ["http"]
+        
+        # Security options
+        readonly_rootfs = true
+        
+        # Mount tmpfs for nginx temporary files
+        mount {
+          type   = "tmpfs"
+          target = "/var/cache/nginx"
+          tmpfs_options {
+            size = 100000000  # 100MB
+          }
+        }
+        
+        mount {
+          type   = "tmpfs"
+          target = "/var/run"
+          tmpfs_options {
+            size = 10000000  # 10MB
+          }
+        }
+      }
+
+      # Custom nginx configuration
+      template {
+        destination = "local/nginx.conf"
+        data = <<EOF
+user nginx;
+worker_processes auto;
+error_log /dev/stderr info;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+    use epoll;
+    multi_accept on;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    
+    # Logging
+    access_log /dev/stdout combined;
+    
+    # Performance
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    client_max_body_size 16M;
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml application/atom+xml image/svg+xml;
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+        
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+        
+        # Serve static files
+        location / {
+            try_files $uri $uri/ /index.html;
+            
+            # Cache static assets
+            location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+            }
+        }
+        
+        # Deny access to hidden files
+        location ~ /\. {
+            deny all;
+        }
+        
+        # Custom error pages
+        error_page 404 /404.html;
+        error_page 500 502 503 504 /50x.html;
+        location = /50x.html {
+            root /usr/share/nginx/html;
+        }
+    }
+}
+EOF
+      }
+
+      # Environment variables
+      env {
+        NGINX_HOST = "{{ domain }}"
+        NGINX_PORT = "80"
+      }
+
+      # Resources
+      resources {
+        cpu    = {{ cpu }}
+        memory = {{ memory }}
+      }
+
+      # Lifecycle
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+    }
+
+    # Optional: Static content updater sidecar
+    {% if enable_auto_update|default(false) %}
+    task "content-updater" {
+      driver = "docker"
+      
+      lifecycle {
+        hook    = "poststart"
+        sidecar = true
+      }
+
+      config {
+        image   = "alpine/git:latest"
+        command = "/local/update.sh"
+      }
+
+      template {
+        destination = "local/update.sh"
+        perms       = "755"
+        data        = <<EOF
+#!/bin/sh
+while true; do
+  sleep 300  # Check every 5 minutes
+  # Git pull logic here if needed
+done
+EOF
+      }
+
+      resources {
+        cpu    = 50
+        memory = 64
+      }
+    }
+    {% endif %}
+  }
+}
