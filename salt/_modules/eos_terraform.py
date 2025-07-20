@@ -240,6 +240,183 @@ def get_outputs(component, environment='production'):
     else:
         return {}
 
+def deploy_nomad_service(service_name, environment='production', service_config=None, auto_approve=False):
+    """
+    Deploy a containerized service using Terraform → Nomad pattern
+    
+    Args:
+        service_name: Name of the service to deploy (e.g., 'jenkins', 'grafana')
+        environment: Environment/workspace (production, staging, dev)
+        service_config: Service-specific configuration dictionary
+        auto_approve: Skip confirmation prompts
+    
+    CLI Example:
+        salt '*' eos_terraform.deploy_nomad_service jenkins production \
+            service_config='{"admin_password": "secret", "port": 8080}' \
+            auto_approve=True
+    """
+    if service_config is None:
+        service_config = {}
+    
+    # Service is treated as a Terraform component
+    workspace = TerraformWorkspace(f"nomad-{service_name}", environment)
+    
+    # Generate Terraform configuration for Nomad job
+    terraform_config = _generate_nomad_service_terraform(service_name, service_config)
+    
+    # Write Terraform configuration
+    config_path = workspace.workspace_path / 'main.tf'
+    workspace.workspace_path.mkdir(parents=True, exist_ok=True)
+    
+    with open(config_path, 'w') as f:
+        f.write(terraform_config)
+    
+    # Apply Terraform configuration (which deploys Nomad job)
+    return apply(f"nomad-{service_name}", environment, auto_approve=auto_approve)
+
+def _generate_nomad_service_terraform(service_name, config):
+    """
+    Generate Terraform configuration that creates a Nomad job
+    
+    This creates a Terraform configuration that uses the nomad provider
+    to deploy containerized services as Nomad jobs.
+    """
+    # Service-specific template generation
+    if service_name == 'jenkins':
+        return _generate_jenkins_terraform(config)
+    elif service_name == 'grafana':
+        return _generate_grafana_terraform(config)
+    elif service_name == 'umami':
+        return _generate_umami_terraform(config)
+    else:
+        # Generic service template
+        return _generate_generic_service_terraform(service_name, config)
+
+def _generate_jenkins_terraform(config):
+    """Generate Terraform configuration for Jenkins deployment via Nomad"""
+    admin_password = config.get('admin_password', 'admin')
+    port = config.get('port', 8080)
+    datacenter = config.get('datacenter', 'dc1')
+    
+    return f'''
+terraform {{
+  required_providers {{
+    nomad = {{
+      source  = "hashicorp/nomad"
+      version = "~> 2.0"
+    }}
+    consul = {{
+      source  = "hashicorp/consul"
+      version = "~> 2.0"
+    }}
+  }}
+}}
+
+provider "nomad" {{
+  address = "http://localhost:4646"
+}}
+
+provider "consul" {{
+  address = "localhost:8500"
+}}
+
+resource "nomad_job" "jenkins" {{
+  jobspec = templatefile("${{path.module}}/jenkins.nomad.tpl", {{
+    admin_password = "{admin_password}"
+    port          = {port}
+    datacenter    = "{datacenter}"
+    data_path     = "/opt/jenkins/data"
+  }})
+  
+  purge_on_destroy = true
+  detach          = false
+}}
+
+# Create Nomad job template file
+resource "local_file" "jenkins_job_template" {{
+  filename = "${{path.module}}/jenkins.nomad.tpl"
+  content  = <<-EOT
+job "jenkins" {{
+  datacenters = ["{datacenter}"]
+  type        = "service"
+  
+  group "jenkins" {{
+    count = 1
+    
+    network {{
+      port "http" {{ 
+        to = {port}
+      }}
+      port "agent" {{
+        to = 50000
+      }}
+    }}
+    
+    volume "jenkins_data" {{
+      type   = "host"
+      source = "jenkins_data"
+    }}
+    
+    task "jenkins" {{
+      driver = "docker"
+      
+      config {{
+        image = "jenkins/jenkins:lts"
+        ports = ["http", "agent"]
+      }}
+      
+      volume_mount {{
+        volume      = "jenkins_data"
+        destination = "/var/jenkins_home"
+      }}
+      
+      service {{
+        name = "jenkins"
+        port = "http"
+        
+        tags = [
+          "ci-cd",
+          "automation",
+          "eos-managed"
+        ]
+        
+        check {{
+          type     = "http"
+          path     = "/login"
+          interval = "10s"
+          timeout  = "3s"
+        }}
+      }}
+      
+      resources {{
+        cpu    = 500
+        memory = 1024
+      }}
+      
+      env {{
+        JAVA_OPTS = "-Djenkins.install.runSetupWizard=false"
+        JENKINS_ADMIN_PASSWORD = "{admin_password}"
+      }}
+    }}
+  }}
+}}
+EOT
+}}
+
+output "jenkins_url" {{
+  value = "http://localhost:{port}"
+}}
+
+output "jenkins_consul_service" {{
+  value = "jenkins.service.consul"
+}}
+
+output "jenkins_admin_password" {{
+  value     = "{admin_password}"
+  sensitive = true
+}}
+'''
+
 def destroy(component, environment='production', auto_approve=False):
     """
     Destroy Terraform-managed infrastructure

@@ -13,22 +13,48 @@ import (
 )
 
 // SetupToolsCmd installs and configures essential system tools
+// DEPRECATED: This command is deprecated in favor of SaltStack-based package management.
+// Essential system packages are now managed via SaltStack states for consistency and reliability.
+// Individual packages can be installed via their specific 'eos create X' commands.
 var SetupToolsCmd = &cobra.Command{
 	Use:   "tools",
-	Short: "Install and configure essential system tools",
-	Long: `Install and configure essential system tools and packages.
+	Short: "DEPRECATED: Use individual service commands instead", 
+	Long: `DEPRECATED: This command is deprecated and will be removed in a future version.
 
-This command performs system updates, installs essential packages,
-and configures basic system tools for development and administration.
+Essential system tools are now managed through SaltStack states for better consistency 
+and reliability. Instead of installing bulk packages, use specific service commands:
 
-Examples:
+RECOMMENDED ALTERNATIVES:
+  eos create saltstack              # Install base orchestration
+  eos create fail2ban               # Install security tools
+  eos create trivy                  # Install security scanning
+  eos create docker                 # Install container runtime
+  
+For custom package installation, use the SaltStack states or your system package manager directly.
+
+This approach provides:
+- Better dependency management
+- Consistent configuration
+- Idempotent installations
+- Improved error handling
+
+Examples (DEPRECATED - for reference only):
   eos setup tools                    # Install default tool set
-  eos setup tools --interactive     # Interactive installation
+  eos setup tools --interactive     # Interactive installation  
   eos setup tools --npm             # Include npm and zx
   eos setup tools --dry-run         # Test installation`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+		// Show deprecation warning
+		logger.Warn("DEPRECATION WARNING: 'eos create tools' is deprecated")
+		logger.Info("Please use individual service commands instead:")
+		logger.Info("  eos create saltstack    # Base orchestration")
+		logger.Info("  eos create fail2ban     # Security tools")  
+		logger.Info("  eos create trivy        # Security scanning")
+		logger.Info("  eos create docker       # Container runtime")
+		logger.Info("This command will continue to work but will be removed in a future version.")
 
 		// Get flags
 		installNpm, _ := cmd.Flags().GetBool("npm")

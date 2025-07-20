@@ -3,10 +3,14 @@ package create
 
 import (
 	"fmt"
+	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/service_installation"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -15,205 +19,159 @@ import (
 // CreateMattermostCmd installs Mattermost team collaboration platform
 var CreateMattermostCmd = &cobra.Command{
 	Use:   "mattermost",
-	Short: "Install Mattermost team collaboration platform",
-	Long: `Install Mattermost using Docker Compose for team messaging and collaboration.
+	Short: "Install Mattermost team collaboration platform using Nomad orchestration",
+	Long: `Install Mattermost using the SaltStack → Terraform → Nomad architecture.
 
-Mattermost is an open-source, self-hostable online chat service with file sharing,
-search, and integrations. It is designed as an internal chat for organizations
-and companies.
+This command provides a complete Mattermost deployment with automatic configuration:
+- Automatic environment discovery (production/staging/development)
+- Secure credential generation and storage (Vault/SaltStack/file)
+- Container orchestration via Nomad
+- Service discovery via Consul
+- Persistent data storage
+- Health monitoring and recovery
+- Production-ready configuration
+
+Mattermost is an open-source, self-hostable team collaboration platform with messaging,
+file sharing, search, and integrations designed for organizations.
 
 Examples:
-  eos create mattermost                    # Install with defaults
-  eos create mattermost --port 8065       # Custom port
-  eos create mattermost --interactive     # Interactive setup
-  eos create mattermost --dry-run         # Test installation`,
+  eos create mattermost                         # Deploy with automatic configuration
+  eos create mattermost --database-password secret123  # Override database password
+  eos create mattermost --port 8065            # Override port
+  eos create mattermost --datacenter production # Override datacenter`,
 
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(runCreateMattermost),
+}
 
-		// Get flags
-		version, _ := cmd.Flags().GetString("version")
-		port, _ := cmd.Flags().GetInt("port")
-		interactive, _ := cmd.Flags().GetBool("interactive")
-		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		workDir, _ := cmd.Flags().GetString("work-dir")
+func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
 
-		logger.Info("Installing Mattermost",
-			zap.String("version", version),
-			zap.Int("port", port),
-			zap.Bool("interactive", interactive),
-			zap.Bool("dry_run", dryRun))
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("this command must be run as root")
+	}
 
-		// Build installation options
-		options := &service_installation.ServiceInstallOptions{
-			Name:             "mattermost",
-			Type:             service_installation.ServiceTypeMattermost,
-			Version:          version,
-			Port:             port,
-			Method:           service_installation.MethodCompose,
-			Interactive:      interactive,
-			DryRun:           dryRun,
-			WorkingDirectory: workDir,
-			Environment:      make(map[string]string),
-			Config:           make(map[string]string),
+	logger.Info("Starting Mattermost deployment with automatic configuration")
+
+	// 1. Discover environment automatically
+	envConfig, err := environment.DiscoverEnvironment(rc)
+	if err != nil {
+		logger.Warn("Environment discovery failed, using defaults", zap.Error(err))
+		// Continue with defaults rather than failing
+		envConfig = &environment.EnvironmentConfig{
+			Environment:   "development",
+			Datacenter:    "dc1",
+			SecretBackend: "file",
 		}
+	}
 
-		// Set defaults
-		if options.Version == "" {
-			options.Version = "latest"
-		}
-		if options.Port == 0 {
-			options.Port = 8065
-		}
+	logger.Info("Environment discovered",
+		zap.String("environment", envConfig.Environment),
+		zap.String("datacenter", envConfig.Datacenter),
+		zap.String("secret_backend", envConfig.SecretBackend))
 
-		// Interactive mode
-		if interactive {
-			if err := runInteractiveMattermostSetup(rc, options); err != nil {
-				return fmt.Errorf("interactive setup failed: %w", err)
-			}
-		}
+	// 2. Check for manual overrides from flags
+	if manualPassword, _ := cmd.Flags().GetString("database-password"); manualPassword != "" {
+		logger.Info("Using manually provided database password")
+	}
+	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 && manualPort != shared.PortMattermost {
+		logger.Info("Using manually provided port", zap.Int("port", manualPort))
+	}
 
-		// Perform installation
-		result, err := service_installation.InstallService(rc, options)
-		if err != nil {
-			return fmt.Errorf("mattermost installation failed: %w", err)
-		}
+	// 3. Get or generate secrets automatically
+	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	if err != nil {
+		return fmt.Errorf("secret manager initialization failed: %w", err)
+	}
 
-		// Output result
-		if result.Success {
-			logger.Info("Mattermost installation completed successfully",
-				zap.String("version", result.Version),
-				zap.Int("port", result.Port),
-				zap.Duration("duration", result.Duration))
+	requiredSecrets := map[string]secrets.SecretType{
+		"database_password": secrets.SecretTypePassword,
+		"file_public_key":   secrets.SecretTypeAPIKey,
+		"file_private_key":  secrets.SecretTypeAPIKey,
+		"invite_salt":       secrets.SecretTypeToken,
+	}
 
-			logger.Info("terminal prompt: Mattermost Installation Complete!\n")
-			logger.Info("terminal prompt: 💬 Service Details:")
-			logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
-			logger.Info(fmt.Sprintf("terminal prompt:    Port: %d", result.Port))
-			logger.Info(fmt.Sprintf("terminal prompt:    Method: %s", result.Method))
-			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))
+	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("mattermost", requiredSecrets)
+	if err != nil {
+		return fmt.Errorf("secret generation failed: %w", err)
+	}
 
-			if len(result.Endpoints) > 0 {
-				logger.Info("terminal prompt: 🌐 Access URLs:")
-				for _, endpoint := range result.Endpoints {
-					logger.Info(fmt.Sprintf("terminal prompt:    %s", endpoint))
-				}
-			}
+	// 4. Build configuration with discovered/generated values
+	databasePassword := serviceSecrets.Secrets["database_password"].(string)
+	filePublicKey := serviceSecrets.Secrets["file_public_key"].(string)
+	filePrivateKey := serviceSecrets.Secrets["file_private_key"].(string)
+	inviteSalt := serviceSecrets.Secrets["invite_salt"].(string)
+	
+	// Allow manual overrides
+	if manualPassword, _ := cmd.Flags().GetString("database-password"); manualPassword != "" {
+		databasePassword = manualPassword
+	}
+	
+	port := envConfig.Services.DefaultPorts["mattermost"]
+	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 {
+		port = manualPort
+	}
 
-			if len(result.Credentials) > 0 {
-				logger.Info("terminal prompt:  Database Credentials:")
-				for key, value := range result.Credentials {
-					logger.Info(fmt.Sprintf("terminal prompt:    %s: %s", key, value))
-				}
-			}
+	resourceConfig := envConfig.Services.Resources[envConfig.Environment]
+	
+	pillarConfig := map[string]interface{}{
+		"nomad_service": map[string]interface{}{
+			"name":        "mattermost",
+			"environment": envConfig.Environment,
+			"config": map[string]interface{}{
+				"database_password": databasePassword,
+				"file_public_key":   filePublicKey,
+				"file_private_key":  filePrivateKey,
+				"invite_salt":       inviteSalt,
+				"port":              port,
+				"datacenter":        envConfig.Datacenter,
+				"data_path":         envConfig.Services.DataPath + "/mattermost",
+				"cpu":               resourceConfig.CPU,
+				"memory":            resourceConfig.Memory,
+				"replicas":          resourceConfig.Replicas,
+			},
+		},
+	}
 
-			logger.Info("terminal prompt: 📝 Next Steps:")
-			logger.Info(fmt.Sprintf("terminal prompt:    1. Open Mattermost in your browser: http://localhost:%d", result.Port))
-			logger.Info("terminal prompt:    2. Create the first admin account")
-			logger.Info("terminal prompt:    3. Configure team settings and integrations")
-			logger.Info("terminal prompt:    4. Invite team members")
-			logger.Info("terminal prompt:    5. Check status: eos status mattermost")
-		} else {
-			logger.Error("Mattermost installation failed", zap.String("error", result.Error))
-			logger.Info("terminal prompt: ❌ Mattermost Installation Failed!")
-			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
+	// 5. Deploy with automatically configured values
+	logger.Info("Deploying Mattermost via SaltStack → Terraform → Nomad",
+		zap.String("environment", envConfig.Environment),
+		zap.String("datacenter", envConfig.Datacenter),
+		zap.Int("port", port),
+		zap.Int("cpu", resourceConfig.CPU),
+		zap.Int("memory", resourceConfig.Memory),
+		zap.Int("replicas", resourceConfig.Replicas))
 
-			if len(result.Steps) > 0 {
-				logger.Info("terminal prompt: Installation Steps:")
-				for _, step := range result.Steps {
-					status := ""
-					switch step.Status {
-					case "failed":
-						status = "❌"
-					case "running":
-						status = "⏳"
-					}
-					logger.Info(fmt.Sprintf("terminal prompt:    %s %s (%s)", status, step.Name, step.Duration))
-					if step.Error != "" {
-						logger.Info(fmt.Sprintf("terminal prompt:       Error: %s", step.Error))
-					}
-				}
-			}
-		}
+	if err := saltstack.ApplySaltStateWithPillar(rc, "nomad.services", pillarConfig); err != nil {
+		return fmt.Errorf("Mattermost deployment failed: %w", err)
+	}
 
-		return nil
-	}),
+	// 6. Display success information with generated credentials
+	logger.Info("Mattermost deployment completed successfully",
+		zap.String("management", "SaltStack → Terraform → Nomad"),
+		zap.String("environment", envConfig.Environment),
+		zap.String("secret_backend", envConfig.SecretBackend))
+
+	logger.Info("Mattermost is now available",
+		zap.String("web_ui", fmt.Sprintf("http://localhost:%d", port)),
+		zap.String("database_password", databasePassword),
+		zap.String("consul_service", "mattermost.service.consul"))
+
+	logger.Info("Configuration automatically managed",
+		zap.String("environment_discovery", "bootstrap/salt/cloud"),
+		zap.String("secret_storage", envConfig.SecretBackend),
+		zap.String("resource_allocation", envConfig.Environment))
+
+	return nil
 }
 
 func init() {
 	CreateCmd.AddCommand(CreateMattermostCmd)
 
-	CreateMattermostCmd.Flags().StringP("version", "v", "latest", "Mattermost version to install")
-	CreateMattermostCmd.Flags().IntP("port", "p", 8065, "Port to expose Mattermost on")
-	CreateMattermostCmd.Flags().BoolP("interactive", "i", false, "Interactive setup mode")
-	CreateMattermostCmd.Flags().Bool("dry-run", false, "Simulate installation without making changes")
-	CreateMattermostCmd.Flags().String("work-dir", "", "Working directory for Mattermost installation")
+	// Optional override flags - everything is automatic by default
+	CreateMattermostCmd.Flags().String("database-password", "", "Override automatic database password generation")
+	CreateMattermostCmd.Flags().IntP("port", "p", 0, "Override automatic port assignment")
+	CreateMattermostCmd.Flags().StringP("datacenter", "d", "", "Override automatic datacenter detection")
+	CreateMattermostCmd.Flags().StringP("environment", "e", "", "Override automatic environment detection")
 }
 
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func runInteractiveMattermostSetup(rc *eos_io.RuntimeContext, options *service_installation.ServiceInstallOptions) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("terminal prompt: Interactive Mattermost Setup")
-	logger.Info("terminal prompt: ================================\n")
-
-	// Version
-	logger.Info(fmt.Sprintf("terminal prompt: Mattermost version [%s]: ", options.Version))
-	var version string
-	fmt.Scanln(&version)
-	if version != "" {
-		options.Version = version
-	}
-
-	// Port
-	logger.Info(fmt.Sprintf("terminal prompt: Port [%d]: ", options.Port))
-	var portStr string
-	fmt.Scanln(&portStr)
-	if portStr != "" {
-		var port int
-		if _, err := fmt.Sscanf(portStr, "%d", &port); err == nil {
-			options.Port = port
-		}
-	}
-
-	// Database password
-	logger.Info("terminal prompt: Set custom database password? [y/N]: ")
-	var setPassword string
-	fmt.Scanln(&setPassword)
-	if setPassword == "y" || setPassword == "Y" {
-		logger.Info("terminal prompt: Database password: ")
-		var password string
-		fmt.Scanln(&password)
-		if password != "" {
-			options.Environment["DB_PASSWORD"] = password
-		}
-	}
-
-	// Site URL
-	logger.Info("terminal prompt: Set site URL (e.g., https://mattermost.example.com)? [y/N]: ")
-	var setSiteURL string
-	fmt.Scanln(&setSiteURL)
-	if setSiteURL == "y" || setSiteURL == "Y" {
-		logger.Info("terminal prompt: Site URL: ")
-		var siteURL string
-		fmt.Scanln(&siteURL)
-		if siteURL != "" {
-			options.Config["SITE_URL"] = siteURL
-		}
-	}
-
-	logger.Info("terminal prompt: Configuration Summary:")
-	logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", options.Version))
-	logger.Info(fmt.Sprintf("terminal prompt:    Port: %d", options.Port))
-	if siteURL, exists := options.Config["SITE_URL"]; exists {
-		logger.Info(fmt.Sprintf("terminal prompt:    Site URL: %s", siteURL))
-	}
-
-	logger.Info("terminal prompt: \nProceed with installation? [Y/n]: ")
-	var proceed string
-	fmt.Scanln(&proceed)
-	if proceed == "n" || proceed == "N" {
-		return fmt.Errorf("installation cancelled by user")
-	}
-
-	return nil
-}

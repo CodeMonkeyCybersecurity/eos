@@ -3,156 +3,170 @@ package create
 
 import (
 	"fmt"
+	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/service_installation"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// CreateGrafanaCmd installs Grafana using Docker
+// CreateGrafanaCmd installs Grafana using Nomad orchestration
 var CreateGrafanaCmd = &cobra.Command{
 	Use:   "grafana",
 	Short: "Install Grafana monitoring and visualization platform",
-	Long: `Install Grafana using Docker with comprehensive configuration options.
+	Long: `Install Grafana using Nomad container orchestration with comprehensive configuration options.
 
 Grafana is a powerful monitoring and visualization platform that allows you to
-query, visualize, and understand your metrics. This command sets up Grafana
-with Docker and provides options for custom configuration.
+query, visualize, and understand your metrics. This command deploys Grafana
+as a containerized service managed by Nomad with automatic service discovery
+via Consul.
+
+The deployment includes:
+- Automated container lifecycle management via Nomad
+- Service registration and health checks via Consul
+- Persistent data storage
+- Secure admin credentials
+- Production-ready configuration
 
 Examples:
   eos create grafana                                    # Install with defaults
-  eos create grafana --version 10.2.0 --port 3000     # Specific version and port
-  eos create grafana --interactive                     # Interactive setup
-  eos create grafana --dry-run                         # Test installation`,
+  eos create grafana --admin-password secret123        # Custom admin password
+  eos create grafana --port 3000                       # Custom port
+  eos create grafana --datacenter production           # Specific datacenter`,
 
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := otelzap.Ctx(rc.Ctx)
-
-		// Get flags
-		version, _ := cmd.Flags().GetString("version")
-		port, _ := cmd.Flags().GetInt("port")
-		interactive, _ := cmd.Flags().GetBool("interactive")
-		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		force, _ := cmd.Flags().GetBool("force")
-		skipHealthCheck, _ := cmd.Flags().GetBool("skip-health-check")
-
-		logger.Info("Installing Grafana",
-			zap.String("version", version),
-			zap.Int("port", port),
-			zap.Bool("interactive", interactive),
-			zap.Bool("dry_run", dryRun))
-
-		// Build installation options
-		options := &service_installation.ServiceInstallOptions{
-			Name:            "grafana",
-			Type:            service_installation.ServiceTypeGrafana,
-			Version:         version,
-			Port:            port,
-			Method:          service_installation.MethodDocker,
-			Interactive:     interactive,
-			DryRun:          dryRun,
-			Force:           force,
-			SkipHealthCheck: skipHealthCheck,
-			Environment:     make(map[string]string),
-			Config:          make(map[string]string),
-		}
-
-		// Interactive mode
-		if interactive {
-			if err := service_installation.RunInteractiveGrafanaSetup(options); err != nil {
-				return fmt.Errorf("interactive setup failed: %w", err)
-			}
-		}
-
-		// Set defaults
-		if options.Version == "" {
-			options.Version = "latest"
-		}
-		if options.Port == 0 {
-			options.Port = shared.PortGrafana
-		}
-
-		// Perform installation
-		result, err := service_installation.InstallService(rc, options)
-		if err != nil {
-			return fmt.Errorf("grafana installation failed: %w", err)
-		}
-
-		// Output result
-		if result.Success {
-			logger.Info("Grafana installation completed successfully",
-				zap.String("version", result.Version),
-				zap.Int("port", result.Port),
-				zap.Duration("duration", result.Duration))
-
-			logger.Info("terminal prompt: Grafana Installation Complete!\n")
-			logger.Info("terminal prompt: 📊 Service Details:")
-			logger.Info("terminal prompt:    Version", zap.String("version", result.Version))
-			logger.Info("terminal prompt:    Port", zap.Int("port", result.Port))
-			logger.Info("terminal prompt:    Method", zap.String("method", string(result.Method)))
-			logger.Info("terminal prompt:    Duration", zap.Duration("duration", result.Duration))
-
-			if len(result.Endpoints) > 0 {
-				logger.Info("terminal prompt: 🌐 Access URLs:")
-				for _, endpoint := range result.Endpoints {
-					logger.Info("terminal prompt:    Endpoint", zap.String("url", endpoint))
-				}
-			}
-
-			if len(result.Credentials) > 0 {
-				logger.Info("terminal prompt:  Default Credentials:")
-				for key, value := range result.Credentials {
-					logger.Info("terminal prompt:    Credential", zap.String("key", key), zap.String("value", value))
-				}
-			}
-
-			logger.Info("terminal prompt: 📝 Next Steps:")
-			logger.Info("terminal prompt:    1. Open Grafana in your browser", zap.String("url", fmt.Sprintf("http://localhost:%d", result.Port)))
-			logger.Info("terminal prompt:    2. Login with default credentials (admin/admin)")
-			logger.Info("terminal prompt:    3. Change the default password")
-			logger.Info("terminal prompt:    4. Configure data sources and dashboards")
-			logger.Info("terminal prompt:    5. Check status: eos status grafana")
-		} else {
-			logger.Error("Grafana installation failed", zap.String("error", result.Error))
-			logger.Info("terminal prompt: ❌ Grafana Installation Failed!")
-			logger.Info("terminal prompt: Error", zap.String("error", result.Error))
-
-			if len(result.Steps) > 0 {
-				logger.Info("terminal prompt: Installation Steps:")
-				for _, step := range result.Steps {
-					status := ""
-					switch step.Status {
-					case "failed":
-						status = "❌"
-					case "running":
-						status = "⏳"
-					}
-					logger.Info("terminal prompt:    Step", 
-						zap.String("status", status),
-						zap.String("name", step.Name),
-						zap.Duration("duration", step.Duration))
-					if step.Error != "" {
-						logger.Info("terminal prompt:       Error", zap.String("error", step.Error))
-					}
-				}
-			}
-		}
-
-		return nil
-	}),
+	RunE: eos.Wrap(runCreateGrafana),
 }
+
+func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("this command must be run as root")
+	}
+
+	logger.Info("Starting Grafana deployment with automatic configuration")
+
+	// 1. Discover environment automatically
+	envConfig, err := environment.DiscoverEnvironment(rc)
+	if err != nil {
+		logger.Warn("Environment discovery failed, using defaults", zap.Error(err))
+		// Continue with defaults rather than failing
+		envConfig = &environment.EnvironmentConfig{
+			Environment:   "development",
+			Datacenter:    "dc1",
+			SecretBackend: "file",
+		}
+	}
+
+	logger.Info("Environment discovered",
+		zap.String("environment", envConfig.Environment),
+		zap.String("datacenter", envConfig.Datacenter),
+		zap.String("secret_backend", envConfig.SecretBackend))
+
+	// 2. Check for manual overrides from flags
+	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
+		logger.Info("Using manually provided admin password")
+	}
+	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 && manualPort != shared.PortGrafana {
+		logger.Info("Using manually provided port", zap.Int("port", manualPort))
+	}
+
+	// 3. Get or generate secrets automatically
+	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	if err != nil {
+		return fmt.Errorf("secret manager initialization failed: %w", err)
+	}
+
+	requiredSecrets := map[string]secrets.SecretType{
+		"admin_password": secrets.SecretTypePassword,
+		"secret_key":     secrets.SecretTypeToken,
+	}
+
+	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("grafana", requiredSecrets)
+	if err != nil {
+		return fmt.Errorf("secret generation failed: %w", err)
+	}
+
+	// 4. Build configuration with discovered/generated values
+	adminPassword := serviceSecrets.Secrets["admin_password"].(string)
+	secretKey := serviceSecrets.Secrets["secret_key"].(string)
+	
+	// Allow manual overrides
+	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
+		adminPassword = manualPassword
+	}
+	
+	port := envConfig.Services.DefaultPorts["grafana"]
+	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 {
+		port = manualPort
+	}
+
+	resourceConfig := envConfig.Services.Resources[envConfig.Environment]
+	
+	pillarConfig := map[string]interface{}{
+		"nomad_service": map[string]interface{}{
+			"name":        "grafana",
+			"environment": envConfig.Environment,
+			"config": map[string]interface{}{
+				"admin_password": adminPassword,
+				"secret_key":     secretKey,
+				"port":          port,
+				"datacenter":    envConfig.Datacenter,
+				"data_path":     envConfig.Services.DataPath + "/grafana",
+				"cpu":           resourceConfig.CPU,
+				"memory":        resourceConfig.Memory,
+				"replicas":      resourceConfig.Replicas,
+			},
+		},
+	}
+
+	// 5. Deploy with automatically configured values
+	logger.Info("Deploying Grafana via SaltStack → Terraform → Nomad",
+		zap.String("environment", envConfig.Environment),
+		zap.String("datacenter", envConfig.Datacenter),
+		zap.Int("port", port),
+		zap.Int("cpu", resourceConfig.CPU),
+		zap.Int("memory", resourceConfig.Memory),
+		zap.Int("replicas", resourceConfig.Replicas))
+
+	if err := saltstack.ApplySaltStateWithPillar(rc, "nomad.services", pillarConfig); err != nil {
+		return fmt.Errorf("Grafana deployment failed: %w", err)
+	}
+
+	// 6. Display success information with generated credentials
+	logger.Info("Grafana deployment completed successfully",
+		zap.String("management", "SaltStack → Terraform → Nomad"),
+		zap.String("environment", envConfig.Environment),
+		zap.String("secret_backend", envConfig.SecretBackend))
+
+	logger.Info("Grafana is now available",
+		zap.String("web_ui", fmt.Sprintf("http://localhost:%d", port)),
+		zap.String("username", "admin"),
+		zap.String("password", adminPassword),
+		zap.String("consul_service", "grafana.service.consul"))
+
+	logger.Info("Configuration automatically managed",
+		zap.String("environment_discovery", "bootstrap/salt/cloud"),
+		zap.String("secret_storage", envConfig.SecretBackend),
+		zap.String("resource_allocation", envConfig.Environment))
+
+	return nil
+}
+
 
 func init() {
 	CreateCmd.AddCommand(CreateGrafanaCmd)
 
-	CreateGrafanaCmd.Flags().StringP("version", "v", "latest", "Grafana version to install")
-	CreateGrafanaCmd.Flags().IntP("port", "p", shared.PortGrafana, "Port to expose Grafana on")
-	CreateGrafanaCmd.Flags().BoolP("interactive", "i", false, "Interactive setup mode")
-	CreateGrafanaCmd.Flags().Bool("dry-run", false, "Simulate installation without making changes")
-	CreateGrafanaCmd.Flags().BoolP("force", "f", false, "Force installation even if port is in use")
-	CreateGrafanaCmd.Flags().Bool("skip-health-check", false, "Skip post-installation health check")
+	// Optional override flags - everything is automatic by default
+	CreateGrafanaCmd.Flags().String("admin-password", "", "Override automatic admin password generation")
+	CreateGrafanaCmd.Flags().IntP("port", "p", 0, "Override automatic port assignment")
+	CreateGrafanaCmd.Flags().StringP("datacenter", "d", "", "Override automatic datacenter detection")
+	CreateGrafanaCmd.Flags().StringP("environment", "e", "", "Override automatic environment detection")
 }

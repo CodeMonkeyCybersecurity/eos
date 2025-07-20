@@ -32,6 +32,104 @@ go test -v ./pkg/...                     # Must pass all tests
 
 ## Architecture
 
+### SaltStack + Nomad Dual-Layer Architecture
+
+*Last Updated: 2025-01-20*
+
+**CRITICAL**: Eos uses a dual-layer architecture that separates infrastructure management from application orchestration. This architecture decision drives all implementation choices.
+
+#### Layer 1: Infrastructure Foundation (SaltStack)
+**Responsibility**: System-level configuration, base packages, and infrastructure services
+
+**SaltStack manages:**
+- System packages (fail2ban, trivy, osquery, essential tools)
+- Infrastructure services (Consul, Nomad, Vault, SaltStack itself)
+- Host security configuration
+- Docker runtime installation (for Nomad)
+
+**Implementation Pattern for Infrastructure Services:**
+```go
+// Example: cmd/create/consul.go
+func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    // ASSESS - Check SaltStack availability
+    if _, err := exec.LookPath("salt-call"); err != nil {
+        return fmt.Errorf("saltstack is required")
+    }
+    
+    // INTERVENE - Apply SaltStack state
+    pillarData := map[string]interface{}{
+        "consul": map[string]interface{}{
+            "datacenter": datacenterName,
+            "ui_enabled": true,
+        },
+    }
+    
+    args := []string{"--local", "state.apply", "hashicorp.consul", 
+                     fmt.Sprintf("pillar='%s'", pillarJSON)}
+    exec.Command("salt-call", args...).Run()
+    
+    // EVALUATE - Verify service running
+    return verifyService("consul")
+}
+```
+
+#### Layer 2: Application Orchestration (Nomad)
+**Responsibility**: Container-based applications, service mesh, and workload scheduling
+
+**Nomad manages:**
+- Application containers (Jenkins, Grafana, Mattermost, Nextcloud)
+- Service discovery via Consul integration
+- Container lifecycle, health checks, and recovery
+- Resource allocation and scheduling
+
+**Implementation Pattern for Application Services:**
+```go
+// Example: cmd/create/grafana.go  
+func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    // ASSESS - Check Nomad availability
+    if err := checkNomadRunning(rc); err != nil {
+        return fmt.Errorf("nomad is required for application services")
+    }
+    
+    // INTERVENE - Deploy Nomad job
+    jobTemplate := loadJobTemplate("grafana.nomad")
+    jobConfig := buildJobConfig(cmd) // From flags
+    nomadJob := renderJobTemplate(jobTemplate, jobConfig)
+    
+    if err := deployNomadJob(rc, nomadJob); err != nil {
+        return fmt.Errorf("failed to deploy grafana: %w", err)
+    }
+    
+    // EVALUATE - Verify job running and healthy
+    return verifyNomadJob(rc, "grafana")
+}
+```
+
+#### User Experience Abstraction
+**CRITICAL**: Users don't need to know about the underlying architecture. The same `eos create X` pattern works for both layers:
+
+```bash
+# Infrastructure (SaltStack) - Users don't need to know
+eos create consul        # Deploys via SaltStack state
+eos create vault         # Deploys via SaltStack state
+eos create fail2ban      # Deploys via SaltStack state
+
+# Applications (Nomad) - Users don't need to know  
+eos create grafana       # Deploys via Nomad job
+eos create jenkins       # Deploys via Nomad job
+eos create nextcloud     # Deploys via Nomad job
+```
+
+#### Service Classification Rules
+**Infrastructure Services (SaltStack)**: System packages, security tools, orchestration platforms
+**Application Services (Nomad)**: Containerized applications, web services, databases
+
+#### Anti-Patterns to Avoid
+- **NEVER** run Docker Compose alongside Nomad on same host
+- **NEVER** mix SaltStack and Nomad for same service type
+- **NEVER** expose architecture complexity to users
+- **NEVER** bypass Consul for service discovery
+
 ### Architecture Patterns
 
 #### Command Flow
@@ -198,6 +296,10 @@ The following commands have special status and remain under their current struct
 - **Runtime Context**: All operations use `*eos_io.RuntimeContext` for logging and cancellation
 - **Error Handling**: Distinguish user errors (exit 0) from system errors (exit 1)
 - **Verbose Logging**: Add extensive structured logging for debugging
+- **Architecture Compliance**: **CRITICAL** - All new services MUST follow the SaltStack + Nomad dual-layer architecture
+  - Infrastructure services → SaltStack states
+  - Application services → Nomad jobs  
+  - Users see consistent `eos create X` experience regardless of underlying implementation
 
 ### Building and Installation
 ```bash
@@ -557,9 +659,50 @@ go test -v -run "Security|Validation|Auth" ./pkg/...
 
 ## Integration Guidelines
 
+### Service Classification Decision Tree
+
+**CRITICAL**: Before implementing any new service, determine the correct architectural layer:
+
+#### Infrastructure Services (SaltStack Implementation)
+**Criteria**: System packages, security tools, orchestration platforms, host-level services
+**Examples**: consul, vault, nomad, fail2ban, trivy, osquery, saltstack itself
+
+**Implementation Requirements**:
+- Create SaltStack state file: `/salt/states/[category]/[service].sls`
+- Use pillar data for configuration
+- Apply via `salt-call state.apply`
+- Service registers with system (systemd)
+
+#### Application Services (Nomad Implementation)  
+**Criteria**: Containerized applications, web services, databases, user-facing applications
+**Examples**: grafana, jenkins, nextcloud, mattermost, gitlab
+
+**Implementation Requirements**:
+- Create Nomad job template: `/nomad/jobs/[service].nomad` 
+- Use job variables for configuration
+- Deploy via `nomad job run`
+- Service registers with Consul for service discovery
+
+#### Classification Examples
+```bash
+# Infrastructure (SaltStack)
+eos create saltstack    # Orchestration platform
+eos create consul       # Service discovery infrastructure  
+eos create vault        # Secrets management infrastructure
+eos create fail2ban     # Host security
+eos create docker       # Container runtime
+
+# Applications (Nomad)  
+eos create grafana      # Monitoring dashboard
+eos create jenkins      # CI/CD platform
+eos create nextcloud    # File sharing platform
+eos create postgres     # Database service
+eos create redis        # Cache service
+```
+
 ### Adding New Tool Integrations
 
-When adding support for a new tool (like SaltStack, Terraform, etc.), follow this structure:
+When adding support for a new tool, follow this structure:
 
 #### 1. Package Structure
 ```
