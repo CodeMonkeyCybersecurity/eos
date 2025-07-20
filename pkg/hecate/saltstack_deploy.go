@@ -98,9 +98,27 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 		return fmt.Errorf("hardware requirements check failed: %w", err)
 	}
 
-	// ASSESS - Check prerequisites
-	if err := assessPrerequisites(rc); err != nil {
-		return fmt.Errorf("prerequisites check failed: %w", err)
+	// ASSESS - Run comprehensive preflight checks
+	preflightResult, err := PreflightChecks(rc)
+	if err != nil {
+		return fmt.Errorf("preflight checks failed: %w", err)
+	}
+
+	// Handle any missing dependencies interactively
+	if !preflightResult.CanProceed {
+		if err := InteractivelyHandleDependencies(rc, preflightResult); err != nil {
+			return err
+		}
+		
+		// Re-run preflight checks after installations
+		preflightResult, err = PreflightChecks(rc)
+		if err != nil {
+			return fmt.Errorf("preflight checks failed after dependency installation: %w", err)
+		}
+		
+		if !preflightResult.CanProceed {
+			return eos_err.NewUserError("Cannot proceed with deployment - critical issues remain unresolved")
+		}
 	}
 
 	// Initialize state manager for tracking deployment progress
@@ -396,7 +414,9 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 	return nil
 }
 
-// assessPrerequisites checks that all required services are available and installs them if missing
+// assessPrerequisites checks that all required services are available and attempts to install missing ones
+// DEPRECATED: This function is replaced by PreflightChecks() which provides more comprehensive validation
+// This is kept for backward compatibility but should not be used directly
 func assessPrerequisites(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Assessing prerequisites for Hecate deployment")
@@ -800,7 +820,7 @@ func installMissingService(rc *eos_io.RuntimeContext, serviceName string) error 
 		// Consul can use default settings
 		args = append(args, "--dev-mode")
 	case "nomad":
-		// Nomad can use default settings
+		// Nomad needs both server and client roles for single-node setup
 		args = append(args, "--node-role", "both")
 	case "saltstack":
 		// SaltStack needs masterless mode for single-node setup
