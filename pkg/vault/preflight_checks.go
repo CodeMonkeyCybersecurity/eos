@@ -96,7 +96,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 				logger.Error("Cannot create required parent directory",
 					zap.String("directory", parentDir),
 					zap.Error(err))
-				return eos_err.NewUserError("Cannot create required directory: " + parentDir + "\nError: " + err.Error() + "\n\nThis usually means you need to run with sudo privileges.")
+				return eos_err.NewUserError("Cannot create required directory: %s\nError: %v\n\nThis usually means you need to run with sudo privileges.", parentDir, err)
 			}
 			// Clean up the test directory
 			os.RemoveAll(parentDir)
@@ -107,7 +107,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 			logger.Error("Cannot create required directory",
 				zap.String("directory", dir),
 				zap.Error(err))
-			return eos_err.NewUserError("Cannot create required directory: " + dir + "\nError: " + err.Error() + "\n\nThis usually means you need to run with sudo privileges.")
+			return eos_err.NewUserError("Cannot create required directory: %s\nError: %v\n\nThis usually means you need to run with sudo privileges.", dir, err)
 		}
 		
 		// Clean up the test directory
@@ -139,7 +139,7 @@ func checkSystemTools(rc *eos_io.RuntimeContext) error {
 	if len(missingTools) > 0 {
 		logger.Error("Missing required system tools",
 			zap.Strings("missing_tools", missingTools))
-		return eos_err.NewUserError("Missing required system tools: " + strings.Join(missingTools, ", ") + "\n\nPlease install the missing tools and try again.\nOn Ubuntu/Debian: sudo apt-get update && sudo apt-get install " + strings.Join(missingTools, " "))
+		return eos_err.NewUserError("Missing required system tools: %s\n\nPlease install the missing tools and try again.\nOn Ubuntu/Debian: sudo apt-get update && sudo apt-get install %s", strings.Join(missingTools, ", "), strings.Join(missingTools, " "))
 	}
 	
 	logger.Debug("System tools check passed")
@@ -185,7 +185,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 					zap.String("path", path),
 					zap.Int64("available_gb", available),
 					zap.Int64("required_gb", minSpaceGB))
-				return eos_err.NewUserError("Insufficient disk space in " + path + ". Available: " + fmt.Sprintf("%d", available) + " GB, Required: " + fmt.Sprintf("%d", minSpaceGB) + " GB. Please free up disk space and try again.")
+				return eos_err.NewUserError("Insufficient disk space in %s. Available: %d GB, Required: %d GB. Please free up disk space and try again.", path, available, minSpaceGB)
 			}
 		}
 	}
@@ -204,7 +204,7 @@ func checkNetworkRequirements(rc *eos_io.RuntimeContext) error {
 		if isPortInUse(port) {
 			logger.Error("Required port is already in use",
 				zap.Int("port", port))
-			return eos_err.NewUserError("Port " + fmt.Sprintf("%d", port) + " is already in use by another service.\n\nVault requires ports 8200 (API) and 8201 (cluster) to be available.\nPlease stop the conflicting service or choose different ports.")
+			return eos_err.NewUserError("Port %d is already in use by another service.\n\nVault requires ports 8200 (API) and 8201 (cluster) to be available.\nPlease stop the conflicting service or choose different ports.", port)
 		}
 	}
 	

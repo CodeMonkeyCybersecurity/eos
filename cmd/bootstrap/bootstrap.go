@@ -5,49 +5,52 @@ package bootstrap
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
 // BootstrapCmd is the top-level bootstrap command
 var BootstrapCmd *cobra.Command
 
 func init() {
-	// Find the bootstrap command from create and use it directly
-	for _, cmd := range create.CreateCmd.Commands() {
-		if cmd.Name() == "bootstrap" {
-			// Create a copy of the bootstrap command for top-level use
-			BootstrapCmd = &cobra.Command{
-				Use:     cmd.Use,
-				Short:   cmd.Short + " (alias)",
-				Long:    cmd.Long,
-				Aliases: cmd.Aliases,
-				RunE:    cmd.RunE,
-			}
-			
-			// Copy all subcommands
-			for _, subCmd := range cmd.Commands() {
-				BootstrapCmd.AddCommand(subCmd)
-			}
-			
-			// Copy all flags
-			cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-				BootstrapCmd.Flags().AddFlag(flag)
-			})
-			
-			break
-		}
+	// Create the top-level bootstrap command that defaults to "all"
+	BootstrapCmd = &cobra.Command{
+		Use:   "bootstrap",
+		Short: "Bootstrap all infrastructure components with security hardening",
+		Long: `Bootstrap all infrastructure components on a fresh system.
+This command installs and configures:
+- Salt (configuration management)
+- Storage Operations (monitoring and management)
+- Tailscale (secure networking)
+- OSQuery (system monitoring)
+- Ubuntu security hardening (optional FIDO2 SSH authentication)
+
+Examples:
+  eos bootstrap                  # Bootstrap everything including hardening (default)
+  eos bootstrap --skip-hardening # Bootstrap without Ubuntu hardening
+  eos bootstrap --single-node    # Bootstrap as single-node deployment
+  eos bootstrap --join-cluster   # Join existing cluster
+
+Flags:
+  --skip-hardening    Skip Ubuntu security hardening
+  --single-node       Configure as single-node deployment
+  --join-cluster      Join existing cluster at specified address
+  --preferred-role    Set role when joining cluster (edge/core/data/compute)
+  --auto-discover     Enable automatic cluster discovery`,
+		RunE: eos_cli.Wrap(runBootstrapAll),
 	}
 	
-	// Fallback if bootstrap command not found
-	if BootstrapCmd == nil {
-		BootstrapCmd = &cobra.Command{
-			Use:   "bootstrap",
-			Short: "Bootstrap infrastructure components",
-			Long:  "Bootstrap infrastructure components (create bootstrap must be available)",
-			RunE: func(cmd *cobra.Command, args []string) error {
-				return cmd.Help()
-			},
-		}
-	}
+	// Add the same flags as create bootstrap all
+	BootstrapCmd.Flags().String("join-cluster", "", "Join existing cluster at specified master address")
+	BootstrapCmd.Flags().Bool("single-node", false, "Explicitly configure as single-node deployment")
+	BootstrapCmd.Flags().String("preferred-role", "", "Preferred role when joining cluster (edge/core/data/compute)")
+	BootstrapCmd.Flags().Bool("auto-discover", false, "Enable automatic cluster discovery via multicast")
+	BootstrapCmd.Flags().Bool("skip-hardening", false, "Skip Ubuntu security hardening (not recommended for production)")
+}
+
+// runBootstrapAll runs the enhanced bootstrap all command
+func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// Directly call the enhanced bootstrap function from create package
+	return create.RunBootstrapAllEnhanced(rc, cmd, args)
 }

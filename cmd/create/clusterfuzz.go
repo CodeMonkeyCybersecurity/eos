@@ -87,7 +87,7 @@ EXAMPLES:
 				logger.Info("terminal prompt: Please enter S3 access key")
 				accessKey, err := eos_io.PromptInput(rc, "S3 Access Key: ", "s3_access_key")
 				if err != nil {
-					return eos_err.NewUserError("failed to read S3 access key: " + err.Error())
+					return eos_err.NewUserError("failed to read S3 access key: %v", err)
 				}
 				s3AccessKey = accessKey
 			}
@@ -96,7 +96,7 @@ EXAMPLES:
 				logger.Info("terminal prompt: Please enter S3 secret key")
 				secretKey, err := eos_io.PromptSecurePassword(rc, "S3 Secret Key: ")
 				if err != nil {
-					return eos_err.NewUserError("failed to read S3 secret key: " + err.Error())
+					return eos_err.NewUserError("failed to read S3 secret key: %v", err)
 				}
 				s3SecretKey = secretKey
 			}

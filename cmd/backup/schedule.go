@@ -267,7 +267,7 @@ Examples:
 			fmt.Printf("%-20s %-20s %-20s %s\n",
 				profileName, schedule, status, nextRun)
 		}
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", )))
+		logger.Info("terminal prompt: Backup schedules listed successfully")
 
 		return nil
 	}),

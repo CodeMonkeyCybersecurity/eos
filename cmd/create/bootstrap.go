@@ -142,5 +142,5 @@ func runBootstrapOsquery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	// Redirect to enhanced version that includes storage ops and clustering
-	return runBootstrapAllEnhanced(rc, cmd, args)
+	return RunBootstrapAllEnhanced(rc, cmd, args)
 }
