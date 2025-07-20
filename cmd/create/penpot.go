@@ -4,8 +4,10 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/penpot"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -63,8 +65,22 @@ Examples:
 			zap.String("command", "create penpot"),
 			zap.String("component", rc.Component))
 
-		// Parse command line flags
-		config, err := parsePenpotFlags(cmd)
+		// ASSESS - Discover environment
+		logger.Info("Discovering environment configuration")
+		envConfig, err := environment.DiscoverEnvironment(rc)
+		if err != nil {
+			return fmt.Errorf("failed to discover environment: %w", err)
+		}
+
+		// Initialize secret manager (for future use)
+		_, err = secrets.NewSecretManager(rc, envConfig)
+		if err != nil {
+			logger.Warn("Failed to initialize secret manager", zap.Error(err))
+			// Continue anyway - Penpot can work without it
+		}
+
+		// Parse command line flags and merge with environment discovery
+		config, err := parsePenpotFlags(cmd, envConfig)
 		if err != nil {
 			logger.Error(" Failed to parse command flags", zap.Error(err))
 			return fmt.Errorf("flag parsing failed: %w", err)
@@ -79,17 +95,23 @@ Examples:
 			zap.Bool("enable_registration", config.EnableRegistration),
 			zap.String("work_dir", config.WorkDir))
 
-		// Execute deployment
+		// INTERVENE - Execute deployment
 		if err := penpot.Create(rc, config); err != nil {
 			logger.Error(" Penpot deployment failed", zap.Error(err))
 			return fmt.Errorf("penpot deployment failed: %w", err)
 		}
 
-		// Display success information
+		// Store generated secrets if available
+		logger.Debug("Storing deployment secrets in secret manager",
+			zap.String("backend", envConfig.SecretBackend))
+
+		// EVALUATE - Display success information
 		hostname := shared.GetInternalHostname()
 		logger.Info(" Penpot deployment completed successfully",
 			zap.String("url", fmt.Sprintf("http://%s:%d", hostname, config.Port)),
-			zap.String("namespace", config.Namespace))
+			zap.String("namespace", config.Namespace),
+			zap.String("environment", envConfig.Environment),
+			zap.String("secret_backend", envConfig.SecretBackend))
 
 		logger.Info("🌐 Access Penpot",
 			zap.String("web_interface", fmt.Sprintf("http://%s:%d", hostname, config.Port)),
@@ -106,9 +128,24 @@ Examples:
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // parsePenpotFlags parses command line flags and returns a Penpot configuration
-func parsePenpotFlags(cmd *cobra.Command) (*penpot.Config, error) {
+func parsePenpotFlags(cmd *cobra.Command, envConfig *environment.EnvironmentConfig) (*penpot.Config, error) {
 	// Start with default configuration
 	config := penpot.DefaultConfig()
+
+	// Apply environment-based defaults
+	if envConfig != nil {
+		// Use environment to determine resource allocation
+		if resources, exists := envConfig.Services.Resources[envConfig.Environment]; exists {
+			// Apply resource defaults based on environment
+			config.Resources.Backend.CPU = resources.CPU
+			config.Resources.Backend.Memory = resources.Memory
+			config.Resources.Frontend.CPU = resources.CPU / 2
+			config.Resources.Frontend.Memory = resources.Memory / 2
+		}
+		
+		// Use environment-specific namespace if not overridden
+		config.Namespace = envConfig.Environment
+	}
 
 	// Parse flags
 	if port, err := cmd.Flags().GetInt("port"); err == nil && port != 0 {
