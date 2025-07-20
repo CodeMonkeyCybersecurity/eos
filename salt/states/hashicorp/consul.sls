@@ -68,6 +68,15 @@ consul_config:
         connect {
           enabled = {{ pillar.get('consul:connect_enabled', 'true') }}
         }
+        ports {
+          http = {{ pillar.get('consul:http_port', '8500') }}
+          dns = {{ pillar.get('consul:dns_port', '8600') }}
+          grpc = {{ pillar.get('consul:grpc_port', '8502') }}
+        }
+        {% if pillar.get('consul:vault_integration', false) %}
+        # Vault integration enabled
+        auto_reload_config = true
+        {% endif %}
     - user: consul
     - group: consul
     - mode: 640
@@ -106,3 +115,22 @@ consul_service:
     - name: systemctl daemon-reload
     - require:
       - file: consul_service
+
+# Enable and start consul service
+consul_service_enabled:
+  service.enabled:
+    - name: consul
+    - require:
+      - file: consul_service
+      - cmd: consul_service
+
+consul_service_running:
+  service.running:
+    - name: consul
+    - enable: True
+    - restart: True
+    - watch:
+      - file: consul_config
+      - file: consul_service
+    - require:
+      - service: consul_service_enabled

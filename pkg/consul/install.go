@@ -26,6 +26,8 @@ import (
 )
 
 // InstallConsul performs complete Consul installation with error recovery
+// DEPRECATED: This function is deprecated in favor of SaltStack-based installation.
+// Use 'eos create consul' command instead which uses SaltStack orchestration.
 func InstallConsul(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	

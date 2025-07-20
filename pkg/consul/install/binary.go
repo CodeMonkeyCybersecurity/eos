@@ -14,6 +14,8 @@ import (
 
 // Binary installs the Consul binary from HashiCorp releases.
 // It follows the Assess → Intervene → Evaluate pattern.
+// DEPRECATED: This function is deprecated in favor of SaltStack-based installation.
+// Use 'eos create consul' command instead which uses SaltStack orchestration.
 func Binary(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
