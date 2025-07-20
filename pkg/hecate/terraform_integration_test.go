@@ -102,26 +102,23 @@ func TestTerraformBasedHecateIntegration(t *testing.T) {
 
 	// Test secret manager functionality
 	t.Run("SecretManager", func(t *testing.T) {
-		client := &HecateClient{
-			rc: rc,
+		sm, err := NewSecretManager(rc)
+		if err != nil {
+			t.Errorf("Failed to create SecretManager: %v", err)
 		}
-
-		sm := NewSecretManager(client)
 		if sm == nil {
 			t.Error("SecretManager should not be nil")
 		}
 
-		// Test secret generation
-		secret := sm.generateSecret()
-		if len(secret) == 0 {
-			t.Error("Generated secret should not be empty")
+		// Test backend detection
+		backend := sm.GetBackend()
+		if backend == SecretBackendUnknown {
+			t.Error("Backend should be detected")
 		}
 
-		// Test service mapping
-		services := sm.getAffectedServices("authentik-api-token")
-		if len(services) == 0 {
-			t.Error("Should have affected services for authentik-api-token")
-		}
+		// Test that we can initialize secret manager without errors
+		// Other functionality requires actual Salt/Vault infrastructure
+		t.Logf("Secret manager initialized with backend: %s", backend)
 	})
 
 	// Test stream manager functionality  

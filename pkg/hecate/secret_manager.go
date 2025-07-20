@@ -1,381 +1,352 @@
 package hecate
 
 import (
+	"bufio"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
-	"github.com/hashicorp/consul/api"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// SecretManager handles secret rotation
+// SecretBackend represents the type of secret management backend in use
+type SecretBackend string
+
+const (
+	SecretBackendVault      SecretBackend = "vault"
+	SecretBackendSaltPillar SecretBackend = "salt-pillar"
+	SecretBackendUnknown    SecretBackend = "unknown"
+)
+
+// SecretManager provides a unified interface for secret management
 type SecretManager struct {
-	client *HecateClient
+	backend SecretBackend
+	rc      *eos_io.RuntimeContext
 }
 
-// NewSecretManager creates a new secret manager
-func NewSecretManager(client *HecateClient) *SecretManager {
-	return &SecretManager{client: client}
-}
-
-// RotateSecretRequest represents a request to rotate a secret
-type RotateSecretRequest struct {
-	Name     string `json:"name"`
-	Strategy string `json:"strategy"` // dual-secret, immediate
-}
-
-// RotateSecretResult represents the result of secret rotation
-type RotateSecretResult struct {
-	Name         string    `json:"name"`
-	Strategy     string    `json:"strategy"`
-	Success      bool      `json:"success"`
-	NewVersion   string    `json:"new_version"`
-	RotatedAt    time.Time `json:"rotated_at"`
-	CleanupAfter time.Time `json:"cleanup_after,omitempty"`
-	Error        string    `json:"error,omitempty"`
-}
-
-// RotateSecret rotates a single secret
-func (sm *SecretManager) RotateSecret(ctx context.Context, req *RotateSecretRequest) (*RotateSecretResult, error) {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
-	logger.Info("Rotating secret",
-		zap.String("name", req.Name),
-		zap.String("strategy", req.Strategy))
-
-	result := &RotateSecretResult{
-		Name:      req.Name,
-		Strategy:  req.Strategy,
-		RotatedAt: time.Now(),
+// NewSecretManager creates a new secret manager with automatic backend detection
+func NewSecretManager(rc *eos_io.RuntimeContext) (*SecretManager, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	sm := &SecretManager{
+		rc: rc,
 	}
+	
+	// Detect which backend is available
+	backend, err := sm.detectBackend()
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect secret backend: %w", err)
+	}
+	
+	sm.backend = backend
+	logger.Info("Secret manager initialized", zap.String("backend", string(backend)))
+	
+	return sm, nil
+}
 
-	switch req.Strategy {
-	case "dual-secret":
-		err := sm.rotateDualSecret(ctx, req.Name, result)
-		result.Success = err == nil
-		if err != nil {
-			result.Error = err.Error()
-			return result, err
+// detectBackend determines which secret management backend to use
+func (sm *SecretManager) detectBackend() (SecretBackend, error) {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	
+	// First try Vault
+	logger.Debug("Checking Vault availability")
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	if vaultAddr == "" {
+		vaultAddr = "https://127.0.0.1:8179"
+	}
+	
+	// Test Vault connectivity with timeout
+	ctx, cancel := context.WithTimeout(sm.rc.Ctx, 5*time.Second)
+	defer cancel()
+	
+	// Set environment variable for Vault
+	oldVaultAddr := os.Getenv("VAULT_ADDR")
+	os.Setenv("VAULT_ADDR", vaultAddr)
+	defer func() {
+		if oldVaultAddr != "" {
+			os.Setenv("VAULT_ADDR", oldVaultAddr)
+		} else {
+			os.Unsetenv("VAULT_ADDR")
 		}
-	case "immediate":
-		err := sm.rotateImmediate(ctx, req.Name, result)
-		result.Success = err == nil
-		if err != nil {
-			result.Error = err.Error()
-			return result, err
+	}()
+	
+	_, err := execute.Run(ctx, execute.Options{
+		Command: "vault",
+		Args:    []string{"status"},
+		Capture: true,
+	})
+	
+	if err == nil {
+		logger.Debug("Vault is available and accessible")
+		return SecretBackendVault, nil
+	}
+	
+	logger.Debug("Vault not available, using Salt pillar fallback", zap.Error(err))
+	
+	// Use Salt pillar as fallback
+	return SecretBackendSaltPillar, nil
+}
+
+// GetSecret retrieves a secret using the configured backend
+func (sm *SecretManager) GetSecret(service, key string) (string, error) {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger.Debug("Retrieving secret", 
+		zap.String("service", service), 
+		zap.String("key", key),
+		zap.String("backend", string(sm.backend)))
+	
+	switch sm.backend {
+	case SecretBackendVault:
+		return sm.getVaultSecret(service, key)
+	case SecretBackendSaltPillar:
+		return sm.getSaltSecret(service, key)
+	default:
+		return "", fmt.Errorf("unknown secret backend: %s", sm.backend)
+	}
+}
+
+// getVaultSecret retrieves a secret from Vault
+func (sm *SecretManager) getVaultSecret(service, key string) (string, error) {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	if vaultAddr == "" {
+		vaultAddr = "https://127.0.0.1:8179"
+	}
+	
+	var vaultPath, field string
+	
+	switch service {
+	case "postgres":
+		switch key {
+		case "password":
+			vaultPath = "secret/hecate/postgres/password"
+			field = "value"
+		case "root_password":
+			vaultPath = "secret/hecate/postgres/root_password"
+			field = "value"
+		default:
+			return "", fmt.Errorf("unknown postgres secret key: %s", key)
+		}
+	case "redis":
+		switch key {
+		case "password":
+			vaultPath = "secret/hecate/redis/password"
+			field = "value"
+		default:
+			return "", fmt.Errorf("unknown redis secret key: %s", key)
+		}
+	case "authentik":
+		switch key {
+		case "secret_key":
+			vaultPath = "secret/hecate/authentik/secret_key"
+			field = "value"
+		case "admin_password":
+			vaultPath = "secret/hecate/authentik/admin"
+			field = "password"
+		case "admin_username":
+			vaultPath = "secret/hecate/authentik/admin"
+			field = "username"
+		default:
+			return "", fmt.Errorf("unknown authentik secret key: %s", key)
 		}
 	default:
-		err := fmt.Errorf("unknown rotation strategy: %s", req.Strategy)
-		result.Success = false
-		result.Error = err.Error()
-		return result, err
+		return "", fmt.Errorf("unknown service: %s", service)
 	}
-
-	logger.Info("Secret rotated successfully",
-		zap.String("name", req.Name),
-		zap.String("strategy", req.Strategy),
-		zap.String("new_version", result.NewVersion))
-
-	return result, nil
-}
-
-// RotateAllSecrets rotates all secrets for Hecate
-func (sm *SecretManager) RotateAllSecrets(ctx context.Context) ([]*RotateSecretResult, error) {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
-	logger.Info("Rotating all Hecate secrets")
-
-	secrets := []struct {
-		name     string
-		strategy string
-	}{
-		{"authentik-api-token", "dual-secret"},
-		{"caddy-admin-token", "dual-secret"},
-		{"hetzner-api-token", "immediate"},
-		{"vault-root-token", "immediate"},
-		{"consul-master-token", "immediate"},
-	}
-
-	results := make([]*RotateSecretResult, 0, len(secrets))
-
-	for _, secret := range secrets {
-		req := &RotateSecretRequest{
-			Name:     secret.name,
-			Strategy: secret.strategy,
-		}
-
-		result, err := sm.RotateSecret(ctx, req)
-		if err != nil {
-			logger.Error("Failed to rotate secret",
-				zap.String("name", secret.name),
-				zap.Error(err))
-		}
-		results = append(results, result)
-	}
-
-	successCount := 0
-	for _, result := range results {
-		if result.Success {
-			successCount++
-		}
-	}
-
-	logger.Info("Bulk secret rotation completed",
-		zap.Int("total", len(secrets)),
-		zap.Int("successful", successCount),
-		zap.Int("failed", len(secrets)-successCount))
-
-	return results, nil
-}
-
-// GetSecretStatus gets the status of a secret
-func (sm *SecretManager) GetSecretStatus(ctx context.Context, name string) (*SecretStatus, error) {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
-	logger.Debug("Getting secret status",
-		zap.String("name", name))
-
-	// Try to get secret from Vault
-	path := fmt.Sprintf("secret/data/hecate/%s", name)
-	secret, err := sm.client.vault.Logical().Read(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read secret: %w", err)
-	}
-
-	if secret == nil {
-		return &SecretStatus{
-			Name:   name,
-			Exists: false,
-		}, nil
-	}
-
-	status := &SecretStatus{
-		Name:   name,
-		Exists: true,
-	}
-
-	// Extract metadata if available
-	if secret.Data != nil {
-		if data, ok := secret.Data["data"].(map[string]interface{}); ok {
-			if rotatedAt, ok := data["rotated_at"].(string); ok {
-				if parsed, err := time.Parse(time.RFC3339, rotatedAt); err == nil {
-					status.LastRotated = &parsed
-				}
-			}
-			if version, ok := data["version"].(string); ok {
-				status.Version = version
-			}
-		}
-	}
-
-	return status, nil
-}
-
-// ListSecrets lists all Hecate secrets
-func (sm *SecretManager) ListSecrets(ctx context.Context) ([]*SecretStatus, error) {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
-	logger.Debug("Listing all Hecate secrets")
-
-	secretNames := []string{
-		"authentik-api-token",
-		"caddy-admin-token", 
-		"hetzner-api-token",
-		"vault-root-token",
-		"consul-master-token",
-	}
-
-	statuses := make([]*SecretStatus, 0, len(secretNames))
-
-	for _, name := range secretNames {
-		status, err := sm.GetSecretStatus(ctx, name)
-		if err != nil {
-			logger.Warn("Failed to get secret status",
-				zap.String("name", name),
-				zap.Error(err))
-			status = &SecretStatus{
-				Name:   name,
-				Exists: false,
-				Error:  err.Error(),
-			}
-		}
-		statuses = append(statuses, status)
-	}
-
-	return statuses, nil
-}
-
-// Helper methods
-
-func (sm *SecretManager) rotateDualSecret(ctx context.Context, name string, result *RotateSecretResult) error {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
 	
-	// Get current secret
-	currentPath := fmt.Sprintf("secret/data/hecate/%s", name)
-	current, err := sm.client.vault.Logical().Read(currentPath)
-	if err != nil {
-		return fmt.Errorf("failed to read current secret: %w", err)
-	}
-
-	var currentValue string
-	if current != nil && current.Data != nil {
-		if data, ok := current.Data["data"].(map[string]interface{}); ok {
-			currentValue, _ = data["value"].(string)
+	logger.Debug("Retrieving secret from Vault", 
+		zap.String("path", vaultPath), 
+		zap.String("field", field))
+	
+	// Set environment variable for Vault
+	oldVaultAddr := os.Getenv("VAULT_ADDR")
+	os.Setenv("VAULT_ADDR", vaultAddr)
+	defer func() {
+		if oldVaultAddr != "" {
+			os.Setenv("VAULT_ADDR", oldVaultAddr)
+		} else {
+			os.Unsetenv("VAULT_ADDR")
 		}
-	}
-
-	// Generate new secret
-	newValue := sm.generateSecret()
-	newVersion := fmt.Sprintf("v%d", time.Now().Unix())
-	result.NewVersion = newVersion
-
-	// Store both secrets
-	dualData := map[string]interface{}{
-		"data": map[string]interface{}{
-			"current":    newValue,
-			"previous":   currentValue,
-			"version":    newVersion,
-			"rotated_at": time.Now().Format(time.RFC3339),
-		},
-	}
-
-	_, err = sm.client.vault.Logical().Write(currentPath, dualData)
-	if err != nil {
-		return fmt.Errorf("failed to write dual secrets: %w", err)
-	}
-
-	// Update services to use new secret
-	if err := sm.updateServices(ctx, name, newValue); err != nil {
-		// Rollback
-		logger.Warn("Failed to update services, rolling back secret",
-			zap.String("name", name),
-			zap.Error(err))
-		_, rollbackErr := sm.client.vault.Logical().Write(currentPath, map[string]interface{}{
-			"data": map[string]interface{}{
-				"value": currentValue,
-			},
-		})
-		_ = rollbackErr // Ignore rollback errors
-		return fmt.Errorf("failed to update services: %w", err)
-	}
-
-	// Schedule cleanup of old secret
-	result.CleanupAfter = time.Now().Add(1 * time.Hour)
-	sm.scheduleCleanup(ctx, name, 1*time.Hour)
-
-	return nil
-}
-
-func (sm *SecretManager) rotateImmediate(ctx context.Context, name string, result *RotateSecretResult) error {
-	// Generate new secret
-	newValue := sm.generateSecret()
-	newVersion := fmt.Sprintf("v%d", time.Now().Unix())
-	result.NewVersion = newVersion
-
-	// Update in Vault
-	path := fmt.Sprintf("secret/data/hecate/%s", name)
-	_, err := sm.client.vault.Logical().Write(path, map[string]interface{}{
-		"data": map[string]interface{}{
-			"value":      newValue,
-			"version":    newVersion,
-			"rotated_at": time.Now().Format(time.RFC3339),
-		},
+	}()
+	
+	output, err := execute.Run(sm.rc.Ctx, execute.Options{
+		Command: "vault",
+		Args:    []string{"kv", "get", "-field=" + field, vaultPath},
+		Capture: true,
 	})
+	
 	if err != nil {
-		return fmt.Errorf("failed to write new secret: %w", err)
+		return "", fmt.Errorf("failed to get secret from Vault: %w", err)
 	}
-
-	// Update services
-	if err := sm.updateServices(ctx, name, newValue); err != nil {
-		return fmt.Errorf("failed to update services: %w", err)
-	}
-
-	// Restart affected services
-	if err := sm.restartServices(ctx, name); err != nil {
-		return fmt.Errorf("failed to restart services: %w", err)
-	}
-
-	return nil
+	
+	return strings.TrimSpace(output), nil
 }
 
-func (sm *SecretManager) generateSecret() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)
-}
-
-func (sm *SecretManager) updateServices(ctx context.Context, secretName, newValue string) error {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
-	logger.Info("Updating services with new secret",
-		zap.String("secret_name", secretName))
-
-	// Apply Salt state to update service configurations
-	state := map[string]interface{}{
-		"hecate_secret": map[string]interface{}{
-			"name":  secretName,
-			"value": newValue,
-		},
+// getSaltSecret retrieves a secret from Salt pillar files
+func (sm *SecretManager) getSaltSecret(service, key string) (string, error) {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	
+	var envFile, envKey string
+	
+	switch service {
+	case "postgres":
+		envFile = "/opt/hecate/secrets/postgres.env"
+		switch key {
+		case "password":
+			envKey = "POSTGRES_PASSWORD"
+		case "root_password":
+			envKey = "POSTGRES_ROOT_PASSWORD"
+		default:
+			return "", fmt.Errorf("unknown postgres secret key: %s", key)
+		}
+	case "redis":
+		envFile = "/opt/hecate/secrets/redis.env"
+		switch key {
+		case "password":
+			envKey = "REDIS_PASSWORD"
+		default:
+			return "", fmt.Errorf("unknown redis secret key: %s", key)
+		}
+	case "authentik":
+		envFile = "/opt/hecate/secrets/authentik.env"
+		switch key {
+		case "secret_key":
+			envKey = "AUTHENTIK_SECRET_KEY"
+		case "admin_password":
+			envKey = "AUTHENTIK_ADMIN_PASSWORD"
+		case "admin_username":
+			envKey = "AUTHENTIK_ADMIN_USERNAME"
+		default:
+			return "", fmt.Errorf("unknown authentik secret key: %s", key)
+		}
+	default:
+		return "", fmt.Errorf("unknown service: %s", service)
 	}
-
-	return sm.client.salt.ApplyState(ctx, "hecate.secret_update", state)
-}
-
-func (sm *SecretManager) restartServices(ctx context.Context, secretName string) error {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
-	logger.Info("Restarting services for secret",
-		zap.String("secret_name", secretName))
-
-	// Determine which services use this secret
-	services := sm.getAffectedServices(secretName)
-
-	for _, service := range services {
-		if err := sm.client.salt.RestartService(ctx, service); err != nil {
-			return fmt.Errorf("failed to restart %s: %w", service, err)
+	
+	logger.Debug("Retrieving secret from Salt pillar file", 
+		zap.String("file", envFile), 
+		zap.String("key", envKey))
+	
+	// Read the environment file
+	file, err := os.Open(envFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to open secret file %s: %w", envFile, err)
+	}
+	defer file.Close()
+	
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, envKey+"=") {
+			value := strings.TrimPrefix(line, envKey+"=")
+			return value, nil
 		}
 	}
+	
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("error reading secret file: %w", err)
+	}
+	
+	return "", fmt.Errorf("secret key %s not found in %s", envKey, envFile)
+}
 
+// GetBackend returns the current secret management backend
+func (sm *SecretManager) GetBackend() SecretBackend {
+	return sm.backend
+}
+
+// IsVaultAvailable checks if Vault is available and accessible
+func (sm *SecretManager) IsVaultAvailable() bool {
+	return sm.backend == SecretBackendVault
+}
+
+// GenerateSecrets triggers secret generation using the appropriate backend
+func (sm *SecretManager) GenerateSecrets() error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger.Info("Generating secrets", zap.String("backend", string(sm.backend)))
+	
+	switch sm.backend {
+	case SecretBackendVault:
+		return sm.generateVaultSecrets()
+	case SecretBackendSaltPillar:
+		return sm.generateSaltSecrets()
+	default:
+		return fmt.Errorf("cannot generate secrets with backend: %s", sm.backend)
+	}
+}
+
+// generateVaultSecrets creates secrets in Vault
+func (sm *SecretManager) generateVaultSecrets() error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger.Info("Generating secrets in Vault")
+	
+	// Apply the existing vault_secrets Salt state
+	_, err := execute.Run(sm.rc.Ctx, execute.Options{
+		Command: "salt-call",
+		Args:    []string{"state.apply", "hecate.vault_secrets"},
+		Capture: false, // Show output to user
+	})
+	
+	if err != nil {
+		return fmt.Errorf("failed to generate Vault secrets: %w", err)
+	}
+	
+	logger.Info("Vault secrets generated successfully")
 	return nil
 }
 
-func (sm *SecretManager) scheduleCleanup(ctx context.Context, name string, after time.Duration) {
-	logger := otelzap.Ctx(sm.client.rc.Ctx)
-	logger.Info("Scheduling secret cleanup",
-		zap.String("name", name),
-		zap.Duration("after", after))
-
-	// Store cleanup task in Consul
-	cleanupTime := time.Now().Add(after)
-	data := []byte(fmt.Sprintf(`{"secret_name":"%s","cleanup_time":"%s","created_at":"%s"}`, 
-		name, cleanupTime.Format(time.RFC3339), time.Now().Format(time.RFC3339)))
-	key := fmt.Sprintf("hecate/secret-cleanup/%s-%d", name, cleanupTime.Unix())
-	sm.client.consul.KV().Put(&api.KVPair{
-		Key:   key,
-		Value: data,
-	}, nil)
+// generateSaltSecrets creates secrets using Salt pillar
+func (sm *SecretManager) generateSaltSecrets() error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger.Info("Generating secrets using Salt pillar")
+	
+	// Apply the hybrid_secrets Salt state with pillar mode
+	_, err := execute.Run(sm.rc.Ctx, execute.Options{
+		Command: "salt-call",
+		Args:    []string{"state.apply", "hecate.hybrid_secrets", "--pillar-root=/opt/eos/salt/pillar"},
+		Capture: false, // Show output to user
+	})
+	
+	if err != nil {
+		return fmt.Errorf("failed to generate Salt pillar secrets: %w", err)
+	}
+	
+	logger.Info("Salt pillar secrets generated successfully")
+	return nil
 }
 
-func (sm *SecretManager) getAffectedServices(secretName string) []string {
-	// Map secret names to services that use them
-	serviceMap := map[string][]string{
-		"authentik-api-token": {"authentik"},
-		"caddy-admin-token":   {"caddy"},
-		"hetzner-api-token":   {"hecate-api"},
-		"vault-root-token":    {"vault"},
-		"consul-master-token": {"consul"},
+// ValidateSecrets checks that all required secrets are available
+func (sm *SecretManager) ValidateSecrets() error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger.Info("Validating secrets availability")
+	
+	requiredSecrets := []struct {
+		service string
+		key     string
+	}{
+		{"postgres", "root_password"},
+		{"postgres", "password"},
+		{"redis", "password"},
+		{"authentik", "secret_key"},
+		{"authentik", "admin_password"},
+		{"authentik", "admin_username"},
 	}
-
-	services, exists := serviceMap[secretName]
-	if !exists {
-		return []string{}
+	
+	for _, secret := range requiredSecrets {
+		_, err := sm.GetSecret(secret.service, secret.key)
+		if err != nil {
+			return fmt.Errorf("validation failed for %s.%s: %w", secret.service, secret.key, err)
+		}
+		logger.Debug("Secret validation passed", 
+			zap.String("service", secret.service), 
+			zap.String("key", secret.key))
 	}
-	return services
-}
-
-// SecretStatus represents the status of a secret
-type SecretStatus struct {
-	Name        string     `json:"name"`
-	Exists      bool       `json:"exists"`
-	Version     string     `json:"version,omitempty"`
-	LastRotated *time.Time `json:"last_rotated,omitempty"`
-	Error       string     `json:"error,omitempty"`
+	
+	logger.Info("All secrets validated successfully")
+	return nil
 }

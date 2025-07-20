@@ -73,8 +73,8 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 		return checkManualHecateRequirements(rc)
 	}
 	
-	// Show the calculated requirements to the user
-	logger.Info("Calculated Hecate requirements",
+	// Calculate requirements with debug logging for verbose details
+	logger.Debug("Calculated Hecate requirements",
 		zap.Float64("cpu_cores", breakdown.FinalRequirements.CPU),
 		zap.Float64("memory_gb", breakdown.FinalRequirements.Memory),
 		zap.Float64("storage_gb", breakdown.FinalRequirements.Storage))
@@ -82,7 +82,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 	// Generate a report for the user
 	report, err := sizing.GenerateHecateRecommendationReport(rc, "small_production")
 	if err == nil {
-		logger.Info("Hecate sizing report generated",
+		logger.Debug("Hecate sizing report generated",
 			zap.String("report_length", fmt.Sprintf("%d chars", len(report))))
 		// Log key points from the report (but don't flood the log)
 		lines := strings.Split(report, "\n")
@@ -154,9 +154,9 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 			healthCheck: checkHashiCorpStack,
 		},
 		{
-			name:        "vault_secrets",
-			state:       "hecate.vault_secrets",
-			description: "Creating Vault secrets for Hecate components",
+			name:        "hybrid_secrets",
+			state:       "hecate.hybrid_secrets",
+			description: "Creating secrets for Hecate components (Vault or Salt pillar)",
 			critical:    true,
 			healthCheck: checkVaultSecrets,
 		},
@@ -242,7 +242,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 					zap.String("phase", phase.name),
 					zap.String("state", phase.state))
 
-				// Log detailed output for debugging (but only in debug mode)
+				// Log detailed output for debugging
 				logger.Debug("Salt state execution result",
 					zap.String("phase", phase.name),
 					zap.String("output", output))
@@ -258,7 +258,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 					for healthAttempt := 1; healthAttempt <= healthCheckRetries; healthAttempt++ {
 						healthErr = phase.healthCheck(rc)
 						if healthErr == nil {
-							logger.Info("Health check passed",
+							logger.Debug("Health check passed",
 								zap.String("phase", phase.name),
 								zap.Int("health_attempt", healthAttempt))
 							break
@@ -293,8 +293,7 @@ func DeployWithSaltStackAndServices(rc *eos_io.RuntimeContext, requestedServices
 				}
 
 				logger.Info("Phase completed successfully",
-					zap.String("phase", phase.name),
-					zap.Duration("total_time", time.Since(time.Now())))
+					zap.String("phase", phase.name))
 				break
 			}
 
@@ -960,24 +959,22 @@ func checkHashiCorpStack(rc *eos_io.RuntimeContext) error {
 
 func checkVaultSecrets(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("Checking Vault secrets")
+	logger.Debug("Checking secrets using hybrid secret manager")
 
-	requiredSecrets := []string{
-		"secret/hecate/postgres/root_password",
-		"secret/hecate/postgres/password",
-		"secret/hecate/redis/password",
-		"secret/hecate/authentik/secret_key",
-		"secret/hecate/authentik/admin",
+	// Use the hybrid secret manager to check secrets regardless of backend
+	secretManager, err := NewSecretManager(rc)
+	if err != nil {
+		return fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
 
-	for _, secret := range requiredSecrets {
-		_, err := executeVaultCommand(rc, []string{"kv", "get", "-field=value", secret}, true)
-		if err != nil {
-			return fmt.Errorf("secret %s not found: %w", secret, err)
-		}
-		logger.Debug("Secret verified", zap.String("secret", secret))
+	logger.Info("Using secret backend", zap.String("backend", string(secretManager.GetBackend())))
+
+	// Validate all required secrets are available
+	if err := secretManager.ValidateSecrets(); err != nil {
+		return fmt.Errorf("secret validation failed: %w", err)
 	}
 
+	logger.Debug("All secrets validated successfully")
 	return nil
 }
 

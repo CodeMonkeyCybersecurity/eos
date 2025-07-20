@@ -456,10 +456,13 @@ func analyzeResults(result *PreflightCheckResult) {
 		result.CanProceed = false
 	}
 
-	// Don't block on NAT/port issues, just warn
+	// NAT is a critical issue for Caddy/ACME
 	if result.NetworkCheck.BehindNAT {
-		result.Warnings = append(result.Warnings,
-			"Server is behind NAT - ensure ports 80/443 are forwarded for ACME to work")
+		result.CriticalIssues = append(result.CriticalIssues,
+			"Server is behind NAT - Caddy's ACME/Let's Encrypt will not work properly")
+		result.CriticalIssues = append(result.CriticalIssues,
+			"Consider: 1) Using a cloud deployment with public IP, 2) Using DNS challenge instead of HTTP, or 3) Using a cloud load balancer")
+		result.CanProceed = false
 	}
 }
 

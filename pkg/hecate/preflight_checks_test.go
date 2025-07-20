@@ -1,6 +1,7 @@
 package hecate
 
 import (
+	"context"
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -10,7 +11,7 @@ import (
 
 func TestPreflightChecks(t *testing.T) {
 	// Create test runtime context
-	rc := eos_io.NewTestContext(t)
+	rc := eos_io.NewContext(context.Background(), "test")
 
 	// Run preflight checks
 	result, err := PreflightChecks(rc)
@@ -90,7 +91,7 @@ func TestIsPortInUse(t *testing.T) {
 }
 
 func TestCanReachInternet(t *testing.T) {
-	rc := eos_io.NewTestContext(t)
+	rc := eos_io.NewContext(context.Background(), "test")
 	
 	// This test might fail in isolated environments
 	// Just verify it returns a boolean without error

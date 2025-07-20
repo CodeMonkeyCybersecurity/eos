@@ -3,6 +3,7 @@
 
 include:
   - .prereqs
+  - .hybrid_secrets
   - .nomad.jobs
   - .authentik.database
   - .authentik.redis
@@ -17,6 +18,7 @@ hecate_deployment_order:
   test.succeed_with_changes:
     - require:
       - sls: hecate.prereqs
+      - sls: hecate.hybrid_secrets
       - sls: hecate.nomad.jobs
       - sls: hecate.authentik.database
       - sls: hecate.authentik.redis
