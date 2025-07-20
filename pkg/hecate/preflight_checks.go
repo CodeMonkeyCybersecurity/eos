@@ -672,7 +672,8 @@ func installDependency(rc *eos_io.RuntimeContext, dep DependencyStatus) error {
 	case "vault":
 		args = append(args, "--dev-mode")
 	case "consul":
-		args = append(args, "--dev-mode")
+		// Consul doesn't have a --dev-mode flag, it will run with default settings
+		// which are appropriate for a single-node deployment
 	case "nomad":
 		// Don't add --node-role flag, let the command use its defaults
 		// The nomad command will handle the role appropriately
