@@ -456,12 +456,17 @@ func analyzeResults(result *PreflightCheckResult) {
 		result.CanProceed = false
 	}
 
-	// Hecate requires cloud deployment with public IP
-	if result.NetworkCheck.BehindNAT {
+	// Check if we have a public IP but it might be behind cloud NAT
+	if result.NetworkCheck.BehindNAT && result.NetworkCheck.PublicIP != "" {
+		// This is likely a cloud server with NAT (common in AWS, GCP, etc.)
+		result.Warnings = append(result.Warnings,
+			"Server appears to be behind NAT but has a public IP - this is common in cloud environments")
+	} else if result.NetworkCheck.BehindNAT && result.NetworkCheck.PublicIP == "" {
+		// This is truly a private network without public IP
 		result.CriticalIssues = append(result.CriticalIssues,
-			"Hecate must be deployed on a cloud server with a public IP address")
+			"No public IP detected - Hecate requires a public IP for HTTPS certificates")
 		result.CriticalIssues = append(result.CriticalIssues,
-			"NAT/private networks are not supported. Please deploy on: AWS EC2, Hetzner Cloud, DigitalOcean, GCP, Azure, etc.")
+			"Please deploy on a cloud server with public IP: AWS EC2, Hetzner Cloud, DigitalOcean, GCP, Azure, etc.")
 		result.CanProceed = false
 	}
 	
