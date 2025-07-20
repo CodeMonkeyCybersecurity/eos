@@ -606,6 +606,35 @@ func DeployNomadViaSalt(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Nomad deployment via Salt states")
 	
+	// ASSESS - Check prerequisites 
+	logger.Info("Assessing Nomad deployment prerequisites")
+	
+	// Run comprehensive preflight checks
+	preflightResult, err := RunPreflightChecks(rc)
+	if err != nil {
+		return fmt.Errorf("preflight checks failed: %w", err)
+	}
+	
+	// Display preflight summary
+	DisplayPreflightSummary(rc, preflightResult)
+	
+	// Handle missing dependencies
+	if !preflightResult.CanProceed {
+		if err := HandleMissingDependencies(rc, preflightResult); err != nil {
+			return err
+		}
+		
+		// Re-run preflight checks after handling dependencies
+		preflightResult, err = RunPreflightChecks(rc)
+		if err != nil {
+			return fmt.Errorf("preflight checks failed after dependency handling: %w", err)
+		}
+		
+		if !preflightResult.CanProceed {
+			return fmt.Errorf("cannot proceed with installation - critical issues remain")
+		}
+	}
+	
 	// Ask for user consent before proceeding
 	consent, err := eos_io.PromptForInstallation(rc, "HashiCorp Nomad", "orchestrator for containers and workloads")
 	if err != nil {
@@ -616,9 +645,6 @@ func DeployNomadViaSalt(rc *eos_io.RuntimeContext) error {
 		logger.Info("Installation cancelled by user")
 		return fmt.Errorf("installation cancelled by user")
 	}
-
-	// ASSESS - Check prerequisites 
-	logger.Info("Assessing Nomad deployment prerequisites")
 	
 	// Check firewall status
 	platform.CheckFirewallStatus(rc)

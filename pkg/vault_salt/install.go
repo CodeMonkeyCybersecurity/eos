@@ -56,7 +56,7 @@ func checkInstallPrerequisites(rc *eos_io.RuntimeContext, config *Config) error 
 	cli := eos_cli.New(rc)
 	if _, err := cli.ExecString("salt-call", "--version"); err != nil {
 		logger.Error("Salt is not available", zap.Error(err))
-		return eos_err.NewUserError("salt is not available")
+		return eos_err.NewUserError("SaltStack is required for vault installation. Please install SaltStack first using 'eos create saltstack'")
 	}
 	
 	// Check if Vault is already installed

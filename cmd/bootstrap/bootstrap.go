@@ -38,7 +38,7 @@ Flags:
   --join-cluster      Join existing cluster at specified address
   --preferred-role    Set role when joining cluster (edge/core/data/compute)
   --auto-discover     Enable automatic cluster discovery`,
-		RunE: eos_cli.Wrap(runBootstrapAll),
+		RunE: eos_cli.Wrap(runBootstrapAllTop),
 	}
 	
 	// Add the same flags as create bootstrap all
@@ -47,10 +47,21 @@ Flags:
 	BootstrapCmd.Flags().String("preferred-role", "", "Preferred role when joining cluster (edge/core/data/compute)")
 	BootstrapCmd.Flags().Bool("auto-discover", false, "Enable automatic cluster discovery via multicast")
 	BootstrapCmd.Flags().Bool("skip-hardening", false, "Skip Ubuntu security hardening (not recommended for production)")
+	
 }
 
-// runBootstrapAll runs the enhanced bootstrap all command
-func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+// AddSubcommands adds all bootstrap subcommands to BootstrapCmd
+func AddSubcommands() {
+	BootstrapCmd.AddCommand(GetAllCmd())
+	BootstrapCmd.AddCommand(GetQuickstartCmd())
+	BootstrapCmd.AddCommand(GetSaltCmd())
+	BootstrapCmd.AddCommand(GetVaultCmd())
+	BootstrapCmd.AddCommand(GetNomadCmd())
+	BootstrapCmd.AddCommand(GetOsqueryCmd())
+}
+
+// runBootstrapAllTop runs the enhanced bootstrap all command (top-level bootstrap)
+func runBootstrapAllTop(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	// Directly call the enhanced bootstrap function from create package
 	return create.RunBootstrapAllEnhanced(rc, cmd, args)
 }

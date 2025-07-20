@@ -1,8 +1,4 @@
-// DEPRECATED: This file is deprecated. Use 'eos bootstrap quickstart' instead of 'eos create quickstart'.
-// All quickstart functionality has been migrated to cmd/bootstrap/ for better organization.
-// This file is maintained only for backward compatibility.
-
-package create
+package bootstrap
 
 import (
 	"context"
@@ -12,6 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
@@ -21,36 +18,132 @@ import (
 	"go.uber.org/zap"
 )
 
+var allCmd = &cobra.Command{
+	Use:   "all",
+	Short: "Bootstrap all infrastructure components in the correct order",
+	Long: `Bootstrap all infrastructure components in the correct order: Salt, Vault, Nomad, OSQuery.
+	
+This is a comprehensive setup that includes:
+- SaltStack for configuration management
+- HashiCorp Vault for secrets management 
+- HashiCorp Nomad for container orchestration (optional)
+- OSQuery for system monitoring
+- State tracking and verification`,
+	RunE: eos_cli.Wrap(runBootstrapAll),
+}
+
 var quickstartCmd = &cobra.Command{
 	Use:   "quickstart",
-	Short: "DEPRECATED: Use 'eos bootstrap quickstart' instead",
-	Long: `DEPRECATED: This command is deprecated. Use 'eos bootstrap quickstart' instead.
+	Short: "Quick setup of a complete eos environment (5 minutes)",
+	Long: `Quickstart sets up a complete eos environment in under 5 minutes.
+This includes Salt, Vault, OSQuery, and optionally Nomad for container orchestration.
 
-The new quickstart command provides the same functionality:
+The quickstart process will:
+1. Bootstrap core infrastructure (Salt, Vault, OSQuery)
+2. Use Salt to manage additional components
+3. Verify all components are running correctly
+4. Provide a summary of what was installed
 
-  eos bootstrap quickstart           # Quick 5-minute setup
-  eos bootstrap quickstart --with-nomad  # Include Nomad
-
-This command will redirect to the new bootstrap quickstart for backward compatibility.`,
+This is ideal for:
+- New users getting started with eos
+- Testing eos capabilities on fresh VMs
+- Rapid prototyping of infrastructure`,
 	RunE: eos_cli.Wrap(runQuickstart),
 }
 
 func init() {
-	// DEPRECATED: This command is deprecated. Users should use 'eos bootstrap quickstart' instead.
-	// Keeping for backward compatibility but showing deprecation warnings.
-	CreateCmd.AddCommand(quickstartCmd)
-
+	// Initialize flags first
+	allCmd.Flags().Bool("with-nomad", false, "Include Nomad for container orchestration")
+	allCmd.Flags().Bool("skip-verify", false, "Skip verification steps")
+	allCmd.Flags().Duration("timeout", 10*time.Minute, "Maximum time for bootstrap")
+	
 	quickstartCmd.Flags().Bool("with-nomad", false, "Include Nomad for container orchestration")
 	quickstartCmd.Flags().Bool("with-clusterfuzz", false, "Include ClusterFuzz setup")
 	quickstartCmd.Flags().Bool("skip-verify", false, "Skip verification steps")
 	quickstartCmd.Flags().Duration("timeout", 5*time.Minute, "Maximum time for quickstart")
 }
 
+// GetAllCmd returns the bootstrap all command
+func GetAllCmd() *cobra.Command {
+	return allCmd
+}
+
+// GetQuickstartCmd returns the bootstrap quickstart command  
+func GetQuickstartCmd() *cobra.Command {
+	return quickstartCmd
+}
+
+func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	startTime := time.Now()
+
+	logger.Info("Starting comprehensive bootstrap",
+		zap.Time("start_time", startTime))
+
+	// Parse flags
+	withNomad := cmd.Flag("with-nomad").Value.String() == "true"
+	skipVerify := cmd.Flag("skip-verify").Value.String() == "true"
+	timeout, _ := cmd.Flags().GetDuration("timeout")
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
+	defer cancel()
+	rc.Ctx = ctx
+
+	logger.Info("Bootstrap configuration",
+		zap.Bool("with_nomad", withNomad),
+		zap.Bool("skip_verify", skipVerify),
+		zap.Duration("timeout", timeout))
+
+	// Phase 1: Bootstrap Salt
+	logger.Info("Phase 1: Bootstrap SaltStack")
+	saltConfig := &saltstack.Config{
+		MasterMode: true,
+		LogLevel:   "warning",
+	}
+	if err := saltstack.Install(rc, saltConfig); err != nil {
+		return fmt.Errorf("failed to bootstrap Salt: %w", err)
+	}
+
+	// Phase 2: Bootstrap Vault
+	logger.Info("Phase 2: Bootstrap Vault via SaltStack")
+	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
+		return fmt.Errorf("failed to bootstrap Vault: %w", err)
+	}
+
+	// Phase 3: Bootstrap OSQuery
+	logger.Info("Phase 3: Bootstrap OSQuery")
+	if err := osquery.InstallOsquery(rc); err != nil {
+		return fmt.Errorf("failed to bootstrap OSQuery: %w", err)
+	}
+
+	// Phase 4: Optional Nomad
+	if withNomad {
+		logger.Info("Phase 4: Bootstrap Nomad via SaltStack")
+		if err := nomad.DeployNomadViaSaltBootstrap(rc); err != nil {
+			return fmt.Errorf("failed to bootstrap Nomad: %w", err)
+		}
+	}
+
+	// Phase 5: Verification
+	if !skipVerify {
+		logger.Info("Phase 5: Verification")
+		if err := verifyBootstrap(rc, withNomad); err != nil {
+			return fmt.Errorf("verification failed: %w", err)
+		}
+	}
+
+	elapsed := time.Since(startTime)
+	logger.Info("Bootstrap completed successfully",
+		zap.Duration("elapsed_time", elapsed))
+
+	return nil
+}
+
 func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
 
-	logger.Warn("DEPRECATION WARNING: 'eos create quickstart' is deprecated. Use 'eos bootstrap quickstart' instead.")
 	logger.Info("Starting eos quickstart",
 		zap.Time("start_time", startTime))
 
@@ -215,6 +308,54 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	return nil
 }
 
+func verifyBootstrap(rc *eos_io.RuntimeContext, withNomad bool) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	cmd := eos_cli.New(rc)
+
+	logger.Info("Verifying bootstrap installation")
+
+	// Verify core components
+	components := []struct {
+		name    string
+		command string
+		service string
+	}{
+		{"Salt Master", "salt", "salt-master"},
+		{"Salt Minion", "salt-minion", "salt-minion"},
+		{"Vault", "vault", "vault"},
+		{"OSQuery", "osqueryi", "osqueryd"},
+	}
+
+	if withNomad {
+		components = append(components, struct {
+			name    string
+			command string
+			service string
+		}{"Nomad", "nomad", "nomad"})
+	}
+
+	for _, comp := range components {
+		// Check command exists
+		if _, err := cmd.Which(comp.command); err != nil {
+			return fmt.Errorf("%s command not found: %w", comp.name, err)
+		}
+
+		// Check service is running
+		output, err := cmd.ExecString("systemctl", "is-active", comp.service)
+		if err != nil || output != "active" {
+			return fmt.Errorf("%s service is not active", comp.name)
+		}
+
+		logger.Info("Component verified",
+			zap.String("component", comp.name),
+			zap.String("status", "active"))
+	}
+
+	logger.Info("All verifications passed")
+	return nil
+}
+
+// Helper functions from original quickstart
 func installNomadViaSalt(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	cmd := eos_cli.New(rc)

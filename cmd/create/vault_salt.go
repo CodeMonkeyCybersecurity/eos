@@ -13,23 +13,20 @@ import (
 
 var createVaultSaltCmd = &cobra.Command{
 	Use:   "vault-salt",
-	Short: "Install and configure HashiCorp Vault using SaltStack",
-	Long: `Install and configure HashiCorp Vault using SaltStack orchestration.
+	Short: "DEPRECATED: Use 'eos create vault' instead",
+	Long: `DEPRECATED: This command is deprecated and will be removed in a future version.
 
-This command provides a complete Vault deployment including:
-- Installation of Vault binary
-- TLS certificate generation
-- Service configuration
-- Initialization and unsealing
-- Auth method configuration (userpass, approle)
-- Policy management
-- Audit logging
+All vault-salt functionality has been merged into the main 'eos create vault' command.
+The main vault command now uses SaltStack by default and includes all the same features:
+
+- Complete SaltStack-based deployment
+- Advanced configuration options
 - Security hardening
 - Backup configuration
+- Phase-based deployment control
 
-The deployment is managed entirely through SaltStack states, ensuring
-consistent and repeatable installations.`,
-	RunE: eos_cli.Wrap(runCreateVaultSalt),
+Please use 'eos create vault' for all new deployments.`,
+	RunE: eos_cli.Wrap(runCreateVaultSaltDeprecated),
 }
 
 func init() {
@@ -89,7 +86,17 @@ func init() {
 	createVaultSaltCmd.Flags().Bool("skip-verify", false, "Skip verification phase")
 }
 
-func runCreateVaultSalt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runCreateVaultSaltDeprecated(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("DEPRECATION WARNING: 'eos create vault-salt' is deprecated")
+	logger.Info("All vault-salt functionality has been merged into 'eos create vault'")
+	logger.Info("Please use 'eos create vault' for new deployments")
+	
+	// Redirect to the main vault command functionality
+	return runCreateVaultSaltLegacy(rc, cmd, args)
+}
+
+func runCreateVaultSaltLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault deployment via SaltStack")
 	

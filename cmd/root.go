@@ -87,6 +87,9 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 	} {
 		RootCmd.AddCommand(subCmd)
 	}
+	
+	// Add bootstrap subcommands after all init() functions have run
+	bootstrap.AddSubcommands()
 }
 
 // Execute initializes and runs the root command.

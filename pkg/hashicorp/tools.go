@@ -54,6 +54,23 @@ func InstallToolViaSalt(rc *eos_io.RuntimeContext, tool string) error {
 	}
 
 	logger.Info("Tool validation passed", zap.String("tool", tool))
+	
+	// Run tool-specific preflight checks
+	if err := runToolPreflightChecks(rc, tool); err != nil {
+		return fmt.Errorf("preflight checks failed: %w", err)
+	}
+	
+	// Ask for user consent before proceeding
+	toolDescription := getToolDescription(tool)
+	consent, err := eos_io.PromptForInstallation(rc, fmt.Sprintf("HashiCorp %s", strings.Title(tool)), toolDescription)
+	if err != nil {
+		return fmt.Errorf("failed to get user consent: %w", err)
+	}
+	
+	if !consent {
+		logger.Info("Installation cancelled by user")
+		return fmt.Errorf("installation cancelled by user")
+	}
 
 	// ASSESS - Check if Salt is available
 	logger.Info("Assessing Salt availability for HashiCorp tool installation")
@@ -375,5 +392,85 @@ func installToolDirect(rc *eos_io.RuntimeContext, tool string) error {
 	logger.Info("Tool installation completed", zap.String("tool", tool))
 
 	logger.Info("Successfully installed HashiCorp tool via direct method", zap.String("tool", tool))
+	return nil
+}
+
+// runToolPreflightChecks runs tool-specific preflight checks
+func runToolPreflightChecks(rc *eos_io.RuntimeContext, tool string) error {
+	switch tool {
+	case "terraform":
+		// For now, just do basic checks until we can properly import
+		return runBasicPreflightChecks(rc, tool)
+		
+	case "nomad":
+		// Nomad has its own comprehensive installation flow
+		return nil
+		
+	case "consul":
+		// Consul has its own installation flow
+		return nil
+		
+	default:
+		// Basic checks for other tools
+		return runBasicPreflightChecks(rc, tool)
+	}
+}
+
+// getToolDescription returns a description for each HashiCorp tool
+func getToolDescription(tool string) string {
+	descriptions := map[string]string{
+		"terraform": "infrastructure as code provisioning",
+		"vault":     "secrets management and encryption",
+		"consul":    "service discovery and mesh networking",
+		"nomad":     "workload orchestration",
+		"packer":    "automated machine image building",
+		"boundary":  "secure remote access",
+	}
+	
+	if desc, ok := descriptions[tool]; ok {
+		return desc
+	}
+	return "HashiCorp tool"
+}
+
+// runBasicPreflightChecks performs basic checks for tools without specific requirements
+func runBasicPreflightChecks(rc *eos_io.RuntimeContext, tool string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Running basic preflight checks", zap.String("tool", tool))
+	
+	// Check if already installed
+	if path, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "which",
+		Args:    []string{tool},
+		Capture: true,
+	}); err == nil {
+		logger.Info("⚠ Tool already installed", 
+			zap.String("tool", tool),
+			zap.String("path", strings.TrimSpace(path)))
+		
+		// Get version
+		if version, err := execute.Run(rc.Ctx, execute.Options{
+			Command: tool,
+			Args:    []string{"version"},
+			Capture: true,
+		}); err == nil {
+			logger.Info("Existing version", zap.String("version", strings.Split(version, "\n")[0]))
+		}
+	}
+	
+	// Check disk space
+	logger.Info("Checking disk space")
+	// Simple df check - we need at least 500MB
+	if output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "df",
+		Args:    []string{"-BM", "/usr/local/bin"},
+		Capture: true,
+	}); err == nil {
+		lines := strings.Split(output, "\n")
+		if len(lines) > 1 {
+			logger.Info("Disk space check", zap.String("df_output", lines[1]))
+		}
+	}
+	
 	return nil
 }

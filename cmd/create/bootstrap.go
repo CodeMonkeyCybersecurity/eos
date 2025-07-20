@@ -1,3 +1,7 @@
+// DEPRECATED: This file is deprecated. Use 'eos bootstrap' instead of 'eos create bootstrap'.
+// All bootstrap functionality has been migrated to cmd/bootstrap/ for better organization.
+// This file is maintained only for backward compatibility.
+
 package create
 
 import (
@@ -14,22 +18,20 @@ import (
 
 var bootstrapCmd = &cobra.Command{
 	Use:   "bootstrap [component]",
-	Short: "Bootstrap infrastructure components from scratch",
-	Long: `Bootstrap infrastructure components on a fresh system.
-This command installs and configures core infrastructure using Salt states.
+	Short: "DEPRECATED: Use 'eos bootstrap' instead",
+	Long: `DEPRECATED: This command is deprecated. Use 'eos bootstrap' instead.
 
-Available components:
-  salt     - Install and configure Salt (master/minion or masterless)
-  vault    - Install and configure HashiCorp Vault using Salt states
-  nomad    - Install and configure HashiCorp Nomad using Salt states
-  osquery  - Install and configure OSQuery for system monitoring
-  all      - Bootstrap all components in the correct order
+All bootstrap functionality has been migrated to the top-level 'eos bootstrap' command:
 
-Examples:
-  eos create bootstrap salt      # Bootstrap Salt infrastructure
-  eos create bootstrap vault     # Bootstrap Vault via Salt
-  eos create bootstrap nomad     # Bootstrap Nomad via Salt
-  eos create bootstrap all       # Bootstrap everything`,
+  eos bootstrap           # Bootstrap everything (recommended)
+  eos bootstrap all       # Bootstrap all components  
+  eos bootstrap salt      # Bootstrap Salt infrastructure
+  eos bootstrap vault     # Bootstrap Vault via Salt
+  eos bootstrap nomad     # Bootstrap Nomad via Salt
+  eos bootstrap osquery   # Bootstrap OSQuery
+  eos bootstrap quickstart # Quick 5-minute setup
+
+This command will redirect to the new bootstrap commands for backward compatibility.`,
 }
 
 var bootstrapSaltCmd = &cobra.Command{
@@ -68,6 +70,8 @@ var bootstrapAllCmd = &cobra.Command{
 }
 
 func init() {
+	// DEPRECATED: This command is deprecated. Users should use 'eos bootstrap' instead.
+	// Keeping for backward compatibility but showing deprecation warnings.
 	CreateCmd.AddCommand(bootstrapCmd)
 	bootstrapCmd.AddCommand(bootstrapSaltCmd)
 	bootstrapCmd.AddCommand(bootstrapVaultCmd)
@@ -82,6 +86,7 @@ func init() {
 
 func runBootstrapSalt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("DEPRECATION WARNING: 'eos create bootstrap salt' is deprecated. Use 'eos bootstrap salt' instead.")
 	logger.Info("Starting Salt bootstrap with integrated file_roots setup")
 
 	masterMode := cmd.Flag("master-mode").Value.String() == "true"
@@ -104,6 +109,7 @@ func runBootstrapSalt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 func runBootstrapVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("DEPRECATION WARNING: 'eos create bootstrap vault' is deprecated. Use 'eos bootstrap vault' instead.")
 	logger.Info("Starting Vault bootstrap")
 
 	// Use the Salt-based Vault deployment for architectural consistency
@@ -117,6 +123,7 @@ func runBootstrapVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 func runBootstrapNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("DEPRECATION WARNING: 'eos create bootstrap nomad' is deprecated. Use 'eos bootstrap nomad' instead.")
 	logger.Info("Starting Nomad bootstrap")
 
 	// Use the bootstrap-specific Salt deployment (no interactive prompts)
@@ -130,6 +137,7 @@ func runBootstrapNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 func runBootstrapOsquery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("DEPRECATION WARNING: 'eos create bootstrap osquery' is deprecated. Use 'eos bootstrap osquery' instead.")
 	logger.Info("Starting OSQuery bootstrap")
 
 	if err := osquery.InstallOsquery(rc); err != nil {
@@ -141,6 +149,8 @@ func runBootstrapOsquery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 }
 
 func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("DEPRECATION WARNING: 'eos create bootstrap all' is deprecated. Use 'eos bootstrap all' or 'eos bootstrap' instead.")
 	// Redirect to enhanced version that includes storage ops and clustering
 	return RunBootstrapAllEnhanced(rc, cmd, args)
 }
