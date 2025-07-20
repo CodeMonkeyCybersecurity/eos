@@ -3,12 +3,16 @@
 package create
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bootstrap"
-	// "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/service_installation"
@@ -173,6 +177,13 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 				logger.Info("Ubuntu hardening completed successfully (SSH password auth remains enabled)")
 			}
 		}
+	}
+	
+	// Phase 6: Create Enhanced Environment Configuration
+	logger.Info("Phase 6: Creating enhanced environment configuration", zap.Int("phase", 6), zap.Int("total_phases", 6))
+	if err := createEnhancedEnvironmentConfig(rc, clusterInfo); err != nil {
+		logger.Warn("Failed to create enhanced environment config", zap.Error(err))
+		// Don't fail bootstrap for this
 	}
 	
 	// Save cluster configuration for future reference
@@ -363,5 +374,119 @@ func installTailscaleForBootstrap(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("tailscale installation was not successful")
 	}
 	
+	return nil
+}
+
+// createEnhancedEnvironmentConfig creates environment configuration files during bootstrap
+func createEnhancedEnvironmentConfig(rc *eos_io.RuntimeContext, clusterInfo *bootstrap.ClusterInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Creating enhanced environment configuration")
+
+	// Create environment config directory
+	bootstrapDir := "/opt/eos/bootstrap"
+	if err := os.MkdirAll(bootstrapDir, 0755); err != nil {
+		return fmt.Errorf("failed to create bootstrap directory: %w", err)
+	}
+
+	// Discover enhanced environment configuration
+	enhancedConfig, err := environment.DiscoverEnhancedEnvironment(rc)
+	if err != nil {
+		return fmt.Errorf("failed to discover enhanced environment: %w", err)
+	}
+
+	// Override with cluster-specific information
+	enhancedConfig.ClusterSize = clusterInfo.NodeCount
+	if clusterInfo.IsSingleNode {
+		enhancedConfig.ClusterSize = 1
+		enhancedConfig.NodeRoles = map[string][]string{
+			"localhost": {"server", "client", "database", "monitoring"},
+		}
+	}
+
+	// Create environment.json file
+	envFile := filepath.Join(bootstrapDir, "environment.json")
+	envData, err := json.MarshalIndent(enhancedConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal environment config: %w", err)
+	}
+
+	if err := os.WriteFile(envFile, envData, 0644); err != nil {
+		return fmt.Errorf("failed to write environment config: %w", err)
+	}
+
+	logger.Info("Created environment configuration file",
+		zap.String("file", envFile),
+		zap.String("profile", string(enhancedConfig.Profile)),
+		zap.Int("cluster_size", enhancedConfig.ClusterSize))
+
+	// Set Salt grains for environment discovery
+	if err := setSaltEnvironmentGrains(rc, enhancedConfig); err != nil {
+		logger.Warn("Failed to set Salt environment grains", zap.Error(err))
+		// Don't fail bootstrap for this
+	}
+
+	return nil
+}
+
+// setSaltEnvironmentGrains configures Salt grains for environment discovery
+func setSaltEnvironmentGrains(rc *eos_io.RuntimeContext, config *environment.EnhancedEnvironmentConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Setting Salt environment grains")
+
+	// Set environment grain
+	if err := setSaltGrain(rc, "environment", config.Environment); err != nil {
+		return fmt.Errorf("failed to set environment grain: %w", err)
+	}
+
+	// Set deployment profile grain
+	if err := setSaltGrain(rc, "deployment_profile", string(config.Profile)); err != nil {
+		return fmt.Errorf("failed to set deployment_profile grain: %w", err)
+	}
+
+	// Set cluster size grain
+	if err := setSaltGrain(rc, "cluster_size", fmt.Sprintf("%d", config.ClusterSize)); err != nil {
+		return fmt.Errorf("failed to set cluster_size grain: %w", err)
+	}
+
+	// Set resource strategy grain
+	if err := setSaltGrain(rc, "resource_strategy", config.ResourceStrategy); err != nil {
+		return fmt.Errorf("failed to set resource_strategy grain: %w", err)
+	}
+
+	// Set node roles grain (convert to JSON string)
+	if len(config.NodeRoles) > 0 {
+		rolesData, err := json.Marshal(config.NodeRoles)
+		if err == nil {
+			if err := setSaltGrain(rc, "node_roles", string(rolesData)); err != nil {
+				logger.Warn("Failed to set node_roles grain", zap.Error(err))
+			}
+		}
+	}
+
+	// Set primary namespace grain
+	if err := setSaltGrain(rc, "primary_namespace", config.Namespaces.Primary); err != nil {
+		return fmt.Errorf("failed to set primary_namespace grain: %w", err)
+	}
+
+	logger.Info("Salt environment grains configured successfully")
+	return nil
+}
+
+// setSaltGrain sets a single Salt grain
+func setSaltGrain(rc *eos_io.RuntimeContext, key, value string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Setting Salt grain", zap.String("key", key), zap.String("value", value))
+
+	// Use salt-call to set the grain locally
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "salt-call",
+		Args:    []string{"--local", "grains.setval", key, value},
+		Capture: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set grain %s: %w (output: %s)", key, err, output)
+	}
+
+	logger.Debug("Salt grain set successfully", zap.String("key", key))
 	return nil
 }

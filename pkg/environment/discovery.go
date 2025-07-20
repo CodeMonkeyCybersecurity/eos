@@ -56,10 +56,36 @@ type ResourceConfig struct {
 }
 
 // DiscoverEnvironment automatically discovers the current environment configuration
+// This is the main entry point that uses enhanced discovery when available
 func DiscoverEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Discovering environment configuration")
+	logger.Info("Discovering environment configuration with enhanced topology detection")
 
+	// Try enhanced discovery first (includes cluster topology and node roles)
+	if enhancedConfig, err := DiscoverEnhancedEnvironment(rc); err == nil {
+		// Convert enhanced config to basic config for backward compatibility
+		config := convertEnhancedToBasic(enhancedConfig)
+		
+		logger.Info("Enhanced environment discovery completed",
+			zap.String("profile", string(enhancedConfig.Profile)),
+			zap.Int("cluster_size", enhancedConfig.ClusterSize),
+			zap.String("environment", config.Environment),
+			zap.String("datacenter", config.Datacenter),
+			zap.String("namespace_primary", enhancedConfig.Namespaces.Primary))
+		
+		// Save both enhanced and basic configs
+		if err := saveEnhancedConfig(enhancedConfig); err != nil {
+			logger.Warn("Failed to save enhanced configuration", zap.Error(err))
+		}
+		if err := saveConfig(config); err != nil {
+			logger.Warn("Failed to save basic configuration", zap.Error(err))
+		}
+		
+		return config, nil
+	}
+
+	// Fallback to basic discovery
+	logger.Info("Enhanced discovery failed, using basic discovery")
 	config := &EnvironmentConfig{}
 
 	// 1. Check for existing environment configuration
@@ -93,12 +119,82 @@ func DiscoverEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentConfig, error) 
 		logger.Warn("Failed to save configuration", zap.Error(err))
 	}
 
-	logger.Info("Environment discovery completed",
+	logger.Info("Basic environment discovery completed",
 		zap.String("environment", config.Environment),
 		zap.String("datacenter", config.Datacenter),
 		zap.String("secret_backend", config.SecretBackend))
 
 	return config, nil
+}
+
+// convertEnhancedToBasic converts enhanced config to basic config for backward compatibility
+func convertEnhancedToBasic(enhanced *EnhancedEnvironmentConfig) *EnvironmentConfig {
+	return &EnvironmentConfig{
+		Environment:   enhanced.Environment,
+		Datacenter:    enhanced.Datacenter,
+		Region:        enhanced.Region,
+		NodeRole:      determineNodeRole(enhanced),
+		NodeID:        "localhost", // Could be enhanced to use actual node ID
+		ClusterNodes:  extractClusterNodes(enhanced),
+		Services:      enhanced.Services,
+		SecretBackend: enhanced.SecretBackend,
+		VaultAddr:     enhanced.VaultAddr,
+		SaltMaster:    enhanced.SaltMaster,
+	}
+}
+
+// determineNodeRole determines the primary role for this node
+func determineNodeRole(enhanced *EnhancedEnvironmentConfig) string {
+	// Find localhost or current node in the cluster
+	hostname, _ := os.Hostname()
+	
+	// Try to find current node in cluster
+	for nodeId, roles := range enhanced.NodeRoles {
+		if nodeId == hostname || nodeId == "localhost" {
+			if len(roles) > 0 {
+				return roles[0] // Return primary role
+			}
+		}
+	}
+	
+	// Default based on profile
+	switch enhanced.Profile {
+	case ProfileDevelopment, ProfileSingleNode, ProfileHomelab:
+		return "server"
+	case ProfileSmallCluster, ProfileEnterprise, ProfileCloud:
+		return "client"
+	default:
+		return "server"
+	}
+}
+
+// extractClusterNodes extracts cluster node list from enhanced config
+func extractClusterNodes(enhanced *EnhancedEnvironmentConfig) []string {
+	nodes := make([]string, 0, len(enhanced.NodeRoles))
+	for nodeId := range enhanced.NodeRoles {
+		nodes = append(nodes, nodeId)
+	}
+	return nodes
+}
+
+// saveEnhancedConfig saves the enhanced configuration
+func saveEnhancedConfig(config *EnhancedEnvironmentConfig) error {
+	configDir := "/opt/eos/config"
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	configPath := filepath.Join(configDir, "enhanced_environment.json")
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal enhanced config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write enhanced config file: %w", err)
+	}
+
+	return nil
 }
 
 // loadExistingConfig loads previously discovered configuration
