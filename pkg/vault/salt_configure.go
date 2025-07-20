@@ -1,9 +1,10 @@
-package vault_salt
+package vault
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -11,13 +12,12 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-// Configure configures Vault using SaltStack
-func Configure(rc *eos_io.RuntimeContext, config *Config) error {
+// SaltConfigure configures Vault using SaltStack
+func SaltConfigure(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault configuration via Salt")
 	
@@ -43,24 +43,26 @@ func Configure(rc *eos_io.RuntimeContext, config *Config) error {
 	return nil
 }
 
-func checkConfigurePrerequisites(rc *eos_io.RuntimeContext, config *Config) error {
+func checkConfigurePrerequisites(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check if Salt is available
-	cli := eos_cli.New(rc)
-	if _, err := cli.ExecString("salt-call", "--version"); err != nil {
+	cmd := exec.CommandContext(rc.Ctx, "salt-call", "--version")
+	if err := cmd.Run(); err != nil {
 		logger.Error("Salt is not available", zap.Error(err))
 		return eos_err.NewUserError("salt is not available")
 	}
 	
 	// Check if Vault is installed
-	if _, err := cli.ExecString("vault", "version"); err != nil {
+	cmd = exec.CommandContext(rc.Ctx, "vault", "version")
+	if err := cmd.Run(); err != nil {
 		logger.Error("Vault is not installed", zap.Error(err))
 		return eos_err.NewUserError("vault is not installed")
 	}
 	
 	// Check if Vault service exists
-	if _, err := cli.ExecString("systemctl", "status", VaultServiceName); err != nil {
+	cmd = exec.CommandContext(rc.Ctx, "systemctl", "status", VaultServiceName)
+	if err := cmd.Run(); err != nil {
 		logger.Warn("Vault service not found, will create it")
 	}
 	
@@ -89,7 +91,7 @@ func ensureDirectory(path string, perm os.FileMode) error {
 	return nil
 }
 
-func ensureTLSCertificates(rc *eos_io.RuntimeContext, config *Config) error {
+func ensureTLSCertificates(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	certFile := filepath.Join(config.TLSPath, "vault-cert.pem")
@@ -123,8 +125,8 @@ func ensureTLSCertificates(rc *eos_io.RuntimeContext, config *Config) error {
 		"-addext", "subjectAltName=DNS:vault.local,DNS:localhost,IP:127.0.0.1",
 	}
 	
-	cli := eos_cli.New(rc)
-	if _, err := cli.ExecString("openssl", args...); err != nil {
+	cmd := exec.CommandContext(rc.Ctx, "openssl", args...)
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to generate TLS certificates: %w", err)
 	}
 	
@@ -147,7 +149,7 @@ func ensureTLSCertificates(rc *eos_io.RuntimeContext, config *Config) error {
 	return nil
 }
 
-func executeSaltConfigure(rc *eos_io.RuntimeContext, config *Config) error {
+func executeSaltConfigure(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Prepare Salt pillar data
@@ -190,30 +192,31 @@ func executeSaltConfigure(rc *eos_io.RuntimeContext, config *Config) error {
 		SaltStateVaultConfigure,
 		"--output=json",
 		"--output-indent=2",
-		fmt.Sprintf("pillar='%s'", string(pillarJSON)),
+		"pillar=" + string(pillarJSON),
 	}
 	
 	logger.Info("Executing Salt state",
 		zap.String("state", SaltStateVaultConfigure),
 		zap.Strings("args", args))
 	
-	cli := eos_cli.WithTimeout(rc, config.SaltTimeout)
-	output, err := cli.ExecString("salt-call", args...)
+	cmd := exec.CommandContext(rc.Ctx, "salt-call", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Error("Salt state execution failed",
 			zap.Error(err),
-			zap.String("output", output))
+			zap.String("output", string(output)))
 		return fmt.Errorf("salt state execution failed: %w", err)
 	}
 	
 	// Parse Salt output
-	if err := parseSaltOutput(output); err != nil {
+	if err := parseSaltOutput(string(output)); err != nil {
 		return fmt.Errorf("salt state failed: %w", err)
 	}
 	
 	// Restart Vault service to apply configuration
 	logger.Info("Restarting Vault service")
-	if _, err := cli.ExecString("systemctl", "restart", VaultServiceName); err != nil {
+	cmd = exec.CommandContext(rc.Ctx, "systemctl", "restart", VaultServiceName)
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to restart vault service: %w", err)
 	}
 	
@@ -235,7 +238,7 @@ func getHostname() string {
 	return hostname
 }
 
-func waitForVaultReady(rc *eos_io.RuntimeContext, config *Config) error {
+func waitForVaultReady(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	maxAttempts := 30
@@ -245,11 +248,11 @@ func waitForVaultReady(rc *eos_io.RuntimeContext, config *Config) error {
 			return rc.Ctx.Err()
 		default:
 			// Check if service is active
-			cli := eos_cli.New(rc)
-			output, err := cli.ExecString("systemctl", "is-active", VaultServiceName)
-			if err == nil && strings.TrimSpace(output) == "active" {
+			cmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", VaultServiceName)
+			if output, err := cmd.Output(); err == nil && strings.TrimSpace(string(output)) == "active" {
 				// Check if Vault is responding
-				if _, err := cli.ExecString("vault", "status"); err == nil || strings.Contains(err.Error(), "exit status 2") {
+				cmd = exec.CommandContext(rc.Ctx, "vault", "status")
+				if err := cmd.Run(); err == nil || strings.Contains(err.Error(), "exit status 2") {
 					logger.Info("Vault service is ready")
 					return nil
 				}
@@ -266,7 +269,7 @@ func waitForVaultReady(rc *eos_io.RuntimeContext, config *Config) error {
 	return fmt.Errorf("vault service did not become ready in time")
 }
 
-func verifyConfiguration(rc *eos_io.RuntimeContext, config *Config) error {
+func verifyConfiguration(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check configuration file exists
@@ -276,21 +279,22 @@ func verifyConfiguration(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 	
 	// Check service is running
-	cli := eos_cli.New(rc)
-	output, err := cli.ExecString("systemctl", "is-active", VaultServiceName)
-	if err != nil || strings.TrimSpace(output) != "active" {
+	cmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", VaultServiceName)
+	output, err := cmd.Output()
+	if err != nil || strings.TrimSpace(string(output)) != "active" {
 		return fmt.Errorf("vault service is not active")
 	}
 	
 	// Check Vault is responding
-	statusOutput, err := cli.ExecString("vault", "status", "-format=json")
+	cmd = exec.CommandContext(rc.Ctx, "vault", "status", "-format=json")
+	statusOutput, err := cmd.Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 2") {
 		return fmt.Errorf("vault is not responding: %w", err)
 	}
 	
 	// Parse status
 	var status VaultStatus
-	if err := json.Unmarshal([]byte(statusOutput), &status); err == nil {
+	if err := json.Unmarshal(statusOutput, &status); err == nil {
 		logger.Info("Vault configuration verified",
 			zap.Bool("initialized", status.Initialized),
 			zap.Bool("sealed", status.Sealed),

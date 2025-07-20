@@ -1,9 +1,10 @@
-package vault_salt
+package vault
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	
@@ -11,13 +12,12 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-// Enable enables Vault features using SaltStack
-func Enable(rc *eos_io.RuntimeContext, config *Config) error {
+// SaltEnable enables Vault features using SaltStack
+func SaltEnable(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault feature enablement via Salt")
 	
@@ -49,36 +49,39 @@ func Enable(rc *eos_io.RuntimeContext, config *Config) error {
 	return nil
 }
 
-func checkEnablePrerequisites(rc *eos_io.RuntimeContext, config *Config) error {
+func checkEnablePrerequisites(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check if Salt is available
-	cli := eos_cli.New(rc)
-	if _, err := cli.ExecString("salt-call", "--version"); err != nil {
+	cmd := exec.CommandContext(rc.Ctx, "salt-call", "--version")
+	if err := cmd.Run(); err != nil {
 		logger.Error("Salt is not available", zap.Error(err))
 		return eos_err.NewUserError("salt is not available")
 	}
 	
 	// Check if Vault is installed
-	if _, err := cli.ExecString("vault", "version"); err != nil {
+	cmd = exec.CommandContext(rc.Ctx, "vault", "version")
+	if err := cmd.Run(); err != nil {
 		logger.Error("Vault is not installed", zap.Error(err))
 		return eos_err.NewUserError("vault is not installed")
 	}
 	
 	// Check if Vault service is running
-	output, err := cli.ExecString("systemctl", "is-active", VaultServiceName)
-	if err != nil || strings.TrimSpace(output) != "active" {
+	cmd = exec.CommandContext(rc.Ctx, "systemctl", "is-active", VaultServiceName)
+	output, err := cmd.Output()
+	if err != nil || strings.TrimSpace(string(output)) != "active" {
 		return eos_err.NewUserError("vault service is not running")
 	}
 	
 	// Check Vault status
-	statusOutput, err := cli.ExecString("vault", "status", "-format=json")
+	cmd = exec.CommandContext(rc.Ctx, "vault", "status", "-format=json")
+	statusOutput, err := cmd.Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 2") {
 		return fmt.Errorf("failed to check vault status: %w", err)
 	}
 	
 	var status VaultStatus
-	if err := json.Unmarshal([]byte(statusOutput), &status); err == nil {
+	if err := json.Unmarshal(statusOutput, &status); err == nil {
 		if !status.Initialized {
 			return eos_err.NewUserError("vault is not initialized")
 		}
@@ -123,7 +126,7 @@ func getRootToken(rc *eos_io.RuntimeContext) (string, error) {
 	return vaultInit.RootToken, nil
 }
 
-func executeSaltEnable(rc *eos_io.RuntimeContext, config *Config, rootToken string) error {
+func executeSaltEnable(rc *eos_io.RuntimeContext, config *SaltConfig, rootToken string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Set Vault environment variables
@@ -225,7 +228,7 @@ path "secret/metadata/eos/*" {
 		SaltStateVaultEnable,
 		"--output=json",
 		"--output-indent=2",
-		fmt.Sprintf("pillar='%s'", string(pillarJSON)),
+		"pillar=" + string(pillarJSON),
 	}
 	
 	// Set environment variables for Salt execution
@@ -252,17 +255,17 @@ path "secret/metadata/eos/*" {
 		os.Unsetenv(VaultSkipVerifyEnvVar)
 	}()
 	
-	cli := eos_cli.WithTimeout(rc, config.SaltTimeout)
-	output, err := cli.ExecString("salt-call", args...)
+	cmd := exec.CommandContext(rc.Ctx, "salt-call", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Error("Salt state execution failed",
 			zap.Error(err),
-			zap.String("output", output))
+			zap.String("output", string(output)))
 		return fmt.Errorf("salt state execution failed: %w", err)
 	}
 	
 	// Parse Salt output
-	if err := parseSaltOutput(output); err != nil {
+	if err := parseSaltOutput(string(output)); err != nil {
 		return fmt.Errorf("salt state failed: %w", err)
 	}
 	
@@ -280,7 +283,7 @@ path "secret/metadata/eos/*" {
 	return nil
 }
 
-func configureVaultAgent(rc *eos_io.RuntimeContext, config *Config, vaultAddr string) error {
+func configureVaultAgent(rc *eos_io.RuntimeContext, config *SaltConfig, vaultAddr string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Create Vault agent configuration
@@ -334,7 +337,7 @@ func configureVaultAgent(rc *eos_io.RuntimeContext, config *Config, vaultAddr st
 	return nil
 }
 
-func verifyEnablement(rc *eos_io.RuntimeContext, config *Config) error {
+func verifyEnablement(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Create Vault client

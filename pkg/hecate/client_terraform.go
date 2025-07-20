@@ -334,7 +334,7 @@ func (s *SaltClient) ApplyState(ctx context.Context, state string, pillar map[st
 			"--local",
 			"state.apply",
 			state,
-			fmt.Sprintf("pillar='%s'", string(pillarJSON)),
+			"pillar=" + string(pillarJSON),
 		},
 		Capture: true,
 	})

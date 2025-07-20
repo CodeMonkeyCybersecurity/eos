@@ -62,3 +62,37 @@ const (
 var (
 	DefaultAddress = fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault)
 )
+
+// Salt-related constants
+const (
+	// Service names
+	VaultServiceName       = "vault"
+	VaultAgentServiceName  = "vault-agent"
+	
+	// File paths
+	VaultBinaryPath        = "/usr/local/bin/vault"
+	VaultConfigFile        = "vault.hcl"
+	VaultAgentConfigFile   = "vault-agent.hcl"
+	VaultInitDataFile      = "/var/lib/eos/secret/vault_init.json"
+	
+	// Salt state names
+	SaltStateVaultInstall  = "hashicorp.vault.install"
+	SaltStateVaultConfigure = "hashicorp.vault.configure"
+	SaltStateVaultEnable    = "hashicorp.vault.enable"
+	SaltStateVaultHarden    = "hashicorp.vault.harden"
+	SaltStateVaultComplete  = "hashicorp.vault.complete_lifecycle"
+	
+	// Environment variables (Salt-specific)
+	VaultAddrEnvVar        = "VAULT_ADDR"
+	VaultTokenEnvVar       = "VAULT_TOKEN"
+	VaultSkipVerifyEnvVar  = "VAULT_SKIP_VERIFY"
+	
+	// Default policies
+	DefaultPolicyName      = "default"
+	AdminPolicyName        = "admin"
+	ReadOnlyPolicyName     = "readonly"
+	
+	// Audit log paths
+	AuditLogFilePath       = "/var/log/vault/vault-audit.log"
+	AuditLogSyslogPath     = "vault-audit"
+)

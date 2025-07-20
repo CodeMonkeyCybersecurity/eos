@@ -26,7 +26,7 @@ func ApplySaltStateWithPillar(rc *eos_io.RuntimeContext, stateName string, pilla
 		"--local",
 		"state.apply",
 		stateName,
-		fmt.Sprintf("pillar='%s'", string(pillarJSON)),
+		"pillar=" + string(pillarJSON),
 	}
 	
 	logger.Info("Applying Salt state",

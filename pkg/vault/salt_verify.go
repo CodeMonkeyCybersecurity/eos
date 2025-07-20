@@ -1,9 +1,10 @@
-package vault_salt
+package vault
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	
@@ -11,18 +12,17 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-// Verify performs comprehensive verification of Vault installation and configuration
-func Verify(rc *eos_io.RuntimeContext) error {
+// SaltVerify performs comprehensive verification of Vault installation and configuration
+func SaltVerify(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault verification")
 	
 	// Load default config for verification
-	config := DefaultConfig()
+	config := DefaultSaltConfig()
 	
 	// ASSESS - Check what needs to be verified
 	logger.Info("Assessing Vault installation status")
@@ -81,15 +81,15 @@ type VerificationResults struct {
 	Warnings         []string
 }
 
-func assessVaultStatus(rc *eos_io.RuntimeContext, config *Config) (*VaultVerificationStatus, error) {
+func assessVaultStatus(rc *eos_io.RuntimeContext, config *SaltConfig) (*VaultVerificationStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	status := &VaultVerificationStatus{}
 	
 	// Check if Vault is installed
-	cli := eos_cli.New(rc)
-	if output, err := cli.ExecString("vault", "version"); err == nil {
+	cmd := exec.CommandContext(rc.Ctx, "vault", "version")
+	if output, err := cmd.Output(); err == nil {
 		status.Installed = true
-		status.Version = strings.TrimSpace(output)
+		status.Version = strings.TrimSpace(string(output))
 		logger.Info("Vault binary found", zap.String("version", status.Version))
 	} else {
 		logger.Warn("Vault binary not found")
@@ -97,19 +97,21 @@ func assessVaultStatus(rc *eos_io.RuntimeContext, config *Config) (*VaultVerific
 	}
 	
 	// Check service status
-	if output, err := cli.ExecString("systemctl", "is-active", VaultServiceName); err == nil {
-		status.ServiceActive = strings.TrimSpace(output) == "active"
+	cmd = exec.CommandContext(rc.Ctx, "systemctl", "is-active", VaultServiceName)
+	if output, err := cmd.Output(); err == nil {
+		status.ServiceActive = strings.TrimSpace(string(output)) == "active"
 	}
 	
 	// Check Vault status
-	statusOutput, err := cli.ExecString("vault", "status", "-format=json")
+	cmd = exec.CommandContext(rc.Ctx, "vault", "status", "-format=json")
+	statusOutput, err := cmd.Output()
 	if err != nil && !strings.Contains(err.Error(), "exit status 2") {
 		logger.Warn("Failed to get vault status", zap.Error(err))
 		return status, nil
 	}
 	
 	var vaultStatus VaultStatus
-	if err := json.Unmarshal([]byte(statusOutput), &vaultStatus); err == nil {
+	if err := json.Unmarshal(statusOutput, &vaultStatus); err == nil {
 		status.Initialized = vaultStatus.Initialized
 		status.Sealed = vaultStatus.Sealed
 		status.ClusterID = vaultStatus.ClusterID
@@ -171,7 +173,7 @@ func checkAuthAndPolicies(rc *eos_io.RuntimeContext, status *VaultVerificationSt
 	}
 }
 
-func performVerificationChecks(rc *eos_io.RuntimeContext, config *Config, status *VaultVerificationStatus) (*VerificationResults, error) {
+func performVerificationChecks(rc *eos_io.RuntimeContext, config *SaltConfig, status *VaultVerificationStatus) (*VerificationResults, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	results := &VerificationResults{
@@ -248,7 +250,7 @@ func performVerificationChecks(rc *eos_io.RuntimeContext, config *Config, status
 	return results, nil
 }
 
-func checkTLSConfiguration(rc *eos_io.RuntimeContext, config *Config) bool {
+func checkTLSConfiguration(rc *eos_io.RuntimeContext, config *SaltConfig) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	certFile := filepath.Join(config.TLSPath, "vault-cert.pem")
@@ -266,28 +268,28 @@ func checkTLSConfiguration(rc *eos_io.RuntimeContext, config *Config) bool {
 	}
 	
 	// Verify certificate validity
-	cli := eos_cli.New(rc)
-	if output, err := cli.ExecString("openssl", "x509", "-in", certFile, "-noout", "-dates"); err == nil {
-		logger.Debug("TLS certificate validity", zap.String("dates", output))
+	cmd := exec.CommandContext(rc.Ctx, "openssl", "x509", "-in", certFile, "-noout", "-dates")
+	if output, err := cmd.Output(); err == nil {
+		logger.Debug("TLS certificate validity", zap.String("dates", string(output)))
 		return true
 	}
 	
 	return false
 }
 
-func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *Config) bool {
+func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *SaltConfig) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check if port is listening
-	cli := eos_cli.New(rc)
-	output, err := cli.ExecString("ss", "-tlpn")
+	cmd := exec.CommandContext(rc.Ctx, "ss", "-tlpn")
+	output, err := cmd.Output()
 	if err != nil {
 		logger.Warn("Failed to check listening ports", zap.Error(err))
 		return false
 	}
 	
 	portStr := fmt.Sprintf(":%d", config.Port)
-	if strings.Contains(output, portStr) {
+	if strings.Contains(string(output), portStr) {
 		logger.Debug("Vault port is listening", zap.Int("port", config.Port))
 		return true
 	}
@@ -295,7 +297,7 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *Config) bool {
 	return false
 }
 
-func checkStorageConfiguration(rc *eos_io.RuntimeContext, config *Config) bool {
+func checkStorageConfiguration(rc *eos_io.RuntimeContext, config *SaltConfig) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check storage directory
@@ -306,9 +308,9 @@ func checkStorageConfiguration(rc *eos_io.RuntimeContext, config *Config) bool {
 		}
 		
 		// Check disk space
-		cli := eos_cli.New(rc)
-		if output, err := cli.ExecString("df", "-h", config.StoragePath); err == nil {
-			logger.Debug("Storage disk usage", zap.String("output", output))
+		cmd := exec.CommandContext(rc.Ctx, "df", "-h", config.StoragePath)
+		if output, err := cmd.Output(); err == nil {
+			logger.Debug("Storage disk usage", zap.String("output", string(output)))
 		}
 		
 		return true
@@ -317,7 +319,7 @@ func checkStorageConfiguration(rc *eos_io.RuntimeContext, config *Config) bool {
 	return false
 }
 
-func checkFilePermissions(rc *eos_io.RuntimeContext, config *Config) bool {
+func checkFilePermissions(rc *eos_io.RuntimeContext, config *SaltConfig) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 	allGood := true
 	
@@ -343,7 +345,7 @@ func checkFilePermissions(rc *eos_io.RuntimeContext, config *Config) bool {
 	return allGood
 }
 
-func checkBackupConfiguration(rc *eos_io.RuntimeContext, config *Config) bool {
+func checkBackupConfiguration(rc *eos_io.RuntimeContext, config *SaltConfig) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check backup directory
@@ -353,9 +355,9 @@ func checkBackupConfiguration(rc *eos_io.RuntimeContext, config *Config) bool {
 	}
 	
 	// Check cron job
-	cli := eos_cli.New(rc)
-	if output, err := cli.ExecString("crontab", "-l"); err == nil {
-		if strings.Contains(output, "vault") && strings.Contains(output, "backup") {
+	cmd := exec.CommandContext(rc.Ctx, "crontab", "-l")
+	if output, err := cmd.Output(); err == nil {
+		if strings.Contains(string(output), "vault") && strings.Contains(string(output), "backup") {
 			logger.Debug("Backup cron job found")
 			return true
 		}

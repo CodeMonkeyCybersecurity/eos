@@ -1,9 +1,10 @@
-package vault_salt
+package vault
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	
@@ -11,13 +12,12 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-// Install installs Vault using SaltStack
-func Install(rc *eos_io.RuntimeContext, config *Config) error {
+// SaltInstall installs Vault using SaltStack
+func SaltInstall(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault installation via Salt")
 	
@@ -49,22 +49,24 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 	return nil
 }
 
-func checkInstallPrerequisites(rc *eos_io.RuntimeContext, config *Config) error {
+func checkInstallPrerequisites(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check if Salt is available
-	cli := eos_cli.New(rc)
-	if _, err := cli.ExecString("salt-call", "--version"); err != nil {
+	cmd := exec.CommandContext(rc.Ctx, "salt-call", "--version")
+	if err := cmd.Run(); err != nil {
 		logger.Error("Salt is not available", zap.Error(err))
 		return eos_err.NewUserError("SaltStack is required for vault installation. Please install SaltStack first using 'eos create saltstack'")
 	}
 	
 	// Check if Vault is already installed
-	if _, err := cli.ExecString("vault", "version"); err == nil {
+	cmd = exec.CommandContext(rc.Ctx, "vault", "version")
+	if err := cmd.Run(); err == nil {
 		logger.Warn("Vault appears to be already installed")
 		// Check if service is running
-		if output, err := cli.ExecString("systemctl", "is-active", VaultServiceName); err == nil {
-			if strings.TrimSpace(output) == "active" {
+		cmd = exec.CommandContext(rc.Ctx, "systemctl", "is-active", VaultServiceName)
+		if output, err := cmd.Output(); err == nil {
+			if strings.TrimSpace(string(output)) == "active" {
 				return eos_err.NewUserError("vault service is already running")
 			}
 		}
@@ -102,9 +104,9 @@ func checkSystemRequirements(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check OS
-	cli := eos_cli.New(rc)
-	if output, err := cli.ExecString("lsb_release", "-i", "-s"); err == nil {
-		if !strings.Contains(strings.ToLower(output), "ubuntu") {
+	cmd := exec.CommandContext(rc.Ctx, "lsb_release", "-i", "-s")
+	if output, err := cmd.Output(); err == nil {
+		if !strings.Contains(strings.ToLower(string(output)), "ubuntu") {
 			return eos_err.NewUserError("this tool requires Ubuntu")
 		}
 	}
@@ -115,8 +117,9 @@ func checkSystemRequirements(rc *eos_io.RuntimeContext) error {
 	}
 	
 	// Check disk space (minimum 1GB free)
-	if output, err := cli.ExecString("df", "-BG", "/opt"); err == nil {
-		lines := strings.Split(output, "\n")
+	cmd = exec.CommandContext(rc.Ctx, "df", "-BG", "/opt")
+	if output, err := cmd.Output(); err == nil {
+		lines := strings.Split(string(output), "\n")
 		if len(lines) > 1 {
 			fields := strings.Fields(lines[1])
 			if len(fields) > 3 {
@@ -129,7 +132,7 @@ func checkSystemRequirements(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func executeSaltInstall(rc *eos_io.RuntimeContext, config *Config) error {
+func executeSaltInstall(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Prepare Salt pillar data
@@ -167,24 +170,24 @@ func executeSaltInstall(rc *eos_io.RuntimeContext, config *Config) error {
 		SaltStateVaultInstall,
 		"--output=json",
 		"--output-indent=2",
-		fmt.Sprintf("pillar='%s'", string(pillarJSON)),
+		"pillar=" + string(pillarJSON),
 	}
 	
 	logger.Info("Executing Salt state",
 		zap.String("state", SaltStateVaultInstall),
 		zap.Strings("args", args))
 	
-	cli := eos_cli.WithTimeout(rc, config.SaltTimeout)
-	output, err := cli.ExecString("salt-call", args...)
+	cmd := exec.CommandContext(rc.Ctx, "salt-call", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Error("Salt state execution failed",
 			zap.Error(err),
-			zap.String("output", output))
+			zap.String("output", string(output)))
 		return fmt.Errorf("salt state execution failed: %w", err)
 	}
 	
 	// Parse Salt output
-	if err := parseSaltOutput(output); err != nil {
+	if err := parseSaltOutput(string(output)); err != nil {
 		return fmt.Errorf("salt state failed: %w", err)
 	}
 	
@@ -192,7 +195,7 @@ func executeSaltInstall(rc *eos_io.RuntimeContext, config *Config) error {
 	return nil
 }
 
-func initializeVault(rc *eos_io.RuntimeContext, config *Config) error {
+func initializeVault(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Set Vault address
@@ -300,23 +303,25 @@ func saveInitData(rc *eos_io.RuntimeContext, data *VaultInitResponse) error {
 	return nil
 }
 
-func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
+func verifyInstallation(rc *eos_io.RuntimeContext, config *SaltConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check Vault binary
-	cli := eos_cli.New(rc)
-	if _, err := cli.ExecString("vault", "version"); err != nil {
+	cmd := exec.CommandContext(rc.Ctx, "vault", "version")
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("vault binary not found: %w", err)
 	}
 	
 	// Check service status
-	output, err := cli.ExecString("systemctl", "is-active", VaultServiceName)
-	if err != nil || strings.TrimSpace(output) != "active" {
+	cmd = exec.CommandContext(rc.Ctx, "systemctl", "is-active", VaultServiceName)
+	output, err := cmd.Output()
+	if err != nil || strings.TrimSpace(string(output)) != "active" {
 		return fmt.Errorf("vault service is not active")
 	}
 	
 	// Check Vault status
-	statusOutput, err := cli.ExecString("vault", "status", "-format=json")
+	cmd = exec.CommandContext(rc.Ctx, "vault", "status", "-format=json")
+	statusOutput, err := cmd.Output()
 	if err != nil {
 		// Vault returns exit code 2 when sealed, which is expected
 		if !strings.Contains(err.Error(), "exit status 2") {
@@ -325,7 +330,7 @@ func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 	
 	var status VaultStatus
-	if err := json.Unmarshal([]byte(statusOutput), &status); err == nil {
+	if err := json.Unmarshal(statusOutput, &status); err == nil {
 		logger.Info("Vault status",
 			zap.Bool("initialized", status.Initialized),
 			zap.Bool("sealed", status.Sealed),

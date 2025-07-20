@@ -128,7 +128,7 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		"hashicorp.consul",
 		"--output=json",
 		"--output-indent=2",
-		fmt.Sprintf("pillar='%s'", string(pillarJSON)),
+		"pillar=" + string(pillarJSON),
 	}
 
 	logger.Info("Executing Salt state",

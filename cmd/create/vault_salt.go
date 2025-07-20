@@ -8,7 +8,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault_salt"
 )
 
 var createVaultSaltCmd = &cobra.Command{
@@ -112,7 +111,7 @@ func runCreateVaultSaltLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	skipInstall, _ := cmd.Flags().GetBool("skip-install")
 	if !skipInstall {
 		logger.Info("Phase 1: Installing Vault")
-		if err := vault_salt.Install(rc, config); err != nil {
+		if err := vault.SaltInstall(rc, config); err != nil {
 			return err
 		}
 	}
@@ -121,7 +120,7 @@ func runCreateVaultSaltLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	skipConfigure, _ := cmd.Flags().GetBool("skip-configure")
 	if !skipConfigure {
 		logger.Info("Phase 2: Configuring Vault")
-		if err := vault_salt.Configure(rc, config); err != nil {
+		if err := vault.SaltConfigure(rc, config); err != nil {
 			return err
 		}
 	}
@@ -130,7 +129,7 @@ func runCreateVaultSaltLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	skipEnable, _ := cmd.Flags().GetBool("skip-enable")
 	if !skipEnable {
 		logger.Info("Phase 3: Enabling Vault features")
-		if err := vault_salt.Enable(rc, config); err != nil {
+		if err := vault.SaltEnable(rc, config); err != nil {
 			return err
 		}
 	}
@@ -139,7 +138,7 @@ func runCreateVaultSaltLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	skipHarden, _ := cmd.Flags().GetBool("skip-harden")
 	if !skipHarden {
 		logger.Info("Phase 4: Hardening Vault")
-		if err := vault_salt.Harden(rc, config); err != nil {
+		if err := vault.SaltHarden(rc, config); err != nil {
 			return err
 		}
 	}
@@ -148,7 +147,7 @@ func runCreateVaultSaltLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	skipVerify, _ := cmd.Flags().GetBool("skip-verify")
 	if !skipVerify {
 		logger.Info("Phase 5: Verifying Vault deployment")
-		if err := vault_salt.Verify(rc); err != nil {
+		if err := vault.SaltVerify(rc); err != nil {
 			return err
 		}
 	}
@@ -160,8 +159,8 @@ func runCreateVaultSaltLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	return nil
 }
 
-func buildVaultSaltConfig(cmd *cobra.Command) *vault_salt.Config {
-	config := vault_salt.DefaultConfig()
+func buildVaultSaltConfig(cmd *cobra.Command) *vault.SaltConfig {
+	config := vault.DefaultSaltConfig()
 	
 	// Update from flags
 	if v := cmd.Flag("version").Value.String(); v != "" {
@@ -268,7 +267,7 @@ func buildVaultSaltConfig(cmd *cobra.Command) *vault_salt.Config {
 	return config
 }
 
-func displayCompletionMessage(rc *eos_io.RuntimeContext, config *vault_salt.Config) {
+func displayCompletionMessage(rc *eos_io.RuntimeContext, config *vault.SaltConfig) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	logger.Info("=== Vault Deployment Complete ===")

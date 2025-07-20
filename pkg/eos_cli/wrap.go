@@ -66,27 +66,27 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		// Check if system needs bootstrap before executing command
 		if bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
 			ctx.Log.Info("Checking bootstrap status", zap.String("command", cmd.Name()))
-			
+
 			shouldBootstrap, promptErr := bootstrap.PromptForBootstrap(ctx)
 			if promptErr != nil {
 				ctx.Log.Error("Failed to prompt for bootstrap", zap.Error(promptErr))
 				return eos_err.NewUserError("failed to prompt for bootstrap: %v", promptErr)
 			}
-			
+
 			if shouldBootstrap {
 				ctx.Log.Info("User requested bootstrap, launching bootstrap command")
-				
+
 				// Execute the bootstrap command
 				bootstrapCmd := exec.Command("eos", "bootstrap")
 				bootstrapCmd.Stdout = cmd.OutOrStdout()
 				bootstrapCmd.Stderr = cmd.ErrOrStderr()
 				bootstrapCmd.Stdin = cmd.InOrStdin()
-				
+
 				if err := bootstrapCmd.Run(); err != nil {
 					ctx.Log.Error("Bootstrap command failed", zap.Error(err))
 					return eos_err.NewUserError("bootstrap failed: %v", err)
 				}
-				
+
 				ctx.Log.Info("Bootstrap completed successfully, continuing with original command")
 			} else {
 				ctx.Log.Info("User declined bootstrap, command may fail without proper setup")
@@ -150,27 +150,27 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 		// Check if system needs bootstrap before executing command
 		if bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
 			ctx.Log.Info("Checking bootstrap status", zap.String("command", cmd.Name()))
-			
+
 			shouldBootstrap, promptErr := bootstrap.PromptForBootstrap(ctx)
 			if promptErr != nil {
 				ctx.Log.Error("Failed to prompt for bootstrap", zap.Error(promptErr))
 				return eos_err.NewUserError("failed to prompt for bootstrap: %v", promptErr)
 			}
-			
+
 			if shouldBootstrap {
 				ctx.Log.Info("User requested bootstrap, launching bootstrap command")
-				
+
 				// Execute the bootstrap command
 				bootstrapCmd := exec.Command("eos", "bootstrap")
 				bootstrapCmd.Stdout = cmd.OutOrStdout()
 				bootstrapCmd.Stderr = cmd.ErrOrStderr()
 				bootstrapCmd.Stdin = cmd.InOrStdin()
-				
+
 				if err := bootstrapCmd.Run(); err != nil {
 					ctx.Log.Error("Bootstrap command failed", zap.Error(err))
 					return eos_err.NewUserError("bootstrap failed: %v", err)
 				}
-				
+
 				ctx.Log.Info("Bootstrap completed successfully, continuing with original command")
 			} else {
 				ctx.Log.Info("User declined bootstrap, command may fail without proper setup")

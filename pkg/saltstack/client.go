@@ -47,7 +47,7 @@ func (c *Client) StateApply(ctx context.Context, target string, state string, pi
 		if err != nil {
 			return fmt.Errorf("marshaling pillar data: %w", err)
 		}
-		args = append(args, fmt.Sprintf("pillar='%s'", string(pillarJSON)))
+		args = append(args, "pillar="+string(pillarJSON))
 	}
 
 	output, err := execute.Run(ctx, execute.Options{
@@ -166,7 +166,7 @@ func (c *Client) StateApplyLocal(ctx context.Context, state string, pillar map[s
 		if err != nil {
 			return fmt.Errorf("marshaling pillar data: %w", err)
 		}
-		args = append(args, fmt.Sprintf("pillar='%s'", string(pillarJSON)))
+		args = append(args, "pillar="+string(pillarJSON))
 	}
 
 	output, err := execute.Run(ctx, execute.Options{
