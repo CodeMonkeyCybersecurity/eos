@@ -605,6 +605,17 @@ func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfi
 func DeployNomadViaSalt(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Nomad deployment via Salt states")
+	
+	// Ask for user consent before proceeding
+	consent, err := eos_io.PromptForInstallation(rc, "HashiCorp Nomad", "orchestrator for containers and workloads")
+	if err != nil {
+		return fmt.Errorf("failed to get user consent: %w", err)
+	}
+	
+	if !consent {
+		logger.Info("Installation cancelled by user")
+		return fmt.Errorf("installation cancelled by user")
+	}
 
 	// ASSESS - Check prerequisites 
 	logger.Info("Assessing Nomad deployment prerequisites")

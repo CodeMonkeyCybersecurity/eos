@@ -338,10 +338,8 @@ func runDebugSaltstack(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		logger.Info("terminal prompt: Auto-fix completed. Re-run 'eos debug saltstack' to verify.")
 	}
 	
-	if len(issues) > 0 {
-		return fmt.Errorf("SaltStack has %d critical issue(s) that need resolution", len(issues))
-	}
-	
+	// Don't return error for diagnostic command - we successfully diagnosed issues
+	// Only return error if the diagnostic itself failed
 	return nil
 }
 

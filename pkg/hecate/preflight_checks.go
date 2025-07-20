@@ -623,16 +623,13 @@ func InteractivelyHandleDependencies(rc *eos_io.RuntimeContext, result *Prefligh
 	logger.Info("terminal prompt: Would you like to install these dependencies now?")
 
 	for _, dep := range missingDeps {
-		logger.Info("terminal prompt: ")
-		logger.Info(fmt.Sprintf("terminal prompt: Install %s (%s)? [y/N]: ", dep.Name, dep.Description))
-
-		response, err := eos_io.ReadInput(rc)
+		// Use the new consent helper for consistency
+		consent, err := eos_io.PromptForDependency(rc, dep.Name, dep.Description, "Hecate")
 		if err != nil {
-			return fmt.Errorf("failed to read user input: %w", err)
+			return fmt.Errorf("failed to get user consent: %w", err)
 		}
 
-		response = strings.ToLower(strings.TrimSpace(response))
-		if response == "y" || response == "yes" {
+		if consent {
 			logger.Info(fmt.Sprintf("terminal prompt: Installing %s...", dep.Name))
 			
 			if err := installDependency(rc, dep); err != nil {
@@ -641,12 +638,8 @@ func InteractivelyHandleDependencies(rc *eos_io.RuntimeContext, result *Prefligh
 					zap.Error(err))
 				
 				// Ask if they want to continue anyway
-				logger.Info("terminal prompt: ")
-				logger.Info(fmt.Sprintf("terminal prompt: Failed to install %s. Continue anyway? [y/N]: ", dep.Name))
-				
-				contResponse, _ := eos_io.ReadInput(rc)
-				contResponse = strings.ToLower(strings.TrimSpace(contResponse))
-				if contResponse != "y" && contResponse != "yes" {
+				continueAnyway, _ := eos_io.PromptToContinueDespiteErrors(rc, 1, fmt.Sprintf("installing %s", dep.Name))
+				if !continueAnyway {
 					return eos_err.NewUserError("Deployment cancelled - %s is required", dep.Name)
 				}
 			} else {

@@ -28,6 +28,17 @@ import (
 // InstallConsul performs complete Consul installation with error recovery
 func InstallConsul(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Ask for user consent before proceeding
+	consent, err := eos_io.PromptForInstallation(rc, "HashiCorp Consul", "service discovery & mesh networking")
+	if err != nil {
+		return fmt.Errorf("failed to get user consent: %w", err)
+	}
+	
+	if !consent {
+		logger.Info("Installation cancelled by user")
+		return fmt.Errorf("installation cancelled by user")
+	}
 
 	// ASSESS - Check prerequisites and validate configuration
 	logger.Info("Assessing Consul installation prerequisites",
