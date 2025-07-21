@@ -379,37 +379,95 @@ func FuzzScriptExecution(f *testing.F) {
 
 // Helper functions that should be implemented
 
-func validateCommand(command string) bool {
-	// TODO: Implement command validation
-	return !containsInjectionPatterns(command) && len(command) < 10000
-}
-
 func sanitizeCommand(command string) string {
-	// TODO: Implement command sanitization
-	command = strings.ReplaceAll(command, "\x00", "")
-	command = strings.ReplaceAll(command, ";", "")
-	command = strings.ReplaceAll(command, "|", "")
-	command = strings.ReplaceAll(command, "&", "")
-	return command
-}
-
-func containsInjectionPatterns(input string) bool {
-	patterns := []string{
-		";", "|", "&", "$(", "`", "&&", "||", 
-		"rm -rf", "cat /etc/passwd", "/bin/sh",
+	// Comprehensive command injection prevention using proven techniques
+	
+	// Remove dangerous shell metacharacters and operators
+	dangerous := []string{
+		";", "|", "&", "$(", "`", "&&", "||", ">", "<", ">>", "<<",
+		"'", "\"", "\\", "\n", "\r", "\t", "\x00",
+		"${", "}", "$", "*", "?", "[", "]", "~",
 	}
-	lower := strings.ToLower(input)
-	for _, pattern := range patterns {
-		if strings.Contains(lower, pattern) {
-			return true
+	
+	// Remove environment variable patterns
+	envPatterns := []string{
+		"$PATH", "$HOME", "$USER", "$SHELL", "$IFS", "$PWD",
+		"${PATH}", "${HOME}", "${USER}", "${SHELL}", "${IFS}", "${PWD}",
+	}
+	
+	// Remove dangerous command patterns
+	cmdPatterns := []string{
+		"rm -rf", "cat /etc/", "/bin/sh", "/bin/bash", "sh -c", "bash -c",
+		"wget", "curl", "nc ", "netcat", "telnet", "ssh", "scp",
+		"python -c", "perl -e", "ruby -e", "php -r",
+	}
+	
+	// Remove Unicode command injection characters
+	unicodeDangerous := []string{
+		"；",  // Unicode semicolon
+		"｜",  // Unicode pipe  
+		"＆",  // Unicode ampersand
+		"＜",  // Unicode less-than
+		"＞",  // Unicode greater-than
+	}
+	
+	result := command
+	
+	// Apply standard dangerous pattern filtering
+	for _, pattern := range dangerous {
+		result = strings.ReplaceAll(result, pattern, "_SAFE_")
+	}
+	
+	// Apply environment variable filtering
+	for _, pattern := range envPatterns {
+		result = strings.ReplaceAll(result, pattern, "_SAFE_")
+		result = strings.ReplaceAll(result, strings.ToLower(pattern), "_SAFE_")
+		result = strings.ReplaceAll(result, strings.ToUpper(pattern), "_SAFE_")
+	}
+	
+	// Apply command pattern filtering
+	for _, pattern := range cmdPatterns {
+		result = strings.ReplaceAll(result, pattern, "_SAFE_")
+		result = strings.ReplaceAll(result, strings.ToLower(pattern), "_SAFE_")
+	}
+	
+	// Apply Unicode filtering
+	for _, pattern := range unicodeDangerous {
+		result = strings.ReplaceAll(result, pattern, "_SAFE_")
+	}
+	
+	// Remove any non-ASCII characters that could hide attacks
+	safeResult := ""
+	for _, r := range result {
+		if r >= 32 && r <= 126 { // Only allow printable ASCII
+			safeResult += string(r)
+		} else {
+			safeResult += "_" // Replace with safe underscore
 		}
 	}
-	return false
+	
+	return safeResult
 }
 
 func parseCommandArguments(command string) []string {
-	// TODO: Implement secure argument parsing
-	return strings.Fields(command)
+	// Secure command argument parsing with sanitization
+	
+	// First sanitize the command to remove injection attempts
+	sanitized := sanitizeCommand(command)
+	
+	// Parse into fields
+	fields := strings.Fields(sanitized)
+	
+	// Filter out any remaining suspicious fields
+	var safeFields []string
+	for _, field := range fields {
+		// Skip fields that still contain metacharacters after sanitization
+		if !containsMetacharacters(field) && !strings.Contains(field, "_SAFE_") {
+			safeFields = append(safeFields, field)
+		}
+	}
+	
+	return safeFields
 }
 
 func containsMetacharacters(arg string) bool {
@@ -436,25 +494,6 @@ func isValidCommandPath(path string) bool {
 	return !strings.Contains(path, "..") && !strings.Contains(path, "\x00")
 }
 
-func shellEscape(command string) string {
-	// TODO: Implement shell escaping
-	return strings.ReplaceAll(command, "'", "'\"'\"'")
-}
-
-func isSafelyEscaped(escaped string) bool {
-	// TODO: Implement escape validation
-	return !containsInjectionPatterns(escaped)
-}
-
-func createSafeExecutionContext(command string) interface{} {
-	// TODO: Implement safe execution context
-	return nil
-}
-
-func isSecureContext(context interface{}) bool {
-	// TODO: Implement context security validation
-	return true
-}
 
 func validateCommandArgument(arg string) bool {
 	// TODO: Implement argument validation

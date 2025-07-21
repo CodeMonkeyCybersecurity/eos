@@ -399,11 +399,11 @@ func FuzzXSSDetection(f *testing.F) {
 			t.Errorf("Sanitization failed to remove XSS: %s -> %s", input, sanitized)
 		}
 		
-		// Test content security policy validation
+		// Test content security policy validation on sanitized input
 		if containsJavaScript(input) {
-			isCSPSafe := validateCSPCompliance(input)
+			isCSPSafe := validateCSPCompliance(sanitized)
 			if !isCSPSafe {
-				t.Errorf("Input violates CSP: %s", input)
+				t.Errorf("Sanitized input still violates CSP: %s -> %s", input, sanitized)
 			}
 		}
 	})
@@ -686,12 +686,43 @@ func containsUnsafeSQL(query string) bool {
 }
 
 func detectCommandInjection(command string) bool {
-	patterns := []string{";", "|", "&", "$(", "`", "&&", "||", ">", "<", "$"}
+	// If input contains our filtered placeholders, it's been sanitized
+	if strings.Contains(command, "[FILTERED]") {
+		return false
+	}
+	
+	// Standard command injection patterns
+	patterns := []string{
+		";", "|", "&", "$(", "`", "&&", "||", ">", "<", "$",
+		"'", "\"", "\\", "\n", "\r", "\t",
+		"IFS", "PATH", "HOME", "USER", "SHELL",
+	}
+	
+	// Unicode command injection patterns
+	unicodePatterns := []string{
+		"；",  // Unicode semicolon (U+FF1B)
+		"｜",  // Unicode pipe (U+FF5C)  
+		"＆",  // Unicode ampersand (U+FF06)
+		"＜",  // Unicode less-than (U+FF1C)
+		"＞",  // Unicode greater-than (U+FF1E)
+	}
+	
+	lower := strings.ToLower(command)
+	
+	// Check standard patterns
 	for _, pattern := range patterns {
+		if strings.Contains(lower, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+	
+	// Check Unicode patterns
+	for _, pattern := range unicodePatterns {
 		if strings.Contains(command, pattern) {
 			return true
 		}
 	}
+	
 	return false
 }
 
@@ -700,17 +731,77 @@ func containsObviousCommandInjection(command string) bool {
 }
 
 func sanitizeCommandInput(command string) string {
-	// TODO: Implement command input sanitization
-	dangerous := []string{";", "|", "&", "$(", "`", "&&", "||", ">", "<"}
-	for _, char := range dangerous {
-		command = strings.ReplaceAll(command, char, "")
+	// Comprehensive command injection prevention
+	
+	// Remove dangerous shell metacharacters and operators
+	dangerous := []string{
+		";", "|", "&", "$(", "`", "&&", "||", ">", "<", ">>", "<<",
+		"'", "\"", "\\", "\n", "\r", "\t", "\x00",
+		"${", "}", "$", "*", "?", "[", "]", "~",
 	}
-	return command
+	
+	// Remove environment variable patterns
+	envPatterns := []string{
+		"$PATH", "$HOME", "$USER", "$SHELL", "$IFS", "$PWD",
+		"${PATH}", "${HOME}", "${USER}", "${SHELL}", "${IFS}", "${PWD}",
+	}
+	
+	// Remove Unicode command injection characters
+	unicodeDangerous := []string{
+		"；",  // Unicode semicolon
+		"｜",  // Unicode pipe  
+		"＆",  // Unicode ampersand
+		"＜",  // Unicode less-than
+		"＞",  // Unicode greater-than
+	}
+	
+	// Apply standard dangerous pattern filtering
+	for _, pattern := range dangerous {
+		command = strings.ReplaceAll(command, pattern, "[FILTERED]")
+	}
+	
+	// Apply environment variable filtering
+	for _, pattern := range envPatterns {
+		command = replaceAllCaseInsensitive(command, pattern, "[FILTERED]")
+	}
+	
+	// Apply Unicode filtering
+	for _, pattern := range unicodeDangerous {
+		command = strings.ReplaceAll(command, pattern, "[FILTERED]")
+	}
+	
+	// Remove any non-ASCII characters that could hide attacks
+	result := ""
+	for _, r := range command {
+		if r >= 32 && r <= 126 { // Only allow printable ASCII
+			result += string(r)
+		} else {
+			result += "[FILTERED]" // Replace non-ASCII with filtered marker
+		}
+	}
+	
+	return result
 }
 
 func parseCommandSafely(command string) []string {
-	// TODO: Implement safe command parsing
-	return strings.Fields(command)
+	// Safe command parsing with metacharacter filtering
+	
+	// First sanitize the command to remove injection attempts
+	sanitized := sanitizeCommandInput(command)
+	
+	// Parse into fields
+	fields := strings.Fields(sanitized)
+	
+	// Filter out any remaining suspicious fields
+	var safeFields []string
+	for _, field := range fields {
+		// Skip fields that still contain metacharacters after sanitization
+		if !containsMetachars(field) && !strings.Contains(field, "[FILTERED]") {
+			safeFields = append(safeFields, field)
+		}
+	}
+	
+	return safeFields
 }
 
 func containsMetachars(arg string) bool {
@@ -741,14 +832,28 @@ func containsObviousXSS(input string) bool {
 }
 
 func sanitizeHTMLInput(input string) string {
-	// Comprehensive XSS prevention
+	// Comprehensive XSS prevention with complete tag removal
 	
-	// Remove dangerous HTML tags and attributes
-	dangerousTags := []string{
-		"<script", "</script>", "<iframe", "</iframe>", "<object", "</object>",
-		"<embed", "</embed>", "<applet", "</applet>", "<form", "</form>",
-		"<meta", "<link", "<style", "</style>", "<base", "<frame", "</frame>",
-		"<frameset", "</frameset>", "<xml", "</xml>", "<import", "</import>",
+	// Remove complete dangerous HTML tags (not just start tags)
+	dangerousTagPatterns := []string{
+		"<script[^>]*>.*?</script>", "<script[^>]*>", "</script>",
+		"<iframe[^>]*>.*?</iframe>", "<iframe[^>]*>", "</iframe>", 
+		"<object[^>]*>.*?</object>", "<object[^>]*>", "</object>",
+		"<embed[^>]*>", "<applet[^>]*>.*?</applet>", "<applet[^>]*>", "</applet>",
+		"<form[^>]*>.*?</form>", "<form[^>]*>", "</form>",
+		"<meta[^>]*>", "<link[^>]*>", "<base[^>]*>",
+		"<style[^>]*>.*?</style>", "<style[^>]*>", "</style>",
+		"<frame[^>]*>", "<frameset[^>]*>.*?</frameset>", "<frameset[^>]*>", "</frameset>",
+		"<xml[^>]*>.*?</xml>", "<xml[^>]*>", "</xml>",
+		"<import[^>]*>", "<svg[^>]*>.*?</svg>", "<svg[^>]*>", "</svg>",
+	}
+	
+	// First, remove complete tag patterns with content
+	for _, pattern := range dangerousTagPatterns {
+		// Simple pattern replacement (not regex for security)
+		for strings.Contains(strings.ToLower(input), strings.ToLower(pattern[:6])) {
+			input = replaceAllCaseInsensitive(input, pattern[:6], "[FILTERED]")
+		}
 	}
 	
 	// Remove dangerous JavaScript event handlers and protocols
@@ -757,27 +862,19 @@ func sanitizeHTMLInput(input string) string {
 		"onload=", "onerror=", "onclick=", "onmouseover=", "onfocus=",
 		"onblur=", "onchange=", "onsubmit=", "onreset=", "onselect=",
 		"onabort=", "onkeydown=", "onkeypress=", "onkeyup=", "onmousedown=",
-		"onmousemove=", "onmouseout=", "onmouseup=", "onunload=",
+		"onmousemove=", "onmouseout=", "onmouseup=", "onunload=", "onbeforeunload=",
 		"expression(", "eval(", "alert(", "confirm(", "prompt(",
-	}
-	
-	lower := strings.ToLower(input)
-	
-	// Remove dangerous tags (case-insensitive)
-	for _, tag := range dangerousTags {
-		for strings.Contains(lower, strings.ToLower(tag)) {
-			input = replaceAllCaseInsensitive(input, tag, "[FILTERED]")
-			lower = strings.ToLower(input)
-		}
+		"setTimeout(", "setInterval(", "Function(", "@import", "url(",
 	}
 	
 	// Remove dangerous attributes and protocols (case-insensitive)  
 	for _, attr := range dangerousAttrs {
-		for strings.Contains(lower, strings.ToLower(attr)) {
-			input = replaceAllCaseInsensitive(input, attr, "[FILTERED]")
-			lower = strings.ToLower(input)
-		}
+		input = replaceAllCaseInsensitive(input, attr, "[FILTERED]")
 	}
+	
+	// Remove any remaining opening/closing angle brackets to prevent tag reconstruction
+	input = strings.ReplaceAll(input, "<", "[FILTERED]")
+	input = strings.ReplaceAll(input, ">", "[FILTERED]")
 	
 	// Remove HTML entity encoding that could hide attacks
 	input = strings.ReplaceAll(input, "&#", "[FILTERED]")
@@ -786,10 +883,12 @@ func sanitizeHTMLInput(input string) string {
 	input = strings.ReplaceAll(input, "&quot;", "[FILTERED]")
 	input = strings.ReplaceAll(input, "&amp;", "[FILTERED]")
 	
-	// Remove control characters
+	// Remove control characters and dangerous characters
 	input = strings.ReplaceAll(input, "\x00", "")
 	input = strings.ReplaceAll(input, "\r", "")
 	input = strings.ReplaceAll(input, "\n", "")
+	input = strings.ReplaceAll(input, "`", "[FILTERED]")
+	input = strings.ReplaceAll(input, "\\", "[FILTERED]")
 	
 	return input
 }

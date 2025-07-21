@@ -253,33 +253,68 @@ func ValidateAppName(appName string) error {
 	return nil
 }
 
-// SanitizeInputForCommand performs final sanitization before command execution
-// This is a belt-and-suspenders approach after validation
+// SanitizeInputForCommand performs comprehensive sanitization before command execution
+// This is a belt-and-suspenders approach after validation with comprehensive injection prevention
 func SanitizeInputForCommand(input string) string {
-	// Remove any null bytes
-	input = strings.ReplaceAll(input, "\x00", "")
+	// Remove any null bytes and control characters
+	sanitized := strings.ReplaceAll(input, "\x00", "")
+	sanitized = strings.ReplaceAll(sanitized, "\r", "")
+	sanitized = strings.ReplaceAll(sanitized, "\n", "")
+	sanitized = strings.ReplaceAll(sanitized, "\t", "")
 
-	// Remove dangerous characters that could be used for injection
-	dangerousReplacements := map[string]string{
-		";":  "",
-		"&":  "",
-		"|":  "",
-		"`":  "",
-		"$":  "",
-		"\\": "",
-		"'":  "",
-		"\"": "",
-		"\n": "",
-		"\r": "",
-		"\t": "",
+	// Remove basic shell metacharacters
+	basicDangerous := []string{
+		";", "|", "&", "`", "$", "\\", "'", "\"",
+		"(", ")", "<", ">", "[", "]", "{", "}",
+		"*", "?", "~", "!",
 	}
 
-	sanitized := input
-	for dangerous, replacement := range dangerousReplacements {
-		sanitized = strings.ReplaceAll(sanitized, dangerous, replacement)
+	// Remove compound operators
+	compoundOperators := []string{
+		"&&", "||", ">>", "<<", "2>&1", "$(", "${",
 	}
 
-	return sanitized
+	// Remove dangerous command patterns
+	dangerousCommands := []string{
+		"rm -rf", "cat /etc", "/bin/sh", "/bin/bash", "sh -c", "bash -c",
+		"wget", "curl", "nc ", "netcat", "python -c", "perl -e", "ruby -e",
+		"chmod 777", "sudo ", "su ", "eval ", "exec ",
+	}
+
+	// Remove environment variables that could be exploited
+	envVars := []string{
+		"$PATH", "$HOME", "$USER", "$SHELL", "$IFS", "$PWD",
+		"${PATH}", "${HOME}", "${USER}", "${SHELL}", "${IFS}", "${PWD}",
+	}
+
+	// Remove Unicode command injection characters
+	unicodeDangerous := []string{
+		"；",  // Unicode semicolon (U+FF1B)
+		"｜",  // Unicode pipe (U+FF5C)
+		"＆",  // Unicode ampersand (U+FF06)
+		"＜",  // Unicode less-than (U+FF1C)
+		"＞",  // Unicode greater-than (U+FF1E)
+	}
+
+	// Apply all sanitization filters
+	allDangerous := append(append(append(append(basicDangerous, compoundOperators...), dangerousCommands...), envVars...), unicodeDangerous...)
+
+	for _, dangerous := range allDangerous {
+		sanitized = strings.ReplaceAll(sanitized, dangerous, "")
+		// Also remove case variations for command patterns
+		sanitized = strings.ReplaceAll(sanitized, strings.ToUpper(dangerous), "")
+		sanitized = strings.ReplaceAll(sanitized, strings.ToLower(dangerous), "")
+	}
+
+	// Final safety: remove any non-printable ASCII characters that could hide attacks
+	result := ""
+	for _, r := range sanitized {
+		if r >= 32 && r <= 126 { // Only allow printable ASCII
+			result += string(r)
+		}
+	}
+
+	return result
 }
 
 // ValidateAllCertificateInputs validates all inputs for certificate generation

@@ -479,6 +479,13 @@ func executeSimpleQuery(db *sql.DB, operation *DatabaseOperation, start time.Tim
 		Timestamp: start,
 	}
 
+	// SECURITY: Validate SQL query for injection attempts
+	if err := validateSQLQuerySafety(operation.Query); err != nil {
+		result.Error = fmt.Sprintf("SQL validation failed: %s", err.Error())
+		result.Duration = time.Since(start)
+		return result, fmt.Errorf("unsafe SQL query rejected: %w", err)
+	}
+
 	rows, err := db.Query(operation.Query)
 	if err != nil {
 		result.Error = err.Error()
@@ -504,6 +511,13 @@ func executeSimpleQuery(db *sql.DB, operation *DatabaseOperation, start time.Tim
 func executeTransaction(db *sql.DB, operation *DatabaseOperation, start time.Time) (*DatabaseOperationResult, error) {
 	result := &DatabaseOperationResult{
 		Timestamp: start,
+	}
+
+	// SECURITY: Validate SQL query for injection attempts
+	if err := validateSQLQuerySafety(operation.Query); err != nil {
+		result.Error = fmt.Sprintf("SQL validation failed: %s", err.Error())
+		result.Duration = time.Since(start)
+		return result, fmt.Errorf("unsafe SQL query rejected: %w", err)
 	}
 
 	tx, err := db.Begin()
@@ -566,3 +580,4 @@ func executeVaultCommand(rc *eos_io.RuntimeContext, cmd []string) error {
 	// Implementation would execute vault CLI commands
 	return nil
 }
+

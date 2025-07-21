@@ -131,18 +131,39 @@ func ValidateVaultTokenFormat(token string) error {
 	return nil
 }
 
-// ValidateCredentialPath validates that a credential path is safe
+// ValidateCredentialPath validates that a credential path is safe with comprehensive protection
 func ValidateCredentialPath(rc *eos_io.RuntimeContext, credentialPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	// Check for path traversal attempts
-	if strings.Contains(credentialPath, "..") {
-		log.Warn("Path traversal attempt detected",
-			zap.String("path", credentialPath))
-		return fmt.Errorf("path contains directory traversal: %s", credentialPath)
+	// Comprehensive path traversal detection including encoded variants
+	pathTraversalPatterns := []string{
+		// Basic traversal
+		"..", "../", "..\\", ".../", "...\\",
+		// URL-encoded variations
+		"%2e%2e", "..%2f", "..%5c", "%2e%2e%2f", "%2e%2e%5c",
+		// Double URL-encoded
+		"%252e%252e", "..%252f", "..%255c", "%252e%252e%252f", "%252e%252e%255c",
+		// Triple URL-encoded (for comprehensive protection)
+		"%25252e%25252e", "..%25252f", "..%25255c",
+		// Unicode full-width variations
+		"．．", "．．／", "．．＼",
+		// UTF-8 overlong encoding
+		"%c0%ae%c0%ae", "%c0%af", "%c1%9c",
+		// Mixed variations
+		"..\\/", "../\\", "..\\./",
 	}
 
-	// Check for absolute paths to sensitive locations
+	lowerPath := strings.ToLower(credentialPath)
+	for _, pattern := range pathTraversalPatterns {
+		if strings.Contains(lowerPath, strings.ToLower(pattern)) {
+			log.Warn("Advanced path traversal attempt detected",
+				zap.String("path", credentialPath),
+				zap.String("pattern", pattern))
+			return fmt.Errorf("path contains directory traversal pattern '%s': %s", pattern, credentialPath)
+		}
+	}
+
+	// Check for absolute paths to sensitive locations (case-insensitive)
 	sensitivePaths := []string{
 		"/etc/",
 		"/root/",
@@ -155,7 +176,7 @@ func ValidateCredentialPath(rc *eos_io.RuntimeContext, credentialPath string) er
 	}
 
 	for _, sensitive := range sensitivePaths {
-		if strings.HasPrefix(credentialPath, sensitive) {
+		if strings.HasPrefix(lowerPath, strings.ToLower(sensitive)) {
 			log.Warn("Access to sensitive path attempted",
 				zap.String("path", credentialPath),
 				zap.String("sensitive_prefix", sensitive))
@@ -185,8 +206,9 @@ func ValidateCredentialPath(rc *eos_io.RuntimeContext, credentialPath string) er
 	}
 
 	allowed := false
+	lowerAbsPath := strings.ToLower(absPath)
 	for _, allowedDir := range allowedDirectories {
-		if strings.HasPrefix(absPath, allowedDir) {
+		if strings.HasPrefix(lowerAbsPath, strings.ToLower(allowedDir)) {
 			allowed = true
 			break
 		}
