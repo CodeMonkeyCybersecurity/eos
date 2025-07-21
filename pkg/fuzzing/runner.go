@@ -283,10 +283,25 @@ func categorizeTest(test FuzzTest, filePath string) FuzzTest {
 		strings.Contains(path, "security") ||
 		strings.Contains(path, "auth") ||
 		strings.Contains(path, "vault") ||
+		strings.Contains(path, "network") ||
+		strings.Contains(path, "config") ||
 		strings.Contains(name, "security") ||
 		strings.Contains(name, "crypto") ||
 		strings.Contains(name, "password") ||
-		strings.Contains(name, "token") {
+		strings.Contains(name, "token") ||
+		strings.Contains(name, "sql") ||
+		strings.Contains(name, "injection") ||
+		strings.Contains(name, "xss") ||
+		strings.Contains(name, "path") ||
+		strings.Contains(name, "traversal") ||
+		strings.Contains(name, "validation") ||
+		strings.Contains(name, "http") ||
+		strings.Contains(name, "dns") ||
+		strings.Contains(name, "url") ||
+		strings.Contains(name, "json") ||
+		strings.Contains(name, "yaml") ||
+		strings.Contains(name, "toml") ||
+		strings.Contains(name, "regex") {
 		test.Category = CategorySecurityCritical
 		test.Priority = 1
 		test.Description = "Security-critical functionality test"
