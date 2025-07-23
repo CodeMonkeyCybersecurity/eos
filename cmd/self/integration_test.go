@@ -52,6 +52,11 @@ func (m *MockSaltClient) CheckMinion(ctx context.Context, minion string) (bool, 
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *MockSaltClient) IsAPIAvailable(ctx context.Context) bool {
+	args := m.Called(ctx)
+	return args.Bool(0)
+}
+
 // MockVaultClient for testing Vault integration
 type MockVaultClient struct {
 	mock.Mock

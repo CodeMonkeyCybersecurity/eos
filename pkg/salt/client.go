@@ -119,9 +119,9 @@ func (c *Client) authenticate(ctx context.Context) error {
 		zap.String("eauth", c.eauth))
 
 	data := url.Values{
-		"username": {c.username},
-		"password": {c.password},
-		"eauth":    {c.eauth},
+		"username": []string{c.username},
+		"password": []string{c.password},
+		"eauth":    []string{c.eauth},
 	}
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, "POST",
@@ -287,11 +287,11 @@ func (c *Client) startStateJob(ctx context.Context, state string, pillar map[str
 	}
 
 	data := url.Values{
-		"client": {"local_async"},
-		"tgt":    {"*"},
-		"fun":    {"state.apply"},
-		"arg":    {state},
-		"kwarg":  {fmt.Sprintf("pillar=%s", pillarJSON)},
+		"client": []string{"local_async"},
+		"tgt":    []string{"*"},
+		"fun":    []string{"state.apply"},
+		"arg":    []string{state},
+		"kwarg":  []string{fmt.Sprintf("pillar=%s", pillarJSON)},
 	}
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, "POST",
@@ -373,7 +373,7 @@ func (c *Client) streamJobProgress(ctx context.Context, jobID string,
 				if err := scanner.Err(); err != nil {
 					return nil, err
 				}
-				break
+				return result, nil // Job stream ended
 			}
 
 			line := scanner.Text()
@@ -397,8 +397,6 @@ func (c *Client) streamJobProgress(ctx context.Context, jobID string,
 			}
 		}
 	}
-
-	return result, nil
 }
 
 // processJobEvent processes a job event and updates result

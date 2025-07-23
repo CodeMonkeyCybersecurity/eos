@@ -67,6 +67,10 @@ func (m *MockSaltClient) CheckMinion(ctx context.Context, minion string) (bool, 
 	return false, errors.New("not implemented in mock")
 }
 
+func (m *MockSaltClient) IsAPIAvailable(ctx context.Context) bool {
+	return false // Default to local mode for tests
+}
+
 // MockVaultClient implements users.VaultClient interface for testing
 type MockVaultClient struct {
 	WriteError error

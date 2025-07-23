@@ -398,14 +398,14 @@ func ConcurrencyPattern(numWorkers int, operation func(workerID int, s *Integrat
 		Execute: func(s *IntegrationTestSuite) error {
 			errors := make(chan error, numWorkers)
 
-			for i := range numWorkers {
+			for i := 0; i < numWorkers; i++ {
 				go func(workerID int) {
 					errors <- operation(workerID, s)
 				}(i)
 			}
 
 			// Collect results
-			for range numWorkers {
+			for i := 0; i < numWorkers; i++ {
 				if err := <-errors; err != nil {
 					return fmt.Errorf("worker failed: %w", err)
 				}

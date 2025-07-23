@@ -35,8 +35,4 @@ func OrchestrateVaultCreate(rc *eos_io.RuntimeContext) error {
 	// Salt not available - require it for new deployments
 	otelzap.Ctx(rc.Ctx).Error("Salt is required for vault installation. Please install SaltStack first using 'eos create saltstack'")
 	return fmt.Errorf("salt is required for vault installation - direct installation is deprecated")
-
-	// Legacy fallback code removed - Salt is now required
-	// This code path should never be reached due to the error above
-	return fmt.Errorf("unreachable code: direct installation path disabled")
 }

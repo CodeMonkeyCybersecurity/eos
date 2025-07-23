@@ -176,7 +176,7 @@ func OutputJoinToken() {
 	tokenPath := "/var/lib/rancher/k3s/server/node-token"
 	fmt.Println("Retrieving K3s join token...")
 	maxAttempts := 30
-	for range maxAttempts {
+	for i := 0; i < maxAttempts; i++ {
 		tokenData, err := os.ReadFile(tokenPath)
 		if err == nil {
 			token := strings.TrimSpace(string(tokenData))

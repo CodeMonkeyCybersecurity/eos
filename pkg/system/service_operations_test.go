@@ -64,6 +64,10 @@ func (m *MockSaltClient) CheckMinion(ctx context.Context, minion string) (bool, 
 	return true, nil
 }
 
+func (m *MockSaltClient) IsAPIAvailable(ctx context.Context) bool {
+	return false // Default to local mode for tests
+}
+
 func createTestLogger(t *testing.T) otelzap.LoggerWithCtx {
 	logger := zaptest.NewLogger(t)
 	return otelzap.New(logger).Ctx(context.Background())
