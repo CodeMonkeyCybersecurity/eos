@@ -4,8 +4,10 @@ package delete
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -220,7 +222,7 @@ func initializeSaltClient(logger otelzap.LoggerWithCtx) (*salt.Client, error) {
 	// Get underlying zap logger
 	baseLogger := logger.ZapLogger()
 	config := salt.ClientConfig{
-		BaseURL:            getDeleteConsulEnvOrDefault("SALT_API_URL", "https://localhost:8080"),
+		BaseURL:            getDeleteConsulEnvOrDefault("SALT_API_URL", "https://localhost:8000"),
 		Username:           getDeleteConsulEnvOrDefault("SALT_API_USER", "eos-service"),
 		Password:           os.Getenv("SALT_API_PASSWORD"),
 		EAuth:              "pam",
@@ -370,14 +372,61 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 // runDeleteConsulFallback is the original implementation using salt-call
 func runDeleteConsulFallback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// This contains the original implementation from the file
-	// which uses exec.Command to run salt-call directly
-	// We keep this as a fallback when Salt API is not configured
+	logger := otelzap.Ctx(rc.Ctx)
 	
-	// For brevity, I'm not including the full implementation
-	// but it would be the original code from the file
+	// Check if SaltStack is available
+	saltCallPath, err := exec.LookPath("salt-call")
+	if err != nil {
+		logger.Error("SaltStack is required for Consul removal")
+		return eos_err.NewUserError("saltstack is required for consul removal - salt-call not found in PATH")
+	}
+	logger.Info("SaltStack detected", zap.String("salt_call", saltCallPath))
 	
-	return fmt.Errorf("Salt API required for this operation")
+	// Prepare Salt pillar data for removal
+	pillarData := map[string]interface{}{
+		"consul": map[string]interface{}{
+			"ensure":      "absent",
+			"force":       forceDelete,
+			"keep_data":   keepData,
+			"keep_config": keepConfig,
+			"keep_user":   keepUser,
+			"timeout":     timeout,
+		},
+	}
+
+	pillarJSON, err := json.Marshal(pillarData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pillar data: %w", err)
+	}
+
+	// Execute Salt state for removal
+	saltArgs := []string{
+		"--local",
+		"--file-root=/opt/eos/salt/states",
+		"--pillar-root=/opt/eos/salt/pillar",
+		"state.apply",
+		"hashicorp.consul_remove",
+		"--output=json",
+		"--output-indent=2",
+		"pillar=" + string(pillarJSON),
+	}
+
+	logger.Info("Executing Salt state for removal",
+		zap.String("state", "hashicorp.consul_remove"),
+		zap.Strings("args", saltArgs))
+
+	output, err := exec.Command("salt-call", saltArgs...).CombinedOutput()
+	if err != nil {
+		logger.Error("Salt state execution failed",
+			zap.Error(err),
+			zap.String("output", string(output)))
+		return fmt.Errorf("salt state execution failed: %w", err)
+	}
+
+	logger.Info("Salt state executed successfully")
+	logger.Debug("Salt output", zap.String("output", string(output)))
+	
+	return nil
 }
 
 func init() {

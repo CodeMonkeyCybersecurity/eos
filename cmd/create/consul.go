@@ -168,7 +168,7 @@ func initializeSaltClient(logger otelzap.LoggerWithCtx) (*salt.Client, error) {
 	// Get underlying zap logger
 	baseLogger := logger.ZapLogger()
 	config := salt.ClientConfig{
-		BaseURL:            getConsulEnvOrDefault("SALT_API_URL", "https://localhost:8080"),
+		BaseURL:            getConsulEnvOrDefault("SALT_API_URL", "https://localhost:8000"),
 		Username:           getConsulEnvOrDefault("SALT_API_USER", "eos-service"),
 		Password:           os.Getenv("SALT_API_PASSWORD"),
 		EAuth:              "pam",

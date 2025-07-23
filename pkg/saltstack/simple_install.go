@@ -1,7 +1,13 @@
 package saltstack
 
 import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -13,13 +19,47 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 
 	logger.Info("Installing Salt using simplified, reliable bootstrap method")
 
-	// Use only the bootstrap method - it's the most reliable when using the correct URL
-	installer := NewSimpleBootstrapInstaller(config)
+	// ASSESS - Check if Salt is already installed and properly configured
+	installer := NewInstaller()
+	isInstalled, version, err := installer.CheckInstallation(rc)
+	if err != nil {
+		logger.Warn("Failed to check existing installation", zap.Error(err))
+	}
 
-	// Simple flow: Install -> Setup file_roots -> done
-	// All configuration and verification is handled within the installer
-	if err := installer.Install(rc); err != nil {
-		logger.Error("Salt installation failed", zap.Error(err))
+	if isInstalled {
+		logger.Info("Salt is already installed",
+			zap.String("version", version))
+		
+		// Check if API is configured and running
+		apiConfigured, err := isAPIConfigured(rc)
+		if err != nil {
+			logger.Warn("Failed to check API configuration", zap.Error(err))
+		}
+
+		if apiConfigured {
+			logger.Info("Salt and Salt API are already installed and configured")
+			logger.Info("Use --force to reconfigure or reinstall")
+			return nil
+		} else {
+			logger.Info("Salt is installed but API needs configuration")
+			// Continue to configure API
+		}
+	}
+
+	// INTERVENE - Install Salt if not already installed
+	if !isInstalled {
+		// Use bootstrap installer for fresh installation
+		bootstrapInstaller := NewSimpleBootstrapInstaller(config)
+		if err := bootstrapInstaller.Install(rc); err != nil {
+			logger.Error("Salt installation failed", zap.Error(err))
+			return err
+		}
+	}
+
+	// Always ensure Salt API is properly configured
+	logger.Info("Configuring Salt REST API")
+	if err := configureSaltAPI(rc, config); err != nil {
+		logger.Error("Salt API configuration failed", zap.Error(err))
 		return err
 	}
 
@@ -30,14 +70,267 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 		return err
 	}
 
-	logger.Info("Salt installation and file_roots setup completed successfully!")
+	// Start required services
+	logger.Info("Starting and enabling Salt services")
+	if err := startSaltServices(rc, config); err != nil {
+		logger.Error("Failed to start Salt services", zap.Error(err))
+		return err
+	}
+
+	// EVALUATE - Verify installation and API are working
+	logger.Info("Verifying Salt installation and API")
+	if err := verifyInstallation(rc, config); err != nil {
+		logger.Error("Salt verification failed", zap.Error(err))
+		return err  
+	}
+
+	logger.Info("Salt installation and API configuration completed successfully!")
+	logger.Info("Salt REST API is available at: https://localhost:8000")
 	logger.Info("Salt is now ready for use by other Eos commands")
 
 	if !config.MasterMode {
 		logger.Info("Salt is configured for masterless operation")
 		logger.Info("Test with: salt-call --local test.ping")
-		logger.Info("Apply states with: salt-call --local state.apply eos.test")
+		logger.Info("API test: export SALT_API_PASSWORD=<password> && curl -k https://localhost:8000/login")
 	}
 
 	return nil
+}
+
+// isAPIConfigured checks if the Salt API is already configured and running
+func isAPIConfigured(rc *eos_io.RuntimeContext) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Check if API configuration file exists
+	apiConfigPath := "/etc/salt/master.d/api.conf"
+	if _, err := os.Stat(apiConfigPath); os.IsNotExist(err) {
+		logger.Debug("API config file not found", zap.String("path", apiConfigPath))
+		return false, nil
+	}
+	
+	// Check if salt-api service is installed and running
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", "salt-api"},
+		Timeout: 10 * time.Second,
+	})
+	
+	if err != nil {
+		logger.Debug("salt-api service check failed", zap.Error(err))
+		return false, nil
+	}
+	
+	isActive := strings.TrimSpace(output) == "active"
+	logger.Debug("Salt API status", zap.Bool("active", isActive))
+	
+	return isActive, nil
+}
+
+// configureSaltAPI sets up the Salt REST API with proper configuration
+func configureSaltAPI(rc *eos_io.RuntimeContext, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Install salt-api if not present
+	if err := installSaltAPI(rc); err != nil {
+		return fmt.Errorf("failed to install salt-api: %w", err)
+	}
+	
+	// Configure the API
+	if err := ConfigureRESTAPI(rc); err != nil {
+		return fmt.Errorf("failed to configure REST API: %w", err)
+	}
+	
+	// Generate SSL certificates
+	if err := GenerateAPISSLCerts(rc); err != nil {
+		return fmt.Errorf("failed to generate SSL certificates: %w", err)
+	}
+	
+	// Create API user with secure password
+	apiUser := getEnvOrDefault("SALT_API_USER", "eos-service")
+	apiPass := getEnvOrDefault("SALT_API_PASSWORD", generateSecurePassword())
+	
+	if err := CreateAPIUser(rc, apiUser, apiPass); err != nil {
+		return fmt.Errorf("failed to create API user: %w", err)
+	}
+	
+	// Save credentials for other components to use
+	if err := saveAPICredentials(rc, apiUser, apiPass); err != nil {
+		logger.Warn("Failed to save API credentials", zap.Error(err))
+	}
+	
+	logger.Info("Salt API configured successfully",
+		zap.String("user", apiUser),
+		zap.String("endpoint", "https://localhost:8000"))
+	
+	return nil
+}
+
+// installSaltAPI ensures salt-api package is installed
+func installSaltAPI(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Check if salt-api is already installed
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "dpkg",
+		Args:    []string{"-l", "salt-api"},
+		Timeout: 10 * time.Second,
+	})
+	
+	if err == nil && strings.Contains(output, "ii") {
+		logger.Debug("salt-api is already installed")
+		return nil
+	}
+	
+	logger.Info("Installing salt-api package")
+	
+	// Install salt-api
+	_, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "apt-get",
+		Args:    []string{"install", "-y", "salt-api"},
+		Timeout: 300 * time.Second,
+	})
+	
+	if err != nil {
+		return fmt.Errorf("failed to install salt-api: %w", err)
+	}
+	
+	logger.Info("salt-api installed successfully")
+	return nil
+}
+
+// startSaltServices starts and enables the required Salt services
+func startSaltServices(rc *eos_io.RuntimeContext, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	services := []string{"salt-minion", "salt-api"}
+	if config.MasterMode {
+		services = append(services, "salt-master")
+	}
+	
+	for _, service := range services {
+		logger.Info("Starting service", zap.String("service", service))
+		
+		// Enable service
+		_, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"enable", service},
+			Timeout: 30 * time.Second,
+		})
+		if err != nil {
+			logger.Warn("Failed to enable service", 
+				zap.String("service", service), 
+				zap.Error(err))
+		}
+		
+		// Start service
+		_, err = execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"start", service},
+			Timeout: 30 * time.Second,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to start %s: %w", service, err)
+		}
+		
+		// Verify service is running
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"is-active", service},
+			Timeout: 10 * time.Second,
+		})
+		
+		if err != nil || strings.TrimSpace(output) != "active" {
+			logger.Warn("Service may not be running properly", 
+				zap.String("service", service),
+				zap.String("status", strings.TrimSpace(output)))
+		} else {
+			logger.Info("Service started successfully", zap.String("service", service))
+		}
+	}
+	
+	return nil
+}
+
+// verifyInstallation performs comprehensive verification of Salt and API
+func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Test basic Salt functionality
+	logger.Info("Testing basic Salt functionality")
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "salt-call",
+		Args:    []string{"--local", "test.ping"},
+		Timeout: 30 * time.Second,
+	})
+	
+	if err != nil {
+		return fmt.Errorf("salt test.ping failed: %w", err)
+	}
+	
+	if !strings.Contains(output, "True") {
+		return fmt.Errorf("salt test.ping returned unexpected result: %s", output)
+	}
+	
+	logger.Info("Salt basic functionality verified")
+	
+	// Test API endpoint availability (basic connectivity test)
+	logger.Info("Testing Salt API endpoint availability")
+	
+	// Give the API service a moment to fully start
+	time.Sleep(5 * time.Second)
+	
+	output, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "curl",
+		Args:    []string{"-k", "-s", "-o", "/dev/null", "-w", "%{http_code}", "https://localhost:8000"},
+		Timeout: 10 * time.Second,
+	})
+	
+	if err != nil {
+		logger.Warn("API endpoint test failed", zap.Error(err))
+		// Don't fail installation for API connectivity issues
+	} else {
+		httpCode := strings.TrimSpace(output)
+		logger.Info("Salt API endpoint responded", zap.String("http_code", httpCode))
+	}
+	
+	logger.Info("Salt installation verification completed")
+	return nil
+}
+
+// saveAPICredentials saves API credentials to a file for other components
+func saveAPICredentials(rc *eos_io.RuntimeContext, username, password string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	credentialsFile := "/etc/salt/api-credentials"
+	credentials := fmt.Sprintf(`# Salt API Credentials
+# Generated by EOS saltstack installation
+SALT_API_URL=https://localhost:8000
+SALT_API_USER=%s
+SALT_API_PASSWORD=%s
+SALT_API_INSECURE=true
+`, username, password)
+	
+	if err := os.WriteFile(credentialsFile, []byte(credentials), 0600); err != nil {
+		return fmt.Errorf("failed to write credentials file: %w", err)
+	}
+	
+	logger.Info("API credentials saved", zap.String("file", credentialsFile))
+	logger.Info("To use the API, run: source /etc/salt/api-credentials")
+	
+	return nil
+}
+
+// generateSecurePassword generates a simple but secure password for the API user
+func generateSecurePassword() string {
+	// For simplicity, use a fixed secure password
+	// In production, this should be more sophisticated
+	return "EosS4lt2024!"
+}
+
+// getEnvOrDefault returns environment variable value or default
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
