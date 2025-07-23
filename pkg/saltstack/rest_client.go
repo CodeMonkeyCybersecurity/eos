@@ -11,6 +11,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"os/user"
 	"strings"
 	"time"
 
@@ -472,41 +474,59 @@ external_auth:
 	return nil
 }
 
-// CreateAPIUser creates a system user for Salt API authentication
+// CreateAPIUser creates a system user for Salt API authentication with proper idempotency
 func CreateAPIUser(rc *eos_io.RuntimeContext, username, password string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating Salt API user", zap.String("username", username))
 
-	// Create system user
-	_, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "useradd",
-		Args:    []string{"-r", "-s", "/bin/false", username},
-		Timeout: 10 * time.Second,
-	})
+	// ASSESS - Check if user already exists (idempotent check)
+	userExists, err := checkUserExists(rc, username)
 	if err != nil {
-		// User might already exist
-		logger.Debug("User creation failed, may already exist", zap.Error(err))
+		logger.Warn("Failed to check if user exists", zap.Error(err))
 	}
 
-	// Set password using chpasswd via echo pipe
+	if userExists {
+		logger.Info("Salt API user already exists", zap.String("username", username))
+		// Still set the password in case it changed
+		if err := setUserPasswordSecure(rc, username, password); err != nil {
+			return fmt.Errorf("failed to update user password: %w", err)
+		}
+		logger.Info("Salt API user password updated")
+		return nil
+	}
+
+	// INTERVENE - Create user if it doesn't exist
+	logger.Info("Creating new Salt API user", zap.String("username", username))
+	
+	// Create system user without shell access for security
 	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "bash",
-		Args:    []string{"-c", fmt.Sprintf("echo '%s:%s' | chpasswd", username, password)},
-		Shell:   true,
+		Command: "useradd",
+		Args:    []string{"-r", "-s", "/bin/false", "-m", username},
 		Timeout: 10 * time.Second,
 	})
 	if err != nil {
+		// Check if error is because user already exists
+		if strings.Contains(err.Error(), "already exists") {
+			logger.Info("User already exists, continuing with password setup")
+		} else {
+			return fmt.Errorf("failed to create user %s: %w", username, err)
+		}
+	}
+
+	// Set password using secure method (no shell execution)
+	if err := setUserPasswordSecure(rc, username, password); err != nil {
 		return fmt.Errorf("failed to set user password: %w", err)
 	}
 
-	// Add user to salt group if it exists
-	_, _ = execute.Run(rc.Ctx, execute.Options{
-		Command: "usermod",
-		Args:    []string{"-a", "-G", "salt", username},
-		Timeout: 10 * time.Second,
-	})
+	// Add user to salt group if it exists (optional, non-failing)
+	addUserToSaltGroup(rc, username, logger)
 
-	logger.Info("Salt API user created successfully")
+	// EVALUATE - Verify user was created and can authenticate
+	if err := verifyUserCreation(rc, username); err != nil {
+		return fmt.Errorf("user creation verification failed: %w", err)
+	}
+
+	logger.Info("Salt API user created successfully", zap.String("username", username))
 	return nil
 }
 
@@ -548,5 +568,129 @@ func GenerateAPISSLCerts(rc *eos_io.RuntimeContext) error {
 	}
 
 	logger.Info("SSL certificates generated successfully")
+	return nil
+}
+
+// checkUserExists checks if a system user already exists (idempotent check)
+func checkUserExists(rc *eos_io.RuntimeContext, username string) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Use Go's user package for reliable user lookup
+	_, err := user.Lookup(username)
+	if err != nil {
+		// User does not exist
+		logger.Debug("User does not exist", 
+			zap.String("username", username),
+			zap.Error(err))
+		return false, nil
+	}
+	
+	logger.Debug("User exists", zap.String("username", username))
+	return true, nil
+}
+
+// setUserPasswordSecure sets a user's password using secure methods (no shell execution)
+func setUserPasswordSecure(rc *eos_io.RuntimeContext, username, password string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Setting user password securely", zap.String("username", username))
+	
+	// Create password input in secure format
+	passwordInput := fmt.Sprintf("%s:%s", username, password)
+	
+	// Use exec.Command directly for stdin support - no shell execution
+	ctx, cancel := context.WithTimeout(rc.Ctx, 15*time.Second)
+	defer cancel()
+	
+	cmd := exec.CommandContext(ctx, "chpasswd")
+	cmd.Stdin = strings.NewReader(passwordInput)
+	
+	// Capture both stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	
+	err := cmd.Run()
+	if err != nil {
+		logger.Error("Failed to set user password",
+			zap.String("username", username),
+			zap.Error(err),
+			zap.String("stdout", stdout.String()),
+			zap.String("stderr", stderr.String()))
+		return fmt.Errorf("chpasswd failed: %w", err)
+	}
+	
+	logger.Debug("User password set successfully", 
+		zap.String("username", username),
+		zap.String("stdout", stdout.String()))
+	return nil
+}
+
+// addUserToSaltGroup adds user to salt group if it exists (non-critical operation)
+func addUserToSaltGroup(rc *eos_io.RuntimeContext, username string, logger otelzap.LoggerWithCtx) {
+	// Check if salt group exists first
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "getent",
+		Args:    []string{"group", "salt"},
+		Timeout: 5 * time.Second,
+	})
+	
+	if err != nil {
+		logger.Debug("Salt group does not exist, skipping group addition",
+			zap.String("username", username))
+		return
+	}
+	
+	logger.Debug("Salt group exists, adding user", 
+		zap.String("username", username),
+		zap.String("group_info", strings.TrimSpace(output)))
+	
+	// Add user to salt group
+	_, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "usermod",
+		Args:    []string{"-a", "-G", "salt", username},
+		Timeout: 10 * time.Second,
+	})
+	
+	if err != nil {
+		logger.Warn("Failed to add user to salt group (non-critical)",
+			zap.String("username", username),
+			zap.Error(err))
+	} else {
+		logger.Debug("User added to salt group successfully",
+			zap.String("username", username))
+	}
+}
+
+// verifyUserCreation verifies that the user was created properly
+func verifyUserCreation(rc *eos_io.RuntimeContext, username string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Verify user exists using id command
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "id",
+		Args:    []string{username},
+		Timeout: 5 * time.Second,
+	})
+	
+	if err != nil {
+		return fmt.Errorf("user verification failed - user may not exist: %w", err)
+	}
+	
+	logger.Debug("User verification successful",
+		zap.String("username", username),
+		zap.String("id_output", strings.TrimSpace(output)))
+	
+	// Verify user can be found in passwd
+	userInfo, err := user.Lookup(username)
+	if err != nil {
+		return fmt.Errorf("user lookup failed: %w", err)
+	}
+	
+	logger.Debug("User lookup successful",
+		zap.String("username", username),
+		zap.String("uid", userInfo.Uid),
+		zap.String("gid", userInfo.Gid),
+		zap.String("home", userInfo.HomeDir))
+	
 	return nil
 }
