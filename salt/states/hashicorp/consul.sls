@@ -39,6 +39,23 @@ consul_binary_verify:
     - require:
       - pkg: consul_package
 
+# Pre-flight checks for Consul
+consul_port_check:
+  cmd.run:
+    - name: |
+        for port in {{ pillar.get('consul:http_port', '8161') }} {{ pillar.get('consul:dns_port', '8600') }} {{ pillar.get('consul:grpc_port', '8502') }}; do
+          if lsof -i :$port > /dev/null 2>&1; then
+            echo "ERROR: Port $port is already in use"
+            lsof -i :$port
+            exit 1
+          fi
+        done
+        echo "All required ports are available"
+    - require:
+      - pkg: consul_package
+    - require_in:
+      - service: consul_service_running
+
 # Ensure consul is in PATH
 consul_binary_link:
   file.symlink:
@@ -60,7 +77,16 @@ consul_config:
         log_level = "{{ pillar.get('consul:log_level', 'INFO') }}"
         server = {{ pillar.get('consul:server_mode', 'false') }}
         bootstrap_expect = {{ pillar.get('consul:bootstrap_expect', '1') }}
-        bind_addr = "{{ pillar.get('consul:bind_addr', '127.0.0.1') }}"
+        {% set bind_addr = pillar.get('consul:bind_addr', '0.0.0.0') %}
+        {% if bind_addr == '0.0.0.0' %}
+          {% set ipv4_addrs = grains.get('ipv4', []) %}
+          {% if ipv4_addrs and ipv4_addrs|length > 0 %}
+            {% set bind_addr = ipv4_addrs|reject('equalto', '127.0.0.1')|first|default(ipv4_addrs[0]) %}
+          {% else %}
+            {% set bind_addr = '127.0.0.1' %}
+          {% endif %}
+        {% endif %}
+        bind_addr = "{{ bind_addr }}"
         client_addr = "{{ pillar.get('consul:client_addr', '127.0.0.1') }}"
         ui_config {
           enabled = {{ pillar.get('consul:ui_enabled', 'true') }}
@@ -69,7 +95,7 @@ consul_config:
           enabled = {{ pillar.get('consul:connect_enabled', 'true') }}
         }
         ports {
-          http = {{ pillar.get('consul:http_port', '8500') }}
+          http = {{ pillar.get('consul:http_port', '8161') }}
           dns = {{ pillar.get('consul:dns_port', '8600') }}
           grpc = {{ pillar.get('consul:grpc_port', '8502') }}
         }
@@ -83,6 +109,17 @@ consul_config:
     - require:
       - file: consul_directories
       - pkg: consul_package
+
+# Validate Consul configuration before starting
+consul_config_validate:
+  cmd.run:
+    - name: consul validate /etc/consul.d/
+    - runas: consul
+    - require:
+      - file: consul_config
+      - file: consul_directories
+    - require_in:
+      - service: consul_service_running
 
 # Systemd service for consul
 consul_service:
@@ -129,8 +166,36 @@ consul_service_running:
     - name: consul
     - enable: True
     - restart: True
+    - retry:
+        attempts: 3
+        interval: 5
     - watch:
       - file: consul_config
       - file: consul_service
     - require:
       - service: consul_service_enabled
+      - cmd: consul_config_validate
+      - cmd: consul_port_check
+
+# Debug output on failure
+consul_debug_on_failure:
+  cmd.run:
+    - name: |
+        echo "=== Consul Service Status ==="
+        systemctl status consul.service
+        echo ""
+        echo "=== Consul Journal Logs ==="
+        journalctl -xeu consul.service -n 50 --no-pager
+        echo ""
+        echo "=== Consul Configuration ==="
+        cat /etc/consul.d/consul.hcl
+        echo ""
+        echo "=== Consul Validation ==="
+        consul validate /etc/consul.d/ || true
+        echo ""
+        echo "=== Port Usage ==="
+        lsof -i :{{ pillar.get('consul:http_port', '8161') }} || true
+        lsof -i :{{ pillar.get('consul:dns_port', '8600') }} || true
+        lsof -i :{{ pillar.get('consul:grpc_port', '8502') }} || true
+    - onfail:
+      - service: consul_service_running

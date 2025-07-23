@@ -15,9 +15,11 @@ eos_dependencies:
       - ca-certificates             # Certificate authorities
       - lsb-release                 # System information
       - unzip                       # Archive extraction
+      - lsof                        # Port checking utility
 
 # Ensure system is up to date
 eos_system_update:
-  pkg.upgrade:
+  pkg.uptodate:
+    - refresh: True
     - require:
       - pkg: eos_dependencies
