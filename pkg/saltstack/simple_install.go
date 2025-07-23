@@ -114,6 +114,7 @@ func isAPIConfigured(rc *eos_io.RuntimeContext) (bool, error) {
 		Command: "systemctl",
 		Args:    []string{"is-active", "salt-api"},
 		Timeout: 10 * time.Second,
+		Capture: true,
 	})
 	
 	if err != nil {
@@ -175,6 +176,7 @@ func installSaltAPI(rc *eos_io.RuntimeContext) error {
 		Command: "dpkg",
 		Args:    []string{"-l", "salt-api"},
 		Timeout: 10 * time.Second,
+		Capture: true,
 	})
 	
 	if err == nil && strings.Contains(output, "ii") {
@@ -261,6 +263,7 @@ func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
 		Command: "salt-call",
 		Args:    []string{"--local", "test.ping", "--out=json"},
 		Timeout: 30 * time.Second,
+		Capture: true, // CRITICAL: Must capture output
 	})
 	
 	if err != nil {
@@ -270,11 +273,15 @@ func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
 			Command: "salt-call",
 			Args:    []string{"--local", "test.ping"},
 			Timeout: 30 * time.Second,
+			Capture: true, // CRITICAL: Must capture output
 		})
 		if err != nil {
 			return fmt.Errorf("salt test.ping failed: %w", err)
 		}
 	}
+	
+	// Add debug logging to see what we actually got
+	logger.Debug("Salt ping output captured", zap.String("output", output), zap.Int("length", len(output)))
 	
 	// Parse the output more flexibly
 	if err := validateSaltPingOutput(output, logger); err != nil {
@@ -293,6 +300,7 @@ func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
 		Command: "curl",
 		Args:    []string{"-k", "-s", "-o", "/dev/null", "-w", "%{http_code}", "https://localhost:8000"},
 		Timeout: 10 * time.Second,
+		Capture: true,
 	})
 	
 	if err != nil {
@@ -389,6 +397,7 @@ func checkServiceStatus(rc *eos_io.RuntimeContext, service string) (string, erro
 		Command: "systemctl",
 		Args:    []string{"is-active", service},
 		Timeout: 10 * time.Second,
+		Capture: true, // CRITICAL: Must capture output
 	})
 	
 	if err != nil {
@@ -402,7 +411,9 @@ func checkServiceStatus(rc *eos_io.RuntimeContext, service string) (string, erro
 	status := strings.TrimSpace(output)
 	logger.Debug("Service status check", 
 		zap.String("service", service),
-		zap.String("status", status))
+		zap.String("raw_output", output),
+		zap.String("status", status),
+		zap.Int("output_length", len(output)))
 	
 	// Handle empty status (should not happen, but be defensive)
 	if status == "" {
@@ -411,6 +422,7 @@ func checkServiceStatus(rc *eos_io.RuntimeContext, service string) (string, erro
 			Command: "systemctl",
 			Args:    []string{"show", "-p", "ActiveState", service},
 			Timeout: 10 * time.Second,
+			Capture: true, // CRITICAL: Must capture output
 		})
 		if err != nil {
 			return "unknown", fmt.Errorf("failed to get service status: %w", err)

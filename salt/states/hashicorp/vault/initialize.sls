@@ -82,7 +82,7 @@ vault_initialize:
         # Extract root token for verification (without logging sensitive data)
         ROOT_TOKEN=$(echo "$INIT_OUTPUT" | jq -r '.root_token')
         if [ -n "$ROOT_TOKEN" ] && [ "$ROOT_TOKEN" != "null" ]; then
-          echo "Root token successfully extracted (length: ${#ROOT_TOKEN})"
+          echo "Root token successfully extracted (length: $(echo -n "$ROOT_TOKEN" | wc -c))"
         else
           echo "ERROR: Failed to extract root token from initialization output"
           exit 1

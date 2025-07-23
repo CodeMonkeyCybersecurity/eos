@@ -58,7 +58,7 @@ vault_eos_config:
       - file: vault_directories
 
 # Environment variables for Vault service (replicating VAULT_ADDR and VAULT_CACERT)
-vault_environment:
+vault_environment_eos:
   file.managed:
     - name: /etc/vault.d/vault.env
     - contents: |
