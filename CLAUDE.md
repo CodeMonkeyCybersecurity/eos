@@ -143,6 +143,18 @@ The complete flow from user input to execution follows these steps:
 6. **Error Handling**: Proper exit codes based on error type
 7. **Cleanup**: Context cancellation and resource cleanup
 
+### Eos is idempotent
+Proper idempotency checks ensure that operations can be run
+  multiple times safely without causing errors or unintended side effects. Let me
+  show you what good idempotency looks like in different contexts.
+
+  Key Principles of Idempotency
+
+  1. Check before acting - Don't assume state
+  2. Handle "already done" gracefully - Not an error
+  3. Verify desired state - Focus on end result, not the action
+  4. Use conditional operations - Only act when needed
+
 #### Package Responsibility Boundaries
 ```
 cmd/

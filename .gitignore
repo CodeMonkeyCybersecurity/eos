@@ -13,7 +13,6 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
-*.txt
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -42,8 +41,8 @@ go.work.sum
 __pycache__
 
 # MacOS
-.DS_Store
-desktop.ini
+*.DS_Store
+*desktop.ini
 
 # Backups 
 *.bak
@@ -63,17 +62,17 @@ apps/mattermost/docker*
 # Other 
 *.deb
 *.rpm
-eos
+*eos*
 
 # tests
 coverage.*
 *.out
 gosec-report.*
 
-.aider*
+*.aider*
 
 #claude
 *this-session-is-being-continued-from-a-previous-co.txt
-*.nomad
+*.txt
 
 *.bootstrapped

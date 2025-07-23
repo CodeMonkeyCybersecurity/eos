@@ -1,15 +1,163 @@
 # Consul Installation via Salt
 # Manages HashiCorp Consul installation following Eos architectural principles
+# Implements idempotent operations with force/clean options
 
 # Include shared HashiCorp repository setup
 include:
   - hashicorp
+
+# Get pillar values for control flow
+{% set force_reinstall = pillar.get('consul:force_reinstall', False) %}
+{% set clean_install = pillar.get('consul:clean_install', False) %}
+
+# Pre-flight status check
+consul_preflight_check:
+  cmd.run:
+    - name: |
+        #!/bin/bash
+        set -e
+        
+        echo "=== Consul Pre-flight Checks ==="
+        echo "Force reinstall: {{ force_reinstall }}"
+        echo "Clean install: {{ clean_install }}"
+        
+        # Initialize status variables
+        CONSUL_INSTALLED=false
+        CONSUL_RUNNING=false
+        CONSUL_FAILED=false
+        CONFIG_VALID=false
+        
+        # Check if Consul binary exists
+        if command -v consul >/dev/null 2>&1; then
+          CONSUL_INSTALLED=true
+          echo "Consul binary found: $(which consul)"
+          echo "Version: $(consul version | head -1)"
+        fi
+        
+        # Check service status
+        if systemctl is-active consul.service >/dev/null 2>&1; then
+          CONSUL_RUNNING=true
+          echo "Consul service is running"
+        elif systemctl is-failed consul.service >/dev/null 2>&1; then
+          CONSUL_FAILED=true
+          echo "Consul service is in failed state"
+        fi
+        
+        # Check config validity if Consul is installed
+        if [ "$CONSUL_INSTALLED" = "true" ] && [ -f /etc/consul.d/consul.hcl ]; then
+          if consul validate /etc/consul.d/ >/dev/null 2>&1; then
+            CONFIG_VALID=true
+            echo "Consul configuration is valid"
+          else
+            echo "Consul configuration is invalid"
+          fi
+        fi
+        
+        # Decision logic
+        if [ "$CONSUL_RUNNING" = "true" ] && [ "$CONFIG_VALID" = "true" ]; then
+          if [ "{{ force_reinstall }}" != "True" ] && [ "{{ clean_install }}" != "True" ]; then
+            echo ""
+            echo "=== Consul is already running successfully ==="
+            echo "Consul version: $(consul version | head -1)"
+            echo "Service status: active"
+            echo ""
+            echo "To force reinstallation, run with --force"
+            echo "To clean install, run with --clean"
+            exit 0
+          fi
+        fi
+        
+        # If Consul is failed and no force flags
+        if [ "$CONSUL_FAILED" = "true" ]; then
+          if [ "{{ force_reinstall }}" != "True" ] && [ "{{ clean_install }}" != "True" ]; then
+            echo ""
+            echo "=== ERROR: Consul service is in failed state ==="
+            echo "Last 10 lines of logs:"
+            journalctl -u consul.service -n 10 --no-pager || true
+            echo ""
+            echo "Options:"
+            echo "1. Fix the issue manually and restart"
+            echo "2. Run with --force to reconfigure"
+            echo "3. Run with --clean to start fresh"
+            exit 1
+          fi
+        fi
+        
+        echo ""
+        echo "=== Proceeding with Consul installation ==="
+    - stateful: False
+
+# Clean up if requested
+{% if clean_install %}
+consul_cleanup_stop_service:
+  service.dead:
+    - name: consul
+    - enable: False
+    - onlyif: systemctl list-unit-files | grep -q consul.service
+
+consul_cleanup_processes:
+  cmd.run:
+    - name: pkill -f consul || true
+    - require:
+      - service: consul_cleanup_stop_service
+
+consul_cleanup_config:
+  file.absent:
+    - names:
+      - /etc/consul.d
+      - /etc/consul
+    - require:
+      - cmd: consul_cleanup_processes
+
+consul_cleanup_data:
+  cmd.run:
+    - name: |
+        echo "WARNING: Cleaning Consul data directory"
+        rm -rf /var/lib/consul/*
+    - onlyif: test -d /var/lib/consul
+    - require:
+      - file: consul_cleanup_config
+
+consul_cleanup_logs:
+  file.absent:
+    - name: /var/log/consul
+    - require:
+      - cmd: consul_cleanup_data
+
+consul_reset_systemd:
+  cmd.run:
+    - name: systemctl reset-failed consul.service || true
+    - require:
+      - service: consul_cleanup_stop_service
+{% endif %}
+
+# Stop service if force reinstall
+{% if force_reinstall and not clean_install %}
+consul_force_stop_service:
+  service.dead:
+    - name: consul
+    - onlyif: systemctl is-active consul.service
+{% endif %}
+
+# Backup existing configuration if not clean install
+{% if not clean_install %}
+consul_backup_config:
+  cmd.run:
+    - name: |
+        if [ -f /etc/consul.d/consul.hcl ]; then
+          BACKUP_FILE="/etc/consul.d/consul.hcl.backup.$(date +%Y%m%d_%H%M%S)"
+          cp /etc/consul.d/consul.hcl "$BACKUP_FILE"
+          echo "Backed up existing config to $BACKUP_FILE"
+        fi
+    - onlyif: test -f /etc/consul.d/consul.hcl
+{% endif %}
 
 consul_package:
   pkg.installed:
     - name: consul
     - require:
       - pkgrepo: hashicorp_repo
+      - cmd: consul_preflight_check
 
 consul_user:
   user.present:
@@ -55,6 +203,7 @@ consul_port_check:
       - pkg: consul_package
     - require_in:
       - service: consul_service_running
+    - unless: systemctl is-active consul.service
 
 # Ensure consul is in PATH
 consul_binary_link:
@@ -75,7 +224,7 @@ consul_config:
         datacenter = "{{ pillar.get('consul:datacenter', 'dc1') }}"
         data_dir = "/var/lib/consul"
         log_level = "{{ pillar.get('consul:log_level', 'INFO') }}"
-        server = {{ pillar.get('consul:server_mode', 'false') }}
+        server = {{ pillar.get('consul:server_mode', false)|lower }}
         bootstrap_expect = {{ pillar.get('consul:bootstrap_expect', '1') }}
         {% set bind_addr = pillar.get('consul:bind_addr', '0.0.0.0') %}
         {% if bind_addr == '0.0.0.0' %}
@@ -198,4 +347,42 @@ consul_debug_on_failure:
         lsof -i :{{ pillar.get('consul:dns_port', '8600') }} || true
         lsof -i :{{ pillar.get('consul:grpc_port', '8502') }} || true
     - onfail:
+      - service: consul_service_running
+
+# Final verification
+consul_final_verification:
+  cmd.run:
+    - name: |
+        echo "=== Consul Installation Verification ==="
+        
+        # Check service status
+        if systemctl is-active consul.service >/dev/null 2>&1; then
+          echo "✓ Consul service is running"
+        else
+          echo "✗ Consul service is not running"
+          systemctl status consul.service --no-pager || true
+          exit 1
+        fi
+        
+        # Check cluster health
+        if timeout 5 consul members >/dev/null 2>&1; then
+          echo "✓ Consul cluster is responding"
+          consul members
+        else
+          echo "✗ Consul cluster is not responding"
+          exit 1
+        fi
+        
+        # Check API
+        if curl -sf http://localhost:{{ pillar.get('consul:http_port', '8161') }}/v1/status/leader >/dev/null; then
+          echo "✓ Consul API is accessible"
+        else
+          echo "✗ Consul API is not accessible"
+          exit 1
+        fi
+        
+        echo ""
+        echo "=== Consul Successfully Installed ==="
+        consul version
+    - require:
       - service: consul_service_running
