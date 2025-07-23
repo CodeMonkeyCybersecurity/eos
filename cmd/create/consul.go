@@ -6,12 +6,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -164,8 +166,17 @@ func displayConsulStatus(logger otelzap.LoggerWithCtx, status *salt.ConsulStatus
 	}
 }
 
-func initializeSaltClient(logger otelzap.LoggerWithCtx) (*salt.Client, error) {
-	// Get underlying zap logger
+func initializeSaltClient(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) (*salt.Client, error) {
+	// Create a basic saltstack client first to check API availability
+	basicClient := saltstack.NewClient(logger)
+	
+	// Perform comprehensive API availability check
+	if !basicClient.IsAPIAvailable(rc.Ctx) {
+		logger.Info("Salt API is not available, will use salt-call fallback")
+		return nil, fmt.Errorf("Salt API not available")
+	}
+	
+	// If API is available, create the full REST API client
 	baseLogger := logger.ZapLogger()
 	config := salt.ClientConfig{
 		BaseURL:            getConsulEnvOrDefault("SALT_API_URL", "https://localhost:8000"),
@@ -179,8 +190,8 @@ func initializeSaltClient(logger otelzap.LoggerWithCtx) (*salt.Client, error) {
 	}
 
 	if config.Password == "" {
-		// Fall back to using salt-call directly if API is not configured
-		return nil, fmt.Errorf("Salt API not configured")
+		logger.Info("Salt API password not configured, will use salt-call fallback")
+		return nil, fmt.Errorf("Salt API password not configured")
 	}
 
 	return salt.NewClient(config)
@@ -209,10 +220,11 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.Bool("clean", cleanInstall))
 
 	// Try to initialize Salt API client
-	saltClient, err := initializeSaltClient(logger)
+	saltClient, err := initializeSaltClient(rc, logger)
 	if err != nil {
-		logger.Info("Salt API not configured, falling back to local salt-call execution")
-		// Fall back to the original implementation using salt-call
+		logger.Info("Salt API not available, falling back to local salt-call execution", 
+			zap.Error(err))
+		// Fall back to the salt-call implementation
 		return runCreateConsulFallback(rc, cmd, args)
 	}
 
@@ -347,17 +359,75 @@ func getLogLevel(debug bool) string {
 	return "INFO"
 }
 
-// runCreateConsulFallback is the original implementation using salt-call
+// runCreateConsulFallback implements consul creation using salt-call (masterless mode)
 func runCreateConsulFallback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// This contains the original implementation from the file
-	// which uses exec.Command to run salt-call directly
-	// We keep this as a fallback when Salt API is not configured
+	logger := otelzap.Ctx(rc.Ctx)
 	
-	// ... (original implementation would go here)
-	// For brevity, I'm not including the full implementation
-	// but it would be the original code from the file
+	logger.Info("Using Salt masterless mode for Consul installation")
 	
-	return fmt.Errorf("Salt API required for this operation")
+	// Create basic saltstack client for local operations
+	saltClient := saltstack.NewClient(logger)
+	
+	// ASSESS - Check if we can run salt-call
+	logger.Info("Checking Salt masterless mode availability")
+	
+	// Prepare Salt pillar data (same as API version)
+	pillar := map[string]interface{}{
+		"consul": map[string]interface{}{
+			"datacenter":        datacenterName,
+			"bootstrap_expect":  1,
+			"server_mode":       true,
+			"vault_integration": !disableVaultIntegration,
+			"log_level":         getLogLevel(enableDebugLogging),
+			"force_install":     forceReinstall,
+			"clean_install":     cleanInstall,
+			"bind_addr":         "0.0.0.0",
+			"client_addr":       "0.0.0.0",
+			"ui_enabled":        true,
+			"connect_enabled":   true,
+			"dns_port":          8600,
+			"http_port":         shared.PortConsul,
+			"grpc_port":         8502,
+		},
+	}
+	
+	// INTERVENE - Apply Salt state using salt-call
+	logger.Info("Applying Consul Salt state using salt-call")
+	
+	if err := saltClient.StateApplyLocal(rc.Ctx, "hashicorp.consul", pillar); err != nil {
+		return fmt.Errorf("failed to apply consul state: %w", err)
+	}
+	
+	// EVALUATE - Basic verification using salt-call
+	logger.Info("Verifying Consul installation")
+	
+	// Check consul binary is available
+	output, err := saltClient.CmdRunLocal(rc.Ctx, "which consul")
+	if err != nil || output == "" {
+		return fmt.Errorf("consul binary not found after installation")
+	}
+	
+	// Check consul service status
+	output, err = saltClient.CmdRunLocal(rc.Ctx, "systemctl is-active consul")
+	if err != nil {
+		logger.Warn("Consul service may not be running yet", zap.Error(err))
+		// Give it a moment to start
+		time.Sleep(5 * time.Second)
+		
+		output, err = saltClient.CmdRunLocal(rc.Ctx, "systemctl is-active consul")
+		if err != nil {
+			return fmt.Errorf("consul service failed to start: %w", err)
+		}
+	}
+	
+	if !strings.Contains(output, "active") {
+		return fmt.Errorf("consul service is not active, status: %s", output)
+	}
+	
+	logger.Info("terminal prompt: ✅ Consul installation completed successfully using salt-call!")
+	logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
+	
+	return nil
 }
 
 func init() {

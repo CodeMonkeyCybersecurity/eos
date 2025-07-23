@@ -89,7 +89,7 @@ vault_mlock_capability:
       - pkg: vault_package
 
 # Create systemd environment file
-vault_environment:
+vault_environment_install:
   file.managed:
     - name: /etc/vault.d/vault.env
     - contents: |

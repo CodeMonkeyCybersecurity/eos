@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -19,6 +21,7 @@ type ClientInterface interface {
 	GrainGet(ctx context.Context, target string, grain string) (map[string]interface{}, error)
 	CmdRun(ctx context.Context, target string, command string) (string, error)
 	CheckMinion(ctx context.Context, minion string) (bool, error)
+	IsAPIAvailable(ctx context.Context) bool
 }
 
 // Client provides Salt Stack operations
@@ -234,4 +237,111 @@ func (c *Client) GetGrains(target, targetType string, grains []string) (map[stri
 		return c.GrainGet(context.Background(), target, grains[0])
 	}
 	return make(map[string]interface{}), nil
+}
+
+// IsAPIAvailable performs comprehensive checks to determine if Salt API is available and working
+func (c *Client) IsAPIAvailable(ctx context.Context) bool {
+	logger := otelzap.Ctx(ctx)
+	
+	logger.Debug("Checking Salt API availability")
+	
+	// 1. Check if salt-api package is installed
+	if !isPackageInstalled("salt-api") {
+		logger.Debug("Salt API package not installed")
+		return false
+	}
+	
+	// 2. Check if salt-api service is running
+	if !isServiceActive("salt-api") {
+		logger.Debug("Salt API service not active")
+		return false
+	}
+	
+	// 3. Check if API configuration exists
+	if !fileExists("/etc/salt/master.d/api.conf") {
+		logger.Debug("Salt API configuration file not found")
+		return false
+	}
+	
+	// 4. Check if we can actually connect to the API
+	if !canConnectToAPI(ctx) {
+		logger.Debug("Cannot connect to Salt API")
+		return false
+	}
+	
+	logger.Debug("Salt API is available and working")
+	return true
+}
+
+// isPackageInstalled checks if a package is installed using dpkg
+func isPackageInstalled(packageName string) bool {
+	cmd := exec.Command("dpkg", "-l", packageName)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	
+	// Check if package is installed (status starts with 'ii')
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "ii") && strings.Contains(line, packageName) {
+			return true
+		}
+	}
+	return false
+}
+
+// isServiceActive checks if a systemd service is active
+func isServiceActive(serviceName string) bool {
+	cmd := exec.Command("systemctl", "is-active", serviceName)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	
+	return strings.TrimSpace(string(output)) == "active"
+}
+
+// fileExists checks if a file exists
+func fileExists(filepath string) bool {
+	_, err := os.Stat(filepath)
+	return err == nil
+}
+
+// canConnectToAPI attempts to connect to the Salt API
+func canConnectToAPI(ctx context.Context) bool {
+	// Try to make a simple API call to test connectivity
+	// We'll use a basic health check endpoint or authentication endpoint
+	
+	// First, check if the API port is listening
+	cmd := exec.CommandContext(ctx, "ss", "-tuln")
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	
+	// Look for common Salt API ports (8000, 8080)
+	apiPorts := []string{":8000", ":8080"}
+	for _, port := range apiPorts {
+		if strings.Contains(string(output), port) {
+			// Found a listening port, try to make a basic HTTP request
+			return testAPIConnection(ctx, port)
+		}
+	}
+	
+	return false
+}
+
+// testAPIConnection tests if we can make a basic HTTP connection to the API
+func testAPIConnection(ctx context.Context, port string) bool {
+	// Extract port number from the format ":8000" 
+	portNum := strings.TrimPrefix(port, ":")
+	
+	// Try to connect using curl to avoid complex HTTP client setup
+	cmd := exec.CommandContext(ctx, "curl", "-s", "-k", "--connect-timeout", "2", 
+		fmt.Sprintf("https://localhost:%s/", portNum))
+	
+	// We don't care about the response content, just that we can connect
+	err := cmd.Run()
+	return err == nil
 }
