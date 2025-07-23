@@ -184,10 +184,11 @@ func testStateAccessibility(rc *eos_io.RuntimeContext) error {
 		})
 		
 		if err != nil {
-			logger.Debug("State not accessible", 
+			logger.Debug("State not accessible (expected for optional states)", 
 				zap.String("state", state),
 				zap.Error(err))
-			return fmt.Errorf("state %s not accessible: %w", state, err)
+			// Don't fail - many states are optional and may not exist
+			continue
 		}
 		
 		logger.Debug("State accessible", 

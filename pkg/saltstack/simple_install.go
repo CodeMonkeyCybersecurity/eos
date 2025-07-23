@@ -1,6 +1,7 @@
 package saltstack
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -233,16 +234,15 @@ func startSaltServices(rc *eos_io.RuntimeContext, config *Config) error {
 		}
 		
 		// Verify service is running
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "systemctl",
-			Args:    []string{"is-active", service},
-			Timeout: 10 * time.Second,
-		})
-		
-		if err != nil || strings.TrimSpace(output) != "active" {
+		status, err := checkServiceStatus(rc, service)
+		if err != nil {
+			logger.Warn("Failed to check service status", 
+				zap.String("service", service),
+				zap.Error(err))
+		} else if status != "active" {
 			logger.Warn("Service may not be running properly", 
 				zap.String("service", service),
-				zap.String("status", strings.TrimSpace(output)))
+				zap.String("status", status))
 		} else {
 			logger.Info("Service started successfully", zap.String("service", service))
 		}
@@ -259,16 +259,26 @@ func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("Testing basic Salt functionality")
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "salt-call",
-		Args:    []string{"--local", "test.ping"},
+		Args:    []string{"--local", "test.ping", "--out=json"},
 		Timeout: 30 * time.Second,
 	})
 	
 	if err != nil {
-		return fmt.Errorf("salt test.ping failed: %w", err)
+		// Try fallback without JSON output
+		logger.Debug("JSON output failed, trying YAML output", zap.Error(err))
+		output, err = execute.Run(rc.Ctx, execute.Options{
+			Command: "salt-call",
+			Args:    []string{"--local", "test.ping"},
+			Timeout: 30 * time.Second,
+		})
+		if err != nil {
+			return fmt.Errorf("salt test.ping failed: %w", err)
+		}
 	}
 	
-	if !strings.Contains(output, "True") {
-		return fmt.Errorf("salt test.ping returned unexpected result: %s", output)
+	// Parse the output more flexibly
+	if err := validateSaltPingOutput(output, logger); err != nil {
+		return fmt.Errorf("salt test.ping validation failed: %w", err)
 	}
 	
 	logger.Info("Salt basic functionality verified")
@@ -333,4 +343,86 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// validateSaltPingOutput validates salt test.ping output in various formats
+func validateSaltPingOutput(output string, logger otelzap.LoggerWithCtx) error {
+	output = strings.TrimSpace(output)
+	logger.Debug("Validating salt ping output", zap.String("output", output))
+	
+	// Try to parse as JSON first
+	if strings.HasPrefix(output, "{") {
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(output), &result); err == nil {
+			// JSON format: {"local": true}
+			if local, ok := result["local"]; ok {
+				if local == true {
+					logger.Debug("Salt ping successful (JSON format)")
+					return nil
+				}
+			}
+		}
+	}
+	
+	// Try YAML format: "local:\n    True"
+	if strings.Contains(output, "local:") && strings.Contains(output, "True") {
+		logger.Debug("Salt ping successful (YAML format)")
+		return nil
+	}
+	
+	// Try simple format: just "True"
+	if strings.Contains(output, "True") {
+		logger.Debug("Salt ping successful (simple format)")
+		return nil
+	}
+	
+	// If we get here, the output doesn't match expected patterns
+	return fmt.Errorf("unexpected salt ping output format: %s", output)
+}
+
+// checkServiceStatus checks the status of a systemd service reliably
+func checkServiceStatus(rc *eos_io.RuntimeContext, service string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Use systemctl is-active to get precise status
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", service},
+		Timeout: 10 * time.Second,
+	})
+	
+	if err != nil {
+		// Service might be inactive or failed, but that's not necessarily an error
+		// The output should still contain the status
+		logger.Debug("systemctl command returned error (expected for inactive services)",
+			zap.String("service", service),
+			zap.Error(err))
+	}
+	
+	status := strings.TrimSpace(output)
+	logger.Debug("Service status check", 
+		zap.String("service", service),
+		zap.String("status", status))
+	
+	// Handle empty status (should not happen, but be defensive)
+	if status == "" {
+		// Try alternative method
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"show", "-p", "ActiveState", service},
+			Timeout: 10 * time.Second,
+		})
+		if err != nil {
+			return "unknown", fmt.Errorf("failed to get service status: %w", err)
+		}
+		
+		// Parse output like "ActiveState=active"
+		if strings.HasPrefix(output, "ActiveState=") {
+			status = strings.TrimSpace(strings.TrimPrefix(output, "ActiveState="))
+		} else {
+			status = "unknown"
+		}
+	}
+	
+	return status, nil
 }
