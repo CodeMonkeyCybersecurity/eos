@@ -3,9 +3,15 @@
 package create
 
 import (
+	"encoding/json"
 	"fmt"
-	
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
 	"github.com/spf13/cobra"
@@ -13,19 +19,522 @@ import (
 	"go.uber.org/zap"
 )
 
+var CreateNomadCmd = &cobra.Command{
+	Use:   "nomad",
+	Short: "Install and configure HashiCorp Nomad orchestrator",
+	Long: `Install and configure HashiCorp Nomad for workload orchestration.
+
+This command will:
+- Check if Nomad is already installed and running
+- Install Nomad with proper idempotency
+- Configure Nomad as server or client based on flags
+- Integrate with existing Consul for service discovery
+- Integrate with existing Vault for secrets management
+- Set up systemd service
+- Verify installation and connectivity
+
+EXAMPLES:
+  # Install Nomad as a server with 3 expected nodes
+  eos create nomad --server --bootstrap-expect=3
+
+  # Install Nomad as a client
+  eos create nomad --client
+
+  # Install with custom datacenter and region
+  eos create nomad --server --datacenter=us-west-1 --region=global
+
+  # Force reinstall/reconfigure
+  eos create nomad --force
+
+  # Clean install (remove existing data)
+  eos create nomad --clean
+
+  # Install with ACL enabled
+  eos create nomad --enable-acl`,
+	RunE: eos.Wrap(runCreateNomad),
+}
+
+var (
+	nomadServerMode     bool
+	nomadClientMode     bool
+	nomadBootstrapExpect int
+	nomadDatacenter     string
+	nomadRegion         string
+	nomadBindAddr       string
+	nomadAdvertiseAddr  string
+	nomadLogLevel       string
+	nomadEnableACL      bool
+	nomadForce          bool
+	nomadClean          bool
+	nomadJoinAddrs      []string
+	nomadClientServers  []string
+	nomadEnableDocker   bool
+	nomadEnableRaw      bool
+)
+
+// NomadStatus represents the current state of Nomad installation
+type NomadStatus struct {
+	Installed       bool
+	Running         bool
+	Failed          bool
+	ConfigValid     bool
+	Version         string
+	ServiceStatus   string
+	ServerMode      bool
+	ClientMode      bool
+	ClusterLeader   string
+	ClusterMembers  []string
+	JobCount        int
+	LastError       string
+}
+
+func checkNomadStatus(rc *eos_io.RuntimeContext) (*NomadStatus, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	status := &NomadStatus{}
+
+	// Check if Nomad binary exists
+	if nomadPath, err := exec.LookPath("nomad"); err == nil {
+		status.Installed = true
+		logger.Debug("Nomad binary found", zap.String("path", nomadPath))
+		
+		// Get version
+		if output, err := exec.Command("nomad", "version").Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) > 0 {
+				status.Version = strings.TrimSpace(lines[0])
+			}
+		}
+	}
+
+	// Check service status
+	if output, err := exec.Command("systemctl", "is-active", "nomad").Output(); err == nil {
+		status.ServiceStatus = strings.TrimSpace(string(output))
+		status.Running = (status.ServiceStatus == "active")
+	} else {
+		// Check if service is in failed state
+		if exec.Command("systemctl", "is-failed", "nomad").Run() == nil {
+			status.Failed = true
+			status.ServiceStatus = "failed"
+		}
+	}
+
+	// Check configuration validity
+	if status.Installed {
+		configPath := "/etc/nomad.d/nomad.hcl"
+		if _, err := os.Stat(configPath); err == nil {
+			if err := exec.Command("nomad", "config", "validate", configPath).Run(); err == nil {
+				status.ConfigValid = true
+			}
+		}
+	}
+
+	// Check server/client mode and cluster status if running
+	if status.Running {
+		// Check agent info
+		if output, err := exec.Command("nomad", "agent-info").Output(); err == nil {
+			outputStr := string(output)
+			status.ServerMode = strings.Contains(outputStr, "server = true")
+			status.ClientMode = strings.Contains(outputStr, "client = true") || !status.ServerMode
+		}
+
+		// Get server members (for server mode)
+		if status.ServerMode {
+			if output, err := exec.Command("nomad", "server", "members").Output(); err == nil {
+				lines := strings.Split(string(output), "\n")
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					if line != "" && !strings.HasPrefix(line, "Name") {
+						status.ClusterMembers = append(status.ClusterMembers, line)
+						// Extract leader info
+						if strings.Contains(line, "leader=true") {
+							parts := strings.Fields(line)
+							if len(parts) > 0 {
+								status.ClusterLeader = parts[0]
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Get job count
+		if output, err := exec.Command("nomad", "job", "status", "-short").Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			// Subtract header line and empty lines
+			for _, line := range lines {
+				if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, "ID") {
+					status.JobCount++
+				}
+			}
+		}
+	}
+
+	return status, nil
+}
+
+func runCreateNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Validate mode selection
+	if !nomadServerMode && !nomadClientMode {
+		// Default to client mode if neither specified
+		nomadClientMode = true
+		logger.Info("No mode specified, defaulting to client mode")
+	}
+	
+	if nomadServerMode && nomadClientMode {
+		return eos_err.NewUserError("cannot specify both --server and --client modes")
+	}
+
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return eos_err.NewUserError("this command must be run as root")
+	}
+
+	// ASSESS - Check current Nomad status
+	logger.Info("Checking current Nomad status")
+	status, err := checkNomadStatus(rc)
+	if err != nil {
+		logger.Warn("Failed to check Nomad status", zap.Error(err))
+		status = &NomadStatus{} // Use empty status
+	}
+
+	// Log detailed status
+	logger.Info("Current Nomad installation status",
+		zap.Bool("installed", status.Installed),
+		zap.Bool("running", status.Running),
+		zap.Bool("failed", status.Failed),
+		zap.String("version", status.Version),
+		zap.String("service_status", status.ServiceStatus),
+		zap.Bool("config_valid", status.ConfigValid),
+		zap.Bool("server_mode", status.ServerMode),
+		zap.Bool("client_mode", status.ClientMode),
+		zap.String("cluster_leader", status.ClusterLeader),
+		zap.Int("cluster_members", len(status.ClusterMembers)),
+		zap.Int("job_count", status.JobCount))
+
+	// Determine if we should proceed
+	shouldInstall := false
+	shouldConfigure := false
+
+	if !status.Installed {
+		logger.Info("Nomad is not installed, will install")
+		shouldInstall = true
+		shouldConfigure = true
+	} else if status.Failed {
+		logger.Warn("Nomad service is in failed state, will reconfigure",
+			zap.String("current_status", status.ServiceStatus))
+		shouldConfigure = true
+	} else if !status.ConfigValid {
+		logger.Warn("Nomad configuration is invalid, will reconfigure")
+		shouldConfigure = true
+	} else if nomadForce {
+		logger.Info("Force flag specified, will reinstall/reconfigure")
+		shouldInstall = true
+		shouldConfigure = true
+	} else if status.Running {
+		// Check if mode change is requested
+		if (nomadServerMode && !status.ServerMode) || (nomadClientMode && !status.ClientMode) {
+			logger.Info("Mode change requested",
+				zap.Bool("current_server", status.ServerMode),
+				zap.Bool("requested_server", nomadServerMode))
+			shouldConfigure = true
+		} else {
+			logger.Info("Nomad is already installed and running properly")
+			
+			// Show current status
+			logger.Info("terminal prompt: Nomad is already installed and running")
+			logger.Info("terminal prompt: Version: " + status.Version)
+			logger.Info("terminal prompt: Mode: " + func() string {
+				if status.ServerMode {
+					return "server"
+				}
+				return "client"
+			}())
+			if status.ServerMode && status.ClusterLeader != "" {
+				logger.Info("terminal prompt: Cluster leader: " + status.ClusterLeader)
+				logger.Info("terminal prompt: Cluster size: " + fmt.Sprintf("%d members", len(status.ClusterMembers)))
+			}
+			if status.JobCount > 0 {
+				logger.Info("terminal prompt: Running jobs: " + fmt.Sprintf("%d", status.JobCount))
+			}
+			logger.Info("terminal prompt: Use --force to reinstall or --clean for clean install")
+			return nil
+		}
+	}
+
+	// Clean operation if requested
+	if nomadClean && status.Installed {
+		logger.Info("Clean flag specified, removing existing Nomad installation first")
+		
+		// Gracefully stop and drain if running
+		if status.Running {
+			if status.ClientMode {
+				logger.Info("Draining Nomad client node")
+				exec.Command("nomad", "node", "drain", "-enable", "-yes", "-self").Run()
+				time.Sleep(5 * time.Second)
+			}
+		}
+		
+		// Stop service
+		exec.Command("systemctl", "stop", "nomad").Run()
+		
+		// Remove data
+		logger.Info("Removing Nomad data directory")
+		os.RemoveAll("/var/lib/nomad")
+		os.RemoveAll("/etc/nomad.d")
+		
+		shouldInstall = true
+		shouldConfigure = true
+	}
+
+	// Check dependencies
+	logger.Info("Checking dependencies")
+	
+	// Check for Consul
+	consulRunning := false
+	if output, err := exec.Command("systemctl", "is-active", "consul").Output(); err == nil {
+		consulRunning = strings.TrimSpace(string(output)) == "active"
+	}
+	if !consulRunning {
+		logger.Warn("Consul is not running - Nomad will have limited functionality without service discovery")
+		logger.Info("terminal prompt: Warning: Consul is not running. Consider installing with 'eos create consul' first")
+	}
+
+	// Check for Vault
+	vaultRunning := false
+	if output, err := exec.Command("systemctl", "is-active", "vault").Output(); err == nil {
+		vaultRunning = strings.TrimSpace(string(output)) == "active"
+	}
+	if !vaultRunning {
+		logger.Warn("Vault is not running - Nomad will not have secrets management integration")
+		logger.Info("terminal prompt: Warning: Vault is not running. Consider installing with 'eos create vault' first")
+	}
+
+	// Check if SaltStack REST API is available
+	apiURL := "https://localhost:8000"
+	restInstaller := nomad.NewRESTInstaller(apiURL, true) // Skip TLS verify for self-signed cert
+
+	// Check authentication
+	logger.Info("Authenticating with Salt REST API")
+	if err := restInstaller.Authenticate(rc.Ctx, "salt", "saltpass"); err != nil {
+		logger.Error("Failed to authenticate with Salt REST API", zap.Error(err))
+		// Fallback to direct salt-call if API not available
+		saltCallPath, err := exec.LookPath("salt-call")
+		if err != nil {
+			logger.Error("Neither Salt REST API nor salt-call is available")
+			return eos_err.NewUserError("saltstack is required for nomad installation - install with: eos create saltstack")
+		}
+		logger.Info("Falling back to direct salt-call execution", zap.String("salt_call", saltCallPath))
+		
+		// Use direct salt-call execution
+		return runCreateNomadDirectSalt(rc, nomadServerMode, nomadClientMode, nomadBootstrapExpect,
+			nomadDatacenter, nomadRegion, nomadBindAddr, nomadAdvertiseAddr, nomadLogLevel,
+			nomadEnableACL, nomadForce, nomadClean, nomadJoinAddrs, nomadClientServers,
+			nomadEnableDocker, nomadEnableRaw, consulRunning, vaultRunning)
+	}
+
+	logger.Info("Successfully authenticated with Salt REST API")
+
+	if !shouldInstall && !shouldConfigure {
+		logger.Info("No changes needed")
+		return nil
+	}
+
+	// INTERVENE - Install Nomad via REST API
+	logger.Info("Installing Nomad via Salt REST API")
+
+	// Prepare configuration
+	config := &nomad.NomadInstallConfig{
+		ServerMode:        nomadServerMode,
+		ClientMode:        nomadClientMode,
+		BootstrapExpect:   nomadBootstrapExpect,
+		Datacenter:        nomadDatacenter,
+		Region:            nomadRegion,
+		BindAddr:          nomadBindAddr,
+		AdvertiseAddr:     nomadAdvertiseAddr,
+		LogLevel:          nomadLogLevel,
+		EnableACL:         nomadEnableACL,
+		Force:             nomadForce,
+		Clean:             nomadClean,
+		JoinAddrs:         nomadJoinAddrs,
+		ClientServers:     nomadClientServers,
+		EnableDocker:      nomadEnableDocker,
+		EnableRawExec:     nomadEnableRaw,
+		ConsulIntegration: consulRunning,
+		VaultIntegration:  vaultRunning,
+	}
+
+	// Execute installation via REST API
+	if err := restInstaller.InstallNomad(rc, config); err != nil {
+		logger.Error("Nomad installation via REST API failed", zap.Error(err))
+		return fmt.Errorf("nomad installation failed: %w", err)
+	}
+
+	// EVALUATE - Verify installation
+	logger.Info("Verifying Nomad installation")
+
+	// Wait for service to stabilize
+	time.Sleep(5 * time.Second)
+
+	// Re-check status
+	finalStatus, err := checkNomadStatus(rc)
+	if err != nil {
+		return fmt.Errorf("failed to verify installation: %w", err)
+	}
+
+	if !finalStatus.Installed {
+		return fmt.Errorf("nomad binary not found after installation")
+	}
+
+	if !finalStatus.Running {
+		return fmt.Errorf("nomad service not running after installation")
+	}
+
+	// Log successful installation
+	logger.Info("Nomad installed successfully",
+		zap.String("version", finalStatus.Version),
+		zap.Bool("server_mode", finalStatus.ServerMode),
+		zap.Bool("client_mode", finalStatus.ClientMode))
+
+	// Show post-installation information
+	logger.Info("terminal prompt: Nomad installation completed successfully!")
+	logger.Info("terminal prompt: Version: " + finalStatus.Version)
+	logger.Info("terminal prompt: Mode: " + func() string {
+		if finalStatus.ServerMode {
+			return "server"
+		}
+		return "client"
+	}())
+
+	if finalStatus.ServerMode {
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Nomad server is running. Access the UI at: http://localhost:4646")
+		if nomadBootstrapExpect > 1 {
+			logger.Info("terminal prompt: Expecting " + fmt.Sprintf("%d", nomadBootstrapExpect) + " servers for quorum")
+			logger.Info("terminal prompt: Join other servers with: nomad server join " + nomadAdvertiseAddr)
+		}
+	} else {
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Nomad client is running and ready to accept jobs")
+		if len(nomadClientServers) > 0 {
+			logger.Info("terminal prompt: Connected to servers: " + strings.Join(nomadClientServers, ", "))
+		}
+	}
+
+	if consulRunning {
+		logger.Info("terminal prompt: ✓ Consul integration enabled for service discovery")
+	}
+	if vaultRunning {
+		logger.Info("terminal prompt: ✓ Vault integration enabled for secrets management")
+	}
+
+	// Show next steps
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Next steps:")
+	logger.Info("terminal prompt: - Check status: nomad status")
+	logger.Info("terminal prompt: - View members: nomad server members")
+	logger.Info("terminal prompt: - Submit a job: nomad job run <job.nomad>")
+	logger.Info("terminal prompt: - View logs: journalctl -u nomad -f")
+
+	return nil
+}
+
+// runCreateNomadDirectSalt is a fallback function that uses direct salt-call execution
+func runCreateNomadDirectSalt(rc *eos_io.RuntimeContext, serverMode, clientMode bool, 
+	bootstrapExpect int, datacenter, region, bindAddr, advertiseAddr, logLevel string,
+	enableACL, force, clean bool, joinAddrs, clientServers []string,
+	enableDocker, enableRaw, consulRunning, vaultRunning bool) error {
+	
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Using direct salt-call execution for Nomad installation")
+
+	// Prepare pillar data
+	pillarData := map[string]interface{}{
+		"nomad": map[string]interface{}{
+			"ensure":            "present",
+			"server_mode":       serverMode,
+			"client_mode":       clientMode,
+			"bootstrap_expect":  bootstrapExpect,
+			"datacenter":        datacenter,
+			"region":            region,
+			"bind_addr":         bindAddr,
+			"advertise_addr":    advertiseAddr,
+			"log_level":         logLevel,
+			"enable_acl":        enableACL,
+			"force":             force,
+			"clean":             clean,
+			"join_addrs":        joinAddrs,
+			"client_servers":    clientServers,
+			"enable_docker":     enableDocker,
+			"enable_raw_exec":   enableRaw,
+			"consul_integration": consulRunning,
+			"vault_integration": vaultRunning,
+		},
+	}
+
+	pillarJSON, err := json.Marshal(pillarData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal pillar data: %w", err)
+	}
+
+	// Execute Salt state
+	saltCmd := exec.Command("salt-call",
+		"--local",
+		"--file-root=/opt/eos/salt/states",
+		"--pillar-root=/opt/eos/salt/pillar",
+		"state.apply",
+		"hashicorp.nomad",
+		fmt.Sprintf("pillar=%s", string(pillarJSON)))
+
+	saltCmd.Stdout = os.Stdout
+	saltCmd.Stderr = os.Stderr
+
+	logger.Info("Executing Salt state", 
+		zap.String("state", "hashicorp.nomad"),
+		zap.Bool("server_mode", serverMode))
+
+	if err := saltCmd.Run(); err != nil {
+		logger.Error("Salt state execution failed", zap.Error(err))
+		return fmt.Errorf("salt state execution failed: %w", err)
+	}
+
+	return nil
+}
+
 func init() {
-	CreateCmd.AddCommand(createNomadCmd)
+	CreateCmd.AddCommand(CreateNomadCmd)
 	CreateCmd.AddCommand(createNomadIngressCmd)
 	CreateCmd.AddCommand(migrateK3sCmd)
 	
-	// Add configuration flags for Nomad
-	createNomadCmd.Flags().String("version", "latest", "Nomad version to install")
-	createNomadCmd.Flags().String("datacenter", "dc1", "Nomad datacenter name")
-	createNomadCmd.Flags().String("region", "global", "Nomad region name")
-	createNomadCmd.Flags().String("node-role", "both", "Node role: client, server, or both")
-	createNomadCmd.Flags().Bool("enable-ui", true, "Enable Nomad web UI")
-	createNomadCmd.Flags().Bool("skip-configure", false, "Skip configuration phase")
-	createNomadCmd.Flags().Bool("skip-verify", false, "Skip verification phase")
+	// Mode flags
+	CreateNomadCmd.Flags().BoolVar(&nomadServerMode, "server", false, "Install Nomad in server mode")
+	CreateNomadCmd.Flags().BoolVar(&nomadClientMode, "client", false, "Install Nomad in client mode (default)")
+	
+	// Server configuration
+	CreateNomadCmd.Flags().IntVar(&nomadBootstrapExpect, "bootstrap-expect", 1, "Number of servers to wait for before bootstrapping cluster")
+	CreateNomadCmd.Flags().StringVar(&nomadDatacenter, "datacenter", "dc1", "Datacenter name")
+	CreateNomadCmd.Flags().StringVar(&nomadRegion, "region", "global", "Region name")
+	
+	// Network configuration
+	CreateNomadCmd.Flags().StringVar(&nomadBindAddr, "bind-addr", "0.0.0.0", "Address to bind to")
+	CreateNomadCmd.Flags().StringVar(&nomadAdvertiseAddr, "advertise-addr", "", "Address to advertise (defaults to bind addr)")
+	
+	// Cluster joining
+	CreateNomadCmd.Flags().StringSliceVar(&nomadJoinAddrs, "join", []string{}, "Addresses of servers to join (for server mode)")
+	CreateNomadCmd.Flags().StringSliceVar(&nomadClientServers, "servers", []string{}, "Server addresses (for client mode)")
+	
+	// Client drivers
+	CreateNomadCmd.Flags().BoolVar(&nomadEnableDocker, "enable-docker", true, "Enable Docker driver on clients")
+	CreateNomadCmd.Flags().BoolVar(&nomadEnableRaw, "enable-raw-exec", false, "Enable raw_exec driver (security risk)")
+	
+	// Security
+	CreateNomadCmd.Flags().BoolVar(&nomadEnableACL, "enable-acl", false, "Enable ACL system")
+	
+	// Operational flags
+	CreateNomadCmd.Flags().StringVar(&nomadLogLevel, "log-level", "INFO", "Log level (DEBUG, INFO, WARN, ERROR)")
+	CreateNomadCmd.Flags().BoolVar(&nomadForce, "force", false, "Force reinstall even if already installed")
+	CreateNomadCmd.Flags().BoolVar(&nomadClean, "clean", false, "Clean install (removes existing data)")
 
 	// Add flags for Nomad ingress
 	createNomadIngressCmd.Flags().String("domain", "", "Primary domain for ingress")
@@ -40,123 +549,6 @@ func init() {
 	migrateK3sCmd.Flags().Bool("migrate-mail-proxy", false, "Migrate mail proxy to Nomad")
 	migrateK3sCmd.Flags().String("datacenter", "dc1", "Target Nomad datacenter")
 	migrateK3sCmd.Flags().String("region", "global", "Target Nomad region")
-}
-
-var createNomadCmd = &cobra.Command{
-	Use:   "nomad",
-	Short: "Install and configure HashiCorp Nomad using SaltStack",
-	Long: `Install and configure HashiCorp Nomad orchestrator using SaltStack.
-This command deploys Nomad as part of the HashiCorp stack for container orchestration.
-
-Nomad is a workload orchestrator that can manage containerized and non-containerized
-applications across on-premise and cloud environments.
-
-The deployment includes:
-- Nomad binary installation
-- Service configuration
-- Consul integration
-- Vault integration
-- Web UI setup
-- Basic security hardening
-
-Prerequisites:
-- Running Consul cluster
-- Running Vault server
-- SaltStack minion configured
-
-Examples:
-  eos create nomad                              # Install with defaults
-  eos create nomad --version=1.7.2            # Install specific version
-  eos create nomad --node-role=server         # Server-only node
-  eos create nomad --datacenter=production    # Custom datacenter`,
-	RunE: eos_cli.Wrap(runCreateNomad),
-}
-
-func runCreateNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Nomad installation with SaltStack")
-
-	// Parse configuration flags
-	version, _ := cmd.Flags().GetString("version")
-	datacenter, _ := cmd.Flags().GetString("datacenter")
-	region, _ := cmd.Flags().GetString("region")
-	nodeRole, _ := cmd.Flags().GetString("node-role")
-	enableUI, _ := cmd.Flags().GetBool("enable-ui")
-	skipConfigure, _ := cmd.Flags().GetBool("skip-configure")
-	skipVerify, _ := cmd.Flags().GetBool("skip-verify")
-
-	// Build configuration
-	config := &nomad.Config{
-		Version:    version,
-		Datacenter: datacenter,
-		Region:     region,
-		NodeRole:   nodeRole,
-		EnableUI:   enableUI,
-		
-		// Integration settings
-		ConsulIntegration: true,
-		VaultIntegration:  true,
-		
-		// Security settings
-		EnableTLS:    true,
-		EnableACL:    true,
-		EnableGossip: true,
-	}
-
-	// ASSESS - Check prerequisites
-	logger.Info("Checking prerequisites for Nomad installation")
-	if err := nomad.CheckPrerequisites(rc); err != nil {
-		logger.Error("Prerequisites check failed", zap.Error(err))
-		return err
-	}
-
-	// INTERVENE - Install Nomad using SaltStack
-	logger.Info("Installing Nomad using SaltStack")
-	if err := nomad.InstallWithSaltStack(rc, config); err != nil {
-		logger.Error("Nomad installation failed", zap.Error(err))
-		return err
-	}
-
-	// Configure Nomad
-	if !skipConfigure {
-		logger.Info("Configuring Nomad")
-		if err := nomad.Configure(rc, config); err != nil {
-			logger.Error("Nomad configuration failed", zap.Error(err))
-			return err
-		}
-	}
-
-	// EVALUATE - Verify installation
-	if !skipVerify {
-		logger.Info("Verifying Nomad installation")
-		if err := nomad.Verify(rc, config); err != nil {
-			logger.Error("Nomad verification failed", zap.Error(err))
-			return err
-		}
-	}
-
-	logger.Info("Nomad installation completed successfully")
-	logger.Info("terminal prompt: ✅ Nomad Installation Complete!")
-	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: Service Details:")
-	logger.Info("terminal prompt:   - Version: " + version)
-	logger.Info("terminal prompt:   - Datacenter: " + datacenter)
-	logger.Info("terminal prompt:   - Region: " + region)
-	logger.Info("terminal prompt:   - Node Role: " + nodeRole)
-	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: Access URLs:")
-	if enableUI {
-		logger.Info("terminal prompt:   - Web UI: http://localhost:4646")
-	}
-	logger.Info("terminal prompt:   - API: http://localhost:4646/v1/")
-	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: Next Steps:")
-	logger.Info("terminal prompt:   1. Check status: nomad server members")
-	logger.Info("terminal prompt:   2. View logs: sudo journalctl -u nomad -f")
-	logger.Info("terminal prompt:   3. Deploy jobs: nomad job run <job-file>")
-	logger.Info("terminal prompt:   4. Install Hecate: eos create hecate")
-
-	return nil
 }
 
 // createNomadIngressCmd sets up Nomad ingress to replace K3s ingress
@@ -183,7 +575,7 @@ Prerequisites:
 Examples:
   eos create nomad-ingress --domain=example.com
   eos create nomad-ingress --domain=mail.example.com --enable-mail`,
-	RunE: eos_cli.Wrap(runCreateNomadIngress),
+	RunE: eos.Wrap(runCreateNomadIngress),
 }
 
 func runCreateNomadIngress(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -282,7 +674,7 @@ Examples:
   eos create migrate-k3s --domain=example.com --dry-run
   eos create migrate-k3s --domain=example.com --migrate-ingress --migrate-mail-proxy
   eos create migrate-k3s --domain=example.com --datacenter=production`,
-	RunE: eos_cli.Wrap(runMigrateK3s),
+	RunE: eos.Wrap(runMigrateK3s),
 }
 
 func runMigrateK3s(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

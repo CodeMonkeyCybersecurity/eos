@@ -212,43 +212,97 @@ func (i *Installer) updatePackages(rc *eos_io.RuntimeContext) error {
 func (i *Installer) installPackage(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Determine which package to install
-	packageName := "salt-minion"
+	// Determine which packages to install
+	packages := []string{"salt-minion"}
+	
+	// Always install salt-api for REST API support
+	packages = append(packages, "salt-api")
+	
 	if config.MasterMode {
-		// In master mode, we still install minion but will configure it differently
-		logger.Info("Installing salt-minion for master-minion mode")
+		// In master mode, also install salt-master
+		packages = append(packages, "salt-master")
+		logger.Info("Installing Salt packages for master-minion mode")
+	} else {
+		logger.Info("Installing Salt packages for masterless mode")
 	}
 
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "apt-get",
-		Args: []string{
-			"install",
-			"-y",
-			"--no-install-recommends",
-			packageName,
-		},
-		Timeout: 300 * time.Second,
-	})
+	// Install packages
+	for _, pkg := range packages {
+		logger.Info("Installing package", zap.String("package", pkg))
+		
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "apt-get",
+			Args: []string{
+				"install",
+				"-y",
+				"--no-install-recommends",
+				pkg,
+			},
+			Timeout: 300 * time.Second,
+		})
 
-	if err != nil {
-		logger.Error("Package installation failed", zap.String("output", output))
-		return fmt.Errorf("failed to install %s: %w", packageName, err)
+		if err != nil {
+			logger.Error("Package installation failed", 
+				zap.String("package", pkg),
+				zap.String("output", output))
+			return fmt.Errorf("failed to install %s: %w", pkg, err)
+		}
 	}
 
-	// Stop the salt-minion service (we'll configure it first)
-	logger.Info("Stopping salt-minion service for configuration")
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"stop", "salt-minion"},
-		Timeout: 30 * time.Second,
-	})
+	// Stop the services (we'll configure them first)
+	services := []string{"salt-minion", "salt-api"}
+	if config.MasterMode {
+		services = append(services, "salt-master")
+	}
+	
+	for _, svc := range services {
+		logger.Info("Stopping service for configuration", zap.String("service", svc))
+		_, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"stop", svc},
+			Timeout: 30 * time.Second,
+		})
 
-	if err != nil {
-		logger.Warn("Failed to stop salt-minion service", zap.Error(err))
-		// This is not fatal, continue
+		if err != nil {
+			logger.Warn("Failed to stop service", 
+				zap.String("service", svc),
+				zap.Error(err))
+			// This is not fatal, continue
+		}
 	}
 
-	logger.Info("Salt package installed successfully", zap.String("package", packageName))
+	// Configure REST API
+	if err := i.configureRESTAPI(rc, config); err != nil {
+		return fmt.Errorf("failed to configure REST API: %w", err)
+	}
+
+	logger.Info("Salt packages installed successfully", zap.Strings("packages", packages))
+	return nil
+}
+
+// configureRESTAPI sets up the Salt REST API
+func (i *Installer) configureRESTAPI(rc *eos_io.RuntimeContext, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Configuring Salt REST API")
+
+	// Configure the API
+	if err := ConfigureRESTAPI(rc); err != nil {
+		return fmt.Errorf("failed to configure REST API: %w", err)
+	}
+
+	// Generate SSL certificates
+	if err := GenerateAPISSLCerts(rc); err != nil {
+		return fmt.Errorf("failed to generate SSL certificates: %w", err)
+	}
+
+	// Create API user
+	apiUser := "salt"
+	apiPass := "saltpass" // In production, this should be generated/secured
+	if err := CreateAPIUser(rc, apiUser, apiPass); err != nil {
+		return fmt.Errorf("failed to create API user: %w", err)
+	}
+
+	logger.Info("Salt REST API configured successfully")
 	return nil
 }
 
