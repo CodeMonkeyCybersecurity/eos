@@ -102,9 +102,16 @@ func PromptForBootstrap(rc *eos_io.RuntimeContext) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("System has not been bootstrapped")
-	logger.Info("terminal prompt: This system has not been bootstrapped. Would you like to bootstrap now? (y/N)")
+	logger.Info("terminal prompt: ⚠️  This system has not been bootstrapped.")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Bootstrap will install and configure:")
+	logger.Info("terminal prompt:   • Salt (configuration management)")
+	logger.Info("terminal prompt:   • Vault, Consul, Nomad (orchestration)")
+	logger.Info("terminal prompt:   • OSQuery, Trivy (security monitoring)")
+	logger.Info("terminal prompt:   • Ubuntu hardening (optional)")
+	logger.Info("terminal prompt: ")
 
-	response, err := eos_io.PromptInput(rc, "Bootstrap now? (y/N): ", "bootstrap_choice")
+	response, err := eos_io.PromptInput(rc, "Would you like to bootstrap now? (y/N): ", "bootstrap_choice")
 	if err != nil {
 		return false, err
 	}

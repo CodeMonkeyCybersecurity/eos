@@ -74,6 +74,20 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 			cmd.Name() == "bootstrap" ||
 			(cmd.Parent() != nil && cmd.Parent().Name() == "bootstrap")
 		
+		// Debug logging to understand command detection
+		ctx.Log.Debug("Bootstrap command detection",
+			zap.String("cmd.Name()", cmd.Name()),
+			zap.String("cmd.CommandPath()", cmd.CommandPath()),
+			zap.String("cmd.Use", cmd.Use),
+			zap.Bool("has_parent", cmd.Parent() != nil),
+			zap.String("parent_name", func() string {
+				if cmd.Parent() != nil {
+					return cmd.Parent().Name()
+				}
+				return "none"
+			}()),
+			zap.Bool("is_bootstrap_command", isBootstrapCommand))
+		
 		// Check if system needs bootstrap before executing command
 		if !isBootstrapCommand && bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
 			ctx.Log.Info("Checking bootstrap status", 
@@ -171,6 +185,20 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 		isBootstrapCommand := strings.Contains(cmd.CommandPath(), "bootstrap") || 
 			cmd.Name() == "bootstrap" ||
 			(cmd.Parent() != nil && cmd.Parent().Name() == "bootstrap")
+		
+		// Debug logging to understand command detection
+		ctx.Log.Debug("Bootstrap command detection",
+			zap.String("cmd.Name()", cmd.Name()),
+			zap.String("cmd.CommandPath()", cmd.CommandPath()),
+			zap.String("cmd.Use", cmd.Use),
+			zap.Bool("has_parent", cmd.Parent() != nil),
+			zap.String("parent_name", func() string {
+				if cmd.Parent() != nil {
+					return cmd.Parent().Name()
+				}
+				return "none"
+			}()),
+			zap.Bool("is_bootstrap_command", isBootstrapCommand))
 		
 		// Check if system needs bootstrap before executing command
 		if !isBootstrapCommand && bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
