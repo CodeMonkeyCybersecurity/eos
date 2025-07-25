@@ -62,7 +62,7 @@ func NewWayStateApply(rc *eos_io.RuntimeContext, state string, pillar map[string
 func OldWayAcceptKey(minion string) error {
 	// List pending keys
 	listCmd := exec.Command("salt-key", "-l", "pre", "--out=json")
-	output, err := listCmd.Output()
+	_, err := listCmd.Output()
 	if err != nil {
 		return err
 	}
@@ -121,14 +121,14 @@ func NewWayAcceptKey(rc *eos_io.RuntimeContext, minion string) error {
 // BEFORE: Using salt-run for orchestration
 func OldWayCheckMinions() ([]string, error) {
 	cmd := exec.Command("salt-run", "manage.up")
-	output, err := cmd.Output()
+	_, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}
 	
-	// Parse output manually
+	// Parse output manually (omitted for brevity)
 	var minions []string
-	// ... parsing logic ...
+	// In real code, you would parse the output here
 	
 	return minions, nil
 }

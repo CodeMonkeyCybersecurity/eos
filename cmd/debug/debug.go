@@ -12,11 +12,14 @@ var debugCmd = &cobra.Command{
 	Long: `Debug provides comprehensive troubleshooting tools for various Eos services.
 	
 Available subcommands:
-  consul - Debug Consul service installation and configuration issues`,
+  consul - Debug Consul service installation and configuration issues
+  watchdog-traces - Analyze resource watchdog traces from previous runs`,
 }
 
 func init() {
 	// Register subcommands here
+	debugCmd.AddCommand(consulCmd)
+	debugCmd.AddCommand(watchdogTracesCmd)
 }
 
 // GetDebugCmd returns the debug command for registration with root

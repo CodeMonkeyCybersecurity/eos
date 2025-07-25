@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/watchdog"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -93,72 +94,59 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 }
 
 // Execute initializes and runs the root command.
-// No change needed here.
 func Execute(rc *eos_io.RuntimeContext) {
 	_ = telemetry.Init("eos")
 
 	// Register all subcommands first
 	RegisterCommands(rc)
 
-	// Start global watchdog timer for command execution
-	watchdogDuration := 3 * time.Minute
-	timer := time.NewTimer(watchdogDuration)
-	defer timer.Stop()
-
-	// Channel to signal completion
-	done := make(chan bool)
-
-	// Execute command in goroutine
-	go func() {
-		defer func() {
-			done <- true
-		}()
-
-		// Log execution context for debugging
-		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("Command execution started",
-			zap.String("command", os.Args[0]),
-			zap.Strings("args", os.Args[1:]),
-			zap.String("working_dir", func() string {
-				if wd, err := os.Getwd(); err == nil {
-					return wd
-				}
-				return "unknown"
-			}()),
-			zap.Int("uid", os.Getuid()),
-			zap.Int("gid", os.Getgid()))
-
+	// Create command watchdog with configurable timeout
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Check for custom timeout from environment or use default
+	watchdogTimeout := 3 * time.Minute
+	if envTimeout := os.Getenv("EOS_WATCHDOG_TIMEOUT"); envTimeout != "" {
+		if duration, err := time.ParseDuration(envTimeout); err == nil {
+			watchdogTimeout = duration
+			logger.Info("Using custom watchdog timeout",
+				zap.Duration("timeout", watchdogTimeout))
+		}
+	}
+	
+	// Create and use the command watchdog
+	cmdWatchdog := watchdog.NewCommandWatchdog(rc.Log, watchdogTimeout)
+	
+	// Get command name for logging
+	cmdName := "eos"
+	if len(os.Args) > 1 {
+		cmdName = os.Args[1]
+	}
+	
+	// Execute with watchdog protection
+	err := cmdWatchdog.Execute(cmdName, os.Args[1:], func() error {
 		// Execute the command
 		if err := RootCmd.Execute(); err != nil {
 			if eos_err.IsExpectedUserError(err) {
 				// Expected error (bad usage, file not found, etc.)
 				// Show the error but don't use ERROR level logging
-				logger := otelzap.Ctx(rc.Ctx)
 				logger.Info("Command completed with expected error",
 					zap.Error(err),
 					zap.String("error_type", "user_error"))
 				os.Exit(0) // Exit with success code for user errors
 			} else {
 				// Unexpected system error
-				logger := otelzap.Ctx(rc.Ctx)
 				logger.Error("Command failed with system error",
 					zap.Error(err),
 					zap.String("error_type", "system_error"))
 				os.Exit(1) // Exit with error code for system errors
 			}
 		}
-	}()
-
-	// Wait for either completion or timeout
-	select {
-	case <-done:
-		// Command completed normally
-		return
-	case <-timer.C:
-		// Watchdog timeout
-		logger := otelzap.Ctx(rc.Ctx)
-		logger.Fatal("Command execution timeout exceeded",
-			zap.Duration("timeout", watchdogDuration),
-			zap.String("component", rc.Component))
+		return nil
+	})
+	
+	// This should never be reached due to os.Exit calls above
+	if err != nil {
+		logger.Error("Unexpected error in command execution", zap.Error(err))
+		os.Exit(1)
 	}
 }
