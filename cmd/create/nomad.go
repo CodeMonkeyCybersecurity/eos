@@ -33,6 +33,11 @@ This command will:
 - Set up systemd service
 - Verify installation and connectivity
 
+PREREQUISITES:
+- System must be bootstrapped (run 'eos bootstrap' first)
+- Consul should be installed for service discovery
+- Vault (optional) for secrets management
+
 EXAMPLES:
   # Install Nomad as a server with 3 expected nodes
   eos create nomad --server --bootstrap-expect=3

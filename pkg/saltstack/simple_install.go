@@ -57,24 +57,10 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 		}
 	}
 
-	// Always ensure Salt API is properly configured
-	logger.Info("Configuring Salt REST API")
-	if err := configureSaltAPI(rc, config); err != nil {
-		logger.Error("Salt API configuration failed", zap.Error(err))
-		return err
-	}
-
-	// Set up file_roots for eos state management
-	logger.Info("Setting up Salt file_roots for eos state management")
-	if err := SetupFileRoots(rc); err != nil {
-		logger.Error("File_roots setup failed", zap.Error(err))
-		return err
-	}
-
-	// Start required services
-	logger.Info("Starting and enabling Salt services")
-	if err := startSaltServices(rc, config); err != nil {
-		logger.Error("Failed to start Salt services", zap.Error(err))
+	// Bootstrap Salt with API-first configuration
+	logger.Info("Bootstrapping Salt with API-first configuration")
+	if err := BootstrapAPIConfig(rc, config); err != nil {
+		logger.Error("Salt API bootstrap failed", zap.Error(err))
 		return err
 	}
 

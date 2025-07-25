@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -210,6 +211,11 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// Check if running as root
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError("this command must be run as root")
+	}
+
+	// Check if system is bootstrapped
+	if err := bootstrap.RequireBootstrap(rc); err != nil {
+		return err
 	}
 
 	logger.Info("Starting Consul installation process",

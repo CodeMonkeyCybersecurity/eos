@@ -52,6 +52,7 @@ Flags:
 
 // AddSubcommands adds all bootstrap subcommands to BootstrapCmd
 func AddSubcommands() {
+	BootstrapCmd.AddCommand(GetCoreCmd())
 	BootstrapCmd.AddCommand(GetAllCmd())
 	BootstrapCmd.AddCommand(GetQuickstartCmd())
 	BootstrapCmd.AddCommand(GetSaltCmd())

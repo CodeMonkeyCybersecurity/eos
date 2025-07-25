@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
@@ -92,14 +91,14 @@ func runCreateConsulAPI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// Execute state with progress updates
 	logger.Info("terminal prompt: Starting Consul installation...")
-	
+
 	progressStarted := false
 	result, err := saltClient.ExecuteStateApply(rc.Ctx, "hashicorp.consul", pillar,
 		func(progress salt.StateProgress) {
 			if !progressStarted {
 				progressStarted = true
 			}
-			
+
 			if progress.Completed {
 				status := "✓"
 				if !progress.Success {
