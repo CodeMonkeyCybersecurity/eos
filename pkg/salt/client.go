@@ -192,9 +192,9 @@ func (c *Client) ExecuteCommand(ctx context.Context, cmd Command) (*CommandResul
 
 	// Build request data
 	data := url.Values{
-		"client": {cmd.Client},
-		"tgt":    {cmd.Target},
-		"fun":    {cmd.Function},
+		"client": []string{cmd.Client},
+		"tgt":    []string{cmd.Target},
+		"fun":    []string{cmd.Function},
 	}
 
 	// Add arguments
