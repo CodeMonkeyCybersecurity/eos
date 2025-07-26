@@ -74,6 +74,7 @@ func ShouldPromptForBootstrap(cmdName string) bool {
 		"version":    true,
 		"bootstrap":  true,
 		"self":       true,
+		"update":     true,     // Self-update shouldn't require bootstrap
 		"install":    true,
 		"completion": true,
 		"test":       true,     // Don't prompt during testing

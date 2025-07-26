@@ -39,7 +39,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info(" Starting Eos self-update process")
+		logger.Info("Starting Eos self-update process")
 
 		// Check if we're already running as root
 		if os.Geteuid() != 0 {

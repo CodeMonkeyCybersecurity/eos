@@ -4,9 +4,7 @@ package eos_cli
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -26,9 +24,6 @@ import (
 func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) (err error) {
 		logger.InitFallback()
-		
-		// Early debug logging
-		fmt.Fprintf(os.Stderr, "DEBUG: Wrap() called for command: %s\n", cmd.Name())
 		
 		ctx := eos_io.NewContext(context.Background(), cmd.Name())
 		defer ctx.End(&err)
@@ -94,9 +89,29 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 			zap.Bool("is_bootstrap_command", isBootstrapCommand))
 		
 		// Check if system needs bootstrap before executing command
-		if !isBootstrapCommand && bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
+		// For subcommands, also check if parent command is exempt
+		shouldCheckBootstrap := !isBootstrapCommand
+		if shouldCheckBootstrap && cmd.Parent() != nil {
+			// If parent command is exempt, skip bootstrap check for subcommands
+			parentExempt := !bootstrap.ShouldPromptForBootstrap(cmd.Parent().Name())
+			shouldCheckBootstrap = !parentExempt
+			
+			if parentExempt {
+				ctx.Log.Debug("Skipping bootstrap check - parent command is exempt",
+					zap.String("parent", cmd.Parent().Name()),
+					zap.String("command", cmd.Name()))
+			}
+		}
+		
+		if shouldCheckBootstrap && bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
 			ctx.Log.Info("Checking bootstrap status", 
 				zap.String("command", cmd.Name()),
+				zap.String("parent", func() string {
+					if cmd.Parent() != nil {
+						return cmd.Parent().Name()
+					}
+					return "none"
+				}()),
 				zap.Bool("is_bootstrap_cmd", isBootstrapCommand))
 
 			// Also check environment variable to prevent any possibility of recursion
@@ -104,31 +119,10 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 				ctx.Log.Info("Bootstrap prompt check",
 					zap.String("EOS_BOOTSTRAP_IN_PROGRESS", os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS")))
 				
-				shouldBootstrap, promptErr := bootstrap.PromptForBootstrap(ctx)
-				if promptErr != nil {
-					ctx.Log.Error("Failed to prompt for bootstrap", zap.Error(promptErr))
-					return eos_err.NewUserError("failed to prompt for bootstrap: %v", promptErr)
-				}
-
-				if shouldBootstrap {
-					ctx.Log.Info("User requested bootstrap, launching bootstrap command")
-
-					// Set environment variable to prevent recursion
-					bootstrapCmd := exec.Command("eos", "bootstrap")
-					bootstrapCmd.Env = append(os.Environ(), "EOS_BOOTSTRAP_IN_PROGRESS=1")
-					bootstrapCmd.Stdout = cmd.OutOrStdout()
-					bootstrapCmd.Stderr = cmd.ErrOrStderr()
-					bootstrapCmd.Stdin = cmd.InOrStdin()
-
-					if err := bootstrapCmd.Run(); err != nil {
-						ctx.Log.Error("Bootstrap command failed", zap.Error(err))
-						return eos_err.NewUserError("bootstrap failed: %v", err)
-					}
-
-					ctx.Log.Info("Bootstrap completed successfully, continuing with original command")
-				} else {
-					ctx.Log.Info("User declined bootstrap, command may fail without proper setup")
-				}
+				// Don't prompt in the wrapper - just warn
+				ctx.Log.Warn("System is not bootstrapped")
+				ctx.Log.Warn("Some commands may fail without proper setup")
+				ctx.Log.Warn("Run 'eos bootstrap' to set up the system")
 			}
 		}
 
@@ -209,9 +203,29 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 			zap.Bool("is_bootstrap_command", isBootstrapCommand))
 		
 		// Check if system needs bootstrap before executing command
-		if !isBootstrapCommand && bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
+		// For subcommands, also check if parent command is exempt
+		shouldCheckBootstrap := !isBootstrapCommand
+		if shouldCheckBootstrap && cmd.Parent() != nil {
+			// If parent command is exempt, skip bootstrap check for subcommands
+			parentExempt := !bootstrap.ShouldPromptForBootstrap(cmd.Parent().Name())
+			shouldCheckBootstrap = !parentExempt
+			
+			if parentExempt {
+				ctx.Log.Debug("Skipping bootstrap check - parent command is exempt",
+					zap.String("parent", cmd.Parent().Name()),
+					zap.String("command", cmd.Name()))
+			}
+		}
+		
+		if shouldCheckBootstrap && bootstrap.ShouldPromptForBootstrap(cmd.Name()) {
 			ctx.Log.Info("Checking bootstrap status", 
 				zap.String("command", cmd.Name()),
+				zap.String("parent", func() string {
+					if cmd.Parent() != nil {
+						return cmd.Parent().Name()
+					}
+					return "none"
+				}()),
 				zap.Bool("is_bootstrap_cmd", isBootstrapCommand))
 
 			// Also check environment variable to prevent any possibility of recursion
@@ -219,31 +233,10 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 				ctx.Log.Info("Bootstrap prompt check",
 					zap.String("EOS_BOOTSTRAP_IN_PROGRESS", os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS")))
 				
-				shouldBootstrap, promptErr := bootstrap.PromptForBootstrap(ctx)
-				if promptErr != nil {
-					ctx.Log.Error("Failed to prompt for bootstrap", zap.Error(promptErr))
-					return eos_err.NewUserError("failed to prompt for bootstrap: %v", promptErr)
-				}
-
-				if shouldBootstrap {
-					ctx.Log.Info("User requested bootstrap, launching bootstrap command")
-
-					// Set environment variable to prevent recursion
-					bootstrapCmd := exec.Command("eos", "bootstrap")
-					bootstrapCmd.Env = append(os.Environ(), "EOS_BOOTSTRAP_IN_PROGRESS=1")
-					bootstrapCmd.Stdout = cmd.OutOrStdout()
-					bootstrapCmd.Stderr = cmd.ErrOrStderr()
-					bootstrapCmd.Stdin = cmd.InOrStdin()
-
-					if err := bootstrapCmd.Run(); err != nil {
-						ctx.Log.Error("Bootstrap command failed", zap.Error(err))
-						return eos_err.NewUserError("bootstrap failed: %v", err)
-					}
-
-					ctx.Log.Info("Bootstrap completed successfully, continuing with original command")
-				} else {
-					ctx.Log.Info("User declined bootstrap, command may fail without proper setup")
-				}
+				// Don't prompt in the wrapper - just warn
+				ctx.Log.Warn("System is not bootstrapped")
+				ctx.Log.Warn("Some commands may fail without proper setup")
+				ctx.Log.Warn("Run 'eos bootstrap' to set up the system")
 			}
 		}
 
@@ -335,7 +328,8 @@ func sanitizeFlagValues(ctx *eos_io.RuntimeContext, cmd *cobra.Command, sanitize
 // startResourceWatchdog initializes resource monitoring for resource-intensive commands
 func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 	// List of commands that should have resource monitoring
-	resourceIntensiveCommands := []string{"bootstrap", "create", "update", "deploy", "install"}
+	// NOTE: Removed "update" from this list as it's not resource-intensive
+	resourceIntensiveCommands := []string{"bootstrap", "create", "deploy", "install"}
 	
 	// Check if this command needs monitoring
 	shouldMonitor := false
@@ -352,6 +346,10 @@ func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 	
 	// Configure watchdog with enhanced tracing
 	config := watchdog.DefaultResourceConfig()
+	
+	// TEMPORARY: Disable tracing to fix hang issue
+	// TODO: Investigate why TraceLogger.Initialize() hangs
+	config.EnableTracing = false
 	
 	// Enable terminal output for visibility
 	config.EnableTerminalOutput = true
