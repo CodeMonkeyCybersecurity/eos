@@ -64,8 +64,28 @@ func init() {
 func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced infrastructure bootstrap")
+	logger.Info("Bootstrap environment check",
+		zap.String("EOS_BOOTSTRAP_IN_PROGRESS", os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS")))
+	
+	// Get flags from command if they're not set (when called from top-level bootstrap)
+	if cmd.Flag("join-cluster") != nil {
+		joinCluster = cmd.Flag("join-cluster").Value.String()
+	}
+	if cmd.Flag("single-node") != nil {
+		singleNode = cmd.Flag("single-node").Value.String() == "true"
+	}
+	if cmd.Flag("preferred-role") != nil {
+		preferredRole = cmd.Flag("preferred-role").Value.String()
+	}
+	if cmd.Flag("auto-discover") != nil {
+		autoDiscover = cmd.Flag("auto-discover").Value.String() == "true"
+	}
+	if cmd.Flag("skip-hardening") != nil {
+		skipHardening = cmd.Flag("skip-hardening").Value.String() == "true"
+	}
 	
 	// ASSESS - Detect cluster state
+	logger.Info("Detecting cluster state...")
 	clusterInfo, err := bootstrap.DetectClusterState(rc, bootstrap.Options{
 		JoinCluster:   joinCluster,
 		SingleNode:    singleNode,

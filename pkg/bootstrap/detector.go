@@ -242,27 +242,36 @@ func autoDiscoverCluster(rc *eos_io.RuntimeContext) (*ClusterInfo, error) {
 // isSaltMasterRunning checks if Salt master is already running
 func isSaltMasterRunning(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking if Salt master is running...")
 	
 	// Check if salt-master service is running
+	logger.Debug("Checking systemctl is-active salt-master")
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"is-active", "salt-master"},
 		Capture: true,
+		Timeout: 5 * time.Second,
 	})
 	if err == nil && strings.TrimSpace(output) == "active" {
 		logger.Debug("Salt master service is active")
 		return true
 	}
+	logger.Debug("Salt master service check result", 
+		zap.String("output", output),
+		zap.Error(err))
 
 	// Check if salt-master process is running
+	logger.Debug("Checking pgrep for salt-master process")
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "pgrep",
 		Args:    []string{"-f", "salt-master"},
 		Capture: true,
+		Timeout: 5 * time.Second,
 	}); err == nil {
 		logger.Debug("Salt master process found")
 		return true
 	}
+	logger.Debug("Salt master process not found")
 
 	return false
 }

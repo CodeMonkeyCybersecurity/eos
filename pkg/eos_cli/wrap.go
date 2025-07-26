@@ -4,6 +4,7 @@ package eos_cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -25,6 +26,10 @@ import (
 func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) (err error) {
 		logger.InitFallback()
+		
+		// Early debug logging
+		fmt.Fprintf(os.Stderr, "DEBUG: Wrap() called for command: %s\n", cmd.Name())
+		
 		ctx := eos_io.NewContext(context.Background(), cmd.Name())
 		defer ctx.End(&err)
 
@@ -96,6 +101,9 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 			// Also check environment variable to prevent any possibility of recursion
 			if os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS") != "1" {
+				ctx.Log.Info("Bootstrap prompt check",
+					zap.String("EOS_BOOTSTRAP_IN_PROGRESS", os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS")))
+				
 				shouldBootstrap, promptErr := bootstrap.PromptForBootstrap(ctx)
 				if promptErr != nil {
 					ctx.Log.Error("Failed to prompt for bootstrap", zap.Error(promptErr))
@@ -208,6 +216,9 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 
 			// Also check environment variable to prevent any possibility of recursion
 			if os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS") != "1" {
+				ctx.Log.Info("Bootstrap prompt check",
+					zap.String("EOS_BOOTSTRAP_IN_PROGRESS", os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS")))
+				
 				shouldBootstrap, promptErr := bootstrap.PromptForBootstrap(ctx)
 				if promptErr != nil {
 					ctx.Log.Error("Failed to prompt for bootstrap", zap.Error(promptErr))

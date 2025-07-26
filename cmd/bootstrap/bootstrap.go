@@ -4,6 +4,8 @@
 package bootstrap
 
 import (
+	"os"
+	
 	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -63,6 +65,14 @@ func AddSubcommands() {
 
 // runBootstrapAllTop runs the enhanced bootstrap all command (top-level bootstrap)
 func runBootstrapAllTop(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := rc.Log
+	logger.Info("Bootstrap command started")
+	
+	// Set environment variable to prevent bootstrap prompt recursion
+	os.Setenv("EOS_BOOTSTRAP_IN_PROGRESS", "1")
+	logger.Info("Set EOS_BOOTSTRAP_IN_PROGRESS=1 to prevent recursion")
+	
 	// Directly call the enhanced bootstrap function from create package
+	logger.Info("Calling enhanced bootstrap function")
 	return create.RunBootstrapAllEnhanced(rc, cmd, args)
 }
