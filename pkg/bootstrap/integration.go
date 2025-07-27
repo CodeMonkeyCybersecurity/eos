@@ -38,9 +38,16 @@ func RunEnhancedBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	
 	// Check if system is already bootstrapped
 	if !opts.Force && IsSystemBootstrapped() {
-		logger.Info("System is already bootstrapped")
-		logger.Info("Use --force to re-run bootstrap")
-		return nil
+		// Double-check that Salt API is actually configured
+		status, err := CheckBootstrap(rc)
+		if err == nil && status.Bootstrapped && status.SaltAPIConfigured {
+			logger.Info("System is already bootstrapped and Salt API is configured")
+			logger.Info("Use --force to re-run bootstrap")
+			return nil
+		}
+		
+		// System has incomplete bootstrap - continue with bootstrap
+		logger.Info("System has incomplete bootstrap, continuing to complete setup")
 	}
 	
 	// Run the enhanced orchestrator

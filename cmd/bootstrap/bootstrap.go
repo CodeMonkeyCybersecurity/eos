@@ -49,6 +49,9 @@ Flags:
 	BootstrapCmd.Flags().String("preferred-role", "", "Preferred role when joining cluster (edge/core/data/compute)")
 	BootstrapCmd.Flags().Bool("auto-discover", false, "Enable automatic cluster discovery via multicast")
 	BootstrapCmd.Flags().Bool("skip-hardening", false, "Skip Ubuntu security hardening (not recommended for production)")
+	BootstrapCmd.Flags().Bool("force", false, "Force bootstrap even if system appears to be already bootstrapped")
+	BootstrapCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
+	BootstrapCmd.Flags().Bool("validate-only", false, "Only validate system requirements without bootstrapping")
 	
 }
 
