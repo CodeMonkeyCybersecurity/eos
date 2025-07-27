@@ -173,7 +173,7 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 		{
 			Name:        "salt-api",
 			Description: "Setting up Salt API service",
-			Required:    false,
+			Required:    true,  // Changed to required - Salt API is essential for Eos operations
 			RunFunc:     phaseSaltAPI,
 		},
 		{
@@ -272,12 +272,10 @@ func executePhaseWithRecovery(rc *eos_io.RuntimeContext, phase BootstrapPhase, o
 
 func phaseSalt(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing SaltStack")
+	logger.Info("Installing and configuring SaltStack")
 	
-	// Import saltstack package to avoid circular dependency
-	// This would normally call saltstack.Install(rc, config)
-	// For now, return placeholder
-	return fmt.Errorf("salt installation not implemented in refactored version")
+	// Use the comprehensive Salt bootstrap that includes both Salt and file roots setup
+	return BootstrapSaltComplete(rc, info)
 }
 
 func phaseSaltAPI(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {

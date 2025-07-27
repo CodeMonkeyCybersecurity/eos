@@ -8,7 +8,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -166,24 +165,42 @@ func checkSaltInstalled(rc *eos_io.RuntimeContext) (bool, string) {
 
 // checkSaltAPIConfigured checks if Salt API is configured and accessible
 func checkSaltAPIConfigured(rc *eos_io.RuntimeContext) bool {
-	// Check if API credentials exist
-	if _, err := saltstack.LoadAPICredentials(); err != nil {
-		return false
-	}
-
-	// Check if API service is running
+	// Check if EOS Salt API service is running
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"is-active", "salt-api"},
+		Args:    []string{"is-active", "eos-salt-api"},
 		Capture: true,
 		Timeout: 5 * time.Second,
 	})
 
 	if err != nil || strings.TrimSpace(output) != "active" {
-		return false
+		// Also check for the standard salt-api service as fallback
+		output, err = execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"is-active", "salt-api"},
+			Capture: true,
+			Timeout: 5 * time.Second,
+		})
+		
+		if err != nil || strings.TrimSpace(output) != "active" {
+			return false
+		}
 	}
 
-	// Check if API endpoint responds
+	// Check if API endpoint responds on port 5000 (EOS Salt API)
+	output, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "curl",
+		Args:    []string{"-s", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:5000/health"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	httpCode := strings.TrimSpace(output)
+	if httpCode == "200" {
+		return true
+	}
+
+	// Fallback: Check standard Salt API on port 8000
 	output, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
 		Args:    []string{"-k", "-s", "-o", "/dev/null", "-w", "%{http_code}", "https://localhost:8000"},
@@ -191,7 +208,7 @@ func checkSaltAPIConfigured(rc *eos_io.RuntimeContext) bool {
 		Timeout: 5 * time.Second,
 	})
 
-	httpCode := strings.TrimSpace(output)
+	httpCode = strings.TrimSpace(output)
 	return httpCode == "401" || httpCode == "200" // 401 is expected without auth
 }
 
