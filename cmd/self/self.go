@@ -38,6 +38,7 @@ var UpdateCmd = &cobra.Command{
 This command performs the equivalent of: su, cd /opt/eos && git pull && ./install.sh && exit`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		fmt.Fprintf(os.Stderr, "DEBUG: Inside update function\n")
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Starting Eos self-update process")
 
@@ -52,6 +53,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		}
 
 		// Change to /opt/eos directory
+		fmt.Fprintf(os.Stderr, "DEBUG: About to change to /opt/eos\n")
 		if err := os.Chdir("/opt/eos"); err != nil {
 			logger.Error(" Failed to change directory",
 				zap.String("directory", "/opt/eos"),
@@ -60,9 +62,11 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		}
 
 		logger.Info(" Changed to /opt/eos directory")
+		fmt.Fprintf(os.Stderr, "DEBUG: Successfully changed to /opt/eos\n")
 
 		// Execute git pull
 		logger.Info(" Pulling latest changes from git repository")
+		fmt.Fprintf(os.Stderr, "DEBUG: About to run git pull\n")
 		gitCmd := exec.Command("git", "pull")
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
@@ -70,6 +74,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 			logger.Error(" Git pull failed", zap.Error(err))
 			return fmt.Errorf("failed to pull latest changes: %w", err)
 		}
+		fmt.Fprintf(os.Stderr, "DEBUG: Git pull completed\n")
 
 		// Check if install.sh exists and is executable
 		if _, err := os.Stat("./install.sh"); os.IsNotExist(err) {
