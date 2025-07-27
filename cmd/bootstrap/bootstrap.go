@@ -7,7 +7,6 @@ import (
 	"os"
 	
 	"github.com/spf13/cobra"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
@@ -71,11 +70,12 @@ func runBootstrapAllTop(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	logger := rc.Log
 	logger.Info("Bootstrap command started")
 	
+	// FIXME: [P3] Using environment variable for state management is fragile
 	// Set environment variable to prevent bootstrap prompt recursion
 	os.Setenv("EOS_BOOTSTRAP_IN_PROGRESS", "1")
 	logger.Info("Set EOS_BOOTSTRAP_IN_PROGRESS=1 to prevent recursion")
 	
-	// Directly call the enhanced bootstrap function from create package
+	// Directly call the enhanced bootstrap function from bootstrap package
 	logger.Info("Calling enhanced bootstrap function")
-	return create.RunBootstrapAllEnhanced(rc, cmd, args)
+	return RunBootstrapAllEnhanced(rc, cmd, args)
 }

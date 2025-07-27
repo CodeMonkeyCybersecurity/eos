@@ -76,15 +76,18 @@ func CheckBootstrap(rc *eos_io.RuntimeContext) (*BootstrapStatus, error) {
 		status.Issues = append(status.Issues, "Security configuration needs attention")
 	}
 
-	// Check 6: Bootstrap marker file
-	if _, err := os.Stat("/etc/eos/bootstrapped"); err == nil {
+	// Use state-based validation instead of marker files
+	// Check if all required phases are complete
+	complete, missingPhases := IsBootstrapComplete(rc)
+	if complete {
 		status.Bootstrapped = true
-		logger.Debug("Bootstrap marker file found")
-	}
-
-	// Overall bootstrap status
-	if status.SaltInstalled && status.SaltAPIConfigured && status.FileRootsConfigured && len(status.Issues) == 0 {
-		status.Bootstrapped = true
+		logger.Debug("Bootstrap complete - all required phases validated")
+	} else {
+		status.Bootstrapped = false
+		logger.Debug("Bootstrap incomplete", zap.Strings("missing_phases", missingPhases))
+		for _, phase := range missingPhases {
+			status.Issues = append(status.Issues, fmt.Sprintf("%s phase not completed", phase))
+		}
 	}
 
 	return status, nil
@@ -94,49 +97,49 @@ func CheckBootstrap(rc *eos_io.RuntimeContext) (*BootstrapStatus, error) {
 func RequireBootstrap(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	status, err := CheckBootstrap(rc)
-	if err != nil {
-		return fmt.Errorf("failed to check bootstrap status: %w", err)
+	// Use state validation to check if bootstrap is complete
+	complete, missingPhases := IsBootstrapComplete(rc)
+	
+	if complete {
+		logger.Debug("Bootstrap validation passed - all required components are running")
+		return nil
 	}
-
-	if !status.Bootstrapped {
-		logger.Error("System is not bootstrapped",
-			zap.Bool("salt_installed", status.SaltInstalled),
-			zap.Bool("api_configured", status.SaltAPIConfigured),
-			zap.Bool("file_roots_ok", status.FileRootsConfigured),
-			zap.Strings("issues", status.Issues))
-
-		// Provide helpful error message
-		logger.Info("terminal prompt: ❌ ERROR: This system has not been bootstrapped!")
-		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: The Eos bootstrap process prepares your system for:")
-		logger.Info("terminal prompt:   • Configuration management with SaltStack")
-		logger.Info("terminal prompt:   • Secure API communication")
-		logger.Info("terminal prompt:   • Service orchestration and deployment")
-		logger.Info("terminal prompt:   • Automated system management")
-		logger.Info("terminal prompt: ")
-		
-		if len(status.Issues) > 0 {
-			logger.Info("terminal prompt: Issues detected:")
-			for _, issue := range status.Issues {
-				logger.Info(fmt.Sprintf("terminal prompt:   ✗ %s", issue))
-			}
-			logger.Info("terminal prompt: ")
+	
+	// System is not fully bootstrapped
+	logger.Error("System bootstrap incomplete",
+		zap.Strings("missing_phases", missingPhases))
+	
+	// Provide helpful error message
+	logger.Info("terminal prompt: ❌ ERROR: System bootstrap is incomplete!")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: The following components are missing or not running:")
+	
+	for _, phase := range missingPhases {
+		var issue string
+		switch phase {
+		case "salt":
+			issue = "SaltStack is not installed or not running"
+		case "salt-api":
+			issue = "Salt API service is not configured or not running"
+		default:
+			issue = fmt.Sprintf("%s is not configured", phase)
 		}
-		
-		logger.Info("terminal prompt: To bootstrap this system, run:")
-		logger.Info("terminal prompt:   sudo eos bootstrap")
-		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: Or for a complete setup with all components:")
-		logger.Info("terminal prompt:   sudo eos bootstrap all")
-		
-		return fmt.Errorf("system not bootstrapped - run 'sudo eos bootstrap' first")
+		logger.Info(fmt.Sprintf("terminal prompt:   ✗ %s", issue))
 	}
-
-	logger.Debug("Bootstrap check passed")
-	return nil
+	
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: To complete the bootstrap, run:")
+	logger.Info("terminal prompt:   sudo eos bootstrap")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: The bootstrap will automatically:")
+	logger.Info("terminal prompt:   • Detect what's missing")
+	logger.Info("terminal prompt:   • Complete only the necessary steps")
+	logger.Info("terminal prompt:   • Verify all services are running")
+	
+	return fmt.Errorf("bootstrap incomplete - missing: %s", strings.Join(missingPhases, ", "))
 }
 
+// FIXME: [P4] Code duplication - this function is duplicated in state_validator.go
 // checkSaltInstalled checks if Salt is installed
 func checkSaltInstalled(rc *eos_io.RuntimeContext) (bool, string) {
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -263,27 +266,10 @@ func checkSecurityConfiguration(rc *eos_io.RuntimeContext) bool {
 	return err == nil
 }
 
-// MarkBootstrapped creates a marker file indicating successful bootstrap
+// MarkBootstrapped is deprecated - we use state-based validation now
+// This function is kept for backward compatibility but does nothing
 func MarkBootstrapped(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-
-	// Create eos directory if it doesn't exist
-	if err := os.MkdirAll("/etc/eos", 0755); err != nil {
-		return fmt.Errorf("failed to create /etc/eos directory: %w", err)
-	}
-
-	// Create bootstrap marker file with metadata
-	content := fmt.Sprintf(`# Eos Bootstrap Marker
-# Generated: %s
-# Version: 1.0
-bootstrapped=true
-timestamp=%d
-`, time.Now().Format(time.RFC3339), time.Now().Unix())
-
-	if err := os.WriteFile("/etc/eos/bootstrapped", []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to create bootstrap marker: %w", err)
-	}
-
-	logger.Info("System marked as bootstrapped")
+	logger.Debug("MarkBootstrapped called but ignored - using state-based validation")
 	return nil
 }

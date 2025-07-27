@@ -66,6 +66,7 @@ func WithRetry(rc *eos_io.RuntimeContext, config RetryConfig, operation func() e
 	delay := config.InitialDelay
 	var lastErr error
 	
+	// FIXME: [P4] Retry logic is duplicated in multiple places
 	for attempt := 1; attempt <= config.MaxAttempts; attempt++ {
 		logger.Debug("Attempting operation",
 			zap.Int("attempt", attempt),
@@ -143,6 +144,8 @@ func EnsureService(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Ensuring service is running", zap.String("service", serviceName))
 	
+	// BUG: [P2] Doesn't check if service unit file exists before trying to start
+	// BUG: [P2] No handling of masked or disabled services
 	// ASSESS - Check current status
 	status, err := CheckService(rc, serviceName)
 	if err == nil && status == ServiceStatusActive {

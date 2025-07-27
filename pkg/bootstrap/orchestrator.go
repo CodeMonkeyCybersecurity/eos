@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -17,6 +18,9 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// checkpointMutex protects concurrent checkpoint file operations
+var checkpointMutex sync.Mutex
 
 // BootstrapOptions contains all configuration for bootstrap
 type BootstrapOptions struct {
@@ -136,22 +140,24 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 		
 		progress.CompletePhase()
 		
-		// Create checkpoint after each successful phase
-		if err := createCheckpoint(rc, phase.Name, clusterInfo); err != nil {
-			logger.Warn("Failed to create checkpoint", zap.Error(err))
-		}
+		// Log phase completion - we use state validation now, not checkpoints
+		logger.Info("Phase completed successfully", 
+			zap.String("phase", phase.Name),
+			zap.String("description", phase.Description))
 	}
 	
 	// Final steps
 	if !opts.DryRun {
-		// Mark system as bootstrapped
-		if err := MarkSystemAsBootstrapped(rc); err != nil {
-			logger.Warn("Failed to mark system as bootstrapped", zap.Error(err))
-		}
-		
 		// Save cluster configuration
 		if err := SaveClusterConfig(rc, clusterInfo); err != nil {
 			logger.Warn("Failed to save cluster config", zap.Error(err))
+		}
+		
+		// Verify all phases completed successfully
+		complete, missingPhases := IsBootstrapComplete(rc)
+		if !complete {
+			logger.Warn("Bootstrap may be incomplete",
+				zap.Strings("missing_phases", missingPhases))
 		}
 	}
 	
@@ -369,15 +375,15 @@ func phaseClusterJoin(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *C
 // Utility functions
 
 func isPhaseCompleted(rc *eos_io.RuntimeContext, phaseName string) bool {
-	// Check checkpoint file
-	checkpointFile := fmt.Sprintf("/var/lib/eos/bootstrap/checkpoint_%s", phaseName)
-	if _, err := os.Stat(checkpointFile); err == nil {
-		return true
-	}
-	return false
+	// Use state validation to check phase completion
+	return ValidatePhaseCompletion(rc, phaseName)
 }
 
 func createCheckpoint(rc *eos_io.RuntimeContext, phaseName string, info *ClusterInfo) error {
+	// Protect checkpoint operations with mutex
+	checkpointMutex.Lock()
+	defer checkpointMutex.Unlock()
+	
 	checkpointDir := "/var/lib/eos/bootstrap"
 	if err := CreateDirectoryIfMissing(checkpointDir, 0755); err != nil {
 		return err
@@ -397,6 +403,8 @@ func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) e
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Attempting Salt recovery")
 			
+			// FIXME: [P2] No error handling for cleanup operations
+			// BUG: [P2] Cleanup might remove user-customized configurations
 			// Clean up partial installation
 			execute.Run(rc.Ctx, execute.Options{
 				Command: "apt-get",

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -81,12 +82,29 @@ type APINodeInfo struct {
 
 // NewSaltAPIClient creates a new Salt API client
 func NewSaltAPIClient(rc *eos_io.RuntimeContext, masterAddr string) *SaltAPIClient {
+	// Check if TLS should be enabled based on environment
+	scheme := "http"
+	if os.Getenv("EOS_SALT_API_TLS") == "true" {
+		scheme = "https"
+	}
+	
+	// Create HTTP client with TLS config if needed
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	
+	// If using HTTPS, configure TLS
+	if scheme == "https" {
+		// TODO: Implement proper certificate validation
+		// For now, this is a placeholder for TLS support
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Warn("HTTPS enabled but certificate validation not yet implemented")
+	}
+	
 	return &SaltAPIClient{
-		baseURL: fmt.Sprintf("http://%s:5000", masterAddr),
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		rc: rc,
+		baseURL:    fmt.Sprintf("%s://%s:5000", scheme, masterAddr),
+		httpClient: httpClient,
+		rc:         rc,
 	}
 }
 

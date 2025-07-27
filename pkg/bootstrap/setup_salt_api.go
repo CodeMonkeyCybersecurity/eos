@@ -176,6 +176,7 @@ func verifyAPIService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Verifying Salt API service")
 
+	// RACE: [P1] Service might be starting up - no delay between start and check
 	// First check if the service is active
 	status, err := CheckService(rc, "eos-salt-api")
 	if err != nil || status != ServiceStatusActive {
@@ -297,25 +298,51 @@ func createAPIScript(rc *eos_io.RuntimeContext) error {
 		return nil
 	}
 	
+	// Ensure /etc/eos directory exists for API key storage
+	if err := CreateDirectoryIfMissing("/etc/eos", 0755); err != nil {
+		return fmt.Errorf("failed to create /etc/eos directory: %w", err)
+	}
+	
 	logger.Info("Creating Salt API script")
 	
-	// For now, create a minimal health check API
-	// The full API implementation should be provided by the package
+	// Create a minimal API with basic authentication
+	// Note: This is a temporary implementation - production should use proper auth
 	minimalAPI := `#!/usr/bin/env python3
-"""Minimal Salt API for health checks"""
+"""Minimal Salt API with basic authentication"""
 
-from flask import Flask, jsonify
+import os
+import secrets
+from functools import wraps
+from flask import Flask, jsonify, request, Response
 
 app = Flask(__name__)
 
+# Generate a random API key on startup if not provided
+API_KEY = os.environ.get('EOS_SALT_API_KEY', secrets.token_urlsafe(32))
+
+# Write the API key to a file for other services to read
+with open('/etc/eos/salt-api.key', 'w') as f:
+    f.write(API_KEY)
+os.chmod('/etc/eos/salt-api.key', 0o600)
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+        if api_key != API_KEY:
+            return Response('Unauthorized', 401)
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint"""
+    """Health check endpoint - no auth required"""
     return jsonify({'status': 'healthy', 'service': 'eos-salt-api'})
 
 @app.route('/cluster/info', methods=['GET'])
+@require_api_key
 def cluster_info():
-    """Basic cluster info endpoint"""
+    """Basic cluster info endpoint - requires authentication"""
     return jsonify({
         'cluster_id': 'standalone',
         'nodes': 1,
@@ -323,6 +350,7 @@ def cluster_info():
     })
 
 if __name__ == '__main__':
+    print(f"API Key: {API_KEY}")
     app.run(host='0.0.0.0', port=5000, debug=False)
 `
 	

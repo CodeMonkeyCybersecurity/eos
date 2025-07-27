@@ -326,6 +326,7 @@ func setupSaltFileRoots(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("failed to create link directory %s: %w", linkDir, err)
 		}
 
+		// BUG: [P2] No cleanup of orphaned symlinks if setup fails
 		// Create symlink
 		if err := os.Symlink(target, link); err != nil {
 			logger.Warn("Failed to create symlink, trying to create directory",
@@ -452,6 +453,9 @@ func checkUbuntuVersion(rc *eos_io.RuntimeContext) error {
 }
 
 func checkSaltNetworkConnectivity(rc *eos_io.RuntimeContext) error {
+	// BUG: [P3] Only checks DNS resolution, not actual network connectivity
+	// FIXME: [P3] No retry logic for transient network failures
+	// TODO: [P3] Add proxy configuration support
 	// Try to resolve a well-known domain
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "getent",

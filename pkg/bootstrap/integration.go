@@ -36,18 +36,21 @@ func RunEnhancedBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		Force:         getBoolFlag(cmd, "force"),
 	}
 	
-	// Check if system is already bootstrapped
-	if !opts.Force && IsSystemBootstrapped() {
-		// Double-check that Salt API is actually configured
-		status, err := CheckBootstrap(rc)
-		if err == nil && status.Bootstrapped && status.SaltAPIConfigured {
-			logger.Info("System is already bootstrapped and Salt API is configured")
+	// Check if system is already bootstrapped using state validation
+	if !opts.Force {
+		complete, missingPhases := IsBootstrapComplete(rc)
+		if complete {
+			logger.Info("Bootstrap validation passed - all required components are running")
 			logger.Info("Use --force to re-run bootstrap")
 			return nil
 		}
 		
-		// System has incomplete bootstrap - continue with bootstrap
-		logger.Info("System has incomplete bootstrap, continuing to complete setup")
+		// System has incomplete bootstrap - show what's missing and continue
+		if len(missingPhases) > 0 {
+			logger.Info("Bootstrap incomplete - missing components detected",
+				zap.Strings("missing_phases", missingPhases))
+			logger.Info("Continuing bootstrap to complete setup...")
+		}
 	}
 	
 	// Run the enhanced orchestrator
@@ -90,6 +93,7 @@ func RunComponentBootstrap(rc *eos_io.RuntimeContext, component string, cmd *cob
 	return OrchestrateBootstrap(rc, cmd, opts)
 }
 
+// FIXME: [P1] This function still creates checkpoint files even though we moved to state validation
 // MigrateToRefactoredBootstrap provides a migration path from old to new bootstrap
 func MigrateToRefactoredBootstrap(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -115,17 +119,13 @@ func MigrateToRefactoredBootstrap(rc *eos_io.RuntimeContext) error {
 		return nil
 	}
 	
-	// Create new checkpoint files for completed phases
+	// Use state validation instead of creating checkpoint files
+	// Just log what components are already installed
 	phases := []string{"salt", "vault", "nomad", "osquery"}
 	for _, phase := range phases {
-		// Check if the component is installed
-		if isComponentInstalled(rc, phase) {
-			logger.Info("Creating checkpoint for installed component", zap.String("phase", phase))
-			if err := createCheckpoint(rc, phase, &ClusterInfo{}); err != nil {
-				logger.Warn("Failed to create checkpoint", 
-					zap.String("phase", phase),
-					zap.Error(err))
-			}
+		// Check if the component is installed using state validation
+		if ValidatePhaseCompletion(rc, phase) {
+			logger.Info("Component already installed and validated", zap.String("phase", phase))
 		}
 	}
 	
