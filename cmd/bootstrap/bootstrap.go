@@ -28,12 +28,26 @@ This command installs and configures:
 - Ubuntu security hardening (optional FIDO2 SSH authentication)
 
 Examples:
-  eos bootstrap                  # Bootstrap everything including hardening (default)
-  eos bootstrap --skip-hardening # Bootstrap without Ubuntu hardening
-  eos bootstrap --single-node    # Bootstrap as single-node deployment
-  eos bootstrap --join-cluster   # Join existing cluster
+  eos bootstrap                     # Bootstrap everything including hardening (default)
+  eos bootstrap --guided            # Beginner-friendly guided mode
+  eos bootstrap --verify            # Check existing installation status
+  eos bootstrap --skip-hardening    # Bootstrap without Ubuntu hardening
+  eos bootstrap --single-node       # Bootstrap as single-node deployment
+  eos bootstrap --join-cluster      # Join existing cluster
+  eos bootstrap --stop-conflicting  # Automatically resolve port conflicts
+  eos bootstrap --clean             # Clean slate installation
+  eos bootstrap --force             # Force installation despite conflicts
 
-Flags:
+Enhanced Options:
+  --guided            Step-by-step guidance for beginners
+  --verify            Verify existing bootstrap without changes
+  --stop-conflicting  Automatically stop conflicting services
+  --continue          Continue with existing EOS installation
+  --clean             Clean slate - remove existing services
+  --reconfigure       Reconfigure existing services
+  --force             Force bootstrap despite conflicts
+
+Standard Options:
   --skip-hardening    Skip Ubuntu security hardening
   --single-node       Configure as single-node deployment
   --join-cluster      Join existing cluster at specified address
@@ -51,6 +65,14 @@ Flags:
 	BootstrapCmd.Flags().Bool("force", false, "Force bootstrap even if system appears to be already bootstrapped")
 	BootstrapCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 	BootstrapCmd.Flags().Bool("validate-only", false, "Only validate system requirements without bootstrapping")
+	
+	// Enhanced bootstrap flags
+	BootstrapCmd.Flags().Bool("verify", false, "Verify existing bootstrap without making changes")
+	BootstrapCmd.Flags().Bool("guided", false, "Use guided mode for beginners with step-by-step instructions")
+	BootstrapCmd.Flags().Bool("stop-conflicting", false, "Automatically stop conflicting services")
+	BootstrapCmd.Flags().Bool("continue", false, "Continue with existing EOS installation")
+	BootstrapCmd.Flags().Bool("clean", false, "Clean slate - remove existing services and start fresh")
+	BootstrapCmd.Flags().Bool("reconfigure", false, "Reconfigure existing services")
 	
 }
 

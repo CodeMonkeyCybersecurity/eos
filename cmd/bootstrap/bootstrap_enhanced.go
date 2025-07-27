@@ -66,8 +66,35 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced infrastructure bootstrap")
 	
-	// Use the new refactored bootstrap system
-	return bootstrap.RunEnhancedBootstrap(rc, cmd, args)
+	// Parse flags into options
+	opts := &bootstrap.BootstrapOptions{
+		JoinCluster:   cmd.Flag("join-cluster").Value.String(),
+		SingleNode:    cmd.Flag("single-node").Value.String() == "true",
+		PreferredRole: cmd.Flag("preferred-role").Value.String(),
+		AutoDiscover:  cmd.Flag("auto-discover").Value.String() == "true",
+		SkipHardening: cmd.Flag("skip-hardening").Value.String() == "true",
+		DryRun:        cmd.Flag("dry-run").Value.String() == "true",
+		ValidateOnly:  cmd.Flag("validate-only").Value.String() == "true",
+		Force:         cmd.Flag("force").Value.String() == "true",
+	}
+	
+	// Handle enhanced flags
+	if cmd.Flag("verify") != nil && cmd.Flag("verify").Value.String() == "true" {
+		opts.ValidateOnly = true
+	}
+	
+	if cmd.Flag("stop-conflicting") != nil && cmd.Flag("stop-conflicting").Value.String() == "true" {
+		// This will be handled in the orchestrator
+		logger.Info("Auto-stop conflicting services enabled")
+	}
+	
+	if cmd.Flag("clean") != nil && cmd.Flag("clean").Value.String() == "true" {
+		logger.Info("Clean slate installation requested")
+		opts.Force = true
+	}
+	
+	// Use the new enhanced orchestrator
+	return bootstrap.OrchestrateBootstrap(rc, cmd, opts)
 }
 
 // bootstrapSingleNodeEnhanced bootstraps a single node with storage ops

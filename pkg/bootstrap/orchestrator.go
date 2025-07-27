@@ -56,7 +56,41 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced bootstrap orchestration")
 	
-	// Phase 0: Validation
+	// Phase 0: State Detection and Conflict Resolution
+	logger.Info("Detecting bootstrap state")
+	state, err := DetectBootstrapState(rc)
+	if err != nil {
+		return fmt.Errorf("failed to detect bootstrap state: %w", err)
+	}
+	
+	// Handle guided mode
+	if isGuidedMode(cmd) {
+		return PromptGuidedBootstrap(rc)
+	}
+	
+	// Print state report
+	PrintBootstrapStateReport(rc, state)
+	
+	// Handle conflicts unless forced
+	if !opts.Force && (state.Phase == PhaseConflicting || len(state.PortConflicts) > 0) {
+		logger.Info("Resolving conflicts")
+		resolutionOptions, err := PromptConflictResolution(rc, state)
+		if err != nil {
+			return fmt.Errorf("conflict resolution failed: %w", err)
+		}
+		
+		if err := ExecuteConflictResolution(rc, resolutionOptions); err != nil {
+			return fmt.Errorf("failed to resolve conflicts: %w", err)
+		}
+		
+		// Re-detect state after conflict resolution
+		state, err = DetectBootstrapState(rc)
+		if err != nil {
+			return fmt.Errorf("failed to re-detect state after conflict resolution: %w", err)
+		}
+	}
+	
+	// Phase 1: System Validation
 	if !opts.Force {
 		logger.Info("Running system validation")
 		requirements := DefaultSystemRequirements()
@@ -500,4 +534,12 @@ func showBootstrapSummary(rc *eos_io.RuntimeContext, info *ClusterInfo, opts *Bo
 func isYes(response string) bool {
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
+}
+
+// isGuidedMode checks if guided mode is enabled
+func isGuidedMode(cmd *cobra.Command) bool {
+	if cmd.Flag("guided") != nil {
+		return cmd.Flag("guided").Value.String() == "true"
+	}
+	return false
 }
