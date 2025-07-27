@@ -64,57 +64,9 @@ func init() {
 func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced infrastructure bootstrap")
-	logger.Info("Bootstrap environment check",
-		zap.String("EOS_BOOTSTRAP_IN_PROGRESS", os.Getenv("EOS_BOOTSTRAP_IN_PROGRESS")))
 	
-	// Get flags from command if they're not set (when called from top-level bootstrap)
-	if cmd.Flag("join-cluster") != nil {
-		joinCluster = cmd.Flag("join-cluster").Value.String()
-	}
-	if cmd.Flag("single-node") != nil {
-		singleNode = cmd.Flag("single-node").Value.String() == "true"
-	}
-	if cmd.Flag("preferred-role") != nil {
-		preferredRole = cmd.Flag("preferred-role").Value.String()
-	}
-	if cmd.Flag("auto-discover") != nil {
-		autoDiscover = cmd.Flag("auto-discover").Value.String() == "true"
-	}
-	if cmd.Flag("skip-hardening") != nil {
-		skipHardening = cmd.Flag("skip-hardening").Value.String() == "true"
-	}
-	
-	// ASSESS - Detect cluster state
-	logger.Info("Detecting cluster state...")
-	clusterInfo, err := bootstrap.DetectClusterState(rc, bootstrap.Options{
-		JoinCluster:   joinCluster,
-		SingleNode:    singleNode,
-		PreferredRole: preferredRole,
-		AutoDiscover:  autoDiscover,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to detect cluster state: %w", err)
-	}
-	
-	// Log cluster information
-	logger.Info("Cluster state detected",
-		zap.Bool("single_node", clusterInfo.IsSingleNode),
-		zap.Bool("is_master", clusterInfo.IsMaster),
-		zap.String("master_addr", clusterInfo.MasterAddr),
-		zap.Int("node_count", clusterInfo.NodeCount),
-		zap.String("my_role", string(clusterInfo.MyRole)))
-	
-	// INTERVENE - Bootstrap based on node type
-	if clusterInfo.IsSingleNode || clusterInfo.IsMaster {
-		// Single node or first master
-		logger.Info("Bootstrapping as single node or first master")
-		return bootstrapSingleNodeEnhanced(rc, cmd, clusterInfo)
-	} else {
-		// Joining existing cluster
-		logger.Info("Bootstrapping as additional node",
-			zap.String("master", clusterInfo.MasterAddr))
-		return bootstrapAdditionalNode(rc, cmd, clusterInfo)
-	}
+	// Use the new refactored bootstrap system
+	return bootstrap.RunEnhancedBootstrap(rc, cmd, args)
 }
 
 // bootstrapSingleNodeEnhanced bootstraps a single node with storage ops

@@ -18,9 +18,10 @@ func SetupSaltAPI(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Setting up Salt API service")
 
-	// ASSESS - Check if Salt master is running
-	if err := checkSaltMasterRunning(rc); err != nil {
-		return fmt.Errorf("Salt master is not running: %w", err)
+	// ASSESS - Ensure Salt master is running (required for API)
+	// For single-node deployments, we may need to start it
+	if err := ensureSaltMasterRunning(rc); err != nil {
+		return fmt.Errorf("failed to ensure Salt master is running: %w", err)
 	}
 
 	// Install Flask and dependencies
@@ -51,23 +52,6 @@ func SetupSaltAPI(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// checkSaltMasterRunning verifies Salt master is active
-func checkSaltMasterRunning(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", "salt-master"},
-		Capture: true,
-	})
-
-	if err != nil || output != "active" {
-		return fmt.Errorf("salt-master service is not active")
-	}
-
-	logger.Debug("Salt master is running")
-	return nil
-}
 
 // installPythonDependencies installs required Python packages
 func installPythonDependencies(rc *eos_io.RuntimeContext) error {
@@ -80,15 +64,9 @@ func installPythonDependencies(rc *eos_io.RuntimeContext) error {
 		"python3-salt",
 	}
 
+	// Install packages using common utility for idempotency
 	for _, pkg := range packages {
-		logger.Debug("Installing package", zap.String("package", pkg))
-		
-		if _, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "apt-get",
-			Args:    []string{"install", "-y", pkg},
-			Capture: false,
-			Timeout: 300 * time.Second,
-		}); err != nil {
+		if err := InstallPackageIfMissing(rc, pkg); err != nil {
 			return fmt.Errorf("failed to install %s: %w", pkg, err)
 		}
 	}
@@ -100,6 +78,7 @@ func installPythonDependencies(rc *eos_io.RuntimeContext) error {
 // createAPIDirectories creates necessary directories for the API service
 func createAPIDirectories(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Creating API directories")
 
 	directories := []string{
 		"/opt/eos/salt/api",
@@ -108,10 +87,10 @@ func createAPIDirectories(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, dir := range directories {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := CreateDirectoryIfMissing(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
-		logger.Debug("Created directory", zap.String("directory", dir))
+		logger.Debug("Ensured directory exists", zap.String("directory", dir))
 	}
 
 	return nil
@@ -185,19 +164,42 @@ func verifyAPIService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Verifying Salt API service")
 
-	// Create API client and test health check
-	apiClient := NewSaltAPIClient(rc, "localhost")
-
-	// Wait for API to become available (up to 30 seconds)
-	if err := apiClient.WaitForAPI(rc.Ctx, 30*time.Second); err != nil {
-		return fmt.Errorf("API did not become available: %w", err)
+	// First check if the service is active
+	status, err := CheckService(rc, "eos-salt-api")
+	if err != nil || status != ServiceStatusActive {
+		return fmt.Errorf("eos-salt-api service is not active (status: %s)", status)
 	}
 
-	// Test a simple API call
-	_, err := apiClient.GetClusterInfo()
+	// Create API client and test health check with retry
+	apiClient := NewSaltAPIClient(rc, "localhost")
+
+	// Use retry logic for API availability
+	retryConfig := RetryConfig{
+		MaxAttempts:       6,
+		InitialDelay:      5 * time.Second,
+		MaxDelay:          30 * time.Second,
+		BackoffMultiplier: 1.5,
+	}
+
+	err = WithRetry(rc, retryConfig, func() error {
+		// Wait for API to respond
+		if err := apiClient.WaitForAPI(rc.Ctx, 10*time.Second); err != nil {
+			return fmt.Errorf("API not responding: %w", err)
+		}
+
+		// Test a simple API call
+		_, err := apiClient.GetClusterInfo()
+		if err != nil {
+			logger.Debug("Cluster info call failed (expected during bootstrap)", zap.Error(err))
+			// This is OK - cluster might not be fully configured yet
+			// We just need to know the API is responding
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		logger.Warn("Cluster info call failed, but API is responding", zap.Error(err))
-		// This is OK - cluster might not be fully configured yet
+		return fmt.Errorf("API verification failed: %w", err)
 	}
 
 	logger.Info("Salt API service verification completed")
@@ -237,4 +239,33 @@ func GetSaltAPIStatus(rc *eos_io.RuntimeContext) (string, error) {
 	}
 
 	return output, nil
+}
+
+// ensureSaltMasterRunning ensures Salt master service is running, starting it if necessary
+func ensureSaltMasterRunning(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Ensuring Salt master service is running")
+
+	// Use common utility to check and ensure service is running
+	status, err := CheckService(rc, "salt-master")
+	if err == nil && status == ServiceStatusActive {
+		logger.Debug("Salt master is already running")
+		return nil
+	}
+
+	// Check if salt-master package is installed
+	installed, err := CheckPackageInstalled(rc, "salt-master")
+	if err != nil {
+		return fmt.Errorf("failed to check salt-master package: %w", err)
+	}
+
+	if !installed {
+		logger.Info("Salt master not installed, installing it")
+		if err := InstallPackageIfMissing(rc, "salt-master"); err != nil {
+			return fmt.Errorf("failed to install salt-master: %w", err)
+		}
+	}
+
+	// Use common utility to ensure service is running with retry
+	return EnsureService(rc, "salt-master")
 }

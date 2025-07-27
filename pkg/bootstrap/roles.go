@@ -167,8 +167,11 @@ func assignDistributedRoles(rc *eos_io.RuntimeContext, existingNodes []NodeInfo,
 	}
 	
 	// Determine best role for new node
-	// TODO: Add PreferredRole field to NodeInfo when needed
-	newNodeRole := determineBestRole(roleCounts, idealDist, "")
+	preferredRole := ""
+	if newNode.PreferredRole != "" {
+		preferredRole = newNode.PreferredRole
+	}
+	newNodeRole := determineBestRole(roleCounts, idealDist, preferredRole)
 	roles[newNode.Hostname] = newNodeRole
 	roleCounts[newNodeRole]++
 	
@@ -313,10 +316,67 @@ func rebalanceRoles(rc *eos_io.RuntimeContext, nodes []NodeInfo, ideal map[envir
 	return roles
 }
 
+// selectRoleByResourceRequirements selects role based on resource requirements
+func selectRoleByResourceRequirements(resources *ResourceInfo, ideal, assigned map[environment.Role]int) environment.Role {
+	// Define resource requirements for each role
+	roleRequirements := map[environment.Role]struct {
+		MinCPU    int
+		MinMemory int
+		MinDisk   int
+	}{
+		environment.RoleEdge:    {MinCPU: 2, MinMemory: 4, MinDisk: 50},
+		environment.RoleCore:    {MinCPU: 4, MinMemory: 8, MinDisk: 100},
+		environment.RoleData:    {MinCPU: 4, MinMemory: 16, MinDisk: 500},
+		environment.RoleApp:     {MinCPU: 2, MinMemory: 4, MinDisk: 50},
+		environment.RoleCompute: {MinCPU: 8, MinMemory: 32, MinDisk: 100},
+		environment.RoleMessage: {MinCPU: 2, MinMemory: 8, MinDisk: 100},
+		environment.RoleObserve: {MinCPU: 4, MinMemory: 8, MinDisk: 200},
+	}
+	
+	// Find roles that:
+	// 1. Need more assignment (below ideal)
+	// 2. Node has sufficient resources for
+	var candidates []environment.Role
+	
+	for role, req := range roleRequirements {
+		if assigned[role] < ideal[role] {
+			if resources.CPUCores >= req.MinCPU && 
+			   resources.MemoryGB >= req.MinMemory && 
+			   resources.StorageGB >= req.MinDisk {
+				candidates = append(candidates, role)
+			}
+		}
+	}
+	
+	// If no candidates match resources, fall back to RoleApp
+	if len(candidates) == 0 {
+		return environment.RoleApp
+	}
+	
+	// Select the role with the biggest gap from ideal
+	bestRole := candidates[0]
+	biggestGap := ideal[bestRole] - assigned[bestRole]
+	
+	for _, role := range candidates[1:] {
+		gap := ideal[role] - assigned[role]
+		if gap > biggestGap {
+			biggestGap = gap
+			bestRole = role
+		}
+	}
+	
+	return bestRole
+}
+
 // selectRoleByResources chooses role based on node resources
 func selectRoleByResources(node NodeInfo, ideal, assigned map[environment.Role]int) environment.Role {
-	// For now, use a simplified approach without resource requirements
-	// TODO: Add ResourceInfo to NodeInfo struct and use actual resource matching
+	// Check if we have resource information
+	if node.Resources != nil {
+		// Use resource-based selection
+		return selectRoleByResourceRequirements(node.Resources, ideal, assigned)
+	}
+	
+	// Fallback to simple distribution if no resource info
 	// Find roles that need assignment
 	var candidates []environment.Role
 	

@@ -32,10 +32,12 @@ type ClusterInfo struct {
 
 // NodeInfo contains information about a node in the cluster
 type NodeInfo struct {
-	Hostname  string
-	IP        string
-	Role      environment.Role
-	JoinedAt  time.Time
+	Hostname      string
+	IP            string
+	Role          environment.Role
+	JoinedAt      time.Time
+	PreferredRole string           // Preferred role specified during join
+	Resources     *ResourceInfo    // Node resource information
 }
 
 // ResourceInfo contains node resource information (defined in registration.go)
