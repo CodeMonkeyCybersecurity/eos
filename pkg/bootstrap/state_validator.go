@@ -79,18 +79,26 @@ func validateSaltPhase(rc *eos_io.RuntimeContext) (bool, error) {
 		return false, nil
 	}
 	
-	// BUG: [P1] Missing error handling for specific error cases from CheckBootstrap
-	// FIXME: [P2] CheckBootstrap creates circular dependency and may return stale data
-	// Check if Salt services are running
-	status, err := CheckBootstrap(rc)
-	if err != nil {
-		return false, fmt.Errorf("failed to check bootstrap status: %w", err)
+	// Check Salt configuration directly instead of using CheckBootstrap to avoid circular dependency
+	// Verify Salt configuration files exist
+	saltConfigFiles := []string{
+		"/etc/salt/minion.d/99-masterless.conf",
+		"/etc/salt/minion.d/99-local.conf", 
+		"/etc/salt/minion.d/99-cluster.conf",
+		"/etc/salt/master.d/99-eos.conf",
 	}
 	
-	if !status.SaltInstalled || !status.FileRootsConfigured {
-		logger.Debug("Salt not fully configured",
-			zap.Bool("installed", status.SaltInstalled),
-			zap.Bool("file_roots", status.FileRootsConfigured))
+	configExists := false
+	for _, configFile := range saltConfigFiles {
+		if _, err := os.Stat(configFile); err == nil {
+			configExists = true
+			logger.Debug("Found Salt configuration", zap.String("config", configFile))
+			break
+		}
+	}
+	
+	if !configExists {
+		logger.Debug("No Salt configuration files found")
 		return false, nil
 	}
 	

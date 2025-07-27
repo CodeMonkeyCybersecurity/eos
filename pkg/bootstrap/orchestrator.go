@@ -403,18 +403,56 @@ func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) e
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Attempting Salt recovery")
 			
-			// FIXME: [P2] No error handling for cleanup operations
-			// BUG: [P2] Cleanup might remove user-customized configurations
-			// Clean up partial installation
-			execute.Run(rc.Ctx, execute.Options{
+			// Check if we should preserve user configurations
+			preserveConfigs := os.Getenv("EOS_PRESERVE_CONFIGS") == "true"
+			
+			if preserveConfigs {
+				// Backup user configurations before cleanup
+				backupDir := "/var/backups/eos-salt-configs"
+				if err := os.MkdirAll(backupDir, 0755); err == nil {
+					// Best effort backup
+					execute.Run(rc.Ctx, execute.Options{
+						Command: "cp",
+						Args:    []string{"-r", "/etc/salt", backupDir},
+						Capture: false,
+					})
+					logger.Info("Backed up Salt configurations", zap.String("backup_dir", backupDir))
+				}
+			}
+			
+			// Clean up partial installation with error handling
+			if output, err := execute.Run(rc.Ctx, execute.Options{
 				Command: "apt-get",
 				Args:    []string{"remove", "--purge", "-y", "salt-common", "salt-minion", "salt-master"},
-				Capture: false,
-			})
+				Capture: true,
+			}); err != nil {
+				logger.Warn("Failed to remove Salt packages", 
+					zap.Error(err),
+					zap.String("output", output))
+				// Continue with cleanup anyway
+			}
 			
-			// Clean configuration
-			os.RemoveAll("/etc/salt")
-			os.RemoveAll("/var/cache/salt")
+			// Clean configuration directories
+			configDirs := []string{"/etc/salt", "/var/cache/salt"}
+			for _, dir := range configDirs {
+				if preserveConfigs {
+					// Only remove cache, keep configs
+					if dir == "/var/cache/salt" {
+						if err := os.RemoveAll(dir); err != nil {
+							logger.Warn("Failed to remove directory",
+								zap.String("dir", dir),
+								zap.Error(err))
+						}
+					}
+				} else {
+					// Remove all
+					if err := os.RemoveAll(dir); err != nil {
+						logger.Warn("Failed to remove directory",
+							zap.String("dir", dir),
+							zap.Error(err))
+					}
+				}
+			}
 			
 			return nil
 		},

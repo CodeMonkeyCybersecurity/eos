@@ -313,6 +313,27 @@ func setupSaltFileRoots(rc *eos_io.RuntimeContext) error {
 		"/srv/salt/networking":    "/opt/eos/salt/states/networking",
 		"/srv/salt/monitoring":    "/opt/eos/salt/states/monitoring",
 	}
+	
+	// Track created symlinks for cleanup on failure
+	var createdLinks []string
+	var returnErr error
+	
+	// Cleanup function that runs at the end
+	defer func() {
+		// If we're returning an error, clean up any symlinks we created
+		if returnErr != nil && len(createdLinks) > 0 {
+			logger.Debug("Cleaning up symlinks due to error", 
+				zap.Int("count", len(createdLinks)),
+				zap.Error(returnErr))
+			for _, link := range createdLinks {
+				if err := os.Remove(link); err != nil {
+					logger.Debug("Failed to remove symlink during cleanup",
+						zap.String("link", link),
+						zap.Error(err))
+				}
+			}
+		}
+	}()
 
 	for link, target := range links {
 		// Remove existing link if it exists
@@ -323,10 +344,10 @@ func setupSaltFileRoots(rc *eos_io.RuntimeContext) error {
 		// Create parent directory if needed
 		linkDir := filepath.Dir(link)
 		if err := CreateDirectoryIfMissing(linkDir, 0755); err != nil {
-			return fmt.Errorf("failed to create link directory %s: %w", linkDir, err)
+			returnErr = fmt.Errorf("failed to create link directory %s: %w", linkDir, err)
+			return returnErr
 		}
 
-		// BUG: [P2] No cleanup of orphaned symlinks if setup fails
 		// Create symlink
 		if err := os.Symlink(target, link); err != nil {
 			logger.Warn("Failed to create symlink, trying to create directory",
@@ -337,15 +358,21 @@ func setupSaltFileRoots(rc *eos_io.RuntimeContext) error {
 			// If target doesn't exist, create it
 			if _, err := os.Stat(target); os.IsNotExist(err) {
 				if err := CreateDirectoryIfMissing(target, 0755); err != nil {
-					return fmt.Errorf("failed to create target directory %s: %w", target, err)
+					// Cleanup will happen in defer
+					returnErr = fmt.Errorf("failed to create target directory %s: %w", target, err)
+					return returnErr
 				}
 				// Retry symlink
 				if err := os.Symlink(target, link); err != nil {
-					return fmt.Errorf("failed to create symlink %s -> %s: %w", link, target, err)
+					// Cleanup will happen in defer
+					returnErr = fmt.Errorf("failed to create symlink %s -> %s: %w", link, target, err)
+					return returnErr
 				}
 			}
 		}
 		
+		// Track successfully created symlink
+		createdLinks = append(createdLinks, link)
 		logger.Debug("Created symlink", zap.String("link", link), zap.String("target", target))
 	}
 

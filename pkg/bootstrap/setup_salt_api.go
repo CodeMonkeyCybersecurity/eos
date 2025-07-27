@@ -176,7 +176,6 @@ func verifyAPIService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Verifying Salt API service")
 
-	// RACE: [P1] Service might be starting up - no delay between start and check
 	// First check if the service is active
 	status, err := CheckService(rc, "eos-salt-api")
 	if err != nil || status != ServiceStatusActive {

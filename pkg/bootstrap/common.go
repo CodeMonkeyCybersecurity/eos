@@ -144,8 +144,23 @@ func EnsureService(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Ensuring service is running", zap.String("service", serviceName))
 	
-	// BUG: [P2] Doesn't check if service unit file exists before trying to start
-	// BUG: [P2] No handling of masked or disabled services
+	// First check if service unit file exists
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"list-unit-files", serviceName},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+	
+	if err != nil || !strings.Contains(output, serviceName) {
+		return fmt.Errorf("service unit file not found for %s", serviceName)
+	}
+	
+	// Check if service is masked or disabled
+	if strings.Contains(output, "masked") {
+		return fmt.Errorf("service %s is masked and cannot be started", serviceName)
+	}
+	
 	// ASSESS - Check current status
 	status, err := CheckService(rc, serviceName)
 	if err == nil && status == ServiceStatusActive {

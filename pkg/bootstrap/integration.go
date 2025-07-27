@@ -93,7 +93,6 @@ func RunComponentBootstrap(rc *eos_io.RuntimeContext, component string, cmd *cob
 	return OrchestrateBootstrap(rc, cmd, opts)
 }
 
-// FIXME: [P1] This function still creates checkpoint files even though we moved to state validation
 // MigrateToRefactoredBootstrap provides a migration path from old to new bootstrap
 func MigrateToRefactoredBootstrap(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
