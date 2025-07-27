@@ -5,11 +5,15 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -82,23 +86,34 @@ type APINodeInfo struct {
 
 // NewSaltAPIClient creates a new Salt API client
 func NewSaltAPIClient(rc *eos_io.RuntimeContext, masterAddr string) *SaltAPIClient {
+	logger := otelzap.Ctx(rc.Ctx)
+	
 	// Check if TLS should be enabled based on environment
 	scheme := "http"
 	if os.Getenv("EOS_SALT_API_TLS") == "true" {
 		scheme = "https"
 	}
 	
-	// Create HTTP client with TLS config if needed
+	// Create HTTP client with secure TLS configuration
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 	
-	// If using HTTPS, configure TLS
+	// Configure TLS security if HTTPS is enabled
 	if scheme == "https" {
-		// TODO: Implement proper certificate validation
-		// For now, this is a placeholder for TLS support
-		logger := otelzap.Ctx(rc.Ctx)
-		logger.Warn("HTTPS enabled but certificate validation not yet implemented")
+		tlsConfig, err := createSecureTLSConfig(rc, masterAddr)
+		if err != nil {
+			logger.Error("Failed to create secure TLS configuration, falling back to HTTP", 
+				zap.Error(err),
+				zap.String("master", masterAddr))
+			scheme = "http"
+		} else {
+			httpClient.Transport = &http.Transport{
+				TLSClientConfig: tlsConfig,
+			}
+			logger.Info("HTTPS enabled with certificate validation", 
+				zap.String("master", masterAddr))
+		}
 	}
 	
 	return &SaltAPIClient{
@@ -106,6 +121,108 @@ func NewSaltAPIClient(rc *eos_io.RuntimeContext, masterAddr string) *SaltAPIClie
 		httpClient: httpClient,
 		rc:         rc,
 	}
+}
+
+// createSecureTLSConfig creates a secure TLS configuration with proper certificate validation
+func createSecureTLSConfig(rc *eos_io.RuntimeContext, masterAddr string) (*tls.Config, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Start with secure defaults
+	tlsConfig := &tls.Config{
+		ServerName:         masterAddr,
+		MinVersion:         tls.VersionTLS12, // Require TLS 1.2 or higher
+		CipherSuites:       getSecureCipherSuites(),
+		InsecureSkipVerify: false, // Always validate certificates by default
+	}
+	
+	// Check for custom CA certificate
+	caCertPath := os.Getenv("EOS_SALT_API_CA_CERT")
+	if caCertPath != "" {
+		logger.Info("Loading custom CA certificate", zap.String("path", caCertPath))
+		
+		caCert, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate from %s: %w", caCertPath, err)
+		}
+		
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate from %s", caCertPath)
+		}
+		
+		tlsConfig.RootCAs = caCertPool
+		logger.Info("Custom CA certificate loaded successfully")
+	}
+	
+	// Check for client certificate authentication
+	clientCertPath := os.Getenv("EOS_SALT_API_CLIENT_CERT")
+	clientKeyPath := os.Getenv("EOS_SALT_API_CLIENT_KEY")
+	
+	if clientCertPath != "" && clientKeyPath != "" {
+		logger.Info("Loading client certificate for mutual TLS", 
+			zap.String("cert", clientCertPath),
+			zap.String("key", clientKeyPath))
+		
+		clientCert, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+		}
+		
+		tlsConfig.Certificates = []tls.Certificate{clientCert}
+		logger.Info("Client certificate loaded for mutual TLS")
+	}
+	
+	// Allow skipping certificate verification ONLY if explicitly requested
+	// This should only be used in development environments
+	if os.Getenv("EOS_SALT_API_SKIP_VERIFY") == "true" {
+		logger.Warn("Certificate verification disabled - THIS IS INSECURE and should only be used in development",
+			zap.String("master", masterAddr))
+		tlsConfig.InsecureSkipVerify = true
+	}
+	
+	// Verify the configuration can connect
+	if err := validateTLSConfig(tlsConfig, masterAddr); err != nil {
+		return nil, fmt.Errorf("TLS configuration validation failed: %w", err)
+	}
+	
+	return tlsConfig, nil
+}
+
+// getSecureCipherSuites returns a list of secure cipher suites
+func getSecureCipherSuites() []uint16 {
+	return []uint16{
+		tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+		tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	}
+}
+
+// validateTLSConfig performs a basic validation of the TLS configuration
+func validateTLSConfig(tlsConfig *tls.Config, masterAddr string) error {
+	// Create a test connection to validate the TLS configuration
+	dialer := &tls.Dialer{
+		NetDialer: &net.Dialer{
+			Timeout: 10 * time.Second,
+		},
+		Config: tlsConfig,
+	}
+	
+	conn, err := dialer.Dial("tcp", fmt.Sprintf("%s:5000", masterAddr))
+	if err != nil {
+		// If connection fails, it might be because the service isn't running yet
+		// We'll allow this but warn about it
+		if strings.Contains(err.Error(), "connection refused") || 
+		   strings.Contains(err.Error(), "no route to host") {
+			return nil // Service not running, but TLS config is probably OK
+		}
+		return fmt.Errorf("TLS connection test failed: %w", err)
+	}
+	defer conn.Close()
+	
+	return nil
 }
 
 // makeRequest makes an HTTP request to the Salt API

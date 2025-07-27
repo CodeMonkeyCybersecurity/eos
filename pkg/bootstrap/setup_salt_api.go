@@ -302,58 +302,259 @@ func createAPIScript(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to create /etc/eos directory: %w", err)
 	}
 	
-	logger.Info("Creating Salt API script")
+	logger.Info("Creating production-grade Salt API script")
 	
-	// Create a minimal API with basic authentication
-	// Note: This is a temporary implementation - production should use proper auth
-	minimalAPI := `#!/usr/bin/env python3
-"""Minimal Salt API with basic authentication"""
+	// Create a production-grade API with enhanced security
+	productionAPI := `#!/usr/bin/env python3
+"""Production-grade Salt API with enhanced security features"""
 
 import os
+import sys
+import time
+import hashlib
 import secrets
+import logging
+import jwt
+from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, jsonify, request, Response
+from collections import defaultdict
+from flask import Flask, jsonify, request, Response, g
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/var/log/eos/salt-api.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger('eos-salt-api')
 
 app = Flask(__name__)
 
-# Generate a random API key on startup if not provided
+# Security configuration
 API_KEY = os.environ.get('EOS_SALT_API_KEY', secrets.token_urlsafe(32))
+JWT_SECRET = os.environ.get('EOS_JWT_SECRET', secrets.token_urlsafe(64))
+RATE_LIMIT = int(os.environ.get('EOS_API_RATE_LIMIT', '100'))  # requests per minute
+TOKEN_EXPIRY = int(os.environ.get('EOS_TOKEN_EXPIRY_HOURS', '24'))
 
-# Write the API key to a file for other services to read
-with open('/etc/eos/salt-api.key', 'w') as f:
-    f.write(API_KEY)
-os.chmod('/etc/eos/salt-api.key', 0o600)
+# Rate limiting storage
+request_counts = defaultdict(list)
+failed_auth_attempts = defaultdict(list)
 
-def require_api_key(f):
+# Write API key and JWT secret to secure files
+try:
+    os.makedirs('/etc/eos', exist_ok=True)
+    
+    with open('/etc/eos/salt-api.key', 'w') as f:
+        f.write(API_KEY)
+    os.chmod('/etc/eos/salt-api.key', 0o600)
+    
+    with open('/etc/eos/salt-api.jwt', 'w') as f:
+        f.write(JWT_SECRET)
+    os.chmod('/etc/eos/salt-api.jwt', 0o600)
+    
+    logger.info("API security files created successfully")
+except Exception as e:
+    logger.error(f"Failed to create security files: {e}")
+    sys.exit(1)
+
+def get_client_ip():
+    """Get the real client IP address"""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+    elif request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+    else:
+        return request.remote_addr
+
+def check_rate_limit(client_ip, limit=RATE_LIMIT):
+    """Check if client is within rate limits"""
+    now = time.time()
+    minute_ago = now - 60
+    
+    # Clean old entries
+    request_counts[client_ip] = [req_time for req_time in request_counts[client_ip] if req_time > minute_ago]
+    
+    # Check limit
+    if len(request_counts[client_ip]) >= limit:
+        return False
+    
+    # Record this request
+    request_counts[client_ip].append(now)
+    return True
+
+def check_failed_attempts(client_ip, max_attempts=5):
+    """Check if client has too many failed auth attempts"""
+    now = time.time()
+    hour_ago = now - 3600
+    
+    # Clean old entries
+    failed_auth_attempts[client_ip] = [attempt_time for attempt_time in failed_auth_attempts[client_ip] if attempt_time > hour_ago]
+    
+    return len(failed_auth_attempts[client_ip]) < max_attempts
+
+def record_failed_attempt(client_ip):
+    """Record a failed authentication attempt"""
+    failed_auth_attempts[client_ip].append(time.time())
+
+def validate_api_key(provided_key):
+    """Validate API key with timing attack protection"""
+    if not provided_key:
+        return False
+    
+    # Use constant-time comparison to prevent timing attacks
+    return secrets.compare_digest(provided_key, API_KEY)
+
+def validate_jwt_token(token):
+    """Validate JWT token"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        logger.warning("JWT token expired")
+        return None
+    except jwt.InvalidTokenError:
+        logger.warning("Invalid JWT token")
+        return None
+
+def require_authentication(f):
+    """Enhanced authentication decorator with multiple auth methods"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        client_ip = get_client_ip()
+        g.client_ip = client_ip
+        
+        # Rate limiting
+        if not check_rate_limit(client_ip):
+            logger.warning(f"Rate limit exceeded for {client_ip}")
+            return Response('Rate limit exceeded', 429)
+        
+        # Check failed attempts
+        if not check_failed_attempts(client_ip):
+            logger.warning(f"Too many failed attempts from {client_ip}")
+            return Response('Too many failed attempts', 429)
+        
+        # Try JWT token first
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header[7:]  # Remove 'Bearer ' prefix
+            payload = validate_jwt_token(token)
+            if payload:
+                g.user_id = payload.get('user_id')
+                g.auth_method = 'jwt'
+                logger.info(f"Authenticated request from {client_ip} via JWT")
+                return f(*args, **kwargs)
+        
+        # Fall back to API key
         api_key = request.headers.get('X-API-Key')
-        if api_key != API_KEY:
-            return Response('Unauthorized', 401)
-        return f(*args, **kwargs)
+        if validate_api_key(api_key):
+            g.user_id = 'api_key_user'
+            g.auth_method = 'api_key'
+            logger.info(f"Authenticated request from {client_ip} via API key")
+            return f(*args, **kwargs)
+        
+        # Authentication failed
+        record_failed_attempt(client_ip)
+        logger.warning(f"Authentication failed for {client_ip}")
+        return Response('Unauthorized', 401)
+    
     return decorated_function
+
+@app.before_request
+def before_request():
+    """Log all requests"""
+    client_ip = get_client_ip()
+    logger.info(f"Request: {request.method} {request.path} from {client_ip}")
+
+@app.after_request
+def after_request(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'"
+    response.headers['Server'] = 'EOS-Salt-API'
+    return response
 
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint - no auth required"""
-    return jsonify({'status': 'healthy', 'service': 'eos-salt-api'})
+    return jsonify({
+        'status': 'healthy', 
+        'service': 'eos-salt-api',
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+@app.route('/auth/token', methods=['POST'])
+def get_token():
+    """Get JWT token using API key"""
+    client_ip = get_client_ip()
+    
+    if not check_rate_limit(client_ip, limit=10):  # Stricter limit for auth endpoint
+        return Response('Rate limit exceeded', 429)
+    
+    if not check_failed_attempts(client_ip):
+        return Response('Too many failed attempts', 429)
+    
+    api_key = request.headers.get('X-API-Key')
+    if not validate_api_key(api_key):
+        record_failed_attempt(client_ip)
+        return Response('Invalid API key', 401)
+    
+    # Generate JWT token
+    payload = {
+        'user_id': 'eos_user',
+        'iat': datetime.utcnow(),
+        'exp': datetime.utcnow() + timedelta(hours=TOKEN_EXPIRY)
+    }
+    
+    token = jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+    
+    logger.info(f"JWT token issued to {client_ip}")
+    return jsonify({
+        'token': token,
+        'expires_in': TOKEN_EXPIRY * 3600,
+        'token_type': 'Bearer'
+    })
 
 @app.route('/cluster/info', methods=['GET'])
-@require_api_key
+@require_authentication
 def cluster_info():
     """Basic cluster info endpoint - requires authentication"""
     return jsonify({
         'cluster_id': 'standalone',
         'nodes': 1,
-        'status': 'active'
+        'status': 'active',
+        'authenticated_as': g.get('user_id'),
+        'auth_method': g.get('auth_method')
+    })
+
+@app.route('/cluster/nodes', methods=['GET'])
+@require_authentication
+def cluster_nodes():
+    """Get cluster nodes - requires authentication"""
+    return jsonify({
+        'nodes': [],
+        'total': 0,
+        'timestamp': datetime.utcnow().isoformat()
     })
 
 if __name__ == '__main__':
-    print(f"API Key: {API_KEY}")
+    logger.info(f"Starting EOS Salt API with enhanced security")
+    logger.info(f"Rate limit: {RATE_LIMIT} requests/minute")
+    logger.info(f"Token expiry: {TOKEN_EXPIRY} hours")
+    
+    # Don't print API key in production logs
+    if os.environ.get('EOS_DEBUG') == 'true':
+        print(f"API Key: {API_KEY}")
+    
     app.run(host='0.0.0.0', port=5000, debug=False)
 `
 	
-	if err := os.WriteFile(scriptPath, []byte(minimalAPI), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(productionAPI), 0755); err != nil {
 		return fmt.Errorf("failed to create API script: %w", err)
 	}
 	

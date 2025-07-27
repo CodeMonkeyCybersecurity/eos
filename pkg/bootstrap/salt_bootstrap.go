@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -480,19 +481,135 @@ func checkUbuntuVersion(rc *eos_io.RuntimeContext) error {
 }
 
 func checkSaltNetworkConnectivity(rc *eos_io.RuntimeContext) error {
-	// BUG: [P3] Only checks DNS resolution, not actual network connectivity
-	// FIXME: [P3] No retry logic for transient network failures
-	// TODO: [P3] Add proxy configuration support
-	// Try to resolve a well-known domain
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "getent",
-		Args:    []string{"hosts", "github.com"},
-		Capture: true,
-	})
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking network connectivity for Salt operations")
 
-	if err != nil || output == "" {
-		return fmt.Errorf("cannot resolve DNS names - check network configuration")
+	// Define retry configuration for network checks
+	retryConfig := RetryConfig{
+		MaxAttempts:       3,
+		InitialDelay:      2 * time.Second,
+		MaxDelay:          10 * time.Second,
+		BackoffMultiplier: 2.0,
 	}
 
+	// Check proxy configuration first
+	proxyEnvVars := []string{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"}
+	for _, envVar := range proxyEnvVars {
+		if proxy := os.Getenv(envVar); proxy != "" {
+			logger.Debug("Detected proxy configuration", 
+				zap.String("env_var", envVar), 
+				zap.String("proxy", proxy))
+		}
+	}
+
+	// Test multiple connectivity endpoints with retry logic
+	connectivityTests := []struct {
+		name        string
+		testFunc    func(rc *eos_io.RuntimeContext) error
+		description string
+	}{
+		{"dns", testDNSResolution, "DNS resolution"},
+		{"http", testHTTPConnectivity, "HTTP connectivity"},
+		{"package-repos", testPackageRepositories, "Package repository access"},
+	}
+
+	// Run connectivity tests with retry logic
+	return WithRetry(rc, retryConfig, func() error {
+		for _, test := range connectivityTests {
+			logger.Debug("Running connectivity test", zap.String("test", test.name))
+			
+			if err := test.testFunc(rc); err != nil {
+				logger.Debug("Connectivity test failed", 
+					zap.String("test", test.name),
+					zap.String("description", test.description),
+					zap.Error(err))
+				return fmt.Errorf("%s failed: %w", test.description, err)
+			}
+			
+			logger.Debug("Connectivity test passed", zap.String("test", test.name))
+		}
+		
+		logger.Info("All network connectivity tests passed")
+		return nil
+	})
+}
+
+// testDNSResolution checks if DNS resolution is working
+func testDNSResolution(rc *eos_io.RuntimeContext) error {
+	// Test DNS resolution for multiple domains
+	domains := []string{"github.com", "archive.ubuntu.com", "security.ubuntu.com"}
+	
+	for _, domain := range domains {
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "getent",
+			Args:    []string{"hosts", domain},
+			Capture: true,
+			Timeout: 10 * time.Second,
+		})
+
+		if err != nil || output == "" {
+			return fmt.Errorf("cannot resolve %s - check DNS configuration", domain)
+		}
+	}
+	
+	return nil
+}
+
+// testHTTPConnectivity checks if HTTP/HTTPS connections work
+func testHTTPConnectivity(rc *eos_io.RuntimeContext) error {
+	// Test actual HTTP connectivity, not just DNS
+	urls := []string{
+		"https://github.com",
+		"http://archive.ubuntu.com/ubuntu/", 
+		"https://security.ubuntu.com/ubuntu/",
+	}
+	
+	for _, url := range urls {
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "curl",
+			Args:    []string{"-s", "-I", "--connect-timeout", "10", "--max-time", "15", url},
+			Capture: true,
+			Timeout: 20 * time.Second,
+		})
+
+		if err != nil {
+			return fmt.Errorf("HTTP connectivity test failed for %s: %w", url, err)
+		}
+		
+		// Check for successful HTTP response
+		if !strings.Contains(output, "HTTP/") {
+			return fmt.Errorf("invalid HTTP response from %s", url)
+		}
+		
+		// Check for HTTP error codes
+		if strings.Contains(output, "HTTP/1.1 4") || strings.Contains(output, "HTTP/1.1 5") {
+			return fmt.Errorf("HTTP error response from %s: %s", url, strings.Split(output, "\n")[0])
+		}
+	}
+	
+	return nil
+}
+
+// testPackageRepositories checks if package repositories are accessible
+func testPackageRepositories(rc *eos_io.RuntimeContext) error {
+	// Test if we can reach Ubuntu package repositories
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "apt-get",
+		Args:    []string{"update", "--dry-run"},
+		Capture: true,
+		Timeout: 30 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("cannot reach package repositories: %w", err)
+	}
+	
+	// Check for common repository errors
+	if strings.Contains(output, "Could not resolve") || 
+	   strings.Contains(output, "Connection failed") ||
+	   strings.Contains(output, "Network is unreachable") {
+		return fmt.Errorf("package repository connectivity issues detected")
+	}
+	
 	return nil
 }

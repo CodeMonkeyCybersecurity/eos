@@ -133,28 +133,238 @@ func DetectClusterState(rc *eos_io.RuntimeContext, opts Options) (*ClusterInfo, 
 func detectFromMaster(rc *eos_io.RuntimeContext, masterAddr string, preferredRole string) (*ClusterInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	// Test connectivity to master
+	// Test connectivity to Salt master
 	conn, err := net.DialTimeout("tcp", masterAddr+":4506", 5*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to Salt master at %s: %w", masterAddr, err)
 	}
 	conn.Close()
 
-	// Query cluster state via Salt API or custom endpoint
-	// For now, we'll use a simplified approach
 	logger.Info("Connected to Salt master, querying cluster state")
 
-	// This would normally query the Salt API
-	// For this implementation, we'll return a placeholder
+	// Create Salt API client to query cluster information
+	apiClient := NewSaltAPIClient(rc, masterAddr)
+	
+	// Try to get cluster information from the API
+	clusterInfo, err := queryClusterViaAPI(rc, apiClient, masterAddr, preferredRole)
+	if err != nil {
+		logger.Warn("Failed to query cluster via API, falling back to Salt minion queries", 
+			zap.Error(err))
+		
+		// Fallback to direct Salt commands if API isn't available
+		return queryClusterViaSalt(rc, masterAddr, preferredRole)
+	}
+	
+	return clusterInfo, nil
+}
+
+// queryClusterViaAPI queries cluster information using the Salt API
+func queryClusterViaAPI(rc *eos_io.RuntimeContext, apiClient *SaltAPIClient, masterAddr string, preferredRole string) (*ClusterInfo, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// First, try to get cluster info from our custom endpoint
+	clusterResp, err := apiClient.GetClusterInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster info: %w", err)
+	}
+	
+	// Use cluster information directly from the response
+	clusterID := clusterResp.ClusterID
+	if clusterID == "" {
+		clusterID = "unknown"
+	}
+	
+	// Query connected minions to determine cluster size and nodes
+	nodes, err := queryClusterNodes(rc, apiClient)
+	if err != nil {
+		logger.Warn("Failed to query cluster nodes", zap.Error(err))
+		nodes = []NodeInfo{} // Empty list, will be populated later
+	}
+	
+	// Determine role based on cluster state and preferences
+	assignedRole := determineNodeRole(preferredRole, len(nodes))
+	
+	logger.Info("Successfully queried cluster state via API",
+		zap.String("cluster_id", clusterID),
+		zap.Int("node_count", len(nodes)),
+		zap.String("assigned_role", string(assignedRole)))
+	
 	return &ClusterInfo{
-		IsSingleNode:  false,
+		IsSingleNode:  len(nodes) <= 1,
+		IsMaster:      false, // This node is joining, not the master
+		MasterAddr:    masterAddr,
+		NodeCount:     len(nodes) + 1, // +1 for this node joining
+		MyRole:        assignedRole,
+		ClusterID:     clusterID,
+		ExistingNodes: nodes,
+	}, nil
+}
+
+// queryClusterViaSalt queries cluster information using direct Salt commands
+func queryClusterViaSalt(rc *eos_io.RuntimeContext, masterAddr string, preferredRole string) (*ClusterInfo, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Querying cluster state via Salt commands")
+	
+	// Query accepted minion keys to determine cluster size
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "salt-key",
+		Args:    []string{"-L", "--no-color"},
+		Capture: true,
+		Timeout: 15 * time.Second,
+	})
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Salt keys: %w", err)
+	}
+	
+	// Parse the salt-key output to count nodes
+	nodes := parseSaltKeyOutput(output)
+	
+	// Try to get grains information for more details
+	if len(nodes) > 0 {
+		enrichNodesWithGrains(rc, &nodes)
+	}
+	
+	// Determine role
+	assignedRole := determineNodeRole(preferredRole, len(nodes))
+	
+	// Generate cluster ID if not available
+	clusterID := fmt.Sprintf("salt-cluster-%s", masterAddr)
+	
+	logger.Info("Successfully queried cluster state via Salt commands",
+		zap.String("cluster_id", clusterID),
+		zap.Int("node_count", len(nodes)),
+		zap.String("assigned_role", string(assignedRole)))
+	
+	return &ClusterInfo{
+		IsSingleNode:  len(nodes) <= 1,
 		IsMaster:      false,
 		MasterAddr:    masterAddr,
-		NodeCount:     2, // Will be updated after actual query
-		MyRole:        environment.RoleApp, // Will be assigned by master
-		ClusterID:     "cluster-001",
-		ExistingNodes: []NodeInfo{}, // Will be populated by master
+		NodeCount:     len(nodes) + 1,
+		MyRole:        assignedRole,
+		ClusterID:     clusterID,
+		ExistingNodes: nodes,
 	}, nil
+}
+
+// queryClusterNodes queries the existing nodes in the cluster
+func queryClusterNodes(rc *eos_io.RuntimeContext, apiClient *SaltAPIClient) ([]NodeInfo, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// This would make an API call to get minion information
+	// For now, we'll implement a basic version
+	logger.Debug("Querying cluster nodes via API (basic implementation)")
+	
+	// In a full implementation, this would call something like:
+	// resp, err := apiClient.makeRequest("GET", "/minions", nil)
+	// For now, return empty list - nodes will be discovered during bootstrap
+	
+	return []NodeInfo{}, nil
+}
+
+// parseSaltKeyOutput parses the output of salt-key -L to extract node information
+func parseSaltKeyOutput(output string) []NodeInfo {
+	var nodes []NodeInfo
+	
+	lines := strings.Split(output, "\n")
+	inAcceptedSection := false
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		if strings.Contains(line, "Accepted Keys:") {
+			inAcceptedSection = true
+			continue
+		}
+		
+		if strings.Contains(line, "Denied Keys:") || 
+		   strings.Contains(line, "Unaccepted Keys:") ||
+		   strings.Contains(line, "Rejected Keys:") {
+			inAcceptedSection = false
+			continue
+		}
+		
+		if inAcceptedSection && line != "" && !strings.Contains(line, "Keys:") {
+			// Extract hostname from the key name
+			hostname := line
+			nodes = append(nodes, NodeInfo{
+				Hostname:      hostname,
+				IP:            "", // Will be populated by grains if available
+				Role:          environment.RoleApp, // Default role
+				JoinedAt:      time.Now(), // Approximate
+				PreferredRole: "auto",
+			})
+		}
+	}
+	
+	return nodes
+}
+
+// enrichNodesWithGrains adds additional information to nodes using Salt grains
+func enrichNodesWithGrains(rc *eos_io.RuntimeContext, nodes *[]NodeInfo) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	for i := range *nodes {
+		node := &(*nodes)[i]
+		
+		// Try to get IP address from grains
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "salt",
+			Args:    []string{node.Hostname, "grains.get", "ipv4", "--no-color"},
+			Capture: true,
+			Timeout: 10 * time.Second,
+		})
+		
+		if err == nil && output != "" {
+			// Parse the IP address from grains output
+			lines := strings.Split(output, "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.Contains(line, ".") && !strings.Contains(line, ":") {
+					// Looks like an IPv4 address
+					if net.ParseIP(strings.Trim(line, " -")) != nil {
+						node.IP = strings.Trim(line, " -")
+						break
+					}
+				}
+			}
+		}
+		
+		logger.Debug("Enriched node information",
+			zap.String("hostname", node.Hostname),
+			zap.String("ip", node.IP))
+	}
+}
+
+// determineNodeRole determines the appropriate role for this node
+func determineNodeRole(preferredRole string, existingNodeCount int) environment.Role {
+	// If user specified a role preference, try to honor it
+	switch strings.ToLower(preferredRole) {
+	case "data", "storage":
+		return environment.RoleData
+	case "compute", "app":
+		return environment.RoleApp
+	case "message", "messaging":
+		return environment.RoleMessage
+	case "observe", "monitoring":
+		return environment.RoleObserve
+	case "core":
+		return environment.RoleCore
+	case "edge":
+		return environment.RoleEdge
+	case "auto", "":
+		// Auto-assign based on cluster size and needs
+		if existingNodeCount == 0 {
+			return environment.RoleApp // First node gets app role
+		}
+		// For subsequent nodes, default to app role
+		// In a more sophisticated implementation, this would check
+		// what roles are already filled and assign accordingly
+		return environment.RoleApp
+	default:
+		// Unknown role, default to app
+		return environment.RoleApp
+	}
 }
 
 // detectFromConfigFile reads cluster info from local config

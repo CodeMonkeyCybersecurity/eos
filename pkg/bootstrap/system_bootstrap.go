@@ -21,6 +21,7 @@
 package bootstrap
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
@@ -39,30 +40,41 @@ var (
 // IsSystemBootstrapped performs a lightweight check to determine if the system has been bootstrapped.
 // This is designed to be fast with minimal performance impact.
 func IsSystemBootstrapped() bool {
-	// Check primary bootstrap marker
-	if _, err := os.Stat(bootstrapMarkerFile); err == nil {
-		return true
+	// Create a basic runtime context for validation
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
 	}
-
-	// Check for vault initialization as a secondary indicator
-	if _, err := os.Stat(vaultMarkerFile); err == nil {
-		return true
-	}
-
-	// Check for other common bootstrap indicators
-	bootstrapIndicators := []string{
-		"/etc/eos/bootstrap.conf",
-		"/var/lib/eos/bootstrapped",
-		filepath.Join(os.Getenv("HOME"), ".eos/bootstrapped"),
-	}
-
-	for _, indicator := range bootstrapIndicators {
-		if _, err := os.Stat(indicator); err == nil {
+	
+	// Use the state-based validation system
+	complete, _ := IsBootstrapComplete(rc)
+	
+	// Also check for legacy marker files as backup
+	if !complete {
+		// Check primary bootstrap marker (legacy support)
+		if _, err := os.Stat(bootstrapMarkerFile); err == nil {
 			return true
 		}
-	}
 
-	return false
+		// Check for vault initialization as a secondary indicator
+		if _, err := os.Stat(vaultMarkerFile); err == nil {
+			return true
+		}
+
+		// Check for other common bootstrap indicators
+		bootstrapIndicators := []string{
+			"/etc/eos/bootstrap.conf",
+			"/var/lib/eos/bootstrapped",
+			filepath.Join(os.Getenv("HOME"), ".eos/bootstrapped"),
+		}
+
+		for _, indicator := range bootstrapIndicators {
+			if _, err := os.Stat(indicator); err == nil {
+				return true
+			}
+		}
+	}
+	
+	return complete
 }
 
 // ShouldPromptForBootstrap determines if we should prompt the user to bootstrap.
