@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -186,9 +187,27 @@ func removeNomadComponents(rc *eos_io.RuntimeContext, state *NomadState, keepDat
 
 	// Remove binaries and config files
 	logger.Info("Removing Nomad binaries and configs")
+	systemdReloadNeeded := false
 	for _, file := range state.ConfigFiles {
 		if err := os.Remove(file); err != nil {
 			logger.Debug("Failed to remove file", zap.String("file", file), zap.Error(err))
+		} else {
+			// Check if we removed a systemd unit file
+			if strings.HasSuffix(file, ".service") && strings.Contains(file, "/systemd/system/") {
+				systemdReloadNeeded = true
+			}
+		}
+	}
+
+	// Reload systemd if we removed unit files
+	if systemdReloadNeeded {
+		logger.Info("Reloading systemd daemon after unit file removal")
+		if _, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"daemon-reload"},
+			Timeout: 10 * time.Second,
+		}); err != nil {
+			logger.Warn("Failed to reload systemd daemon", zap.Error(err))
 		}
 	}
 
@@ -242,14 +261,23 @@ func verifyNomadRemoval(rc *eos_io.RuntimeContext) error {
 		issues = append(issues, "Nomad binary still found in PATH")
 	}
 
-	// Check if service still exists
+	// Check if service still exists - but first reload systemd to ensure cache is fresh
+	execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"daemon-reload"},
+		Timeout: 5 * time.Second,
+	})
+
 	if output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"list-unit-files", "--no-pager", "nomad.service"},
 		Capture: true,
 		Timeout: 5 * time.Second,
 	}); err == nil && output != "" {
-		issues = append(issues, "Nomad service unit file still exists")
+		// Only report as issue if the service is actually listed (not just header)
+		if strings.Contains(output, "nomad.service") && !strings.Contains(output, "0 unit files listed") {
+			issues = append(issues, "Nomad service unit file still exists")
+		}
 	}
 
 	// Check if processes still running (don't log error if none found)

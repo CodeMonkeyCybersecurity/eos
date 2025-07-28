@@ -3,6 +3,7 @@ package nuke
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
@@ -348,6 +349,12 @@ func stopClusterFuzz(rc *eos_io.RuntimeContext) {
 func stopNomadJobs(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	cli := eos_cli.New(rc)
+
+	// Check if nomad binary exists before trying to use it
+	if _, err := exec.LookPath("nomad"); err != nil {
+		logger.Info("Nomad binary not found, skipping job cleanup", zap.Error(err))
+		return nil
+	}
 
 	output, err := cli.ExecString("nomad", "job", "list", "-short")
 	if err != nil {
