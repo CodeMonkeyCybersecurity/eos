@@ -448,7 +448,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	finalTracker.GatherInBand(rc)
 
 	// Generate final report
-	generateFinalReport(rc, finalTracker, tracker)
+	generateFinalReport(rc, finalTracker, tracker, cli)
 
 	// Clean up state file
 	stateFile := "/var/lib/eos/state.json"
@@ -529,7 +529,7 @@ func showPhaseProgress(phase int, description string) {
 }
 
 // generateFinalReport creates a comprehensive final report
-func generateFinalReport(rc *eos_io.RuntimeContext, finalTracker *state.StateTracker, initialTracker *state.StateTracker) {
+func generateFinalReport(rc *eos_io.RuntimeContext, finalTracker *state.StateTracker, initialTracker *state.StateTracker, cli *eos_cli.CLI) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	fmt.Println("\n" + strings.Repeat("=", 60))
@@ -604,18 +604,34 @@ func generateFinalReport(rc *eos_io.RuntimeContext, finalTracker *state.StateTra
 		fmt.Println("✓ System restored to clean state")
 	}
 
+	// Clean up APT packages before final recommendations
+	logger.Info("Cleaning up APT packages")
+	fmt.Println("\n>>> Cleaning up APT packages...")
+	
+	// Run apt autoremove
+	if output, err := cli.ExecString("apt-get", "autoremove", "-y"); err != nil {
+		logger.Warn("Failed to run apt autoremove", zap.Error(err))
+	} else {
+		logger.Info("APT autoremove completed", zap.String("output", output))
+	}
+	
+	// Run apt autoclean
+	if output, err := cli.ExecString("apt-get", "autoclean"); err != nil {
+		logger.Warn("Failed to run apt autoclean", zap.Error(err))
+	} else {
+		logger.Info("APT autoclean completed", zap.String("output", output))
+	}
+
 	// Final recommendations
 	fmt.Println("\nRecommended next steps:")
 	fmt.Println("=======================")
 	if remainingCount > 0 {
 		fmt.Println("1. Review the remaining components above")
 		fmt.Println("2. Follow the provided solutions for manual cleanup")
-		fmt.Println("3. Run 'sudo apt-get autoremove' to clean orphaned packages")
-		fmt.Println("4. Reboot the system to ensure all services are stopped")
+		fmt.Println("3. Reboot the system to ensure all services are stopped")
 	} else {
-		fmt.Println("1. Run 'sudo apt-get autoremove' to clean orphaned packages")
-		fmt.Println("2. Run 'sudo apt-get autoclean' to clean package cache")
-		fmt.Println("3. Consider rebooting to ensure clean system state")
+		fmt.Println("1. Consider rebooting to ensure clean system state")
+		fmt.Println("2. System has been cleaned and is ready for fresh deployments")
 	}
 
 	fmt.Println("\n" + strings.Repeat("=", 60))

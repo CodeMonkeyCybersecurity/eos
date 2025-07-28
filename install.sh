@@ -72,6 +72,9 @@ update_system_packages() {
     log INFO " Updating Debian-based system packages..."
     apt-get update -y
     apt-get upgrade -y
+    log INFO " Cleaning up unused packages..."
+    apt-get autoremove -y
+    apt-get autoclean
   elif $IS_MAC; then
     log INFO " Skipping system update on macOS (use brew upgrade manually if needed)"
   fi
