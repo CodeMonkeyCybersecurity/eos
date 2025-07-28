@@ -126,8 +126,7 @@ func getRemovableServices(excluded map[string]bool) []ServiceConfig {
 		{Name: "nginx", Component: "nginx", Required: false},
 		{Name: "glances", Component: "glances", Required: false},
 		{Name: "code-server@*", Component: "code-server", Required: false},
-		{Name: "tailscale", Component: "tailscale", Required: false},
-		{Name: "tailscaled", Component: "tailscaled", Required: false},
+		{Name: "tailscaled", Component: "tailscale", Required: false},
 	}
 
 	var removable []ServiceConfig

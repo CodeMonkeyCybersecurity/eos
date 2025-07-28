@@ -202,7 +202,7 @@ func checkRemainingProcesses(rc *eos_io.RuntimeContext) []string {
 		"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", 
 		"osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh", "eos", 
 		"code-server", "prometheus", "node_exporter", "grafana-server", "nginx", 
-		"glances", "tailscale", "tailscaled",
+		"glances", "tailscaled",
 	}
 
 	var remainingProcesses []string
