@@ -90,6 +90,7 @@ func getRequiredPorts() []int {
 func DetectBootstrapState(rc *eos_io.RuntimeContext) (*BootstrapState, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Detecting bootstrap state")
+	logger.Debug("Starting comprehensive state detection")
 
 	state := &BootstrapState{
 		Components:      make(map[string]*ComponentStatus),
@@ -100,17 +101,37 @@ func DetectBootstrapState(rc *eos_io.RuntimeContext) (*BootstrapState, error) {
 	// Check for existing EOS installation markers
 	state.IsEosInstall = detectEosInstallation(rc)
 
-	// Detect service components
-	services := []string{"salt-master", "salt-api", "vault", "consul", "nomad"}
-	for _, service := range services {
-		status := detectComponentStatus(rc, service)
-		state.Components[service] = status
+	// Use the new service manager for better detection
+	sm := NewServiceManager(rc)
+	detectedServices, err := sm.DetectServices()
+	if err != nil {
+		logger.Warn("Service manager detection failed, using fallback", zap.Error(err))
+		// Fallback to old method
+		services := []string{"salt-master", "salt-api", "vault", "consul", "nomad"}
+		for _, service := range services {
+			status := detectComponentStatus(rc, service)
+			state.Components[service] = status
+		}
+	} else {
+		// Convert detected services to component status
+		logger.Debug("Detected services", zap.Int("count", len(detectedServices)))
+		for _, service := range detectedServices {
+			logger.Debug("Processing detected service",
+				zap.String("name", service.Name),
+				zap.String("process_name", service.ProcessName),
+				zap.String("process_path", service.ProcessPath),
+				zap.String("status", service.Status),
+				zap.Int("pid", service.PID),
+				zap.Ints("ports", service.Ports))
+			status := convertServiceToComponentStatus(service)
+			state.Components[service.Name] = status
+		}
 	}
 
-	// Check for port conflicts
+	// Check for port conflicts using the service manager
 	requiredPorts := getRequiredPorts()
 	for _, port := range requiredPorts {
-		if conflict := checkPortConflict(rc, port); conflict != nil {
+		if conflict := checkPortConflictEnhanced(rc, sm, port); conflict != nil {
 			state.PortConflicts = append(state.PortConflicts, *conflict)
 		}
 	}
@@ -876,5 +897,77 @@ func PrintBootstrapStateReport(rc *eos_io.RuntimeContext, state *BootstrapState)
 		for _, rec := range state.Recommendations {
 			logger.Info("→ " + rec)
 		}
+	}
+}
+
+// convertServiceToComponentStatus converts a Service to ComponentStatus
+func convertServiceToComponentStatus(service Service) *ComponentStatus {
+	return &ComponentStatus{
+		Name:         service.Name,
+		Installed:    service.Status != "not-found",
+		Running:      service.Status == "active",
+		Healthy:      service.Status == "active", // Simplified health check
+		Version:      service.Version,
+		Port:         getMainPort(service.Ports),
+		ProcessID:    service.PID,
+		ProcessName:  service.ProcessName,
+		ConfigPath:   getConfigPath(service.Name),
+		IsEosManaged: service.Managed,
+		CanReuse:     service.Managed && service.Status == "active",
+		Issues:       []string{},
+	}
+}
+
+// getMainPort gets the main port from a list of ports
+func getMainPort(ports []int) int {
+	if len(ports) > 0 {
+		return ports[0]
+	}
+	return 0
+}
+
+// getConfigPath gets the config path for a service
+func getConfigPath(serviceName string) string {
+	configPaths := map[string]string{
+		"salt-master": "/etc/salt/master",
+		"salt-api":    "/etc/salt/master.d/api.conf",
+		"vault":       "/etc/vault/vault.hcl",
+		"consul":      "/etc/consul/consul.hcl",
+		"nomad":       "/etc/nomad/nomad.hcl",
+	}
+	
+	if path, exists := configPaths[serviceName]; exists {
+		return path
+	}
+	
+	return ""
+}
+
+// checkPortConflictEnhanced uses the service manager for enhanced port conflict detection
+func checkPortConflictEnhanced(rc *eos_io.RuntimeContext, sm *ServiceManager, port int) *PortConflict {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	service := sm.getServiceFromPort(port)
+	if service == nil {
+		logger.Debug("Port is free", zap.Int("port", port))
+		return nil // Port is free
+	}
+	
+	logger.Debug("Port conflict detected",
+		zap.Int("port", port),
+		zap.String("service_name", service.Name),
+		zap.String("process_name", service.ProcessName),
+		zap.String("process_path", service.ProcessPath),
+		zap.Int("pid", service.PID),
+		zap.Bool("can_stop", service.CanStop),
+		zap.Bool("is_eos_managed", service.Managed))
+	
+	return &PortConflict{
+		Port:         port,
+		ServiceName:  service.Name,
+		ProcessID:    service.PID,
+		ProcessName:  service.ProcessName,
+		CanStop:      service.CanStop,
+		IsEosService: service.Managed,
 	}
 }

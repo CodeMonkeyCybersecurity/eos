@@ -148,20 +148,34 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	logger.Info("⚠️  Port conflicts detected!")
 	logger.Info("")
 	
-	// Identify which services can be stopped
+	// Add quick fix suggestion early
+	addQuickFixSuggestion(rc, state.PortConflicts)
+	
+	// Identify which services can be stopped and provide detailed analysis
 	stoppableServices := []string{}
 	eosServices := []string{}
+	criticalServices := []string{}
 	
 	for _, conflict := range state.PortConflicts {
+		logger.Debug("Analyzing port conflict",
+			zap.Int("port", conflict.Port),
+			zap.String("service_name", conflict.ServiceName),
+			zap.String("process_name", conflict.ProcessName),
+			zap.Int("pid", conflict.ProcessID),
+			zap.Bool("can_stop", conflict.CanStop),
+			zap.Bool("is_eos", conflict.IsEosService))
+		
 		if conflict.IsEosService {
 			eosServices = append(eosServices, conflict.ServiceName)
 		} else if conflict.CanStop {
 			stoppableServices = append(stoppableServices, conflict.ServiceName)
+		} else {
+			criticalServices = append(criticalServices, conflict.ServiceName)
 		}
 	}
 	
 	if len(stoppableServices) > 0 {
-		logger.Info("The following services can be automatically stopped:")
+		logger.Info("✅ The following services can be automatically stopped:")
 		for _, service := range stoppableServices {
 			logger.Info("  • " + service)
 		}
@@ -169,9 +183,17 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	}
 	
 	if len(eosServices) > 0 {
-		logger.Info("The following EOS services are running:")
+		logger.Info("🔧 The following EOS services are running:")
 		for _, service := range eosServices {
-			logger.Info("  • " + service)
+			logger.Info("  • " + service + " (EOS managed)")
+		}
+		logger.Info("")
+	}
+	
+	if len(criticalServices) > 0 {
+		logger.Info("⚠️  The following services cannot be automatically stopped:")
+		for _, service := range criticalServices {
+			logger.Info("  • " + service + " (requires manual intervention)")
 		}
 		logger.Info("")
 	}
@@ -400,6 +422,7 @@ func executeCleanSlate(rc *eos_io.RuntimeContext, options *ConflictResolutionOpt
 func executeStopConflicts(rc *eos_io.RuntimeContext, options *ConflictResolutionOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Stopping conflicting services")
+	logger.Debug("Services to stop", zap.Strings("services", options.ServicesToStop))
 	
 	// Backup configurations if requested
 	if options.BackupConfigs {
@@ -410,6 +433,8 @@ func executeStopConflicts(rc *eos_io.RuntimeContext, options *ConflictResolution
 	
 	// Stop specified services
 	for _, service := range options.ServicesToStop {
+		logger.Debug("Attempting to stop service", 
+			zap.String("service", service))
 		if err := stopService(rc, service); err != nil {
 			logger.Warn("Failed to stop service", 
 				zap.String("service", service),
@@ -432,42 +457,131 @@ func executeAdvancedResolution(rc *eos_io.RuntimeContext, options *ConflictResol
 	return executeStopConflicts(rc, options)
 }
 
-// stopService stops a systemd service
+// stopService stops a service using the robust service manager
 func stopService(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Stopping service", zap.String("service", serviceName))
 	
-	// Stop the service
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"stop", serviceName},
-		Capture: true,
-	})
+	// Create service manager
+	sm := NewServiceManager(rc)
 	
+	// Get all services to find the one we want to stop
+	services, err := sm.DetectServices()
 	if err != nil {
-		return fmt.Errorf("failed to stop service %s: %w (output: %s)", serviceName, err, output)
+		logger.Warn("Failed to detect services, using fallback method", zap.Error(err))
+		return stopServiceFallback(rc, serviceName)
+	}
+	
+	// Find the service to stop
+	var targetService *Service
+	for _, service := range services {
+		if service.Name == serviceName || 
+		   strings.Contains(service.ProcessName, serviceName) ||
+		   strings.Contains(service.ProcessPath, serviceName) {
+			targetService = &service
+			break
+		}
+	}
+	
+	if targetService == nil {
+		logger.Warn("Service not found in detected services, using fallback", 
+			zap.String("service", serviceName))
+		return stopServiceFallback(rc, serviceName)
+	}
+	
+	// Use the service manager to stop the service
+	err = sm.StopService(*targetService)
+	if err != nil {
+		logger.Error("Service manager failed to stop service", 
+			zap.String("service", serviceName),
+			zap.Error(err))
+		
+		// If the service manager fails, provide detailed help
+		logger.Info("💡 Service stopping failed. Let me help you fix this...")
+		showServiceStoppingHelp(rc, *targetService, err)
+		
+		// Try diagnostic mode
+		logger.Info("🔍 Running diagnostic analysis...")
+		for _, port := range targetService.Ports {
+			sm.DiagnosePortConflict(port)
+		}
+		
+		return fmt.Errorf("failed to stop service %s. See diagnostic information above for manual resolution", serviceName)
 	}
 	
 	// Wait a moment for the service to fully stop
 	time.Sleep(2 * time.Second)
 	
-	// Verify it stopped
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
-		Capture: true,
-	})
-	
-	status := strings.TrimSpace(output)
-	if status == "active" {
-		return fmt.Errorf("service %s is still active after stop command", serviceName)
+	// Verify it stopped by checking if ports are free
+	for _, port := range targetService.Ports {
+		if stillInUse := isPortInUse(rc, port); stillInUse {
+			logger.Warn("Port still in use after stopping service", 
+				zap.String("service", serviceName),
+				zap.Int("port", port))
+			
+			// Run diagnostics
+			sm.DiagnosePortConflict(port)
+			
+			return fmt.Errorf("service %s appears to still be using port %d after stop", serviceName, port)
+		}
 	}
 	
 	logger.Info("Service stopped successfully", 
-		zap.String("service", serviceName),
-		zap.String("status", status))
+		zap.String("service", serviceName))
 	
 	return nil
+}
+
+// stopServiceFallback provides fallback service stopping when service manager fails
+func stopServiceFallback(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Using fallback method to stop service", zap.String("service", serviceName))
+	
+	// Try multiple service name variations
+	serviceVariations := []string{
+		serviceName,
+		serviceName + ".service",
+	}
+	
+	// Add specific mappings for common issues
+	if strings.Contains(serviceName, "/opt/saltstack/") {
+		serviceVariations = append(serviceVariations, "salt-master", "salt-api")
+	}
+	
+	for _, variation := range serviceVariations {
+		logger.Debug("Trying service variation", zap.String("variation", variation))
+		
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"stop", variation},
+			Capture: true,
+		})
+		
+		if err == nil {
+			logger.Info("Successfully stopped service with variation", 
+				zap.String("original", serviceName),
+				zap.String("variation", variation))
+			return nil
+		}
+		
+		logger.Debug("Service variation failed", 
+			zap.String("variation", variation),
+			zap.Error(err),
+			zap.String("output", output))
+	}
+	
+	return fmt.Errorf("failed to stop service %s using all variations", serviceName)
+}
+
+// isPortInUse checks if a port is currently in use
+func isPortInUse(rc *eos_io.RuntimeContext, port int) bool {
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "ss",
+		Args:    []string{"-tlnp", fmt.Sprintf("sport = :%d", port)},
+		Capture: true,
+	})
+	
+	return err == nil && len(strings.TrimSpace(output)) > 1
 }
 
 // backupExistingConfigurations backs up existing service configurations
@@ -608,4 +722,113 @@ func PromptGuidedBootstrap(rc *eos_io.RuntimeContext) error {
 	}
 	
 	return nil
+}
+
+// showServiceStoppingHelp provides detailed help when service stopping fails
+func showServiceStoppingHelp(rc *eos_io.RuntimeContext, service Service, stopError error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("╔══════════════════════════════════════╗")
+	logger.Info("║        Service Stopping Help         ║")
+	logger.Info("╚══════════════════════════════════════╝")
+	
+	logger.Info("Service Details:")
+	logger.Info(fmt.Sprintf("  Name: %s", service.Name))
+	logger.Info(fmt.Sprintf("  Status: %s", service.Status))
+	logger.Info(fmt.Sprintf("  PID: %d", service.PID))
+	if service.ProcessPath != "" {
+		logger.Info(fmt.Sprintf("  Command: %s", service.ProcessPath))
+	}
+	if len(service.Ports) > 0 {
+		portStrs := make([]string, len(service.Ports))
+		for i, port := range service.Ports {
+			portStrs[i] = fmt.Sprintf("%d", port)
+		}
+		logger.Info(fmt.Sprintf("  Ports: %s", strings.Join(portStrs, ", ")))
+	}
+	
+	logger.Info("")
+	logger.Info("Error Details:")
+	logger.Info(fmt.Sprintf("  %s", stopError.Error()))
+	
+	logger.Info("")
+	logger.Info("🛠️  Manual Fix Options:")
+	
+	// Option 1: Try systemctl variations
+	logger.Info("1) Try stopping with different service names:")
+	serviceVariations := []string{service.Name, service.Name + ".service"}
+	if strings.Contains(service.ProcessPath, "salt") {
+		serviceVariations = append(serviceVariations, "salt-master", "salt-api")
+	}
+	
+	for _, variation := range serviceVariations {
+		logger.Info(fmt.Sprintf("   sudo systemctl stop %s", variation))
+	}
+	
+	// Option 2: Kill by PID
+	if service.PID > 0 {
+		logger.Info("")
+		logger.Info("2) Stop by process ID:")
+		logger.Info(fmt.Sprintf("   sudo kill -TERM %d", service.PID))
+		logger.Info(fmt.Sprintf("   # If that doesn't work: sudo kill -KILL %d", service.PID))
+	}
+	
+	// Option 3: Kill by port
+	if len(service.Ports) > 0 {
+		logger.Info("")
+		logger.Info("3) Stop by killing processes using the ports:")
+		for _, port := range service.Ports {
+			logger.Info(fmt.Sprintf("   sudo lsof -ti:%d | xargs kill -9", port))
+		}
+	}
+	
+	// Option 4: Check for dependencies
+	logger.Info("")
+	logger.Info("4) Check for service dependencies:")
+	logger.Info(fmt.Sprintf("   systemctl list-dependencies %s", service.Name))
+	logger.Info(fmt.Sprintf("   systemctl status %s", service.Name))
+	
+	// Option 5: Force bootstrap
+	logger.Info("")
+	logger.Info("5) Force bootstrap anyway:")
+	logger.Info("   sudo eos bootstrap --force")
+	
+	logger.Info("")
+	logger.Info("After manually stopping the service, you can retry with:")
+	logger.Info("   sudo eos bootstrap")
+}
+
+// addQuickFixSuggestion adds a quick fix suggestion to the conflict resolution
+func addQuickFixSuggestion(rc *eos_io.RuntimeContext, conflicts []PortConflict) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	if len(conflicts) == 0 {
+		return
+	}
+	
+	logger.Info("")
+	logger.Info("💡 Quick Fix Suggestion:")
+	
+	// Build a command to stop all conflicting services
+	servicesToStop := []string{}
+	serviceMap := make(map[string]bool)
+	
+	for _, conflict := range conflicts {
+		if conflict.CanStop && conflict.ServiceName != "unknown" && !serviceMap[conflict.ServiceName] {
+			servicesToStop = append(servicesToStop, conflict.ServiceName)
+			serviceMap[conflict.ServiceName] = true
+		}
+	}
+	
+	if len(servicesToStop) > 0 {
+		logger.Info("Run this command to stop conflicting services:")
+		logger.Info(fmt.Sprintf("   sudo systemctl stop %s", strings.Join(servicesToStop, " ")))
+		logger.Info("   sudo eos bootstrap")
+		logger.Info("")
+		logger.Info("Or use the automatic option:")
+		logger.Info("   sudo eos bootstrap --stop-conflicting")
+	} else {
+		logger.Info("Manual intervention required for these services.")
+		logger.Info("Try: sudo eos bootstrap --force")
+	}
 }
