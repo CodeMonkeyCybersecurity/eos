@@ -72,7 +72,7 @@ func PromptConflictResolution(rc *eos_io.RuntimeContext, state *BootstrapState) 
 				status = "⚠️"
 			}
 			logger.Info(fmt.Sprintf("  %s Port %d: %s (PID %d)", 
-				status, conflict.Port, conflict.ProcessName, conflict.ProcessID))
+				status, conflict.Port, conflict.ServiceName, conflict.ProcessID))
 		}
 	}
 	

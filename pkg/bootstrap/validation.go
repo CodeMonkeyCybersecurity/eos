@@ -326,26 +326,74 @@ func validatePorts(rc *eos_io.RuntimeContext, ports []int) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	var blockedPorts []string
 	
+	// Use the service manager for better detection
+	sm := NewServiceManager(rc)
+	
 	for _, port := range ports {
-		// Check if port is in use using ss command
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "ss",
-			Args:    []string{"-tlnp", fmt.Sprintf("sport = :%d", port)},
-			Capture: true,
-		})
+		// Check if port is in use using the service manager
+		service := sm.getServiceFromPort(port)
 		
-		if err == nil && len(strings.TrimSpace(output)) > 1 {
-			// Port is in use
-			blockedPorts = append(blockedPorts, fmt.Sprintf("%d", port))
-			logger.Debug("Port in use", zap.Int("port", port))
+		if service != nil {
+			// Port is in use - check if it's an EOS-managed service
+			if service.Managed {
+				logger.Debug("Port in use by EOS-managed service", 
+					zap.Int("port", port),
+					zap.String("service", service.Name),
+					zap.Bool("managed", service.Managed))
+				// This is fine - EOS service using the port
+				continue
+			}
+			
+			// Also check if it's a known EOS service by name (belt and suspenders)
+			eosServices := []string{"salt-master", "salt-api", "vault", "consul", "nomad"}
+			isEOSService := false
+			for _, eosService := range eosServices {
+				if service.Name == eosService {
+					logger.Debug("Port in use by known EOS service", 
+						zap.Int("port", port),
+						zap.String("service", service.Name))
+					isEOSService = true
+					break
+				}
+			}
+			
+			if !isEOSService {
+				// Port is blocked by a non-EOS service
+				blockedPorts = append(blockedPorts, fmt.Sprintf("%d (used by %s)", port, service.Name))
+				logger.Debug("Port blocked by non-EOS service", 
+					zap.Int("port", port),
+					zap.String("service", service.Name))
+			}
 		}
 	}
 	
 	if len(blockedPorts) > 0 {
-		return eos_err.NewUserError("required ports already in use: %s", strings.Join(blockedPorts, ", "))
+		return eos_err.NewUserError("required ports already in use by non-EOS services: %s", strings.Join(blockedPorts, ", "))
 	}
 	
 	return nil
+}
+
+// getEOSServicePorts returns a map of EOS services and their ports
+func getEOSServicePorts() map[string][]int {
+	return map[string][]int{
+		"salt-master": {4505, 4506},
+		"salt-api":    {8000},
+		"vault":       {8200, 8201},
+		"consul":      {8300, 8301, 8302, 8500, 8600},
+		"nomad":       {4646, 4647, 4648},
+	}
+}
+
+// isSystemdServiceActive checks if a systemd service is active
+func isSystemdServiceActive(rc *eos_io.RuntimeContext, serviceName string) bool {
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", serviceName},
+		Capture: true,
+	})
+	
+	return err == nil && strings.TrimSpace(output) == "active"
 }
 
 // checkForConflicts checks for conflicting software

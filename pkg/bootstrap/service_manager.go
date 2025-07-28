@@ -54,6 +54,9 @@ var ProcessToServiceMapping = map[string]string{
 	
 	// Process paths that might be detected
 	"/opt/saltstack/": "salt-master",
+	"/opt/saltstack":  "salt-master",  // Without trailing slash
+	"opt/saltstack/":  "salt-master",  // Without leading slash
+	"opt/saltstack":   "salt-master",  // Without any slashes
 	"/opt/vault/":     "vault",
 	"/opt/consul/":    "consul",
 	"/opt/nomad/":     "nomad",
@@ -426,7 +429,8 @@ func (sm *ServiceManager) mapProcessToServiceName(processName string, port int) 
 	
 	// Try partial matching for paths
 	for pattern, serviceName := range ProcessToServiceMapping {
-		if strings.Contains(processName, pattern) || strings.Contains(pattern, processName) {
+		// Check if the process name contains the pattern or if it's an exact match
+		if strings.Contains(processName, pattern) || processName == pattern {
 			logger.Debug("Mapped process to service by pattern", 
 				zap.String("process", processName),
 				zap.String("pattern", pattern),
