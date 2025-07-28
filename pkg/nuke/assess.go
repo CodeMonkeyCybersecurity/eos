@@ -9,7 +9,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/services"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -84,6 +83,16 @@ func loadCurrentState(rc *eos_io.RuntimeContext) (*state.StateTracker, error) {
 }
 
 // getDevExclusions returns the list of components to exclude in development mode
+// When --dev flag is used:
+// 1. All tools listed here are preserved (not removed)
+// 2. All /opt/* directories are preserved (see executePhase5DirectoriesAndFiles)
+// 3. This protects development environments from accidental destruction
+// The preserved tools include:
+// - Development tools: code-server, git, golang, github-cli, golangci-lint
+// - Container runtime: docker (needed for development)
+// - Remote access: tailscale/tailscaled
+// - Monitoring: prometheus, prometheus-node-exporter, wazuh-agent
+// - Eos itself (to continue using the tool)
 func getDevExclusions() []string {
 	return []string{
 		"code-server",
@@ -112,150 +121,50 @@ func filterComponents(components []state.Component, excluded map[string]bool) []
 	return filtered
 }
 
-// TODO: MIGRATE SERVICE LIST - This hardcoded list should be built from component lifecycle managers
-// FIXME: Each component should register its services, this function should aggregate them
-// 
-// LIFECYCLE MANAGER STATUS:
-// ✅ MIGRATED: nomad -> pkg/nomad/removal.go:RemoveNomadCompletely
-// ✅ MIGRATED: consul -> pkg/consul/remove.go:RemoveConsul
-// ✅ MIGRATED: vault -> pkg/vault/salt_removal.go:RemoveVaultViaSalt
-// ✅ MIGRATED: salt -> pkg/saltstack/removal.go:RemoveSaltCompletely
-// ✅ MIGRATED: hecate -> pkg/hecate/removal.go:RemoveHecateCompletely
-// ✅ MIGRATED: fail2ban,trivy,wazuh-agent,prometheus,grafana,nginx,glances,code-server,tailscale -> pkg/services/removal.go:RemoveService
-// ❌ MISSING: osquery (needs pkg/osquery/removal.go)
-// ❌ MISSING: boundary (needs pkg/boundary/removal.go)
-// ❌ MISSING: docker (needs pkg/docker/removal.go)
-// ❌ MISSING: eos (needs pkg/eos/removal.go)
-//
-// getRemovableServices returns the list of services that can be removed
-func getRemovableServices(excluded map[string]bool) []ServiceConfig {
-	allServices := []ServiceConfig{
-		{Name: "osqueryd", Component: "osquery", Required: false}, // TODO: MIGRATE - needs pkg/osquery/removal.go
-		{Name: "nomad", Component: "nomad", Required: false}, // ✅ MIGRATED
-		{Name: "consul", Component: "consul", Required: false}, // ✅ MIGRATED
-		{Name: "vault", Component: "vault", Required: false}, // ✅ MIGRATED
-		{Name: "boundary", Component: "boundary", Required: false}, // TODO: MIGRATE - needs pkg/boundary/removal.go
-		{Name: "salt-minion", Component: "salt", Required: false}, // ✅ MIGRATED
-		{Name: "salt-master", Component: "salt", Required: false}, // ✅ MIGRATED
-		{Name: "docker", Component: "docker", Required: false}, // TODO: MIGRATE - needs pkg/docker/removal.go
-		{Name: "eos-storage-monitor", Component: "eos", Required: false}, // TODO: MIGRATE - needs pkg/eos/removal.go
-		{Name: "fail2ban", Component: "fail2ban", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "trivy", Component: "trivy", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "wazuh-agent", Component: "wazuh-agent", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "prometheus", Component: "prometheus", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "prometheus-node-exporter", Component: "prometheus-node-exporter", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "grafana-server", Component: "grafana", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "nginx", Component: "nginx", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "glances", Component: "glances", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "code-server@*", Component: "code-server", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "tailscaled", Component: "tailscale", Required: false}, // ✅ MIGRATED to pkg/services
-		{Name: "hecate-caddy", Component: "hecate", Required: false}, // ✅ MIGRATED
-		{Name: "hecate-authentik", Component: "hecate", Required: false}, // ✅ MIGRATED
-		{Name: "hecate-redis", Component: "hecate", Required: false}, // ✅ MIGRATED
-		{Name: "hecate-postgres", Component: "hecate", Required: false}, // ✅ MIGRATED
-	}
-
-	var removable []ServiceConfig
-	for _, svc := range allServices {
-		if !excluded[svc.Component] && !excluded[svc.Name] {
-			removable = append(removable, svc)
-		}
-	}
-
-	return removable
-}
-
-// TODO: MIGRATE DIRECTORY LIST - This hardcoded list should be built from component lifecycle managers
-// FIXME: Each component should register its directories, this function should aggregate them
-//
-// DIRECTORY OWNERSHIP ANALYSIS:
-// ✅ MIGRATED: salt directories -> pkg/saltstack/removal.go (lines 113-127, 237-253)
-// ✅ MIGRATED: vault directories -> pkg/vault/salt_removal.go (lines 116-128) and phase_delete.go
-// ✅ MIGRATED: nomad directories -> pkg/nomad/removal.go (lines 100-111, 214-231)
-// ✅ MIGRATED: consul directories -> pkg/consul/remove.go (lines 152-169, 200-229)
-// ❌ MISSING: eos directories -> need pkg/eos/removal.go
-//
-// DUPLICATE ISSUE: These directories are handled by both nuke and component managers!
-// This creates maintenance burden and potential inconsistencies.
-//
-// getRemovableDirectories returns the list of directories that can be removed
-func getRemovableDirectories(excluded map[string]bool, keepData bool) []DirectoryConfig {
-	allDirectories := []DirectoryConfig{
-		{Path: "/srv/salt", Component: "salt", IsData: false, Description: "Salt states directory"}, // DUPLICATE: handled in pkg/saltstack/removal.go:113-127
-		{Path: "/srv/pillar", Component: "salt", IsData: false, Description: "Salt pillar directory"}, // DUPLICATE: handled in pkg/saltstack/removal.go:113-127
-		{Path: "/etc/salt", Component: "salt", IsData: false, Description: "Salt configuration directory"}, // DUPLICATE: handled in pkg/saltstack/removal.go:113-127
-		{Path: "/var/log/salt", Component: "salt", IsData: true, Description: "Salt log directory"}, // DUPLICATE: handled in pkg/saltstack/removal.go:113-127
-		{Path: "/var/cache/salt", Component: "salt", IsData: true, Description: "Salt cache directory"}, // DUPLICATE: handled in pkg/saltstack/removal.go:113-127
-		{Path: "/opt/vault", Component: "vault", IsData: false, Description: "Vault binary directory"}, // DUPLICATE: handled in pkg/vault/salt_removal.go:116-128
-		{Path: "/opt/vault/data", Component: "vault", IsData: true, Description: "Vault data directory"}, // DUPLICATE: handled in pkg/vault/salt_removal.go:116-128
-		{Path: "/etc/vault.d", Component: "vault", IsData: false, Description: "Vault configuration directory"}, // DUPLICATE: handled in pkg/vault/salt_removal.go:116-128
-		{Path: "/opt/nomad", Component: "nomad", IsData: false, Description: "Nomad binary directory"}, // DUPLICATE: handled in pkg/nomad/removal.go:100-111
-		{Path: "/opt/nomad/data", Component: "nomad", IsData: true, Description: "Nomad data directory"}, // DUPLICATE: handled in pkg/nomad/removal.go:100-111
-		{Path: "/etc/nomad.d", Component: "nomad", IsData: false, Description: "Nomad configuration directory"}, // DUPLICATE: handled in pkg/nomad/removal.go:100-111
-		{Path: "/opt/consul", Component: "consul", IsData: false, Description: "Consul binary directory"}, // DUPLICATE: handled in pkg/consul/remove.go:152-169
-		{Path: "/opt/consul/data", Component: "consul", IsData: true, Description: "Consul data directory"}, // DUPLICATE: handled in pkg/consul/remove.go:152-169
-		{Path: "/etc/consul.d", Component: "consul", IsData: false, Description: "Consul configuration directory"}, // DUPLICATE: handled in pkg/consul/remove.go:152-169
-		{Path: "/var/lib/eos", Component: "eos", IsData: false, Description: "Eos state directory"}, // TODO: MIGRATE - needs pkg/eos/removal.go
-	}
-
-	var removable []DirectoryConfig
-	for _, dir := range allDirectories {
-		// Skip if component is excluded
-		if excluded[dir.Component] {
-			continue
-		}
-		
-		// Skip data directories if keepData is true
-		if dir.IsData && keepData {
-			continue
-		}
-
-		removable = append(removable, dir)
-	}
-
-	return removable
-}
+// The old hardcoded functions have been replaced by dynamic discovery.
+// Keeping these here for reference only - they are no longer used.
+// TODO: Remove these functions in a future cleanup once we're confident in the dynamic discovery.
 
 // getRemovableServicesDynamic dynamically discovers services from all components
 func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
-	// Get services from components that have explicit removal functions
-	var allServices []ServiceConfig
+	// Use a map to prevent duplicates
+	serviceMap := make(map[string]ServiceConfig)
 	
 	// Add services from components with removal functions
 	for _, svc := range osquery.GetOsqueryServices() {
-		allServices = append(allServices, ServiceConfig{
+		serviceMap[svc.Name] = ServiceConfig{
 			Name:      svc.Name,
 			Component: svc.Component,
 			Required:  svc.Required,
-		})
+		}
 	}
 	
 	for _, svc := range boundary.GetBoundaryServices() {
-		allServices = append(allServices, ServiceConfig{
+		serviceMap[svc.Name] = ServiceConfig{
 			Name:      svc.Name,
 			Component: svc.Component,
 			Required:  svc.Required,
-		})
+		}
 	}
 	
 	for _, svc := range docker.GetDockerServices() {
-		allServices = append(allServices, ServiceConfig{
+		serviceMap[svc.Name] = ServiceConfig{
 			Name:      svc.Name,
 			Component: svc.Component,
 			Required:  svc.Required,
-		})
+		}
 	}
 	
 	for _, svc := range eos.GetEosServices() {
-		allServices = append(allServices, ServiceConfig{
+		serviceMap[svc.Name] = ServiceConfig{
 			Name:      svc.Name,
 			Component: svc.Component,
 			Required:  svc.Required,
-		})
+		}
 	}
 	
 	// Add hardcoded services that already have proper lifecycle managers
-	allServices = append(allServices, []ServiceConfig{
+	hardcodedServices := []ServiceConfig{
 		{Name: "nomad", Component: "nomad", Required: false},
 		{Name: "consul", Component: "consul", Required: false},
 		{Name: "vault", Component: "vault", Required: false},
@@ -265,20 +174,19 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 		{Name: "hecate-authentik", Component: "hecate", Required: false},
 		{Name: "hecate-redis", Component: "hecate", Required: false},
 		{Name: "hecate-postgres", Component: "hecate", Required: false},
-	}...)
-	
-	// Add services handled by generic service removal
-	for _, svcConfig := range services.GetAdditionalServicesConfigs() {
-		allServices = append(allServices, ServiceConfig{
-			Name:      svcConfig.Name,
-			Component: svcConfig.Name,
-			Required:  false,
-		})
 	}
 	
-	// Filter excluded services
+	for _, svc := range hardcodedServices {
+		serviceMap[svc.Name] = svc
+	}
+	
+	// Skip adding services from GetAdditionalServicesConfigs here
+	// because they're already handled in Phase 2 by removeAdditionalServices
+	// This prevents duplicate service removal attempts
+	
+	// Convert map to slice and filter excluded services
 	var removable []ServiceConfig
-	for _, svc := range allServices {
+	for _, svc := range serviceMap {
 		if !excluded[svc.Component] && !excluded[svc.Name] {
 			removable = append(removable, svc)
 		}

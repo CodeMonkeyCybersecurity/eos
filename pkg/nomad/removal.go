@@ -190,13 +190,26 @@ func removeNomadComponents(rc *eos_io.RuntimeContext, state *NomadState, keepDat
 	systemdReloadNeeded := false
 	for _, file := range state.ConfigFiles {
 		if err := os.Remove(file); err != nil {
-			logger.Debug("Failed to remove file", zap.String("file", file), zap.Error(err))
+			// Use RemoveAll for directories that might contain files
+			if err := os.RemoveAll(file); err != nil {
+				logger.Debug("Failed to remove file", zap.String("file", file), zap.Error(err))
+			}
 		} else {
 			// Check if we removed a systemd unit file
 			if strings.HasSuffix(file, ".service") && strings.Contains(file, "/systemd/system/") {
 				systemdReloadNeeded = true
 			}
 		}
+	}
+	
+	// Ensure the systemd service file is really gone
+	systemdFile := "/etc/systemd/system/nomad.service"
+	if _, err := os.Stat(systemdFile); err == nil {
+		logger.Info("Removing systemd service file", zap.String("file", systemdFile))
+		if err := os.Remove(systemdFile); err != nil {
+			logger.Warn("Failed to remove systemd service file", zap.String("file", systemdFile), zap.Error(err))
+		}
+		systemdReloadNeeded = true
 	}
 
 	// Reload systemd if we removed unit files

@@ -47,8 +47,26 @@ func EvaluateRemoval(rc *eos_io.RuntimeContext, config *Config, initialPlan *Rem
 		logger.Warn("Some processes are still running", zap.Strings("processes", remainingProcesses))
 		result.RemainingItems = append(result.RemainingItems, remainingProcesses...)
 		
-		// Force kill remaining processes
-		killRemainingProcesses(rc, remainingProcesses)
+		// Only kill processes that aren't excluded
+		processesToKill := []string{}
+		for _, proc := range remainingProcesses {
+			// Check if this process is excluded (e.g., code-server, tailscaled in dev mode)
+			isExcluded := false
+			for _, excluded := range config.ExcludeList {
+				if strings.Contains(proc, excluded) {
+					isExcluded = true
+					break
+				}
+			}
+			if !isExcluded {
+				processesToKill = append(processesToKill, proc)
+			}
+		}
+		
+		if len(processesToKill) > 0 {
+			// Force kill remaining non-excluded processes
+			killRemainingProcesses(rc, processesToKill)
+		}
 	}
 
 	// Check for remaining components

@@ -17,6 +17,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -146,10 +147,7 @@ func executePhase2ApplicationServices(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
-	// TODO: MIGRATE - Additional services removal uses generic service lifecycle manager
-	// MIGRATE: This already delegates to pkg/services/removal.go:RemoveService
-	// Status: ALREADY MIGRATED - This uses the generic service lifecycle pattern
-	// Remove additional services
+	// Remove additional services using the generic service lifecycle manager
 	if err := removeAdditionalServices(rc, excluded, keepData); err != nil {
 		logger.Warn("Failed to remove some additional services", zap.Error(err))
 		errors = append(errors, fmt.Sprintf("additional services: %v", err))
@@ -222,9 +220,7 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 
 	var errors []string
 
-	// TODO: MIGRATE - Use comprehensive removal for each component
-	// MIGRATE: This should delegate to pkg/nomad/removal.go:RemoveNomadCompletely
-	// Status: ALREADY MIGRATED - This is the correct pattern
+	// Remove Nomad using its lifecycle manager
 	if !excluded["nomad"] {
 		logger.Info("Removing Nomad completely")
 		if err := nomad.RemoveNomadCompletely(rc, keepData); err != nil {
@@ -233,9 +229,7 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
-	// TODO: MIGRATE - Consul removal already properly delegated
-	// MIGRATE: This should delegate to pkg/consul/remove.go:RemoveConsul
-	// Status: ALREADY MIGRATED - This is the correct pattern
+	// Remove Consul using its lifecycle manager
 	if !excluded["consul"] {
 		logger.Info("Removing Consul completely")
 		if err := consul.RemoveConsul(rc); err != nil {
@@ -244,9 +238,7 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
-	// TODO: MIGRATE - Salt removal already properly delegated
-	// MIGRATE: This should delegate to pkg/saltstack/removal.go:RemoveSaltCompletely
-	// Status: ALREADY MIGRATED - This is the correct pattern
+	// Remove Salt using its lifecycle manager
 	if !excluded["salt"] {
 		logger.Info("Removing Salt completely")
 		if err := saltstack.RemoveSaltCompletely(rc, keepData); err != nil {
@@ -255,9 +247,7 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
-	// TODO: MIGRATE - Vault removal already properly delegated
-	// MIGRATE: This should delegate to pkg/vault/salt_removal.go:RemoveVaultViaSalt
-	// Status: ALREADY MIGRATED - This is the correct pattern
+	// Remove Vault using its lifecycle manager
 	if !excluded["vault"] {
 		logger.Info("Removing Vault completely")
 		if err := vault.RemoveVaultViaSalt(rc); err != nil {
@@ -509,28 +499,10 @@ func cleanupAPTSources(rc *eos_io.RuntimeContext) {
 	// Components like osquery, saltstack, etc. handle their own APT sources
 }
 
-// TODO: MIGRATE DUPLICATE LOGIC - This function duplicates APT package cleanup
-// FIXME: This should delegate to a shared system package lifecycle manager:
-// - Create pkg/system/package_lifecycle.go for system-wide cleanup
-// - This is generic cleanup that can remain centralized but should be in system package
-// CURRENT STATUS: Acceptable centralized logic but wrong location
+// cleanupAPTPackages delegates to the system package lifecycle manager
 func cleanupAPTPackages(rc *eos_io.RuntimeContext, cli *eos_cli.CLI) {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Cleaning up APT packages")
-
-	// Run apt autoremove
-	if output, err := cli.ExecString("apt-get", "autoremove", "-y"); err != nil {
-		logger.Warn("Failed to run apt autoremove", zap.Error(err))
-	} else {
-		logger.Info("APT autoremove completed", zap.String("output", output))
-	}
-
-	// Run apt autoclean
-	if output, err := cli.ExecString("apt-get", "autoclean"); err != nil {
-		logger.Warn("Failed to run apt autoclean", zap.Error(err))
-	} else {
-		logger.Info("APT autoclean completed", zap.String("output", output))
-	}
+	// Delegate to the system package for proper APT cleanup
+	system.CleanupAPTPackages(rc)
 }
 
 func fileExists(path string) bool {

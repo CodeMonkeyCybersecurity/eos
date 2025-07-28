@@ -66,7 +66,7 @@ func ExecuteNuke(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("Infrastructure nuke operation completed",
 		zap.Float64("success_rate", result.SuccessRate),
 		zap.Int("remaining_components", result.RemainingComponents))
-
+	
 	return nil
 }
 

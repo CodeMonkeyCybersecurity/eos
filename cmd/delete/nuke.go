@@ -1,6 +1,9 @@
 package delete
 
 import (
+	"context"
+	"time"
+	
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nuke"
@@ -37,6 +40,17 @@ func init() {
 }
 
 func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// Nuke operations can take a long time, extend the context timeout
+	// Create a new context with 10 minute timeout for nuke operations
+	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Minute)
+	defer cancel()
+	
+	// Create new runtime context with extended timeout
+	nukeRC := &eos_io.RuntimeContext{
+		Ctx: ctx,
+		Log: rc.Log,
+	}
+	
 	// Parse flags into configuration
 	config := &nuke.Config{
 		RemoveAll:   cmd.Flag("all").Value.String() == "true",
@@ -53,5 +67,5 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	}
 
 	// Delegate to nuke package helper
-	return nuke.ExecuteNuke(rc, config)
+	return nuke.ExecuteNuke(nukeRC, config)
 }
