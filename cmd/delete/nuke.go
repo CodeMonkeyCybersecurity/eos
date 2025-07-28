@@ -73,6 +73,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			"git",
 			"golang",
 			"github-cli",
+			"tailscale",
 		}
 		excludeList = append(excludeList, devExclusions...)
 		logger.Info("Development mode enabled - preserving development tools")
