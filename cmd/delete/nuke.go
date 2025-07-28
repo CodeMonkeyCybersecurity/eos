@@ -73,7 +73,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			"git",
 			"golang",
 			"github-cli",
-			"tailscale",
+			"tailscaled",
 			"golangci-lint",
 		}
 		excludeList = append(excludeList, devExclusions...)
