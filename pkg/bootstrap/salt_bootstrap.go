@@ -593,9 +593,10 @@ func testHTTPConnectivity(rc *eos_io.RuntimeContext) error {
 // testPackageRepositories checks if package repositories are accessible
 func testPackageRepositories(rc *eos_io.RuntimeContext) error {
 	// Test if we can reach Ubuntu package repositories
+	// Use --simulate (-s) flag which is the correct dry-run option for apt-get update
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "apt-get",
-		Args:    []string{"update", "--dry-run"},
+		Args:    []string{"update", "-s"},
 		Capture: true,
 		Timeout: 30 * time.Second,
 	})
