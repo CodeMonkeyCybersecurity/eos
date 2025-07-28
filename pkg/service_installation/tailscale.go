@@ -3,6 +3,7 @@ package service_installation
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -38,17 +39,41 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 	// Use curl to download and pipe to sh
 	cmd := exec.Command("bash", "-c", "curl -fsSL https://tailscale.com/install.sh | sh")
 	output, err := cmd.CombinedOutput()
-	if err != nil {
+	outputStr := string(output)
+	
+	// Check for installation success indicators in output
+	installSuccess := false
+	if err == nil {
+		// Look for success indicators in the output
+		if strings.Contains(outputStr, "Installation complete!") || 
+		   strings.Contains(outputStr, "Tailscale installed") ||
+		   strings.Contains(outputStr, "Setting up tailscale") {
+			installSuccess = true
+		}
+	}
+	
+	if err != nil || !installSuccess {
 		step1.Status = "failed"
-		step1.Error = fmt.Sprintf("Installation failed: %v\nOutput: %s", err, string(output))
+		if err != nil {
+			step1.Error = fmt.Sprintf("Installation command failed: %v\nOutput: %s", err, outputStr)
+		} else {
+			step1.Error = fmt.Sprintf("Installation script completed but did not indicate success\nOutput: %s", outputStr)
+		}
 		step1.Duration = time.Since(step1Start)
 		result.Steps = append(result.Steps, step1)
-		return fmt.Errorf("failed to install Tailscale: %w", err)
+		return fmt.Errorf("failed to install Tailscale - installation script did not complete successfully")
 	}
 
 	step1.Status = "completed"
 	step1.Duration = time.Since(step1Start)
 	result.Steps = append(result.Steps, step1)
+	
+	// Log a preview of the output (first 200 chars)
+	previewLen := len(outputStr)
+	if previewLen > 200 {
+		previewLen = 200
+	}
+	logger.Info("Tailscale installation script completed", zap.String("output_preview", outputStr[:previewLen]))
 
 	logger.Info("Tailscale installed successfully")
 
@@ -61,13 +86,28 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 	step2Start := time.Now()
 
 	// Check if tailscale command exists
-	if _, err := exec.LookPath("tailscale"); err != nil {
+	tailscalePath, err := exec.LookPath("tailscale")
+	if err != nil {
 		step2.Status = "failed"
-		step2.Error = "Tailscale command not found after installation"
+		step2.Error = fmt.Sprintf("Tailscale command not found after installation. PATH searched: %s", err.Error())
 		step2.Duration = time.Since(step2Start)
 		result.Steps = append(result.Steps, step2)
-		return fmt.Errorf("tailscale command not found after installation")
+		
+		// Try alternative locations
+		alternativePaths := []string{"/usr/bin/tailscale", "/usr/local/bin/tailscale", "/opt/tailscale/bin/tailscale"}
+		for _, altPath := range alternativePaths {
+			if _, statErr := os.Stat(altPath); statErr == nil {
+				logger.Warn("Tailscale found in alternative location", 
+					zap.String("path", altPath), 
+					zap.String("expected_in_path", "not found"))
+				break
+			}
+		}
+		
+		return fmt.Errorf("tailscale command not found after installation - installation may have failed silently")
 	}
+	
+	logger.Info("Tailscale binary verified", zap.String("path", tailscalePath))
 
 	// Get version
 	cmd = exec.Command("tailscale", "version")
@@ -83,7 +123,7 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 	// Step 3: Enable and start service
 	step3 := InstallationStep{
 		Name:        "Enable Service",
-		Description: "Enabling Tailscale service",
+		Description: "Enabling and starting Tailscale service",
 		Status:      "running",
 	}
 	step3Start := time.Now()
@@ -91,19 +131,55 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 	// Use standardized service manager for consistent service operations
 	serviceManager := serviceutil.NewServiceManager(rc)
 	
+	// Check if tailscaled service exists
+	tailscaledExists := false
+	if checkCmd := exec.Command("systemctl", "list-unit-files", "tailscaled.service"); checkCmd.Run() == nil {
+		tailscaledExists = true
+		logger.Info("tailscaled service unit found")
+	}
+	
+	if !tailscaledExists {
+		step3.Status = "failed"
+		step3.Error = "tailscaled.service unit file not found - installation may be incomplete"
+		step3.Duration = time.Since(step3Start)
+		result.Steps = append(result.Steps, step3)
+		return fmt.Errorf("tailscaled service not found after installation")
+	}
+	
 	// Enable the service
 	if err := serviceManager.Enable("tailscaled"); err != nil {
 		logger.Warn("Failed to enable Tailscale service", zap.Error(err))
+		step3.Status = "failed"
+		step3.Error = fmt.Sprintf("Failed to enable tailscaled service: %v", err)
+		step3.Duration = time.Since(step3Start)
+		result.Steps = append(result.Steps, step3)
+		return fmt.Errorf("failed to enable tailscaled service: %w", err)
 	}
 
 	// Start the service if not already running
 	if err := serviceManager.Start("tailscaled"); err != nil {
 		logger.Warn("Failed to start Tailscale service", zap.Error(err))
+		step3.Status = "failed"
+		step3.Error = fmt.Sprintf("Failed to start tailscaled service: %v", err)
+		step3.Duration = time.Since(step3Start)
+		result.Steps = append(result.Steps, step3)
+		return fmt.Errorf("failed to start tailscaled service: %w", err)
+	}
+	
+	// Verify the service is actually running
+	if active, err := serviceManager.IsActive("tailscaled"); err != nil || !active {
+		step3.Status = "failed"
+		step3.Error = fmt.Sprintf("Service failed to start properly - active check failed: %v", err)
+		step3.Duration = time.Since(step3Start)
+		result.Steps = append(result.Steps, step3)
+		return fmt.Errorf("tailscaled service is not running after start attempt")
 	}
 
 	step3.Status = "completed"
 	step3.Duration = time.Since(step3Start)
 	result.Steps = append(result.Steps, step3)
+	
+	logger.Info("Tailscale service enabled and started successfully")
 
 	// Set result
 	result.Success = true
