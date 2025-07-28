@@ -101,7 +101,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	}
 
 	// Show what will be removed with enhanced display
-	showRemovalPlan(tracker, excludeList, keepData)
+	showRemovalPlan(tracker, excludeList, keepData, devMode)
 
 	// Confirm with user unless --force
 	if !force {
@@ -344,6 +344,12 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			continue
 		}
 
+		// Skip /opt/* directories in dev mode
+		if devMode && strings.HasPrefix(dir.path, "/opt/") {
+			logger.Info("Skipping directory in dev mode", zap.String("path", dir.path))
+			continue
+		}
+
 		if dir.isData && keepData {
 			logger.Info("Keeping data directory", zap.String("path", dir.path))
 			continue
@@ -493,7 +499,7 @@ func stopClusterFuzz(rc *eos_io.RuntimeContext) {
 }
 
 // showRemovalPlan displays what will be removed in a user-friendly format
-func showRemovalPlan(tracker *state.StateTracker, excludeList []string, keepData bool) {
+func showRemovalPlan(tracker *state.StateTracker, excludeList []string, keepData bool, devMode bool) {
 	fmt.Println("\nThe following will be removed:")
 	fmt.Println("=========================================")
 
@@ -529,6 +535,12 @@ func showRemovalPlan(tracker *state.StateTracker, excludeList []string, keepData
 
 	if len(excludeList) > 0 {
 		fmt.Printf("\nExcluded from removal: %v\n", excludeList)
+	}
+
+	if devMode {
+		fmt.Println("\nDevelopment mode protections:")
+		fmt.Println("  - All /opt/* directories will be preserved")
+		fmt.Println("  - Development tools listed above will not be removed")
 	}
 
 	fmt.Println()
