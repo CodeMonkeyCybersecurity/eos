@@ -5,13 +5,18 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/process"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/services"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -73,10 +78,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		}
 	}
 
-	// Show what will be removed
-	fmt.Println("\nThe following components will be removed:")
-	fmt.Println("=========================================")
-	fmt.Println(tracker.ListComponents())
+	// Show what will be removed with enhanced display
+	showRemovalPlan(tracker, excludeList, keepData)
 
 	// Confirm with user unless --force
 	if !force {
@@ -98,8 +101,26 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		excluded[ex] = true
 	}
 
-	// Phase 1: Stop application services
-	logger.Info("Phase 1: Stopping application services")
+	// Show progress phases to user
+	fmt.Println("\nRemoval will proceed in the following phases:")
+	fmt.Println("1. Clean up Docker resources")
+	fmt.Println("2. Stop application services")
+	fmt.Println("3. Stop infrastructure services")
+	fmt.Println("4. Remove packages and binaries")
+	fmt.Println("5. Clean up directories and files")
+	fmt.Println("6. Verify complete removal")
+	fmt.Println()
+
+	// Phase 1: Docker cleanup (before stopping Docker service)
+	showPhaseProgress(1, "Cleaning up Docker resources")
+	if !excluded["docker"] && commandExists(cli, "docker") {
+		if err := docker.CleanupDockerResources(rc, keepData); err != nil {
+			logger.Warn("Docker cleanup had issues", zap.Error(err))
+		}
+	}
+
+	// Phase 2: Stop application services
+	showPhaseProgress(2, "Stopping application services")
 
 	// Remove Hecate completely if exists
 	if !excluded["hecate"] {
@@ -136,8 +157,21 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		}
 	}
 
-	// Phase 2: Stop infrastructure services
-	logger.Info("Phase 2: Stopping infrastructure services")
+	// Remove additional services
+	logger.Info("Removing additional services")
+	additionalServices := services.GetAdditionalServicesConfigs()
+	for _, svcConfig := range additionalServices {
+		if !excluded[svcConfig.Name] {
+			if err := services.RemoveService(rc, svcConfig, keepData); err != nil {
+				logger.Warn("Failed to remove service",
+					zap.String("service", svcConfig.Name),
+					zap.Error(err))
+			}
+		}
+	}
+
+	// Phase 3: Stop infrastructure services
+	showPhaseProgress(3, "Stopping infrastructure services")
 
 	services := []string{
 		"osqueryd",
@@ -160,10 +194,10 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			logger.Info("Stopping service", zap.String("service", service))
 			// Stop service (ignore errors for already stopped services)
 			if _, err := cli.ExecString("systemctl", "stop", service); err != nil {
-				logger.Debug("Service stop failed (may already be stopped)", 
+				logger.Debug("Service stop failed (may already be stopped)",
 					zap.String("service", service), zap.Error(err))
 			}
-			// Disable service (ignore errors for already disabled services)  
+			// Disable service (ignore errors for already disabled services)
 			if _, err := cli.ExecString("systemctl", "disable", service); err != nil {
 				logger.Debug("Service disable failed (may already be disabled)",
 					zap.String("service", service), zap.Error(err))
@@ -173,38 +207,53 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		}
 	}
 
-	// Phase 3: Remove packages
-	logger.Info("Phase 3: Removing packages")
+	// Phase 4: Remove packages and comprehensive component removal
+	showPhaseProgress(4, "Removing packages and components")
+
+	// Use comprehensive removal for each component
+	if !excluded["nomad"] {
+		logger.Info("Removing Nomad completely")
+		if err := nomad.RemoveNomadCompletely(rc, keepData); err != nil {
+			logger.Warn("Nomad removal had issues", zap.Error(err))
+		}
+	}
+
+	if !excluded["consul"] {
+		logger.Info("Removing Consul completely")
+		if err := consul.RemoveConsul(rc); err != nil {
+			logger.Warn("Consul removal had issues", zap.Error(err))
+		}
+	}
+
+	if !excluded["salt"] {
+		logger.Info("Removing Salt completely")
+		if err := saltstack.RemoveSaltCompletely(rc, keepData); err != nil {
+			logger.Warn("Salt removal had issues", zap.Error(err))
+		}
+	}
 
 	if !excluded["osquery"] && commandExists(cli, "osqueryi") {
 		logger.Info("Removing OSQuery")
 		cli.ExecToSuccess("apt-get", "remove", "-y", "--purge", "osquery")
 	}
 
-	if !excluded["salt"] && commandExists(cli, "salt") {
-		logger.Info("Removing Salt")
-		cli.ExecToSuccess("apt-get", "remove", "-y", "--purge", "salt-master", "salt-minion", "salt-common")
-	}
-
-	// Phase 4: Comprehensive Vault removal via Salt
+	// Vault removal (already has comprehensive removal)
 	if !excluded["vault"] {
-		logger.Info("Phase 4: Comprehensive Vault removal via Salt")
+		logger.Info("Removing Vault completely")
 		if err := vault.RemoveVaultViaSalt(rc); err != nil {
-			logger.Warn("Salt-based Vault removal failed, skipping", zap.Error(err))
-		} else {
-			logger.Info("Vault completely removed via Salt")
+			logger.Warn("Vault removal had issues", zap.Error(err))
 		}
 	}
 
-	// Phase 5: Remove remaining binaries
-	logger.Info("Phase 5: Removing remaining binaries")
+	// Remove remaining binaries (handled by component removals above)
+	logger.Info("Checking for remaining binaries")
 
 	binaries := map[string]string{
-		"nomad":    "/usr/local/bin/nomad",
-		"consul":   "/usr/local/bin/consul",
+		"nomad":     "/usr/local/bin/nomad",
+		"consul":    "/usr/local/bin/consul",
 		"terraform": "/usr/local/bin/terraform",
-		"packer":   "/usr/local/bin/packer",
-		"boundary": "/usr/local/bin/boundary",
+		"packer":    "/usr/local/bin/packer",
+		"boundary":  "/usr/local/bin/boundary",
 	}
 
 	for component, path := range binaries {
@@ -214,8 +263,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		}
 	}
 
-	// Phase 6: Remove directories
-	logger.Info("Phase 6: Removing directories")
+	// Phase 5: Remove directories
+	showPhaseProgress(5, "Cleaning up directories and files")
 
 	directories := []struct {
 		path      string
@@ -231,9 +280,9 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		{"/opt/vault/data", "vault", true},
 		{"/etc/vault.d", "vault", false},
 		{"/etc/vault-agent-eos.hcl", "vault", false},
-		{"/run/eos", "vault", false},  // Runtime directory for vault agent
-		{"/home/vault/.config", "vault", false},  // Vault user config
-		{"/etc/tmpfiles.d/eos.conf", "vault", false},  // Tmpfiles config
+		{"/run/eos", "vault", false},                 // Runtime directory for vault agent
+		{"/home/vault/.config", "vault", false},      // Vault user config
+		{"/etc/tmpfiles.d/eos.conf", "vault", false}, // Tmpfiles config
 		{"/opt/nomad", "nomad", false},
 		{"/opt/nomad/data", "nomad", true},
 		{"/etc/nomad.d", "nomad", false},
@@ -273,8 +322,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		}
 	}
 
-	// Phase 7: Remove systemd service files
-	logger.Info("Phase 7: Cleaning up systemd services")
+	// Clean up systemd (part of phase 5)
+	logger.Info("Cleaning up systemd services")
 
 	serviceFiles := []string{
 		// Vault services
@@ -284,7 +333,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		"/etc/systemd/system/vault-backup.timer",
 		"/etc/systemd/system/vault-agent-health-check.service",
 		"/etc/systemd/system/vault-agent-health-check.timer",
-		"/etc/systemd/system/vault.service.d/",  // Directory for overrides
+		"/etc/systemd/system/vault.service.d/", // Directory for overrides
 		// Hecate services
 		"/etc/systemd/system/hecate.service",
 		"/etc/systemd/system/hecate-caddy.service",
@@ -310,8 +359,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	cli.ExecToSuccess("systemctl", "daemon-reload")
 
-	// Phase 8: Clean up APT sources
-	logger.Info("Phase 8: Cleaning up APT sources")
+	// Clean up APT sources (part of phase 5)
+	logger.Info("Cleaning up APT sources")
 
 	aptSources := []string{
 		"/etc/apt/sources.list.d/salt.list",
@@ -339,43 +388,36 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		logger.Warn("Cannot remove eos source directory while running from it")
 	}
 
-	// EVALUATE - Verify cleanup
-	logger.Info("Verifying cleanup")
+	// Phase 6: Verify cleanup
+	showPhaseProgress(6, "Verifying complete removal")
 
-	// Check for remaining processes (using execute directly to avoid error logging)
+	// Use improved process detection
 	remainingProcesses := []string{}
-	for _, proc := range []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd", "caddy", "authentik"} {
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "pgrep",
-			Args:    []string{"-f", proc},
-			Capture: true,
-		})
-		// pgrep returns exit code 1 when no processes found - this is normal, not an error
-		if err == nil && strings.TrimSpace(output) != "" {
+	processesToCheck := []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh"}
+
+	for _, proc := range processesToCheck {
+		if processes, err := process.FindProcesses(rc.Ctx, proc); err == nil && len(processes) > 0 {
 			remainingProcesses = append(remainingProcesses, proc)
-			logger.Debug("Process still running", zap.String("process", proc))
-		} else {
-			logger.Debug("No processes found for service (this is normal during cleanup)",
-				zap.String("process", proc))
+			logger.Debug("Process still running",
+				zap.String("process", proc),
+				zap.Int("count", len(processes)))
 		}
 	}
 
 	if len(remainingProcesses) > 0 {
 		logger.Warn("Some processes are still running",
 			zap.Strings("processes", remainingProcesses))
+		fmt.Printf("\nKilling remaining processes: %v\n", remainingProcesses)
 
-		// Force kill if needed
+		// Force kill remaining processes
 		for _, proc := range remainingProcesses {
-			_, err := execute.Run(rc.Ctx, execute.Options{
-				Command: "pkill",
-				Args:    []string{"-9", "-f", proc},
-				Capture: true,
-			})
-			if err != nil {
-				logger.Debug("Failed to kill process (may have already exited)",
+			if killed, err := process.KillProcesses(rc.Ctx, proc); err != nil {
+				logger.Debug("Failed to kill process",
 					zap.String("process", proc), zap.Error(err))
-			} else {
-				logger.Info("Force killed process", zap.String("process", proc))
+			} else if killed > 0 {
+				logger.Info("Killed processes",
+					zap.String("process", proc),
+					zap.Int("count", killed))
 			}
 		}
 	}
@@ -384,14 +426,8 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	finalTracker := state.New()
 	finalTracker.GatherInBand(rc)
 
-	if len(finalTracker.Components) > 0 {
-		logger.Warn("Some components may still be present",
-			zap.Int("remaining", len(finalTracker.Components)))
-		fmt.Println("\nRemaining components detected:")
-		fmt.Println(finalTracker.ListComponents())
-	} else {
-		logger.Info("All components successfully removed")
-	}
+	// Generate final report
+	generateFinalReport(rc, finalTracker, tracker)
 
 	// Clean up state file
 	stateFile := "/var/lib/eos/state.json"
@@ -419,6 +455,152 @@ func stopClusterFuzz(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Stopping ClusterFuzz components")
 
+	// TODO: Implement actual ClusterFuzz removal
 	// For now, just log that we're stopping it
-	// In a real implementation, this would stop ClusterFuzz services
+}
+
+// showRemovalPlan displays what will be removed in a user-friendly format
+func showRemovalPlan(tracker *state.StateTracker, excludeList []string, keepData bool) {
+	fmt.Println("\nThe following will be removed:")
+	fmt.Println("=========================================")
+
+	// Show components
+	if len(tracker.Components) > 0 {
+		fmt.Println("\nComponents:")
+		for _, comp := range tracker.Components {
+			excluded := false
+			for _, ex := range excludeList {
+				if string(comp.Type) == ex || comp.Name == ex {
+					excluded = true
+					break
+				}
+			}
+			status := comp.Status
+			if status == "" {
+				status = "unknown"
+			}
+			if excluded {
+				fmt.Printf("  - %s %s (EXCLUDED)\n", comp.Name, comp.Version)
+			} else {
+				fmt.Printf("  - %s %s [%s]\n", comp.Name, comp.Version, status)
+			}
+		}
+	} else {
+		fmt.Println("\nNo eos-managed components detected")
+	}
+
+	// Show what will be kept
+	if keepData {
+		fmt.Println("\nData directories will be KEPT")
+	}
+
+	if len(excludeList) > 0 {
+		fmt.Printf("\nExcluded from removal: %v\n", excludeList)
+	}
+
+	fmt.Println()
+}
+
+// showPhaseProgress displays progress for each phase
+func showPhaseProgress(phase int, description string) {
+	fmt.Printf("\n>>> Phase %d/%d: %s\n", phase, 6, description)
+	fmt.Println(strings.Repeat("-", 50))
+}
+
+// generateFinalReport creates a comprehensive final report
+func generateFinalReport(rc *eos_io.RuntimeContext, finalTracker *state.StateTracker, initialTracker *state.StateTracker) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	fmt.Println("\n" + strings.Repeat("=", 60))
+	fmt.Println("NUKE OPERATION FINAL REPORT")
+	fmt.Println(strings.Repeat("=", 60))
+
+	// Summary
+	initialCount := len(initialTracker.Components)
+	remainingCount := len(finalTracker.Components)
+	removedCount := initialCount - remainingCount
+
+	fmt.Printf("\nSummary:\n")
+	fmt.Printf("  - Initial components: %d\n", initialCount)
+	fmt.Printf("  - Removed components: %d\n", removedCount)
+	fmt.Printf("  - Remaining components: %d\n", remainingCount)
+
+	// Success rate
+	var successRate float64
+	if initialCount > 0 {
+		successRate = float64(removedCount) / float64(initialCount) * 100
+	}
+	fmt.Printf("  - Success rate: %.1f%%\n", successRate)
+
+	// Detailed remaining components
+	if remainingCount > 0 {
+		fmt.Println("\nComponents that could not be removed:")
+		fmt.Println("=====================================")
+
+		for _, comp := range finalTracker.Components {
+			fmt.Printf("\n%s (%s):\n", comp.Name, comp.Type)
+			fmt.Printf("  Version: %s\n", comp.Version)
+			fmt.Printf("  Status: %s\n", comp.Status)
+
+			// Provide specific reasons/solutions
+			switch comp.Type {
+			case state.ComponentNomad:
+				fmt.Println("  Reason: Nomad service or files persist")
+				fmt.Println("  Solution: Run 'sudo systemctl stop nomad && sudo rm -rf /opt/nomad /etc/nomad.d'")
+			case state.ComponentConsul:
+				fmt.Println("  Reason: Consul service or files persist")
+				fmt.Println("  Solution: Run 'sudo systemctl stop consul && sudo rm -rf /opt/consul /etc/consul.d'")
+			case state.ComponentSalt:
+				fmt.Println("  Reason: Salt packages or files persist")
+				fmt.Println("  Solution: Run 'sudo apt-get purge salt-* && sudo rm -rf /srv/salt /etc/salt'")
+			case state.ComponentDocker:
+				fmt.Println("  Reason: Docker is a system-critical service")
+				fmt.Println("  Solution: Manually remove if needed with 'sudo apt-get purge docker-ce'")
+			case state.ComponentVault:
+				fmt.Println("  Reason: Vault files or mounts persist")
+				fmt.Println("  Solution: Check for active Vault mounts and unmount before removal")
+			default:
+				fmt.Println("  Reason: Unknown - manual investigation required")
+			}
+		}
+
+		// Check for remaining directories
+		remainingDirs := []string{}
+		for _, dir := range finalTracker.Directories {
+			if _, err := os.Stat(dir); err == nil {
+				remainingDirs = append(remainingDirs, dir)
+			}
+		}
+
+		if len(remainingDirs) > 0 {
+			fmt.Println("\nRemaining directories:")
+			for _, dir := range remainingDirs {
+				fmt.Printf("  - %s\n", dir)
+			}
+		}
+	} else {
+		fmt.Println("\n✓ All components successfully removed!")
+		fmt.Println("✓ System restored to clean state")
+	}
+
+	// Final recommendations
+	fmt.Println("\nRecommended next steps:")
+	fmt.Println("=======================")
+	if remainingCount > 0 {
+		fmt.Println("1. Review the remaining components above")
+		fmt.Println("2. Follow the provided solutions for manual cleanup")
+		fmt.Println("3. Run 'sudo apt-get autoremove' to clean orphaned packages")
+		fmt.Println("4. Reboot the system to ensure all services are stopped")
+	} else {
+		fmt.Println("1. Run 'sudo apt-get autoremove' to clean orphaned packages")
+		fmt.Println("2. Run 'sudo apt-get autoclean' to clean package cache")
+		fmt.Println("3. Consider rebooting to ensure clean system state")
+	}
+
+	fmt.Println("\n" + strings.Repeat("=", 60))
+
+	logger.Info("Nuke operation completed",
+		zap.Int("removed", removedCount),
+		zap.Int("remaining", remainingCount),
+		zap.Float64("success_rate", successRate))
 }
