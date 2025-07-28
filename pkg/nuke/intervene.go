@@ -6,14 +6,18 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -130,23 +134,11 @@ func executePhase2ApplicationServices(rc *eos_io.RuntimeContext, excluded map[st
 
 	var errors []string
 
-	// Remove Hecate completely if not excluded
-	if !excluded["hecate"] {
-		logger.Info("Removing Hecate reverse proxy framework")
-		if err := hecate.RemoveHecateCompletely(rc, keepData); err != nil {
-			logger.Warn("Failed to remove Hecate completely", zap.Error(err))
-			errors = append(errors, fmt.Sprintf("hecate: %v", err))
-		} else {
-			logger.Info("Hecate removed successfully")
-		}
-	}
+	// Hecate will be handled through the standard service removal process
 
-	// Stop ClusterFuzz if exists
-	if !excluded["clusterfuzz"] {
-		stopClusterFuzz(rc)
-	}
+	// ClusterFuzz will be handled through the standard service removal process
 
-	// Stop Nomad jobs
+	// Stop Nomad jobs (this is needed before the comprehensive removal in Phase 4)
 	if !excluded["nomad"] {
 		if err := stopNomadJobs(rc); err != nil {
 			logger.Warn("Failed to stop some Nomad jobs", zap.Error(err))
@@ -154,6 +146,9 @@ func executePhase2ApplicationServices(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
+	// TODO: MIGRATE - Additional services removal uses generic service lifecycle manager
+	// MIGRATE: This already delegates to pkg/services/removal.go:RemoveService
+	// Status: ALREADY MIGRATED - This uses the generic service lifecycle pattern
 	// Remove additional services
 	if err := removeAdditionalServices(rc, excluded, keepData); err != nil {
 		logger.Warn("Failed to remove some additional services", zap.Error(err))
@@ -227,7 +222,9 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 
 	var errors []string
 
-	// Use comprehensive removal for each component
+	// TODO: MIGRATE - Use comprehensive removal for each component
+	// MIGRATE: This should delegate to pkg/nomad/removal.go:RemoveNomadCompletely
+	// Status: ALREADY MIGRATED - This is the correct pattern
 	if !excluded["nomad"] {
 		logger.Info("Removing Nomad completely")
 		if err := nomad.RemoveNomadCompletely(rc, keepData); err != nil {
@@ -236,6 +233,9 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
+	// TODO: MIGRATE - Consul removal already properly delegated
+	// MIGRATE: This should delegate to pkg/consul/remove.go:RemoveConsul
+	// Status: ALREADY MIGRATED - This is the correct pattern
 	if !excluded["consul"] {
 		logger.Info("Removing Consul completely")
 		if err := consul.RemoveConsul(rc); err != nil {
@@ -244,6 +244,9 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
+	// TODO: MIGRATE - Salt removal already properly delegated
+	// MIGRATE: This should delegate to pkg/saltstack/removal.go:RemoveSaltCompletely
+	// Status: ALREADY MIGRATED - This is the correct pattern
 	if !excluded["salt"] {
 		logger.Info("Removing Salt completely")
 		if err := saltstack.RemoveSaltCompletely(rc, keepData); err != nil {
@@ -252,6 +255,9 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
+	// TODO: MIGRATE - Vault removal already properly delegated
+	// MIGRATE: This should delegate to pkg/vault/salt_removal.go:RemoveVaultViaSalt
+	// Status: ALREADY MIGRATED - This is the correct pattern
 	if !excluded["vault"] {
 		logger.Info("Removing Vault completely")
 		if err := vault.RemoveVaultViaSalt(rc); err != nil {
@@ -260,7 +266,62 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
-	// Remove remaining binaries
+	// Remove osquery using the new lifecycle manager
+	if !excluded["osquery"] {
+		logger.Info("Removing osquery completely")
+		if err := osquery.RemoveOsqueryCompletely(rc, keepData); err != nil {
+			logger.Warn("Osquery removal had issues", zap.Error(err))
+			errors = append(errors, fmt.Sprintf("osquery: %v", err))
+		}
+	}
+
+	// Remove boundary using the new lifecycle manager
+	if !excluded["boundary"] {
+		logger.Info("Removing Boundary completely")
+		if err := boundary.RemoveBoundaryCompletely(rc, keepData); err != nil {
+			logger.Warn("Boundary removal had issues", zap.Error(err))
+			errors = append(errors, fmt.Sprintf("boundary: %v", err))
+		}
+	}
+
+	// Remove Docker completely (not just cleanup)
+	if !excluded["docker"] {
+		logger.Info("Removing Docker completely")
+		if err := docker.RemoveDockerCompletely(rc, keepData); err != nil {
+			logger.Warn("Docker removal had issues", zap.Error(err))
+			errors = append(errors, fmt.Sprintf("docker: %v", err))
+		}
+	}
+
+	// Remove Terraform
+	if !excluded["terraform"] {
+		logger.Info("Removing Terraform completely")
+		if err := terraform.RemoveTerraformCompletely(rc, keepData); err != nil {
+			logger.Warn("Terraform removal had issues", zap.Error(err))
+			errors = append(errors, fmt.Sprintf("terraform: %v", err))
+		}
+	}
+
+	// Remove Packer
+	if !excluded["packer"] {
+		logger.Info("Removing Packer completely")
+		if err := packer.RemovePackerCompletely(rc, keepData); err != nil {
+			logger.Warn("Packer removal had issues", zap.Error(err))
+			errors = append(errors, fmt.Sprintf("packer: %v", err))
+		}
+	}
+
+	// Remove Eos resources (but not the binary itself)
+	if !excluded["eos"] {
+		logger.Info("Removing Eos resources")
+		if err := eos.RemoveEosResources(rc, keepData); err != nil {
+			logger.Warn("Eos resources removal had issues", zap.Error(err))
+			errors = append(errors, fmt.Sprintf("eos: %v", err))
+		}
+	}
+
+	// Remove remaining binaries - this function is now empty since all binaries
+	// are handled by their respective lifecycle managers
 	removedBinaries := removeBinaries(rc, excluded)
 	result.Details["removed_binaries"] = removedBinaries
 
@@ -340,11 +401,6 @@ func commandExists(cli *eos_cli.CLI, cmd string) bool {
 	return err == nil
 }
 
-func stopClusterFuzz(rc *eos_io.RuntimeContext) {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Stopping ClusterFuzz components")
-	// TODO: Implement actual ClusterFuzz removal
-}
 
 func stopNomadJobs(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -420,86 +476,44 @@ func stopService(rc *eos_io.RuntimeContext, cli *eos_cli.CLI, serviceName string
 	return nil
 }
 
+// removeBinaries is now mostly obsolete as all components handle their own binaries
+// This function remains for backward compatibility but should be removed in future
 func removeBinaries(rc *eos_io.RuntimeContext, excluded map[string]bool) []string {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Removing remaining binaries")
+	logger.Info("Checking for any remaining binaries")
 
-	binaries := map[string]string{
-		"nomad":     "/usr/local/bin/nomad",
-		"consul":    "/usr/local/bin/consul",
-		"terraform": "/usr/local/bin/terraform",
-		"packer":    "/usr/local/bin/packer",
-		"boundary":  "/usr/local/bin/boundary",
-	}
-
-	var removed []string
-	for component, path := range binaries {
-		if !excluded[component] && fileExists(path) {
-			logger.Info("Removing binary", 
-				zap.String("component", component), 
-				zap.String("path", path))
-			if err := os.Remove(path); err == nil {
-				removed = append(removed, path)
-			}
-		}
-	}
-
-	return removed
+	// All binaries are now handled by their respective lifecycle managers
+	// This function is kept for backward compatibility but returns empty
+	return []string{}
 }
 
+// cleanupSystemdServices is now obsolete as all components handle their own systemd files
+// This function remains for backward compatibility but does minimal work
 func cleanupSystemdServices(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Cleaning up systemd services")
-
-	serviceFiles := []string{
-		"/etc/systemd/system/vault.service",
-		"/etc/systemd/system/vault-agent-eos.service",
-		"/etc/systemd/system/vault-backup.service",
-		"/etc/systemd/system/vault-backup.timer",
-		"/etc/systemd/system/vault-agent-health-check.service",
-		"/etc/systemd/system/vault-agent-health-check.timer",
-		"/etc/systemd/system/vault.service.d/",
-		"/etc/systemd/system/hecate.service",
-		"/etc/systemd/system/hecate-caddy.service",
-		"/etc/systemd/system/hecate-authentik.service",
-		"/etc/systemd/system/nomad.service",
-		"/etc/systemd/system/consul.service",
-		"/etc/systemd/system/boundary.service",
-	}
-
-	for _, file := range serviceFiles {
-		if fileExists(file) {
-			logger.Info("Removing service file", zap.String("file", file))
-			fileInfo, err := os.Stat(file)
-			if err == nil && fileInfo.IsDir() {
-				os.RemoveAll(file)
-			} else {
-				os.Remove(file)
-			}
-		}
-	}
-
+	logger.Info("Systemd cleanup delegated to component lifecycle managers")
+	
+	// All systemd files are now handled by their respective lifecycle managers
+	// Just reload systemd to ensure any removed services are cleaned up
 	cli := eos_cli.New(rc)
 	cli.ExecToSuccess("systemctl", "daemon-reload")
 }
 
+// cleanupAPTSources is now obsolete as all components handle their own APT sources
+// This function remains for backward compatibility but does minimal work
 func cleanupAPTSources(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Cleaning up APT sources")
-
-	aptSources := []string{
-		"/etc/apt/sources.list.d/salt.list",
-		"/etc/apt/sources.list.d/osquery.list",
-	}
-
-	for _, source := range aptSources {
-		if fileExists(source) {
-			logger.Info("Removing APT source", zap.String("file", source))
-			os.Remove(source)
-		}
-	}
+	logger.Info("APT source cleanup delegated to component lifecycle managers")
+	
+	// All APT sources are now handled by their respective lifecycle managers
+	// Components like osquery, saltstack, etc. handle their own APT sources
 }
 
+// TODO: MIGRATE DUPLICATE LOGIC - This function duplicates APT package cleanup
+// FIXME: This should delegate to a shared system package lifecycle manager:
+// - Create pkg/system/package_lifecycle.go for system-wide cleanup
+// - This is generic cleanup that can remain centralized but should be in system package
+// CURRENT STATUS: Acceptable centralized logic but wrong location
 func cleanupAPTPackages(rc *eos_io.RuntimeContext, cli *eos_cli.CLI) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Cleaning up APT packages")

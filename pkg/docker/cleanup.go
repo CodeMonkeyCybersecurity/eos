@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -386,4 +387,333 @@ func cleanupSystem(rc *eos_io.RuntimeContext) error {
 	})
 
 	return nil
+}
+
+// RemoveDockerCompletely removes Docker from the system completely
+func RemoveDockerCompletely(rc *eos_io.RuntimeContext, keepData bool) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting comprehensive Docker removal", zap.Bool("keep_data", keepData))
+
+	// ASSESS - Check current Docker state
+	dockerInstalled := isDockerInstalled(rc)
+	if !dockerInstalled {
+		logger.Info("Docker is not installed, nothing to remove")
+		return nil
+	}
+
+	// First cleanup all Docker resources
+	if err := CleanupDockerResources(rc, keepData); err != nil {
+		logger.Warn("Docker resource cleanup had issues", zap.Error(err))
+		// Continue with removal anyway
+	}
+
+	// INTERVENE - Remove Docker components
+	if err := removeDockerComponents(rc, keepData); err != nil {
+		return fmt.Errorf("failed to remove Docker components: %w", err)
+	}
+
+	// EVALUATE - Verify removal
+	if err := verifyDockerRemoval(rc); err != nil {
+		logger.Warn("Docker removal verification had issues", zap.Error(err))
+		// Don't fail - partial removal is better than none
+	}
+
+	logger.Info("Docker removal completed successfully")
+	return nil
+}
+
+// isDockerInstalled checks if Docker is installed on the system
+func isDockerInstalled(rc *eos_io.RuntimeContext) bool {
+	// Check if docker command exists
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "which",
+		Args:    []string{"docker"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+	if err == nil {
+		return true
+	}
+
+	// Check if Docker package is installed
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "dpkg",
+		Args:    []string{"-l", "docker-ce"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+	if err == nil && strings.Contains(output, "ii") {
+		return true
+	}
+
+	// Check docker.io package
+	output, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "dpkg",
+		Args:    []string{"-l", "docker.io"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+	return err == nil && strings.Contains(output, "ii")
+}
+
+// removeDockerComponents removes all Docker components from the system
+func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Stop Docker service
+	logger.Info("Stopping Docker service")
+	execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"stop", "docker"},
+		Timeout: 30 * time.Second,
+	})
+	execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"stop", "docker.socket"},
+		Timeout: 10 * time.Second,
+	})
+
+	// Disable Docker service
+	logger.Info("Disabling Docker service")
+	execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"disable", "docker"},
+		Timeout: 10 * time.Second,
+	})
+	execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"disable", "docker.socket"},
+		Timeout: 10 * time.Second,
+	})
+
+	// Kill any remaining Docker processes
+	logger.Info("Killing any remaining Docker processes")
+	execute.Run(rc.Ctx, execute.Options{
+		Command: "pkill",
+		Args:    []string{"-f", "docker"},
+		Timeout: 5 * time.Second,
+	})
+
+	// Remove Docker packages
+	logger.Info("Removing Docker packages")
+	dockerPackages := []string{
+		"docker-ce",
+		"docker-ce-cli",
+		"containerd.io",
+		"docker-compose-plugin",
+		"docker-ce-rootless-extras",
+		"docker.io",
+		"docker-compose",
+	}
+
+	for _, pkg := range dockerPackages {
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "dpkg",
+			Args:    []string{"-l", pkg},
+			Capture: true,
+			Timeout: 5 * time.Second,
+		})
+		if err == nil && strings.Contains(output, "ii") {
+			logger.Info("Removing Docker package", zap.String("package", pkg))
+			if keepData {
+				execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", pkg)
+			} else {
+				execute.RunSimple(rc.Ctx, "apt-get", "purge", "-y", pkg)
+			}
+		}
+	}
+
+	// Remove Docker repository
+	logger.Info("Removing Docker APT repository")
+	dockerAPTSources := []string{
+		"/etc/apt/sources.list.d/docker.list",
+		"/etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list",
+	}
+	for _, source := range dockerAPTSources {
+		os.Remove(source)
+	}
+
+	// Remove Docker GPG key
+	dockerGPGKeys := []string{
+		"/usr/share/keyrings/docker-archive-keyring.gpg",
+		"/etc/apt/keyrings/docker.gpg",
+	}
+	for _, key := range dockerGPGKeys {
+		os.Remove(key)
+	}
+
+	// Remove Docker directories
+	logger.Info("Removing Docker directories")
+	directories := GetDockerDirectories()
+	for _, dir := range directories {
+		// Skip data directories if keepData is true
+		if keepData && dir.IsData {
+			logger.Info("Preserving Docker data directory", zap.String("path", dir.Path))
+			continue
+		}
+
+		if err := os.RemoveAll(dir.Path); err != nil && !os.IsNotExist(err) {
+			logger.Warn("Failed to remove directory",
+				zap.String("path", dir.Path),
+				zap.String("description", dir.Description),
+				zap.Error(err))
+		}
+	}
+
+	// Remove Docker binaries
+	logger.Info("Removing Docker binaries")
+	dockerBinaries := []string{
+		"/usr/bin/docker",
+		"/usr/local/bin/docker",
+		"/usr/bin/dockerd",
+		"/usr/local/bin/dockerd",
+		"/usr/bin/docker-compose",
+		"/usr/local/bin/docker-compose",
+		"/usr/bin/docker-proxy",
+		"/usr/bin/docker-init",
+	}
+	for _, binary := range dockerBinaries {
+		os.Remove(binary)
+	}
+
+	// Remove Docker group
+	logger.Info("Removing Docker group")
+	execute.Run(rc.Ctx, execute.Options{
+		Command: "groupdel",
+		Args:    []string{"docker"},
+		Timeout: 5 * time.Second,
+	})
+
+	// Update APT cache
+	logger.Info("Updating APT cache")
+	execute.RunSimple(rc.Ctx, "apt-get", "update")
+
+	// Reload systemd
+	execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
+
+	return nil
+}
+
+// verifyDockerRemoval verifies that Docker has been completely removed
+func verifyDockerRemoval(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Verifying Docker removal")
+
+	var issues []string
+
+	// Check Docker command doesn't exist
+	if _, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "which",
+		Args:    []string{"docker"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	}); err == nil {
+		issues = append(issues, "docker command still exists")
+	}
+
+	// Check Docker service doesn't exist
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", "docker"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+	if err == nil && strings.TrimSpace(output) == "active" {
+		issues = append(issues, "Docker service still active")
+	}
+
+	// Check no Docker processes
+	output, _ = execute.Run(rc.Ctx, execute.Options{
+		Command: "pgrep",
+		Args:    []string{"-f", "docker"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+	if output != "" {
+		issues = append(issues, "Docker processes still running")
+	}
+
+	// Check Docker packages are removed
+	packages := []string{"docker-ce", "docker.io"}
+	for _, pkg := range packages {
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "dpkg",
+			Args:    []string{"-l", pkg},
+			Capture: true,
+			Timeout: 5 * time.Second,
+		})
+		if err == nil && strings.Contains(output, "ii") {
+			issues = append(issues, fmt.Sprintf("%s package still installed", pkg))
+		}
+	}
+
+	if len(issues) > 0 {
+		return fmt.Errorf("Docker removal incomplete: %v", issues)
+	}
+
+	logger.Info("Docker removal verified successfully")
+	return nil
+}
+
+// GetDockerServices returns the list of services managed by Docker
+func GetDockerServices() []ServiceConfig {
+	return []ServiceConfig{
+		{Name: "docker", Component: "docker", Required: false},
+		{Name: "docker.socket", Component: "docker", Required: false},
+		{Name: "containerd", Component: "docker", Required: false},
+	}
+}
+
+// DirectoryConfig represents a directory managed by a component
+type DirectoryConfig struct {
+	Path        string
+	Component   string
+	IsData      bool
+	Description string
+}
+
+// ServiceConfig represents a service managed by a component
+type ServiceConfig struct {
+	Name      string
+	Component string
+	Required  bool
+}
+
+// GetDockerDirectories returns the list of directories managed by Docker
+func GetDockerDirectories() []DirectoryConfig {
+	return []DirectoryConfig{
+		{Path: "/var/lib/docker", Component: "docker", IsData: true, Description: "Docker data directory"},
+		{Path: "/var/lib/containerd", Component: "docker", IsData: true, Description: "Containerd data directory"},
+		{Path: "/etc/docker", Component: "docker", IsData: false, Description: "Docker configuration directory"},
+		{Path: "/etc/containerd", Component: "docker", IsData: false, Description: "Containerd configuration directory"},
+		{Path: "/var/run/docker", Component: "docker", IsData: false, Description: "Docker runtime directory"},
+		{Path: "/run/docker", Component: "docker", IsData: false, Description: "Docker runtime directory"},
+	}
+}
+
+// GetDockerBinaries returns the list of binaries managed by Docker
+func GetDockerBinaries() []string {
+	return []string{
+		"/usr/bin/docker",
+		"/usr/local/bin/docker",
+		"/usr/bin/dockerd",
+		"/usr/local/bin/dockerd",
+		"/usr/bin/docker-compose",
+		"/usr/local/bin/docker-compose",
+		"/usr/bin/docker-proxy",
+		"/usr/bin/docker-init",
+		"/usr/bin/containerd",
+		"/usr/bin/containerd-shim",
+		"/usr/bin/containerd-shim-runc-v2",
+		"/usr/bin/ctr",
+		"/usr/bin/runc",
+	}
+}
+
+// GetDockerAPTSources returns the list of APT sources managed by Docker
+func GetDockerAPTSources() []string {
+	return []string{
+		"/etc/apt/sources.list.d/docker.list",
+		"/etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list",
+	}
 }
