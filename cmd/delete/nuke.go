@@ -48,6 +48,7 @@ func init() {
 	nukeCmd.Flags().Bool("force", false, "Skip confirmation prompts")
 	nukeCmd.Flags().Bool("keep-data", false, "Keep data directories (logs, databases)")
 	nukeCmd.Flags().StringSlice("exclude", []string{}, "Components to exclude from removal")
+	nukeCmd.Flags().Bool("dev", false, "Development mode - preserve development tools")
 }
 
 func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -58,11 +59,30 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	force := cmd.Flag("force").Value.String() == "true"
 	keepData := cmd.Flag("keep-data").Value.String() == "true"
 	excludeList, _ := cmd.Flags().GetStringSlice("exclude")
+	devMode := cmd.Flag("dev").Value.String() == "true"
+
+	// Add development exclusions if --dev flag is set
+	if devMode {
+		devExclusions := []string{
+			"code-server",
+			"wazuh-agent", 
+			"prometheus",
+			"prometheus-node-exporter",
+			"docker",
+			"eos",
+			"git",
+			"golang",
+			"github-cli",
+		}
+		excludeList = append(excludeList, devExclusions...)
+		logger.Info("Development mode enabled - preserving development tools")
+	}
 
 	logger.Info("Starting infrastructure nuke",
 		zap.Bool("remove_all", removeAll),
 		zap.Bool("force", force),
 		zap.Bool("keep_data", keepData),
+		zap.Bool("dev_mode", devMode),
 		zap.Strings("exclude", excludeList))
 
 	// ASSESS - Load current state

@@ -28,7 +28,8 @@ Examples:
   eos nuke              # Destroy all infrastructure (with confirmation)
   eos nuke --force      # Skip confirmation prompt
   eos nuke --all        # Also remove eos itself
-  eos nuke --keep-data  # Preserve data directories`,
+  eos nuke --keep-data  # Preserve data directories
+  eos nuke --dev        # Development mode - preserve dev tools`,
 	// Delegate to the actual nuke command in delete
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Find the nuke command in delete
@@ -47,6 +48,9 @@ Examples:
 				if cmd.Flags().Changed("exclude") {
 					subCmd.Flags().Set("exclude", cmd.Flag("exclude").Value.String())
 				}
+				if cmd.Flags().Changed("dev") {
+					subCmd.Flags().Set("dev", cmd.Flag("dev").Value.String())
+				}
 				
 				// Execute the actual command
 				return subCmd.RunE(cmd, args)
@@ -62,4 +66,5 @@ func init() {
 	NukeCmd.Flags().Bool("force", false, "Skip confirmation prompts")
 	NukeCmd.Flags().Bool("keep-data", false, "Keep data directories (logs, databases)")
 	NukeCmd.Flags().StringSlice("exclude", []string{}, "Components to exclude from removal")
+	NukeCmd.Flags().Bool("dev", false, "Development mode - preserve development tools")
 }
