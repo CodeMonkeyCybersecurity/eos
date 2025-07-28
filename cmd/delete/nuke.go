@@ -73,6 +73,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			"git",
 			"golang",
 			"github-cli",
+			"tailscale",
 			"tailscaled",
 			"golangci-lint",
 		}
@@ -214,6 +215,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		"nginx",
 		"glances",
 		"code-server@*",
+		"tailscale",
 		"tailscaled",
 	}
 
@@ -432,7 +434,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	// Use improved process detection
 	remainingProcesses := []string{}
-	processesToCheck := []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh", "eos", "code-server", "prometheus", "node_exporter", "grafana-server", "nginx", "glances", "tailscaled"}
+	processesToCheck := []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh", "eos", "code-server", "prometheus", "node_exporter", "grafana-server", "nginx", "glances", "tailscale", "tailscaled"}
 
 	for _, proc := range processesToCheck {
 		if processes, err := process.FindProcesses(rc.Ctx, proc); err == nil && len(processes) > 0 {
