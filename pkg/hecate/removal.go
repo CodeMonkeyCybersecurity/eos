@@ -182,22 +182,61 @@ func stopHecateNomadJobs(rc *eos_io.RuntimeContext) error {
 		}
 	}
 
-	// Wait for jobs to fully terminate
+	// Wait for jobs to fully terminate with retry logic
 	logger.Info("Waiting for jobs to terminate...")
-	time.Sleep(10 * time.Second)
-
-	// Verify jobs are stopped
-	for _, job := range hecateJobs {
-		_, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "nomad",
-			Args:    []string{"job", "status", job},
-			Capture: true,
-		})
-		if err == nil {
-			logger.Warn("Job may still be running", zap.String("job", job))
-		} else {
-			logger.Debug("Job confirmed stopped", zap.String("job", job))
+	maxRetries := 12 // 60 seconds total (5 second intervals)
+	
+	for retry := 0; retry < maxRetries; retry++ {
+		time.Sleep(5 * time.Second)
+		
+		var stillRunning []string
+		for _, job := range hecateJobs {
+			_, err := execute.Run(rc.Ctx, execute.Options{
+				Command: "nomad",
+				Args:    []string{"job", "status", job},
+				Capture: true,
+			})
+			if err == nil {
+				stillRunning = append(stillRunning, job)
+			}
 		}
+		
+		if len(stillRunning) == 0 {
+			logger.Info("All Hecate jobs terminated successfully")
+			break
+		}
+		
+		logger.Info("Still waiting for jobs to terminate",
+			zap.Strings("jobs", stillRunning),
+			zap.Int("retry", retry+1),
+			zap.Int("max_retries", maxRetries))
+		
+		// Force-kill remaining jobs if we're on the last retry
+		if retry == maxRetries-1 {
+			logger.Warn("Forcing termination of remaining jobs")
+			for _, job := range stillRunning {
+				logger.Info("Force stopping job", zap.String("job", job))
+				execute.Run(rc.Ctx, execute.Options{
+					Command: "nomad",
+					Args:    []string{"job", "stop", "-purge", "-force", job},
+					Capture: true,
+				})
+			}
+			time.Sleep(5 * time.Second) // Final wait after force termination
+		}
+	}
+
+	// Force Nomad garbage collection to clean up any remaining allocations
+	logger.Info("Running Nomad garbage collection to clean up allocations")
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "nomad",
+		Args:    []string{"system", "gc"},
+		Capture: true,
+	})
+	if err != nil {
+		logger.Warn("Nomad garbage collection failed", zap.Error(err))
+	} else {
+		logger.Info("Nomad garbage collection completed")
 	}
 
 	return nil
@@ -207,6 +246,17 @@ func stopHecateNomadJobs(rc *eos_io.RuntimeContext) error {
 func removeBySalt(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Attempting Salt-based Hecate removal")
+
+	// First check if salt-call is available
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "which",
+		Args:    []string{"salt-call"},
+		Capture: true,
+	})
+	if err != nil {
+		logger.Info("Salt not available, skipping Salt-based removal")
+		return fmt.Errorf("salt-call not available: %w", err)
+	}
 
 	// Check if Salt removal state exists
 	removalState := "hecate.remove"
@@ -228,7 +278,7 @@ func removeBySalt(rc *eos_io.RuntimeContext) error {
 			zap.String("state", removalState),
 			zap.Error(err),
 			zap.String("output", output))
-		return fmt.Errorf("salt removal failed: %w", err)
+		return fmt.Errorf("salt removal failed: command failed after 0 attempts: %w", err)
 	}
 
 	logger.Info("Salt-based removal completed",
