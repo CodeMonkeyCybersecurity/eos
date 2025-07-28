@@ -74,6 +74,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			"golang",
 			"github-cli",
 			"tailscale",
+			"golangci-lint",
 		}
 		excludeList = append(excludeList, devExclusions...)
 		logger.Info("Development mode enabled - preserving development tools")
@@ -203,6 +204,17 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		"salt-minion",
 		"salt-master",
 		"docker",
+		"eos-storage-monitor",
+		"fail2ban",
+		"trivy",
+		"wazuh-agent",
+		"prometheus", 
+		"prometheus-node-exporter",
+		"grafana-server",
+		"nginx",
+		"glances",
+		"code-server@*",
+		"tailscaled",
 	}
 
 	for _, service := range services {
@@ -414,7 +426,7 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	// Use improved process detection
 	remainingProcesses := []string{}
-	processesToCheck := []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh"}
+	processesToCheck := []string{"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", "osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh", "eos", "code-server", "prometheus", "node_exporter", "grafana-server", "nginx", "glances", "tailscaled"}
 
 	for _, proc := range processesToCheck {
 		if processes, err := process.FindProcesses(rc.Ctx, proc); err == nil && len(processes) > 0 {

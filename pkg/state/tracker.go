@@ -233,7 +233,12 @@ func (s *StateTracker) GatherInBand(rc *eos_io.RuntimeContext) error {
 		for _, line := range lines {
 			if strings.Contains(line, "salt") || strings.Contains(line, "vault") ||
 			   strings.Contains(line, "nomad") || strings.Contains(line, "consul") ||
-			   strings.Contains(line, "docker") || strings.Contains(line, "osquery") {
+			   strings.Contains(line, "docker") || strings.Contains(line, "osquery") ||
+			   strings.Contains(line, "eos-storage-monitor") || strings.Contains(line, "code-server") ||
+			   strings.Contains(line, "prometheus") || strings.Contains(line, "grafana") ||
+			   strings.Contains(line, "fail2ban") || strings.Contains(line, "trivy") ||
+			   strings.Contains(line, "wazuh") || strings.Contains(line, "nginx") ||
+			   strings.Contains(line, "glances") || strings.Contains(line, "hecate") {
 				fields := strings.Fields(line)
 				if len(fields) > 0 {
 					s.SystemdUnits = append(s.SystemdUnits, fields[0])

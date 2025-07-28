@@ -232,6 +232,27 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 			DataDirs:     []string{"/var/lib/eos/storage-monitor"},
 			LogDirs:      []string{"/var/log/eos"},
 		},
+		{
+			Name:         "tailscale",
+			ServiceNames: []string{"tailscaled"},
+			PackageNames: []string{"tailscale"},
+			Processes:    []string{"tailscaled", "tailscale"},
+			ConfigDirs:   []string{"/etc/tailscale"},
+			DataDirs:     []string{"/var/lib/tailscale"},
+			LogDirs:      []string{"/var/log/tailscale"},
+			CustomCleanup: func(rc *eos_io.RuntimeContext) error {
+				// Logout from tailscale before removal
+				execute.Run(rc.Ctx, execute.Options{
+					Command: "tailscale",
+					Args:    []string{"logout"},
+					Timeout: 10 * time.Second,
+				})
+				// Remove APT repository
+				os.Remove("/etc/apt/sources.list.d/tailscale.list")
+				os.Remove("/usr/share/keyrings/tailscale-archive-keyring.gpg")
+				return nil
+			},
+		},
 	}
 }
 

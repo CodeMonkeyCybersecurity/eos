@@ -71,6 +71,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	if !config.SkipGH {
 		fmt.Println("✓ GitHub CLI with authentication")
 	}
+	fmt.Println("✓ Go development tools (golangci-lint, gopls, etc.)")
 	fmt.Println("✓ Firewall rules for port 8080")
 	fmt.Println()
 
@@ -138,7 +139,17 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		}
 	}
 
-	// 5. Configure firewall
+	// 5. Install Go development tools
+	logger.Info("Installing Go development tools")
+	fmt.Println("\n>>> Installing Go development tools...")
+	if err := dev_environment.InstallGoTools(rc); err != nil {
+		// Non-fatal error
+		logger.Warn("Failed to install some Go tools", zap.Error(err))
+		fmt.Printf("⚠️  Failed to install some Go tools: %v\n", err)
+		fmt.Println("   You can install them manually later")
+	}
+
+	// 6. Configure firewall
 	logger.Info("Configuring firewall for code-server access")
 	fmt.Println("\n>>> Configuring firewall...")
 	if err := dev_environment.ConfigureFirewall(rc, config); err != nil {
@@ -169,6 +180,14 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	if !config.SkipGH {
 		fmt.Println("5. Use 'gh' commands for GitHub operations")
 	}
+	fmt.Println("\nGo Development Tools Installed:")
+	fmt.Println("================================")
+	fmt.Println("✓ golangci-lint - Fast Go linters runner")
+	fmt.Println("✓ gopls - Go language server")
+	fmt.Println("✓ dlv - Go debugger")
+	fmt.Println("✓ staticcheck - Advanced Go static analysis")
+	fmt.Println("✓ goimports - Auto-format and organize imports")
+	fmt.Println("Run 'golangci-lint run' in your Go projects for linting")
 	
 	fmt.Println("\nFirewall Configuration:")
 	fmt.Println("=======================")
