@@ -70,6 +70,51 @@ update_system_packages() {
     fi
   elif $IS_DEBIAN; then
     log INFO " Updating Debian-based system packages..."
+    
+    # Check if dpkg lock is held
+    local max_wait=60
+    local wait_interval=5
+    local waited=0
+    
+    while [ $waited -lt $max_wait ]; do
+      if ! lsof /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+        # Lock is free, proceed with update
+        break
+      fi
+      
+      if [ $waited -eq 0 ]; then
+        log INFO " Waiting for package management lock to be released..."
+        log INFO " Another apt/dpkg process is running. Waiting up to ${max_wait} seconds..."
+      fi
+      
+      sleep $wait_interval
+      waited=$((waited + wait_interval))
+      
+      if [ $waited -lt $max_wait ]; then
+        echo -n "."
+      fi
+    done
+    
+    if [ $waited -ge $max_wait ]; then
+      log WARN " Package management lock still held after ${max_wait} seconds"
+      log INFO " Checking what process is holding the lock..."
+      
+      # Try to identify the process
+      local lock_pid=$(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | grep -v COMMAND | awk '{print $2}' | head -1)
+      if [ -n "$lock_pid" ]; then
+        local proc_name=$(ps -p "$lock_pid" -o comm= 2>/dev/null || echo "unknown")
+        log INFO " Process holding lock: $proc_name (PID: $lock_pid)"
+        log ERR " Cannot proceed while another package manager is running"
+        log INFO " Please wait for it to complete or terminate it, then run again"
+        exit 100
+      fi
+    fi
+    
+    if [ $waited -gt 0 ] && [ $waited -lt $max_wait ]; then
+      echo ""  # New line after dots
+      log INFO " Lock released, proceeding with update"
+    fi
+    
     apt-get update -y
     apt-get upgrade -y
     log INFO " Cleaning up unused packages..."
@@ -333,10 +378,30 @@ create_directories() {
 }
 
 main() {
+  # Parse command line arguments
+  local skip_update=false
+  for arg in "$@"; do
+    case $arg in
+      --skip-update)
+        skip_update=true
+        log INFO " Skipping system package update (--skip-update flag provided)"
+        shift
+        ;;
+      --help|-h)
+        echo "Usage: $0 [OPTIONS]"
+        echo ""
+        echo "Options:"
+        echo "  --skip-update    Skip system package updates (apt/yum/dnf)"
+        echo "  --help, -h       Show this help message"
+        exit 0
+        ;;
+    esac
+  done
+  
   detect_platform
   
   # Update system packages first (Linux only, requires root)
-  if $IS_LINUX; then
+  if $IS_LINUX && ! $skip_update; then
     if [[ "$EUID" -eq 0 ]]; then
       update_system_packages
     else

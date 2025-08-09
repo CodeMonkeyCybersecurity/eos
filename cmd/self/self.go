@@ -123,7 +123,80 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		installCmd.Stdout = os.Stdout
 		installCmd.Stderr = os.Stderr
 		if err := installCmd.Run(); err != nil {
+			// Check if this is a dpkg lock error
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 100 {
+				// Check if apt/dpkg is currently running
+				checkCmd := exec.Command("sh", "-c", "lsof /var/lib/dpkg/lock-frontend 2>/dev/null | grep -v COMMAND | awk '{print $2}' | head -1")
+				if pidBytes, err := checkCmd.Output(); err == nil && len(pidBytes) > 0 {
+					pid := string(pidBytes[:len(pidBytes)-1]) // Remove newline
+					
+					// Get the process name
+					psCmd := exec.Command("ps", "-p", pid, "-o", "comm=")
+					if nameBytes, err := psCmd.Output(); err == nil && len(nameBytes) > 0 {
+						processName := string(nameBytes[:len(nameBytes)-1])
+						
+						logger.Warn(" Another package management process is running",
+							zap.String("process", processName),
+							zap.String("pid", pid))
+						
+						logger.Info("terminal prompt: ")
+						logger.Info("terminal prompt: ⚠️  Another package management process is currently running")
+						logger.Info(fmt.Sprintf("terminal prompt: Process: %s (PID: %s)", processName, pid))
+						logger.Info("terminal prompt: ")
+						logger.Info("terminal prompt: Please wait for it to complete, then run:")
+						logger.Info("terminal prompt:   sudo eos self update")
+						logger.Info("terminal prompt: ")
+						logger.Info("terminal prompt: Or skip the system update with:")
+						logger.Info("terminal prompt:   cd /opt/eos && sudo ./install.sh --skip-update")
+						logger.Info("terminal prompt: ")
+						logger.Info("terminal prompt: If the process is stuck, you can check it with:")
+						logger.Info(fmt.Sprintf("terminal prompt:   ps -p %s -f", pid))
+						
+						return eos_err.NewUserError("cannot update while another package manager is running")
+					}
+				}
+				
+				// Generic dpkg lock error message
+				logger.Warn(" Package management system is locked")
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: ⚠️  The package management system is currently locked")
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: This usually means:")
+				logger.Info("terminal prompt:   • Another apt/dpkg process is running")
+				logger.Info("terminal prompt:   • An automatic update is in progress")
+				logger.Info("terminal prompt:   • A previous installation was interrupted")
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: To check what's using apt/dpkg:")
+				logger.Info("terminal prompt:   sudo lsof /var/lib/dpkg/lock-frontend")
+				logger.Info("terminal prompt:   ps aux | grep -E 'apt|dpkg'")
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: Once resolved, run:")
+				logger.Info("terminal prompt:   sudo eos self update")
+				
+				return eos_err.NewUserError("package management system is locked")
+			}
+			
+			// For other errors, provide helpful context
 			logger.Error(" Installation script failed", zap.Error(err))
+			
+			// Check if this might be a network issue
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				switch exitErr.ExitCode() {
+				case 1:
+					logger.Info("terminal prompt: ")
+					logger.Info("terminal prompt: ❌ Installation failed - this might be a general error")
+					logger.Info("terminal prompt: Check the output above for specific error messages")
+				case 2:
+					logger.Info("terminal prompt: ")
+					logger.Info("terminal prompt: ❌ Installation failed - command not found or permission denied")
+					logger.Info("terminal prompt: Ensure all required tools are installed")
+				default:
+					logger.Info("terminal prompt: ")
+					logger.Info(fmt.Sprintf("terminal prompt: ❌ Installation failed with exit code %d", exitErr.ExitCode()))
+					logger.Info("terminal prompt: Check the output above for details")
+				}
+			}
+			
 			return fmt.Errorf("failed to run installation script: %w", err)
 		}
 
