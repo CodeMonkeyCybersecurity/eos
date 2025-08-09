@@ -13,7 +13,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -166,12 +165,11 @@ func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	serverOnly := nomadServerMode && !nomadClientMode
 	clientOnly := nomadClientMode && !nomadServerMode
 	
-	config := &nomad.NativeInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        "latest",
-			CleanInstall:   nomadClean,
-			ForceReinstall: nomadForce,
-		},
+	config := &nomad.InstallConfig{
+		Version:           "latest",
+		UseRepository:     false,  // Use binary by default
+		CleanInstall:      nomadClean,
+		ForceReinstall:    nomadForce,
 		ServerEnabled:     !clientOnly,
 		ClientEnabled:     !serverOnly,
 		Datacenter:        nomadDatacenter,
@@ -182,11 +180,8 @@ func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		DockerEnabled:     nomadEnableDocker,
 	}
 
-	// Set install method
-	config.InstallConfig.InstallMethod = hashicorp.MethodBinary
-
 	// Create and run installer
-	installer := nomad.NewNativeInstaller(rc, config)
+	installer := nomad.NewNomadInstaller(rc, config)
 	if err := installer.Install(); err != nil {
 		return fmt.Errorf("Nomad installation failed: %w", err)
 	}

@@ -68,6 +68,7 @@ apps/mattermost/docker*
 coverage.*
 *.out
 gosec-report.*
+*eos-test*
 
 *.aider*
 

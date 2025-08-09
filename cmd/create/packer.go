@@ -6,7 +6,6 @@ import (
 	
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -46,24 +45,17 @@ func runCreatePackerNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 	logger.Info("Installing Packer using native installer")
 
 	// Parse flags
-	config := &packer.PackerInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        cmd.Flag("version").Value.String(),
-			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
-			ForceReinstall: cmd.Flag("force").Value.String() == "true",
-		},
+	config := &packer.InstallConfig{
+		Version:         cmd.Flag("version").Value.String(),
+		UseRepository:   cmd.Flag("use-repository").Value.String() == "true",
 		PluginDirectory: cmd.Flag("plugin-dir").Value.String(),
 		CacheDirectory:  cmd.Flag("cache-dir").Value.String(),
-	}
-
-	if cmd.Flag("use-repository").Value.String() == "true" {
-		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
-	} else {
-		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
+		CleanInstall:    cmd.Flag("clean").Value.String() == "true",
+		ForceReinstall:  cmd.Flag("force").Value.String() == "true",
 	}
 
 	// Create and run installer
-	installer := packer.NewNativeInstaller(rc, config)
+	installer := packer.NewPackerInstaller(rc, config)
 	if err := installer.Install(); err != nil {
 		return fmt.Errorf("Packer installation failed: %w", err)
 	}

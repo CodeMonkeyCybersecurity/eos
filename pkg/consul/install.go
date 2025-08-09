@@ -113,10 +113,18 @@ func (ci *ConsulInstaller) Install() error {
 		zap.String("datacenter", ci.config.Datacenter),
 		zap.Bool("use_repository", ci.config.UseRepository))
 	
-	// Phase 1: ASSESS
+	// Phase 1: ASSESS - Check if already installed
 	ci.progress.Update("[16%] Checking current Consul status")
-	if err := ci.assess(); err != nil {
+	shouldInstall, err := ci.assess()
+	if err != nil {
 		return fmt.Errorf("assessment failed: %w", err)
+	}
+	
+	// If Consul is already properly installed and running, we're done
+	if !shouldInstall {
+		ci.logger.Info("Consul is already installed and running properly")
+		ci.progress.Complete("Consul is already installed and running")
+		return nil
 	}
 	
 	// Phase 2: Prerequisites
@@ -154,29 +162,68 @@ func (ci *ConsulInstaller) Install() error {
 }
 
 // assess checks the current state of Consul installation
-func (ci *ConsulInstaller) assess() error {
+// Returns true if installation should proceed, false if already installed
+func (ci *ConsulInstaller) assess() (bool, error) {
 	ci.logger.Info("Assessing current Consul installation")
 	
+	// First, check if Consul binary exists
+	if _, err := os.Stat(ci.config.BinaryPath); err == nil {
+		// Binary exists, check version
+		if output, err := ci.runner.RunOutput(ci.config.BinaryPath, "version"); err == nil {
+			ci.logger.Info("Consul binary found", zap.String("output", output))
+		}
+	}
+	
 	// Check if Consul service exists
-	if _, err := ci.systemd.GetStatus(); err == nil {
+	if status, err := ci.systemd.GetStatus(); err == nil {
+		ci.logger.Info("Consul service found", zap.String("status", status))
+		
 		if !ci.config.ForceReinstall {
 			// Check if it's running
 			if ci.systemd.IsActive() {
-				ci.logger.Info("Consul is already installed and running")
-				return nil
+				// Verify it's actually working
+				if ci.isConsulReady() {
+					ci.logger.Info("Consul is already installed and running properly")
+					
+					// Print service information
+					ci.logger.Info(fmt.Sprintf("terminal prompt: ✅ Consul is already installed and running"))
+					ci.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
+					ci.logger.Info("terminal prompt: ")
+					ci.logger.Info("terminal prompt: To check status: consul members")
+					ci.logger.Info("terminal prompt: To view logs: journalctl -u consul -f")
+					
+					return false, nil // Don't install, already running
+				}
+				ci.logger.Warn("Consul service is active but not responding properly")
+				// Fall through to attempt repair/reinstall
+			} else {
+				ci.logger.Info("Consul is installed but not running")
+				// Try to start it
+				ci.logger.Info("Attempting to start existing Consul service")
+				if err := ci.systemd.Start(); err != nil {
+					ci.logger.Warn("Failed to start existing Consul service", zap.Error(err))
+				} else {
+					// Wait a moment for it to start
+					time.Sleep(3 * time.Second)
+					if ci.isConsulReady() {
+						ci.logger.Info("Successfully started existing Consul service")
+						ci.logger.Info(fmt.Sprintf("terminal prompt: ✅ Consul service started successfully"))
+						ci.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
+						return false, nil // Don't install, successfully started existing
+					}
+				}
 			}
-			ci.logger.Info("Consul is installed but not running")
 		} else {
 			ci.logger.Info("Force reinstall requested, proceeding with installation")
 			if ci.config.CleanInstall {
 				if err := ci.cleanExistingInstallation(); err != nil {
-					return fmt.Errorf("failed to clean existing installation: %w", err)
+					return false, fmt.Errorf("failed to clean existing installation: %w", err)
 				}
 			}
 		}
 	}
 	
-	return nil
+	return true, nil // Proceed with installation
 }
 
 // validatePrerequisites checks system requirements
@@ -198,6 +245,16 @@ func (ci *ConsulInstaller) validatePrerequisites() error {
 		return err
 	}
 	
+	// Check port availability - but be smart about it
+	// If we're doing a force reinstall, stop the existing service first
+	if ci.config.ForceReinstall && ci.systemd.IsActive() {
+		ci.logger.Info("Stopping existing Consul service for reinstallation")
+		if err := ci.systemd.Stop(); err != nil {
+			ci.logger.Warn("Failed to stop existing Consul service", zap.Error(err))
+		}
+		time.Sleep(2 * time.Second) // Give it time to release ports
+	}
+	
 	// Check port availability
 	requiredPorts := []int{
 		shared.PortConsul,     // HTTP API (8161)
@@ -208,10 +265,15 @@ func (ci *ConsulInstaller) validatePrerequisites() error {
 		8600,                   // DNS
 	}
 	
+	var portErrors []string
 	for _, port := range requiredPorts {
 		if err := ci.checkPortAvailable(port); err != nil {
-			return err
+			portErrors = append(portErrors, err.Error())
 		}
+	}
+	
+	if len(portErrors) > 0 {
+		return fmt.Errorf("port availability check failed:\n  - %s", strings.Join(portErrors, "\n  - "))
 	}
 	
 	return nil
@@ -635,18 +697,29 @@ func (ci *ConsulInstaller) checkDiskSpace(path string, requiredMB int64) error {
 }
 
 func (ci *ConsulInstaller) checkPortAvailable(port int) error {
-	// Use ss command to check if port is in use
-	output, err := ci.runner.RunOutput("sh", "-c", fmt.Sprintf("ss -tln | grep -q ':%d ' && echo 'in-use' || echo 'available'", port))
-	if err != nil {
-		// If command fails, assume port is available
+	// Use lsof to check what's using the port
+	output, err := ci.runner.RunOutput("sh", "-c", fmt.Sprintf("lsof -i :%d 2>/dev/null | grep LISTEN | awk '{print $1}' | head -1", port))
+	if err != nil || output == "" {
+		// Port is available
 		return nil
 	}
 	
-	if strings.TrimSpace(output) == "in-use" {
-		return fmt.Errorf("port %d is already in use", port)
+	processName := strings.TrimSpace(output)
+	
+	// If it's Consul already using the port, that's fine for idempotency
+	if processName == "consul" {
+		ci.logger.Debug("Port already in use by Consul", zap.Int("port", port))
+		// Check if this is our Consul or another instance
+		if ci.systemd.IsActive() {
+			// It's our managed Consul, that's OK
+			return nil
+		}
+		// It's another Consul instance
+		return fmt.Errorf("port %d is already in use by another Consul instance", port)
 	}
 	
-	return nil
+	// Some other process is using the port
+	return fmt.Errorf("port %d is already in use by %s", port, processName)
 }
 
 func (ci *ConsulInstaller) createDirectory(path string, mode os.FileMode) error {

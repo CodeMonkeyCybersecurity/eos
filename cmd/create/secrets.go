@@ -7,7 +7,6 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack/orchestrator"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -98,32 +97,24 @@ func init() {
 
 func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Vault using native installer")
+	logger.Info("Installing Vault using unified installer")
 
 	// Parse flags
-	config := &vault.VaultInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        cmd.Flag("version").Value.String(),
-			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
-			ForceReinstall: cmd.Flag("force").Value.String() == "true",
-		},
+	config := &vault.InstallConfig{
+		Version:         cmd.Flag("version").Value.String(),
+		UseRepository:   cmd.Flag("use-repository").Value.String() == "true",
 		UIEnabled:       cmd.Flag("ui").Value.String() == "true",
 		StorageBackend:  cmd.Flag("storage-backend").Value.String(),
 		ListenerAddress: cmd.Flag("listener-address").Value.String(),
 		AutoUnseal:      cmd.Flag("auto-unseal").Value.String() == "true",
 		KMSKeyID:        cmd.Flag("kms-key").Value.String(),
+		TLSEnabled:      cmd.Flag("tls").Value.String() == "true",
+		CleanInstall:    cmd.Flag("clean").Value.String() == "true",
+		ForceReinstall:  cmd.Flag("force").Value.String() == "true",
 	}
-
-	if cmd.Flag("use-repository").Value.String() == "true" {
-		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
-	} else {
-		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
-	}
-
-	config.InstallConfig.TLSEnabled = cmd.Flag("tls").Value.String() == "true"
 
 	// Create and run installer
-	installer := vault.NewNativeInstaller(rc, config)
+	installer := vault.NewVaultInstaller(rc, config)
 	if err := installer.Install(); err != nil {
 		return fmt.Errorf("Vault installation failed: %w", err)
 	}

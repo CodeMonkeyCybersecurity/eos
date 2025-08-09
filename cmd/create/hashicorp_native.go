@@ -5,7 +5,6 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -200,23 +199,16 @@ func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	logger.Info("Installing Terraform using native installer")
 
 	// Parse flags
-	config := &terraform.TerraformInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        cmd.Flag("version").Value.String(),
-			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
-			ForceReinstall: cmd.Flag("force").Value.String() == "true",
-		},
+	config := &terraform.InstallConfig{
+		Version:        cmd.Flag("version").Value.String(),
+		UseRepository:  cmd.Flag("use-repository").Value.String() == "true",
 		PluginCacheDir: cmd.Flag("plugin-cache").Value.String(),
-	}
-
-	if cmd.Flag("use-repository").Value.String() == "true" {
-		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
-	} else {
-		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
+		CleanInstall:   cmd.Flag("clean").Value.String() == "true",
+		ForceReinstall: cmd.Flag("force").Value.String() == "true",
 	}
 
 	// Create and run installer
-	installer := terraform.NewNativeInstaller(rc, config)
+	installer := terraform.NewTerraformInstaller(rc, config)
 	if err := installer.Install(); err != nil {
 		return fmt.Errorf("Terraform installation failed: %w", err)
 	}

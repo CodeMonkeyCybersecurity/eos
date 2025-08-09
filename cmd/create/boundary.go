@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -76,13 +75,9 @@ func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	logger.Info("Installing Boundary using native installer")
 
 	// Parse flags
-	config := &boundary.BoundaryInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        boundaryVersion,
-			CleanInstall:   boundaryClean,
-			ForceReinstall: boundaryForce,
-			TLSEnabled:     !boundaryTLSDisable,
-		},
+	config := &boundary.InstallConfig{
+		Version:           boundaryVersion,
+		UseRepository:     false,  // Always use binary for Boundary
 		ControllerEnabled: boundaryRole == "controller" || boundaryRole == "dev",
 		WorkerEnabled:     boundaryRole == "worker" || boundaryRole == "dev",
 		DevMode:           boundaryRole == "dev",
@@ -91,13 +86,12 @@ func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		PublicAddr:        boundaryPublicAddr,
 		RecoveryKmsType:   boundaryKMSType,
 		KmsKeyID:          boundaryKMSKeyID,
+		CleanInstall:      boundaryClean,
+		ForceReinstall:    boundaryForce,
 	}
 
-	// Set install method
-	config.InstallConfig.InstallMethod = hashicorp.MethodBinary
-
 	// Create and run installer
-	installer := boundary.NewNativeInstaller(rc, config)
+	installer := boundary.NewBoundaryInstaller(rc, config)
 	if err := installer.Install(); err != nil {
 		return fmt.Errorf("Boundary installation failed: %w", err)
 	}
