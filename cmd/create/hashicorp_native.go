@@ -3,18 +3,12 @@ package create
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 // Native installer commands for each HashiCorp product
@@ -199,90 +193,6 @@ func init() {
 	createBoundaryNativeCmd.Flags().Bool("use-repository", false, "Install via APT repository")
 }
 
-// Vault native installer
-func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Vault using native installer")
-
-	// Parse flags
-	config := &vault.VaultInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        cmd.Flag("version").Value.String(),
-			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
-			ForceReinstall: cmd.Flag("force").Value.String() == "true",
-		},
-		UIEnabled:       cmd.Flag("ui").Value.String() == "true",
-		StorageBackend:  cmd.Flag("storage-backend").Value.String(),
-		ListenerAddress: cmd.Flag("listener-address").Value.String(),
-		AutoUnseal:      cmd.Flag("auto-unseal").Value.String() == "true",
-		KMSKeyID:        cmd.Flag("kms-key").Value.String(),
-	}
-
-	if cmd.Flag("use-repository").Value.String() == "true" {
-		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
-	} else {
-		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
-	}
-
-	config.InstallConfig.TLSEnabled = cmd.Flag("tls").Value.String() == "true"
-
-	// Create and run installer
-	installer := vault.NewNativeInstaller(rc, config)
-	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Vault installation failed: %w", err)
-	}
-
-	logger.Info("Vault installation completed successfully")
-	logger.Info("terminal prompt: Vault is installed. Initialize with: vault operator init")
-	return nil
-}
-
-// Nomad native installer
-func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Nomad using native installer")
-
-	// Parse flags
-	serverOnly := cmd.Flag("server-only").Value.String() == "true"
-	clientOnly := cmd.Flag("client-only").Value.String() == "true"
-	
-	config := &nomad.NativeInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        cmd.Flag("version").Value.String(),
-			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
-			ForceReinstall: cmd.Flag("force").Value.String() == "true",
-		},
-		ServerEnabled:     !clientOnly,
-		ClientEnabled:     !serverOnly,
-		Datacenter:        cmd.Flag("datacenter").Value.String(),
-		Region:            cmd.Flag("region").Value.String(),
-		BootstrapExpect:   1, // Will be parsed below
-		ConsulIntegration: cmd.Flag("consul").Value.String() == "true",
-		VaultIntegration:  cmd.Flag("vault").Value.String() == "true",
-		DockerEnabled:     cmd.Flag("docker").Value.String() == "true",
-	}
-
-	// Parse bootstrap-expect
-	if bootstrapExpect, err := cmd.Flags().GetInt("bootstrap-expect"); err == nil {
-		config.BootstrapExpect = bootstrapExpect
-	}
-
-	if cmd.Flag("use-repository").Value.String() == "true" {
-		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
-	} else {
-		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
-	}
-
-	// Create and run installer
-	installer := nomad.NewNativeInstaller(rc, config)
-	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Nomad installation failed: %w", err)
-	}
-
-	logger.Info("Nomad installation completed successfully")
-	logger.Info("terminal prompt: Nomad is installed. Check status with: nomad node status")
-	return nil
-}
 
 // Terraform native installer
 func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -316,82 +226,6 @@ func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	return nil
 }
 
-// Packer native installer
-func runCreatePackerNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Packer using native installer")
-
-	// Parse flags
-	config := &packer.PackerInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        cmd.Flag("version").Value.String(),
-			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
-			ForceReinstall: cmd.Flag("force").Value.String() == "true",
-		},
-		PluginDirectory: cmd.Flag("plugin-dir").Value.String(),
-		CacheDirectory:  cmd.Flag("cache-dir").Value.String(),
-	}
-
-	if cmd.Flag("use-repository").Value.String() == "true" {
-		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
-	} else {
-		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
-	}
-
-	// Create and run installer
-	installer := packer.NewNativeInstaller(rc, config)
-	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Packer installation failed: %w", err)
-	}
-
-	logger.Info("Packer installation completed successfully")
-	logger.Info("terminal prompt: Packer is installed. Check version with: packer version")
-	return nil
-}
-
-// Boundary native installer
-func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Boundary using native installer")
-
-	// Parse flags
-	config := &boundary.BoundaryInstallConfig{
-		InstallConfig: &hashicorp.InstallConfig{
-			Version:        cmd.Flag("version").Value.String(),
-			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
-			ForceReinstall: cmd.Flag("force").Value.String() == "true",
-			TLSEnabled:     cmd.Flag("tls").Value.String() == "true",
-		},
-		ControllerEnabled: cmd.Flag("controller").Value.String() == "true",
-		WorkerEnabled:     cmd.Flag("worker").Value.String() == "true",
-		DevMode:           cmd.Flag("dev").Value.String() == "true",
-		DatabaseURL:       cmd.Flag("database-url").Value.String(),
-		ClusterAddr:       cmd.Flag("cluster-addr").Value.String(),
-		PublicAddr:        cmd.Flag("public-addr").Value.String(),
-		RecoveryKmsType:   cmd.Flag("kms-type").Value.String(),
-		KmsKeyID:          cmd.Flag("kms-key").Value.String(),
-	}
-
-	if cmd.Flag("use-repository").Value.String() == "true" {
-		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
-	} else {
-		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
-	}
-
-	// Create and run installer
-	installer := boundary.NewNativeInstaller(rc, config)
-	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Boundary installation failed: %w", err)
-	}
-
-	logger.Info("Boundary installation completed successfully")
-	if config.DevMode {
-		logger.Info("terminal prompt: Boundary is installed in dev mode. Run: boundary-dev")
-	} else {
-		logger.Info("terminal prompt: Boundary is installed. Check status with: systemctl status boundary")
-	}
-	return nil
-}
 
 // Update existing Consul command to use native installer
 func runCreateConsulNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

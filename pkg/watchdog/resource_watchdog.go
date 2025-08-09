@@ -194,9 +194,9 @@ func (tl *TraceLogger) Initialize() error {
 	
 	// Write session header
 	tl.writeToAll("=== EOS Resource Watchdog Session Started ===\n")
-	tl.writeToAll(fmt.Sprintf("Session ID: %s\n", tl.sessionID))
-	tl.writeToAll(fmt.Sprintf("Start Time: %s\n", time.Now().Format(time.RFC3339)))
-	tl.writeToAll(fmt.Sprintf("Log Directory: %s\n\n", sessionDir))
+	tl.writeToAll("Session ID: %s\n", tl.sessionID)
+	tl.writeToAll("Start Time: %s\n", time.Now().Format(time.RFC3339))
+	tl.writeToAll("Log Directory: %s\n\n", sessionDir)
 	
 	return nil
 }
@@ -597,7 +597,7 @@ func (rw *ResourceWatchdog) captureNetworkState(dir string) {
 				if conns, err := p.Connections(); err == nil {
 					fmt.Fprintf(f, "\nPID %d (%s):\n", proc.PID, proc.Name)
 					for _, conn := range conns {
-						fmt.Fprintf(f, "  %s %s:%d -> %s:%d\n",
+						fmt.Fprintf(f, "  %d %s:%d -> %s:%d\n",
 							conn.Type, conn.Laddr.IP, conn.Laddr.Port,
 							conn.Raddr.IP, conn.Raddr.Port)
 					}
