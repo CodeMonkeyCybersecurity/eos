@@ -90,6 +90,27 @@ func (r *VersionResolver) initializeStrategies() {
 				Fn:          r.getSaltFallbackVersion,
 			},
 		}
+	case "consul":
+		r.strategies = []VersionStrategy{
+			{
+				Name:        "GitHub API",
+				Description: "Query Consul's GitHub releases API",
+				Timeout:     10 * time.Second,
+				Fn:          r.getConsulVersionFromGitHub,
+			},
+			{
+				Name:        "HashiCorp Checkpoint",
+				Description: "Check HashiCorp's checkpoint service",
+				Timeout:     10 * time.Second,
+				Fn:          r.getConsulVersionFromCheckpoint,
+			},
+			{
+				Name:        "Fallback to Known Good",
+				Description: "Use hardcoded fallback version",
+				Timeout:     1 * time.Second,
+				Fn:          r.getConsulFallbackVersion,
+			},
+		}
 	case "minio":
 		r.strategies = []VersionStrategy{
 			{
@@ -513,6 +534,148 @@ func (r *VersionResolver) getMinIOFallbackVersion(resolver *VersionResolver) (st
 	
 	// Updated fallback version - check MinIO's releases for current stable
 	fallbackVersion := "2024-01-16T16-07-38Z"
+	
+	logger.Warn("Using hardcoded fallback version",
+		zap.String("software", r.software),
+		zap.String("version", fallbackVersion),
+		zap.String("note", "Update this periodically"))
+	
+	return fallbackVersion, nil
+}
+
+// getConsulVersionFromGitHub queries Consul's GitHub releases API
+func (r *VersionResolver) getConsulVersionFromGitHub(resolver *VersionResolver) (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+	
+	apiURL := "https://api.github.com/repos/hashicorp/consul/releases/latest"
+	
+	client := &http.Client{Timeout: 10 * time.Second}
+	
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "EOS-Consul-Installer/1.0")
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to query GitHub API: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+	
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+	
+	// Skip draft and prerelease versions
+	if release.Draft || release.Prerelease {
+		logger.Warn("Latest GitHub release is not stable",
+			zap.String("version", release.TagName),
+			zap.Bool("draft", release.Draft),
+			zap.Bool("prerelease", release.Prerelease))
+		return r.getLatestStableConsulFromAllReleases()
+	}
+	
+	// Remove 'v' prefix if present
+	version := strings.TrimPrefix(release.TagName, "v")
+	
+	logger.Info("Retrieved Consul version from GitHub",
+		zap.String("version", version),
+		zap.String("tag", release.TagName),
+		zap.Time("released", release.CreatedAt))
+	
+	return version, nil
+}
+
+// getLatestStableConsulFromAllReleases fetches all releases to find the latest stable one
+func (r *VersionResolver) getLatestStableConsulFromAllReleases() (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+	
+	apiURL := "https://api.github.com/repos/hashicorp/consul/releases?per_page=50"
+	
+	client := &http.Client{Timeout: 15 * time.Second}
+	
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "EOS-Consul-Installer/1.0")
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to query GitHub API: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	var releases []GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return "", fmt.Errorf("failed to parse GitHub response: %w", err)
+	}
+	
+	// Find the latest stable release
+	for _, release := range releases {
+		if !release.Draft && !release.Prerelease {
+			version := strings.TrimPrefix(release.TagName, "v")
+			logger.Debug("Found latest stable Consul release",
+				zap.String("version", version),
+				zap.String("name", release.Name))
+			return version, nil
+		}
+	}
+	
+	return "", fmt.Errorf("no stable releases found")
+}
+
+// getConsulVersionFromCheckpoint queries HashiCorp's checkpoint service
+func (r *VersionResolver) getConsulVersionFromCheckpoint(resolver *VersionResolver) (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+	
+	// HashiCorp's checkpoint API
+	checkpointURL := "https://checkpoint-api.hashicorp.com/v1/check/consul"
+	
+	client := &http.Client{Timeout: 10 * time.Second}
+	
+	resp, err := client.Get(checkpointURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to query checkpoint service: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checkpoint service returned status %d", resp.StatusCode)
+	}
+	
+	var checkpointResp struct {
+		CurrentVersion string `json:"current_version"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&checkpointResp); err != nil {
+		return "", fmt.Errorf("failed to decode checkpoint response: %w", err)
+	}
+	
+	version := strings.TrimPrefix(checkpointResp.CurrentVersion, "v")
+	
+	logger.Info("Retrieved Consul version from HashiCorp checkpoint",
+		zap.String("version", version))
+	
+	return version, nil
+}
+
+// getConsulFallbackVersion returns a known good Consul version
+func (r *VersionResolver) getConsulFallbackVersion(resolver *VersionResolver) (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+	
+	// Updated fallback version - check Consul's releases for current stable
+	fallbackVersion := "1.17.1"
 	
 	logger.Warn("Using hardcoded fallback version",
 		zap.String("software", r.software),

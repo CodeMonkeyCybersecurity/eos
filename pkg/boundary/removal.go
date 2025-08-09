@@ -82,7 +82,7 @@ func removeBoundaryComponents(rc *eos_io.RuntimeContext, state *BoundaryState, k
 	// Stop and disable service if it exists
 	if state.ServiceExists {
 		logger.Info("Stopping and disabling Boundary service")
-		
+
 		// Stop service
 		execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",

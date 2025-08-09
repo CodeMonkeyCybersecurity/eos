@@ -31,7 +31,7 @@ func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Warn("Using deprecated direct installation method, consider using InstallToolViaSalt",
 		zap.String("tool", tool))
-	
+
 	// Redirect to Salt-based installation for consistency
 	return InstallToolViaSalt(rc, tool)
 }
@@ -54,19 +54,19 @@ func InstallToolViaSalt(rc *eos_io.RuntimeContext, tool string) error {
 	}
 
 	logger.Info("Tool validation passed", zap.String("tool", tool))
-	
+
 	// Run tool-specific preflight checks
 	if err := runToolPreflightChecks(rc, tool); err != nil {
 		return fmt.Errorf("preflight checks failed: %w", err)
 	}
-	
+
 	// Ask for user consent before proceeding
 	toolDescription := getToolDescription(tool)
 	consent, err := eos_io.PromptForInstallation(rc, fmt.Sprintf("HashiCorp %s", strings.Title(tool)), toolDescription)
 	if err != nil {
 		return fmt.Errorf("failed to get user consent: %w", err)
 	}
-	
+
 	if !consent {
 		logger.Info("Installation cancelled by user")
 		return fmt.Errorf("installation cancelled by user")
@@ -82,7 +82,7 @@ func InstallToolViaSalt(rc *eos_io.RuntimeContext, tool string) error {
 	// INTERVENE - Install via Salt states
 	logger.Info("Installing HashiCorp tool via Salt states", zap.String("tool", tool))
 	if err := installToolViaSaltStates(rc, tool); err != nil {
-		logger.Error("Salt installation failed, falling back to direct installation", 
+		logger.Error("Salt installation failed, falling back to direct installation",
 			zap.String("tool", tool), zap.Error(err))
 		return installToolDirect(rc, tool)
 	}
@@ -281,13 +281,13 @@ func GetSupportedToolsString() string {
 // checkSaltAvailability checks if Salt is available for use
 func checkSaltAvailability(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if salt-call is available
 	if err := execute.RunSimple(rc.Ctx, "which", "salt-call"); err != nil {
 		logger.Warn("salt-call not found in PATH", zap.Error(err))
 		return fmt.Errorf("salt-call not available: %w", err)
 	}
-	
+
 	logger.Info("Salt availability verified")
 	return nil
 }
@@ -295,14 +295,14 @@ func checkSaltAvailability(rc *eos_io.RuntimeContext) error {
 // installToolViaSaltStates installs a tool using Salt states
 func installToolViaSaltStates(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Apply Salt state for the specific HashiCorp tool
 	stateName := fmt.Sprintf("hashicorp.%s", tool)
-	
+
 	logger.Info("Applying Salt state for HashiCorp tool",
 		zap.String("tool", tool),
 		zap.String("state", stateName))
-	
+
 	// Run salt-call to apply the state with enhanced error handling
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "salt-call",
@@ -310,14 +310,14 @@ func installToolViaSaltStates(rc *eos_io.RuntimeContext, tool string) error {
 		Capture: true,
 		Timeout: 300 * time.Second, // 5 minute timeout for installation
 	})
-	
+
 	if err != nil {
 		logger.Error("Failed to apply Salt state",
 			zap.String("tool", tool),
 			zap.String("state", stateName),
 			zap.String("output", output),
 			zap.Error(err))
-			
+
 		// Check for common error patterns and provide helpful guidance
 		if strings.Contains(output, "State not found") {
 			return fmt.Errorf("Salt state %s not found. Please ensure Salt states are properly installed in /opt/eos/salt/states/", stateName)
@@ -331,10 +331,10 @@ func installToolViaSaltStates(rc *eos_io.RuntimeContext, tool string) error {
 		if strings.Contains(output, "Permission denied") {
 			return fmt.Errorf("Permission error applying Salt state %s. Please run with sudo", stateName)
 		}
-		
+
 		return fmt.Errorf("failed to apply Salt state %s: %w\nOutput: %s", stateName, err, output)
 	}
-	
+
 	// Parse JSON output to check for state failures
 	if strings.Contains(output, "\"result\": false") {
 		logger.Error("Salt state execution failed",
@@ -343,11 +343,11 @@ func installToolViaSaltStates(rc *eos_io.RuntimeContext, tool string) error {
 			zap.String("output", output))
 		return fmt.Errorf("Salt state %s executed but failed. Check Salt logs for details", stateName)
 	}
-	
+
 	logger.Info("Successfully applied Salt state for HashiCorp tool",
 		zap.String("tool", tool),
 		zap.String("state", stateName))
-	
+
 	return nil
 }
 
@@ -401,15 +401,15 @@ func runToolPreflightChecks(rc *eos_io.RuntimeContext, tool string) error {
 	case "terraform":
 		// For now, just do basic checks until we can properly import
 		return runBasicPreflightChecks(rc, tool)
-		
+
 	case "nomad":
 		// Nomad has its own comprehensive installation flow
 		return nil
-		
+
 	case "consul":
 		// Consul has its own installation flow
 		return nil
-		
+
 	default:
 		// Basic checks for other tools
 		return runBasicPreflightChecks(rc, tool)
@@ -426,7 +426,7 @@ func getToolDescription(tool string) string {
 		"packer":    "automated machine image building",
 		"boundary":  "secure remote access",
 	}
-	
+
 	if desc, ok := descriptions[tool]; ok {
 		return desc
 	}
@@ -437,17 +437,17 @@ func getToolDescription(tool string) string {
 func runBasicPreflightChecks(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Running basic preflight checks", zap.String("tool", tool))
-	
+
 	// Check if already installed
 	if path, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "which",
 		Args:    []string{tool},
 		Capture: true,
 	}); err == nil {
-		logger.Info("⚠ Tool already installed", 
+		logger.Info("⚠ Tool already installed",
 			zap.String("tool", tool),
 			zap.String("path", strings.TrimSpace(path)))
-		
+
 		// Get version
 		if version, err := execute.Run(rc.Ctx, execute.Options{
 			Command: tool,
@@ -457,7 +457,7 @@ func runBasicPreflightChecks(rc *eos_io.RuntimeContext, tool string) error {
 			logger.Info("Existing version", zap.String("version", strings.Split(version, "\n")[0]))
 		}
 	}
-	
+
 	// Check disk space
 	logger.Info("Checking disk space")
 	// Simple df check - we need at least 500MB
@@ -471,6 +471,6 @@ func runBasicPreflightChecks(rc *eos_io.RuntimeContext, tool string) error {
 			logger.Info("Disk space check", zap.String("df_output", lines[1]))
 		}
 	}
-	
+
 	return nil
 }

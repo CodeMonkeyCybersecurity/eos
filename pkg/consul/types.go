@@ -15,6 +15,18 @@ type Config struct {
 	DisableVaultIntegration bool
 }
 
+// ConsulStatus represents the current Consul installation status
+type ConsulStatus struct {
+	Installed      bool
+	Running        bool
+	Failed         bool
+	ConfigValid    bool
+	Version        string
+	ServiceStatus  string
+	ClusterMembers int
+	LastError      string
+}
+
 // ConsulConfig represents the comprehensive Consul configuration
 type ConsulConfig struct {
 	Mode            string   `json:"mode"` // server, agent, dev
@@ -40,9 +52,18 @@ type ConsulConfig struct {
 
 	// Features
 	EnableUI       bool `json:"enable_ui"`
+	UI             bool `json:"ui"` // Alias for EnableUI
 	ConnectEnabled bool `json:"connect_enabled"`
 	MeshGateway    bool `json:"mesh_gateway"`
 	IngressGateway bool `json:"ingress_gateway"`
+
+	// Installation options
+	Version          string `json:"version"`
+	VaultIntegration bool   `json:"vault_integration"`
+	LogLevel         string `json:"log_level"`
+	Force            bool   `json:"force"`
+	Clean            bool   `json:"clean"`
+	UseRepository    bool   `json:"use_repository"`
 
 	// Advanced
 	Performance PerformanceConfig `json:"performance"`

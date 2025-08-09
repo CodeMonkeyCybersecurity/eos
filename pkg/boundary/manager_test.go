@@ -173,11 +173,11 @@ func TestConfig_Validation(t *testing.T) {
 			// Basic validation that config fields are properly set
 			assert.NotEmpty(t, tt.config.Role)
 			assert.NotEmpty(t, tt.config.ClusterName)
-			
+
 			if tt.config.Role == "controller" || tt.config.Role == "dev" {
 				assert.NotEmpty(t, tt.config.DatabaseURL)
 			}
-			
+
 			if tt.config.Role == "worker" {
 				assert.NotEmpty(t, tt.config.InitialUpstreams)
 			}
@@ -212,11 +212,11 @@ func createMockSaltAPI(t *testing.T) *httptest.Server {
 
 			// Mock successful command response
 			w.Header().Set("Content-Type", "application/json")
-			
+
 			// Parse the request to determine response
 			r.ParseForm()
 			fun := r.FormValue("fun")
-			
+
 			switch fun {
 			case "state.apply":
 				// Mock state application success
@@ -235,7 +235,7 @@ func createMockSaltAPI(t *testing.T) *httptest.Server {
 						}
 					}]
 				}`))
-				
+
 			case "cmd.run":
 				// Mock status check response
 				w.Write([]byte(`{
@@ -243,7 +243,7 @@ func createMockSaltAPI(t *testing.T) *httptest.Server {
 						"test-minion": "{\"installed\": true, \"running\": true, \"version\": \"0.15.0\", \"role\": \"controller\", \"service_status\": \"active\", \"config_valid\": true}"
 					}]
 				}`))
-				
+
 			default:
 				// Default success response
 				w.Write([]byte(`{

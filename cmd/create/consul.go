@@ -1,20 +1,16 @@
-// cmd/create/consul.go
+// cmd/create/consul_native.go
 
 package create
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bootstrap"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -23,46 +19,37 @@ import (
 
 var CreateConsulCmd = &cobra.Command{
 	Use:   "consul",
-	Short: "Install and configure HashiCorp Consul using SaltStack",
-	Long: `Install and configure HashiCorp Consul using SaltStack orchestration.
+	Short: "Install and configure HashiCorp Consul directly (without SaltStack)",
+	Long: `Install and configure HashiCorp Consul using native installation methods.
 
-This command provides a complete Consul deployment including:
-- Installation of Consul binary via HashiCorp repository
-- Service discovery and mesh networking configuration
-- TLS certificate generation and management
-- Service configuration and systemd integration
-- Health monitoring and automatic failover
-- Consul Connect service mesh ready configuration
-- Automatic Vault integration if available
-- Comprehensive audit logging and security settings
+This command installs Consul directly without using configuration management tools,
+eliminating circular dependencies and simplifying the installation process.
 
-The deployment is managed entirely through SaltStack states, ensuring
-consistent and repeatable installations.
-
-IDEMPOTENCY:
-By default, this command will not reinstall or reconfigure Consul if it's
-already running successfully. Use --force to reconfigure an existing
-installation or --clean to completely remove and reinstall.
+INSTALLATION METHODS:
+• Repository: Use HashiCorp's official APT repository (default)
+• Binary: Download and install binary directly from releases.hashicorp.com
 
 FEATURES:
 • Service discovery with DNS and HTTP API
 • Health monitoring and automatic failover
 • Consul Connect service mesh ready
 • Automatic Vault integration if available
-• Scaling-ready configuration
-• Comprehensive audit logging
 • Production-ready security settings
+• Idempotent installation (safe to run multiple times)
 
 CONFIGURATION:
-• HTTP API on port ` + fmt.Sprintf("%d", shared.PortConsul) + ` (instead of default 8500)
-• Consul Connect enabled for service mesh
-• UI enabled for management
-• Automatic Vault service registration
+• HTTP API on port ` + fmt.Sprintf("%d", shared.PortConsul) + `
 • DNS service discovery on port 8600
+• gRPC on port 8502
+• UI enabled by default
+• Consul Connect enabled for service mesh
 
 EXAMPLES:
-  # Install Consul with default configuration
+  # Install Consul using APT repository (recommended)
   eos create consul
+
+  # Install specific version via binary download
+  eos create consul --binary --version 1.17.1
 
   # Force reconfiguration of existing Consul
   eos create consul --force
@@ -70,140 +57,23 @@ EXAMPLES:
   # Clean install (removes existing data)
   eos create consul --clean
 
-  # Install Consul with custom datacenter name
+  # Install with custom datacenter name
   eos create consul --datacenter production
 
   # Install without Vault integration
-  eos create consul --no-vault-integration
-
-  # Install with debug logging enabled
-  eos create consul --debug --datacenter staging`,
+  eos create consul --no-vault-integration`,
 	RunE: eos_cli.Wrap(runCreateConsul),
 }
 
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
-	datacenterName          string
-	disableVaultIntegration bool
-	enableDebugLogging      bool
-	forceReinstall          bool
-	cleanInstall            bool
+	consulDatacenter       string
+	consulNoVault          bool
+	consulDebug            bool
+	consulForce            bool
+	consulClean            bool
+	consulBinary           bool
+	consulVersion          string
 )
-
-func checkConsulStatus(ctx context.Context, client *salt.Client, logger otelzap.LoggerWithCtx) (*salt.ConsulStatus, error) {
-	cmd := salt.Command{
-		Client:   "local",
-		Target:   "*",
-		Function: "cmd.run",
-		Args: []string{`
-			STATUS='{}'
-			if command -v consul >/dev/null 2>&1; then
-				STATUS=$(echo $STATUS | jq '. + {installed: true}')
-				VERSION=$(consul version | head -1)
-				STATUS=$(echo $STATUS | jq --arg v "$VERSION" '. + {version: $v}')
-			fi
-			
-			if systemctl is-active consul.service >/dev/null 2>&1; then
-				STATUS=$(echo $STATUS | jq '. + {running: true, service_status: "active"}')
-			elif systemctl is-failed consul.service >/dev/null 2>&1; then
-				STATUS=$(echo $STATUS | jq '. + {failed: true, service_status: "failed"}')
-				ERROR=$(journalctl -u consul.service -n 1 --no-pager | tail -1)
-				STATUS=$(echo $STATUS | jq --arg e "$ERROR" '. + {last_error: $e}')
-			fi
-			
-			if [ -f /etc/consul.d/consul.hcl ] && consul validate /etc/consul.d >/dev/null 2>&1; then
-				STATUS=$(echo $STATUS | jq '. + {config_valid: true}')
-			fi
-			
-			echo $STATUS
-		`},
-		Kwargs: map[string]string{
-			"shell": "/bin/bash",
-		},
-	}
-
-	result, err := client.ExecuteCommand(ctx, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check Consul status: %w", err)
-	}
-
-	// Parse the response to extract status
-	status := &salt.ConsulStatus{}
-	for _, output := range result.Raw {
-		if str, ok := output.(string); ok {
-			// For simplicity, we'll parse known patterns
-			// In production, you'd properly unmarshal the JSON
-			if str != "" {
-				status.Installed = true // Simplified parsing
-				logger.Debug("Consul status response", zap.String("output", str))
-			}
-		}
-	}
-
-	return status, nil
-}
-
-func displayConsulStatus(logger otelzap.LoggerWithCtx, status *salt.ConsulStatus) {
-	logger.Info("Current Consul status",
-		zap.Bool("installed", status.Installed),
-		zap.Bool("running", status.Running),
-		zap.Bool("failed", status.Failed),
-		zap.Bool("config_valid", status.ConfigValid),
-		zap.String("version", status.Version),
-		zap.String("service_status", status.ServiceStatus))
-
-	logger.Info("terminal prompt: Current Consul Status:")
-	logger.Info(fmt.Sprintf("terminal prompt:   Installed:     %v", status.Installed))
-	logger.Info(fmt.Sprintf("terminal prompt:   Running:       %v", status.Running))
-	logger.Info(fmt.Sprintf("terminal prompt:   Config Valid:  %v", status.ConfigValid))
-	if status.Version != "" {
-		logger.Info(fmt.Sprintf("terminal prompt:   Version:       %s", status.Version))
-	}
-	if status.Failed {
-		logger.Info("terminal prompt:   ⚠️  Status:       FAILED")
-		if status.LastError != "" {
-			logger.Info(fmt.Sprintf("terminal prompt:   Last Error:    %s", status.LastError))
-		}
-	}
-}
-
-func initializeSaltClient(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) (*salt.Client, error) {
-	// Create a basic saltstack client first to check API availability
-	basicClient := saltstack.NewClient(logger)
-	
-	// Perform comprehensive API availability check
-	if !basicClient.IsAPIAvailable(rc.Ctx) {
-		logger.Info("Salt API is not available, will use salt-call fallback")
-		return nil, fmt.Errorf("Salt API not available")
-	}
-	
-	// If API is available, create the full REST API client
-	baseLogger := logger.ZapLogger()
-	config := salt.ClientConfig{
-		BaseURL:            getConsulEnvOrDefault("SALT_API_URL", "https://localhost:8000"),
-		Username:           getConsulEnvOrDefault("SALT_API_USER", "eos-service"),
-		Password:           os.Getenv("SALT_API_PASSWORD"),
-		EAuth:              "pam",
-		Timeout:            10 * time.Minute,
-		MaxRetries:         3,
-		InsecureSkipVerify: getConsulEnvOrDefault("SALT_API_INSECURE", "false") == "true",
-		Logger:             baseLogger,
-	}
-
-	if config.Password == "" {
-		logger.Info("Salt API password not configured, will use salt-call fallback")
-		return nil, fmt.Errorf("Salt API password not configured")
-	}
-
-	return salt.NewClient(config)
-}
-
-func getConsulEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
 func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -215,233 +85,74 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	// Check if system is bootstrapped
 	if err := bootstrap.RequireBootstrap(rc); err != nil {
-		return err
+		// Bootstrap not required for fundamental services like Consul
+		logger.Debug("System not bootstrapped, continuing with Consul installation")
 	}
 
-	logger.Info("Starting Consul installation process",
-		zap.String("datacenter", datacenterName),
-		zap.Bool("vault_integration", !disableVaultIntegration),
-		zap.Bool("debug_logging", enableDebugLogging),
-		zap.Bool("force", forceReinstall),
-		zap.Bool("clean", cleanInstall))
+	logger.Info("Starting native Consul installation",
+		zap.String("datacenter", consulDatacenter),
+		zap.Bool("vault_integration", !consulNoVault),
+		zap.Bool("use_binary", consulBinary),
+		zap.String("version", consulVersion))
 
-	// Try to initialize Salt API client
-	saltClient, err := initializeSaltClient(rc, logger)
-	if err != nil {
-		logger.Info("Salt API not available, falling back to local salt-call execution", 
-			zap.Error(err))
-		// Fall back to the salt-call implementation
-		return runCreateConsulFallback(rc, cmd, args)
+	// Create installation config
+	installConfig := &consul.InstallConfig{
+		Version:          consulVersion,
+		Datacenter:       consulDatacenter,
+		ServerMode:       true,
+		BootstrapExpect:  1,
+		UIEnabled:        true,
+		ConnectEnabled:   true,
+		VaultIntegration: !consulNoVault,
+		LogLevel:         getConsulLogLevel(consulDebug),
+		BindAddr:         "0.0.0.0",
+		ClientAddr:       "0.0.0.0",
+		ForceReinstall:   consulForce,
+		CleanInstall:     consulClean,
+		UseRepository:    !consulBinary, // Use repository by default
 	}
 
-	// ASSESS - Check current Consul status
-	logger.Info("Checking current Consul status")
-	status, err := checkConsulStatus(rc.Ctx, saltClient, logger)
-	if err != nil {
-		logger.Warn("Could not determine Consul status", zap.Error(err))
-		status = &salt.ConsulStatus{} // Use empty status
-	}
-
-	// Display current status
-	displayConsulStatus(logger, status)
-
-	// Idempotency check - if Consul is running successfully and no force flags
-	if status.Running && status.ConfigValid && !forceReinstall && !cleanInstall {
-		logger.Info("terminal prompt: Consul is already installed and running.")
-		logger.Info("terminal prompt: Use --force to reconfigure or --clean for a fresh install.")
-		return nil
-	}
-
-	// If Consul is in failed state and no force flags
-	if status.Failed && !forceReinstall && !cleanInstall {
-		logger.Info("terminal prompt: Consul is installed but in a failed state.")
-		logger.Info("terminal prompt: Check logs with: journalctl -xeu consul.service")
-		logger.Info("terminal prompt: Use --force to reconfigure or --clean for a fresh install.")
-		return eos_err.NewUserError("Consul is in failed state. Use --force or --clean to proceed")
-	}
-
-	// INTERVENE - Apply SaltStack state
-	logger.Info("Applying SaltStack state for Consul installation")
-
-	// Prepare Salt pillar data
-	pillar := map[string]interface{}{
-		"consul": map[string]interface{}{
-			"datacenter":        datacenterName,
-			"bootstrap_expect":  1,
-			"server_mode":       true,
-			"vault_integration": !disableVaultIntegration,
-			"log_level":         getLogLevel(enableDebugLogging),
-			"force_install":     forceReinstall,
-			"clean_install":     cleanInstall,
-			"bind_addr":         "0.0.0.0",
-			"client_addr":       "0.0.0.0",
-			"ui_enabled":        true,
-			"connect_enabled":   true,
-			"dns_port":          8600,
-			"http_port":         shared.PortConsul,
-			"grpc_port":         8502,
-		},
-	}
-
-	// Execute state with progress updates
-	logger.Info("terminal prompt: Starting Consul installation...")
+	// Use native installer
+	installer := consul.NewNativeInstaller(rc, installConfig)
 	
-	progressStarted := false
-	result, err := saltClient.ExecuteStateApply(rc.Ctx, "hashicorp.consul", pillar,
-		func(progress salt.StateProgress) {
-			if !progressStarted {
-				progressStarted = true
-			}
-			
-			if progress.Completed {
-				status := "✓"
-				if !progress.Success {
-					status = "✗"
-				}
-				logger.Info(fmt.Sprintf("terminal prompt: %s %s - %s", status, progress.State, progress.Message))
-			} else {
-				logger.Info(fmt.Sprintf("terminal prompt: ... %s", progress.Message))
-			}
-		})
-
-	if err != nil {
-		return fmt.Errorf("state execution failed: %w", err)
-	}
-
-	if result.Failed {
-		logger.Error("Consul installation failed",
-			zap.Strings("errors", result.Errors))
-		logger.Info("terminal prompt: ❌ Consul installation failed:")
-		for _, err := range result.Errors {
-			logger.Info(fmt.Sprintf("terminal prompt:   - %s", err))
-		}
-		return salt.ErrStateExecutionFailed
-	}
-
-	// EVALUATE - Verify installation
-	logger.Info("Verifying Consul installation")
-	if err := verifyConsulInstallation(rc.Ctx, saltClient); err != nil {
-		return fmt.Errorf("installation verification failed: %w", err)
+	// ASSESS, INTERVENE, EVALUATE pattern is handled inside the installer
+	if err := installer.Install(); err != nil {
+		return fmt.Errorf("Consul installation failed: %w", err)
 	}
 
 	logger.Info("terminal prompt: ✅ Consul installation completed successfully!")
 	logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Next steps:")
+	logger.Info("terminal prompt: 1. Check status: consul members")
+	logger.Info("terminal prompt: 2. View logs: journalctl -u consul -f")
+	logger.Info(fmt.Sprintf("terminal prompt: 3. Access UI: http://localhost:%d/ui", shared.PortConsul))
 
 	return nil
 }
 
-func verifyConsulInstallation(ctx context.Context, client *salt.Client) error {
-	// Wait a moment for service to start
-	time.Sleep(5 * time.Second)
-
-	cmd := salt.Command{
-		Client:   "local",
-		Target:   "*",
-		Function: "consul.agent_members",
-	}
-
-	_, err := client.ExecuteCommand(ctx, cmd)
-	if err != nil {
-		// Try a simpler check
-		pingCmd := salt.Command{
-			Client:   "local",
-			Target:   "*",
-			Function: "cmd.run",
-			Args:     []string{"consul members"},
-		}
-		
-		if _, err := client.ExecuteCommand(ctx, pingCmd); err != nil {
-			return fmt.Errorf("Consul is not responding properly: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func getLogLevel(debug bool) string {
+func getConsulLogLevel(debug bool) string {
 	if debug {
 		return "DEBUG"
 	}
 	return "INFO"
 }
 
-// runCreateConsulFallback implements consul creation using salt-call (masterless mode)
-func runCreateConsulFallback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	logger.Info("Using Salt masterless mode for Consul installation")
-	
-	// Create basic saltstack client for local operations
-	saltClient := saltstack.NewClient(logger)
-	
-	// ASSESS - Check if we can run salt-call
-	logger.Info("Checking Salt masterless mode availability")
-	
-	// Prepare Salt pillar data (same as API version)
-	pillar := map[string]interface{}{
-		"consul": map[string]interface{}{
-			"datacenter":        datacenterName,
-			"bootstrap_expect":  1,
-			"server_mode":       true,
-			"vault_integration": !disableVaultIntegration,
-			"log_level":         getLogLevel(enableDebugLogging),
-			"force_install":     forceReinstall,
-			"clean_install":     cleanInstall,
-			"bind_addr":         "0.0.0.0",
-			"client_addr":       "0.0.0.0",
-			"ui_enabled":        true,
-			"connect_enabled":   true,
-			"dns_port":          8600,
-			"http_port":         shared.PortConsul,
-			"grpc_port":         8502,
-		},
-	}
-	
-	// INTERVENE - Apply Salt state using salt-call
-	logger.Info("Applying Consul Salt state using salt-call")
-	
-	if err := saltClient.StateApplyLocal(rc.Ctx, "hashicorp.consul", pillar); err != nil {
-		return fmt.Errorf("failed to apply consul state: %w", err)
-	}
-	
-	// EVALUATE - Basic verification using salt-call
-	logger.Info("Verifying Consul installation")
-	
-	// Check consul binary is available
-	output, err := saltClient.CmdRunLocal(rc.Ctx, "which consul")
-	if err != nil || output == "" {
-		return fmt.Errorf("consul binary not found after installation")
-	}
-	
-	// Check consul service status
-	output, err = saltClient.CmdRunLocal(rc.Ctx, "systemctl is-active consul")
-	if err != nil {
-		logger.Warn("Consul service may not be running yet", zap.Error(err))
-		// Give it a moment to start
-		time.Sleep(5 * time.Second)
-		
-		output, err = saltClient.CmdRunLocal(rc.Ctx, "systemctl is-active consul")
-		if err != nil {
-			return fmt.Errorf("consul service failed to start: %w", err)
-		}
-	}
-	
-	if !strings.Contains(output, "active") {
-		return fmt.Errorf("consul service is not active, status: %s", output)
-	}
-	
-	logger.Info("terminal prompt: ✅ Consul installation completed successfully using salt-call!")
-	logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
-	
-	return nil
-}
-
 func init() {
-	CreateConsulCmd.Flags().StringVarP(&datacenterName, "datacenter", "d", "dc1", "Datacenter name for Consul cluster")
-	CreateConsulCmd.Flags().BoolVar(&disableVaultIntegration, "no-vault-integration", false, "Disable automatic Vault integration")
-	CreateConsulCmd.Flags().BoolVar(&enableDebugLogging, "debug", false, "Enable debug logging for Consul")
-	CreateConsulCmd.Flags().BoolVar(&forceReinstall, "force", false, "Force reconfiguration even if Consul is running")
-	CreateConsulCmd.Flags().BoolVar(&cleanInstall, "clean", false, "Remove all data and perform clean installation")
+	CreateConsulCmd.Flags().StringVarP(&consulDatacenter, "datacenter", "d", "dc1", 
+		"Datacenter name for Consul cluster")
+	CreateConsulCmd.Flags().BoolVar(&consulNoVault, "no-vault-integration", false, 
+		"Disable automatic Vault integration")
+	CreateConsulCmd.Flags().BoolVar(&consulDebug, "debug", false, 
+		"Enable debug logging for Consul")
+	CreateConsulCmd.Flags().BoolVar(&consulForce, "force", false, 
+		"Force reconfiguration even if Consul is running")
+	CreateConsulCmd.Flags().BoolVar(&consulClean, "clean", false, 
+		"Remove all data and perform clean installation")
+	CreateConsulCmd.Flags().BoolVar(&consulBinary, "binary", false, 
+		"Use direct binary download instead of APT repository")
+	CreateConsulCmd.Flags().StringVar(&consulVersion, "version", "latest", 
+		"Consul version to install (default: latest)")
 
 	// Register the command with the create command
 	CreateCmd.AddCommand(CreateConsulCmd)

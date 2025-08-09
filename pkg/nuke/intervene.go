@@ -9,7 +9,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
@@ -302,13 +301,14 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 	}
 
 	// Remove Eos resources (but not the binary itself)
-	if !excluded["eos"] {
-		logger.Info("Removing Eos resources")
-		if err := eos.RemoveEosResources(rc, keepData); err != nil {
-			logger.Warn("Eos resources removal had issues", zap.Error(err))
-			errors = append(errors, fmt.Sprintf("eos: %v", err))
-		}
-	}
+	// EOS resources removed - no longer needed
+	// if !excluded["eos"] {
+	// 	logger.Info("Removing Eos resources")
+	// 	if err := eos.RemoveEosResources(rc, keepData); err != nil {
+	// 		logger.Warn("Eos resources removal had issues", zap.Error(err))
+	// 		errors = append(errors, fmt.Sprintf("eos: %v", err))
+	// 	}
+	// }
 
 	// Remove remaining binaries - this function is now empty since all binaries
 	// are handled by their respective lifecycle managers

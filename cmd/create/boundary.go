@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -20,44 +21,22 @@ import (
 
 var CreateBoundaryCmd = &cobra.Command{
 	Use:   "boundary",
-	Short: "Install and configure HashiCorp Boundary",
-	Long: `Install and configure HashiCorp Boundary for secure remote access.
+	Short: "Install HashiCorp Boundary using native installer",
+	Long: `Install HashiCorp Boundary for secure remote access.
 
-This command will:
-- Check if Boundary is already installed and running
-- Install Boundary with proper idempotency
-- Configure Boundary as controller or worker based on flags
-- Set up database (for controllers)
-- Configure KMS for encryption
-- Set up systemd service
-- Verify installation and connectivity
+This installer provides:
+- Controller and/or worker configuration
+- Database setup for controllers
+- KMS configuration
+- Development mode
+- TLS setup
 
-ARCHITECTURE:
-Boundary provides identity-based access to infrastructure without exposing
-networks. It consists of:
-- Controllers: Manage workers, handle API requests, store data
-- Workers: Proxy connections between users and targets
-- Database: PostgreSQL backend for controllers
-
-EXAMPLES:
-  # Install Boundary controller with PostgreSQL
-  eos create boundary --role controller --database-url "postgresql://boundary:password@localhost/boundary"
-
-  # Install Boundary worker connecting to controllers
-  eos create boundary --role worker --upstream "controller1.example.com:9201,controller2.example.com:9201"
-
-  # Install combined dev mode (controller + worker)
-  eos create boundary --role dev
-
-  # Install with specific version
-  eos create boundary --version 0.15.0
-
-  # Force reinstall/reconfigure
-  eos create boundary --force
-
-  # Clean install (remove existing data)
-  eos create boundary --clean`,
-	RunE: eos.Wrap(runCreateBoundary),
+Examples:
+  eos create boundary --dev                     # Development mode
+  eos create boundary --controller              # Controller only
+  eos create boundary --worker                  # Worker only
+  eos create boundary --database-url=...        # With PostgreSQL`,
+	RunE: eos.Wrap(runCreateBoundaryNative),
 }
 
 var (
@@ -92,7 +71,48 @@ var (
 	boundaryStreamOutput bool
 )
 
-func runCreateBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing Boundary using native installer")
+
+	// Parse flags
+	config := &boundary.BoundaryInstallConfig{
+		InstallConfig: &hashicorp.InstallConfig{
+			Version:        boundaryVersion,
+			CleanInstall:   boundaryClean,
+			ForceReinstall: boundaryForce,
+			TLSEnabled:     !boundaryTLSDisable,
+		},
+		ControllerEnabled: boundaryRole == "controller" || boundaryRole == "dev",
+		WorkerEnabled:     boundaryRole == "worker" || boundaryRole == "dev",
+		DevMode:           boundaryRole == "dev",
+		DatabaseURL:       boundaryDatabaseURL,
+		ClusterAddr:       boundaryPublicClusterAddr,
+		PublicAddr:        boundaryPublicAddr,
+		RecoveryKmsType:   boundaryKMSType,
+		KmsKeyID:          boundaryKMSKeyID,
+	}
+
+	// Set install method
+	config.InstallConfig.InstallMethod = hashicorp.MethodBinary
+
+	// Create and run installer
+	installer := boundary.NewNativeInstaller(rc, config)
+	if err := installer.Install(); err != nil {
+		return fmt.Errorf("Boundary installation failed: %w", err)
+	}
+
+	logger.Info("Boundary installation completed successfully")
+	if config.DevMode {
+		logger.Info("terminal prompt: Boundary is installed in dev mode. Run: boundary-dev")
+	} else {
+		logger.Info("terminal prompt: Boundary is installed. Check status with: systemctl status boundary")
+	}
+	return nil
+}
+
+// Legacy function kept for reference
+func runCreateBoundaryLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check if running as root

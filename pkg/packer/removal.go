@@ -17,7 +17,7 @@ import (
 func EnsureInstalled(rc *eos_io.RuntimeContext, logger *zap.Logger) error {
 	l := otelzap.Ctx(rc.Ctx)
 	l.Info("Ensuring Packer is installed")
-	
+
 	// Check if already installed
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "packer",
@@ -28,7 +28,7 @@ func EnsureInstalled(rc *eos_io.RuntimeContext, logger *zap.Logger) error {
 		l.Info("Packer is already installed")
 		return nil
 	}
-	
+
 	// TODO: Implement actual installation
 	return fmt.Errorf("packer installation not yet implemented")
 }

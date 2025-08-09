@@ -1,9 +1,8 @@
-package hashicorp
+package consul
 
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -16,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// CommandRunner provides consistent command execution with retry logic
+// CommandRunner provides a consistent interface for running commands with retry logic
 type CommandRunner struct {
 	rc      *eos_io.RuntimeContext
 	logger  otelzap.LoggerWithCtx
@@ -24,7 +23,7 @@ type CommandRunner struct {
 	retries int
 }
 
-// NewCommandRunner creates a new command runner
+// NewCommandRunner creates a new command runner with default retry settings
 func NewCommandRunner(rc *eos_io.RuntimeContext) *CommandRunner {
 	return &CommandRunner{
 		rc:      rc,
@@ -33,7 +32,7 @@ func NewCommandRunner(rc *eos_io.RuntimeContext) *CommandRunner {
 	}
 }
 
-// Run executes a command with default retry logic
+// Run executes a command with retry logic and proper error handling
 func (r *CommandRunner) Run(name string, args ...string) error {
 	return r.RunWithRetries(name, args, r.retries)
 }
@@ -90,6 +89,9 @@ func (r *CommandRunner) RunOutput(name string, args ...string) (string, error) {
 		zap.Strings("args", args))
 
 	if r.dryRun {
+		r.logger.Info("DRY RUN: Would execute for output",
+			zap.String("command", name),
+			zap.Strings("args", args))
 		return "", nil
 	}
 
@@ -106,7 +108,7 @@ func (r *CommandRunner) RunOutput(name string, args ...string) (string, error) {
 	return strings.TrimSpace(output), nil
 }
 
-// RunQuiet executes a command without logging output
+// RunQuiet executes a command without logging output (for checks)
 func (r *CommandRunner) RunQuiet(name string, args ...string) error {
 	if r.dryRun {
 		return nil
@@ -120,64 +122,68 @@ func (r *CommandRunner) RunQuiet(name string, args ...string) error {
 	return err
 }
 
-// SystemdManager handles systemd service operations
-type SystemdManager struct {
+// SystemdService provides consistent systemd operations
+type SystemdService struct {
 	runner *CommandRunner
+	name   string
 }
 
-// NewSystemdManager creates a systemd manager
-func NewSystemdManager(runner *CommandRunner) *SystemdManager {
-	return &SystemdManager{runner: runner}
+// NewSystemdService creates a systemd service manager
+func NewSystemdService(runner *CommandRunner, serviceName string) *SystemdService {
+	return &SystemdService{
+		runner: runner,
+		name:   serviceName,
+	}
 }
 
-// StopService stops a systemd service
-func (s *SystemdManager) StopService(serviceName string) error {
-	return s.runner.RunQuiet("systemctl", "stop", serviceName)
+// Stop stops the service
+func (s *SystemdService) Stop() error {
+	return s.runner.RunQuiet("systemctl", "stop", s.name)
 }
 
-// DisableService disables a systemd service
-func (s *SystemdManager) DisableService(serviceName string) error {
-	return s.runner.RunQuiet("systemctl", "disable", serviceName)
+// Disable disables the service
+func (s *SystemdService) Disable() error {
+	return s.runner.RunQuiet("systemctl", "disable", s.name)
 }
 
-// EnableService enables a systemd service
-func (s *SystemdManager) EnableService(serviceName string) error {
-	return s.runner.Run("systemctl", "enable", serviceName)
+// Enable enables the service
+func (s *SystemdService) Enable() error {
+	return s.runner.Run("systemctl", "enable", s.name)
 }
 
-// StartService starts a systemd service with retries
-func (s *SystemdManager) StartService(serviceName string) error {
-	return s.runner.RunWithRetries("systemctl", []string{"start", serviceName}, 3)
+// Start starts the service with retries
+func (s *SystemdService) Start() error {
+	return s.runner.RunWithRetries("systemctl", []string{"start", s.name}, 3)
 }
 
-// RestartService restarts a systemd service
-func (s *SystemdManager) RestartService(serviceName string) error {
-	return s.runner.Run("systemctl", "restart", serviceName)
+// Restart restarts the service
+func (s *SystemdService) Restart() error {
+	return s.runner.Run("systemctl", "restart", s.name)
 }
 
-// IsServiceActive checks if a service is active
-func (s *SystemdManager) IsServiceActive(serviceName string) bool {
-	output, err := s.runner.RunOutput("systemctl", "is-active", serviceName)
+// IsActive checks if the service is active
+func (s *SystemdService) IsActive() bool {
+	output, err := s.runner.RunOutput("systemctl", "is-active", s.name)
 	return err == nil && output == "active"
 }
 
-// IsServiceFailed checks if a service has failed
-func (s *SystemdManager) IsServiceFailed(serviceName string) bool {
-	output, err := s.runner.RunOutput("systemctl", "is-failed", serviceName)
+// IsFailed checks if the service is failed
+func (s *SystemdService) IsFailed() bool {
+	output, err := s.runner.RunOutput("systemctl", "is-failed", s.name)
 	return err == nil && output == "failed"
 }
 
-// GetServiceStatus returns the service status
-func (s *SystemdManager) GetServiceStatus(serviceName string) (string, error) {
-	return s.runner.RunOutput("systemctl", "status", serviceName, "--no-pager")
+// GetStatus returns the service status
+func (s *SystemdService) GetStatus() (string, error) {
+	return s.runner.RunOutput("systemctl", "status", s.name, "--no-pager")
 }
 
-// ReloadDaemon reloads the systemd daemon
-func (s *SystemdManager) ReloadDaemon() error {
+// ReloadDaemon reloads systemd daemon
+func (s *SystemdService) ReloadDaemon() error {
 	return s.runner.Run("systemctl", "daemon-reload")
 }
 
-// DirectoryManager handles directory operations
+// DirectoryManager handles directory operations consistently
 type DirectoryManager struct {
 	runner *CommandRunner
 	logger otelzap.LoggerWithCtx
@@ -192,7 +198,7 @@ func NewDirectoryManager(runner *CommandRunner) *DirectoryManager {
 }
 
 // CreateWithOwnership creates a directory with specified ownership
-func (d *DirectoryManager) CreateWithOwnership(path, user, group string, mode os.FileMode) error {
+func (d *DirectoryManager) CreateWithOwnership(path string, user string, group string, mode os.FileMode) error {
 	d.logger.Debug("Creating directory",
 		zap.String("path", path),
 		zap.String("user", user),
@@ -225,7 +231,7 @@ func (d *DirectoryManager) RemoveIfExists(path string) error {
 	return nil
 }
 
-// FileManager handles file operations
+// FileManager handles file operations consistently
 type FileManager struct {
 	logger otelzap.LoggerWithCtx
 	runner *CommandRunner
@@ -240,7 +246,7 @@ func NewFileManager(runner *CommandRunner) *FileManager {
 }
 
 // WriteWithOwnership writes a file with specified ownership
-func (f *FileManager) WriteWithOwnership(path string, content []byte, mode os.FileMode, user, group string) error {
+func (f *FileManager) WriteWithOwnership(path string, content []byte, mode os.FileMode, user string, group string) error {
 	f.logger.Debug("Writing file",
 		zap.String("path", path),
 		zap.Int("size", len(content)),
@@ -284,45 +290,7 @@ func (f *FileManager) BackupFile(path string) error {
 	return nil
 }
 
-// UserManager handles user operations
-type UserManager struct {
-	runner *CommandRunner
-	logger otelzap.LoggerWithCtx
-}
-
-// NewUserManager creates a user manager
-func NewUserManager(runner *CommandRunner) *UserManager {
-	return &UserManager{
-		runner: runner,
-		logger: runner.logger,
-	}
-}
-
-// CreateSystemUser creates a system user if it doesn't exist
-func (u *UserManager) CreateSystemUser(username, home string) error {
-	// Check if user exists
-	if err := u.runner.RunQuiet("id", username); err == nil {
-		u.logger.Debug("User already exists", zap.String("user", username))
-		return nil
-	}
-
-	u.logger.Info("Creating system user", zap.String("user", username))
-
-	args := []string{
-		"--system",
-		"--home", home,
-		"--shell", "/bin/false",
-		username,
-	}
-
-	if err := u.runner.Run("useradd", args...); err != nil {
-		return fmt.Errorf("failed to create user %s: %w", username, err)
-	}
-
-	return nil
-}
-
-// ProgressReporter provides user feedback during operations
+// ProgressReporter provides user feedback during long operations
 type ProgressReporter struct {
 	logger  otelzap.LoggerWithCtx
 	current int
@@ -358,162 +326,157 @@ func (p *ProgressReporter) Failed(message string, err error) {
 		zap.Error(err))
 }
 
-// Validator provides pre-installation validation
-type Validator struct {
+// UserHelper provides consistent user management
+type UserHelper struct {
+	runner *CommandRunner
+	logger otelzap.LoggerWithCtx
+}
+
+// NewUserHelper creates a user helper
+func NewUserHelper(runner *CommandRunner) *UserHelper {
+	return &UserHelper{
+		runner: runner,
+		logger: runner.logger,
+	}
+}
+
+// CreateSystemUser creates a system user if it doesn't exist
+func (u *UserHelper) CreateSystemUser(username string, home string) error {
+	// Check if user exists
+	if err := u.runner.RunQuiet("id", username); err == nil {
+		u.logger.Debug("User already exists", zap.String("user", username))
+		return nil
+	}
+
+	u.logger.Info("Creating system user", zap.String("user", username))
+	
+	args := []string{
+		"--system",
+		"--home", home,
+		"--shell", "/bin/false",
+		username,
+	}
+	
+	if err := u.runner.Run("useradd", args...); err != nil {
+		return fmt.Errorf("failed to create user %s: %w", username, err)
+	}
+	
+	return nil
+}
+
+// ValidationHelper provides pre-installation validation
+type ValidationHelper struct {
 	logger otelzap.LoggerWithCtx
 	errors []string
 }
 
-// NewValidator creates a validator
-func NewValidator(logger otelzap.LoggerWithCtx) *Validator {
-	return &Validator{
+// NewValidationHelper creates a validation helper
+func NewValidationHelper(logger otelzap.LoggerWithCtx) *ValidationHelper {
+	return &ValidationHelper{
 		logger: logger,
 		errors: []string{},
 	}
 }
 
-// RequireRoot checks for root privileges
-func (v *Validator) RequireRoot() {
-	if os.Geteuid() != 0 {
-		v.errors = append(v.errors, "Root privileges required. Please run with sudo")
-	}
-}
-
-// CheckPort validates port availability
-func (v *Validator) CheckPort(port int) {
+// ValidatePort checks if a port is available
+func (v *ValidationHelper) ValidatePort(port int) {
 	addr := fmt.Sprintf(":%d", port)
 	conn, err := exec.Command("lsof", "-i", addr).Output()
 	if err == nil && len(conn) > 0 {
 		v.errors = append(v.errors, fmt.Sprintf("Port %d is already in use", port))
-		v.logger.Warn("Port in use",
+		v.logger.Warn("Port in use", 
 			zap.Int("port", port),
 			zap.String("output", string(conn)))
 	}
 }
 
-// CheckDiskSpace validates available disk space
-func (v *Validator) CheckDiskSpace(path string, requiredMB int64) {
+// ValidateDiskSpace checks available disk space
+func (v *ValidationHelper) ValidateDiskSpace(path string, requiredMB int64) {
+	// This would use actual disk space checking
+	// For now, just a placeholder
 	v.logger.Debug("Checking disk space",
 		zap.String("path", path),
 		zap.Int64("required_mb", requiredMB))
-	// Simplified check - would use actual disk space checking in production
 }
 
-// RequireCommand checks if a command exists
-func (v *Validator) RequireCommand(cmd string) {
-	if _, err := exec.LookPath(cmd); err != nil {
-		v.errors = append(v.errors, fmt.Sprintf("Required command '%s' not found", cmd))
+// ValidatePermissions checks if we have required permissions
+func (v *ValidationHelper) ValidatePermissions() {
+	if os.Geteuid() != 0 {
+		v.errors = append(v.errors, "Root privileges required")
 	}
 }
 
 // HasErrors returns true if validation errors exist
-func (v *Validator) HasErrors() bool {
+func (v *ValidationHelper) HasErrors() bool {
 	return len(v.errors) > 0
 }
 
+// GetErrors returns all validation errors
+func (v *ValidationHelper) GetErrors() []string {
+	return v.errors
+}
+
 // GetError returns a combined error message
-func (v *Validator) GetError() error {
+func (v *ValidationHelper) GetError() error {
 	if !v.HasErrors() {
 		return nil
 	}
 	return fmt.Errorf("validation failed:\n  - %s", strings.Join(v.errors, "\n  - "))
 }
 
-// NetworkHelper provides network operations with retry logic
+// NetworkHelper provides network operation helpers with retry logic
 type NetworkHelper struct {
+	client  *HTTPClient
 	logger  otelzap.LoggerWithCtx
-	client  *http.Client
-	retries int
+	timeout time.Duration
 }
 
-// NewNetworkHelper creates a network helper
-func NewNetworkHelper(logger otelzap.LoggerWithCtx) *NetworkHelper {
-	return &NetworkHelper{
-		logger: logger,
+// HTTPClient wraps http.Client with retry logic
+type HTTPClient struct {
+	client    *http.Client
+	maxRetry  int
+	retryWait time.Duration
+}
+
+// NewHTTPClient creates a new HTTP client with retry logic
+func NewHTTPClient(timeout time.Duration) *HTTPClient {
+	return &HTTPClient{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: timeout,
 		},
-		retries: 3,
+		maxRetry:  3,
+		retryWait: 2 * time.Second,
 	}
-}
-
-// DownloadFile downloads a file from URL to destination with retry
-func (n *NetworkHelper) DownloadFile(url, dest string) error {
-	var lastErr error
-
-	for attempt := 1; attempt <= n.retries; attempt++ {
-		n.logger.Debug("Downloading file",
-			zap.String("url", url),
-			zap.String("dest", dest),
-			zap.Int("attempt", attempt))
-
-		err := n.downloadAttempt(url, dest)
-		if err == nil {
-			return nil
-		}
-
-		lastErr = err
-		n.logger.Warn("Download failed, retrying",
-			zap.Int("attempt", attempt),
-			zap.Error(err))
-
-		if attempt < n.retries {
-			time.Sleep(time.Duration(attempt) * 2 * time.Second)
-		}
-	}
-
-	return fmt.Errorf("download failed after %d attempts: %w", n.retries, lastErr)
-}
-
-func (n *NetworkHelper) downloadAttempt(url, dest string) error {
-	resp, err := n.client.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed with status: %d", resp.StatusCode)
-	}
-
-	out, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	return err
 }
 
 // GetWithRetry performs GET request with automatic retry
-func (n *NetworkHelper) GetWithRetry(ctx context.Context, url string) (*http.Response, error) {
+func (h *HTTPClient) GetWithRetry(ctx context.Context, url string) (*http.Response, error) {
 	var lastErr error
-
-	for attempt := 1; attempt <= n.retries; attempt++ {
+	
+	for attempt := 1; attempt <= h.maxRetry; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, err
 		}
-
-		resp, err := n.client.Do(req)
+		
+		resp, err := h.client.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return resp, nil
 		}
-
+		
 		if resp != nil {
 			resp.Body.Close()
 		}
-
+		
 		lastErr = err
 		if err == nil {
 			lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
 		}
-
-		if attempt < n.retries {
-			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+		
+		if attempt < h.maxRetry {
+			time.Sleep(h.retryWait * time.Duration(attempt))
 		}
 	}
-
-	return nil, fmt.Errorf("request failed after %d attempts: %w", n.retries, lastErr)
+	
+	return nil, fmt.Errorf("failed after %d attempts: %w", h.maxRetry, lastErr)
 }

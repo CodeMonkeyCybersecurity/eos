@@ -22,11 +22,11 @@ type Manager struct {
 // NewManager creates a new Boundary manager
 func NewManager(rc *eos_io.RuntimeContext, saltClient *salt.Client) (*Manager, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if saltClient == nil {
 		return nil, fmt.Errorf("salt client is required")
 	}
-	
+
 	return &Manager{
 		saltClient: saltClient,
 		logger:     logger.ZapLogger(),
@@ -38,7 +38,7 @@ func (m *Manager) Create(ctx context.Context, opts *CreateOptions) error {
 	if opts == nil {
 		opts = &CreateOptions{}
 	}
-	
+
 	// Set defaults
 	if opts.Target == "" {
 		opts.Target = "*"
@@ -52,7 +52,7 @@ func (m *Manager) Create(ctx context.Context, opts *CreateOptions) error {
 	if opts.Timeout == 0 {
 		opts.Timeout = 30 * time.Minute
 	}
-	
+
 	m.logger.Info("creating boundary deployment",
 		zap.String("target", opts.Target),
 		zap.String("role", opts.Config.Role),
@@ -60,25 +60,25 @@ func (m *Manager) Create(ctx context.Context, opts *CreateOptions) error {
 		zap.String("version", opts.Config.Version),
 		zap.Bool("force", opts.Force),
 		zap.Bool("clean", opts.Clean))
-	
+
 	// Build pillar data for Salt state
 	pillar := m.buildCreatePillar(opts)
-	
+
 	// Apply state with progress tracking
 	if opts.StreamOutput {
 		return m.applyStateWithProgress(ctx, "hashicorp.boundary", pillar, opts.Timeout)
 	}
-	
+
 	// Apply state without streaming
 	result, err := m.applyState(ctx, "hashicorp.boundary", pillar, opts.Timeout)
 	if err != nil {
 		return fmt.Errorf("failed to apply boundary state: %w", err)
 	}
-	
+
 	if result.Failed {
 		return fmt.Errorf("boundary installation failed: %v", result.Errors)
 	}
-	
+
 	m.logger.Info("boundary deployment created successfully")
 	return nil
 }
@@ -88,7 +88,7 @@ func (m *Manager) Delete(ctx context.Context, opts *DeleteOptions) error {
 	if opts == nil {
 		opts = &DeleteOptions{}
 	}
-	
+
 	// Set defaults
 	if opts.Target == "" {
 		opts.Target = "*"
@@ -99,7 +99,7 @@ func (m *Manager) Delete(ctx context.Context, opts *DeleteOptions) error {
 	if opts.Timeout == 0 {
 		opts.Timeout = 30 * time.Minute
 	}
-	
+
 	m.logger.Info("deleting boundary deployment",
 		zap.String("target", opts.Target),
 		zap.String("cluster", opts.ClusterName),
@@ -107,24 +107,24 @@ func (m *Manager) Delete(ctx context.Context, opts *DeleteOptions) error {
 		zap.Bool("keep_config", opts.KeepConfig),
 		zap.Bool("keep_user", opts.KeepUser),
 		zap.Bool("force", opts.Force))
-	
+
 	// Build pillar data for removal
 	pillar := m.buildDeletePillar(opts)
-	
+
 	// Apply removal state
 	if opts.StreamOutput {
 		return m.applyStateWithProgress(ctx, "hashicorp.boundary_remove", pillar, opts.Timeout)
 	}
-	
+
 	result, err := m.applyState(ctx, "hashicorp.boundary_remove", pillar, opts.Timeout)
 	if err != nil {
 		return fmt.Errorf("failed to apply boundary removal state: %w", err)
 	}
-	
+
 	if result.Failed {
 		return fmt.Errorf("boundary removal failed: %v", result.Errors)
 	}
-	
+
 	m.logger.Info("boundary deployment deleted successfully")
 	return nil
 }
@@ -134,16 +134,16 @@ func (m *Manager) Status(ctx context.Context, opts *StatusOptions) (*StatusResul
 	if opts == nil {
 		opts = &StatusOptions{}
 	}
-	
+
 	// Set defaults
 	if opts.Target == "" {
 		opts.Target = "*"
 	}
-	
+
 	m.logger.Debug("checking boundary status",
 		zap.String("target", opts.Target),
 		zap.Bool("detailed", opts.Detailed))
-	
+
 	// Execute status check command
 	cmd := salt.Command{
 		Client:   "local",
@@ -184,22 +184,22 @@ func (m *Manager) Status(ctx context.Context, opts *StatusOptions) (*StatusResul
 			"shell": "/bin/bash",
 		},
 	}
-	
+
 	result, err := m.saltClient.ExecuteCommand(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check boundary status: %w", err)
 	}
-	
+
 	// Parse results
 	statusResult := &StatusResult{
 		Minions: make(map[string]MinionStatus),
 	}
-	
+
 	for minion, output := range result.Raw {
 		minionStatus := MinionStatus{
 			Minion: minion,
 		}
-		
+
 		if outputStr, ok := output.(string); ok {
 			// Try to parse JSON status
 			var status map[string]interface{}
@@ -210,15 +210,15 @@ func (m *Manager) Status(ctx context.Context, opts *StatusOptions) (*StatusResul
 				minionStatus.Output = outputStr
 			}
 		}
-		
+
 		statusResult.Minions[minion] = minionStatus
 	}
-	
+
 	// Get detailed information if requested
 	if opts.Detailed {
 		m.enrichStatusDetails(ctx, opts.Target, statusResult)
 	}
-	
+
 	return statusResult, nil
 }
 
@@ -233,12 +233,12 @@ func (m *Manager) buildCreatePillar(opts *CreateOptions) map[string]interface{} 
 			"clean":        opts.Clean,
 		},
 	}
-	
+
 	// Add version if specified
 	if opts.Config.Version != "" {
 		pillar["boundary"].(map[string]interface{})["version"] = opts.Config.Version
 	}
-	
+
 	// Add controller-specific configuration
 	if opts.Config.Role == "controller" || opts.Config.Role == "dev" {
 		if opts.Config.DatabaseURL != "" {
@@ -251,7 +251,7 @@ func (m *Manager) buildCreatePillar(opts *CreateOptions) map[string]interface{} 
 			pillar["boundary"].(map[string]interface{})["public_addr"] = opts.Config.PublicAddr
 		}
 	}
-	
+
 	// Add worker-specific configuration
 	if opts.Config.Role == "worker" {
 		if len(opts.Config.InitialUpstreams) > 0 {
@@ -261,12 +261,12 @@ func (m *Manager) buildCreatePillar(opts *CreateOptions) map[string]interface{} 
 			pillar["boundary"].(map[string]interface{})["public_proxy_addr"] = opts.Config.PublicProxyAddr
 		}
 	}
-	
+
 	// Add common configuration
 	if opts.Config.ListenerAddress != "" {
 		pillar["boundary"].(map[string]interface{})["listener_address"] = opts.Config.ListenerAddress
 	}
-	
+
 	// TLS configuration
 	pillar["boundary"].(map[string]interface{})["tls_disable"] = opts.Config.TLSDisable
 	if !opts.Config.TLSDisable {
@@ -277,7 +277,7 @@ func (m *Manager) buildCreatePillar(opts *CreateOptions) map[string]interface{} 
 			pillar["boundary"].(map[string]interface{})["tls_key_file"] = opts.Config.TLSKeyFile
 		}
 	}
-	
+
 	// KMS configuration
 	if opts.Config.KMSType != "" {
 		kms := map[string]interface{}{
@@ -291,7 +291,7 @@ func (m *Manager) buildCreatePillar(opts *CreateOptions) map[string]interface{} 
 		}
 		pillar["boundary"].(map[string]interface{})["kms"] = kms
 	}
-	
+
 	return pillar
 }
 
@@ -314,13 +314,13 @@ func (m *Manager) applyState(ctx context.Context, state string, pillar map[strin
 	// Set timeout context
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	
+
 	// Start the state job
 	jobID, err := m.startStateJob(ctx, state, pillar)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Wait for completion
 	return m.waitForJob(ctx, jobID)
 }
@@ -330,7 +330,7 @@ func (m *Manager) applyStateWithProgress(ctx context.Context, state string, pill
 	// Set timeout context
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	
+
 	// Apply state with progress callback
 	result, err := m.saltClient.ExecuteStateApply(ctx, state, pillar,
 		func(progress salt.StateProgress) {
@@ -344,15 +344,15 @@ func (m *Manager) applyStateWithProgress(ctx context.Context, state string, pill
 				fmt.Printf("... %s\n", progress.Message)
 			}
 		})
-	
+
 	if err != nil {
 		return fmt.Errorf("state execution failed: %w", err)
 	}
-	
+
 	if result.Failed {
 		return fmt.Errorf("state had failures: %v", result.Errors)
 	}
-	
+
 	return nil
 }
 
@@ -362,7 +362,7 @@ func (m *Manager) startStateJob(ctx context.Context, state string, pillar map[st
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal pillar: %w", err)
 	}
-	
+
 	cmd := salt.Command{
 		Client:   "local_async",
 		Target:   "*",
@@ -372,17 +372,17 @@ func (m *Manager) startStateJob(ctx context.Context, state string, pillar map[st
 			"pillar": string(pillarJSON),
 		},
 	}
-	
+
 	result, err := m.saltClient.ExecuteCommand(ctx, cmd)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Extract job ID from result
 	if jid, ok := result.Raw["jid"].(string); ok {
 		return jid, nil
 	}
-	
+
 	return "", fmt.Errorf("no job ID returned")
 }
 
@@ -390,7 +390,7 @@ func (m *Manager) startStateJob(ctx context.Context, state string, pillar map[st
 func (m *Manager) waitForJob(ctx context.Context, jobID string) (*salt.StateResult, error) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -402,20 +402,20 @@ func (m *Manager) waitForJob(ctx context.Context, jobID string) (*salt.StateResu
 				Function: "jobs.lookup_jid",
 				Args:     []string{jobID},
 			}
-			
+
 			result, err := m.saltClient.ExecuteCommand(ctx, cmd)
 			if err != nil {
 				m.logger.Debug("failed to lookup job", zap.Error(err))
 				continue
 			}
-			
+
 			// Check if job is complete
 			if len(result.Raw) > 0 {
 				// Parse results
 				stateResult := &salt.StateResult{
 					States: make(map[string]salt.StateExecutionResult),
 				}
-				
+
 				// Simple parsing - in production would need more robust parsing
 				stateResult.Completed = true
 				return stateResult, nil
@@ -427,7 +427,7 @@ func (m *Manager) waitForJob(ctx context.Context, jobID string) (*salt.StateResu
 // parseStatus parses status from JSON data
 func (m *Manager) parseStatus(data map[string]interface{}) Status {
 	status := Status{}
-	
+
 	if v, ok := data["installed"].(bool); ok {
 		status.Installed = v
 	}
@@ -452,7 +452,7 @@ func (m *Manager) parseStatus(data map[string]interface{}) Status {
 	if v, ok := data["config_valid"].(bool); ok {
 		status.ConfigValid = v
 	}
-	
+
 	return status
 }
 
@@ -465,7 +465,7 @@ func (m *Manager) enrichStatusDetails(ctx context.Context, target string, result
 		Function: "cmd.run",
 		Args:     []string{"cat /etc/boundary/*.hcl 2>/dev/null | head -100"},
 	}
-	
+
 	configResult, err := m.saltClient.ExecuteCommand(ctx, cmd)
 	if err == nil {
 		for minion, output := range configResult.Raw {
@@ -477,7 +477,7 @@ func (m *Manager) enrichStatusDetails(ctx context.Context, target string, result
 			}
 		}
 	}
-	
+
 	// Get cluster members if running
 	for minion, status := range result.Minions {
 		if status.Status.Running && status.Status.Role == "controller" {
@@ -488,7 +488,7 @@ func (m *Manager) enrichStatusDetails(ctx context.Context, target string, result
 				Function: "cmd.run",
 				Args:     []string{"boundary database migrate -config /etc/boundary/controller.hcl -dry-run 2>&1 | grep -i 'already'"},
 			}
-			
+
 			if dbResult, err := m.saltClient.ExecuteCommand(ctx, cmd); err == nil {
 				if output, ok := dbResult.Raw[minion].(string); ok && strings.Contains(output, "already") {
 					status.Status.DatabaseConnected = true

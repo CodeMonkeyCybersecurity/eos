@@ -81,11 +81,13 @@ var boundaryCmd = &cobra.Command{
 
 func init() {
 	CreateCmd.AddCommand(hclCmd)
-	CreateCmd.AddCommand(terraformCmd)
-	CreateCmd.AddCommand(consulCmd)
-	CreateCmd.AddCommand(nomadCmd)
-	CreateCmd.AddCommand(packerCmd)
-	CreateCmd.AddCommand(boundaryCmd)
+	// NOTE: These individual commands are commented out to avoid conflicts
+	// The existing commands in other files now use native installers
+	// CreateCmd.AddCommand(terraformCmd)
+	// CreateCmd.AddCommand(consulCmd)
+	// CreateCmd.AddCommand(nomadCmd)
+	// CreateCmd.AddCommand(packerCmd)
+	// CreateCmd.AddCommand(boundaryCmd)
 }
 
 // All helper functions have been moved to pkg/hashicorp package for better code organization,

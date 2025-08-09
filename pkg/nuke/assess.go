@@ -5,7 +5,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
@@ -155,13 +154,14 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 		}
 	}
 	
-	for _, svc := range eos.GetEosServices() {
-		serviceMap[svc.Name] = ServiceConfig{
-			Name:      svc.Name,
-			Component: svc.Component,
-			Required:  svc.Required,
-		}
-	}
+	// EOS services removed - no longer needed
+	// for _, svc := range eos.GetEosServices() {
+	// 	serviceMap[svc.Name] = ServiceConfig{
+	// 		Name:      svc.Name,
+	// 		Component: svc.Component,
+	// 		Required:  svc.Required,
+	// 	}
+	// }
 	
 	// Add hardcoded services that already have proper lifecycle managers
 	hardcodedServices := []ServiceConfig{
@@ -245,14 +245,15 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 		})
 	}
 	
-	for _, dir := range eos.GetEosDirectories() {
-		allDirectories = append(allDirectories, DirectoryConfig{
-			Path:        dir.Path,
-			Component:   dir.Component,
-			IsData:      dir.IsData,
-			Description: dir.Description,
-		})
-	}
+	// EOS directories removed - no longer needed
+	// for _, dir := range eos.GetEosDirectories() {
+	// 	allDirectories = append(allDirectories, DirectoryConfig{
+	// 		Path:        dir.Path,
+	// 		Component:   dir.Component,
+	// 		IsData:      dir.IsData,
+	// 		Description: dir.Description,
+	// 	})
+	// }
 	
 	// Add hardcoded directories for components with proper lifecycle managers
 	// These will be removed once all components implement the lifecycle interface

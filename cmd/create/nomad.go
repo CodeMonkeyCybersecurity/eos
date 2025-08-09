@@ -13,6 +13,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -21,42 +22,22 @@ import (
 
 var CreateNomadCmd = &cobra.Command{
 	Use:   "nomad",
-	Short: "Install and configure HashiCorp Nomad orchestrator",
-	Long: `Install and configure HashiCorp Nomad for workload orchestration.
+	Short: "Install and configure HashiCorp Nomad using native installer",
+	Long: `Install HashiCorp Nomad for workload orchestration using the native installer.
 
-This command will:
-- Check if Nomad is already installed and running
-- Install Nomad with proper idempotency
-- Configure Nomad as server or client based on flags
-- Integrate with existing Consul for service discovery
-- Integrate with existing Vault for secrets management
-- Set up systemd service
-- Verify installation and connectivity
+This installer provides:
+- Server and/or client mode configuration
+- Docker integration for containers
+- Consul service discovery integration
+- Vault secrets integration
+- Automatic cluster bootstrapping
 
-PREREQUISITES:
-- System must be bootstrapped (run 'eos bootstrap' first)
-- Consul should be installed for service discovery
-- Vault (optional) for secrets management
-
-EXAMPLES:
-  # Install Nomad as a server with 3 expected nodes
-  eos create nomad --server --bootstrap-expect=3
-
-  # Install Nomad as a client
-  eos create nomad --client
-
-  # Install with custom datacenter and region
-  eos create nomad --server --datacenter=us-west-1 --region=global
-
-  # Force reinstall/reconfigure
-  eos create nomad --force
-
-  # Clean install (remove existing data)
-  eos create nomad --clean
-
-  # Install with ACL enabled
-  eos create nomad --enable-acl`,
-	RunE: eos.Wrap(runCreateNomad),
+Examples:
+  eos create nomad                              # Install as both server and client
+  eos create nomad --server-only                # Server only
+  eos create nomad --client-only --docker       # Client with Docker
+  eos create nomad --consul --vault             # With integrations`,
+	RunE: eos.Wrap(runCreateNomadNative),
 }
 
 var (
@@ -177,7 +158,46 @@ func checkNomadStatus(rc *eos_io.RuntimeContext) (*NomadStatus, error) {
 	return status, nil
 }
 
-func runCreateNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing Nomad using native installer")
+
+	// Parse flags
+	serverOnly := nomadServerMode && !nomadClientMode
+	clientOnly := nomadClientMode && !nomadServerMode
+	
+	config := &nomad.NativeInstallConfig{
+		InstallConfig: &hashicorp.InstallConfig{
+			Version:        "latest",
+			CleanInstall:   nomadClean,
+			ForceReinstall: nomadForce,
+		},
+		ServerEnabled:     !clientOnly,
+		ClientEnabled:     !serverOnly,
+		Datacenter:        nomadDatacenter,
+		Region:            nomadRegion,
+		BootstrapExpect:   nomadBootstrapExpect,
+		ConsulIntegration: true,  // Enable by default
+		VaultIntegration:  false,  // Disabled by default
+		DockerEnabled:     nomadEnableDocker,
+	}
+
+	// Set install method
+	config.InstallConfig.InstallMethod = hashicorp.MethodBinary
+
+	// Create and run installer
+	installer := nomad.NewNativeInstaller(rc, config)
+	if err := installer.Install(); err != nil {
+		return fmt.Errorf("Nomad installation failed: %w", err)
+	}
+
+	logger.Info("Nomad installation completed successfully")
+	logger.Info("terminal prompt: Nomad is installed. Check status with: nomad node status")
+	return nil
+}
+
+// Legacy function kept for reference
+func runCreateNomadLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Validate mode selection

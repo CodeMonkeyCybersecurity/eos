@@ -7,6 +7,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack/orchestrator"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -60,286 +61,79 @@ func init() {
 
 var CreateVaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Install and configure HashiCorp Vault using SaltStack",
-	Long: `Install and configure HashiCorp Vault using SaltStack orchestration.
+	Short: "Install and configure HashiCorp Vault using native installer",
+	Long: `Install HashiCorp Vault for secrets management using the native installer.
 
-This command provides a complete Vault deployment including:
-- Installation of Vault binary
-- TLS certificate generation
-- Service configuration
-- Initialization and unsealing
-- Auth method configuration (userpass, approle)
-- Policy management
-- Audit logging
-- Security hardening
-- Backup configuration
+This installer provides:
+- Direct binary or repository installation
+- Multiple storage backends (file, consul, raft)
+- Auto-unseal configuration
+- TLS setup
+- Systemd service management
+- Automatic version resolution
 
-The deployment is managed entirely through SaltStack states, ensuring
-consistent and repeatable installations.`,
-	RunE: eos.Wrap(runCreateVault),
+Examples:
+  eos create vault                              # Basic installation
+  eos create vault --storage-backend=consul     # Use Consul storage
+  eos create vault --auto-unseal --kms-key=...  # AWS KMS auto-unseal
+  eos create vault --ui                         # Enable web UI`,
+	RunE: eos.Wrap(runCreateVaultNative),
 }
 
 func init() {
 	CreateCmd.AddCommand(CreateVaultCmd)
 	
-	// Installation flags
+	// Vault flags for native installer
 	CreateVaultCmd.Flags().String("version", "latest", "Vault version to install")
-	CreateVaultCmd.Flags().String("install-path", "/opt/vault", "Installation directory")
-	CreateVaultCmd.Flags().String("config-path", "/etc/vault.d", "Configuration directory")
-	CreateVaultCmd.Flags().String("data-path", "/opt/vault/data", "Data storage directory")
-	CreateVaultCmd.Flags().String("log-path", "/var/log/vault", "Log directory")
-	
-	// Network configuration
-	CreateVaultCmd.Flags().String("listen-address", "0.0.0.0", "Listen address for Vault API")
-	CreateVaultCmd.Flags().Int("port", 8179, "Vault API port (Eos default)")
-	CreateVaultCmd.Flags().Int("cluster-port", 8180, "Vault cluster port")
-	
-	// TLS configuration
-	CreateVaultCmd.Flags().Bool("tls-disable", false, "Disable TLS (not recommended)")
-	CreateVaultCmd.Flags().String("tls-cert-file", "", "Path to TLS certificate file")
-	CreateVaultCmd.Flags().String("tls-key-file", "", "Path to TLS key file")
-	
-	// Storage configuration
-	CreateVaultCmd.Flags().String("storage-type", "raft", "Storage backend type")
-	
-	// Initialization configuration
-	CreateVaultCmd.Flags().Int("key-shares", 5, "Number of key shares")
-	CreateVaultCmd.Flags().Int("key-threshold", 3, "Key threshold for unsealing")
-	
-	// Feature flags
-	CreateVaultCmd.Flags().Bool("enable-userpass", true, "Enable userpass auth method")
-	CreateVaultCmd.Flags().Bool("enable-approle", true, "Enable approle auth method")
-	CreateVaultCmd.Flags().Bool("enable-mfa", true, "Enable MFA")
-	CreateVaultCmd.Flags().Bool("enable-audit", true, "Enable audit logging")
-	CreateVaultCmd.Flags().Bool("enable-policies", true, "Configure default policies")
-	
-	// Hardening flags
-	CreateVaultCmd.Flags().Bool("harden-system", true, "Apply system hardening")
-	CreateVaultCmd.Flags().Bool("harden-network", true, "Apply network hardening")
-	CreateVaultCmd.Flags().Bool("harden-vault", true, "Apply Vault-specific hardening")
-	CreateVaultCmd.Flags().Bool("harden-backup", true, "Configure secure backups")
-	
-	// Backup configuration
-	CreateVaultCmd.Flags().Bool("backup-enabled", true, "Enable automatic backups")
-	CreateVaultCmd.Flags().String("backup-path", "/opt/vault/backup", "Backup directory")
-	CreateVaultCmd.Flags().String("backup-schedule", "0 2 * * *", "Cron schedule for backups")
-	
-	// Integration flags
-	CreateVaultCmd.Flags().Bool("hecate-integration", true, "Enable Hecate integration")
-	CreateVaultCmd.Flags().Bool("delphi-integration", true, "Enable Delphi integration")
-	
-	// Workflow flags
-	CreateVaultCmd.Flags().Bool("skip-install", false, "Skip installation phase")
-	CreateVaultCmd.Flags().Bool("skip-configure", false, "Skip configuration phase")
-	CreateVaultCmd.Flags().Bool("skip-enable", false, "Skip feature enablement phase")
-	CreateVaultCmd.Flags().Bool("skip-harden", false, "Skip hardening phase")
-	CreateVaultCmd.Flags().Bool("skip-verify", false, "Skip verification phase")
+	CreateVaultCmd.Flags().String("storage-backend", "file", "Storage backend (file, consul, raft)")
+	CreateVaultCmd.Flags().Bool("ui", true, "Enable web UI")
+	CreateVaultCmd.Flags().String("listener-address", "0.0.0.0:8200", "Listener address")
+	CreateVaultCmd.Flags().Bool("tls", true, "Enable TLS")
+	CreateVaultCmd.Flags().Bool("auto-unseal", false, "Enable auto-unseal")
+	CreateVaultCmd.Flags().String("kms-key", "", "KMS key ID for auto-unseal")
+	CreateVaultCmd.Flags().Bool("clean", false, "Clean install (remove existing)")
+	CreateVaultCmd.Flags().Bool("force", false, "Force reinstall")
+	CreateVaultCmd.Flags().Bool("use-repository", false, "Install via APT repository")
 }
 
-func runCreateVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Vault deployment via SaltStack")
-	
-	// Run pre-flight checks before attempting installation
-	if err := vault.PreflightChecks(rc); err != nil {
-		return err
+	logger.Info("Installing Vault using native installer")
+
+	// Parse flags
+	config := &vault.VaultInstallConfig{
+		InstallConfig: &hashicorp.InstallConfig{
+			Version:        cmd.Flag("version").Value.String(),
+			CleanInstall:   cmd.Flag("clean").Value.String() == "true",
+			ForceReinstall: cmd.Flag("force").Value.String() == "true",
+		},
+		UIEnabled:       cmd.Flag("ui").Value.String() == "true",
+		StorageBackend:  cmd.Flag("storage-backend").Value.String(),
+		ListenerAddress: cmd.Flag("listener-address").Value.String(),
+		AutoUnseal:      cmd.Flag("auto-unseal").Value.String() == "true",
+		KMSKeyID:        cmd.Flag("kms-key").Value.String(),
 	}
-	
-	// Build configuration from flags
-	config := buildVaultConfig(cmd)
-	
-	// Execute installation phase
-	skipInstall, _ := cmd.Flags().GetBool("skip-install")
-	if !skipInstall {
-		logger.Info("Phase 1: Installing Vault")
-		if err := vault.SaltInstall(rc, config); err != nil {
-			return err
-		}
+
+	if cmd.Flag("use-repository").Value.String() == "true" {
+		config.InstallConfig.InstallMethod = hashicorp.MethodRepository
+	} else {
+		config.InstallConfig.InstallMethod = hashicorp.MethodBinary
 	}
-	
-	// Execute configuration phase
-	skipConfigure, _ := cmd.Flags().GetBool("skip-configure")
-	if !skipConfigure {
-		logger.Info("Phase 2: Configuring Vault")
-		if err := vault.SaltConfigure(rc, config); err != nil {
-			return err
-		}
+
+	config.InstallConfig.TLSEnabled = cmd.Flag("tls").Value.String() == "true"
+
+	// Create and run installer
+	installer := vault.NewNativeInstaller(rc, config)
+	if err := installer.Install(); err != nil {
+		return fmt.Errorf("Vault installation failed: %w", err)
 	}
-	
-	// Execute enablement phase
-	skipEnable, _ := cmd.Flags().GetBool("skip-enable")
-	if !skipEnable {
-		logger.Info("Phase 3: Enabling Vault features")
-		if err := vault.SaltEnable(rc, config); err != nil {
-			return err
-		}
-	}
-	
-	// Execute hardening phase
-	skipHarden, _ := cmd.Flags().GetBool("skip-harden")
-	if !skipHarden {
-		logger.Info("Phase 4: Hardening Vault")
-		if err := vault.SaltHarden(rc, config); err != nil {
-			return err
-		}
-	}
-	
-	// Execute verification phase
-	skipVerify, _ := cmd.Flags().GetBool("skip-verify")
-	if !skipVerify {
-		logger.Info("Phase 5: Verifying Vault deployment")
-		if err := vault.SaltVerify(rc); err != nil {
-			return err
-		}
-	}
-	
-	// Display completion message
-	displayVaultCompletionMessage(rc, config)
-	
-	logger.Info("Vault deployment completed successfully")
+
+	logger.Info("Vault installation completed successfully")
+	logger.Info("terminal prompt: Vault is installed. Initialize with: vault operator init")
 	return nil
 }
 
-func buildVaultConfig(cmd *cobra.Command) *vault.SaltConfig {
-	config := vault.DefaultSaltConfig()
-	
-	// Update from flags
-	if v := cmd.Flag("version").Value.String(); v != "" {
-		config.Version = v
-	}
-	if v := cmd.Flag("install-path").Value.String(); v != "" {
-		config.InstallPath = v
-	}
-	if v := cmd.Flag("config-path").Value.String(); v != "" {
-		config.ConfigPath = v
-	}
-	if v := cmd.Flag("data-path").Value.String(); v != "" {
-		config.DataPath = v
-	}
-	if v := cmd.Flag("log-path").Value.String(); v != "" {
-		config.LogPath = v
-	}
-	
-	// Network configuration
-	if v := cmd.Flag("listen-address").Value.String(); v != "" {
-		config.ListenAddress = v
-	}
-	if v, err := cmd.Flags().GetInt("port"); err == nil {
-		config.Port = v
-	}
-	if v, err := cmd.Flags().GetInt("cluster-port"); err == nil {
-		config.ClusterPort = v
-	}
-	
-	// TLS configuration
-	if v, err := cmd.Flags().GetBool("tls-disable"); err == nil {
-		config.TLSDisable = v
-	}
-	if v := cmd.Flag("tls-cert-file").Value.String(); v != "" {
-		config.TLSCertFile = v
-	}
-	if v := cmd.Flag("tls-key-file").Value.String(); v != "" {
-		config.TLSKeyFile = v
-	}
-	
-	// Storage configuration
-	if v := cmd.Flag("storage-type").Value.String(); v != "" {
-		config.StorageType = v
-	}
-	
-	// Initialization configuration
-	if v, err := cmd.Flags().GetInt("key-shares"); err == nil {
-		config.KeyShares = v
-	}
-	if v, err := cmd.Flags().GetInt("key-threshold"); err == nil {
-		config.KeyThreshold = v
-	}
-	
-	// Feature flags
-	if v, err := cmd.Flags().GetBool("enable-userpass"); err == nil {
-		config.EnableUserpass = v
-	}
-	if v, err := cmd.Flags().GetBool("enable-approle"); err == nil {
-		config.EnableAppRole = v
-	}
-	if v, err := cmd.Flags().GetBool("enable-mfa"); err == nil {
-		config.EnableMFA = v
-	}
-	if v, err := cmd.Flags().GetBool("enable-audit"); err == nil {
-		config.EnableAudit = v
-	}
-	if v, err := cmd.Flags().GetBool("enable-policies"); err == nil {
-		config.EnablePolicies = v
-	}
-	
-	// Hardening flags
-	if v, err := cmd.Flags().GetBool("harden-system"); err == nil {
-		config.HardenSystem = v
-	}
-	if v, err := cmd.Flags().GetBool("harden-network"); err == nil {
-		config.HardenNetwork = v
-	}
-	if v, err := cmd.Flags().GetBool("harden-vault"); err == nil {
-		config.HardenVault = v
-	}
-	if v, err := cmd.Flags().GetBool("harden-backup"); err == nil {
-		config.HardenBackup = v
-	}
-	
-	// Backup configuration
-	if v, err := cmd.Flags().GetBool("backup-enabled"); err == nil {
-		config.BackupEnabled = v
-	}
-	if v := cmd.Flag("backup-path").Value.String(); v != "" {
-		config.BackupPath = v
-	}
-	if v := cmd.Flag("backup-schedule").Value.String(); v != "" {
-		config.BackupSchedule = v
-	}
-	
-	// Integration flags
-	if v, err := cmd.Flags().GetBool("hecate-integration"); err == nil {
-		config.HecateIntegration = v
-	}
-	if v, err := cmd.Flags().GetBool("delphi-integration"); err == nil {
-		config.DelphiIntegration = v
-	}
-	
-	return config
-}
-
-func displayVaultCompletionMessage(rc *eos_io.RuntimeContext, config *vault.SaltConfig) {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	logger.Info("=== Vault Deployment Complete ===")
-	logger.Info("Vault Details:",
-		zap.String("version", config.Version),
-		zap.Int("api_port", config.Port),
-		zap.Int("cluster_port", config.ClusterPort),
-		zap.Bool("tls_enabled", !config.TLSDisable))
-	
-	vaultAddr := "https://127.0.0.1:8179"
-	if config.TLSDisable {
-		vaultAddr = "http://127.0.0.1:8179"
-	}
-	
-	logger.Info("Access Information:",
-		zap.String("vault_addr", vaultAddr),
-		zap.String("init_data", "/var/lib/eos/secret/vault_init.json"))
-	
-	logger.Info("Next Steps:",
-		zap.String("1", "Review the initialization data for root token and unseal keys"),
-		zap.String("2", "Configure additional auth methods as needed"),
-		zap.String("3", "Create application-specific policies"),
-		zap.String("4", "Set up monitoring and alerting"),
-		zap.String("5", "Test backup and restoration procedures"))
-	
-	logger.Info("Useful Commands:",
-		zap.String("status", "vault status"),
-		zap.String("unseal", "vault operator unseal"),
-		zap.String("login", "vault login"),
-		zap.String("audit_log", "tail -f /var/log/vault/vault-audit.log"))
-}
+// Removed unused Salt-based functions - now using native installer
 
 var CreateVaultEnhancedCmd = &cobra.Command{
 	Use:   "vault-enhanced",
