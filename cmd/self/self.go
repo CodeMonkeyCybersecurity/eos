@@ -41,6 +41,9 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Starting Eos self-update process")
 
+		// Phase 1: ASSESS - Check prerequisites and current state
+		logger.Info("Phase 1: ASSESS - Checking prerequisites")
+		
 		// Check if we're already running as root
 		if os.Geteuid() != 0 {
 			return eos_err.NewExpectedError(rc.Ctx, errors.New("self-update must be run as root. Please run: sudo eos self update (or sudo eos config self update)"))
@@ -61,6 +64,9 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 		logger.Info(" Changed to /opt/eos directory")
 
+		// Phase 2: INTERVENE - Perform the update operations
+		logger.Info("Phase 2: INTERVENE - Performing update operations")
+		
 		// Check for uncommitted changes
 		statusCmd := exec.Command("git", "status", "--porcelain")
 		statusOutput, err := statusCmd.Output()
@@ -141,7 +147,9 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 						
 						logger.Info("terminal prompt: ")
 						logger.Info("terminal prompt: ⚠️  Another package management process is currently running")
-						logger.Info(fmt.Sprintf("terminal prompt: Process: %s (PID: %s)", processName, pid))
+						logger.Info("terminal prompt: Process details", 
+							zap.String("process", processName),
+							zap.String("pid", pid))
 						logger.Info("terminal prompt: ")
 						logger.Info("terminal prompt: Please wait for it to complete, then run:")
 						logger.Info("terminal prompt:   sudo eos self update")
@@ -150,7 +158,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 						logger.Info("terminal prompt:   cd /opt/eos && sudo ./install.sh --skip-update")
 						logger.Info("terminal prompt: ")
 						logger.Info("terminal prompt: If the process is stuck, you can check it with:")
-						logger.Info(fmt.Sprintf("terminal prompt:   ps -p %s -f", pid))
+						logger.Info("terminal prompt:   ps -p [PID] -f", zap.String("pid", pid))
 						
 						return eos_err.NewUserError("cannot update while another package manager is running")
 					}
@@ -192,7 +200,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 					logger.Info("terminal prompt: Ensure all required tools are installed")
 				default:
 					logger.Info("terminal prompt: ")
-					logger.Info(fmt.Sprintf("terminal prompt: ❌ Installation failed with exit code %d", exitErr.ExitCode()))
+					logger.Info("terminal prompt: ❌ Installation failed with exit code", zap.Int("exit_code", exitErr.ExitCode()))
 					logger.Info("terminal prompt: Check the output above for details")
 				}
 			}
@@ -200,8 +208,17 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 			return fmt.Errorf("failed to run installation script: %w", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info(" Eos self-update completed successfully")
-		otelzap.Ctx(rc.Ctx).Info(" Eos has been successfully updated to the latest version")
+		// Phase 3: EVALUATE - Verify the update was successful
+		logger.Info("Phase 3: EVALUATE - Verifying update success")
+		
+		// Check if eos binary exists and is executable
+		if _, err := exec.LookPath("eos"); err != nil {
+			logger.Error("Failed to find eos binary after update", zap.Error(err))
+			return fmt.Errorf("update appears to have failed - eos binary not found: %w", err)
+		}
+		
+		logger.Info(" Eos self-update completed successfully")
+		logger.Info(" Eos has been successfully updated to the latest version")
 
 		return nil
 	}),
