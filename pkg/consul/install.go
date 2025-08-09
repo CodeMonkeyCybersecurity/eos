@@ -3,1215 +3,847 @@
 package consul
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
+	"context"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
-	"math/big"
-	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 )
 
-// InstallConsul performs complete Consul installation with error recovery
-// DEPRECATED: This function is deprecated in favor of SaltStack-based installation.
-// Use 'eos create consul' command instead which uses SaltStack orchestration.
-func InstallConsul(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
+// ConsulInstaller handles Consul installation using native methods
+type ConsulInstaller struct {
+	rc       *eos_io.RuntimeContext
+	config   *InstallConfig
+	logger   otelzap.LoggerWithCtx
+	runner   *CommandRunner
+	systemd  *SystemdService
+	dirs     *DirectoryManager
+	files    *FileManager
+	progress *ProgressReporter
+	user     *UserHelper
+	validate *ValidationHelper
+	network  *HTTPClient
+}
+
+// InstallConfig contains all configuration for Consul installation
+type InstallConfig struct {
+	// Installation method
+	Version       string // Version to install (e.g., "1.21.3" or "latest")
+	UseRepository bool   // Use APT repository vs direct binary download
+	BinaryPath    string // Path for binary installation
 	
-	// Ask for user consent before proceeding
-	consent, err := eos_io.PromptForInstallation(rc, "HashiCorp Consul", "service discovery & mesh networking")
-	if err != nil {
-		return fmt.Errorf("failed to get user consent: %w", err)
+	// Consul configuration
+	Datacenter      string
+	ServerMode      bool
+	BootstrapExpect int
+	UIEnabled       bool
+	ConnectEnabled  bool
+	BindAddr        string
+	ClientAddr      string
+	LogLevel        string
+	
+	// Integration options
+	VaultIntegration bool
+	VaultAddr        string
+	
+	// Installation behavior
+	ForceReinstall bool // Force reinstallation even if already installed
+	CleanInstall   bool // Remove existing data before installation
+	DryRun         bool // Dry run mode
+}
+
+// NewConsulInstaller creates a new Consul installer instance
+func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *ConsulInstaller {
+	// Set defaults
+	if config.Version == "" {
+		config.Version = "latest"
+	}
+	if config.Datacenter == "" {
+		config.Datacenter = "dc1"
+	}
+	if config.BindAddr == "" {
+		config.BindAddr = getDefaultBindAddr()
+	}
+	if config.ClientAddr == "" {
+		config.ClientAddr = "0.0.0.0"
+	}
+	if config.LogLevel == "" {
+		config.LogLevel = "INFO"
+	}
+	if config.BinaryPath == "" {
+		config.BinaryPath = "/usr/bin/consul"
 	}
 	
-	if !consent {
-		logger.Info("Installation cancelled by user")
-		return fmt.Errorf("installation cancelled by user")
+	logger := otelzap.Ctx(rc.Ctx)
+	runner := NewCommandRunner(rc)
+	
+	return &ConsulInstaller{
+		rc:       rc,
+		config:   config,
+		logger:   logger,
+		runner:   runner,
+		systemd:  NewSystemdService(runner, "consul"),
+		dirs:     NewDirectoryManager(runner),
+		files:    NewFileManager(runner),
+		progress: NewProgressReporter(logger, "Consul Installation", 100),
+		user:     NewUserHelper(runner),
+		validate: NewValidationHelper(logger),
+		network:  NewHTTPClient(30 * time.Second),
 	}
+}
 
-	// ASSESS - Check prerequisites and validate configuration
-	logger.Info("Assessing Consul installation prerequisites",
-		zap.String("mode", config.Mode),
-		zap.String("datacenter", config.Datacenter))
-
-	// Run comprehensive preflight checks
-	if err := RunPreflightChecks(rc, config); err != nil {
-		return fmt.Errorf("preflight checks failed: %w", err)
+// Install performs the complete Consul installation
+func (ci *ConsulInstaller) Install() error {
+	ci.logger.Info("Starting Consul installation",
+		zap.String("version", ci.config.Version),
+		zap.String("datacenter", ci.config.Datacenter),
+		zap.Bool("use_repository", ci.config.UseRepository))
+	
+	// Phase 1: ASSESS
+	ci.progress.Update("[16%] Checking current Consul status")
+	if err := ci.assess(); err != nil {
+		return fmt.Errorf("assessment failed: %w", err)
 	}
-
-	// Validate configuration
-	if err := validateConsulConfig(rc, config); err != nil {
-		return fmt.Errorf("configuration validation failed: %w", err)
+	
+	// Phase 2: Prerequisites
+	ci.progress.Update("[33%] Validating prerequisites")
+	if err := ci.validatePrerequisites(); err != nil {
+		return fmt.Errorf("prerequisite validation failed: %w", err)
 	}
-
-	// Check for existing installation
-	if err := handleExistingInstallation(rc, config); err != nil {
-		return fmt.Errorf("failed to handle existing installation: %w", err)
+	
+	// Phase 3: INTERVENE - Install
+	ci.progress.Update("[50%] Installing Consul binary")
+	if err := ci.installBinary(); err != nil {
+		return fmt.Errorf("binary installation failed: %w", err)
 	}
-
-	// INTERVENE - Perform the installation
-	logger.Info("Beginning Consul installation",
-		zap.String("mode", config.Mode),
-		zap.String("datacenter", config.Datacenter))
-
-	// Step 1: Download and install Consul binary
-	if err := downloadAndInstallBinary(rc, config); err != nil {
-		return fmt.Errorf("failed to download and install Consul binary: %w", err)
+	
+	// Phase 4: Configure
+	ci.progress.Update("[66%] Configuring Consul")
+	if err := ci.configure(); err != nil {
+		return fmt.Errorf("configuration failed: %w", err)
 	}
-
-	// Step 2: Create system user and directories
-	if err := createSystemResources(rc, config); err != nil {
-		return fmt.Errorf("failed to create system resources: %w", err)
+	
+	// Phase 5: Setup Service
+	ci.progress.Update("[83%] Setting up systemd service")
+	if err := ci.setupService(); err != nil {
+		return fmt.Errorf("service setup failed: %w", err)
 	}
-
-	// Step 3: Generate configuration files
-	if err := generateConfiguration(rc, config); err != nil {
-		return fmt.Errorf("failed to generate configuration: %w", err)
+	
+	// Phase 6: EVALUATE - Verify
+	ci.progress.Update("[100%] Verifying installation")
+	if err := ci.verify(); err != nil {
+		return fmt.Errorf("verification failed: %w", err)
 	}
-
-	// Step 4: Set up security (ACL, TLS, Gossip encryption)
-	if err := setupSecurity(rc, config); err != nil {
-		return fmt.Errorf("failed to setup security: %w", err)
-	}
-
-	// Step 5: Install and configure systemd service
-	if err := installSystemdService(rc, config); err != nil {
-		return fmt.Errorf("failed to install systemd service: %w", err)
-	}
-
-	// Step 6: Handle bootstrap if this is the first server
-	if config.Mode == "server" && config.BootstrapExpect > 0 {
-		if err := handleBootstrap(rc, config); err != nil {
-			return fmt.Errorf("failed to handle bootstrap: %w", err)
-		}
-	}
-
-	// Step 7: Start Consul service
-	if err := startConsulService(rc, config); err != nil {
-		return fmt.Errorf("failed to start Consul service: %w", err)
-	}
-
-	// Step 8: Join cluster if needed
-	if len(config.JoinAddresses) > 0 {
-		if err := joinCluster(rc, config); err != nil {
-			return fmt.Errorf("failed to join cluster: %w", err)
-		}
-	}
-
-	// EVALUATE - Verify the installation succeeded
-	logger.Info("Evaluating Consul installation success")
-
-	// Verify service is running and healthy
-	if err := verifyInstallation(rc, config); err != nil {
-		return fmt.Errorf("installation verification failed: %w", err)
-	}
-
-	// Test cluster connectivity if applicable
-	if len(config.JoinAddresses) > 0 {
-		if err := verifyClusterConnectivity(rc, config); err != nil {
-			logger.Warn("Cluster connectivity verification failed",
-				zap.Error(err))
-			// Non-fatal - service is running but cluster needs attention
-		}
-	}
-
-	// Configure monitoring and health checks
-	if err := configureMonitoring(rc, config); err != nil {
-		logger.Warn("Failed to configure monitoring",
-			zap.Error(err))
-		// Non-fatal - monitoring can be set up later
-	}
-
-	logger.Info("Consul installation completed successfully",
-		zap.String("mode", config.Mode),
-		zap.String("datacenter", config.Datacenter),
-		zap.String("node_name", config.NodeName))
-
+	
+	ci.progress.Complete("Consul installation completed successfully")
 	return nil
 }
 
-// handleExistingInstallation checks for and handles existing Consul installations
-func handleExistingInstallation(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if Consul is already installed
-	if _, err := exec.LookPath("consul"); err == nil {
-		logger.Info("Existing Consul binary found")
-
-		// Check if service is running
-		if isServiceRunning("consul") {
-			return eos_err.NewUserError("Consul service is already running. Stop it first with: sudo systemctl stop consul")
-		}
-
-		// Check version compatibility
-		if err := checkVersionCompatibility(rc); err != nil {
-			logger.Warn("Version compatibility check failed", zap.Error(err))
-		}
-
-		// Backup existing configuration
-		if err := backupExistingConfig(rc); err != nil {
-			logger.Warn("Failed to backup existing configuration", zap.Error(err))
-		}
-	}
-
-	return nil
-}
-
-// downloadAndInstallBinary downloads and installs the Consul binary
-func downloadAndInstallBinary(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Downloading Consul binary")
-
-	// TODO: Use platform version resolver when available
-	version := "1.17.0" // Default to stable version
-	logger.Info("Installing Consul version", zap.String("version", version))
-
-	// TODO: Implement proper binary download
-	// For now, assume binary is downloaded to /tmp
-	binaryPath := "/tmp/consul"
-	if _, err := os.Stat(binaryPath); err != nil {
-		return fmt.Errorf("consul binary not found at %s - please download manually", binaryPath)
-	}
-
-	// Install binary to system location
-	targetPath := "/usr/local/bin/consul"
-	if err := os.Rename(binaryPath, targetPath); err != nil {
-		return fmt.Errorf("failed to install binary to %s: %w", targetPath, err)
-	}
-
-	// Set permissions
-	if err := os.Chmod(targetPath, 0755); err != nil {
-		return fmt.Errorf("failed to set permissions on %s: %w", targetPath, err)
-	}
-
-	// Verify installation
-	if err := exec.Command("consul", "version").Run(); err != nil {
-		return fmt.Errorf("failed to verify Consul installation: %w", err)
-	}
-
-	logger.Info("Consul binary installed successfully",
-		zap.String("path", targetPath),
-		zap.String("version", version))
-
-	return nil
-}
-
-// createSystemResources creates necessary system users and directories
-func createSystemResources(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Creating system resources")
-
-	// Create consul user
-	if err := createConsulUser(rc); err != nil {
-		return fmt.Errorf("failed to create consul user: %w", err)
-	}
-
-	// Create directories
-	directories := []string{
-		"/etc/consul.d",
-		"/opt/consul",
-		"/opt/consul/data",
-		"/var/log/consul",
-	}
-
-	for _, dir := range directories {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-
-		// Set ownership to consul user
-		if err := exec.Command("chown", "consul:consul", dir).Run(); err != nil {
-			return fmt.Errorf("failed to set ownership on %s: %w", dir, err)
-		}
-	}
-
-	logger.Info("System resources created successfully")
-	return nil
-}
-
-// generateConfiguration generates Consul configuration files
-func generateConfiguration(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Generating Consul configuration")
-
-	// Generate main configuration
-	mainConfig := generateMainConfig(config)
-	configPath := "/etc/consul.d/consul.json"
-
-	if err := writeConfigFile(configPath, mainConfig); err != nil {
-		return fmt.Errorf("failed to write main configuration: %w", err)
-	}
-
-	// Generate additional configuration files based on mode
-	if config.Mode == "server" {
-		serverConfig := generateServerConfig(config)
-		serverConfigPath := "/etc/consul.d/server.json"
-		if err := writeConfigFile(serverConfigPath, serverConfig); err != nil {
-			return fmt.Errorf("failed to write server configuration: %w", err)
-		}
-	}
-
-	// Generate client configuration if needed
-	if config.Mode == "agent" {
-		clientConfig := generateClientConfig(config)
-		clientConfigPath := "/etc/consul.d/client.json"
-		if err := writeConfigFile(clientConfigPath, clientConfig); err != nil {
-			return fmt.Errorf("failed to write client configuration: %w", err)
-		}
-	}
-
-	// Set proper permissions
-	if err := exec.Command("chown", "-R", "consul:consul", "/etc/consul.d").Run(); err != nil {
-		return fmt.Errorf("failed to set ownership on configuration directory: %w", err)
-	}
-
-	logger.Info("Configuration generated successfully")
-	return nil
-}
-
-// setupSecurity configures ACL, TLS, and gossip encryption
-func setupSecurity(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Setting up security configuration")
-
-	// Generate gossip encryption key if not provided
-	if config.GossipKey == "" && config.Mode == "server" {
-		key, err := generateGossipKey(rc)
-		if err != nil {
-			return fmt.Errorf("failed to generate gossip key: %w", err)
-		}
-		config.GossipKey = key
-	}
-
-	// Setup TLS if enabled
-	if config.EnableTLS {
-		if err := setupTLS(rc, config); err != nil {
-			return fmt.Errorf("failed to setup TLS: %w", err)
-		}
-	}
-
-	// Setup ACL if enabled
-	if config.EnableACL {
-		if err := setupACL(rc, config); err != nil {
-			return fmt.Errorf("failed to setup ACL: %w", err)
-		}
-	}
-
-	logger.Info("Security configuration completed")
-	return nil
-}
-
-// installSystemdService installs and configures the systemd service
-func installSystemdService(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Installing systemd service")
-
-	serviceContent := generateSystemdService(config)
-	servicePath := "/etc/systemd/system/consul.service"
-
-	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
-		return fmt.Errorf("failed to write systemd service file: %w", err)
-	}
-
-	// Reload systemd daemon
-	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
-		return fmt.Errorf("failed to reload systemd daemon: %w", err)
-	}
-
-	// Enable service
-	if err := exec.Command("systemctl", "enable", "consul").Run(); err != nil {
-		return fmt.Errorf("failed to enable consul service: %w", err)
-	}
-
-	logger.Info("Systemd service installed successfully")
-	return nil
-}
-
-// handleBootstrap handles the bootstrap process for the first server
-func handleBootstrap(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Handling bootstrap process",
-		zap.Int("bootstrap_expect", config.BootstrapExpect))
-
-	// Generate bootstrap configuration
-	bootstrapConfig := generateBootstrapConfig(config)
-	bootstrapPath := "/etc/consul.d/bootstrap.json"
-
-	if err := writeConfigFile(bootstrapPath, bootstrapConfig); err != nil {
-		return fmt.Errorf("failed to write bootstrap configuration: %w", err)
-	}
-
-	// Set proper permissions
-	if err := exec.Command("chown", "consul:consul", bootstrapPath).Run(); err != nil {
-		return fmt.Errorf("failed to set ownership on bootstrap config: %w", err)
-	}
-
-	logger.Info("Bootstrap configuration created")
-	return nil
-}
-
-// startConsulService starts the Consul service
-func startConsulService(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Starting Consul service")
-
-	// Start service
-	if err := exec.Command("systemctl", "start", "consul").Run(); err != nil {
-		return fmt.Errorf("failed to start consul service: %w", err)
-	}
-
-	// Wait for service to be ready
-	if err := waitForService(rc, 30*time.Second); err != nil {
-		return fmt.Errorf("service failed to start within timeout: %w", err)
-	}
-
-	logger.Info("Consul service started successfully")
-	return nil
-}
-
-// joinCluster joins the Consul cluster
-func joinCluster(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Joining Consul cluster",
-		zap.Strings("join_addresses", config.JoinAddresses))
-
-	// Attempt to join cluster
-	for _, addr := range config.JoinAddresses {
-		logger.Info("Attempting to join", zap.String("address", addr))
-
-		cmd := exec.Command("consul", "join", addr)
-		if err := cmd.Run(); err != nil {
-			logger.Warn("Failed to join address",
-				zap.String("address", addr),
-				zap.Error(err))
-			continue
-		}
-
-		logger.Info("Successfully joined cluster", zap.String("address", addr))
-		return nil
-	}
-
-	return fmt.Errorf("failed to join any cluster members")
-}
-
-// verifyInstallation verifies the Consul installation
-func verifyInstallation(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Verifying Consul installation")
-
-	// Check if service is running
-	if !isServiceRunning("consul") {
-		return fmt.Errorf("consul service is not running")
-	}
-
-	// Check if Consul is responding
-	if err := exec.Command("consul", "info").Run(); err != nil {
-		return fmt.Errorf("consul is not responding: %w", err)
-	}
-
-	// Check cluster membership
-	if err := verifyClusterMembership(rc, config); err != nil {
-		return fmt.Errorf("cluster membership verification failed: %w", err)
-	}
-
-	logger.Info("Installation verification completed successfully")
-	return nil
-}
-
-// Helper functions
-
-func isServiceRunning(serviceName string) bool {
-	err := exec.Command("systemctl", "is-active", serviceName).Run()
-	return err == nil
-}
-
-func checkVersionCompatibility(rc *eos_io.RuntimeContext) error {
-	// TODO: Implement version compatibility checking
-	return nil
-}
-
-func backupExistingConfig(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	backupDir := fmt.Sprintf("/opt/consul/backup-%d", time.Now().Unix())
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		return fmt.Errorf("failed to create backup directory: %w", err)
-	}
-
-	// Backup configuration
-	configDirs := []string{"/etc/consul.d", "/etc/consul"}
-	for _, dir := range configDirs {
-		if _, err := os.Stat(dir); err == nil {
-			targetDir := filepath.Join(backupDir, filepath.Base(dir))
-			if err := exec.Command("cp", "-r", dir, targetDir).Run(); err != nil {
-				logger.Warn("Failed to backup directory",
-					zap.String("dir", dir),
-					zap.Error(err))
+// assess checks the current state of Consul installation
+func (ci *ConsulInstaller) assess() error {
+	ci.logger.Info("Assessing current Consul installation")
+	
+	// Check if Consul service exists
+	if _, err := ci.systemd.GetStatus(); err == nil {
+		if !ci.config.ForceReinstall {
+			// Check if it's running
+			if ci.systemd.IsActive() {
+				ci.logger.Info("Consul is already installed and running")
+				return nil
+			}
+			ci.logger.Info("Consul is installed but not running")
+		} else {
+			ci.logger.Info("Force reinstall requested, proceeding with installation")
+			if ci.config.CleanInstall {
+				if err := ci.cleanExistingInstallation(); err != nil {
+					return fmt.Errorf("failed to clean existing installation: %w", err)
+				}
 			}
 		}
 	}
-
-	logger.Info("Configuration backed up", zap.String("backup_dir", backupDir))
+	
 	return nil
 }
 
-func createConsulUser(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if user already exists
-	if err := exec.Command("id", "consul").Run(); err == nil {
-		logger.Info("Consul user already exists")
-		return nil
+// validatePrerequisites checks system requirements
+func (ci *ConsulInstaller) validatePrerequisites() error {
+	ci.logger.Info("Validating prerequisites")
+	
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return eos_err.NewUserError("this command must be run as root")
 	}
-
-	// Create system user
-	cmd := exec.Command("useradd", "--system", "--home", "/etc/consul.d", "--shell", "/bin/false", "consul")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to create consul user: %w", err)
+	
+	// Check memory requirements (minimum 256MB recommended)
+	if err := ci.checkMemory(); err != nil {
+		return err
 	}
-
-	logger.Info("Consul user created successfully")
+	
+	// Check disk space (minimum 100MB for Consul)
+	if err := ci.checkDiskSpace("/var/lib", 100); err != nil {
+		return err
+	}
+	
+	// Check port availability
+	requiredPorts := []int{
+		shared.PortConsul,     // HTTP API (8161)
+		8300,                   // Server RPC
+		8301,                   // Serf LAN
+		8302,                   // Serf WAN
+		8502,                   // gRPC
+		8600,                   // DNS
+	}
+	
+	for _, port := range requiredPorts {
+		if err := ci.checkPortAvailable(port); err != nil {
+			return err
+		}
+	}
+	
 	return nil
 }
 
-func generateGossipKey(rc *eos_io.RuntimeContext) (string, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Generating gossip encryption key")
-
-	cmd := exec.Command("consul", "keygen")
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate gossip key: %w", err)
+// installBinary installs the Consul binary
+func (ci *ConsulInstaller) installBinary() error {
+	if ci.config.UseRepository {
+		return ci.installViaRepository()
 	}
-
-	key := strings.TrimSpace(string(output))
-	logger.Info("Gossip key generated successfully")
-
-	return key, nil
+	return ci.installViaBinary()
 }
 
-func setupTLS(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Setting up TLS configuration")
-
-	// Create TLS directory
-	tlsDir := "/etc/consul.d/tls"
-	if err := os.MkdirAll(tlsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create TLS directory: %w", err)
+// installViaRepository installs Consul using APT repository
+func (ci *ConsulInstaller) installViaRepository() error {
+	ci.logger.Info("Installing Consul via HashiCorp APT repository")
+	
+	// Add HashiCorp GPG key
+	ci.logger.Info("Adding HashiCorp GPG key")
+	if output, err := ci.runner.RunOutput("sh", "-c",
+		"wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg"); err != nil {
+		return fmt.Errorf("failed to add GPG key: %w (output: %s)", err, output)
 	}
-
-	// If certificates are provided, validate and copy them
-	if config.CACert != "" && config.ServerCert != "" && config.ServerKey != "" {
-		logger.Info("Using provided TLS certificates")
-		
-		// Validate certificate files exist
-		certFiles := map[string]string{
-			"CA certificate":     config.CACert,
-			"Server certificate": config.ServerCert,
-			"Server key":         config.ServerKey,
-		}
-		
-		for name, path := range certFiles {
-			if _, err := os.Stat(path); err != nil {
-				return fmt.Errorf("%s not found at %s: %w", name, path, err)
-			}
-		}
-		
-		// Copy certificates to TLS directory
-		caCertDest := filepath.Join(tlsDir, "ca.pem")
-		serverCertDest := filepath.Join(tlsDir, "server.pem")
-		serverKeyDest := filepath.Join(tlsDir, "server-key.pem")
-		
-		if err := copyFile(config.CACert, caCertDest); err != nil {
-			return fmt.Errorf("failed to copy CA certificate: %w", err)
-		}
-		
-		if err := copyFile(config.ServerCert, serverCertDest); err != nil {
-			return fmt.Errorf("failed to copy server certificate: %w", err)
-		}
-		
-		if err := copyFile(config.ServerKey, serverKeyDest); err != nil {
-			return fmt.Errorf("failed to copy server key: %w", err)
-		}
-		
-		// Update config paths to point to copied files
-		config.CACert = caCertDest
-		config.ServerCert = serverCertDest
-		config.ServerKey = serverKeyDest
-		
-		// Set proper permissions
-		if err := os.Chmod(serverKeyDest, 0600); err != nil {
-			return fmt.Errorf("failed to set server key permissions: %w", err)
-		}
-		
+	
+	// Add HashiCorp repository
+	ci.logger.Info("Adding HashiCorp repository")
+	repoLine := fmt.Sprintf("deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com %s main",
+		getUbuntuCodename())
+	
+	if err := ci.writeFile("/etc/apt/sources.list.d/hashicorp.list", []byte(repoLine), 0644); err != nil {
+		return fmt.Errorf("failed to add repository: %w", err)
+	}
+	
+	// Update package list
+	ci.logger.Info("Updating package list")
+	if err := ci.runner.Run("apt-get", "update"); err != nil {
+		return fmt.Errorf("failed to update package list: %w", err)
+	}
+	
+	// Install Consul package
+	ci.logger.Info("Installing Consul package")
+	installCmd := []string{"apt-get", "install", "-y"}
+	if ci.config.Version != "latest" {
+		installCmd = append(installCmd, fmt.Sprintf("consul=%s", ci.config.Version))
 	} else {
-		logger.Info("Generating self-signed TLS certificates")
-		
-		// Generate self-signed certificates
-		if err := generateSelfSignedCerts(rc, config, tlsDir); err != nil {
-			return fmt.Errorf("failed to generate self-signed certificates: %w", err)
-		}
+		installCmd = append(installCmd, "consul")
 	}
-
-	// Set ownership of TLS directory
-	if err := exec.Command("chown", "-R", "consul:consul", tlsDir).Run(); err != nil {
-		return fmt.Errorf("failed to set ownership on TLS directory: %w", err)
+	
+	if err := ci.runner.Run(installCmd[0], installCmd[1:]...); err != nil {
+		return fmt.Errorf("failed to install Consul package: %w", err)
 	}
-
-	logger.Info("TLS configuration completed")
+	
 	return nil
 }
 
-func setupACL(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Setting up ACL configuration")
-
-	// ACL setup is primarily handled in configuration generation
-	// and bootstrap process. This function prepares the environment
-	// for ACL bootstrapping.
-
-	// Create ACL directory for tokens
-	aclDir := "/etc/consul.d/acl"
-	if err := os.MkdirAll(aclDir, 0755); err != nil {
-		return fmt.Errorf("failed to create ACL directory: %w", err)
+// installViaBinary downloads and installs Consul binary directly
+func (ci *ConsulInstaller) installViaBinary() error {
+	ci.logger.Info("Installing Consul via direct binary download")
+	
+	// Determine version to install
+	version := ci.config.Version
+	if version == "latest" {
+		var err error
+		version, err = ci.getLatestVersion()
+		if err != nil {
+			return fmt.Errorf("failed to determine latest version: %w", err)
+		}
 	}
-
-	// Set ownership
-	if err := exec.Command("chown", "-R", "consul:consul", aclDir).Run(); err != nil {
-		return fmt.Errorf("failed to set ownership on ACL directory: %w", err)
+	
+	// Download binary
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "amd64"
+	} else if arch == "arm64" {
+		arch = "arm64"
 	}
-
-	// Create ACL configuration file
-	aclConfig := map[string]interface{}{
-		"acl": map[string]interface{}{
-			"enabled":                    true,
-			"default_policy":             "deny",
-			"enable_token_persistence":   true,
-			"enable_token_replication":   config.Mode == "server",
-			"down_policy":               "extend-cache",
-			"token_ttl":                 "30s",
-		},
+	
+	downloadURL := fmt.Sprintf("https://releases.hashicorp.com/consul/%s/consul_%s_linux_%s.zip",
+		version, version, arch)
+	
+	ci.logger.Info("Downloading Consul binary",
+		zap.String("version", version),
+		zap.String("url", downloadURL))
+	
+	tmpDir := "/tmp/consul-install"
+	if err := ci.createDirectory(tmpDir, 0755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-
-	aclConfigPath := filepath.Join(aclDir, "acl.json")
-	if err := writeConfigFile(aclConfigPath, aclConfig); err != nil {
-		return fmt.Errorf("failed to write ACL configuration: %w", err)
+	defer os.RemoveAll(tmpDir)
+	
+	zipPath := filepath.Join(tmpDir, "consul.zip")
+	if err := ci.downloadFile(downloadURL, zipPath); err != nil {
+		return fmt.Errorf("failed to download Consul: %w", err)
 	}
-
-	// Set proper permissions
-	if err := os.Chmod(aclConfigPath, 0644); err != nil {
-		return fmt.Errorf("failed to set ACL config permissions: %w", err)
+	
+	// Extract binary
+	if err := ci.runner.Run("unzip", "-o", zipPath, "-d", tmpDir); err != nil {
+		return fmt.Errorf("failed to extract Consul: %w", err)
 	}
-
-	logger.Info("ACL configuration setup completed")
+	
+	// Install binary
+	binaryPath := filepath.Join(tmpDir, "consul")
+	if err := ci.runner.Run("install", "-m", "755", binaryPath, ci.config.BinaryPath); err != nil {
+		return fmt.Errorf("failed to install binary: %w", err)
+	}
+	
 	return nil
 }
 
-func waitForService(rc *eos_io.RuntimeContext, timeout time.Duration) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Waiting for service to be ready", zap.Duration("timeout", timeout))
-
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if err := exec.Command("consul", "info").Run(); err == nil {
-			logger.Info("Service is ready")
-			return nil
+// configure sets up Consul configuration
+func (ci *ConsulInstaller) configure() error {
+	ci.logger.Info("Configuring Consul")
+	
+	// Create consul user and group
+	if err := ci.user.CreateSystemUser("consul", "/var/lib/consul"); err != nil {
+		return fmt.Errorf("failed to create consul user: %w", err)
+	}
+	
+	// Create required directories
+	directories := []struct {
+		path  string
+		mode  os.FileMode
+		owner string
+	}{
+		{"/etc/consul.d", 0755, "consul"},
+		{"/var/lib/consul", 0755, "consul"},
+		{"/var/log/consul", 0755, "consul"},
+	}
+	
+	for _, dir := range directories {
+		if err := ci.createDirectory(dir.path, dir.mode); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir.path, err)
 		}
-		time.Sleep(2 * time.Second)
-	}
-
-	return fmt.Errorf("service failed to start within %v", timeout)
-}
-
-func verifyClusterMembership(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Verifying cluster membership")
-
-	// Get cluster members
-	cmd := exec.Command("consul", "members")
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to get cluster members: %w", err)
-	}
-
-	members := strings.Split(string(output), "\n")
-	logger.Info("Cluster members", zap.Int("count", len(members)-1))
-
-	// Verify this node is in the cluster
-	nodeFound := false
-	for _, member := range members {
-		if strings.Contains(member, config.NodeName) {
-			nodeFound = true
-			break
+		if err := ci.runner.Run("chown", "-R", dir.owner+":"+dir.owner, dir.path); err != nil {
+			return fmt.Errorf("failed to set ownership for %s: %w", dir.path, err)
 		}
 	}
-
-	if !nodeFound {
-		return fmt.Errorf("node %s not found in cluster members", config.NodeName)
+	
+	// Backup existing configuration if present
+	configPath := "/etc/consul.d/consul.hcl"
+	if ci.fileExists(configPath) {
+		if err := ci.files.BackupFile(configPath); err != nil {
+			ci.logger.Warn("Failed to backup existing configuration", zap.Error(err))
+		}
 	}
-
-	logger.Info("Cluster membership verified")
+	
+	// Write HCL configuration
+	hclConfig := ci.generateHCLConfig()
+	if err := ci.writeFile(configPath, []byte(hclConfig), 0644); err != nil {
+		return fmt.Errorf("failed to write configuration: %w", err)
+	}
+	
+	// Set proper ownership
+	if err := ci.runner.Run("chown", "consul:consul", configPath); err != nil {
+		return fmt.Errorf("failed to set configuration ownership: %w", err)
+	}
+	
+	// Validate configuration
+	ci.logger.Info("Validating Consul configuration")
+	if output, err := ci.runner.RunOutput(ci.config.BinaryPath, "validate", "/etc/consul.d"); err != nil {
+		return fmt.Errorf("configuration validation failed: %w (output: %s)", err, output)
+	}
+	
 	return nil
 }
 
-func verifyClusterConnectivity(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Verifying cluster connectivity")
-
-	// Check cluster health
-	cmd := exec.Command("consul", "operator", "raft", "list-peers")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to check cluster health: %w", err)
+// generateHCLConfig generates HCL format configuration
+func (ci *ConsulInstaller) generateHCLConfig() string {
+	var sb strings.Builder
+	sb.WriteString("# Consul configuration managed by Eos\n")
+	sb.WriteString(fmt.Sprintf("datacenter = \"%s\"\n", ci.config.Datacenter))
+	sb.WriteString("data_dir = \"/var/lib/consul\"\n")
+	sb.WriteString(fmt.Sprintf("log_level = \"%s\"\n", ci.config.LogLevel))
+	sb.WriteString(fmt.Sprintf("server = %t\n", ci.config.ServerMode))
+	
+	if ci.config.ServerMode {
+		sb.WriteString(fmt.Sprintf("bootstrap_expect = %d\n", ci.config.BootstrapExpect))
 	}
-
-	logger.Info("Cluster connectivity verified")
-	return nil
+	
+	sb.WriteString(fmt.Sprintf("bind_addr = \"%s\"\n", ci.config.BindAddr))
+	sb.WriteString(fmt.Sprintf("client_addr = \"%s\"\n", ci.config.ClientAddr))
+	sb.WriteString("\n")
+	
+	sb.WriteString("ui_config {\n")
+	sb.WriteString(fmt.Sprintf("  enabled = %t\n", ci.config.UIEnabled))
+	sb.WriteString("}\n\n")
+	
+	sb.WriteString("connect {\n")
+	sb.WriteString(fmt.Sprintf("  enabled = %t\n", ci.config.ConnectEnabled))
+	sb.WriteString("}\n\n")
+	
+	sb.WriteString("ports {\n")
+	sb.WriteString(fmt.Sprintf("  http = %d\n", shared.PortConsul))
+	sb.WriteString("  dns = 8600\n")
+	sb.WriteString("  grpc = 8502\n")
+	sb.WriteString("}\n\n")
+	
+	sb.WriteString("performance {\n")
+	sb.WriteString("  raft_multiplier = 1\n")
+	sb.WriteString("}")
+	
+	return sb.String()
 }
 
-func configureMonitoring(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Configuring monitoring")
-
-	// Create monitoring directory
-	monitoringDir := "/etc/consul.d/monitoring"
-	if err := os.MkdirAll(monitoringDir, 0755); err != nil {
-		return fmt.Errorf("failed to create monitoring directory: %w", err)
+// setupService configures and starts the Consul systemd service
+func (ci *ConsulInstaller) setupService() error {
+	ci.logger.Info("Setting up Consul systemd service")
+	
+	// Create systemd service file
+	binaryPath := ci.config.BinaryPath
+	if ci.config.UseRepository {
+		// Repository installation puts binary in /usr/bin
+		binaryPath = "/usr/bin/consul"
 	}
-
-	// Configure telemetry
-	telemetryConfig := map[string]interface{}{
-		"telemetry": map[string]interface{}{
-			"prometheus_retention_time": config.Telemetry.PrometheusRetentionTime,
-			"disable_hostname":          config.Telemetry.DisableHostname,
-			"statsd_address":           config.Telemetry.StatsdAddr,
-			"dogstatsd_address":        config.Telemetry.DogstatsdAddr,
-			"metrics_prefix":           "consul",
-			"filter_default":           true,
-			"prefix_filter": []string{
-				"+consul.runtime",
-				"+consul.raft",
-				"+consul.serf",
-				"+consul.catalog",
-				"+consul.health",
-				"+consul.http",
-				"+consul.acl",
-				"+consul.autopilot",
-				"+consul.txn",
-				"+consul.kvs",
-				"+consul.connect",
-				"+consul.leader",
-				"+consul.dns",
-				"+consul.rpc",
-			},
-		},
-	}
-
-	telemetryConfigPath := filepath.Join(monitoringDir, "telemetry.json")
-	if err := writeConfigFile(telemetryConfigPath, telemetryConfig); err != nil {
-		return fmt.Errorf("failed to write telemetry configuration: %w", err)
-	}
-
-	// Configure logging
-	loggingConfig := map[string]interface{}{
-		"log_level":        config.Logging.LogLevel,
-		"log_file":         config.Logging.LogFile,
-		"log_rotate_bytes": 10485760, // 10MB
-		"log_rotate_duration": "24h",
-		"log_rotate_max_files": 5,
-		"enable_syslog":    config.Logging.EnableSyslog,
-		"enable_json_logs": config.Logging.EnableJSON,
-	}
-
-	loggingConfigPath := filepath.Join(monitoringDir, "logging.json")
-	if err := writeConfigFile(loggingConfigPath, loggingConfig); err != nil {
-		return fmt.Errorf("failed to write logging configuration: %w", err)
-	}
-
-	// Configure health checks
-	healthConfig := map[string]interface{}{
-		"checks": []map[string]interface{}{
-			{
-				"id":                  "consul-health",
-				"name":               "Consul Health Check",
-				"http":               fmt.Sprintf("http://localhost:%d/v1/status/leader", config.Ports.HTTP),
-				"interval":           "10s",
-				"timeout":            "5s",
-				"deregister_critical_service_after": "30s",
-			},
-		},
-	}
-
-	healthConfigPath := filepath.Join(monitoringDir, "health.json")
-	if err := writeConfigFile(healthConfigPath, healthConfig); err != nil {
-		return fmt.Errorf("failed to write health configuration: %w", err)
-	}
-
-	// Set ownership
-	if err := exec.Command("chown", "-R", "consul:consul", monitoringDir).Run(); err != nil {
-		return fmt.Errorf("failed to set ownership on monitoring directory: %w", err)
-	}
-
-	logger.Info("Monitoring configuration completed")
-	return nil
-}
-
-func writeConfigFile(path string, content interface{}) error {
-	// Serialize configuration to JSON
-	jsonData, err := json.MarshalIndent(content, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal configuration: %w", err)
-	}
-
-	// Write to file
-	if err := os.WriteFile(path, jsonData, 0644); err != nil {
-		return fmt.Errorf("failed to write configuration file: %w", err)
-	}
-
-	return nil
-}
-
-func generateMainConfig(config *ConsulConfig) interface{} {
-	mainConfig := map[string]interface{}{
-		"datacenter":    config.Datacenter,
-		"data_dir":      "/opt/consul/data",
-		"log_level":     config.Logging.LogLevel,
-		"node_name":     config.NodeName,
-		"bind_addr":     config.BindAddr,
-		"client_addr":   config.ClientAddr,
-		"server":        config.Mode == "server",
-		"ui_config": map[string]interface{}{
-			"enabled": config.EnableUI,
-		},
-		"connect": map[string]interface{}{
-			"enabled": config.ConnectEnabled,
-		},
-		"ports": map[string]interface{}{
-			"grpc":     config.Ports.GRPC,
-			"http":     config.Ports.HTTP,
-			"https":    config.Ports.HTTPS,
-			"serf_lan": config.Ports.SerfLAN,
-			"serf_wan": config.Ports.SerfWAN,
-			"server":   config.Ports.Server,
-			"dns":      config.Ports.DNS,
-		},
-		"performance": map[string]interface{}{
-			"raft_multiplier": config.Performance.RaftMultiplier,
-		},
-		"telemetry": map[string]interface{}{
-			"prometheus_retention_time": config.Telemetry.PrometheusRetentionTime,
-			"disable_hostname":          config.Telemetry.DisableHostname,
-		},
-	}
-
-	// Add advertise address if specified
-	if config.AdvertiseAddr != "" {
-		mainConfig["advertise_addr"] = config.AdvertiseAddr
-	}
-
-	// Add gossip encryption if enabled
-	if config.GossipKey != "" {
-		mainConfig["encrypt"] = config.GossipKey
-	}
-
-	// Add ACL configuration if enabled
-	if config.EnableACL {
-		mainConfig["acl"] = map[string]interface{}{
-			"enabled":        true,
-			"default_policy": "deny",
-			"enable_token_persistence": true,
-		}
-	}
-
-	// Add TLS configuration if enabled
-	if config.EnableTLS {
-		mainConfig["tls"] = map[string]interface{}{
-			"defaults": map[string]interface{}{
-				"ca_file":         config.CACert,
-				"cert_file":       config.ServerCert,
-				"key_file":        config.ServerKey,
-				"verify_incoming": true,
-				"verify_outgoing": true,
-			},
-			"internal_rpc": map[string]interface{}{
-				"verify_server_hostname": true,
-			},
-		}
-	}
-
-	// Add retry join if specified
-	if len(config.RetryJoin) > 0 {
-		mainConfig["retry_join"] = config.RetryJoin
-	}
-
-	return mainConfig
-}
-
-func generateServerConfig(config *ConsulConfig) interface{} {
-	serverConfig := map[string]interface{}{
-		"bootstrap_expect": config.BootstrapExpect,
-		"leave_on_terminate": config.Performance.LeaveOnTerm,
-		"skip_leave_on_interrupt": config.Performance.SkipLeaveOnInt,
-		"rejoin_after_leave": config.Performance.RejoinAfterLeave,
-	}
-
-	// Add join addresses if specified
-	if len(config.JoinAddresses) > 0 {
-		serverConfig["start_join"] = config.JoinAddresses
-	}
-
-	// Add mesh gateway configuration if enabled
-	if config.MeshGateway {
-		serverConfig["mesh_gateway"] = map[string]interface{}{
-			"mode": "local",
-		}
-	}
-
-	// Add ingress gateway configuration if enabled
-	if config.IngressGateway {
-		serverConfig["ingress_gateway"] = map[string]interface{}{
-			"enabled": true,
-		}
-	}
-
-	return serverConfig
-}
-
-func generateClientConfig(config *ConsulConfig) interface{} {
-	clientConfig := map[string]interface{}{
-		"leave_on_terminate": config.Performance.LeaveOnTerm,
-		"skip_leave_on_interrupt": config.Performance.SkipLeaveOnInt,
-		"rejoin_after_leave": config.Performance.RejoinAfterLeave,
-	}
-
-	// Add join addresses if specified
-	if len(config.JoinAddresses) > 0 {
-		clientConfig["start_join"] = config.JoinAddresses
-	}
-
-	// Add retry join if specified
-	if len(config.RetryJoin) > 0 {
-		clientConfig["retry_join"] = config.RetryJoin
-	}
-
-	return clientConfig
-}
-
-func generateBootstrapConfig(config *ConsulConfig) interface{} {
-	bootstrapConfig := map[string]interface{}{
-		"bootstrap_expect": config.BootstrapExpect,
-		"server": true,
-	}
-
-	// Bootstrap config typically has minimal settings
-	// to avoid conflicts during cluster formation
-	return bootstrapConfig
-}
-
-func generateSystemdService(config *ConsulConfig) string {
-	return fmt.Sprintf(`[Unit]
+	
+	serviceContent := fmt.Sprintf(`[Unit]
 Description=Consul
 Documentation=https://www.consul.io/
 Requires=network-online.target
 After=network-online.target
-ConditionFileNotEmpty=/etc/consul.d/consul.json
+ConditionFileNotEmpty=/etc/consul.d/consul.hcl
 
 [Service]
-Type=notify
+Type=simple
 User=consul
 Group=consul
-ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d/
+ExecStart=%s agent -config-dir=/etc/consul.d/
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Restart=on-failure
+RestartSec=5
 LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
-`)
-}
-
-// validateConsulConfig validates the Consul configuration
-func validateConsulConfig(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Validating Consul configuration")
-
-	// Validate required fields
-	if config.Mode == "" {
-		return eos_err.NewUserError("mode is required (server, agent, or dev)")
+`, binaryPath)
+	
+	servicePath := "/etc/systemd/system/consul.service"
+	if err := ci.writeFile(servicePath, []byte(serviceContent), 0644); err != nil {
+		return fmt.Errorf("failed to create service file: %w", err)
 	}
-
-	if config.Datacenter == "" {
-		return eos_err.NewUserError("datacenter is required")
+	
+	// Reload systemd
+	if err := ci.runner.Run("systemctl", "daemon-reload"); err != nil {
+		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
-
-	if config.NodeName == "" {
-		return eos_err.NewUserError("node_name is required")
+	
+	// Enable service
+	if err := ci.systemd.Enable(); err != nil {
+		return fmt.Errorf("failed to enable service: %w", err)
 	}
-
-	// Validate mode-specific configuration
-	switch config.Mode {
-	case "server":
-		if config.BootstrapExpect < 1 {
-			return eos_err.NewUserError("bootstrap_expect must be >= 1 for server mode")
+	
+	// Start service with retries
+	ci.logger.Info("Starting Consul service")
+	if err := ci.systemd.Start(); err != nil {
+		// Get service status for debugging
+		if status, statusErr := ci.systemd.GetStatus(); statusErr == nil {
+			ci.logger.Error("Failed to start Consul service", 
+				zap.String("status", status))
 		}
-	case "agent":
-		if len(config.JoinAddresses) == 0 && len(config.RetryJoin) == 0 {
-			return eos_err.NewUserError("join_addresses or retry_join required for agent mode")
+		return fmt.Errorf("failed to start service: %w", err)
+	}
+	
+	// Wait for Consul to be ready
+	ci.logger.Info("Waiting for Consul to be ready")
+	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 30*time.Second)
+	defer cancel()
+	
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for Consul to be ready")
+		case <-ticker.C:
+			if ci.isConsulReady() {
+				ci.logger.Info("Consul is ready")
+				return nil
+			}
 		}
-	case "dev":
-		// Dev mode has minimal requirements
-	default:
-		return eos_err.NewUserError("invalid mode: %s (must be server, agent, or dev)", config.Mode)
 	}
+}
 
-	// Validate network configuration
-	if config.BindAddr == "" {
-		config.BindAddr = "0.0.0.0"
+// verify performs post-installation verification
+func (ci *ConsulInstaller) verify() error {
+	ci.logger.Info("Verifying Consul installation")
+	
+	// Check service status
+	if !ci.systemd.IsActive() {
+		return fmt.Errorf("Consul service is not active")
 	}
-
-	if config.ClientAddr == "" {
-		config.ClientAddr = "127.0.0.1"
+	
+	// Check API endpoint
+	apiURL := fmt.Sprintf("http://127.0.0.1:%d/v1/agent/self", shared.PortConsul)
+	resp, err := ci.httpGet(apiURL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Consul API: %w", err)
 	}
-
-	// Validate port configuration
-	if config.Ports.HTTP == 0 {
-		config.Ports = DefaultPortConfig()
+	
+	var agentInfo map[string]interface{}
+	if err := json.Unmarshal(resp, &agentInfo); err != nil {
+		return fmt.Errorf("failed to parse API response: %w", err)
 	}
-
-	// Validate security configuration
-	if config.EnableTLS && (config.CACert == "" || config.ServerCert == "" || config.ServerKey == "") {
-		return eos_err.NewUserError("TLS certificates required when TLS is enabled")
+	
+	// Check cluster members
+	membersURL := fmt.Sprintf("http://127.0.0.1:%d/v1/agent/members", shared.PortConsul)
+	membersResp, err := ci.httpGet(membersURL)
+	if err != nil {
+		ci.logger.Warn("Failed to get cluster members", zap.Error(err))
+	} else {
+		var members []map[string]interface{}
+		if err := json.Unmarshal(membersResp, &members); err == nil {
+			ci.logger.Info("Cluster has members", zap.Int("count", len(members)))
+		}
 	}
-
-	logger.Info("Configuration validation completed successfully")
+	
+	// Log success information
+	ci.logger.Info("Consul installation verified successfully",
+		zap.String("datacenter", ci.config.Datacenter),
+		zap.Bool("server_mode", ci.config.ServerMode),
+		zap.String("api_url", fmt.Sprintf("http://%s:%d", ci.config.BindAddr, shared.PortConsul)))
+	
 	return nil
 }
 
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
+// isConsulReady checks if Consul is ready to accept requests
+func (ci *ConsulInstaller) isConsulReady() bool {
+	// Try to connect to the API
+	config := api.DefaultConfig()
+	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
+	
+	client, err := api.NewClient(config)
 	if err != nil {
-		return fmt.Errorf("failed to open source file: %w", err)
+		return false
 	}
-	defer sourceFile.Close()
+	
+	// Check agent status
+	_, err = client.Agent().Self()
+	return err == nil
+}
 
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("failed to create destination file: %w", err)
+// cleanExistingInstallation removes existing Consul installation
+func (ci *ConsulInstaller) cleanExistingInstallation() error {
+	ci.logger.Info("Cleaning existing Consul installation")
+	
+	// Stop service if running
+	if ci.systemd.IsActive() {
+		if err := ci.systemd.Stop(); err != nil {
+			ci.logger.Warn("Failed to stop Consul service", zap.Error(err))
+		}
 	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	if err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+	
+	// Remove data directory
+	if err := os.RemoveAll("/var/lib/consul"); err != nil {
+		ci.logger.Warn("Failed to remove data directory", zap.Error(err))
 	}
-
+	
+	// Remove log directory
+	if err := os.RemoveAll("/var/log/consul"); err != nil {
+		ci.logger.Warn("Failed to remove log directory", zap.Error(err))
+	}
+	
 	return nil
 }
 
-// generateSelfSignedCerts generates self-signed certificates for Consul
-func generateSelfSignedCerts(rc *eos_io.RuntimeContext, config *ConsulConfig, tlsDir string) error {
+// getLatestVersion fetches the latest Consul version from HashiCorp
+func (ci *ConsulInstaller) getLatestVersion() (string, error) {
+	// Query HashiCorp checkpoint API
+	resp, err := ci.httpGet("https://checkpoint-api.hashicorp.com/v1/check/consul")
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch version info: %w", err)
+	}
+	
+	var versionInfo struct {
+		CurrentVersion string `json:"current_version"`
+	}
+	
+	if err := json.Unmarshal(resp, &versionInfo); err != nil {
+		return "", fmt.Errorf("failed to parse version info: %w", err)
+	}
+	
+	if versionInfo.CurrentVersion == "" {
+		return "", fmt.Errorf("no version found in response")
+	}
+	
+	return versionInfo.CurrentVersion, nil
+}
+
+// Helper methods for various operations
+
+func (ci *ConsulInstaller) checkMemory() error {
+	var info unix.Sysinfo_t
+	if err := unix.Sysinfo(&info); err != nil {
+		ci.logger.Warn("Could not check memory", zap.Error(err))
+		return nil
+	}
+	
+	totalMB := info.Totalram / 1024 / 1024
+	if totalMB < 256 {
+		return fmt.Errorf("insufficient memory: %dMB (minimum 256MB required)", totalMB)
+	}
+	
+	return nil
+}
+
+func (ci *ConsulInstaller) checkDiskSpace(path string, requiredMB int64) error {
+	var stat unix.Statfs_t
+	if err := unix.Statfs(path, &stat); err != nil {
+		ci.logger.Warn("Could not check disk space", zap.Error(err))
+		return nil
+	}
+	
+	availableMB := int64(stat.Bavail) * int64(stat.Bsize) / 1024 / 1024
+	if availableMB < requiredMB {
+		return fmt.Errorf("insufficient disk space in %s: %dMB available (minimum %dMB required)", 
+			path, availableMB, requiredMB)
+	}
+	
+	return nil
+}
+
+func (ci *ConsulInstaller) checkPortAvailable(port int) error {
+	// Use ss command to check if port is in use
+	output, err := ci.runner.RunOutput("sh", "-c", fmt.Sprintf("ss -tln | grep -q ':%d ' && echo 'in-use' || echo 'available'", port))
+	if err != nil {
+		// If command fails, assume port is available
+		return nil
+	}
+	
+	if strings.TrimSpace(output) == "in-use" {
+		return fmt.Errorf("port %d is already in use", port)
+	}
+	
+	return nil
+}
+
+func (ci *ConsulInstaller) createDirectory(path string, mode os.FileMode) error {
+	if err := os.MkdirAll(path, mode); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ci *ConsulInstaller) writeFile(path string, content []byte, mode os.FileMode) error {
+	return os.WriteFile(path, content, mode)
+}
+
+func (ci *ConsulInstaller) fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func (ci *ConsulInstaller) downloadFile(url, dest string) error {
+	// Download using wget
+	if err := ci.runner.Run("wget", "-O", dest, url); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ci *ConsulInstaller) httpGet(url string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 10*time.Second)
+	defer cancel()
+	
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	
+	resp, err := ci.network.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+	
+	return io.ReadAll(resp.Body)
+}
+
+// getDefaultBindAddr returns the default bind address (first non-loopback IP)
+func getDefaultBindAddr() string {
+	cmd := exec.Command("hostname", "-I")
+	output, err := cmd.Output()
+	if err != nil {
+		return "127.0.0.1"
+	}
+	
+	ips := strings.Fields(string(output))
+	if len(ips) > 0 {
+		return ips[0]
+	}
+	
+	return "127.0.0.1"
+}
+
+// getUbuntuCodename returns the Ubuntu codename for APT repository
+func getUbuntuCodename() string {
+	cmd := exec.Command("lsb_release", "-cs")
+	output, err := cmd.Output()
+	if err != nil {
+		return "noble" // Default to latest LTS
+	}
+	
+	return strings.TrimSpace(string(output))
+}
+
+// Legacy function for backward compatibility
+func InstallConsul(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
+	// Convert old config to new format
+	installConfig := &InstallConfig{
+		Version:          config.Version,
+		UseRepository:    config.UseRepository,
+		Datacenter:       config.Datacenter,
+		ServerMode:       config.Mode == "server",
+		BootstrapExpect:  config.BootstrapExpect,
+		UIEnabled:        config.EnableUI || config.UI,
+		ConnectEnabled:   config.ConnectEnabled,
+		BindAddr:         config.BindAddr,
+		ClientAddr:       config.ClientAddr,
+		LogLevel:         config.LogLevel,
+		VaultIntegration: config.VaultIntegration,
+		ForceReinstall:   config.Force,
+		CleanInstall:     config.Clean,
+	}
+	
+	installer := NewConsulInstaller(rc, installConfig)
+	return installer.Install()
+}
+
+// Additional helper functions for Consul operations
+
+// CheckConsulHealth verifies Consul cluster health
+func CheckConsulHealth(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Generating self-signed certificates")
-
-	// Generate CA certificate
-	caKey, caCert, err := generateCA(config.NodeName)
+	
+	config := api.DefaultConfig()
+	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
+	
+	client, err := api.NewClient(config)
 	if err != nil {
-		return fmt.Errorf("failed to generate CA: %w", err)
+		return fmt.Errorf("failed to create Consul client: %w", err)
 	}
-
-	// Generate server certificate
-	serverKey, serverCert, err := generateServerCert(caCert, caKey, config.NodeName)
+	
+	// Check agent health
+	health, _, err := client.Health().Node("_agent", nil)
 	if err != nil {
-		return fmt.Errorf("failed to generate server certificate: %w", err)
+		return fmt.Errorf("failed to check agent health: %w", err)
 	}
-
-	// Write CA certificate
-	caCertPath := filepath.Join(tlsDir, "ca.pem")
-	if err := writeCertToPEM(caCert, caCertPath); err != nil {
-		return fmt.Errorf("failed to write CA certificate: %w", err)
+	
+	for _, check := range health {
+		if check.Status != "passing" {
+			logger.Warn("Health check not passing",
+				zap.String("check", check.Name),
+				zap.String("status", check.Status),
+				zap.String("output", check.Output))
+		}
 	}
-
-	// Write server certificate
-	serverCertPath := filepath.Join(tlsDir, "server.pem")
-	if err := writeCertToPEM(serverCert, serverCertPath); err != nil {
-		return fmt.Errorf("failed to write server certificate: %w", err)
-	}
-
-	// Write server key
-	serverKeyPath := filepath.Join(tlsDir, "server-key.pem")
-	if err := writeKeyToPEM(serverKey, serverKeyPath); err != nil {
-		return fmt.Errorf("failed to write server key: %w", err)
-	}
-
-	// Update config paths
-	config.CACert = caCertPath
-	config.ServerCert = serverCertPath
-	config.ServerKey = serverKeyPath
-
-	logger.Info("Self-signed certificates generated successfully")
+	
 	return nil
 }
 
-// generateCA generates a CA certificate and private key
-func generateCA(commonName string) (*rsa.PrivateKey, *x509.Certificate, error) {
-	// Generate CA private key
-	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+// GetConsulMembers returns the list of Consul cluster members
+func GetConsulMembers(rc *eos_io.RuntimeContext) ([]string, error) {
+	config := api.DefaultConfig()
+	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
+	
+	client, err := api.NewClient(config)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate CA key: %w", err)
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
-
-	// Create CA certificate template
-	caTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization:  []string{"Consul"},
-			Country:       []string{"US"},
-			Province:      []string{""},
-			Locality:      []string{""},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-			CommonName:    fmt.Sprintf("Consul CA %s", commonName),
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
-		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		BasicConstraintsValid: true,
-	}
-
-	// Create CA certificate
-	caCertBytes, err := x509.CreateCertificate(rand.Reader, &caTemplate, &caTemplate, &caKey.PublicKey, caKey)
+	
+	members, err := client.Agent().Members(false)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create CA certificate: %w", err)
+		return nil, fmt.Errorf("failed to get members: %w", err)
 	}
-
-	// Parse CA certificate
-	caCert, err := x509.ParseCertificate(caCertBytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse CA certificate: %w", err)
+	
+	var memberList []string
+	for _, member := range members {
+		memberList = append(memberList, member.Name)
 	}
-
-	return caKey, caCert, nil
+	
+	return memberList, nil
 }
 
-// generateServerCert generates a server certificate signed by the CA
-func generateServerCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, commonName string) (*rsa.PrivateKey, *x509.Certificate, error) {
-	// Generate server private key
-	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate server key: %w", err)
+// RestartConsul performs a safe Consul restart
+func RestartConsul(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Restarting Consul service")
+	
+	runner := NewCommandRunner(rc)
+	systemd := NewSystemdService(runner, "consul")
+	
+	// Gracefully stop
+	if err := systemd.Stop(); err != nil {
+		return fmt.Errorf("failed to stop Consul: %w", err)
 	}
-
-	// Create server certificate template
-	serverTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(2),
-		Subject: pkix.Name{
-			Organization:  []string{"Consul"},
-			Country:       []string{"US"},
-			Province:      []string{""},
-			Locality:      []string{""},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
-			CommonName:    commonName,
-		},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
-		SubjectKeyId: []byte{1, 2, 3, 4, 6},
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		DNSNames:     []string{commonName, "localhost", "consul.service.consul"},
-		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+	
+	// Wait a moment
+	time.Sleep(2 * time.Second)
+	
+	// Start again
+	if err := systemd.Start(); err != nil {
+		return fmt.Errorf("failed to start Consul: %w", err)
 	}
-
-	// Create server certificate
-	serverCertBytes, err := x509.CreateCertificate(rand.Reader, &serverTemplate, caCert, &serverKey.PublicKey, caKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create server certificate: %w", err)
+	
+	// Wait for it to be ready
+	installer := &ConsulInstaller{
+		rc:      rc,
+		logger:  logger,
+		network: NewHTTPClient(30 * time.Second),
+		config:  &InstallConfig{},
 	}
-
-	// Parse server certificate
-	serverCert, err := x509.ParseCertificate(serverCertBytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse server certificate: %w", err)
+	
+	ctx, cancel := context.WithTimeout(rc.Ctx, 30*time.Second)
+	defer cancel()
+	
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for Consul to be ready after restart")
+		case <-ticker.C:
+			if installer.isConsulReady() {
+				logger.Info("Consul restarted successfully")
+				return nil
+			}
+		}
 	}
-
-	return serverKey, serverCert, nil
-}
-
-// writeCertToPEM writes a certificate to a PEM file
-func writeCertToPEM(cert *x509.Certificate, path string) error {
-	certPEM := &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: cert.Raw,
-	}
-
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("failed to create certificate file: %w", err)
-	}
-	defer file.Close()
-
-	if err := pem.Encode(file, certPEM); err != nil {
-		return fmt.Errorf("failed to encode certificate: %w", err)
-	}
-
-	return nil
-}
-
-// writeKeyToPEM writes a private key to a PEM file
-func writeKeyToPEM(key *rsa.PrivateKey, path string) error {
-	keyPEM := &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
-	}
-
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("failed to create key file: %w", err)
-	}
-	defer file.Close()
-
-	if err := pem.Encode(file, keyPEM); err != nil {
-		return fmt.Errorf("failed to encode key: %w", err)
-	}
-
-	// Set restricted permissions on the key file
-	if err := os.Chmod(path, 0600); err != nil {
-		return fmt.Errorf("failed to set key file permissions: %w", err)
-	}
-
-	return nil
 }

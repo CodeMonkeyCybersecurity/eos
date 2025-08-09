@@ -112,8 +112,8 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		UseRepository:    !consulBinary, // Use repository by default
 	}
 
-	// Use native installer
-	installer := consul.NewNativeInstaller(rc, installConfig)
+	// Use unified installer
+	installer := consul.NewConsulInstaller(rc, installConfig)
 	
 	// ASSESS, INTERVENE, EVALUATE pattern is handled inside the installer
 	if err := installer.Install(); err != nil {
