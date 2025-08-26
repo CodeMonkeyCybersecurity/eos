@@ -116,7 +116,7 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 		if len(result.Changes) > 0 {
 			logger.Info("terminal prompt: 📝 Changes Made:")
 			for _, change := range result.Changes {
-				logger.Info("terminal prompt:    • Change", 
+				logger.Info("terminal prompt:    • Change",
 					zap.String("type", change.Type),
 					zap.String("target", change.Target),
 					zap.String("action", change.Action))
@@ -140,7 +140,7 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 				case "running":
 					status = "⏳"
 				}
-				logger.Info("terminal prompt:    Step", 
+				logger.Info("terminal prompt:    Step",
 					zap.String("status", status),
 					zap.String("name", step.Name),
 					zap.Duration("duration", step.Duration))

@@ -24,10 +24,10 @@ type DiskManagerService struct {
 func NewDiskManagerService(rc *eos_io.RuntimeContext) (*DiskManagerService, error) {
 	// Create SaltStack client
 	saltClient := saltstack.NewClient(otelzap.Ctx(rc.Ctx))
-	
+
 	// Create disk manager with SaltStack backend
 	diskManager := NewSaltStackDiskManager(saltClient, rc)
-	
+
 	return &DiskManagerService{
 		diskManager: diskManager,
 		logger:      otelzap.Ctx(rc.Ctx),
@@ -185,7 +185,7 @@ func (dms *DiskManagerService) AutoExpandFilesystems(ctx context.Context, target
 				zap.Error(err))
 		} else {
 			expansionResult.Status = "SUCCESS"
-			
+
 			// Get updated usage after expansion
 			afterUsage, err := dms.diskManager.GetDiskUsage(ctx, target, candidate.Path)
 			if err != nil {
@@ -261,7 +261,7 @@ func (dms *DiskManagerService) MonitorDiskGrowth(ctx context.Context, target str
 			growthMetrics.PreviousSize = growthMetrics.CurrentSize
 			growthMetrics.CurrentSize = usage.UsedSize
 			growthMetrics.GrowthBytes = growthMetrics.CurrentSize - growthMetrics.PreviousSize
-			
+
 			if growthMetrics.PreviousSize > 0 {
 				growthMetrics.GrowthPercent = float64(growthMetrics.GrowthBytes) / float64(growthMetrics.PreviousSize) * 100
 			}
@@ -290,11 +290,11 @@ func (dms *DiskManagerService) analyzeHealthStatus(report *DiskHealthReport) {
 	for _, usage := range report.DiskUsage {
 		if usage.UsedPercent >= 95 {
 			criticalIssues++
-			report.Errors = append(report.Errors, 
+			report.Errors = append(report.Errors,
 				fmt.Sprintf("Critical: %s is %0.1f%% full", usage.Path, usage.UsedPercent))
 		} else if usage.UsedPercent >= 85 {
 			warnings++
-			report.Warnings = append(report.Warnings, 
+			report.Warnings = append(report.Warnings,
 				fmt.Sprintf("Warning: %s is %0.1f%% full", usage.Path, usage.UsedPercent))
 		}
 	}
@@ -303,7 +303,7 @@ func (dms *DiskManagerService) analyzeHealthStatus(report *DiskHealthReport) {
 	for _, smart := range report.SMARTData {
 		if smart.OverallHealth != "PASSED" && smart.OverallHealth != "" {
 			criticalIssues++
-			report.Errors = append(report.Errors, 
+			report.Errors = append(report.Errors,
 				fmt.Sprintf("Critical: Disk %s health status: %s", smart.Device, smart.OverallHealth))
 		}
 	}
@@ -318,13 +318,13 @@ func (dms *DiskManagerService) analyzeHealthStatus(report *DiskHealthReport) {
 	}
 
 	report.Summary = DiskHealthSummary{
-		TotalDisks:      len(report.DiskUsage),
-		HealthyDisks:    len(report.DiskUsage) - criticalIssues - warnings,
-		WarningDisks:    warnings,
-		CriticalDisks:   criticalIssues,
-		TotalCapacity:   dms.calculateTotalCapacity(report.DiskUsage),
-		TotalUsed:       dms.calculateTotalUsed(report.DiskUsage),
-		AverageUsage:    dms.calculateAverageUsage(report.DiskUsage),
+		TotalDisks:    len(report.DiskUsage),
+		HealthyDisks:  len(report.DiskUsage) - criticalIssues - warnings,
+		WarningDisks:  warnings,
+		CriticalDisks: criticalIssues,
+		TotalCapacity: dms.calculateTotalCapacity(report.DiskUsage),
+		TotalUsed:     dms.calculateTotalUsed(report.DiskUsage),
+		AverageUsage:  dms.calculateAverageUsage(report.DiskUsage),
 	}
 }
 
@@ -376,13 +376,12 @@ func (dms *DiskManagerService) analyzeGrowthPatterns(report *DiskGrowthReport) {
 	}
 }
 
-
 func (dms *DiskManagerService) loadGrowthMetrics(ctx context.Context, target, path string) (*GrowthMetrics, error) {
 	// This would integrate with the existing growth tracking functionality
 	// For now, return a placeholder implementation
 	return &GrowthMetrics{
-		Path:        path,
-		TimeWindow:  24 * time.Hour,
+		Path:       path,
+		TimeWindow: 24 * time.Hour,
 	}, nil
 }
 
@@ -406,7 +405,7 @@ func (dms *DiskManagerService) calculateAverageUsage(usage []DiskUsage) float64 
 	if len(usage) == 0 {
 		return 0
 	}
-	
+
 	var total float64
 	for _, u := range usage {
 		total += u.UsedPercent
@@ -417,15 +416,15 @@ func (dms *DiskManagerService) calculateAverageUsage(usage []DiskUsage) float64 
 // Report types for comprehensive disk management operations
 
 type DiskHealthReport struct {
-	Target      string              `json:"target"`
-	Timestamp   time.Time           `json:"timestamp"`
-	Status      string              `json:"status"` // HEALTHY, WARNING, CRITICAL, ERROR
-	DiskUsage   []DiskUsage         `json:"disk_usage"`
-	SMARTData   []SMARTData         `json:"smart_data"`
-	MountPoints []MountInfo         `json:"mount_points"`
-	Summary     DiskHealthSummary   `json:"summary"`
-	Warnings    []string            `json:"warnings"`
-	Errors      []string            `json:"errors"`
+	Target      string            `json:"target"`
+	Timestamp   time.Time         `json:"timestamp"`
+	Status      string            `json:"status"` // HEALTHY, WARNING, CRITICAL, ERROR
+	DiskUsage   []DiskUsage       `json:"disk_usage"`
+	SMARTData   []SMARTData       `json:"smart_data"`
+	MountPoints []MountInfo       `json:"mount_points"`
+	Summary     DiskHealthSummary `json:"summary"`
+	Warnings    []string          `json:"warnings"`
+	Errors      []string          `json:"errors"`
 }
 
 type DiskHealthSummary struct {
@@ -439,15 +438,15 @@ type DiskHealthSummary struct {
 }
 
 type DiskCleanupReport struct {
-	Target                string                       `json:"target"`
-	Timestamp             time.Time                    `json:"timestamp"`
-	Status                string                       `json:"status"`
-	Options               CleanupOptions               `json:"options"`
-	BeforeUsage           []DiskUsage                  `json:"before_usage"`
-	AfterUsage            []DiskUsage                  `json:"after_usage"`
-	CleanupResult         DiskCleanupResult            `json:"cleanup_result"`
-	EffectivenessMetrics  CleanupEffectivenessMetrics  `json:"effectiveness_metrics"`
-	Error                 string                       `json:"error,omitempty"`
+	Target               string                      `json:"target"`
+	Timestamp            time.Time                   `json:"timestamp"`
+	Status               string                      `json:"status"`
+	Options              CleanupOptions              `json:"options"`
+	BeforeUsage          []DiskUsage                 `json:"before_usage"`
+	AfterUsage           []DiskUsage                 `json:"after_usage"`
+	CleanupResult        DiskCleanupResult           `json:"cleanup_result"`
+	EffectivenessMetrics CleanupEffectivenessMetrics `json:"effectiveness_metrics"`
+	Error                string                      `json:"error,omitempty"`
 }
 
 type CleanupEffectivenessMetrics struct {
@@ -457,12 +456,12 @@ type CleanupEffectivenessMetrics struct {
 }
 
 type FilesystemExpansionReport struct {
-	Target                string                        `json:"target"`
-	Timestamp             time.Time                     `json:"timestamp"`
-	Status                string                        `json:"status"`
-	Threshold             float64                       `json:"threshold"`
-	CandidateFilesystems  []DiskUsage                   `json:"candidate_filesystems"`
-	ExpansionResults      []FilesystemExpansionResult   `json:"expansion_results"`
+	Target               string                      `json:"target"`
+	Timestamp            time.Time                   `json:"timestamp"`
+	Status               string                      `json:"status"`
+	Threshold            float64                     `json:"threshold"`
+	CandidateFilesystems []DiskUsage                 `json:"candidate_filesystems"`
+	ExpansionResults     []FilesystemExpansionResult `json:"expansion_results"`
 }
 
 type FilesystemExpansionResult struct {

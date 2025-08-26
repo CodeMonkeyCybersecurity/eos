@@ -39,7 +39,6 @@ Examples:
 			zap.String("version", version),
 			zap.Bool("dry_run", dryRun))
 
-
 		// Build installation options
 		options := &service_installation.ServiceInstallOptions{
 			Name:             "loki",

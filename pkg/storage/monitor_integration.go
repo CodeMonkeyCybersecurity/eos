@@ -65,9 +65,9 @@ func (mi *MonitorIntegration) PredictGrowth(ctx context.Context, id string) (*Gr
 	// Return basic growth prediction for now
 	prediction := &GrowthInfo{
 		ResourceID:      id,
-		PredictedGrowth: 0.1, // 10% growth estimate
+		PredictedGrowth: 0.1,                 // 10% growth estimate
 		TimeToCapacity:  time.Hour * 24 * 30, // 30 days estimate
-		Confidence:      0.75, // Medium confidence
+		Confidence:      0.75,                // Medium confidence
 	}
 
 	return prediction, nil
@@ -202,7 +202,6 @@ type ResourceHealth struct {
 	Status     HealthStatus `json:"status"`
 	CheckTime  time.Time    `json:"check_time"`
 }
-
 
 // PartitionConfig represents partition configuration
 type PartitionConfig struct {

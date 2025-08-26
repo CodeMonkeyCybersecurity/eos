@@ -21,20 +21,20 @@ type DiskManager interface {
 	// Disk usage monitoring and reporting
 	GetDiskUsage(ctx context.Context, target, path string) (*DiskUsage, error)
 	GetAllDiskUsage(ctx context.Context, target string) ([]DiskUsage, error)
-	
+
 	// Disk space management
 	CleanupTempFiles(ctx context.Context, target string, options CleanupOptions) (*DiskCleanupResult, error)
 	ExpandFilesystem(ctx context.Context, target, device string) error
-	
+
 	// Mount point operations
 	GetMountPoints(ctx context.Context, target string) ([]MountInfo, error)
 	MountDevice(ctx context.Context, target, device, mountPoint, fsType string, options []string) error
 	UnmountDevice(ctx context.Context, target, mountPoint string, force bool) error
-	
+
 	// Disk health checks and SMART data
 	GetSMARTData(ctx context.Context, target, device string) (*SMARTData, error)
 	CheckDiskHealth(ctx context.Context, target string) ([]SMARTData, error)
-	
+
 	// Storage allocation and partitioning
 	GetPartitions(ctx context.Context, target, device string) ([]PartitionInfo, error)
 	CreatePartition(ctx context.Context, target, device string, partition PartitionSpec) error
@@ -53,11 +53,11 @@ type CleanupOptions struct {
 
 // PartitionSpec defines partition creation specifications
 type PartitionSpec struct {
-	Start      string `json:"start"`
-	End        string `json:"end"`
-	Type       string `json:"type"`
-	Filesystem string `json:"filesystem,omitempty"`
-	Label      string `json:"label,omitempty"`
+	Start      string   `json:"start"`
+	End        string   `json:"end"`
+	Type       string   `json:"type"`
+	Filesystem string   `json:"filesystem,omitempty"`
+	Label      string   `json:"label,omitempty"`
 	Flags      []string `json:"flags,omitempty"`
 }
 
@@ -356,7 +356,7 @@ func (dm *SaltStackDiskManager) DeletePartition(ctx context.Context, target, dev
 		zap.Int("partition", partNumber))
 
 	pillar := map[string]interface{}{
-		"device":         device,
+		"device":           device,
 		"partition_number": partNumber,
 	}
 

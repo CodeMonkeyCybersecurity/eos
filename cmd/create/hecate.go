@@ -18,22 +18,22 @@ func init() {
 	// Attach the hetzner-dns subcommand here
 	CreateCmd.AddCommand(hetznerWildcardCmd)
 	CreateCmd.AddCommand(CreateHecateCmd)
-	
+
 	// Add flags for Hecate deployment
 	CreateHecateCmd.Flags().Bool("legacy", false, "Use legacy Docker Compose deployment method")
-	
+
 	// Add service-specific flags for monitoring and observability
 	CreateHecateCmd.Flags().Bool("wazuh", false, "Deploy Wazuh SIEM for security monitoring")
 	CreateHecateCmd.Flags().Bool("grafana", false, "Deploy Grafana with Prometheus and Loki for monitoring")
 	CreateHecateCmd.Flags().Bool("elk", false, "Deploy Elasticsearch, Logstash, and Kibana stack")
 	CreateHecateCmd.Flags().Bool("prometheus", false, "Deploy Prometheus monitoring (included with --grafana)")
 	CreateHecateCmd.Flags().Bool("loki", false, "Deploy Loki log aggregation (included with --grafana)")
-	
+
 	// Add flags for other services
 	CreateHecateCmd.Flags().Bool("mattermost", false, "Deploy Mattermost team chat")
 	CreateHecateCmd.Flags().Bool("vault", false, "Deploy HashiCorp Vault for secrets management")
 	CreateHecateCmd.Flags().Bool("consul", false, "Deploy HashiCorp Consul for service discovery")
-	
+
 	// Add flags for deployment options
 	CreateHecateCmd.Flags().Bool("all-monitoring", false, "Deploy all monitoring services (Grafana, Prometheus, Loki, Elasticsearch)")
 	CreateHecateCmd.Flags().Bool("minimal", false, "Deploy minimal Hecate stack without additional services")
@@ -89,15 +89,15 @@ Examples:
 
 		// Check for legacy flag
 		useLegacy, _ := cmd.Flags().GetBool("legacy")
-		
+
 		if useLegacy {
 			log.Info("Using legacy Docker Compose deployment method")
 			return hecate.OrchestrateHecateWizard(rc)
 		}
-		
+
 		// Collect requested services
 		var requestedServices []string
-		
+
 		// Check individual service flags
 		if wazuh, _ := cmd.Flags().GetBool("wazuh"); wazuh {
 			requestedServices = append(requestedServices, "wazuh")
@@ -123,30 +123,30 @@ Examples:
 		if consul, _ := cmd.Flags().GetBool("consul"); consul {
 			requestedServices = append(requestedServices, "consul")
 		}
-		
+
 		// Check aggregate flags
 		if allMonitoring, _ := cmd.Flags().GetBool("all-monitoring"); allMonitoring {
 			requestedServices = append(requestedServices, "grafana", "prometheus", "loki", "elasticsearch", "kibana")
 		}
-		
+
 		// Remove duplicates
 		serviceMap := make(map[string]bool)
 		for _, service := range requestedServices {
 			serviceMap[service] = true
 		}
-		
+
 		// Convert back to slice
 		var services []string
 		for service := range serviceMap {
 			services = append(services, service)
 		}
-		
+
 		// Log requested services
 		if len(services) > 0 {
 			log.Info("Deploying Hecate with additional services",
 				zap.Strings("services", services))
 		}
-		
+
 		// Default to SaltStack deployment with services
 		log.Info("Using SaltStack deployment method")
 		return hecate.DeployWithSaltStackAndServices(rc, services)
@@ -180,7 +180,6 @@ Examples:
 		logger.Info("Installing Caddy",
 			zap.Bool("interactive", interactive),
 			zap.Bool("dry_run", dryRun))
-
 
 		// Build installation options
 		options := &service_installation.ServiceInstallOptions{
@@ -225,7 +224,7 @@ Examples:
 			if len(result.Endpoints) > 0 {
 				logger.Info("terminal prompt: Access URLs:")
 				for _, endpoint := range result.Endpoints {
-					logger.Info("terminal prompt: "+endpoint)
+					logger.Info("terminal prompt: " + endpoint)
 				}
 			}
 

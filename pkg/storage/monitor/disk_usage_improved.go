@@ -56,7 +56,7 @@ func (s *SystemDiskChecker) CheckDiskUsage(ctx context.Context, paths []string) 
 
 	// Pre-allocate slice with known capacity
 	usageData := make([]DiskUsage, 0, len(paths))
-	
+
 	// Use errgroup for better error handling in concurrent scenarios
 	for _, path := range paths {
 		select {

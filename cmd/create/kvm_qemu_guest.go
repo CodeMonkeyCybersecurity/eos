@@ -38,7 +38,6 @@ Examples:
 		logger.Info("Installing QEMU Guest Agent",
 			zap.Bool("dry_run", dryRun))
 
-
 		// Build installation options
 		options := &service_installation.ServiceInstallOptions{
 			Name:        "qemu-guest-agent",

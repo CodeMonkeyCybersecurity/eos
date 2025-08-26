@@ -429,21 +429,20 @@ const (
 	OperationBackup = "backup"
 )
 
-
 // Essential types for storage interfaces
 
 // StorageInfo represents basic storage information
 type StorageInfo struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Device       string            `json:"device"`
-	Type         StorageType       `json:"type"`
-	Size         int64             `json:"size"`
-	TotalSize    int64             `json:"total_size"`
-	UsagePercent float64           `json:"usage_percent"`
-	MountPoint   string            `json:"mount_point"`
-	Filesystem   FilesystemType    `json:"filesystem"`
-	Status       HealthStatus      `json:"status"`
+	ID           string                 `json:"id"`
+	Name         string                 `json:"name"`
+	Device       string                 `json:"device"`
+	Type         StorageType            `json:"type"`
+	Size         int64                  `json:"size"`
+	TotalSize    int64                  `json:"total_size"`
+	UsagePercent float64                `json:"usage_percent"`
+	MountPoint   string                 `json:"mount_point"`
+	Filesystem   FilesystemType         `json:"filesystem"`
+	Status       HealthStatus           `json:"status"`
 	Metadata     map[string]interface{} `json:"metadata"`
 }
 
@@ -463,28 +462,28 @@ type VolumeConfig struct {
 
 // VolumeInfo represents volume information
 type VolumeInfo struct {
-	StorageInfo                   // Embedded StorageInfo
-	Name        string            `json:"name"`
-	TotalSize   int64             `json:"total_size"`
-	CreatedAt   time.Time         `json:"created_at"`
-	Type        StorageType       `json:"type"`
-	State       StorageState      `json:"state"`
-	Device      string            `json:"device"`
-	IsEncrypted bool              `json:"is_encrypted"`
+	StorageInfo              // Embedded StorageInfo
+	Name        string       `json:"name"`
+	TotalSize   int64        `json:"total_size"`
+	CreatedAt   time.Time    `json:"created_at"`
+	Type        StorageType  `json:"type"`
+	State       StorageState `json:"state"`
+	Device      string       `json:"device"`
+	IsEncrypted bool         `json:"is_encrypted"`
 }
 
 // VolumeFilter represents filters for volume listing
 type VolumeFilter struct {
-	Type        *StorageType      `json:"type,omitempty"`
-	Types       []StorageType     `json:"types,omitempty"`
-	Filesystem  *FilesystemType   `json:"filesystem,omitempty"`
-	Status      *HealthStatus     `json:"status,omitempty"`
-	States      []StorageState    `json:"states,omitempty"`
-	NamePrefix  string            `json:"name_prefix,omitempty"`
-	MinSize     *int64            `json:"min_size,omitempty"`
-	MaxSize     *int64            `json:"max_size,omitempty"`
-	MountPoint  *string           `json:"mount_point,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	Type       *StorageType      `json:"type,omitempty"`
+	Types      []StorageType     `json:"types,omitempty"`
+	Filesystem *FilesystemType   `json:"filesystem,omitempty"`
+	Status     *HealthStatus     `json:"status,omitempty"`
+	States     []StorageState    `json:"states,omitempty"`
+	NamePrefix string            `json:"name_prefix,omitempty"`
+	MinSize    *int64            `json:"min_size,omitempty"`
+	MaxSize    *int64            `json:"max_size,omitempty"`
+	MountPoint *string           `json:"mount_point,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
 }
 
 // VolumeUpdate represents volume update operations
@@ -527,11 +526,11 @@ type BackupJob struct {
 
 // BackupJobConfig represents backup job configuration
 type BackupJobConfig struct {
-	Name        string        `json:"name"`
-	SourceID    string        `json:"source_id"`
-	Destination string        `json:"destination"`
-	Schedule    string        `json:"schedule"`
-	Retention   time.Duration `json:"retention"`
+	Name        string                 `json:"name"`
+	SourceID    string                 `json:"source_id"`
+	Destination string                 `json:"destination"`
+	Schedule    string                 `json:"schedule"`
+	Retention   time.Duration          `json:"retention"`
 	Options     map[string]interface{} `json:"options"`
 }
 
@@ -548,9 +547,9 @@ type BackupRun struct {
 
 // Additional interface types
 type MetricsHistory struct {
-	ResourceID string          `json:"resource_id"`
-	StartTime  time.Time       `json:"start_time"`
-	EndTime    time.Time       `json:"end_time"`
+	ResourceID string           `json:"resource_id"`
+	StartTime  time.Time        `json:"start_time"`
+	EndTime    time.Time        `json:"end_time"`
 	Metrics    []StorageMetrics `json:"metrics"`
 }
 
@@ -563,10 +562,10 @@ type GrowthPrediction struct {
 }
 
 type SystemHealthReport struct {
-	OverallStatus   HealthStatus      `json:"overall_status"`
-	CheckTime       time.Time         `json:"check_time"`
-	Issues          []HealthIssue     `json:"issues"`
-	Recommendations []string          `json:"recommendations"`
+	OverallStatus   HealthStatus  `json:"overall_status"`
+	CheckTime       time.Time     `json:"check_time"`
+	Issues          []HealthIssue `json:"issues"`
+	Recommendations []string      `json:"recommendations"`
 }
 
 type HealthIssue struct {
@@ -601,13 +600,13 @@ type DiskHealth struct {
 }
 
 type StoragePolicy struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Type        string                 `json:"type"`
-	Rules       []PolicyRule           `json:"rules"`
-	Enabled     bool                   `json:"enabled"`
-	CreatedAt   time.Time              `json:"created_at"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	ID        string                 `json:"id"`
+	Name      string                 `json:"name"`
+	Type      string                 `json:"type"`
+	Rules     []PolicyRule           `json:"rules"`
+	Enabled   bool                   `json:"enabled"`
+	CreatedAt time.Time              `json:"created_at"`
+	Metadata  map[string]interface{} `json:"metadata"`
 }
 
 type PolicyRule struct {
@@ -626,33 +625,33 @@ type PolicyViolation struct {
 }
 
 type StorageRequirements struct {
-	MinSize     int64         `json:"min_size"`
-	MaxSize     int64         `json:"max_size"`
-	Performance string        `json:"performance"`
-	Redundancy  string        `json:"redundancy"`
+	MinSize     int64          `json:"min_size"`
+	MaxSize     int64          `json:"max_size"`
+	Performance string         `json:"performance"`
+	Redundancy  string         `json:"redundancy"`
 	Filesystem  FilesystemType `json:"filesystem"`
 }
 
 type StorageDeployment struct {
-	ID          string                 `json:"id"`
-	Workload    string                 `json:"workload"`
-	Components  []StorageInfo          `json:"components"`
-	Status      string                 `json:"status"`
-	DeployedAt  time.Time              `json:"deployed_at"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	ID         string                 `json:"id"`
+	Workload   string                 `json:"workload"`
+	Components []StorageInfo          `json:"components"`
+	Status     string                 `json:"status"`
+	DeployedAt time.Time              `json:"deployed_at"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 type MigrationOptions struct {
-	Method      string            `json:"method"`
-	Bandwidth   int64             `json:"bandwidth"`
-	Verify      bool              `json:"verify"`
-	Options     map[string]string `json:"options"`
+	Method    string            `json:"method"`
+	Bandwidth int64             `json:"bandwidth"`
+	Verify    bool              `json:"verify"`
+	Options   map[string]string `json:"options"`
 }
 
 type OptimizationReport struct {
-	GeneratedAt     time.Time                `json:"generated_at"`
-	Recommendations []OptimizationRecommendation `json:"recommendations"`
-	PotentialSavings int64                   `json:"potential_savings"`
+	GeneratedAt      time.Time                    `json:"generated_at"`
+	Recommendations  []OptimizationRecommendation `json:"recommendations"`
+	PotentialSavings int64                        `json:"potential_savings"`
 }
 
 type OptimizationRecommendation struct {
@@ -663,18 +662,18 @@ type OptimizationRecommendation struct {
 }
 
 type DRPlan struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Components  []string               `json:"components"`
-	Procedures  []DRProcedure          `json:"procedures"`
-	CreatedAt   time.Time              `json:"created_at"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	ID         string                 `json:"id"`
+	Name       string                 `json:"name"`
+	Components []string               `json:"components"`
+	Procedures []DRProcedure          `json:"procedures"`
+	CreatedAt  time.Time              `json:"created_at"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 type DRProcedure struct {
-	Step        int    `json:"step"`
-	Description string `json:"description"`
-	Action      string `json:"action"`
+	Step        int           `json:"step"`
+	Description string        `json:"description"`
+	Action      string        `json:"action"`
 	Timeout     time.Duration `json:"timeout"`
 }
 
@@ -686,20 +685,20 @@ type ValidationRule struct {
 }
 
 type SystemInfo struct {
-	OS           string            `json:"os"`
-	Kernel       string            `json:"kernel"`
-	Architecture string            `json:"architecture"`
-	Memory       int64             `json:"memory"`
-	CPU          string            `json:"cpu"`
-	Features     map[string]bool   `json:"features"`
+	OS           string          `json:"os"`
+	Kernel       string          `json:"kernel"`
+	Architecture string          `json:"architecture"`
+	Memory       int64           `json:"memory"`
+	CPU          string          `json:"cpu"`
+	Features     map[string]bool `json:"features"`
 }
 
 // Interface types for filesystem operations
 type FilesystemOptions struct {
-	Label       string            `json:"label,omitempty"`
-	BlockSize   int               `json:"block_size,omitempty"`
-	InodeRatio  int               `json:"inode_ratio,omitempty"`
-	Options     map[string]string `json:"options,omitempty"`
+	Label      string            `json:"label,omitempty"`
+	BlockSize  int               `json:"block_size,omitempty"`
+	InodeRatio int               `json:"inode_ratio,omitempty"`
+	Options    map[string]string `json:"options,omitempty"`
 }
 
 type FilesystemInfo struct {
@@ -714,10 +713,10 @@ type FilesystemInfo struct {
 }
 
 type UsageInfo struct {
-	Total     int64   `json:"total"`
-	Used      int64   `json:"used"`
-	Available int64   `json:"available"`
-	Percent   float64 `json:"percent"`
+	Total     int64      `json:"total"`
+	Used      int64      `json:"used"`
+	Available int64      `json:"available"`
+	Percent   float64    `json:"percent"`
 	Inodes    *InodeInfo `json:"inodes,omitempty"`
 }
 

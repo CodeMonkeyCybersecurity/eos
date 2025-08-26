@@ -48,7 +48,6 @@ Examples:
 			zap.Bool("dry_run", dryRun),
 			zap.Bool("auto_start", autoStart))
 
-
 		// Build installation options
 		options := &service_installation.ServiceInstallOptions{
 			Name:        "tailscale",

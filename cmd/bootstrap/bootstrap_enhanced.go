@@ -34,7 +34,7 @@ var (
 // TODO: Fix command registration - temporarily commented to allow build
 // func init() {
 // 	// Add flags to existing bootstrap commands
-// 	bootstrapCmd.Flags().StringVar(&joinCluster, "join-cluster", "", 
+// 	bootstrapCmd.Flags().StringVar(&joinCluster, "join-cluster", "",
 // 		"Join existing cluster at specified master address")
 // 	bootstrapCmd.Flags().BoolVar(&singleNode, "single-node", false,
 // 		"Explicitly configure as single-node deployment")
@@ -42,9 +42,9 @@ var (
 // 		"Preferred role when joining cluster (edge/core/data/compute)")
 // 	bootstrapCmd.Flags().BoolVar(&autoDiscover, "auto-discover", false,
 // 		"Enable automatic cluster discovery via multicast")
-		
+
 // 	// Also add to the all command
-// 	bootstrapAllCmd.Flags().StringVar(&joinCluster, "join-cluster", "", 
+// 	bootstrapAllCmd.Flags().StringVar(&joinCluster, "join-cluster", "",
 // 		"Join existing cluster at specified master address")
 // 	bootstrapAllCmd.Flags().BoolVar(&singleNode, "single-node", false,
 // 		"Explicitly configure as single-node deployment")
@@ -52,7 +52,7 @@ var (
 // 		"Preferred role when joining cluster (edge/core/data/compute)")
 // 	bootstrapAllCmd.Flags().BoolVar(&autoDiscover, "auto-discover", false,
 // 		"Enable automatic cluster discovery via multicast")
-	
+
 // 	// Add hardening flag
 // 	bootstrapCmd.Flags().BoolVar(&skipHardening, "skip-hardening", false,
 // 		"Skip Ubuntu security hardening (not recommended for production)")
@@ -65,7 +65,7 @@ var (
 func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced infrastructure bootstrap")
-	
+
 	// Parse flags into options
 	opts := &bootstrap.BootstrapOptions{
 		JoinCluster:   cmd.Flag("join-cluster").Value.String(),
@@ -77,22 +77,22 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		ValidateOnly:  cmd.Flag("validate-only").Value.String() == "true",
 		Force:         cmd.Flag("force").Value.String() == "true",
 	}
-	
+
 	// Handle enhanced flags
 	if cmd.Flag("verify") != nil && cmd.Flag("verify").Value.String() == "true" {
 		opts.ValidateOnly = true
 	}
-	
+
 	if cmd.Flag("stop-conflicting") != nil && cmd.Flag("stop-conflicting").Value.String() == "true" {
 		// This will be handled in the orchestrator
 		logger.Info("Auto-stop conflicting services enabled")
 	}
-	
+
 	if cmd.Flag("clean") != nil && cmd.Flag("clean").Value.String() == "true" {
 		logger.Info("Clean slate installation requested")
 		opts.Force = true
 	}
-	
+
 	// Use the new enhanced orchestrator
 	return bootstrap.OrchestrateBootstrap(rc, cmd, opts)
 }
@@ -100,7 +100,7 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 // bootstrapSingleNodeEnhanced bootstraps a single node with storage ops
 func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, clusterInfo *bootstrap.ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Phase 1: Install Salt
 	logger.Info("Phase 1: Bootstrapping Salt", zap.Int("phase", 1), zap.Int("total_phases", 5))
 	saltConfig := &saltstack.Config{
@@ -110,7 +110,7 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 	if err := saltstack.Install(rc, saltConfig); err != nil {
 		return fmt.Errorf("salt bootstrap failed: %w", err)
 	}
-	
+
 	// Phase 1.5: Setup Salt API (for master nodes)
 	if clusterInfo.IsMaster || clusterInfo.IsSingleNode {
 		logger.Info("Phase 1.5: Setting up Salt API", zap.Int("phase", 1), zap.Int("total_phases", 5))
@@ -119,26 +119,26 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 			// Continue anyway - the system can work without the API
 		}
 	}
-	
+
 	// Phase 2: Deploy Storage Operations
 	logger.Info("Phase 2: Deploying Storage Operations", zap.Int("phase", 2), zap.Int("total_phases", 5))
 	if err := bootstrap.DeployStorageOps(rc, clusterInfo); err != nil {
 		return fmt.Errorf("storage ops deployment failed: %w", err)
 	}
-	
+
 	// Phase 3: Install Tailscale
 	logger.Info("Phase 3: Installing Tailscale", zap.Int("phase", 3), zap.Int("total_phases", 5))
 	if err := installTailscaleForBootstrap(rc); err != nil {
 		logger.Warn("Tailscale installation failed, continuing anyway", zap.Error(err))
 		// Continue anyway - Tailscale is helpful but not critical
 	}
-	
+
 	// Phase 4: Bootstrap OSQuery
 	logger.Info("Phase 4: Bootstrapping OSQuery", zap.Int("phase", 4), zap.Int("total_phases", 5))
 	if err := osquery.InstallOsquery(rc); err != nil {
 		return fmt.Errorf("osquery bootstrap failed: %w", err)
 	}
-	
+
 	// Phase 5: Ubuntu Security Hardening with FIDO2
 	logger.Info("Phase 5: Applying Ubuntu security hardening", zap.Int("phase", 5), zap.Int("total_phases", 5))
 	skipHardening := cmd.Flag("skip-hardening").Value.String() == "true"
@@ -149,13 +149,13 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 		logger.Info("Ubuntu security hardening includes FIDO2/YubiKey requirement for SSH")
 		logger.Info("This will disable password authentication and require hardware keys")
 		logger.Info("terminal prompt: Do you have a FIDO2/YubiKey device and want to enable this security feature? [y/N]")
-		
+
 		response, err := eos_io.ReadInput(rc)
 		if err != nil {
 			logger.Warn("Failed to read user input, skipping FIDO2 hardening", zap.Error(err))
 			response = "n"
 		}
-		
+
 		response = strings.ToLower(strings.TrimSpace(response))
 		if response == "y" || response == "yes" {
 			logger.Info("Applying comprehensive Ubuntu hardening with FIDO2 SSH authentication")
@@ -178,96 +178,96 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 			}
 		}
 	}
-	
+
 	// Phase 6: Create Enhanced Environment Configuration
 	logger.Info("Phase 6: Creating enhanced environment configuration", zap.Int("phase", 6), zap.Int("total_phases", 6))
 	if err := createEnhancedEnvironmentConfig(rc, clusterInfo); err != nil {
 		logger.Warn("Failed to create enhanced environment config", zap.Error(err))
 		// Don't fail bootstrap for this
 	}
-	
+
 	// Save cluster configuration for future reference
 	if err := bootstrap.SaveClusterConfig(rc, clusterInfo); err != nil {
 		logger.Warn("Failed to save cluster config", zap.Error(err))
 	}
-	
+
 	// Start storage monitoring
 	logger.Info("Starting storage monitoring service")
 	// The service was already created and enabled, just start it
-	
+
 	logger.Info("Single node bootstrap completed successfully")
 	showPostBootstrapInfo(logger, clusterInfo)
-	
+
 	return nil
 }
 
 // bootstrapAdditionalNode bootstraps a node joining an existing cluster
 func bootstrapAdditionalNode(rc *eos_io.RuntimeContext, cmd *cobra.Command, clusterInfo *bootstrap.ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Phase 0: Health checks
 	logger.Info("Phase 0: Running pre-join health checks")
 	healthResult, err := bootstrap.PerformHealthChecks(rc, clusterInfo.MasterAddr)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)
 	}
-	
+
 	if !healthResult.Passed {
 		logger.Error("Health checks failed",
 			zap.Strings("failed_checks", healthResult.FailedChecks))
 		return fmt.Errorf("pre-join health checks failed: %v", healthResult.FailedChecks)
 	}
-	
+
 	if len(healthResult.Warnings) > 0 {
 		logger.Warn("Health check warnings",
 			zap.Strings("warnings", healthResult.Warnings))
 	}
-	
+
 	// Create node registration
 	reg := bootstrap.NodeRegistration{
 		PreferredRole: preferredRole,
 	}
-	
+
 	// Phase 1: Register with master
-	logger.Info("Phase 1: Registering with cluster master", 
+	logger.Info("Phase 1: Registering with cluster master",
 		zap.String("master", clusterInfo.MasterAddr))
-	
+
 	result, err := bootstrap.RegisterNode(rc, clusterInfo.MasterAddr, reg)
 	if err != nil {
 		return fmt.Errorf("node registration failed: %w", err)
 	}
-	
+
 	if !result.Accepted {
 		return fmt.Errorf("node registration was not accepted by master")
 	}
-	
+
 	logger.Info("Node registered successfully",
 		zap.String("assigned_role", string(result.AssignedRole)),
 		zap.String("cluster_id", result.ClusterID))
-	
+
 	// Update cluster info with registration result
 	clusterInfo.MyRole = result.AssignedRole
 	clusterInfo.ClusterID = result.ClusterID
-	
+
 	// Phase 2: Deploy storage operations with assigned role
 	logger.Info("Phase 2: Deploying Storage Operations for assigned role",
 		zap.String("role", string(result.AssignedRole)))
-	
+
 	if err := bootstrap.DeployStorageOps(rc, clusterInfo); err != nil {
 		return fmt.Errorf("storage ops deployment failed: %w", err)
 	}
-	
+
 	// Phase 3: Install Tailscale
 	logger.Info("Phase 3: Installing Tailscale")
 	if err := installTailscaleForBootstrap(rc); err != nil {
 		logger.Warn("Tailscale installation failed, continuing anyway", zap.Error(err))
 		// Continue anyway - Tailscale is helpful but not critical
 	}
-	
+
 	// Phase 4: Apply Salt highstate to configure node
 	logger.Info("Phase 4: Applying Salt highstate for node configuration")
 	// The master will push the appropriate states based on our role
-	
+
 	// Phase 5: Ubuntu Security Hardening with FIDO2 (same as master)
 	logger.Info("Phase 5: Applying Ubuntu security hardening")
 	skipHardening := cmd.Flag("skip-hardening").Value.String() == "true"
@@ -278,13 +278,13 @@ func bootstrapAdditionalNode(rc *eos_io.RuntimeContext, cmd *cobra.Command, clus
 		logger.Info("Ubuntu security hardening includes FIDO2/YubiKey requirement for SSH")
 		logger.Info("This will disable password authentication and require hardware keys")
 		logger.Info("terminal prompt: Do you have a FIDO2/YubiKey device and want to enable this security feature? [y/N]")
-		
+
 		response, err := eos_io.ReadInput(rc)
 		if err != nil {
 			logger.Warn("Failed to read user input, skipping FIDO2 hardening", zap.Error(err))
 			response = "n"
 		}
-		
+
 		response = strings.ToLower(strings.TrimSpace(response))
 		if response == "y" || response == "yes" {
 			logger.Info("Applying comprehensive Ubuntu hardening with FIDO2 SSH authentication")
@@ -306,15 +306,15 @@ func bootstrapAdditionalNode(rc *eos_io.RuntimeContext, cmd *cobra.Command, clus
 			}
 		}
 	}
-	
+
 	// Save cluster configuration
 	if err := bootstrap.SaveClusterConfig(rc, clusterInfo); err != nil {
 		logger.Warn("Failed to save cluster config", zap.Error(err))
 	}
-	
+
 	logger.Info("Additional node bootstrap completed successfully")
 	showPostBootstrapInfo(logger, clusterInfo)
-	
+
 	return nil
 }
 
@@ -324,7 +324,7 @@ func showPostBootstrapInfo(logger otelzap.LoggerWithCtx, info *bootstrap.Cluster
 	logger.Info("Node Information",
 		zap.String("role", string(info.MyRole)),
 		zap.Int("cluster_size", info.NodeCount))
-	
+
 	if info.IsSingleNode {
 		logger.Info("Single-node deployment ready")
 		logger.Info("Next steps:")
@@ -343,7 +343,7 @@ func showPostBootstrapInfo(logger otelzap.LoggerWithCtx, info *bootstrap.Cluster
 			logger.Info("Master: " + info.MasterAddr)
 		}
 	}
-	
+
 	logger.Info("Storage monitoring will start automatically")
 	logger.Info("Configuration: /etc/eos/storage-ops.yaml")
 }
@@ -365,16 +365,16 @@ func installTailscaleForBootstrap(rc *eos_io.RuntimeContext) error {
 		Environment: make(map[string]string),
 		Config:      make(map[string]string),
 	}
-	
+
 	result, err := service_installation.InstallService(rc, options)
 	if err != nil {
 		return fmt.Errorf("tailscale installation failed: %w", err)
 	}
-	
+
 	if !result.Success {
 		return fmt.Errorf("tailscale installation was not successful")
 	}
-	
+
 	return nil
 }
 

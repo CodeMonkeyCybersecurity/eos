@@ -37,7 +37,7 @@ func (ae *AssessmentEngine) RegisterProvider(provider ComponentProvider) {
 // GetAllServices collects services from all registered providers
 func (ae *AssessmentEngine) GetAllServices(excluded map[string]bool) []ServiceConfig {
 	serviceMap := make(map[string]ServiceConfig)
-	
+
 	for _, provider := range ae.providers {
 		for _, svc := range provider.GetServices() {
 			if !excluded[svc.Component] && !excluded[svc.Name] {
@@ -45,35 +45,35 @@ func (ae *AssessmentEngine) GetAllServices(excluded map[string]bool) []ServiceCo
 			}
 		}
 	}
-	
+
 	// Convert map to slice
 	services := make([]ServiceConfig, 0, len(serviceMap))
 	for _, svc := range serviceMap {
 		services = append(services, svc)
 	}
-	
+
 	return services
 }
 
 // GetAllDirectories collects directories from all registered providers
 func (ae *AssessmentEngine) GetAllDirectories(excluded map[string]bool, keepData bool) []DirectoryConfig {
 	var directories []DirectoryConfig
-	
+
 	for _, provider := range ae.providers {
 		for _, dir := range provider.GetDirectories() {
 			// Skip if component is excluded
 			if excluded[dir.Component] {
 				continue
 			}
-			
+
 			// Skip data directories if keepData is true
 			if dir.IsData && keepData {
 				continue
 			}
-			
+
 			directories = append(directories, dir)
 		}
 	}
-	
+
 	return directories
 }

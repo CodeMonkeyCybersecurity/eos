@@ -44,31 +44,31 @@ type InstallConfig struct {
 	Version       string // Version to install (e.g., "1.15.0" or "latest")
 	UseRepository bool   // Use APT repository vs direct binary download
 	BinaryPath    string // Path for binary installation
-	
+
 	// Vault configuration
-	UIEnabled        bool
-	ClusterName      string
-	StorageBackend   string // "file", "consul", "raft"
-	ListenerAddress  string
-	APIAddr          string
-	ClusterAddr      string
-	DisableMlock     bool
-	AutoUnseal       bool
-	KMSKeyID         string // For AWS KMS auto-unseal
-	LogLevel         string
-	
+	UIEnabled       bool
+	ClusterName     string
+	StorageBackend  string // "file", "consul", "raft"
+	ListenerAddress string
+	APIAddr         string
+	ClusterAddr     string
+	DisableMlock    bool
+	AutoUnseal      bool
+	KMSKeyID        string // For AWS KMS auto-unseal
+	LogLevel        string
+
 	// Paths
 	ConfigPath string
 	DataPath   string
 	LogPath    string
-	
+
 	// Service configuration
 	ServiceName  string
 	ServiceUser  string
 	ServiceGroup string
 	Port         int
 	TLSEnabled   bool
-	
+
 	// Installation behavior
 	ForceReinstall bool // Force reinstallation even if already installed
 	CleanInstall   bool // Remove existing data before installation
@@ -120,10 +120,10 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 	if config.Port == 0 {
 		config.Port = shared.PortVault
 	}
-	
+
 	logger := otelzap.Ctx(rc.Ctx)
 	runner := NewCommandRunner(rc)
-	
+
 	return &VaultInstaller{
 		rc:       rc,
 		config:   config,
@@ -145,57 +145,57 @@ func (vi *VaultInstaller) Install() error {
 		zap.String("version", vi.config.Version),
 		zap.String("storage_backend", vi.config.StorageBackend),
 		zap.Bool("use_repository", vi.config.UseRepository))
-	
+
 	// Phase 1: ASSESS - Check if already installed
 	vi.progress.Update("[14%] Checking current Vault status")
 	shouldInstall, err := vi.assess()
 	if err != nil {
 		return fmt.Errorf("assessment failed: %w", err)
 	}
-	
+
 	// If Vault is already properly installed and running, we're done
 	if !shouldInstall {
 		vi.logger.Info("Vault is already installed and running properly")
 		vi.progress.Complete("Vault is already installed and running")
 		return nil
 	}
-	
+
 	// Phase 2: Prerequisites
 	vi.progress.Update("[28%] Validating prerequisites")
 	if err := vi.validatePrerequisites(); err != nil {
 		return fmt.Errorf("prerequisite validation failed: %w", err)
 	}
-	
+
 	// Phase 3: INTERVENE - Install
 	vi.progress.Update("[42%] Installing Vault binary")
 	if err := vi.installBinary(); err != nil {
 		return fmt.Errorf("binary installation failed: %w", err)
 	}
-	
+
 	// Phase 4: User and directories
 	vi.progress.Update("[56%] Creating user and directories")
 	if err := vi.setupUserAndDirectories(); err != nil {
 		return fmt.Errorf("user/directory setup failed: %w", err)
 	}
-	
+
 	// Phase 5: Configure
 	vi.progress.Update("[70%] Configuring Vault")
 	if err := vi.configure(); err != nil {
 		return fmt.Errorf("configuration failed: %w", err)
 	}
-	
+
 	// Phase 6: Setup Service
 	vi.progress.Update("[84%] Setting up systemd service")
 	if err := vi.setupService(); err != nil {
 		return fmt.Errorf("service setup failed: %w", err)
 	}
-	
+
 	// Phase 7: EVALUATE - Verify
 	vi.progress.Update("[100%] Verifying installation")
 	if err := vi.verify(); err != nil {
 		return fmt.Errorf("verification failed: %w", err)
 	}
-	
+
 	vi.progress.Complete("Vault installation completed successfully")
 	return nil
 }
@@ -204,7 +204,7 @@ func (vi *VaultInstaller) Install() error {
 // Returns true if installation should proceed, false if already installed
 func (vi *VaultInstaller) assess() (bool, error) {
 	vi.logger.Info("Assessing current Vault installation")
-	
+
 	// First, check if Vault binary exists
 	if _, err := os.Stat(vi.config.BinaryPath); err == nil {
 		// Binary exists, check version
@@ -212,25 +212,25 @@ func (vi *VaultInstaller) assess() (bool, error) {
 			vi.logger.Info("Vault binary found", zap.String("output", output))
 		}
 	}
-	
+
 	// Check if Vault service exists
 	if status, err := vi.systemd.GetStatus(); err == nil {
 		vi.logger.Info("Vault service found", zap.String("status", status))
-		
+
 		if !vi.config.ForceReinstall {
 			// Check if it's running
 			if vi.systemd.IsActive() {
 				// Verify it's actually working
 				if vi.isVaultReady() {
 					vi.logger.Info("Vault is already installed and running properly")
-					
+
 					// Print service information
 					vi.logger.Info(fmt.Sprintf("terminal prompt: ✅ Vault is already installed and running"))
 					vi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", vi.config.Port))
 					vi.logger.Info("terminal prompt: ")
 					vi.logger.Info("terminal prompt: To check status: vault status")
 					vi.logger.Info("terminal prompt: To view logs: journalctl -u vault -f")
-					
+
 					return false, nil // Don't install, already running
 				}
 				vi.logger.Warn("Vault service is active but not responding properly")
@@ -261,29 +261,29 @@ func (vi *VaultInstaller) assess() (bool, error) {
 			}
 		}
 	}
-	
+
 	return true, nil // Proceed with installation
 }
 
 // validatePrerequisites checks system requirements
 func (vi *VaultInstaller) validatePrerequisites() error {
 	vi.logger.Info("Validating prerequisites")
-	
+
 	// Check if running as root
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError("this command must be run as root")
 	}
-	
+
 	// Check memory requirements (minimum 256MB recommended)
 	if err := vi.checkMemory(); err != nil {
 		return err
 	}
-	
+
 	// Check disk space (minimum 100MB for Vault)
 	if err := vi.checkDiskSpace("/opt", 100); err != nil {
 		return err
 	}
-	
+
 	// Check port availability - but be smart about it
 	// If we're doing a force reinstall, stop the existing service first
 	if vi.config.ForceReinstall && vi.systemd.IsActive() {
@@ -293,12 +293,12 @@ func (vi *VaultInstaller) validatePrerequisites() error {
 		}
 		time.Sleep(2 * time.Second) // Give it time to release ports
 	}
-	
+
 	// Check port availability
 	if err := vi.checkPortAvailable(vi.config.Port); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -313,29 +313,29 @@ func (vi *VaultInstaller) installBinary() error {
 // installViaRepository installs Vault using APT repository
 func (vi *VaultInstaller) installViaRepository() error {
 	vi.logger.Info("Installing Vault via HashiCorp APT repository")
-	
+
 	// Add HashiCorp GPG key
 	vi.logger.Info("Adding HashiCorp GPG key")
 	if output, err := vi.runner.RunOutput("sh", "-c",
 		"wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg"); err != nil {
 		return fmt.Errorf("failed to add GPG key: %w (output: %s)", err, output)
 	}
-	
+
 	// Add HashiCorp repository
 	vi.logger.Info("Adding HashiCorp repository")
 	repoLine := fmt.Sprintf("deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com %s main",
 		getUbuntuCodename())
-	
+
 	if err := vi.writeFile("/etc/apt/sources.list.d/hashicorp.list", []byte(repoLine), 0644); err != nil {
 		return fmt.Errorf("failed to add repository: %w", err)
 	}
-	
+
 	// Update package list
 	vi.logger.Info("Updating package list")
 	if err := vi.runner.Run("apt-get", "update"); err != nil {
 		return fmt.Errorf("failed to update package list: %w", err)
 	}
-	
+
 	// Install Vault package
 	vi.logger.Info("Installing Vault package")
 	installCmd := []string{"apt-get", "install", "-y"}
@@ -344,18 +344,18 @@ func (vi *VaultInstaller) installViaRepository() error {
 	} else {
 		installCmd = append(installCmd, "vault")
 	}
-	
+
 	if err := vi.runner.Run(installCmd[0], installCmd[1:]...); err != nil {
 		return fmt.Errorf("failed to install Vault package: %w", err)
 	}
-	
+
 	return nil
 }
 
 // installViaBinary downloads and installs Vault binary directly
 func (vi *VaultInstaller) installViaBinary() error {
 	vi.logger.Info("Installing Vault via direct binary download")
-	
+
 	// Determine version to install
 	version := vi.config.Version
 	if version == "latest" {
@@ -365,7 +365,7 @@ func (vi *VaultInstaller) installViaBinary() error {
 			return fmt.Errorf("failed to determine latest version: %w", err)
 		}
 	}
-	
+
 	// Download binary
 	arch := runtime.GOARCH
 	if arch == "amd64" {
@@ -373,53 +373,53 @@ func (vi *VaultInstaller) installViaBinary() error {
 	} else if arch == "arm64" {
 		arch = "arm64"
 	}
-	
+
 	downloadURL := fmt.Sprintf("https://releases.hashicorp.com/vault/%s/vault_%s_linux_%s.zip",
 		version, version, arch)
-	
+
 	vi.logger.Info("Downloading Vault binary",
 		zap.String("version", version),
 		zap.String("url", downloadURL))
-	
+
 	tmpDir := "/tmp/vault-install"
 	if err := vi.createDirectory(tmpDir, 0755); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	
+
 	zipPath := filepath.Join(tmpDir, "vault.zip")
 	if err := vi.downloadFile(downloadURL, zipPath); err != nil {
 		return fmt.Errorf("failed to download Vault: %w", err)
 	}
-	
+
 	// Extract binary
 	if err := vi.runner.Run("unzip", "-o", zipPath, "-d", tmpDir); err != nil {
 		return fmt.Errorf("failed to extract Vault: %w", err)
 	}
-	
+
 	// Install binary
 	binaryPath := filepath.Join(tmpDir, "vault")
 	if err := vi.runner.Run("install", "-m", "755", binaryPath, vi.config.BinaryPath); err != nil {
 		return fmt.Errorf("failed to install binary: %w", err)
 	}
-	
+
 	// Set IPC_LOCK capability
 	if err := vi.runner.Run("setcap", "cap_ipc_lock=+ep", vi.config.BinaryPath); err != nil {
 		vi.logger.Warn("Failed to set IPC_LOCK capability", zap.Error(err))
 	}
-	
+
 	return nil
 }
 
 // setupUserAndDirectories creates the Vault user and required directories
 func (vi *VaultInstaller) setupUserAndDirectories() error {
 	vi.logger.Info("Setting up Vault user and directories")
-	
+
 	// Create vault user and group
 	if err := vi.user.CreateSystemUser(vi.config.ServiceUser, vi.config.DataPath); err != nil {
 		return fmt.Errorf("failed to create vault user: %w", err)
 	}
-	
+
 	// Create required directories
 	directories := []struct {
 		path  string
@@ -431,7 +431,7 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 		{vi.config.LogPath, 0755, vi.config.ServiceUser},
 		{filepath.Join(vi.config.DataPath, "raft"), 0700, vi.config.ServiceUser},
 	}
-	
+
 	for _, dir := range directories {
 		if err := vi.createDirectory(dir.path, dir.mode); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir.path, err)
@@ -440,14 +440,14 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 			return fmt.Errorf("failed to set ownership for %s: %w", dir.path, err)
 		}
 	}
-	
+
 	return nil
 }
 
 // configure sets up Vault configuration
 func (vi *VaultInstaller) configure() error {
 	vi.logger.Info("Configuring Vault")
-	
+
 	// Backup existing configuration if present
 	configPath := filepath.Join(vi.config.ConfigPath, "vault.hcl")
 	if vi.fileExists(configPath) {
@@ -455,7 +455,7 @@ func (vi *VaultInstaller) configure() error {
 			vi.logger.Warn("Failed to backup existing configuration", zap.Error(err))
 		}
 	}
-	
+
 	// Generate configuration based on storage backend
 	var storageConfig string
 	switch vi.config.StorageBackend {
@@ -474,7 +474,7 @@ func (vi *VaultInstaller) configure() error {
   path = "%s"
 }`, vi.config.DataPath)
 	}
-	
+
 	// Generate seal configuration
 	var sealConfig string
 	if vi.config.AutoUnseal && vi.config.KMSKeyID != "" {
@@ -483,7 +483,7 @@ func (vi *VaultInstaller) configure() error {
   kms_key_id = "%s"
 }`, vi.config.KMSKeyID)
 	}
-	
+
 	// Generate complete configuration
 	config := fmt.Sprintf(`# Vault configuration managed by Eos
 %s
@@ -503,33 +503,33 @@ disable_mlock = %t
 
 log_level = "%s"
 log_format = "json"
-`, storageConfig, sealConfig, vi.config.ListenerAddress, 
-   !vi.config.TLSEnabled, vi.config.APIAddr, vi.config.ClusterAddr,
-   vi.config.UIEnabled, vi.config.DisableMlock, vi.config.LogLevel)
-	
+`, storageConfig, sealConfig, vi.config.ListenerAddress,
+		!vi.config.TLSEnabled, vi.config.APIAddr, vi.config.ClusterAddr,
+		vi.config.UIEnabled, vi.config.DisableMlock, vi.config.LogLevel)
+
 	// Write configuration
 	if err := vi.writeFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write configuration: %w", err)
 	}
-	
+
 	// Set proper ownership
 	if err := vi.runner.Run("chown", vi.config.ServiceUser+":"+vi.config.ServiceGroup, configPath); err != nil {
 		return fmt.Errorf("failed to set configuration ownership: %w", err)
 	}
-	
+
 	// Validate configuration
 	vi.logger.Info("Validating Vault configuration")
 	if output, err := vi.runner.RunOutput(vi.config.BinaryPath, "validate", vi.config.ConfigPath); err != nil {
 		return fmt.Errorf("configuration validation failed: %w (output: %s)", err, output)
 	}
-	
+
 	return nil
 }
 
 // setupService configures and starts the Vault systemd service
 func (vi *VaultInstaller) setupService() error {
 	vi.logger.Info("Setting up Vault systemd service")
-	
+
 	// Create systemd service file
 	serviceContent := fmt.Sprintf(`[Unit]
 Description=HashiCorp Vault
@@ -568,58 +568,58 @@ LimitNPROC=512
 [Install]
 WantedBy=multi-user.target
 `, vi.config.ConfigPath, vi.config.ConfigPath,
-   vi.config.ServiceUser, vi.config.ServiceGroup,
-   vi.config.BinaryPath, vi.config.ConfigPath)
-	
+		vi.config.ServiceUser, vi.config.ServiceGroup,
+		vi.config.BinaryPath, vi.config.ConfigPath)
+
 	servicePath := fmt.Sprintf("/etc/systemd/system/%s.service", vi.config.ServiceName)
 	if err := vi.writeFile(servicePath, []byte(serviceContent), 0644); err != nil {
 		return fmt.Errorf("failed to create service file: %w", err)
 	}
-	
+
 	// Create environment file
 	envContent := fmt.Sprintf(`VAULT_API_ADDR=%s
 VAULT_CLUSTER_ADDR=%s
 `, vi.config.APIAddr, vi.config.ClusterAddr)
-	
+
 	envPath := filepath.Join(vi.config.ConfigPath, "vault.env")
 	if err := vi.writeFile(envPath, []byte(envContent), 0640); err != nil {
 		return fmt.Errorf("failed to write environment file: %w", err)
 	}
-	
+
 	// Set ownership for env file
 	if err := vi.runner.Run("chown", vi.config.ServiceUser+":"+vi.config.ServiceGroup, envPath); err != nil {
 		return fmt.Errorf("failed to set env file ownership: %w", err)
 	}
-	
+
 	// Reload systemd
 	if err := vi.runner.Run("systemctl", "daemon-reload"); err != nil {
 		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
-	
+
 	// Enable service
 	if err := vi.systemd.Enable(); err != nil {
 		return fmt.Errorf("failed to enable service: %w", err)
 	}
-	
+
 	// Start service with retries
 	vi.logger.Info("Starting Vault service")
 	if err := vi.systemd.Start(); err != nil {
 		// Get service status for debugging
 		if status, statusErr := vi.systemd.GetStatus(); statusErr == nil {
-			vi.logger.Error("Failed to start Vault service", 
+			vi.logger.Error("Failed to start Vault service",
 				zap.String("status", status))
 		}
 		return fmt.Errorf("failed to start service: %w", err)
 	}
-	
+
 	// Wait for Vault to be ready
 	vi.logger.Info("Waiting for Vault to be ready")
 	ctx, cancel := context.WithTimeout(vi.rc.Ctx, 30*time.Second)
 	defer cancel()
-	
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -636,12 +636,12 @@ VAULT_CLUSTER_ADDR=%s
 // verify performs post-installation verification
 func (vi *VaultInstaller) verify() error {
 	vi.logger.Info("Verifying Vault installation")
-	
+
 	// Check service status
 	if !vi.systemd.IsActive() {
 		return fmt.Errorf("Vault service is not active")
 	}
-	
+
 	// Check Vault status
 	if err := vi.runner.Run(vi.config.BinaryPath, "status"); err != nil {
 		// Vault returns exit code 2 when sealed, which is expected
@@ -651,12 +651,12 @@ func (vi *VaultInstaller) verify() error {
 			return fmt.Errorf("Vault is not responding to commands: %w", err)
 		}
 	}
-	
+
 	// Log success information
 	vi.logger.Info("Vault installation verified successfully",
 		zap.String("storage_backend", vi.config.StorageBackend),
 		zap.String("api_url", vi.config.APIAddr))
-	
+
 	// Print user instructions
 	vi.logger.Info("terminal prompt: ")
 	vi.logger.Info("terminal prompt: ✅ Vault installation completed successfully!")
@@ -671,7 +671,7 @@ func (vi *VaultInstaller) verify() error {
 	vi.logger.Info("terminal prompt:   vault operator unseal <key1>")
 	vi.logger.Info("terminal prompt:   vault operator unseal <key2>")
 	vi.logger.Info("terminal prompt:   vault operator unseal <key3>")
-	
+
 	return nil
 }
 
@@ -693,24 +693,24 @@ func (vi *VaultInstaller) isVaultReady() bool {
 // cleanExistingInstallation removes existing Vault installation
 func (vi *VaultInstaller) cleanExistingInstallation() error {
 	vi.logger.Info("Cleaning existing Vault installation")
-	
+
 	// Stop service if running
 	if vi.systemd.IsActive() {
 		if err := vi.systemd.Stop(); err != nil {
 			vi.logger.Warn("Failed to stop Vault service", zap.Error(err))
 		}
 	}
-	
+
 	// Remove data directory
 	if err := os.RemoveAll(vi.config.DataPath); err != nil {
 		vi.logger.Warn("Failed to remove data directory", zap.Error(err))
 	}
-	
+
 	// Remove log directory
 	if err := os.RemoveAll(vi.config.LogPath); err != nil {
 		vi.logger.Warn("Failed to remove log directory", zap.Error(err))
 	}
-	
+
 	return nil
 }
 
@@ -721,19 +721,19 @@ func (vi *VaultInstaller) getLatestVersion() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch version info: %w", err)
 	}
-	
+
 	var versionInfo struct {
 		CurrentVersion string `json:"current_version"`
 	}
-	
+
 	if err := json.Unmarshal(resp, &versionInfo); err != nil {
 		return "", fmt.Errorf("failed to parse version info: %w", err)
 	}
-	
+
 	if versionInfo.CurrentVersion == "" {
 		return "", fmt.Errorf("no version found in response")
 	}
-	
+
 	return versionInfo.CurrentVersion, nil
 }
 
@@ -743,12 +743,12 @@ func (vi *VaultInstaller) checkMemory() error {
 	// Use runtime.MemStats for cross-platform memory checking
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	
+
 	totalMB := m.Sys / 1024 / 1024
 	if totalMB < 256 {
 		return fmt.Errorf("insufficient memory: %dMB (minimum 256MB required)", totalMB)
 	}
-	
+
 	return nil
 }
 
@@ -758,13 +758,13 @@ func (vi *VaultInstaller) checkDiskSpace(path string, requiredMB int64) error {
 		vi.logger.Warn("Could not check disk space", zap.Error(err))
 		return nil
 	}
-	
+
 	availableMB := int64(stat.Bavail) * int64(stat.Bsize) / 1024 / 1024
 	if availableMB < requiredMB {
-		return fmt.Errorf("insufficient disk space in %s: %dMB available (minimum %dMB required)", 
+		return fmt.Errorf("insufficient disk space in %s: %dMB available (minimum %dMB required)",
 			path, availableMB, requiredMB)
 	}
-	
+
 	return nil
 }
 
@@ -775,9 +775,9 @@ func (vi *VaultInstaller) checkPortAvailable(port int) error {
 		// Port is available
 		return nil
 	}
-	
+
 	processName := strings.TrimSpace(output)
-	
+
 	// If it's Vault already using the port, that's fine for idempotency
 	if processName == "vault" {
 		vi.logger.Debug("Port already in use by Vault", zap.Int("port", port))
@@ -789,7 +789,7 @@ func (vi *VaultInstaller) checkPortAvailable(port int) error {
 		// It's another Vault instance
 		return fmt.Errorf("port %d is already in use by another Vault instance", port)
 	}
-	
+
 	// Some other process is using the port
 	return fmt.Errorf("port %d is already in use by %s", port, processName)
 }
@@ -821,22 +821,22 @@ func (vi *VaultInstaller) downloadFile(url, dest string) error {
 func (vi *VaultInstaller) httpGet(url string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(vi.rc.Ctx, 10*time.Second)
 	defer cancel()
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	resp, err := vi.network.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
 	}
-	
+
 	return io.ReadAll(resp.Body)
 }
 
@@ -847,6 +847,6 @@ func getUbuntuCodename() string {
 	if err != nil {
 		return "noble" // Default to latest LTS
 	}
-	
+
 	return strings.TrimSpace(string(output))
 }

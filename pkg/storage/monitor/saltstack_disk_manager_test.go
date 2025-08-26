@@ -51,24 +51,24 @@ func (m *MockSaltStackClient) IsAPIAvailable(ctx context.Context) bool {
 
 func setupTestDiskManager(t *testing.T) (*SaltStackDiskManager, *MockSaltStackClient) {
 	mockClient := &MockSaltStackClient{}
-	
+
 	ctx := context.Background()
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 	}
-	
+
 	manager := NewSaltStackDiskManager(mockClient, rc)
 	return manager, mockClient
 }
 
 func setupBenchmarkDiskManager(b *testing.B) (*SaltStackDiskManager, *MockSaltStackClient) {
 	mockClient := &MockSaltStackClient{}
-	
+
 	ctx := context.Background()
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 	}
-	
+
 	manager := NewSaltStackDiskManager(mockClient, rc)
 	return manager, mockClient
 }

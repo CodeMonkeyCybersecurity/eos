@@ -12,7 +12,7 @@ import (
 // AssessInfrastructureV2 demonstrates improved Go patterns using interfaces
 func AssessInfrastructureV2(rc *eos_io.RuntimeContext, config *Config) (*RemovalPlan, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Assessing infrastructure for removal (v2)",
 		zap.Bool("dev_mode", config.DevMode),
 		zap.Bool("keep_data", config.KeepData),
@@ -60,15 +60,15 @@ func loadCurrentStateV2(rc *eos_io.RuntimeContext) (*state.StateTracker, error) 
 	tracker, err := state.Load(rc)
 	if err != nil {
 		logger.Warn("Failed to load state file, scanning for components", zap.Error(err))
-		
+
 		// Create new tracker and attempt in-band gathering
 		tracker = state.New()
 		if gatherErr := tracker.GatherInBand(rc); gatherErr != nil {
 			// Wrap both errors for better context
-			return nil, fmt.Errorf("failed to load state (%w) and gather in-band state (%w)", 
+			return nil, fmt.Errorf("failed to load state (%w) and gather in-band state (%w)",
 				err, gatherErr)
 		}
-		
+
 		logger.Info("Successfully gathered in-band state as fallback")
 	}
 
@@ -78,20 +78,20 @@ func loadCurrentStateV2(rc *eos_io.RuntimeContext) (*state.StateTracker, error) 
 // applyDevExclusions demonstrates functional programming patterns
 func applyDevExclusions(plan *RemovalPlan, logger otelzap.LoggerWithCtx) *RemovalPlan {
 	devExclusions := getDevExclusionsV2()
-	
+
 	// Convert to map for efficient lookup
 	excludedMap := make(map[string]bool)
 	for _, item := range plan.ExcludedItems {
 		excludedMap[item] = true
 	}
-	
+
 	// Add dev exclusions that aren't already present
 	for exclusion := range devExclusions {
 		if !excludedMap[exclusion] {
 			plan.ExcludedItems = append(plan.ExcludedItems, exclusion)
 		}
 	}
-	
+
 	logger.Info("Development mode enabled - preserving development tools",
 		zap.Int("dev_exclusions_count", len(devExclusions)))
 	return plan
@@ -121,10 +121,10 @@ func filterComponentsV2(components []state.Component, excluded map[string]bool) 
 	if len(components) == 0 {
 		return nil // Return nil for empty slice (Go idiom)
 	}
-	
+
 	// Pre-allocate with estimated capacity
 	filtered := make([]state.Component, 0, len(components)/2)
-	
+
 	for _, comp := range components {
 		// Early continue for excluded items
 		if excluded[comp.Name] || excluded[string(comp.Type)] {
@@ -132,7 +132,7 @@ func filterComponentsV2(components []state.Component, excluded map[string]bool) 
 		}
 		filtered = append(filtered, comp)
 	}
-	
+
 	return filtered
 }
 
@@ -151,12 +151,12 @@ func logAssessmentResults(plan *RemovalPlan, logger otelzap.LoggerWithCtx) {
 func registerAllProviders(engine *AssessmentEngine) {
 	// In a real implementation, you would register actual providers here
 	// This demonstrates the pattern without requiring all the imports
-	
+
 	// Example of how you would register providers:
 	// engine.RegisterProvider(osquery.NewProvider())
 	// engine.RegisterProvider(boundary.NewProvider())
 	// engine.RegisterProvider(docker.NewProvider())
-	
+
 	// For now, we'll use a mock provider to demonstrate the pattern
 	engine.RegisterProvider(&mockProvider{})
 }

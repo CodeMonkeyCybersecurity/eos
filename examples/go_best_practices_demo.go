@@ -23,9 +23,9 @@ type UsageInfo struct {
 }
 
 type GrowthInfo struct {
-	Path            string
-	GrowthRate      float64
-	DaysUntilFull   float64
+	Path          string
+	GrowthRate    float64
+	DaysUntilFull float64
 }
 
 // 2. STRUCT EMBEDDING - Compose behavior instead of inheritance
@@ -34,11 +34,11 @@ type BaseMonitor struct {
 	timeout time.Duration
 }
 
-func (b *BaseMonitor) GetName() string { return b.name }
+func (b *BaseMonitor) GetName() string           { return b.name }
 func (b *BaseMonitor) GetTimeout() time.Duration { return b.timeout }
 
 type DiskMonitor struct {
-	BaseMonitor  // Embedded struct
+	BaseMonitor    // Embedded struct
 	alertThreshold float64
 }
 
@@ -65,12 +65,12 @@ func NewDiskMonitor(name string, opts ...MonitorOption) *DiskMonitor {
 		},
 		alertThreshold: 80.0, // default
 	}
-	
+
 	// Apply options
 	for _, opt := range opts {
 		opt(m)
 	}
-	
+
 	return m
 }
 
@@ -79,7 +79,7 @@ func (d *DiskMonitor) CheckUsage(ctx context.Context, path string) (*UsageInfo, 
 	// Create a timeout context
 	ctx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
-	
+
 	// Simulate work with context checking
 	select {
 	case <-ctx.Done():
@@ -100,7 +100,7 @@ func (d *DiskMonitor) TrackGrowth(ctx context.Context, path string) (*GrowthInfo
 	if err != nil {
 		return nil, fmt.Errorf("failed to check usage for growth tracking: %w", err)
 	}
-	
+
 	// Simulate growth calculation
 	return &GrowthInfo{
 		Path:          usage.Path,
@@ -117,12 +117,12 @@ type MonitorJob struct {
 }
 
 type MonitorPool struct {
-	monitor   StorageMonitor
-	workers   int
-	jobQueue  chan MonitorJob
-	ctx       context.Context
-	cancel    context.CancelFunc
-	wg        sync.WaitGroup
+	monitor  StorageMonitor
+	workers  int
+	jobQueue chan MonitorJob
+	ctx      context.Context
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 func NewMonitorPool(monitor StorageMonitor, workers int) *MonitorPool {
@@ -145,7 +145,7 @@ func (p *MonitorPool) Start() {
 
 func (p *MonitorPool) worker(id int) {
 	defer p.wg.Done()
-	
+
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -164,20 +164,20 @@ func (p *MonitorPool) worker(id int) {
 func (p *MonitorPool) Submit(path string) (<-chan *UsageInfo, <-chan error) {
 	resultChan := make(chan *UsageInfo, 1)
 	errorChan := make(chan error, 1)
-	
+
 	job := MonitorJob{
 		Path:   path,
 		Result: resultChan,
 		Error:  errorChan,
 	}
-	
+
 	select {
 	case p.jobQueue <- job:
 		// Job submitted successfully
 	case <-p.ctx.Done():
 		errorChan <- p.ctx.Err()
 	}
-	
+
 	return resultChan, errorChan
 }
 
@@ -191,16 +191,16 @@ func (p *MonitorPool) Stop() {
 func MonitorMultiplePaths(monitor StorageMonitor, paths []string) error {
 	pool := NewMonitorPool(monitor, 3)
 	defer pool.Stop() // Ensure cleanup happens
-	
+
 	pool.Start()
-	
+
 	// Collect results
 	var wg sync.WaitGroup
 	for _, path := range paths {
 		wg.Add(1)
 		go func(p string) {
 			defer wg.Done()
-			
+
 			resultChan, errorChan := pool.Submit(p)
 			select {
 			case result := <-resultChan:
@@ -212,7 +212,7 @@ func MonitorMultiplePaths(monitor StorageMonitor, paths []string) error {
 			}
 		}(path)
 	}
-	
+
 	wg.Wait()
 	return nil
 }
@@ -263,25 +263,25 @@ func (b *AlertConfigBuilder) Build() *AlertConfig {
 		Enabled:    b.config.Enabled,
 		Cooldown:   b.config.Cooldown,
 	}
-	
+
 	for k, v := range b.config.Thresholds {
 		config.Thresholds[k] = v
 	}
 	copy(config.Recipients, b.config.Recipients)
-	
+
 	return config
 }
 
 // 9. DEMONSTRATION FUNCTION
 func demonstratePatterns() {
 	fmt.Println("=== Go Best Practices Demo ===")
-	
+
 	// Functional options pattern
 	monitor := NewDiskMonitor("production",
 		WithAlertThreshold(85.0),
 		WithTimeout(10*time.Second),
 	)
-	
+
 	// Builder pattern
 	alertConfig := NewAlertConfigBuilder().
 		WithThreshold("disk_usage", 80.0).
@@ -289,24 +289,24 @@ func demonstratePatterns() {
 		AddRecipient("admin@example.com").
 		SetCooldown(10 * time.Minute).
 		Build()
-	
-	fmt.Printf("Monitor: %s, Threshold: %.1f%%\n", 
+
+	fmt.Printf("Monitor: %s, Threshold: %.1f%%\n",
 		monitor.GetName(), monitor.alertThreshold)
 	fmt.Printf("Alert config has %d thresholds and %d recipients\n",
 		len(alertConfig.Thresholds), len(alertConfig.Recipients))
-	
+
 	// Context and error handling
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	usage, err := monitor.CheckUsage(ctx, "/")
 	if err != nil {
 		log.Printf("Error: %v", err)
 		return
 	}
-	
+
 	fmt.Printf("Usage for %s: %.1f%%\n", usage.Path, usage.UsedPercent)
-	
+
 	// Worker pool pattern
 	paths := []string{"/", "/home", "/var", "/tmp"}
 	if err := MonitorMultiplePaths(monitor, paths); err != nil {

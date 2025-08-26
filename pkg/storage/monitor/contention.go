@@ -234,7 +234,6 @@ type ContentionAnalysis struct {
 
 // Helper functions
 
-
 func detectContentionWithIostat(rc *eos_io.RuntimeContext) ([]ContentionMetrics, error) {
 	// Run iostat with extended statistics
 	output, err := execute.Run(rc.Ctx, execute.Options{
