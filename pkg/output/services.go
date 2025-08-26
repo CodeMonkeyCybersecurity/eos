@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system_services"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system/system_services"
 )
 
 // ServiceListToStdout outputs a service list result to stdout

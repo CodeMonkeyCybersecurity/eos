@@ -6,13 +6,13 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage_monitor"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage/monitor"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 // DiskUsageTable outputs disk usage information in a formatted table.
 // It follows the Assess → Intervene → Evaluate pattern.
-func DiskUsageTable(usage []storage_monitor.DiskUsage, showInodes bool) error {
+func DiskUsageTable(usage []monitor.DiskUsage, showInodes bool) error {
 	// ASSESS - Prepare table writer
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 

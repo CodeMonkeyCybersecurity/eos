@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/security_permissions"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/security/security_permissions"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )

@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package storage_monitor
+package monitor
 
 import (
 	"syscall"

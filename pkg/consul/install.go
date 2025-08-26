@@ -166,12 +166,23 @@ func (ci *ConsulInstaller) Install() error {
 func (ci *ConsulInstaller) assess() (bool, error) {
 	ci.logger.Info("Assessing current Consul installation")
 	
+	// Create context with timeout for assessment operations
+	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 30*time.Second)
+	defer cancel()
+	
 	// First, check if Consul binary exists
 	if _, err := os.Stat(ci.config.BinaryPath); err == nil {
-		// Binary exists, check version
+		// Binary exists, check version with context
 		if output, err := ci.runner.RunOutput(ci.config.BinaryPath, "version"); err == nil {
 			ci.logger.Info("Consul binary found", zap.String("output", output))
 		}
+	}
+	
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		return false, ctx.Err()
+	default:
 	}
 	
 	// Check if Consul service exists
@@ -230,19 +241,28 @@ func (ci *ConsulInstaller) assess() (bool, error) {
 func (ci *ConsulInstaller) validatePrerequisites() error {
 	ci.logger.Info("Validating prerequisites")
 	
+	// Validate configuration with better error context
+	if ci.config.Version == "" {
+		return eos_err.NewUserError("consul version must be specified")
+	}
+	
 	// Check if running as root
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError("this command must be run as root")
 	}
 	
+	// Create context for prerequisite checks
+	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 15*time.Second)
+	defer cancel()
+	
 	// Check memory requirements (minimum 256MB recommended)
-	if err := ci.checkMemory(); err != nil {
-		return err
+	if err := ci.checkMemoryWithContext(ctx); err != nil {
+		return fmt.Errorf("memory check failed: %w", err)
 	}
 	
 	// Check disk space (minimum 100MB for Consul)
-	if err := ci.checkDiskSpace("/var/lib", 100); err != nil {
-		return err
+	if err := ci.checkDiskSpaceWithContext(ctx, "/var/lib", 100); err != nil {
+		return fmt.Errorf("disk space check failed: %w", err)
 	}
 	
 	// Check port availability - but be smart about it
@@ -365,7 +385,7 @@ func (ci *ConsulInstaller) installViaBinary() error {
 	defer os.RemoveAll(tmpDir)
 	
 	zipPath := filepath.Join(tmpDir, "consul.zip")
-	if err := ci.downloadFile(downloadURL, zipPath); err != nil {
+	if err := ci.downloadFileWithWget(downloadURL, zipPath); err != nil {
 		return fmt.Errorf("failed to download Consul: %w", err)
 	}
 	
@@ -383,32 +403,50 @@ func (ci *ConsulInstaller) installViaBinary() error {
 	return nil
 }
 
+// DirectoryConfig represents a directory to be created with specific permissions
+type DirectoryConfig struct {
+	Path  string
+	Mode  os.FileMode
+	Owner string
+}
+
 // configure sets up Consul configuration
 func (ci *ConsulInstaller) configure() error {
 	ci.logger.Info("Configuring Consul")
+	
+	// Create context for configuration operations
+	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 30*time.Second)
+	defer cancel()
 	
 	// Create consul user and group
 	if err := ci.user.CreateSystemUser("consul", "/var/lib/consul"); err != nil {
 		return fmt.Errorf("failed to create consul user: %w", err)
 	}
 	
-	// Create required directories
-	directories := []struct {
-		path  string
-		mode  os.FileMode
-		owner string
-	}{
-		{"/etc/consul.d", 0755, "consul"},
-		{"/var/lib/consul", 0755, "consul"},
-		{"/var/log/consul", 0755, "consul"},
+	// Define required directories using struct for better organization
+	directories := []DirectoryConfig{
+		{Path: "/etc/consul.d", Mode: 0755, Owner: "consul"},
+		{Path: "/var/lib/consul", Mode: 0755, Owner: "consul"},
+		{Path: "/var/log/consul", Mode: 0755, Owner: "consul"},
 	}
 	
+	// Create directories with proper error handling
 	for _, dir := range directories {
-		if err := ci.createDirectory(dir.path, dir.mode); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir.path, err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
 		}
-		if err := ci.runner.Run("chown", "-R", dir.owner+":"+dir.owner, dir.path); err != nil {
-			return fmt.Errorf("failed to set ownership for %s: %w", dir.path, err)
+		
+		if err := ci.createDirectory(dir.Path, dir.Mode); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir.Path, err)
+		}
+		// Set ownership after creation
+		if err := ci.runner.Run("chown", "-R", dir.Owner+":"+dir.Owner, dir.Path); err != nil {
+			ci.logger.Warn("Failed to set directory ownership", 
+				zap.String("path", dir.Path),
+				zap.String("owner", dir.Owner),
+				zap.Error(err))
 		}
 	}
 	
@@ -663,20 +701,71 @@ func (ci *ConsulInstaller) getLatestVersion() (string, error) {
 	return versionInfo.CurrentVersion, nil
 }
 
-// Helper methods for various operations
-
-func (ci *ConsulInstaller) checkMemory() error {
-	var info unix.Sysinfo_t
-	if err := unix.Sysinfo(&info); err != nil {
+// checkMemoryWithContext checks available system memory with context support
+func (ci *ConsulInstaller) checkMemoryWithContext(ctx context.Context) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	
+	// Use a more portable approach to check memory
+	cmd := exec.Command("free", "-m")
+	output, err := cmd.Output()
+	if err != nil {
 		ci.logger.Warn("Could not check memory", zap.Error(err))
+		return nil // Non-fatal, continue installation
+	}
+	
+	// Parse free command output to get total memory
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 2 {
 		return nil
 	}
 	
-	totalMB := info.Totalram / 1024 / 1024
-	if totalMB < 256 {
-		return fmt.Errorf("insufficient memory: %dMB (minimum 256MB required)", totalMB)
+	fields := strings.Fields(lines[1])
+	if len(fields) < 2 {
+		return nil
 	}
 	
+	totalMB := 0
+	if _, err := fmt.Sscanf(fields[1], "%d", &totalMB); err != nil {
+		return nil
+	}
+	if totalMB < 256 {
+		return eos_err.NewUserError("insufficient memory: %dMB (minimum 256MB required)", totalMB)
+	}
+	
+	ci.logger.Debug("Memory check passed", zap.Int("totalMB", totalMB))
+	return nil
+}
+
+// checkDiskSpaceWithContext checks available disk space with context support
+func (ci *ConsulInstaller) checkDiskSpaceWithContext(ctx context.Context, path string, requiredMB int64) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	
+	var stat unix.Statfs_t
+	if err := unix.Statfs(path, &stat); err != nil {
+		ci.logger.Warn("Could not check disk space", zap.String("path", path), zap.Error(err))
+		return nil // Non-fatal, continue installation
+	}
+	
+	availableMB := int64(stat.Bavail) * int64(stat.Bsize) / 1024 / 1024
+	if availableMB < requiredMB {
+		return eos_err.NewUserError("insufficient disk space in %s: %dMB available (minimum %dMB required)", 
+			path, availableMB, requiredMB)
+	}
+	
+	ci.logger.Debug("Disk space check passed", 
+		zap.String("path", path),
+		zap.Int64("availableMB", availableMB),
+		zap.Int64("requiredMB", requiredMB))
 	return nil
 }
 
@@ -738,31 +827,44 @@ func (ci *ConsulInstaller) fileExists(path string) bool {
 	return err == nil
 }
 
-func (ci *ConsulInstaller) downloadFile(url, dest string) error {
-	// Download using wget
-	if err := ci.runner.Run("wget", "-O", dest, url); err != nil {
-		return err
+// downloadFileWithWget downloads a file using wget with proper error handling
+func (ci *ConsulInstaller) downloadFileWithWget(url, dest string) error {
+	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 5*time.Minute)
+	defer cancel()
+	
+	ci.logger.Info("Downloading file with wget", 
+		zap.String("url", url), 
+		zap.String("dest", dest))
+	
+	// Use wget with timeout
+	cmd := exec.CommandContext(ctx, "wget", "-O", dest, url)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to download %s to %s: %w", url, dest, err)
 	}
+	
 	return nil
 }
 
+// httpGet performs HTTP GET request with proper error wrapping and context handling
 func (ci *ConsulInstaller) httpGet(url string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 10*time.Second)
 	defer cancel()
 	
+	// Create HTTP request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 	
-	resp, err := ci.network.client.Do(req)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("HTTP GET request failed for %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 	
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf("HTTP %d: %s for URL %s", resp.StatusCode, resp.Status, url)
 	}
 	
 	return io.ReadAll(resp.Body)

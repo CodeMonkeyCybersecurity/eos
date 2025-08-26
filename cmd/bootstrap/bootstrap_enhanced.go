@@ -15,7 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/service_installation"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ubuntu"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"

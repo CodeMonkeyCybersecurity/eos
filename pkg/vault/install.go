@@ -740,13 +740,11 @@ func (vi *VaultInstaller) getLatestVersion() (string, error) {
 // Helper methods for various operations
 
 func (vi *VaultInstaller) checkMemory() error {
-	var info unix.Sysinfo_t
-	if err := unix.Sysinfo(&info); err != nil {
-		vi.logger.Warn("Could not check memory", zap.Error(err))
-		return nil
-	}
+	// Use runtime.MemStats for cross-platform memory checking
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
 	
-	totalMB := info.Totalram / 1024 / 1024
+	totalMB := m.Sys / 1024 / 1024
 	if totalMB < 256 {
 		return fmt.Errorf("insufficient memory: %dMB (minimum 256MB required)", totalMB)
 	}

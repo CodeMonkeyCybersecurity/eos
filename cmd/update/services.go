@@ -6,7 +6,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/output"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system_services"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system/system_services"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"

@@ -6,7 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/output"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage_monitor"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage/monitor"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -65,14 +65,14 @@ Examples:
 			zap.Bool("all", showAll))
 
 		// Get disk usage
-		usage, err := storage_monitor.CheckDiskUsage(rc, paths)
+		usage, err := monitor.CheckDiskUsage(rc, paths)
 		if err != nil {
 			return fmt.Errorf("failed to check disk usage: %w", err)
 		}
 
 		// Filter out pseudo filesystems unless --all
 		if !showAll {
-			filtered := make([]storage_monitor.DiskUsage, 0)
+			filtered := make([]monitor.DiskUsage, 0)
 			for _, u := range usage {
 				if !utils.IsPseudoFilesystem(u.Filesystem) {
 					filtered = append(filtered, u)

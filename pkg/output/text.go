@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/security_permissions"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/security/security_permissions"
 )
 
 // TextWriter provides utilities for formatted text output

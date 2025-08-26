@@ -8,7 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage_monitor"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage/monitor"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -63,14 +63,14 @@ Examples:
 		}
 
 		// One-time collection
-		metrics, err := storage_monitor.CollectIOMetrics(rc)
+		metrics, err := monitor.CollectIOMetrics(rc)
 		if err != nil {
 			return fmt.Errorf("failed to collect I/O metrics: %w", err)
 		}
 
 		// Filter by device if specified
 		if device != "" {
-			filtered := make([]storage_monitor.IOMetrics, 0)
+			filtered := make([]monitor.IOMetrics, 0)
 			for _, m := range metrics {
 				if m.Device == device {
 					filtered = append(filtered, m)
@@ -90,7 +90,7 @@ func init() {
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func displayMetrics(metrics []storage_monitor.IOMetrics) error {
+func displayMetrics(metrics []monitor.IOMetrics) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 	fmt.Fprintf(w, "DEVICE\tREAD MB/s\tWRITE MB/s\tREAD IOPS\tWRITE IOPS\tREAD LAT(ms)\tWRITE LAT(ms)\n")
@@ -98,8 +98,8 @@ func displayMetrics(metrics []storage_monitor.IOMetrics) error {
 	for _, m := range metrics {
 		fmt.Fprintf(w, "%s\t%.2f\t%.2f\t%.0f\t%.0f\t%.2f\t%.2f\n",
 			m.Device,
-			m.ReadBytesPerSec/storage_monitor.MB,
-			m.WriteBytesPerSec/storage_monitor.MB,
+			m.ReadBytesPerSec/monitor.MB,
+			m.WriteBytesPerSec/monitor.MB,
 			m.ReadOpsPerSec,
 			m.WriteOpsPerSec,
 			m.AvgReadLatency,
@@ -126,7 +126,7 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 			// Clear screen and move cursor to top
 			logger.Info("terminal prompt: \033[2J\033[H")
 
-			metrics, err := storage_monitor.CollectIOMetrics(rc)
+			metrics, err := monitor.CollectIOMetrics(rc)
 			if err != nil {
 				logger.Info(fmt.Sprintf("terminal prompt: Error: %v", err))
 				continue
@@ -134,7 +134,7 @@ func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Durati
 
 			// Filter if needed
 			if device != "" {
-				filtered := make([]storage_monitor.IOMetrics, 0)
+				filtered := make([]monitor.IOMetrics, 0)
 				for _, m := range metrics {
 					if m.Device == device {
 						filtered = append(filtered, m)

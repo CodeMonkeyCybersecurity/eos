@@ -8,7 +8,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/service_deployment"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_deployment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"

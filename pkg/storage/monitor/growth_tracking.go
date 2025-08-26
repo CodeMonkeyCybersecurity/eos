@@ -1,4 +1,4 @@
-package storage_monitor
+package monitor
 
 import (
 	"encoding/json"
