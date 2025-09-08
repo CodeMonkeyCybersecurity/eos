@@ -12,6 +12,7 @@ import (
 type Config struct {
 	// Authentication
 	AdminPassword     string `yaml:"admin_password" json:"admin_password"`
+	BasicAuthEnabled  bool   `yaml:"basic_auth_enabled" json:"basic_auth_enabled"`
 	BasicAuthUser     string `yaml:"basic_auth_user" json:"basic_auth_user"`
 	BasicAuthPassword string `yaml:"basic_auth_password" json:"basic_auth_password"`
 	EncryptionKey     string `yaml:"encryption_key" json:"encryption_key"`

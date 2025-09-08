@@ -216,7 +216,8 @@ func (m *Manager) createN8nJob() *api.Job {
 	return job
 }
 
-// createNginxJob creates a Nomad job for nginx reverse proxy
+// createNginxJob creates a Nomad job for local nginx reverse proxy
+// This serves as Layer 2 (Backend) in the Hecate two-layer architecture
 func (m *Manager) createNginxJob() *api.Job {
 	job := &api.Job{
 		ID:          stringPtr("n8n-nginx"),
@@ -235,11 +236,6 @@ func (m *Manager) createNginxJob() *api.Job {
 								Label: "nginx",
 								Value: 80,
 								To:    80,
-							},
-							{
-								Label: "nginx-ssl",
-								Value: 443,
-								To:    443,
 							},
 						},
 					},
@@ -264,11 +260,11 @@ func (m *Manager) createNginxJob() *api.Job {
 						Driver: "docker",
 						Config: map[string]interface{}{
 							"image": "nginx:alpine",
-							"ports": []string{"nginx", "nginx-ssl"},
+							"ports": []string{"nginx"},
 						},
 						Templates: []*api.Template{
 							{
-								DestPath:   stringPtr("/etc/nginx/nginx.conf"),
+								DestPath:     stringPtr("/etc/nginx/nginx.conf"),
 								EmbeddedTmpl: stringPtr(m.getNginxConfig()),
 							},
 						},
