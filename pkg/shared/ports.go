@@ -144,6 +144,7 @@ var AppProxies = []AppProxy{
 	{AppName: "minio-api", Subdomain: "s3api", BackendPort: PortMinioAPI},
 	{AppName: "jenkins", Subdomain: "j-api", BackendPort: PortJenkinsLegacy},
 	{AppName: "nextcloud", Subdomain: "cloud", BackendPort: PortNextcloudLegacy},
+	{AppName: "n8n", Subdomain: "n8n", BackendPort: PortN8n},
 }
 
 // n8n 8147
