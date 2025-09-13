@@ -104,7 +104,6 @@ func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	return nil
 }
 
-// Legacy function kept for reference
 func runCreateBoundaryLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
@@ -265,34 +264,16 @@ func initializeBoundaryNomadClient(logger otelzap.LoggerWithCtx) error {
 	return nil
 }
 
-func displayBoundaryStatus(logger otelzap.LoggerWithCtx, status *boundary.StatusResult) {
-	logger.Info("terminal prompt: Current Boundary Status:")
-	
-	for minion, minionStatus := range status.Minions {
-		logger.Info(fmt.Sprintf("terminal prompt: === %s ===", minion))
-		s := minionStatus.Status
-		logger.Info(fmt.Sprintf("terminal prompt:   Installed:     %v", s.Installed))
-		logger.Info(fmt.Sprintf("terminal prompt:   Running:       %v", s.Running))
-		logger.Info(fmt.Sprintf("terminal prompt:   Role:          %s", s.Role))
-		if s.Version != "" {
-			logger.Info(fmt.Sprintf("terminal prompt:   Version:       %s", s.Version))
-		}
-		if s.Failed {
-			logger.Info("terminal prompt:   ⚠️  Status:       FAILED")
-			if s.LastError != "" {
-				logger.Info(fmt.Sprintf("terminal prompt:   Last Error:    %s", s.LastError))
-			}
-		}
-		if s.DatabaseConnected {
-			logger.Info("terminal prompt:   Database:      Connected")
-		}
-	}
-}
+// displayBoundaryStatus - REMOVED: Function no longer used
+// TODO: Restore when Boundary status display is needed
 
 // runCreateBoundaryFallback is the fallback implementation using salt-call
 func runCreateBoundaryFallback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	// This would contain the original shell-based implementation
 	// For now, we'll return an error indicating API is required
+	_ = rc // Suppress unused parameter warning
+	_ = cmd // Suppress unused parameter warning
+	_ = args // Suppress unused parameter warning
 	return fmt.Errorf("Salt API required for Boundary installation. Please configure SALT_API_* environment variables")
 }
 
