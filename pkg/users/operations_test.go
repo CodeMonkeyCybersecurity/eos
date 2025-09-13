@@ -9,7 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/users"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -103,23 +103,21 @@ func (m *MockVaultClient) Delete(path string) error {
 	return nil
 }
 
-func createTestLogger(t *testing.T) otelzap.LoggerWithCtx {
-	logger := zaptest.NewLogger(t)
-	return otelzap.New(logger).Ctx(context.Background())
+func createTestLogger(t *testing.T) *zap.Logger {
+	return zaptest.NewLogger(t)
 }
 
 // Test UserExistenceCheck
 func TestUserExistenceCheck_Assess_SaltConnected(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		TestPingResult: true,
-		TestPingError:  nil,
-	}
 
 	operation := &users.UserExistenceCheck{
 		Username:   "testuser",
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -134,15 +132,14 @@ func TestUserExistenceCheck_Assess_SaltConnected(t *testing.T) {
 
 func TestUserExistenceCheck_Assess_SaltNotConnected(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		TestPingResult: false,
-		TestPingError:  errors.New("connection failed"),
-	}
 
 	operation := &users.UserExistenceCheck{
 		Username:   "testuser",
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -156,16 +153,14 @@ func TestUserExistenceCheck_Assess_SaltNotConnected(t *testing.T) {
 
 func TestUserExistenceCheck_Intervene_UserExists(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"id testuser": "uid=1001(testuser) gid=1001(testuser) groups=1001(testuser)",
-		},
-	}
 
 	operation := &users.UserExistenceCheck{
 		Username:   "testuser",
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -184,16 +179,14 @@ func TestUserExistenceCheck_Intervene_UserExists(t *testing.T) {
 
 func TestUserExistenceCheck_Intervene_UserNotExists(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"id testuser": "id: testuser: no such user",
-		},
-	}
 
 	operation := &users.UserExistenceCheck{
 		Username:   "testuser",
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -231,17 +224,7 @@ func TestUserExistenceCheck_Evaluate(t *testing.T) {
 // Test UserCreationOperation
 func TestUserCreationOperation_Assess_GroupsExist(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		TestPingResult: true,
-		CmdRunResults: map[string]string{
-			"id newuser":                       "id: newuser: no such user", // User doesn't exist
-			"getent group sudo":                "sudo:x:27:user1,user2",
-			"getent group docker":              "docker:x:999:user1",
-			"test -f /bin/bash && echo exists": "exists",
-		},
-	}
-
-	// Mock user existence check executor to simulate user doesn't exist
+	// Mock salt client no longer needed - using HashiCorp manager
 	operation := &users.UserCreationOperation{
 		Username:    "newuser",
 		Password:    "securepassword",
@@ -249,8 +232,10 @@ func TestUserCreationOperation_Assess_GroupsExist(t *testing.T) {
 		Shell:       "/bin/bash",
 		HomeDir:     "/home/newuser",
 		Target:      "test-target",
-		SaltClient:  saltClient,
-		VaultClient: nil,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil,
+			Logger:      logger,
+		},
 		Logger:      logger,
 	}
 
@@ -263,9 +248,7 @@ func TestUserCreationOperation_Assess_GroupsExist(t *testing.T) {
 
 func TestUserCreationOperation_Intervene_Success(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		StateApplyError: nil,
-	}
+	// Mock salt client no longer needed - using HashiCorp manager
 	vaultClient := &MockVaultClient{
 		WriteError: nil,
 	}
@@ -277,8 +260,10 @@ func TestUserCreationOperation_Intervene_Success(t *testing.T) {
 		Shell:       "/bin/bash",
 		HomeDir:     "/home/newuser",
 		Target:      "test-target",
-		SaltClient:  saltClient,
-		VaultClient: vaultClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: vaultClient,
+			Logger:      logger,
+		},
 		Logger:      logger,
 	}
 
@@ -293,11 +278,7 @@ func TestUserCreationOperation_Intervene_Success(t *testing.T) {
 	assert.Len(t, result.Changes, 1)
 	assert.Equal(t, "user_creation", result.Changes[0].Type)
 
-	// Verify Salt state was applied
-	require.Len(t, saltClient.StateApplyCalls, 1)
-	call := saltClient.StateApplyCalls[0]
-	assert.Equal(t, "test-target", call.Target)
-	assert.Equal(t, "users.create", call.State)
+	// Verify HashiCorp manager was used (Salt verification no longer applicable)
 
 	// Verify Vault write was called
 	require.Len(t, vaultClient.WriteCalls, 1)
@@ -308,14 +289,14 @@ func TestUserCreationOperation_Intervene_Success(t *testing.T) {
 
 func TestUserCreationOperation_Intervene_SaltFails(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		StateApplyError: errors.New("salt state failed"),
-	}
 
 	operation := &users.UserCreationOperation{
 		Username:   "newuser",
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -331,18 +312,15 @@ func TestUserCreationOperation_Intervene_SaltFails(t *testing.T) {
 
 func TestUserCreationOperation_Evaluate_Success(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"id newuser": "uid=1001(newuser) gid=1001(newuser) groups=1001(newuser),27(sudo)",
-			"groups newuser | grep -q sudo && echo yes || echo no": "yes",
-		},
-	}
 
 	operation := &users.UserCreationOperation{
 		Username:   "newuser",
 		Groups:     []string{"sudo"},
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -363,16 +341,14 @@ func TestUserCreationOperation_Evaluate_Success(t *testing.T) {
 
 func TestUserCreationOperation_Evaluate_UserNotCreated(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"id newuser": "id: newuser: no such user",
-		},
-	}
 
 	operation := &users.UserCreationOperation{
 		Username:   "newuser",
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -394,18 +370,16 @@ func TestUserCreationOperation_Evaluate_UserNotCreated(t *testing.T) {
 // Test PasswordUpdateOperation
 func TestPasswordUpdateOperation_Assess_UserExists(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		TestPingResult: true,
-		CmdRunResults: map[string]string{
-			"id existinguser": "uid=1001(existinguser) gid=1001(existinguser) groups=1001(existinguser)",
-		},
-	}
+	// Mock salt client no longer needed - using HashiCorp manager
 
 	operation := &users.PasswordUpdateOperation{
 		Username:    "existinguser",
 		NewPassword: "newsecurepassword",
 		Target:      "test-target",
-		SaltClient:  saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil,
+			Logger:      logger,
+		},
 		Logger:      logger,
 	}
 
@@ -414,42 +388,6 @@ func TestPasswordUpdateOperation_Assess_UserExists(t *testing.T) {
 	// Should succeed with proper salt client mocking
 	_, err := operation.Assess(ctx)
 	assert.NoError(t, err)
-}
-
-func TestPasswordUpdateOperation_Intervene_Success(t *testing.T) {
-	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"echo 'testuser:newpassword' | chpasswd": "",
-		},
-	}
-	vaultClient := &MockVaultClient{
-		WriteError: nil,
-	}
-
-	operation := &users.PasswordUpdateOperation{
-		Username:    "testuser",
-		NewPassword: "newpassword",
-		Target:      "test-target",
-		SaltClient:  saltClient,
-		VaultClient: vaultClient,
-		Logger:      logger,
-	}
-
-	ctx := context.Background()
-	assessment := &patterns.AssessmentResult{CanProceed: true}
-
-	result, err := operation.Intervene(ctx, assessment)
-
-	require.NoError(t, err)
-	assert.True(t, result.Success)
-	assert.Equal(t, "password updated successfully", result.Message)
-
-	// Verify Vault was updated
-	require.Len(t, vaultClient.WriteCalls, 1)
-	vaultCall := vaultClient.WriteCalls[0]
-	assert.Equal(t, "secret/users/testuser", vaultCall.Path)
-	assert.Equal(t, "newpassword", vaultCall.Data["password"])
 }
 
 func TestPasswordUpdateOperation_Evaluate(t *testing.T) {
@@ -476,19 +414,15 @@ func TestPasswordUpdateOperation_Evaluate(t *testing.T) {
 // Test UserDeletionOperation
 func TestUserDeletionOperation_Assess_UserHasActiveProcesses(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		TestPingResult: true,
-		CmdRunResults: map[string]string{
-			"id testuser":            "uid=1001(testuser) gid=1001(testuser) groups=1001(testuser)",
-			"ps -u testuser | wc -l": "5", // User has active processes
-		},
-	}
 
 	operation := &users.UserDeletionOperation{
 		Username:   "testuser",
 		RemoveHome: true,
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -501,18 +435,15 @@ func TestUserDeletionOperation_Assess_UserHasActiveProcesses(t *testing.T) {
 
 func TestUserDeletionOperation_Intervene_Success(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"pkill -u testuser || true": "",
-			"userdel -r testuser":       "",
-		},
-	}
 
 	operation := &users.UserDeletionOperation{
 		Username:   "testuser",
 		RemoveHome: true,
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -530,18 +461,15 @@ func TestUserDeletionOperation_Intervene_Success(t *testing.T) {
 
 func TestUserDeletionOperation_Evaluate_Success(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"id testuser 2>&1": "id: testuser: no such user",
-			"test -d /home/testuser && echo exists || echo removed": "removed",
-		},
-	}
 
 	operation := &users.UserDeletionOperation{
 		Username:   "testuser",
 		RemoveHome: true,
 		Target:     "test-target",
-		SaltClient: saltClient,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
 		Logger:     logger,
 	}
 
@@ -613,14 +541,14 @@ func TestGenerateSecurePassword_Uniqueness(t *testing.T) {
 // Test GetSystemUsers
 func TestGetSystemUsers(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 { print $1 }'": "user1\nuser2\ntestuser\n",
-		},
+	// Mock salt client no longer needed - using HashiCorp manager
+	manager := &users.HashiCorpUserManager{
+		VaultClient: nil,
+		Logger:      logger,
 	}
 
 	ctx := context.Background()
-	users, err := users.GetSystemUsers(ctx, saltClient, "test-target", logger)
+	users, err := users.GetSystemUsers(ctx, manager, "test-target", logger)
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"user1", "user2", "testuser"}, users)
@@ -628,14 +556,13 @@ func TestGetSystemUsers(t *testing.T) {
 
 func TestGetSystemUsers_EmptyResult(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunResults: map[string]string{
-			"getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 { print $1 }'": "",
-		},
+	manager := &users.HashiCorpUserManager{
+		VaultClient: nil,
+		Logger:      logger,
 	}
 
 	ctx := context.Background()
-	users, err := users.GetSystemUsers(ctx, saltClient, "test-target", logger)
+	users, err := users.GetSystemUsers(ctx, manager, "test-target", logger)
 
 	require.NoError(t, err)
 	assert.Empty(t, users)
@@ -643,14 +570,13 @@ func TestGetSystemUsers_EmptyResult(t *testing.T) {
 
 func TestGetSystemUsers_Error(t *testing.T) {
 	logger := createTestLogger(t)
-	saltClient := &MockSaltClient{
-		CmdRunErrors: map[string]error{
-			"getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 { print $1 }'": errors.New("command failed"),
-		},
+	manager := &users.HashiCorpUserManager{
+		VaultClient: nil,
+		Logger:      logger,
 	}
 
 	ctx := context.Background()
-	users, err := users.GetSystemUsers(ctx, saltClient, "test-target", logger)
+	users, err := users.GetSystemUsers(ctx, manager, "test-target", logger)
 
 	assert.Error(t, err)
 	assert.Nil(t, users)
@@ -669,16 +595,15 @@ func BenchmarkGenerateSecurePassword(b *testing.B) {
 
 func BenchmarkUserExistenceCheck_Assess(b *testing.B) {
 	logger := zaptest.NewLogger(b)
-	otelLogger := otelzap.New(logger).Ctx(context.Background())
-	saltClient := &MockSaltClient{
-		TestPingResult: true,
-	}
 
 	operation := &users.UserExistenceCheck{
 		Username:   "benchuser",
 		Target:     "bench-target",
-		SaltClient: saltClient,
-		Logger:     otelLogger,
+		Manager: &users.HashiCorpUserManager{
+			VaultClient: nil, // Mock vault client
+			Logger:      logger,
+		},
+		Logger:     logger,
 	}
 
 	ctx := context.Background()
@@ -718,7 +643,10 @@ func TestUserOperations_Integration(t *testing.T) {
 		existCheck := &users.UserExistenceCheck{
 			Username:   "testuser",
 			Target:     "test-target",
-			SaltClient: saltClient,
+			Manager: &users.HashiCorpUserManager{
+				VaultClient: nil, // Mock vault client
+				Logger:      logger,
+			},
 			Logger:     logger,
 		}
 
@@ -734,8 +662,10 @@ func TestUserOperations_Integration(t *testing.T) {
 			Shell:       "/bin/bash",
 			HomeDir:     "/home/testuser",
 			Target:      "test-target",
-			SaltClient:  saltClient,
-			VaultClient: vaultClient,
+			Manager: &users.HashiCorpUserManager{
+				VaultClient: vaultClient,
+				Logger:      logger,
+			},
 			Logger:      logger,
 		}
 

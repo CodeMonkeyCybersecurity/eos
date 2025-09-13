@@ -8,28 +8,33 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// RESTInstaller handles Nomad installation via Salt REST API
+// RESTInstaller handles Nomad installation via REST API
 type RESTInstaller struct {
-	restClient *saltstack.RESTClient
-	logger     *zap.Logger
+	// TODO: Replace with Nomad REST client
+	logger *zap.Logger
 }
 
 // NewRESTInstaller creates a new REST-based installer
 func NewRESTInstaller(apiURL string, skipTLSVerify bool) *RESTInstaller {
+	// TODO: Initialize Nomad REST client
+	_ = apiURL
+	_ = skipTLSVerify
 	return &RESTInstaller{
-		restClient: saltstack.NewRESTClient(apiURL, skipTLSVerify),
-		logger:     zap.L(),
+		logger: zap.L(),
 	}
 }
 
-// Authenticate authenticates with the Salt API
+// Authenticate authenticates with the Nomad API
 func (i *RESTInstaller) Authenticate(ctx context.Context, username, password string) error {
-	return i.restClient.Authenticate(ctx, username, password, "pam")
+	// TODO: Implement Nomad authentication
+	_ = ctx
+	_ = username
+	_ = password
+	return fmt.Errorf("nomad authentication not implemented")
 }
 
 // InstallNomad installs Nomad using Salt REST API
@@ -63,34 +68,13 @@ func (i *RESTInstaller) InstallNomad(rc *eos_io.RuntimeContext, config *NomadIns
 
 	// Apply the Nomad installation state
 	logger.Info("Applying Nomad installation state")
-	result, err := i.restClient.ApplyState(rc.Ctx, "*", "hashicorp.nomad", pillarData)
-	if err != nil {
-		return fmt.Errorf("failed to apply Nomad state: %w", err)
-	}
+	// TODO: Replace with actual Nomad installation logic
+	_ = pillarData
+	logger.Info("Nomad installation placeholder - not implemented")
+	return fmt.Errorf("nomad installation via REST not implemented")
 
-	// Check results
-	logger.Info("Checking installation results")
-	successCount := 0
-	failureCount := 0
-	
-	for minion, minionResult := range result {
-		if isStateSuccessful(minionResult) {
-			successCount++
-			logger.Info("Nomad installed successfully on minion", zap.String("minion", minion))
-		} else {
-			failureCount++
-			logger.Error("Nomad installation failed on minion", 
-				zap.String("minion", minion),
-				zap.Any("result", minionResult))
-		}
-	}
-
-	if failureCount > 0 {
-		return fmt.Errorf("Nomad installation failed on %d minion(s)", failureCount)
-	}
-
-	logger.Info("Nomad installation completed successfully", 
-		zap.Int("successful_minions", successCount))
+	// Installation completed (placeholder)
+	logger.Info("Nomad installation completed (placeholder)")
 	return nil
 }
 
@@ -116,27 +100,14 @@ func (i *RESTInstaller) RemoveNomad(rc *eos_io.RuntimeContext, config *NomadRemo
 
 	// Apply the Nomad removal state
 	logger.Info("Applying Nomad removal state")
-	result, err := i.restClient.ApplyState(rc.Ctx, "*", "hashicorp.nomad_remove", pillarData)
-	if err != nil {
-		return fmt.Errorf("failed to apply Nomad removal state: %w", err)
-	}
+	// TODO: Replace with Nomad client implementation
+	_ = pillarData // suppress unused variable warning
+	return fmt.Errorf("nomad removal not implemented yet")
 
-	// Check results
-	logger.Info("Checking removal results")
-	successCount := 0
+	// Check results - placeholder for Nomad implementation
+	logger.Info("Nomad removal completed (placeholder)")
+	successCount := 1 // placeholder
 	failureCount := 0
-	
-	for minion, minionResult := range result {
-		if isStateSuccessful(minionResult) {
-			successCount++
-			logger.Info("Nomad removed successfully from minion", zap.String("minion", minion))
-		} else {
-			failureCount++
-			logger.Error("Nomad removal failed on minion", 
-				zap.String("minion", minion),
-				zap.Any("result", minionResult))
-		}
-	}
 
 	if failureCount > 0 {
 		return fmt.Errorf("Nomad removal failed on %d minion(s)", failureCount)
@@ -153,30 +124,21 @@ func (i *RESTInstaller) CheckNomadStatus(rc *eos_io.RuntimeContext) (map[string]
 	logger.Info("Checking Nomad status via Salt REST API")
 
 	// Execute status check command
-	result, err := i.restClient.ExecuteCommand(rc.Ctx, "*", "cmd.run", 
-		[]interface{}{"nomad status 2>&1 || echo 'NOT_INSTALLED'"}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check Nomad status: %w", err)
-	}
+	// TODO: Replace with Nomad client implementation
+	return nil, fmt.Errorf("nomad status check not implemented yet")
 
-	// Parse results
+	// Parse results - placeholder for Nomad implementation
 	statusMap := make(map[string]NomadRESTStatus)
-	for minion, output := range result {
-		status := parseNomadStatus(output)
-		statusMap[minion] = status
-		
-		logger.Debug("Nomad status on minion",
-			zap.String("minion", minion),
-			zap.Bool("installed", status.Installed),
-			zap.Bool("running", status.Running))
-	}
+	// TODO: Implement actual Nomad status parsing
 
 	return statusMap, nil
 }
 
 // TestConnection tests the connection to Salt API
 func (i *RESTInstaller) TestConnection(ctx context.Context) error {
-	return i.restClient.ValidateConnection(ctx)
+	// TODO: Replace with Nomad client implementation
+	_ = ctx // suppress unused variable warning
+	return fmt.Errorf("nomad connection test not implemented yet")
 }
 
 // Helper function to check if a state execution was successful

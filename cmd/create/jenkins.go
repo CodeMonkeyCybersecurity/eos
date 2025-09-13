@@ -9,7 +9,8 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	// TODO: Replace with Nomad orchestration
+	// "github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
@@ -137,29 +138,17 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		zap.Int("memory", resourceConfig.Memory),
 		zap.Int("replicas", resourceConfig.Replicas))
 
-	if err := saltstack.ApplySaltStateWithPillar(rc, "nomad.services", pillarConfig); err != nil {
-		return fmt.Errorf("Jenkins deployment failed: %w", err)
-	}
-
-	// 6. Display success information with generated credentials
-	logger.Info("Jenkins deployment completed successfully",
-		zap.String("management", "SaltStack → Terraform → Nomad"),
-		zap.String("environment", envConfig.Environment),
-		zap.String("secret_backend", envConfig.SecretBackend))
-
-	logger.Info("Jenkins is now available",
-		zap.String("web_ui", fmt.Sprintf("http://localhost:%d", port)),
-		zap.String("username", "admin"),
-		zap.String("password", adminPassword),
-		zap.String("api_token", apiToken),
-		zap.String("consul_service", "jenkins.service.consul"))
-
-	logger.Info("Configuration automatically managed",
-		zap.String("environment_discovery", "bootstrap/salt/cloud"),
-		zap.String("secret_storage", envConfig.SecretBackend),
-		zap.String("resource_allocation", envConfig.Environment))
-
-	return nil
+	// TODO: Replace with Nomad orchestration when implemented
+	logger.Info("Jenkins deployment placeholder - Nomad orchestration not implemented yet")
+	_ = pillarConfig // Suppress unused variable warning
+	
+	// TODO: When Nomad implementation is complete, add success logging:
+	// - Jenkins web UI availability
+	// - Generated admin credentials  
+	// - Consul service registration
+	// - Configuration management details
+	
+	return fmt.Errorf("Jenkins deployment not implemented with Nomad yet")
 }
 
 

@@ -1,15 +1,15 @@
 package assessment
 
 import (
+	"fmt"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // UserExistence checks if user already exists on target systems
 // Migrated from cmd/create/user.go assessUserExistence
-func UserExistence(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManager, target, username string) error {
+func UserExistence(rc *eos_io.RuntimeContext, target, username string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Check prerequisites
@@ -17,12 +17,11 @@ func UserExistence(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManag
 		zap.String("username", username),
 		zap.String("target", target))
 
-	// INTERVENE - Query Salt for user information
-	// Query user information via Salt - note we need to add a method to get the client
-	// For now, we'll use a placeholder implementation
-	logger.Debug("Querying Salt for user information")
+	// INTERVENE - User existence check requires administrator intervention
+	logger.Warn("User existence check requires administrator intervention - HashiCorp stack cannot query system users directly",
+		zap.String("username", username),
+		zap.String("target", target))
 
-	// EVALUATE - Log results
-	logger.Info("User existence check completed")
-	return nil
+	// EVALUATE - Return escalation error
+	return fmt.Errorf("user existence check requires administrator intervention - HashiCorp stack cannot query system users directly")
 }

@@ -8,276 +8,92 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	// "github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack" // Removed for Nomad migration
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
+// DiskManager interface for disk management operations
+type DiskManager interface {
+	GetDiskUsage(ctx context.Context, target string, path string) ([]DiskUsage, error)
+	GetAllDiskUsage(ctx context.Context, target string) ([]DiskUsage, error)
+	CheckDiskHealth(ctx context.Context, target string) (*DiskHealth, error)
+	GetMountPoints(ctx context.Context, target string) ([]string, error)
+	CleanupTempFiles(ctx context.Context, target string, options CleanupOptions) (*DiskCleanupResult, error)
+	ExpandFilesystem(ctx context.Context, target string, path string) error
+	PerformCleanup(ctx context.Context, target string, options CleanupOptions) (*DiskCleanupResult, error)
+}
+
+// CleanupOptions defines options for disk cleanup operations
+type CleanupOptions struct {
+	DryRun              bool     `json:"dry_run"`
+	MaxAge              int      `json:"max_age_days"`
+	MinFreeSpace        int64    `json:"min_free_space_bytes"`
+	ExcludePaths        []string `json:"exclude_paths"`
+	IncludeSystemFiles  bool     `json:"include_system_files"`
+	CompressOldFiles    bool     `json:"compress_old_files"`
+	RemoveEmptyDirs     bool     `json:"remove_empty_dirs"`
+	CleanTempFiles      bool     `json:"clean_temp_files"`
+	CleanLogFiles       bool     `json:"clean_log_files"`
+	CleanCacheFiles     bool     `json:"clean_cache_files"`
+}
+
 // DiskManagerService provides high-level disk management operations
 type DiskManagerService struct {
-	diskManager DiskManager
+	diskManager DiskManager // Interface for disk management operations
 	logger      otelzap.LoggerWithCtx
 	rc          *eos_io.RuntimeContext
 }
 
 // NewDiskManagerService creates a new disk manager service
 func NewDiskManagerService(rc *eos_io.RuntimeContext) (*DiskManagerService, error) {
-	// Create SaltStack client
-	saltClient := saltstack.NewClient(otelzap.Ctx(rc.Ctx))
-
-	// Create disk manager with SaltStack backend
-	diskManager := NewSaltStackDiskManager(saltClient, rc)
-
-	return &DiskManagerService{
-		diskManager: diskManager,
-		logger:      otelzap.Ctx(rc.Ctx),
-		rc:          rc,
-	}, nil
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("Disk management service requires administrator intervention - HashiCorp stack cannot perform system-level disk operations")
+	return nil, fmt.Errorf("disk management service requires administrator intervention - HashiCorp stack cannot perform system-level disk operations")
 }
 
 // PerformDiskHealthCheck performs comprehensive disk health monitoring
 func (dms *DiskManagerService) PerformDiskHealthCheck(ctx context.Context, target string) (*DiskHealthReport, error) {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("Starting comprehensive disk health check", zap.String("target", target))
+	logger.Warn("Disk health check requires administrator intervention - HashiCorp stack cannot access system-level disk health data",
+		zap.String("target", target))
+	return nil, fmt.Errorf("disk health check requires administrator intervention - HashiCorp stack cannot access system-level disk health data")
+}
 
-	report := &DiskHealthReport{
-		Target:    target,
-		Timestamp: time.Now(),
-		Status:    "CHECKING",
-	}
-
-	// Get all disk usage
-	usageData, err := dms.diskManager.GetAllDiskUsage(ctx, target)
-	if err != nil {
-		report.Status = "ERROR"
-		report.Errors = append(report.Errors, fmt.Sprintf("Failed to get disk usage: %v", err))
-		return report, fmt.Errorf("failed to get disk usage: %w", err)
-	}
-	report.DiskUsage = usageData
-
-	// Check SMART data for all disks
-	smartData, err := dms.diskManager.CheckDiskHealth(ctx, target)
-	if err != nil {
-		logger.Warn("Failed to get SMART data", zap.Error(err))
-		report.Warnings = append(report.Warnings, fmt.Sprintf("SMART data unavailable: %v", err))
-	} else {
-		report.SMARTData = smartData
-	}
-
-	// Get mount points
-	mountPoints, err := dms.diskManager.GetMountPoints(ctx, target)
-	if err != nil {
-		logger.Warn("Failed to get mount points", zap.Error(err))
-		report.Warnings = append(report.Warnings, fmt.Sprintf("Mount points unavailable: %v", err))
-	} else {
-		report.MountPoints = mountPoints
-	}
-
-	// Analyze health status
-	dms.analyzeHealthStatus(report)
-
-	logger.Info("Disk health check completed",
-		zap.String("status", report.Status),
-		zap.Int("disk_count", len(report.DiskUsage)),
-		zap.Int("smart_devices", len(report.SMARTData)))
-
-	return report, nil
+// PerformIntelligentCleanup performs advanced cleanup based on usage patterns and file analysis
+func (dms *DiskManagerService) PerformIntelligentCleanup(ctx context.Context, target string, threshold int64) error {
+	logger := otelzap.Ctx(ctx)
+	logger.Warn("Intelligent cleanup requires administrator intervention - HashiCorp stack cannot perform advanced file system analysis and cleanup",
+		zap.String("target", target),
+		zap.Int64("threshold", threshold))
+	return fmt.Errorf("intelligent cleanup requires administrator intervention - HashiCorp stack cannot perform advanced file system analysis and cleanup")
 }
 
 // PerformDiskCleanup performs intelligent disk cleanup based on usage patterns
 func (dms *DiskManagerService) PerformDiskCleanup(ctx context.Context, target string, options CleanupOptions) (*DiskCleanupReport, error) {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("Starting disk cleanup operation",
+	logger.Warn("Disk cleanup requires administrator intervention - HashiCorp stack cannot perform system-level file cleanup operations",
 		zap.String("target", target),
 		zap.Bool("dry_run", options.DryRun))
-
-	report := &DiskCleanupReport{
-		Target:    target,
-		Timestamp: time.Now(),
-		Options:   options,
-	}
-
-	// Get current disk usage before cleanup
-	beforeUsage, err := dms.diskManager.GetAllDiskUsage(ctx, target)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get initial disk usage: %w", err)
-	}
-	report.BeforeUsage = beforeUsage
-
-	// Perform cleanup
-	cleanupResult, err := dms.diskManager.CleanupTempFiles(ctx, target, options)
-	if err != nil {
-		report.Status = "FAILED"
-		report.Error = err.Error()
-		return report, fmt.Errorf("cleanup operation failed: %w", err)
-	}
-	report.CleanupResult = *cleanupResult
-
-	// Get disk usage after cleanup (if not dry run)
-	if !options.DryRun {
-		afterUsage, err := dms.diskManager.GetAllDiskUsage(ctx, target)
-		if err != nil {
-			logger.Warn("Failed to get post-cleanup disk usage", zap.Error(err))
-		} else {
-			report.AfterUsage = afterUsage
-			dms.calculateCleanupEffectiveness(report)
-		}
-	}
-
-	report.Status = "SUCCESS"
-	logger.Info("Disk cleanup completed",
-		zap.String("status", report.Status),
-		zap.Int64("bytes_freed", cleanupResult.FreedBytes),
-		zap.Int("files_removed", cleanupResult.FilesRemoved))
-
-	return report, nil
+	return nil, fmt.Errorf("disk cleanup requires administrator intervention - HashiCorp stack cannot perform system-level file cleanup operations")
 }
 
 // AutoExpandFilesystems automatically expands filesystems that are running low on space
 func (dms *DiskManagerService) AutoExpandFilesystems(ctx context.Context, target string, thresholdPercent float64) (*FilesystemExpansionReport, error) {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("Starting automatic filesystem expansion",
+	logger.Warn("Filesystem expansion requires administrator intervention - HashiCorp stack cannot perform system-level filesystem operations",
 		zap.String("target", target),
 		zap.Float64("threshold_percent", thresholdPercent))
-
-	report := &FilesystemExpansionReport{
-		Target:    target,
-		Timestamp: time.Now(),
-		Threshold: thresholdPercent,
-	}
-
-	// Get current disk usage
-	usageData, err := dms.diskManager.GetAllDiskUsage(ctx, target)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get disk usage: %w", err)
-	}
-
-	// Identify filesystems that need expansion
-	var candidatesForExpansion []DiskUsage
-	for _, usage := range usageData {
-		if usage.UsedPercent >= thresholdPercent {
-			candidatesForExpansion = append(candidatesForExpansion, usage)
-		}
-	}
-
-	report.CandidateFilesystems = candidatesForExpansion
-
-	if len(candidatesForExpansion) == 0 {
-		report.Status = "NO_ACTION_NEEDED"
-		logger.Info("No filesystems require expansion")
-		return report, nil
-	}
-
-	// Attempt to expand each candidate filesystem
-	for _, candidate := range candidatesForExpansion {
-		expansionResult := FilesystemExpansionResult{
-			Path:        candidate.Path,
-			Device:      candidate.Device,
-			BeforeUsage: candidate,
-		}
-
-		err := dms.diskManager.ExpandFilesystem(ctx, target, candidate.Device)
-		if err != nil {
-			expansionResult.Status = "FAILED"
-			expansionResult.Error = err.Error()
-			logger.Warn("Failed to expand filesystem",
-				zap.String("device", candidate.Device),
-				zap.Error(err))
-		} else {
-			expansionResult.Status = "SUCCESS"
-
-			// Get updated usage after expansion
-			afterUsage, err := dms.diskManager.GetDiskUsage(ctx, target, candidate.Path)
-			if err != nil {
-				logger.Warn("Failed to get post-expansion usage", zap.Error(err))
-			} else {
-				expansionResult.AfterUsage = *afterUsage
-			}
-		}
-
-		report.ExpansionResults = append(report.ExpansionResults, expansionResult)
-	}
-
-	// Determine overall status
-	successCount := 0
-	for _, result := range report.ExpansionResults {
-		if result.Status == "SUCCESS" {
-			successCount++
-		}
-	}
-
-	if successCount == len(report.ExpansionResults) {
-		report.Status = "SUCCESS"
-	} else if successCount > 0 {
-		report.Status = "PARTIAL_SUCCESS"
-	} else {
-		report.Status = "FAILED"
-	}
-
-	logger.Info("Filesystem expansion completed",
-		zap.String("status", report.Status),
-		zap.Int("candidates", len(candidatesForExpansion)),
-		zap.Int("successful", successCount))
-
-	return report, nil
+	return nil, fmt.Errorf("filesystem expansion requires administrator intervention - HashiCorp stack cannot perform system-level filesystem operations")
 }
 
 // MonitorDiskGrowth tracks disk usage growth patterns
 func (dms *DiskManagerService) MonitorDiskGrowth(ctx context.Context, target string, paths []string) (*DiskGrowthReport, error) {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("Starting disk growth monitoring",
+	logger.Warn("Disk growth monitoring requires administrator intervention - HashiCorp stack cannot perform long-term disk usage analysis",
 		zap.String("target", target),
 		zap.Strings("paths", paths))
-
-	report := &DiskGrowthReport{
-		Target:    target,
-		Timestamp: time.Now(),
-		Paths:     paths,
-	}
-
-	// Get current usage for all specified paths
-	for _, path := range paths {
-		usage, err := dms.diskManager.GetDiskUsage(ctx, target, path)
-		if err != nil {
-			logger.Warn("Failed to get usage for path",
-				zap.String("path", path),
-				zap.Error(err))
-			continue
-		}
-
-		// Load historical growth data (this would integrate with existing growth tracking)
-		growthMetrics, err := dms.loadGrowthMetrics(ctx, target, path)
-		if err != nil {
-			logger.Warn("Failed to load growth metrics",
-				zap.String("path", path),
-				zap.Error(err))
-			// Create new metrics if none exist
-			growthMetrics = &GrowthMetrics{
-				Path:        path,
-				CurrentSize: usage.UsedSize,
-			}
-		} else {
-			// Update metrics with current data
-			growthMetrics.PreviousSize = growthMetrics.CurrentSize
-			growthMetrics.CurrentSize = usage.UsedSize
-			growthMetrics.GrowthBytes = growthMetrics.CurrentSize - growthMetrics.PreviousSize
-
-			if growthMetrics.PreviousSize > 0 {
-				growthMetrics.GrowthPercent = float64(growthMetrics.GrowthBytes) / float64(growthMetrics.PreviousSize) * 100
-			}
-		}
-
-		report.GrowthMetrics = append(report.GrowthMetrics, *growthMetrics)
-	}
-
-	// Analyze growth patterns and generate alerts
-	dms.analyzeGrowthPatterns(report)
-
-	logger.Info("Disk growth monitoring completed",
-		zap.Int("paths_monitored", len(report.GrowthMetrics)),
-		zap.Int("alerts", len(report.Alerts)))
-
-	return report, nil
+	return nil, fmt.Errorf("disk growth monitoring requires administrator intervention - HashiCorp stack cannot perform long-term disk usage analysis")
 }
 
 // Helper methods for analysis and reporting

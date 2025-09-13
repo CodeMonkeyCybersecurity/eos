@@ -27,9 +27,9 @@ func OrchestrateVaultCreate(rc *eos_io.RuntimeContext) error {
 	otelzap.Ctx(rc.Ctx).Warn("DEPRECATION WARNING: Direct vault installation is deprecated. Use 'eos create vault-salt' instead.")
 	
 	// Check if Salt is available and use it if possible
-	if err := checkSaltAvailability(rc); err == nil {
+	if err := checkNomadAvailability(rc); err == nil {
 		otelzap.Ctx(rc.Ctx).Info("Salt is available, using Salt-based deployment")
-		return OrchestrateVaultCreateViaSalt(rc)
+		return OrchestrateVaultCreateViaNomad(rc)
 	}
 
 	// Salt not available - require it for new deployments

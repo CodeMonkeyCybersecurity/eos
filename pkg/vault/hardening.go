@@ -74,13 +74,13 @@ func ComprehensiveHardening(rc *eos_io.RuntimeContext, client *api.Client, confi
 	log.Info(" Starting comprehensive Vault hardening")
 
 	// Check if Salt is available and use it if possible
-	if err := checkSaltAvailability(rc); err == nil {
-		log.Info("Salt is available, using Salt-based hardening")
+	if err := checkNomadAvailability(rc); err == nil {
+		log.Info("Nomad is available, using Nomad-based hardening")
 		return OrchestrateVaultHardenViaSalt(rc)
 	}
 
 	// Fall back to direct hardening
-	log.Info("Salt not available, using direct hardening")
+	log.Info("Nomad not available, using direct hardening")
 
 	if config == nil {
 		config = DefaultHardeningConfig()

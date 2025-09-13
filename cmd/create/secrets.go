@@ -7,13 +7,10 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack/orchestrator"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-	vaultorch "github.com/CodeMonkeyCybersecurity/eos/pkg/vault/orchestrator"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 var CreateSecretCmd = &cobra.Command{
@@ -166,15 +163,10 @@ Environment Variables:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
-		// Get orchestration options
-		opts, err := orchestrator.GetOrchestrationOptions(cmd)
-		if err != nil {
-			return fmt.Errorf("failed to get orchestration options: %w", err)
-		}
+		// Use Nomad orchestration instead of Salt
+		logger.Info("Using Nomad orchestration for Vault deployment")
 
-		logger.Info("Starting Vault creation",
-			zap.String("orchestration_mode", string(opts.Mode)),
-			zap.String("target", opts.Target))
+		logger.Info("Starting Vault creation with Nomad orchestration")
 
 		// Define direct execution function
 		directExec := func(rc *eos_io.RuntimeContext) error {
@@ -186,22 +178,15 @@ Environment Variables:
 			return nil
 		}
 
-		// Define Salt operation
-		saltOp := vaultorch.CreateSaltOperation(opts)
+		// Salt operations removed - using Nomad orchestration
 
-		// Execute based on orchestration mode
-		if opts.Mode == orchestrator.OrchestrationModeSalt {
-			return vaultorch.ExecuteWithSalt(rc, opts, directExec, saltOp)
-		}
-
-		// Execute directly
+		// Execute directly using Nomad orchestration
 		return directExec(rc)
 	}),
 }
 
 func init() {
-	// Add orchestration flags
-	orchestrator.AddOrchestrationFlags(CreateVaultEnhancedCmd)
+	// Nomad orchestration flags (replacing Salt orchestration)
 
 	// Add Vault-specific flags
 	CreateVaultEnhancedCmd.Flags().String("vault-version", "", "Specific Vault version to install")

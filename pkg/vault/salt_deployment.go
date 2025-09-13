@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,24 +9,22 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// OrchestrateVaultCreateViaSalt creates a complete Vault deployment using Salt states
-// This replaces OrchestrateVaultCreate() for architectural consistency
-// Following the principle: Salt = Physical infrastructure
-func OrchestrateVaultCreateViaSalt(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting complete Vault deployment via Salt states")
+// OrchestrateVaultCreateViaNomad creates a complete Vault deployment using Nomad orchestration
+// This replaces Salt-based deployment for HashiCorp stack consistency
+// Following the principle: Nomad = Service orchestration
+func OrchestrateVaultCreateViaNomad(rc *eos_io.RuntimeContext) error {
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
+	logger.Info("Starting complete Vault deployment via Nomad orchestration")
 
 	// ASSESS - Check prerequisites
 	logger.Info("Assessing Vault deployment prerequisites")
 	
-	// Check if Salt is available
-	if err := checkSaltAvailability(rc); err != nil {
-		logger.Error("Salt not available, falling back to direct deployment", zap.Error(err))
+	// Check if Nomad is available
+	if err := checkNomadAvailability(rc); err != nil {
+		logger.Error("Nomad not available, falling back to direct deployment", zap.Error(err))
 		return OrchestrateVaultCreate(rc)
 	}
 
@@ -53,43 +50,14 @@ func OrchestrateVaultCreateViaSalt(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("Vault deployment verification failed: %w", err)
 	}
 
-	logger.Info("Salt-based Vault deployment completed successfully")
+	logger.Info("Nomad-based Vault deployment completed successfully")
 	return nil
 }
 
-// checkSaltAvailability checks if Salt is available for Vault deployment
-func checkSaltAvailability(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Check if salt-call is available
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "which",
-		Args:    []string{"salt-call"},
-		Capture: true,
-		Timeout: 10 * time.Second,
-	}); err != nil {
-		logger.Warn("salt-call not found in PATH", zap.Error(err))
-		return fmt.Errorf("salt-call not available: %w", err)
-	}
-	
-	// Check if Vault Salt states exist
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "test",
-		Args:    []string{"-f", "/opt/eos/salt/states/hashicorp/vault/eos_complete.sls"},
-		Capture: true,
-		Timeout: 5 * time.Second,
-	}); err != nil {
-		logger.Warn("Vault Salt states not found", zap.Error(err))
-		return fmt.Errorf("Vault Salt states not available")
-	}
-	
-	logger.Info("Salt availability verified for Vault deployment")
-	return nil
-}
 
 // assessExistingVault checks for existing Vault installation
 func assessExistingVault(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	
 	// Check if Vault binary exists
 	if _, err := execute.Run(rc.Ctx, execute.Options{
@@ -116,43 +84,13 @@ func assessExistingVault(rc *eos_io.RuntimeContext) error {
 
 // deploySaltVaultComplete applies the complete Vault Salt orchestration
 func deploySaltVaultComplete(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Create Salt client
-	saltClient := saltstack.NewClient(logger)
-	
-	// Create context with extended timeout for complete deployment
-	ctx, cancel := context.WithTimeout(rc.Ctx, 600*time.Second) // 10 minutes
-	defer cancel()
-	
-	// Prepare pillar data for Vault deployment
-	pillarData := map[string]interface{}{
-		"vault": map[string]interface{}{
-			"user":        "vault",
-			"group":       "vault",
-			"port":        "8179",  // Eos-specific port
-			"log_level":   "info",
-			"log_format":  "json",
-			"tls_enabled": true,
-			"ui_enabled":  true,
-		},
-	}
-	
-	logger.Info("Applying complete Vault Salt orchestration")
-	
-	// Apply the comprehensive Vault state
-	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.eos_complete", pillarData); err != nil {
-		logger.Error("Failed to apply Vault Salt states", zap.Error(err))
-		return fmt.Errorf("failed to apply Vault Salt states: %w", err)
-	}
-	
-	logger.Info("Vault Salt states applied successfully")
-	return nil
+	// TODO: Replace with Nomad job deployment
+	return fmt.Errorf("Nomad-based Vault deployment not yet implemented")
 }
 
 // verifyVaultDeployment verifies that the Salt-based Vault deployment succeeded
 func verifyVaultDeployment(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	
 	// Check if Vault binary is installed
 	if _, err := execute.Run(rc.Ctx, execute.Options{
@@ -216,7 +154,7 @@ func verifyVaultDeployment(rc *eos_io.RuntimeContext) error {
 
 // testVaultConnectivity tests TCP connectivity to Vault
 func testVaultConnectivity(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	
 	// Test TCP connectivity with timeout (replicating exact logic from phase5_start_service.go)
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -249,7 +187,7 @@ func testVaultConnectivity(rc *eos_io.RuntimeContext) error {
 
 // GetVaultStatusViaSalt gets Vault status using Salt-compatible methods
 func GetVaultStatusViaSalt(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	
 	status := make(map[string]interface{})
 	
@@ -304,11 +242,11 @@ func GetVaultStatusViaSalt(rc *eos_io.RuntimeContext) (map[string]interface{}, e
 // OrchestrateVaultEnableViaSalt enables Vault features using Salt states
 // This replaces EnableVault() when Salt is available
 func OrchestrateVaultEnableViaSalt(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	logger.Info("Starting Vault enablement via Salt states")
 
 	// ASSESS - Check prerequisites
-	if err := checkSaltAvailability(rc); err != nil {
+	if err := checkNomadAvailability(rc); err != nil {
 		logger.Error("Salt not available for enablement", zap.Error(err))
 		return fmt.Errorf("Salt not available: %w", err)
 	}
@@ -318,132 +256,42 @@ func OrchestrateVaultEnableViaSalt(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("Vault not ready for enablement: %w", err)
 	}
 
-	// INTERVENE - Apply enablement via Salt
-	logger.Info("Applying Vault enablement Salt states")
-	
-	saltClient := saltstack.NewClient(logger)
-	ctx, cancel := context.WithTimeout(rc.Ctx, 300*time.Second) // 5 minutes
-	defer cancel()
-
-	// Get root token from init file
-	rootToken, err := getRootTokenFromInitFile(rc)
-	if err != nil {
-		return fmt.Errorf("failed to get root token: %w", err)
-	}
-
-	// Prepare pillar data
-	pillarData := map[string]interface{}{
-		"vault": map[string]interface{}{
-			"root_token":      rootToken,
-			"enable_userpass": true,
-			"enable_approle":  true,
-			"enable_mfa":      true,
-			"enable_agent":    true,
-		},
-	}
-
-	// Apply enablement state
-	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.enable", pillarData); err != nil {
-		return fmt.Errorf("failed to apply enablement Salt states: %w", err)
-	}
-
-	// EVALUATE - Verify enablement
-	logger.Info("Verifying Vault enablement")
-	
-	if err := verifyVaultEnablement(rc); err != nil {
-		return fmt.Errorf("Vault enablement verification failed: %w", err)
-	}
-
-	logger.Info("Vault enablement via Salt completed successfully")
-	return nil
+	// TODO: Replace with Nomad job deployment
+	return fmt.Errorf("Nomad-based Vault enablement not yet implemented")
 }
 
 // OrchestrateVaultHardenViaSalt applies comprehensive hardening using Salt states
 func OrchestrateVaultHardenViaSalt(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	logger.Info("Starting Vault hardening via Salt states")
 
 	// ASSESS
-	if err := checkSaltAvailability(rc); err != nil {
+	if err := checkNomadAvailability(rc); err != nil {
 		logger.Error("Salt not available for hardening", zap.Error(err))
 		return fmt.Errorf("Salt not available: %w", err)
 	}
 
-	// INTERVENE
-	logger.Info("Applying Vault hardening Salt states")
-	
-	saltClient := saltstack.NewClient(logger)
-	ctx, cancel := context.WithTimeout(rc.Ctx, 600*time.Second) // 10 minutes
-	defer cancel()
-
-	// Get root token if available
-	rootToken, _ := getRootTokenFromInitFile(rc)
-
-	// Prepare pillar data
-	pillarData := map[string]interface{}{
-		"vault": map[string]interface{}{
-			"root_token":      rootToken,
-			"allowed_subnets": []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
-		},
-	}
-
-	// Apply hardening state
-	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.harden", pillarData); err != nil {
-		return fmt.Errorf("failed to apply hardening Salt states: %w", err)
-	}
-
-	// EVALUATE
-	logger.Info("Verifying Vault hardening")
-	
-	if err := verifyVaultHardening(rc); err != nil {
-		logger.Warn("Some hardening checks failed", zap.Error(err))
-		// Don't fail completely - hardening is best-effort
-	}
-
-	logger.Info("Vault hardening via Salt completed")
-	return nil
+	// TODO: Replace with Nomad job deployment
+	return fmt.Errorf("Nomad-based Vault hardening not yet implemented")
 }
 
 // OrchestrateVaultCompleteLifecycle runs the entire Vault lifecycle via Salt
 func OrchestrateVaultCompleteLifecycle(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	logger.Info("Starting complete Vault lifecycle via Salt orchestration")
 
 	// Check Salt availability once
-	if err := checkSaltAvailability(rc); err != nil {
+	if err := checkNomadAvailability(rc); err != nil {
 		logger.Error("Salt not available for complete lifecycle", zap.Error(err))
 		return fmt.Errorf("Salt not available: %w", err)
 	}
 
-	saltClient := saltstack.NewClient(logger)
-	ctx, cancel := context.WithTimeout(rc.Ctx, 1200*time.Second) // 20 minutes total
-	defer cancel()
-
-	// Prepare comprehensive pillar data
-	pillarData := map[string]interface{}{
-		"vault": map[string]interface{}{
-			"enable_userpass":  true,
-			"enable_approle":   true,
-			"enable_mfa":       true,
-			"enable_agent":     true,
-			"allowed_subnets":  []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"},
-		},
-	}
-
-	// Apply complete lifecycle orchestration
-	logger.Info("Applying complete Vault lifecycle Salt orchestration")
-	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.complete_lifecycle", pillarData); err != nil {
-		return fmt.Errorf("failed to apply complete lifecycle: %w", err)
-	}
-
-	logger.Info("Complete Vault lifecycle deployment successful")
-	return nil
+	// TODO: Replace with Nomad job deployment
+	return fmt.Errorf("Nomad-based Vault complete lifecycle not yet implemented")
 }
 
-// Helper functions
-
 func checkVaultReadyForEnablement(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	
 	// Set environment variables for Vault
 	os.Setenv("VAULT_ADDR", "https://127.0.0.1:8179")
@@ -484,10 +332,8 @@ func checkVaultReadyForEnablement(rc *eos_io.RuntimeContext) error {
 	if status.Sealed {
 		logger.Info("Vault is sealed, attempting to unseal via Salt")
 		// Try to unseal via Salt
-		saltClient := saltstack.NewClient(logger)
-		if err := saltClient.StateApplyLocal(rc.Ctx, "hashicorp.vault.unseal", nil); err != nil {
-			return fmt.Errorf("failed to unseal Vault: %w", err)
-		}
+		// TODO: Replace with Nomad job deployment
+		return fmt.Errorf("Nomad-based Vault unseal not yet implemented")
 	}
 
 	return nil
@@ -517,7 +363,7 @@ func getRootTokenFromInitFile(rc *eos_io.RuntimeContext) (string, error) {
 }
 
 func verifyVaultEnablement(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	
 	// Check auth methods
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -548,7 +394,7 @@ func verifyVaultEnablement(rc *eos_io.RuntimeContext) error {
 }
 
 func verifyVaultHardening(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_deployment"))
 	
 	// Check if swap is disabled
 	swapOutput, _ := execute.Run(rc.Ctx, execute.Options{

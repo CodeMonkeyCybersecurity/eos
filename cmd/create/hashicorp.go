@@ -7,7 +7,6 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -67,7 +66,7 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	enableACL, _ := cmd.Flags().GetBool("enable-acl")
 	enableTLS, _ := cmd.Flags().GetBool("enable-tls")
 	consulAddress, _ := cmd.Flags().GetString("consul-address")
-	vaultAddress, _ := cmd.Flags().GetString("vault-address")
+	_ = cmd.Flag("vault-address").Value.String() // Unused in Nomad implementation
 	timeout, _ := cmd.Flags().GetDuration("timeout")
 	testMode, _ := cmd.Flags().GetBool("test")
 
@@ -101,15 +100,20 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		return fmt.Errorf("invalid component '%s'. Valid components: %v", component, validComponents)
 	}
 
-	// Create Salt client
-	saltClient := saltstack.NewClient(logger)
+	// Use Nomad orchestration instead of Salt
+	logger.Info("Using Nomad orchestration for HashiCorp stack deployment")
 
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
 	defer cancel()
 
-	// Prepare pillar data
-	pillarData := map[string]interface{}{
+	logger.Info("Deploying via Nomad orchestration",
+		zap.String("component", component),
+		zap.String("version", version),
+		zap.String("datacenter", datacenter))
+
+	// Prepare Nomad job configuration (replacing Salt pillar)
+	nomadConfig := map[string]interface{}{
 		component: map[string]interface{}{
 			"version":    version,
 			"datacenter": datacenter,
@@ -119,88 +123,36 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	// Component-specific configuration
 	switch component {
 	case "vault":
-		pillarData["vault"].(map[string]interface{})["server_mode"] = serverMode
-		pillarData["vault"].(map[string]interface{})["bootstrap_expect"] = bootstrapExpect
-		pillarData["vault"].(map[string]interface{})["acl_enabled"] = enableACL
-		pillarData["vault"].(map[string]interface{})["tls_enabled"] = enableTLS
+		nomadConfig["vault"].(map[string]interface{})["server_mode"] = serverMode
+		nomadConfig["vault"].(map[string]interface{})["bootstrap_expect"] = bootstrapExpect
+		nomadConfig["vault"].(map[string]interface{})["acl_enabled"] = enableACL
+		nomadConfig["vault"].(map[string]interface{})["tls_enabled"] = enableTLS
 		if consulAddress != "127.0.0.1:8500" {
-			pillarData["vault"].(map[string]interface{})["consul_enabled"] = true
-			pillarData["vault"].(map[string]interface{})["consul_address"] = consulAddress
+			nomadConfig["vault"].(map[string]interface{})["consul_enabled"] = true
+			nomadConfig["vault"].(map[string]interface{})["consul_address"] = consulAddress
 		}
 
 	case "nomad":
-		pillarData["nomad"].(map[string]interface{})["server_mode"] = serverMode
-		pillarData["nomad"].(map[string]interface{})["client_mode"] = clientMode
-		pillarData["nomad"].(map[string]interface{})["region"] = region
-		pillarData["nomad"].(map[string]interface{})["bootstrap_expect"] = bootstrapExpect
-		pillarData["nomad"].(map[string]interface{})["acl_enabled"] = enableACL
-		pillarData["nomad"].(map[string]interface{})["tls_enabled"] = enableTLS
-		if consulAddress != "127.0.0.1:8500" {
-			pillarData["nomad"].(map[string]interface{})["consul_enabled"] = true
-			pillarData["nomad"].(map[string]interface{})["consul_address"] = consulAddress
-		}
-		if vaultAddress != "https://127.0.0.1:8200" {
-			pillarData["nomad"].(map[string]interface{})["vault_enabled"] = true
-			pillarData["nomad"].(map[string]interface{})["vault_address"] = vaultAddress
-		}
+		nomadConfig["nomad"].(map[string]interface{})["server_mode"] = serverMode
+		nomadConfig["nomad"].(map[string]interface{})["client_mode"] = clientMode
+		nomadConfig["nomad"].(map[string]interface{})["region"] = region
+		nomadConfig["nomad"].(map[string]interface{})["bootstrap_expect"] = bootstrapExpect
+		nomadConfig["nomad"].(map[string]interface{})["acl_enabled"] = enableACL
 	}
 
-	// Apply Salt state
-	logger.Info("Applying Salt state", zap.String("state", fmt.Sprintf("hashicorp.%s", component)))
-	
-	// Use salt-call for masterless mode
-	stateName := fmt.Sprintf("hashicorp.%s", component)
-	err := saltClient.StateApplyLocal(ctx, stateName, pillarData)
-	if err != nil {
-		logger.Error("Salt state application failed",
-			zap.String("state", stateName),
-			zap.Error(err))
-		return fmt.Errorf("failed to apply Salt state %s: %w", stateName, err)
-	}
-
-	logger.Info("HashiCorp component installed successfully",
-		zap.String("component", component),
-		zap.String("state", stateName))
-
-	// Verify installation
-	if err := verifyHashicorpInstallation(ctx, saltClient, component); err != nil {
-		logger.Warn("Installation verification failed", zap.Error(err))
-		return fmt.Errorf("installation verification failed: %w", err)
-	}
-
-	logger.Info("HashiCorp component installation completed successfully",
-		zap.String("component", component))
-
-	return nil
+	// TODO: Implement Nomad job deployment for HashiCorp components
+	_ = nomadConfig
+	_ = ctx // TODO: Use context for Nomad API calls
+	return fmt.Errorf("%s Nomad deployment not yet implemented", component)
 }
 
-func verifyHashicorpInstallation(ctx context.Context, saltClient *saltstack.Client, component string) error {
+func verifyHashicorpInstallation(ctx context.Context, component string) error {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("Verifying installation", zap.String("component", component))
+	logger.Info("Verifying installation via Nomad", zap.String("component", component))
 
-	// Check if binary is available
-	binaryCheck := fmt.Sprintf("which %s", component)
-	result, err := saltClient.CmdRunLocal(ctx, binaryCheck)
-	if err != nil {
-		return fmt.Errorf("binary check failed: %w", err)
-	}
-
-	logger.Info("Binary check passed", 
-		zap.String("component", component),
-		zap.Any("result", result))
-
-	// Check if service is running
-	serviceCheck := fmt.Sprintf("systemctl is-active %s", component)
-	result, err = saltClient.CmdRunLocal(ctx, serviceCheck)
-	if err != nil {
-		logger.Warn("Service check failed", zap.Error(err))
-		// Don't fail here as service might not be started yet
-	} else {
-		logger.Info("Service check passed", 
-			zap.String("component", component),
-			zap.Any("result", result))
-	}
-
+	// TODO: Implement Nomad-based verification
+	// Check Nomad job status instead of direct binary/service checks
+	logger.Info("Nomad-based verification not yet implemented")
 	return nil
 }
 

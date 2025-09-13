@@ -16,10 +16,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// SecurityHardeningManager handles security configuration via SaltStack
+// SecurityHardeningManager handles security configuration via HashiCorp stack
+// Note: Security hardening requires administrator intervention
 type SecurityHardeningManager struct {
-	saltManager *SaltStackManager
-	vaultPath   string
+	hashiManager *HashiCorpManager
+	vaultPath    string
 }
 
 // SecurityProfile defines different security hardening levels
@@ -270,10 +271,10 @@ type SecurityChange struct {
 }
 
 // NewSecurityHardeningManager creates a new security hardening manager
-func NewSecurityHardeningManager(saltManager *SaltStackManager, vaultPath string) *SecurityHardeningManager {
+func NewSecurityHardeningManager(hashiManager *HashiCorpManager, vaultPath string) *SecurityHardeningManager {
 	return &SecurityHardeningManager{
-		saltManager: saltManager,
-		vaultPath:   vaultPath,
+		hashiManager: hashiManager,
+		vaultPath:    vaultPath,
 	}
 }
 
@@ -322,7 +323,10 @@ func (s *SecurityHardeningManager) AssessSecurityPosture(rc *eos_io.RuntimeConte
 		Timestamp:       time.Now(),
 	}
 
-	// Assess SSH configuration
+	// Security assessment requires administrator intervention for system-level access
+	logger.Warn("Security assessment requires administrator intervention", zap.String("target", target))
+
+	// Assess SSH security
 	if err := s.assessSSHSecurity(rc, target, assessment); err != nil {
 		return nil, cerr.Wrap(err, "SSH security assessment failed")
 	}
@@ -382,19 +386,11 @@ func (s *SecurityHardeningManager) SetupTwoFactorAuthentication(rc *eos_io.Runti
 		logger.Info("TOTP secret generated and stored", zap.String("user", user))
 	}
 
-	// Apply 2FA configuration via SaltStack
-	slsContent := s.generateTwoFactorSLS(config)
-	err := s.saltManager.client.StateApply(rc.Ctx, target, "two_factor_auth", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return cerr.Wrap(err, "failed to apply 2FA configuration")
-	}
+	// Two-factor authentication requires administrator intervention
+	logger.Warn("Two-factor authentication configuration requires administrator intervention - HashiCorp stack cannot modify system authentication",
+		zap.String("target", target))
 
-	// Configuration applied successfully
-
-	logger.Info("Two-factor authentication setup completed")
-	return nil
+	return fmt.Errorf("two-factor authentication configuration requires administrator intervention - HashiCorp stack cannot modify system authentication")
 }
 
 // SetupEmergencyAccess configures emergency access methods
@@ -470,42 +466,27 @@ func (s *SecurityHardeningManager) EvaluateSecurityHardening(rc *eos_io.RuntimeC
 // Helper methods for assessment
 
 func (s *SecurityHardeningManager) assessSSHSecurity(rc *eos_io.RuntimeContext, target string, assessment *SecurityAssessment) error {
-	// Query SSH configuration via Salt
-	result, err := s.saltManager.client.RunCommand(target, "grains", "ssh.check_key_present", []interface{}{"/etc/ssh/sshd_config"}, nil)
-	if err != nil {
-		return err
-	}
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("SSH security assessment requires administrator intervention - HashiCorp stack cannot assess system SSH configuration",
+		zap.String("target", target))
 
-	// Analyze SSH configuration and add vulnerabilities/recommendations
-	_ = result // Process actual SSH config
-
-	return nil
+	return fmt.Errorf("SSH security assessment requires administrator intervention - HashiCorp stack cannot assess system SSH configuration")
 }
 
 func (s *SecurityHardeningManager) assessUserSecurity(rc *eos_io.RuntimeContext, target string, assessment *SecurityAssessment) error {
-	// Query user security configuration via Salt
-	result, err := s.saltManager.client.RunCommand(target, "grains", "shadow.info", []interface{}{"root"}, nil)
-	if err != nil {
-		return err
-	}
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("User security assessment requires administrator intervention - HashiCorp stack cannot assess system user security",
+		zap.String("target", target))
 
-	// Analyze user security and add findings
-	_ = result // Process user security state
-
-	return nil
+	return fmt.Errorf("user security assessment requires administrator intervention - HashiCorp stack cannot assess system user security")
 }
 
 func (s *SecurityHardeningManager) assessSystemSecurity(rc *eos_io.RuntimeContext, target string, assessment *SecurityAssessment) error {
-	// Query system security configuration via Salt
-	result, err := s.saltManager.client.RunCommand(target, "grains", "sysctl.show", []interface{}{}, nil)
-	if err != nil {
-		return err
-	}
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("System security assessment requires administrator intervention - HashiCorp stack cannot assess system security configuration",
+		zap.String("target", target))
 
-	// Analyze system security and add findings
-	_ = result // Process system security state
-
-	return nil
+	return fmt.Errorf("system security assessment requires administrator intervention - HashiCorp stack cannot assess system security configuration")
 }
 
 // Helper methods for intervention
@@ -513,6 +494,9 @@ func (s *SecurityHardeningManager) assessSystemSecurity(rc *eos_io.RuntimeContex
 func (s *SecurityHardeningManager) interventionApplySecurityMeasures(rc *eos_io.RuntimeContext, target string, config *SecurityConfiguration, assessment *SecurityAssessment) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Applying security hardening measures")
+
+	// SSH hardening requires administrator intervention
+	logger.Warn("SSH hardening requires administrator intervention", zap.String("target", target))
 
 	// Apply SSH hardening
 	if err := s.applySSHHardening(rc, target, &config.SSHConfig); err != nil {
@@ -524,10 +508,16 @@ func (s *SecurityHardeningManager) interventionApplySecurityMeasures(rc *eos_io.
 		return err
 	}
 
+	// System hardening requires administrator intervention
+	logger.Warn("System hardening requires administrator intervention", zap.String("target", target))
+
 	// Apply system security
 	if err := s.applySystemSecurity(rc, target, &config.SystemSecurity); err != nil {
 		return err
 	}
+
+	// Firewall configuration requires administrator intervention
+	logger.Warn("Firewall configuration requires administrator intervention", zap.String("target", target))
 
 	// Apply firewall configuration
 	if err := s.applyFirewallConfig(rc, target, &config.FirewallConfig); err != nil {
@@ -538,51 +528,35 @@ func (s *SecurityHardeningManager) interventionApplySecurityMeasures(rc *eos_io.
 }
 
 func (s *SecurityHardeningManager) applySSHHardening(rc *eos_io.RuntimeContext, target string, config *SSHSecurityConfig) error {
-	slsContent := s.generateSSHHardeningSLS(config)
-	err := s.saltManager.client.StateApply(rc.Ctx, target, "ssh_hardening", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return err
-	}
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("SSH hardening requires administrator intervention - HashiCorp stack cannot modify system SSH configuration",
+		zap.String("target", target))
 
-	return nil // SSH hardening configuration applied successfully
+	return fmt.Errorf("SSH hardening requires administrator intervention - HashiCorp stack cannot modify system SSH configuration")
 }
 
 func (s *SecurityHardeningManager) applyUserSecurity(rc *eos_io.RuntimeContext, target string, config *UserSecurityConfig) error {
-	slsContent := s.generateUserSecuritySLS(config)
-	err := s.saltManager.client.StateApply(rc.Ctx, target, "user_security", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return err
-	}
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("User security configuration requires administrator intervention - HashiCorp stack cannot modify system user security",
+		zap.String("target", target))
 
-	return nil // User security configuration applied successfully
+	return fmt.Errorf("user security configuration requires administrator intervention - HashiCorp stack cannot modify system user security")
 }
 
 func (s *SecurityHardeningManager) applySystemSecurity(rc *eos_io.RuntimeContext, target string, config *SystemSecurityConfig) error {
-	slsContent := s.generateSystemSecuritySLS(config)
-	err := s.saltManager.client.StateApply(rc.Ctx, target, "system_security", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return err
-	}
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("System security configuration requires administrator intervention - HashiCorp stack cannot modify system security settings",
+		zap.String("target", target))
 
-	return nil // System security configuration applied successfully
+	return fmt.Errorf("system security configuration requires administrator intervention - HashiCorp stack cannot modify system security settings")
 }
 
 func (s *SecurityHardeningManager) applyFirewallConfig(rc *eos_io.RuntimeContext, target string, config *FirewallConfig) error {
-	slsContent := s.generateFirewallSLS(config)
-	err := s.saltManager.client.StateApply(rc.Ctx, target, "firewall", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return err
-	}
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("Firewall configuration requires administrator intervention - HashiCorp stack cannot modify system firewall rules",
+		zap.String("target", target))
 
-	return nil // Firewall configuration applied successfully
+	return fmt.Errorf("firewall configuration requires administrator intervention - HashiCorp stack cannot modify system firewall rules")
 }
 
 // SLS generation methods
@@ -723,46 +697,16 @@ func (s *SecurityHardeningManager) generateTOTPSecret(rc *eos_io.RuntimeContext,
 }
 
 func (s *SecurityHardeningManager) configureDropbearSSH(rc *eos_io.RuntimeContext, target string, config *DropbearConfig) error {
-	slsContent := fmt.Sprintf(`
-dropbear_package:
-  pkg.installed:
-    - name: dropbear
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("Dropbear SSH configuration requires administrator intervention - HashiCorp stack cannot configure system SSH services",
+		zap.String("target", target))
 
-dropbear_config:
-  file.managed:
-    - name: /etc/default/dropbear
-    - contents: |
-        DROPBEAR_PORT=%d
-        DROPBEAR_EXTRA_ARGS="-w -g"
+	// SLS content generation removed - administrator escalation required
 
-dropbear_authorized_keys:
-  file.managed:
-    - name: /etc/dropbear/authorized_keys
-    - contents: |
-%s
-    - mode: 600
-
-dropbear_service:
-  service.running:
-    - name: dropbear
-    - enable: True
-    - watch:
-      - file: dropbear_config
-      - file: dropbear_authorized_keys
-`, config.Port, strings.Join(config.AuthorizedKeys, "\n        "))
-
-	err := s.saltManager.client.StateApply(rc.Ctx, target, "dropbear", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil // Dropbear configuration applied successfully
+	return fmt.Errorf("dropbear SSH configuration requires administrator intervention - HashiCorp stack cannot configure system SSH services")
 }
 
 func (s *SecurityHardeningManager) calculateComplianceScore(assessment *SecurityAssessment) float64 {
-	// Calculate compliance score based on vulnerabilities and recommendations
 	baseScore := 100.0
 
 	for _, vuln := range assessment.Vulnerabilities {
@@ -801,21 +745,12 @@ func (s *SecurityHardeningManager) determineRiskLevel(score float64) string {
 func (s *SecurityHardeningManager) verifyCriticalSecurity(rc *eos_io.RuntimeContext, target string, config *SecurityConfiguration) error {
 	// Verify critical security measures are in place
 
-	// Check SSH configuration
-	result, err := s.saltManager.client.RunCommand(target, "grains", "service.status", []interface{}{"ssh"}, nil)
-	if err != nil {
-		return cerr.Wrap(err, "failed to verify SSH service")
-	}
-	_ = result // Process result to verify SSH is running
+	// Security verification requires administrator intervention
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("Security verification requires administrator intervention - HashiCorp stack cannot verify system security services",
+		zap.String("target", target))
 
-	// Check firewall status
-	result, err = s.saltManager.client.RunCommand(target, "grains", "service.status", []interface{}{"ufw"}, nil)
-	if err != nil {
-		return cerr.Wrap(err, "failed to verify firewall service")
-	}
-	_ = result // Process result to verify firewall is active
-
-	return nil
+	return fmt.Errorf("security verification requires administrator intervention - HashiCorp stack cannot verify system security services")
 }
 
 func generateSecurityConfig(profile SecurityProfile) *SecurityConfiguration {

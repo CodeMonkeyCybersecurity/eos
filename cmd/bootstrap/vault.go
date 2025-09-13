@@ -29,7 +29,7 @@ func runBootstrapVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	logger.Info("Starting Vault bootstrap")
 
 	// Use the Salt-based Vault deployment for architectural consistency
-	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
+	if err := vault.OrchestrateVaultCreateViaNomad(rc); err != nil {
 		return err
 	}
 

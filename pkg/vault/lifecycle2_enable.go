@@ -24,13 +24,13 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	log.Info(" Starting Vault enablement flow")
 
 	// Check if Salt is available and use it if possible
-	if err := checkSaltAvailability(rc); err == nil {
-		log.Info("Salt is available, using Salt-based enablement")
+	if err := checkNomadAvailability(rc); err == nil {
+		log.Info("Nomad is available, using Nomad-based enablement")
 		return OrchestrateVaultEnableViaSalt(rc)
 	}
 
 	// Fall back to direct enablement
-	log.Info("Salt not available, using direct enablement")
+	log.Info("Nomad not available, using direct enablement")
 
 	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {

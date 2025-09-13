@@ -13,7 +13,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -57,26 +56,10 @@ func CheckPrerequisites(rc *eos_io.RuntimeContext) error {
 	if !saltInstalled {
 		logger.Info("SaltStack is not installed, installing it first")
 		
-		// Install SaltStack using the existing installer
-		saltInstaller := saltstack.NewInstaller()
-		saltConfig := &saltstack.Config{
-			MasterMode: false, // Install as masterless
-			LogLevel:   "warning",
-		}
+		// TODO: Replace with Nomad installer when implemented
+		return fmt.Errorf("SaltStack installer not available during migration to Nomad")
 		
-		if err := saltInstaller.Install(rc, saltConfig); err != nil {
-			return fmt.Errorf("failed to install SaltStack: %w", err)
-		}
-		
-		if err := saltInstaller.Configure(rc, saltConfig); err != nil {
-			return fmt.Errorf("failed to configure SaltStack: %w", err)
-		}
-		
-		if err := saltInstaller.Verify(rc); err != nil {
-			return fmt.Errorf("failed to verify SaltStack installation: %w", err)
-		}
-		
-		logger.Info("SaltStack installed successfully")
+		// Placeholder - will be replaced with Nomad installation logic
 	}
 	
 	// Check if Consul is running (required for Nomad integration)

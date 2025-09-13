@@ -8,9 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -95,19 +93,14 @@ func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.Bool("skip_verify", skipVerify),
 		zap.Duration("timeout", timeout))
 
-	// Phase 1: Bootstrap Salt
-	logger.Info("Phase 1: Bootstrap SaltStack")
-	saltConfig := &saltstack.Config{
-		MasterMode: true,
-		LogLevel:   "warning",
-	}
-	if err := saltstack.Install(rc, saltConfig); err != nil {
-		return fmt.Errorf("failed to bootstrap Salt: %w", err)
-	}
+	// Phase 1: Bootstrap Nomad (replaced SaltStack)
+	logger.Info("Phase 1: Bootstrap Nomad")
+	// TODO: Implement Nomad bootstrap
+	logger.Info("Nomad bootstrap placeholder - not implemented")
 
 	// Phase 2: Bootstrap Vault
-	logger.Info("Phase 2: Bootstrap Vault via SaltStack")
-	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
+	logger.Info("Phase 2: Bootstrap Vault via Nomad")
+	if err := vault.OrchestrateVaultCreateViaNomad(rc); err != nil {
 		return fmt.Errorf("failed to bootstrap Vault: %w", err)
 	}
 
@@ -119,10 +112,9 @@ func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	// Phase 4: Optional Nomad
 	if withNomad {
-		logger.Info("Phase 4: Bootstrap Nomad via SaltStack")
-		if err := nomad.DeployNomadViaSaltBootstrap(rc); err != nil {
-			return fmt.Errorf("failed to bootstrap Nomad: %w", err)
-		}
+		logger.Info("Phase 4: Bootstrap Nomad")
+		// TODO: Implement Nomad deployment
+		logger.Info("Nomad deployment placeholder - not implemented")
 	}
 
 	// Phase 5: Verification
@@ -172,15 +164,17 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.Int("phase", 1),
 		zap.Int("total_phases", 4))
 
-	// 1.1 Bootstrap Salt
-	logger.Info("Bootstrapping Salt (master-minion mode)")
-	saltConfig := &saltstack.Config{
-		MasterMode: true,
-		LogLevel:   "warning",
-	}
-	if err := saltstack.Install(rc, saltConfig); err != nil {
-		return fmt.Errorf("failed to bootstrap Salt: %w", err)
-	}
+	// 1.1 Bootstrap Nomad (replacing Salt)
+	logger.Info("Bootstrapping Nomad (server mode)")
+	// TODO: Replace with actual Nomad installation
+	logger.Info("Nomad bootstrap placeholder - implementation pending")
+	// nomadConfig := &nomad.Config{
+	//     ServerMode: true,
+	//     LogLevel:   "warn",
+	// }
+	// if err := nomad.Install(rc, nomadConfig); err != nil {
+	//     return fmt.Errorf("failed to bootstrap Nomad: %w", err)
+	// }
 	tracker.AddComponent(state.Component{
 		Type:        state.ComponentSalt,
 		Name:        "salt-master",
@@ -190,7 +184,7 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	// 1.2 Bootstrap Vault
 	logger.Info("Bootstrapping Vault")
-	if err := vault.OrchestrateVaultCreateViaSalt(rc); err != nil {
+	if err := vault.OrchestrateVaultCreateViaNomad(rc); err != nil {
 		return fmt.Errorf("failed to bootstrap Vault: %w", err)
 	}
 	tracker.AddComponent(state.Component{

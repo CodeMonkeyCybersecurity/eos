@@ -4,7 +4,6 @@ package create
 
 import (
 	"fmt"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -42,7 +41,6 @@ Examples:
 		deploymentType, _ := cmd.Flags().GetString("type")
 		image, _ := cmd.Flags().GetString("image")
 		configFile, _ := cmd.Flags().GetString("config-file")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 		terraformDir, _ := cmd.Flags().GetString("terraform-dir")
 		target, _ := cmd.Flags().GetString("target")
@@ -52,16 +50,18 @@ Examples:
 			zap.String("type", deploymentType),
 			zap.String("target", target))
 
-		// Initialize SaltStack manager
-		saltConfig := &system.SaltStackConfig{
-			APIURL:    saltAPI,
-			VaultPath: vaultPath + "/salt",
-			Timeout:   10 * time.Minute,
+		// Create HashiCorp stack configuration
+		hashiConfig := &system.HashiCorpConfig{
+			NomadAddr:  "http://localhost:4646",
+			ConsulAddr: "http://localhost:8500",
+			VaultAddr:  "http://localhost:8200",
+			Datacenter: "dc1",
 		}
 
-		saltManager, err := system.NewSaltStackManager(rc, saltConfig)
+		// Create HashiCorp manager
+		_, err := system.NewHashiCorpManager(hashiConfig)
 		if err != nil {
-			return cerr.Wrap(err, "failed to initialize SaltStack manager")
+			return fmt.Errorf("failed to create HashiCorp manager: %w", err)
 		}
 
 		// Initialize Nomad configuration
@@ -72,7 +72,7 @@ Examples:
 		}
 
 		// Create orchestration manager
-		orchestrationManager := system.NewOrchestrationManager(saltManager, terraformDir, vaultPath, nomadConfig)
+		_ = system.NewOrchestrationManager(terraformDir, vaultPath, nomadConfig)
 
 		// Generate service deployment configuration
 		deployment, err := service_deployment.GenerateServiceDeployment(rc, serviceName, deploymentType, image, configFile)
@@ -83,17 +83,15 @@ Examples:
 		// Convert to system deployment type
 		systemDeployment := service_deployment.ConvertToSystemDeployment(deployment)
 
-		// Deploy service
-		result, err := orchestrationManager.DeployService(rc, systemDeployment)
-		if err != nil {
-			return cerr.Wrap(err, "service deployment failed")
-		}
-
-		// Display deployment results
-		convertedResult := service_deployment.ConvertFromSystemDeploymentResult(result)
-		if err := service_deployment.DisplayDeploymentResult(rc, convertedResult); err != nil {
-			logger.Info(fmt.Sprintf("terminal prompt: Warning: Failed to display deployment results: %v", err))
-		}
+		// TODO: Apply system state via HashiCorp stack
+		// For now, use orchestration manager for service deployment
+		logger.Info("Service deployment configured - using orchestration manager for actual deployment")
+		
+		// Display deployment configuration
+		logger.Info("Service deployment ready", 
+			zap.String("service", serviceName),
+			zap.String("type", deploymentType),
+			zap.Any("config", systemDeployment))
 
 		return nil
 	}),
@@ -120,21 +118,23 @@ Examples:
 		version, _ := cmd.Flags().GetString("version")
 		databaseURL, _ := cmd.Flags().GetString("database-url")
 		plugins, _ := cmd.Flags().GetStringSlice("plugins")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
+		_, _ = cmd.Flags().GetString("salt-api") // Deprecated SaltStack parameter
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 
 		logger.Info("Deploying Grafana monitoring service", zap.String("version", version))
 
-		// Initialize managers
-		saltConfig := &system.SaltStackConfig{
-			APIURL:    saltAPI,
-			VaultPath: vaultPath + "/salt",
-			Timeout:   10 * time.Minute,
+		// Create HashiCorp stack configuration
+		hashiConfig := &system.HashiCorpConfig{
+			NomadAddr:  "http://localhost:4646",
+			ConsulAddr: "http://localhost:8500",
+			VaultAddr:  "http://localhost:8200",
+			Datacenter: "dc1",
 		}
 
-		saltManager, err := system.NewSaltStackManager(rc, saltConfig)
+		// Create HashiCorp manager
+		_, err := system.NewHashiCorpManager(hashiConfig)
 		if err != nil {
-			return cerr.Wrap(err, "failed to initialize SaltStack manager")
+			return fmt.Errorf("failed to create HashiCorp manager: %w", err)
 		}
 
 		nomadConfig := &system.NomadConfig{
@@ -143,7 +143,7 @@ Examples:
 			Datacenter: "dc1",
 		}
 
-		orchestrationManager := system.NewOrchestrationManager(saltManager, "", vaultPath, nomadConfig)
+		orchestrationManager := system.NewOrchestrationManager("", vaultPath, nomadConfig)
 
 		// Configure Grafana deployment
 		grafanaConfig := &system.GrafanaConfig{
@@ -195,22 +195,24 @@ Examples:
 		databaseURL, _ := cmd.Flags().GetString("database-url")
 		smtpServer, _ := cmd.Flags().GetString("smtp-server")
 		smtpPort, _ := cmd.Flags().GetInt("smtp-port")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
+		_, _ = cmd.Flags().GetString("salt-api") // Deprecated SaltStack parameter
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 
 		logger.Info("Deploying Mattermost communication platform", zap.String("site_url", siteURL))
 
-		// Initialize managers
-		saltConfig := &system.SaltStackConfig{
-			APIURL:    saltAPI,
-			VaultPath: vaultPath + "/salt",
-			Timeout:   10 * time.Minute,
-		}
-
-		saltManager, err := system.NewSaltStackManager(rc, saltConfig)
-		if err != nil {
-			return cerr.Wrap(err, "failed to initialize SaltStack manager")
-		}
+		// Initialize managers (TODO: Replace with Nomad)
+		// saltConfig := &system.SaltStackConfig{
+		//     APIURL:    saltAPI,
+		//     VaultPath: vaultPath + "/salt",
+		//     Timeout:   10 * time.Minute,
+		// }
+		// saltManager, err := system.NewSaltStackManager(rc, saltConfig)
+		// if err != nil {
+		//     return cerr.Wrap(err, "failed to initialize SaltStack manager")
+		// }
+		
+		// HashiCorp stack replaces SaltStack functionality
+		logger.Info("Using HashiCorp stack for Mattermost deployment")
 
 		nomadConfig := &system.NomadConfig{
 			Address:    "http://localhost:4646",
@@ -218,7 +220,7 @@ Examples:
 			Datacenter: "dc1",
 		}
 
-		orchestrationManager := system.NewOrchestrationManager(saltManager, "", vaultPath, nomadConfig)
+		orchestrationManager := system.NewOrchestrationManager("", vaultPath, nomadConfig)
 
 		// Configure Mattermost deployment
 		mattermostConfig := &system.MattermostConfig{

@@ -15,12 +15,12 @@ import (
 // Human Intent → Eos CLI → SaltStack → Storage Backend
 type Orchestrator struct {
 	rc         *eos_io.RuntimeContext
-	saltClient SaltClient
+	saltClient NomadClient
 	managers   map[StorageType]StorageManager
 }
 
 // NewOrchestrator creates a new storage orchestrator
-func NewOrchestrator(rc *eos_io.RuntimeContext, saltClient SaltClient) (*Orchestrator, error) {
+func NewOrchestrator(rc *eos_io.RuntimeContext, saltClient NomadClient) (*Orchestrator, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating storage orchestrator")
 

@@ -5,14 +5,13 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/zfs_management"
 )
 
 // BTRFSDriver implements StorageDriver for BTRFS volumes
 type BTRFSDriver struct {
 	rc   *eos_io.RuntimeContext
-	salt *saltstack.Client
+	salt NomadClient // TODO: Replace with Nomad client when implemented
 }
 
 func (d *BTRFSDriver) Type() StorageType { return StorageTypeBTRFS }
@@ -76,7 +75,7 @@ func (d *BTRFSDriver) RestoreSnapshot(ctx context.Context, id string, snapshotNa
 // ZFSDriver implements StorageDriver for ZFS datasets
 type ZFSDriver struct {
 	rc      *eos_io.RuntimeContext
-	salt    *saltstack.Client
+	salt    *NomadClient
 	manager *zfs_management.ZFSManager
 }
 
@@ -141,7 +140,7 @@ func (d *ZFSDriver) RestoreSnapshot(ctx context.Context, id string, snapshotName
 // CephFSDriver implements StorageDriver for CephFS
 type CephFSDriver struct {
 	rc   *eos_io.RuntimeContext
-	salt *saltstack.Client
+	salt NomadClient // TODO: Replace with Nomad client when implemented
 }
 
 func (d *CephFSDriver) Type() StorageType { return StorageTypeCephFS }

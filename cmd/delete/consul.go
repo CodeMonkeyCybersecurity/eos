@@ -9,15 +9,14 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	// TODO: Add Nomad client import when implemented
 )
 
 var DeleteConsulCmd = &cobra.Command{
@@ -82,75 +81,12 @@ type ConsulInstallationStatus struct {
 	UserExists     bool
 }
 
-func checkConsulInstallation(ctx context.Context, client *salt.Client, logger otelzap.LoggerWithCtx) (*ConsulInstallationStatus, error) {
-	cmd := salt.Command{
-		Client:   "local",
-		Target:   "*",
-		Function: "cmd.run",
-		Args: []string{`
-			if command -v consul >/dev/null 2>&1; then
-				echo "installed=true"
-				consul version | head -1
-			else
-				echo "installed=false"
-			fi
-			
-			if systemctl is-active consul.service >/dev/null 2>&1; then
-				echo "running=true"
-				consul members 2>/dev/null | wc -l
-			else
-				echo "running=false"
-			fi
-			
-			if [ -d /var/lib/consul ] && [ "$(ls -A /var/lib/consul)" ]; then
-				echo "has_data=true"
-				du -sh /var/lib/consul | cut -f1
-			fi
-			
-			if [ -d /etc/consul.d ]; then
-				echo "has_config=true"
-			fi
-			
-			if getent passwd consul >/dev/null 2>&1; then
-				echo "user_exists=true"
-			fi
-		`},
-		Kwargs: map[string]string{
-			"shell": "/bin/bash",
-		},
-	}
-
-	result, err := client.ExecuteCommand(ctx, cmd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check Consul installation: %w", err)
-	}
-
-	// Parse output and build status
-	status := &ConsulInstallationStatus{}
-	for _, output := range result.Raw {
-		if str, ok := output.(string); ok {
-			// Simple parsing for demonstration
-			// In production, you'd parse the structured output properly
-			if strings.Contains(str, "installed=true") {
-				status.Installed = true
-			}
-			if strings.Contains(str, "running=true") {
-				status.Running = true
-			}
-			if strings.Contains(str, "has_data=true") {
-				status.HasData = true
-			}
-			if strings.Contains(str, "has_config=true") {
-				status.HasConfig = true
-			}
-			if strings.Contains(str, "user_exists=true") {
-				status.UserExists = true
-			}
-			logger.Debug("Consul status output", zap.String("output", str))
-		}
-	}
-
-	return status, nil
+func checkConsulInstallation(ctx context.Context, logger otelzap.LoggerWithCtx) (*ConsulInstallationStatus, error) {
+	// TODO: Replace with Nomad-based consul status check
+	return &ConsulInstallationStatus{
+		Installed: false,
+		Version:   "unknown",
+	}, fmt.Errorf("nomad consul status check not implemented")
 }
 
 func displayRemovalPlan(logger otelzap.LoggerWithCtx, status *ConsulInstallationStatus, opts *ConsulDeleteOptions) {
@@ -168,17 +104,17 @@ func displayRemovalPlan(logger otelzap.LoggerWithCtx, status *ConsulInstallation
 
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Components to be removed:")
-	logger.Info("terminal prompt:   ✓ Consul service and binary")
+	logger.Info("terminal prompt:   Consul service and binary")
 	if !opts.KeepConfig {
-		logger.Info("terminal prompt:   ✓ Configuration files (/etc/consul.d)")
+		logger.Info("terminal prompt:   Configuration files (/etc/consul.d)")
 	}
 	if !opts.KeepData {
-		logger.Info("terminal prompt:   ✓ Data directory (/var/lib/consul)")
+		logger.Info("terminal prompt:   Data directory (/var/lib/consul)")
 	}
 	if !opts.KeepUser {
-		logger.Info("terminal prompt:   ✓ System user and group (consul)")
+		logger.Info("terminal prompt:   System user and group (consul)")
 	}
-	logger.Info("terminal prompt:   ✓ Log files (/var/log/consul)")
+	logger.Info("terminal prompt:   Log files (/var/log/consul)")
 }
 
 func confirmDeletion(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, opts *ConsulDeleteOptions) bool {
@@ -218,26 +154,10 @@ type ConsulDeleteOptions struct {
 	Timeout    int
 }
 
-func initializeSaltClient(logger otelzap.LoggerWithCtx) (*salt.Client, error) {
-	// Get underlying zap logger
-	baseLogger := logger.ZapLogger()
-	config := salt.ClientConfig{
-		BaseURL:            getDeleteConsulEnvOrDefault("SALT_API_URL", "https://localhost:8000"),
-		Username:           getDeleteConsulEnvOrDefault("SALT_API_USER", "eos-service"),
-		Password:           os.Getenv("SALT_API_PASSWORD"),
-		EAuth:              "pam",
-		Timeout:            10 * time.Minute,
-		MaxRetries:         3,
-		InsecureSkipVerify: getDeleteConsulEnvOrDefault("SALT_API_INSECURE", "false") == "true",
-		Logger:             baseLogger,
-	}
-
-	if config.Password == "" {
-		// Fall back to using salt-call directly if API is not configured
-		return nil, fmt.Errorf("Salt API not configured")
-	}
-
-	return salt.NewClient(config)
+// TODO: Replace with Nomad client initialization
+func initializeNomadClient(logger otelzap.LoggerWithCtx) (interface{}, error) {
+	// Placeholder for Nomad client initialization
+	return nil, fmt.Errorf("Nomad client not implemented yet")
 }
 
 func getDeleteConsulEnvOrDefault(key, defaultValue string) string {
@@ -271,17 +191,18 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.Bool("keep_user", opts.KeepUser),
 		zap.Int("timeout", opts.Timeout))
 
-	// Try to initialize Salt API client
-	saltClient, err := initializeSaltClient(logger)
+	// TODO: Initialize Nomad client when implemented
+	nomadClient, err := initializeNomadClient(logger)
 	if err != nil {
-		logger.Info("Salt API not configured, falling back to local salt-call execution")
-		// Fall back to the original implementation using salt-call
+		logger.Info("Nomad client not configured, falling back to local execution")
+		// Fall back to the original implementation
 		return runDeleteConsulFallback(rc, cmd, args)
 	}
 
 	// ASSESS - Check current status
 	logger.Info("Checking current Consul installation")
-	status, err := checkConsulInstallation(rc.Ctx, saltClient, logger)
+	status, err := checkConsulInstallation(rc.Ctx, logger)
+	_ = nomadClient // Suppress unused variable warning
 	if err != nil {
 		logger.Debug("Error checking status", zap.Error(err))
 		status = &ConsulInstallationStatus{} // Use empty status
@@ -319,43 +240,23 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Starting Consul removal...")
 	
-	progressStarted := false
-	result, err := saltClient.ExecuteStateApply(rc.Ctx, "hashicorp.consul_remove", pillar,
-		func(progress salt.StateProgress) {
-			if !progressStarted {
-				progressStarted = true
-			}
-			
-			if progress.Completed {
-				status := "✓"
-				if !progress.Success {
-					status = "✗"
-				}
-				logger.Info(fmt.Sprintf("terminal prompt: %s %s - %s", status, progress.State, progress.Message))
-			} else {
-				logger.Info(fmt.Sprintf("terminal prompt: ... %s", progress.Message))
-			}
-		})
+	// TODO: Replace with Nomad orchestration when implemented
+	logger.Info("terminal prompt: Nomad orchestration not implemented yet")
+	_ = pillar // Suppress unused variable warning
 
+	// TODO: Implement actual removal logic with Nomad
+	err = fmt.Errorf("Consul removal not implemented with Nomad yet")
 	if err != nil {
 		return fmt.Errorf("removal failed: %w", err)
 	}
 
-	if result.Failed {
-		logger.Error("Consul removal had errors",
-			zap.Strings("errors", result.Errors))
-		logger.Info("terminal prompt: ⚠️  Consul removal completed with errors:")
-		for _, err := range result.Errors {
-			logger.Info(fmt.Sprintf("terminal prompt:   - %s", err))
-		}
-	} else {
-		logger.Info("terminal prompt: ✅ Consul successfully removed!")
-	}
+	// TODO: Add result handling when Nomad orchestration is implemented
+	logger.Info("terminal prompt: ✅ Consul removal placeholder completed")
 
 	// EVALUATE - Show what was preserved
 	if opts.KeepData || opts.KeepConfig || opts.KeepUser {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: Preserved components:")
+		logger.Info("terminal prompt: Preserved items:")
 		if opts.KeepData {
 			logger.Info("terminal prompt:   - Data directory: /var/lib/consul")
 		}

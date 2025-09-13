@@ -1,4 +1,4 @@
-// Package users provides user management operations following the AIE pattern
+// Package users provides user management operations using HashiCorp stack
 package users
 
 import (
@@ -6,83 +6,94 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/patterns"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// UserExistenceCheck implements AIE pattern for checking user existence
-type UserExistenceCheck struct {
-	Username   string
-	Target     string
-	SaltClient saltstack.ClientInterface
-	Logger     otelzap.LoggerWithCtx
+// HashiCorpUserManager handles user operations via HashiCorp stack
+// Note: System-level user management requires escalation to administrator
+type HashiCorpUserManager struct {
+	VaultClient VaultClient
+	Logger      *zap.Logger
 }
 
-// Assess checks if we can verify user existence
+// NewHashiCorpUserManager creates a new HashiCorp-based user manager
+func NewHashiCorpUserManager(vaultClient VaultClient, logger *zap.Logger) *HashiCorpUserManager {
+	return &HashiCorpUserManager{
+		VaultClient: vaultClient,
+		Logger:      logger,
+	}
+}
+
+// NewUserCreationOperation creates a new user creation operation
+func NewUserCreationOperation(username, target string, manager *HashiCorpUserManager, logger *zap.Logger) *UserCreationOperation {
+	return &UserCreationOperation{
+		Username: username,
+		Target:   target,
+		Manager:  manager,
+		Logger:   logger,
+	}
+}
+
+// UserExistenceCheck implements AIE pattern for checking user existence via HashiCorp stack
+type UserExistenceCheck struct {
+	Username string
+	Target   string
+	Manager  *HashiCorpUserManager
+	Logger   *zap.Logger
+}
+
+// Assess checks if we can verify user existence (requires escalation)
 func (u *UserExistenceCheck) Assess(ctx context.Context) (*patterns.AssessmentResult, error) {
 	u.Logger.Info("Assessing user existence check capability",
 		zap.String("username", u.Username),
 		zap.String("target", u.Target))
 
-	// Check Salt connectivity
-	connected, err := u.SaltClient.TestPing(ctx, u.Target)
-	if err != nil || !connected {
-		return &patterns.AssessmentResult{
-			CanProceed: false,
-			Reason:     "cannot connect to target via Salt",
-		}, nil
-	}
-
+	// User management requires system-level access - escalate to administrator
 	return &patterns.AssessmentResult{
-		CanProceed: true,
+		CanProceed: false,
+		Reason:     "user management requires administrator intervention - HashiCorp stack cannot manage system users",
 		Prerequisites: map[string]bool{
-			"salt_connected":   true,
-			"target_reachable": true,
+			"requires_escalation": true,
+			"system_level_access": false,
 		},
 	}, nil
 }
 
-// Intervene checks for user existence
+// Intervene escalates user existence check to administrator
 func (u *UserExistenceCheck) Intervene(ctx context.Context, assessment *patterns.AssessmentResult) (*patterns.InterventionResult, error) {
-	u.Logger.Info("Checking user existence",
-		zap.String("username", u.Username))
-
-	output, err := u.SaltClient.CmdRun(ctx, u.Target, fmt.Sprintf("id %s", u.Username))
-	userExists := err == nil && !strings.Contains(output, "no such user")
+	u.Logger.Warn("User existence check requires administrator intervention",
+		zap.String("username", u.Username),
+		zap.String("target", u.Target))
 
 	return &patterns.InterventionResult{
-		Success: true,
-		Message: "user existence check completed",
+		Success: false,
+		Message: "user existence check requires manual administrator intervention",
 		Changes: []patterns.Change{
 			{
-				Type:        "user_check",
-				Description: fmt.Sprintf("Checked existence of user %s", u.Username),
-				After:       userExists,
+				Type:        "escalation_required",
+				Description: fmt.Sprintf("User existence check for %s requires administrator access", u.Username),
 			},
 		},
-		RollbackData: userExists,
-	}, nil
+	}, fmt.Errorf("user management requires administrator intervention")
 }
 
-// Evaluate verifies the check was successful
+// Evaluate indicates escalation is required
 func (u *UserExistenceCheck) Evaluate(ctx context.Context, intervention *patterns.InterventionResult) (*patterns.EvaluationResult, error) {
 	return &patterns.EvaluationResult{
-		Success: true,
-		Message: "user existence check validated",
+		Success: false,
+		Message: "user existence check requires administrator intervention",
 		Validations: map[string]patterns.ValidationResult{
-			"check_completed": {
-				Passed:  true,
-				Message: "existence check completed successfully",
+			"escalation_required": {
+				Passed:  false,
+				Message: "system-level user management requires manual intervention",
 			},
 		},
 	}, nil
 }
 
-// UserCreationOperation implements AIE pattern for user creation
+// UserCreationOperation implements AIE pattern for user creation via HashiCorp stack
 type UserCreationOperation struct {
 	Username    string
 	Password    string
@@ -90,104 +101,65 @@ type UserCreationOperation struct {
 	Shell       string
 	HomeDir     string
 	Target      string
-	SaltClient  saltstack.ClientInterface
+	Manager     *HashiCorpUserManager
 	VaultClient VaultClient
-	Logger      otelzap.LoggerWithCtx
+	Logger      *zap.Logger
 }
 
-// Assess checks if user can be created
+// Assess checks if user can be created (requires escalation)
 func (u *UserCreationOperation) Assess(ctx context.Context) (*patterns.AssessmentResult, error) {
 	u.Logger.Info("Assessing user creation readiness",
 		zap.String("username", u.Username),
 		zap.String("target", u.Target))
 
-	prerequisites := make(map[string]bool)
-
-	// Check user doesn't already exist
-	existCheck := &UserExistenceCheck{
-		Username:   u.Username,
-		Target:     u.Target,
-		SaltClient: u.SaltClient,
-		Logger:     u.Logger,
-	}
-
-	executor := patterns.NewExecutor(u.Logger)
-	err := executor.Execute(ctx, existCheck, "user_existence_precheck")
-	if err != nil {
-		return &patterns.AssessmentResult{
-			CanProceed: false,
-			Reason:     "failed to check user existence",
-		}, err
-	}
-
-	// Check groups exist
-	for _, group := range u.Groups {
-		output, err := u.SaltClient.CmdRun(ctx, u.Target, fmt.Sprintf("getent group %s", group))
-		if err != nil || output == "" {
-			prerequisites[fmt.Sprintf("group_%s_exists", group)] = false
-			return &patterns.AssessmentResult{
-				CanProceed:    false,
-				Reason:        fmt.Sprintf("group %s does not exist", group),
-				Prerequisites: prerequisites,
-			}, nil
+	// Store user configuration in Vault for administrator reference
+	if u.VaultClient != nil {
+		vaultPath := fmt.Sprintf("secret/users/pending/%s", u.Username)
+		data := map[string]interface{}{
+			"username":    u.Username,
+			"groups":      u.Groups,
+			"shell":       u.Shell,
+			"home_dir":    u.HomeDir,
+			"target":      u.Target,
+			"status":      "pending_creation",
+			"requires":    "administrator_intervention",
 		}
-		prerequisites[fmt.Sprintf("group_%s_exists", group)] = true
-	}
 
-	// Validate shell exists
-	if u.Shell != "" {
-		output, err := u.SaltClient.CmdRun(ctx, u.Target, fmt.Sprintf("test -f %s && echo exists", u.Shell))
-		if err != nil || !strings.Contains(output, "exists") {
-			prerequisites["shell_exists"] = false
-			return &patterns.AssessmentResult{
-				CanProceed:    false,
-				Reason:        fmt.Sprintf("shell %s does not exist", u.Shell),
-				Prerequisites: prerequisites,
-			}, nil
+		if err := u.VaultClient.Write(vaultPath, data); err != nil {
+			u.Logger.Warn("Failed to store user configuration in Vault",
+				zap.String("username", u.Username),
+				zap.Error(err))
+		} else {
+			u.Logger.Info("User configuration stored in Vault for administrator reference",
+				zap.String("vault_path", vaultPath))
 		}
-		prerequisites["shell_exists"] = true
 	}
 
 	return &patterns.AssessmentResult{
-		CanProceed:    true,
-		Prerequisites: prerequisites,
+		CanProceed: false,
+		Reason:     "user creation requires administrator intervention - HashiCorp stack cannot create system users",
+		Prerequisites: map[string]bool{
+			"requires_escalation":   true,
+			"system_level_access":   false,
+			"config_stored_vault":   true,
+		},
 	}, nil
 }
 
-// Intervene creates the user
+// Intervene escalates user creation to administrator
 func (u *UserCreationOperation) Intervene(ctx context.Context, assessment *patterns.AssessmentResult) (*patterns.InterventionResult, error) {
-	u.Logger.Info("Creating user",
+	u.Logger.Warn("User creation requires administrator intervention",
 		zap.String("username", u.Username),
 		zap.String("target", u.Target))
 
-	// Apply user creation state via Salt
-	pillar := map[string]interface{}{
-		"users": map[string]interface{}{
-			u.Username: map[string]interface{}{
-				"password":   u.Password,
-				"groups":     u.Groups,
-				"shell":      u.Shell,
-				"home":       u.HomeDir,
-				"createhome": true,
-			},
-		},
-	}
-
-	err := u.SaltClient.StateApply(ctx, u.Target, "users.create", pillar)
-	if err != nil {
-		return &patterns.InterventionResult{
-			Success: false,
-			Message: fmt.Sprintf("failed to create user: %v", err),
-		}, err
-	}
-
-	// Store password in Vault
-	if u.VaultClient != nil {
-		vaultPath := fmt.Sprintf("secret/users/%s", u.Username)
+	// Store password securely in Vault for administrator use
+	if u.VaultClient != nil && u.Password != "" {
+		vaultPath := fmt.Sprintf("secret/users/credentials/%s", u.Username)
 		data := map[string]interface{}{
 			"password": u.Password,
-			"created":  "true",
+			"created":  "pending",
 			"target":   u.Target,
+			"status":   "awaiting_admin_creation",
 		}
 
 		if err := u.VaultClient.Write(vaultPath, data); err != nil {
@@ -198,78 +170,28 @@ func (u *UserCreationOperation) Intervene(ctx context.Context, assessment *patte
 	}
 
 	return &patterns.InterventionResult{
-		Success: true,
-		Message: "user created successfully",
+		Success: false,
+		Message: "user creation requires manual administrator intervention",
 		Changes: []patterns.Change{
 			{
-				Type:        "user_creation",
-				Description: fmt.Sprintf("Created user %s on %s", u.Username, u.Target),
+				Type:        "escalation_required",
+				Description: fmt.Sprintf("User creation for %s requires administrator access", u.Username),
 			},
 		},
-	}, nil
+	}, fmt.Errorf("user creation requires administrator intervention")
 }
 
-// Evaluate verifies user was created successfully
+// Evaluate indicates escalation is required
 func (u *UserCreationOperation) Evaluate(ctx context.Context, intervention *patterns.InterventionResult) (*patterns.EvaluationResult, error) {
-	if !intervention.Success {
-		return &patterns.EvaluationResult{
-			Success: false,
-			Message: "user creation failed",
-		}, nil
-	}
-
-	validations := make(map[string]patterns.ValidationResult)
-
-	// Verify user exists
-	output, err := u.SaltClient.CmdRun(ctx, u.Target, fmt.Sprintf("id %s", u.Username))
-	if err != nil || strings.Contains(output, "no such user") {
-		validations["user_exists"] = patterns.ValidationResult{
-			Passed:  false,
-			Message: "user not found after creation",
-		}
-		return &patterns.EvaluationResult{
-			Success:       false,
-			Message:       "user creation validation failed",
-			Validations:   validations,
-			NeedsRollback: true,
-		}, nil
-	}
-	validations["user_exists"] = patterns.ValidationResult{
-		Passed:  true,
-		Message: "user exists",
-		Details: output,
-	}
-
-	// Verify groups
-	for _, group := range u.Groups {
-		groupCheck, _ := u.SaltClient.CmdRun(ctx, u.Target,
-			fmt.Sprintf("groups %s | grep -q %s && echo yes || echo no", u.Username, group))
-		if strings.TrimSpace(groupCheck) == "yes" {
-			validations[fmt.Sprintf("group_%s", group)] = patterns.ValidationResult{
-				Passed:  true,
-				Message: fmt.Sprintf("user is member of group %s", group),
-			}
-		} else {
-			validations[fmt.Sprintf("group_%s", group)] = patterns.ValidationResult{
-				Passed:  false,
-				Message: fmt.Sprintf("user is not member of group %s", group),
-			}
-		}
-	}
-
-	// Check if all validations passed
-	allPassed := true
-	for _, v := range validations {
-		if !v.Passed {
-			allPassed = false
-			break
-		}
-	}
-
 	return &patterns.EvaluationResult{
-		Success:     allPassed,
-		Message:     "user creation validated",
-		Validations: validations,
+		Success: false,
+		Message: "user creation requires administrator intervention",
+		Validations: map[string]patterns.ValidationResult{
+			"escalation_required": {
+				Passed:  false,
+				Message: "system-level user creation requires manual intervention",
+			},
+		},
 	}, nil
 }
 
@@ -294,247 +216,141 @@ func GenerateSecurePassword(length int) (string, error) {
 	return password, nil
 }
 
-// GetSystemUsers retrieves system users via Salt
-func GetSystemUsers(ctx context.Context, saltClient saltstack.ClientInterface, target string, logger otelzap.LoggerWithCtx) ([]string, error) {
-	logger.Info("Getting system users",
+// GetSystemUsers indicates that system user retrieval requires escalation
+func GetSystemUsers(ctx context.Context, manager *HashiCorpUserManager, target string, logger *zap.Logger) ([]string, error) {
+	logger.Warn("System user retrieval requires administrator intervention",
 		zap.String("target", target))
 
-	output, err := saltClient.CmdRun(ctx, target,
-		"getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 { print $1 }'")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get users: %w", err)
-	}
-
-	users := strings.Split(strings.TrimSpace(output), "\n")
-	var nonEmpty []string
-	for _, user := range users {
-		if user != "" {
-			nonEmpty = append(nonEmpty, user)
-		}
-	}
-
-	return nonEmpty, nil
+	return nil, fmt.Errorf("system user retrieval requires administrator intervention - HashiCorp stack cannot access system user database")
 }
 
-// PasswordUpdateOperation implements AIE pattern for password updates
+// PasswordUpdateOperation implements AIE pattern for password updates via HashiCorp stack
 type PasswordUpdateOperation struct {
 	Username    string
 	NewPassword string
 	Target      string
-	SaltClient  saltstack.ClientInterface
+	Manager     *HashiCorpUserManager
 	VaultClient VaultClient
-	Logger      otelzap.LoggerWithCtx
+	Logger      *zap.Logger
 }
 
-// Assess checks if password can be updated
+// Assess checks if password can be updated (requires escalation)
 func (p *PasswordUpdateOperation) Assess(ctx context.Context) (*patterns.AssessmentResult, error) {
-	// Check user exists
-	existCheck := &UserExistenceCheck{
-		Username:   p.Username,
-		Target:     p.Target,
-		SaltClient: p.SaltClient,
-		Logger:     p.Logger,
-	}
+	p.Logger.Info("Assessing password update capability",
+		zap.String("username", p.Username),
+		zap.String("target", p.Target))
 
-	executor := patterns.NewExecutor(p.Logger)
-	if err := executor.Execute(ctx, existCheck, "user_existence_check"); err != nil {
-		return &patterns.AssessmentResult{
-			CanProceed: false,
-			Reason:     "user does not exist",
-		}, nil
-	}
-
-	return &patterns.AssessmentResult{
-		CanProceed: true,
-		Prerequisites: map[string]bool{
-			"user_exists": true,
-		},
-	}, nil
-}
-
-// Intervene updates the password
-func (p *PasswordUpdateOperation) Intervene(ctx context.Context, assessment *patterns.AssessmentResult) (*patterns.InterventionResult, error) {
-	p.Logger.Info("Updating user password",
-		zap.String("username", p.Username))
-
-	// Use chpasswd via Salt
-	cmd := fmt.Sprintf("echo '%s:%s' | chpasswd", p.Username, p.NewPassword)
-	_, err := p.SaltClient.CmdRun(ctx, p.Target, cmd)
-	if err != nil {
-		return &patterns.InterventionResult{
-			Success: false,
-			Message: fmt.Sprintf("failed to update password: %v", err),
-		}, err
-	}
-
-	// Update password in Vault
+	// Store new password in Vault for administrator reference
 	if p.VaultClient != nil {
-		vaultPath := fmt.Sprintf("secret/users/%s", p.Username)
+		vaultPath := fmt.Sprintf("secret/users/password_updates/%s", p.Username)
 		data := map[string]interface{}{
-			"password": p.NewPassword,
-			"updated":  "true",
-			"target":   p.Target,
+			"new_password": p.NewPassword,
+			"target":       p.Target,
+			"status":       "pending_update",
+			"requires":     "administrator_intervention",
 		}
 
 		if err := p.VaultClient.Write(vaultPath, data); err != nil {
-			p.Logger.Warn("Failed to update password in Vault",
+			p.Logger.Warn("Failed to store password update in Vault",
 				zap.String("username", p.Username),
 				zap.Error(err))
 		}
 	}
 
+	return &patterns.AssessmentResult{
+		CanProceed: false,
+		Reason:     "password update requires administrator intervention - HashiCorp stack cannot modify system passwords",
+		Prerequisites: map[string]bool{
+			"requires_escalation": true,
+			"system_level_access": false,
+		},
+	}, nil
+}
+
+// Intervene escalates password update to administrator
+func (p *PasswordUpdateOperation) Intervene(ctx context.Context, assessment *patterns.AssessmentResult) (*patterns.InterventionResult, error) {
+	p.Logger.Warn("Password update requires administrator intervention",
+		zap.String("username", p.Username))
+
 	return &patterns.InterventionResult{
-		Success: true,
-		Message: "password updated successfully",
+		Success: false,
+		Message: "password update requires manual administrator intervention",
 		Changes: []patterns.Change{
 			{
-				Type:        "password_update",
-				Description: fmt.Sprintf("Updated password for user %s", p.Username),
+				Type:        "escalation_required",
+				Description: fmt.Sprintf("Password update for %s requires administrator access", p.Username),
 			},
 		},
-	}, nil
+	}, fmt.Errorf("password update requires administrator intervention")
 }
 
-// Evaluate verifies password was updated
+// Evaluate indicates escalation is required
 func (p *PasswordUpdateOperation) Evaluate(ctx context.Context, intervention *patterns.InterventionResult) (*patterns.EvaluationResult, error) {
-	// Password changes are difficult to verify directly
-	// We assume success if the command didn't error
 	return &patterns.EvaluationResult{
-		Success: intervention.Success,
-		Message: "password update assumed successful",
+		Success: false,
+		Message: "password update requires administrator intervention",
 		Validations: map[string]patterns.ValidationResult{
-			"password_changed": {
-				Passed:  true,
-				Message: "password change command completed",
+			"escalation_required": {
+				Passed:  false,
+				Message: "system-level password management requires manual intervention",
 			},
 		},
 	}, nil
 }
 
-// UserDeletionOperation implements AIE pattern for user deletion
+// UserDeletionOperation implements AIE pattern for user deletion via HashiCorp stack
 type UserDeletionOperation struct {
 	Username   string
 	RemoveHome bool
 	Target     string
-	SaltClient saltstack.ClientInterface
-	Logger     otelzap.LoggerWithCtx
+	Manager    *HashiCorpUserManager
+	Logger     *zap.Logger
 }
 
-// Assess checks if user can be deleted
+// Assess checks if user can be deleted (requires escalation)
 func (d *UserDeletionOperation) Assess(ctx context.Context) (*patterns.AssessmentResult, error) {
-	// Check user exists
-	existCheck := &UserExistenceCheck{
-		Username:   d.Username,
-		Target:     d.Target,
-		SaltClient: d.SaltClient,
-		Logger:     d.Logger,
-	}
-
-	executor := patterns.NewExecutor(d.Logger)
-	if err := executor.Execute(ctx, existCheck, "user_existence_check"); err != nil {
-		return &patterns.AssessmentResult{
-			CanProceed: false,
-			Reason:     "user does not exist",
-		}, nil
-	}
-
-	// Check if user has active processes
-	output, _ := d.SaltClient.CmdRun(ctx, d.Target, fmt.Sprintf("ps -u %s | wc -l", d.Username))
-	if strings.TrimSpace(output) != "1" && strings.TrimSpace(output) != "0" {
-		return &patterns.AssessmentResult{
-			CanProceed: false,
-			Reason:     "user has active processes",
-		}, nil
-	}
+	d.Logger.Info("Assessing user deletion capability",
+		zap.String("username", d.Username),
+		zap.String("target", d.Target))
 
 	return &patterns.AssessmentResult{
-		CanProceed: true,
+		CanProceed: false,
+		Reason:     "user deletion requires administrator intervention - HashiCorp stack cannot delete system users",
 		Prerequisites: map[string]bool{
-			"user_exists":     true,
-			"no_active_procs": true,
+			"requires_escalation": true,
+			"system_level_access": false,
 		},
 	}, nil
 }
 
-// Intervene deletes the user
+// Intervene escalates user deletion to administrator
 func (d *UserDeletionOperation) Intervene(ctx context.Context, assessment *patterns.AssessmentResult) (*patterns.InterventionResult, error) {
-	d.Logger.Info("Deleting user",
+	d.Logger.Warn("User deletion requires administrator intervention",
 		zap.String("username", d.Username),
 		zap.Bool("remove_home", d.RemoveHome))
 
-	// Kill any remaining processes
-	_, _ = d.SaltClient.CmdRun(ctx, d.Target, fmt.Sprintf("pkill -u %s || true", d.Username))
-
-	// Delete user
-	cmd := fmt.Sprintf("userdel %s %s", d.Username, "")
-	if d.RemoveHome {
-		cmd = fmt.Sprintf("userdel -r %s", d.Username)
-	}
-
-	_, err := d.SaltClient.CmdRun(ctx, d.Target, cmd)
-	if err != nil {
-		return &patterns.InterventionResult{
-			Success: false,
-			Message: fmt.Sprintf("failed to delete user: %v", err),
-		}, err
-	}
-
 	return &patterns.InterventionResult{
-		Success: true,
-		Message: "user deleted successfully",
+		Success: false,
+		Message: "user deletion requires manual administrator intervention",
 		Changes: []patterns.Change{
 			{
-				Type:        "user_deletion",
-				Description: fmt.Sprintf("Deleted user %s", d.Username),
+				Type:        "escalation_required",
+				Description: fmt.Sprintf("User deletion for %s requires administrator access", d.Username),
 			},
 		},
-	}, nil
+	}, fmt.Errorf("user deletion requires administrator intervention")
 }
 
-// Evaluate verifies user was deleted
+// Evaluate indicates escalation is required
 func (d *UserDeletionOperation) Evaluate(ctx context.Context, intervention *patterns.InterventionResult) (*patterns.EvaluationResult, error) {
-	// Verify user no longer exists
-	output, _ := d.SaltClient.CmdRun(ctx, d.Target, fmt.Sprintf("id %s 2>&1", d.Username))
-	if !strings.Contains(output, "no such user") {
-		return &patterns.EvaluationResult{
-			Success: false,
-			Message: "user still exists after deletion",
-			Validations: map[string]patterns.ValidationResult{
-				"user_removed": {
-					Passed:  false,
-					Message: "user account still present",
-				},
-			},
-		}, nil
-	}
-
-	validations := map[string]patterns.ValidationResult{
-		"user_removed": {
-			Passed:  true,
-			Message: "user account removed",
-		},
-	}
-
-	// Verify home directory if requested
-	if d.RemoveHome {
-		homeCheck, _ := d.SaltClient.CmdRun(ctx, d.Target,
-			fmt.Sprintf("test -d /home/%s && echo exists || echo removed", d.Username))
-		if strings.TrimSpace(homeCheck) == "removed" {
-			validations["home_removed"] = patterns.ValidationResult{
-				Passed:  true,
-				Message: "home directory removed",
-			}
-		} else {
-			validations["home_removed"] = patterns.ValidationResult{
-				Passed:  false,
-				Message: "home directory still exists",
-			}
-		}
-	}
-
 	return &patterns.EvaluationResult{
-		Success:     true,
-		Message:     "user deletion validated",
-		Validations: validations,
+		Success: false,
+		Message: "user deletion requires administrator intervention",
+		Validations: map[string]patterns.ValidationResult{
+			"escalation_required": {
+				Passed:  false,
+				Message: "system-level user deletion requires manual intervention",
+			},
+		},
 	}, nil
 }

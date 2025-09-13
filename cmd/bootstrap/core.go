@@ -11,7 +11,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -71,11 +70,9 @@ func runBootstrapCore(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		return fmt.Errorf("SaltStack bootstrap failed: %w", err)
 	}
 
-	// Step 2: Verify file roots are set up
-	logger.Info("Step 2/3: Verifying file roots configuration")
-	if err := saltstack.SetupFileRoots(rc); err != nil {
-		return fmt.Errorf("file roots setup failed: %w", err)
-	}
+	// Step 2: Verify file roots are set up - TODO: Replace with Nomad orchestration
+	logger.Info("Step 2/3: File roots configuration placeholder - Nomad orchestration not implemented yet")
+	// TODO: Replace with Nomad client setup
 
 	// Step 3: Mark as bootstrapped
 	logger.Info("Step 3/3: Marking system as bootstrapped")
@@ -111,14 +108,9 @@ func formatStatus(ok bool) string {
 }
 
 func bootstrapSaltWithAPI(rc *eos_io.RuntimeContext) error {
-	// Use the standard Salt installation which now includes API setup
-	config := &saltstack.Config{
-		MasterMode: false,
-		LogLevel:   "warning",
-		SkipTest:   false,
-	}
-
-	return saltstack.Install(rc, config)
+	// TODO: Replace with Nomad client setup
+	_ = rc // suppress unused variable warning
+	return fmt.Errorf("salt bootstrap not implemented with Nomad yet")
 }
 
 func displayCoreSuccess(rc *eos_io.RuntimeContext) {
@@ -128,14 +120,10 @@ func displayCoreSuccess(rc *eos_io.RuntimeContext) {
 	logger.Info("terminal prompt: ✅ Core bootstrap completed successfully!")
 	logger.Info("terminal prompt: ")
 	
-	// Load and display API credentials
-	if creds, err := saltstack.LoadAPICredentials(); err == nil {
-		logger.Info("terminal prompt: Salt API is configured:")
-		logger.Info(fmt.Sprintf("terminal prompt:   URL: %s", creds.URL))
-		logger.Info(fmt.Sprintf("terminal prompt:   User: %s", creds.Username))
-		logger.Info("terminal prompt:   Credentials: /etc/eos/salt/api.env")
-		logger.Info("terminal prompt: ")
-	}
+	// Load and display API credentials - TODO: Replace with Nomad client
+	logger.Info("terminal prompt: Nomad API placeholder - not implemented yet")
+	// TODO: Display Nomad API credentials when implemented
+	logger.Info("terminal prompt: ")
 	
 	logger.Info("terminal prompt: You can now deploy services:")
 	logger.Info("terminal prompt:   eos create consul")

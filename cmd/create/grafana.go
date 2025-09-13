@@ -8,7 +8,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
@@ -110,25 +109,25 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 	resourceConfig := envConfig.Services.Resources[envConfig.Environment]
 	
-	pillarConfig := map[string]interface{}{
-		"nomad_service": map[string]interface{}{
-			"name":        "grafana",
+	nomadConfig := map[string]interface{}{
+		"grafana": map[string]interface{}{
+			"version":     "latest",
+			"port":        port,
 			"environment": envConfig.Environment,
-			"config": map[string]interface{}{
-				"admin_password": adminPassword,
-				"secret_key":     secretKey,
-				"port":          port,
-				"datacenter":    envConfig.Datacenter,
-				"data_path":     envConfig.Services.DataPath + "/grafana",
-				"cpu":           resourceConfig.CPU,
-				"memory":        resourceConfig.Memory,
-				"replicas":      resourceConfig.Replicas,
-			},
+			"datacenter":  envConfig.Datacenter,
+			"cpu":         resourceConfig.CPU,
+			"memory":      resourceConfig.Memory,
+			"replicas":    resourceConfig.Replicas,
+			"admin_user":  "admin",
+			"admin_pass":  adminPassword,
+			"secret_key":  secretKey,
+			"database_url": "sqlite3:///grafana.db",
 		},
 	}
+	_ = nomadConfig // TODO: Use for Nomad job deployment
 
 	// 5. Deploy with automatically configured values
-	logger.Info("Deploying Grafana via SaltStack → Terraform → Nomad",
+	logger.Info("Deploying Grafana via Nomad orchestration",
 		zap.String("environment", envConfig.Environment),
 		zap.String("datacenter", envConfig.Datacenter),
 		zap.Int("port", port),
@@ -136,28 +135,10 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		zap.Int("memory", resourceConfig.Memory),
 		zap.Int("replicas", resourceConfig.Replicas))
 
-	if err := saltstack.ApplySaltStateWithPillar(rc, "nomad.services", pillarConfig); err != nil {
-		return fmt.Errorf("Grafana deployment failed: %w", err)
-	}
-
-	// 6. Display success information with generated credentials
-	logger.Info("Grafana deployment completed successfully",
-		zap.String("management", "SaltStack → Terraform → Nomad"),
-		zap.String("environment", envConfig.Environment),
-		zap.String("secret_backend", envConfig.SecretBackend))
-
-	logger.Info("Grafana is now available",
-		zap.String("web_ui", fmt.Sprintf("http://localhost:%d", port)),
-		zap.String("username", "admin"),
-		zap.String("password", adminPassword),
-		zap.String("consul_service", "grafana.service.consul"))
-
-	logger.Info("Configuration automatically managed",
-		zap.String("environment_discovery", "bootstrap/salt/cloud"),
-		zap.String("secret_storage", envConfig.SecretBackend),
-		zap.String("resource_allocation", envConfig.Environment))
-
-	return nil
+	// Deploy using Nomad orchestration instead of SaltStack
+	logger.Info("Deploying Grafana using Nomad orchestration")
+	// TODO: Implement Nomad job deployment for Grafana
+	return fmt.Errorf("Grafana Nomad deployment not yet implemented")
 }
 
 

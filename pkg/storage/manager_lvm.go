@@ -13,11 +13,11 @@ import (
 // LVMManager manages LVM storage operations through Salt
 type LVMManager struct {
 	rc         *eos_io.RuntimeContext
-	saltClient SaltClient
+	saltClient NomadClient
 }
 
 // NewLVMManager creates a new LVM storage manager
-func NewLVMManager(rc *eos_io.RuntimeContext, saltClient SaltClient) (*LVMManager, error) {
+func NewLVMManager(rc *eos_io.RuntimeContext, saltClient NomadClient) (*LVMManager, error) {
 	return &LVMManager{
 		rc:         rc,
 		saltClient: saltClient,
@@ -85,7 +85,7 @@ func (m *LVMManager) Create(config StorageConfig) error {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return fmt.Errorf("failed to create logical volume via Salt: %w", err)
 	}
@@ -129,7 +129,7 @@ func (m *LVMManager) Read(id string) (*StorageStatus, error) {
 		},
 	}
 
-	_, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	_, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query LVM info via Salt: %w", err)
 	}
@@ -192,7 +192,7 @@ func (m *LVMManager) Delete(id string) error {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return fmt.Errorf("failed to delete logical volume via Salt: %w", err)
 	}
@@ -223,7 +223,7 @@ func (m *LVMManager) List() ([]*StorageStatus, error) {
 		Pillar: map[string]interface{}{},
 	}
 
-	_, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	_, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list LVs via Salt: %w", err)
 	}
@@ -250,7 +250,7 @@ func (m *LVMManager) GetMetrics(id string) (*StorageMetrics, error) {
 		},
 	}
 
-	_, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	_, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metrics via Salt: %w", err)
 	}
@@ -302,7 +302,7 @@ func (m *LVMManager) Resize(operation ResizeOperation) error {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return fmt.Errorf("failed to resize LV via Salt: %w", err)
 	}
@@ -330,7 +330,7 @@ func (m *LVMManager) CheckHealth(id string) error {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)
 	}
@@ -389,7 +389,7 @@ func (m *LVMManager) checkPhysicalVolume(device string) (bool, error) {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return false, err
 	}
@@ -408,7 +408,7 @@ func (m *LVMManager) createPhysicalVolume(device string) error {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ func (m *LVMManager) checkVolumeGroup(name string) (bool, error) {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return false, err
 	}
@@ -451,7 +451,7 @@ func (m *LVMManager) createVolumeGroup(name, device string) error {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return err
 	}
@@ -473,7 +473,7 @@ func (m *LVMManager) unmountVolume(path string) error {
 		},
 	}
 
-	result, err := m.saltClient.ApplyState(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
+	result, err := m.saltClient.ApplyJob(m.rc.Ctx, saltConfig.Target, saltConfig.State, saltConfig.Pillar)
 	if err != nil {
 		return err
 	}

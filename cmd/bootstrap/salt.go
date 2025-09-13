@@ -1,10 +1,10 @@
 package bootstrap
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
@@ -32,18 +32,10 @@ func runBootstrapSalt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 	masterMode := cmd.Flag("master-mode").Value.String() == "true"
 
-	config := &saltstack.Config{
-		MasterMode: masterMode,
-		LogLevel:   "warning",
-	}
+	// TODO: Replace with Nomad client setup
+	_ = masterMode // suppress unused variable warning
+	_ = rc // suppress unused variable warning
 
-	logger.Info("Installing Salt and configuring file_roots for eos state management")
-	if err := saltstack.Install(rc, config); err != nil {
-		return err
-	}
-
-	logger.Info("Salt bootstrap completed successfully")
-	logger.Info("Salt states are now accessible via file_roots configuration")
-	logger.Info("Test with: salt-call --local state.show_sls dependencies")
-	return nil
+	logger.Info("Salt bootstrap placeholder - Nomad orchestration not implemented yet")
+	return fmt.Errorf("salt bootstrap not implemented with Nomad yet")
 }

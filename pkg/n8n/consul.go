@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
-	"go.opentelemetry.io/contrib/instrumentation/go.uber.org/zap/otelzap"
 )
 
 // ConsulProxyConfig represents the configuration stored in Consul KV for reverse proxies
@@ -51,7 +50,7 @@ type ConsulHealthCheckConfig struct {
 
 // registerWithConsul registers n8n services with Consul using the CLI
 func (m *Manager) registerWithConsul(ctx context.Context) error {
-	logger := otelzap.Ctx(ctx)
+	logger := zap.L().With(zap.String("context", "consul_registration"))
 	
 	// Register n8n main service
 	if err := m.registerConsulService(ctx, "n8n", m.config.Port, []string{"n8n", "workflow", "web"}); err != nil {
@@ -74,7 +73,7 @@ func (m *Manager) registerWithConsul(ctx context.Context) error {
 
 // registerConsulService registers a single service with Consul
 func (m *Manager) registerConsulService(ctx context.Context, name string, port int, tags []string) error {
-	logger := otelzap.Ctx(ctx)
+	logger := zap.L().With(zap.String("context", "consul_registration"))
 	
 	// Create service definition JSON
 	serviceDef := map[string]interface{}{
@@ -118,7 +117,7 @@ func (m *Manager) registerConsulService(ctx context.Context, name string, port i
 
 // storeProxyConfig stores reverse proxy configuration in Consul KV
 func (m *Manager) storeProxyConfig(ctx context.Context) error {
-	logger := otelzap.Ctx(ctx)
+	logger := zap.L().With(zap.String("context", "consul_registration"))
 	
 	// Create proxy configuration
 	config := ConsulProxyConfig{

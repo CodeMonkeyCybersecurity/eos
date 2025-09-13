@@ -9,17 +9,15 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/jenkins"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	cerr "github.com/cockroachdb/errors"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// OrchestrationManager handles service deployment orchestration via SaltStack + Nomad
+// OrchestrationManager handles service deployment orchestration via Nomad
 type OrchestrationManager struct {
-	saltManager      *SaltStackManager
+	// saltManager deprecated in favor of Nomad orchestration
 	terraformManager *terraform.Manager
 	vaultPath        string
 	nomadConfig      *NomadConfig
@@ -29,7 +27,7 @@ type OrchestrationManager struct {
 // DeploymentOrchestrator coordinates deployments using Jenkins and Salt (legacy support)
 type DeploymentOrchestrator struct {
 	Jenkins *jenkins.Client
-	Salt    *saltstack.Client
+	// Salt client deprecated in favor of Nomad orchestration
 }
 
 // DeploymentRequest represents a deployment request for legacy orchestration
@@ -337,14 +335,14 @@ type ServiceEndpoint struct {
 }
 
 // NewOrchestrationManager creates a new orchestration manager
-func NewOrchestrationManager(saltManager *SaltStackManager, terraformDir string, vaultPath string, nomadConfig *NomadConfig) *OrchestrationManager {
+func NewOrchestrationManager(terraformDir string, vaultPath string, nomadConfig *NomadConfig) *OrchestrationManager {
 	var tfManager *terraform.Manager
 	if terraformDir != "" {
 		tfManager = terraform.NewManager(&eos_io.RuntimeContext{}, terraformDir)
 	}
 
 	return &OrchestrationManager{
-		saltManager:      saltManager,
+		// saltManager deprecated
 		terraformManager: tfManager,
 		vaultPath:        vaultPath,
 		nomadConfig:      nomadConfig,
@@ -353,7 +351,7 @@ func NewOrchestrationManager(saltManager *SaltStackManager, terraformDir string,
 
 // DeployService deploys a service following assessment→intervention→evaluation
 func (o *OrchestrationManager) DeployService(rc *eos_io.RuntimeContext, deployment *ServiceDeployment) (*DeploymentResult, error) {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Starting service deployment",
 		zap.String("service", deployment.Name),
 		zap.String("type", deployment.Type))
@@ -411,7 +409,7 @@ func (o *OrchestrationManager) DeployService(rc *eos_io.RuntimeContext, deployme
 
 // DeployGrafana deploys Grafana monitoring service
 func (o *OrchestrationManager) DeployGrafana(rc *eos_io.RuntimeContext, config *GrafanaConfig) (*DeploymentResult, error) {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Deploying Grafana monitoring service")
 
 	// Generate Grafana deployment configuration
@@ -494,7 +492,7 @@ func (o *OrchestrationManager) DeployGrafana(rc *eos_io.RuntimeContext, config *
 
 // DeployMattermost deploys Mattermost communication platform
 func (o *OrchestrationManager) DeployMattermost(rc *eos_io.RuntimeContext, config *MattermostConfig) (*DeploymentResult, error) {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Deploying Mattermost communication platform")
 
 	deployment := &ServiceDeployment{
@@ -591,7 +589,7 @@ type SMTPConfig struct {
 // Assessment methods
 
 func (o *OrchestrationManager) assessDeploymentReadiness(rc *eos_io.RuntimeContext, deployment *ServiceDeployment) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Assessing deployment readiness", zap.String("service", deployment.Name))
 
 	// Check Nomad cluster connectivity
@@ -626,7 +624,7 @@ func (o *OrchestrationManager) assessDeploymentReadiness(rc *eos_io.RuntimeConte
 // Intervention methods
 
 func (o *OrchestrationManager) interventionDeployService(rc *eos_io.RuntimeContext, deployment *ServiceDeployment, result *DeploymentResult) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Deploying service", zap.String("type", deployment.Type))
 
 	switch deployment.Type {
@@ -642,110 +640,41 @@ func (o *OrchestrationManager) interventionDeployService(rc *eos_io.RuntimeConte
 }
 
 func (o *OrchestrationManager) deployNomadJob(rc *eos_io.RuntimeContext, deployment *ServiceDeployment, result *DeploymentResult) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Deploying Nomad job", zap.String("job_id", deployment.JobSpec.ID))
 
-	// Generate Nomad job HCL
-	jobHCL := o.generateNomadJobHCL(deployment.JobSpec)
+	// TODO: Implement Nomad job deployment
+	logger.Warn("Nomad job deployment not yet implemented")
+	return fmt.Errorf("Nomad job deployment not yet implemented")
 
-	// Deploy via SaltStack
-	slsContent := fmt.Sprintf(`
-nomad_job_%s:
-  file.managed:
-    - name: /tmp/%s.nomad
-    - contents: |
-%s
-
-  cmd.run:
-    - name: nomad job run /tmp/%s.nomad
-    - require:
-      - file: nomad_job_%s
-`, deployment.JobSpec.ID, deployment.JobSpec.ID,
-		strings.ReplaceAll(jobHCL, "\n", "\n        "),
-		deployment.JobSpec.ID, deployment.JobSpec.ID)
-
-	err := o.saltManager.client.StateApply(rc.Ctx, "*", "nomad_deploy", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return cerr.Wrap(err, "failed to deploy Nomad job via SaltStack")
-	}
-
-	// Deployment completed successfully via SaltStack
+	// Deployment will be completed via Nomad API
 
 	result.JobID = deployment.JobSpec.ID
 	return nil
 }
 
 func (o *OrchestrationManager) deployDockerService(rc *eos_io.RuntimeContext, deployment *ServiceDeployment, result *DeploymentResult) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Deploying Docker service")
 
-	// Generate Docker Compose configuration
-	composeContent := o.generateDockerCompose(deployment.DockerConfig)
-
-	slsContent := fmt.Sprintf(`
-docker_service_%s:
-  file.managed:
-    - name: /opt/%s/docker-compose.yml
-    - contents: |
-%s
-    - makedirs: True
-
-  cmd.run:
-    - name: cd /opt/%s && docker-compose up -d
-    - require:
-      - file: docker_service_%s
-`, deployment.Name, deployment.Name,
-		strings.ReplaceAll(composeContent, "\n", "\n        "),
-		deployment.Name, deployment.Name)
-
-	err := o.saltManager.client.StateApply(rc.Ctx, "*", "docker_deploy", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return cerr.Wrap(err, "failed to deploy Docker service via SaltStack")
-	}
-
-	return nil // Deployment completed successfully via SaltStack
+	// TODO: Implement Docker service deployment via Nomad
+	logger.Warn("Docker service deployment not yet implemented")
+	return fmt.Errorf("Docker service deployment not yet implemented")
 }
 
 func (o *OrchestrationManager) deploySystemdService(rc *eos_io.RuntimeContext, deployment *ServiceDeployment, result *DeploymentResult) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Deploying systemd service")
 
-	// Generate systemd unit file
-	unitContent := o.generateSystemdUnit(deployment.SystemdConfig)
-
-	slsContent := fmt.Sprintf(`
-systemd_service_%s:
-  file.managed:
-    - name: /etc/systemd/system/%s.service
-    - contents: |
-%s
-
-  cmd.run:
-    - name: systemctl daemon-reload && systemctl enable %s && systemctl start %s
-    - require:
-      - file: systemd_service_%s
-`, deployment.Name, deployment.Name,
-		strings.ReplaceAll(unitContent, "\n", "\n        "),
-		deployment.Name, deployment.Name, deployment.Name)
-
-	err := o.saltManager.client.StateApply(rc.Ctx, "*", "systemd_deploy", map[string]interface{}{
-		"sls_content": slsContent,
-	})
-	if err != nil {
-		return cerr.Wrap(err, "failed to deploy systemd service via SaltStack")
-	}
-
-	return nil // Deployment completed successfully via SaltStack
+	// TODO: Implement systemd service deployment via Nomad
+	logger.Warn("Systemd service deployment not yet implemented")
+	return fmt.Errorf("Systemd service deployment not yet implemented")
 }
 
 // Evaluation methods
 
 func (o *OrchestrationManager) evaluateDeployment(rc *eos_io.RuntimeContext, deployment *ServiceDeployment, result *DeploymentResult) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Evaluating deployment", zap.String("service", deployment.Name))
 
 	// Wait for service to be ready
@@ -775,12 +704,8 @@ func (o *OrchestrationManager) evaluateDeployment(rc *eos_io.RuntimeContext, dep
 // Helper methods
 
 func (o *OrchestrationManager) checkNomadConnectivity(rc *eos_io.RuntimeContext) error {
-	// Check Nomad cluster connectivity via SaltStack
-	result, err := o.saltManager.client.RunCommand("*", "grains", "cmd.run", []interface{}{"nomad server members"}, nil)
-	if err != nil {
-		return err
-	}
-	_ = result // Process result to verify Nomad connectivity
+	// TODO: Implement Nomad cluster connectivity check
+	// This would use Nomad API to check cluster status
 	return nil
 }
 
@@ -790,22 +715,14 @@ func (o *OrchestrationManager) verifyVaultSecret(rc *eos_io.RuntimeContext, vaul
 }
 
 func (o *OrchestrationManager) checkServiceDependency(rc *eos_io.RuntimeContext, serviceName string) error {
-	// Check if dependency service is running
-	result, err := o.saltManager.client.RunCommand("*", "grains", "service.status", []interface{}{serviceName}, nil)
-	if err != nil {
-		return err
-	}
-	_ = result // Process result to verify service is running
+	// TODO: Implement service dependency check via Consul service discovery
+	// This would query Consul to verify service is running
 	return nil
 }
 
 func (o *OrchestrationManager) checkResourceAvailability(rc *eos_io.RuntimeContext, requirements *ResourceRequirements) error {
-	// Check available resources via SaltStack
-	result, err := o.saltManager.client.RunCommand("*", "grains", "status.loadavg", []interface{}{}, nil)
-	if err != nil {
-		return err
-	}
-	_ = result // Process result to verify resources
+	// TODO: Implement resource availability check via Nomad API
+	// This would query Nomad cluster for available resources
 	return nil
 }
 
@@ -845,7 +762,7 @@ func (o *OrchestrationManager) checkResourceUtilization(rc *eos_io.RuntimeContex
 }
 
 func (o *OrchestrationManager) rollbackDeployment(rc *eos_io.RuntimeContext, deployment *ServiceDeployment) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Rolling back deployment", zap.String("service", deployment.Name))
 
 	// Implementation would rollback to previous version
@@ -948,7 +865,7 @@ func (o *OrchestrationManager) generateMattermostConfig(config *MattermostConfig
 
 // DeployApplication orchestrates a full deployment following assessment→intervention→evaluation
 func (d *DeploymentOrchestrator) DeployApplication(rc *eos_io.RuntimeContext, req DeploymentRequest) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	logger.Info("Starting deployment orchestration",
 		zap.String("application", req.Application),
 		zap.String("version", req.Version),
@@ -977,16 +894,12 @@ func (d *DeploymentOrchestrator) DeployApplication(rc *eos_io.RuntimeContext, re
 		return cerr.New(fmt.Sprintf("build failed with result: %s", build.Result))
 	}
 
-	// Step 3: Prepare infrastructure with Salt
-	logger.Info("Preparing infrastructure via SaltStack")
-
-	target := fmt.Sprintf("G@environment:%s and G@role:%s", req.Environment, req.Application)
-	err = d.Salt.StateApply(rc.Ctx, target, "prepare_deployment", map[string]interface{}{
-		"version": req.Version,
-	})
-	if err != nil {
-		return cerr.Wrap(err, "failed to prepare infrastructure")
-	}
+	// Step 3: Prepare infrastructure with Nomad
+	logger.Info("Preparing infrastructure via Nomad")
+	
+	// TODO: Implement Nomad-based infrastructure preparation
+	logger.Warn("Infrastructure preparation not yet implemented")
+	return fmt.Errorf("infrastructure preparation not yet implemented")
 
 	// Step 4: Execute deployment based on strategy
 	switch req.Strategy {
@@ -1003,76 +916,16 @@ func (d *DeploymentOrchestrator) DeployApplication(rc *eos_io.RuntimeContext, re
 
 // rollingDeployment performs a rolling deployment
 func (d *DeploymentOrchestrator) rollingDeployment(rc *eos_io.RuntimeContext, req DeploymentRequest) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	target := fmt.Sprintf("G@environment:%s and G@role:%s", req.Environment, req.Application)
-
-	// Get list of minions
-	grainResult, err := d.Salt.GetGrains(target, "compound", []string{"id"})
-	if err != nil {
-		return cerr.Wrap(err, "failed to get minion list")
-	}
-
-	minions := make([]string, 0, len(grainResult))
-	for minion := range grainResult {
-		minions = append(minions, minion)
-	}
-
-	logger.Info("Performing rolling deployment", zap.Int("server_count", len(minions)))
-
-	// Deploy to servers in batches
-	batchSize := len(minions) / 4 // 25% at a time
-	if batchSize < 1 {
-		batchSize = 1
-	}
-
-	for i := 0; i < len(minions); i += batchSize {
-		end := i + batchSize
-		if end > len(minions) {
-			end = len(minions)
-		}
-
-		batch := minions[i:end]
-		logger.Info("Deploying to batch",
-			zap.Int("batch_number", i/batchSize+1),
-			zap.Int("total_batches", (len(minions)+batchSize-1)/batchSize),
-			zap.Strings("minions", batch))
-
-		// Deploy to this batch
-		for _, minion := range batch {
-			err := d.Salt.StateApply(rc.Ctx, minion, "deploy_application", map[string]interface{}{
-				"application": req.Application,
-				"version":     req.Version,
-			},
-			)
-			if err != nil {
-				return cerr.Wrap(err, fmt.Sprintf("deployment to %s failed", minion))
-			}
-		}
-
-		// Health check the batch
-		time.Sleep(30 * time.Second) // Give services time to start
-
-		healthResult, err := d.Salt.CmdRun(rc.Ctx, strings.Join(batch, ","), fmt.Sprintf("curl -f http://localhost/%s/health", req.Application))
-		if err != nil {
-			return cerr.Wrap(err, "health check failed")
-		}
-
-		// Check if health check was successful
-		if !strings.Contains(healthResult, "200") {
-			return cerr.New("health check failed for batch")
-		}
-
-		logger.Info("Batch deployed successfully",
-			zap.Int("batch_number", i/batchSize+1),
-			zap.Int("total_batches", (len(minions)+batchSize-1)/batchSize))
-	}
-
-	return nil
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
+	
+	// TODO: Implement rolling deployment via Nomad
+	logger.Warn("Rolling deployment not yet implemented")
+	return fmt.Errorf("rolling deployment not yet implemented")
 }
 
 // canaryDeployment performs a canary deployment with gradual rollout
 func (d *DeploymentOrchestrator) canaryDeployment(rc *eos_io.RuntimeContext, req DeploymentRequest) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	// Implementation would gradually increase the percentage of servers
 	// running the new version while monitoring metrics
 	logger.Info("Canary deployment not yet implemented",
@@ -1083,7 +936,7 @@ func (d *DeploymentOrchestrator) canaryDeployment(rc *eos_io.RuntimeContext, req
 
 // blueGreenDeployment performs a blue-green deployment
 func (d *DeploymentOrchestrator) blueGreenDeployment(rc *eos_io.RuntimeContext, req DeploymentRequest) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "orchestration_manager"))
 	// Implementation would deploy to the inactive color, test it,
 	// then switch the load balancer
 	logger.Info("Blue-green deployment not yet implemented",

@@ -5,13 +5,12 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack/orchestrator"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // DisplayOrchestrationResult displays the orchestration results for Vault installation
-func DisplayOrchestrationResult(rc *eos_io.RuntimeContext, result *orchestrator.OrchestrationResult) error {
+func DisplayOrchestrationResult(rc *eos_io.RuntimeContext, result *OrchestrationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Vault orchestration completed",
@@ -29,32 +28,16 @@ func DisplayOrchestrationResult(rc *eos_io.RuntimeContext, result *orchestrator.
 		fmt.Printf("❌ FAILED\n")
 	}
 	fmt.Printf("Duration: %s\n", result.Duration)
-	fmt.Printf("Message: %s\n", result.Message)
-
-	if result.JobID != "" {
-		fmt.Printf("Salt Job ID: %s\n", result.JobID)
+	if result.Message != "" {
+		fmt.Printf("Message: %s\n", result.Message)
 	}
 
-	if len(result.Minions) > 0 {
-		fmt.Printf("\n🎯 Target Minions (%d):\n", len(result.Minions))
-		for _, minion := range result.Minions {
-			fmt.Printf("   • %s\n", minion)
-		}
-	}
-
-	if len(result.Failed) > 0 {
-		fmt.Printf("\n❌ Failed Minions (%d):\n", len(result.Failed))
-		for _, minion := range result.Failed {
-			fmt.Printf("   • %s\n", minion)
-		}
-	}
-
-	if result.Mode == orchestrator.OrchestrationModeSalt && result.Success {
+	if result.Mode == ModeNomad && result.Success {
 		fmt.Printf("\n💡 Next Steps:\n")
-		fmt.Printf("   • Check Vault status: eos salt run '%s' vault.status\n", "vault-*")
-		fmt.Printf("   • Initialize Vault: eos salt run '%s' vault.init\n", "vault-*")
-		fmt.Printf("   • Unseal Vault: eos salt run '%s' vault.unseal\n", "vault-*")
-		fmt.Printf("   • View logs: eos salt run '%s' cmd.run 'journalctl -u vault -f'\n", "vault-*")
+		fmt.Printf("   • Check Vault status: nomad job status vault\n")
+		fmt.Printf("   • Initialize Vault: vault operator init\n")
+		fmt.Printf("   • Unseal Vault: vault operator unseal\n")
+		fmt.Printf("   • View logs: nomad alloc logs <alloc-id>\n")
 	}
 
 	return nil

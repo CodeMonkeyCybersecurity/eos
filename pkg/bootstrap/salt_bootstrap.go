@@ -13,14 +13,12 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // BootstrapSaltComplete performs a comprehensive Salt and Salt API setup
 func BootstrapSaltComplete(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Starting comprehensive Salt bootstrap")
 
 	// Phase 1: Validate prerequisites
@@ -64,7 +62,7 @@ func BootstrapSaltComplete(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 
 // validateSaltPrerequisites checks system requirements for Salt
 func validateSaltPrerequisites(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Validating Salt prerequisites")
 
 	// Check root access
@@ -93,7 +91,7 @@ func validateSaltPrerequisites(rc *eos_io.RuntimeContext) error {
 
 // ensureSaltInstalled installs Salt if not already present
 func ensureSaltInstalled(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	
 	// Check if Salt is already installed
 	if installed, version := checkSaltInstalled(rc); installed {
@@ -103,25 +101,13 @@ func ensureSaltInstalled(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 
 	logger.Info("Installing SaltStack")
 
-	// Determine installation mode
-	masterMode := !info.IsSingleNode || info.IsMaster
-	
-	config := &saltstack.Config{
-		MasterMode: masterMode,
-		LogLevel:   "warning",
-	}
-
-	// Use the saltstack package installation
-	if err := saltstack.Install(rc, config); err != nil {
-		return fmt.Errorf("salt installation failed: %w", err)
-	}
-
-	return nil
+	// TODO: Replace SaltStack installation with Nomad agent installation
+	return fmt.Errorf("SaltStack installation deprecated - use Nomad instead")
 }
 
 // configureSalt applies Salt configuration
 func configureSalt(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Configuring Salt")
 
 	// Create configuration directories
@@ -159,7 +145,7 @@ func configureSalt(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 
 // configureSaltMasterless sets up Salt for single-node deployment
 func configureSaltMasterless(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Configuring Salt for masterless mode")
 
 	// Create masterless configuration
@@ -196,7 +182,7 @@ state_output: changes
 
 // configureSaltMaster sets up Salt master configuration
 func configureSaltMaster(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Configuring Salt master")
 
 	// Create master configuration
@@ -259,7 +245,7 @@ log_file: /var/log/salt/minion
 
 // configureSaltMinionForCluster sets up Salt minion to connect to master
 func configureSaltMinionForCluster(rc *eos_io.RuntimeContext, masterAddr string) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Configuring Salt minion", zap.String("master", masterAddr))
 
 	minionConfig := fmt.Sprintf(`# Minion configuration
@@ -287,7 +273,7 @@ state_output: changes
 
 // setupSaltFileRoots creates and links Salt state directories
 func setupSaltFileRoots(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Setting up Salt file roots")
 
 	// Create base directories
@@ -382,7 +368,7 @@ func setupSaltFileRoots(rc *eos_io.RuntimeContext) error {
 
 // ensureSaltServicesRunning starts necessary Salt services
 func ensureSaltServicesRunning(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Ensuring Salt services are running")
 
 	// Determine which services to start
@@ -424,7 +410,7 @@ func ensureSaltServicesRunning(rc *eos_io.RuntimeContext, info *ClusterInfo) err
 
 // verifySaltSetup performs comprehensive verification
 func verifySaltSetup(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Info("Verifying Salt setup")
 
 	// Test Salt command execution
@@ -481,7 +467,7 @@ func checkUbuntuVersion(rc *eos_io.RuntimeContext) error {
 }
 
 func checkSaltNetworkConnectivity(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "salt_bootstrap"))
 	logger.Debug("Checking network connectivity for Salt operations")
 
 	// Define retry configuration for network checks

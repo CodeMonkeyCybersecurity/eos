@@ -8,7 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/mattermost"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
@@ -142,9 +142,44 @@ func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		zap.Int("memory", resourceConfig.Memory),
 		zap.Int("replicas", resourceConfig.Replicas))
 
-	if err := saltstack.ApplySaltStateWithPillar(rc, "nomad.services", pillarConfig); err != nil {
+	// Deploy using Nomad orchestration
+	mattermostConfig := &mattermost.Config{
+		PostgresUser:     "mattermost",
+		PostgresPassword: databasePassword,
+		PostgresDB:       "mattermost",
+		PostgresHost:     "mattermost-postgres.service.consul",
+		PostgresPort:     5432,
+		Port:             port,
+		Host:             "0.0.0.0",
+		Domain:           fmt.Sprintf("mattermost.%s.local", envConfig.Environment),
+		Protocol:         "https",
+		Datacenter:       envConfig.Datacenter,
+		Environment:      envConfig.Environment,
+		DataPath:         envConfig.Services.DataPath + "/mattermost",
+		Replicas:         resourceConfig.Replicas,
+		CPU:              resourceConfig.CPU,
+		Memory:           resourceConfig.Memory,
+		NomadAddr:        "http://localhost:4646",
+		VaultAddr:        "http://localhost:8200",
+		FilePublicKey:    filePublicKey,
+		FilePrivateKey:   filePrivateKey,
+		InviteSalt:       inviteSalt,
+		SupportEmail:     "support@example.com",
+		Timezone:         "UTC",
+	}
+
+	// Create Mattermost manager
+	mattermostManager, err := mattermost.NewManager(rc, mattermostConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create Mattermost manager: %w", err)
+	}
+
+	// Deploy Mattermost using HashiCorp stack
+	if err := mattermostManager.Deploy(rc.Ctx); err != nil {
 		return fmt.Errorf("Mattermost deployment failed: %w", err)
 	}
+
+	_ = pillarConfig // Keep for backward compatibility
 
 	// 6. Display success information with generated credentials
 	logger.Info("Mattermost deployment completed successfully",

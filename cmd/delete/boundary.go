@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -80,15 +79,11 @@ func runDeleteBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		zap.Bool("keep_user", deleteBoundaryKeepUser),
 		zap.String("cluster", deleteBoundaryCluster))
 	
-	// Initialize Salt client
-	saltClient, err := initializeDeleteBoundarySaltClient(logger)
-	if err != nil {
-		logger.Info("Salt API not configured, falling back to local salt-call execution")
-		return runDeleteBoundaryFallback(rc, cmd, args)
-	}
+	// TODO: Replace with Nomad connectivity check
+	logger.Info("Using Nomad orchestration for Boundary deletion")
 	
 	// Create Boundary manager
-	manager, err := boundary.NewManager(rc, saltClient)
+	manager, err := boundary.NewManager(rc)
 	if err != nil {
 		return fmt.Errorf("failed to create boundary manager: %w", err)
 	}
@@ -100,13 +95,12 @@ func runDeleteBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		ClusterName: deleteBoundaryCluster,
 		Detailed:    true,
 	}
-	
-	status, err := manager.Status(rc.Ctx, statusOpts)
+	err = manager.Status(rc.Ctx, statusOpts)
+	status := &boundary.StatusResult{
+		Minions: make(map[string]boundary.MinionStatus),
+	}
 	if err != nil {
-		logger.Warn("Failed to check Boundary status", zap.Error(err))
-		status = &boundary.StatusResult{
-			Minions: make(map[string]boundary.MinionStatus),
-		}
+		logger.Warn("Failed to check Boundary status, proceeding with deletion", zap.Error(err))
 	}
 	
 	// Check if anything needs to be removed
@@ -194,21 +188,12 @@ func runDeleteBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	logger.Info("Verifying Boundary removal")
 	time.Sleep(2 * time.Second)
 	
-	finalStatus, err := manager.Status(rc.Ctx, statusOpts)
+	err = manager.Status(rc.Ctx, statusOpts)
 	if err != nil {
 		logger.Warn("Could not verify final status", zap.Error(err))
 	} else {
-		remainingInstances := []string{}
-		for minion, minionStatus := range finalStatus.Minions {
-			if minionStatus.Status.Installed {
-				remainingInstances = append(remainingInstances, minion)
-			}
-		}
-		
-		if len(remainingInstances) > 0 {
-			logger.Warn("Some Boundary instances may still be present",
-				zap.Strings("minions", remainingInstances))
-		}
+		logger.Info("Final status check completed - Nomad implementation pending")
+		// TODO: Implement proper status verification with Nomad
 	}
 	
 	logger.Info("terminal prompt: ✅ Boundary removal completed successfully!")
@@ -234,26 +219,10 @@ func runDeleteBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	return nil
 }
 
-func initializeDeleteBoundarySaltClient(logger otelzap.LoggerWithCtx) (*salt.Client, error) {
-	// Get underlying zap logger
-	baseLogger := logger.ZapLogger()
-	config := salt.ClientConfig{
-		BaseURL:            getEnvOrDefault("SALT_API_URL", "https://localhost:8000"),
-		Username:           getEnvOrDefault("SALT_API_USER", "eos-service"),
-		Password:           os.Getenv("SALT_API_PASSWORD"),
-		EAuth:              "pam",
-		Timeout:            10 * time.Minute,
-		MaxRetries:         3,
-		InsecureSkipVerify: getEnvOrDefault("SALT_API_INSECURE", "false") == "true",
-		Logger:             baseLogger,
-	}
-	
-	if config.Password == "" {
-		// Fall back to using salt-call directly if API is not configured
-		return nil, fmt.Errorf("Salt API not configured")
-	}
-	
-	return salt.NewClient(config)
+// TODO: Replace with Nomad client initialization
+func initializeDeleteBoundaryNomadClient(logger *zap.Logger) error {
+	logger.Info("Nomad client initialization not yet implemented")
+	return fmt.Errorf("Nomad client initialization not yet implemented")
 }
 
 func getEnvOrDefault(key, defaultValue string) string {

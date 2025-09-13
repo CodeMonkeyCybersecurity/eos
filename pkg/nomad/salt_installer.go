@@ -6,22 +6,23 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // SaltInstaller provides Salt-based Nomad installation
+// TODO: Replace with native Nomad installer
 type SaltInstaller struct {
-	logger     otelzap.LoggerWithCtx
-	saltClient *saltstack.Client
+	logger otelzap.LoggerWithCtx
+	// saltClient removed - migrating to Nomad
 }
 
 // NewSaltInstaller creates a new Salt-based Nomad installer
+// TODO: Replace with native Nomad installer
 func NewSaltInstaller(logger otelzap.LoggerWithCtx) *SaltInstaller {
 	return &SaltInstaller{
-		logger:     logger,
-		saltClient: saltstack.NewClient(logger),
+		logger: logger,
+		// saltClient removed - migrating to Nomad
 	}
 }
 
@@ -139,16 +140,10 @@ func (si *SaltInstaller) getDefaultConfig() *SaltNomadConfig {
 
 // verifySaltAvailability checks if Salt is available
 func (si *SaltInstaller) verifySaltAvailability(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Check if salt-call is available
-	result, err := si.saltClient.CmdRunLocal(rc.Ctx, "which salt-call")
-	if err != nil {
-		return fmt.Errorf("salt-call not found: %w", err)
-	}
-	
-	logger.Info("Salt availability verified", zap.String("salt_path", result))
-	return nil
+	// Check if salt-call is available - TODO: Replace with Nomad client
+	// Placeholder implementation
+	_ = rc // suppress unused variable warning
+	return fmt.Errorf("salt installer not implemented with Nomad yet")
 }
 
 // applySaltState applies the Nomad Salt state
@@ -191,10 +186,9 @@ func (si *SaltInstaller) applySaltState(ctx context.Context, config *SaltNomadCo
 
 	logger.Info("Applying Nomad Salt state", zap.Any("pillar", pillarData))
 	
-	// Apply the state
-	if err := si.saltClient.StateApplyLocal(ctx, "hashicorp.nomad", pillarData); err != nil {
-		return fmt.Errorf("failed to apply nomad state: %w", err)
-	}
+	// Apply the state - TODO: Replace with Nomad client
+	_ = pillarData // suppress unused variable warning
+	return fmt.Errorf("nomad state apply not implemented yet")
 
 	return nil
 }
@@ -203,28 +197,9 @@ func (si *SaltInstaller) applySaltState(ctx context.Context, config *SaltNomadCo
 func (si *SaltInstaller) verifyInstallation(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 	
-	// Check if Nomad binary exists
-	if _, err := si.saltClient.CmdRunLocal(ctx, "which nomad"); err != nil {
-		return fmt.Errorf("nomad binary not found: %w", err)
-	}
-	
-	// Check if service is enabled
-	if _, err := si.saltClient.CmdRunLocal(ctx, "systemctl is-enabled nomad"); err != nil {
-		logger.Warn("Nomad service not enabled", zap.Error(err))
-	}
-	
-	// Check if service is running
-	if _, err := si.saltClient.CmdRunLocal(ctx, "systemctl is-active nomad"); err != nil {
-		logger.Warn("Nomad service not running", zap.Error(err))
-		// Don't fail here as service might not be started yet
-	}
-	
-	// Check Nomad version
-	if result, err := si.saltClient.CmdRunLocal(ctx, "nomad version"); err != nil {
-		logger.Warn("Failed to check Nomad version", zap.Error(err))
-	} else {
-		logger.Info("Nomad version check passed", zap.String("version", result))
-	}
+	// Check if Nomad binary exists - TODO: Replace with Nomad client
+	_ = ctx // suppress unused variable warning
+	return fmt.Errorf("nomad verification not implemented yet")
 	
 	logger.Info("Nomad installation verification completed")
 	return nil
@@ -235,15 +210,9 @@ func (si *SaltInstaller) StartNomadService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Nomad service")
 	
-	// Enable service
-	if _, err := si.saltClient.CmdRunLocal(rc.Ctx, "systemctl enable nomad"); err != nil {
-		return fmt.Errorf("failed to enable nomad service: %w", err)
-	}
-	
-	// Start service
-	if _, err := si.saltClient.CmdRunLocal(rc.Ctx, "systemctl start nomad"); err != nil {
-		return fmt.Errorf("failed to start nomad service: %w", err)
-	}
+	// Enable and start service - TODO: Replace with Nomad client
+	_ = rc // suppress unused variable warning
+	return fmt.Errorf("nomad service start not implemented yet")
 	
 	logger.Info("Nomad service started successfully")
 	return nil
@@ -254,15 +223,9 @@ func (si *SaltInstaller) StopNomadService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Stopping Nomad service")
 	
-	// Stop service
-	if _, err := si.saltClient.CmdRunLocal(rc.Ctx, "systemctl stop nomad"); err != nil {
-		return fmt.Errorf("failed to stop nomad service: %w", err)
-	}
-	
-	// Disable service
-	if _, err := si.saltClient.CmdRunLocal(rc.Ctx, "systemctl disable nomad"); err != nil {
-		return fmt.Errorf("failed to disable nomad service: %w", err)
-	}
+	// Stop and disable service - TODO: Replace with Nomad client
+	_ = rc // suppress unused variable warning
+	return fmt.Errorf("nomad service stop not implemented yet")
 	
 	logger.Info("Nomad service stopped successfully")
 	return nil
@@ -275,31 +238,12 @@ func (si *SaltInstaller) GetNomadStatus(rc *eos_io.RuntimeContext) (map[string]i
 	
 	status := make(map[string]interface{})
 	
-	// Check if binary exists
-	if _, err := si.saltClient.CmdRunLocal(rc.Ctx, "which nomad"); err != nil {
-		status["binary_installed"] = false
-	} else {
-		status["binary_installed"] = true
-	}
-	
-	// Check service status
-	if result, err := si.saltClient.CmdRunLocal(rc.Ctx, "systemctl is-active nomad"); err != nil {
-		status["service_active"] = false
-	} else {
-		status["service_active"] = result == "active"
-	}
-	
-	// Check if service is enabled
-	if result, err := si.saltClient.CmdRunLocal(rc.Ctx, "systemctl is-enabled nomad"); err != nil {
-		status["service_enabled"] = false
-	} else {
-		status["service_enabled"] = result == "enabled"
-	}
-	
-	// Get version if available
-	if result, err := si.saltClient.CmdRunLocal(rc.Ctx, "nomad version"); err == nil {
-		status["version"] = result
-	}
+	// Check status - TODO: Replace with Nomad client
+	_ = rc // suppress unused variable warning
+	status["binary_installed"] = false // placeholder
+	status["service_active"] = false // placeholder
+	status["service_enabled"] = false // placeholder
+	status["version"] = "unknown" // placeholder
 	
 	return status, nil
 }

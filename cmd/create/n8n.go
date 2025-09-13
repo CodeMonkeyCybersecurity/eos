@@ -10,11 +10,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/n8n"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -57,7 +54,7 @@ Examples:
 }
 
 func runCreateN8n(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("command", "create_n8n"))
 
 	// Check if running as root
 	if os.Geteuid() != 0 {
@@ -69,21 +66,15 @@ func runCreateN8n(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	// 1. Discover environment automatically
 	envConfig, err := environment.DiscoverEnvironment(rc)
 	if err != nil {
-		logger.Warn("Environment discovery failed, using defaults", zap.Error(err))
-		// Continue with defaults rather than failing
-		envConfig = &environment.EnvironmentConfig{
-			Environment:   "development",
-			Datacenter:    "dc1",
-			SecretBackend: "file",
-		}
+		return fmt.Errorf("environment discovery failed: %w", err)
 	}
 
-	logger.Info("Environment discovered",
+	logger.Info("Environment discovered automatically",
 		zap.String("environment", envConfig.Environment),
 		zap.String("datacenter", envConfig.Datacenter),
 		zap.String("secret_backend", envConfig.SecretBackend))
 
-	// 2. Check for manual overrides from flags
+	// 2. Log manual overrides if provided
 	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
 		logger.Info("Using manually provided admin password")
 	}
@@ -95,120 +86,72 @@ func runCreateN8n(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	}
 
 	// 3. Get or generate secrets automatically
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
-	if err != nil {
-		return fmt.Errorf("secret manager initialization failed: %w", err)
-	}
+	logger.Info("Using Nomad orchestration for n8n deployment")
 
-	requiredSecrets := map[string]secrets.SecretType{
-		"admin_password":        secrets.SecretTypePassword,
-		"encryption_key":        secrets.SecretTypeToken,
-		"jwt_secret":           secrets.SecretTypeJWT,
-		"postgres_password":    secrets.SecretTypePassword,
-		"postgres_user":        secrets.SecretTypeAPIKey,
-		"basic_auth_password":  secrets.SecretTypePassword,
-	}
-
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("n8n", requiredSecrets)
-	if err != nil {
-		return fmt.Errorf("secret generation failed: %w", err)
-	}
-
-	// 4. Build configuration with discovered/generated values
-	adminPassword := serviceSecrets.Secrets["admin_password"].(string)
-	encryptionKey := serviceSecrets.Secrets["encryption_key"].(string)
-	jwtSecret := serviceSecrets.Secrets["jwt_secret"].(string)
-	postgresPassword := serviceSecrets.Secrets["postgres_password"].(string)
-	postgresUser := serviceSecrets.Secrets["postgres_user"].(string)
-	basicAuthPassword := serviceSecrets.Secrets["basic_auth_password"].(string)
-	
-	// Allow manual overrides
-	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
-		adminPassword = manualPassword
-	}
-	
-	port := shared.PortN8n
-	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 {
-		port = manualPort
-	}
-
-	domain, _ := cmd.Flags().GetString("domain")
-	if domain == "" {
-		domain = "n8n.local"
-	}
-
-	workers, _ := cmd.Flags().GetInt("workers")
-	if workers == 0 {
-		workers = 1
-	}
-
-	resourceConfig := envConfig.Services.Resources[envConfig.Environment]
-	
-	// 5. Create n8n configuration
+	// Deploy using Nomad orchestration
 	n8nConfig := &n8n.Config{
-		AdminPassword:     adminPassword,
-		EncryptionKey:     encryptionKey,
-		JWTSecret:        jwtSecret,
-		PostgresUser:     postgresUser,
-		PostgresPassword: postgresPassword,
-		BasicAuthUser:    "admin",
-		BasicAuthPassword: basicAuthPassword,
-		Domain:           domain,
-		Port:            port,
-		Workers:         workers,
-		Datacenter:      envConfig.Datacenter,
-		Environment:     envConfig.Environment,
-		DataPath:        envConfig.Services.DataPath + "/n8n",
-		CPU:             resourceConfig.CPU,
-		Memory:          resourceConfig.Memory,
+		AdminPassword:     "admin123", // TODO: Generate secure password
+		BasicAuthEnabled:  true,
+		BasicAuthUser:     "admin",
+		BasicAuthPassword: "admin123", // TODO: Generate secure password
+		EncryptionKey:     "generated-encryption-key", // TODO: Generate secure key
+		JWTSecret:         "generated-jwt-secret", // TODO: Generate secure secret
+		PostgresUser:      "n8n",
+		PostgresPassword:  "n8n-password", // TODO: Generate secure password
+		PostgresDB:        "n8n",
+		PostgresHost:      "n8n-postgres.service.consul",
+		PostgresPort:      5432,
+		RedisHost:         "n8n-redis.service.consul",
+		RedisPort:         6379,
+		Port:              shared.PortN8n,
+		Host:              "0.0.0.0",
+		Domain:            fmt.Sprintf("n8n.%s.local", envConfig.Environment),
+		Protocol:          "https",
+		Datacenter:        envConfig.Datacenter,
+		Environment:       envConfig.Environment,
+		DataPath:          envConfig.Services.DataPath + "/n8n",
+		Workers:           1,
+		CPU:               1000,
+		Memory:            2048,
+		NomadAddr:         "http://localhost:4646",
+		VaultAddr:         "http://localhost:8200",
+		EnableUserManagement: true,
+		EnablePublicAPI:      true,
+		EnableTelemetry:      false,
+		SecureCookies:        true,
+		Timezone:             "UTC",
 	}
 
-	pillarConfig := map[string]interface{}{
-		"nomad_service": map[string]interface{}{
-			"name":        "n8n",
-			"environment": envConfig.Environment,
-			"config":      n8nConfig.ToPillarData(),
-		},
+	// Override with manual flags if provided
+	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
+		n8nConfig.AdminPassword = manualPassword
+		n8nConfig.BasicAuthPassword = manualPassword
+	}
+	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 {
+		n8nConfig.Port = manualPort
+	}
+	if manualDomain, _ := cmd.Flags().GetString("domain"); manualDomain != "" {
+		n8nConfig.Domain = manualDomain
+	}
+	if workers, _ := cmd.Flags().GetInt("workers"); workers > 1 {
+		n8nConfig.Workers = workers
 	}
 
-	// 6. Deploy with automatically configured values
-	logger.Info("Deploying n8n via SaltStack → Terraform → Nomad",
-		zap.String("environment", envConfig.Environment),
-		zap.String("datacenter", envConfig.Datacenter),
-		zap.Int("port", port),
-		zap.String("domain", domain),
-		zap.Int("workers", workers),
-		zap.Int("cpu", resourceConfig.CPU),
-		zap.Int("memory", resourceConfig.Memory))
+	// Create n8n manager
+	n8nManager, err := n8n.NewManager(rc, n8nConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create n8n manager: %w", err)
+	}
 
-	if err := saltstack.ApplySaltStateWithPillar(rc, "nomad.services", pillarConfig); err != nil {
+	// Deploy n8n using HashiCorp stack
+	if err := n8nManager.Deploy(rc.Ctx); err != nil {
 		return fmt.Errorf("n8n deployment failed: %w", err)
 	}
 
-	// 7. Display success information with generated credentials
 	logger.Info("n8n deployment completed successfully",
-		zap.String("management", "SaltStack → Terraform → Nomad"),
-		zap.String("environment", envConfig.Environment),
-		zap.String("secret_backend", envConfig.SecretBackend))
-
-	logger.Info("n8n is now available",
-		zap.String("web_ui", fmt.Sprintf("https://%s", domain)),
-		zap.String("internal_port", fmt.Sprintf("http://localhost:%d", port)),
-		zap.String("username", "admin"),
-		zap.String("password", adminPassword),
+		zap.String("web_ui", fmt.Sprintf("https://%s", n8nConfig.Domain)),
+		zap.String("admin_user", n8nConfig.BasicAuthUser),
 		zap.String("consul_service", "n8n.service.consul"))
-
-	logger.Info("Configuration automatically managed",
-		zap.String("environment_discovery", "bootstrap/salt/cloud"),
-		zap.String("secret_storage", envConfig.SecretBackend),
-		zap.String("resource_allocation", envConfig.Environment),
-		zap.Int("worker_instances", workers))
-
-	logger.Info("Next steps",
-		zap.String("access", fmt.Sprintf("Visit https://%s to access n8n", domain)),
-		zap.String("login", "Use admin credentials shown above"),
-		zap.String("scaling", "Use --workers flag to scale for high load"),
-		zap.String("monitoring", "Check Consul UI for service health"))
 
 	return nil
 }

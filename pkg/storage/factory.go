@@ -17,11 +17,11 @@ type DriverRegistry struct {
 	mu      sync.RWMutex
 	drivers map[StorageType]StorageDriverFactory
 	rc      *eos_io.RuntimeContext
-	salt    SaltClient
+	salt    NomadClient
 }
 
 // NewDriverRegistry creates a new driver registry
-func NewDriverRegistry(rc *eos_io.RuntimeContext, salt SaltClient) *DriverRegistry {
+func NewDriverRegistry(rc *eos_io.RuntimeContext, salt NomadClient) *DriverRegistry {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating storage driver registry")
 
@@ -106,7 +106,7 @@ func (r *DriverRegistry) registerDefaultDrivers() {
 
 // LVMDriverFactory creates LVM storage drivers
 type LVMDriverFactory struct {
-	salt SaltClient
+	salt NomadClient
 }
 
 // CreateDriver creates an LVM storage driver
@@ -126,7 +126,7 @@ func (f *LVMDriverFactory) SupportsType(storageType StorageType) bool {
 
 // BTRFSDriverFactory creates BTRFS storage drivers
 type BTRFSDriverFactory struct {
-	salt SaltClient
+	salt NomadClient
 }
 
 // CreateDriver creates a BTRFS storage driver
@@ -135,7 +135,7 @@ func (f *BTRFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driv
 	// So we need to type assert or pass nil for now
 	return &BTRFSDriver{
 		rc:   rc,
-		salt: nil, // TODO: Fix this when adapting SaltClient interface
+		salt: nil, // TODO: Fix this when adapting NomadClient interface
 	}, nil
 }
 
@@ -146,7 +146,7 @@ func (f *BTRFSDriverFactory) SupportsType(storageType StorageType) bool {
 
 // ZFSDriverFactory creates ZFS storage drivers
 type ZFSDriverFactory struct {
-	salt SaltClient
+	salt NomadClient
 }
 
 // CreateDriver creates a ZFS storage driver
@@ -156,7 +156,7 @@ func (f *ZFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driver
 
 	return &ZFSDriver{
 		rc:      rc,
-		salt:    nil, // TODO: Fix this when adapting SaltClient interface
+		salt:    nil, // TODO: Fix this when adapting NomadClient interface
 		manager: manager,
 	}, nil
 }
@@ -168,7 +168,7 @@ func (f *ZFSDriverFactory) SupportsType(storageType StorageType) bool {
 
 // CephFSDriverFactory creates CephFS storage drivers
 type CephFSDriverFactory struct {
-	salt SaltClient
+	salt NomadClient
 }
 
 // CreateDriver creates a CephFS storage driver
@@ -177,7 +177,7 @@ func (f *CephFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Dri
 	// So we need to type assert or pass nil for now
 	return &CephFSDriver{
 		rc:   rc,
-		salt: nil, // TODO: Fix this when adapting SaltClient interface
+		salt: nil, // TODO: Fix this when adapting NomadClient interface
 	}, nil
 }
 
@@ -207,13 +207,13 @@ type UnifiedStorageManager struct {
 	rc          *eos_io.RuntimeContext
 	registry    *DriverRegistry
 	diskManager *disk_management.DiskManager
-	salt        SaltClient
+	salt        NomadClient
 	drivers     map[StorageType]StorageDriver
 	mu          sync.RWMutex
 }
 
 // NewUnifiedStorageManager creates a new unified storage manager
-func NewUnifiedStorageManager(rc *eos_io.RuntimeContext, salt SaltClient) (*UnifiedStorageManager, error) {
+func NewUnifiedStorageManager(rc *eos_io.RuntimeContext, salt NomadClient) (*UnifiedStorageManager, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating unified storage manager")
 

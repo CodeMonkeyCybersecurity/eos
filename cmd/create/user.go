@@ -4,22 +4,18 @@ package create
 
 import (
 	"fmt"
-	"time"
+
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
-	secpassword "github.com/CodeMonkeyCybersecurity/eos/pkg/security/password"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared/slice"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/users"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/users/assessment"
-	usersvault "github.com/CodeMonkeyCybersecurity/eos/pkg/users/vault"
-	cerr "github.com/cockroachdb/errors"
-	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 var (
@@ -63,7 +59,7 @@ Examples:
 		logger := otelzap.Ctx(rc.Ctx)
 
 		if len(args) == 0 {
-			return cerr.New("username must be specified")
+			return eos_err.NewUserError("username must be specified")
 		}
 
 		username := args[0]
@@ -86,6 +82,11 @@ Examples:
 			groups = append(groups, "sudo")
 		}
 
+		// Suppress unused variable warnings
+		_ = generatePassword
+		_ = saltAPI
+		_ = vaultPath
+
 		logger.Info("Creating user account",
 			zap.String("username", username),
 			zap.String("target", target),
@@ -93,70 +94,12 @@ Examples:
 			zap.String("shell", shell),
 			zap.String("home", home))
 
-		// Assessment: Initialize managers and validate prerequisites
-		saltConfig := &system.SaltStackConfig{
-			APIURL:    saltAPI,
-			VaultPath: vaultPath + "/salt",
-			Timeout:   5 * time.Minute,
-		}
-
-		saltManager, err := system.NewSaltStackManager(rc, saltConfig)
-		if err != nil {
-			return cerr.Wrap(err, "failed to initialize SaltStack manager")
-		}
-
-		// Check if user already exists
-		if err := assessment.UserExistence(rc, saltManager, target, username); err != nil {
-			return cerr.Wrap(err, "user existence assessment failed")
-		}
-
-		// Intervention: Generate secure password and create user
-		var password string
-		if generatePassword {
-			password, err = secpassword.GenerateSecure()
-			if err != nil {
-				return cerr.Wrap(err, "failed to generate secure password")
-			}
-
-			// Store password in Vault
-			if err := usersvault.StoreUserPassword(rc, vaultPath, username, password); err != nil {
-				return cerr.Wrap(err, "failed to store password in Vault")
-			}
-
-			logger.Info("Secure password generated and stored in Vault",
-				zap.String("vault_path", fmt.Sprintf("%s/users/%s", vaultPath, username)))
-		}
-
-		// Create user configuration
-		userConfig := system.UserConfig{
-			Name:    username,
-			Groups:  groups,
-			Shell:   shell,
-			Home:    home,
-			Present: true,
-		}
-
-		// Apply user creation via SaltStack
-		if err := saltManager.ManageUsers(rc, target, []system.UserConfig{userConfig}); err != nil {
-			return cerr.Wrap(err, "user creation failed")
-		}
-
-		// Evaluation: Verify user was created successfully
-		if err := assessment.UserCreation(rc, saltManager, target, username); err != nil {
-			return cerr.Wrap(err, "user creation verification failed")
-		}
-
-		logger.Info("User account created successfully",
+		// Assessment: User creation requires administrator intervention
+		logger.Warn("User creation requires administrator intervention - HashiCorp stack cannot create system users",
 			zap.String("username", username),
-			zap.String("home", home),
-			zap.Strings("groups", groups),
-			zap.Bool("password_generated", generatePassword))
+			zap.String("target", target))
 
-		if generatePassword {
-			logger.Info("Password stored securely in Vault - retrieve with: vault kv get secret/eos/users/" + username)
-		}
-
-		return nil
+		return fmt.Errorf("user creation requires administrator intervention - HashiCorp stack cannot create system users")
 	}),
 }
 

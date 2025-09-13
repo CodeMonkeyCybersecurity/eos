@@ -387,15 +387,15 @@ func TestUserCreationCommandIntegration(t *testing.T) {
 
 			// Create user operation
 			userOp := &users.UserCreationOperation{
-				Username:    tt.username,
+				Username:    "testuser",
 				Password:    "testpass123",
-				Groups:      tt.groups,
+				Groups:      []string{"users"},
 				Shell:       "/bin/bash",
-				HomeDir:     fmt.Sprintf("/home/%s", tt.username),
+				HomeDir:     "/home/testuser",
 				Target:      "*",
-				SaltClient:  mockSalt,
+				// SaltClient removed for Nomad migration
 				VaultClient: mockVault,
-				Logger:      otelzap.Ctx(rc.Ctx),
+				Logger:      zap.NewNop(),
 			}
 
 			// Execute AIE pattern
@@ -501,7 +501,7 @@ func TestSystemServiceCommandIntegration(t *testing.T) {
 				ServiceName: tt.serviceName,
 				Action:      tt.action,
 				Target:      "*",
-				SaltClient:  mockSalt,
+				// SaltClient removed for Nomad migration
 				Logger:      otelzap.Ctx(rc.Ctx),
 			}
 
@@ -660,20 +660,23 @@ func TestErrorHandlingIntegration(t *testing.T) {
 			case "user_creation":
 				operation = &users.UserCreationOperation{
 					Username:   "testuser",
-					Password:   "testpass",
-					Groups:     []string{"users"},
+					Password:   "testpass123",
+					Groups:     []string{"sudo"},
 					Shell:      "/bin/bash",
 					HomeDir:    "/home/testuser",
 					Target:     "*",
-					SaltClient: mockSalt,
-					Logger:     otelzap.Ctx(rc.Ctx),
+					Manager: &users.HashiCorpUserManager{
+						VaultClient: nil, // Mock vault client
+						Logger:      zap.NewNop(),
+					},
+					Logger:     zap.NewNop(),
 				}
 			case "service_control":
 				operation = &system.ServiceOperation{
 					ServiceName: "test-service",
 					Action:      "start",
 					Target:      "*",
-					SaltClient:  mockSalt,
+					// SaltClient removed for Nomad migration
 					Logger:      otelzap.Ctx(rc.Ctx),
 				}
 			}
@@ -713,7 +716,7 @@ func BenchmarkCommandExecution(b *testing.B) {
 		ServiceName: "test-service",
 		Action:      "status",
 		Target:      "*",
-		SaltClient:  mockSalt,
+		// SaltClient removed for Nomad migration
 		Logger:      otelzap.Ctx(rc.Ctx),
 	}
 

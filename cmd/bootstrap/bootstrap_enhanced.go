@@ -14,7 +14,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ubuntu"
 	"github.com/spf13/cobra"
@@ -101,15 +100,17 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, clusterInfo *bootstrap.ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Phase 1: Install Salt
-	logger.Info("Phase 1: Bootstrapping Salt", zap.Int("phase", 1), zap.Int("total_phases", 5))
-	saltConfig := &saltstack.Config{
-		MasterMode: !clusterInfo.IsSingleNode, // Master mode for multi-node
-		LogLevel:   "warning",
-	}
-	if err := saltstack.Install(rc, saltConfig); err != nil {
-		return fmt.Errorf("salt bootstrap failed: %w", err)
-	}
+	// Phase 1: Install Nomad (replacing Salt)
+	logger.Info("Phase 1: Bootstrapping Nomad", zap.Int("phase", 1), zap.Int("total_phases", 5))
+	// TODO: Replace with Nomad installation
+	logger.Info("Nomad installation placeholder - implementation pending")
+	// nomadConfig := &nomad.Config{
+	//     ServerMode: !clusterInfo.IsSingleNode,
+	//     LogLevel:   "warn",
+	// }
+	// if err := nomad.Install(rc, nomadConfig); err != nil {
+	//     return fmt.Errorf("nomad bootstrap failed: %w", err)
+	// }
 
 	// Phase 1.5: Setup Salt API (for master nodes)
 	if clusterInfo.IsMaster || clusterInfo.IsSingleNode {

@@ -13,7 +13,7 @@ import (
 // LVMDriver implements StorageDriver for LVM volumes
 type LVMDriver struct {
 	rc   *eos_io.RuntimeContext
-	salt SaltClient
+	salt NomadClient
 	lvm  interface{} // TODO: Replace with proper LVM manager interface
 }
 
@@ -57,7 +57,7 @@ func (d *LVMDriver) Create(ctx context.Context, config StorageConfig) error {
 		},
 	}
 
-	result, err := d.salt.ApplyState(d.rc.Ctx, "*", "lvm.lv_present", saltState)
+	result, err := d.salt.ApplyJob(d.rc.Ctx, "*", "lvm.lv_present", saltState)
 	if err != nil {
 		return fmt.Errorf("failed to create LVM volume via Salt: %w", err)
 	}
@@ -88,7 +88,7 @@ func (d *LVMDriver) Delete(ctx context.Context, id string) error {
 		},
 	}
 
-	result, err := d.salt.ApplyState(d.rc.Ctx, "*", "lvm.lv_absent", saltState)
+	result, err := d.salt.ApplyJob(d.rc.Ctx, "*", "lvm.lv_absent", saltState)
 	if err != nil {
 		return fmt.Errorf("failed to delete LVM volume via Salt: %w", err)
 	}
@@ -210,7 +210,7 @@ func (d *LVMDriver) Resize(ctx context.Context, id string, newSize int64) error 
 		},
 	}
 
-	result, err := d.salt.ApplyState(d.rc.Ctx, "*", "lvm.lv_resize", saltState)
+	result, err := d.salt.ApplyJob(d.rc.Ctx, "*", "lvm.lv_resize", saltState)
 	if err != nil {
 		return fmt.Errorf("failed to resize LVM volume via Salt: %w", err)
 	}
@@ -242,7 +242,7 @@ func (d *LVMDriver) Mount(ctx context.Context, id string, mountPoint string, opt
 		},
 	}
 
-	result, err := d.salt.ApplyState(d.rc.Ctx, "*", "mount.mounted", saltState)
+	result, err := d.salt.ApplyJob(d.rc.Ctx, "*", "mount.mounted", saltState)
 	if err != nil {
 		return fmt.Errorf("failed to mount volume via Salt: %w", err)
 	}
@@ -269,7 +269,7 @@ func (d *LVMDriver) Unmount(ctx context.Context, id string) error {
 		},
 	}
 
-	result, err := d.salt.ApplyState(d.rc.Ctx, "*", "mount.unmounted", saltState)
+	result, err := d.salt.ApplyJob(d.rc.Ctx, "*", "mount.unmounted", saltState)
 	if err != nil {
 		return fmt.Errorf("failed to unmount volume via Salt: %w", err)
 	}
@@ -324,7 +324,7 @@ func (d *LVMDriver) CreateSnapshot(ctx context.Context, id string, snapshotName 
 		},
 	}
 
-	result, err := d.salt.ApplyState(d.rc.Ctx, "*", "lvm.lv_snapshot", saltState)
+	result, err := d.salt.ApplyJob(d.rc.Ctx, "*", "lvm.lv_snapshot", saltState)
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot via Salt: %w", err)
 	}

@@ -1,32 +1,30 @@
 package vault
 
 import (
-	"context"
+	"fmt"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // RemoveVaultViaSalt removes Vault completely using Salt states
 // This provides a clean, comprehensive removal following the architectural principle: Salt = Physical infrastructure
 func RemoveVaultViaSalt(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_removal"))
 	
 	logger.Info("Starting comprehensive Vault removal via Salt states")
 	
 	// ASSESS - Check if Salt is available
-	if err := checkSaltAvailability(rc); err != nil {
-		logger.Warn("Salt not available, falling back to direct removal", zap.Error(err))
+	if err := checkNomadAvailability(rc); err != nil {
+		logger.Warn("Nomad not available, falling back to direct removal", zap.Error(err))
 		return removeVaultDirect(rc)
 	}
 	
-	// INTERVENE - Remove via Salt states
-	if err := removeVaultViaSaltStates(rc); err != nil {
-		logger.Error("Salt-based Vault removal failed, attempting direct removal", zap.Error(err))
+	// INTERVENE - Remove via Nomad
+	if err := removeVaultViaNomad(rc); err != nil {
+		logger.Error("Nomad-based Vault removal failed, attempting direct removal", zap.Error(err))
 		return removeVaultDirect(rc)
 	}
 	
@@ -40,32 +38,20 @@ func RemoveVaultViaSalt(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// removeVaultViaSaltStates applies the Vault removal Salt state
-func removeVaultViaSaltStates(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+
+// removeVaultViaNomad removes Vault using Nomad job management
+func removeVaultViaNomad(rc *eos_io.RuntimeContext) error {
+	logger := zap.L().With(zap.String("component", "vault_removal"))
 	
-	// Create Salt client
-	saltClient := saltstack.NewClient(logger)
+	logger.Info("Removing Vault via Nomad job management")
 	
-	// Create context with extended timeout for removal operations
-	ctx, cancel := context.WithTimeout(rc.Ctx, 300*time.Second) // 5 minutes
-	defer cancel()
-	
-	logger.Info("Applying Vault removal Salt states")
-	
-	// Apply the removal state
-	if err := saltClient.StateApplyLocal(ctx, "hashicorp.vault.remove", nil); err != nil {
-		logger.Error("Failed to apply Vault removal Salt states", zap.Error(err))
-		return err
-	}
-	
-	logger.Info("Vault removal Salt states applied successfully")
-	return nil
+	// TODO: Implement Nomad job removal
+	return fmt.Errorf("Nomad-based Vault removal not yet implemented")
 }
 
 // removeVaultDirect removes Vault using the existing direct methods (fallback)
 func removeVaultDirect(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_removal"))
 	
 	logger.Info("Performing direct Vault removal (fallback method)")
 	
@@ -86,7 +72,7 @@ func removeVaultDirect(rc *eos_io.RuntimeContext) error {
 
 // verifyVaultRemoval verifies that Vault has been properly removed
 func verifyVaultRemoval(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	logger := zap.L().With(zap.String("component", "vault_removal"))
 	
 	logger.Info("Verifying Vault removal")
 	

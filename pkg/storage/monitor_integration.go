@@ -161,8 +161,9 @@ func (mi *MonitorIntegration) GetHealthRecommendations(ctx context.Context) ([]*
 }
 
 // GetDiskManager provides access to the underlying disk manager
-func (mi *MonitorIntegration) GetDiskManager() *monitor.SaltStackDiskManager {
-	// Return nil for now - will be implemented when DiskManagerService is updated
+// Note: SaltStackDiskManager removed for HashiCorp migration - returns nil
+func (mi *MonitorIntegration) GetDiskManager() interface{} {
+	// Disk management requires administrator intervention after migration
 	return nil
 }
 
