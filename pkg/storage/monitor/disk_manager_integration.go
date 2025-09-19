@@ -98,101 +98,20 @@ func (dms *DiskManagerService) MonitorDiskGrowth(ctx context.Context, target str
 
 // Helper methods for analysis and reporting
 
-func (dms *DiskManagerService) analyzeHealthStatus(report *DiskHealthReport) {
-	criticalIssues := 0
-	warnings := 0
+// analyzeHealthStatus - REMOVED: Method no longer used
+// TODO: Restore when health analysis is needed
 
-	// Check disk usage thresholds
-	for _, usage := range report.DiskUsage {
-		if usage.UsedPercent >= 95 {
-			criticalIssues++
-			report.Errors = append(report.Errors,
-				fmt.Sprintf("Critical: %s is %0.1f%% full", usage.Path, usage.UsedPercent))
-		} else if usage.UsedPercent >= 85 {
-			warnings++
-			report.Warnings = append(report.Warnings,
-				fmt.Sprintf("Warning: %s is %0.1f%% full", usage.Path, usage.UsedPercent))
-		}
-	}
+// calculateCleanupEffectiveness - REMOVED: Method no longer used
+// TODO: Restore when cleanup effectiveness calculation is needed
 
-	// Check SMART data
-	for _, smart := range report.SMARTData {
-		if smart.OverallHealth != "PASSED" && smart.OverallHealth != "" {
-			criticalIssues++
-			report.Errors = append(report.Errors,
-				fmt.Sprintf("Critical: Disk %s health status: %s", smart.Device, smart.OverallHealth))
-		}
-	}
+// analyzeGrowthPatterns - REMOVED: Method no longer used
+// TODO: Restore when growth pattern analysis is needed
 
-	// Determine overall status
-	if criticalIssues > 0 {
-		report.Status = "CRITICAL"
-	} else if warnings > 0 {
-		report.Status = "WARNING"
-	} else {
-		report.Status = "HEALTHY"
-	}
-
-	report.Summary = DiskHealthSummary{
-		TotalDisks:    len(report.DiskUsage),
-		HealthyDisks:  len(report.DiskUsage) - criticalIssues - warnings,
-		WarningDisks:  warnings,
-		CriticalDisks: criticalIssues,
-		TotalCapacity: dms.calculateTotalCapacity(report.DiskUsage),
-		TotalUsed:     dms.calculateTotalUsed(report.DiskUsage),
-		AverageUsage:  dms.calculateAverageUsage(report.DiskUsage),
-	}
-}
-
-func (dms *DiskManagerService) calculateCleanupEffectiveness(report *DiskCleanupReport) {
-	if len(report.BeforeUsage) != len(report.AfterUsage) {
-		return
-	}
-
-	var totalFreed int64
-	for i, before := range report.BeforeUsage {
-		if i < len(report.AfterUsage) {
-			after := report.AfterUsage[i]
-			if before.Path == after.Path {
-				freed := before.UsedSize - after.UsedSize
-				if freed > 0 {
-					totalFreed += freed
-				}
-			}
-		}
-	}
-
-	report.EffectivenessMetrics = CleanupEffectivenessMetrics{
-		TotalFreedBytes:    totalFreed,
-		TargetFreedBytes:   report.CleanupResult.FreedBytes,
-		EffectivenessRatio: float64(totalFreed) / float64(report.CleanupResult.FreedBytes),
-	}
-}
-
-func (dms *DiskManagerService) analyzeGrowthPatterns(report *DiskGrowthReport) {
-	for _, metrics := range report.GrowthMetrics {
-		// Generate alerts based on growth patterns
-		if metrics.GrowthPercent > 20 {
-			alert := DiskGrowthAlert{
-				Path:        metrics.Path,
-				Severity:    "HIGH",
-				Message:     fmt.Sprintf("Rapid growth detected: %0.1f%% increase", metrics.GrowthPercent),
-				GrowthBytes: metrics.GrowthBytes,
-			}
-			report.Alerts = append(report.Alerts, alert)
-		} else if metrics.GrowthPercent > 10 {
-			alert := DiskGrowthAlert{
-				Path:        metrics.Path,
-				Severity:    "MEDIUM",
-				Message:     fmt.Sprintf("Moderate growth detected: %0.1f%% increase", metrics.GrowthPercent),
-				GrowthBytes: metrics.GrowthBytes,
-			}
-			report.Alerts = append(report.Alerts, alert)
-		}
-	}
-}
-
+// loadGrowthMetrics - REMOVED: Method no longer used
+// TODO: Restore when growth metrics loading is needed
 func (dms *DiskManagerService) loadGrowthMetrics(ctx context.Context, target, path string) (*GrowthMetrics, error) {
+	_ = ctx // Suppress unused parameter warning
+	_ = target // Suppress unused parameter warning
 	// This would integrate with the existing growth tracking functionality
 	// For now, return a placeholder implementation
 	return &GrowthMetrics{

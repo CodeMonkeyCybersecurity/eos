@@ -431,6 +431,7 @@ func generateAlertID(path string, alertType AlertType) string {
 }
 
 func findLargeFilesManual(rc *eos_io.RuntimeContext, path string, minSize int64, topN int) ([]FileInfo, error) {
+	_ = rc // Suppress unused parameter warning
 	files := make([]FileInfo, 0)
 
 	err := filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {

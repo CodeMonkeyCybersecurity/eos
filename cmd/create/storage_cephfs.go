@@ -67,10 +67,7 @@ Prerequisites:
 		// Orchestrate deployment phases
 		if !config.TerraformOnly {
 			logger.Info("Phase 1: SaltStack configuration generation")
-			if err := cephfs.GenerateSaltStackConfig(rc, config); err != nil {
-				logger.Error("SaltStack configuration generation failed", zap.Error(err))
-				return err
-			}
+			return fmt.Errorf("SaltStack-based CephFS deployment has been migrated to HashiCorp stack. Please contact your administrator for distributed storage deployment assistance")
 		}
 
 		if !config.SaltOnly {

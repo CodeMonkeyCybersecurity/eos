@@ -14,7 +14,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
@@ -237,13 +236,9 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
-	// Remove Salt using its lifecycle manager
+	// Salt removal is no longer needed - migrated to HashiCorp stack
 	if !excluded["salt"] {
-		logger.Info("Removing Salt completely")
-		if err := saltstack.RemoveSaltCompletely(rc, keepData); err != nil {
-			logger.Warn("Salt removal had issues", zap.Error(err))
-			errors = append(errors, fmt.Sprintf("salt: %v", err))
-		}
+		logger.Info("Salt removal skipped - already migrated to HashiCorp stack")
 	}
 
 	// Remove Vault using its lifecycle manager

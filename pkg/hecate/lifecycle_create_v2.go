@@ -47,8 +47,8 @@ func OrchestrateHecateDeployment(rc *eos_io.RuntimeContext) error {
 	// Deploy based on selected method
 	switch config.Method {
 	case DeploymentMethodSaltStack:
-		logger.Info("Deploying Hecate with SaltStack")
-		return DeployWithSaltStack(rc)
+		logger.Info("SaltStack deployment requires administrator intervention")
+		return fmt.Errorf("SaltStack deployment has been migrated to HashiCorp stack. Please use Docker or Manual deployment methods, or contact your administrator for system-level deployment assistance")
 	
 	case DeploymentMethodDocker:
 		logger.Info("Deploying Hecate with Docker Compose")

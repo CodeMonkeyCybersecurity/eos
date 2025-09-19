@@ -263,6 +263,7 @@ func readDiskStats() (map[string]diskStats, error) {
 }
 
 func getIOStatsFromProc(rc *eos_io.RuntimeContext, device string) (*IOMetrics, error) {
+	_ = rc // Suppress unused parameter warning
 	stats, err := readDiskStats()
 	if err != nil {
 		return nil, err

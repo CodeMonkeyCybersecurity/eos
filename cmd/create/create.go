@@ -38,7 +38,11 @@ For example:
 
 func init() {
 	// Initialize the shared logger for the entire deploy package
-
+	
+	// Add storage and VM management commands
+	CreateCmd.AddCommand(storageUdisks2Cmd)
+	CreateCmd.AddCommand(vmLibvirtCmd)
+	CreateCmd.AddCommand(storageUnifiedCmd)
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions

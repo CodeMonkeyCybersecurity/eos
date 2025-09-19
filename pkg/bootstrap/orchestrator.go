@@ -315,7 +315,7 @@ func phaseSalt(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterI
 	logger.Info("Installing and configuring SaltStack")
 	
 	// Use the comprehensive Salt bootstrap that includes both Salt and file roots setup
-	return BootstrapSaltComplete(rc, info)
+	return BootstrapHashiCorpComplete(rc, info)
 }
 
 func phaseSaltAPI(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {

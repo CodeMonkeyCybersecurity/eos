@@ -149,7 +149,7 @@ Examples:
 
 		// Default to SaltStack deployment with services
 		log.Info("Using SaltStack deployment method")
-		return hecate.DeployWithSaltStackAndServices(rc, services)
+		return fmt.Errorf("SaltStack deployment has been migrated to HashiCorp stack. Please use 'eos create hecate' for Docker-based deployment, or contact your administrator for system-level deployment assistance")
 	}),
 }
 

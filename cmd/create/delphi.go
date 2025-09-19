@@ -78,7 +78,7 @@ EXAMPLES:
 		}
 
 		tmpDir := "/tmp"
-		scriptURL := "https://packages.wazuh.com/4.11/wazuh-install.sh"
+		scriptURL := "https://packages.wazuh.com/4.13/wazuh-install.sh"
 		scriptPath := filepath.Join(tmpDir, "wazuh-install.sh")
 
 		log.Info("Downloading Wazuh installer", zap.String("url", scriptURL))
@@ -150,7 +150,6 @@ EXAMPLES:
 		return nil
 	}),
 }
-
 
 var mappingCmd = &cobra.Command{
 	Use:   "mapping",

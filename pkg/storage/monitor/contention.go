@@ -249,6 +249,7 @@ func detectContentionWithIostat(rc *eos_io.RuntimeContext) ([]ContentionMetrics,
 }
 
 func detectContentionFromProc(rc *eos_io.RuntimeContext) ([]ContentionMetrics, error) {
+	_ = rc // Suppress unused parameter warning
 	// Read CPU stats for I/O wait
 	cpuStat, err := readCPUStat()
 	if err != nil {
