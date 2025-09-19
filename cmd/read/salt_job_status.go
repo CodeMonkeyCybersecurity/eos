@@ -11,30 +11,30 @@ import (
 	"go.uber.org/zap"
 )
 
-var saltJobStatusCmd = &cobra.Command{
-	Use:     "salt-job-status <job-id>",
-	Aliases: []string{"salt-job-info", "saltstack-job-status"},
-	Short:   "Get detailed Salt job status and information",
-	Long: `Get detailed status and information for a specific Salt job.
+var nomadJobStatusCmd = &cobra.Command{
+	Use:     "nomad-job-status <job-id>",
+	Aliases: []string{"job-status", "nomad-job-info"},
+	Short:   "Get detailed Nomad job status and information",
+	Long: `Get detailed status and information for a specific Nomad job.
 
-This command retrieves comprehensive information about a Salt job including:
+This command retrieves comprehensive information about a Nomad job including:
 - Current execution status and progress
-- Function being executed and arguments
-- Target minions and their individual status
+- Job specification and configuration
+- Allocation status across nodes
 - Start time, duration, and completion time
 - Error messages and failure details
 
 Examples:
-  eos read salt-job-status 20240112123456789      # Get job status
-  eos read salt-job-status 20240112123456789 --json  # Output in JSON format
-  eos read salt-job-status 20240112123456789 --details  # Include full response details
+  eos read nomad-job-status my-web-service      # Get job status
+  eos read nomad-job-status my-web-service --json  # Output in JSON format
+  eos read nomad-job-status my-web-service --details  # Include full allocation details
 
 Job States:
-  - Running: Job is currently executing
-  - Complete: Job finished successfully  
-  - Failed: Job completed with errors
-  - Killed: Job was manually terminated
-  - Timeout: Job exceeded time limit`,
+  - pending: Job is queued for scheduling
+  - running: Job is currently executing
+  - complete: Job finished successfully  
+  - failed: Job completed with errors
+  - dead: Job was stopped or killed`,
 
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -46,21 +46,23 @@ Job States:
 		_, _ = cmd.Flags().GetBool("json")
 		includeDetails, _ := cmd.Flags().GetBool("details")
 
-		logger.Info("Getting Salt job status",
+		logger.Info("Getting Nomad job status",
 			zap.String("job_id", jobID),
 			zap.Bool("include_details", includeDetails))
 
-		// Temporarily disabled due to interface changes
-		logger.Warn("Salt job status feature temporarily disabled during refactoring",
-			zap.String("job_id", jobID))
-		return fmt.Errorf("GetJobStatus method not available in current saltstack.KeyManager interface")
+		// TODO: Implement Nomad job status retrieval
+		// This should use the Nomad API to get job status
+		logger.Info("terminal prompt: Nomad job status retrieval not yet implemented")
+		logger.Info("terminal prompt: Job ID:", zap.String("job_id", jobID))
+		logger.Info("terminal prompt: Use 'nomad job status" + jobID + "' directly for now")
+		return fmt.Errorf("Nomad job status integration pending - use nomad CLI directly")
 	}),
 }
 
 func init() {
-	saltJobStatusCmd.Flags().Bool("json", false, "Output results in JSON format")
-	saltJobStatusCmd.Flags().Bool("details", false, "Include full response details from minions")
+	nomadJobStatusCmd.Flags().Bool("json", false, "Output results in JSON format")
+	nomadJobStatusCmd.Flags().Bool("details", false, "Include full allocation details")
 
-	ReadCmd.AddCommand(saltJobStatusCmd)
+	ReadCmd.AddCommand(nomadJobStatusCmd)
 }
 

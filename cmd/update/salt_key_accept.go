@@ -11,71 +11,69 @@ import (
 	"go.uber.org/zap"
 )
 
-var saltKeyAcceptCmd = &cobra.Command{
-	Use:     "salt-key-accept [pattern]",
-	Aliases: []string{"salt-key-approve", "accept-salt-keys"},
-	Short:   "Accept Salt minion authentication keys",
-	Long: `Accept Salt minion authentication keys to allow communication.
+var consulNodeJoinCmd = &cobra.Command{
+	Use:     "consul-node-join [node-address]",
+	Aliases: []string{"join-node", "consul-join"},
+	Short:   "Join a node to the Consul cluster",
+	Long: `Join a node to the Consul cluster for service discovery and coordination.
 
-Once a minion key is accepted, the minion can receive and execute commands
-from the Salt master. This is a security-critical operation that should
-only be performed for trusted minions.
+This command helps nodes join the Consul cluster, enabling them to participate
+in service discovery, health checking, and distributed coordination. This is
+a security-critical operation that should only be performed for trusted nodes.
 
 Examples:
-  eos update salt-key-accept 'web01'          # Accept specific minion
-  eos update salt-key-accept 'web*'           # Accept pattern match
-  eos update salt-key-accept --all            # Accept all pending keys
-  eos update salt-key-accept --include 'web01,web02'  # Accept specific list
+  eos update consul-node-join 192.168.1.10    # Join specific node
+  eos update consul-node-join --wan            # Join via WAN
+  eos update consul-node-join --retry-join     # Enable retry join
 
 Security Notice:
-  - Only accept keys from trusted minions
-  - Verify minion identity before accepting
-  - Use patterns carefully to avoid accepting unwanted keys
+  - Only join trusted nodes to the cluster
+  - Verify node identity before joining
+  - Use proper ACL tokens for authentication
   - Consider using --dry-run to preview changes`,
 
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
-		// Parse pattern from args or flags
-		var pattern string
+		// Parse node address from args
+		var nodeAddress string
 		if len(args) > 0 {
-			pattern = args[0]
+			nodeAddress = args[0]
 		}
 
 		// Parse flags
-		acceptAll, _ := cmd.Flags().GetBool("all")
-		includeList, _ := cmd.Flags().GetString("include")
+		wan, _ := cmd.Flags().GetBool("wan")
+		retryJoin, _ := cmd.Flags().GetBool("retry-join")
 		force, _ := cmd.Flags().GetBool("force")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		// Validate input
-		if !acceptAll && pattern == "" && includeList == "" {
-			return fmt.Errorf("must specify pattern, --all, or --include")
+		if nodeAddress == "" {
+			return fmt.Errorf("must specify node address")
 		}
 
-		logger.Info("Accepting Salt keys",
-			zap.String("pattern", pattern),
-			zap.Bool("accept_all", acceptAll),
-			zap.String("include_list", includeList),
+		logger.Info("Joining node to Consul cluster",
+			zap.String("node_address", nodeAddress),
+			zap.Bool("wan", wan),
+			zap.Bool("retry_join", retryJoin),
 			zap.Bool("force", force),
 			zap.Bool("dry_run", dryRun))
 
 		if dryRun {
-			logger.Info("terminal prompt: DRY RUN: Would accept Salt keys")
-			if acceptAll {
-				logger.Info("terminal prompt:   Target: All pending keys")
-			} else if pattern != "" {
-				logger.Info("terminal prompt:   Pattern", zap.String("pattern", pattern))
-			} else if includeList != "" {
-				logger.Info("terminal prompt:   Include List", zap.String("include_list", includeList))
+			logger.Info("terminal prompt: DRY RUN: Would join node to Consul cluster")
+			logger.Info("terminal prompt:   Node Address:", zap.String("node_address", nodeAddress))
+			if wan {
+				logger.Info("terminal prompt:   Join Type: WAN")
+			} else {
+				logger.Info("terminal prompt:   Join Type: LAN")
 			}
 			return nil
 		}
 
-		// Security confirmation for --all
-		if acceptAll && !force {
-			logger.Info("terminal prompt: WARNING: This will accept ALL pending keys. Continue? [y/N]: ")
+		// Security confirmation for node join
+		if !force {
+			logger.Info("terminal prompt: WARNING: This will join node to cluster. Continue? [y/N]: ")
 			var response string
 			if _, err := fmt.Scanln(&response); err != nil {
 				// If we can't read user input, default to cancel for security
@@ -86,17 +84,19 @@ Security Notice:
 			}
 		}
 
-		// Salt key accept feature temporarily disabled during refactoring
-		logger.Warn("Salt key accept feature temporarily disabled during refactoring")
-		return fmt.Errorf("AcceptKeys methods not available in current saltstack.KeyManager interface")
+		// TODO: Implement Consul node join functionality
+		logger.Info("terminal prompt: Consul node join not yet implemented")
+		logger.Info("terminal prompt: Node Address:", zap.String("node_address", nodeAddress))
+		logger.Info("terminal prompt: Use 'consul join" + nodeAddress + "' directly for now")
+		return fmt.Errorf("Consul node join integration pending - use consul CLI directly")
 	}),
 }
 
 func init() {
-	saltKeyAcceptCmd.Flags().Bool("all", false, "Accept all pending keys")
-	saltKeyAcceptCmd.Flags().String("include", "", "Comma-separated list of specific keys to accept")
-	saltKeyAcceptCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompts")
-	saltKeyAcceptCmd.Flags().Bool("dry-run", false, "Show what would be accepted without making changes")
+	consulNodeJoinCmd.Flags().Bool("wan", false, "Join via WAN")
+	consulNodeJoinCmd.Flags().Bool("retry-join", false, "Enable retry join")
+	consulNodeJoinCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompts")
+	consulNodeJoinCmd.Flags().Bool("dry-run", false, "Show what would be joined without making changes")
 
-	UpdateCmd.AddCommand(saltKeyAcceptCmd)
+	UpdateCmd.AddCommand(consulNodeJoinCmd)
 }

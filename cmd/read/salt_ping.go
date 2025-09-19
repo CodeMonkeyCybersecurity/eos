@@ -12,63 +12,65 @@ import (
 	"go.uber.org/zap"
 )
 
-var saltPingCmd = &cobra.Command{
-	Use:     "salt-ping [target]",
-	Aliases: []string{"salt-connectivity", "salt-minion-ping"},
-	Short:   "Test Salt minion connectivity and responsiveness",
-	Long: `Test Salt minion connectivity and responsiveness by sending test.ping.
+var consulHealthCmd = &cobra.Command{
+	Use:     "consul-health [service]",
+	Aliases: []string{"health-check", "consul-ping"},
+	Short:   "Check Consul service health and connectivity",
+	Long: `Check Consul service health and connectivity across the cluster.
 
-This command sends a test.ping to the specified minions and reports
-which minions are responsive. It's useful for checking minion health
-and connectivity before running other Salt operations.
+This command queries Consul for service health status and reports
+which services are healthy and responsive. It's useful for checking
+service health before running operations.
 
 Examples:
-  eos read salt-ping '*'                         # Ping all minions
-  eos read salt-ping 'web*'                      # Ping web servers
-  eos read salt-ping 'web01,web02'               # Ping specific minions (list target type)
-  eos read salt-ping 'os:Ubuntu' --target-type grain  # Ping Ubuntu minions via grain
+  eos read consul-health                         # Check all services
+  eos read consul-health web                     # Check web services
+  eos read consul-health --node web01            # Check specific node
+  eos read consul-health --datacenter dc1        # Check specific datacenter
   
-Target Types:
-  glob     - Shell-style wildcards (default)
-  pcre     - Perl-compatible regular expressions
-  list     - Comma-separated list of minion IDs
-  grain    - Match based on grains data
-  pillar   - Match based on pillar data
-  nodegroup - Match based on nodegroup`,
+Health States:
+  passing  - Service is healthy
+  warning  - Service has warnings
+  critical - Service is unhealthy
+  maintenance - Service is in maintenance mode`,
 
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
-		// Parse target - default to '*' if not provided
-		target := "*"
+		// Parse service - default to all services if not provided
+		service := ""
 		if len(args) > 0 {
-			target = args[0]
+			service = args[0]
 		}
 
 		// Parse flags
-		targetType, _ := cmd.Flags().GetString("target-type")
+		node, _ := cmd.Flags().GetString("node")
+		datacenter, _ := cmd.Flags().GetString("datacenter")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
 		_, _ = cmd.Flags().GetBool("json")
 		_, _ = cmd.Flags().GetBool("verbose")
 
-		logger.Info("Starting Salt minion ping",
-			zap.String("target", target),
-			zap.String("target_type", targetType),
+		logger.Info("Checking Consul service health",
+			zap.String("service", service),
+			zap.String("node", node),
+			zap.String("datacenter", datacenter),
 			zap.Duration("timeout", timeout))
 
-		// Salt ping feature temporarily disabled during refactoring
-		logger.Warn("Salt ping feature temporarily disabled during refactoring",
-			zap.String("target", target))
-		return fmt.Errorf("ping method not available in current saltstack.KeyManager interface")
+		// TODO: Implement Consul health check integration
+		logger.Info("terminal prompt: Consul health check not yet implemented")
+		logger.Info("terminal prompt: Service:", zap.String("service", service))
+		logger.Info("terminal prompt: Use 'consul members' and 'consul catalog services' directly for now")
+		return fmt.Errorf("Consul health check integration pending - use consul CLI directly")
 	}),
 }
 
 func init() {
-	saltPingCmd.Flags().String("target-type", "glob", "Target type: glob, pcre, list, grain, pillar, nodegroup")
-	saltPingCmd.Flags().Duration("timeout", 10*time.Second, "Timeout for ping operation")
-	saltPingCmd.Flags().Bool("json", false, "Output results in JSON format")
-	saltPingCmd.Flags().BoolP("verbose", "v", false, "Verbose output with timing information")
+	consulHealthCmd.Flags().String("node", "", "Check specific node")
+	consulHealthCmd.Flags().String("datacenter", "", "Check specific datacenter")
+	consulHealthCmd.Flags().Duration("timeout", 10*time.Second, "Timeout for health check")
+	consulHealthCmd.Flags().Bool("json", false, "Output results in JSON format")
+	consulHealthCmd.Flags().BoolP("verbose", "v", false, "Verbose output with detailed health information")
 
-	ReadCmd.AddCommand(saltPingCmd)
+	ReadCmd.AddCommand(consulHealthCmd)
 }

@@ -75,7 +75,7 @@ func (d *BTRFSDriver) RestoreSnapshot(ctx context.Context, id string, snapshotNa
 // ZFSDriver implements StorageDriver for ZFS datasets
 type ZFSDriver struct {
 	rc      *eos_io.RuntimeContext
-	salt    *NomadClient
+	salt    NomadClient
 	manager *zfs_management.ZFSManager
 }
 

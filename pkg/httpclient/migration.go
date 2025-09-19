@@ -272,7 +272,7 @@ resp, err := newClient.Get(ctx, url)
 			Recommendation: "Use httpclient.MigrateFromSaltStackClient()",
 			Example: `
 // OLD
-client := saltstack.NewClient(baseURL, username, password, insecure)
+// client := saltstack.NewClient(baseURL, username, password, insecure) // Deprecated
 
 // NEW
 client, _ := httpclient.MigrateFromSaltStackClient(baseURL, username, password, insecure)

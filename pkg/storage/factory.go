@@ -131,11 +131,11 @@ type BTRFSDriverFactory struct {
 
 // CreateDriver creates a BTRFS storage driver
 func (f *BTRFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config DriverConfig) (StorageDriver, error) {
-	// The BTRFSDriver in drivers_stubs.go expects *saltstack.Client
-	// So we need to type assert or pass nil for now
+	// The BTRFSDriver uses NomadClient for orchestration
+	// Storage operations are handled through Nomad job scheduling
 	return &BTRFSDriver{
 		rc:   rc,
-		salt: nil, // TODO: Fix this when adapting NomadClient interface
+		salt: f.salt, // NomadClient for orchestration
 	}, nil
 }
 
@@ -156,7 +156,7 @@ func (f *ZFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driver
 
 	return &ZFSDriver{
 		rc:      rc,
-		salt:    nil, // TODO: Fix this when adapting NomadClient interface
+		salt:    f.salt, // NomadClient for orchestration
 		manager: manager,
 	}, nil
 }
@@ -173,11 +173,11 @@ type CephFSDriverFactory struct {
 
 // CreateDriver creates a CephFS storage driver
 func (f *CephFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config DriverConfig) (StorageDriver, error) {
-	// The CephFSDriver in drivers_stubs.go expects *saltstack.Client
-	// So we need to type assert or pass nil for now
+	// The CephFSDriver uses NomadClient for distributed storage orchestration
+	// CephFS operations are handled through Nomad job scheduling
 	return &CephFSDriver{
 		rc:   rc,
-		salt: nil, // TODO: Fix this when adapting NomadClient interface
+		salt: f.salt, // NomadClient for orchestration
 	}, nil
 }
 
