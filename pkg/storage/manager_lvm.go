@@ -383,7 +383,6 @@ func (m *LVMManager) checkPhysicalVolume(device string) (bool, error) {
 	saltConfig := SaltStackConfig{
 		Target: "*",
 		State:  "lvm.pv_present",
-		Test:   true, // Just check, don't create
 		Pillar: map[string]interface{}{
 			"device": device,
 		},
@@ -425,7 +424,6 @@ func (m *LVMManager) checkVolumeGroup(name string) (bool, error) {
 	saltConfig := SaltStackConfig{
 		Target: "*",
 		State:  "lvm.vg_present",
-		Test:   true, // Just check, don't create
 		Pillar: map[string]interface{}{
 			"name": name,
 		},

@@ -403,7 +403,7 @@ func (dm *DiskManagerImpl) backupPartitionTable(rc *eos_io.RuntimeContext, devic
 	return os.WriteFile(backupFile, output, 0644)
 }
 
-func (dm *DiskManagerImpl) createPartitionWithFdisk(rc *eos_io.RuntimeContext, device string, options *PartitionOptions) error {
+func (dm *DiskManagerImpl) createPartitionWithFdisk(rc *eos_io.RuntimeContext, device string, _ *PartitionOptions) error {
 	// This is a simplified implementation - production would need more sophisticated fdisk interaction
 	fdiskCommands := "n\np\n1\n\n\nw\n"
 
@@ -550,14 +550,14 @@ func (dm *DiskManagerImpl) parseDiskutilOutput(output string) ([]DiskInfo, error
 	return disks, nil
 }
 
-func (dm *DiskManagerImpl) parsePartitionsFromLsblk(output string) ([]PartitionInfo, error) {
+func (dm *DiskManagerImpl) parsePartitionsFromLsblk(_ string) ([]PartitionInfo, error) {
 	// Simplified partition parsing from lsblk output
 	var partitions []PartitionInfo
 	// Implementation would parse the JSON output and extract partition information
 	return partitions, nil
 }
 
-func (dm *DiskManagerImpl) parsePartitionsFromDiskutil(output string) ([]PartitionInfo, error) {
+func (dm *DiskManagerImpl) parsePartitionsFromDiskutil(_ string) ([]PartitionInfo, error) {
 	// Simplified partition parsing from diskutil output
 	var partitions []PartitionInfo
 	// Implementation would parse the diskutil output and extract partition information

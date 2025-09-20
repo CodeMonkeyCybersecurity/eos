@@ -158,14 +158,6 @@ type NomadStatus struct {
 	LastError      string
 }
 
-// TODO: Nomad status checking - removed during HashiCorp migration
-// This function was replaced with native Nomad installer status checking
-// checkNomadStatus checks the status of Nomad service
-// nolint:unused // Will be used in Nomad health checks
-func checkNomadStatus(rc *eos_io.RuntimeContext) (*NomadStatus, error) {
-	// TODO: Implement Nomad status checking if needed
-	return &NomadStatus{}, fmt.Errorf("nomad status checking not implemented - use native installer")
-}
 
 // runCreateNomadNative installs Nomad using the native installer
 func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
