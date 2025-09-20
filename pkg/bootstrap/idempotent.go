@@ -37,7 +37,7 @@ func PerformIdempotentBootstrap(rc *eos_io.RuntimeContext, opts *BootstrapOption
 	}
 
 	// Define components to check/install
-	components := []string{"salt", "salt-api", "vault", "consul", "nomad"}
+	components := []string{"vault", "consul", "nomad"}
 
 	for _, component := range components {
 		logger.Info("Checking component", zap.String("component", component))
@@ -180,10 +180,6 @@ func checkComponentIdempotency(rc *eos_io.RuntimeContext, component string) Comp
 // isComponentInstalledIdempotent checks if a component is installed
 func isComponentInstalledIdempotent(rc *eos_io.RuntimeContext, component string) bool {
 	switch component {
-	case "salt", "salt-master":
-		return checkPackageInstalled(rc, "salt-master")
-	case "salt-api":
-		return checkPackageInstalled(rc, "salt-api")
 	case "vault":
 		return checkBinaryExists(rc, "vault")
 	case "consul":
@@ -219,7 +215,7 @@ func checkBinaryExists(rc *eos_io.RuntimeContext, binaryName string) bool {
 
 // isServiceComponent checks if a component is a systemd service
 func isServiceComponent(component string) bool {
-	serviceComponents := []string{"salt", "salt-master", "salt-api", "vault", "consul", "nomad"}
+	serviceComponents := []string{"vault", "consul", "nomad"}
 	for _, service := range serviceComponents {
 		if component == service {
 			return true
@@ -233,10 +229,7 @@ func isConfigurationCorrect(rc *eos_io.RuntimeContext, component string) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	switch component {
-	case "salt", "salt-master":
-		return checkSaltConfiguration(rc)
-	case "salt-api":
-		return checkSaltAPIConfiguration(rc)
+
 	case "vault":
 		return checkVaultConfiguration(rc)
 	case "consul":
@@ -249,47 +242,7 @@ func isConfigurationCorrect(rc *eos_io.RuntimeContext, component string) bool {
 	}
 }
 
-// checkSaltConfiguration checks if Salt configuration is correct
-func checkSaltConfiguration(rc *eos_io.RuntimeContext) bool {
-	// Check if Salt master config exists and has basic required settings
-	configPath := "/etc/salt/master"
-	content, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "cat",
-		Args:    []string{configPath},
-		Capture: true,
-	})
-	
-	if err != nil {
-		return false
-	}
 
-	// Check for basic configuration elements
-	requiredConfig := []string{
-		"file_roots:",
-		"pillar_roots:",
-	}
-
-	for _, required := range requiredConfig {
-		if !strings.Contains(content, required) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// checkSaltAPIConfiguration checks if Salt API configuration is correct
-func checkSaltAPIConfiguration(rc *eos_io.RuntimeContext) bool {
-	// Check if Salt API config exists
-	configPath := "/etc/salt/master.d/api.conf"
-	_, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "test",
-		Args:    []string{"-f", configPath},
-		Capture: false,
-	})
-	
-	return err == nil
-}
 
 // checkVaultConfiguration checks if Vault configuration is correct
 func checkVaultConfiguration(rc *eos_io.RuntimeContext) bool {
@@ -333,10 +286,6 @@ func checkNomadConfiguration(rc *eos_io.RuntimeContext) bool {
 // isServiceHealthy checks if a service is healthy
 func isServiceHealthy(rc *eos_io.RuntimeContext, component string) bool {
 	switch component {
-	case "salt", "salt-master":
-		return checkSaltHealth(rc, "salt-master")
-	case "salt-api":
-		return checkSaltHealth(rc, "salt-api")
 	case "vault":
 		return checkVaultHealth(rc)
 	case "consul":
@@ -351,8 +300,6 @@ func isServiceHealthy(rc *eos_io.RuntimeContext, component string) bool {
 // getComponentVersion gets the version of a component
 func getComponentVersion(rc *eos_io.RuntimeContext, component string) string {
 	switch component {
-	case "salt", "salt-master", "salt-api":
-		return getSaltVersion(rc)
 	case "vault":
 		return getVaultVersion(rc)
 	case "consul":
@@ -370,10 +317,7 @@ func performComponentInstall(rc *eos_io.RuntimeContext, component string, _ *Boo
 	logger.Info("Installing component", zap.String("component", component))
 
 	switch component {
-	case "salt", "salt-master":
-		return installSalt(rc)
-	case "salt-api":
-		return installSaltAPI(rc)
+
 	case "vault":
 		return installVault(rc)
 	case "consul":
@@ -393,10 +337,7 @@ func performComponentUpdate(rc *eos_io.RuntimeContext, component string, status 
 		zap.String("reason", status.Reason))
 
 	switch component {
-	case "salt", "salt-master":
-		return updateSalt(rc)
-	case "salt-api":
-		return updateSaltAPI(rc)
+
 	case "vault":
 		return updateVault(rc)
 	case "consul":
@@ -406,17 +347,6 @@ func performComponentUpdate(rc *eos_io.RuntimeContext, component string, status 
 	default:
 		return fmt.Errorf("unknown component: %s", component)
 	}
-}
-
-// Component installation functions (placeholders - would call actual implementation)
-func installSalt(rc *eos_io.RuntimeContext) error {
-	// This would call the actual Salt installation from pkg/saltstack
-	return fmt.Errorf("salt installation not yet integrated")
-}
-
-func installSaltAPI(rc *eos_io.RuntimeContext) error {
-	// This would call the actual Salt API setup
-	return fmt.Errorf("salt api installation not yet integrated")
 }
 
 func installVault(rc *eos_io.RuntimeContext) error {
@@ -432,45 +362,6 @@ func installConsul(rc *eos_io.RuntimeContext) error {
 func installNomad(rc *eos_io.RuntimeContext) error {
 	// This would call the actual Nomad installation
 	return fmt.Errorf("nomad installation not yet integrated")
-}
-
-// Component update functions (placeholders)
-func updateSalt(rc *eos_io.RuntimeContext) error {
-	// This would handle Salt configuration updates
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Updating Salt configuration")
-	
-	// Restart service if needed
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"restart", "salt-master"},
-		Capture: true,
-	})
-	
-	if err != nil {
-		return fmt.Errorf("failed to restart salt-master: %w (output: %s)", err, output)
-	}
-	
-	return nil
-}
-
-func updateSaltAPI(rc *eos_io.RuntimeContext) error {
-	// This would handle Salt API configuration updates
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Updating Salt API configuration")
-	
-	// Restart service if needed
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"restart", "salt-api"},
-		Capture: true,
-	})
-	
-	if err != nil {
-		return fmt.Errorf("failed to restart salt-api: %w (output: %s)", err, output)
-	}
-	
-	return nil
 }
 
 func updateVault(rc *eos_io.RuntimeContext) error {

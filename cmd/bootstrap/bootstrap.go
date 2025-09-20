@@ -5,10 +5,10 @@ package bootstrap
 
 import (
 	"os"
-	
-	"github.com/spf13/cobra"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/spf13/cobra"
 )
 
 // BootstrapCmd is the top-level bootstrap command
@@ -21,7 +21,7 @@ func init() {
 		Short: "Bootstrap all infrastructure components with security hardening",
 		Long: `Bootstrap all infrastructure components on a fresh system.
 This command installs and configures:
-- Salt (configuration management)
+-  (configuration management)
 - Storage Operations (monitoring and management)
 - Tailscale (secure networking)
 - OSQuery (system monitoring)
@@ -55,7 +55,7 @@ Standard Options:
   --auto-discover     Enable automatic cluster discovery`,
 		RunE: eos_cli.Wrap(runBootstrapAllTop),
 	}
-	
+
 	// Add the same flags as create bootstrap all
 	BootstrapCmd.Flags().String("join-cluster", "", "Join existing cluster at specified master address")
 	BootstrapCmd.Flags().Bool("single-node", false, "Explicitly configure as single-node deployment")
@@ -65,7 +65,7 @@ Standard Options:
 	BootstrapCmd.Flags().Bool("force", false, "Force bootstrap even if system appears to be already bootstrapped")
 	BootstrapCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 	BootstrapCmd.Flags().Bool("validate-only", false, "Only validate system requirements without bootstrapping")
-	
+
 	// Enhanced bootstrap flags
 	BootstrapCmd.Flags().Bool("verify", false, "Verify existing bootstrap without making changes")
 	BootstrapCmd.Flags().Bool("guided", false, "Use guided mode for beginners with step-by-step instructions")
@@ -73,7 +73,7 @@ Standard Options:
 	BootstrapCmd.Flags().Bool("continue", false, "Continue with existing EOS installation")
 	BootstrapCmd.Flags().Bool("clean", false, "Clean slate - remove existing services and start fresh")
 	BootstrapCmd.Flags().Bool("reconfigure", false, "Reconfigure existing services")
-	
+
 }
 
 // AddSubcommands adds all bootstrap subcommands to BootstrapCmd
@@ -90,12 +90,12 @@ func AddSubcommands() {
 func runBootstrapAllTop(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := rc.Log
 	logger.Info("Bootstrap command started")
-	
+
 	// FIXME: [P3] Using environment variable for state management is fragile
 	// Set environment variable to prevent bootstrap prompt recursion
 	os.Setenv("EOS_BOOTSTRAP_IN_PROGRESS", "1")
 	logger.Info("Set EOS_BOOTSTRAP_IN_PROGRESS=1 to prevent recursion")
-	
+
 	// Directly call the enhanced bootstrap function from bootstrap package
 	logger.Info("Calling enhanced bootstrap function")
 	return RunBootstrapAllEnhanced(rc, cmd, args)

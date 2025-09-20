@@ -1,47 +1,47 @@
-# Salt API Migration Guide
+#  API Migration Guide
 
 *Last Updated: 2025-01-25*
 
 ## Overview
 
-This document outlines the migration from direct Salt CLI commands (salt-call, salt-run, salt-key) to the unified Salt REST API using the CherryPy interface. All Salt operations in Eos must now go through the API for consistency, security, and remote management capabilities.
+This document outlines the migration from direct  CLI commands (-call, -run, -key) to the unified  REST API using the CherryPy interface. All  operations in Eos must now go through the API for consistency, security, and remote management capabilities.
 
 ## Migration Status
 
 ### Completed
-- [x] Created unified `salt.APIClient` for all Salt operations
-- [x] Created `salt.ClientFactory` for consistent client creation
-- [x] Created `salt.MigrationClient` for transitional period
+- [x] Created unified `.APIClient` for all  operations
+- [x] Created `.ClientFactory` for consistent client creation
+- [x] Created `.MigrationClient` for transitional period
 - [x] Updated Consul deployment to use API-only approach
 
 ### In Progress
-- [ ] Migrating all `salt-call` usage to API
-- [ ] Migrating all `salt-run` usage to API  
-- [ ] Migrating all `salt-key` usage to API
+- [ ] Migrating all `-call` usage to API
+- [ ] Migrating all `-run` usage to API  
+- [ ] Migrating all `-key` usage to API
 - [ ] Updating all packages to use `ClientFactory`
 
 ## API Configuration
 
-The Salt API requires the following environment variables:
+The  API requires the following environment variables:
 
 ```bash
-export SALT_API_URL="https://localhost:8000"
-export SALT_API_USER="eos-service"
-export SALT_API_PASSWORD="<secure-password>"
-export SALT_API_EAUTH="pam"  # Optional, defaults to "pam"
-export SALT_API_INSECURE="false"  # Optional, for dev environments
+export _API_URL="https://localhost:8000"
+export _API_USER="eos-service"
+export _API_PASSWORD="<secure-password>"
+export _API_EAUTH="pam"  # Optional, defaults to "pam"
+export _API_INSECURE="false"  # Optional, for dev environments
 ```
 
 ## Usage Examples
 
-### Creating a Salt Client
+### Creating a  Client
 
 ```go
 // Always use the factory to create clients
-factory := salt.NewClientFactory(rc)
+factory := .NewClientFactory(rc)
 client, err := factory.CreateClient()
 if err != nil {
-    return fmt.Errorf("Salt API not available: %w", err)
+    return fmt.Errorf(" API not available: %w", err)
 }
 ```
 
@@ -49,17 +49,17 @@ if err != nil {
 
 ```go
 // Old way (DEPRECATED)
-cmd := exec.Command("salt-call", "--local", "state.apply", "consul")
+cmd := exec.Command("-call", "--local", "state.apply", "consul")
 
 // New way
-result, err := client.ExecuteStateApply(ctx, "consul", pillar, progressFunc)
+result, err := client.ExecuteStateApply(ctx, "consul", , progressFunc)
 ```
 
 ### Command Execution
 
 ```go
 // Old way (DEPRECATED)
-cmd := exec.Command("salt-call", "--local", "cmd.run", "systemctl status consul")
+cmd := exec.Command("-call", "--local", "cmd.run", "systemctl status consul")
 
 // New way
 output, err := client.CmdRunLocal(ctx, "systemctl status consul")
@@ -69,21 +69,13 @@ output, err := client.CmdRunLocal(ctx, "systemctl status consul")
 
 ```go
 // Old way (DEPRECATED)
-cmd := exec.Command("salt-key", "-L")
+cmd := exec.Command("-key", "-L")
 
 // New way
 keyList, err := client.ListKeys(ctx)
 ```
 
-### Runner Commands
 
-```go
-// Old way (DEPRECATED)
-cmd := exec.Command("salt-run", "manage.up")
-
-// New way
-minions, err := client.ManageUp(ctx)
-```
 
 ## Migration Checklist
 
@@ -91,32 +83,32 @@ When migrating a package or command:
 
 1. **Replace Direct Imports**
    - Remove: `os/exec`, direct command execution
-   - Add: `github.com/CodeMonkeyCybersecurity/eos/pkg/salt`
+   - Add: `github.com/CodeMonkeyCybersecurity/eos/pkg/`
 
 2. **Use ClientFactory**
    ```go
-   factory := salt.NewClientFactory(rc)
+   factory := .NewClientFactory(rc)
    client, err := factory.CreateClient()
    ```
 
 3. **Update Function Calls**
-   - Replace `exec.Command("salt-call", ...)` with appropriate API method
-   - Replace `exec.Command("salt-run", ...)` with `RunnerExecute()`
-   - Replace `exec.Command("salt-key", ...)` with key management methods
+   - Replace `exec.Command("-call", ...)` with appropriate API method
+   - Replace `exec.Command("-run", ...)` with `RunnerExecute()`
+   - Replace `exec.Command("-key", ...)` with key management methods
 
 4. **Handle Errors Appropriately**
    - API errors should be wrapped with context
    - Check for `ErrAuthenticationFailed` and `ErrTokenExpired`
 
 5. **Update Tests**
-   - Mock the `SaltClient` interface
+   - Mock the `Client` interface
    - Test both success and failure scenarios
 
 ## Common Patterns
 
 ### Local State Application
 ```go
-// Apply state locally with pillar data
+// Apply state locally with  data
 result, err := client.StateApplyLocal(ctx, "mystate", map[string]interface{}{
     "config": map[string]interface{}{
         "option1": "value1",
@@ -152,22 +144,22 @@ err := client.FileManage(ctx, "*", "/etc/myapp/config.yml", configContent, "0640
 
 If the API is not available, check:
 
-1. Salt API service is running: `systemctl status salt-api`
-2. API configuration exists: `/etc/salt/master.d/api.conf`
+1.  API service is running: `systemctl status -api`
+2. API configuration exists: `/etc//master.d/api.conf`
 3. Credentials are correct in environment variables
 4. Network connectivity to API endpoint
 
 ### Authentication Failures
 
 1. Verify PAM user exists and has correct permissions
-2. Check Salt master logs: `journalctl -u salt-master`
+2. Check  master logs: `journalctl -u -master`
 3. Ensure token hasn't expired (11-hour default)
 
 ### State Execution Failures
 
-1. Check Salt file_roots configuration
+1. Check  file_roots configuration
 2. Verify state files exist in correct location
-3. Review Salt master logs for detailed errors
+3. Review  master logs for detailed errors
 
 ## Future Improvements
 

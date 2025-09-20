@@ -24,7 +24,6 @@ type Config struct {
 
 	// Operational settings
 	SkipVerify    bool // Skip cluster health verification
-	SaltOnly      bool // Only generate SaltStack configuration
 	TerraformOnly bool // Only run Terraform deployment
 	ForceRedeploy bool // Force redeployment even if cluster exists
 
@@ -112,13 +111,7 @@ type DaemonStatus struct {
 	Started time.Time `json:"started"`
 }
 
-// SaltStackConfig represents the SaltStack configuration for CephFS
-type SaltStackConfig struct {
-	PillarData    map[string]any    // Pillar data for Salt states
-	StateFiles    []string          // List of state files to apply
-	TemplateVars  map[string]string // Template variables
-	TerraformPath string            // Path to generated Terraform files
-}
+
 
 // TerraformConfig represents the Terraform configuration for CephFS
 type TerraformConfig struct {
@@ -152,10 +145,6 @@ const (
 	CephLogDir    = "/var/log/ceph"
 	CephadmPath   = "/usr/local/bin/cephadm"
 
-	// Salt paths
-	SaltCephStatesDir   = "/srv/salt/ceph"
-	SaltCephPillarDir   = "/srv/pillar/ceph"
-	SaltCephTemplateDir = "/srv/salt/ceph/templates"
 
 	// Terraform paths
 	TerraformCephDir   = "/opt/eos/terraform/ceph"
@@ -232,10 +221,7 @@ func GetCephMGRPort() int {
 	return 8263 // Next available prime after shared ports
 }
 
-// GetSaltCephPillarPath returns the path to the Ceph pillar file
-func GetSaltCephPillarPath() string {
-	return SaltCephPillarDir + "/ceph.sls"
-}
+
 
 // GetTerraformCephConfigPath returns the path to the Terraform configuration
 func GetTerraformCephConfigPath() string {

@@ -5,7 +5,6 @@ package system
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -353,7 +352,7 @@ func (s *SecurityHardeningManager) AssessSecurityPosture(rc *eos_io.RuntimeConte
 	return assessment, nil
 }
 
-// SetupTwoFactorAuthentication configures 2FA via SaltStack
+// SetupTwoFactorAuthentication configures 2FA via
 func (s *SecurityHardeningManager) SetupTwoFactorAuthentication(rc *eos_io.RuntimeContext, target string, config *TwoFactorAuthConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Setting up two-factor authentication", zap.String("target", target))
@@ -559,135 +558,6 @@ func (s *SecurityHardeningManager) applyFirewallConfig(rc *eos_io.RuntimeContext
 	return fmt.Errorf("firewall configuration requires administrator intervention - HashiCorp stack cannot modify system firewall rules")
 }
 
-// SLS generation methods
-
-func (s *SecurityHardeningManager) generateTwoFactorSLS(config *TwoFactorAuthConfig) string {
-	var sls strings.Builder
-
-	sls.WriteString(`
-# Two-Factor Authentication Configuration
-google_authenticator:
-  pkg.installed:
-    - names:
-      - libpam-oath
-      - oathtool
-
-pam_oath_config:
-  file.managed:
-    - name: /etc/pam.d/sshd
-    - source: salt://security/templates/pam_sshd.j2
-    - template: jinja
-    - backup: minion
-`)
-
-	return sls.String()
-}
-
-func (s *SecurityHardeningManager) generateSSHHardeningSLS(config *SSHSecurityConfig) string {
-	var sls strings.Builder
-
-	sls.WriteString(fmt.Sprintf(`
-# SSH Hardening Configuration
-sshd_config:
-  file.managed:
-    - name: /etc/ssh/sshd_config
-    - source: salt://security/templates/sshd_config.j2
-    - template: jinja
-    - mode: 644
-    - backup: minion
-    - context:
-        port: %d
-        permit_root_login: %t
-        password_authentication: %t
-        pubkey_authentication: %t
-        max_auth_tries: %d
-
-sshd_service:
-  service.running:
-    - name: ssh
-    - enable: True
-    - reload: True
-    - watch:
-      - file: sshd_config
-`, config.Port, config.PermitRootLogin, config.PasswordAuthentication,
-		config.PubkeyAuthentication, config.MaxAuthTries))
-
-	return sls.String()
-}
-
-func (s *SecurityHardeningManager) generateUserSecuritySLS(config *UserSecurityConfig) string {
-	var sls strings.Builder
-
-	sls.WriteString(`
-# User Security Configuration
-password_policy:
-  file.managed:
-    - name: /etc/pam.d/common-password
-    - source: salt://security/templates/common-password.j2
-    - template: jinja
-    - backup: minion
-
-login_defs:
-  file.managed:
-    - name: /etc/login.defs
-    - source: salt://security/templates/login.defs.j2
-    - template: jinja
-    - backup: minion
-`)
-
-	return sls.String()
-}
-
-func (s *SecurityHardeningManager) generateSystemSecuritySLS(config *SystemSecurityConfig) string {
-	var sls strings.Builder
-
-	sls.WriteString(`
-# System Security Configuration
-sysctl_security:
-  file.managed:
-    - name: /etc/sysctl.d/99-security.conf
-    - source: salt://security/templates/sysctl-security.conf.j2
-    - template: jinja
-
-kernel_modules_blacklist:
-  file.managed:
-    - name: /etc/modprobe.d/blacklist-security.conf
-    - source: salt://security/templates/blacklist-modules.conf.j2
-    - template: jinja
-`)
-
-	return sls.String()
-}
-
-func (s *SecurityHardeningManager) generateFirewallSLS(config *FirewallConfig) string {
-	var sls strings.Builder
-
-	sls.WriteString(`
-# Firewall Configuration
-ufw_package:
-  pkg.installed:
-    - name: ufw
-
-ufw_default_policy:
-  cmd.run:
-    - name: ufw --force reset && ufw default deny incoming && ufw default allow outgoing
-    - require:
-      - pkg: ufw_package
-`)
-
-	for i, rule := range config.Rules {
-		sls.WriteString(fmt.Sprintf(`
-firewall_rule_%d:
-  cmd.run:
-    - name: ufw %s from %s to any port %s proto %s
-    - require:
-      - cmd: ufw_default_policy
-`, i, rule.Action, rule.Source, rule.Port, rule.Protocol))
-	}
-
-	return sls.String()
-}
-
 // Helper methods
 
 func (s *SecurityHardeningManager) generateTOTPSecret(rc *eos_io.RuntimeContext, user string) (string, error) {
@@ -700,8 +570,6 @@ func (s *SecurityHardeningManager) configureDropbearSSH(rc *eos_io.RuntimeContex
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Warn("Dropbear SSH configuration requires administrator intervention - HashiCorp stack cannot configure system SSH services",
 		zap.String("target", target))
-
-	// SLS content generation removed - administrator escalation required
 
 	return fmt.Errorf("dropbear SSH configuration requires administrator intervention - HashiCorp stack cannot configure system SSH services")
 }

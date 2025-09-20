@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/n8n"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
@@ -19,7 +19,7 @@ import (
 var CreateN8nCmd = &cobra.Command{
 	Use:   "n8n",
 	Short: "Deploy n8n workflow automation platform using Nomad orchestration",
-	Long: `Deploy n8n workflow automation platform using the SaltStack → Terraform → Nomad architecture.
+	Long: `Deploy n8n workflow automation platform using the Terraform → Nomad architecture.
 
 n8n is a powerful workflow automation tool that allows you to connect different services
 and automate tasks. This command provides a complete production-ready deployment with:
@@ -69,10 +69,10 @@ func runCreateN8n(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		return fmt.Errorf("environment discovery failed: %w", err)
 	}
 
-	logger.Info("Environment discovered automatically",
+	logger.Info("Environment discovered",
 		zap.String("environment", envConfig.Environment),
 		zap.String("datacenter", envConfig.Datacenter),
-		zap.String("secret_backend", envConfig.SecretBackend))
+		zap.String("vault_addr", envConfig.VaultAddr))
 
 	// 2. Log manual overrides if provided
 	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
@@ -90,31 +90,31 @@ func runCreateN8n(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 	// Deploy using Nomad orchestration
 	n8nConfig := &n8n.Config{
-		AdminPassword:     "admin123", // TODO: Generate secure password
-		BasicAuthEnabled:  true,
-		BasicAuthUser:     "admin",
-		BasicAuthPassword: "admin123", // TODO: Generate secure password
-		EncryptionKey:     "generated-encryption-key", // TODO: Generate secure key
-		JWTSecret:         "generated-jwt-secret", // TODO: Generate secure secret
-		PostgresUser:      "n8n",
-		PostgresPassword:  "n8n-password", // TODO: Generate secure password
-		PostgresDB:        "n8n",
-		PostgresHost:      "n8n-postgres.service.consul",
-		PostgresPort:      5432,
-		RedisHost:         "n8n-redis.service.consul",
-		RedisPort:         6379,
-		Port:              shared.PortN8n,
-		Host:              "0.0.0.0",
-		Domain:            fmt.Sprintf("n8n.%s.local", envConfig.Environment),
-		Protocol:          "https",
-		Datacenter:        envConfig.Datacenter,
-		Environment:       envConfig.Environment,
-		DataPath:          envConfig.Services.DataPath + "/n8n",
-		Workers:           1,
-		CPU:               1000,
-		Memory:            2048,
-		NomadAddr:         "http://localhost:4646",
-		VaultAddr:         "http://localhost:8200",
+		AdminPassword:        "admin123", // TODO: Generate secure password
+		BasicAuthEnabled:     true,
+		BasicAuthUser:        "admin",
+		BasicAuthPassword:    "admin123",                 // TODO: Generate secure password
+		EncryptionKey:        "generated-encryption-key", // TODO: Generate secure key
+		JWTSecret:            "generated-jwt-secret",     // TODO: Generate secure secret
+		PostgresUser:         "n8n",
+		PostgresPassword:     "n8n-password", // TODO: Generate secure password
+		PostgresDB:           "n8n",
+		PostgresHost:         "n8n-postgres.service.consul",
+		PostgresPort:         5432,
+		RedisHost:            "n8n-redis.service.consul",
+		RedisPort:            6379,
+		Port:                 shared.PortN8n,
+		Host:                 "0.0.0.0",
+		Domain:               fmt.Sprintf("n8n.%s.local", envConfig.Environment),
+		Protocol:             "https",
+		Datacenter:           envConfig.Datacenter,
+		Environment:          envConfig.Environment,
+		DataPath:             envConfig.Services.DataPath + "/n8n",
+		Workers:              1,
+		CPU:                  1000,
+		Memory:               2048,
+		NomadAddr:            "http://localhost:4646",
+		VaultAddr:            "http://localhost:8200",
 		EnableUserManagement: true,
 		EnablePublicAPI:      true,
 		EnableTelemetry:      false,
@@ -158,7 +158,7 @@ func runCreateN8n(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 func init() {
 	CreateCmd.AddCommand(CreateN8nCmd)
-	
+
 	// Optional override flags - everything is automatic by default
 	CreateN8nCmd.Flags().String("admin-password", "", "Override automatic admin password generation")
 	CreateN8nCmd.Flags().IntP("port", "p", 0, "Override automatic port assignment (default: 8147)")

@@ -11,7 +11,6 @@ import (
 )
 
 // NomadManager handles system management operations via Nomad
-// This replaces the deprecated SaltStackManager
 type NomadManager struct {
 	address   string
 	region    string

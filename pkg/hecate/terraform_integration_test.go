@@ -117,11 +117,11 @@ func TestTerraformBasedHecateIntegration(t *testing.T) {
 		}
 
 		// Test that we can initialize secret manager without errors
-		// Other functionality requires actual Salt/Vault infrastructure
+		// Other functionality requires actual /Vault infrastructure
 		t.Logf("Secret manager initialized with backend: %s", backend)
 	})
 
-	// Test stream manager functionality  
+	// Test stream manager functionality
 	t.Run("StreamManager", func(t *testing.T) {
 		client := &HecateClient{
 			rc: rc,
@@ -192,7 +192,7 @@ func TestTerraformBasedHecateIntegration(t *testing.T) {
 
 		client := &HecateClient{rc: rc}
 		sm := NewStreamManager(client)
-		
+
 		err := sm.validateCreateRequest(streamReq)
 		if err != nil {
 			t.Errorf("Valid stream request should not fail validation: %v", err)
@@ -207,9 +207,9 @@ func TestTerraformBasedHecateIntegration(t *testing.T) {
 	})
 }
 
-func TestTerraformSaltIntegration(t *testing.T) {
-	// Test the Salt state integration
-	t.Run("SaltStateGeneration", func(t *testing.T) {
+func TestTerraformIntegration(t *testing.T) {
+	// Test the  state integration
+	t.Run("StateGeneration", func(t *testing.T) {
 		route := &RouteInfo{
 			Domain:     "app.example.com",
 			Upstreams:  []string{"10.0.1.100:3000"},
@@ -217,16 +217,16 @@ func TestTerraformSaltIntegration(t *testing.T) {
 			Headers:    map[string]string{"X-Environment": "production"},
 		}
 
-		// Verify route data structure is correct for Salt templates
+		// Verify route data structure is correct for  templates
 		if route.Domain == "" {
-			t.Error("Domain should be set for Salt state")
+			t.Error("Domain should be set for  state")
 		}
 
 		if len(route.Upstreams) == 0 {
-			t.Error("Upstreams should be set for Salt state")
+			t.Error("Upstreams should be set for  state")
 		}
 
-		t.Logf("Route ready for Salt state: domain=%s, upstreams=%v", 
+		t.Logf("Route ready for  state: domain=%s, upstreams=%v",
 			route.Domain, route.Upstreams)
 	})
 

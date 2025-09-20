@@ -19,7 +19,7 @@ func NewPipelineOrchestrator(config *PipelineConfig) (*PipelineOrchestrator, err
 	}, nil
 }
 
-// Execute runs the complete CI/CD pipeline following the Salt → Terraform → Nomad orchestration hierarchy
+// Execute runs the complete CI/CD pipeline following the  → Terraform → Nomad orchestration hierarchy
 func (po *PipelineOrchestrator) Execute(rc *eos_io.RuntimeContext, trigger TriggerInfo) (*PipelineExecution, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -129,7 +129,7 @@ func (po *PipelineOrchestrator) Execute(rc *eos_io.RuntimeContext, trigger Trigg
 		Message:     fmt.Sprintf("Pipeline completed successfully for %s", po.config.AppName),
 		Timestamp:   time.Now(),
 		Metadata: map[string]interface{}{
-			"duration":       execution.Duration.String(),
+			"duration":        execution.Duration.String(),
 			"artifacts_count": len(execution.Artifacts),
 		},
 	})
@@ -321,7 +321,7 @@ func (po *PipelineOrchestrator) executeTestStage(ctx context.Context, stage Stag
 	return nil
 }
 
-// executeDeployStage handles the deployment stage via Salt → Terraform → Nomad
+// executeDeployStage handles the deployment stage via  → Terraform → Nomad
 func (po *PipelineOrchestrator) executeDeployStage(ctx context.Context, stage StageConfig, execution *StageExecution) error {
 	logger := otelzap.Ctx(ctx)
 
@@ -335,49 +335,6 @@ func (po *PipelineOrchestrator) executeDeployStage(ctx context.Context, stage St
 		Source:    "orchestrator",
 		Stage:     stage.Name,
 	})
-
-	// Check Salt connectivity
-	if err := po.saltClient.Ping(ctx, po.config.Infrastructure.Salt.Targets); err != nil {
-		return fmt.Errorf("salt connectivity check failed: %w", err)
-	}
-
-	// Intervention: Execute deployment through Salt orchestration
-	logger.Info("Executing Salt orchestration", zap.String("stage", stage.Name))
-	execution.Logs = append(execution.Logs, LogEntry{
-		Timestamp: time.Now(),
-		Level:     "info",
-		Message:   "Starting Salt orchestration",
-		Source:    "salt",
-		Stage:     stage.Name,
-	})
-
-	// Prepare Salt pillar data
-	pillarData := map[string]interface{}{
-		po.config.AppName: map[string]interface{}{
-			"version":     po.config.Version,
-			"git_commit":  po.config.Git.Commit,
-			"environment": po.config.Deployment.Environment,
-			"domain":      po.config.Deployment.Domain,
-			"resources":   po.config.Deployment.Resources,
-			"image":       fmt.Sprintf("%s/%s:%s", po.config.Build.Registry, po.config.Build.Image, po.config.Version),
-		},
-		"docker": map[string]interface{}{
-			"registry": po.config.Build.Registry,
-		},
-	}
-
-	// Execute Salt orchestration state
-	orchestrateState := fmt.Sprintf("%s.deploy", po.config.AppName)
-	if err := po.saltClient.ExecuteOrchestrate(ctx, orchestrateState, pillarData); err != nil {
-		execution.Logs = append(execution.Logs, LogEntry{
-			Timestamp: time.Now(),
-			Level:     "error",
-			Message:   fmt.Sprintf("Salt orchestration failed: %s", err.Error()),
-			Source:    "salt",
-			Stage:     stage.Name,
-		})
-		return fmt.Errorf("salt orchestration failed: %w", err)
-	}
 
 	// Evaluation: Verify deployment health
 	logger.Info("Evaluating deployment health", zap.String("stage", stage.Name))
@@ -532,15 +489,15 @@ func (po *PipelineOrchestrator) Rollback(rc *eos_io.RuntimeContext, executionID,
 		Timestamp:   time.Now(),
 	})
 
-	// Execute Salt rollback orchestration
-	pillarData := map[string]interface{}{
+	// Execute  rollback orchestration
+	Data := map[string]interface{}{
 		"rollback_reason": "manual_rollback",
 		"target_version":  targetVersion,
 		"app_name":        po.config.AppName,
 	}
 
 	rollbackState := fmt.Sprintf("%s.rollback", po.config.AppName)
-	if err := po.saltClient.ExecuteOrchestrate(rc.Ctx, rollbackState, pillarData); err != nil {
+	if err := po.Client.ExecuteOrchestrate(rc.Ctx, rollbackState, Data); err != nil {
 		po.sendStatusUpdate(StatusUpdate{
 			ExecutionID: executionID,
 			Stage:       "rollback_failed",
@@ -584,14 +541,14 @@ func (po *PipelineOrchestrator) sendStatusUpdate(update StatusUpdate) {
 
 // SetClients sets the various service clients
 func (po *PipelineOrchestrator) SetClients(
-	saltClient SaltClient,
+	Client Client,
 	terraformClient TerraformClient,
 	nomadClient NomadClient,
 	vaultClient VaultClient,
 	consulClient ConsulClient,
 	buildClient BuildClient,
 ) {
-	po.saltClient = saltClient
+	po.Client = Client
 	po.terraformClient = terraformClient
 	po.nomadClient = nomadClient
 	po.vaultClient = vaultClient

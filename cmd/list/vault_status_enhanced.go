@@ -2,6 +2,8 @@
 package list
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -9,11 +11,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-// _vaultStatusEnhancedCmd demonstrates using enhanced vault container for status operations
-// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
-//
-//nolint:unused
-var _vaultStatusEnhancedCmd = &cobra.Command{
+// vaultStatusEnhancedCmd demonstrates using enhanced vault container for status operations
+var vaultStatusEnhancedCmd = &cobra.Command{
 	Use:   "vault-status-enhanced",
 	Short: "Get vault status using enhanced container pattern",
 	Long: `Demonstrates the new clean architecture pattern for vault operations.
@@ -49,7 +48,7 @@ Examples:
 
 		// TODO: This is demo code that requires container Start/Stop methods which don't exist yet
 		logger.Info("Demo function - container start would go here")
-		
+
 		// Mock cleanup for demo purposes
 		defer func() {
 			logger.Info("Demo function - container stop would go here")
@@ -85,11 +84,12 @@ Examples:
 //
 //nolint:unused
 func _performStatusChecks(rc *eos_io.RuntimeContext, container interface{}, logger *zap.Logger) error {
-	logger.Info(" Performing comprehensive status checks")
+	logger.Info("Performing comprehensive status checks")
 
 	// TODO: This is demo code that requires EnhancedVaultContainer which doesn't exist yet
-	logger.Info("Demo function - container health check would go here")
-	_ = container // Avoid unused parameter warning
+	logger.Info("Demo function - container health check would go here",
+		zap.String("context_type", fmt.Sprintf("%T", rc.Ctx)),
+		zap.Any("container_type", fmt.Sprintf("%T", container)))
 
 	return nil
 }
@@ -106,7 +106,7 @@ func _performStatusChecks(rc *eos_io.RuntimeContext, container interface{}, logg
 
 func _demonstrateVaultOperations(rc *eos_io.RuntimeContext, container interface{}, logger *zap.Logger) error {
 	logger.Info(" Demonstrating vault operations with clean architecture")
-	
+
 	// TODO: This is demo code that requires EnhancedVaultContainer which doesn't exist yet
 	logger.Info("Demo function - vault operations would go here")
 	_ = container // Avoid unused parameter warning
@@ -115,9 +115,8 @@ func _demonstrateVaultOperations(rc *eos_io.RuntimeContext, container interface{
 	return nil
 }
 
-// Example of how to add this command to the CLI
+// Register the enhanced vault status command
 func init() {
-	// This would be added to an appropriate parent command
-	// For demonstration purposes, commented out to avoid conflicts
-	// rootCmd.AddCommand(vaultStatusEnhancedCmd)
+	// Add to the list command group
+	ListCmd.AddCommand(vaultStatusEnhancedCmd)
 }

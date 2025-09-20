@@ -37,12 +37,7 @@ type DirectExecutor interface {
 	Execute(target string, command string) error
 }
 
-// SaltOperation represents a Salt operation (deprecated, kept for compatibility)
-type SaltOperation struct {
-	Target  string
-	Command string
-	Args    map[string]interface{}
-}
+
 
 // NomadOperation represents a Nomad operation
 type NomadOperation struct {

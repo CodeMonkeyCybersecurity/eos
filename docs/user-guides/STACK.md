@@ -41,8 +41,8 @@ Our infrastructure architecture combines multiple deployment strategies and orch
 - **Vault**: Secrets management using file backend for bootstrap simplicity. Bare metal deployment ensures minimal attack surface and eliminates dependency on container orchestration for critical security operations.
 
 **Orchestration and Management Services:**
-- **SaltStack**: Primary orchestrator and single source of truth for all configuration management. SaltStack serves as the authoritative system for policy enforcement and high-level operational procedures.
-- **Terraform**: Infrastructure mediation layer that translates SaltStack's declarative intentions into specific resource provisioning. Terraform provides the critical translation between configuration management and infrastructure orchestration.
+- ****: Primary orchestrator and single source of truth for all configuration management.  serves as the authoritative system for policy enforcement and high-level operational procedures.
+- **Terraform**: Infrastructure mediation layer that translates 's declarative intentions into specific resource provisioning. Terraform provides the critical translation between configuration management and infrastructure orchestration.
 - **Nomad**: Container orchestration platform operating within Terraform-defined boundaries. Nomad handles dynamic workload scheduling and container lifecycle management.
 
 **Supporting Infrastructure:**
@@ -70,11 +70,11 @@ Our infrastructure architecture combines multiple deployment strategies and orch
 
 #### Orchestration Hierarchy
 
-We will implement a three-tier orchestration hierarchy: SaltStack → Terraform → Nomad. This mediation pattern was chosen over direct integration because it solves the fundamental tension between declarative configuration management and dynamic container orchestration.
+We will implement a three-tier orchestration hierarchy:  → Terraform → Nomad. This mediation pattern was chosen over direct integration because it solves the fundamental tension between declarative configuration management and dynamic container orchestration.
 
-SaltStack excels at expressing "this is what the system should look like" through declarative states, while Nomad excels at making real-time decisions about workload placement and resource optimization. Terraform serves as the critical translation layer that maintains state consistency between these two paradigms. When SaltStack determines that an application should have certain characteristics, it generates Terraform configuration that creates appropriate Nomad job specifications. Terraform then applies this configuration and maintains ongoing state reconciliation between declared intentions and operational reality.
+ excels at expressing "this is what the system should look like" through declarative states, while Nomad excels at making real-time decisions about workload placement and resource optimization. Terraform serves as the critical translation layer that maintains state consistency between these two paradigms. When  determines that an application should have certain characteristics, it generates Terraform configuration that creates appropriate Nomad job specifications. Terraform then applies this configuration and maintains ongoing state reconciliation between declared intentions and operational reality.
 
-This approach provides several key benefits over direct integration alternatives. First, it leverages each tool's core strengths rather than forcing any single tool to handle responsibilities outside its design scope. Second, it provides clear separation of concerns where SaltStack owns policy and high-level configuration, Terraform owns infrastructure state management, and Nomad owns workload orchestration. Third, it creates a systematic approach to handling configuration drift across multiple management layers.
+This approach provides several key benefits over direct integration alternatives. First, it leverages each tool's core strengths rather than forcing any single tool to handle responsibilities outside its design scope. Second, it provides clear separation of concerns where  owns policy and high-level configuration, Terraform owns infrastructure state management, and Nomad owns workload orchestration. Third, it creates a systematic approach to handling configuration drift across multiple management layers.
 
 #### Deployment Strategy Matrix
 
@@ -114,11 +114,11 @@ This multi-storage approach acknowledges that different applications have fundam
 
 #### Separation of Concerns
 
-Our architecture maintains clear boundaries between configuration management, infrastructure provisioning, and workload orchestration. SaltStack owns high-level policy and configuration decisions. Terraform owns infrastructure state management and resource provisioning. Nomad owns container scheduling and lifecycle management. This separation prevents any single tool from becoming overly complex while ensuring that each tool operates within its core competency area.
+Our architecture maintains clear boundaries between configuration management, infrastructure provisioning, and workload orchestration.  owns high-level policy and configuration decisions. Terraform owns infrastructure state management and resource provisioning. Nomad owns container scheduling and lifecycle management. This separation prevents any single tool from becoming overly complex while ensuring that each tool operates within its core competency area.
 
 #### State Management Philosophy
 
-We will maintain state consistency across multiple management layers through systematic reconciliation and validation procedures. SaltStack provides the authoritative source for desired configuration state. Terraform maintains infrastructure state and handles drift detection between desired and actual resource configurations. Nomad maintains runtime state for active workloads. Regular validation procedures ensure that all three state representations remain consistent with each other and with operational reality.
+We will maintain state consistency across multiple management layers through systematic reconciliation and validation procedures.  provides the authoritative source for desired configuration state. Terraform maintains infrastructure state and handles drift detection between desired and actual resource configurations. Nomad maintains runtime state for active workloads. Regular validation procedures ensure that all three state representations remain consistent with each other and with operational reality.
 
 #### Security-by-Design
 
@@ -174,31 +174,31 @@ Each phase includes explicit wait conditions and health checks that prevent the 
 
 We avoid circular dependencies through careful service design and staged initialization. Vault uses a file backend specifically to avoid dependency on distributed storage during bootstrap. CephFS provides optional rather than required storage capabilities, allowing the system to operate without distributed storage during initial deployment.
 
-The SaltStack → Terraform → Nomad orchestration chain creates a unidirectional dependency flow that prevents circular dependencies in the management layer. SaltStack generates Terraform configurations based on static pillar data. Terraform provisions resources based on these configurations. Nomad schedules workloads based on Terraform-created job specifications.
+The  → Terraform → Nomad orchestration chain creates a unidirectional dependency flow that prevents circular dependencies in the management layer.  generates Terraform configurations based on static  data. Terraform provisions resources based on these configurations. Nomad schedules workloads based on Terraform-created job specifications.
 
 #### Recovery Procedures
 
 Individual component restart procedures are designed to minimize impact on running services. Vault restart requires manual unseal operations but doesn't affect running applications that have already retrieved their secrets. CephFS restart may cause temporary storage unavailability but doesn't affect applications using local or MinIO storage. Nomad restart triggers workload rescheduling but maintains application availability through rolling restart procedures.
 
-Complete system recovery follows the same startup sequence but includes additional validation steps to ensure that persistent data remains consistent across the restart. Database integrity checks validate PostgreSQL data consistency. Storage system checks validate CephFS and MinIO data integrity. Configuration validation ensures that SaltStack, Terraform, and Nomad state representations remain consistent.
+Complete system recovery follows the same startup sequence but includes additional validation steps to ensure that persistent data remains consistent across the restart. Database integrity checks validate PostgreSQL data consistency. Storage system checks validate CephFS and MinIO data integrity. Configuration validation ensures that , Terraform, and Nomad state representations remain consistent.
 
 ### 2.3 Configuration Generation Workflows
 
-#### SaltStack to Terraform Translation
+####  to Terraform Translation
 
-SaltStack generates Terraform configurations using Jinja2 templating that transforms high-level application requirements into specific infrastructure resource specifications. SaltStack pillar data contains application-level configuration including resource requirements, networking specifications, and storage needs. Template files convert this data into appropriate Terraform HCL configurations that create corresponding Nomad jobs and supporting infrastructure.
+ generates Terraform configurations using Jinja2 templating that transforms high-level application requirements into specific infrastructure resource specifications.   data contains application-level configuration including resource requirements, networking specifications, and storage needs. Template files convert this data into appropriate Terraform HCL configurations that create corresponding Nomad jobs and supporting infrastructure.
 
 The templating process includes validation steps that ensure generated Terraform configurations are syntactically correct and operationally consistent. Variable files provide parameterization that allows the same Terraform templates to be used across different environments and application types.
 
 #### State Coordination Mechanisms
 
-State consistency across SaltStack, Terraform, and Nomad requires systematic synchronization and validation procedures. SaltStack maintains authoritative configuration state in pillar data and state execution results. Terraform maintains infrastructure state in state files that track provisioned resources and their configurations. Nomad maintains runtime state about job allocations and workload health.
+State consistency across , Terraform, and Nomad requires systematic synchronization and validation procedures.  maintains authoritative configuration state in  data and state execution results. Terraform maintains infrastructure state in state files that track provisioned resources and their configurations. Nomad maintains runtime state about job allocations and workload health.
 
-Regular reconciliation procedures compare state across all three systems and alert when inconsistencies are detected. SaltStack states include validation steps that query Terraform state and Nomad status to ensure that intended configurations match operational reality. Terraform refresh cycles detect when Nomad resources have changed outside of Terraform control. Nomad health checks provide feedback about workload operational status that informs higher-level configuration decisions.
+Regular reconciliation procedures compare state across all three systems and alert when inconsistencies are detected.  states include validation steps that query Terraform state and Nomad status to ensure that intended configurations match operational reality. Terraform refresh cycles detect when Nomad resources have changed outside of Terraform control. Nomad health checks provide feedback about workload operational status that informs higher-level configuration decisions.
 
 #### Change Propagation
 
-Configuration changes flow through the orchestration hierarchy in a controlled manner that prevents partial applications and ensures consistency. SaltStack pillar data changes trigger Terraform configuration regeneration and validation. Terraform plan operations show exactly what infrastructure changes will result from configuration updates. Terraform apply operations implement changes in a way that respects resource dependencies and minimizes service disruption.
+Configuration changes flow through the orchestration hierarchy in a controlled manner that prevents partial applications and ensures consistency.   data changes trigger Terraform configuration regeneration and validation. Terraform plan operations show exactly what infrastructure changes will result from configuration updates. Terraform apply operations implement changes in a way that respects resource dependencies and minimizes service disruption.
 
 Emergency change procedures allow bypassing parts of the normal workflow when rapid response is required, but these procedures include reconciliation steps that ensure temporary changes are properly integrated into the normal configuration management workflow.
 
@@ -241,21 +241,21 @@ This section prepares operators for anticipated problems and provides strategies
 
 #### Multi-Layer Drift
 
-Configuration drift manifests differently across our three management layers, creating complex scenarios where each layer may have a different understanding of the correct system state. SaltStack drift occurs when pillar data changes or state execution fails to complete successfully. Terraform drift occurs when infrastructure resources are modified outside of Terraform control. Nomad drift occurs when job specifications are manually modified or when autonomous rescheduling changes workload placement.
+Configuration drift manifests differently across our three management layers, creating complex scenarios where each layer may have a different understanding of the correct system state.  drift occurs when  data changes or state execution fails to complete successfully. Terraform drift occurs when infrastructure resources are modified outside of Terraform control. Nomad drift occurs when job specifications are manually modified or when autonomous rescheduling changes workload placement.
 
-Detection strategies must account for the different types of drift that can occur at each layer. SaltStack state runs include validation steps that compare intended configuration with actual system state. Terraform refresh operations detect when managed resources differ from state file expectations. Nomad status monitoring identifies when job specifications or allocation patterns differ from management system expectations.
+Detection strategies must account for the different types of drift that can occur at each layer.  state runs include validation steps that compare intended configuration with actual system state. Terraform refresh operations detect when managed resources differ from state file expectations. Nomad status monitoring identifies when job specifications or allocation patterns differ from management system expectations.
 
 The most challenging drift scenarios occur when multiple layers drift simultaneously or when drift in one layer causes apparent drift in other layers. For example, manual changes to Nomad job specifications can make Terraform state appear inconsistent even though Terraform hasn't actually lost control of its resources.
 
 #### Consistency Validation
 
-Verifying that actual system state matches intended configuration across all three layers requires comprehensive validation procedures that can correlate information from different management systems. End-to-end validation procedures check that high-level application requirements specified in SaltStack pillar data result in appropriate infrastructure resources in Terraform state and operational workloads in Nomad.
+Verifying that actual system state matches intended configuration across all three layers requires comprehensive validation procedures that can correlate information from different management systems. End-to-end validation procedures check that high-level application requirements specified in   data result in appropriate infrastructure resources in Terraform state and operational workloads in Nomad.
 
 Cross-layer validation becomes particularly complex when dealing with dynamic systems like Nomad that make autonomous decisions about resource allocation. Validation procedures must distinguish between legitimate operational changes and actual configuration problems that require intervention.
 
 #### Conflict Resolution
 
-When different management layers disagree about desired system state, resolution procedures must determine which layer has authoritative information and how to restore consistency. SaltStack serves as the ultimate authority for high-level configuration decisions, but Terraform and Nomad may have more current information about infrastructure and runtime state.
+When different management layers disagree about desired system state, resolution procedures must determine which layer has authoritative information and how to restore consistency.  serves as the ultimate authority for high-level configuration decisions, but Terraform and Nomad may have more current information about infrastructure and runtime state.
 
 Conflict resolution procedures include escalation paths that determine when manual intervention is required versus when automated reconciliation can resolve inconsistencies. Emergency procedures allow bypassing normal validation when rapid response is required, but these procedures include follow-up steps that ensure emergency changes are properly integrated into normal configuration management workflows.
 
@@ -415,7 +415,7 @@ Storage boundary testing validates that applications can switch between storage 
 
 #### Integration Testing
 
-SaltStack → Terraform → Nomad workflow validation requires end-to-end testing that exercises the complete configuration generation and deployment pipeline. Test scenarios include configuration changes that affect multiple layers simultaneously, failure recovery scenarios that test state reconciliation across all three layers, and performance testing that validates the latency characteristics of the complete workflow.
+ → Terraform → Nomad workflow validation requires end-to-end testing that exercises the complete configuration generation and deployment pipeline. Test scenarios include configuration changes that affect multiple layers simultaneously, failure recovery scenarios that test state reconciliation across all three layers, and performance testing that validates the latency characteristics of the complete workflow.
 
 Integration testing includes validation that emergency procedures work correctly when normal workflows need to be bypassed. Rollback testing ensures that configuration changes can be reversed without causing service disruption. Cross-environment testing validates that the same configuration management workflow works correctly across development, staging, and production environments.
 
@@ -449,7 +449,7 @@ Alert correlation provides intelligent alerting that can distinguish between pro
 
 #### State Consistency Monitoring
 
-Automated state consistency checks compare intended configuration across SaltStack, Terraform, and Nomad to detect drift before it causes operational problems. Configuration monitoring tracks changes in any layer and validates that appropriate changes occur in dependent layers. Reconciliation monitoring ensures that periodic state synchronization operations complete successfully.
+Automated state consistency checks compare intended configuration across , Terraform, and Nomad to detect drift before it causes operational problems. Configuration monitoring tracks changes in any layer and validates that appropriate changes occur in dependent layers. Reconciliation monitoring ensures that periodic state synchronization operations complete successfully.
 
 State validation monitoring includes checks that verify end-to-end consistency between high-level application requirements and actual running services. Resource allocation monitoring ensures that intended resource allocations match actual resource usage across all management layers. Service discovery monitoring validates that registered services match deployed services across all orchestration layers.
 
@@ -519,7 +519,7 @@ Cost efficiency metrics account for both hardware utilization and operational ef
 
 System performance baselines establish expected performance characteristics for all major system components and integration points. Storage performance baselines define expected throughput and latency characteristics for CephFS, MinIO, and PostgreSQL under different workload patterns. Network performance baselines establish expected latency and throughput for communication between different system components.
 
-Authentication performance baselines define expected authentication latency and throughput across the complete authentication workflow. Orchestration performance baselines establish expected latency for configuration changes to propagate through the SaltStack → Terraform → Nomad workflow.
+Authentication performance baselines define expected authentication latency and throughput across the complete authentication workflow. Orchestration performance baselines establish expected latency for configuration changes to propagate through the  → Terraform → Nomad workflow.
 
 Application deployment performance baselines define expected deployment times for different types of applications and infrastructure changes. Backup and recovery performance baselines establish expected backup completion times and recovery time objectives for different types of failures.
 
@@ -543,7 +543,7 @@ Architectural decision review triggers define when specific architectural choice
 
 **CephFS**: Distributed file system providing shared storage capabilities across multiple nodes
 **Nomad**: HashiCorp's container orchestration platform for scheduling and managing workloads
-**SaltStack**: Configuration management and orchestration platform that ensures consistent system state
+****: Configuration management and orchestration platform that ensures consistent system state
 **Terraform**: Infrastructure as code tool that provisions and manages infrastructure resources
 **Vault**: HashiCorp's secrets management platform for securing and controlling access to tokens, passwords, and other secrets
 **Authentik**: Open-source identity provider that provides SSO and authentication capabilities

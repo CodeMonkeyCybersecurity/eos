@@ -1,4 +1,4 @@
-# SaltStack Infrastructure Scaling Guide
+#  Infrastructure Scaling Guide
 
 ## Overview
 
@@ -8,7 +8,7 @@ This guide provides a comprehensive framework for deploying and scaling infrastr
 
 ### Base Requirements (All Deployments)
 - **Operating System**: Ubuntu Server 24.04 LTS
-- **Configuration Management**: SaltStack
+- **Configuration Management**: 
 - **Infrastructure as Code**: Terraform
 - **Container Orchestration**: Nomad
 
@@ -41,7 +41,6 @@ single_node:
       - Caddy (with automatic HTTPS)
       - Authentik (minimal config)
       - Grafana (local metrics only)
-      - SaltStack Minion (masterless mode)
       - Tailscale (for remote access)
       - Terraform (local state)
     
@@ -80,7 +79,6 @@ security_focused:
       - Nginx (reverse proxy)
       - Boundary (zero-trust access)
       - Tailscale
-      - SaltStack Minion
       - Authentik (auth gateway only)
       - Nomad (client only - for edge services)
       - Terraform (read-only state access)
@@ -96,7 +94,6 @@ security_focused:
       - Nomad (server + client)
       - Vault (secrets management)
       - Grafana
-      - SaltStack Master
       - Local backup service
       - Application containers
       - Database services
@@ -112,7 +109,6 @@ reliability_focused:
     services:
       - Caddy (reverse proxy)
       - Tailscale
-      - SaltStack Minion
       - Authentik (auth gateway)
       - Nomad (client only)
       - Terraform (read-only)
@@ -124,7 +120,6 @@ reliability_focused:
       - Grafana
       - Application containers
       - Backup services
-      - SaltStack Master
       - Database services
       - Terraform (state backend)
 ```
@@ -133,7 +128,6 @@ reliability_focused:
 - **Frontend Isolation**: Keep edge nodes stateless and minimal
 - **Wazuh Deployment**: Manager MUST be on backend before agents can be deployed
 - **Vault vs Backups**: If handling sensitive data → Vault first. Otherwise → Backups first
-- **Salt Master**: Always on backend node
 - **Networking**: Keep Tailscale for now (simpler than Consul at this scale)
 
 ### Tier 3: Three Nodes (Balanced Triad)
@@ -148,7 +142,6 @@ three_node_deployment:
       - Nginx (primary reverse proxy)
       - Caddy (backup reverse proxy)
       - Boundary (zero-trust access)
-      - SaltStack Minion
       - Tailscale
       - Authentik (auth gateway mode)
       - Nomad (client only)
@@ -162,7 +155,7 @@ three_node_deployment:
     services:
       - Nomad (server)
       - Vault (primary secrets)
-      - SaltStack Master
+      -  Master
       - Consul Server (if migrating from Tailscale)
       - Primary application containers
       - Database services
@@ -205,7 +198,6 @@ specialized_deployment:
       - WAF capabilities
       - DDoS protection
       - Tailscale/Consul agent
-      - SaltStack Minion
       - Authentik (gateway mode)
       - Nomad (client only)
       - Terraform (read-only)
@@ -215,7 +207,6 @@ specialized_deployment:
     role: "Control Plane"
     services:
       - Vault (HA mode)
-      - SaltStack Master (HA)
       - Consul Server
       - Terraform (primary state backend)
       - Nomad (server - control)
@@ -267,13 +258,12 @@ specialized_deployment:
 - Boundary (if used)
 - VPN/Tailscale endpoint
 - WAF/Security filters
-- Salt Minion
 - Nomad Client (for edge workloads only)
 
 **NEVER on Edge/Frontend**:
 - Databases
 - Vault
-- Salt Master
+-  Master
 - Monitoring data stores
 - Backup services
 - Application containers (except edge-specific)
@@ -309,7 +299,7 @@ Backend Node (Wazuh Manager)
 
 ### Enhancement Services (Deploy as Resources Allow)
 1. **Monitoring**: Grafana → Prometheus → Wazuh
-2. **Automation**: Salt Master → Jenkins/GitLab CI
+2. **Automation**:  Master → Jenkins/GitLab CI
 3. **Service Mesh**: Consul Connect
 4. **Advanced Security**: Wazuh XDR, Falco
 
@@ -428,21 +418,19 @@ Backup Network:     Backend ↔ Backup storage
 
 ## Configuration Management
 
-### SaltStack Deployment Patterns
+###  Deployment Patterns
 
 **Edge Nodes**: 
-- Always Salt Minion only
 - Pull states from Master
 - No local state storage
 
 **Backend Nodes**:
-- 1 Node: Masterless minion
 - 2+ Nodes: Dedicated Master on backend
 - 3+ Nodes: Consider Master HA
 
-### Example Salt State Structure
+### Example  State Structure
 ```
-/srv/salt/
+/srv//
 ├── top.sls
 ├── roles/
 │   ├── edge/

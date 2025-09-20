@@ -3,7 +3,7 @@ package delete
 import (
 	"context"
 	"time"
-	
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nuke"
@@ -22,7 +22,7 @@ The nuke process will:
 1. Stop and remove all running services
 2. Uninstall all packages installed by eos
 3. Remove all configuration files and directories
-4. Clean up any Salt states and pillars
+4. Clean up any  states and s
 5. Remove state tracking files
 
 Use --force to skip confirmation prompts.`,
@@ -44,19 +44,19 @@ func runNuke(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	// Create a new context with 10 minute timeout for nuke operations
 	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Minute)
 	defer cancel()
-	
+
 	// Create new runtime context with extended timeout
 	nukeRC := &eos_io.RuntimeContext{
 		Ctx: ctx,
 		Log: rc.Log,
 	}
-	
+
 	// Parse flags into configuration
 	config := &nuke.Config{
-		RemoveAll:   cmd.Flag("all").Value.String() == "true",
-		Force:       cmd.Flag("force").Value.String() == "true",
-		KeepData:    cmd.Flag("keep-data").Value.String() == "true",
-		DevMode:     cmd.Flag("dev").Value.String() == "true",
+		RemoveAll: cmd.Flag("all").Value.String() == "true",
+		Force:     cmd.Flag("force").Value.String() == "true",
+		KeepData:  cmd.Flag("keep-data").Value.String() == "true",
+		DevMode:   cmd.Flag("dev").Value.String() == "true",
 	}
 
 	// Get exclude list

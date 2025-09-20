@@ -9,7 +9,7 @@ Analysis of the scripts directory reveals 100+ shell scripts and Python utilitie
 ### User Management
 - **addUser.sh** → `eos create user` / `eos create user-account`
   - Full user creation with SSH keys and secure passwords
-  - SaltStack integration for remote management
+  -  integration for remote management
   - Vault integration for password storage
 
 - **changeUserPassword.sh** → `eos update users`
@@ -39,7 +39,7 @@ Analysis of the scripts directory reveals 100+ shell scripts and Python utilitie
 
 ### Service Management
 - **manageServices.py** → `eos create service`
-  - Service deployment via SaltStack/Nomad
+  - Service deployment via /Nomad
   - Systemd service management
   - Docker Compose integration
 
@@ -179,5 +179,5 @@ Analysis of the scripts directory reveals 100+ shell scripts and Python utilitie
 - Many scripts contain interactive prompts that should be converted to flags/options
 - Error handling should follow Eos patterns with proper context
 - Logging should use structured logging with OpenTelemetry
-- Commands should integrate with existing Eos subsystems (Vault, SaltStack, etc.)
+- Commands should integrate with existing Eos subsystems (Vault, , etc.)
 - Consider grouping related scripts into subcommands (e.g., `eos storage zfs`, `eos storage resize`)

@@ -2,14 +2,13 @@
 package enrollment
 
 import (
-	"fmt"
 	"time"
 )
 
 // EnrollmentConfig holds the configuration for server enrollment
 type EnrollmentConfig struct {
 	Role           string // "master" or "minion"
-	MasterAddress  string // For minions
+	ess            string // For minions
 	Datacenter     string // Geographic location
 	NetworkMode    string // "consul-connect" or "wireguard"
 	TransitionMode bool   // True if converting from masterless
@@ -27,8 +26,7 @@ type SystemInfo struct {
 	DiskSpaceGB   int                `json:"disk_space_gb"`
 	NetworkIfaces []NetworkInterface `json:"network_interfaces"`
 	Services      []ServiceInfo      `json:"services"`
-	SaltMode      string             `json:"salt_mode"` // "masterless", "minion", "master", "none"
-	SaltVersion   string             `json:"salt_version"`
+	Version       string             `json:"_version"`
 	DockerVersion string             `json:"docker_version"`
 	KernelVersion string             `json:"kernel_version"`
 	Uptime        time.Duration      `json:"uptime"`
@@ -57,7 +55,7 @@ type ServiceInfo struct {
 	Description string `json:"description"`
 }
 
-// MasterInfo contains information about discovered salt masters
+// MasterInfo contains information about discovered  masters
 type MasterInfo struct {
 	Address    string    `json:"address"`
 	Datacenter string    `json:"datacenter"`
@@ -80,15 +78,12 @@ type EnrollmentResult struct {
 	Errors         []string      `json:"errors,omitempty"`
 }
 
-// SaltConfiguration holds salt-specific configuration
-type SaltConfiguration struct {
-	Mode         string                 `json:"mode"` // master, minion, masterless
-	MasterAddr   string                 `json:"master_addr,omitempty"`
-	MinionID     string                 `json:"minion_id"`
+// Configuration holds -specific configuration
+type Configuration struct {
 	LogLevel     string                 `json:"log_level"`
 	FileRoots    []string               `json:"file_roots"`
-	PillarRoots  []string               `json:"pillar_roots"`
-	Extensions   map[string]string      `json:"extensions"`
+	Roots        []string               `json:"_roots"`
+	Environment  map[string]interface{} `json:"environment"`
 	CustomConfig map[string]interface{} `json:"custom_config"`
 }
 
@@ -111,58 +106,25 @@ type FirewallRule struct {
 	Comment  string `json:"comment"`
 }
 
-// Constants for enrollment
+// Constants for enrollment (HashiCorp migration)
 const (
 	// Roles
-	RoleMaster = "master"
-	RoleMinion = "minion"
+	RoleMaster     = "master"
+	RoleAgent      = "agent"      // HashiCorp cluster agent
+	RoleMasterless = "standalone" // Standalone HashiCorp deployment
 
 	// Network modes
 	NetworkModeConsul    = "consul-connect"
 	NetworkModeWireGuard = "wireguard"
 	NetworkModeDirect    = "direct"
 
-	// Salt modes
-	SaltModeMaster     = "master"
-	SaltModeMinion     = "minion"
-	SaltModeMasterless = "masterless"
-	SaltModeNone       = "none"
+	// HashiCorp ports (replacing  ports)
+	PublisherPort = 4505 // For backward compatibility
+	RequestPort   = 4506 // For backward compatibility
 
-	// Salt ports
-	SaltPublisherPort = 4505
-	SaltRequestPort   = 4506
-
-	// Consul ports - deprecated, use shared.Port* constants instead
-	// ConsulHTTPPort = 8500 // Use shared.PortConsul (8161) instead
-	ConsulDNSPort  = 8600
-	ConsulSerfPort = 8301
-
-	// Default directories
-	DefaultSaltConfigDir = "/etc/salt"
-	DefaultSaltStateDir  = "/srv/salt"
-	DefaultSaltPillarDir = "/srv/pillar"
-
-	// Backup suffix
+	// Backup suffix for configuration files
 	BackupSuffix = ".eos-backup"
 )
-
-// Validation functions
-func (c *EnrollmentConfig) Validate() error {
-	if c.Role != "" && c.Role != RoleMaster && c.Role != RoleMinion {
-		return fmt.Errorf("invalid role: %s, must be 'master' or 'minion'", c.Role)
-	}
-
-	if c.Role == RoleMinion && c.MasterAddress == "" && !c.AutoDetect {
-		return fmt.Errorf("master address required for minion role")
-	}
-
-	if c.NetworkMode != "" && c.NetworkMode != NetworkModeConsul &&
-		c.NetworkMode != NetworkModeWireGuard && c.NetworkMode != NetworkModeDirect {
-		return fmt.Errorf("invalid network mode: %s", c.NetworkMode)
-	}
-
-	return nil
-}
 
 func (s *SystemInfo) HasSufficientResources() bool {
 	// Minimum requirements: 1GB RAM, 10GB disk, 1 CPU core
@@ -176,10 +138,6 @@ func (s *SystemInfo) GetPublicInterface() *NetworkInterface {
 		}
 	}
 	return nil
-}
-
-func (s *SystemInfo) IsSaltInstalled() bool {
-	return s.SaltVersion != "" && s.SaltMode != SaltModeNone
 }
 
 func (s *SystemInfo) IsDockerInstalled() bool {

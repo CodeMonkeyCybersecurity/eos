@@ -29,9 +29,9 @@ modules/wazuh-mssp/
 │   ├── jobs/
 │   ├── packs/
 │   └── policies/
-├── salt/
+├── /
 │   ├── states/
-│   ├── pillar/
+│   ├── /
 │   └── orchestration/
 ├── temporal/
 │   ├── workflows/
@@ -68,7 +68,7 @@ A multi-tenant Wazuh deployment platform for Managed Security Service Providers 
 - Self-service customer onboarding through Authentik SSO
 - Automated provisioning with Temporal workflows
 - Event-driven architecture with NATS and Benthos
-- Infrastructure as Code with Terraform and SaltStack
+- Infrastructure as Code with Terraform and 
 - Support for multiple customer tiers (starter/pro/enterprise)
 
 ## Quick Start
@@ -97,7 +97,7 @@ See [docs/architecture.md](docs/architecture.md) for detailed architecture docum
 - Nomad 1.7+ cluster
 - Temporal 1.22+ server
 - NATS 2.10+ with JetStream
-- SaltStack 3006+
+-  3006+
 - Terraform 1.5+
 ```
 
@@ -552,7 +552,7 @@ resource "libvirt_cloudinit_disk" "base_config" {
   
   user_data = templatefile("${path.module}/templates/cloud-init-base.yaml", {
     ssh_authorized_keys = var.ssh_authorized_keys
-    salt_master         = var.salt_master_ip
+    _master         = var._master_ip
   })
   
   network_config = templatefile("${path.module}/templates/network-config.yaml", {
@@ -1113,7 +1113,7 @@ job "temporal-workers" {
             }
             
             upstreams {
-              destination_name = "salt-api"
+              destination_name = "-api"
               local_bind_port  = 8080
             }
           }
@@ -1160,8 +1160,8 @@ TERRAFORM_CLOUD_TOKEN="{{ .Data.data.terraform_cloud_token }}"
 NOMAD_TOKEN="{{ .Data.data.nomad_token }}"
 CONSUL_TOKEN="{{ .Data.data.consul_token }}"
 VAULT_TOKEN="{{ .Data.data.vault_token }}"
-SALT_API_URL="{{ .Data.data.salt_api_url }}"
-SALT_API_TOKEN="{{ .Data.data.salt_api_token }}"
+_API_URL="{{ .Data.data._api_url }}"
+_API_TOKEN="{{ .Data.data._api_token }}"
 {{- end }}
 
 {{- with secret "kv/data/aws/config" }}
@@ -2312,14 +2312,14 @@ EOF
 }
 ```
 
-### 10. salt/states/wazuh/base.sls
+### 10. /states/wazuh/base.sls
 
 ```yaml
-# modules/wazuh-mssp/salt/states/wazuh/base.sls
+# modules/wazuh-mssp//states/wazuh/base.sls
 # Base Wazuh configuration state
 
-{% set customer = salt['pillar.get']('customer', {}) %}
-{% set wazuh = salt['pillar.get']('wazuh', {}) %}
+{% set customer = ['.get']('customer', {}) %}
+{% set wazuh = ['.get']('wazuh', {}) %}
 
 # Wazuh repository
 wazuh_repo:
@@ -2334,14 +2334,14 @@ wazuh_repo:
 wazuh_packages:
   pkg.installed:
     - pkgs:
-      {% if 'indexer' in grains.get('wazuh_role', []) %}
+      {% if 'indexer' in s.get('wazuh_role', []) %}
       - wazuh-indexer
       {% endif %}
-      {% if 'server' in grains.get('wazuh_role', []) %}
+      {% if 'server' in s.get('wazuh_role', []) %}
       - wazuh-manager
       - filebeat
       {% endif %}
-      {% if 'dashboard' in grains.get('wazuh_role', []) %}
+      {% if 'dashboard' in s.get('wazuh_role', []) %}
       - wazuh-dashboard
       {% endif %}
     - version: {{ wazuh.get('version', '4.8.2') }}
@@ -2384,7 +2384,7 @@ wazuh_cert_{{ cert_type }}:
   cmd.run:
     - name: |
         vault kv get -field={{ cert_type }} \
-          secret/customers/{{ customer.id }}/certificates/{{ grains['id'] }} \
+          secret/customers/{{ customer.id }}/certificates/{{ s['id'] }} \
           > /etc/wazuh-certs/{{ cert_type }}
     - creates: /etc/wazuh-certs/{{ cert_type }}
     - require:
@@ -2425,7 +2425,7 @@ wazuh_group:
     - system: True
 
 # Firewall rules based on role
-{% if 'indexer' in grains.get('wazuh_role', []) %}
+{% if 'indexer' in s.get('wazuh_role', []) %}
 wazuh_indexer_firewall:
   cmd.run:
     - names:
@@ -2434,7 +2434,7 @@ wazuh_indexer_firewall:
     - unless: ufw status | grep -E '9200|9300'
 {% endif %}
 
-{% if 'server' in grains.get('wazuh_role', []) %}
+{% if 'server' in s.get('wazuh_role', []) %}
 wazuh_server_firewall:
   cmd.run:
     - names:
@@ -2447,7 +2447,7 @@ wazuh_server_firewall:
     - unless: ufw status | grep -E '1514|1515|1516|55000|514'
 {% endif %}
 
-{% if 'dashboard' in grains.get('wazuh_role', []) %}
+{% if 'dashboard' in s.get('wazuh_role', []) %}
 wazuh_dashboard_firewall:
   cmd.run:
     - names:
@@ -2495,7 +2495,7 @@ node_exporter_wazuh_service:
         mkdir -p "$TEXTFILE_COLLECTOR_DIR"
         
         # Collect based on role
-        {% if 'server' in grains.get('wazuh_role', []) %}
+        {% if 'server' in s.get('wazuh_role', []) %}
         # Agent count
         AGENT_COUNT=$(/var/ossec/bin/agent_control -l | grep -c "Active")
         echo "wazuh_active_agents $AGENT_COUNT" > "$TEXTFILE_COLLECTOR_DIR/wazuh.prom"
@@ -2505,7 +2505,7 @@ node_exporter_wazuh_service:
         echo "wazuh_queue_size $QUEUE_SIZE" >> "$TEXTFILE_COLLECTOR_DIR/wazuh.prom"
         {% endif %}
         
-        {% if 'indexer' in grains.get('wazuh_role', []) %}
+        {% if 'indexer' in s.get('wazuh_role', []) %}
         # Index size
         INDICES_SIZE=$(curl -s -k -u admin:$ADMIN_PASSWORD https://localhost:9200/_cat/indices?bytes=b | awk '{sum+=$9} END {print sum}')
         echo "wazuh_indices_size_bytes $INDICES_SIZE" >> "$TEXTFILE_COLLECTOR_DIR/wazuh.prom"
@@ -2715,9 +2715,9 @@ func CustomerProvisioningWorkflow(ctx workflow.Context, request models.Provision
         return workflow.ExecuteActivity(ctx, activities.UndeployWazuhComponents, request.CustomerID).Get(ctx, nil)
     })
     
-    // Step 7: Configure Salt states for the customer
-    logger.Info("Applying Salt configuration")
-    err = workflow.ExecuteActivity(ctx, activities.ApplySaltConfiguration, models.SaltConfigRequest{
+    // Step 7: Configure  states for the customer
+    logger.Info("Applying  configuration")
+    err = workflow.ExecuteActivity(ctx, activities.ApplyConfiguration, models.ConfigRequest{
         CustomerID: request.CustomerID,
         Targets:    infrastructure.NodeIDs,
         States: []string{
@@ -2729,7 +2729,7 @@ func CustomerProvisioningWorkflow(ctx workflow.Context, request models.Provision
     }).Get(ctx, nil)
     
     if err != nil {
-        return compensate(ctx, compensations, fmt.Errorf("salt configuration failed: %w", err))
+        return compensate(ctx, compensations, fmt.Errorf(" configuration failed: %w", err))
     }
     
     // Step 8: Wait for services to be healthy
@@ -3386,7 +3386,7 @@ fi
 ENVIRONMENT="${ENVIRONMENT:-production}"
 TERRAFORM_DIR="${MODULE_ROOT}/terraform"
 NOMAD_DIR="${MODULE_ROOT}/nomad"
-SALT_DIR="${MODULE_ROOT}/salt"
+_DIR="${MODULE_ROOT}/"
 TEMPORAL_DIR="${MODULE_ROOT}/temporal"
 BENTHOS_DIR="${MODULE_ROOT}/benthos"
 
@@ -3417,7 +3417,7 @@ error() {
 
 # Check dependencies
 check_dependencies() {
-    local deps=("terraform" "nomad" "consul" "vault" "temporal" "nats-server" "salt" "jq")
+    local deps=("terraform" "nomad" "consul" "vault" "temporal" "nats-server" "" "jq")
     
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" &> /dev/null; then

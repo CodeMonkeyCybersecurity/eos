@@ -132,10 +132,10 @@ var CreateUmamiCmd = &cobra.Command{
 		}
 
 		// Display success information
-		logger.Info("Umami deployment completed successfully",
-			zap.String("management", "Docker Compose"),
+		logger.Info("Environment discovered",
 			zap.String("environment", envConfig.Environment),
-			zap.String("secret_backend", envConfig.SecretBackend))
+			zap.String("datacenter", envConfig.Datacenter),
+			zap.String("vault_addr", envConfig.VaultAddr))
 
 		logger.Info("Umami is now available",
 			zap.String("web_ui", fmt.Sprintf("http://%s:%d", eos_unix.GetInternalHostname(), shared.PortUmami)),

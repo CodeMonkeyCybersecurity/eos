@@ -16,7 +16,7 @@ Phase 10 successfully completed the migration of remaining code to use the newly
 | `pkg/service_installation/tailscale.go` | `installTailscale()` | enable, start, is-active | ✅ Complete |
 | `pkg/service_installation/lxd.go` | `installLxd()` | is-active check | ✅ Complete |
 | `pkg/container/k3s.go` | `InstallK3sServer()` | enable --now (split to enable+start) | ✅ Complete |
-| `pkg/enrollment/salt.go` | `manageSaltServices()` | Full service management suite | ✅ Complete |
+| `pkg/enrollment/.go` | `manageServices()` | Full service management suite | ✅ Complete |
 
 **Total**: **15 systemctl calls** converted to use `serviceutil.NewServiceManager()`
 
@@ -60,7 +60,7 @@ The migration to `SystemdServiceManager` provides:
 #### 3. Eliminated Duplicate Implementations
 
 **Removed Functions**:
-- `manageSystemdService()` in `enrollment/salt.go` - Replaced with switch-case using ServiceManager
+- `manageSystemdService()` in `enrollment/.go` - Replaced with switch-case using ServiceManager
 - **Enhanced Logic**: Added comprehensive action support (start, stop, restart, enable, disable)
 
 **Identified Duplication** (for future consolidation):
@@ -84,7 +84,7 @@ The migration to `SystemdServiceManager` provides:
 
 ### 1. Complex Service Operations
 
-The salt.go migration demonstrates advanced patterns:
+The .go migration demonstrates advanced patterns:
 
 ```go
 // Before: Simple string-based commands

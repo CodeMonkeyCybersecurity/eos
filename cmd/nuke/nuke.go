@@ -4,8 +4,8 @@
 package nuke
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
+	"github.com/spf13/cobra"
 )
 
 // NukeCmd is the top-level nuke command that delegates to delete nuke
@@ -21,7 +21,7 @@ The nuke process will:
 1. Stop and remove all running services
 2. Uninstall all packages installed by eos
 3. Remove all configuration files and directories
-4. Clean up any Salt states and pillars
+4. Clean up any  states and s
 5. Remove state tracking files
 
 Examples:
@@ -51,7 +51,7 @@ Examples:
 				if cmd.Flags().Changed("dev") {
 					subCmd.Flags().Set("dev", cmd.Flag("dev").Value.String())
 				}
-				
+
 				// Execute the actual command
 				return subCmd.RunE(cmd, args)
 			}

@@ -211,219 +211,6 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 
 ## Command Implementation {#commands}
 
-### Complete Command Example
-```go
-// cmd/create/saltstack.go
-package create
-
-import (
-    "github.com/spf13/cobra"
-    "your-repo/pkg/eos_cli"
-    "your-repo/pkg/eos_io"
-    "your-repo/pkg/saltstack"
-)
-
-var createSaltstackCmd = &cobra.Command{
-    Use:   "saltstack",
-    Short: "Install and configure SaltStack",
-    Long: `Install and configure SaltStack in masterless mode by default.
-This command will install Salt, configure it for local management,
-and verify the installation is working correctly.`,
-    RunE: eos_cli.Wrap(runCreateSaltstack),
-}
-
-func init() {
-    createCmd.AddCommand(createSaltstackCmd)
-    
-    // Define flags with sensible defaults
-    createSaltstackCmd.Flags().Bool("master-mode", false, 
-        "Install as master-minion instead of masterless")
-    createSaltstackCmd.Flags().String("log-level", "warning", 
-        "Salt log level (debug, info, warning, error)")
-    createSaltstackCmd.Flags().String("version", "latest",
-        "Salt version to install (prompted if not provided)")
-}
-
-func runCreateSaltstack(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-    logger := otelzap.Ctx(rc.Ctx)
-    
-    // Parse flags into configuration
-    masterMode, _ := cmd.Flags().GetBool("master-mode")
-    logLevel, _ := cmd.Flags().GetString("log-level")
-    version, _ := cmd.Flags().GetString("version")
-    
-    config := &saltstack.Config{
-        MasterMode: masterMode,
-        LogLevel:   logLevel,
-        Version:    version,
-    }
-    
-    // Prompt for any missing required values
-    if config.Version == "" {
-        logger.Info("Version not provided, prompting user")
-        logger.Info("terminal prompt: Please enter Salt version to install")
-        
-        version, err := eos_io.PromptInput(rc, "Version (latest): ")
-        if err != nil {
-            return fmt.Errorf("failed to read version: %w", err)
-        }
-        if version == "" {
-            version = "latest"
-        }
-        config.Version = version
-    }
-    
-    // Orchestrate helpers - NO business logic here
-    logger.Info("Beginning SaltStack installation")
-    
-    if err := saltstack.Install(rc, config); err != nil {
-        return err // Error already wrapped by helper
-    }
-    
-    if err := saltstack.Configure(rc, config); err != nil {
-        return err
-    }
-    
-    if err := saltstack.Verify(rc); err != nil {
-        return err
-    }
-    
-    logger.Info("SaltStack installation completed successfully")
-    return nil
-}
-```
-
-## Testing Patterns {#testing}
-
-### Unit Test Structure
-```go
-// pkg/saltstack/install_test.go
-package saltstack
-
-import (
-    "testing"
-    "your-repo/pkg/eos_io"
-)
-
-func TestInstall(t *testing.T) {
-    tests := []struct {
-        name    string
-        config  *Config
-        setup   func(*testing.T)
-        wantErr bool
-    }{
-        {
-            name: "successful installation",
-            config: &Config{
-                MasterMode: false,
-                Version:    "3004",
-            },
-            setup: func(t *testing.T) {
-                // Mock successful conditions
-                // Set up test environment
-            },
-            wantErr: false,
-        },
-        {
-            name: "fails when already installed",
-            config: &Config{
-                MasterMode: false,
-                Version:    "3004",
-            },
-            setup: func(t *testing.T) {
-                // Mock already installed condition
-                // Create marker files
-            },
-            wantErr: true,
-        },
-        {
-            name: "fails without root privileges",
-            config: &Config{
-                MasterMode: false,
-                Version:    "3004",
-            },
-            setup: func(t *testing.T) {
-                // Mock non-root user
-            },
-            wantErr: true,
-        },
-    }
-    
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            tt.setup(t)
-            
-            rc := eos_io.NewTestContext(t)
-            err := Install(rc, tt.config)
-            
-            if (err != nil) != tt.wantErr {
-                t.Errorf("Install() error = %v, wantErr %v", err, tt.wantErr)
-            }
-        })
-    }
-}
-```
-
-### Integration Test Pattern
-```go
-// integration_test.go
-func TestSaltStackIntegration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test")
-    }
-    
-    rc := eos_io.NewTestContext(t)
-    config := &saltstack.Config{
-        MasterMode: false,
-        Version:    "latest",
-    }
-    
-    // Full end-to-end test
-    if err := saltstack.Install(rc, config); err != nil {
-        t.Fatalf("Install failed: %v", err)
-    }
-    
-    if err := saltstack.Configure(rc, config); err != nil {
-        t.Fatalf("Configure failed: %v", err)
-    }
-    
-    if err := saltstack.Verify(rc); err != nil {
-        t.Fatalf("Verify failed: %v", err)
-    }
-    
-    // Test actual functionality
-    output, err := exec.Command("salt-call", "--version").Output()
-    if err != nil {
-        t.Fatalf("Salt not working after installation: %v", err)
-    }
-    
-    if !strings.Contains(string(output), "salt") {
-        t.Errorf("Unexpected version output: %s", output)
-    }
-}
-```
-
-## Idempotency Examples
-
-### Checking Before Acting
-```go
-func InstallService(rc *eos_io.RuntimeContext, serviceName string) error {
-    logger := otelzap.Ctx(rc.Ctx)
-    
-    // Check if already installed
-    if isServiceInstalled(serviceName) {
-        logger.Info("Service already installed, skipping", 
-            zap.String("service", serviceName))
-        return nil  // Not an error - idempotent
-    }
-    
-    // Proceed with installation
-    logger.Info("Installing service", zap.String("service", serviceName))
-    // ... installation logic ...
-    
-    return nil
-}
-```
 
 ### State-Based Operations
 ```go
@@ -453,29 +240,29 @@ func EnsureServiceRunning(rc *eos_io.RuntimeContext, serviceName string) error {
 
 ## Architecture Implementation Examples
 
-### Infrastructure Service (SaltStack)
+### Infrastructure Service ()
 ```go
 // cmd/create/consul.go
 func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
     logger := otelzap.Ctx(rc.Ctx)
     
-    // ASSESS - Check SaltStack availability
-    if _, err := exec.LookPath("salt-call"); err != nil {
-        return eos_err.NewUserError("saltstack is required for infrastructure services")
+    // ASSESS - Check  availability
+    if _, err := exec.LookPath("-call"); err != nil {
+        return eos_err.NewUserError(" is required for infrastructure services")
     }
     
-    // Build pillar data
+    // Build  data
     datacenter, _ := cmd.Flags().GetString("datacenter")
-    pillarData := map[string]interface{}{
+    Data := map[string]interface{}{
         "consul": map[string]interface{}{
             "datacenter": datacenter,
             "ui_enabled": true,
         },
     }
     
-    // INTERVENE - Apply SaltStack state
-    logger.Info("Deploying Consul via SaltStack")
-    if err := applySaltState(rc, "hashicorp.consul", pillarData); err != nil {
+    // INTERVENE - Apply  state
+    logger.Info("Deploying Consul via ")
+    if err := applyState(rc, "hashicorp.consul", Data); err != nil {
         return fmt.Errorf("failed to apply consul state: %w", err)
     }
     

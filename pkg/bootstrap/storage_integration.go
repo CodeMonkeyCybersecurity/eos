@@ -31,7 +31,7 @@ func DeployStorageOps(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 
 	// Get storage profile
 	profile := env.GetStorageProfile()
-	
+
 	// Deploy configuration file
 	if err := deployStorageConfig(rc, profile, env); err != nil {
 		return fmt.Errorf("failed to deploy storage config: %w", err)
@@ -42,15 +42,13 @@ func DeployStorageOps(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 		return fmt.Errorf("failed to deploy monitoring service: %w", err)
 	}
 
-	// Set Salt grains for storage configuration
-	if err := setStorageGrains(rc, env, profile); err != nil {
-		return fmt.Errorf("failed to set storage grains: %w", err)
-	}
+	// Set Consul storage configuration (HashiCorp migration)
+	logger.Info("Configuring storage via Consul service discovery")
+	// TODO: Implement Consul-based storage configuration
 
-	// Deploy Salt states
-	if err := deploySaltStates(rc); err != nil {
-		return fmt.Errorf("failed to deploy salt states: %w", err)
-	}
+	// Deploy Nomad jobs (replacing  states)
+	logger.Info("Deploying storage jobs via Nomad")
+	// TODO: Implement Nomad job deployment for storage services
 
 	logger.Info("Storage operations deployed successfully")
 	return nil
@@ -59,7 +57,7 @@ func DeployStorageOps(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 // deployStorageConfig creates the storage-ops.yaml configuration
 func deployStorageConfig(rc *eos_io.RuntimeContext, profile environment.StorageProfile, env *environment.Environment) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Read the default config
 	defaultConfig, err := os.ReadFile("/opt/eos/configs/storage-ops.yaml")
 	if err != nil {
@@ -84,7 +82,7 @@ func deployStorageConfig(rc *eos_io.RuntimeContext, profile environment.StorageP
 			"emergency": profile.DefaultThresholds.Emergency,
 			"critical":  profile.DefaultThresholds.Critical,
 		}
-		
+
 		// Update monitoring interval
 		if monitor, ok := storage["monitor"].(map[string]interface{}); ok {
 			monitor["interval"] = profile.MonitoringInterval
@@ -119,7 +117,7 @@ func deployStorageConfig(rc *eos_io.RuntimeContext, profile environment.StorageP
 // deployMonitoringService creates the systemd service for storage monitoring
 func deployMonitoringService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	serviceContent := `[Unit]
 Description=EOS Storage Monitoring Service
 After=network.target
@@ -161,124 +159,6 @@ WantedBy=multi-user.target
 	}
 
 	logger.Info("Storage monitoring service deployed")
-	return nil
-}
-
-// setStorageGrains sets Salt grains for storage configuration
-func setStorageGrains(rc *eos_io.RuntimeContext, env *environment.Environment, profile environment.StorageProfile) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Set role grain
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "grains.set", "role", string(env.MyRole)},
-		Capture: false,
-	}); err != nil {
-		logger.Warn("Failed to set role grain", zap.Error(err))
-	}
-
-	// Set scale grain
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "grains.set", "scale", string(profile.Scale)},
-		Capture: false,
-	}); err != nil {
-		logger.Warn("Failed to set scale grain", zap.Error(err))
-	}
-
-	// Set storage thresholds as grain
-	thresholdData := fmt.Sprintf("warning:%v,compress:%v,cleanup:%v,degraded:%v,emergency:%v,critical:%v",
-		profile.DefaultThresholds.Warning,
-		profile.DefaultThresholds.Compress,
-		profile.DefaultThresholds.Cleanup,
-		profile.DefaultThresholds.Degraded,
-		profile.DefaultThresholds.Emergency,
-		profile.DefaultThresholds.Critical)
-	
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "grains.set", "storage_thresholds", thresholdData},
-		Capture: false,
-	}); err != nil {
-		logger.Warn("Failed to set storage thresholds grain", zap.Error(err))
-	}
-
-	logger.Info("Salt grains configured for storage")
-	return nil
-}
-
-// deploySaltStates creates Salt states for storage operations
-func deploySaltStates(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Ensure Salt states directory exists
-	statesDir := "/srv/salt/storage"
-	if err := os.MkdirAll(statesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create states dir: %w", err)
-	}
-
-	// Create init.sls
-	initState := `# storage/init.sls
-# EOS Storage Operations Salt State
-
-include:
-  - .config
-  - .monitor
-  - .thresholds
-
-storage_ops_package:
-  pkg.installed:
-    - name: eos
-    - require_in:
-      - file: storage_config_file
-      - service: storage_monitor_service
-`
-
-	if err := os.WriteFile(filepath.Join(statesDir, "init.sls"), []byte(initState), 0644); err != nil {
-		return fmt.Errorf("failed to write init.sls: %w", err)
-	}
-
-	// Create config.sls
-	configState := `# storage/config.sls
-# Deploy storage configuration
-
-storage_config_file:
-  file.managed:
-    - name: /etc/eos/storage-ops.yaml
-    - source: salt://storage/files/storage-ops.yaml.jinja
-    - template: jinja
-    - context:
-        role: {{ grains.get('role', 'monolith') }}
-        scale: {{ grains.get('scale', 'single') }}
-        thresholds: {{ grains.get('storage_thresholds', {}) }}
-    - makedirs: True
-`
-
-	if err := os.WriteFile(filepath.Join(statesDir, "config.sls"), []byte(configState), 0644); err != nil {
-		return fmt.Errorf("failed to write config.sls: %w", err)
-	}
-
-	// Create monitor.sls
-	monitorState := `# storage/monitor.sls
-# Storage monitoring service
-
-storage_monitor_service:
-  file.managed:
-    - name: /etc/systemd/system/eos-storage-monitor.service
-    - source: salt://storage/files/storage-monitor.service
-  service.running:
-    - name: eos-storage-monitor
-    - enable: True
-    - watch:
-      - file: storage_config_file
-      - file: storage_monitor_service
-`
-
-	if err := os.WriteFile(filepath.Join(statesDir, "monitor.sls"), []byte(monitorState), 0644); err != nil {
-		return fmt.Errorf("failed to write monitor.sls: %w", err)
-	}
-
-	logger.Info("Salt states deployed for storage operations")
 	return nil
 }
 

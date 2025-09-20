@@ -13,8 +13,8 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
-// MockSaltClient implements saltstack.ClientInterface for testing system operations
-type MockSaltClient struct {
+// MockClient implements .ClientInterface for testing system operations
+type MockClient struct {
 	CmdRunResults map[string]string
 	CmdRunErrors  map[string]error
 	CmdRunCalls   []CmdRunCall
@@ -25,7 +25,7 @@ type CmdRunCall struct {
 	Command string
 }
 
-func (m *MockSaltClient) CmdRun(ctx context.Context, target string, command string) (string, error) {
+func (m *MockClient) CmdRun(ctx context.Context, target string, command string) (string, error) {
 	if m.CmdRunCalls == nil {
 		m.CmdRunCalls = make([]CmdRunCall, 0)
 	}
@@ -48,23 +48,23 @@ func (m *MockSaltClient) CmdRun(ctx context.Context, target string, command stri
 }
 
 // Other methods needed for the interface
-func (m *MockSaltClient) TestPing(ctx context.Context, target string) (bool, error) {
+func (m *MockClient) TestPing(ctx context.Context, target string) (bool, error) {
 	return true, nil
 }
 
-func (m *MockSaltClient) StateApply(ctx context.Context, target string, state string, pillar map[string]interface{}) error {
+func (m *MockClient) StateApply(ctx context.Context, target string, state string, config map[string]interface{}) error {
 	return nil
 }
 
-func (m *MockSaltClient) GrainGet(ctx context.Context, target string, grain string) (map[string]interface{}, error) {
+func (m *MockClient) Get(ctx context.Context, target string, key string) (map[string]interface{}, error) {
 	return nil, nil
 }
 
-func (m *MockSaltClient) CheckMinion(ctx context.Context, minion string) (bool, error) {
+func (m *MockClient) CheckMinion(ctx context.Context, minion string) (bool, error) {
 	return true, nil
 }
 
-func (m *MockSaltClient) IsAPIAvailable(ctx context.Context) bool {
+func (m *MockClient) IsAPIAvailable(ctx context.Context) bool {
 	return false // Default to local mode for tests
 }
 
@@ -76,7 +76,7 @@ func createTestLogger(t *testing.T) otelzap.LoggerWithCtx {
 // Test ServiceOperation
 func TestServiceOperation_Assess_SystemdAvailable(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
@@ -89,8 +89,8 @@ func TestServiceOperation_Assess_SystemdAvailable(t *testing.T) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -106,7 +106,7 @@ func TestServiceOperation_Assess_SystemdAvailable(t *testing.T) {
 
 func TestServiceOperation_Assess_SystemdNotAvailable(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunErrors: map[string]error{
 			"systemctl --version": errors.New("command not found"),
 		},
@@ -116,8 +116,8 @@ func TestServiceOperation_Assess_SystemdNotAvailable(t *testing.T) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -130,7 +130,7 @@ func TestServiceOperation_Assess_SystemdNotAvailable(t *testing.T) {
 
 func TestServiceOperation_Assess_ServiceNotFound(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
 			"systemctl cat nonexistent >/dev/null 2>&1 && echo exists || echo notfound": "notfound",
@@ -141,8 +141,8 @@ func TestServiceOperation_Assess_ServiceNotFound(t *testing.T) {
 		ServiceName: "nonexistent",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -156,7 +156,7 @@ func TestServiceOperation_Assess_ServiceNotFound(t *testing.T) {
 
 func TestServiceOperation_Assess_AlreadyActive(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
@@ -168,8 +168,8 @@ func TestServiceOperation_Assess_AlreadyActive(t *testing.T) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -182,7 +182,7 @@ func TestServiceOperation_Assess_AlreadyActive(t *testing.T) {
 
 func TestServiceOperation_Intervene_StartService(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl start nginx": "",
 		},
@@ -192,8 +192,8 @@ func TestServiceOperation_Intervene_StartService(t *testing.T) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -213,13 +213,13 @@ func TestServiceOperation_Intervene_StartService(t *testing.T) {
 	assert.Equal(t, "service_operation", result.Changes[0].Type)
 
 	// TODO: Verify command execution with Nomad client
-	// require.Len(t, saltClient.CmdRunCalls, 1)
-	// assert.Equal(t, "systemctl start nginx", saltClient.CmdRunCalls[0].Command)
+	// require.Len(t, Client.CmdRunCalls, 1)
+	// assert.Equal(t, "systemctl start nginx", Client.CmdRunCalls[0].Command)
 }
 
 func TestServiceOperation_Intervene_CommandFails(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunErrors: map[string]error{
 			"systemctl start nginx": errors.New("service failed to start"),
 		},
@@ -229,8 +229,8 @@ func TestServiceOperation_Intervene_CommandFails(t *testing.T) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -245,7 +245,7 @@ func TestServiceOperation_Intervene_CommandFails(t *testing.T) {
 
 func TestServiceOperation_Evaluate_StartSuccess(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl is-active nginx": "active",
 		},
@@ -255,8 +255,8 @@ func TestServiceOperation_Evaluate_StartSuccess(t *testing.T) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -275,7 +275,7 @@ func TestServiceOperation_Evaluate_StartSuccess(t *testing.T) {
 
 func TestServiceOperation_Evaluate_StartFailed(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl is-active nginx": "failed",
 		},
@@ -285,8 +285,8 @@ func TestServiceOperation_Evaluate_StartFailed(t *testing.T) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:      logger,
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -385,7 +385,7 @@ func TestServiceOperation_AllActions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := createTestLogger(t)
-			_ = &MockSaltClient{
+			_ = &MockClient{
 				CmdRunResults: map[string]string{
 					"systemctl --version": "systemd 249",
 					"systemctl cat testservice >/dev/null 2>&1 && echo exists || echo notfound": "exists",
@@ -398,8 +398,8 @@ func TestServiceOperation_AllActions(t *testing.T) {
 				ServiceName: "testservice",
 				Action:      tt.action,
 				Target:      "test-target",
-				// SaltClient removed for Nomad migration
-				Logger:      logger,
+				// Client removed for Nomad migration
+				Logger: logger,
 			}
 
 			ctx := context.Background()
@@ -417,7 +417,7 @@ func TestServiceOperation_AllActions(t *testing.T) {
 // Test SleepDisableOperation
 func TestSleepDisableOperation_Assess(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
 			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":        "enabled",
@@ -428,9 +428,9 @@ func TestSleepDisableOperation_Assess(t *testing.T) {
 	}
 
 	operation := &system.SleepDisableOperation{
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -446,7 +446,7 @@ func TestSleepDisableOperation_Assess(t *testing.T) {
 
 func TestSleepDisableOperation_Intervene(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl mask sleep.target":        "",
 			"systemctl mask suspend.target":      "",
@@ -458,9 +458,9 @@ func TestSleepDisableOperation_Intervene(t *testing.T) {
 	}
 
 	operation := &system.SleepDisableOperation{
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -476,7 +476,7 @@ func TestSleepDisableOperation_Intervene(t *testing.T) {
 
 func TestSleepDisableOperation_Evaluate(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl is-enabled sleep.target":        "masked",
 			"systemctl is-enabled suspend.target":      "masked",
@@ -487,9 +487,9 @@ func TestSleepDisableOperation_Evaluate(t *testing.T) {
 	}
 
 	operation := &system.SleepDisableOperation{
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -513,17 +513,17 @@ func TestSleepDisableOperation_Evaluate(t *testing.T) {
 // Test PortKillOperation
 func TestPortKillOperation_Assess_ProcessesFound(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"lsof -ti:8080 2>/dev/null || echo none": "1234\n5678",
 		},
 	}
 
 	operation := &system.PortKillOperation{
-		Port:       8080,
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Port:   8080,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -538,17 +538,17 @@ func TestPortKillOperation_Assess_ProcessesFound(t *testing.T) {
 
 func TestPortKillOperation_Assess_NoProcesses(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"lsof -ti:8080 2>/dev/null || echo none": "none",
 		},
 	}
 
 	operation := &system.PortKillOperation{
-		Port:       8080,
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Port:   8080,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -561,17 +561,17 @@ func TestPortKillOperation_Assess_NoProcesses(t *testing.T) {
 
 func TestPortKillOperation_Intervene(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"lsof -ti:8080 | xargs -r kill -9": "",
 		},
 	}
 
 	operation := &system.PortKillOperation{
-		Port:       8080,
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Port:   8080,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -592,17 +592,17 @@ func TestPortKillOperation_Intervene(t *testing.T) {
 
 func TestPortKillOperation_Evaluate_Success(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"lsof -ti:8080 2>/dev/null | wc -l": "0",
 		},
 	}
 
 	operation := &system.PortKillOperation{
-		Port:       8080,
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Port:   8080,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -621,17 +621,17 @@ func TestPortKillOperation_Evaluate_Success(t *testing.T) {
 
 func TestPortKillOperation_Evaluate_ProcessesRemain(t *testing.T) {
 	logger := createTestLogger(t)
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"lsof -ti:8080 2>/dev/null | wc -l": "2",
 		},
 	}
 
 	operation := &system.PortKillOperation{
-		Port:       8080,
-		Target:     "test-target",
-		// SaltClient removed for Nomad migration
-		Logger:     logger,
+		Port:   8080,
+		Target: "test-target",
+		// Client removed for Nomad migration
+		Logger: logger,
 	}
 
 	ctx := context.Background()
@@ -651,7 +651,7 @@ func TestPortKillOperation_Evaluate_ProcessesRemain(t *testing.T) {
 // Test helper functions
 func TestManageService(t *testing.T) {
 	_ = createTestLogger(t) // logger unused due to Nomad migration
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
@@ -664,14 +664,14 @@ func TestManageService(t *testing.T) {
 
 	// TODO: Replace with Nomad client implementation
 	// ctx := context.Background()
-	// err := system.ManageService(ctx, logger, saltClient, "test-target", "nginx", "start")
+	// err := system.ManageService(ctx, logger, Client, "test-target", "nginx", "start")
 	// assert.NoError(t, err)
 	t.Skip("ManageService test skipped - requires Nomad client implementation")
 }
 
 func TestDisableSystemSleep(t *testing.T) {
 	_ = createTestLogger(t) // logger unused due to Nomad migration
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
 			"systemctl is-enabled sleep.target 2>/dev/null || echo not-found":        "enabled",
@@ -694,14 +694,14 @@ func TestDisableSystemSleep(t *testing.T) {
 
 	// ctx := context.Background() // Unused in skipped test
 	// TODO: Replace with Nomad client implementation
-	// err := system.DisableSystemSleep(ctx, logger, saltClient, "test-target")
+	// err := system.DisableSystemSleep(ctx, logger, Client, "test-target")
 	// assert.NoError(t, err)
 	t.Skip("DisableSystemSleep test skipped - requires Nomad client implementation")
 }
 
 func TestKillProcessesByPort(t *testing.T) {
 	_ = createTestLogger(t) // logger unused due to Nomad migration
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"lsof -ti:8080 2>/dev/null || echo none": "1234\n5678",
 			"lsof -ti:8080 | xargs -r kill -9":       "",
@@ -711,7 +711,7 @@ func TestKillProcessesByPort(t *testing.T) {
 
 	// TODO: Replace with Nomad client implementation
 	// ctx := context.Background()
-	// err := system.KillProcessesByPort(ctx, logger, saltClient, "test-target", 8080)
+	// err := system.KillProcessesByPort(ctx, logger, Client, "test-target", 8080)
 	// assert.NoError(t, err)
 	t.Skip("KillProcessesByPort test skipped - requires Nomad client implementation")
 }
@@ -720,7 +720,7 @@ func TestKillProcessesByPort(t *testing.T) {
 func BenchmarkServiceOperation_Assess(b *testing.B) {
 	logger := zaptest.NewLogger(b)
 	otelLogger := otelzap.New(logger).Ctx(context.Background())
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			"systemctl --version": "systemd 249",
 			"systemctl cat nginx >/dev/null 2>&1 && echo exists || echo notfound": "exists",
@@ -733,15 +733,15 @@ func BenchmarkServiceOperation_Assess(b *testing.B) {
 		ServiceName: "nginx",
 		Action:      "start",
 		Target:      "bench-target",
-		// SaltClient removed for Nomad migration
-		Logger:      otelLogger,
+		// Client removed for Nomad migration
+		Logger: otelLogger,
 	}
 
 	ctx := context.Background()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// saltClient.CmdRunCalls = nil // Reset calls - TODO: Nomad client
+		// Client.CmdRunCalls = nil // Reset calls - TODO: Nomad client
 		_, err := operation.Assess(ctx)
 		if err != nil {
 			b.Fatal(err)
@@ -756,7 +756,7 @@ func TestSystemOperations_Integration(t *testing.T) {
 	}
 
 	_ = createTestLogger(t) // logger unused due to Nomad migration
-	_ = &MockSaltClient{
+	_ = &MockClient{
 		CmdRunResults: map[string]string{
 			// Service operation sequence
 			"systemctl --version": "systemd 249",

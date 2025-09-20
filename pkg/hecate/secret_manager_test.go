@@ -18,18 +18,18 @@ func TestSecretManager_BackendDetection(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, sm)
 
-	// Should fall back to Salt pillar
+	// Should fall back to Consul KV
 	backend := sm.GetBackend()
-	assert.Equal(t, SecretBackendSaltPillar, backend)
+	assert.Equal(t, SecretBackendConsul, backend)
 	assert.False(t, sm.IsVaultAvailable())
 }
 
-func TestSecretManager_SaltSecrets(t *testing.T) {
-	rc := eos_io.NewContext(context.Background(), "test-salt-secrets")
+func TestSecretManager_Secrets(t *testing.T) {
+	rc := eos_io.NewContext(context.Background(), "test--secrets")
 
-	// Create a test secret manager that will use Salt
+	// Create a test secret manager that will use Consul KV
 	sm := &SecretManager{
-		backend: SecretBackendSaltPillar,
+		backend: SecretBackendConsul,
 		rc:      rc,
 	}
 
@@ -37,7 +37,7 @@ func TestSecretManager_SaltSecrets(t *testing.T) {
 	testDir := "/opt/hecate/secrets"
 	err := os.MkdirAll(testDir, 0700)
 	if err != nil {
-		t.Skipf("Cannot create test directory %s: %v. Skipping Salt secrets test.", testDir, err)
+		t.Skipf("Cannot create test directory %s: %v. Skipping  secrets test.", testDir, err)
 		return
 	}
 	defer func() {
@@ -103,7 +103,7 @@ func TestSecretManager_BackendComparison(t *testing.T) {
 	rc := eos_io.NewContext(context.Background(), "test-backend-comparison")
 
 	// Test that both backends have the same interface
-	backends := []SecretBackend{SecretBackendVault, SecretBackendSaltPillar}
+	backends := []SecretBackend{SecretBackendVault, SecretBackendConsul}
 
 	for _, backend := range backends {
 		t.Run(string(backend), func(t *testing.T) {
@@ -129,12 +129,12 @@ func TestSecretManager_Integration(t *testing.T) {
 
 	rc := eos_io.NewContext(context.Background(), "test-integration")
 
-	// Create secret manager (should detect Salt backend in test environment)
+	// Create secret manager (should detect  backend in test environment)
 	sm, err := NewSecretManager(rc)
 	require.NoError(t, err)
 
-	// In test environment, expect Salt backend
-	assert.Equal(t, SecretBackendSaltPillar, sm.GetBackend())
+	// In test environment, expect Consul KV backend
+	assert.Equal(t, SecretBackendConsul, sm.GetBackend())
 
 	// Test that GenerateSecrets can be called without error (even if it fails)
 	// This tests the interface rather than the actual generation

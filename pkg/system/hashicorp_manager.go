@@ -11,27 +11,27 @@ import (
 )
 
 // HashiCorpManager handles system management operations via HashiCorp stack
-// This replaces the deprecated SaltStackManager
+// This replaces the deprecated Manager
 type HashiCorpManager struct {
-	nomadAddr   string
-	consulAddr  string
-	vaultAddr   string
-	datacenter  string
+	nomadAddr  string
+	consulAddr string
+	vaultAddr  string
+	datacenter string
 }
 
 // HashiCorpConfig defines configuration for HashiCorp stack integration
 type HashiCorpConfig struct {
-	NomadAddr    string        `json:"nomad_addr"`
-	ConsulAddr   string        `json:"consul_addr"`
-	VaultAddr    string        `json:"vault_addr"`
-	Datacenter   string        `json:"datacenter"`
-	Timeout      time.Duration `json:"timeout"`
+	NomadAddr  string        `json:"nomad_addr"`
+	ConsulAddr string        `json:"consul_addr"`
+	VaultAddr  string        `json:"vault_addr"`
+	Datacenter string        `json:"datacenter"`
+	Timeout    time.Duration `json:"timeout"`
 }
 
 // NewHashiCorpManager creates a new HashiCorpManager instance
 func NewHashiCorpManager(config *HashiCorpConfig) (*HashiCorpManager, error) {
 	logger := zap.L().With(zap.String("component", "hashicorp_manager"))
-	
+
 	if config == nil {
 		return nil, fmt.Errorf("hashicorp config cannot be nil")
 	}
@@ -93,7 +93,7 @@ func (h *HashiCorpManager) ManageServices(rc *eos_io.RuntimeContext, target stri
 	logger.Info("Managing services via Nomad", zap.String("target", target), zap.Int("service_count", len(services)))
 
 	for _, service := range services {
-		logger.Info("Processing service", 
+		logger.Info("Processing service",
 			zap.String("name", service.Name),
 			zap.String("state", service.State),
 			zap.Bool("enable", service.Enable))
@@ -129,7 +129,7 @@ func (h *HashiCorpManager) ManageCronJobs(rc *eos_io.RuntimeContext, target stri
 func (h *HashiCorpManager) ManageUsers(rc *eos_io.RuntimeContext, target string, users []UserConfig) error {
 	logger := zap.L().With(zap.String("component", "hashicorp_manager"))
 	logger.Warn("User management requires system-level access - escalating to administrator",
-		zap.String("target", target), 
+		zap.String("target", target),
 		zap.Int("user_count", len(users)))
 
 	// User management requires system-level privileges that HashiCorp stack cannot handle

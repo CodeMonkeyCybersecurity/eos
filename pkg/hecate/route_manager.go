@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/consul/api"
+
 	// "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -171,10 +172,10 @@ func (rm *RouteManager) CreateRoute(ctx context.Context, req *CreateRouteRequest
 			zap.Error(err))
 	}
 
-	// Step 6: Apply via Salt
-	logger.Info("Applying Salt state for route", zap.String("domain", req.Domain))
-	if err := rm.applySaltState(ctx, route); err != nil {
-		logger.Warn("Failed to apply Salt state",
+	// Step 6: Apply via 
+	logger.Info("Applying  state for route", zap.String("domain", req.Domain))
+	if err := rm.applyState(ctx, route); err != nil {
+		logger.Warn("Failed to apply  state",
 			zap.String("domain", req.Domain),
 			zap.Error(err))
 	}
@@ -445,11 +446,6 @@ func (rm *RouteManager) configureCertificate(ctx context.Context, domain string)
 	return rm.verifyDNS(ctx, domain)
 }
 
-func (rm *RouteManager) deleteCertificate(ctx context.Context, domain string) error {
-	// TODO: Implement certificate deletion if needed
-	// Caddy manages certificates automatically
-	return nil
-}
 
 func (rm *RouteManager) configureAuth(ctx context.Context, route *RouteInfo) error {
 	// Auth configuration is handled by the Caddy configuration
@@ -457,7 +453,7 @@ func (rm *RouteManager) configureAuth(ctx context.Context, route *RouteInfo) err
 	return nil
 }
 
-func (rm *RouteManager) applySaltState(ctx context.Context, route *RouteInfo) error {
+func (rm *RouteManager) applyState(ctx context.Context, route *RouteInfo) error {
 	state := map[string]interface{}{
 		"hecate_route": map[string]interface{}{
 			"domain":      route.Domain,
@@ -467,7 +463,7 @@ func (rm *RouteManager) applySaltState(ctx context.Context, route *RouteInfo) er
 		},
 	}
 
-	return rm.client.salt.ApplyState(ctx, "hecate.route", state)
+	return rm.storeRouteConfigInConsul(ctx, "hecate.route", state)
 }
 
 func (rm *RouteManager) verifyRoute(ctx context.Context, domain string) error {
@@ -523,6 +519,43 @@ func (rm *RouteManager) cloneRoute(route *RouteInfo) *RouteInfo {
 	}
 
 	return clone
+}
+
+// storeRouteConfigInConsul stores route configuration in Consul KV for administrator review
+func (rm *RouteManager) storeRouteConfigInConsul(ctx context.Context, operation string, config map[string]interface{}) error {
+	logger := otelzap.Ctx(ctx)
+	
+	// Create configuration entry with metadata
+	configEntry := map[string]interface{}{
+		"operation":   operation,
+		"config":      config,
+		"created_at":  time.Now().UTC(),
+		"status":      "pending_admin_review",
+		"description": fmt.Sprintf("Route %s operation requires administrator intervention", operation),
+	}
+	
+	// Marshal configuration to JSON
+	configJSON, err := json.Marshal(configEntry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal route configuration: %w", err)
+	}
+	
+	// Store in Consul KV
+	consulKey := fmt.Sprintf("hecate/route-operations/%s-%d", operation, time.Now().Unix())
+	_, err = rm.client.consul.KV().Put(&api.KVPair{
+		Key:   consulKey,
+		Value: configJSON,
+	}, nil)
+	
+	if err != nil {
+		return fmt.Errorf("failed to store route configuration in Consul: %w", err)
+	}
+	
+	logger.Info("Route configuration stored in Consul for administrator review",
+		zap.String("consul_key", consulKey),
+		zap.String("operation", operation))
+	
+	return nil
 }
 
 func generateRouteID(domain string) string {

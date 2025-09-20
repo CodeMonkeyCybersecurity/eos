@@ -1,36 +1,26 @@
-# SaltStack → Terraform → Nomad: Deep Dive Architecture Guide
+# Terraform & Nomad: Deep Dive Architecture Guide
 
-*Last Updated: 2025-01-20*
+> **📝 Documentation has been moved inline with the code for better maintainability.**
+> 
+> The comprehensive three-layer orchestration architecture documentation is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 
-## Overview
+## Quick Reference
 
-This document provides a comprehensive analysis of Eos's sophisticated three-layer orchestration architecture. This system represents a mature, production-ready approach to infrastructure and application management that addresses the complexities of modern containerized deployments.
+For detailed architecture documentation, see the inline comments in these files:
 
-## Architecture Complexity Analysis
+- **Nomad Job Generation**: `pkg/nomad/job_generator.go` - Complete three-layer architecture guide and orchestration patterns
+- **Infrastructure Compiler**: `pkg/bootstrap/check.go` - EOS infrastructure compiler pattern implementation
+- **Service Orchestration**: `pkg/orchestrator/` - Multi-layer orchestration coordination
+- **Container Management**: `pkg/nomad/` - Nomad job specifications and deployment patterns
 
-### **The Problem This Architecture Solves**
+## Architecture Status: ✅ ACTIVE
 
-Modern container deployments face several critical challenges:
+**Date:** September 20, 2025  
+**Architecture:** ✅ THREE-LAYER ORCHESTRATION ACTIVE  
 
-1. **State Management Chaos**: Multiple orchestrators managing same resources
-2. **Configuration Drift**: Inconsistent deployments across environments  
-3. **Dependency Hell**: Applications deployed before infrastructure is ready
-4. **Rollback Complexity**: No unified rollback across infrastructure + applications
-5. **Secret Management**: Credentials scattered across multiple systems
-6. **Service Discovery**: Manual service registration and health monitoring
-
-### **Eos Three-Layer Solution**
-
-```
 ┌─────────────────────────────────────────────────────────────┐
-│                    User Interface Layer                     │
-│  eos create jenkins --admin-password secret --port 8080    │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Layer 1: SaltStack (Configuration)             │
-│  • Source of Truth (Pillar data)                           │
+│              Layer 1:  (Configuration)             │
+│  • Source of Truth ( data)                           │
 │  • System Configuration Management                          │
 │  • Infrastructure Prerequisites                             │
 │  • Cross-component Orchestration                           │
@@ -57,10 +47,10 @@ Modern container deployments face several critical challenges:
 
 ## Deep Dive: Layer Interactions
 
-### **1. Configuration Flow (Pillar → Variables → Jobs)**
+### **1. Configuration Flow ( → Variables → Jobs)**
 
 ```yaml
-# Layer 1: SaltStack Pillar (Source of Truth)
+# Layer 1:   (Source of Truth)
 nomad_service:
   name: jenkins
   environment: production
@@ -74,7 +64,7 @@ nomad_service:
 ```
 
 ```python
-# Layer 1 → 2: Salt calls Terraform via eos_terraform.py
+# Layer 1 → 2:  calls Terraform via eos_terraform.py
 def deploy_nomad_service(service_name, environment, service_config):
     workspace = TerraformWorkspace(f"nomad-{service_name}", environment)
     terraform_config = _generate_nomad_service_terraform(service_name, service_config)
@@ -130,7 +120,7 @@ job "jenkins" {
 #### **Distributed State Coordination**
 
 ```python
-# /opt/eos/salt/_modules/eos_terraform.py
+# /opt/eos//_modules/eos_terraform.py
 class TerraformWorkspace:
     def __init__(self, component, environment):
         self.workspace_path = Path(f'/srv/terraform/{environment}/{component}')
@@ -138,11 +128,11 @@ class TerraformWorkspace:
     
     def acquire_lock(self, ttl=600):
         """Acquire distributed lock via Consul"""
-        consul_client = salt.utils.consul.get_conn()
+        consul_client = .utils.consul.get_conn()
         session = consul_client.session.create(ttl=ttl)
         acquired = consul_client.kv.put(
             self.state_lock_key,
-            __grains__['id'],
+            __s__['id'],
             acquire=session
         )
         return session if acquired else None
@@ -150,7 +140,7 @@ class TerraformWorkspace:
 
 #### **State Hierarchy**
 
-1. **SaltStack Grains/Pillar**: System facts and configuration
+1. ** s/**: System facts and configuration
 2. **Consul KV Store**: Service discovery and runtime configuration  
 3. **Terraform State**: Infrastructure and Nomad job resources
 4. **Nomad State**: Container runtime and health status
@@ -212,7 +202,7 @@ def apply(component, environment, auto_approve=False):
 
 | Failure Point | Impact | Recovery Strategy |
 |---------------|--------|-------------------|
-| **Salt State Failure** | Configuration not applied | Retry Salt state with corrected pillar |
+| ** State Failure** | Configuration not applied | Retry  state with corrected  |
 | **Terraform Apply Failure** | Infrastructure inconsistent | Automatic rollback to previous state |
 | **Nomad Job Failure** | Container not scheduled | Terraform re-applies job, Nomad reschedules |
 | **Service Health Check Failure** | Service unhealthy | Nomad restarts container, Consul removes from LB |
@@ -285,10 +275,10 @@ resource "cloudflare_record" "jenkins" {
 #### **Multi-Layer Security Model**
 
 ```python
-# Vault integration in Salt-Terraform bridge
+# Vault integration in -Terraform bridge
 def _get_vault_credentials(provider_name):
     """Retrieve provider credentials from Vault"""
-    vault_client = salt.utils.vault.get_conn()
+    vault_client = .utils.vault.get_conn()
     
     # Different secret paths for different providers
     secret_paths = {
@@ -319,8 +309,8 @@ provider "hcloud" {
 The system must coordinate deployment across multiple layers:
 
 ```
-1. SaltStack validates pillar configuration
-2. Salt calls Terraform with validated config
+1.  validates  configuration
+2.  calls Terraform with validated config
 3. Terraform acquires distributed lock via Consul
 4. Terraform provisions infrastructure if needed
 5. Terraform generates Nomad job from template
@@ -330,7 +320,7 @@ The system must coordinate deployment across multiple layers:
 9. Health checks validate service health
 10. Consul updates service discovery
 11. Terraform records state changes
-12. Salt triggers post-deployment hooks
+12.  triggers post-deployment hooks
 ```
 
 ### **2. Monitoring and Observability**
@@ -397,7 +387,7 @@ class TerraformWorkspace:
 
 - **Centralized Secrets**: All credentials managed through Vault
 - **Network Segmentation**: Consul Connect provides service mesh security
-- **Audit Trail**: Every change tracked through Terraform state and Salt logs
+- **Audit Trail**: Every change tracked through Terraform state and  logs
 - **Least Privilege**: Services only access required resources
 
 ## Challenges and Mitigations
@@ -422,7 +412,7 @@ class TerraformWorkspace:
 
 ### **3. Learning Curve**
 
-**Challenge**: Operators need to understand SaltStack, Terraform, and Nomad
+**Challenge**: Operators need to understand , Terraform, and Nomad
 **Mitigation**:
 - Role-based access (users vs operators vs architects)
 - Abstracted user interface for common tasks
@@ -435,9 +425,9 @@ class TerraformWorkspace:
 
 ```
 Phase 1: Infrastructure Services (Already Complete)
-├── consul (SaltStack → direct installation)
-├── vault (SaltStack → Terraform integration)  
-└── nomad (SaltStack → cluster management)
+├── consul ( → direct installation)
+├── vault ( → Terraform integration)  
+└── nomad ( → cluster management)
 
 Phase 2: High-Priority Applications (Current)
 ├── jenkins (Docker Compose → Terraform → Nomad)
@@ -454,8 +444,8 @@ Phase 3: Remaining Services
 ```python
 # Multi-layer testing approach
 def test_service_deployment():
-    # Layer 1: Salt state validation
-    assert validate_pillar_data(service_config)
+    # Layer 1:  state validation
+    assert validate__data(service_config)
     
     # Layer 2: Terraform plan validation  
     plan = terraform_plan(service_name, environment)
@@ -472,7 +462,7 @@ def test_service_deployment():
 
 ## Conclusion
 
-The SaltStack → Terraform → Nomad architecture represents a sophisticated approach to modern infrastructure and application management. While complex, this architecture provides:
+The  → Terraform → Nomad architecture represents a sophisticated approach to modern infrastructure and application management. While complex, this architecture provides:
 
 - **Unified Operations**: Single workflow for infrastructure and applications
 - **Enterprise Reliability**: State management, rollback, and dependency resolution

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-	
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -41,15 +41,15 @@ func (b *BaseDeployer) createDeploymentResult(component *Component, status strin
 		StartTime: time.Now(),
 		Outputs:   make(map[string]interface{}),
 	}
-	
+
 	if err != nil {
 		result.Error = err.Error()
 		result.Status = "failed"
 	}
-	
+
 	endTime := time.Now()
 	result.EndTime = &endTime
-	
+
 	return result
 }
 
@@ -74,7 +74,7 @@ func (b *BaseDeployer) validateComponent(component *Component) error {
 			Message:   "component name cannot be empty",
 		}
 	}
-	
+
 	if component.Type == "" {
 		return &ValidationError{
 			Component: component.Name,
@@ -82,19 +82,19 @@ func (b *BaseDeployer) validateComponent(component *Component) error {
 			Message:   "component type cannot be empty",
 		}
 	}
-	
+
 	if component.Config == nil {
 		component.Config = make(map[string]interface{})
 	}
-	
+
 	// Check strategy capabilities
 	capabilities := GetCapabilities(b.strategy)
-	
+
 	// Validate dry-run support
 	if dryRun, ok := component.Config["dry_run"].(bool); ok && dryRun && !capabilities.SupportsDryRun {
 		return fmt.Errorf("strategy %s does not support dry-run mode", b.strategy)
 	}
-	
+
 	return nil
 }
 
@@ -106,46 +106,46 @@ func (b *BaseDeployer) saveRollbackInfo(component *Component, previousState map[
 		Strategy:        b.strategy,
 		Timestamp:       time.Now(),
 	}
-	
+
 	// TODO: Store in Consul KV or another persistent store
 	// For now, just log it
 	b.logger.Info("Rollback info saved",
 		zap.String("component", component.Name),
 		zap.String("previous_version", rollbackInfo.PreviousVersion),
 		zap.Time("timestamp", rollbackInfo.Timestamp))
-	
+
 	return rollbackInfo, nil
 }
 
 // checkPrerequisites checks if all prerequisites for the strategy are met
 func (b *BaseDeployer) checkPrerequisites(ctx context.Context) error {
 	capabilities := GetCapabilities(b.strategy)
-	
-	if capabilities.RequiresSalt {
-		if err := b.checkSaltAvailable(ctx); err != nil {
-			return fmt.Errorf("Salt is required but not available: %w", err)
+
+	if capabilities.Requires {
+		if err := b.checkAvailable(ctx); err != nil {
+			return fmt.Errorf(" is required but not available: %w", err)
 		}
 	}
-	
+
 	if capabilities.RequiresTerraform {
 		if err := b.checkTerraformAvailable(ctx); err != nil {
 			return fmt.Errorf("Terraform is required but not available: %w", err)
 		}
 	}
-	
+
 	if capabilities.RequiresNomad {
 		if err := b.checkNomadAvailable(ctx); err != nil {
 			return fmt.Errorf("Nomad is required but not available: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
-// checkSaltAvailable checks if Salt is available
-func (b *BaseDeployer) checkSaltAvailable(ctx context.Context) error {
+// checkAvailable checks if  is available
+func (b *BaseDeployer) checkAvailable(ctx context.Context) error {
 	// TODO: Implement actual check
-	b.logger.Debug("Checking Salt availability")
+	b.logger.Debug("Checking  availability")
 	return nil
 }
 
@@ -166,7 +166,7 @@ func (b *BaseDeployer) checkNomadAvailable(ctx context.Context) error {
 // sanitizeConfig sanitizes configuration values to prevent injection attacks
 func (b *BaseDeployer) sanitizeConfig(config map[string]interface{}) map[string]interface{} {
 	sanitized := make(map[string]interface{})
-	
+
 	for key, value := range config {
 		switch v := value.(type) {
 		case string:
@@ -176,7 +176,7 @@ func (b *BaseDeployer) sanitizeConfig(config map[string]interface{}) map[string]
 			sanitized[key] = value
 		}
 	}
-	
+
 	return sanitized
 }
 
@@ -196,7 +196,7 @@ func (b *BaseDeployer) recordDeploymentMetrics(result *DeploymentResult) {
 			zap.String("strategy", string(result.Strategy)),
 			zap.String("status", result.Status),
 			zap.Duration("duration", duration))
-		
+
 		// TODO: Send to Prometheus or other metrics system
 	}
 }

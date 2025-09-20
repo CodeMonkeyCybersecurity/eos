@@ -19,7 +19,7 @@ import (
 
 var CreateConsulCmd = &cobra.Command{
 	Use:   "consul",
-	Short: "Install and configure HashiCorp Consul directly (without SaltStack)",
+	Short: "Install and configure HashiCorp Consul directly (without )",
 	Long: `Install and configure HashiCorp Consul using native installation methods.
 
 This command installs Consul directly without using configuration management tools,
@@ -66,13 +66,13 @@ EXAMPLES:
 }
 
 var (
-	consulDatacenter       string
-	consulNoVault          bool
-	consulDebug            bool
-	consulForce            bool
-	consulClean            bool
-	consulBinary           bool
-	consulVersion          string
+	consulDatacenter string
+	consulNoVault    bool
+	consulDebug      bool
+	consulForce      bool
+	consulClean      bool
+	consulBinary     bool
+	consulVersion    string
 )
 
 func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -114,7 +114,7 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	// Use unified installer
 	installer := consul.NewConsulInstaller(rc, installConfig)
-	
+
 	// ASSESS, INTERVENE, EVALUATE pattern is handled inside the installer
 	if err := installer.Install(); err != nil {
 		return fmt.Errorf("consul installation failed: %w", err)
@@ -139,19 +139,19 @@ func getConsulLogLevel(debug bool) string {
 }
 
 func init() {
-	CreateConsulCmd.Flags().StringVarP(&consulDatacenter, "datacenter", "d", "dc1", 
+	CreateConsulCmd.Flags().StringVarP(&consulDatacenter, "datacenter", "d", "dc1",
 		"Datacenter name for Consul cluster")
-	CreateConsulCmd.Flags().BoolVar(&consulNoVault, "no-vault-integration", false, 
+	CreateConsulCmd.Flags().BoolVar(&consulNoVault, "no-vault-integration", false,
 		"Disable automatic Vault integration")
-	CreateConsulCmd.Flags().BoolVar(&consulDebug, "debug", false, 
+	CreateConsulCmd.Flags().BoolVar(&consulDebug, "debug", false,
 		"Enable debug logging for Consul")
-	CreateConsulCmd.Flags().BoolVar(&consulForce, "force", false, 
+	CreateConsulCmd.Flags().BoolVar(&consulForce, "force", false,
 		"Force reconfiguration even if Consul is running")
-	CreateConsulCmd.Flags().BoolVar(&consulClean, "clean", false, 
+	CreateConsulCmd.Flags().BoolVar(&consulClean, "clean", false,
 		"Remove all data and perform clean installation")
-	CreateConsulCmd.Flags().BoolVar(&consulBinary, "binary", false, 
+	CreateConsulCmd.Flags().BoolVar(&consulBinary, "binary", false,
 		"Use direct binary download instead of APT repository")
-	CreateConsulCmd.Flags().StringVar(&consulVersion, "version", "latest", 
+	CreateConsulCmd.Flags().StringVar(&consulVersion, "version", "latest",
 		"Consul version to install (default: latest)")
 
 	// Register the command with the create command

@@ -16,24 +16,24 @@ During bootstrap, we need to determine if this is:
 
 Detection methods:
 1. **Explicit Flag**: `--join-cluster=<master-ip>` or `--single-node`
-2. **Auto-Discovery**: Check for existing Salt master via multicast/broadcast
+2. **Auto-Discovery**: Check for existing  master via multicast/broadcast
 3. **Configuration File**: Check for `/etc/eos/cluster.yaml` with cluster info
 
 ### 2. Bootstrap Flow
 
 #### Single Node Bootstrap
 ```
-1. Install Salt (masterless or master mode)
-2. Deploy storage ops Salt states
+1. Install  (masterless or master mode)
+2. Deploy storage ops  states
 3. Apply storage configuration for single-node profile
-4. Set grains: role=monolith, scale=single
+4. Set s: role=monolith, scale=single
 5. Start storage monitoring
 ```
 
 #### Additional Node Bootstrap
 ```
 1. Detect existing cluster
-2. Register with Salt master
+2. Register with  master
 3. Trigger orchestration on master
 4. Master reassigns roles cluster-wide
 5. Deploy appropriate storage configs
@@ -47,8 +47,7 @@ Detection methods:
 ```go
 // pkg/bootstrap/detector.go
 type ClusterInfo struct {
-    IsMaster     bool
-    MasterAddr   string
+
     NodeCount    int
     MyRole       environment.Role
     ClusterID    string
@@ -56,7 +55,7 @@ type ClusterInfo struct {
 
 func DetectClusterState(rc *eos_io.RuntimeContext) (*ClusterInfo, error) {
     // 1. Check explicit flags
-    // 2. Try Salt master discovery
+    // 2. Try  master discovery
     // 3. Check local config file
     // 4. Default to single-node
 }
@@ -74,48 +73,48 @@ type NodeRegistration struct {
 }
 
 func RegisterNode(rc *eos_io.RuntimeContext, master string, reg NodeRegistration) error {
-    // 1. Connect to Salt master
+    // 1. Connect to  master
     // 2. Submit registration
     // 3. Wait for acceptance
     // 4. Receive initial configuration
 }
 ```
 
-### Phase 3: Salt Orchestration
+### Phase 3:  Orchestration
 
 ```yaml
-# salt/orchestration/node_addition.sls
-{% set new_node = salt.pillar.get('new_node') %}
-{% set current_nodes = salt['mine.get']('*', 'node_info') %}
+# /orchestration/node_addition.sls
+{% set new_node = ..get('new_node') %}
+{% set current_nodes = ['mine.get']('*', 'node_info') %}
 
 # Step 1: Accept new node
 accept_new_node:
-  salt.wheel:
+  .wheel:
     - name: key.accept
     - match: {{ new_node.hostname }}
 
 # Step 2: Calculate new roles
-{% set new_roles = salt['eos_roles.recalculate'](current_nodes, new_node) %}
+{% set new_roles = ['eos_roles.recalculate'](current_nodes, new_node) %}
 
 # Step 3: Update all node roles
 {% for node, role in new_roles.items() %}
 update_{{ node }}_role:
-  salt.state:
+  .state:
     - tgt: {{ node }}
     - sls:
       - roles.{{ role }}
       - storage.config
-    - pillar:
+    - :
       role: {{ role }}
       scale: {{ new_roles.scale }}
 {% endfor %}
 
 # Step 4: Update storage thresholds
 update_storage_thresholds:
-  salt.state:
+  .state:
     - tgt: '*'
     - sls: storage.thresholds
-    - pillar:
+    - :
       scale: {{ new_roles.scale }}
 ```
 
@@ -143,23 +142,23 @@ func RecalculateRoles(existingNodes []Machine, newNode Machine) map[string]Role 
 ### Phase 5: Storage Configuration Distribution
 
 ```yaml
-# salt/storage/config.sls
-{% set scale = grains.get('scale', 'single') %}
-{% set role = grains.get('role', 'monolith') %}
+# /storage/config.sls
+{% set scale = s.get('scale', 'single') %}
+{% set role = s.get('role', 'monolith') %}
 
 /etc/eos/storage-ops.yaml:
   file.managed:
-    - source: salt://storage/files/storage-ops.yaml.jinja
+    - source: ://storage/files/storage-ops.yaml.jinja
     - template: jinja
     - context:
         scale: {{ scale }}
         role: {{ role }}
-        thresholds: {{ pillar.get('storage_thresholds') }}
+        thresholds: {{ .get('storage_thresholds') }}
 
 storage_monitor_service:
   file.managed:
     - name: /etc/systemd/system/eos-storage-monitor.service
-    - source: salt://storage/files/storage-monitor.service
+    - source: ://storage/files/storage-monitor.service
   service.running:
     - name: eos-storage-monitor
     - enable: True
@@ -207,7 +206,7 @@ func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
     } else {
         // Joining existing cluster
         logger.Info("Bootstrapping as additional node",
-            zap.String("master", clusterInfo.MasterAddr))
+            zap.String("master", clusterInfo.))
         return bootstrapAdditionalNode(rc, clusterInfo)
     }
 }
@@ -236,10 +235,10 @@ New Node                    Master                      Existing Nodes
    |<---------- Storage Config Sync ------------------------>|
 ```
 
-## Salt States Structure
+##  States Structure
 
 ```
-salt/
+/
 ├── storage/
 │   ├── init.sls              # Main storage state
 │   ├── config.sls             # Configuration deployment
@@ -262,7 +261,7 @@ salt/
 ## Safety and Rollback
 
 ### Pre-checks
-1. Verify Salt connectivity
+1. Verify  connectivity
 2. Check disk space on all nodes
 3. Validate network connectivity
 4. Ensure no ongoing operations
@@ -323,7 +322,7 @@ cluster:
 2. **Two Nodes**: Test edge/core assignment
 3. **Three Nodes**: Test edge/core/data assignment
 4. **Scale Up**: Add 4th, 5th nodes and verify role distribution
-5. **Failure Cases**: Network partition, Salt master failure
+5. **Failure Cases**: Network partition,  master failure
 6. **Rollback**: Test checkpoint and recovery
 
 ## Summary

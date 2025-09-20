@@ -60,33 +60,33 @@ type HugoConfig struct {
 
 // DeploymentConfig holds deployment configuration
 type DeploymentConfig struct {
-	Environment string                 `yaml:"environment" json:"environment"`
-	Namespace   string                 `yaml:"namespace" json:"namespace"`
-	Domain      string                 `yaml:"domain" json:"domain"`
-	Resources   ResourceConfig         `yaml:"resources" json:"resources"`
-	Strategy    DeploymentStrategy     `yaml:"strategy" json:"strategy"`
-	Health      HealthCheckConfig      `yaml:"health" json:"health"`
-	Secrets     map[string]SecretRef   `yaml:"secrets" json:"secrets"`
+	Environment string                  `yaml:"environment" json:"environment"`
+	Namespace   string                  `yaml:"namespace" json:"namespace"`
+	Domain      string                  `yaml:"domain" json:"domain"`
+	Resources   ResourceConfig          `yaml:"resources" json:"resources"`
+	Strategy    DeploymentStrategy      `yaml:"strategy" json:"strategy"`
+	Health      HealthCheckConfig       `yaml:"health" json:"health"`
+	Secrets     map[string]SecretRef    `yaml:"secrets" json:"secrets"`
 	ConfigMaps  map[string]ConfigMapRef `yaml:"config_maps" json:"config_maps"`
 }
 
 // ResourceConfig defines resource allocation
 type ResourceConfig struct {
-	CPU       int `yaml:"cpu" json:"cpu"`             // MHz
-	Memory    int `yaml:"memory" json:"memory"`       // MB
+	CPU       int `yaml:"cpu" json:"cpu"`               // MHz
+	Memory    int `yaml:"memory" json:"memory"`         // MB
 	MemoryMax int `yaml:"memory_max" json:"memory_max"` // MB burst capacity
 }
 
 // DeploymentStrategy defines how deployments should be handled
 type DeploymentStrategy struct {
-	Type              string        `yaml:"type" json:"type"` // rolling, blue-green, canary
-	MaxParallel       int           `yaml:"max_parallel" json:"max_parallel"`
-	MinHealthyTime    time.Duration `yaml:"min_healthy_time" json:"min_healthy_time"`
-	HealthyDeadline   time.Duration `yaml:"healthy_deadline" json:"healthy_deadline"`
-	ProgressDeadline  time.Duration `yaml:"progress_deadline" json:"progress_deadline"`
-	AutoRevert        bool          `yaml:"auto_revert" json:"auto_revert"`
-	AutoPromote       bool          `yaml:"auto_promote" json:"auto_promote"`
-	Canary            int           `yaml:"canary" json:"canary"`
+	Type             string        `yaml:"type" json:"type"` // rolling, blue-green, canary
+	MaxParallel      int           `yaml:"max_parallel" json:"max_parallel"`
+	MinHealthyTime   time.Duration `yaml:"min_healthy_time" json:"min_healthy_time"`
+	HealthyDeadline  time.Duration `yaml:"healthy_deadline" json:"healthy_deadline"`
+	ProgressDeadline time.Duration `yaml:"progress_deadline" json:"progress_deadline"`
+	AutoRevert       bool          `yaml:"auto_revert" json:"auto_revert"`
+	AutoPromote      bool          `yaml:"auto_promote" json:"auto_promote"`
+	Canary           int           `yaml:"canary" json:"canary"`
 }
 
 // HealthCheckConfig defines health check settings
@@ -114,23 +114,23 @@ type ConfigMapRef struct {
 
 // InfrastructureConfig holds infrastructure settings
 type InfrastructureConfig struct {
-	Provider    string                 `yaml:"provider" json:"provider"` // hetzner, aws, gcp
-	Region      string                 `yaml:"region" json:"region"`
-	ServerType  string                 `yaml:"server_type" json:"server_type"`
-	Image       string                 `yaml:"image" json:"image"`
-	Firewall    FirewallConfig         `yaml:"firewall" json:"firewall"`
-	DNS         DNSConfig              `yaml:"dns" json:"dns"`
-	Consul      ConsulConfig           `yaml:"consul" json:"consul"`
-	Nomad       NomadConfig            `yaml:"nomad" json:"nomad"`
-	Vault       VaultConfig            `yaml:"vault" json:"vault"`
-	Terraform   TerraformConfig        `yaml:"terraform" json:"terraform"`
-	Salt        SaltStackConfig        `yaml:"salt" json:"salt"`
+	Provider   string          `yaml:"provider" json:"provider"` // hetzner, aws, gcp
+	Region     string          `yaml:"region" json:"region"`
+	ServerType string          `yaml:"server_type" json:"server_type"`
+	Image      string          `yaml:"image" json:"image"`
+	Firewall   FirewallConfig  `yaml:"firewall" json:"firewall"`
+	DNS        DNSConfig       `yaml:"dns" json:"dns"`
+	Consul     ConsulConfig    `yaml:"consul" json:"consul"`
+	Nomad      NomadConfig     `yaml:"nomad" json:"nomad"`
+	Vault      VaultConfig     `yaml:"vault" json:"vault"`
+	Terraform  TerraformConfig `yaml:"terraform" json:"terraform"`
+	Config     `yaml:"" json:""`
 }
 
 // FirewallConfig holds firewall rule configuration
 type FirewallConfig struct {
-	Enabled bool              `yaml:"enabled" json:"enabled"`
-	Rules   []FirewallRule    `yaml:"rules" json:"rules"`
+	Enabled bool           `yaml:"enabled" json:"enabled"`
+	Rules   []FirewallRule `yaml:"rules" json:"rules"`
 }
 
 // FirewallRule defines a single firewall rule
@@ -143,11 +143,11 @@ type FirewallRule struct {
 
 // DNSConfig holds DNS configuration
 type DNSConfig struct {
-	Enabled  bool   `yaml:"enabled" json:"enabled"`
-	ZoneID   string `yaml:"zone_id" json:"zone_id"`
-	Record   string `yaml:"record" json:"record"`
-	Type     string `yaml:"type" json:"type"`
-	TTL      int    `yaml:"ttl" json:"ttl"`
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	ZoneID  string `yaml:"zone_id" json:"zone_id"`
+	Record  string `yaml:"record" json:"record"`
+	Type    string `yaml:"type" json:"type"`
+	TTL     int    `yaml:"ttl" json:"ttl"`
 }
 
 // ConsulConfig holds Consul configuration
@@ -179,12 +179,11 @@ type TerraformConfig struct {
 	Variables     map[string]string `yaml:"variables" json:"variables"`
 }
 
-// SaltStackConfig holds SaltStack configuration
-type SaltStackConfig struct {
-	Master   string   `yaml:"master" json:"master"`
-	Targets  []string `yaml:"targets" json:"targets"`
-	States   []string `yaml:"states" json:"states"`
-	Pillar   string   `yaml:"pillar" json:"pillar"`
+// Config holds  configuration
+type Config struct {
+	Targets []string `yaml:"targets" json:"targets"`
+	States  []string `yaml:"states" json:"states"`
+	string  `yaml:"" json:""`
 }
 
 // PipelineSettings holds pipeline behavior settings
@@ -211,35 +210,35 @@ type StageConfig struct {
 
 // TriggerConfig defines what triggers the pipeline
 type TriggerConfig struct {
-	Type      string            `yaml:"type" json:"type"` // git_push, webhook, schedule
-	Enabled   bool              `yaml:"enabled" json:"enabled"`
-	Branches  []string          `yaml:"branches" json:"branches"`
-	Schedule  string            `yaml:"schedule" json:"schedule"` // cron format
-	Webhook   WebhookConfig     `yaml:"webhook" json:"webhook"`
+	Type       string            `yaml:"type" json:"type"` // git_push, webhook, schedule
+	Enabled    bool              `yaml:"enabled" json:"enabled"`
+	Branches   []string          `yaml:"branches" json:"branches"`
+	Schedule   string            `yaml:"schedule" json:"schedule"` // cron format
+	Webhook    WebhookConfig     `yaml:"webhook" json:"webhook"`
 	Conditions map[string]string `yaml:"conditions" json:"conditions"`
 }
 
 // WebhookConfig defines webhook trigger settings
 type WebhookConfig struct {
-	URL        string            `yaml:"url" json:"url"`
-	Secret     string            `yaml:"secret" json:"secret"`
-	Headers    map[string]string `yaml:"headers" json:"headers"`
-	Events     []string          `yaml:"events" json:"events"`
+	URL     string            `yaml:"url" json:"url"`
+	Secret  string            `yaml:"secret" json:"secret"`
+	Headers map[string]string `yaml:"headers" json:"headers"`
+	Events  []string          `yaml:"events" json:"events"`
 }
 
 // PipelineExecution represents a running pipeline execution
 type PipelineExecution struct {
-	ID          string                       `json:"id"`
-	PipelineID  string                       `json:"pipeline_id"`
-	Status      ExecutionStatus              `json:"status"`
-	Trigger     TriggerInfo                  `json:"trigger"`
-	StartTime   time.Time                    `json:"start_time"`
-	EndTime     *time.Time                   `json:"end_time,omitempty"`
-	Duration    time.Duration                `json:"duration"`
-	Stages      []StageExecution             `json:"stages"`
-	Artifacts   []ArtifactInfo               `json:"artifacts"`
-	Environment map[string]string            `json:"environment"`
-	Config      *PipelineConfig              `json:"config"`
+	ID          string            `json:"id"`
+	PipelineID  string            `json:"pipeline_id"`
+	Status      ExecutionStatus   `json:"status"`
+	Trigger     TriggerInfo       `json:"trigger"`
+	StartTime   time.Time         `json:"start_time"`
+	EndTime     *time.Time        `json:"end_time,omitempty"`
+	Duration    time.Duration     `json:"duration"`
+	Stages      []StageExecution  `json:"stages"`
+	Artifacts   []ArtifactInfo    `json:"artifacts"`
+	Environment map[string]string `json:"environment"`
+	Config      *PipelineConfig   `json:"config"`
 }
 
 // ExecutionStatus represents the status of a pipeline execution
@@ -288,13 +287,13 @@ type LogEntry struct {
 
 // ArtifactInfo represents information about a build artifact
 type ArtifactInfo struct {
-	Name        string            `json:"name"`
-	Type        string            `json:"type"` // docker_image, file, archive
-	Location    string            `json:"location"`
-	Size        int64             `json:"size"`
-	Checksum    string            `json:"checksum"`
-	Metadata    map[string]string `json:"metadata"`
-	CreatedAt   time.Time         `json:"created_at"`
+	Name      string            `json:"name"`
+	Type      string            `json:"type"` // docker_image, file, archive
+	Location  string            `json:"location"`
+	Size      int64             `json:"size"`
+	Checksum  string            `json:"checksum"`
+	Metadata  map[string]string `json:"metadata"`
+	CreatedAt time.Time         `json:"created_at"`
 }
 
 // PipelineOrchestrator manages pipeline execution
@@ -302,7 +301,7 @@ type PipelineOrchestrator struct {
 	config          *PipelineConfig
 	execution       *PipelineExecution
 	currentStage    int
-	saltClient      SaltClient
+	Client          Client
 	terraformClient TerraformClient
 	nomadClient     NomadClient
 	vaultClient     VaultClient
@@ -311,11 +310,11 @@ type PipelineOrchestrator struct {
 	statusChan      chan StatusUpdate
 }
 
-// SaltClient interface for SaltStack operations
-type SaltClient interface {
-	ExecuteState(ctx context.Context, targets []string, state string, pillar map[string]interface{}) error
-	ExecuteOrchestrate(ctx context.Context, orchestrate string, pillar map[string]interface{}) error
-	GetJobStatus(ctx context.Context, jobID string) (*SaltJobStatus, error)
+// Client interface for  operations
+type Client interface {
+	ExecuteState(ctx context.Context, targets []string, state string, data map[string]interface{}) error
+	ExecuteOrchestrate(ctx context.Context, orchestrate string, data map[string]interface{}) error
+	GetJobStatus(ctx context.Context, jobID string) (*JobStatus, error)
 	Ping(ctx context.Context, targets []string) error
 }
 
@@ -371,13 +370,13 @@ type StatusUpdate struct {
 
 // Supporting types for client interfaces
 
-// SaltJobStatus represents the status of a Salt job
-type SaltJobStatus struct {
-	ID       string            `json:"id"`
-	Status   string            `json:"status"`
+// JobStatus represents the status of a  job
+type JobStatus struct {
+	ID       string                 `json:"id"`
+	Status   string                 `json:"status"`
 	Result   map[string]interface{} `json:"result"`
-	Success  bool              `json:"success"`
-	Duration time.Duration     `json:"duration"`
+	Success  bool                   `json:"success"`
+	Duration time.Duration          `json:"duration"`
 }
 
 // TerraformPlan represents a Terraform plan
@@ -402,16 +401,16 @@ type TerraformOutput struct {
 
 // ResourceInfo represents information about a Terraform resource
 type ResourceInfo struct {
-	Type       string `json:"type"`
-	Name       string `json:"name"`
-	Address    string `json:"address"`
-	Status     string `json:"status"`
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	Status  string `json:"status"`
 }
 
 // TerraformState represents Terraform state
 type TerraformState struct {
-	Version   int            `json:"version"`
-	Resources []ResourceInfo `json:"resources"`
+	Version   int               `json:"version"`
+	Resources []ResourceInfo    `json:"resources"`
 	Outputs   map[string]string `json:"outputs"`
 }
 
@@ -427,11 +426,11 @@ type NomadJobStatus struct {
 
 // NomadAllocation represents a Nomad allocation
 type NomadAllocation struct {
-	ID        string            `json:"id"`
-	JobID     string            `json:"job_id"`
-	Status    string            `json:"status"`
-	NodeID    string            `json:"node_id"`
-	Tasks     map[string]string `json:"tasks"`
+	ID     string            `json:"id"`
+	JobID  string            `json:"job_id"`
+	Status string            `json:"status"`
+	NodeID string            `json:"node_id"`
+	Tasks  map[string]string `json:"tasks"`
 }
 
 // ConsulService represents a Consul service registration
@@ -447,33 +446,33 @@ type ConsulService struct {
 
 // ConsulCheck represents a Consul health check
 type ConsulCheck struct {
-	Name         string        `json:"name"`
-	Type         string        `json:"type"`
-	HTTP         string        `json:"http,omitempty"`
-	Interval     time.Duration `json:"interval"`
-	Timeout      time.Duration `json:"timeout"`
+	Name          string        `json:"name"`
+	Type          string        `json:"type"`
+	HTTP          string        `json:"http,omitempty"`
+	Interval      time.Duration `json:"interval"`
+	Timeout       time.Duration `json:"timeout"`
 	DeregisterTTL time.Duration `json:"deregister_ttl,omitempty"`
 }
 
 // BuildResult represents the result of a build operation
 type BuildResult struct {
-	Success    bool              `json:"success"`
-	Artifacts  []ArtifactInfo    `json:"artifacts"`
-	Logs       []LogEntry        `json:"logs"`
-	Duration   time.Duration     `json:"duration"`
-	Metadata   map[string]string `json:"metadata"`
-	Error      string            `json:"error,omitempty"`
+	Success   bool              `json:"success"`
+	Artifacts []ArtifactInfo    `json:"artifacts"`
+	Logs      []LogEntry        `json:"logs"`
+	Duration  time.Duration     `json:"duration"`
+	Metadata  map[string]string `json:"metadata"`
+	Error     string            `json:"error,omitempty"`
 }
 
 // PipelineError represents an error during pipeline execution
 type PipelineError struct {
-	Type       string                 `json:"type"`
-	Stage      string                 `json:"stage"`
-	Message    string                 `json:"message"`
-	Cause      error                  `json:"cause,omitempty"`
-	Retryable  bool                   `json:"retryable"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	Timestamp  time.Time              `json:"timestamp"`
+	Type      string                 `json:"type"`
+	Stage     string                 `json:"stage"`
+	Message   string                 `json:"message"`
+	Cause     error                  `json:"cause,omitempty"`
+	Retryable bool                   `json:"retryable"`
+	Metadata  map[string]interface{} `json:"metadata"`
+	Timestamp time.Time              `json:"timestamp"`
 }
 
 func (e *PipelineError) Error() string {
@@ -510,14 +509,14 @@ func DefaultPipelineConfig(appName string) *PipelineConfig {
 				MemoryMax: 512,
 			},
 			Strategy: DeploymentStrategy{
-				Type:              "rolling",
-				MaxParallel:       1,
-				MinHealthyTime:    30 * time.Second,
-				HealthyDeadline:   2 * time.Minute,
-				ProgressDeadline:  10 * time.Minute,
-				AutoRevert:        true,
-				AutoPromote:       true,
-				Canary:            1,
+				Type:             "rolling",
+				MaxParallel:      1,
+				MinHealthyTime:   30 * time.Second,
+				HealthyDeadline:  2 * time.Minute,
+				ProgressDeadline: 10 * time.Minute,
+				AutoRevert:       true,
+				AutoPromote:      true,
+				Canary:           1,
 			},
 			Health: HealthCheckConfig{
 				Enabled:  true,
@@ -543,10 +542,6 @@ func DefaultPipelineConfig(appName string) *PipelineConfig {
 			},
 			Vault: VaultConfig{
 				Address: "http://localhost:8179",
-			},
-			Salt: SaltStackConfig{
-				Master:  "salt-master.cybermonkey.net.au",
-				Targets: []string{"*"},
 			},
 		},
 		Pipeline: PipelineSettings{

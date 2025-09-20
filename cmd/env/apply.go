@@ -95,7 +95,7 @@ Examples:
 		// Load environment configuration from file
 		env, err := loadEnvironmentFromFile(rc, configFile)
 		if err != nil {
-			logger.Error("Failed to load environment configuration", 
+			logger.Error("Failed to load environment configuration",
 				zap.String("file", configFile),
 				zap.Error(err))
 			return fmt.Errorf("failed to load environment configuration: %w", err)
@@ -124,7 +124,7 @@ Examples:
 		// Check if environment already exists
 		existingEnv, err := envManager.GetEnvironment(rc, env.Name)
 		isUpdate := err == nil
-		
+
 		// Validate operation type
 		if createOnly && isUpdate {
 			return fmt.Errorf("environment '%s' already exists and --create-only was specified", env.Name)
@@ -185,7 +185,7 @@ Examples:
 
 		// Success message
 		fmt.Printf("✅ Environment '%s' %sd successfully\n", env.Name, operation)
-		
+
 		// Show next steps
 		fmt.Printf("\nNext Steps:\n")
 		fmt.Printf("──────────\n")
@@ -312,7 +312,7 @@ func displayConfigurationDiff(existing, new *environments.Environment) {
 func displayApplyPlan(env *environments.Environment, operation string) error {
 	fmt.Printf("Apply Plan for '%s' (%s):\n", env.Name, operation)
 	fmt.Printf("────────────────────────────────\n")
-	
+
 	fmt.Printf("Environment Configuration:\n")
 	fmt.Printf("  Name:         %s\n", env.Name)
 	fmt.Printf("  Display Name: %s\n", env.DisplayName)
@@ -325,7 +325,6 @@ func displayApplyPlan(env *environments.Environment, operation string) error {
 	fmt.Printf("  Consul:     %s (%s)\n", env.Infrastructure.Consul.Address, env.Infrastructure.Consul.Datacenter)
 	fmt.Printf("  Vault:      %s\n", env.Infrastructure.Vault.Address)
 	fmt.Printf("  Terraform:  %s backend\n", env.Infrastructure.Terraform.Backend)
-	fmt.Printf("  Salt:       %s\n", env.Infrastructure.Salt.Master)
 	fmt.Printf("\n")
 
 	fmt.Printf("Deployment:\n")
@@ -339,7 +338,7 @@ func displayApplyPlan(env *environments.Environment, operation string) error {
 	fmt.Printf("  RBAC:         %t\n", env.Security.AccessControl.RBAC.Enabled)
 	fmt.Printf("  MFA Required: %t\n", env.Security.AccessControl.MFA.Required)
 	fmt.Printf("  Approval Req: %t\n", env.Security.AccessControl.Approval.Required)
-	fmt.Printf("  Encryption:   In-transit: %t, At-rest: %t\n", 
+	fmt.Printf("  Encryption:   In-transit: %t, At-rest: %t\n",
 		env.Security.Encryption.InTransit.Enabled,
 		env.Security.Encryption.AtRest.Enabled)
 
@@ -349,7 +348,7 @@ func displayApplyPlan(env *environments.Environment, operation string) error {
 // confirmApply prompts user for confirmation
 func confirmApply(env *environments.Environment, operation string) error {
 	fmt.Printf("Do you want to %s environment '%s' with this configuration? (y/N): ", operation, env.Name)
-	
+
 	// In a real implementation, this would read from stdin
 	// For now, we'll assume confirmation
 	fmt.Printf("y\n")

@@ -33,29 +33,6 @@ apt-get install -y \
 systemctl enable docker
 systemctl start docker
 
-# Install Salt Minion
-curl -fsSL https://repo.saltproject.io/py3/ubuntu/22.04/amd64/latest/SALTSTACK-GPG-KEY.pub | apt-key add -
-echo "deb https://repo.saltproject.io/py3/ubuntu/22.04/amd64/latest jammy main" > /etc/apt/sources.list.d/saltstack.list
-apt-get update
-apt-get install -y salt-minion
-
-# Configure Salt Minion
-cat > /etc/salt/minion <<EOF
-master: salt.service.consul
-id: hecate-${ENVIRONMENT}-$(hostname -s)
-grains:
-  roles:
-    - hecate
-    - reverse-proxy
-  environment: ${ENVIRONMENT}
-  component: ${COMPONENT}
-  services: ${SERVICES}
-EOF
-
-# Start Salt Minion
-systemctl enable salt-minion
-systemctl start salt-minion
-
 # Install Consul agent
 CONSUL_VERSION="1.17.0"
 wget -O consul.zip "https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip"
@@ -252,13 +229,6 @@ docker network create hecate-network || true
 
 # Create necessary directories
 mkdir -p /opt/hecate/{config,data,logs}
-
-# Wait for Salt to configure the system
-echo "Waiting for Salt configuration..."
-sleep 30
-
-# Trigger Salt highstate
-salt-call state.highstate || true
 
 # Configure log rotation
 cat > /etc/logrotate.d/hecate <<EOF

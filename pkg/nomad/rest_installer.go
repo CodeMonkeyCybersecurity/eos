@@ -37,50 +37,50 @@ func (i *RESTInstaller) Authenticate(ctx context.Context, username, password str
 	return fmt.Errorf("nomad authentication not implemented")
 }
 
-// InstallNomad installs Nomad using Salt REST API
+// InstallNomad installs Nomad using  REST API
 func (i *RESTInstaller) InstallNomad(rc *eos_io.RuntimeContext, config *NomadInstallConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Nomad via Salt REST API")
+	logger.Info("Installing Nomad via  REST API")
 
-	// Prepare pillar data
-	pillarData := map[string]interface{}{
+	// Prepare  data
+	Data := map[string]interface{}{
 		"nomad": map[string]interface{}{
-			"ensure":            "present",
-			"server_mode":       config.ServerMode,
-			"client_mode":       config.ClientMode,
-			"bootstrap_expect":  config.BootstrapExpect,
-			"datacenter":        config.Datacenter,
-			"region":            config.Region,
-			"bind_addr":         config.BindAddr,
-			"advertise_addr":    config.AdvertiseAddr,
-			"log_level":         config.LogLevel,
-			"enable_acl":        config.EnableACL,
-			"force":             config.Force,
-			"clean":             config.Clean,
-			"join_addrs":        config.JoinAddrs,
-			"client_servers":    config.ClientServers,
-			"enable_docker":     config.EnableDocker,
-			"enable_raw_exec":   config.EnableRawExec,
+			"ensure":             "present",
+			"server_mode":        config.ServerMode,
+			"client_mode":        config.ClientMode,
+			"bootstrap_expect":   config.BootstrapExpect,
+			"datacenter":         config.Datacenter,
+			"region":             config.Region,
+			"bind_addr":          config.BindAddr,
+			"advertise_addr":     config.AdvertiseAddr,
+			"log_level":          config.LogLevel,
+			"enable_acl":         config.EnableACL,
+			"force":              config.Force,
+			"clean":              config.Clean,
+			"join_addrs":         config.JoinAddrs,
+			"client_servers":     config.ClientServers,
+			"enable_docker":      config.EnableDocker,
+			"enable_raw_exec":    config.EnableRawExec,
 			"consul_integration": config.ConsulIntegration,
-			"vault_integration": config.VaultIntegration,
+			"vault_integration":  config.VaultIntegration,
 		},
 	}
 
 	// Apply the Nomad installation state
 	logger.Info("Applying Nomad installation state")
 	// TODO: Replace with actual Nomad installation logic
-	_ = pillarData
+	_ = Data
 	logger.Info("Nomad installation placeholder - not implemented")
 	return fmt.Errorf("nomad installation via REST not implemented")
 }
 
-// RemoveNomad removes Nomad using Salt REST API
+// RemoveNomad removes Nomad using  REST API
 func (i *RESTInstaller) RemoveNomad(rc *eos_io.RuntimeContext, config *NomadRemoveConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Removing Nomad via Salt REST API")
+	logger.Info("Removing Nomad via  REST API")
 
-	// Prepare pillar data for removal
-	pillarData := map[string]interface{}{
+	// Prepare  data for removal
+	Data := map[string]interface{}{
 		"nomad": map[string]interface{}{
 			"ensure":      "absent",
 			"force":       config.Force,
@@ -97,21 +97,21 @@ func (i *RESTInstaller) RemoveNomad(rc *eos_io.RuntimeContext, config *NomadRemo
 	// Apply the Nomad removal state
 	logger.Info("Applying Nomad removal state")
 	// TODO: Replace with Nomad client implementation
-	_ = pillarData // suppress unused variable warning
+	_ = Data // suppress unused variable warning
 	return fmt.Errorf("nomad removal not implemented yet")
 }
 
 // CheckNomadStatus checks Nomad status across minions
 func (i *RESTInstaller) CheckNomadStatus(rc *eos_io.RuntimeContext) (map[string]NomadRESTStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking Nomad status via Salt REST API")
+	logger.Info("Checking Nomad status via  REST API")
 
 	// Execute status check command
 	// TODO: Replace with Nomad client implementation
 	return nil, fmt.Errorf("nomad status check not implemented yet")
 }
 
-// TestConnection tests the connection to Salt API
+// TestConnection tests the connection to  API
 func (i *RESTInstaller) TestConnection(ctx context.Context) error {
 	// TODO: Replace with Nomad client implementation
 	_ = ctx // suppress unused variable warning
@@ -120,7 +120,7 @@ func (i *RESTInstaller) TestConnection(ctx context.Context) error {
 
 // Helper function to check if a state execution was successful
 func isStateSuccessful(result interface{}) bool {
-	// Salt state results are complex nested structures
+	//  state results are complex nested structures
 	// This is a simplified check - in production you'd want more thorough parsing
 	resultMap, ok := result.(map[string]interface{})
 	if !ok {
@@ -144,7 +144,7 @@ func isStateSuccessful(result interface{}) bool {
 // Helper function to parse Nomad status from command output
 func parseNomadStatus(output interface{}) NomadRESTStatus {
 	status := NomadRESTStatus{}
-	
+
 	outputStr, ok := output.(string)
 	if !ok {
 		return status
@@ -157,12 +157,12 @@ func parseNomadStatus(output interface{}) NomadRESTStatus {
 	}
 
 	status.Installed = true
-	
+
 	// Parse additional status information
 	if strings.Contains(outputStr, "Nomad agent is running") {
 		status.Running = true
 	}
-	
+
 	// Extract version if available
 	if strings.Contains(outputStr, "Nomad v") {
 		// Simple version extraction - could be improved

@@ -20,12 +20,12 @@ import (
 func GetCoreCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "core",
-		Short: "Bootstrap core Eos components (Salt + API)",
+		Short: "Bootstrap core Eos components ( + API)",
 		Long: `Bootstrap the core components required for Eos operation.
 
 This minimal bootstrap includes:
-• SaltStack installation and configuration
-• Salt REST API setup with secure credentials
+•  installation and configuration
+•  REST API setup with secure credentials
 • File roots configuration for Eos states
 • Basic system verification
 
@@ -56,7 +56,7 @@ func runBootstrapCore(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	displayCoreStatus(rc, status)
 
 	// If already bootstrapped, check if user wants to re-run
-	if status.SaltInstalled && status.SaltAPIConfigured && status.FileRootsConfigured {
+	if status.Installed && status.APIConfigured && status.FileRootsConfigured {
 		if !cmd.Flag("force").Changed {
 			logger.Info("terminal prompt: Core components are already bootstrapped.")
 			logger.Info("terminal prompt: Use --force to re-run bootstrap.")
@@ -64,10 +64,10 @@ func runBootstrapCore(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		}
 	}
 
-	// Step 1: Install and configure SaltStack with API
-	logger.Info("Step 1/3: Installing SaltStack with API configuration")
-	if err := bootstrapSaltWithAPI(rc); err != nil {
-		return fmt.Errorf("SaltStack bootstrap failed: %w", err)
+	// Step 1: Install and configure  with API
+	logger.Info("Step 1/3: Installing  with API configuration")
+	if err := bootstrapWithAPI(rc); err != nil {
+		return fmt.Errorf(" bootstrap failed: %w", err)
 	}
 
 	// Step 2: Verify file roots are set up - TODO: Replace with Nomad orchestration
@@ -94,8 +94,8 @@ func displayCoreStatus(rc *eos_io.RuntimeContext, status *bootstrap.BootstrapSta
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("terminal prompt: Core Bootstrap Status:")
-	logger.Info(fmt.Sprintf("terminal prompt:   SaltStack installed:    %s", formatStatus(status.SaltInstalled)))
-	logger.Info(fmt.Sprintf("terminal prompt:   Salt API configured:    %s", formatStatus(status.SaltAPIConfigured)))
+	logger.Info(fmt.Sprintf("terminal prompt:    installed:    %s", formatStatus(status.Installed)))
+	logger.Info(fmt.Sprintf("terminal prompt:    API configured:    %s", formatStatus(status.APIConfigured)))
 	logger.Info(fmt.Sprintf("terminal prompt:   File roots configured:  %s", formatStatus(status.FileRootsConfigured)))
 	logger.Info("terminal prompt: ")
 }
@@ -107,10 +107,10 @@ func formatStatus(ok bool) string {
 	return "✗"
 }
 
-func bootstrapSaltWithAPI(rc *eos_io.RuntimeContext) error {
+func bootstrapWithAPI(rc *eos_io.RuntimeContext) error {
 	// TODO: Replace with Nomad client setup
 	_ = rc // suppress unused variable warning
-	return fmt.Errorf("salt bootstrap not implemented with Nomad yet")
+	return fmt.Errorf(" bootstrap not implemented with Nomad yet")
 }
 
 func displayCoreSuccess(rc *eos_io.RuntimeContext) {
@@ -119,12 +119,12 @@ func displayCoreSuccess(rc *eos_io.RuntimeContext) {
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ✅ Core bootstrap completed successfully!")
 	logger.Info("terminal prompt: ")
-	
+
 	// Load and display API credentials - TODO: Replace with Nomad client
 	logger.Info("terminal prompt: Nomad API placeholder - not implemented yet")
 	// TODO: Display Nomad API credentials when implemented
 	logger.Info("terminal prompt: ")
-	
+
 	logger.Info("terminal prompt: You can now deploy services:")
 	logger.Info("terminal prompt:   eos create consul")
 	logger.Info("terminal prompt:   eos create vault")

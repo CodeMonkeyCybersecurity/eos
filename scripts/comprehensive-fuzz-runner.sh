@@ -233,8 +233,6 @@ discover_enhanced_fuzz_tests() {
         "FuzzValidateAppName::./pkg/crypto"
         "FuzzSanitizeInputForCommand::./pkg/crypto"
         "FuzzExecuteCommand::./pkg/execute"
-        "FuzzSaltStateGeneration::./pkg/saltstack"
-        "FuzzSaltPillarDataValidation::./pkg/saltstack"
         "FuzzTerraformConfigGeneration::./pkg/terraform"
         "FuzzTerraformVariableValidation::./pkg/terraform"
     )

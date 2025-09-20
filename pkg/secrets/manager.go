@@ -1,4 +1,4 @@
-// Package secrets provides automatic secret management across Vault, SaltStack, and file backends
+// Package secrets provides automatic secret management across Vault, , and file backends
 package secrets
 
 import (
@@ -8,10 +8,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -58,23 +57,18 @@ func NewSecretManager(rc *eos_io.RuntimeContext, envConfig *environment.Environm
 	var err error
 
 	// Choose backend based on environment configuration
-	switch envConfig.SecretBackend {
+	// Use Vault as default backend (HashiCorp migration)
+	switch "vault" {
 	case "vault":
 		backend, err = NewVaultBackend(envConfig.VaultAddr)
 		if err != nil {
-			logger.Warn("Vault backend failed, falling back to SaltStack", zap.Error(err))
-			backend, err = NewSaltStackBackend()
+			logger.Warn("Vault backend failed, falling back to ", zap.Error(err))
 			if err != nil {
-				logger.Warn("SaltStack backend failed, falling back to file", zap.Error(err))
+				logger.Warn(" backend failed, falling back to file", zap.Error(err))
 				backend = NewFileBackend()
 			}
 		}
-	case "saltstack":
-		backend, err = NewSaltStackBackend()
-		if err != nil {
-			logger.Warn("SaltStack backend failed, falling back to file", zap.Error(err))
-			backend = NewFileBackend()
-		}
+
 	default:
 		backend = NewFileBackend()
 	}
@@ -92,9 +86,9 @@ func NewSecretManager(rc *eos_io.RuntimeContext, envConfig *environment.Environm
 // GetOrGenerateServiceSecrets gets existing secrets or generates new ones for a service
 func (sm *SecretManager) GetOrGenerateServiceSecrets(serviceName string, requiredSecrets map[string]SecretType) (*ServiceSecrets, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
-	
+
 	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
-	
+
 	logger.Info("Getting or generating service secrets",
 		zap.String("service", serviceName),
 		zap.String("environment", sm.env.Environment),
@@ -113,18 +107,18 @@ func (sm *SecretManager) GetOrGenerateServiceSecrets(serviceName string, require
 				Secrets:     existing,
 				Backend:     fmt.Sprintf("%T", sm.backend),
 			}
-			
+
 			if sm.validateSecrets(secrets, requiredSecrets) {
 				logger.Info("Using existing secrets", zap.String("service", serviceName))
 				return secrets, nil
 			}
-			
+
 			logger.Info("Existing secrets incomplete, generating missing secrets")
 		}
 	}
 
 	// Generate new secrets
-	logger.Info("Generating new secrets", 
+	logger.Info("Generating new secrets",
 		zap.String("service", serviceName),
 		zap.Int("secret_count", len(requiredSecrets)))
 
@@ -142,7 +136,7 @@ func (sm *SecretManager) GetOrGenerateServiceSecrets(serviceName string, require
 			return nil, fmt.Errorf("failed to generate %s: %w", secretName, err)
 		}
 		secrets.Secrets[secretName] = value
-		
+
 		logger.Info("Generated secret",
 			zap.String("service", serviceName),
 			zap.String("secret", secretName),
@@ -166,7 +160,7 @@ func (sm *SecretManager) validateSecrets(secrets *ServiceSecrets, required map[s
 		if _, exists := secrets.Secrets[secretName]; !exists {
 			return false
 		}
-		
+
 		// Check if secret value is not empty
 		if value, ok := secrets.Secrets[secretName].(string); !ok || value == "" {
 			return false
@@ -198,9 +192,9 @@ func (sm *SecretManager) generatePassword(length int) (string, error) {
 	uppercase := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digits := "0123456789"
 	special := "!@#$%^&*"
-	
+
 	allChars := lowercase + uppercase + digits + special
-	
+
 	password := make([]byte, length)
 	for i := range password {
 		randomBytes := make([]byte, 1)
@@ -209,7 +203,7 @@ func (sm *SecretManager) generatePassword(length int) (string, error) {
 		}
 		password[i] = allChars[int(randomBytes[0])%len(allChars)]
 	}
-	
+
 	return string(password), nil
 }
 
@@ -271,58 +265,6 @@ func (vb *VaultBackend) Exists(path string) bool {
 	return false
 }
 
-// SaltStack Backend Implementation
-type SaltStackBackend struct{}
-
-func NewSaltStackBackend() (*SaltStackBackend, error) {
-	// Check if Salt is available
-	return &SaltStackBackend{}, nil
-}
-
-func (sb *SaltStackBackend) Store(path string, secret map[string]interface{}) error {
-	// Store in Salt pillar
-	pillarPath := fmt.Sprintf("/srv/pillar/secrets/%s.sls", strings.Replace(path, "/", "_", -1))
-	
-	// Create pillar directory
-	if err := os.MkdirAll(filepath.Dir(pillarPath), 0700); err != nil {
-		return fmt.Errorf("failed to create pillar directory: %w", err)
-	}
-	
-	// Convert to YAML format for Salt pillar
-	yamlContent := fmt.Sprintf("secrets:\n")
-	for key, value := range secret {
-		yamlContent += fmt.Sprintf("  %s: %v\n", key, value)
-	}
-	
-	if err := os.WriteFile(pillarPath, []byte(yamlContent), 0600); err != nil {
-		return fmt.Errorf("failed to write pillar file: %w", err)
-	}
-	
-	return nil
-}
-
-func (sb *SaltStackBackend) Retrieve(path string) (map[string]interface{}, error) {
-	pillarPath := fmt.Sprintf("/srv/pillar/secrets/%s.sls", strings.Replace(path, "/", "_", -1))
-	
-	if _, err := os.Stat(pillarPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("secret not found")
-	}
-	
-	// Implementation would parse YAML pillar file
-	return nil, fmt.Errorf("saltstack retrieve not fully implemented")
-}
-
-func (sb *SaltStackBackend) Generate(path string, secretType SecretType) (string, error) {
-	// Use Salt's built-in secret generation
-	return "", fmt.Errorf("saltstack generate not fully implemented")
-}
-
-func (sb *SaltStackBackend) Exists(path string) bool {
-	pillarPath := fmt.Sprintf("/srv/pillar/secrets/%s.sls", strings.Replace(path, "/", "_", -1))
-	_, err := os.Stat(pillarPath)
-	return err == nil
-}
-
 // File Backend Implementation (fallback)
 type FileBackend struct {
 	basePath string
@@ -336,42 +278,42 @@ func NewFileBackend() *FileBackend {
 
 func (fb *FileBackend) Store(path string, secret map[string]interface{}) error {
 	fullPath := filepath.Join(fb.basePath, path+".json")
-	
+
 	// Create directory
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0700); err != nil {
 		return fmt.Errorf("failed to create secret directory: %w", err)
 	}
-	
+
 	// Store as JSON
 	data, err := json.MarshalIndent(secret, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal secret: %w", err)
 	}
-	
+
 	if err := os.WriteFile(fullPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write secret file: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (fb *FileBackend) Retrieve(path string) (map[string]interface{}, error) {
 	fullPath := filepath.Join(fb.basePath, path+".json")
-	
+
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("secret not found")
 	}
-	
+
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secret file: %w", err)
 	}
-	
+
 	var secret map[string]interface{}
 	if err := json.Unmarshal(data, &secret); err != nil {
 		return nil, fmt.Errorf("failed to parse secret: %w", err)
 	}
-	
+
 	return secret, nil
 }
 

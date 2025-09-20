@@ -20,7 +20,7 @@ EOS is a thin wrapper around powerful infrastructure tools that acts as a human-
 
 ### Core Architecture Flow
 ```
-Human Intent (Imperative) → Eos CLI → SaltStack (Declarative) → Terraform (Resource Provisioning) → Nomad (Container Runtime)
+Human Intent (Imperative) → Eos CLI →  (Declarative) → Terraform (Resource Provisioning) → Nomad (Container Runtime)
 ```
 
 ### Key Principles

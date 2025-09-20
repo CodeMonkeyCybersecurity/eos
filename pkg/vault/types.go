@@ -17,8 +17,7 @@ var (
 	ErrSecretNotFound = errors.New("secret not found")
 	ErrVaultNotInstalled   = errors.New("vault is not installed")
 	ErrVaultNotInitialized = errors.New("vault is not initialized")
-	ErrSaltNotAvailable    = errors.New("salt is not available")
-	ErrSaltStateFailed     = errors.New("salt state execution failed")
+
 )
 
 // Interfaces
@@ -290,139 +289,6 @@ type AppRoleCredentials struct {
 	SecretID string `json:"-"` // Never serialize secret
 }
 
-// SaltConfig holds the configuration for Vault deployment via Salt
-type SaltConfig struct {
-	// Installation configuration
-	Version           string
-	InstallPath       string
-	ConfigPath        string
-	DataPath          string
-	LogPath           string
-	TLSPath           string
-	
-	// Network configuration
-	ListenAddress     string
-	ClusterAddress    string
-	APIAddr           string
-	ClusterAPIAddr    string
-	Port              int
-	ClusterPort       int
-	
-	// TLS configuration
-	TLSDisable        bool
-	TLSCertFile       string
-	TLSKeyFile        string
-	TLSMinVersion     string
-	
-	// Storage configuration
-	StorageType       string
-	StoragePath       string
-	
-	// UI configuration
-	UIEnabled         bool
-	
-	// Performance configuration
-	MaxLeaseTTL       time.Duration
-	DefaultLeaseTTL   time.Duration
-	
-	// Salt-specific configuration
-	SaltMasterless    bool
-	SaltFileRoot      string
-	SaltPillarRoot    string
-	SaltStateFile     string
-	SaltTimeout       time.Duration
-	
-	// Initialization configuration
-	KeyShares         int
-	KeyThreshold      int
-	AutoUnseal        bool
-	
-	// Enable phase configuration
-	EnableUserpass    bool
-	EnableAppRole     bool
-	EnableMFA         bool
-	EnableAudit       bool
-	EnablePolicies    bool
-	
-	// Hardening configuration
-	HardenSystem      bool
-	HardenNetwork     bool
-	HardenVault       bool
-	HardenBackup      bool
-	
-	// Backup configuration
-	BackupEnabled     bool
-	BackupPath        string
-	BackupSchedule    string
-	
-	// Monitoring configuration
-	TelemetryEnabled  bool
-	MetricsPath       string
-	
-	// Integration configuration
-	HecateIntegration bool
-	DelphiIntegration bool
-}
-
-// DefaultSaltConfig returns a default configuration for Vault via Salt
-func DefaultSaltConfig() *SaltConfig {
-	return &SaltConfig{
-		Version:           "latest",
-		InstallPath:       "/opt/vault",
-		ConfigPath:        "/etc/vault.d",
-		DataPath:          "/opt/vault/data",
-		LogPath:           "/var/log/vault",
-		TLSPath:           "/opt/vault/tls",
-		
-		ListenAddress:     "0.0.0.0",
-		ClusterAddress:    "0.0.0.0",
-		Port:              8179, // Eos-specific port
-		ClusterPort:       8180,
-		
-		TLSDisable:        false,
-		TLSMinVersion:     "tls12",
-		
-		StorageType:       "raft",
-		StoragePath:       "/opt/vault/data",
-		
-		UIEnabled:         true,
-		
-		MaxLeaseTTL:       87600 * time.Hour, // 10 years
-		DefaultLeaseTTL:   768 * time.Hour,   // 32 days
-		
-		SaltMasterless:    true,
-		SaltFileRoot:      "/opt/eos/salt/states",
-		SaltPillarRoot:    "/opt/eos/salt/pillar",
-		SaltStateFile:     "hashicorp.vault.complete_lifecycle",
-		SaltTimeout:       10 * time.Minute,
-		
-		KeyShares:         5,
-		KeyThreshold:      3,
-		AutoUnseal:        false,
-		
-		EnableUserpass:    true,
-		EnableAppRole:     true,
-		EnableMFA:         true,
-		EnableAudit:       true,
-		EnablePolicies:    true,
-		
-		HardenSystem:      true,
-		HardenNetwork:     true,
-		HardenVault:       true,
-		HardenBackup:      true,
-		
-		BackupEnabled:     true,
-		BackupPath:        "/opt/vault/backup",
-		BackupSchedule:    "0 2 * * *", // 2 AM daily
-		
-		TelemetryEnabled:  true,
-		MetricsPath:       "/metrics",
-		
-		HecateIntegration: true,
-		DelphiIntegration: true,
-	}
-}
-
 // VaultInitResponse represents the response from vault operator init
 type VaultInitResponse struct {
 	UnsealKeysB64     []string `json:"unseal_keys_b64"`
@@ -436,11 +302,3 @@ type VaultInitResponse struct {
 	RootToken         string   `json:"root_token"`
 }
 
-// SaltState represents a Salt state execution result
-type SaltState struct {
-	Name     string
-	Result   bool
-	Changes  map[string]interface{}
-	Comment  string
-	Duration float64
-}

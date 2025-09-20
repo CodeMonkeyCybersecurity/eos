@@ -19,7 +19,7 @@ var appCmd = &cobra.Command{
 	Long: `Deploy a specific application to target environments using sophisticated deployment
 strategies including rolling, blue-green, canary, and immutable deployments.
 
-This command orchestrates comprehensive application deployment following the Salt → Terraform → Nomad
+This command orchestrates comprehensive application deployment following the  → Terraform → Nomad
 pattern with extensive validation, health checking, and rollback capabilities. Each deployment
 follows the assessment→intervention→evaluation pattern to ensure reliable operations.
 
@@ -68,7 +68,7 @@ Examples:
 		skipValidation, _ := cmd.Flags().GetBool("skip-validation")
 		skipHealthCheck, _ := cmd.Flags().GetBool("skip-health-check")
 		rollbackOnFailure, _ := cmd.Flags().GetBool("rollback-on-failure")
-		
+
 		// Strategy-specific flags
 		batchSize, _ := cmd.Flags().GetInt("batch-size")
 		canaryPercentage, _ := cmd.Flags().GetInt("canary-percentage")
@@ -139,30 +139,30 @@ Examples:
 			StrategyConfig: deploy.StrategyConfig{
 				Rolling: deploy.RollingConfig{
 					BatchSize:        batchSize,
-					MaxSurge:        1,
-					MaxUnavailable:  0,
+					MaxSurge:         1,
+					MaxUnavailable:   0,
 					ProgressDeadline: 10 * time.Minute,
 				},
 				BlueGreen: deploy.BlueGreenConfig{
-					PrePromotionAnalysis:  5 * time.Minute,
+					PrePromotionAnalysis: 5 * time.Minute,
 					ScaleDownDelay:       10 * time.Minute,
 					AutoPromotionEnabled: false,
 				},
 				Canary: deploy.CanaryConfig{
 					InitialPercentage: canaryPercentage,
-					StepPercentage:   10,
-					StepDuration:     canaryDuration,
-					MaxSteps:         10,
-					AnalysisDelay:    2 * time.Minute,
+					StepPercentage:    10,
+					StepDuration:      canaryDuration,
+					MaxSteps:          10,
+					AnalysisDelay:     2 * time.Minute,
 				},
 			},
 			HealthCheck: deploy.HealthCheckConfig{
-				Enabled:        !skipHealthCheck,
-				Path:          "/health",
-				Retries:       healthCheckRetries,
-				Timeout:       healthCheckTimeout,
-				Interval:      30 * time.Second,
-				InitialDelay:  10 * time.Second,
+				Enabled:      !skipHealthCheck,
+				Path:         "/health",
+				Retries:      healthCheckRetries,
+				Timeout:      healthCheckTimeout,
+				Interval:     30 * time.Second,
+				InitialDelay: 10 * time.Second,
 			},
 		}
 
@@ -252,7 +252,7 @@ Examples:
 
 			// Check if rollback was attempted
 			if rollbackOnFailure && result != nil && result.RollbackAttempted {
-				fmt.Printf("❌ Deployment failed, but rollback was %s\n", 
+				fmt.Printf("❌ Deployment failed, but rollback was %s\n",
 					func() string {
 						if result.RollbackSuccessful {
 							return "successful"

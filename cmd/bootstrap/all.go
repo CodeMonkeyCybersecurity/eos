@@ -19,10 +19,9 @@ import (
 var allCmd = &cobra.Command{
 	Use:   "all",
 	Short: "Bootstrap all infrastructure components in the correct order",
-	Long: `Bootstrap all infrastructure components in the correct order: Salt, Vault, Nomad, OSQuery.
+	Long: `Bootstrap all infrastructure components in the correct order: , Vault, Nomad, OSQuery.
 	
 This is a comprehensive setup that includes:
-- SaltStack for configuration management
 - HashiCorp Vault for secrets management 
 - HashiCorp Nomad for container orchestration (optional)
 - OSQuery for system monitoring
@@ -34,11 +33,11 @@ var quickstartCmd = &cobra.Command{
 	Use:   "quickstart",
 	Short: "Quick setup of a complete eos environment (5 minutes)",
 	Long: `Quickstart sets up a complete eos environment in under 5 minutes.
-This includes Salt, Vault, OSQuery, and optionally Nomad for container orchestration.
+This includes , Vault, OSQuery, and optionally Nomad for container orchestration.
 
 The quickstart process will:
-1. Bootstrap core infrastructure (Salt, Vault, OSQuery)
-2. Use Salt to manage additional components
+1. Bootstrap core infrastructure (, Vault, OSQuery)
+2. Use  to manage additional components
 3. Verify all components are running correctly
 4. Provide a summary of what was installed
 
@@ -54,7 +53,7 @@ func init() {
 	allCmd.Flags().Bool("with-nomad", false, "Include Nomad for container orchestration")
 	allCmd.Flags().Bool("skip-verify", false, "Skip verification steps")
 	allCmd.Flags().Duration("timeout", 10*time.Minute, "Maximum time for bootstrap")
-	
+
 	quickstartCmd.Flags().Bool("with-nomad", false, "Include Nomad for container orchestration")
 	quickstartCmd.Flags().Bool("with-clusterfuzz", false, "Include ClusterFuzz setup")
 	quickstartCmd.Flags().Bool("skip-verify", false, "Skip verification steps")
@@ -66,7 +65,7 @@ func GetAllCmd() *cobra.Command {
 	return allCmd
 }
 
-// GetQuickstartCmd returns the bootstrap quickstart command  
+// GetQuickstartCmd returns the bootstrap quickstart command
 func GetQuickstartCmd() *cobra.Command {
 	return quickstartCmd
 }
@@ -93,7 +92,7 @@ func runBootstrapAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.Bool("skip_verify", skipVerify),
 		zap.Duration("timeout", timeout))
 
-	// Phase 1: Bootstrap Nomad (replaced SaltStack)
+	// Phase 1: Bootstrap Nomad (replaced )
 	logger.Info("Phase 1: Bootstrap Nomad")
 	// TODO: Implement Nomad bootstrap
 	logger.Info("Nomad bootstrap placeholder - not implemented")
@@ -164,7 +163,7 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.Int("phase", 1),
 		zap.Int("total_phases", 4))
 
-	// 1.1 Bootstrap Nomad (replacing Salt)
+	// 1.1 Bootstrap Nomad (replacing )
 	logger.Info("Bootstrapping Nomad (server mode)")
 	// TODO: Replace with actual Nomad installation
 	logger.Info("Nomad bootstrap placeholder - implementation pending")
@@ -206,14 +205,14 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		InstalledAt: time.Now(),
 	})
 
-	// Phase 2: Salt-Managed Infrastructure
-	logger.Info("PHASE 2: Salt-Managed Infrastructure",
+	// Phase 2: -Managed Infrastructure
+	logger.Info("PHASE 2: -Managed Infrastructure",
 		zap.Int("phase", 2),
 		zap.Int("total_phases", 4))
 
 	if withNomad {
-		logger.Info("Installing Nomad via Salt")
-		if err := installNomadViaSalt(rc); err != nil {
+		logger.Info("Installing Nomad via HashiCorp package manager")
+		if err := installNomadViaHashiCorp(rc); err != nil {
 			return fmt.Errorf("failed to install Nomad: %w", err)
 		}
 		tracker.AddComponent(state.Component{
@@ -292,7 +291,7 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	fmt.Println("\nNext Steps:")
 	fmt.Println("===========")
 	fmt.Println("1. Check component status: eos list --all")
-	fmt.Println("2. View Salt states: salt-call state.show_top")
+	fmt.Println("2. View  states: -call state.show_top")
 	fmt.Println("3. Check Vault status: vault status")
 	if withNomad {
 		fmt.Println("4. Check Nomad status: nomad status")
@@ -314,8 +313,6 @@ func verifyBootstrap(rc *eos_io.RuntimeContext, withNomad bool) error {
 		command string
 		service string
 	}{
-		{"Salt Master", "salt", "salt-master"},
-		{"Salt Minion", "salt-minion", "salt-minion"},
 		{"Vault", "vault", "vault"},
 		{"OSQuery", "osqueryi", "osqueryd"},
 	}
@@ -346,130 +343,6 @@ func verifyBootstrap(rc *eos_io.RuntimeContext, withNomad bool) error {
 	}
 
 	logger.Info("All verifications passed")
-	return nil
-}
-
-// Helper functions from original quickstart
-func installNomadViaSalt(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	cmd := eos_cli.New(rc)
-
-	// Create Nomad Salt state
-	nomadState := `nomad:
-  archive.extracted:
-    - name: /usr/local/bin
-    - source: https://releases.hashicorp.com/nomad/{{ salt['pillar.get']('nomad:version', '1.9.3') }}/nomad_{{ salt['pillar.get']('nomad:version', '1.9.3') }}_linux_amd64.zip
-    - skip_verify: True
-    - enforce_toplevel: False
-    - require_in:
-      - service: nomad
-
-  service.running:
-    - enable: True
-    - require:
-      - archive: nomad
-      - file: /etc/nomad.d/nomad.hcl
-
-/etc/nomad.d:
-  file.directory:
-    - mode: 755
-    - makedirs: True
-
-/etc/nomad.d/nomad.hcl:
-  file.managed:
-    - source: salt://nomad/files/nomad.hcl
-    - template: jinja
-    - mode: 644
-    - require:
-      - file: /etc/nomad.d
-
-/opt/nomad:
-  file.directory:
-    - mode: 755
-    - makedirs: True
-
-/opt/nomad/data:
-  file.directory:
-    - mode: 755
-    - makedirs: True
-    - require:
-      - file: /opt/nomad
-
-/etc/systemd/system/nomad.service:
-  file.managed:
-    - source: salt://nomad/files/nomad.service
-    - mode: 644
-`
-
-	// Create directories
-	if err := cmd.ExecToSuccess("mkdir", "-p", "/srv/salt/states/nomad/files"); err != nil {
-		return fmt.Errorf("failed to create nomad state directory: %w", err)
-	}
-
-	// Write state file
-	stateFile := "/srv/salt/states/nomad/init.sls"
-	if err := os.WriteFile(stateFile, []byte(nomadState), 0644); err != nil {
-		return fmt.Errorf("failed to write nomad state: %w", err)
-	}
-
-	// Create Nomad config
-	nomadConfig := `datacenter = "dc1"
-data_dir = "/opt/nomad/data"
-
-server {
-  enabled = true
-  bootstrap_expect = 1
-}
-
-client {
-  enabled = true
-  servers = ["127.0.0.1:4647"]
-}
-
-ui {
-  enabled = true
-}
-
-bind_addr = "0.0.0.0"
-`
-
-	configFile := "/srv/salt/states/nomad/files/nomad.hcl"
-	if err := os.WriteFile(configFile, []byte(nomadConfig), 0644); err != nil {
-		return fmt.Errorf("failed to write nomad config: %w", err)
-	}
-
-	// Create systemd service
-	nomadService := `[Unit]
-Description=Nomad
-Documentation=https://nomadproject.io/docs/
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-ExecReload=/bin/kill -HUP $MAINPID
-ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
-KillMode=process
-Restart=on-failure
-LimitNOFILE=65536
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`
-
-	serviceFile := "/srv/salt/states/nomad/files/nomad.service"
-	if err := os.WriteFile(serviceFile, []byte(nomadService), 0644); err != nil {
-		return fmt.Errorf("failed to write nomad service: %w", err)
-	}
-
-	// Apply Salt state
-	logger.Info("Applying Nomad Salt state")
-	output, err := cmd.ExecString("salt-call", "--local", "state.apply", "nomad")
-	if err != nil {
-		return fmt.Errorf("failed to apply nomad state: %w", err)
-	}
-
-	logger.Info("Nomad installed via Salt", zap.String("output", output))
 	return nil
 }
 
@@ -523,8 +396,6 @@ func verifyQuickstart(rc *eos_io.RuntimeContext, _ *state.StateTracker) error {
 		command string
 		service string
 	}{
-		{"Salt Master", "salt", "salt-master"},
-		{"Salt Minion", "salt-minion", "salt-minion"},
 		{"Vault", "vault", "vault"},
 		{"OSQuery", "osqueryi", "osqueryd"},
 	}
@@ -546,12 +417,12 @@ func verifyQuickstart(rc *eos_io.RuntimeContext, _ *state.StateTracker) error {
 			zap.String("status", "active"))
 	}
 
-	// Test Salt connectivity
-	output, err := cmd.ExecString("salt", "*", "test.ping")
+	// Test  connectivity
+	output, err := cmd.ExecString("", "*", "test.ping")
 	if err != nil {
-		logger.Warn("Salt connectivity test failed", zap.Error(err))
+		logger.Warn(" connectivity test failed", zap.Error(err))
 	} else {
-		logger.Info("Salt connectivity verified", zap.String("output", output))
+		logger.Info(" connectivity verified", zap.String("output", output))
 	}
 
 	// Test OSQuery
@@ -564,4 +435,38 @@ func verifyQuickstart(rc *eos_io.RuntimeContext, _ *state.StateTracker) error {
 
 	logger.Info("All verifications passed")
 	return nil
+}
+
+// installNomadViaHashiCorp installs Nomad using HashiCorp's official package manager
+func installNomadViaHashiCorp(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// This requires administrator intervention for system package installation
+	logger.Warn("Nomad installation requires administrator intervention",
+		zap.String("reason", "system package installation requires root privileges"),
+		zap.String("action", "administrator must install Nomad using HashiCorp package repository"))
+	
+	// Store installation request in Vault for administrator reference
+	installConfig := map[string]interface{}{
+		"package": "nomad",
+		"source": "hashicorp",
+		"version": "latest",
+		"repository": "https://rpm.releases.hashicorp.com/",
+		"instructions": []string{
+			"Add HashiCorp repository to system package manager",
+			"Install nomad package using system package manager (yum/apt/pkg)",
+			"Configure nomad service for automatic startup",
+			"Verify nomad installation with 'nomad version'",
+		},
+	}
+	
+	// Store in Vault for administrator reference (simplified for now)
+	vaultPath := "eos/bootstrap/nomad-install-request"
+	logger.Info("Installation request would be stored in Vault",
+		zap.String("vault_path", vaultPath),
+		zap.Any("config", installConfig))
+	
+	// TODO: Implement proper Vault integration when Vault client is available
+	
+	return fmt.Errorf("nomad installation requires administrator intervention - configuration stored in Vault at %s", vaultPath)
 }

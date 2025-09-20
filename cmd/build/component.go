@@ -18,7 +18,7 @@ var componentCmd = &cobra.Command{
 
 This command builds individual components following the assessment→intervention→evaluation
 pattern to ensure reliable and reproducible builds. It supports various build strategies,
-artifact management, and integration with the Salt → Terraform → Nomad orchestration.
+artifact management, and integration with the  → Terraform → Nomad orchestration.
 
 The build process includes:
 - Dependency resolution and validation
@@ -77,16 +77,16 @@ Examples:
 
 		// Create build configuration
 		buildConfig := &build.ComponentBuildConfig{
-			Name:            componentName,
-			Tag:             tag,
-			Registry:        registry,
-			Push:            push,
-			Force:           force,
+			Name:             componentName,
+			Tag:              tag,
+			Registry:         registry,
+			Push:             push,
+			Force:            force,
 			WithDependencies: withDeps,
-			BuildArgs:       buildArgsToMap(buildArgs),
-			Target:          target,
-			Parallel:        parallel,
-			DryRun:          dryRun,
+			BuildArgs:        buildArgsToMap(buildArgs),
+			Target:           target,
+			Parallel:         parallel,
+			DryRun:           dryRun,
 		}
 
 		// Create component builder

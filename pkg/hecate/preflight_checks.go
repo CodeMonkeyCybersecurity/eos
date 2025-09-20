@@ -43,14 +43,14 @@ type NetworkCheckResult struct {
 
 // PreflightCheckResult contains all preflight check results
 type PreflightCheckResult struct {
-	Dependencies    []DependencyStatus
-	NetworkCheck    NetworkCheckResult
-	DiskSpace       map[string]int64 // path -> available MB
-	PortAvailability map[int]bool    // port -> available
-	SystemChecks    map[string]bool  // check name -> passed
-	CanProceed      bool
-	CriticalIssues  []string
-	Warnings        []string
+	Dependencies     []DependencyStatus
+	NetworkCheck     NetworkCheckResult
+	DiskSpace        map[string]int64 // path -> available MB
+	PortAvailability map[int]bool     // port -> available
+	SystemChecks     map[string]bool  // check name -> passed
+	CanProceed       bool
+	CriticalIssues   []string
+	Warnings         []string
 }
 
 // PreflightChecks performs comprehensive preflight validation for Hecate
@@ -60,12 +60,12 @@ func PreflightChecks(rc *eos_io.RuntimeContext) (*PreflightCheckResult, error) {
 
 	result := &PreflightCheckResult{
 		Dependencies:     []DependencyStatus{},
-		DiskSpace:       make(map[string]int64),
+		DiskSpace:        make(map[string]int64),
 		PortAvailability: make(map[int]bool),
-		SystemChecks:    make(map[string]bool),
-		CanProceed:      true,
-		CriticalIssues:  []string{},
-		Warnings:        []string{},
+		SystemChecks:     make(map[string]bool),
+		CanProceed:       true,
+		CriticalIssues:   []string{},
+		Warnings:         []string{},
 	}
 
 	// 1. Check system requirements
@@ -106,7 +106,7 @@ func checkSystemRequirements(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 	}
 
 	// Check required system tools
-	requiredTools := []string{"systemctl", "curl", "ss", "nc", "dig", "salt-call"}
+	requiredTools := []string{"systemctl", "curl", "ss", "nc", "dig", "-call"}
 	for _, tool := range requiredTools {
 		if _, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "which",
@@ -159,12 +159,11 @@ func checkDependencies(rc *eos_io.RuntimeContext, result *PreflightCheckResult) 
 			checkCmd:    []string{"vault", "version"},
 		},
 		{
-			name:        "SaltStack",
-			description: "SaltStack configuration management",
+			name:        "",
+			description: " configuration management",
 			required:    true,
-			serviceName: "salt-minion",
-			installCmd:  "saltstack",
-			checkCmd:    []string{"salt-call", "--version"},
+			installCmd:  "",
+			checkCmd:    []string{"-call", "--version"},
 		},
 		{
 			name:        "Docker",
@@ -303,8 +302,8 @@ func checkPortAvailability(rc *eos_io.RuntimeContext, result *PreflightCheckResu
 	logger.Info("Checking port availability")
 
 	requiredPorts := map[int]string{
-		80:               "HTTP (Caddy)",
-		443:              "HTTPS (Caddy)",
+		80:                    "HTTP (Caddy)",
+		443:                   "HTTPS (Caddy)",
 		shared.PortCaddyAdmin: "Caddy Admin API",
 		shared.PortAuthentik:  "Authentik",
 		8263:                  "PostgreSQL", // PortPostgres
@@ -322,7 +321,7 @@ func checkPortAvailability(rc *eos_io.RuntimeContext, result *PreflightCheckResu
 			if strings.Contains(service, "should be running") {
 				logger.Debug("Port in use by expected service", zap.Int("port", port), zap.String("service", service))
 			} else {
-				result.Warnings = append(result.Warnings, 
+				result.Warnings = append(result.Warnings,
 					fmt.Sprintf("Port %d (%s) is already in use", port, service))
 			}
 		} else {
@@ -356,7 +355,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext, result *PreflightCheckResult) {
 
 		if availableMB < requiredMB {
 			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Low disk space on %s: %d MB available (recommended: %d MB)", 
+				fmt.Sprintf("Low disk space on %s: %d MB available (recommended: %d MB)",
 					path, availableMB, requiredMB))
 		}
 	}
@@ -469,7 +468,7 @@ func analyzeResults(result *PreflightCheckResult) {
 			"Please deploy on a cloud server with public IP: AWS EC2, Hetzner Cloud, DigitalOcean, GCP, Azure, etc.")
 		result.CanProceed = false
 	}
-	
+
 	// Also check if we have a public IP at all
 	if result.NetworkCheck.PublicIP == "" {
 		result.CriticalIssues = append(result.CriticalIssues,
@@ -631,12 +630,12 @@ func InteractivelyHandleDependencies(rc *eos_io.RuntimeContext, result *Prefligh
 
 		if consent {
 			logger.Info(fmt.Sprintf("terminal prompt: Installing %s...", dep.Name))
-			
+
 			if err := installDependency(rc, dep); err != nil {
-				logger.Error("Failed to install dependency", 
+				logger.Error("Failed to install dependency",
 					zap.String("dependency", dep.Name),
 					zap.Error(err))
-				
+
 				// Ask if they want to continue anyway
 				continueAnyway, _ := eos_io.PromptToContinueDespiteErrors(rc, 1, fmt.Sprintf("installing %s", dep.Name))
 				if !continueAnyway {
@@ -677,7 +676,7 @@ func installDependency(rc *eos_io.RuntimeContext, dep DependencyStatus) error {
 	case "nomad":
 		// Don't add --node-role flag, let the command use its defaults
 		// The nomad command will handle the role appropriately
-	case "saltstack":
+	case "":
 		args = append(args, "--masterless")
 	}
 

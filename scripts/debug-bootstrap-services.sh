@@ -46,11 +46,9 @@ trace_service_mapping() {
     
     # Direct mappings
     case "$process_path" in
-        "salt-master") echo "  -> Direct match: salt-master" ;;
         "vault") echo "  -> Direct match: vault" ;;
         "consul") echo "  -> Direct match: consul" ;;
         "nomad") echo "  -> Direct match: nomad" ;;
-        "/opt/saltstack/"*) echo "  -> Path match: salt-master" ;;
         "/opt/vault/"*) echo "  -> Path match: vault" ;;
         "/opt/consul/"*) echo "  -> Path match: consul" ;;
         "/opt/nomad/"*) echo "  -> Path match: nomad" ;;
@@ -80,10 +78,6 @@ echo "==================================="
 
 # Test various process paths that might be encountered
 test_paths=(
-    "/opt/saltstack/"
-    "/opt/saltstack"
-    "salt-master"
-    "/usr/bin/salt-master"
     "/opt/vault/bin/vault"
     "vault"
     "/usr/bin/vault"
@@ -99,23 +93,7 @@ echo
 echo "3. Current service status..."
 echo "============================"
 
-# Check status of EOS services
-services=("salt-master" "salt-api" "vault" "consul" "nomad")
-for service in "${services[@]}"; do
-    echo -n "$service: "
-    if systemctl is-active --quiet $service 2>/dev/null; then
-        echo -e "${GREEN}active${NC}"
-        # Get the main PID
-        pid=$(systemctl show -p MainPID --value $service 2>/dev/null)
-        if [ -n "$pid" ] && [ "$pid" != "0" ]; then
-            echo "  PID: $pid"
-            echo -n "  Process: "
-            ps -p $pid -o comm= 2>/dev/null || echo "unknown"
-        fi
-    else
-        echo -e "${RED}inactive${NC}"
-    fi
-done
+
 
 echo
 echo "4. Debugging bootstrap detection..."
@@ -137,9 +115,7 @@ echo
 echo "5. Common issues and solutions..."
 echo "================================="
 
-echo -e "${BLUE}Issue:${NC} Service shows as '/opt/saltstack/' instead of 'salt-master'"
-echo -e "${GREEN}Solution:${NC} The fix should map this to 'salt-master' automatically"
-echo
+
 
 echo -e "${BLUE}Issue:${NC} systemctl stop fails with 'Unit not found'"
 echo -e "${GREEN}Solution:${NC} The service name mapping is incorrect or service has a different name"

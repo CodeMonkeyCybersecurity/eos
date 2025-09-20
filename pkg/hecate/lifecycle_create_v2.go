@@ -15,22 +15,22 @@ import (
 type DeploymentMethod string
 
 const (
-	DeploymentMethodSaltStack DeploymentMethod = "saltstack"
-	DeploymentMethodDocker    DeploymentMethod = "docker"
-	DeploymentMethodManual    DeploymentMethod = "manual"
+	DeploymentMethodDefault DeploymentMethod = ""
+	DeploymentMethodDocker  DeploymentMethod = "docker"
+	DeploymentMethodManual  DeploymentMethod = "manual"
 )
 
 // HecateDeploymentConfig holds configuration for the deployment
 type HecateDeploymentConfig struct {
-	Method          DeploymentMethod
-	Domain          string
-	AdminEmail      string
-	EnableAuth      bool
-	EnableMetrics   bool
-	CustomCertPath  string
-	CustomKeyPath   string
-	DNSProvider     string
-	DNSAPIToken     string
+	Method         DeploymentMethod
+	Domain         string
+	AdminEmail     string
+	EnableAuth     bool
+	EnableMetrics  bool
+	CustomCertPath string
+	CustomKeyPath  string
+	DNSProvider    string
+	DNSAPIToken    string
 }
 
 // OrchestrateHecateDeployment is the new main entry point for Hecate deployment
@@ -46,19 +46,19 @@ func OrchestrateHecateDeployment(rc *eos_io.RuntimeContext) error {
 
 	// Deploy based on selected method
 	switch config.Method {
-	case DeploymentMethodSaltStack:
-		logger.Info("SaltStack deployment requires administrator intervention")
-		return fmt.Errorf("SaltStack deployment has been migrated to HashiCorp stack. Please use Docker or Manual deployment methods, or contact your administrator for system-level deployment assistance")
-	
+	case DeploymentMethodDefault:
+		logger.Info("Default deployment requires administrator intervention")
+		return fmt.Errorf("Default deployment has been migrated to HashiCorp stack. Please use Docker or Manual deployment methods, or contact your administrator for system-level deployment assistance")
+
 	case DeploymentMethodDocker:
 		logger.Info("Deploying Hecate with Docker Compose")
 		// Fall back to existing wizard for now
 		return OrchestrateHecateWizard(rc)
-	
+
 	case DeploymentMethodManual:
 		logger.Info("Manual deployment selected")
 		return provideManualInstructions(rc)
-	
+
 	default:
 		return eos_err.NewUserError("invalid deployment method selected")
 	}
@@ -75,7 +75,7 @@ func collectDeploymentConfig(rc *eos_io.RuntimeContext) (*HecateDeploymentConfig
 	logger.Info("terminal prompt: Welcome to Hecate Deployment")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Select deployment method:")
-	logger.Info("terminal prompt:   1. SaltStack (recommended for production)")
+	logger.Info("terminal prompt:   1.  (recommended for production)")
 	logger.Info("terminal prompt:   2. Docker Compose (for development)")
 	logger.Info("terminal prompt:   3. Manual (show instructions)")
 	logger.Info("terminal prompt: ")
@@ -92,7 +92,7 @@ func collectDeploymentConfig(rc *eos_io.RuntimeContext) (*HecateDeploymentConfig
 	case "3":
 		config.Method = DeploymentMethodManual
 	default:
-		config.Method = DeploymentMethodSaltStack
+		config.Method = DeploymentMethodDefault
 	}
 
 	// Only collect additional config for non-manual deployments
@@ -104,7 +104,7 @@ func collectDeploymentConfig(rc *eos_io.RuntimeContext) (*HecateDeploymentConfig
 			return nil, fmt.Errorf("failed to read domain: %w", err)
 		}
 		config.Domain = strings.TrimSpace(domain)
-		
+
 		if config.Domain == "" {
 			config.Domain = "localhost"
 			logger.Info("Using default domain: localhost")
@@ -125,7 +125,7 @@ func collectDeploymentConfig(rc *eos_io.RuntimeContext) (*HecateDeploymentConfig
 			if err != nil {
 				return nil, fmt.Errorf("failed to read DNS choice: %w", err)
 			}
-			
+
 			if strings.ToLower(strings.TrimSpace(dnsChoice)) == "y" {
 				logger.Info("terminal prompt: Select DNS provider:")
 				logger.Info("terminal prompt:   1. Hetzner")
@@ -133,12 +133,12 @@ func collectDeploymentConfig(rc *eos_io.RuntimeContext) (*HecateDeploymentConfig
 				logger.Info("terminal prompt:   3. Route53")
 				logger.Info("terminal prompt:   4. Manual DNS")
 				logger.Info("terminal prompt: Enter choice [1-4]:")
-				
+
 				providerChoice, err := eos_io.ReadInput(rc)
 				if err != nil {
 					return nil, fmt.Errorf("failed to read DNS provider: %w", err)
 				}
-				
+
 				switch strings.TrimSpace(providerChoice) {
 				case "1":
 					config.DNSProvider = "hetzner"
@@ -191,18 +191,18 @@ func collectDeploymentConfig(rc *eos_io.RuntimeContext) (*HecateDeploymentConfig
 	}
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Proceed with deployment? [Y/n]:")
-	
+
 	proceed, err := eos_io.ReadInput(rc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read confirmation: %w", err)
 	}
-	
+
 	if strings.ToLower(strings.TrimSpace(proceed)) == "n" {
 		return nil, eos_err.NewUserError("deployment cancelled by user")
 	}
 
-	// Store configuration in Vault if using SaltStack
-	if config.Method == DeploymentMethodSaltStack {
+	// Store configuration in Vault if using default method
+	if config.Method == DeploymentMethodDefault {
 		if err := storeConfigInVault(rc, config); err != nil {
 			return nil, fmt.Errorf("failed to store configuration: %w", err)
 		}
@@ -256,7 +256,7 @@ func storeVaultSecret(rc *eos_io.RuntimeContext, path, value string) error {
 // provideManualInstructions displays manual deployment instructions
 func provideManualInstructions(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Manual Hecate Deployment Instructions")
 	logger.Info("terminal prompt: =====================================")
@@ -268,21 +268,21 @@ func provideManualInstructions(rc *eos_io.RuntimeContext) error {
 	logger.Info("terminal prompt:    - Docker for containerization")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: 2. Deploy PostgreSQL:")
-	logger.Info("terminal prompt:    nomad job run /opt/eos/salt/states/hecate/files/nomad/postgres.nomad")
+	logger.Info("terminal prompt:    nomad job run /opt/eos//states/hecate/files/nomad/postgres.nomad")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: 3. Deploy Redis:")
-	logger.Info("terminal prompt:    nomad job run /opt/eos/salt/states/hecate/files/nomad/redis.nomad")
+	logger.Info("terminal prompt:    nomad job run /opt/eos//states/hecate/files/nomad/redis.nomad")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: 4. Deploy Authentik:")
-	logger.Info("terminal prompt:    nomad job run /opt/eos/salt/states/hecate/files/nomad/authentik-server.nomad")
-	logger.Info("terminal prompt:    nomad job run /opt/eos/salt/states/hecate/files/nomad/authentik-worker.nomad")
+	logger.Info("terminal prompt:    nomad job run /opt/eos//states/hecate/files/nomad/authentik-server.nomad")
+	logger.Info("terminal prompt:    nomad job run /opt/eos//states/hecate/files/nomad/authentik-worker.nomad")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: 5. Deploy Caddy:")
-	logger.Info("terminal prompt:    nomad job run /opt/eos/salt/states/hecate/files/nomad/caddy.nomad")
+	logger.Info("terminal prompt:    nomad job run /opt/eos//states/hecate/files/nomad/caddy.nomad")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: 6. Configure routes in /opt/hecate/caddy/routes/")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: For automated deployment, use: eos create hecate")
-	
+
 	return nil
 }

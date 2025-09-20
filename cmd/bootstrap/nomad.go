@@ -1,17 +1,17 @@
 package bootstrap
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 var nomadCmd = &cobra.Command{
 	Use:   "nomad",
-	Short: "Bootstrap HashiCorp Nomad using SaltStack",
-	Long:  `Install and configure HashiCorp Nomad using Salt states. Requires Salt to be already installed.`,
+	Short: "Bootstrap HashiCorp Nomad using ",
+	Long:  `Install and configure HashiCorp Nomad using  states. Requires  to be already installed.`,
 	RunE:  eos_cli.Wrap(runBootstrapNomad),
 }
 
@@ -28,8 +28,8 @@ func runBootstrapNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Nomad bootstrap")
 
-	// Use the bootstrap-specific Salt deployment (no interactive prompts)
-	if err := nomad.DeployNomadViaSaltBootstrap(rc); err != nil {
+	// Use the bootstrap-specific  deployment (no interactive prompts)
+	if err := nomad.DeployNomadViaBootstrap(rc); err != nil {
 		return err
 	}
 

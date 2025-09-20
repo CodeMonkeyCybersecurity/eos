@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -27,7 +27,7 @@ The promotion process includes:
 - Source environment validation and artifact verification
 - Target environment compatibility checking  
 - Approval workflow execution (if required)
-- Deployment orchestration using Salt → Terraform → Nomad
+- Deployment orchestration using  → Terraform → Nomad
 - Health checks and smoke testing
 - Deployment registry updates
 - Rollback plan generation

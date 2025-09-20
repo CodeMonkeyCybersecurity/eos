@@ -8,6 +8,7 @@ import (
 	// disk_management functionality now consolidated into storage package
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/zfs_management"
+	"github.com/hashicorp/nomad/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -17,18 +18,22 @@ type DriverRegistry struct {
 	mu      sync.RWMutex
 	drivers map[StorageType]StorageDriverFactory
 	rc      *eos_io.RuntimeContext
-	salt    NomadClient
 }
 
+// ZFSDriverFactory creates ZFS storage drivers
+type ZFSDriverFactory struct{}
+
+// CephFSDriverFactory creates CephFS storage drivers  
+type CephFSDriverFactory struct{}
+
 // NewDriverRegistry creates a new driver registry
-func NewDriverRegistry(rc *eos_io.RuntimeContext, salt NomadClient) *DriverRegistry {
+func NewDriverRegistry(rc *eos_io.RuntimeContext, nomadClient *api.Client) *DriverRegistry {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating storage driver registry")
 
 	registry := &DriverRegistry{
 		drivers: make(map[StorageType]StorageDriverFactory),
 		rc:      rc,
-		salt:    salt,
 	}
 
 	// Register default drivers
@@ -80,25 +85,7 @@ func (r *DriverRegistry) registerDefaultDrivers() {
 	logger := otelzap.Ctx(r.rc.Ctx)
 	logger.Info("Registering default storage drivers")
 
-	// Register LVM driver
-	r.Register(StorageTypeLVM, &LVMDriverFactory{
-		salt: r.salt,
-	})
 
-	// Register BTRFS driver
-	r.Register(StorageTypeBTRFS, &BTRFSDriverFactory{
-		salt: r.salt,
-	})
-
-	// Register ZFS driver
-	r.Register(StorageTypeZFS, &ZFSDriverFactory{
-		salt: r.salt,
-	})
-
-	// Register CephFS driver
-	r.Register(StorageTypeCephFS, &CephFSDriverFactory{
-		salt: r.salt,
-	})
 
 	// Register Docker Volume driver
 	r.Register(StorageType("docker"), &DockerVolumeDriverFactory{})
@@ -106,7 +93,6 @@ func (r *DriverRegistry) registerDefaultDrivers() {
 
 // LVMDriverFactory creates LVM storage drivers
 type LVMDriverFactory struct {
-	salt NomadClient
 }
 
 // CreateDriver creates an LVM storage driver
@@ -114,8 +100,6 @@ func (f *LVMDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driver
 	// Use existing LVM package functionality
 	return &LVMDriver{
 		rc:   rc,
-		salt: f.salt,
-		lvm:  nil, // LVM operations are done through Salt and direct calls
 	}, nil
 }
 
@@ -126,7 +110,6 @@ func (f *LVMDriverFactory) SupportsType(storageType StorageType) bool {
 
 // BTRFSDriverFactory creates BTRFS storage drivers
 type BTRFSDriverFactory struct {
-	salt NomadClient
 }
 
 // CreateDriver creates a BTRFS storage driver
@@ -135,7 +118,6 @@ func (f *BTRFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driv
 	// Storage operations are handled through Nomad job scheduling
 	return &BTRFSDriver{
 		rc:   rc,
-		salt: f.salt, // NomadClient for orchestration
 	}, nil
 }
 
@@ -144,10 +126,7 @@ func (f *BTRFSDriverFactory) SupportsType(storageType StorageType) bool {
 	return storageType == StorageTypeBTRFS
 }
 
-// ZFSDriverFactory creates ZFS storage drivers
-type ZFSDriverFactory struct {
-	salt NomadClient
-}
+
 
 // CreateDriver creates a ZFS storage driver
 func (f *ZFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config DriverConfig) (StorageDriver, error) {
@@ -156,7 +135,6 @@ func (f *ZFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driver
 
 	return &ZFSDriver{
 		rc:      rc,
-		salt:    f.salt, // NomadClient for orchestration
 		manager: manager,
 	}, nil
 }
@@ -166,18 +144,12 @@ func (f *ZFSDriverFactory) SupportsType(storageType StorageType) bool {
 	return storageType == StorageTypeZFS
 }
 
-// CephFSDriverFactory creates CephFS storage drivers
-type CephFSDriverFactory struct {
-	salt NomadClient
-}
-
 // CreateDriver creates a CephFS storage driver
 func (f *CephFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config DriverConfig) (StorageDriver, error) {
 	// The CephFSDriver uses NomadClient for distributed storage orchestration
 	// CephFS operations are handled through Nomad job scheduling
 	return &CephFSDriver{
 		rc:   rc,
-		salt: f.salt, // NomadClient for orchestration
 	}, nil
 }
 
@@ -207,24 +179,22 @@ type UnifiedStorageManager struct {
 	rc          *eos_io.RuntimeContext
 	registry    *DriverRegistry
 	diskManager *DiskManagerImpl
-	salt        NomadClient
 	drivers     map[StorageType]StorageDriver
 	mu          sync.RWMutex
 }
 
 // NewUnifiedStorageManager creates a new unified storage manager
-func NewUnifiedStorageManager(rc *eos_io.RuntimeContext, salt NomadClient) (*UnifiedStorageManager, error) {
+func NewUnifiedStorageManager(rc *eos_io.RuntimeContext, nomadClient *api.Client) (*UnifiedStorageManager, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating unified storage manager")
 
-	registry := NewDriverRegistry(rc, salt)
 	diskManager := NewDiskManagerImpl(nil)
+	registry := NewDriverRegistry(rc, nomadClient)
 
 	manager := &UnifiedStorageManager{
 		rc:          rc,
 		registry:    registry,
 		diskManager: diskManager,
-		salt:        salt,
 		drivers:     make(map[StorageType]StorageDriver),
 	}
 

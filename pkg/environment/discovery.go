@@ -19,29 +19,27 @@ type EnvironmentConfig struct {
 	Environment string `json:"environment"` // production, staging, development
 	Datacenter  string `json:"datacenter"`  // dc1, us-east-1, eu-west-1
 	Region      string `json:"region"`      // geographic region
-	
+
 	// Node configuration
 	NodeRole     string   `json:"node_role"`     // server, client, standalone
 	NodeID       string   `json:"node_id"`       // unique node identifier
 	ClusterNodes []string `json:"cluster_nodes"` // other nodes in cluster
-	
+
 	// Service configuration
 	Services ServiceDefaults `json:"services"`
-	
+
 	// Secret management
-	SecretBackend string `json:"secret_backend"` // vault, saltstack, file
-	VaultAddr     string `json:"vault_addr"`     // vault server address
-	SaltMaster    string `json:"salt_master"`    // salt master address
+	VaultAddr string `json:"vault_addr"` // vault server address
 }
 
 // ServiceDefaults contains default configurations for services
 type ServiceDefaults struct {
 	// Network defaults
 	DefaultPorts map[string]int `json:"default_ports"`
-	
+
 	// Resource defaults by environment
 	Resources map[string]ResourceConfig `json:"resources"`
-	
+
 	// Storage defaults
 	DataPath   string `json:"data_path"`
 	BackupPath string `json:"backup_path"`
@@ -49,10 +47,10 @@ type ServiceDefaults struct {
 
 // ResourceConfig defines resource allocation by environment
 type ResourceConfig struct {
-	CPU          int `json:"cpu"`
-	Memory       int `json:"memory"`
-	Replicas     int `json:"replicas"`
-	MaxReplicas  int `json:"max_replicas"`
+	CPU         int `json:"cpu"`
+	Memory      int `json:"memory"`
+	Replicas    int `json:"replicas"`
+	MaxReplicas int `json:"max_replicas"`
 }
 
 // DiscoverEnvironment automatically discovers the current environment configuration
@@ -65,14 +63,14 @@ func DiscoverEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentConfig, error) 
 	if enhancedConfig, err := DiscoverEnhancedEnvironment(rc); err == nil {
 		// Convert enhanced config to basic config for backward compatibility
 		config := convertEnhancedToBasic(enhancedConfig)
-		
+
 		logger.Info("Enhanced environment discovery completed",
 			zap.String("profile", string(enhancedConfig.Profile)),
 			zap.Int("cluster_size", enhancedConfig.ClusterSize),
 			zap.String("environment", config.Environment),
 			zap.String("datacenter", config.Datacenter),
 			zap.String("namespace_primary", enhancedConfig.Namespaces.Primary))
-		
+
 		// Save both enhanced and basic configs
 		if err := saveEnhancedConfig(enhancedConfig); err != nil {
 			logger.Warn("Failed to save enhanced configuration", zap.Error(err))
@@ -80,7 +78,7 @@ func DiscoverEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentConfig, error) 
 		if err := saveConfig(config); err != nil {
 			logger.Warn("Failed to save basic configuration", zap.Error(err))
 		}
-		
+
 		return config, nil
 	}
 
@@ -96,14 +94,9 @@ func DiscoverEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentConfig, error) 
 		return config, nil
 	}
 
-	// 2. Discover from bootstrap state
-	if err := discoverFromBootstrap(config); err != nil {
-		logger.Warn("Failed to discover from bootstrap", zap.Error(err))
-	}
-
-	// 3. Discover from Salt grains
-	if err := discoverFromSalt(config); err != nil {
-		logger.Warn("Failed to discover from Salt", zap.Error(err))
+	// 2. Discover from HashiCorp bootstrap state
+	if err := discoverFromHashiCorpBootstrap(config); err != nil {
+		logger.Warn("Failed to discover from HashiCorp bootstrap", zap.Error(err))
 	}
 
 	// 4. Discover from cloud metadata
@@ -119,10 +112,11 @@ func DiscoverEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentConfig, error) 
 		logger.Warn("Failed to save configuration", zap.Error(err))
 	}
 
-	logger.Info("Basic environment discovery completed",
+	logger.Debug("Enhanced environment config loaded",
 		zap.String("environment", config.Environment),
 		zap.String("datacenter", config.Datacenter),
-		zap.String("secret_backend", config.SecretBackend))
+		zap.String("region", config.Region),
+		zap.String("vault_addr", config.VaultAddr))
 
 	return config, nil
 }
@@ -130,16 +124,14 @@ func DiscoverEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentConfig, error) 
 // convertEnhancedToBasic converts enhanced config to basic config for backward compatibility
 func convertEnhancedToBasic(enhanced *EnhancedEnvironmentConfig) *EnvironmentConfig {
 	return &EnvironmentConfig{
-		Environment:   enhanced.Environment,
-		Datacenter:    enhanced.Datacenter,
-		Region:        enhanced.Region,
-		NodeRole:      determineNodeRole(enhanced),
-		NodeID:        "localhost", // Could be enhanced to use actual node ID
-		ClusterNodes:  extractClusterNodes(enhanced),
-		Services:      enhanced.Services,
-		SecretBackend: enhanced.SecretBackend,
-		VaultAddr:     enhanced.VaultAddr,
-		SaltMaster:    enhanced.SaltMaster,
+		Environment:  enhanced.Environment,
+		Datacenter:   enhanced.Datacenter,
+		Region:       enhanced.Region,
+		NodeRole:     determineNodeRole(enhanced),
+		NodeID:       "localhost", // Could be enhanced to use actual node ID
+		ClusterNodes: extractClusterNodes(enhanced),
+		Services:     enhanced.Services,
+		VaultAddr:    enhanced.VaultAddr,
 	}
 }
 
@@ -147,7 +139,7 @@ func convertEnhancedToBasic(enhanced *EnhancedEnvironmentConfig) *EnvironmentCon
 func determineNodeRole(enhanced *EnhancedEnvironmentConfig) string {
 	// Find localhost or current node in the cluster
 	hostname, _ := os.Hostname()
-	
+
 	// Try to find current node in cluster
 	for nodeId, roles := range enhanced.NodeRoles {
 		if nodeId == hostname || nodeId == "localhost" {
@@ -156,7 +148,7 @@ func determineNodeRole(enhanced *EnhancedEnvironmentConfig) string {
 			}
 		}
 	}
-	
+
 	// Default based on profile
 	switch enhanced.Profile {
 	case ProfileDevelopment, ProfileSingleNode, ProfileHomelab:
@@ -200,7 +192,7 @@ func saveEnhancedConfig(config *EnhancedEnvironmentConfig) error {
 // loadExistingConfig loads previously discovered configuration
 func loadExistingConfig(config *EnvironmentConfig) error {
 	configPath := "/opt/eos/config/environment.json"
-	
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return fmt.Errorf("no existing configuration found")
 	}
@@ -217,39 +209,23 @@ func loadExistingConfig(config *EnvironmentConfig) error {
 	return nil
 }
 
-// discoverFromBootstrap discovers configuration from bootstrap state
-func discoverFromBootstrap(config *EnvironmentConfig) error {
-	// Check for bootstrap state files
-	bootstrapPaths := []string{
-		"/opt/eos/bootstrap/environment.json",
-		"/srv/pillar/bootstrap.sls",
-		"/etc/eos/bootstrap.conf",
-	}
 
-	for _, path := range bootstrapPaths {
-		if _, err := os.Stat(path); err == nil {
-			return parseBootstrapConfig(path, config)
-		}
-	}
 
-	return fmt.Errorf("no bootstrap configuration found")
-}
-
-// discoverFromSalt discovers configuration from Salt grains
-func discoverFromSalt(config *EnvironmentConfig) error {
-	// Try to get Salt grains
-	output, err := executeCommand("salt-call", "--local", "grains.items", "--output=json")
+// discoverFrom discovers configuration from  s
+func discoverFrom(config *EnvironmentConfig) error {
+	// Try to get  s
+	output, err := executeCommand("-call", "--local", "s.items", "--output=json")
 	if err != nil {
-		return fmt.Errorf("failed to get Salt grains: %w", err)
+		return fmt.Errorf("failed to get  s: %w", err)
 	}
 
-	var grains map[string]interface{}
-	if err := json.Unmarshal([]byte(output), &grains); err != nil {
-		return fmt.Errorf("failed to parse Salt grains: %w", err)
+	var s map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &s); err != nil {
+		return fmt.Errorf("failed to parse  s: %w", err)
 	}
 
-	// Extract environment information from grains
-	if local, ok := grains["local"].(map[string]interface{}); ok {
+	// Extract environment information from s
+	if local, ok := s["local"].(map[string]interface{}); ok {
 		if env, ok := local["environment"].(string); ok {
 			config.Environment = env
 		}
@@ -270,7 +246,7 @@ func discoverFromCloud(config *EnvironmentConfig) error {
 	if err := discoverFromHetzner(config); err == nil {
 		return nil
 	}
-	
+
 	if err := discoverFromAWS(config); err == nil {
 		return nil
 	}
@@ -329,8 +305,8 @@ func applyDefaults(config *EnvironmentConfig) {
 		config.NodeRole = "standalone" // Default for single-node
 	}
 
-	// Secret backend detection
-	config.SecretBackend = determineSecretBackend()
+	// Vault address detection (HashiCorp migration)
+	config.VaultAddr = determineVaultAddress()
 
 	// Service defaults
 	config.Services = ServiceDefaults{
@@ -398,20 +374,20 @@ func determineEnvironmentFromContext(config *EnvironmentConfig) string {
 	return "development"
 }
 
-// determineSecretBackend determines the best available secret backend
-func determineSecretBackend() string {
-	// Check if Vault is available
+// determineVaultAddress determines the Vault server address (HashiCorp migration)
+func determineVaultAddress() string {
+	// Check if Vault is available locally
 	if _, err := executeCommand("vault", "status"); err == nil {
-		return "vault"
+		return "http://localhost:8200" // Default local Vault address
 	}
 
-	// Check if Salt is available
-	if _, err := executeCommand("salt-call", "--version"); err == nil {
-		return "saltstack"
+	// Check environment variable
+	if vaultAddr := os.Getenv("VAULT_ADDR"); vaultAddr != "" {
+		return vaultAddr
 	}
 
-	// Fallback to file-based secrets
-	return "file"
+	// Default Vault address
+	return "http://localhost:8200"
 }
 
 // saveConfig saves the discovered configuration
@@ -443,4 +419,22 @@ func parseBootstrapConfig(path string, config *EnvironmentConfig) error {
 func executeCommand(name string, args ...string) (string, error) {
 	// Simple command execution - would use proper exec package in real implementation
 	return "", fmt.Errorf("command execution not implemented")
+}
+
+// discoverFromHashiCorpBootstrap discovers configuration from HashiCorp bootstrap state
+func discoverFromHashiCorpBootstrap(config *EnvironmentConfig) error {
+	// Check for HashiCorp bootstrap state files
+	bootstrapPaths := []string{
+		"/opt/eos/bootstrap/environment.json",
+		"/etc/eos/bootstrap.conf",
+		"/var/lib/consul/bootstrap.json",
+	}
+
+	for _, path := range bootstrapPaths {
+		if _, err := os.Stat(path); err == nil {
+			return parseBootstrapConfig(path, config)
+		}
+	}
+
+	return fmt.Errorf("no HashiCorp bootstrap configuration found")
 }

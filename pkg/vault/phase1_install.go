@@ -21,8 +21,6 @@ import (
 //--------------------------------------------------------------------
 // 
 // This file contains deprecated functions for direct package manager installation.
-// All new deployments should use the SaltStack-based installation via:
-//   eos create vault-salt
 //
 // These functions are maintained only for backward compatibility and will be
 // removed in a future version.

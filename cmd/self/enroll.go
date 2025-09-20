@@ -16,40 +16,23 @@ import (
 
 var EnrollCmd = &cobra.Command{
 	Use:   "enroll",
-	Short: "Enroll system into eos/salt infrastructure",
-	Long: `Enroll this system into the eos/salt infrastructure and handle the transition
-from masterless to master/minion architecture.
+	Short: "Enroll system into eos/ infrastructure",
+	Long: `Enroll this system into the eos/ infrastructure and handle the transition
 
 This command will:
 1. Discover current system configuration and resources
-2. Determine the appropriate role (master or minion)
 3. Configure networking (direct, consul-connect, or wireguard)
-4. Install and configure Salt with the appropriate role
-5. Handle transition from masterless if needed
+4. Install and configure  with the appropriate role
 6. Verify enrollment and export system information
 
 Features:
   - Auto-detection of appropriate role based on system resources
   - Network mode selection (direct, consul-connect, wireguard)
-  - Seamless transition from masterless to master/minion mode
   - Dry-run capability for preview
   - Automatic backup creation before changes
   - Comprehensive verification and reporting
 
-Examples:
-  # Enroll as master with specific datacenter
-  eos self enroll --role=master --datacenter=us-west
-  
-  # Enroll as minion with master address
-  eos self enroll --role=minion --master-address=10.0.1.100 --datacenter=us-west
-  
-  # Auto-detect role with consul network
-  eos self enroll --auto-detect --network-mode=consul-connect --datacenter=us-west
-  
-  # Preview changes without applying
-  eos self enroll --dry-run --role=master --datacenter=us-west
-  
-  # Force transition from masterless mode
+
   eos self enroll --transition-mode --role=minion --master-address=10.0.1.100 --datacenter=us-west`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -126,20 +109,6 @@ Examples:
 			return fmt.Errorf("network setup failed: %w", err)
 		}
 
-		// Handle transition from masterless if needed
-		if config.TransitionMode || systemInfo.SaltMode == enrollment.SaltModeMasterless {
-			logger.Info("Handling transition from masterless mode")
-			if err := enrollment.TransitionFromMasterless(rc, config.MasterAddress); err != nil {
-				return fmt.Errorf("masterless transition failed: %w", err)
-			}
-		}
-
-		// Configure Salt
-		logger.Info("Configuring Salt")
-		if err := enrollment.ConfigureSalt(rc, config); err != nil {
-			return fmt.Errorf("Salt configuration failed: %w", err)
-		}
-
 		// EVALUATE - Verification Phase
 		logger.Info("Phase 3: Verifying enrollment")
 
@@ -154,18 +123,26 @@ Examples:
 			return fmt.Errorf("inventory export failed: %w", err)
 		}
 
-		// Validate inventory export
-		if err := enrollment.ValidateInventoryExport(rc, systemInfo); err != nil {
-			logger.Warn("Inventory export validation failed", zap.Error(err))
+		// Validate HashiCorp configuration export
+		if err := enrollment.ValidateHashiCorpExport(rc, systemInfo); err != nil {
+			logger.Warn("HashiCorp configuration validation failed", zap.Error(err))
 		}
 
 		// Generate final report
-		result, err := enrollment.GenerateVerificationReport(rc, config, systemInfo)
+		reportStr, err := enrollment.GenerateHashiCorpVerificationReport(rc, systemInfo, config.Role)
 		if err != nil {
 			logger.Warn("Failed to generate verification report", zap.Error(err))
 		} else {
-			result.Duration = time.Since(startTime)
+			// Create EnrollmentResult for logging
+			result := &enrollment.EnrollmentResult{
+				Success:        true,
+				Role:           config.Role,
+				Duration:       time.Since(startTime),
+				ServicesSetup:  []string{"HashiCorp Stack"},
+				ConfigsUpdated: []string{"Consul", "Nomad", "Vault"},
+			}
 			enrollment.LogEnrollmentResults(logger, result)
+			logger.Info("Verification report generated", zap.String("report", reportStr))
 		}
 
 		duration := time.Since(startTime)
@@ -181,9 +158,6 @@ Examples:
 func init() {
 	SelfCmd.AddCommand(EnrollCmd)
 
-	// Role configuration
-	EnrollCmd.Flags().String("role", "", "Salt role: master or minion (prompted if not provided unless --auto-detect)")
-	EnrollCmd.Flags().String("master-address", "", "Salt master address (prompted if not provided for minion role)")
 	EnrollCmd.Flags().String("datacenter", "", "Datacenter identifier (prompted if not provided)")
 
 	// Network configuration

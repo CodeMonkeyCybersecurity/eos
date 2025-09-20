@@ -1,5 +1,4 @@
 // pkg/environment/detector.go
-
 package environment
 
 import (
@@ -9,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -43,44 +41,22 @@ const (
 	RoleCompute  Role = "compute"
 )
 
-// Detect discovers the environment configuration using Salt
+// Detect discovers the environment configuration using
 func Detect(rc *eos_io.RuntimeContext) (*Environment, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Detecting environment configuration")
 
-	// ASSESS - Check if Salt is available
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "which",
-		Args:    []string{"salt-call"},
-		Capture: true,
-	}); err != nil {
-		logger.Warn("Salt not available, falling back to single machine mode")
-		return detectSingleMachine()
-	}
-
-	// INTERVENE - Use Salt to detect environment
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "publish.publish", "*", "test.ping", "--out=json"},
-		Capture: true,
-	})
-	if err != nil {
-		logger.Warn("Failed to use Salt for detection, falling back to single machine mode",
-			zap.Error(err))
-		return detectSingleMachine()
-	}
-
-	// Parse Salt output
-	machines, err := parseSaltOutput(output)
-	if err != nil {
-		logger.Warn("Failed to parse Salt output, falling back to single machine mode",
-			zap.Error(err))
-		return detectSingleMachine()
-	}
-
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	// TODO: Implement Consul-based machine discovery (HashiCorp migration)
+	machines := []Machine{
+		{
+			Hostname: hostname,
+			Role:     "standalone",
+		},
 	}
 
 	env := &Environment{
@@ -123,14 +99,14 @@ func detectSingleMachine() (*Environment, error) {
 	}, nil
 }
 
-// parseSaltOutput parses the JSON output from Salt
-func parseSaltOutput(output string) ([]Machine, error) {
+// parseOutput parses the JSON output from
+func parseOutput(output string) ([]Machine, error) {
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	// Extract machines from Salt response
+	// Extract machines from  response
 	var machines []Machine
 	if local, ok := result["local"].(map[string]interface{}); ok {
 		for hostname := range local {
@@ -165,7 +141,7 @@ func (e *Environment) assignRoles() error {
 			} else {
 				e.Machines[i].Role = RoleCore
 			}
-			
+
 			if e.Machines[i].Hostname == e.MyHostname {
 				e.MyRole = e.Machines[i].Role
 			}
@@ -182,7 +158,7 @@ func (e *Environment) assignRoles() error {
 			} else {
 				e.Machines[i].Role = RoleData
 			}
-			
+
 			if hostname == e.MyHostname {
 				e.MyRole = e.Machines[i].Role
 			}
@@ -201,10 +177,10 @@ func (e *Environment) assignRoles() error {
 // assignComplexRoles handles role assignment for larger deployments
 func (e *Environment) assignComplexRoles() error {
 	// For now, use a simple naming convention
-	// In production, this would read from Salt grains or configuration
+	// In production, this would read from  s or configuration
 	for i := range e.Machines {
 		hostname := e.Machines[i].Hostname
-		
+
 		switch {
 		case strings.Contains(hostname, "edge"):
 			e.Machines[i].Role = RoleEdge
@@ -224,7 +200,7 @@ func (e *Environment) assignComplexRoles() error {
 			// Default to app role for unmatched machines
 			e.Machines[i].Role = RoleApp
 		}
-		
+
 		if hostname == e.MyHostname {
 			e.MyRole = e.Machines[i].Role
 		}
@@ -245,7 +221,7 @@ func GetRoleDescription(role Role) string {
 		RoleObserve:  "Observability (monitoring, logging, metrics)",
 		RoleCompute:  "Compute node (batch processing, workers)",
 	}
-	
+
 	if desc, ok := descriptions[role]; ok {
 		return desc
 	}

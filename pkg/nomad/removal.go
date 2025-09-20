@@ -14,7 +14,7 @@ import (
 )
 
 // RemoveNomadCompletely removes Nomad using comprehensive direct removal
-// This provides complete removal when Salt is not available
+// This provides complete removal when  is not available
 func RemoveNomadCompletely(rc *eos_io.RuntimeContext, keepData bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting comprehensive Nomad removal", zap.Bool("keep_data", keepData))
@@ -44,12 +44,12 @@ func RemoveNomadCompletely(rc *eos_io.RuntimeContext, keepData bool) error {
 
 // NomadState represents the current state of Nomad installation
 type NomadState struct {
-	BinaryExists   bool
-	ServiceExists  bool
-	APIAccessible  bool
-	RunningJobs    []string
-	DataDirs       []string
-	ConfigFiles    []string
+	BinaryExists  bool
+	ServiceExists bool
+	APIAccessible bool
+	RunningJobs   []string
+	DataDirs      []string
+	ConfigFiles   []string
 }
 
 // assessNomadState checks the current state of Nomad installation
@@ -201,7 +201,7 @@ func removeNomadComponents(rc *eos_io.RuntimeContext, state *NomadState, keepDat
 			}
 		}
 	}
-	
+
 	// Ensure the systemd service file is really gone
 	systemdFile := "/etc/systemd/system/nomad.service"
 	if _, err := os.Stat(systemdFile); err == nil {
@@ -365,7 +365,7 @@ func removeHashiCorpRepo(rc *eos_io.RuntimeContext) {
 		}
 		for _, file := range repoFiles {
 			if err := os.Remove(file); err != nil {
-				logger.Debug("Failed to remove repo file", 
+				logger.Debug("Failed to remove repo file",
 					zap.String("file", file), zap.Error(err))
 			}
 		}

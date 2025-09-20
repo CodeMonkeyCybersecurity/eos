@@ -10,10 +10,10 @@ import (
 type DeploymentStrategy string
 
 const (
-	DirectStrategy     DeploymentStrategy = "direct"      // Current approach for dev/test
-	SaltStrategy       DeploymentStrategy = "salt"        // Salt-based configuration management
-	SaltNomadStrategy  DeploymentStrategy = "salt-nomad"  // Salt + Nomad orchestration
-	FullStackStrategy  DeploymentStrategy = "full"        // Full Salt→Terraform→Nomad stack
+	DirectStrategy    DeploymentStrategy = "direct" // Current approach for dev/test
+	Strategy          DeploymentStrategy = ""       // -based configuration management
+	NomadStrategy     DeploymentStrategy = "-nomad" //  + Nomad orchestration
+	FullStackStrategy DeploymentStrategy = "full"   // Full →Terraform→Nomad stack
 )
 
 // Component represents a deployable component
@@ -43,7 +43,7 @@ type Deployer interface {
 	Validate(ctx context.Context, component *Component) error
 	Rollback(ctx context.Context, deployment *DeploymentResult) error
 	GetStatus(ctx context.Context, component *Component) (*DeploymentStatus, error)
-	
+
 	// Strategy-specific operations
 	GetStrategy() DeploymentStrategy
 	SupportsComponent(componentType ComponentType) bool
@@ -51,15 +51,15 @@ type Deployer interface {
 
 // DeploymentResult contains deployment outcome information
 type DeploymentResult struct {
-	ID            string                 `json:"id"`
-	Component     string                 `json:"component"`
-	Strategy      DeploymentStrategy     `json:"strategy"`
-	Status        string                 `json:"status"`
-	StartTime     time.Time              `json:"start_time"`
-	EndTime       *time.Time             `json:"end_time,omitempty"`
-	Outputs       map[string]interface{} `json:"outputs,omitempty"`
-	Error         string                 `json:"error,omitempty"`
-	RollbackInfo  *RollbackInfo          `json:"rollback_info,omitempty"`
+	ID           string                 `json:"id"`
+	Component    string                 `json:"component"`
+	Strategy     DeploymentStrategy     `json:"strategy"`
+	Status       string                 `json:"status"`
+	StartTime    time.Time              `json:"start_time"`
+	EndTime      *time.Time             `json:"end_time,omitempty"`
+	Outputs      map[string]interface{} `json:"outputs,omitempty"`
+	Error        string                 `json:"error,omitempty"`
+	RollbackInfo *RollbackInfo          `json:"rollback_info,omitempty"`
 }
 
 // DeploymentStatus represents the current status of a deployment
@@ -106,7 +106,7 @@ type StrategyCapabilities struct {
 	SupportsValidation  bool `json:"supports_validation"`
 	SupportsDryRun      bool `json:"supports_dry_run"`
 	SupportsHealthCheck bool `json:"supports_health_check"`
-	RequiresSalt        bool `json:"requires_salt"`
+	Requires            bool `json:"requires_"`
 	RequiresTerraform   bool `json:"requires_terraform"`
 	RequiresNomad       bool `json:"requires_nomad"`
 }
@@ -120,27 +120,27 @@ func GetCapabilities(strategy DeploymentStrategy) StrategyCapabilities {
 			SupportsValidation:  true,
 			SupportsDryRun:      true,
 			SupportsHealthCheck: true,
-			RequiresSalt:        false,
+			Requires:            false,
 			RequiresTerraform:   false,
 			RequiresNomad:       false,
 		}
-	case SaltStrategy:
+	case Strategy:
 		return StrategyCapabilities{
 			SupportsRollback:    true,
 			SupportsValidation:  true,
 			SupportsDryRun:      true,
 			SupportsHealthCheck: true,
-			RequiresSalt:        true,
+			Requires:            true,
 			RequiresTerraform:   false,
 			RequiresNomad:       false,
 		}
-	case SaltNomadStrategy:
+	case NomadStrategy:
 		return StrategyCapabilities{
 			SupportsRollback:    true,
 			SupportsValidation:  true,
 			SupportsDryRun:      true,
 			SupportsHealthCheck: true,
-			RequiresSalt:        true,
+			Requires:            true,
 			RequiresTerraform:   false,
 			RequiresNomad:       true,
 		}
@@ -150,7 +150,7 @@ func GetCapabilities(strategy DeploymentStrategy) StrategyCapabilities {
 			SupportsValidation:  true,
 			SupportsDryRun:      true,
 			SupportsHealthCheck: true,
-			RequiresSalt:        true,
+			Requires:            true,
 			RequiresTerraform:   true,
 			RequiresNomad:       true,
 		}
@@ -165,25 +165,25 @@ func GetDefaultStrategy(componentType ComponentType, environment string) Deploym
 	if environment == "dev" || environment == "test" {
 		return DirectStrategy
 	}
-	
+
 	// Production environments use more sophisticated strategies
 	switch componentType {
 	case InfrastructureType:
-		// Infrastructure services like Consul/Vault use Salt
-		return SaltStrategy
-		
+		// Infrastructure services like Consul/Vault use
+		return Strategy
+
 	case ServiceType:
-		// Application services use Salt+Nomad
-		return SaltNomadStrategy
-		
+		// Application services use +Nomad
+		return NomadStrategy
+
 	case DatabaseType:
-		// Databases use Salt for configuration
-		return SaltStrategy
-		
+		// Databases use  for configuration
+		return Strategy
+
 	case StorageType:
-		// Storage uses Salt for system-level management
-		return SaltStrategy
-		
+		// Storage uses  for system-level management
+		return Strategy
+
 	default:
 		return DirectStrategy
 	}

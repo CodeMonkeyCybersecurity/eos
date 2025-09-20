@@ -12,7 +12,7 @@ import (
 var minioCmd = &cobra.Command{
 	Use:   "minio",
 	Short: "Deploy MinIO object storage to Nomad cluster",
-	Long: `Deploy MinIO object storage using the EOS framework's SaltStack → Terraform → Nomad workflow.
+	Long: `Deploy MinIO object storage using the EOS framework's  → Terraform → Nomad workflow.
 
 This command will:
 - Deploy MinIO using Terraform to manage Nomad jobs and Consul services
@@ -20,7 +20,7 @@ This command will:
 - Set up Prometheus metrics collection
 
 Prerequisites:
-- Ubuntu 22.04 hosts with Salt minion configured
+- Ubuntu 22.04 hosts
 - Terraform, Nomad, Vault, and Consul installed
 - External disk mounted at /mnt/external_disk
 - Vault KV v2 engine enabled at 'kv/'`,

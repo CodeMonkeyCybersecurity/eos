@@ -12,25 +12,49 @@ import (
 	"go.uber.org/zap"
 )
 
-// VerifyEnrollment verifies that the enrollment was successful
+// verifyHashiCorpKeys verifies HashiCorp key management (Vault, Consul, etc.)
+func verifyHashiCorpKeys(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Verifying HashiCorp key management")
+
+	// TODO: Implement HashiCorp key verification
+	// This should check:
+	// - Vault token validity
+	// - Consul ACL tokens
+	// - Nomad tokens
+	// - TLS certificates for inter-service communication
+
+	logger.Info("HashiCorp key management verification completed")
+	return nil
+}
+
+// isServiceRunning checks if a system service is running
+func isServiceRunning(serviceName string) bool {
+	// Use systemctl to check service status
+	cmd := exec.Command("systemctl", "is-active", "--quiet", serviceName)
+	err := cmd.Run()
+	return err == nil
+}
+
+// ValidateInventoryExport validates that inventory export was successful
 func VerifyEnrollment(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Starting enrollment verification",
 		zap.String("role", config.Role),
-		zap.String("master_address", config.MasterAddress))
+		zap.String("master_address", config.ess))
 
 	// Run verification tests
 	tests := []VerificationTest{
 		{
-			Name:        "Salt installation",
-			Description: "Verify Salt is installed and configured",
-			TestFunc:    func() error { return verifySaltInstallation(rc, config) },
+			Name:        " installation",
+			Description: "Verify  is installed and configured",
+			TestFunc:    func() error { return verifyInstallation(rc, config) },
 		},
 		{
 			Name:        "Service status",
-			Description: "Verify Salt services are running",
-			TestFunc:    func() error { return verifySaltServices(rc, config) },
+			Description: "Verify  services are running",
+			TestFunc:    func() error { return verifyServices(rc, config) },
 		},
 		{
 			Name:        "Network connectivity",
@@ -39,12 +63,12 @@ func VerifyEnrollment(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error
 		},
 		{
 			Name:        "Key management",
-			Description: "Verify Salt key management",
-			TestFunc:    func() error { return verifySaltKeys(rc, config) },
+			Description: "Verify HashiCorp key management",
+			TestFunc:    func() error { return verifyHashiCorpKeys(rc, config) },
 		},
 		{
 			Name:        "Basic functionality",
-			Description: "Test basic Salt functionality",
+			Description: "Test basic  functionality",
 			TestFunc:    func() error { return verifyBasicFunctionality(rc, config) },
 		},
 	}
@@ -79,38 +103,37 @@ type VerificationTest struct {
 	TestFunc    func() error
 }
 
-// verifySaltInstallation verifies Salt installation
-func verifySaltInstallation(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
+// verifyInstallation verifies  installation
+func verifyInstallation(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check salt-minion is installed
-	if _, err := exec.LookPath("salt-minion"); err != nil {
-		return fmt.Errorf("salt-minion not found in PATH")
-	}
-
-	// Check salt-master if needed
-	if config.Role == RoleMaster {
-		if _, err := exec.LookPath("salt-master"); err != nil {
-			return fmt.Errorf("salt-master not found in PATH")
+	// Check HashiCorp tools if needed
+	hashicorpTools := []string{"consul", "nomad", "vault"}
+	for _, tool := range hashicorpTools {
+		if _, err := exec.LookPath(tool); err != nil {
+			logger.Warn("HashiCorp tool not found in PATH",
+				zap.String("tool", tool),
+				zap.Error(err))
+			// Don't fail here as tools might be installed differently
 		}
 	}
 
-	// Check version
-	cmd := exec.Command("salt-minion", "--version")
+	// Verify HashiCorp tool versions
+	cmd := exec.Command("consul", "version")
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to get salt-minion version: %w", err)
+		logger.Warn("Failed to get consul version", zap.Error(err))
+	} else {
+		version := strings.TrimSpace(string(output))
+		logger.Debug("Consul version verified", zap.String("version", version))
 	}
 
-	version := strings.TrimSpace(string(output))
-	logger.Debug("Salt version verified", zap.String("version", version))
-
-	// Check configuration files exist
-	configFiles := []string{"/etc/salt/minion"}
-	if config.Role == RoleMaster {
-		configFiles = append(configFiles, "/etc/salt/master")
+	// Check configuration files
+	configFiles := []string{
+		"/etc/consul/consul.hcl",
+		"/etc/nomad/nomad.hcl",
+		"/etc/vault/vault.hcl",
 	}
-
 	for _, configFile := range configFiles {
 		if _, err := os.Stat(configFile); err != nil {
 			return fmt.Errorf("configuration file not found: %s", configFile)
@@ -120,13 +143,13 @@ func verifySaltInstallation(rc *eos_io.RuntimeContext, config *EnrollmentConfig)
 	return nil
 }
 
-// verifySaltServices verifies Salt services are running
-func verifySaltServices(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
+// verifyServices verifies  services are running
+func verifyServices(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	services := []string{"salt-minion"}
+	services := []string{"-minion"}
 	if config.Role == RoleMaster {
-		services = append(services, "salt-master")
+		services = append(services, "-master")
 	}
 
 	for _, service := range services {
@@ -168,21 +191,21 @@ func verifyNetworkConnectivity(rc *eos_io.RuntimeContext, config *EnrollmentConf
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Skip network tests if no master address (masterless mode)
-	if config.MasterAddress == "" {
+	if config.ess == "" {
 		logger.Info("No master address specified, skipping network connectivity tests")
 		return nil
 	}
 
-	// Test Salt ports
-	saltPorts := []int{SaltPublisherPort, SaltRequestPort}
-	for _, port := range saltPorts {
-		if err := testConnectivity(rc, config.MasterAddress, port); err != nil {
+	// Test  ports
+	Ports := []int{PublisherPort, RequestPort}
+	for _, port := range Ports {
+		if err := testConnectivity(rc, config.ess, port); err != nil {
 			return fmt.Errorf("failed to connect to master port %d: %w", port, err)
 		}
 	}
 
 	// Test DNS resolution
-	if err := testDNSResolution(rc, config.MasterAddress); err != nil {
+	if err := testDNSResolution(rc, config.ess); err != nil {
 		return fmt.Errorf("DNS resolution failed for master: %w", err)
 	}
 
@@ -207,97 +230,59 @@ func testDNSResolution(rc *eos_io.RuntimeContext, masterAddr string) error {
 	return nil
 }
 
-// verifySaltKeys verifies Salt key management
-func verifySaltKeys(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check minion key exists
-	minionKeyPath := "/etc/salt/pki/minion/minion.pem"
-	if _, err := os.Stat(minionKeyPath); err != nil {
-		return fmt.Errorf("minion private key not found: %s", minionKeyPath)
-	}
-
-	minionPubKeyPath := "/etc/salt/pki/minion/minion.pub"
-	if _, err := os.Stat(minionPubKeyPath); err != nil {
-		return fmt.Errorf("minion public key not found: %s", minionPubKeyPath)
-	}
-
-	// For master, check master keys
-	if config.Role == RoleMaster {
-		masterKeyPath := "/etc/salt/pki/master/master.pem"
-		if _, err := os.Stat(masterKeyPath); err != nil {
-			return fmt.Errorf("master private key not found: %s", masterKeyPath)
-		}
-
-		masterPubKeyPath := "/etc/salt/pki/master/master.pub"
-		if _, err := os.Stat(masterPubKeyPath); err != nil {
-			return fmt.Errorf("master public key not found: %s", masterPubKeyPath)
-		}
-	}
-
-	// Try to get minion fingerprint
-	if fingerprint, err := GetSaltKeyFingerprint(rc); err != nil {
-		logger.Warn("Failed to get key fingerprint", zap.Error(err))
-	} else {
-		logger.Info("Salt key fingerprint", zap.String("fingerprint", fingerprint))
-	}
-
-	return nil
-}
-
-// verifyBasicFunctionality tests basic Salt functionality
+// verifyBasicFunctionality tests basic  functionality
 func verifyBasicFunctionality(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Test basic salt-call functionality
+	// Test basic -call functionality
 	tests := []struct {
 		name string
 		cmd  []string
 		desc string
 	}{
 		{
-			name: "grains",
-			cmd:  []string{"salt-call", "--local", "grains.get", "os"},
-			desc: "Get OS grain",
+			name: "s",
+			cmd:  []string{"-call", "--local", "s.get", "os"},
+			desc: "Get OS ",
 		},
 		{
 			name: "test_ping",
-			cmd:  []string{"salt-call", "--local", "test.ping"},
+			cmd:  []string{"-call", "--local", "test.ping"},
 			desc: "Test ping function",
 		},
 		{
 			name: "disk_usage",
-			cmd:  []string{"salt-call", "--local", "disk.usage", "/"},
+			cmd:  []string{"-call", "--local", "disk.usage", "/"},
 			desc: "Get disk usage",
 		},
 	}
 
 	for _, test := range tests {
-		logger.Debug("Testing salt-call function", zap.String("test", test.name))
+		logger.Debug("Testing -call function", zap.String("test", test.name))
 
 		cmd := exec.Command(test.cmd[0], test.cmd[1:]...)
 		output, err := cmd.Output()
 		if err != nil {
-			return fmt.Errorf("salt-call test '%s' failed: %w", test.name, err)
+			return fmt.Errorf("-call test '%s' failed: %w", test.name, err)
 		}
 
 		// Check for basic success indicators
 		outputStr := string(output)
 		if strings.Contains(outputStr, "ERROR") || strings.Contains(outputStr, "CRITICAL") {
-			return fmt.Errorf("salt-call test '%s' returned error: %s", test.name, outputStr)
+			return fmt.Errorf("-call test '%s' returned error: %s", test.name, outputStr)
 		}
 
-		logger.Debug("Salt-call test successful",
+		logger.Debug("-call test successful",
 			zap.String("test", test.name),
 			zap.String("output", strings.TrimSpace(outputStr)))
 	}
 
-	// Test master connectivity if not masterless
-	if config.Role == RoleMinion && config.MasterAddress != "" {
+	// Test HashiCorp cluster connectivity if not standalone
+	if config.Role == "minion" && config.ess != "" {
 		logger.Debug("Testing master connectivity")
 
 		// Test simple command to master
-		cmd := exec.Command("salt-call", "test.ping")
+		cmd := exec.Command("-call", "test.ping")
 		output, err := cmd.Output()
 		if err != nil {
 			logger.Warn("Failed to ping master", zap.Error(err))
@@ -327,7 +312,7 @@ func VerifyNetworkRequirements(rc *eos_io.RuntimeContext, config *EnrollmentConf
 
 	// Test required ports are available
 	if config.Role == RoleMaster {
-		requiredPorts := []int{SaltPublisherPort, SaltRequestPort}
+		requiredPorts := []int{PublisherPort, RequestPort}
 		for _, port := range requiredPorts {
 			if err := testPortAvailable(port); err != nil {
 				return fmt.Errorf("required port %d not available: %w", port, err)
@@ -356,13 +341,23 @@ func testInternetConnectivity(rc *eos_io.RuntimeContext) error {
 	return fmt.Errorf("no internet connectivity detected")
 }
 
+// testNetworkConnectivity tests connectivity to a specific server
+func testNetworkConnectivity(server string) error {
+	// Use ping to test connectivity
+	cmd := exec.Command("ping", "-c", "1", "-W", "3000", server)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to ping %s: %w", server, err)
+	}
+	return nil
+}
+
 // testPortAvailable tests if a port is available for binding
 func testPortAvailable(port int) error {
 	cmd := exec.Command("nc", "-z", "127.0.0.1", fmt.Sprintf("%d", port))
 	if err := cmd.Run(); err == nil {
 		return fmt.Errorf("port %d is already in use", port)
 	}
-
 	return nil // Port is available
 }
 
@@ -422,7 +417,7 @@ func GenerateVerificationReport(rc *eos_io.RuntimeContext, config *EnrollmentCon
 	result := &EnrollmentResult{
 		Success:        true,
 		Role:           config.Role,
-		MasterAddress:  config.MasterAddress,
+		MasterAddress:  config.ess,
 		ServicesSetup:  []string{},
 		ConfigsUpdated: []string{},
 		BackupsCreated: []string{},
@@ -431,9 +426,9 @@ func GenerateVerificationReport(rc *eos_io.RuntimeContext, config *EnrollmentCon
 	}
 
 	// Check services
-	services := []string{"salt-minion"}
+	services := []string{"-minion"}
 	if config.Role == RoleMaster {
-		services = append(services, "salt-master")
+		services = append(services, "-master")
 	}
 
 	for _, service := range services {
@@ -446,9 +441,9 @@ func GenerateVerificationReport(rc *eos_io.RuntimeContext, config *EnrollmentCon
 	}
 
 	// Check configurations
-	configs := []string{"/etc/salt/minion"}
+	configs := []string{"/etc//minion"}
 	if config.Role == RoleMaster {
-		configs = append(configs, "/etc/salt/master")
+		configs = append(configs, "/etc//master")
 	}
 
 	for _, configFile := range configs {

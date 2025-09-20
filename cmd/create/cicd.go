@@ -19,12 +19,11 @@ import (
 var cicdCmd = &cobra.Command{
 	Use:   "cicd [app-name]",
 	Short: "Set up a complete CI/CD pipeline for an application",
-	Long: `Set up a complete CI/CD pipeline that follows the Salt → Terraform → Nomad orchestration 
+	Long: `Set up a complete CI/CD pipeline that follows the  → Terraform → Nomad orchestration 
 hierarchy for reliable deployment automation.
 
 This command creates a comprehensive deployment pipeline that includes:
 - Hugo static site building with Docker containerization
-- SaltStack orchestration for deployment coordination  
 - Terraform for infrastructure provisioning and management
 - Nomad for container scheduling and management
 - Consul for service discovery and health checking
@@ -89,7 +88,7 @@ Examples:
 
 		logger.Info("CI/CD pipeline ready",
 			zap.String("config_file", fmt.Sprintf(".eos/%s-pipeline.yaml", appName)),
-			zap.String("salt_states", fmt.Sprintf("/srv/salt/states/%s/", appName)),
+			zap.String("_states", fmt.Sprintf("/srv//states/%s/", appName)),
 			zap.String("terraform_config", fmt.Sprintf("/srv/terraform/%s/", appName)))
 
 		logger.Info("Next steps",
@@ -151,7 +150,6 @@ func init() {
 
 	// Service addresses
 	hostname := shared.GetInternalHostname()
-	cicdCmd.Flags().String("salt-master", "salt-master.cybermonkey.net.au", "Salt master address")
 	cicdCmd.Flags().String("nomad-addr", fmt.Sprintf("http://%s:%d", hostname, shared.PortNomad), "Nomad server address")
 	cicdCmd.Flags().String("consul-addr", fmt.Sprintf("http://%s:%d", hostname, shared.PortConsul), "Consul server address")
 	cicdCmd.Flags().String("vault-addr", fmt.Sprintf("https://%s:%d", hostname, shared.PortVault), "Vault server address")
@@ -275,9 +273,6 @@ func parseeCICDFlags(cmd *cobra.Command, appName string) (*cicd.PipelineConfig, 
 	}
 
 	// Parse service addresses
-	if saltMaster, _ := cmd.Flags().GetString("salt-master"); saltMaster != "" {
-		config.Infrastructure.Salt.Master = saltMaster
-	}
 	if nomadAddr, _ := cmd.Flags().GetString("nomad-addr"); nomadAddr != "" {
 		config.Infrastructure.Nomad.Address = nomadAddr
 	}
@@ -328,8 +323,8 @@ func createCICDPipeline(rc *eos_io.RuntimeContext, config *cicd.PipelineConfig) 
 		return fmt.Errorf("failed to initialize pipeline engine: %w", err)
 	}
 
-	// Step 4: Create configuration structure (HashiCorp migration - replacing Salt states)
-	logger.Info("Salt states creation skipped - migrating to HashiCorp configuration")
+	// Step 4: Create configuration structure (HashiCorp migration - replacing  states)
+	logger.Info(" states creation skipped - migrating to HashiCorp configuration")
 
 	// Step 5: Create Terraform configuration
 	if err := createTerraformConfig(rc, config); err != nil {
@@ -450,53 +445,6 @@ func initializeDeploymentSystem(rc *eos_io.RuntimeContext, _ *cicd.PipelineConfi
 
 // Helper functions for creating configuration files
 
-func createDeployState(filename string, config *cicd.PipelineConfig) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	content := fmt.Sprintf(`# Salt deployment state for %s
-# This file orchestrates the complete deployment through Terraform and Nomad
-
-deploy_%s:
-  salt.runner:
-    - name: state.orchestrate
-    - mods: %s.infrastructure
-    - pillar:
-        app_name: %s
-        version: {{ pillar.get('%s:version', 'latest') }}
-        environment: %s
-`, config.AppName, config.AppName, config.AppName, config.AppName, config.AppName, config.Deployment.Environment)
-
-	_, err = file.WriteString(content)
-	return err
-}
-
-func createRollbackState(filename string, config *cicd.PipelineConfig) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	content := fmt.Sprintf(`# Salt rollback state for %s
-# This file handles rollback operations
-
-rollback_%s:
-  salt.runner:
-    - name: state.orchestrate
-    - mods: %s.rollback_infrastructure
-    - pillar:
-        app_name: %s
-        target_version: {{ pillar.get('target_version', 'previous') }}
-        rollback_reason: {{ pillar.get('rollback_reason', 'manual') }}
-`, config.AppName, config.AppName, config.AppName, config.AppName)
-
-	_, err = file.WriteString(content)
-	return err
-}
 
 func createTerraformMain(filename string, config *cicd.PipelineConfig) error {
 	file, err := os.Create(filename)
@@ -505,38 +453,7 @@ func createTerraformMain(filename string, config *cicd.PipelineConfig) error {
 	}
 	defer file.Close()
 
-	content := fmt.Sprintf(`# Terraform configuration for %s
-# This file manages the infrastructure for the application
-
-terraform {
-  required_version = ">= 1.0"
-  
-  backend "consul" {
-    address = "%s:%d"
-    path    = "terraform/%s/state"
-    lock    = true
-  }
-}
-
-# Application infrastructure configuration
-variable "app_name" {
-  description = "Application name"
-  type        = string
-  default     = "%s"
-}
-
-variable "environment" {
-  description = "Deployment environment"
-  type        = string
-  default     = "%s"
-}
-
-variable "domain" {
-  description = "Application domain"
-  type        = string
-  default     = "%s"
-}
-`, config.AppName, shared.GetInternalHostname(), shared.PortConsul, config.AppName, config.AppName, config.Deployment.Environment, config.Deployment.Domain)
+	content := fmt.Sprintf("# Terraform configuration for %s\n# This file manages the infrastructure for the application\n\nterraform {\n  required_version = \">= 1.0\"\n  \n  backend \"consul\" {\n    address = \"%s:%d\"\n    path    = \"terraform/%s/state\"\n    lock    = true\n  }\n}\n\n# Application infrastructure configuration\nvariable \"app_name\" {\n  description = \"Application name\"\n  type        = string\n  default     = \"%s\"\n}\n\nvariable \"environment\" {\n  description = \"Deployment environment\"\n  type        = string\n  default     = \"%s\"\n}\n\nvariable \"domain\" {\n  description = \"Application domain\"\n  type        = string\n  default     = \"%s\"\n}\n", config.AppName, shared.GetInternalHostname(), shared.PortConsul, config.AppName, config.AppName, config.Deployment.Environment, config.Deployment.Domain)
 
 	_, err = file.WriteString(content)
 	return err
@@ -549,56 +466,7 @@ func createNomadJobFile(filename string, config *cicd.PipelineConfig) error {
 	}
 	defer file.Close()
 
-	content := fmt.Sprintf(`# Nomad job template for %s
-# This file defines the container deployment specification
-
-job "%s-web" {
-  datacenters = ["dc1"]
-  type = "service"
-
-  group "web" {
-    count = 1
-
-    network {
-      port "http" {
-        to = 80
-      }
-    }
-
-    service {
-      name = "%s-web"
-      port = "http"
-      
-      tags = [
-        "hugo",
-        "static-site",
-        "production"
-      ]
-      
-      check {
-        type     = "http"
-        path     = "%s"
-        interval = "30s"
-        timeout  = "5s"
-      }
-    }
-
-    task "%s" {
-      driver = "docker"
-      
-      config {
-        image = "{{ NOMAD_META_docker_image }}"
-        ports = ["http"]
-      }
-      
-      resources {
-        cpu    = %d
-        memory = %d
-      }
-    }
-  }
-}
-`, config.AppName, config.AppName, config.AppName, config.Deployment.Health.Path, config.AppName, config.Deployment.Resources.CPU, config.Deployment.Resources.Memory)
+	content := fmt.Sprintf("# Nomad job template for %s\n# This file defines the container deployment specification\n\njob \"%s-web\" {\n  datacenters = [\"dc1\"]\n  type = \"service\"\n\n  group \"web\" {\n    count = 1\n\n    network {\n      port \"http\" {\n        to = 80\n      }\n    }\n\n    service {\n      name = \"%s-web\"\n      port = \"http\"\n      \n      tags = [\n        \"hugo\",\n        \"static-site\",\n        \"production\"\n      ]\n      \n      check {\n        type     = \"http\"\n        path     = \"%s\"\n        interval = \"30s\"\n        timeout  = \"5s\"\n      }\n    }\n\n    task \"%s\" {\n      driver = \"docker\"\n      \n      config {\n        image = \"{{ NOMAD_META_docker_image }}\"\n        ports = [\"http\"]\n      }\n      \n      resources {\n        cpu    = %d\n        memory = %d\n      }\n    }\n  }\n}\n", config.AppName, config.AppName, config.AppName, config.Deployment.Health.Path, config.AppName, config.Deployment.Resources.CPU, config.Deployment.Resources.Memory)
 
 	_, err = file.WriteString(content)
 	return err
@@ -676,10 +544,10 @@ func testPipelineConfiguration(rc *eos_io.RuntimeContext, config *cicd.PipelineC
 		}
 	}
 
-	// Test 3: Validate Salt states if they exist
-	statesDir := fmt.Sprintf("/srv/salt/states/%s", config.AppName)
+	// Test 3: Validate  states if they exist
+	statesDir := fmt.Sprintf("/srv//states/%s", config.AppName)
 	if _, err := os.Stat(statesDir); err == nil {
-		logger.Debug("Salt states directory exists", zap.String("dir", statesDir))
+		logger.Debug(" states directory exists", zap.String("dir", statesDir))
 	}
 
 	// Test 4: Validate Terraform config if it exists

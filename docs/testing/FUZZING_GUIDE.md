@@ -822,11 +822,11 @@ Focus on security vulnerabilities and injection prevention:
 - Input sanitization (`pkg/security`)
 - Cryptographic functions (`pkg/crypto`) 
 - Command execution (`pkg/execute`)
-- Template generation (`pkg/saltstack`, `pkg/terraform`)
+- Template generation (`pkg/`, `pkg/terraform`)
 
 #### Architecture Tests
 Validate STACK.md compliance:
-- Orchestration workflows (SaltStack → Terraform → Nomad)
+- Orchestration workflows ( → Terraform → Nomad)
 - Cross-boundary integration (bare metal ↔ containerized)
 - State consistency validation
 - Resource contention scenarios

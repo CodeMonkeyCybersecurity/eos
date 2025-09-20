@@ -145,7 +145,7 @@ type CaddyRoute struct {
 }
 ```
 
-**Salt States**: `/opt/eos/salt/states/hecate/caddy/`
+** States**: `/opt/eos//states/hecate/caddy/`
 - `init.sls` - Main Caddy installation
 - `config.sls` - Configuration management
 - `service.sls` - Service management
@@ -162,7 +162,7 @@ type CaddyRoute struct {
 eos create hera --domain auth.example.com
 ```
 
-**Salt States**: `/opt/eos/salt/states/hecate/authentik/`
+** States**: `/opt/eos//states/hecate/authentik/`
 - Database setup (PostgreSQL)
 - Redis configuration
 - Authentik deployment
@@ -267,8 +267,8 @@ eos create hecate auth-policy --name users --provider authentik --groups staff
 #### Step 1: Infrastructure Preparation
 
 ```bash
-# Ensure Salt states are synchronized
-salt-call state.apply hecate.prereqs
+# Ensure  states are synchronized
+-call state.apply hecate.prereqs
 
 # Deploy database for Authentik
 eos create postgres --name authentik-db --version 15
@@ -1010,9 +1010,9 @@ JAEGER_ENDPOINT=http://jaeger:4317
 │   ├── nginx/                 # Nginx management
 │   ├── caddy/                 # Caddy utilities
 │   └── hera/                  # Auth plugin
-├── salt/
+├── /
 │   └── states/
-│       └── hecate/            # Salt states
+│       └── hecate/            #  states
 ├── terraform/
 │   └── modules/
 │       └── hecate/            # Terraform modules

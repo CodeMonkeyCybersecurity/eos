@@ -217,16 +217,3 @@ func IsDebianBased(rc *eos_io.RuntimeContext) (bool, error) {
 	return id == "ubuntu" || id == "debian" || strings.Contains(idLike, "debian"), nil
 }
 
-// GetSaltRepoURL returns the appropriate Salt repository URL for the Ubuntu release
-func GetSaltRepoURL(version, codename string) string {
-	// Current Salt repository structure: https://repo.saltproject.io/salt/py3/ubuntu/VERSION/ARCH/latest
-	const saltRepoBaseURL = "https://repo.saltproject.io/salt/py3/ubuntu"
-	return fmt.Sprintf("%s/%s/amd64/latest", saltRepoBaseURL, version)
-}
-
-// GetSaltRepoKeyURL returns the GPG key URL for the given Ubuntu version
-func GetSaltRepoKeyURL(version string) string {
-	// Salt GPG key URL - use the latest available key
-	const saltKeyBaseURL = "https://repo.saltproject.io/salt/py3/ubuntu"
-	return fmt.Sprintf("%s/%s/amd64/SALTSTACK-GPG-KEY.pub", saltKeyBaseURL, version)
-}

@@ -102,8 +102,10 @@ Examples:
 		}
 
 		// Store generated secrets if available
-		logger.Debug("Storing deployment secrets in secret manager",
-			zap.String("backend", envConfig.SecretBackend))
+		if envConfig.VaultAddr != "" {
+			logger.Debug("Storing deployment secrets in secret manager",
+				zap.String("backend", "Vault"))
+		}
 
 		// EVALUATE - Display success information
 		hostname := shared.GetInternalHostname()
@@ -111,7 +113,12 @@ Examples:
 			zap.String("url", fmt.Sprintf("http://%s:%d", hostname, config.Port)),
 			zap.String("namespace", config.Namespace),
 			zap.String("environment", envConfig.Environment),
-			zap.String("secret_backend", envConfig.SecretBackend))
+			zap.String("secret_backend", "Vault"))
+
+		logger.Info("Environment discovered",
+			zap.String("environment", envConfig.Environment),
+			zap.String("datacenter", envConfig.Datacenter),
+			zap.String("vault_addr", envConfig.VaultAddr))
 
 		logger.Info("🌐 Access Penpot",
 			zap.String("web_interface", fmt.Sprintf("http://%s:%d", hostname, config.Port)),

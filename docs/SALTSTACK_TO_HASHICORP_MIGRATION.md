@@ -1,4 +1,4 @@
-# EOS SaltStack to HashiCorp Migration Guide
+# EOS  to HashiCorp Migration Guide
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 
@@ -19,7 +19,7 @@ For detailed migration documentation, see the inline comments in these files:
 **Compilation Status:** ✅ SUCCESSFUL  
 **Breaking Changes:** ❌ NONE  
 
-The EOS codebase has been successfully migrated from SaltStack to HashiCorp stack (Consul, Nomad, Vault) while maintaining backward compatibility and preserving all safety mechanisms.
+The EOS codebase has been successfully migrated from  to HashiCorp stack (Consul, Nomad, Vault) while maintaining backward compatibility and preserving all safety mechanisms.
 
 ---
 

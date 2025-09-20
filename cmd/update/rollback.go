@@ -16,10 +16,10 @@ var rollbackCmd = &cobra.Command{
 	Use:   "rollback [app-name]",
 	Short: "Rollback an application deployment to a previous version",
 	Long: `Rollback an application deployment to a previous stable version using the 
-Salt → Terraform → Nomad orchestration hierarchy for safe and reliable rollback operations.
+ → Terraform → Nomad orchestration hierarchy for safe and reliable rollback operations.
 
 This command performs a comprehensive rollback that includes:
-- Automated rollback through SaltStack orchestration
+- Automated rollback through  orchestration
 - Graceful service draining and traffic rerouting
 - Database and configuration rollback if needed
 - Health verification of the rolled-back version
@@ -134,43 +134,43 @@ func init() {
 
 // RollbackRequest represents a rollback request configuration
 type RollbackRequest struct {
-	AppName           string        `json:"app_name"`
-	TargetVersion     string        `json:"target_version"`
-	CurrentVersion    string        `json:"current_version"`
-	Reason            string        `json:"reason"`
-	Emergency         bool          `json:"emergency"`
-	DryRun            bool          `json:"dry_run"`
-	Force             bool          `json:"force"`
-	Timeout           time.Duration `json:"timeout"`
-	SkipHealthCheck   bool          `json:"skip_health_check"`
-	SkipBackup        bool          `json:"skip_backup"`
-	AutoConfirm       bool          `json:"auto_confirm"`
-	Environment       string        `json:"environment"`
-	Namespace         string        `json:"namespace"`
-	Components        []string      `json:"components"`
-	NotificationChannel string      `json:"notification_channel"`
-	NotifyUsers       []string      `json:"notify_users"`
+	AppName             string        `json:"app_name"`
+	TargetVersion       string        `json:"target_version"`
+	CurrentVersion      string        `json:"current_version"`
+	Reason              string        `json:"reason"`
+	Emergency           bool          `json:"emergency"`
+	DryRun              bool          `json:"dry_run"`
+	Force               bool          `json:"force"`
+	Timeout             time.Duration `json:"timeout"`
+	SkipHealthCheck     bool          `json:"skip_health_check"`
+	SkipBackup          bool          `json:"skip_backup"`
+	AutoConfirm         bool          `json:"auto_confirm"`
+	Environment         string        `json:"environment"`
+	Namespace           string        `json:"namespace"`
+	Components          []string      `json:"components"`
+	NotificationChannel string        `json:"notification_channel"`
+	NotifyUsers         []string      `json:"notify_users"`
 }
 
 // RollbackPlan represents the rollback execution plan
 type RollbackPlan struct {
-	Request       *RollbackRequest  `json:"request"`
-	Steps         []RollbackStep    `json:"steps"`
-	EstimatedTime time.Duration     `json:"estimated_time"`
-	RiskLevel     string            `json:"risk_level"`
-	Warnings      []string          `json:"warnings"`
-	Prerequisites []string          `json:"prerequisites"`
+	Request       *RollbackRequest `json:"request"`
+	Steps         []RollbackStep   `json:"steps"`
+	EstimatedTime time.Duration    `json:"estimated_time"`
+	RiskLevel     string           `json:"risk_level"`
+	Warnings      []string         `json:"warnings"`
+	Prerequisites []string         `json:"prerequisites"`
 }
 
 // RollbackStep represents a single rollback step
 type RollbackStep struct {
-	Name        string        `json:"name"`
-	Description string        `json:"description"`
-	Component   string        `json:"component"`
-	Action      string        `json:"action"`
+	Name          string        `json:"name"`
+	Description   string        `json:"description"`
+	Component     string        `json:"component"`
+	Action        string        `json:"action"`
 	EstimatedTime time.Duration `json:"estimated_time"`
-	Risk        string        `json:"risk"`
-	Required    bool          `json:"required"`
+	Risk          string        `json:"risk"`
+	Required      bool          `json:"required"`
 }
 
 // RollbackResult represents the result of a rollback operation
@@ -205,13 +205,13 @@ func executeRollback(rc *eos_io.RuntimeContext, appName, toVersion, reason strin
 
 	// Create rollback request
 	request := &RollbackRequest{
-		AppName:        appName,
-		TargetVersion:  toVersion,
-		Reason:         reason,
-		Emergency:      emergency,
-		DryRun:         dryRun,
-		Force:          force,
-		Timeout:        timeout,
+		AppName:       appName,
+		TargetVersion: toVersion,
+		Reason:        reason,
+		Emergency:     emergency,
+		DryRun:        dryRun,
+		Force:         force,
+		Timeout:       timeout,
 	}
 
 	// Step 1: Assess current deployment and determine rollback plan
@@ -307,9 +307,9 @@ func assessRollback(rc *eos_io.RuntimeContext, request *RollbackRequest) (*Rollb
 			Required:      true,
 		},
 		{
-			Name:          "salt_orchestration",
-			Description:   "Execute Salt rollback orchestration",
-			Component:     "salt",
+			Name:          "_orchestration",
+			Description:   "Execute  rollback orchestration",
+			Component:     "",
 			Action:        "orchestrate",
 			EstimatedTime: 5 * time.Minute,
 			Risk:          "medium",
@@ -365,7 +365,7 @@ func assessRollback(rc *eos_io.RuntimeContext, request *RollbackRequest) (*Rollb
 		RiskLevel:     riskLevel,
 		Warnings:      warnings,
 		Prerequisites: []string{
-			"Salt master connectivity",
+			" master connectivity",
 			"Nomad cluster availability",
 			"Consul cluster availability",
 		},
@@ -407,7 +407,7 @@ func confirmRollback(rc *eos_io.RuntimeContext, plan *RollbackPlan) error {
 
 	// Get confirmation (implementation would use interactive prompt)
 	fmt.Printf("Do you want to proceed with this rollback? (y/N): ")
-	
+
 	// For now, assume confirmation (in real implementation, would read from stdin)
 	logger.Info("Rollback confirmed by user")
 	return nil
@@ -480,8 +480,8 @@ func executeRollbackPlan(rc *eos_io.RuntimeContext, plan *RollbackPlan) (*Rollba
 		// Execute step based on component
 		var stepErr error
 		switch step.Component {
-		case "salt":
-			stepErr = executeSaltRollback(rc, manager, plan.Request)
+		case "":
+			stepErr = executeRollback(rc, plan.Request.AppName, plan.Request.TargetVersion, plan.Request.Reason, plan.Request.Emergency, false, plan.Request.Timeout, false)
 		case "consul":
 			stepErr = executeConsulRollback(rc, manager, plan.Request, step.Action)
 		case "backup":
@@ -500,12 +500,12 @@ func executeRollbackPlan(rc *eos_io.RuntimeContext, plan *RollbackPlan) (*Rollba
 			stepResult.Status = "failed"
 			stepResult.Error = stepErr.Error()
 			result.StepsExecuted = append(result.StepsExecuted, stepResult)
-			
+
 			result.Success = false
 			result.Error = fmt.Sprintf("Step %s failed: %s", step.Name, stepErr.Error())
 			result.EndTime = time.Now()
 			result.Duration = result.EndTime.Sub(result.StartTime)
-			
+
 			return result, fmt.Errorf("rollback step %s failed: %w", step.Name, stepErr)
 		}
 
@@ -523,17 +523,6 @@ func executeRollbackPlan(rc *eos_io.RuntimeContext, plan *RollbackPlan) (*Rollba
 	result.Duration = result.EndTime.Sub(result.StartTime)
 
 	return result, nil
-}
-
-// executeSaltRollback executes the Salt orchestration rollback
-func executeSaltRollback(rc *eos_io.RuntimeContext, manager *deploy.DeploymentManager, request *RollbackRequest) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Executing Salt rollback orchestration",
-		zap.String("app_name", request.AppName),
-		zap.String("target_version", request.TargetVersion))
-
-	return manager.ExecuteRollback(rc, request.AppName, request.TargetVersion, request.Reason)
 }
 
 // executeConsulRollback handles Consul service registration/deregistration

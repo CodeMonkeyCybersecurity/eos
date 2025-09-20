@@ -25,7 +25,7 @@ eos update container security --cap-drop ALL
 ### 2. Patch Applications
 
 **Eos Implementation:**
-- **Automated Updates**: Salt states for regular application patching
+- **Automated Updates**:  states for regular application patching
 - **Version Management**: `pkg/platform/version_resolver.go` ensures latest versions
 - **Monitoring**: Delphi tracks unpatched applications
 
@@ -40,12 +40,12 @@ eos update applications --auto-patch
 
 **Eos Implementation:**
 - Not directly applicable to Linux servers
-- For Windows workstations managed via Salt: custom states available
+- For Windows workstations managed via : custom states available
 
 ### 4. User Application Hardening
 
 **Eos Implementation:**
-- **Browser Hardening**: Automated Firefox/Chrome hardening via Salt
+- **Browser Hardening**: Automated Firefox/Chrome hardening via 
 - **PDF Reader Security**: Restricted PDF handling in containers
 - **Email Security**: Integration with mail servers for attachment filtering
 
@@ -59,7 +59,7 @@ eos create hardening user-apps
 
 **Eos Implementation:**
 - **LDAP Integration**: Centralized user management with role-based access
-- **Sudo Policies**: Granular sudo rules via Salt states
+- **Sudo Policies**: Granular sudo rules via  states
 - **Vault Integration**: Time-bound credential leasing
 - **Audit Logging**: All privileged actions logged to Delphi
 
@@ -106,7 +106,7 @@ eos create api-gateway --enforce-mfa
 - **Automated Backups**: Scheduled via `eos backup` commands
 - **Immutable Storage**: Backup versioning with retention policies
 - **Encryption**: All backups encrypted at rest and in transit
-- **Testing**: Automated restore testing via Salt states
+- **Testing**: Automated restore testing via  states
 
 **Commands:**
 ```bash
@@ -158,9 +158,9 @@ eos create alert --compliance-drift --severity high
 
 ## Integration with Existing Tools
 
-### Salt States for Compliance
+###  States for Compliance
 ```yaml
-# /srv/salt/essential-eight/init.sls
+# /srv//essential-eight/init.sls
 essential_eight_compliance:
   eos.compliance:
     - framework: essential-eight

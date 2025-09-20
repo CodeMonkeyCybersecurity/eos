@@ -26,7 +26,7 @@ var ReadEnvironmentCmd = &cobra.Command{
 - Service placement preferences
 - Discovered vs configured settings
 
-This command reads the environment configuration discovered by SaltStack, Consul,
+This command reads the environment configuration discovered by , Consul,
 and Nomad to provide a complete picture of the deployment architecture.
 
 Examples:
@@ -115,7 +115,7 @@ func displayBasicEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, json
 	fmt.Printf("Datacenter:      %s\n", basicConfig.Datacenter)
 	fmt.Printf("Region:          %s\n", basicConfig.Region)
 	fmt.Printf("Node Role:       %s\n", basicConfig.NodeRole)
-	fmt.Printf("Secret Backend:  %s\n", basicConfig.SecretBackend)
+	fmt.Printf("Secret Backend:  %s\n", "Vault")
 	
 	if len(basicConfig.ClusterNodes) > 0 {
 		fmt.Printf("\nCluster Nodes:   %v\n", basicConfig.ClusterNodes)

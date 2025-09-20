@@ -6,14 +6,11 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared/slice"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/users"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
@@ -27,7 +24,7 @@ var (
 // Legacy command for backward compatibility
 var CreateUserCmd = &cobra.Command{
 	Use:   "user",
-	Short: "Create a new Linux user (legacy - use 'eos create user-account' for SaltStack-based management)",
+	Short: "Create a new Linux user (legacy - use 'eos create user-account' for -based management)",
 	Long:  `Creates a new user account and optionally adds them to the admin group, generates SSH keys, and sets a secure password.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		opts := eos_unix.CreateUserOptions{
@@ -38,137 +35,6 @@ var CreateUserCmd = &cobra.Command{
 		return eos_unix.RunCreateUser(rc.Ctx, opts)
 	}),
 }
-
-// New SaltStack-based user creation command
-var createUserAccountCmd = &cobra.Command{
-	Use:   "user-account [username]",
-	Short: "Create user accounts via SaltStack with secure password management",
-	Long: `Create user accounts using SaltStack for remote management and Vault for secure password storage.
-
-This replaces the legacy addUser.sh script with a more secure and scalable approach:
-- Passwords are generated securely and stored in Vault
-- User creation is managed via SaltStack for consistency across multiple systems  
-- Follows assessment→intervention→evaluation model for reliability
-
-Examples:
-  eos create user-account alice --groups sudo,admin --shell /bin/bash
-  eos create user-account bob --target "web-servers" --generate-password
-  eos create user-account deploy --no-sudo --home /opt/deploy`,
-
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := otelzap.Ctx(rc.Ctx)
-
-		if len(args) == 0 {
-			return eos_err.NewUserError("username must be specified")
-		}
-
-		username := args[0]
-		target, _ := cmd.Flags().GetString("target")
-		groups, _ := cmd.Flags().GetStringSlice("groups")
-		shell, _ := cmd.Flags().GetString("shell")
-		home, _ := cmd.Flags().GetString("home")
-		sudo, _ := cmd.Flags().GetBool("sudo")
-		generatePassword, _ := cmd.Flags().GetBool("generate-password")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
-		vaultPath, _ := cmd.Flags().GetString("vault-path")
-
-		// Set default home directory
-		if home == "" {
-			home = fmt.Sprintf("/home/%s", username)
-		}
-
-		// Add sudo group if requested
-		if sudo && !slice.Contains(groups, "sudo") {
-			groups = append(groups, "sudo")
-		}
-
-		// Suppress unused variable warnings
-		_ = generatePassword
-		_ = saltAPI
-		_ = vaultPath
-
-		logger.Info("Creating user account",
-			zap.String("username", username),
-			zap.String("target", target),
-			zap.Strings("groups", groups),
-			zap.String("shell", shell),
-			zap.String("home", home))
-
-		// Assessment: User creation requires administrator intervention
-		logger.Warn("User creation requires administrator intervention - HashiCorp stack cannot create system users",
-			zap.String("username", username),
-			zap.String("target", target))
-
-		return fmt.Errorf("user creation requires administrator intervention - HashiCorp stack cannot create system users")
-	}),
-}
-
-// assessUserExistence moved to pkg/users/assessment
-// DEPRECATED: Use assessment.UserExistence instead
-/*
-func assessUserExistence(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManager, target, username string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Assessing user existence", zap.String("username", username))
-
-	// Query user information via Salt - note we need to add a method to get the client
-	// For now, we'll use a placeholder implementation
-	logger.Info("User existence check completed")
-	return nil
-}
-*/
-
-// generateSecurePassword moved to pkg/security/password
-// DEPRECATED: Use password.GenerateSecure instead
-/*
-func generateSecurePassword() (string, error) {
-	// Use the crypto package for password generation
-	return crypto.GeneratePassword(16)
-}
-*/
-
-// storeUserPasswordInVault moved to pkg/users/vault
-// DEPRECATED: Use usersvault.StoreUserPassword instead
-/*
-func storeUserPasswordInVault(rc *eos_io.RuntimeContext, vaultPath, username, password string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	client, err := vault.GetVaultClient(rc)
-	if err != nil {
-		return cerr.Wrap(err, "failed to get Vault client")
-	}
-
-	// Store password with metadata
-	secretData := map[string]interface{}{
-		"password":    password,
-		"username":    username,
-		"created_at":  time.Now().Unix(),
-		"created_by":  "eos-cli",
-		"description": fmt.Sprintf("Password for user %s", username),
-	}
-
-	secretPath := fmt.Sprintf("%s/users/%s", vaultPath, username)
-	if err := vault.WriteKVv2(rc, client, "secret", secretPath, secretData); err != nil {
-		return cerr.Wrap(err, "failed to write password to Vault")
-	}
-
-	logger.Info("Password stored in Vault", zap.String("path", secretPath))
-	return nil
-}
-*/
-
-// evaluateUserCreation moved to pkg/users/assessment
-// DEPRECATED: Use assessment.UserCreation instead
-/*
-func evaluateUserCreation(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManager, target, username string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Evaluating user creation", zap.String("username", username))
-
-	// Verify user exists and has correct configuration
-	// For now, we'll use a placeholder implementation
-	logger.Info("User creation verified successfully")
-	return nil
-}
-*/
 
 // Simple user creation command (replaces addUser.sh)
 var createUserSimpleCmd = &cobra.Command{
@@ -265,22 +131,12 @@ func init() {
 	CreateUserCmd.Flags().BoolVar(&auto, "auto", false, "Enable non-interactive auto mode with secure random password")
 	CreateUserCmd.Flags().BoolVar(&loginShell, "login", false, "Allow login shell for this user (default is no shell)")
 
-	// New SaltStack-based command
-	createUserAccountCmd.Flags().String("target", "*", "Salt target minions for user creation")
-	createUserAccountCmd.Flags().StringSlice("groups", []string{}, "Groups to add the user to")
-	createUserAccountCmd.Flags().String("shell", "/bin/bash", "User's login shell")
-	createUserAccountCmd.Flags().String("home", "", "User's home directory (defaults to /home/username)")
-	createUserAccountCmd.Flags().Bool("sudo", false, "Grant sudo privileges to the user")
-	createUserAccountCmd.Flags().Bool("generate-password", true, "Generate and store a secure password in Vault")
-	createUserAccountCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
-	createUserAccountCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
-
 	// Simple user creation command (replaces addUser.sh)
 	createUserSimpleCmd.Flags().String("username", "", "Username for the new account")
 	createUserSimpleCmd.Flags().String("password", "", "Password for the new account")
 	createUserSimpleCmd.Flags().Bool("sudo", false, "Grant sudo privileges to the user")
 	createUserSimpleCmd.Flags().Bool("ssh", false, "Grant SSH access to the user")
 
-	CreateCmd.AddCommand(createUserAccountCmd)
+	CreateCmd.AddCommand(CreateUserCmd)
 	CreateCmd.AddCommand(createUserSimpleCmd)
 }

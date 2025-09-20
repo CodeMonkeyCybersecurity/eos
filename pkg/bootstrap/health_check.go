@@ -33,7 +33,7 @@ type HealthCheck struct {
 }
 
 // PerformHealthChecks runs all health checks before joining cluster
-func PerformHealthChecks(rc *eos_io.RuntimeContext, masterAddr string) (*HealthCheckResult, error) {
+func PerformHealthChecks(rc *eos_io.RuntimeContext, consulAddr string) (*HealthCheckResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting pre-join health checks")
 
@@ -49,14 +49,13 @@ func PerformHealthChecks(rc *eos_io.RuntimeContext, masterAddr string) (*HealthC
 		checkMemory,
 		checkNetworkConnectivity,
 		checkTimeSynchronization,
-		checkSaltInstallation,
 		checkPortAvailability,
 		checkHostnameResolution,
 		checkExistingServices,
 	}
 
 	for _, checkFunc := range checks {
-		check := checkFunc(rc, masterAddr)
+		check := checkFunc(rc, consulAddr)
 		result.Checks = append(result.Checks, check)
 
 		if !check.Passed {
@@ -81,7 +80,7 @@ func PerformHealthChecks(rc *eos_io.RuntimeContext, masterAddr string) (*HealthC
 }
 
 // checkOSCompatibility verifies OS is supported
-func checkOSCompatibility(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkOSCompatibility(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "OS Compatibility",
 		Description: "Verify operating system is supported",
@@ -125,7 +124,7 @@ func checkOSCompatibility(rc *eos_io.RuntimeContext, masterAddr string) HealthCh
 }
 
 // checkDiskSpace verifies sufficient disk space
-func checkDiskSpace(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkDiskSpace(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "Disk Space",
 		Description: "Verify sufficient disk space available",
@@ -176,7 +175,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
 }
 
 // checkMemory verifies sufficient memory
-func checkMemory(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkMemory(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "Memory",
 		Description: "Verify sufficient memory available",
@@ -209,13 +208,13 @@ func checkMemory(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
 			if len(fields) > 1 {
 				var totalGB int
 				fmt.Sscanf(fields[1], "%d", &totalGB)
-				
+
 				if totalGB < 4 {
 					check.Passed = false
 					check.Message = fmt.Sprintf("Low memory: %dGB total, recommend at least 4GB", totalGB)
 					return check
 				}
-				
+
 				check.Passed = true
 				check.Message = fmt.Sprintf("%dGB total memory", totalGB)
 				return check
@@ -229,7 +228,7 @@ func checkMemory(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
 }
 
 // checkNetworkConnectivity verifies network connectivity to master
-func checkNetworkConnectivity(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkNetworkConnectivity(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "Network Connectivity",
 		Description: "Verify network connectivity to master",
@@ -239,26 +238,14 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, masterAddr string) Heal
 	// Ping the master
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "ping",
-		Args:    []string{"-c", "3", "-W", "2", masterAddr},
+		Args:    []string{"-c", "3", "-W", "2", consulAddr},
 		Capture: true,
 		Timeout: 10 * time.Second,
 	})
 	if err != nil {
 		check.Passed = false
-		check.Message = fmt.Sprintf("Cannot reach master at %s", masterAddr)
+		check.Message = fmt.Sprintf("Cannot reach master at %s", consulAddr)
 		return check
-	}
-
-	// Check Salt ports
-	ports := []int{4505, 4506} // Salt publish and return ports
-	for _, port := range ports {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", masterAddr, port), 5*time.Second)
-		if err != nil {
-			check.Passed = false
-			check.Message = fmt.Sprintf("Cannot connect to master port %d", port)
-			return check
-		}
-		conn.Close()
 	}
 
 	check.Passed = true
@@ -267,7 +254,7 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, masterAddr string) Heal
 }
 
 // checkTimeSynchronization verifies time is synchronized
-func checkTimeSynchronization(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkTimeSynchronization(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "Time Synchronization",
 		Description: "Verify system time is synchronized",
@@ -297,47 +284,8 @@ func checkTimeSynchronization(rc *eos_io.RuntimeContext, masterAddr string) Heal
 	return check
 }
 
-// checkSaltInstallation verifies Salt is properly installed
-func checkSaltInstallation(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
-	check := HealthCheck{
-		Name:        "Salt Installation",
-		Description: "Verify Salt is installed and configured",
-		Critical:    true,
-	}
-
-	// Check salt-minion is installed
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "which",
-		Args:    []string{"salt-minion"},
-		Capture: true,
-	}); err != nil {
-		check.Passed = false
-		check.Message = "Salt minion is not installed"
-		return check
-	}
-
-	// Check if already configured
-	if _, err := os.Stat("/etc/salt/minion"); err == nil {
-		// Check if pointing to different master
-		output, _ := execute.Run(rc.Ctx, execute.Options{
-			Command: "grep",
-			Args:    []string{"^master:", "/etc/salt/minion"},
-			Capture: true,
-		})
-		if output != "" && !strings.Contains(output, masterAddr) {
-			check.Passed = false
-			check.Message = "Salt minion already configured for different master"
-			return check
-		}
-	}
-
-	check.Passed = true
-	check.Message = "Salt is ready"
-	return check
-}
-
 // checkPortAvailability verifies required ports are available
-func checkPortAvailability(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkPortAvailability(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "Port Availability",
 		Description: "Verify required ports are available",
@@ -376,7 +324,7 @@ func checkPortAvailability(rc *eos_io.RuntimeContext, masterAddr string) HealthC
 }
 
 // checkHostnameResolution verifies hostname resolution
-func checkHostnameResolution(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkHostnameResolution(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "Hostname Resolution",
 		Description: "Verify hostname resolution is working",
@@ -412,7 +360,7 @@ func checkHostnameResolution(rc *eos_io.RuntimeContext, masterAddr string) Healt
 }
 
 // checkExistingServices checks for conflicting services
-func checkExistingServices(rc *eos_io.RuntimeContext, masterAddr string) HealthCheck {
+func checkExistingServices(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	check := HealthCheck{
 		Name:        "Service Conflicts",
 		Description: "Check for conflicting services",

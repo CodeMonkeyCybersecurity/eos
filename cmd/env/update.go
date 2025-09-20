@@ -56,7 +56,7 @@ Examples:
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		force, _ := cmd.Flags().GetBool("force")
 		interactive, _ := cmd.Flags().GetBool("interactive")
-		
+
 		// Configuration flags
 		displayName, _ := cmd.Flags().GetString("display-name")
 		description, _ := cmd.Flags().GetString("description")
@@ -64,7 +64,6 @@ Examples:
 		nomadAddress, _ := cmd.Flags().GetString("nomad-address")
 		consulAddress, _ := cmd.Flags().GetString("consul-address")
 		vaultAddress, _ := cmd.Flags().GetString("vault-address")
-		saltMaster, _ := cmd.Flags().GetString("salt-master")
 		deployStrategy, _ := cmd.Flags().GetString("deploy-strategy")
 		cpu, _ := cmd.Flags().GetInt("cpu")
 		memory, _ := cmd.Flags().GetInt("memory")
@@ -79,7 +78,7 @@ Examples:
 		// Get current environment configuration
 		currentEnv, err := envManager.GetEnvironment(rc, envName)
 		if err != nil {
-			logger.Error("Environment not found", 
+			logger.Error("Environment not found",
 				zap.String("environment", envName),
 				zap.Error(err))
 			return fmt.Errorf("environment '%s' not found. Use 'eos env list' to see available environments", envName)
@@ -122,11 +121,6 @@ Examples:
 			changes["vault_address"] = fmt.Sprintf("%s → %s", currentEnv.Infrastructure.Vault.Address, vaultAddress)
 		}
 
-		if saltMaster != "" && saltMaster != currentEnv.Infrastructure.Salt.Master {
-			updatedEnv.Infrastructure.Salt.Master = saltMaster
-			changes["salt_master"] = fmt.Sprintf("%s → %s", currentEnv.Infrastructure.Salt.Master, saltMaster)
-		}
-
 		if deployStrategy != "" && deployStrategy != currentEnv.Deployment.Strategy.Type {
 			updatedEnv.Deployment.Strategy.Type = deployStrategy
 			changes["deploy_strategy"] = fmt.Sprintf("%s → %s", currentEnv.Deployment.Strategy.Type, deployStrategy)
@@ -147,7 +141,7 @@ Examples:
 			fmt.Printf("\n🔧 Interactive Environment Update\n")
 			fmt.Printf("═════════════════════════════════\n")
 			fmt.Printf("Current configuration for '%s':\n\n", envName)
-			
+
 			// Show current config and allow updates
 			if err := interactiveEnvironmentUpdate(rc, &updatedEnv, changes); err != nil {
 				return fmt.Errorf("interactive update failed: %w", err)
@@ -221,7 +215,6 @@ func init() {
 	updateCmd.Flags().String("nomad-address", "", "Nomad cluster address")
 	updateCmd.Flags().String("consul-address", "", "Consul cluster address")
 	updateCmd.Flags().String("vault-address", "", "Vault cluster address")
-	updateCmd.Flags().String("salt-master", "", "Salt master address")
 
 	// Deployment configuration
 	updateCmd.Flags().String("deploy-strategy", "", "Deployment strategy: rolling, blue-green, canary")
@@ -284,9 +277,6 @@ func interactiveEnvironmentUpdate(rc *eos_io.RuntimeContext, env *environments.E
 	// In real implementation, would read from stdin and update if changed
 
 	fmt.Printf("Vault address [%s]: ", env.Infrastructure.Vault.Address)
-	// In real implementation, would read from stdin and update if changed
-
-	fmt.Printf("Salt master [%s]: ", env.Infrastructure.Salt.Master)
 	// In real implementation, would read from stdin and update if changed
 
 	// Deployment

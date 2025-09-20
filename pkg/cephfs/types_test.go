@@ -171,12 +171,6 @@ func TestGetCephMGRPort(t *testing.T) {
 	}
 }
 
-func TestGetSaltCephPillarPath(t *testing.T) {
-	expected := SaltCephPillarDir + "/ceph.sls"
-	if got := GetSaltCephPillarPath(); got != expected {
-		t.Errorf("GetSaltCephPillarPath() = %v, want %v", got, expected)
-	}
-}
 
 func TestGetTerraformCephConfigPath(t *testing.T) {
 	expected := TerraformCephDir + "/main.tf"

@@ -74,16 +74,3 @@ type StatusOptions struct {
 	ClusterName string
 	Detailed    bool
 }
-
-// StatusResult represents the status of Boundary across minions
-type StatusResult struct {
-	Minions map[string]MinionStatus
-}
-
-// MinionStatus represents Boundary status on a single minion
-type MinionStatus struct {
-	Minion     string
-	Status     Status
-	Output     string
-	ConfigFile string
-}

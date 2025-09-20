@@ -10,7 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 )
 
-// FuzzStackOrchestrationWorkflow tests the SaltStack → Terraform → Nomad workflow with fuzzing
+// FuzzStackOrchestrationWorkflow tests the  → Terraform → Nomad workflow with fuzzing
 func FuzzStackOrchestrationWorkflow(f *testing.F) {
 	// Seed with orchestration injection attempts
 	f.Add("normal_app_name")
@@ -56,14 +56,6 @@ func FuzzStackOrchestrationWorkflow(f *testing.F) {
 						return validateOrchestrationAppName(appName)
 					},
 					Timeout: 5 * time.Second,
-				},
-				{
-					Name:        "test_salt_generation",
-					Description: "Test Salt configuration generation",
-					Action: func(s *testutil.IntegrationTestSuite) error {
-						return testSaltConfigGeneration(s, appName)
-					},
-					Timeout: 10 * time.Second,
 				},
 				{
 					Name:        "test_terraform_generation",
@@ -296,20 +288,6 @@ func validateOrchestrationAppName(appName string) error {
 	return nil
 }
 
-func testSaltConfigGeneration(suite *testutil.IntegrationTestSuite, appName string) error {
-	_ = suite.CreateTestContext("salt-config-gen")
-
-	// Test Salt configuration generation with app name
-	// This would call actual Salt configuration generation code
-	// For now, just validate the app name doesn't cause issues
-
-	if containsMaliciousPatterns(appName) {
-		return fmt.Errorf("malicious app name detected in Salt generation")
-	}
-
-	return nil
-}
-
 func testTerraformConfigGeneration(suite *testutil.IntegrationTestSuite, appName string) error {
 	_ = suite.CreateTestContext("terraform-config-gen")
 
@@ -324,7 +302,7 @@ func testTerraformConfigGeneration(suite *testutil.IntegrationTestSuite, appName
 }
 
 func testStateConsistency(suite *testutil.IntegrationTestSuite, appName string) error {
-	// Test state consistency across Salt, Terraform, and Nomad
+	// Test state consistency across , Terraform, and Nomad
 	// This would validate that all three layers have consistent state
 
 	if containsMaliciousPatterns(appName) {

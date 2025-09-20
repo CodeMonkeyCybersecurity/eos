@@ -8,9 +8,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
-// DeploymentManager orchestrates deployments through the Salt → Terraform → Nomad hierarchy
+// DeploymentManager orchestrates deployments through the  → Terraform → Nomad hierarchy
 type DeploymentManager struct {
-	saltClient      *SaltClient
 	terraformClient *TerraformClient
 	nomadClient     *NomadClient
 	vaultClient     *VaultClient
@@ -20,24 +19,11 @@ type DeploymentManager struct {
 
 // DeploymentConfig holds configuration for the deployment manager
 type DeploymentConfig struct {
-	WorkDir       string                 `yaml:"work_dir" json:"work_dir"`
-	SaltConfig    SaltClientConfig       `yaml:"salt" json:"salt"`
+	WorkDir         string                `yaml:"work_dir" json:"work_dir"`
 	TerraformConfig TerraformClientConfig `yaml:"terraform" json:"terraform"`
-	NomadConfig   NomadClientConfig      `yaml:"nomad" json:"nomad"`
-	VaultConfig   VaultClientConfig      `yaml:"vault" json:"vault"`
-	ConsulConfig  ConsulClientConfig     `yaml:"consul" json:"consul"`
-}
-
-// SaltClientConfig holds SaltStack client configuration
-type SaltClientConfig struct {
-	MasterURL string            `yaml:"master_url" json:"master_url"`
-	Username  string            `yaml:"username" json:"username"`
-	Password  string            `yaml:"password" json:"password"`
-	Token     string            `yaml:"token" json:"token"`
-	EAuth     string            `yaml:"eauth" json:"eauth"`
-	Timeout   time.Duration     `yaml:"timeout" json:"timeout"`
-	Headers   map[string]string `yaml:"headers" json:"headers"`
-	TLS       TLSConfig         `yaml:"tls" json:"tls"`
+	NomadConfig     NomadClientConfig     `yaml:"nomad" json:"nomad"`
+	VaultConfig     VaultClientConfig     `yaml:"vault" json:"vault"`
+	ConsulConfig    ConsulClientConfig    `yaml:"consul" json:"consul"`
 }
 
 // TerraformClientConfig holds Terraform client configuration
@@ -89,12 +75,6 @@ type TLSConfig struct {
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify" json:"insecure_skip_verify"`
 }
 
-// SaltClient implements the cicd.SaltClient interface
-type SaltClient struct {
-	config     SaltClientConfig
-	httpClient HTTPClient
-}
-
 // TerraformClient implements the cicd.TerraformClient interface
 type TerraformClient struct {
 	config     TerraformClientConfig
@@ -135,8 +115,8 @@ type HTTPResponse struct {
 	Body       []byte            `json:"body"`
 }
 
-// SaltJobRequest represents a Salt job execution request
-type SaltJobRequest struct {
+// JobRequest represents a  job execution request
+type JobRequest struct {
 	Client   string                 `json:"client"`
 	Target   string                 `json:"tgt"`
 	Function string                 `json:"fun"`
@@ -145,14 +125,14 @@ type SaltJobRequest struct {
 	Timeout  int                    `json:"timeout,omitempty"`
 }
 
-// SaltJobResponse represents a Salt job execution response
-type SaltJobResponse struct {
+// JobResponse represents a  job execution response
+type JobResponse struct {
 	Return []map[string]interface{} `json:"return"`
 	Error  string                   `json:"error,omitempty"`
 }
 
-// SaltOrchestrationRequest represents a Salt orchestration request
-type SaltOrchestrationRequest struct {
+// OrchestrationRequest represents a  orchestration request
+type OrchestrationRequest struct {
 	Client string                 `json:"client"`
 	Fun    string                 `json:"fun"`
 	Mods   string                 `json:"mods"`
@@ -172,33 +152,33 @@ type TerraformWorkspace struct {
 
 // NomadJobSpec represents a Nomad job specification
 type NomadJobSpec struct {
-	Job      *NomadJob             `json:"Job"`
+	Job      *NomadJob              `json:"Job"`
 	Metadata map[string]interface{} `json:"Metadata,omitempty"`
 }
 
 // NomadJob represents a Nomad job definition
 type NomadJob struct {
-	ID          string                `json:"ID"`
-	Name        string                `json:"Name"`
-	Type        string                `json:"Type"`
-	Priority    int                   `json:"Priority"`
-	Datacenters []string              `json:"Datacenters"`
-	Region      string                `json:"Region,omitempty"`
-	Namespace   string                `json:"Namespace,omitempty"`
-	TaskGroups  []*NomadTaskGroup     `json:"TaskGroups"`
-	Update      *NomadUpdateStrategy  `json:"Update,omitempty"`
-	Meta        map[string]string     `json:"Meta,omitempty"`
+	ID          string               `json:"ID"`
+	Name        string               `json:"Name"`
+	Type        string               `json:"Type"`
+	Priority    int                  `json:"Priority"`
+	Datacenters []string             `json:"Datacenters"`
+	Region      string               `json:"Region,omitempty"`
+	Namespace   string               `json:"Namespace,omitempty"`
+	TaskGroups  []*NomadTaskGroup    `json:"TaskGroups"`
+	Update      *NomadUpdateStrategy `json:"Update,omitempty"`
+	Meta        map[string]string    `json:"Meta,omitempty"`
 }
 
 // NomadTaskGroup represents a Nomad task group
 type NomadTaskGroup struct {
-	Name     string                `json:"Name"`
-	Count    int                   `json:"Count"`
-	Tasks    []*NomadTask          `json:"Tasks"`
-	Networks []*NomadNetwork       `json:"Networks,omitempty"`
-	Services []*NomadService       `json:"Services,omitempty"`
-	Restart  *NomadRestartPolicy   `json:"Restart,omitempty"`
-	Update   *NomadUpdateStrategy  `json:"Update,omitempty"`
+	Name     string               `json:"Name"`
+	Count    int                  `json:"Count"`
+	Tasks    []*NomadTask         `json:"Tasks"`
+	Networks []*NomadNetwork      `json:"Networks,omitempty"`
+	Services []*NomadService      `json:"Services,omitempty"`
+	Restart  *NomadRestartPolicy  `json:"Restart,omitempty"`
+	Update   *NomadUpdateStrategy `json:"Update,omitempty"`
 }
 
 // NomadTask represents a Nomad task
@@ -216,21 +196,21 @@ type NomadTask struct {
 
 // NomadResources represents Nomad resource requirements
 type NomadResources struct {
-	CPU      int               `json:"CPU"`
-	MemoryMB int               `json:"MemoryMB"`
-	DiskMB   int               `json:"DiskMB,omitempty"`
-	Networks []*NomadNetwork   `json:"Networks,omitempty"`
+	CPU      int             `json:"CPU"`
+	MemoryMB int             `json:"MemoryMB"`
+	DiskMB   int             `json:"DiskMB,omitempty"`
+	Networks []*NomadNetwork `json:"Networks,omitempty"`
 }
 
 // NomadNetwork represents a Nomad network configuration
 type NomadNetwork struct {
-	Mode         string          `json:"Mode,omitempty"`
-	Device       string          `json:"Device,omitempty"`
-	CIDR         string          `json:"CIDR,omitempty"`
-	IP           string          `json:"IP,omitempty"`
-	MBits        int             `json:"MBits,omitempty"`
-	DynamicPorts []*NomadPort    `json:"DynamicPorts,omitempty"`
-	StaticPorts  []*NomadPort    `json:"StaticPorts,omitempty"`
+	Mode         string       `json:"Mode,omitempty"`
+	Device       string       `json:"Device,omitempty"`
+	CIDR         string       `json:"CIDR,omitempty"`
+	IP           string       `json:"IP,omitempty"`
+	MBits        int          `json:"MBits,omitempty"`
+	DynamicPorts []*NomadPort `json:"DynamicPorts,omitempty"`
+	StaticPorts  []*NomadPort `json:"StaticPorts,omitempty"`
 }
 
 // NomadPort represents a Nomad port mapping
@@ -243,13 +223,13 @@ type NomadPort struct {
 
 // NomadService represents a Nomad service definition
 type NomadService struct {
-	Name        string             `json:"Name"`
-	Tags        []string           `json:"Tags,omitempty"`
-	PortLabel   string             `json:"PortLabel,omitempty"`
-	AddressMode string             `json:"AddressMode,omitempty"`
-	Checks      []*NomadCheck      `json:"Checks,omitempty"`
-	Connect     *NomadConnect      `json:"Connect,omitempty"`
-	Meta        map[string]string  `json:"Meta,omitempty"`
+	Name        string            `json:"Name"`
+	Tags        []string          `json:"Tags,omitempty"`
+	PortLabel   string            `json:"PortLabel,omitempty"`
+	AddressMode string            `json:"AddressMode,omitempty"`
+	Checks      []*NomadCheck     `json:"Checks,omitempty"`
+	Connect     *NomadConnect     `json:"Connect,omitempty"`
+	Meta        map[string]string `json:"Meta,omitempty"`
 }
 
 // NomadCheck represents a Nomad health check
@@ -275,9 +255,9 @@ type NomadConnect struct {
 
 // NomadSidecarService represents a Connect sidecar service
 type NomadSidecarService struct {
-	Tags  []string          `json:"Tags,omitempty"`
-	Port  string            `json:"Port,omitempty"`
-	Proxy *NomadProxy       `json:"Proxy,omitempty"`
+	Tags  []string    `json:"Tags,omitempty"`
+	Port  string      `json:"Port,omitempty"`
+	Proxy *NomadProxy `json:"Proxy,omitempty"`
 }
 
 // NomadSidecarTask represents a Connect sidecar task
@@ -290,9 +270,9 @@ type NomadSidecarTask struct {
 
 // NomadProxy represents Connect proxy configuration
 type NomadProxy struct {
-	LocalServiceAddress string               `json:"LocalServiceAddress,omitempty"`
-	LocalServicePort    int                  `json:"LocalServicePort,omitempty"`
-	Upstreams           []*NomadUpstream     `json:"Upstreams,omitempty"`
+	LocalServiceAddress string                 `json:"LocalServiceAddress,omitempty"`
+	LocalServicePort    int                    `json:"LocalServicePort,omitempty"`
+	Upstreams           []*NomadUpstream       `json:"Upstreams,omitempty"`
 	Config              map[string]interface{} `json:"Config,omitempty"`
 }
 
@@ -304,9 +284,9 @@ type NomadUpstream struct {
 
 // NomadVault represents Vault integration configuration
 type NomadVault struct {
-	Policies    []string `json:"Policies,omitempty"`
-	Env         bool     `json:"Env,omitempty"`
-	ChangeMode  string   `json:"ChangeMode,omitempty"`
+	Policies     []string `json:"Policies,omitempty"`
+	Env          bool     `json:"Env,omitempty"`
+	ChangeMode   string   `json:"ChangeMode,omitempty"`
 	Changesignal string   `json:"ChangeSignal,omitempty"`
 }
 
@@ -384,7 +364,7 @@ type ConsulKVPair struct {
 // DeploymentError represents an error during deployment operations
 type DeploymentError struct {
 	Type      string                 `json:"type"`
-	Component string                 `json:"component"` // salt, terraform, nomad, vault, consul
+	Component string                 `json:"component"` // , terraform, nomad, vault, consul
 	Stage     string                 `json:"stage"`
 	Message   string                 `json:"message"`
 	Cause     error                  `json:"cause,omitempty"`
@@ -404,13 +384,8 @@ func (e *DeploymentError) Error() string {
 func DefaultDeploymentConfig() *DeploymentConfig {
 	return &DeploymentConfig{
 		WorkDir: "/tmp/eos-deploy",
-		SaltConfig: SaltClientConfig{
-			MasterURL: "http://salt-master.cybermonkey.net.au:8000",
-			EAuth:     "pam",
-			Timeout:   5 * time.Minute,
-		},
 		TerraformConfig: TerraformClientConfig{
-			WorkingDir:  "/srv/terraform",
+			WorkingDir:   "/srv/terraform",
 			StateBackend: "consul",
 			BackendConfig: map[string]string{
 				"address": shared.GetConsulAddr(),

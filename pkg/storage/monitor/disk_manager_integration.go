@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	// "github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack" // Removed for Nomad migration
+	// "github.com/CodeMonkeyCybersecurity/eos/pkg/" // Removed for Nomad migration
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -26,16 +26,16 @@ type DiskManager interface {
 
 // CleanupOptions defines options for disk cleanup operations
 type CleanupOptions struct {
-	DryRun              bool     `json:"dry_run"`
-	MaxAge              int      `json:"max_age_days"`
-	MinFreeSpace        int64    `json:"min_free_space_bytes"`
-	ExcludePaths        []string `json:"exclude_paths"`
-	IncludeSystemFiles  bool     `json:"include_system_files"`
-	CompressOldFiles    bool     `json:"compress_old_files"`
-	RemoveEmptyDirs     bool     `json:"remove_empty_dirs"`
-	CleanTempFiles      bool     `json:"clean_temp_files"`
-	CleanLogFiles       bool     `json:"clean_log_files"`
-	CleanCacheFiles     bool     `json:"clean_cache_files"`
+	DryRun             bool     `json:"dry_run"`
+	MaxAge             int      `json:"max_age_days"`
+	MinFreeSpace       int64    `json:"min_free_space_bytes"`
+	ExcludePaths       []string `json:"exclude_paths"`
+	IncludeSystemFiles bool     `json:"include_system_files"`
+	CompressOldFiles   bool     `json:"compress_old_files"`
+	RemoveEmptyDirs    bool     `json:"remove_empty_dirs"`
+	CleanTempFiles     bool     `json:"clean_temp_files"`
+	CleanLogFiles      bool     `json:"clean_log_files"`
+	CleanCacheFiles    bool     `json:"clean_cache_files"`
 }
 
 // DiskManagerService provides high-level disk management operations
@@ -110,7 +110,7 @@ func (dms *DiskManagerService) MonitorDiskGrowth(ctx context.Context, target str
 // loadGrowthMetrics - REMOVED: Method no longer used
 // TODO: Restore when growth metrics loading is needed
 func (dms *DiskManagerService) loadGrowthMetrics(ctx context.Context, target, path string) (*GrowthMetrics, error) {
-	_ = ctx // Suppress unused parameter warning
+	_ = ctx    // Suppress unused parameter warning
 	_ = target // Suppress unused parameter warning
 	// This would integrate with the existing growth tracking functionality
 	// For now, return a placeholder implementation

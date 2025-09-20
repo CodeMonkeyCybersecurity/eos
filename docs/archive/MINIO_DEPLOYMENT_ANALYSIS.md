@@ -9,12 +9,12 @@ The current MinIO deployment implementation violates the core orchestration hier
 ### Architecture Violations
 
 1. **Broken Orchestration Chain**
-   - **Expected**: SaltStack → Terraform → Nomad
-   - **Actual**: Go code → (minimal Salt) → Go code → Terraform → Nomad
-   - **Issue**: Go code generates Terraform configurations instead of SaltStack
+   - **Expected**:  → Terraform → Nomad
+   - **Actual**: Go code → (minimal ) → Go code → Terraform → Nomad
+   - **Issue**: Go code generates Terraform configurations instead of 
 
 2. **Missing State Coordination**
-   - No Salt pillar data driving configuration
+   - No   data driving configuration
    - Terraform state stored in `/tmp` (temporary)
    - No consistency validation between layers
 
@@ -25,16 +25,16 @@ The current MinIO deployment implementation violates the core orchestration hier
 
 ## Recommended Architecture-Compliant Implementation
 
-### 1. Salt-Driven Configuration Generation
+### 1. -Driven Configuration Generation
 
 **New Flow**:
 ```
-Salt Pillar Data → Salt States → Terraform Configs → Terraform Apply → Nomad Job
+  Data →  States → Terraform Configs → Terraform Apply → Nomad Job
 ```
 
 **Key Changes**:
-- Salt generates all Terraform configurations via Jinja2 templates
-- Pillar data becomes single source of truth
+-  generates all Terraform configurations via Jinja2 templates
+-  data becomes single source of truth
 - Terraform configurations stored in `/srv/terraform/minio/`
 
 ### 2. State Management Improvements
@@ -110,16 +110,16 @@ host_volume "minio-data-{app}" {
 
 **Problem**: Default ports conflict with other services
 **Solution**:
-- Configurable ports via pillar data
+- Configurable ports via  data
 - Validation against existing service registrations
 - Host networking mode for predictable access
 
 ## Implementation Plan
 
-### Phase 1: Salt Integration
-1. Create Salt pillar structure for MinIO configuration
-2. Implement Terraform generation via Salt templates
-3. Update deployer to use Salt-generated configs
+### Phase 1:  Integration
+1. Create   structure for MinIO configuration
+2. Implement Terraform generation via  templates
+3. Update deployer to use -generated configs
 
 ### Phase 2: State Management
 1. Configure Consul backend for Terraform state
@@ -139,29 +139,29 @@ host_volume "minio-data-{app}" {
 ## Code Changes Required
 
 ### 1. Update Deployer (pkg/minio/deployer_aligned.go)
-- Replace template generation with Salt state application
+- Replace template generation with  state application
 - Add state validation between orchestration layers
 - Implement Vault degradation handling
 
-### 2. Create Salt States
+### 2. Create  States
 - `minio/terraform_generator.sls` - Generate Terraform configs
 - Jinja2 templates for main.tf, variables.tf, nomad.hcl
-- Pillar data validation and error handling
+-  data validation and error handling
 
 ### 3. Update Command Interface
-- Add pillar data configuration options
+- Add  data configuration options
 - Remove template-related flags
 - Add state management options
 
 ## Migration Strategy
 
 ### Immediate (Fix Current Issues)
-1. Deploy Salt states to `/srv/salt/minio/`
+1. Deploy  states to `/srv//minio/`
 2. Fix symlink for `minio.sls` → `minio/init.sls`
-3. Test basic Salt state application
+3. Test basic  state application
 
 ### Short-term (Architecture Alignment)
-1. Implement Salt-driven Terraform generation
+1. Implement -driven Terraform generation
 2. Add Consul state backend
 3. Test with aligned deployer
 
@@ -197,10 +197,10 @@ host_volume "minio-data-{app}" {
 
 ## Conclusion
 
-The current implementation can be brought into alignment with STACK.md architecture through systematic refactoring. The key is maintaining the SaltStack → Terraform → Nomad orchestration hierarchy while implementing practical workarounds for common deployment issues.
+The current implementation can be brought into alignment with STACK.md architecture through systematic refactoring. The key is maintaining the  → Terraform → Nomad orchestration hierarchy while implementing practical workarounds for common deployment issues.
 
 Priority should be given to:
-1. Fixing immediate Salt state deployment issues
+1. Fixing immediate  state deployment issues
 2. Implementing proper state management
 3. Adding graceful Vault degradation
 4. Creating production-ready workarounds for resource and timing issues

@@ -4,13 +4,13 @@
 //
 // This package implements EOS's solution to the "agent sprawl" problem where infrastructure
 // accumulates multiple monitoring and management agents. The architecture follows a
-// four-pillar consolidation strategy:
+// four- consolidation strategy:
 //
 // ## The Agent Sprawl Problem
 //
 // Traditional infrastructure often accumulates multiple agents:
 // - Wazuh (security monitoring)
-// - SaltStack agents (configuration management) 
+// -  agents (configuration management)
 // - Zabbix agents (infrastructure monitoring)
 // - Jenkins agents (CI/CD)
 // - Prometheus exporters (metrics)
@@ -19,34 +19,34 @@
 // Each agent requires network ports, credentials, update cycles, configuration files,
 // resources, and meta-monitoring - creating security and maintenance overhead.
 //
-// ## Four-Pillar Consolidation Strategy
+// ## Four- Consolidation Strategy
 //
 // 1. **Monitoring Layer** (OpenTelemetry or Telegraf)
-//    - All telemetry: metrics, logs, network monitoring
-//    - Single agent replacing multiple specialized agents
-//    - Unified configuration language
+//   - All telemetry: metrics, logs, network monitoring
+//   - Single agent replacing multiple specialized agents
+//   - Unified configuration language
 //
 // 2. **Security Layer** (Wazuh/Delphi)
-//    - Kept separate for security reasons
-//    - Different privileges and audit requirements
-//    - Implements separation of duties principle
-//    - Handles authentication logs, file integrity, system calls
+//   - Kept separate for security reasons
+//   - Different privileges and audit requirements
+//   - Implements separation of duties principle
+//   - Handles authentication logs, file integrity, system calls
 //
-// 3. **Automation Layer** (Jenkins + SaltStack)
-//    - Jenkins: CI/CD orchestration (the "when and what")
-//    - SaltStack: Configuration management (the "how")
-//    - Jenkins as conductor, SaltStack as orchestra
+// 3. **Automation Layer** (Jenkins + )
+//   - Jenkins: CI/CD orchestration (the "when and what")
+//   - : Configuration management (the "how")
+//   - Jenkins as conductor,  as orchestra
 //
 // 4. **Maintenance Layer** (Scripts)
-//    - Backups and patching
-//    - Simple, auditable scripts
-//    - Periodic, well-defined tasks
+//   - Backups and patching
+//   - Simple, auditable scripts
+//   - Periodic, well-defined tasks
 //
 // ## Architecture Benefits
 //
 // - Different types of system management have fundamentally different requirements
 // - Like a house where electrical and plumbing systems are separate
-// - Each pillar serves a distinct purpose that would be compromised if merged
+// - Each  serves a distinct purpose that would be compromised if merged
 // - Reduced attack surface with fewer network ports and credentials
 // - Simplified maintenance and update cycles
 //
@@ -61,7 +61,6 @@
 // For monitoring layer consolidation, see pkg/monitoring/
 // For automation layer integration, see pkg/automation/
 // For maintenance scripts, see scripts/ directory
-//
 package agents
 
 // OSInfo represents operating system information

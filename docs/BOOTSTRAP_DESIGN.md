@@ -15,7 +15,7 @@ For detailed documentation, see the inline comments in these files:
 
 ## Overview
 
-The EOS bootstrap system ensures machines are properly prepared before deploying services. This prevents common errors like "Salt state files not found" and ensures a consistent, secure foundation for all deployments.
+The EOS bootstrap system ensures machines are properly prepared before deploying services. This prevents common errors like " state files not found" and ensures a consistent, secure foundation for all deployments.
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ eos bootstrap --verify
 ## Key Components
 
 - **Machine Preparation**: Ensures proper system state before service deployment
-- **SaltStack Setup**: Installs and configures configuration management
+- ** Setup**: Installs and configures configuration management
 - **API Configuration**: Sets up secure communication channels
 - **Security Baseline**: Applies initial security hardening
 - **State Validation**: Verifies bootstrap completion

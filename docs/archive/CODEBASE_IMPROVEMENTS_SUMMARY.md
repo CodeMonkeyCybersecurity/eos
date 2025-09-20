@@ -200,7 +200,7 @@ Fragmented HTTP client implementations with inconsistent security, timeouts, ret
 - Backward compatibility through wrapper functions
 
 ### Migration Support for Critical Clients
-- **SaltStack Client**: Session management with enhanced security
+- ** Client**: Session management with enhanced security
 - **Hetzner API Client**: Bearer token auth with rate limiting
 - **Vault Client**: High-security configuration with TLS 1.3
 - **LLM/AI Services**: Service-specific optimizations and timeouts

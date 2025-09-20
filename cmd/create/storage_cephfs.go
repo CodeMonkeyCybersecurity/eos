@@ -13,9 +13,8 @@ import (
 
 var cephfsCmd = &cobra.Command{
 	Use:   "cephfs",
-	Short: "Deploy CephFS cluster on bare metal with SaltStack and Terraform orchestration",
+	Short: "Deploy CephFS cluster on bare metal with  Terraform orchestration",
 	Long: `Deploy CephFS cluster on bare metal using the three-tier orchestration:
-1. SaltStack generates Terraform configurations from pillar data
 2. Terraform applies these configurations to deploy CephFS via cephadm
 3. CephFS runs on bare metal (not containerized) for optimal I/O performance
 
@@ -47,7 +46,6 @@ Prerequisites:
 		clusterNetwork, _ := cmd.Flags().GetString("cluster-network")
 		osdDevices, _ := cmd.Flags().GetStringSlice("osd-devices")
 		skipVerify, _ := cmd.Flags().GetBool("skip-verify")
-		saltOnly, _ := cmd.Flags().GetBool("salt-only")
 		terraformOnly, _ := cmd.Flags().GetBool("terraform-only")
 
 		// Create configuration
@@ -60,17 +58,16 @@ Prerequisites:
 			ClusterNetwork: clusterNetwork,
 			OSDDevices:     osdDevices,
 			SkipVerify:     skipVerify,
-			SaltOnly:       saltOnly,
 			TerraformOnly:  terraformOnly,
 		}
 
 		// Orchestrate deployment phases
 		if !config.TerraformOnly {
-			logger.Info("Phase 1: SaltStack configuration generation")
-			return fmt.Errorf("SaltStack-based CephFS deployment has been migrated to HashiCorp stack. Please contact your administrator for distributed storage deployment assistance")
+			logger.Info("Phase 1:  configuration generation")
+			return fmt.Errorf("-based CephFS deployment has been migrated to HashiCorp stack. Please contact your administrator for distributed storage deployment assistance")
 		}
 
-		if !config.SaltOnly {
+		if !config.TerraformOnly {
 			logger.Info("Phase 2: Terraform infrastructure deployment")
 			if err := cephfs.DeployTerraform(rc, config); err != nil {
 				logger.Error("Terraform deployment failed", zap.Error(err))
@@ -78,7 +75,7 @@ Prerequisites:
 			}
 		}
 
-		if !config.SkipVerify && !config.SaltOnly {
+		if !config.SkipVerify && !config.TerraformOnly {
 			logger.Info("Phase 3: CephFS cluster verification")
 			if err := cephfs.VerifyCluster(rc, config); err != nil {
 				logger.Error("CephFS cluster verification failed", zap.Error(err))
@@ -107,8 +104,7 @@ func init() {
 
 	// Control flags
 	cephfsCmd.Flags().Bool("skip-verify", false, "Skip cluster health verification")
-	cephfsCmd.Flags().Bool("salt-only", false, "Only generate SaltStack configuration, don't deploy")
-	cephfsCmd.Flags().Bool("terraform-only", false, "Only run Terraform deployment, skip SaltStack generation")
+	cephfsCmd.Flags().Bool("terraform-only", false, "Only run Terraform deployment, skip  generation")
 
 	// Mark required flags
 	if err := cephfsCmd.MarkFlagRequired("admin-host"); err != nil {

@@ -24,7 +24,7 @@ type DeploymentOptions struct {
 	StoragePath   string
 	APIPort       int
 	ConsolePort   int
-	SkipSalt      bool
+	Skip          bool
 	SkipTerraform bool
 }
 
@@ -48,7 +48,7 @@ func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) er
 
 	// Configure Vault secrets
 	config := &Config{
-		Region: DefaultRegion,
+		Region:        DefaultRegion,
 		BrowserEnable: true,
 	}
 	if err := ConfigureVaultSecrets(rc, config); err != nil {
@@ -58,14 +58,6 @@ func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) er
 	// Configure Vault policies
 	if err := ConfigureVaultPolicies(rc); err != nil {
 		return err
-	}
-
-	// Step 1: Apply SaltStack states
-	if !opts.SkipSalt {
-		logger.Info("Applying SaltStack states for MinIO")
-		if err := d.applySaltStates(rc); err != nil {
-			return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to apply Salt states: %w", err))
-		}
 	}
 
 	// Step 2: Generate deployment files
@@ -95,26 +87,26 @@ func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) er
 	return nil
 }
 
-// applySaltStates runs Salt states for MinIO setup
-func (d *Deployer) applySaltStates(rc *eos_io.RuntimeContext) error {
+// applyStates runs  states for MinIO setup
+func (d *Deployer) applyStates(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Apply MinIO setup states (using masterless mode with salt-call)
-	logger.Info("Applying MinIO Salt states")
+	// Apply MinIO setup states (using masterless mode with -call)
+	logger.Info("Applying MinIO  states")
 	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
+		Command: "-call",
 		Args:    []string{"--local", "state.apply", "minio"},
 		Timeout: 300 * time.Second,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to apply minio state: %w", err)
 	}
-	logger.Debug("Salt state output", zap.String("output", output))
+	logger.Debug(" state output", zap.String("output", output))
 
 	// Apply Vault policy states (also using masterless mode)
-	logger.Info("Applying Vault policy Salt states")
+	logger.Info("Applying Vault policy  states")
 	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
+		Command: "-call",
 		Args:    []string{"--local", "state.apply", "minio.vault_policy"},
 		Timeout: 300 * time.Second,
 	})
@@ -230,5 +222,3 @@ func (d *Deployer) runTerraformDeployment(rc *eos_io.RuntimeContext, deployDir s
 
 	return nil
 }
-
-

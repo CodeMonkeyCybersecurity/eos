@@ -72,7 +72,7 @@ Examples:
 		// Get environment to delete
 		env, err := envManager.GetEnvironment(rc, envName)
 		if err != nil {
-			logger.Error("Environment not found", 
+			logger.Error("Environment not found",
 				zap.String("environment", envName),
 				zap.Error(err))
 			return fmt.Errorf("environment '%s' not found. Use 'eos env list' to see available environments", envName)
@@ -111,7 +111,6 @@ Examples:
 			fmt.Printf("• Consul service registrations\n")
 			fmt.Printf("• Vault policies and secrets\n")
 			fmt.Printf("• Terraform state and resources\n")
-			fmt.Printf("• Salt state configurations\n")
 		}
 		fmt.Printf("\n")
 
@@ -250,7 +249,6 @@ func displayDeletionPlan(env *environments.Environment, cleanup bool) error {
 		fmt.Printf("  Consul:      Remove services in datacenter '%s'\n", env.Infrastructure.Consul.Datacenter)
 		fmt.Printf("  Vault:       Clean up policies and secrets\n")
 		fmt.Printf("  Terraform:   Destroy resources in workspace '%s'\n", env.Infrastructure.Terraform.Workspace)
-		fmt.Printf("  Salt:        Remove environment '%s' configuration\n", env.Infrastructure.Salt.Environment)
 		fmt.Printf("\n")
 	}
 
@@ -265,7 +263,7 @@ func displayDeletionPlan(env *environments.Environment, cleanup bool) error {
 func createEnvironmentBackup(rc *eos_io.RuntimeContext, env *environments.Environment) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Creating environment backup", 
+	logger.Info("Creating environment backup",
 		zap.String("environment", env.Name))
 
 	// In real implementation, this would:
@@ -274,10 +272,10 @@ func createEnvironmentBackup(rc *eos_io.RuntimeContext, env *environments.Enviro
 	// 3. Optionally backup current infrastructure state
 
 	// Simulate backup creation
-	backupFile := fmt.Sprintf("environment-%s-backup-%s.yaml", 
-		env.Name, 
+	backupFile := fmt.Sprintf("environment-%s-backup-%s.yaml",
+		env.Name,
 		env.UpdatedAt.Format("20060102-150405"))
-	
+
 	fmt.Printf("Creating backup: %s\n", backupFile)
 
 	logger.Info("Environment backup created successfully",

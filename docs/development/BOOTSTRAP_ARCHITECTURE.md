@@ -4,10 +4,10 @@
 
 ## Problem Statement
 
-Eos is designed to orchestrate infrastructure through Salt, but faces a chicken-and-egg problem:
-- To configure Salt properly, we need to know about the system
-- To query the system through Salt, Salt must already be installed and configured
-- New machines don't have Salt installed
+Eos is designed to orchestrate infrastructure through , but faces a chicken-and-egg problem:
+- To configure  properly, we need to know about the system
+- To query the system through ,  must already be installed and configured
+- New machines don't have  installed
 
 ## Solution: Bootstrap Mode
 
@@ -15,41 +15,25 @@ Eos is designed to orchestrate infrastructure through Salt, but faces a chicken-
 
 All system discovery commands should support two execution modes:
 - **Direct Mode**: Execute commands directly on the system (for bootstrap)
-- **Salt Mode**: Execute commands through Salt (for managed systems)
+- ** Mode**: Execute commands through  (for managed systems)
 
 ### 2. Implementation Pattern
 
-```go
-// Example implementation pattern for dual-mode execution
-type SystemQueryManager struct {
-    useSalt    bool
-    saltClient SaltClientInterface
-}
-
-func (m *SystemQueryManager) ExecuteCommand(ctx context.Context, cmd string) (string, error) {
-    if m.useSalt && m.saltClient != nil {
-        // Execute through Salt
-        return m.saltClient.CmdRun(ctx, "*", cmd)
-    }
-    // Execute directly
-    return executeDirectly(ctx, cmd)
-}
-```
 
 ### 3. Bootstrap Workflow
 
 ```mermaid
 graph TD
-    A[New System] --> B{Salt Installed?}
+    A[New System] --> B{ Installed?}
     B -->|No| C[Bootstrap Mode]
-    B -->|Yes| D[Salt Mode]
+    B -->|Yes| D[ Mode]
     
     C --> E[Direct System Discovery]
-    E --> F[Generate Salt Config]
-    F --> G[Install Salt]
+    E --> F[Generate  Config]
+    F --> G[Install ]
     G --> H[Apply Configuration]
     
-    D --> I[Query via Salt]
+    D --> I[Query via ]
     I --> J[Apply States]
 ```
 
@@ -92,12 +76,12 @@ SELECT * FROM system_info;
 
 Once system discovery is complete, generate:
 
-1. **Salt Configuration**
+1. ** Configuration**
    ```yaml
-   # /etc/salt/minion
-   master: salt-master.example.com
+   # /etc//minion
+   master: -master.example.com
    id: ${HOSTNAME}
-   grains:
+   s:
      roles:
        - ${DETECTED_ROLE}
      datacenter: ${DETECTED_DC}
@@ -123,17 +107,17 @@ eos read system-info --bootstrap
 # Generate initial configuration
 eos create bootstrap-config --output=/tmp/bootstrap
 
-# Install Salt with generated config
-eos create saltstack --config=/tmp/bootstrap/salt-minion.conf
+# Install  with generated config
+eos create  --config=/tmp/bootstrap/-minion.conf
 
-# After Salt installation, use Salt mode
-eos list disks  # Now executes through Salt
+# After  installation, use  mode
+eos list disks  # Now executes through 
 ```
 
 ### 7. Error Handling
 
 The system should gracefully handle:
-- Missing Salt installation
+- Missing  installation
 - Permission issues
 - Platform differences
 - Incomplete system information
@@ -153,13 +137,13 @@ Bootstrap mode requires:
 - [ ] Create OSQuery integration package
 - [ ] Add bootstrap config generator
 - [ ] Create comprehensive system discovery module
-- [ ] Add Salt installation validation
+- [ ] Add  installation validation
 - [ ] Implement automatic mode detection
 - [ ] Add security validations
 
 ## Future Enhancements
 
-1. **Auto-Detection**: Automatically detect if Salt is available
+1. **Auto-Detection**: Automatically detect if  is available
 2. **Progressive Enhancement**: Start with basic queries, add detail as tools become available
 3. **Cloud Integration**: Detect cloud metadata (AWS, GCP, Azure)
 4. **Container Detection**: Identify if running in container/VM

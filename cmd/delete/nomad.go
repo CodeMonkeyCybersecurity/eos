@@ -4,12 +4,10 @@ package delete
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -24,7 +22,7 @@ import (
 var DeleteNomadCmd = &cobra.Command{
 	Use:   "nomad",
 	Short: "Remove HashiCorp Nomad and all associated data",
-	Long: `Remove HashiCorp Nomad completely from the system using SaltStack.
+	Long: `Remove HashiCorp Nomad completely from the system using .
 
 This command will:
 - Gracefully drain node if running as client
@@ -74,20 +72,20 @@ var (
 
 // NomadStatus represents the current state of Nomad installation
 type NomadDeleteStatus struct {
-	Installed       bool
-	Running         bool
-	Failed          bool
-	ConfigValid     bool
-	Version         string
-	ServiceStatus   string
-	ServerMode      bool
-	ClientMode      bool
-	NodeID          string
-	ClusterMembers  []string
-	RunningJobs     []string
-	HasData         bool
-	HasConfig       bool
-	UserExists      bool
+	Installed      bool
+	Running        bool
+	Failed         bool
+	ConfigValid    bool
+	Version        string
+	ServiceStatus  string
+	ServerMode     bool
+	ClientMode     bool
+	NodeID         string
+	ClusterMembers []string
+	RunningJobs    []string
+	HasData        bool
+	HasConfig      bool
+	UserExists     bool
 }
 
 func checkNomadDeleteStatus(rc *eos_io.RuntimeContext) (*NomadDeleteStatus, error) {
@@ -98,7 +96,7 @@ func checkNomadDeleteStatus(rc *eos_io.RuntimeContext) (*NomadDeleteStatus, erro
 	if nomadPath, err := exec.LookPath("nomad"); err == nil {
 		status.Installed = true
 		logger.Debug("Nomad binary found", zap.String("path", nomadPath))
-		
+
 		// Get version
 		if output, err := exec.Command("nomad", "version").Output(); err == nil {
 			lines := strings.Split(string(output), "\n")
@@ -127,7 +125,7 @@ func checkNomadDeleteStatus(rc *eos_io.RuntimeContext) (*NomadDeleteStatus, erro
 			outputStr := string(output)
 			status.ServerMode = strings.Contains(outputStr, "server = true")
 			status.ClientMode = strings.Contains(outputStr, "client = true")
-			
+
 			// Extract node ID
 			lines := strings.Split(outputStr, "\n")
 			for _, line := range lines {
@@ -207,7 +205,7 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	deleteTimeout := time.Duration(nomadTimeout+300) * time.Second // Add 5 minutes to user timeout
 	ctx, cancel := context.WithTimeout(rc.Ctx, deleteTimeout)
 	defer cancel()
-	
+
 	// Update the runtime context with extended timeout
 	rc.Ctx = ctx
 
@@ -270,7 +268,7 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	if !nomadForceDelete {
 		prompt := "Are you sure you want to remove Nomad"
 		details := []string{}
-		
+
 		if status.HasData && !nomadKeepData {
 			details = append(details, "all data will be deleted")
 		}
@@ -283,18 +281,18 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		if len(status.RunningJobs) > 0 {
 			details = append(details, fmt.Sprintf("%d running jobs will be stopped", len(status.RunningJobs)))
 		}
-		
+
 		if len(details) > 0 {
 			prompt += " (" + strings.Join(details, ", ") + ")"
 		}
 		prompt += "? This action cannot be undone. [y/N]"
-		
+
 		logger.Info("terminal prompt: " + prompt)
 		response, err := eos_io.ReadInput(rc)
 		if err != nil {
 			return fmt.Errorf("failed to read user input: %w", err)
 		}
-		
+
 		if response != "y" && response != "Y" {
 			logger.Info("Nomad deletion cancelled by user")
 			return nil
@@ -303,23 +301,23 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	// INTERVENE - Apply removal using REST API or fallback to direct execution
 	logger.Info("Applying Nomad removal")
-	
+
 	// Try REST API first
 	apiURL := "https://localhost:8000"
 	restInstaller := getNomadRESTInstaller(apiURL, true) // Skip TLS verify for self-signed cert
-	
+
 	// Check authentication
-	logger.Info("Attempting to authenticate with Salt REST API")
-	if err := restInstaller.Authenticate(rc.Ctx, "salt", "saltpass"); err != nil {
-		logger.Warn("Failed to authenticate with Salt REST API, falling back to direct execution", zap.Error(err))
-		
-		// Fallback to direct salt-call execution
-		return runDeleteNomadDirectSalt(rc, ctx, status, nomadForceDelete, nomadKeepData, 
-			nomadKeepConfig, nomadKeepUser, nomadTimeout)
+	logger.Info("Attempting to authenticate with  REST API")
+	if err := restInstaller.Authenticate(rc.Ctx, "", "pass"); err != nil {
+		logger.Warn("Failed to authenticate with  REST API, falling back to direct execution", zap.Error(err))
+
+		// HashiCorp Nomad deletion requires administrator intervention
+		logger.Info("Nomad deletion requires administrator intervention - use HashiCorp Nomad CLI for service management")
+		return fmt.Errorf("Nomad deletion requires administrator intervention - use 'nomad system gc' and 'nomad operator raft list-peers' for cluster management")
 	}
-	
-	logger.Info("Successfully authenticated with Salt REST API")
-	
+
+	logger.Info("Successfully authenticated with  REST API")
+
 	// Prepare removal configuration
 	removeConfig := &nomad.NomadRemoveConfig{
 		Force:      nomadForceDelete,
@@ -331,26 +329,26 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		ClientMode: status.ClientMode,
 		NodeID:     status.NodeID,
 	}
-	
+
 	// Execute removal via REST API
-	logger.Info("Removing Nomad via Salt REST API")
+	logger.Info("Removing Nomad via  REST API")
 	if err := restInstaller.RemoveNomad(rc, removeConfig); err != nil {
 		logger.Error("Nomad removal via REST API failed", zap.Error(err))
 		return fmt.Errorf("nomad removal failed: %w", err)
 	}
-	
+
 	logger.Info("Nomad removal via REST API completed successfully")
 
 	// EVALUATE - Verify removal
 	logger.Info("Verifying Nomad removal")
-	
+
 	// Re-check status after removal
 	finalStatus, err := checkNomadDeleteStatus(rc)
 	if err != nil {
 		logger.Warn("Failed to verify final status", zap.Error(err))
 	} else {
 		remainingComponents := []string{}
-		
+
 		if finalStatus.Installed {
 			remainingComponents = append(remainingComponents, "binary")
 		}
@@ -363,34 +361,34 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		if finalStatus.HasData && !nomadKeepData {
 			remainingComponents = append(remainingComponents, "data")
 		}
-		
+
 		if len(remainingComponents) == 0 {
 			logger.Info("Nomad removal completed successfully - all components removed")
 		} else {
 			logger.Warn("Some Nomad components remain",
 				zap.Strings("remaining", remainingComponents))
-			
+
 			// This is only an error if we didn't intend to keep them
-			if (finalStatus.HasData && !nomadKeepData) || 
-			   (finalStatus.HasConfig && !nomadKeepConfig) || 
-			   (finalStatus.UserExists && !nomadKeepUser) {
+			if (finalStatus.HasData && !nomadKeepData) ||
+				(finalStatus.HasConfig && !nomadKeepConfig) ||
+				(finalStatus.UserExists && !nomadKeepUser) {
 				return fmt.Errorf("failed to remove all components: %v", remainingComponents)
 			}
 		}
 	}
-	
+
 	// Show summary
 	logger.Info("Nomad removal summary",
 		zap.Bool("data_kept", nomadKeepData && finalStatus.HasData),
 		zap.Bool("config_kept", nomadKeepConfig && finalStatus.HasConfig),
 		zap.Bool("user_kept", nomadKeepUser && finalStatus.UserExists))
-	
+
 	if nomadKeepData || nomadKeepConfig {
 		logger.Info("terminal prompt: Preserved components can be manually removed later if needed")
 	}
-	
+
 	logger.Info("terminal prompt: You can now safely reinstall Nomad with 'eos create nomad'")
-	
+
 	return nil
 }
 
@@ -399,199 +397,13 @@ func getNomadRESTInstaller(apiURL string, skipTLSVerify bool) *nomad.RESTInstall
 	return nomad.NewRESTInstaller(apiURL, skipTLSVerify)
 }
 
-// runDeleteNomadDirectSalt is a fallback function that uses direct salt-call execution
-func runDeleteNomadDirectSalt(rc *eos_io.RuntimeContext, ctx context.Context, status *NomadDeleteStatus,
-	force, keepData, keepConfig, keepUser bool, timeout int) error {
-	
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Using direct salt-call execution for Nomad removal")
-	
-	// Check if SaltStack is available
-	saltCallPath, err := exec.LookPath("salt-call")
-	if err != nil {
-		logger.Error("SaltStack is required for Nomad removal")
-		return eos_err.NewUserError("saltstack is required for nomad removal - salt-call not found in PATH")
-	}
-	logger.Info("SaltStack detected", zap.String("salt_call", saltCallPath))
-	
-	// Test Salt functionality
-	logger.Info("Testing Salt functionality")
-	testCmd := exec.Command("salt-call", "--local", "test.ping")
-	if testOutput, err := testCmd.CombinedOutput(); err != nil {
-		logger.Error("Salt test failed",
-			zap.Error(err),
-			zap.String("output", string(testOutput)))
-		return fmt.Errorf("salt appears to be broken: %w", err)
-	} else {
-		logger.Debug("Salt test successful", zap.String("output", string(testOutput)))
-	}
-	
-	// Check if the salt state file exists
-	stateFile := "/opt/eos/salt/states/hashicorp/nomad_remove.sls"
-	if info, err := os.Stat(stateFile); err != nil {
-		logger.Error("Salt state file not found",
-			zap.String("path", stateFile),
-			zap.Error(err))
-		return fmt.Errorf("salt state file not found: %s", stateFile)
-	} else {
-		logger.Info("Salt state file found",
-			zap.String("path", stateFile),
-			zap.Int64("size", info.Size()))
-	}
-	
-	// Prepare Salt pillar data for removal
-	pillarData := map[string]interface{}{
-		"nomad": map[string]interface{}{
-			"ensure":      "absent",
-			"force":       force,
-			"keep_data":   keepData,
-			"keep_config": keepConfig,
-			"keep_user":   keepUser,
-			"timeout":     timeout,
-			"server_mode": status.ServerMode,
-			"client_mode": status.ClientMode,
-			"node_id":     status.NodeID,
-		},
-	}
-
-	pillarJSON, err := json.Marshal(pillarData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal pillar data: %w", err)
-	}
-
-	// Execute Salt state for removal
-	saltArgs := []string{
-		"--local",
-		"--file-root=/opt/eos/salt/states",
-		"--pillar-root=/opt/eos/salt/pillar",
-		"state.apply",
-		"hashicorp.nomad_remove",
-		"--output=json",
-		"--output-indent=2",
-		"pillar=" + string(pillarJSON),
-	}
-
-	logger.Info("Executing Salt state for removal",
-		zap.String("state", "hashicorp.nomad_remove"),
-		zap.Strings("args", saltArgs))
-
-	// Create command with context for better control
-	saltCmd := exec.CommandContext(ctx, "salt-call", saltArgs...)
-	
-	// Set up output capture
-	var outputBuilder strings.Builder
-	var outputMu sync.Mutex
-	
-	// Set up pipes to capture output in real-time
-	stdout, err := saltCmd.StdoutPipe()
-	if err != nil {
-		logger.Error("Failed to create stdout pipe", zap.Error(err))
-		return fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-	
-	stderr, err := saltCmd.StderrPipe()
-	if err != nil {
-		logger.Error("Failed to create stderr pipe", zap.Error(err))
-		return fmt.Errorf("failed to create stderr pipe: %w", err)
-	}
-	
-	logger.Info("Starting Salt command execution")
-	
-	// Start the command
-	if err := saltCmd.Start(); err != nil {
-		logger.Error("Failed to start Salt command",
-			zap.Error(err),
-			zap.String("command", "salt-call"),
-			zap.Strings("args", saltArgs))
-		return fmt.Errorf("failed to start salt command: %w", err)
-	}
-	
-	logger.Info("Salt command started, waiting for completion",
-		zap.Int("pid", saltCmd.Process.Pid))
-	
-	// Read output in real-time
-	var wg sync.WaitGroup
-	wg.Add(2)
-	
-	go func() {
-		defer wg.Done()
-		buf := make([]byte, 1024)
-		for {
-			n, err := stdout.Read(buf)
-			if n > 0 {
-				outputMu.Lock()
-				outputBuilder.Write(buf[:n])
-				outputMu.Unlock()
-				logger.Debug("Salt stdout", zap.String("output", string(buf[:n])))
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
-	
-	go func() {
-		defer wg.Done()
-		buf := make([]byte, 1024)
-		for {
-			n, err := stderr.Read(buf)
-			if n > 0 {
-				outputMu.Lock()
-				outputBuilder.Write(buf[:n])
-				outputMu.Unlock()
-				logger.Warn("Salt stderr", zap.String("output", string(buf[:n])))
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
-	
-	// Wait for command to complete
-	logger.Info("Waiting for Salt command to complete")
-	err = saltCmd.Wait()
-	wg.Wait() // Wait for output readers to finish
-	
-	outputMu.Lock()
-	output := outputBuilder.String()
-	outputMu.Unlock()
-	
-	if err != nil {
-		logger.Error("Salt state execution failed",
-			zap.Error(err),
-			zap.String("output", output))
-		
-		// Check process state for more details
-		if saltCmd.ProcessState != nil {
-			logger.Error("Salt process details",
-				zap.Int("exit_code", saltCmd.ProcessState.ExitCode()),
-				zap.Bool("success", saltCmd.ProcessState.Success()),
-				zap.String("string", saltCmd.ProcessState.String()))
-		}
-		
-		// Check if context was cancelled
-		if ctx.Err() != nil {
-			logger.Error("Operation cancelled or timed out",
-				zap.Error(ctx.Err()))
-			return fmt.Errorf("operation cancelled or timed out: %w", ctx.Err())
-		}
-		
-		return fmt.Errorf("salt state execution failed: %w", err)
-	}
-	
-	logger.Info("Salt state executed successfully")
-	logger.Debug("Salt output", zap.String("output", output))
-	
-	return nil
-}
-
 func init() {
 	DeleteNomadCmd.Flags().BoolVarP(&nomadForceDelete, "force", "f", false, "Force deletion without confirmation prompt")
 	DeleteNomadCmd.Flags().BoolVar(&nomadKeepData, "keep-data", false, "Preserve Nomad data directory (/var/lib/nomad)")
 	DeleteNomadCmd.Flags().BoolVar(&nomadKeepConfig, "keep-config", false, "Preserve Nomad configuration (/etc/nomad.d)")
 	DeleteNomadCmd.Flags().BoolVar(&nomadKeepUser, "keep-user", false, "Preserve nomad system user account")
 	DeleteNomadCmd.Flags().IntVar(&nomadTimeout, "timeout", 30, "Timeout in seconds for graceful node drain")
-	
+
 	// Register the command with the delete command
 	DeleteCmd.AddCommand(DeleteNomadCmd)
 }

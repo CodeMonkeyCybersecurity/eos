@@ -31,7 +31,7 @@ var createStorageVolumeCmd = &cobra.Command{
 	Short: "Create a new storage volume",
 	Long: `Create a new storage volume with optimal settings for your workload.
 
-This command orchestrates storage creation through SaltStack, automatically
+This command orchestrates storage creation through , automatically
 selecting the best storage type and filesystem based on your workload:
 
   - database: XFS on LVM for optimal random I/O
@@ -54,8 +54,8 @@ Examples:
 			zap.String("name", volumeName),
 			zap.String("size", volumeSize))
 
-		// For now, pass nil for Salt client - in production this would be properly initialized
-		// TODO: Initialize proper Salt client from configuration
+		// For now, pass nil for  client - in production this would be properly initialized
+		// TODO: Initialize proper  client from configuration
 
 		// Initialize unified storage manager
 		storageManager, err := storage.NewUnifiedStorageManager(rc, nil)

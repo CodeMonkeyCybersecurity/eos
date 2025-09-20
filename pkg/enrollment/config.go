@@ -6,7 +6,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 // ParseEnrollmentFlags parses command line flags into EnrollmentConfig
@@ -14,7 +13,7 @@ import (
 func ParseEnrollmentFlags(cmd *cobra.Command) (*EnrollmentConfig, error) {
 	// ASSESS - Extract flag values
 	role, _ := cmd.Flags().GetString("role")
-	masterAddress, _ := cmd.Flags().GetString("master-address")
+	ess, _ := cmd.Flags().GetString("master-address")
 	datacenter, _ := cmd.Flags().GetString("datacenter")
 	networkMode, _ := cmd.Flags().GetString("network-mode")
 	autoDetect, _ := cmd.Flags().GetBool("auto-detect")
@@ -24,7 +23,7 @@ func ParseEnrollmentFlags(cmd *cobra.Command) (*EnrollmentConfig, error) {
 	// INTERVENE - Create configuration
 	config := &EnrollmentConfig{
 		Role:           role,
-		MasterAddress:  masterAddress,
+		ess:            ess,
 		Datacenter:     datacenter,
 		NetworkMode:    networkMode,
 		AutoDetect:     autoDetect,
@@ -39,10 +38,10 @@ func ParseEnrollmentFlags(cmd *cobra.Command) (*EnrollmentConfig, error) {
 // ParseEnrollmentFlagsWithPrompts parses command line flags and prompts for missing required values
 func ParseEnrollmentFlagsWithPrompts(rc *eos_io.RuntimeContext, cmd *cobra.Command) (*EnrollmentConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Extract flag values
 	role, _ := cmd.Flags().GetString("role")
-	masterAddress, _ := cmd.Flags().GetString("master-address")
+	ess, _ := cmd.Flags().GetString("master-address")
 	datacenter, _ := cmd.Flags().GetString("datacenter")
 	networkMode, _ := cmd.Flags().GetString("network-mode")
 	autoDetect, _ := cmd.Flags().GetBool("auto-detect")
@@ -68,10 +67,10 @@ func ParseEnrollmentFlagsWithPrompts(rc *eos_io.RuntimeContext, cmd *cobra.Comma
 		}
 	}
 
-	if role == RoleMinion && masterAddress == "" {
-		logger.Info("Master address not provided via flag for minion role, prompting user")
+	if role == "client" && ess == "" {
+		logger.Info("Consul address not provided via flag for client role, prompting user")
 		var err error
-		masterAddress, err = eos_io.PromptInputWithValidation(rc, "Enter Salt master address: ", "master-address")
+		ess, err = eos_io.PromptInputWithValidation(rc, "Enter HashiCorp Consul address: ", "consul-address")
 		if err != nil {
 			return nil, fmt.Errorf("failed to read master address: %w", err)
 		}
@@ -80,7 +79,7 @@ func ParseEnrollmentFlagsWithPrompts(rc *eos_io.RuntimeContext, cmd *cobra.Comma
 	// Create configuration
 	config := &EnrollmentConfig{
 		Role:           role,
-		MasterAddress:  masterAddress,
+		ess:            ess,
 		Datacenter:     datacenter,
 		NetworkMode:    networkMode,
 		AutoDetect:     autoDetect,
@@ -104,12 +103,12 @@ func ValidateEnrollmentConfig(config *EnrollmentConfig) error {
 		return fmt.Errorf("role is required unless --auto-detect is specified")
 	}
 
-	// INTERVENE - Validate role-specific requirements
-	if config.Role == RoleMinion && config.MasterAddress == "" {
-		return fmt.Errorf("master-address is required for minion role")
+	// INTERVENE - Validate role-specific requirements for HashiCorp
+	if config.Role == "client" && config.ess == "" {
+		return fmt.Errorf("consul-address is required for client role")
 	}
 
-	if config.Role == RoleMaster && config.MasterAddress != "" {
+	if config.Role == RoleMaster && config.ess != "" {
 		return fmt.Errorf("master-address should not be specified for master role")
 	}
 
@@ -130,45 +129,4 @@ func ValidateEnrollmentConfig(config *EnrollmentConfig) error {
 
 	// EVALUATE - Configuration is valid
 	return nil
-}
-
-// DetectRole automatically detects the appropriate role based on system characteristics
-// Migrated from cmd/self/enroll.go detectRole
-func DetectRole(rc *eos_io.RuntimeContext, info *SystemInfo) (string, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// ASSESS - Analyze system characteristics
-	logger.Info("🔍 Assessing system characteristics for role detection",
-		zap.Int("cpu_cores", info.CPUCores),
-		zap.Int("memory_gb", info.MemoryGB),
-		zap.Int("disk_gb", info.DiskSpaceGB))
-
-	// INTERVENE - Apply role detection heuristics
-	logger.Debug("Analyzing system resources for role detection",
-		zap.Int("cpu_cores", info.CPUCores),
-		zap.Int("memory_gb", info.MemoryGB),
-		zap.Int("disk_gb", info.DiskSpaceGB))
-
-	// Simple heuristics for role detection
-	// TODO: 2025-01-09T22:00:00Z - Implement more sophisticated role detection
-	// Could check for:
-	// - Existing infrastructure (consul, nomad, etc.)
-	// - Network topology
-	// - System resources
-	// - Environment variables
-	// - Configuration files
-
-	// High-resource systems default to master
-	if info.CPUCores >= 4 && info.MemoryGB >= 8 {
-		logger.Info(" Detected high-resource system, suggesting master role",
-			zap.Int("cpu_cores", info.CPUCores),
-			zap.Int("memory_gb", info.MemoryGB))
-		return RoleMaster, nil
-	}
-
-	// EVALUATE - Lower-resource systems default to minion
-	logger.Info("📊 Detected standard system, suggesting minion role",
-		zap.Int("cpu_cores", info.CPUCores),
-		zap.Int("memory_gb", info.MemoryGB))
-	return RoleMinion, nil
 }

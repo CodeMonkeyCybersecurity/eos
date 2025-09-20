@@ -25,7 +25,6 @@
 //
 // Integration with EOS Infrastructure:
 // - Vault Integration: Secure credential storage and management
-// - SaltStack Integration: System-level security policy enforcement
 // - HashiCorp Stack: Application-level security controls
 // - Audit Integration: Centralized security event logging
 //

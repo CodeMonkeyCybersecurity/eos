@@ -76,13 +76,9 @@ func RunComponentBootstrap(rc *eos_io.RuntimeContext, component string, cmd *cob
 	
 	// Enable only the requested component
 	switch component {
-	case "salt":
-		// Only Salt will run
 	case "vault":
-		// This would need to ensure Salt is installed first
 		return fmt.Errorf("vault bootstrap not yet implemented in refactored version")
 	case "nomad":
-		// This would need to ensure Salt is installed first
 		return fmt.Errorf("nomad bootstrap not yet implemented in refactored version")
 	case "osquery":
 		opts.SkipOSQuery = false
@@ -120,7 +116,7 @@ func MigrateToRefactoredBootstrap(rc *eos_io.RuntimeContext) error {
 	
 	// Use state validation instead of creating checkpoint files
 	// Just log what components are already installed
-	phases := []string{"salt", "vault", "nomad", "osquery"}
+	phases := []string{"vault", "nomad", "osquery"}
 	for _, phase := range phases {
 		// Check if the component is installed using state validation
 		if ValidatePhaseCompletion(rc, phase) {

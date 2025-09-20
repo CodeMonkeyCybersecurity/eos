@@ -7,7 +7,6 @@ package bootstrap
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -34,11 +33,11 @@ type BootstrapState struct {
 type BootstrapPhaseState string
 
 const (
-	PhaseNotInstalled        BootstrapPhaseState = "not_installed"
-	PhasePartiallyInstalled  BootstrapPhaseState = "partially_installed"
-	PhaseFullyInstalled      BootstrapPhaseState = "fully_installed"
-	PhaseConflicting         BootstrapPhaseState = "conflicting"
-	PhaseIncompatible        BootstrapPhaseState = "incompatible"
+	PhaseNotInstalled       BootstrapPhaseState = "not_installed"
+	PhasePartiallyInstalled BootstrapPhaseState = "partially_installed"
+	PhaseFullyInstalled     BootstrapPhaseState = "fully_installed"
+	PhaseConflicting        BootstrapPhaseState = "conflicting"
+	PhaseIncompatible       BootstrapPhaseState = "incompatible"
 )
 
 // ComponentStatus represents the status of a single service component
@@ -59,11 +58,11 @@ type ComponentStatus struct {
 
 // PortConflict represents a port that's already in use
 type PortConflict struct {
-	Port        int
-	ServiceName string
-	ProcessID   int
-	ProcessName string
-	CanStop     bool
+	Port         int
+	ServiceName  string
+	ProcessID    int
+	ProcessName  string
+	CanStop      bool
 	IsEosService bool
 }
 
@@ -78,9 +77,9 @@ type ServiceHealthResponse struct {
 // getRequiredPorts returns the list of ports required for bootstrap
 func getRequiredPorts() []int {
 	return []int{
-		8200,       // Vault
+		8200,                         // Vault
 		8300, 8301, 8302, 8500, 8600, // Consul
-		4646, 4647, 4648,             // Nomad
+		4646, 4647, 4648, // Nomad
 	}
 }
 
@@ -105,7 +104,7 @@ func DetectBootstrapState(rc *eos_io.RuntimeContext) (*BootstrapState, error) {
 	if err != nil {
 		logger.Warn("Service manager detection failed, using fallback", zap.Error(err))
 		// Fallback to old method
-		services := []string{"salt-master", "salt-api", "vault", "consul", "nomad"}
+		services := []string{"-master", "-api", "vault", "consul", "nomad"}
 		for _, service := range services {
 			status := detectComponentStatus(rc, service)
 			state.Components[service] = status
@@ -181,9 +180,9 @@ func detectEosInstallation(rc *eos_io.RuntimeContext) bool {
 
 // hasEosConfiguration checks if services have EOS-specific configurations
 func hasEosConfiguration(rc *eos_io.RuntimeContext) bool {
-	// Check Salt configuration for EOS-specific settings
-	saltConfig := "/etc/salt/master"
-	if data, err := os.ReadFile(saltConfig); err == nil {
+	// Check  configuration for EOS-specific settings
+	Config := "/etc//master"
+	if data, err := os.ReadFile(Config); err == nil {
 		content := string(data)
 		if strings.Contains(content, "eos") || strings.Contains(content, "file_roots:") {
 			return true
@@ -209,8 +208,8 @@ func detectComponentStatus(rc *eos_io.RuntimeContext, serviceName string) *Compo
 	logger.Debug("Detecting component status", zap.String("service", serviceName))
 
 	status := &ComponentStatus{
-		Name:     serviceName,
-		Issues:   []string{},
+		Name:   serviceName,
+		Issues: []string{},
 	}
 
 	// Check if service is installed
@@ -219,7 +218,7 @@ func detectComponentStatus(rc *eos_io.RuntimeContext, serviceName string) *Compo
 	// Check if service is running
 	if status.Installed {
 		status.Running = isServiceRunning(rc, serviceName)
-		
+
 		// Get process information
 		if status.Running {
 			status.ProcessID, status.ProcessName = getServiceProcess(rc, serviceName)
@@ -258,7 +257,7 @@ func isServiceInstalled(rc *eos_io.RuntimeContext, serviceName string) bool {
 		Args:    []string{"-l", serviceName},
 		Capture: true,
 	})
-	
+
 	return err == nil && strings.Contains(output, "ii")
 }
 
@@ -269,7 +268,7 @@ func isServiceRunning(rc *eos_io.RuntimeContext, serviceName string) bool {
 		Args:    []string{"is-active", serviceName},
 		Capture: true,
 	})
-	
+
 	return err == nil && strings.TrimSpace(output) == "active"
 }
 
@@ -280,7 +279,7 @@ func getServiceProcess(rc *eos_io.RuntimeContext, serviceName string) (int, stri
 		Args:    []string{"show", serviceName, "--property=MainPID"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return 0, ""
 	}
@@ -312,7 +311,7 @@ func getProcessName(rc *eos_io.RuntimeContext, pid int) string {
 		Args:    []string{"-p", strconv.Itoa(pid), "-o", "comm="},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return ""
 	}
@@ -329,8 +328,9 @@ func checkServiceHealth(rc *eos_io.RuntimeContext, serviceName string) bool {
 		return checkConsulHealth(rc)
 	case "nomad":
 		return checkNomadHealth(rc)
-	case "salt-master", "salt-api":
-		return checkSaltHealth(rc, serviceName)
+	case "-api":
+		// Migrated to HashiCorp stack - check Consul health instead
+		return checkConsulHealth(rc)
 	default:
 		// For unknown services, assume healthy if running
 		return isServiceRunning(rc, serviceName)
@@ -345,7 +345,7 @@ func checkVaultHealth(rc *eos_io.RuntimeContext) bool {
 		return false
 	}
 	defer resp.Body.Close()
-	
+
 	return resp.StatusCode == 200 || resp.StatusCode == 429 // 429 = sealed but running
 }
 
@@ -357,7 +357,7 @@ func checkConsulHealth(rc *eos_io.RuntimeContext) bool {
 		return false
 	}
 	defer resp.Body.Close()
-	
+
 	return resp.StatusCode == 200
 }
 
@@ -369,32 +369,8 @@ func checkNomadHealth(rc *eos_io.RuntimeContext) bool {
 		return false
 	}
 	defer resp.Body.Close()
-	
+
 	return resp.StatusCode == 200
-}
-
-// checkSaltHealth checks Salt health
-func checkSaltHealth(rc *eos_io.RuntimeContext, serviceName string) bool {
-	// For salt-master, check if it responds to test.ping
-	if serviceName == "salt-master" {
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "salt-call",
-			Args:    []string{"--local", "test.ping"},
-			Capture: true,
-		})
-		return err == nil && strings.Contains(output, "True")
-	}
-
-	// For salt-api, check if port 8000 is responding
-	if serviceName == "salt-api" {
-		conn, err := net.DialTimeout("tcp", "localhost:8000", 5*time.Second)
-		if err == nil {
-			conn.Close()
-			return true
-		}
-	}
-
-	return false
 }
 
 // getServiceVersion gets the version of a service
@@ -406,8 +382,7 @@ func getServiceVersion(rc *eos_io.RuntimeContext, serviceName string) string {
 		return getConsulVersion(rc)
 	case "nomad":
 		return getNomadVersion(rc)
-	case "salt-master", "salt-api":
-		return getSaltVersion(rc)
+
 	default:
 		return ""
 	}
@@ -420,7 +395,7 @@ func getVaultVersion(rc *eos_io.RuntimeContext) string {
 		Args:    []string{"version"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return ""
 	}
@@ -441,7 +416,7 @@ func getConsulVersion(rc *eos_io.RuntimeContext) string {
 		Args:    []string{"version"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return ""
 	}
@@ -465,7 +440,7 @@ func getNomadVersion(rc *eos_io.RuntimeContext) string {
 		Args:    []string{"version"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return ""
 	}
@@ -482,19 +457,19 @@ func getNomadVersion(rc *eos_io.RuntimeContext) string {
 	return ""
 }
 
-// getSaltVersion gets Salt version
-func getSaltVersion(rc *eos_io.RuntimeContext) string {
+// getVersion gets  version
+func getVersion(rc *eos_io.RuntimeContext) string {
 	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt",
+		Command: "",
 		Args:    []string{"--version"},
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return ""
 	}
 
-	// Parse "salt 3004.2" format
+	// Parse " 3004.2" format
 	parts := strings.Fields(output)
 	if len(parts) >= 2 {
 		return parts[1]
@@ -506,11 +481,11 @@ func getSaltVersion(rc *eos_io.RuntimeContext) string {
 // getServicePort gets the main port for a service
 func getServicePort(serviceName string) int {
 	portMap := map[string]int{
-		"salt-master": 4505,
-		"salt-api":    8000,
-		"vault":       8200,
-		"consul":      8500,
-		"nomad":       4646,
+		"-master": 4505,
+		"-api":    8000,
+		"vault":   8200,
+		"consul":  8500,
+		"nomad":   4646,
 	}
 
 	return portMap[serviceName]
@@ -520,10 +495,9 @@ func getServicePort(serviceName string) int {
 func isEosManaged(rc *eos_io.RuntimeContext, serviceName string) bool {
 	// Check for EOS-specific configuration markers
 	configPaths := map[string]string{
-		"salt-master": "/etc/salt/master",
-		"vault":       "/etc/vault/vault.hcl",
-		"consul":      "/etc/consul/consul.hcl",
-		"nomad":       "/etc/nomad/nomad.hcl",
+		"vault":  "/etc/vault/vault.hcl",
+		"consul": "/etc/consul/consul.hcl",
+		"nomad":  "/etc/nomad/nomad.hcl",
 	}
 
 	configPath, exists := configPaths[serviceName]
@@ -592,11 +566,11 @@ func checkPortConflict(rc *eos_io.RuntimeContext, port int) *PortConflict {
 
 	// Generic conflict if we can't parse details
 	return &PortConflict{
-		Port:        port,
-		ServiceName: "unknown",
-		ProcessID:   0,
-		ProcessName: "unknown",
-		CanStop:     false,
+		Port:         port,
+		ServiceName:  "unknown",
+		ProcessID:    0,
+		ProcessName:  "unknown",
+		CanStop:      false,
 		IsEosService: false,
 	}
 }
@@ -656,7 +630,7 @@ func getSystemdServiceByPID(rc *eos_io.RuntimeContext, pid int) string {
 
 // isEosServiceProcess checks if a process belongs to an EOS service
 func isEosServiceProcess(processName string) bool {
-	eosServices := []string{"vault", "consul", "nomad", "salt-master", "salt-api"}
+	eosServices := []string{"vault", "consul", "nomad", "-master", "-api"}
 	for _, service := range eosServices {
 		if processName == service {
 			return true
@@ -757,7 +731,7 @@ func generateRecommendations(state *BootstrapState) []string {
 				}
 			}
 			if len(stoppableServices) > 0 {
-				recommendations = append(recommendations, 
+				recommendations = append(recommendations,
 					fmt.Sprintf("Stop conflicting services: %s", strings.Join(stoppableServices, ", ")))
 				recommendations = append(recommendations, "Run: eos bootstrap --stop-conflicting")
 			}
@@ -822,7 +796,7 @@ func PrintBootstrapStateReport(rc *eos_io.RuntimeContext, state *BootstrapState)
 				status = "⚠️"
 			}
 
-			details := fmt.Sprintf("%s Port %d: %s (PID %d)", 
+			details := fmt.Sprintf("%s Port %d: %s (PID %d)",
 				status, conflict.Port, conflict.ServiceName, conflict.ProcessID)
 			if conflict.CanStop {
 				details += " [Can Stop]"
@@ -869,30 +843,29 @@ func getMainPort(ports []int) int {
 // getConfigPath gets the config path for a service
 func getConfigPath(serviceName string) string {
 	configPaths := map[string]string{
-		"salt-master": "/etc/salt/master",
-		"salt-api":    "/etc/salt/master.d/api.conf",
-		"vault":       "/etc/vault/vault.hcl",
-		"consul":      "/etc/consul/consul.hcl",
-		"nomad":       "/etc/nomad/nomad.hcl",
+
+		"vault":  "/etc/vault/vault.hcl",
+		"consul": "/etc/consul/consul.hcl",
+		"nomad":  "/etc/nomad/nomad.hcl",
 	}
-	
+
 	if path, exists := configPaths[serviceName]; exists {
 		return path
 	}
-	
+
 	return ""
 }
 
 // checkPortConflictEnhanced uses the service manager for enhanced port conflict detection
 func checkPortConflictEnhanced(rc *eos_io.RuntimeContext, sm *ServiceManager, port int) *PortConflict {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	service := sm.getServiceFromPort(port)
 	if service == nil {
 		logger.Debug("Port is free", zap.Int("port", port))
 		return nil // Port is free
 	}
-	
+
 	logger.Debug("Port conflict detected",
 		zap.Int("port", port),
 		zap.String("service_name", service.Name),
@@ -901,7 +874,7 @@ func checkPortConflictEnhanced(rc *eos_io.RuntimeContext, sm *ServiceManager, po
 		zap.Int("pid", service.PID),
 		zap.Bool("can_stop", service.CanStop),
 		zap.Bool("is_eos_managed", service.Managed))
-	
+
 	return &PortConflict{
 		Port:         port,
 		ServiceName:  service.Name,

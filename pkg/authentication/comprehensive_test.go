@@ -809,7 +809,7 @@ func generateSessionID() string {
 
 // Mock implementations
 func HashPassword(password string) (string, error) {
-	// Use proper bcrypt hashing with random salt
+	// Use proper bcrypt hashing with random
 	cost := 12
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 type Layer string
 
 const (
-	LayerSalt      Layer = "salt"
+	LayerUnknown   Layer = ""
 	LayerTerraform Layer = "terraform"
 	LayerNomad     Layer = "nomad"
 	LayerEos       Layer = "eos"
@@ -29,35 +29,35 @@ const (
 
 // OrchestrationError provides detailed error information with remediation suggestions
 type OrchestrationError struct {
-	Layer       Layer  `json:"layer"`
-	Phase       Phase  `json:"phase"`
-	Component   string `json:"component"`
-	Message     string `json:"message"`
-	Original    error  `json:"-"`
-	Remediation string `json:"remediation"`
+	Layer       Layer                  `json:"layer"`
+	Phase       Phase                  `json:"phase"`
+	Component   string                 `json:"component"`
+	Message     string                 `json:"message"`
+	Original    error                  `json:"-"`
+	Remediation string                 `json:"remediation"`
 	Details     map[string]interface{} `json:"details,omitempty"`
 }
 
 // Error implements the error interface
 func (e *OrchestrationError) Error() string {
 	var sb strings.Builder
-	
+
 	sb.WriteString(fmt.Sprintf("%s error during %s", e.Layer, e.Phase))
-	
+
 	if e.Component != "" {
 		sb.WriteString(fmt.Sprintf(" for component '%s'", e.Component))
 	}
-	
+
 	sb.WriteString(fmt.Sprintf(": %s", e.Message))
-	
+
 	if e.Original != nil {
 		sb.WriteString(fmt.Sprintf("\nCaused by: %v", e.Original))
 	}
-	
+
 	if e.Remediation != "" {
 		sb.WriteString(fmt.Sprintf("\nSuggested fix: %s", e.Remediation))
 	}
-	
+
 	return sb.String()
 }
 
@@ -76,61 +76,28 @@ func NewOrchestrationError(layer Layer, phase Phase, component, message string, 
 		Original:  original,
 		Details:   make(map[string]interface{}),
 	}
-	
+
 	// Add automatic remediation suggestions based on layer and phase
-	err.Remediation = getSuggestedRemediation(layer, phase, message)
-	
+	err.Remediation = getSuggestedRemediation(string(layer), string(phase), message)
+
 	return err
 }
 
-// getSuggestedRemediation provides context-aware remediation suggestions
-func getSuggestedRemediation(layer Layer, phase Phase, message string) string {
-	// Salt-specific remediations
-	if layer == LayerSalt {
-		switch phase {
-		case PhaseValidation:
-			return "Run 'eos debug salt-states <component>' to validate generated states"
-		case PhaseApplication:
-			if strings.Contains(message, "minion") {
-				return "Check Salt minion connectivity with 'salt-key -L' and 'salt '*' test.ping'"
-			}
-			return "Check Salt master logs at /var/log/salt/master and run 'salt-run jobs.active'"
-		case PhaseVerification:
-			return "Run 'salt '*' state.show_sls <component>' to debug state compilation"
-		}
+// getSuggestedRemediation provides automatic remediation suggestions based on error context
+func getSuggestedRemediation(layer, phase, message string) string {
+	// Simple remediation suggestions based on common patterns
+	switch {
+	case strings.Contains(message, "connection refused"):
+		return "Check if the service is running and network connectivity is available"
+	case strings.Contains(message, "permission denied"):
+		return "Verify user permissions and run with appropriate privileges"
+	case strings.Contains(message, "not found"):
+		return "Ensure the required resource or service is properly installed and configured"
+	case strings.Contains(message, "timeout"):
+		return "Check network connectivity and increase timeout values if necessary"
+	default:
+		return fmt.Sprintf("Review %s configuration in %s phase", layer, phase)
 	}
-	
-	// Terraform-specific remediations
-	if layer == LayerTerraform {
-		switch phase {
-		case PhaseValidation:
-			return "Run 'eos create <component> --dry-run --show-terraform' to see generated config"
-		case PhaseApplication:
-			if strings.Contains(message, "lock") {
-				return "Another operation may be in progress. Check with 'terraform show' or force unlock"
-			}
-			return "Check Terraform state with 'terraform state list' and logs in .terraform/logs"
-		case PhaseVerification:
-			return "Run 'terraform plan' manually to see pending changes"
-		}
-	}
-	
-	// Nomad-specific remediations
-	if layer == LayerNomad {
-		switch phase {
-		case PhaseValidation:
-			return "Validate job spec with 'nomad job validate <jobfile>'"
-		case PhaseApplication:
-			if strings.Contains(message, "allocation") {
-				return "Check allocations with 'nomad job status <job>' and 'nomad alloc logs <alloc-id>'"
-			}
-			return "Check Nomad server status with 'nomad server members'"
-		case PhaseVerification:
-			return "Monitor job health with 'nomad job status -verbose <job>'"
-		}
-	}
-	
-	return "Run 'eos debug orchestration --component <name>' for detailed diagnostics"
 }
 
 // ErrorChain represents a chain of errors that occurred during orchestration
@@ -143,14 +110,14 @@ func (ec *ErrorChain) Error() string {
 	if len(ec.Errors) == 0 {
 		return "no errors"
 	}
-	
+
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Orchestration failed with %d error(s):\n", len(ec.Errors)))
-	
+
 	for i, err := range ec.Errors {
 		sb.WriteString(fmt.Sprintf("\n%d. %s", i+1, err.Error()))
 	}
-	
+
 	return sb.String()
 }
 
@@ -188,9 +155,9 @@ func (ec *ErrorChain) GetByPhase(phase Phase) []*OrchestrationError {
 
 // ValidationError represents a validation failure
 type ValidationError struct {
-	Field   string `json:"field"`
+	Field   string      `json:"field"`
 	Value   interface{} `json:"value"`
-	Message string `json:"message"`
+	Message string      `json:"message"`
 }
 
 // Error implements the error interface
@@ -208,12 +175,12 @@ func (ve *ValidationErrors) Error() string {
 	if len(ve.Errors) == 0 {
 		return "no validation errors"
 	}
-	
+
 	var messages []string
 	for _, err := range ve.Errors {
 		messages = append(messages, err.Error())
 	}
-	
+
 	return fmt.Sprintf("validation failed: %s", strings.Join(messages, "; "))
 }
 

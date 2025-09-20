@@ -17,7 +17,7 @@ import (
 // AssessInfrastructure assesses what infrastructure exists and creates a removal plan
 func AssessInfrastructure(rc *eos_io.RuntimeContext, config *Config) (*RemovalPlan, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check current infrastructure state
 	logger.Info("Assessing infrastructure for removal",
 		zap.Bool("dev_mode", config.DevMode),
@@ -128,7 +128,7 @@ func filterComponents(components []state.Component, excluded map[string]bool) []
 func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 	// Use a map to prevent duplicates
 	serviceMap := make(map[string]ServiceConfig)
-	
+
 	// Add services from components with removal functions
 	for _, svc := range osquery.GetOsqueryServices() {
 		serviceMap[svc.Name] = ServiceConfig{
@@ -137,7 +137,7 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 			Required:  svc.Required,
 		}
 	}
-	
+
 	for _, svc := range boundary.GetBoundaryServices() {
 		serviceMap[svc.Name] = ServiceConfig{
 			Name:      svc.Name,
@@ -145,7 +145,7 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 			Required:  svc.Required,
 		}
 	}
-	
+
 	for _, svc := range docker.GetDockerServices() {
 		serviceMap[svc.Name] = ServiceConfig{
 			Name:      svc.Name,
@@ -153,7 +153,7 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 			Required:  svc.Required,
 		}
 	}
-	
+
 	// EOS services removed - no longer needed
 	// for _, svc := range eos.GetEosServices() {
 	// 	serviceMap[svc.Name] = ServiceConfig{
@@ -162,28 +162,28 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 	// 		Required:  svc.Required,
 	// 	}
 	// }
-	
+
 	// Add hardcoded services that already have proper lifecycle managers
 	hardcodedServices := []ServiceConfig{
 		{Name: "nomad", Component: "nomad", Required: false},
 		{Name: "consul", Component: "consul", Required: false},
 		{Name: "vault", Component: "vault", Required: false},
-		{Name: "salt-minion", Component: "salt", Required: false},
-		{Name: "salt-master", Component: "salt", Required: false},
+		{Name: "-minion", Component: "", Required: false},
+		{Name: "-master", Component: "", Required: false},
 		{Name: "hecate-caddy", Component: "hecate", Required: false},
 		{Name: "hecate-authentik", Component: "hecate", Required: false},
 		{Name: "hecate-redis", Component: "hecate", Required: false},
 		{Name: "hecate-postgres", Component: "hecate", Required: false},
 	}
-	
+
 	for _, svc := range hardcodedServices {
 		serviceMap[svc.Name] = svc
 	}
-	
+
 	// Skip adding services from GetAdditionalServicesConfigs here
 	// because they're already handled in Phase 2 by removeAdditionalServices
 	// This prevents duplicate service removal attempts
-	
+
 	// Convert map to slice and filter excluded services
 	var removable []ServiceConfig
 	for _, svc := range serviceMap {
@@ -191,14 +191,14 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 			removable = append(removable, svc)
 		}
 	}
-	
+
 	return removable
 }
 
 // getRemovableDirectoriesDynamic dynamically discovers directories from all components
 func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []DirectoryConfig {
 	var allDirectories []DirectoryConfig
-	
+
 	// Add directories from components with removal functions
 	for _, dir := range osquery.GetOsqueryDirectories() {
 		allDirectories = append(allDirectories, DirectoryConfig{
@@ -208,7 +208,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 			Description: dir.Description,
 		})
 	}
-	
+
 	for _, dir := range boundary.GetBoundaryDirectories() {
 		allDirectories = append(allDirectories, DirectoryConfig{
 			Path:        dir.Path,
@@ -217,7 +217,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 			Description: dir.Description,
 		})
 	}
-	
+
 	for _, dir := range docker.GetDockerDirectories() {
 		allDirectories = append(allDirectories, DirectoryConfig{
 			Path:        dir.Path,
@@ -226,7 +226,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 			Description: dir.Description,
 		})
 	}
-	
+
 	for _, dir := range terraform.GetTerraformDirectories() {
 		allDirectories = append(allDirectories, DirectoryConfig{
 			Path:        dir.Path,
@@ -235,7 +235,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 			Description: dir.Description,
 		})
 	}
-	
+
 	for _, dir := range packer.GetPackerDirectories() {
 		allDirectories = append(allDirectories, DirectoryConfig{
 			Path:        dir.Path,
@@ -244,7 +244,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 			Description: dir.Description,
 		})
 	}
-	
+
 	// EOS directories removed - no longer needed
 	// for _, dir := range eos.GetEosDirectories() {
 	// 	allDirectories = append(allDirectories, DirectoryConfig{
@@ -254,15 +254,15 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 	// 		Description: dir.Description,
 	// 	})
 	// }
-	
+
 	// Add hardcoded directories for components with proper lifecycle managers
 	// These will be removed once all components implement the lifecycle interface
 	allDirectories = append(allDirectories, []DirectoryConfig{
-		{Path: "/srv/salt", Component: "salt", IsData: false, Description: "Salt states directory"},
-		{Path: "/srv/pillar", Component: "salt", IsData: false, Description: "Salt pillar directory"},
-		{Path: "/etc/salt", Component: "salt", IsData: false, Description: "Salt configuration directory"},
-		{Path: "/var/log/salt", Component: "salt", IsData: true, Description: "Salt log directory"},
-		{Path: "/var/cache/salt", Component: "salt", IsData: true, Description: "Salt cache directory"},
+		{Path: "/srv/", Component: "", IsData: false, Description: " states directory"},
+		{Path: "/srv/", Component: "", IsData: false, Description: "  directory"},
+		{Path: "/etc/", Component: "", IsData: false, Description: " configuration directory"},
+		{Path: "/var/log/", Component: "", IsData: true, Description: " log directory"},
+		{Path: "/var/cache/", Component: "", IsData: true, Description: " cache directory"},
 		{Path: "/opt/vault", Component: "vault", IsData: false, Description: "Vault binary directory"},
 		{Path: "/opt/vault/data", Component: "vault", IsData: true, Description: "Vault data directory"},
 		{Path: "/etc/vault.d", Component: "vault", IsData: false, Description: "Vault configuration directory"},
@@ -273,7 +273,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 		{Path: "/opt/consul/data", Component: "consul", IsData: true, Description: "Consul data directory"},
 		{Path: "/etc/consul.d", Component: "consul", IsData: false, Description: "Consul configuration directory"},
 	}...)
-	
+
 	// Filter directories
 	var removable []DirectoryConfig
 	for _, dir := range allDirectories {
@@ -281,14 +281,14 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 		if excluded[dir.Component] {
 			continue
 		}
-		
+
 		// Skip data directories if keepData is true
 		if dir.IsData && keepData {
 			continue
 		}
-		
+
 		removable = append(removable, dir)
 	}
-	
+
 	return removable
 }

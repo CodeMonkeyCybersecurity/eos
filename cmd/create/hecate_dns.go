@@ -13,6 +13,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// getEnvOrDefault gets environment variable or returns default value
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	hetznerDNSDomain string
@@ -130,10 +138,10 @@ Then, run this command again.
 func init() {
 	hetznerWildcardCmd.Flags().StringVar(&hetznerDNSDomain, "domain", "", "Root domain name (e.g. example.com)")
 	hetznerWildcardCmd.Flags().StringVar(&hetznerDNSIP, "ip", "", "IP address for the A record")
-	
+
 	// Add the modern DNS command to Hecate
 	CreateHecateCmd.AddCommand(createHecateDNSCmd)
-	
+
 	// Add flags for the DNS command
 	createHecateDNSCmd.Flags().String("domain", "", "Domain name for the DNS record (prompted if not provided)")
 	createHecateDNSCmd.Flags().String("target", "", "Target IP address (prompted if not provided)")
@@ -148,7 +156,7 @@ var createHecateDNSCmd = &cobra.Command{
 	Long: `Create a DNS record using the Hecate DNS manager with Terraform integration.
 
 This command creates DNS records via Terraform with automatic reconciliation and tracking.
-DNS records are managed in Consul and automatically deployed via SaltStack.
+DNS records are managed in Consul and automatically deployed via .
 
 Examples:
   eos create hecate dns --domain app.example.com --target 1.2.3.4
@@ -199,7 +207,7 @@ func runCreateHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// Create DNS manager and record
 	dm := hecate.NewDNSManager(client)
-	
+
 	logger.Info("Creating DNS record",
 		zap.String("domain", domain),
 		zap.String("target", target))

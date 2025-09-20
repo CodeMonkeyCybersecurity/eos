@@ -291,10 +291,10 @@ func (dm *DNSManager) createDNSRecord(ctx context.Context, domain, target string
 				zap.String("target", target))
 			return nil
 		}
-		return fmt.Errorf("DNS record already exists for domain %s with different target %s", domain, existing.Value)
+		return fmt.Errorf("dns record already exists for domain %s with different target %s", domain, existing.Value)
 	}
 
-	// Create DNS record via Salt state (which applies via Terraform)
+	// Create DNS record via  state (which applies via Terraform)
 	state := map[string]interface{}{
 		"dns_record": map[string]interface{}{
 			"domain": domain,
@@ -308,9 +308,9 @@ func (dm *DNSManager) createDNSRecord(ctx context.Context, domain, target string
 		zap.String("domain", domain),
 		zap.String("target", target))
 
-	// Apply Salt state to create DNS record
-	if err := dm.client.salt.ApplyState(ctx, "hecate.dns", state); err != nil {
-		return fmt.Errorf("failed to apply DNS creation state: %w", err)
+	// Store DNS configuration in Consul KV for administrator review
+	if err := dm.storeDNSConfigInConsul(ctx, "hecate.dns", state); err != nil {
+		return fmt.Errorf("failed to store DNS configuration: %w", err)
 	}
 
 	// Track DNS record in Consul
@@ -383,16 +383,16 @@ func (dm *DNSManager) deleteDNSRecord(ctx context.Context, domain string) error 
 		backup = existing
 	}
 
-	// Remove DNS record via Terraform by removing from Salt state
+	// Remove DNS record via Terraform by removing from  state
 	state := map[string]interface{}{
 		"dns_record_remove": map[string]interface{}{
 			"domain": domain,
 		},
 	}
 
-	// Apply Salt state to remove DNS record
-	if err := dm.client.salt.ApplyState(ctx, "hecate.dns_remove", state); err != nil {
-		return fmt.Errorf("failed to apply DNS removal state: %w", err)
+	// Store DNS removal configuration in Consul KV for administrator review
+	if err := dm.storeDNSConfigInConsul(ctx, "hecate.dns_remove", state); err != nil {
+		return fmt.Errorf("failed to store DNS removal configuration: %w", err)
 	}
 
 	// Remove from our Consul tracking
@@ -494,7 +494,7 @@ func (dm *DNSManager) getDNSRecord(ctx context.Context, domain string) (*DNSReco
 	}
 
 	if data == nil {
-		return nil, fmt.Errorf("DNS record not found")
+		return nil, fmt.Errorf("dns record not found")
 	}
 
 	var record DNSRecord
@@ -511,14 +511,14 @@ func (dm *DNSManager) rollbackDNSCreation(ctx context.Context, domain string) er
 	logger.Warn("Rolling back DNS record creation",
 		zap.String("domain", domain))
 
-	// Remove DNS record via Salt state
+	// Remove DNS record via  state
 	state := map[string]interface{}{
 		"dns_record_remove": map[string]interface{}{
 			"domain": domain,
 		},
 	}
 
-	if err := dm.client.salt.ApplyState(ctx, "hecate.dns_remove", state); err != nil {
+	if err := dm.storeDNSConfigInConsul(ctx, "hecate.dns_remove", state); err != nil {
 		logger.Error("Failed to rollback DNS record creation",
 			zap.String("domain", domain),
 			zap.Error(err))
@@ -531,30 +531,6 @@ func (dm *DNSManager) rollbackDNSCreation(ctx context.Context, domain string) er
 	return nil
 }
 
-// verifyDNSRecord checks if a DNS record is properly propagated
-func (dm *DNSManager) verifyDNSRecord(ctx context.Context, domain, expectedTarget string) error {
-	logger := otelzap.Ctx(dm.client.rc.Ctx)
-	logger.Debug("Verifying DNS record propagation",
-		zap.String("domain", domain),
-		zap.String("expected_target", expectedTarget))
-
-	// This is a simplified verification - in production you'd do actual DNS lookups
-	// For now, we just check if the record exists in our Consul state
-	record, err := dm.getDNSRecord(ctx, domain)
-	if err != nil {
-		return fmt.Errorf("DNS record not found in state: %w", err)
-	}
-
-	if record.Value != expectedTarget {
-		return fmt.Errorf("DNS record has wrong target: expected %s, got %s", expectedTarget, record.Value)
-	}
-
-	logger.Debug("DNS record verification successful",
-		zap.String("domain", domain),
-		zap.String("target", record.Value))
-
-	return nil
-}
 
 // retryDNSOperation performs a DNS operation with exponential backoff retry
 func (dm *DNSManager) retryDNSOperation(ctx context.Context, operation string, fn func() error) error {
@@ -574,7 +550,7 @@ func (dm *DNSManager) retryDNSOperation(ctx context.Context, operation string, f
 				zap.String("operation", operation),
 				zap.Int("attempts", maxRetries),
 				zap.Error(err))
-			return fmt.Errorf("DNS operation %s failed after %d attempts: %w", operation, maxRetries, err)
+			return fmt.Errorf("dns operation %s failed after %d attempts: %w", operation, maxRetries, err)
 		}
 		
 		delay := baseDelay * time.Duration(1<<attempt) // Exponential backoff
@@ -592,19 +568,14 @@ func (dm *DNSManager) retryDNSOperation(ctx context.Context, operation string, f
 		}
 	}
 	
-	return fmt.Errorf("DNS operation %s failed after %d attempts", operation, maxRetries)
+	return fmt.Errorf("dns operation %s failed after %d attempts", operation, maxRetries)
 }
 
 // validateDNSOperationPreconditions checks if a DNS operation can be performed
 func (dm *DNSManager) validateDNSOperationPreconditions(ctx context.Context) error {
-	// Check if Salt client is available
-	if dm.client.salt == nil {
-		return fmt.Errorf("Salt client not available")
-	}
-	
-	// Check if Consul client is available
+	// Check if HashiCorp clients are available
 	if dm.client.consul == nil {
-		return fmt.Errorf("Consul client not available")
+		return fmt.Errorf("consul client not available")
 	}
 	
 	// Check if context is not cancelled
@@ -618,7 +589,7 @@ func (dm *DNSManager) validateDNSOperationPreconditions(ctx context.Context) err
 // CreateDNSRecordWithRetry creates a DNS record with retry logic
 func (dm *DNSManager) CreateDNSRecordWithRetry(ctx context.Context, domain, target string) error {
 	if err := dm.validateDNSOperationPreconditions(ctx); err != nil {
-		return fmt.Errorf("DNS operation preconditions failed: %w", err)
+		return fmt.Errorf("dns operation preconditions failed: %w", err)
 	}
 	
 	return dm.retryDNSOperation(ctx, "create", func() error {
@@ -629,12 +600,49 @@ func (dm *DNSManager) CreateDNSRecordWithRetry(ctx context.Context, domain, targ
 // DeleteDNSRecordWithRetry deletes a DNS record with retry logic
 func (dm *DNSManager) DeleteDNSRecordWithRetry(ctx context.Context, domain string) error {
 	if err := dm.validateDNSOperationPreconditions(ctx); err != nil {
-		return fmt.Errorf("DNS operation preconditions failed: %w", err)
+		return fmt.Errorf("dns operation preconditions failed: %w", err)
 	}
 	
 	return dm.retryDNSOperation(ctx, "delete", func() error {
 		return dm.deleteDNSRecord(ctx, domain)
 	})
+}
+
+// storeDNSConfigInConsul stores DNS configuration in Consul KV for administrator review
+func (dm *DNSManager) storeDNSConfigInConsul(ctx context.Context, operation string, config map[string]interface{}) error {
+	logger := otelzap.Ctx(ctx)
+	
+	// Create configuration entry with metadata
+	configEntry := map[string]interface{}{
+		"operation":   operation,
+		"config":      config,
+		"created_at":  time.Now().UTC(),
+		"status":      "pending_admin_review",
+		"description": fmt.Sprintf("DNS %s operation requires administrator intervention", operation),
+	}
+	
+	// Marshal configuration to JSON
+	configJSON, err := json.Marshal(configEntry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal DNS configuration: %w", err)
+	}
+	
+	// Store in Consul KV
+	consulKey := fmt.Sprintf("hecate/dns-operations/%s-%d", operation, time.Now().Unix())
+	_, err = dm.client.consul.KV().Put(&api.KVPair{
+		Key:   consulKey,
+		Value: configJSON,
+	}, nil)
+	
+	if err != nil {
+		return fmt.Errorf("failed to store DNS configuration in Consul: %w", err)
+	}
+	
+	logger.Info("DNS configuration stored in Consul for administrator review",
+		zap.String("consul_key", consulKey),
+		zap.String("operation", operation))
+	
+	return nil
 }
 
 // DNSMetrics represents DNS management metrics

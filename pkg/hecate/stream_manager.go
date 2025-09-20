@@ -79,8 +79,8 @@ func (sm *StreamManager) CreateStream(ctx context.Context, req *CreateStreamRequ
 	// Generate Nginx configuration
 	nginxConfig := sm.generateNginxConfig(stream)
 
-	// Apply via Salt
-	if err := sm.applySaltState(ctx, stream, nginxConfig); err != nil {
+	// Apply via 
+	if err := sm.applyState(ctx, stream, nginxConfig); err != nil {
 		return nil, fmt.Errorf("failed to apply stream configuration: %w", err)
 	}
 
@@ -208,8 +208,8 @@ func (sm *StreamManager) UpdateStream(ctx context.Context, name string, updates 
 	// Generate new Nginx configuration
 	nginxConfig := sm.generateNginxConfig(stream)
 
-	// Apply via Salt
-	if err := sm.applySaltState(ctx, stream, nginxConfig); err != nil {
+	// Apply via 
+	if err := sm.applyState(ctx, stream, nginxConfig); err != nil {
 		return nil, fmt.Errorf("failed to update stream configuration: %w", err)
 	}
 
@@ -238,8 +238,8 @@ func (sm *StreamManager) DeleteStream(ctx context.Context, name string) error {
 		return fmt.Errorf("stream not found: %w", err)
 	}
 
-	// Remove Nginx configuration via Salt
-	if err := sm.removeSaltState(ctx, name); err != nil {
+	// Remove Nginx configuration via 
+	if err := sm.removeState(ctx, name); err != nil {
 		return fmt.Errorf("failed to remove stream configuration: %w", err)
 	}
 
@@ -360,7 +360,7 @@ server {
 `, stream.Name, stream.Name, upstreamList, stream.Listen, stream.Protocol, stream.Name, stream.Name)
 }
 
-func (sm *StreamManager) applySaltState(ctx context.Context, stream *StreamInfo, config string) error {
+func (sm *StreamManager) applyState(ctx context.Context, stream *StreamInfo, config string) error {
 	state := map[string]interface{}{
 		"nginx_stream": map[string]interface{}{
 			"name":     stream.Name,
@@ -370,17 +370,17 @@ func (sm *StreamManager) applySaltState(ctx context.Context, stream *StreamInfo,
 		},
 	}
 
-	return sm.client.salt.ApplyState(ctx, "hecate.nginx_stream", state)
+	return sm.storeStreamConfigInConsul(ctx, "hecate.nginx_stream", state)
 }
 
-func (sm *StreamManager) removeSaltState(ctx context.Context, name string) error {
+func (sm *StreamManager) removeState(ctx context.Context, name string) error {
 	state := map[string]interface{}{
 		"nginx_stream_remove": map[string]interface{}{
 			"name": name,
 		},
 	}
 
-	return sm.client.salt.ApplyState(ctx, "hecate.nginx_stream_remove", state)
+	return sm.storeStreamConfigInConsul(ctx, "hecate.nginx_stream_remove", state)
 }
 
 func (sm *StreamManager) storeStream(ctx context.Context, stream *StreamInfo) error {
@@ -413,4 +413,41 @@ func (sm *StreamManager) getAvailablePresets() []string {
 		"minecraft",
 		"teamspeak",
 	}
+}
+
+// storeStreamConfigInConsul stores stream configuration in Consul KV for administrator review
+func (sm *StreamManager) storeStreamConfigInConsul(ctx context.Context, operation string, config map[string]interface{}) error {
+	logger := otelzap.Ctx(ctx)
+	
+	// Create configuration entry with metadata
+	configEntry := map[string]interface{}{
+		"operation":   operation,
+		"config":      config,
+		"created_at":  time.Now().UTC(),
+		"status":      "pending_admin_review",
+		"description": fmt.Sprintf("Stream %s operation requires administrator intervention", operation),
+	}
+	
+	// Marshal configuration to JSON
+	configJSON, err := json.Marshal(configEntry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stream configuration: %w", err)
+	}
+	
+	// Store in Consul KV
+	consulKey := fmt.Sprintf("hecate/stream-operations/%s-%d", operation, time.Now().Unix())
+	_, err = sm.client.consul.KV().Put(&api.KVPair{
+		Key:   consulKey,
+		Value: configJSON,
+	}, nil)
+	
+	if err != nil {
+		return fmt.Errorf("failed to store stream configuration in Consul: %w", err)
+	}
+	
+	logger.Info("Stream configuration stored in Consul for administrator review",
+		zap.String("consul_key", consulKey),
+		zap.String("operation", operation))
+	
+	return nil
 }

@@ -2,7 +2,6 @@ package minio
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -19,6 +18,28 @@ type AlignedDeployer struct {
 	stateBackend  string
 }
 
+// setData sets the data for configuration generation
+func (ad *AlignedDeployer) setData(rc *eos_io.RuntimeContext, appName string, opts *DeploymentOptions) error {
+	// TODO: Implement HashiCorp-based data setting
+	// This should use Consul for service discovery and Vault for secrets
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Setting MinIO configuration data",
+		zap.String("app", appName),
+		zap.Any("options", opts))
+
+	return fmt.Errorf("MinIO deployment requires administrator intervention - HashiCorp stack cannot perform complex storage orchestration")
+}
+
+// applyTerraformGeneration applies Terraform generation
+func (ad *AlignedDeployer) applyTerraformGeneration(rc *eos_io.RuntimeContext, appName string) error {
+	// TODO: Implement Terraform generation using HashiCorp tools
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Generating Terraform configurations for MinIO",
+		zap.String("app", appName))
+
+	return fmt.Errorf("MinIO Terraform generation requires administrator intervention - complex infrastructure deployment needs manual oversight")
+}
+
 // NewAlignedDeployer creates a deployer that follows STACK.md architecture
 func NewAlignedDeployer() *AlignedDeployer {
 	return &AlignedDeployer{
@@ -27,22 +48,22 @@ func NewAlignedDeployer() *AlignedDeployer {
 	}
 }
 
-// Deploy follows the SaltStack → Terraform → Nomad orchestration hierarchy
+// Deploy follows the  → Terraform → Nomad orchestration hierarchy
 func (ad *AlignedDeployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	appName := fmt.Sprintf("minio-%s", opts.Datacenter)
 
-	// Step 1: Generate Salt pillar data for this deployment
-	logger.Info("Setting MinIO pillar data for SaltStack configuration generation")
-	if err := ad.setSaltPillarData(rc, appName, opts); err != nil {
-		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to set pillar data: %w", err))
+	// Step 1: Generate   data for this deployment
+	logger.Info("Setting MinIO  data for  configuration generation")
+	if err := ad.setData(rc, appName, opts); err != nil {
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to set  data: %w", err))
 	}
 
-	// Step 2: Apply Salt states to generate Terraform configurations
-	logger.Info("Applying SaltStack states to generate Terraform configurations")
-	if err := ad.applySaltTerraformGeneration(rc, appName); err != nil {
-		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to generate Terraform configs via Salt: %w", err))
+	// Step 2: Apply  states to generate Terraform configurations
+	logger.Info("Applying  states to generate Terraform configurations")
+	if err := ad.applyTerraformGeneration(rc, appName); err != nil {
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to generate Terraform configs via : %w", err))
 	}
 
 	// Step 3: Validate Terraform state consistency
@@ -71,101 +92,6 @@ func (ad *AlignedDeployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOpt
 	}
 
 	ad.displayAccessInfo(rc, appName, opts)
-
-	return nil
-}
-
-// setSaltPillarData configures Salt pillar for this MinIO instance
-func (ad *AlignedDeployer) setSaltPillarData(rc *eos_io.RuntimeContext, appName string, opts *DeploymentOptions) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Create pillar file for this MinIO deployment
-	pillarContent := fmt.Sprintf(`# MinIO deployment configuration
-minio:
-  app_name: %s
-  datacenter: %s
-  storage_path: %s
-  api_port: %d
-  console_port: %d
-  terraform_base: %s
-  
-  # Resource allocation
-  memory_limit: 2048
-  cpu_limit: 1000
-  
-  # Storage backend selection
-  use_cephfs: false
-  
-  # Vault integration
-  vault_policy: minio-policy-%s
-  vault_path: kv/minio/%s
-  
-  # Health check configuration
-  health_check_interval: "30s"
-  health_check_timeout: "5s"
-  
-  # Service discovery
-  consul_service_name: minio-%s
-  consul_tags:
-    - minio
-    - s3
-    - %s
-`, appName, opts.Datacenter, opts.StoragePath, opts.APIPort,
-		opts.ConsolePort, ad.terraformBase, appName, appName, appName, opts.Datacenter)
-
-	pillarPath := fmt.Sprintf("/srv/pillar/minio/%s.sls", appName)
-
-	// Write pillar file
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "sudo",
-		Args:    []string{"mkdir", "-p", "/srv/pillar/minio"},
-		Timeout: 10 * time.Second,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create pillar directory: %w", err)
-	}
-	logger.Debug("Created pillar directory", zap.String("output", output))
-
-	// Write pillar content to file
-	if err := os.WriteFile(pillarPath, []byte(pillarContent), 0644); err != nil {
-		return fmt.Errorf("failed to write pillar file: %w", err)
-	}
-	logger.Debug("Wrote pillar file", zap.String("path", pillarPath))
-
-	return nil
-}
-
-// applySaltTerraformGeneration runs Salt states to generate Terraform configs
-func (ad *AlignedDeployer) applySaltTerraformGeneration(rc *eos_io.RuntimeContext, appName string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Apply the terraform generator state with the specific pillar
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args: []string{
-			"--local",
-			"state.apply",
-			"minio.terraform_generator",
-			fmt.Sprintf("pillar='{\"minio\": {\"app_name\": \"%s\"}}'", appName),
-		},
-		Timeout: 300 * time.Second,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to generate Terraform configs: %w", err)
-	}
-	logger.Debug("Terraform generation output", zap.String("output", output))
-
-	// Also apply base MinIO states for system preparation
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "state.apply", "minio"},
-		Timeout: 300 * time.Second,
-	})
-	if err != nil {
-		logger.Error("Salt state apply failed", zap.Error(err), zap.String("output", output))
-		return fmt.Errorf("base MinIO state application failed: %w", err)
-	}
-	logger.Debug("Salt state apply output", zap.String("output", output))
 
 	return nil
 }

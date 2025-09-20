@@ -1,6 +1,6 @@
 // pkg/terraform/terraform.go
 //
-// EOS Infrastructure Compiler - Terraform Integration
+// # EOS Infrastructure Compiler - Terraform Integration
 //
 // This package implements comprehensive Terraform integration for the EOS
 // infrastructure compiler, providing unified state management and orchestration
@@ -12,7 +12,6 @@
 //
 // ```
 // eos-infrastructure/
-// ├── salt/
 // │   ├── orchestrate/
 // │   │   ├── init.sls
 // │   │   ├── deploy.sls
@@ -54,9 +53,7 @@
 // - Comprehensive rollback capabilities
 // - Audit trail for all changes
 //
-// **SaltStack Orchestration:**
-// - Salt states call Terraform via eos_terraform.py module
-// - Configuration flows: Pillar → TF vars → Resources
+// - Configuration flows:  → TF vars → Resources
 // - Dependency management and ordering
 // - Error handling and recovery
 //
@@ -70,7 +67,6 @@
 // ## Implementation Status
 //
 // - ✅ Terraform state management implemented
-// - ✅ SaltStack orchestration integration operational
 // - ✅ Component modules for HashiCorp stack active
 // - ✅ Environment-specific configurations implemented
 // - ✅ Unified deployment and rollback capabilities operational
@@ -79,7 +75,6 @@
 // - cmd/create/terraform_workflow.go - Terraform workflow orchestration
 // - pkg/hecate/terraform_config.go - Hecate Terraform configuration
 // - pkg/vault/ - Vault Terraform integration and PKI management
-//
 package terraform
 
 import (

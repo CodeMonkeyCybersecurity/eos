@@ -40,7 +40,7 @@ The following hardcoded ports were found across the codebase. These should be mi
 
 - **Location**: Multiple vault-related files
   - Port 8200: Used extensively in test files and configurations
-  - Port 8179: Used in Salt deployment configurations
+  - Port 8179: Used in  deployment configurations
 
 ### 4. Consul Services
 - **Location**: `pkg/terraform/consul_templates.go`
@@ -99,7 +99,7 @@ The following hardcoded ports were found across the codebase. These should be mi
   - Port 8080: Build service default
 
 ### 9. Nomad Services
-- **Location**: `pkg/nomad/deploy.go`, `salt_installer.go`
+- **Location**: `pkg/nomad/deploy.go`, `_installer.go`
   - Port 4647: Nomad server (non-standard, typically 4646)
 
 - **Location**: `pkg/orchestrator/terraform/provider.go`

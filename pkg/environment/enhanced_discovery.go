@@ -18,11 +18,11 @@ type DeploymentProfile string
 
 const (
 	// Single-node deployments
-	ProfileDevelopment DeploymentProfile = "development"     // 1 node, all services
-	ProfileSingleNode  DeploymentProfile = "single-node"    // 1 node, production workload
-	ProfileHomelab     DeploymentProfile = "homelab"        // 1-2 nodes, personal/learning
-	
-	// Multi-node deployments  
+	ProfileDevelopment DeploymentProfile = "development" // 1 node, all services
+	ProfileSingleNode  DeploymentProfile = "single-node" // 1 node, production workload
+	ProfileHomelab     DeploymentProfile = "homelab"     // 1-2 nodes, personal/learning
+
+	// Multi-node deployments
 	ProfileSmallCluster DeploymentProfile = "small-cluster" // 3-5 nodes, small business
 	ProfileEnterprise   DeploymentProfile = "enterprise"    // 6+ nodes, full separation
 	ProfileCloud        DeploymentProfile = "cloud"         // Auto-scaling, cloud-native
@@ -30,9 +30,9 @@ const (
 
 // EnvironmentNamespace represents workload separation
 type EnvironmentNamespace struct {
-	Primary   string   `json:"primary"`     // dev, staging, production, or single
-	Secondary []string `json:"secondary"`   // frontend, backend, database, monitoring
-	Admin     bool     `json:"admin"`       // separate admin/management namespace
+	Primary   string   `json:"primary"`   // dev, staging, production, or single
+	Secondary []string `json:"secondary"` // frontend, backend, database, monitoring
+	Admin     bool     `json:"admin"`     // separate admin/management namespace
 }
 
 // EnhancedEnvironmentConfig extends the basic environment config
@@ -41,24 +41,24 @@ type EnhancedEnvironmentConfig struct {
 	Environment string `json:"environment"`
 	Datacenter  string `json:"datacenter"`
 	Region      string `json:"region"`
-	
+
 	// Enhanced deployment characteristics
 	Profile     DeploymentProfile    `json:"profile"`
 	ClusterSize int                  `json:"cluster_size"`
-	NodeRoles   map[string][]string  `json:"node_roles"`  // node_id -> [roles]
+	NodeRoles   map[string][]string  `json:"node_roles"` // node_id -> [roles]
 	Namespaces  EnvironmentNamespace `json:"namespaces"`
-	
+
 	// Resource allocation strategy
 	ResourceStrategy string `json:"resource_strategy"` // shared, dedicated, hybrid
-	
+
 	// Service placement
 	ServicePlacement map[string]string `json:"service_placement"` // service -> preferred_node_role
-	
+
 	// Existing fields
-	SecretBackend string           `json:"secret_backend"`
-	VaultAddr     string           `json:"vault_addr"`
-	SaltMaster    string           `json:"salt_master"`
-	Services      ServiceDefaults  `json:"services"`
+	SecretBackend string          `json:"secret_backend"`
+	VaultAddr     string          `json:"vault_addr"`
+	Master        string          `json:"_master"`
+	Services      ServiceDefaults `json:"services"`
 }
 
 // DiscoverEnhancedEnvironment performs intelligent environment discovery
@@ -101,8 +101,8 @@ func DiscoverEnhancedEnvironment(rc *eos_io.RuntimeContext) (*EnhancedEnvironmen
 	if config.VaultAddr == "" {
 		config.VaultAddr = "http://127.0.0.1:8200"
 	}
-	if config.SaltMaster == "" {
-		config.SaltMaster = "127.0.0.1"
+	if config.Master == "" {
+		config.Master = "127.0.0.1"
 	}
 
 	logger.Info("Enhanced environment discovery completed",
@@ -116,8 +116,8 @@ func DiscoverEnhancedEnvironment(rc *eos_io.RuntimeContext) (*EnhancedEnvironmen
 
 // detectClusterTopology discovers the actual cluster size and node roles
 func detectClusterTopology(config *EnhancedEnvironmentConfig) error {
-	// Try to detect from SaltStack
-	if nodes, err := getSaltStackNodes(); err == nil {
+	// Try to detect from
+	if nodes, err := getNodes(); err == nil {
 		config.ClusterSize = len(nodes)
 		config.NodeRoles = nodes
 		return nil
@@ -155,7 +155,7 @@ func determineDeploymentProfile(config *EnhancedEnvironmentConfig) {
 			config.Profile = ProfileDevelopment
 			config.Environment = "development"
 		} else if isHomelab() {
-			config.Profile = ProfileHomelab  
+			config.Profile = ProfileHomelab
 			config.Environment = "homelab"
 		} else {
 			config.Profile = ProfileSingleNode
@@ -242,7 +242,7 @@ func configureServicePlacement(config *EnhancedEnvironmentConfig) {
 		// Everything goes on available nodes
 		config.ServicePlacement = map[string]string{
 			"grafana":    "server",
-			"jenkins":    "server", 
+			"jenkins":    "server",
 			"mattermost": "server",
 			"vault":      "server",
 			"consul":     "server",
@@ -254,7 +254,7 @@ func configureServicePlacement(config *EnhancedEnvironmentConfig) {
 		config.ServicePlacement = map[string]string{
 			"grafana":    "monitoring",
 			"jenkins":    "backend",
-			"mattermost": "frontend", 
+			"mattermost": "frontend",
 			"vault":      "server",
 			"consul":     "server",
 			"nomad":      "server",
@@ -267,7 +267,7 @@ func configureServicePlacement(config *EnhancedEnvironmentConfig) {
 			"jenkins":    "cicd",
 			"mattermost": "collaboration",
 			"vault":      "security",
-			"consul":     "infrastructure", 
+			"consul":     "infrastructure",
 			"nomad":      "infrastructure",
 		}
 	}
@@ -297,8 +297,8 @@ func applyEnhancedServiceDefaults(config *EnhancedEnvironmentConfig) {
 
 	case ProfileEnterprise, ProfileCloud:
 		resourceConfigs = map[string]ResourceConfig{
-			"production": {CPU: 1000, Memory: 2048, Replicas: 3, MaxReplicas: 10},
-			"staging":    {CPU: 500, Memory: 1024, Replicas: 2, MaxReplicas: 5},
+			"production":  {CPU: 1000, Memory: 2048, Replicas: 3, MaxReplicas: 10},
+			"staging":     {CPU: 500, Memory: 1024, Replicas: 2, MaxReplicas: 5},
 			"development": {CPU: 200, Memory: 512, Replicas: 1, MaxReplicas: 2},
 		}
 	}
@@ -326,7 +326,7 @@ func isDevelopmentContext() bool {
 	// Check for development indicators
 	hostname, _ := os.Hostname()
 	hostname = strings.ToLower(hostname)
-	
+
 	// Development hostname patterns
 	developmentPatterns := []string{"dev", "development", "local", "test", "laptop", "desktop"}
 	for _, pattern := range developmentPatterns {
@@ -334,7 +334,7 @@ func isDevelopmentContext() bool {
 			return true
 		}
 	}
-	
+
 	// Check for development environment variables
 	if env := os.Getenv("NODE_ENV"); env == "development" || env == "dev" {
 		return true
@@ -342,14 +342,14 @@ func isDevelopmentContext() bool {
 	if env := os.Getenv("ENVIRONMENT"); env == "development" || env == "dev" {
 		return true
 	}
-	
+
 	// Check if running in common development locations
 	if wd, err := os.Getwd(); err == nil {
 		if strings.Contains(wd, "/home/") && strings.Contains(wd, "/dev") {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -357,7 +357,7 @@ func isHomelab() bool {
 	// Check for homelab/personal indicators
 	hostname, _ := os.Hostname()
 	hostname = strings.ToLower(hostname)
-	
+
 	// Homelab hostname patterns
 	homelabPatterns := []string{"homelab", "home", "lab", "personal", "pi", "mini", "nuc"}
 	for _, pattern := range homelabPatterns {
@@ -365,7 +365,7 @@ func isHomelab() bool {
 			return true
 		}
 	}
-	
+
 	// Check for private IP ranges (common in homelabs)
 	if isPrivateNetwork() {
 		// Additional homelab indicators on private networks
@@ -373,7 +373,7 @@ func isHomelab() bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -395,21 +395,21 @@ func isPrivateNetwork() bool {
 func checkHomelabServices() bool {
 	// Check for common homelab applications
 	homelabServices := []string{"plex", "jellyfin", "pihole", "homeassistant", "nextcloud"}
-	
+
 	for _, service := range homelabServices {
 		// Check if service is running
 		cmd := exec.Command("systemctl", "is-active", service)
 		if err := cmd.Run(); err == nil {
 			return true
 		}
-		
+
 		// Check if docker container exists
 		cmd = exec.Command("docker", "ps", "-q", "-f", fmt.Sprintf("name=%s", service))
 		if output, err := cmd.Output(); err == nil && len(strings.TrimSpace(string(output))) > 0 {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -422,13 +422,13 @@ func isCloudEnvironment() bool {
 		checkHetzner,
 		checkDigitalOcean,
 	}
-	
+
 	for _, check := range cloudChecks {
 		if check() {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -469,15 +469,15 @@ func detectExplicitEnvironment() string {
 	if env := os.Getenv("NODE_ENV"); env != "" {
 		return env
 	}
-	
+
 	// Check for explicit environment files
 	envFiles := []string{
 		"/opt/eos/config/environment",
-		"/etc/eos/environment", 
+		"/etc/eos/environment",
 		"/opt/eos/bootstrap/environment",
 		".env",
 	}
-	
+
 	for _, file := range envFiles {
 		if content, err := os.ReadFile(file); err == nil {
 			env := strings.TrimSpace(string(content))
@@ -486,9 +486,9 @@ func detectExplicitEnvironment() string {
 			}
 		}
 	}
-	
-	// Check SaltStack grains for explicit environment
-	cmd := exec.Command("salt-call", "--local", "grains.get", "environment", "--output=json")
+
+	// Check  s for explicit environment
+	cmd := exec.Command("-call", "--local", "s.get", "environment", "--output=json")
 	if output, err := cmd.Output(); err == nil {
 		var result map[string]interface{}
 		if json.Unmarshal(output, &result) == nil {
@@ -499,7 +499,7 @@ func detectExplicitEnvironment() string {
 			}
 		}
 	}
-	
+
 	return ""
 }
 
@@ -510,9 +510,9 @@ func determineEnhancedSecretBackend() string {
 		return "vault"
 	}
 
-	// Check if Salt is available
-	if _, err := exec.Command("salt-call", "--version").Output(); err == nil {
-		return "saltstack"
+	// Check if  is available
+	if _, err := exec.Command("-call", "--version").Output(); err == nil {
+		return ""
 	}
 
 	// Fallback to file-based secrets
@@ -522,7 +522,7 @@ func determineEnhancedSecretBackend() string {
 // loadBootstrapEnvironmentConfig loads the environment config created during bootstrap
 func loadBootstrapEnvironmentConfig() (*EnhancedEnvironmentConfig, error) {
 	bootstrapConfigFile := "/opt/eos/bootstrap/environment.json"
-	
+
 	// Check if the bootstrap config file exists
 	if _, err := os.Stat(bootstrapConfigFile); os.IsNotExist(err) {
 		return nil, fmt.Errorf("bootstrap config file not found: %s", bootstrapConfigFile)
@@ -543,29 +543,28 @@ func loadBootstrapEnvironmentConfig() (*EnhancedEnvironmentConfig, error) {
 	return &config, nil
 }
 
-
-func getSaltStackNodes() (map[string][]string, error) {
-	// Query SaltStack for node inventory via salt-run manage.status
-	cmd := exec.Command("salt-run", "manage.status", "--output=json")
+func getNodes() (map[string][]string, error) {
+	// Query  for node inventory via -run manage.status
+	cmd := exec.Command("-run", "manage.status", "--output=json")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to query salt node status: %w", err)
+		return nil, fmt.Errorf("failed to query  node status: %w", err)
 	}
 
 	var statusResult map[string]interface{}
 	if err := json.Unmarshal(output, &statusResult); err != nil {
-		return nil, fmt.Errorf("failed to parse salt status output: %w", err)
+		return nil, fmt.Errorf("failed to parse  status output: %w", err)
 	}
 
 	nodes := make(map[string][]string)
-	
+
 	// Get up nodes
 	if upNodes, exists := statusResult["up"]; exists {
 		if upList, ok := upNodes.([]interface{}); ok {
 			for _, nodeInterface := range upList {
 				if nodeId, ok := nodeInterface.(string); ok {
-					// Query each node for its roles via grains
-					roles, err := getSaltNodeRoles(nodeId)
+					// Query each node for its roles via s
+					roles, err := getNodeRoles(nodeId)
 					if err != nil {
 						// Default roles if we can't query
 						roles = []string{"server", "client"}
@@ -584,14 +583,14 @@ func getSaltStackNodes() (map[string][]string, error) {
 	return nodes, nil
 }
 
-// getSaltNodeRoles queries a specific node for its configured roles
-func getSaltNodeRoles(nodeId string) ([]string, error) {
-	// Query node grains for role information
-	cmd := exec.Command("salt", nodeId, "grains.get", "roles", "--output=json")
+// getNodeRoles queries a specific node for its configured roles
+func getNodeRoles(nodeId string) ([]string, error) {
+	// Query node s for role information
+	cmd := exec.Command("", nodeId, "s.get", "roles", "--output=json")
 	output, err := cmd.Output()
 	if err != nil {
-		// Try alternative grain keys
-		if roles := tryAlternativeRoleGrains(nodeId); len(roles) > 0 {
+		// Try alternative  keys
+		if roles := tryAlternativeRoles(nodeId); len(roles) > 0 {
 			return roles, nil
 		}
 		return []string{"server", "client"}, nil
@@ -618,31 +617,31 @@ func getSaltNodeRoles(nodeId string) ([]string, error) {
 	return []string{"server", "client"}, nil
 }
 
-// tryAlternativeRoleGrains tries different grain keys for role information
-func tryAlternativeRoleGrains(nodeId string) []string {
+// tryAlternativeRoles tries different  keys for role information
+func tryAlternativeRoles(nodeId string) []string {
 	alternativeKeys := []string{"node_roles", "service_roles", "cluster_roles", "environment"}
-	
+
 	for _, key := range alternativeKeys {
-		cmd := exec.Command("salt", nodeId, "grains.get", key, "--output=json")
+		cmd := exec.Command("", nodeId, "s.get", key, "--output=json")
 		if output, err := cmd.Output(); err == nil {
 			var result map[string]interface{}
 			if json.Unmarshal(output, &result) == nil {
 				if nodeResult, exists := result[nodeId]; exists {
 					// Try to extract roles from various formats
-					if roles := extractRolesFromGrain(nodeResult); len(roles) > 0 {
+					if roles := extractRolesFrom(nodeResult); len(roles) > 0 {
 						return roles
 					}
 				}
 			}
 		}
 	}
-	
+
 	return nil
 }
 
-// extractRolesFromGrain extracts role information from various grain formats
-func extractRolesFromGrain(grain interface{}) []string {
-	switch v := grain.(type) {
+// extractRolesFrom extracts role information from various data formats
+func extractRolesFrom(data interface{}) []string {
+	switch v := data.(type) {
 	case []interface{}:
 		// Array of roles
 		roles := make([]string, 0, len(v))
@@ -652,14 +651,14 @@ func extractRolesFromGrain(grain interface{}) []string {
 			}
 		}
 		return roles
-		
+
 	case string:
 		// Single role or comma-separated
 		if strings.Contains(v, ",") {
 			return strings.Split(v, ",")
 		}
 		return []string{v}
-		
+
 	case map[string]interface{}:
 		// Role object with enabled/disabled
 		roles := make([]string, 0)
@@ -670,7 +669,7 @@ func extractRolesFromGrain(grain interface{}) []string {
 		}
 		return roles
 	}
-	
+
 	return nil
 }
 
@@ -692,7 +691,7 @@ func getConsulNodes() (map[string][]string, error) {
 		if name, exists := member["Name"]; exists {
 			if nameStr, ok := name.(string); ok {
 				roles := []string{"client"}
-				
+
 				// Check if it's a server
 				if tags, exists := member["Tags"]; exists {
 					if tagsMap, ok := tags.(map[string]interface{}); ok {
@@ -703,7 +702,7 @@ func getConsulNodes() (map[string][]string, error) {
 						}
 					}
 				}
-				
+
 				nodes[nameStr] = roles
 			}
 		}
@@ -730,21 +729,21 @@ func getNomadNodes() (map[string][]string, error) {
 		if name, exists := node["Name"]; exists {
 			if nameStr, ok := name.(string); ok {
 				roles := []string{"client"}
-				
+
 				// Check node class for additional roles
 				if nodeClass, exists := node["NodeClass"]; exists {
 					if classStr, ok := nodeClass.(string); ok && classStr != "" {
 						roles = append(roles, classStr)
 					}
 				}
-				
+
 				// Check if it's eligible (active)
 				if status, exists := node["Status"]; exists {
 					if statusStr, ok := status.(string); ok && statusStr == "ready" {
 						roles = append(roles, "ready")
 					}
 				}
-				
+
 				nodes[nameStr] = roles
 			}
 		}

@@ -120,7 +120,7 @@ func SecurityInvariantProperty() Property {
 func OrchestrationConsistencyProperty() Property {
 	return Property{
 		Name:        "OrchestrationConsistency",
-		Description: "Salt → Terraform → Nomad workflow must maintain state consistency",
+		Description: " → Terraform → Nomad workflow must maintain state consistency",
 		Predicate: func(input interface{}) bool {
 			appName, ok := input.(string)
 			if !ok {
@@ -128,12 +128,12 @@ func OrchestrationConsistencyProperty() Property {
 			}
 
 			// Test that app names are consistently processed across all layers
-			saltName := processAppNameForSalt(appName)
+			Name := processAppNameFor(appName)
 			terraformName := processAppNameForTerraform(appName)
 			nomadName := processAppNameForNomad(appName)
 
 			// All layers should produce equivalent names
-			return saltName == terraformName && terraformName == nomadName
+			return Name == terraformName && terraformName == nomadName
 		},
 		Generator: func() interface{} {
 			appNames := []string{
@@ -222,11 +222,11 @@ func ConfigurationValidityProperty() Property {
 			}
 
 			// Test that generated configurations are valid
-			saltConfig := generateSaltConfig(config)
+			Config := generateConfig(config)
 			terraformConfig := generateTerraformConfig(config)
 			nomadConfig := generateNomadConfig(config)
 
-			return isValidSaltConfig(saltConfig) &&
+			return isValidConfig(Config) &&
 				isValidTerraformConfig(terraformConfig) &&
 				isValidNomadConfig(nomadConfig)
 		},
@@ -329,8 +329,8 @@ func containsInjectionAttempts(s string) bool {
 	return false
 }
 
-func processAppNameForSalt(name string) string {
-	// Simulate Salt app name processing
+func processAppNameFor(name string) string {
+	// Simulate  app name processing
 	return sanitizeAppName(name)
 }
 
@@ -381,8 +381,8 @@ func validateResourceAllocation(req ResourceRequest) bool {
 		req.Disk >= 0 && req.Disk <= 100000 // Max 100GB
 }
 
-func generateSaltConfig(data ConfigurationData) string {
-	// Mock Salt configuration generation
+func generateConfig(data ConfigurationData) string {
+	// Mock  configuration generation
 	return fmt.Sprintf("app_name: %s\nenv: %s", data.AppName, data.Environment)
 }
 
@@ -396,7 +396,7 @@ func generateNomadConfig(data ConfigurationData) string {
 	return fmt.Sprintf("job \"%s\" { type = \"service\" }", data.AppName)
 }
 
-func isValidSaltConfig(config string) bool {
+func isValidConfig(config string) bool {
 	// Basic YAML-like validation
 	return !strings.Contains(config, "$(") && !strings.Contains(config, "\x00")
 }

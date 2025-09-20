@@ -10,7 +10,7 @@ These violations cause immediate failure:
 
 1. **Logging**: ONLY use `otelzap.Ctx(rc.Ctx)` - NEVER `fmt.Print*/Println`
 2. **Pattern**: ALWAYS follow Assess → Intervene → Evaluate in helpers
-3. **Architecture**: Infrastructure → SaltStack, Applications → Nomad
+3. **Architecture**: Infrastructure → , Applications → Nomad
 4. **Completion**: Must pass `go build`, `golangci-lint run`, `go test -v ./pkg/...`
 5. **Context**: Always use `*eos_io.RuntimeContext` for all operations
 
@@ -18,7 +18,7 @@ These violations cause immediate failure:
 
 ```
 New Service?
-├─ System/Security/Orchestration → SaltStack (/salt/states/)
+├─ System/Security/Orchestration →  (//states/)
 └─ Container/Web/Database → Nomad (/nomad/jobs/)
 
 Need User Input?
@@ -49,7 +49,7 @@ Command Structure?
 - Skip verification steps
 - Create tactical documentation files (.md)
 - Hardcode values - use flags or prompts
-- Mix SaltStack and Nomad for same service
+- Mix  and Nomad for same service
 
 ## Quick Command Reference
 
@@ -64,7 +64,7 @@ Command Structure?
 ## Architecture Overview
 
 ### Dual-Layer System
-- **Layer 1 (SaltStack)**: Infrastructure, security tools, system packages
+- **Layer 1 ()**: Infrastructure, security tools, system packages
 - **Layer 2 (Nomad)**: Containerized apps, web services, databases
 - **User sees**: Unified `eos create X` regardless of layer
 
@@ -120,8 +120,8 @@ For detailed examples see `PATTERNS.md`:
 
 ## Service Classification
 
-### Infrastructure (SaltStack)
-consul, vault, nomad, fail2ban, trivy, osquery, saltstack, docker
+### Infrastructure ()
+consul, vault, nomad, fail2ban, trivy, osquery, , docker
 
 ### Applications (Nomad)
 grafana, jenkins, nextcloud, mattermost, gitlab, postgres, redis

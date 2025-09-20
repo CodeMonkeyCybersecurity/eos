@@ -1,13 +1,13 @@
-# Boundary Salt API Implementation
+# Boundary  API Implementation
 
 *Last Updated: 2025-01-23*
 
-This package provides a Go client for managing HashiCorp Boundary deployments using the Salt REST API, enabling programmatic control of Boundary infrastructure without shell execution.
+This package provides a Go client for managing HashiCorp Boundary deployments using the  REST API, enabling programmatic control of Boundary infrastructure without shell execution.
 
 ## Features
 
 - **Complete Boundary Management**: Create, delete, and monitor Boundary controllers and workers
-- **Salt API Integration**: Uses existing Salt REST API client for reliable communication
+- ** API Integration**: Uses existing  REST API client for reliable communication
 - **Role-based Configuration**: Supports controller, worker, and dev (combined) roles
 - **Database Integration**: Automatic PostgreSQL setup for controllers
 - **KMS Support**: Configurable Key Management Service integration
@@ -25,7 +25,7 @@ This package provides a Go client for managing HashiCorp Boundary deployments us
 
 ### Integration Points
 
-- **Salt States**: Uses `hashicorp.boundary` and `hashicorp.boundary_remove` Salt states
+- ** States**: Uses `hashicorp.boundary` and `hashicorp.boundary_remove`  states
 - **Service Discovery**: Integrates with Consul for service registration
 - **Secrets Management**: Uses Vault for secure credential storage
 - **TLS/PKI**: Automatic certificate management for secure communication
@@ -35,10 +35,10 @@ This package provides a Go client for managing HashiCorp Boundary deployments us
 ### Environment Variables
 
 ```bash
-export SALT_API_URL="https://salt-master.example.com:8080"
-export SALT_API_USER="eos-service"
-export SALT_API_PASSWORD="secure-password"
-export SALT_API_INSECURE="false"  # Set to true for self-signed certs in dev
+export _API_URL="https://-master.example.com:8080"
+export _API_USER="eos-service"
+export _API_PASSWORD="secure-password"
+export _API_INSECURE="false"  # Set to true for self-signed certs in dev
 ```
 
 ### Boundary Configuration
@@ -81,11 +81,11 @@ config := &boundary.Config{
 ### Creating a Boundary Controller
 
 ```go
-// Create Salt client
-saltClient, err := salt.NewClient(salt.ClientConfig{
-    BaseURL:  "https://salt-master:8080",
+// Create  client
+Client, err := .NewClient(.ClientConfig{
+    BaseURL:  "https://-master:8080",
     Username: "eos-service",
-    Password: os.Getenv("SALT_API_PASSWORD"),
+    Password: os.Getenv("_API_PASSWORD"),
     Logger:   logger,
 })
 if err != nil {
@@ -93,7 +93,7 @@ if err != nil {
 }
 
 // Create Boundary manager
-manager, err := boundary.NewManager(rc, saltClient)
+manager, err := boundary.NewManager(rc, Client)
 if err != nil {
     log.Fatal(err)
 }
@@ -130,26 +130,6 @@ err = manager.Create(ctx, &boundary.CreateOptions{
     },
     StreamOutput: true,
 })
-```
-
-### Checking Status
-
-```go
-status, err := manager.Status(ctx, &boundary.StatusOptions{
-    Target:   "*",
-    Detailed: true,
-})
-if err != nil {
-    log.Fatal(err)
-}
-
-for minion, minionStatus := range status.Minions {
-    fmt.Printf("Minion: %s\n", minion)
-    fmt.Printf("  Installed: %v\n", minionStatus.Status.Installed)
-    fmt.Printf("  Running: %v\n", minionStatus.Status.Running)
-    fmt.Printf("  Role: %s\n", minionStatus.Status.Role)
-    fmt.Printf("  Version: %s\n", minionStatus.Status.Version)
-}
 ```
 
 ### Removing Boundary
@@ -214,18 +194,18 @@ eos delete boundary --keep-config
 eos delete boundary --stream
 ```
 
-## Salt State Integration
+##  State Integration
 
-The implementation relies on Salt states that should be present on your Salt master:
+The implementation relies on  states that should be present on your  master:
 
-### Required Salt States
+### Required  States
 
 1. **hashicorp.boundary** - Main installation and configuration state
 2. **hashicorp.boundary_remove** - Removal and cleanup state
 
-### Pillar Data Structure
+###  Data Structure
 
-The manager generates pillar data in this format:
+The manager generates  data in this format:
 
 ```yaml
 boundary:
@@ -286,15 +266,15 @@ if err != nil {
 go test -v ./pkg/boundary/...
 ```
 
-### Mock Salt API
+### Mock  API
 
-Tests include a mock Salt API server for testing without a real Salt installation:
+Tests include a mock  API server for testing without a real  installation:
 
 ```go
-server := createMockSaltAPI(t)
+server := createMockAPI(t)
 defer server.Close()
 
-saltClient, err := salt.NewClient(salt.ClientConfig{
+Client, err := .NewClient(.ClientConfig{
     BaseURL:  server.URL,
     Username: "test",
     Password: "test",
@@ -303,15 +283,15 @@ saltClient, err := salt.NewClient(salt.ClientConfig{
 
 ### Integration Testing
 
-For integration testing with a real Salt master:
+For integration testing with a real  master:
 
 1. Set up test environment variables
-2. Deploy test Salt states
+2. Deploy test  states
 3. Run integration tests:
 
 ```bash
-SALT_API_URL=https://test-salt:8080 \
-SALT_API_PASSWORD=test-password \
+_API_URL=https://test-:8080 \
+_API_PASSWORD=test-password \
 go test -tags=integration ./pkg/boundary/...
 ```
 
@@ -358,10 +338,10 @@ go test -tags=integration ./pkg/boundary/...
    - Check upstream addresses
    - Validate TLS configuration
 
-3. **Salt State Failures**
-   - Check Salt minion connectivity
+3. ** State Failures**
+   - Check  minion connectivity
    - Verify state file availability
-   - Review Salt master logs
+   - Review  master logs
 
 ### Debug Mode
 
@@ -408,7 +388,7 @@ eos create boundary --role controller --force
 ### Adding Features
 
 1. Extend the `Config` struct for new configuration options
-2. Update the pillar data generation in `buildCreatePillar`
+2. Update the  data generation in `buildCreate`
 3. Add corresponding CLI flags
 4. Update tests and documentation
 

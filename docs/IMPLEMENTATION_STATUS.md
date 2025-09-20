@@ -19,7 +19,7 @@ For detailed implementation status, see the inline comments in these files:
 **Migration Status:** ✅ SUCCESSFUL  
 **Breaking Changes:** ❌ NONE  
 
-The EOS bootstrap storage operations integration has been successfully completed following the SaltStack to HashiCorp migration.
+The EOS bootstrap storage operations integration has been successfully completed following the  to HashiCorp migration.
 
 ---
 

@@ -42,8 +42,8 @@ func init() {
 // CreateHecateCmd creates the `create hecate` subcommand
 var CreateHecateCmd = &cobra.Command{
 	Use:   "hecate",
-	Short: "Deploy Hecate reverse proxy framework with SaltStack",
-	Long: `Deploy Hecate reverse proxy framework using SaltStack orchestration.
+	Short: "Deploy Hecate reverse proxy framework with ",
+	Long: `Deploy Hecate reverse proxy framework using  orchestration.
 This command deploys a complete reverse proxy stack with:
 - Caddy reverse proxy
 - Authentik identity provider
@@ -57,7 +57,6 @@ Prerequisites:
 - Running Consul cluster
 - Running Vault server
 - Running Nomad cluster
-- SaltStack minion configured
 
 The deployment follows a phased approach:
 1. HashiCorp stack verification
@@ -85,7 +84,7 @@ Examples:
   eos create hecate --legacy                  # Use legacy Docker Compose method`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
-		log.Info("Starting Hecate deployment with SaltStack")
+		log.Info("Starting Hecate deployment with ")
 
 		// Check for legacy flag
 		useLegacy, _ := cmd.Flags().GetBool("legacy")
@@ -147,9 +146,9 @@ Examples:
 				zap.Strings("services", services))
 		}
 
-		// Default to SaltStack deployment with services
-		log.Info("Using SaltStack deployment method")
-		return fmt.Errorf("SaltStack deployment has been migrated to HashiCorp stack. Please use 'eos create hecate' for Docker-based deployment, or contact your administrator for system-level deployment assistance")
+		// Default to  deployment with services
+		log.Info("Using  deployment method")
+		return fmt.Errorf(" deployment has been migrated to HashiCorp stack. Please use 'eos create hecate' for Docker-based deployment, or contact your administrator for system-level deployment assistance")
 	}),
 }
 

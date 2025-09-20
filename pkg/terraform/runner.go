@@ -15,12 +15,12 @@ import (
 
 // InfrastructureRunner orchestrates infrastructure deployments
 type InfrastructureRunner struct {
-	executor  *Executor
-	saltPath  string
+	executor *Executor
+	Path     string
 }
 
 // NewInfrastructureRunner creates a new infrastructure runner
-func NewInfrastructureRunner(workspaceDir, saltPath string) (*InfrastructureRunner, error) {
+func NewInfrastructureRunner(workspaceDir, Path string) (*InfrastructureRunner, error) {
 	executor, err := NewExecutor(workspaceDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create executor: %w", err)
@@ -28,29 +28,29 @@ func NewInfrastructureRunner(workspaceDir, saltPath string) (*InfrastructureRunn
 
 	return &InfrastructureRunner{
 		executor: executor,
-		saltPath: saltPath,
+		Path:     Path,
 	}, nil
 }
 
 // DeploymentRequest represents a deployment request
 type DeploymentRequest struct {
-	Component    string
-	Environment  string
-	Services     []string
-	Variables    map[string]any
-	AutoApprove  bool
-	DryRun       bool
+	Component   string
+	Environment string
+	Services    []string
+	Variables   map[string]any
+	AutoApprove bool
+	DryRun      bool
 }
 
 // DeploymentResult represents the result of a deployment
 type DeploymentResult struct {
-	Success      bool
-	Component    string
-	Environment  string
-	Outputs      map[string]Output
-	Services     []ServiceDeploymentResult
-	Duration     time.Duration
-	Error        string
+	Success     bool
+	Component   string
+	Environment string
+	Outputs     map[string]Output
+	Services    []ServiceDeploymentResult
+	Duration    time.Duration
+	Error       string
 }
 
 // ServiceDeploymentResult represents the result of a service deployment
@@ -77,8 +77,8 @@ func (r *InfrastructureRunner) Deploy(rc *eos_io.RuntimeContext, req DeploymentR
 		Services:    []ServiceDeploymentResult{},
 	}
 
-	// Run Salt orchestration
-	if err := r.runSaltOrchestration(rc, req); err != nil {
+	// Run  orchestration
+	if err := r.runOrchestration(rc, req); err != nil {
 		result.Success = false
 		result.Error = err.Error()
 		result.Duration = time.Since(startTime)
@@ -109,40 +109,40 @@ func (r *InfrastructureRunner) Deploy(rc *eos_io.RuntimeContext, req DeploymentR
 	return result, nil
 }
 
-// runSaltOrchestration runs the Salt orchestration state for the component
-func (r *InfrastructureRunner) runSaltOrchestration(rc *eos_io.RuntimeContext, req DeploymentRequest) error {
+// runOrchestration runs the  orchestration state for the component
+func (r *InfrastructureRunner) runOrchestration(rc *eos_io.RuntimeContext, req DeploymentRequest) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Build Salt command
+	// Build  command
 	orchState := fmt.Sprintf("orch.%s.deploy", req.Component)
-	
+
 	args := []string{
-		"salt-run",
+		"-run",
 		"state.orchestrate",
 		orchState,
 	}
 
-	// Add pillar data for services
+	// Add  data for services
 	if len(req.Services) > 0 {
-		pillarData := fmt.Sprintf("%s:services=[%s]", req.Component, strings.Join(req.Services, ","))
-		args = append(args, "pillar="+pillarData)
+		Data := fmt.Sprintf("%s:services=[%s]", req.Component, strings.Join(req.Services, ","))
+		args = append(args, "="+Data)
 	}
 
-	// Add variables as pillar data
+	// Add variables as  data
 	for key, value := range req.Variables {
-		pillarData := fmt.Sprintf("infrastructure:%s:%s=%v", req.Component, key, value)
-		args = append(args, "pillar="+pillarData)
+		Data := fmt.Sprintf("infrastructure:%s:%s=%v", req.Component, key, value)
+		args = append(args, "="+Data)
 	}
 
 	if req.DryRun {
 		args = append(args, "test=True")
 	}
 
-	logger.Info("Running Salt orchestration",
+	logger.Info("Running  orchestration",
 		zap.String("state", orchState),
 		zap.Strings("args", args))
 
-	// Execute Salt orchestration
+	// Execute  orchestration
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: args[0],
 		Args:    args[1:],
@@ -151,15 +151,15 @@ func (r *InfrastructureRunner) runSaltOrchestration(rc *eos_io.RuntimeContext, r
 	})
 
 	if err != nil {
-		return fmt.Errorf("Salt orchestration failed: %w\nOutput: %s", err, output)
+		return fmt.Errorf(" orchestration failed: %w\nOutput: %s", err, output)
 	}
 
 	// Check for failures in output
 	if strings.Contains(output, "Failed:") && !strings.Contains(output, "Failed:     0") {
-		return fmt.Errorf("Salt orchestration reported failures:\n%s", output)
+		return fmt.Errorf(" orchestration reported failures:\n%s", output)
 	}
 
-	logger.Info("Salt orchestration completed successfully")
+	logger.Info(" orchestration completed successfully")
 	return nil
 }
 
@@ -242,10 +242,10 @@ func (r *InfrastructureRunner) Destroy(rc *eos_io.RuntimeContext, component, env
 
 	// Run destroy orchestration
 	args := []string{
-		"salt-run",
+		"-run",
 		"state.orchestrate",
 		fmt.Sprintf("orch.%s.destroy", component),
-		fmt.Sprintf("pillar=environment:%s", environment),
+		fmt.Sprintf("=environment:%s", environment),
 	}
 
 	if !autoApprove {

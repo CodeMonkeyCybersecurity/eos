@@ -1,17 +1,17 @@
 package bootstrap
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 var vaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Bootstrap HashiCorp Vault using SaltStack",
-	Long:  `Install and configure HashiCorp Vault using Salt states. Requires Salt to be already installed.`,
+	Short: "Bootstrap HashiCorp Vault using ",
+	Long:  `Install and configure HashiCorp Vault using  states. Requires  to be already installed.`,
 	RunE:  eos_cli.Wrap(runBootstrapVault),
 }
 
@@ -28,7 +28,7 @@ func runBootstrapVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault bootstrap")
 
-	// Use the Salt-based Vault deployment for architectural consistency
+	// Use the -based Vault deployment for architectural consistency
 	if err := vault.OrchestrateVaultCreateViaNomad(rc); err != nil {
 		return err
 	}

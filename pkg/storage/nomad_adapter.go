@@ -6,7 +6,7 @@ import (
 )
 
 // NomadResult represents the result of a Nomad operation
-// This replaces SaltResult as part of the SaltStack → HashiCorp migration
+// This replaces Result as part of the  → HashiCorp migration
 type NomadResult struct {
 	Success bool
 	Message string
@@ -14,7 +14,7 @@ type NomadResult struct {
 }
 
 // NomadClient wraps the actual Nomad client for storage operations
-// This replaces SaltClient as part of the SaltStack → HashiCorp migration
+// This replaces Client as part of the  → HashiCorp migration
 type NomadClient interface {
 	ApplyJob(ctx context.Context, target, jobSpec string, vars map[string]interface{}) (*NomadResult, error)
 }

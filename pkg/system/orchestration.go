@@ -17,17 +17,15 @@ import (
 
 // OrchestrationManager handles service deployment orchestration via Nomad
 type OrchestrationManager struct {
-	// saltManager deprecated in favor of Nomad orchestration
 	terraformManager *terraform.Manager
 	vaultPath        string
 	nomadConfig      *NomadConfig
 	deploymentOrch   *DeploymentOrchestrator // Legacy Jenkins-based deployment support
 }
 
-// DeploymentOrchestrator coordinates deployments using Jenkins and Salt (legacy support)
+// DeploymentOrchestrator coordinates deployments using Jenkins
 type DeploymentOrchestrator struct {
 	Jenkins *jenkins.Client
-	// Salt client deprecated in favor of Nomad orchestration
 }
 
 // DeploymentRequest represents a deployment request for legacy orchestration
@@ -342,7 +340,6 @@ func NewOrchestrationManager(terraformDir string, vaultPath string, nomadConfig 
 	}
 
 	return &OrchestrationManager{
-		// saltManager deprecated
 		terraformManager: tfManager,
 		vaultPath:        vaultPath,
 		nomadConfig:      nomadConfig,

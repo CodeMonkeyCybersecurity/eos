@@ -47,21 +47,21 @@ func setupDirectNetwork(rc *eos_io.RuntimeContext, config *EnrollmentConfig, inf
 
 	logger.Info("Setting up direct network connectivity")
 
-	// Configure firewall rules for Salt
+	// Configure firewall rules for
 	rules := []FirewallRule{
 		{
-			Port:     SaltPublisherPort,
+			Port:     PublisherPort,
 			Protocol: "tcp",
 			Source:   "any",
 			Target:   "ACCEPT",
-			Comment:  "Salt publisher port",
+			Comment:  " publisher port",
 		},
 		{
-			Port:     SaltRequestPort,
+			Port:     RequestPort,
 			Protocol: "tcp",
 			Source:   "any",
 			Target:   "ACCEPT",
-			Comment:  "Salt request port",
+			Comment:  " request port",
 		},
 	}
 
@@ -72,10 +72,10 @@ func setupDirectNetwork(rc *eos_io.RuntimeContext, config *EnrollmentConfig, inf
 		}
 	}
 
-	// Test connectivity to master if we're a minion
-	if config.Role == RoleMinion && config.MasterAddress != "" {
-		if err := testConnectivity(rc, config.MasterAddress, SaltPublisherPort); err != nil {
-			return fmt.Errorf("failed to connect to master: %w", err)
+	// Test connectivity to HashiCorp cluster if we're a client
+	if config.Role == "minion" && config.ess != "" {
+		if err := testConnectivity(rc, config.ess, PublisherPort); err != nil {
+			return fmt.Errorf("failed to connect to HashiCorp cluster: %w", err)
 		}
 	}
 
@@ -128,13 +128,13 @@ func setupWireGuardNetwork(rc *eos_io.RuntimeContext, config *EnrollmentConfig, 
 	// 2. Generate public/private key pairs
 	// 3. Configure WireGuard interface
 	// 4. Exchange keys with other nodes
-	// 5. Setup routing for Salt traffic over WireGuard
+	// 5. Setup routing for  traffic over WireGuard
 
 	logger.Warn("WireGuard networking not fully implemented yet")
 	return setupDirectNetwork(rc, config, info)
 }
 
-// configureFirewallRules configures firewall rules for Salt
+// configureFirewallRules configures firewall rules for
 func configureFirewallRules(rc *eos_io.RuntimeContext, rules []FirewallRule, allowIncoming bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -433,15 +433,6 @@ func ValidateNetworkRequirements(rc *eos_io.RuntimeContext, config *EnrollmentCo
 		return fmt.Errorf("no active network interfaces found")
 	}
 
-	// For minions, validate master connectivity
-	if config.Role == RoleMinion && config.MasterAddress != "" {
-		logger.Info("Validating master connectivity", zap.String("master", config.MasterAddress))
-
-		if err := testConnectivity(rc, config.MasterAddress, SaltPublisherPort); err != nil {
-			return fmt.Errorf("cannot reach master at %s: %w", config.MasterAddress, err)
-		}
-	}
-
 	logger.Info("Network requirements validated")
 	return nil
 }
@@ -662,7 +653,7 @@ func generateConsulConfig(config *EnrollmentConfig, info *SystemInfo) string {
     "down_policy": "extend-cache"
   },
   "encrypt": "ENCRYPT_KEY_PLACEHOLDER"
-}`, datacenter, info.Hostname, isServer, getBootstrapExpect(isServer), getMasterAddress(config))
+}`, datacenter, info.Hostname, isServer, getBootstrapExpect(isServer), getess(config))
 
 	return consulConfig
 }
@@ -675,10 +666,10 @@ func getBootstrapExpect(isServer bool) int {
 	return 0
 }
 
-// getMasterAddress gets the master address for joining
-func getMasterAddress(config *EnrollmentConfig) string {
-	if config.MasterAddress != "" {
-		return config.MasterAddress
+// getess gets the master address for joining
+func getess(config *EnrollmentConfig) string {
+	if config.ess != "" {
+		return config.ess
 	}
 	return "127.0.0.1"
 }
@@ -736,7 +727,7 @@ func startConsulService(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// setupConsulServices configures service definitions for Salt
+// setupConsulServices configures service definitions for
 func setupConsulServices(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -751,12 +742,6 @@ func setupConsulServices(rc *eos_io.RuntimeContext, config *EnrollmentConfig) er
 	// Configure service definitions based on role
 	var services []string
 
-	if config.Role == RoleMaster {
-		services = []string{"salt-master", "salt-minion"}
-	} else {
-		services = []string{"salt-minion"}
-	}
-
 	for _, service := range services {
 		if err := registerConsulService(rc, service, config); err != nil {
 			return fmt.Errorf("failed to register service %s: %w", service, err)
@@ -769,9 +754,9 @@ func setupConsulServices(rc *eos_io.RuntimeContext, config *EnrollmentConfig) er
 
 // registerConsulService registers a service with Consul
 func registerConsulService(rc *eos_io.RuntimeContext, serviceName string, config *EnrollmentConfig) error {
-	port := SaltRequestPort
-	if serviceName == "salt-master" {
-		port = SaltPublisherPort
+	port := RequestPort
+	if serviceName == "-master" {
+		port = PublisherPort
 	}
 
 	serviceDefinition := fmt.Sprintf(`{
@@ -779,7 +764,7 @@ func registerConsulService(rc *eos_io.RuntimeContext, serviceName string, config
     "name": "%s",
     "port": %d,
     "tags": [
-      "salt",
+      "",
       "eos-managed",
       "%s"
     ],
@@ -819,10 +804,10 @@ func setupConsulConnect(rc *eos_io.RuntimeContext, config *EnrollmentConfig) err
 		}
 	}
 
-	// Configure Connect proxy for Salt services
+	// Configure Connect proxy for  services
 	var services []string
 	if config.Role == RoleMaster {
-		services = []string{"salt-master"}
+		services = []string{"-master"}
 	}
 
 	for _, service := range services {

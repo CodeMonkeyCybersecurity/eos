@@ -12,7 +12,7 @@
 **Rationale:** System user operations require root privileges and security validation
 
 #### 2. Storage Management Operations  
-**Files:** `pkg/storage/monitor/saltstack_disk_manager.go`, `pkg/storage/manager_lvm.go`
+**Files:** `pkg/storage/monitor/_disk_manager.go`, `pkg/storage/manager_lvm.go`
 **Complexity:** Very High - LVM management, filesystem operations, disk partitioning
 **Current Status:** Basic escalation implemented
 **Recommendation:** Hybrid approach - Nomad for application storage, escalation for system storage
@@ -35,7 +35,7 @@
 ### Priority 2: Distributed Systems (Complex Orchestration)
 
 #### 5. CephFS Cluster Management
-**Files:** `pkg/cephfs/saltstack.go`, `cmd/create/storage_cephfs.go`
+**Files:** `pkg/cephfs/.go`, `cmd/create/storage_cephfs.go`
 **Complexity:** Very High - Distributed storage cluster coordination
 **Current Status:** Placeholder implementations
 **Recommendation:** Nomad job orchestration with Consul coordination

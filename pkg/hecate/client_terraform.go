@@ -2,7 +2,6 @@ package hecate
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/consul/api"
+	nomad "github.com/hashicorp/nomad/api"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -24,7 +24,7 @@ type HecateClient struct {
 	consul    *api.Client
 	vault     *vault.Client
 	nginx     *NginxClient
-	salt      *SaltClient
+	nomad     *nomad.Client
 	terraform *TerraformClient
 	rc        *eos_io.RuntimeContext
 }
@@ -38,7 +38,7 @@ type ClientConfig struct {
 	VaultAddr          string
 	VaultToken         string
 	NginxConfigPath    string
-	SaltMaster         string
+	NomadAddr          string
 	TerraformWorkspace string
 }
 
@@ -84,10 +84,26 @@ func NewHecateClient(rc *eos_io.RuntimeContext, config *ClientConfig) (*HecateCl
 		consul:    consulClient,
 		vault:     vaultClient,
 		nginx:     NewNginxClient(config.NginxConfigPath),
-		salt:      NewSaltClient(rc, config.SaltMaster),
+		nomad:     createNomadClient(config.NomadAddr),
 		terraform: NewTerraformClient(rc, config.TerraformWorkspace),
 		rc:        rc,
 	}, nil
+}
+
+// createNomadClient creates a Nomad client for HashiCorp integration
+func createNomadClient(nomadAddr string) *nomad.Client {
+	config := nomad.DefaultConfig()
+	if nomadAddr != "" {
+		config.Address = nomadAddr
+	}
+	
+	client, err := nomad.NewClient(config)
+	if err != nil {
+		// Return nil client if creation fails - operations will handle gracefully
+		return nil
+	}
+	
+	return client
 }
 
 // CaddyAPIClient handles Caddy API operations
@@ -300,82 +316,6 @@ func NewNginxClient(configPath string) *NginxClient {
 	}
 }
 
-// SaltClient handles Salt state operations
-type SaltClient struct {
-	rc         *eos_io.RuntimeContext
-	masterAddr string
-}
-
-// NewSaltClient creates a new Salt client
-func NewSaltClient(rc *eos_io.RuntimeContext, masterAddr string) *SaltClient {
-	return &SaltClient{
-		rc:         rc,
-		masterAddr: masterAddr,
-	}
-}
-
-// ApplyState applies a Salt state
-func (s *SaltClient) ApplyState(ctx context.Context, state string, pillar map[string]interface{}) error {
-	logger := otelzap.Ctx(s.rc.Ctx)
-	logger.Info("Applying Salt state",
-		zap.String("state", state),
-		zap.Any("pillar", pillar))
-
-	// Convert pillar data to JSON
-	pillarJSON, err := json.Marshal(pillar)
-	if err != nil {
-		return fmt.Errorf("failed to marshal pillar data: %w", err)
-	}
-
-	// Apply the state
-	output, err := execute.Run(s.rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args: []string{
-			"--local",
-			"state.apply",
-			state,
-			"pillar=" + string(pillarJSON),
-		},
-		Capture: true,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to apply salt state %s: %w", state, err)
-	}
-
-	logger.Debug("Salt state applied",
-		zap.String("state", state),
-		zap.String("output", output))
-
-	return nil
-}
-
-// RestartService restarts a service via Salt
-func (s *SaltClient) RestartService(ctx context.Context, service string) error {
-	logger := otelzap.Ctx(s.rc.Ctx)
-	logger.Info("Restarting service via Salt",
-		zap.String("service", service))
-
-	output, err := execute.Run(s.rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args: []string{
-			"--local",
-			"service.restart",
-			service,
-		},
-		Capture: true,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to restart service %s: %w", service, err)
-	}
-
-	logger.Debug("Service restarted",
-		zap.String("service", service),
-		zap.String("output", output))
-
-	return nil
-}
 
 // TerraformClient handles Terraform operations
 type TerraformClient struct {
@@ -502,16 +442,6 @@ type CaddyForwardAuth struct {
 	Handler string              `json:"handler"`
 	URI     string              `json:"uri"`
 	Headers map[string][]string `json:"headers,omitempty"`
-}
-
-// AuthentikPolicy represents an Authentik policy
-type AuthentikPolicy struct {
-	Name       string            `json:"name"`
-	Slug       string            `json:"slug"`
-	Enabled    bool              `json:"enabled"`
-	Expression string            `json:"expression,omitempty"`
-	Bindings   []string          `json:"bindings,omitempty"`
-	Attributes map[string]string `json:"attributes,omitempty"`
 }
 
 // AuthentikPolicyResponse represents the API response for policies

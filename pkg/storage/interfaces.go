@@ -11,7 +11,6 @@
 // - Well-defined interfaces (StorageDriver, VolumeManager, DiskManager)
 // - Safety-first design with journaling, rollback, preflight checks
 // - Multi-backend support (LVM, BTRFS, ZFS, CephFS)
-// - SaltStack integration following infrastructure compiler pattern
 // - Strong type safety with comprehensive type definitions
 //
 // Key Features:
@@ -118,7 +117,6 @@
 //
 // Integration:
 // - EOS Infrastructure Compiler: Translates user intent to storage operations
-// - SaltStack: System-level storage operations and configuration
 // - HashiCorp Stack: Application-level storage orchestration
 // - Nomad: Container storage management and allocation
 // - Consul: Service discovery for distributed storage

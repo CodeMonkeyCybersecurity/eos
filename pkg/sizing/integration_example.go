@@ -202,32 +202,7 @@ func runReadValidateSizing(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 /*
 NEW: Simple integration using RunWithSizingChecks:
 
-// In cmd/create/nomad.go - Add sizing checks with one function call
-func runCreateNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// Parse configuration as before
-	config := parseNomadConfig(cmd)
-	
-	// Wrap your deployment logic with sizing checks
-	return sizing.RunWithSizingChecks(rc, "nomad", func(rc *eos_io.RuntimeContext) error {
-		// Your existing deployment logic stays exactly the same
-		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("Starting Nomad installation with SaltStack")
-		
-		if err := nomad.CheckPrerequisites(rc); err != nil {
-			return err
-		}
-		
-		if err := nomad.InstallWithSaltStack(rc, config); err != nil {
-			return err
-		}
-		
-		if err := nomad.Configure(rc, config); err != nil {
-			return err
-		}
-		
-		return nomad.Verify(rc, config)
-	})
-}
+
 
 // In cmd/create/postgres.go - Database with sizing
 func runCreatePostgres(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

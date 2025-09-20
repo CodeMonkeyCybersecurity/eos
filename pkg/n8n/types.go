@@ -30,10 +30,10 @@ type Config struct {
 	RedisPort int    `yaml:"redis_port" json:"redis_port"`
 
 	// Network configuration
-	Port      int    `yaml:"port" json:"port"`
-	Host      string `yaml:"host" json:"host"`
-	Domain    string `yaml:"domain" json:"domain"`
-	Protocol  string `yaml:"protocol" json:"protocol"`
+	Port     int    `yaml:"port" json:"port"`
+	Host     string `yaml:"host" json:"host"`
+	Domain   string `yaml:"domain" json:"domain"`
+	Protocol string `yaml:"protocol" json:"protocol"`
 
 	// Deployment configuration
 	Datacenter  string `yaml:"datacenter" json:"datacenter"`
@@ -141,21 +141,21 @@ func DefaultConfig() *Config {
 		PostgresDB:           "n8n",
 		PostgresHost:         "postgres",
 		PostgresPort:         5432,
-		RedisHost:           "redis",
-		RedisPort:           6379,
-		NomadAddr:           "http://localhost:4646",
-		VaultAddr:           "http://localhost:8200",
-		Datacenter:          "dc1",
-		Environment:         "development",
-		DataPath:            "/opt/n8n/data",
-		Workers:             1,
-		CPU:                 1000,
-		Memory:              2048,
+		RedisHost:            "redis",
+		RedisPort:            6379,
+		NomadAddr:            "http://localhost:4646",
+		VaultAddr:            "http://localhost:8200",
+		Datacenter:           "dc1",
+		Environment:          "development",
+		DataPath:             "/opt/n8n/data",
+		Workers:              1,
+		CPU:                  1000,
+		Memory:               2048,
 		EnableUserManagement: true,
-		EnablePublicAPI:     true,
-		EnableTelemetry:     false,
-		SecureCookies:       true,
-		Timezone:            "UTC",
+		EnablePublicAPI:      true,
+		EnableTelemetry:      false,
+		SecureCookies:        true,
+		Timezone:             "UTC",
 	}
 }
 
@@ -214,40 +214,40 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// ToPillarData converts the config to pillar data format for SaltStack
-func (c *Config) ToPillarData() map[string]interface{} {
+// ToData converts the config to  data format for
+func (c *Config) ToData() map[string]interface{} {
 	return map[string]interface{}{
-		"admin_password":      c.AdminPassword,
-		"basic_auth_user":     c.BasicAuthUser,
-		"basic_auth_password": c.BasicAuthPassword,
-		"encryption_key":      c.EncryptionKey,
-		"jwt_secret":          c.JWTSecret,
-		"postgres_user":       c.PostgresUser,
-		"postgres_password":   c.PostgresPassword,
-		"postgres_db":         c.PostgresDB,
-		"postgres_host":       c.PostgresHost,
-		"postgres_port":       c.PostgresPort,
-		"redis_host":          c.RedisHost,
-		"redis_port":          c.RedisPort,
-		"port":                c.Port,
-		"host":                c.Host,
-		"domain":              c.Domain,
-		"protocol":            c.Protocol,
-		"datacenter":          c.Datacenter,
-		"environment":         c.Environment,
-		"data_path":           c.DataPath,
-		"workers":             c.Workers,
-		"cpu":                 c.CPU,
-		"memory":              c.Memory,
-		"smtp_host":           c.SMTPHost,
-		"smtp_port":           c.SMTPPort,
-		"smtp_user":           c.SMTPUser,
-		"smtp_pass":           c.SMTPPass,
-		"smtp_sender":         c.SMTPSender,
+		"admin_password":         c.AdminPassword,
+		"basic_auth_user":        c.BasicAuthUser,
+		"basic_auth_password":    c.BasicAuthPassword,
+		"encryption_key":         c.EncryptionKey,
+		"jwt_secret":             c.JWTSecret,
+		"postgres_user":          c.PostgresUser,
+		"postgres_password":      c.PostgresPassword,
+		"postgres_db":            c.PostgresDB,
+		"postgres_host":          c.PostgresHost,
+		"postgres_port":          c.PostgresPort,
+		"redis_host":             c.RedisHost,
+		"redis_port":             c.RedisPort,
+		"port":                   c.Port,
+		"host":                   c.Host,
+		"domain":                 c.Domain,
+		"protocol":               c.Protocol,
+		"datacenter":             c.Datacenter,
+		"environment":            c.Environment,
+		"data_path":              c.DataPath,
+		"workers":                c.Workers,
+		"cpu":                    c.CPU,
+		"memory":                 c.Memory,
+		"smtp_host":              c.SMTPHost,
+		"smtp_port":              c.SMTPPort,
+		"smtp_user":              c.SMTPUser,
+		"smtp_pass":              c.SMTPPass,
+		"smtp_sender":            c.SMTPSender,
 		"enable_user_management": c.EnableUserManagement,
 		"enable_public_api":      c.EnablePublicAPI,
 		"enable_telemetry":       c.EnableTelemetry,
 		"secure_cookies":         c.SecureCookies,
-		"timezone":              c.Timezone,
+		"timezone":               c.Timezone,
 	}
 }

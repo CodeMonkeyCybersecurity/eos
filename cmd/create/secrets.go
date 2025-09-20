@@ -1,6 +1,6 @@
 // cmd/create/secrets.go
 //
-// Secure Secret Generation Commands
+// # Secure Secret Generation Commands
 //
 // This file implements CLI commands for generating cryptographically secure
 // random secrets and managing secret storage. It provides a secure alternative
@@ -22,7 +22,7 @@
 //
 // Available Commands:
 // - eos create secret                           # Generate 32-byte hex secret
-// - eos create secret --length 64               # Generate 64-byte hex secret  
+// - eos create secret --length 64               # Generate 64-byte hex secret
 // - eos create secret --format base64           # Generate base64-encoded secret
 // - eos create secret --vault-path secret/app   # Store in Vault
 //
@@ -48,7 +48,7 @@
 //
 // # Problems:
 // # - Users had to remember/manage passwords
-// # - Weak passwords often used for convenience  
+// # - Weak passwords often used for convenience
 // # - Environment configuration inconsistent
 // # - Manual coordination of datacenters/regions
 // ```
@@ -107,17 +107,18 @@
 // - Role-based access control for secret management
 //
 // Usage Examples:
-//   # Generate standard 32-byte hex secret (like openssl rand -hex 32)
-//   eos create secret
 //
-//   # Generate longer secret for high-security applications
-//   eos create secret --length 64
+//	# Generate standard 32-byte hex secret (like openssl rand -hex 32)
+//	eos create secret
 //
-//   # Generate and store in Vault
-//   eos create secret --vault-path secret/myapp/database-password
+//	# Generate longer secret for high-security applications
+//	eos create secret --length 64
 //
-//   # Generate base64 secret for configuration files
-//   eos create secret --format base64 --length 48
+//	# Generate and store in Vault
+//	eos create secret --vault-path secret/myapp/database-password
+//
+//	# Generate base64 secret for configuration files
+//	eos create secret --format base64 --length 48
 //
 // Security Considerations:
 // - Secrets are generated using crypto/rand for cryptographic security
@@ -202,7 +203,7 @@ Examples:
 
 func init() {
 	CreateCmd.AddCommand(CreateVaultCmd)
-	
+
 	// Vault flags for native installer
 	CreateVaultCmd.Flags().String("version", "latest", "Vault version to install")
 	CreateVaultCmd.Flags().String("storage-backend", "file", "Storage backend (file, consul, raft)")
@@ -245,39 +246,29 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	return nil
 }
 
-// Removed unused Salt-based functions - now using native installer
+// Removed unused -based functions - now using native installer
 
 var CreateVaultEnhancedCmd = &cobra.Command{
 	Use:   "vault-enhanced",
-	Short: "Installs Vault with TLS, systemd service, and initial configuration (Salt orchestration supported)",
+	Short: "Installs Vault with TLS, systemd service, and initial configuration ( orchestration supported)",
 	Long: `Install and configure HashiCorp Vault with comprehensive orchestration support.
 
-This enhanced version supports both direct execution and Salt orchestration,
+This enhanced version supports both direct execution and  orchestration,
 allowing for coordinated deployment across multiple nodes and integration
 with broader infrastructure automation.
 
 Direct Execution:
   eos create vault-enhanced
 
-Salt Orchestration:
-  eos create vault-enhanced --orchestrator=salt --salt-target 'vault-*'
-  eos create vault-enhanced --orchestrator=salt --salt-target 'vault-cluster' --salt-pillar cluster_size=3
-  eos create vault-enhanced --orchestrator=salt --salt-batch 1 --salt-async
-
 Features:
   - TLS certificate generation and configuration
   - Systemd service setup and management
   - Initial Vault configuration and unsealing
-  - HA cluster support via Salt orchestration
+  - HA cluster support via  orchestration
   - Integration with Consul backend when available
   - Automated backup configuration
   - Security hardening and best practices
 
-Salt States Used:
-  - hashicorp.vault.install: Core Vault installation
-  - hashicorp.vault.config: Configuration management
-  - hashicorp.vault.cluster: HA cluster setup
-  - hashicorp.vault.security: Security hardening
 
 Environment Variables:
   VAULT_VERSION: Specific Vault version to install
@@ -287,7 +278,7 @@ Environment Variables:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
-		// Use Nomad orchestration instead of Salt
+		// Use Nomad orchestration instead of
 		logger.Info("Using Nomad orchestration for Vault deployment")
 
 		logger.Info("Starting Vault creation with Nomad orchestration")
@@ -302,7 +293,7 @@ Environment Variables:
 			return nil
 		}
 
-		// Salt operations removed - using Nomad orchestration
+		//  operations removed - using Nomad orchestration
 
 		// Execute directly using Nomad orchestration
 		return directExec(rc)
@@ -310,7 +301,7 @@ Environment Variables:
 }
 
 func init() {
-	// Nomad orchestration flags (replacing Salt orchestration)
+	// Nomad orchestration flags (replacing  orchestration)
 
 	// Add Vault-specific flags
 	CreateVaultEnhancedCmd.Flags().String("vault-version", "", "Specific Vault version to install")

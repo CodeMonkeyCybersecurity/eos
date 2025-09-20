@@ -1,10 +1,10 @@
 // pkg/cli/cli.go
 //
-// EOS CLI User Experience Abstraction System
+// # EOS CLI User Experience Abstraction System
 //
 // This package implements the abstracted user experience for EOS, where users
 // interact with a consistent `eos create X` interface regardless of the underlying
-// orchestration technology (SaltStack for infrastructure, Nomad for applications).
+// orchestration technology ( for infrastructure, Nomad for applications).
 //
 // # User Experience Abstraction Implementation
 //
@@ -34,7 +34,7 @@
 // - Automatic scaling and health monitoring
 // - Integrated with Hecate reverse proxy
 //
-// **Infrastructure Services** (SaltStack):
+// **Infrastructure Services** ():
 // - consul, nomad, storage, networking
 // - System-level configuration and management
 // - Hardware abstraction and OS integration
@@ -72,7 +72,6 @@
 // - cmd/create/ - Service creation commands with abstracted interface
 // - pkg/shared/ - Shared CLI utilities and patterns
 // - pkg/bootstrap/ - Infrastructure bootstrapping with user abstraction
-//
 package cli
 
 import (

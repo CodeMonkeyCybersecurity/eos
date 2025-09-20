@@ -15,7 +15,6 @@ const (
 	SHA256   HashAlgorithm = "sha256"
 	SHA384   HashAlgorithm = "sha384"
 	SHA512   HashAlgorithm = "sha512"
-	MD5      HashAlgorithm = "md5" // For legacy compatibility only
 	BLAKE2b  HashAlgorithm = "blake2b"
 	BLAKE2s  HashAlgorithm = "blake2s"
 	SHA3_256 HashAlgorithm = "sha3-256"

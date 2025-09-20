@@ -16,7 +16,6 @@ const (
 	ServiceProfileTypeVault       ServiceProfileType = "vault"
 	ServiceProfileTypeConsul      ServiceProfileType = "consul"
 	ServiceProfileTypeNomad       ServiceProfileType = "nomad"
-	ServiceProfileTypeSaltStack   ServiceProfileType = "saltstack"
 	ServiceProfileTypeMinIO       ServiceProfileType = "minio"
 	ServiceProfileTypeDatabase    ServiceProfileType = "database"
 	ServiceProfileTypeMonitoring  ServiceProfileType = "monitoring"

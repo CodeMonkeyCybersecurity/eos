@@ -23,11 +23,7 @@ func VaultAddress() string {
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
 	log.Info(" Starting Vault enablement flow")
 
-	// Check if Salt is available and use it if possible
-	if err := checkNomadAvailability(rc); err == nil {
-		log.Info("Nomad is available, using Nomad-based enablement")
-		return OrchestrateVaultEnableViaSalt(rc)
-	}
+
 
 	// Fall back to direct enablement
 	log.Info("Nomad not available, using direct enablement")

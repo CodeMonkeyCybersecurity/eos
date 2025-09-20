@@ -17,8 +17,8 @@ import (
 
 var createServiceCmd = &cobra.Command{
 	Use:   "service [service-name]",
-	Short: "Deploy and orchestrate services via SaltStack and Nomad",
-	Long: `Deploy and orchestrate services using SaltStack for configuration management and Nomad for scheduling.
+	Short: "Deploy and orchestrate services via  and Nomad",
+	Long: `Deploy and orchestrate services using  for configuration management and Nomad for scheduling.
 
 This command supports multiple deployment types:
 - Nomad jobs for container orchestration
@@ -86,9 +86,9 @@ Examples:
 		// TODO: Apply system state via HashiCorp stack
 		// For now, use orchestration manager for service deployment
 		logger.Info("Service deployment configured - using orchestration manager for actual deployment")
-		
+
 		// Display deployment configuration
-		logger.Info("Service deployment ready", 
+		logger.Info("Service deployment ready",
 			zap.String("service", serviceName),
 			zap.String("type", deploymentType),
 			zap.Any("config", systemDeployment))
@@ -100,7 +100,7 @@ Examples:
 var createGrafanaCmd = &cobra.Command{
 	Use:   "grafana",
 	Short: "Deploy Grafana monitoring service via Nomad",
-	Long: `Deploy Grafana monitoring service using Nomad orchestration with SaltStack configuration management.
+	Long: `Deploy Grafana monitoring service using Nomad orchestration with  configuration management.
 
 This deploys a production-ready Grafana instance with:
 - Persistent data storage
@@ -118,7 +118,6 @@ Examples:
 		version, _ := cmd.Flags().GetString("version")
 		databaseURL, _ := cmd.Flags().GetString("database-url")
 		plugins, _ := cmd.Flags().GetStringSlice("plugins")
-		_, _ = cmd.Flags().GetString("salt-api") // Deprecated SaltStack parameter
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 
 		logger.Info("Deploying Grafana monitoring service", zap.String("version", version))
@@ -195,23 +194,11 @@ Examples:
 		databaseURL, _ := cmd.Flags().GetString("database-url")
 		smtpServer, _ := cmd.Flags().GetString("smtp-server")
 		smtpPort, _ := cmd.Flags().GetInt("smtp-port")
-		_, _ = cmd.Flags().GetString("salt-api") // Deprecated SaltStack parameter
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 
 		logger.Info("Deploying Mattermost communication platform", zap.String("site_url", siteURL))
 
-		// Initialize managers (TODO: Replace with Nomad)
-		// saltConfig := &system.SaltStackConfig{
-		//     APIURL:    saltAPI,
-		//     VaultPath: vaultPath + "/salt",
-		//     Timeout:   10 * time.Minute,
-		// }
-		// saltManager, err := system.NewSaltStackManager(rc, saltConfig)
-		// if err != nil {
-		//     return cerr.Wrap(err, "failed to initialize SaltStack manager")
-		// }
-		
-		// HashiCorp stack replaces SaltStack functionality
+		// HashiCorp stack replaces  functionality
 		logger.Info("Using HashiCorp stack for Mattermost deployment")
 
 		nomadConfig := &system.NomadConfig{
@@ -253,16 +240,14 @@ func init() {
 	createServiceCmd.Flags().String("type", "nomad", "Deployment type: nomad, docker, systemd")
 	createServiceCmd.Flags().String("image", "", "Container image for docker/nomad deployments")
 	createServiceCmd.Flags().String("config-file", "", "Configuration file path")
-	createServiceCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
+	createServiceCmd.Flags().String("-api", "https://localhost:8000", " API URL")
 	createServiceCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
 	createServiceCmd.Flags().String("terraform-dir", "", "Terraform directory for infrastructure")
-	createServiceCmd.Flags().String("target", "*", "Salt target minions")
 
 	// Grafana deployment command
 	createGrafanaCmd.Flags().String("version", "latest", "Grafana version to deploy")
 	createGrafanaCmd.Flags().String("database-url", "", "Database connection URL")
 	createGrafanaCmd.Flags().StringSlice("plugins", []string{}, "Grafana plugins to install")
-	createGrafanaCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
 	createGrafanaCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
 
 	// Mattermost deployment command
@@ -271,7 +256,7 @@ func init() {
 	createMattermostCmd.Flags().String("database-url", "", "Database connection URL")
 	createMattermostCmd.Flags().String("smtp-server", "", "SMTP server for email")
 	createMattermostCmd.Flags().Int("smtp-port", 587, "SMTP server port")
-	createMattermostCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
+	createMattermostCmd.Flags().String("-api", "https://localhost:8000", " API URL")
 	createMattermostCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
 
 	CreateCmd.AddCommand(createServiceCmd)

@@ -1,15 +1,15 @@
-# SaltStack Removal & Simplification Plan
+#  Removal & Simplification Plan
 
 ## Overview
-This document outlines the strategy to remove SaltStack from the EOS infrastructure and replace it with simpler, more maintainable solutions for on-premises Linux fleet disk management.
+This document outlines the strategy to remove  from the EOS infrastructure and replace it with simpler, more maintainable solutions for on-premises Linux fleet disk management.
 
 ## Current State Analysis
 
-### SaltStack Components to Remove
-- `pkg/storage_monitor/` - SaltStack disk monitoring integration
-- Salt minion configurations
-- Salt master infrastructure
-- Complex state files and pillar data
+###  Components to Remove
+- `pkg/storage_monitor/` -  disk monitoring integration
+-  minion configurations
+-  master infrastructure
+- Complex state files and  data
 - Manual `vg`/`lv` LVM management scripts
 
 ### Dependencies to Maintain
@@ -51,7 +51,7 @@ This document outlines the strategy to remove SaltStack from the EOS infrastruct
 **Best for:** Teams familiar with Ansible, gradual migration
 
 **Advantages:**
-- Simpler than SaltStack
+- Simpler than 
 - Good documentation
 - Idempotent operations
 - Easy to understand playbooks
@@ -59,12 +59,12 @@ This document outlines the strategy to remove SaltStack from the EOS infrastruct
 **Implementation:**
 - Ansible playbooks for disk management
 - systemd services for monitoring
-- Gradual replacement of Salt states
+- Gradual replacement of  states
 
 ## Migration Strategy
 
 ### Phase 1: Parallel Implementation (Month 1)
-1. **Deploy new solutions alongside SaltStack**
+1. **Deploy new solutions alongside **
    - Implement local storage manager
    - Create Terraform modules
    - Test on non-production systems
@@ -85,8 +85,7 @@ This document outlines the strategy to remove SaltStack from the EOS infrastruct
    - Finally migrate production (with rollback plan)
 
 ### Phase 3: Complete Removal (Month 4)
-1. **Remove SaltStack infrastructure**
-   - Decommission Salt master
+1. **Remove  infrastructure**
    - Remove minion configurations
    - Clean up old code
 
@@ -162,7 +161,7 @@ eos resize storage-local data-vol
 ## Success Criteria
 
 ### Technical
-- [ ] All storage operations work without SaltStack
+- [ ] All storage operations work without 
 - [ ] No data loss during migration
 - [ ] Performance maintained or improved
 - [ ] Monitoring and alerting functional
@@ -185,7 +184,7 @@ eos resize storage-local data-vol
 |-------|----------|----------------|
 | Phase 1 | Month 1 | New solutions implemented and tested |
 | Phase 2 | Months 2-3 | 50% of systems migrated |
-| Phase 3 | Month 4 | SaltStack completely removed |
+| Phase 3 | Month 4 |  completely removed |
 
 ## Resource Requirements
 
@@ -209,7 +208,7 @@ eos resize storage-local data-vol
 
 ### Procedure
 1. Stop new system operations
-2. Restore SaltStack services
+2. Restore  services
 3. Validate data integrity
 4. Resume normal operations
 5. Analyze failure and plan retry
@@ -218,8 +217,8 @@ eos resize storage-local data-vol
 
 ### Simplified Architecture
 - Fewer moving parts
-- No Salt master/minion complexity
-- Direct API calls instead of Salt states
+- No  master/minion complexity
+- Direct API calls instead of  states
 - Native Go error handling
 
 ### Improved Operations
@@ -229,7 +228,7 @@ eos resize storage-local data-vol
 - Native monitoring integration
 
 ### Reduced Maintenance
-- No Salt version upgrades
+- No  version upgrades
 - Fewer security patches
 - Simpler troubleshooting
 - Better documentation

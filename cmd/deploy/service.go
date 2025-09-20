@@ -15,11 +15,11 @@ import (
 
 var serviceCmd = &cobra.Command{
 	Use:   "service <service-name>",
-	Short: "Deploy a service component with fine-grained control",
+	Short: "Deploy a service component with fine-ed control",
 	Long: `Deploy a specific service component with granular deployment control and
 service-specific configuration options.
 
-Service deployments provide fine-grained control over individual microservices,
+Service deployments provide fine-ed control over individual microservices,
 allowing for independent scaling, configuration, and deployment strategies.
 Each service deployment follows the assessment→intervention→evaluation pattern
 with comprehensive service mesh integration and dependency management.
@@ -27,7 +27,7 @@ with comprehensive service mesh integration and dependency management.
 Service deployment features include:
 - Independent service lifecycle management
 - Service mesh integration (Consul Connect)
-- Fine-grained resource allocation and scaling
+- Fine-ed resource allocation and scaling
 - Service-specific health checks and metrics
 - Dependency management and orchestration
 - Configuration management with environment-specific overrides
@@ -69,7 +69,7 @@ Examples:
 		timeout, _ := cmd.Flags().GetDuration("timeout")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		force, _ := cmd.Flags().GetBool("force")
-		
+
 		// Service-specific flags
 		enableMesh, _ := cmd.Flags().GetBool("enable-mesh")
 		meshProxyCpu, _ := cmd.Flags().GetString("mesh-proxy-cpu")
@@ -130,14 +130,14 @@ Examples:
 
 		// Create service deployment configuration
 		serviceConfig := &deploy.ServiceDeploymentConfig{
-			ServiceName:  serviceName,
-			Environment:  environment,
-			Strategy:     strategyEnum,
-			Version:      version,
-			Replicas:     replicas,
-			Timeout:      timeout,
-			DryRun:       dryRun,
-			Force:        force,
+			ServiceName: serviceName,
+			Environment: environment,
+			Strategy:    strategyEnum,
+			Version:     version,
+			Replicas:    replicas,
+			Timeout:     timeout,
+			DryRun:      dryRun,
+			Force:       force,
 			Resources: deploy.ResourceConfig{
 				CPU:    cpu,
 				Memory: memory,

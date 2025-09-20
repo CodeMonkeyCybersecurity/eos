@@ -14,11 +14,10 @@ import (
 
 var hashicorpCmd = &cobra.Command{
 	Use:   "hashicorp [component]",
-	Short: "Install HashiCorp tools via Salt states",
-	Long: `Install HashiCorp tools using Salt states for configuration management.
+	Short: "Install HashiCorp tools",
+	Long: `Install HashiCorp tools.
 
-This command uses Salt states to install and configure HashiCorp tools following
-the architectural principle that Salt manages all physical infrastructure.
+This command installs and configures HashiCorp tools.
 
 Available components:
   vault  - HashiCorp Vault for secrets management
@@ -76,7 +75,7 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		clientMode = true
 	}
 
-	logger.Info("Installing HashiCorp component via Salt",
+	logger.Info("Installing HashiCorp component via ",
 		zap.String("component", component),
 		zap.Bool("server_mode", serverMode),
 		zap.Bool("client_mode", clientMode),
@@ -100,7 +99,7 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		return fmt.Errorf("invalid component '%s'. Valid components: %v", component, validComponents)
 	}
 
-	// Use Nomad orchestration instead of Salt
+	// Use Nomad orchestration i
 	logger.Info("Using Nomad orchestration for HashiCorp stack deployment")
 
 	// Create context with timeout
@@ -112,7 +111,7 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		zap.String("version", version),
 		zap.String("datacenter", datacenter))
 
-	// Prepare Nomad job configuration (replacing Salt pillar)
+	// Prepare Nomad job configuration (replacing  )
 	nomadConfig := map[string]interface{}{
 		component: map[string]interface{}{
 			"version":    version,
@@ -145,7 +144,6 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	_ = ctx // TODO: Use context for Nomad API calls
 	return fmt.Errorf("%s Nomad deployment not yet implemented", component)
 }
-
 
 func contains(slice []string, item string) bool {
 	for _, s := range slice {

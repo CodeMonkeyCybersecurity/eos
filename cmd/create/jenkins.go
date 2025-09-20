@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
+
 	// TODO: Replace with Nomad orchestration
-	// "github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
+	// "github.com/CodeMonkeyCybersecurity/eos/pkg/"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
@@ -22,11 +23,11 @@ import (
 var CreateJenkinsCmd = &cobra.Command{
 	Use:   "jenkins",
 	Short: "Deploy Jenkins CI/CD platform using Nomad orchestration",
-	Long: `Deploy Jenkins CI/CD platform using the SaltStack → Terraform → Nomad architecture.
+	Long: `Deploy Jenkins CI/CD platform using the  → Terraform → Nomad architecture.
 
 This command provides a complete Jenkins deployment with automatic configuration:
 - Automatic environment discovery (production/staging/development)
-- Secure credential generation and storage (Vault/SaltStack/file)
+- Secure credential generation and storage (Vault//file)
 - Container orchestration via Nomad
 - Service discovery via Consul
 - Persistent data storage
@@ -42,6 +43,7 @@ Examples:
   eos create jenkins --datacenter production       # Override datacenter`,
 	RunE: eos.Wrap(runCreateJenkins),
 }
+
 func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -58,16 +60,17 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		logger.Warn("Environment discovery failed, using defaults", zap.Error(err))
 		// Continue with defaults rather than failing
 		envConfig = &environment.EnvironmentConfig{
-			Environment:   "development",
+			Environment:   "production",
 			Datacenter:    "dc1",
-			SecretBackend: "file",
+			Region:        "us-east-1",
+			VaultAddr:     "http://localhost:8200",
 		}
 	}
 
 	logger.Info("Environment discovered",
 		zap.String("environment", envConfig.Environment),
 		zap.String("datacenter", envConfig.Datacenter),
-		zap.String("secret_backend", envConfig.SecretBackend))
+		zap.String("vault_addr", envConfig.VaultAddr))
 
 	// 2. Check for manual overrides from flags
 	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
@@ -98,20 +101,20 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	adminPassword := serviceSecrets.Secrets["admin_password"].(string)
 	apiToken := serviceSecrets.Secrets["api_token"].(string)
 	jwtSecret := serviceSecrets.Secrets["jwt_secret"].(string)
-	
+
 	// Allow manual overrides
 	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
 		adminPassword = manualPassword
 	}
-	
+
 	port := envConfig.Services.DefaultPorts["jenkins"]
 	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 {
 		port = manualPort
 	}
 
 	resourceConfig := envConfig.Services.Resources[envConfig.Environment]
-	
-	pillarConfig := map[string]interface{}{
+
+	Config := map[string]interface{}{
 		"nomad_service": map[string]interface{}{
 			"name":        "jenkins",
 			"environment": envConfig.Environment,
@@ -119,18 +122,18 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 				"admin_password": adminPassword,
 				"api_token":      apiToken,
 				"jwt_secret":     jwtSecret,
-				"port":          port,
-				"datacenter":    envConfig.Datacenter,
-				"data_path":     envConfig.Services.DataPath + "/jenkins",
-				"cpu":           resourceConfig.CPU,
-				"memory":        resourceConfig.Memory,
-				"replicas":      resourceConfig.Replicas,
+				"port":           port,
+				"datacenter":     envConfig.Datacenter,
+				"data_path":      envConfig.Services.DataPath + "/jenkins",
+				"cpu":            resourceConfig.CPU,
+				"memory":         resourceConfig.Memory,
+				"replicas":       resourceConfig.Replicas,
 			},
 		},
 	}
 
 	// 5. Deploy with automatically configured values
-	logger.Info("Deploying Jenkins via SaltStack → Terraform → Nomad",
+	logger.Info("Deploying Jenkins via  → Terraform → Nomad",
 		zap.String("environment", envConfig.Environment),
 		zap.String("datacenter", envConfig.Datacenter),
 		zap.Int("port", port),
@@ -140,25 +143,23 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 	// TODO: Replace with Nomad orchestration when implemented
 	logger.Info("Jenkins deployment placeholder - Nomad orchestration not implemented yet")
-	_ = pillarConfig // Suppress unused variable warning
-	
+	_ = Config // Suppress unused variable warning
+
 	// TODO: When Nomad implementation is complete, add success logging:
 	// - Jenkins web UI availability
-	// - Generated admin credentials  
+	// - Generated admin credentials
 	// - Consul service registration
 	// - Configuration management details
-	
+
 	return fmt.Errorf("jenkins deployment not implemented with Nomad yet")
 }
 
-
 func init() {
 	CreateCmd.AddCommand(CreateJenkinsCmd)
-	
+
 	// Optional override flags - everything is automatic by default
 	CreateJenkinsCmd.Flags().String("admin-password", "", "Override automatic admin password generation")
 	CreateJenkinsCmd.Flags().IntP("port", "p", 0, "Override automatic port assignment")
 	CreateJenkinsCmd.Flags().StringP("datacenter", "d", "", "Override automatic datacenter detection")
 	CreateJenkinsCmd.Flags().StringP("environment", "e", "", "Override automatic environment detection")
 }
-

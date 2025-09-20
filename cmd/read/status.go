@@ -51,8 +51,7 @@ func runStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		command string
 		port    string
 	}{
-		{"Salt Master", "salt-master", "salt", "4505"},
-		{"Salt Minion", "salt-minion", "salt-minion", ""},
+
 		{"Vault", "vault", "vault", "8200"},
 		{"Nomad", "nomad", "nomad", "4646"},
 		{"OSQuery", "osqueryd", "osqueryi", ""},
@@ -106,17 +105,6 @@ func runStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	fmt.Println("Connectivity Tests:")
 	fmt.Println("------------------")
 
-	// Salt connectivity
-	if _, err := cli.Which("salt"); err == nil {
-		fmt.Print("Salt Master → Minion: ")
-		if output, err := cli.ExecString("salt", "*", "test.ping"); err == nil && strings.Contains(output, "True") {
-			fmt.Println("✓ Connected")
-		} else {
-			fmt.Println("✗ Failed")
-			allHealthy = false
-		}
-	}
-
 	// Vault status
 	if _, err := cli.Which("vault"); err == nil {
 		fmt.Print("Vault API:           ")
@@ -150,7 +138,7 @@ func runStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		fmt.Println("OSQuery Verification:")
 		fmt.Println("-------------------")
 
-		query := `SELECT name, pid, state FROM processes WHERE name IN ('salt-master', 'salt-minion', 'vault', 'nomad', 'osqueryd');`
+		query := `SELECT name, pid, state FROM processes WHERE name IN ('vault', 'nomad', 'osqueryd');`
 
 		if output, err := cli.ExecString("osqueryi", "--line", query); err == nil {
 			fmt.Println(output)

@@ -306,9 +306,3 @@ func startService(rc *eos_io.RuntimeContext, service string) error {
 	return nil
 }
 
-// Legacy compatibility - redirect old SaltStack calls to HashiCorp
-func BootstrapSaltComplete(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Redirecting SaltStack bootstrap to HashiCorp stack")
-	return BootstrapHashiCorpComplete(rc, info)
-}

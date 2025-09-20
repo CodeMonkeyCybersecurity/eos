@@ -5,9 +5,9 @@ package create
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
@@ -39,27 +39,27 @@ var (
 	boundaryForce       bool
 	boundaryClean       bool
 	boundaryClusterName string
-	
+
 	// Controller options
 	boundaryDatabaseURL       string
 	boundaryPublicClusterAddr string
 	boundaryPublicAddr        string
-	
+
 	// Worker options
-	boundaryUpstreams      string
+	boundaryUpstreams       string
 	boundaryPublicProxyAddr string
-	
+
 	// Common options
 	boundaryListenerAddr string
 	boundaryTLSDisable   bool
 	boundaryTLSCertFile  string
 	boundaryTLSKeyFile   string
-	
+
 	// KMS options
 	boundaryKMSType   string
 	boundaryKMSKeyID  string
 	boundaryKMSRegion string
-	
+
 	// Stream output
 	boundaryStreamOutput bool
 )
@@ -71,7 +71,7 @@ func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	// Parse flags
 	config := &boundary.InstallConfig{
 		Version:           boundaryVersion,
-		UseRepository:     false,  // Always use binary for Boundary
+		UseRepository:     false, // Always use binary for Boundary
 		ControllerEnabled: boundaryRole == "controller" || boundaryRole == "dev",
 		WorkerEnabled:     boundaryRole == "worker" || boundaryRole == "dev",
 		DevMode:           boundaryRole == "dev",
@@ -103,7 +103,7 @@ func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 // This function was replaced with Nomad-based orchestration
 // Restore if direct boundary installation is needed outside of Nomad
 
-// initializeBoundarySaltClient replaced with Nomad orchestration
+// initializeBoundaryClient replaced with Nomad orchestration
 // TODO: Nomad client initialization for Boundary
 // This will be implemented when Nomad API integration is complete
 
@@ -121,30 +121,30 @@ func init() {
 	CreateBoundaryCmd.Flags().BoolVar(&boundaryForce, "force", false, "Force reinstallation even if already installed")
 	CreateBoundaryCmd.Flags().BoolVar(&boundaryClean, "clean", false, "Remove all data and perform clean installation")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryClusterName, "cluster-name", "eos", "Boundary cluster name")
-	
+
 	// Controller configuration
 	CreateBoundaryCmd.Flags().StringVar(&boundaryDatabaseURL, "database-url", "", "PostgreSQL connection string for controllers")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryPublicClusterAddr, "public-cluster-addr", "", "Public address for cluster communication")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryPublicAddr, "public-addr", "", "Public address for API")
-	
+
 	// Worker configuration
 	CreateBoundaryCmd.Flags().StringVar(&boundaryUpstreams, "upstream", "", "Comma-separated list of upstream controllers for workers")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryPublicProxyAddr, "public-proxy-addr", "", "Public address for worker proxy")
-	
+
 	// Common configuration
 	CreateBoundaryCmd.Flags().StringVar(&boundaryListenerAddr, "listener-addr", "0.0.0.0", "Listener address")
 	CreateBoundaryCmd.Flags().BoolVar(&boundaryTLSDisable, "tls-disable", false, "Disable TLS (not recommended for production)")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryTLSCertFile, "tls-cert", "", "Path to TLS certificate file")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryTLSKeyFile, "tls-key", "", "Path to TLS key file")
-	
+
 	// KMS configuration
 	CreateBoundaryCmd.Flags().StringVar(&boundaryKMSType, "kms-type", "aead", "KMS type (aead, awskms, azurekeyvault, gcpckms, ocikms, transit)")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryKMSKeyID, "kms-key-id", "", "KMS key ID")
 	CreateBoundaryCmd.Flags().StringVar(&boundaryKMSRegion, "kms-region", "", "KMS region (for cloud KMS)")
-	
+
 	// Output options
 	CreateBoundaryCmd.Flags().BoolVar(&boundaryStreamOutput, "stream", false, "Stream installation output in real-time")
-	
+
 	// Register the command
 	CreateCmd.AddCommand(CreateBoundaryCmd)
 }

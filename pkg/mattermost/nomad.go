@@ -55,9 +55,9 @@ func (m *Manager) createPostgresJob() *api.Job {
 							},
 						},
 						Env: map[string]string{
-							"POSTGRES_DB":       m.config.PostgresDB,
-							"POSTGRES_USER":     m.config.PostgresUser,
-							"POSTGRES_PASSWORD": m.config.PostgresPassword,
+							"POSTGRES_DB":          m.config.PostgresDB,
+							"POSTGRES_USER":        m.config.PostgresUser,
+							"POSTGRES_PASSWORD":    m.config.PostgresPassword,
 							"POSTGRES_INITDB_ARGS": "--encoding=UTF8 --locale=en_US.UTF-8",
 						},
 						Resources: &api.Resources{
@@ -209,28 +209,28 @@ func (m *Manager) createNginxJob() *api.Job {
 func (m *Manager) getMattermostEnvironment() map[string]string {
 	return map[string]string{
 		// Database Configuration
-		"MM_SQLSETTINGS_DRIVERNAME":     "postgres",
-		"MM_SQLSETTINGS_DATASOURCE":     fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable&connect_timeout=10", 
+		"MM_SQLSETTINGS_DRIVERNAME": "postgres",
+		"MM_SQLSETTINGS_DATASOURCE": fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable&connect_timeout=10",
 			m.config.PostgresUser, m.config.PostgresPassword, m.config.PostgresHost, m.config.PostgresPort, m.config.PostgresDB),
 
 		// Server Configuration
-		"MM_SERVICESETTINGS_SITEURL":                fmt.Sprintf("%s://%s", m.config.Protocol, m.config.Domain),
-		"MM_SERVICESETTINGS_LISTENADDRESS":          ":8065",
-		"MM_SERVICESETTINGS_CONNECTIONSECURITY":     "",
-		"MM_SERVICESETTINGS_TLSCERTFILE":            "",
-		"MM_SERVICESETTINGS_TLSKEYFILE":             "",
-		"MM_SERVICESETTINGS_USELETSENCRPYT":         "false",
-		"MM_SERVICESETTINGS_FORWARD80TO443":         "false",
-		"MM_SERVICESETTINGS_READTIMEOUT":            "300",
-		"MM_SERVICESETTINGS_WRITETIMEOUT":           "300",
-		"MM_SERVICESETTINGS_MAXLOGINATTEMPTSPERIP":  "10",
-		"MM_SERVICESETTINGS_MAXLOGINATTEMPTS":       "10",
+		"MM_SERVICESETTINGS_SITEURL":               fmt.Sprintf("%s://%s", m.config.Protocol, m.config.Domain),
+		"MM_SERVICESETTINGS_LISTENADDRESS":         ":8065",
+		"MM_SERVICESETTINGS_CONNECTIONSECURITY":    "",
+		"MM_SERVICESETTINGS_TLSCERTFILE":           "",
+		"MM_SERVICESETTINGS_TLSKEYFILE":            "",
+		"MM_SERVICESETTINGS_USELETSENCRPYT":        "false",
+		"MM_SERVICESETTINGS_FORWARD80TO443":        "false",
+		"MM_SERVICESETTINGS_READTIMEOUT":           "300",
+		"MM_SERVICESETTINGS_WRITETIMEOUT":          "300",
+		"MM_SERVICESETTINGS_MAXLOGINATTEMPTSPERIP": "10",
+		"MM_SERVICESETTINGS_MAXLOGINATTEMPTS":      "10",
 
 		// File Storage
-		"MM_FILESETTINGS_DRIVERNAME":                "local",
-		"MM_FILESETTINGS_DIRECTORY":                 "/mattermost/data/",
-		"MM_FILESETTINGS_ENABLEPUBLICLINK":          "false",
-		"MM_FILESETTINGS_MAXFILESIZE":               "52428800",
+		"MM_FILESETTINGS_DRIVERNAME":       "local",
+		"MM_FILESETTINGS_DIRECTORY":        "/mattermost/data/",
+		"MM_FILESETTINGS_ENABLEPUBLICLINK": "false",
+		"MM_FILESETTINGS_MAXFILESIZE":      "52428800",
 
 		// Email Configuration
 		"MM_EMAILSETTINGS_ENABLESIGNUPWITHEMAIL":    "true",
@@ -240,11 +240,11 @@ func (m *Manager) getMattermostEnvironment() map[string]string {
 		"MM_EMAILSETTINGS_REQUIREEMAILVERIFICATION": "false",
 
 		// Security
-		"MM_PASSWORDSETTINGS_MINIMUMLENGTH":         "5",
-		"MM_PASSWORDSETTINGS_LOWERCASE":             "false",
-		"MM_PASSWORDSETTINGS_NUMBER":                "false",
-		"MM_PASSWORDSETTINGS_UPPERCASE":             "false",
-		"MM_PASSWORDSETTINGS_SYMBOL":                "false",
+		"MM_PASSWORDSETTINGS_MINIMUMLENGTH": "5",
+		"MM_PASSWORDSETTINGS_LOWERCASE":     "false",
+		"MM_PASSWORDSETTINGS_NUMBER":        "false",
+		"MM_PASSWORDSETTINGS_UPPERCASE":     "false",
+		"MM_PASSWORDSETTINGS_SYMBOL":        "false",
 
 		// Team Settings
 		"MM_TEAMSETTINGS_SITENAME":                  "Mattermost",
@@ -255,29 +255,29 @@ func (m *Manager) getMattermostEnvironment() map[string]string {
 		"MM_TEAMSETTINGS_RESTRICTCREATIONTODOMAINS": "",
 
 		// Logging
-		"MM_LOGSETTINGS_ENABLECONSOLE":              "true",
-		"MM_LOGSETTINGS_CONSOLELEVEL":               "INFO",
-		"MM_LOGSETTINGS_ENABLEFILE":                 "true",
-		"MM_LOGSETTINGS_FILELEVEL":                  "INFO",
-		"MM_LOGSETTINGS_FILEFORMAT":                 "",
-		"MM_LOGSETTINGS_FILELOCATION":               "/mattermost/logs/mattermost.log",
+		"MM_LOGSETTINGS_ENABLECONSOLE": "true",
+		"MM_LOGSETTINGS_CONSOLELEVEL":  "INFO",
+		"MM_LOGSETTINGS_ENABLEFILE":    "true",
+		"MM_LOGSETTINGS_FILELEVEL":     "INFO",
+		"MM_LOGSETTINGS_FILEFORMAT":    "",
+		"MM_LOGSETTINGS_FILELOCATION":  "/mattermost/logs/mattermost.log",
 
 		// Plugin Settings
-		"MM_PLUGINSETTINGS_ENABLE":                  "true",
-		"MM_PLUGINSETTINGS_ENABLEUPLOADS":           "true",
-		"MM_PLUGINSETTINGS_DIRECTORY":               "/mattermost/plugins",
-		"MM_PLUGINSETTINGS_CLIENTDIRECTORY":         "/mattermost/client/plugins",
+		"MM_PLUGINSETTINGS_ENABLE":          "true",
+		"MM_PLUGINSETTINGS_ENABLEUPLOADS":   "true",
+		"MM_PLUGINSETTINGS_DIRECTORY":       "/mattermost/plugins",
+		"MM_PLUGINSETTINGS_CLIENTDIRECTORY": "/mattermost/client/plugins",
 
 		// Support Settings
-		"MM_SUPPORTSETTINGS_SUPPORTEMAIL":           m.config.SupportEmail,
-		"MM_SUPPORTSETTINGS_ABOUTLINK":              "https://about.mattermost.com/",
-		"MM_SUPPORTSETTINGS_HELPLINK":               "https://about.mattermost.com/help/",
-		"MM_SUPPORTSETTINGS_REPORTAPROBLEMLINK":     "https://about.mattermost.com/report-problem/",
+		"MM_SUPPORTSETTINGS_SUPPORTEMAIL":       m.config.SupportEmail,
+		"MM_SUPPORTSETTINGS_ABOUTLINK":          "https://about.mattermost.com/",
+		"MM_SUPPORTSETTINGS_HELPLINK":           "https://about.mattermost.com/help/",
+		"MM_SUPPORTSETTINGS_REPORTAPROBLEMLINK": "https://about.mattermost.com/report-problem/",
 
 		// Security Keys
-		"MM_SERVICESETTINGS_PUBLICLINKKEY":          m.config.FilePublicKey,
-		"MM_SERVICESETTINGS_PRIVATELINKKEY":         m.config.FilePrivateKey,
-		"MM_EMAILSETTINGS_INVITESALT":               m.config.InviteSalt,
+		"MM_SERVICESETTINGS_PUBLICLINKKEY":  m.config.FilePublicKey,
+		"MM_SERVICESETTINGS_PRIVATELINKKEY": m.config.FilePrivateKey,
+		"MM_EMAILSETTINGS_INVITE":           m.config.Invite,
 
 		// Timezone
 		"TZ": m.config.Timezone,

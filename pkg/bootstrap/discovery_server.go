@@ -16,37 +16,30 @@ import (
 	"go.uber.org/zap"
 )
 
-// DiscoveryServer handles multicast discovery for Salt masters
+// DiscoveryServer handles HashiCorp cluster discovery via Consul
 type DiscoveryServer struct {
 	rc         *eos_io.RuntimeContext
-	conn       *net.UDPConn
 	clusterID  string
-	masterAddr string
+	consulAddr string // HashiCorp Consul address instead of masterAddr
+	conn       *net.UDPConn
 }
 
-// DiscoveryResponse is sent in response to discovery requests
+// DiscoveryResponse represents a HashiCorp cluster discovery response
 type DiscoveryResponse struct {
 	ClusterID  string `json:"cluster_id"`
-	MasterAddr string `json:"master_addr"`
+	ConsulAddr string `json:"consul_addr"`
+	NomadAddr  string `json:"nomad_addr"`
 	NodeCount  int    `json:"node_count"`
+	Timestamp  int64  `json:"timestamp"`
 	Version    string `json:"version"`
-}
-
-// NewDiscoveryServer creates a new discovery server
-func NewDiscoveryServer(rc *eos_io.RuntimeContext, clusterID, masterAddr string) *DiscoveryServer {
-	return &DiscoveryServer{
-		rc:         rc,
-		clusterID:  clusterID,
-		masterAddr: masterAddr,
-	}
 }
 
 // Start begins listening for discovery requests
 func (d *DiscoveryServer) Start(ctx context.Context) error {
 	logger := otelzap.Ctx(d.rc.Ctx)
-	logger.Info("Starting discovery server",
+	logger.Info("Starting HashiCorp discovery server",
 		zap.String("cluster_id", d.clusterID),
-		zap.String("master_addr", d.masterAddr))
+		zap.String("consul_addr", d.consulAddr))
 
 	// Setup multicast listener
 	addr, err := net.ResolveUDPAddr("udp", "224.0.0.1:4505")
@@ -74,7 +67,7 @@ func (d *DiscoveryServer) Start(ctx context.Context) error {
 		default:
 			// Set read deadline to allow checking context
 			conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-			
+
 			n, clientAddr, err := conn.ReadFromUDP(buffer)
 			if err != nil {
 				// Timeout is expected, continue
@@ -89,7 +82,7 @@ func (d *DiscoveryServer) Start(ctx context.Context) error {
 			if string(buffer[:n]) == "EOS_CLUSTER_DISCOVERY_v1" {
 				logger.Info("Received discovery request",
 					zap.String("from", clientAddr.String()))
-				
+
 				// Send response
 				if err := d.sendResponse(clientAddr); err != nil {
 					logger.Error("Failed to send discovery response",
@@ -104,14 +97,16 @@ func (d *DiscoveryServer) Start(ctx context.Context) error {
 // sendResponse sends a discovery response to the client
 func (d *DiscoveryServer) sendResponse(clientAddr *net.UDPAddr) error {
 	logger := otelzap.Ctx(d.rc.Ctx)
-	
+
 	// Get current node count
 	nodeCount := d.getNodeCount()
-	
+
 	response := DiscoveryResponse{
 		ClusterID:  d.clusterID,
-		MasterAddr: d.masterAddr,
+		ConsulAddr: d.consulAddr,
+		NomadAddr:  "localhost:4646", // Default Nomad address
 		NodeCount:  nodeCount,
+		Timestamp:  time.Now().Unix(),
 		Version:    "1.0",
 	}
 
@@ -142,15 +137,15 @@ func (d *DiscoveryServer) sendResponse(clientAddr *net.UDPAddr) error {
 // getNodeCount returns the current number of nodes in the cluster
 func (d *DiscoveryServer) getNodeCount() int {
 	logger := otelzap.Ctx(d.rc.Ctx)
-	
-	// Query Salt for accepted minions
+
+	// Query  for accepted minions
 	output, err := execute.Run(d.rc.Ctx, execute.Options{
-		Command: "salt",
+		Command: "",
 		Args:    []string{"--out=json", "'*'", "test.ping"},
 		Capture: true,
 		Timeout: 5 * time.Second,
 	})
-	
+
 	if err != nil {
 		logger.Warn("Failed to get node count", zap.Error(err))
 		return 1 // Assume at least this node
@@ -159,7 +154,7 @@ func (d *DiscoveryServer) getNodeCount() int {
 	// Parse JSON output to count responding nodes
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		logger.Warn("Failed to parse Salt output", zap.Error(err))
+		logger.Warn("Failed to parse  output", zap.Error(err))
 		return 1
 	}
 
@@ -169,21 +164,23 @@ func (d *DiscoveryServer) getNodeCount() int {
 // StartDiscoveryService starts the discovery service as a background service
 func StartDiscoveryService(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Get cluster configuration
 	clusterID := "eos-cluster-001" // Default, would be from config
-	
-	// Get master address
-	masterAddr, err := getLocalIP()
+
+	// Get local Consul address for HashiCorp discovery
+	consulAddr, err := getLocalIP()
 	if err != nil {
 		logger.Warn("Failed to get local IP, using localhost", zap.Error(err))
-		masterAddr = "localhost"
+		consulAddr = "localhost:8500"
+	} else {
+		consulAddr = consulAddr + ":8500" // Add Consul port
 	}
 
 	// Create systemd service for discovery
 	serviceContent := fmt.Sprintf(`[Unit]
 Description=EOS Cluster Discovery Service
-After=network.target salt-master.service
+After=network.target -master.service
 
 [Service]
 Type=simple
@@ -194,7 +191,7 @@ User=root
 
 [Install]
 WantedBy=multi-user.target
-`, clusterID, masterAddr)
+`, clusterID)
 
 	servicePath := "/etc/systemd/system/eos-discovery.service"
 	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {

@@ -10,7 +10,7 @@ import (
 // Options holds orchestration options for OpenStack deployment
 type Options struct {
 	Target string
-	Pillar map[string]interface{}
+	Config map[string]interface{}
 }
 
 // IsNomadAvailable checks if Nomad is available for orchestration

@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/spf13/cobra"
@@ -203,16 +204,6 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 	phases := []BootstrapPhase{
 		{
-			Name:        "salt",
-			Description: "Installing and configuring SaltStack",
-			Required:    true,
-		},
-		{
-			Name:        "salt-api",
-			Description: "Setting up Salt API service",
-			Required:    true, // Changed to required - Salt API is essential for Eos operations
-		},
-		{
 			Name:        "storage",
 			Description: "Deploying storage operations",
 			Required:    false,
@@ -250,9 +241,9 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 		},
 	}
 
-	// Add cluster-specific phases if joining
-	if !clusterInfo.IsSingleNode && !clusterInfo.IsMaster {
-		// Insert cluster join phase after Salt
+	// Add cluster-specific phases if joining (HashiCorp cluster member)
+	if !clusterInfo.IsSingleNode && clusterInfo.MyRole != environment.RoleMonolith {
+		// Insert cluster join phase after
 		joinPhase := BootstrapPhase{
 			Name:        "cluster-join",
 			Description: "Joining existing cluster",
@@ -260,7 +251,7 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 			RunFunc:     phaseClusterJoin,
 		}
 
-		// Insert after Salt phase
+		// Insert after  phase
 		newPhases := []BootstrapPhase{phases[0], joinPhase}
 		newPhases = append(newPhases, phases[1:]...)
 		phases = newPhases
@@ -306,10 +297,6 @@ func executePhaseWithRecovery(rc *eos_io.RuntimeContext, phase BootstrapPhase, o
 
 // Phase implementations
 
-
-
-
-
 func phaseStorage(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
 	return DeployStorageOps(rc, info)
 }
@@ -354,10 +341,13 @@ func phaseHardening(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Clu
 
 func phaseClusterJoin(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Joining cluster", zap.String("master", info.MasterAddr))
+	logger.Info("Joining HashiCorp cluster",
+		zap.String("cluster_id", info.ClusterID),
+		zap.String("role", string(info.MyRole)))
 
-	// Perform health checks
-	healthResult, err := PerformHealthChecks(rc, info.MasterAddr)
+	// Perform HashiCorp cluster health checks (Consul/Nomad)
+	consulAddr := "localhost:8500" // Default Consul address
+	healthResult, err := PerformHealthChecks(rc, consulAddr)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)
 	}
@@ -366,12 +356,12 @@ func phaseClusterJoin(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *C
 		return fmt.Errorf("pre-join health checks failed: %v", healthResult.FailedChecks)
 	}
 
-	// Register with master
+	// Register with HashiCorp Consul cluster
 	reg := NodeRegistration{
 		PreferredRole: opts.PreferredRole,
 	}
 
-	result, err := RegisterNode(rc, info.MasterAddr, reg)
+	result, err := RegisterNode(rc, consulAddr, reg)
 	if err != nil {
 		return fmt.Errorf("node registration failed: %w", err)
 	}
@@ -403,59 +393,37 @@ func isPhaseCompleted(rc *eos_io.RuntimeContext, phaseName string) bool {
 func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) error {
 	// Define recovery functions for specific phases
 	recoveryFuncs := map[string]func(*eos_io.RuntimeContext, error) error{
-		"salt": func(rc *eos_io.RuntimeContext, err error) error {
+		"": func(rc *eos_io.RuntimeContext, err error) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("Attempting Salt recovery")
+			logger.Info("Attempting  recovery")
 
 			// Check if we should preserve user configurations
 			preserveConfigs := os.Getenv("EOS_PRESERVE_CONFIGS") == "true"
 
 			if preserveConfigs {
 				// Backup user configurations before cleanup
-				backupDir := "/var/backups/eos-salt-configs"
+				backupDir := "/var/backups/eos--configs"
 				if err := os.MkdirAll(backupDir, 0755); err == nil {
 					// Best effort backup
 					execute.Run(rc.Ctx, execute.Options{
 						Command: "cp",
-						Args:    []string{"-r", "/etc/salt", backupDir},
+						Args:    []string{"-r", "/etc/", backupDir},
 						Capture: false,
 					})
-					logger.Info("Backed up Salt configurations", zap.String("backup_dir", backupDir))
+					logger.Info("Backed up  configurations", zap.String("backup_dir", backupDir))
 				}
 			}
 
 			// Clean up partial installation with error handling
 			if output, err := execute.Run(rc.Ctx, execute.Options{
 				Command: "apt-get",
-				Args:    []string{"remove", "--purge", "-y", "salt-common", "salt-minion", "salt-master"},
+				Args:    []string{"remove", "--purge", "-y"},
 				Capture: true,
 			}); err != nil {
-				logger.Warn("Failed to remove Salt packages",
+				logger.Warn("Failed to remove  packages",
 					zap.Error(err),
 					zap.String("output", output))
 				// Continue with cleanup anyway
-			}
-
-			// Clean configuration directories
-			configDirs := []string{"/etc/salt", "/var/cache/salt"}
-			for _, dir := range configDirs {
-				if preserveConfigs {
-					// Only remove cache, keep configs
-					if dir == "/var/cache/salt" {
-						if err := os.RemoveAll(dir); err != nil {
-							logger.Warn("Failed to remove directory",
-								zap.String("dir", dir),
-								zap.Error(err))
-						}
-					}
-				} else {
-					// Remove all
-					if err := os.RemoveAll(dir); err != nil {
-						logger.Warn("Failed to remove directory",
-							zap.String("dir", dir),
-							zap.Error(err))
-					}
-				}
 			}
 
 			return nil
@@ -487,7 +455,7 @@ func showBootstrapSummary(rc *eos_io.RuntimeContext, info *ClusterInfo, opts *Bo
 		logger.Info("• Check system status: eos read system-status")
 		logger.Info("• Configure Vault: eos create vault")
 		logger.Info("• Deploy services: eos create [service]")
-	} else if info.IsMaster {
+	} else if info.MyRole == environment.RoleMonolith {
 		logger.Info("• Add more nodes: eos bootstrap --join-cluster=<this-node-ip>")
 		logger.Info("• Check cluster status: eos read cluster-status")
 	} else {
@@ -513,4 +481,3 @@ func isGuidedMode(cmd *cobra.Command) bool {
 	}
 	return false
 }
-

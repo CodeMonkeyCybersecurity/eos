@@ -12,22 +12,99 @@ import (
 
 // Orchestrator coordinates storage operations across different backends
 // following the Eos infrastructure compiler pattern:
-// Human Intent → Eos CLI → SaltStack → Storage Backend
+// Orchestrator manages storage operations across multiple backends
 type Orchestrator struct {
-	rc         *eos_io.RuntimeContext
-	saltClient NomadClient
-	managers   map[StorageType]StorageManager
+	rc *eos_io.RuntimeContext
+
+	managers map[StorageType]StorageManager
+}
+
+// DriverManagerAdapter adapts a StorageDriver to implement StorageManager interface
+type DriverManagerAdapter struct {
+	driver StorageDriver
+}
+
+// Create implements StorageManager interface
+func (a *DriverManagerAdapter) Create(ctx context.Context, config StorageConfig) error {
+	return a.driver.Create(ctx, config)
+}
+
+// Read implements StorageManager interface
+func (a *DriverManagerAdapter) Read(ctx context.Context, id string) (*StorageStatus, error) {
+	info, err := a.driver.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	// Convert StorageInfo to StorageStatus
+	return &StorageStatus{
+		ID:    info.ID,
+		Type:  info.Type,
+		State: string(info.Status),
+	}, nil
+}
+
+// Update implements StorageManager interface
+func (a *DriverManagerAdapter) Update(ctx context.Context, id string, config StorageConfig) error {
+	// StorageDriver doesn't have Update method, so we escalate to administrator
+	return fmt.Errorf("storage update requires administrator intervention - use HashiCorp Nomad for application storage management")
+}
+
+// Delete implements StorageManager interface
+func (a *DriverManagerAdapter) Delete(ctx context.Context, id string) error {
+	return a.driver.Delete(ctx, id)
+}
+
+// List implements StorageManager interface
+func (a *DriverManagerAdapter) List(ctx context.Context) ([]*StorageStatus, error) {
+	infos, err := a.driver.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var statuses []*StorageStatus
+	for _, info := range infos {
+		status := &StorageStatus{
+			ID:    info.ID,
+			Type:  info.Type,
+			State: string(info.Status),
+		}
+		statuses = append(statuses, status)
+	}
+	return statuses, nil
+}
+
+// GetMetrics implements StorageManager interface
+func (a *DriverManagerAdapter) GetMetrics(ctx context.Context, id string) (*StorageMetrics, error) {
+	return a.driver.GetMetrics(ctx, id)
+}
+
+// Resize implements StorageManager interface
+func (a *DriverManagerAdapter) Resize(ctx context.Context, operation ResizeOperation) error {
+	// Convert ResizeOperation to StorageDriver's Resize method signature
+	return a.driver.Resize(ctx, operation.Target, operation.NewSize)
+}
+
+// CheckHealth implements StorageManager interface
+func (a *DriverManagerAdapter) CheckHealth(ctx context.Context, id string) (*HealthStatus, error) {
+	// Use the driver's GetMetrics method to check health
+	_, err := a.driver.GetMetrics(ctx, id)
+	if err != nil {
+		status := HealthCritical
+		return &status, err
+	}
+	status := HealthGood
+	return &status, nil
 }
 
 // NewOrchestrator creates a new storage orchestrator
-func NewOrchestrator(rc *eos_io.RuntimeContext, saltClient NomadClient) (*Orchestrator, error) {
+func NewOrchestrator(rc *eos_io.RuntimeContext, Client NomadClient) (*Orchestrator, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating storage orchestrator")
 
 	o := &Orchestrator{
-		rc:         rc,
-		saltClient: saltClient,
-		managers:   make(map[StorageType]StorageManager),
+		rc: rc,
+
+		managers: make(map[StorageType]StorageManager),
 	}
 
 	// Initialize storage managers for each backend type
@@ -43,37 +120,18 @@ func (o *Orchestrator) initializeManagers() error {
 	logger := otelzap.Ctx(o.rc.Ctx)
 	logger.Info("Initializing storage managers")
 
-	// Initialize LVM manager
-	lvmManager, err := NewLVMManager(o.rc, o.saltClient)
+	// Initialize storage drivers using factory pattern
+	lvmFactory := &LVMDriverFactory{}
+
+	// Create LVM driver
+	lvmDriver, err := lvmFactory.CreateDriver(o.rc, DriverConfig{})
 	if err != nil {
-		logger.Warn("Failed to initialize LVM manager", zap.Error(err))
+		logger.Warn("Failed to create LVM driver", zap.Error(err))
 	} else {
+		// Create a storage manager wrapper for the driver
+		lvmManager := &DriverManagerAdapter{driver: lvmDriver}
 		o.managers[StorageTypeLVM] = lvmManager
 	}
-
-	// TODO: Initialize BTRFS manager
-	// btrfsManager, err := NewBTRFSManager(o.rc, o.saltClient)
-	// if err != nil {
-	// 	logger.Warn("Failed to initialize BTRFS manager", zap.Error(err))
-	// } else {
-	// 	o.managers[StorageTypeBTRFS] = btrfsManager
-	// }
-
-	// TODO: Initialize CephFS manager
-	// cephfsManager, err := NewCephFSManager(o.rc, o.saltClient)
-	// if err != nil {
-	// 	logger.Warn("Failed to initialize CephFS manager", zap.Error(err))
-	// } else {
-	// 	o.managers[StorageTypeCephFS] = cephfsManager
-	// }
-
-	// TODO: Initialize ZFS manager
-	// zfsManager, err := NewZFSManager(o.rc, o.saltClient)
-	// if err != nil {
-	// 	logger.Warn("Failed to initialize ZFS manager", zap.Error(err))
-	// } else {
-	// 	o.managers[StorageTypeZFS] = zfsManager
-	// }
 
 	if len(o.managers) == 0 {
 		return fmt.Errorf("no storage managers could be initialized")
@@ -85,7 +143,7 @@ func (o *Orchestrator) initializeManagers() error {
 	return nil
 }
 
-// CreateStorage creates a new storage resource through Salt
+// CreateStorage creates a new storage resource through
 func (o *Orchestrator) CreateStorage(config StorageConfig) error {
 	logger := otelzap.Ctx(o.rc.Ctx)
 	logger.Info("Creating storage resource",
@@ -103,13 +161,13 @@ func (o *Orchestrator) CreateStorage(config StorageConfig) error {
 		return fmt.Errorf("no manager available for storage type: %s", config.Type)
 	}
 
-	// INTERVENE - Create through manager (which uses Salt)
-	if err := manager.Create(config); err != nil {
+	// INTERVENE - Create through manager (which uses HashiCorp stack)
+	if err := manager.Create(o.rc.Ctx, config); err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
 	}
 
 	// EVALUATE - Verify creation succeeded
-	status, err := manager.Read(config.Device)
+	status, err := manager.Read(o.rc.Ctx, config.Device)
 	if err != nil {
 		return fmt.Errorf("failed to verify storage creation: %w", err)
 	}
@@ -137,7 +195,7 @@ func (o *Orchestrator) ReadStorage(storageType StorageType, id string) (*Storage
 		return nil, fmt.Errorf("no manager available for storage type: %s", storageType)
 	}
 
-	return manager.Read(id)
+	return manager.Read(o.rc.Ctx, id)
 }
 
 // ListStorage lists all storage resources of a given type
@@ -151,7 +209,7 @@ func (o *Orchestrator) ListStorage(storageType StorageType) ([]*StorageStatus, e
 		var allStorage []*StorageStatus
 		for sType, manager := range o.managers {
 			logger.Debug("Listing storage for type", zap.String("type", string(sType)))
-			resources, err := manager.List()
+			resources, err := manager.List(o.rc.Ctx)
 			if err != nil {
 				logger.Warn("Failed to list storage",
 					zap.String("type", string(sType)),
@@ -168,7 +226,7 @@ func (o *Orchestrator) ListStorage(storageType StorageType) ([]*StorageStatus, e
 		return nil, fmt.Errorf("no manager available for storage type: %s", storageType)
 	}
 
-	return manager.List()
+	return manager.List(o.rc.Ctx)
 }
 
 // UpdateStorage updates a storage resource configuration
@@ -184,18 +242,18 @@ func (o *Orchestrator) UpdateStorage(storageType StorageType, id string, config 
 		return fmt.Errorf("no manager available for storage type: %s", storageType)
 	}
 
-	currentStatus, err := manager.Read(id)
+	currentStatus, err := manager.Read(o.rc.Ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to read current state: %w", err)
 	}
 
 	// INTERVENE - Apply update
-	if err := manager.Update(id, config); err != nil {
+	if err := manager.Update(o.rc.Ctx, id, config); err != nil {
 		return fmt.Errorf("failed to update storage: %w", err)
 	}
 
 	// EVALUATE - Verify update succeeded
-	newStatus, err := manager.Read(id)
+	newStatus, err := manager.Read(o.rc.Ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to verify storage update: %w", err)
 	}
@@ -221,7 +279,7 @@ func (o *Orchestrator) DeleteStorage(storageType StorageType, id string) error {
 		return fmt.Errorf("no manager available for storage type: %s", storageType)
 	}
 
-	status, err := manager.Read(id)
+	status, err := manager.Read(o.rc.Ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to read storage state: %w", err)
 	}
@@ -231,12 +289,12 @@ func (o *Orchestrator) DeleteStorage(storageType StorageType, id string) error {
 	}
 
 	// INTERVENE - Delete the resource
-	if err := manager.Delete(id); err != nil {
+	if err := manager.Delete(o.rc.Ctx, id); err != nil {
 		return fmt.Errorf("failed to delete storage: %w", err)
 	}
 
 	// EVALUATE - Verify deletion
-	_, err = manager.Read(id)
+	_, err = manager.Read(o.rc.Ctx, id)
 	if err == nil {
 		return fmt.Errorf("storage deletion failed: resource still exists")
 	}
@@ -270,12 +328,12 @@ func (o *Orchestrator) ResizeStorage(operation ResizeOperation) error {
 	}
 
 	// INTERVENE - Perform resize
-	if err := manager.Resize(operation); err != nil {
+	if err := manager.Resize(o.rc.Ctx, operation); err != nil {
 		return fmt.Errorf("failed to resize storage: %w", err)
 	}
 
 	// EVALUATE - Verify new size
-	status, err := manager.Read(operation.Target)
+	status, err := manager.Read(o.rc.Ctx, operation.Target)
 	if err != nil {
 		return fmt.Errorf("failed to verify resize: %w", err)
 	}
@@ -303,7 +361,7 @@ func (o *Orchestrator) GetMetrics(storageType StorageType, id string) (*StorageM
 		return nil, fmt.Errorf("no manager available for storage type: %s", storageType)
 	}
 
-	return manager.GetMetrics(id)
+	return manager.GetMetrics(o.rc.Ctx, id)
 }
 
 // CheckHealth performs health check on storage resources
@@ -316,7 +374,7 @@ func (o *Orchestrator) CheckHealth(ctx context.Context) ([]StorageAlert, error) 
 	for storageType, manager := range o.managers {
 		logger.Debug("Checking health for storage type", zap.String("type", string(storageType)))
 
-		resources, err := manager.List()
+		resources, err := manager.List(o.rc.Ctx)
 		if err != nil {
 			logger.Warn("Failed to list resources for health check",
 				zap.String("type", string(storageType)),
@@ -325,7 +383,7 @@ func (o *Orchestrator) CheckHealth(ctx context.Context) ([]StorageAlert, error) 
 		}
 
 		for _, resource := range resources {
-			if err := manager.CheckHealth(resource.ID); err != nil {
+			if _, err := manager.CheckHealth(o.rc.Ctx, resource.ID); err != nil {
 				alert := StorageAlert{
 					ID:           fmt.Sprintf("%s-%s-health", storageType, resource.ID),
 					Severity:     "warning",
@@ -380,7 +438,7 @@ func (o *Orchestrator) AutoResize(ctx context.Context, threshold float64) error 
 		zap.Float64("threshold", threshold))
 
 	for storageType, manager := range o.managers {
-		resources, err := manager.List()
+		resources, err := manager.List(o.rc.Ctx)
 		if err != nil {
 			logger.Warn("Failed to list resources for auto-resize",
 				zap.String("type", string(storageType)),
@@ -404,7 +462,7 @@ func (o *Orchestrator) AutoResize(ctx context.Context, threshold float64) error 
 					Type:        "grow",
 				}
 
-				if err := manager.Resize(operation); err != nil {
+				if err := manager.Resize(o.rc.Ctx, operation); err != nil {
 					logger.Error("Auto-resize failed",
 						zap.String("resource", resource.ID),
 						zap.Error(err))
@@ -449,11 +507,11 @@ func (o *Orchestrator) assessCreatePrerequisites(config StorageConfig) error {
 // detectStorageType attempts to detect the storage type from a device path
 func (o *Orchestrator) detectStorageType(device string) (StorageType, error) {
 	// This is a simplified detection logic
-	// In production, this would query Salt to determine the actual type
+	// In production, this would query  to determine the actual type
 
 	// Check through each manager to see if it recognizes the device
 	for storageType, manager := range o.managers {
-		if _, err := manager.Read(device); err == nil {
+		if _, err := manager.Read(o.rc.Ctx, device); err == nil {
 			return storageType, nil
 		}
 	}

@@ -1,9 +1,9 @@
 package kubernetes
 
 // TODO: DEPRECATION NOTICE - STRATEGIC ARCHITECTURE CHANGE
-// This package is being deprecated in favor of the SaltStack → Terraform → Nomad architecture.
+// This package is being deprecated in favor of the  → Terraform → Nomad architecture.
 // K3s/Kubernetes functionality should be replaced with:
-// - SaltStack for configuration management
+// -  for configuration management
 // - Terraform for infrastructure provisioning
 // - Nomad for container orchestration
 //
@@ -377,11 +377,11 @@ func RunCreateKubeadm(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 func GenerateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// DEPRECATED: K3s functionality has been replaced with Nomad
 	logger.Warn("K3s support is deprecated and has been replaced with Nomad")
 	logger.Info("Please use 'eos create nomad-ingress' for ingress functionality instead")
 	logger.Info("Migration: 'eos create nomad-ingress --domain=<domain> --enable-mail' provides the same Caddy + Nginx functionality")
-	
+
 	return fmt.Errorf("K3s support is deprecated. Use 'eos create nomad-ingress' for ingress instead")
 }

@@ -1,9 +1,9 @@
 // pkg/hashicorp/tools.go
 //
-// EOS HashiCorp Stack Integration - Migration from SaltStack
+// # EOS HashiCorp Stack Integration - Migration from
 //
 // This package provides comprehensive HashiCorp stack integration for EOS following
-// the successful migration from SaltStack. It implements the new architectural
+// the successful migration from . It implements the new architectural
 // pattern where HashiCorp tools handle application services and container
 // orchestration, while system-level operations escalate to administrator intervention.
 //
@@ -29,24 +29,23 @@
 // KEY MIGRATIONS IMPLEMENTED:
 //
 // 1. Command Interface Updates:
-//    - salt-key-accept → consul-node-join (Consul cluster management)
-//    - salt-job-status → nomad-job-status (Nomad job monitoring)  
-//    - salt-ping → consul-health (Consul service health checks)
+//   - -key-accept → consul-node-join (Consul cluster management)
+//   - -job-status → nomad-job-status (Nomad job monitoring)
+//   - -ping → consul-health (Consul service health checks)
 //
 // 2. Service Discovery Migration:
-//    - SaltStack targeting → Consul service discovery
-//    - Salt minion health → Consul health checks
-//    - Salt job orchestration → Nomad job scheduling
+//   - targeting → Consul service discovery
+//   - job orchestration → Nomad job scheduling
 //
 // 3. Storage System Updates:
-//    - Fixed interface type issues (NomadClient vs *NomadClient)
-//    - Updated all storage drivers for HashiCorp integration
-//    - Maintained type safety across storage factory
+//   - Fixed interface type issues (NomadClient vs *NomadClient)
+//   - Updated all storage drivers for HashiCorp integration
+//   - Maintained type safety across storage factory
 //
 // 4. HTTP Client Migration:
-//    - Created unified client framework
-//    - Maintained SaltStack compatibility layer
-//    - Enhanced security with proper authentication
+//   - Created unified client framework
+//   - Maintained  compatibility layer
+//   - Enhanced security with proper authentication
 //
 // INTEGRATION PATTERNS:
 //
@@ -58,14 +57,15 @@
 // - Vault manages secrets and authentication
 //
 // Usage Examples:
-//   // Install HashiCorp tool
-//   err := hashicorp.InstallTool(rc, "consul")
-//   
-//   // Verify installation
-//   err := hashicorp.VerifyInstallation(rc, "consul")
-//   
-//   // Get tool version
-//   version, err := hashicorp.GetToolVersion(rc, "consul")
+//
+//	// Install HashiCorp tool
+//	err := hashicorp.InstallTool(rc, "consul")
+//
+//	// Verify installation
+//	err := hashicorp.VerifyInstallation(rc, "consul")
+//
+//	// Get tool version
+//	version, err := hashicorp.GetToolVersion(rc, "consul")
 //
 // SECURITY BENEFITS:
 // - Clear separation between application and system operations
@@ -74,7 +74,7 @@
 // - Future-proof architecture for HashiCorp ecosystem growth
 // - Comprehensive audit trails for compliance
 //
-// The migration successfully transforms EOS from a SaltStack-dependent system
+// The migration successfully transforms EOS from a -dependent system
 // to a modern HashiCorp-integrated platform while maintaining all existing
 // functionality and safety guarantees.
 package hashicorp
@@ -82,7 +82,6 @@ package hashicorp
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -91,6 +90,30 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// checkAvailability checks if HashiCorp tools are available for installation
+func checkAvailability(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking HashiCorp tool availability")
+
+	// Check if we can access HashiCorp repositories
+	// In a real implementation, this would check network connectivity, package managers, etc.
+	// For now, we'll assume availability and let the actual installation handle failures
+	return nil
+}
+
+// installToolViaStates installs HashiCorp tools using modern package management
+func installToolViaStates(rc *eos_io.RuntimeContext, tool string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing HashiCorp tool via package management",
+		zap.String("tool", tool))
+
+	// TODO: Implement actual HashiCorp tool installation
+	// This should use appropriate package managers (apt, yum, brew, etc.)
+	// and follow HashiCorp's official installation methods
+
+	return fmt.Errorf("HashiCorp tool installation requires administrator intervention - use official HashiCorp installation methods for %s", tool)
+}
 
 // SupportedHCLTools defines the HashiCorp tools that can be installed
 var SupportedHCLTools = []string{
@@ -103,21 +126,21 @@ var SupportedHCLTools = []string{
 }
 
 // InstallTool installs a specific HashiCorp tool with comprehensive error handling
-// DEPRECATED: Use InstallToolViaSalt instead for architectural consistency
+// DEPRECATED: Use InstallToolVia instead for architectural consistency
 func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Warn("Using deprecated direct installation method, consider using InstallToolViaSalt",
+	logger.Warn("Using deprecated direct installation method, consider using InstallToolVia",
 		zap.String("tool", tool))
 
-	// Redirect to Salt-based installation for consistency
-	return InstallToolViaSalt(rc, tool)
+	// Redirect to -based installation for consistency
+	return InstallToolVia(rc, tool)
 }
 
-// InstallToolViaSalt installs a specific HashiCorp tool using Salt states
-// This follows the architectural principle: Salt = Physical infrastructure
-func InstallToolViaSalt(rc *eos_io.RuntimeContext, tool string) error {
+// InstallToolVia installs a specific HashiCorp tool using  states
+// This follows the architectural principle:  = Physical infrastructure
+func InstallToolVia(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting HashiCorp tool installation via Salt",
+	logger.Info("Starting HashiCorp tool installation via ",
 		zap.String("tool", tool),
 		zap.Strings("supported_tools", SupportedHCLTools))
 
@@ -149,23 +172,23 @@ func InstallToolViaSalt(rc *eos_io.RuntimeContext, tool string) error {
 		return fmt.Errorf("installation cancelled by user")
 	}
 
-	// ASSESS - Check if Salt is available
-	logger.Info("Assessing Salt availability for HashiCorp tool installation")
-	if err := checkSaltAvailability(rc); err != nil {
-		logger.Error("Salt not available, falling back to direct installation", zap.Error(err))
+	// ASSESS - Check if  is available
+	logger.Info("Assessing  availability for HashiCorp tool installation")
+	if err := checkAvailability(rc); err != nil {
+		logger.Error(" not available, falling back to direct installation", zap.Error(err))
 		return installToolDirect(rc, tool)
 	}
 
-	// INTERVENE - Install via Salt states
-	logger.Info("Installing HashiCorp tool via Salt states", zap.String("tool", tool))
-	if err := installToolViaSaltStates(rc, tool); err != nil {
-		logger.Error("Salt installation failed, falling back to direct installation",
+	// INTERVENE - Install via  states
+	logger.Info("Installing HashiCorp tool via  states", zap.String("tool", tool))
+	if err := installToolViaStates(rc, tool); err != nil {
+		logger.Error(" installation failed, falling back to direct installation",
 			zap.String("tool", tool), zap.Error(err))
 		return installToolDirect(rc, tool)
 	}
 
 	// EVALUATE - Verify installation
-	logger.Info("Verifying Salt-based installation", zap.String("tool", tool))
+	logger.Info("Verifying -based installation", zap.String("tool", tool))
 	if err := VerifyInstallation(rc, tool); err != nil {
 		logger.Error("Installation verification failed",
 			zap.String("tool", tool),
@@ -173,7 +196,7 @@ func InstallToolViaSalt(rc *eos_io.RuntimeContext, tool string) error {
 		return cerr.Wrapf(err, "verify %s installation", tool)
 	}
 
-	logger.Info("Successfully installed HashiCorp tool via Salt", zap.String("tool", tool))
+	logger.Info("Successfully installed HashiCorp tool via ", zap.String("tool", tool))
 	return nil
 }
 
@@ -353,79 +376,6 @@ func installSpecificTool(rc *eos_io.RuntimeContext, tool string) error {
 // GetSupportedToolsString returns a comma-separated string of supported tools
 func GetSupportedToolsString() string {
 	return strings.Join(SupportedHCLTools, ", ")
-}
-
-// checkSaltAvailability checks if Salt is available for use
-func checkSaltAvailability(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if salt-call is available
-	if err := execute.RunSimple(rc.Ctx, "which", "salt-call"); err != nil {
-		logger.Warn("salt-call not found in PATH", zap.Error(err))
-		return fmt.Errorf("salt-call not available: %w", err)
-	}
-
-	logger.Info("Salt availability verified")
-	return nil
-}
-
-// installToolViaSaltStates installs a tool using Salt states
-func installToolViaSaltStates(rc *eos_io.RuntimeContext, tool string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Apply Salt state for the specific HashiCorp tool
-	stateName := fmt.Sprintf("hashicorp.%s", tool)
-
-	logger.Info("Applying Salt state for HashiCorp tool",
-		zap.String("tool", tool),
-		zap.String("state", stateName))
-
-	// Run salt-call to apply the state with enhanced error handling
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "state.apply", stateName, "--output=json"},
-		Capture: true,
-		Timeout: 300 * time.Second, // 5 minute timeout for installation
-	})
-
-	if err != nil {
-		logger.Error("Failed to apply Salt state",
-			zap.String("tool", tool),
-			zap.String("state", stateName),
-			zap.String("output", output),
-			zap.Error(err))
-
-		// Check for common error patterns and provide helpful guidance
-		if strings.Contains(output, "State not found") {
-			return fmt.Errorf("Salt state %s not found. Please ensure Salt states are properly installed in /opt/eos/salt/states/", stateName)
-		}
-		if strings.Contains(output, "No matching sls found") {
-			return fmt.Errorf("Salt state file %s.sls not found. Please check if the state file exists", stateName)
-		}
-		if strings.Contains(output, "Repository") && strings.Contains(output, "error") {
-			return fmt.Errorf("HashiCorp repository error. Salt state %s failed due to repository issues. Check network connectivity", stateName)
-		}
-		if strings.Contains(output, "Permission denied") {
-			return fmt.Errorf("Permission error applying Salt state %s. Please run with sudo", stateName)
-		}
-
-		return fmt.Errorf("failed to apply Salt state %s: %w\nOutput: %s", stateName, err, output)
-	}
-
-	// Parse JSON output to check for state failures
-	if strings.Contains(output, "\"result\": false") {
-		logger.Error("Salt state execution failed",
-			zap.String("tool", tool),
-			zap.String("state", stateName),
-			zap.String("output", output))
-		return fmt.Errorf("Salt state %s executed but failed. Check Salt logs for details", stateName)
-	}
-
-	logger.Info("Successfully applied Salt state for HashiCorp tool",
-		zap.String("tool", tool),
-		zap.String("state", stateName))
-
-	return nil
 }
 
 // installToolDirect installs a tool using direct system commands (fallback)

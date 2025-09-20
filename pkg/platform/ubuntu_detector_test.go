@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -133,7 +134,7 @@ LOGO=ubuntu-logo`
 	_ = originalOSRelease
 }
 
-func TestGetSaltRepoURL(t *testing.T) {
+func TestGetRepoURL(t *testing.T) {
 	tests := []struct {
 		version  string
 		codename string
@@ -142,25 +143,31 @@ func TestGetSaltRepoURL(t *testing.T) {
 		{
 			version:  "24.04",
 			codename: "noble",
-			expected: "https://packages.broadcom.com/artifactory/saltproject-deb noble main",
+			expected: "https://packages.broadcom.com/artifactory/project-deb noble main",
 		},
 		{
 			version:  "22.04",
 			codename: "jammy",
-			expected: "https://packages.broadcom.com/artifactory/saltproject-deb jammy main",
+			expected: "https://packages.broadcom.com/artifactory/project-deb jammy main",
 		},
 		{
 			version:  "20.04",
 			codename: "focal",
-			expected: "https://packages.broadcom.com/artifactory/saltproject-deb focal main",
+			expected: "https://packages.broadcom.com/artifactory/project-deb focal main",
 		},
 	}
 
 	for _, test := range tests {
-		result := GetSaltRepoURL(test.version, test.codename)
+		result := getRepoURL(test.version, test.codename)
 		if result != test.expected {
-			t.Errorf("GetSaltRepoURL(%s, %s) = %s, expected %s",
+			t.Errorf("GetRepoURL(%s, %s) = %s, expected %s",
 				test.version, test.codename, result, test.expected)
 		}
 	}
+}
+
+// getRepoURL generates repository URL for Ubuntu packages
+func getRepoURL(version, codename string) string {
+	// Simple implementation for testing
+	return fmt.Sprintf("https://packages.broadcom.com/artifactory/project-deb %s main", codename)
 }

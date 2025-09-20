@@ -43,7 +43,7 @@ type Config struct {
 	// Security keys
 	FilePublicKey  string `yaml:"file_public_key" json:"file_public_key"`
 	FilePrivateKey string `yaml:"file_private_key" json:"file_private_key"`
-	InviteSalt     string `yaml:"invite_salt" json:"invite_salt"`
+	Invite         string `yaml:"invite_" json:"invite_"`
 
 	// Support configuration
 	SupportEmail string `yaml:"support_email" json:"support_email"`

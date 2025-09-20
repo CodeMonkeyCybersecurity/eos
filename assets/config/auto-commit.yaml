@@ -15,7 +15,6 @@ safety:
   # Protected branches that require confirmation
   protected_branches:
     - main
-    - master
     - production
     - prod
     - release

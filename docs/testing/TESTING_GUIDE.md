@@ -32,10 +32,10 @@ The Eos testing strategy implements multiple layers of testing to ensure robust 
 - **ClusterFuzz integration** for continuous vulnerability discovery
 
 **Critical Gaps Addressed:**
-- **STACK.md Architecture Testing**: SaltStack → Terraform → Nomad workflows
+- **STACK.md Architecture Testing**:  → Terraform → Nomad workflows
 - **Cross-Boundary Integration**: Bare metal ↔ containerized service communication
 - **State Consistency Validation**: Multi-layer state drift detection
-- **Template Injection Prevention**: Salt/Terraform generation security
+- **Template Injection Prevention**: /Terraform generation security
 - **Chaos Engineering**: Infrastructure resilience testing
 
 ## Testing Prioritization Framework
@@ -266,9 +266,9 @@ go test -v ./integration_scenarios_test.go -run TestIntegrationScenarios_VaultHe
 #### 1. Security-Critical Component Fuzzing
 
 **High-Priority Targets:**
-- **Salt Template Generation** (`pkg/saltstack/template_fuzz_test.go`)
+- ** Template Generation** (`pkg//template_fuzz_test.go`)
   - Jinja2 template injection prevention
-  - Pillar data validation and sanitization
+  -  data validation and sanitization
   - Configuration file generation security
 
 - **Terraform Configuration Generation** (`pkg/terraform/config_fuzz_test.go`)
@@ -297,7 +297,7 @@ SecurityInvariantProperty() Property {
 
 **STACK.md Compliance Testing:**
 - **Orchestration Workflow Consistency**
-  - SaltStack → Terraform → Nomad state consistency
+  -  → Terraform → Nomad state consistency
   - Configuration generation chain validation
   - Error propagation and handling
 
@@ -323,7 +323,7 @@ OrchestrationConsistencyProperty() Property {
     Name: "OrchestrationConsistency"
     Predicate: func(input interface{}) bool {
         // All layers should produce equivalent names
-        return saltName == terraformName && terraformName == nomadName
+        return Name == terraformName && terraformName == nomadName
     }
 }
 ```
@@ -503,7 +503,7 @@ func TestErrorHandling(t *testing.T) {
 ## Implementation Roadmap
 
 ### Phase 1: Security Foundation (Weeks 1-2)
-- Salt template generation fuzzing
+-  template generation fuzzing
 - Terraform configuration fuzzing
 - Enhanced input sanitization testing
 - Security property framework

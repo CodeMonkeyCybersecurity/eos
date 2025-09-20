@@ -59,7 +59,6 @@ func TestDynamicDirectoryDiscovery(t *testing.T) {
 		"/etc/boundary.d",    // from boundary
 		"/var/lib/docker",    // from docker
 		"/var/lib/eos",       // from eos
-		"/srv/salt",          // hardcoded but valid
 		"/opt/vault",         // hardcoded but valid
 		"/opt/nomad",         // hardcoded but valid
 		"/opt/consul",        // hardcoded but valid

@@ -9,7 +9,7 @@ var DeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy applications and services to various environments",
 	Long: `Deploy applications and services with advanced deployment strategies and comprehensive
-orchestration following the Salt → Terraform → Nomad hierarchy.
+orchestration following the  → Terraform → Nomad hierarchy.
 
 The deployment system provides sophisticated deployment strategies, progressive rollouts,
 comprehensive health checking, and automated rollback capabilities. All deployments follow

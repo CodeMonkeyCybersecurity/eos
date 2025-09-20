@@ -61,7 +61,6 @@ const (
 	LegacyNomadPort     = 4646
 	LegacyConsulPort    = 8500
 	LegacyVaultPort     = 8200
-	LegacySaltAPIPort   = 8000
 	LegacyCaddyPort     = 2019
 	LegacyAuthentikPort = 9000
 )

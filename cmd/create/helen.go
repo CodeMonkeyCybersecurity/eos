@@ -1,6 +1,6 @@
 // cmd/create/helen.go
 //
-// Helen Integration Specifications
+// # Helen Integration Specifications
 //
 // Helen is a dual-mode website deployment platform within the EOS infrastructure
 // compiler framework. It supports both static website hosting and full Ghost CMS
@@ -12,7 +12,7 @@
 //
 // Helen follows the EOS dual-layer architecture:
 //
-// - **Infrastructure Layer (SaltStack)**: Manages prerequisites like Docker, Nomad, Consul
+// - **Infrastructure Layer ()**: Manages prerequisites like Docker, Nomad, Consul
 // - **Application Layer (Nomad)**: Deploys Helen as containerized workload
 //
 // ## Deployment Modes
@@ -62,7 +62,6 @@
 // - pkg/helen/ - Helen deployment and configuration logic
 // - pkg/hecate/ - Reverse proxy integration and SSL management
 // - cmd/create/helen.go - CLI command implementation and user interface
-//
 package create
 
 import (

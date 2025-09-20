@@ -207,28 +207,6 @@ systemctl start vault
 # Set VAULT_ADDR for commands
 export VAULT_ADDR="http://127.0.0.1:8200"
 
-# Install Salt Minion
-curl -fsSL https://repo.saltproject.io/py3/ubuntu/22.04/amd64/latest/SALTSTACK-GPG-KEY.pub | apt-key add -
-echo "deb https://repo.saltproject.io/py3/ubuntu/22.04/amd64/latest jammy main" > /etc/apt/sources.list.d/saltstack.list
-apt-get update
-apt-get install -y salt-minion
-
-# Configure Salt Minion
-cat > /etc/salt/minion <<EOF
-master: salt.service.consul
-id: vault-${ENVIRONMENT}-${INSTANCE_ID}
-grains:
-  roles:
-    - vault
-  environment: ${ENVIRONMENT}
-  component: ${COMPONENT}
-  vault_addr: http://${PRIVATE_IP}:8200
-EOF
-
-# Start Salt Minion
-systemctl enable salt-minion
-systemctl start salt-minion
-
 # Create backup script
 cat > /usr/local/bin/vault-backup.sh <<'EOF'
 #!/bin/bash

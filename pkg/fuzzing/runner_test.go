@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 func TestExtractFuzzTests(t *testing.T) {
 	// Create a temporary test file
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "example_test.go")
-	
+
 	testContent := `package example
 
 import "testing"
@@ -39,16 +39,16 @@ func TestRegular(t *testing.T) {
 	// Not a fuzz test
 }
 `
-	
+
 	err := os.WriteFile(testFile, []byte(testContent), 0644)
 	require.NoError(t, err)
-	
+
 	rc := NewTestContext(t)
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	tests, err := extractFuzzTests(testFile, logger)
 	require.NoError(t, err)
-	
+
 	assert.Len(t, tests, 2)
 	assert.Equal(t, "FuzzExample", tests[0].Name)
 	assert.Equal(t, "FuzzAnother", tests[1].Name)
@@ -74,9 +74,9 @@ func TestCategorizeTest(t *testing.T) {
 			expected: CategorySecurityCritical,
 		},
 		{
-			name:     "architecture - saltstack",
+			name:     "architecture - ",
 			test:     FuzzTest{Name: "FuzzDeploy"},
-			filePath: "pkg/saltstack/deploy_test.go",
+			filePath: "pkg//deploy_test.go",
 			expected: CategoryArchitecture,
 		},
 		{
@@ -86,7 +86,7 @@ func TestCategorizeTest(t *testing.T) {
 			expected: CategoryComponent,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := categorizeTest(tt.test, tt.filePath)
@@ -124,7 +124,7 @@ func TestExtractExecutionCount(t *testing.T) {
 			expected: 0,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractExecutionCount(tt.output)
@@ -155,7 +155,7 @@ func TestExtractNewInputs(t *testing.T) {
 			expected: 5, // Takes first match
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractNewInputs(tt.output)
@@ -198,7 +198,7 @@ PASS`,
 			expectCrash: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractCrashData(tt.output)
@@ -217,7 +217,7 @@ PASS`,
 func TestGenerateMarkdownReport(t *testing.T) {
 	rc := NewTestContext(t)
 	runner := NewRunner(rc, &Config{})
-	
+
 	session := &FuzzSession{
 		ID:        "test-session-123",
 		StartTime: time.Now().Add(-10 * time.Minute),
@@ -258,10 +258,10 @@ func TestGenerateMarkdownReport(t *testing.T) {
 			SecurityAlert:   true,
 		},
 	}
-	
+
 	report, err := runner.generateMarkdownReport(session)
 	require.NoError(t, err)
-	
+
 	// Verify report contains key elements
 	assert.Contains(t, report, "# Fuzzing Session Report")
 	assert.Contains(t, report, "test-session-123")
@@ -277,22 +277,22 @@ func TestGenerateMarkdownReport(t *testing.T) {
 func TestGenerateTextReport(t *testing.T) {
 	rc := NewTestContext(t)
 	runner := NewRunner(rc, &Config{})
-	
+
 	session := &FuzzSession{
 		ID: "test-123",
 		Summary: SessionSummary{
-			TotalTests:      10,
-			PassedTests:     8,
-			FailedTests:     2,
-			SuccessRate:     0.8,
-			TotalDuration:   1 * time.Minute,
-			SecurityAlert:   false,
+			TotalTests:    10,
+			PassedTests:   8,
+			FailedTests:   2,
+			SuccessRate:   0.8,
+			TotalDuration: 1 * time.Minute,
+			SecurityAlert: false,
 		},
 	}
-	
+
 	report, err := runner.generateTextReport(session)
 	require.NoError(t, err)
-	
+
 	// Verify text report format
 	assert.Contains(t, report, "FUZZING SESSION REPORT")
 	assert.Contains(t, report, "Session ID: test-123")
@@ -303,7 +303,7 @@ func TestGenerateTextReport(t *testing.T) {
 func TestSelectTests(t *testing.T) {
 	rc := NewTestContext(t)
 	runner := NewRunner(rc, &Config{})
-	
+
 	discovery := &TestDiscovery{
 		SecurityCritical: []FuzzTest{
 			{Name: "FuzzAuth", Category: CategorySecurityCritical},
@@ -317,7 +317,7 @@ func TestSelectTests(t *testing.T) {
 			{Name: "FuzzValidator", Category: CategoryComponent},
 		},
 	}
-	
+
 	tests := []struct {
 		name     string
 		config   Config
@@ -352,12 +352,12 @@ func TestSelectTests(t *testing.T) {
 			hasAuth:  true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			selected := runner.selectTests(discovery, tt.config)
 			assert.Len(t, selected, tt.expected)
-			
+
 			// Check if security tests are included when expected
 			hasAuth := false
 			for _, test := range selected {
@@ -374,7 +374,7 @@ func TestSelectTests(t *testing.T) {
 func TestCalculateSummary(t *testing.T) {
 	rc := NewTestContext(t)
 	runner := NewRunner(rc, &Config{})
-	
+
 	results := []TestResult{
 		{
 			Success:    true,
@@ -393,9 +393,9 @@ func TestCalculateSummary(t *testing.T) {
 			CrashData:  &CrashData{},
 		},
 	}
-	
+
 	summary := runner.calculateSummary(results)
-	
+
 	assert.Equal(t, 3, summary.TotalTests)
 	assert.Equal(t, 2, summary.PassedTests)
 	assert.Equal(t, 1, summary.FailedTests)
@@ -409,18 +409,18 @@ func TestCalculateSummary(t *testing.T) {
 func TestDiscoverTests(t *testing.T) {
 	// Create temporary test structure
 	tempDir := t.TempDir()
-	
+
 	// Create test files in different categories
 	testFiles := map[string]string{
 		"pkg/crypto/crypto_fuzz_test.go": `package crypto
 func FuzzEncrypt(f *testing.F) {}
 func FuzzDecrypt(f *testing.F) {}`,
-		"pkg/saltstack/salt_fuzz_test.go": `package saltstack  
+		"pkg//_fuzz_test.go": `package   
 func FuzzDeploy(f *testing.F) {}`,
 		"pkg/utils/util_fuzz_test.go": `package utils
 func FuzzParser(f *testing.F) {}`,
 	}
-	
+
 	for path, content := range testFiles {
 		fullPath := filepath.Join(tempDir, path)
 		err := os.MkdirAll(filepath.Dir(fullPath), 0755)
@@ -428,19 +428,19 @@ func FuzzParser(f *testing.F) {}`,
 		err = os.WriteFile(fullPath, []byte(content), 0644)
 		require.NoError(t, err)
 	}
-	
+
 	// Change to temp directory for discovery
 	originalWd, _ := os.Getwd()
 	err := os.Chdir(tempDir)
 	require.NoError(t, err)
 	defer func() { _ = os.Chdir(originalWd) }()
-	
+
 	rc := NewTestContext(t)
 	runner := NewRunner(rc, &Config{})
-	
+
 	discovery, err := runner.DiscoverTests(context.Background())
 	require.NoError(t, err)
-	
+
 	// Verify categorization
 	assert.Equal(t, 2, len(discovery.SecurityCritical))
 	assert.Equal(t, 1, len(discovery.Architecture))
@@ -458,7 +458,7 @@ func TestExtractPackageName(t *testing.T) {
 		{"./test.go", "."},
 		{"deep/nested/path/test.go", "./deep/nested/path"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.filePath, func(t *testing.T) {
 			result := extractPackageName(tt.filePath)
@@ -470,30 +470,30 @@ func TestExtractPackageName(t *testing.T) {
 func TestRunnerReportFormats(t *testing.T) {
 	rc := NewTestContext(t)
 	runner := NewRunner(rc, &Config{})
-	
+
 	session := &FuzzSession{
-		ID: "test-formats",
+		ID:     "test-formats",
 		Config: Config{},
 		Summary: SessionSummary{
 			TotalTests:  1,
 			PassedTests: 1,
 		},
 	}
-	
+
 	// Test each format
 	formats := []string{
 		ReportFormatMarkdown,
 		ReportFormatJSON,
 		ReportFormatText,
 	}
-	
+
 	for _, format := range formats {
 		t.Run(format, func(t *testing.T) {
 			session.Config.ReportFormat = format
 			report, err := runner.GenerateReport(session)
 			require.NoError(t, err)
 			assert.NotEmpty(t, report)
-			
+
 			// JSON format currently returns error message
 			if format == ReportFormatJSON {
 				assert.Contains(t, report, "not implemented")

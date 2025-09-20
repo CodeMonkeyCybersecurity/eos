@@ -17,7 +17,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	vaultcleanup "github.com/CodeMonkeyCybersecurity/eos/pkg/vault/cleanup"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -25,10 +25,10 @@ import (
 // ExecuteRemoval executes the infrastructure removal plan
 func ExecuteRemoval(rc *eos_io.RuntimeContext, config *Config, plan *RemovalPlan) ([]PhaseResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Verify we can proceed with removal
 	logger.Info("Preparing to execute infrastructure removal")
-	
+
 	cli := eos_cli.New(rc)
 	excluded := make(map[string]bool)
 	for _, ex := range config.ExcludeList {
@@ -84,7 +84,7 @@ func ExecuteRemoval(rc *eos_io.RuntimeContext, config *Config, plan *RemovalPlan
 // executePhase1DockerCleanup cleans up Docker resources
 func executePhase1DockerCleanup(rc *eos_io.RuntimeContext, cli *eos_cli.CLI, excluded map[string]bool, keepData bool) PhaseResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	result := PhaseResult{
 		Phase:       1,
 		Description: "Clean up Docker resources",
@@ -122,7 +122,7 @@ func executePhase1DockerCleanup(rc *eos_io.RuntimeContext, cli *eos_cli.CLI, exc
 // executePhase2ApplicationServices stops application services
 func executePhase2ApplicationServices(rc *eos_io.RuntimeContext, excluded map[string]bool, keepData bool) PhaseResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	result := PhaseResult{
 		Phase:       2,
 		Description: "Stop application services",
@@ -165,7 +165,7 @@ func executePhase2ApplicationServices(rc *eos_io.RuntimeContext, excluded map[st
 // executePhase3InfrastructureServices stops infrastructure services
 func executePhase3InfrastructureServices(rc *eos_io.RuntimeContext, cli *eos_cli.CLI, services []ServiceConfig) PhaseResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	result := PhaseResult{
 		Phase:       3,
 		Description: "Stop infrastructure services",
@@ -179,8 +179,8 @@ func executePhase3InfrastructureServices(rc *eos_io.RuntimeContext, cli *eos_cli
 
 	for _, svc := range services {
 		if err := stopService(rc, cli, svc.Name); err != nil {
-			logger.Debug("Service stop failed", 
-				zap.String("service", svc.Name), 
+			logger.Debug("Service stop failed",
+				zap.String("service", svc.Name),
 				zap.Error(err))
 			failed = append(failed, svc.Name)
 		} else {
@@ -207,7 +207,7 @@ func executePhase3InfrastructureServices(rc *eos_io.RuntimeContext, cli *eos_cli
 // executePhase4PackagesAndBinaries removes packages and binaries
 func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[string]bool, keepData bool) PhaseResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	result := PhaseResult{
 		Phase:       4,
 		Description: "Remove packages and binaries",
@@ -236,15 +236,15 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 		}
 	}
 
-	// Salt removal is no longer needed - migrated to HashiCorp stack
-	if !excluded["salt"] {
-		logger.Info("Salt removal skipped - already migrated to HashiCorp stack")
+	//  removal is no longer needed - migrated to HashiCorp stack
+	if !excluded[""] {
+		logger.Info(" removal skipped - already migrated to HashiCorp stack")
 	}
 
 	// Remove Vault using its lifecycle manager
 	if !excluded["vault"] {
 		logger.Info("Removing Vault completely")
-		if err := vault.RemoveVaultViaSalt(rc); err != nil {
+		if err := vaultcleanup.RemoveVaultPackages(rc, "auto"); err != nil {
 			logger.Warn("Vault removal had issues", zap.Error(err))
 			errors = append(errors, fmt.Sprintf("vault: %v", err))
 		}
@@ -324,7 +324,7 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 // executePhase5DirectoriesAndFiles cleans up directories and files
 func executePhase5DirectoriesAndFiles(rc *eos_io.RuntimeContext, cli *eos_cli.CLI, directories []DirectoryConfig, devMode bool) PhaseResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	result := PhaseResult{
 		Phase:       5,
 		Description: "Clean up directories and files",
@@ -348,7 +348,7 @@ func executePhase5DirectoriesAndFiles(rc *eos_io.RuntimeContext, cli *eos_cli.CL
 			logger.Info("Removing directory",
 				zap.String("path", dir.Path),
 				zap.String("description", dir.Description))
-			
+
 			if err := os.RemoveAll(dir.Path); err != nil {
 				logger.Error("Failed to remove directory",
 					zap.String("path", dir.Path),
@@ -385,7 +385,6 @@ func commandExists(cli *eos_cli.CLI, cmd string) bool {
 	_, err := cli.Which(cmd)
 	return err == nil
 }
-
 
 func stopNomadJobs(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -477,7 +476,7 @@ func removeBinaries(rc *eos_io.RuntimeContext, excluded map[string]bool) []strin
 func cleanupSystemdServices(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Systemd cleanup delegated to component lifecycle managers")
-	
+
 	// All systemd files are now handled by their respective lifecycle managers
 	// Just reload systemd to ensure any removed services are cleaned up
 	cli := eos_cli.New(rc)
@@ -489,9 +488,9 @@ func cleanupSystemdServices(rc *eos_io.RuntimeContext) {
 func cleanupAPTSources(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("APT source cleanup delegated to component lifecycle managers")
-	
+
 	// All APT sources are now handled by their respective lifecycle managers
-	// Components like osquery, saltstack, etc. handle their own APT sources
+	// Components like osquery, , etc. handle their own APT sources
 }
 
 // cleanupAPTPackages delegates to the system package lifecycle manager

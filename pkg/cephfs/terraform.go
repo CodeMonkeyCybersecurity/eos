@@ -59,7 +59,7 @@ func assessTerraformPrerequisites(rc *eos_io.RuntimeContext, config *Config) err
 	// Check if Terraform configuration exists
 	configPath := GetTerraformCephConfigPath()
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("terraform configuration not found at %s: run SaltStack generation first", configPath))
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("terraform configuration not found at %s: run  generation first", configPath))
 	}
 
 	// Check SSH connectivity to admin host

@@ -393,41 +393,6 @@ func (c *AuthentikClient) GetPolicyByName(rc *eos_io.RuntimeContext, name string
 
 // Helper function implementations for the existing auth.go
 
-func authPolicyExistsImpl(rc *eos_io.RuntimeContext, policyName string) (bool, error) {
-	client, err := NewAuthentikClient(rc)
-	if err != nil {
-		return false, err
-	}
-	
-	_, err = client.GetPolicyByName(rc, policyName)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			return false, nil
-		}
-		return false, err
-	}
-	
-	return true, nil
-}
-
-func getAuthPolicyIDImpl(rc *eos_io.RuntimeContext, policyName string) (string, error) {
-	client, err := NewAuthentikClient(rc)
-	if err != nil {
-		return "", err
-	}
-	
-	policy, err := client.GetPolicyByName(rc, policyName)
-	if err != nil {
-		return "", err
-	}
-	
-	id, ok := policy["pk"].(string)
-	if !ok {
-		return "", fmt.Errorf("invalid policy ID format")
-	}
-	
-	return id, nil
-}
 
 // AuthFlow represents an authentication flow in Authentik
 type AuthFlow struct {

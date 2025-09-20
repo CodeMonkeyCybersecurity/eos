@@ -14,11 +14,11 @@ import (
 var systemUpdateCmd = &cobra.Command{
 	Use:   "system [target]",
 	Short: "Apply comprehensive security hardening to target systems",
-	Long: `Apply comprehensive security hardening to target systems using SaltStack.
+	Long: `Apply comprehensive security hardening to target systems using .
 
 This command follows the assessment→intervention→evaluation model:
 1. Assessment: Evaluates current security posture
-2. Intervention: Applies security hardening measures via SaltStack
+2. Intervention: Applies security hardening measures via 
 3. Evaluation: Verifies security improvements
 
 Examples:
@@ -35,7 +35,6 @@ Examples:
 
 		target := args[0]
 		profile, _ := cmd.Flags().GetString("profile")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
@@ -46,7 +45,6 @@ Examples:
 
 		// Suppress unused variable warnings
 		_ = profile
-		_ = saltAPI
 		_ = vaultPath
 		_ = dryRun
 
@@ -62,7 +60,7 @@ Examples:
 var twoFactorCmd = &cobra.Command{
 	Use:   "2fa [target]",
 	Short: "Setup two-factor authentication on target systems",
-	Long: `Setup two-factor authentication (2FA) on target systems using SaltStack.
+	Long: `Setup two-factor authentication (2FA) on target systems using .
 
 Supported 2FA methods:
 - TOTP (Time-based One-Time Password) via Google Authenticator
@@ -84,7 +82,7 @@ Examples:
 		target := args[0]
 		method, _ := cmd.Flags().GetString("method")
 		users, _ := cmd.Flags().GetStringSlice("users")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
+		API, _ := cmd.Flags().GetString("-api")
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 		enforceSSH, _ := cmd.Flags().GetBool("enforce-ssh")
 		enforceSudo, _ := cmd.Flags().GetBool("enforce-sudo")
@@ -97,7 +95,7 @@ Examples:
 		// Suppress unused variable warnings
 		_ = method
 		_ = users
-		_ = saltAPI
+		_ = API
 		_ = vaultPath
 		_ = enforceSSH
 		_ = enforceSudo
@@ -114,8 +112,8 @@ Examples:
 
 var manageServicesCmd = &cobra.Command{
 	Use:   "services [target]",
-	Short: "Manage system services via SaltStack",
-	Long: `Manage system services on target minions using SaltStack.
+	Short: "Manage system services via ",
+	Long: `Manage system services on target minions using .
 
 This command follows the assessment→intervention→evaluation model:
 1. Assessment: Check current service states
@@ -135,25 +133,8 @@ Examples:
 		}
 
 		target := args[0]
-		configFile, _ := cmd.Flags().GetString("config")
 		serviceName, _ := cmd.Flags().GetString("service")
-		serviceState, _ := cmd.Flags().GetString("state")
-		enable, _ := cmd.Flags().GetBool("enable")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
-		vaultPath, _ := cmd.Flags().GetString("vault-path")
-
-		logger.Info("Managing services via SaltStack",
-			zap.String("target", target),
-			zap.String("service", serviceName),
-			zap.String("state", serviceState))
-
-		// Suppress unused variable warnings
-		_ = configFile
-		_ = serviceName
-		_ = serviceState
-		_ = enable
-		_ = saltAPI
-		_ = vaultPath
+		// Note: Other flags removed as they're not needed for administrator escalation
 
 		// Assessment: Service management requires administrator intervention
 		logger.Warn("Service management requires administrator intervention - HashiCorp stack cannot modify system services",
@@ -166,8 +147,8 @@ Examples:
 
 var manageCronCmd = &cobra.Command{
 	Use:   "cron [target]",
-	Short: "Manage cron jobs via SaltStack",
-	Long: `Manage cron jobs on target minions using SaltStack.
+	Short: "Manage cron jobs via ",
+	Long: `Manage cron jobs on target minions using .
 
 Examples:
   eos manage cron "*" --config cron.json
@@ -189,10 +170,10 @@ Examples:
 		hour, _ := cmd.Flags().GetString("hour")
 		user, _ := cmd.Flags().GetString("user")
 		present, _ := cmd.Flags().GetBool("present")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
+		API, _ := cmd.Flags().GetString("-api")
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 
-		logger.Info("Managing cron jobs via SaltStack",
+		logger.Info("Managing cron jobs via ",
 			zap.String("target", target),
 			zap.String("job", jobName))
 
@@ -204,7 +185,7 @@ Examples:
 		_ = hour
 		_ = user
 		_ = present
-		_ = saltAPI
+		_ = API
 		_ = vaultPath
 
 		// Assessment: Cron job management requires administrator intervention
@@ -218,10 +199,10 @@ Examples:
 
 var manageUsersCmd = &cobra.Command{
 	Use:   "users [target]",
-	Short: "Manage user accounts via SaltStack",
-	Long: `Manage user accounts on target minions using SaltStack.
+	Short: "Manage user accounts via ",
+	Long: `Manage user accounts on target minions using .
 
-This replaces traditional user management scripts with Salt-based automation
+This replaces traditional user management scripts with -based automation
 following the assessment→intervention→evaluation pattern.
 
 Examples:
@@ -237,28 +218,12 @@ Examples:
 		}
 
 		target := args[0]
-		configFile, _ := cmd.Flags().GetString("config")
 		username, _ := cmd.Flags().GetString("user")
-		groups, _ := cmd.Flags().GetStringSlice("groups")
-		shell, _ := cmd.Flags().GetString("shell")
-		home, _ := cmd.Flags().GetString("home")
-		present, _ := cmd.Flags().GetBool("present")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
-		vaultPath, _ := cmd.Flags().GetString("vault-path")
+		// Note: Other flags removed as they're not needed for administrator escalation
 
-		logger.Info("Managing users via SaltStack",
+		logger.Info("Managing users via ",
 			zap.String("target", target),
 			zap.String("user", username))
-
-		// Suppress unused variable warnings
-		_ = configFile
-		_ = username
-		_ = groups
-		_ = shell
-		_ = home
-		_ = present
-		_ = saltAPI
-		_ = vaultPath
 
 		// Assessment: User management requires administrator intervention
 		logger.Warn("User management requires administrator intervention - HashiCorp stack cannot modify system users",
@@ -271,7 +236,7 @@ Examples:
 
 var manageStateCmd = &cobra.Command{
 	Use:   "state [target]",
-	Short: "Apply comprehensive system state via SaltStack",
+	Short: "Apply comprehensive system state via ",
 	Long: `Apply comprehensive system state including services, users, cron jobs, and packages.
 
 This command provides holistic system management by applying multiple 
@@ -291,20 +256,13 @@ Examples:
 		target := args[0]
 		configFile, _ := cmd.Flags().GetString("config")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		saltAPI, _ := cmd.Flags().GetString("salt-api")
-		vaultPath, _ := cmd.Flags().GetString("vault-path")
+		// Note: vaultPath removed as it's not needed for administrator escalation
 
 		if configFile == "" {
 			return eos_err.NewUserError("--config file must be specified")
 		}
 
-		// Suppress unused variable warnings
-		_ = configFile
-		_ = dryRun
-		_ = saltAPI
-		_ = vaultPath
-
-		logger.Info("Applying system state via SaltStack",
+		logger.Info("Applying system state via ",
 			zap.String("target", target),
 			zap.String("config_file", configFile),
 			zap.Bool("dry_run", dryRun))
@@ -324,7 +282,6 @@ func init() {
 	manageServicesCmd.Flags().String("service", "", "Single service name to manage")
 	manageServicesCmd.Flags().String("state", "running", "Service state: running, stopped")
 	manageServicesCmd.Flags().Bool("enable", true, "Enable service on boot")
-	manageServicesCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
 	manageServicesCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
 
 	// Cron management command
@@ -335,7 +292,6 @@ func init() {
 	manageCronCmd.Flags().String("hour", "*", "Hour field (0-23)")
 	manageCronCmd.Flags().String("user", "root", "User to run the cron job as")
 	manageCronCmd.Flags().Bool("present", true, "Whether the cron job should be present")
-	manageCronCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
 	manageCronCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
 
 	// Users management command
@@ -345,13 +301,11 @@ func init() {
 	manageUsersCmd.Flags().String("shell", "/bin/bash", "User's shell")
 	manageUsersCmd.Flags().String("home", "", "User's home directory")
 	manageUsersCmd.Flags().Bool("present", true, "Whether the user should be present")
-	manageUsersCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
 	manageUsersCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
 
 	// System state management command
 	manageStateCmd.Flags().String("config", "", "System state configuration file")
 	manageStateCmd.Flags().Bool("dry-run", false, "Show what would be done without applying changes")
-	manageStateCmd.Flags().String("salt-api", "https://localhost:8000", "Salt API URL")
 	manageStateCmd.Flags().String("vault-path", "secret/eos", "Vault base path for secrets")
 
 	UpdateCmd.AddCommand(manageServicesCmd)

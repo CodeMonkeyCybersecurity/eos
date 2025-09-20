@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// RemoveHecateCompletely removes all Hecate components using SaltStack and manual cleanup
+// RemoveHecateCompletely removes all Hecate components using  and manual cleanup
 func RemoveHecateCompletely(rc *eos_io.RuntimeContext, keepData bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting complete Hecate removal",
@@ -49,7 +49,7 @@ func assessHecateComponents(rc *eos_io.RuntimeContext) error {
 	// Check Nomad jobs
 	hecateJobs := []string{
 		"hecate-caddy",
-		"hecate-authentik-server", 
+		"hecate-authentik-server",
 		"hecate-authentik-worker",
 		"hecate-redis",
 		"hecate-postgres",
@@ -87,7 +87,7 @@ func assessHecateComponents(rc *eos_io.RuntimeContext) error {
 	// Check for Vault secrets
 	hecateSecrets := []string{
 		"secret/hecate/postgres/root_password",
-		"secret/hecate/postgres/password", 
+		"secret/hecate/postgres/password",
 		"secret/hecate/redis/password",
 		"secret/hecate/authentik/secret_key",
 		"secret/hecate/authentik/admin",
@@ -125,9 +125,9 @@ func removeHecateServices(rc *eos_io.RuntimeContext, keepData bool) error {
 		return fmt.Errorf("failed to stop Nomad jobs: %w", err)
 	}
 
-	// Phase 2: Remove Salt-managed components via Salt removal state
-	if err := removeBySalt(rc); err != nil {
-		logger.Warn("Salt-based removal failed, continuing with manual removal", zap.Error(err))
+	// Phase 2: Remove -managed components via  removal state
+	if err := removeBy(rc); err != nil {
+		logger.Warn("-based removal failed, continuing with manual removal", zap.Error(err))
 	}
 
 	// Phase 3: Remove Vault secrets
@@ -156,21 +156,21 @@ func stopHecateNomadJobs(rc *eos_io.RuntimeContext) error {
 	hecateJobs := []string{
 		"hecate-caddy",
 		"hecate-authentik-server",
-		"hecate-authentik-worker", 
+		"hecate-authentik-worker",
 		"hecate-redis",
 		"hecate-postgres",
 	}
 
 	for _, job := range hecateJobs {
 		logger.Info("Stopping Nomad job", zap.String("job", job))
-		
+
 		// Stop and purge the job
 		output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "nomad",
 			Args:    []string{"job", "stop", "-purge", job},
 			Capture: true,
 		})
-		
+
 		if err != nil {
 			logger.Debug("Job stop failed (may not exist)",
 				zap.String("job", job),
@@ -185,10 +185,10 @@ func stopHecateNomadJobs(rc *eos_io.RuntimeContext) error {
 	// Wait for jobs to fully terminate with retry logic
 	logger.Info("Waiting for jobs to terminate...")
 	maxRetries := 12 // 60 seconds total (5 second intervals)
-	
+
 	for retry := 0; retry < maxRetries; retry++ {
 		time.Sleep(5 * time.Second)
-		
+
 		var stillRunning []string
 		for _, job := range hecateJobs {
 			_, err := execute.Run(rc.Ctx, execute.Options{
@@ -200,17 +200,17 @@ func stopHecateNomadJobs(rc *eos_io.RuntimeContext) error {
 				stillRunning = append(stillRunning, job)
 			}
 		}
-		
+
 		if len(stillRunning) == 0 {
 			logger.Info("All Hecate jobs terminated successfully")
 			break
 		}
-		
+
 		logger.Info("Still waiting for jobs to terminate",
 			zap.Strings("jobs", stillRunning),
 			zap.Int("retry", retry+1),
 			zap.Int("max_retries", maxRetries))
-		
+
 		// Force-kill remaining jobs if we're on the last retry
 		if retry == maxRetries-1 {
 			logger.Warn("Forcing termination of remaining jobs")
@@ -242,28 +242,28 @@ func stopHecateNomadJobs(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// removeBySalt attempts to remove Hecate using SaltStack removal states
-func removeBySalt(rc *eos_io.RuntimeContext) error {
+// removeBy attempts to remove Hecate using  removal states
+func removeBy(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Attempting Salt-based Hecate removal")
+	logger.Info("Attempting -based Hecate removal")
 
-	// First check if salt-call is available
+	// First check if -call is available
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "which",
-		Args:    []string{"salt-call"},
+		Args:    []string{"-call"},
 		Capture: true,
 	})
 	if err != nil {
-		logger.Info("Salt not available, skipping Salt-based removal")
-		return fmt.Errorf("salt-call not available: %w", err)
+		logger.Info(" not available, skipping -based removal")
+		return fmt.Errorf("-call not available: %w", err)
 	}
 
-	// Check if Salt removal state exists
+	// Check if  removal state exists
 	removalState := "hecate.remove"
-	
+
 	// Try to apply the removal state
 	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
+		Command: "-call",
 		Args: []string{
 			"state.apply",
 			removalState,
@@ -274,16 +274,16 @@ func removeBySalt(rc *eos_io.RuntimeContext) error {
 	})
 
 	if err != nil {
-		logger.Debug("Salt removal state failed or doesn't exist",
+		logger.Debug(" removal state failed or doesn't exist",
 			zap.String("state", removalState),
 			zap.Error(err),
 			zap.String("output", output))
-		return fmt.Errorf("salt removal failed: command failed after 0 attempts: %w", err)
+		return fmt.Errorf(" removal failed: command failed after 0 attempts: %w", err)
 	}
 
-	logger.Info("Salt-based removal completed",
+	logger.Info("-based removal completed",
 		zap.String("state", removalState))
-	
+
 	return nil
 }
 
@@ -295,20 +295,20 @@ func removeHecateVaultSecrets(rc *eos_io.RuntimeContext) error {
 	hecateSecrets := []string{
 		"secret/hecate/postgres/root_password",
 		"secret/hecate/postgres/password",
-		"secret/hecate/redis/password", 
+		"secret/hecate/redis/password",
 		"secret/hecate/authentik/secret_key",
 		"secret/hecate/authentik/admin",
 	}
 
 	for _, secret := range hecateSecrets {
 		logger.Debug("Removing Vault secret", zap.String("secret", secret))
-		
+
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "vault",
 			Args:    []string{"kv", "delete", secret},
 			Capture: true,
 		})
-		
+
 		if err != nil {
 			logger.Debug("Secret removal failed (may not exist)",
 				zap.String("secret", secret),
@@ -343,17 +343,17 @@ func removeHecateDirectories(rc *eos_io.RuntimeContext, keepData bool) error {
 		desc   string
 	}{
 		{"/opt/hecate", false, "Hecate application directory"},
-		{"/etc/hecate", false, "Hecate configuration directory"}, 
+		{"/etc/hecate", false, "Hecate configuration directory"},
 		{"/var/lib/hecate", true, "Hecate data directory"},
 		{"/var/log/hecate", true, "Hecate log directory"},
-		{"/srv/salt/hecate", false, "Hecate Salt states"},
-		{"/srv/pillar/hecate", false, "Hecate Salt pillar data"},
+		{"/srv//hecate", false, "Hecate  states"},
+		{"/srv//hecate", false, "Hecate   data"},
 	}
 
 	for _, dir := range directories {
 		// Skip data directories if keepData is true
 		if dir.isData && keepData {
-			logger.Info("Keeping data directory", 
+			logger.Info("Keeping data directory",
 				zap.String("directory", dir.path),
 				zap.String("description", dir.desc))
 			continue
@@ -363,7 +363,7 @@ func removeHecateDirectories(rc *eos_io.RuntimeContext, keepData bool) error {
 			logger.Info("Removing directory",
 				zap.String("directory", dir.path),
 				zap.String("description", dir.desc))
-			
+
 			if err := os.RemoveAll(dir.path); err != nil {
 				logger.Error("Failed to remove directory",
 					zap.String("directory", dir.path),
@@ -433,21 +433,21 @@ func removeHecateSystemdServices(rc *eos_io.RuntimeContext) error {
 			Args:    []string{"list-unit-files", service + ".service"},
 			Capture: true,
 		})
-		
+
 		if err == nil {
 			logger.Info("Found Hecate service, stopping and disabling",
 				zap.String("service", service))
-			
+
 			// Stop service
 			execute.Run(rc.Ctx, execute.Options{
 				Command: "systemctl",
 				Args:    []string{"stop", service},
 				Capture: true,
 			})
-			
-			// Disable service  
+
+			// Disable service
 			execute.Run(rc.Ctx, execute.Options{
-				Command: "systemctl", 
+				Command: "systemctl",
 				Args:    []string{"disable", service},
 				Capture: true,
 			})
@@ -476,7 +476,7 @@ func verifyHecateRemoval(rc *eos_io.RuntimeContext) error {
 		"hecate-caddy",
 		"hecate-authentik-server",
 		"hecate-authentik-worker",
-		"hecate-redis", 
+		"hecate-redis",
 		"hecate-postgres",
 	}
 

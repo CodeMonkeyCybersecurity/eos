@@ -2,6 +2,8 @@
 package list
 
 import (
+	"fmt"
+
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -67,12 +69,19 @@ func init() {
 
 func filterServicesByStatus(services interface{}, status string) interface{} {
 	// TODO: Implement filtering based on actual service structure
-	// For now, just return the services as-is
+	// For now, log the filtering request and return the services as-is
+	fmt.Printf("Filtering services by status: %s\n", status)
 	return services
 }
 
 func displayServicesTable(services interface{}, detailed bool) error {
 	// TODO: Implement service table display based on actual service structure
 	// This would typically iterate through services and format them nicely
+	if detailed {
+		fmt.Println("Detailed service information requested")
+	} else {
+		fmt.Println("Basic service information")
+	}
+	fmt.Printf("Services: %v\n", services)
 	return nil
 }

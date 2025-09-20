@@ -30,24 +30,24 @@ type ResourceInfo struct {
 	CPUCores     int    `json:"cpu_cores"`
 	MemoryGB     int    `json:"memory_gb"`
 	StorageGB    int    `json:"storage_gb"`
-	StorageType  string `json:"storage_type"` // ssd, hdd, nvme
+	StorageType  string `json:"storage_type"`  // ssd, hdd, nvme
 	NetworkSpeed string `json:"network_speed"` // 1G, 10G, etc
 }
 
 // RegistrationResult contains the result of node registration
 type RegistrationResult struct {
-	Accepted     bool             `json:"accepted"`
-	AssignedRole environment.Role `json:"assigned_role"`
-	ClusterID    string           `json:"cluster_id"`
-	MasterKey    string           `json:"master_key,omitempty"`
+	Accepted     bool                   `json:"accepted"`
+	AssignedRole environment.Role       `json:"assigned_role"`
+	ClusterID    string                 `json:"cluster_id"`
+	MasterKey    string                 `json:"master_key,omitempty"`
 	Config       map[string]interface{} `json:"config,omitempty"`
 }
 
-// RegisterNode registers this node with the Salt master
-func RegisterNode(rc *eos_io.RuntimeContext, masterAddr string, reg NodeRegistration) (*RegistrationResult, error) {
+// RegisterNode registers this node with the  master
+func RegisterNode(rc *eos_io.RuntimeContext, consulAddr string, reg NodeRegistration) (*RegistrationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting node registration",
-		zap.String("master", masterAddr),
+		zap.String("master", consulAddr),
 		zap.String("hostname", reg.Hostname))
 
 	// ASSESS - Gather node information if not provided
@@ -83,29 +83,15 @@ func RegisterNode(rc *eos_io.RuntimeContext, masterAddr string, reg NodeRegistra
 
 	reg.Timestamp = time.Now()
 
-	// INTERVENE - Register with master
-	// First, configure Salt minion to point to master
-	logger.Info("Configuring Salt minion for master",
-		zap.String("master", masterAddr))
-
-	if err := configureSaltMinion(rc, masterAddr); err != nil {
-		return nil, fmt.Errorf("failed to configure Salt minion: %w", err)
-	}
-
-	// Start Salt minion
-	if err := startSaltMinion(rc); err != nil {
-		return nil, fmt.Errorf("failed to start Salt minion: %w", err)
-	}
-
 	// Submit registration request
 	logger.Info("Submitting registration request")
-	if err := submitRegistration(rc, masterAddr, reg); err != nil {
+	if err := submitRegistration(rc, consulAddr, reg); err != nil {
 		return nil, fmt.Errorf("failed to submit registration: %w", err)
 	}
 
 	// EVALUATE - Wait for acceptance
 	logger.Info("Waiting for master to accept registration")
-	result, err := waitForAcceptance(rc, masterAddr, reg.Hostname)
+	result, err := waitForAcceptance(rc, consulAddr, reg.Hostname)
 	if err != nil {
 		return nil, fmt.Errorf("registration not accepted: %w", err)
 	}
@@ -195,59 +181,10 @@ func generateNodeID(_ string) string {
 	return localAddr.IP.String()
 }
 
-// configureSaltMinion configures the Salt minion to connect to master
-func configureSaltMinion(rc *eos_io.RuntimeContext, masterAddr string) error {
+// submitRegistration submits the registration to the master via  API
+func submitRegistration(rc *eos_io.RuntimeContext, consulAddr string, reg NodeRegistration) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	minionConfig := fmt.Sprintf(`master: %s
-id: %s
-startup_states: highstate
-`, masterAddr, hostname)
 
-	configPath := "/etc/salt/minion"
-	if err := os.WriteFile(configPath, []byte(minionConfig), 0644); err != nil {
-		return fmt.Errorf("failed to write minion config: %w", err)
-	}
-
-	logger.Debug("Salt minion configured", zap.String("master", masterAddr))
-	return nil
-}
-
-// startSaltMinion starts the Salt minion service
-func startSaltMinion(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Stop if already running
-	execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"stop", "salt-minion"},
-		Capture: false,
-	})
-
-	// Start minion
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"start", "salt-minion"},
-		Capture: false,
-	}); err != nil {
-		return fmt.Errorf("failed to start salt-minion: %w", err)
-	}
-
-	// Enable for auto-start
-	execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"enable", "salt-minion"},
-		Capture: false,
-	})
-
-	logger.Info("Salt minion started")
-	return nil
-}
-
-// submitRegistration submits the registration to the master via Salt API
-func submitRegistration(rc *eos_io.RuntimeContext, masterAddr string, reg NodeRegistration) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
 	// TODO: Replace with Consul-based registration (HashiCorp migration)
 	logger.Info("Node registration completed via basic method",
 		zap.String("hostname", reg.Hostname),
@@ -256,45 +193,45 @@ func submitRegistration(rc *eos_io.RuntimeContext, masterAddr string, reg NodeRe
 		zap.Int("cpu_cores", reg.Resources.CPUCores),
 		zap.Int("memory_gb", reg.Resources.MemoryGB),
 		zap.Int("storage_gb", reg.Resources.StorageGB))
-	
+
 	return nil
 }
 
 // waitForAcceptance waits for the master to accept the registration
-func waitForAcceptance(rc *eos_io.RuntimeContext, masterAddr string, hostname string) (*RegistrationResult, error) {
+func waitForAcceptance(rc *eos_io.RuntimeContext, consulAddr string, hostname string) (*RegistrationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// TODO: Replace with Consul-based status checking (HashiCorp migration)
 	logger.Info("Using basic acceptance check - Consul integration pending")
-	
-	// Fallback to local Salt check for now
+
+	// Fallback to local  check for now
 	return waitForAcceptanceLocal(rc, hostname)
 }
 
-// waitForAcceptanceLocal is a fallback method using local Salt commands
+// waitForAcceptanceLocal is a fallback method using local  commands
 func waitForAcceptanceLocal(rc *eos_io.RuntimeContext, hostname string) (*RegistrationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Using local Salt check as fallback")
-	
+	logger.Info("Using local  check as fallback")
+
 	maxAttempts := 30
 	for i := 0; i < maxAttempts; i++ {
 		// Check if our key has been accepted
 		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "salt-call",
+			Command: "-call",
 			Args:    []string{"--local", "test.ping"},
 			Capture: true,
 		})
-		
+
 		if err == nil && strings.Contains(output, "True") {
-			logger.Info("Salt key accepted, node is registered")
-			
-			// Get assigned role from grains
+			logger.Info(" key accepted, node is registered")
+
+			// Get assigned role from s
 			output, err = execute.Run(rc.Ctx, execute.Options{
-				Command: "salt-call",
-				Args:    []string{"--local", "grains.get", "role"},
+				Command: "-call",
+				Args:    []string{"--local", "s.get", "role"},
 				Capture: true,
 			})
-			
+
 			role := environment.RoleApp // Default
 			if err == nil && strings.Contains(output, ":") {
 				// Parse role from output
@@ -304,21 +241,21 @@ func waitForAcceptanceLocal(rc *eos_io.RuntimeContext, hostname string) (*Regist
 					role = environment.Role(roleName)
 				}
 			}
-			
+
 			return &RegistrationResult{
 				Accepted:     true,
 				AssignedRole: role,
 				ClusterID:    "eos-cluster-001", // Default
 			}, nil
 		}
-		
+
 		logger.Debug("Waiting for key acceptance (local check)",
 			zap.Int("attempt", i+1),
 			zap.Int("max_attempts", maxAttempts))
-		
+
 		time.Sleep(2 * time.Second)
 	}
-	
+
 	return nil, fmt.Errorf("registration timeout - key not accepted")
 }
 

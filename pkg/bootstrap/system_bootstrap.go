@@ -2,21 +2,21 @@
 //
 // Bootstrap System Improvements
 //
-// This file provides comprehensive bootstrap functionality with enhanced Salt and
-// Salt API setup. The EOS bootstrap system has been enhanced to ensure Salt and
-// Salt API are always set up together as part of the default bootstrap process.
+// This file provides comprehensive bootstrap functionality with enhanced  and
+//  API setup. The EOS bootstrap system has been enhanced to ensure  and
+//  API are always set up together as part of the default bootstrap process.
 //
 // # Bootstrap System Improvements
 //
 // ## Key Improvements
 //
-// ### 1. Mandatory Salt API Setup
-// - Salt API is now marked as `Required: true` in the bootstrap phases
+// ### 1. Mandatory  API Setup
+// -  API is now marked as `Required: true` in the bootstrap phases
 // - The API setup is no longer optional - it's an essential component for EOS operations
-// - Both Salt and Salt API are installed and configured in a single, comprehensive process
+// - Both  and  API are installed and configured in a single, comprehensive process
 //
-// ### 2. Comprehensive Salt Bootstrap
-// The `BootstrapSaltComplete` function provides:
+// ### 2. Comprehensive  Bootstrap
+// The `BootstrapComplete` function provides:
 //
 // **Prerequisites Validation:**
 // - Ubuntu version check (minimum 20.04)
@@ -25,13 +25,11 @@
 // - Network connectivity testing
 //
 // **Intelligent Installation:**
-// - Detects if Salt is already installed
-// - Configures based on deployment type (single-node, master, or minion)
-// - Handles both new installations and existing Salt setups
+// - Detects if  is already installed
+// - Handles both new installations and existing  setups
 //
 // **Proper Configuration:**
-// - Sets up Salt master and minion configurations
-// - Configures Salt API with proper authentication
+// - Configures  API with proper authentication
 // - Establishes secure communication channels
 // - Integrates with EOS service discovery
 //
@@ -49,8 +47,8 @@
 //
 // ## Implementation Status
 //
-// - ✅ Mandatory Salt API setup implemented
-// - ✅ Comprehensive Salt bootstrap operational
+// - ✅ Mandatory  API setup implemented
+// - ✅ Comprehensive  bootstrap operational
 // - ✅ Enhanced error handling and retry mechanisms active
 // - ✅ Integration with HashiCorp stack completed
 // - ✅ Health monitoring and validation implemented
@@ -76,8 +74,8 @@
 //   - ~/.eos/bootstrapped
 //
 // For detailed bootstrap implementation, see:
-// - pkg/bootstrap/setup_salt_api.go - Salt API setup and configuration
-// - pkg/bootstrap/salt_api_client.go - Salt API client integration
+// - pkg/bootstrap/setup__api.go -  API setup and configuration
+// - pkg/bootstrap/_api_client.go -  API client integration
 // - pkg/bootstrap/check.go - Bootstrap validation and health checks
 
 package bootstrap
@@ -106,10 +104,10 @@ func IsSystemBootstrapped() bool {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	// Use the state-based validation system
 	complete, _ := IsBootstrapComplete(rc)
-	
+
 	// Also check for legacy marker files as backup
 	if !complete {
 		// Check primary bootstrap marker (legacy support)
@@ -135,7 +133,7 @@ func IsSystemBootstrapped() bool {
 			}
 		}
 	}
-	
+
 	return complete
 }
 
@@ -144,17 +142,17 @@ func IsSystemBootstrapped() bool {
 func ShouldPromptForBootstrap(cmdName string) bool {
 	// Commands that don't require bootstrap
 	exemptCommands := map[string]bool{
-		"help":       true,
-		"version":    true,
-		"bootstrap":  true,
-		"self":       true,
-		"update":     true,     // Self-update shouldn't require bootstrap
-		"install":    true,
-		"completion": true,
-		"test":       true,     // Don't prompt during testing
-		"test-cmd":   true,     // Test command from wrap tests
-		"panic-cmd":  true,     // Test command from wrap tests
-		"long-running": true,   // Test command from wrap tests
+		"help":         true,
+		"version":      true,
+		"bootstrap":    true,
+		"self":         true,
+		"update":       true, // Self-update shouldn't require bootstrap
+		"install":      true,
+		"completion":   true,
+		"test":         true, // Don't prompt during testing
+		"test-cmd":     true, // Test command from wrap tests
+		"panic-cmd":    true, // Test command from wrap tests
+		"long-running": true, // Test command from wrap tests
 	}
 
 	// Check if command is exempt
@@ -180,7 +178,7 @@ func PromptForBootstrap(rc *eos_io.RuntimeContext) (bool, error) {
 	logger.Info("terminal prompt: ⚠️  This system has not been bootstrapped.")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Bootstrap will install and configure:")
-	logger.Info("terminal prompt:   • Salt (configuration management)")
+	logger.Info("terminal prompt:   •  (configuration management)")
 	logger.Info("terminal prompt:   • Vault, Consul, Nomad (orchestration)")
 	logger.Info("terminal prompt:   • OSQuery, Trivy (security monitoring)")
 	logger.Info("terminal prompt:   • Ubuntu hardening (optional)")

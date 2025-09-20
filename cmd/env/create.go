@@ -58,7 +58,6 @@ Examples:
 		nomadAddress, _ := cmd.Flags().GetString("nomad-address")
 		consulAddress, _ := cmd.Flags().GetString("consul-address")
 		vaultAddress, _ := cmd.Flags().GetString("vault-address")
-		saltMaster, _ := cmd.Flags().GetString("salt-master")
 		skipPrompts, _ := cmd.Flags().GetBool("skip-prompts")
 
 		// Create environment manager
@@ -78,7 +77,7 @@ Examples:
 		if template != "" {
 			templateEnv, err := envManager.GetEnvironment(rc, template)
 			if err != nil {
-				logger.Error("Template environment not found", 
+				logger.Error("Template environment not found",
 					zap.String("template", template),
 					zap.Error(err))
 				return fmt.Errorf("template environment '%s' not found", template)
@@ -118,9 +117,6 @@ Examples:
 		if vaultAddress != "" {
 			env.Infrastructure.Vault.Address = vaultAddress
 		}
-		if saltMaster != "" {
-			env.Infrastructure.Salt.Master = saltMaster
-		}
 
 		// Interactive configuration if not skipping prompts
 		if !skipPrompts {
@@ -140,7 +136,6 @@ Examples:
 		fmt.Printf("  Nomad:      %s\n", env.Infrastructure.Nomad.Address)
 		fmt.Printf("  Consul:     %s\n", env.Infrastructure.Consul.Address)
 		fmt.Printf("  Vault:      %s\n", env.Infrastructure.Vault.Address)
-		fmt.Printf("  Salt:       %s\n", env.Infrastructure.Salt.Master)
 		fmt.Printf("\nDeployment:\n")
 		fmt.Printf("  Strategy:   %s\n", env.Deployment.Strategy.Type)
 		fmt.Printf("  CPU:        %dMHz\n", env.Deployment.Resources.CPU)
@@ -197,7 +192,6 @@ func init() {
 	createCmd.Flags().String("nomad-address", "", "Nomad cluster address")
 	createCmd.Flags().String("consul-address", "", "Consul cluster address")
 	createCmd.Flags().String("vault-address", "", "Vault cluster address")
-	createCmd.Flags().String("salt-master", "", "Salt master address")
 
 	// Terraform configuration
 	createCmd.Flags().String("terraform-backend", "", "Terraform backend type")
@@ -279,10 +273,6 @@ func interactiveEnvironmentConfig(rc *eos_io.RuntimeContext, env *environments.E
 	// Vault
 	fmt.Printf("Vault address [%s]: ", env.Infrastructure.Vault.Address)
 	// In real implementation, would read from stdin and validate URL
-
-	// Salt master
-	fmt.Printf("Salt master [%s]: ", env.Infrastructure.Salt.Master)
-	// In real implementation, would read from stdin
 
 	fmt.Printf("\nDeployment Configuration:\n")
 	fmt.Printf("─────────────────────────\n")

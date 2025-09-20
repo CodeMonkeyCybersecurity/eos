@@ -38,7 +38,7 @@ func TestDNSErrorHandling(t *testing.T) {
 
 	t.Run("PreconditionValidation", func(t *testing.T) {
 		// Test with nil clients (simulating unavailable services)
-		emptyClient := &HecateClient{rc: rc} // No salt or consul clients
+		emptyClient := &HecateClient{rc: rc} // No  or consul clients
 		emptyDNSManager := NewDNSManager(emptyClient)
 
 		err := emptyDNSManager.validateDNSOperationPreconditions(context.Background())
@@ -52,7 +52,6 @@ func TestDNSErrorHandling(t *testing.T) {
 		// Create a client with minimal required services for this test
 		clientWithServices := &HecateClient{
 			rc:     rc,
-			salt:   &SaltClient{}, // Minimal mock
 			consul: &api.Client{}, // Minimal mock
 		}
 		dnsManagerWithServices := NewDNSManager(clientWithServices)

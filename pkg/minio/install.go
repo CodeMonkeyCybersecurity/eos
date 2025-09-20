@@ -115,8 +115,6 @@ func checkRequiredCommands(rc *eos_io.RuntimeContext) error {
 		errorMsg += "\n  sudo apt-get update && sudo apt-get install -y curl"
 		errorMsg += "\n\nFor HashiCorp tools (Terraform, Nomad, Vault, Consul):"
 		errorMsg += "\n  See: https://developer.hashicorp.com/tutorials/library"
-		errorMsg += "\n\nFor SaltStack:"
-		errorMsg += "\n  See: https://docs.saltproject.io/salt/install-guide/en/latest/topics/install-by-operating-system/ubuntu.html"
 		
 		return eos_err.NewUserError("%s", errorMsg)
 	}

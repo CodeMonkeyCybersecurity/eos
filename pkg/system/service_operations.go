@@ -3,12 +3,10 @@ package system
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/patterns"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -126,7 +124,7 @@ func (s *ServiceOperation) Intervene(ctx context.Context, assessment *patterns.A
 
 	// TODO: Replace with Nomad job execution
 	_ = fmt.Sprintf("systemctl %s %s", s.Action, s.ServiceName) // cmd placeholder
-	
+
 	return &patterns.InterventionResult{
 		Success: false,
 		Message: "nomad service operations not implemented",
@@ -215,7 +213,7 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 	case "mask":
 		// TODO: Replace with Nomad client implementation
 		state := "disabled" // placeholder
-		_ = s.Target // suppress unused variable warning
+		_ = s.Target        // suppress unused variable warning
 		if strings.TrimSpace(state) == "masked" {
 			validations["service_masked"] = patterns.ValidationResult{
 				Passed:  true,
@@ -247,9 +245,9 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 
 // SleepDisableOperation implements AIE pattern for disabling system sleep
 type SleepDisableOperation struct {
-	Target     string
+	Target string
 	// TODO: Replace with Nomad client interface
-	Logger     otelzap.LoggerWithCtx
+	Logger otelzap.LoggerWithCtx
 }
 
 // Assess checks if sleep can be disabled
@@ -388,10 +386,10 @@ func (s *SleepDisableOperation) Evaluate(ctx context.Context, intervention *patt
 
 // PortKillOperation implements AIE pattern for killing processes by port
 type PortKillOperation struct {
-	Port       int
-	Target     string
+	Port   int
+	Target string
 	// TODO: Replace with Nomad client interface
-	Logger     otelzap.LoggerWithCtx
+	Logger otelzap.LoggerWithCtx
 }
 
 // Assess checks if processes can be killed on the port
@@ -402,7 +400,7 @@ func (p *PortKillOperation) Assess(ctx context.Context) (*patterns.AssessmentRes
 
 	// Find processes using the port
 	// TODO: Replace with Nomad client implementation
-	output := "none" // placeholder
+	output := "none"  // placeholder
 	err := error(nil) // placeholder
 	if err != nil {
 		return &patterns.AssessmentResult{
@@ -469,7 +467,7 @@ func (p *PortKillOperation) Evaluate(ctx context.Context, intervention *patterns
 	// Check if any processes still exist on the port
 	// TODO: Replace with Nomad client implementation
 	output := "0" // placeholder
-	_ = p.Target // suppress unused variable warning
+	_ = p.Target  // suppress unused variable warning
 
 	count, err := strconv.Atoi(strings.TrimSpace(output))
 	if err != nil {
@@ -502,185 +500,3 @@ func (p *PortKillOperation) Evaluate(ctx context.Context, intervention *patterns
 }
 
 // Helper functions for common service operations
-
-// ManageService performs a service operation using AIE pattern
-// TODO: Replace saltClient parameter with Nomad client interface
-func ManageService(ctx context.Context, logger otelzap.LoggerWithCtx, nomadClient interface{},
-	target, serviceName, action string) error {
-
-	operation := &ServiceOperation{
-		ServiceName: serviceName,
-		Action:      action,
-		Target:      target,
-		Logger:      logger,
-		// TODO: Add NomadClient field when implemented
-	}
-	_ = nomadClient // Suppress unused variable warning
-
-	executor := patterns.NewExecutor(logger)
-	return executor.Execute(ctx, operation, fmt.Sprintf("service_%s_%s", action, serviceName))
-}
-
-// DisableSystemSleep disables system sleep functionality using AIE pattern
-// TODO: Replace saltClient parameter with Nomad client interface
-func DisableSystemSleep(ctx context.Context, logger otelzap.LoggerWithCtx, nomadClient interface{},
-	target string) error {
-
-	operation := &SleepDisableOperation{
-		Target:     target,
-		Logger:     logger,
-		// TODO: Add NomadClient field when implemented
-	}
-	_ = nomadClient // Suppress unused variable warning
-
-	executor := patterns.NewExecutor(logger)
-	return executor.Execute(ctx, operation, "disable_system_sleep")
-}
-
-// KillProcessesByPort kills processes using a specific port using AIE pattern
-// TODO: Replace saltClient parameter with Nomad client interface
-func KillProcessesByPort(ctx context.Context, logger otelzap.LoggerWithCtx, nomadClient interface{},
-	target string, port int) error {
-
-	operation := &PortKillOperation{
-		Port:       port,
-		Target:     target,
-		Logger:     logger,
-		// TODO: Add NomadClient field when implemented
-	}
-	_ = nomadClient // Suppress unused variable warning
-
-	executor := patterns.NewExecutor(logger)
-	return executor.Execute(ctx, operation, fmt.Sprintf("kill_port_%d", port))
-}
-
-// Helper functions to load configurations from files
-
-func loadServicesFromFile(configFile string) ([]ServiceConfig, error) {
-	// In a real implementation, this would read and parse the JSON file
-	// For now, return a sample configuration
-	return []ServiceConfig{
-		{
-			Name:   "nginx",
-			State:  "running",
-			Enable: true,
-			Reload: true,
-		},
-		{
-			Name:   "postgresql",
-			State:  "running",
-			Enable: true,
-			Reload: false,
-		},
-	}, nil
-}
-
-func loadCronJobsFromFile(configFile string) ([]CronJobConfig, error) {
-	// In a real implementation, this would read and parse the JSON file
-	return []CronJobConfig{
-		{
-			Name:       "daily-backup",
-			Command:    "/usr/bin/backup.sh",
-			User:       "root",
-			Minute:     "0",
-			Hour:       "2",
-			Day:        "*",
-			Month:      "*",
-			Weekday:    "*",
-			Identifier: "daily-backup",
-			Present:    true,
-		},
-	}, nil
-}
-
-func loadUsersFromFile(configFile string) ([]UserConfig, error) {
-	// In a real implementation, this would read and parse the JSON file
-	return []UserConfig{
-		{
-			Name:    "alice",
-			Groups:  []string{"sudo", "admin"},
-			Shell:   "/bin/bash",
-			Home:    "/home/alice",
-			Present: true,
-		},
-	}, nil
-}
-
-func loadSystemStateFromFile(configFile string) (*SystemState, error) {
-	// In a real implementation, this would read and parse the JSON file
-	return &SystemState{
-		Services: []ServiceConfig{
-			{Name: "nginx", State: "running", Enable: true},
-			{Name: "postgresql", State: "running", Enable: true},
-		},
-		CronJobs: []CronJobConfig{
-			{
-				Name:       "backup",
-				Command:    "/usr/bin/backup.sh",
-				User:       "root",
-				Minute:     "0",
-				Hour:       "2",
-				Identifier: "backup",
-				Present:    true,
-			},
-		},
-		Users: []UserConfig{
-			{
-				Name:    "deploy",
-				Groups:  []string{"deploy"},
-				Shell:   "/bin/bash",
-				Home:    "/home/deploy",
-				Present: true,
-			},
-		},
-		Environment: map[string]string{
-			"ENVIRONMENT": "production",
-			"LOG_LEVEL":   "info",
-		},
-	}, nil
-}
-
-func displaySystemState(rc *eos_io.RuntimeContext, state *SystemState) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	stateJSON, _ := json.MarshalIndent(state, "", "  ")
-	logger.Info("System state configuration",
-		zap.Int("services", len(state.Services)),
-		zap.Int("cron_jobs", len(state.CronJobs)),
-		zap.Int("users", len(state.Users)),
-		zap.String("state_json", string(stateJSON)))
-}
-
-func displayStateApplication(rc *eos_io.RuntimeContext, result *StateApplication) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	if result.Success {
-		logger.Info("System state application completed successfully",
-			zap.String("target", result.Target),
-			zap.Duration("duration", result.Duration),
-			zap.Int("states_applied", len(result.States)))
-	} else {
-		logger.Error("System state application failed",
-			zap.String("target", result.Target),
-			zap.Duration("duration", result.Duration),
-			zap.Strings("errors", result.Errors))
-	}
-
-	// Display individual state results
-	for stateName, stateResult := range result.Results {
-		if stateResult.Result {
-			logger.Info("State applied successfully",
-				zap.String("state", stateName),
-				zap.String("comment", stateResult.Comment),
-				zap.Float64("duration", stateResult.Duration))
-		} else {
-			logger.Error("State application failed",
-				zap.String("state", stateName),
-				zap.String("comment", stateResult.Comment))
-		}
-	}
-
-	// Log as JSON for machine parsing
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	logger.Debug("Complete state application result", zap.String("result_json", string(resultJSON)))
-}

@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -36,11 +36,11 @@ Examples:
 		bootstrap, _ := cmd.Flags().GetBool("bootstrap")
 
 		if bootstrap {
-			logger.Info("Using bootstrap mode (direct execution without Salt)")
+			logger.Info("Using bootstrap mode (direct execution without )")
 		} else {
 			// For now, still use direct execution even without bootstrap flag
-			// TODO: When Salt integration is ready, implement Salt-based disk listing
-			logger.Info("Salt not configured, falling back to direct execution")
+			// TODO: When  integration is ready, implement -based disk listing
+			logger.Info(" not configured, falling back to direct execution")
 		}
 
 		// Use simplified function instead of manager pattern
@@ -60,7 +60,7 @@ Examples:
 
 func init() {
 	disksCmd.Flags().Bool("json", false, "Output in JSON format")
-	disksCmd.Flags().Bool("bootstrap", false, "Use direct execution without Salt (for initial system discovery)")
+	disksCmd.Flags().Bool("bootstrap", false, "Use direct execution without  (for initial system discovery)")
 
 	ListCmd.AddCommand(disksCmd)
 }

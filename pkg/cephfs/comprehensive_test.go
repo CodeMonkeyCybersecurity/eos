@@ -75,7 +75,7 @@ func TestIsValidCephImage_Comprehensive(t *testing.T) {
 
 		// Edge cases
 		{"just colon", ":", false},
-		{"empty after colon", "quay.io/ceph/ceph:", true}, // Current implementation allows this
+		{"empty after colon", "quay.io/ceph/ceph:", true},        // Current implementation allows this
 		{"multiple colons", "quay.io/ceph/ceph:tag:extra", true}, // Current implementation allows this
 	}
 
@@ -159,12 +159,6 @@ func TestCephFSGetterFunctions(t *testing.T) {
 		assert.Less(t, port, 65536)
 	})
 
-	t.Run("GetSaltCephPillarPath returns correct path", func(t *testing.T) {
-		expected := SaltCephPillarDir + "/ceph.sls"
-		result := GetSaltCephPillarPath()
-		assert.Equal(t, expected, result)
-		assert.True(t, strings.HasSuffix(result, ".sls"))
-	})
 
 	t.Run("GetTerraformCephConfigPath returns correct path", func(t *testing.T) {
 		expected := TerraformCephDir + "/main.tf"
@@ -616,7 +610,7 @@ func TestVolumeInfo(t *testing.T) {
 func TestFileOperations(t *testing.T) {
 	t.Run("createTempCephFile helper", func(t *testing.T) {
 		content := "test ceph file content"
-		
+
 		filePath, err := createTempCephFile(content)
 		require.NoError(t, err)
 		defer removeTempCephFile(filePath)
@@ -709,10 +703,10 @@ func TestErrorHandling(t *testing.T) {
 	t.Run("validateConfig error handling", func(t *testing.T) {
 		// Test multiple error conditions
 		invalidConfigs := []*Config{
-			{Name: "", ReplicationSize: 3, PGNum: 128},      // Empty name
-			{Name: "test", ReplicationSize: -1, PGNum: 128}, // Invalid replication
-			{Name: "test", ReplicationSize: 11, PGNum: 128}, // Invalid replication
-			{Name: "test", ReplicationSize: 3, PGNum: -1},   // Invalid PG num
+			{Name: "", ReplicationSize: 3, PGNum: 128},       // Empty name
+			{Name: "test", ReplicationSize: -1, PGNum: 128},  // Invalid replication
+			{Name: "test", ReplicationSize: 11, PGNum: 128},  // Invalid replication
+			{Name: "test", ReplicationSize: 3, PGNum: -1},    // Invalid PG num
 			{Name: "test", ReplicationSize: 3, PGNum: 50000}, // Invalid PG num
 		}
 

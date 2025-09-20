@@ -15,7 +15,7 @@ import (
 // EvaluateRemoval verifies the infrastructure removal was successful
 func EvaluateRemoval(rc *eos_io.RuntimeContext, config *Config, initialPlan *RemovalPlan, phaseResults []PhaseResult) (*NukeResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check if we can evaluate the removal
 	logger.Info("Evaluating infrastructure removal results")
 
@@ -34,7 +34,7 @@ func EvaluateRemoval(rc *eos_io.RuntimeContext, config *Config, initialPlan *Rem
 	removedCount := initialCount - finalCount
 
 	result.InitialComponents = initialCount
-	result.RemainingComponents = finalCount  
+	result.RemainingComponents = finalCount
 	result.RemovedComponents = removedCount
 
 	if initialCount > 0 {
@@ -46,7 +46,7 @@ func EvaluateRemoval(rc *eos_io.RuntimeContext, config *Config, initialPlan *Rem
 	if len(remainingProcesses) > 0 {
 		logger.Warn("Some processes are still running", zap.Strings("processes", remainingProcesses))
 		result.RemainingItems = append(result.RemainingItems, remainingProcesses...)
-		
+
 		// Only kill processes that aren't excluded
 		processesToKill := []string{}
 		for _, proc := range remainingProcesses {
@@ -62,7 +62,7 @@ func EvaluateRemoval(rc *eos_io.RuntimeContext, config *Config, initialPlan *Rem
 				processesToKill = append(processesToKill, proc)
 			}
 		}
-		
+
 		if len(processesToKill) > 0 {
 			// Force kill remaining non-excluded processes
 			killRemainingProcesses(rc, processesToKill)
@@ -134,7 +134,7 @@ func ShowRemovalPlan(rc *eos_io.RuntimeContext, plan *RemovalPlan) {
 	}
 }
 
-// GenerateRemovalReport creates a comprehensive final report (replacing fmt.Print violations)  
+// GenerateRemovalReport creates a comprehensive final report (replacing fmt.Print violations)
 func GenerateRemovalReport(rc *eos_io.RuntimeContext, result *NukeResult, phaseResults []PhaseResult) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -145,7 +145,7 @@ func GenerateRemovalReport(rc *eos_io.RuntimeContext, result *NukeResult, phaseR
 	// Summary information
 	logger.Info("Nuke operation summary",
 		zap.Int("initial_components", result.InitialComponents),
-		zap.Int("removed_components", result.RemovedComponents), 
+		zap.Int("removed_components", result.RemovedComponents),
 		zap.Int("remaining_components", result.RemainingComponents),
 		zap.Float64("success_rate", result.SuccessRate))
 
@@ -215,11 +215,11 @@ func loadFinalState(rc *eos_io.RuntimeContext) (*state.StateTracker, error) {
 
 func checkRemainingProcesses(rc *eos_io.RuntimeContext) []string {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	processesToCheck := []string{
-		"salt-master", "salt-minion", "vault", "nomad", "consul", "boundary", 
-		"osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh", "eos", 
-		"code-server", "prometheus", "node_exporter", "grafana-server", "nginx", 
+		"vault", "nomad", "consul", "boundary",
+		"osqueryd", "caddy", "authentik", "fail2ban", "trivy", "wazuh", "eos",
+		"code-server", "prometheus", "node_exporter", "grafana-server", "nginx",
 		"glances", "tailscaled",
 	}
 
@@ -243,7 +243,7 @@ func killRemainingProcesses(rc *eos_io.RuntimeContext, remainingProcesses []stri
 	for _, proc := range remainingProcesses {
 		if killed, err := process.KillProcesses(rc.Ctx, proc); err != nil {
 			logger.Debug("Failed to kill process",
-				zap.String("process", proc), 
+				zap.String("process", proc),
 				zap.Error(err))
 		} else if killed > 0 {
 			logger.Info("Killed processes",
@@ -255,7 +255,7 @@ func killRemainingProcesses(rc *eos_io.RuntimeContext, remainingProcesses []stri
 
 func cleanupStateFile(rc *eos_io.RuntimeContext, keepData bool) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	stateFile := "/var/lib/eos/state.json"
 	if fileExists(stateFile) && !keepData {
 		logger.Info("Removing state file", zap.String("file", stateFile))
@@ -267,11 +267,11 @@ func cleanupStateFile(rc *eos_io.RuntimeContext, keepData bool) {
 
 func getRemovalSolution(componentName string) string {
 	solutions := map[string]string{
-		"nomad":   "Run 'sudo systemctl stop nomad && sudo rm -rf /opt/nomad /etc/nomad.d'",
-		"consul":  "Run 'sudo systemctl stop consul && sudo rm -rf /opt/consul /etc/consul.d'",
-		"salt":    "Run 'sudo apt-get purge salt-* && sudo rm -rf /srv/salt /etc/salt'",
-		"docker":  "Manually remove if needed with 'sudo apt-get purge docker-ce'",
-		"vault":   "Check for active Vault mounts and unmount before removal",
+		"nomad":  "Run 'sudo systemctl stop nomad && sudo rm -rf /opt/nomad /etc/nomad.d'",
+		"consul": "Run 'sudo systemctl stop consul && sudo rm -rf /opt/consul /etc/consul.d'",
+		"":       "Run 'sudo apt-get purge -* && sudo rm -rf /srv/ /etc/'",
+		"docker": "Manually remove if needed with 'sudo apt-get purge docker-ce'",
+		"vault":  "Check for active Vault mounts and unmount before removal",
 	}
 
 	if solution, exists := solutions[componentName]; exists {

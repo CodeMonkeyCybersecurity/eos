@@ -23,16 +23,16 @@ func TestMapProcessToServiceName(t *testing.T) {
 	}{
 		// Direct process name mappings
 		{
-			name:         "salt-master direct",
-			processName:  "salt-master",
+			name:         "-master direct",
+			processName:  "-master",
 			port:         4505,
-			expectedName: "salt-master",
+			expectedName: "-master",
 		},
 		{
-			name:         "salt-api direct",
-			processName:  "salt-api",
+			name:         "-api direct",
+			processName:  "-api",
 			port:         8000,
-			expectedName: "salt-api",
+			expectedName: "-api",
 		},
 		{
 			name:         "vault direct",
@@ -54,16 +54,16 @@ func TestMapProcessToServiceName(t *testing.T) {
 		},
 		// Path-based mappings
 		{
-			name:         "saltstack path with slash",
-			processName:  "/opt/saltstack/",
+			name:         " path with slash",
+			processName:  "/opt//",
 			port:         4505,
-			expectedName: "salt-master",
+			expectedName: "-master",
 		},
 		{
-			name:         "saltstack path without slash",
-			processName:  "/opt/saltstack",
+			name:         " path without slash",
+			processName:  "/opt/",
 			port:         4505,
-			expectedName: "salt-master",
+			expectedName: "-master",
 		},
 		{
 			name:         "vault path",
@@ -79,10 +79,10 @@ func TestMapProcessToServiceName(t *testing.T) {
 		},
 		// Full path mappings
 		{
-			name:         "usr bin salt-master",
-			processName:  "/usr/bin/salt-master",
+			name:         "usr bin -master",
+			processName:  "/usr/bin/-master",
 			port:         4505,
-			expectedName: "salt-master",
+			expectedName: "-master",
 		},
 		{
 			name:         "usr bin vault",
@@ -92,10 +92,10 @@ func TestMapProcessToServiceName(t *testing.T) {
 		},
 		// Port-based fallback
 		{
-			name:         "unknown process on salt port",
+			name:         "unknown process on  port",
 			processName:  "unknown-process",
 			port:         4505,
-			expectedName: "salt-master",
+			expectedName: "-master",
 		},
 		{
 			name:         "unknown process on vault port",
@@ -111,17 +111,17 @@ func TestMapProcessToServiceName(t *testing.T) {
 			expectedName: "consul",
 		},
 		{
-			name:         "python script on salt-api port",
+			name:         "python script on -api port",
 			processName:  "python3",
 			port:         8000,
-			expectedName: "salt-api",
+			expectedName: "-api",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := sm.mapProcessToServiceName(tt.processName, tt.port)
-			assert.Equal(t, tt.expectedName, result, 
+			assert.Equal(t, tt.expectedName, result,
 				"Process %s on port %d should map to %s, got %s",
 				tt.processName, tt.port, tt.expectedName, result)
 		})
@@ -142,28 +142,25 @@ func TestParseServiceFromSSLine(t *testing.T) {
 		shouldBeNil     bool
 	}{
 		{
-			name:            "standard ss output with quotes",
-			ssLine:          `LISTEN 0 128 *:4505 *:* users:(("salt-master",pid=1234,fd=8))`,
-			port:            4505,
-			expectedService: "salt-master",
-			expectedPID:     1234,
-			shouldBeNil:     false,
+			name:        "standard ss output with quotes",
+			ssLine:      `LISTEN 0 128 *:4505 *:* users:(("-master",pid=1234,fd=8))`,
+			port:        4505,
+			expectedPID: 1234,
+			shouldBeNil: false,
 		},
 		{
-			name:            "ss output without quotes",
-			ssLine:          `LISTEN 0 128 *:4505 *:* users:((salt-master,pid=1234,fd=8))`,
-			port:            4505,
-			expectedService: "salt-master",
-			expectedPID:     1234,
-			shouldBeNil:     false,
+			name:        "ss output without quotes",
+			ssLine:      `LISTEN 0 128 *:4505 *:* users:((-master,pid=1234,fd=8))`,
+			port:        4505,
+			expectedPID: 1234,
+			shouldBeNil: false,
 		},
 		{
-			name:            "ss output with path",
-			ssLine:          `LISTEN 0 128 *:4505 *:* users:(("/opt/saltstack/",pid=1234,fd=8))`,
-			port:            4505,
-			expectedService: "salt-master",
-			expectedPID:     1234,
-			shouldBeNil:     false,
+			name:        "ss output with path",
+			ssLine:      `LISTEN 0 128 *:4505 *:* users:(("/opt//",pid=1234,fd=8))`,
+			port:        4505,
+			expectedPID: 1234,
+			shouldBeNil: false,
 		},
 		{
 			name:            "vault process",
@@ -186,7 +183,7 @@ func TestParseServiceFromSSLine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := sm.parseServiceFromSSLine(tt.ssLine, tt.port)
-			
+
 			if tt.shouldBeNil {
 				assert.Nil(t, service, "Expected nil service for line: %s", tt.ssLine)
 			} else {
@@ -209,10 +206,10 @@ func TestServiceStoppingFallback(t *testing.T) {
 	}{
 		{
 			name:        "process path to service name",
-			serviceName: "/opt/saltstack/",
+			serviceName: "/opt//",
 			expectedCmds: []string{
-				"salt-master",
-				"salt-api",
+				"-master",
+				"-api",
 			},
 		},
 		{
@@ -229,7 +226,7 @@ func TestServiceStoppingFallback(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// This tests the fallback logic without actually running commands
 			// In a real test, you'd mock the execute.Run function
-			
+
 			// Verify the service variations are generated correctly
 			variations := getServiceVariations(tt.serviceName)
 			for _, expected := range tt.expectedCmds {
@@ -246,10 +243,10 @@ func getServiceVariations(serviceName string) []string {
 		serviceName,
 		serviceName + ".service",
 	}
-	
-	if strings.Contains(serviceName, "/opt/saltstack/") {
-		variations = append(variations, "salt-master", "salt-api")
+
+	if strings.Contains(serviceName, "/opt//") {
+		variations = append(variations, "-master", "-api")
 	}
-	
+
 	return variations
 }

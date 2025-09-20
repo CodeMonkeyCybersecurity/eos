@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -21,7 +21,7 @@ var ListClusterNodesCmd = &cobra.Command{
 	Use:     "nodes",
 	Aliases: []string{"cluster-nodes", "cluster", "topology"},
 	Short:   "List cluster nodes and their roles",
-	Long: `List all cluster nodes discovered via SaltStack, Consul, or Nomad along with their assigned roles.
+	Long: `List all cluster nodes discovered via , Consul, or Nomad along with their assigned roles.
 
 This command provides visibility into the cluster topology including:
 - Node IDs and hostnames
@@ -31,7 +31,6 @@ This command provides visibility into the cluster topology including:
 - Service placement preferences
 
 The information is gathered from multiple sources:
-- SaltStack node inventory and grains
 - Consul cluster members and services
 - Nomad client nodes and classes
 
@@ -58,7 +57,7 @@ func runListClusterNodes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	enhancedConfig, err := loadEnhancedEnvironmentConfig()
 	if err != nil {
 		logger.Warn("Enhanced environment config not found, performing discovery", zap.Error(err))
-		
+
 		// Perform live discovery
 		enhancedConfig, err = environment.DiscoverEnhancedEnvironment(rc)
 		if err != nil {
@@ -79,7 +78,7 @@ func runListClusterNodes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 // loadEnhancedEnvironmentConfig loads the enhanced environment configuration
 func loadEnhancedEnvironmentConfig() (*environment.EnhancedEnvironmentConfig, error) {
 	configPath := "/opt/eos/config/enhanced_environment.json"
-	
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("enhanced environment config not found")
 	}
@@ -104,7 +103,7 @@ func filterNodes(allNodes map[string][]string, roleFilter, statusFilter string) 
 	}
 
 	filtered := make(map[string][]string)
-	
+
 	for nodeId, roles := range allNodes {
 		includeNode := true
 
@@ -142,12 +141,12 @@ func filterNodes(allNodes map[string][]string, roleFilter, statusFilter string) 
 // outputNodesJSON outputs nodes information as JSON
 func outputNodesJSON(nodes map[string][]string, config *environment.EnhancedEnvironmentConfig) error {
 	output := map[string]interface{}{
-		"cluster_size":     config.ClusterSize,
-		"profile":          config.Profile,
+		"cluster_size":      config.ClusterSize,
+		"profile":           config.Profile,
 		"resource_strategy": config.ResourceStrategy,
-		"nodes":            nodes,
-		"environment":      config.Environment,
-		"datacenter":       config.Datacenter,
+		"nodes":             nodes,
+		"environment":       config.Environment,
+		"datacenter":        config.Datacenter,
 	}
 
 	data, err := json.MarshalIndent(output, "", "  ")
@@ -186,7 +185,7 @@ func displayNodesTable(nodes map[string][]string, config *environment.EnhancedEn
 		if len(roleStr) > 40 {
 			roleStr = roleStr[:37] + "..."
 		}
-		
+
 		// Simple status determination (could be enhanced)
 		status := "Ready"
 		if nodeId == "localhost" || strings.Contains(nodeId, "local") {
@@ -201,7 +200,7 @@ func displayNodesTable(nodes map[string][]string, config *environment.EnhancedEn
 	// Show service placement if available
 	if len(config.ServicePlacement) > 0 {
 		fmt.Printf("📍 Service Placement Preferences:\n")
-		
+
 		// Group services by node role
 		roleServices := make(map[string][]string)
 		for service, role := range config.ServicePlacement {

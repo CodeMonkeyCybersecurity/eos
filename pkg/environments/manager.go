@@ -260,8 +260,8 @@ func (em *EnvironmentManager) CreateEnvironment(rc *eos_io.RuntimeContext, env *
 
 	// Initialize environment infrastructure
 	if err := em.initializeEnvironment(rc, env); err != nil {
-		logger.Error("Failed to initialize environment infrastructure", 
-			zap.String("environment", env.Name), 
+		logger.Error("Failed to initialize environment infrastructure",
+			zap.String("environment", env.Name),
 			zap.Error(err))
 		// Mark as inactive but don't delete
 		env.Status = EnvironmentStatusInactive
@@ -448,10 +448,6 @@ func (em *EnvironmentManager) GetDeploymentManager(rc *eos_io.RuntimeContext, en
 	// Create deployment config from environment
 	deployConfig := &deploy.DeploymentConfig{
 		WorkDir: "/tmp/eos-deploy",
-		SaltConfig: deploy.SaltClientConfig{
-			MasterURL: fmt.Sprintf("http://%s:8000", env.Infrastructure.Salt.Master),
-			Timeout:   5 * time.Minute,
-		},
 		NomadConfig: deploy.NomadClientConfig{
 			Address:   env.Infrastructure.Nomad.Address,
 			Region:    env.Infrastructure.Nomad.Region,

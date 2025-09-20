@@ -27,7 +27,7 @@ Based on comprehensive analysis, the following migration opportunities remain:
 ### Current Usage Patterns
 ```bash
 # Direct exec.Command usage found in:
-- pkg/saltstack/*.go (12 instances)
+- pkg//*.go (12 instances)
 - pkg/terraform/*.go (8 instances) 
 - pkg/docker_volume/*.go (6 instances)
 - pkg/kvm/*.go (11 instances)
@@ -58,7 +58,7 @@ type ExecutionResult struct {
 #### Step 2: Priority Migration Order
 1. **Security-critical commands** (15 instances in pkg/crypto, pkg/vault)
 2. **Service management commands** (20 instances in cmd/delphi, pkg/systemd)  
-3. **Infrastructure commands** (25 instances in pkg/saltstack, pkg/terraform)
+3. **Infrastructure commands** (25 instances in pkg/, pkg/terraform)
 4. **Utility commands** (24 instances in remaining packages)
 
 #### Step 3: Implementation Pattern

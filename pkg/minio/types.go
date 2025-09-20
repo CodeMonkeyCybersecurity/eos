@@ -40,12 +40,7 @@ const (
 // GetRequiredDependencies returns the list of required system dependencies
 func GetRequiredDependencies() []Dependency {
 	return []Dependency{
-		{
-			Name:        "salt-call",
-			Command:     "salt-call",
-			Description: "SaltStack configuration management (masterless mode)",
-			Required:    true,
-		},
+
 		{
 			Name:        "terraform",
 			Command:     "terraform",

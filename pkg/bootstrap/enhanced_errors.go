@@ -365,9 +365,7 @@ func getProcessInfoByPID(rc *eos_io.RuntimeContext, pid int) ProcessInfo {
 // getServiceNameForPort maps ports to service names
 func getServiceNameForPort(port int) string {
 	portMap := map[int]string{
-		4505: "salt-master",
-		4506: "salt-master",
-		8000: "salt-api",
+
 		8200: "vault",
 		8300: "consul",
 		8301: "consul",

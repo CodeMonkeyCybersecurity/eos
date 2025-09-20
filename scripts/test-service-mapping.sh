@@ -80,8 +80,6 @@ func main() {
         process string
         port int
     }{
-        {"/opt/saltstack/", 4505},
-        {"salt-master", 4505},
         {"/usr/bin/vault", 8200},
         {"consul", 8500},
         {"/opt/nomad/bin/nomad", 4646},
@@ -131,15 +129,7 @@ test_variations() {
     # Direct service name
     echo "  - $service"
     echo "  - ${service}.service"
-    
-    # Special cases
-    if [[ "$service" == *"/opt/saltstack/"* ]]; then
-        echo "  - salt-master"
-        echo "  - salt-api"
-    fi
-}
 
-test_variations "/opt/saltstack/"
 test_variations "vault"
 test_variations "consul"
 

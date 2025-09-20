@@ -419,14 +419,14 @@ func TestBcryptIntegration(t *testing.T) {
 func TestBcryptSecurityProperties(t *testing.T) {
 	password := "testpassword"
 
-	// Test that same password produces different hashes (salt)
+	// Test that same password produces different hashes ()
 	hash1, err := HashPassword(password)
 	require.NoError(t, err)
 
 	hash2, err := HashPassword(password)
 	require.NoError(t, err)
 
-	assert.NotEqual(t, hash1, hash2, "Same password should produce different hashes due to salt")
+	assert.NotEqual(t, hash1, hash2, "Same password should produce different hashes due to ")
 
 	// Both hashes should verify the same password
 	assert.True(t, ComparePasswordBool(hash1, password))

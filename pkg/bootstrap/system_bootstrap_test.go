@@ -34,22 +34,22 @@ func TestIsSystemBootstrapped(t *testing.T) {
 			// Save original values
 			originalMarker := bootstrapMarkerFile
 			originalVault := vaultMarkerFile
-			
+
 			defer func() {
 				bootstrapMarkerFile = originalMarker
 				vaultMarkerFile = originalVault
 			}()
-			
+
 			if len(tt.setupMarkerFiles) > 0 {
 				// Create temporary directory and file for testing
 				tempDir := "/tmp/test-bootstrap"
 				os.MkdirAll(tempDir, 0755)
 				defer os.RemoveAll(tempDir)
-				
+
 				// Override the variables temporarily for test
 				bootstrapMarkerFile = filepath.Join(tempDir, ".bootstrapped")
 				vaultMarkerFile = "/tmp/nonexistent-vault-marker"
-				
+
 				if tt.setupMarkerFiles[0] != "" {
 					os.WriteFile(bootstrapMarkerFile, []byte("test"), 0644)
 				}
@@ -58,7 +58,7 @@ func TestIsSystemBootstrapped(t *testing.T) {
 				bootstrapMarkerFile = "/tmp/nonexistent-bootstrap-marker"
 				vaultMarkerFile = "/tmp/nonexistent-vault-marker"
 			}
-			
+
 			got := IsSystemBootstrapped()
 			if got != tt.wantBootstrapped {
 				t.Errorf("IsSystemBootstrapped() = %v, want %v", got, tt.wantBootstrapped)
@@ -125,16 +125,16 @@ func TestShouldPromptForBootstrap(t *testing.T) {
 			// Mock system as not bootstrapped for these tests
 			originalMarker := bootstrapMarkerFile
 			originalVault := vaultMarkerFile
-			
+
 			// Setup non-bootstrapped state
 			bootstrapMarkerFile = "/tmp/nonexistent-bootstrap-marker"
 			vaultMarkerFile = "/tmp/nonexistent-vault-marker"
-			
-			defer func() { 
-				bootstrapMarkerFile = originalMarker 
+
+			defer func() {
+				bootstrapMarkerFile = originalMarker
 				vaultMarkerFile = originalVault
 			}()
-			
+
 			got := ShouldPromptForBootstrap(tt.cmdName)
 			if got != tt.want {
 				t.Errorf("ShouldPromptForBootstrap(%q) = %v, want %v", tt.cmdName, got, tt.want)
@@ -148,29 +148,29 @@ func TestStateValidation(t *testing.T) {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	t.Run("IsBootstrapComplete with no validators", func(t *testing.T) {
 		originalValidator := PhaseValidators
 		PhaseValidators = map[string]PhaseValidator{}
 		defer func() { PhaseValidators = originalValidator }()
-		
+
 		complete, missing := IsBootstrapComplete(rc)
 		if complete {
 			t.Errorf("IsBootstrapComplete() = %v, want false when no phases validated", complete)
 		}
-		if len(missing) != 2 { // salt and salt-api are required
+		if len(missing) != 2 { //  and -api are required
 			t.Errorf("IsBootstrapComplete() missing phases = %v, want 2 missing phases", missing)
 		}
 	})
-	
+
 	t.Run("IsBootstrapComplete with all phases complete", func(t *testing.T) {
 		originalValidator := PhaseValidators
 		PhaseValidators = map[string]PhaseValidator{
-			"salt":     func(rc *eos_io.RuntimeContext) (bool, error) { return true, nil },
-			"salt-api": func(rc *eos_io.RuntimeContext) (bool, error) { return true, nil },
+			"":     func(rc *eos_io.RuntimeContext) (bool, error) { return true, nil },
+			"-api": func(rc *eos_io.RuntimeContext) (bool, error) { return true, nil },
 		}
 		defer func() { PhaseValidators = originalValidator }()
-		
+
 		complete, missing := IsBootstrapComplete(rc)
 		if !complete {
 			t.Errorf("IsBootstrapComplete() = %v, want true when all phases validated", complete)

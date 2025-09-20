@@ -39,13 +39,13 @@ func OutputMountOpText(result *MountOperation) error {
 
 // DiskManager handles disk and partition operations
 type DiskManager struct {
-	config     *DiskManagerConfig
-	useSalt    bool
-	saltClient SaltClientInterface
+	config *DiskManagerConfig
+	use    bool
+	Client ClientInterface
 }
 
-// SaltClientInterface defines the interface for Salt operations
-type SaltClientInterface interface {
+// ClientInterface defines the interface for  operations
+type ClientInterface interface {
 	CmdRun(ctx context.Context, target string, command string) (string, error)
 }
 
@@ -56,21 +56,21 @@ func NewDiskManager(config *DiskManagerConfig) *DiskManager {
 	}
 
 	return &DiskManager{
-		config:  config,
-		useSalt: false, // Default to direct execution
+		config: config,
+		use:    false, // Default to direct execution
 	}
 }
 
-// NewDiskManagerWithSalt creates a new disk manager that uses Salt for execution
-func NewDiskManagerWithSalt(config *DiskManagerConfig, saltClient SaltClientInterface) *DiskManager {
+// NewDiskManagerWith creates a new disk manager that uses  for execution
+func NewDiskManagerWith(config *DiskManagerConfig, Client ClientInterface) *DiskManager {
 	if config == nil {
 		config = DefaultDiskManagerConfig()
 	}
 
 	return &DiskManager{
-		config:     config,
-		useSalt:    true,
-		saltClient: saltClient,
+		config: config,
+		use:    true,
+		Client: Client,
 	}
 }
 
@@ -120,16 +120,16 @@ func (dm *DiskManager) listDisksLinux(rc *eos_io.RuntimeContext) ([]DiskInfo, er
 	var output []byte
 	var err error
 
-	if dm.useSalt && dm.saltClient != nil {
-		// Execute through Salt
-		logger.Info("Executing lsblk through Salt")
+	if dm.use && dm.Client != nil {
+		// Execute through
+		logger.Info("Executing lsblk through ")
 		cmdStr := "lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,RM,FSTYPE,LABEL,UUID"
-		outputStr, err := dm.saltClient.CmdRun(rc.Ctx, "*", cmdStr)
+		outputStr, err := dm.Client.CmdRun(rc.Ctx, "*", cmdStr)
 		if err != nil {
-			logger.Error("Failed to run lsblk through Salt",
+			logger.Error("Failed to run lsblk through ",
 				zap.Error(err),
 				zap.String("output", outputStr))
-			return nil, fmt.Errorf("lsblk failed through Salt: %w", err)
+			return nil, fmt.Errorf("lsblk failed through : %w", err)
 		}
 		output = []byte(outputStr)
 	} else {
@@ -161,16 +161,16 @@ func (dm *DiskManager) listDisksDarwin(rc *eos_io.RuntimeContext) ([]DiskInfo, e
 	var output []byte
 	var err error
 
-	if dm.useSalt && dm.saltClient != nil {
-		// Execute through Salt
-		logger.Info("Executing diskutil through Salt")
+	if dm.use && dm.Client != nil {
+		// Execute through
+		logger.Info("Executing diskutil through ")
 		cmdStr := "diskutil list -plist"
-		outputStr, err := dm.saltClient.CmdRun(rc.Ctx, "*", cmdStr)
+		outputStr, err := dm.Client.CmdRun(rc.Ctx, "*", cmdStr)
 		if err != nil {
-			logger.Error("Failed to run diskutil through Salt",
+			logger.Error("Failed to run diskutil through ",
 				zap.Error(err),
 				zap.String("output", outputStr))
-			return nil, fmt.Errorf("diskutil failed through Salt: %w", err)
+			return nil, fmt.Errorf("diskutil failed through : %w", err)
 		}
 		output = []byte(outputStr)
 	} else {
@@ -591,7 +591,6 @@ func (dm *DiskManager) parseDiskutilOutput(output string) ([]DiskInfo, error) {
 
 	return disks, nil
 }
-
 
 func (dm *DiskManager) performSafetyChecks(device string) error {
 	// Check if device is in excluded list

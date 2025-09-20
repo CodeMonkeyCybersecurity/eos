@@ -28,7 +28,7 @@ var deploymentStatusCmd = &cobra.Command{
 - Pipeline execution status if currently running
 
 This command provides real-time visibility into all aspects of your deployment
-following the Salt → Terraform → Nomad orchestration hierarchy.
+following the  → Terraform → Nomad orchestration hierarchy.
 
 Examples:
   # Check Helen deployment status

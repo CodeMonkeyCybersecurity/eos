@@ -151,7 +151,7 @@ eos list users --system
 - `eos create zabbix` - Infrastructure monitoring
 
 ### Development Tools
-- `eos create saltstack` - Configuration management
+- `eos create ` - Configuration management
 - `eos create terraform` - Infrastructure as Code
 - `eos create ansible` - Automation platform
 - `eos create gitlab` - Version control platform

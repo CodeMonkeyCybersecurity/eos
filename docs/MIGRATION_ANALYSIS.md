@@ -17,8 +17,8 @@ These components already follow the correct pattern where nuke delegates to comp
 
 - **nomad**: `pkg/nomad/removal.go:RemoveNomadCompletely()` - ✅ MIGRATED
 - **consul**: `pkg/consul/remove.go:RemoveConsul()` - ✅ MIGRATED
-- **vault**: `pkg/vault/salt_removal.go:RemoveVaultViaSalt()` - ✅ MIGRATED
-- **saltstack**: `pkg/saltstack/removal.go:RemoveSaltCompletely()` - ✅ MIGRATED
+- **vault**: `pkg/vault/_removal.go:RemoveVaultVia()` - ✅ MIGRATED
+- ****: `pkg//removal.go:RemoveCompletely()` - ✅ MIGRATED
 - **hecate**: `pkg/hecate/removal.go:RemoveHecateCompletely()` - ✅ MIGRATED
 - **services**: `pkg/services/removal.go:RemoveService()` - ✅ MIGRATED (handles fail2ban, trivy, wazuh-agent, prometheus, grafana, nginx, glances, code-server, tailscale)
 
@@ -49,8 +49,8 @@ allServices := []ServiceConfig{
 **Line Numbers**: 176-191
 **Issue**: Directory paths duplicated between nuke and component packages
 **Duplicate Examples**:
-- Lines 177-181: Salt directories - DUPLICATE of `pkg/saltstack/removal.go:113-127`
-- Lines 182-185: Vault directories - DUPLICATE of `pkg/vault/salt_removal.go:116-128`
+- Lines 177-181:  directories - DUPLICATE of `pkg//removal.go:113-127`
+- Lines 182-185: Vault directories - DUPLICATE of `pkg/vault/_removal.go:116-128`
 - Lines 185-187: Nomad directories - DUPLICATE of `pkg/nomad/removal.go:100-111`
 - Lines 188-190: Consul directories - DUPLICATE of `pkg/consul/remove.go:152-169`
 
@@ -86,7 +86,7 @@ allServices := []ServiceConfig{
    - Lines 144-147: Service removal already migrated comment
    - Lines 221-224: Nomad removal migration comment
    - Lines 231-234: Consul removal migration comment
-   - Lines 242-245: Salt removal migration comment
+   - Lines 242-245:  removal migration comment
    - Lines 254-257: Vault removal migration comment
    - Lines 419-426: Binary removal migration TODO
    - Lines 453-461: Systemd cleanup migration TODO
@@ -178,7 +178,7 @@ func getRemovableDirectories(excluded map[string]bool, keepData bool) []Director
     directories = append(directories, nomad.GetDirectories()...)
     directories = append(directories, consul.GetDirectories()...)
     directories = append(directories, vault.GetDirectories()...)
-    directories = append(directories, salt.GetDirectories()...)
+    directories = append(directories, .GetDirectories()...)
     directories = append(directories, eos.GetDirectories()...)
     
     return filterByDataPolicy(directories, excluded, keepData)
@@ -190,8 +190,8 @@ func getRemovableDirectories(excluded map[string]bool, keepData bool) []Director
 ### 1. Immediate Actions (Already Correct)
 - Nomad removal - ✅ Already delegates to `pkg/nomad/removal.go`
 - Consul removal - ✅ Already delegates to `pkg/consul/remove.go`
-- Vault removal - ✅ Already delegates to `pkg/vault/salt_removal.go`
-- Salt removal - ✅ Already delegates to `pkg/saltstack/removal.go`
+- Vault removal - ✅ Already delegates to `pkg/vault/_removal.go`
+-  removal - ✅ Already delegates to `pkg//removal.go`
 - Generic services - ✅ Already use `pkg/services/removal.go`
 
 ### 2. High Priority (Missing Components)

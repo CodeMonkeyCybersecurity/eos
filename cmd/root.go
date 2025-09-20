@@ -29,7 +29,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
-	// "github.com/CodeMonkeyCybersecurity/eos/cmd/salt" // TODO: Migrate to verb directories
+	// "github.com/CodeMonkeyCybersecurity/eos/cmd/" // TODO: Migrate to verb directories
 	// Internal packages
 )
 
@@ -66,29 +66,29 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 
 	// Group subcommands for cleanliness - Core verb-first architecture
 	for _, subCmd := range []*cobra.Command{
-		create.CreateCmd, // VERB-FIRST ARCHITECTURE
-		read.ReadCmd,     // VERB-FIRST ARCHITECTURE
-		list.ListCmd,     // VERB-FIRST ARCHITECTURE
-		update.UpdateCmd, // VERB-FIRST ARCHITECTURE
-		delete.DeleteCmd, // VERB-FIRST ARCHITECTURE
+		create.CreateCmd,    // VERB-FIRST ARCHITECTURE
+		read.ReadCmd,        // VERB-FIRST ARCHITECTURE
+		list.ListCmd,        // VERB-FIRST ARCHITECTURE
+		update.UpdateCmd,    // VERB-FIRST ARCHITECTURE
+		delete.DeleteCmd,    // VERB-FIRST ARCHITECTURE
 		debug.GetDebugCmd(), // VERB-FIRST ARCHITECTURE (debugging tools)
-		self.SelfCmd,     // SPECIAL CASE (Eos self-management)
-		backup.BackupCmd, // SPECIAL CASE (Complex nomenclature)
-		
+		self.SelfCmd,        // SPECIAL CASE (Eos self-management)
+		backup.BackupCmd,    // SPECIAL CASE (Complex nomenclature)
+
 		// Top-level aliases for convenience
 		bootstrap.BootstrapCmd, // Alias for create bootstrap
 		nuke.NukeCmd,           // Alias for delete nuke
 
 		// TODO: Migrate these to verb directories (Phase 4)
 		// delphi.DelphiCmd,    // TODO: Migrate to verb directories (Phase 4)
-		// salt.SaltCmd,        // TODO: Migrate to verb directories (Phase 4)
+		// .Cmd,        // TODO: Migrate to verb directories (Phase 4)
 
 		// Legacy commands
 		ragequit.RagequitCmd,
 	} {
 		RootCmd.AddCommand(subCmd)
 	}
-	
+
 	// Add bootstrap subcommands after all init() functions have run
 	bootstrap.AddSubcommands()
 }
@@ -102,7 +102,7 @@ func Execute(rc *eos_io.RuntimeContext) {
 
 	// Create command watchdog with configurable timeout
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check for custom timeout from environment or use default
 	watchdogTimeout := 3 * time.Minute
 	if envTimeout := os.Getenv("EOS_WATCHDOG_TIMEOUT"); envTimeout != "" {
@@ -112,16 +112,16 @@ func Execute(rc *eos_io.RuntimeContext) {
 				zap.Duration("timeout", watchdogTimeout))
 		}
 	}
-	
+
 	// Create and use the command watchdog
 	cmdWatchdog := watchdog.NewCommandWatchdog(rc.Log, watchdogTimeout)
-	
+
 	// Get command name for logging
 	cmdName := "eos"
 	if len(os.Args) > 1 {
 		cmdName = os.Args[1]
 	}
-	
+
 	// Execute with watchdog protection
 	err := cmdWatchdog.Execute(cmdName, os.Args[1:], func() error {
 		// Execute the command
@@ -143,7 +143,7 @@ func Execute(rc *eos_io.RuntimeContext) {
 		}
 		return nil
 	})
-	
+
 	// This should never be reached due to os.Exit calls above
 	if err != nil {
 		logger.Error("Unexpected error in command execution", zap.Error(err))

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
@@ -58,16 +58,18 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		logger.Warn("Environment discovery failed, using defaults", zap.Error(err))
 		// Continue with defaults rather than failing
 		envConfig = &environment.EnvironmentConfig{
-			Environment:   "development",
-			Datacenter:    "dc1",
-			SecretBackend: "file",
+			Environment: "production",
+			Datacenter:  "dc1",
+			Region:      "us-east-1",
+			VaultAddr:   "http://localhost:8200",
 		}
 	}
 
 	logger.Info("Environment discovered",
 		zap.String("environment", envConfig.Environment),
 		zap.String("datacenter", envConfig.Datacenter),
-		zap.String("secret_backend", envConfig.SecretBackend))
+		zap.String("region", envConfig.Region),
+		zap.String("vault_addr", envConfig.VaultAddr))
 
 	// 2. Check for manual overrides from flags
 	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
@@ -96,31 +98,31 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	// 4. Build configuration with discovered/generated values
 	adminPassword := serviceSecrets.Secrets["admin_password"].(string)
 	secretKey := serviceSecrets.Secrets["secret_key"].(string)
-	
+
 	// Allow manual overrides
 	if manualPassword, _ := cmd.Flags().GetString("admin-password"); manualPassword != "" {
 		adminPassword = manualPassword
 	}
-	
+
 	port := envConfig.Services.DefaultPorts["grafana"]
 	if manualPort, _ := cmd.Flags().GetInt("port"); manualPort != 0 {
 		port = manualPort
 	}
 
 	resourceConfig := envConfig.Services.Resources[envConfig.Environment]
-	
+
 	nomadConfig := map[string]interface{}{
 		"grafana": map[string]interface{}{
-			"version":     "latest",
-			"port":        port,
-			"environment": envConfig.Environment,
-			"datacenter":  envConfig.Datacenter,
-			"cpu":         resourceConfig.CPU,
-			"memory":      resourceConfig.Memory,
-			"replicas":    resourceConfig.Replicas,
-			"admin_user":  "admin",
-			"admin_pass":  adminPassword,
-			"secret_key":  secretKey,
+			"version":      "latest",
+			"port":         port,
+			"environment":  envConfig.Environment,
+			"datacenter":   envConfig.Datacenter,
+			"cpu":          resourceConfig.CPU,
+			"memory":       resourceConfig.Memory,
+			"replicas":     resourceConfig.Replicas,
+			"admin_user":   "admin",
+			"admin_pass":   adminPassword,
+			"secret_key":   secretKey,
 			"database_url": "sqlite3:///grafana.db",
 		},
 	}
@@ -135,12 +137,11 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		zap.Int("memory", resourceConfig.Memory),
 		zap.Int("replicas", resourceConfig.Replicas))
 
-	// Deploy using Nomad orchestration instead of SaltStack
+	// Deploy using Nomad orchestration instead of
 	logger.Info("Deploying Grafana using Nomad orchestration")
 	// TODO: Implement Nomad job deployment for Grafana
 	return fmt.Errorf("grafana Nomad deployment not yet implemented")
 }
-
 
 func init() {
 	CreateCmd.AddCommand(CreateGrafanaCmd)

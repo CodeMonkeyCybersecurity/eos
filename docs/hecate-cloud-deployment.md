@@ -97,9 +97,9 @@ az vm create \
 
 Hecate uses Caddy's DNS challenge for automatic HTTPS certificates. This is required for cloud deployments.
 
-### 1. Set DNS Provider in Pillar
+### 1. Set DNS Provider in 
 
-Create `/srv/pillar/hecate.sls`:
+Create `/srv//hecate.sls`:
 
 ```yaml
 hecate:

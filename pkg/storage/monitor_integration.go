@@ -73,9 +73,9 @@ func (mi *MonitorIntegration) PredictGrowth(ctx context.Context, id string) (*Gr
 	return prediction, nil
 }
 
-// DiskManager implementation - delegate to our SaltStack disk manager
+// DiskManager implementation - delegate to our  disk manager
 func (mi *MonitorIntegration) ListDisks(ctx context.Context) ([]*DiskInfo, error) {
-	// This would integrate with SaltStack to list all disks
+	// This would integrate with  to list all disks
 	return make([]*DiskInfo, 0), nil
 }
 
@@ -114,7 +114,7 @@ func (mi *MonitorIntegration) ListPartitions(ctx context.Context, device string)
 }
 
 func (mi *MonitorIntegration) FormatPartition(ctx context.Context, device string, filesystem FilesystemType) error {
-	// This would delegate to SaltStack for formatting
+	// This would delegate to  for formatting
 	return fmt.Errorf("format partition not yet implemented")
 }
 
@@ -161,7 +161,7 @@ func (mi *MonitorIntegration) GetHealthRecommendations(ctx context.Context) ([]*
 }
 
 // GetDiskManager provides access to the underlying disk manager
-// Note: SaltStackDiskManager removed for HashiCorp migration - returns nil
+// Note: DiskManager removed for HashiCorp migration - returns nil
 func (mi *MonitorIntegration) GetDiskManager() interface{} {
 	// Disk management requires administrator intervention after migration
 	return nil

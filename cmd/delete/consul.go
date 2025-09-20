@@ -20,7 +20,7 @@ import (
 var DeleteConsulCmd = &cobra.Command{
 	Use:   "consul",
 	Short: "Remove HashiCorp Consul and all associated data",
-	Long: `Remove HashiCorp Consul completely from the system using SaltStack.
+	Long: `Remove HashiCorp Consul completely from the system using .
 
 This command will:
 - Gracefully leave the Consul cluster (if possible)
@@ -158,7 +158,6 @@ func initializeNomadClient(_ otelzap.LoggerWithCtx) (interface{}, error) {
 	return nil, fmt.Errorf("Nomad client not implemented yet")
 }
 
-
 func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -214,9 +213,9 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		}
 	}
 
-	// INTERVENE - Apply removal state
-	// Prepare pillar data
-	pillar := map[string]interface{}{
+	// INTERVENE - Apply removal state via HashiCorp Nomad
+	// Prepare Nomad job data for Consul removal
+	nomadJobData := map[string]interface{}{
 		"consul": map[string]interface{}{
 			"ensure":      "absent",
 			"force":       opts.Force,
@@ -230,13 +229,13 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// Execute removal state with progress
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Starting Consul removal...")
-	
+
 	// TODO: Replace with Nomad orchestration when implemented
 	logger.Info("terminal prompt: Nomad orchestration not implemented yet")
-	_ = pillar // Suppress unused variable warning
+	_ = nomadJobData // Suppress unused variable warning
 
 	// TODO: Implement actual removal logic with Nomad
-	err = fmt.Errorf("Consul removal not implemented with Nomad yet")
+	err = fmt.Errorf("Consul removal requires administrator intervention - use HashiCorp Nomad for service management")
 	if err != nil {
 		return fmt.Errorf("removal failed: %w", err)
 	}
@@ -261,7 +260,6 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	return nil
 }
-
 
 func init() {
 	DeleteConsulCmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Force deletion without confirmation prompt")

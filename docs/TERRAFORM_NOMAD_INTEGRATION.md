@@ -7,7 +7,7 @@
 Eos uses a **mature, opinionated architecture** that treats infrastructure and workloads as a unified system:
 
 ```
-SaltStack (Source of Truth) → Terraform (State Management) → Nomad (Container Runtime)
+ (Source of Truth) → Terraform (State Management) → Nomad (Container Runtime)
 ```
 
 ## Why Terraform Manages Nomad Jobs
@@ -30,8 +30,8 @@ resource "nomad_job" "grafana" {
 ```
 
 ### **3. Cross-Component Integration**
-- Salt states call Terraform via `eos_terraform.py`
-- Configuration flows: Pillar → TF vars → Nomad jobs
+-  states call Terraform via `eos_terraform.py`
+- Configuration flows:  → TF vars → Nomad jobs
 - Consul KV integration for service discovery
 
 ## Enhanced Implementation Pattern
@@ -66,21 +66,21 @@ output "consul_service" {
 }
 ```
 
-### **2. Enhanced Salt Integration**
+### **2. Enhanced  Integration**
 
-Update Salt states to call Terraform modules:
+Update  states to call Terraform modules:
 
 ```yaml
-# /srv/salt/grafana/deploy.sls
+# /srv//grafana/deploy.sls
 grafana_terraform_deployment:
   eos_terraform.apply:
     - component: grafana
-    - workspace: {{ pillar.get('environment', 'production') }}
+    - workspace: {{ .get('environment', 'production') }}
     - variables:
-        admin_password: {{ pillar.get('grafana:admin_password', 'admin') }}
-        port: {{ pillar.get('grafana:port', 3000) }}
-        datacenter: {{ pillar.get('nomad:datacenter', 'dc1') }}
-        data_path: {{ pillar.get('grafana:data_path', '/opt/grafana/data') }}
+        admin_password: {{ .get('grafana:admin_password', 'admin') }}
+        port: {{ .get('grafana:port', 3000) }}
+        datacenter: {{ .get('nomad:datacenter', 'dc1') }}
+        data_path: {{ .get('grafana:data_path', '/opt/grafana/data') }}
 ```
 
 ### **3. Command Implementation**
@@ -90,8 +90,8 @@ Update commands to use the Terraform → Nomad flow:
 ```go
 // cmd/create/grafana.go
 func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-    // Build pillar configuration
-    pillarConfig := map[string]interface{}{
+    // Build  configuration
+    Config := map[string]interface{}{
         "grafana": map[string]interface{}{
             "admin_password": adminPassword,
             "port":          port,
@@ -99,8 +99,8 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
         },
     }
     
-    // Apply Salt state (which calls Terraform)
-    if err := applySaltState(rc, "grafana.deploy", pillarConfig); err != nil {
+    // Apply  state (which calls Terraform)
+    if err := applyState(rc, "grafana.deploy", Config); err != nil {
         return fmt.Errorf("failed to deploy Grafana: %w", err)
     }
     
@@ -111,14 +111,14 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 ## Benefits of This Approach
 
 ### **1. Maintains Architectural Consistency**
-- Preserves established SaltStack → Terraform → Nomad flow
+- Preserves established  → Terraform → Nomad flow
 - No breaking changes to existing integration
 - Respects engineering investment in current architecture
 
 ### **2. Enhanced Capabilities** 
 - State management and rollback via Terraform
 - Dependency tracking between infrastructure and workloads
-- Unified configuration source (SaltStack pillars)
+- Unified configuration source ( s)
 
 ### **3. Operational Excellence**
 - Consul locks for distributed state management
@@ -132,7 +132,7 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 - Improve job templates with better parameterization
 - Add proper resource dependencies
 
-### **Phase 2: Improve Salt Integration**
+### **Phase 2: Improve  Integration**
 - Enhance `eos_terraform.py` with better error handling
 - Add validation for Terraform variables
 - Improve state coordination with Consul
@@ -149,7 +149,7 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 eos create grafana --admin-password secret123 --port 3000
 ```
 
-### **2. Salt State Application**
+### **2.  State Application**
 ```yaml
 # Applied automatically
 grafana_deployment:

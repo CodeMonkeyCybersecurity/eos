@@ -59,10 +59,10 @@ This document summarizes the comprehensive test coverage improvements made to th
 - ❌ User creation operations (AIE pattern)
 - ❌ Password update operations (AIE pattern)
 - ❌ User deletion operations (AIE pattern)
-- ❌ Salt Stack integration for user management
+- ❌  Stack integration for user management
 
-#### 4. **Salt Stack Integration** (`pkg/saltstack/`) - **3.7% Coverage**
-- **Location**: `/pkg/saltstack/client_test.go`
+#### 4. ** Stack Integration** (`pkg//`) - **3.7% Coverage**
+- **Location**: `/pkg//client_test.go`
 - **Test Cases**: 8 test functions covering interfaces
 - **Focus**: Argument validation and structure testing
 
@@ -74,8 +74,8 @@ This document summarizes the comprehensive test coverage improvements made to th
 -  HashiCorp tools deployment interfaces
 
 **Limitations**:
-- Tests are interface-focused due to dependency on actual Salt Stack
-- Real integration tests would require Salt Stack environment
+- Tests are interface-focused due to dependency on actual  Stack
+- Real integration tests would require  Stack environment
 
 ## Test Quality Metrics
 
@@ -87,7 +87,7 @@ This document summarizes the comprehensive test coverage improvements made to th
 
 ### 🔴 **Low Coverage (<20%)**
 3. **User Management**: 0.5% - Existing validation covered, new AIE operations need tests
-4. **Salt Stack Integration**: 3.7% - Interface testing only
+4. ** Stack Integration**: 3.7% - Interface testing only
 5. **System Service Operations**: No tests yet
 
 ## Testing Architecture
@@ -147,7 +147,7 @@ This document summarizes the comprehensive test coverage improvements made to th
 ```
 
 **Mock Requirements**:
-- MockSaltClient for Salt Stack operations
+- MockClient for  Stack operations
 - MockVaultClient for credential storage
 
 #### 2. System Service Operations (`pkg/system/service_operations.go`)
@@ -174,8 +174,8 @@ This document summarizes the comprehensive test coverage improvements made to th
 - Integration with new AIE operations
 - Cross-operation workflow testing
 
-#### 5. Salt Stack Integration Tests
-- Mock-based Salt Stack operation testing
+#### 5.  Stack Integration Tests
+- Mock-based  Stack operation testing
 - Configuration validation testing
 - HashiCorp tools deployment testing
 
@@ -208,7 +208,7 @@ This document summarizes the comprehensive test coverage improvements made to th
 - System service management ❌ (needs tests)
 
 #### **Integration Points (15% avg)**
-- Salt Stack integration (interface testing only)
+-  Stack integration (interface testing only)
 - Command orchestration ❌ (needs tests)
 - Cross-component workflows ❌ (needs tests)
 
@@ -236,7 +236,7 @@ The testing improvements focus on the **most critical components first**:
 
 1. **Foundation First**: AIE pattern framework (97.5% coverage)
 2. **Security Operations**: User management and system operations (next priority)
-3. **Infrastructure**: Salt Stack and command integration (medium priority)
+3. **Infrastructure**:  Stack and command integration (medium priority)
 
 This approach ensures that the core architectural components are thoroughly tested before building on top of them, providing a solid foundation for the entire Eos system.
 

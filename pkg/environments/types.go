@@ -15,23 +15,23 @@ type Environment struct {
 	Description string            `yaml:"description" json:"description"`
 	Type        EnvironmentType   `yaml:"type" json:"type"`
 	Status      EnvironmentStatus `yaml:"status" json:"status"`
-	
+
 	// Infrastructure configuration
 	Infrastructure InfrastructureConfig `yaml:"infrastructure" json:"infrastructure"`
-	
+
 	// Deployment configuration
 	Deployment DeploymentConfig `yaml:"deployment" json:"deployment"`
-	
+
 	// Security and access control
 	Security SecurityConfig `yaml:"security" json:"security"`
-	
+
 	// Monitoring and alerting
 	Monitoring MonitoringConfig `yaml:"monitoring" json:"monitoring"`
-	
+
 	// Metadata
-	Metadata   EnvironmentMetadata `yaml:"metadata" json:"metadata"`
-	CreatedAt  time.Time           `yaml:"created_at" json:"created_at"`
-	UpdatedAt  time.Time           `yaml:"updated_at" json:"updated_at"`
+	Metadata  EnvironmentMetadata `yaml:"metadata" json:"metadata"`
+	CreatedAt time.Time           `yaml:"created_at" json:"created_at"`
+	UpdatedAt time.Time           `yaml:"updated_at" json:"updated_at"`
 }
 
 // EnvironmentType defines the type of environment
@@ -64,29 +64,29 @@ type InfrastructureConfig struct {
 	Nomad  NomadConfig  `yaml:"nomad" json:"nomad"`
 	Consul ConsulConfig `yaml:"consul" json:"consul"`
 	Vault  VaultConfig  `yaml:"vault" json:"vault"`
-	
+
 	// Terraform configuration
 	Terraform TerraformConfig `yaml:"terraform" json:"terraform"`
-	
-	// SaltStack configuration
-	Salt SaltConfig `yaml:"salt" json:"salt"`
-	
+
+	//  configuration
+	Config `yaml:"" json:""`
+
 	// Cloud provider configuration
 	Provider ProviderConfig `yaml:"provider" json:"provider"`
-	
+
 	// Network configuration
 	Network NetworkConfig `yaml:"network" json:"network"`
 }
 
 // NomadConfig holds Nomad-specific configuration
 type NomadConfig struct {
-	Address     string            `yaml:"address" json:"address"`
-	Region      string            `yaml:"region" json:"region"`
-	Datacenter  string            `yaml:"datacenter" json:"datacenter"`
-	Namespace   string            `yaml:"namespace" json:"namespace"`
-	Token       string            `yaml:"token,omitempty" json:"token,omitempty"`
-	TLS         TLSConfig         `yaml:"tls" json:"tls"`
-	Meta        map[string]string `yaml:"meta" json:"meta"`
+	Address    string            `yaml:"address" json:"address"`
+	Region     string            `yaml:"region" json:"region"`
+	Datacenter string            `yaml:"datacenter" json:"datacenter"`
+	Namespace  string            `yaml:"namespace" json:"namespace"`
+	Token      string            `yaml:"token,omitempty" json:"token,omitempty"`
+	TLS        TLSConfig         `yaml:"tls" json:"tls"`
+	Meta       map[string]string `yaml:"meta" json:"meta"`
 }
 
 // ConsulConfig holds Consul-specific configuration
@@ -118,12 +118,12 @@ type TerraformConfig struct {
 	ModulePath    string            `yaml:"module_path" json:"module_path"`
 }
 
-// SaltConfig holds SaltStack-specific configuration
-type SaltConfig struct {
+// Config holds -specific configuration
+type Config struct {
 	Master      string            `yaml:"master" json:"master"`
 	Environment string            `yaml:"environment" json:"environment"`
 	Targets     []string          `yaml:"targets" json:"targets"`
-	Pillar      map[string]string `yaml:"pillar" json:"pillar"`
+	Variables   map[string]string `yaml:"variables" json:"variables"`
 }
 
 // ProviderConfig holds cloud provider configuration
@@ -153,45 +153,45 @@ type TLSConfig struct {
 
 // DeploymentConfig holds deployment-specific configuration
 type DeploymentConfig struct {
-	Strategy         DeploymentStrategy `yaml:"strategy" json:"strategy"`
-	Resources        ResourceLimits     `yaml:"resources" json:"resources"`
-	HealthChecks     HealthCheckConfig  `yaml:"health_checks" json:"health_checks"`
-	RollbackPolicy   RollbackPolicy     `yaml:"rollback_policy" json:"rollback_policy"`
-	UpdatePolicy     UpdatePolicy       `yaml:"update_policy" json:"update_policy"`
-	AutoScaling      AutoScalingConfig  `yaml:"auto_scaling" json:"auto_scaling"`
+	Strategy       DeploymentStrategy `yaml:"strategy" json:"strategy"`
+	Resources      ResourceLimits     `yaml:"resources" json:"resources"`
+	HealthChecks   HealthCheckConfig  `yaml:"health_checks" json:"health_checks"`
+	RollbackPolicy RollbackPolicy     `yaml:"rollback_policy" json:"rollback_policy"`
+	UpdatePolicy   UpdatePolicy       `yaml:"update_policy" json:"update_policy"`
+	AutoScaling    AutoScalingConfig  `yaml:"auto_scaling" json:"auto_scaling"`
 }
 
 // DeploymentStrategy defines deployment strategy settings
 type DeploymentStrategy struct {
-	Type              string        `yaml:"type" json:"type"` // rolling, blue-green, canary
-	MaxParallel       int           `yaml:"max_parallel" json:"max_parallel"`
-	MinHealthyTime    time.Duration `yaml:"min_healthy_time" json:"min_healthy_time"`
-	HealthyDeadline   time.Duration `yaml:"healthy_deadline" json:"healthy_deadline"`
-	ProgressDeadline  time.Duration `yaml:"progress_deadline" json:"progress_deadline"`
-	AutoRevert        bool          `yaml:"auto_revert" json:"auto_revert"`
-	AutoPromote       bool          `yaml:"auto_promote" json:"auto_promote"`
-	CanaryReplicas    int           `yaml:"canary_replicas" json:"canary_replicas"`
-	CanaryDuration    time.Duration `yaml:"canary_duration" json:"canary_duration"`
+	Type             string        `yaml:"type" json:"type"` // rolling, blue-green, canary
+	MaxParallel      int           `yaml:"max_parallel" json:"max_parallel"`
+	MinHealthyTime   time.Duration `yaml:"min_healthy_time" json:"min_healthy_time"`
+	HealthyDeadline  time.Duration `yaml:"healthy_deadline" json:"healthy_deadline"`
+	ProgressDeadline time.Duration `yaml:"progress_deadline" json:"progress_deadline"`
+	AutoRevert       bool          `yaml:"auto_revert" json:"auto_revert"`
+	AutoPromote      bool          `yaml:"auto_promote" json:"auto_promote"`
+	CanaryReplicas   int           `yaml:"canary_replicas" json:"canary_replicas"`
+	CanaryDuration   time.Duration `yaml:"canary_duration" json:"canary_duration"`
 }
 
 // ResourceLimits defines default resource limits for the environment
 type ResourceLimits struct {
-	CPU       int `yaml:"cpu" json:"cpu"`             // MHz
-	Memory    int `yaml:"memory" json:"memory"`       // MB
+	CPU       int `yaml:"cpu" json:"cpu"`               // MHz
+	Memory    int `yaml:"memory" json:"memory"`         // MB
 	MemoryMax int `yaml:"memory_max" json:"memory_max"` // MB
-	Disk      int `yaml:"disk" json:"disk"`           // MB
-	Network   int `yaml:"network" json:"network"`     // Mbps
+	Disk      int `yaml:"disk" json:"disk"`             // MB
+	Network   int `yaml:"network" json:"network"`       // Mbps
 }
 
 // HealthCheckConfig defines health check settings
 type HealthCheckConfig struct {
-	Enabled         bool          `yaml:"enabled" json:"enabled"`
-	Path            string        `yaml:"path" json:"path"`
-	Interval        time.Duration `yaml:"interval" json:"interval"`
-	Timeout         time.Duration `yaml:"timeout" json:"timeout"`
-	Retries         int           `yaml:"retries" json:"retries"`
-	GracePeriod     time.Duration `yaml:"grace_period" json:"grace_period"`
-	FailureThreshold int          `yaml:"failure_threshold" json:"failure_threshold"`
+	Enabled          bool          `yaml:"enabled" json:"enabled"`
+	Path             string        `yaml:"path" json:"path"`
+	Interval         time.Duration `yaml:"interval" json:"interval"`
+	Timeout          time.Duration `yaml:"timeout" json:"timeout"`
+	Retries          int           `yaml:"retries" json:"retries"`
+	GracePeriod      time.Duration `yaml:"grace_period" json:"grace_period"`
+	FailureThreshold int           `yaml:"failure_threshold" json:"failure_threshold"`
 }
 
 // RollbackPolicy defines rollback behavior
@@ -204,20 +204,20 @@ type RollbackPolicy struct {
 
 // UpdatePolicy defines update behavior
 type UpdatePolicy struct {
-	MaxUnavailable   string        `yaml:"max_unavailable" json:"max_unavailable"`
-	MaxSurge         string        `yaml:"max_surge" json:"max_surge"`
-	MinReadySeconds  int           `yaml:"min_ready_seconds" json:"min_ready_seconds"`
-	PodDisruption    int           `yaml:"pod_disruption" json:"pod_disruption"`
-	UpdateTimeout    time.Duration `yaml:"update_timeout" json:"update_timeout"`
+	MaxUnavailable  string        `yaml:"max_unavailable" json:"max_unavailable"`
+	MaxSurge        string        `yaml:"max_surge" json:"max_surge"`
+	MinReadySeconds int           `yaml:"min_ready_seconds" json:"min_ready_seconds"`
+	PodDisruption   int           `yaml:"pod_disruption" json:"pod_disruption"`
+	UpdateTimeout   time.Duration `yaml:"update_timeout" json:"update_timeout"`
 }
 
 // AutoScalingConfig defines auto-scaling settings
 type AutoScalingConfig struct {
-	Enabled     bool               `yaml:"enabled" json:"enabled"`
-	MinReplicas int                `yaml:"min_replicas" json:"min_replicas"`
-	MaxReplicas int                `yaml:"max_replicas" json:"max_replicas"`
-	Metrics     []ScalingMetric    `yaml:"metrics" json:"metrics"`
-	Behavior    ScalingBehavior    `yaml:"behavior" json:"behavior"`
+	Enabled     bool            `yaml:"enabled" json:"enabled"`
+	MinReplicas int             `yaml:"min_replicas" json:"min_replicas"`
+	MaxReplicas int             `yaml:"max_replicas" json:"max_replicas"`
+	Metrics     []ScalingMetric `yaml:"metrics" json:"metrics"`
+	Behavior    ScalingBehavior `yaml:"behavior" json:"behavior"`
 }
 
 // ScalingMetric defines a metric for auto-scaling
@@ -257,10 +257,10 @@ type SecurityConfig struct {
 
 // AccessControlConfig defines access control settings
 type AccessControlConfig struct {
-	RBAC        RBACConfig        `yaml:"rbac" json:"rbac"`
-	MFA         MFAConfig         `yaml:"mfa" json:"mfa"`
-	Approval    ApprovalConfig    `yaml:"approval" json:"approval"`
-	Audit       AuditConfig       `yaml:"audit" json:"audit"`
+	RBAC     RBACConfig     `yaml:"rbac" json:"rbac"`
+	MFA      MFAConfig      `yaml:"mfa" json:"mfa"`
+	Approval ApprovalConfig `yaml:"approval" json:"approval"`
+	Audit    AuditConfig    `yaml:"audit" json:"audit"`
 }
 
 // RBACConfig defines role-based access control
@@ -285,16 +285,16 @@ type UserSpec struct {
 
 // MFAConfig defines multi-factor authentication settings
 type MFAConfig struct {
-	Required   bool     `yaml:"required" json:"required"`
-	Providers  []string `yaml:"providers" json:"providers"`
+	Required    bool          `yaml:"required" json:"required"`
+	Providers   []string      `yaml:"providers" json:"providers"`
 	GracePeriod time.Duration `yaml:"grace_period" json:"grace_period"`
 }
 
 // ApprovalConfig defines approval workflow settings
 type ApprovalConfig struct {
-	Required     bool     `yaml:"required" json:"required"`
-	Approvers    []string `yaml:"approvers" json:"approvers"`
-	MinApprovals int      `yaml:"min_approvals" json:"min_approvals"`
+	Required     bool          `yaml:"required" json:"required"`
+	Approvers    []string      `yaml:"approvers" json:"approvers"`
+	MinApprovals int           `yaml:"min_approvals" json:"min_approvals"`
 	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
 }
 
@@ -307,10 +307,10 @@ type AuditConfig struct {
 
 // NetworkPolicyConfig defines network policy settings
 type NetworkPolicyConfig struct {
-	Enabled       bool              `yaml:"enabled" json:"enabled"`
-	DefaultDeny   bool              `yaml:"default_deny" json:"default_deny"`
-	AllowedEgress []NetworkRule     `yaml:"allowed_egress" json:"allowed_egress"`
-	AllowedIngress []NetworkRule    `yaml:"allowed_ingress" json:"allowed_ingress"`
+	Enabled        bool          `yaml:"enabled" json:"enabled"`
+	DefaultDeny    bool          `yaml:"default_deny" json:"default_deny"`
+	AllowedEgress  []NetworkRule `yaml:"allowed_egress" json:"allowed_egress"`
+	AllowedIngress []NetworkRule `yaml:"allowed_ingress" json:"allowed_ingress"`
 }
 
 // NetworkRule defines a network rule
@@ -323,24 +323,24 @@ type NetworkRule struct {
 
 // EncryptionConfig defines encryption settings
 type EncryptionConfig struct {
-	InTransit  EncryptionSpec `yaml:"in_transit" json:"in_transit"`
-	AtRest     EncryptionSpec `yaml:"at_rest" json:"at_rest"`
+	InTransit     EncryptionSpec      `yaml:"in_transit" json:"in_transit"`
+	AtRest        EncryptionSpec      `yaml:"at_rest" json:"at_rest"`
 	KeyManagement KeyManagementConfig `yaml:"key_management" json:"key_management"`
 }
 
 // EncryptionSpec defines encryption specification
 type EncryptionSpec struct {
-	Enabled    bool   `yaml:"enabled" json:"enabled"`
-	Algorithm  string `yaml:"algorithm" json:"algorithm"`
-	KeySize    int    `yaml:"key_size" json:"key_size"`
-	Provider   string `yaml:"provider" json:"provider"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Algorithm string `yaml:"algorithm" json:"algorithm"`
+	KeySize   int    `yaml:"key_size" json:"key_size"`
+	Provider  string `yaml:"provider" json:"provider"`
 }
 
 // KeyManagementConfig defines key management settings
 type KeyManagementConfig struct {
-	Provider   string        `yaml:"provider" json:"provider"` // vault, kms, etc.
+	Provider       string        `yaml:"provider" json:"provider"` // vault, kms, etc.
 	RotationPeriod time.Duration `yaml:"rotation_period" json:"rotation_period"`
-	BackupEnabled  bool         `yaml:"backup_enabled" json:"backup_enabled"`
+	BackupEnabled  bool          `yaml:"backup_enabled" json:"backup_enabled"`
 }
 
 // ComplianceConfig defines compliance settings
@@ -352,27 +352,27 @@ type ComplianceConfig struct {
 
 // ScanningConfig defines security scanning settings
 type ScanningConfig struct {
-	Enabled   bool          `yaml:"enabled" json:"enabled"`
-	Schedule  string        `yaml:"schedule" json:"schedule"`
-	Types     []string      `yaml:"types" json:"types"` // vulnerability, compliance, etc.
-	Threshold string        `yaml:"threshold" json:"threshold"` // low, medium, high, critical
+	Enabled   bool     `yaml:"enabled" json:"enabled"`
+	Schedule  string   `yaml:"schedule" json:"schedule"`
+	Types     []string `yaml:"types" json:"types"`         // vulnerability, compliance, etc.
+	Threshold string   `yaml:"threshold" json:"threshold"` // low, medium, high, critical
 }
 
 // SecretScanningConfig defines secret scanning settings
 type SecretScanningConfig struct {
-	Enabled     bool     `yaml:"enabled" json:"enabled"`
-	Patterns    []string `yaml:"patterns" json:"patterns"`
-	Exclusions  []string `yaml:"exclusions" json:"exclusions"`
-	Action      string   `yaml:"action" json:"action"` // warn, block, quarantine
+	Enabled    bool     `yaml:"enabled" json:"enabled"`
+	Patterns   []string `yaml:"patterns" json:"patterns"`
+	Exclusions []string `yaml:"exclusions" json:"exclusions"`
+	Action     string   `yaml:"action" json:"action"` // warn, block, quarantine
 }
 
 // MonitoringConfig holds monitoring and alerting configuration
 type MonitoringConfig struct {
-	Metrics    MetricsConfig    `yaml:"metrics" json:"metrics"`
-	Logging    LoggingConfig    `yaml:"logging" json:"logging"`
-	Tracing    TracingConfig    `yaml:"tracing" json:"tracing"`
-	Alerting   AlertingConfig   `yaml:"alerting" json:"alerting"`
-	Dashboards DashboardConfig  `yaml:"dashboards" json:"dashboards"`
+	Metrics    MetricsConfig   `yaml:"metrics" json:"metrics"`
+	Logging    LoggingConfig   `yaml:"logging" json:"logging"`
+	Tracing    TracingConfig   `yaml:"tracing" json:"tracing"`
+	Alerting   AlertingConfig  `yaml:"alerting" json:"alerting"`
+	Dashboards DashboardConfig `yaml:"dashboards" json:"dashboards"`
 }
 
 // MetricsConfig defines metrics collection settings
@@ -387,12 +387,12 @@ type MetricsConfig struct {
 
 // LoggingConfig defines logging settings
 type LoggingConfig struct {
-	Enabled   bool              `yaml:"enabled" json:"enabled"`
-	Level     string            `yaml:"level" json:"level"`
-	Format    string            `yaml:"format" json:"format"`
-	Output    []string          `yaml:"output" json:"output"`
-	Rotation  LogRotationConfig `yaml:"rotation" json:"rotation"`
-	Shipping  LogShippingConfig `yaml:"shipping" json:"shipping"`
+	Enabled  bool              `yaml:"enabled" json:"enabled"`
+	Level    string            `yaml:"level" json:"level"`
+	Format   string            `yaml:"format" json:"format"`
+	Output   []string          `yaml:"output" json:"output"`
+	Rotation LogRotationConfig `yaml:"rotation" json:"rotation"`
+	Shipping LogShippingConfig `yaml:"shipping" json:"shipping"`
 }
 
 // LogRotationConfig defines log rotation settings
@@ -420,21 +420,21 @@ type LogBufferConfig struct {
 
 // TracingConfig defines distributed tracing settings
 type TracingConfig struct {
-	Enabled     bool              `yaml:"enabled" json:"enabled"`
-	Provider    string            `yaml:"provider" json:"provider"` // jaeger, zipkin, etc.
-	Endpoint    string            `yaml:"endpoint" json:"endpoint"`
-	SampleRate  float64           `yaml:"sample_rate" json:"sample_rate"`
-	Tags        map[string]string `yaml:"tags" json:"tags"`
+	Enabled    bool              `yaml:"enabled" json:"enabled"`
+	Provider   string            `yaml:"provider" json:"provider"` // jaeger, zipkin, etc.
+	Endpoint   string            `yaml:"endpoint" json:"endpoint"`
+	SampleRate float64           `yaml:"sample_rate" json:"sample_rate"`
+	Tags       map[string]string `yaml:"tags" json:"tags"`
 }
 
 // AlertingConfig defines alerting settings
 type AlertingConfig struct {
-	Enabled      bool                  `yaml:"enabled" json:"enabled"`
-	Provider     string                `yaml:"provider" json:"provider"`
-	Channels     []AlertChannel        `yaml:"channels" json:"channels"`
-	Rules        []AlertRule           `yaml:"rules" json:"rules"`
-	Escalation   EscalationPolicy      `yaml:"escalation" json:"escalation"`
-	Maintenance  MaintenanceWindow     `yaml:"maintenance" json:"maintenance"`
+	Enabled     bool              `yaml:"enabled" json:"enabled"`
+	Provider    string            `yaml:"provider" json:"provider"`
+	Channels    []AlertChannel    `yaml:"channels" json:"channels"`
+	Rules       []AlertRule       `yaml:"rules" json:"rules"`
+	Escalation  EscalationPolicy  `yaml:"escalation" json:"escalation"`
+	Maintenance MaintenanceWindow `yaml:"maintenance" json:"maintenance"`
 }
 
 // AlertChannel defines an alert channel
@@ -458,8 +458,8 @@ type AlertRule struct {
 
 // EscalationPolicy defines alert escalation
 type EscalationPolicy struct {
-	Enabled bool                 `yaml:"enabled" json:"enabled"`
-	Levels  []EscalationLevel    `yaml:"levels" json:"levels"`
+	Enabled bool              `yaml:"enabled" json:"enabled"`
+	Levels  []EscalationLevel `yaml:"levels" json:"levels"`
 }
 
 // EscalationLevel defines an escalation level
@@ -472,26 +472,26 @@ type EscalationLevel struct {
 
 // MaintenanceWindow defines maintenance window settings
 type MaintenanceWindow struct {
-	Enabled   bool                 `yaml:"enabled" json:"enabled"`
-	Windows   []MaintenanceSlot    `yaml:"windows" json:"windows"`
-	AlertsOff bool                 `yaml:"alerts_off" json:"alerts_off"`
+	Enabled   bool              `yaml:"enabled" json:"enabled"`
+	Windows   []MaintenanceSlot `yaml:"windows" json:"windows"`
+	AlertsOff bool              `yaml:"alerts_off" json:"alerts_off"`
 }
 
 // MaintenanceSlot defines a maintenance time slot
 type MaintenanceSlot struct {
-	Start    string   `yaml:"start" json:"start"` // "Monday 02:00"
-	Duration time.Duration `yaml:"duration" json:"duration"`
-	Timezone string   `yaml:"timezone" json:"timezone"`
-	Recurring bool    `yaml:"recurring" json:"recurring"`
+	Start     string        `yaml:"start" json:"start"` // "Monday 02:00"
+	Duration  time.Duration `yaml:"duration" json:"duration"`
+	Timezone  string        `yaml:"timezone" json:"timezone"`
+	Recurring bool          `yaml:"recurring" json:"recurring"`
 }
 
 // DashboardConfig defines dashboard settings
 type DashboardConfig struct {
-	Enabled    bool              `yaml:"enabled" json:"enabled"`
-	Provider   string            `yaml:"provider" json:"provider"` // grafana, etc.
-	URL        string            `yaml:"url" json:"url"`
-	Templates  []string          `yaml:"templates" json:"templates"`
-	Variables  map[string]string `yaml:"variables" json:"variables"`
+	Enabled   bool              `yaml:"enabled" json:"enabled"`
+	Provider  string            `yaml:"provider" json:"provider"` // grafana, etc.
+	URL       string            `yaml:"url" json:"url"`
+	Templates []string          `yaml:"templates" json:"templates"`
+	Variables map[string]string `yaml:"variables" json:"variables"`
 }
 
 // EnvironmentMetadata holds environment metadata
@@ -516,28 +516,28 @@ type Context struct {
 
 // ContextConfig holds context-specific configuration
 type ContextConfig struct {
-	ConfigPath     string        `yaml:"config_path" json:"config_path"`
-	CacheTimeout   time.Duration `yaml:"cache_timeout" json:"cache_timeout"`
-	DefaultTimeout time.Duration `yaml:"default_timeout" json:"default_timeout"`
-	AutoRefresh    bool          `yaml:"auto_refresh" json:"auto_refresh"`
+	ConfigPath     string           `yaml:"config_path" json:"config_path"`
+	CacheTimeout   time.Duration    `yaml:"cache_timeout" json:"cache_timeout"`
+	DefaultTimeout time.Duration    `yaml:"default_timeout" json:"default_timeout"`
+	AutoRefresh    bool             `yaml:"auto_refresh" json:"auto_refresh"`
 	Validation     ValidationConfig `yaml:"validation" json:"validation"`
 }
 
 // ValidationConfig defines validation settings
 type ValidationConfig struct {
-	Enabled     bool     `yaml:"enabled" json:"enabled"`
-	Strict      bool     `yaml:"strict" json:"strict"`
-	SkipWarnings bool    `yaml:"skip_warnings" json:"skip_warnings"`
-	Rules       []string `yaml:"rules" json:"rules"`
+	Enabled      bool     `yaml:"enabled" json:"enabled"`
+	Strict       bool     `yaml:"strict" json:"strict"`
+	SkipWarnings bool     `yaml:"skip_warnings" json:"skip_warnings"`
+	Rules        []string `yaml:"rules" json:"rules"`
 }
 
 // EnvironmentManager manages environment operations
 type EnvironmentManager struct {
-	configPath      string
-	context         *Context
-	deployManager   *deploy.DeploymentManager
-	cache           map[string]*Environment
-	cacheExpiry     time.Time
+	configPath    string
+	context       *Context
+	deployManager *deploy.DeploymentManager
+	cache         map[string]*Environment
+	cacheExpiry   time.Time
 }
 
 // EnvironmentError represents an error during environment operations
@@ -591,21 +591,16 @@ func DefaultDevelopmentEnvironment() *Environment {
 				},
 				Workspace: "development",
 			},
-			Salt: SaltConfig{
-				Master:      "salt-master.cybermonkey.net.au",
-				Environment: "development",
-				Targets:     []string{"*"},
-			},
 		},
 		Deployment: DeploymentConfig{
 			Strategy: DeploymentStrategy{
-				Type:              "rolling",
-				MaxParallel:       1,
-				MinHealthyTime:    30 * time.Second,
-				HealthyDeadline:   5 * time.Minute,
-				ProgressDeadline:  10 * time.Minute,
-				AutoRevert:        true,
-				AutoPromote:       true,
+				Type:             "rolling",
+				MaxParallel:      1,
+				MinHealthyTime:   30 * time.Second,
+				HealthyDeadline:  5 * time.Minute,
+				ProgressDeadline: 10 * time.Minute,
+				AutoRevert:       true,
+				AutoPromote:      true,
 			},
 			Resources: ResourceLimits{
 				CPU:       500,
@@ -673,21 +668,16 @@ func DefaultProductionEnvironment() *Environment {
 				},
 				Workspace: "production",
 			},
-			Salt: SaltConfig{
-				Master:      "salt-master-prod.cybermonkey.net.au",
-				Environment: "production",
-				Targets:     []string{"*"},
-			},
 		},
 		Deployment: DeploymentConfig{
 			Strategy: DeploymentStrategy{
-				Type:              "blue-green",
-				MaxParallel:       2,
-				MinHealthyTime:    2 * time.Minute,
-				HealthyDeadline:   10 * time.Minute,
-				ProgressDeadline:  30 * time.Minute,
-				AutoRevert:        true,
-				AutoPromote:       false, // Require manual promotion
+				Type:             "blue-green",
+				MaxParallel:      2,
+				MinHealthyTime:   2 * time.Minute,
+				HealthyDeadline:  10 * time.Minute,
+				ProgressDeadline: 30 * time.Minute,
+				AutoRevert:       true,
+				AutoPromote:      false, // Require manual promotion
 			},
 			Resources: ResourceLimits{
 				CPU:       1000,
@@ -756,8 +746,8 @@ func DefaultContext() *Context {
 			DefaultTimeout: 30 * time.Second,
 			AutoRefresh:    true,
 			Validation: ValidationConfig{
-				Enabled:     true,
-				Strict:      false,
+				Enabled:      true,
+				Strict:       false,
 				SkipWarnings: false,
 			},
 		},

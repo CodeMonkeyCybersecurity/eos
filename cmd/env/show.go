@@ -136,7 +136,7 @@ func displayEnvironmentTable(env *environments.Environment, detailed bool) error
 	// Infrastructure section
 	fmt.Printf("Infrastructure:\n")
 	fmt.Printf("───────────────\n")
-	fmt.Printf("Nomad:     %s (region: %s, dc: %s)\n", 
+	fmt.Printf("Nomad:     %s (region: %s, dc: %s)\n",
 		env.Infrastructure.Nomad.Address,
 		env.Infrastructure.Nomad.Region,
 		env.Infrastructure.Nomad.Datacenter)
@@ -144,9 +144,7 @@ func displayEnvironmentTable(env *environments.Environment, detailed bool) error
 		env.Infrastructure.Consul.Address,
 		env.Infrastructure.Consul.Datacenter)
 	fmt.Printf("Vault:     %s\n", env.Infrastructure.Vault.Address)
-	fmt.Printf("Salt:      %s (env: %s)\n",
-		env.Infrastructure.Salt.Master,
-		env.Infrastructure.Salt.Environment)
+
 	fmt.Printf("Terraform: %s backend, workspace: %s\n",
 		env.Infrastructure.Terraform.Backend,
 		env.Infrastructure.Terraform.Workspace)

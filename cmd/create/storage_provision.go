@@ -34,7 +34,7 @@ var (
 
 func init() {
 	CreateCmd.AddCommand(storageProvisionCmd)
-	
+
 	storageProvisionCmd.Flags().StringVar(&provisionWorkload, "workload", "general",
 		"Workload type: database, container, backup, distributed, general")
 	storageProvisionCmd.Flags().StringVar(&provisionSize, "size", "",
@@ -48,18 +48,18 @@ func init() {
 func runStorageProvision(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting storage provisioning")
-	
+
 	// ASSESS - Detect environment
 	env, err := environment.Detect(rc)
 	if err != nil {
 		return fmt.Errorf("failed to detect environment: %w", err)
 	}
-	
+
 	profile := env.GetStorageProfile()
 	logger.Info("Environment detected",
 		zap.String("scale", string(profile.Scale)),
 		zap.String("role", string(env.MyRole)))
-	
+
 	// Validate inputs
 	if provisionPath == "" {
 		logger.Info("terminal prompt: Enter mount path for new storage")
@@ -69,7 +69,7 @@ func runStorageProvision(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		}
 		provisionPath = path
 	}
-	
+
 	if provisionSize == "" {
 		logger.Info("terminal prompt: Enter storage size (e.g., 100G, 1T)")
 		size, err := eos_io.PromptInput(rc, "Storage size", "100G")
@@ -78,10 +78,10 @@ func runStorageProvision(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		}
 		provisionSize = size
 	}
-	
+
 	// INTERVENE - Determine filesystem
 	fsDetector := filesystem.NewDetector(rc)
-	
+
 	var selectedFS filesystem.Filesystem
 	if provisionFilesystem != "" {
 		selectedFS = filesystem.Filesystem(provisionFilesystem)
@@ -92,20 +92,20 @@ func runStorageProvision(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 			zap.String("workload", provisionWorkload),
 			zap.String("filesystem", string(selectedFS)))
 	}
-	
+
 	// Check filesystem support
 	supported, err := fsDetector.CheckSupport(selectedFS)
 	if err != nil {
 		return fmt.Errorf("failed to check filesystem support: %w", err)
 	}
-	
+
 	if !supported {
 		return fmt.Errorf("filesystem %s is not supported on this system", selectedFS)
 	}
-	
+
 	// Get optimization options
 	opts := fsDetector.GetOptimizationOptions(selectedFS, provisionWorkload)
-	
+
 	// Display provisioning plan
 	logger.Info("Storage provisioning plan",
 		zap.String("path", provisionPath),
@@ -113,23 +113,23 @@ func runStorageProvision(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		zap.String("filesystem", string(selectedFS)),
 		zap.String("workload", provisionWorkload),
 		zap.Any("optimizations", opts))
-	
+
 	features := fsDetector.GetFeatures(selectedFS)
 	logger.Info("Filesystem features",
 		zap.Strings("features", features))
-	
+
 	// EVALUATE - Confirm with user
 	logger.Info("terminal prompt: Proceed with storage provisioning? (y/N)")
 	response, err := eos_io.PromptInput(rc, "Proceed?", "y/N")
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
-	
+
 	if response != "y" && response != "Y" {
 		logger.Info("Storage provisioning cancelled")
 		return nil
 	}
-	
+
 	// TODO: Actual provisioning would involve:
 	// - Creating LVM volumes or partitions
 	// - Formatting with selected filesystem
@@ -137,16 +137,15 @@ func runStorageProvision(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	// - Updating /etc/fstab
 	// - Creating mount point
 	// - Setting up monitoring
-	
+
 	logger.Info("Storage provisioning completed successfully",
 		zap.String("path", provisionPath),
 		zap.String("filesystem", string(selectedFS)))
-	
+
 	// Show next steps
 	logger.Info("Next steps:")
 	logger.Info("1. Configure monitoring: eos read storage-monitor")
 	logger.Info("2. Set up backups: eos backup create --path " + provisionPath)
-	logger.Info("3. Apply Salt states: eos storage salt generate")
-	
+
 	return nil
 }
