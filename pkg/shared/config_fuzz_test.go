@@ -415,7 +415,7 @@ func validateConfigFormat(data string) bool {
 	return len(data) < 1000000 && utf8.ValidString(data)
 }
 
-func extractConfigKeys(data string) []string {
+func extractConfigKeys(_ string) []string {
 	// TODO: Implement key extraction
 	return []string{}
 }
@@ -479,12 +479,12 @@ func isShellSafe(input string) bool {
 	return !containsCommandInjection(input)
 }
 
-func parseTemplate(template string) (interface{}, error) {
+func parseTemplate(_ string) (interface{}, error) {
 	// TODO: Implement template parsing
 	return nil, nil
 }
 
-func validateTemplate(parsed interface{}) bool {
+func validateTemplate(_ interface{}) bool {
 	// TODO: Implement template validation
 	return true
 }
@@ -498,7 +498,7 @@ func containsScriptTags(input string) bool {
 	return strings.Contains(strings.ToLower(input), "<script>")
 }
 
-func executeTemplateSafely(template string, data interface{}) string {
+func executeTemplateSafely(_ string, _ interface{}) string {
 	// TODO: Implement safe template execution
 	return ""
 }
@@ -534,7 +534,7 @@ func getBaseConfig() map[string]interface{} {
 	return map[string]interface{}{"base": "config"}
 }
 
-func mergeConfigurations(base map[string]interface{}, configJSON string) (map[string]interface{}, error) {
+func mergeConfigurations(base map[string]interface{}, _ string) (map[string]interface{}, error) {
 	// TODO: Implement secure configuration merging
 	return base, nil
 }
@@ -551,12 +551,12 @@ func hasPrototypePollutionConfig(config map[string]interface{}) bool {
 	return false
 }
 
-func hasUnauthorizedOverrides(config map[string]interface{}) bool {
+func hasUnauthorizedOverrides(_ map[string]interface{}) bool {
 	// TODO: Implement override detection
 	return false
 }
 
-func calculateConfigDepth(config map[string]interface{}) int {
+func calculateConfigDepth(_ map[string]interface{}) int {
 	// TODO: Implement depth calculation
 	return 1
 }

@@ -385,14 +385,14 @@ func validateRequired(fieldName string, value interface{}) error {
 }
 
 // validateMinLength validates minimum length for strings and slices
-func validateMinLength(fieldName string, value interface{}, minStr string) error {
+func validateMinLength(_ string, _ interface{}, _ string) error {
 	// This would need proper parsing of minStr to int
 	// Simplified for brevity
 	return nil
 }
 
 // validateMaxLength validates maximum length for strings and slices  
-func validateMaxLength(fieldName string, value interface{}, maxStr string) error {
+func validateMaxLength(_ string, _ interface{}, _ string) error {
 	// This would need proper parsing of maxStr to int
 	// Simplified for brevity
 	return nil

@@ -320,7 +320,7 @@ func (slm *ServiceLifecycleManager) disableService(ctx context.Context, serviceN
 }
 
 // removeUnitFile removes the systemd unit file
-func (slm *ServiceLifecycleManager) removeUnitFile(ctx context.Context, serviceName string) error {
+func (slm *ServiceLifecycleManager) removeUnitFile(_ context.Context, serviceName string) error {
 	unitPaths := []string{
 		"/etc/systemd/system/" + serviceName + ".service",
 		"/usr/lib/systemd/system/" + serviceName + ".service",
