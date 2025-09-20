@@ -383,12 +383,12 @@ func parseYAMLConfig(_ string) (map[string]interface{}, error) {
 	return nil, nil
 }
 
-func parseTOMLConfig(data string) (map[string]interface{}, error) {
+func parseTOMLConfig(_ string) (map[string]interface{}, error) {
 	// TODO: Implement secure TOML parsing
 	return nil, nil
 }
 
-func parseENVConfig(data string) (map[string]interface{}, error) {
+func parseENVConfig(_ string) (map[string]interface{}, error) {
 	// TODO: Implement secure ENV parsing
 	return nil, nil
 }
