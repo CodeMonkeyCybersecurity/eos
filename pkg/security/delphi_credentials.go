@@ -120,7 +120,7 @@ func assessDelphiDeployment(rc *eos_io.RuntimeContext, config DelphiCredentialCo
 }
 
 // generateAndStoreDelphiCredentials creates secure credentials and stores them in Vault
-func generateAndStoreDelphiCredentials(rc *eos_io.RuntimeContext, config DelphiCredentialConfig) (*DelphiCredentials, error) {
+func generateAndStoreDelphiCredentials(rc *eos_io.RuntimeContext, _ DelphiCredentialConfig) (*DelphiCredentials, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating secure Delphi credentials")
 
@@ -356,7 +356,7 @@ func getRunningDelphiContainers(rc *eos_io.RuntimeContext) ([]string, error) {
 	return containers, nil
 }
 
-func retrieveDelphiCredentialsFromVault(rc *eos_io.RuntimeContext, vaultPath string) (*DelphiCredentials, error) {
+func retrieveDelphiCredentialsFromVault(_ *eos_io.RuntimeContext, _ string) (*DelphiCredentials, error) {
 	// This would use the vault functions to retrieve the stored credentials
 	// For now, return placeholder - in real implementation would call vault.ReadSecret
 	return &DelphiCredentials{
@@ -374,7 +374,7 @@ func replaceInFile(rc *eos_io.RuntimeContext, filePath, oldPattern, newPattern s
 	return err
 }
 
-func writeFile(rc *eos_io.RuntimeContext, filePath, content string, mode int) error {
+func writeFile(rc *eos_io.RuntimeContext, filePath, content string, _ int) error {
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "sh",
 		Args:    []string{"-c", fmt.Sprintf("cat > %s << 'EOF'\n%s\nEOF", filePath, content)},
@@ -455,7 +455,7 @@ func validateContainerRunning(rc *eos_io.RuntimeContext, containerName string) e
 	return err
 }
 
-func testDelphiAPIConnectivity(rc *eos_io.RuntimeContext, apiPassword string) error {
+func testDelphiAPIConnectivity(_ *eos_io.RuntimeContext, _ string) error {
 	// Test API connectivity with new credentials
 	// This would make actual API calls to verify functionality
 	return nil

@@ -248,7 +248,7 @@ func (sh *SystemHardener) setSysctl(ctx context.Context, param, value string) er
 }
 
 // saveSysctlConfig saves sysctl configuration permanently
-func (sh *SystemHardener) saveSysctlConfig(ctx context.Context, parameters map[string]string) error {
+func (sh *SystemHardener) saveSysctlConfig(_ context.Context, _ map[string]string) error {
 	// Placeholder implementation
 	return nil
 }

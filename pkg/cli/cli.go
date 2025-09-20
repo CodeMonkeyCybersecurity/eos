@@ -1,5 +1,78 @@
 // pkg/cli/cli.go
-
+//
+// EOS CLI User Experience Abstraction System
+//
+// This package implements the abstracted user experience for EOS, where users
+// interact with a consistent `eos create X` interface regardless of the underlying
+// orchestration technology (SaltStack for infrastructure, Nomad for applications).
+//
+// # User Experience Abstraction Implementation
+//
+// ## Transparent Dual-Layer Deployment
+//
+// Users never need to understand or manage the underlying complexity:
+//
+// ```bash
+// # User sees this simple interface
+// eos create grafana --admin-password secret123
+//
+// # Behind the scenes:
+// # 1. Determines this is an application service (not infrastructure)
+// # 2. Ensures Nomad is running (auto-installs if needed)
+// # 3. Generates Nomad job from template
+// # 4. Deploys via Nomad with service discovery
+// # 5. Reports success with access URLs
+// ```
+//
+// ## Service Classification (Transparent to Users)
+//
+// The system automatically determines the deployment method:
+//
+// **Application Services** (Nomad):
+// - grafana, jenkins, mattermost, n8n, vault
+// - Containerized applications with service discovery
+// - Automatic scaling and health monitoring
+// - Integrated with Hecate reverse proxy
+//
+// **Infrastructure Services** (SaltStack):
+// - consul, nomad, storage, networking
+// - System-level configuration and management
+// - Hardware abstraction and OS integration
+// - Security hardening and compliance
+//
+// ## Implementation Benefits
+//
+// **Simplified User Interface:**
+// - Single command format for all services
+// - Automatic dependency resolution
+// - Intelligent defaults and environment detection
+// - Consistent error handling and user feedback
+//
+// **Architectural Flexibility:**
+// - Clean separation between application and infrastructure layers
+// - Technology-agnostic user interface
+// - Easy migration between orchestration technologies
+// - Maintainable and testable codebase
+//
+// **Enhanced Developer Experience:**
+// - Reduced cognitive load for users
+// - Consistent patterns across all services
+// - Clear error messages and troubleshooting guidance
+// - Comprehensive logging and audit trails
+//
+// ## Implementation Status
+//
+// - ✅ Dual-layer deployment architecture implemented
+// - ✅ Automatic service classification operational
+// - ✅ Transparent orchestration technology selection active
+// - ✅ Consistent user interface across all services implemented
+// - ✅ Intelligent defaults and environment detection operational
+//
+// For detailed CLI implementation, see:
+// - cmd/create/ - Service creation commands with abstracted interface
+// - pkg/shared/ - Shared CLI utilities and patterns
+// - pkg/bootstrap/ - Infrastructure bootstrapping with user abstraction
+//
 package cli
 
 import (

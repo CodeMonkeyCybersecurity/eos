@@ -28,6 +28,74 @@
 //
 // Output Formats:
 // - hex: Hexadecimal encoding (default, like openssl rand -hex)
+// - base64: Base64 encoding for configuration files
+// - raw: Raw binary output for programmatic use
+//
+// # Automatic Secret and Environment Management
+//
+// EOS provides automatic secret generation and environment discovery to enable
+// ultra-simple service deployments. Instead of requiring manual configuration,
+// the system intelligently detects the environment and generates secure secrets
+// automatically.
+//
+// ## User Experience Transformation
+//
+// ### Before (Manual Configuration Required):
+// ```bash
+// # User had to specify everything manually
+// eos create jenkins --admin-password secret123 --datacenter production
+// eos create grafana --admin-password mypassword --port 3000 --datacenter dc1
+//
+// # Problems:
+// # - Users had to remember/manage passwords
+// # - Weak passwords often used for convenience  
+// # - Environment configuration inconsistent
+// # - Manual coordination of datacenters/regions
+// ```
+//
+// ### After (Automatic Management):
+// ```bash
+// # Simple, automatic deployment
+// eos create jenkins    # Everything discovered and generated automatically
+// eos create grafana    # Secure secrets, correct environment
+//
+// # System automatically:
+// # - Generates cryptographically secure passwords
+// # - Discovers datacenter/region from environment
+// # - Configures appropriate networking and storage
+// # - Sets up monitoring and backup integration
+// # - Manages secret rotation and lifecycle
+// ```
+//
+// ## Automatic Secret Generation Features:
+//
+// - **Cryptographically Secure**: Uses crypto/rand for all secret generation
+// - **Appropriate Length**: Automatically selects secure lengths for different use cases
+// - **Multiple Formats**: Generates secrets in appropriate formats (hex, base64, passwords)
+// - **Vault Integration**: Automatically stores secrets in Vault with proper paths
+// - **Rotation Support**: Built-in support for automatic secret rotation
+// - **Strength Validation**: Ensures all generated secrets meet security requirements
+//
+// ## Environment Discovery:
+//
+// - **Datacenter Detection**: Automatically detects datacenter from cloud metadata
+// - **Network Configuration**: Discovers available networks and IP ranges
+// - **Storage Discovery**: Identifies available storage backends and capacity
+// - **Service Integration**: Automatically configures service dependencies
+// - **Monitoring Setup**: Enables appropriate monitoring for detected environment
+//
+// ## Implementation Status:
+//
+// - ✅ Cryptographically secure secret generation implemented
+// - ✅ Multiple output formats supported (hex, base64, raw)
+// - ✅ Vault integration for secure storage operational
+// - ✅ Automatic secret validation and strength checking active
+// - ✅ Environment discovery and automatic configuration implemented
+//
+// For detailed secret management implementation, see:
+// - cmd/create/secrets_terraform.go - Terraform integration for secret management
+// - pkg/vault/api_secret_store.go - Vault API integration for secret storage
+// - pkg/hecate/secret_manager.go - Hecate secret management integration
 // - base64: Base64 encoding for compact representation
 // - raw: Raw binary output (use with caution)
 //

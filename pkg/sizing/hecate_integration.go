@@ -262,7 +262,7 @@ func GenerateHecateRecommendationReport(rc *eos_io.RuntimeContext, profileName s
 		calculation:  breakdown,
 	}
 
-	report := fmt.Sprintf("=== HECATE DEPLOYMENT RECOMMENDATION ===\n\n")
+	report := "=== HECATE DEPLOYMENT RECOMMENDATION ===\n\n"
 	report += fmt.Sprintf("Profile: %s\n", profile.Name)
 	report += fmt.Sprintf("Description: %s\n", profile.Description)
 	report += fmt.Sprintf("Target Users: %d\n", profile.ExpectedUsers)

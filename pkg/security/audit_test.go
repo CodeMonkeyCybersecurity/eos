@@ -285,17 +285,10 @@ func TestAuditEventValidation(t *testing.T) {
 		now := time.Now()
 
 		// Test with zero timestamp
-		event1 := AuditEvent{
-			EventType: "test",
-			Actor:     "user",
-			Action:    "test",
-		}
+		event1 := AuditEvent{}
 
 		// Test with existing timestamp
 		event2 := AuditEvent{
-			EventType: "test",
-			Actor:     "user",
-			Action:    "test",
 			Timestamp: now,
 		}
 

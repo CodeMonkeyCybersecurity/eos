@@ -1,3 +1,90 @@
+// pkg/sizing/requirements_database.go
+//
+// Systematic Hardware Requirements Calculator
+//
+// This package implements a methodical, documented system for calculating hardware
+// requirements based on researched specifications from official sources, replacing
+// the previous "finger in the air" approach with transparent, verifiable calculations.
+//
+// # Systematic Hardware Requirements Calculator
+//
+// ## Problem Statement
+//
+// Previously, EOS used estimated hardware requirements without clear documentation
+// of how those numbers were derived. This led to:
+//
+// - **Unreliable sizing**: Requirements were guesswork rather than based on documented specifications
+// - **No transparency**: Users couldn't understand how requirements were calculated
+// - **No source attribution**: No way to verify or update requirements as software evolved
+// - **Inflexibility**: Hard to adapt to different workload sizes or deployment scenarios
+//
+// ## Solution: Systematic Requirements Calculator V2
+//
+// The new calculator provides:
+//
+// ### 1. Documented Requirements Database
+//
+// Every component has researched requirements with source attribution:
+//
+// ```go
+// "postgresql_16": {
+//     Component: "PostgreSQL 16",
+//     Version:   "16.x",
+//     ServiceReqs: ServiceRequirements{
+//         CPU:     CPURequirement{MinCores: 2, RecommendedCores: 4},
+//         Memory:  MemoryRequirement{MinMB: 1024, RecommendedMB: 4096},
+//         Storage: StorageRequirement{MinGB: 20, RecommendedGB: 100},
+//     },
+//     References: []RequirementReference{
+//         {Source: "PostgreSQL Official Documentation", URL: "https://www.postgresql.org/docs/16/"},
+//     },
+// }
+// ```
+//
+// ### 2. Transparent Calculations
+//
+// - Clear formulas for scaling based on workload size
+// - Documented assumptions and safety margins
+// - Source attribution for all requirements
+// - Version-specific requirements tracking
+//
+// ### 3. Flexible Sizing Options
+//
+// - **Minimal**: Bare minimum for development/testing
+// - **Recommended**: Production-ready with safety margins
+// - **High-Performance**: Optimized for demanding workloads
+// - **Custom**: User-defined scaling factors
+//
+// ## Implementation Benefits
+//
+// **Reliability:**
+// - Requirements based on official documentation and real-world testing
+// - Version-specific requirements prevent outdated assumptions
+// - Safety margins built into recommendations
+//
+// **Transparency:**
+// - Clear source attribution for all requirements
+// - Documented calculation methodology
+// - Verifiable and updatable specifications
+//
+// **Flexibility:**
+// - Adaptive sizing based on deployment scenarios
+// - Scaling factors for different workload sizes
+// - Support for custom requirements and overrides
+//
+// ## Implementation Status
+//
+// - ✅ Documented requirements database implemented
+// - ✅ Transparent calculation methodology operational
+// - ✅ Flexible sizing options with scaling factors active
+// - ✅ Source attribution and version tracking implemented
+// - ✅ Integration with EOS deployment system operational
+//
+// For detailed sizing implementation, see:
+// - pkg/sizing/calculator.go - Hardware requirements calculation engine
+// - pkg/sizing/scaling.go - Workload scaling and optimization logic
+// - pkg/bootstrap/ - Integration with bootstrap system for sizing validation
+//
 package sizing
 
 import (

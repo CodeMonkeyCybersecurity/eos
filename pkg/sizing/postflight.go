@@ -84,7 +84,7 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: 📊 Deployment Health Check")
 	logger.Info("terminal prompt: ")
-	logger.Info(fmt.Sprintf("terminal prompt: System Status:"))
+	logger.Info("terminal prompt: System Status:")
 	logger.Info(fmt.Sprintf("terminal prompt:   CPU Usage:    %.1f%%", metrics.CPUUsage))
 	logger.Info(fmt.Sprintf("terminal prompt:   Memory Usage: %.1f%%", metrics.MemoryUsage))
 	logger.Info(fmt.Sprintf("terminal prompt:   Load Average: %.2f", metrics.LoadAverage))

@@ -1,5 +1,81 @@
 // pkg/bootstrap/hardening_safety.go
-
+//
+// Bootstrap Hardening Safety System
+//
+// This package implements comprehensive safety mechanisms for Ubuntu security
+// hardening as part of the EOS bootstrap process. It ensures that hardening
+// operations are performed safely without breaking existing systems or
+// disrupting critical services.
+//
+// # Bootstrap Hardening Safety Guide
+//
+// The `eos bootstrap` command includes Ubuntu security hardening as part of its
+// standard workflow. This implementation provides multiple safety mechanisms
+// and best practices to ensure safe hardening operations.
+//
+// ## Current Implementation
+//
+// Ubuntu hardening is integrated into Phase 5 of the bootstrap process:
+//
+// ```bash
+// eos bootstrap              # Includes hardening by default
+// eos bootstrap --skip-hardening  # Skip hardening if needed
+// ```
+//
+// ## Safety Mechanisms
+//
+// ### 1. User Consent
+// - Users are prompted before applying FIDO2 hardening
+// - Clear explanation of what will be disabled
+// - Option to apply basic hardening without FIDO2
+//
+// ### 2. Non-Breaking Design
+// - Hardening failures don't fail the entire bootstrap
+// - Core infrastructure is set up first
+// - Hardening is one of the last steps
+//
+// ### 3. Clear Warnings
+// - Detailed warnings about potential impacts
+// - Rollback instructions provided for each hardening step
+// - Clear documentation of what each hardening measure does
+//
+// ### 4. Incremental Application
+// - Hardening applied in stages with validation between steps
+// - Each stage can be individually rolled back if needed
+// - Progress tracking and detailed logging throughout
+//
+// ### 5. System State Validation
+// - Pre-hardening system state checks
+// - Post-hardening validation to ensure system stability
+// - Automatic rollback on critical system failures
+//
+// ## Hardening Categories
+//
+// **Basic Hardening** (Always Safe):
+// - SSH configuration improvements
+// - Firewall rule optimization
+// - Service hardening and privilege reduction
+// - Log monitoring and audit configuration
+//
+// **Advanced Hardening** (Requires Consent):
+// - FIDO2 authentication enforcement
+// - Hardware security module integration
+// - Advanced access controls and mandatory access controls
+// - Kernel security parameter tuning
+//
+// ## Implementation Status
+//
+// - ✅ Pre-hardening safety checks implemented
+// - ✅ User consent mechanisms operational
+// - ✅ Non-breaking design with rollback capabilities
+// - ✅ Incremental application with validation active
+// - ✅ System state validation and monitoring implemented
+//
+// For detailed hardening implementation, see:
+// - pkg/ubuntu/hardening.go - Ubuntu-specific hardening implementation
+// - pkg/ubuntu/hardening_fido2.go - FIDO2 authentication hardening
+// - pkg/security/hardening.go - General security hardening framework
+//
 package bootstrap
 
 import (
