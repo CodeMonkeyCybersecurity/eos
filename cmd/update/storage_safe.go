@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_safety"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -73,17 +73,17 @@ func runUpdateStorageSafe(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		zap.String("size", safeSize))
 
 	// Create safety configuration
-	safetyConfig := disk_safety.DefaultSafetyConfig()
+	safetyConfig := storage.DefaultSafetyConfig()
 	safetyConfig.RequireSnapshot = skipSnapshots // Invert the logic - if skip is true, don't require
 	// Note: We always try to create snapshots but don't fail if they can't be created (unless required)
 
 	// Initialize safe storage operations
-	safeOps, err := disk_safety.NewSafeStorageOperations(rc, safetyConfig)
+	safeOps, err := storage.NewSafeStorageOperations(rc, safetyConfig)
 	if err != nil {
 		return fmt.Errorf("initialize safe operations: %w", err)
 	}
 
-	var result *disk_safety.OperationResult
+	var result *storage.OperationResult
 
 	// Handle different operation modes
 	if safeMode {
@@ -91,7 +91,7 @@ func runUpdateStorageSafe(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		result, err = safeOps.SafeAutoResizeUbuntuLVM(rc, safeDryRun)
 	} else if safeVG != "" && safeLV != "" && safeSize != "" {
 		// Specific LV extension
-		req := &disk_safety.ExtendLVRequest{
+		req := &storage.ExtendLVRequest{
 			VolumeGroup:   safeVG,
 			LogicalVolume: safeLV,
 			Size:          safeSize,
@@ -133,28 +133,24 @@ func runUpdateStorageSafe(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		zap.String("journal_id", result.JournalID),
 		zap.Duration("duration", result.Duration))
 
-	// Show operation summary
+	// Show operation summary (simplified for placeholder implementation)
 	fmt.Printf("\n=== OPERATION SUMMARY ===\n")
 	fmt.Printf("Operation: %s\n", result.Operation)
-	fmt.Printf("Target: %s\n", result.Target.Device)
+	fmt.Printf("Target: %s\n", result.Target)
 	fmt.Printf("Status: %s\n", getStatusIcon(result.Success))
 	fmt.Printf("Duration: %s\n", result.Duration.Round(100*1000000)) // Round to 100ms
-	fmt.Printf("Journal ID: %s\n", result.JournalID)
+	
+	if result.JournalID != "" {
+		fmt.Printf("Journal ID: %s\n", result.JournalID)
+	}
 
 	if result.SnapshotCreated {
 		fmt.Printf("Safety Snapshot: ✓ Created (%s)\n", result.SnapshotID)
 	}
 
-	// Show preflight results
+	// Show preflight results (simplified)
 	if result.PreflightReport != nil {
-		fmt.Printf("\nPreflight Checks: %d passed", len(result.PreflightReport.Checks))
-		if len(result.PreflightReport.Warnings) > 0 {
-			fmt.Printf(", %d warnings", len(result.PreflightReport.Warnings))
-		}
-		if len(result.PreflightReport.Errors) > 0 {
-			fmt.Printf(", %d errors", len(result.PreflightReport.Errors))
-		}
-		fmt.Println()
+		fmt.Printf("\nPreflight: Placeholder implementation - requires administrator intervention\n")
 	}
 
 	if result.Message != "" {
@@ -165,7 +161,7 @@ func runUpdateStorageSafe(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 }
 
 // getOperationConfirmation prompts user for operation confirmation
-func getOperationConfirmation(req *disk_safety.ExtendLVRequest) error {
+func getOperationConfirmation(req *storage.ExtendLVRequest) error {
 	fmt.Printf("\n=== OPERATION CONFIRMATION ===\n")
 	fmt.Printf("Volume Group: %s\n", req.VolumeGroup)
 	fmt.Printf("Logical Volume: %s\n", req.LogicalVolume)

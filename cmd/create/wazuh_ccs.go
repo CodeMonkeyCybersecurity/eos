@@ -9,8 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp/customer"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -134,17 +133,17 @@ func initializePlatform(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	}
 
 	// Install platform
-	if err := wazuh_mssp.InstallPlatform(rc, config); err != nil {
+	if err := delphi.InstallPlatform(rc, config); err != nil {
 		return fmt.Errorf("platform installation failed: %w", err)
 	}
 
 	// Configure platform
-	if err := wazuh_mssp.ConfigurePlatform(rc, config); err != nil {
+	if err := delphi.ConfigurePlatform(rc, config); err != nil {
 		return fmt.Errorf("platform configuration failed: %w", err)
 	}
 
 	// Verify platform
-	if err := wazuh_mssp.VerifyPlatform(rc); err != nil {
+	if err := delphi.VerifyPlatform(rc); err != nil {
 		return fmt.Errorf("platform verification failed: %w", err)
 	}
 
@@ -219,12 +218,12 @@ func addNewCustomer(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 
 	// Set defaults
 	if customerConfig.WazuhConfig.Version == "" {
-		version, err := wazuh_mssp.GetLatestWazuhVersion(rc)
+		version, err := delphi.GetLatestDelphiVersion(rc)
 		if err != nil {
-			logger.Warn("Failed to get latest Wazuh version, using default",
+			logger.Warn("Failed to get latest Delphi version, using default",
 				zap.Error(err),
-				zap.String("default", wazuh_mssp.DefaultWazuhVersion))
-			version = wazuh_mssp.DefaultWazuhVersion
+				zap.String("default", delphi.DefaultDelphiVersion))
+			version = delphi.DefaultDelphiVersion
 		}
 		customerConfig.WazuhConfig.Version = version
 	}
@@ -232,17 +231,17 @@ func addNewCustomer(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	// Set component enablement based on tier
 	customerConfig.WazuhConfig.IndexerEnabled = true
 	customerConfig.WazuhConfig.ServerEnabled = true
-	customerConfig.WazuhConfig.DashboardEnabled = customerConfig.Tier != wazuh_mssp.TierStarter
+	customerConfig.WazuhConfig.DashboardEnabled = customerConfig.Tier != delphi.TierStarter
 
 	// Provision customer
-	if err := customer.ProvisionCustomer(rc, customerConfig); err != nil {
+	if err := delphi.ProvisionCustomer(rc, customerConfig); err != nil {
 		return fmt.Errorf("customer provisioning failed: %w", err)
 	}
 
 	logger.Info("Customer added successfully",
 		zap.String("customer_id", customerConfig.ID),
 		zap.String("company", customerConfig.CompanyName),
-		zap.String("tier", string(customerConfig.Tier)))
+		zap.String("tier", customerConfig.Tier.String()))
 
 	// Show access information
 	logger.Info("terminal prompt: Customer provisioned successfully!")
@@ -256,8 +255,8 @@ func addNewCustomer(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	return nil
 }
 
-func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_mssp.PlatformConfig, error) {
-	config := &wazuh_mssp.PlatformConfig{}
+func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*delphi.PlatformConfig, error) {
+	config := &delphi.PlatformConfig{}
 
 	// Basic configuration
 	config.Name, _ = cmd.Flags().GetString("platform-name")
@@ -274,12 +273,12 @@ func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_m
 	// Nomad configuration
 	config.Nomad.ServerCount, _ = cmd.Flags().GetInt("nomad-servers")
 	config.Nomad.ClientCount, _ = cmd.Flags().GetInt("nomad-clients")
-	config.Nomad.ServerResources = wazuh_mssp.ResourceConfig{
+	config.Nomad.ServerResources = delphi.ResourceConfig{
 		VCPUs:  2,
 		Memory: "4096",
 		Disk:   "50G",
 	}
-	config.Nomad.ClientResources = wazuh_mssp.ResourceConfig{
+	config.Nomad.ClientResources = delphi.ResourceConfig{
 		VCPUs:  8,
 		Memory: "16384",
 		Disk:   "200G",
@@ -288,12 +287,12 @@ func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_m
 	// Temporal configuration
 	config.Temporal.ServerCount, _ = cmd.Flags().GetInt("temporal-servers")
 	config.Temporal.Namespace = "default"
-	config.Temporal.ServerResources = wazuh_mssp.ResourceConfig{
+	config.Temporal.ServerResources = delphi.ResourceConfig{
 		VCPUs:  4,
 		Memory: "8192",
 		Disk:   "100G",
 	}
-	config.Temporal.DatabaseResources = wazuh_mssp.ResourceConfig{
+	config.Temporal.DatabaseResources = delphi.ResourceConfig{
 		VCPUs:  2,
 		Memory: "4096",
 		Disk:   "50G",
@@ -302,23 +301,23 @@ func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_m
 	// NATS configuration
 	config.NATS.ServerCount, _ = cmd.Flags().GetInt("nats-servers")
 	config.NATS.EnableJetStream = true
-	config.NATS.ServerResources = wazuh_mssp.ResourceConfig{
+	config.NATS.ServerResources = delphi.ResourceConfig{
 		VCPUs:  2,
 		Memory: "4096",
 		Disk:   "100G",
 	}
-	config.NATS.JetStreamConfig = wazuh_mssp.JetStreamConfig{
+	config.NATS.JetStreamConfig = delphi.JetStreamConfig{
 		MaxMemory: "4GB",
 		MaxFile:   "100GB",
 	}
 
 	// CCS configuration
-	config.CCS.IndexerResources = wazuh_mssp.ResourceConfig{
+	config.CCS.IndexerResources = delphi.ResourceConfig{
 		VCPUs:  4,
 		Memory: "8192",
 		Disk:   "200G",
 	}
-	config.CCS.DashboardResources = wazuh_mssp.ResourceConfig{
+	config.CCS.DashboardResources = delphi.ResourceConfig{
 		VCPUs:  2,
 		Memory: "4096",
 		Disk:   "50G",
@@ -330,7 +329,7 @@ func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_m
 	config.Authentik.Enabled, _ = cmd.Flags().GetBool("authentik-enabled")
 
 	// Storage configuration (default)
-	config.Storage.Pools = map[string]wazuh_mssp.StoragePool{
+	config.Storage.Pools = map[string]delphi.StoragePool{
 		"default": {
 			Path: "/var/lib/libvirt/images",
 			Size: "1TB",
@@ -344,8 +343,8 @@ func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_m
 	return config, nil
 }
 
-func parseCustomerConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_mssp.CustomerConfig, error) {
-	config := &wazuh_mssp.CustomerConfig{}
+func parseCustomerConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*delphi.CustomerConfig, error) {
+	config := &delphi.CustomerConfig{}
 
 	// Check if config file is provided
 	configFile, _ := cmd.Flags().GetString("customer-config")
@@ -371,22 +370,22 @@ func parseCustomerConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_m
 		tierStr, _ := cmd.Flags().GetString("tier")
 		switch tierStr {
 		case "starter":
-			config.Tier = wazuh_mssp.TierStarter
+			config.Tier = delphi.TierStarter
 		case "pro":
-			config.Tier = wazuh_mssp.TierPro
+			config.Tier = delphi.TierPro
 		case "enterprise":
-			config.Tier = wazuh_mssp.TierEnterprise
+			config.Tier = delphi.TierEnterprise
 		default:
 			return nil, eos_err.NewUserError("invalid tier specified (must be starter/pro/enterprise)")
 		}
 	}
 
 	// Set default Wazuh configuration
-	config.WazuhConfig = wazuh_mssp.WazuhDeploymentConfig{
-		Version:          wazuh_mssp.DefaultWazuhVersion,
+	config.WazuhConfig = delphi.WazuhDeploymentConfig{
+		Version:          delphi.DefaultDelphiVersion,
 		IndexerEnabled:   true,
 		ServerEnabled:    true,
-		DashboardEnabled: config.Tier != wazuh_mssp.TierStarter,
+		DashboardEnabled: config.Tier != delphi.TierStarter,
 	}
 
 	return config, nil

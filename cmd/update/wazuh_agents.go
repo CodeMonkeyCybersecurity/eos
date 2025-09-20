@@ -35,10 +35,10 @@ package update
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
@@ -121,7 +121,7 @@ Common Use Cases:
 		logger := otelzap.Ctx(rc.Ctx)
 
 		// Build configuration for agent upgrade (default action)
-		config := wazuh_mssp.GetDefaultAgentUpgradeConfig()
+		config := delphi.GetDefaultAgentUpgradeConfig()
 		
 		// Determine operation mode
 		if reRegister {
@@ -170,7 +170,7 @@ Common Use Cases:
 		}
 
 		// Create upgrade manager
-		upgradeManager := wazuh_mssp.NewAgentUpgradeManager(config)
+		upgradeManager := delphi.NewAgentUpgradeManager(config)
 
 		// Execute the operation
 		result, err := upgradeManager.UpgradeLocalAgent(rc)

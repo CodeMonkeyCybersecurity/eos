@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_safety"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -64,13 +64,13 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 		zap.Bool("show_plan", showPlan))
 
 	// Initialize rollback components
-	journal, err := disk_safety.NewJournalStorage()
+	journal, err := storage.NewJournalStorage()
 	if err != nil {
 		return fmt.Errorf("initialize journal: %w", err)
 	}
 
-	snapshots := disk_safety.NewSnapshotManager(journal)
-	rollbackManager := disk_safety.NewRollbackManager(journal, snapshots)
+	snapshots := storage.NewSnapshotManager(journal)
+	rollbackManager := storage.NewRollbackManager(journal, snapshots)
 
 	// Load the operation journal
 	entry, err := journal.Load(journalID)
@@ -185,12 +185,12 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 
 	// Additional information based on rollback method
 	switch plan.Method {
-	case disk_safety.RollbackSnapshot:
+	case storage.RollbackSnapshot:
 		fmt.Printf("\nNOTE: Snapshot merge initiated. A system reboot may be required\n")
 		fmt.Printf("for the merge to complete if the logical volume is currently in use.\n")
-	case disk_safety.RollbackReverse:
+	case storage.RollbackReverse:
 		fmt.Printf("\nVerify that your system is functioning correctly after the rollback.\n")
-	case disk_safety.RollbackManual:
+	case storage.RollbackManual:
 		fmt.Printf("\nManual intervention was required. Please review the operation log\n")
 		fmt.Printf("and verify your system state manually.\n")
 	}
@@ -199,14 +199,14 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 }
 
 // getRollbackConfirmation prompts user for rollback confirmation
-func getRollbackConfirmation(plan *disk_safety.RollbackPlan) error {
+func getRollbackConfirmation(plan *storage.RollbackPlan) error {
 	fmt.Printf("This will rollback the operation using: %s\n", string(plan.Method))
 	fmt.Printf("Estimated time: %s\n", plan.EstimatedTime.Round(time.Second))
 
-	if plan.Method == disk_safety.RollbackSnapshot {
+	if plan.Method == storage.RollbackSnapshot {
 		fmt.Printf("\n⚠️  WARNING: Snapshot rollback will restore the volume to its\n")
 		fmt.Printf("previous state, potentially losing any changes made after the snapshot.\n")
-	} else if plan.Method == disk_safety.RollbackReverse {
+	} else if plan.Method == storage.RollbackReverse {
 		fmt.Printf("\n⚠️  WARNING: Reverse operations will attempt to undo the changes.\n")
 		fmt.Printf("This may involve shrinking volumes or removing created resources.\n")
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -167,7 +167,7 @@ func showCustomerStatus(rc *eos_io.RuntimeContext, customerID string, format str
 	logger.Info("Showing customer status", zap.String("customer_id", customerID))
 
 	// Verify customer
-	if err := wazuh_mssp.VerifyCustomer(rc, customerID); err != nil {
+	if err := delphi.VerifyCustomer(rc, customerID); err != nil {
 		return fmt.Errorf("customer verification failed: %w", err)
 	}
 
@@ -285,7 +285,7 @@ func showPlatformHealth(rc *eos_io.RuntimeContext, cmd *cobra.Command, format st
 	detailed, _ := cmd.Flags().GetBool("detailed")
 
 	// Run platform verification
-	if err := wazuh_mssp.VerifyPlatform(rc); err != nil {
+	if err := delphi.VerifyPlatform(rc); err != nil {
 		logger.Warn("Platform verification found issues", zap.Error(err))
 	}
 

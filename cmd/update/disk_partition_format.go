@@ -3,7 +3,7 @@ package update
 
 import (
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -49,17 +49,17 @@ Examples:
 		}
 
 		// Use simplified function instead of manager pattern
-		result, err := disk_management.FormatPartition(rc, device, filesystem, label, dryRun)
+		result, err := storage.FormatPartition(rc, device, filesystem, label, dryRun)
 		if err != nil {
 			logger.Error("Failed to format partition", zap.Error(err))
 			return err
 		}
 
 		if outputJSON {
-			return disk_management.OutputFormatOpJSON(result)
+			return storage.OutputFormatOpJSON(result)
 		}
 
-		return disk_management.OutputFormatOpText(result)
+		return storage.OutputFormatOpText(result)
 	}),
 }
 

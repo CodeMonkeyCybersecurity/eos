@@ -69,7 +69,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp/version"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
@@ -131,7 +131,7 @@ func init() {
 func runCreateWazuhVersionConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	configManager := version.NewConfigManager()
+	configManager := delphi.NewConfigManager()
 
 	// Check if configuration already exists
 	if _, err := configManager.LoadConfig(rc); err == nil {
@@ -156,21 +156,21 @@ func runCreateWazuhVersionConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 	return createFromFlags(rc, configManager, cmd)
 }
 
-func createFromTemplate(rc *eos_io.RuntimeContext, configManager *version.ConfigManager, template string) error {
+func createFromTemplate(rc *eos_io.RuntimeContext, configManager *delphi.ConfigManager, template string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	var config *version.VersionConfig
+	var config *delphi.VersionConfig
 
 	switch template {
 	case "production":
-		config = &version.VersionConfig{
-			UpdatePolicy:       version.UpdatePolicyManual,
+		config = &delphi.VersionConfig{
+			UpdatePolicy:       delphi.UpdatePolicyManual,
 			AutoUpdate:         false,
 			RequireApproval:    true,
 			TestEnvironment:    false,
 			BackupBeforeUpdate: true,
 			NotifyOnUpdate:     true,
-			MaintenanceWindow: &version.TimeWindow{
+			MaintenanceWindow: &delphi.TimeWindow{
 				StartHour: 2,           // 2 AM
 				EndHour:   4,           // 4 AM
 				Days:      []int{0, 6}, // Sunday and Saturday
@@ -180,14 +180,14 @@ func createFromTemplate(rc *eos_io.RuntimeContext, configManager *version.Config
 		logger.Info("Creating production configuration (conservative, manual updates)")
 
 	case "staging":
-		config = &version.VersionConfig{
-			UpdatePolicy:       version.UpdatePolicyPatch,
+		config = &delphi.VersionConfig{
+			UpdatePolicy:       delphi.UpdatePolicyPatch,
 			AutoUpdate:         true,
 			RequireApproval:    true,
 			TestEnvironment:    false,
 			BackupBeforeUpdate: true,
 			NotifyOnUpdate:     true,
-			MaintenanceWindow: &version.TimeWindow{
+			MaintenanceWindow: &delphi.TimeWindow{
 				StartHour: 1,                          // 1 AM
 				EndHour:   5,                          // 5 AM
 				Days:      []int{0, 1, 2, 3, 4, 5, 6}, // Every day
@@ -197,14 +197,14 @@ func createFromTemplate(rc *eos_io.RuntimeContext, configManager *version.Config
 		logger.Info("Creating staging configuration (moderate, patch auto-updates)")
 
 	case "development":
-		config = &version.VersionConfig{
-			UpdatePolicy:       version.UpdatePolicyLatest,
+		config = &delphi.VersionConfig{
+			UpdatePolicy:       delphi.UpdatePolicyLatest,
 			AutoUpdate:         true,
 			RequireApproval:    false,
 			TestEnvironment:    true,
 			BackupBeforeUpdate: false,
 			NotifyOnUpdate:     true,
-			MaintenanceWindow: &version.TimeWindow{
+			MaintenanceWindow: &delphi.TimeWindow{
 				StartHour: 0, // Any time
 				EndHour:   23,
 				Days:      []int{0, 1, 2, 3, 4, 5, 6}, // Every day
@@ -226,11 +226,11 @@ func createFromTemplate(rc *eos_io.RuntimeContext, configManager *version.Config
 	return showConfigurationSummary(rc, config)
 }
 
-func createInteractiveConfig(rc *eos_io.RuntimeContext, _ *version.ConfigManager) error {
+func createInteractiveConfig(rc *eos_io.RuntimeContext, _ *delphi.ConfigManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Interactive Wazuh version configuration setup")
 
-	_ = version.DefaultVersionConfig() // Reserved for future interactive implementation
+	_ = delphi.DefaultVersionConfig() // Reserved for future interactive implementation
 
 	// This would be a full interactive setup in a real implementation
 	// For now, we'll create a basic interactive flow
@@ -245,25 +245,25 @@ func createInteractiveConfig(rc *eos_io.RuntimeContext, _ *version.ConfigManager
 	return eos_err.NewUserError("interactive mode not fully implemented. Please use --template or flag-based configuration")
 }
 
-func createFromFlags(rc *eos_io.RuntimeContext, configManager *version.ConfigManager, cmd *cobra.Command) error {
+func createFromFlags(rc *eos_io.RuntimeContext, configManager *delphi.ConfigManager, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Start with default configuration
-	config := version.DefaultVersionConfig()
+	config := delphi.DefaultVersionConfig()
 
 	// Apply flag-based overrides
 	if policy, _ := cmd.Flags().GetString("policy"); policy != "" {
 		switch policy {
 		case "manual":
-			config.UpdatePolicy = version.UpdatePolicyManual
+			config.UpdatePolicy = delphi.UpdatePolicyManual
 		case "patch":
-			config.UpdatePolicy = version.UpdatePolicyPatch
+			config.UpdatePolicy = delphi.UpdatePolicyPatch
 		case "minor":
-			config.UpdatePolicy = version.UpdatePolicyMinor
+			config.UpdatePolicy = delphi.UpdatePolicyMinor
 		case "major":
-			config.UpdatePolicy = version.UpdatePolicyMajor
+			config.UpdatePolicy = delphi.UpdatePolicyMajor
 		case "latest":
-			config.UpdatePolicy = version.UpdatePolicyLatest
+			config.UpdatePolicy = delphi.UpdatePolicyLatest
 		default:
 			return eos_err.NewUserError("invalid policy '%s'. Valid: manual, patch, minor, major, latest", policy)
 		}
@@ -324,7 +324,7 @@ func createFromFlags(rc *eos_io.RuntimeContext, configManager *version.ConfigMan
 	return showConfigurationSummary(rc, config)
 }
 
-func configureMaintenanceWindow(config *version.VersionConfig, cmd *cobra.Command) error {
+func configureMaintenanceWindow(config *delphi.VersionConfig, cmd *cobra.Command) error {
 	startHour, _ := cmd.Flags().GetString("maintenance-start")
 	endHour, _ := cmd.Flags().GetString("maintenance-end")
 	days, _ := cmd.Flags().GetString("maintenance-days")
@@ -333,7 +333,7 @@ func configureMaintenanceWindow(config *version.VersionConfig, cmd *cobra.Comman
 	// Only create maintenance window if any maintenance flags are set
 	if startHour != "" || endHour != "" || days != "" || cmd.Flags().Changed("timezone") {
 		if config.MaintenanceWindow == nil {
-			config.MaintenanceWindow = &version.TimeWindow{
+			config.MaintenanceWindow = &delphi.TimeWindow{
 				StartHour: 2,
 				EndHour:   4,
 				Days:      []int{0, 6},
@@ -379,7 +379,7 @@ func configureMaintenanceWindow(config *version.VersionConfig, cmd *cobra.Comman
 	return nil
 }
 
-func showConfigurationSummary(rc *eos_io.RuntimeContext, config *version.VersionConfig) error {
+func showConfigurationSummary(rc *eos_io.RuntimeContext, config *delphi.VersionConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("terminal prompt: \n=== Configuration Summary ===")

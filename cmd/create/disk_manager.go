@@ -116,7 +116,7 @@ func discoverDisks(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) erro
 
 	for _, disk := range disks {
 		fmt.Printf("Device: %s\n", disk.Device)
-		fmt.Printf("  Size: %s\n", formatDiskSize(disk.Size))
+		fmt.Printf("  Size: %s\n", formatDiskSize(uint64(disk.Size)))
 		fmt.Printf("  Model: %s\n", disk.Model)
 		fmt.Printf("  Vendor: %s\n", disk.Vendor)
 		fmt.Printf("  Serial: %s\n", disk.Serial)

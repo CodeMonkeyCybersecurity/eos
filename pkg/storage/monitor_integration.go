@@ -96,7 +96,7 @@ func (mi *MonitorIntegration) CreatePartition(ctx context.Context, device string
 	partitionInfo := &PartitionInfo{
 		Device:     device,
 		Number:     1,
-		Size:       config.Size,
+		Size:       uint64(config.Size),
 		Filesystem: string(FilesystemExt4),
 	}
 

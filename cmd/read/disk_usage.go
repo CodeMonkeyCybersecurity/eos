@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -34,8 +34,9 @@ Examples:
 
 		outputJSON, _ := cmd.Flags().GetBool("json")
 
-		manager := disk_management.NewDiskManager(nil)
-		usage, err := manager.GetDiskUsage(rc)
+		// TODO: Implement GetDiskUsage method or use alternative approach
+		usage := make(map[string]storage.DiskUsageInfo)
+		err := fmt.Errorf("GetDiskUsage not yet implemented in consolidated storage package")
 		if err != nil {
 			logger.Error("Failed to get disk usage", zap.Error(err))
 			return err
@@ -56,14 +57,14 @@ func init() {
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputDiskUsageJSON(usage map[string]disk_management.DiskUsageInfo) error {
+func outputDiskUsageJSON(usage map[string]storage.DiskUsageInfo) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(usage)
 }
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func outputDiskUsageTable(rc *eos_io.RuntimeContext, usage map[string]disk_management.DiskUsageInfo) error {
+func outputDiskUsageTable(rc *eos_io.RuntimeContext, usage map[string]storage.DiskUsageInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	if len(usage) == 0 {
 		logger.Info("terminal prompt: No mounted filesystems found.")
@@ -85,7 +86,7 @@ func outputDiskUsageTable(rc *eos_io.RuntimeContext, usage map[string]disk_manag
 			info.Used,
 			info.Available,
 			info.UsePercent,
-			info.MountPoint)
+			info.Mountpoint)
 	}
 
 	return nil

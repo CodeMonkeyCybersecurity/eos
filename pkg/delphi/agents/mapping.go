@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -13,32 +12,43 @@ import (
 )
 
 // RunMapping executes the agent mapping process
-// Migrated from cmd/create/delphi.go runMapping
-func RunMapping(rc *eos_io.RuntimeContext) error {
+// Note: This function requires ResolveConfig and Authenticate functions to be called externally
+// to avoid circular import issues
+func RunMapping(rc *eos_io.RuntimeContext, cfg interface{}, authenticateFunc func(*eos_io.RuntimeContext, interface{}) (string, error)) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Check configuration and connectivity
 	log.Info("🔍 Assessing Delphi configuration for agent mapping")
 
-	cfg, err := delphi.ResolveConfig(rc)
-	if err != nil {
-		return fmt.Errorf("failed to resolve config: %w", err)
+	// Extract FQDN and Port from config (assuming it has these fields)
+	// This is a temporary workaround to avoid circular imports
+	var fqdn, port, protocol string
+	if configMap, ok := cfg.(map[string]interface{}); ok {
+		if f, exists := configMap["FQDN"]; exists {
+			fqdn = fmt.Sprintf("%v", f)
+		}
+		if p, exists := configMap["Port"]; exists {
+			port = fmt.Sprintf("%v", p)
+		}
+		if pr, exists := configMap["Protocol"]; exists {
+			protocol = fmt.Sprintf("%v", pr)
+		}
 	}
 
 	log.Info("📊 Using API",
-		zap.String("fqdn", cfg.FQDN),
-		zap.String("port", utils.DefaultStr(cfg.Port, "55000")))
+		zap.String("fqdn", fqdn),
+		zap.String("port", utils.DefaultStr(port, "55000")))
 
 	baseURL := fmt.Sprintf("%s://%s:%s",
-		utils.DefaultStr(cfg.Protocol, "https"),
-		cfg.FQDN,
-		utils.DefaultStr(cfg.Port, "55000"))
+		utils.DefaultStr(protocol, "https"),
+		fqdn,
+		utils.DefaultStr(port, "55000"))
 
 	// INTERVENE - Fetch and process agent data
 	log.Info("🚀 Fetching agents from API")
 
-	// Authenticate first
-	token, err := delphi.Authenticate(rc, cfg)
+	// Authenticate using provided function
+	token, err := authenticateFunc(rc, cfg)
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}

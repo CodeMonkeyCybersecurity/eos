@@ -6,7 +6,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp/customer"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -112,7 +112,7 @@ func removeCustomerDeployment(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 	// Create backup if requested
 	if archive {
 		logger.Info("Creating customer backup before removal")
-		backupID, err := customer.BackupCustomer(rc, customerID, "full")
+		backupID, err := delphi.BackupCustomer(rc, customerID, "full")
 		if err != nil {
 			logger.Error("Failed to create backup", zap.Error(err))
 			if !force {
@@ -125,7 +125,7 @@ func removeCustomerDeployment(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 	}
 
 	// Remove customer
-	if err := customer.RemoveCustomer(rc, customerID, force); err != nil {
+	if err := delphi.RemoveCustomer(rc, customerID, force); err != nil {
 		return fmt.Errorf("customer removal failed: %w", err)
 	}
 

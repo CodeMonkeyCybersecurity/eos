@@ -2,7 +2,7 @@
 package update
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -40,17 +40,17 @@ Examples:
 			zap.Bool("dry_run", dryRun))
 
 		// Use simplified function instead of manager pattern
-		result, err := disk_management.MountPartition(rc, device, mountPoint, options, dryRun)
+		result, err := storage.MountPartition(rc, device, mountPoint, options, dryRun)
 		if err != nil {
 			logger.Error("Failed to mount partition", zap.Error(err))
 			return err
 		}
 
 		if outputJSON {
-			return disk_management.OutputMountOpJSON(result)
+			return storage.OutputMountOpJSON(result)
 		}
 
-		return disk_management.OutputMountOpText(result)
+		return storage.OutputMountOpText(result)
 	}),
 }
 

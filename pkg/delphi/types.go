@@ -93,3 +93,129 @@ const (
 
 	APIAgentConfig = "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
 )
+
+// PlatformConfig represents the overall Delphi platform configuration
+// Migrated from wazuh_mssp - Delphi and Wazuh are interchangeable
+type PlatformConfig struct {
+	Name        string          `json:"platform_name"`
+	Environment string          `json:"environment"` // dev, staging, production
+	Datacenter  string          `json:"datacenter"`
+	Domain      string          `json:"platform_domain"`
+	Network     NetworkConfig   `json:"network_config"`
+	Storage     StorageConfig   `json:"storage_config"`
+	Nomad       NomadConfig     `json:"nomad_config"`
+	Temporal    TemporalConfig  `json:"temporal_config"`
+	NATS        NATSConfig      `json:"nats_config"`
+	CCS         CCSConfig       `json:"ccs_config"`
+	Authentik   AuthentikConfig `json:"authentik_config"`
+}
+
+// NetworkConfig defines network configuration for the platform
+type NetworkConfig struct {
+	PlatformCIDR string    `json:"platform_cidr"`
+	CustomerCIDR string    `json:"customer_cidr"`
+	VLANRange    VLANRange `json:"vlan_range"`
+}
+
+// VLANRange defines the VLAN range for customer isolation
+type VLANRange struct {
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+
+// StorageConfig defines storage pool configuration
+type StorageConfig struct {
+	Pools map[string]StoragePool `json:"pools"`
+}
+
+// StoragePool represents a storage pool configuration
+type StoragePool struct {
+	Path string `json:"path"`
+	Size string `json:"size"`
+}
+
+// NomadConfig defines Nomad cluster configuration
+type NomadConfig struct {
+	ServerCount       int            `json:"server_count"`
+	ClientCount       int            `json:"client_count"`
+	DatacenterName    string         `json:"datacenter_name"`
+	EncryptionKey     string         `json:"encryption_key"`
+	ACLBootstrap      bool           `json:"acl_bootstrap"`
+	TLSConfig         TLSConfig      `json:"tls_config"`
+	StoragePools      []string       `json:"storage_pools"`
+	ClientConfig      ClientConfig   `json:"client_config"`
+	ServerResources   ResourceConfig `json:"server_resources"`
+	ClientResources   ResourceConfig `json:"client_resources"`
+}
+
+// TLSConfig defines TLS configuration
+type TLSConfig struct {
+	Enabled bool   `json:"enabled"`
+	CAFile  string `json:"ca_file"`
+	CertFile string `json:"cert_file"`
+	KeyFile  string `json:"key_file"`
+}
+
+// ClientConfig defines Nomad client configuration
+type ClientConfig struct {
+	EnableDocker bool     `json:"enable_docker"`
+	EnableRaw    bool     `json:"enable_raw_exec"`
+	MetaData     map[string]string `json:"meta_data"`
+}
+
+// TemporalConfig defines Temporal workflow engine configuration
+type TemporalConfig struct {
+	ServerCount       int                   `json:"server_count"`
+	Namespace         string                `json:"namespace"`
+	RetentionDays     int                   `json:"retention_days"`
+	DatabaseConfig    TemporalDatabaseConfig `json:"database_config"`
+	ServerResources   ResourceConfig        `json:"server_resources"`
+	DatabaseResources ResourceConfig        `json:"database_resources"`
+}
+
+// TemporalDatabaseConfig defines database configuration for Temporal
+type TemporalDatabaseConfig struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Database string `json:"database"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// NATSConfig defines NATS messaging configuration
+type NATSConfig struct {
+	ServerCount       int             `json:"server_count"`
+	ClusterID         string          `json:"cluster_id"`
+	Subjects          []string        `json:"subjects"`
+	EnableJetStream   bool            `json:"enable_jetstream"`
+	ServerResources   ResourceConfig  `json:"server_resources"`
+	JetStreamConfig   JetStreamConfig `json:"jetstream_config"`
+}
+
+// CCSConfig defines Cross-Cluster Search configuration
+type CCSConfig struct {
+	IndexerNodes        []string                     `json:"indexer_nodes"`
+	RemoteClusters      map[string]RemoteCluster     `json:"remote_clusters"`
+	IndexerResources    ResourceConfig               `json:"indexer_resources"`
+	DashboardResources  ResourceConfig               `json:"dashboard_resources"`
+}
+
+// RemoteCluster defines remote cluster configuration for CCS
+type RemoteCluster struct {
+	Seeds []string `json:"seeds"`
+	SkipUnavailable bool `json:"skip_unavailable"`
+}
+
+// AuthentikConfig defines Authentik SSO configuration
+type AuthentikConfig struct {
+	URL     string `json:"url"`
+	Token   string `json:"token"`
+	Enabled bool   `json:"enabled"`
+}
+
+// JetStreamConfig defines NATS JetStream configuration
+type JetStreamConfig struct {
+	MaxMemory string `json:"max_memory"`
+	MaxFile   string `json:"max_file"`
+}
+

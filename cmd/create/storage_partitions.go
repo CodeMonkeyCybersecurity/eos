@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -44,13 +44,13 @@ Examples:
 			zap.String("type", partitionType),
 			zap.Bool("dry_run", dryRun))
 
-		options := disk_management.DefaultPartitionOptions()
+		options := storage.DefaultPartitionOptions()
 		options.PartitionType = partitionType
 		options.Force = force
 		options.DryRun = dryRun
 
 		// Use simplified function instead of manager pattern
-		result, err := disk_management.CreatePartition(rc, device, options)
+		result, err := storage.CreatePartition(rc, device, options)
 		if err != nil {
 			logger.Error("Failed to create partition", zap.Error(err))
 			return err
@@ -74,14 +74,14 @@ func init() {
 }
 
 // TODO
-func outputPartitionOpJSON(result *disk_management.PartitionOperation) error {
+func outputPartitionOpJSON(result *storage.PartitionOperation) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
 // TODO
-func outputPartitionOpText(rc *eos_io.RuntimeContext, result *disk_management.PartitionOperation) error {
+func outputPartitionOpText(rc *eos_io.RuntimeContext, result *storage.PartitionOperation) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	if result.DryRun {
 		logger.Info(fmt.Sprintf("terminal prompt: [DRY RUN] %s", result.Message))

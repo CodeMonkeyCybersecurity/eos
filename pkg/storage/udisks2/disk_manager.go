@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	"github.com/godbus/dbus/v5"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -20,40 +21,10 @@ type DiskManager struct {
 	rc     *eos_io.RuntimeContext
 }
 
-// DiskInfo represents physical disk information
-type DiskInfo struct {
-	Device       string            `json:"device"`
-	Size         uint64            `json:"size"`
-	Model        string            `json:"model"`
-	Serial       string            `json:"serial"`
-	Vendor       string            `json:"vendor"`
-	MediaType    string            `json:"media_type"`    // SSD, HDD, etc.
-	ConnectionBus string           `json:"connection_bus"` // SATA, NVMe, USB, etc.
-	Removable    bool              `json:"removable"`
-	Partitions   []PartitionInfo   `json:"partitions"`
-	Health       DiskHealth        `json:"health"`
-	Metadata     map[string]string `json:"metadata"`
-}
-
-// PartitionInfo represents partition information
-type PartitionInfo struct {
-	Device     string `json:"device"`
-	Size       uint64 `json:"size"`
-	Filesystem string `json:"filesystem"`
-	Label      string `json:"label"`
-	UUID       string `json:"uuid"`
-	MountPoint string `json:"mount_point"`
-	Encrypted  bool   `json:"encrypted"`
-}
-
-// DiskHealth represents disk health status
-type DiskHealth struct {
-	Status      string            `json:"status"`       // healthy, warning, critical
-	Temperature int               `json:"temperature"`  // Celsius
-	PowerOnHours uint64           `json:"power_on_hours"`
-	SmartData   map[string]string `json:"smart_data"`
-	LastCheck   time.Time         `json:"last_check"`
-}
+// Type aliases for storage types - use unified types from storage package
+type DiskInfo = storage.DiskInfo
+type PartitionInfo = storage.PartitionInfo
+type DiskHealth = storage.DiskHealth
 
 // VolumeRequest represents a volume creation request
 type VolumeRequest struct {
@@ -442,7 +413,7 @@ func (dm *DiskManager) getDiskInfo(ctx context.Context, devicePath dbus.ObjectPa
 
 	return &DiskInfo{
 		Device:        device,
-		Size:          size,
+		Size:          int64(size),
 		Model:         model,
 		Serial:        serial,
 		Vendor:        vendor,

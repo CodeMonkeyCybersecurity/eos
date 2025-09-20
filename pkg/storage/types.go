@@ -168,70 +168,87 @@ type StorageStatus struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// DiskInfo represents information about a disk device
-type DiskInfo struct {
-	// Device path (e.g., /dev/sda)
-	Device string `json:"device"`
-
-	// Size in bytes
-	Size int64 `json:"size"`
-
-	// Model name
-	Model string `json:"model"`
-
-	// Serial number
-	Serial string `json:"serial"`
-
-	// Vendor
-	Vendor string `json:"vendor"`
-
-	// Type (HDD, SSD, NVMe)
-	Type string `json:"type"`
-
-	// Current usage
-	InUse bool `json:"in_use"`
-
-	// Filesystem if formatted
-	Filesystem string `json:"filesystem"`
-
-	// Mount point if mounted
-	MountPoint string `json:"mount_point"`
-
-	// SMART health status
-	SmartStatus string `json:"smart_status"`
-
-	// Partitions
-	Partitions []PartitionInfo `json:"partitions"`
+// MountPoint represents a mount point with its characteristics
+type MountPoint struct {
+	Path     string `json:"path"`     // Mount path
+	Readonly bool   `json:"readonly"` // Whether mounted read-only
 }
 
-// PartitionInfo represents information about a disk partition
+
+// DiskInfo represents comprehensive information about a disk device
+// This unified type consolidates all disk information across EOS storage subsystems
+type DiskInfo struct {
+	// Basic device information
+	Device      string `json:"device"`       // Device path (e.g., /dev/sda)
+	Name        string `json:"name"`         // Human-readable name
+	Description string `json:"description"`  // Device description
+	
+	// Size information
+	Size       int64  `json:"size"`        // Size in bytes
+	SizeHuman  string `json:"size_human"`  // Human-readable size (e.g., "1TB")
+	
+	// Hardware information
+	Model         string `json:"model"`          // Model name
+	Serial        string `json:"serial"`         // Serial number
+	Vendor        string `json:"vendor"`         // Vendor/manufacturer
+	MediaType     string `json:"media_type"`     // SSD, HDD, NVMe, etc.
+	ConnectionBus string `json:"connection_bus"` // SATA, NVMe, USB, etc.
+	
+	// Device characteristics
+	IsRemovable bool `json:"is_removable"` // Whether device is removable
+	IsUSB       bool `json:"is_usb"`       // Whether device is USB
+	Removable   bool `json:"removable"`    // Alternative removable flag for compatibility
+	
+	// Usage and status
+	InUse       bool   `json:"in_use"`        // Whether device is currently in use
+	Filesystem  string `json:"filesystem"`    // Filesystem type if formatted
+	MountPoint  string `json:"mount_point"`   // Primary mount point if mounted
+	SmartStatus string `json:"smart_status"`  // SMART health status
+	
+	// Collections
+	Mountpoints []MountPoint    `json:"mountpoints"` // All mount points
+	Partitions  []PartitionInfo `json:"partitions"`  // Partition information
+	
+	// Health and metadata
+	Health     *DiskHealth       `json:"health,omitempty"`   // Detailed health information
+	Properties map[string]string `json:"properties"`         // Additional properties
+	Metadata   map[string]string `json:"metadata"`           // Additional metadata
+	
+	// Timestamps
+	LastUpdated time.Time `json:"last_updated"` // When this information was last updated
+}
+
+// PartitionInfo represents comprehensive information about a disk partition
+// This unified type consolidates all partition information across EOS storage subsystems
 type PartitionInfo struct {
-	// Partition device (e.g., /dev/sda1)
-	Device string `json:"device"`
-
-	// Partition number
-	Number int `json:"number"`
-
-	// Start sector
-	Start int64 `json:"start"`
-
-	// End sector
-	End int64 `json:"end"`
-
-	// Size in bytes
-	Size int64 `json:"size"`
-
-	// Filesystem type
-	Filesystem string `json:"filesystem"`
-
-	// Mount point if mounted
-	MountPoint string `json:"mount_point"`
-
-	// UUID
-	UUID string `json:"uuid"`
-
-	// Label
-	Label string `json:"label"`
+	// Basic partition information
+	Device string `json:"device"` // Partition device (e.g., /dev/sda1)
+	Number int    `json:"number"` // Partition number
+	
+	// Geometry information
+	Start uint64 `json:"start"` // Start sector
+	End   uint64 `json:"end"`   // End sector
+	Size  uint64 `json:"size"`  // Size in bytes
+	
+	// Size formatting
+	SizeHuman string `json:"size_human"` // Human-readable size (e.g., "100GB")
+	
+	// Partition characteristics
+	Type       string   `json:"type"`       // Partition type (primary, extended, logical)
+	Filesystem string   `json:"filesystem"` // Filesystem type
+	Label      string   `json:"label"`      // Partition label
+	UUID       string   `json:"uuid"`       // Partition UUID
+	Flags      []string `json:"flags"`      // Partition flags (boot, lvm, etc.)
+	
+	// Mount information
+	IsMounted  bool   `json:"is_mounted"`  // Whether partition is currently mounted
+	MountPoint string `json:"mount_point"` // Mount point if mounted
+	
+	// Security and features
+	Encrypted bool `json:"encrypted"` // Whether partition is encrypted
+	
+	// Timestamps
+	Timestamp time.Time `json:"timestamp"` // When this information was collected
 }
 
 // BackupConfig represents configuration for backup operations
@@ -589,14 +606,16 @@ type HealthRecommendation struct {
 	Action      string `json:"action"`
 }
 
-// DiskHealth represents disk health status
+// DiskHealth represents comprehensive disk health status
+// This unified type consolidates disk health information across EOS storage subsystems
 type DiskHealth struct {
-	Device       string    `json:"device"`
-	Status       string    `json:"status"`
-	Temperature  int       `json:"temperature"`
-	PowerOnHours int64     `json:"power_on_hours"`
-	LastCheck    time.Time `json:"last_check"`
-	Errors       []string  `json:"errors"`
+	Device       string            `json:"device"`        // Device path
+	Status       string            `json:"status"`        // healthy, warning, critical
+	Temperature  int               `json:"temperature"`   // Temperature in Celsius
+	PowerOnHours uint64            `json:"power_on_hours"` // Total power-on hours
+	LastCheck    time.Time         `json:"last_check"`    // When health was last checked
+	Errors       []string          `json:"errors"`        // Health check errors
+	SmartData    map[string]string `json:"smart_data"`    // SMART attribute data
 }
 
 type StoragePolicy struct {
@@ -741,3 +760,327 @@ const (
 	MaxLabelLength     = 255
 	MaxMountPathLength = 4096
 )
+
+// =============================================================================
+// DISK MANAGEMENT TYPES
+// Consolidated from pkg/disk_management - provides disk operation types
+// =============================================================================
+
+// DiskListResult contains results of listing disks
+type DiskListResult struct {
+	Disks     []DiskInfo `json:"disks"`
+	Total     int        `json:"total"`
+	Timestamp time.Time  `json:"timestamp"`
+}
+
+// PartitionListResult contains results of listing partitions
+type PartitionListResult struct {
+	DiskPath   string          `json:"disk_path"`
+	Partitions []PartitionInfo `json:"partitions"`
+	Timestamp  time.Time       `json:"timestamp"`
+}
+
+// MountedVolume represents a currently mounted volume
+type MountedVolume struct {
+	Device     string `json:"device"`
+	MountPoint string `json:"mount_point"`
+	Filesystem string `json:"filesystem"`
+	Options    string `json:"options"`
+}
+
+// PartitionOperation represents a partition management operation
+type PartitionOperation struct {
+	Operation string        `json:"operation"` // create, format, mount, unmount
+	Device    string        `json:"device"`
+	Target    string        `json:"target"`
+	Success   bool          `json:"success"`
+	Message   string        `json:"message"`
+	Output    string        `json:"output,omitempty"`
+	Timestamp time.Time     `json:"timestamp"`
+	Duration  time.Duration `json:"duration"`
+	DryRun    bool          `json:"dry_run"`
+}
+
+// PartitionOptions contains options for partition operations
+type PartitionOptions struct {
+	PartitionType  string `json:"partition_type"` // primary, extended, logical
+	FileSystem     string `json:"filesystem"`     // ext4, xfs, btrfs, etc.
+	Label          string `json:"label"`
+	MountPoint     string `json:"mount_point"`
+	MountOptions   string `json:"mount_options"`
+	Force          bool   `json:"force"`
+	DryRun         bool   `json:"dry_run"`
+	AddToFstab     bool   `json:"add_to_fstab"`
+	CreateMountDir bool   `json:"create_mount_dir"`
+}
+
+// DefaultPartitionOptions returns options with sensible defaults
+func DefaultPartitionOptions() *PartitionOptions {
+	return &PartitionOptions{
+		PartitionType:  "primary",
+		FileSystem:     "ext4",
+		Force:          false,
+		DryRun:         false,
+		AddToFstab:     false,
+		CreateMountDir: true,
+	}
+}
+
+// DiskManagerConfig contains configuration for disk management
+type DiskManagerConfig struct {
+	RequireConfirmation  bool     `json:"require_confirmation" mapstructure:"require_confirmation"`
+	SafetyChecks         bool     `json:"safety_checks" mapstructure:"safety_checks"`
+	BackupPartitionTable bool     `json:"backup_partition_table" mapstructure:"backup_partition_table"`
+	AllowRemovableMedia  bool     `json:"allow_removable_media" mapstructure:"allow_removable_media"`
+	ExcludedDevices      []string `json:"excluded_devices" mapstructure:"excluded_devices"`
+	DefaultFileSystem    string   `json:"default_filesystem" mapstructure:"default_filesystem"`
+	DefaultMountBase     string   `json:"default_mount_base" mapstructure:"default_mount_base"`
+}
+
+// DefaultDiskManagerConfig returns a configuration with sensible defaults
+func DefaultDiskManagerConfig() *DiskManagerConfig {
+	return &DiskManagerConfig{
+		RequireConfirmation:  true,
+		SafetyChecks:         true,
+		BackupPartitionTable: true,
+		AllowRemovableMedia:  true,
+		ExcludedDevices:      []string{"/dev/sda", "/dev/nvme0n1"}, // Common system disks
+		DefaultFileSystem:    "ext4",
+		DefaultMountBase:     "/mnt",
+	}
+}
+
+// MountOperation represents a mount/unmount operation
+type MountOperation struct {
+	Operation  string        `json:"operation"` // mount, unmount
+	Device     string        `json:"device"`
+	MountPoint string        `json:"mount_point"`
+	Success    bool          `json:"success"`
+	Message    string        `json:"message"`
+	Timestamp  time.Time     `json:"timestamp"`
+	Duration   time.Duration `json:"duration"`
+	DryRun     bool          `json:"dry_run"`
+}
+
+// FormatOperation represents a filesystem format operation
+type FormatOperation struct {
+	Device     string        `json:"device"`
+	FileSystem string        `json:"filesystem"`
+	Label      string        `json:"label"`
+	Success    bool          `json:"success"`
+	Message    string        `json:"message"`
+	Output     string        `json:"output,omitempty"`
+	Timestamp  time.Time     `json:"timestamp"`
+	Duration   time.Duration `json:"duration"`
+	DryRun     bool          `json:"dry_run"`
+}
+
+// =============================================================================
+// DISK SAFETY TYPES
+// Consolidated from pkg/disk_safety - provides safety and journaling types
+// =============================================================================
+
+// OperationStatus represents the status of a disk operation
+type OperationStatus string
+
+const (
+	StatusPending    OperationStatus = "pending"
+	StatusInProgress OperationStatus = "in_progress"
+	StatusCompleted  OperationStatus = "completed"
+	StatusFailed     OperationStatus = "failed"
+	StatusRolledBack OperationStatus = "rolled_back"
+)
+
+// JournalEntry represents a logged disk operation
+type JournalEntry struct {
+	ID              string                 `json:"id"`
+	StartTime       time.Time             `json:"start_time"`
+	EndTime         *time.Time            `json:"end_time,omitempty"`
+	OperationType   string                `json:"operation_type"`
+	Target          DiskTarget            `json:"target"`
+	Parameters      map[string]interface{} `json:"parameters"`
+	PreState        *DiskState            `json:"pre_state"`
+	PostState       *DiskState            `json:"post_state,omitempty"`
+	Status          OperationStatus       `json:"status"`
+	Commands        []ExecutedCommand     `json:"commands"`
+	RollbackPlan    *RollbackPlan         `json:"rollback_plan,omitempty"`
+	Snapshot        *Snapshot             `json:"snapshot,omitempty"`
+	Error           string                `json:"error,omitempty"`
+	User            string                `json:"user"`
+	Checksum        string                `json:"checksum"`
+}
+
+// DiskTarget identifies the target of a disk operation
+type DiskTarget struct {
+	Device      string `json:"device"`
+	VolumeGroup string `json:"volume_group,omitempty"`
+	LogicalVol  string `json:"logical_volume,omitempty"`
+	Mountpoint  string `json:"mountpoint,omitempty"`
+	Filesystem  string `json:"filesystem,omitempty"`
+}
+
+// DiskState captures the state of disk resources
+type DiskState struct {
+	Timestamp   time.Time              `json:"timestamp"`
+	LVMState    *LVMState              `json:"lvm_state,omitempty"`
+	Filesystems []FilesystemState      `json:"filesystems"`
+	Mounts      []MountState           `json:"mounts"`
+	BlockDevs   map[string]BlockDevice `json:"block_devices"`
+	DiskUsage   map[string]DiskUsageState `json:"disk_usage"`
+}
+
+// LVMState represents LVM configuration
+type LVMState struct {
+	PhysicalVolumes map[string]PVState `json:"physical_volumes"`
+	VolumeGroups    map[string]VGState `json:"volume_groups"`
+	LogicalVolumes  map[string]LVState `json:"logical_volumes"`
+}
+
+// PVState represents physical volume state
+type PVState struct {
+	Device    string `json:"device"`
+	Size      int64  `json:"size"`
+	Free      int64  `json:"free"`
+	VGName    string `json:"vg_name"`
+	UUID      string `json:"uuid"`
+	Allocatable bool `json:"allocatable"`
+}
+
+// VGState represents volume group state
+type VGState struct {
+	Name         string   `json:"name"`
+	UUID         string   `json:"uuid"`
+	Size         int64    `json:"size"`
+	Free         int64    `json:"free"`
+	ExtentSize   int64    `json:"extent_size"`
+	ExtentCount  int      `json:"extent_count"`
+	FreeExtents  int      `json:"free_extents"`
+	PVCount      int      `json:"pv_count"`
+	LVCount      int      `json:"lv_count"`
+	MaxLV        int      `json:"max_lv"`
+	MaxPV        int      `json:"max_pv"`
+	PhysicalVols []string `json:"physical_volumes"`
+}
+
+// LVState represents logical volume state
+type LVState struct {
+	Name        string `json:"name"`
+	VGName      string `json:"vg_name"`
+	UUID        string `json:"uuid"`
+	Path        string `json:"path"`
+	Size        int64  `json:"size"`
+	Active      bool   `json:"active"`
+	Open        bool   `json:"open"`
+	Attributes  string `json:"attributes"`
+	DevicePath  string `json:"device_path"`
+}
+
+// FilesystemState represents filesystem state
+type FilesystemState struct {
+	Device      string `json:"device"`
+	Type        string `json:"type"`
+	Label       string `json:"label"`
+	UUID        string `json:"uuid"`
+	TotalSize   int64  `json:"total_size"`
+	UsedSize    int64  `json:"used_size"`
+	FreeSize    int64  `json:"free_size"`
+	InodesTotal int64  `json:"inodes_total"`
+	InodesFree  int64  `json:"inodes_free"`
+}
+
+// MountState represents mount point state
+type MountState struct {
+	Device     string   `json:"device"`
+	Mountpoint string   `json:"mountpoint"`
+	Filesystem string   `json:"filesystem"`
+	Options    []string `json:"options"`
+	Dump       int      `json:"dump"`
+	Pass       int      `json:"pass"`
+}
+
+// DiskUsageState represents disk usage at a point in time
+type DiskUsageState struct {
+	Filesystem  string  `json:"filesystem"`
+	Size        int64   `json:"size"`
+	Used        int64   `json:"used"`
+	Available   int64   `json:"available"`
+	UsePercent  float64 `json:"use_percent"`
+	Mountpoint  string  `json:"mountpoint"`
+}
+
+// DiskUsageInfo represents disk usage information (alias for compatibility)
+type DiskUsageInfo = DiskUsageState
+
+// ExecutedCommand represents a command that was executed
+type ExecutedCommand struct {
+	Timestamp time.Time `json:"timestamp"`
+	Command   string    `json:"command"`
+	Args      []string  `json:"args"`
+	WorkDir   string    `json:"work_dir,omitempty"`
+	Output    string    `json:"output"`
+	Error     string    `json:"error,omitempty"`
+	ExitCode  int       `json:"exit_code"`
+	Duration  time.Duration `json:"duration"`
+}
+
+// RollbackPlan describes how to rollback an operation
+type RollbackPlan struct {
+	Method        RollbackMethod    `json:"method"`
+	SnapshotID    string            `json:"snapshot_id,omitempty"`
+	Commands      []RollbackCommand `json:"commands,omitempty"`
+	EstimatedTime time.Duration     `json:"estimated_time"`
+	Description   string            `json:"description"`
+}
+
+// RollbackMethod describes the rollback approach
+type RollbackMethod string
+
+const (
+	RollbackSnapshot RollbackMethod = "snapshot"
+	RollbackReverse  RollbackMethod = "reverse"
+	RollbackManual   RollbackMethod = "manual"
+)
+
+// RollbackCommand describes a command to execute for rollback
+type RollbackCommand struct {
+	Command     string   `json:"command"`
+	Args        []string `json:"args"`
+	Description string   `json:"description"`
+	Critical    bool     `json:"critical"`
+}
+
+// Snapshot represents an LVM snapshot
+type Snapshot struct {
+	Name      string    `json:"name"`
+	SourceVG  string    `json:"source_vg"`
+	SourceLV  string    `json:"source_lv"`
+	Size      int64     `json:"size"`
+	Created   time.Time `json:"created"`
+	JournalID string    `json:"journal_id"`
+	AutoRemove bool     `json:"auto_remove"`
+	RemoveAt  *time.Time `json:"remove_at,omitempty"`
+}
+
+// SafetyConfig represents configuration for safe storage operations
+type SafetyConfig struct {
+	RequireSnapshot      bool          `json:"require_snapshot"`
+	SnapshotMinSize      int64         `json:"snapshot_min_size"`
+	SnapshotRetention    time.Duration `json:"snapshot_retention"`
+	MaxConcurrentOps     int           `json:"max_concurrent_ops"`
+	PreflightChecks      bool          `json:"preflight_checks"`
+	JournalRetention     time.Duration `json:"journal_retention"`
+	BackupBeforeOperation bool         `json:"backup_before_operation"`
+}
+
+// DefaultSafetyConfig returns a conservative safety configuration
+func DefaultSafetyConfig() *SafetyConfig {
+	return &SafetyConfig{
+		RequireSnapshot:      false, // Allow operations without snapshots if VG space is limited
+		SnapshotMinSize:      1 << 30,  // 1GB
+		SnapshotRetention:    24 * time.Hour,
+		MaxConcurrentOps:     2,
+		PreflightChecks:      true,
+		JournalRetention:     7 * 24 * time.Hour, // 7 days
+		BackupBeforeOperation: true,
+	}
+}

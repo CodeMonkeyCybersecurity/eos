@@ -1,4 +1,5 @@
-// pkg/security/wazuh_credentials.go
+// pkg/security/delphi_credentials.go
+// Migrated from wazuh_credentials.go - Delphi is our Delphi implementation
 
 package security
 
@@ -15,55 +16,55 @@ import (
 	"go.uber.org/zap"
 )
 
-// WazuhCredentialConfig defines Wazuh-specific credential configuration
-type WazuhCredentialConfig struct {
-	Version        string // Wazuh version (e.g., "4.10.1")
+// DelphiCredentialConfig defines Delphi-specific credential configuration
+type DelphiCredentialConfig struct {
+	Version        string // Delphi version (e.g., "4.13.0")
 	DeploymentType string // "single-node" or "multi-node"
 	WorkingDir     string // Directory containing docker-compose.yml
 }
 
-// WazuhCredentials represents the three main Wazuh credentials
-type WazuhCredentials struct {
+// DelphiCredentials represents the three main Delphi credentials
+type DelphiCredentials struct {
 	AdminPassword  string
 	KibanaPassword string
 	APIPassword    string
 }
 
-// ManageWazuhCredentials replaces the changeDefaultCredentials.sh functionality
-func ManageWazuhCredentials(rc *eos_io.RuntimeContext, config WazuhCredentialConfig) error {
+// ManageDelphiCredentials replaces the changeDefaultCredentials.sh functionality
+func ManageDelphiCredentials(rc *eos_io.RuntimeContext, config DelphiCredentialConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Wazuh credential management",
+	logger.Info("Starting Delphi credential management",
 		zap.String("version", config.Version),
 		zap.String("deployment_type", config.DeploymentType))
 
-	// Assessment: Check current Wazuh deployment state
-	_, err := assessWazuhDeployment(rc, config)
+	// Assessment: Check current Delphi deployment state
+	_, err := assessDelphiDeployment(rc, config)
 	if err != nil {
-		return cerr.Wrap(err, "Wazuh deployment assessment failed")
+		return cerr.Wrap(err, "Delphi deployment assessment failed")
 	}
 
 	// Intervention: Migrate credentials to Vault and update configuration
-	credentials, err := generateAndStoreWazuhCredentials(rc, config)
+	credentials, err := generateAndStoreDelphiCredentials(rc, config)
 	if err != nil {
-		return cerr.Wrap(err, "failed to generate and store Wazuh credentials")
+		return cerr.Wrap(err, "failed to generate and store Delphi credentials")
 	}
 
-	if err := updateWazuhConfiguration(rc, config, credentials); err != nil {
-		return cerr.Wrap(err, "failed to update Wazuh configuration")
+	if err := updateDelphiConfiguration(rc, config, credentials); err != nil {
+		return cerr.Wrap(err, "failed to update Delphi configuration")
 	}
 
-	if err := deployWazuhWithNewCredentials(rc, config); err != nil {
-		return cerr.Wrap(err, "failed to deploy Wazuh with new credentials")
+	if err := deployDelphiWithNewCredentials(rc, config); err != nil {
+		return cerr.Wrap(err, "failed to deploy Delphi with new credentials")
 	}
 
 	// Evaluation: Verify deployment and credential functionality
-	return validateWazuhDeployment(rc, config, credentials)
+	return validateDelphiDeployment(rc, config, credentials)
 }
 
-// assessWazuhDeployment checks the current state of Wazuh deployment
-func assessWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialConfig) (*CredentialAssessment, error) {
+// assessDelphiDeployment checks the current state of Delphi deployment
+func assessDelphiDeployment(rc *eos_io.RuntimeContext, config DelphiCredentialConfig) (*CredentialAssessment, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Assessing Wazuh deployment state")
+	logger.Info("Assessing Delphi deployment state")
 
 	assessment := &CredentialAssessment{
 		Service:         "wazuh",
@@ -87,7 +88,7 @@ func assessWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialConf
 	assessment.ConfigFiles = append(assessment.ConfigFiles, dockerComposePath)
 
 	// Check for default credentials in docker-compose.yml
-	if hasDefaultCreds, _ := checkForDefaultWazuhCredentials(dockerComposePath); hasDefaultCreds {
+	if hasDefaultCreds, _ := checkForDefaultDelphiCredentials(dockerComposePath); hasDefaultCreds {
 		assessment.WeakCredentials = append(assessment.WeakCredentials, dockerComposePath)
 		assessment.PlaintextFound = append(assessment.PlaintextFound, dockerComposePath)
 	}
@@ -97,20 +98,20 @@ func assessWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialConf
 	if exists, _ := fileExists(internalUsersPath); exists {
 		assessment.ConfigFiles = append(assessment.ConfigFiles, internalUsersPath)
 
-		if hasDefaultHashes, _ := checkForDefaultWazuhHashes(internalUsersPath); hasDefaultHashes {
+		if hasDefaultHashes, _ := checkForDefaultDelphiHashes(internalUsersPath); hasDefaultHashes {
 			assessment.WeakCredentials = append(assessment.WeakCredentials, internalUsersPath)
 		}
 	}
 
 	// Check if containers are running
-	runningContainers, err := getRunningWazuhContainers(rc)
+	runningContainers, err := getRunningDelphiContainers(rc)
 	if err != nil {
 		logger.Warn("Could not check running containers", zap.Error(err))
 	} else {
-		logger.Info("Found running Wazuh containers", zap.Strings("containers", runningContainers))
+		logger.Info("Found running Delphi containers", zap.Strings("containers", runningContainers))
 	}
 
-	logger.Info("Wazuh deployment assessment completed",
+	logger.Info("Delphi deployment assessment completed",
 		zap.Int("config_files", len(assessment.ConfigFiles)),
 		zap.Int("weak_credentials", len(assessment.WeakCredentials)),
 		zap.Int("plaintext_found", len(assessment.PlaintextFound)))
@@ -118,10 +119,10 @@ func assessWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialConf
 	return assessment, nil
 }
 
-// generateAndStoreWazuhCredentials creates secure credentials and stores them in Vault
-func generateAndStoreWazuhCredentials(rc *eos_io.RuntimeContext, config WazuhCredentialConfig) (*WazuhCredentials, error) {
+// generateAndStoreDelphiCredentials creates secure credentials and stores them in Vault
+func generateAndStoreDelphiCredentials(rc *eos_io.RuntimeContext, config DelphiCredentialConfig) (*DelphiCredentials, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Generating secure Wazuh credentials")
+	logger.Info("Generating secure Delphi credentials")
 
 	// Define credential configuration for Vault storage
 	credConfig := CredentialConfig{
@@ -138,23 +139,23 @@ func generateAndStoreWazuhCredentials(rc *eos_io.RuntimeContext, config WazuhCre
 
 	// Generate and store credentials in Vault
 	if err := MigrateCredentialsToVault(rc, credConfig); err != nil {
-		return nil, cerr.Wrap(err, "failed to store Wazuh credentials in Vault")
+		return nil, cerr.Wrap(err, "failed to store Delphi credentials in Vault")
 	}
 
 	// Retrieve the generated credentials for configuration updates
-	credentials, err := retrieveWazuhCredentialsFromVault(rc, credConfig.VaultPath)
+	credentials, err := retrieveDelphiCredentialsFromVault(rc, credConfig.VaultPath)
 	if err != nil {
 		return nil, cerr.Wrap(err, "failed to retrieve generated credentials from Vault")
 	}
 
-	logger.Info("Wazuh credentials generated and stored in Vault successfully")
+	logger.Info("Delphi credentials generated and stored in Vault successfully")
 	return credentials, nil
 }
 
-// updateWazuhConfiguration updates docker-compose.yml and internal_users.yml with Vault credentials
-func updateWazuhConfiguration(rc *eos_io.RuntimeContext, config WazuhCredentialConfig, credentials *WazuhCredentials) error {
+// updateDelphiConfiguration updates docker-compose.yml and internal_users.yml with Vault credentials
+func updateDelphiConfiguration(rc *eos_io.RuntimeContext, config DelphiCredentialConfig, credentials *DelphiCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Updating Wazuh configuration files")
+	logger.Info("Updating Delphi configuration files")
 
 	workingDir := config.WorkingDir
 	if workingDir == "" {
@@ -184,7 +185,7 @@ func updateWazuhConfiguration(rc *eos_io.RuntimeContext, config WazuhCredentialC
 
 	// Create .env file with Vault-sourced credentials
 	envPath := filepath.Join(workingDir, ".env")
-	envContent := fmt.Sprintf(`# Wazuh credentials sourced from Vault
+	envContent := fmt.Sprintf(`# Delphi credentials sourced from Vault
 WAZUH_ADMIN_PASSWORD=%s
 WAZUH_KIBANA_PASSWORD=%s
 WAZUH_API_PASSWORD=%s
@@ -195,12 +196,12 @@ WAZUH_API_PASSWORD=%s
 	}
 
 	// Generate and update hashed passwords in internal_users.yml
-	adminHash, err := generateWazuhPasswordHash(rc, credentials.AdminPassword, config.Version)
+	adminHash, err := generateDelphiPasswordHash(rc, credentials.AdminPassword, config.Version)
 	if err != nil {
 		return cerr.Wrap(err, "failed to generate admin password hash")
 	}
 
-	kibanaHash, err := generateWazuhPasswordHash(rc, credentials.KibanaPassword, config.Version)
+	kibanaHash, err := generateDelphiPasswordHash(rc, credentials.KibanaPassword, config.Version)
 	if err != nil {
 		return cerr.Wrap(err, "failed to generate kibana password hash")
 	}
@@ -220,14 +221,14 @@ WAZUH_API_PASSWORD=%s
 		return cerr.Wrap(err, "failed to update kibana hash in internal_users.yml")
 	}
 
-	logger.Info("Wazuh configuration files updated successfully")
+	logger.Info("Delphi configuration files updated successfully")
 	return nil
 }
 
-// deployWazuhWithNewCredentials brings down and redeploys Wazuh with new credentials
-func deployWazuhWithNewCredentials(rc *eos_io.RuntimeContext, config WazuhCredentialConfig) error {
+// deployDelphiWithNewCredentials brings down and redeploys Delphi with new credentials
+func deployDelphiWithNewCredentials(rc *eos_io.RuntimeContext, config DelphiCredentialConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Deploying Wazuh with new credentials")
+	logger.Info("Deploying Delphi with new credentials")
 
 	workingDir := config.WorkingDir
 	if workingDir == "" {
@@ -240,34 +241,34 @@ func deployWazuhWithNewCredentials(rc *eos_io.RuntimeContext, config WazuhCreden
 	}
 
 	// Bring down existing deployment
-	logger.Info("Stopping existing Wazuh deployment")
+	logger.Info("Stopping existing Delphi deployment")
 	if err := execute.RunSimple(rc.Ctx, "sh", "-c", fmt.Sprintf("cd %s && docker compose down", workingDir)); err != nil {
 		logger.Warn("Failed to stop existing deployment", zap.Error(err))
 		// Continue anyway in case it wasn't running
 	}
 
 	// Deploy with new credentials
-	logger.Info("Starting Wazuh deployment with new credentials")
+	logger.Info("Starting Delphi deployment with new credentials")
 	if err := execute.RunSimple(rc.Ctx, "sh", "-c", fmt.Sprintf("cd %s && docker compose up -d", workingDir)); err != nil {
-		return cerr.Wrap(err, "failed to start Wazuh deployment")
+		return cerr.Wrap(err, "failed to start Delphi deployment")
 	}
 
 	// Apply security configuration
-	if err := applyWazuhSecurityConfiguration(rc, config); err != nil {
+	if err := applyDelphiSecurityConfiguration(rc, config); err != nil {
 		return cerr.Wrap(err, "failed to apply security configuration")
 	}
 
-	logger.Info("Wazuh deployment completed successfully")
+	logger.Info("Delphi deployment completed successfully")
 	return nil
 }
 
-// validateWazuhDeployment verifies the deployment is working with new credentials
-func validateWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialConfig, credentials *WazuhCredentials) error {
+// validateDelphiDeployment verifies the deployment is working with new credentials
+func validateDelphiDeployment(rc *eos_io.RuntimeContext, config DelphiCredentialConfig, credentials *DelphiCredentials) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Validating Wazuh deployment")
+	logger.Info("Validating Delphi deployment")
 
 	// Check that all containers are running
-	containerNames := getExpectedWazuhContainers(config.DeploymentType)
+	containerNames := getExpectedDelphiContainers(config.DeploymentType)
 	for _, containerName := range containerNames {
 		if err := validateContainerRunning(rc, containerName); err != nil {
 			return cerr.Wrap(err, fmt.Sprintf("container %s validation failed", containerName))
@@ -275,17 +276,17 @@ func validateWazuhDeployment(rc *eos_io.RuntimeContext, config WazuhCredentialCo
 	}
 
 	// Test credential functionality (API connectivity, dashboard access, etc.)
-	if err := testWazuhAPIConnectivity(rc, credentials.APIPassword); err != nil {
+	if err := testDelphiAPIConnectivity(rc, credentials.APIPassword); err != nil {
 		return cerr.Wrap(err, "API connectivity test failed")
 	}
 
-	logger.Info("Wazuh deployment validation completed successfully")
+	logger.Info("Delphi deployment validation completed successfully")
 	return nil
 }
 
 // Helper functions
 
-func checkForDefaultWazuhCredentials(filePath string) (bool, error) {
+func checkForDefaultDelphiCredentials(filePath string) (bool, error) {
 	content, err := execute.Run(context.Background(), execute.Options{
 		Command: "cat",
 		Args:    []string{filePath},
@@ -310,7 +311,7 @@ func checkForDefaultWazuhCredentials(filePath string) (bool, error) {
 	return false, nil
 }
 
-func checkForDefaultWazuhHashes(filePath string) (bool, error) {
+func checkForDefaultDelphiHashes(filePath string) (bool, error) {
 	content, err := execute.Run(context.Background(), execute.Options{
 		Command: "cat",
 		Args:    []string{filePath},
@@ -334,7 +335,7 @@ func checkForDefaultWazuhHashes(filePath string) (bool, error) {
 	return false, nil
 }
 
-func getRunningWazuhContainers(rc *eos_io.RuntimeContext) ([]string, error) {
+func getRunningDelphiContainers(rc *eos_io.RuntimeContext) ([]string, error) {
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"ps", "--format", "{{.Names}}", "--filter", "name=wazuh"},
@@ -355,10 +356,10 @@ func getRunningWazuhContainers(rc *eos_io.RuntimeContext) ([]string, error) {
 	return containers, nil
 }
 
-func retrieveWazuhCredentialsFromVault(rc *eos_io.RuntimeContext, vaultPath string) (*WazuhCredentials, error) {
+func retrieveDelphiCredentialsFromVault(rc *eos_io.RuntimeContext, vaultPath string) (*DelphiCredentials, error) {
 	// This would use the vault functions to retrieve the stored credentials
 	// For now, return placeholder - in real implementation would call vault.ReadSecret
-	return &WazuhCredentials{
+	return &DelphiCredentials{
 		AdminPassword:  "placeholder-will-retrieve-from-vault",
 		KibanaPassword: "placeholder-will-retrieve-from-vault",
 		APIPassword:    "placeholder-will-retrieve-from-vault",
@@ -381,7 +382,7 @@ func writeFile(rc *eos_io.RuntimeContext, filePath, content string, mode int) er
 	return err
 }
 
-func generateWazuhPasswordHash(rc *eos_io.RuntimeContext, password, version string) (string, error) {
+func generateDelphiPasswordHash(rc *eos_io.RuntimeContext, password, version string) (string, error) {
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args: []string{
@@ -399,9 +400,9 @@ func generateWazuhPasswordHash(rc *eos_io.RuntimeContext, password, version stri
 	return strings.TrimSpace(output), nil
 }
 
-func applyWazuhSecurityConfiguration(rc *eos_io.RuntimeContext, config WazuhCredentialConfig) error {
+func applyDelphiSecurityConfiguration(rc *eos_io.RuntimeContext, config DelphiCredentialConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Applying Wazuh security configuration")
+	logger.Info("Applying Delphi security configuration")
 
 	containerName := getIndexerContainerName(config.DeploymentType)
 
@@ -429,7 +430,7 @@ func getIndexerContainerName(deploymentType string) string {
 	return "multi-node-wazuh1.indexer-1"
 }
 
-func getExpectedWazuhContainers(deploymentType string) []string {
+func getExpectedDelphiContainers(deploymentType string) []string {
 	if deploymentType == "single-node" {
 		return []string{
 			"single-node-wazuh.indexer-1",
@@ -454,7 +455,7 @@ func validateContainerRunning(rc *eos_io.RuntimeContext, containerName string) e
 	return err
 }
 
-func testWazuhAPIConnectivity(rc *eos_io.RuntimeContext, apiPassword string) error {
+func testDelphiAPIConnectivity(rc *eos_io.RuntimeContext, apiPassword string) error {
 	// Test API connectivity with new credentials
 	// This would make actual API calls to verify functionality
 	return nil

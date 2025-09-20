@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	// disk_management functionality now consolidated into storage package
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/zfs_management"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -206,7 +206,7 @@ func (f *DockerVolumeDriverFactory) SupportsType(storageType StorageType) bool {
 type UnifiedStorageManager struct {
 	rc          *eos_io.RuntimeContext
 	registry    *DriverRegistry
-	diskManager *disk_management.DiskManager
+	diskManager *DiskManagerImpl
 	salt        NomadClient
 	drivers     map[StorageType]StorageDriver
 	mu          sync.RWMutex
@@ -218,7 +218,7 @@ func NewUnifiedStorageManager(rc *eos_io.RuntimeContext, salt NomadClient) (*Uni
 	logger.Info("Creating unified storage manager")
 
 	registry := NewDriverRegistry(rc, salt)
-	diskManager := disk_management.NewDiskManager(nil)
+	diskManager := NewDiskManagerImpl(nil)
 
 	manager := &UnifiedStorageManager{
 		rc:          rc,

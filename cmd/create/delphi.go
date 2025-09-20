@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/agents"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/credentials"
@@ -155,7 +156,22 @@ var mappingCmd = &cobra.Command{
 	Use:   "mapping",
 	Short: "Suggest the best agent package for each endpoint",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return agents.RunMapping(rc)
+		// Use the delphi package to access ResolveConfig and Authenticate
+		// This avoids the circular import issue
+		cfg, err := delphi.ResolveConfig(rc)
+		if err != nil {
+			return fmt.Errorf("failed to resolve config: %w", err)
+		}
+
+		// Create authentication function
+		authenticateFunc := func(rc *eos_io.RuntimeContext, cfg interface{}) (string, error) {
+			if delphiCfg, ok := cfg.(*delphi.Config); ok {
+				return delphi.Authenticate(rc, delphiCfg)
+			}
+			return "", fmt.Errorf("invalid config type")
+		}
+
+		return agents.RunMapping(rc, cfg, authenticateFunc)
 	}),
 }
 

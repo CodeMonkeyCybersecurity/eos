@@ -7,8 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp/customer"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -105,14 +104,14 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	}
 
 	// Validate tier
-	var newTier wazuh_mssp.CustomerTier
+	var newTier delphi.CustomerTier
 	switch newTierStr {
 	case "starter":
-		newTier = wazuh_mssp.TierStarter
+		newTier = delphi.TierStarter
 	case "pro":
-		newTier = wazuh_mssp.TierPro
+		newTier = delphi.TierPro
 	case "enterprise":
-		newTier = wazuh_mssp.TierEnterprise
+		newTier = delphi.TierEnterprise
 	default:
 		return eos_err.NewUserError("invalid tier specified")
 	}
@@ -129,7 +128,7 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	}
 
 	// Scale customer
-	if err := customer.ScaleCustomer(rc, customerID, newTier); err != nil {
+	if err := delphi.ScaleCustomer(rc, customerID, newTier); err != nil {
 		return fmt.Errorf("customer scaling failed: %w", err)
 	}
 
@@ -138,14 +137,14 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 		zap.String("new_tier", newTierStr))
 
 	// Show new resource allocation
-	resources := wazuh_mssp.GetResourcesByTier(newTier)
+	resources := delphi.GetResourcesByTier(newTier)
 	logger.Info("terminal prompt: Customer scaled to tier", zap.String("tier", newTierStr))
 	logger.Info("terminal prompt: New resource allocation:")
 	fmt.Printf("- Indexer: %d instances, %d CPU, %d MB memory\n",
 		resources.Indexer.Count, resources.Indexer.CPU, resources.Indexer.Memory)
 	fmt.Printf("- Server: %d instances, %d CPU, %d MB memory\n",
 		resources.Server.Count, resources.Server.CPU, resources.Server.Memory)
-	if newTier != wazuh_mssp.TierStarter {
+	if newTier != delphi.TierStarter {
 		fmt.Printf("- Dashboard: %d instances, %d CPU, %d MB memory\n",
 			resources.Dashboard.Count, resources.Dashboard.CPU, resources.Dashboard.Memory)
 	}
@@ -159,7 +158,7 @@ func updatePlatformConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 
 	// Read current configuration
 	// This would read from Vault
-	config := &wazuh_mssp.PlatformConfig{
+	config := &delphi.PlatformConfig{
 		Name:        "wazuh-mssp",
 		Environment: "production",
 		Datacenter:  "dc1",
@@ -192,7 +191,7 @@ func updatePlatformConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 	}
 
 	// Apply configuration
-	if err := wazuh_mssp.ConfigurePlatform(rc, config); err != nil {
+	if err := delphi.ConfigurePlatform(rc, config); err != nil {
 		return fmt.Errorf("platform configuration update failed: %w", err)
 	}
 
@@ -217,7 +216,7 @@ func updateCustomerConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 
 	// Get customer configuration
 	// This would read from Vault
-	config := &wazuh_mssp.CustomerConfig{
+	config := &delphi.CustomerConfig{
 		ID: customerID,
 	}
 
@@ -259,7 +258,7 @@ func updateCustomerConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 	}
 
 	// Apply configuration
-	if err := wazuh_mssp.ConfigureCustomer(rc, config); err != nil {
+	if err := delphi.ConfigureCustomer(rc, config); err != nil {
 		return fmt.Errorf("customer configuration update failed: %w", err)
 	}
 
