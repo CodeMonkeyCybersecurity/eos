@@ -117,7 +117,7 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	
 	// ASSESS, INTERVENE, EVALUATE pattern is handled inside the installer
 	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Consul installation failed: %w", err)
+		return fmt.Errorf("consul installation failed: %w", err)
 	}
 
 	logger.Info("terminal prompt: ✅ Consul installation completed successfully!")

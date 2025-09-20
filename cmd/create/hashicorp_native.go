@@ -107,24 +107,8 @@ Examples:
 		RunE: eos.Wrap(runCreateBoundaryNative),
 	}
 
-	createConsulNativeCmd = &cobra.Command{
-		Use:   "consul",  
-		Short: "Install and configure HashiCorp Consul using native installer",
-		Long: `Install HashiCorp Consul for service discovery using the native installer.
-
-This installer provides:
-- Direct binary or repository installation
-- Server/agent mode configuration
-- UI enablement
-- Connect service mesh
-- ACL system setup
-
-Examples:
-  eos create consul                              # Basic installation
-  eos create consul --server --ui               # Server with UI
-  eos create consul --connect                   # Enable Connect`,
-		RunE: eos.Wrap(runCreateConsulNative),
-	}
+	// TODO: Native Consul installer - functionality moved to consul.go
+	// This command is redundant with existing consul.go implementation
 )
 
 func init() {
@@ -219,13 +203,5 @@ func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 }
 
 
-// Update existing Consul command to use native installer
-func runCreateConsulNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Consul using native installer")
-
-	// Implementation would be similar to above
-	// This is already implemented in consul.go, so we'll leave it there
-	logger.Info("Using existing Consul native installer from consul.go")
-	return nil
-}
+// TODO: Native Consul installer - functionality moved to consul.go
+// This function is redundant with existing consul.go implementation

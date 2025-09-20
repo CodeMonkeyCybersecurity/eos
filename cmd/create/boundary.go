@@ -4,17 +4,12 @@ package create
 
 import (
 	"fmt"
-	"os"
-	"strings"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 var CreateBoundaryCmd = &cobra.Command{
@@ -92,7 +87,7 @@ func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	// Create and run installer
 	installer := boundary.NewBoundaryInstaller(rc, config)
 	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Boundary installation failed: %w", err)
+		return fmt.Errorf("boundary installation failed: %w", err)
 	}
 
 	logger.Info("Boundary installation completed successfully")
@@ -104,178 +99,20 @@ func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	return nil
 }
 
-func runCreateBoundaryLegacy(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Check if running as root
-	if os.Geteuid() != 0 {
-		return eos_err.NewUserError("this command must be run as root")
-	}
-	
-	logger.Info("Starting Boundary installation process",
-		zap.String("role", boundaryRole),
-		zap.String("version", boundaryVersion),
-		zap.String("cluster", boundaryClusterName),
-		zap.Bool("force", boundaryForce),
-		zap.Bool("clean", boundaryClean))
-	
-	// Validate role
-	if boundaryRole != "controller" && boundaryRole != "worker" && boundaryRole != "dev" {
-		return eos_err.NewUserError("role must be one of: controller, worker, dev")
-	}
-	
-	// Validate controller requirements
-	if (boundaryRole == "controller" || boundaryRole == "dev") && boundaryDatabaseURL == "" {
-		logger.Info("terminal prompt: Database URL is required for controller role")
-		logger.Info("terminal prompt: Please enter PostgreSQL connection string (e.g., postgresql://boundary:password@localhost/boundary)")
-		
-		dbURL, err := eos_io.ReadInput(rc)
-		if err != nil {
-			return fmt.Errorf("failed to read database URL: %w", err)
-		}
-		boundaryDatabaseURL = dbURL
-	}
-	
-	// Validate worker requirements
-	if boundaryRole == "worker" && boundaryUpstreams == "" {
-		logger.Info("terminal prompt: Upstream controllers are required for worker role")
-		logger.Info("terminal prompt: Please enter comma-separated controller addresses (e.g., controller1:9201,controller2:9201)")
-		
-		upstreams, err := eos_io.ReadInput(rc)
-		if err != nil {
-			return fmt.Errorf("failed to read upstreams: %w", err)
-		}
-		boundaryUpstreams = upstreams
-	}
-	
-	// Initialize Nomad orchestration (replacing Salt)
-	err := initializeBoundaryNomadClient(logger)
-	if err != nil {
-		logger.Info("Nomad orchestration initialization failed, using direct execution")
-		return runCreateBoundaryFallback(rc, cmd, args)
-	}
-	
-	// Create Boundary manager (using Nomad orchestration)
-	manager, err := boundary.NewManager(rc)
-	if err != nil {
-		return fmt.Errorf("failed to create boundary manager: %w", err)
-	}
-	
-	// Build configuration
-	config := &boundary.Config{
-		Role:              boundaryRole,
-		Version:           boundaryVersion,
-		ClusterName:       boundaryClusterName,
-		DatabaseURL:       boundaryDatabaseURL,
-		PublicClusterAddr: boundaryPublicClusterAddr,
-		PublicAddr:        boundaryPublicAddr,
-		PublicProxyAddr:   boundaryPublicProxyAddr,
-		ListenerAddress:   boundaryListenerAddr,
-		TLSDisable:        boundaryTLSDisable,
-		TLSCertFile:       boundaryTLSCertFile,
-		TLSKeyFile:        boundaryTLSKeyFile,
-		KMSType:           boundaryKMSType,
-		KMSKeyID:          boundaryKMSKeyID,
-		KMSRegion:         boundaryKMSRegion,
-	}
-	
-	// Parse upstreams for workers
-	if boundaryUpstreams != "" {
-		config.InitialUpstreams = strings.Split(boundaryUpstreams, ",")
-		for i, upstream := range config.InitialUpstreams {
-			config.InitialUpstreams[i] = strings.TrimSpace(upstream)
-		}
-	}
-	
-	// Create options
-	createOpts := &boundary.CreateOptions{
-		Target:       "*", // Could be made configurable
-		Config:       config,
-		Force:        boundaryForce,
-		Clean:        boundaryClean,
-		StreamOutput: boundaryStreamOutput,
-		Timeout:      30 * time.Minute,
-	}
-	
-	// Check current status first
-	logger.Info("Checking current Boundary status")
-	statusOpts := &boundary.StatusOptions{
-		Target:   createOpts.Target,
-		Detailed: true,
-	}
-	
-	err = manager.Status(rc.Ctx, statusOpts)
-	if err != nil {
-		logger.Warn("Could not determine Boundary status", zap.Error(err))
-	} else {
-		logger.Info("Boundary status check completed - Nomad implementation pending")
-		// TODO: Implement proper status checking with Nomad
-	}
-	
-	// Execute installation
-	logger.Info("terminal prompt: Starting Boundary installation...")
-	
-	if boundaryStreamOutput {
-		logger.Info("terminal prompt: Streaming installation progress...")
-	}
-	
-	err = manager.Create(rc.Ctx, createOpts)
-	if err != nil {
-		return fmt.Errorf("boundary installation failed: %w", err)
-	}
-	
-	// Verify installation
-	logger.Info("Verifying Boundary installation")
-	time.Sleep(5 * time.Second) // Give services time to start
-	
-	err = manager.Status(rc.Ctx, statusOpts)
-	if err != nil {
-		logger.Warn("Could not verify final status", zap.Error(err))
-	} else {
-		logger.Info("Final status verification completed - Nomad implementation pending")
-	}
-	
-	logger.Info("terminal prompt: ✅ Boundary installation completed successfully!")
-	
-	// Display connection information based on role
-	switch boundaryRole {
-	case "controller", "dev":
-		logger.Info(fmt.Sprintf("terminal prompt: Boundary API available at: https://<server-ip>:%d", 9200))
-		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: Next steps:")
-		logger.Info("terminal prompt: 1. Initialize the database: boundary database init -config /etc/boundary/controller.hcl")
-		logger.Info("terminal prompt: 2. Create initial admin user")
-		logger.Info("terminal prompt: 3. Configure authentication methods")
-		logger.Info("terminal prompt: 4. Set up targets and host catalogs")
-		
-	case "worker":
-		logger.Info("terminal prompt: Boundary worker installed and connected to upstream controllers")
-		logger.Info("terminal prompt: Worker will proxy connections for authorized sessions")
-	}
-	
-	return nil
-}
+// TODO: Legacy boundary creation - removed during HashiCorp migration
+// This function was replaced with Nomad-based orchestration
+// Restore if direct boundary installation is needed outside of Nomad
 
 // initializeBoundarySaltClient replaced with Nomad orchestration
-// Salt client functionality moved to Nomad job scheduling
-func initializeBoundaryNomadClient(logger otelzap.LoggerWithCtx) error {
-	// Use Nomad client for Boundary orchestration instead of Salt
-	logger.Info("Using Nomad orchestration for Boundary deployment")
-	return nil
-}
+// TODO: Nomad client initialization for Boundary
+// This will be implemented when Nomad API integration is complete
 
 // displayBoundaryStatus - REMOVED: Function no longer used
 // TODO: Restore when Boundary status display is needed
 
-// runCreateBoundaryFallback is the fallback implementation using salt-call
-func runCreateBoundaryFallback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// This would contain the original shell-based implementation
-	// For now, we'll return an error indicating API is required
-	_ = rc // Suppress unused parameter warning
-	_ = cmd // Suppress unused parameter warning
-	_ = args // Suppress unused parameter warning
-	return fmt.Errorf("Salt API required for Boundary installation. Please configure SALT_API_* environment variables")
-}
+// TODO: Boundary fallback implementation
+// This will be replaced with administrator escalation pattern
+// when system-level boundary installation is needed
 
 func init() {
 	// Role configuration

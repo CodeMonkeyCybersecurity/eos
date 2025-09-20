@@ -281,7 +281,7 @@ type ComponentStatus struct {
 
 // Constants for common configurations
 const (
-	DefaultWazuhVersion = "4.8.2"
+	DefaultWazuhVersion = "4.13.0" // Updated to current stable version
 	DefaultDatacenter   = "dc1"
 	DefaultEnvironment  = "production"
 	DefaultPlatformCIDR = "10.0.0.0/16"

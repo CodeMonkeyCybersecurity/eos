@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp/version"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -689,8 +690,82 @@ func testEndToEndWorkflow(rc *eos_io.RuntimeContext, config *PlatformConfig) err
 	return nil
 }
 
-// GetLatestWazuhVersion uses the version resolver to get the latest Wazuh version
+// GetLatestWazuhVersion uses the centralized version management system to get the latest Wazuh version.
+//
+// This function is the main integration point between EOS Wazuh deployments and the
+// centralized version management system. It automatically:
+//
+// 1. Loads your version management configuration
+// 2. Respects version pinning if configured
+// 3. Fetches the latest version from GitHub API (with caching)
+// 4. Applies your update policy to determine if the version is allowed
+// 5. Falls back to safe defaults if any step fails
+//
+// Usage in Wazuh deployments:
+//   version, err := GetLatestWazuhVersion(rc)
+//   if err != nil {
+//       // Handle error - function provides safe fallbacks
+//   }
+//   // Use version for deployment
+//
+// Configuration:
+// The behavior is controlled by ~/.eos/wazuh-version-config.json which can be
+// created with: eos create wazuh-version-config --template production
+//
+// This replaces manual version management and ensures consistency across your
+// Wazuh infrastructure.
 func GetLatestWazuhVersion(rc *eos_io.RuntimeContext) (string, error) {
-	// Use default version for now
-	return DefaultWazuhVersion, nil
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Create version manager
+	versionManager := version.NewManager()
+	configManager := version.NewConfigManager()
+	
+	// Load configuration
+	config, err := configManager.LoadConfig(rc)
+	if err != nil {
+		logger.Warn("Failed to load version config, using default", zap.Error(err))
+		return DefaultWazuhVersion, nil
+	}
+	
+	// If version is pinned, use that
+	if config.PinnedVersion != "" {
+		logger.Info("Using pinned Wazuh version", zap.String("version", config.PinnedVersion))
+		return config.PinnedVersion, nil
+	}
+	
+	// Get latest version
+	versionInfo, err := versionManager.GetLatestVersion(rc)
+	if err != nil {
+		logger.Warn("Failed to get latest version, using default", 
+			zap.Error(err),
+			zap.String("default", DefaultWazuhVersion))
+		return DefaultWazuhVersion, nil
+	}
+	
+	// Check if this version is allowed by policy
+	currentVersion := config.CurrentVersion
+	if currentVersion == "" {
+		currentVersion = DefaultWazuhVersion
+	}
+	
+	allowed, reason, err := configManager.ShouldUpdate(rc, currentVersion, versionInfo.Version, versionManager)
+	if err != nil {
+		logger.Warn("Failed to check update policy, using current version", zap.Error(err))
+		return currentVersion, nil
+	}
+	
+	if !allowed {
+		logger.Info("Version update not allowed by policy",
+			zap.String("current", currentVersion),
+			zap.String("available", versionInfo.Version),
+			zap.String("reason", reason))
+		return currentVersion, nil
+	}
+	
+	logger.Info("Using latest Wazuh version",
+		zap.String("version", versionInfo.Version),
+		zap.Time("release_date", versionInfo.ReleaseDate))
+	
+	return versionInfo.Version, nil
 }

@@ -57,7 +57,7 @@ func runCreatePackerNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 	// Create and run installer
 	installer := packer.NewPackerInstaller(rc, config)
 	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Packer installation failed: %w", err)
+		return fmt.Errorf("packer installation failed: %w", err)
 	}
 
 	logger.Info("Packer installation completed successfully")

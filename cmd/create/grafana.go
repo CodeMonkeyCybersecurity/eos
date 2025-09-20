@@ -138,7 +138,7 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	// Deploy using Nomad orchestration instead of SaltStack
 	logger.Info("Deploying Grafana using Nomad orchestration")
 	// TODO: Implement Nomad job deployment for Grafana
-	return fmt.Errorf("Grafana Nomad deployment not yet implemented")
+	return fmt.Errorf("grafana Nomad deployment not yet implemented")
 }
 
 

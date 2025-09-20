@@ -176,7 +176,7 @@ func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	// Deploy Mattermost using HashiCorp stack
 	if err := mattermostManager.Deploy(rc.Ctx); err != nil {
-		return fmt.Errorf("Mattermost deployment failed: %w", err)
+		return fmt.Errorf("mattermost deployment failed: %w", err)
 	}
 
 	_ = pillarConfig // Keep for backward compatibility

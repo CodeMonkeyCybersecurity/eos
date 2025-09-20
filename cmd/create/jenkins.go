@@ -148,7 +148,7 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	// - Consul service registration
 	// - Configuration management details
 	
-	return fmt.Errorf("Jenkins deployment not implemented with Nomad yet")
+	return fmt.Errorf("jenkins deployment not implemented with Nomad yet")
 }
 
 

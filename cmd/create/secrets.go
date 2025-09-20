@@ -113,7 +113,7 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	// Create and run installer
 	installer := vault.NewVaultInstaller(rc, config)
 	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Vault installation failed: %w", err)
+		return fmt.Errorf("vault installation failed: %w", err)
 	}
 
 	logger.Info("Vault installation completed successfully")

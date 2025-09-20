@@ -264,7 +264,7 @@ func validateBackendPrerequisites(rc *eos_io.RuntimeContext, backend *hybrid.Bac
 
 	// Check Consul connectivity
 	if err := validateConsulConnectivity(rc); err != nil {
-		return fmt.Errorf("Consul connectivity validation failed: %w", err)
+		return fmt.Errorf("consul connectivity validation failed: %w", err)
 	}
 
 	return nil
@@ -278,7 +278,7 @@ func verifyBackendCreation(rc *eos_io.RuntimeContext, backend *hybrid.Backend) e
 
 	// Check if service is registered in Consul
 	if err := verifyConsulServiceRegistration(rc, backend.ConsulService.Name); err != nil {
-		return fmt.Errorf("Consul service registration verification failed: %w", err)
+		return fmt.Errorf("consul service registration verification failed: %w", err)
 	}
 
 	// Check if health monitoring is active
@@ -298,42 +298,42 @@ func verifyBackendCreation(rc *eos_io.RuntimeContext, backend *hybrid.Backend) e
 
 // Helper functions
 
-func parsePort(portStr string) (int, error) {
+func parsePort(_ string) (int, error) {
 	// TODO: Implement port parsing
 	return 8080, nil
 }
 
-func parseHostPort(address string) (string, string, error) {
+func parseHostPort(_ string) (string, string, error) {
 	// TODO: Implement host:port parsing
 	return "localhost", "8080", nil
 }
 
-func validateLocalAddress(rc *eos_io.RuntimeContext, address string) error {
+func validateLocalAddress(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement local address validation
 	return nil
 }
 
-func validatePublicDomain(rc *eos_io.RuntimeContext, domain string) error {
+func validatePublicDomain(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement public domain validation
 	return nil
 }
 
-func validateConsulConnectivity(rc *eos_io.RuntimeContext) error {
+func validateConsulConnectivity(_ *eos_io.RuntimeContext) error {
 	// TODO: Implement Consul connectivity validation
 	return nil
 }
 
-func verifyConsulServiceRegistration(rc *eos_io.RuntimeContext, serviceName string) error {
+func verifyConsulServiceRegistration(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement Consul service registration verification
 	return nil
 }
 
-func verifyHealthMonitoring(rc *eos_io.RuntimeContext, backendID string) error {
+func verifyHealthMonitoring(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement health monitoring verification
 	return nil
 }
 
-func testTunnelConnectivity(rc *eos_io.RuntimeContext, backend *hybrid.Backend) error {
+func testTunnelConnectivity(_ *eos_io.RuntimeContext, _ *hybrid.Backend) error {
 	// TODO: Implement tunnel connectivity test
 	return nil
 }
