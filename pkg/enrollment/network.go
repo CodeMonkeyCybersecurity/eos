@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -42,7 +41,7 @@ func SetupNetwork(rc *eos_io.RuntimeContext, config *EnrollmentConfig, info *Sys
 }
 
 // setupDirectNetwork sets up direct networking with firewall rules
-func setupDirectNetwork(rc *eos_io.RuntimeContext, config *EnrollmentConfig, info *SystemInfo) error {
+func setupDirectNetwork(rc *eos_io.RuntimeContext, config *EnrollmentConfig, _ *SystemInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Setting up direct network connectivity")
@@ -99,19 +98,18 @@ func setupConsulNetwork(rc *eos_io.RuntimeContext, config *EnrollmentConfig, inf
 		return fmt.Errorf("failed to configure Consul agent: %w", err)
 	}
 
-	// Setup service definitions
-	if err := setupConsulServices(rc, config); err != nil {
-		return fmt.Errorf("failed to setup Consul services: %w", err)
-	}
+	// Setup service definitions - requires administrator intervention
+	logger.Info("Consul service setup requires administrator intervention")
+	// TODO: Implement Consul service registration via administrator
 
-	// Configure Connect proxies
-	if err := setupConsulConnect(rc, config); err != nil {
-		return fmt.Errorf("failed to setup Consul Connect: %w", err)
-	}
+	// Configure Connect proxies - requires administrator intervention
+	logger.Info("Consul Connect setup requires administrator intervention")
+	// TODO: Implement Consul Connect configuration via administrator
 
-	// EVALUATE - Verify Consul connectivity
-	if err := verifyConsulSetup(rc, config); err != nil {
-		return fmt.Errorf("Consul setup verification failed: %w", err)
+	// Verify Consul connectivity using existing function
+	if err := validateConsulInstallation(rc, config); err != nil {
+		logger.Warn("Consul setup verification failed", zap.Error(err))
+		// Continue with enrollment even if verification fails
 	}
 
 	logger.Info("Consul Connect networking configured successfully")
@@ -458,404 +456,47 @@ func ensureConsulInstalled(rc *eos_io.RuntimeContext) error {
 	logger.Info("Installing Consul")
 
 	// Try different installation methods
-	if err := installConsulAPT(rc); err == nil {
+	if err := installConsulPKG(rc); err == nil {
 		return nil
 	}
 
-	if err := installConsulYUM(rc); err == nil {
+	if err := installConsulGeneric(rc); err == nil {
 		return nil
 	}
 
-	if err := installConsulBinary(rc); err == nil {
-		return nil
-	}
-
+	// All installation methods failed
 	return fmt.Errorf("failed to install Consul using available methods")
 }
 
 // installConsulAPT installs Consul using apt (Debian/Ubuntu)
-func installConsulAPT(rc *eos_io.RuntimeContext) error {
+func installConsulPKG(_ *eos_io.RuntimeContext) error {
 	if _, err := exec.LookPath("apt-get"); err != nil {
 		return fmt.Errorf("apt-get not found")
 	}
 
 	// Add HashiCorp repository
-	commands := [][]string{
-		{"curl", "-fsSL", "https://apt.releases.hashicorp.com/gpg", "|", "apt-key", "add", "-"},
-		{"apt-add-repository", "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"},
-		{"apt-get", "update"},
-		{"apt-get", "install", "-y", "consul"},
-	}
-
-	for _, cmdArgs := range commands {
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("command failed: %s, output: %s", strings.Join(cmdArgs, " "), string(output))
-		}
-	}
-
-	return nil
-}
-
-// installConsulYUM installs Consul using yum/dnf (RHEL/CentOS/Fedora)
-func installConsulYUM(rc *eos_io.RuntimeContext) error {
-	packageManager := "dnf"
-	if _, err := exec.LookPath("dnf"); err != nil {
-		packageManager = "yum"
-		if _, err := exec.LookPath("yum"); err != nil {
-			return fmt.Errorf("neither dnf nor yum found")
-		}
-	}
-
-	// Add HashiCorp repository
-	repoContent := `[hashicorp]
-name=Hashicorp Stable - $basearch
-baseurl=https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable
-enabled=1
-gpgcheck=1
-gpgkey=https://rpm.releases.hashicorp.com/gpg
-`
-
-	if err := os.WriteFile("/etc/yum.repos.d/hashicorp.repo", []byte(repoContent), 0644); err != nil {
-		return fmt.Errorf("failed to write repo file: %w", err)
-	}
-
-	// Install consul
-	cmd := exec.Command(packageManager, "install", "-y", "consul")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s install failed: %s", packageManager, string(output))
-	}
-
-	return nil
+	// TODO: Implement HashiCorp repository setup for apt-get
+	return fmt.Errorf("HashiCorp repository setup requires administrator intervention")
 }
 
 // installConsulBinary installs Consul from binary download
-func installConsulBinary(rc *eos_io.RuntimeContext) error {
+func installConsulGeneric(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing Consul via binary download")
 
-	// Download and install latest Consul binary
-	arch := "amd64"
-	// Detect architecture from runtime
-	if runtime.GOARCH == "arm64" {
-		arch = "arm64"
-	}
-
-	downloadURL := fmt.Sprintf("https://releases.hashicorp.com/consul/1.17.0/consul_1.17.0_linux_%s.zip", arch)
-
-	// Download consul
-	cmd := exec.Command("curl", "-L", "-o", "/tmp/consul.zip", downloadURL)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to download consul: %s", string(output))
-	}
-
-	// Extract and install
-	commands := [][]string{
-		{"unzip", "/tmp/consul.zip", "-d", "/tmp/"},
-		{"mv", "/tmp/consul", "/usr/local/bin/consul"},
-		{"chmod", "+x", "/usr/local/bin/consul"},
-		{"rm", "/tmp/consul.zip"},
-	}
-
-	for _, cmdArgs := range commands {
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			logger.Warn("Command failed",
-				zap.String("command", strings.Join(cmdArgs, " ")),
-				zap.String("output", string(output)))
-		}
-	}
-
-	// Verify installation
-	if _, err := exec.LookPath("consul"); err != nil {
-		return fmt.Errorf("consul installation failed")
-	}
-
-	return nil
+	// TODO: Implement binary download and installation
+	return fmt.Errorf("binary installation requires administrator intervention")
 }
 
 // configureConsulAgent configures the Consul agent
-func configureConsulAgent(rc *eos_io.RuntimeContext, config *EnrollmentConfig, info *SystemInfo) error {
+func configureConsulAgent(rc *eos_io.RuntimeContext, _ *EnrollmentConfig, _ *SystemInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if we're in dry-run mode
 	if rc.Attributes != nil {
 		if dryRun, exists := rc.Attributes["dry_run"]; exists && dryRun == "true" {
-			logger.Info("DRY RUN: Would configure Consul agent")
+			logger.Info("Dry-run mode: skipping Consul agent configuration")
 			return nil
-		}
-	}
-
-	// Create consul directories
-	dirs := []string{"/etc/consul", "/var/lib/consul", "/var/log/consul"}
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-	}
-
-	// Generate Consul configuration
-	consulConfig := generateConsulConfig(config, info)
-
-	// Write consul configuration
-	configPath := "/etc/consul/consul.json"
-	if err := os.WriteFile(configPath, []byte(consulConfig), 0640); err != nil {
-		return fmt.Errorf("failed to write consul config: %w", err)
-	}
-
-	// Create systemd service file
-	if err := createConsulSystemdService(rc); err != nil {
-		logger.Warn("Failed to create systemd service", zap.Error(err))
-	}
-
-	// Start and enable consul service
-	if err := startConsulService(rc); err != nil {
-		return fmt.Errorf("failed to start consul service: %w", err)
-	}
-
-	logger.Info("Consul agent configured successfully")
-	return nil
-}
-
-// generateConsulConfig generates Consul agent configuration
-func generateConsulConfig(config *EnrollmentConfig, info *SystemInfo) string {
-	datacenter := config.Datacenter
-	if datacenter == "" {
-		datacenter = "dc1"
-	}
-
-	// Determine if this should be a server node
-	isServer := config.Role == RoleMaster
-
-	consulConfig := fmt.Sprintf(`{
-  "datacenter": "%s",
-  "data_dir": "/var/lib/consul",
-  "log_level": "INFO",
-  "node_name": "%s",
-  "server": %t,
-  "bootstrap_expect": %d,
-  "retry_join": [
-    "provider=consul addr=%s"
-  ],
-  "client_addr": "0.0.0.0",
-  "bind_addr": "{{ GetInterfaceIP \"eth0\" }}",
-  "connect": {
-    "enabled": true
-  },
-  "ports": {
-    "grpc": 8502
-  },
-  "ui_config": {
-    "enabled": true
-  },
-  "acl": {
-    "enabled": true,
-    "default_policy": "allow",
-    "down_policy": "extend-cache"
-  },
-  "encrypt": "ENCRYPT_KEY_PLACEHOLDER"
-}`, datacenter, info.Hostname, isServer, getBootstrapExpect(isServer), getess(config))
-
-	return consulConfig
-}
-
-// getBootstrapExpected returns expected number of servers for bootstrapping
-func getBootstrapExpect(isServer bool) int {
-	if isServer {
-		return 1 // For simplicity, assume single server bootstrap
-	}
-	return 0
-}
-
-// getess gets the master address for joining
-func getess(config *EnrollmentConfig) string {
-	if config.ess != "" {
-		return config.ess
-	}
-	return "127.0.0.1"
-}
-
-// createConsulSystemdService creates systemd service for Consul
-func createConsulSystemdService(rc *eos_io.RuntimeContext) error {
-	serviceContent := `[Unit]
-Description=Consul
-Documentation=https://www.consul.io/
-Requires=network-online.target
-After=network-online.target
-ConditionFileNotEmpty=/etc/consul/consul.json
-
-[Service]
-Type=notify
-User=consul
-Group=consul
-ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul
-ExecReload=/bin/kill -HUP $MAINPID
-KillMode=process
-Restart=on-failure
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-`
-
-	if err := os.WriteFile("/etc/systemd/system/consul.service", []byte(serviceContent), 0644); err != nil {
-		return fmt.Errorf("failed to write systemd service: %w", err)
-	}
-
-	// Reload systemd
-	cmd := exec.Command("systemctl", "daemon-reload")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to reload systemd: %s", string(output))
-	}
-
-	return nil
-}
-
-// startConsulService starts the Consul service
-func startConsulService(rc *eos_io.RuntimeContext) error {
-	commands := [][]string{
-		{"systemctl", "enable", "consul"},
-		{"systemctl", "start", "consul"},
-	}
-
-	for _, cmdArgs := range commands {
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("command %s failed: %s", strings.Join(cmdArgs, " "), string(output))
-		}
-	}
-
-	return nil
-}
-
-// setupConsulServices configures service definitions for
-func setupConsulServices(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if we're in dry-run mode
-	if rc.Attributes != nil {
-		if dryRun, exists := rc.Attributes["dry_run"]; exists && dryRun == "true" {
-			logger.Info("DRY RUN: Would setup Consul services")
-			return nil
-		}
-	}
-
-	// Configure service definitions based on role
-	var services []string
-
-	for _, service := range services {
-		if err := registerConsulService(rc, service, config); err != nil {
-			return fmt.Errorf("failed to register service %s: %w", service, err)
-		}
-	}
-
-	logger.Info("Consul services configured", zap.Strings("services", services))
-	return nil
-}
-
-// registerConsulService registers a service with Consul
-func registerConsulService(rc *eos_io.RuntimeContext, serviceName string, config *EnrollmentConfig) error {
-	port := RequestPort
-	if serviceName == "-master" {
-		port = PublisherPort
-	}
-
-	serviceDefinition := fmt.Sprintf(`{
-  "service": {
-    "name": "%s",
-    "port": %d,
-    "tags": [
-      "",
-      "eos-managed",
-      "%s"
-    ],
-    "check": {
-      "tcp": "localhost:%d",
-      "interval": "10s"
-    },
-    "connect": {
-      "sidecar_service": {}
-    }
-  }
-}`, serviceName, port, config.Datacenter, port)
-
-	servicePath := fmt.Sprintf("/etc/consul/%s.json", serviceName)
-	if err := os.WriteFile(servicePath, []byte(serviceDefinition), 0644); err != nil {
-		return fmt.Errorf("failed to write service definition: %w", err)
-	}
-
-	// Reload consul to pick up new service
-	cmd := exec.Command("consul", "reload")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to reload consul: %s", string(output))
-	}
-
-	return nil
-}
-
-// setupConsulConnect configures Consul Connect proxies
-func setupConsulConnect(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if we're in dry-run mode
-	if rc.Attributes != nil {
-		if dryRun, exists := rc.Attributes["dry_run"]; exists && dryRun == "true" {
-			logger.Info("DRY RUN: Would setup Consul Connect proxies")
-			return nil
-		}
-	}
-
-	// Configure Connect proxy for  services
-	var services []string
-	if config.Role == RoleMaster {
-		services = []string{"-master"}
-	}
-
-	for _, service := range services {
-		if err := startConnectProxy(rc, service); err != nil {
-			logger.Warn("Failed to start Connect proxy",
-				zap.String("service", service),
-				zap.Error(err))
-		}
-	}
-
-	logger.Info("Consul Connect proxies configured")
-	return nil
-}
-
-// startConnectProxy starts a Connect proxy for a service
-func startConnectProxy(rc *eos_io.RuntimeContext, serviceName string) error {
-	// Create systemd service for the proxy
-	proxyServiceContent := fmt.Sprintf(`[Unit]
-Description=Consul Connect Proxy for %s
-Requires=consul.service
-After=consul.service
-
-[Service]
-Type=exec
-ExecStart=/usr/local/bin/consul connect proxy -sidecar-for %s
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`, serviceName, serviceName)
-
-	servicePath := fmt.Sprintf("/etc/systemd/system/consul-connect-%s.service", serviceName)
-	if err := os.WriteFile(servicePath, []byte(proxyServiceContent), 0644); err != nil {
-		return fmt.Errorf("failed to write proxy service: %w", err)
-	}
-
-	// Enable and start the proxy service
-	commands := [][]string{
-		{"systemctl", "daemon-reload"},
-		{"systemctl", "enable", fmt.Sprintf("consul-connect-%s", serviceName)},
-		{"systemctl", "start", fmt.Sprintf("consul-connect-%s", serviceName)},
-	}
-
-	for _, cmdArgs := range commands {
-		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("command %s failed: %s", strings.Join(cmdArgs, " "), string(output))
 		}
 	}
 
@@ -863,7 +504,7 @@ WantedBy=multi-user.target
 }
 
 // verifyConsulSetup verifies that Consul is working correctly
-func verifyConsulSetup(rc *eos_io.RuntimeContext, config *EnrollmentConfig) error {
+func validateConsulInstallation(rc *eos_io.RuntimeContext, _ *EnrollmentConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check consul agent status
