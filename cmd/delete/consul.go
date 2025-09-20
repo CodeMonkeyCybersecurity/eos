@@ -4,10 +4,8 @@ package delete
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -155,17 +153,11 @@ type ConsulDeleteOptions struct {
 }
 
 // TODO: Replace with Nomad client initialization
-func initializeNomadClient(logger otelzap.LoggerWithCtx) (interface{}, error) {
+func initializeNomadClient(_ otelzap.LoggerWithCtx) (interface{}, error) {
 	// Placeholder for Nomad client initialization
 	return nil, fmt.Errorf("Nomad client not implemented yet")
 }
 
-func getDeleteConsulEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
 func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -194,9 +186,8 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// TODO: Initialize Nomad client when implemented
 	nomadClient, err := initializeNomadClient(logger)
 	if err != nil {
-		logger.Info("Nomad client not configured, falling back to local execution")
-		// Fall back to the original implementation
-		return runDeleteConsulFallback(rc, cmd, args)
+		logger.Error("Nomad client not configured for Consul deletion")
+		return fmt.Errorf("nomad client required for consul deletion: %w", err)
 	}
 
 	// ASSESS - Check current status
@@ -271,64 +262,6 @@ func runDeleteConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	return nil
 }
 
-// runDeleteConsulFallback is the original implementation using salt-call
-func runDeleteConsulFallback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Check if SaltStack is available
-	saltCallPath, err := exec.LookPath("salt-call")
-	if err != nil {
-		logger.Error("SaltStack is required for Consul removal")
-		return eos_err.NewUserError("saltstack is required for consul removal - salt-call not found in PATH")
-	}
-	logger.Info("SaltStack detected", zap.String("salt_call", saltCallPath))
-	
-	// Prepare Salt pillar data for removal
-	pillarData := map[string]interface{}{
-		"consul": map[string]interface{}{
-			"ensure":      "absent",
-			"force":       forceDelete,
-			"keep_data":   keepData,
-			"keep_config": keepConfig,
-			"keep_user":   keepUser,
-			"timeout":     timeout,
-		},
-	}
-
-	pillarJSON, err := json.Marshal(pillarData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal pillar data: %w", err)
-	}
-
-	// Execute Salt state for removal
-	saltArgs := []string{
-		"--local",
-		"--file-root=/opt/eos/salt/states",
-		"--pillar-root=/opt/eos/salt/pillar",
-		"state.apply",
-		"hashicorp.consul_remove",
-		"--output=json",
-		"--output-indent=2",
-		"pillar=" + string(pillarJSON),
-	}
-
-	logger.Info("Executing Salt state for removal",
-		zap.String("state", "hashicorp.consul_remove"),
-		zap.Strings("args", saltArgs))
-
-	output, err := exec.Command("salt-call", saltArgs...).CombinedOutput()
-	if err != nil {
-		logger.Error("Salt state execution failed",
-			zap.Error(err),
-			zap.String("output", string(output)))
-		return fmt.Errorf("salt state execution failed: %w", err)
-	}
-
-	logger.Info("Salt state executed successfully")
-	logger.Debug("Salt output", zap.String("output", string(output)))
-	
-	return nil
-}
 
 func init() {
 	DeleteConsulCmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Force deletion without confirmation prompt")

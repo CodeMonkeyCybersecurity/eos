@@ -255,12 +255,6 @@ func displayBoundaryRemovalStatus(logger otelzap.LoggerWithCtx, status *boundary
 	logger.Info("terminal prompt:   ✓ Systemd service files")
 }
 
-// runDeleteBoundaryFallback is the fallback implementation using salt-call
-func runDeleteBoundaryFallback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// This would contain the original shell-based implementation
-	// For now, we'll return an error indicating API is required
-	return fmt.Errorf("Salt API required for Boundary removal. Please configure SALT_API_* environment variables")
-}
 
 func init() {
 	DeleteBoundaryCmd.Flags().BoolVarP(&deleteBoundaryForce, "force", "f", false, "Force deletion without confirmation prompt")

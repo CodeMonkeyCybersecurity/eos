@@ -373,12 +373,12 @@ func isTOMLFormat(data string) bool {
 	return strings.Contains(data, "=") && !strings.Contains(data, ":")
 }
 
-func parseJSONConfig(data string) (map[string]interface{}, error) {
+func parseJSONConfig(_ string) (map[string]interface{}, error) {
 	// TODO: Implement secure JSON parsing with size limits
 	return nil, nil
 }
 
-func parseYAMLConfig(data string) (map[string]interface{}, error) {
+func parseYAMLConfig(_ string) (map[string]interface{}, error) {
 	// TODO: Implement secure YAML parsing without dangerous constructors
 	return nil, nil
 }

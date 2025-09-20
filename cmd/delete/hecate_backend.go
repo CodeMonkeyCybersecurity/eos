@@ -266,47 +266,47 @@ func verifyBackendDeletion(rc *eos_io.RuntimeContext, backendID string) error {
 
 // Helper functions
 
-func stopHealthMonitoring(rc *eos_io.RuntimeContext, backendID string) error {
+func stopHealthMonitoring(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement health monitoring stop
 	return nil
 }
 
-func removeConsulService(rc *eos_io.RuntimeContext, backend *hybrid.Backend) error {
+func removeConsulService(_ *eos_io.RuntimeContext, _ *hybrid.Backend) error {
 	// TODO: Implement Consul service removal
 	return nil
 }
 
-func removeRoutingConfiguration(rc *eos_io.RuntimeContext, backend *hybrid.Backend) error {
+func removeRoutingConfiguration(_ *eos_io.RuntimeContext, _ *hybrid.Backend) error {
 	// TODO: Implement routing configuration removal
 	return nil
 }
 
-func teardownTunnel(rc *eos_io.RuntimeContext, backend *hybrid.Backend) error {
+func teardownTunnel(_ *eos_io.RuntimeContext, _ *hybrid.Backend) error {
 	// TODO: Implement tunnel teardown
 	return nil
 }
 
-func removeConsulIntentions(rc *eos_io.RuntimeContext, backend *hybrid.Backend) error {
+func removeConsulIntentions(_ *eos_io.RuntimeContext, _ *hybrid.Backend) error {
 	// TODO: Implement Consul intentions removal
 	return nil
 }
 
-func cleanupCertificates(rc *eos_io.RuntimeContext, backend *hybrid.Backend) error {
+func cleanupCertificates(_ *eos_io.RuntimeContext, _ *hybrid.Backend) error {
 	// TODO: Implement certificate cleanup
 	return nil
 }
 
-func removeFromStateStore(rc *eos_io.RuntimeContext, backendID string) error {
+func removeFromStateStore(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement state store removal
 	return nil
 }
 
-func backendExistsInStateStore(rc *eos_io.RuntimeContext, backendID string) (bool, error) {
+func backendExistsInStateStore(_ *eos_io.RuntimeContext, _ string) (bool, error) {
 	// TODO: Implement state store existence check
 	return false, nil
 }
 
-func consulServiceExists(rc *eos_io.RuntimeContext, backendID string) (bool, error) {
+func consulServiceExists(_ *eos_io.RuntimeContext, _ string) (bool, error) {
 	// TODO: Implement Consul service existence check
 	return false, nil
 }
