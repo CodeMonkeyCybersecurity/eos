@@ -327,9 +327,7 @@ echo "Restore complete. You may need to reboot."
 func backupFile(rc *eos_io.RuntimeContext, source, backupDir string) error {
 	// Get just the filename
 	filename := strings.ReplaceAll(source, "/", "_")
-	if strings.HasPrefix(filename, "_") {
-		filename = filename[1:]
-	}
+	filename = strings.TrimPrefix(filename, "_")
 	
 	dest := fmt.Sprintf("%s/%s", backupDir, filename)
 	

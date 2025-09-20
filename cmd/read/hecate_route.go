@@ -180,15 +180,15 @@ func displayRouteTable(rc *eos_io.RuntimeContext, route *hecate.Route, status *h
 		logger.Info("terminal prompt: " + strings.Repeat("-", 80))
 		logger.Info("terminal prompt: Health Status:")
 		if status.Health == hecate.RouteHealthHealthy {
-			logger.Info(fmt.Sprintf("terminal prompt:   ✓ Status: Healthy"))
-			logger.Info(fmt.Sprintf("terminal prompt:   Response Time: N/A"))
+			logger.Info("terminal prompt:   ✓ Status: Healthy")
+			logger.Info("terminal prompt:   Response Time: N/A")
 		} else {
-			logger.Info(fmt.Sprintf("terminal prompt:   ✗ Status: Unhealthy"))
+			logger.Info("terminal prompt:   ✗ Status: Unhealthy")
 			if status.Message != "" {
-				logger.Info(fmt.Sprintf("terminal prompt:   Error: %s", status.Message))
+				logger.Info("terminal prompt:   Error: " + status.Message)
 			}
 		}
-		logger.Info(fmt.Sprintf("terminal prompt:   Last Check: %s", status.LastChecked.Format("2006-01-02 15:04:05")))
+		logger.Info("terminal prompt:   Last Check: " + status.LastChecked.Format("2006-01-02 15:04:05"))
 	}
 
 	// Metrics
@@ -208,7 +208,7 @@ func displayRouteTable(rc *eos_io.RuntimeContext, route *hecate.Route, status *h
 		logger.Info("terminal prompt: " + strings.Repeat("-", 80))
 		logger.Info("terminal prompt: Connection Test Results:")
 		if connectionTest.Success {
-			logger.Info(fmt.Sprintf("terminal prompt:   ✓ Connection Successful"))
+			logger.Info("terminal prompt:   ✓ Connection Successful")
 			logger.Info(fmt.Sprintf("terminal prompt:   Response Code: %d", connectionTest.StatusCode))
 			logger.Info(fmt.Sprintf("terminal prompt:   Response Time: %s", connectionTest.ResponseTime))
 			if connectionTest.SSL != nil {
@@ -217,8 +217,8 @@ func displayRouteTable(rc *eos_io.RuntimeContext, route *hecate.Route, status *h
 					connectionTest.SSL.NotAfter.Format("2006-01-02")))
 			}
 		} else {
-			logger.Info(fmt.Sprintf("terminal prompt:   ✗ Connection Failed"))
-			logger.Info(fmt.Sprintf("terminal prompt:   Error: %s", connectionTest.Error))
+			logger.Info("terminal prompt:   ✗ Connection Failed")
+			logger.Info("terminal prompt:   Error: " + connectionTest.Error)
 		}
 	}
 

@@ -189,20 +189,13 @@ func (si *SaltInstaller) applySaltState(ctx context.Context, config *SaltNomadCo
 	// Apply the state - TODO: Replace with Nomad client
 	_ = pillarData // suppress unused variable warning
 	return fmt.Errorf("nomad state apply not implemented yet")
-
-	return nil
 }
 
 // verifyInstallation verifies that Nomad was installed correctly
 func (si *SaltInstaller) verifyInstallation(ctx context.Context) error {
-	logger := otelzap.Ctx(ctx)
-	
-	// Check if Nomad binary exists - TODO: Replace with Nomad client
 	_ = ctx // suppress unused variable warning
+	// Check if Nomad binary exists - TODO: Replace with Nomad client
 	return fmt.Errorf("nomad verification not implemented yet")
-	
-	logger.Info("Nomad installation verification completed")
-	return nil
 }
 
 // StartNomadService starts the Nomad service
@@ -213,9 +206,6 @@ func (si *SaltInstaller) StartNomadService(rc *eos_io.RuntimeContext) error {
 	// Enable and start service - TODO: Replace with Nomad client
 	_ = rc // suppress unused variable warning
 	return fmt.Errorf("nomad service start not implemented yet")
-	
-	logger.Info("Nomad service started successfully")
-	return nil
 }
 
 // StopNomadService stops the Nomad service
@@ -226,9 +216,6 @@ func (si *SaltInstaller) StopNomadService(rc *eos_io.RuntimeContext) error {
 	// Stop and disable service - TODO: Replace with Nomad client
 	_ = rc // suppress unused variable warning
 	return fmt.Errorf("nomad service stop not implemented yet")
-	
-	logger.Info("Nomad service stopped successfully")
-	return nil
 }
 
 // GetNomadStatus gets the current status of Nomad

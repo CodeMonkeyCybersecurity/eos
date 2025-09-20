@@ -88,6 +88,8 @@ func init() {
 	SetupCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 }
 
+// TODO: setupConfiguration is currently unused but will be needed for system configuration management
+// This function will be used when system configuration features are implemented
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // setupConfiguration is a helper function to apply configuration
 func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.ConfigurationType, manager system_config.ConfigurationManager, options *system_config.ConfigurationOptions) error {

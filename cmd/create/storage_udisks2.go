@@ -196,7 +196,7 @@ func checkDeviceSafety(ctx context.Context, diskMgr *udisks2.DiskManager, device
 	return nil
 }
 
-func showDryRun(rc *eos_io.RuntimeContext, request *udisks2.VolumeRequest) error {
+func showDryRun(_ *eos_io.RuntimeContext, request *udisks2.VolumeRequest) error {
 	fmt.Println("=== DRY RUN MODE ===")
 	fmt.Printf("Would create volume with the following configuration:\n\n")
 	fmt.Printf("Device:       %s\n", request.Device)
@@ -235,7 +235,7 @@ func showDryRun(rc *eos_io.RuntimeContext, request *udisks2.VolumeRequest) error
 	return nil
 }
 
-func displayVolumeInfo(rc *eos_io.RuntimeContext, volume *udisks2.VolumeInfo) {
+func displayVolumeInfo(_ *eos_io.RuntimeContext, volume *udisks2.VolumeInfo) {
 	fmt.Printf("\n=== Volume Created Successfully ===\n\n")
 	fmt.Printf("Device:       %s\n", volume.Device)
 	fmt.Printf("UUID:         %s\n", volume.UUID)

@@ -511,7 +511,7 @@ bot_count: 2
 	return nil
 }
 
-func verifyQuickstart(rc *eos_io.RuntimeContext, tracker *state.StateTracker) error {
+func verifyQuickstart(rc *eos_io.RuntimeContext, _ *state.StateTracker) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	cmd := eos_cli.New(rc)
 

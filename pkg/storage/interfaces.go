@@ -1,3 +1,75 @@
+// pkg/storage/interfaces.go
+//
+// EOS Storage Management System - Core Interfaces and Architecture
+//
+// This package provides comprehensive storage management for EOS with a focus on
+// safety, performance, and multi-backend support. It implements a unified interface
+// for managing various storage technologies while maintaining strong type safety
+// and comprehensive monitoring capabilities.
+//
+// Architecture Strengths:
+// - Well-defined interfaces (StorageDriver, VolumeManager, DiskManager)
+// - Safety-first design with journaling, rollback, preflight checks
+// - Multi-backend support (LVM, BTRFS, ZFS, CephFS)
+// - SaltStack integration following infrastructure compiler pattern
+// - Strong type safety with comprehensive type definitions
+//
+// Key Features:
+// - Unified storage interface across multiple backend technologies
+// - Real-time performance monitoring with comprehensive metrics
+// - Safety mechanisms including rollback and preflight validation
+// - Concurrent operation support with dependency resolution
+// - Plugin architecture for extensibility
+// - Integration with HashiCorp stack for modern orchestration
+//
+// Storage Backends Supported:
+// - LVM: Logical Volume Management for flexible disk allocation
+// - BTRFS: Advanced filesystem with snapshots and compression
+// - ZFS: Enterprise-grade filesystem with data integrity
+// - CephFS: Distributed storage for cluster environments
+// - Local: Direct filesystem operations
+// - Cloud: Integration with cloud storage providers
+//
+// Safety Features:
+// - Preflight checks before all operations
+// - Journaling for operation tracking and rollback
+// - Multi-layer rollback capabilities
+// - Comprehensive validation and error handling
+// - Audit logging for all storage operations
+//
+// Performance Features:
+// - Real-time IOPS, latency, and throughput monitoring
+// - Concurrent operation scheduler with dependency resolution
+// - Caching and batching for improved performance
+// - Performance optimization recommendations
+//
+// Usage Examples:
+//   // Create storage manager
+//   manager := storage.NewManager(storage.Config{
+//       Backend: storage.BackendLVM,
+//       SafetyChecks: true,
+//   })
+//
+//   // Create volume with safety checks
+//   volume, err := manager.CreateVolume(ctx, storage.VolumeConfig{
+//       Name: "data-volume",
+//       Size: "100GB",
+//       Type: storage.VolumeTypeData,
+//   })
+//
+// Integration:
+// - EOS Infrastructure Compiler: Translates user intent to storage operations
+// - SaltStack: System-level storage operations and configuration
+// - HashiCorp Stack: Application-level storage orchestration
+// - Nomad: Container storage management and allocation
+// - Consul: Service discovery for distributed storage
+//
+// Monitoring:
+// The system provides comprehensive monitoring including:
+// - Real-time performance metrics (IOPS, latency, throughput)
+// - Capacity tracking and growth prediction
+// - Health monitoring with SMART data integration
+// - Threshold-based alerting and automated actions
 package storage
 
 import (

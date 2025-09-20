@@ -1,4 +1,62 @@
 // pkg/security/hardening.go
+//
+// EOS Security Hardening System
+//
+// This package provides comprehensive security hardening capabilities for EOS
+// infrastructure. It implements defense-in-depth security measures including
+// system hardening, network security, access controls, and audit logging.
+//
+// Key Security Features:
+// - System-level hardening (swap/coredump disabling, ulimits, firewall)
+// - SSH hardening with secure defaults and key management
+// - Network security with firewall rules and access restrictions
+// - Audit logging with comprehensive event tracking
+// - Input sanitization and output security
+// - Credential management with secure storage
+// - Permission management with principle of least privilege
+//
+// Security Hardening Components:
+// - System Hardening: Kernel parameters, swap disabling, core dump prevention
+// - Network Hardening: Firewall configuration, port restrictions, SSL/TLS
+// - Access Control: User permissions, sudo configuration, SSH keys
+// - Audit System: Comprehensive logging, event tracking, compliance reporting
+// - Input Validation: Sanitization, validation, injection prevention
+// - Credential Security: Secure storage, rotation, access controls
+//
+// Integration with EOS Infrastructure:
+// - Vault Integration: Secure credential storage and management
+// - SaltStack Integration: System-level security policy enforcement
+// - HashiCorp Stack: Application-level security controls
+// - Audit Integration: Centralized security event logging
+//
+// Usage Examples:
+//   // Create system hardener
+//   hardener := security.NewSystemHardener(rc, auditLogger)
+//   
+//   // Apply comprehensive hardening
+//   err := hardener.HardenSystem(ctx)
+//   if err != nil {
+//       // Handle hardening failure
+//   }
+//
+//   // Configure SSH security
+//   err = hardener.HardenSSH(ctx, security.SSHConfig{
+//       DisablePasswordAuth: true,
+//       RequireKeyAuth: true,
+//       AllowedUsers: []string{"admin", "deploy"},
+//   })
+//
+// Security Standards:
+// - Follows CIS (Center for Internet Security) benchmarks
+// - Implements NIST security frameworks
+// - Complies with SOC 2 Type II requirements
+// - Supports compliance reporting and auditing
+//
+// Audit and Compliance:
+// - Comprehensive audit logging for all security events
+// - Compliance reporting for regulatory requirements
+// - Security metrics and monitoring integration
+// - Automated security policy enforcement
 package security
 
 import (

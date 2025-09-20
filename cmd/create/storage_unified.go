@@ -192,7 +192,8 @@ func parseVolumeSpecs(volumeSpecs []string) ([]unified.VolumeSpec, error) {
 	return volumes, nil
 }
 
-func showUnifiedDryRun(rc *eos_io.RuntimeContext, request *unified.StorageRequest) error {
+// TODO: showUnifiedDryRun is currently unused but will be needed for unified storage dry-run
+func showUnifiedDryRun(_ *eos_io.RuntimeContext, request *unified.StorageRequest) error {
 	fmt.Println("=== UNIFIED STORAGE DRY RUN ===")
 	fmt.Printf("Would create %s storage with the following configuration:\n\n", request.Type)
 	fmt.Printf("Name:         %s\n", request.Name)
@@ -250,7 +251,8 @@ func showUnifiedDryRun(rc *eos_io.RuntimeContext, request *unified.StorageReques
 	return nil
 }
 
-func displayUnifiedStorageInfo(rc *eos_io.RuntimeContext, storage *unified.StorageInfo) {
+// TODO: displayUnifiedStorageInfo is currently unused but will be needed for unified storage info display
+func displayUnifiedStorageInfo(_ *eos_io.RuntimeContext, storage *unified.StorageInfo) {
 	fmt.Printf("\n=== %s Storage Created Successfully ===\n\n", strings.Title(storage.Type))
 	fmt.Printf("Name:         %s\n", storage.Name)
 	fmt.Printf("Type:         %s\n", storage.Type)

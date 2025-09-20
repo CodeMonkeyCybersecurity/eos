@@ -72,10 +72,6 @@ func (i *RESTInstaller) InstallNomad(rc *eos_io.RuntimeContext, config *NomadIns
 	_ = pillarData
 	logger.Info("Nomad installation placeholder - not implemented")
 	return fmt.Errorf("nomad installation via REST not implemented")
-
-	// Installation completed (placeholder)
-	logger.Info("Nomad installation completed (placeholder)")
-	return nil
 }
 
 // RemoveNomad removes Nomad using Salt REST API
@@ -103,19 +99,6 @@ func (i *RESTInstaller) RemoveNomad(rc *eos_io.RuntimeContext, config *NomadRemo
 	// TODO: Replace with Nomad client implementation
 	_ = pillarData // suppress unused variable warning
 	return fmt.Errorf("nomad removal not implemented yet")
-
-	// Check results - placeholder for Nomad implementation
-	logger.Info("Nomad removal completed (placeholder)")
-	successCount := 1 // placeholder
-	failureCount := 0
-
-	if failureCount > 0 {
-		return fmt.Errorf("Nomad removal failed on %d minion(s)", failureCount)
-	}
-
-	logger.Info("Nomad removal completed successfully", 
-		zap.Int("successful_minions", successCount))
-	return nil
 }
 
 // CheckNomadStatus checks Nomad status across minions
@@ -126,12 +109,6 @@ func (i *RESTInstaller) CheckNomadStatus(rc *eos_io.RuntimeContext) (map[string]
 	// Execute status check command
 	// TODO: Replace with Nomad client implementation
 	return nil, fmt.Errorf("nomad status check not implemented yet")
-
-	// Parse results - placeholder for Nomad implementation
-	statusMap := make(map[string]NomadRESTStatus)
-	// TODO: Implement actual Nomad status parsing
-
-	return statusMap, nil
 }
 
 // TestConnection tests the connection to Salt API

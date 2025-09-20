@@ -1,3 +1,81 @@
+// pkg/bootstrap/check.go
+//
+// EOS Bootstrap System - Machine Preparation and Validation
+//
+// The EOS bootstrap system ensures machines are properly prepared before deploying
+// services. This prevents common errors like "Salt state files not found" and
+// ensures a consistent, secure foundation for all deployments.
+//
+// Why Bootstrap is Required:
+// Without proper bootstrapping, users encounter:
+// - Salt can't find state files
+// - API credentials aren't configured  
+// - Services fail to deploy
+// - Inconsistent system states
+// - Security vulnerabilities
+//
+// Bootstrap provides:
+// - Configuration management (SaltStack)
+// - Secure API communication
+// - Proper file system structure
+// - Network verification
+// - Security baseline
+//
+// Bootstrap Architecture:
+// Every service deployment command checks bootstrap status using RequireBootstrap().
+// The system validates:
+// - SaltStack Installation: Configuration management system
+// - Salt API Configuration: REST API for remote management
+// - File Roots Setup: Paths to EOS state files
+// - Network Configuration: Basic connectivity
+// - Security Configuration: Firewall and basics
+//
+// IMPLEMENTATION STATUS (September 20, 2025):
+//
+// ✅ COMPLETED COMPONENTS:
+//
+// Core Storage Operations Framework:
+// - Storage Analyzer (pkg/storage/analyzer/) - Real-time analysis and monitoring
+// - Threshold Management (pkg/storage/threshold/) - Progressive action system
+// - Filesystem Detection (pkg/storage/filesystem/) - Smart filesystem recommendations
+// - Emergency Recovery (pkg/storage/emergency/) - Automated space recovery
+// - Environment Detection (pkg/environment/) - Scale-aware configuration
+//
+// Bootstrap Integration:
+// - Cluster Detection (pkg/bootstrap/detector.go) - Single vs multi-node detection
+// - Node Registration (pkg/bootstrap/registration.go) - New node joining workflow
+// - Role Assignment (pkg/bootstrap/roles.go) - Dynamic role calculation
+// - Storage Integration (pkg/bootstrap/storage_integration.go) - Automatic deployment
+// - Enhanced Bootstrap Commands (cmd/bootstrap/bootstrap_enhanced.go) - Complete CLI integration
+//
+// HashiCorp Stack Migration:
+// - Following the successful SaltStack to HashiCorp migration, bootstrap now integrates
+//   with Consul for service discovery, Nomad for orchestration, and Vault for secrets
+// - Administrator escalation patterns implemented for system-level operations
+// - Clear architectural boundaries between application and system operations
+//
+// MIGRATION CONTEXT:
+// The bootstrap system has been updated to work with the new HashiCorp stack while
+// maintaining backward compatibility. System-level operations now properly escalate
+// to administrator intervention, while application services use HashiCorp orchestration.
+// - Security Configuration: Firewall and basics
+//
+// User Experience:
+// When bootstrap is missing, users get clear guidance:
+//   Error: System not bootstrapped
+//   Run: eos bootstrap
+//   This will: Install SaltStack, configure API, set up file roots
+//
+// Usage:
+//   status, err := bootstrap.CheckBootstrap(rc)
+//   if err != nil || !status.Bootstrapped {
+//       return bootstrap.RequireBootstrap(rc)
+//   }
+//
+// Integration:
+// Bootstrap integrates with all EOS create commands to ensure proper system
+// preparation before service deployment. It provides the foundation for the
+// EOS infrastructure compiler pattern.
 package bootstrap
 
 import (

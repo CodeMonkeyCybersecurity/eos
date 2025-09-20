@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ubuntu"
@@ -23,11 +22,13 @@ import (
 
 // Bootstrap flags for cluster management
 var (
-	joinCluster   string
-	singleNode    bool
-	preferredRole string
-	autoDiscover  bool
-	skipHardening bool
+	// TODO: These variables are placeholders for enhanced bootstrap functionality
+	// They will be used when the enhanced bootstrap commands are re-enabled
+	_ = ""   // joinCluster placeholder
+	_ = false // singleNode placeholder  
+	preferredRole string // Keep this one as it may be used
+	_ = false // autoDiscover placeholder
+	_ = false // skipHardening placeholder
 )
 
 // TODO: Fix command registration - temporarily commented to allow build
@@ -96,6 +97,8 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	return bootstrap.OrchestrateBootstrap(rc, cmd, opts)
 }
 
+// TODO: bootstrapSingleNodeEnhanced is currently unused but will be needed for enhanced bootstrap
+// This function will replace the current bootstrap process with HashiCorp stack integration
 // bootstrapSingleNodeEnhanced bootstraps a single node with storage ops
 func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, clusterInfo *bootstrap.ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -202,6 +205,8 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 	return nil
 }
 
+// TODO: bootstrapAdditionalNode is currently unused but will be needed for cluster joining
+// This function will handle joining additional nodes to an existing HashiCorp cluster
 // bootstrapAdditionalNode bootstraps a node joining an existing cluster
 func bootstrapAdditionalNode(rc *eos_io.RuntimeContext, cmd *cobra.Command, clusterInfo *bootstrap.ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -421,74 +426,11 @@ func createEnhancedEnvironmentConfig(rc *eos_io.RuntimeContext, clusterInfo *boo
 		zap.String("profile", string(enhancedConfig.Profile)),
 		zap.Int("cluster_size", enhancedConfig.ClusterSize))
 
-	// Set Salt grains for environment discovery
-	if err := setSaltEnvironmentGrains(rc, enhancedConfig); err != nil {
-		logger.Warn("Failed to set Salt environment grains", zap.Error(err))
-		// Don't fail bootstrap for this
-	}
+	// TODO: Implement environment discovery for HashiCorp stack
+	// Following the SaltStack to HashiCorp migration, environment discovery
+	// will be handled through Consul service discovery instead of Salt grains
+	logger.Info("Environment discovery will be implemented via Consul service discovery")
 
 	return nil
 }
 
-// setSaltEnvironmentGrains configures Salt grains for environment discovery
-func setSaltEnvironmentGrains(rc *eos_io.RuntimeContext, config *environment.EnhancedEnvironmentConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Setting Salt environment grains")
-
-	// Set environment grain
-	if err := setSaltGrain(rc, "environment", config.Environment); err != nil {
-		return fmt.Errorf("failed to set environment grain: %w", err)
-	}
-
-	// Set deployment profile grain
-	if err := setSaltGrain(rc, "deployment_profile", string(config.Profile)); err != nil {
-		return fmt.Errorf("failed to set deployment_profile grain: %w", err)
-	}
-
-	// Set cluster size grain
-	if err := setSaltGrain(rc, "cluster_size", fmt.Sprintf("%d", config.ClusterSize)); err != nil {
-		return fmt.Errorf("failed to set cluster_size grain: %w", err)
-	}
-
-	// Set resource strategy grain
-	if err := setSaltGrain(rc, "resource_strategy", config.ResourceStrategy); err != nil {
-		return fmt.Errorf("failed to set resource_strategy grain: %w", err)
-	}
-
-	// Set node roles grain (convert to JSON string)
-	if len(config.NodeRoles) > 0 {
-		rolesData, err := json.Marshal(config.NodeRoles)
-		if err == nil {
-			if err := setSaltGrain(rc, "node_roles", string(rolesData)); err != nil {
-				logger.Warn("Failed to set node_roles grain", zap.Error(err))
-			}
-		}
-	}
-
-	// Set primary namespace grain
-	if err := setSaltGrain(rc, "primary_namespace", config.Namespaces.Primary); err != nil {
-		return fmt.Errorf("failed to set primary_namespace grain: %w", err)
-	}
-
-	logger.Info("Salt environment grains configured successfully")
-	return nil
-}
-
-// setSaltGrain sets a single Salt grain
-func setSaltGrain(rc *eos_io.RuntimeContext, key, value string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("Setting Salt grain", zap.String("key", key), zap.String("value", value))
-
-	// Use salt-call to set the grain locally
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt-call",
-		Args:    []string{"--local", "grains.setval", key, value},
-		Capture: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to set grain %s: %w (output: %s)", key, err, output)
-	}
-
-	logger.Debug("Salt grain set successfully", zap.String("key", key))
-	return nil
-}

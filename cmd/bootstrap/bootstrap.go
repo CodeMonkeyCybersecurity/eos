@@ -81,7 +81,6 @@ func AddSubcommands() {
 	BootstrapCmd.AddCommand(GetCoreCmd())
 	BootstrapCmd.AddCommand(GetAllCmd())
 	BootstrapCmd.AddCommand(GetQuickstartCmd())
-	BootstrapCmd.AddCommand(GetSaltCmd())
 	BootstrapCmd.AddCommand(GetVaultCmd())
 	BootstrapCmd.AddCommand(GetNomadCmd())
 	BootstrapCmd.AddCommand(GetOsqueryCmd())

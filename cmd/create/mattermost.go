@@ -1,4 +1,77 @@
 // cmd/create/mattermost.go
+//
+// Mattermost Team Collaboration Platform Deployment
+//
+// This file implements CLI commands for deploying Mattermost using EOS's
+// infrastructure compiler pattern. It orchestrates the complete deployment
+// stack including container orchestration, service discovery, and secure
+// credential management.
+//
+// EOS Infrastructure Compiler Integration:
+// This deployment follows EOS's core philosophy of translating simple human
+// intent ("deploy Mattermost") into complex multi-system orchestration:
+// Human Intent → EOS CLI → SaltStack → Terraform → Nomad → Mattermost
+//
+// Key Features:
+// - Complete Mattermost deployment with automatic configuration
+// - Automatic environment discovery (production/staging/development)
+// - Secure credential generation and Vault integration
+// - Container orchestration via Nomad with health checks
+// - Service discovery via Consul for scalability
+// - Persistent data storage with PostgreSQL backend
+// - Hecate two-layer reverse proxy integration
+// - SSL termination and authentication via Authentik
+//
+// Architecture Components:
+// - Nomad: Container orchestration and job scheduling
+// - Consul: Service discovery and health monitoring
+// - Vault: Secure credential storage and management
+// - PostgreSQL: Persistent data storage backend
+// - Nginx: Local reverse proxy for service routing
+// - Hecate: Two-layer reverse proxy (Hetzner Cloud + Local)
+//
+// Hecate Integration:
+// Follows the two-layer reverse proxy architecture:
+// Internet → Hetzner Cloud (Caddy + Authentik) → Local Infrastructure (Nginx + Mattermost)
+//
+// Layer 1 (Frontend - Hetzner Cloud):
+// - Caddy: SSL termination and automatic certificate management
+// - Authentik: Identity provider with SSO/SAML/OAuth2
+// - DNS: Automatic domain management
+//
+// Layer 2 (Backend - Local Infrastructure):
+// - Nginx: Local reverse proxy container
+// - Mattermost: Application container
+// - Consul: Service discovery (mattermost.service.consul)
+//
+// Available Commands:
+// - eos create mattermost                    # Basic deployment
+// - eos create mattermost --domain chat.example.com  # Custom domain
+// - eos create mattermost --environment prod # Production configuration
+//
+// Security Features:
+// - Automatic secure credential generation
+// - Vault integration for secret management
+// - Role-based access control via Authentik
+// - TLS encryption end-to-end
+// - Network isolation via Nomad networking
+//
+// Usage Examples:
+//   # Basic deployment with automatic configuration
+//   eos create mattermost
+//
+//   # Production deployment with custom domain
+//   eos create mattermost --domain chat.company.com --environment production
+//
+//   # Development deployment with local access
+//   eos create mattermost --environment development --local-only
+//
+// Integration Points:
+// - Vault: Secure storage of database credentials and API keys
+// - Consul: Service registration and health monitoring
+// - Nomad: Container lifecycle management and scaling
+// - PostgreSQL: Persistent data storage with automatic backups
+// - Hecate: Public access with authentication and SSL
 package create
 
 import (

@@ -1,5 +1,64 @@
 // cmd/create/nomad.go
-
+//
+// HashiCorp Nomad Installation Commands
+//
+// This file implements CLI commands for installing and configuring HashiCorp Nomad
+// for workload orchestration. It provides a native installer that handles both
+// server and client modes with comprehensive configuration options.
+//
+// EOS Infrastructure Compiler Integration:
+// EOS acts as a human-friendly infrastructure compiler that translates imperative
+// commands into declarative infrastructure state. The Nomad installer follows this
+// pattern by taking simple user intent ("install Nomad") and orchestrating the
+// complex multi-system setup required.
+//
+// Key Features:
+// - Server and/or client mode configuration
+// - Docker integration for container workloads
+// - Consul service discovery integration
+// - Vault secrets management integration
+// - Automatic cluster bootstrapping
+// - Comprehensive flag support for all configuration options
+//
+// Architecture Integration:
+// Nomad fits into the EOS infrastructure stack as the container runtime layer:
+// Human Intent → EOS CLI → SaltStack (config) → Terraform (resources) → Nomad (runtime)
+//
+// Available Commands:
+// - eos create nomad                              # Install as both server and client
+// - eos create nomad --server-only                # Server only
+// - eos create nomad --client-only --docker       # Client with Docker
+// - eos create nomad --consul --vault             # With integrations
+//
+// Configuration Options:
+// - Server/Client modes with flexible deployment patterns
+// - Cluster configuration (bootstrap-expect, datacenter, region)
+// - Network configuration (bind/advertise addresses)
+// - Driver configuration (Docker, raw exec)
+// - Security configuration (ACL system)
+// - Operational flags (force, clean installation)
+//
+// Integration Points:
+// - Consul: Service discovery and health checking
+// - Vault: Secret management and dynamic credentials
+// - Docker: Container runtime for workloads
+// - SaltStack: Configuration management and orchestration
+//
+// Usage Examples:
+//   # Basic installation
+//   eos create nomad
+//
+//   # Production cluster setup
+//   eos create nomad --server --bootstrap-expect 3 --datacenter prod
+//
+//   # Client-only with Docker
+//   eos create nomad --client-only --docker --servers server1:4647,server2:4647
+//
+// Security Considerations:
+// - ACL system can be enabled for production deployments
+// - TLS encryption is configured by default
+// - Integration with Vault provides secure credential management
+// - Network configuration supports secure bind/advertise patterns
 package create
 
 import (

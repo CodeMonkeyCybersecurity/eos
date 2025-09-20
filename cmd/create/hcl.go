@@ -39,7 +39,9 @@ Use the specific tool commands for simpler syntax:
 	}),
 }
 
-var terraformCmd = &cobra.Command{
+// TODO: HCL-based Terraform command - currently unused
+// This will be integrated when HCL configuration management is implemented
+var _ = &cobra.Command{ // terraformCmd
 	Use:   "terraform",
 	Short: "Install Terraform",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -47,7 +49,9 @@ var terraformCmd = &cobra.Command{
 	}),
 }
 
-var consulCmd = &cobra.Command{
+// TODO: HCL-based Consul command - currently unused
+// This will be integrated when HCL configuration management is implemented
+var _ = &cobra.Command{ // consulCmd
 	Use:   "consul",
 	Short: "Install Consul",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -55,7 +59,9 @@ var consulCmd = &cobra.Command{
 	}),
 }
 
-var nomadCmd = &cobra.Command{
+// TODO: HCL-based Nomad command - currently unused
+// This will be integrated when HCL configuration management is implemented
+var _ = &cobra.Command{ // nomadCmd
 	Use:   "nomad",
 	Short: "Install Nomad",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -63,7 +69,9 @@ var nomadCmd = &cobra.Command{
 	}),
 }
 
-var packerCmd = &cobra.Command{
+// TODO: HCL-based Packer command - currently unused
+// This will be integrated when HCL configuration management is implemented
+var _ = &cobra.Command{ // packerCmd
 	Use:   "packer",
 	Short: "Install Packer",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -71,7 +79,9 @@ var packerCmd = &cobra.Command{
 	}),
 }
 
-var boundaryCmd = &cobra.Command{
+// TODO: HCL-based Boundary command - currently unused
+// This will be integrated when HCL configuration management is implemented
+var _ = &cobra.Command{ // boundaryCmd
 	Use:   "boundary",
 	Short: "Install Boundary",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

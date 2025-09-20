@@ -303,7 +303,7 @@ func ensureStoragePool(ctx context.Context, mgr *libvirt.LibvirtManager, poolNam
 	return mgr.CreateStoragePool(ctx, poolName, "dir", poolPath)
 }
 
-func showVMDryRun(rc *eos_io.RuntimeContext, config *libvirt.VMConfig) error {
+func showVMDryRun(_ *eos_io.RuntimeContext, config *libvirt.VMConfig) error {
 	fmt.Println("=== DRY RUN MODE ===")
 	fmt.Printf("Would create VM with the following configuration:\n\n")
 	fmt.Printf("Name:         %s\n", config.Name)
@@ -345,7 +345,7 @@ func showVMDryRun(rc *eos_io.RuntimeContext, config *libvirt.VMConfig) error {
 	return nil
 }
 
-func displayVMInfo(rc *eos_io.RuntimeContext, vm *libvirt.VMInfo) {
+func displayVMInfo(_ *eos_io.RuntimeContext, vm *libvirt.VMInfo) {
 	fmt.Printf("\n=== Virtual Machine Created Successfully ===\n\n")
 	fmt.Printf("Name:         %s\n", vm.Name)
 	fmt.Printf("UUID:         %s\n", vm.UUID)

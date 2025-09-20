@@ -194,7 +194,7 @@ func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	// Create and run installer
 	installer := terraform.NewTerraformInstaller(rc, config)
 	if err := installer.Install(); err != nil {
-		return fmt.Errorf("Terraform installation failed: %w", err)
+		return fmt.Errorf("terraform installation failed: %w", err)
 	}
 
 	logger.Info("Terraform installation completed successfully")

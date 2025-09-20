@@ -256,7 +256,7 @@ func addNewCustomer(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	return nil
 }
 
-func parsePlatformConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_mssp.PlatformConfig, error) {
+func parsePlatformConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_mssp.PlatformConfig, error) {
 	config := &wazuh_mssp.PlatformConfig{}
 
 	// Basic configuration
@@ -344,7 +344,7 @@ func parsePlatformConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_
 	return config, nil
 }
 
-func parseCustomerConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_mssp.CustomerConfig, error) {
+func parseCustomerConfig(_ *eos_io.RuntimeContext, cmd *cobra.Command) (*wazuh_mssp.CustomerConfig, error) {
 	config := &wazuh_mssp.CustomerConfig{}
 
 	// Check if config file is provided

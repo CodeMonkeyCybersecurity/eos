@@ -225,7 +225,7 @@ func (vi *VaultInstaller) assess() (bool, error) {
 					vi.logger.Info("Vault is already installed and running properly")
 
 					// Print service information
-					vi.logger.Info(fmt.Sprintf("terminal prompt: ✅ Vault is already installed and running"))
+					vi.logger.Info("terminal prompt: ✅ Vault is already installed and running")
 					vi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", vi.config.Port))
 					vi.logger.Info("terminal prompt: ")
 					vi.logger.Info("terminal prompt: To check status: vault status")
@@ -246,7 +246,7 @@ func (vi *VaultInstaller) assess() (bool, error) {
 					time.Sleep(3 * time.Second)
 					if vi.isVaultReady() {
 						vi.logger.Info("Successfully started existing Vault service")
-						vi.logger.Info(fmt.Sprintf("terminal prompt: ✅ Vault service started successfully"))
+						vi.logger.Info("terminal prompt: ✅ Vault service started successfully")
 						vi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", vi.config.Port))
 						return false, nil // Don't install, successfully started existing
 					}

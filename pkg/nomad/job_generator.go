@@ -1,4 +1,68 @@
 // pkg/nomad/job_generator.go
+//
+// EOS Nomad Job Generator - Container Orchestration
+//
+// This package provides comprehensive Nomad job generation capabilities for EOS
+// infrastructure. It implements the EOS infrastructure compiler pattern by
+// translating high-level service configurations into Nomad job specifications.
+//
+// Key Features:
+// - Service-to-Job Translation: Converts EOS service configs to Nomad jobs
+// - Template-Based Generation: Uses Go templates for flexible job creation
+// - Multi-Service Support: Handles complex multi-container deployments
+// - Resource Management: Automatic resource allocation and constraints
+// - Service Discovery: Consul integration for service registration
+// - Health Checks: Comprehensive health monitoring configuration
+// - Volume Management: Storage integration with proper mount handling
+//
+// Architecture Integration:
+// - Replaces Kubernetes/K3s deployment generation in EOS
+// - Integrates with Consul for service discovery
+// - Works with Vault for secret management
+// - Supports Hecate reverse proxy architecture
+// - Follows EOS infrastructure compiler patterns
+//
+// Job Generation Process:
+// 1. Parse service configuration from EOS commands
+// 2. Apply service-specific templates and constraints
+// 3. Generate Nomad job specification with proper networking
+// 4. Configure Consul service registration
+// 5. Set up health checks and monitoring
+// 6. Handle volume mounts and storage requirements
+//
+// Service Types Supported:
+// - Web Services: HTTP/HTTPS applications with reverse proxy
+// - Databases: PostgreSQL, MySQL, Redis with persistent storage
+// - Message Queues: RabbitMQ, Apache Kafka with clustering
+// - Monitoring: Grafana, Prometheus with data persistence
+// - Collaboration: Mattermost, n8n with full orchestration
+//
+// Template System:
+// The generator uses a flexible template system that allows:
+// - Service-specific job configurations
+// - Environment-based variations (dev/staging/prod)
+// - Resource scaling based on deployment size
+// - Network configuration for service mesh integration
+//
+// Usage Examples:
+//   generator := nomad.NewJobGenerator(logger)
+//   
+//   config := &nomad.NomadJobConfig{
+//       ServiceName: "mattermost",
+//       Image: "mattermost/mattermost-enterprise-edition:latest",
+//       Port: 8065,
+//       Resources: nomad.ResourceConfig{CPU: 500, Memory: 1024},
+//   }
+//   
+//   jobSpec, err := generator.GenerateServiceJob(rc, config)
+//   if err != nil {
+//       // Handle error
+//   }
+//
+// Integration with EOS Commands:
+// This generator is called by EOS create commands to translate user intent
+// into deployable Nomad jobs, maintaining the infrastructure compiler pattern
+// where users express what they want and EOS handles the orchestration details.
 package nomad
 
 import (

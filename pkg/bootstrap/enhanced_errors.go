@@ -140,7 +140,7 @@ func EnhancePermissionError(rc *eos_io.RuntimeContext, operation string, origina
 		},
 		Suggestions: []string{
 			"Run the command with sudo:",
-			fmt.Sprintf("  sudo eos bootstrap"),
+			"  sudo eos bootstrap",
 			"",
 			"Or if you're already using sudo, check that:",
 			"• Your user is in the sudo group",
@@ -469,7 +469,7 @@ func generatePortConflictSuggestions(process ProcessInfo, port int) []string {
 				"You can:",
 				fmt.Sprintf("• Stop the service: sudo systemctl stop %s", serviceName),
 				"• Let EOS handle it: eos bootstrap --stop-conflicting",
-				fmt.Sprintf("• Force installation: eos bootstrap --force"),
+				"• Force installation: eos bootstrap --force",
 			)
 		} else {
 			suggestions = append(suggestions,

@@ -226,7 +226,7 @@ func createFromTemplate(rc *eos_io.RuntimeContext, configManager *version.Config
 	return showConfigurationSummary(rc, config)
 }
 
-func createInteractiveConfig(rc *eos_io.RuntimeContext, configManager *version.ConfigManager) error {
+func createInteractiveConfig(rc *eos_io.RuntimeContext, _ *version.ConfigManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Interactive Wazuh version configuration setup")
 

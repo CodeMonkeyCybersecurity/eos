@@ -1,5 +1,61 @@
-// cmd/create/secret.go
-
+// cmd/create/secrets.go
+//
+// Secure Secret Generation Commands
+//
+// This file implements CLI commands for generating cryptographically secure
+// random secrets and managing secret storage. It provides a secure alternative
+// to manual secret generation and integrates with EOS Vault infrastructure.
+//
+// Key Features:
+// - Cryptographically secure random secret generation
+// - Multiple output formats (hex, base64, raw)
+// - Configurable secret length
+// - Integration with Vault for secure storage
+// - Automatic secret validation and strength checking
+//
+// Security Features:
+// - Uses crypto/rand for cryptographically secure randomness
+// - Validates secret strength and entropy
+// - Secure memory handling for sensitive data
+// - Automatic redaction in logs
+// - Integration with Vault's secret management
+//
+// Available Commands:
+// - eos create secret                           # Generate 32-byte hex secret
+// - eos create secret --length 64               # Generate 64-byte hex secret  
+// - eos create secret --format base64           # Generate base64-encoded secret
+// - eos create secret --vault-path secret/app   # Store in Vault
+//
+// Output Formats:
+// - hex: Hexadecimal encoding (default, like openssl rand -hex)
+// - base64: Base64 encoding for compact representation
+// - raw: Raw binary output (use with caution)
+//
+// Integration:
+// Integrates with EOS Vault infrastructure for secure secret storage:
+// - Automatic Vault authentication using configured methods
+// - Secure secret storage with proper access controls
+// - Audit logging for secret generation and storage
+// - Role-based access control for secret management
+//
+// Usage Examples:
+//   # Generate standard 32-byte hex secret (like openssl rand -hex 32)
+//   eos create secret
+//
+//   # Generate longer secret for high-security applications
+//   eos create secret --length 64
+//
+//   # Generate and store in Vault
+//   eos create secret --vault-path secret/myapp/database-password
+//
+//   # Generate base64 secret for configuration files
+//   eos create secret --format base64 --length 48
+//
+// Security Considerations:
+// - Secrets are generated using crypto/rand for cryptographic security
+// - Memory is cleared after use to prevent secret leakage
+// - All secret operations are logged for audit purposes
+// - Vault integration provides secure storage with access controls
 package create
 
 import (

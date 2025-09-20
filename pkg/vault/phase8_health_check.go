@@ -149,7 +149,7 @@ func isVaultProcessRunning(rc *eos_io.RuntimeContext) bool {
 	}
 	for _, line := range strings.Split(string(out), "\n") {
 		// Check for vault process running as vault user
-		if strings.Contains(line, "vault") && strings.Contains(line, "vault") {
+		if strings.Contains(line, "vault") && strings.Contains(line, ":8200") {
 			otelzap.Ctx(rc.Ctx).Debug(" Vault process detected in lsof output", zap.String("line", line))
 			return true
 		}

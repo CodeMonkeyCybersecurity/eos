@@ -1,3 +1,73 @@
+// pkg/users/management.go
+//
+// EOS User Management System
+//
+// This package provides comprehensive user management capabilities for EOS
+// infrastructure. It handles system user creation, SSH key management, sudo
+// configuration, and integrates with the HashiCorp stack for modern user
+// management patterns.
+//
+// Architecture Decision:
+// Following the EOS SaltStack to HashiCorp migration, user management operations
+// are handled through administrator escalation patterns. System-level user
+// operations require administrator intervention rather than allowing the
+// HashiCorp stack to perform privileged operations directly.
+//
+// Key Features:
+// - System user creation with secure defaults
+// - SSH key management and authentication setup
+// - Sudo configuration with principle of least privilege
+// - Integration with Vault for credential storage
+// - Administrator escalation for system-level operations
+// - Comprehensive audit logging for user operations
+//
+// User Management Components:
+// - User Creation: System user accounts with secure configuration
+// - SSH Management: Key generation, distribution, and access control
+// - Permission Management: Sudo rules, group membership, access controls
+// - Credential Management: Secure storage and rotation via Vault
+// - Assessment: User existence verification and validation
+// - Operations: CRUD operations for user lifecycle management
+//
+// Security Features:
+// - Secure password generation and storage
+// - SSH key-based authentication (password auth disabled by default)
+// - Principle of least privilege for sudo access
+// - Audit logging for all user operations
+// - Integration with security hardening system
+// - Vault integration for credential management
+//
+// Administrator Escalation Pattern:
+// Complex user management operations escalate to administrator intervention:
+//   Error: User management requires administrator intervention
+//   Reason: System-level user operations require root privileges
+//   Action: Administrator should manually create user with proper security controls
+//   Config: User configuration stored in Vault for administrator reference
+//
+// Usage Examples:
+//   // Create user with administrator escalation
+//   userManager := users.NewHashiCorpUserManager(rc)
+//   err := userManager.CreateUser(ctx, users.UserCreationOptions{
+//       Username: "deploy",
+//       SudoAccess: true,
+//       SSHAccess: true,
+//   })
+//   // This will escalate to administrator with clear instructions
+//
+//   // Assess user existence
+//   exists, err := userManager.UserExists(ctx, "deploy")
+//
+// Integration Points:
+// - Vault: Secure credential storage and SSH key management
+// - Security Package: Integration with system hardening
+// - Audit System: Comprehensive logging of user operations
+// - SaltStack: System-level user configuration (via administrator)
+// - HashiCorp Stack: Application-level user management
+//
+// Migration Notes:
+// This package has been migrated from direct SaltStack operations to the
+// administrator escalation pattern, maintaining security while providing
+// clear guidance for manual user management operations.
 package users
 
 import (
