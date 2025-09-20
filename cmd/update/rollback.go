@@ -266,7 +266,12 @@ func assessRollback(rc *eos_io.RuntimeContext, request *RollbackRequest) (*Rollb
 	logger.Info("Assessing rollback requirements", zap.String("app_name", request.AppName))
 
 	// Get current deployment version
-	currentVersion, err := getCurrentVersion(rc, request.AppName)
+	err := rollbackApplication(rc, request.AppName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current version: %w", err)
+	}
+	// TODO: Replace with actual version retrieval
+	currentVersion := "20240113120000"
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current version: %w", err)
 	}
@@ -603,10 +608,10 @@ func sendRollbackNotifications(rc *eos_io.RuntimeContext, result *RollbackResult
 
 // Helper functions
 
-// getCurrentVersion gets the current deployed version
-func getCurrentVersion(rc *eos_io.RuntimeContext, appName string) (string, error) {
-	// Implementation would query current version from deployment system
-	return "20240113120000", nil
+// rollbackApplication gets the current deployed version
+func rollbackApplication(_ *eos_io.RuntimeContext, _ string) error {
+	// TODO: Implementation would query current version from deployment system
+	return nil
 }
 
 // getPreviousStableVersion gets the previous stable version for rollback

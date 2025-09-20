@@ -44,7 +44,6 @@ package update
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -144,15 +143,6 @@ func runUpdateWazuhVersion(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 	return nil
 }
 
-func validateUpdatePolicy(policy string) error {
-	validPolicies := []string{"manual", "patch", "minor", "major", "latest"}
-	for _, valid := range validPolicies {
-		if policy == valid {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid policy '%s', must be one of: %s", policy, strings.Join(validPolicies, ", "))
-}
 
 // TODO: Implement comprehensive version management system
 // These functions will be enhanced when the full Delphi version management system is complete

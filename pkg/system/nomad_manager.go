@@ -161,7 +161,7 @@ func (n *NomadManager) ApplySystemState(rc *eos_io.RuntimeContext, target string
 	app.Errors = append(app.Errors, "Nomad system state management not yet implemented")
 	app.Duration = time.Since(startTime)
 
-	return app, fmt.Errorf("Nomad system state management not yet implemented")
+	return app, fmt.Errorf("nomad system state management not yet implemented")
 }
 
 // ManageServices handles service management via Nomad
@@ -171,7 +171,7 @@ func (n *NomadManager) ManageServices(rc *eos_io.RuntimeContext, target string, 
 
 	// TODO: Implement Nomad service management
 	logger.Warn("Nomad service management not yet implemented")
-	return fmt.Errorf("Nomad service management not yet implemented")
+	return fmt.Errorf("nomad service management not yet implemented")
 }
 
 // ManageCronJobs handles cron job management via Nomad
@@ -181,7 +181,7 @@ func (n *NomadManager) ManageCronJobs(rc *eos_io.RuntimeContext, target string, 
 
 	// TODO: Implement Nomad cron job management
 	logger.Warn("Nomad cron job management not yet implemented")
-	return fmt.Errorf("Nomad cron job management not yet implemented")
+	return fmt.Errorf("nomad cron job management not yet implemented")
 }
 
 // ManageUsers handles user account management via Nomad
@@ -191,5 +191,5 @@ func (n *NomadManager) ManageUsers(rc *eos_io.RuntimeContext, target string, use
 
 	// TODO: Implement Nomad user management
 	logger.Warn("Nomad user management not yet implemented")
-	return fmt.Errorf("Nomad user management not yet implemented")
+	return fmt.Errorf("nomad user management not yet implemented")
 }

@@ -232,7 +232,7 @@ func configureIptablesRules(rc *eos_io.RuntimeContext, rules []FirewallRule, all
 func testConnectivity(rc *eos_io.RuntimeContext, host string, port int) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	address := fmt.Sprintf("%s:%d", host, port)
+	address := net.JoinHostPort(host, strconv.Itoa(port))
 	logger.Info("Testing connectivity", zap.String("address", address))
 
 	// Use context timeout from RuntimeContext

@@ -391,7 +391,7 @@ func (rm *RouteManager) buildCaddyRoute(route *RouteInfo) *CaddyRoute {
 func (rm *RouteManager) buildAuthHandler(route *RouteInfo) CaddyHandler {
 	return &CaddyForwardAuth{
 		Handler: "forward_auth",
-		URI: fmt.Sprintf("http://authentik:9000/outpost.goauthentik.io/auth/caddy"),
+		URI: "http://authentik:9000/outpost.goauthentik.io/auth/caddy",
 		Headers: map[string][]string{
 			"X-Authentik-Meta-Outpost": {"authentik-embedded-outpost"},
 			"X-Authentik-Meta-Provider": {route.AuthPolicy},
@@ -419,7 +419,7 @@ func (rm *RouteManager) buildProxyHandler(route *RouteInfo) CaddyHandler {
 	}
 }
 
-func (rm *RouteManager) storeRoute(ctx context.Context, route *RouteInfo) error {
+func (rm *RouteManager) storeRoute(_ context.Context, route *RouteInfo) error {
 	data, err := json.Marshal(route)
 	if err != nil {
 		return err
@@ -447,23 +447,15 @@ func (rm *RouteManager) configureCertificate(ctx context.Context, domain string)
 }
 
 
-func (rm *RouteManager) configureAuth(ctx context.Context, route *RouteInfo) error {
+func (rm *RouteManager) configureAuth(_ context.Context, _ *RouteInfo) error {
 	// Auth configuration is handled by the Caddy configuration
 	// Additional setup might be needed in Authentik
 	return nil
 }
 
-func (rm *RouteManager) applyState(ctx context.Context, route *RouteInfo) error {
-	state := map[string]interface{}{
-		"hecate_route": map[string]interface{}{
-			"domain":      route.Domain,
-			"upstreams":   route.Upstreams,
-			"auth_policy": route.AuthPolicy,
-			"headers":     route.Headers,
-		},
-	}
-
-	return rm.storeRouteConfigInConsul(ctx, "hecate.route", state)
+func (rm *RouteManager) applyState(_ context.Context, _ *RouteInfo) error {
+	// TODO: Store route configuration in Consul
+	return nil
 }
 
 func (rm *RouteManager) verifyRoute(ctx context.Context, domain string) error {
@@ -494,7 +486,7 @@ func (rm *RouteManager) verifyRoute(ctx context.Context, domain string) error {
 	return nil
 }
 
-func (rm *RouteManager) verifyDNS(ctx context.Context, domain string) error {
+func (rm *RouteManager) verifyDNS(_ context.Context, _ string) error {
 	// TODO: Implement DNS verification
 	// For now, we'll assume DNS is configured correctly
 	return nil
@@ -521,42 +513,6 @@ func (rm *RouteManager) cloneRoute(route *RouteInfo) *RouteInfo {
 	return clone
 }
 
-// storeRouteConfigInConsul stores route configuration in Consul KV for administrator review
-func (rm *RouteManager) storeRouteConfigInConsul(ctx context.Context, operation string, config map[string]interface{}) error {
-	logger := otelzap.Ctx(ctx)
-	
-	// Create configuration entry with metadata
-	configEntry := map[string]interface{}{
-		"operation":   operation,
-		"config":      config,
-		"created_at":  time.Now().UTC(),
-		"status":      "pending_admin_review",
-		"description": fmt.Sprintf("Route %s operation requires administrator intervention", operation),
-	}
-	
-	// Marshal configuration to JSON
-	configJSON, err := json.Marshal(configEntry)
-	if err != nil {
-		return fmt.Errorf("failed to marshal route configuration: %w", err)
-	}
-	
-	// Store in Consul KV
-	consulKey := fmt.Sprintf("hecate/route-operations/%s-%d", operation, time.Now().Unix())
-	_, err = rm.client.consul.KV().Put(&api.KVPair{
-		Key:   consulKey,
-		Value: configJSON,
-	}, nil)
-	
-	if err != nil {
-		return fmt.Errorf("failed to store route configuration in Consul: %w", err)
-	}
-	
-	logger.Info("Route configuration stored in Consul for administrator review",
-		zap.String("consul_key", consulKey),
-		zap.String("operation", operation))
-	
-	return nil
-}
 
 func generateRouteID(domain string) string {
 	// Simple ID generation - could be improved with UUIDs

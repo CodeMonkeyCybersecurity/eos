@@ -184,7 +184,7 @@ After=network.target -master.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/eos-discovery-server --cluster-id=%s --master=%s
+ExecStart=/usr/local/bin/eos-discovery-server --cluster-id=%s
 Restart=always
 RestartSec=10
 User=root

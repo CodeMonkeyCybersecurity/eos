@@ -367,7 +367,7 @@ func TestRouteConnection(rc *eos_io.RuntimeContext, route *Route) (*ConnectionTe
 
 	// TODO: Implement actual connection testing
 	// This would make HTTP requests to test connectivity
-	
+
 	logger.Debug("Route connection test completed",
 		zap.String("domain", route.Domain),
 		zap.Bool("success", result.Success))
@@ -408,7 +408,7 @@ func mergeRouteUpdates(existing *Route, updates *Route) *Route {
 	if updates.AuthPolicy != nil {
 		merged.AuthPolicy = updates.AuthPolicy
 	}
-	if updates.Headers != nil && len(updates.Headers) > 0 {
+	if len(updates.Headers) > 0 {
 		if merged.Headers == nil {
 			merged.Headers = make(map[string]string)
 		}
@@ -425,7 +425,7 @@ func mergeRouteUpdates(existing *Route, updates *Route) *Route {
 	if updates.TLS != nil {
 		merged.TLS = updates.TLS
 	}
-	if updates.Metadata != nil && len(updates.Metadata) > 0 {
+	if len(updates.Metadata) > 0 {
 		if merged.Metadata == nil {
 			merged.Metadata = make(map[string]string)
 		}
@@ -437,71 +437,72 @@ func mergeRouteUpdates(existing *Route, updates *Route) *Route {
 	return &merged
 }
 
-func updateRouteHealth(rc *eos_io.RuntimeContext, route *Route) error {
-	// TODO: Implement actual health checking
-	// This would check the backend service health
-	route.Status.LastChecked = time.Now()
-	return nil
-}
 
-// Backend integration functions (to be implemented based on actual backend)
 
-func createRouteInBackend(rc *eos_io.RuntimeContext, config *HecateConfig, route *Route) error {
+func createRouteInBackend(_ *eos_io.RuntimeContext, _ *HecateConfig, _ *Route) error {
 	// TODO: Implement backend-specific route creation
 	return nil
 }
 
-func updateRouteInBackend(rc *eos_io.RuntimeContext, config *HecateConfig, route *Route) error {
+func updateRouteInBackend(_ *eos_io.RuntimeContext, _ *HecateConfig, _ *Route) error {
 	// TODO: Implement backend-specific route updates
 	return nil
 }
 
-func deleteRouteFromBackend(rc *eos_io.RuntimeContext, config *HecateConfig, routeID string) error {
+func deleteRouteFromBackend(_ *eos_io.RuntimeContext, _ *HecateConfig, _ string) error {
 	// TODO: Implement backend-specific route deletion
 	return nil
 }
 
-func createDNSRecord(rc *eos_io.RuntimeContext, config *HecateConfig, domain string) error {
+func createDNSRecord(_ *eos_io.RuntimeContext, _ *HecateConfig, _ string) error {
 	// TODO: Implement DNS record creation
 	return nil
 }
 
-func deleteDNSRecord(rc *eos_io.RuntimeContext, config *HecateConfig, domain string) error {
+
+func deleteDNSRecord(_ *eos_io.RuntimeContext, _ *HecateConfig, _ string) error {
 	// TODO: Implement DNS record deletion
 	return nil
 }
 
-func verifyRoute(rc *eos_io.RuntimeContext, route *Route) error {
-	// TODO: Implement route verification
-	return nil
-}
 
-func verifyRouteDeleted(rc *eos_io.RuntimeContext, domain string) error {
+func verifyRouteDeleted(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement route deletion verification
 	return nil
 }
 
-// State management functions
-
-func loadRoutesFromState(rc *eos_io.RuntimeContext, config *HecateConfig) ([]*Route, error) {
+func loadRoutesFromState(_ *eos_io.RuntimeContext, _ *HecateConfig) ([]*Route, error) {
 	// TODO: Implement state backend loading
 	return []*Route{}, nil
 }
 
-func saveRouteState(rc *eos_io.RuntimeContext, config *HecateConfig, route *Route) error {
+func saveRouteState(_ *eos_io.RuntimeContext, _ *HecateConfig, _ *Route) error {
 	// TODO: Implement state backend saving
 	return nil
 }
 
-func deleteRouteState(rc *eos_io.RuntimeContext, config *HecateConfig, domain string) error {
+func updateRouteHealth(_ *eos_io.RuntimeContext, _ *Route) error {
+	// TODO: Implement route health checking
+	return nil
+}
+
+func verifyRoute(_ *eos_io.RuntimeContext, _ *Route) error {
+	// TODO: Implement route verification
+	return nil
+}
+
+func configureCaddy(_ *eos_io.RuntimeContext, _ *HecateConfig, _ *RouteInfo) error {
+	// TODO: Implement state backend saving
+	return nil
+}
+
+func deleteRouteState(_ *eos_io.RuntimeContext, _ *HecateConfig, _ string) error {
 	// TODO: Implement state backend deletion
 	return nil
 }
 
-
-func getFromStateStore(rc *eos_io.RuntimeContext, collection, key string, dest interface{}) error {
+func getFromStateStore(_ *eos_io.RuntimeContext, _, _ string, _ interface{}) error {
 	// TODO: Implement state store retrieval
 	// This would retrieve the value from the configured state backend
 	return nil
 }
-

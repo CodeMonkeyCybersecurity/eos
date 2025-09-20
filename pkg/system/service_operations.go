@@ -401,13 +401,8 @@ func (p *PortKillOperation) Assess(ctx context.Context) (*patterns.AssessmentRes
 	// Find processes using the port
 	// TODO: Replace with Nomad client implementation
 	output := "none"  // placeholder
-	err := error(nil) // placeholder
-	if err != nil {
-		return &patterns.AssessmentResult{
-			CanProceed: false,
-			Reason:     "failed to check port usage",
-		}, err
-	}
+	// TODO: Implement actual service status check
+	// For now, assume services are running correctly
 
 	output = strings.TrimSpace(output)
 	if output == "none" || output == "" {
