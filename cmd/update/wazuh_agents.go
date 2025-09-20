@@ -34,7 +34,6 @@ package update
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -42,13 +41,15 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh_mssp"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 var (
-	// Re-registration flags
+	// Operation mode flags
 	reRegister         bool
 	analyzeOnly        bool
+	forceUpgrade       bool
+	
+	// Configuration flags
 	managerHost        string
 	managerPort        int
 	authPort           int
@@ -63,8 +64,8 @@ var (
 
 var updateWazuhAgentsCmd = &cobra.Command{
 	Use:   "wazuh-agents",
-	Short: "Analyze and re-register Wazuh agents with comprehensive checks",
-	Long: `Analyze and re-register Wazuh agents with comprehensive checks and transparency.
+	Short: "Upgrade local Wazuh agent with comprehensive analysis and safety checks",
+	Long: `Upgrade the local Wazuh agent with comprehensive analysis and safety checks.
 
 This command provides robust analysis and management of Wazuh agents, following EOS 
 principles of transparency and safety. It performs comprehensive checks including:
@@ -82,21 +83,23 @@ The command will:
 5. Optionally execute the re-registration process
 
 Examples:
-  # Analyze all agents (no changes made)
-  eos update wazuh-agents --analyze-only --all-agents
+  # Default: Upgrade local Wazuh agent (with comprehensive analysis)
+  eos update wazuh-agents
 
-  # Re-register all agents with new manager after analysis
-  eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au --all-agents
+  # Analyze local agent without making changes
+  eos update wazuh-agents --analyze-only
 
-  # Re-register specific agents with analysis
-  eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au --agents "001,002,003"
+  # Upgrade with dry-run to see what would happen
+  eos update wazuh-agents --dry-run
 
-  # Dry run to see analysis and what would happen
-  eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au --all-agents --dry-run
+  # Upgrade and re-register with new manager
+  eos update wazuh-agents --manager delphi.cybermonkey.net.au
 
-  # Use custom ports and password authentication
-  eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au --all-agents \
-    --manager-port 1514 --auth-port 1515 --use-password --password "mypassword"
+  # Re-register only (no upgrade)
+  eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au
+
+  # Force upgrade even if already current
+  eos update wazuh-agents --force-upgrade
 
 Analysis Features:
   - Version comparison (current vs latest available)
@@ -117,113 +120,103 @@ Common Use Cases:
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
-		if !reRegister && !analyzeOnly {
-			return fmt.Errorf("either --re-register or --analyze-only flag is required")
+		// Build configuration for agent upgrade (default action)
+		config := wazuh_mssp.GetDefaultAgentUpgradeConfig()
+		
+		// Determine operation mode
+		if reRegister {
+			config.UpgradeAgent = false
+			config.ReRegisterOnly = true
+			
+			// Validate manager host requirement for re-registration
+			if managerHost == "" {
+				return fmt.Errorf("--manager flag is required when using --re-register")
+			}
+			config.ManagerHost = managerHost
+		} else if analyzeOnly {
+			config.UpgradeAgent = false
+			config.AnalyzeOnly = true
+		} else {
+			// Default: upgrade agent
+			config.UpgradeAgent = true
+			if managerHost != "" {
+				config.ManagerHost = managerHost // Optional re-registration after upgrade
+			}
 		}
 
-		if reRegister && analyzeOnly {
-			return fmt.Errorf("cannot use both --re-register and --analyze-only flags together")
-		}
-
-		// Validate manager host requirement for re-registration
-		if reRegister && managerHost == "" {
-			return fmt.Errorf("--manager flag is required when using --re-register")
-		}
-
-		// Build configuration from flags
-		config := wazuh_mssp.GetDefaultAgentRegistrationConfig()
-		config.ManagerHost = managerHost
+		// Apply other configuration
 		config.ManagerPort = managerPort
 		config.AuthPort = authPort
-		config.AllAgents = allAgents
 		config.UsePassword = useWazuhPassword
 		config.Password = wazuhPassword
 		config.DryRun = wazuhDryRun
 		config.BackupKeys = backupKeys
-		config.ConcurrentLimit = concurrent
-
-		// Parse target agents if specified
-		if targetAgents != "" {
-			config.TargetAgents = strings.Split(strings.ReplaceAll(targetAgents, " ", ""), ",")
-		}
-
-		// For analyze-only mode, we don't need manager host
-		if analyzeOnly {
-			config.ManagerHost = "analysis-mode" // Placeholder for validation
-			config.DryRun = true // Analysis is always dry-run
-		}
-
-		// Validate configuration
-		if err := config.Validate(); err != nil {
-			return fmt.Errorf("invalid configuration: %v", err)
-		}
+		config.ForceUpgrade = forceUpgrade
 
 		// Interactive confirmation for non-dry-run operations
-		if !config.DryRun && !analyzeOnly {
-			confirmed := interaction.PromptYesNo(rc.Ctx, 
-				fmt.Sprintf("Re-register agents with manager %s?", config.ManagerHost), false)
+		if !config.DryRun && !config.AnalyzeOnly {
+			var confirmMsg string
+			if config.UpgradeAgent {
+				confirmMsg = "Upgrade local Wazuh agent?"
+			} else {
+				confirmMsg = fmt.Sprintf("Re-register agent with manager %s?", config.ManagerHost)
+			}
+			
+			confirmed := interaction.PromptYesNo(rc.Ctx, confirmMsg, false)
 			if !confirmed {
 				logger.Info("Operation cancelled by user")
 				return nil
 			}
 		}
 
-		if analyzeOnly {
-			logger.Info("🔍 Starting Wazuh agent analysis",
-				zap.Bool("all_agents", config.AllAgents))
-		} else {
-			logger.Info("🚀 Starting Wazuh agent re-registration",
-				zap.String("manager_host", config.ManagerHost),
-				zap.Bool("all_agents", config.AllAgents),
-				zap.Bool("dry_run", config.DryRun))
-		}
+		// Create upgrade manager
+		upgradeManager := wazuh_mssp.NewAgentUpgradeManager(config)
 
-		// Create registration manager
-		manager := wazuh_mssp.NewAgentRegistrationManager(config)
-
-		// Discover agents
-		agents, err := manager.DiscoverAgents(rc)
+		// Execute the operation
+		result, err := upgradeManager.UpgradeLocalAgent(rc)
 		if err != nil {
-			return fmt.Errorf("failed to discover agents: %v", err)
-		}
-
-		if len(agents) == 0 {
-			logger.Info("No agents found for re-registration")
-			return nil
-		}
-
-		logger.Info("Discovered agents for re-registration",
-			zap.Int("agent_count", len(agents)))
-
-		// Perform re-registration
-		summary, err := manager.ReregisterAgents(rc, agents)
-		if err != nil {
-			return fmt.Errorf("re-registration failed: %v", err)
+			return fmt.Errorf("operation failed: %v", err)
 		}
 
 		// Display results
-		fmt.Println(summary.FormatSummary())
-
-		if config.DryRun {
-			fmt.Println("\n📋 Generated Re-registration Commands:")
-			fmt.Println("Copy and execute these commands on each agent:")
-			fmt.Println(strings.Repeat("=", 60))
+		if result.Analysis != nil {
+			fmt.Printf("\n📊 Agent Analysis Results:\n")
+			fmt.Printf("Current Version: %s\n", result.Analysis.CurrentVersion)
+			fmt.Printf("Latest Version: %s\n", result.Analysis.LatestVersion)
+			fmt.Printf("Platform: %s (%s)\n", result.Analysis.Platform, result.Analysis.Architecture)
+			fmt.Printf("Needs Upgrade: %t\n", result.Analysis.NeedsUpgrade)
+			fmt.Printf("Upgrade Method: %s\n", result.Analysis.UpgradeMethod)
+			fmt.Printf("Risk Level: %s\n", result.Analysis.RiskLevel)
+			fmt.Printf("Repository Reachable: %t\n", result.Analysis.RepositoryReachable)
 			
-			// Show sample commands for the first agent
-			if len(agents) > 0 {
-				sampleCommands := manager.GenerateReregistrationCommands(agents[0])
-				for _, cmd := range sampleCommands {
-					fmt.Println(cmd)
+			if len(result.Analysis.ConnectivityIssues) > 0 {
+				fmt.Printf("\n⚠️  Connectivity Issues:\n")
+				for _, issue := range result.Analysis.ConnectivityIssues {
+					fmt.Printf("  - %s\n", issue)
+				}
+			}
+			
+			if len(result.Analysis.Prerequisites) > 0 {
+				fmt.Printf("\n📋 Prerequisites:\n")
+				for _, prereq := range result.Analysis.Prerequisites {
+					fmt.Printf("  - %s\n", prereq)
 				}
 			}
 		}
 
-		// Return error if any agents failed (for non-dry-run operations)
-		if !config.DryRun && summary.FailureCount > 0 {
-			return fmt.Errorf("%d agents failed to re-register", summary.FailureCount)
+		if result.Success {
+			if config.AnalyzeOnly {
+				fmt.Printf("\n✅ Analysis completed successfully\n")
+			} else if config.UpgradeAgent {
+				fmt.Printf("\n✅ Agent upgrade completed successfully in %v\n", result.Duration)
+			} else {
+				fmt.Printf("\n✅ Agent re-registration completed successfully in %v\n", result.Duration)
+			}
+		} else {
+			fmt.Printf("\n❌ Operation failed: %s\n", result.Error)
+			return fmt.Errorf("operation failed: %s", result.Error)
 		}
 
-		logger.Info("✅ Wazuh agent re-registration completed successfully")
 		return nil
 	}),
 }
@@ -231,9 +224,11 @@ Common Use Cases:
 func init() {
 	// Mode selection flags
 	updateWazuhAgentsCmd.Flags().BoolVar(&reRegister, "re-register", false,
-		"Enable agent re-registration mode")
+		"Enable agent re-registration mode (instead of upgrade)")
 	updateWazuhAgentsCmd.Flags().BoolVar(&analyzeOnly, "analyze-only", false,
-		"Analyze agents without making any changes")
+		"Analyze agent without making any changes")
+	updateWazuhAgentsCmd.Flags().BoolVar(&forceUpgrade, "force-upgrade", false,
+		"Force upgrade even if agent is already current")
 
 	// Manager configuration flags
 	updateWazuhAgentsCmd.Flags().StringVar(&managerHost, "manager", "",
