@@ -97,8 +97,6 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	return bootstrap.OrchestrateBootstrap(rc, cmd, opts)
 }
 
-// TODO: bootstrapSingleNodeEnhanced is currently unused but will be needed for enhanced bootstrap
-// This function will replace the current bootstrap process with HashiCorp stack integration
 // bootstrapSingleNodeEnhanced bootstraps a single node with storage ops
 func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, clusterInfo *bootstrap.ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -207,7 +205,8 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 
 // TODO: bootstrapAdditionalNode is currently unused but will be needed for cluster joining
 // This function will handle joining additional nodes to an existing HashiCorp cluster
-// bootstrapAdditionalNode bootstraps a node joining an existing cluster
+// bootstrapAdditionalNode bootstraps an additional node in a cluster
+// nolint:unused // Will be used in future HashiCorp integration
 func bootstrapAdditionalNode(rc *eos_io.RuntimeContext, cmd *cobra.Command, clusterInfo *bootstrap.ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

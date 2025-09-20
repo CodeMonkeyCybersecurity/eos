@@ -81,7 +81,7 @@ type ConsulInstallationStatus struct {
 	UserExists     bool
 }
 
-func checkConsulInstallation(ctx context.Context, logger otelzap.LoggerWithCtx) (*ConsulInstallationStatus, error) {
+func checkConsulInstallation(_ context.Context, _ otelzap.LoggerWithCtx) (*ConsulInstallationStatus, error) {
 	// TODO: Replace with Nomad-based consul status check
 	return &ConsulInstallationStatus{
 		Installed: false,

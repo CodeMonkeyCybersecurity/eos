@@ -146,17 +146,6 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	return fmt.Errorf("%s Nomad deployment not yet implemented", component)
 }
 
-// TODO: verifyHashicorpInstallation is currently unused but will be needed for HashiCorp verification
-// This function will verify HashiCorp component installations via Nomad job status
-func verifyHashicorpInstallation(ctx context.Context, component string) error {
-	logger := otelzap.Ctx(ctx)
-	logger.Info("Verifying installation via Nomad", zap.String("component", component))
-
-	// TODO: Implement Nomad-based verification
-	// Check Nomad job status instead of direct binary/service checks
-	logger.Info("Nomad-based verification not yet implemented")
-	return nil
-}
 
 func contains(slice []string, item string) bool {
 	for _, s := range slice {

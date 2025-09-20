@@ -3,15 +3,12 @@
 package create
 
 import (
-	"fmt"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system/system_config"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 // CreateCmd is the root command for create operations
@@ -88,78 +85,3 @@ func init() {
 	SetupCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 }
 
-// TODO: setupConfiguration is currently unused but will be needed for system configuration management
-// This function will be used when system configuration features are implemented
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// setupConfiguration is a helper function to apply configuration
-func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.ConfigurationType, manager system_config.ConfigurationManager, options *system_config.ConfigurationOptions) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Create system config manager and register the specific manager
-	scm := system_config.NewSystemConfigManager()
-	scm.RegisterManager(configType, manager)
-
-	// Apply configuration
-	result, err := scm.ApplyConfiguration(rc, options)
-	if err != nil {
-		return fmt.Errorf("configuration failed: %w", err)
-	}
-
-	// Output result
-	if jsonOutput {
-		// TODO: Implement JSON output
-		logger.Info("JSON output not yet implemented")
-	}
-
-	if result.Success {
-		logger.Info("Setup completed successfully",
-			zap.String("type", string(configType)),
-			zap.Duration("duration", result.Duration))
-
-		logger.Info("terminal prompt: Setup Complete!", zap.String("type", string(configType)))
-		logger.Info("terminal prompt: ⏱️ Duration", zap.Duration("duration", result.Duration))
-
-		if len(result.Changes) > 0 {
-			logger.Info("terminal prompt: 📝 Changes Made:")
-			for _, change := range result.Changes {
-				logger.Info("terminal prompt:    • Change",
-					zap.String("type", change.Type),
-					zap.String("target", change.Target),
-					zap.String("action", change.Action))
-			}
-		}
-
-		if len(result.Warnings) > 0 {
-			logger.Info("terminal prompt: Warnings:")
-			for _, warning := range result.Warnings {
-				logger.Info("terminal prompt:    • Warning", zap.String("warning", warning))
-			}
-		}
-
-		if len(result.Steps) > 0 {
-			logger.Info("terminal prompt: Steps Completed:")
-			for _, step := range result.Steps {
-				status := ""
-				switch step.Status {
-				case "failed":
-					status = "❌"
-				case "running":
-					status = "⏳"
-				}
-				logger.Info("terminal prompt:    Step",
-					zap.String("status", status),
-					zap.String("name", step.Name),
-					zap.Duration("duration", step.Duration))
-				if step.Error != "" {
-					logger.Info("terminal prompt:       Error", zap.String("error", step.Error))
-				}
-			}
-		}
-	} else {
-		logger.Error("Setup failed", zap.String("error", result.Error))
-		logger.Info("terminal prompt: ❌ Setup Failed!", zap.String("type", string(configType)))
-		logger.Info("terminal prompt: Error", zap.String("error", result.Error))
-	}
-
-	return nil
-}

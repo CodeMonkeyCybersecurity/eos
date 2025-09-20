@@ -80,7 +80,7 @@ func outputDiskUsageTable(rc *eos_io.RuntimeContext, usage map[string]storage.Di
 
 	// Print usage information
 	for _, info := range usage {
-		fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n",
+		fmt.Printf("%-20s %-10d %-10d %-10d %-8.1f%% %s\n",
 			utils.TruncateString(info.Filesystem, 20),
 			info.Size,
 			info.Used,

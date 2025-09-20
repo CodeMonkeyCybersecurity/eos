@@ -127,6 +127,11 @@ func createStorageUnified(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		}
 	}
 
+	// Handle dry-run
+	if unifiedDryRun {
+		return showUnifiedDryRun(rc, request)
+	}
+
 	// Initialize storage manager
 	storageManager, err := unified.NewUnifiedStorageManager(rc)
 	if err != nil {
@@ -146,15 +151,7 @@ func createStorageUnified(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		zap.String("type", storageInfo.Type),
 		zap.String("status", storageInfo.Status))
 
-	fmt.Printf("✅ Storage created successfully:\n")
-	fmt.Printf("   Name: %s\n", storageInfo.Name)
-	fmt.Printf("   Type: %s\n", storageInfo.Type)
-	fmt.Printf("   Size: %s\n", utils.FormatBytes(storageInfo.Size))
-	fmt.Printf("   Status: %s\n", storageInfo.Status)
-	fmt.Printf("   Health: %s\n", storageInfo.Health)
-	if storageInfo.Location != "" {
-		fmt.Printf("   Location: %s\n", storageInfo.Location)
-	}
+	displayUnifiedStorageInfo(rc, storageInfo)
 
 	return nil
 }
@@ -192,7 +189,7 @@ func parseVolumeSpecs(volumeSpecs []string) ([]unified.VolumeSpec, error) {
 	return volumes, nil
 }
 
-// TODO: showUnifiedDryRun is currently unused but will be needed for unified storage dry-run
+// showUnifiedDryRun displays what would be done in a dry-run mode
 func showUnifiedDryRun(_ *eos_io.RuntimeContext, request *unified.StorageRequest) error {
 	fmt.Println("=== UNIFIED STORAGE DRY RUN ===")
 	fmt.Printf("Would create %s storage with the following configuration:\n\n", request.Type)
@@ -251,7 +248,7 @@ func showUnifiedDryRun(_ *eos_io.RuntimeContext, request *unified.StorageRequest
 	return nil
 }
 
-// TODO: displayUnifiedStorageInfo is currently unused but will be needed for unified storage info display
+// displayUnifiedStorageInfo displays detailed information about created storage
 func displayUnifiedStorageInfo(_ *eos_io.RuntimeContext, storage *unified.StorageInfo) {
 	fmt.Printf("\n=== %s Storage Created Successfully ===\n\n", strings.Title(storage.Type))
 	fmt.Printf("Name:         %s\n", storage.Name)

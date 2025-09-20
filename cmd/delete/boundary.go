@@ -219,18 +219,6 @@ func runDeleteBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	return nil
 }
 
-// TODO: Replace with Nomad client initialization
-func initializeDeleteBoundaryNomadClient(logger *zap.Logger) error {
-	logger.Info("Nomad client initialization not yet implemented")
-	return fmt.Errorf("Nomad client initialization not yet implemented")
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
 func displayBoundaryRemovalStatus(logger otelzap.LoggerWithCtx, status *boundary.StatusResult, running, failed []string) {
 	logger.Info("terminal prompt: Current Boundary Installation Status:")

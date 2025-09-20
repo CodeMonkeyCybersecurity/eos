@@ -160,8 +160,9 @@ type NomadStatus struct {
 
 // TODO: Nomad status checking - removed during HashiCorp migration
 // This function was replaced with native Nomad installer status checking
-// Restore if detailed status monitoring is needed
-func checkNomadStatus(_ *eos_io.RuntimeContext) (*NomadStatus, error) {
+// checkNomadStatus checks the status of Nomad service
+// nolint:unused // Will be used in Nomad health checks
+func checkNomadStatus(rc *eos_io.RuntimeContext) (*NomadStatus, error) {
 	// TODO: Implement Nomad status checking if needed
 	return &NomadStatus{}, fmt.Errorf("nomad status checking not implemented - use native installer")
 }
@@ -195,21 +196,3 @@ func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	return nil
 }
 
-// TODO: Legacy Nomad creation - removed during HashiCorp migration
-// This function was replaced with native Nomad installer
-// Restore if direct Nomad installation is needed outside of installer
-func runCreateNomadLegacy(_ *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
-	// TODO: Implement legacy Nomad creation if needed
-	return fmt.Errorf("legacy nomad creation not implemented - use native installer")
-}
-
-// TODO: Direct Salt execution - removed during HashiCorp migration
-// This function was replaced with administrator escalation pattern
-// Restore if system-level Nomad installation is needed
-func runCreateNomadDirectSalt(_ *eos_io.RuntimeContext, _, _ bool,
-	_ int, _, _, _, _, _ string,
-	_, _, _ bool, _, _ []string,
-	_, _, _, _ bool) error {
-	// TODO: Implement direct Salt execution if needed
-	return fmt.Errorf("direct salt execution not implemented - use administrator escalation")
-}
