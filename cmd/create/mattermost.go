@@ -236,7 +236,6 @@ func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		VaultAddr:        "http://localhost:8200",
 		FilePublicKey:    filePublicKey,
 		FilePrivateKey:   filePrivateKey,
-		InviteSalt:       inviteSalt,
 		SupportEmail:     "support@example.com",
 		Timezone:         "UTC",
 	}

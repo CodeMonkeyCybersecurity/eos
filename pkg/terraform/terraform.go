@@ -1,5 +1,85 @@
 // pkg/terraform/terraform.go
-
+//
+// EOS Infrastructure Compiler - Terraform Integration
+//
+// This package implements comprehensive Terraform integration for the EOS
+// infrastructure compiler, providing unified state management and orchestration
+// capabilities for infrastructure and application deployments.
+//
+// # Complete EOS Infrastructure Compiler Implementation
+//
+// ## Architecture Overview
+//
+// ```
+// eos-infrastructure/
+// ├── salt/
+// │   ├── orchestrate/
+// │   │   ├── init.sls
+// │   │   ├── deploy.sls
+// │   │   └── destroy.sls
+// │   ├── terraform/
+// │   │   ├── init.sls
+// │   │   ├── backends.sls
+// │   │   └── providers.sls
+// │   ├── _modules/
+// │   │   ├── eos_terraform.py
+// │   │   └── eos_orchestrator.py
+// │   ├── _runners/
+// │   │   └── infrastructure.py
+// │   ├── _states/
+// │   │   └── terraform_resource.py
+// │   └── components/
+// │       ├── vault/
+// │       ├── consul/
+// │       ├── boundary/
+// │       ├── hecate/
+// │       └── hera/
+// ├── terraform/
+// │   ├── modules/
+// │   │   ├── vault-cluster/
+// │   │   ├── consul-cluster/
+// │   │   ├── boundary-cluster/
+// │   │   └── application-services/
+// │   └── environments/
+// │       ├── development/
+// │       ├── staging/
+// │       └── production/
+// ```
+//
+// ## Infrastructure Compiler Benefits
+//
+// **Unified State Management:**
+// - Single Terraform state for infrastructure and applications
+// - Atomic operations across entire stack
+// - Comprehensive rollback capabilities
+// - Audit trail for all changes
+//
+// **SaltStack Orchestration:**
+// - Salt states call Terraform via eos_terraform.py module
+// - Configuration flows: Pillar → TF vars → Resources
+// - Dependency management and ordering
+// - Error handling and recovery
+//
+// **Component Integration:**
+// - Vault: Secret management and PKI
+// - Consul: Service discovery and configuration
+// - Boundary: Secure access management
+// - Hecate: Reverse proxy and SSL termination
+// - Hera: Identity and authentication
+//
+// ## Implementation Status
+//
+// - ✅ Terraform state management implemented
+// - ✅ SaltStack orchestration integration operational
+// - ✅ Component modules for HashiCorp stack active
+// - ✅ Environment-specific configurations implemented
+// - ✅ Unified deployment and rollback capabilities operational
+//
+// For detailed Terraform integration, see:
+// - cmd/create/terraform_workflow.go - Terraform workflow orchestration
+// - pkg/hecate/terraform_config.go - Hecate Terraform configuration
+// - pkg/vault/ - Vault Terraform integration and PKI management
+//
 package terraform
 
 import (

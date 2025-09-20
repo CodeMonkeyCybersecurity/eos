@@ -365,7 +365,7 @@ func getComponentVersion(rc *eos_io.RuntimeContext, component string) string {
 }
 
 // performComponentInstall installs a component
-func performComponentInstall(rc *eos_io.RuntimeContext, component string, opts *BootstrapOptions) error {
+func performComponentInstall(rc *eos_io.RuntimeContext, component string, _ *BootstrapOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing component", zap.String("component", component))
 

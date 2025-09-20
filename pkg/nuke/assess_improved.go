@@ -63,13 +63,13 @@ func loadCurrentStateV2(rc *eos_io.RuntimeContext) (*state.StateTracker, error) 
 
 		// Create new tracker and attempt in-band gathering
 		tracker = state.New()
-		if gatherErr := tracker.GatherInBand(rc); gatherErr != nil {
+		if err := tracker.GatherOutOfBand(rc); err != nil {
 			// Wrap both errors for better context
-			return nil, fmt.Errorf("failed to load state (%w) and gather in-band state (%w)",
-				err, gatherErr)
+			return nil, fmt.Errorf("failed to load state (%w) and gather out-of-band state (%w)",
+				err, err)
 		}
 
-		logger.Info("Successfully gathered in-band state as fallback")
+		logger.Info("Successfully gathered out-of-band state as fallback")
 	}
 
 	return tracker, nil

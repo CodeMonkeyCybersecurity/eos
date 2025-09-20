@@ -116,10 +116,8 @@ func bootstrapSingleNodeEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 	// Phase 1.5: Setup Salt API (for master nodes)
 	if clusterInfo.IsMaster || clusterInfo.IsSingleNode {
 		logger.Info("Phase 1.5: Setting up Salt API", zap.Int("phase", 1), zap.Int("total_phases", 5))
-		if err := bootstrap.SetupSaltAPI(rc); err != nil {
-			logger.Warn("Salt API setup failed, continuing without API", zap.Error(err))
-			// Continue anyway - the system can work without the API
-		}
+		// TODO: Replace with Consul API setup (HashiCorp migration)
+		logger.Info("Salt API setup skipped - migrating to Consul-based API")
 	}
 
 	// Phase 2: Deploy Storage Operations

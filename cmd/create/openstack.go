@@ -19,7 +19,6 @@ var openstackCmd = &cobra.Command{
 	Aliases: []string{"openstack-aio", "os"},
 	Short:   "Deploy OpenStack cloud infrastructure with integrated services",
 	Long: `Deploy OpenStack cloud infrastructure using the three-tier orchestration:
-1. SaltStack manages configuration across nodes
 2. Terraform provisions infrastructure resources
 3. Nomad can optionally orchestrate OpenStack workloads
 
@@ -134,32 +133,7 @@ Prerequisites:
 			return eos_err.NewUserError("Invalid configuration: %v", err)
 		}
 
-		// Check for SaltStack orchestration
-		// TODO: Enable Salt orchestration once the orchestrator package is fixed
-		// if orchestrator.IsSaltAvailable() && !config.Force {
-		// 	logger.Info("SaltStack detected, using orchestrated deployment")
 
-		// 	opts := &orchestrator.Options{
-		// 		Target: "*",
-		// 		Pillar: map[string]interface{}{
-		// 			"openstack_mode":           string(config.Mode),
-		// 			"openstack_admin_password": config.AdminPassword,
-		// 			"openstack_endpoints": map[string]string{
-		// 				"public":   config.PublicEndpoint,
-		// 				"internal": config.InternalEndpoint,
-		// 			},
-		// 		},
-		// 	}
-
-		// 	saltOp := orchestrator.CreateSaltOperation(opts)
-		// 	directExec := func(rc *eos_io.RuntimeContext) error {
-		// 		return executeDirectInstallation(rc, config)
-		// 	}
-
-		// 	return orchestrator.ExecuteWithSalt(rc, opts, directExec, saltOp)
-		// }
-
-		// Direct installation
 		return executeDirectInstallation(rc, config)
 	}),
 }

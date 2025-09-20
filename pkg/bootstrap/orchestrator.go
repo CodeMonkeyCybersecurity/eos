@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -20,7 +18,7 @@ import (
 )
 
 // checkpointMutex protects concurrent checkpoint file operations
-var checkpointMutex sync.Mutex
+// checkpointMutex removed - was unused after createCheckpoint function removal
 
 // BootstrapOptions contains all configuration for bootstrap
 type BootstrapOptions struct {
@@ -29,17 +27,17 @@ type BootstrapOptions struct {
 	SingleNode    bool
 	PreferredRole string
 	AutoDiscover  bool
-	
+
 	// Features to enable/disable
 	SkipHardening bool
 	SkipStorage   bool
 	SkipTailscale bool
 	SkipOSQuery   bool
-	
+
 	// Advanced options
-	DryRun        bool
-	ValidateOnly  bool
-	Force         bool
+	DryRun       bool
+	ValidateOnly bool
+	Force        bool
 }
 
 // BootstrapPhase represents a phase of the bootstrap process
@@ -55,22 +53,22 @@ type BootstrapPhase struct {
 func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *BootstrapOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced bootstrap orchestration")
-	
+
 	// Phase 0: State Detection and Conflict Resolution
 	logger.Info("Detecting bootstrap state")
 	state, err := DetectBootstrapState(rc)
 	if err != nil {
 		return fmt.Errorf("failed to detect bootstrap state: %w", err)
 	}
-	
+
 	// Handle guided mode
 	if isGuidedMode(cmd) {
 		return PromptGuidedBootstrap(rc)
 	}
-	
+
 	// Print state report
 	PrintBootstrapStateReport(rc, state)
-	
+
 	// Handle conflicts unless forced
 	if !opts.Force && (state.Phase == PhaseConflicting || len(state.PortConflicts) > 0) {
 		logger.Info("Resolving conflicts")
@@ -78,18 +76,18 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 		if err != nil {
 			return fmt.Errorf("conflict resolution failed: %w", err)
 		}
-		
+
 		if err := ExecuteConflictResolution(rc, resolutionOptions); err != nil {
 			return fmt.Errorf("failed to resolve conflicts: %w", err)
 		}
-		
+
 		// Re-detect state after conflict resolution
 		state, err = DetectBootstrapState(rc)
 		if err != nil {
 			return fmt.Errorf("failed to re-detect state after conflict resolution: %w", err)
 		}
 	}
-	
+
 	// Phase 1: System Validation
 	if !opts.Force {
 		logger.Info("Running system validation")
@@ -98,14 +96,14 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 		if err != nil {
 			return fmt.Errorf("system validation failed: %w", err)
 		}
-		
+
 		PrintValidationReport(rc, result)
-		
+
 		if !result.Passed {
 			if opts.ValidateOnly {
 				return fmt.Errorf("system validation failed")
 			}
-			
+
 			// Ask user if they want to continue despite failures
 			logger.Info("terminal prompt: System validation failed. Continue anyway? [y/N]")
 			response, err := eos_io.ReadInput(rc)
@@ -113,13 +111,13 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 				return fmt.Errorf("bootstrap cancelled due to validation failures")
 			}
 		}
-		
+
 		if opts.ValidateOnly {
 			logger.Info("Validation completed successfully (--validate-only specified)")
 			return nil
 		}
 	}
-	
+
 	// Detect cluster state
 	logger.Info("Detecting cluster state")
 	clusterInfo, err := DetectClusterState(rc, Options{
@@ -131,10 +129,10 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 	if err != nil {
 		return fmt.Errorf("failed to detect cluster state: %w", err)
 	}
-	
+
 	// Define bootstrap phases
 	phases := defineBootstrapPhases(clusterInfo)
-	
+
 	// Count enabled phases
 	enabledPhases := 0
 	for _, phase := range phases {
@@ -142,10 +140,10 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 			enabledPhases++
 		}
 	}
-	
+
 	// Create progress reporter
 	progress := NewProgressReporter(rc, enabledPhases)
-	
+
 	// Execute phases
 	for _, phase := range phases {
 		// Check if phase should be skipped
@@ -153,40 +151,40 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 			logger.Info("Skipping phase", zap.String("phase", phase.Name))
 			continue
 		}
-		
+
 		progress.StartPhase(phase.Description)
-		
+
 		if opts.DryRun {
 			logger.Info("DRY RUN: Would execute phase", zap.String("phase", phase.Name))
 			progress.CompletePhase()
 			continue
 		}
-		
+
 		// Execute phase with error handling
 		if err := executePhaseWithRecovery(rc, phase, opts, clusterInfo); err != nil {
 			if phase.Required {
 				return fmt.Errorf("required phase %s failed: %w", phase.Name, err)
 			}
-			logger.Warn("Optional phase failed, continuing", 
+			logger.Warn("Optional phase failed, continuing",
 				zap.String("phase", phase.Name),
 				zap.Error(err))
 		}
-		
+
 		progress.CompletePhase()
-		
+
 		// Log phase completion - we use state validation now, not checkpoints
-		logger.Info("Phase completed successfully", 
+		logger.Info("Phase completed successfully",
 			zap.String("phase", phase.Name),
 			zap.String("description", phase.Description))
 	}
-	
+
 	// Final steps
 	if !opts.DryRun {
 		// Save cluster configuration
 		if err := SaveClusterConfig(rc, clusterInfo); err != nil {
 			logger.Warn("Failed to save cluster config", zap.Error(err))
 		}
-		
+
 		// Verify all phases completed successfully
 		complete, missingPhases := IsBootstrapComplete(rc)
 		if !complete {
@@ -194,10 +192,10 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 				zap.Strings("missing_phases", missingPhases))
 		}
 	}
-	
+
 	// Show completion summary
 	showBootstrapSummary(rc, clusterInfo, opts)
-	
+
 	return nil
 }
 
@@ -208,13 +206,11 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 			Name:        "salt",
 			Description: "Installing and configuring SaltStack",
 			Required:    true,
-			RunFunc:     phaseSalt,
 		},
 		{
 			Name:        "salt-api",
 			Description: "Setting up Salt API service",
-			Required:    true,  // Changed to required - Salt API is essential for Eos operations
-			RunFunc:     phaseSaltAPI,
+			Required:    true, // Changed to required - Salt API is essential for Eos operations
 		},
 		{
 			Name:        "storage",
@@ -253,7 +249,7 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 			},
 		},
 	}
-	
+
 	// Add cluster-specific phases if joining
 	if !clusterInfo.IsSingleNode && !clusterInfo.IsMaster {
 		// Insert cluster join phase after Salt
@@ -263,36 +259,36 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 			Required:    true,
 			RunFunc:     phaseClusterJoin,
 		}
-		
+
 		// Insert after Salt phase
 		newPhases := []BootstrapPhase{phases[0], joinPhase}
 		newPhases = append(newPhases, phases[1:]...)
 		phases = newPhases
 	}
-	
+
 	return phases
 }
 
 // executePhaseWithRecovery executes a phase with error recovery
 func executePhaseWithRecovery(rc *eos_io.RuntimeContext, phase BootstrapPhase, opts *BootstrapOptions, info *ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if phase was already completed (idempotency)
 	if isPhaseCompleted(rc, phase.Name) {
 		logger.Info("Phase already completed, skipping", zap.String("phase", phase.Name))
 		return nil
 	}
-	
+
 	// Execute with retry for transient failures
 	retryConfig := DefaultRetryConfig()
 	if phase.Required {
 		retryConfig.MaxAttempts = 5
 	}
-	
+
 	err := WithRetry(rc, retryConfig, func() error {
 		return phase.RunFunc(rc, opts, info)
 	})
-	
+
 	if err != nil {
 		// Try recovery if available
 		if recoveryFunc := getRecoveryFunction(phase.Name); recoveryFunc != nil {
@@ -304,26 +300,15 @@ func executePhaseWithRecovery(rc *eos_io.RuntimeContext, phase BootstrapPhase, o
 		}
 		return err
 	}
-	
+
 	return nil
 }
 
 // Phase implementations
 
-func phaseSalt(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing and configuring SaltStack")
-	
-	// Use the comprehensive Salt bootstrap that includes both Salt and file roots setup
-	return BootstrapHashiCorpComplete(rc, info)
-}
 
-func phaseSaltAPI(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
-	if info.IsMaster || info.IsSingleNode {
-		return SetupSaltAPI(rc)
-	}
-	return nil
-}
+
+
 
 func phaseStorage(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
 	return DeployStorageOps(rc, info)
@@ -345,17 +330,17 @@ func phaseOSQuery(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Clust
 
 func phaseHardening(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if user wants FIDO2 hardening
 	logger.Info("Ubuntu security hardening includes FIDO2/YubiKey requirement for SSH")
 	logger.Info("terminal prompt: Enable FIDO2 SSH authentication? [y/N]")
-	
+
 	response, err := eos_io.ReadInput(rc)
 	if err != nil {
 		logger.Warn("Failed to read user input, skipping FIDO2", zap.Error(err))
 		response = "n"
 	}
-	
+
 	if isYes(response) {
 		logger.Info("Applying hardening with FIDO2")
 		// Would call ubuntu.HardenUbuntuWithFIDO2(rc)
@@ -363,46 +348,46 @@ func phaseHardening(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Clu
 		logger.Info("Applying hardening without FIDO2")
 		// Would call ubuntu.SecureUbuntuEnhanced(rc, "disabled")
 	}
-	
+
 	return nil
 }
 
 func phaseClusterJoin(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Joining cluster", zap.String("master", info.MasterAddr))
-	
+
 	// Perform health checks
 	healthResult, err := PerformHealthChecks(rc, info.MasterAddr)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)
 	}
-	
+
 	if !healthResult.Passed {
 		return fmt.Errorf("pre-join health checks failed: %v", healthResult.FailedChecks)
 	}
-	
+
 	// Register with master
 	reg := NodeRegistration{
 		PreferredRole: opts.PreferredRole,
 	}
-	
+
 	result, err := RegisterNode(rc, info.MasterAddr, reg)
 	if err != nil {
 		return fmt.Errorf("node registration failed: %w", err)
 	}
-	
+
 	if !result.Accepted {
 		return fmt.Errorf("node registration was not accepted")
 	}
-	
+
 	// Update cluster info
 	info.MyRole = result.AssignedRole
 	info.ClusterID = result.ClusterID
-	
+
 	logger.Info("Successfully joined cluster",
 		zap.String("role", string(result.AssignedRole)),
 		zap.String("cluster_id", result.ClusterID))
-	
+
 	return nil
 }
 
@@ -413,22 +398,7 @@ func isPhaseCompleted(rc *eos_io.RuntimeContext, phaseName string) bool {
 	return ValidatePhaseCompletion(rc, phaseName)
 }
 
-func createCheckpoint(rc *eos_io.RuntimeContext, phaseName string, info *ClusterInfo) error {
-	// Protect checkpoint operations with mutex
-	checkpointMutex.Lock()
-	defer checkpointMutex.Unlock()
-	
-	checkpointDir := "/var/lib/eos/bootstrap"
-	if err := CreateDirectoryIfMissing(checkpointDir, 0755); err != nil {
-		return err
-	}
-	
-	checkpointFile := fmt.Sprintf("%s/checkpoint_%s", checkpointDir, phaseName)
-	data := fmt.Sprintf("phase=%s\ntime=%s\ncluster_id=%s\n", 
-		phaseName, time.Now().Format(time.RFC3339), info.ClusterID)
-	
-	return os.WriteFile(checkpointFile, []byte(data), 0644)
-}
+// createCheckpoint function removed - was unused
 
 func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) error {
 	// Define recovery functions for specific phases
@@ -436,10 +406,10 @@ func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) e
 		"salt": func(rc *eos_io.RuntimeContext, err error) error {
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Attempting Salt recovery")
-			
+
 			// Check if we should preserve user configurations
 			preserveConfigs := os.Getenv("EOS_PRESERVE_CONFIGS") == "true"
-			
+
 			if preserveConfigs {
 				// Backup user configurations before cleanup
 				backupDir := "/var/backups/eos-salt-configs"
@@ -453,19 +423,19 @@ func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) e
 					logger.Info("Backed up Salt configurations", zap.String("backup_dir", backupDir))
 				}
 			}
-			
+
 			// Clean up partial installation with error handling
 			if output, err := execute.Run(rc.Ctx, execute.Options{
 				Command: "apt-get",
 				Args:    []string{"remove", "--purge", "-y", "salt-common", "salt-minion", "salt-master"},
 				Capture: true,
 			}); err != nil {
-				logger.Warn("Failed to remove Salt packages", 
+				logger.Warn("Failed to remove Salt packages",
 					zap.Error(err),
 					zap.String("output", output))
 				// Continue with cleanup anyway
 			}
-			
+
 			// Clean configuration directories
 			configDirs := []string{"/etc/salt", "/var/cache/salt"}
 			for _, dir := range configDirs {
@@ -487,31 +457,31 @@ func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) e
 					}
 				}
 			}
-			
+
 			return nil
 		},
 	}
-	
+
 	return recoveryFuncs[phaseName]
 }
 
 func showBootstrapSummary(rc *eos_io.RuntimeContext, info *ClusterInfo, opts *BootstrapOptions) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("╔══════════════════════════════════════╗")
 	logger.Info("║     Bootstrap Completed Successfully  ║")
 	logger.Info("╚══════════════════════════════════════╝")
-	
+
 	logger.Info("System Configuration:",
 		zap.Bool("single_node", info.IsSingleNode),
 		zap.String("role", string(info.MyRole)),
 		zap.String("cluster_id", info.ClusterID))
-	
+
 	if opts.DryRun {
 		logger.Info("This was a DRY RUN - no changes were made")
 		return
 	}
-	
+
 	logger.Info("Next Steps:")
 	if info.IsSingleNode {
 		logger.Info("• Check system status: eos read system-status")
@@ -524,7 +494,7 @@ func showBootstrapSummary(rc *eos_io.RuntimeContext, info *ClusterInfo, opts *Bo
 		logger.Info("• Verify cluster membership: eos read cluster-status")
 		logger.Info("• Check assigned workloads: eos list workloads")
 	}
-	
+
 	if !opts.SkipHardening {
 		logger.Info("• Security hardening has been applied")
 		logger.Info("• Review security settings: eos read security-status")
@@ -543,3 +513,4 @@ func isGuidedMode(cmd *cobra.Command) bool {
 	}
 	return false
 }
+

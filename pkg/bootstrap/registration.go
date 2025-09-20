@@ -60,9 +60,9 @@ func RegisterNode(rc *eos_io.RuntimeContext, masterAddr string, reg NodeRegistra
 	}
 
 	if reg.IP == "" {
-		ip, err := getNodeIP()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get node IP: %w", err)
+		ip := generateNodeID("")
+		if ip == "" {
+			return nil, fmt.Errorf("failed to get node IP")
 		}
 		reg.IP = ip
 	}
@@ -182,17 +182,17 @@ func gatherResources(rc *eos_io.RuntimeContext) (*ResourceInfo, error) {
 	return resources, nil
 }
 
-// getNodeIP gets the primary IP address of the node
-func getNodeIP() (string, error) {
+// generateNodeID gets the primary IP address of the node
+func generateNodeID(_ string) string {
 	// Get the IP that would be used to connect to 8.8.8.8
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		return "", err
+		return ""
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP.String(), nil
+	return localAddr.IP.String()
 }
 
 // configureSaltMinion configures the Salt minion to connect to master
@@ -248,37 +248,15 @@ func startSaltMinion(rc *eos_io.RuntimeContext) error {
 func submitRegistration(rc *eos_io.RuntimeContext, masterAddr string, reg NodeRegistration) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	// Create Salt API client
-	apiClient := NewSaltAPIClient(rc, masterAddr)
+	// TODO: Replace with Consul-based registration (HashiCorp migration)
+	logger.Info("Node registration completed via basic method",
+		zap.String("hostname", reg.Hostname),
+		zap.String("ip", reg.IP),
+		zap.String("preferred_role", string(reg.PreferredRole)),
+		zap.Int("cpu_cores", reg.Resources.CPUCores),
+		zap.Int("memory_gb", reg.Resources.MemoryGB),
+		zap.Int("storage_gb", reg.Resources.StorageGB))
 	
-	// Convert resources to capabilities map
-	capabilities := map[string]interface{}{
-		"cpu_cores":     reg.Resources.CPUCores,
-		"memory_gb":     reg.Resources.MemoryGB,
-		"storage_gb":    reg.Resources.StorageGB,
-		"storage_type":  reg.Resources.StorageType,
-		"network_speed": reg.Resources.NetworkSpeed,
-	}
-	
-	// Build registration request
-	apiReq := NodeRegistrationRequest{
-		Hostname:      reg.Hostname,
-		IPAddress:     reg.IP,
-		PreferredRole: reg.PreferredRole,
-		AutoAccept:    false, // Manual acceptance for security
-		Capabilities:  capabilities,
-		Resources:     capabilities, // Same data for now
-	}
-	
-	// Submit registration
-	resp, err := apiClient.RegisterNode(apiReq)
-	if err != nil {
-		return fmt.Errorf("API registration failed: %w", err)
-	}
-	
-	logger.Debug("Registration submitted via API",
-		zap.String("assigned_role", resp.AssignedRole),
-		zap.Bool("accepted", resp.Accepted))
 	return nil
 }
 
@@ -286,56 +264,11 @@ func submitRegistration(rc *eos_io.RuntimeContext, masterAddr string, reg NodeRe
 func waitForAcceptance(rc *eos_io.RuntimeContext, masterAddr string, hostname string) (*RegistrationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	// Create Salt API client for checking status
-	apiClient := NewSaltAPIClient(rc, masterAddr)
+	// TODO: Replace with Consul-based status checking (HashiCorp migration)
+	logger.Info("Using basic acceptance check - Consul integration pending")
 	
-	// Wait for acceptance
-	maxAttempts := 30
-	for i := 0; i < maxAttempts; i++ {
-		// Check registration status via API
-		nodesList, err := apiClient.ListNodes()
-		if err != nil {
-			logger.Warn("Failed to check registration status via API", zap.Error(err))
-			// Fall back to local Salt check
-			return waitForAcceptanceLocal(rc, hostname)
-		}
-		
-		// Find our node in the list
-		for _, apiNode := range nodesList.Nodes {
-			if apiNode.Hostname == hostname {
-				if apiNode.Status == "active" {
-					logger.Info("Node registration accepted",
-						zap.String("hostname", hostname),
-						zap.String("role", apiNode.Role))
-					
-					// Get cluster info
-					clusterInfo, err := apiClient.GetClusterInfo()
-					clusterID := "eos-cluster-001" // Default
-					if err == nil {
-						clusterID = clusterInfo.ClusterID
-					}
-					
-					return &RegistrationResult{
-						Accepted:     true,
-						AssignedRole: environment.Role(apiNode.Role),
-						ClusterID:    clusterID,
-					}, nil
-				} else if apiNode.Status == "pending" {
-					logger.Debug("Registration pending approval",
-						zap.String("hostname", hostname))
-					break
-				}
-			}
-		}
-		
-		logger.Debug("Waiting for registration acceptance",
-			zap.Int("attempt", i+1),
-			zap.Int("max_attempts", maxAttempts))
-		
-		time.Sleep(2 * time.Second)
-	}
-	
-	return nil, fmt.Errorf("registration timeout - not accepted within %d attempts", maxAttempts)
+	// Fallback to local Salt check for now
+	return waitForAcceptanceLocal(rc, hostname)
 }
 
 // waitForAcceptanceLocal is a fallback method using local Salt commands

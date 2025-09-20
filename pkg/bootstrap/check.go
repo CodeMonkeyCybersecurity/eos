@@ -294,7 +294,7 @@ func checkSaltAPIConfigured(rc *eos_io.RuntimeContext) bool {
 }
 
 // checkFileRootsConfigured verifies Salt file_roots are properly set up
-func checkFileRootsConfigured(rc *eos_io.RuntimeContext) bool {
+func checkFileRootsConfigured(_ *eos_io.RuntimeContext) bool {
 	// Check if required directories exist
 	requiredDirs := []string{
 		"/srv/salt",

@@ -25,7 +25,7 @@ n8n is a powerful workflow automation tool that allows you to connect different 
 and automate tasks. This command provides a complete production-ready deployment with:
 
 - Automatic environment discovery (production/staging/development)
-- Secure credential generation and storage (Vault/SaltStack/file)
+- Secure credential generation and storage 
 - PostgreSQL database with automated setup
 - Redis for job queuing and horizontal scaling
 - Container orchestration via Nomad

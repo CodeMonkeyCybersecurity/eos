@@ -148,23 +148,7 @@ func getBoolFlag(cmd *cobra.Command, name string) bool {
 	return false
 }
 
-func isComponentInstalled(rc *eos_io.RuntimeContext, component string) bool {
-	switch component {
-	case "salt":
-		status, _ := CheckService(rc, "salt-minion")
-		return status == ServiceStatusActive
-	case "vault":
-		status, _ := CheckService(rc, "vault")
-		return status == ServiceStatusActive
-	case "nomad":
-		status, _ := CheckService(rc, "nomad")
-		return status == ServiceStatusActive
-	case "osquery":
-		status, _ := CheckService(rc, "osqueryd")
-		return status == ServiceStatusActive
-	}
-	return false
-}
+// isComponentInstalled function removed - was unused
 
 // AddBootstrapFlags adds all bootstrap flags to a command
 func AddBootstrapFlags(cmd *cobra.Command) {

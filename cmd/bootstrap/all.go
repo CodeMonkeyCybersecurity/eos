@@ -176,8 +176,8 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	//     return fmt.Errorf("failed to bootstrap Nomad: %w", err)
 	// }
 	tracker.AddComponent(state.Component{
-		Type:        state.ComponentSalt,
-		Name:        "salt-master",
+		Type:        state.ComponentConsul,
+		Name:        "consul",
 		Status:      "active",
 		InstalledAt: time.Now(),
 	})
@@ -243,7 +243,7 @@ func runQuickstart(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.Int("total_phases", 4))
 
 	// Gather current state
-	if err := tracker.GatherInBand(rc); err != nil {
+	if err := tracker.GatherOutOfBand(rc); err != nil {
 		logger.Warn("Failed to gather in-band state", zap.Error(err))
 	}
 

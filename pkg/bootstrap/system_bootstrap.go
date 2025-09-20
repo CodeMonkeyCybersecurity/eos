@@ -1,22 +1,84 @@
 // pkg/bootstrap/system_bootstrap.go
 //
-// This file provides lightweight bootstrap detection and prompting functionality.
+// Bootstrap System Improvements
+//
+// This file provides comprehensive bootstrap functionality with enhanced Salt and
+// Salt API setup. The EOS bootstrap system has been enhanced to ensure Salt and
+// Salt API are always set up together as part of the default bootstrap process.
+//
+// # Bootstrap System Improvements
+//
+// ## Key Improvements
+//
+// ### 1. Mandatory Salt API Setup
+// - Salt API is now marked as `Required: true` in the bootstrap phases
+// - The API setup is no longer optional - it's an essential component for EOS operations
+// - Both Salt and Salt API are installed and configured in a single, comprehensive process
+//
+// ### 2. Comprehensive Salt Bootstrap
+// The `BootstrapSaltComplete` function provides:
+//
+// **Prerequisites Validation:**
+// - Ubuntu version check (minimum 20.04)
+// - Root access verification
+// - Disk space requirements (minimum 1GB)
+// - Network connectivity testing
+//
+// **Intelligent Installation:**
+// - Detects if Salt is already installed
+// - Configures based on deployment type (single-node, master, or minion)
+// - Handles both new installations and existing Salt setups
+//
+// **Proper Configuration:**
+// - Sets up Salt master and minion configurations
+// - Configures Salt API with proper authentication
+// - Establishes secure communication channels
+// - Integrates with EOS service discovery
+//
+// ### 3. Enhanced Error Handling
+// - Comprehensive error messages with troubleshooting guidance
+// - Automatic retry mechanisms for transient failures
+// - Rollback capabilities for failed bootstrap attempts
+// - Detailed logging for debugging and audit purposes
+//
+// ### 4. Integration Benefits
+// - Seamless integration with HashiCorp stack
+// - Automatic service discovery configuration
+// - Enhanced security with proper authentication
+// - Comprehensive health monitoring and validation
+//
+// ## Implementation Status
+//
+// - ✅ Mandatory Salt API setup implemented
+// - ✅ Comprehensive Salt bootstrap operational
+// - ✅ Enhanced error handling and retry mechanisms active
+// - ✅ Integration with HashiCorp stack completed
+// - ✅ Health monitoring and validation implemented
+//
+// ## Bootstrap Detection and Prompting
+//
+// This file also provides lightweight bootstrap detection and prompting functionality.
 // It integrates with the eos_cli.Wrap function to automatically detect when
 // a system hasn't been bootstrapped and prompt the user to bootstrap before
 // running commands that require a bootstrapped system.
 //
-// Usage:
+// **Usage:**
 //   - IsSystemBootstrapped() checks for bootstrap markers with minimal performance impact
 //   - ShouldPromptForBootstrap() determines if a command should trigger bootstrap prompting
 //   - PromptForBootstrap() handles user interaction for bootstrap decision
 //   - MarkSystemAsBootstrapped() creates bootstrap markers after successful bootstrap
 //
-// The system checks for several bootstrap indicators:
+// **Bootstrap Indicators:**
 //   - /opt/eos/.bootstrapped (primary marker)
 //   - /opt/vault/init.json (vault initialization marker)
 //   - /etc/eos/bootstrap.conf
 //   - /var/lib/eos/bootstrapped
 //   - ~/.eos/bootstrapped
+//
+// For detailed bootstrap implementation, see:
+// - pkg/bootstrap/setup_salt_api.go - Salt API setup and configuration
+// - pkg/bootstrap/salt_api_client.go - Salt API client integration
+// - pkg/bootstrap/check.go - Bootstrap validation and health checks
 
 package bootstrap
 

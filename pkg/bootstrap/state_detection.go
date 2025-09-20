@@ -78,8 +78,6 @@ type ServiceHealthResponse struct {
 // getRequiredPorts returns the list of ports required for bootstrap
 func getRequiredPorts() []int {
 	return []int{
-		4505, 4506, // Salt master
-		8000,       // Salt API
 		8200,       // Vault
 		8300, 8301, 8302, 8500, 8600, // Consul
 		4646, 4647, 4648,             // Nomad
@@ -580,9 +578,14 @@ func checkPortConflict(rc *eos_io.RuntimeContext, port int) *PortConflict {
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		if strings.Contains(line, fmt.Sprintf(":%d ", port)) {
-			conflict := parseSSOutput(rc, line, port)
-			if conflict != nil {
-				return conflict
+			// Port conflict detected - return basic conflict info
+			return &PortConflict{
+				Port:         port,
+				ServiceName:  "unknown",
+				ProcessID:    0,
+				ProcessName:  "unknown",
+				CanStop:      false,
+				IsEosService: false,
 			}
 		}
 	}
@@ -598,70 +601,7 @@ func checkPortConflict(rc *eos_io.RuntimeContext, port int) *PortConflict {
 	}
 }
 
-// parseSSOutput parses ss command output to extract process information
-func parseSSOutput(rc *eos_io.RuntimeContext, line string, port int) *PortConflict {
-	// ss output format: LISTEN 0 128 *:8500 *:* users:(("consul",pid=1234,fd=8))
-	parts := strings.Fields(line)
-	if len(parts) < 6 {
-		return nil
-	}
-
-	// Extract process info from users:((name,pid=123,fd=8))
-	usersPart := parts[len(parts)-1]
-	if !strings.Contains(usersPart, "pid=") {
-		return nil
-	}
-
-	// Parse process name and PID
-	processName := ""
-	processID := 0
-
-	// Extract from users:(("process",pid=1234,fd=8))
-	start := strings.Index(usersPart, "((\"") + 3
-	end := strings.Index(usersPart[start:], "\",")
-	if start > 2 && end > 0 {
-		processName = usersPart[start : start+end]
-	}
-
-	pidStart := strings.Index(usersPart, "pid=") + 4
-	pidEnd := strings.Index(usersPart[pidStart:], ",")
-	if pidStart > 3 && pidEnd > 0 {
-		if pid, err := strconv.Atoi(usersPart[pidStart : pidStart+pidEnd]); err == nil {
-			processID = pid
-		}
-	}
-
-	// Determine service name and if it can be stopped
-	serviceName := mapProcessToService(processName)
-	canStop := canStopProcess(rc, processName, processID)
-	isEosService := isEosServiceProcess(processName)
-
-	return &PortConflict{
-		Port:         port,
-		ServiceName:  serviceName,
-		ProcessID:    processID,
-		ProcessName:  processName,
-		CanStop:      canStop,
-		IsEosService: isEosService,
-	}
-}
-
-// mapProcessToService maps process names to service names
-func mapProcessToService(processName string) string {
-	serviceMap := map[string]string{
-		"vault":       "vault",
-		"consul":      "consul",
-		"nomad":       "nomad",
-		"salt-master": "salt-master",
-		"salt-api":    "salt-api",
-	}
-
-	if service, exists := serviceMap[processName]; exists {
-		return service
-	}
-
-	return processName
-}
+// parseSSOutput and mapProcessToService functions removed - were unused
 
 // canStopProcess determines if a process can be safely stopped
 func canStopProcess(rc *eos_io.RuntimeContext, processName string, processID int) bool {

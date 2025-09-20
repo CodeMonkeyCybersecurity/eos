@@ -207,7 +207,7 @@ func GenerateRemovalReport(rc *eos_io.RuntimeContext, result *NukeResult, phaseR
 
 func loadFinalState(rc *eos_io.RuntimeContext) (*state.StateTracker, error) {
 	finalTracker := state.New()
-	if err := finalTracker.GatherInBand(rc); err != nil {
+	if err := finalTracker.GatherOutOfBand(rc); err != nil {
 		return nil, fmt.Errorf("failed to gather final state: %w", err)
 	}
 	return finalTracker, nil

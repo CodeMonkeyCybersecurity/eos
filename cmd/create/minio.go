@@ -15,7 +15,6 @@ var minioCmd = &cobra.Command{
 	Long: `Deploy MinIO object storage using the EOS framework's SaltStack → Terraform → Nomad workflow.
 
 This command will:
-- Apply SaltStack states to prepare nodes and configure Vault
 - Deploy MinIO using Terraform to manage Nomad jobs and Consul services
 - Configure dynamic credentials via Vault
 - Set up Prometheus metrics collection
@@ -36,7 +35,6 @@ Prerequisites:
 		storagePath, _ := cmd.Flags().GetString("storage-path")
 		apiPort, _ := cmd.Flags().GetInt("api-port")
 		consolePort, _ := cmd.Flags().GetInt("console-port")
-		skipSalt, _ := cmd.Flags().GetBool("skip-salt")
 		skipTerraform, _ := cmd.Flags().GetBool("skip-terraform")
 
 		// Create deployment options
@@ -45,7 +43,6 @@ Prerequisites:
 			StoragePath:   storagePath,
 			APIPort:       apiPort,
 			ConsolePort:   consolePort,
-			SkipSalt:      skipSalt,
 			SkipTerraform: skipTerraform,
 		}
 
@@ -67,7 +64,6 @@ func init() {
 	minioCmd.Flags().String("storage-path", "/mnt/external_disk", "Storage path for MinIO data")
 	minioCmd.Flags().Int("api-port", 9123, "MinIO API port")
 	minioCmd.Flags().Int("console-port", 8123, "MinIO console port")
-	minioCmd.Flags().Bool("skip-salt", false, "Skip SaltStack configuration")
 	minioCmd.Flags().Bool("skip-terraform", false, "Skip Terraform deployment (useful for manual Nomad job submission)")
 
 	// Register with parent command

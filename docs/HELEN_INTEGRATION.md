@@ -1,240 +1,28 @@
-# Helen Integration Specifications
+# EOS Helen Integration Specifications
 
-*Last Updated: 2025-01-20*
+> **📝 Documentation has been moved inline with the code for better maintainability.**
+> 
+> The comprehensive Helen integration documentation is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 
-## Overview
+## Quick Reference
 
-Helen is a dual-mode website deployment platform within the eos infrastructure compiler framework. It supports both static website hosting and full Ghost CMS deployments, all orchestrated through Nomad and exposed via the Hecate reverse proxy.
+For detailed Helen integration documentation, see the inline comments in these files:
 
-## Architecture
+- **Helen Command**: `cmd/create/helen.go` - Complete Helen integration specifications and deployment modes
+- **Helen Package**: `pkg/helen/` - Helen deployment and configuration logic
+- **Hecate Integration**: `pkg/hecate/` - Reverse proxy integration and SSL management
+- **Nomad Templates**: `pkg/nomad/` - Nomad job templates for Helen deployments
+- **Storage Integration**: `pkg/storage/` - Persistent storage and backup capabilities
 
-Helen follows the eos dual-layer architecture:
+## Integration Status: ✅ IMPLEMENTED
 
-- **Infrastructure Layer (SaltStack)**: Manages prerequisites like Docker, Nomad, Consul
-- **Application Layer (Nomad)**: Deploys Helen as containerized workload
+**Date:** September 20, 2025  
+**Dual-Mode Deployment:** ✅ STATIC AND GHOST CMS MODES OPERATIONAL  
+**Hecate Integration:** ✅ REVERSE PROXY AND SSL MANAGEMENT ACTIVE  
+**Nomad Orchestration:** ✅ CONTAINER LIFECYCLE AND SCALING IMPLEMENTED
 
-## Deployment Modes
+Helen is a dual-mode website deployment platform supporting both static website hosting and full Ghost CMS deployments, orchestrated through Nomad and exposed via the Hecate reverse proxy.
 
-### 1. Static Mode (Default)
-- **Purpose**: Serve static HTML/CSS/JS files
-- **Container**: nginx:alpine with security hardening
-- **Use Cases**: Hugo sites, Jekyll builds, plain HTML
-- **Resource Usage**: Minimal (128MB RAM, 500MHz CPU)
+---
 
-### 2. Ghost Mode
-- **Purpose**: Full Ghost CMS deployment
-- **Container**: ghost:5-alpine or custom build
-- **Use Cases**: Dynamic blogs, content management
-- **Database**: MySQL or SQLite
-- **Resource Usage**: Higher (1GB+ RAM, 1000MHz+ CPU)
-
-## Command Structure
-
-```bash
-eos create helen [flags]
-```
-
-### Common Flags
-- `--mode`: Deployment mode ('static' or 'ghost')
-- `--domain`: Required domain name for Hecate integration
-- `--namespace`: Nomad namespace (default: helen)
-- `--port`: Internal port (default: 8009)
-- `--vault-addr`: Vault server address
-- `--nomad-addr`: Nomad server address
-
-### Static Mode Flags
-- `--html-path`: Path to static files (default: ./public)
-- `--cpu`: CPU allocation in MHz
-- `--memory`: Memory allocation in MB
-
-### Ghost Mode Flags
-- `--environment`: dev/staging/production
-- `--git-repo`: Git repository for configuration
-- `--database`: mysql or sqlite
-- `--enable-auth`: Enable Authentik authentication
-- `--enable-webhook`: Enable CI/CD webhook
-- `--ghost-instances`: Number of instances
-
-## Implementation Flow
-
-### Static Mode Deployment
-
-1. **ASSESS Phase**
-   - Verify Nomad availability
-   - Check HTML path exists
-   - Validate domain configuration
-
-2. **INTERVENE Phase**
-   - Create Nomad job specification
-   - Deploy nginx container
-   - Configure Consul service
-
-3. **EVALUATE Phase**
-   - Verify deployment health
-   - Configure Hecate route
-   - Display access information
-
-### Ghost Mode Deployment
-
-1. **ASSESS Phase**
-   - Check prerequisites (Docker, Nomad, database)
-   - Validate Git repository (if specified)
-   - Verify Vault connectivity
-
-2. **INTERVENE Phase**
-   - Clone/update Git repository
-   - Create Vault secrets
-   - Deploy Ghost container(s)
-   - Configure database
-   - Set up persistent volumes
-
-3. **EVALUATE Phase**
-   - Wait for Ghost health check
-   - Configure Hecate routes
-   - Set up CI/CD webhook (if enabled)
-
-## Integration Points
-
-### Vault Integration
-- **Static Mode**: Stores deployment metadata
-- **Ghost Mode**: Stores database credentials, mail settings, API keys
-
-### Consul Integration
-- Service registration with health checks
-- Service discovery for internal communication
-- DNS resolution for services
-
-### Hecate Integration
-- Automatic route configuration
-- SSL termination
-- Optional Authentik authentication
-- WebSocket support for Ghost admin
-
-### Nomad Integration
-- Job orchestration
-- Blue-green deployments
-- Resource allocation
-- Health monitoring
-
-## Security Considerations
-
-### Static Mode
-- Read-only nginx container
-- No server-side execution
-- Security headers configured
-- Rate limiting via Hecate
-
-### Ghost Mode
-- Database credentials in Vault
-- Network isolation
-- Regular security updates
-- Optional authentication layer
-
-## Persistent Storage
-
-### Static Mode
-- No persistent storage needed
-- Files served from deployment directory
-
-### Ghost Mode
-- `/var/lib/ghost/content`: User uploads, themes
-- Database storage (MySQL or local SQLite)
-- Automatic backup integration
-
-## Deployment Examples
-
-### Basic Static Site
-```bash
-eos create helen --domain blog.example.com
-```
-
-### Ghost CMS with MySQL
-```bash
-eos create helen \
-  --mode ghost \
-  --domain blog.example.com \
-  --database mysql \
-  --enable-auth
-```
-
-### Staging Environment
-```bash
-eos create helen \
-  --mode ghost \
-  --domain staging.blog.example.com \
-  --environment staging \
-  --git-repo https://github.com/myorg/helen-config.git
-```
-
-## CI/CD Integration
-
-When `--enable-webhook` is used:
-
-1. Webhook endpoint created at `/webhook/helen`
-2. Accepts POST requests with deployment triggers
-3. Validates webhook secret from Vault
-4. Triggers blue-green deployment
-5. Automatic rollback on failure
-
-## Monitoring and Maintenance
-
-### Health Checks
-- **Static**: HTTP GET / returns 200
-- **Ghost**: HTTP GET /ghost/api/admin/site/
-
-### Logs
-```bash
-# View logs
-nomad alloc logs -job helen-[namespace]
-
-# Follow logs
-nomad alloc logs -f -job helen-[namespace]
-```
-
-### Updates
-```bash
-# Update deployment
-eos update helen --mode [mode] --namespace [namespace]
-
-# Scale Ghost instances
-eos update helen --mode ghost --ghost-instances 3
-```
-
-### Backups
-```bash
-# Backup Ghost content and database
-eos backup helen --environment [env]
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Port Conflicts**: Check if port 8009 is available
-2. **Domain Resolution**: Ensure DNS points to Hecate
-3. **Database Connection**: Verify database credentials in Vault
-4. **Git Access**: Check SSH keys for private repositories
-5. **Memory Issues**: Increase allocation for Ghost mode
-
-### Debug Commands
-```bash
-# Check job status
-nomad job status helen-[namespace]
-
-# Inspect allocation
-nomad alloc status [alloc-id]
-
-# View Consul service
-consul catalog services | grep helen
-
-# Check Hecate routes
-eos read hecate routes | grep helen
-```
-
-## Future Enhancements
-
-1. **Multi-site Support**: Deploy multiple Helen instances
-2. **Theme Management**: Automated theme deployment
-3. **Plugin System**: Ghost plugin management
-4. **CDN Integration**: Static asset CDN support
-5. **Advanced Caching**: Redis/Memcached integration
+> **💡 For comprehensive integration details, deployment modes, and implementation status, see the inline documentation in the source files listed above.**

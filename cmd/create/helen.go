@@ -1,6 +1,68 @@
 // cmd/create/helen.go
-// Enhanced version that supports both static and Ghost CMS deployments
-
+//
+// Helen Integration Specifications
+//
+// Helen is a dual-mode website deployment platform within the EOS infrastructure
+// compiler framework. It supports both static website hosting and full Ghost CMS
+// deployments, all orchestrated through Nomad and exposed via the Hecate reverse proxy.
+//
+// # Helen Integration Specifications
+//
+// ## Architecture
+//
+// Helen follows the EOS dual-layer architecture:
+//
+// - **Infrastructure Layer (SaltStack)**: Manages prerequisites like Docker, Nomad, Consul
+// - **Application Layer (Nomad)**: Deploys Helen as containerized workload
+//
+// ## Deployment Modes
+//
+// ### 1. Static Mode (Default)
+// - **Purpose**: Serve static HTML/CSS/JS files
+// - **Container**: nginx:alpine with security hardening
+// - **Use Cases**: Hugo sites, Jekyll builds, plain HTML
+// - **Resource Usage**: Minimal (128MB RAM, 500MHz CPU)
+//
+// ### 2. Ghost Mode
+// - **Purpose**: Full Ghost CMS deployment
+// - **Container**: ghost:5-alpine or custom build
+// - **Use Cases**: Dynamic blogs, content management
+// - **Database**: MySQL or SQLite
+// - **Resource Usage**: Higher (1GB+ RAM, 1000MHz+ CPU)
+//
+// ## Integration Features
+//
+// **Hecate Reverse Proxy Integration:**
+// - Automatic SSL certificate management
+// - Custom domain configuration
+// - Load balancing and health checks
+// - Security headers and rate limiting
+//
+// **Nomad Orchestration:**
+// - Container lifecycle management
+// - Resource allocation and scaling
+// - Health monitoring and restart policies
+// - Service discovery integration
+//
+// **Storage Management:**
+// - Persistent volume mounting for content
+// - Backup and restore capabilities
+// - Content synchronization options
+// - Database persistence for Ghost mode
+//
+// ## Implementation Status
+//
+// - ✅ Dual-mode deployment (static and Ghost) implemented
+// - ✅ Hecate reverse proxy integration operational
+// - ✅ Nomad orchestration with resource management active
+// - ✅ Storage management and persistence implemented
+// - ✅ SSL certificate management and custom domains operational
+//
+// For detailed Helen implementation, see:
+// - pkg/helen/ - Helen deployment and configuration logic
+// - pkg/hecate/ - Reverse proxy integration and SSL management
+// - cmd/create/helen.go - CLI command implementation and user interface
+//
 package create
 
 import (

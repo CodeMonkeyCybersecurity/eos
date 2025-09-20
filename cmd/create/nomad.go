@@ -22,7 +22,6 @@
 //
 // Architecture Integration:
 // Nomad fits into the EOS infrastructure stack as the container runtime layer:
-// Human Intent → EOS CLI → SaltStack (config) → Terraform (resources) → Nomad (runtime)
 //
 // Available Commands:
 // - eos create nomad                              # Install as both server and client
@@ -42,7 +41,6 @@
 // - Consul: Service discovery and health checking
 // - Vault: Secret management and dynamic credentials
 // - Docker: Container runtime for workloads
-// - SaltStack: Configuration management and orchestration
 //
 // Usage Examples:
 //   # Basic installation

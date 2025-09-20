@@ -142,62 +142,20 @@ func detectFromMaster(rc *eos_io.RuntimeContext, masterAddr string, preferredRol
 
 	logger.Info("Connected to Salt master, querying cluster state")
 
-	// Create Salt API client to query cluster information
-	apiClient := NewSaltAPIClient(rc, masterAddr)
+	// Use basic cluster detection (HashiCorp migration - Consul integration TODO)
+	logger.Info("Using basic cluster detection - Consul integration pending")
 	
-	// Try to get cluster information from the API
-	clusterInfo, err := queryClusterViaAPI(rc, apiClient, masterAddr, preferredRole)
-	if err != nil {
-		logger.Warn("Failed to query cluster via API, falling back to Salt minion queries", 
-			zap.Error(err))
-		
-		// Fallback to direct Salt commands if API isn't available
-		return queryClusterViaSalt(rc, masterAddr, preferredRole)
-	}
-	
-	return clusterInfo, nil
+	// Fallback to direct Salt commands for now
+	return queryClusterViaSalt(rc, masterAddr, preferredRole)
 }
 
-// queryClusterViaAPI queries cluster information using the Salt API
-func queryClusterViaAPI(rc *eos_io.RuntimeContext, apiClient *SaltAPIClient, masterAddr string, preferredRole string) (*ClusterInfo, error) {
+// queryClusterViaAPI function removed - replaced with Consul-based discovery (HashiCorp migration)
+func queryClusterViaAPI(rc *eos_io.RuntimeContext, _ interface{}, masterAddr string, preferredRole string) (*ClusterInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("API-based cluster query not implemented - using fallback to Salt commands")
 	
-	// First, try to get cluster info from our custom endpoint
-	clusterResp, err := apiClient.GetClusterInfo()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get cluster info: %w", err)
-	}
-	
-	// Use cluster information directly from the response
-	clusterID := clusterResp.ClusterID
-	if clusterID == "" {
-		clusterID = "unknown"
-	}
-	
-	// Query connected minions to determine cluster size and nodes
-	nodes, err := queryClusterNodes(rc, apiClient)
-	if err != nil {
-		logger.Warn("Failed to query cluster nodes", zap.Error(err))
-		nodes = []NodeInfo{} // Empty list, will be populated later
-	}
-	
-	// Determine role based on cluster state and preferences
-	assignedRole := determineNodeRole(preferredRole, len(nodes))
-	
-	logger.Info("Successfully queried cluster state via API",
-		zap.String("cluster_id", clusterID),
-		zap.Int("node_count", len(nodes)),
-		zap.String("assigned_role", string(assignedRole)))
-	
-	return &ClusterInfo{
-		IsSingleNode:  len(nodes) <= 1,
-		IsMaster:      false, // This node is joining, not the master
-		MasterAddr:    masterAddr,
-		NodeCount:     len(nodes) + 1, // +1 for this node joining
-		MyRole:        assignedRole,
-		ClusterID:     clusterID,
-		ExistingNodes: nodes,
-	}, nil
+	// Fallback to Salt-based detection
+	return queryClusterViaSalt(rc, masterAddr, preferredRole)
 }
 
 // queryClusterViaSalt queries cluster information using direct Salt commands
@@ -248,7 +206,7 @@ func queryClusterViaSalt(rc *eos_io.RuntimeContext, masterAddr string, preferred
 }
 
 // queryClusterNodes queries the existing nodes in the cluster
-func queryClusterNodes(rc *eos_io.RuntimeContext, apiClient *SaltAPIClient) ([]NodeInfo, error) {
+func queryClusterNodes(rc *eos_io.RuntimeContext, _ interface{}) ([]NodeInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// This would make an API call to get minion information

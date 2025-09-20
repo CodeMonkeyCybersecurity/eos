@@ -180,7 +180,7 @@ func (c *Checkpoint) captureServiceStates(rc *eos_io.RuntimeContext) error {
 }
 
 // backupFiles backs up critical configuration files
-func (c *Checkpoint) backupFiles(rc *eos_io.RuntimeContext) error {
+func (c *Checkpoint) backupFiles(_ *eos_io.RuntimeContext) error {
 	// Files to backup
 	files := []string{
 		"/etc/salt/minion",

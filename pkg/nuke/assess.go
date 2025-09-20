@@ -73,7 +73,7 @@ func loadCurrentState(rc *eos_io.RuntimeContext) (*state.StateTracker, error) {
 	if err != nil {
 		logger.Warn("Failed to load state file, scanning for components", zap.Error(err))
 		tracker = state.New()
-		if err := tracker.GatherInBand(rc); err != nil {
+		if err := tracker.GatherOutOfBand(rc); err != nil {
 			logger.Warn("Failed to gather in-band state", zap.Error(err))
 		}
 	}

@@ -59,7 +59,7 @@ func runListAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 	
 	// Gather current state
 	logger.Info("Gathering in-band state information")
-	if err := tracker.GatherInBand(rc); err != nil {
+	if err := tracker.GatherOutOfBand(rc); err != nil {
 		logger.Warn("Failed to gather complete in-band state", zap.Error(err))
 	}
 	
@@ -125,20 +125,10 @@ func runListAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 		fmt.Println()
 	}
 	
-	// Salt section
-	if len(tracker.SaltStates) > 0 {
-		fmt.Println("Salt States:")
-		fmt.Println("-----------")
-		for _, state := range tracker.SaltStates {
-			fmt.Printf("  • %s\n", state)
-		}
-		fmt.Println()
-	}
-	
-	// Nomad section
+	// Nomad Jobs section (replacing Salt States)
 	if len(tracker.NomadJobs) > 0 {
 		fmt.Println("Nomad Jobs:")
-		fmt.Println("----------")
+		fmt.Println("-----------")
 		for _, job := range tracker.NomadJobs {
 			fmt.Printf("  • %s\n", job)
 		}
@@ -199,7 +189,6 @@ func runListAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 	fmt.Println("--------")
 	fmt.Printf("Components: %d\n", len(tracker.Components))
 	fmt.Printf("Services:   %d\n", len(tracker.SystemdUnits))
-	fmt.Printf("Salt States: %d\n", len(tracker.SaltStates))
 	fmt.Printf("Nomad Jobs: %d\n", len(tracker.NomadJobs))
 	fmt.Printf("Directories: %d\n", len(tracker.Directories))
 	fmt.Printf("\nLast Updated: %s\n", tracker.LastUpdated.Format("2006-01-02 15:04:05"))

@@ -328,10 +328,8 @@ func createCICDPipeline(rc *eos_io.RuntimeContext, config *cicd.PipelineConfig) 
 		return fmt.Errorf("failed to initialize pipeline engine: %w", err)
 	}
 
-	// Step 4: Create Salt states directory structure
-	if err := createSaltStates(rc, config); err != nil {
-		return fmt.Errorf("failed to create Salt states: %w", err)
-	}
+	// Step 4: Create configuration structure (HashiCorp migration - replacing Salt states)
+	logger.Info("Salt states creation skipped - migrating to HashiCorp configuration")
 
 	// Step 5: Create Terraform configuration
 	if err := createTerraformConfig(rc, config); err != nil {
@@ -378,31 +376,6 @@ func writePipelineConfig(config *cicd.PipelineConfig, filename string) error {
 	// Write a simple configuration placeholder
 	_, err = file.WriteString(fmt.Sprintf("# CI/CD Pipeline Configuration for %s\n", config.AppName))
 	return err
-}
-
-// createSaltStates creates the Salt state files for deployment
-func createSaltStates(rc *eos_io.RuntimeContext, config *cicd.PipelineConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	statesDir := fmt.Sprintf("/srv/salt/states/%s", config.AppName)
-	if err := os.MkdirAll(statesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create Salt states directory: %w", err)
-	}
-
-	// Create deploy.sls
-	deployState := filepath.Join(statesDir, "deploy.sls")
-	if err := createDeployState(deployState, config); err != nil {
-		logger.Warn("Failed to create deploy state", zap.Error(err))
-	}
-
-	// Create rollback.sls
-	rollbackState := filepath.Join(statesDir, "rollback.sls")
-	if err := createRollbackState(rollbackState, config); err != nil {
-		logger.Warn("Failed to create rollback state", zap.Error(err))
-	}
-
-	logger.Info("Salt states created", zap.String("directory", statesDir))
-	return nil
 }
 
 // createTerraformConfig creates the Terraform configuration files

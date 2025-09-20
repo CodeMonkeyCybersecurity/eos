@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -433,7 +434,7 @@ func fileExists(path string) bool {
 
 // getAvailableDiskSpace returns available disk space in MB for the given path
 func getAvailableDiskSpace(path string) (int64, error) {
-	output, err := execute.Run(nil, execute.Options{
+	output, err := execute.Run(context.TODO(), execute.Options{
 		Command: "df",
 		Args:    []string{"-m", path},
 		Capture: true,
