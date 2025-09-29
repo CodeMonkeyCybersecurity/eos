@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/ai"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/test"
@@ -67,56 +68,146 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		// Phase 2: INTERVENE - Perform the update operations
 		logger.Info("Phase 2: INTERVENE - Performing update operations")
 		
-		// Check for uncommitted changes
+		// Check for uncommitted changes and conflicts first
 		statusCmd := exec.Command("git", "status", "--porcelain")
-		statusOutput, err := statusCmd.Output()
+		statusOutput, err := statusCmd.CombinedOutput()
 		if err != nil {
-			logger.Error(" Failed to check git status", zap.Error(err))
-			return fmt.Errorf("failed to check git status: %w", err)
+			logger.Error("Failed to check git status", zap.Error(err), zap.String("output", string(statusOutput)))
+			return fmt.Errorf("failed to check git status: %w - output: %s", err, string(statusOutput))
+		}
+
+		// Check for merge conflicts
+		conflictCmd := exec.Command("git", "diff", "--name-only", "--diff-filter=U")
+		conflictOutput, _ := conflictCmd.Output()
+		if len(conflictOutput) > 0 {
+			logger.Warn("Unresolved merge conflicts detected", 
+				zap.String("conflicts", string(conflictOutput)))
+			logger.Info("\n" + 
+				"❌ Cannot update - there are unresolved merge conflicts.\n" +
+				"Please resolve them manually with these steps:\n" +
+				"1. Resolve the conflicts marked in these files:\n   " + 
+				strings.ReplaceAll(string(conflictOutput), "\n", "\n   ") + "\n" +
+				"2. Mark them as resolved: git add <file>\n" +
+				"3. Complete the merge: git commit\n" +
+				"4. Try updating again: sudo eos self update")
+			return fmt.Errorf("unresolved merge conflicts detected")
 		}
 
 		// If there are uncommitted changes, stash them
 		var stashed bool
 		if len(statusOutput) > 0 {
-			logger.Info(" Detected uncommitted changes, stashing them")
-			stashCmd := exec.Command("git", "stash", "push", "-m", "eos-self-update-auto-stash")
-			stashCmd.Stdout = os.Stdout
-			stashCmd.Stderr = os.Stderr
-			if err := stashCmd.Run(); err != nil {
-				logger.Error(" Failed to stash changes", zap.Error(err))
-				return fmt.Errorf("failed to stash uncommitted changes: %w", err)
+			logger.Info("Detected uncommitted changes, stashing them")
+			stashSave := exec.Command("git", "stash", "save", "--include-untracked", "--keep-index", 
+				"eos-self-update-auto-stash")
+			stashSave.Stdout = os.Stdout
+			stashSave.Stderr = os.Stderr
+			
+			if err := stashSave.Run(); err != nil {
+				// Check if stashing failed because there were no changes to stash
+				if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+					// Git returns 1 when there's nothing to stash
+					logger.Debug("No changes to stash")
+				} else {
+					logger.Error("Failed to stash changes", zap.Error(err))
+					return fmt.Errorf("failed to stash uncommitted changes: %w", err)
+				}
+			} else {
+				stashed = true
 			}
-			stashed = true
 		}
 
-		// Execute git pull
-		logger.Info(" Pulling latest changes from git repository")
-		gitCmd := exec.Command("git", "pull")
-		gitCmd.Stdout = os.Stdout
-		gitCmd.Stderr = os.Stderr
-		if err := gitCmd.Run(); err != nil {
-			logger.Error(" Git pull failed", zap.Error(err))
-			if stashed {
-				logger.Info(" Attempting to restore stashed changes")
-				popCmd := exec.Command("git", "stash", "pop")
-				popCmd.Stdout = os.Stdout
-				popCmd.Stderr = os.Stderr
-				_ = popCmd.Run() // Best effort restore
+		// Execute git fetch first to avoid merge issues
+		logger.Info("Fetching latest changes from remote...")
+		fetchCmd := exec.Command("git", "fetch", "--all", "--prune")
+		fetchCmd.Stdout = os.Stdout
+		fetchCmd.Stderr = os.Stderr
+		if err := fetchCmd.Run(); err != nil {
+			logger.Error("Git fetch failed", zap.Error(err))
+			return fmt.Errorf("failed to fetch latest changes: %w", err)
+		}
+
+		// Check if we can fast-forward
+		logger.Info("Checking if we can fast-forward...")
+		aheadCmd := exec.Command("git", "rev-list", "--count", "--left-right", "HEAD...@{u}")
+		aheadOutput, _ := aheadCmd.Output()
+		
+		// Execute git pull with rebase to avoid merge commits
+		logger.Info("Pulling latest changes with rebase...")
+		pullCmd := exec.Command("git", "pull", "--rebase")
+		pullCmd.Stdout = os.Stdout
+		pullCmd.Stderr = os.Stderr
+		
+		if err := pullCmd.Run(); err != nil {
+			logger.Error("Git pull with rebase failed", zap.Error(err))
+			
+			// Check for merge conflicts
+			conflictCmd := exec.Command("git", "diff", "--name-only", "--diff-filter=U")
+			conflictOutput, _ := conflictCmd.Output()
+			
+			if len(conflictOutput) > 0 {
+				// Abort the rebase
+				exec.Command("git", "rebase", "--abort").Run()
+				
+				logger.Error("\n❌ Merge conflict detected during update",
+					zap.String("conflicting_files", string(conflictOutput)))
+				
+				// Provide recovery instructions
+				logger.Info("\nTo resolve this issue:\n" +
+					"1. Resolve the conflicts in these files:\n   " +
+					strings.ReplaceAll(string(conflictOutput), "\n", "\n   ") + "\n" +
+					"2. Mark them as resolved: git add <file>\n" +
+					"3. Continue the rebase: git rebase --continue\n" +
+					"4. Try updating again: sudo eos self update\n\n" +
+					"Or to reset to a clean state (WARNING: discards local changes):\n" +
+					"  git reset --hard HEAD && git clean -fd")
+				
+				return fmt.Errorf("merge conflict during update")
 			}
-			return fmt.Errorf("failed to pull latest changes: %w", err)
+			
+			// For other git errors, try a regular pull
+			logger.Warn("Rebase failed, attempting regular pull...")
+			pullCmd = exec.Command("git", "pull")
+			pullCmd.Stdout = os.Stdout
+			pullCmd.Stderr = os.Stderr
+			
+			if err := pullCmd.Run(); err != nil {
+				logger.Error("Regular git pull also failed", zap.Error(err))
+				return fmt.Errorf("failed to pull changes: %w", err)
+			}
 		}
 
 		// If we stashed changes, pop them back
 		if stashed {
-			logger.Info(" Restoring stashed changes")
-			popCmd := exec.Command("git", "stash", "pop")
-			popCmd.Stdout = os.Stdout
-			popCmd.Stderr = os.Stderr
-			if err := popCmd.Run(); err != nil {
-				logger.Warn(" Failed to restore stashed changes, they remain in stash", zap.Error(err))
-				logger.Info(" You can manually restore them with: git stash pop")
+			logger.Info("Restoring stashed changes...")
+			// First check if there are any stashes
+			stashList := exec.Command("git", "stash", "list")
+			stashListOutput, _ := stashList.Output()
+			
+			if len(stashListOutput) > 0 {
+				popCmd := exec.Command("git", "stash", "pop", "--index")
+				popCmd.Stdout = os.Stdout
+				popCmd.Stderr = os.Stderr
+				
+				if err := popCmd.Run(); err != nil {
+					// If pop fails, try apply instead and drop the stash
+					logger.Warn("Stash pop failed, trying stash apply...")
+					applyCmd := exec.Command("git", "stash", "apply")
+					applyCmd.Stdout = os.Stdout
+					applyCmd.Stderr = os.Stderr
+					
+					if applyErr := applyCmd.Run(); applyErr != nil {
+						logger.Error("Failed to restore stashed changes", 
+							zap.Error(applyErr), 
+							zap.String("recovery_cmd", "git stash apply"))
+					} else {
+						// Drop the stash since we applied it
+						dropCmd := exec.Command("git", "stash", "drop")
+						dropCmd.Stdout = os.Stdout
+						dropCmd.Stderr = os.Stderr
+						_ = dropCmd.Run()
+					}
+				}
 			}
-		}
 
 		// Check if install.sh exists and is executable
 		if _, err := os.Stat("./install.sh"); os.IsNotExist(err) {
