@@ -2,6 +2,8 @@ package create
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -64,7 +66,96 @@ var (
 	kvmDryRun      bool
 )
 
+// UbuntuVMDefaultConfig contains the recommended defaults for Ubuntu VMs
+type UbuntuVMConfig struct {
+	Name        string
+	Memory      string // e.g., "4GB"
+	VCPUs       int
+	DiskSize    string // e.g., "40GB"
+	OSVariant   string // e.g., "ubuntu24.04"
+	Network     string
+	StoragePool string
+	Autostart   bool
+}
+
+// DefaultUbuntuVMConfig returns the recommended defaults for Ubuntu VMs
+func DefaultUbuntuVMConfig(name string) *UbuntuVMConfig {
+	return &UbuntuVMConfig{
+		Name:        name,
+		Memory:      "4GB",
+		VCPUs:       2,
+		DiskSize:    "40GB",
+		OSVariant:   "ubuntu24.04",
+		Network:     "default",
+		StoragePool: "default",
+		Autostart:   true,
+	}
+}
+
+// NewUbuntuVMCmd creates a command for creating Ubuntu VMs with recommended defaults
+var NewUbuntuVMCmd = &cobra.Command{
+	Use:   "ubuntu-vm [name]",
+	Short: "Create a new Ubuntu VM with recommended defaults",
+	Long: `Create a new Ubuntu VM with secure, production-ready defaults:
+  - 4GB RAM
+  - 2 vCPUs
+  - 40GB disk (thin provisioned)
+  - UEFI boot (if available)
+  - VirtIO for disk and network
+  - Cloud-init for initial configuration
+
+Example:
+  # Create a new Ubuntu 24.04 VM
+  eos create ubuntu-vm my-vm --ssh-keys ~/.ssh/id_rsa.pub
+`,
+	Args: cobra.ExactArgs(1),
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		// Use default Ubuntu VM config
+		config := DefaultUbuntuVMConfig(args[0])
+
+		// Apply any overrides from flags
+		if cmd.Flags().Changed("memory") {
+			config.Memory = kvmMemory
+		}
+		if cmd.Flags().Changed("vcpus") {
+			config.VCPUs = kvmVCPUs
+		}
+		if cmd.Flags().Changed("disk-size") {
+			config.DiskSize = kvmDiskSize
+		}
+		if cmd.Flags().Changed("network") {
+			config.Network = kvmNetwork
+		}
+		if cmd.Flags().Changed("storage-pool") {
+			config.StoragePool = kvmStoragePool
+		}
+		if cmd.Flags().Changed("autostart") {
+			config.Autostart = kvmAutostart
+		}
+
+		// Set the global variables to match our config
+		kvmName = config.Name
+		kvmMemory = config.Memory
+		kvmVCPUs = config.VCPUs
+		kvmDiskSize = config.DiskSize
+		kvmOSVariant = config.OSVariant
+		kvmNetwork = config.Network
+		kvmStoragePool = config.StoragePool
+		kvmAutostart = config.Autostart
+
+		// Initialize KVM manager
+		kvmMgr, err := kvm.NewKVMManager(rc, "")
+		if err != nil {
+			return fmt.Errorf("failed to initialize KVM manager: %w", err)
+		}
+		defer kvmMgr.Close()
+
+		return createKVMVM(rc, kvmMgr)
+	}),
+}
+
 func init() {
+	// Original KVM manager command
 	kvmManagerCmd.Flags().StringVar(&kvmAction, "action", "vm", "Action to perform (vm, pool, list, destroy)")
 	kvmManagerCmd.Flags().StringVar(&kvmName, "name", "", "VM or pool name")
 	kvmManagerCmd.Flags().StringVar(&kvmMemory, "memory", "1GB", "Memory allocation (e.g., 1GB, 2048MB)")
@@ -82,6 +173,18 @@ func init() {
 	kvmManagerCmd.Flags().StringVar(&kvmPoolPath, "pool-path", "", "Storage pool path")
 	kvmManagerCmd.Flags().StringVar(&kvmListType, "type", "vm", "List type (vm, pool)")
 	kvmManagerCmd.Flags().BoolVar(&kvmDryRun, "dry-run", false, "Show what would be done without executing")
+
+	// Ubuntu VM command with defaults
+	NewUbuntuVMCmd.Flags().StringVar(&kvmMemory, "memory", "4GB", "Memory allocation (e.g., 4GB, 8192MB)")
+	NewUbuntuVMCmd.Flags().IntVar(&kvmVCPUs, "vcpus", 2, "Number of virtual CPUs")
+	NewUbuntuVMCmd.Flags().StringVar(&kvmDiskSize, "disk-size", "40GB", "Primary disk size")
+	NewUbuntuVMCmd.Flags().StringVar(&kvmNetwork, "network", "default", "Network name")
+	NewUbuntuVMCmd.Flags().StringVar(&kvmStoragePool, "storage-pool", "default", "Storage pool for VM disks")
+	NewUbuntuVMCmd.Flags().BoolVar(&kvmAutostart, "autostart", true, "Enable VM autostart")
+	NewUbuntuVMCmd.Flags().StringSliceVar(&kvmSSHKeys, "ssh-keys", []string{}, "SSH public key files (required)")
+	NewUbuntuVMCmd.Flags().StringSliceVar(&kvmVolumes, "volumes", []string{}, "Additional volumes (name:size:format)")
+	NewUbuntuVMCmd.Flags().BoolVar(&kvmDryRun, "dry-run", false, "Show what would be done without executing")
+	NewUbuntuVMCmd.MarkFlagRequired("ssh-keys") // Require SSH keys for security
 }
 
 func runKVMManager(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -138,15 +241,35 @@ func createKVMVM(rc *eos_io.RuntimeContext, kvmMgr *kvm.KVMManager) error {
 		return fmt.Errorf("invalid volume format: %w", err)
 	}
 
-	// Read SSH keys (simplified for demo)
-	sshKeys := kvmSSHKeys
-	if len(sshKeys) == 0 {
-		sshKeys = []string{} // Default empty
+	// Read SSH keys (required for security)
+	if len(kvmSSHKeys) == 0 {
+		// Try to use default SSH key if none provided
+		home, err := os.UserHomeDir()
+		if err == nil {
+			defaultKey := filepath.Join(home, ".ssh", "id_rsa.pub")
+			if _, err := os.Stat(defaultKey); err == nil {
+				kvmSSHKeys = []string{defaultKey}
+				logger.Info("Using default SSH key", zap.String("path", defaultKey))
+			}
+		}
+		if len(kvmSSHKeys) == 0 {
+			return fmt.Errorf("at least one SSH public key is required for secure access")
+		}
 	}
 
-	// Generate cloud-init data
-	userData := generateKVMCloudInit(sshKeys)
+	// Generate cloud-init data with secure defaults
+	userData := generateKVMCloudInit(kvmSSHKeys)
 	metaData := generateKVMMetaData(kvmName)
+
+	// Log the VM configuration
+	logger.Info("VM configuration",
+		zap.String("name", kvmName),
+		zap.Uint("memory_mb", memoryMB),
+		zap.Int("vcpus", kvmVCPUs),
+		zap.Uint64("disk_size", diskSizeBytes),
+		zap.String("os_variant", kvmOSVariant),
+		zap.Strings("ssh_keys", kvmSSHKeys),
+		zap.Bool("autostart", kvmAutostart))
 
 	logger.Info("Creating KVM VM",
 		zap.String("name", kvmName),
@@ -181,7 +304,7 @@ func createKVMVM(rc *eos_io.RuntimeContext, kvmMgr *kvm.KVMManager) error {
 		NetworkName:  kvmNetwork,
 		OSVariant:    kvmOSVariant,
 		ImagePath:    kvmImagePath,
-		SSHKeys:      sshKeys,
+		SSHKeys:      kvmSSHKeys,
 		UserData:     userData,
 		MetaData:     metaData,
 		Volumes:      volumes,

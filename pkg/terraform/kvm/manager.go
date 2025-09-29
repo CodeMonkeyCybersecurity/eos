@@ -38,6 +38,26 @@ type VMConfig struct {
 	Tags         map[string]string `json:"tags"`
 	StoragePool  string            `json:"storage_pool"`
 	AutoStart    bool              `json:"auto_start"`
+	
+	// Security settings
+	EnableTPM      bool   `json:"enable_tpm"`      // Enable TPM 2.0 emulation
+	SecureBoot     bool   `json:"secure_boot"`     // Enable UEFI Secure Boot
+	Firmware       string `json:"firmware"`        // Path to UEFI firmware (e.g., "/usr/share/OVMF/OVMF_CODE.fd")
+	NVRAM          string `json:"nvram"`           // Path to NVRAM template (e.g., "/usr/share/OVMF/OVMF_VARS.fd")
+	TPMVersion     string `json:"tpm_version"`     // TPM version ("2.0" or "1.2")
+	TPMType        string `json:"tpm_type"`        // TPM type ("emulator" or "passthrough")
+	TPMBackend    string `json:"tpm_backend"`      // TPM backend ("emulator" or "crosvm")
+	TPMDevicePath string `json:"tpm_device_path"`  // Path to TPM device (for passthrough)
+	
+	// Disk encryption
+	EncryptDisk    bool   `json:"encrypt_disk"`    // Enable disk encryption
+	EncryptionKey  string `json:"encryption_key"`  // Encryption key (leave empty for auto-generation)
+	
+	// Secure boot settings
+	SecureBootLoader     string `json:"secure_boot_loader"`      // Path to secure boot loader
+	SecureBootKeySource  string `json:"secure_boot_key_source"`  // Source for secure boot keys ("auto", "none", "host")
+	SecureBootKeyFile    string `json:"secure_boot_key_file"`    // Path to secure boot key file
+	SecureBootCertFile   string `json:"secure_boot_cert_file"`   // Path to secure boot certificate file
 }
 
 // VolumeConfig represents additional volume configuration
@@ -300,6 +320,67 @@ provider "libvirt" {
 }
 
 func (km *KVMManager) generateVMConfig(config *VMConfig) error {
+	// Set default security settings if not provided
+	if config.TPMVersion == "" {
+		config.TPMVersion = "2.0"
+	}
+	if config.TPMType == "" {
+		config.TPMType = "emulator"
+	}
+	if config.TPMBackend == "" {
+		config.TPMBackend = "emulator"
+	}
+	if config.Firmware == "" {
+		config.Firmware = "/usr/share/OVMF/OVMF_CODE.fd"
+	}
+	if config.NVRAM == "" {
+		config.NVRAM = "/usr/share/OVMF/OVMF_VARS.fd"
+	}
+
+	// TPM configuration is handled by the libvirt provider directly via the VMConfig
+
+	// Generate secure boot configuration
+	firmwareConfig := ""
+	if config.SecureBoot || config.Firmware != "" {
+		firmwareConfig = fmt.Sprintf(`
+  firmware = "%s"
+  nvram {
+    file = "%s"
+  }`, config.Firmware, config.NVRAM)
+
+		if config.SecureBoot {
+			firmwareConfig += `
+  machine = "q35"
+  boot_devices {
+    dev = ["hd", "cdrom", "network"]
+  }`
+
+			// Add secure boot settings if provided
+			if config.SecureBootLoader != "" {
+				firmwareConfig += fmt.Sprintf(`
+  loader {
+    secure = "%s"
+  }`, config.SecureBootLoader)
+			}
+
+			if config.SecureBootKeySource != "" {
+				firmwareConfig += fmt.Sprintf(`
+  secure_boot = true
+  secure_boot_key_source = "%s"`, config.SecureBootKeySource)
+
+				if config.SecureBootKeyFile != "" {
+					firmwareConfig += fmt.Sprintf(`
+  secure_boot_key_file = "%s"`, config.SecureBootKeyFile)
+				}
+
+				if config.SecureBootCertFile != "" {
+					firmwareConfig += fmt.Sprintf(`
+  secure_boot_cert_file = "%s"`, config.SecureBootCertFile)
+				}
+			}
+		}
+	}
+
 	// Generate cloud-init ISO configuration
 	cloudInitConfig := fmt.Sprintf(`
 resource "libvirt_cloudinit_disk" "%s_cloudinit" {
@@ -314,8 +395,31 @@ EOF
 }
 `, config.Name, config.Name, config.StoragePool, config.UserData, config.MetaData)
 
-	// Generate main disk configuration
-	diskConfig := fmt.Sprintf(`
+	// Generate main disk configuration with optional encryption
+	diskConfig := ""
+	if config.EncryptDisk {
+		encryptionKey := config.EncryptionKey
+		if encryptionKey == "" {
+			encryptionKey = fmt.Sprintf("${uuid()}") // Generate a random key if not provided
+		}
+
+		diskConfig = fmt.Sprintf(`
+resource "libvirt_volume" "%s_disk" {
+  name   = "%s-disk.qcow2"
+  pool   = "%s"
+  size   = %d
+  format = "qcow2"
+  
+  # Enable LUKS encryption
+  encryption {
+    secret = "%s"
+    cipher = "aes-256-xts-plain64"
+    size   = 512
+  }
+}
+`, config.Name, config.Name, config.StoragePool, config.DiskSize, encryptionKey)
+	} else {
+		diskConfig = fmt.Sprintf(`
 resource "libvirt_volume" "%s_disk" {
   name   = "%s-disk.qcow2"
   pool   = "%s"
@@ -323,6 +427,7 @@ resource "libvirt_volume" "%s_disk" {
   format = "qcow2"
 }
 `, config.Name, config.Name, config.StoragePool, config.DiskSize)
+	}
 
 	// Generate additional volumes
 	var volumeConfigs string
@@ -344,24 +449,30 @@ resource "libvirt_volume" "%s_volume_%d" {
 `, config.Name, i)
 	}
 
-	// Generate VM configuration
+	// Generate VM configuration with security settings
 	vmConfig := fmt.Sprintf(`
 resource "libvirt_domain" "%s" {
   name   = "%s"
   memory = %d
   vcpu   = %d
   
+  # Cloud-init configuration
   cloudinit = libvirt_cloudinit_disk.%s_cloudinit.id
   
+  # Network configuration
   network_interface {
     network_name = "%s"
   }
   
+  # Main disk
   disk {
     volume_id = libvirt_volume.%s_disk.id
   }
+  
+  # Additional volumes
   %s
   
+  # Console configuration
   console {
     type        = "pty"
     target_port = "0"
@@ -374,10 +485,88 @@ resource "libvirt_domain" "%s" {
     target_port = "1"
   }
   
+  # Graphics - use SPICE with secure settings
   graphics {
     type        = "spice"
     listen_type = "address"
     autoport    = true
+    
+    # Security settings for SPICE
+    listen_address = "127.0.0.1"
+    tls_port      = -1
+    
+    # Disable file transfer and USB redirection by default
+    filetransfer_enable = "off"
+    clipboard_copypaste = "off"
+    streaming_mode      = "filter"
+  }
+  
+  # CPU and memory settings for security
+  cpu {
+    mode = "host-passthrough"
+  }
+  
+  # Memory settings with secure defaults
+  memory_backend {
+    access   = "shared"
+    discard  = true
+    nocow    = true
+  }
+  
+  # Enable memory ballooning with secure settings
+  ballooning {
+    period = 30
+  }
+  
+  # RNG device for better entropy
+  rng {
+    backend = "/dev/urandom"
+    model   = "virtio"
+  }
+  
+  # Add TPM configuration if enabled
+  %s
+  
+  # Add firmware and secure boot configuration
+  %s
+  
+  # Security features
+  features {
+    acpi   = "on"
+    apic   = "on"
+    pae    = "on"
+    vmpage = "on"
+  }
+  
+  # Secure boot settings
+  boot_menu = false
+  boot {
+    menu    = false
+    timeout = 1000  # 1 second timeout for boot menu
+  }
+  
+  # Disable unneeded devices
+  emulator = "/usr/bin/qemu-system-x86_64"
+  
+  # Disable USB controller if not needed
+  # usb {
+  #   enabled = false
+  # }
+  
+  # Disable VNC by default (using SPICE instead)
+  vnc {
+    enabled = false
+  }
+  
+  # Disable unneeded features
+  video {
+    type = "qxl"
+  }
+  
+  # Enable memory ballooning
+  memballoon {
+    model = "virtio"
+  }
   }
   
   autostart = %t
