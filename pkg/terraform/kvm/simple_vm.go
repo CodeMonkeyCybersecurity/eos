@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/terraform-exec/tfexec"
@@ -64,6 +65,13 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		return fmt.Errorf("failed to fix storage permissions: %w", err)
 	}
 
+	// Clean up any existing domain with same name for idempotency
+	logger.Info("Cleaning up potential domain conflicts", zap.String("vm_name", vmName))
+	if err := cleanupExistingDomain(vmName); err != nil {
+		logger.Warn("Failed to cleanup existing domain", zap.Error(err))
+		// Continue anyway - domain might not exist
+	}
+
 	// Remove duplicate terraform check - already done above
 
 	// Find SSH keys (REQUIRED for security)
@@ -74,13 +82,27 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	}
 	logger.Info("Found SSH keys for VM access", zap.Int("key_count", len(sshKeys)))
 
-	// Create working directory
-	workingDir := filepath.Join("/tmp", "terraform-"+vmName)
+	// Create fresh working directory with timestamp for idempotency
+	workingDir := filepath.Join("/tmp", fmt.Sprintf("terraform-%s-%d", vmName, time.Now().Unix()))
+
+	// Check for existing directory and clean up previous attempts
+	if _, err := os.Stat(workingDir); err == nil {
+		logger.Warn("Cleaning up previous attempt")
+		// Attempt to destroy previous state if it exists
+		tfStateFile := filepath.Join(workingDir, "terraform.tfstate")
+		if _, err := os.Stat(tfStateFile); err == nil {
+			destroyCmd := exec.Command("terraform", "destroy", "-auto-approve", "-state", tfStateFile)
+			destroyCmd.Dir = workingDir
+			destroyCmd.Run() // Ignore errors - state may be corrupted
+		}
+		os.RemoveAll(workingDir)
+	}
+
 	if err := os.MkdirAll(workingDir, 0755); err != nil {
 		return fmt.Errorf("failed to create working directory: %w", err)
 	}
 
-	logger.Info("Created working directory", zap.String("path", workingDir))
+	logger.Info("Created fresh working directory", zap.String("path", workingDir))
 
 	// Allocate static IP with persistent state management
 	staticIP, err := allocateStaticIP(vmName)
@@ -124,6 +146,14 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 					"base_volume_id": "${libvirt_volume.ubuntu_base.id}",
 					"pool":           "default",
 					"size":           42949672960, // 40GB
+					// Add local-exec provisioner to fix ownership
+					"provisioner": []interface{}{
+						map[string]interface{}{
+							"local-exec": map[string]interface{}{
+								"command": fmt.Sprintf("sleep 2 && sudo chown libvirt-qemu:kvm /var/lib/libvirt/images/%s.qcow2", vmName),
+							},
+						},
+					},
 				},
 			},
 			"libvirt_cloudinit_disk": map[string]interface{}{
@@ -219,31 +249,59 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		return fmt.Errorf("terraform init failed: %w", err)
 	}
 
-	// Stage 1: Create volumes
-	logger.Info("Creating VM volumes")
-	if err := tf.Apply(ctx,
-		tfexec.Target("libvirt_volume.ubuntu_base"),
-		tfexec.Target("libvirt_volume.vm_disk"),
-		tfexec.Target("libvirt_cloudinit_disk.cloudinit"),
-	); err != nil {
-		return fmt.Errorf("failed to create volumes: %w", err)
-	}
+	// Implement retry logic with destroy/reapply pattern
+	maxRetries := 2
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		logger.Info("Starting terraform apply", zap.Int("attempt", attempt+1), zap.Int("max_attempts", maxRetries+1))
 
-	// Fix ownership - use explicit file instead of wildcard for reliability
-	logger.Info("Fixing volume ownership")
-	vmDiskPath := filepath.Join("/var/lib/libvirt/images", vmName+".qcow2")
-	cmd := exec.Command("chown", "libvirt-qemu:kvm", vmDiskPath)
-	if os.Getuid() != 0 {
-		cmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", vmDiskPath)
-	}
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to fix ownership on %s: %w", vmDiskPath, err)
-	}
+		// Stage 1: Create volumes
+		logger.Info("Creating VM volumes")
+		if err := tf.Apply(ctx,
+			tfexec.Target("libvirt_volume.ubuntu_base"),
+			tfexec.Target("libvirt_volume.vm_disk"),
+			tfexec.Target("libvirt_cloudinit_disk.cloudinit"),
+		); err != nil {
+			if attempt < maxRetries {
+				logger.Warn("Volume creation failed, cleaning and retrying", zap.Int("attempt", attempt+1), zap.Error(err))
+				tf.Destroy(ctx)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			return fmt.Errorf("failed to create volumes after %d attempts: %w", maxRetries+1, err)
+		}
 
-	// Stage 2: Create VM
-	logger.Info("Creating VM domain")
-	if err := tf.Apply(ctx); err != nil {
-		return fmt.Errorf("failed to create domain: %w", err)
+		// Fix ownership - use explicit file instead of wildcard for reliability
+		logger.Info("Fixing volume ownership")
+		vmDiskPath := filepath.Join("/var/lib/libvirt/images", vmName+".qcow2")
+		cmd := exec.Command("chown", "libvirt-qemu:kvm", vmDiskPath)
+		if os.Getuid() != 0 {
+			cmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", vmDiskPath)
+		}
+		if err := cmd.Run(); err != nil {
+			if attempt < maxRetries {
+				logger.Warn("Ownership fix failed, cleaning and retrying", zap.Int("attempt", attempt+1), zap.Error(err))
+				tf.Destroy(ctx)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			return fmt.Errorf("failed to fix ownership on %s after %d attempts: %w", vmDiskPath, maxRetries+1, err)
+		}
+
+		// Stage 2: Create VM
+		logger.Info("Creating VM domain")
+		if err := tf.Apply(ctx); err != nil {
+			if attempt < maxRetries {
+				logger.Warn("VM creation failed, cleaning and retrying", zap.Int("attempt", attempt+1), zap.Error(err))
+				tf.Destroy(ctx)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			return fmt.Errorf("failed to create domain after %d attempts: %w", maxRetries+1, err)
+		}
+
+		// Success - break out of retry loop
+		logger.Info("VM creation successful", zap.Int("attempt", attempt+1))
+		break
 	}
 
 	// Fix file permissions after creation (simplified)
@@ -505,6 +563,30 @@ func fixStoragePoolPermissions() error {
 			cmd = exec.Command(fullArgs[0], fullArgs[1:]...)
 		}
 		cmd.Run() // Ignore errors - permissions may already be correct
+	}
+
+	return nil
+}
+
+// cleanupExistingDomain removes any existing libvirt domain with the same name to ensure idempotency
+func cleanupExistingDomain(vmName string) error {
+	// First try to destroy (stop) the domain if it's running
+	destroyCmd := exec.Command("virsh", "destroy", vmName)
+	if os.Getuid() != 0 {
+		destroyCmd = exec.Command("sudo", "virsh", "destroy", vmName)
+	}
+	destroyCmd.Run() // Ignore errors - domain might not be running
+
+	// Then undefine (remove) the domain completely
+	undefineCmd := exec.Command("virsh", "undefine", vmName, "--nvram")
+	if os.Getuid() != 0 {
+		undefineCmd = exec.Command("sudo", "virsh", "undefine", vmName, "--nvram")
+	}
+
+	// Run and capture error for logging, but don't fail if domain doesn't exist
+	if err := undefineCmd.Run(); err != nil {
+		// This is expected if domain doesn't exist - not a real error
+		return nil
 	}
 
 	return nil
