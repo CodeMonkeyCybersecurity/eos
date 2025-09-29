@@ -41,27 +41,27 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		return fmt.Errorf("KVM prerequisite check failed: %w", err)
 	}
 
-	// Check libvirt storage permissions
-	storageDir := "/var/lib/libvirt/images"
-	if info, err := os.Stat(storageDir); err != nil {
-		return fmt.Errorf("libvirt storage directory not found: %s\nRun: sudo mkdir -p %s", storageDir, storageDir)
+	// Check libvirt base directory permissions - let Terraform create the subdirectory
+	baseStorageDir := "/var/lib/libvirt/images"
+	if info, err := os.Stat(baseStorageDir); err != nil {
+		return fmt.Errorf("libvirt base storage directory not found: %s\nRun: sudo mkdir -p %s", baseStorageDir, baseStorageDir)
 	} else if !info.IsDir() {
-		return fmt.Errorf("%s exists but is not a directory", storageDir)
+		return fmt.Errorf("%s exists but is not a directory", baseStorageDir)
 	}
 
-	// Test write permissions
-	testFile := filepath.Join(storageDir, ".eos-permission-test")
+	// Test write permissions on base directory (for pool creation)
+	testFile := filepath.Join(baseStorageDir, ".eos-permission-test")
 	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
 		currentUser, _ := user.Current()
 		if currentUser.Uid != "0" {
 			return fmt.Errorf("cannot write to %s\nFix with:\n  sudo usermod -aG libvirt %s\n  sudo chmod 775 %s\n  sudo chown root:libvirt %s\n  # Then log out and back in",
-				storageDir, currentUser.Username, storageDir, storageDir)
+				baseStorageDir, currentUser.Username, baseStorageDir, baseStorageDir)
 		}
-		return fmt.Errorf("cannot write to %s: %v", storageDir, err)
+		return fmt.Errorf("cannot write to %s: %v", baseStorageDir, err)
 	}
 	os.Remove(testFile)
 
-	logger.Info("Storage permissions verified", zap.String("storage_dir", storageDir))
+	logger.Info("Storage permissions verified", zap.String("base_storage_dir", baseStorageDir))
 
 	// Create working directory
 	workingDir := filepath.Join("/tmp", "terraform-"+vmName)
@@ -86,17 +86,31 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 			},
 		},
 		"resource": map[string]interface{}{
+			"libvirt_pool": map[string]interface{}{
+				"eos_pool": map[string]interface{}{
+					"name": "eos-vm-pool",
+					"type": "dir",
+					"path": "/var/lib/libvirt/images/eos-vms",
+					"xml": map[string]interface{}{
+						"permissions": map[string]interface{}{
+							"mode":  "0755",
+							"owner": "0",
+							"group": "0",
+						},
+					},
+				},
+			},
 			"libvirt_volume": map[string]interface{}{
 				"ubuntu_base": map[string]interface{}{
 					"name":   vmName + "-base.qcow2",
 					"source": "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
-					"pool":   "default",
+					"pool":   "${libvirt_pool.eos_pool.name}",
 					"format": "qcow2",
 				},
 				"vm_disk": map[string]interface{}{
 					"name":           vmName + ".qcow2",
 					"base_volume_id": "${libvirt_volume.ubuntu_base.id}",
-					"pool":           "default",
+					"pool":           "${libvirt_pool.eos_pool.name}",
 					"size":           42949672960, // 40GB
 				},
 			},
@@ -115,7 +129,7 @@ package_update: true
 packages:
   - qemu-guest-agent`,
 					"meta_data": fmt.Sprintf("instance-id: %s\nlocal-hostname: %s", vmName, vmName),
-					"pool":      "default",
+					"pool":      "${libvirt_pool.eos_pool.name}",
 				},
 			},
 			"libvirt_domain": map[string]interface{}{
@@ -204,14 +218,17 @@ packages:
 
 	// Print success message
 	fmt.Printf("\n✅ VM created: %s\n", vmName)
+	fmt.Printf("Storage pool: eos-vm-pool (/var/lib/libvirt/images/eos-vms)\n")
 	fmt.Printf("Working directory: %s\n", workingDir)
 	fmt.Printf("\nVerify with:\n")
 	fmt.Printf("  virsh list --all\n")
 	fmt.Printf("  virsh dominfo %s\n", vmName)
+	fmt.Printf("  virsh pool-list\n")
 	fmt.Printf("\nConnect with:\n")
 	fmt.Printf("  virsh console %s  (password: ubuntu)\n", vmName)
 	fmt.Printf("\nCleanup:\n")
 	fmt.Printf("  cd %s && terraform destroy -auto-approve\n", workingDir)
+	fmt.Printf("  # This will also remove the storage pool if no other VMs are using it\n")
 
 	return nil
 }
