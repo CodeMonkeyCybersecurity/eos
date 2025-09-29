@@ -206,9 +206,12 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 			zap.Error(err))
 	}
 
-	// Build the new binary with explicit architecture
-	logger.Info("Building updated Eos binary for current architecture")
-	buildCmd := exec.Command("go", "build", "-o", "/usr/local/bin/eos", ".")
+	// Build to a temporary location first to avoid corrupting the running binary
+	tempBinary := "/tmp/eos-update-" + fmt.Sprintf("%d", time.Now().Unix())
+	logger.Info("Building updated Eos binary to temporary location",
+		zap.String("temp_path", tempBinary))
+
+	buildCmd := exec.Command("go", "build", "-o", tempBinary, ".")
 	buildCmd.Dir = "/opt/eos"
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
@@ -226,28 +229,61 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	}
 
 	if err := buildCmd.Run(); err != nil {
+		// Clean up temp file if it exists
+		_ = os.Remove(tempBinary)
 		return fmt.Errorf("failed to build updated Eos binary: %w", err)
 	}
 
 	// Validate the binary was created and is valid
-	binaryInfo, err := os.Stat("/usr/local/bin/eos")
+	binaryInfo, err := os.Stat(tempBinary)
 	if err != nil {
 		return fmt.Errorf("failed to stat newly built binary: %w", err)
 	}
 
 	// Check the file size is reasonable (at least 1MB for a Go binary)
 	if binaryInfo.Size() < 1024*1024 {
+		_ = os.Remove(tempBinary)
 		return fmt.Errorf("built binary is suspiciously small (%d bytes), build may have failed", binaryInfo.Size())
 	}
 
 	logger.Info("Binary built successfully",
 		zap.Int64("size_bytes", binaryInfo.Size()))
 
-	// Set execute permissions on the binary
-	logger.Info("Setting execute permissions on binary")
-	if err := os.Chmod("/usr/local/bin/eos", 0755); err != nil {
-		return fmt.Errorf("failed to set execute permissions: %w", err)
+	// Set execute permissions on the temporary binary
+	if err := os.Chmod(tempBinary, 0755); err != nil {
+		_ = os.Remove(tempBinary)
+		return fmt.Errorf("failed to set execute permissions on temp binary: %w", err)
 	}
+
+	// Test the new binary before replacing the old one
+	logger.Info("Testing new binary before installation")
+	testCmd := exec.Command(tempBinary, "version")
+	if err := testCmd.Run(); err != nil {
+		_ = os.Remove(tempBinary)
+		return fmt.Errorf("new binary failed validation test: %w", err)
+	}
+
+	// Atomically replace the old binary with the new one
+	logger.Info("Replacing old binary with new one")
+	if err := os.Rename(tempBinary, "/usr/local/bin/eos"); err != nil {
+		// Try to copy if rename fails (might be across filesystems)
+		logger.Info("Rename failed, trying copy instead")
+		input, err := os.ReadFile(tempBinary)
+		if err != nil {
+			_ = os.Remove(tempBinary)
+			return fmt.Errorf("failed to read temp binary for copy: %w", err)
+		}
+
+		if err := os.WriteFile("/usr/local/bin/eos", input, 0755); err != nil {
+			_ = os.Remove(tempBinary)
+			return fmt.Errorf("failed to copy new binary to destination: %w", err)
+		}
+
+		// Clean up temp file after successful copy
+		_ = os.Remove(tempBinary)
+	}
+
+	logger.Info("Binary replacement completed successfully")
 
 	// EVALUATE - Verify the update
 	logger.Info("Verifying Eos update")
