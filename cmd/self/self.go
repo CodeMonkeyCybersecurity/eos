@@ -208,7 +208,7 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 
 	// Build the new binary with explicit architecture
 	logger.Info("Building updated Eos binary for current architecture")
-	buildCmd := exec.Command("go", "build", "-o", "/usr/local/bin/eos", "./cmd")
+	buildCmd := exec.Command("go", "build", "-o", "/usr/local/bin/eos", ".")
 	buildCmd.Dir = "/opt/eos"
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
@@ -228,6 +228,20 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	if err := buildCmd.Run(); err != nil {
 		return fmt.Errorf("failed to build updated Eos binary: %w", err)
 	}
+
+	// Validate the binary was created and is valid
+	binaryInfo, err := os.Stat("/usr/local/bin/eos")
+	if err != nil {
+		return fmt.Errorf("failed to stat newly built binary: %w", err)
+	}
+
+	// Check the file size is reasonable (at least 1MB for a Go binary)
+	if binaryInfo.Size() < 1024*1024 {
+		return fmt.Errorf("built binary is suspiciously small (%d bytes), build may have failed", binaryInfo.Size())
+	}
+
+	logger.Info("Binary built successfully",
+		zap.Int64("size_bytes", binaryInfo.Size()))
 
 	// Set execute permissions on the binary
 	logger.Info("Setting execute permissions on binary")
