@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -39,6 +40,28 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	if err := checkKVM(); err != nil {
 		return fmt.Errorf("KVM prerequisite check failed: %w", err)
 	}
+
+	// Check libvirt storage permissions
+	storageDir := "/var/lib/libvirt/images"
+	if info, err := os.Stat(storageDir); err != nil {
+		return fmt.Errorf("libvirt storage directory not found: %s\nRun: sudo mkdir -p %s", storageDir, storageDir)
+	} else if !info.IsDir() {
+		return fmt.Errorf("%s exists but is not a directory", storageDir)
+	}
+
+	// Test write permissions
+	testFile := filepath.Join(storageDir, ".eos-permission-test")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		currentUser, _ := user.Current()
+		if currentUser.Uid != "0" {
+			return fmt.Errorf("cannot write to %s\nFix with:\n  sudo usermod -aG libvirt %s\n  sudo chmod 775 %s\n  sudo chown root:libvirt %s\n  # Then log out and back in",
+				storageDir, currentUser.Username, storageDir, storageDir)
+		}
+		return fmt.Errorf("cannot write to %s: %v", storageDir, err)
+	}
+	os.Remove(testFile)
+
+	logger.Info("Storage permissions verified", zap.String("storage_dir", storageDir))
 
 	// Create working directory
 	workingDir := filepath.Join("/tmp", "terraform-"+vmName)
