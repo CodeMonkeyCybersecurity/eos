@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -41,27 +40,8 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		return fmt.Errorf("KVM prerequisite check failed: %w", err)
 	}
 
-	// Check libvirt base directory permissions - let Terraform create the subdirectory
-	baseStorageDir := "/var/lib/libvirt/images"
-	if info, err := os.Stat(baseStorageDir); err != nil {
-		return fmt.Errorf("libvirt base storage directory not found: %s\nRun: sudo mkdir -p %s", baseStorageDir, baseStorageDir)
-	} else if !info.IsDir() {
-		return fmt.Errorf("%s exists but is not a directory", baseStorageDir)
-	}
-
-	// Test write permissions on base directory (for pool creation)
-	testFile := filepath.Join(baseStorageDir, ".eos-permission-test")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
-		currentUser, _ := user.Current()
-		if currentUser.Uid != "0" {
-			return fmt.Errorf("cannot write to %s\nFix with:\n  sudo usermod -aG libvirt %s\n  sudo chmod 775 %s\n  sudo chown root:libvirt %s\n  # Then log out and back in",
-				baseStorageDir, currentUser.Username, baseStorageDir, baseStorageDir)
-		}
-		return fmt.Errorf("cannot write to %s: %v", baseStorageDir, err)
-	}
-	os.Remove(testFile)
-
-	logger.Info("Storage permissions verified", zap.String("base_storage_dir", baseStorageDir))
+	// Using /tmp for storage - no permission checks needed
+	logger.Info("Using /tmp for VM storage - bypasses permission issues")
 
 	// Create working directory
 	workingDir := filepath.Join("/tmp", "terraform-"+vmName)
@@ -88,21 +68,19 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		"resource": map[string]interface{}{
 			"libvirt_volume": map[string]interface{}{
 				"ubuntu_base": map[string]interface{}{
-					"name":   vmName + "-base.qcow2",
+					"name":   "/tmp/" + vmName + "-base.qcow2",
 					"source": "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
-					"pool":   "default",
 					"format": "qcow2",
 				},
 				"vm_disk": map[string]interface{}{
-					"name":           vmName + ".qcow2",
+					"name":           "/tmp/" + vmName + ".qcow2",
 					"base_volume_id": "${libvirt_volume.ubuntu_base.id}",
-					"pool":           "default",
 					"size":           42949672960, // 40GB
 				},
 			},
 			"libvirt_cloudinit_disk": map[string]interface{}{
 				"cloudinit": map[string]interface{}{
-					"name": vmName + "-cloudinit.iso",
+					"name": "/tmp/" + vmName + "-cloudinit.iso",
 					"user_data": `#cloud-config
 users:
   - name: ubuntu
@@ -115,7 +93,6 @@ package_update: true
 packages:
   - qemu-guest-agent`,
 					"meta_data": fmt.Sprintf("instance-id: %s\nlocal-hostname: %s", vmName, vmName),
-					"pool":      "default",
 				},
 			},
 			"libvirt_domain": map[string]interface{}{
@@ -204,15 +181,17 @@ packages:
 
 	// Print success message
 	fmt.Printf("\n✅ VM created: %s\n", vmName)
-	fmt.Printf("Storage: default pool (/var/lib/libvirt/images)\n")
+	fmt.Printf("Storage: /tmp (VM files: /tmp/%s-*.qcow2)\n", vmName)
 	fmt.Printf("Working directory: %s\n", workingDir)
 	fmt.Printf("\nVerify with:\n")
 	fmt.Printf("  virsh list --all\n")
 	fmt.Printf("  virsh dominfo %s\n", vmName)
+	fmt.Printf("  ls -la /tmp/%s-*\n", vmName)
 	fmt.Printf("\nConnect with:\n")
 	fmt.Printf("  virsh console %s  (password: ubuntu)\n", vmName)
 	fmt.Printf("\nCleanup:\n")
 	fmt.Printf("  cd %s && terraform destroy -auto-approve\n", workingDir)
+	fmt.Printf("  # VM files in /tmp will be cleaned up on reboot\n")
 
 	return nil
 }
