@@ -254,6 +254,22 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		logger.Info("Starting terraform apply", zap.Int("attempt", attempt+1), zap.Int("max_attempts", maxRetries+1))
 
+		// Between retries, force cleanup any existing domain
+		if attempt > 0 {
+			logger.Info("Cleaning up existing domain before retry", zap.String("vm_name", vmName))
+			destroyCmd := exec.Command("virsh", "destroy", vmName)
+			if os.Getuid() != 0 {
+				destroyCmd = exec.Command("sudo", "virsh", "destroy", vmName)
+			}
+			destroyCmd.Run() // Ignore errors
+
+			undefineCmd := exec.Command("virsh", "undefine", vmName, "--nvram")
+			if os.Getuid() != 0 {
+				undefineCmd = exec.Command("sudo", "virsh", "undefine", vmName, "--nvram")
+			}
+			undefineCmd.Run() // Ignore errors
+		}
+
 		// Stage 1: Create volumes
 		logger.Info("Creating VM volumes")
 		if err := tf.Apply(ctx,
@@ -270,13 +286,15 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 			return fmt.Errorf("failed to create volumes after %d attempts: %w", maxRetries+1, err)
 		}
 
-		// Fix ownership - use explicit file instead of wildcard for reliability
-		logger.Info("Fixing volume ownership")
-		vmDiskPath := filepath.Join("/var/lib/libvirt/images", vmName+".qcow2")
-		cmd := exec.Command("chown", "libvirt-qemu:kvm", vmDiskPath)
+		// Fix ownership on ALL created files using wildcard to catch everything
+		logger.Info("Fixing volume ownership on all created files")
+		cmd := exec.Command("sh", "-c",
+			fmt.Sprintf("chown -R libvirt-qemu:kvm /var/lib/libvirt/images/%s*", vmName))
 		if os.Getuid() != 0 {
-			cmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", vmDiskPath)
+			cmd = exec.Command("sudo", "sh", "-c",
+				fmt.Sprintf("chown -R libvirt-qemu:kvm /var/lib/libvirt/images/%s*", vmName))
 		}
+
 		if err := cmd.Run(); err != nil {
 			if attempt < maxRetries {
 				logger.Warn("Ownership fix failed, cleaning and retrying", zap.Int("attempt", attempt+1), zap.Error(err))
@@ -284,8 +302,10 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 				time.Sleep(5 * time.Second)
 				continue
 			}
-			return fmt.Errorf("failed to fix ownership on %s after %d attempts: %w", vmDiskPath, maxRetries+1, err)
+			return fmt.Errorf("failed to fix ownership after %d attempts: %w", maxRetries+1, err)
 		}
+
+		logger.Info("Successfully fixed ownership on all VM files")
 
 		// Stage 2: Create VM
 		logger.Info("Creating VM domain")
