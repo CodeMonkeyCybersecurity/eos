@@ -124,7 +124,8 @@ func init() {
 	NewSecureUbuntuVMCmd.Flags().BoolVar(&ubuntuVMDisableAuto, "disable-autoupdates", false, "Disable automatic security updates (not recommended)")
 
 	// Make ssh-keys optional with default behavior
-	NewSecureUbuntuVMCmd.Flags().StringVarP(&ubuntuVMName, "name", "n", "", "Custom name for the VM (default: auto-generated)")
+	// Using 'N' for name to avoid conflict with network's 'n' shorthand
+	NewSecureUbuntuVMCmd.Flags().StringVarP(&ubuntuVMName, "name", "N", "", "Custom name for the VM (default: auto-generated)")
 }
 
 func findDefaultSSHKeys() ([]string, error) {
