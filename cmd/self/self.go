@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/enrollment"
@@ -182,11 +185,41 @@ func enrollSystem(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	return nil
 }
 
+// cleanupOldBackups removes old backup files, keeping only the most recent 3
+func cleanupOldBackups(logger otelzap.LoggerWithCtx) {
+	backupFiles, err := filepath.Glob("/usr/local/bin/eos.backup.*")
+	if err != nil || len(backupFiles) <= 3 {
+		return
+	}
+
+	// Sort by name (which includes timestamp)
+	sort.Strings(backupFiles)
+
+	// Remove all but the last 3
+	for i := 0; i < len(backupFiles)-3; i++ {
+		if err := os.Remove(backupFiles[i]); err == nil {
+			logger.Debug("Removed old backup",
+				zap.String("file", backupFiles[i]))
+		}
+	}
+}
+
 func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Check current state
 	logger.Info("Starting Eos self-update process")
+
+	// Create backup of current binary before update
+	backupPath := fmt.Sprintf("/usr/local/bin/eos.backup.%d", time.Now().Unix())
+	if currentBinary, err := os.ReadFile("/usr/local/bin/eos"); err == nil {
+		if err := os.WriteFile(backupPath, currentBinary, 0755); err == nil {
+			logger.Info("Created backup of current binary",
+				zap.String("backup_path", backupPath))
+			// Clean up old backups (keep only last 3)
+			cleanupOldBackups(logger)
+		}
+	}
 
 	// INTERVENE - Pull latest code
 	logger.Info("Pulling latest changes from git repository")
@@ -257,10 +290,22 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 
 	// Test the new binary before replacing the old one
 	logger.Info("Testing new binary before installation")
-	testCmd := exec.Command(tempBinary, "version")
-	if err := testCmd.Run(); err != nil {
+	testCmd := exec.Command(tempBinary, "--help")
+	testOutput, err := testCmd.CombinedOutput()
+	if err != nil {
+		logger.Error("Binary validation failed",
+			zap.Error(err),
+			zap.String("output", string(testOutput)))
 		_ = os.Remove(tempBinary)
 		return fmt.Errorf("new binary failed validation test: %w", err)
+	}
+
+	// Check that the output contains expected text
+	if !strings.Contains(string(testOutput), "Eos CLI") && !strings.Contains(string(testOutput), "Available Commands:") {
+		logger.Error("Binary validation failed - unexpected output",
+			zap.String("output", string(testOutput)))
+		_ = os.Remove(tempBinary)
+		return fmt.Errorf("new binary produced unexpected output")
 	}
 
 	// Atomically replace the old binary with the new one
@@ -287,13 +332,18 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 
 	// EVALUATE - Verify the update
 	logger.Info("Verifying Eos update")
-	versionCmd := exec.Command("/usr/local/bin/eos", "version")
-	versionCmd.Stdout = os.Stdout
-	versionCmd.Stderr = os.Stderr
+	versionCmd := exec.Command("/usr/local/bin/eos", "--help")
+	verifyOutput, err := versionCmd.CombinedOutput()
 
-	if err := versionCmd.Run(); err != nil {
-		logger.Warn("Could not verify Eos version after update",
-			zap.Error(err))
+	if err != nil {
+		logger.Warn("Could not verify Eos after update",
+			zap.Error(err),
+			zap.String("output", string(verifyOutput)))
+	} else if strings.Contains(string(verifyOutput), "Eos CLI") || strings.Contains(string(verifyOutput), "Available Commands:") {
+		logger.Info("Eos binary verified successfully")
+	} else {
+		logger.Warn("Eos binary verification produced unexpected output",
+			zap.String("output", string(verifyOutput)))
 	}
 
 	logger.Info("Eos updated successfully")

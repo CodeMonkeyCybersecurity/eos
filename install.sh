@@ -310,12 +310,80 @@ check_prerequisites() {
   fi
 }
 
+update_from_git() {
+  # Pull latest code from git if we're in a git repo
+  if [ -d "$Eos_SRC_DIR/.git" ]; then
+    log INFO " Pulling latest changes from GitHub..."
+    cd "$Eos_SRC_DIR"
+
+    # Save any local changes first
+    if git diff --quiet && git diff --cached --quiet; then
+      log INFO " No local changes detected"
+    else
+      log INFO " Stashing local changes before pull..."
+      git stash push -m "install.sh auto-stash $(date +%Y%m%d-%H%M%S)"
+    fi
+
+    # Pull latest
+    if git pull origin main; then
+      log INFO " Successfully pulled latest changes"
+    else
+      log WARN " Git pull failed, continuing with existing code"
+    fi
+  else
+    log INFO " Not a git repository, using existing code"
+  fi
+}
+
+backup_existing_binary() {
+  if [ -f "$INSTALL_PATH" ]; then
+    BACKUP_PATH="${INSTALL_PATH}.backup.$(date +%Y%m%d-%H%M%S)"
+    log INFO " Backing up existing binary to $BACKUP_PATH"
+    if $IS_MAC; then
+      sudo cp "$INSTALL_PATH" "$BACKUP_PATH"
+    else
+      cp "$INSTALL_PATH" "$BACKUP_PATH" 2>/dev/null || sudo cp "$INSTALL_PATH" "$BACKUP_PATH"
+    fi
+  fi
+}
+
 build_eos_binary() {
   log INFO " Building Eos..."
   cd "$Eos_SRC_DIR"
-  rm -rf "$Eos_BINARY_NAME"
-  # Use the 'go' command which should now be in PATH due to check_prerequisites
-  go build -o "$Eos_BINARY_NAME" .
+
+  # Build to temp location first
+  TEMP_BINARY="/tmp/eos-build-$(date +%s)"
+
+  # Build with static linking
+  CGO_ENABLED=0 GO111MODULE=on go build -o "$TEMP_BINARY" .
+
+  if [ $? -ne 0 ]; then
+    log ERR " Build failed"
+    exit 1
+  fi
+
+  # Validate the binary
+  if [ ! -f "$TEMP_BINARY" ]; then
+    log ERR " Binary was not created"
+    exit 1
+  fi
+
+  # Check size (should be at least 1MB)
+  SIZE=$(stat -f%z "$TEMP_BINARY" 2>/dev/null || stat -c%s "$TEMP_BINARY" 2>/dev/null)
+  if [ "$SIZE" -lt 1048576 ]; then
+    log ERR " Binary is suspiciously small: $SIZE bytes"
+    exit 1
+  fi
+
+  # Test the binary
+  if ! "$TEMP_BINARY" --help >/dev/null 2>&1; then
+    log ERR " Binary validation failed"
+    exit 1
+  fi
+
+  # Move to expected location
+  mv "$TEMP_BINARY" "$Eos_BUILD_PATH"
+  log INFO " Build successful, binary size: $SIZE bytes"
 }
 
 show_existing_checksum() {
@@ -410,6 +478,14 @@ main() {
   fi
   
   check_prerequisites
+
+  # Pull latest changes from git if available
+  update_from_git
+
+  # Backup existing binary before replacing
+  backup_existing_binary
+
+  # Build and validate
   build_eos_binary
   show_existing_checksum
   install_binary "$@"
