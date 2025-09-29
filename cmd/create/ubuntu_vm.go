@@ -1,8 +1,14 @@
 package create
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
+	"os/user"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -57,27 +63,45 @@ var (
 	ubuntuVMDisableAuto bool
 )
 
-// NewSecureUbuntuVMCmd creates a command for creating secure Ubuntu VMs
+// generateVMName creates a unique VM name with timestamp and random string
+func generateVMName(base string) string {
+	timestamp := time.Now().Format("20060102-150405")
+	// Generate 4 random bytes (8 hex characters) for uniqueness
+	randBytes := make([]byte, 4)
+	if _, err := rand.Read(randBytes); err != nil {
+		// Fallback to nanosecond timestamp if crypto/rand fails
+		randBytes = []byte(fmt.Sprintf("%d", time.Now().Nanosecond()))
+	}
+	randStr := hex.EncodeToString(randBytes)
+	
+	// Clean the base name to be filesystem and DNS safe
+	safeBase := strings.ToLower(base)
+	safeBase = strings.ReplaceAll(safeBase, " ", "-")
+	safeBase = strings.ReplaceAll(safeBase, ".", "-")
+	
+	// Combine components
+	return fmt.Sprintf("%s-%s-%s", safeBase, timestamp, randStr)
+}
+
+// NewSecureUbuntuVMCmd represents the create ubuntu-vm command
 var NewSecureUbuntuVMCmd = &cobra.Command{
 	Use:   "ubuntu-vm [name]",
-	Short: "Create a new Ubuntu VM with secure defaults",
-	Long: `Create a new Ubuntu VM with security best practices:
-  - Secure Boot enabled
-  - TPM 2.0 emulation
-  - Full disk encryption
-  - Automatic security updates
-  - SSH key authentication only
-  - Minimal attack surface
-  - Secure memory allocation
-  - Network filtering
+	Short: "Create a new secure Ubuntu VM with hardened defaults",
+	Long: `Create a new Ubuntu VM with security best practices enabled by default.
+This includes TPM 2.0, Secure Boot, disk encryption, and automatic security updates.
 
-Example:
-  # Create a new secure Ubuntu VM
-  eos create ubuntu-vm my-secure-vm --ssh-keys ~/.ssh/id_rsa.pub
+If no name is provided, a unique name will be generated automatically.
 
-  # Create with custom resources
-  eos create ubuntu-vm high-perf-vm --memory 8GB --vcpus 4 --disk-size 100GB`,
-	Args: cobra.ExactArgs(1),
+Examples:
+  # Create a VM with auto-generated name
+  eos create ubuntu-vm
+
+  # Create a VM with custom name
+  eos create ubuntu-vm my-vm
+
+  # Customize VM resources
+  eos create ubuntu-vm --memory 8GB --vcpus 4 --disk-size 100GB`,
+	Args: cobra.MaximumNArgs(1), // Make name argument optional
 	RunE: eos_cli.Wrap(createSecureUbuntuVM),
 }
 
@@ -99,13 +123,50 @@ func init() {
 	NewSecureUbuntuVMCmd.Flags().BoolVar(&ubuntuVMDisableEnc, "disable-encryption", false, "Disable disk encryption (not recommended)")
 	NewSecureUbuntuVMCmd.Flags().BoolVar(&ubuntuVMDisableAuto, "disable-autoupdates", false, "Disable automatic security updates (not recommended)")
 
-	// Mark required flags
-	_ = NewSecureUbuntuVMCmd.MarkFlagRequired("ssh-keys")
+	// Make ssh-keys optional with default behavior
+	NewSecureUbuntuVMCmd.Flags().StringVarP(&ubuntuVMName, "name", "n", "", "Custom name for the VM (default: auto-generated)")
+}
+
+func findDefaultSSHKeys() ([]string, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	sshDir := filepath.Join(usr.HomeDir, ".ssh")
+	entries, err := os.ReadDir(sshDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read ~/.ssh directory: %w", err)
+	}
+
+	var keys []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".pub") {
+			keyPath := filepath.Join(sshDir, entry.Name())
+			keys = append(keys, keyPath)
+		}
+	}
+
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no SSH public keys found in ~/.ssh/")
+	}
+
+	return keys, nil
 }
 
 func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// Generate or use provided VM name
+	var vmName string
+	if len(args) > 0 {
+		vmName = args[0]
+	} else {
+		vmName = generateVMName("eos-vm")
+		otelzap.Ctx(rc.Ctx).Info("No VM name provided, using generated name", 
+			zap.String("name", vmName))
+	}
+
 	// Use secure defaults
-	config := DefaultSecureVMConfig(args[0])
+	config := DefaultSecureVMConfig(vmName)
 
 	// Apply any overrides from flags
 	if cmd.Flags().Changed("memory") {
@@ -123,9 +184,39 @@ func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	if cmd.Flags().Changed("storage-pool") {
 		config.StoragePool = ubuntuVMPool
 	}
+
+	// Handle VM name override from flag if provided
+	if cmd.Flags().Changed("name") {
+		config.Name = ubuntuVMName
+		otelzap.Ctx(rc.Ctx).Info("Using custom VM name from flag",
+			zap.String("name", config.Name))
+	}
+
+	// Handle SSH keys - use provided keys or default to ~/.ssh/*.pub
 	if cmd.Flags().Changed("ssh-keys") {
 		config.SSHKeys = ubuntuVMSSHKeys
+		otelzap.Ctx(rc.Ctx).Info("Using provided SSH keys",
+			zap.Strings("keys", config.SSHKeys))
+	} else {
+		defaultKeys, err := findDefaultSSHKeys()
+		if err != nil {
+			return fmt.Errorf("no SSH keys provided and failed to find default keys: %w", err)
+		}
+		config.SSHKeys = defaultKeys
+		otelzap.Ctx(rc.Ctx).Info("Using default SSH keys from ~/.ssh/", 
+			zap.Strings("keys", defaultKeys))
 	}
+
+	// Log VM creation details
+	otelzap.Ctx(rc.Ctx).Info("Creating secure Ubuntu VM",
+		zap.String("name", config.Name),
+		zap.String("memory", config.Memory),
+		zap.Int("vcpus", config.VCPUs),
+		zap.String("disk", config.DiskSize),
+		zap.String("network", config.Network),
+		zap.Bool("tpm", config.EnableTPM),
+		zap.Bool("secureboot", config.SecureBoot),
+		zap.Bool("encryption", config.EncryptDisk))
 
 	// Apply security toggles
 	config.EnableTPM = !ubuntuVMDisableTPM
