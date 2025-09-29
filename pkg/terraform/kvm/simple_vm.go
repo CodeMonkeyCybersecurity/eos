@@ -219,10 +219,31 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		return fmt.Errorf("terraform init failed: %w", err)
 	}
 
-	// Apply with simplified approach (no staged apply due to complexity)
-	logger.Info("Running terraform apply")
+	// Stage 1: Create volumes
+	logger.Info("Creating VM volumes")
+	if err := tf.Apply(ctx,
+		tfexec.Target("libvirt_volume.ubuntu_base"),
+		tfexec.Target("libvirt_volume.vm_disk"),
+		tfexec.Target("libvirt_cloudinit_disk.cloudinit"),
+	); err != nil {
+		return fmt.Errorf("failed to create volumes: %w", err)
+	}
+
+	// Fix ownership - use explicit file instead of wildcard for reliability
+	logger.Info("Fixing volume ownership")
+	vmDiskPath := filepath.Join("/var/lib/libvirt/images", vmName+".qcow2")
+	cmd := exec.Command("chown", "libvirt-qemu:kvm", vmDiskPath)
+	if os.Getuid() != 0 {
+		cmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", vmDiskPath)
+	}
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to fix ownership on %s: %w", vmDiskPath, err)
+	}
+
+	// Stage 2: Create VM
+	logger.Info("Creating VM domain")
 	if err := tf.Apply(ctx); err != nil {
-		return fmt.Errorf("terraform apply failed: %w", err)
+		return fmt.Errorf("failed to create domain: %w", err)
 	}
 
 	// Fix file permissions after creation (simplified)
