@@ -111,8 +111,13 @@ type StoragePool struct {
 
 // NewKVMManager creates a new KVM manager using Terraform
 func NewKVMManager(rc *eos_io.RuntimeContext, workingDir string) (*KVMManager, error) {
+	// Defensive nil check
+	if rc == nil || rc.Ctx == nil {
+		return nil, fmt.Errorf("invalid runtime context: context is nil")
+	}
+
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if workingDir == "" {
 		workingDir = "/tmp/eos-terraform-kvm"
 	}

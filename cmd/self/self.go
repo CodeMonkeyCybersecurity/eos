@@ -183,21 +183,43 @@ func enrollSystem(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 }
 
 func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// Log using the standard output for now
-	fmt.Println("Starting Eos self-update process")
+	logger := otelzap.Ctx(rc.Ctx)
 
-	// Implementation of the update logic would go here
-	// This is a simplified version - you'll want to add proper error handling and logging
-	
-	// Example implementation:
+	// ASSESS - Check current state
+	logger.Info("Starting Eos self-update process")
+
+	// INTERVENE - Pull latest code
+	logger.Info("Pulling latest changes from git repository")
 	updateCmd := exec.Command("git", "-C", "/opt/eos", "pull")
 	updateCmd.Stdout = os.Stdout
 	updateCmd.Stderr = os.Stderr
-	
+
 	if err := updateCmd.Run(); err != nil {
-		return fmt.Errorf("failed to update Eos: %w", err)
+		return fmt.Errorf("failed to update Eos source code: %w", err)
 	}
 
-	fmt.Println("Eos updated successfully")
+	// Build the new binary
+	logger.Info("Building updated Eos binary")
+	buildCmd := exec.Command("go", "build", "-o", "/usr/local/bin/eos", "./cmd")
+	buildCmd.Dir = "/opt/eos"
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("failed to build updated Eos binary: %w", err)
+	}
+
+	// EVALUATE - Verify the update
+	logger.Info("Verifying Eos update")
+	versionCmd := exec.Command("/usr/local/bin/eos", "version")
+	versionCmd.Stdout = os.Stdout
+	versionCmd.Stderr = os.Stderr
+
+	if err := versionCmd.Run(); err != nil {
+		logger.Warn("Could not verify Eos version after update",
+			zap.Error(err))
+	}
+
+	logger.Info("Eos updated successfully")
 	return nil
 }
