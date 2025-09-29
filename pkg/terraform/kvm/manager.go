@@ -592,8 +592,8 @@ resource "libvirt_domain" "%s" {
 		config.Name, config.Name, config.Memory, config.VCPUs, config.Name, 
 		config.NetworkName, config.Name, volumeAttachments, tpmConfig, firmwareConfig, config.AutoStart)
 
-	// Write complete configuration
-	fullConfig := cloudInitConfig + diskConfig + volumeConfigs + vmConfig
+	// Write complete configuration with proper newlines between resources
+	fullConfig := cloudInitConfig + "\n\n" + diskConfig + "\n\n" + volumeConfigs + "\n\n" + vmConfig
 	configPath := filepath.Join(km.workingDir, fmt.Sprintf("%s.tf", config.Name))
 	
 	if err := os.WriteFile(configPath, []byte(fullConfig), 0644); err != nil {
