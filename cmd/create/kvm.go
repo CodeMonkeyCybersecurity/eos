@@ -3,7 +3,7 @@
 package create
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 )
@@ -25,15 +25,14 @@ Examples:
 
   # Create Ubuntu VM with shorthand
   eos create kvm --ubuntu my-vm`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// If --ubuntu flag is provided, run ubuntu VM creation
 		if ubuntu, _ := cmd.Flags().GetBool("ubuntu"); ubuntu {
 			// Delegate to ubuntu VM creation
-			rc := &eos_io.RuntimeContext{}
 			return createSecureUbuntuVM(rc, cmd, args)
 		}
 		return cmd.Help()
-	},
+	}),
 }
 
 // kvmUbuntuCmd represents the ubuntu subcommand under kvm
@@ -79,7 +78,7 @@ Examples:
   # Create VM with all security features
   eos create kvm ubuntu fortress --enable-all-security`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: eos_cli.Wrap(createSecureUbuntuVM),
+	RunE: eos.Wrap(createSecureUbuntuVM),
 }
 
 func init() {

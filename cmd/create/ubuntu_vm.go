@@ -1,16 +1,8 @@
 package create
 
 import (
-	"bytes"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"os"
-	"os/exec"
-	"os/user"
-	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -20,47 +12,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// SecureVMConfig contains secure defaults for Ubuntu VM creation
-type SecureVMConfig struct {
-	Name           string
-	Memory         string // e.g., "4GB"
-	VCPUs          int
-	DiskSize       string // e.g., "40GB"
-	Network        string
-	StoragePool    string
-	SSHKeys        []string
-	EnableTPM      bool
-	SecureBoot     bool
-	EncryptDisk    bool
-	AutoUpdate     bool
-	SecurityLevel  string // "basic", "moderate", "high", "paranoid"
-	EnableFirewall bool
-	EnableFail2ban bool
-	EnableAudit    bool
-	EnableAppArmor bool
-	DisableIPv6    bool
-}
+// Use SecureVMConfig from the kvm package
+type SecureVMConfig = kvm.SecureVMConfig
 
-// DefaultSecureVMConfig returns secure defaults for Ubuntu VMs
+// DefaultSecureVMConfig delegates to the kvm package
 func DefaultSecureVMConfig(name string) *SecureVMConfig {
-	return &SecureVMConfig{
-		Name:           name,
-		Memory:         "4GB",
-		VCPUs:          2,
-		DiskSize:       "40GB",
-		Network:        "default",
-		StoragePool:    "default",
-		EnableTPM:      true,
-		SecureBoot:     true,
-		EncryptDisk:    true,
-		AutoUpdate:     true,
-		SecurityLevel:  "high",  // Default to high security
-		EnableFirewall: true,
-		EnableFail2ban: true,
-		EnableAudit:    true,
-		EnableAppArmor: true,
-		DisableIPv6:    true,  // IPv6 disabled by default for security
-	}
+	return kvm.DefaultSecureVMConfig(name)
 }
 
 var (
@@ -77,24 +34,9 @@ var (
 	ubuntuVMDisableAuto bool
 )
 
-// generateVMName creates a unique VM name with timestamp and random string
+// generateVMName delegates to the kvm package
 func generateVMName(base string) string {
-	timestamp := time.Now().Format("20060102-150405")
-	// Generate 4 random bytes (8 hex characters) for uniqueness
-	randBytes := make([]byte, 4)
-	if _, err := rand.Read(randBytes); err != nil {
-		// Fallback to nanosecond timestamp if crypto/rand fails
-		randBytes = []byte(fmt.Sprintf("%d", time.Now().Nanosecond()))
-	}
-	randStr := hex.EncodeToString(randBytes)
-	
-	// Clean the base name to be filesystem and DNS safe
-	safeBase := strings.ToLower(base)
-	safeBase = strings.ReplaceAll(safeBase, " ", "-")
-	safeBase = strings.ReplaceAll(safeBase, ".", "-")
-	
-	// Combine components
-	return fmt.Sprintf("%s-%s-%s", safeBase, timestamp, randStr)
+	return kvm.GenerateVMName(base)
 }
 
 // NewSecureUbuntuVMCmd represents the create ubuntu-vm command
@@ -142,76 +84,9 @@ func init() {
 	NewSecureUbuntuVMCmd.Flags().StringVarP(&ubuntuVMName, "name", "N", "", "Custom name for the VM (default: auto-generated)")
 }
 
+// findDefaultSSHKeys delegates to the kvm package
 func findDefaultSSHKeys() ([]string, error) {
-	// First check if running as sudo and get the original user
-	sudoUser := os.Getenv("SUDO_USER")
-	var homeDir string
-
-	if sudoUser != "" {
-		// Running as sudo, get the original user's home directory
-		cmd := exec.Command("getent", "passwd", sudoUser)
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		if err := cmd.Run(); err == nil {
-			fields := strings.Split(out.String(), ":")
-			if len(fields) >= 6 {
-				homeDir = fields[5]
-			}
-		}
-	}
-
-	// Fall back to current user if not sudo or if lookup failed
-	if homeDir == "" {
-		usr, err := user.Current()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current user: %w", err)
-		}
-		homeDir = usr.HomeDir
-	}
-
-	// Look for SSH keys in multiple locations
-	possiblePaths := []string{
-		filepath.Join(homeDir, ".ssh"),
-		"/root/.ssh",
-		filepath.Join("/home", sudoUser, ".ssh"),
-	}
-
-	var keys []string
-	for _, sshDir := range possiblePaths {
-		if _, err := os.Stat(sshDir); err != nil {
-			continue // Directory doesn't exist, skip
-		}
-
-		entries, err := os.ReadDir(sshDir)
-		if err != nil {
-			continue // Can't read directory, skip
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".pub") {
-				keyPath := filepath.Join(sshDir, entry.Name())
-				// Verify we can read the key
-				if _, err := os.ReadFile(keyPath); err == nil {
-					keys = append(keys, keyPath)
-				}
-			}
-		}
-	}
-
-	// Prefer Ed25519 keys over RSA for better security
-	for i, key := range keys {
-		if strings.Contains(key, "id_ed25519.pub") {
-			// Move Ed25519 key to the front
-			keys[0], keys[i] = keys[i], keys[0]
-			break
-		}
-	}
-
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("no SSH public keys found. Please generate one with: ssh-keygen -t ed25519")
-	}
-
-	return keys, nil
+	return kvm.FindDefaultSSHKeys()
 }
 
 func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -387,84 +262,8 @@ func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 }
 
 func createSecureVM(rc *eos_io.RuntimeContext, kvmMgr *kvm.KVMManager, config *SecureVMConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Parse memory size
-	memoryMB, err := parseKVMMemorySize(config.Memory)
-	if err != nil {
-		return fmt.Errorf("invalid memory format: %w", err)
-	}
-
-	// Parse disk size
-	diskSizeBytes, err := parseKVMDiskSize(config.DiskSize)
-	if err != nil {
-		return fmt.Errorf("invalid disk size format: %w", err)
-	}
-
-	// Generate secure cloud-init configuration
-	userData := generateSecureCloudInit(config)
-	metaData := generateKVMMetaData(config.Name)
-
-	// Log the secure VM configuration
-	logger.Info("Secure VM configuration",
-		zap.String("name", config.Name),
-		zap.Uint("memory_mb", memoryMB),
-		zap.Int("vcpus", config.VCPUs),
-		zap.Uint64("disk_size", diskSizeBytes),
-		zap.Bool("tpm_enabled", config.EnableTPM),
-		zap.Bool("secure_boot", config.SecureBoot),
-		zap.Bool("disk_encrypted", config.EncryptDisk),
-		zap.Bool("auto_updates", config.AutoUpdate))
-
-	// Create VM configuration with security settings
-	vmConfig := &kvm.VMConfig{
-		Name:        config.Name,
-		Memory:      memoryMB,
-		VCPUs:       uint(config.VCPUs),
-		DiskSize:    diskSizeBytes,
-		NetworkName: config.Network,
-		OSVariant:   "ubuntu24.04",
-		SSHKeys:     config.SSHKeys,
-		UserData:    userData,
-		MetaData:    metaData,
-		StoragePool: config.StoragePool,
-		AutoStart:   true,
-
-		// Security settings
-		EnableTPM:   config.EnableTPM,
-		SecureBoot:  config.SecureBoot,
-		EncryptDisk: config.EncryptDisk,
-		TPMVersion:  "2.0",
-		TPMType:     "emulator",
-		TPMBackend:  "emulator",
-		Firmware:    "/usr/share/OVMF/OVMF_CODE.fd",
-		NVRAM:       "/usr/share/OVMF/OVMF_VARS.fd",
-
-		// Secure boot settings
-		SecureBootLoader:    "/usr/share/OVMF/OVMF_CODE.secboot.fd",
-		SecureBootKeySource: "auto",
-
-		Tags: map[string]string{
-			"created_by":  "eos-cli",
-			"purpose":     "secure-ubuntu-vm",
-			"security":    "high",
-			"environment": "production",
-		},
-	}
-
-	// Add security features
-	if config.EnableTPM {
-		// TPM 2.0 emulation
-		vmConfig.Tags["tpm"] = "2.0"
-	}
-
-	if config.SecureBoot {
-		// Enable UEFI Secure Boot
-		vmConfig.Tags["secure_boot"] = "enabled"
-	}
-
-	// Create the VM
-	vmInfo, err := kvmMgr.CreateVM(rc.Ctx, vmConfig)
+	// Delegate to the package function for VM creation
+	vmInfo, err := kvm.CreateSecureVM(rc.Ctx, kvmMgr, config)
 	if err != nil {
 		return fmt.Errorf("failed to create secure VM: %w", err)
 	}
@@ -474,7 +273,7 @@ func createSecureVM(rc *eos_io.RuntimeContext, kvmMgr *kvm.KVMManager, config *S
 	fmt.Printf("   Name: %s\n", vmInfo.Name)
 	fmt.Printf("   UUID: %s\n", vmInfo.UUID)
 	fmt.Printf("   State: %s\n", vmInfo.State)
-	fmt.Printf("   Memory: %s\n", formatKVMSize(vmInfo.Memory))
+	fmt.Printf("   Memory: %s\n", kvm.FormatMemorySize(int(vmInfo.Memory)))
 	fmt.Printf("   vCPUs: %d\n", vmInfo.VCPUs)
 
 	// Security features summary
