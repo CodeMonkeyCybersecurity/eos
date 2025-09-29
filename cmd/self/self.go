@@ -110,7 +110,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 		// Reset to match the remote branch exactly
 		logger.Info("Resetting to match remote origin/main...")
-		resetCmd := exec.Command("git", "reset", "--hard", "origin/main")
+		resetCmd = exec.Command("git", "reset", "--hard", "origin/main")
 		resetCmd.Stdout = os.Stdout
 		resetCmd.Stderr = os.Stderr
 		if err := resetCmd.Run(); err != nil {
@@ -119,7 +119,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		}
 
 		// Clean any remaining untracked files
-		cleanCmd := exec.Command("git", "clean", "-fd")
+		cleanCmd = exec.Command("git", "clean", "-fd")
 		cleanCmd.Stdout = os.Stdout
 		cleanCmd.Stderr = os.Stderr
 		if err := cleanCmd.Run(); err != nil {
