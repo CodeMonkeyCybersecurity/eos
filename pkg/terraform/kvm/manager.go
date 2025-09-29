@@ -167,32 +167,75 @@ func (km *KVMManager) CreateVM(ctx context.Context, config *VMConfig) (*VMInfo, 
 		return nil, fmt.Errorf("failed to generate Terraform config: %w", err)
 	}
 
-	// Plan and apply
+	// ASSESS - Initialize Terraform
+	km.logger.Info("ASSESS: Initializing Terraform for VM creation",
+		zap.String("working_dir", km.workingDir))
 	if err := km.tf.Init(ctx); err != nil {
+		km.logger.Error("Terraform init failed",
+			zap.Error(err),
+			zap.String("working_dir", km.workingDir))
+		// Check if terraform files exist in working directory
+		files, _ := os.ReadDir(km.workingDir)
+		for _, f := range files {
+			if filepath.Ext(f.Name()) == ".tf" {
+				km.logger.Debug("Terraform file found",
+					zap.String("file", f.Name()))
+			}
+		}
 		return nil, fmt.Errorf("terraform init failed: %w", err)
 	}
+	km.logger.Info("Terraform initialized successfully")
 
+	// INTERVENE - Plan the changes
+	km.logger.Info("INTERVENE: Planning VM infrastructure changes",
+		zap.String("vm_name", config.Name))
 	planPath := filepath.Join(km.workingDir, fmt.Sprintf("%s.tfplan", config.Name))
 	hasChanges, err := km.tf.Plan(ctx, tfexec.Out(planPath))
 	if err != nil {
+		km.logger.Error("Terraform plan failed",
+			zap.Error(err),
+			zap.String("plan_path", planPath),
+			zap.String("working_dir", km.workingDir))
 		return nil, fmt.Errorf("terraform plan failed: %w", err)
 	}
+	km.logger.Info("Terraform plan completed",
+		zap.Bool("has_changes", hasChanges),
+		zap.String("plan_file", planPath))
 
 	if hasChanges {
+		// INTERVENE - Apply the changes
+		km.logger.Info("Applying Terraform configuration",
+			zap.String("vm_name", config.Name))
 		if err := km.tf.Apply(ctx, tfexec.DirOrPlan(planPath)); err != nil {
+			km.logger.Error("Terraform apply failed",
+				zap.Error(err),
+				zap.String("plan_path", planPath))
 			return nil, fmt.Errorf("terraform apply failed: %w", err)
 		}
+		km.logger.Info("Terraform apply completed successfully",
+			zap.String("vm_name", config.Name))
+	} else {
+		km.logger.Info("No changes required, VM already exists",
+			zap.String("vm_name", config.Name))
 	}
 
-	// Get VM information
+	// EVALUATE - Get VM information
+	km.logger.Info("EVALUATE: Retrieving VM information")
 	vmInfo, err := km.getVMInfo(ctx, config.Name)
 	if err != nil {
+		km.logger.Error("Failed to get VM info after creation",
+			zap.Error(err),
+			zap.String("vm_name", config.Name))
 		return nil, fmt.Errorf("failed to get VM info: %w", err)
 	}
 
-	km.logger.Info("VM created successfully", 
+	km.logger.Info("VM created and verified successfully",
 		zap.String("name", vmInfo.Name),
-		zap.String("uuid", vmInfo.UUID))
+		zap.String("uuid", vmInfo.UUID),
+		zap.String("state", vmInfo.State),
+		zap.Uint("memory_mb", config.Memory),
+		zap.Uint("vcpus", config.VCPUs),
+		zap.Uint64("disk_gb", config.DiskSize/(1024*1024*1024)))
 
 	return vmInfo, nil
 }
@@ -416,7 +459,8 @@ func (km *KVMManager) generateVMConfig(config *VMConfig) error {
   meta_data = <<-EOF
 %s
   EOF
-}`, config.Name, config.Name, config.StoragePool, config.UserData, config.MetaData)
+}
+`, config.Name, config.Name, config.StoragePool, config.UserData, config.MetaData)
 
 	// Generate main disk configuration with optional encryption
 	diskConfig := ""
@@ -437,14 +481,16 @@ func (km *KVMManager) generateVMConfig(config *VMConfig) error {
     cipher = "aes-256-xts-plain64"
     size = 512
   }
-}`, config.Name, config.Name, config.StoragePool, config.DiskSize, "qcow2", "", encryptionKey)
+}
+`, config.Name, config.Name, config.StoragePool, config.DiskSize, "qcow2", "", encryptionKey)
 	} else {
 		diskConfig = fmt.Sprintf(`resource "libvirt_volume" "%s_disk" {
   name   = "%s-disk.qcow2"
   pool   = "%s"
   size   = %d
   format = "qcow2"
-}`, config.Name, config.Name, config.StoragePool, config.DiskSize)
+}
+`, config.Name, config.Name, config.StoragePool, config.DiskSize)
 	}
 
 	// Generate additional volumes

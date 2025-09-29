@@ -2,7 +2,11 @@
 
 *Last Updated: 2025-01-07*
 
-AI assistant guidance for the Eos project - a Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity.
+AI assistant guidance for the Eos project - a Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity. The Motto is 'Cybersecurity. With humans.'  We focus on making sure cybersecurity is human centric, evidence based, and we focus on sustainable innovation. 
+
+The building of eos is an iterative process, we need to as much as we can build on what already exists. We want to solve complex problems once, encode in Eos, never solve again.
+
+Eos needs to be human-centric, 
 
 ## 🚨 CRITICAL RULES (P0 - Breaking)
 
