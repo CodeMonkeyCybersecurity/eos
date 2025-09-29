@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -286,26 +287,94 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 			return fmt.Errorf("failed to create volumes after %d attempts: %w", maxRetries+1, err)
 		}
 
-		// Fix ownership on ALL created files using wildcard to catch everything
-		logger.Info("Fixing volume ownership on all created files")
-		cmd := exec.Command("sh", "-c",
-			fmt.Sprintf("chown -R libvirt-qemu:kvm /var/lib/libvirt/images/%s*", vmName))
-		if os.Getuid() != 0 {
-			cmd = exec.Command("sudo", "sh", "-c",
-				fmt.Sprintf("chown -R libvirt-qemu:kvm /var/lib/libvirt/images/%s*", vmName))
+		// Poll for files instead of fixed wait
+		logger.Info("Waiting for volume files to be written")
+		var files []string
+		pattern := fmt.Sprintf("/var/lib/libvirt/images/%s*", vmName)
+
+		for i := 0; i < 10; i++ {
+			files, _ = filepath.Glob(pattern)
+			if len(files) > 0 {
+				logger.Info("Files found after polling", zap.Int("attempts", i+1), zap.Int("file_count", len(files)))
+				break
+			}
+			logger.Info("Waiting for files to appear", zap.Int("attempt", i+1), zap.String("pattern", pattern))
+			time.Sleep(time.Second)
 		}
 
-		if err := cmd.Run(); err != nil {
+		if len(files) == 0 {
+			logger.Error("No files found after polling", zap.String("pattern", pattern))
 			if attempt < maxRetries {
-				logger.Warn("Ownership fix failed, cleaning and retrying", zap.Int("attempt", attempt+1), zap.Error(err))
+				logger.Warn("Volume files not found, cleaning and retrying", zap.Int("attempt", attempt+1))
 				tf.Destroy(ctx)
 				time.Sleep(5 * time.Second)
 				continue
 			}
-			return fmt.Errorf("failed to fix ownership after %d attempts: %w", maxRetries+1, err)
+			return fmt.Errorf("volume files not created after %d attempts", maxRetries+1)
 		}
 
-		logger.Info("Successfully fixed ownership on all VM files")
+		logger.Info("Found files to fix ownership", zap.Strings("files", files))
+
+		// Log expected ownership IDs for debugging
+		if libvirtUser, err := exec.Command("id", "-u", "libvirt-qemu").Output(); err == nil {
+			if libvirtGroup, err := exec.Command("id", "-g", "libvirt-qemu").Output(); err == nil {
+				logger.Info("Target ownership IDs",
+					zap.String("user", "libvirt-qemu"),
+					zap.String("uid", strings.TrimSpace(string(libvirtUser))),
+					zap.String("group", "kvm"),
+					zap.String("gid", strings.TrimSpace(string(libvirtGroup))))
+			}
+		}
+
+		// Fix each file individually - no wildcards
+		var ownershipFailed bool
+		for _, file := range files {
+			// Before fixing, check current ownership
+			if info, err := os.Stat(file); err == nil {
+				if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+					logger.Info("Current file ownership",
+						zap.String("file", filepath.Base(file)),
+						zap.Uint32("current_uid", stat.Uid),
+						zap.Uint32("current_gid", stat.Gid),
+						zap.String("needs_to_be", "libvirt-qemu:kvm"))
+				}
+			}
+
+			cmd := exec.Command("chown", "libvirt-qemu:kvm", file)
+			if os.Getuid() != 0 {
+				cmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", file)
+			}
+
+			if err := cmd.Run(); err != nil {
+				logger.Error("Failed to fix ownership",
+					zap.String("file", filepath.Base(file)),
+					zap.Error(err))
+				ownershipFailed = true
+			} else {
+				// Verify it worked - use Info level for visibility
+				if info, err := os.Stat(file); err == nil {
+					if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+						logger.Info("File ownership after fix",
+							zap.String("file", filepath.Base(file)),
+							zap.Uint32("new_uid", stat.Uid),
+							zap.Uint32("new_gid", stat.Gid),
+							zap.Bool("success", true))
+					}
+				}
+			}
+		}
+
+		if ownershipFailed {
+			if attempt < maxRetries {
+				logger.Warn("Ownership fix failed on some files, cleaning and retrying", zap.Int("attempt", attempt+1))
+				tf.Destroy(ctx)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			return fmt.Errorf("failed to fix ownership on some files after %d attempts", maxRetries+1)
+		}
+
+		logger.Info("Successfully fixed ownership on all VM files", zap.Int("file_count", len(files)))
 
 		// Stage 2: Create VM
 		logger.Info("Creating VM domain")
