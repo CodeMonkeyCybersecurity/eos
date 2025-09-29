@@ -8,13 +8,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"sync"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// IP allocation state management
+var (
+	ipMutex    sync.Mutex
+	ipStateDir = "/var/lib/eos"
+)
+
+type IPAllocations struct {
+	Allocations map[string]string `json:"allocations"` // vmName -> IP
+}
 
 // Use the existing GenerateVMName from secure_vm.go
 
@@ -35,13 +48,32 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		return fmt.Errorf("libvirt prerequisite check failed: %w", err)
 	}
 
-	// Check if KVM is available
-	if err := checkKVM(); err != nil {
+	// Check all KVM prerequisites
+	if err := checkKVMPrerequisites(); err != nil {
 		return fmt.Errorf("KVM prerequisite check failed: %w", err)
 	}
 
-	// Using /tmp for storage - no permission checks needed
-	logger.Info("Using /tmp for VM storage - bypasses permission issues")
+	// Fix permissions on libvirt images directory (simplified)
+	logger.Info("Fixing libvirt storage permissions...")
+	var err error
+	if os.Getuid() == 0 {
+		err = exec.Command("chmod", "755", "/var/lib/libvirt/images").Run()
+	} else {
+		err = exec.Command("sudo", "chmod", "755", "/var/lib/libvirt/images").Run()
+	}
+	if err != nil {
+		return fmt.Errorf("failed to fix permissions: %w", err)
+	}
+
+	// Remove duplicate terraform check - already done above
+
+	// Find SSH keys (REQUIRED for security)
+	sshKeys := findSSHKeys()
+	if len(sshKeys) == 0 {
+		return fmt.Errorf("No SSH keys found in ~/.ssh/, /root/.ssh/, or /home/$SUDO_USER/.ssh/\n" +
+			"Please create SSH keys first: ssh-keygen -t rsa -b 4096")
+	}
+	logger.Info("Found SSH keys for VM access", zap.Int("key_count", len(sshKeys)))
 
 	// Create working directory
 	workingDir := filepath.Join("/tmp", "terraform-"+vmName)
@@ -50,6 +82,23 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	}
 
 	logger.Info("Created working directory", zap.String("path", workingDir))
+
+	// Allocate static IP with persistent state management
+	staticIP, err := allocateStaticIP(vmName)
+	if err != nil {
+		return fmt.Errorf("failed to allocate static IP: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			releaseStaticIP(vmName) // Rollback on failure
+		}
+	}()
+
+	// Generate cloud-init configuration with static IP
+	userData, err := generateCloudInit(sshKeys, staticIP)
+	if err != nil {
+		return fmt.Errorf("failed to generate cloud-init: %w", err)
+	}
 
 	// Create simple Terraform JSON configuration
 	tfConfig := map[string]interface{}{
@@ -68,30 +117,23 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		"resource": map[string]interface{}{
 			"libvirt_volume": map[string]interface{}{
 				"ubuntu_base": map[string]interface{}{
-					"name":   "/tmp/" + vmName + "-base.qcow2",
-					"source": "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
+					"name":   vmName + "-base.qcow2",
+					"source": "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img",
+					"pool":   "default",
 					"format": "qcow2",
 				},
 				"vm_disk": map[string]interface{}{
-					"name":           "/tmp/" + vmName + ".qcow2",
+					"name":           vmName + ".qcow2",
 					"base_volume_id": "${libvirt_volume.ubuntu_base.id}",
+					"pool":           "default",
 					"size":           42949672960, // 40GB
 				},
 			},
 			"libvirt_cloudinit_disk": map[string]interface{}{
 				"cloudinit": map[string]interface{}{
-					"name": "/tmp/" + vmName + "-cloudinit.iso",
-					"user_data": `#cloud-config
-users:
-  - name: ubuntu
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    lock_passwd: false
-    passwd: $6$rounds=4096$saltsalt$7xmvWaIOaKB5QZEV.IXnP4YW9BJHZkDSdTLqk8xrNDrPP2LR0JcR9Qx7XQqGBFqJmYqVqLqaWgtmNDYiJQfz71
-
-package_update: true
-packages:
-  - qemu-guest-agent`,
+					"name": vmName + "-cloudinit.iso",
+					"pool": "default",
+					"user_data": userData,
 					"meta_data": fmt.Sprintf("instance-id: %s\nlocal-hostname: %s", vmName, vmName),
 				},
 			},
@@ -104,7 +146,8 @@ packages:
 					"network_interface": []interface{}{
 						map[string]interface{}{
 							"network_name":   "default",
-							"wait_for_lease": true,
+							"addresses":      []string{staticIP},
+							"wait_for_lease": false, // Static IP, no DHCP lease needed
 						},
 					},
 					"disk": []interface{}{
@@ -131,7 +174,10 @@ packages:
 		},
 		"output": map[string]interface{}{
 			"vm_ip": map[string]interface{}{
-				"value": "${libvirt_domain.vm.network_interface[0].addresses[0]}",
+				"value": staticIP,
+			},
+			"vm_mac": map[string]interface{}{
+				"value": "${libvirt_domain.vm.network_interface[0].mac}",
 			},
 		},
 	}
@@ -149,6 +195,11 @@ packages:
 
 	logger.Info("Wrote Terraform configuration", zap.String("path", configPath))
 
+	// Debug output only if DEBUG environment variable is set
+	if os.Getenv("DEBUG") != "" {
+		fmt.Printf("\n=== Generated Terraform Config ===\n%s\n=== End Config ===\n", string(configData))
+	}
+
 	// Run Terraform
 	tf, err := tfexec.NewTerraform(workingDir, "terraform")
 	if err != nil {
@@ -156,6 +207,13 @@ packages:
 	}
 
 	ctx := context.Background()
+
+	// Enable debug logging only if DEBUG environment variable is set
+	if os.Getenv("DEBUG") != "" {
+		os.Setenv("TF_LOG", "DEBUG")
+		os.Setenv("TF_LOG_PATH", filepath.Join(workingDir, "terraform-debug.log"))
+		logger.Info("Debug logging enabled", zap.String("log_path", filepath.Join(workingDir, "terraform-debug.log")))
+	}
 
 	// Initialize
 	logger.Info("Running terraform init")
@@ -169,6 +227,22 @@ packages:
 		return fmt.Errorf("terraform apply failed: %w", err)
 	}
 
+	// Fix file permissions after creation
+	logger.Info("Fixing VM file permissions for QEMU access")
+	vmPattern := filepath.Join("/var/lib/libvirt/images", vmName+"*")
+	vmFiles, err := filepath.Glob(vmPattern)
+	if err == nil {
+		for _, file := range vmFiles {
+			if os.Getuid() == 0 {
+				exec.Command("chmod", "644", file).Run()
+				exec.Command("chown", "libvirt-qemu:kvm", file).Run()
+			} else {
+				exec.Command("sudo", "chmod", "644", file).Run()
+				exec.Command("sudo", "chown", "libvirt-qemu:kvm", file).Run()
+			}
+		}
+	}
+
 	// Get outputs
 	outputs, err := tf.Output(ctx)
 	if err != nil {
@@ -179,42 +253,31 @@ packages:
 		}
 	}
 
-	// Print success message
-	fmt.Printf("\n✅ VM created: %s\n", vmName)
-	fmt.Printf("Storage: /tmp (VM files: /tmp/%s-*.qcow2)\n", vmName)
+	// Print success message with static IP
+	fmt.Printf("\n✅ Ubuntu 24.04 LTS VM created: %s\n", vmName)
+	fmt.Printf("SSH Keys: %d keys configured\n", len(sshKeys))
 	fmt.Printf("Working directory: %s\n", workingDir)
-	fmt.Printf("\nVerify with:\n")
+	fmt.Printf("\n✅ VM Ready!\n")
+	fmt.Printf("Static IP Address: %s\n", staticIP)
+	fmt.Printf("SSH Access: ssh ubuntu@%s\n", staticIP)
+
+	fmt.Printf("\nVerify:\n")
 	fmt.Printf("  virsh list --all\n")
 	fmt.Printf("  virsh dominfo %s\n", vmName)
-	fmt.Printf("  ls -la /tmp/%s-*\n", vmName)
-	fmt.Printf("\nConnect with:\n")
-	fmt.Printf("  virsh console %s  (password: ubuntu)\n", vmName)
+
 	fmt.Printf("\nCleanup:\n")
 	fmt.Printf("  cd %s && terraform destroy -auto-approve\n", workingDir)
-	fmt.Printf("  # VM files in /tmp will be cleaned up on reboot\n")
 
 	return nil
 }
 
 // checkTerraform verifies terraform is installed and accessible
 func checkTerraform() error {
-	// Use exec.LookPath instead of tfexec.LookPath
-	if _, err := os.LookupEnv("PATH"); !err {
-		return fmt.Errorf("PATH environment variable not set")
+	// Use exec.LookPath for proper PATH lookup
+	if _, err := exec.LookPath("terraform"); err != nil {
+		return fmt.Errorf("terraform not found in PATH - install from https://terraform.io")
 	}
-
-	// Check if terraform exists in PATH
-	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
-		if dir == "" {
-			continue
-		}
-		terraformPath := filepath.Join(dir, "terraform")
-		if info, err := os.Stat(terraformPath); err == nil && !info.IsDir() {
-			return nil // Found terraform
-		}
-	}
-
-	return fmt.Errorf("terraform not found in PATH - install from https://terraform.io")
+	return nil
 }
 
 // checkLibvirt verifies libvirt daemon is running
@@ -232,5 +295,178 @@ func checkKVM() error {
 	if _, err := os.Stat("/dev/kvm"); err != nil {
 		return fmt.Errorf("KVM not available - ensure virtualization is enabled in BIOS")
 	}
+	return nil
+}
+
+// findSSHKeys looks for SSH public keys in multiple locations
+func findSSHKeys() []string {
+	var keys []string
+	var sshDirs []string
+
+	// Check /root/.ssh (current process running as root)
+	sshDirs = append(sshDirs, "/root/.ssh")
+
+	// If running via sudo, also check original user's .ssh
+	if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
+		sshDirs = append(sshDirs, filepath.Join("/home", sudoUser, ".ssh"))
+	}
+
+	// Also check current user's home as fallback
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		sshDir := filepath.Join(homeDir, ".ssh")
+		sshDirs = append(sshDirs, sshDir)
+	}
+
+	// Scan all directories for keys
+	for _, sshDir := range sshDirs {
+		entries, err := os.ReadDir(sshDir)
+		if err != nil {
+			continue // Skip if directory doesn't exist or can't read
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() && filepath.Ext(entry.Name()) == ".pub" {
+				keyPath := filepath.Join(sshDir, entry.Name())
+				if keyData, err := os.ReadFile(keyPath); err == nil {
+					// Clean up the key (remove newlines) and avoid duplicates
+					cleanKey := strings.TrimSpace(string(keyData))
+					if cleanKey != "" && !contains(keys, cleanKey) {
+						keys = append(keys, cleanKey)
+					}
+				}
+			}
+		}
+	}
+
+	return keys
+}
+
+// Helper function to check if slice contains string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// allocateStaticIP allocates a static IP with persistent state management
+func allocateStaticIP(vmName string) (string, error) {
+	ipMutex.Lock()
+	defer ipMutex.Unlock()
+
+	// Ensure state directory exists
+	if err := os.MkdirAll(ipStateDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create state directory: %w", err)
+	}
+
+	ipStateFile := filepath.Join(ipStateDir, "ip-allocations.json")
+
+	// Load existing allocations
+	allocations := make(map[string]string)
+	if data, err := os.ReadFile(ipStateFile); err == nil {
+		json.Unmarshal(data, &allocations)
+	}
+
+	// Check if VM already has an IP
+	if ip, exists := allocations[vmName]; exists {
+		return ip, nil
+	}
+
+	// Find next available IP in range 100-200
+	for i := 100; i <= 200; i++ {
+		ip := fmt.Sprintf("192.168.122.%d", i)
+		used := false
+		for _, allocatedIP := range allocations {
+			if allocatedIP == ip {
+				used = true
+				break
+			}
+		}
+		if !used {
+			allocations[vmName] = ip
+			data, _ := json.Marshal(allocations)
+			os.WriteFile(ipStateFile, data, 0644)
+			return ip, nil
+		}
+	}
+
+	return "", fmt.Errorf("no IPs available in pool (192.168.122.100-200)")
+}
+
+// releaseStaticIP releases an IP allocation for rollback
+func releaseStaticIP(vmName string) {
+	ipMutex.Lock()
+	defer ipMutex.Unlock()
+
+	ipStateFile := filepath.Join(ipStateDir, "ip-allocations.json")
+	allocations := make(map[string]string)
+	if data, err := os.ReadFile(ipStateFile); err == nil {
+		json.Unmarshal(data, &allocations)
+	}
+
+	delete(allocations, vmName)
+	data, _ := json.Marshal(allocations)
+	os.WriteFile(ipStateFile, data, 0644)
+}
+
+// generateCloudInit creates cloud-init user data with SSH keys and static IP configuration
+func generateCloudInit(sshKeys []string, staticIP string) (string, error) {
+	if len(sshKeys) == 0 {
+		return "", fmt.Errorf("no SSH keys provided")
+	}
+
+	userData := `#cloud-config
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:`
+
+	for _, key := range sshKeys {
+		userData += fmt.Sprintf("\n      - %s", key)
+	}
+
+	userData += fmt.Sprintf(`
+
+package_update: true
+packages:
+  - qemu-guest-agent
+
+ssh_pwauth: false
+disable_root: true
+
+# Static IP configuration
+network:
+  version: 2
+  ethernets:
+    ens3:
+      dhcp4: false
+      addresses:
+        - %s/24
+      gateway4: 192.168.122.1
+      nameservers:
+        addresses:
+          - 192.168.122.1
+          - 8.8.8.8
+
+runcmd:
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent`, staticIP)
+
+	return userData, nil
+}
+
+// getVMIP is removed - we use static IP assignment instead of dynamic discovery
+
+// checkKVMPrerequisites verifies all KVM-related requirements
+func checkKVMPrerequisites() error {
+	// Check if KVM device exists
+	if _, err := os.Stat("/dev/kvm"); err != nil {
+		return fmt.Errorf("KVM not available - ensure virtualization is enabled in BIOS")
+	}
+
 	return nil
 }
