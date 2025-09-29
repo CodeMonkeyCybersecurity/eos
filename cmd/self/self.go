@@ -209,6 +209,12 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		return fmt.Errorf("failed to build updated Eos binary: %w", err)
 	}
 
+	// Set execute permissions on the binary
+	logger.Info("Setting execute permissions on binary")
+	if err := os.Chmod("/usr/local/bin/eos", 0755); err != nil {
+		return fmt.Errorf("failed to set execute permissions: %w", err)
+	}
+
 	// EVALUATE - Verify the update
 	logger.Info("Verifying Eos update")
 	versionCmd := exec.Command("/usr/local/bin/eos", "version")
