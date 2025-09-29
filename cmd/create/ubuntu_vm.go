@@ -90,6 +90,11 @@ func findDefaultSSHKeys() ([]string, error) {
 }
 
 func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// Defensive check for nil context
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("invalid runtime context: context is nil")
+	}
+
 	// Generate or use provided VM name
 	var vmName string
 	if len(args) > 0 {
@@ -262,6 +267,11 @@ func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 }
 
 func createSecureVM(rc *eos_io.RuntimeContext, kvmMgr *kvm.KVMManager, config *SecureVMConfig) error {
+	// Defensive check for nil context
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("invalid runtime context: context is nil")
+	}
+
 	// Delegate to the package function for VM creation
 	vmInfo, err := kvm.CreateSecureVM(rc.Ctx, kvmMgr, config)
 	if err != nil {

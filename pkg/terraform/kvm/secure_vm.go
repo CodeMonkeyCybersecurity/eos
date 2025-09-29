@@ -185,6 +185,10 @@ func GenerateVMName(base string) string {
 
 // CreateSecureVM creates a security-hardened Ubuntu VM
 func CreateSecureVM(ctx context.Context, manager *KVMManager, config *SecureVMConfig) (*VMInfo, error) {
+	// Defensive check for nil context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	logger := otelzap.Ctx(ctx)
 
 	// ASSESS - Validate configuration
