@@ -391,260 +391,40 @@ func (km *KVMManager) generateVMConfig(config *VMConfig) error {
 		config.NVRAM = "/usr/share/OVMF/OVMF_VARS.fd"
 	}
 
-	// Generate TPM configuration
-	tpmConfig := ""
-	if config.EnableTPM {
-		tpmConfig = fmt.Sprintf(`
-  tpm {
-    model = "%s"
-    type  = "%s"
-    backend = "%s"`, config.TPMVersion, config.TPMType, config.TPMBackend)
+	// Use the HCL builder for proper configuration generation
+	builder := NewHCLBuilder(km.logger)
 
-		if config.TPMDevicePath != "" {
-			tpmConfig += fmt.Sprintf(`
-    device_path = "%s"`, config.TPMDevicePath)
-		}
-		tpmConfig += "\n  }"
+	// Add cloud-init disk
+	if err := builder.AddCloudInitDisk(config.Name, config.StoragePool, config.UserData, config.MetaData); err != nil {
+		return fmt.Errorf("failed to add cloud-init disk: %w", err)
 	}
 
-	// Generate secure boot configuration
-	firmwareConfig := ""
-	if config.SecureBoot || config.Firmware != "" {
-		firmwareConfig = fmt.Sprintf(`
-  firmware = "%s"
-  nvram {
-    file = "%s"
-  }`, config.Firmware, config.NVRAM)
-
-		if config.SecureBoot {
-			firmwareConfig += `
-  machine = "q35"
-  boot_devices {
-    dev = ["hd", "cdrom", "network"]
-  }`
-
-			// Add secure boot settings if provided
-			if config.SecureBootLoader != "" {
-				firmwareConfig += fmt.Sprintf(`
-  loader {
-    secure = "%s"
-  }`, config.SecureBootLoader)
-			}
-
-			if config.SecureBootKeySource != "" {
-				firmwareConfig += fmt.Sprintf(`
-  secure_boot = true
-  secure_boot_key_source = "%s"`, config.SecureBootKeySource)
-
-				if config.SecureBootKeyFile != "" {
-					firmwareConfig += fmt.Sprintf(`
-  secure_boot_key_file = "%s"`, config.SecureBootKeyFile)
-				}
-
-				if config.SecureBootCertFile != "" {
-					firmwareConfig += fmt.Sprintf(`
-  secure_boot_cert_file = "%s"`, config.SecureBootCertFile)
-				}
-			}
-		}
+	// Add main disk
+	if err := builder.AddVolume(config.Name, config.StoragePool, int64(config.DiskSize), "qcow2", config.EncryptDisk, config.EncryptionKey); err != nil {
+		return fmt.Errorf("failed to add main volume: %w", err)
 	}
 
-	// Generate cloud-init configuration
-	cloudInitConfig := fmt.Sprintf(`resource "libvirt_cloudinit_disk" "%s_cloudinit" {
-  name      = "%s-cloudinit.iso"
-  pool      = "%s"
-  user_data = <<-EOF
-%s
-  EOF
-  meta_data = <<-EOF
-%s
-  EOF
-}
-`, config.Name, config.Name, config.StoragePool, config.UserData, config.MetaData)
-
-	// Generate main disk configuration with optional encryption
-	diskConfig := ""
-	if config.EncryptDisk {
-		encryptionKey := config.EncryptionKey
-		if encryptionKey == "" {
-			encryptionKey = "${uuid()}" // Generate a random key if not provided
-		}
-
-		diskConfig = fmt.Sprintf(`resource "libvirt_volume" "%s_disk" {
-  name = "%s-disk.qcow2"
-  pool = "%s"
-  size = %d
-  format = "%s"
-  base_volume_id = "%s"
-  encryption {
-    secret = "%s"
-    cipher = "aes-256-xts-plain64"
-    size = 512
-  }
-}
-`, config.Name, config.Name, config.StoragePool, config.DiskSize, "qcow2", "", encryptionKey)
-	} else {
-		diskConfig = fmt.Sprintf(`resource "libvirt_volume" "%s_disk" {
-  name   = "%s-disk.qcow2"
-  pool   = "%s"
-  size   = %d
-  format = "qcow2"
-}
-`, config.Name, config.Name, config.StoragePool, config.DiskSize)
-	}
-
-	// Generate additional volumes
-	var volumeConfigs string
-	var volumeAttachments string
-	
+	// Add additional volumes
 	for i, vol := range config.Volumes {
-		volumeConfigs += fmt.Sprintf(`
-resource "libvirt_volume" "%s_volume_%d" {
-  name   = "%s-%s.%s"
-  pool   = "%s"
-  size   = %d
-  format = "%s"
-}
-`, config.Name, i, config.Name, vol.Name, vol.Format, vol.Pool, vol.Size, vol.Format)
-
-		volumeAttachments += fmt.Sprintf(`
-  disk {
-    volume_id = libvirt_volume.%s_volume_%d.id
-  }
-`, config.Name, i)
+		if err := builder.AddAdditionalVolume(config.Name, i, vol); err != nil {
+			return fmt.Errorf("failed to add volume %d: %w", i, err)
+		}
 	}
 
-	// Generate VM configuration with security settings
-	vmConfig := fmt.Sprintf(`
-resource "libvirt_domain" "%s" {
-  name   = "%s"
-  memory = %d
-  vcpu   = %d
-  
-  # Cloud-init configuration
-  cloudinit = libvirt_cloudinit_disk.%s_cloudinit.id
-  
-  # Network configuration
-  network_interface {
-    network_name = "%s"
-  }
-  
-  # Main disk
-  disk {
-    volume_id = libvirt_volume.%s_disk.id
-  }
-  
-  # Additional volumes
-  %s
-  
-  # Console configuration
-  console {
-    type        = "pty"
-    target_port = "0"
-    target_type = "serial"
-  }
-  
-  console {
-    type        = "pty"
-    target_type = "virtio"
-    target_port = "1"
-  }
-  
-  # Graphics - use SPICE with secure settings
-  graphics {
-    type        = "spice"
-    listen_type = "address"
-    autoport    = true
-    
-    # Security settings for SPICE
-    listen_address = "127.0.0.1"
-    tls_port      = -1
-    
-    # Disable file transfer and USB redirection by default
-    filetransfer_enable = "off"
-    clipboard_copypaste = "off"
-    streaming_mode      = "filter"
-  }
-  
-  # CPU and memory settings for security
-  cpu {
-    mode = "host-passthrough"
-  }
-  
-  # Memory settings with secure defaults
-  memory_backend {
-    access   = "shared"
-    discard  = true
-    nocow    = true
-  }
-  
-  # Enable memory ballooning with secure settings
-  ballooning {
-    period = 30
-  }
-  
-  # RNG device for better entropy
-  rng {
-    backend = "/dev/urandom"
-    model   = "virtio"
-  }
-  
-  # Add TPM configuration if enabled
-  %s
-  
-  # Add firmware and secure boot configuration
-  %s
-  
-  # Security features
-  features {
-    acpi   = "on"
-    apic   = "on"
-    pae    = "on"
-    vmpage = "on"
-  }
-  
-  # Secure boot settings
-  boot_menu = false
-  boot {
-    menu    = false
-    timeout = 1000  # 1 second timeout for boot menu
-  }
-  
-  # Disable unneeded devices
-  emulator = "/usr/bin/qemu-system-x86_64"
-  
-  # Disable USB controller if not needed
-  # usb {
-  #   enabled = false
-  # }
-  
-  # Disable VNC by default (using SPICE instead)
-  vnc {
-    enabled = false
-  }
-  
-  # Disable unneeded features
-  video {
-    type = "qxl"
-  }
-  
-  # Enable memory ballooning
-  memballoon {
-    model = "virtio"
-  }
-  
-  autostart = %v
-}`,
-		config.Name, config.Name, config.Memory, config.VCPUs, config.Name, 
-		config.NetworkName, config.Name, volumeAttachments, tpmConfig, firmwareConfig, config.AutoStart)
+	// Add the domain (VM) configuration
+	if err := builder.AddDomain(config); err != nil {
+		return fmt.Errorf("failed to add domain configuration: %w", err)
+	}
 
-	// Write complete configuration with proper newlines between resources
-	fullConfig := cloudInitConfig + "\n\n" + diskConfig + "\n\n" + volumeConfigs + "\n\n" + vmConfig
+	// Write the configuration to file
 	configPath := filepath.Join(km.workingDir, fmt.Sprintf("%s.tf", config.Name))
-	
-	if err := os.WriteFile(configPath, []byte(fullConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, builder.Bytes(), 0644); err != nil {
 		return fmt.Errorf("failed to write VM configuration: %w", err)
 	}
+
+	km.logger.Debug("Generated Terraform configuration",
+		zap.String("path", configPath),
+		zap.Int("size", len(builder.Bytes())))
 
 	return nil
 }
