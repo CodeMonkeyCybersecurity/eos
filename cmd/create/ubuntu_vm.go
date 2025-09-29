@@ -31,7 +31,7 @@ func init() {
 // createSecureUbuntuVM - SIMPLIFIED to just create a basic VM
 func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	// Generate VM name
-	vmName := kvm.GenerateVMName("eos-vm")
+	vmName := kvm.GenerateVMName("eos-kvm")
 
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating Ubuntu VM with defaults (4GB RAM, 2 vCPUs, 40GB disk)",

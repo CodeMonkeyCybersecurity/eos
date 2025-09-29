@@ -19,10 +19,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// IP allocation state management
+// VM creation and IP allocation state management
 var (
-	ipMutex    sync.Mutex
-	ipStateDir = "/var/lib/eos"
+	vmCreationMutex sync.Mutex // Global lock for entire VM creation process
+	ipMutex         sync.Mutex
+	ipStateDir      = "/var/lib/eos"
 )
 
 type IPAllocations struct {
@@ -33,6 +34,10 @@ type IPAllocations struct {
 
 // CreateSimpleUbuntuVM creates an Ubuntu VM with hardcoded defaults: 4GB RAM, 2 vCPUs, 40GB disk
 func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
+	// Lock entire VM creation to prevent race conditions
+	vmCreationMutex.Lock()
+	defer vmCreationMutex.Unlock()
+
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS: Check prerequisites
@@ -53,16 +58,10 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		return fmt.Errorf("KVM prerequisite check failed: %w", err)
 	}
 
-	// Fix permissions on libvirt images directory (simplified)
-	logger.Info("Fixing libvirt storage permissions...")
-	var err error
-	if os.Getuid() == 0 {
-		err = exec.Command("chmod", "755", "/var/lib/libvirt/images").Run()
-	} else {
-		err = exec.Command("sudo", "chmod", "755", "/var/lib/libvirt/images").Run()
-	}
-	if err != nil {
-		return fmt.Errorf("failed to fix permissions: %w", err)
+	// Fix storage pool permissions (simplified approach)
+	logger.Info("Fixing storage pool permissions...")
+	if err := fixStoragePoolPermissions(); err != nil {
+		return fmt.Errorf("failed to fix storage permissions: %w", err)
 	}
 
 	// Remove duplicate terraform check - already done above
@@ -94,18 +93,16 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		}
 	}()
 
-	// Generate cloud-init configuration with static IP
-	userData, err := generateCloudInit(sshKeys, staticIP)
-	if err != nil {
-		return fmt.Errorf("failed to generate cloud-init: %w", err)
-	}
+	// Generate cloud-init user data with static IP configured in runcmd
+	userData := generateUserData(sshKeys, staticIP, vmName)
 
 	// Create simple Terraform JSON configuration
 	tfConfig := map[string]interface{}{
 		"terraform": map[string]interface{}{
 			"required_providers": map[string]interface{}{
 				"libvirt": map[string]interface{}{
-					"source": "dmacvicar/libvirt",
+					"source":  "dmacvicar/libvirt",
+					"version": "~> 0.7",
 				},
 			},
 		},
@@ -131,23 +128,24 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 			},
 			"libvirt_cloudinit_disk": map[string]interface{}{
 				"cloudinit": map[string]interface{}{
-					"name": vmName + "-cloudinit.iso",
-					"pool": "default",
+					"name":      vmName + "-cloudinit.iso",
+					"pool":      "default",
 					"user_data": userData,
 					"meta_data": fmt.Sprintf("instance-id: %s\nlocal-hostname: %s", vmName, vmName),
 				},
 			},
 			"libvirt_domain": map[string]interface{}{
 				"vm": map[string]interface{}{
-					"name":      vmName,
-					"memory":    4096, // 4GB RAM
-					"vcpu":      2,    // 2 vCPUs
-					"cloudinit": "${libvirt_cloudinit_disk.cloudinit.id}",
+					"name":       vmName,
+					"memory":     4096, // 4GB RAM
+					"vcpu":       2,    // 2 vCPUs
+					"autostart":  true, // Auto-start on boot
+					"qemu_agent": true, // Enable QEMU agent
+					"cloudinit":  "${libvirt_cloudinit_disk.cloudinit.id}",
 					"network_interface": []interface{}{
 						map[string]interface{}{
 							"network_name":   "default",
-							"addresses":      []string{staticIP},
-							"wait_for_lease": false, // Static IP, no DHCP lease needed
+							"wait_for_lease": true, // Let DHCP assign based on MAC
 						},
 					},
 					"disk": []interface{}{
@@ -216,30 +214,30 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	}
 
 	// Initialize
-	logger.Info("Running terraform init")
+	logger.Info("Initializing Terraform")
 	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
 		return fmt.Errorf("terraform init failed: %w", err)
 	}
 
-	// Apply (auto-approve not needed with terraform-exec)
+	// Apply with simplified approach (no staged apply due to complexity)
 	logger.Info("Running terraform apply")
 	if err := tf.Apply(ctx); err != nil {
 		return fmt.Errorf("terraform apply failed: %w", err)
 	}
 
-	// Fix file permissions after creation
+	// Fix file permissions after creation (simplified)
 	logger.Info("Fixing VM file permissions for QEMU access")
 	vmPattern := filepath.Join("/var/lib/libvirt/images", vmName+"*")
 	vmFiles, err := filepath.Glob(vmPattern)
 	if err == nil {
 		for _, file := range vmFiles {
+			var chownCmd *exec.Cmd
 			if os.Getuid() == 0 {
-				exec.Command("chmod", "644", file).Run()
-				exec.Command("chown", "libvirt-qemu:kvm", file).Run()
+				chownCmd = exec.Command("chown", "libvirt-qemu:kvm", file)
 			} else {
-				exec.Command("sudo", "chmod", "644", file).Run()
-				exec.Command("sudo", "chown", "libvirt-qemu:kvm", file).Run()
+				chownCmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", file)
 			}
+			chownCmd.Run() // Ignore errors - may already be correct
 		}
 	}
 
@@ -253,20 +251,25 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		}
 	}
 
-	// Print success message with static IP
+	// Success output with comprehensive information
 	fmt.Printf("\n✅ Ubuntu 24.04 LTS VM created: %s\n", vmName)
-	fmt.Printf("SSH Keys: %d keys configured\n", len(sshKeys))
-	fmt.Printf("Working directory: %s\n", workingDir)
-	fmt.Printf("\n✅ VM Ready!\n")
-	fmt.Printf("Static IP Address: %s\n", staticIP)
-	fmt.Printf("SSH Access: ssh ubuntu@%s\n", staticIP)
-
-	fmt.Printf("\nVerify:\n")
-	fmt.Printf("  virsh list --all\n")
-	fmt.Printf("  virsh dominfo %s\n", vmName)
-
-	fmt.Printf("\nCleanup:\n")
-	fmt.Printf("  cd %s && terraform destroy -auto-approve\n", workingDir)
+	fmt.Printf("Configuration:\n")
+	fmt.Printf("  Memory: 4GB\n")
+	fmt.Printf("  vCPUs: 2\n")
+	fmt.Printf("  Disk: 40GB\n")
+	fmt.Printf("  Network: Static IP %s (configured via cloud-init)\n", staticIP)
+	fmt.Printf("  Auto-start: Enabled\n")
+	fmt.Printf("  QEMU Agent: Enabled\n")
+	fmt.Printf("  SSH Keys: %d configured\n", len(sshKeys))
+	fmt.Printf("\nAccess:\n")
+	fmt.Printf("  SSH: ssh ubuntu@%s\n", staticIP)
+	fmt.Printf("  Console: virsh console %s\n", vmName)
+	fmt.Printf("\nManagement:\n")
+	fmt.Printf("  Stop: virsh shutdown %s\n", vmName)
+	fmt.Printf("  Start: virsh start %s\n", vmName)
+	fmt.Printf("  Status: virsh list --all\n")
+	fmt.Printf("  Info: virsh dominfo %s\n", vmName)
+	fmt.Printf("  Destroy: cd %s && terraform destroy\n", workingDir)
 
 	return nil
 }
@@ -411,61 +414,76 @@ func releaseStaticIP(vmName string) {
 	os.WriteFile(ipStateFile, data, 0644)
 }
 
-// generateCloudInit creates cloud-init user data with SSH keys and static IP configuration
-func generateCloudInit(sshKeys []string, staticIP string) (string, error) {
-	if len(sshKeys) == 0 {
-		return "", fmt.Errorf("no SSH keys provided")
+// generateUserData creates cloud-init user data with SSH keys and static IP in runcmd
+func generateUserData(sshKeys []string, staticIP, vmName string) string {
+	keys := make([]string, len(sshKeys))
+	for i, key := range sshKeys {
+		keys[i] = "      - " + strings.TrimSpace(key)
 	}
+	keyString := strings.Join(keys, "\n")
 
-	userData := `#cloud-config
+	return fmt.Sprintf(`#cloud-config
+hostname: %s
+manage_etc_hosts: true
 users:
   - name: ubuntu
     sudo: ALL=(ALL) NOPASSWD:ALL
     shell: /bin/bash
     lock_passwd: true
-    ssh_authorized_keys:`
-
-	for _, key := range sshKeys {
-		userData += fmt.Sprintf("\n      - %s", key)
-	}
-
-	userData += fmt.Sprintf(`
+    ssh_authorized_keys:
+%s
 
 package_update: true
 packages:
   - qemu-guest-agent
 
-ssh_pwauth: false
-disable_root: true
-
-# Static IP configuration
-network:
-  version: 2
-  ethernets:
-    ens3:
-      dhcp4: false
-      addresses:
-        - %s/24
-      gateway4: 192.168.122.1
-      nameservers:
-        addresses:
-          - 192.168.122.1
-          - 8.8.8.8
-
 runcmd:
-  - systemctl enable qemu-guest-agent
-  - systemctl start qemu-guest-agent`, staticIP)
+  - |
+    cat > /etc/netplan/99-static.yaml <<EOF
+    network:
+      version: 2
+      ethernets:
+        ens3:
+          dhcp4: false
+          addresses: [%s/24]
+          gateway4: 192.168.122.1
+          nameservers:
+            addresses: [8.8.8.8, 8.8.4.4]
+    EOF
+  - netplan apply
+  - systemctl enable --now qemu-guest-agent
 
-	return userData, nil
+ssh_pwauth: false
+disable_root: true`, vmName, keyString, staticIP)
 }
-
-// getVMIP is removed - we use static IP assignment instead of dynamic discovery
 
 // checkKVMPrerequisites verifies all KVM-related requirements
 func checkKVMPrerequisites() error {
 	// Check if KVM device exists
 	if _, err := os.Stat("/dev/kvm"); err != nil {
 		return fmt.Errorf("KVM not available - ensure virtualization is enabled in BIOS")
+	}
+
+	return nil
+}
+
+// fixStoragePoolPermissions applies simple, reliable permission fixes
+func fixStoragePoolPermissions() error {
+	// Simple approach: make the images directory accessible
+	cmds := [][]string{
+		{"chmod", "1777", "/var/lib/libvirt/images"},
+		{"chown", "root:kvm", "/var/lib/libvirt/images"},
+	}
+
+	for _, args := range cmds {
+		var cmd *exec.Cmd
+		if os.Getuid() == 0 {
+			cmd = exec.Command(args[0], args[1:]...)
+		} else {
+			fullArgs := append([]string{"sudo"}, args...)
+			cmd = exec.Command(fullArgs[0], fullArgs[1:]...)
+		}
+		cmd.Run() // Ignore errors - permissions may already be correct
 	}
 
 	return nil
