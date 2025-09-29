@@ -86,31 +86,17 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 			},
 		},
 		"resource": map[string]interface{}{
-			"libvirt_pool": map[string]interface{}{
-				"eos_pool": map[string]interface{}{
-					"name": "eos-vm-pool",
-					"type": "dir",
-					"path": "/var/lib/libvirt/images/eos-vms",
-					"xml": map[string]interface{}{
-						"permissions": map[string]interface{}{
-							"mode":  "0755",
-							"owner": "0",
-							"group": "0",
-						},
-					},
-				},
-			},
 			"libvirt_volume": map[string]interface{}{
 				"ubuntu_base": map[string]interface{}{
 					"name":   vmName + "-base.qcow2",
 					"source": "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
-					"pool":   "${libvirt_pool.eos_pool.name}",
+					"pool":   "default",
 					"format": "qcow2",
 				},
 				"vm_disk": map[string]interface{}{
 					"name":           vmName + ".qcow2",
 					"base_volume_id": "${libvirt_volume.ubuntu_base.id}",
-					"pool":           "${libvirt_pool.eos_pool.name}",
+					"pool":           "default",
 					"size":           42949672960, // 40GB
 				},
 			},
@@ -129,7 +115,7 @@ package_update: true
 packages:
   - qemu-guest-agent`,
 					"meta_data": fmt.Sprintf("instance-id: %s\nlocal-hostname: %s", vmName, vmName),
-					"pool":      "${libvirt_pool.eos_pool.name}",
+					"pool":      "default",
 				},
 			},
 			"libvirt_domain": map[string]interface{}{
@@ -218,17 +204,15 @@ packages:
 
 	// Print success message
 	fmt.Printf("\n✅ VM created: %s\n", vmName)
-	fmt.Printf("Storage pool: eos-vm-pool (/var/lib/libvirt/images/eos-vms)\n")
+	fmt.Printf("Storage: default pool (/var/lib/libvirt/images)\n")
 	fmt.Printf("Working directory: %s\n", workingDir)
 	fmt.Printf("\nVerify with:\n")
 	fmt.Printf("  virsh list --all\n")
 	fmt.Printf("  virsh dominfo %s\n", vmName)
-	fmt.Printf("  virsh pool-list\n")
 	fmt.Printf("\nConnect with:\n")
 	fmt.Printf("  virsh console %s  (password: ubuntu)\n", vmName)
 	fmt.Printf("\nCleanup:\n")
 	fmt.Printf("  cd %s && terraform destroy -auto-approve\n", workingDir)
-	fmt.Printf("  # This will also remove the storage pool if no other VMs are using it\n")
 
 	return nil
 }
