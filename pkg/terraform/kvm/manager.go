@@ -337,7 +337,21 @@ func (km *KVMManager) generateVMConfig(config *VMConfig) error {
 		config.NVRAM = "/usr/share/OVMF/OVMF_VARS.fd"
 	}
 
-	// TPM configuration is handled by the libvirt provider directly via the VMConfig
+	// Generate TPM configuration
+	tpmConfig := ""
+	if config.EnableTPM {
+		tpmConfig = fmt.Sprintf(`
+  tpm {
+    model = "%s"
+    type  = "%s"
+    backend = "%s"`, config.TPMVersion, config.TPMType, config.TPMBackend)
+
+		if config.TPMDevicePath != "" {
+			tpmConfig += fmt.Sprintf(`
+    device_path = "%s"`, config.TPMDevicePath)
+		}
+		tpmConfig += "\n  }"
+	}
 
 	// Generate secure boot configuration
 	firmwareConfig := ""
@@ -381,57 +395,51 @@ func (km *KVMManager) generateVMConfig(config *VMConfig) error {
 		}
 	}
 
-	// Generate cloud-init ISO configuration
-	cloudInitConfig := fmt.Sprintf(`
-resource "libvirt_cloudinit_disk" "%s_cloudinit" {
+	// Generate cloud-init configuration
+	cloudInitConfig := fmt.Sprintf(`resource "libvirt_cloudinit_disk" "%s_cloudinit" {
   name      = "%s-cloudinit.iso"
   pool      = "%s"
   user_data = <<-EOF
 %s
-EOF
+  EOF
   meta_data = <<-EOF
 %s
-EOF
-}
-`, config.Name, config.Name, config.StoragePool, config.UserData, config.MetaData)
+  EOF
+}`, config.Name, config.Name, config.StoragePool, config.UserData, config.MetaData)
 
 	// Generate main disk configuration with optional encryption
 	diskConfig := ""
 	if config.EncryptDisk {
 		encryptionKey := config.EncryptionKey
 		if encryptionKey == "" {
-			encryptionKey = fmt.Sprintf("${uuid()}") // Generate a random key if not provided
+			encryptionKey = "${uuid()}" // Generate a random key if not provided
 		}
 
-		diskConfig = fmt.Sprintf(`
-resource "libvirt_volume" "%s_disk" {
-  name   = "%s-disk.qcow2"
-  pool   = "%s"
-  size   = %d
-  format = "qcow2"
-  
-  # Enable LUKS encryption
+		diskConfig = fmt.Sprintf(`resource "libvirt_volume" "%s_disk" {
+  name = "%s-disk.qcow2"
+  pool = "%s"
+  size = %d
+  format = "%s"
+  base_volume_id = "%s"
   encryption {
     secret = "%s"
     cipher = "aes-256-xts-plain64"
-    size   = 512
+    size = 512
   }
-}
-`, config.Name, config.Name, config.StoragePool, config.DiskSize, encryptionKey)
+}`, config.Name, config.Name, config.StoragePool, config.DiskSize, "qcow2", "", encryptionKey)
 	} else {
-		diskConfig = fmt.Sprintf(`
-resource "libvirt_volume" "%s_disk" {
+		diskConfig = fmt.Sprintf(`resource "libvirt_volume" "%s_disk" {
   name   = "%s-disk.qcow2"
   pool   = "%s"
   size   = %d
   format = "qcow2"
-}
-`, config.Name, config.Name, config.StoragePool, config.DiskSize)
+}`, config.Name, config.Name, config.StoragePool, config.DiskSize)
 	}
 
 	// Generate additional volumes
 	var volumeConfigs string
 	var volumeAttachments string
+	
 	for i, vol := range config.Volumes {
 		volumeConfigs += fmt.Sprintf(`
 resource "libvirt_volume" "%s_volume_%d" {
@@ -567,12 +575,11 @@ resource "libvirt_domain" "%s" {
   memballoon {
     model = "virtio"
   }
-  }
   
-  autostart = %t
-}
-`, config.Name, config.Name, config.Memory, config.VCPUs, config.Name, 
-   config.NetworkName, config.Name, volumeAttachments, config.AutoStart)
+  autostart = %v
+}`,
+		config.Name, config.Name, config.Memory, config.VCPUs, config.Name, 
+		config.NetworkName, config.Name, volumeAttachments, tpmConfig, firmwareConfig, config.AutoStart)
 
 	// Write complete configuration
 	fullConfig := cloudInitConfig + diskConfig + volumeConfigs + vmConfig

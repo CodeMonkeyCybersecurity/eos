@@ -3,11 +3,11 @@ package update
 
 import (
 	"fmt"
-	"time"
+	// "time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hera"
+	// "github.com/CodeMonkeyCybersecurity/eos/pkg/hera"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/users"
@@ -66,7 +66,7 @@ var SyncUsersCmd = &cobra.Command{
 		otelzap.Ctx(rc.Ctx)
 
 		realm, _ := interaction.PromptIfMissing(rc.Ctx, cmd, "realm", "Enter Keycloak realm", false)
-		sinceStr, _ := cmd.Flags().GetString("since")
+		// sinceStr, _ := cmd.Flags().GetString("since")
 
 		kcURL, _ := interaction.PromptIfMissing(rc.Ctx, cmd, "url", "Enter Keycloak base URL", false)
 
@@ -80,11 +80,11 @@ var SyncUsersCmd = &cobra.Command{
 			zap.String("clientID", clientID),
 		)
 
-		sinceDur, err := time.ParseDuration(sinceStr)
-		if err != nil {
-			otelzap.Ctx(rc.Ctx).Error("Invalid --since duration", zap.Error(err))
-			return err
-		}
+		// sinceDur, err := time.ParseDuration(sinceStr)
+		// if err != nil {
+		// 	otelzap.Ctx(rc.Ctx).Error("Invalid --since duration", zap.Error(err))
+		// 	return err
+		// }
 
 		// DEPRECATED: This command still uses Keycloak for backward compatibility
 		// but users should migrate to Authentik
@@ -92,7 +92,14 @@ var SyncUsersCmd = &cobra.Command{
 		otelzap.Ctx(rc.Ctx).Info("Use 'eos update authentik-users' for new Authentik-based user management")
 		
 		// For Authentik, we use the clientSecret as token since it's a different auth model
-		client, err := hera.NewAuthentikClient(kcURL, clientSecret)
+		// TODO: Fix hera package import
+		// client, err := hera.NewAuthentikClient(kcURL, clientSecret)
+		_ = clientSecret // Mark as used
+		// var client interface{}
+		// err = fmt.Errorf("hera package not available")
+		return fmt.Errorf("hera package not available - cannot sync users")
+
+		/* TODO: Re-enable when hera package is available
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to initialize Authentik client",
 				zap.String("url", kcURL),
@@ -153,6 +160,7 @@ var SyncUsersCmd = &cobra.Command{
 
 		otelzap.Ctx(rc.Ctx).Info("User group synchronization complete")
 		return nil
+		*/
 	}),
 }
 

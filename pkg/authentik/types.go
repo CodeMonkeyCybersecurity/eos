@@ -1,6 +1,6 @@
-/* pkg/hera/types.go */
+/* pkg/authentik/types.go */
 
-package hera
+package authentik
 
 import (
 	"context"

@@ -1,10 +1,12 @@
 package create
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -20,32 +22,44 @@ import (
 
 // SecureVMConfig contains secure defaults for Ubuntu VM creation
 type SecureVMConfig struct {
-	Name        string
-	Memory      string // e.g., "4GB"
-	VCPUs       int
-	DiskSize    string // e.g., "40GB"
-	Network     string
-	StoragePool string
-	SSHKeys     []string
-	EnableTPM   bool
-	SecureBoot  bool
-	EncryptDisk bool
-	AutoUpdate  bool
+	Name           string
+	Memory         string // e.g., "4GB"
+	VCPUs          int
+	DiskSize       string // e.g., "40GB"
+	Network        string
+	StoragePool    string
+	SSHKeys        []string
+	EnableTPM      bool
+	SecureBoot     bool
+	EncryptDisk    bool
+	AutoUpdate     bool
+	SecurityLevel  string // "basic", "moderate", "high", "paranoid"
+	EnableFirewall bool
+	EnableFail2ban bool
+	EnableAudit    bool
+	EnableAppArmor bool
+	DisableIPv6    bool
 }
 
 // DefaultSecureVMConfig returns secure defaults for Ubuntu VMs
 func DefaultSecureVMConfig(name string) *SecureVMConfig {
 	return &SecureVMConfig{
-		Name:        name,
-		Memory:      "4GB",
-		VCPUs:       2,
-		DiskSize:    "40GB",
-		Network:     "default",
-		StoragePool: "default",
-		EnableTPM:   true,
-		SecureBoot:  true,
-		EncryptDisk: true,
-		AutoUpdate:  true,
+		Name:           name,
+		Memory:         "4GB",
+		VCPUs:          2,
+		DiskSize:       "40GB",
+		Network:        "default",
+		StoragePool:    "default",
+		EnableTPM:      true,
+		SecureBoot:     true,
+		EncryptDisk:    true,
+		AutoUpdate:     true,
+		SecurityLevel:  "high",  // Default to high security
+		EnableFirewall: true,
+		EnableFail2ban: true,
+		EnableAudit:    true,
+		EnableAppArmor: true,
+		DisableIPv6:    true,  // IPv6 disabled by default for security
 	}
 }
 
@@ -129,27 +143,72 @@ func init() {
 }
 
 func findDefaultSSHKeys() ([]string, error) {
-	usr, err := user.Current()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current user: %w", err)
+	// First check if running as sudo and get the original user
+	sudoUser := os.Getenv("SUDO_USER")
+	var homeDir string
+
+	if sudoUser != "" {
+		// Running as sudo, get the original user's home directory
+		cmd := exec.Command("getent", "passwd", sudoUser)
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		if err := cmd.Run(); err == nil {
+			fields := strings.Split(out.String(), ":")
+			if len(fields) >= 6 {
+				homeDir = fields[5]
+			}
+		}
 	}
 
-	sshDir := filepath.Join(usr.HomeDir, ".ssh")
-	entries, err := os.ReadDir(sshDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read ~/.ssh directory: %w", err)
+	// Fall back to current user if not sudo or if lookup failed
+	if homeDir == "" {
+		usr, err := user.Current()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current user: %w", err)
+		}
+		homeDir = usr.HomeDir
+	}
+
+	// Look for SSH keys in multiple locations
+	possiblePaths := []string{
+		filepath.Join(homeDir, ".ssh"),
+		"/root/.ssh",
+		filepath.Join("/home", sudoUser, ".ssh"),
 	}
 
 	var keys []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".pub") {
-			keyPath := filepath.Join(sshDir, entry.Name())
-			keys = append(keys, keyPath)
+	for _, sshDir := range possiblePaths {
+		if _, err := os.Stat(sshDir); err != nil {
+			continue // Directory doesn't exist, skip
+		}
+
+		entries, err := os.ReadDir(sshDir)
+		if err != nil {
+			continue // Can't read directory, skip
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".pub") {
+				keyPath := filepath.Join(sshDir, entry.Name())
+				// Verify we can read the key
+				if _, err := os.ReadFile(keyPath); err == nil {
+					keys = append(keys, keyPath)
+				}
+			}
+		}
+	}
+
+	// Prefer Ed25519 keys over RSA for better security
+	for i, key := range keys {
+		if strings.Contains(key, "id_ed25519.pub") {
+			// Move Ed25519 key to the front
+			keys[0], keys[i] = keys[i], keys[0]
+			break
 		}
 	}
 
 	if len(keys) == 0 {
-		return nil, fmt.Errorf("no SSH public keys found in ~/.ssh/")
+		return nil, fmt.Errorf("no SSH public keys found. Please generate one with: ssh-keygen -t ed25519")
 	}
 
 	return keys, nil
@@ -162,7 +221,7 @@ func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		vmName = args[0]
 	} else {
 		vmName = generateVMName("eos-vm")
-		otelzap.Ctx(rc.Ctx).Info("No VM name provided, using generated name", 
+		otelzap.Ctx(rc.Ctx).Info("No VM name provided, using generated name",
 			zap.String("name", vmName))
 	}
 
@@ -171,41 +230,132 @@ func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	// Apply any overrides from flags
 	if cmd.Flags().Changed("memory") {
-		config.Memory = ubuntuVMMemory
+		val, _ := cmd.Flags().GetString("memory")
+		if val != "" {
+			config.Memory = val
+		}
 	}
 	if cmd.Flags().Changed("vcpus") {
-		config.VCPUs = ubuntuVMVCPUs
+		val, _ := cmd.Flags().GetInt("vcpus")
+		if val > 0 {
+			config.VCPUs = val
+		}
 	}
 	if cmd.Flags().Changed("disk-size") {
-		config.DiskSize = ubuntuVMDiskSize
+		val, _ := cmd.Flags().GetString("disk-size")
+		if val != "" {
+			config.DiskSize = val
+		}
 	}
 	if cmd.Flags().Changed("network") {
-		config.Network = ubuntuVMNetwork
+		val, _ := cmd.Flags().GetString("network")
+		if val != "" {
+			config.Network = val
+		}
 	}
 	if cmd.Flags().Changed("storage-pool") {
-		config.StoragePool = ubuntuVMPool
+		val, _ := cmd.Flags().GetString("storage-pool")
+		if val != "" {
+			config.StoragePool = val
+		}
+	}
+
+	// Handle security level
+	if cmd.Flags().Changed("security-level") {
+		val, _ := cmd.Flags().GetString("security-level")
+		if val != "" {
+			config.SecurityLevel = val
+		}
+	}
+
+	// Handle enable-all-security flag
+	if cmd.Flags().Changed("enable-all-security") {
+		if enabled, _ := cmd.Flags().GetBool("enable-all-security"); enabled {
+			config.SecurityLevel = "paranoid"
+			config.EnableTPM = true
+			config.SecureBoot = true
+			config.EncryptDisk = true
+			config.AutoUpdate = true
+			config.EnableFirewall = true
+			config.EnableFail2ban = true
+			config.EnableAudit = true
+			config.EnableAppArmor = true
+		}
 	}
 
 	// Handle VM name override from flag if provided
 	if cmd.Flags().Changed("name") {
-		config.Name = ubuntuVMName
-		otelzap.Ctx(rc.Ctx).Info("Using custom VM name from flag",
-			zap.String("name", config.Name))
+		val, _ := cmd.Flags().GetString("name")
+		if val != "" {
+			config.Name = val
+			otelzap.Ctx(rc.Ctx).Info("Using custom VM name from flag",
+				zap.String("name", config.Name))
+		}
 	}
 
 	// Handle SSH keys - use provided keys or default to ~/.ssh/*.pub
 	if cmd.Flags().Changed("ssh-keys") {
-		config.SSHKeys = ubuntuVMSSHKeys
-		otelzap.Ctx(rc.Ctx).Info("Using provided SSH keys",
-			zap.Strings("keys", config.SSHKeys))
+		val, _ := cmd.Flags().GetStringSlice("ssh-keys")
+		if len(val) > 0 {
+			config.SSHKeys = val
+			otelzap.Ctx(rc.Ctx).Info("Using provided SSH keys",
+				zap.Strings("keys", config.SSHKeys))
+		}
 	} else {
 		defaultKeys, err := findDefaultSSHKeys()
 		if err != nil {
 			return fmt.Errorf("no SSH keys provided and failed to find default keys: %w", err)
 		}
 		config.SSHKeys = defaultKeys
-		otelzap.Ctx(rc.Ctx).Info("Using default SSH keys from ~/.ssh/", 
+		otelzap.Ctx(rc.Ctx).Info("Using default SSH keys from ~/.ssh/",
 			zap.Strings("keys", defaultKeys))
+	}
+
+	// Apply security disable flags (override defaults)
+	if cmd.Flags().Changed("disable-tpm") {
+		if disabled, _ := cmd.Flags().GetBool("disable-tpm"); disabled {
+			config.EnableTPM = false
+		}
+	}
+	if cmd.Flags().Changed("disable-secureboot") {
+		if disabled, _ := cmd.Flags().GetBool("disable-secureboot"); disabled {
+			config.SecureBoot = false
+		}
+	}
+	if cmd.Flags().Changed("disable-encryption") {
+		if disabled, _ := cmd.Flags().GetBool("disable-encryption"); disabled {
+			config.EncryptDisk = false
+		}
+	}
+	if cmd.Flags().Changed("disable-autoupdates") {
+		if disabled, _ := cmd.Flags().GetBool("disable-autoupdates"); disabled {
+			config.AutoUpdate = false
+		}
+	}
+	if cmd.Flags().Changed("disable-firewall") {
+		if disabled, _ := cmd.Flags().GetBool("disable-firewall"); disabled {
+			config.EnableFirewall = false
+		}
+	}
+	if cmd.Flags().Changed("disable-fail2ban") {
+		if disabled, _ := cmd.Flags().GetBool("disable-fail2ban"); disabled {
+			config.EnableFail2ban = false
+		}
+	}
+	if cmd.Flags().Changed("disable-audit") {
+		if disabled, _ := cmd.Flags().GetBool("disable-audit"); disabled {
+			config.EnableAudit = false
+		}
+	}
+	if cmd.Flags().Changed("disable-apparmor") {
+		if disabled, _ := cmd.Flags().GetBool("disable-apparmor"); disabled {
+			config.EnableAppArmor = false
+		}
+	}
+	if cmd.Flags().Changed("enable-ipv6") {
+		if enabled, _ := cmd.Flags().GetBool("enable-ipv6"); enabled {
+			config.DisableIPv6 = false
+		}
 	}
 
 	// Log VM creation details
@@ -215,15 +365,15 @@ func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		zap.Int("vcpus", config.VCPUs),
 		zap.String("disk", config.DiskSize),
 		zap.String("network", config.Network),
+		zap.String("security_level", config.SecurityLevel),
 		zap.Bool("tpm", config.EnableTPM),
 		zap.Bool("secureboot", config.SecureBoot),
-		zap.Bool("encryption", config.EncryptDisk))
-
-	// Apply security toggles
-	config.EnableTPM = !ubuntuVMDisableTPM
-	config.SecureBoot = !ubuntuVMDisableSB
-	config.EncryptDisk = !ubuntuVMDisableEnc
-	config.AutoUpdate = !ubuntuVMDisableAuto
+		zap.Bool("encryption", config.EncryptDisk),
+		zap.Bool("firewall", config.EnableFirewall),
+		zap.Bool("fail2ban", config.EnableFail2ban),
+		zap.Bool("audit", config.EnableAudit),
+		zap.Bool("apparmor", config.EnableAppArmor),
+		zap.Bool("disable_ipv6", config.DisableIPv6))
 
 	// Initialize KVM manager
 	kvmMgr, err := kvm.NewKVMManager(rc, "")
@@ -363,26 +513,63 @@ func createSecureVM(rc *eos_io.RuntimeContext, kvmMgr *kvm.KVMManager, config *S
 
 func generateSecureCloudInit(config *SecureVMConfig) string {
 	// Start with base configuration
-	cloudConfig := `#cloud-config
+	cloudConfig := fmt.Sprintf(`#cloud-config
+hostname: %s
+manage_etc_hosts: true
+preserve_hostname: false
+
+# System updates
 package_update: true
 package_upgrade: true
 package_reboot_if_required: true
-`
 
-	// Add security packages
-	cloudConfig += `
-# Security packages
-packages:
-  - unattended-upgrades
-  - apt-listchanges
-  - needrestart
-  - tpm2-tools
-  - apparmor
-  - apparmor-utils
-  - auditd
-  - fail2ban
-  - ufw
-`
+# Create secure default user
+users:
+  - name: ubuntu
+    groups: [sudo]
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+    lock_passwd: true
+`, config.Name)
+
+	// Add comprehensive security packages based on security level
+	packages := []string{
+		"qemu-guest-agent",
+		"unattended-upgrades",
+		"apt-listchanges",
+		"needrestart",
+		"ufw",
+		"fail2ban",
+		"apparmor",
+		"apparmor-utils",
+		"auditd",
+		"rsyslog",
+		"libpam-tmpdir",
+		"libpam-cracklib",
+		"debsums",
+	}
+
+	// Add extra packages for higher security levels
+	if config.SecurityLevel == "high" || config.SecurityLevel == "paranoid" {
+		packages = append(packages, []string{
+			"aide",
+			"rkhunter",
+			"clamav",
+			"clamav-daemon",
+			"debsecan",
+			"lynis",
+			"chkrootkit",
+		}...)
+	}
+
+	if config.EnableTPM {
+		packages = append(packages, "tpm2-tools", "tpm2-abrmd")
+	}
+
+	cloudConfig += "\n# Security packages\npackages:\n"
+	for _, pkg := range packages {
+		cloudConfig += fmt.Sprintf("  - %s\n", pkg)
+	}
 
 	// Configure automatic security updates
 	if config.AutoUpdate {
@@ -415,26 +602,184 @@ unattended_upgrades:
 		}
 	}
 
-	// Add security hardening
+	// Add kernel hardening and security configurations
 	cloudConfig += `
-# Security hardening
-security:
-  disable_root: true
-  ssh_pwauth: false
-  allow_public_ssh: true
+# Write security configuration files
+write_files:
+  - path: /etc/sysctl.d/99-eos-security.conf
+    content: |
+      # IP Spoofing protection
+      net.ipv4.conf.all.rp_filter = 1
+      net.ipv4.conf.default.rp_filter = 1
 
-# Enable UFW firewall
+      # Ignore ICMP redirects
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv6.conf.all.accept_redirects = 0
+
+      # Ignore send redirects
+      net.ipv4.conf.all.send_redirects = 0
+
+      # Disable source packet routing
+      net.ipv4.conf.all.accept_source_route = 0
+      net.ipv6.conf.all.accept_source_route = 0
+
+      # Log Martians
+      net.ipv4.conf.all.log_martians = 1
+
+      # Ignore ICMP ping requests
+      net.ipv4.icmp_echo_ignore_broadcasts = 1
+      net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+      # Enable SYN cookies
+      net.ipv4.tcp_syncookies = 1
+      net.ipv4.tcp_syn_retries = 5
+
+      # Kernel randomization
+      kernel.randomize_va_space = 2
+
+      # Disable core dumps
+      fs.suid_dumpable = 0
+      kernel.core_pattern = |/bin/false
+`
+
+	if config.DisableIPv6 {
+		cloudConfig += `      # Disable IPv6
+      net.ipv6.conf.all.disable_ipv6 = 1
+      net.ipv6.conf.default.disable_ipv6 = 1
+      net.ipv6.conf.lo.disable_ipv6 = 1
+`
+	}
+
+	// SSH hardening for high security
+	if config.SecurityLevel == "high" || config.SecurityLevel == "paranoid" {
+		cloudConfig += `
+  - path: /etc/ssh/sshd_config.d/99-eos-hardened.conf
+    content: |
+      # EOS Security Hardened SSH Configuration
+      Protocol 2
+      PermitRootLogin no
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      PermitEmptyPasswords no
+      ChallengeResponseAuthentication no
+      KerberosAuthentication no
+      GSSAPIAuthentication no
+      X11Forwarding no
+      PermitUserEnvironment no
+      AllowUsers ubuntu
+      ClientAliveInterval 300
+      ClientAliveCountMax 2
+      MaxAuthTries 3
+      MaxSessions 2
+      LoginGraceTime 30
+      StrictModes yes
+      IgnoreRhosts yes
+      HostbasedAuthentication no
+      Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes256-ctr
+      MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+      KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
+`
+	}
+
+	// Fail2ban configuration
+	if config.EnableFail2ban {
+		cloudConfig += `
+  - path: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      bantime = 3600
+      findtime = 600
+      maxretry = 5
+      destemail = security@localhost
+      action = %(action_mwl)s
+
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 3
+`
+	}
+
+	// Audit rules for paranoid level
+	if config.SecurityLevel == "paranoid" {
+		cloudConfig += `
+  - path: /etc/audit/rules.d/eos-cis.rules
+    content: |
+      # CIS Benchmark Audit Rules
+      -w /etc/passwd -p wa -k passwd_changes
+      -w /etc/group -p wa -k group_changes
+      -w /etc/shadow -p wa -k shadow_changes
+      -w /etc/sudoers -p wa -k sudoers_changes
+      -w /var/log/auth.log -p wa -k auth_log_changes
+      -w /etc/ssh/sshd_config -p wa -k sshd_config_changes
+      -a always,exit -F arch=b64 -S execve -C uid!=euid -F key=setuid
+      -a always,exit -F arch=b64 -S execve -C gid!=egid -F key=setgid
+`
+	}
+
+	// Security banner
+	cloudConfig += `
+  - path: /etc/issue.net
+    content: |
+      ############################################################
+      #                                                          #
+      #  Unauthorized access to this system is prohibited.      #
+      #  All activities are logged and monitored.               #
+      #  Violators will be prosecuted to the fullest extent     #
+      #  of the law.                                            #
+      #                                                          #
+      ############################################################
+`
+
+	// Add comprehensive run commands for security setup
+	cloudConfig += `
+# Security hardening commands
 runcmd:
-  - ufw --force enable
+  # Update and upgrade system
+  - apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+
+  # Apply kernel parameters
+  - sysctl -p /etc/sysctl.d/99-eos-security.conf
+
+  # Configure firewall
+  - ufw --force reset
   - ufw default deny incoming
   - ufw default allow outgoing
-  - ufw allow ssh
-  - ufw allow http
-  - ufw allow https
+  - ufw allow ssh/tcp
+  - ufw limit ssh/tcp
+  - ufw --force enable
+
+  # Enable security services
   - systemctl enable --now ufw
   - systemctl enable --now fail2ban
   - systemctl enable --now apparmor
   - systemctl enable --now auditd
+
+  # Configure AppArmor
+  - aa-enforce /etc/apparmor.d/*
+
+  # Configure automatic updates
+  - dpkg-reconfigure -plow unattended-upgrades
+
+  # Secure shared memory
+  - echo "tmpfs /run/shm tmpfs defaults,noexec,nosuid,nodev 0 0" >> /etc/fstab
+  - mount -o remount /run/shm
+
+  # Disable unnecessary services
+  - systemctl disable bluetooth.service 2>/dev/null || true
+  - systemctl disable cups.service 2>/dev/null || true
+  - systemctl disable avahi-daemon.service 2>/dev/null || true
+
+  # Set security limits
+  - echo "* hard core 0" >> /etc/security/limits.conf
+  - echo "* soft core 0" >> /etc/security/limits.conf
+
+  # Create security audit log
+  - echo "Security hardening completed at $(date)" > /var/log/eos-security.log
+  - chmod 600 /var/log/eos-security.log
 `
 
 	// Add disk encryption if enabled

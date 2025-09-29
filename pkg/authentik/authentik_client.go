@@ -1,4 +1,4 @@
-package hera
+package authentik
 
 import (
 	"bytes"
@@ -30,11 +30,11 @@ type AuthentikUser struct {
 
 // AuthentikGroup represents a group in Authentik
 type AuthentikGroup struct {
-	UUID         string `json:"pk"`
-	Name         string `json:"name"`
-	IsSuperuser  bool   `json:"is_superuser"`
-	UsersCount   int    `json:"users_obj_count"`
-	NumUsers     int    `json:"num_pk"`
+	UUID        string `json:"pk"`
+	Name        string `json:"name"`
+	IsSuperuser bool   `json:"is_superuser"`
+	UsersCount  int    `json:"users_obj_count"`
+	NumUsers    int    `json:"num_pk"`
 }
 
 // AuthentikEvent represents an event in Authentik
