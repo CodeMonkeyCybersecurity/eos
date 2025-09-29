@@ -198,12 +198,32 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		return fmt.Errorf("failed to update Eos source code: %w", err)
 	}
 
-	// Build the new binary
-	logger.Info("Building updated Eos binary")
+	// Detect the current system architecture
+	detectCmd := exec.Command("go", "env", "GOOS", "GOARCH")
+	detectOutput, err := detectCmd.Output()
+	if err != nil {
+		logger.Warn("Could not detect system architecture, using defaults",
+			zap.Error(err))
+	}
+
+	// Build the new binary with explicit architecture
+	logger.Info("Building updated Eos binary for current architecture")
 	buildCmd := exec.Command("go", "build", "-o", "/usr/local/bin/eos", "./cmd")
 	buildCmd.Dir = "/opt/eos"
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
+
+	// Set build environment to match current system
+	buildCmd.Env = append(os.Environ(),
+		"CGO_ENABLED=0",  // Disable CGO for static binary
+		"GO111MODULE=on", // Ensure module mode
+	)
+
+	// If we successfully detected architecture, log it
+	if detectOutput != nil {
+		logger.Info("Building for detected architecture",
+			zap.String("arch_info", string(detectOutput)))
+	}
 
 	if err := buildCmd.Run(); err != nil {
 		return fmt.Errorf("failed to build updated Eos binary: %w", err)
