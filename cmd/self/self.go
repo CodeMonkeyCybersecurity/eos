@@ -39,6 +39,10 @@ var UpdateCmd = &cobra.Command{
 This command performs the equivalent of: su, cd /opt/eos && git pull && ./install.sh && exit`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		// Declare variables that will be used later
+		var resetCmd *exec.Cmd
+		var cleanCmd *exec.Cmd
+		
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Starting Eos self-update process")
 
@@ -70,7 +74,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 		// Reset any local changes to match the remote exactly
 		logger.Info("Resetting local changes to match remote...")
-		resetCmd := exec.Command("git", "reset", "--hard", "HEAD")
+		resetCmd = exec.Command("git", "reset", "--hard", "HEAD")
 		resetCmd.Stdout = os.Stdout
 		resetCmd.Stderr = os.Stderr
 		if err := resetCmd.Run(); err != nil {
@@ -79,7 +83,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		}
 
 		// Clean untracked files and directories
-		cleanCmd := exec.Command("git", "clean", "-fd")
+		cleanCmd = exec.Command("git", "clean", "-fd")
 		cleanCmd.Stdout = os.Stdout
 		cleanCmd.Stderr = os.Stderr
 		if err := cleanCmd.Run(); err != nil {
