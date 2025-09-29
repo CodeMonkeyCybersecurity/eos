@@ -64,7 +64,9 @@ var PhaseValidators map[string]PhaseValidator
 
 func init() {
 	PhaseValidators = map[string]PhaseValidator{
-
+		"consul":    validateConsulPhase,
+		"vault":     validateVaultPhase,
+		"nomad":     validateNomadPhase,
 		"storage":   validateStoragePhase,
 		"tailscale": validateTailscalePhase,
 		"osquery":   validateOSQueryPhase,
@@ -118,16 +120,122 @@ func checkConsulInstalled(rc *eos_io.RuntimeContext) (bool, string) {
 	return true, "unknown"
 }
 
-// checkConsulConfigured checks if Consul is properly configured (HashiCorp migration)
-func checkConsulConfigured(rc *eos_io.RuntimeContext) bool {
-	// Check if Consul is responding to health checks
-	return checkConsulHealth(rc)
+
+// validateConsulPhase checks if Consul is installed and running
+func validateConsulPhase(rc *eos_io.RuntimeContext) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Validating Consul phase")
+
+	// Check if Consul binary exists
+	installed, version := checkConsulInstalled(rc)
+	if !installed {
+		logger.Debug("Consul not installed")
+		return false, nil
+	}
+	logger.Debug("Consul installed", zap.String("version", version))
+
+	// Check if Consul service is active
+	status, err := CheckService(rc, "consul")
+	if err != nil {
+		logger.Debug("Consul service check failed", zap.Error(err))
+		return false, nil
+	}
+
+	if status != ServiceStatusActive {
+		logger.Debug("Consul service not active", zap.String("status", string(status)))
+		return false, nil
+	}
+
+	// Check if Consul API is responding
+	if !checkConsulHealthSimple(rc) {
+		logger.Debug("Consul API not responding")
+		return false, nil
+	}
+
+	logger.Debug("Consul phase validated successfully")
+	return true, nil
 }
 
-// checkConsulAPIConfigured checks if Consul API is properly configured (HashiCorp migration)
-func checkConsulAPIConfigured(rc *eos_io.RuntimeContext) bool {
-	// Check if Consul API is responding
-	return checkConsulHealth(rc)
+// validateVaultPhase checks if Vault is installed and running
+func validateVaultPhase(rc *eos_io.RuntimeContext) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Validating Vault phase")
+
+	// Check if Vault binary exists
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "vault",
+		Args:    []string{"version"},
+		Capture: true,
+	})
+
+	if err != nil {
+		logger.Debug("Vault not installed")
+		return false, nil
+	}
+
+	logger.Debug("Vault installed", zap.String("version", output))
+
+	// Check if Vault service is active
+	status, err := CheckService(rc, "vault")
+	if err != nil {
+		logger.Debug("Vault service check failed", zap.Error(err))
+		return false, nil
+	}
+
+	if status != ServiceStatusActive {
+		logger.Debug("Vault service not active", zap.String("status", string(status)))
+		return false, nil
+	}
+
+	// Check if Vault is initialized and unsealed
+	if !checkVaultHealthSimple(rc) {
+		logger.Debug("Vault not healthy (may need init/unseal)")
+		return false, nil
+	}
+
+	logger.Debug("Vault phase validated successfully")
+	return true, nil
+}
+
+// validateNomadPhase checks if Nomad is installed and running
+func validateNomadPhase(rc *eos_io.RuntimeContext) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Validating Nomad phase")
+
+	// Check if Nomad binary exists
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "nomad",
+		Args:    []string{"version"},
+		Capture: true,
+	})
+
+	if err != nil {
+		logger.Debug("Nomad not installed")
+		return false, nil
+	}
+
+	logger.Debug("Nomad installed", zap.String("version", output))
+
+	// Check if Nomad service is active
+	status, err := CheckService(rc, "nomad")
+	if err != nil {
+		logger.Debug("Nomad service check failed", zap.Error(err))
+		return false, nil
+	}
+
+	if status != ServiceStatusActive {
+		logger.Debug("Nomad service not active", zap.String("status", string(status)))
+		return false, nil
+	}
+
+	// Check if Nomad API is responding
+	if !checkNomadHealthSimple(rc) {
+		logger.Debug("Nomad API not responding")
+		return false, nil
+	}
+
+	logger.Debug("Nomad phase validated successfully")
+	return true, nil
 }
 
 // validateStoragePhase checks if storage operations are deployed
@@ -253,8 +361,8 @@ func IsBootstrapComplete(rc *eos_io.RuntimeContext) (bool, []string) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking if bootstrap is complete")
 
-	// Define required phases
-	requiredPhases := []string{"", "-api"}
+	// Define required phases - Consul is always required
+	requiredPhases := []string{"consul"}
 	var missingPhases []string
 
 	for _, phase := range requiredPhases {

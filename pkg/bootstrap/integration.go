@@ -34,6 +34,10 @@ func RunEnhancedBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		DryRun:        getBoolFlag(cmd, "dry-run"),
 		ValidateOnly:  getBoolFlag(cmd, "validate-only"),
 		Force:         getBoolFlag(cmd, "force"),
+		// HashiCorp services
+		SkipConsul:    false,  // Consul is always required
+		EnableVault:   getBoolFlag(cmd, "enable-vault"),
+		EnableNomad:   getBoolFlag(cmd, "enable-nomad"),
 	}
 	
 	// Check if system is already bootstrapped using state validation

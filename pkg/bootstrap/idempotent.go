@@ -287,11 +287,11 @@ func checkNomadConfiguration(rc *eos_io.RuntimeContext) bool {
 func isServiceHealthy(rc *eos_io.RuntimeContext, component string) bool {
 	switch component {
 	case "vault":
-		return checkVaultHealth(rc)
+		return checkVaultHealthSimple(rc)
 	case "consul":
-		return checkConsulHealth(rc)
+		return checkConsulHealthSimple(rc)
 	case "nomad":
-		return checkNomadHealth(rc)
+		return checkNomadHealthSimple(rc)
 	default:
 		return true
 	}

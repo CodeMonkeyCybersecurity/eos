@@ -4,13 +4,10 @@ package cmd
 
 import (
 	"os"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/watchdog"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -68,16 +65,16 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 
 	// Group subcommands for cleanliness - Core verb-first architecture
 	for _, subCmd := range []*cobra.Command{
-		create.CreateCmd,    // VERB-FIRST ARCHITECTURE
-		read.ReadCmd,        // VERB-FIRST ARCHITECTURE
-		list.ListCmd,        // VERB-FIRST ARCHITECTURE
-		update.UpdateCmd,    // VERB-FIRST ARCHITECTURE
-		delete.DeleteCmd,    // VERB-FIRST ARCHITECTURE
-		check.CheckCmd,      // VERB-FIRST ARCHITECTURE (health checks)
-		debug.GetDebugCmd(), // VERB-FIRST ARCHITECTURE (debugging tools)
-		self.SelfCmd,        // SPECIAL CASE (Eos self-management)
-		backup.BackupCmd,    // SPECIAL CASE (Complex nomenclature)
-		rollback.RollbackCmd,// VERB-FIRST ARCHITECTURE (rollback operations)
+		create.CreateCmd,     // VERB-FIRST ARCHITECTURE
+		read.ReadCmd,         // VERB-FIRST ARCHITECTURE
+		list.ListCmd,         // VERB-FIRST ARCHITECTURE
+		update.UpdateCmd,     // VERB-FIRST ARCHITECTURE
+		delete.DeleteCmd,     // VERB-FIRST ARCHITECTURE
+		check.CheckCmd,       // VERB-FIRST ARCHITECTURE (health checks)
+		debug.GetDebugCmd(),  // VERB-FIRST ARCHITECTURE (debugging tools)
+		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
+		backup.BackupCmd,     // SPECIAL CASE (Complex nomenclature)
+		rollback.RollbackCmd, // VERB-FIRST ARCHITECTURE (rollback operations)
 
 		// Top-level aliases for convenience
 		bootstrap.BootstrapCmd, // Alias for create bootstrap
@@ -102,58 +99,21 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 
 // Execute initializes and runs the root command.
 func Execute(rc *eos_io.RuntimeContext) {
-	_ = telemetry.Init("eos")
+	// Skip telemetry for now to avoid hangs
+	// _ = telemetry.Init("eos")
 
 	// Register all subcommands first
 	RegisterCommands(rc)
 
-	// Create command watchdog with configurable timeout
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check for custom timeout from environment or use default
-	watchdogTimeout := 3 * time.Minute
-	if envTimeout := os.Getenv("EOS_WATCHDOG_TIMEOUT"); envTimeout != "" {
-		if duration, err := time.ParseDuration(envTimeout); err == nil {
-			watchdogTimeout = duration
-			logger.Info("Using custom watchdog timeout",
-				zap.Duration("timeout", watchdogTimeout))
+	// Simple execution without watchdog
+	if err := RootCmd.Execute(); err != nil {
+		logger := otelzap.Ctx(rc.Ctx)
+		if eos_err.IsExpectedUserError(err) {
+			logger.Info("Command completed with expected error", zap.Error(err))
+			os.Exit(0)
+		} else {
+			logger.Error("Command failed with system error", zap.Error(err))
+			os.Exit(1)
 		}
-	}
-
-	// Create and use the command watchdog
-	cmdWatchdog := watchdog.NewCommandWatchdog(rc.Log, watchdogTimeout)
-
-	// Get command name for logging
-	cmdName := "eos"
-	if len(os.Args) > 1 {
-		cmdName = os.Args[1]
-	}
-
-	// Execute with watchdog protection
-	err := cmdWatchdog.Execute(cmdName, os.Args[1:], func() error {
-		// Execute the command
-		if err := RootCmd.Execute(); err != nil {
-			if eos_err.IsExpectedUserError(err) {
-				// Expected error (bad usage, file not found, etc.)
-				// Show the error but don't use ERROR level logging
-				logger.Info("Command completed with expected error",
-					zap.Error(err),
-					zap.String("error_type", "user_error"))
-				os.Exit(0) // Exit with success code for user errors
-			} else {
-				// Unexpected system error
-				logger.Error("Command failed with system error",
-					zap.Error(err),
-					zap.String("error_type", "system_error"))
-				os.Exit(1) // Exit with error code for system errors
-			}
-		}
-		return nil
-	})
-
-	// This should never be reached due to os.Exit calls above
-	if err != nil {
-		logger.Error("Unexpected error in command execution", zap.Error(err))
-		os.Exit(1)
 	}
 }

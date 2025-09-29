@@ -323,22 +323,22 @@ func getProcessName(rc *eos_io.RuntimeContext, pid int) string {
 func checkServiceHealth(rc *eos_io.RuntimeContext, serviceName string) bool {
 	switch serviceName {
 	case "vault":
-		return checkVaultHealth(rc)
+		return checkVaultHealthSimple(rc)
 	case "consul":
-		return checkConsulHealth(rc)
+		return checkConsulHealthSimple(rc)
 	case "nomad":
-		return checkNomadHealth(rc)
+		return checkNomadHealthSimple(rc)
 	case "-api":
 		// Migrated to HashiCorp stack - check Consul health instead
-		return checkConsulHealth(rc)
+		return checkConsulHealthSimple(rc)
 	default:
 		// For unknown services, assume healthy if running
 		return isServiceRunning(rc, serviceName)
 	}
 }
 
-// checkVaultHealth checks Vault health endpoint
-func checkVaultHealth(rc *eos_io.RuntimeContext) bool {
+// checkVaultHealthSimple checks Vault health endpoint (simple version)
+func checkVaultHealthSimple(rc *eos_io.RuntimeContext) bool {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get("http://localhost:8200/v1/sys/health")
 	if err != nil {
@@ -349,8 +349,8 @@ func checkVaultHealth(rc *eos_io.RuntimeContext) bool {
 	return resp.StatusCode == 200 || resp.StatusCode == 429 // 429 = sealed but running
 }
 
-// checkConsulHealth checks Consul health endpoint
-func checkConsulHealth(rc *eos_io.RuntimeContext) bool {
+// checkConsulHealthSimple checks Consul health endpoint (simple version)
+func checkConsulHealthSimple(rc *eos_io.RuntimeContext) bool {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get("http://localhost:8500/v1/status/leader")
 	if err != nil {
@@ -361,8 +361,8 @@ func checkConsulHealth(rc *eos_io.RuntimeContext) bool {
 	return resp.StatusCode == 200
 }
 
-// checkNomadHealth checks Nomad health endpoint
-func checkNomadHealth(rc *eos_io.RuntimeContext) bool {
+// checkNomadHealthSimple checks Nomad health endpoint (simple version)
+func checkNomadHealthSimple(rc *eos_io.RuntimeContext) bool {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get("http://localhost:4646/v1/status/leader")
 	if err != nil {

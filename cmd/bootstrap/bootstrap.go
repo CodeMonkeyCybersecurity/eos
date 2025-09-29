@@ -74,6 +74,11 @@ Standard Options:
 	BootstrapCmd.Flags().Bool("clean", false, "Clean slate - remove existing services and start fresh")
 	BootstrapCmd.Flags().Bool("reconfigure", false, "Reconfigure existing services")
 
+	// HashiCorp service flags
+	// Consul is always installed as it's required for service discovery
+	BootstrapCmd.Flags().Bool("enable-vault", false, "Install and configure HashiCorp Vault (opt-in)")
+	BootstrapCmd.Flags().Bool("enable-nomad", false, "Install and configure HashiCorp Nomad (opt-in)")
+
 }
 
 // AddSubcommands adds all bootstrap subcommands to BootstrapCmd
