@@ -9,6 +9,12 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
+// AddSubcommands adds all backup subcommands to the backup command
+func AddSubcommands() {
+	// Add Authentik subcommand
+	BackupCmd.AddCommand(AuthentikCmd)
+}
+
 // BackupCmd is the main backup command that follows CRUD pattern
 var BackupCmd = &cobra.Command{
 	Use:   "backup",

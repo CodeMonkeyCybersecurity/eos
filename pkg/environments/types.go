@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/deploy"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
@@ -533,11 +532,10 @@ type ValidationConfig struct {
 
 // EnvironmentManager manages environment operations
 type EnvironmentManager struct {
-	configPath    string
-	context       *Context
-	deployManager *deploy.DeploymentManager
-	cache         map[string]*Environment
-	cacheExpiry   time.Time
+	configPath  string
+	context     *Context
+	cache       map[string]*Environment
+	cacheExpiry time.Time
 }
 
 // EnvironmentError represents an error during environment operations

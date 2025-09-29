@@ -3,7 +3,6 @@ package secrets
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"strings"
 	"testing"
 )
@@ -468,15 +467,8 @@ func BenchmarkGenerateBase64_32(b *testing.B) {
 	}
 }
 
-// Helper to simulate crypto/rand.Read failure
-type failReader struct{}
-
-func (f failReader) Read(p []byte) (n int, err error) {
-	return 0, errors.New("simulated random source failure")
-}
-
-// TestRandomSourceFailure would test crypto/rand failure,
-// but we can't easily inject a failing reader in the current implementation.
+// Note: Random source failure testing would require dependency injection
+// of the random source, which is not currently implemented.
 // This is documented for completeness.
 func TestRandomSourceFailureDocumentation(t *testing.T) {
 	// In a production system, you might want to make the random source

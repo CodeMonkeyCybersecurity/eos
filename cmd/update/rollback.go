@@ -272,9 +272,6 @@ func assessRollback(rc *eos_io.RuntimeContext, request *RollbackRequest) (*Rollb
 	}
 	// TODO: Replace with actual version retrieval
 	currentVersion := "20240113120000"
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current version: %w", err)
-	}
 	request.CurrentVersion = currentVersion
 
 	// Determine target version if not specified

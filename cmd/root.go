@@ -18,6 +18,7 @@ import (
 	// Subcommands - Core verb-first architecture
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/bootstrap"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/check"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
@@ -27,6 +28,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/nuke"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/rollback"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 	// "github.com/CodeMonkeyCybersecurity/eos/cmd/" // TODO: Migrate to verb directories
@@ -71,9 +73,11 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		list.ListCmd,        // VERB-FIRST ARCHITECTURE
 		update.UpdateCmd,    // VERB-FIRST ARCHITECTURE
 		delete.DeleteCmd,    // VERB-FIRST ARCHITECTURE
+		check.CheckCmd,      // VERB-FIRST ARCHITECTURE (health checks)
 		debug.GetDebugCmd(), // VERB-FIRST ARCHITECTURE (debugging tools)
 		self.SelfCmd,        // SPECIAL CASE (Eos self-management)
 		backup.BackupCmd,    // SPECIAL CASE (Complex nomenclature)
+		rollback.RollbackCmd,// VERB-FIRST ARCHITECTURE (rollback operations)
 
 		// Top-level aliases for convenience
 		bootstrap.BootstrapCmd, // Alias for create bootstrap
@@ -89,8 +93,11 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		RootCmd.AddCommand(subCmd)
 	}
 
-	// Add bootstrap subcommands after all init() functions have run
+	// Add subcommands after all init() functions have run
 	bootstrap.AddSubcommands()
+	update.AddSubcommands()
+	backup.AddSubcommands()
+	rollback.AddSubcommands()
 }
 
 // Execute initializes and runs the root command.

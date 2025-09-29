@@ -17,7 +17,14 @@ The rollback system uses operation journals to track what was done
 and provides multiple recovery strategies based on available data.`,
 }
 
-func init() {
+// AddSubcommands adds all rollback subcommands to the rollback command
+func AddSubcommands() {
 	// Add subcommands
 	RollbackCmd.AddCommand(DiskOperationCmd)
+	RollbackCmd.AddCommand(AuthentikCmd)
+}
+
+func init() {
+	// Initialize subcommands
+	AddSubcommands()
 }

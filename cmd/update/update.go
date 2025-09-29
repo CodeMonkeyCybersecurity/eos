@@ -12,6 +12,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// AddSubcommands adds all update subcommands to the update command
+func AddSubcommands() {
+	// Add Authentik subcommand
+	UpdateCmd.AddCommand(AuthentikCmd)
+}
+
 // UpdateCmd is the root command for update operations
 var UpdateCmd = &cobra.Command{
 	Use:     "update",
