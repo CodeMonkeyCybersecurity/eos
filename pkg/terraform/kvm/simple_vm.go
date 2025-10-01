@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -241,6 +242,31 @@ func generateVMName() string {
 	return fmt.Sprintf("%s-%03d", vmPrefix, max+1)
 }
 
+// getRealUserIDs returns the real user's UID and GID when running under sudo
+// Returns (-1, -1) if not running under sudo or if values can't be determined
+func getRealUserIDs() (uid int, gid int) {
+	uid = -1
+	gid = -1
+
+	// Check if running under sudo
+	sudoUID := os.Getenv("SUDO_UID")
+	sudoGID := os.Getenv("SUDO_GID")
+
+	if sudoUID != "" {
+		if parsedUID, err := strconv.Atoi(sudoUID); err == nil {
+			uid = parsedUID
+		}
+	}
+
+	if sudoGID != "" {
+		if parsedGID, err := strconv.Atoi(sudoGID); err == nil {
+			gid = parsedGID
+		}
+	}
+
+	return uid, gid
+}
+
 func generateSSHKeyED25519(seedDir, vmName string) (string, string, error) {
 	privKeyPath := filepath.Join(seedDir, fmt.Sprintf("id_ed25519_%s", vmName))
 
@@ -279,6 +305,19 @@ func generateSSHKeyED25519(seedDir, vmName string) (string, string, error) {
 	pubKeyPath := privKeyPath + ".pub"
 	if err := os.WriteFile(pubKeyPath, []byte(pubKeyStr), 0644); err != nil {
 		return "", "", fmt.Errorf("failed to write public key: %w", err)
+	}
+
+	// Change ownership to real user if running under sudo
+	uid, gid := getRealUserIDs()
+	if uid != -1 && gid != -1 {
+		// Change ownership of private key
+		if err := os.Chown(privKeyPath, uid, gid); err != nil {
+			return "", "", fmt.Errorf("failed to chown private key: %w", err)
+		}
+		// Change ownership of public key
+		if err := os.Chown(pubKeyPath, uid, gid); err != nil {
+			return "", "", fmt.Errorf("failed to chown public key: %w", err)
+		}
 	}
 
 	return privKeyPath, strings.TrimSpace(pubKeyStr), nil
