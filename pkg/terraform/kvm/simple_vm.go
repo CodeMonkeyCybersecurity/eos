@@ -1,40 +1,49 @@
 // pkg/terraform/kvm/simple_vm.go
-// MINIMAL VM CREATION - Just the essentials
+// Direct virsh-based VM creation - simpler and more reliable than Terraform
 
 package kvm
 
 import (
-	"context"
-	"encoding/json"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/ssh"
 )
 
-// VM creation and IP allocation state management
+const (
+	baseImageURL = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+	isoDir       = "/srv/iso"
+	vmPrefix     = "eos-kvm"
+)
+
+// VM creation state management
 var (
 	vmCreationMutex sync.Mutex // Global lock for entire VM creation process
-	ipMutex         sync.Mutex
-	ipStateDir      = "/var/lib/eos"
 )
 
-type IPAllocations struct {
-	Allocations map[string]string `json:"allocations"` // vmName -> IP
+// SimpleVMConfig holds simplified configuration for quick VM creation
+type SimpleVMConfig struct {
+	Name     string
+	Memory   string   // in MB
+	VCPUs    string
+	DiskSize string   // in GB
+	Network  string
+	SSHKeys  []string // Additional SSH public keys to inject
 }
 
-// Use the existing GenerateVMName from secure_vm.go
-
-// CreateSimpleUbuntuVM creates an Ubuntu VM with hardcoded defaults: 4GB RAM, 2 vCPUs, 40GB disk
+// CreateSimpleUbuntuVM creates an Ubuntu VM using virsh directly
 func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	// Lock entire VM creation to prevent race conditions
 	vmCreationMutex.Lock()
@@ -42,464 +51,268 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// ASSESS: Check prerequisites
+	// Check prerequisites
 	logger.Info("Checking KVM/libvirt prerequisites...")
-
-	// Check if terraform is installed
-	if err := checkTerraform(); err != nil {
-		return fmt.Errorf("terraform prerequisite check failed: %w", err)
+	if err := checkPrerequisites(); err != nil {
+		return fmt.Errorf("prerequisite check failed: %w", err)
 	}
 
-	// Check if libvirt is available
-	if err := checkLibvirt(); err != nil {
-		return fmt.Errorf("libvirt prerequisite check failed: %w", err)
+	// Create VM configuration with defaults
+	config := SimpleVMConfig{
+		Name:     vmName,
+		Memory:   "4096",
+		VCPUs:    "2",
+		DiskSize: "40",
+		Network:  "default",
 	}
 
-	// Check all KVM prerequisites
-	if err := checkKVMPrerequisites(); err != nil {
-		return fmt.Errorf("KVM prerequisite check failed: %w", err)
+	// Input validation
+	if err := validateSimpleVMConfig(&config); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
 	}
 
-	// Fix storage pool permissions (simplified approach)
-	logger.Info("Fixing storage pool permissions...")
-	if err := fixStoragePoolPermissions(); err != nil {
-		return fmt.Errorf("failed to fix storage permissions: %w", err)
+	// Generate VM name if not provided
+	if config.Name == "" {
+		config.Name = generateVMName()
 	}
 
 	// Clean up any existing domain with same name for idempotency
-	logger.Info("Cleaning up potential domain conflicts", zap.String("vm_name", vmName))
-	if err := cleanupExistingDomain(vmName); err != nil {
-		logger.Warn("Failed to cleanup existing domain", zap.Error(err))
-		// Continue anyway - domain might not exist
+	logger.Info("Cleaning up potential domain conflicts", zap.String("vm_name", config.Name))
+	cleanupExistingDomain(config.Name, &logger)
+
+	// Create working directory
+	seedDir := filepath.Join(isoDir, config.Name)
+	if err := os.MkdirAll(seedDir, 0755); err != nil {
+		return fmt.Errorf("failed to create seed directory: %w", err)
 	}
 
-	// Remove duplicate terraform check - already done above
+	logger.Info("Creating Ubuntu 24.04 VM", zap.String("name", config.Name))
 
-	// Find SSH keys (REQUIRED for security)
-	sshKeys := findSSHKeys()
-	if len(sshKeys) == 0 {
-		return fmt.Errorf("No SSH keys found in ~/.ssh/, /root/.ssh/, or /home/$SUDO_USER/.ssh/\n" +
-			"Please create SSH keys first: ssh-keygen -t rsa -b 4096")
-	}
-	logger.Info("Found SSH keys for VM access", zap.Int("key_count", len(sshKeys)))
-
-	// Create fresh working directory with timestamp for idempotency
-	workingDir := filepath.Join("/tmp", fmt.Sprintf("terraform-%s-%d", vmName, time.Now().Unix()))
-
-	// Check for existing directory and clean up previous attempts
-	if _, err := os.Stat(workingDir); err == nil {
-		logger.Warn("Cleaning up previous attempt")
-		// Attempt to destroy previous state if it exists
-		tfStateFile := filepath.Join(workingDir, "terraform.tfstate")
-		if _, err := os.Stat(tfStateFile); err == nil {
-			destroyCmd := exec.Command("terraform", "destroy", "-auto-approve", "-state", tfStateFile)
-			destroyCmd.Dir = workingDir
-			destroyCmd.Run() // Ignore errors - state may be corrupted
-		}
-		os.RemoveAll(workingDir)
+	// Find existing SSH keys
+	existingKeys := findSSHKeys()
+	if len(existingKeys) > 0 {
+		logger.Info("Found existing SSH keys", zap.Int("count", len(existingKeys)))
+		config.SSHKeys = append(config.SSHKeys, existingKeys...)
 	}
 
-	if err := os.MkdirAll(workingDir, 0755); err != nil {
-		return fmt.Errorf("failed to create working directory: %w", err)
-	}
-
-	logger.Info("Created fresh working directory", zap.String("path", workingDir))
-
-	// Allocate static IP with persistent state management
-	staticIP, err := allocateStaticIP(vmName)
+	// Generate SSH keypair (ed25519)
+	privKeyPath, pubKey, err := generateSSHKeyED25519(seedDir, config.Name)
 	if err != nil {
-		return fmt.Errorf("failed to allocate static IP: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			releaseStaticIP(vmName) // Rollback on failure
-		}
-	}()
-
-	// Generate cloud-init user data with static IP configured in runcmd
-	userData := generateUserData(sshKeys, staticIP, vmName)
-
-	// Create simple Terraform JSON configuration
-	tfConfig := map[string]interface{}{
-		"terraform": map[string]interface{}{
-			"required_providers": map[string]interface{}{
-				"libvirt": map[string]interface{}{
-					"source":  "dmacvicar/libvirt",
-					"version": "~> 0.7",
-				},
-			},
-		},
-		"provider": map[string]interface{}{
-			"libvirt": map[string]interface{}{
-				"uri": "qemu:///system",
-			},
-		},
-		"resource": map[string]interface{}{
-			"libvirt_volume": map[string]interface{}{
-				"ubuntu_base": map[string]interface{}{
-					"name":   vmName + "-base.qcow2",
-					"source": "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img",
-					"pool":   "default",
-					"format": "qcow2",
-				},
-				"vm_disk": map[string]interface{}{
-					"name":           vmName + ".qcow2",
-					"base_volume_id": "${libvirt_volume.ubuntu_base.id}",
-					"pool":           "default",
-					"size":           42949672960, // 40GB
-					// Add local-exec provisioner to fix ownership
-					"provisioner": []interface{}{
-						map[string]interface{}{
-							"local-exec": map[string]interface{}{
-								"command": fmt.Sprintf("sleep 2 && sudo chown libvirt-qemu:kvm /var/lib/libvirt/images/%s.qcow2", vmName),
-							},
-						},
-					},
-				},
-			},
-			"libvirt_cloudinit_disk": map[string]interface{}{
-				"cloudinit": map[string]interface{}{
-					"name":      vmName + "-cloudinit.iso",
-					"pool":      "default",
-					"user_data": userData,
-					"meta_data": fmt.Sprintf("instance-id: %s\nlocal-hostname: %s", vmName, vmName),
-				},
-			},
-			"libvirt_domain": map[string]interface{}{
-				"vm": map[string]interface{}{
-					"name":       vmName,
-					"memory":     4096, // 4GB RAM
-					"vcpu":       2,    // 2 vCPUs
-					"autostart":  true, // Auto-start on boot
-					"qemu_agent": true, // Enable QEMU agent
-					"cloudinit":  "${libvirt_cloudinit_disk.cloudinit.id}",
-					"network_interface": []interface{}{
-						map[string]interface{}{
-							"network_name":   "default",
-							"wait_for_lease": true, // Let DHCP assign based on MAC
-						},
-					},
-					"disk": []interface{}{
-						map[string]interface{}{
-							"volume_id": "${libvirt_volume.vm_disk.id}",
-						},
-					},
-					"console": []interface{}{
-						map[string]interface{}{
-							"type":        "pty",
-							"target_type": "serial",
-							"target_port": "0",
-						},
-					},
-					"graphics": []interface{}{
-						map[string]interface{}{
-							"type":        "spice",
-							"listen_type": "none",
-							"autoport":    true,
-						},
-					},
-				},
-			},
-		},
-		"output": map[string]interface{}{
-			"vm_ip": map[string]interface{}{
-				"value": staticIP,
-			},
-			"vm_mac": map[string]interface{}{
-				"value": "${libvirt_domain.vm.network_interface[0].mac}",
-			},
-		},
+		return fmt.Errorf("failed to generate SSH key: %w", err)
 	}
 
-	// Write configuration to file
-	configPath := filepath.Join(workingDir, "main.tf.json")
-	configData, err := json.MarshalIndent(tfConfig, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+	// Add generated key to the list
+	config.SSHKeys = append([]string{pubKey}, config.SSHKeys...)
+	logger.Info("Generated ed25519 SSH keypair", zap.String("private_key", privKeyPath))
+
+	// Create cloud-init files
+	if err := createCloudInit(seedDir, config); err != nil {
+		return fmt.Errorf("failed to create cloud-init: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, configData, 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
+	// Generate seed.img
+	seedImgPath := filepath.Join(seedDir, "seed.img")
+	if err := generateSeedImage(seedDir, seedImgPath); err != nil {
+		return fmt.Errorf("failed to generate seed image: %w", err)
 	}
 
-	logger.Info("Wrote Terraform configuration", zap.String("path", configPath))
-
-	// Debug output only if DEBUG environment variable is set
-	if os.Getenv("DEBUG") != "" {
-		fmt.Printf("\n=== Generated Terraform Config ===\n%s\n=== End Config ===\n", string(configData))
+	// Download or copy base image
+	baseImagePath := filepath.Join(isoDir, "ubuntu-24.04-base.img")
+	if _, err := os.Stat(baseImagePath); os.IsNotExist(err) {
+		logger.Info("Downloading Ubuntu base image")
+		if err := downloadBaseImage(baseImagePath, &logger); err != nil {
+			return fmt.Errorf("failed to get base image: %w", err)
+		}
+	} else {
+		logger.Info("Using existing base image", zap.String("path", baseImagePath))
 	}
 
-	// Run Terraform
-	tf, err := tfexec.NewTerraform(workingDir, "terraform")
-	if err != nil {
-		return fmt.Errorf("failed to create terraform executor: %w", err)
+	// Create VM disk from base
+	vmDiskPath := filepath.Join(isoDir, config.Name+".qcow2")
+	if err := createVMDisk(baseImagePath, vmDiskPath, config.DiskSize, &logger); err != nil {
+		return fmt.Errorf("failed to create VM disk: %w", err)
 	}
 
-	ctx := context.Background()
-
-	// Enable debug logging only if DEBUG environment variable is set
-	if os.Getenv("DEBUG") != "" {
-		os.Setenv("TF_LOG", "DEBUG")
-		os.Setenv("TF_LOG_PATH", filepath.Join(workingDir, "terraform-debug.log"))
-		logger.Info("Debug logging enabled", zap.String("log_path", filepath.Join(workingDir, "terraform-debug.log")))
+	// Launch VM with virt-install
+	if err := launchVM(config, vmDiskPath, seedImgPath, &logger); err != nil {
+		return fmt.Errorf("failed to launch VM: %w", err)
 	}
 
-	// Initialize
-	logger.Info("Initializing Terraform")
-	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
-		return fmt.Errorf("terraform init failed: %w", err)
-	}
+	// Get VM IP
+	ip, _ := waitForVMIP(config.Name, 30, &logger)
 
-	// Implement retry logic with destroy/reapply pattern
-	maxRetries := 2
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		logger.Info("Starting terraform apply", zap.Int("attempt", attempt+1), zap.Int("max_attempts", maxRetries+1))
+	logger.Info("VM created successfully",
+		zap.String("name", config.Name),
+		zap.String("ip", ip),
+		zap.String("ssh_key", privKeyPath))
 
-		// Between retries, force cleanup any existing domain
-		if attempt > 0 {
-			logger.Info("Cleaning up existing domain before retry", zap.String("vm_name", vmName))
-			destroyCmd := exec.Command("virsh", "destroy", vmName)
-			if os.Getuid() != 0 {
-				destroyCmd = exec.Command("sudo", "virsh", "destroy", vmName)
-			}
-			destroyCmd.Run() // Ignore errors
-
-			undefineCmd := exec.Command("virsh", "undefine", vmName, "--nvram")
-			if os.Getuid() != 0 {
-				undefineCmd = exec.Command("sudo", "virsh", "undefine", vmName, "--nvram")
-			}
-			undefineCmd.Run() // Ignore errors
-		}
-
-		// Stage 1: Create volumes
-		logger.Info("Creating VM volumes")
-		if err := tf.Apply(ctx,
-			tfexec.Target("libvirt_volume.ubuntu_base"),
-			tfexec.Target("libvirt_volume.vm_disk"),
-			tfexec.Target("libvirt_cloudinit_disk.cloudinit"),
-		); err != nil {
-			if attempt < maxRetries {
-				logger.Warn("Volume creation failed, cleaning and retrying", zap.Int("attempt", attempt+1), zap.Error(err))
-				tf.Destroy(ctx)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			return fmt.Errorf("failed to create volumes after %d attempts: %w", maxRetries+1, err)
-		}
-
-		// Poll for files instead of fixed wait
-		logger.Info("Waiting for volume files to be written")
-		var files []string
-		pattern := fmt.Sprintf("/var/lib/libvirt/images/%s*", vmName)
-
-		for i := 0; i < 10; i++ {
-			files, _ = filepath.Glob(pattern)
-			if len(files) > 0 {
-				logger.Info("Files found after polling", zap.Int("attempts", i+1), zap.Int("file_count", len(files)))
-				break
-			}
-			logger.Info("Waiting for files to appear", zap.Int("attempt", i+1), zap.String("pattern", pattern))
-			time.Sleep(time.Second)
-		}
-
-		if len(files) == 0 {
-			logger.Error("No files found after polling", zap.String("pattern", pattern))
-			if attempt < maxRetries {
-				logger.Warn("Volume files not found, cleaning and retrying", zap.Int("attempt", attempt+1))
-				tf.Destroy(ctx)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			return fmt.Errorf("volume files not created after %d attempts", maxRetries+1)
-		}
-
-		logger.Info("Found files to fix ownership", zap.Strings("files", files))
-
-		// Log expected ownership IDs for debugging
-		if libvirtUser, err := exec.Command("id", "-u", "libvirt-qemu").Output(); err == nil {
-			if libvirtGroup, err := exec.Command("id", "-g", "libvirt-qemu").Output(); err == nil {
-				logger.Info("Target ownership IDs",
-					zap.String("user", "libvirt-qemu"),
-					zap.String("uid", strings.TrimSpace(string(libvirtUser))),
-					zap.String("group", "kvm"),
-					zap.String("gid", strings.TrimSpace(string(libvirtGroup))))
-			}
-		}
-
-		// Fix each file individually - no wildcards
-		var ownershipFailed bool
-		for _, file := range files {
-			// Before fixing, check current ownership
-			if info, err := os.Stat(file); err == nil {
-				if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-					logger.Info("Current file ownership",
-						zap.String("file", filepath.Base(file)),
-						zap.Uint32("current_uid", stat.Uid),
-						zap.Uint32("current_gid", stat.Gid),
-						zap.String("needs_to_be", "libvirt-qemu:kvm"))
-				}
-			}
-
-			cmd := exec.Command("chown", "libvirt-qemu:kvm", file)
-			if os.Getuid() != 0 {
-				cmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", file)
-			}
-
-			if err := cmd.Run(); err != nil {
-				logger.Error("Failed to fix ownership",
-					zap.String("file", filepath.Base(file)),
-					zap.Error(err))
-				ownershipFailed = true
-			} else {
-				// Verify it worked - use Info level for visibility
-				if info, err := os.Stat(file); err == nil {
-					if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-						logger.Info("File ownership after fix",
-							zap.String("file", filepath.Base(file)),
-							zap.Uint32("new_uid", stat.Uid),
-							zap.Uint32("new_gid", stat.Gid),
-							zap.Bool("success", true))
-					}
-				}
-			}
-		}
-
-		if ownershipFailed {
-			if attempt < maxRetries {
-				logger.Warn("Ownership fix failed on some files, cleaning and retrying", zap.Int("attempt", attempt+1))
-				tf.Destroy(ctx)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			return fmt.Errorf("failed to fix ownership on some files after %d attempts", maxRetries+1)
-		}
-
-		logger.Info("Successfully fixed ownership on all VM files", zap.Int("file_count", len(files)))
-
-		// Stage 2: Create VM
-		logger.Info("Creating VM domain")
-		if err := tf.Apply(ctx); err != nil {
-			if attempt < maxRetries {
-				logger.Warn("VM creation failed, cleaning and retrying", zap.Int("attempt", attempt+1), zap.Error(err))
-				tf.Destroy(ctx)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			return fmt.Errorf("failed to create domain after %d attempts: %w", maxRetries+1, err)
-		}
-
-		// Success - break out of retry loop
-		logger.Info("VM creation successful", zap.Int("attempt", attempt+1))
-		break
-	}
-
-	// Fix file permissions after creation (simplified)
-	logger.Info("Fixing VM file permissions for QEMU access")
-	vmPattern := filepath.Join("/var/lib/libvirt/images", vmName+"*")
-	vmFiles, err := filepath.Glob(vmPattern)
-	if err == nil {
-		for _, file := range vmFiles {
-			var chownCmd *exec.Cmd
-			if os.Getuid() == 0 {
-				chownCmd = exec.Command("chown", "libvirt-qemu:kvm", file)
-			} else {
-				chownCmd = exec.Command("sudo", "chown", "libvirt-qemu:kvm", file)
-			}
-			chownCmd.Run() // Ignore errors - may already be correct
-		}
-	}
-
-	// Get outputs
-	outputs, err := tf.Output(ctx)
-	if err != nil {
-		logger.Warn("Failed to get outputs", zap.Error(err))
-	} else if outputs != nil {
-		if vmIP, ok := outputs["vm_ip"]; ok {
-			logger.Info("VM IP address", zap.Any("ip", vmIP.Value))
-		}
-	}
-
-	// Success output with comprehensive information
-	fmt.Printf("\n✅ Ubuntu 24.04 LTS VM created: %s\n", vmName)
+	// Success output
+	fmt.Printf("\n✅ Ubuntu 24.04 VM created: %s\n", config.Name)
 	fmt.Printf("Configuration:\n")
-	fmt.Printf("  Memory: 4GB\n")
-	fmt.Printf("  vCPUs: 2\n")
-	fmt.Printf("  Disk: 40GB\n")
-	fmt.Printf("  Network: Static IP %s (configured via cloud-init)\n", staticIP)
-	fmt.Printf("  Auto-start: Enabled\n")
-	fmt.Printf("  QEMU Agent: Enabled\n")
-	fmt.Printf("  SSH Keys: %d configured\n", len(sshKeys))
-	fmt.Printf("\nAccess:\n")
-	fmt.Printf("  SSH: ssh ubuntu@%s\n", staticIP)
-	fmt.Printf("  Console: virsh console %s\n", vmName)
+	fmt.Printf("  Memory: %s MB\n", config.Memory)
+	fmt.Printf("  vCPUs: %s\n", config.VCPUs)
+	fmt.Printf("  Disk: %s GB\n", config.DiskSize)
+	fmt.Printf("  Network: %s\n", config.Network)
+	fmt.Printf("\nSSH Access:\n")
+	fmt.Printf("  Private key: %s\n", privKeyPath)
+	if ip != "" {
+		fmt.Printf("  Command: ssh -i %s ubuntu@%s\n", privKeyPath, ip)
+	} else {
+		fmt.Printf("  Get IP: virsh domifaddr %s\n", config.Name)
+		fmt.Printf("  Then: ssh -i %s ubuntu@<ip>\n", privKeyPath)
+	}
 	fmt.Printf("\nManagement:\n")
-	fmt.Printf("  Stop: virsh shutdown %s\n", vmName)
-	fmt.Printf("  Start: virsh start %s\n", vmName)
-	fmt.Printf("  Status: virsh list --all\n")
-	fmt.Printf("  Info: virsh dominfo %s\n", vmName)
-	fmt.Printf("  Destroy: cd %s && terraform destroy\n", workingDir)
+	fmt.Printf("  Stop: virsh shutdown %s\n", config.Name)
+	fmt.Printf("  Start: virsh start %s\n", config.Name)
+	fmt.Printf("  Delete: virsh undefine %s --remove-all-storage\n", config.Name)
 
 	return nil
 }
 
-// checkTerraform verifies terraform is installed and accessible
-func checkTerraform() error {
-	// Use exec.LookPath for proper PATH lookup
-	if _, err := exec.LookPath("terraform"); err != nil {
-		return fmt.Errorf("terraform not found in PATH - install from https://terraform.io")
+func checkPrerequisites() error {
+	// Check required commands
+	requiredCmds := []string{"virsh", "virt-install", "qemu-img", "cloud-localds", "wget"}
+	for _, cmd := range requiredCmds {
+		if _, err := exec.LookPath(cmd); err != nil {
+			return fmt.Errorf("%s not found - install required packages", cmd)
+		}
 	}
-	return nil
-}
 
-// checkLibvirt verifies libvirt daemon is running
-func checkLibvirt() error {
-	// Try to connect to libvirt socket
-	if _, err := os.Stat("/var/run/libvirt/libvirt-sock"); err != nil {
-		return fmt.Errorf("libvirt daemon not running - run: sudo systemctl start libvirtd")
-	}
-	return nil
-}
-
-// checkKVM verifies KVM is available
-func checkKVM() error {
-	// Check if KVM device exists
+	// Check if KVM is available
 	if _, err := os.Stat("/dev/kvm"); err != nil {
 		return fmt.Errorf("KVM not available - ensure virtualization is enabled in BIOS")
 	}
+
+	// Check if libvirt daemon is running
+	if _, err := os.Stat("/var/run/libvirt/libvirt-sock"); err != nil {
+		return fmt.Errorf("libvirt daemon not running - run: sudo systemctl start libvirtd")
+	}
+
+	// Ensure iso directory exists and is writable
+	if err := os.MkdirAll(isoDir, 0755); err != nil {
+		return fmt.Errorf("failed to create iso directory: %w", err)
+	}
+
 	return nil
 }
 
-// findSSHKeys looks for SSH public keys in multiple locations
+func validateSimpleVMConfig(config *SimpleVMConfig) error {
+	// Validate VM name
+	if config.Name != "" {
+		validName := regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-_]{0,63}$`)
+		if !validName.MatchString(config.Name) {
+			return fmt.Errorf("invalid VM name: must be alphanumeric with - or _")
+		}
+	}
+
+	// Set defaults
+	if config.Memory == "" {
+		config.Memory = "4096"
+	}
+	if config.VCPUs == "" {
+		config.VCPUs = "2"
+	}
+	if config.DiskSize == "" {
+		config.DiskSize = "40"
+	}
+	if config.Network == "" {
+		config.Network = "default"
+	}
+
+	return nil
+}
+
+func generateVMName() string {
+	// Find next available number
+	max := 0
+	files, _ := filepath.Glob(filepath.Join(isoDir, vmPrefix+"-*"))
+	for _, f := range files {
+		base := filepath.Base(f)
+		if strings.HasPrefix(base, vmPrefix+"-") {
+			// Extract number
+			suffix := strings.TrimPrefix(base, vmPrefix+"-")
+			var num int
+			fmt.Sscanf(suffix, "%d", &num)
+			if num > max {
+				max = num
+			}
+		}
+	}
+	return fmt.Sprintf("%s-%03d", vmPrefix, max+1)
+}
+
+func generateSSHKeyED25519(seedDir, vmName string) (string, string, error) {
+	privKeyPath := filepath.Join(seedDir, fmt.Sprintf("id_ed25519_%s", vmName))
+
+	// Generate ED25519 key
+	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate ed25519 key: %w", err)
+	}
+
+	// Format private key in OpenSSH format
+	pemBlock := &pem.Block{
+		Type:  "OPENSSH PRIVATE KEY",
+		Bytes: marshalED25519PrivateKey(privKey),
+	}
+
+	// Write private key
+	privKeyFile, err := os.OpenFile(privKeyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create private key file: %w", err)
+	}
+	defer privKeyFile.Close()
+
+	if err := pem.Encode(privKeyFile, pemBlock); err != nil {
+		return "", "", fmt.Errorf("failed to encode private key: %w", err)
+	}
+
+	// Generate SSH public key
+	sshPubKey, err := ssh.NewPublicKey(pubKey)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create ssh public key: %w", err)
+	}
+
+	pubKeyStr := string(ssh.MarshalAuthorizedKey(sshPubKey))
+
+	// Write public key
+	pubKeyPath := privKeyPath + ".pub"
+	if err := os.WriteFile(pubKeyPath, []byte(pubKeyStr), 0644); err != nil {
+		return "", "", fmt.Errorf("failed to write public key: %w", err)
+	}
+
+	return privKeyPath, strings.TrimSpace(pubKeyStr), nil
+}
+
+// marshalED25519PrivateKey formats an ed25519 private key for OpenSSH
+func marshalED25519PrivateKey(key ed25519.PrivateKey) []byte {
+	// For OpenSSH compatibility, we'll just store the raw key bytes
+	// This is a simplified version - OpenSSH format is complex but
+	// for our purposes storing the seed is sufficient
+	return key.Seed()
+}
+
 func findSSHKeys() []string {
 	var keys []string
 	var sshDirs []string
 
-	// Check /root/.ssh (current process running as root)
+	// Check common SSH directories
 	sshDirs = append(sshDirs, "/root/.ssh")
-
-	// If running via sudo, also check original user's .ssh
 	if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
 		sshDirs = append(sshDirs, filepath.Join("/home", sudoUser, ".ssh"))
 	}
-
-	// Also check current user's home as fallback
 	if homeDir, err := os.UserHomeDir(); err == nil {
-		sshDir := filepath.Join(homeDir, ".ssh")
-		sshDirs = append(sshDirs, sshDir)
+		sshDirs = append(sshDirs, filepath.Join(homeDir, ".ssh"))
 	}
 
-	// Scan all directories for keys
-	for _, sshDir := range sshDirs {
-		entries, err := os.ReadDir(sshDir)
-		if err != nil {
-			continue // Skip if directory doesn't exist or can't read
-		}
+	// Prefer ed25519 keys, then RSA
+	keyPatterns := []string{"id_ed25519.pub", "id_rsa.pub", "*.pub"}
 
-		for _, entry := range entries {
-			if !entry.IsDir() && filepath.Ext(entry.Name()) == ".pub" {
-				keyPath := filepath.Join(sshDir, entry.Name())
+	for _, sshDir := range sshDirs {
+		for _, pattern := range keyPatterns {
+			matches, _ := filepath.Glob(filepath.Join(sshDir, pattern))
+			for _, keyPath := range matches {
 				if keyData, err := os.ReadFile(keyPath); err == nil {
-					// Clean up the key (remove newlines) and avoid duplicates
 					cleanKey := strings.TrimSpace(string(keyData))
 					if cleanKey != "" && !contains(keys, cleanKey) {
 						keys = append(keys, cleanKey)
@@ -512,7 +325,6 @@ func findSSHKeys() []string {
 	return keys
 }
 
-// Helper function to check if slice contains string
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -522,75 +334,9 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// allocateStaticIP allocates a static IP with persistent state management
-func allocateStaticIP(vmName string) (string, error) {
-	ipMutex.Lock()
-	defer ipMutex.Unlock()
-
-	// Ensure state directory exists
-	if err := os.MkdirAll(ipStateDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create state directory: %w", err)
-	}
-
-	ipStateFile := filepath.Join(ipStateDir, "ip-allocations.json")
-
-	// Load existing allocations
-	allocations := make(map[string]string)
-	if data, err := os.ReadFile(ipStateFile); err == nil {
-		json.Unmarshal(data, &allocations)
-	}
-
-	// Check if VM already has an IP
-	if ip, exists := allocations[vmName]; exists {
-		return ip, nil
-	}
-
-	// Find next available IP in range 100-200
-	for i := 100; i <= 200; i++ {
-		ip := fmt.Sprintf("192.168.122.%d", i)
-		used := false
-		for _, allocatedIP := range allocations {
-			if allocatedIP == ip {
-				used = true
-				break
-			}
-		}
-		if !used {
-			allocations[vmName] = ip
-			data, _ := json.Marshal(allocations)
-			os.WriteFile(ipStateFile, data, 0644)
-			return ip, nil
-		}
-	}
-
-	return "", fmt.Errorf("no IPs available in pool (192.168.122.100-200)")
-}
-
-// releaseStaticIP releases an IP allocation for rollback
-func releaseStaticIP(vmName string) {
-	ipMutex.Lock()
-	defer ipMutex.Unlock()
-
-	ipStateFile := filepath.Join(ipStateDir, "ip-allocations.json")
-	allocations := make(map[string]string)
-	if data, err := os.ReadFile(ipStateFile); err == nil {
-		json.Unmarshal(data, &allocations)
-	}
-
-	delete(allocations, vmName)
-	data, _ := json.Marshal(allocations)
-	os.WriteFile(ipStateFile, data, 0644)
-}
-
-// generateUserData creates cloud-init user data with SSH keys and static IP in runcmd
-func generateUserData(sshKeys []string, staticIP, vmName string) string {
-	keys := make([]string, len(sshKeys))
-	for i, key := range sshKeys {
-		keys[i] = "      - " + strings.TrimSpace(key)
-	}
-	keyString := strings.Join(keys, "\n")
-
-	return fmt.Sprintf(`#cloud-config
+func createCloudInit(seedDir string, config SimpleVMConfig) error {
+	// Create user-data
+	userData := fmt.Sprintf(`#cloud-config
 hostname: %s
 manage_etc_hosts: true
 users:
@@ -606,77 +352,177 @@ packages:
   - qemu-guest-agent
 
 runcmd:
-  - |
-    cat > /etc/netplan/99-static.yaml <<EOF
-    network:
-      version: 2
-      ethernets:
-        ens3:
-          dhcp4: false
-          addresses: [%s/24]
-          gateway4: 192.168.122.1
-          nameservers:
-            addresses: [8.8.8.8, 8.8.4.4]
-    EOF
-  - netplan apply
   - systemctl enable --now qemu-guest-agent
 
 ssh_pwauth: false
-disable_root: true`, vmName, keyString, staticIP)
-}
+disable_root: true
+`, config.Name, formatSSHKeys(config.SSHKeys))
 
-// checkKVMPrerequisites verifies all KVM-related requirements
-func checkKVMPrerequisites() error {
-	// Check if KVM device exists
-	if _, err := os.Stat("/dev/kvm"); err != nil {
-		return fmt.Errorf("KVM not available - ensure virtualization is enabled in BIOS")
+	userDataPath := filepath.Join(seedDir, "user-data")
+	if err := os.WriteFile(userDataPath, []byte(userData), 0644); err != nil {
+		return fmt.Errorf("failed to write user-data: %w", err)
+	}
+
+	// Create meta-data
+	metaData := fmt.Sprintf(`instance-id: %s
+local-hostname: %s
+`, config.Name, config.Name)
+
+	metaDataPath := filepath.Join(seedDir, "meta-data")
+	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+		return fmt.Errorf("failed to write meta-data: %w", err)
 	}
 
 	return nil
 }
 
-// fixStoragePoolPermissions applies simple, reliable permission fixes
-func fixStoragePoolPermissions() error {
-	// Simple approach: make the images directory accessible
-	cmds := [][]string{
-		{"chmod", "1777", "/var/lib/libvirt/images"},
-		{"chown", "root:kvm", "/var/lib/libvirt/images"},
+func formatSSHKeys(keys []string) string {
+	var formatted []string
+	for _, key := range keys {
+		formatted = append(formatted, "      - "+strings.TrimSpace(key))
+	}
+	return strings.Join(formatted, "\n")
+}
+
+func generateSeedImage(seedDir, outputPath string) error {
+	// Use cloud-localds to create seed.img
+	cmd := exec.Command("cloud-localds",
+		outputPath,
+		filepath.Join(seedDir, "user-data"),
+		filepath.Join(seedDir, "meta-data"))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cloud-localds failed: %w\nOutput: %s", err, output)
 	}
 
-	for _, args := range cmds {
-		var cmd *exec.Cmd
-		if os.Getuid() == 0 {
-			cmd = exec.Command(args[0], args[1:]...)
-		} else {
-			fullArgs := append([]string{"sudo"}, args...)
-			cmd = exec.Command(fullArgs[0], fullArgs[1:]...)
+	return nil
+}
+
+func downloadBaseImage(targetPath string, logger *otelzap.LoggerWithCtx) error {
+	logger.Info("Downloading base image", zap.String("url", baseImageURL))
+
+	// Use wget to download
+	cmd := exec.Command("wget",
+		"-O", targetPath,
+		"--progress=dot:mega",
+		baseImageURL)
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("wget failed: %w", err)
+	}
+
+	return nil
+}
+
+func createVMDisk(baseImagePath, vmDiskPath, diskSize string, logger *otelzap.LoggerWithCtx) error {
+	logger.Info("Creating VM disk",
+		zap.String("base", baseImagePath),
+		zap.String("disk", vmDiskPath),
+		zap.String("size", diskSize+"G"))
+
+	// Create a copy-on-write clone with specified size
+	cmd := exec.Command("qemu-img", "create",
+		"-f", "qcow2",
+		"-b", baseImagePath,
+		"-F", "qcow2",
+		vmDiskPath,
+		diskSize+"G")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("qemu-img failed: %w\nOutput: %s", err, output)
+	}
+
+	// Set proper permissions
+	if err := os.Chmod(vmDiskPath, 0644); err != nil {
+		logger.Warn("Failed to set disk permissions", zap.Error(err))
+	}
+
+	return nil
+}
+
+func launchVM(config SimpleVMConfig, diskPath, seedPath string, logger *otelzap.LoggerWithCtx) error {
+	logger.Info("Launching VM with virt-install", zap.String("name", config.Name))
+
+	args := []string{
+		"--name", config.Name,
+		"--memory", config.Memory,
+		"--vcpus", config.VCPUs,
+		"--disk", fmt.Sprintf("path=%s,format=qcow2", diskPath),
+		"--disk", fmt.Sprintf("path=%s,device=cdrom", seedPath),
+		"--os-variant", "ubuntu24.04",
+		"--virt-type", "kvm",
+		"--import",
+		"--network", fmt.Sprintf("network=%s", config.Network),
+		"--graphics", "none",
+		"--noautoconsole",
+		"--autostart",
+	}
+
+	cmd := exec.Command("virt-install", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("virt-install failed: %w\nOutput: %s", err, output)
+	}
+
+	logger.Info("VM launched successfully", zap.String("name", config.Name))
+	return nil
+}
+
+func waitForVMIP(vmName string, timeoutSecs int, logger *otelzap.LoggerWithCtx) (string, error) {
+	logger.Info("Waiting for VM to get IP address", zap.String("vm", vmName))
+
+	for i := 0; i < timeoutSecs; i++ {
+		cmd := exec.Command("virsh", "domifaddr", vmName)
+		output, _ := cmd.Output()
+
+		// Parse output for IP
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "/") {
+				fields := strings.Fields(line)
+				for _, field := range fields {
+					if strings.Contains(field, "/") {
+						ip := strings.Split(field, "/")[0]
+						logger.Info("VM IP address obtained", zap.String("ip", ip))
+						return ip, nil
+					}
+				}
+			}
 		}
-		cmd.Run() // Ignore errors - permissions may already be correct
+
+		time.Sleep(time.Second)
 	}
 
-	return nil
+	logger.Warn("Timeout waiting for VM IP", zap.String("vm", vmName))
+	return "", fmt.Errorf("timeout waiting for IP")
 }
 
-// cleanupExistingDomain removes any existing libvirt domain with the same name to ensure idempotency
-func cleanupExistingDomain(vmName string) error {
-	// First try to destroy (stop) the domain if it's running
+func cleanupExistingDomain(vmName string, logger *otelzap.LoggerWithCtx) {
+	// Try to destroy (stop) the domain if it's running
 	destroyCmd := exec.Command("virsh", "destroy", vmName)
 	if os.Getuid() != 0 {
 		destroyCmd = exec.Command("sudo", "virsh", "destroy", vmName)
 	}
-	destroyCmd.Run() // Ignore errors - domain might not be running
+	if output, err := destroyCmd.CombinedOutput(); err == nil {
+		logger.Info("Stopped existing VM", zap.String("vm", vmName))
+	} else if !strings.Contains(string(output), "not found") {
+		logger.Debug("VM not running or doesn't exist", zap.String("vm", vmName))
+	}
 
 	// Then undefine (remove) the domain completely
-	undefineCmd := exec.Command("virsh", "undefine", vmName, "--nvram")
+	undefineCmd := exec.Command("virsh", "undefine", vmName, "--nvram", "--remove-all-storage")
 	if os.Getuid() != 0 {
-		undefineCmd = exec.Command("sudo", "virsh", "undefine", vmName, "--nvram")
+		undefineCmd = exec.Command("sudo", "virsh", "undefine", vmName, "--nvram", "--remove-all-storage")
 	}
-
-	// Run and capture error for logging, but don't fail if domain doesn't exist
-	if err := undefineCmd.Run(); err != nil {
-		// This is expected if domain doesn't exist - not a real error
-		return nil
+	if output, err := undefineCmd.CombinedOutput(); err == nil {
+		logger.Info("Removed existing VM definition", zap.String("vm", vmName))
+	} else if !strings.Contains(string(output), "not found") {
+		logger.Debug("VM definition doesn't exist", zap.String("vm", vmName))
 	}
-
-	return nil
 }

@@ -49,6 +49,23 @@ func GenerateSSHKeyPair(vmName string) (pubPath, privPath string, err error) {
 	return pubPath, privPath, nil
 }
 
+// GenerateEd25519Keys generates ed25519 SSH key pair in specified directory
+func GenerateEd25519Keys(sshDir string) (publicKeyPath, privateKeyPath string, err error) {
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		return "", "", fmt.Errorf("failed to create SSH directory: %w", err)
+	}
+
+	privateKeyPath = filepath.Join(sshDir, "id_ed25519")
+	publicKeyPath = privateKeyPath + ".pub"
+
+	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", privateKeyPath, "-C", "eos-vm")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return "", "", fmt.Errorf("ssh-keygen failed: %v\n%s", err, string(out))
+	}
+
+	return publicKeyPath, privateKeyPath, nil
+}
+
 func GenerateKickstartWithSSH(vmName, pubkeyPath string) (string, error) {
 	key, err := os.ReadFile(pubkeyPath)
 	if err != nil {
