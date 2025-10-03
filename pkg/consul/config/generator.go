@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -30,6 +31,17 @@ func Generate(rc *eos_io.RuntimeContext, cfg *ConsulConfig) error {
 	if cfg.EnableDebugLogging {
 		logLevel = "DEBUG"
 	}
+
+	// Detect the correct network interface for Consul binding
+	log.Info("Detecting network interface for Consul")
+	iface, err := network.SelectInterface(rc)
+	if err != nil {
+		return fmt.Errorf("failed to select network interface: %w", err)
+	}
+
+	log.Info("Using network interface for Consul",
+		zap.String("interface", iface.Name),
+		zap.String("bind_addr", iface.IP))
 
 	// INTERVENE - Generate and write configuration
 	log.Info("Generating Consul configuration")
@@ -61,11 +73,11 @@ ports {
 
 # Network configuration
 client_addr = "0.0.0.0"  # Accept connections from anywhere
-bind_addr = "{{ GetPrivateIP }}"  # Auto-detect private IP
+bind_addr = "%s"  # Primary interface IP
 
 # Advertise addresses for when you add more nodes
-advertise_addr = "{{ GetPrivateIP }}"
-advertise_addr_wan = "{{ GetPrivateIP }}"
+advertise_addr = "%s"
+advertise_addr_wan = "%s"
 
 # UI enabled for management
 ui_config {
@@ -151,7 +163,7 @@ watches = [
     args = ["/usr/local/bin/consul-vault-helper", "watch"]
   }
 ]
-`, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, shared.PortConsul, logLevel)
+`, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, shared.PortConsul, iface.IP, iface.IP, iface.IP, logLevel)
 
 	configPath := "/etc/consul.d/consul.hcl"
 	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
