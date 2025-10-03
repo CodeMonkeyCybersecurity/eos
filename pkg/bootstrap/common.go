@@ -7,6 +7,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -31,6 +32,142 @@ const (
 	ServiceStatusFailed   ServiceStatus = "failed"
 	ServiceStatusUnknown  ServiceStatus = "unknown"
 )
+
+// ErrorClass categorizes errors for retry decision-making
+type ErrorClass int
+
+const (
+	// ErrorTransient indicates a temporary failure that should be retried
+	// Examples: network timeouts, temporary locks, resource temporarily unavailable
+	ErrorTransient ErrorClass = iota
+
+	// ErrorPermanent indicates a configuration or logic error that won't be fixed by retrying
+	// Examples: validation failures, missing files, permission denied, bind address in use
+	ErrorPermanent
+
+	// ErrorAmbiguous indicates an unknown error that should be retried cautiously (max 2 attempts)
+	// Examples: unfamiliar error messages, errors that don't match known patterns
+	ErrorAmbiguous
+)
+
+// String returns the string representation of ErrorClass
+func (ec ErrorClass) String() string {
+	switch ec {
+	case ErrorTransient:
+		return "Transient"
+	case ErrorPermanent:
+		return "Permanent"
+	case ErrorAmbiguous:
+		return "Ambiguous"
+	default:
+		return "Unknown"
+	}
+}
+
+// ClassifyError categorizes an error to determine if it should be retried
+// It recursively unwraps errors and checks all levels for known patterns
+//
+// Pattern Matching Strategy:
+// 1. Check PERMANENT patterns first (fail fast is safer than wasting time)
+// 2. Check TRANSIENT patterns second (known retry-able errors)
+// 3. Default to AMBIGUOUS (retry cautiously when uncertain)
+//
+// This function uses case-insensitive partial matching to handle:
+// - Error message variations across versions
+// - Wrapped errors with context
+// - Non-exact wording changes
+func ClassifyError(err error) ErrorClass {
+	if err == nil {
+		return ErrorTransient // No error = success = transient issue resolved
+	}
+
+	// Collect all error messages in the chain for pattern matching
+	var messages []string
+	currentErr := err
+	for currentErr != nil {
+		msg := strings.ToLower(currentErr.Error())
+		if msg != "" {
+			messages = append(messages, msg)
+		}
+		currentErr = errors.Unwrap(currentErr)
+	}
+
+	// If no messages found, can't classify reliably
+	if len(messages) == 0 {
+		return ErrorAmbiguous
+	}
+
+	// Check all messages in the error chain
+	for _, msg := range messages {
+		// PERMANENT patterns - configuration/logic errors that won't fix themselves
+		// These should fail fast to give user actionable feedback
+		permanentPatterns := []string{
+			"validat",      // validation failed, config validation error
+			"not found",    // file not found, service not found, device not found
+			"no such",      // no such file, no such directory
+			"does not exist",
+			"permission denied",
+			"access denied",
+			"forbidden",
+			"unauthorized",
+			"address already in use", // Port conflicts
+			"bind: address already in use",
+			"cannot bind",
+			"masked",               // systemd masked service
+			"command not found",    // Missing executables
+			"executable not found", // Missing binaries
+			"invalid",              // invalid configuration, invalid argument
+			"malformed",            // Malformed config files
+			"syntax error",         // Config file syntax
+			"parse error",          // Config parsing failures
+			"multiple private",     // Consul multi-interface error
+			"multiple.*address",    // Generic multi-address errors
+			"incompatible",         // Version mismatches
+			"unsupported",          // Feature not supported
+		}
+
+		for _, pattern := range permanentPatterns {
+			if strings.Contains(msg, pattern) {
+				return ErrorPermanent
+			}
+		}
+
+		// TRANSIENT patterns - temporary failures that are safe to retry
+		// These are environmental issues that may resolve on their own
+		transientPatterns := []string{
+			"timeout",       // Network timeouts, operation timeouts
+			"timed out",     // Alternative timeout phrasing
+			"connection refused",
+			"connection reset",
+			"connection closed",
+			"network unreachable",
+			"host unreachable",
+			"no route to host",
+			"temporary failure", // DNS and other temporary failures
+			"try again",         // EAGAIN, EWOULDBLOCK
+			"resource temporarily unavailable",
+			"too many open files", // Might resolve if files close
+			"service unavailable",
+			"503",                     // HTTP 503 Service Unavailable
+			"dial tcp",                // Network dial errors
+			"i/o timeout",             // I/O operation timeout
+			"deadline exceeded",       // Context deadline exceeded
+			"lock",                    // Lock contention (might release)
+			"busy",                    // Resource busy
+			"connection pool exhausted", // Might free up
+		}
+
+		for _, pattern := range transientPatterns {
+			if strings.Contains(msg, pattern) {
+				return ErrorTransient
+			}
+		}
+	}
+
+	// If no patterns matched, classify as ambiguous
+	// This is the safe default: retry cautiously rather than give up or retry aggressively
+	return ErrorAmbiguous
+}
 
 // RetryConfig defines retry behavior for operations
 type RetryConfig struct {
@@ -61,51 +198,107 @@ func ServiceRetryConfig() RetryConfig {
 }
 
 // WithRetry executes an operation with exponential backoff retry logic
+// It uses error classification to determine if retrying makes sense:
+// - Permanent errors: Fail immediately (no retry)
+// - Transient errors: Retry with full backoff (network issues, etc.)
+// - Ambiguous errors: Retry cautiously (max 2 attempts)
 func WithRetry(rc *eos_io.RuntimeContext, config RetryConfig, operation func() error) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	delay := config.InitialDelay
 	var lastErr error
-	
-	// FIXME: [P4] Retry logic is duplicated in multiple places
+
 	for attempt := 1; attempt <= config.MaxAttempts; attempt++ {
 		logger.Debug("Attempting operation",
 			zap.Int("attempt", attempt),
 			zap.Int("max_attempts", config.MaxAttempts))
-		
-		if err := operation(); err == nil {
+
+		// Execute the operation
+		err := operation()
+		if err == nil {
 			if attempt > 1 {
 				logger.Info("Operation succeeded after retry",
 					zap.Int("attempts", attempt))
 			}
 			return nil
-		} else {
-			lastErr = err
-			
-			if attempt < config.MaxAttempts {
-				logger.Warn("Operation failed, will retry",
-					zap.Error(err),
-					zap.Int("attempt", attempt),
-					zap.Duration("retry_delay", delay))
-				
-				// Sleep with context cancellation support
-				select {
-				case <-time.After(delay):
-					// Continue to next attempt
-				case <-rc.Ctx.Done():
-					return fmt.Errorf("operation cancelled: %w", rc.Ctx.Err())
-				}
-				
-				// Calculate next delay with exponential backoff
-				delay = time.Duration(float64(delay) * config.BackoffMultiplier)
-				if delay > config.MaxDelay {
-					delay = config.MaxDelay
-				}
-			}
+		}
+
+		lastErr = err
+
+		// Classify the error to determine retry strategy
+		errorClass := ClassifyError(err)
+
+		logger.Debug("Error classification",
+			zap.String("class", errorClass.String()),
+			zap.Error(err))
+
+		// PERMANENT errors - fail fast, don't waste time retrying
+		if errorClass == ErrorPermanent {
+			logger.Error("Operation failed with permanent error (not retrying)",
+				zap.Error(err),
+				zap.String("error_class", errorClass.String()),
+				zap.String("reason", "Configuration or logic error that won't fix itself"))
+			return fmt.Errorf("permanent error (not retrying): %w", err)
+		}
+
+		// AMBIGUOUS errors - retry cautiously (max 2 attempts total)
+		if errorClass == ErrorAmbiguous && attempt >= 2 {
+			logger.Warn("Operation failed with ambiguous error (retry limit reached)",
+				zap.Error(err),
+				zap.String("error_class", errorClass.String()),
+				zap.Int("attempt", attempt),
+				zap.String("reason", "Unknown error type, limited to 2 retry attempts"))
+			return fmt.Errorf("ambiguous error after %d attempts: %w", attempt, err)
+		}
+
+		// If we've reached max attempts, fail
+		if attempt >= config.MaxAttempts {
+			logger.Error("Operation failed after max attempts",
+				zap.Error(err),
+				zap.String("error_class", errorClass.String()),
+				zap.Int("attempts", attempt))
+			return fmt.Errorf("operation failed after %d attempts: %w", config.MaxAttempts, err)
+		}
+
+		// TRANSIENT or AMBIGUOUS (attempt 1) - retry with backoff
+		logger.Warn("Operation failed, will retry",
+			zap.Error(err),
+			zap.String("error_class", errorClass.String()),
+			zap.Int("attempt", attempt),
+			zap.Int("max_attempts", config.MaxAttempts),
+			zap.Duration("retry_delay", delay),
+			zap.String("reason", getRetryReason(errorClass)))
+
+		// Sleep with context cancellation support
+		select {
+		case <-time.After(delay):
+			// Continue to next attempt
+		case <-rc.Ctx.Done():
+			return fmt.Errorf("operation cancelled during retry: %w", rc.Ctx.Err())
+		}
+
+		// Calculate next delay with exponential backoff
+		delay = time.Duration(float64(delay) * config.BackoffMultiplier)
+		if delay > config.MaxDelay {
+			delay = config.MaxDelay
 		}
 	}
-	
+
 	return fmt.Errorf("operation failed after %d attempts: %w", config.MaxAttempts, lastErr)
+}
+
+// getRetryReason returns a human-readable reason for why we're retrying
+func getRetryReason(class ErrorClass) string {
+	switch class {
+	case ErrorTransient:
+		return "Transient error (network/timing issue, likely to succeed on retry)"
+	case ErrorAmbiguous:
+		return "Ambiguous error (unknown cause, retrying cautiously)"
+	case ErrorPermanent:
+		return "Permanent error (should not retry)"
+	default:
+		return "Unknown error classification"
+	}
 }
 
 // CheckService checks if a systemd service is active

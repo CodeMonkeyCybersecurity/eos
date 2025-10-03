@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -413,23 +414,24 @@ type DirectoryConfig struct {
 // configure sets up Consul configuration
 func (ci *ConsulInstaller) configure() error {
 	ci.logger.Info("Configuring Consul")
-	
+
 	// Create context for configuration operations
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 30*time.Second)
 	defer cancel()
-	
+
 	// Create consul user and group
 	if err := ci.user.CreateSystemUser("consul", "/var/lib/consul"); err != nil {
 		return fmt.Errorf("failed to create consul user: %w", err)
 	}
-	
+
 	// Define required directories using struct for better organization
 	directories := []DirectoryConfig{
 		{Path: "/etc/consul.d", Mode: 0755, Owner: "consul"},
 		{Path: "/var/lib/consul", Mode: 0755, Owner: "consul"},
 		{Path: "/var/log/consul", Mode: 0755, Owner: "consul"},
+		{Path: "/opt/consul", Mode: 0755, Owner: "consul"}, // Required by config generator
 	}
-	
+
 	// Create directories with proper error handling
 	for _, dir := range directories {
 		select {
@@ -437,19 +439,19 @@ func (ci *ConsulInstaller) configure() error {
 			return ctx.Err()
 		default:
 		}
-		
+
 		if err := ci.createDirectory(dir.Path, dir.Mode); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir.Path, err)
 		}
 		// Set ownership after creation
 		if err := ci.runner.Run("chown", "-R", dir.Owner+":"+dir.Owner, dir.Path); err != nil {
-			ci.logger.Warn("Failed to set directory ownership", 
+			ci.logger.Warn("Failed to set directory ownership",
 				zap.String("path", dir.Path),
 				zap.String("owner", dir.Owner),
 				zap.Error(err))
 		}
 	}
-	
+
 	// Backup existing configuration if present
 	configPath := "/etc/consul.d/consul.hcl"
 	if ci.fileExists(configPath) {
@@ -457,62 +459,64 @@ func (ci *ConsulInstaller) configure() error {
 			ci.logger.Warn("Failed to backup existing configuration", zap.Error(err))
 		}
 	}
-	
-	// Write HCL configuration
-	hclConfig := ci.generateHCLConfig()
-	if err := ci.writeFile(configPath, []byte(hclConfig), 0644); err != nil {
-		return fmt.Errorf("failed to write configuration: %w", err)
+
+	// Use the config generator with network interface detection
+	// Convert InstallConfig to config.ConsulConfig
+	consulConfig := &config.ConsulConfig{
+		DatacenterName:     ci.config.Datacenter,
+		EnableDebugLogging: ci.config.LogLevel == "DEBUG",
+		VaultAvailable:     ci.config.VaultIntegration,
 	}
-	
-	// Set proper ownership
-	if err := ci.runner.Run("chown", "consul:consul", configPath); err != nil {
-		return fmt.Errorf("failed to set configuration ownership: %w", err)
+
+	if err := config.Generate(ci.rc, consulConfig); err != nil {
+		return fmt.Errorf("failed to generate configuration: %w", err)
 	}
-	
+
 	// Validate configuration
 	ci.logger.Info("Validating Consul configuration")
 	if output, err := ci.runner.RunOutput(ci.config.BinaryPath, "validate", "/etc/consul.d"); err != nil {
 		return fmt.Errorf("configuration validation failed: %w (output: %s)", err, output)
 	}
-	
+
 	return nil
 }
 
-// generateHCLConfig generates HCL format configuration
+// generateHCLConfig is deprecated - use config.Generate() instead
+// Kept for backward compatibility only
 func (ci *ConsulInstaller) generateHCLConfig() string {
 	var sb strings.Builder
-	sb.WriteString("# Consul configuration managed by Eos\n")
+	sb.WriteString("# Consul configuration managed by Eos (DEPRECATED - use config.Generate)\n")
 	sb.WriteString(fmt.Sprintf("datacenter = \"%s\"\n", ci.config.Datacenter))
 	sb.WriteString("data_dir = \"/var/lib/consul\"\n")
 	sb.WriteString(fmt.Sprintf("log_level = \"%s\"\n", ci.config.LogLevel))
 	sb.WriteString(fmt.Sprintf("server = %t\n", ci.config.ServerMode))
-	
+
 	if ci.config.ServerMode {
 		sb.WriteString(fmt.Sprintf("bootstrap_expect = %d\n", ci.config.BootstrapExpect))
 	}
-	
+
 	sb.WriteString(fmt.Sprintf("bind_addr = \"%s\"\n", ci.config.BindAddr))
 	sb.WriteString(fmt.Sprintf("client_addr = \"%s\"\n", ci.config.ClientAddr))
 	sb.WriteString("\n")
-	
+
 	sb.WriteString("ui_config {\n")
 	sb.WriteString(fmt.Sprintf("  enabled = %t\n", ci.config.UIEnabled))
 	sb.WriteString("}\n\n")
-	
+
 	sb.WriteString("connect {\n")
 	sb.WriteString(fmt.Sprintf("  enabled = %t\n", ci.config.ConnectEnabled))
 	sb.WriteString("}\n\n")
-	
+
 	sb.WriteString("ports {\n")
 	sb.WriteString(fmt.Sprintf("  http = %d\n", shared.PortConsul))
 	sb.WriteString("  dns = 8600\n")
 	sb.WriteString("  grpc = 8502\n")
 	sb.WriteString("}\n\n")
-	
+
 	sb.WriteString("performance {\n")
 	sb.WriteString("  raft_multiplier = 1\n")
 	sb.WriteString("}")
-	
+
 	return sb.String()
 }
 
