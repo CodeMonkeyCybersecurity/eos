@@ -349,9 +349,15 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 		return nil
 	}
 
-	// Install Consul if not present
-	if !health.Enabled {
-		logger.Info("Consul not found, installing...")
+	// Install/Reconfigure Consul if not healthy
+	// IMPORTANT: We install even if Consul exists but is unhealthy (e.g. crash looping with bad config)
+	// The Install() function has idempotent checks that will fix stale configs
+	if !health.Enabled || !health.Healthy {
+		if !health.Enabled {
+			logger.Info("Consul not found, installing...")
+		} else {
+			logger.Info("Consul is unhealthy, reinstalling/reconfiguring...")
+		}
 
 		// Configure Consul based on cluster info
 		consulConfig := &consul.ConsulConfig{

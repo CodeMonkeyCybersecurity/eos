@@ -413,6 +413,7 @@ type DirectoryConfig struct {
 
 // configure sets up Consul configuration
 func (ci *ConsulInstaller) configure() error {
+	ci.logger.Info("=== EXECUTING: configure() ===")
 	ci.logger.Info("Configuring Consul")
 
 	// Create context for configuration operations
@@ -432,6 +433,9 @@ func (ci *ConsulInstaller) configure() error {
 		{Path: "/opt/consul", Mode: 0755, Owner: "consul"}, // Required by config generator
 	}
 
+	ci.logger.Info("Creating Consul directories",
+		zap.Int("directory_count", len(directories)))
+
 	// Create directories with proper error handling
 	for _, dir := range directories {
 		select {
@@ -443,14 +447,24 @@ func (ci *ConsulInstaller) configure() error {
 		if err := ci.createDirectory(dir.Path, dir.Mode); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir.Path, err)
 		}
+		ci.logger.Info("Created directory",
+			zap.String("path", dir.Path),
+			zap.String("mode", fmt.Sprintf("%o", dir.Mode)))
+
 		// Set ownership after creation
 		if err := ci.runner.Run("chown", "-R", dir.Owner+":"+dir.Owner, dir.Path); err != nil {
 			ci.logger.Warn("Failed to set directory ownership",
 				zap.String("path", dir.Path),
 				zap.String("owner", dir.Owner),
 				zap.Error(err))
+		} else {
+			ci.logger.Info("Set directory ownership",
+				zap.String("path", dir.Path),
+				zap.String("owner", dir.Owner))
 		}
 	}
+
+	ci.logger.Info("All Consul directories created successfully")
 
 	// IDEMPOTENCY: Check if service is in crash loop before regenerating config
 	// If service is crash looping, stop it before changing config to prevent racing restarts
@@ -577,6 +591,7 @@ func (ci *ConsulInstaller) configure() error {
 	}
 
 	ci.logger.Info("Consul configuration validation succeeded")
+	ci.logger.Info("=== COMPLETED: configure() ===")
 	return nil
 }
 
