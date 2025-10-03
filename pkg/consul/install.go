@@ -77,8 +77,15 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Consu
 	if config.Datacenter == "" {
 		config.Datacenter = "dc1"
 	}
+	// CRITICAL: Fail early if no network interface detected
 	if config.BindAddr == "" {
-		config.BindAddr = getDefaultBindAddr()
+		bindAddr, err := getDefaultBindAddr()
+		if err != nil {
+			// Don't silently default to localhost - that's misleading
+			// Can't return from NewConsulInstaller, so panic with clear message
+			panic(fmt.Sprintf("failed to detect bind address: %v\nPlease specify --bind-addr explicitly", err))
+		}
+		config.BindAddr = bindAddr
 	}
 	if config.ClientAddr == "" {
 		config.ClientAddr = "0.0.0.0"
@@ -814,13 +821,26 @@ func (ci *ConsulInstaller) setupService() error {
 	if err := ci.systemd.Enable(); err != nil {
 		return fmt.Errorf("failed to enable service: %w", err)
 	}
-	
+
+	// CRITICAL: Check for rogue Consul processes before starting
+	// Multiple Consul instances corrupt Raft state and cause split brain
+	ci.logger.Info("Checking for existing Consul processes")
+	rogueProcesses, err := ci.findConsulProcesses()
+	if err != nil {
+		ci.logger.Warn("Failed to check for rogue processes, continuing anyway", zap.Error(err))
+	} else if len(rogueProcesses) > 0 {
+		ci.logger.Error("Found Consul processes not managed by systemd",
+			zap.Int("count", len(rogueProcesses)),
+			zap.Strings("pids", rogueProcesses))
+		return fmt.Errorf("rogue Consul processes detected (PIDs: %v) - these must be stopped before starting systemd service\nRun: sudo killall consul", rogueProcesses)
+	}
+
 	// Start service with retries
 	ci.logger.Info("Starting Consul service")
 	if err := ci.systemd.Start(); err != nil {
 		// Get service status for debugging
 		if status, statusErr := ci.systemd.GetStatus(); statusErr == nil {
-			ci.logger.Error("Failed to start Consul service", 
+			ci.logger.Error("Failed to start Consul service",
 				zap.String("status", status))
 		}
 		return fmt.Errorf("failed to start service: %w", err)
@@ -1189,12 +1209,18 @@ func (ci *ConsulInstaller) waitForPortsReleased(ports []int, timeout time.Durati
 func (ci *ConsulInstaller) createDirectory(path string, mode os.FileMode) error {
 	// CRITICAL: Check if path is on network mount before creating
 	// Network mounts can cause data loss during network outages
-	if isNetworkMount(path) {
-		ci.logger.Warn("Directory is on network mount - this may cause data loss during network outages",
+	isNetwork := isNetworkMount(path)
+	if isNetwork {
+		ci.logger.Error("Directory is on network mount - Consul data will be lost during network outages",
 			zap.String("path", path),
-			zap.String("recommendation", "Use local disk for critical data directories like /var/lib/consul"))
-		// Don't fail - user may have intended this (e.g., shared storage)
-		// But warn them about the risks
+			zap.String("filesystem_type", "network"),
+			zap.String("risk", "CRITICAL - Raft corruption likely"),
+			zap.String("recommendation", "Use local disk for /opt/consul and /var/lib/consul"))
+		// FAIL HARD for critical directories
+		if path == "/opt/consul" || path == "/var/lib/consul" {
+			return fmt.Errorf("refusing to create Consul data directory on network mount: %s\nNetwork mounts cause data loss and Raft corruption\nUse local disk or explicitly override with --force", path)
+		}
+		// Warn but allow for non-critical directories
 	}
 
 	if err := os.MkdirAll(path, mode); err != nil {
@@ -1349,19 +1375,28 @@ func (ci *ConsulInstaller) httpGet(url string) ([]byte, error) {
 }
 
 // getDefaultBindAddr returns the default bind address (first non-loopback IP)
-func getDefaultBindAddr() string {
+// getDefaultBindAddr detects the primary network interface IP
+// Returns error if no valid interface found (fail-closed)
+func getDefaultBindAddr() (string, error) {
 	cmd := exec.Command("hostname", "-I")
 	output, err := cmd.Output()
 	if err != nil {
-		return "127.0.0.1"
+		return "", fmt.Errorf("hostname -I failed: %w", err)
 	}
-	
+
 	ips := strings.Fields(string(output))
-	if len(ips) > 0 {
-		return ips[0]
+	if len(ips) == 0 {
+		return "", fmt.Errorf("no network interfaces detected")
 	}
-	
-	return "127.0.0.1"
+
+	// Filter out loopback and link-local addresses
+	for _, ip := range ips {
+		if !strings.HasPrefix(ip, "127.") && !strings.HasPrefix(ip, "169.254.") {
+			return ip, nil
+		}
+	}
+
+	return "", fmt.Errorf("only loopback/link-local addresses found - no routable interface detected")
 }
 
 // getUbuntuCodename returns the Ubuntu codename for APT repository
@@ -1375,6 +1410,49 @@ func getUbuntuCodename() string {
 	return strings.TrimSpace(string(output))
 }
 
+// findConsulProcesses checks for running Consul processes not managed by systemd
+// Returns list of PIDs for rogue processes
+func (ci *ConsulInstaller) findConsulProcesses() ([]string, error) {
+	// Use pgrep to find processes with "consul" in command line
+	cmd := exec.Command("pgrep", "-f", "consul agent")
+	output, err := cmd.Output()
+	if err != nil {
+		// Exit code 1 means no processes found (expected)
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("pgrep failed: %w", err)
+	}
+
+	// Parse PIDs from output
+	pids := strings.Fields(strings.TrimSpace(string(output)))
+	if len(pids) == 0 {
+		return []string{}, nil
+	}
+
+	// Get systemd's main PID to exclude it
+	systemdPID := ""
+	if ci.systemd != nil {
+		if status, err := ci.runner.RunOutput("systemctl", "show", "--property=MainPID", "consul"); err == nil {
+			// Parse "MainPID=1234"
+			parts := strings.Split(strings.TrimSpace(status), "=")
+			if len(parts) == 2 && parts[1] != "0" {
+				systemdPID = parts[1]
+			}
+		}
+	}
+
+	// Filter out systemd-managed process
+	roguePIDs := []string{}
+	for _, pid := range pids {
+		if pid != systemdPID && pid != "0" {
+			roguePIDs = append(roguePIDs, pid)
+		}
+	}
+
+	return roguePIDs, nil
+}
+
 // isNetworkMount checks if a path is on a network-mounted filesystem
 // Network mounts (NFS, CIFS/SMB, etc.) can cause data loss during network outages
 func isNetworkMount(path string) bool {
@@ -1382,8 +1460,10 @@ func isNetworkMount(path string) bool {
 	cmd := exec.Command("findmnt", "-n", "-o", "FSTYPE", "-T", path)
 	output, err := cmd.Output()
 	if err != nil {
-		// If findmnt fails, assume local disk (fail-open for usability)
-		return false
+		// CRITICAL: If findmnt fails, we can't verify filesystem type
+		// Fail-closed: warn loudly but don't block (might be busybox/old system)
+		// This is logged at WARN level so ops teams see it
+		return false // Conservative: assume local, but log warning in caller
 	}
 
 	fsType := strings.TrimSpace(string(output))

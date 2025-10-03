@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -91,12 +90,10 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		}
 
 		var buf bytes.Buffer
-		// TODO: Remove os.Stdout from MultiWriter to prevent raw command output in logs
-		// This causes unstructured output mixed with structured logs (issue flagged 2025-07-14)
-		// Should only capture to buffer and use structured logging for command output
-		writer := io.MultiWriter(os.Stdout, &buf)
-		cmd.Stdout = writer
-		cmd.Stderr = writer
+		// FIXED: Only capture to buffer, use structured logging for output
+		// Removed os.Stdout to prevent raw command output mixing with structured logs
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
 
 		err = cmd.Run()
 		output = buf.String()

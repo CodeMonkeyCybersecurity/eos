@@ -18,6 +18,11 @@ import (
 // Generate creates the Consul configuration file
 // Migrated from cmd/create/consul.go generateConsulConfig
 func Generate(rc *eos_io.RuntimeContext, cfg *ConsulConfig) error {
+	// CRITICAL: Prevent panic on nil config
+	if cfg == nil {
+		return fmt.Errorf("consul config cannot be nil")
+	}
+
 	log := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Prepare configuration parameters

@@ -379,16 +379,37 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 			if health.Running {
 				members, err := consul.GetConsulMembers(rc)
 				if err == nil && len(members) > 1 {
-					logger.Warn("Consul is part of a cluster - stopping it may affect quorum",
+					logger.Warn("Consul is part of a cluster - analyzing quorum impact",
 						zap.Int("cluster_size", len(members)),
 						zap.Strings("members", members))
 
-					// Check if this is a multi-node cluster
+					// Calculate quorum: majority of bootstrap_expect nodes
+					// For 3 nodes, quorum is 2. If we stop 1, we have 2 left → OK
+					// For 5 nodes, quorum is 3. If we stop 1, we have 4 left → OK
+					// But if cluster is already degraded (4 nodes, quorum 3, stop 1 → 3 left → UNSAFE)
+					bootstrapExpect := len(members) // Assume cluster was bootstrapped with current size
+					quorum := (bootstrapExpect / 2) + 1
+					remainingAfterStop := len(members) - 1
+
+					logger.Info("Quorum analysis",
+						zap.Int("bootstrap_expect", bootstrapExpect),
+						zap.Int("quorum_required", quorum),
+						zap.Int("current_size", len(members)),
+						zap.Int("after_stop", remainingAfterStop))
+
+					// BLOCK if stopping would break quorum
+					if remainingAfterStop < quorum {
+						return fmt.Errorf("REFUSING to stop Consul - would break cluster quorum\n"+
+							"Current: %d members, Quorum: %d, After stop: %d (INSUFFICIENT)\n"+
+							"Use 'consul leave' for graceful departure, or --force to override\n"+
+							"Members: %v", len(members), quorum, remainingAfterStop, members)
+					}
+
 					if len(members) >= 3 {
-						logger.Warn("Multi-node cluster detected - use caution",
+						logger.Warn("Stopping Consul in multi-node cluster",
 							zap.Int("members", len(members)),
-							zap.String("recommendation", "Perform graceful leave with 'consul leave' first"))
-						// Note: We continue anyway for bootstrap repair, but log warning
+							zap.Int("quorum_remaining", remainingAfterStop-quorum+1),
+							zap.String("recommendation", "Use 'consul leave' for graceful departure"))
 					}
 				}
 			}
