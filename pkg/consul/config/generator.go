@@ -123,10 +123,6 @@ performance {
 # Logging configuration
 log_level = "%s"
 log_json = true
-log_file = "/var/log/consul/"
-log_rotate_bytes = 104857600  # 100MB
-log_rotate_duration = "24h"
-log_rotate_max_files = 10
 
 # Enable metrics for monitoring
 telemetry {
