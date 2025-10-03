@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
 )
 
 // checkpointMutex protects concurrent checkpoint file operations
@@ -388,7 +389,25 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 					}
 				}
 			}
+		}
 
+		// CRITICAL: Detect network BEFORE stopping service
+		// If network detection fails, we don't want to leave service stopped
+		logger.Info("Detecting network interface for Consul binding")
+		iface, err := network.SelectInterface(rc)
+		if err != nil {
+			return fmt.Errorf("failed to detect network interface for Consul: %w\nRemediation: Manually specify interface with --bind-addr flag or ensure network is configured", err)
+		}
+
+		logger.Info("Selected network interface for Consul",
+			zap.String("interface", iface.Name),
+			zap.String("ip", iface.IP),
+			zap.String("gateway", iface.Gateway))
+
+		// Now that we have network, stop service if needed
+		if !health.Enabled {
+			logger.Info("Consul not found, installing...")
+		} else if !health.Healthy {
 			// CRITICAL: Stop crash looping service before fixing config
 			// This prevents race condition between systemd restarts and our config changes
 			if health.Running || health.Enabled {
@@ -404,18 +423,6 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 				}
 			}
 		}
-
-		// Detect network interface for Consul binding
-		// CRITICAL: Consul needs to bind to the correct interface for cluster communication
-		iface, err := network.SelectInterface(rc)
-		if err != nil {
-			return fmt.Errorf("failed to detect network interface for Consul: %w\nRemediation: Manually specify interface with --bind-addr flag or ensure network is configured", err)
-		}
-
-		logger.Info("Selected network interface for Consul",
-			zap.String("interface", iface.Name),
-			zap.String("ip", iface.IP),
-			zap.String("gateway", iface.Gateway))
 
 		// Configure Consul based on cluster info
 		consulConfig := &consul.ConsulConfig{
@@ -841,22 +848,37 @@ func releaseBootstrapLock(lock *os.File, lockPath string) {
 	}
 }
 
-// tryLockFile attempts to acquire an exclusive lock on a file
+// tryLockFile attempts to acquire an exclusive lock on a file using flock(2)
 func tryLockFile(file *os.File) error {
-	// This is a placeholder - the actual implementation would use:
-	// unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB)
-	// For now, use a simple file-based lock check
+	// Try to acquire EXCLUSIVE, NON-BLOCKING lock using flock(2)
+	// This is atomic and handles all race conditions correctly
+	if err := unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		// Lock is already held by another process
 
-	// Try to read existing PID from lock file
-	buf := make([]byte, 16)
-	n, _ := file.ReadAt(buf, 0)
-	if n > 0 {
-		existingPID := strings.TrimSpace(string(buf[:n]))
-		// Check if process is still running
-		if processExists(existingPID) {
-			return fmt.Errorf("bootstrap already running with PID %s", existingPID)
+		// Try to read PID for better error message
+		buf := make([]byte, 16)
+		n, _ := file.ReadAt(buf, 0)
+		if n > 0 {
+			existingPID := strings.TrimSpace(string(buf[:n]))
+			if processExists(existingPID) {
+				return fmt.Errorf("bootstrap already running with PID %s", existingPID)
+			}
+			return fmt.Errorf("bootstrap lock held by process (PID in lock file: %s, may be stale)", existingPID)
 		}
-		// Stale lock file, we can reuse it
+
+		return fmt.Errorf("bootstrap lock is held by another process")
+	}
+
+	// Lock acquired successfully
+	// Truncate file and write our PID
+	if err := file.Truncate(0); err != nil {
+		return fmt.Errorf("failed to truncate lock file: %w", err)
+	}
+
+	pid := fmt.Sprintf("%d\n", os.Getpid())
+	if _, err := file.WriteAt([]byte(pid), 0); err != nil {
+		// Non-fatal - lock is held, PID write is just for debugging
+		return nil
 	}
 
 	return nil

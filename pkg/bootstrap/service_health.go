@@ -480,13 +480,16 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 	defer ticker.Stop()
 
 	failureCount := 0
+	attempts := 0
+	maxAttempts := 30 // Fail fast after 30 attempts (60 seconds) even if not explicitly "failed"
 
 	for {
 		select {
 		case <-ctx.Done():
 			// Timeout - capture journalctl logs to show WHY service failed
 			logger.Error("Service failed to become ready, capturing logs",
-				zap.String("service", serviceName))
+				zap.String("service", serviceName),
+				zap.Int("attempts", attempts))
 
 			if logs := captureServiceLogs(rc, serviceName, 50); logs != "" {
 				logger.Error("Service failure logs from journalctl",
@@ -494,11 +497,32 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 					zap.String("logs", logs))
 			}
 
-			return fmt.Errorf("timeout waiting for %s to be ready (check logs above for details)", serviceName)
+			return fmt.Errorf("timeout waiting for %s to be ready after %d attempts (check logs above for details)", serviceName, attempts)
 		case <-ticker.C:
+			attempts++
+
+			// CRITICAL: Fail fast if too many attempts even without explicit "failed" status
+			// This prevents infinite loop when service is stuck in "activating" state
+			if attempts > maxAttempts {
+				logger.Error("Service failed to become ready within attempt limit",
+					zap.String("service", serviceName),
+					zap.Int("attempts", attempts),
+					zap.Int("max_attempts", maxAttempts))
+
+				if logs := captureServiceLogs(rc, serviceName, 50); logs != "" {
+					logger.Error("Service logs after max attempts",
+						zap.String("service", serviceName),
+						zap.String("logs", logs))
+				}
+
+				return fmt.Errorf("%s failed to become ready after %d attempts (may be stuck in activating state)", serviceName, attempts)
+			}
+
 			health, err := CheckServiceHealth(rc, serviceName)
 			if err == nil && health.Healthy {
-				logger.Info("Service is ready", zap.String("service", serviceName))
+				logger.Info("Service is ready",
+					zap.String("service", serviceName),
+					zap.Int("attempts", attempts))
 				return nil
 			}
 
@@ -529,6 +553,7 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 			if health != nil && len(health.Errors) > 0 {
 				logger.Debug("Service not ready yet",
 					zap.String("service", serviceName),
+					zap.Int("attempt", attempts),
 					zap.Strings("errors", health.Errors))
 			}
 		}

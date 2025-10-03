@@ -113,53 +113,137 @@ func (ci *ConsulInstaller) Install() error {
 		zap.String("version", ci.config.Version),
 		zap.String("datacenter", ci.config.Datacenter),
 		zap.Bool("use_repository", ci.config.UseRepository))
-	
+
+	// Track installation progress for rollback
+	installComplete := false
+	binaryInstalled := false
+	configCreated := false
+	serviceCreated := false
+
+	// CRITICAL: Rollback partial installation on failure
+	defer func() {
+		if !installComplete {
+			ci.logger.Warn("Installation failed, attempting rollback of partial changes")
+			ci.rollbackPartialInstall(binaryInstalled, configCreated, serviceCreated)
+		}
+	}()
+
 	// Phase 1: ASSESS - Check if already installed
 	ci.progress.Update("[16%] Checking current Consul status")
 	shouldInstall, err := ci.assess()
 	if err != nil {
 		return fmt.Errorf("assessment failed: %w", err)
 	}
-	
+
 	// If Consul is already properly installed and running, we're done
 	if !shouldInstall {
 		ci.logger.Info("Consul is already installed and running properly")
 		ci.progress.Complete("Consul is already installed and running")
+		installComplete = true // Don't rollback if already installed
 		return nil
 	}
-	
+
 	// Phase 2: Prerequisites
 	ci.progress.Update("[33%] Validating prerequisites")
 	if err := ci.validatePrerequisites(); err != nil {
 		return fmt.Errorf("prerequisite validation failed: %w", err)
 	}
-	
+
 	// Phase 3: INTERVENE - Install
 	ci.progress.Update("[50%] Installing Consul binary")
 	if err := ci.installBinary(); err != nil {
 		return fmt.Errorf("binary installation failed: %w", err)
 	}
-	
+	binaryInstalled = true
+
 	// Phase 4: Configure
 	ci.progress.Update("[66%] Configuring Consul")
 	if err := ci.configure(); err != nil {
 		return fmt.Errorf("configuration failed: %w", err)
 	}
-	
+	configCreated = true
+
 	// Phase 5: Setup Service
 	ci.progress.Update("[83%] Setting up systemd service")
 	if err := ci.setupService(); err != nil {
 		return fmt.Errorf("service setup failed: %w", err)
 	}
-	
+	serviceCreated = true
+
 	// Phase 6: EVALUATE - Verify
 	ci.progress.Update("[100%] Verifying installation")
 	if err := ci.verify(); err != nil {
 		return fmt.Errorf("verification failed: %w", err)
 	}
-	
+
 	ci.progress.Complete("Consul installation completed successfully")
+	installComplete = true
 	return nil
+}
+
+// rollbackPartialInstall cleans up a failed installation
+func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated, serviceCreated bool) {
+	ci.logger.Info("Rolling back partial installation",
+		zap.Bool("binary_installed", binaryInstalled),
+		zap.Bool("config_created", configCreated),
+		zap.Bool("service_created", serviceCreated))
+
+	// Stop service if it was created
+	if serviceCreated {
+		ci.logger.Info("Stopping service created during failed installation")
+		if err := ci.systemd.Stop(); err != nil {
+			ci.logger.Warn("Failed to stop service during rollback", zap.Error(err))
+		}
+
+		// Remove systemd service file
+		servicePath := "/etc/systemd/system/consul.service"
+		if err := os.Remove(servicePath); err != nil {
+			ci.logger.Warn("Failed to remove service file during rollback",
+				zap.String("file", servicePath),
+				zap.Error(err))
+		} else {
+			ci.logger.Info("Removed service file", zap.String("file", servicePath))
+		}
+
+		// Reload systemd
+		if output, err := ci.runner.RunOutput("systemctl", "daemon-reload"); err != nil {
+			ci.logger.Warn("Failed to reload systemd during rollback",
+				zap.Error(err),
+				zap.String("output", output))
+		}
+	}
+
+	// Remove config if it was created
+	if configCreated {
+		ci.logger.Info("Removing configuration created during failed installation")
+		configPaths := []string{
+			"/etc/consul.d/consul.hcl",
+			"/etc/consul.d",
+		}
+		for _, path := range configPaths {
+			if err := os.RemoveAll(path); err != nil {
+				ci.logger.Warn("Failed to remove config during rollback",
+					zap.String("path", path),
+					zap.Error(err))
+			} else {
+				ci.logger.Info("Removed config", zap.String("path", path))
+			}
+		}
+	}
+
+	// Remove binary if it was installed (only if not from repository)
+	if binaryInstalled && !ci.config.UseRepository {
+		ci.logger.Info("Removing binary installed during failed installation")
+		if err := os.Remove(ci.config.BinaryPath); err != nil {
+			ci.logger.Warn("Failed to remove binary during rollback",
+				zap.String("binary", ci.config.BinaryPath),
+				zap.Error(err))
+		} else {
+			ci.logger.Info("Removed binary", zap.String("binary", ci.config.BinaryPath))
+		}
+	}
+
+	ci.logger.Info("Rollback completed - system should be in pre-installation state")
 }
 
 // assess checks the current state of Consul installation
@@ -567,20 +651,28 @@ func (ci *ConsulInstaller) configure() error {
 
 			// Stop crash looping service before config change
 			if err := ci.systemd.Stop(); err != nil {
-				ci.logger.Warn("Failed to stop crash looping service",
-					zap.Error(err))
-			} else {
-				ci.logger.Info("Stopped crash looping service for clean reconfiguration")
+				// CRITICAL: If we can't stop service, fail hard - can't safely reconfigure
+				return fmt.Errorf("failed to stop crash looping service: %w\nCannot safely reconfigure while service is running", err)
+			}
 
-				// Poll for service stop instead of hard-coded sleep
-				deadline := time.Now().Add(10 * time.Second)
-				for time.Now().Before(deadline) {
-					if !ci.systemd.IsActive() {
-						ci.logger.Info("Crash looping service stopped successfully")
-						break
-					}
-					time.Sleep(500 * time.Millisecond)
+			ci.logger.Info("Stopped crash looping service for clean reconfiguration")
+
+			// CRITICAL: Poll for service stop and FAIL if it doesn't stop
+			// This prevents race condition where we validate config while service is still writing to it
+			deadline := time.Now().Add(10 * time.Second)
+			stopped := false
+			for time.Now().Before(deadline) {
+				if !ci.systemd.IsActive() {
+					stopped = true
+					ci.logger.Info("Crash looping service stopped successfully")
+					break
 				}
+				time.Sleep(500 * time.Millisecond)
+			}
+
+			// FAIL HARD if service didn't stop
+			if !stopped {
+				return fmt.Errorf("service failed to stop within 10 seconds - cannot safely reconfigure\nManual intervention required: systemctl stop consul")
 			}
 		}
 	}
@@ -1327,22 +1419,28 @@ func CheckConsulHealth(rc *eos_io.RuntimeContext) error {
 func GetConsulMembers(rc *eos_io.RuntimeContext) ([]string, error) {
 	config := api.DefaultConfig()
 	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
-	
+
+	// CRITICAL: Add timeout to prevent hanging on unresponsive/crash-looping Consul
+	// Without this, bootstrap can hang for 30+ seconds waiting for HTTP client timeout
+	config.HttpClient = &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	members, err := client.Agent().Members(false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get members: %w", err)
+		return nil, fmt.Errorf("failed to get members (Consul may be unresponsive): %w", err)
 	}
-	
+
 	var memberList []string
 	for _, member := range members {
 		memberList = append(memberList, member.Name)
 	}
-	
+
 	return memberList, nil
 }
 
