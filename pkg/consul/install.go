@@ -210,20 +210,10 @@ func (ci *ConsulInstaller) assess() (bool, error) {
 				// Fall through to attempt repair/reinstall
 			} else {
 				ci.logger.Info("Consul is installed but not running")
-				// Try to start it
-				ci.logger.Info("Attempting to start existing Consul service")
-				if err := ci.systemd.Start(); err != nil {
-					ci.logger.Warn("Failed to start existing Consul service", zap.Error(err))
-				} else {
-					// Wait a moment for it to start
-					time.Sleep(3 * time.Second)
-					if ci.isConsulReady() {
-						ci.logger.Info("Successfully started existing Consul service")
-						ci.logger.Info(fmt.Sprintf("terminal prompt: ✅ Consul service started successfully"))
-						ci.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
-						return false, nil // Don't install, successfully started existing
-					}
-				}
+				// Don't try to start it here - if it's not running, there's likely a reason
+				// (broken config, missing dependencies, etc.)
+				// Let Install() fix the underlying issue first, then start it properly
+				ci.logger.Info("Service not running, will proceed with installation to fix any issues")
 			}
 		} else {
 			ci.logger.Info("Force reinstall requested, proceeding with installation")

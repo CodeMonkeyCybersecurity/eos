@@ -332,9 +332,9 @@ func (c *Checkpoint) backupFiles(rc *eos_io.RuntimeContext) error {
 
 	// HashiCorp configuration files (replacing  files)
 	criticalFiles := []string{
-		"/etc/consul/consul.hcl",
-		"/etc/nomad/nomad.hcl",
-		"/etc/vault/vault.hcl",
+		"/etc/consul.d/consul.hcl",   // Consul config is in consul.d/
+		"/etc/nomad.d/nomad.hcl",     // Nomad config is in nomad.d/
+		"/etc/vault.d/vault.hcl",     // Vault config is in vault.d/
 	}
 
 	for _, filePath := range criticalFiles {

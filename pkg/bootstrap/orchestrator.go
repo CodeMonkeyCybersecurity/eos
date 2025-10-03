@@ -357,15 +357,31 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 			logger.Info("Consul not found, installing...")
 		} else {
 			logger.Info("Consul is unhealthy, reinstalling/reconfiguring...")
+
+			// CRITICAL: Stop crash looping service before fixing config
+			// This prevents race condition between systemd restarts and our config changes
+			if health.Running || health.Enabled {
+				logger.Info("Stopping unhealthy Consul service before reconfiguration")
+				if err := SystemctlStop(rc, "consul"); err != nil {
+					logger.Warn("Failed to stop Consul service, continuing anyway", zap.Error(err))
+				} else {
+					// Give systemd a moment to fully stop
+					time.Sleep(2 * time.Second)
+					logger.Info("Consul service stopped successfully")
+				}
+			}
 		}
 
 		// Configure Consul based on cluster info
+		// NOTE: BindAddr/ClientAddr are legacy parameters - the config generator
+		// (pkg/consul/config/generator.go) uses network.SelectInterface() to detect
+		// the correct network interface automatically. These "0.0.0.0" values are ignored.
 		consulConfig := &consul.ConsulConfig{
 			Mode:       "server", // Bootstrap always installs server mode
 			Datacenter: "dc1",
 			UI:         true,
-			BindAddr:   "0.0.0.0",
-			ClientAddr: "0.0.0.0",
+			BindAddr:   "0.0.0.0",   // Legacy - config generator uses network detection
+			ClientAddr: "0.0.0.0",   // Legacy - config generator uses network detection
 			LogLevel:   "INFO",
 		}
 
