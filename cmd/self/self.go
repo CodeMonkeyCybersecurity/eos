@@ -267,9 +267,22 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	buildCmd := exec.Command("go", "build", "-o", tempBinary, ".")
 	buildCmd.Dir = "/opt/eos"
 
+	// Check if libvirt development libraries are available
+	cgoEnabled := "0" // Default to static build
+	pkgConfigCmd := exec.Command("pkg-config", "--exists", "libvirt")
+	if err := pkgConfigCmd.Run(); err == nil {
+		// libvirt is available, enable CGO for libvirt support
+		cgoEnabled = "1"
+		logger.Info("Libvirt development libraries detected - building with libvirt support",
+			zap.String("cgo_enabled", cgoEnabled))
+	} else {
+		logger.Warn("Libvirt development libraries not found - building without KVM features",
+			zap.String("cgo_enabled", cgoEnabled))
+	}
+
 	// Set build environment to match current system
 	buildCmd.Env = append(os.Environ(),
-		"CGO_ENABLED=0",  // Disable CGO for static binary
+		fmt.Sprintf("CGO_ENABLED=%s", cgoEnabled),
 		"GO111MODULE=on", // Ensure module mode
 	)
 

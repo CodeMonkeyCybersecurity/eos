@@ -270,6 +270,71 @@ install_github_cli() {
   fi
 }
 
+check_libvirt_deps() {
+  if $IS_LINUX; then
+    log INFO " Checking for libvirt development dependencies..."
+
+    local missing_deps=()
+
+    # Check for pkg-config
+    if ! command -v pkg-config >/dev/null 2>&1; then
+      missing_deps+=("pkg-config")
+    fi
+
+    # Check for libvirt development files
+    if ! pkg-config --exists libvirt 2>/dev/null; then
+      if $IS_DEBIAN; then
+        missing_deps+=("libvirt-dev")
+      elif $IS_RHEL; then
+        missing_deps+=("libvirt-devel")
+      fi
+    fi
+
+    # Check for libvirt client libraries
+    if ! pkg-config --exists libvirt-lxc 2>/dev/null; then
+      if $IS_DEBIAN; then
+        missing_deps+=("libvirt-daemon-system")
+      elif $IS_RHEL; then
+        missing_deps+=("libvirt-daemon-kvm")
+      fi
+    fi
+
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+      log WARN " Missing libvirt dependencies: ${missing_deps[*]}"
+      log INFO " EOS KVM features require libvirt development libraries"
+
+      # Only auto-install if running as root
+      if [[ "$EUID" -eq 0 ]]; then
+        log INFO " Installing libvirt dependencies..."
+
+        if $IS_DEBIAN; then
+          apt-get install -y "${missing_deps[@]}"
+        elif $IS_RHEL; then
+          if command -v dnf >/dev/null 2>&1; then
+            dnf install -y "${missing_deps[@]}"
+          elif command -v yum >/dev/null 2>&1; then
+            yum install -y "${missing_deps[@]}"
+          fi
+        fi
+
+        log INFO " Libvirt dependencies installed"
+      else
+        log WARN " Run as root to auto-install libvirt dependencies, or install manually:"
+        if $IS_DEBIAN; then
+          log INFO "   sudo apt-get install ${missing_deps[*]}"
+        elif $IS_RHEL; then
+          log INFO "   sudo yum install ${missing_deps[*]}"
+        fi
+        log WARN " Building without libvirt support - KVM features will not be available"
+      fi
+    else
+      log INFO " Libvirt dependencies are satisfied"
+    fi
+  elif $IS_MAC; then
+    log INFO " Skipping libvirt check on macOS (not required for development)"
+  fi
+}
+
 check_prerequisites() {
   local go_found=false
 
@@ -299,6 +364,9 @@ check_prerequisites() {
 
   # Install GitHub CLI if not present
   install_github_cli
+
+  # Check for libvirt dependencies (required for KVM features)
+  check_libvirt_deps
 
   # Verify Go is now available
   log INFO "Go detected and ready. Version details: $(go version)"
@@ -354,8 +422,17 @@ build_eos_binary() {
   # Build to temp location first
   TEMP_BINARY="/tmp/eos-build-$(date +%s)"
 
-  # Build with static linking
-  CGO_ENABLED=0 GO111MODULE=on go build -o "$TEMP_BINARY" .
+  # Check if libvirt is available for CGO
+  CGO_ENABLED=0
+  if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libvirt 2>/dev/null; then
+    log INFO " Libvirt development libraries detected - building with KVM support (CGO enabled)"
+    CGO_ENABLED=1
+  else
+    log INFO " Building without libvirt support (static binary, no KVM features)"
+  fi
+
+  # Build with appropriate CGO setting
+  CGO_ENABLED=$CGO_ENABLED GO111MODULE=on go build -o "$TEMP_BINARY" .
 
   if [ $? -ne 0 ]; then
     log ERR " Build failed"

@@ -4,6 +4,7 @@
 package kvm
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
@@ -536,25 +537,19 @@ func waitForVMIP(vmName string, timeoutSecs int, logger *otelzap.LoggerWithCtx) 
 }
 
 func cleanupExistingDomain(vmName string, logger *otelzap.LoggerWithCtx) {
+	ctx := context.Background()
+
 	// Try to destroy (stop) the domain if it's running
-	destroyCmd := exec.Command("virsh", "destroy", vmName)
-	if os.Getuid() != 0 {
-		destroyCmd = exec.Command("sudo", "virsh", "destroy", vmName)
-	}
-	if output, err := destroyCmd.CombinedOutput(); err == nil {
+	if err := DestroyDomain(ctx, vmName); err != nil {
+		logger.Debug("Error destroying domain", zap.String("vm", vmName), zap.Error(err))
+	} else {
 		logger.Info("Stopped existing VM", zap.String("vm", vmName))
-	} else if !strings.Contains(string(output), "not found") {
-		logger.Debug("VM not running or doesn't exist", zap.String("vm", vmName))
 	}
 
 	// Then undefine (remove) the domain completely
-	undefineCmd := exec.Command("virsh", "undefine", vmName, "--nvram", "--remove-all-storage")
-	if os.Getuid() != 0 {
-		undefineCmd = exec.Command("sudo", "virsh", "undefine", vmName, "--nvram", "--remove-all-storage")
-	}
-	if output, err := undefineCmd.CombinedOutput(); err == nil {
+	if err := UndefineDomain(ctx, vmName, true); err != nil {
+		logger.Debug("Error undefining domain", zap.String("vm", vmName), zap.Error(err))
+	} else {
 		logger.Info("Removed existing VM definition", zap.String("vm", vmName))
-	} else if !strings.Contains(string(output), "not found") {
-		logger.Debug("VM definition doesn't exist", zap.String("vm", vmName))
 	}
 }

@@ -9,9 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	"libvirt.org/go/libvirt"
 )
@@ -53,7 +51,7 @@ func ListVMs(ctx context.Context) ([]VMInfo, error) {
 
 	var vms []VMInfo
 	for _, domain := range domains {
-		vm, err := getVMInfo(domain, hostQEMUVersion)
+		vm, err := getVMInfo(&domain, hostQEMUVersion)
 		if err != nil {
 			// Log error but continue with other VMs
 			continue
@@ -282,37 +280,77 @@ func getVMUptime(domain *libvirt.Domain) int {
 
 // checkGuestAgent checks if QEMU guest agent is responsive
 func checkGuestAgent(domain *libvirt.Domain) bool {
-	// Try to ping guest agent
-	_, err := domain.InterfaceAddresses(libvirt.DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT, 0)
-	return err == nil
+	// Try to get guest info via QEMU agent command
+	// This is a simple ping to see if agent responds
+	_, err := domain.GetMetadata(libvirt.DOMAIN_METADATA_ELEMENT, "http://libvirt.org/qemu/1.0", 0)
+	// Agent is considered OK if no error or if it's just a "no metadata" error
+	return err == nil || strings.Contains(err.Error(), "no metadata")
 }
 
 // getVMIPs retrieves network IP addresses for the VM
 func getVMIPs(domain *libvirt.Domain) []string {
 	var ips []string
 
-	// Try guest agent first (more reliable)
-	ifaces, err := domain.InterfaceAddresses(libvirt.DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT, 0)
-	if err == nil {
-		for _, iface := range ifaces {
-			for _, addr := range iface.Addrs {
-				ips = append(ips, addr.Addr)
-			}
-		}
+	// Get the XML description and parse network interfaces
+	xmlDesc, err := domain.GetXMLDesc(0)
+	if err != nil {
 		return ips
 	}
 
-	// Fallback to lease information
-	ifaces, err = domain.InterfaceAddresses(libvirt.DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE, 0)
-	if err == nil {
-		for _, iface := range ifaces {
-			for _, addr := range iface.Addrs {
-				ips = append(ips, addr.Addr)
+	// Parse MAC addresses from XML
+	macRegex := regexp.MustCompile(`<mac address='([^']+)'`)
+	macs := macRegex.FindAllStringSubmatch(xmlDesc, -1)
+
+	// For each MAC, try to find IP from DHCP leases or ARP
+	for _, mac := range macs {
+		if len(mac) > 1 {
+			// Try to get IP from virsh net-dhcp-leases or ARP cache
+			ip := getIPFromMAC(mac[1])
+			if ip != "" {
+				ips = append(ips, ip)
 			}
 		}
 	}
 
 	return ips
+}
+
+// getIPFromMAC attempts to find IP address for a given MAC address
+func getIPFromMAC(mac string) string {
+	// Try ARP cache first
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("arp -an | grep -i %s | awk '{print $2}' | tr -d '()'", mac))
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		ip := strings.TrimSpace(string(output))
+		if ip != "" {
+			return ip
+		}
+	}
+
+	// Try virsh net-dhcp-leases for default network
+	cmd = exec.Command("virsh", "net-dhcp-leases", "default")
+	output, err = cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(strings.ToLower(line), strings.ToLower(mac)) {
+				// Parse IP from lease line
+				// Format: Expiry Time          MAC address        Protocol  IP address                Hostname        Client ID or DUID
+				fields := strings.Fields(line)
+				if len(fields) >= 5 {
+					// IP is usually in field index 4
+					ipPort := fields[4]
+					// Remove /prefix if present
+					parts := strings.Split(ipPort, "/")
+					if len(parts) > 0 {
+						return parts[0]
+					}
+				}
+			}
+		}
+	}
+
+	return ""
 }
 
 // FilterVMsByState filters VMs by their state

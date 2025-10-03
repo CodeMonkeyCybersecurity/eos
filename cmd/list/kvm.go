@@ -108,20 +108,9 @@ func runListKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 
 func outputTableKVM(vms []kvm.VMInfo, showDrift, detailed bool) error {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetAutoWrapText(false)
-	table.SetAutoFormatHeaders(true)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetCenterSeparator("")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetTablePadding("\t")
-	table.SetNoWhiteSpace(true)
 
 	if showDrift {
-		table.SetHeader([]string{"NAME", "STATE", "QEMU", "HOST_QEMU", "DRIFT", "UPTIME", "IPS"})
+		table.Header("NAME", "STATE", "QEMU", "HOST_QEMU", "DRIFT", "UPTIME", "IPS")
 
 		for _, vm := range vms {
 			drift := "NO"
@@ -147,7 +136,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, detailed bool) error {
 				hostVer = "N/A"
 			}
 
-			table.Append([]string{
+			table.Append(
 				vm.Name,
 				vm.State,
 				qemuVer,
@@ -155,10 +144,10 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, detailed bool) error {
 				drift,
 				fmt.Sprintf("%dd", vm.UptimeDays),
 				ips,
-			})
+			)
 		}
 	} else {
-		table.SetHeader([]string{"NAME", "STATE", "VCPUS", "MEMORY", "GUEST_AGENT", "IPS"})
+		table.Header("NAME", "STATE", "VCPUS", "MEMORY", "GUEST_AGENT", "IPS")
 
 		for _, vm := range vms {
 			agent := "NO"
@@ -174,14 +163,14 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, detailed bool) error {
 				}
 			}
 
-			table.Append([]string{
+			table.Append(
 				vm.Name,
 				vm.State,
 				fmt.Sprintf("%d", vm.VCPUs),
 				fmt.Sprintf("%d MB", vm.MemoryMB),
 				agent,
 				ips,
-			})
+			)
 		}
 	}
 

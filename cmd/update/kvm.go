@@ -36,32 +36,29 @@ Example:
 		log.Info("🛠 Starting rescue for KVM VM", zap.String("vm", vmName))
 
 		// Check VM status
-		out, err := exec.Command("virsh", "list", "--all").Output()
+		state, err := kvm.GetDomainState(rc.Ctx, vmName)
 		if err != nil {
-			return fmt.Errorf("failed to list VMs: %w", err)
+			return fmt.Errorf("failed to get VM state: %w", err)
 		}
 
-		if !kvm.IsVMRunning(string(out), vmName) {
+		if state == "shutoff" {
 			log.Info(" VM is already shut off", zap.String("vm", vmName))
 		} else {
 			// Shut it down
 			log.Info("Shutting down VM...", zap.String("vm", vmName))
-			cmdShutdown := exec.Command("virsh", "shutdown", vmName)
-			cmdShutdown.Stdout = os.Stdout
-			cmdShutdown.Stderr = os.Stderr
-			if err := cmdShutdown.Run(); err != nil {
+			if err := kvm.ShutdownDomain(rc.Ctx, vmName); err != nil {
 				return fmt.Errorf("failed to shutdown VM: %w", err)
 			}
 
-			// Wait for shutdown
+			// Wait for shutdown (up to 5 minutes)
 			log.Info(" Waiting for VM to shut off...")
-			for {
+			for i := 0; i < 100; i++ {
 				time.Sleep(3 * time.Second)
-				out, err := exec.Command("virsh", "list", "--all").Output()
+				state, err := kvm.GetDomainState(rc.Ctx, vmName)
 				if err != nil {
-					return fmt.Errorf("failed to list VMs during shutdown wait: %w", err)
+					return fmt.Errorf("failed to get VM state: %w", err)
 				}
-				if !kvm.IsVMRunning(string(out), vmName) {
+				if state == "shutoff" {
 					log.Info(" VM is now shut off", zap.String("vm", vmName))
 					break
 				}

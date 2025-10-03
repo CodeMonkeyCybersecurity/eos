@@ -360,5 +360,5 @@ func rollbackToSnapshot(domain *libvirt.Domain, snapshotName string) error {
 	}
 	defer snapshot.Free()
 
-	return domain.RevertToSnapshot(snapshot, 0)
+	return snapshot.RevertToSnapshot(0)
 }
