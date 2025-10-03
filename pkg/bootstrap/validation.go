@@ -387,13 +387,8 @@ func getEOSServicePorts() map[string][]int {
 
 // isSystemdServiceActive checks if a systemd service is active
 func isSystemdServiceActive(rc *eos_io.RuntimeContext, serviceName string) bool {
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
-		Capture: true,
-	})
-
-	return err == nil && strings.TrimSpace(output) == "active"
+	active, err := SystemctlIsActive(rc, serviceName)
+	return err == nil && active
 }
 
 // checkForConflicts checks for conflicting software

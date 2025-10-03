@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -112,33 +113,28 @@ func CheckService(rc *eos_io.RuntimeContext, serviceName string) (ServiceStatus,
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking service status", zap.String("service", serviceName))
 
-	logger.Debug("About to call: systemctl is-active (from CheckService)",
-		zap.String("service_name", serviceName))
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
-		Capture: true,
-		Timeout: 5 * time.Second,
-	})
-	
-	status := strings.TrimSpace(output)
-	
-	switch status {
-	case "active":
+	isActive, err := SystemctlIsActive(rc, serviceName)
+	if err == nil && isActive {
 		return ServiceStatusActive, nil
-	case "inactive":
-		return ServiceStatusInactive, nil
-	case "failed":
-		return ServiceStatusFailed, nil
-	default:
-		if err != nil {
-			logger.Debug("Service check failed",
-				zap.String("service", serviceName),
-				zap.String("output", output),
-				zap.Error(err))
-		}
-		return ServiceStatusUnknown, err
 	}
+
+	// Get more detailed status for non-active services
+	status, _ := SystemctlGetStatus(rc, serviceName)
+
+	if strings.Contains(status, "inactive") {
+		return ServiceStatusInactive, nil
+	}
+	if strings.Contains(status, "failed") {
+		return ServiceStatusFailed, nil
+	}
+
+	if err != nil {
+		logger.Debug("Service check failed",
+			zap.String("service", serviceName),
+			zap.Error(err))
+	}
+
+	return ServiceStatusUnknown, err
 }
 
 // EnsureService ensures a systemd service is running, starting it if necessary
@@ -146,66 +142,51 @@ func EnsureService(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Ensuring service is running", zap.String("service", serviceName))
 
-	// First check if service unit file exists
-	logger.Debug("About to call: systemctl list-unit-files (from EnsureService)",
-		zap.String("service_name", serviceName))
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"list-unit-files", serviceName},
-		Capture: true,
-		Timeout: 5 * time.Second,
-	})
-	
+	// ASSESS - Check if service unit file exists
+	output, err := SystemctlListUnitFiles(rc, serviceName)
 	if err != nil || !strings.Contains(output, serviceName) {
 		return fmt.Errorf("service unit file not found for %s", serviceName)
 	}
-	
-	// Check if service is masked or disabled
+
+	// Check if service is masked
 	if strings.Contains(output, "masked") {
 		return fmt.Errorf("service %s is masked and cannot be started", serviceName)
 	}
-	
+
 	// ASSESS - Check current status
 	status, err := CheckService(rc, serviceName)
 	if err == nil && status == ServiceStatusActive {
 		logger.Debug("Service is already active", zap.String("service", serviceName))
 		return nil
 	}
-	
-	// INTERVENE - Start the service
+
+	// INTERVENE - Enable and start the service
 	logger.Info("Starting service", zap.String("service", serviceName))
-	
+
 	// Enable the service first
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"enable", serviceName},
-		Capture: false,
-	}); err != nil {
-		logger.Warn("Failed to enable service", 
+	if err := SystemctlEnable(rc, serviceName); err != nil {
+		logger.Warn("Failed to enable service",
 			zap.String("service", serviceName),
 			zap.Error(err))
+		// Continue anyway - service might still start
 	}
-	
+
 	// Start the service
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"start", serviceName},
-		Capture: false,
-	}); err != nil {
-		return fmt.Errorf("failed to start service %s: %w", serviceName, err)
+	if err := SystemctlStart(rc, serviceName); err != nil {
+		return err // Error already includes context from SystemctlStart
 	}
-	
+
 	// EVALUATE - Verify service is running with retry
 	return WithRetry(rc, ServiceRetryConfig(), func() error {
 		status, err := CheckService(rc, serviceName)
 		if err != nil {
 			return fmt.Errorf("failed to check service status: %w", err)
 		}
-		
+
 		if status != ServiceStatusActive {
 			return fmt.Errorf("service %s is not active (status: %s)", serviceName, status)
 		}
-		
+
 		logger.Info("Service is now active", zap.String("service", serviceName))
 		return nil
 	})
@@ -440,4 +421,283 @@ func WaitForPort(ctx context.Context, host string, port int, timeout time.Durati
 	}
 	
 	return fmt.Errorf("timeout waiting for %s:%d", host, port)
+}
+
+// Systemctl wrapper functions
+// These provide a consistent, safe interface to systemctl commands
+// All service names are protected with "--" separator to handle names starting with hyphens
+
+// SystemctlIsActive checks if a service is active
+func SystemctlIsActive(rc *eos_io.RuntimeContext, serviceName string) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking if service is active",
+		zap.String("service", serviceName))
+
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", "--", serviceName},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	status := strings.TrimSpace(output)
+	isActive := status == "active"
+
+	logger.Debug("Service active check result",
+		zap.String("service", serviceName),
+		zap.Bool("is_active", isActive),
+		zap.String("status", status))
+
+	return isActive, err
+}
+
+// SystemctlIsEnabled checks if a service is enabled
+func SystemctlIsEnabled(rc *eos_io.RuntimeContext, serviceName string) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking if service is enabled",
+		zap.String("service", serviceName))
+
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-enabled", "--", serviceName},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	status := strings.TrimSpace(output)
+	isEnabled := status == "enabled"
+
+	logger.Debug("Service enabled check result",
+		zap.String("service", serviceName),
+		zap.Bool("is_enabled", isEnabled),
+		zap.String("status", status))
+
+	return isEnabled, err
+}
+
+// SystemctlStart starts a service
+func SystemctlStart(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting service via systemctl",
+		zap.String("service", serviceName))
+
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"start", "--", serviceName},
+		Capture: false,
+		Timeout: 30 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to start service %s: %w", serviceName, err)
+	}
+
+	logger.Info("Service started successfully",
+		zap.String("service", serviceName))
+	return nil
+}
+
+// SystemctlStop stops a service
+func SystemctlStop(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Stopping service via systemctl",
+		zap.String("service", serviceName))
+
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"stop", "--", serviceName},
+		Capture: false,
+		Timeout: 30 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to stop service %s: %w", serviceName, err)
+	}
+
+	logger.Info("Service stopped successfully",
+		zap.String("service", serviceName))
+	return nil
+}
+
+// SystemctlRestart restarts a service
+func SystemctlRestart(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Restarting service via systemctl",
+		zap.String("service", serviceName))
+
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"restart", "--", serviceName},
+		Capture: false,
+		Timeout: 30 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to restart service %s: %w", serviceName, err)
+	}
+
+	logger.Info("Service restarted successfully",
+		zap.String("service", serviceName))
+	return nil
+}
+
+// SystemctlEnable enables a service
+func SystemctlEnable(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Enabling service via systemctl",
+		zap.String("service", serviceName))
+
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"enable", "--", serviceName},
+		Capture: false,
+		Timeout: 10 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to enable service %s: %w", serviceName, err)
+	}
+
+	logger.Info("Service enabled successfully",
+		zap.String("service", serviceName))
+	return nil
+}
+
+// SystemctlDisable disables a service
+func SystemctlDisable(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Disabling service via systemctl",
+		zap.String("service", serviceName))
+
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"disable", "--", serviceName},
+		Capture: false,
+		Timeout: 10 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to disable service %s: %w", serviceName, err)
+	}
+
+	logger.Info("Service disabled successfully",
+		zap.String("service", serviceName))
+	return nil
+}
+
+// SystemctlEnableNow enables and starts a service in one command
+func SystemctlEnableNow(rc *eos_io.RuntimeContext, serviceName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Enabling and starting service via systemctl",
+		zap.String("service", serviceName))
+
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"enable", "--now", "--", serviceName},
+		Capture: false,
+		Timeout: 30 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to enable and start service %s: %w", serviceName, err)
+	}
+
+	logger.Info("Service enabled and started successfully",
+		zap.String("service", serviceName))
+	return nil
+}
+
+// SystemctlDaemonReload reloads systemd manager configuration
+func SystemctlDaemonReload(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Reloading systemd daemon configuration")
+
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"daemon-reload"},
+		Capture: false,
+		Timeout: 10 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+	}
+
+	logger.Info("Systemd daemon reloaded successfully")
+	return nil
+}
+
+// SystemctlGetMainPID gets the main PID of a service
+func SystemctlGetMainPID(rc *eos_io.RuntimeContext, serviceName string) (int, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Getting main PID for service",
+		zap.String("service", serviceName))
+
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"show", "--property=MainPID", "--", serviceName},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to get PID for %s: %w", serviceName, err)
+	}
+
+	parts := strings.Split(strings.TrimSpace(output), "=")
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("unexpected format from systemctl show: %s", output)
+	}
+
+	pid, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse PID %s: %w", parts[1], err)
+	}
+
+	logger.Debug("Got main PID for service",
+		zap.String("service", serviceName),
+		zap.Int("pid", pid))
+
+	return pid, nil
+}
+
+// SystemctlGetStatus gets detailed status information for a service
+func SystemctlGetStatus(rc *eos_io.RuntimeContext, serviceName string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Getting status for service",
+		zap.String("service", serviceName))
+
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"status", "--", serviceName},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	// Note: systemctl status returns non-zero for inactive services, but output is still useful
+	logger.Debug("Got status for service",
+		zap.String("service", serviceName),
+		zap.Int("output_length", len(output)))
+
+	return output, err
+}
+
+// SystemctlListUnitFiles lists unit files matching a pattern
+func SystemctlListUnitFiles(rc *eos_io.RuntimeContext, pattern string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Listing unit files",
+		zap.String("pattern", pattern))
+
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"list-unit-files", "--", pattern},
+		Capture: true,
+		Timeout: 10 * time.Second,
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to list unit files for %s: %w", pattern, err)
+	}
+
+	return output, nil
 }

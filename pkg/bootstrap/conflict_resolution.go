@@ -551,11 +551,7 @@ func stopServiceFallback(rc *eos_io.RuntimeContext, serviceName string) error {
 	for _, variation := range serviceVariations {
 		logger.Debug("Trying service variation", zap.String("variation", variation))
 
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "systemctl",
-			Args:    []string{"stop", variation},
-			Capture: true,
-		})
+		err := SystemctlStop(rc, variation)
 
 		if err == nil {
 			logger.Info("Successfully stopped service with variation",
@@ -566,8 +562,7 @@ func stopServiceFallback(rc *eos_io.RuntimeContext, serviceName string) error {
 
 		logger.Debug("Service variation failed",
 			zap.String("variation", variation),
-			zap.Error(err),
-			zap.String("output", output))
+			zap.Error(err))
 	}
 
 	return fmt.Errorf("failed to stop service %s using all variations", serviceName)

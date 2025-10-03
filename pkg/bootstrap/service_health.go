@@ -2,7 +2,6 @@
 //
 // Comprehensive service health checking for HashiCorp stack components
 // with proper port validation and initialization status checks.
-//
 package bootstrap
 
 import (
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -38,15 +36,15 @@ type ServiceHealth struct {
 
 // VaultStatus represents Vault health response
 type VaultStatus struct {
-	Initialized          bool   `json:"initialized"`
-	Sealed               bool   `json:"sealed"`
-	Standby              bool   `json:"standby"`
-	Version              string `json:"version"`
-	ClusterName          string `json:"cluster_name"`
-	ClusterID            string `json:"cluster_id"`
-	PerformanceStandby   bool   `json:"performance_standby"`
-	ReplicationPerformance int  `json:"replication_perf_mode"`
-	ReplicationDR        int    `json:"replication_dr_mode"`
+	Initialized            bool   `json:"initialized"`
+	Sealed                 bool   `json:"sealed"`
+	Standby                bool   `json:"standby"`
+	Version                string `json:"version"`
+	ClusterName            string `json:"cluster_name"`
+	ClusterID              string `json:"cluster_id"`
+	PerformanceStandby     bool   `json:"performance_standby"`
+	ReplicationPerformance int    `json:"replication_perf_mode"`
+	ReplicationDR          int    `json:"replication_dr_mode"`
 }
 
 // ConsulStatus represents Consul health response
@@ -108,26 +106,14 @@ func CheckServiceHealth(rc *eos_io.RuntimeContext, serviceName string) (*Service
 
 // checkSystemdEnabled checks if service is enabled in systemd
 func checkSystemdEnabled(rc *eos_io.RuntimeContext, serviceName string) bool {
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-enabled", serviceName},
-		Capture: true,
-		Timeout: 5 * time.Second,
-	})
-
-	return err == nil && strings.TrimSpace(output) == "enabled"
+	enabled, err := SystemctlIsEnabled(rc, serviceName)
+	return err == nil && enabled
 }
 
 // checkSystemdRunning checks if service is running in systemd
 func checkSystemdRunning(rc *eos_io.RuntimeContext, serviceName string) bool {
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
-		Capture: true,
-		Timeout: 5 * time.Second,
-	})
-
-	return err == nil && strings.TrimSpace(output) == "active"
+	active, err := SystemctlIsActive(rc, serviceName)
+	return err == nil && active
 }
 
 // checkPortListening checks if a port is listening
@@ -434,22 +420,12 @@ func EnableAndStartService(rc *eos_io.RuntimeContext, serviceName string) error 
 	logger.Info("Enabling and starting service", zap.String("service", serviceName))
 
 	// Enable the service
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"enable", serviceName},
-		Capture: false,
-		Timeout: 10 * time.Second,
-	}); err != nil {
+	if err := SystemctlEnable(rc, serviceName); err != nil {
 		return fmt.Errorf("failed to enable %s: %w", serviceName, err)
 	}
 
 	// Start the service
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"start", serviceName},
-		Capture: false,
-		Timeout: 30 * time.Second,
-	}); err != nil {
+	if err := SystemctlStart(rc, serviceName); err != nil {
 		return fmt.Errorf("failed to start %s: %w", serviceName, err)
 	}
 

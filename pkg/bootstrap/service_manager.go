@@ -153,7 +153,7 @@ func (sm *ServiceManager) getSystemdServiceDetails(serviceName string) (*Service
 		zap.String("service_name", serviceName+".service"))
 	output, err := execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"list-unit-files", serviceName + ".service"},
+		Args:    []string{"list-unit-files", "--", serviceName + ".service"},
 		Capture: true,
 	})
 
@@ -171,7 +171,7 @@ func (sm *ServiceManager) getSystemdServiceDetails(serviceName string) (*Service
 		zap.String("service_name", serviceName))
 	output, err = execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
+		Args:    []string{"is-active", "--", serviceName},
 		Capture: true,
 	})
 
@@ -188,7 +188,7 @@ func (sm *ServiceManager) getSystemdServiceDetails(serviceName string) (*Service
 			zap.String("service_name", serviceName))
 		output, err = execute.Run(sm.rc.Ctx, execute.Options{
 			Command: "systemctl",
-			Args:    []string{"show", serviceName, "--property=MainPID"},
+			Args:    []string{"show", "--property=MainPID", "--", serviceName},
 			Capture: true,
 		})
 
@@ -611,7 +611,7 @@ func (sm *ServiceManager) StopService(service Service) error {
 	logger.Debug("Attempting systemctl stop", zap.String("service", service.Name))
 	output, err := execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"stop", service.Name},
+		Args:    []string{"stop", "--", service.Name},
 		Capture: true,
 	})
 
@@ -629,7 +629,7 @@ func (sm *ServiceManager) StopService(service Service) error {
 	if !strings.HasSuffix(service.Name, ".service") {
 		output, err = execute.Run(sm.rc.Ctx, execute.Options{
 			Command: "systemctl",
-			Args:    []string{"stop", service.Name + ".service"},
+			Args:    []string{"stop", "--", service.Name + ".service"},
 			Capture: true,
 		})
 
@@ -671,7 +671,7 @@ func (sm *ServiceManager) StartService(service Service) error {
 
 	output, err := execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"start", service.Name},
+		Args:    []string{"start", "--", service.Name},
 		Capture: true,
 	})
 
@@ -690,7 +690,7 @@ func (sm *ServiceManager) RestartService(service Service) error {
 
 	output, err := execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"restart", service.Name},
+		Args:    []string{"restart", "--", service.Name},
 		Capture: true,
 	})
 
@@ -728,7 +728,7 @@ func (sm *ServiceManager) DiagnosePortConflict(port int) {
 	logger.Info("Related systemd services:")
 	if output, err := execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"list-units", "--type=service", "--state=running"},
+		Args:    []string{"list-units", "--type=service", "--state=running", "--"},
 		Capture: true,
 	}); err == nil {
 		lines := strings.Split(output, "\n")

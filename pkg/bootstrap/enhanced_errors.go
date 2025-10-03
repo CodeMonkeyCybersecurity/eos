@@ -397,33 +397,21 @@ func getServiceStatusInfo(rc *eos_io.RuntimeContext, serviceName string) *Servic
 	status := &ServiceStatusInfo{Name: serviceName}
 
 	// Get service status
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
-		Capture: true,
-	})
-
+	active, err := SystemctlIsActive(rc, serviceName)
 	if err == nil {
-		status.Status = strings.TrimSpace(output)
-		status.Active = status.Status == "active"
+		if active {
+			status.Status = "active"
+			status.Active = true
+		} else {
+			status.Status = "inactive"
+			status.Active = false
+		}
 	}
 
 	// Get main PID if active
 	if status.Active {
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "systemctl",
-			Args:    []string{"show", serviceName, "--property=MainPID"},
-			Capture: true,
-		})
-
-		if err == nil {
-			// Parse MainPID=12345
-			parts := strings.Split(strings.TrimSpace(output), "=")
-			if len(parts) == 2 {
-				if pid, err := strconv.Atoi(parts[1]); err == nil {
-					status.PID = pid
-				}
-			}
+		if pid, err := SystemctlGetMainPID(rc, serviceName); err == nil {
+			status.PID = pid
 		}
 	}
 

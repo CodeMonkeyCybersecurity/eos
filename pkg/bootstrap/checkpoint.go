@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -150,11 +149,9 @@ func RollbackToCheckpoint(rc *eos_io.RuntimeContext, checkpointID string) error 
 	}
 
 	// Reload systemd
-	execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"daemon-reload"},
-		Capture: false,
-	})
+	if err := SystemctlDaemonReload(rc); err != nil {
+		logger.Warn("Failed to reload systemd after rollback", zap.Error(err))
+	}
 
 	logger.Info("Rollback completed", zap.String("checkpoint_id", checkpointID))
 	return nil
@@ -162,23 +159,25 @@ func RollbackToCheckpoint(rc *eos_io.RuntimeContext, checkpointID string) error 
 
 // rollbackServices restores service states
 func (c *Checkpoint) rollbackServices(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	for serviceName, serviceInfo := range c.Services {
 		// If service was not active, stop it
 		if !serviceInfo.Active {
-			execute.Run(rc.Ctx, execute.Options{
-				Command: "systemctl",
-				Args:    []string{"stop", serviceName},
-				Capture: false,
-			})
+			if err := SystemctlStop(rc, serviceName); err != nil {
+				logger.Warn("Failed to stop service during rollback",
+					zap.String("service", serviceName),
+					zap.Error(err))
+			}
 		}
 
 		// If service was not enabled, disable it
 		if !serviceInfo.Enabled {
-			execute.Run(rc.Ctx, execute.Options{
-				Command: "systemctl",
-				Args:    []string{"disable", serviceName},
-				Capture: false,
-			})
+			if err := SystemctlDisable(rc, serviceName); err != nil {
+				logger.Warn("Failed to disable service during rollback",
+					zap.String("service", serviceName),
+					zap.Error(err))
+			}
 		}
 	}
 

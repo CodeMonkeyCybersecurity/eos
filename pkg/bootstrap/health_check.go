@@ -376,12 +376,7 @@ func checkExistingServices(rc *eos_io.RuntimeContext, consulAddr string) HealthC
 
 	var activeServices []string
 	for _, service := range services {
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "systemctl",
-			Args:    []string{"is-active", service},
-			Capture: true,
-		})
-		if err == nil && strings.TrimSpace(output) == "active" {
+		if active, err := SystemctlIsActive(rc, service); err == nil && active {
 			activeServices = append(activeServices, service)
 		}
 	}

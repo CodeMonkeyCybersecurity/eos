@@ -199,20 +199,12 @@ WantedBy=multi-user.target
 	}
 
 	// Reload systemd
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"daemon-reload"},
-		Capture: false,
-	}); err != nil {
+	if err := SystemctlDaemonReload(rc); err != nil {
 		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
 
 	// Enable and start service
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"enable", "--now", "eos-discovery.service"},
-		Capture: false,
-	}); err != nil {
+	if err := SystemctlEnableNow(rc, "eos-discovery.service"); err != nil {
 		logger.Warn("Failed to start discovery service", zap.Error(err))
 	}
 

@@ -9,7 +9,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -141,20 +140,12 @@ WantedBy=multi-user.target
 	}
 
 	// Reload systemd
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"daemon-reload"},
-		Capture: false,
-	}); err != nil {
+	if err := SystemctlDaemonReload(rc); err != nil {
 		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
 
 	// Enable service (but don't start yet)
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"enable", "eos-storage-monitor.service"},
-		Capture: false,
-	}); err != nil {
+	if err := SystemctlEnable(rc, "eos-storage-monitor.service"); err != nil {
 		logger.Warn("Failed to enable storage monitor service", zap.Error(err))
 	}
 

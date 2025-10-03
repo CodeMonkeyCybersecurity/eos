@@ -263,34 +263,13 @@ func isServiceInstalled(rc *eos_io.RuntimeContext, serviceName string) bool {
 
 // isServiceRunning checks if a service is currently running
 func isServiceRunning(rc *eos_io.RuntimeContext, serviceName string) bool {
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
-		Capture: true,
-	})
-
-	return err == nil && strings.TrimSpace(output) == "active"
+	active, err := SystemctlIsActive(rc, serviceName)
+	return err == nil && active
 }
 
 // getServiceProcess gets process information for a running service
 func getServiceProcess(rc *eos_io.RuntimeContext, serviceName string) (int, string) {
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"show", serviceName, "--property=MainPID"},
-		Capture: true,
-	})
-
-	if err != nil {
-		return 0, ""
-	}
-
-	// Parse MainPID=12345 format
-	parts := strings.Split(strings.TrimSpace(output), "=")
-	if len(parts) != 2 {
-		return 0, ""
-	}
-
-	pid, err := strconv.Atoi(parts[1])
+	pid, err := SystemctlGetMainPID(rc, serviceName)
 	if err != nil {
 		return 0, ""
 	}
@@ -602,12 +581,7 @@ func canStopProcess(rc *eos_io.RuntimeContext, processName string, processID int
 
 // getSystemdServiceByPID gets the systemd service name for a PID
 func getSystemdServiceByPID(rc *eos_io.RuntimeContext, pid int) string {
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"status", strconv.Itoa(pid)},
-		Capture: true,
-	})
-
+	output, err := SystemctlGetStatus(rc, strconv.Itoa(pid))
 	if err != nil {
 		return ""
 	}
