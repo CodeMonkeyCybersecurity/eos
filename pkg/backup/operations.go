@@ -56,13 +56,75 @@ func (h *HookOperation) Assess(ctx context.Context) (*patterns.AssessmentResult,
 }
 
 // Intervene executes the hook
+// SECURITY: Validates hook command against whitelist to prevent RCE
 func (h *HookOperation) Intervene(ctx context.Context, assessment *patterns.AssessmentResult) (*patterns.InterventionResult, error) {
 	h.Logger.Info("Executing hook",
 		zap.String("command", h.Hook))
 
 	parts := strings.Fields(h.Hook)
+	if len(parts) == 0 {
+		return &patterns.InterventionResult{
+			Success: false,
+			Message: "hook command is empty",
+		}, fmt.Errorf("empty hook command")
+	}
+
+	// CRITICAL: Validate hook command to prevent RCE
+	// WHITELIST only specific allowed commands
+	allowedCommands := map[string]bool{
+		"/usr/bin/restic":      true,
+		"/usr/bin/rsync":       true,
+		"/usr/bin/tar":         true,
+		"/usr/bin/gzip":        true,
+		"/bin/sh":              false, // BLOCKED - shell injection risk
+		"/bin/bash":            false, // BLOCKED - shell injection risk
+		"/usr/bin/curl":        false, // BLOCKED - exfiltration risk
+		"/usr/bin/wget":        false, // BLOCKED - exfiltration risk
+	}
+
+	cmd := parts[0]
+
+	// Command must be absolute path
+	if !filepath.IsAbs(cmd) {
+		return &patterns.InterventionResult{
+			Success: false,
+			Message: "hook command must be absolute path",
+		}, fmt.Errorf("hook command must be absolute path: %s", cmd)
+	}
+
+	// Clean path to prevent traversal
+	cleanCmd := filepath.Clean(cmd)
+
+	// Check whitelist
+	allowed, exists := allowedCommands[cleanCmd]
+	if !exists || !allowed {
+		return &patterns.InterventionResult{
+			Success: false,
+			Message: fmt.Sprintf("command not whitelisted: %s", cleanCmd),
+		}, fmt.Errorf("command not whitelisted: %s (add to allowedCommands if legitimate)", cleanCmd)
+	}
+
+	// Validate arguments don't contain shell metacharacters or dangerous patterns
+	for i, arg := range parts[1:] {
+		// Block shell metacharacters that could enable command injection
+		if strings.ContainsAny(arg, ";|&$`<>(){}[]'\"\\") {
+			return &patterns.InterventionResult{
+				Success: false,
+				Message: fmt.Sprintf("invalid characters in hook argument %d", i+1),
+			}, fmt.Errorf("hook argument %d contains shell metacharacters: %s", i+1, arg)
+		}
+
+		// Block path traversal in arguments
+		if strings.Contains(arg, "..") {
+			return &patterns.InterventionResult{
+				Success: false,
+				Message: fmt.Sprintf("path traversal detected in argument %d", i+1),
+			}, fmt.Errorf("path traversal in hook argument %d: %s", i+1, arg)
+		}
+	}
+
 	output, err := execute.Run(ctx, execute.Options{
-		Command: parts[0],
+		Command: cleanCmd, // Use cleaned path
 		Args:    parts[1:],
 		Capture: true,
 	})
@@ -80,7 +142,7 @@ func (h *HookOperation) Intervene(ctx context.Context, assessment *patterns.Asse
 		Changes: []patterns.Change{
 			{
 				Type:        "hook_execution",
-				Description: fmt.Sprintf("Executed hook: %s", h.Hook),
+				Description: fmt.Sprintf("Executed hook: %s", cleanCmd),
 				After:       output,
 			},
 		},

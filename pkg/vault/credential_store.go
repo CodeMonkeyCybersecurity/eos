@@ -4,14 +4,17 @@ package vault
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/text/unicode/norm"
 )
 
 // VaultCredentialStore provides secure credential storage using HashiCorp Vault
@@ -242,19 +245,66 @@ func (vcs *VaultCredentialStore) constructVaultPath(app, username string) string
 }
 
 // sanitizeVaultPathComponent removes dangerous characters from Vault path components
+// SECURITY: Prevents path traversal via Unicode normalization, filepath.Clean, and whitelist validation
 func sanitizeVaultPathComponent(component string) string {
-	// Remove dangerous characters
-	safe := strings.ReplaceAll(component, "..", "")
-	safe = strings.ReplaceAll(safe, "/", "-")
-	safe = strings.ReplaceAll(safe, "\\", "-")
-	safe = strings.ReplaceAll(safe, "\x00", "")
-	safe = strings.TrimSpace(safe)
-	
-	// Replace other problematic characters
-	safe = strings.ReplaceAll(safe, " ", "-")
-	safe = strings.ReplaceAll(safe, "@", "-at-")
-	
-	return safe
+	// CRITICAL: Unicode normalization prevents attacks like:
+	// "..%c0%af" → "../" after normalization
+	// "..%e0%80%af" → "../" (overlong UTF-8)
+	component = norm.NFC.String(component)
+
+	// Remove null bytes (directory traversal in some filesystems)
+	component = strings.ReplaceAll(component, "\x00", "")
+	component = strings.TrimSpace(component)
+
+	// Reject if empty after normalization
+	if component == "" {
+		return "invalid"
+	}
+
+	// CRITICAL: Use filepath.Clean to resolve ".." and "." before validation
+	// This prevents "a/../../etc/passwd" → "etc/passwd" attacks
+	component = filepath.Clean(component)
+
+	// CRITICAL: Reject if contains path traversal after cleaning
+	if strings.Contains(component, "..") {
+		return "invalid"
+	}
+
+	// CRITICAL: Reject absolute paths
+	if strings.HasPrefix(component, "/") || strings.HasPrefix(component, "\\") {
+		return "invalid"
+	}
+
+	// CRITICAL: Filter to alphanumeric, dash, underscore only
+	// This prevents all special characters that could be used for traversal
+	var safe strings.Builder
+	safe.Grow(len(component))
+
+	for _, r := range component {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			safe.WriteRune(r)
+		} else if r == '-' || r == '_' || r == '.' {
+			// Allow limited special chars
+			safe.WriteRune(r)
+		} else {
+			// Replace everything else with dash
+			safe.WriteRune('-')
+		}
+	}
+
+	result := safe.String()
+
+	// Final validation: No ".." should exist
+	if strings.Contains(result, "..") {
+		return "invalid"
+	}
+
+	// Prevent empty result
+	if result == "" || result == "." || result == "-" {
+		return "invalid"
+	}
+
+	return result
 }
 
 // Ensure VaultCredentialStore implements xdg.CredentialStore

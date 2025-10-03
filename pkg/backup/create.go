@@ -3,6 +3,7 @@
 package backup
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
 
@@ -243,11 +244,27 @@ func CreateProfile(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	return nil
 }
 
+// generateSecurePassword generates a cryptographically secure random password
+// SECURITY: Uses crypto/rand to ensure unpredictable passwords for backup encryption
 func generateSecurePassword() (string, error) {
-	// Generate a secure 32-character password
-	// TODO: Implementation would use crypto/rand with proper charset
-	// Placeholder for demonstration
-	return "generated-secure-password-here", nil
+	const (
+		length  = 32
+		charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?"
+	)
+
+	// Generate random bytes
+	randomBytes := make([]byte, length)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("failed to generate random password: %w", err)
+	}
+
+	// Map random bytes to charset to ensure printable characters
+	password := make([]byte, length)
+	for i, b := range randomBytes {
+		password[i] = charset[int(b)%len(charset)]
+	}
+
+	return string(password), nil
 }
 
 func storeLocalPassword(repoName, password string) error {

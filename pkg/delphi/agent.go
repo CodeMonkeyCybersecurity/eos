@@ -29,7 +29,8 @@ func DeleteAgent(rc *eos_io.RuntimeContext, agentID string, token string, config
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	// SECURITY: Set timeout to prevent resource exhaustion from slow/hanging connections
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		// Log the error first
@@ -201,7 +202,11 @@ func queryUpgradeResult(rc *eos_io.RuntimeContext, apiURL, token string, agentID
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	tr := &http.Transport{TLSClientConfig: getDelphiTLSConfig()}
-	client := &http.Client{Transport: tr}
+	// SECURITY: Set timeout to prevent resource exhaustion from slow/hanging connections
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   30 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("API request failed for upgrade result", zap.Error(err), zap.String("url", queryURL))

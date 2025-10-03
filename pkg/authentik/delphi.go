@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -87,10 +88,11 @@ func setupAuthentikForWazuh(cmd *cobra.Command, args []string) error {
 	wazuhURL, _ := cmd.Flags().GetString("wazuh-url")
 	entityID, _ := cmd.Flags().GetString("entity-id")
 
+	// SECURITY: Set timeout to prevent resource exhaustion from slow/hanging connections
 	client := &AuthentikClient{
 		baseURL: authentikURL,
 		token:   apiKey,
-		client:  &http.Client{},
+		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
 	fmt.Println("=== Configuring Authentik for Wazuh SSO ===")

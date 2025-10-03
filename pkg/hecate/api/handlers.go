@@ -31,6 +31,11 @@ func NewHandler(rc *eos_io.RuntimeContext) *Handler {
 func (h *Handler) CreateRoute(w http.ResponseWriter, r *http.Request) {
 	logger := otelzap.Ctx(h.rc.Ctx)
 
+	// SECURITY: Limit request body size to prevent DoS via JSON bomb
+	// A malicious 1MB JSON can expand to gigabytes when parsed (deeply nested arrays/objects)
+	const maxRequestSize = 1 * 1024 * 1024 // 1MB maximum
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
+
 	var req CreateRouteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.respondError(w, http.StatusBadRequest, "Invalid request body", err)
@@ -108,6 +113,10 @@ func (h *Handler) UpdateRoute(w http.ResponseWriter, r *http.Request) {
 	logger := otelzap.Ctx(h.rc.Ctx)
 	vars := mux.Vars(r)
 	domain := vars["domain"]
+
+	// SECURITY: Limit request body size to prevent DoS via JSON bomb
+	const maxRequestSize = 1 * 1024 * 1024 // 1MB maximum
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
 
 	var req UpdateRouteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -258,6 +267,10 @@ func (h *Handler) ListRoutes(w http.ResponseWriter, r *http.Request) {
 // CreateAuthPolicy handles POST /api/v1/auth-policies
 func (h *Handler) CreateAuthPolicy(w http.ResponseWriter, r *http.Request) {
 	logger := otelzap.Ctx(h.rc.Ctx)
+
+	// SECURITY: Limit request body size to prevent DoS via JSON bomb
+	const maxRequestSize = 1 * 1024 * 1024 // 1MB maximum
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
 
 	var req CreateAuthPolicyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
