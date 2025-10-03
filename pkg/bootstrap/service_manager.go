@@ -83,6 +83,7 @@ var ServicePortMapping = map[int]string{
 // DetectServices detects all relevant services on the system
 func (sm *ServiceManager) DetectServices() ([]Service, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger.Info("=== START DetectServices() ===")
 	logger.Info("Detecting services on system")
 
 	services := []Service{}
@@ -115,12 +116,15 @@ func (sm *ServiceManager) DetectServices() ([]Service, error) {
 // getSystemdServices gets services from systemd
 func (sm *ServiceManager) getSystemdServices() ([]Service, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger.Debug("=== START getSystemdServices() ===")
 	services := []Service{}
 
 	// List of service names we care about
 	serviceNames := []string{"-master", "-api", "vault", "consul", "nomad"}
 
+	logger.Debug("Will check these service names", zap.Strings("services", serviceNames))
 	for _, serviceName := range serviceNames {
+		logger.Debug("Checking service", zap.String("service", serviceName))
 		service, err := sm.getSystemdServiceDetails(serviceName)
 		if err != nil {
 			logger.Debug("Service not found or error getting details",
@@ -141,7 +145,12 @@ func (sm *ServiceManager) getSystemdServices() ([]Service, error) {
 func (sm *ServiceManager) getSystemdServiceDetails(serviceName string) (*Service, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
 
+	logger.Debug("getSystemdServiceDetails() called",
+		zap.String("service_name", serviceName))
+
 	// Check if service exists
+	logger.Debug("About to call: systemctl list-unit-files",
+		zap.String("service_name", serviceName+".service"))
 	output, err := execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"list-unit-files", serviceName + ".service"},
@@ -158,6 +167,8 @@ func (sm *ServiceManager) getSystemdServiceDetails(serviceName string) (*Service
 	}
 
 	// Get service status
+	logger.Debug("About to call: systemctl is-active",
+		zap.String("service_name", serviceName))
 	output, err = execute.Run(sm.rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"is-active", serviceName},
@@ -173,6 +184,8 @@ func (sm *ServiceManager) getSystemdServiceDetails(serviceName string) (*Service
 	// If service is active, get more details
 	if service.Status == "active" {
 		// Get PID
+		logger.Debug("About to call: systemctl show --property=MainPID",
+			zap.String("service_name", serviceName))
 		output, err = execute.Run(sm.rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"show", serviceName, "--property=MainPID"},

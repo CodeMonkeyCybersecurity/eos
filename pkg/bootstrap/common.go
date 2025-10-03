@@ -111,7 +111,9 @@ func WithRetry(rc *eos_io.RuntimeContext, config RetryConfig, operation func() e
 func CheckService(rc *eos_io.RuntimeContext, serviceName string) (ServiceStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Checking service status", zap.String("service", serviceName))
-	
+
+	logger.Debug("About to call: systemctl is-active (from CheckService)",
+		zap.String("service_name", serviceName))
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"is-active", serviceName},
@@ -143,8 +145,10 @@ func CheckService(rc *eos_io.RuntimeContext, serviceName string) (ServiceStatus,
 func EnsureService(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Ensuring service is running", zap.String("service", serviceName))
-	
+
 	// First check if service unit file exists
+	logger.Debug("About to call: systemctl list-unit-files (from EnsureService)",
+		zap.String("service_name", serviceName))
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"list-unit-files", serviceName},

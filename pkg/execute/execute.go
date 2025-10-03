@@ -63,6 +63,14 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		return "", nil
 	}
 
+	// Add detailed debug logging for systemctl commands to track down -m flag issue
+	if opts.Command == "systemctl" {
+		logger.Debug("SYSTEMCTL COMMAND TRACE",
+			zap.String("command", opts.Command),
+			zap.Strings("args", opts.Args),
+			zap.String("full_command", cmdStr))
+	}
+
 	logInfo(logger, "Starting execution", zap.String("command", cmdStr))
 
 	var output string
