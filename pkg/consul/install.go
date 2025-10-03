@@ -452,11 +452,49 @@ func (ci *ConsulInstaller) configure() error {
 		}
 	}
 
-	// Backup existing configuration if present
+	// IDEMPOTENCY: Check if service is in crash loop before regenerating config
+	// If service is crash looping, stop it before changing config to prevent racing restarts
 	configPath := "/etc/consul.d/consul.hcl"
+	needsReconfiguration := false
+
 	if ci.fileExists(configPath) {
-		if err := ci.files.BackupFile(configPath); err != nil {
-			ci.logger.Warn("Failed to backup existing configuration", zap.Error(err))
+		// Check if existing config has deprecated log_file directive
+		if configContent, err := os.ReadFile(configPath); err == nil {
+			configStr := string(configContent)
+			if strings.Contains(configStr, "log_file") {
+				ci.logger.Warn("Detected deprecated log_file directive in existing config",
+					zap.String("config_path", configPath))
+				needsReconfiguration = true
+			}
+		}
+
+		// Check if service is crash looping (activating with failures)
+		if status, err := ci.systemd.GetStatus(); err == nil {
+			if strings.Contains(strings.ToLower(status), "activating") &&
+			   strings.Contains(strings.ToLower(status), "exit-code") {
+				ci.logger.Warn("Service is in crash loop, will stop before reconfiguration",
+					zap.String("status", status))
+				needsReconfiguration = true
+
+				// Stop crash looping service before config change
+				if err := ci.systemd.Stop(); err != nil {
+					ci.logger.Warn("Failed to stop crash looping service",
+						zap.Error(err))
+				} else {
+					ci.logger.Info("Stopped crash looping service for clean reconfiguration")
+					// Give systemd a moment to fully stop
+					time.Sleep(2 * time.Second)
+				}
+			}
+		}
+
+		// Backup existing configuration
+		if needsReconfiguration {
+			ci.logger.Info("Backing up stale configuration before regeneration",
+				zap.String("config_path", configPath))
+			if err := ci.files.BackupFile(configPath); err != nil {
+				ci.logger.Warn("Failed to backup existing configuration", zap.Error(err))
+			}
 		}
 	}
 
