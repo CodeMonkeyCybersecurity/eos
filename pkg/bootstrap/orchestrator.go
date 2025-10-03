@@ -16,6 +16,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -388,7 +389,7 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 			}
 			// Check if it's a port conflict
 			if strings.Contains(err.Error(), "port") || strings.Contains(err.Error(), "bind") {
-				return fmt.Errorf("Consul installation failed due to port conflict. Please check if another service is using Consul ports (8300, 8301, 8302, 8500, 8600): %w", err)
+				return fmt.Errorf("Consul installation failed due to port conflict. Please check if another service is using Consul ports (8161, 8431, 8443, 8447, 8389): %w", err)
 			}
 			return fmt.Errorf("Consul installation failed: %w", err)
 		}
@@ -576,7 +577,7 @@ func phaseClusterJoin(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *C
 		zap.String("role", string(info.MyRole)))
 
 	// Perform HashiCorp cluster health checks (Consul/Nomad)
-	consulAddr := "localhost:8500" // Default Consul address
+	consulAddr := fmt.Sprintf("localhost:%d", shared.PortConsul) // EOS Consul address (8161)
 	healthResult, err := PerformHealthChecks(rc, consulAddr)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)

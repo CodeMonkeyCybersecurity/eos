@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -267,10 +269,15 @@ func (f *FileManager) WriteWithOwnership(path string, content []byte, mode os.Fi
 	return nil
 }
 
-// BackupFile creates a timestamped backup of a file
+// BackupFile creates a timestamped backup of a file with rotation (keeps max 5 backups)
 func (f *FileManager) BackupFile(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return nil // File doesn't exist, nothing to backup
+	}
+
+	// Clean old backups first (keep max 5)
+	if err := f.cleanOldBackups(path, 5); err != nil {
+		f.logger.Warn("Failed to clean old backups", zap.Error(err))
 	}
 
 	backupPath := fmt.Sprintf("%s.backup.%s", path, time.Now().Format("20060102_150405"))
@@ -285,6 +292,67 @@ func (f *FileManager) BackupFile(path string) error {
 
 	if err := os.WriteFile(backupPath, input, 0644); err != nil {
 		return fmt.Errorf("failed to write backup %s: %w", backupPath, err)
+	}
+
+	return nil
+}
+
+// cleanOldBackups removes old backup files, keeping only the most recent maxBackups
+func (f *FileManager) cleanOldBackups(originalPath string, maxBackups int) error {
+	dir := filepath.Dir(originalPath)
+	baseName := filepath.Base(originalPath)
+	backupPattern := baseName + ".backup.*"
+
+	// Find all backup files
+	pattern := filepath.Join(dir, backupPattern)
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("failed to find backup files: %w", err)
+	}
+
+	// If we have fewer backups than the max, nothing to clean
+	if len(matches) < maxBackups {
+		return nil
+	}
+
+	// Sort backups by modification time (oldest first)
+	type backupInfo struct {
+		path    string
+		modTime time.Time
+	}
+
+	var backups []backupInfo
+	for _, match := range matches {
+		info, err := os.Stat(match)
+		if err != nil {
+			continue
+		}
+		backups = append(backups, backupInfo{
+			path:    match,
+			modTime: info.ModTime(),
+		})
+	}
+
+	// Sort by modification time (oldest first)
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].modTime.Before(backups[j].modTime)
+	})
+
+	// Delete oldest backups, keeping only maxBackups-1 (to make room for new one)
+	toDelete := len(backups) - (maxBackups - 1)
+	if toDelete <= 0 {
+		return nil
+	}
+
+	for i := 0; i < toDelete; i++ {
+		if err := os.Remove(backups[i].path); err != nil {
+			f.logger.Warn("Failed to remove old backup",
+				zap.String("path", backups[i].path),
+				zap.Error(err))
+		} else {
+			f.logger.Debug("Removed old backup",
+				zap.String("path", backups[i].path))
+		}
 	}
 
 	return nil

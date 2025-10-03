@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -172,9 +173,9 @@ func StartDiscoveryService(rc *eos_io.RuntimeContext) error {
 	consulAddr, err := getLocalIP()
 	if err != nil {
 		logger.Warn("Failed to get local IP, using localhost", zap.Error(err))
-		consulAddr = "localhost:8500"
+		consulAddr = fmt.Sprintf("localhost:%d", shared.PortConsul)
 	} else {
-		consulAddr = consulAddr + ":8500" // Add Consul port
+		consulAddr = fmt.Sprintf("%s:%d", consulAddr, shared.PortConsul) // Add EOS Consul port (8161)
 	}
 
 	// Create systemd service for discovery

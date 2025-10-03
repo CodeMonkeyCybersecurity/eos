@@ -15,6 +15,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -190,7 +191,7 @@ func hasEosConfiguration(rc *eos_io.RuntimeContext) bool {
 	}
 
 	// Check Consul for EOS metadata
-	consulHealthURL := "http://localhost:8500/v1/kv/eos/metadata"
+	consulHealthURL := fmt.Sprintf("http://localhost:%d/v1/kv/eos/metadata", shared.PortConsul)
 	client := &http.Client{Timeout: 5 * time.Second}
 	if resp, err := client.Get(consulHealthURL); err == nil {
 		resp.Body.Close()
@@ -331,7 +332,7 @@ func checkVaultHealthSimple(rc *eos_io.RuntimeContext) bool {
 // checkConsulHealthSimple checks Consul health endpoint (simple version)
 func checkConsulHealthSimple(rc *eos_io.RuntimeContext) bool {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get("http://localhost:8500/v1/status/leader")
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsul))
 	if err != nil {
 		return false
 	}

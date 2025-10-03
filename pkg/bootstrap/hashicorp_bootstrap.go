@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -242,8 +243,8 @@ client {
 }
 
 consul {
-  address = "127.0.0.1:8500"
-}`, datacenter)
+  address = "127.0.0.1:%d"
+}`, datacenter, shared.PortConsul)
 
 	configPath := filepath.Join(configDir, "nomad.hcl")
 	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
@@ -264,8 +265,8 @@ func configureVault(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 	}
 
 	// Generate basic configuration
-	config := `storage "consul" {
-  address = "127.0.0.1:8500"
+	config := fmt.Sprintf(`storage "consul" {
+  address = "127.0.0.1:%d"
   path    = "vault/"
 }
 
@@ -276,7 +277,7 @@ listener "tcp" {
 
 api_addr = "http://127.0.0.1:8200"
 cluster_addr = "https://127.0.0.1:8201"
-ui = true`
+ui = true`, shared.PortConsul)
 
 	configPath := filepath.Join(configDir, "vault.hcl")
 	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {

@@ -141,14 +141,14 @@ func getServicePorts(serviceName string) []int {
 		// Vault uses custom port 8179 and original 8200
 		return []int{shared.PortVault, shared.PortVaultOriginal}
 	case "consul":
-		// Consul uses custom and original ports
+		// Consul uses EOS custom port 8161 (NOT 8500)
+		// Only check 8161 for health - legacy 8500 is via fallback in checkConsulHealth
 		return []int{
-			shared.PortConsul,         // 8161
-			shared.PortConsulOriginal, // 8500
-			shared.PortConsulRPC,      // 8431
-			shared.PortConsulSerfLAN,  // 8443
-			shared.PortConsulSerfWAN,  // 8447
-			shared.PortConsulDNS,      // 8389
+			shared.PortConsul,        // 8161 (PRIMARY - EOS standard)
+			shared.PortConsulRPC,     // 8431
+			shared.PortConsulSerfLAN, // 8443
+			shared.PortConsulSerfWAN, // 8447
+			shared.PortConsulDNS,     // 8389
 		}
 	case "nomad":
 		// Nomad uses custom and original ports
@@ -241,8 +241,8 @@ func checkConsulHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 	// Check Consul API health endpoint
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	// Check leader endpoint - try both ports
-	url := fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsulOriginal)
+	// Check leader endpoint - try EOS port first (8161), then original (8500)
+	url := fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsul)
 	req, err := http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	if err != nil {
 		health.Errors = append(health.Errors, fmt.Sprintf("Failed to create request: %v", err))
@@ -251,8 +251,15 @@ func checkConsulHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		health.Errors = append(health.Errors, fmt.Sprintf("Consul API unreachable: %v", err))
-		return
+		// Fallback to original port
+		logger.Debug("Failed to reach Consul on port 8161, trying port 8500", zap.Error(err))
+		url = fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsulOriginal)
+		req, _ = http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
+		resp, err = client.Do(req)
+		if err != nil {
+			health.Errors = append(health.Errors, fmt.Sprintf("Consul API unreachable on both ports: %v", err))
+			return
+		}
 	}
 	defer resp.Body.Close()
 
@@ -271,8 +278,12 @@ func checkConsulHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 		health.Details["leader"] = leader
 	}
 
-	// Get agent info
-	url = fmt.Sprintf("http://localhost:%d/v1/agent/self", shared.PortConsulOriginal)
+	// Get agent info (use same port that succeeded for leader check)
+	consulPort := shared.PortConsul
+	if strings.Contains(url, fmt.Sprintf(":%d", shared.PortConsulOriginal)) {
+		consulPort = shared.PortConsulOriginal
+	}
+	url = fmt.Sprintf("http://localhost:%d/v1/agent/self", consulPort)
 	req, _ = http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	resp, err = client.Do(req)
 	if err == nil {

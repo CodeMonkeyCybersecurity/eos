@@ -466,6 +466,7 @@ func (ci *ConsulInstaller) configure() error {
 		DatacenterName:     ci.config.Datacenter,
 		EnableDebugLogging: ci.config.LogLevel == "DEBUG",
 		VaultAvailable:     ci.config.VaultIntegration,
+		BootstrapExpect:    ci.config.BootstrapExpect,
 	}
 
 	if err := config.Generate(ci.rc, consulConfig); err != nil {
