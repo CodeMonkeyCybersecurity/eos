@@ -1182,6 +1182,16 @@ func (ci *ConsulInstaller) waitForPortsReleased(ports []int, timeout time.Durati
 }
 
 func (ci *ConsulInstaller) createDirectory(path string, mode os.FileMode) error {
+	// CRITICAL: Check if path is on network mount before creating
+	// Network mounts can cause data loss during network outages
+	if isNetworkMount(path) {
+		ci.logger.Warn("Directory is on network mount - this may cause data loss during network outages",
+			zap.String("path", path),
+			zap.String("recommendation", "Use local disk for critical data directories like /var/lib/consul"))
+		// Don't fail - user may have intended this (e.g., shared storage)
+		// But warn them about the risks
+	}
+
 	if err := os.MkdirAll(path, mode); err != nil {
 		return err
 	}
@@ -1356,8 +1366,41 @@ func getUbuntuCodename() string {
 	if err != nil {
 		return "noble" // Default to latest LTS
 	}
-	
+
 	return strings.TrimSpace(string(output))
+}
+
+// isNetworkMount checks if a path is on a network-mounted filesystem
+// Network mounts (NFS, CIFS/SMB, etc.) can cause data loss during network outages
+func isNetworkMount(path string) bool {
+	// Use findmnt to check mount point type (works on all modern Linux)
+	cmd := exec.Command("findmnt", "-n", "-o", "FSTYPE", "-T", path)
+	output, err := cmd.Output()
+	if err != nil {
+		// If findmnt fails, assume local disk (fail-open for usability)
+		return false
+	}
+
+	fsType := strings.TrimSpace(string(output))
+
+	// Network filesystem types
+	networkFS := []string{
+		"nfs", "nfs4", "nfs3",      // NFS
+		"cifs", "smb", "smbfs",     // CIFS/SMB
+		"glusterfs",                 // GlusterFS
+		"ceph", "cephfs",           // Ceph
+		"9p",                        // Plan 9 (QEMU shared folders)
+		"fuse.sshfs",               // SSHFS
+		"davfs", "fuse.davfs2",     // WebDAV
+	}
+
+	for _, nfs := range networkFS {
+		if fsType == nfs {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Legacy function for backward compatibility

@@ -2,8 +2,10 @@ package systemd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -48,6 +50,26 @@ TimeoutStartSec=60
 WantedBy=multi-user.target`, shared.PortConsul)
 
 	servicePath := "/etc/systemd/system/consul.service"
+
+	// CRITICAL: Backup existing unit file before overwrite
+	// This prevents loss of custom systemd configurations
+	if _, err := os.Stat(servicePath); err == nil {
+		// File exists, create backup
+		backupPath := fmt.Sprintf("%s.backup.%d", servicePath, time.Now().Unix())
+		log.Info("Backing up existing systemd unit file",
+			zap.String("original", servicePath),
+			zap.String("backup", backupPath))
+
+		if err := backupFile(servicePath, backupPath); err != nil {
+			log.Warn("Failed to backup systemd unit file, continuing anyway",
+				zap.Error(err))
+			// Non-fatal - continue with overwrite
+		} else {
+			log.Info("Systemd unit file backed up successfully",
+				zap.String("backup", backupPath))
+		}
+	}
+
 	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
 		return fmt.Errorf("failed to write systemd service: %w", err)
 	}
@@ -99,6 +121,32 @@ WantedBy=multi-user.target`, shared.PortConsul)
 	log.Info("Consul systemd service created successfully",
 		zap.String("path", servicePath),
 		zap.Int("consul_port", shared.PortConsul))
+
+	return nil
+}
+
+// backupFile creates a copy of a file
+func backupFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source: %w", err)
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+	defer destFile.Close()
+
+	if _, err := io.Copy(destFile, sourceFile); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	// Sync to ensure data is written to disk
+	if err := destFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync backup: %w", err)
+	}
 
 	return nil
 }

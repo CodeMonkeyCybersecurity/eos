@@ -584,13 +584,22 @@ func (pr *ProgressReporter) CompletePhase() {
 		zap.String("phase_name", pr.phaseName))
 }
 
+// FailPhase logs the failure of the current phase with error context
+func (pr *ProgressReporter) FailPhase(err error) {
+	pr.logger.Error(fmt.Sprintf("✗ Failed: %s", pr.phaseName),
+		zap.Int("phase", pr.currentPhase),
+		zap.Int("total_phases", pr.totalPhases),
+		zap.String("phase_name", pr.phaseName),
+		zap.Error(err))
+}
+
 // ReportProgress logs progress within a phase
 func (pr *ProgressReporter) ReportProgress(message string, fields ...zap.Field) {
 	allFields := append([]zap.Field{
 		zap.Int("phase", pr.currentPhase),
 		zap.String("phase_name", pr.phaseName),
 	}, fields...)
-	
+
 	pr.logger.Info(message, allFields...)
 }
 

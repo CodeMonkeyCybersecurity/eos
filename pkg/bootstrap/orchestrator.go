@@ -186,15 +186,18 @@ func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *B
 
 		// Execute phase with error handling
 		if err := executePhaseWithRecovery(rc, phase, opts, clusterInfo); err != nil {
+			progress.FailPhase(err)
 			if phase.Required {
 				return fmt.Errorf("required phase %s failed: %w", phase.Name, err)
 			}
 			logger.Warn("Optional phase failed, continuing",
 				zap.String("phase", phase.Name),
 				zap.Error(err))
+		} else {
+			progress.CompletePhase()
 		}
 
-		progress.CompletePhase()
+		// Only complete phase if no error occurred
 
 		// Log phase completion - we use state validation now, not checkpoints
 		logger.Info("Phase completed successfully",
