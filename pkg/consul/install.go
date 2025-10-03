@@ -454,48 +454,66 @@ func (ci *ConsulInstaller) configure() error {
 
 	// IDEMPOTENCY: Check if service is in crash loop before regenerating config
 	// If service is crash looping, stop it before changing config to prevent racing restarts
-	configPath := "/etc/consul.d/consul.hcl"
+	configDir := "/etc/consul.d"
 	needsReconfiguration := false
 
-	if ci.fileExists(configPath) {
-		// Check if existing config has deprecated log_file directive
-		if configContent, err := os.ReadFile(configPath); err == nil {
-			configStr := string(configContent)
-			if strings.Contains(configStr, "log_file") {
-				ci.logger.Warn("Detected deprecated log_file directive in existing config",
-					zap.String("config_path", configPath))
-				needsReconfiguration = true
+	// Check ALL .hcl files in config directory for deprecated directives
+	if entries, err := os.ReadDir(configDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".hcl") {
+				continue
 			}
-		}
 
-		// Check if service is crash looping (activating with failures)
-		if status, err := ci.systemd.GetStatus(); err == nil {
-			if strings.Contains(strings.ToLower(status), "activating") &&
-			   strings.Contains(strings.ToLower(status), "exit-code") {
-				ci.logger.Warn("Service is in crash loop, will stop before reconfiguration",
-					zap.String("status", status))
-				needsReconfiguration = true
+			fullPath := filepath.Join(configDir, entry.Name())
+			if configContent, err := os.ReadFile(fullPath); err == nil {
+				configStr := string(configContent)
+				if strings.Contains(configStr, "log_file") {
+					ci.logger.Warn("Detected deprecated log_file directive in config file",
+						zap.String("config_file", fullPath))
+					needsReconfiguration = true
 
-				// Stop crash looping service before config change
-				if err := ci.systemd.Stop(); err != nil {
-					ci.logger.Warn("Failed to stop crash looping service",
-						zap.Error(err))
-				} else {
-					ci.logger.Info("Stopped crash looping service for clean reconfiguration")
-					// Give systemd a moment to fully stop
-					time.Sleep(2 * time.Second)
+					// Backup and remove the stale config file
+					ci.logger.Info("Removing stale config file with deprecated directives",
+						zap.String("config_file", fullPath))
+					if err := ci.files.BackupFile(fullPath); err != nil {
+						ci.logger.Warn("Failed to backup stale config",
+							zap.String("file", fullPath),
+							zap.Error(err))
+					}
+					if err := os.Remove(fullPath); err != nil {
+						ci.logger.Warn("Failed to remove stale config",
+							zap.String("file", fullPath),
+							zap.Error(err))
+					}
 				}
 			}
 		}
+	}
 
-		// Backup existing configuration
-		if needsReconfiguration {
-			ci.logger.Info("Backing up stale configuration before regeneration",
-				zap.String("config_path", configPath))
-			if err := ci.files.BackupFile(configPath); err != nil {
-				ci.logger.Warn("Failed to backup existing configuration", zap.Error(err))
+	// Check if service is crash looping (activating with failures)
+	if status, err := ci.systemd.GetStatus(); err == nil {
+		if strings.Contains(strings.ToLower(status), "activating") &&
+		   strings.Contains(strings.ToLower(status), "exit-code") {
+			ci.logger.Warn("Service is in crash loop, will stop before reconfiguration",
+				zap.String("status", status))
+			needsReconfiguration = true
+
+			// Stop crash looping service before config change
+			if err := ci.systemd.Stop(); err != nil {
+				ci.logger.Warn("Failed to stop crash looping service",
+					zap.Error(err))
+			} else {
+				ci.logger.Info("Stopped crash looping service for clean reconfiguration")
+				// Give systemd a moment to fully stop
+				time.Sleep(2 * time.Second)
 			}
 		}
+	}
+
+	// Log reconfiguration decision
+	if needsReconfiguration {
+		ci.logger.Info("Reconfiguration needed, will regenerate consul.hcl",
+			zap.String("reason", "deprecated directives or crash loop detected"))
 	}
 
 	// Use the config generator with network interface detection
