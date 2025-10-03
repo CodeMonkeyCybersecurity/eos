@@ -62,6 +62,17 @@ func CreateCheckpoint(rc *eos_io.RuntimeContext, stage, description string) (*Ch
 		zap.String("stage", stage),
 		zap.String("description", description))
 
+	// Cleanup old checkpoints before creating new one (prevent disk fill)
+	// Keep last 10 checkpoints OR 7 days, whichever is more
+	if err := CleanupCheckpointsByCount(10); err != nil {
+		logger.Warn("Failed to cleanup old checkpoints by count", zap.Error(err))
+		// Non-fatal, continue with checkpoint creation
+	}
+	if err := CleanupOldCheckpoints(7 * 24 * time.Hour); err != nil {
+		logger.Warn("Failed to cleanup old checkpoints by age", zap.Error(err))
+		// Non-fatal, continue
+	}
+
 	checkpoint := &Checkpoint{
 		ID:          fmt.Sprintf("checkpoint-%d", time.Now().Unix()),
 		Timestamp:   time.Now(),
@@ -164,10 +175,37 @@ func (c *Checkpoint) rollbackServices(rc *eos_io.RuntimeContext) error {
 	for serviceName, serviceInfo := range c.Services {
 		// If service was not active, stop it
 		if !serviceInfo.Active {
+			logger.Info("Stopping service for rollback",
+				zap.String("service", serviceName))
+
 			if err := SystemctlStop(rc, serviceName); err != nil {
 				logger.Warn("Failed to stop service during rollback",
 					zap.String("service", serviceName),
 					zap.Error(err))
+			} else {
+				// CRITICAL: Wait for service to actually stop before continuing
+				// This prevents race condition where service is still writing config
+				// while we're trying to restore old config
+				deadline := time.Now().Add(10 * time.Second)
+				stopped := false
+
+				for time.Now().Before(deadline) {
+					active, err := SystemctlIsActive(rc, serviceName)
+					if err != nil || !active {
+						stopped = true
+						logger.Info("Service stopped successfully for rollback",
+							zap.String("service", serviceName))
+						break
+					}
+					time.Sleep(500 * time.Millisecond)
+				}
+
+				if !stopped {
+					logger.Error("Service failed to stop within timeout during rollback",
+						zap.String("service", serviceName),
+						zap.Duration("timeout", 10*time.Second))
+					// Continue anyway - rollback is best-effort
+				}
 			}
 		}
 
@@ -238,32 +276,143 @@ func ListCheckpoints() ([]*Checkpoint, error) {
 	return checkpoints, nil
 }
 
-// copyFile copies a file from src to dst
+// CleanupOldCheckpoints removes checkpoints older than the specified duration
+// This prevents disk fill from accumulated checkpoints
+func CleanupOldCheckpoints(maxAge time.Duration) error {
+	checkpoints, err := ListCheckpoints()
+	if err != nil {
+		return fmt.Errorf("failed to list checkpoints: %w", err)
+	}
+
+	now := time.Now()
+	removedCount := 0
+
+	for _, checkpoint := range checkpoints {
+		age := now.Sub(checkpoint.Timestamp)
+		if age > maxAge {
+			// Remove checkpoint JSON file
+			checkpointPath := filepath.Join(CheckpointDir, checkpoint.ID+".json")
+			if err := os.Remove(checkpointPath); err != nil {
+				// Log but continue with other checkpoints
+				continue
+			}
+
+			// Remove checkpoint backup directory
+			backupDir := filepath.Join(CheckpointDir, checkpoint.ID+"-files")
+			if err := os.RemoveAll(backupDir); err != nil {
+				// Log but continue
+				continue
+			}
+
+			removedCount++
+		}
+	}
+
+	return nil
+}
+
+// CleanupCheckpointsByCount keeps only the N most recent checkpoints
+func CleanupCheckpointsByCount(keepCount int) error {
+	checkpoints, err := ListCheckpoints()
+	if err != nil {
+		return fmt.Errorf("failed to list checkpoints: %w", err)
+	}
+
+	if len(checkpoints) <= keepCount {
+		return nil // Nothing to clean up
+	}
+
+	// Sort by timestamp (newest first)
+	// Simple bubble sort since we don't have many checkpoints
+	for i := 0; i < len(checkpoints); i++ {
+		for j := i + 1; j < len(checkpoints); j++ {
+			if checkpoints[j].Timestamp.After(checkpoints[i].Timestamp) {
+				checkpoints[i], checkpoints[j] = checkpoints[j], checkpoints[i]
+			}
+		}
+	}
+
+	// Remove checkpoints beyond keepCount
+	for i := keepCount; i < len(checkpoints); i++ {
+		checkpoint := checkpoints[i]
+
+		// Remove checkpoint JSON
+		checkpointPath := filepath.Join(CheckpointDir, checkpoint.ID+".json")
+		_ = os.Remove(checkpointPath)
+
+		// Remove backup directory
+		backupDir := filepath.Join(CheckpointDir, checkpoint.ID+"-files")
+		_ = os.RemoveAll(backupDir)
+	}
+
+	return nil
+}
+
+// copyFile copies a file from src to dst (deprecated - use atomicCopyFile)
 func copyFile(src, dst string) error {
+	return atomicCopyFile(src, dst)
+}
+
+// atomicCopyFile copies a file atomically using temp file + rename
+// This prevents partial writes on crash/power loss
+func atomicCopyFile(src, dst string) error {
+	// Open source file
 	sourceFile, err := os.Open(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open source: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
+	// Get source file info for permissions
 	sourceInfo, err := sourceFile.Stat()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to stat source: %w", err)
 	}
 
-	err = destFile.Chmod(sourceInfo.Mode())
+	// Create temp file in same directory as destination (for atomic rename)
+	dstDir := filepath.Dir(dst)
+	tmpFile, err := os.CreateTemp(dstDir, ".checkpoint-tmp-*")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	// Cleanup temp file on error
+	success := false
+	defer func() {
+		if !success {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	// Set correct permissions on temp file
+	if err := tmpFile.Chmod(sourceInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to set permissions: %w", err)
 	}
 
-	_, err = io.Copy(destFile, sourceFile)
-	return err
+	// Copy contents to temp file
+	if _, err := io.Copy(tmpFile, sourceFile); err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	// Sync to disk before rename (ensure data is written)
+	if err := tmpFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+
+	// Close temp file before rename
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	// Atomic rename (POSIX guarantees atomicity)
+	if err := os.Rename(tmpPath, dst); err != nil {
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	success = true
+	return nil
 }
 
 // captureNodeState captures the current node state for the checkpoint
@@ -330,6 +479,12 @@ func (c *Checkpoint) backupFiles(rc *eos_io.RuntimeContext) error {
 		c.Files = make(map[string]FileBackup)
 	}
 
+	// Create checkpoint backup directory
+	checkpointBackupDir := filepath.Join(CheckpointDir, c.ID+"-files")
+	if err := os.MkdirAll(checkpointBackupDir, 0700); err != nil {
+		return fmt.Errorf("failed to create checkpoint backup directory: %w", err)
+	}
+
 	// HashiCorp configuration files (replacing  files)
 	criticalFiles := []string{
 		"/etc/consul.d/consul.hcl",   // Consul config is in consul.d/
@@ -339,10 +494,12 @@ func (c *Checkpoint) backupFiles(rc *eos_io.RuntimeContext) error {
 
 	for _, filePath := range criticalFiles {
 		if _, err := os.Stat(filePath); err == nil {
-			// File exists, create backup info
+			// File exists, create backup with actual file copy
+			backupPath := filepath.Join(checkpointBackupDir, filepath.Base(filePath))
+
 			backup := FileBackup{
 				OriginalPath: filePath,
-				BackupPath:   fmt.Sprintf("/tmp/eos-checkpoint-%s-%s", c.ID, filepath.Base(filePath)),
+				BackupPath:   backupPath,
 				Timestamp:    time.Now(),
 				Size:         0,
 			}
@@ -353,10 +510,24 @@ func (c *Checkpoint) backupFiles(rc *eos_io.RuntimeContext) error {
 				backup.Timestamp = info.ModTime()
 			}
 
+			// CRITICAL: Actually copy the file contents (was missing before!)
+			// Use atomic copy to prevent partial writes
+			if err := atomicCopyFile(filePath, backupPath); err != nil {
+				logger.Error("Failed to backup file",
+					zap.String("file", filePath),
+					zap.Error(err))
+				return fmt.Errorf("failed to backup critical file %s: %w", filePath, err)
+			}
+
+			logger.Debug("Backed up file successfully",
+				zap.String("source", filePath),
+				zap.String("backup", backupPath),
+				zap.Int64("size", backup.Size))
+
 			c.Files[filePath] = backup
 		}
 	}
 
-	logger.Debug("File backup information captured", zap.Int("files", len(c.Files)))
+	logger.Debug("File backup completed", zap.Int("files", len(c.Files)))
 	return nil
 }
