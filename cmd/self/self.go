@@ -267,18 +267,29 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	// Check if libvirt development libraries are available
 	cgoEnabled := "0" // Default to static build
 	buildTags := ""
-	pkgConfigCmd := exec.Command("pkg-config", "--exists", "libvirt")
-	if err := pkgConfigCmd.Run(); err == nil {
-		// libvirt is available, enable CGO for libvirt support
-		cgoEnabled = "1"
-		buildTags = "-tags=libvirt"
-		logger.Info("Libvirt development libraries detected - building with full KVM support",
-			zap.String("cgo_enabled", cgoEnabled),
-			zap.String("build_tags", "libvirt"))
+
+	// Find pkg-config in PATH (important when running as root via sudo)
+	pkgConfigPath, err := exec.LookPath("pkg-config")
+	if err != nil {
+		logger.Warn("pkg-config not found in PATH - building without libvirt support",
+			zap.Error(err))
 	} else {
-		logger.Warn("Libvirt development libraries not found - building with limited KVM features",
-			zap.String("cgo_enabled", cgoEnabled),
-			zap.String("note", "Install libvirt-dev to enable full KVM support"))
+		pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
+		if err := pkgConfigCmd.Run(); err == nil {
+			// libvirt is available, enable CGO for libvirt support
+			cgoEnabled = "1"
+			buildTags = "-tags=libvirt"
+			logger.Info("Libvirt development libraries detected - building with full KVM support",
+				zap.String("pkg_config_path", pkgConfigPath),
+				zap.String("cgo_enabled", cgoEnabled),
+				zap.String("build_tags", "libvirt"))
+		} else {
+			logger.Warn("Libvirt development libraries not found - building with limited KVM features",
+				zap.String("pkg_config_path", pkgConfigPath),
+				zap.Error(err),
+				zap.String("cgo_enabled", cgoEnabled),
+				zap.String("note", "Install libvirt-dev to enable full KVM support"))
+		}
 	}
 
 	// Build command with conditional tags
