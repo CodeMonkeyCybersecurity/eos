@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -184,6 +185,18 @@ watches = [
 `, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, serverConfig, shared.PortConsul, iface.IP, iface.IP, iface.IP, logLevel)
 
 	configPath := "/etc/consul.d/consul.hcl"
+
+	// Log first 30 lines of config for debugging (before writing)
+	configLines := strings.Split(config, "\n")
+	previewLines := 30
+	if len(configLines) < previewLines {
+		previewLines = len(configLines)
+	}
+	configPreview := strings.Join(configLines[:previewLines], "\n")
+	log.Info("Generated Consul configuration (first 30 lines)",
+		zap.String("config_preview", configPreview),
+		zap.Int("total_lines", len(configLines)))
+
 	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write consul config: %w", err)
 	}

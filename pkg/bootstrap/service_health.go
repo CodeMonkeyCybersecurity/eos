@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -373,6 +374,27 @@ func determineOverallHealth(health *ServiceHealth) bool {
 	return health.Status == "healthy" || health.Status == ""
 }
 
+// captureServiceLogs captures recent journalctl logs for a service
+func captureServiceLogs(rc *eos_io.RuntimeContext, serviceName string, lines int) string {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Run journalctl to get recent logs
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "journalctl",
+		Args:    []string{"-u", serviceName + ".service", "-n", fmt.Sprintf("%d", lines), "--no-pager"},
+		Capture: true,
+	})
+
+	if err != nil {
+		logger.Warn("Failed to capture service logs",
+			zap.String("service", serviceName),
+			zap.Error(err))
+		return ""
+	}
+
+	return output
+}
+
 // ValidateRequiredServices validates that required services are healthy
 func ValidateRequiredServices(rc *eos_io.RuntimeContext, requiredServices []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -457,15 +479,51 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
+	failureCount := 0
+
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for %s to be ready", serviceName)
+			// Timeout - capture journalctl logs to show WHY service failed
+			logger.Error("Service failed to become ready, capturing logs",
+				zap.String("service", serviceName))
+
+			if logs := captureServiceLogs(rc, serviceName, 50); logs != "" {
+				logger.Error("Service failure logs from journalctl",
+					zap.String("service", serviceName),
+					zap.String("logs", logs))
+			}
+
+			return fmt.Errorf("timeout waiting for %s to be ready (check logs above for details)", serviceName)
 		case <-ticker.C:
 			health, err := CheckServiceHealth(rc, serviceName)
 			if err == nil && health.Healthy {
 				logger.Info("Service is ready", zap.String("service", serviceName))
 				return nil
+			}
+
+			// Check if service is in failed state (crash loop)
+			status, _ := SystemctlGetStatus(rc, serviceName)
+			if strings.Contains(strings.ToLower(status), "failed") ||
+			   strings.Contains(strings.ToLower(status), "exit-code") {
+				failureCount++
+
+				// After 3 consecutive failures (6 seconds), capture logs immediately
+				if failureCount >= 3 {
+					logger.Error("Service repeatedly failing, capturing logs",
+						zap.String("service", serviceName),
+						zap.Int("failure_count", failureCount))
+
+					if logs := captureServiceLogs(rc, serviceName, 50); logs != "" {
+						logger.Error("Service crash logs from journalctl",
+							zap.String("service", serviceName),
+							zap.String("logs", logs))
+					}
+
+					return fmt.Errorf("%s is in failed state (crashed %d times, check logs above)", serviceName, failureCount)
+				}
+			} else {
+				failureCount = 0 // Reset if service is not failing
 			}
 
 			if health != nil && len(health.Errors) > 0 {

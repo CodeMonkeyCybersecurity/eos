@@ -475,10 +475,22 @@ func (ci *ConsulInstaller) configure() error {
 
 	// Validate configuration
 	ci.logger.Info("Validating Consul configuration")
-	if output, err := ci.runner.RunOutput(ci.config.BinaryPath, "validate", "/etc/consul.d"); err != nil {
+	output, err := ci.runner.RunOutput(ci.config.BinaryPath, "validate", "/etc/consul.d")
+
+	// Always log validation output (success or failure)
+	if output != "" {
+		ci.logger.Info("Consul configuration validation output",
+			zap.String("output", output))
+	}
+
+	if err != nil {
+		ci.logger.Error("Consul configuration validation failed",
+			zap.Error(err),
+			zap.String("output", output))
 		return fmt.Errorf("configuration validation failed: %w (output: %s)", err, output)
 	}
 
+	ci.logger.Info("Consul configuration validation succeeded")
 	return nil
 }
 
