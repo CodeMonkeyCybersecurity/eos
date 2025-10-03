@@ -1,4 +1,4 @@
-// pkg/terraform/kvm/cloud_init.go
+// pkg/kvm/cloud_init.go
 
 package kvm
 

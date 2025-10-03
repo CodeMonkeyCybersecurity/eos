@@ -24,7 +24,7 @@ func TestConsulConfigGeneration(t *testing.T) {
 				IsSingleNode: true,
 				NodeCount:    1,
 			},
-			expectedExpected: 1,
+			expectedExpect: 1,
 		},
 		{
 			name: "multi-node with count",
@@ -32,7 +32,7 @@ func TestConsulConfigGeneration(t *testing.T) {
 				IsSingleNode: false,
 				NodeCount:    5,
 			},
-			expectedExpected: 5,
+			expectedExpect: 5,
 		},
 		{
 			name: "multi-node default",
@@ -40,7 +40,7 @@ func TestConsulConfigGeneration(t *testing.T) {
 				IsSingleNode: false,
 				NodeCount:    0,
 			},
-			expectedExpected: 3, // Should default to 3
+			expectedExpect: 3, // Should default to 3
 		},
 	}
 
@@ -50,21 +50,20 @@ func TestConsulConfigGeneration(t *testing.T) {
 			consulConfig := &consul.ConsulConfig{
 				Mode:       "server",
 				Datacenter: "dc1",
-				UI:         true,
 			}
 
 			// Apply the logic from phaseConsul
 			if tt.clusterInfo.IsSingleNode {
-				consulConfig.BootstrapExpected = 1
+				consulConfig.BootstrapExpect = 1
 			} else {
-				consulConfig.BootstrapExpected = tt.clusterInfo.NodeCount
-				if consulConfig.BootstrapExpected == 0 {
-					consulConfig.BootstrapExpected = 3
+				consulConfig.BootstrapExpect = tt.clusterInfo.NodeCount
+				if consulConfig.BootstrapExpect == 0 {
+					consulConfig.BootstrapExpect = 3
 				}
 			}
 
-			assert.Equal(t, tt.expectedExpected, consulConfig.BootstrapExpected,
-				"BootstrapExpected should match expected value")
+			assert.Equal(t, tt.expectedExpect, consulConfig.BootstrapExpect,
+				"BootstrapExpect should match expected value")
 		})
 	}
 }

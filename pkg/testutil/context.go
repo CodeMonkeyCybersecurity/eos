@@ -17,18 +17,13 @@ func TestContext(t *testing.T) *eos_io.RuntimeContext {
 	// Create a test logger
 	logger := zaptest.NewLogger(t)
 
-	// Create context with logger
-	ctx := context.Background()
+	// Set as global logger for otelzap.Ctx to work
+	zap.ReplaceGlobals(logger)
 
-	// Create otelzap logger
-	otelLogger := otelzap.New(logger)
-
-	// Store logger in context using otelzap's method
-	ctx = otelzap.CtxWithLogger(ctx, otelLogger)
-
-	// Create runtime context
+	// Create runtime context with plain context
 	rc := &eos_io.RuntimeContext{
-		Ctx: ctx,
+		Ctx: context.Background(),
+		Log: logger,
 		Attributes: map[string]string{
 			"test": "true",
 		},
@@ -38,22 +33,17 @@ func TestContext(t *testing.T) *eos_io.RuntimeContext {
 }
 
 // TestContextWithOptions creates a test RuntimeContext with custom options
-func TestContextWithOptions(t *testing.T, opts ...zap.Option) *eos_io.RuntimeContext {
+func TestContextWithOptions(t *testing.T, opts ...zaptest.LoggerOption) *eos_io.RuntimeContext {
 	// Create a test logger with options
 	logger := zaptest.NewLogger(t, opts...)
 
-	// Create context with logger
-	ctx := context.Background()
-
-	// Create otelzap logger
-	otelLogger := otelzap.New(logger)
-
-	// Store logger in context
-	ctx = otelzap.CtxWithLogger(ctx, otelLogger)
+	// Set as global logger
+	zap.ReplaceGlobals(logger)
 
 	// Create runtime context
 	rc := &eos_io.RuntimeContext{
-		Ctx: ctx,
+		Ctx: context.Background(),
+		Log: logger,
 		Attributes: map[string]string{
 			"test": "true",
 		},
@@ -65,19 +55,19 @@ func TestContextWithOptions(t *testing.T, opts ...zap.Option) *eos_io.RuntimeCon
 // TestLogger creates a test-friendly otelzap logger
 func TestLogger(t *testing.T) otelzap.LoggerWithCtx {
 	logger := zaptest.NewLogger(t)
+	zap.ReplaceGlobals(logger)
 	otelLogger := otelzap.New(logger)
-	ctx := otelzap.CtxWithLogger(context.Background(), otelLogger)
-	return otelzap.Ctx(ctx)
+	return otelLogger.Ctx(context.Background())
 }
 
 // NopContext creates a RuntimeContext with a no-op logger for benchmarks
 func NopContext() *eos_io.RuntimeContext {
 	logger := zap.NewNop()
-	otelLogger := otelzap.New(logger)
-	ctx := otelzap.CtxWithLogger(context.Background(), otelLogger)
+	zap.ReplaceGlobals(logger)
 
 	return &eos_io.RuntimeContext{
-		Ctx: ctx,
+		Ctx: context.Background(),
+		Log: logger,
 		Attributes: map[string]string{
 			"test": "true",
 		},

@@ -1,5 +1,5 @@
-// pkg/terraform/kvm/simple_vm.go
-// Direct virsh-based VM creation - simpler and more reliable than Terraform
+// pkg/kvm/simple_vm.go
+// Direct virsh-based VM creation using libvirt/virsh
 
 package kvm
 

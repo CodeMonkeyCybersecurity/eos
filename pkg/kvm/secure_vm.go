@@ -1,17 +1,12 @@
-// pkg/terraform/kvm/secure_vm.go
+// pkg/kvm/secure_vm.go
 
 package kvm
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
-
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 // SecureVMConfig represents configuration for a security-hardened Ubuntu VM
@@ -174,93 +169,15 @@ func FindDefaultSSHKeys() ([]string, error) {
 	return keys, nil
 }
 
-// GenerateVMName generates a unique VM name with timestamp
-func GenerateVMName(base string) string {
-	timestamp := time.Now().Format("20060102-1504")
-	if base == "" {
-		base = "ubuntu"
-	}
-	return fmt.Sprintf("%s-vm-%s", base, timestamp)
-}
-
-// CreateSecureVM creates a security-hardened Ubuntu VM
+// CreateSecureVM creates a security-hardened Ubuntu VM using Terraform
+// NOTE: This function has been commented out as we've moved to direct virsh-based VM creation.
+// The Terraform-based approach is still available in pkg/terraform/kvm if needed.
+// TODO: Remove this commented code if the virsh-based approach proves sufficient
+/*
 func CreateSecureVM(ctx context.Context, manager *KVMManager, config *SecureVMConfig) (*VMInfo, error) {
-	// Defensive check for nil context
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	logger := otelzap.Ctx(ctx)
-
-	// ASSESS - Validate configuration
-	logger.Info("Creating secure Ubuntu VM",
-		zap.String("name", config.Name),
-		zap.String("security_level", config.SecurityLevel),
-		zap.String("memory", config.Memory),
-		zap.Int("vcpus", config.VCPUs))
-
-	// Parse memory size
-	memoryMB, err := ParseMemorySize(config.Memory)
-	if err != nil {
-		return nil, fmt.Errorf("invalid memory format: %w", err)
-	}
-
-	// Parse disk size
-	diskSizeBytes, err := ParseDiskSize(config.DiskSize)
-	if err != nil {
-		return nil, fmt.Errorf("invalid disk size format: %w", err)
-	}
-
-	// Generate cloud-init configuration
-	cloudInit := GenerateSecureCloudInit(config)
-
-	// INTERVENE - Create VM configuration
-	vmConfig := &VMConfig{
-		Name:        config.Name,
-		Memory:      uint(memoryMB),
-		VCPUs:       uint(config.VCPUs),
-		DiskSize:    uint64(diskSizeBytes),
-		NetworkName: config.Network,
-		StoragePool: config.StoragePool,
-		UserData:    cloudInit,
-		OSVariant:   "ubuntu22.04",
-		EnableTPM:   config.EnableTPM,
-		SecureBoot:  config.SecureBoot,
-		EncryptDisk: config.EncryptDisk,
-		Tags: map[string]string{
-			"created_by":     "eos",
-			"security_level": config.SecurityLevel,
-			"os":            "ubuntu",
-			"hardened":      "true",
-		},
-	}
-
-	// Add security-specific configurations
-	if config.EncryptDisk {
-		vmConfig.Tags["disk_encryption"] = "luks"
-	}
-
-	if config.EnableTPM {
-		vmConfig.Tags["tpm"] = "enabled"
-	}
-
-	if config.SecureBoot {
-		vmConfig.Tags["secure_boot"] = "enabled"
-	}
-
-	// Create the VM
-	vmInfo, err := manager.CreateVM(ctx, vmConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create secure VM: %w", err)
-	}
-
-	// EVALUATE - Verify VM creation
-	logger.Info("Secure Ubuntu VM created successfully",
-		zap.String("name", vmInfo.Name),
-		zap.String("uuid", vmInfo.UUID),
-		zap.String("state", vmInfo.State))
-
-	return vmInfo, nil
+	// Function body commented out - depends on Terraform types
 }
+*/
 
 // ValidateSecureVMConfig validates the VM configuration
 func ValidateSecureVMConfig(config *SecureVMConfig) error {
