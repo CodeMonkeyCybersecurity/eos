@@ -276,29 +276,30 @@ func generateSSHKeyED25519(seedDir, vmName string) (string, string, error) {
 		return "", "", fmt.Errorf("failed to generate ed25519 key: %w", err)
 	}
 
-	// Format private key in OpenSSH format
-	pemBlock := &pem.Block{
-		Type:  "OPENSSH PRIVATE KEY",
-		Bytes: marshalED25519PrivateKey(privKey),
+	// Generate SSH public key first (we'll need this)
+	sshPubKey, err := ssh.NewPublicKey(pubKey)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create ssh public key: %w", err)
 	}
 
-	// Write private key
+	// Marshal private key in OpenSSH format using ssh package
+	privKeyPEM, err := ssh.MarshalPrivateKey(privKey, "")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal private key: %w", err)
+	}
+
+	// Write private key in OpenSSH format (PEM encoded)
 	privKeyFile, err := os.OpenFile(privKeyPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create private key file: %w", err)
 	}
 	defer privKeyFile.Close()
 
-	if err := pem.Encode(privKeyFile, pemBlock); err != nil {
+	if err := pem.Encode(privKeyFile, privKeyPEM); err != nil {
 		return "", "", fmt.Errorf("failed to encode private key: %w", err)
 	}
 
-	// Generate SSH public key
-	sshPubKey, err := ssh.NewPublicKey(pubKey)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create ssh public key: %w", err)
-	}
-
+	// Get public key string
 	pubKeyStr := string(ssh.MarshalAuthorizedKey(sshPubKey))
 
 	// Write public key
@@ -321,14 +322,6 @@ func generateSSHKeyED25519(seedDir, vmName string) (string, string, error) {
 	}
 
 	return privKeyPath, strings.TrimSpace(pubKeyStr), nil
-}
-
-// marshalED25519PrivateKey formats an ed25519 private key for OpenSSH
-func marshalED25519PrivateKey(key ed25519.PrivateKey) []byte {
-	// For OpenSSH compatibility, we'll just store the raw key bytes
-	// This is a simplified version - OpenSSH format is complex but
-	// for our purposes storing the seed is sufficient
-	return key.Seed()
 }
 
 func findSSHKeys() []string {
