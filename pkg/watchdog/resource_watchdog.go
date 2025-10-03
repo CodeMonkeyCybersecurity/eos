@@ -820,10 +820,63 @@ func (rw *ResourceWatchdog) checkResources() ResourceStatus {
 	processes, _ := process.Processes()
 	var eosProcesses []ProcessInfo
 
+	// Build a complete process tree for the current command to exclude it from monitoring
+	currentPID := int32(os.Getpid())
+	currentProc, err := process.NewProcess(currentPID)
+	var parentPID int32
+	if err == nil {
+		parentPID, _ = currentProc.Ppid()
+	}
+
+	// Build set of all PIDs in our process tree (current process + all ancestors + all descendants)
+	excludedPIDs := make(map[int32]bool)
+	excludedPIDs[currentPID] = true
+	if parentPID > 0 {
+		excludedPIDs[parentPID] = true
+		// Also exclude parent's ancestors (grandparents, etc.)
+		ancestor := parentPID
+		for i := 0; i < 5; i++ { // Limit depth to prevent infinite loops
+			if ancestorProc, err := process.NewProcess(ancestor); err == nil {
+				if ppid, err := ancestorProc.Ppid(); err == nil && ppid > 1 {
+					excludedPIDs[ppid] = true
+					ancestor = ppid
+				} else {
+					break
+				}
+			} else {
+				break
+			}
+		}
+	}
+
+	// First pass: Build descendant tree (children, grandchildren, etc.)
 	for _, p := range processes {
+		ppid, _ := p.Ppid()
+		if excludedPIDs[ppid] {
+			excludedPIDs[p.Pid] = true // This process is a child of something we're excluding
+		}
+	}
+
+	// Second pass: Catch any remaining descendants (needed for multi-level trees)
+	for i := 0; i < 3; i++ { // Multiple passes to catch deep trees
+		for _, p := range processes {
+			ppid, _ := p.Ppid()
+			if excludedPIDs[ppid] && !excludedPIDs[p.Pid] {
+				excludedPIDs[p.Pid] = true
+			}
+		}
+	}
+
+	// Third pass: Collect eos processes that are NOT in our process tree
+	for _, p := range processes {
+		// CRITICAL FIX: Skip entire process tree of current command
+		if excludedPIDs[p.Pid] {
+			continue
+		}
+
 		name, _ := p.Name()
 		cmdline, _ := p.Cmdline()
-		
+
 		if strings.Contains(name, "eos") || strings.Contains(cmdline, "eos") {
 			cpuP, _ := p.CPUPercent()
 			memInfo, _ := p.MemoryInfo()

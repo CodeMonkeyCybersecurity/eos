@@ -332,10 +332,21 @@ func sanitizeFlagValues(ctx *eos_io.RuntimeContext, cmd *cobra.Command, sanitize
 // startResourceWatchdog initializes resource monitoring for resource-intensive commands
 func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 	fmt.Fprintf(os.Stderr, "DEBUG: startResourceWatchdog called for command: %s\n", commandName)
+
+	// Commands that should NEVER be monitored
+	// These commands have built-in recursion protection and legitimately spawn multiple processes
+	exemptCommands := []string{"bootstrap", "doctor", "self"}
+	for _, exempt := range exemptCommands {
+		if strings.Contains(commandName, exempt) {
+			fmt.Fprintf(os.Stderr, "DEBUG: Command %s exempt from watchdog (uses built-in recursion protection)\n", commandName)
+			return
+		}
+	}
+
 	// List of commands that should have resource monitoring
-	// NOTE: Removed "update" from this list as it's not resource-intensive
-	resourceIntensiveCommands := []string{"bootstrap", "create", "deploy", "install"}
-	
+	// These are long-running operations that might spawn runaway processes
+	resourceIntensiveCommands := []string{"create", "deploy", "install"}
+
 	// Check if this command needs monitoring
 	shouldMonitor := false
 	for _, cmd := range resourceIntensiveCommands {
@@ -344,7 +355,7 @@ func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 			break
 		}
 	}
-	
+
 	if !shouldMonitor {
 		fmt.Fprintf(os.Stderr, "DEBUG: Command %s doesn't need monitoring, returning\n", commandName)
 		return
@@ -352,24 +363,17 @@ func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 	
 	// Configure watchdog with enhanced tracing
 	config := watchdog.DefaultResourceConfig()
-	
+
 	// TEMPORARY: Disable tracing to fix hang issue
 	// TODO: Investigate why TraceLogger.Initialize() hangs
 	config.EnableTracing = false
-	
+
 	// Enable terminal output for visibility
 	config.EnableTerminalOutput = true
 	config.CaptureSystemInfo = true
-	
-	// Special configuration for bootstrap
-	if strings.Contains(commandName, "bootstrap") {
-		// Bootstrap is allowed more CPU but fewer processes
-		config.CPUWarningThreshold = 80.0
-		config.CPUCriticalThreshold = 95.0
-		config.MaxEosProcesses = 5 // Strict limit to catch recursion
-		config.SustainedDuration = 2 * time.Second // React faster to bootstrap issues
-		config.VerboseLogging = true // Always verbose for bootstrap
-	}
+
+	// NOTE: Bootstrap-specific config removed - bootstrap is now exempt from watchdog monitoring
+	// Bootstrap has its own recursion protection via EOS_BOOTSTRAP_IN_PROGRESS env var
 	
 	// Create and start the watchdog
 	rw := watchdog.NewResourceWatchdog(ctx.Ctx, ctx.Log, config)

@@ -274,7 +274,12 @@ func checkGuestAgent(domain *libvirt.Domain) bool {
 
 	// Try to ping the guest agent with a short timeout
 	// The guest-ping command should return immediately if the agent is responsive
-	result, err := domain.QemuAgentCommand(`{"execute":"guest-ping"}`, libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT, 0)
+	// Use explicit type cast for libvirt constant (required for Go bindings)
+	result, err := domain.QemuAgentCommand(
+		`{"execute":"guest-ping"}`,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
 	if err != nil {
 		// Guest agent not available or not responsive
 		return false
