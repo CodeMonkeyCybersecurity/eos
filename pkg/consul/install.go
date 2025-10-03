@@ -231,16 +231,19 @@ func (ci *ConsulInstaller) assess() (bool, error) {
 // validatePrerequisites checks system requirements
 func (ci *ConsulInstaller) validatePrerequisites() error {
 	ci.logger.Info("Validating prerequisites")
-	
+
 	// Validate configuration with better error context
 	if ci.config.Version == "" {
 		return eos_err.NewUserError("consul version must be specified")
 	}
-	
+
 	// Check if running as root
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError("this command must be run as root")
 	}
+
+	// Check for SELinux/AppArmor that might block Consul
+	ci.checkSecurityModules()
 	
 	// Create context for prerequisite checks
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 15*time.Second)
@@ -263,7 +266,13 @@ func (ci *ConsulInstaller) validatePrerequisites() error {
 		if err := ci.systemd.Stop(); err != nil {
 			ci.logger.Warn("Failed to stop existing Consul service", zap.Error(err))
 		}
-		time.Sleep(2 * time.Second) // Give it time to release ports
+
+		// Poll until ports are released (no hard-coded sleep)
+		criticalPorts := []int{shared.PortConsul, 8300, 8301}
+		if err := ci.waitForPortsReleased(criticalPorts, 10*time.Second); err != nil {
+			ci.logger.Warn("Ports may not be fully released", zap.Error(err))
+			// Continue anyway - port check below will catch if still in use
+		}
 	}
 	
 	// Check port availability
@@ -427,6 +436,11 @@ func (ci *ConsulInstaller) configure() error {
 		zap.Int("directory_count", len(directories)))
 
 	// Create directories with proper error handling
+	criticalDirs := map[string]bool{
+		"/var/lib/consul": true,
+		"/var/log/consul": true,
+	}
+
 	for _, dir := range directories {
 		select {
 		case <-ctx.Done():
@@ -443,6 +457,11 @@ func (ci *ConsulInstaller) configure() error {
 
 		// Set ownership after creation
 		if err := ci.runner.Run("chown", "-R", dir.Owner+":"+dir.Owner, dir.Path); err != nil {
+			// CRITICAL: Fail hard if ownership fails on critical directories
+			// Without proper ownership, Consul can't write data/logs → crash loop
+			if criticalDirs[dir.Path] {
+				return fmt.Errorf("failed to set ownership on critical directory %s (Consul will not be able to write data): %w\nRemediation: Ensure 'consul' user exists and you have permission to chown", dir.Path, err)
+			}
 			ci.logger.Warn("Failed to set directory ownership",
 				zap.String("path", dir.Path),
 				zap.String("owner", dir.Owner),
@@ -451,10 +470,24 @@ func (ci *ConsulInstaller) configure() error {
 			ci.logger.Info("Set directory ownership",
 				zap.String("path", dir.Path),
 				zap.String("owner", dir.Owner))
+
+			// Verify ownership was actually set correctly on critical directories
+			if criticalDirs[dir.Path] {
+				if err := ci.verifyDirectoryOwnership(dir.Path, dir.Owner); err != nil {
+					return fmt.Errorf("ownership verification failed for critical directory %s: %w", dir.Path, err)
+				}
+			}
 		}
 	}
 
 	ci.logger.Info("All Consul directories created successfully")
+
+	// Create logrotate configuration to prevent disk fill
+	if err := ci.createLogrotateConfig(); err != nil {
+		ci.logger.Warn("Failed to create logrotate config (logs may fill disk)",
+			zap.Error(err))
+		// Non-fatal, continue anyway
+	}
 
 	// IDEMPOTENCY: Check if service is in crash loop before regenerating config
 	// If service is crash looping, stop it before changing config to prevent racing restarts
@@ -538,8 +571,16 @@ func (ci *ConsulInstaller) configure() error {
 					zap.Error(err))
 			} else {
 				ci.logger.Info("Stopped crash looping service for clean reconfiguration")
-				// Give systemd a moment to fully stop
-				time.Sleep(2 * time.Second)
+
+				// Poll for service stop instead of hard-coded sleep
+				deadline := time.Now().Add(10 * time.Second)
+				for time.Now().Before(deadline) {
+					if !ci.systemd.IsActive() {
+						ci.logger.Info("Crash looping service stopped successfully")
+						break
+					}
+					time.Sleep(500 * time.Millisecond)
+				}
 			}
 		}
 	}
@@ -557,6 +598,11 @@ func (ci *ConsulInstaller) configure() error {
 		EnableDebugLogging: ci.config.LogLevel == "DEBUG",
 		VaultAvailable:     ci.config.VaultIntegration,
 		BootstrapExpect:    ci.config.BootstrapExpect,
+	}
+
+	// Check disk space before writing config (prevent partial writes)
+	if err := ci.checkDiskSpaceWithContext(context.Background(), "/etc", 10); err != nil {
+		return fmt.Errorf("insufficient disk space for config write: %w", err)
 	}
 
 	if err := config.Generate(ci.rc, consulConfig); err != nil {
@@ -762,27 +808,75 @@ func (ci *ConsulInstaller) isConsulReady() bool {
 	return err == nil
 }
 
-// cleanExistingInstallation removes existing Consul installation
+// cleanExistingInstallation removes existing Consul installation with backup
 func (ci *ConsulInstaller) cleanExistingInstallation() error {
 	ci.logger.Info("Cleaning existing Consul installation")
-	
+
+	// CRITICAL: Backup data before deletion to prevent data loss
+	timestamp := time.Now().Format("20060102-150405")
+	backupDir := fmt.Sprintf("/var/backups/eos-consul-%s", timestamp)
+
+	ci.logger.Warn("Clean install will DELETE all Consul data",
+		zap.String("backup_location", backupDir))
+
+	// Create backup directory
+	if err := os.MkdirAll(backupDir, 0700); err != nil {
+		return fmt.Errorf("failed to create backup directory: %w", err)
+	}
+
+	// Backup critical directories if they exist
+	backupTargets := []string{
+		"/var/lib/consul",  // KV store, Raft data, snapshots, ACL tokens
+		"/etc/consul.d",    // Configuration files
+		"/var/log/consul",  // Logs
+	}
+
+	for _, target := range backupTargets {
+		if _, err := os.Stat(target); err == nil {
+			// Directory exists, back it up
+			targetName := filepath.Base(target)
+			backupPath := filepath.Join(backupDir, targetName)
+
+			ci.logger.Info("Backing up directory before deletion",
+				zap.String("source", target),
+				zap.String("destination", backupPath))
+
+			// Use cp -a to preserve permissions and timestamps
+			if output, err := ci.runner.RunOutput("cp", "-a", target, backupPath); err != nil {
+				ci.logger.Error("Backup failed for directory",
+					zap.String("target", target),
+					zap.Error(err),
+					zap.String("output", output))
+				return fmt.Errorf("failed to backup %s before clean install: %w\nData preservation is critical - aborting clean install", target, err)
+			}
+
+			ci.logger.Info("Backup completed successfully",
+				zap.String("target", target),
+				zap.String("backup", backupPath))
+		}
+	}
+
+	ci.logger.Info("All backups completed",
+		zap.String("backup_dir", backupDir),
+		zap.String("restore_command", fmt.Sprintf("To restore: cp -a %s/* /", backupDir)))
+
 	// Stop service if running
 	if ci.systemd.IsActive() {
 		if err := ci.systemd.Stop(); err != nil {
 			ci.logger.Warn("Failed to stop Consul service", zap.Error(err))
 		}
 	}
-	
-	// Remove data directory
+
+	// Remove data directory (now backed up)
 	if err := os.RemoveAll("/var/lib/consul"); err != nil {
 		ci.logger.Warn("Failed to remove data directory", zap.Error(err))
 	}
-	
-	// Remove log directory
+
+	// Remove log directory (now backed up)
 	if err := os.RemoveAll("/var/log/consul"); err != nil {
 		ci.logger.Warn("Failed to remove log directory", zap.Error(err))
 	}
-	
+
 	return nil
 }
 
@@ -883,26 +977,48 @@ func (ci *ConsulInstaller) checkDiskSpace(path string, requiredMB int64) error {
 		ci.logger.Warn("Could not check disk space", zap.Error(err))
 		return nil
 	}
-	
+
 	availableMB := int64(stat.Bavail) * int64(stat.Bsize) / 1024 / 1024
 	if availableMB < requiredMB {
-		return fmt.Errorf("insufficient disk space in %s: %dMB available (minimum %dMB required)", 
+		return fmt.Errorf("insufficient disk space in %s: %dMB available (minimum %dMB required)",
 			path, availableMB, requiredMB)
 	}
-	
+
+	// Log warning if disk is >90% full even if above minimum
+	totalMB := int64(stat.Blocks) * int64(stat.Bsize) / 1024 / 1024
+	usedPercent := float64(totalMB-availableMB) / float64(totalMB) * 100
+
+	if usedPercent > 90 {
+		ci.logger.Warn("Disk space critically low",
+			zap.String("path", path),
+			zap.Float64("used_percent", usedPercent),
+			zap.Int64("available_mb", availableMB),
+			zap.String("recommendation", "Free up disk space to prevent future failures"))
+	} else if usedPercent > 80 {
+		ci.logger.Warn("Disk space low",
+			zap.String("path", path),
+			zap.Float64("used_percent", usedPercent),
+			zap.Int64("available_mb", availableMB))
+	}
+
 	return nil
 }
 
 func (ci *ConsulInstaller) checkPortAvailable(port int) error {
+	// Check Docker containers first (lsof doesn't show these clearly)
+	if dockerConflict, err := ci.checkDockerPortConflict(port); err == nil && dockerConflict != "" {
+		return fmt.Errorf("port %d is exposed by Docker container: %s\nRemediation: Stop container with 'docker stop %s'", port, dockerConflict, dockerConflict)
+	}
+
 	// Use lsof to check what's using the port
 	output, err := ci.runner.RunOutput("sh", "-c", fmt.Sprintf("lsof -i :%d 2>/dev/null | grep LISTEN | awk '{print $1}' | head -1", port))
 	if err != nil || output == "" {
 		// Port is available
 		return nil
 	}
-	
+
 	processName := strings.TrimSpace(output)
-	
+
 	// If it's Consul already using the port, that's fine for idempotency
 	if processName == "consul" {
 		ci.logger.Debug("Port already in use by Consul", zap.Int("port", port))
@@ -914,15 +1030,162 @@ func (ci *ConsulInstaller) checkPortAvailable(port int) error {
 		// It's another Consul instance
 		return fmt.Errorf("port %d is already in use by another Consul instance", port)
 	}
-	
+
 	// Some other process is using the port
 	return fmt.Errorf("port %d is already in use by %s", port, processName)
+}
+
+// checkDockerPortConflict checks if a Docker container is exposing the port
+func (ci *ConsulInstaller) checkDockerPortConflict(port int) (string, error) {
+	// Check if docker is installed
+	if _, err := exec.LookPath("docker"); err != nil {
+		return "", err // Docker not installed, no conflict
+	}
+
+	// Query Docker for containers exposing this port
+	// Format: container_name:port_mapping
+	cmd := fmt.Sprintf("docker ps --format '{{.Names}}:{{.Ports}}' | grep ':%d->' | head -1", port)
+	output, err := ci.runner.RunOutput("sh", "-c", cmd)
+	if err != nil || output == "" {
+		return "", nil // No Docker conflict
+	}
+
+	// Extract container name from output
+	parts := strings.Split(output, ":")
+	if len(parts) > 0 {
+		return parts[0], nil
+	}
+
+	return "", nil
+}
+
+// waitForPortsReleased polls until critical ports are released after service stop
+func (ci *ConsulInstaller) waitForPortsReleased(ports []int, timeout time.Duration) error {
+	ci.logger.Info("Waiting for ports to be released",
+		zap.Ints("ports", ports),
+		zap.Duration("timeout", timeout))
+
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for time.Now().Before(deadline) {
+		allFree := true
+		for _, port := range ports {
+			if err := ci.checkPortAvailable(port); err != nil {
+				allFree = false
+				break
+			}
+		}
+
+		if allFree {
+			ci.logger.Info("All ports released successfully")
+			return nil
+		}
+
+		<-ticker.C
+	}
+
+	return fmt.Errorf("timeout waiting for ports to be released after %v", timeout)
 }
 
 func (ci *ConsulInstaller) createDirectory(path string, mode os.FileMode) error {
 	if err := os.MkdirAll(path, mode); err != nil {
 		return err
 	}
+	return nil
+}
+
+// createLogrotateConfig creates a logrotate configuration for Consul logs
+func (ci *ConsulInstaller) createLogrotateConfig() error {
+	logrotateConfig := `/var/log/consul/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 consul consul
+    sharedscripts
+    postrotate
+        systemctl reload consul >/dev/null 2>&1 || true
+    endscript
+}
+`
+
+	logrotateFile := "/etc/logrotate.d/consul"
+	ci.logger.Info("Creating logrotate configuration",
+		zap.String("file", logrotateFile))
+
+	if err := os.WriteFile(logrotateFile, []byte(logrotateConfig), 0644); err != nil {
+		return fmt.Errorf("failed to write logrotate config: %w", err)
+	}
+
+	ci.logger.Info("Logrotate configuration created successfully",
+		zap.String("file", logrotateFile),
+		zap.String("rotation", "daily, keep 7 days"))
+
+	return nil
+}
+
+// checkSecurityModules detects SELinux/AppArmor and warns if they might interfere
+func (ci *ConsulInstaller) checkSecurityModules() {
+	// Check SELinux
+	if output, err := ci.runner.RunOutput("getenforce"); err == nil {
+		mode := strings.ToLower(strings.TrimSpace(output))
+		if mode == "enforcing" {
+			ci.logger.Warn("SELinux is in enforcing mode - may block Consul operations",
+				zap.String("selinux_mode", mode),
+				zap.String("remediation", "If Consul fails, check: ausearch -m AVC -ts recent | grep consul"))
+
+			// Check for consul-related denials in audit log
+			if denials, err := ci.runner.RunOutput("sh", "-c", "ausearch -m AVC -ts recent 2>/dev/null | grep -i consul | tail -5"); err == nil && denials != "" {
+				ci.logger.Error("SELinux has denied Consul operations recently",
+					zap.String("recent_denials", denials),
+					zap.String("fix", "Run: setenforce 0 (temporarily) or create SELinux policy"))
+			}
+		} else if mode == "permissive" {
+			ci.logger.Info("SELinux is in permissive mode (will log but not block)")
+		}
+	}
+
+	// Check AppArmor
+	if output, err := ci.runner.RunOutput("sh", "-c", "aa-status 2>/dev/null | grep -i consul"); err == nil && output != "" {
+		ci.logger.Warn("AppArmor profile detected for Consul",
+			zap.String("profile", output),
+			zap.String("remediation", "If Consul fails, check: dmesg | grep -i apparmor | grep consul"))
+	}
+}
+
+// verifyDirectoryOwnership verifies that a directory has correct ownership
+func (ci *ConsulInstaller) verifyDirectoryOwnership(path, expectedOwner string) error {
+	// Get directory stat info
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat directory: %w", err)
+	}
+
+	// Get UID/GID using stat command for verification
+	output, err := ci.runner.RunOutput("stat", "-c", "%U:%G", path)
+	if err != nil {
+		ci.logger.Debug("Failed to verify ownership with stat, assuming correct",
+			zap.String("path", path),
+			zap.Error(err))
+		return nil // Don't fail if stat command doesn't work
+	}
+
+	actualOwner := strings.TrimSpace(output)
+	expectedOwnership := expectedOwner + ":" + expectedOwner
+
+	if actualOwner != expectedOwnership {
+		return fmt.Errorf("directory %s has ownership %s but expected %s", path, actualOwner, expectedOwnership)
+	}
+
+	ci.logger.Debug("Ownership verification passed",
+		zap.String("path", path),
+		zap.String("owner", actualOwner),
+		zap.Uint32("mode", uint32(fileInfo.Mode())))
+
 	return nil
 }
 

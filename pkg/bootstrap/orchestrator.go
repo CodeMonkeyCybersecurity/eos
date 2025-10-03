@@ -15,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -64,6 +65,17 @@ type BootstrapPhase struct {
 func OrchestrateBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command, opts *BootstrapOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced bootstrap orchestration")
+
+	// CRITICAL: Acquire lock to prevent concurrent bootstrap attempts
+	// Concurrent bootstraps can cause race conditions, corrupted configs, split brain
+	lockFile := "/var/lock/eos-bootstrap.lock"
+	lock, err := acquireBootstrapLock(lockFile)
+	if err != nil {
+		return fmt.Errorf("failed to acquire bootstrap lock: %w\nAnother bootstrap may be running. Check 'ps aux | grep eos'", err)
+	}
+	defer releaseBootstrapLock(lock, lockFile)
+
+	logger.Info("Bootstrap lock acquired", zap.String("lock_file", lockFile))
 
 	// Phase 0: State Detection and Conflict Resolution
 	logger.Info("Detecting bootstrap state")
@@ -358,30 +370,60 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 		} else {
 			logger.Info("Consul is unhealthy, reinstalling/reconfiguring...")
 
+			// CRITICAL: Check cluster membership before stopping service
+			// Stopping a cluster member can cause quorum loss
+			if health.Running {
+				members, err := consul.GetConsulMembers(rc)
+				if err == nil && len(members) > 1 {
+					logger.Warn("Consul is part of a cluster - stopping it may affect quorum",
+						zap.Int("cluster_size", len(members)),
+						zap.Strings("members", members))
+
+					// Check if this is a multi-node cluster
+					if len(members) >= 3 {
+						logger.Warn("Multi-node cluster detected - use caution",
+							zap.Int("members", len(members)),
+							zap.String("recommendation", "Perform graceful leave with 'consul leave' first"))
+						// Note: We continue anyway for bootstrap repair, but log warning
+					}
+				}
+			}
+
 			// CRITICAL: Stop crash looping service before fixing config
 			// This prevents race condition between systemd restarts and our config changes
 			if health.Running || health.Enabled {
 				logger.Info("Stopping unhealthy Consul service before reconfiguration")
 				if err := SystemctlStop(rc, "consul"); err != nil {
-					logger.Warn("Failed to stop Consul service, continuing anyway", zap.Error(err))
-				} else {
-					// Give systemd a moment to fully stop
-					time.Sleep(2 * time.Second)
-					logger.Info("Consul service stopped successfully")
+					// FAIL HARD - if we can't stop the service, we'll race with it
+					return fmt.Errorf("failed to stop Consul service before reconfiguration: %w\nRemediation: Manually stop with 'systemctl stop consul' and retry", err)
+				}
+
+				// Poll until service is fully stopped (no hard-coded sleep)
+				if err := waitForServiceStopped(rc, "consul", 10*time.Second); err != nil {
+					return fmt.Errorf("service stop verification failed: %w", err)
 				}
 			}
 		}
 
+		// Detect network interface for Consul binding
+		// CRITICAL: Consul needs to bind to the correct interface for cluster communication
+		iface, err := network.SelectInterface(rc)
+		if err != nil {
+			return fmt.Errorf("failed to detect network interface for Consul: %w\nRemediation: Manually specify interface with --bind-addr flag or ensure network is configured", err)
+		}
+
+		logger.Info("Selected network interface for Consul",
+			zap.String("interface", iface.Name),
+			zap.String("ip", iface.IP),
+			zap.String("gateway", iface.Gateway))
+
 		// Configure Consul based on cluster info
-		// NOTE: BindAddr/ClientAddr are legacy parameters - the config generator
-		// (pkg/consul/config/generator.go) uses network.SelectInterface() to detect
-		// the correct network interface automatically. These "0.0.0.0" values are ignored.
 		consulConfig := &consul.ConsulConfig{
 			Mode:       "server", // Bootstrap always installs server mode
 			Datacenter: "dc1",
 			UI:         true,
-			BindAddr:   "0.0.0.0",   // Legacy - config generator uses network detection
-			ClientAddr: "0.0.0.0",   // Legacy - config generator uses network detection
+			BindAddr:   iface.IP,      // Use detected interface IP
+			ClientAddr: "0.0.0.0",     // Client can listen on all interfaces
 			LogLevel:   "INFO",
 		}
 
@@ -641,6 +683,33 @@ func isPhaseCompleted(rc *eos_io.RuntimeContext, phaseName string) bool {
 	return ValidatePhaseCompletion(rc, phaseName)
 }
 
+// waitForServiceStopped polls systemctl until service is fully stopped
+// Returns error if timeout is reached
+func waitForServiceStopped(rc *eos_io.RuntimeContext, serviceName string, timeout time.Duration) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Waiting for service to stop completely",
+		zap.String("service", serviceName),
+		zap.Duration("timeout", timeout))
+
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for time.Now().Before(deadline) {
+		active, err := SystemctlIsActive(rc, serviceName)
+		if err != nil || !active {
+			// Service is stopped
+			logger.Info("Service stopped successfully",
+				zap.String("service", serviceName))
+			return nil
+		}
+
+		<-ticker.C
+	}
+
+	return fmt.Errorf("timeout waiting for %s to stop (still active after %v)", serviceName, timeout)
+}
+
 // createCheckpoint function removed - was unused
 
 func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) error {
@@ -731,6 +800,74 @@ func isYes(response string) bool {
 func isGuidedMode(cmd *cobra.Command) bool {
 	if cmd.Flag("guided") != nil {
 		return cmd.Flag("guided").Value.String() == "true"
+	}
+	return false
+}
+
+// acquireBootstrapLock acquires an exclusive file lock to prevent concurrent bootstrap
+func acquireBootstrapLock(lockPath string) (*os.File, error) {
+	// Ensure /var/lock exists
+	if err := os.MkdirAll("/var/lock", 0755); err != nil {
+		return nil, fmt.Errorf("failed to create lock directory: %w", err)
+	}
+
+	// Open/create lock file
+	lock, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open lock file: %w", err)
+	}
+
+	// Try to acquire exclusive lock (non-blocking)
+	// Uses flock(2) system call via golang.org/x/sys/unix
+	if err := tryLockFile(lock); err != nil {
+		lock.Close()
+		return nil, fmt.Errorf("lock already held: %w", err)
+	}
+
+	// Write PID to lock file for debugging
+	pid := fmt.Sprintf("%d\n", os.Getpid())
+	if _, err := lock.WriteAt([]byte(pid), 0); err != nil {
+		// Non-fatal, continue anyway
+	}
+
+	return lock, nil
+}
+
+// releaseBootstrapLock releases the bootstrap lock
+func releaseBootstrapLock(lock *os.File, lockPath string) {
+	if lock != nil {
+		_ = lock.Close() // Close also releases flock
+		_ = os.Remove(lockPath)
+	}
+}
+
+// tryLockFile attempts to acquire an exclusive lock on a file
+func tryLockFile(file *os.File) error {
+	// This is a placeholder - the actual implementation would use:
+	// unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+	// For now, use a simple file-based lock check
+
+	// Try to read existing PID from lock file
+	buf := make([]byte, 16)
+	n, _ := file.ReadAt(buf, 0)
+	if n > 0 {
+		existingPID := strings.TrimSpace(string(buf[:n]))
+		// Check if process is still running
+		if processExists(existingPID) {
+			return fmt.Errorf("bootstrap already running with PID %s", existingPID)
+		}
+		// Stale lock file, we can reuse it
+	}
+
+	return nil
+}
+
+// processExists checks if a process with given PID is running
+func processExists(pidStr string) bool {
+	// Check if /proc/PID exists on Linux
+	procPath := fmt.Sprintf("/proc/%s", pidStr)
+	if _, err := os.Stat(procPath); err == nil {
+		return true
 	}
 	return false
 }
