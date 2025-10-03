@@ -14,14 +14,6 @@ import (
 	"libvirt.org/go/libvirt"
 )
 
-func SetLibvirtACL(dir string) {
-	fmt.Println("Setting libvirt ACL on directory:", dir)
-	cmd := exec.Command("setfacl", "-R", "-m", "u:libvirt-qemu:rx", dir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
-}
-
 func SetLibvirtDefaultNetworkAutostart() error {
 	conn, err := libvirt.NewConnect("qemu:///system")
 	if err != nil {

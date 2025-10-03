@@ -17,21 +17,6 @@ import (
 	"libvirt.org/go/libvirt"
 )
 
-// VMInfo contains comprehensive information about a VM
-type VMInfo struct {
-	Name            string
-	UUID            string
-	State           string
-	VCPUs           int
-	MemoryMB        int
-	QEMUVersion     string
-	HostQEMUVersion string
-	DriftDetected   bool
-	UptimeDays      int
-	GuestAgentOK    bool
-	NetworkIPs      []string
-	DiskPaths       []string
-}
 
 // hostQEMUVersionCache caches the host QEMU version to avoid repeated expensive checks
 var hostQEMUVersionCache string
@@ -380,21 +365,6 @@ func getIPFromMAC(mac string) string {
 	}
 
 	return ""
-}
-
-// FilterVMsByState filters VMs by their state
-func FilterVMsByState(vms []VMInfo, state string) []VMInfo {
-	if state == "" {
-		return vms
-	}
-
-	filtered := make([]VMInfo, 0)
-	for _, vm := range vms {
-		if strings.EqualFold(vm.State, state) {
-			filtered = append(filtered, vm)
-		}
-	}
-	return filtered
 }
 
 // FilterVMsWithDrift returns only VMs with QEMU version drift

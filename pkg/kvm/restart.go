@@ -15,27 +15,6 @@ import (
 	"libvirt.org/go/libvirt"
 )
 
-// RestartConfig contains configuration for VM restart operations
-type RestartConfig struct {
-	CreateSnapshot   bool
-	SnapshotName     string
-	ShutdownTimeout  time.Duration
-	SkipSafetyChecks bool
-	WaitForBoot      bool
-	BootTimeout      time.Duration
-}
-
-// DefaultRestartConfig returns a safe default configuration
-func DefaultRestartConfig() *RestartConfig {
-	return &RestartConfig{
-		CreateSnapshot:   false, // Opt-in for safety
-		SnapshotName:     fmt.Sprintf("pre-restart-%d", time.Now().Unix()),
-		ShutdownTimeout:  5 * time.Minute,
-		SkipSafetyChecks: false,
-		WaitForBoot:      true,
-		BootTimeout:      5 * time.Minute,
-	}
-}
 
 // RestartVM safely restarts a VM with health checks
 func RestartVM(ctx context.Context, vmName string, cfg *RestartConfig) error {
