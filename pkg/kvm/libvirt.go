@@ -1,5 +1,3 @@
-// +build libvirt
-
 // pkg/kvm/libvirt.go
 // Libvirt Go bindings helper functions to replace virsh commands
 
@@ -8,8 +6,6 @@ package kvm
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
 
 	"libvirt.org/go/libvirt"
 )
@@ -228,11 +224,11 @@ func GetDomainInfo(ctx context.Context, vmName string) (map[string]interface{}, 
 	uuid, _ := domain.GetUUIDString()
 
 	return map[string]interface{}{
-		"state":      stateToString(state),
-		"max_mem":    info.MaxMem,
-		"memory":     info.Memory,
+		"state":       stateToString(state),
+		"max_mem":     info.MaxMem,
+		"memory":      info.Memory,
 		"nr_virt_cpu": info.NrVirtCpu,
-		"cpu_time":   info.CpuTime,
-		"uuid":       uuid,
+		"cpu_time":    info.CpuTime,
+		"uuid":        uuid,
 	}, nil
 }
