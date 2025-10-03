@@ -1,5 +1,3 @@
-// +build libvirt
-
 // pkg/kvm/restart.go
 // Safe VM restart operations with health checks
 
@@ -224,8 +222,8 @@ func assessVMRestart(ctx context.Context, domain *libvirt.Domain) error {
 func gracefulShutdown(ctx context.Context, domain *libvirt.Domain, timeout time.Duration) error {
 	logger := otelzap.Ctx(ctx)
 
-	// Send ACPI shutdown signal
-	if err := domain.ShutdownFlags(libvirt.DOMAIN_SHUTDOWN_ACPI_POWER_BTN); err != nil {
+	// Send ACPI shutdown signal (explicit type cast required for Go bindings)
+	if err := domain.ShutdownFlags(libvirt.DomainShutdownFlags(libvirt.DOMAIN_SHUTDOWN_ACPI_POWER_BTN)); err != nil {
 		return fmt.Errorf("failed to send shutdown signal: %w", err)
 	}
 

@@ -1,5 +1,3 @@
-// +build libvirt
-
 // pkg/kvm/inventory.go
 // VM inventory management with drift detection
 

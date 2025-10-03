@@ -264,48 +264,31 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		zap.String("temp_path", tempBinary),
 		zap.String("source_dir", "/opt/eos"))
 
-	// Check if libvirt development libraries are available
-	cgoEnabled := "0" // Default to static build
-	buildTags := ""
-
-	// Find pkg-config in PATH (important when running as root via sudo)
+	// Libvirt is now a required dependency for EOS
+	// Verify pkg-config and libvirt are available
 	pkgConfigPath, err := exec.LookPath("pkg-config")
 	if err != nil {
-		logger.Warn("pkg-config not found in PATH - building without libvirt support",
-			zap.Error(err))
-	} else {
-		pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
-		if err := pkgConfigCmd.Run(); err == nil {
-			// libvirt is available, enable CGO for libvirt support
-			cgoEnabled = "1"
-			buildTags = "-tags=libvirt"
-			logger.Info("Libvirt development libraries detected - building with full KVM support",
-				zap.String("pkg_config_path", pkgConfigPath),
-				zap.String("cgo_enabled", cgoEnabled),
-				zap.String("build_tags", "libvirt"))
-		} else {
-			logger.Warn("Libvirt development libraries not found - building with limited KVM features",
-				zap.String("pkg_config_path", pkgConfigPath),
-				zap.Error(err),
-				zap.String("cgo_enabled", cgoEnabled),
-				zap.String("note", "Install libvirt-dev to enable full KVM support"))
-		}
+		return fmt.Errorf("pkg-config not found in PATH - required for building EOS with libvirt: %w", err)
 	}
 
-	// Build command with conditional tags
-	buildArgs := []string{"build"}
-	if buildTags != "" {
-		buildArgs = append(buildArgs, buildTags)
+	pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
+	if err := pkgConfigCmd.Run(); err != nil {
+		return fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel: %w", err)
 	}
-	buildArgs = append(buildArgs, "-o", tempBinary, ".")
+
+	logger.Info("Libvirt development libraries detected - building EOS with KVM support",
+		zap.String("pkg_config_path", pkgConfigPath))
+
+	// Build command - CGO is required for libvirt
+	buildArgs := []string{"build", "-o", tempBinary, "."}
 
 	buildCmd := exec.Command("go", buildArgs...)
 	buildCmd.Dir = "/opt/eos"
 
-	// Set build environment to match current system
+	// Set build environment to match current system - CGO must be enabled for libvirt
 	buildCmd.Env = append(os.Environ(),
-		fmt.Sprintf("CGO_ENABLED=%s", cgoEnabled),
-		"GO111MODULE=on", // Ensure module mode
+		"CGO_ENABLED=1",
+		"GO111MODULE=on",
 	)
 
 	// If we successfully detected architecture, log it

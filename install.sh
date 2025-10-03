@@ -272,7 +272,7 @@ install_github_cli() {
 
 check_libvirt_deps() {
   if $IS_LINUX; then
-    log INFO " Checking for libvirt development dependencies..."
+    log INFO " Checking for libvirt development dependencies (REQUIRED)..."
 
     local missing_deps=()
 
@@ -300,12 +300,12 @@ check_libvirt_deps() {
     fi
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
-      log WARN " Missing libvirt dependencies: ${missing_deps[*]}"
-      log INFO " EOS KVM features require libvirt development libraries"
+      log ERR " Missing REQUIRED libvirt dependencies: ${missing_deps[*]}"
+      log ERR " EOS requires libvirt development libraries to build"
 
       # Only auto-install if running as root
       if [[ "$EUID" -eq 0 ]]; then
-        log INFO " Installing libvirt dependencies..."
+        log INFO " Installing required libvirt dependencies..."
 
         if $IS_DEBIAN; then
           apt-get install -y "${missing_deps[@]}"
@@ -317,21 +317,23 @@ check_libvirt_deps() {
           fi
         fi
 
-        log INFO " Libvirt dependencies installed"
+        log INFO " Libvirt dependencies installed successfully"
       else
-        log WARN " Run as root to auto-install libvirt dependencies, or install manually:"
+        log ERR " Cannot continue without libvirt. Install manually:"
         if $IS_DEBIAN; then
-          log INFO "   sudo apt-get install ${missing_deps[*]}"
+          log ERR "   sudo apt-get install ${missing_deps[*]}"
         elif $IS_RHEL; then
-          log INFO "   sudo yum install ${missing_deps[*]}"
+          log ERR "   sudo yum install ${missing_deps[*]}"
         fi
-        log WARN " Building without libvirt support - KVM features will not be available"
+        exit 1
       fi
     else
-      log INFO " Libvirt dependencies are satisfied"
+      log INFO " All required libvirt dependencies are satisfied"
     fi
   elif $IS_MAC; then
-    log INFO " Skipping libvirt check on macOS (not required for development)"
+    log ERR " EOS cannot be built on macOS - libvirt is required and not available on macOS"
+    log ERR " EOS is designed to run on Linux servers only"
+    exit 1
   fi
 }
 
@@ -416,26 +418,24 @@ backup_existing_binary() {
 }
 
 build_eos_binary() {
-  log INFO " Building Eos..."
+  log INFO " Building Eos with libvirt support..."
   cd "$Eos_SRC_DIR"
 
   # Build to temp location first
   TEMP_BINARY="/tmp/eos-build-$(date +%s)"
 
-  # Check if libvirt is available for CGO
-  CGO_ENABLED=0
-  BUILD_TAGS=""
-  if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libvirt 2>/dev/null; then
-    log INFO " Libvirt development libraries detected - building with KVM support"
-    CGO_ENABLED=1
-    BUILD_TAGS="-tags libvirt"
-  else
-    log INFO " Building without libvirt support (static binary, limited KVM features)"
-    log INFO " To enable full KVM support, install: libvirt-dev libvirt-daemon-system pkg-config"
+  # Libvirt is required - this should have been checked by check_libvirt_deps()
+  # but double-check here for safety
+  if ! command -v pkg-config >/dev/null 2>&1 || ! pkg-config --exists libvirt 2>/dev/null; then
+    log ERR " Libvirt development libraries not found - this should have been caught earlier"
+    log ERR " Cannot build EOS without libvirt. Please run: sudo apt-get install libvirt-dev libvirt-daemon-system pkg-config"
+    exit 1
   fi
 
-  # Build with appropriate CGO setting and build tags
-  CGO_ENABLED=$CGO_ENABLED GO111MODULE=on go build $BUILD_TAGS -o "$TEMP_BINARY" .
+  log INFO " Building with CGO enabled for libvirt"
+
+  # Build with CGO enabled (required for libvirt)
+  CGO_ENABLED=1 GO111MODULE=on go build -o "$TEMP_BINARY" .
 
   if [ $? -ne 0 ]; then
     log ERR " Build failed"

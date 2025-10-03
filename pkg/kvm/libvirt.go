@@ -169,7 +169,8 @@ func ShutdownDomain(ctx context.Context, vmName string) error {
 	}
 	defer domain.Free()
 
-	if err := domain.ShutdownFlags(libvirt.DOMAIN_SHUTDOWN_ACPI_POWER_BTN); err != nil {
+	// Use explicit type cast for libvirt constant (required for Go bindings)
+	if err := domain.ShutdownFlags(libvirt.DomainShutdownFlags(libvirt.DOMAIN_SHUTDOWN_ACPI_POWER_BTN)); err != nil {
 		return fmt.Errorf("failed to shutdown domain: %w", err)
 	}
 

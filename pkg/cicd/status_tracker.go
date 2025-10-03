@@ -477,16 +477,16 @@ func extractExecutionID(key string) string {
 
 // generateSummary creates a human-readable summary
 func (st *StatusTracker) generateSummary(report *StatusReport) []byte {
-	summary := fmt.Sprintf("Pipeline Execution Report\n")
-	summary += fmt.Sprintf("========================\n")
+	summary := "Pipeline Execution Report\n"
+	summary += "========================\n"
 	summary += fmt.Sprintf("Execution ID: %s\n", report.ExecutionID)
 	summary += fmt.Sprintf("Pipeline ID:  %s\n", report.PipelineID)
 	summary += fmt.Sprintf("Status:       %s\n", report.Status)
 	summary += fmt.Sprintf("Duration:     %s\n", report.Duration)
 	summary += fmt.Sprintf("Progress:     %.1f%% (%s)\n", report.Progress.Percentage, report.Progress.Description)
-	summary += fmt.Sprintf("\nStages:\n")
-	summary += fmt.Sprintf("-------\n")
-	
+	summary += "\nStages:\n"
+	summary += "-------\n"
+
 	for _, stage := range report.Stages {
 		status := string(stage.Status)
 		if stage.Error != "" {
@@ -494,10 +494,10 @@ func (st *StatusTracker) generateSummary(report *StatusReport) []byte {
 		}
 		summary += fmt.Sprintf("  %-20s %s\n", stage.Name+":", status)
 	}
-	
+
 	if len(report.RecentEvents) > 0 {
-		summary += fmt.Sprintf("\nRecent Events:\n")
-		summary += fmt.Sprintf("--------------\n")
+		summary += "\nRecent Events:\n"
+		summary += "--------------\n"
 		for _, event := range report.RecentEvents {
 			summary += fmt.Sprintf("%s [%s] %s: %s\n",
 				event.Timestamp.Format("15:04:05"),
