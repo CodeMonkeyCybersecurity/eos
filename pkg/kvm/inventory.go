@@ -266,16 +266,22 @@ func getVMUptime(domain *libvirt.Domain) int {
 
 // checkGuestAgent checks if QEMU guest agent is responsive
 func checkGuestAgent(domain *libvirt.Domain) bool {
-	// Conservative check: The guest agent cannot be reliably detected via
-	// libvirt Go bindings without CGO constants that may not be available.
-	//
-	// A proper check would use:
-	// - domain.QemuAgentCommand() to ping the agent
-	// - domain.GetInterfaceAddresses() with DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT
-	//
-	// For now, we return false (conservative) to avoid false positives.
-	// Users should verify guest agent manually with: virsh qemu-agent-command <vm> '{"execute":"guest-ping"}'
-	return false
+	// Check if domain is running first (guest agent only works on running VMs)
+	state, _, err := domain.GetState()
+	if err != nil || state != libvirt.DOMAIN_RUNNING {
+		return false
+	}
+
+	// Try to ping the guest agent with a short timeout
+	// The guest-ping command should return immediately if the agent is responsive
+	result, err := domain.QemuAgentCommand(`{"execute":"guest-ping"}`, libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT, 0)
+	if err != nil {
+		// Guest agent not available or not responsive
+		return false
+	}
+
+	// Check if we got a valid response (should be {"return":{}})
+	return result != "" && (result == `{"return":{}}` || result == `{"return": {}}`)
 }
 
 // getVMIPs retrieves network IP addresses for the VM with retry logic

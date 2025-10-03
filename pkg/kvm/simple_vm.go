@@ -491,6 +491,7 @@ func launchVM(config SimpleVMConfig, diskPath, seedPath string, logger *otelzap.
 		"--virt-type", "kvm",
 		"--import",
 		"--network", fmt.Sprintf("network=%s", config.Network),
+		"--channel", "unix,target_type=virtio,name=org.qemu.guest_agent.0",
 		"--graphics", "none",
 		"--noautoconsole",
 		"--autostart",

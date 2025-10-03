@@ -290,6 +290,7 @@ func (om *OrchestratedVMManager) createVMWithVirsh(vmName, _ /* ip */, cloudInit
 		"--disk", fmt.Sprintf("path=%s,device=cdrom", seedPath),
 		"--os-variant", "ubuntu24.04",
 		"--network", "network=default",
+		"--channel", "unix,target_type=virtio,name=org.qemu.guest_agent.0",
 		"--graphics", "none",
 		"--console", "pty,target_type=serial",
 		"--import",
