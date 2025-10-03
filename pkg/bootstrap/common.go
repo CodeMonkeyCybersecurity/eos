@@ -719,21 +719,31 @@ func SystemctlStop(rc *eos_io.RuntimeContext, serviceName string) error {
 	// CRITICAL: systemctl stop is ASYNCHRONOUS - poll until service actually stops
 	// Without this, we return immediately but service is still shutting down
 	// This causes race conditions when we modify config files the service is still using
-	deadline := time.Now().Add(10 * time.Second)
+	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
+	defer cancel()
+
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
-	for time.Now().Before(deadline) {
-		active, err := SystemctlIsActive(rc, serviceName)
-		if err != nil || !active {
-			logger.Info("Service stopped successfully",
-				zap.String("service", serviceName))
-			return nil
-		}
-		<-ticker.C
-	}
+	for {
+		select {
+		case <-ctx.Done():
+			// Check if timeout or context cancelled
+			if ctx.Err() == context.DeadlineExceeded {
+				return fmt.Errorf("service %s did not stop within 10 seconds (still active)", serviceName)
+			}
+			// User cancelled (Ctrl-C)
+			return fmt.Errorf("service stop cancelled by user: %w", ctx.Err())
 
-	return fmt.Errorf("service %s did not stop within 10 seconds (still active)", serviceName)
+		case <-ticker.C:
+			active, err := SystemctlIsActive(rc, serviceName)
+			if err != nil || !active {
+				logger.Info("Service stopped successfully",
+					zap.String("service", serviceName))
+				return nil
+			}
+		}
+	}
 }
 
 // SystemctlRestart restarts a service

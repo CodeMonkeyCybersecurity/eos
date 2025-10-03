@@ -415,14 +415,10 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 			// This prevents race condition between systemd restarts and our config changes
 			if health.Running || health.Enabled {
 				logger.Info("Stopping unhealthy Consul service before reconfiguration")
+				// SystemctlStop now polls internally until service stops, no need for waitForServiceStopped
 				if err := SystemctlStop(rc, "consul"); err != nil {
 					// FAIL HARD - if we can't stop the service, we'll race with it
 					return fmt.Errorf("failed to stop Consul service before reconfiguration: %w\nRemediation: Manually stop with 'systemctl stop consul' and retry", err)
-				}
-
-				// Poll until service is fully stopped (no hard-coded sleep)
-				if err := waitForServiceStopped(rc, "consul", 10*time.Second); err != nil {
-					return fmt.Errorf("service stop verification failed: %w", err)
 				}
 			}
 		}
@@ -867,19 +863,14 @@ func tryLockFile(file *os.File) error {
 				return fmt.Errorf("bootstrap already running with PID %s", existingPID)
 			}
 
-			// CRITICAL: PID doesn't exist → process crashed → flock is released
-			// Try to acquire lock again (should succeed now)
-			if err := unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
-				// Still can't acquire? Someone else got it
-				return fmt.Errorf("lock was stale (PID %s not running) but another process acquired it", existingPID)
-			}
-
-			// We got the lock after detecting stale PID
-			// Fall through to write our PID
-		} else {
-			// No PID in file but lock is held
-			return fmt.Errorf("bootstrap lock is held by another process")
+			// CRITICAL: PID doesn't exist → process crashed → flock SHOULD be released
+			// But we're seeing EWOULDBLOCK, which means someone else has it
+			// This is a race - the crashed process released it, another process grabbed it
+			return fmt.Errorf("lock was held by crashed process (PID %s not running), but another process acquired it before us\nRetry in a few seconds", existingPID)
 		}
+
+		// No PID in file but lock is held
+		return fmt.Errorf("bootstrap lock is held by another process")
 	}
 
 	// Lock acquired successfully

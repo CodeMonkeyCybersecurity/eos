@@ -193,6 +193,20 @@ watches = [
 		zap.String("config_preview", configPreview),
 		zap.Int("total_lines", len(configLines)))
 
+	// CRITICAL: Check if config changed before writing
+	// Avoids unnecessary disk writes and config reloads
+	if existingConfig, err := os.ReadFile(configPath); err == nil {
+		if string(existingConfig) == config {
+			log.Info("Configuration unchanged, skipping write",
+				zap.String("path", configPath))
+			return nil
+		}
+		log.Info("Configuration changed, will update",
+			zap.String("path", configPath),
+			zap.Int("old_size", len(existingConfig)),
+			zap.Int("new_size", len(config)))
+	}
+
 	// CRITICAL: Write and sync to disk to prevent corruption on power loss
 	// Without fsync, file might be partially written in kernel buffers during crash
 	file, err := os.OpenFile(configPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0640)

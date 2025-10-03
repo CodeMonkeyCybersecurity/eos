@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/systemd"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -198,12 +199,17 @@ func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated
 		}
 
 		// Wait for service to fully stop before proceeding
+		// Use consistent polling pattern with SystemctlStop
 		deadline := time.Now().Add(5 * time.Second)
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+
 		for time.Now().Before(deadline) {
 			if !ci.systemd.IsActive() {
+				ci.logger.Info("Service stopped during rollback")
 				break
 			}
-			time.Sleep(200 * time.Millisecond)
+			<-ticker.C
 		}
 
 		// Remove systemd service file
@@ -221,6 +227,11 @@ func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated
 			ci.logger.Warn("Failed to reload systemd during rollback",
 				zap.Error(err),
 				zap.String("output", output))
+		} else {
+			// CRITICAL: daemon-reload is async - systemd scans /etc/systemd/system/
+			// If we immediately delete files, systemd might see partial state
+			ci.logger.Debug("Waiting for daemon-reload to complete")
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
@@ -792,46 +803,13 @@ func (ci *ConsulInstaller) generateHCLConfig() string {
 // setupService configures and starts the Consul systemd service
 func (ci *ConsulInstaller) setupService() error {
 	ci.logger.Info("Setting up Consul systemd service")
-	
-	// Create systemd service file
-	binaryPath := ci.config.BinaryPath
-	if ci.config.UseRepository {
-		// Repository installation puts binary in /usr/bin
-		binaryPath = "/usr/bin/consul"
-	}
-	
-	serviceContent := fmt.Sprintf(`[Unit]
-Description=Consul
-Documentation=https://www.consul.io/
-Requires=network-online.target
-After=network-online.target
-ConditionFileNotEmpty=/etc/consul.d/consul.hcl
 
-[Service]
-Type=simple
-User=consul
-Group=consul
-ExecStart=%s agent -config-dir=/etc/consul.d/
-ExecReload=/bin/kill -HUP $MAINPID
-KillMode=process
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=65536
+	// CRITICAL: Use systemd/service.go which has proper fsync implementation
+	// The old inline writeFile() doesn't sync to disk, causing corruption on power loss
+	if err := systemd.CreateService(ci.rc); err != nil {
+		return fmt.Errorf("failed to create systemd service: %w", err)
+	}
 
-[Install]
-WantedBy=multi-user.target
-`, binaryPath)
-	
-	servicePath := "/etc/systemd/system/consul.service"
-	if err := ci.writeFile(servicePath, []byte(serviceContent), 0644); err != nil {
-		return fmt.Errorf("failed to create service file: %w", err)
-	}
-	
-	// Reload systemd
-	if err := ci.runner.Run("systemctl", "daemon-reload"); err != nil {
-		return fmt.Errorf("failed to reload systemd: %w", err)
-	}
-	
 	// Enable service
 	if err := ci.systemd.Enable(); err != nil {
 		return fmt.Errorf("failed to enable service: %w", err)
