@@ -88,18 +88,22 @@ func (sm *ServiceManager) DetectServices() ([]Service, error) {
 	services := []Service{}
 
 	// Get all systemd services that might be relevant
+	logger.Debug("Calling getSystemdServices()")
 	systemdServices, err := sm.getSystemdServices()
 	if err != nil {
 		logger.Warn("Failed to get systemd services", zap.Error(err))
 	} else {
+		logger.Debug("getSystemdServices() completed", zap.Int("count", len(systemdServices)))
 		services = append(services, systemdServices...)
 	}
 
 	// Get services detected by port usage
+	logger.Debug("Calling getServicesFromPorts()")
 	portServices, err := sm.getServicesFromPorts()
 	if err != nil {
 		logger.Warn("Failed to get services from ports", zap.Error(err))
 	} else {
+		logger.Debug("getServicesFromPorts() completed", zap.Int("count", len(portServices)))
 		// Merge port-detected services with systemd services
 		services = sm.mergeServices(services, portServices)
 	}
