@@ -3,7 +3,64 @@
 
 package kvm
 
-import "time"
+import (
+	"path/filepath"
+	"time"
+)
+
+// Configuration variables for KVM tenant VMs
+var (
+	// UserProvidedVMName allows custom VM naming (flag-based)
+	UserProvidedVMName string
+
+	// VmPrefix is the default prefix for auto-generated VM names
+	VmPrefix = "tenant-"
+
+	// TenantDistro specifies which distribution to use for tenant VMs
+	TenantDistro = "centos-stream9"
+
+	// ImageDir is where VM disk images are stored
+	ImageDir = "/var/lib/libvirt/images"
+
+	// VmBaseIDFile tracks the next available VM ID for auto-naming
+	VmBaseIDFile = filepath.Join(ImageDir, ".vm_id_counter")
+
+	// SshKeyOverride allows specifying a custom SSH key path
+	SshKeyOverride string
+
+	// IsoPathOverride allows specifying a custom ISO path
+	IsoPathOverride string
+
+	// IsoDefaultPath is the default ISO location for CentOS Stream 9
+	IsoDefaultPath = "/srv/iso/CentOS-Stream-9-latest-x86_64-boot.iso"
+)
+
+// CloudInitConfig represents cloud-init configuration
+type CloudInitConfig struct {
+	VMName        string
+	Hostname      string
+	PublicKey     string
+	SSHPublicKey  string
+	UserData      string
+	MetaData      string
+	NetworkConfig string
+	CloudImg      string
+	DiskSizeGB    int
+	UseUEFI       bool
+}
+
+// VMEntry represents a VM entry for network management
+type VMEntry struct {
+	Name       string
+	DomainName string
+	State      string
+	Network    string
+	MACAddress string
+	Protocol   string
+	IPAddress  string
+	IP         string // Alias for IPAddress
+	MAC        string // Alias for MACAddress
+}
 
 // VMInfo contains comprehensive information about a VM
 type VMInfo struct {
