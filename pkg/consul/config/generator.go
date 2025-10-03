@@ -193,11 +193,28 @@ watches = [
 		zap.String("config_preview", configPreview),
 		zap.Int("total_lines", len(configLines)))
 
-	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
+	// CRITICAL: Write and sync to disk to prevent corruption on power loss
+	// Without fsync, file might be partially written in kernel buffers during crash
+	file, err := os.OpenFile(configPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0640)
+	if err != nil {
+		return fmt.Errorf("failed to open config file for writing: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(config); err != nil {
 		return fmt.Errorf("failed to write consul config: %w", err)
 	}
 
-	// Force correct permissions (WriteFile may be affected by umask)
+	// Sync to disk before closing - ensures data is persisted
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync config to disk: %w", err)
+	}
+
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close config file: %w", err)
+	}
+
+	// Force correct permissions (may be affected by umask)
 	if err := os.Chmod(configPath, 0640); err != nil {
 		return fmt.Errorf("failed to set config permissions: %w", err)
 	}

@@ -53,9 +53,11 @@ WantedBy=multi-user.target`, shared.PortConsul)
 
 	// CRITICAL: Backup existing unit file before overwrite
 	// This prevents loss of custom systemd configurations
+	var backupPath string
+	backupCreated := false
 	if _, err := os.Stat(servicePath); err == nil {
 		// File exists, create backup
-		backupPath := fmt.Sprintf("%s.backup.%d", servicePath, time.Now().Unix())
+		backupPath = fmt.Sprintf("%s.backup.%d", servicePath, time.Now().Unix())
 		log.Info("Backing up existing systemd unit file",
 			zap.String("original", servicePath),
 			zap.String("backup", backupPath))
@@ -67,11 +69,48 @@ WantedBy=multi-user.target`, shared.PortConsul)
 		} else {
 			log.Info("Systemd unit file backed up successfully",
 				zap.String("backup", backupPath))
+			backupCreated = true
 		}
 	}
 
-	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
+	// Defer restore backup if service creation fails
+	serviceComplete := false
+	defer func() {
+		if !serviceComplete && backupCreated {
+			log.Warn("Service creation failed, restoring backup unit file",
+				zap.String("backup", backupPath),
+				zap.String("original", servicePath))
+			if err := backupFile(backupPath, servicePath); err != nil {
+				log.Error("Failed to restore backup unit file",
+					zap.String("backup", backupPath),
+					zap.Error(err))
+			} else {
+				log.Info("Backup unit file restored successfully")
+				// Reload systemd with restored file
+				execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
+			}
+		}
+	}()
+
+	// CRITICAL: Write and sync systemd unit file to prevent corruption
+	// Without fsync, service might not exist after reboot/crash
+	file, err := os.OpenFile(servicePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open service file for writing: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(serviceContent); err != nil {
 		return fmt.Errorf("failed to write systemd service: %w", err)
+	}
+
+	// Sync to disk before daemon-reload
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync service file to disk: %w", err)
+	}
+
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close service file: %w", err)
 	}
 
 	// Reload systemd
@@ -122,6 +161,7 @@ WantedBy=multi-user.target`, shared.PortConsul)
 		zap.String("path", servicePath),
 		zap.Int("consul_port", shared.PortConsul))
 
+	serviceComplete = true // Mark as complete to prevent backup restore
 	return nil
 }
 

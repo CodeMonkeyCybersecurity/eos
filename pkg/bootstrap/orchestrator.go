@@ -866,20 +866,44 @@ func tryLockFile(file *os.File) error {
 			if processExists(existingPID) {
 				return fmt.Errorf("bootstrap already running with PID %s", existingPID)
 			}
-			return fmt.Errorf("bootstrap lock held by process (PID in lock file: %s, may be stale)", existingPID)
-		}
 
-		return fmt.Errorf("bootstrap lock is held by another process")
+			// CRITICAL: PID doesn't exist → process crashed → flock is released
+			// Try to acquire lock again (should succeed now)
+			if err := unix.Flock(int(file.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+				// Still can't acquire? Someone else got it
+				return fmt.Errorf("lock was stale (PID %s not running) but another process acquired it", existingPID)
+			}
+
+			// We got the lock after detecting stale PID
+			// Fall through to write our PID
+		} else {
+			// No PID in file but lock is held
+			return fmt.Errorf("bootstrap lock is held by another process")
+		}
 	}
 
 	// Lock acquired successfully
-	// Truncate file and write our PID
-	if err := file.Truncate(0); err != nil {
-		return fmt.Errorf("failed to truncate lock file: %w", err)
+	// Write our PID atomically using pwrite (WriteAt with O_TRUNC equivalent)
+	// Seek to start and truncate
+	if _, err := file.Seek(0, 0); err != nil {
+		// Non-fatal - lock is held, PID write is just for debugging
+		return nil
 	}
 
+	if err := file.Truncate(0); err != nil {
+		// Non-fatal - lock is held, PID write is just for debugging
+		return nil
+	}
+
+	// Write PID
 	pid := fmt.Sprintf("%d\n", os.Getpid())
-	if _, err := file.WriteAt([]byte(pid), 0); err != nil {
+	if _, err := file.WriteString(pid); err != nil {
+		// Non-fatal - lock is held, PID write is just for debugging
+		return nil
+	}
+
+	// Sync to disk to ensure PID is visible to other processes
+	if err := file.Sync(); err != nil {
 		// Non-fatal - lock is held, PID write is just for debugging
 		return nil
 	}

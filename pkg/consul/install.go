@@ -188,11 +188,22 @@ func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated
 		zap.Bool("config_created", configCreated),
 		zap.Bool("service_created", serviceCreated))
 
-	// Stop service if it was created
+	// CRITICAL: Stop service FIRST before deleting anything
+	// If service is running, it might be reading config files → crash if we delete them
 	if serviceCreated {
 		ci.logger.Info("Stopping service created during failed installation")
 		if err := ci.systemd.Stop(); err != nil {
 			ci.logger.Warn("Failed to stop service during rollback", zap.Error(err))
+			// Continue anyway - we need to clean up
+		}
+
+		// Wait for service to fully stop before proceeding
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			if !ci.systemd.IsActive() {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
 		}
 
 		// Remove systemd service file
@@ -213,7 +224,7 @@ func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated
 		}
 	}
 
-	// Remove config if it was created
+	// Remove config if it was created (service is already stopped above)
 	if configCreated {
 		ci.logger.Info("Removing configuration created during failed installation")
 		configPaths := []string{
@@ -701,6 +712,21 @@ func (ci *ConsulInstaller) configure() error {
 		return fmt.Errorf("failed to generate configuration: %w", err)
 	}
 
+	// CRITICAL: Verify binary version before validating config
+	// Old binary might accept deprecated config that newer versions reject (or vice versa)
+	ci.logger.Info("Verifying Consul binary version")
+	versionOutput, err := ci.runner.RunOutput(ci.config.BinaryPath, "version")
+	if err != nil {
+		ci.logger.Warn("Failed to check Consul version",
+			zap.Error(err),
+			zap.String("binary", ci.config.BinaryPath))
+		// Continue anyway - validation will catch issues
+	} else {
+		ci.logger.Info("Consul binary version",
+			zap.String("version_output", versionOutput),
+			zap.String("binary", ci.config.BinaryPath))
+	}
+
 	// Validate configuration
 	ci.logger.Info("Validating Consul configuration")
 	output, err := ci.runner.RunOutput(ci.config.BinaryPath, "validate", "/etc/consul.d")
@@ -714,8 +740,9 @@ func (ci *ConsulInstaller) configure() error {
 	if err != nil {
 		ci.logger.Error("Consul configuration validation failed",
 			zap.Error(err),
-			zap.String("output", output))
-		return fmt.Errorf("configuration validation failed: %w (output: %s)", err, output)
+			zap.String("output", output),
+			zap.String("binary_version", versionOutput))
+		return fmt.Errorf("configuration validation failed with binary %s: %w (output: %s)", ci.config.BinaryPath, err, output)
 	}
 
 	ci.logger.Info("Consul configuration validation succeeded")

@@ -479,9 +479,11 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	failureCount := 0
+	// Track failures across ENTIRE wait period, not just consecutive
+	totalFailures := 0
 	attempts := 0
-	maxAttempts := 30 // Fail fast after 30 attempts (60 seconds) even if not explicitly "failed"
+	maxAttempts := 30 // Fail fast after 30 attempts (60 seconds)
+	maxFailures := 5  // Fail if we see 5 failures during entire wait (restart loop)
 
 	for {
 		select {
@@ -489,7 +491,8 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 			// Timeout - capture journalctl logs to show WHY service failed
 			logger.Error("Service failed to become ready, capturing logs",
 				zap.String("service", serviceName),
-				zap.Int("attempts", attempts))
+				zap.Int("attempts", attempts),
+				zap.Int("total_failures", totalFailures))
 
 			if logs := captureServiceLogs(rc, serviceName, 50); logs != "" {
 				logger.Error("Service failure logs from journalctl",
@@ -497,7 +500,7 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 					zap.String("logs", logs))
 			}
 
-			return fmt.Errorf("timeout waiting for %s to be ready after %d attempts (check logs above for details)", serviceName, attempts)
+			return fmt.Errorf("timeout waiting for %s to be ready after %d attempts (%d failures detected, check logs above)", serviceName, attempts, totalFailures)
 		case <-ticker.C:
 			attempts++
 
@@ -507,7 +510,8 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 				logger.Error("Service failed to become ready within attempt limit",
 					zap.String("service", serviceName),
 					zap.Int("attempts", attempts),
-					zap.Int("max_attempts", maxAttempts))
+					zap.Int("max_attempts", maxAttempts),
+					zap.Int("total_failures", totalFailures))
 
 				if logs := captureServiceLogs(rc, serviceName, 50); logs != "" {
 					logger.Error("Service logs after max attempts",
@@ -522,21 +526,28 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 			if err == nil && health.Healthy {
 				logger.Info("Service is ready",
 					zap.String("service", serviceName),
-					zap.Int("attempts", attempts))
+					zap.Int("attempts", attempts),
+					zap.Int("failures_seen", totalFailures))
 				return nil
 			}
 
-			// Check if service is in failed state (crash loop)
+			// CRITICAL: Track failures across ENTIRE wait period
+			// Service can crash, restart (inactive for 5s due to RestartSec), crash again
+			// We need to detect this pattern, not just consecutive failures
 			status, _ := SystemctlGetStatus(rc, serviceName)
 			if strings.Contains(strings.ToLower(status), "failed") ||
 			   strings.Contains(strings.ToLower(status), "exit-code") {
-				failureCount++
+				totalFailures++
+				logger.Warn("Service failure detected",
+					zap.String("service", serviceName),
+					zap.Int("total_failures", totalFailures),
+					zap.Int("max_failures", maxFailures))
 
-				// After 3 consecutive failures (6 seconds), capture logs immediately
-				if failureCount >= 3 {
-					logger.Error("Service repeatedly failing, capturing logs",
+				// If we've seen too many failures (even non-consecutive), it's crash looping
+				if totalFailures >= maxFailures {
+					logger.Error("Service is crash looping (multiple failures detected)",
 						zap.String("service", serviceName),
-						zap.Int("failure_count", failureCount))
+						zap.Int("total_failures", totalFailures))
 
 					if logs := captureServiceLogs(rc, serviceName, 50); logs != "" {
 						logger.Error("Service crash logs from journalctl",
@@ -544,10 +555,8 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 							zap.String("logs", logs))
 					}
 
-					return fmt.Errorf("%s is in failed state (crashed %d times, check logs above)", serviceName, failureCount)
+					return fmt.Errorf("%s is crash looping (%d failures during wait period, check logs above)", serviceName, totalFailures)
 				}
-			} else {
-				failureCount = 0 // Reset if service is not failing
 			}
 
 			if health != nil && len(health.Errors) > 0 {
