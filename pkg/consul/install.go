@@ -458,34 +458,64 @@ func (ci *ConsulInstaller) configure() error {
 	needsReconfiguration := false
 
 	// Check ALL .hcl files in config directory for deprecated directives
-	if entries, err := os.ReadDir(configDir); err == nil {
+	ci.logger.Info("Scanning config directory for stale configurations",
+		zap.String("config_dir", configDir))
+
+	entries, err := os.ReadDir(configDir)
+	if err != nil {
+		ci.logger.Warn("Failed to read config directory",
+			zap.String("config_dir", configDir),
+			zap.Error(err))
+	} else {
+		ci.logger.Info("Found config directory entries",
+			zap.Int("count", len(entries)))
+
 		for _, entry := range entries {
+			ci.logger.Debug("Checking directory entry",
+				zap.String("name", entry.Name()),
+				zap.Bool("is_dir", entry.IsDir()))
+
 			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".hcl") {
 				continue
 			}
 
 			fullPath := filepath.Join(configDir, entry.Name())
-			if configContent, err := os.ReadFile(fullPath); err == nil {
-				configStr := string(configContent)
-				if strings.Contains(configStr, "log_file") {
-					ci.logger.Warn("Detected deprecated log_file directive in config file",
-						zap.String("config_file", fullPath))
-					needsReconfiguration = true
+			ci.logger.Info("Scanning HCL file for deprecated directives",
+				zap.String("file", fullPath))
 
-					// Backup and remove the stale config file
-					ci.logger.Info("Removing stale config file with deprecated directives",
-						zap.String("config_file", fullPath))
-					if err := ci.files.BackupFile(fullPath); err != nil {
-						ci.logger.Warn("Failed to backup stale config",
-							zap.String("file", fullPath),
-							zap.Error(err))
-					}
-					if err := os.Remove(fullPath); err != nil {
-						ci.logger.Warn("Failed to remove stale config",
-							zap.String("file", fullPath),
-							zap.Error(err))
-					}
+			configContent, err := os.ReadFile(fullPath)
+			if err != nil {
+				ci.logger.Warn("Failed to read config file",
+					zap.String("file", fullPath),
+					zap.Error(err))
+				continue
+			}
+
+			configStr := string(configContent)
+			if strings.Contains(configStr, "log_file") {
+				ci.logger.Warn("Detected deprecated log_file directive in config file",
+					zap.String("config_file", fullPath))
+				needsReconfiguration = true
+
+				// Backup and remove the stale config file
+				ci.logger.Info("Removing stale config file with deprecated directives",
+					zap.String("config_file", fullPath))
+				if err := ci.files.BackupFile(fullPath); err != nil {
+					ci.logger.Warn("Failed to backup stale config",
+						zap.String("file", fullPath),
+						zap.Error(err))
 				}
+				if err := os.Remove(fullPath); err != nil {
+					ci.logger.Warn("Failed to remove stale config",
+						zap.String("file", fullPath),
+						zap.Error(err))
+				} else {
+					ci.logger.Info("Successfully removed stale config file",
+						zap.String("file", fullPath))
+				}
+			} else {
+				ci.logger.Debug("Config file does not contain log_file directive",
+					zap.String("file", fullPath))
 			}
 		}
 	}
