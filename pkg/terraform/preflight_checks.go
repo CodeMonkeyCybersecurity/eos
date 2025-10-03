@@ -99,7 +99,7 @@ func checkSystemRequirements(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 	}
 	
 	// Check disk space (need at least 500MB for Terraform + providers)
-	diskSpace, err := getAvailableDiskSpace("/usr/local/bin")
+	diskSpace, err := getAvailableDiskSpace(rc.Ctx, "/usr/local/bin")
 	if err == nil {
 		result.AvailableDiskSpaceMB = diskSpace
 		if diskSpace < 500 {
@@ -433,8 +433,8 @@ func fileExists(path string) bool {
 }
 
 // getAvailableDiskSpace returns available disk space in MB for the given path
-func getAvailableDiskSpace(path string) (int64, error) {
-	output, err := execute.Run(context.TODO(), execute.Options{
+func getAvailableDiskSpace(ctx context.Context, path string) (int64, error) {
+	output, err := execute.Run(ctx, execute.Options{
 		Command: "df",
 		Args:    []string{"-m", path},
 		Capture: true,

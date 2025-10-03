@@ -4,7 +4,6 @@ package container
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -150,7 +149,7 @@ func ComposeUp(rc *eos_io.RuntimeContext, path string) error {
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "-f", path, "up", "-d"},
-		Ctx:     context.TODO(),
+		// Context already passed via rc.Ctx in Run() call above
 	})
 	return cerr.WithHint(err, "Failed to run docker compose up")
 }

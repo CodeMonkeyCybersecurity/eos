@@ -1209,8 +1209,17 @@ func (ci *ConsulInstaller) waitForPortsReleased(ports []int, timeout time.Durati
 func (ci *ConsulInstaller) createDirectory(path string, mode os.FileMode) error {
 	// CRITICAL: Check if path is on network mount before creating
 	// Network mounts can cause data loss during network outages
-	isNetwork := isNetworkMount(path)
-	if isNetwork {
+	isNetwork, err := isNetworkMount(path)
+	if err != nil {
+		// FAIL-CLOSED: If we can't check filesystem type, block critical directories
+		if path == "/opt/consul" || path == "/var/lib/consul" {
+			return fmt.Errorf("cannot verify filesystem type for critical Consul directory: %w", err)
+		}
+		// Warn for non-critical directories but allow
+		ci.logger.Warn("Cannot verify filesystem type, proceeding with caution",
+			zap.String("path", path),
+			zap.Error(err))
+	} else if isNetwork {
 		ci.logger.Error("Directory is on network mount - Consul data will be lost during network outages",
 			zap.String("path", path),
 			zap.String("filesystem_type", "network"),
@@ -1353,24 +1362,33 @@ func (ci *ConsulInstaller) downloadFileWithWget(url, dest string) error {
 func (ci *ConsulInstaller) httpGet(url string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 10*time.Second)
 	defer cancel()
-	
+
 	// Create HTTP request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP GET request failed for %s: %w", url, err)
 	}
-	defer resp.Body.Close()
-	
+
+	// CRITICAL: Handle body close properly with error checking
+	// Network errors can cause Close() to fail and leak connections
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			ci.logger.Warn("Failed to close HTTP response body",
+				zap.String("url", url),
+				zap.Error(closeErr))
+		}
+	}()
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d: %s for URL %s", resp.StatusCode, resp.Status, url)
 	}
-	
+
 	return io.ReadAll(resp.Body)
 }
 
@@ -1455,15 +1473,17 @@ func (ci *ConsulInstaller) findConsulProcesses() ([]string, error) {
 
 // isNetworkMount checks if a path is on a network-mounted filesystem
 // Network mounts (NFS, CIFS/SMB, etc.) can cause data loss during network outages
-func isNetworkMount(path string) bool {
+func isNetworkMount(path string) (bool, error) {
 	// Use findmnt to check mount point type (works on all modern Linux)
 	cmd := exec.Command("findmnt", "-n", "-o", "FSTYPE", "-T", path)
 	output, err := cmd.Output()
 	if err != nil {
 		// CRITICAL: If findmnt fails, we can't verify filesystem type
-		// Fail-closed: warn loudly but don't block (might be busybox/old system)
-		// This is logged at WARN level so ops teams see it
-		return false // Conservative: assume local, but log warning in caller
+		// FAIL-CLOSED: Return error to prevent data loss on network mounts
+		// Caller should handle this and either:
+		// 1. Skip network mount check (with explicit --allow-network-mount flag)
+		// 2. Fail the operation (safer default)
+		return false, fmt.Errorf("failed to check filesystem type: %w\nInstall 'findmnt' or use --allow-network-mount to skip this check", err)
 	}
 
 	fsType := strings.TrimSpace(string(output))
@@ -1481,11 +1501,11 @@ func isNetworkMount(path string) bool {
 
 	for _, nfs := range networkFS {
 		if fsType == nfs {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // Legacy function for backward compatibility

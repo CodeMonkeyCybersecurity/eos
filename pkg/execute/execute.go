@@ -75,7 +75,30 @@ func Run(ctx context.Context, opts Options) (string, error) {
 	var output string
 	var err error
 
-	for i := 1; i <= max(1, opts.Retries); i++ {
+	// Setup retry configuration with defaults
+	maxRetries := max(1, opts.Retries)
+	useBackoff := opts.ExponentialBackoff || (opts.Retries > 1 && !opts.ExponentialBackoff) // default true if retries > 1
+	initialDelay := opts.Delay
+	if initialDelay == 0 {
+		initialDelay = 100 * time.Millisecond // sensible default
+	}
+
+	// Setup retry timeout context if specified
+	retryCtx := rc
+	var retryCancel context.CancelFunc
+	if opts.MaxRetryTimeout > 0 {
+		retryCtx, retryCancel = context.WithTimeout(rc, opts.MaxRetryTimeout)
+		defer retryCancel()
+	}
+
+	retryStartTime := time.Now()
+
+	for i := 1; i <= maxRetries; i++ {
+		// Check if retry timeout exceeded
+		if opts.MaxRetryTimeout > 0 && time.Since(retryStartTime) >= opts.MaxRetryTimeout {
+			return output, cerr.Wrapf(err, "retry timeout exceeded after %v", opts.MaxRetryTimeout)
+		}
+
 		var cmd *exec.Cmd
 		if opts.Shell {
 			// SECURITY: Shell mode is dangerous and should be avoided
@@ -83,7 +106,7 @@ func Run(ctx context.Context, opts Options) (string, error) {
 				zap.String("command", opts.Command))
 			return "", fmt.Errorf("shell execution mode disabled for security - use Args instead")
 		} else {
-			cmd = exec.CommandContext(rc, opts.Command, opts.Args...)
+			cmd = exec.CommandContext(retryCtx, opts.Command, opts.Args...)
 		}
 		if opts.Dir != "" {
 			cmd.Dir = opts.Dir
@@ -107,17 +130,46 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		span.RecordError(err)
 		logError(logger, "Execution failed", err,
 			zap.Int("attempt", i),
+			zap.Int("max_attempts", maxRetries),
 			zap.String("command", cmdStr),
 			zap.String("summary", summary),
 		)
 
-		if i < opts.Retries {
-			time.Sleep(opts.Delay)
+		if i < maxRetries {
+			// Calculate delay with exponential backoff and jitter
+			delay := initialDelay
+			if useBackoff {
+				// Exponential backoff: delay * 2^(attempt-1)
+				// e.g., 100ms, 200ms, 400ms, 800ms, 1600ms...
+				delay = initialDelay * time.Duration(1<<uint(i-1))
+			}
+
+			// Add jitter (±25%) to prevent thundering herd
+			jitterFactor := (2*float64(time.Now().UnixNano()%1000)/1000.0 - 1) * 0.25
+			jitter := time.Duration(float64(delay) * jitterFactor)
+			delay = delay + jitter
+
+			// Cap maximum delay at 30 seconds
+			if delay > 30*time.Second {
+				delay = 30 * time.Second
+			}
+
+			logger.Debug("Retrying after delay",
+				zap.Duration("delay", delay),
+				zap.Bool("exponential_backoff", useBackoff),
+				zap.Int("attempt", i))
+
+			select {
+			case <-time.After(delay):
+				// Continue to next retry
+			case <-retryCtx.Done():
+				return output, cerr.Wrapf(retryCtx.Err(), "retry cancelled: %w", err)
+			}
 		}
 	}
 
 	if err != nil {
-		return output, cerr.Wrapf(err, "command failed after %d attempts", opts.Retries)
+		return output, cerr.Wrapf(err, "command failed after %d attempts", maxRetries)
 	}
 
 	if opts.Capture {
