@@ -71,7 +71,12 @@ Examples:
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to save token", zap.Error(err))
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("JWT token retrieved successfully", zap.String("token", token))
+		// SECURITY: Don't log full JWT token - only log confirmation and prefix
+		tokenPrefix := "***"
+		if len(token) > 8 {
+			tokenPrefix = token[:8] + "..."
+		}
+		otelzap.Ctx(rc.Ctx).Info("JWT token retrieved successfully", zap.String("token_prefix", tokenPrefix))
 		return nil
 	}),
 }

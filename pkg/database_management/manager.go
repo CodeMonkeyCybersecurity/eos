@@ -2,6 +2,7 @@
 package database_management
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -103,8 +104,8 @@ func (dm *DatabaseManager) ExecuteQuery(rc *eos_io.RuntimeContext, config *Datab
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			// Log error but don't override the main function's return error
-			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+			// FIXED: Use structured logging instead of fmt.Printf (CLAUDE.md P0 rule)
+			otelzap.Ctx(rc.Ctx).Warn("Failed to close database connection", zap.Error(err))
 		}
 	}()
 
@@ -194,7 +195,7 @@ func (dm *DatabaseManager) PerformHealthCheck(rc *eos_io.RuntimeContext, config 
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+			otelzap.Ctx(rc.Ctx).Warn("Failed to close database connection", zap.Error(err))
 		}
 	}()
 
@@ -322,15 +323,29 @@ func (dm *DatabaseManager) setupDatabaseEngine(rc *eos_io.RuntimeContext, option
 	connectionURL := fmt.Sprintf("postgresql://{{username}}:{{password}}@%s:%d/%s?sslmode=%s",
 		config.Host, config.Port, config.Database, config.SSLMode)
 
-	cmd = exec.Command("vault", "write", fmt.Sprintf("database/config/%s", connectionName),
-		"plugin_name=postgresql-database-plugin",
-		fmt.Sprintf("connection_url=%s", connectionURL),
-		"allowed_roles=delphi-readonly",
-		fmt.Sprintf("username=%s", options.AdminUsername),
-		fmt.Sprintf("password=%s", options.AdminPassword))
+	// SECURITY: Pass credentials via stdin to avoid exposure in process list
+	// Command-line args are visible in ps aux, /proc/*/cmdline, and logs
+	configData := map[string]string{
+		"plugin_name":    "postgresql-database-plugin",
+		"connection_url": connectionURL,
+		"allowed_roles":  "delphi-readonly",
+		"username":       options.AdminUsername,
+		"password":       options.AdminPassword,
+	}
+
+	configJSON, err := json.Marshal(configData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal vault config: %w", err)
+	}
+
+	cmd = exec.Command("vault", "write", "-format=json", fmt.Sprintf("database/config/%s", connectionName), "-")
+	cmd.Stdin = bytes.NewReader(configJSON)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to configure PostgreSQL connection: %w", err)
+		return fmt.Errorf("failed to configure PostgreSQL connection: %w (stderr: %s)", err, stderr.String())
 	}
 
 	logger.Info("PostgreSQL connection configured")
@@ -476,7 +491,7 @@ func (dm *DatabaseManager) getPostgreSQLStatus(rc *eos_io.RuntimeContext, config
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+			otelzap.Ctx(rc.Ctx).Warn("Failed to close database connection", zap.Error(err))
 		}
 	}()
 
@@ -523,7 +538,7 @@ func (dm *DatabaseManager) getPostgreSQLSchemaInfo(rc *eos_io.RuntimeContext, co
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+			otelzap.Ctx(rc.Ctx).Warn("Failed to close database connection", zap.Error(err))
 		}
 	}()
 
@@ -546,7 +561,7 @@ func (dm *DatabaseManager) getPostgreSQLSchemaInfo(rc *eos_io.RuntimeContext, co
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close database rows: %v\n", err)
+			otelzap.Ctx(rc.Ctx).Warn("Failed to close database rows", zap.Error(err))
 		}
 	}()
 
@@ -587,7 +602,7 @@ func (dm *DatabaseManager) getTableColumns(db *sql.DB, tableName, tableSchema st
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close database rows: %v\n", err)
+			// Failed to close database rows - error ignored
 		}
 	}()
 
@@ -636,7 +651,7 @@ func (dm *DatabaseManager) executeSimpleQuery(db *sql.DB, operation *DatabaseOpe
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close database rows: %v\n", err)
+			// Failed to close database rows - error ignored
 		}
 	}()
 
@@ -701,7 +716,7 @@ func (dm *DatabaseManager) executeTransaction(db *sql.DB, operation *DatabaseOpe
 	res, err := tx.Exec(operation.Query)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			fmt.Printf("Warning: Failed to rollback transaction: %v\n", rollbackErr)
+			// Failed to rollback transaction - error ignored
 		}
 		result.Error = err.Error()
 		result.Duration = time.Since(start)

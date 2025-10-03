@@ -286,43 +286,108 @@ func connectToInventoryDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 }
 
 // connectToPostgreSQL connects to PostgreSQL database
+// SECURITY: Uses environment variables or Vault for credentials, never hardcoded
 func connectToPostgreSQL(rc *eos_io.RuntimeContext) (*sql.DB, error) {
-	// Try common PostgreSQL connection strings
-	connectionStrings := []string{
-		"host=localhost port=5432 dbname=eos_inventory user=eos password=eos sslmode=disable",
-		"host=localhost port=5432 dbname=eos user=eos password=eos sslmode=disable",
-		"host=postgres port=5432 dbname=eos_inventory user=eos password=eos sslmode=disable",
-		"postgresql://eos:eos@localhost:5432/eos_inventory?sslmode=disable",
-	}
+	logger := otelzap.Ctx(rc.Ctx)
 
-	for _, connStr := range connectionStrings {
-		db, err := sql.Open("postgres", connStr)
-		if err != nil {
-			continue
+	// CRITICAL: Get credentials from environment or Vault - NEVER hardcode
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		// Try reading from standard PostgreSQL environment variables
+		host := os.Getenv("PGHOST")
+		if host == "" {
+			host = "localhost"
+		}
+		port := os.Getenv("PGPORT")
+		if port == "" {
+			port = "5432"
+		}
+		dbname := os.Getenv("PGDATABASE")
+		if dbname == "" {
+			dbname = "eos_inventory"
+		}
+		user := os.Getenv("PGUSER")
+		password := os.Getenv("PGPASSWORD")
+		sslmode := os.Getenv("PGSSLMODE")
+		if sslmode == "" {
+			sslmode = "require" // SECURE DEFAULT - require SSL
 		}
 
-		// Test connection
-		if err := db.Ping(); err != nil {
-			if err := db.Close(); err != nil {
-				// Log error but continue trying other connections
-			}
-			continue
+		if user == "" || password == "" {
+			return nil, fmt.Errorf("database credentials not found in environment (set DATABASE_URL or PGUSER/PGPASSWORD)")
 		}
 
-		return db, nil
+		connStr = fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=%s",
+			host, port, dbname, user, password, sslmode)
 	}
 
-	return nil, fmt.Errorf("failed to connect to PostgreSQL")
+	logger.Info("Connecting to PostgreSQL",
+		zap.String("host", extractHost(connStr)),
+		zap.String("database", extractDatabase(connStr)))
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
+
+	// Test connection
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	logger.Info("Successfully connected to PostgreSQL inventory database")
+	return db, nil
+}
+
+// extractHost extracts hostname from connection string for logging (without credentials)
+func extractHost(connStr string) string {
+	if strings.HasPrefix(connStr, "postgresql://") {
+		parts := strings.Split(connStr, "@")
+		if len(parts) > 1 {
+			hostPart := strings.Split(parts[1], "/")[0]
+			return strings.Split(hostPart, ":")[0]
+		}
+	}
+	if strings.Contains(connStr, "host=") {
+		parts := strings.Split(connStr, "host=")
+		if len(parts) > 1 {
+			return strings.Fields(parts[1])[0]
+		}
+	}
+	return "unknown"
+}
+
+// extractDatabase extracts database name from connection string for logging
+func extractDatabase(connStr string) string {
+	if strings.HasPrefix(connStr, "postgresql://") {
+		parts := strings.Split(connStr, "/")
+		if len(parts) > 3 {
+			return strings.Split(parts[3], "?")[0]
+		}
+	}
+	if strings.Contains(connStr, "dbname=") {
+		parts := strings.Split(connStr, "dbname=")
+		if len(parts) > 1 {
+			return strings.Fields(parts[1])[0]
+		}
+	}
+	return "unknown"
 }
 
 // insertOrUpdateNodeRecord inserts or updates node record in database
 func insertOrUpdateNodeRecord(rc *eos_io.RuntimeContext, db *sql.DB, info *SystemInfo) error {
+	// SECURITY: Validate hostname before inserting into database
+	if !isValidHostname(info.Hostname) {
+		return fmt.Errorf("invalid hostname: %s (must be alphanumeric with dots/hyphens, max 255 chars)", info.Hostname)
+	}
+
 	query := `
 	INSERT INTO nodes (
 		hostname, platform, architecture, kernel_version,
 		cpu_cores, memory_gb, disk_space_gb, docker_version,
 		updated_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
 	ON CONFLICT (hostname) DO UPDATE SET
 		platform = EXCLUDED.platform,
 		architecture = EXCLUDED.architecture,
@@ -330,11 +395,11 @@ func insertOrUpdateNodeRecord(rc *eos_io.RuntimeContext, db *sql.DB, info *Syste
 		cpu_cores = EXCLUDED.cpu_cores,
 		memory_gb = EXCLUDED.memory_gb,
 		disk_space_gb = EXCLUDED.disk_space_gb,
-
 		docker_version = EXCLUDED.docker_version,
 		updated_at = CURRENT_TIMESTAMP
 	`
 
+	// FIXED: Parameter count now matches placeholders (8 params, $1-$8)
 	_, err := db.Exec(query,
 		info.Hostname,
 		info.Platform,
@@ -343,11 +408,28 @@ func insertOrUpdateNodeRecord(rc *eos_io.RuntimeContext, db *sql.DB, info *Syste
 		info.CPUCores,
 		info.MemoryGB,
 		info.DiskSpaceGB,
-
 		info.DockerVersion,
 	)
 
 	return err
+}
+
+// isValidHostname validates hostname to prevent SQL injection and malformed data
+func isValidHostname(hostname string) bool {
+	if len(hostname) == 0 || len(hostname) > 255 {
+		return false
+	}
+	// Allow alphanumeric, dots, hyphens, underscores
+	// Reject any special characters that could be used for injection
+	for _, char := range hostname {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '.' || char == '-' || char == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // updateServiceInventory updates service inventory in database
