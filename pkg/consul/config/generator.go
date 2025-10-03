@@ -198,47 +198,72 @@ watches = [
 		zap.String("config_preview", configPreview),
 		zap.Int("total_lines", len(configLines)))
 
-	// CRITICAL: Check if config changed before writing
-	// Avoids unnecessary disk writes and config reloads
-	if existingConfig, err := os.ReadFile(configPath); err == nil {
-		if string(existingConfig) == config {
-			log.Info("Configuration unchanged, skipping write",
-				zap.String("path", configPath))
-			return nil
-		}
-		log.Info("Configuration changed, will update",
-			zap.String("path", configPath),
-			zap.Int("old_size", len(existingConfig)),
-			zap.Int("new_size", len(config)))
+	// CRITICAL: Use atomic write pattern to avoid TOCTOU race
+	// Write to temp file first, then atomic rename
+	// This prevents:
+	// 1. Race between check and write
+	// 2. Partial writes if process crashes
+	// 3. Reading corrupted config during write
+
+	tempPath := configPath + ".tmp"
+
+	// Write to temp file with sync
+	file, err := os.OpenFile(tempPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0640)
+	if err != nil {
+		return fmt.Errorf("failed to open temp config file: %w", err)
 	}
 
-	// CRITICAL: Write and sync to disk to prevent corruption on power loss
-	// Without fsync, file might be partially written in kernel buffers during crash
-	file, err := os.OpenFile(configPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0640)
-	if err != nil {
-		return fmt.Errorf("failed to open config file for writing: %w", err)
-	}
-	defer file.Close()
+	// Ensure temp file is cleaned up on error
+	var writeSuccess bool
+	defer func() {
+		file.Close()
+		if !writeSuccess {
+			os.Remove(tempPath)
+		}
+	}()
 
 	if _, err := file.WriteString(config); err != nil {
-		return fmt.Errorf("failed to write consul config: %w", err)
+		return fmt.Errorf("failed to write consul config to temp file: %w", err)
 	}
 
-	// Sync to disk before closing - ensures data is persisted
+	// Sync to disk before rename - ensures data is persisted
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("failed to sync config to disk: %w", err)
 	}
 
 	if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close config file: %w", err)
+		return fmt.Errorf("failed to close temp config file: %w", err)
 	}
 
-	// Force correct permissions (may be affected by umask)
-	if err := os.Chmod(configPath, 0640); err != nil {
-		return fmt.Errorf("failed to set config permissions: %w", err)
+	// Check if config actually changed (after writing to temp)
+	// This avoids unnecessary renames and Consul reloads
+	if existingConfig, err := os.ReadFile(configPath); err == nil {
+		if string(existingConfig) == config {
+			log.Info("Configuration unchanged, skipping atomic rename",
+				zap.String("path", configPath))
+			os.Remove(tempPath) // Clean up temp file
+			return nil
+		}
+		log.Info("Configuration changed, performing atomic rename",
+			zap.String("path", configPath),
+			zap.Int("old_size", len(existingConfig)),
+			zap.Int("new_size", len(config)))
 	}
 
-	// Set ownership
+	// Force correct permissions before rename
+	if err := os.Chmod(tempPath, 0640); err != nil {
+		return fmt.Errorf("failed to set temp config permissions: %w", err)
+	}
+
+	// Atomic rename - this is the critical operation
+	// Rename is atomic on POSIX systems, preventing partial reads
+	if err := os.Rename(tempPath, configPath); err != nil {
+		return fmt.Errorf("failed to atomically rename config: %w", err)
+	}
+
+	writeSuccess = true // Prevent temp file cleanup
+
+	// Set ownership (after successful rename)
 	if err := execute.RunSimple(rc.Ctx, "chown", "consul:consul", configPath); err != nil {
 		return fmt.Errorf("failed to set config ownership: %w", err)
 	}

@@ -69,7 +69,7 @@ type InstallConfig struct {
 }
 
 // NewConsulInstaller creates a new Consul installer instance
-func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *ConsulInstaller {
+func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*ConsulInstaller, error) {
 	// Set defaults
 	if config.Version == "" {
 		config.Version = "latest"
@@ -82,8 +82,8 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Consu
 		bindAddr, err := getDefaultBindAddr()
 		if err != nil {
 			// Don't silently default to localhost - that's misleading
-			// Can't return from NewConsulInstaller, so panic with clear message
-			panic(fmt.Sprintf("failed to detect bind address: %v\nPlease specify --bind-addr explicitly", err))
+			// Return error instead of panicking - let caller handle it
+			return nil, fmt.Errorf("failed to detect bind address: %w\nPlease specify --bind-addr explicitly", err)
 		}
 		config.BindAddr = bindAddr
 	}
@@ -96,10 +96,10 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Consu
 	if config.BinaryPath == "" {
 		config.BinaryPath = "/usr/bin/consul"
 	}
-	
+
 	logger := otelzap.Ctx(rc.Ctx)
 	runner := NewCommandRunner(rc)
-	
+
 	return &ConsulInstaller{
 		rc:       rc,
 		config:   config,
@@ -112,7 +112,7 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Consu
 		user:     NewUserHelper(runner),
 		validate: NewValidationHelper(logger),
 		network:  NewHTTPClient(30 * time.Second),
-	}
+	}, nil
 }
 
 // Install performs the complete Consul installation
@@ -1507,7 +1507,10 @@ func InstallConsul(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 		CleanInstall:     config.Clean,
 	}
 	
-	installer := NewConsulInstaller(rc, installConfig)
+	installer, err := NewConsulInstaller(rc, installConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create consul installer: %w", err)
+	}
 	return installer.Install()
 }
 

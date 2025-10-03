@@ -113,7 +113,10 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	}
 
 	// Use unified installer
-	installer := consul.NewConsulInstaller(rc, installConfig)
+	installer, err := consul.NewConsulInstaller(rc, installConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create consul installer: %w", err)
+	}
 
 	// ASSESS, INTERVENE, EVALUATE pattern is handled inside the installer
 	if err := installer.Install(); err != nil {

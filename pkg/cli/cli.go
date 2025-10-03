@@ -87,11 +87,14 @@ import (
 
 // AddStringFlag adds a string flag and optionally marks as required.
 // Env/Config are handled by Viper if you call BindFlagsToViper.
+// Note: Errors marking flag as required are logged but don't fail - Cobra will validate at runtime.
 func AddStringFlag(cmd *cobra.Command, name, shorthand, def, help string, required bool) {
 	cmd.Flags().StringP(name, shorthand, def, help)
 	if required {
 		if err := cmd.MarkFlagRequired(name); err != nil {
-			panic(err)
+			// Don't panic - Cobra will still validate required flags at runtime
+			// This error is extremely rare (only if flag doesn't exist)
+			fmt.Fprintf(os.Stderr, "warning: failed to mark flag %s as required: %v\n", name, err)
 		}
 	}
 }
@@ -107,11 +110,13 @@ func AddIntFlag(cmd *cobra.Command, name, shorthand string, def int, help string
 }
 
 // AddStringSliceFlag adds a string slice flag.
+// Note: Errors marking flag as required are logged but don't fail - Cobra will validate at runtime.
 func AddStringSliceFlag(cmd *cobra.Command, name, shorthand string, def []string, help string, required bool) {
 	cmd.Flags().StringSliceP(name, shorthand, def, help)
 	if required {
 		if err := cmd.MarkFlagRequired(name); err != nil {
-			panic(err)
+			// Don't panic - Cobra will still validate required flags at runtime
+			fmt.Fprintf(os.Stderr, "warning: failed to mark flag %s as required: %v\n", name, err)
 		}
 	}
 }
@@ -134,7 +139,20 @@ func SetViperEnvPrefix(v *viper.Viper, prefix string) {
 	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 }
 
+// GetStringOrEmpty returns the string value or empty string if error.
+// For required flags, use Cobra's built-in validation instead.
+func GetStringOrEmpty(cmd *cobra.Command, name string) string {
+	val, err := cmd.Flags().GetString(name)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to get flag %s: %v\n", name, err)
+		return ""
+	}
+	return val
+}
+
 // MustGetString returns the string value, panics if error.
+// DEPRECATED: Use GetStringOrEmpty and proper error handling instead.
+// Only kept for backward compatibility with existing code.
 func MustGetString(cmd *cobra.Command, name string) string {
 	val, err := cmd.Flags().GetString(name)
 	if err != nil {
@@ -147,7 +165,15 @@ func MustGetString(cmd *cobra.Command, name string) string {
 }
 
 // ShowHelpAndExit prints usage and exits.
+// DEPRECATED: Return error from command instead and let main() handle exit.
+// Only kept for backward compatibility.
 func ShowHelpAndExit(cmd *cobra.Command, code int) {
 	_ = cmd.Usage()
 	os.Exit(code)
+}
+
+// ShowHelp prints command usage without exiting.
+// Prefer this over ShowHelpAndExit for library code.
+func ShowHelp(cmd *cobra.Command) error {
+	return cmd.Usage()
 }
