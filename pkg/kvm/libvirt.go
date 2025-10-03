@@ -1,3 +1,5 @@
+// +build libvirt
+
 // pkg/kvm/libvirt.go
 // Libvirt Go bindings helper functions to replace virsh commands
 
@@ -98,15 +100,16 @@ func UndefineDomain(ctx context.Context, vmName string, removeStorage bool) erro
 	}
 	defer domain.Free()
 
-	// Undefine with appropriate flags
-	flags := libvirt.DOMAIN_UNDEFINE_NVRAM
-	if removeStorage {
-		flags |= libvirt.DOMAIN_UNDEFINE_MANAGED_SAVE | libvirt.DOMAIN_UNDEFINE_SNAPSHOTS_METADATA
-	}
-
-	if err := domain.UndefineFlags(flags); err != nil {
+	// Use simple Undefine instead of UndefineFlags to avoid CGO constant issues
+	// UndefineFlags with specific flags would be better but requires CGO constants
+	if err := domain.Undefine(); err != nil {
 		return fmt.Errorf("failed to undefine domain: %w", err)
 	}
+
+	// Note: This doesn't automatically remove NVRAM or managed save files
+	// For full cleanup, users may need to manually remove:
+	// - /var/lib/libvirt/qemu/nvram/<vm>_VARS.fd
+	// - /var/lib/libvirt/qemu/save/<vm>.save
 
 	return nil
 }

@@ -264,21 +264,32 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		zap.String("temp_path", tempBinary),
 		zap.String("source_dir", "/opt/eos"))
 
-	buildCmd := exec.Command("go", "build", "-o", tempBinary, ".")
-	buildCmd.Dir = "/opt/eos"
-
 	// Check if libvirt development libraries are available
 	cgoEnabled := "0" // Default to static build
+	buildTags := ""
 	pkgConfigCmd := exec.Command("pkg-config", "--exists", "libvirt")
 	if err := pkgConfigCmd.Run(); err == nil {
 		// libvirt is available, enable CGO for libvirt support
 		cgoEnabled = "1"
-		logger.Info("Libvirt development libraries detected - building with libvirt support",
-			zap.String("cgo_enabled", cgoEnabled))
+		buildTags = "-tags=libvirt"
+		logger.Info("Libvirt development libraries detected - building with full KVM support",
+			zap.String("cgo_enabled", cgoEnabled),
+			zap.String("build_tags", "libvirt"))
 	} else {
-		logger.Warn("Libvirt development libraries not found - building without KVM features",
-			zap.String("cgo_enabled", cgoEnabled))
+		logger.Warn("Libvirt development libraries not found - building with limited KVM features",
+			zap.String("cgo_enabled", cgoEnabled),
+			zap.String("note", "Install libvirt-dev to enable full KVM support"))
 	}
+
+	// Build command with conditional tags
+	buildArgs := []string{"build"}
+	if buildTags != "" {
+		buildArgs = append(buildArgs, buildTags)
+	}
+	buildArgs = append(buildArgs, "-o", tempBinary, ".")
+
+	buildCmd := exec.Command("go", buildArgs...)
+	buildCmd.Dir = "/opt/eos"
 
 	// Set build environment to match current system
 	buildCmd.Env = append(os.Environ(),

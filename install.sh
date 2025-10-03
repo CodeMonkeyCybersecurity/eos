@@ -424,15 +424,18 @@ build_eos_binary() {
 
   # Check if libvirt is available for CGO
   CGO_ENABLED=0
+  BUILD_TAGS=""
   if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libvirt 2>/dev/null; then
-    log INFO " Libvirt development libraries detected - building with KVM support (CGO enabled)"
+    log INFO " Libvirt development libraries detected - building with KVM support"
     CGO_ENABLED=1
+    BUILD_TAGS="-tags libvirt"
   else
-    log INFO " Building without libvirt support (static binary, no KVM features)"
+    log INFO " Building without libvirt support (static binary, limited KVM features)"
+    log INFO " To enable full KVM support, install: libvirt-dev libvirt-daemon-system pkg-config"
   fi
 
-  # Build with appropriate CGO setting
-  CGO_ENABLED=$CGO_ENABLED GO111MODULE=on go build -o "$TEMP_BINARY" .
+  # Build with appropriate CGO setting and build tags
+  CGO_ENABLED=$CGO_ENABLED GO111MODULE=on go build $BUILD_TAGS -o "$TEMP_BINARY" .
 
   if [ $? -ne 0 ]; then
     log ERR " Build failed"

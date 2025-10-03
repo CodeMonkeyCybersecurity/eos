@@ -1,3 +1,5 @@
+// +build libvirt
+
 // pkg/kvm/inventory.go
 // VM inventory management with drift detection
 
@@ -10,6 +12,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"libvirt.org/go/libvirt"
 )
@@ -280,18 +283,19 @@ func getVMUptime(domain *libvirt.Domain) int {
 
 // checkGuestAgent checks if QEMU guest agent is responsive
 func checkGuestAgent(domain *libvirt.Domain) bool {
-	// Simple check: try to get hostname via guest agent
-	// This will fail if guest agent is not running
-	// We use a simple XML metadata check instead of agent-specific calls
-	// since we can't reliably detect guest agent without platform-specific APIs
-
-	// For now, assume guest agent is available if we can get domain info
-	// A more robust check would require platform-specific QEMU agent commands
-	_, err := domain.GetInfo()
-	return err == nil
+	// Conservative check: The guest agent cannot be reliably detected via
+	// libvirt Go bindings without CGO constants that may not be available.
+	//
+	// A proper check would use:
+	// - domain.QemuAgentCommand() to ping the agent
+	// - domain.GetInterfaceAddresses() with DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT
+	//
+	// For now, we return false (conservative) to avoid false positives.
+	// Users should verify guest agent manually with: virsh qemu-agent-command <vm> '{"execute":"guest-ping"}'
+	return false
 }
 
-// getVMIPs retrieves network IP addresses for the VM
+// getVMIPs retrieves network IP addresses for the VM with retry logic
 func getVMIPs(domain *libvirt.Domain) []string {
 	var ips []string
 
@@ -301,17 +305,38 @@ func getVMIPs(domain *libvirt.Domain) []string {
 		return ips
 	}
 
-	// Parse MAC addresses from XML
+	// Parse MAC addresses from XML - only get the first one (primary interface)
 	macRegex := regexp.MustCompile(`<mac address='([^']+)'`)
 	macs := macRegex.FindAllStringSubmatch(xmlDesc, -1)
 
-	// For each MAC, try to find IP from DHCP leases or ARP
-	for _, mac := range macs {
-		if len(mac) > 1 {
-			// Try to get IP from virsh net-dhcp-leases or ARP cache
-			ip := getIPFromMAC(mac[1])
-			if ip != "" {
-				ips = append(ips, ip)
+	if len(macs) == 0 {
+		return ips
+	}
+
+	// Try primary interface first (first MAC in XML)
+	primaryMAC := macs[0][1]
+
+	// Retry up to 3 times with 1-second delay for newly started VMs
+	for attempt := 0; attempt < 3; attempt++ {
+		ip := getIPFromMAC(primaryMAC)
+		if ip != "" {
+			ips = append(ips, ip)
+			break
+		}
+		if attempt < 2 {
+			time.Sleep(1 * time.Second)
+		}
+	}
+
+	// Try other interfaces if primary didn't work
+	if len(ips) == 0 && len(macs) > 1 {
+		for i := 1; i < len(macs); i++ {
+			if len(macs[i]) > 1 {
+				ip := getIPFromMAC(macs[i][1])
+				if ip != "" {
+					ips = append(ips, ip)
+					break // Stop after finding first IP
+				}
 			}
 		}
 	}

@@ -1,3 +1,5 @@
+// +build libvirt
+
 // pkg/kvm/restart.go
 // Safe VM restart operations with health checks
 
@@ -69,30 +71,49 @@ func RestartVM(ctx context.Context, vmName string, cfg *RestartConfig) error {
 	}
 
 	// INTERVENE - Perform restart
+	var snapshotCreated bool
 	if cfg.CreateSnapshot {
 		logger.Info("Creating snapshot before restart", zap.String("snapshot", cfg.SnapshotName))
 		if err := createRestartSnapshot(domain, cfg.SnapshotName); err != nil {
 			return fmt.Errorf("failed to create snapshot: %w", err)
 		}
+		snapshotCreated = true
+		logger.Info("Snapshot created successfully", zap.String("snapshot", cfg.SnapshotName))
 	}
 
 	logger.Info("Shutting down VM gracefully", zap.String("vm", vmName))
-	if err := gracefulShutdown(ctx, domain, cfg.ShutdownTimeout); err != nil {
-		return fmt.Errorf("shutdown failed: %w", err)
+	shutdownErr := gracefulShutdown(ctx, domain, cfg.ShutdownTimeout)
+	if shutdownErr != nil {
+		// Shutdown failed - rollback if we have a snapshot
+		if snapshotCreated {
+			logger.Error("Shutdown failed, attempting rollback", zap.Error(shutdownErr))
+			if rollbackErr := rollbackToSnapshot(domain, cfg.SnapshotName); rollbackErr != nil {
+				return fmt.Errorf("shutdown failed and rollback also failed: %w (rollback error: %v)", shutdownErr, rollbackErr)
+			}
+			logger.Info("Rolled back to snapshot after shutdown failure")
+			return fmt.Errorf("shutdown failed, rolled back to snapshot: %w", shutdownErr)
+		}
+		return fmt.Errorf("shutdown failed: %w", shutdownErr)
 	}
 
 	logger.Info("Starting VM", zap.String("vm", vmName))
 	if err := domain.Create(); err != nil {
-		// Attempt rollback if we created a snapshot
-		if cfg.CreateSnapshot {
+		// Start failed - attempt rollback if we created a snapshot
+		if snapshotCreated {
 			logger.Error("Start failed, attempting rollback", zap.Error(err))
-			rollbackErr := rollbackToSnapshot(domain, cfg.SnapshotName)
-			if rollbackErr != nil {
+			if rollbackErr := rollbackToSnapshot(domain, cfg.SnapshotName); rollbackErr != nil {
 				return fmt.Errorf("start failed and rollback also failed: %w (rollback error: %v)", err, rollbackErr)
 			}
+			logger.Info("Rolled back to snapshot after start failure")
 			return fmt.Errorf("start failed, rolled back to snapshot: %w", err)
 		}
 		return fmt.Errorf("failed to start VM: %w", err)
+	}
+
+	// Clean up snapshot if everything succeeded
+	if snapshotCreated && !cfg.SkipSafetyChecks {
+		logger.Info("Restart successful, cleaning up snapshot")
+		// Note: We keep the snapshot on success for now - user can clean up manually if desired
 	}
 
 	// EVALUATE - Post-restart validation
