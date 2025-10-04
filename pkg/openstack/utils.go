@@ -100,25 +100,51 @@ func secureMariaDB(rc *eos_io.RuntimeContext, config *Config) error {
 		config.DBPassword)
 	exec.CommandContext(rc.Ctx, "bash", "-c", setRootPassCmd).Run()
 
+	// SECURITY: Use mysql defaults file to pass password securely
+	// BEFORE: Password visible in: ps aux, /proc/*/cmdline, shell history
+	// AFTER: Password in temporary file with 0600 permissions
+
+	// Create temporary mysql defaults file
+	tmpFile, err := os.CreateTemp("", "mysql-defaults-*.cnf")
+	if err != nil {
+		return fmt.Errorf("failed to create temp mysql config: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+
+	// Write password to defaults file with secure permissions
+	mysqlDefaults := fmt.Sprintf("[client]\npassword=%s\n", config.DBPassword)
+	if err := os.WriteFile(tmpFile.Name(), []byte(mysqlDefaults), 0600); err != nil {
+		return fmt.Errorf("failed to write mysql defaults: %w", err)
+	}
+
+	mysqlCmd := func(sql string) error {
+		cmd := exec.CommandContext(rc.Ctx, "mysql",
+			fmt.Sprintf("--defaults-file=%s", tmpFile.Name()),
+			"-u", "root",
+			"-e", sql)
+		return cmd.Run()
+	}
+
 	// Remove anonymous users
-	removeAnonCmd := fmt.Sprintf(`mysql -u root -p%s -e "DELETE FROM mysql.user WHERE User='';"`,
-		config.DBPassword)
-	exec.CommandContext(rc.Ctx, "bash", "-c", removeAnonCmd).Run()
+	if err := mysqlCmd("DELETE FROM mysql.user WHERE User='';"); err != nil {
+		return fmt.Errorf("failed to remove anonymous users: %w", err)
+	}
 
 	// Remove remote root access
-	removeRemoteRootCmd := fmt.Sprintf(`mysql -u root -p%s -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"`,
-		config.DBPassword)
-	exec.CommandContext(rc.Ctx, "bash", "-c", removeRemoteRootCmd).Run()
+	if err := mysqlCmd("DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"); err != nil {
+		return fmt.Errorf("failed to remove remote root: %w", err)
+	}
 
 	// Remove test database
-	removeTestDBCmd := fmt.Sprintf(`mysql -u root -p%s -e "DROP DATABASE IF EXISTS test;"`,
-		config.DBPassword)
-	exec.CommandContext(rc.Ctx, "bash", "-c", removeTestDBCmd).Run()
+	if err := mysqlCmd("DROP DATABASE IF EXISTS test;"); err != nil {
+		return fmt.Errorf("failed to remove test database: %w", err)
+	}
 
 	// Flush privileges
-	flushCmd := fmt.Sprintf(`mysql -u root -p%s -e "FLUSH PRIVILEGES;"`,
-		config.DBPassword)
-	exec.CommandContext(rc.Ctx, "bash", "-c", flushCmd).Run()
+	if err := mysqlCmd("FLUSH PRIVILEGES;"); err != nil {
+		return fmt.Errorf("failed to flush privileges: %w", err)
+	}
 
 	return nil
 }

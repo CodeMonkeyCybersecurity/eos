@@ -8,10 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 // ExtractWazuhPasswords extracts and displays Wazuh installation passwords
@@ -89,7 +91,8 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 
 		if adminPassword == "" {
 			logger.Info("terminal prompt: Enter new admin password")
-			input, err := readInput()
+			fmt.Print("Admin Password: ")
+			input, err := readPassword()
 			if err != nil {
 				return fmt.Errorf("failed to read admin password: %w", err)
 			}
@@ -98,7 +101,8 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 
 		if kibanaPassword == "" {
 			logger.Info("terminal prompt: Enter new kibana password")
-			input, err := readInput()
+			fmt.Print("Kibana Password: ")
+			input, err := readPassword()
 			if err != nil {
 				return fmt.Errorf("failed to read kibana password: %w", err)
 			}
@@ -107,7 +111,8 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 
 		if apiPassword == "" {
 			logger.Info("terminal prompt: Enter new API password")
-			input, err := readInput()
+			fmt.Print("API Password: ")
+			input, err := readPassword()
 			if err != nil {
 				return fmt.Errorf("failed to read API password: %w", err)
 			}
@@ -224,20 +229,32 @@ func replaceInFile(filename, oldValue, newValue string) error {
 	}
 
 	newContent := strings.ReplaceAll(string(content), oldValue, newValue)
-	return os.WriteFile(filename, []byte(newContent), 0644)
+
+	// SECURITY: Write with 0600 permissions (owner read/write only)
+	// BEFORE: 0644 = -rw-r--r-- (world-readable, exposes passwords)
+	// AFTER:  0600 = -rw------- (owner-only, secure)
+	return os.WriteFile(filename, []byte(newContent), 0600)
 }
 
 func generatePasswordHash(password string) (string, error) {
-	// Use Docker to generate hash
-	cmd := exec.Command("docker", "run", "--rm", "-ti", "opensearchproject/opensearch:latest",
-		"bash", "-c", fmt.Sprintf("plugins/opensearch-security/tools/hash.sh -p '%s'", password))
+	// SECURITY: Use argument array instead of shell interpolation to prevent command injection
+	// BEFORE (VULNERABLE): bash -c "hash.sh -p '$password'" → allows shell injection via ' character
+	// AFTER (SAFE): Direct command execution with password as separate argument
+
+	// Use Docker to generate hash - pass password via stdin to avoid command line exposure
+	cmd := exec.Command("docker", "run", "--rm", "-i", "opensearchproject/opensearch:latest",
+		"/bin/sh", "-c", "read -r pass && plugins/opensearch-security/tools/hash.sh -p \"$pass\"")
 
 	var out bytes.Buffer
+	var in bytes.Buffer
+	in.WriteString(password + "\n")
+
+	cmd.Stdin = &in
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to generate hash: %w", err)
+		return "", fmt.Errorf("failed to generate hash: %w (output: %s)", err, out.String())
 	}
 
 	output := out.String()
@@ -251,10 +268,11 @@ func generatePasswordHash(password string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("failed to extract hash from output")
+	return "", fmt.Errorf("failed to extract hash from output: %s", output)
 }
 
 // readInput reads a line of input from stdin
+// DEPRECATED: Use readPassword() for sensitive input
 func readInput() (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
@@ -262,4 +280,25 @@ func readInput() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(input), nil
+}
+
+// readPassword reads a password from stdin without echoing to terminal
+// SECURITY: Prevents password from being visible in:
+// - Terminal display (echoing disabled)
+// - Terminal scrollback buffer
+// - Screen recordings
+func readPassword() (string, error) {
+	// Get file descriptor for stdin
+	fd := int(syscall.Stdin)
+
+	// Read password with terminal echo disabled
+	password, err := term.ReadPassword(fd)
+	if err != nil {
+		return "", fmt.Errorf("failed to read password: %w", err)
+	}
+
+	// Print newline since ReadPassword doesn't echo it
+	fmt.Println()
+
+	return string(password), nil
 }

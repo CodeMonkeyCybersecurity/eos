@@ -152,16 +152,30 @@ func GetStringOrEmpty(cmd *cobra.Command, name string) string {
 
 // MustGetString returns the string value, panics if error.
 // DEPRECATED: Use GetStringOrEmpty and proper error handling instead.
-// Only kept for backward compatibility with existing code.
+// MustGetString gets a required string flag, panicking on error.
+// SECURITY WARNING: Use only in main() or tests, never in library code or HTTP handlers.
+// DEPRECATED: Use GetRequiredString() instead for proper error handling.
 func MustGetString(cmd *cobra.Command, name string) string {
 	val, err := cmd.Flags().GetString(name)
 	if err != nil {
-		panic(fmt.Sprintf("flag error: %v", err))
+		panic(fmt.Errorf("flag error for --%s (use GetRequiredString instead): %w", name, err))
 	}
 	if val == "" {
-		panic(fmt.Sprintf("required flag --%s is empty", name))
+		panic(fmt.Errorf("required flag --%s is empty (use GetRequiredString instead)", name))
 	}
 	return val
+}
+
+// GetRequiredString is a safe alternative to MustGetString that returns errors.
+func GetRequiredString(cmd *cobra.Command, name string) (string, error) {
+	val, err := cmd.Flags().GetString(name)
+	if err != nil {
+		return "", fmt.Errorf("flag error for --%s: %w", name, err)
+	}
+	if val == "" {
+		return "", fmt.Errorf("required flag --%s is empty", name)
+	}
+	return val, nil
 }
 
 // ShowHelpAndExit prints usage and exits.

@@ -2,14 +2,15 @@
 package security_testing
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"encoding/binary"
+	"math/big"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 // SecurityProperty represents a security property that should always hold
@@ -50,9 +51,10 @@ var SecurityProperties = []SecurityProperty{
 
 // TestSecurityProperties runs property-based tests on all security functions
 func TestSecurityProperties(t *testing.T) {
-	// Initialize random seed for deterministic but varied testing
-	rand.Seed(time.Now().UnixNano())
-	
+	// SECURITY: Use crypto/rand instead of math/rand for security testing
+	// math/rand is predictable, crypto/rand provides cryptographically secure randomness
+	// This ensures our security tests use realistic attack patterns
+
 	for _, prop := range SecurityProperties {
 		t.Run(prop.Name, func(t *testing.T) {
 			t.Logf("Testing property: %s", prop.Description)
@@ -244,9 +246,12 @@ func generateTestInputs(count int) []string {
 }
 
 // generateRandomInput creates a random input with various dangerous characteristics
+// SECURITY: Uses crypto/rand for cryptographically secure randomness
 func generateRandomInput() string {
-	length := rand.Intn(200) + 1 // 1-200 characters
-	
+	// Generate random length between 1-200
+	lengthBig, _ := rand.Int(rand.Reader, big.NewInt(200))
+	length := int(lengthBig.Int64()) + 1
+
 	// Character sets for different types of inputs
 	charSets := []string{
 		"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", // Normal
@@ -255,34 +260,48 @@ func generateRandomInput() string {
 		"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F", // Control chars
 		"%2e%2f%5c%22%27%3c%3e%7c%26", // URL encoded
 	}
-	
+
 	var result strings.Builder
-	
+
 	for i := 0; i < length; i++ {
-		charSet := charSets[rand.Intn(len(charSets))]
+		// Select random charset
+		charSetIdx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charSets))))
+		charSet := charSets[charSetIdx.Int64()]
+
 		if len(charSet) > 0 {
-			char := charSet[rand.Intn(len(charSet))]
+			// Select random character from charset
+			charIdx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charSet))))
+			char := charSet[charIdx.Int64()]
 			result.WriteByte(char)
 		}
 	}
-	
-	// Sometimes inject known dangerous patterns
-	if rand.Float32() < 0.3 { // 30% chance
+
+	// Sometimes inject known dangerous patterns (30% chance)
+	randBytes := make([]byte, 4)
+	rand.Read(randBytes)
+	shouldInject := binary.BigEndian.Uint32(randBytes)%100 < 30
+
+	if shouldInject && result.Len() > 0 {
 		dangerousSnippets := []string{
 			"..", "' OR ", "; rm", "$(", "`", "<script", "javascript:",
 			"UNION SELECT", "DROP TABLE", "-- ", "/*", "admin'", "1=1",
 		}
-		
-		snippet := dangerousSnippets[rand.Intn(len(dangerousSnippets))]
-		insertPos := rand.Intn(result.Len() + 1)
-		
+
+		// Select random snippet
+		snippetIdx, _ := rand.Int(rand.Reader, big.NewInt(int64(len(dangerousSnippets))))
+		snippet := dangerousSnippets[snippetIdx.Int64()]
+
+		// Select random insert position
+		insertPosIdx, _ := rand.Int(rand.Reader, big.NewInt(int64(result.Len()+1)))
+		insertPos := int(insertPosIdx.Int64())
+
 		originalStr := result.String()
 		result.Reset()
 		result.WriteString(originalStr[:insertPos])
-		result.WriteString(snippet) 
+		result.WriteString(snippet)
 		result.WriteString(originalStr[insertPos:])
 	}
-	
+
 	return result.String()
 }
 

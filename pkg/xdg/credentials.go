@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 )
 
 // CredentialStore defines the interface for credential storage
@@ -15,66 +17,106 @@ type CredentialStore interface {
 	ListCredentials(ctx context.Context, app string) ([]string, error)
 }
 
-// Global credential store instance (fail-closed by default)
-var globalCredentialStore CredentialStore
+// SECURITY: Protect global credential store with mutex to prevent race conditions
+// Without this, concurrent SetCredentialStore() + SaveCredential() can cause:
+// - Nil pointer dereference (panic)
+// - Credential saved to wrong store
+// - Data corruption
+var (
+	globalCredentialStore CredentialStore
+	storeMutex            sync.RWMutex
+)
 
 // SetCredentialStore sets the global credential store implementation
 func SetCredentialStore(store CredentialStore) {
+	storeMutex.Lock()
+	defer storeMutex.Unlock()
 	globalCredentialStore = store
 }
 
 // SaveCredential saves a credential using the configured store (fail-closed)
 func SaveCredential(app, username, password string) (string, error) {
-	// Fail closed - if store is not initialized, refuse to save
-	if globalCredentialStore == nil {
-		return "", fmt.Errorf("credential store not initialized - refusing to save credentials insecurely")
-	}
-
-	// Validate inputs
+	// Validate inputs first (before acquiring lock)
 	if err := validateCredentialInputs(app, username, password); err != nil {
 		return "", err
 	}
 
-	return globalCredentialStore.SaveCredential(context.Background(), app, username, password)
+	// Acquire read lock to check store
+	storeMutex.RLock()
+	store := globalCredentialStore
+	storeMutex.RUnlock()
+
+	// Fail closed - if store is not initialized, refuse to save
+	if store == nil {
+		return "", fmt.Errorf("credential store not initialized - refusing to save credentials insecurely")
+	}
+
+	// SECURITY: Add timeout to prevent indefinite hangs if Vault is down
+	// Without this, hung goroutines accumulate → resource exhaustion
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	return store.SaveCredential(ctx, app, username, password)
 }
 
 // ReadCredential reads a credential from the configured store
 func ReadCredential(app, username string) (string, error) {
-	if globalCredentialStore == nil {
-		return "", fmt.Errorf("credential store not initialized")
-	}
-
 	if app == "" || username == "" {
 		return "", fmt.Errorf("app and username are required")
 	}
 
-	return globalCredentialStore.ReadCredential(context.Background(), app, username)
+	storeMutex.RLock()
+	store := globalCredentialStore
+	storeMutex.RUnlock()
+
+	if store == nil {
+		return "", fmt.Errorf("credential store not initialized")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	return store.ReadCredential(ctx, app, username)
 }
 
 // DeleteCredential deletes a credential from the configured store
 func DeleteCredential(app, username string) error {
-	if globalCredentialStore == nil {
-		return fmt.Errorf("credential store not initialized")
-	}
-
 	if app == "" || username == "" {
 		return fmt.Errorf("app and username are required")
 	}
 
-	return globalCredentialStore.DeleteCredential(context.Background(), app, username)
+	storeMutex.RLock()
+	store := globalCredentialStore
+	storeMutex.RUnlock()
+
+	if store == nil {
+		return fmt.Errorf("credential store not initialized")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	return store.DeleteCredential(ctx, app, username)
 }
 
 // ListCredentials lists all credentials for an app
 func ListCredentials(app string) ([]string, error) {
-	if globalCredentialStore == nil {
-		return nil, fmt.Errorf("credential store not initialized")
-	}
-
 	if app == "" {
 		return nil, fmt.Errorf("app is required")
 	}
 
-	return globalCredentialStore.ListCredentials(context.Background(), app)
+	storeMutex.RLock()
+	store := globalCredentialStore
+	storeMutex.RUnlock()
+
+	if store == nil {
+		return nil, fmt.Errorf("credential store not initialized")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	return store.ListCredentials(ctx, app)
 }
 
 // validateCredentialInputs validates inputs for credential operations
