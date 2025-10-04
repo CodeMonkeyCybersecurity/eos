@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -98,9 +99,10 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	if interactive || adminPassword == "" || kibanaPassword == "" || apiPassword == "" {
 		logger.Info("Interactive mode: prompting for passwords")
 
+		var err error
 		if adminPassword == "" {
 			logger.Info("Prompting for admin password")
-			adminPassword, err = eos_io.PromptPassword(rc.Ctx, "Admin Password")
+			adminPassword, err = crypto.PromptPassword(rc, "Admin Password: ")
 			if err != nil {
 				return fmt.Errorf("failed to read admin password: %w", err)
 			}
@@ -108,7 +110,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 
 		if kibanaPassword == "" {
 			logger.Info("Prompting for kibana password")
-			kibanaPassword, err = eos_io.PromptPassword(rc.Ctx, "Kibana Password")
+			kibanaPassword, err = crypto.PromptPassword(rc, "Kibana Password: ")
 			if err != nil {
 				return fmt.Errorf("failed to read kibana password: %w", err)
 			}
@@ -116,7 +118,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 
 		if apiPassword == "" {
 			logger.Info("Prompting for API password")
-			apiPassword, err = eos_io.PromptPassword(rc.Ctx, "API Password")
+			apiPassword, err = crypto.PromptPassword(rc, "API Password: ")
 			if err != nil {
 				return fmt.Errorf("failed to read API password: %w", err)
 			}

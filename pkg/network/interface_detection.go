@@ -201,10 +201,14 @@ func SelectInterface(ctx *eos_io.RuntimeContext) (*InterfaceInfo, error) {
 	log.Info("Multiple viable interfaces detected, prompting user",
 		zap.Int("count", len(viable)))
 
+	// SECURITY: Use structured logging instead of fmt.Print* per CLAUDE.md P0 rule
 	log.Info("terminal prompt: Select network interface")
-	fmt.Println("\nMultiple network interfaces detected:")
+	log.Info("Multiple network interfaces detected")
 	for i, iface := range viable {
-		fmt.Printf("  %d. %s - %s\n", i+1, iface.Name, iface.IP)
+		log.Info("Available interface",
+			zap.Int("number", i+1),
+			zap.String("name", iface.Name),
+			zap.String("ip", iface.IP))
 	}
 
 	selection, err := eos_io.PromptInput(ctx, fmt.Sprintf("Select interface number (1-%d)", len(viable)), "interface_selection")

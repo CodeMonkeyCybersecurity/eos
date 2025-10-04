@@ -3,18 +3,22 @@ package interaction
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // PromptValidated asks for input until the validator passes.
 func PromptValidated(label string, validator func(string) error) string {
+	// SECURITY: Use structured logging instead of fmt.Println per CLAUDE.md P0 rule
+	logger := otelzap.L()
+
 	for {
 		input := PromptRequired(label)
 		if err := validator(input); err != nil {
-			fmt.Println("", err)
+			logger.Warn("Validation failed, retrying", zap.Error(err))
 			continue
 		}
 		return input

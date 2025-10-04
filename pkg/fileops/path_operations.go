@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // PathOperations provides path manipulation operations
@@ -66,6 +68,9 @@ func (p *PathOperations) ExpandPath(path string) string {
 // of the provided token with the replacement value.
 // SECURITY: Validates paths, checks symlinks, enforces depth limits, and verifies ownership.
 func UpdateFilesInDir(dir, token, replacement string) error {
+	// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
+	logger := otelzap.L()
+
 	// SECURITY: Validate base directory is absolute and exists
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
@@ -121,7 +126,7 @@ func UpdateFilesInDir(dir, token, replacement string) error {
 		if lstat.Mode()&os.ModeSymlink != 0 {
 			// Skip symlinks to prevent modifying files outside the directory
 			// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md
-			p.logger.Debug("Skipping symlink", zap.String("path", path))
+			logger.Debug("Skipping symlink", zap.String("path", path))
 			return nil
 		}
 
@@ -141,7 +146,7 @@ func UpdateFilesInDir(dir, token, replacement string) error {
 		// SECURITY: Verify current user can write to the file
 		if lstat.Mode().Perm()&0200 == 0 {
 			// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md
-			p.logger.Debug("Skipping read-only file", zap.String("path", path))
+			logger.Debug("Skipping read-only file", zap.String("path", path))
 			return nil
 		}
 
@@ -161,7 +166,7 @@ func UpdateFilesInDir(dir, token, replacement string) error {
 				return fmt.Errorf("failed to write %s: %w", path, err)
 			}
 			// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md
-			p.logger.Info("File updated",
+			logger.Info("File updated",
 				zap.String("path", path),
 				zap.Uint32("mode", uint32(safeMode)),
 				zap.Int("uid", currentUID))

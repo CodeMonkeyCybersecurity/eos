@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // DelphiClient handles API interactions for Delphi/Wazuh SSO
@@ -86,6 +88,9 @@ func init() {
 }
 
 func setupAuthentikForWazuh(cmd *cobra.Command, args []string) error {
+	// SECURITY: Use structured logging instead of fmt.Print* per CLAUDE.md P0 rule
+	logger := otelzap.L()
+
 	authentikURL, _ := cmd.Flags().GetString("authentik-url")
 	apiKey, _ := cmd.Flags().GetString("api-key")
 	wazuhURL, _ := cmd.Flags().GetString("wazuh-url")
@@ -98,65 +103,71 @@ func setupAuthentikForWazuh(cmd *cobra.Command, args []string) error {
 		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
-	fmt.Println("=== Configuring Authentik for Wazuh SSO ===")
-	fmt.Println()
+	logger.Info("=== Configuring Authentik for Wazuh SSO ===")
 
 	// Step 1: Create or verify certificate
-	fmt.Println("Step 1: Creating SAML signing certificate...")
+	logger.Info("Step 1: Creating SAML signing certificate...")
 	certID, err := client.createSAMLCertificate(entityID)
 	if err != nil {
 		return fmt.Errorf("failed to create certificate: %w", err)
 	}
-	fmt.Printf("✓ Certificate created/verified: %s\n", certID)
+	logger.Info("Certificate created/verified",
+		zap.String("status", "✓"),
+		zap.String("cert_id", certID))
 
 	// Step 2: Create the critical Roles property mapping
-	fmt.Println("\nStep 2: Creating Roles property mapping...")
+	logger.Info("Step 2: Creating Roles property mapping...")
 	rolesMappingID, err := client.createRolesPropertyMapping()
 	if err != nil {
 		return fmt.Errorf("failed to create roles mapping: %w", err)
 	}
-	fmt.Printf("✓ Roles property mapping created: %s\n", rolesMappingID)
+	logger.Info("Roles property mapping created",
+		zap.String("status", "✓"),
+		zap.String("mapping_id", rolesMappingID))
 
 	// Step 3: Create standard property mappings
-	fmt.Println("\nStep 3: Creating standard property mappings...")
+	logger.Info("Step 3: Creating standard property mappings...")
 	mappingIDs, err := client.createStandardMappings()
 	if err != nil {
 		return fmt.Errorf("failed to create standard mappings: %w", err)
 	}
-	fmt.Println("✓ Standard mappings created")
+	logger.Info("Standard mappings created", zap.String("status", "✓"))
 
 	// Step 4: Create SAML Provider
-	fmt.Println("\nStep 4: Creating SAML provider...")
+	logger.Info("Step 4: Creating SAML provider...")
 	providerID, err := client.createSAMLProvider(entityID, wazuhURL, certID, append(mappingIDs, rolesMappingID))
 	if err != nil {
 		return fmt.Errorf("failed to create SAML provider: %w", err)
 	}
-	fmt.Printf("✓ SAML provider created: %s\n", providerID)
+	logger.Info("SAML provider created",
+		zap.String("status", "✓"),
+		zap.String("provider_id", providerID))
 
 	// Step 5: Create Application
-	fmt.Println("\nStep 5: Creating Wazuh application...")
+	logger.Info("Step 5: Creating Wazuh application...")
 	appID, err := client.createApplication(entityID, providerID)
 	if err != nil {
 		return fmt.Errorf("failed to create application: %w", err)
 	}
-	fmt.Printf("✓ Application created: %s\n", appID)
+	logger.Info("Application created",
+		zap.String("status", "✓"),
+		zap.String("app_id", appID))
 
 	// Step 6: Create groups
-	fmt.Println("\nStep 6: Creating groups...")
+	logger.Info("Step 6: Creating groups...")
 	if err := client.createWazuhGroups(); err != nil {
 		return fmt.Errorf("failed to create groups: %w", err)
 	}
-	fmt.Println("✓ Groups created")
+	logger.Info("Groups created", zap.String("status", "✓"))
 
-	fmt.Println("\n=== Authentik Configuration Complete ===")
-	fmt.Println("\nNext steps:")
-	fmt.Println("1. Add users to the appropriate groups:")
-	fmt.Println("   - delphi-administrators (maps to Wazuh admin)")
-	fmt.Println("   - wazuh-analysts (maps to kibanauser)")
-	fmt.Println("   - wazuh-readonly (maps to readall)")
-	fmt.Printf("2. Download metadata from: %s/api/v3/providers/saml/%s/metadata/?download\n", authentikURL, entityID)
-	fmt.Println("3. Run 'eos wazuh sso setup' on your Wazuh server")
-	fmt.Println("\n⚠️  CRITICAL: The Roles property mapping MUST have SAML Attribute Name = 'Roles' (not a URI)")
+	logger.Info("=== Authentik Configuration Complete ===")
+	logger.Info("Next steps",
+		zap.Strings("steps", []string{
+			"1. Add users to the appropriate groups: delphi-administrators (maps to Wazuh admin), wazuh-analysts (maps to kibanauser), wazuh-readonly (maps to readall)",
+			fmt.Sprintf("2. Download metadata from: %s/api/v3/providers/saml/%s/metadata/?download", authentikURL, entityID),
+			"3. Run 'eos wazuh sso setup' on your Wazuh server",
+		}))
+	logger.Warn("CRITICAL: The Roles property mapping MUST have SAML Attribute Name = 'Roles' (not a URI)")
 
 	return nil
 }
@@ -411,7 +422,9 @@ func (c *AuthentikClient) createWazuhGroups() error {
 			return fmt.Errorf("failed to create group %s: %s", group["name"], body)
 		}
 
-		fmt.Printf("  - Created/verified group: %s\n", group["name"])
+		// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
+		logger := otelzap.L()
+		logger.Info("Created/verified group", zap.String("group", group["name"]))
 	}
 
 	return nil
@@ -432,7 +445,10 @@ var testWazuhCmd = &cobra.Command{
 }
 
 func testWazuhSSO(cmd *cobra.Command, args []string) error {
-	fmt.Println("=== Testing Wazuh SSO Configuration ===")
+	// SECURITY: Use structured logging instead of fmt.Print* per CLAUDE.md P0 rule
+	logger := otelzap.L()
+
+	logger.Info("=== Testing Wazuh SSO Configuration ===")
 
 	// SECURITY: Get Delphi URL from environment or config, not hardcoded
 	delphiURL := os.Getenv("DELPHI_URL")
@@ -442,7 +458,8 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 
 	// Test 1: Check if metadata endpoint is accessible
 	metadataURL := fmt.Sprintf("%s/_opendistro/_security/saml/metadata", delphiURL)
-	fmt.Printf("1. Checking Wazuh SAML metadata endpoint at %s... ", metadataURL)
+	logger.Info("1. Checking Wazuh SAML metadata endpoint",
+		zap.String("url", metadataURL))
 
 	// SECURITY: Use context with timeout and proper TLS configuration
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -450,7 +467,9 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 
 	req, err := http.NewRequestWithContext(ctx, "GET", metadataURL, nil)
 	if err != nil {
-		fmt.Printf("❌ Failed to create request: %v\n", err)
+		logger.Error("Failed to create request",
+			zap.String("status", "❌"),
+			zap.Error(err))
 		return err
 	}
 
@@ -468,29 +487,36 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("❌ Failed: %v\n", err)
+		logger.Error("Request failed",
+			zap.String("status", "❌"),
+			zap.Error(err))
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		fmt.Println("✅ Accessible")
+		logger.Info("Metadata endpoint accessible", zap.String("status", "✅"))
 	} else {
-		fmt.Printf("❌ Status: %d\n", resp.StatusCode)
+		logger.Error("Metadata endpoint check failed",
+			zap.String("status", "❌"),
+			zap.Int("http_status", resp.StatusCode))
 	}
 
 	// Test 2: Initiate SAML authentication flow
-	fmt.Print("2. Testing SAML authentication flow... ")
+	logger.Info("2. Testing SAML authentication flow...")
 	// This would initiate a SAML auth request
-	fmt.Println("✅ Ready for manual testing")
+	logger.Info("Ready for manual testing", zap.String("status", "✅"))
 
-	fmt.Println("\n=== Manual Testing Steps ===")
-	fmt.Println("1. Open your browser in incognito/private mode")
-	fmt.Printf("2. Navigate to: %s\n", delphiURL)
-	fmt.Println("3. You should be redirected to Authentik for login")
-	fmt.Println("4. Login with a user in the 'delphi-administrators' group")
-	fmt.Println("5. You should be redirected back to Wazuh dashboard")
-	fmt.Println("\nIf authentication fails, run: eos wazuh sso debug")
+	logger.Info("=== Manual Testing Steps ===")
+	logger.Info("Manual test instructions",
+		zap.Strings("steps", []string{
+			"1. Open your browser in incognito/private mode",
+			fmt.Sprintf("2. Navigate to: %s", delphiURL),
+			"3. You should be redirected to Authentik for login",
+			"4. Login with a user in the 'delphi-administrators' group",
+			"5. You should be redirected back to Wazuh dashboard",
+		}))
+	logger.Info("If authentication fails, run: eos wazuh sso debug")
 
 	return nil
 }

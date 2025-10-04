@@ -96,7 +96,7 @@ func (ci *CommandInstaller) InstallInteractive() error {
 // promptForName prompts for and validates command name
 func (ci *CommandInstaller) promptForName() (string, error) {
 	ci.logger.Info("terminal prompt: Enter the name you want to use to call the command")
-	name, err := eos_io.PromptInput(ci.rc.Ctx, "Enter the name you want to use to call the command")
+	name, err := eos_io.PromptInput(ci.rc, "Enter the name you want to use to call the command", "command_name")
 	if err != nil {
 		return "", err
 	}
@@ -112,7 +112,7 @@ func (ci *CommandInstaller) promptForName() (string, error) {
 // promptForContent prompts for command content
 func (ci *CommandInstaller) promptForContent() (string, error) {
 	ci.logger.Info("terminal prompt: Enter the command or script you want to execute")
-	content, err := eos_io.PromptInput(ci.rc.Ctx, "Enter the command or script you want to execute")
+	content, err := eos_io.PromptInput(ci.rc, "Enter the command or script you want to execute", "command_content")
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +128,7 @@ func (ci *CommandInstaller) promptForContent() (string, error) {
 // promptForDescription prompts for optional description
 func (ci *CommandInstaller) promptForDescription() (string, error) {
 	ci.logger.Info("terminal prompt: Enter a description for this command (optional)")
-	description, err := eos_io.PromptInput(ci.rc.Ctx, "Enter a description for this command (optional)")
+	description, err := eos_io.PromptInput(ci.rc, "Enter a description for this command (optional)", "command_description")
 	if err != nil {
 		return "", err
 	}
