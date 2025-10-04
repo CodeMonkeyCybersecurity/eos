@@ -142,7 +142,9 @@ func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 	otelzap.Ctx(rc.Ctx).Debug(" Vault config directory ready", zap.String("path", dir))
 
 	// Safely write the Vault config
-	if err := os.WriteFile(configPath, []byte(hcl), 0644); err != nil {
+	// SECURITY: Use 0640 instead of 0644 to prevent world-readable config
+	// Vault configs may contain sensitive paths, storage backend details, etc.
+	if err := os.WriteFile(configPath, []byte(hcl), 0640); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("failed to write Vault HCL config", zap.Error(err))
 		return fmt.Errorf("write vault hcl: %w", err)
 	}

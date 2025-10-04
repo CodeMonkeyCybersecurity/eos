@@ -4,6 +4,7 @@ package ldap
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"os"
 
@@ -68,7 +69,7 @@ func getSecureTLSConfig() *tls.Config {
 	}
 
 	// Secure TLS configuration for production LDAP connections
-	return &tls.Config{
+	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		CipherSuites: []uint16{
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
@@ -78,6 +79,36 @@ func getSecureTLSConfig() *tls.Config {
 		},
 		PreferServerCipherSuites: true,
 	}
+
+	// SECURITY: Try to load custom CA certificate for self-signed LDAP servers
+	// This supports both system-trusted CAs and custom enterprise CAs
+	caPaths := []string{
+		"/etc/eos/ldap-ca.crt",        // Eos LDAP-specific CA
+		"/etc/eos/ca.crt",              // Eos general CA
+		"/etc/ldap/tls/ca.crt",         // LDAP standard location
+		"/etc/ssl/certs/ldap-ca.crt",   // Alternative location
+	}
+
+	for _, caPath := range caPaths {
+		if _, err := os.Stat(caPath); os.IsNotExist(err) {
+			continue
+		}
+
+		caCert, err := os.ReadFile(caPath)
+		if err != nil {
+			continue
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			continue
+		}
+
+		tlsConfig.RootCAs = caCertPool
+		break // Successfully loaded CA certificate
+	}
+
+	return tlsConfig
 }
 
 func ConnectWithGivenConfig(cfg *LDAPConfig) (*ldap.Conn, error) {

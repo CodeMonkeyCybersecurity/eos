@@ -3,6 +3,7 @@ package delphi
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"os"
 )
 
@@ -17,7 +18,7 @@ func getHTTPTLSConfig() *tls.Config {
 	}
 
 	// Secure TLS configuration for production HTTP requests
-	return &tls.Config{
+	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 		CipherSuites: []uint16{
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
@@ -27,4 +28,34 @@ func getHTTPTLSConfig() *tls.Config {
 		},
 		PreferServerCipherSuites: true,
 	}
+
+	// SECURITY: Try to load custom CA certificate for self-signed Delphi/OpenSearch servers
+	// This supports both system-trusted CAs and custom enterprise CAs
+	caPaths := []string{
+		"/etc/eos/delphi-ca.crt",       // Delphi-specific CA
+		"/etc/eos/ca.crt",               // Eos general CA
+		"/etc/opensearch/tls/ca.crt",    // OpenSearch standard location
+		"/etc/ssl/certs/delphi-ca.crt",  // Alternative location
+	}
+
+	for _, caPath := range caPaths {
+		if _, err := os.Stat(caPath); os.IsNotExist(err) {
+			continue
+		}
+
+		caCert, err := os.ReadFile(caPath)
+		if err != nil {
+			continue
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			continue
+		}
+
+		tlsConfig.RootCAs = caCertPool
+		break // Successfully loaded CA certificate
+	}
+
+	return tlsConfig
 }

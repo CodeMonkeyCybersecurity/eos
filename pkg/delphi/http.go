@@ -2,7 +2,6 @@
 package delphi
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -61,7 +60,7 @@ func AuthenticatedGet(cfg *Config, path string) (*http.Response, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
+			TLSClientConfig: getDelphiTLSConfig(),
 		},
 	}
 
@@ -81,7 +80,7 @@ func AuthenticatedPost(cfg *Config, path string, body io.Reader) (*http.Response
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
+			TLSClientConfig: getDelphiTLSConfig(),
 		},
 	}
 
@@ -106,7 +105,7 @@ func AuthenticatedPut(cfg *Config, path string, payload any) (*http.Response, er
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
+			TLSClientConfig: getDelphiTLSConfig(),
 		},
 	}
 

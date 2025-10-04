@@ -2,7 +2,6 @@
 package delphi
 
 import (
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,9 +25,7 @@ func Authenticate(rc *eos_io.RuntimeContext, cfg *Config) (string, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: !cfg.VerifyCertificates,
-			},
+			TLSClientConfig: getDelphiTLSConfig(),
 		},
 	}
 
@@ -83,9 +80,7 @@ func AuthenticateUser(rc *eos_io.RuntimeContext, cfg *Config, username, password
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: !cfg.VerifyCertificates,
-			},
+			TLSClientConfig: getDelphiTLSConfig(),
 		},
 	}
 

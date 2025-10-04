@@ -7,11 +7,13 @@ package bootstrap
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -179,9 +181,22 @@ func checkVaultHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 		return
 	}
 
-	// Allow self-signed certs for now
+	// SECURITY: Try to load custom CA certificate, fallback to system certs
+	// IMPORTANT: In production, always provide CA cert at /etc/eos/ca.crt
+	// This prevents MITM attacks while supporting self-signed certificates
+	tlsConfig, err := loadVaultTLSConfig()
+	if err != nil {
+		// If CA cert loading fails, still validate against system certs (fail-secure)
+		logger.Warn("Failed to load custom CA cert, using system trust store",
+			zap.Error(err))
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			// InsecureSkipVerify: false (default) - validates certificates
+		}
+	}
+
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: tlsConfig,
 	}
 	client.Transport = transport
 
@@ -567,4 +582,40 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 			}
 		}
 	}
+}
+
+// loadVaultTLSConfig loads TLS configuration for Vault connections
+// SECURITY: Tries multiple paths for CA certificate
+func loadVaultTLSConfig() (*tls.Config, error) {
+	// Try common CA certificate paths
+	caPaths := []string{
+		"/etc/eos/ca.crt",           // Eos standard location
+		"/etc/vault/tls/ca.crt",     // Vault standard location
+		"/etc/ssl/certs/vault-ca.crt", // Alternative location
+	}
+
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+
+	for _, caPath := range caPaths {
+		if _, err := os.Stat(caPath); os.IsNotExist(err) {
+			continue
+		}
+
+		caCert, err := os.ReadFile(caPath)
+		if err != nil {
+			continue
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			continue
+		}
+
+		tlsConfig.RootCAs = caCertPool
+		return tlsConfig, nil
+	}
+
+	return nil, fmt.Errorf("no CA certificate found in standard locations")
 }

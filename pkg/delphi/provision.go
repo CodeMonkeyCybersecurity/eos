@@ -7,12 +7,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// getDelphiAdminPassword retrieves the Delphi/OpenSearch admin password
+// SECURITY: Tries Vault first, falls back to environment variable
+func getDelphiAdminPassword(rc *eos_io.RuntimeContext) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Try to read from Vault first (preferred)
+	var vaultData map[string]interface{}
+	err := vault.ReadFromVault(rc, "secret/delphi/admin", &vaultData)
+	if err == nil {
+		if password, ok := vaultData["password"].(string); ok && password != "" {
+			logger.Debug("Retrieved Delphi admin password from Vault")
+			return password, nil
+		}
+	}
+
+	// Fallback to environment variable (for initial bootstrap)
+	password := os.Getenv("DELPHI_ADMIN_PASSWORD")
+	if password != "" {
+		logger.Warn("Using Delphi admin password from environment variable (should migrate to Vault)")
+		return password, nil
+	}
+
+	return "", fmt.Errorf("Delphi admin password not found in Vault or DELPHI_ADMIN_PASSWORD environment variable")
+}
 
 func CreateDelphiTenant(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	if err := EnsureOpensearchTenant(rc, spec); err != nil {
@@ -69,7 +96,12 @@ func EnsureOpensearchRoleMapping(rc *eos_io.RuntimeContext, spec TenantSpec) err
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.SetBasicAuth("admin", "<vaulted-secret>") // TODO: Replace with secure Vault retrieval
+	// SECURITY: Retrieve admin password from Vault (or environment variable fallback)
+	adminPassword, err := getDelphiAdminPassword(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get admin password: %w", err)
+	}
+	req.SetBasicAuth("admin", adminPassword)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpclient.DefaultClient().Do(req)
@@ -112,7 +144,12 @@ func EnsureOpensearchTenant(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("failed to create tenant request: %w", err)
 	}
 
-	req.SetBasicAuth("admin", "<vaulted-secret>") // TODO: Replace with Vault-backed secret
+	// SECURITY: Retrieve admin password from Vault (or environment variable fallback)
+	adminPassword, err := getDelphiAdminPassword(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get admin password: %w", err)
+	}
+	req.SetBasicAuth("admin", adminPassword)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpclient.DefaultClient().Do(req)
@@ -345,7 +382,12 @@ func EnsureOpensearchRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.SetBasicAuth("admin", "<vaulted-secret>") // Replace with secure lookup
+	// SECURITY: Retrieve admin password from Vault (or environment variable fallback)
+	adminPassword, err := getDelphiAdminPassword(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get admin password: %w", err)
+	}
+	req.SetBasicAuth("admin", adminPassword)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpclient.DefaultClient().Do(req)
@@ -397,7 +439,12 @@ func EnsureGlobalReadonlyRole(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.SetBasicAuth("admin", "<vaulted-secret>") // TODO: Secure from Vault
+	// SECURITY: Retrieve admin password from Vault (or environment variable fallback)
+	adminPassword, err := getDelphiAdminPassword(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get admin password: %w", err)
+	}
+	req.SetBasicAuth("admin", adminPassword)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := httpclient.DefaultClient().Do(req)

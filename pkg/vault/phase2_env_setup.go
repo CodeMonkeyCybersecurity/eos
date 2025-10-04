@@ -4,6 +4,7 @@ package vault
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/url"
@@ -102,6 +103,35 @@ func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool 
 	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
 		tlsConfig.InsecureSkipVerify = true
 		otelzap.Ctx(rc.Ctx).Debug("Using insecure TLS for development/testing", zap.String("host", u.Host))
+	} else {
+		// SECURITY: Try to load custom CA certificate for self-signed Vault servers
+		// This supports both system-trusted CAs and custom enterprise CAs
+		caPaths := []string{
+			"/etc/eos/ca.crt",              // Eos general CA
+			"/etc/vault/tls/ca.crt",        // Vault standard location
+			"/etc/ssl/certs/vault-ca.crt",  // Alternative location
+		}
+
+		for _, caPath := range caPaths {
+			if _, err := os.Stat(caPath); os.IsNotExist(err) {
+				continue
+			}
+
+			caCert, err := os.ReadFile(caPath)
+			if err != nil {
+				continue
+			}
+
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM(caCert) {
+				continue
+			}
+
+			tlsConfig.RootCAs = caCertPool
+			otelzap.Ctx(rc.Ctx).Debug("Loaded custom CA certificate for Vault TLS",
+				zap.String("ca_path", caPath))
+			break // Successfully loaded CA certificate
+		}
 	}
 
 	conn, err := tls.DialWithDialer(dialer, "tcp", u.Host, tlsConfig)

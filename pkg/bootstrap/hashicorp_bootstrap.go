@@ -206,7 +206,8 @@ func configureConsul(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 }`, datacenter)
 
 	configPath := filepath.Join(configDir, "consul.json")
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	// SECURITY: Use 0640 instead of 0644 to prevent world-readable HashiCorp configs
+	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write consul config: %w", err)
 	}
 
@@ -247,7 +248,8 @@ consul {
 }`, datacenter, shared.PortConsul)
 
 	configPath := filepath.Join(configDir, "nomad.hcl")
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	// SECURITY: Use 0640 instead of 0644 to prevent world-readable HashiCorp configs
+	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write nomad config: %w", err)
 	}
 
@@ -280,7 +282,8 @@ cluster_addr = "https://127.0.0.1:8201"
 ui = true`, shared.PortConsul)
 
 	configPath := filepath.Join(configDir, "vault.hcl")
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	// SECURITY: Use 0640 instead of 0644 to prevent world-readable HashiCorp configs
+	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write vault config: %w", err)
 	}
 
