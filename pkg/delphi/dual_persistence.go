@@ -298,6 +298,20 @@ func (dpm *DualPersistenceManager) publishToRedis(ctx context.Context, msg *Stre
 
 // publishToPostgreSQL handles PostgreSQL NOTIFY fallback
 func (dpm *DualPersistenceManager) publishToPostgreSQL(ctx context.Context, alert *Alert, stage string) error {
+	// SECURITY: Whitelist allowed notification channels to prevent SQL injection
+	// Even though GORM uses parameterized queries, channel names in pg_notify must be validated
+	allowedStages := map[string]bool{
+		"ingestion":  true,
+		"enrichment": true,
+		"analysis":   true,
+		"storage":    true,
+		"alerting":   true,
+	}
+
+	if !allowedStages[stage] {
+		return fmt.Errorf("invalid notification stage: %s (allowed: ingestion, enrichment, analysis, storage, alerting)", stage)
+	}
+
 	notification := map[string]interface{}{
 		"alert_id": alert.ID,
 		"stage":    stage,

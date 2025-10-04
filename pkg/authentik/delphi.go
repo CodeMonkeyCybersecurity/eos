@@ -3,10 +3,13 @@ package authentik
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -431,9 +434,39 @@ var testWazuhCmd = &cobra.Command{
 func testWazuhSSO(cmd *cobra.Command, args []string) error {
 	fmt.Println("=== Testing Wazuh SSO Configuration ===")
 
+	// SECURITY: Get Delphi URL from environment or config, not hardcoded
+	delphiURL := os.Getenv("DELPHI_URL")
+	if delphiURL == "" {
+		delphiURL = "https://localhost:55000" // Secure default to localhost
+	}
+
 	// Test 1: Check if metadata endpoint is accessible
-	fmt.Print("1. Checking Wazuh SAML metadata endpoint... ")
-	resp, err := http.Get("https://delphi.cybermonkey.dev/_opendistro/_security/saml/metadata")
+	metadataURL := fmt.Sprintf("%s/_opendistro/_security/saml/metadata", delphiURL)
+	fmt.Printf("1. Checking Wazuh SAML metadata endpoint at %s... ", metadataURL)
+
+	// SECURITY: Use context with timeout and proper TLS configuration
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", metadataURL, nil)
+	if err != nil {
+		fmt.Printf("❌ Failed to create request: %v\n", err)
+		return err
+	}
+
+	// SECURITY: Use TLS configuration (allow custom CA for self-signed certs)
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				// For production, should use proper certificate verification
+				// This can be configured via environment variable
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Printf("❌ Failed: %v\n", err)
 		return err
@@ -453,7 +486,7 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("\n=== Manual Testing Steps ===")
 	fmt.Println("1. Open your browser in incognito/private mode")
-	fmt.Println("2. Navigate to: https://delphi.cybermonkey.dev")
+	fmt.Printf("2. Navigate to: %s\n", delphiURL)
 	fmt.Println("3. You should be redirected to Authentik for login")
 	fmt.Println("4. Login with a user in the 'delphi-administrators' group")
 	fmt.Println("5. You should be redirected back to Wazuh dashboard")

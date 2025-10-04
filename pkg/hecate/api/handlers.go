@@ -3,8 +3,11 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -14,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 // Handler provides HTTP handlers for the Hecate API
@@ -543,6 +547,66 @@ func (h *Handler) respondError(w http.ResponseWriter, code int, message string, 
 	}
 }
 
+// rateLimitMiddleware implements per-IP rate limiting to prevent abuse and DoS attacks
+// SECURITY: Prevents brute force attacks, API abuse, and resource exhaustion
+func rateLimitMiddleware(next http.Handler) http.Handler {
+	// Per-IP rate limiters with cleanup
+	type clientLimiter struct {
+		limiter  *rate.Limiter
+		lastSeen time.Time
+	}
+
+	limiters := make(map[string]*clientLimiter)
+	mu := &sync.Mutex{}
+
+	// Cleanup old limiters periodically (prevents memory leak)
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			mu.Lock()
+			for ip, cl := range limiters {
+				if time.Since(cl.lastSeen) > 10*time.Minute {
+					delete(limiters, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract client IP
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+
+		// Get or create rate limiter for this IP
+		mu.Lock()
+		cl, exists := limiters[ip]
+		if !exists {
+			// 100 requests per minute, burst of 10
+			cl = &clientLimiter{
+				limiter:  rate.NewLimiter(rate.Every(time.Minute/100), 10),
+				lastSeen: time.Now(),
+			}
+			limiters[ip] = cl
+		}
+		cl.lastSeen = time.Now()
+		limiter := cl.limiter
+		mu.Unlock()
+
+		// Check rate limit
+		if !limiter.Allow() {
+			w.Header().Set("Retry-After", "60")
+			http.Error(w, "Rate limit exceeded. Try again later.", http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // securityHeadersMiddleware adds security headers to all responses
 // SECURITY: Prevents common web vulnerabilities (XSS, clickjacking, MIME sniffing, etc.)
 func securityHeadersMiddleware(next http.Handler) http.Handler {
@@ -579,6 +643,9 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 // SetupRoutes sets up the API routes
 func (h *Handler) SetupRoutes() *mux.Router {
 	router := mux.NewRouter()
+
+	// SECURITY: Apply rate limiting middleware first (fail fast on abuse)
+	router.Use(rateLimitMiddleware)
 
 	// SECURITY: Apply security headers middleware to all routes
 	router.Use(securityHeadersMiddleware)
@@ -630,15 +697,33 @@ func (h *Handler) StartServer(ctx context.Context, port int) error {
 	logger.Info("Starting Hecate API server",
 		zap.Int("port", port))
 
-	// Start server in a goroutine with panic recovery
+	// SECURITY: Use error channel to detect immediate failures (prevents goroutine leak)
+	errCh := make(chan error, 1)
 	shared.SafeGo(logger, "hecate-api-server", func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
 			logger.Error("HTTP server error", zap.Error(err))
+			errCh <- err
 		}
 	})
 
+	// Wait for either immediate error or context cancellation
+	select {
+	case err := <-errCh:
+		// Server failed to start (e.g., port already in use)
+		return fmt.Errorf("server failed to start: %w", err)
+	case <-time.After(100 * time.Millisecond):
+		// Server started successfully, wait for shutdown signal
+	}
+
 	// Wait for context cancellation
-	<-ctx.Done()
+	select {
+	case err := <-errCh:
+		// Server crashed during operation
+		return fmt.Errorf("server crashed: %w", err)
+	case <-ctx.Done():
+		// Normal shutdown requested
+	}
 
 	// Shutdown server gracefully
 	logger.Info("Shutting down Hecate API server")

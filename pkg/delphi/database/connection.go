@@ -112,7 +112,7 @@ func getDynamicCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacad
 		Host:      baseConfig.Host,
 		Port:      baseConfig.Port,
 		Database:  baseConfig.Database,
-		SSLMode:   "disable",
+		SSLMode:   "require", // SECURITY: Default to require SSL
 		IsDynamic: true,
 		CreatedAt: time.Now(),
 	}
@@ -142,7 +142,7 @@ func getDynamicCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacad
 func getStaticCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (*ConnectionConfig, error) {
 	// Retrieve database connection details from Vault using simplified facade
 	config := &ConnectionConfig{
-		SSLMode:   "disable", // Default
+		SSLMode:   "require", // SECURITY: Default to require SSL
 		IsDynamic: false,
 		CreatedAt: time.Now(),
 	}
@@ -190,7 +190,7 @@ func getStaticCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade
 // getDatabaseConfig retrieves static database connection parameters (host, port, database name)
 func getDatabaseConfig(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (*ConnectionConfig, error) {
 	config := &ConnectionConfig{
-		SSLMode: "disable", // Default
+		SSLMode: "require", // SECURITY: Default to require SSL
 	}
 
 	// Get database connection parameters (not credentials) using KV v2 paths
