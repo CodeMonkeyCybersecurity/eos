@@ -22,6 +22,7 @@ func loadUnsealKeys(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
 
 // UnsealVaultIfNeeded attempts to unseal Vault if it's currently sealed.
 // It returns true if unsealing was performed, false if not needed.
+// SECURITY: Rate limited to prevent brute force unseal key attacks
 func UnsealVaultIfNeeded(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
 	status, err := client.Sys().SealStatus()
 	if err != nil {
@@ -30,6 +31,11 @@ func UnsealVaultIfNeeded(rc *eos_io.RuntimeContext, client *api.Client) (bool, e
 	if !status.Sealed {
 		otelzap.Ctx(rc.Ctx).Info(" Vault is already unsealed")
 		return false, nil
+	}
+
+	// SECURITY: Apply rate limiting before attempting unseal
+	if err := RateLimitVaultOperation(rc, VaultOpUnseal); err != nil {
+		return false, err
 	}
 
 	initRes, err := loadUnsealKeys(rc)

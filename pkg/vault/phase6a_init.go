@@ -72,7 +72,13 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 }
 
 // InitVault initializes Vault with default 5 keys, 3 threshold.
+// SECURITY: Rate limited to prevent initialization spam attacks
 func InitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.InitResponse, error) {
+	// SECURITY: Apply rate limiting to prevent brute force initialization attempts
+	if err := RateLimitVaultOperation(rc, VaultOpInit); err != nil {
+		return nil, err
+	}
+
 	initOptions := &api.InitRequest{
 		SecretShares:    5,
 		SecretThreshold: 3,
