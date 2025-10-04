@@ -3,11 +3,14 @@
 package hetzner
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
@@ -16,6 +19,30 @@ import (
 )
 
 const baseURL = "https://api.hetzner.cloud/v1"
+
+var (
+	// SECURITY: Shared HTTP client for Hetzner DNS API calls with proper timeout and TLS config
+	hetznerDNSClient     *http.Client
+	hetznerDNSClientOnce sync.Once
+)
+
+// getSecureHTTPClient returns a shared HTTP client with timeout and TLS configuration
+func getSecureHTTPClient() *http.Client {
+	hetznerDNSClientOnce.Do(func() {
+		hetznerDNSClient = &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				},
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+			},
+		}
+	})
+	return hetznerDNSClient
+}
 
 type DNSClient struct {
 	Token      string

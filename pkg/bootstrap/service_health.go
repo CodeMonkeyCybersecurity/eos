@@ -255,7 +255,15 @@ func checkConsulHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check Consul API health endpoint
-	client := &http.Client{Timeout: 5 * time.Second}
+	// SECURITY: Add TLS configuration even for localhost connections
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
 
 	// Check leader endpoint - try EOS port first (8161), then original (8500)
 	url := fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsul)
@@ -323,7 +331,15 @@ func checkNomadHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check Nomad API health endpoint
-	client := &http.Client{Timeout: 5 * time.Second}
+	// SECURITY: Add TLS configuration even for localhost connections
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
 
 	// Check leader endpoint - try original port
 	url := fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortNomadOriginal)

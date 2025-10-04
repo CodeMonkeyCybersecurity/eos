@@ -22,7 +22,8 @@ func (c *DNSClient) GetZones(rc *eos_io.RuntimeContext) ([]DNSZone, error) {
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /zones")
 	}
@@ -56,7 +57,8 @@ func (c *DNSClient) CreateZone(rc *eos_io.RuntimeContext, zone DNSZone) (*DNSZon
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "executing POST /zones")
 	}
@@ -90,7 +92,8 @@ func (c *DNSClient) GetZone(rc *eos_io.RuntimeContext, zoneID string) (*DNSZone,
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "executing GET /zones/{id}")
 	}
@@ -125,7 +128,8 @@ func (c *DNSClient) UpdateZone(rc *eos_io.RuntimeContext, zoneID string, updated
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "executing PUT /zones/{id}")
 	}
@@ -159,7 +163,8 @@ func (c *DNSClient) DeleteZone(rc *eos_io.RuntimeContext, zoneID string) error {
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return errors.Wrap(err, "executing DELETE /zones/{id}")
 	}
@@ -190,7 +195,8 @@ func (c *DNSClient) ImportZoneFilePlain(rc *eos_io.RuntimeContext, zoneID string
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "text/plain")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return errors.Wrap(err, "executing POST /zones/{id}/import")
 	}
@@ -219,7 +225,8 @@ func (c *DNSClient) ExportZoneFile(rc *eos_io.RuntimeContext, zoneID string) (st
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return "", errors.Wrap(err, "executing GET /zones/{id}/export")
 	}
@@ -254,7 +261,8 @@ func (c *DNSClient) ValidateZoneFile(rc *eos_io.RuntimeContext, zoneFile string)
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "text/plain")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return errors.Wrap(err, "executing POST /zones/file/validate")
 	}

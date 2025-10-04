@@ -6,6 +6,7 @@
 package bootstrap
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
@@ -192,7 +193,15 @@ func hasEosConfiguration(rc *eos_io.RuntimeContext) bool {
 
 	// Check Consul for EOS metadata
 	consulHealthURL := fmt.Sprintf("http://localhost:%d/v1/kv/eos/metadata", shared.PortConsul)
-	client := &http.Client{Timeout: 5 * time.Second}
+	// SECURITY: Add TLS configuration even for localhost connections
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
 	if resp, err := client.Get(consulHealthURL); err == nil {
 		resp.Body.Close()
 		if resp.StatusCode == 200 {
@@ -319,7 +328,15 @@ func checkServiceHealth(rc *eos_io.RuntimeContext, serviceName string) bool {
 
 // checkVaultHealthSimple checks Vault health endpoint (simple version)
 func checkVaultHealthSimple(rc *eos_io.RuntimeContext) bool {
-	client := &http.Client{Timeout: 5 * time.Second}
+	// SECURITY: Add TLS configuration
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
 	resp, err := client.Get("http://localhost:8200/v1/sys/health")
 	if err != nil {
 		return false
@@ -331,7 +348,15 @@ func checkVaultHealthSimple(rc *eos_io.RuntimeContext) bool {
 
 // checkConsulHealthSimple checks Consul health endpoint (simple version)
 func checkConsulHealthSimple(rc *eos_io.RuntimeContext) bool {
-	client := &http.Client{Timeout: 5 * time.Second}
+	// SECURITY: Add TLS configuration
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
 	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsul))
 	if err != nil {
 		return false
@@ -343,7 +368,15 @@ func checkConsulHealthSimple(rc *eos_io.RuntimeContext) bool {
 
 // checkNomadHealthSimple checks Nomad health endpoint (simple version)
 func checkNomadHealthSimple(rc *eos_io.RuntimeContext) bool {
-	client := &http.Client{Timeout: 5 * time.Second}
+	// SECURITY: Add TLS configuration
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
 	resp, err := client.Get("http://localhost:4646/v1/status/leader")
 	if err != nil {
 		return false

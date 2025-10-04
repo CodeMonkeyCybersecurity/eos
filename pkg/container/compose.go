@@ -22,6 +22,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// SECURITY: Maximum docker-compose file size to prevent resource exhaustion
+	MaxComposeFileSize = 5 * 1024 * 1024 // 5MB
+)
+
 // UncommentSegment finds the marker (e.g. "uncomment if using Jenkins behind Hecate")
 // in the docker compose file ("docker-compose.yml") and uncomments every line (removes a leading '#')
 // until reaching the line that contains "# <- finish". It returns an error if something goes wrong.
@@ -127,22 +132,80 @@ func FindDockerComposeFile() (string, error) {
 // ParseComposeFile attempts to read and parse the docker compose file.
 // It returns the file contents as a byte slice.
 func ParseComposeFile(composePath string) ([]byte, error) {
+	// SECURITY: Check file size before reading to prevent resource exhaustion
+	fileInfo, err := os.Stat(composePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat %s: %w", composePath, err)
+	}
+
+	if fileInfo.Size() > MaxComposeFileSize {
+		return nil, fmt.Errorf("compose file too large: %d bytes (max %d)", fileInfo.Size(), MaxComposeFileSize)
+	}
+
 	data, err := os.ReadFile(composePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", composePath, err)
 	}
+
+	// SECURITY: Validate YAML structure before returning
+	var cfg ComposeConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("invalid docker-compose.yml structure: %w", err)
+	}
+
 	return data, nil
 }
 
-// ExtractComposeMetadata is a stub function that simulates parsing docker compose metadata.
-// You can replace this with real YAML parsing later.
-func ExtractComposeMetadata(data []byte) ([]string, []string, []string) {
-	// Example dummy data for testing
-	containers := []string{"app", "db"}
-	images := []string{"ghcr.io/example/app", "postgres:15-alpine"}
-	volumes := []string{"app_data", "db_data"}
+// ExtractComposeMetadata parses docker compose metadata from the file data.
+// SECURITY: Validates image sources against allowed registries.
+func ExtractComposeMetadata(data []byte) ([]string, []string, []string, error) {
+	var cfg ComposeConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to parse compose config: %w", err)
+	}
 
-	return containers, images, volumes
+	// SECURITY: Whitelist of allowed container registries
+	allowedRegistries := []string{
+		"docker.io/",
+		"ghcr.io/",
+		"registry.gitlab.com/",
+		"quay.io/",
+		"gcr.io/",
+		"registry.hub.docker.com/",
+	}
+
+	var containers, images, volumes []string
+
+	for name, service := range cfg.Services {
+		containers = append(containers, name)
+
+		// SECURITY: Validate image source against whitelist
+		imageValid := false
+		for _, registry := range allowedRegistries {
+			// Allow images without registry prefix (official Docker images)
+			if !strings.Contains(service.Image, "/") {
+				imageValid = true
+				break
+			}
+			// Check if image starts with allowed registry
+			if strings.HasPrefix(service.Image, registry) {
+				imageValid = true
+				break
+			}
+		}
+
+		if !imageValid {
+			return nil, nil, nil, fmt.Errorf("untrusted image registry: %s (allowed: %v)", service.Image, allowedRegistries)
+		}
+
+		images = append(images, service.Image)
+	}
+
+	for volName := range cfg.Volumes {
+		volumes = append(volumes, volName)
+	}
+
+	return containers, images, volumes, nil
 }
 
 func ComposeUp(rc *eos_io.RuntimeContext, path string) error {

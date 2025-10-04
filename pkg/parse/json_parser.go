@@ -24,6 +24,14 @@ func NewJSONParser(logger *zap.Logger) *JSONParserImpl {
 
 // Parse parses JSON string into a map
 func (j *JSONParserImpl) Parse(ctx context.Context, input string) (map[string]interface{}, error) {
+	// SECURITY: Check size before parsing to prevent large payload DoS
+	if len(input) > MaxJSONSize {
+		j.logger.Error("JSON string too large",
+			zap.Int("size", len(input)),
+			zap.Int("max_size", MaxJSONSize))
+		return nil, fmt.Errorf("JSON string too large: %d bytes (max %d)", len(input), MaxJSONSize)
+	}
+
 	var result map[string]interface{}
 
 	if err := json.Unmarshal([]byte(input), &result); err != nil {
@@ -36,6 +44,14 @@ func (j *JSONParserImpl) Parse(ctx context.Context, input string) (map[string]in
 
 // ParseArray parses JSON string into an array
 func (j *JSONParserImpl) ParseArray(ctx context.Context, input string) ([]interface{}, error) {
+	// SECURITY: Check size before parsing
+	if len(input) > MaxJSONSize {
+		j.logger.Error("JSON array too large",
+			zap.Int("size", len(input)),
+			zap.Int("max_size", MaxJSONSize))
+		return nil, fmt.Errorf("JSON array too large: %d bytes (max %d)", len(input), MaxJSONSize)
+	}
+
 	var result []interface{}
 
 	if err := json.Unmarshal([]byte(input), &result); err != nil {
@@ -48,6 +64,14 @@ func (j *JSONParserImpl) ParseArray(ctx context.Context, input string) ([]interf
 
 // ParseToStruct parses JSON string into a struct
 func (j *JSONParserImpl) ParseToStruct(ctx context.Context, input string, target interface{}) error {
+	// SECURITY: Check size before parsing
+	if len(input) > MaxJSONSize {
+		j.logger.Error("JSON string too large for struct parsing",
+			zap.Int("size", len(input)),
+			zap.Int("max_size", MaxJSONSize))
+		return fmt.Errorf("JSON string too large: %d bytes (max %d)", len(input), MaxJSONSize)
+	}
+
 	if err := json.Unmarshal([]byte(input), target); err != nil {
 		j.logger.Error("Failed to parse JSON to struct", zap.Error(err), zap.String("input_preview", j.previewString(input)))
 		return fmt.Errorf("JSON struct parse error: %w", err)

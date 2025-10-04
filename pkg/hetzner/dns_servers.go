@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -29,8 +28,8 @@ func GetZoneIDForDomain(rc *eos_io.RuntimeContext, token, domain string) (string
 	}
 	req.Header.Set("Auth-API-Token", token)
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to execute HTTP request for fetching zones", zap.Error(err))
 		return "", err
@@ -86,8 +85,8 @@ func CreateRecord(rc *eos_io.RuntimeContext, token, zoneID, name, ip string) err
 	req.Header.Set("Auth-API-Token", token)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to execute HTTP request for creating record", zap.Error(err))
 		return err
@@ -159,7 +158,8 @@ func (c *DNSClient) GetAllPrimaryServers(rc *eos_io.RuntimeContext, zoneID strin
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /primary_servers")
 	}
@@ -198,7 +198,8 @@ func (c *DNSClient) CreatePrimaryServer(rc *eos_io.RuntimeContext, zoneID, addre
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "performing POST /primary_servers")
 	}
@@ -232,7 +233,8 @@ func (c *DNSClient) GetPrimaryServer(rc *eos_io.RuntimeContext, id string) (*Pri
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /primary_servers/{id}")
 	}
@@ -271,7 +273,8 @@ func (c *DNSClient) UpdatePrimaryServer(rc *eos_io.RuntimeContext, id, zoneID, a
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "performing PUT /primary_servers/{id}")
 	}
@@ -303,7 +306,8 @@ func (c *DNSClient) DeletePrimaryServer(rc *eos_io.RuntimeContext, id string) er
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return errors.Wrap(err, "performing DELETE /primary_servers/{id}")
 	}

@@ -5,6 +5,7 @@ package create
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -58,14 +59,35 @@ EXAMPLES:
 			return fmt.Errorf("failed to install required packages: %w", err)
 		}
 
-		log.Info("Adding Trivy GPG key and APT repository")
-		addRepoCmd := `
-		wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - && 
-		echo "deb https://aquasecurity.github.io/trivy-repo/deb stable main" > /etc/apt/sources.list.d/trivy.list
-		`
-		if err := exec.Command("bash", "-c", addRepoCmd).Run(); err != nil {
-			log.Error("Failed to add Trivy APT repo", zap.Error(err))
-			return fmt.Errorf("failed to add Trivy repository: %w", err)
+		log.Info("Downloading Trivy GPG key")
+		// SECURITY: Use separate commands instead of shell pipeline to prevent injection
+		wgetCmd := exec.Command("wget", "-qO-", "https://aquasecurity.github.io/trivy-repo/deb/public.key")
+		aptKeyCmd := exec.Command("apt-key", "add", "-")
+
+		// Pipe wget output to apt-key
+		aptKeyCmd.Stdin, _ = wgetCmd.StdoutPipe()
+
+		if err := aptKeyCmd.Start(); err != nil {
+			log.Error("Failed to start apt-key command", zap.Error(err))
+			return fmt.Errorf("failed to start apt-key: %w", err)
+		}
+
+		if err := wgetCmd.Run(); err != nil {
+			log.Error("Failed to download GPG key", zap.Error(err))
+			return fmt.Errorf("failed to download Trivy GPG key: %w", err)
+		}
+
+		if err := aptKeyCmd.Wait(); err != nil {
+			log.Error("Failed to add GPG key", zap.Error(err))
+			return fmt.Errorf("failed to add Trivy GPG key: %w", err)
+		}
+
+		log.Info("Adding Trivy APT repository")
+		repoLine := "deb https://aquasecurity.github.io/trivy-repo/deb stable main\n"
+		// SECURITY: Use direct file write instead of shell echo redirection
+		if err := os.WriteFile("/etc/apt/sources.list.d/trivy.list", []byte(repoLine), 0644); err != nil {
+			log.Error("Failed to write repository file", zap.Error(err))
+			return fmt.Errorf("failed to write Trivy repository file: %w", err)
 		}
 
 		log.Info("Updating APT package lists")

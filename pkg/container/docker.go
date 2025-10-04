@@ -113,7 +113,8 @@ func AddDockerRepository(rc *eos_io.RuntimeContext) error {
 		zap.String("repo_line", strings.TrimSpace(repoLine)),
 		zap.String("file_path", "/etc/apt/sources.list.d/docker.list"))
 
-	if err := os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(repoLine), 0644); err != nil {
+	// SECURITY: Use 0640 for repository config files
+	if err := os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(repoLine), 0640); err != nil {
 		logger.Error(" Failed to write Docker repository file", zap.Error(err))
 		return cerr.Wrap(err, "write Docker repository file")
 	}

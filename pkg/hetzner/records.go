@@ -23,7 +23,8 @@ func (c *DNSClient) GetRecords(rc *eos_io.RuntimeContext, zoneID string) ([]DNSR
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /records")
 	}
@@ -57,7 +58,8 @@ func (c *DNSClient) CreateRecord(rc *eos_io.RuntimeContext, record DNSRecord) (*
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "performing POST /records")
 	}
@@ -91,7 +93,8 @@ func (c *DNSClient) GetRecord(rc *eos_io.RuntimeContext, id string) (*DNSRecord,
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "executing GET /records/{id}")
 	}
@@ -126,7 +129,8 @@ func (c *DNSClient) UpdateRecord(rc *eos_io.RuntimeContext, id string, updated D
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "executing PUT /records/{id}")
 	}
@@ -160,7 +164,8 @@ func (c *DNSClient) DeleteRecord(rc *eos_io.RuntimeContext, id string) error {
 	}
 	req.Header.Set("Auth-API-Token", c.Token)
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return errors.Wrap(err, "executing DELETE /records/{id}")
 	}
@@ -198,7 +203,8 @@ func (c *DNSClient) bulkSend(rc *eos_io.RuntimeContext, method string, records [
 	req.Header.Set("Auth-API-Token", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	// SECURITY: Use secure HTTP client with timeout and TLS config
+	resp, err := getSecureHTTPClient().Do(req)
 	if err != nil {
 		return errors.Wrap(err, "performing bulk request")
 	}
