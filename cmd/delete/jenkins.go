@@ -30,9 +30,9 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Error parsing docker compose file", zap.Error(err))
 		}
-		containers, images, volumes := container.ExtractComposeMetadata(data)
+		containers, images, volumes, err := container.ExtractComposeMetadata(data)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Fatal("Error parsing docker compose file", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Error extracting compose metadata", zap.Error(err))
 		}
 
 		// Backup all volumes defined in the compose file.
