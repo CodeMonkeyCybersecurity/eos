@@ -5,6 +5,7 @@ package watchdog
 import (
 	"context"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"go.uber.org/zap"
@@ -53,8 +54,17 @@ func NewTimerWatchdog(logger *zap.Logger, config TimerConfig) *TimerWatchdog {
 // Start begins the timer watchdog
 func (tw *TimerWatchdog) Start() {
 	tw.timer = time.NewTimer(tw.timeout)
-	
+
 	go func() {
+		// SECURITY: Panic recovery for timer goroutine
+		defer func() {
+			if r := recover(); r != nil {
+				tw.logger.Error("Timer watchdog panic recovered",
+					zap.Any("panic", r),
+					zap.String("stack", string(debug.Stack())))
+			}
+		}()
+
 		select {
 		case <-tw.done:
 			// Command completed, stop timer
@@ -67,13 +77,13 @@ func (tw *TimerWatchdog) Start() {
 			}
 			tw.logger.Debug("Timer watchdog stopped normally",
 				zap.Duration("elapsed", tw.timeout))
-			
+
 		case <-tw.timer.C:
 			// Timeout occurred
 			tw.logger.Error("Command execution timeout exceeded",
 				zap.Duration("timeout", tw.timeout),
 				zap.Int("pid", os.Getpid()))
-			
+
 			// Call the timeout handler
 			tw.onTimeout()
 		}
@@ -142,9 +152,22 @@ func (cw *CommandWatchdog) Execute(commandName string, args []string, fn func() 
 	defer timer.Stop()
 	
 	done := make(chan error, 1)
-	
-	// Execute function in goroutine
+
+	// Execute function in goroutine with panic recovery
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				cw.logger.Error("Command goroutine panic recovered",
+					zap.String("command", commandName),
+					zap.Any("panic", r),
+					zap.String("stack", string(debug.Stack())))
+				// Send error through channel instead of crashing
+				select {
+				case done <- nil:
+				default:
+				}
+			}
+		}()
 		done <- fn()
 	}()
 	

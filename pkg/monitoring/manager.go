@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -227,9 +228,9 @@ func (mm *MonitoringManager) MonitorTargets(ctx context.Context, targets []*Moni
 	// Start monitoring loops
 	var wg sync.WaitGroup
 
-	// Health monitoring loop
+	// Health monitoring loop with panic recovery
 	wg.Add(1)
-	go func() {
+	shared.SafeGoWithContext(ctx, logger.Logger(), "health-monitoring", func(ctx context.Context) {
 		defer wg.Done()
 		for {
 			select {
@@ -239,11 +240,11 @@ func (mm *MonitoringManager) MonitorTargets(ctx context.Context, targets []*Moni
 				mm.performHealthChecks(rc, targets)
 			}
 		}
-	}()
+	})
 
-	// Metric collection loop
+	// Metric collection loop with panic recovery
 	wg.Add(1)
-	go func() {
+	shared.SafeGoWithContext(ctx, logger.Logger(), "metric-collection", func(ctx context.Context) {
 		defer wg.Done()
 		for {
 			select {
@@ -253,7 +254,7 @@ func (mm *MonitoringManager) MonitorTargets(ctx context.Context, targets []*Moni
 				mm.collectAllMetrics(rc, targets)
 			}
 		}
-	}()
+	})
 
 	// Wait for context cancellation
 	<-ctx.Done()
@@ -276,21 +277,21 @@ func (mm *MonitoringManager) performHealthChecks(rc *eos_io.RuntimeContext, targ
 		}
 
 		wg.Add(1)
-		go func(t *MonitoringTarget) {
+		targetCopy := target // Capture for goroutine
+		shared.SafeGo(logger.Logger(), fmt.Sprintf("health-check-%s", targetCopy.Name), func() {
 			defer wg.Done()
 
-			result, err := mm.CheckHealth(rc, t)
+			result, err := mm.CheckHealth(rc, targetCopy)
 			if err != nil {
 				logger.Error("Health check failed",
-					zap.String("target", t.Name),
+					zap.String("target", targetCopy.Name),
 					zap.Error(err))
 				return
 			}
 
 			// Process result for alerting
-			mm.processHealthResult(rc, t, result)
-
-		}(target)
+			mm.processHealthResult(rc, targetCopy, result)
+		})
 	}
 
 	wg.Wait()
@@ -307,21 +308,21 @@ func (mm *MonitoringManager) collectAllMetrics(rc *eos_io.RuntimeContext, target
 		}
 
 		wg.Add(1)
-		go func(t *MonitoringTarget) {
+		targetCopy := target // Capture for goroutine
+		shared.SafeGo(logger.Logger(), fmt.Sprintf("metric-collection-%s", targetCopy.Name), func() {
 			defer wg.Done()
 
-			result, err := mm.CollectMetrics(rc, t)
+			result, err := mm.CollectMetrics(rc, targetCopy)
 			if err != nil {
 				logger.Error("Metric collection failed",
-					zap.String("target", t.Name),
+					zap.String("target", targetCopy.Name),
 					zap.Error(err))
 				return
 			}
 
 			// Process metrics for alerting
-			mm.processMetricResult(rc, t, result)
-
-		}(target)
+			mm.processMetricResult(rc, targetCopy, result)
+		})
 	}
 
 	wg.Wait()
@@ -352,18 +353,19 @@ func (mm *MonitoringManager) GetOverallHealth(rc *eos_io.RuntimeContext, environ
 		}
 
 		wg.Add(1)
-		go func(t *MonitoringTarget) {
+		targetCopy := target // Capture for goroutine
+		shared.SafeGo(logger.Logger(), fmt.Sprintf("overall-health-%s", targetCopy.Name), func() {
 			defer wg.Done()
 
-			healthResult, err := mm.CheckHealth(rc, t)
+			healthResult, err := mm.CheckHealth(rc, targetCopy)
 			if err != nil {
 				logger.Error("Health check failed",
-					zap.String("target", t.Name),
+					zap.String("target", targetCopy.Name),
 					zap.Error(err))
-				
+
 				// Create a failure result
 				healthResult = &HealthResult{
-					Target:    t.Name,
+					Target:    targetCopy.Name,
 					Healthy:   false,
 					Status:    HealthStatusUnknown,
 					Message:   err.Error(),
@@ -372,8 +374,8 @@ func (mm *MonitoringManager) GetOverallHealth(rc *eos_io.RuntimeContext, environ
 			}
 
 			mu.Lock()
-			result.Targets[t.Name] = healthResult
-			
+			result.Targets[targetCopy.Name] = healthResult
+
 			// Update summary
 			result.Summary.Total++
 			switch healthResult.Status {
@@ -387,8 +389,7 @@ func (mm *MonitoringManager) GetOverallHealth(rc *eos_io.RuntimeContext, environ
 				result.Summary.Unknown++
 			}
 			mu.Unlock()
-
-		}(target)
+		})
 	}
 
 	wg.Wait()

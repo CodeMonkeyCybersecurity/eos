@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -262,9 +263,19 @@ func (c *Client) runBackupWithProgress(args []string) error {
 		return err
 	}
 
-	// Read stderr for errors
+	// Read stderr for errors with panic recovery
 	var stderrBuf bytes.Buffer
 	go func() {
+		// SECURITY: Panic recovery for stderr reader
+		defer func() {
+			if r := recover(); r != nil {
+				logger := otelzap.Ctx(c.rc.Ctx)
+				logger.Error("Stderr reader panic recovered",
+					zap.Any("panic", r),
+					zap.String("stack", string(debug.Stack())))
+			}
+		}()
+
 		buf := make([]byte, 1024)
 		for {
 			n, err := stderr.Read(buf)

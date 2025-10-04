@@ -155,7 +155,8 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 	if err := agentHCLTpl.Execute(f, data); err != nil {
 		return err
 	}
-	return os.Chmod(path, shared.FilePermStandard)
+	// SECURITY: Use 0640 for vault config files containing secrets (not world-readable)
+	return os.Chmod(path, shared.RuntimeFilePerms)
 }
 
 func writeAgentUnit() error {

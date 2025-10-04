@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/temporal"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/gorilla/mux"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -542,9 +543,45 @@ func (h *Handler) respondError(w http.ResponseWriter, code int, message string, 
 	}
 }
 
+// securityHeadersMiddleware adds security headers to all responses
+// SECURITY: Prevents common web vulnerabilities (XSS, clickjacking, MIME sniffing, etc.)
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Prevent MIME type sniffing
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+
+		// Prevent clickjacking attacks
+		w.Header().Set("X-Frame-Options", "DENY")
+
+		// Enable XSS protection (defense in depth, though CSP is primary defense)
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+
+		// Content Security Policy - strict policy for API (no inline scripts/styles)
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+
+		// Require HTTPS for all future requests (HSTS)
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+
+		// Disable caching of sensitive API responses
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, private")
+		w.Header().Set("Pragma", "no-cache")
+
+		// Prevent browsers from sending referrer information
+		w.Header().Set("Referrer-Policy", "no-referrer")
+
+		// Restrict feature permissions (disable geolocation, camera, microphone, etc.)
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // SetupRoutes sets up the API routes
 func (h *Handler) SetupRoutes() *mux.Router {
 	router := mux.NewRouter()
+
+	// SECURITY: Apply security headers middleware to all routes
+	router.Use(securityHeadersMiddleware)
 
 	// API v1 routes
 	v1 := router.PathPrefix("/api/v1").Subrouter()
@@ -593,12 +630,12 @@ func (h *Handler) StartServer(ctx context.Context, port int) error {
 	logger.Info("Starting Hecate API server",
 		zap.Int("port", port))
 
-	// Start server in a goroutine
-	go func() {
+	// Start server in a goroutine with panic recovery
+	shared.SafeGo(logger, "hecate-api-server", func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("HTTP server error", zap.Error(err))
 		}
-	}()
+	})
 
 	// Wait for context cancellation
 	<-ctx.Done()
