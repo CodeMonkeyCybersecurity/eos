@@ -56,7 +56,15 @@ func probeVaultHealthUntilReady(rc *eos_io.RuntimeContext, client *api.Client) e
 		status, err := client.Sys().Health()
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Warn(" Vault health API error", zap.Int("attempt", attempt), zap.Error(err))
-			time.Sleep(shared.VaultRetryDelay)
+			// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+			if attempt < shared.VaultRetryCount {
+				select {
+				case <-time.After(shared.VaultRetryDelay):
+					continue
+				case <-rc.Ctx.Done():
+					return fmt.Errorf("vault health check cancelled: %w", rc.Ctx.Err())
+				}
+			}
 			continue
 		}
 
@@ -85,7 +93,15 @@ func probeVaultHealthUntilReady(rc *eos_io.RuntimeContext, client *api.Client) e
 		}
 
 		otelzap.Ctx(rc.Ctx).Warn("Unexpected Vault health state", zap.Any("response", status))
-		time.Sleep(shared.VaultRetryDelay)
+		// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+		if attempt < shared.VaultRetryCount {
+			select {
+			case <-time.After(shared.VaultRetryDelay):
+				// Continue to next health check
+			case <-rc.Ctx.Done():
+				return fmt.Errorf("vault health check cancelled: %w", rc.Ctx.Err())
+			}
+		}
 	}
 	otelzap.Ctx(rc.Ctx).Error(" Vault not healthy after maximum retry attempts",
 		zap.Int("retries", shared.VaultRetryCount))

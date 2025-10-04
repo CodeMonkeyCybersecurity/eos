@@ -470,7 +470,12 @@ func (n *NetworkHelper) downloadAttempt(url, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			n.logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download failed with status: %d", resp.StatusCode)
@@ -480,7 +485,11 @@ func (n *NetworkHelper) downloadAttempt(url, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		if closeErr := out.Close(); closeErr != nil {
+			n.logger.Warn("Failed to close output file", zap.String("path", dest), zap.Error(closeErr))
+		}
+	}()
 
 	_, err = io.Copy(out, resp.Body)
 	return err

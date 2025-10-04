@@ -3,6 +3,7 @@
 package vault
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -317,7 +318,14 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 	log.Info(" Verifying Vault Agent functionality")
 
 	// Wait for agent to be fully ready
-	time.Sleep(2 * time.Second)
+	// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+	agentStartupWait := 2 * time.Second
+	select {
+	case <-time.After(agentStartupWait):
+		// Continue to token file check
+	case <-rc.Ctx.Done():
+		return fmt.Errorf("vault agent verification cancelled: %w", rc.Ctx.Err())
+	}
 
 	// Check if agent token file exists and is readable
 	tokenPath := shared.AgentToken

@@ -1,6 +1,7 @@
 package cleanup
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -55,7 +56,14 @@ func StopVaultServices(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Wait a moment for processes to terminate
-	time.Sleep(2 * time.Second)
+	// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+	processTerminationWait := 2 * time.Second
+	select {
+	case <-time.After(processTerminationWait):
+		// Continue to evaluation
+	case <-rc.Ctx.Done():
+		return fmt.Errorf("vault service cleanup cancelled: %w", rc.Ctx.Err())
+	}
 
 	// EVALUATE - Check if all services stopped
 	logger.Info("Vault services stop completed")

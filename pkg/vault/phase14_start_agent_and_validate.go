@@ -45,7 +45,14 @@ func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Clie
 
 	// Wait a moment for the service to fully start and begin authentication
 	otelzap.Ctx(rc.Ctx).Info(" Allowing time for Vault Agent service to start and authenticate")
-	time.Sleep(3 * time.Second)
+	// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+	agentStartupWait := 3 * time.Second
+	select {
+	case <-time.After(agentStartupWait):
+		// Continue to token wait
+	case <-rc.Ctx.Done():
+		return fmt.Errorf("vault agent startup wait cancelled: %w", rc.Ctx.Err())
+	}
 
 	tokenPath := shared.AgentToken
 	token, err := WaitForAgentToken(rc, tokenPath, shared.MaxWait)

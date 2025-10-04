@@ -373,7 +373,12 @@ func (r *VersionResolver) getMinIOVersionFromGitHub(resolver *VersionResolver) (
 	if err != nil {
 		return "", fmt.Errorf("failed to query GitHub API: %w", err)
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -409,7 +414,12 @@ func (r *VersionResolver) getMinIOVersionFromUpdateService(resolver *VersionReso
 	if err != nil {
 		return "", fmt.Errorf("failed to query MinIO update service: %w", err)
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("MinIO update service returned status %d", resp.StatusCode)
@@ -458,7 +468,12 @@ func (r *VersionResolver) getConsulVersionFromGitHub(resolver *VersionResolver) 
 	if err != nil {
 		return "", fmt.Errorf("failed to query GitHub API: %w", err)
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -509,7 +524,12 @@ func (r *VersionResolver) getLatestStableConsulFromAllReleases() (string, error)
 	if err != nil {
 		return "", fmt.Errorf("failed to query GitHub API: %w", err)
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
 
 	var releases []GitHubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
@@ -543,7 +563,12 @@ func (r *VersionResolver) getConsulVersionFromCheckpoint(resolver *VersionResolv
 	if err != nil {
 		return "", fmt.Errorf("failed to query checkpoint service: %w", err)
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("checkpoint service returned status %d", resp.StatusCode)

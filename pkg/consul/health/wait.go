@@ -64,7 +64,13 @@ func WaitForReady(rc *eos_io.RuntimeContext) error {
 
 		// Don't sleep on the last attempt
 		if i < maxAttempts-1 {
-			time.Sleep(checkInterval)
+			// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+			select {
+			case <-time.After(checkInterval):
+				// Continue to next check
+			case <-rc.Ctx.Done():
+				return fmt.Errorf("consul readiness check cancelled after %d attempts: %w", i+1, rc.Ctx.Err())
+			}
 		}
 	}
 

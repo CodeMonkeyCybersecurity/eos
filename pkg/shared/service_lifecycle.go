@@ -251,7 +251,14 @@ func (slm *ServiceLifecycleManager) stopServiceSafely(ctx context.Context, servi
 		// First try SIGTERM
 		if err := slm.killProcess(pid, "TERM"); err == nil {
 			// Wait a bit for graceful shutdown
-			time.Sleep(5 * time.Second)
+			// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+			gracefulWait := 5 * time.Second
+			select {
+			case <-time.After(gracefulWait):
+				// Continue to check if process still exists
+			case <-ctx.Done():
+				return fmt.Errorf("service stop cancelled during graceful shutdown wait: %w", ctx.Err())
+			}
 
 			// Check if process still exists
 			if !slm.processExists(pid) {

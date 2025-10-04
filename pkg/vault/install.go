@@ -243,7 +243,14 @@ func (vi *VaultInstaller) assess() (bool, error) {
 					vi.logger.Warn("Failed to start existing Vault service", zap.Error(err))
 				} else {
 					// Wait a moment for it to start
-					time.Sleep(3 * time.Second)
+					// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+					startupWait := 3 * time.Second
+					select {
+					case <-time.After(startupWait):
+						// Continue to check if Vault is ready
+					case <-vi.rc.Ctx.Done():
+						return false, fmt.Errorf("vault startup check cancelled: %w", vi.rc.Ctx.Err())
+					}
 					if vi.isVaultReady() {
 						vi.logger.Info("Successfully started existing Vault service")
 						vi.logger.Info("terminal prompt: ✅ Vault service started successfully")
@@ -291,7 +298,15 @@ func (vi *VaultInstaller) validatePrerequisites() error {
 		if err := vi.systemd.Stop(); err != nil {
 			vi.logger.Warn("Failed to stop existing Vault service", zap.Error(err))
 		}
-		time.Sleep(2 * time.Second) // Give it time to release ports
+		// Give it time to release ports
+		// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+		portReleaseWait := 2 * time.Second
+		select {
+		case <-time.After(portReleaseWait):
+			// Continue to port availability check
+		case <-vi.rc.Ctx.Done():
+			return fmt.Errorf("vault service stop wait cancelled: %w", vi.rc.Ctx.Err())
+		}
 	}
 
 	// Check port availability
@@ -831,7 +846,12 @@ func (vi *VaultInstaller) httpGet(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			vi.logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)

@@ -78,7 +78,13 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 			logger.Info("Waiting before retry",
 				zap.Duration("delay", delay),
 				zap.Int("next_attempt", i+1))
-			time.Sleep(delay)
+			// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+			select {
+			case <-time.After(delay):
+				// Continue to next retry
+			case <-rc.Ctx.Done():
+				return fmt.Errorf("retry cancelled: %w", rc.Ctx.Err())
+			}
 		}
 	}
 
@@ -147,7 +153,13 @@ func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, d
 			logger.Info("Waiting before retry",
 				zap.Duration("delay", delay),
 				zap.Int("next_attempt", i+1))
-			time.Sleep(delay)
+			// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+			select {
+			case <-time.After(delay):
+				// Continue to next retry
+			case <-rc.Ctx.Done():
+				return output, fmt.Errorf("retry cancelled: %w", rc.Ctx.Err())
+			}
 		}
 	}
 

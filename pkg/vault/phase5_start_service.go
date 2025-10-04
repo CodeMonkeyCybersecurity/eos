@@ -124,7 +124,13 @@ func waitForVaultHealth(rc *eos_io.RuntimeContext, maxWait time.Duration) error 
 			return nil
 		}
 		otelzap.Ctx(rc.Ctx).Debug(" Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
-		time.Sleep(shared.VaultRetryDelay)
+		// SECURITY P2 #7: Use context-aware sleep to respect cancellation
+		select {
+		case <-time.After(shared.VaultRetryDelay):
+			// Continue waiting
+		case <-rc.Ctx.Done():
+			return fmt.Errorf("vault listener check cancelled after %s: %w", time.Since(start), rc.Ctx.Err())
+		}
 	}
 }
 

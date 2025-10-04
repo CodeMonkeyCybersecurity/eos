@@ -120,7 +120,13 @@ func (c *AuthentikClient) GetUsers(search string) ([]AuthentikUser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Logger not available in this context, silently ignore (HTTP client best practice)
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -162,7 +168,13 @@ func (c *AuthentikClient) GetGroups(search string) ([]AuthentikGroup, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Logger not available in this context, silently ignore (HTTP client best practice)
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -204,7 +216,13 @@ func (c *AuthentikClient) CreateGroup(groupName string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Logger not available in this context, silently ignore (HTTP client best practice)
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -249,7 +267,13 @@ func (c *AuthentikClient) AddUserToGroup(username, groupName string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Logger not available in this context, silently ignore (HTTP client best practice)
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
@@ -270,7 +294,13 @@ func (c *AuthentikClient) GetEvents(action string, since time.Time) ([]Authentik
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	// SECURITY P2 #8: Check defer Body.Close() error
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Logger not available in this context, silently ignore (HTTP client best practice)
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
