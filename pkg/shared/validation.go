@@ -72,25 +72,72 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
-// ValidateURL validates a URL format
+// ValidateURL validates a URL format with SSRF protection
+// SECURITY: Prevents Server-Side Request Forgery attacks by blocking:
+// - Private IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x)
+// - Cloud metadata endpoints
+// - Link-local addresses
 func ValidateURL(urlStr string) error {
 	if urlStr == "" {
 		return fmt.Errorf("URL cannot be empty")
 	}
-	
+
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("invalid URL format: %v", err)
 	}
-	
+
 	if parsedURL.Scheme == "" {
 		return fmt.Errorf("URL must include a scheme (http:// or https://)")
 	}
-	
+
 	if parsedURL.Host == "" {
 		return fmt.Errorf("URL must include a host")
 	}
-	
+
+	// SECURITY: SSRF protection - validate hostname/IP is not private/internal
+	hostname := parsedURL.Hostname()
+
+	// Check for localhost aliases
+	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" || hostname == "0.0.0.0" {
+		return fmt.Errorf("URL hostname cannot be localhost (SSRF protection)")
+	}
+
+	// Parse IP address if present
+	ip := net.ParseIP(hostname)
+	if ip != nil {
+		// Block private IP ranges (RFC 1918, RFC 4193, link-local, loopback)
+		if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("URL cannot use private/internal IP address (SSRF protection): %s", hostname)
+		}
+
+		// Block cloud metadata IPs (AWS: 169.254.169.254, GCP: metadata.google.internal)
+		if ip.String() == "169.254.169.254" {
+			return fmt.Errorf("URL cannot access cloud metadata service (SSRF protection)")
+		}
+	} else {
+		// For hostnames, check DNS resolution
+		ips, err := net.LookupIP(hostname)
+		if err != nil {
+			return fmt.Errorf("URL hostname DNS lookup failed: %v (may be invalid or unreachable)", err)
+		}
+
+		// Validate all resolved IPs are public
+		for _, resolvedIP := range ips {
+			if resolvedIP.IsPrivate() || resolvedIP.IsLoopback() || resolvedIP.IsLinkLocalUnicast() {
+				return fmt.Errorf("URL hostname resolves to private IP (SSRF protection): %s -> %s", hostname, resolvedIP)
+			}
+		}
+	}
+
+	// Block common metadata hostnames
+	metadataHosts := []string{"metadata.google.internal", "metadata", "instance-data"}
+	for _, blocked := range metadataHosts {
+		if hostname == blocked {
+			return fmt.Errorf("URL cannot access metadata hostname (SSRF protection): %s", hostname)
+		}
+	}
+
 	return nil
 }
 
@@ -315,31 +362,44 @@ func validateStructFields(v interface{}) error {
 }
 
 // validateFieldByTag validates a field based on its validation tag
+// SECURITY: Whitelisted validation rules prevent injection attacks via malicious struct tags
 func validateFieldByTag(fieldName string, value interface{}, tag string) error {
 	rules := strings.Split(tag, ",")
-	
+
 	for _, rule := range rules {
 		rule = strings.TrimSpace(rule)
 		if rule == "" {
 			continue
 		}
-		
+
+		// SECURITY: Whitelist allowed validation rules to prevent command injection
+		// Only allow alphanumeric characters, equals, and underscores in rules
+		if !regexp.MustCompile(`^[a-zA-Z_]+(=[0-9]+)?$`).MatchString(rule) {
+			return fmt.Errorf("invalid validation rule format for field '%s': %s (security: only alphanumeric rules allowed)", fieldName, rule)
+		}
+
 		switch {
 		case rule == "required":
 			if err := validateRequired(fieldName, value); err != nil {
 				return err
 			}
 		case strings.HasPrefix(rule, "min="):
-			if minStr := strings.TrimPrefix(rule, "min="); minStr != "" {
-				if err := validateMinLength(fieldName, value, minStr); err != nil {
-					return err
-				}
+			minStr := strings.TrimPrefix(rule, "min=")
+			// SECURITY: Validate minStr contains only digits
+			if !regexp.MustCompile(`^[0-9]+$`).MatchString(minStr) {
+				return fmt.Errorf("invalid min value for field '%s': must be numeric (security: prevented injection)", fieldName)
+			}
+			if err := validateMinLength(fieldName, value, minStr); err != nil {
+				return err
 			}
 		case strings.HasPrefix(rule, "max="):
-			if maxStr := strings.TrimPrefix(rule, "max="); maxStr != "" {
-				if err := validateMaxLength(fieldName, value, maxStr); err != nil {
-					return err
-				}
+			maxStr := strings.TrimPrefix(rule, "max=")
+			// SECURITY: Validate maxStr contains only digits
+			if !regexp.MustCompile(`^[0-9]+$`).MatchString(maxStr) {
+				return fmt.Errorf("invalid max value for field '%s': must be numeric (security: prevented injection)", fieldName)
+			}
+			if err := validateMaxLength(fieldName, value, maxStr); err != nil {
+				return err
 			}
 		case rule == "email":
 			if str, ok := value.(string); ok {
@@ -353,9 +413,12 @@ func validateFieldByTag(fieldName string, value interface{}, tag string) error {
 					return err
 				}
 			}
+		default:
+			// SECURITY: Reject unknown validation rules
+			return fmt.Errorf("unknown validation rule for field '%s': %s (security: only whitelisted rules allowed)", fieldName, rule)
 		}
 	}
-	
+
 	return nil
 }
 

@@ -49,6 +49,7 @@ func ValidateTokenFilePermissions(rc *eos_io.RuntimeContext, filePath string) er
 }
 
 // SecureWriteTokenFile writes a token to a file with secure permissions
+// SECURITY: Prevents TOCTOU race by using os.OpenFile with explicit mode and exclusive creation
 func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
@@ -58,16 +59,40 @@ func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) err
 		return fmt.Errorf("failed to create token directory %s: %w", dir, err)
 	}
 
-	// Write file with secure permissions
-	if err := os.WriteFile(filePath, []byte(token), SecureFilePermissions); err != nil {
-		return fmt.Errorf("failed to write token file %s: %w", filePath, err)
+	// SECURITY: Use OpenFile with O_EXCL to prevent TOCTOU race
+	// File is created with correct permissions atomically - no window for race condition
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, SecureFilePermissions)
+	if err != nil {
+		if os.IsExist(err) {
+			return fmt.Errorf("token file already exists: %s (refusing to overwrite for security)", filePath)
+		}
+		return fmt.Errorf("failed to create token file %s: %w", filePath, err)
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			log.Warn("Failed to close token file", zap.String("file", filePath), zap.Error(closeErr))
+		}
+	}()
+
+	// Write token content
+	if _, err := file.WriteString(token); err != nil {
+		// Remove partially written file
+		if removeErr := os.Remove(filePath); removeErr != nil {
+			log.Warn("Failed to remove partially written token file", zap.String("file", filePath), zap.Error(removeErr))
+		}
+		return fmt.Errorf("failed to write token content to %s: %w", filePath, err)
 	}
 
-	// Double-check permissions were set correctly
+	// Explicitly sync to disk to ensure atomicity
+	if err := file.Sync(); err != nil {
+		log.Warn("Failed to sync token file to disk", zap.String("file", filePath), zap.Error(err))
+	}
+
+	// Double-check permissions after write (defense in depth)
 	if err := ValidateTokenFilePermissions(rc, filePath); err != nil {
 		// If validation fails, remove the file to prevent security risk
-		if err := os.Remove(filePath); err != nil {
-			log.Warn("Failed to remove insecure token file", zap.String("file", filePath), zap.Error(err))
+		if removeErr := os.Remove(filePath); removeErr != nil {
+			log.Warn("Failed to remove insecure token file", zap.String("file", filePath), zap.Error(removeErr))
 		}
 		return fmt.Errorf("token file written with insecure permissions: %w", err)
 	}
