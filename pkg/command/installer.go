@@ -95,9 +95,8 @@ func (ci *CommandInstaller) InstallInteractive() error {
 
 // promptForName prompts for and validates command name
 func (ci *CommandInstaller) promptForName() (string, error) {
-	fmt.Print("Enter the name you want to use to call the command: ")
-	reader := bufio.NewReader(os.Stdin)
-	name, err := reader.ReadString('\n')
+	ci.logger.Info("terminal prompt: Enter the name you want to use to call the command")
+	name, err := eos_io.PromptInput(ci.rc.Ctx, "Enter the name you want to use to call the command")
 	if err != nil {
 		return "", err
 	}
@@ -112,9 +111,8 @@ func (ci *CommandInstaller) promptForName() (string, error) {
 
 // promptForContent prompts for command content
 func (ci *CommandInstaller) promptForContent() (string, error) {
-	fmt.Print("Enter the command or script you want to execute: ")
-	reader := bufio.NewReader(os.Stdin)
-	content, err := reader.ReadString('\n')
+	ci.logger.Info("terminal prompt: Enter the command or script you want to execute")
+	content, err := eos_io.PromptInput(ci.rc.Ctx, "Enter the command or script you want to execute")
 	if err != nil {
 		return "", err
 	}
@@ -129,9 +127,8 @@ func (ci *CommandInstaller) promptForContent() (string, error) {
 
 // promptForDescription prompts for optional description
 func (ci *CommandInstaller) promptForDescription() (string, error) {
-	fmt.Print("Enter a description for this command (optional): ")
-	reader := bufio.NewReader(os.Stdin)
-	description, err := reader.ReadString('\n')
+	ci.logger.Info("terminal prompt: Enter a description for this command (optional)")
+	description, err := eos_io.PromptInput(ci.rc.Ctx, "Enter a description for this command (optional)")
 	if err != nil {
 		return "", err
 	}
@@ -166,10 +163,9 @@ func (ci *CommandInstaller) Install(def *CommandDefinition) error {
 
 	ci.logger.Info("Command installed successfully",
 		zap.String("name", def.Name),
-		zap.String("path", scriptPath))
-
-	fmt.Printf("Command '%s' has been created and added to %s.\n", def.Name, def.TargetDir)
-	fmt.Printf("You can now use '%s' to execute: %s\n", def.Name, def.Content)
+		zap.String("path", scriptPath),
+		zap.String("target_dir", def.TargetDir),
+		zap.String("content", def.Content))
 
 	return nil
 }
@@ -320,7 +316,7 @@ func (ci *CommandInstaller) isEosCommand(path string) bool {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close file: %v\n", err)
+			ci.logger.Warn("Failed to close file", zap.Error(err), zap.String("path", path))
 		}
 	}()
 
@@ -346,7 +342,7 @@ func (ci *CommandInstaller) extractDescription(path string) (string, error) {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close file: %v\n", err)
+			ci.logger.Warn("Failed to close file", zap.Error(err), zap.String("path", path))
 		}
 	}()
 
@@ -422,8 +418,8 @@ func (ci *CommandInstaller) RemoveCommand(name string) error {
 	// Check if it's an Eos command before removing
 	if !ci.isEosCommand(path) {
 		ci.logger.Warn("Attempting to remove non-Eos command",
-			zap.String("command", name))
-		fmt.Printf("Warning: '%s' may not be an Eos-generated command\n", name)
+			zap.String("command", name),
+			zap.String("note", "This may not be an Eos-generated command"))
 	}
 
 	// Remove with sudo if needed
@@ -438,8 +434,9 @@ func (ci *CommandInstaller) RemoveCommand(name string) error {
 		}
 	}
 
-	ci.logger.Info("Command removed successfully", zap.String("command", name))
-	fmt.Printf("Command '%s' has been removed\n", name)
+	ci.logger.Info("Command removed successfully",
+		zap.String("command", name),
+		zap.String("path", path))
 
 	return nil
 }

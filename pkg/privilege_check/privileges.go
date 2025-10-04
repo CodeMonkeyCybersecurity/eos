@@ -271,13 +271,25 @@ func checkSudoAccess(rc *eos_io.RuntimeContext) bool {
 }
 
 func outputColoredMessage(result *SudoCheckResult) {
+	// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
+	logger := otelzap.L()
+
 	if result.Success {
 		if result.Check.IsRoot {
-			fmt.Printf("\033[32m✔ %s\033[0m\n", result.Message)
+			logger.Info("Privilege check success",
+				zap.String("status", "✔"),
+				zap.String("color", "green"),
+				zap.String("message", result.Message))
 		} else {
-			fmt.Printf("\033[33m✔ %s\033[0m\n", result.Message)
+			logger.Info("Privilege check success",
+				zap.String("status", "✔"),
+				zap.String("color", "yellow"),
+				zap.String("message", result.Message))
 		}
 	} else {
-		fmt.Printf("\033[31m✘ %s\033[0m\n", result.Message)
+		logger.Error("Privilege check failure",
+			zap.String("status", "✘"),
+			zap.String("color", "red"),
+			zap.String("message", result.Message))
 	}
 }

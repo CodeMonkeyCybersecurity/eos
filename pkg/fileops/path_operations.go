@@ -120,7 +120,8 @@ func UpdateFilesInDir(dir, token, replacement string) error {
 		}
 		if lstat.Mode()&os.ModeSymlink != 0 {
 			// Skip symlinks to prevent modifying files outside the directory
-			fmt.Printf("Skipping symlink: %s\n", path)
+			// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md
+			p.logger.Debug("Skipping symlink", zap.String("path", path))
 			return nil
 		}
 
@@ -139,7 +140,8 @@ func UpdateFilesInDir(dir, token, replacement string) error {
 
 		// SECURITY: Verify current user can write to the file
 		if lstat.Mode().Perm()&0200 == 0 {
-			fmt.Printf("Skipping read-only file: %s\n", path)
+			// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md
+			p.logger.Debug("Skipping read-only file", zap.String("path", path))
 			return nil
 		}
 
@@ -158,7 +160,11 @@ func UpdateFilesInDir(dir, token, replacement string) error {
 			if err := os.WriteFile(path, []byte(newContents), safeMode); err != nil {
 				return fmt.Errorf("failed to write %s: %w", path, err)
 			}
-			fmt.Printf("Updated file: %s (mode: %o, uid: %d)\n", path, safeMode, currentUID)
+			// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md
+			p.logger.Info("File updated",
+				zap.String("path", path),
+				zap.Uint32("mode", uint32(safeMode)),
+				zap.Int("uid", currentUID))
 		}
 		return nil
 	})

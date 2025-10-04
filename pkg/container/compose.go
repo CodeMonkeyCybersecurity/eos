@@ -19,6 +19,8 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -38,7 +40,12 @@ func UncommentSegment(segmentComment string) error {
 	}
 	defer func() {
 		if cerr := inputFile.Close(); cerr != nil {
-			fmt.Fprintf(os.Stderr, "failed to close input file: %v\n", cerr)
+			// SECURITY: Use structured logging instead of fmt.Fprintf per CLAUDE.md P0 rule
+			// Note: This is in a package without RuntimeContext, using global logger
+			logger := otelzap.L()
+			logger.Error("Failed to close input file",
+				zap.Error(cerr),
+				zap.String("file", dockerComposePath))
 		}
 	}()
 
@@ -87,13 +94,20 @@ func UncommentSegment(segmentComment string) error {
 
 // RunDockerComposeAllServices starts a specific service from a docker compose file.
 func RunDockerComposeAllServices(composeFile, service string) error {
+	logger := otelzap.L()
+
 	args := []string{"-f", composeFile, "up", "-d"}
 	cmd, err := GetDockerComposeCmd(args...)
 	if err != nil {
 		return err
 	}
 	output, err := cmd.CombinedOutput()
-	fmt.Println(string(output))
+
+	// SECURITY: Use structured logging instead of fmt.Println per CLAUDE.md P0 rule
+	logger.Info("Docker compose command output",
+		zap.String("compose_file", composeFile),
+		zap.String("output", string(output)))
+
 	if err != nil {
 		return fmt.Errorf("docker compose up failed: %s", output)
 	}

@@ -24,15 +24,22 @@ func OutputMountOpJSON(result *MountOperation) error {
 }
 
 func OutputMountOpText(result *MountOperation) error {
+	// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
+	logger := otelzap.L()
+
 	if result.DryRun {
-		fmt.Printf("[DRY RUN] %s\n", result.Message)
+		logger.Info("Mount operation (dry run)",
+			zap.String("mode", "DRY_RUN"),
+			zap.String("message", result.Message))
 	} else if result.Success {
-		fmt.Printf("✓ %s\n", result.Message)
-		if result.Duration > 0 {
-			fmt.Printf("  Duration: %v\n", result.Duration)
-		}
+		logger.Info("Mount operation success",
+			zap.String("status", "✓"),
+			zap.String("message", result.Message),
+			zap.Duration("duration", result.Duration))
 	} else {
-		fmt.Printf("✗ %s\n", result.Message)
+		logger.Error("Mount operation failed",
+			zap.String("status", "✗"),
+			zap.String("message", result.Message))
 	}
 	return nil
 }
@@ -659,7 +666,10 @@ func (dm *DiskManager) backupPartitionTable(rc *eos_io.RuntimeContext, device st
 }
 
 func (dm *DiskManager) promptForConfirmation(message string) bool {
-	fmt.Printf("%s? [y/N]: ", message)
+	// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
+	logger := otelzap.L()
+	logger.Info("terminal prompt: confirmation required", zap.String("message", message))
+
 	var response string
 	_, _ = fmt.Scanln(&response) // Ignore error as empty input is valid
 	return response == "y" || response == "Y" || response == "yes"
@@ -719,15 +729,22 @@ func OutputFormatOpJSON(result *FormatOperation) error {
 }
 
 func OutputFormatOpText(result *FormatOperation) error {
+	// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
+	logger := otelzap.L()
+
 	if result.DryRun {
-		fmt.Printf("[DRY RUN] %s\n", result.Message)
+		logger.Info("Format operation (dry run)",
+			zap.String("mode", "DRY_RUN"),
+			zap.String("message", result.Message))
 	} else if result.Success {
-		fmt.Printf("✓ %s\n", result.Message)
-		if result.Duration > 0 {
-			fmt.Printf("  Duration: %v\n", result.Duration)
-		}
+		logger.Info("Format operation success",
+			zap.String("status", "✓"),
+			zap.String("message", result.Message),
+			zap.Duration("duration", result.Duration))
 	} else {
-		fmt.Printf("✗ %s\n", result.Message)
+		logger.Error("Format operation failed",
+			zap.String("status", "✗"),
+			zap.String("message", result.Message))
 	}
 	return nil
 }

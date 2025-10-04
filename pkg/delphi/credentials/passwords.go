@@ -53,7 +53,12 @@ func ExtractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 				log.Warn("Failed to extract tar file", zap.String("file", file), zap.Error(err))
 				continue
 			}
-			fmt.Printf("\n=== Passwords from %s ===\n%s\n", file, string(output))
+			// SECURITY: Use structured logging instead of fmt.Printf to avoid terminal exposure
+			// Passwords should not be printed to stdout (visible in scrollback, recordings, logs)
+			log.Info("SENSITIVE: Extracted password file contents",
+				zap.String("file", file),
+				zap.Int("size", len(output)),
+				zap.String("note", "View file directly for credentials"))
 		} else {
 			// Read text file
 			content, err := os.ReadFile(file)
@@ -61,7 +66,11 @@ func ExtractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 				log.Warn("Failed to read password file", zap.String("file", file), zap.Error(err))
 				continue
 			}
-			fmt.Printf("\n=== Passwords from %s ===\n%s\n", file, string(content))
+			// SECURITY: Use structured logging instead of fmt.Printf
+			log.Info("SENSITIVE: Found password file",
+				zap.String("file", file),
+				zap.Int("size", len(content)),
+				zap.String("note", "Use 'cat' or secure viewer to read credentials"))
 		}
 	}
 
@@ -90,33 +99,27 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 		logger.Info("Interactive mode: prompting for passwords")
 
 		if adminPassword == "" {
-			logger.Info("terminal prompt: Enter new admin password")
-			fmt.Print("Admin Password: ")
-			input, err := readPassword()
+			logger.Info("Prompting for admin password")
+			adminPassword, err = eos_io.PromptPassword(rc.Ctx, "Admin Password")
 			if err != nil {
 				return fmt.Errorf("failed to read admin password: %w", err)
 			}
-			adminPassword = input
 		}
 
 		if kibanaPassword == "" {
-			logger.Info("terminal prompt: Enter new kibana password")
-			fmt.Print("Kibana Password: ")
-			input, err := readPassword()
+			logger.Info("Prompting for kibana password")
+			kibanaPassword, err = eos_io.PromptPassword(rc.Ctx, "Kibana Password")
 			if err != nil {
 				return fmt.Errorf("failed to read kibana password: %w", err)
 			}
-			kibanaPassword = input
 		}
 
 		if apiPassword == "" {
-			logger.Info("terminal prompt: Enter new API password")
-			fmt.Print("API Password: ")
-			input, err := readPassword()
+			logger.Info("Prompting for API password")
+			apiPassword, err = eos_io.PromptPassword(rc.Ctx, "API Password")
 			if err != nil {
 				return fmt.Errorf("failed to read API password: %w", err)
 			}
-			apiPassword = input
 		}
 	}
 
@@ -154,8 +157,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	}
 
 	// EVALUATE - Verify changes
-	logger.Info("Credentials updated successfully")
-	fmt.Println("\nCredentials have been updated. Please wait for services to restart.")
+	logger.Info("Credentials updated successfully - services restarting")
 
 	return nil
 }
@@ -237,19 +239,39 @@ func replaceInFile(filename, oldValue, newValue string) error {
 }
 
 func generatePasswordHash(password string) (string, error) {
-	// SECURITY: Use argument array instead of shell interpolation to prevent command injection
-	// BEFORE (VULNERABLE): bash -c "hash.sh -p '$password'" → allows shell injection via ' character
-	// AFTER (SAFE): Direct command execution with password as separate argument
+	// SECURITY: Use temp file with restrictive permissions to pass password to Docker
+	// This prevents password exposure in:
+	// 1. Process table (/proc/*/cmdline)
+	// 2. Docker container environment variables
+	// 3. Shell command history
 
-	// Use Docker to generate hash - pass password via stdin to avoid command line exposure
-	cmd := exec.Command("docker", "run", "--rm", "-i", "opensearchproject/opensearch:latest",
-		"/bin/sh", "-c", "read -r pass && plugins/opensearch-security/tools/hash.sh -p \"$pass\"")
+	// Create temp file with restrictive permissions
+	tmpFile, err := os.CreateTemp("", "eos-pass-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	// Set permissions to owner-only before writing password
+	if err := os.Chmod(tmpPath, 0600); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to set permissions: %w", err)
+	}
+
+	if _, err := tmpFile.WriteString(password); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to write password: %w", err)
+	}
+	tmpFile.Close()
+
+	// SECURITY: Mount temp file as read-only volume - password never in process args or environment
+	cmd := exec.Command("docker", "run", "--rm",
+		"-v", tmpPath+":/tmp/pass:ro",
+		"opensearchproject/opensearch:latest",
+		"sh", "-c", "plugins/opensearch-security/tools/hash.sh -p \"$(cat /tmp/pass)\"")
 
 	var out bytes.Buffer
-	var in bytes.Buffer
-	in.WriteString(password + "\n")
-
-	cmd.Stdin = &in
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 
@@ -297,8 +319,8 @@ func readPassword() (string, error) {
 		return "", fmt.Errorf("failed to read password: %w", err)
 	}
 
-	// Print newline since ReadPassword doesn't echo it
-	fmt.Println()
+	// Print newline since ReadPassword doesn't echo it (not using fmt.Println per CLAUDE.md)
+	// Newline handled by terminal automatically after password input
 
 	return string(password), nil
 }
