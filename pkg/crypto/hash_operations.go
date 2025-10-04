@@ -3,7 +3,6 @@ package crypto
 
 import (
 	"context"
-	"crypto/md5"
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
@@ -48,13 +47,12 @@ func (h *HashOperationsImpl) HashBytes(ctx context.Context, input []byte, algori
 	case "sha512":
 		hasher = sha512.New()
 	case "md5":
-		// MD5 is cryptographically broken and should not be used for security purposes
-		h.logger.Warn("MD5 hash algorithm is deprecated and insecure",
-			zap.String("algorithm", algorithm),
-			zap.String("recommendation", "use SHA-256 or higher"))
-		hasher = md5.New()
+		// SECURITY: MD5 is cryptographically broken and MUST NOT be used
+		// MD5 is vulnerable to collision attacks and should never be used for security
+		// Use SHA-256 or higher for cryptographic purposes
+		return nil, fmt.Errorf("MD5 hash algorithm is deprecated and insecure - use SHA-256 or higher")
 	default:
-		return nil, fmt.Errorf("unsupported hash algorithm: %s", algorithm)
+		return nil, fmt.Errorf("unsupported hash algorithm: %s (supported: sha256, sha384, sha512)", algorithm)
 	}
 
 	hasher.Write(input)
@@ -90,13 +88,10 @@ func (h *HashOperationsImpl) HashFile(ctx context.Context, path string, algorith
 	case "sha512":
 		hasher = sha512.New()
 	case "md5":
-		// MD5 is cryptographically broken and should not be used for security purposes
-		h.logger.Warn("MD5 hash algorithm is deprecated and insecure",
-			zap.String("algorithm", algorithm),
-			zap.String("recommendation", "use SHA-256 or higher"))
-		hasher = md5.New()
+		// SECURITY: MD5 is cryptographically broken and MUST NOT be used
+		return "", fmt.Errorf("MD5 hash algorithm is deprecated and insecure - use SHA-256 or higher")
 	default:
-		return "", fmt.Errorf("unsupported hash algorithm: %s", algorithm)
+		return "", fmt.Errorf("unsupported hash algorithm: %s (supported: sha256, sha384, sha512)", algorithm)
 	}
 
 	if _, err := io.Copy(hasher, file); err != nil {

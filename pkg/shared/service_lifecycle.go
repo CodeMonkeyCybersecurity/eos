@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -352,13 +353,46 @@ func (slm *ServiceLifecycleManager) reloadSystemdDaemon(ctx context.Context) err
 
 // Helper functions
 func (slm *ServiceLifecycleManager) killProcess(pid int, signal string) error {
-	cmd := exec.Command("kill", "-"+signal, fmt.Sprintf("%d", pid))
-	return cmd.Run()
+	// SECURITY: Validate signal to prevent command injection
+	// Only allow specific whitelisted signals
+	var sig syscall.Signal
+	switch signal {
+	case "TERM":
+		sig = syscall.SIGTERM
+	case "KILL":
+		sig = syscall.SIGKILL
+	case "HUP":
+		sig = syscall.SIGHUP
+	case "INT":
+		sig = syscall.SIGINT
+	default:
+		return fmt.Errorf("invalid signal: %s (allowed: TERM, KILL, HUP, INT)", signal)
+	}
+
+	// SECURITY: Use syscall.Kill instead of exec.Command to prevent injection
+	// Validates PID is a valid process ID (syscall validates this)
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return fmt.Errorf("failed to find process %d: %w", pid, err)
+	}
+
+	// Send the signal
+	if err := process.Signal(sig); err != nil {
+		return fmt.Errorf("failed to send signal %s to process %d: %w", signal, pid, err)
+	}
+
+	return nil
 }
 
 func (slm *ServiceLifecycleManager) processExists(pid int) bool {
-	cmd := exec.Command("kill", "-0", fmt.Sprintf("%d", pid))
-	return cmd.Run() == nil
+	// SECURITY: Use os.FindProcess + Signal(0) instead of shell command
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	// Signal 0 checks if process exists without actually sending a signal
+	err = process.Signal(syscall.Signal(0))
+	return err == nil
 }
 
 func (slm *ServiceLifecycleManager) parsePID(pidStr string) int {

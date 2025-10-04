@@ -471,7 +471,8 @@ func createVMDisk(baseImagePath, vmDiskPath, diskSize string, logger *otelzap.Lo
 	}
 
 	// Set proper permissions
-	if err := os.Chmod(vmDiskPath, 0644); err != nil {
+	// SECURITY: VM disk images should not be world-readable (may contain sensitive data)
+	if err := os.Chmod(vmDiskPath, 0640); err != nil {
 		logger.Warn("Failed to set disk permissions", zap.Error(err))
 	}
 

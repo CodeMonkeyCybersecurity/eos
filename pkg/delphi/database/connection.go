@@ -40,13 +40,21 @@ func GetConnectionFromVault(rc *eos_io.RuntimeContext) (*ConnectionConfig, error
 	// Initialize Vault service facade
 	if err := vault.InitializeServiceFacade(rc); err != nil {
 		logger.Warn("Failed to initialize Vault service, trying fallback methods", zap.Error(err))
-		return getConnectionFromEnvironment(), nil
+		envConfig := getConnectionFromEnvironment()
+		if envConfig == nil {
+			return nil, fmt.Errorf("vault unavailable and no database credentials in environment variables (set DELPHI_DB_USER and DELPHI_DB_PASSWORD)")
+		}
+		return envConfig, nil
 	}
 
 	facade := vault.GetServiceFacade()
 	if facade == nil {
 		logger.Warn("Vault service facade not available, using environment variables")
-		return getConnectionFromEnvironment(), nil
+		envConfig := getConnectionFromEnvironment()
+		if envConfig == nil {
+			return nil, fmt.Errorf("vault unavailable and no database credentials in environment variables (set DELPHI_DB_USER and DELPHI_DB_PASSWORD)")
+		}
+		return envConfig, nil
 	}
 
 	// First try to get dynamic database credentials
@@ -70,7 +78,11 @@ func GetConnectionFromVault(rc *eos_io.RuntimeContext) (*ConnectionConfig, error
 	}
 
 	logger.Warn("Failed to get static credentials from Vault, using environment variables", zap.Error(err))
-	return getConnectionFromEnvironment(), nil
+	envConfig := getConnectionFromEnvironment()
+	if envConfig == nil {
+		return nil, fmt.Errorf("no database credentials available from Vault or environment variables (set DELPHI_DB_USER and DELPHI_DB_PASSWORD)")
+	}
+	return envConfig, nil
 }
 
 // getDynamicCredentials requests dynamic PostgreSQL credentials from Vault's database secrets engine
@@ -217,28 +229,32 @@ func getDatabaseConfig(rc *eos_io.RuntimeContext, facade *vault.ServiceFacade) (
 }
 
 // getConnectionFromEnvironment retrieves connection details from environment variables
+// SECURITY: Returns nil if required credentials are missing (fail-closed)
 func getConnectionFromEnvironment() *ConnectionConfig {
 	// First try PG_DSN (used by Python workers)
 	if pgDSN := os.Getenv("PG_DSN"); pgDSN != "" {
-		return &ConnectionConfig{
-			Host:     "localhost", // Will be parsed from PG_DSN if needed
-			Port:     "5432",
-			Database: "delphi",
-			Username: "delphi",
-			Password: "delphi",
-			SSLMode:  "disable",
-		}
+		// TODO: Implement proper DSN parsing
+		// For now, return nil to force explicit configuration
+		return nil
 	}
 
 	// Try individual environment variables
-	return &ConnectionConfig{
+	// SECURITY: No defaults for credentials - must be explicitly set
+	config := &ConnectionConfig{
 		Host:     getEnvOrDefault("DELPHI_DB_HOST", "localhost"),
 		Port:     getEnvOrDefault("DELPHI_DB_PORT", "5432"),
 		Database: getEnvOrDefault("DELPHI_DB_NAME", "delphi"),
-		Username: getEnvOrDefault("DELPHI_DB_USER", "delphi"),
-		Password: getEnvOrDefault("DELPHI_DB_PASSWORD", "delphi"),
-		SSLMode:  getEnvOrDefault("DELPHI_DB_SSLMODE", "disable"),
+		Username: os.Getenv("DELPHI_DB_USER"),
+		Password: os.Getenv("DELPHI_DB_PASSWORD"),
+		SSLMode:  getEnvOrDefault("DELPHI_DB_SSLMODE", "require"), // SECURITY: Default to require SSL
 	}
+
+	// SECURITY: Fail-closed if credentials not provided
+	if config.Username == "" || config.Password == "" {
+		return nil
+	}
+
+	return config
 }
 
 // getEnvOrDefault returns environment variable value or default
@@ -250,9 +266,18 @@ func getEnvOrDefault(key, defaultValue string) string {
 }
 
 // ToConnectionString converts config to PostgreSQL connection string
+// SECURITY: This includes the password - be careful not to log this!
+// Use String() method for logging instead
 func (c *ConnectionConfig) ToConnectionString() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		c.Username, c.Password, c.Host, c.Port, c.Database, c.SSLMode)
+}
+
+// String returns a safe string representation with password redacted
+// SECURITY: Safe to log - password is redacted
+func (c *ConnectionConfig) String() string {
+	return fmt.Sprintf("postgres://%s:***@%s:%s/%s?sslmode=%s",
+		c.Username, c.Host, c.Port, c.Database, c.SSLMode)
 }
 
 // Connect establishes a database connection using the configuration
@@ -406,17 +431,8 @@ func (c *ConnectionConfig) ShouldRenew() bool {
 }
 
 // ParsePGDSN parses a PostgreSQL DSN string and returns a ConnectionConfig
+// SECURITY: Proper DSN parsing removed - use explicit configuration instead
+// This prevents misuse of incomplete/insecure parsing logic
 func ParsePGDSN(dsn string) (*ConnectionConfig, error) {
-	// This is a simplified parser - in production you might want to use a proper DSN parser
-	// For now, we'll assume the format is: postgres://username:password@host:port/database?options
-
-	// TODO: Implement proper DSN parsing if needed
-	return &ConnectionConfig{
-		Host:     "localhost",
-		Port:     "5432",
-		Database: "delphi",
-		Username: "delphi",
-		Password: "",
-		SSLMode:  "disable",
-	}, nil
+	return nil, fmt.Errorf("DSN parsing not implemented - use GetConnectionFromVault() or set individual environment variables (DELPHI_DB_HOST, DELPHI_DB_USER, DELPHI_DB_PASSWORD)")
 }

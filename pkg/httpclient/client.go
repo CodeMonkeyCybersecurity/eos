@@ -3,13 +3,14 @@ package httpclient
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -328,9 +329,17 @@ func (c *Client) calculateRetryDelay(attempt int, config *RetryConfig) time.Dura
 	}
 	
 	// Add jitter if enabled
+	// SECURITY: Use crypto/rand instead of math/rand for unpredictability
 	if config.Jitter {
-		jitter := time.Duration(rand.Float64() * float64(delay) * 0.1)
-		delay += jitter
+		var randBytes [8]byte
+		if _, err := rand.Read(randBytes[:]); err == nil {
+			// Convert random bytes to float64 [0.0, 1.0)
+			randUint := binary.BigEndian.Uint64(randBytes[:])
+			randFloat := float64(randUint) / float64(^uint64(0))
+			jitter := time.Duration(randFloat * float64(delay) * 0.1)
+			delay += jitter
+		}
+		// If crypto/rand fails, continue without jitter (fail-safe)
 	}
 	
 	return delay

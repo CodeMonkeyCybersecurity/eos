@@ -53,8 +53,11 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		attribute.String("args", strings.Join(opts.Args, " ")),
 	)
 
-	// TODO: Command validation would go here if needed
-	// Validation logic can be added based on specific requirements
+	// SECURITY: Command validation
+	// Commands are executed via exec.CommandContext which doesn't use shell
+	// Arguments are passed as separate parameters (not concatenated strings)
+	// This prevents shell injection attacks
+	// Additional validation can be added here if specific command restrictions are needed
 
 	// Dry run mode
 	if opts.DryRun || DefaultDryRun {

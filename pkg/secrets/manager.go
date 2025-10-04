@@ -56,21 +56,36 @@ func NewSecretManager(rc *eos_io.RuntimeContext, envConfig *environment.Environm
 	var backend SecretBackend
 	var err error
 
-	// Choose backend based on environment configuration
-	// Use Vault as default backend (HashiCorp migration)
-	switch "vault" {
+	// SECURITY: Choose backend based on environment configuration
+	// Vault is the secure default for production
+	// Only fall back to file backend in development/testing
+	backendType := os.Getenv("EOS_SECRET_BACKEND")
+	if backendType == "" {
+		backendType = "vault" // Secure default
+	}
+
+	switch backendType {
 	case "vault":
 		backend, err = NewVaultBackend(envConfig.VaultAddr)
 		if err != nil {
-			logger.Warn("Vault backend failed, falling back to ", zap.Error(err))
-			if err != nil {
-				logger.Warn(" backend failed, falling back to file", zap.Error(err))
+			logger.Error("Vault backend initialization failed", zap.Error(err))
+			// SECURITY: Fail-closed in production, only allow fallback in dev/test
+			if os.Getenv("GO_ENV") == "development" || os.Getenv("GO_ENV") == "test" {
+				logger.Warn("Development mode: falling back to file backend (INSECURE)")
 				backend = NewFileBackend()
+			} else {
+				return nil, fmt.Errorf("vault backend required in production but initialization failed: %w", err)
 			}
 		}
-
-	default:
+	case "file":
+		// SECURITY: Only allow file backend in development/testing
+		if os.Getenv("GO_ENV") != "development" && os.Getenv("GO_ENV") != "test" {
+			return nil, fmt.Errorf("file backend not allowed in production - use vault")
+		}
+		logger.Warn("Using insecure file backend (development only)")
 		backend = NewFileBackend()
+	default:
+		return nil, fmt.Errorf("unsupported secret backend: %s (supported: vault, file)", backendType)
 	}
 
 	logger.Info("Secret manager initialized",
