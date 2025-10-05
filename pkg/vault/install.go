@@ -552,12 +552,15 @@ log_format = "json"
 	// Validate configuration
 	vi.logger.Info("Validating Vault configuration")
 
-	// BUG FIX: Check if binary exists before trying to validate
+	// Check if binary exists before trying to validate
 	if _, err := os.Stat(vi.config.BinaryPath); err != nil {
-		vi.logger.Warn("Vault binary not found at expected path, skipping config validation",
-			zap.String("path", vi.config.BinaryPath),
-			zap.Error(err))
-		return nil
+		if os.IsNotExist(err) {
+			vi.logger.Warn("Vault binary not installed yet, skipping config validation",
+				zap.String("path", vi.config.BinaryPath),
+				zap.String("hint", "Binary will be validated when service starts"))
+			return nil
+		}
+		return fmt.Errorf("failed to check vault binary: %w", err)
 	}
 
 	// Make sure the binary is executable
@@ -565,12 +568,29 @@ log_format = "json"
 		vi.logger.Warn("Failed to set binary permissions", zap.Error(err))
 	}
 
-	if output, err := vi.runner.RunOutput(vi.config.BinaryPath, "validate", vi.config.ConfigPath); err != nil {
-		vi.logger.Warn("Configuration validation failed, but continuing installation",
+	// Validate the configuration file
+	output, err := vi.runner.RunOutput(vi.config.BinaryPath, "validate", configPath)
+	if err != nil {
+		// Check error type to determine severity
+		if strings.Contains(err.Error(), "exit status 127") {
+			// Command not found - this shouldn't happen since we checked above
+			return fmt.Errorf("vault binary not found or not executable at %s: %w", vi.config.BinaryPath, err)
+		}
+
+		// Configuration validation error - log details but don't fail
+		vi.logger.Error("Configuration validation failed",
 			zap.Error(err),
 			zap.String("output", output),
-			zap.String("hint", "Config will be validated when service starts"))
-		// Don't fail installation - systemd will validate on startup
+			zap.String("config_path", configPath),
+			zap.String("remediation", fmt.Sprintf("Check config file: cat %s", configPath)))
+
+		// If there's actual output explaining the error, include it
+		if output != "" {
+			vi.logger.Error("Validation error details", zap.String("details", output))
+		}
+
+		// Don't fail installation - let systemd try to start it
+		// This allows the service to fail with proper error messages in journalctl
 		return nil
 	}
 
