@@ -299,45 +299,21 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		}
 	}
 
-	// INTERVENE - Apply removal using REST API or fallback to direct execution
+	// INTERVENE - Apply removal using native removal function
 	logger.Info("Applying Nomad removal")
 
-	// Try REST API first
-	apiURL := "https://localhost:8000"
-	restInstaller := getNomadRESTInstaller(apiURL, true) // Skip TLS verify for self-signed cert
+	// P0 FIX: Use the actual working RemoveNomadCompletely function instead of Ansible API
+	logger.Info("Removing Nomad using native removal function")
 
-	// Check authentication
-	logger.Info("Attempting to authenticate with  REST API")
-	if err := restInstaller.Authenticate(rc.Ctx, "", "pass"); err != nil {
-		logger.Warn("Failed to authenticate with  REST API, falling back to direct execution", zap.Error(err))
+	// Determine if we should keep data
+	keepData := nomadKeepData || nomadKeepConfig
 
-		// HashiCorp Nomad deletion requires administrator intervention
-		logger.Info("Nomad deletion requires administrator intervention - use HashiCorp Nomad CLI for service management")
-		return fmt.Errorf("Nomad deletion requires administrator intervention - use 'nomad system gc' and 'nomad operator raft list-peers' for cluster management")
-	}
-
-	logger.Info("Successfully authenticated with  REST API")
-
-	// Prepare removal configuration
-	removeConfig := &nomad.NomadRemoveConfig{
-		Force:      nomadForceDelete,
-		KeepData:   nomadKeepData,
-		KeepConfig: nomadKeepConfig,
-		KeepUser:   nomadKeepUser,
-		Timeout:    nomadTimeout,
-		ServerMode: status.ServerMode,
-		ClientMode: status.ClientMode,
-		NodeID:     status.NodeID,
-	}
-
-	// Execute removal via REST API
-	logger.Info("Removing Nomad via  REST API")
-	if err := restInstaller.RemoveNomad(rc, removeConfig); err != nil {
-		logger.Error("Nomad removal via REST API failed", zap.Error(err))
+	if err := nomad.RemoveNomadCompletely(rc, keepData); err != nil {
+		logger.Error("Nomad removal failed", zap.Error(err))
 		return fmt.Errorf("nomad removal failed: %w", err)
 	}
 
-	logger.Info("Nomad removal via REST API completed successfully")
+	logger.Info("Nomad removal completed successfully")
 
 	// EVALUATE - Verify removal
 	logger.Info("Verifying Nomad removal")
@@ -390,11 +366,6 @@ func runDeleteNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	logger.Info("terminal prompt: You can now safely reinstall Nomad with 'eos create nomad'")
 
 	return nil
-}
-
-// getNomadRESTInstaller creates a REST installer instance
-func getNomadRESTInstaller(apiURL string, skipTLSVerify bool) *nomad.RESTInstaller {
-	return nomad.NewRESTInstaller(apiURL, skipTLSVerify)
 }
 
 func init() {
