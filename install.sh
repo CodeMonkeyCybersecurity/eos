@@ -155,8 +155,14 @@ install_go() {
       fi
       brew install go
     else
-      # Linux installation
+      # Linux installation - detect architecture
       local arch="amd64"
+      case "$(uname -m)" in
+        x86_64)  arch="amd64" ;;
+        aarch64|arm64) arch="arm64" ;;
+        armv7l|armv6l) arch="armv6l" ;;
+        *) log ERR " Unsupported architecture: $(uname -m)"; exit 1 ;;
+      esac
       local os="linux"
       local go_tarball="go${GO_VERSION}.${os}-${arch}.tar.gz"
       local download_url="https://go.dev/dl/${go_tarball}"
