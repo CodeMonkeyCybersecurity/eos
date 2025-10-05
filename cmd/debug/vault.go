@@ -37,7 +37,7 @@ Example:
 }
 
 func init() {
-	DebugCmd.AddCommand(debugVaultCmd)
+	debugCmd.AddCommand(debugVaultCmd)
 }
 
 func runDebugVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
