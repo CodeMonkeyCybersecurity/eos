@@ -152,25 +152,16 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		zap.String("ip", ip),
 		zap.String("ssh_key_status", "configured"))
 
-	// Success output
-	fmt.Printf("\n✅ Ubuntu 24.04 VM created: %s\n", config.Name)
-	fmt.Printf("Configuration:\n")
-	fmt.Printf("  Memory: %s MB\n", config.Memory)
-	fmt.Printf("  vCPUs: %s\n", config.VCPUs)
-	fmt.Printf("  Disk: %s GB\n", config.DiskSize)
-	fmt.Printf("  Network: %s\n", config.Network)
-	fmt.Printf("\nSSH Access:\n")
-	fmt.Printf("  Private key: %s\n", privKeyPath)
-	if ip != "" {
-		fmt.Printf("  Command: ssh -i %s ubuntu@%s\n", privKeyPath, ip)
-	} else {
-		fmt.Printf("  Get IP: virsh domifaddr %s\n", config.Name)
-		fmt.Printf("  Then: ssh -i %s ubuntu@<ip>\n", privKeyPath)
-	}
-	fmt.Printf("\nManagement:\n")
-	fmt.Printf("  Stop: virsh shutdown %s\n", config.Name)
-	fmt.Printf("  Start: virsh start %s\n", config.Name)
-	fmt.Printf("  Delete: virsh undefine %s --remove-all-storage\n", config.Name)
+	// Log success with structured logging (user-facing output should be via dedicated output package)
+	logger.Info("Ubuntu 24.04 VM created successfully",
+		zap.String("vm_name", config.Name),
+		zap.String("memory_mb", config.Memory),
+		zap.String("vcpus", config.VCPUs),
+		zap.String("disk_gb", config.DiskSize),
+		zap.String("network", config.Network),
+		zap.String("ip_address", ip),
+		zap.String("ssh_command", fmt.Sprintf("ssh -i <key> ubuntu@%s", ip)),
+		zap.String("management_commands", "virsh shutdown/start/undefine"))
 
 	return nil
 }

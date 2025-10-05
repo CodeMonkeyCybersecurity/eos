@@ -66,7 +66,20 @@ func (r *CommandRunner) RunWithRetries(name string, args []string, maxRetries in
 		}
 
 		lastErr = err
-		r.logger.Warn("Command failed, retrying",
+
+		// P1 CRITICAL: Detect error type before retrying
+		// Only retry TRANSIENT failures, fail fast on DETERMINISTIC failures
+		if isConfigError(output, err) || isValidationError(output, err) || isPermissionError(output, err) {
+			r.logger.Error("Deterministic failure detected, not retrying",
+				zap.String("command", name),
+				zap.Error(err),
+				zap.String("output", output),
+				zap.String("reason", "configuration/validation/permission error"),
+				zap.String("remediation", "Fix configuration or permissions and retry manually"))
+			return fmt.Errorf("%s failed: %s\n%w", name, output, err)
+		}
+
+		r.logger.Warn("Transient failure, retrying",
 			zap.String("command", name),
 			zap.Int("attempt", attempt),
 			zap.Int("max_retries", maxRetries),
@@ -419,4 +432,77 @@ func (h *HTTPClient) Get(ctx context.Context, url string) (*http.Response, error
 		return nil, err
 	}
 	return h.client.Do(req)
+}
+
+// Error type detection helpers for retry logic
+// P1 CRITICAL: Only retry transient failures, fail fast on deterministic failures
+
+// isConfigError detects configuration validation errors (deterministic - should not retry)
+func isConfigError(output string, err error) bool {
+	lowerOutput := strings.ToLower(output)
+	lowerErr := strings.ToLower(err.Error())
+
+	configPatterns := []string{
+		"invalid configuration",
+		"config error",
+		"configuration invalid",
+		"missing required",
+		"syntax error",
+		"parse error",
+		"invalid syntax",
+		"malformed",
+	}
+
+	for _, pattern := range configPatterns {
+		if strings.Contains(lowerOutput, pattern) || strings.Contains(lowerErr, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// isValidationError detects validation errors (deterministic - should not retry)
+func isValidationError(output string, err error) bool {
+	lowerOutput := strings.ToLower(output)
+	lowerErr := strings.ToLower(err.Error())
+
+	validationPatterns := []string{
+		"validation failed",
+		"invalid argument",
+		"invalid value",
+		"invalid parameter",
+		"not found",
+		"does not exist",
+		"no such file",
+		"no such directory",
+	}
+
+	for _, pattern := range validationPatterns {
+		if strings.Contains(lowerOutput, pattern) || strings.Contains(lowerErr, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// isPermissionError detects permission errors (deterministic - should not retry)
+func isPermissionError(output string, err error) bool {
+	lowerOutput := strings.ToLower(output)
+	lowerErr := strings.ToLower(err.Error())
+
+	permissionPatterns := []string{
+		"permission denied",
+		"access denied",
+		"forbidden",
+		"not permitted",
+		"unauthorized",
+		"insufficient privileges",
+	}
+
+	for _, pattern := range permissionPatterns {
+		if strings.Contains(lowerOutput, pattern) || strings.Contains(lowerErr, pattern) {
+			return true
+		}
+	}
+	return false
 }

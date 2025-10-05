@@ -130,27 +130,23 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 		zap.String("ip", ip),
 		zap.String("ssh_key_status", "configured"))
 
-	// Print connection instructions
-	fmt.Printf("\n✅ Orchestrated VM created successfully!\n")
-	fmt.Printf("VM Name: %s\n", vmName)
-	fmt.Printf("IP Address: %s\n", ip)
-	fmt.Printf("SSH Key: %s\n", privateKeyPath)
-	fmt.Printf("\nConnect with: ssh -i %s ubuntu@%s\n", privateKeyPath, ip)
-	if enableNomad {
-		fmt.Printf("Nomad Job: vm-%s-monitor\n", vmName)
-	}
-	fmt.Printf("Consul Service: vm-%s\n", vmName)
+	// Log completion (user-facing output should be handled by caller or dedicated output package)
+	om.logger.Info("Orchestrated VM created successfully",
+		zap.String("vm_name", vmName),
+		zap.String("ip_address", ip),
+		zap.Bool("nomad_enabled", enableNomad),
+		zap.String("consul_service", fmt.Sprintf("vm-%s", vmName)),
+		zap.String("ssh_command", fmt.Sprintf("ssh -i <key> ubuntu@%s", ip)))
 
 	return nil
 }
 
 // createCloudInitWithStaticIP creates cloud-init config with static IP
 func (om *OrchestratedVMManager) createCloudInitWithStaticIP(vmName, ip, publicKeyPath string) string {
-	// Read the public key
-	pubKeyBytes, err := exec.Command("cat", publicKeyPath).Output()
+	// Read the public key using os.ReadFile instead of exec.Command("cat")
+	pubKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
-		om.logger.Warn("Failed to read public key, using placeholder",
-			zap.String("path", publicKeyPath),
+		om.logger.Warn("Failed to read public key",
 			zap.Error(err))
 		pubKeyBytes = []byte("ssh-ed25519 PLACEHOLDER")
 	}
