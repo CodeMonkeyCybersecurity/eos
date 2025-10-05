@@ -203,6 +203,54 @@ func ExtractConfigurationAPI(ctx context.Context, baseURL, token string, types, 
 			}
 			config.Certificates = result.Results
 			successfulExtractions++
+
+		case "blueprints":
+			data, err := makeAPICall("managed/blueprints/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("blueprints: %w", err))
+				continue
+			}
+			var result struct {
+				Results []Blueprint `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("blueprints unmarshal: %w", err))
+				continue
+			}
+			config.Blueprints = result.Results
+			successfulExtractions++
+
+		case "outposts":
+			data, err := makeAPICall("outposts/instances/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("outposts: %w", err))
+				continue
+			}
+			var result struct {
+				Results []Outpost `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("outposts unmarshal: %w", err))
+				continue
+			}
+			config.Outposts = result.Results
+			successfulExtractions++
+
+		case "tenants":
+			data, err := makeAPICall("core/tenants/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("tenants: %w", err))
+				continue
+			}
+			var result struct {
+				Results []Tenant `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("tenants unmarshal: %w", err))
+				continue
+			}
+			config.Tenants = result.Results
+			successfulExtractions++
 		}
 	}
 

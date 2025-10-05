@@ -62,7 +62,7 @@ func init() {
 
 	// Selective backup options
 	authentikFlags.StringSlice("types", nil,
-		"Resource types to backup (providers,applications,mappings,flows,groups,policies,certificates)")
+		"Resource types to backup (providers,applications,mappings,flows,stages,groups,policies,certificates,blueprints,outposts,tenants)")
 	authentikFlags.StringSlice("apps", nil, "Backup only specific applications by name")
 	authentikFlags.StringSlice("providers", nil, "Backup only specific providers by name")
 
@@ -152,7 +152,7 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// Default to all types if none specified
 	if len(types) == 0 && !extractWazuh {
 		types = []string{"providers", "applications", "mappings", "flows",
-			"stages", "groups", "policies", "certificates"}
+			"stages", "groups", "policies", "certificates", "blueprints", "outposts", "tenants"}
 	}
 
 	// Extract configuration using the helper function
@@ -182,7 +182,14 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.Int("providers", len(config.Providers)),
 		zap.Int("applications", len(config.Applications)),
 		zap.Int("mappings", len(config.PropertyMappings)),
-		zap.Int("groups", len(config.Groups)))
+		zap.Int("flows", len(config.Flows)),
+		zap.Int("stages", len(config.Stages)),
+		zap.Int("groups", len(config.Groups)),
+		zap.Int("policies", len(config.Policies)),
+		zap.Int("certificates", len(config.Certificates)),
+		zap.Int("blueprints", len(config.Blueprints)),
+		zap.Int("outposts", len(config.Outposts)),
+		zap.Int("tenants", len(config.Tenants)))
 
 	// Check for critical Wazuh configuration
 	if extractWazuh || checkWazuhConfiguration(config) {

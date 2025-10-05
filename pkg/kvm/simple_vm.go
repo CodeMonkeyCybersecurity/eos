@@ -98,7 +98,7 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	}
 
 	// Generate SSH keypair (ed25519)
-	privKeyPath, pubKey, err := generateSSHKeyED25519(seedDir, config.Name)
+	_, pubKey, err := generateSSHKeyED25519(seedDir, config.Name)
 	if err != nil {
 		return fmt.Errorf("failed to generate SSH key: %w", err)
 	}
