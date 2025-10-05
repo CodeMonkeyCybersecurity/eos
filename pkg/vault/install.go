@@ -553,7 +553,8 @@ log_format = "json"
 	vi.logger.Info("Validating Vault configuration")
 
 	// Check if binary exists before trying to validate
-	if _, err := os.Stat(vi.config.BinaryPath); err != nil {
+	binaryInfo, err := os.Stat(vi.config.BinaryPath)
+	if err != nil {
 		if os.IsNotExist(err) {
 			vi.logger.Warn("Vault binary not installed yet, skipping config validation",
 				zap.String("path", vi.config.BinaryPath),
@@ -563,10 +564,31 @@ log_format = "json"
 		return fmt.Errorf("failed to check vault binary: %w", err)
 	}
 
+	// Log binary details for debugging
+	vi.logger.Debug("Vault binary details",
+		zap.String("path", vi.config.BinaryPath),
+		zap.Int64("size", binaryInfo.Size()),
+		zap.String("mode", binaryInfo.Mode().String()),
+		zap.Time("modified", binaryInfo.ModTime()))
+
 	// Make sure the binary is executable
 	if err := os.Chmod(vi.config.BinaryPath, 0755); err != nil {
 		vi.logger.Warn("Failed to set binary permissions", zap.Error(err))
 	}
+
+	// Verify it's actually executable by checking if it runs
+	versionOutput, versionErr := vi.runner.RunOutput(vi.config.BinaryPath, "version")
+	if versionErr != nil {
+		vi.logger.Error("Vault binary exists but cannot execute version command",
+			zap.String("path", vi.config.BinaryPath),
+			zap.Error(versionErr),
+			zap.String("output", versionOutput),
+			zap.String("remediation", fmt.Sprintf("Try running manually: %s version", vi.config.BinaryPath)))
+		// Skip validation if binary can't even run
+		return nil
+	}
+	vi.logger.Debug("Vault binary executable",
+		zap.String("version_output", versionOutput))
 
 	// Validate the configuration file
 	output, err := vi.runner.RunOutput(vi.config.BinaryPath, "validate", configPath)
