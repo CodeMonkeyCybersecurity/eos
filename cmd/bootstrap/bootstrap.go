@@ -27,7 +27,24 @@ This command installs and configures:
 - OSQuery (system monitoring)
 - Ubuntu security hardening (optional FIDO2 SSH authentication)
 
-Examples:
+MULTI-ENVIRONMENT SETUP:
+  Bootstrap with environment awareness for multi-site deployments:
+
+  eos bootstrap --environment dev \
+    --frontend cybermonkey-dev \
+    --backend vhost5 \
+    --enable-vault \
+    --enable-nomad
+
+  This will:
+  • Create environment configuration (dev/staging/production)
+  • Setup WireGuard mesh network between frontend and backend
+  • Install Consul server on backend, client on frontend
+  • Install Vault on backend (with Consul service discovery)
+  • Install Nomad on backend (optional)
+  • Configure services to auto-discover each other via Consul
+
+STANDARD EXAMPLES:
   eos bootstrap                     # Bootstrap everything including hardening (default)
   eos bootstrap --guided            # Beginner-friendly guided mode
   eos bootstrap --verify            # Check existing installation status
@@ -37,6 +54,30 @@ Examples:
   eos bootstrap --stop-conflicting  # Automatically resolve port conflicts
   eos bootstrap --clean             # Clean slate installation
   eos bootstrap --force             # Force installation despite conflicts
+
+ENVIRONMENT EXAMPLES:
+  # Development environment
+  eos bootstrap --environment dev --frontend cybermonkey-dev --backend vhost5 --enable-vault
+
+  # Production environment with Nomad
+  eos bootstrap --environment production --frontend cybermonkey-net --backend vhost11 --enable-vault --enable-nomad
+
+  # Custom WireGuard config
+  eos bootstrap --environment staging \
+    --frontend cybermonkey-sh --backend vhost7 \
+    --wireguard-subnet 10.10.0.0/24 \
+    --frontend-ip 10.10.0.2 --backend-ip 10.10.0.5
+
+Environment Options:
+  --environment       Environment name (dev/staging/production)
+  --datacenter        Consul datacenter (defaults to environment name)
+  --frontend          Frontend/cloud host (e.g., cybermonkey-dev)
+  --backend           Backend/on-prem host (e.g., vhost5)
+  --wireguard-subnet  WireGuard subnet (auto-assigned by environment)
+  --frontend-ip       Frontend WireGuard IP (auto-assigned)
+  --backend-ip        Backend WireGuard IP (auto-assigned)
+  --enable-vault      Install Vault on backend (registers with Consul)
+  --enable-nomad      Install Nomad on backend
 
 Enhanced Options:
   --guided            Step-by-step guidance for beginners
@@ -78,6 +119,15 @@ Standard Options:
 	// Consul is always installed as it's required for service discovery
 	BootstrapCmd.Flags().Bool("enable-vault", false, "Install and configure HashiCorp Vault (opt-in)")
 	BootstrapCmd.Flags().Bool("enable-nomad", false, "Install and configure HashiCorp Nomad (opt-in)")
+
+	// Environment setup flags (multi-environment deployment)
+	BootstrapCmd.Flags().String("environment", "", "Environment name (dev/staging/production)")
+	BootstrapCmd.Flags().String("datacenter", "", "Consul datacenter (defaults to environment name)")
+	BootstrapCmd.Flags().String("frontend", "", "Frontend/cloud host (e.g., cybermonkey-dev)")
+	BootstrapCmd.Flags().String("backend", "", "Backend/on-prem host (e.g., vhost5)")
+	BootstrapCmd.Flags().String("wireguard-subnet", "", "WireGuard subnet (e.g., 10.0.0.0/24)")
+	BootstrapCmd.Flags().String("frontend-ip", "", "Frontend WireGuard IP (e.g., 10.0.0.2)")
+	BootstrapCmd.Flags().String("backend-ip", "", "Backend WireGuard IP (e.g., 10.0.0.5)")
 
 }
 

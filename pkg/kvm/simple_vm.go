@@ -163,6 +163,12 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 		zap.String("ssh_command", fmt.Sprintf("ssh -i <key> ubuntu@%s", ip)),
 		zap.String("management_commands", "virsh shutdown/start/undefine"))
 
+	// Attempt Consul registration (non-critical)
+	if err := RegisterVMWithConsul(rc, config.Name, ip); err != nil {
+		logger.Debug("Consul registration failed (non-critical)",
+			zap.Error(err))
+	}
+
 	return nil
 }
 

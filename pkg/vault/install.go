@@ -51,12 +51,14 @@ type InstallConfig struct {
 	ClusterName     string
 	StorageBackend  string // "file", "consul", "raft"
 	ListenerAddress string
+	BindAddr        string // Specific IP to bind to (for Consul registration)
 	APIAddr         string
 	ClusterAddr     string
 	DisableMlock    bool
 	AutoUnseal      bool
 	KMSKeyID        string // For AWS KMS auto-unseal
 	LogLevel        string
+	Datacenter      string // Consul datacenter for service registration
 
 	// Paths
 	ConfigPath string
@@ -192,9 +194,17 @@ func (vi *VaultInstaller) Install() error {
 	}
 
 	// Phase 7: EVALUATE - Verify
-	vi.progress.Update("[100%] Verifying installation")
+	vi.progress.Update("[92%] Verifying installation")
 	if err := vi.verify(); err != nil {
 		return fmt.Errorf("verification failed: %w", err)
+	}
+
+	// Phase 8: Register with Consul (if available)
+	vi.progress.Update("[100%] Registering with Consul")
+	if err := vi.registerWithConsul(); err != nil {
+		vi.logger.Warn("Failed to register with Consul (non-critical)",
+			zap.Error(err))
+		// Don't fail installation if Consul registration fails
 	}
 
 	vi.progress.Complete("Vault installation completed successfully")

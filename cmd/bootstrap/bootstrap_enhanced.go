@@ -65,7 +65,15 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting enhanced infrastructure bootstrap")
 
-	// Parse flags into options
+	// Check if environment setup is requested
+	environmentName := cmd.Flag("environment").Value.String()
+	if environmentName != "" {
+		logger.Info("Environment-aware bootstrap requested",
+			zap.String("environment", environmentName))
+		return runEnvironmentBootstrap(rc, cmd)
+	}
+
+	// Parse flags into options for standard bootstrap
 	opts := &bootstrap.BootstrapOptions{
 		JoinCluster:   cmd.Flag("join-cluster").Value.String(),
 		SingleNode:    cmd.Flag("single-node").Value.String() == "true",
@@ -94,6 +102,82 @@ func RunBootstrapAllEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 
 	// Use the new enhanced orchestrator
 	return bootstrap.OrchestrateBootstrap(rc, cmd, opts)
+}
+
+// runEnvironmentBootstrap handles environment-aware bootstrap
+func runEnvironmentBootstrap(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Parse environment setup options
+	opts := &bootstrap.EnvironmentSetupOptions{
+		EnvironmentName:    cmd.Flag("environment").Value.String(),
+		Datacenter:         cmd.Flag("datacenter").Value.String(),
+		FrontendHost:       cmd.Flag("frontend").Value.String(),
+		BackendHost:        cmd.Flag("backend").Value.String(),
+		WireGuardSubnet:    cmd.Flag("wireguard-subnet").Value.String(),
+		FrontendIP:         cmd.Flag("frontend-ip").Value.String(),
+		BackendIP:          cmd.Flag("backend-ip").Value.String(),
+		EnableVault:        cmd.Flag("enable-vault").Value.String() == "true",
+		EnableNomad:        cmd.Flag("enable-nomad").Value.String() == "true",
+		EnableConsul:       true, // Always enabled
+		ConsulUIEnabled:    true,
+		VaultTLSEnabled:    false, // Default to false for easier setup
+	}
+
+	// Validate required fields
+	if opts.FrontendHost == "" || opts.BackendHost == "" {
+		return fmt.Errorf("--frontend and --backend are required for environment bootstrap")
+	}
+
+	// Auto-generate WireGuard config if not provided
+	if opts.WireGuardSubnet == "" {
+		// Use environment-based subnet assignment
+		subnetMap := map[string]string{
+			"dev":        "10.0.0.0/24",
+			"staging":    "10.0.1.0/24",
+			"production": "10.0.2.0/24",
+		}
+		if subnet, ok := subnetMap[opts.EnvironmentName]; ok {
+			opts.WireGuardSubnet = subnet
+		} else {
+			opts.WireGuardSubnet = "10.0.99.0/24" // Default for custom environments
+		}
+		logger.Info("Auto-assigned WireGuard subnet",
+			zap.String("subnet", opts.WireGuardSubnet))
+	}
+
+	// Auto-generate IPs if not provided
+	if opts.FrontendIP == "" {
+		// Extract base from subnet and assign .2
+		opts.FrontendIP = deriveIP(opts.WireGuardSubnet, 2)
+		logger.Info("Auto-assigned frontend IP",
+			zap.String("ip", opts.FrontendIP))
+	}
+
+	if opts.BackendIP == "" {
+		// Extract base from subnet and assign .5
+		opts.BackendIP = deriveIP(opts.WireGuardSubnet, 5)
+		logger.Info("Auto-assigned backend IP",
+			zap.String("ip", opts.BackendIP))
+	}
+
+	// Run environment setup
+	return bootstrap.SetupEnvironment(rc, opts)
+}
+
+// deriveIP derives an IP address from a subnet and host number
+func deriveIP(subnet string, hostNum int) string {
+	// Simple implementation: replace last octet
+	// subnet format: "10.0.0.0/24" -> "10.0.0.X"
+	parts := strings.Split(subnet, ".")
+	if len(parts) == 4 {
+		lastOctet := parts[3]
+		slashIndex := strings.Index(lastOctet, "/")
+		if slashIndex > 0 {
+			return fmt.Sprintf("%s.%s.%s.%d", parts[0], parts[1], parts[2], hostNum)
+		}
+	}
+	return fmt.Sprintf("10.0.0.%d", hostNum) // Fallback
 }
 
 // bootstrapSingleNodeEnhanced removed - functionality consolidated into OrchestrateBootstrap
