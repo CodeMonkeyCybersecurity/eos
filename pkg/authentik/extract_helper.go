@@ -59,102 +59,154 @@ func ExtractConfigurationAPI(ctx context.Context, baseURL, token string, types, 
 		return io.ReadAll(resp.Body)
 	}
 
+	// Track extraction errors
+	var extractionErrors []error
+	successfulExtractions := 0
+
 	// Extract each type requested
 	for _, resourceType := range types {
 		switch strings.ToLower(resourceType) {
 		case "providers":
-			if data, err := makeAPICall("providers/all/"); err == nil {
-				var result struct {
-					Results []Provider `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					config.Providers = filterProviders(result.Results, providers)
-				}
+			data, err := makeAPICall("providers/all/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("providers: %w", err))
+				continue
 			}
+			var result struct {
+				Results []Provider `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("providers unmarshal: %w", err))
+				continue
+			}
+			config.Providers = filterProviders(result.Results, providers)
+			successfulExtractions++
 
 		case "applications":
-			if data, err := makeAPICall("core/applications/"); err == nil {
-				var result struct {
-					Results []Application `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					config.Applications = filterApplications(result.Results, apps)
-				}
+			data, err := makeAPICall("core/applications/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("applications: %w", err))
+				continue
 			}
+			var result struct {
+				Results []Application `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("applications unmarshal: %w", err))
+				continue
+			}
+			config.Applications = filterApplications(result.Results, apps)
+			successfulExtractions++
 
 		case "mappings", "property_mappings":
-			if data, err := makeAPICall("propertymappings/all/"); err == nil {
-				var result struct {
-					Results []json.RawMessage `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					// Parse SAML property mappings specifically
-					for _, raw := range result.Results {
-						var mapping PropertyMapping
-						if err := json.Unmarshal(raw, &mapping); err == nil {
-							config.PropertyMappings = append(config.PropertyMappings, mapping)
-						}
-					}
+			data, err := makeAPICall("propertymappings/all/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("property mappings: %w", err))
+				continue
+			}
+			var result struct {
+				Results []json.RawMessage `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("property mappings unmarshal: %w", err))
+				continue
+			}
+			// Parse SAML property mappings specifically
+			for _, raw := range result.Results {
+				var mapping PropertyMapping
+				if err := json.Unmarshal(raw, &mapping); err == nil {
+					config.PropertyMappings = append(config.PropertyMappings, mapping)
 				}
 			}
+			successfulExtractions++
 
 		case "flows":
-			if data, err := makeAPICall("flows/instances/"); err == nil {
-				var result struct {
-					Results []Flow `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					config.Flows = result.Results
-				}
+			data, err := makeAPICall("flows/instances/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("flows: %w", err))
+				continue
 			}
+			var result struct {
+				Results []Flow `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("flows unmarshal: %w", err))
+				continue
+			}
+			config.Flows = result.Results
+			successfulExtractions++
 
 		case "stages":
-			if data, err := makeAPICall("stages/all/"); err == nil {
-				var result struct {
-					Results []Stage `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					config.Stages = result.Results
-				}
+			data, err := makeAPICall("stages/all/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("stages: %w", err))
+				continue
 			}
+			var result struct {
+				Results []Stage `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("stages unmarshal: %w", err))
+				continue
+			}
+			config.Stages = result.Results
+			successfulExtractions++
 
 		case "groups":
-			if data, err := makeAPICall("core/groups/"); err == nil {
-				var result struct {
-					Results []Group `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					config.Groups = result.Results
-				}
+			data, err := makeAPICall("core/groups/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("groups: %w", err))
+				continue
 			}
+			var result struct {
+				Results []Group `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("groups unmarshal: %w", err))
+				continue
+			}
+			config.Groups = result.Results
+			successfulExtractions++
 
 		case "policies":
-			if data, err := makeAPICall("policies/all/"); err == nil {
-				var result struct {
-					Results []Policy `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					config.Policies = result.Results
-				}
+			data, err := makeAPICall("policies/all/")
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("policies: %w", err))
+				continue
 			}
+			var result struct {
+				Results []Policy `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("policies unmarshal: %w", err))
+				continue
+			}
+			config.Policies = result.Results
+			successfulExtractions++
 
 		case "certificates":
 			endpoint := "crypto/certificatekeypairs/"
 			if !includeSecrets {
 				endpoint += "?exclude_key=true"
 			}
-			if data, err := makeAPICall(endpoint); err == nil {
-				var result struct {
-					Results []Certificate `json:"results"`
-				}
-				if err := json.Unmarshal(data, &result); err == nil {
-					config.Certificates = result.Results
-				}
+			data, err := makeAPICall(endpoint)
+			if err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("certificates: %w", err))
+				continue
 			}
+			var result struct {
+				Results []Certificate `json:"results"`
+			}
+			if err := json.Unmarshal(data, &result); err != nil {
+				extractionErrors = append(extractionErrors, fmt.Errorf("certificates unmarshal: %w", err))
+				continue
+			}
+			config.Certificates = result.Results
+			successfulExtractions++
 		}
 	}
 
-	// Try to get version info
+	// Try to get version info (non-critical)
 	if data, err := makeAPICall("admin/version/"); err == nil {
 		var versionInfo struct {
 			Version string `json:"version"`
@@ -162,6 +214,26 @@ func ExtractConfigurationAPI(ctx context.Context, baseURL, token string, types, 
 		if err := json.Unmarshal(data, &versionInfo); err == nil {
 			config.Metadata.AuthentikVersion = versionInfo.Version
 		}
+	}
+
+	// If ALL extractions failed, return error with details
+	if successfulExtractions == 0 && len(extractionErrors) > 0 {
+		errorMsg := fmt.Sprintf("failed to extract any configuration (attempted %d types):\n", len(types))
+		for _, err := range extractionErrors {
+			errorMsg += fmt.Sprintf("  - %s\n", err.Error())
+		}
+		errorMsg += "\nCommon causes:\n"
+		errorMsg += "  - Invalid URL (check for typos like 'https://https://')\n"
+		errorMsg += "  - Invalid or expired API token\n"
+		errorMsg += "  - Network connectivity issues\n"
+		errorMsg += "  - Authentik API not accessible at provided URL"
+		return nil, fmt.Errorf(errorMsg)
+	}
+
+	// If SOME extractions failed, include warnings but return partial success
+	if len(extractionErrors) > 0 {
+		// Note: Caller should log these as warnings
+		// For now, we return partial success
 	}
 
 	return config, nil
