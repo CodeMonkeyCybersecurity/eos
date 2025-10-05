@@ -640,11 +640,29 @@ VAULT_CLUSTER_ADDR=%s
 	// Start service with retries
 	vi.logger.Info("Starting Vault service")
 	if err := vi.systemd.Start(); err != nil {
-		// Get service status for debugging
+		// Get detailed service status and logs for debugging
 		if status, statusErr := vi.systemd.GetStatus(); statusErr == nil {
 			vi.logger.Error("Failed to start Vault service",
 				zap.String("status", status))
 		}
+
+		// Get journalctl logs to understand WHY vault failed
+		if output, logErr := vi.runner.RunOutput("journalctl", "-xeu", "vault.service", "-n", "50", "--no-pager"); logErr == nil {
+			vi.logger.Error("Vault service logs",
+				zap.String("journalctl_output", output))
+		}
+
+		// Check if config file exists and is readable
+		if _, statErr := os.Stat(vi.config.ConfigPath); statErr != nil {
+			vi.logger.Error("Config file issue",
+				zap.String("path", vi.config.ConfigPath),
+				zap.Error(statErr))
+		}
+
+		// Provide actionable remediation
+		vi.logger.Error("Vault failed to start - check the logs above for details",
+			zap.String("remediation", "Run: sudo journalctl -xeu vault.service | tail -50"))
+
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 
