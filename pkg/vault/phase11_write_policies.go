@@ -96,7 +96,12 @@ func AttachPolicyToEosEntity(rc *eos_io.RuntimeContext, client *api.Client, log 
 		return fmt.Errorf("failed to look up entity: %w", err)
 	}
 	if entityResp != nil && entityResp.Data != nil {
-		entityID = entityResp.Data["id"].(string)
+		// SECURITY P0 #1: Safe type assertion to prevent panic
+		id, ok := entityResp.Data["id"].(string)
+		if !ok {
+			return fmt.Errorf("entity lookup response has invalid 'id' field type")
+		}
+		entityID = id
 		log.Info(" Entity already exists", zap.String("entity_id", entityID))
 	} else {
 		// Create the entity
@@ -109,7 +114,12 @@ func AttachPolicyToEosEntity(rc *eos_io.RuntimeContext, client *api.Client, log 
 		if err != nil {
 			return fmt.Errorf("failed to create entity: %w", err)
 		}
-		entityID = resp.Data["id"].(string)
+		// SECURITY P0 #1: Safe type assertion to prevent panic
+		id, ok := resp.Data["id"].(string)
+		if !ok {
+			return fmt.Errorf("entity creation response has invalid 'id' field type")
+		}
+		entityID = id
 		log.Info(" Created new entity", zap.String("entity_id", entityID))
 	}
 

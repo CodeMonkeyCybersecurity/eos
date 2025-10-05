@@ -212,15 +212,16 @@ func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
 			zap.String("mode", dirStat.Mode().String()))
 	}
 
-	out, err := exec.Command("cat", path).Output()
+	// SECURITY P0 #1: Use os.ReadFile instead of exec.Command("cat") to prevent command injection
+	tokenBytes, err := os.ReadFile(path)
 	if err != nil {
-		log.Error(" Failed to read token via shell",
+		log.Error(" Failed to read token file",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
 	}
-	token := strings.TrimSpace(string(out))
-	log.Info(" Token read successfully via shell",
+	token := strings.TrimSpace(string(tokenBytes))
+	log.Info(" Token read successfully",
 		zap.String("path", path),
 		zap.Int("token_length", len(token)))
 

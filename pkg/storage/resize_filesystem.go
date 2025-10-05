@@ -24,10 +24,11 @@ func ResizeFilesystem(rc *eos_io.RuntimeContext, devicePath, fsType, mountpoint 
 	}
 
 	// INTERVENE - Resize filesystem based on type
+	// SECURITY P1 #5: Use CommandContext for cancellation support
 	switch fsType {
 	case "ext4", "ext3", "ext2":
 		// Use resize2fs for ext filesystems
-		cmd := exec.Command("resize2fs", devicePath)
+		cmd := exec.CommandContext(rc.Ctx, "resize2fs", devicePath)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to resize ext filesystem: %w", err)
 		}
@@ -36,7 +37,7 @@ func ResizeFilesystem(rc *eos_io.RuntimeContext, devicePath, fsType, mountpoint 
 		if mountpoint == "" {
 			return fmt.Errorf("mountpoint required for XFS filesystem resize")
 		}
-		cmd := exec.Command("xfs_growfs", mountpoint)
+		cmd := exec.CommandContext(rc.Ctx, "xfs_growfs", mountpoint)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to resize XFS filesystem: %w", err)
 		}

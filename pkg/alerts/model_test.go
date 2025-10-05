@@ -3,7 +3,6 @@
 package alerts
 
 import (
-	"html/template"
 	"testing"
 	"time"
 
@@ -44,14 +43,14 @@ func TestAlert(t *testing.T) {
 				RuleID:      "security-001",
 				Title:       "Security Alert",
 				Description: "Potential security issue detected",
-				HTMLDetails: template.HTML("<b>Important:</b> Check immediately"),
+				HTMLDetails: "<b>Important:</b> Check immediately", // SECURITY P0 #1: Now string for auto-escaping
 				Host:        "prod-server",
 				Meta:        map[string]any{"ip": "192.168.1.1", "port": 8080},
 			},
 			check: func(t *testing.T, a Alert) {
 				assert.Equal(t, 3, a.Severity)
 				assert.Equal(t, "security-001", a.RuleID)
-				assert.Equal(t, template.HTML("<b>Important:</b> Check immediately"), a.HTMLDetails)
+				assert.Equal(t, "<b>Important:</b> Check immediately", a.HTMLDetails) // SECURITY P0 #1: String comparison
 				assert.Equal(t, "192.168.1.1", a.Meta["ip"])
 				assert.Equal(t, 8080, a.Meta["port"])
 			},
@@ -165,13 +164,13 @@ func TestAlertHTMLSafety(t *testing.T) {
 		Severity:    3,
 		RuleID:      "xss-test",
 		Title:       "XSS Test",
-		Description: dangerousHTML,                // This should be escaped when rendered
-		HTMLDetails: template.HTML(dangerousHTML), // This is marked as safe HTML
+		Description: dangerousHTML, // This should be escaped when rendered
+		HTMLDetails: dangerousHTML, // SECURITY P0 #1: Now string for auto-escaping
 		Host:        "test",
 	}
 
-	// The Description field is a regular string and should be escaped during rendering
+	// Both fields are now regular strings and will be escaped during rendering
 	assert.Equal(t, dangerousHTML, alert.Description)
-	// The HTMLDetails field is template.HTML and will not be escaped
-	assert.Equal(t, template.HTML(dangerousHTML), alert.HTMLDetails)
+	// SECURITY P0 #1: HTMLDetails is now string - XSS prevented via auto-escaping
+	assert.Equal(t, dangerousHTML, alert.HTMLDetails)
 }

@@ -165,8 +165,11 @@ func (f *FormatDetectorImpl) detectXML(input string) float64 {
 	}
 
 	// Try to parse as XML
+	// SECURITY P0 #2: Use xml.Decoder to prevent XXE attacks
+	decoder := xml.NewDecoder(strings.NewReader(input))
+	decoder.Entity = make(map[string]string) // Disable external entities
 	var temp interface{}
-	if err := xml.Unmarshal([]byte(input), &temp); err != nil {
+	if err := decoder.Decode(&temp); err != nil {
 		return 0.0
 	}
 

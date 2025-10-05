@@ -3,6 +3,7 @@
 package kvm
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -599,8 +600,12 @@ func (sm *SnapshotManager) getSnapshotInfo(rc *eos_io.RuntimeContext, snapshotNa
 		return nil, err
 	}
 
+	// SECURITY P0 #2: Use xml.Decoder to prevent XXE attacks
+	decoder := xml.NewDecoder(bytes.NewReader([]byte(output)))
+	decoder.Entity = make(map[string]string) // Disable external entities
+
 	var info SnapshotInfo
-	if err := xml.Unmarshal([]byte(output), &info); err != nil {
+	if err := decoder.Decode(&info); err != nil {
 		return nil, fmt.Errorf("failed to parse snapshot XML: %w", err)
 	}
 
@@ -640,6 +645,10 @@ func (sm *SnapshotManager) validateXMLFile(xmlPath string) error {
 		return err
 	}
 
+	// SECURITY P0 #2: Use xml.Decoder to prevent XXE attacks
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.Entity = make(map[string]string) // Disable external entities
+
 	var temp interface{}
-	return xml.Unmarshal(data, &temp)
+	return decoder.Decode(&temp)
 }

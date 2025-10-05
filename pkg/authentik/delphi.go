@@ -202,9 +202,17 @@ func (c *AuthentikClient) createSAMLCertificate(entityID string) (string, error)
 	}
 
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode certificate response: %w", err)
+	}
 
-	return result["pk"].(string), nil
+	// SECURITY P0 #1: Safe type assertion to prevent panic
+	pk, ok := result["pk"].(string)
+	if !ok {
+		return "", fmt.Errorf("certificate response missing or invalid 'pk' field")
+	}
+
+	return pk, nil
 }
 
 func (c *AuthentikClient) createRolesPropertyMapping() (string, error) {
@@ -250,9 +258,17 @@ else:
 	}
 
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode property mapping response: %w", err)
+	}
 
-	return result["pk"].(string), nil
+	// SECURITY P0 #1: Safe type assertion to prevent panic
+	pk, ok := result["pk"].(string)
+	if !ok {
+		return "", fmt.Errorf("property mapping response missing or invalid 'pk' field")
+	}
+
+	return pk, nil
 }
 
 func (c *AuthentikClient) createStandardMappings() ([]string, error) {
@@ -298,8 +314,15 @@ func (c *AuthentikClient) createStandardMappings() ([]string, error) {
 
 		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
 			var result map[string]interface{}
-			json.NewDecoder(resp.Body).Decode(&result)
-			ids = append(ids, result["pk"].(string))
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				return nil, fmt.Errorf("failed to decode mapping response: %w", err)
+			}
+			// SECURITY P0 #1: Safe type assertion to prevent panic
+			pk, ok := result["pk"].(string)
+			if !ok {
+				return nil, fmt.Errorf("mapping response missing or invalid 'pk' field")
+			}
+			ids = append(ids, pk)
 		}
 	}
 
@@ -343,9 +366,17 @@ func (c *AuthentikClient) createSAMLProvider(entityID, wazuhURL, certID string, 
 	}
 
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode provider response: %w", err)
+	}
 
-	return result["pk"].(string), nil
+	// SECURITY P0 #1: Safe type assertion to prevent panic
+	pk, ok := result["pk"].(string)
+	if !ok {
+		return "", fmt.Errorf("provider response missing or invalid 'pk' field")
+	}
+
+	return pk, nil
 }
 
 func (c *AuthentikClient) createApplication(entityID string, providerID string) (string, error) {
@@ -380,9 +411,17 @@ func (c *AuthentikClient) createApplication(entityID string, providerID string) 
 	}
 
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode application response: %w", err)
+	}
 
-	return result["pk"].(string), nil
+	// SECURITY P0 #1: Safe type assertion to prevent panic
+	pk, ok := result["pk"].(string)
+	if !ok {
+		return "", fmt.Errorf("application response missing or invalid 'pk' field")
+	}
+
+	return pk, nil
 }
 
 func (c *AuthentikClient) createWazuhGroups() error {

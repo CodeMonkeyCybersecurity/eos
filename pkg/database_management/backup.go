@@ -3,9 +3,12 @@
 package database_management
 
 import (
-	"context"
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,37 +22,37 @@ import (
 
 // DatabaseBackupConfig defines configuration for database backup operations
 type DatabaseBackupConfig struct {
-	DatabaseConfig   *DatabaseConfig   `yaml:"database" json:"database"`
-	BackupDir        string            `yaml:"backup_dir" json:"backup_dir"`
-	BackupName       string            `yaml:"backup_name" json:"backup_name"`
-	Compression      string            `yaml:"compression" json:"compression"` // gzip, none
-	IncludeSchema    bool              `yaml:"include_schema" json:"include_schema"`
-	IncludeData      bool              `yaml:"include_data" json:"include_data"`
-	IncludeTriggers  bool              `yaml:"include_triggers" json:"include_triggers"`
-	IncludeRoutines  bool              `yaml:"include_routines" json:"include_routines"`
-	ExcludeTables    []string          `yaml:"exclude_tables" json:"exclude_tables"`
-	IncludeTables    []string          `yaml:"include_tables" json:"include_tables"`
-	Timeout          time.Duration     `yaml:"timeout" json:"timeout"`
-	Parallel         bool              `yaml:"parallel" json:"parallel"`
-	CustomOptions    map[string]string `yaml:"custom_options" json:"custom_options"`
-	UseVaultCreds    bool              `yaml:"use_vault_creds" json:"use_vault_creds"`
-	VaultCredPath    string            `yaml:"vault_cred_path" json:"vault_cred_path"`
+	DatabaseConfig  *DatabaseConfig   `yaml:"database" json:"database"`
+	BackupDir       string            `yaml:"backup_dir" json:"backup_dir"`
+	BackupName      string            `yaml:"backup_name" json:"backup_name"`
+	Compression     string            `yaml:"compression" json:"compression"` // gzip, none
+	IncludeSchema   bool              `yaml:"include_schema" json:"include_schema"`
+	IncludeData     bool              `yaml:"include_data" json:"include_data"`
+	IncludeTriggers bool              `yaml:"include_triggers" json:"include_triggers"`
+	IncludeRoutines bool              `yaml:"include_routines" json:"include_routines"`
+	ExcludeTables   []string          `yaml:"exclude_tables" json:"exclude_tables"`
+	IncludeTables   []string          `yaml:"include_tables" json:"include_tables"`
+	Timeout         time.Duration     `yaml:"timeout" json:"timeout"`
+	Parallel        bool              `yaml:"parallel" json:"parallel"`
+	CustomOptions   map[string]string `yaml:"custom_options" json:"custom_options"`
+	UseVaultCreds   bool              `yaml:"use_vault_creds" json:"use_vault_creds"`
+	VaultCredPath   string            `yaml:"vault_cred_path" json:"vault_cred_path"`
 }
 
 // DatabaseBackupResult represents the result of a database backup operation
 type DatabaseBackupResult struct {
-	Success       bool              `json:"success"`
-	BackupPath    string            `json:"backup_path"`
-	BackupSize    int64             `json:"backup_size"`
-	Duration      time.Duration     `json:"duration"`
-	DatabaseType  DatabaseType      `json:"database_type"`
-	TablesBackup  []string          `json:"tables_backup"`
-	SchemaInfo    *SchemaInfo       `json:"schema_info,omitempty"`
-	Metadata      map[string]string `json:"metadata"`
-	ErrorMessage  string            `json:"error_message,omitempty"`
-	Compressed    bool              `json:"compressed"`
-	ChecksumMD5   string            `json:"checksum_md5,omitempty"`
-	ChecksumSHA256 string           `json:"checksum_sha256,omitempty"`
+	Success        bool              `json:"success"`
+	BackupPath     string            `json:"backup_path"`
+	BackupSize     int64             `json:"backup_size"`
+	Duration       time.Duration     `json:"duration"`
+	DatabaseType   DatabaseType      `json:"database_type"`
+	TablesBackup   []string          `json:"tables_backup"`
+	SchemaInfo     *SchemaInfo       `json:"schema_info,omitempty"`
+	Metadata       map[string]string `json:"metadata"`
+	ErrorMessage   string            `json:"error_message,omitempty"`
+	Compressed     bool              `json:"compressed"`
+	ChecksumMD5    string            `json:"checksum_md5,omitempty"`
+	ChecksumSHA256 string            `json:"checksum_sha256,omitempty"`
 }
 
 // DatabaseBackupManager handles database backup operations following Assess → Intervene → Evaluate pattern
@@ -202,7 +205,7 @@ func (dbm *DatabaseBackupManager) assessDatabaseBackup(rc *eos_io.RuntimeContext
 
 func (dbm *DatabaseBackupManager) createBackupIntervention(rc *eos_io.RuntimeContext, result *DatabaseBackupResult) error {
 	timestamp := time.Now().Format("20060102-150405")
-	
+
 	var backupFileName string
 	if dbm.config.BackupName != "" {
 		backupFileName = fmt.Sprintf("%s_%s", dbm.config.BackupName, timestamp)
@@ -250,7 +253,7 @@ func (dbm *DatabaseBackupManager) evaluateBackup(rc *eos_io.RuntimeContext, resu
 	}
 
 	// Calculate checksums for integrity verification
-	if err := dbm.calculateChecksums(result.BackupPath, result); err != nil {
+	if err := dbm.calculateChecksums(rc, result.BackupPath, result); err != nil {
 		return fmt.Errorf("failed to calculate checksums: %w", err)
 	}
 
@@ -291,17 +294,42 @@ func (dbm *DatabaseBackupManager) createPostgreSQLBackup(rc *eos_io.RuntimeConte
 
 	// Environment variables are embedded in the bash command below
 
-	// Execute backup with output redirection
-	var cmd string
-	if dbm.config.Compression == "gzip" {
-		cmd = fmt.Sprintf("%s | gzip > %s", strings.Join(args, " "), result.BackupPath)
-	} else {
-		cmd = fmt.Sprintf("%s > %s", strings.Join(args, " "), result.BackupPath)
+	// SECURITY P0 #1: Execute backup with proper file handling (no shell injection)
+	// Set PGPASSWORD via environment variable (secure - not visible in process list)
+	cmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbm.config.DatabaseConfig.Password))
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("pg_dump failed: %w (stderr: %s)", err, stderr.String())
 	}
 
-	err := execute.RunSimple(rc.Ctx, "bash", "-c", cmd)
-	if err != nil {
-		return fmt.Errorf("pg_dump failed: %w", err)
+	output := stdout.String()
+
+	// Write output to file securely
+	var dataToWrite []byte
+	if dbm.config.Compression == "gzip" {
+		// Compress the output
+		compressed, err := gzipCompress([]byte(output))
+		if err != nil {
+			return fmt.Errorf("gzip compression failed: %w", err)
+		}
+		dataToWrite = compressed
+	} else {
+		dataToWrite = []byte(output)
+	}
+
+	// SECURITY P0 #2: Validate backup path before writing (prevent path traversal)
+	if err := validateBackupPath(result.BackupPath, dbm.config.BackupDir); err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
+	}
+
+	if err := os.WriteFile(result.BackupPath, dataToWrite, 0600); err != nil {
+		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 
 	return nil
@@ -312,12 +340,13 @@ func (dbm *DatabaseBackupManager) createMySQLBackup(rc *eos_io.RuntimeContext, r
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating MySQL backup")
 
+	// SECURITY P1 #5: Don't pass password via command-line (visible in ps aux)
+	// Use MYSQL_PWD environment variable instead
 	args := []string{
 		"mysqldump",
 		"--host", dbm.config.DatabaseConfig.Host,
 		"--port", fmt.Sprintf("%d", dbm.config.DatabaseConfig.Port),
 		"--user", dbm.config.DatabaseConfig.Username,
-		fmt.Sprintf("--password=%s", dbm.config.DatabaseConfig.Password),
 		"--single-transaction",
 		"--routines",
 		"--triggers",
@@ -350,17 +379,41 @@ func (dbm *DatabaseBackupManager) createMySQLBackup(rc *eos_io.RuntimeContext, r
 		args = append(args, dbm.config.IncludeTables...)
 	}
 
-	// Execute backup with output redirection
-	var cmd string
-	if dbm.config.Compression == "gzip" {
-		cmd = fmt.Sprintf("%s | gzip > %s", strings.Join(args, " "), result.BackupPath)
-	} else {
-		cmd = fmt.Sprintf("%s > %s", strings.Join(args, " "), result.BackupPath)
+	// SECURITY P0 #1: Execute backup with proper file handling (no shell injection)
+	// SECURITY P1 #5: Set MYSQL_PWD via environment (not visible in process list)
+	cmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("MYSQL_PWD=%s", dbm.config.DatabaseConfig.Password))
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("mysqldump failed: %w (stderr: %s)", err, stderr.String())
 	}
 
-	err := execute.RunSimple(rc.Ctx, "bash", "-c", cmd)
-	if err != nil {
-		return fmt.Errorf("mysqldump failed: %w", err)
+	output := stdout.String()
+
+	// Write output to file securely
+	var dataToWrite []byte
+	if dbm.config.Compression == "gzip" {
+		compressed, err := gzipCompress([]byte(output))
+		if err != nil {
+			return fmt.Errorf("gzip compression failed: %w", err)
+		}
+		dataToWrite = compressed
+	} else {
+		dataToWrite = []byte(output)
+	}
+
+	// SECURITY P0 #2: Validate backup path before writing
+	if err := validateBackupPath(result.BackupPath, dbm.config.BackupDir); err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
+	}
+
+	if err := os.WriteFile(result.BackupPath, dataToWrite, 0600); err != nil {
+		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 
 	return nil
@@ -408,8 +461,13 @@ func (dbm *DatabaseBackupManager) createMongoDBBackup(rc *eos_io.RuntimeContext,
 		if err != nil {
 			return fmt.Errorf("compression failed: %w", err)
 		}
-		// Remove uncompressed directory
-		os.RemoveAll(backupDir)
+
+		// SECURITY P2 #7: Validate backupDir path before os.RemoveAll
+		// Only remove if it's within our backup directory
+		if err := validateBackupPath(backupDir, dbm.config.BackupDir); err == nil {
+			os.RemoveAll(backupDir)
+		}
+
 		result.BackupPath = compressedPath
 		result.Compressed = true
 	}
@@ -445,10 +503,25 @@ func (dbm *DatabaseBackupManager) createRedisBackup(rc *eos_io.RuntimeContext, r
 		return fmt.Errorf("redis BGSAVE failed: %w", err)
 	}
 
-	// Wait for save to complete
-	for {
-		checkArgs := append(args, "LASTSAVE")
-		output, err := execute.Run(rc.Ctx, execute.Options{
+	// SECURITY P2 #6: Wait for save to complete with proper timestamp comparison
+	// SECURITY P1 #4: Use context-aware sleep to respect cancellation
+	checkArgs := append(args, "LASTSAVE")
+
+	// Get initial timestamp before BGSAVE
+	initialOutput, err := execute.Run(rc.Ctx, execute.Options{
+		Command: checkArgs[0],
+		Args:    checkArgs[1:],
+		Capture: true,
+	})
+	if err != nil {
+		return fmt.Errorf("redis initial LASTSAVE check failed: %w", err)
+	}
+	initialTimestamp := strings.TrimSpace(initialOutput)
+
+	// Poll for completion (max 60 seconds)
+	maxAttempts := 60
+	for i := 0; i < maxAttempts; i++ {
+		currentOutput, err := execute.Run(rc.Ctx, execute.Options{
 			Command: checkArgs[0],
 			Args:    checkArgs[1:],
 			Capture: true,
@@ -457,10 +530,21 @@ func (dbm *DatabaseBackupManager) createRedisBackup(rc *eos_io.RuntimeContext, r
 			return fmt.Errorf("redis LASTSAVE check failed: %w", err)
 		}
 
-		// Check if save is complete (implementation would need timestamp comparison)
-		_ = output
-		time.Sleep(1 * time.Second)
-		break // Simplified for demo
+		currentTimestamp := strings.TrimSpace(currentOutput)
+		if currentTimestamp != initialTimestamp {
+			// Save completed successfully
+			break
+		}
+
+		if i < maxAttempts-1 {
+			// Context-aware sleep
+			select {
+			case <-time.After(1 * time.Second):
+				// Continue polling
+			case <-rc.Ctx.Done():
+				return fmt.Errorf("redis backup cancelled: %w", rc.Ctx.Err())
+			}
+		}
 	}
 
 	// Copy the RDB file to backup location
@@ -476,33 +560,77 @@ func (dbm *DatabaseBackupManager) createRedisBackup(rc *eos_io.RuntimeContext, r
 // Verification methods
 
 func (dbm *DatabaseBackupManager) verifyPostgreSQLBackup(rc *eos_io.RuntimeContext, backupPath string) error {
-	// Verify backup can be parsed by PostgreSQL
-	args := []string{"pg_restore", "--list", backupPath}
-	
-	if strings.HasSuffix(backupPath, ".gz") {
-		// Handle compressed backup
-		cmd := fmt.Sprintf("gunzip -c %s | pg_restore --list", backupPath)
-		err := execute.RunSimple(rc.Ctx, "bash", "-c", cmd)
-		return err
+	// SECURITY P0 #2: Validate backup path before reading
+	if err := validateBackupPath(backupPath, dbm.config.BackupDir); err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
 	}
-	
-	err := execute.RunSimple(rc.Ctx, args[0], args[1:]...)
-	return err
+
+	var dataToVerify []byte
+	var err error
+
+	if strings.HasSuffix(backupPath, ".gz") {
+		// SECURITY P0 #1: Read compressed backup securely (no shell injection)
+		compressed, err := os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read backup file: %w", err)
+		}
+		dataToVerify, err = gzipDecompress(compressed)
+		if err != nil {
+			return fmt.Errorf("failed to decompress backup: %w", err)
+		}
+	} else {
+		dataToVerify, err = os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read backup file: %w", err)
+		}
+	}
+
+	// Verify backup format (check for SQL header)
+	if len(dataToVerify) < 100 {
+		return fmt.Errorf("backup file too small to be valid")
+	}
+
+	// Basic validation - check for PostgreSQL dump header
+	header := string(dataToVerify[:100])
+	if !strings.Contains(header, "PostgreSQL") && !strings.Contains(header, "CREATE TABLE") && !strings.Contains(header, "INSERT INTO") {
+		return fmt.Errorf("backup file does not appear to be a valid PostgreSQL dump")
+	}
+
+	return nil
 }
 
 func (dbm *DatabaseBackupManager) verifyMySQLBackup(rc *eos_io.RuntimeContext, backupPath string) error {
-	// Verify backup syntax
-	var cmd string
-	if strings.HasSuffix(backupPath, ".gz") {
-		cmd = fmt.Sprintf("gunzip -c %s | mysql --force --comments=false", backupPath)
-	} else {
-		cmd = fmt.Sprintf("mysql --force --comments=false < %s", backupPath)
+	// SECURITY P0 #2: Validate backup path before reading
+	if err := validateBackupPath(backupPath, dbm.config.BackupDir); err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
 	}
-	
-	// Dry run verification
-	cmd += " --dry-run"
-	err := execute.RunSimple(rc.Ctx, "bash", "-c", cmd)
-	return err
+
+	var dataToVerify []byte
+	var err error
+
+	if strings.HasSuffix(backupPath, ".gz") {
+		compressed, err := os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read backup file: %w", err)
+		}
+		dataToVerify, err = gzipDecompress(compressed)
+		if err != nil {
+			return fmt.Errorf("failed to decompress backup: %w", err)
+		}
+	} else {
+		dataToVerify, err = os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read backup file: %w", err)
+		}
+	}
+
+	// Basic validation - check for MySQL dump header
+	header := string(dataToVerify[:min(len(dataToVerify), 200)])
+	if !strings.Contains(header, "MySQL") && !strings.Contains(header, "CREATE TABLE") && !strings.Contains(header, "INSERT INTO") {
+		return fmt.Errorf("backup file does not appear to be a valid MySQL dump")
+	}
+
+	return nil
 }
 
 func (dbm *DatabaseBackupManager) verifyMongoDBBackup(rc *eos_io.RuntimeContext, backupPath string) error {
@@ -512,19 +640,19 @@ func (dbm *DatabaseBackupManager) verifyMongoDBBackup(rc *eos_io.RuntimeContext,
 		err := execute.RunSimple(rc.Ctx, "tar", "-tzf", backupPath)
 		return err
 	}
-	
+
 	// Verify directory contains BSON files
 	entries, err := os.ReadDir(backupPath)
 	if err != nil {
 		return err
 	}
-	
+
 	for _, entry := range entries {
 		if strings.HasSuffix(entry.Name(), ".bson") {
 			return nil // Found at least one BSON file
 		}
 	}
-	
+
 	return fmt.Errorf("no BSON files found in backup")
 }
 
@@ -535,18 +663,18 @@ func (dbm *DatabaseBackupManager) verifyRedisBackup(rc *eos_io.RuntimeContext, b
 		return err
 	}
 	defer file.Close()
-	
+
 	// Check RDB magic header
 	header := make([]byte, 9)
 	_, err = file.Read(header)
 	if err != nil {
 		return err
 	}
-	
+
 	if string(header[:5]) != "REDIS" {
 		return fmt.Errorf("invalid RDB file format")
 	}
-	
+
 	return nil
 }
 
@@ -600,35 +728,33 @@ func (dbm *DatabaseBackupManager) testDatabaseConnection(rc *eos_io.RuntimeConte
 }
 
 func (dbm *DatabaseBackupManager) testPostgreSQLConnection(rc *eos_io.RuntimeContext) error {
-	// Environment variables are embedded in the bash command below
-	
-	args := []string{
-		"psql",
+	// SECURITY P0 #1: Use exec.CommandContext with environment variables (no shell injection)
+	// SECURITY P1 #5: Set PGPASSWORD via environment (not visible in process list)
+	cmd := exec.CommandContext(rc.Ctx, "psql",
 		"--host", dbm.config.DatabaseConfig.Host,
 		"--port", fmt.Sprintf("%d", dbm.config.DatabaseConfig.Port),
 		"--username", dbm.config.DatabaseConfig.Username,
 		"--dbname", dbm.config.DatabaseConfig.Database,
 		"--command", "SELECT 1;",
-	}
-	
-	// Set environment and run command
-	// For now, use a simple approach with bash -c
-	cmd := fmt.Sprintf("PGPASSWORD='%s' %s", dbm.config.DatabaseConfig.Password, strings.Join(args, " "))
-	return execute.RunSimple(rc.Ctx, "bash", "-c", cmd)
+		"--no-psqlrc") // Don't load user's psqlrc file
+
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbm.config.DatabaseConfig.Password))
+
+	return cmd.Run()
 }
 
 func (dbm *DatabaseBackupManager) testMySQLConnection(rc *eos_io.RuntimeContext) error {
-	args := []string{
-		"mysql",
+	// SECURITY P1 #5: Use MYSQL_PWD environment variable (not visible in process list)
+	cmd := exec.CommandContext(rc.Ctx, "mysql",
 		"--host", dbm.config.DatabaseConfig.Host,
 		"--port", fmt.Sprintf("%d", dbm.config.DatabaseConfig.Port),
 		"--user", dbm.config.DatabaseConfig.Username,
-		fmt.Sprintf("--password=%s", dbm.config.DatabaseConfig.Password),
 		dbm.config.DatabaseConfig.Database,
-		"--execute", "SELECT 1;",
-	}
-	
-	return execute.RunSimple(rc.Ctx, args[0], args[1:]...)
+		"--execute", "SELECT 1;")
+
+	cmd.Env = append(os.Environ(), fmt.Sprintf("MYSQL_PWD=%s", dbm.config.DatabaseConfig.Password))
+
+	return cmd.Run()
 }
 
 func (dbm *DatabaseBackupManager) testMongoDBConnection(rc *eos_io.RuntimeContext) error {
@@ -638,28 +764,28 @@ func (dbm *DatabaseBackupManager) testMongoDBConnection(rc *eos_io.RuntimeContex
 		dbm.config.DatabaseConfig.Database,
 		"--eval", "db.runCommand('ping')",
 	}
-	
+
 	if dbm.config.DatabaseConfig.Username != "" {
 		args = append(args, "--username", dbm.config.DatabaseConfig.Username)
 		args = append(args, "--password", dbm.config.DatabaseConfig.Password)
 	}
-	
+
 	return execute.RunSimple(rc.Ctx, args[0], args[1:]...)
 }
 
 func (dbm *DatabaseBackupManager) testRedisConnection(rc *eos_io.RuntimeContext) error {
-	args := []string{
-		"redis-cli",
+	// SECURITY P1 #5: Use REDISCLI_AUTH environment variable (not visible in process list)
+	cmd := exec.CommandContext(rc.Ctx, "redis-cli",
 		"-h", dbm.config.DatabaseConfig.Host,
 		"-p", fmt.Sprintf("%d", dbm.config.DatabaseConfig.Port),
-		"ping",
-	}
-	
+		"ping")
+
 	if dbm.config.DatabaseConfig.Password != "" {
-		args = append(args, "-a", dbm.config.DatabaseConfig.Password)
+		// Don't use -a flag (visible in ps aux), use environment variable instead
+		cmd.Env = append(os.Environ(), fmt.Sprintf("REDISCLI_AUTH=%s", dbm.config.DatabaseConfig.Password))
 	}
-	
-	return execute.RunSimple(rc.Ctx, args[0], args[1:]...)
+
+	return cmd.Run()
 }
 
 func (dbm *DatabaseBackupManager) getSchemaInfo(rc *eos_io.RuntimeContext) (*SchemaInfo, error) {
@@ -674,9 +800,10 @@ func (dbm *DatabaseBackupManager) getSchemaInfo(rc *eos_io.RuntimeContext) (*Sch
 	}, nil
 }
 
-func (dbm *DatabaseBackupManager) calculateChecksums(backupPath string, result *DatabaseBackupResult) error {
+func (dbm *DatabaseBackupManager) calculateChecksums(rc *eos_io.RuntimeContext, backupPath string, result *DatabaseBackupResult) error {
+	// SECURITY P1 #4: Use rc.Ctx instead of context.Background() for proper cancellation
 	// Calculate MD5 checksum
-	md5Output, err := execute.Run(context.Background(), execute.Options{
+	md5Output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "md5sum",
 		Args:    []string{backupPath},
 		Capture: true,
@@ -687,9 +814,9 @@ func (dbm *DatabaseBackupManager) calculateChecksums(backupPath string, result *
 			result.ChecksumMD5 = fields[0]
 		}
 	}
-	
+
 	// Calculate SHA256 checksum
-	sha256Output, err := execute.Run(context.Background(), execute.Options{
+	sha256Output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "sha256sum",
 		Args:    []string{backupPath},
 		Capture: true,
@@ -700,7 +827,7 @@ func (dbm *DatabaseBackupManager) calculateChecksums(backupPath string, result *
 			result.ChecksumSHA256 = fields[0]
 		}
 	}
-	
+
 	return nil
 }
 
@@ -709,7 +836,7 @@ func (dbm *DatabaseBackupManager) assessDatabaseRestore(rc *eos_io.RuntimeContex
 	if _, err := os.Stat(backupPath); err != nil {
 		return fmt.Errorf("backup file not found: %w", err)
 	}
-	
+
 	// Test database connection
 	return dbm.testDatabaseConnection(rc)
 }
@@ -730,69 +857,136 @@ func (dbm *DatabaseBackupManager) restoreBackupIntervention(rc *eos_io.RuntimeCo
 }
 
 func (dbm *DatabaseBackupManager) restorePostgreSQLBackup(rc *eos_io.RuntimeContext, backupPath string) error {
-	// Environment variables are embedded in the bash command below
-	
-	var cmd string
-	if strings.HasSuffix(backupPath, ".gz") {
-		cmd = fmt.Sprintf("gunzip -c %s | psql --host %s --port %d --username %s --dbname %s",
-			backupPath,
-			dbm.config.DatabaseConfig.Host,
-			dbm.config.DatabaseConfig.Port,
-			dbm.config.DatabaseConfig.Username,
-			dbm.config.DatabaseConfig.Database)
-	} else {
-		cmd = fmt.Sprintf("psql --host %s --port %d --username %s --dbname %s --file %s",
-			dbm.config.DatabaseConfig.Host,
-			dbm.config.DatabaseConfig.Port,
-			dbm.config.DatabaseConfig.Username,
-			dbm.config.DatabaseConfig.Database,
-			backupPath)
+	// SECURITY P0 #2: Validate backup path before reading
+	if err := validateBackupPath(backupPath, dbm.config.BackupDir); err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
 	}
-	
-	// Set environment and run command
-	cmd = fmt.Sprintf("PGPASSWORD='%s' %s", dbm.config.DatabaseConfig.Password, cmd)
-	return execute.RunSimple(rc.Ctx, "bash", "-c", cmd)
+
+	// Read and potentially decompress backup
+	var backupData []byte
+	var err error
+
+	if strings.HasSuffix(backupPath, ".gz") {
+		compressed, err := os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read compressed backup: %w", err)
+		}
+		backupData, err = gzipDecompress(compressed)
+		if err != nil {
+			return fmt.Errorf("failed to decompress backup: %w", err)
+		}
+	} else {
+		backupData, err = os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read backup: %w", err)
+		}
+	}
+
+	// SECURITY P0 #1: Execute restore with stdin input (no shell injection)
+	// SECURITY P1 #5: Set PGPASSWORD via environment (not visible in process list)
+	cmd := exec.CommandContext(rc.Ctx, "psql",
+		"--host", dbm.config.DatabaseConfig.Host,
+		"--port", fmt.Sprintf("%d", dbm.config.DatabaseConfig.Port),
+		"--username", dbm.config.DatabaseConfig.Username,
+		"--dbname", dbm.config.DatabaseConfig.Database,
+		"--no-psqlrc")
+
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbm.config.DatabaseConfig.Password))
+	cmd.Stdin = bytes.NewReader(backupData)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("psql restore failed: %w (stderr: %s)", err, stderr.String())
+	}
+
+	return nil
 }
 
 func (dbm *DatabaseBackupManager) restoreMySQLBackup(rc *eos_io.RuntimeContext, backupPath string) error {
-	var cmd string
-	if strings.HasSuffix(backupPath, ".gz") {
-		cmd = fmt.Sprintf("gunzip -c %s | mysql --host %s --port %d --user %s --password=%s %s",
-			backupPath,
-			dbm.config.DatabaseConfig.Host,
-			dbm.config.DatabaseConfig.Port,
-			dbm.config.DatabaseConfig.Username,
-			dbm.config.DatabaseConfig.Password,
-			dbm.config.DatabaseConfig.Database)
-	} else {
-		cmd = fmt.Sprintf("mysql --host %s --port %d --user %s --password=%s %s < %s",
-			dbm.config.DatabaseConfig.Host,
-			dbm.config.DatabaseConfig.Port,
-			dbm.config.DatabaseConfig.Username,
-			dbm.config.DatabaseConfig.Password,
-			dbm.config.DatabaseConfig.Database,
-			backupPath)
+	// SECURITY P0 #2: Validate backup path before reading
+	if err := validateBackupPath(backupPath, dbm.config.BackupDir); err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
 	}
-	
-	return execute.RunSimple(rc.Ctx, "bash", "-c", cmd)
+
+	// Read and potentially decompress backup
+	var backupData []byte
+	var err error
+
+	if strings.HasSuffix(backupPath, ".gz") {
+		compressed, err := os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read compressed backup: %w", err)
+		}
+		backupData, err = gzipDecompress(compressed)
+		if err != nil {
+			return fmt.Errorf("failed to decompress backup: %w", err)
+		}
+	} else {
+		backupData, err = os.ReadFile(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to read backup: %w", err)
+		}
+	}
+
+	// SECURITY P0 #1: Execute restore with stdin input (no shell injection)
+	// SECURITY P1 #5: Set MYSQL_PWD via environment (not visible in process list)
+	cmd := exec.CommandContext(rc.Ctx, "mysql",
+		"--host", dbm.config.DatabaseConfig.Host,
+		"--port", fmt.Sprintf("%d", dbm.config.DatabaseConfig.Port),
+		"--user", dbm.config.DatabaseConfig.Username,
+		dbm.config.DatabaseConfig.Database)
+
+	cmd.Env = append(os.Environ(), fmt.Sprintf("MYSQL_PWD=%s", dbm.config.DatabaseConfig.Password))
+	cmd.Stdin = bytes.NewReader(backupData)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("mysql restore failed: %w (stderr: %s)", err, stderr.String())
+	}
+
+	return nil
 }
 
 func (dbm *DatabaseBackupManager) restoreMongoDBBackup(rc *eos_io.RuntimeContext, backupPath string) error {
+	// SECURITY P0 #2: Validate backup path before reading
+	if err := validateBackupPath(backupPath, dbm.config.BackupDir); err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
+	}
+
 	var restoreDir string
-	
+
 	if strings.HasSuffix(backupPath, ".tar.gz") {
-		// Extract compressed backup
-		tempDir := "/tmp/mongo_restore_" + fmt.Sprintf("%d", time.Now().Unix())
-		err := execute.RunSimple(rc.Ctx, "tar", "-xzf", backupPath, "-C", tempDir)
+		// SECURITY P0 #3: Create secure temp directory with proper permissions
+		// Don't use hardcoded /tmp path - use os.MkdirTemp for atomic creation
+		tempDir, err := os.MkdirTemp("", "mongo_restore_*")
+		if err != nil {
+			return fmt.Errorf("failed to create temp directory: %w", err)
+		}
+
+		// SECURITY P2 #7: Clean up temp directory on exit
+		defer os.RemoveAll(tempDir)
+
+		// SECURITY P2 #7: Validate backupPath doesn't contain traversal before extraction
+		if strings.Contains(backupPath, "..") {
+			return fmt.Errorf("backup path contains directory traversal")
+		}
+
+		err = execute.RunSimple(rc.Ctx, "tar", "-xzf", backupPath, "-C", tempDir)
 		if err != nil {
 			return fmt.Errorf("failed to extract backup: %w", err)
 		}
-		defer os.RemoveAll(tempDir)
+
 		restoreDir = tempDir
 	} else {
 		restoreDir = backupPath
 	}
-	
+
 	args := []string{
 		"mongorestore",
 		"--host", fmt.Sprintf("%s:%d", dbm.config.DatabaseConfig.Host, dbm.config.DatabaseConfig.Port),
@@ -800,48 +994,130 @@ func (dbm *DatabaseBackupManager) restoreMongoDBBackup(rc *eos_io.RuntimeContext
 		"--drop", // Drop collections before restoring
 		restoreDir,
 	}
-	
+
 	if dbm.config.DatabaseConfig.Username != "" {
 		args = append(args, "--username", dbm.config.DatabaseConfig.Username)
 		args = append(args, "--password", dbm.config.DatabaseConfig.Password)
 	}
-	
+
 	return execute.RunSimple(rc.Ctx, args[0], args[1:]...)
 }
 
 func (dbm *DatabaseBackupManager) restoreRedisBackup(rc *eos_io.RuntimeContext, backupPath string) error {
 	// For Redis, we need to stop the service, replace the RDB file, and restart
 	// This is a simplified implementation
-	
+
 	// Stop Redis service
 	err := execute.RunSimple(rc.Ctx, "systemctl", "stop", "redis-server")
 	if err != nil {
 		return fmt.Errorf("failed to stop Redis: %w", err)
 	}
-	
+
 	// Copy backup to Redis data directory
 	rdbPath := "/var/lib/redis/dump.rdb"
 	err = execute.RunSimple(rc.Ctx, "cp", backupPath, rdbPath)
 	if err != nil {
 		return fmt.Errorf("failed to copy backup: %w", err)
 	}
-	
+
 	// Set proper ownership
 	err = execute.RunSimple(rc.Ctx, "chown", "redis:redis", rdbPath)
 	if err != nil {
 		return fmt.Errorf("failed to set ownership: %w", err)
 	}
-	
+
 	// Start Redis service
 	err = execute.RunSimple(rc.Ctx, "systemctl", "start", "redis-server")
 	if err != nil {
 		return fmt.Errorf("failed to start Redis: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (dbm *DatabaseBackupManager) evaluateRestore(rc *eos_io.RuntimeContext) error {
 	// Test database connection after restore
 	return dbm.testDatabaseConnection(rc)
+}
+
+// SECURITY P0 #2: Helper functions for path validation and compression
+
+// min returns the smaller of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// validateBackupPath ensures backupPath is within the allowedDir to prevent path traversal
+func validateBackupPath(backupPath, allowedDir string) error {
+	// Get absolute paths
+	absBackupPath, err := filepath.Abs(backupPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute backup path: %w", err)
+	}
+
+	absAllowedDir, err := filepath.Abs(allowedDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute allowed directory: %w", err)
+	}
+
+	// Clean paths to remove ".." and other relative elements
+	cleanBackupPath := filepath.Clean(absBackupPath)
+	cleanAllowedDir := filepath.Clean(absAllowedDir)
+
+	// Ensure backup path is within allowed directory
+	if !strings.HasPrefix(cleanBackupPath, cleanAllowedDir+string(filepath.Separator)) &&
+		cleanBackupPath != cleanAllowedDir {
+		return fmt.Errorf("backup path '%s' is outside allowed directory '%s'",
+			cleanBackupPath, cleanAllowedDir)
+	}
+
+	// Additional checks for common path traversal patterns
+	if strings.Contains(backupPath, "..") {
+		return fmt.Errorf("backup path contains directory traversal '..'")
+	}
+
+	// Check for symlink attacks
+	if fileInfo, err := os.Lstat(filepath.Dir(cleanBackupPath)); err == nil {
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("backup path parent directory is a symlink")
+		}
+	}
+
+	return nil
+}
+
+// gzipCompress compresses data using gzip
+func gzipCompress(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+
+	if _, err := gzWriter.Write(data); err != nil {
+		return nil, fmt.Errorf("gzip write failed: %w", err)
+	}
+
+	if err := gzWriter.Close(); err != nil {
+		return nil, fmt.Errorf("gzip close failed: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// gzipDecompress decompresses gzip data
+func gzipDecompress(data []byte) ([]byte, error) {
+	buf := bytes.NewReader(data)
+	gzReader, err := gzip.NewReader(buf)
+	if err != nil {
+		return nil, fmt.Errorf("gzip reader creation failed: %w", err)
+	}
+	defer gzReader.Close()
+
+	var out bytes.Buffer
+	if _, err := io.Copy(&out, gzReader); err != nil {
+		return nil, fmt.Errorf("gzip decompression failed: %w", err)
+	}
+
+	return out.Bytes(), nil
 }

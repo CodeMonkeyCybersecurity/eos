@@ -188,8 +188,12 @@ type vmXML struct {
 
 // parseVMXML parses VM XML configuration
 func (i *Inspector) parseVMXML(xmlData string) (*KVMDomain, error) {
+	// SECURITY P0 #2: Use xml.Decoder to prevent XXE attacks
+	decoder := xml.NewDecoder(strings.NewReader(xmlData))
+	decoder.Entity = make(map[string]string) // Disable external entities
+
 	var vmData vmXML
-	if err := xml.Unmarshal([]byte(xmlData), &vmData); err != nil {
+	if err := decoder.Decode(&vmData); err != nil {
 		return nil, err
 	}
 

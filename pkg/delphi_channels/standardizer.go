@@ -134,8 +134,10 @@ func (cs *ChannelStandardizer) standardizeWorkerFile(workerPath string, expected
 	updatedContent := originalContent
 	hasChanges := false
 
+	// SECURITY P0 #1: Safe array access with explicit bounds check
 	// Update LISTEN_CHANNEL definitions
 	if len(expectedConfig.ListenChannels) > 0 {
+		// Safe to access [0] - length verified above
 		primaryListenChannel := expectedConfig.ListenChannels[0]
 		newContent, changed := cs.updateListenChannelVariable(updatedContent, primaryListenChannel, workerPath)
 		if changed {
@@ -146,6 +148,7 @@ func (cs *ChannelStandardizer) standardizeWorkerFile(workerPath string, expected
 
 	// Update NOTIFY_CHANNEL definitions
 	if len(expectedConfig.NotifyChannels) > 0 {
+		// Safe to access [0] - length verified above
 		primaryNotifyChannel := expectedConfig.NotifyChannels[0]
 		newContent, changed := cs.updateNotifyChannelVariable(updatedContent, primaryNotifyChannel, workerPath)
 		if changed {

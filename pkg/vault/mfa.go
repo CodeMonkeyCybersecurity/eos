@@ -138,7 +138,13 @@ func enableTOTPMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 		return cerr.New("TOTP MFA method creation did not return method_id")
 	}
 
-	methodID := resp.Data["method_id"].(string)
+	// SECURITY P0 #1: Safe type assertion to prevent panic
+	methodID, ok := resp.Data["method_id"].(string)
+	if !ok {
+		log.Error(" TOTP MFA method_id has invalid type",
+			zap.Any("method_id", resp.Data["method_id"]))
+		return cerr.New("TOTP MFA method_id is not a string")
+	}
 	log.Info(" TOTP MFA method created", zap.String("method_id", methodID))
 
 	// Store the method ID for enforcement configuration

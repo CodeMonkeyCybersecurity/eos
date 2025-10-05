@@ -46,18 +46,20 @@ func FindProcesses(ctx context.Context, pattern string) ([]ProcessInfo, error) {
 		if strings.Contains(line, pattern) {
 			// Parse the line
 			fields := strings.Fields(line)
-			if len(fields) >= 11 {
-				// Fields: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND...
+			// SECURITY P0 #2: Safe array bounds - need >10 elements to access fields[10]
+			// Fields: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND...
+			// Index:    0   1    2    3   4   5   6    7     8    9      10
+			if len(fields) > 10 { // Changed from >= 11 to > 10 for clarity
 				if pid, err := strconv.Atoi(fields[1]); err == nil {
 					// Skip our own grep/ps processes
 					cmdLine := strings.Join(fields[10:], " ")
 					if strings.Contains(cmdLine, "ps aux") || strings.Contains(cmdLine, "grep") {
 						continue
 					}
-					
+
 					processes = append(processes, ProcessInfo{
 						PID:     pid,
-						Name:    fields[10], // First part of command
+						Name:    fields[10], // Safe - len > 10 means index 10 is valid
 						Command: cmdLine,
 					})
 				}

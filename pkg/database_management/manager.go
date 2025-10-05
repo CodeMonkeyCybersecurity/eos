@@ -156,7 +156,8 @@ func (dm *DatabaseManager) RevokeCredentials(rc *eos_io.RuntimeContext, leaseID 
 
 	logger.Info("Revoking database credentials", zap.String("lease_id", leaseID))
 
-	cmd := exec.Command("vault", "lease", "revoke", leaseID)
+	// SECURITY P0 #1: Use CommandContext for cancellation support
+	cmd := exec.CommandContext(rc.Ctx, "vault", "lease", "revoke", leaseID)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		logger.Error("Failed to revoke credentials", zap.Error(err), zap.String("output", string(output)))
@@ -292,7 +293,8 @@ func (dm *DatabaseManager) setupDatabaseEngine(rc *eos_io.RuntimeContext, option
 
 	// Enable database secrets engine
 	logger.Info("Enabling database secrets engine")
-	cmd := exec.Command("vault", "secrets", "list")
+	// SECURITY P0 #1: Use CommandContext for cancellation support
+	cmd := exec.CommandContext(rc.Ctx, "vault", "secrets", "list")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to list secrets engines: %w", err)
@@ -304,7 +306,7 @@ func (dm *DatabaseManager) setupDatabaseEngine(rc *eos_io.RuntimeContext, option
 	}
 
 	if !strings.Contains(string(output), engineMount) {
-		cmd = exec.Command("vault", "secrets", "enable", "database")
+		cmd = exec.CommandContext(rc.Ctx, "vault", "secrets", "enable", "database")
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to enable database secrets engine: %w", err)
 		}
@@ -338,7 +340,8 @@ func (dm *DatabaseManager) setupDatabaseEngine(rc *eos_io.RuntimeContext, option
 		return fmt.Errorf("failed to marshal vault config: %w", err)
 	}
 
-	cmd = exec.Command("vault", "write", "-format=json", fmt.Sprintf("database/config/%s", connectionName), "-")
+	// SECURITY P0 #1: Use CommandContext for cancellation support
+	cmd = exec.CommandContext(rc.Ctx, "vault", "write", "-format=json", fmt.Sprintf("database/config/%s", connectionName), "-")
 	cmd.Stdin = bytes.NewReader(configJSON)
 
 	var stderr bytes.Buffer
@@ -380,7 +383,8 @@ func (dm *DatabaseManager) createVaultRole(rc *eos_io.RuntimeContext, connection
 		args = append(args, fmt.Sprintf("revocation_statements=%s", revocationStatements))
 	}
 
-	cmd := exec.Command("vault", args...)
+	// SECURITY P0 #1: Use CommandContext for cancellation support
+	cmd := exec.CommandContext(rc.Ctx, "vault", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create role: %w", err)
 	}
@@ -395,7 +399,8 @@ func (dm *DatabaseManager) testDynamicCredentials(rc *eos_io.RuntimeContext, opt
 	logger.Info("Testing dynamic credential generation")
 
 	for _, role := range options.Roles {
-		cmd := exec.Command("vault", "read", "-format=json", fmt.Sprintf("database/creds/%s", role.Name))
+		// SECURITY P0 #1: Use CommandContext for cancellation support
+		cmd := exec.CommandContext(rc.Ctx, "vault", "read", "-format=json", fmt.Sprintf("database/creds/%s", role.Name))
 		output, err := cmd.Output()
 		if err != nil {
 			return fmt.Errorf("failed to generate credentials for role %s: %w", role.Name, err)
@@ -415,7 +420,8 @@ func (dm *DatabaseManager) testDynamicCredentials(rc *eos_io.RuntimeContext, opt
 }
 
 func (dm *DatabaseManager) generateVaultCredentials(rc *eos_io.RuntimeContext, options *VaultOperationOptions) (*DatabaseCredential, error) {
-	cmd := exec.Command("vault", "read", "-format=json",
+	// SECURITY P0 #1: Use CommandContext for cancellation support
+	cmd := exec.CommandContext(rc.Ctx, "vault", "read", "-format=json",
 		fmt.Sprintf("%s/creds/%s", strings.TrimSuffix(options.EngineMount, "/"), options.RoleName))
 
 	output, err := cmd.Output()
@@ -433,13 +439,24 @@ func (dm *DatabaseManager) generateVaultCredentials(rc *eos_io.RuntimeContext, o
 		return nil, fmt.Errorf("invalid credential response format")
 	}
 
+	// SECURITY P0 #3: Safe type assertions to prevent panic
+	username, ok := data["username"].(string)
+	if !ok {
+		return nil, fmt.Errorf("username field missing or invalid type in credential response")
+	}
+
+	password, ok := data["password"].(string)
+	if !ok {
+		return nil, fmt.Errorf("password field missing or invalid type in credential response")
+	}
+
 	leaseDuration, _ := credResp["lease_duration"].(float64)
 	renewable, _ := credResp["renewable"].(bool)
 	leaseID, _ := credResp["lease_id"].(string)
 
 	credential := &DatabaseCredential{
-		Username:      data["username"].(string),
-		Password:      data["password"].(string),
+		Username:      username,
+		Password:      password,
 		LeaseID:       leaseID,
 		LeaseDuration: int(leaseDuration),
 		Renewable:     renewable,

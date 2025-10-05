@@ -247,7 +247,8 @@ func (g *Generator) getInstalledPackages() ([]string, error) {
 
 // getUserGroups gets the groups for a user
 func (g *Generator) getUserGroups(username string) ([]string, error) {
-	cmd := exec.Command("groups", username)
+	// SECURITY P1 #5: Use CommandContext for cancellation support
+	cmd := exec.CommandContext(g.rc.Ctx, "groups", username)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user groups: %w", err)

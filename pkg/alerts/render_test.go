@@ -4,7 +4,6 @@ package alerts
 
 import (
 	"fmt"
-	"html/template"
 	"net/mail"
 	"strings"
 	"testing"
@@ -48,7 +47,7 @@ func TestRenderEmail(t *testing.T) {
 				RuleID:      "html-test",
 				Title:       "HTML Alert",
 				Description: "Alert with HTML",
-				HTMLDetails: template.HTML("<b>Bold</b> and <i>italic</i>"),
+				HTMLDetails: "<b>Bold</b> and <i>italic</i>", // SECURITY P0 #1: Changed to string for auto-escaping
 				Host:        "prod-server",
 			},
 			checkFunc: func(t *testing.T, r Rendered, err error) {

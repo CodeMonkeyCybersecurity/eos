@@ -87,7 +87,9 @@ func backupNetplanConfigs() error {
 	timestamp := time.Now().Format("20060102-150405")
 	backupDir := fmt.Sprintf("/etc/netplan_backup_%s", timestamp)
 
-	if err := os.Mkdir(backupDir, shared.DirPermStandard); err != nil {
+	// SECURITY P2 #6: Use MkdirAll instead of Mkdir to handle parent directory
+	// This prevents race conditions if /etc doesn't exist (unlikely but defensive)
+	if err := os.MkdirAll(backupDir, shared.DirPermStandard); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 

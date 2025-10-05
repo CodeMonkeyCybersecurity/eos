@@ -4,7 +4,6 @@ package alerts
 
 import (
 	"fmt"
-	"html/template"
 	"net/mail"
 	"strings"
 	"testing"
@@ -56,7 +55,7 @@ func FuzzRenderEmail(f *testing.F) {
 		}
 
 		if htmlDetails != "" {
-			alert.HTMLDetails = template.HTML(htmlDetails)
+			alert.HTMLDetails = htmlDetails // SECURITY P0 #1: Changed to string for auto-escaping
 		}
 
 		// Should not panic

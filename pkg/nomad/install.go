@@ -199,8 +199,11 @@ ports {
 %s
 %s`, ni.config.Datacenter, ni.config.Region, ni.config.LogLevel,
 		ni.config.BindAddr, shared.PortNomad, serverConfig, clientConfig)
-	
-	os.WriteFile("/etc/nomad.d/nomad.hcl", []byte(config), 0640)
+
+	// SECURITY P0 #2: Check critical file write errors
+	if err := os.WriteFile("/etc/nomad.d/nomad.hcl", []byte(config), 0640); err != nil {
+		panic(fmt.Sprintf("FATAL: Failed to write Nomad config: %v", err))
+	}
 	ni.runner.Run("chown", "nomad:nomad", "/etc/nomad.d/nomad.hcl")
 }
 
@@ -223,8 +226,12 @@ TasksMax=infinity
 
 [Install]
 WantedBy=multi-user.target`
-	
-	os.WriteFile("/etc/systemd/system/nomad.service", []byte(serviceContent), 0644)
+
+	// SECURITY P0 #2: Check critical file write errors
+	// SECURITY P2 #6: Use 0640 instead of 0644 for service file (contains paths)
+	if err := os.WriteFile("/etc/systemd/system/nomad.service", []byte(serviceContent), 0640); err != nil {
+		panic(fmt.Sprintf("FATAL: Failed to write Nomad service file: %v", err))
+	}
 	ni.runner.Run("systemctl", "daemon-reload")
 	ni.runner.Run("systemctl", "enable", "nomad")
 	ni.runner.Run("systemctl", "start", "nomad")

@@ -167,49 +167,85 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 // UpdateAdminPassword updates the admin password
 // Migrated from cmd/create/delphi.go updateAdminPassword
 func UpdateAdminPassword(password string) error {
+	// SECURITY P0 #2: Validate password is strong before setting - never fallback to weak defaults
+	if len(password) < 12 {
+		return fmt.Errorf("admin password must be at least 12 characters (got %d)", len(password))
+	}
+
+	// SECURITY P0 #2: Replace hardcoded default "SecretPassword" - this is a known weak default
+	// The old default hash: $2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO
+	defaultPasswordOldHash := "$2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO"
+
 	// Update docker-compose.yml
 	if err := updateComposeFile("INDEXER_PASSWORD=SecretPassword", fmt.Sprintf("INDEXER_PASSWORD=%s", password)); err != nil {
-		return err
+		return fmt.Errorf("failed to update compose file - will not use insecure default: %w", err)
 	}
 
 	// Generate password hash
 	hash, err := generatePasswordHash(password)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	// Update internal users
-	return updateInternalUsers("$2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO", hash)
+	if err := updateInternalUsers(defaultPasswordOldHash, hash); err != nil {
+		return fmt.Errorf("failed to update internal users - configuration may be insecure: %w", err)
+	}
+
+	return nil
 }
 
 // UpdateKibanaPassword updates the kibana password
 // Migrated from cmd/create/delphi.go updateKibanaPassword
 func UpdateKibanaPassword(password string) error {
+	// SECURITY P0 #2: Validate password strength - never use weak default "kibanaserver"
+	if len(password) < 12 {
+		return fmt.Errorf("kibana password must be at least 12 characters (got %d)", len(password))
+	}
+
+	// SECURITY P0 #2: Replace hardcoded default "kibanaserver"
+	// The old default hash: $2a$12$4AcgAt3xwOWadA5s5blL6ev39OXDNhmOesEoo33eZtrq2N0YrU3H.
+	defaultKibanaHash := "$2a$12$4AcgAt3xwOWadA5s5blL6ev39OXDNhmOesEoo33eZtrq2N0YrU3H."
+
 	// Update docker-compose.yml
 	if err := updateComposeFile("DASHBOARD_PASSWORD=kibanaserver", fmt.Sprintf("DASHBOARD_PASSWORD=%s", password)); err != nil {
-		return err
+		return fmt.Errorf("failed to update compose file - will not use insecure default: %w", err)
 	}
 
 	// Generate password hash
 	hash, err := generatePasswordHash(password)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	// Update internal users
-	return updateInternalUsers("$2a$12$4AcgAt3xwOWadA5s5blL6ev39OXDNhmOesEoo33eZtrq2N0YrU3H.", hash)
+	if err := updateInternalUsers(defaultKibanaHash, hash); err != nil {
+		return fmt.Errorf("failed to update internal users - configuration may be insecure: %w", err)
+	}
+
+	return nil
 }
 
 // UpdateAPIPassword updates the API password
 // Migrated from cmd/create/delphi.go updateAPIPassword
 func UpdateAPIPassword(password string) error {
+	// SECURITY P0 #2: Validate password strength - never use weak default "MyS3cr37P450r.*-"
+	if len(password) < 12 {
+		return fmt.Errorf("API password must be at least 12 characters (got %d)", len(password))
+	}
+
+	// SECURITY P0 #2: Replace hardcoded default "MyS3cr37P450r.*-" (publicly known weak password)
 	// Update docker-compose.yml
 	if err := updateComposeFile("API_PASSWORD=MyS3cr37P450r.*-", fmt.Sprintf("API_PASSWORD=%s", password)); err != nil {
-		return err
+		return fmt.Errorf("failed to update compose file - will not use insecure default: %w", err)
 	}
 
 	// Update wazuh.yml
-	return updateWazuhYML("API_PASSWORD=MyS3cr37P450r.*-", fmt.Sprintf("API_PASSWORD=%s", password))
+	if err := updateWazuhYML("API_PASSWORD=MyS3cr37P450r.*-", fmt.Sprintf("API_PASSWORD=%s", password)); err != nil {
+		return fmt.Errorf("failed to update wazuh.yml - configuration may be insecure: %w", err)
+	}
+
+	return nil
 }
 
 // Helper functions
@@ -247,19 +283,23 @@ func generatePasswordHash(password string) (string, error) {
 	// 2. Docker container environment variables
 	// 3. Shell command history
 
-	// Create temp file with restrictive permissions
-	tmpFile, err := os.CreateTemp("", "eos-pass-*")
+	// SECURITY P0 #1: Create temp file in secure directory with atomic permissions
+	// Using "" (default temp dir) can expose sensitive data in world-readable /tmp
+	// Create secure temp directory first with 0700 permissions
+	secureDir, err := os.MkdirTemp("", "eos-secure-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create secure temp dir: %w", err)
+	}
+	defer os.RemoveAll(secureDir)
+
+	// Create temp file in secure directory
+	tmpFile, err := os.CreateTemp(secureDir, "eos-pass-*")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
 
-	// Set permissions to owner-only before writing password
-	if err := os.Chmod(tmpPath, 0600); err != nil {
-		tmpFile.Close()
-		return "", fmt.Errorf("failed to set permissions: %w", err)
-	}
+	// Permissions already 0600 from CreateTemp, but directory is 0700 so only owner can list
 
 	if _, err := tmpFile.WriteString(password); err != nil {
 		tmpFile.Close()

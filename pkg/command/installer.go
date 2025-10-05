@@ -226,21 +226,30 @@ func (ci *CommandInstaller) writeScriptFile(ctx context.Context, path, content s
 
 // writeWithSudo writes file with sudo permissions
 func (ci *CommandInstaller) writeWithSudo(ctx context.Context, path, content string, executable bool) error {
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "eos-cmd-*")
+	// SECURITY P0 #1: Create temp file in secure directory to prevent TOCTOU attacks
+	// Predictable names in /tmp allow symlink attacks
+	secureDir, err := os.MkdirTemp("", "eos-secure-*")
+	if err != nil {
+		return fmt.Errorf("failed to create secure temp dir: %w", err)
+	}
+	defer os.RemoveAll(secureDir)
+
+	// Create temporary file in secure directory
+	tmpFile, err := os.CreateTemp(secureDir, "eos-cmd-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	tmpPath := tmpFile.Name()
 
 	// Write content to temp file
 	if _, err := tmpFile.WriteString(content); err != nil {
+		tmpFile.Close()
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 	tmpFile.Close()
 
 	// Copy with sudo
-	copyCmd := exec.CommandContext(ctx, "sudo", "cp", tmpFile.Name(), path)
+	copyCmd := exec.CommandContext(ctx, "sudo", "cp", tmpPath, path)
 	if err := copyCmd.Run(); err != nil {
 		return fmt.Errorf("failed to copy file: %w", err)
 	}
