@@ -6,19 +6,11 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 
 ## Mission & Values
 
-**Motto**: "Cybersecurity. With humans."
-
-We build Eos with these core principles:
-- **Human-centric**: Technology serves humans, not the other way around
-- **Evidence-based**: Decisions grounded in security research and best practices
-- **Sustainable innovation**: Build once, encode in Eos, never solve again
-- **Collaboration & listening**: Work with users as partners, following their lead
-
 ### Philosphy
-- **Human centric**: , actionable output, addresses barriers to entry, encourage end-user ducation and self-efficacy, feminist (for example, informed consent), safe effective high-quality
-- **Evidence based**: accepts falliblism, error correction, value for time, value for money
-- **Sustainable innovation**: Maintainable code, comprehensive documentation, iterative improvement, response ready, incorporates recent research and best practice
-- **Collaboration and listening**: Built by ethical hackers for ethical hackers, transparent decision making, ownership accountability responsibility, open source
+- **Human centric**: Technology serves humans, not the other way around, actionable output, addresses barriers to entry, encourage end-user ducation and self-efficacy, feminist (for example, informed consent), safe effective high-quality
+- **Evidence based**: accepts falliblism, error correction, value for time, value for money, decisions grounded in security research and best practices
+- **Sustainable innovation**: Maintainable code, comprehensive documentation, iterative improvement, response ready, incorporates recent research and best practice. Solve problems once, encode in Eos, never solve again
+- **Collaboration and listening**: adversarial collaboration, transparent decision making, ownership accountability responsibility, open source, codesign
 
 **Iterative Philosophy**: Shells is built iteratively. We build on what exists, solve complex problems once, encode them in Shells, and never solve them again. Each improvement makes the next one easier. 
 
