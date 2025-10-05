@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul_config"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -142,12 +144,42 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// ASSESS - Validate API parameters
 	logger.Info("Starting Authentik configuration backup")
 
+	// Config resolution priority:
+	// 1. CLI flag (--url)
+	// 2. Environment variable (AUTHENTIK_URL)
+	// 3. Consul KV (eos/config/authentik/url)
+	// 4. Interactive prompt (with option to save to Consul)
+
+	if url == "" {
+		// Try to get from Consul
+		if consulClient, err := consul_config.NewClient(rc.Ctx); err == nil {
+			if consulURL, found, _ := consulClient.Get(rc.Ctx, "authentik/url"); found && consulURL != "" {
+				url = consulURL
+				logger.Info("Retrieved Authentik URL from Consul", zap.String("url", url))
+			}
+		} else {
+			logger.Debug("Consul not available for config retrieval", zap.Error(err))
+		}
+	}
+
 	if url == "" {
 		input, err := eos_io.PromptInput(rc, "Enter Authentik URL (e.g., https://auth.example.com): ", "authentik_url")
 		if err != nil {
 			return err
 		}
 		url = input
+
+		// Offer to save to Consul for next time
+		savePrompt, err := eos_io.PromptInput(rc, "Save Authentik URL to Consul for future use? (y/n): ", "save_to_consul")
+		if err == nil && (savePrompt == "y" || savePrompt == "yes" || savePrompt == "Y" || savePrompt == "Yes") {
+			if consulClient, err := consul_config.NewClient(rc.Ctx); err == nil {
+				if err := consulClient.Set(rc.Ctx, "authentik/url", url); err == nil {
+					logger.Info("Saved Authentik URL to Consul - you won't be prompted again")
+				} else {
+					logger.Warn("Failed to save to Consul", zap.Error(err))
+				}
+			}
+		}
 	}
 
 	// Auto-add https:// if no protocol specified
@@ -156,6 +188,9 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		logger.Info("Added https:// prefix to URL", zap.String("url", url))
 	}
 
+	// Note: Token is a secret - ideally should be in Vault, not Consul
+	// For now, we'll prompt each time (security best practice)
+	// TODO: Integrate with Vault for secure token storage
 	if token == "" {
 		input, err := eos_io.PromptSecurePassword(rc, "Enter Authentik API token: ")
 		if err != nil {

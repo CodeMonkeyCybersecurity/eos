@@ -16,6 +16,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/check"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/config"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
@@ -71,6 +72,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		update.UpdateCmd,     // VERB-FIRST ARCHITECTURE
 		delete.DeleteCmd,     // VERB-FIRST ARCHITECTURE
 		check.CheckCmd,       // VERB-FIRST ARCHITECTURE (health checks)
+		config.ConfigCmd,     // Configuration management (Consul KV)
 		debug.GetDebugCmd(),  // VERB-FIRST ARCHITECTURE (debugging tools)
 		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
 		backup.BackupCmd,     // SPECIAL CASE (Complex nomenclature)

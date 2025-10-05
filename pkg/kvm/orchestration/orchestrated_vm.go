@@ -185,11 +185,11 @@ network:
           - 8.8.8.8
           - 8.8.4.4
 
-# Install Consul agent
+# Install Consul agent and QEMU guest agent
 runcmd:
   - curl -fsSL https://apt.releases.hashicorp.com/gpg | apt-key add -
   - apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-  - apt-get update && apt-get install -y consul
+  - apt-get update && apt-get install -y consul qemu-guest-agent
   - |
     cat > /etc/consul.d/consul.hcl <<EOF
     datacenter = "dc1"
@@ -218,6 +218,8 @@ runcmd:
     EOF
   - systemctl enable consul
   - systemctl start consul
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
 
 # System updates
 package_update: true

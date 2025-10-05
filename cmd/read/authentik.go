@@ -83,7 +83,7 @@ Examples:
 		n := len(data)
 		l.Info("Blueprints exported",
 			zap.String("file", akOut),
-			zap.Int64("bytes", n),
+			zap.Int("bytes", n),
 		)
 		return nil
 	}),
