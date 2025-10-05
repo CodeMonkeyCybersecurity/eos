@@ -6,6 +6,7 @@ package debug
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
 	debugvault "github.com/CodeMonkeyCybersecurity/eos/pkg/debug/vault"
@@ -89,13 +90,50 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	collector := debug.NewCollector("Vault", formatter)
 
-	// Add all vault diagnostics
+	// Add all vault diagnostics including TLS
 	collector.Add(debugvault.AllDiagnostics()...)
+	collector.Add(debugvault.TLSDiagnostic())
 
 	// Run diagnostics
-	output, err := collector.RunAndFormat(rc.Ctx)
+	report, err := collector.Run(rc.Ctx)
 	if err != nil {
-		return fmt.Errorf("diagnostics failed: %w", err)
+		return fmt.Errorf("diagnostics collection failed: %w", err)
+	}
+
+	// Create analyzer with vault-specific rules
+	analyzer := debug.NewAnalyzer("vault")
+	for _, rule := range debugvault.VaultAnalysisRules() {
+		analyzer.AddRule(rule)
+	}
+
+	// Perform analysis
+	analysis := analyzer.Analyze(report)
+
+	// Generate output with analysis
+	var output string
+	if vaultDebugFormat == "text" || vaultDebugFormat == "" {
+		// Add quick health summary at top
+		quickSummary := debug.GenerateQuickSummary(report, analysis)
+		output = debug.FormatQuickSummary(quickSummary, "vault")
+		output += "\n\n"
+		output += formatter.Format(report)
+		output += "\n\n"
+		output += debug.FormatAnalysis(analysis)
+		output += "\n\n"
+		// Add next steps
+		nextSteps := debugvault.GenerateNextSteps(report, analysis)
+		if len(nextSteps) > 0 {
+			output += strings.Repeat("=", 80) + "\n"
+			output += "RECOMMENDED NEXT STEPS\n"
+			output += strings.Repeat("=", 80) + "\n\n"
+			for i, step := range nextSteps {
+				output += fmt.Sprintf("%d. %s\n", i+1, step)
+			}
+			output += "\n"
+		}
+	} else {
+		// JSON/Markdown get full report
+		output = formatter.Format(report)
 	}
 
 	// Sanitize if requested
@@ -121,10 +159,27 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 // sanitizeOutput redacts sensitive information
 func sanitizeOutput(output string) string {
-	// TODO: Implement proper sanitization
-	// - Redact tokens (s.hvs.... )
-	// - Redact IP addresses (optionally)
-	// - Redact file paths (optionally)
-	// - Redact usernames/passwords in logs
-	return output
+	sanitized := output
+
+	// Redact Vault tokens (s.hvs.*, s.root.*)
+	sanitized = strings.ReplaceAll(sanitized, "s.hvs.", "[REDACTED-TOKEN]")
+	sanitized = strings.ReplaceAll(sanitized, "s.root.", "[REDACTED-ROOT-TOKEN]")
+
+	// Redact recovery/unseal keys (base64-encoded)
+	recoveryKeyPattern := `[A-Za-z0-9+/]{44}==`
+	sanitized = strings.ReplaceAll(sanitized, recoveryKeyPattern, "[REDACTED-KEY]")
+
+	// Redact common environment variable values containing secrets
+	lines := strings.Split(sanitized, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "VAULT_TOKEN=") {
+			lines[i] = "VAULT_TOKEN=[REDACTED]"
+		}
+		if strings.Contains(line, "AWS_SECRET_ACCESS_KEY=") {
+			lines[i] = "AWS_SECRET_ACCESS_KEY=[REDACTED]"
+		}
+	}
+	sanitized = strings.Join(lines, "\n")
+
+	return sanitized
 }
