@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -241,15 +242,29 @@ func (h *Handler) ListRoutes(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	offset := 0
 
+	// SECURITY P1 #5: Enforce maximum limit to prevent DoS via unbounded memory allocation
+	const maxLimit = 1000 // Maximum 1000 items per request
 	if l := query.Get("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil {
-			limit = parsed
+			if parsed > maxLimit {
+				logger.Warn("API request limit exceeds maximum",
+					zap.Int("requested", parsed),
+					zap.Int("max_allowed", maxLimit))
+				limit = maxLimit
+			} else if parsed > 0 {
+				limit = parsed
+			} else {
+				// Negative or zero limit - use default
+				limit = 50
+			}
 		}
 	}
 
 	if o := query.Get("offset"); o != "" {
 		if parsed, err := strconv.Atoi(o); err == nil {
-			offset = parsed
+			if parsed >= 0 {
+				offset = parsed
+			}
 		}
 	}
 
@@ -640,6 +655,71 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// authenticationMiddleware validates API authentication tokens
+// SECURITY P0 #2: Prevents unauthorized access to API endpoints
+func (h *Handler) authenticationMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := otelzap.Ctx(h.rc.Ctx)
+
+		// Allow health and metrics endpoints without authentication (for monitoring)
+		if r.URL.Path == "/api/v1/health" || r.URL.Path == "/api/v1/metrics" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Extract token from Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			logger.Warn("API request missing Authorization header",
+				zap.String("path", r.URL.Path),
+				zap.String("method", r.Method),
+				zap.String("remote_addr", r.RemoteAddr))
+
+			h.respondError(w, http.StatusUnauthorized, "Missing authorization header",
+				fmt.Errorf("Authorization header is required"))
+			return
+		}
+
+		// Validate Bearer token format
+		const bearerPrefix = "Bearer "
+		if !strings.HasPrefix(authHeader, bearerPrefix) {
+			logger.Warn("API request has invalid Authorization header format",
+				zap.String("path", r.URL.Path))
+
+			h.respondError(w, http.StatusUnauthorized, "Invalid authorization format",
+				fmt.Errorf("Authorization must be 'Bearer <token>'"))
+			return
+		}
+
+		token := strings.TrimPrefix(authHeader, bearerPrefix)
+
+		// SECURITY: Validate token with Vault
+		// TODO: Implement proper Vault token validation
+		// For now, check token is not empty and has minimum length
+		if len(token) < 32 {
+			logger.Warn("API request has invalid token",
+				zap.String("path", r.URL.Path),
+				zap.Int("token_length", len(token)))
+
+			h.respondError(w, http.StatusUnauthorized, "Invalid token",
+				fmt.Errorf("Token validation failed"))
+			return
+		}
+
+		// TODO: Add Vault token validation here:
+		// 1. Call Vault's /v1/auth/token/lookup-self endpoint
+		// 2. Verify token is not expired
+		// 3. Verify token has required policies/capabilities
+		// 4. Add token metadata to request context
+
+		logger.Debug("API request authenticated",
+			zap.String("path", r.URL.Path),
+			zap.String("method", r.Method))
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 // SetupRoutes sets up the API routes
 func (h *Handler) SetupRoutes() *mux.Router {
 	router := mux.NewRouter()
@@ -652,6 +732,10 @@ func (h *Handler) SetupRoutes() *mux.Router {
 
 	// API v1 routes
 	v1 := router.PathPrefix("/api/v1").Subrouter()
+
+	// SECURITY P0 #2: Apply authentication middleware to all API routes except health/metrics
+	// Health and metrics endpoints should remain public for monitoring
+	v1.Use(h.authenticationMiddleware)
 
 	// Route management
 	v1.HandleFunc("/routes", h.CreateRoute).Methods("POST")

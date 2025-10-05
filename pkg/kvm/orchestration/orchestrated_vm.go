@@ -124,10 +124,11 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 		}
 	}
 
+	// SECURITY P2 #6: Don't log SSH key paths - information disclosure
 	om.logger.Info("Orchestrated VM created successfully",
 		zap.String("vm_name", vmName),
 		zap.String("ip", ip),
-		zap.String("ssh_key", privateKeyPath))
+		zap.String("ssh_key_status", "configured"))
 
 	// Print connection instructions
 	fmt.Printf("\n✅ Orchestrated VM created successfully!\n")

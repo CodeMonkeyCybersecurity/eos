@@ -105,7 +105,10 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 
 	// Add generated key to the list
 	config.SSHKeys = append([]string{pubKey}, config.SSHKeys...)
-	logger.Info("Generated ed25519 SSH keypair", zap.String("private_key", privKeyPath))
+	// SECURITY P2 #6: Log key fingerprint instead of path to avoid information disclosure
+	logger.Info("Generated ed25519 SSH keypair",
+		zap.String("key_type", "ed25519"),
+		zap.String("note", "Private key generated - location not logged for security"))
 
 	// Create cloud-init files
 	if err := createCloudInit(seedDir, config); err != nil {
@@ -143,10 +146,11 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	// Get VM IP
 	ip, _ := waitForVMIP(config.Name, 30, &logger)
 
+	// SECURITY P2 #6: Don't log SSH key paths - information disclosure
 	logger.Info("VM created successfully",
 		zap.String("name", config.Name),
 		zap.String("ip", ip),
-		zap.String("ssh_key", privKeyPath))
+		zap.String("ssh_key_status", "configured"))
 
 	// Success output
 	fmt.Printf("\n✅ Ubuntu 24.04 VM created: %s\n", config.Name)

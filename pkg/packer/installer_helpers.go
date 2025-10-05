@@ -75,7 +75,13 @@ func (r *CommandRunner) RunWithRetries(name string, args []string, maxRetries in
 
 		if attempt < maxRetries {
 			backoff := time.Duration(attempt) * time.Second
-			time.Sleep(backoff)
+			// SECURITY P0 #1: Use context-aware sleep to respect cancellation
+			select {
+			case <-time.After(backoff):
+				// Continue to next retry
+			case <-r.rc.Ctx.Done():
+				return fmt.Errorf("command cancelled during backoff (attempt %d/%d): %w", attempt, maxRetries, r.rc.Ctx.Err())
+			}
 		}
 	}
 

@@ -137,14 +137,16 @@ var CreateUmamiCmd = &cobra.Command{
 			zap.String("datacenter", envConfig.Datacenter),
 			zap.String("vault_addr", envConfig.VaultAddr))
 
+		// SECURITY P0 #3: Never log credentials in plaintext - use redaction
 		logger.Info("Umami is now available",
 			zap.String("web_ui", fmt.Sprintf("http://%s:%d", eos_unix.GetInternalHostname(), shared.PortUmami)),
 			zap.String("username", "admin"),
-			zap.String("password", "umami"),
-			zap.String("note", "Change password immediately after first login"))
+			zap.String("password_note", "Default password set - CHANGE IMMEDIATELY after first login"),
+			zap.String("security_warning", "Default credentials are publicly known - change password at first login"))
 
+		// SECURITY P0 #3: Don't log secret paths - log retrieval method instead
 		logger.Info("Configuration details",
-			zap.String("database_password", "Stored in secret manager at umami/database_password"),
+			zap.String("database_password_location", "Retrieve via: eos read credentials --service umami"),
 			zap.String("docker_network", "arachne-net"),
 			zap.String("config_location", destComposeFile))
 

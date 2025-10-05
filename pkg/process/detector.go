@@ -2,6 +2,7 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -106,7 +107,13 @@ func KillProcesses(ctx context.Context, pattern string) (int, error) {
 	})
 	
 	// Wait for graceful shutdown
-	time.Sleep(2 * time.Second)
+	// SECURITY P0 #1: Use context-aware sleep to respect cancellation
+	select {
+	case <-time.After(2 * time.Second):
+		// Continue after graceful shutdown wait
+	case <-ctx.Done():
+		return 0, fmt.Errorf("process termination cancelled during graceful wait: %w", ctx.Err())
+	}
 	
 	// Check if any still running
 	stillRunning, _ := FindProcesses(ctx, pattern)
