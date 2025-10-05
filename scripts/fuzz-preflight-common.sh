@@ -1,5 +1,5 @@
 #!/bin/bash
-# Common preflight checks for all EOS fuzz testing scripts
+# Common preflight checks for all Eos fuzz testing scripts
 # Source this file from other scripts: source "$(dirname "${BASH_SOURCE[0]}")/fuzz-preflight-common.sh"
 
 # Colors for output
@@ -24,7 +24,7 @@ eos_fuzz_preflight_check() {
     
     # Check for go.mod file as indicator of project root
     if [ -f "go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "go.mod" 2>/dev/null; then
-        echo -e "${GREEN}Already in EOS project root${NC}"
+        echo -e "${GREEN}Already in Eos project root${NC}"
         return 0
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
@@ -34,13 +34,13 @@ eos_fuzz_preflight_check() {
         }
         return 0
     else
-        echo -e "${RED}❌ ERROR: Not in EOS project directory${NC}"
+        echo -e "${RED}❌ ERROR: Not in Eos project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
         echo -e "${YELLOW}To run this script correctly:${NC}"
         echo ""
-        echo -e "  1. ${CYAN}Change to the EOS project root:${NC}"
-        echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the EOS repository${NC}"
+        echo -e "  1. ${CYAN}Change to the Eos project root:${NC}"
+        echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the Eos repository${NC}"
         echo ""
         echo -e "  2. ${CYAN}Then run the script:${NC}"
         echo -e "     ${GREEN}./scripts/${script_name}${NC} [arguments]"
@@ -126,7 +126,7 @@ eos_fuzz_verify_test_files() {
         echo -e "${RED}Missing: ${missing_packages[*]}${NC}"
         echo ""
         echo -e "${YELLOW}This usually means:${NC}"
-        echo -e "  1. You're not in the EOS project root"
+        echo -e "  1. You're not in the Eos project root"
         echo -e "  2. The repository is incomplete"
         echo ""
         echo -e "${CYAN}Try:${NC}"
@@ -140,7 +140,7 @@ eos_fuzz_verify_test_files() {
         echo -e "${RED}❌ ERROR: No fuzz test files found${NC}"
         echo ""
         echo -e "${YELLOW}This could mean:${NC}"
-        echo -e "  1. You're not in the EOS project root"
+        echo -e "  1. You're not in the Eos project root"
         echo -e "  2. The repository is incomplete"
         echo -e "  3. Fuzz tests haven't been written yet"
         echo ""
@@ -158,7 +158,7 @@ eos_fuzz_verify_test_files() {
 eos_run_preflight_checks() {
     local script_name="$(basename "${BASH_SOURCE[1]}")"
     
-    echo -e "${PURPLE}🚀 EOS Fuzz Testing - Preflight Check${NC}"
+    echo -e "${PURPLE}🚀 Eos Fuzz Testing - Preflight Check${NC}"
     echo -e "${PURPLE}Script: ${script_name}${NC}"
     echo "========================================"
     echo ""

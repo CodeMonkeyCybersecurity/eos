@@ -1,4 +1,4 @@
-# EOS Security Improvements & Testing Campaign
+# Eos Security Improvements & Testing Campaign
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 
@@ -21,7 +21,7 @@ For detailed security improvements and testing documentation, see the inline com
 **Testing Framework:** ✅ COMPREHENSIVE SECURITY TESTING ACTIVE  
 **Monitoring:** ✅ CONTINUOUS SECURITY MONITORING OPERATIONAL
 
-Through systematic fuzzing-driven security testing, EOS has identified and fixed 4 critical security vulnerabilities and implemented a comprehensive security testing framework with 1,000+ test cases per property.
+Through systematic fuzzing-driven security testing, Eos has identified and fixed 4 critical security vulnerabilities and implemented a comprehensive security testing framework with 1,000+ test cases per property.
 
 ---
 

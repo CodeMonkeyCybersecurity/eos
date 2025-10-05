@@ -1,8 +1,8 @@
 // pkg/vault/client.go
 //
-// HashiCorp Vault Client Management
+// # HashiCorp Vault Client Management
 //
-// This package provides comprehensive HashiCorp Vault integration for EOS with
+// This package provides comprehensive HashiCorp Vault integration for Eos with
 // safe, high-quality and effective security features. It implements the core
 // Vault client functionality with proper authentication, error handling, and
 // security controls.
@@ -23,16 +23,17 @@
 // - Automatic sensitive data redaction in logs
 //
 // Usage:
-//   client, err := vault.NewClient("https://vault.example.com:8200", logger)
-//   if err != nil {
-//       // Handle error
-//   }
-//   
-//   // Use client for Vault operations
-//   secret, err := client.ReadSecret(ctx, "secret/myapp")
+//
+//	client, err := vault.NewClient("https://vault.example.com:8200", logger)
+//	if err != nil {
+//	    // Handle error
+//	}
+//
+//	// Use client for Vault operations
+//	secret, err := client.ReadSecret(ctx, "secret/myapp")
 //
 // Integration:
-// This client integrates with EOS CLI commands:
+// This client integrates with Eos CLI commands:
 // - eos create vault    # Install Vault
 // - eos enable vault    # Interactive setup with MFA
 // - eos secure vault    # Apply comprehensive hardening

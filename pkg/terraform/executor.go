@@ -1,4 +1,4 @@
-// Package terraform provides Terraform integration for EOS infrastructure management
+// Package terraform provides Terraform integration for Eos infrastructure management
 package terraform
 
 import (
@@ -448,7 +448,7 @@ func (e *Executor) GetResources(rc *eos_io.RuntimeContext, component, environmen
 
 	// Parse resource list
 	resources := strings.Split(strings.TrimSpace(output), "\n")
-	
+
 	// Filter out empty lines
 	var filtered []string
 	for _, r := range resources {
@@ -520,7 +520,7 @@ func (e *Executor) generateBackendConfig(_ *eos_io.RuntimeContext, config *Backe
 func (e *Executor) acquireLock(rc *eos_io.RuntimeContext, component, environment string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	lockKey := fmt.Sprintf("terraform/%s/%s/lock", environment, component)
-	
+
 	// Create session
 	session, _, err := e.consulClient.Session().Create(&api.SessionEntry{
 		Name:     fmt.Sprintf("terraform-%s-%s", component, environment),
@@ -682,7 +682,7 @@ func (e *Executor) resolveComponentDependencies(rc *eos_io.RuntimeContext, compo
 
 			depComponent, outputKey := parts[0], parts[1]
 			consulKey := fmt.Sprintf("terraform/%s/%s/outputs/%s", environment, depComponent, outputKey)
-			
+
 			kvPair, _, err := e.consulClient.KV().Get(consulKey, nil)
 			if err != nil {
 				logger.Warn("Failed to resolve dependency",
@@ -761,7 +761,7 @@ func (e *Executor) componentIsHealthy(_ *eos_io.RuntimeContext, component, envir
 func (e *Executor) createStateSnapshot(_ *eos_io.RuntimeContext, component, environment string) (string, error) {
 	workspace := e.getWorkspace(component, environment)
 	stateFile := filepath.Join(workspace.Path, "terraform.tfstate")
-	
+
 	if _, err := os.Stat(stateFile); os.IsNotExist(err) {
 		// No state file yet
 		return "", nil
@@ -769,7 +769,7 @@ func (e *Executor) createStateSnapshot(_ *eos_io.RuntimeContext, component, envi
 
 	snapshotID := e.generateDeploymentID()
 	snapshotPath := filepath.Join(workspace.Path, fmt.Sprintf(".snapshots/%s.tfstate", snapshotID))
-	
+
 	// Create snapshot directory
 	if err := os.MkdirAll(filepath.Dir(snapshotPath), 0755); err != nil {
 		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
@@ -825,12 +825,12 @@ func (e *Executor) rollbackToSnapshot(rc *eos_io.RuntimeContext, component, envi
 
 	// Run terraform refresh to sync with actual resources
 	envVars, _ := e.getProviderCredentials(rc, component)
-	
+
 	// Set environment variables in current process for terraform
 	for k, v := range envVars {
 		os.Setenv(k, v)
 	}
-	
+
 	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "terraform",
 		Args:    []string{"refresh"},

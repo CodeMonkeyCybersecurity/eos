@@ -1,12 +1,12 @@
 // pkg/terraform/terraform.go
 //
-// # EOS Infrastructure Compiler - Terraform Integration
+// # Eos Infrastructure Compiler - Terraform Integration
 //
-// This package implements comprehensive Terraform integration for the EOS
+// This package implements comprehensive Terraform integration for the Eos
 // infrastructure compiler, providing unified state management and orchestration
 // capabilities for infrastructure and application deployments.
 //
-// # Complete EOS Infrastructure Compiler Implementation
+// # Complete Eos Infrastructure Compiler Implementation
 //
 // ## Architecture Overview
 //

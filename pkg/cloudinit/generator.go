@@ -474,10 +474,8 @@ final_message: |
 	}
 
 	g.logger.Info("Cloud-init template generated",
-		zap.String("path", outputPath))
-
-	fmt.Printf("Cloud-init template generated at %s\n", outputPath)
-	fmt.Println("Edit this file and use it with your cloud provider.")
+		zap.String("path", outputPath),
+		zap.String("next_step", "Edit this file and use it with your cloud provider"))
 
 	return nil
 }

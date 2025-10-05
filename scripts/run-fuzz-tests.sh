@@ -35,7 +35,7 @@ preflight_check() {
     
     # Check for go.mod file as indicator of project root
     if [ -f "go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "go.mod" 2>/dev/null; then
-        echo -e "${GREEN}Already in EOS project root${NC}"
+        echo -e "${GREEN}Already in Eos project root${NC}"
         return 0
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
@@ -45,13 +45,13 @@ preflight_check() {
         }
         return 0
     else
-        echo -e "${RED}❌ ERROR: Not in EOS project directory${NC}"
+        echo -e "${RED}❌ ERROR: Not in Eos project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
         echo -e "${YELLOW}To run this script correctly:${NC}"
         echo ""
-        echo -e "  1. ${CYAN}Change to the EOS project root:${NC}"
-        echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the EOS repository${NC}"
+        echo -e "  1. ${CYAN}Change to the Eos project root:${NC}"
+        echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the Eos repository${NC}"
         echo ""
         echo -e "  2. ${CYAN}Then run the script:${NC}"
         echo -e "     ${GREEN}./scripts/$(basename "$0")${NC} [duration] [package] [function]"
@@ -82,7 +82,7 @@ verify_tools() {
 }
 
 # Run preflight checks
-echo -e "${PURPLE}🚀 EOS Fuzz Test Runner - Preflight${NC}"
+echo -e "${PURPLE}🚀 Eos Fuzz Test Runner - Preflight${NC}"
 echo "===================================="
 echo ""
 

@@ -26,17 +26,17 @@ var (
 		Use:   "self",
 		Short: "Self-management commands for Eos",
 		Long: `The self command provides utilities for managing the Eos installation itself,
-including telemetry, authentication, environment defaults, and other EOS behaviors.`,
+including telemetry, authentication, environment defaults, and other Eos behaviors.`,
 	}
 
 	// UpdateCmd updates Eos to the latest version
 	UpdateCmd = &cobra.Command{
 		Use:   "update",
 		Short: "Update Eos to the latest version",
-		RunE: eos.Wrap(updateEos),
+		RunE:  eos.Wrap(updateEos),
 	}
 
-	// EnrollCmd handles system enrollment into EOS infrastructure
+	// EnrollCmd handles system enrollment into Eos infrastructure
 	EnrollCmd = &cobra.Command{
 		Use:   "enroll",
 		Short: "Enroll system into eos/ infrastructure",
@@ -264,11 +264,11 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		zap.String("temp_path", tempBinary),
 		zap.String("source_dir", "/opt/eos"))
 
-	// Libvirt is now a required dependency for EOS
+	// Libvirt is now a required dependency for Eos
 	// Verify pkg-config and libvirt are available
 	pkgConfigPath, err := exec.LookPath("pkg-config")
 	if err != nil {
-		return fmt.Errorf("pkg-config not found in PATH - required for building EOS with libvirt: %w", err)
+		return fmt.Errorf("pkg-config not found in PATH - required for building Eos with libvirt: %w", err)
 	}
 
 	pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
@@ -276,7 +276,7 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		return fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel: %w", err)
 	}
 
-	logger.Info("Libvirt development libraries detected - building EOS with KVM support",
+	logger.Info("Libvirt development libraries detected - building Eos with KVM support",
 		zap.String("pkg_config_path", pkgConfigPath))
 
 	// Build command - CGO is required for libvirt
@@ -392,8 +392,8 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 
 	// Check that the output contains expected text
 	if !strings.Contains(outputStr, "Eos CLI") &&
-	   !strings.Contains(outputStr, "Available Commands") &&
-	   !strings.Contains(outputStr, "Usage:") {
+		!strings.Contains(outputStr, "Available Commands") &&
+		!strings.Contains(outputStr, "Usage:") {
 		logger.Error("Binary produced unexpected output",
 			zap.String("output", outputStr))
 		_ = os.Remove(tempBinary)
@@ -401,7 +401,7 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		if len(outputStr) > 500 {
 			outputStr = outputStr[:500] + "... (truncated)"
 		}
-		return fmt.Errorf("new binary output doesn't look like EOS CLI: %s", outputStr)
+		return fmt.Errorf("new binary output doesn't look like Eos CLI: %s", outputStr)
 	}
 
 	logger.Info("Binary validation successful",

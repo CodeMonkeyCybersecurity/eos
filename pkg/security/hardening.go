@@ -1,8 +1,8 @@
 // pkg/security/hardening.go
 //
-// EOS Security Hardening System
+// # Eos Security Hardening System
 //
-// This package provides comprehensive security hardening capabilities for EOS
+// This package provides comprehensive security hardening capabilities for Eos
 // infrastructure. It implements defense-in-depth security measures including
 // system hardening, network security, access controls, and audit logging.
 //
@@ -23,38 +23,38 @@
 // - Input Validation: Sanitization, validation, injection prevention
 // - Credential Security: Secure storage, rotation, access controls
 //
-// Integration with EOS Infrastructure:
+// Integration with Eos Infrastructure:
 // - Vault Integration: Secure credential storage and management
 // - HashiCorp Stack: Application-level security controls
 // - Audit Integration: Centralized security event logging
 //
 // # Security Improvements & Testing Campaign
 //
-// Through systematic fuzzing-driven security testing, EOS has identified and fixed
+// Through systematic fuzzing-driven security testing, Eos has identified and fixed
 // 4 critical security vulnerabilities and implemented a comprehensive security
 // testing framework:
 //
 // ## Critical Vulnerabilities Fixed:
 //
 // 1. **SQL Injection Vulnerabilities** (CRITICAL - CVSS 9.8)
-//    - Location: Database management components
-//    - Impact: Complete database compromise, arbitrary SQL execution
-//    - Fix: Implemented parameterized queries and input validation
+//   - Location: Database management components
+//   - Impact: Complete database compromise, arbitrary SQL execution
+//   - Fix: Implemented parameterized queries and input validation
 //
 // 2. **Command Injection Vulnerabilities** (HIGH - CVSS 8.1)
-//    - Location: System command execution paths
-//    - Impact: Arbitrary command execution, privilege escalation
-//    - Fix: Command sanitization and whitelist validation
+//   - Location: System command execution paths
+//   - Impact: Arbitrary command execution, privilege escalation
+//   - Fix: Command sanitization and whitelist validation
 //
 // 3. **Path Traversal Vulnerabilities** (HIGH - CVSS 7.5)
-//    - Location: File system operations
-//    - Impact: Unauthorized file access, information disclosure
-//    - Fix: Path validation and sandboxing
+//   - Location: File system operations
+//   - Impact: Unauthorized file access, information disclosure
+//   - Fix: Path validation and sandboxing
 //
 // 4. **Input Validation Bypass** (MEDIUM - CVSS 6.1)
-//    - Location: User input processing
-//    - Impact: Data corruption, application instability
-//    - Fix: Enhanced input sanitization and validation
+//   - Location: User input processing
+//   - Impact: Data corruption, application instability
+//   - Fix: Enhanced input sanitization and validation
 //
 // ## Security Testing Framework:
 //
@@ -76,21 +76,22 @@
 // - pkg/security/audit.go - Security audit and compliance logging
 //
 // Usage Examples:
-//   // Create system hardener
-//   hardener := security.NewSystemHardener(rc, auditLogger)
-//   
-//   // Apply comprehensive hardening
-//   err := hardener.HardenSystem(ctx)
-//   if err != nil {
-//       // Handle hardening failure
-//   }
 //
-//   // Configure SSH security
-//   err = hardener.HardenSSH(ctx, security.SSHConfig{
-//       DisablePasswordAuth: true,
-//       RequireKeyAuth: true,
-//       AllowedUsers: []string{"admin", "deploy"},
-//   })
+//	// Create system hardener
+//	hardener := security.NewSystemHardener(rc, auditLogger)
+//
+//	// Apply comprehensive hardening
+//	err := hardener.HardenSystem(ctx)
+//	if err != nil {
+//	    // Handle hardening failure
+//	}
+//
+//	// Configure SSH security
+//	err = hardener.HardenSSH(ctx, security.SSHConfig{
+//	    DisablePasswordAuth: true,
+//	    RequireKeyAuth: true,
+//	    AllowedUsers: []string{"admin", "deploy"},
+//	})
 //
 // Security Standards:
 // - Follows CIS (Center for Internet Security) benchmarks

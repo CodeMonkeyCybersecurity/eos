@@ -1,8 +1,8 @@
 // pkg/hashicorp/tools.go
 //
-// # EOS HashiCorp Stack Integration - Migration from
+// # Eos HashiCorp Stack Integration - Migration from
 //
-// This package provides comprehensive HashiCorp stack integration for EOS following
+// This package provides comprehensive HashiCorp stack integration for Eos following
 // the successful migration from . It implements the new architectural
 // pattern where HashiCorp tools handle application services and container
 // orchestration, while system-level operations escalate to administrator intervention.
@@ -49,9 +49,9 @@
 //
 // INTEGRATION PATTERNS:
 //
-// The HashiCorp stack integrates with EOS infrastructure compiler pattern:
+// The HashiCorp stack integrates with Eos infrastructure compiler pattern:
 // - Users express intent through imperative commands
-// - EOS translates to HashiCorp declarative configurations
+// - Eos translates to HashiCorp declarative configurations
 // - Nomad handles container orchestration
 // - Consul provides service discovery and health monitoring
 // - Vault manages secrets and authentication
@@ -74,7 +74,7 @@
 // - Future-proof architecture for HashiCorp ecosystem growth
 // - Comprehensive audit trails for compliance
 //
-// The migration successfully transforms EOS from a -dependent system
+// The migration successfully transforms Eos from a -dependent system
 // to a modern HashiCorp-integrated platform while maintaining all existing
 // functionality and safety guarantees.
 package hashicorp

@@ -30,25 +30,25 @@ type EnhancedError struct {
 type ErrorType string
 
 const (
-	ErrorTypePortConflict      ErrorType = "port_conflict"
-	ErrorTypeServiceConflict   ErrorType = "service_conflict"
-	ErrorTypePermissionDenied  ErrorType = "permission_denied"
-	ErrorTypeResourceShortage  ErrorType = "resource_shortage"
-	ErrorTypeNetworkIssue      ErrorType = "network_issue"
+	ErrorTypePortConflict       ErrorType = "port_conflict"
+	ErrorTypeServiceConflict    ErrorType = "service_conflict"
+	ErrorTypePermissionDenied   ErrorType = "permission_denied"
+	ErrorTypeResourceShortage   ErrorType = "resource_shortage"
+	ErrorTypeNetworkIssue       ErrorType = "network_issue"
 	ErrorTypeConfigurationIssue ErrorType = "configuration_issue"
-	ErrorTypeSystemRequirement ErrorType = "system_requirement"
+	ErrorTypeSystemRequirement  ErrorType = "system_requirement"
 )
 
 // ProcessInfo contains detailed information about a process
 type ProcessInfo struct {
-	PID         int
-	Name        string
-	Command     string
-	User        string
-	StartTime   string
-	Port        int
-	ServiceName string
-	CanStop     bool
+	PID          int
+	Name         string
+	Command      string
+	User         string
+	StartTime    string
+	Port         int
+	ServiceName  string
+	CanStop      bool
 	IsEosService bool
 }
 
@@ -63,7 +63,7 @@ func EnhancePortError(rc *eos_io.RuntimeContext, port int, originalErr error) *E
 	logger.Debug("Enhancing port error", zap.Int("port", port))
 
 	processInfo := getDetailedProcessInfo(rc, port)
-	
+
 	enhanced := &EnhancedError{
 		Type:    ErrorTypePortConflict,
 		Message: fmt.Sprintf("Port %d is already in use", port),
@@ -147,7 +147,7 @@ func EnhancePermissionError(rc *eos_io.RuntimeContext, operation string, origina
 			"• The sudo session hasn't expired",
 		},
 		Context: map[string]string{
-			"operation": operation,
+			"operation":           operation,
 			"required_permission": "root",
 		},
 	}
@@ -178,9 +178,9 @@ func EnhanceResourceError(rc *eos_io.RuntimeContext, resourceType string, requir
 			"",
 			"Or consider:",
 			"• Using a machine with more RAM",
-			"• Running EOS on a larger VM/instance",
+			"• Running Eos on a larger VM/instance",
 		}
-		
+
 	case "disk":
 		enhanced.Suggestions = []string{
 			"Free up disk space by:",
@@ -192,7 +192,7 @@ func EnhanceResourceError(rc *eos_io.RuntimeContext, resourceType string, requir
 			"• Expanding the disk/partition",
 			"• Moving to a larger storage volume",
 		}
-		
+
 	case "cpu":
 		enhanced.Suggestions = []string{
 			"This system has fewer CPU cores than recommended.",
@@ -213,7 +213,7 @@ func EnhanceResourceError(rc *eos_io.RuntimeContext, resourceType string, requir
 // getDetailedProcessInfo gets comprehensive information about the process using a port
 func getDetailedProcessInfo(rc *eos_io.RuntimeContext, port int) ProcessInfo {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	info := ProcessInfo{
 		Port:        port,
 		ServiceName: getServiceNameForPort(port),
@@ -242,10 +242,10 @@ func getDetailedProcessInfo(rc *eos_io.RuntimeContext, port int) ProcessInfo {
 	}
 
 	info.PID = pid
-	
+
 	// Get additional process details
 	info = enrichProcessInfo(rc, info)
-	
+
 	return info
 }
 
@@ -291,17 +291,17 @@ func extractPIDFromSSOutput(line string) string {
 	if pidStart == -1 {
 		return ""
 	}
-	
+
 	pidStart += 4 // Skip "pid="
 	pidEnd := strings.Index(line[pidStart:], ",")
 	if pidEnd == -1 {
 		pidEnd = strings.Index(line[pidStart:], ")")
 	}
-	
+
 	if pidEnd == -1 {
 		return ""
 	}
-	
+
 	return line[pidStart : pidStart+pidEnd]
 }
 
@@ -347,7 +347,7 @@ func enrichProcessInfo(rc *eos_io.RuntimeContext, info ProcessInfo) ProcessInfo 
 		info.StartTime = strings.TrimSpace(output)
 	}
 
-	// Determine if it's an EOS service
+	// Determine if it's an Eos service
 	info.IsEosService = isEosServiceProcess(info.Name)
 
 	// Determine if it can be stopped
@@ -439,22 +439,22 @@ func generatePortConflictSuggestions(process ProcessInfo, port int) []string {
 
 	if process.IsEosService {
 		suggestions = append(suggestions,
-			fmt.Sprintf("This appears to be an existing EOS %s service", serviceName),
+			fmt.Sprintf("This appears to be an existing Eos %s service", serviceName),
 			"You can:",
 			"• Integrate with existing installation: eos bootstrap --continue",
 			"• Restart fresh: eos bootstrap --clean",
-			"• Check service status: systemctl status " + serviceName,
+			"• Check service status: systemctl status "+serviceName,
 		)
 	} else {
 		suggestions = append(suggestions,
-			fmt.Sprintf("Port %d is used by %s (not an EOS service)", port, serviceName),
+			fmt.Sprintf("Port %d is used by %s (not an Eos service)", port, serviceName),
 		)
 
 		if process.CanStop {
 			suggestions = append(suggestions,
 				"You can:",
 				fmt.Sprintf("• Stop the service: sudo systemctl stop %s", serviceName),
-				"• Let EOS handle it: eos bootstrap --stop-conflicting",
+				"• Let Eos handle it: eos bootstrap --stop-conflicting",
 				"• Force installation: eos bootstrap --force",
 			)
 		} else {
@@ -462,8 +462,8 @@ func generatePortConflictSuggestions(process ProcessInfo, port int) []string {
 				"This process cannot be automatically stopped.",
 				"You may need to:",
 				fmt.Sprintf("• Manually stop %s", serviceName),
-				"• Use a different system for EOS",
-				"• Configure EOS to use different ports (advanced)",
+				"• Use a different system for Eos",
+				"• Configure Eos to use different ports (advanced)",
 			)
 		}
 	}
@@ -488,17 +488,17 @@ func generateServiceConflictSuggestions(rc *eos_io.RuntimeContext, serviceName s
 			"This should not cause conflicts.",
 			"If issues persist, try:",
 			fmt.Sprintf("• Reset service: sudo systemctl reset-failed %s", serviceName),
-			"• Check logs: journalctl -u " + serviceName,
+			"• Check logs: journalctl -u "+serviceName,
 		)
 		return suggestions
 	}
 
-	// Check if it's EOS managed
+	// Check if it's Eos managed
 	isEosManaged := isEosManaged(rc, serviceName)
 
 	if isEosManaged {
 		suggestions = append(suggestions,
-			fmt.Sprintf("Service %s appears to be EOS-managed", serviceName),
+			fmt.Sprintf("Service %s appears to be Eos-managed", serviceName),
 			"You can:",
 			"• Continue with existing installation",
 			"• Verify service health: eos read service-status",
@@ -506,11 +506,11 @@ func generateServiceConflictSuggestions(rc *eos_io.RuntimeContext, serviceName s
 		)
 	} else {
 		suggestions = append(suggestions,
-			fmt.Sprintf("Service %s is running but not EOS-managed", serviceName),
+			fmt.Sprintf("Service %s is running but not Eos-managed", serviceName),
 			"You can:",
 			fmt.Sprintf("• Stop the service: sudo systemctl stop %s", serviceName),
 			"• Backup configuration and reinstall",
-			"• Force EOS installation: eos bootstrap --force",
+			"• Force Eos installation: eos bootstrap --force",
 		)
 	}
 
@@ -524,10 +524,10 @@ func PrintEnhancedError(rc *eos_io.RuntimeContext, err *EnhancedError) {
 	logger.Error("╔══════════════════════════════════════╗")
 	logger.Error("║             Error Details            ║")
 	logger.Error("╚══════════════════════════════════════╝")
-	
+
 	logger.Error("Error: " + err.Message)
 	logger.Error("Type: " + string(err.Type))
-	
+
 	if len(err.Details) > 0 {
 		logger.Error("")
 		logger.Error("Details:")

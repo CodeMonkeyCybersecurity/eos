@@ -154,7 +154,7 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 		}
 	}
 
-	// EOS services removed - no longer needed
+	// Eos services removed - no longer needed
 	// for _, svc := range eos.GetEosServices() {
 	// 	serviceMap[svc.Name] = ServiceConfig{
 	// 		Name:      svc.Name,
@@ -245,7 +245,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 		})
 	}
 
-	// EOS directories removed - no longer needed
+	// Eos directories removed - no longer needed
 	// for _, dir := range eos.GetEosDirectories() {
 	// 	allDirectories = append(allDirectories, DirectoryConfig{
 	// 		Path:        dir.Path,

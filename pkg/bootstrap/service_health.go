@@ -144,10 +144,10 @@ func getServicePorts(serviceName string) []int {
 		// Vault uses custom port 8179 and original 8200
 		return []int{shared.PortVault, shared.PortVaultOriginal}
 	case "consul":
-		// Consul uses EOS custom port 8161 (NOT 8500)
+		// Consul uses Eos custom port 8161 (NOT 8500)
 		// Only check 8161 for health - legacy 8500 is via fallback in checkConsulHealth
 		return []int{
-			shared.PortConsul,        // 8161 (PRIMARY - EOS standard)
+			shared.PortConsul,        // 8161 (PRIMARY - Eos standard)
 			shared.PortConsulRPC,     // 8431
 			shared.PortConsulSerfLAN, // 8443
 			shared.PortConsulSerfWAN, // 8447
@@ -265,7 +265,7 @@ func checkConsulHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 		},
 	}
 
-	// Check leader endpoint - try EOS port first (8161), then original (8500)
+	// Check leader endpoint - try Eos port first (8161), then original (8500)
 	url := fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsul)
 	req, err := http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	if err != nil {
@@ -567,7 +567,7 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 			// We need to detect this pattern, not just consecutive failures
 			status, _ := SystemctlGetStatus(rc, serviceName)
 			if strings.Contains(strings.ToLower(status), "failed") ||
-			   strings.Contains(strings.ToLower(status), "exit-code") {
+				strings.Contains(strings.ToLower(status), "exit-code") {
 				totalFailures++
 				logger.Warn("Service failure detected",
 					zap.String("service", serviceName),
@@ -605,8 +605,8 @@ func WaitForServiceReady(rc *eos_io.RuntimeContext, serviceName string, timeout 
 func loadVaultTLSConfig() (*tls.Config, error) {
 	// Try common CA certificate paths
 	caPaths := []string{
-		"/etc/eos/ca.crt",           // Eos standard location
-		"/etc/vault/tls/ca.crt",     // Vault standard location
+		"/etc/eos/ca.crt",             // Eos standard location
+		"/etc/vault/tls/ca.crt",       // Vault standard location
 		"/etc/ssl/certs/vault-ca.crt", // Alternative location
 	}
 

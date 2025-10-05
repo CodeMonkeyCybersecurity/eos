@@ -21,7 +21,7 @@
 // - Bulk agent management operations
 //
 // Integration:
-// This system builds on the existing EOS Delphi functionality and leverages
+// This system builds on the existing Eos Delphi functionality and leverages
 // the centralized version management system for consistency.
 
 package delphi
@@ -42,28 +42,28 @@ import (
 // AgentUpgradeConfig defines configuration for agent upgrade operations
 type AgentUpgradeConfig struct {
 	// Operation mode
-	UpgradeAgent     bool   `json:"upgrade_agent"`      // Default: upgrade agent version
-	ReRegisterOnly   bool   `json:"re_register_only"`   // Alternative: just re-register
-	AnalyzeOnly      bool   `json:"analyze_only"`       // Alternative: just analyze
-	
+	UpgradeAgent   bool `json:"upgrade_agent"`    // Default: upgrade agent version
+	ReRegisterOnly bool `json:"re_register_only"` // Alternative: just re-register
+	AnalyzeOnly    bool `json:"analyze_only"`     // Alternative: just analyze
+
 	// Manager settings (for re-registration)
 	ManagerHost string `json:"manager_host,omitempty"`
 	ManagerPort int    `json:"manager_port"`
-	
+
 	// Version settings
-	TargetVersion    string `json:"target_version,omitempty"` // Empty = latest
-	ForceUpgrade     bool   `json:"force_upgrade"`            // Ignore version policies
-	
+	TargetVersion string `json:"target_version,omitempty"` // Empty = latest
+	ForceUpgrade  bool   `json:"force_upgrade"`            // Ignore version policies
+
 	// Authentication settings
-	UseAgentAuth     bool   `json:"use_agent_auth"`
-	AuthPort         int    `json:"auth_port"`
-	UsePassword      bool   `json:"use_password"`
-	Password         string `json:"password,omitempty"`
-	
+	UseAgentAuth bool   `json:"use_agent_auth"`
+	AuthPort     int    `json:"auth_port"`
+	UsePassword  bool   `json:"use_password"`
+	Password     string `json:"password,omitempty"`
+
 	// Operation settings
-	DryRun           bool          `json:"dry_run"`
-	Timeout          time.Duration `json:"timeout"`
-	
+	DryRun  bool          `json:"dry_run"`
+	Timeout time.Duration `json:"timeout"`
+
 	// Safety settings
 	BackupKeys       bool `json:"backup_keys"`
 	VerifyConnection bool `json:"verify_connection"`
@@ -72,31 +72,31 @@ type AgentUpgradeConfig struct {
 
 // AgentAnalysis represents comprehensive analysis of a Delphi agent
 type AgentAnalysis struct {
-	AgentID              string        `json:"agent_id"`
-	CurrentVersion       string        `json:"current_version"`
-	LatestVersion        string        `json:"latest_version"`
-	Platform             string        `json:"platform"`
-	Architecture         string        `json:"architecture"`
-	NeedsUpgrade         bool          `json:"needs_upgrade"`
-	UpgradeRecommended   bool          `json:"upgrade_recommended"`
-	RepositoryReachable  bool          `json:"repository_reachable"`
-	ConnectivityIssues   []string      `json:"connectivity_issues,omitempty"`
-	UpgradeMethod        string        `json:"upgrade_method"`
-	EstimatedDuration    time.Duration `json:"estimated_duration"`
-	RiskLevel           string         `json:"risk_level"`
-	Prerequisites       []string       `json:"prerequisites,omitempty"`
-	Timestamp           time.Time      `json:"timestamp"`
+	AgentID             string        `json:"agent_id"`
+	CurrentVersion      string        `json:"current_version"`
+	LatestVersion       string        `json:"latest_version"`
+	Platform            string        `json:"platform"`
+	Architecture        string        `json:"architecture"`
+	NeedsUpgrade        bool          `json:"needs_upgrade"`
+	UpgradeRecommended  bool          `json:"upgrade_recommended"`
+	RepositoryReachable bool          `json:"repository_reachable"`
+	ConnectivityIssues  []string      `json:"connectivity_issues,omitempty"`
+	UpgradeMethod       string        `json:"upgrade_method"`
+	EstimatedDuration   time.Duration `json:"estimated_duration"`
+	RiskLevel           string        `json:"risk_level"`
+	Prerequisites       []string      `json:"prerequisites,omitempty"`
+	Timestamp           time.Time     `json:"timestamp"`
 }
 
 // AgentOperationResult represents the result of an agent operation
 type AgentOperationResult struct {
-	AgentID     string         `json:"agent_id"`
-	AgentName   string         `json:"agent_name"`
-	Analysis    *AgentAnalysis `json:"analysis,omitempty"`
-	Success     bool           `json:"success"`
-	Error       string         `json:"error,omitempty"`
-	Duration    time.Duration  `json:"duration"`
-	Timestamp   time.Time      `json:"timestamp"`
+	AgentID   string         `json:"agent_id"`
+	AgentName string         `json:"agent_name"`
+	Analysis  *AgentAnalysis `json:"analysis,omitempty"`
+	Success   bool           `json:"success"`
+	Error     string         `json:"error,omitempty"`
+	Duration  time.Duration  `json:"duration"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 // AgentUpgradeManager handles Delphi agent upgrade and re-registration operations
@@ -115,7 +115,7 @@ func NewAgentUpgradeManager(config *AgentUpgradeConfig) *AgentUpgradeManager {
 func (aum *AgentUpgradeManager) UpgradeLocalAgent(rc *eos_io.RuntimeContext) (*AgentOperationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
-	
+
 	result := &AgentOperationResult{
 		AgentID:   "local",
 		AgentName: "local-agent",
@@ -193,10 +193,10 @@ func (aum *AgentUpgradeManager) UpgradeLocalAgent(rc *eos_io.RuntimeContext) (*A
 
 	result.Success = true
 	result.Duration = time.Since(startTime)
-	
+
 	logger.Info("✅ Local Delphi agent upgrade completed successfully",
 		zap.Duration("duration", result.Duration))
-	
+
 	return result, nil
 }
 
@@ -239,7 +239,7 @@ func (aum *AgentUpgradeManager) analyzeLocalAgent(rc *eos_io.RuntimeContext) (*A
 
 	// Determine upgrade method
 	analysis.UpgradeMethod = aum.determineUpgradeMethod(analysis.Platform)
-	
+
 	// Estimate duration
 	analysis.EstimatedDuration = aum.estimateUpgradeDuration(analysis.Platform, analysis.UpgradeMethod)
 
@@ -265,7 +265,7 @@ func (aum *AgentUpgradeManager) analyzeLocalAgent(rc *eos_io.RuntimeContext) (*A
 // getCurrentAgentVersion gets the currently installed Delphi/Wazuh agent version
 func (aum *AgentUpgradeManager) getCurrentAgentVersion(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Try different methods to get version based on platform
 	switch runtime.GOOS {
 	case "linux":
@@ -288,7 +288,7 @@ func (aum *AgentUpgradeManager) getCurrentAgentVersion(rc *eos_io.RuntimeContext
 				}
 			}
 		}
-		
+
 		// Try rpm (CentOS/RHEL)
 		if output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "rpm",
@@ -298,7 +298,7 @@ func (aum *AgentUpgradeManager) getCurrentAgentVersion(rc *eos_io.RuntimeContext
 			logger.Debug("Found Delphi agent version via rpm", zap.String("version", output))
 			return strings.TrimSpace(output), nil
 		}
-		
+
 		// Try wazuh-control directly
 		if output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "/var/ossec/bin/wazuh-control",
@@ -318,7 +318,7 @@ func (aum *AgentUpgradeManager) getCurrentAgentVersion(rc *eos_io.RuntimeContext
 				}
 			}
 		}
-		
+
 	case "darwin":
 		// macOS - check via pkgutil or direct binary
 		if output, err := execute.Run(rc.Ctx, execute.Options{
@@ -339,20 +339,20 @@ func (aum *AgentUpgradeManager) getCurrentAgentVersion(rc *eos_io.RuntimeContext
 				}
 			}
 		}
-		
+
 	case "windows":
 		// Windows - check registry or service
 		// This would require Windows-specific implementation
 		return "", fmt.Errorf("Windows version detection not implemented yet")
 	}
-	
+
 	return "", fmt.Errorf("could not determine current Delphi agent version")
 }
 
 // GetDefaultAgentUpgradeConfig returns a default configuration for agent upgrades
 func GetDefaultAgentUpgradeConfig() *AgentUpgradeConfig {
 	return &AgentUpgradeConfig{
-		UpgradeAgent:     true,  // Default action is upgrade
+		UpgradeAgent:     true, // Default action is upgrade
 		ReRegisterOnly:   false,
 		AnalyzeOnly:      false,
 		ManagerPort:      1514,
@@ -424,7 +424,7 @@ func (aum *AgentUpgradeManager) assessRiskLevel(current, latest, platform string
 
 func (aum *AgentUpgradeManager) generatePrerequisites(platform, method string) []string {
 	var prerequisites []string
-	
+
 	switch method {
 	case "apt":
 		prerequisites = append(prerequisites,
@@ -451,14 +451,14 @@ func (aum *AgentUpgradeManager) generatePrerequisites(platform, method string) [
 			"Backup existing configuration",
 			"Verify connectivity to Delphi repositories")
 	}
-	
+
 	return prerequisites
 }
 
 func (aum *AgentUpgradeManager) testRepositoryConnectivity(rc *eos_io.RuntimeContext, platform string) (bool, []string) {
 	logger := otelzap.Ctx(rc.Ctx)
 	var issues []string
-	
+
 	// Test DNS resolution
 	if output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "nslookup",
@@ -471,7 +471,7 @@ func (aum *AgentUpgradeManager) testRepositoryConnectivity(rc *eos_io.RuntimeCon
 	} else if !strings.Contains(output, "packages.wazuh.com") {
 		issues = append(issues, "DNS resolution returned unexpected results")
 	}
-	
+
 	// Test HTTPS connectivity
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
@@ -482,12 +482,12 @@ func (aum *AgentUpgradeManager) testRepositoryConnectivity(rc *eos_io.RuntimeCon
 		issues = append(issues, fmt.Sprintf("HTTPS connectivity failed: %v", err))
 		logger.Warn("HTTPS connectivity test failed", zap.Error(err))
 	}
-	
+
 	reachable := len(issues) == 0
 	logger.Info("Repository connectivity test completed",
 		zap.Bool("reachable", reachable),
 		zap.Strings("issues", issues))
-	
+
 	return reachable, issues
 }
 

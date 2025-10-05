@@ -1,13 +1,13 @@
 // pkg/nomad/job_generator.go
 //
-// # EOS Nomad Job Generator - Container Orchestration
+// # Eos Nomad Job Generator - Container Orchestration
 //
-// This package provides comprehensive Nomad job generation capabilities for EOS
-// infrastructure. It implements the EOS infrastructure compiler pattern by
+// This package provides comprehensive Nomad job generation capabilities for Eos
+// infrastructure. It implements the Eos infrastructure compiler pattern by
 // translating high-level service configurations into Nomad job specifications.
 //
 // Key Features:
-// - Service-to-Job Translation: Converts EOS service configs to Nomad jobs
+// - Service-to-Job Translation: Converts Eos service configs to Nomad jobs
 // - Template-Based Generation: Uses Go templates for flexible job creation
 // - Multi-Service Support: Handles complex multi-container deployments
 // - Resource Management: Automatic resource allocation and constraints
@@ -16,10 +16,10 @@
 // - Volume Management: Storage integration with proper mount handling
 //
 // Architecture Integration:
-// - Replaces Kubernetes/K3s deployment generation in EOS
+// - Replaces Kubernetes/K3s deployment generation in Eos
 // - Integrates with Consul for service discovery
 //
-// EOS implements a sophisticated three-layer orchestration architecture that addresses
+// Eos implements a sophisticated three-layer orchestration architecture that addresses
 // the complexities of modern containerized deployments:
 //
 // ## The Problem This Architecture Solves
@@ -32,7 +32,7 @@
 // 5. **Secret Management**: Credentials scattered across multiple systems
 // 6. **Service Discovery**: Manual service registration and health monitoring
 //
-// ## EOS Three-Layer Solution
+// ## Eos Three-Layer Solution
 //
 // ```
 // ┌─────────────────────────────────────────────────────────────┐
@@ -73,10 +73,10 @@
 // to HashiCorp stack while maintaining the proven orchestration patterns.
 // - Works with Vault for secret management
 // - Supports Hecate reverse proxy architecture
-// - Follows EOS infrastructure compiler patterns
+// - Follows Eos infrastructure compiler patterns
 //
 // Job Generation Process:
-// 1. Parse service configuration from EOS commands
+// 1. Parse service configuration from Eos commands
 // 2. Apply service-specific templates and constraints
 // 3. Generate Nomad job specification with proper networking
 // 4. Configure Consul service registration
@@ -113,10 +113,10 @@
 //	    // Handle error
 //	}
 //
-// Integration with EOS Commands:
-// This generator is called by EOS create commands to translate user intent
+// Integration with Eos Commands:
+// This generator is called by Eos create commands to translate user intent
 // into deployable Nomad jobs, maintaining the infrastructure compiler pattern
-// where users express what they want and EOS handles the orchestration details.
+// where users express what they want and Eos handles the orchestration details.
 package nomad
 
 import (

@@ -1,8 +1,8 @@
-// Package agents provides comprehensive agent management and monitoring architecture for EOS.
+// Package agents provides comprehensive agent management and monitoring architecture for Eos.
 //
 // # Agent and Monitoring Architecture Guide
 //
-// This package implements EOS's solution to the "agent sprawl" problem where infrastructure
+// This package implements Eos's solution to the "agent sprawl" problem where infrastructure
 // accumulates multiple monitoring and management agents. The architecture follows a
 // four- consolidation strategy:
 //

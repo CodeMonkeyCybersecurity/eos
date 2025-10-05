@@ -1,4 +1,4 @@
-# EOS Fuzzing Scripts Refactoring Analysis
+# Eos Fuzzing Scripts Refactoring Analysis
 
 ## Executive Summary
 

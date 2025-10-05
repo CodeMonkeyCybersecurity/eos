@@ -1,5 +1,5 @@
 #!/bin/bash
-# Enhanced comprehensive fuzz test runner for EOS
+# Enhanced comprehensive fuzz test runner for Eos
 # Implements property-based testing, chaos engineering, and continuous fuzzing
 
 set -e
@@ -24,7 +24,7 @@ preflight_check() {
     
     # Check for go.mod file as indicator of project root
     if [ -f "go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "go.mod" 2>/dev/null; then
-        echo -e "${GREEN}Already in EOS project root${NC}"
+        echo -e "${GREEN}Already in Eos project root${NC}"
         return 0
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
@@ -34,13 +34,13 @@ preflight_check() {
         }
         return 0
     else
-        echo -e "${RED}❌ ERROR: Not in EOS project directory${NC}"
+        echo -e "${RED}❌ ERROR: Not in Eos project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
         echo -e "${YELLOW}To run this script correctly:${NC}"
         echo ""
-        echo -e "  1. ${CYAN}Change to the EOS project root:${NC}"
-        echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the EOS repository${NC}"
+        echo -e "  1. ${CYAN}Change to the Eos project root:${NC}"
+        echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the Eos repository${NC}"
         echo ""
         echo -e "  2. ${CYAN}Then run the script:${NC}"
         echo -e "     ${GREEN}./scripts/$(basename "$0")${NC}"
@@ -124,7 +124,7 @@ verify_test_files() {
         echo -e "${RED}❌ ERROR: Required test directories are missing${NC}"
         echo -e "${RED}Missing: ${missing_packages[*]}${NC}"
         echo ""
-        echo -e "${YELLOW}This usually means you're not in the EOS project root.${NC}"
+        echo -e "${YELLOW}This usually means you're not in the Eos project root.${NC}"
         echo -e "${YELLOW}Please follow the instructions above to navigate to the correct directory.${NC}"
         echo ""
         exit 1
@@ -135,7 +135,7 @@ verify_test_files() {
         echo -e "${RED}❌ ERROR: No fuzz test files found${NC}"
         echo ""
         echo -e "${YELLOW}This could mean:${NC}"
-        echo -e "  1. You're not in the EOS project root"
+        echo -e "  1. You're not in the Eos project root"
         echo -e "  2. The repository is incomplete"
         echo ""
         echo -e "${CYAN}Try:${NC}"
@@ -149,7 +149,7 @@ verify_test_files() {
 
 # Run all preflight checks
 run_preflight_checks() {
-    echo -e "${PURPLE}🚀 EOS Comprehensive Fuzz Test Runner - Preflight${NC}"
+    echo -e "${PURPLE}🚀 Eos Comprehensive Fuzz Test Runner - Preflight${NC}"
     echo "================================================="
     echo ""
     
@@ -176,7 +176,7 @@ LOG_DIR="${LOG_DIR:-/tmp/eos-comprehensive-fuzz}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 REPORT_FILE="${LOG_DIR}/comprehensive-fuzz-${TIMESTAMP}.md"
 
-echo -e "${CYAN}🧪 EOS Comprehensive Fuzz Test Runner${NC}"
+echo -e "${CYAN}🧪 Eos Comprehensive Fuzz Test Runner${NC}"
 echo "============================================="
 echo -e "📂 Working directory: ${YELLOW}$(pwd)${NC}"
 echo -e "⏰ Duration: ${YELLOW}${FUZZTIME}${NC}"
@@ -196,7 +196,7 @@ mkdir -p "${LOG_DIR}/corpus"
 
 # Initialize comprehensive report
 cat > "${REPORT_FILE}" << EOF
-# EOS Comprehensive Fuzz Test Report
+# Eos Comprehensive Fuzz Test Report
 
 **Generated:** $(date)  
 **Duration:** ${FUZZTIME}  

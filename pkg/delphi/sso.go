@@ -391,7 +391,7 @@ func generateExchangeKey() string {
 }
 
 func runCommand(cmd string) error {
-	// This would use the EOS runtime context in production
+	// This would use the Eos runtime context in production
 	// For now, showing the command structure
 	fmt.Printf("Executing: %s\n", cmd)
 	// In real implementation: exec.Command("/bin/bash", "-c", cmd).Run()

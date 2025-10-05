@@ -62,7 +62,7 @@ Examples:
 			zap.Bool("auto_push", autoPush),
 			zap.Bool("dry_run", dryRun))
 
-		// Ensure we're in the EOS project root
+		// Ensure we're in the Eos project root
 		if err := git.EnsureInProjectRoot(rc); err != nil {
 			return err
 		}

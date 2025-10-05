@@ -1,4 +1,4 @@
-# EOS Infrastructure Compiler - Terraform Integration
+# Eos Infrastructure Compiler - Terraform Integration
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 
@@ -8,7 +8,7 @@
 
 For detailed Terraform integration documentation, see the inline comments in these files:
 
-- **Terraform Core**: `pkg/terraform/terraform.go` - Complete EOS infrastructure compiler implementation
+- **Terraform Core**: `pkg/terraform/terraform.go` - Complete Eos infrastructure compiler implementation
 - **Terraform Workflow**: `cmd/create/terraform_workflow.go` - Terraform workflow orchestration
 - **Hecate Integration**: `pkg/hecate/terraform_config.go` - Hecate Terraform configuration
 - **Vault Integration**: `pkg/vault/` - Vault Terraform integration and PKI management
@@ -21,7 +21,7 @@ For detailed Terraform integration documentation, see the inline comments in the
 ** Orchestration:** ✅ INFRASTRUCTURE COMPILER ACTIVE  
 **Component Integration:** ✅ HASHICORP STACK MODULES IMPLEMENTED
 
-The EOS infrastructure compiler provides comprehensive Terraform integration with unified state management and orchestration capabilities for infrastructure and application deployments.
+The Eos infrastructure compiler provides comprehensive Terraform integration with unified state management and orchestration capabilities for infrastructure and application deployments.
 
 ---
 

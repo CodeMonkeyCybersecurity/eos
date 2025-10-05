@@ -1,5 +1,5 @@
 # .github/workflows/comprehensive-testing.yml
-# Comprehensive testing workflow for EOS with security-focused fuzzing
+# Comprehensive testing workflow for Eos with security-focused fuzzing
 
 name: Comprehensive Security Testing
 
@@ -357,7 +357,7 @@ jobs:
     
     - name: Generate comprehensive security report
       run: |
-        echo "# EOS Comprehensive Security Test Report" > security_report.md
+        echo "# Eos Comprehensive Security Test Report" > security_report.md
         echo "" >> security_report.md
         echo "**Generated:** $(date)" >> security_report.md
         echo "**Trigger:** ${{ github.event_name }}" >> security_report.md

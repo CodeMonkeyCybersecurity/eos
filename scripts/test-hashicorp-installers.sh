@@ -57,7 +57,7 @@ build_eos() {
     
     if go build -o /tmp/eos-test 2>/dev/null; then
         test_pass "Eos build"
-        export EOS_BIN="/tmp/eos-test"
+        export Eos_BIN="/tmp/eos-test"
     else
         test_fail "Eos build" "Compilation failed"
         exit 1

@@ -91,11 +91,11 @@ func PromptConflictResolution(rc *eos_io.RuntimeContext, state *BootstrapState) 
 	}
 }
 
-// promptExistingEosInstall handles the case where EOS is already installed
+// promptExistingEosInstall handles the case where Eos is already installed
 func promptExistingEosInstall(rc *eos_io.RuntimeContext, state *BootstrapState) (*ConflictResolutionOptions, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("✅ Found existing EOS installation")
+	logger.Info("✅ Found existing Eos installation")
 	logger.Info("")
 	logger.Info("What would you like to do?")
 	logger.Info("  1) 🔄 Use existing services (recommended)")
@@ -183,7 +183,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	}
 
 	if len(eosServices) > 0 {
-		logger.Info("🔧 The following EOS services are running:")
+		logger.Info("🔧 The following Eos services are running:")
 		for _, service := range eosServices {
 			logger.Info("  • " + service + " (EOS managed)")
 		}
@@ -210,7 +210,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	optionNum++
 
 	if len(eosServices) > 0 {
-		logger.Info(fmt.Sprintf("  %d) 🔄 Keep existing EOS services", optionNum))
+		logger.Info(fmt.Sprintf("  %d) 🔄 Keep existing Eos services", optionNum))
 		optionNum++
 	}
 
@@ -254,10 +254,10 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	}
 	currentOption++
 
-	// Option: Keep existing EOS services (if available)
+	// Option: Keep existing Eos services (if available)
 	if len(eosServices) > 0 {
 		if choice == fmt.Sprintf("%d", currentOption) || choice == "keep" {
-			logger.Info("Keeping existing EOS services")
+			logger.Info("Keeping existing Eos services")
 			return &ConflictResolutionOptions{
 				Choice:         ChoiceIntegrate,
 				ServicesToStop: stoppableServices,
@@ -658,7 +658,7 @@ func PromptGuidedBootstrap(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("╔══════════════════════════════════════╗")
-	logger.Info("║        Welcome to EOS! 🌅           ║")
+	logger.Info("║        Welcome to Eos! 🌅           ║")
 	logger.Info("║   Let's set up your infrastructure   ║")
 	logger.Info("║            step by step.             ║")
 	logger.Info("╚══════════════════════════════════════╝")
@@ -675,7 +675,7 @@ func PromptGuidedBootstrap(rc *eos_io.RuntimeContext) error {
 	// Show system information
 	logger.Info("✓ System information gathered")
 	if state.IsEosInstall {
-		logger.Info("✓ Existing EOS installation detected")
+		logger.Info("✓ Existing Eos installation detected")
 	}
 
 	if len(state.Components) > 0 {

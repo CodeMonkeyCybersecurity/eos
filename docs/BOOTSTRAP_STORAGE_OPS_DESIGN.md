@@ -12,7 +12,7 @@ This document outlines the design for automatically deploying storage operations
 
 During bootstrap, we need to determine if this is:
 - **Single Node**: First node in a new infrastructure
-- **Additional Node**: Joining an existing EOS infrastructure
+- **Additional Node**: Joining an existing Eos infrastructure
 
 Detection methods:
 1. **Explicit Flag**: `--join-cluster=<master-ip>` or `--single-node`

@@ -98,7 +98,7 @@ CGO_ENABLED=1 go build -tags libvirt -o eos .
   virsh domstate test-kvm-features
   ```
 
-- [ ] **Test EOS Snapshot Creation**
+- [ ] **Test Eos Snapshot Creation**
   ```bash
   # Create test file in VM first
   ssh test-kvm-features "echo 'test data' > /tmp/testfile"
@@ -209,7 +209,7 @@ eos restart kvm-restart test-kvm-features --timeout=5
 # Stop libvirtd
 sudo systemctl stop libvirtd
 
-# Try EOS command
+# Try Eos command
 eos list kvm
 
 # Should show clear error, not crash
@@ -221,7 +221,7 @@ eos list kvm
 virsh dumpxml test-kvm-features > /tmp/backup.xml
 virsh edit test-kvm-features # Add invalid XML
 
-# Try EOS operations
+# Try Eos operations
 eos list kvm
 eos restart kvm-restart test-kvm-features
 
@@ -260,7 +260,7 @@ Expected timing for various operations:
 If something goes wrong during production use:
 
 ```bash
-# 1. Stop all EOS operations (Ctrl+C)
+# 1. Stop all Eos operations (Ctrl+C)
 
 # 2. Check VM states
 virsh list --all

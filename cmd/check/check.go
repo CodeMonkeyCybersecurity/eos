@@ -10,8 +10,8 @@ import (
 // CheckCmd represents the 'eos check' command
 var CheckCmd = &cobra.Command{
 	Use:   "check [command]",
-	Short: "Check the status of various EOS components",
-	Long:  `Check the status and health of various EOS components and services.`,
+	Short: "Check the status of various Eos components",
+	Long:  `Check the status and health of various Eos components and services.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}),

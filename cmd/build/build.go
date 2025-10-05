@@ -8,7 +8,7 @@ import (
 var BuildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Build applications and components",
-	Long: `Build applications and components using the EOS CI/CD system.
+	Long: `Build applications and components using the Eos CI/CD system.
 
 The build system follows the assessment→intervention→evaluation pattern to ensure
 reliable builds across different environments and components. It supports parallel

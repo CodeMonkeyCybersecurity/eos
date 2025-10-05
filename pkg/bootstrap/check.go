@@ -1,8 +1,8 @@
 // pkg/bootstrap/check.go
 //
-// # EOS Bootstrap System - Machine Preparation and Validation
+// # Eos Bootstrap System - Machine Preparation and Validation
 //
-// The EOS bootstrap system ensures machines are properly prepared before deploying
+// The Eos bootstrap system ensures machines are properly prepared before deploying
 // services. This prevents common errors like " state files not found" and
 // ensures a consistent, secure foundation for all deployments.
 //
@@ -26,7 +26,7 @@
 // The system validates:
 // -  Installation: Configuration management system
 // -  API Configuration: REST API for remote management
-// - File Roots Setup: Paths to EOS state files
+// - File Roots Setup: Paths to Eos state files
 // - Network Configuration: Basic connectivity
 // - Security Configuration: Firewall and basics
 //
@@ -75,9 +75,9 @@
 //	}
 //
 // Integration:
-// Bootstrap integrates with all EOS create commands to ensure proper system
+// Bootstrap integrates with all Eos create commands to ensure proper system
 // preparation before service deployment. It provides the foundation for the
-// EOS infrastructure compiler pattern.
+// Eos infrastructure compiler pattern.
 package bootstrap
 
 import (

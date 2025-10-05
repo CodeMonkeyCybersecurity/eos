@@ -32,14 +32,13 @@ func CleanupDockerResources(rc *eos_io.RuntimeContext, keepVolumes bool) error {
 		zap.Int("networks", dockerState.NetworkCount),
 		zap.Int("images", dockerState.ImageCount))
 
-	// Show progress to user
+	// Show progress to user via logger
 	if dockerState.ContainerCount > 0 || dockerState.VolumeCount > 0 {
-		fmt.Printf("\nDocker cleanup required:\n")
-		fmt.Printf("  - Containers: %d\n", dockerState.ContainerCount)
-		fmt.Printf("  - Volumes: %d\n", dockerState.VolumeCount)
-		fmt.Printf("  - Networks: %d\n", dockerState.NetworkCount)
-		fmt.Printf("  - Images: %d\n", dockerState.ImageCount)
-		fmt.Println()
+		logger.Info("Docker cleanup required",
+			zap.Int("containers", dockerState.ContainerCount),
+			zap.Int("volumes", dockerState.VolumeCount),
+			zap.Int("networks", dockerState.NetworkCount),
+			zap.Int("images", dockerState.ImageCount))
 	}
 
 	// INTERVENE - Clean up Docker resources

@@ -1,4 +1,4 @@
-# EOS Helen Integration Specifications
+# Eos Helen Integration Specifications
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 

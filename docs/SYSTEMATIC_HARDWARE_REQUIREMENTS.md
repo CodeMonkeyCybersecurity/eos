@@ -1,4 +1,4 @@
-# EOS Systematic Hardware Requirements Calculator
+# Eos Systematic Hardware Requirements Calculator
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 
@@ -21,7 +21,7 @@ For detailed systematic hardware requirements documentation, see the inline comm
 **Transparent Calculations:** ✅ VERIFIABLE METHODOLOGY OPERATIONAL  
 **Flexible Sizing:** ✅ ADAPTIVE SCALING FOR DIFFERENT WORKLOADS ACTIVE
 
-The EOS systematic hardware requirements calculator provides methodical, documented hardware sizing based on researched specifications from official sources, replacing guesswork with transparent, verifiable calculations.
+The Eos systematic hardware requirements calculator provides methodical, documented hardware sizing based on researched specifications from official sources, replacing guesswork with transparent, verifiable calculations.
 
 ---
 

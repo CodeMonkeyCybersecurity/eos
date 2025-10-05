@@ -1,4 +1,4 @@
-// Package hecate provides the reverse proxy framework for EOS
+// Package hecate provides the reverse proxy framework for Eos
 package hecate
 
 import (
@@ -8,12 +8,12 @@ import (
 // ServiceCatalog defines all available services that can be deployed with Hecate
 var ServiceCatalog = map[string]terraform.ServiceDefinition{
 	"wazuh": {
-		Name:           "wazuh",
-		DisplayName:    "Wazuh SIEM",
-		Description:    "Open source security platform for threat detection and response",
-		Category:       terraform.CategorySecurity,
-		NomadJobPath:   "assets/nomad/wazuh.nomad",
-		Dependencies:   []string{"elasticsearch"},
+		Name:         "wazuh",
+		DisplayName:  "Wazuh SIEM",
+		Description:  "Open source security platform for threat detection and response",
+		Category:     terraform.CategorySecurity,
+		NomadJobPath: "assets/nomad/wazuh.nomad",
+		Dependencies: []string{"elasticsearch"},
 		Ports: []terraform.ServicePort{
 			{Name: "api", Port: 55000, Protocol: "tcp", Public: true},
 			{Name: "registration", Port: 1514, Protocol: "tcp", Public: false},
@@ -33,12 +33,12 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 		},
 	},
 	"grafana": {
-		Name:           "grafana",
-		DisplayName:    "Grafana",
-		Description:    "Open source analytics and monitoring solution",
-		Category:       terraform.CategoryMonitoring,
-		NomadJobPath:   "assets/nomad/grafana.nomad",
-		Dependencies:   []string{"prometheus", "loki"},
+		Name:         "grafana",
+		DisplayName:  "Grafana",
+		Description:  "Open source analytics and monitoring solution",
+		Category:     terraform.CategoryMonitoring,
+		NomadJobPath: "assets/nomad/grafana.nomad",
+		Dependencies: []string{"prometheus", "loki"},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 3000, Protocol: "tcp", Public: true},
 		},
@@ -51,19 +51,19 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 			Disk:   "1GB",
 		},
 		Configuration: map[string]any{
-			"admin_user":     "admin",
-			"allow_signup":   false,
-			"auth_proxy":     true,
-			"auth_header":    "X-Auth-User",
+			"admin_user":   "admin",
+			"allow_signup": false,
+			"auth_proxy":   true,
+			"auth_header":  "X-Auth-User",
 		},
 	},
 	"prometheus": {
-		Name:           "prometheus",
-		DisplayName:    "Prometheus",
-		Description:    "Systems monitoring and alerting toolkit",
-		Category:       terraform.CategoryMonitoring,
-		NomadJobPath:   "assets/nomad/prometheus.nomad",
-		Dependencies:   []string{},
+		Name:         "prometheus",
+		DisplayName:  "Prometheus",
+		Description:  "Systems monitoring and alerting toolkit",
+		Category:     terraform.CategoryMonitoring,
+		NomadJobPath: "assets/nomad/prometheus.nomad",
+		Dependencies: []string{},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 9090, Protocol: "tcp", Public: true},
 		},
@@ -76,17 +76,17 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 			Disk:   "10GB",
 		},
 		Configuration: map[string]any{
-			"retention_time": "15d",
+			"retention_time":  "15d",
 			"scrape_interval": "15s",
 		},
 	},
 	"loki": {
-		Name:           "loki",
-		DisplayName:    "Loki",
-		Description:    "Log aggregation system designed to store and query logs",
-		Category:       terraform.CategoryMonitoring,
-		NomadJobPath:   "assets/nomad/loki.nomad",
-		Dependencies:   []string{},
+		Name:         "loki",
+		DisplayName:  "Loki",
+		Description:  "Log aggregation system designed to store and query logs",
+		Category:     terraform.CategoryMonitoring,
+		NomadJobPath: "assets/nomad/loki.nomad",
+		Dependencies: []string{},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 3100, Protocol: "tcp", Public: true},
 			{Name: "grpc", Port: 9095, Protocol: "tcp", Public: false},
@@ -100,17 +100,17 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 			Disk:   "10GB",
 		},
 		Configuration: map[string]any{
-			"retention_period": "744h", // 31 days
+			"retention_period":  "744h", // 31 days
 			"ingestion_rate_mb": 10,
 		},
 	},
 	"elasticsearch": {
-		Name:           "elasticsearch",
-		DisplayName:    "Elasticsearch",
-		Description:    "Distributed search and analytics engine",
-		Category:       terraform.CategoryDatabase,
-		NomadJobPath:   "assets/nomad/elasticsearch.nomad",
-		Dependencies:   []string{},
+		Name:         "elasticsearch",
+		DisplayName:  "Elasticsearch",
+		Description:  "Distributed search and analytics engine",
+		Category:     terraform.CategoryDatabase,
+		NomadJobPath: "assets/nomad/elasticsearch.nomad",
+		Dependencies: []string{},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 9200, Protocol: "tcp", Public: true},
 			{Name: "transport", Port: 9300, Protocol: "tcp", Public: false},
@@ -130,12 +130,12 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 		},
 	},
 	"kibana": {
-		Name:           "kibana",
-		DisplayName:    "Kibana",
-		Description:    "Data visualization dashboard for Elasticsearch",
-		Category:       terraform.CategoryMonitoring,
-		NomadJobPath:   "assets/nomad/kibana.nomad",
-		Dependencies:   []string{"elasticsearch"},
+		Name:         "kibana",
+		DisplayName:  "Kibana",
+		Description:  "Data visualization dashboard for Elasticsearch",
+		Category:     terraform.CategoryMonitoring,
+		NomadJobPath: "assets/nomad/kibana.nomad",
+		Dependencies: []string{"elasticsearch"},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 5601, Protocol: "tcp", Public: true},
 		},
@@ -153,12 +153,12 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 		},
 	},
 	"mattermost": {
-		Name:           "mattermost",
-		DisplayName:    "Mattermost",
-		Description:    "Open source collaboration platform",
-		Category:       terraform.CategoryMessaging,
-		NomadJobPath:   "assets/nomad/mattermost.nomad",
-		Dependencies:   []string{"postgres"},
+		Name:         "mattermost",
+		DisplayName:  "Mattermost",
+		Description:  "Open source collaboration platform",
+		Category:     terraform.CategoryMessaging,
+		NomadJobPath: "assets/nomad/mattermost.nomad",
+		Dependencies: []string{"postgres"},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 8065, Protocol: "tcp", Public: true},
 		},
@@ -171,18 +171,18 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 			Disk:   "10GB",
 		},
 		Configuration: map[string]any{
-			"site_url": "https://chat.eos.local",
+			"site_url":      "https://chat.eos.local",
 			"enable_signup": false,
-			"enable_oauth": true,
+			"enable_oauth":  true,
 		},
 	},
 	"postgres": {
-		Name:           "postgres",
-		DisplayName:    "PostgreSQL",
-		Description:    "Advanced open source relational database",
-		Category:       terraform.CategoryDatabase,
-		NomadJobPath:   "assets/nomad/postgres.nomad",
-		Dependencies:   []string{},
+		Name:         "postgres",
+		DisplayName:  "PostgreSQL",
+		Description:  "Advanced open source relational database",
+		Category:     terraform.CategoryDatabase,
+		NomadJobPath: "assets/nomad/postgres.nomad",
+		Dependencies: []string{},
 		Ports: []terraform.ServicePort{
 			{Name: "postgres", Port: 5432, Protocol: "tcp", Public: false},
 		},
@@ -201,12 +201,12 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 		},
 	},
 	"redis": {
-		Name:           "redis",
-		DisplayName:    "Redis",
-		Description:    "In-memory data structure store",
-		Category:       terraform.CategoryDatabase,
-		NomadJobPath:   "assets/nomad/redis.nomad",
-		Dependencies:   []string{},
+		Name:         "redis",
+		DisplayName:  "Redis",
+		Description:  "In-memory data structure store",
+		Category:     terraform.CategoryDatabase,
+		NomadJobPath: "assets/nomad/redis.nomad",
+		Dependencies: []string{},
 		Ports: []terraform.ServicePort{
 			{Name: "redis", Port: 6379, Protocol: "tcp", Public: false},
 		},
@@ -225,12 +225,12 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 		},
 	},
 	"vault": {
-		Name:           "vault",
-		DisplayName:    "HashiCorp Vault",
-		Description:    "Secrets management and data protection",
-		Category:       terraform.CategorySecurity,
-		NomadJobPath:   "assets/nomad/vault.nomad",
-		Dependencies:   []string{},
+		Name:         "vault",
+		DisplayName:  "HashiCorp Vault",
+		Description:  "Secrets management and data protection",
+		Category:     terraform.CategorySecurity,
+		NomadJobPath: "assets/nomad/vault.nomad",
+		Dependencies: []string{},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 8200, Protocol: "tcp", Public: true},
 			{Name: "cluster", Port: 8201, Protocol: "tcp", Public: false},
@@ -250,12 +250,12 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 		},
 	},
 	"consul": {
-		Name:           "consul",
-		DisplayName:    "HashiCorp Consul",
-		Description:    "Service mesh and service discovery",
-		Category:       terraform.CategoryDatabase,
-		NomadJobPath:   "assets/nomad/consul.nomad",
-		Dependencies:   []string{},
+		Name:         "consul",
+		DisplayName:  "HashiCorp Consul",
+		Description:  "Service mesh and service discovery",
+		Category:     terraform.CategoryDatabase,
+		NomadJobPath: "assets/nomad/consul.nomad",
+		Dependencies: []string{},
 		Ports: []terraform.ServicePort{
 			{Name: "http", Port: 8500, Protocol: "tcp", Public: true},
 			{Name: "dns", Port: 8600, Protocol: "udp", Public: false},
@@ -272,9 +272,9 @@ var ServiceCatalog = map[string]terraform.ServiceDefinition{
 			Disk:   "10GB",
 		},
 		Configuration: map[string]any{
-			"datacenter":     "dc1",
+			"datacenter":       "dc1",
 			"bootstrap_expect": 3,
-			"ui":             true,
+			"ui":               true,
 		},
 	},
 }
@@ -300,14 +300,14 @@ func GetServicesByCategory(category string) []terraform.ServiceDefinition {
 func GetServiceDependencies(serviceName string) []string {
 	visited := make(map[string]bool)
 	var deps []string
-	
+
 	var collectDeps func(string)
 	collectDeps = func(name string) {
 		if visited[name] {
 			return
 		}
 		visited[name] = true
-		
+
 		if service, exists := ServiceCatalog[name]; exists {
 			for _, dep := range service.Dependencies {
 				if !visited[dep] {
@@ -317,7 +317,7 @@ func GetServiceDependencies(serviceName string) []string {
 			}
 		}
 	}
-	
+
 	collectDeps(serviceName)
 	return deps
 }
@@ -334,12 +334,12 @@ func ValidateServiceCombination(services []string) error {
 			}
 		}
 	}
-	
+
 	// TODO: Add more validation rules
 	// - Check for port conflicts
 	// - Check for resource constraints
 	// - Check for incompatible services
-	
+
 	return nil
 }
 

@@ -10,10 +10,10 @@
 // - Platform prerequisite assessment
 // - Component installation orchestration
 // - Installation verification and validation
-// - Integration with EOS infrastructure patterns
+// - Integration with Eos infrastructure patterns
 //
 // Architecture:
-// The installation follows the EOS ASSESS → INTERVENE → EVALUATE pattern:
+// The installation follows the Eos ASSESS → INTERVENE → EVALUATE pattern:
 // 1. ASSESS: Check prerequisites and system requirements
 // 2. INTERVENE: Install and configure platform components
 // 3. EVALUATE: Verify installation success and functionality

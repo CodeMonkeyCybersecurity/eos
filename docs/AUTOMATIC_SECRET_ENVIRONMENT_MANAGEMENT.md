@@ -1,4 +1,4 @@
-# EOS Automatic Secret and Environment Management
+# Eos Automatic Secret and Environment Management
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 

@@ -176,7 +176,7 @@ type MountPoint struct {
 }
 
 // DiskInfo represents comprehensive information about a disk device
-// This unified type consolidates all disk information across EOS storage subsystems
+// This unified type consolidates all disk information across Eos storage subsystems
 type DiskInfo struct {
 	// Basic device information
 	Device      string `json:"device"`      // Device path (e.g., /dev/sda)
@@ -219,7 +219,7 @@ type DiskInfo struct {
 }
 
 // PartitionInfo represents comprehensive information about a disk partition
-// This unified type consolidates all partition information across EOS storage subsystems
+// This unified type consolidates all partition information across Eos storage subsystems
 type PartitionInfo struct {
 	// Basic partition information
 	Device string `json:"device"` // Partition device (e.g., /dev/sda1)
@@ -607,7 +607,7 @@ type HealthRecommendation struct {
 }
 
 // DiskHealth represents comprehensive disk health status
-// This unified type consolidates disk health information across EOS storage subsystems
+// This unified type consolidates disk health information across Eos storage subsystems
 type DiskHealth struct {
 	Device       string            `json:"device"`         // Device path
 	Status       string            `json:"status"`         // healthy, warning, critical

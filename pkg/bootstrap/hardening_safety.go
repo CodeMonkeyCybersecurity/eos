@@ -1,9 +1,9 @@
 // pkg/bootstrap/hardening_safety.go
 //
-// Bootstrap Hardening Safety System
+// # Bootstrap Hardening Safety System
 //
 // This package implements comprehensive safety mechanisms for Ubuntu security
-// hardening as part of the EOS bootstrap process. It ensures that hardening
+// hardening as part of the Eos bootstrap process. It ensures that hardening
 // operations are performed safely without breaking existing systems or
 // disrupting critical services.
 //
@@ -75,7 +75,6 @@
 // - pkg/ubuntu/hardening.go - Ubuntu-specific hardening implementation
 // - pkg/ubuntu/hardening_fido2.go - FIDO2 authentication hardening
 // - pkg/security/hardening.go - General security hardening framework
-//
 package bootstrap
 
 import (
@@ -102,7 +101,7 @@ type HardeningSafetyCheck struct {
 func PerformHardeningSafetyChecks(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Running pre-hardening safety checks")
-	
+
 	checks := []HardeningSafetyCheck{
 		{
 			Name:        "ssh-session",
@@ -135,21 +134,21 @@ func PerformHardeningSafetyChecks(rc *eos_io.RuntimeContext) error {
 			Critical:    true,
 		},
 	}
-	
+
 	var criticalFailures []string
 	var warnings []string
-	
+
 	for _, check := range checks {
 		logger.Info("Running safety check",
 			zap.String("check", check.Name),
 			zap.String("description", check.Description))
-		
+
 		if err := check.CheckFunc(rc); err != nil {
 			if check.Critical {
 				logger.Error("Critical safety check failed",
 					zap.String("check", check.Name),
 					zap.Error(err))
-				criticalFailures = append(criticalFailures, 
+				criticalFailures = append(criticalFailures,
 					fmt.Sprintf("%s: %v", check.Description, err))
 			} else {
 				logger.Warn("Safety check warning",
@@ -163,20 +162,20 @@ func PerformHardeningSafetyChecks(rc *eos_io.RuntimeContext) error {
 				zap.String("check", check.Name))
 		}
 	}
-	
+
 	// Show summary
 	if len(warnings) > 0 {
 		logger.Warn("Safety check warnings detected",
 			zap.Strings("warnings", warnings))
 	}
-	
+
 	if len(criticalFailures) > 0 {
 		logger.Error("Critical safety checks failed",
 			zap.Strings("failures", criticalFailures))
-		return fmt.Errorf("cannot proceed with hardening: %d critical checks failed", 
+		return fmt.Errorf("cannot proceed with hardening: %d critical checks failed",
 			len(criticalFailures))
 	}
-	
+
 	logger.Info("All critical safety checks passed")
 	return nil
 }
@@ -187,12 +186,12 @@ func checkSSHSession(rc *eos_io.RuntimeContext) error {
 	if os.Getenv("SSH_CONNECTION") == "" {
 		return fmt.Errorf("not in an SSH session - hardening from console is safer")
 	}
-	
+
 	// Check SSH_TTY to ensure it's an interactive session
 	if os.Getenv("SSH_TTY") == "" {
 		return fmt.Errorf("non-interactive SSH session detected - use interactive session")
 	}
-	
+
 	return nil
 }
 
@@ -204,30 +203,30 @@ func checkSudoAccess(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"-n", "true"}, // -n = non-interactive
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("sudo requires password - configure NOPASSWD in sudoers first")
 	}
-	
+
 	if strings.Contains(output, "password") {
 		return fmt.Errorf("sudo is prompting for password")
 	}
-	
+
 	return nil
 }
 
 // checkBackupAccess looks for alternative access methods
 func checkBackupAccess(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	hasBackup := false
-	
+
 	// Check for console access files
 	consolePaths := []string{
 		"/etc/systemd/system/getty@tty1.service.d/override.conf",
 		"/etc/systemd/system/serial-getty@.service",
 	}
-	
+
 	for _, path := range consolePaths {
 		if _, err := os.Stat(path); err == nil {
 			logger.Info("Found console access configuration",
@@ -235,29 +234,29 @@ func checkBackupAccess(rc *eos_io.RuntimeContext) error {
 			hasBackup = true
 		}
 	}
-	
+
 	// Check for recovery user
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "getent",
 		Args:    []string{"passwd", "recovery"},
 		Capture: true,
 	})
-	
+
 	if err == nil && output != "" {
 		logger.Info("Found recovery user account")
 		hasBackup = true
 	}
-	
+
 	// Check for IPMI/iDRAC
 	if _, err := os.Stat("/dev/ipmi0"); err == nil {
 		logger.Info("Found IPMI device")
 		hasBackup = true
 	}
-	
+
 	if !hasBackup {
 		return fmt.Errorf("no backup access method detected - consider physical/console access")
 	}
-	
+
 	return nil
 }
 
@@ -268,12 +267,12 @@ func checkConsoleAccess(rc *eos_io.RuntimeContext) error {
 		Command: "systemd-detect-virt",
 		Capture: true,
 	})
-	
+
 	if err == nil && strings.TrimSpace(output) != "none" {
 		// It's a VM, check for console
 		return nil // VMs usually have console access
 	}
-	
+
 	// For physical machines, warn about console access
 	return fmt.Errorf("physical machine detected - ensure you have console access")
 }
@@ -281,27 +280,27 @@ func checkConsoleAccess(rc *eos_io.RuntimeContext) error {
 // checkSSHKeys verifies SSH keys are properly set up
 func checkSSHKeys(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Get current user
 	currentUser := os.Getenv("USER")
 	if currentUser == "" {
 		currentUser = os.Getenv("LOGNAME")
 	}
-	
+
 	// Check authorized_keys file
 	homeDir := os.Getenv("HOME")
 	if homeDir == "" {
 		homeDir = fmt.Sprintf("/home/%s", currentUser)
 	}
-	
+
 	authKeysPath := fmt.Sprintf("%s/.ssh/authorized_keys", homeDir)
-	
+
 	// Check if file exists and has keys
 	data, err := os.ReadFile(authKeysPath)
 	if err != nil {
 		return fmt.Errorf("cannot read authorized_keys: %v", err)
 	}
-	
+
 	// Count valid keys
 	lines := strings.Split(string(data), "\n")
 	validKeys := 0
@@ -311,15 +310,15 @@ func checkSSHKeys(rc *eos_io.RuntimeContext) error {
 			validKeys++
 		}
 	}
-	
+
 	if validKeys == 0 {
 		return fmt.Errorf("no valid SSH keys found in authorized_keys")
 	}
-	
+
 	logger.Info("Found SSH keys",
 		zap.Int("count", validKeys),
 		zap.String("file", authKeysPath))
-	
+
 	// Also check root if we're running as root
 	if os.Geteuid() == 0 {
 		rootAuthKeys := "/root/.ssh/authorized_keys"
@@ -334,7 +333,7 @@ func checkSSHKeys(rc *eos_io.RuntimeContext) error {
 				zap.Int("count", rootKeys))
 		}
 	}
-	
+
 	return nil
 }
 
@@ -342,14 +341,14 @@ func checkSSHKeys(rc *eos_io.RuntimeContext) error {
 func CreateHardeningBackup(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating pre-hardening backup")
-	
-	backupDir := fmt.Sprintf("/root/eos-hardening-backup-%s", 
+
+	backupDir := fmt.Sprintf("/root/eos-hardening-backup-%s",
 		time.Now().Format("20060102-150405"))
-	
+
 	if err := os.MkdirAll(backupDir, 0700); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
-	
+
 	// Backup critical files
 	filesToBackup := []string{
 		"/etc/ssh/sshd_config",
@@ -358,7 +357,7 @@ func CreateHardeningBackup(rc *eos_io.RuntimeContext) error {
 		"/etc/security/pwquality.conf",
 		"/etc/login.defs",
 	}
-	
+
 	for _, file := range filesToBackup {
 		if err := backupFile(rc, file, backupDir); err != nil {
 			logger.Warn("Failed to backup file",
@@ -366,10 +365,10 @@ func CreateHardeningBackup(rc *eos_io.RuntimeContext) error {
 				zap.Error(err))
 		}
 	}
-	
+
 	// Create restore script
 	restoreScript := fmt.Sprintf(`#!/bin/bash
-# EOS Hardening Restore Script
+# Eos Hardening Restore Script
 # Created: %s
 
 echo "Restoring pre-hardening configuration..."
@@ -386,16 +385,16 @@ cp %s/sudoers /etc/sudoers
 
 echo "Restore complete. You may need to reboot."
 `, time.Now().Format(time.RFC3339), backupDir, backupDir, backupDir)
-	
+
 	restorePath := fmt.Sprintf("%s/restore.sh", backupDir)
 	if err := os.WriteFile(restorePath, []byte(restoreScript), 0700); err != nil {
 		return fmt.Errorf("failed to create restore script: %w", err)
 	}
-	
+
 	logger.Info("Hardening backup created",
 		zap.String("backup_dir", backupDir),
 		zap.String("restore_script", restorePath))
-	
+
 	return nil
 }
 
@@ -404,19 +403,19 @@ func backupFile(rc *eos_io.RuntimeContext, source, backupDir string) error {
 	// Get just the filename
 	filename := strings.ReplaceAll(source, "/", "_")
 	filename = strings.TrimPrefix(filename, "_")
-	
+
 	dest := fmt.Sprintf("%s/%s", backupDir, filename)
-	
+
 	// Copy the file
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "cp",
 		Args:    []string{"-p", source, dest}, // -p preserves permissions
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to copy %s: %w (output: %s)", source, err, output)
 	}
-	
+
 	return nil
 }

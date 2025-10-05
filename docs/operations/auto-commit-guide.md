@@ -1,10 +1,10 @@
-# EOS Auto-Commit Guide
+# Eos Auto-Commit Guide
 
 *Last Updated: 2025-01-14*
 
 ## Overview
 
-The EOS auto-commit feature provides intelligent, safe automation for git commits. It addresses the common need to quickly commit changes without crafting custom commit messages each time, while maintaining code quality and security.
+The Eos auto-commit feature provides intelligent, safe automation for git commits. It addresses the common need to quickly commit changes without crafting custom commit messages each time, while maintaining code quality and security.
 
 ## Features
 
@@ -30,7 +30,7 @@ The EOS auto-commit feature provides intelligent, safe automation for git commit
 
 ## Usage Methods
 
-### 1. **Native EOS Command** (Recommended)
+### 1. **Native Eos Command** (Recommended)
 
 ```bash
 # Basic auto-commit with smart message generation
@@ -178,9 +178,9 @@ eos self git commit
 
 ### **Common Issues**
 
-1. **"Not in EOS project root"**
+1. **"Not in Eos project root"**
    - Solution: Run from `/opt/eos` directory
-   - Check: `pwd` should show EOS project root
+   - Check: `pwd` should show Eos project root
 
 2. **"Potential secrets detected"**
    - Review flagged files for sensitive data

@@ -8,7 +8,7 @@ import (
 var PromoteCmd = &cobra.Command{
 	Use:   "promote",
 	Short: "Promote applications between environments",
-	Long: `Promote applications and components between environments in the EOS CI/CD system.
+	Long: `Promote applications and components between environments in the Eos CI/CD system.
 
 The promotion system enables safe deployment promotion across environments (dev → staging → production)
 with comprehensive validation, approval workflows, and rollback capabilities. All promotions follow

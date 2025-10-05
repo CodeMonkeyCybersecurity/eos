@@ -43,9 +43,9 @@ type BootstrapOptions struct {
 	SkipOSQuery   bool
 
 	// HashiCorp stack options
-	SkipConsul    bool  // Consul is required by default
-	EnableVault   bool  // Vault is opt-in
-	EnableNomad   bool  // Nomad is opt-in
+	SkipConsul  bool // Consul is required by default
+	EnableVault bool // Vault is opt-in
+	EnableNomad bool // Nomad is opt-in
 
 	// Advanced options
 	DryRun       bool
@@ -232,7 +232,7 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 		{
 			Name:        "consul",
 			Description: "Installing and configuring Consul",
-			Required:    true,  // Consul is REQUIRED
+			Required:    true, // Consul is REQUIRED
 			RunFunc:     phaseConsul,
 			SkipIf: func(opts *BootstrapOptions) bool {
 				return opts.SkipConsul
@@ -241,19 +241,19 @@ func defineBootstrapPhases(clusterInfo *ClusterInfo) []BootstrapPhase {
 		{
 			Name:        "vault",
 			Description: "Installing and configuring Vault",
-			Required:    false,  // Vault is optional
+			Required:    false, // Vault is optional
 			RunFunc:     phaseVault,
 			SkipIf: func(opts *BootstrapOptions) bool {
-				return !opts.EnableVault  // Skip unless explicitly enabled
+				return !opts.EnableVault // Skip unless explicitly enabled
 			},
 		},
 		{
 			Name:        "nomad",
 			Description: "Installing and configuring Nomad",
-			Required:    false,  // Nomad is optional
+			Required:    false, // Nomad is optional
 			RunFunc:     phaseNomad,
 			SkipIf: func(opts *BootstrapOptions) bool {
-				return !opts.EnableNomad  // Skip unless explicitly enabled
+				return !opts.EnableNomad // Skip unless explicitly enabled
 			},
 		},
 		{
@@ -449,8 +449,8 @@ func phaseConsul(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluste
 			Mode:       "server", // Bootstrap always installs server mode
 			Datacenter: "dc1",
 			UI:         true,
-			BindAddr:   iface.IP,      // Use detected interface IP
-			ClientAddr: "0.0.0.0",     // Client can listen on all interfaces
+			BindAddr:   iface.IP,  // Use detected interface IP
+			ClientAddr: "0.0.0.0", // Client can listen on all interfaces
 			LogLevel:   "INFO",
 		}
 
@@ -668,7 +668,7 @@ func phaseClusterJoin(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *C
 		zap.String("role", string(info.MyRole)))
 
 	// Perform HashiCorp cluster health checks (Consul/Nomad)
-	consulAddr := fmt.Sprintf("localhost:%d", shared.PortConsul) // EOS Consul address (8161)
+	consulAddr := fmt.Sprintf("localhost:%d", shared.PortConsul) // Eos Consul address (8161)
 	healthResult, err := PerformHealthChecks(rc, consulAddr)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)

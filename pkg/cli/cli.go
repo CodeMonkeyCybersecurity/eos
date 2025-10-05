@@ -1,8 +1,8 @@
 // pkg/cli/cli.go
 //
-// # EOS CLI User Experience Abstraction System
+// # Eos CLI User Experience Abstraction System
 //
-// This package implements the abstracted user experience for EOS, where users
+// This package implements the abstracted user experience for Eos, where users
 // interact with a consistent `eos create X` interface regardless of the underlying
 // orchestration technology ( for infrastructure, Nomad for applications).
 //

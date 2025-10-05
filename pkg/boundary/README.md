@@ -401,4 +401,4 @@ eos create boundary --role controller --force
 
 ## License
 
-This implementation follows the same license as the EOS project.
+This implementation follows the same license as the Eos project.

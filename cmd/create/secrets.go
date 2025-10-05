@@ -4,7 +4,7 @@
 //
 // This file implements CLI commands for generating cryptographically secure
 // random secrets and managing secret storage. It provides a secure alternative
-// to manual secret generation and integrates with EOS Vault infrastructure.
+// to manual secret generation and integrates with Eos Vault infrastructure.
 //
 // Key Features:
 // - Cryptographically secure random secret generation
@@ -33,7 +33,7 @@
 //
 // # Automatic Secret and Environment Management
 //
-// EOS provides automatic secret generation and environment discovery to enable
+// Eos provides automatic secret generation and environment discovery to enable
 // ultra-simple service deployments. Instead of requiring manual configuration,
 // the system intelligently detects the environment and generates secure secrets
 // automatically.
@@ -100,7 +100,7 @@
 // - raw: Raw binary output (use with caution)
 //
 // Integration:
-// Integrates with EOS Vault infrastructure for secure secret storage:
+// Integrates with Eos Vault infrastructure for secure secret storage:
 // - Automatic Vault authentication using configured methods
 // - Secure secret storage with proper access controls
 // - Audit logging for secret generation and storage

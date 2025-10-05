@@ -42,7 +42,7 @@ Enhanced Options:
   --guided            Step-by-step guidance for beginners
   --verify            Verify existing bootstrap without changes
   --stop-conflicting  Automatically stop conflicting services
-  --continue          Continue with existing EOS installation
+  --continue          Continue with existing Eos installation
   --clean             Clean slate - remove existing services
   --reconfigure       Reconfigure existing services
   --force             Force bootstrap despite conflicts
@@ -70,7 +70,7 @@ Standard Options:
 	BootstrapCmd.Flags().Bool("verify", false, "Verify existing bootstrap without making changes")
 	BootstrapCmd.Flags().Bool("guided", false, "Use guided mode for beginners with step-by-step instructions")
 	BootstrapCmd.Flags().Bool("stop-conflicting", false, "Automatically stop conflicting services")
-	BootstrapCmd.Flags().Bool("continue", false, "Continue with existing EOS installation")
+	BootstrapCmd.Flags().Bool("continue", false, "Continue with existing Eos installation")
 	BootstrapCmd.Flags().Bool("clean", false, "Clean slate - remove existing services and start fresh")
 	BootstrapCmd.Flags().Bool("reconfigure", false, "Reconfigure existing services")
 
@@ -99,7 +99,7 @@ func runBootstrapAllTop(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	// FIXME: [P3] Using environment variable for state management is fragile
 	// Set environment variable to prevent bootstrap prompt recursion
 	os.Setenv("EOS_BOOTSTRAP_IN_PROGRESS", "1")
-	logger.Info("Set EOS_BOOTSTRAP_IN_PROGRESS=1 to prevent recursion")
+	logger.Info("Set Eos_BOOTSTRAP_IN_PROGRESS=1 to prevent recursion")
 
 	// Directly call the enhanced bootstrap function from bootstrap package
 	logger.Info("Calling enhanced bootstrap function")

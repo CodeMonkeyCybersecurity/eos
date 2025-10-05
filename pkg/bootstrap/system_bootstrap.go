@@ -3,7 +3,7 @@
 // Bootstrap System Improvements
 //
 // This file provides comprehensive bootstrap functionality with enhanced  and
-//  API setup. The EOS bootstrap system has been enhanced to ensure  and
+//  API setup. The Eos bootstrap system has been enhanced to ensure  and
 //  API are always set up together as part of the default bootstrap process.
 //
 // # Bootstrap System Improvements
@@ -12,7 +12,7 @@
 //
 // ### 1. Mandatory  API Setup
 // -  API is now marked as `Required: true` in the bootstrap phases
-// - The API setup is no longer optional - it's an essential component for EOS operations
+// - The API setup is no longer optional - it's an essential component for Eos operations
 // - Both  and  API are installed and configured in a single, comprehensive process
 //
 // ### 2. Comprehensive  Bootstrap
@@ -31,7 +31,7 @@
 // **Proper Configuration:**
 // - Configures  API with proper authentication
 // - Establishes secure communication channels
-// - Integrates with EOS service discovery
+// - Integrates with Eos service discovery
 //
 // ### 3. Enhanced Error Handling
 // - Comprehensive error messages with troubleshooting guidance

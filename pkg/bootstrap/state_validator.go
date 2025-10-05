@@ -2,7 +2,7 @@
 //
 // # Bootstrap State Validation Architecture
 //
-// The EOS bootstrap system uses **state-based validation** instead of arbitrary marker files.
+// The Eos bootstrap system uses **state-based validation** instead of arbitrary marker files.
 // This ensures the bootstrap is truly complete by verifying actual system state rather than
 // relying on the presence of checkpoint files.
 //
@@ -119,7 +119,6 @@ func checkConsulInstalled(rc *eos_io.RuntimeContext) (bool, string) {
 
 	return true, "unknown"
 }
-
 
 // validateConsulPhase checks if Consul is installed and running
 func validateConsulPhase(rc *eos_io.RuntimeContext) (bool, error) {

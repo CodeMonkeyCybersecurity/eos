@@ -175,7 +175,7 @@ func StartDiscoveryService(rc *eos_io.RuntimeContext) error {
 		logger.Warn("Failed to get local IP, using localhost", zap.Error(err))
 		consulAddr = fmt.Sprintf("localhost:%d", shared.PortConsul)
 	} else {
-		consulAddr = fmt.Sprintf("%s:%d", consulAddr, shared.PortConsul) // Add EOS Consul port (8161)
+		consulAddr = fmt.Sprintf("%s:%d", consulAddr, shared.PortConsul) // Add Eos Consul port (8161)
 	}
 
 	// Create systemd service for discovery

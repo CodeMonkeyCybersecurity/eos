@@ -1,4 +1,4 @@
-# EOS Auto-Commit Configuration
+# Eos Auto-Commit Configuration
 # This file controls the behavior of `eos self git commit`
 
 # Safety checks configuration

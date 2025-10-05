@@ -1,4 +1,4 @@
-# EOS Bootstrap Hardening Safety Guide
+# Eos Bootstrap Hardening Safety Guide
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 
@@ -21,7 +21,7 @@ For detailed bootstrap hardening safety documentation, see the inline comments i
 **User Consent:** ✅ INTERACTIVE CONSENT MECHANISMS OPERATIONAL  
 **Rollback Capabilities:** ✅ AUTOMATIC ROLLBACK ON FAILURES IMPLEMENTED
 
-The EOS bootstrap hardening safety system provides comprehensive safety mechanisms for Ubuntu security hardening with user consent, non-breaking design, and automatic rollback capabilities.
+The Eos bootstrap hardening safety system provides comprehensive safety mechanisms for Ubuntu security hardening with user consent, non-breaking design, and automatic rollback capabilities.
 
 ---
 

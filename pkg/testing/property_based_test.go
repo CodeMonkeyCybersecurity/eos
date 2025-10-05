@@ -1,4 +1,4 @@
-// pkg/testing/property_based_test.go - Property-based testing framework for EOS
+// pkg/testing/property_based_test.go - Property-based testing framework for Eos
 package testing
 
 import (

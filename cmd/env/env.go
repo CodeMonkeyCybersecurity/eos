@@ -8,7 +8,7 @@ import (
 var EnvCmd = &cobra.Command{
 	Use:   "env",
 	Short: "Manage deployment environments",
-	Long: `Manage deployment environments for the EOS CI/CD system.
+	Long: `Manage deployment environments for the Eos CI/CD system.
 
 Environments provide isolated contexts for deploying applications across different
 stages of your development lifecycle (development, staging, production, etc.).

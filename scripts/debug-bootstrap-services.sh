@@ -62,10 +62,10 @@ trace_service_mapping() {
     fi
 }
 
-echo "1. Checking ports used by EOS services..."
+echo "1. Checking ports used by Eos services..."
 echo "=========================================="
 
-# Check all EOS-related ports
+# Check all Eos-related ports
 ports=(4505 4506 8000 8200 8300 8301 8302 8500 8600 4646 4647 4648)
 for port in "${ports[@]}"; do
     if ss -tlnp 2>/dev/null | grep -q ":$port "; then
@@ -100,10 +100,10 @@ echo "4. Debugging bootstrap detection..."
 echo "==================================="
 
 # Set debug environment variable
-export EOS_LOG_LEVEL=debug
+export Eos_LOG_LEVEL=debug
 
 echo "To see detailed debug output during bootstrap, run:"
-echo -e "${YELLOW}  EOS_LOG_LEVEL=debug sudo eos bootstrap --dry-run${NC}"
+echo -e "${YELLOW}  Eos_LOG_LEVEL=debug sudo eos bootstrap --dry-run${NC}"
 echo
 echo "To test service stopping without actually stopping:"
 echo -e "${YELLOW}  sudo eos bootstrap --dry-run --stop-conflicting${NC}"

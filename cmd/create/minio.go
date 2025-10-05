@@ -12,7 +12,7 @@ import (
 var minioCmd = &cobra.Command{
 	Use:   "minio",
 	Short: "Deploy MinIO object storage to Nomad cluster",
-	Long: `Deploy MinIO object storage using the EOS framework's  → Terraform → Nomad workflow.
+	Long: `Deploy MinIO object storage using the Eos framework's  → Terraform → Nomad workflow.
 
 This command will:
 - Deploy MinIO using Terraform to manage Nomad jobs and Consul services

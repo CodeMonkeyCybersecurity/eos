@@ -10,7 +10,7 @@
 // - Cross-platform disk listing (Linux, macOS)
 // - Partition creation, formatting, and mounting
 // - Safety checks and validation
-// - Integration with EOS storage architecture
+// - Integration with Eos storage architecture
 // - Comprehensive logging and error handling
 //
 // Integration:
@@ -80,7 +80,7 @@ func (dm *DiskManagerImpl) ListDisks(rc *eos_io.RuntimeContext) (*DiskListResult
 		Timestamp: time.Now(),
 	}
 
-	logger.Info("Successfully listed disks", 
+	logger.Info("Successfully listed disks",
 		zap.Int("total_found", len(disks)),
 		zap.Int("after_filtering", len(filteredDisks)))
 
@@ -121,7 +121,7 @@ func (dm *DiskManagerImpl) ListPartitions(rc *eos_io.RuntimeContext, diskPath st
 		Timestamp:  time.Now(),
 	}
 
-	logger.Info("Successfully listed partitions", 
+	logger.Info("Successfully listed partitions",
 		zap.String("disk", diskPath),
 		zap.Int("partition_count", len(partitions)))
 
@@ -133,7 +133,7 @@ func (dm *DiskManagerImpl) CreatePartition(rc *eos_io.RuntimeContext, device str
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
 
-	logger.Info("Creating partition", 
+	logger.Info("Creating partition",
 		zap.String("device", device),
 		zap.String("filesystem", options.FileSystem),
 		zap.Bool("dry_run", options.DryRun))
@@ -167,7 +167,7 @@ func (dm *DiskManagerImpl) CreatePartition(rc *eos_io.RuntimeContext, device str
 			output = err.Error()
 		}
 	} else {
-		output = fmt.Sprintf("Would create %s partition on %s with filesystem %s", 
+		output = fmt.Sprintf("Would create %s partition on %s with filesystem %s",
 			options.PartitionType, device, options.FileSystem)
 	}
 
@@ -189,7 +189,7 @@ func (dm *DiskManagerImpl) CreatePartition(rc *eos_io.RuntimeContext, device str
 		return operation, err
 	}
 
-	logger.Info("Partition creation completed", 
+	logger.Info("Partition creation completed",
 		zap.String("device", device),
 		zap.Bool("dry_run", options.DryRun))
 
@@ -201,7 +201,7 @@ func (dm *DiskManagerImpl) FormatPartition(rc *eos_io.RuntimeContext, device str
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
 
-	logger.Info("Formatting partition", 
+	logger.Info("Formatting partition",
 		zap.String("device", device),
 		zap.String("filesystem", filesystem),
 		zap.String("label", label),
@@ -262,7 +262,7 @@ func (dm *DiskManagerImpl) FormatPartition(rc *eos_io.RuntimeContext, device str
 		return operation, err
 	}
 
-	logger.Info("Partition formatting completed", 
+	logger.Info("Partition formatting completed",
 		zap.String("device", device),
 		zap.String("filesystem", filesystem))
 
@@ -274,7 +274,7 @@ func (dm *DiskManagerImpl) MountPartition(rc *eos_io.RuntimeContext, device stri
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
 
-	logger.Info("Mounting partition", 
+	logger.Info("Mounting partition",
 		zap.String("device", device),
 		zap.String("mount_point", mountPoint),
 		zap.String("options", options),
@@ -329,7 +329,7 @@ func (dm *DiskManagerImpl) MountPartition(rc *eos_io.RuntimeContext, device stri
 		return operation, err
 	}
 
-	logger.Info("Partition mounting completed", 
+	logger.Info("Partition mounting completed",
 		zap.String("device", device),
 		zap.String("mount_point", mountPoint))
 

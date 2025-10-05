@@ -1,13 +1,13 @@
 // cmd/create/nomad.go
 //
-// HashiCorp Nomad Installation Commands
+// # HashiCorp Nomad Installation Commands
 //
 // This file implements CLI commands for installing and configuring HashiCorp Nomad
 // for workload orchestration. It provides a native installer that handles both
 // server and client modes with comprehensive configuration options.
 //
-// EOS Infrastructure Compiler Integration:
-// EOS acts as a human-friendly infrastructure compiler that translates imperative
+// Eos Infrastructure Compiler Integration:
+// Eos acts as a human-friendly infrastructure compiler that translates imperative
 // commands into declarative infrastructure state. The Nomad installer follows this
 // pattern by taking simple user intent ("install Nomad") and orchestrating the
 // complex multi-system setup required.
@@ -21,7 +21,7 @@
 // - Comprehensive flag support for all configuration options
 //
 // Architecture Integration:
-// Nomad fits into the EOS infrastructure stack as the container runtime layer:
+// Nomad fits into the Eos infrastructure stack as the container runtime layer:
 //
 // Available Commands:
 // - eos create nomad                              # Install as both server and client
@@ -43,14 +43,15 @@
 // - Docker: Container runtime for workloads
 //
 // Usage Examples:
-//   # Basic installation
-//   eos create nomad
 //
-//   # Production cluster setup
-//   eos create nomad --server --bootstrap-expect 3 --datacenter prod
+//	# Basic installation
+//	eos create nomad
 //
-//   # Client-only with Docker
-//   eos create nomad --client-only --docker --servers server1:4647,server2:4647
+//	# Production cluster setup
+//	eos create nomad --server --bootstrap-expect 3 --datacenter prod
+//
+//	# Client-only with Docker
+//	eos create nomad --client-only --docker --servers server1:4647,server2:4647
 //
 // Security Considerations:
 // - ACL system can be enabled for production deployments
@@ -156,7 +157,6 @@ type NomadStatus struct {
 	LastError      string
 }
 
-
 // runCreateNomadNative installs Nomad using the native installer
 func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -185,4 +185,3 @@ func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	logger.Info("terminal prompt: Nomad is installed. Check status with: nomad node status")
 	return nil
 }
-

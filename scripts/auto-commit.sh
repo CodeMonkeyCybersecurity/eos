@@ -1,5 +1,5 @@
 #!/bin/bash
-# Simple auto-commit script for EOS - Cross-platform compatible
+# Simple auto-commit script for Eos - Cross-platform compatible
 # Usage: ./scripts/auto-commit.sh [message]
 
 set -e
@@ -25,12 +25,12 @@ FORCE=${FORCE:-false}
 PUSH=${PUSH:-false}
 DRY_RUN=${DRY_RUN:-false}
 
-echo -e "${CYAN}🚀 EOS Auto-Commit Script${NC}"
+echo -e "${CYAN}🚀 Eos Auto-Commit Script${NC}"
 echo "=========================="
 
-# Check if we're in the EOS project root
+# Check if we're in the Eos project root
 if [ ! -f "go.mod" ] || ! grep -q "github.com/CodeMonkeyCybersecurity/eos" go.mod; then
-    echo -e "${RED}❌ Error: Must be run from EOS project root${NC}"
+    echo -e "${RED}❌ Error: Must be run from Eos project root${NC}"
     exit 1
 fi
 

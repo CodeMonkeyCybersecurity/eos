@@ -1,8 +1,8 @@
-# EOS Bootstrap System
+# Eos Bootstrap System
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 
-> The comprehensive documentation for the EOS Bootstrap System is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
+> The comprehensive documentation for the Eos Bootstrap System is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 
 ## Quick Reference
 
@@ -15,7 +15,7 @@ For detailed documentation, see the inline comments in these files:
 
 ## Overview
 
-The EOS bootstrap system ensures machines are properly prepared before deploying services. This prevents common errors like " state files not found" and ensures a consistent, secure foundation for all deployments.
+The Eos bootstrap system ensures machines are properly prepared before deploying services. This prevents common errors like " state files not found" and ensures a consistent, secure foundation for all deployments.
 
 ## Quick Start
 

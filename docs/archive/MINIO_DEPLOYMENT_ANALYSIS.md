@@ -205,4 +205,4 @@ Priority should be given to:
 3. Adding graceful Vault degradation
 4. Creating production-ready workarounds for resource and timing issues
 
-This approach will provide a robust, architecture-compliant MinIO deployment that follows EOS framework principles while handling real-world operational challenges.
+This approach will provide a robust, architecture-compliant MinIO deployment that follows Eos framework principles while handling real-world operational challenges.

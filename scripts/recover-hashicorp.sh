@@ -147,7 +147,7 @@ fix_consul() {
         check_port 8302 "Consul Serf WAN"
         check_port 8600 "Consul DNS"
 
-        # Also check EOS custom ports
+        # Also check Eos custom ports
         check_port 8161 "Consul (EOS custom)"
 
         # Test Consul API
@@ -182,7 +182,7 @@ fix_vault() {
         # Check standard Vault port
         check_port 8200 "Vault HTTP API"
 
-        # Also check EOS custom port
+        # Also check Eos custom port
         check_port 8179 "Vault (EOS custom HTTPS)"
 
         # Export VAULT_ADDR for CLI commands
@@ -236,7 +236,7 @@ fix_nomad() {
         check_port 4647 "Nomad RPC"
         check_port 4648 "Nomad Serf"
 
-        # Also check EOS custom ports
+        # Also check Eos custom ports
         check_port 8243 "Nomad (EOS custom)"
 
         # Test Nomad API

@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// EnsureInProjectRoot ensures we are in the EOS project root directory.
+// EnsureInProjectRoot ensures we are in the Eos project root directory.
 // It follows the Assess → Intervene → Evaluate pattern.
 func EnsureInProjectRoot(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -27,7 +27,7 @@ func EnsureInProjectRoot(rc *eos_io.RuntimeContext) error {
 	// Look for go.mod in current dir or walk up the tree
 	projectRoot, err := FindProjectRoot(currentDir)
 	if err != nil {
-		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("not in EOS project: %v", err))
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("not in Eos project: %v", err))
 	}
 
 	// INTERVENE - Change to project root if not already there
@@ -39,17 +39,17 @@ func EnsureInProjectRoot(rc *eos_io.RuntimeContext) error {
 	}
 
 	// EVALUATE - Verify we're in the correct directory
-	logger.Debug("Verified in EOS project root", zap.String("path", projectRoot))
+	logger.Debug("Verified in Eos project root", zap.String("path", projectRoot))
 	return nil
 }
 
-// FindProjectRoot finds the EOS project root directory by looking for go.mod.
-// It walks up the directory tree until it finds a go.mod file with the EOS module.
+// FindProjectRoot finds the Eos project root directory by looking for go.mod.
+// It walks up the directory tree until it finds a go.mod file with the Eos module.
 func FindProjectRoot(startDir string) (string, error) {
 	dir := startDir
 
 	for {
-		// Check for go.mod with EOS module
+		// Check for go.mod with Eos module
 		goModPath := filepath.Join(dir, "go.mod")
 		if _, err := os.Stat(goModPath); err == nil {
 			content, err := os.ReadFile(goModPath)
@@ -67,5 +67,5 @@ func FindProjectRoot(startDir string) (string, error) {
 		dir = parent
 	}
 
-	return "", fmt.Errorf("EOS project root not found (no go.mod with EOS module)")
+	return "", fmt.Errorf("EOS project root not found (no go.mod with Eos module)")
 }

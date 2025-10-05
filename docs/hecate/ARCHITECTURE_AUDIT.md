@@ -1,8 +1,8 @@
-# EOS Two-Layer Architecture Audit Report
+# Eos Two-Layer Architecture Audit Report
 
 ## Executive Summary
 
-This audit examines the EOS codebase to identify services that should follow the standardized Hecate two-layer reverse proxy architecture. The audit reveals several services with inconsistent proxy patterns that should be standardized.
+This audit examines the Eos codebase to identify services that should follow the standardized Hecate two-layer reverse proxy architecture. The audit reveals several services with inconsistent proxy patterns that should be standardized.
 
 ## Architecture Standard
 

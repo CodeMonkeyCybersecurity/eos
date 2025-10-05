@@ -10,7 +10,7 @@
 // - Automatic agent discovery and re-registration
 // - Batch processing for multiple agents
 // - Safety checks and validation
-// - Integration with existing EOS Wazuh infrastructure
+// - Integration with existing Eos Wazuh infrastructure
 // - Support for different authentication methods
 // - Dry-run capabilities for testing
 //
@@ -27,7 +27,7 @@
 // - Bulk agent management operations
 //
 // Integration:
-// This system builds on the existing EOS Wazuh functionality and leverages
+// This system builds on the existing Eos Wazuh functionality and leverages
 // the centralized version management system for consistency.
 
 package update
@@ -45,21 +45,21 @@ import (
 
 var (
 	// Operation mode flags
-	reRegister         bool
-	analyzeOnly        bool
-	forceUpgrade       bool
-	
+	reRegister   bool
+	analyzeOnly  bool
+	forceUpgrade bool
+
 	// Configuration flags
-	managerHost        string
-	managerPort        int
-	authPort           int
-	targetAgents       string
-	allAgents          bool
-	useWazuhPassword   bool
-	wazuhPassword      string
-	wazuhDryRun        bool
-	backupKeys         bool
-	concurrent         int
+	managerHost      string
+	managerPort      int
+	authPort         int
+	targetAgents     string
+	allAgents        bool
+	useWazuhPassword bool
+	wazuhPassword    string
+	wazuhDryRun      bool
+	backupKeys       bool
+	concurrent       int
 )
 
 var updateWazuhAgentsCmd = &cobra.Command{
@@ -67,7 +67,7 @@ var updateWazuhAgentsCmd = &cobra.Command{
 	Short: "Upgrade local Wazuh agent with comprehensive analysis and safety checks",
 	Long: `Upgrade the local Wazuh agent with comprehensive analysis and safety checks.
 
-This command provides robust analysis and management of Wazuh agents, following EOS 
+This command provides robust analysis and management of Wazuh agents, following Eos 
 principles of transparency and safety. It performs comprehensive checks including:
 - Current version detection and comparison with latest available
 - Platform and architecture identification  
@@ -122,12 +122,12 @@ Common Use Cases:
 
 		// Build configuration for agent upgrade (default action)
 		config := delphi.GetDefaultAgentUpgradeConfig()
-		
+
 		// Determine operation mode
 		if reRegister {
 			config.UpgradeAgent = false
 			config.ReRegisterOnly = true
-			
+
 			// Validate manager host requirement for re-registration
 			if managerHost == "" {
 				return fmt.Errorf("--manager flag is required when using --re-register")
@@ -161,7 +161,7 @@ Common Use Cases:
 			} else {
 				confirmMsg = fmt.Sprintf("Re-register agent with manager %s?", config.ManagerHost)
 			}
-			
+
 			confirmed := interaction.PromptYesNo(rc.Ctx, confirmMsg, false)
 			if !confirmed {
 				logger.Info("Operation cancelled by user")
@@ -188,14 +188,14 @@ Common Use Cases:
 			fmt.Printf("Upgrade Method: %s\n", result.Analysis.UpgradeMethod)
 			fmt.Printf("Risk Level: %s\n", result.Analysis.RiskLevel)
 			fmt.Printf("Repository Reachable: %t\n", result.Analysis.RepositoryReachable)
-			
+
 			if len(result.Analysis.ConnectivityIssues) > 0 {
 				fmt.Printf("\n⚠️  Connectivity Issues:\n")
 				for _, issue := range result.Analysis.ConnectivityIssues {
 					fmt.Printf("  - %s\n", issue)
 				}
 			}
-			
+
 			if len(result.Analysis.Prerequisites) > 0 {
 				fmt.Printf("\n📋 Prerequisites:\n")
 				for _, prereq := range result.Analysis.Prerequisites {

@@ -1,14 +1,14 @@
 // pkg/users/management.go
 //
-// # EOS User Management System
+// # Eos User Management System
 //
-// This package provides comprehensive user management capabilities for EOS
+// This package provides comprehensive user management capabilities for Eos
 // infrastructure. It handles system user creation, SSH key management, sudo
 // configuration, and integrates with the HashiCorp stack for modern user
 // management patterns.
 //
 // Architecture Decision:
-// Following the EOS  to HashiCorp migration, user management operations
+// Following the Eos  to HashiCorp migration, user management operations
 // are handled through administrator escalation patterns. System-level user
 // operations require administrator intervention rather than allowing the
 // HashiCorp stack to perform privileged operations directly.

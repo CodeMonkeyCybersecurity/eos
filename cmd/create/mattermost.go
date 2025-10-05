@@ -2,15 +2,15 @@
 //
 // # Mattermost Team Collaboration Platform Deployment
 //
-// This file implements CLI commands for deploying Mattermost using EOS's
+// This file implements CLI commands for deploying Mattermost using Eos's
 // infrastructure compiler pattern. It orchestrates the complete deployment
 // stack including container orchestration, service discovery, and secure
 // credential management.
 //
-// EOS Infrastructure Compiler Integration:
-// This deployment follows EOS's core philosophy of translating simple human
+// Eos Infrastructure Compiler Integration:
+// This deployment follows Eos's core philosophy of translating simple human
 // intent ("deploy Mattermost") into complex multi-system orchestration:
-// Human Intent → EOS CLI →  → Terraform → Nomad → Mattermost
+// Human Intent → Eos CLI →  → Terraform → Nomad → Mattermost
 //
 // Key Features:
 // - Complete Mattermost deployment with automatic configuration

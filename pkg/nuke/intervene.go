@@ -296,7 +296,7 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 	}
 
 	// Remove Eos resources (but not the binary itself)
-	// EOS resources removed - no longer needed
+	// Eos resources removed - no longer needed
 	// if !excluded["eos"] {
 	// 	logger.Info("Removing Eos resources")
 	// 	if err := eos.RemoveEosResources(rc, keepData); err != nil {

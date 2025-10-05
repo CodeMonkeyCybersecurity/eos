@@ -1,7 +1,7 @@
 #  Removal & Simplification Plan
 
 ## Overview
-This document outlines the strategy to remove  from the EOS infrastructure and replace it with simpler, more maintainable solutions for on-premises Linux fleet disk management.
+This document outlines the strategy to remove  from the Eos infrastructure and replace it with simpler, more maintainable solutions for on-premises Linux fleet disk management.
 
 ## Current State Analysis
 
@@ -34,12 +34,12 @@ This document outlines the strategy to remove  from the EOS infrastructure and r
 - systemd timers for monitoring and auto-resize
 
 ### Option 2: Direct Go Implementation (EOS Native)
-**Best for:** Tight integration with existing EOS codebase
+**Best for:** Tight integration with existing Eos codebase
 
 **Advantages:**
 - No external dependencies
 - Native Go error handling and logging
-- Consistent with EOS patterns
+- Consistent with Eos patterns
 - Real-time operations
 
 **Implementation:**
@@ -117,7 +117,7 @@ module "storage_vm" {
 }
 ```
 
-### EOS CLI Usage
+### Eos CLI Usage
 ```bash
 # Create local storage volume
 eos create storage-local data-vol /dev/sdb \

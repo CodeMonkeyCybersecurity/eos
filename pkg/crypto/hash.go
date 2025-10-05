@@ -11,6 +11,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // ----------------------------
@@ -18,32 +20,35 @@ import (
 // ----------------------------
 
 func ConfirmHashedInputs(rc *eos_io.RuntimeContext, reader *bufio.Reader, keyLabel string, count int, tokenLabel string, expectedHashes []string, expectedTokenHash string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	for {
-		fmt.Printf("Please re-enter %d unique keys and the token to confirm.\n", count)
+		logger.Info("terminal prompt: Please re-enter unique keys and token to confirm",
+			zap.Int("key_count", count))
 
 		keys, err := interaction.ReadLines(rc, reader, keyLabel, count)
 		if err != nil {
-			fmt.Println(" Error reading keys:", err)
+			logger.Warn("Error reading keys", zap.Error(err))
 			continue
 		}
 
 		token, err := interaction.ReadLine(rc.Ctx, reader, tokenLabel)
 		if err != nil {
-			fmt.Println(" Error reading token:", err)
+			logger.Warn("Error reading token", zap.Error(err))
 			continue
 		}
 
 		if !AllUnique(keys) {
-			fmt.Println("Keys must be unique. Try again.")
+			logger.Warn("Keys must be unique, try again")
 			continue
 		}
 
 		if !AllHashesPresent(HashStrings(keys), expectedHashes) || HashString(token) != expectedTokenHash {
-			fmt.Println(" One or more values are incorrect. Try again.")
+			logger.Warn("One or more values are incorrect, try again")
 			continue
 		}
 
-		fmt.Println(" Confirmation successful.")
+		logger.Info("Confirmation successful")
 		return nil
 	}
 }

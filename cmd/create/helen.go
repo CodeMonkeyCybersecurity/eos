@@ -2,7 +2,7 @@
 //
 // # Helen Integration Specifications
 //
-// Helen is a dual-mode website deployment platform within the EOS infrastructure
+// Helen is a dual-mode website deployment platform within the Eos infrastructure
 // compiler framework. It supports both static website hosting and full Ghost CMS
 // deployments, all orchestrated through Nomad and exposed via the Hecate reverse proxy.
 //
@@ -10,7 +10,7 @@
 //
 // ## Architecture
 //
-// Helen follows the EOS dual-layer architecture:
+// Helen follows the Eos dual-layer architecture:
 //
 // - **Infrastructure Layer ()**: Manages prerequisites like Docker, Nomad, Consul
 // - **Application Layer (Nomad)**: Deploys Helen as containerized workload

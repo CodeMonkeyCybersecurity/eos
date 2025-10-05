@@ -53,7 +53,7 @@
 // Integration:
 // The created configuration integrates with the centralized version management
 // system to control how Wazuh versions are selected and updated across your
-// infrastructure. All EOS Wazuh deployment commands will respect these policies.
+// infrastructure. All Eos Wazuh deployment commands will respect these policies.
 //
 // Configuration Storage:
 // Settings are stored in ~/.eos/wazuh-version-config.json and can be modified
@@ -66,10 +66,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )

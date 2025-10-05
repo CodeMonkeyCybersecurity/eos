@@ -1,6 +1,6 @@
 // pkg/sizing/requirements_database.go
 //
-// Systematic Hardware Requirements Calculator
+// # Systematic Hardware Requirements Calculator
 //
 // This package implements a methodical, documented system for calculating hardware
 // requirements based on researched specifications from official sources, replacing
@@ -10,7 +10,7 @@
 //
 // ## Problem Statement
 //
-// Previously, EOS used estimated hardware requirements without clear documentation
+// Previously, Eos used estimated hardware requirements without clear documentation
 // of how those numbers were derived. This led to:
 //
 // - **Unreliable sizing**: Requirements were guesswork rather than based on documented specifications
@@ -27,18 +27,20 @@
 // Every component has researched requirements with source attribution:
 //
 // ```go
-// "postgresql_16": {
-//     Component: "PostgreSQL 16",
-//     Version:   "16.x",
-//     ServiceReqs: ServiceRequirements{
-//         CPU:     CPURequirement{MinCores: 2, RecommendedCores: 4},
-//         Memory:  MemoryRequirement{MinMB: 1024, RecommendedMB: 4096},
-//         Storage: StorageRequirement{MinGB: 20, RecommendedGB: 100},
-//     },
-//     References: []RequirementReference{
-//         {Source: "PostgreSQL Official Documentation", URL: "https://www.postgresql.org/docs/16/"},
-//     },
-// }
+//
+//	"postgresql_16": {
+//	    Component: "PostgreSQL 16",
+//	    Version:   "16.x",
+//	    ServiceReqs: ServiceRequirements{
+//	        CPU:     CPURequirement{MinCores: 2, RecommendedCores: 4},
+//	        Memory:  MemoryRequirement{MinMB: 1024, RecommendedMB: 4096},
+//	        Storage: StorageRequirement{MinGB: 20, RecommendedGB: 100},
+//	    },
+//	    References: []RequirementReference{
+//	        {Source: "PostgreSQL Official Documentation", URL: "https://www.postgresql.org/docs/16/"},
+//	    },
+//	}
+//
 // ```
 //
 // ### 2. Transparent Calculations
@@ -78,13 +80,12 @@
 // - ✅ Transparent calculation methodology operational
 // - ✅ Flexible sizing options with scaling factors active
 // - ✅ Source attribution and version tracking implemented
-// - ✅ Integration with EOS deployment system operational
+// - ✅ Integration with Eos deployment system operational
 //
 // For detailed sizing implementation, see:
 // - pkg/sizing/calculator.go - Hardware requirements calculation engine
 // - pkg/sizing/scaling.go - Workload scaling and optimization logic
 // - pkg/bootstrap/ - Integration with bootstrap system for sizing validation
-//
 package sizing
 
 import (
@@ -105,18 +106,18 @@ type SystemRequirements struct {
 
 // OSRequirements represents base operating system requirements
 type OSRequirements struct {
-	CPU     CPURequirement    `json:"cpu"`
-	Memory  MemoryRequirement `json:"memory"`
+	CPU     CPURequirement     `json:"cpu"`
+	Memory  MemoryRequirement  `json:"memory"`
 	Storage StorageRequirement `json:"storage"`
 	Network NetworkRequirement `json:"network,omitempty"`
 }
 
 // CPURequirement represents CPU specifications
 type CPURequirement struct {
-	MinCores     float64 `json:"min_cores"`
+	MinCores         float64 `json:"min_cores"`
 	RecommendedCores float64 `json:"recommended_cores"`
-	Architecture string  `json:"architecture"` // "x86_64", "arm64", etc.
-	Type         string  `json:"type,omitempty"` // "general", "compute", "burstable"
+	Architecture     string  `json:"architecture"`   // "x86_64", "arm64", etc.
+	Type             string  `json:"type,omitempty"` // "general", "compute", "burstable"
 }
 
 // MemoryRequirement represents memory specifications
@@ -130,11 +131,11 @@ type MemoryRequirement struct {
 
 // StorageRequirement represents storage specifications
 type StorageRequirement struct {
-	MinGB        float64 `json:"min_gb"`
+	MinGB         float64 `json:"min_gb"`
 	RecommendedGB float64 `json:"recommended_gb"`
-	Type         string  `json:"type"` // "ssd", "nvme", "hdd"
-	IOPS         int     `json:"iops,omitempty"`
-	Throughput   int     `json:"throughput_mbps,omitempty"`
+	Type          string  `json:"type"` // "ssd", "nvme", "hdd"
+	IOPS          int     `json:"iops,omitempty"`
+	Throughput    int     `json:"throughput_mbps,omitempty"`
 }
 
 // NetworkRequirement represents network specifications
@@ -146,16 +147,16 @@ type NetworkRequirement struct {
 
 // ScalingFactors define how requirements scale with load
 type ScalingFactors struct {
-	UserScaling     float64 `json:"user_scaling"`     // Additional resources per concurrent user
-	RequestScaling  float64 `json:"request_scaling"`  // Additional resources per request/second
-	DataScaling     float64 `json:"data_scaling"`     // Additional storage per GB of data
-	LoadMultiplier  float64 `json:"load_multiplier"`  // Multiplier for peak load scenarios
-	SafetyMargin    float64 `json:"safety_margin"`    // Safety margin (1.5 = 50% buffer)
+	UserScaling    float64 `json:"user_scaling"`    // Additional resources per concurrent user
+	RequestScaling float64 `json:"request_scaling"` // Additional resources per request/second
+	DataScaling    float64 `json:"data_scaling"`    // Additional storage per GB of data
+	LoadMultiplier float64 `json:"load_multiplier"` // Multiplier for peak load scenarios
+	SafetyMargin   float64 `json:"safety_margin"`   // Safety margin (1.5 = 50% buffer)
 }
 
 // RequirementReference provides source documentation for requirements
 type RequirementReference struct {
-	Source      string `json:"source"`      // "official_docs", "community", "measured"
+	Source      string `json:"source"` // "official_docs", "community", "measured"
 	URL         string `json:"url,omitempty"`
 	Description string `json:"description"`
 	Date        string `json:"date,omitempty"`
@@ -168,7 +169,7 @@ const (
 	WorkloadDevelopment WorkloadType = "development"
 	WorkloadProduction  WorkloadType = "production"
 	WorkloadSmall       WorkloadType = "small"
-	WorkloadMedium      WorkloadType = "medium" 
+	WorkloadMedium      WorkloadType = "medium"
 	WorkloadLarge       WorkloadType = "large"
 )
 
@@ -182,7 +183,7 @@ var RequirementsDatabase = map[string]SystemRequirements{
 				MinCores:         1.0,
 				RecommendedCores: 2.0,
 				Architecture:     "x86_64",
-				Type:            "general",
+				Type:             "general",
 			},
 			Memory: MemoryRequirement{
 				MinGB:         1.5,
@@ -219,15 +220,15 @@ var RequirementsDatabase = map[string]SystemRequirements{
 				Name: "Caddy Reverse Proxy",
 				Type: ServiceTypeProxy,
 				BaseRequirements: ResourceRequirements{
-					CPU:    CPURequirements{Cores: 1.0, Type: "general"},
-					Memory: MemoryRequirements{GB: 1.0, Type: "standard"},
-					Disk:   DiskRequirements{GB: 20, Type: "ssd"},
+					CPU:     CPURequirements{Cores: 1.0, Type: "general"},
+					Memory:  MemoryRequirements{GB: 1.0, Type: "standard"},
+					Disk:    DiskRequirements{GB: 20, Type: "ssd"},
 					Network: NetworkRequirements{BandwidthMbps: 1000, PublicIP: true},
 				},
 			},
 		},
 		ScalingFactors: ScalingFactors{
-			UserScaling:    0.0001, // Very lightweight per user
+			UserScaling:    0.0001,  // Very lightweight per user
 			RequestScaling: 0.00001, // Very lightweight per request
 			LoadMultiplier: 1.5,     // Can handle burst traffic well
 			SafetyMargin:   1.3,     // 30% safety margin
@@ -264,11 +265,11 @@ var RequirementsDatabase = map[string]SystemRequirements{
 			},
 		},
 		ScalingFactors: ScalingFactors{
-			UserScaling:    0.01,   // 10MB memory per concurrent user
-			RequestScaling: 0.001,  // Additional CPU per request/second
-			DataScaling:    1.0,    // 1:1 storage scaling with data
-			LoadMultiplier: 2.0,    // Database can be I/O intensive
-			SafetyMargin:   1.5,    // 50% safety margin for production
+			UserScaling:    0.01,  // 10MB memory per concurrent user
+			RequestScaling: 0.001, // Additional CPU per request/second
+			DataScaling:    1.0,   // 1:1 storage scaling with data
+			LoadMultiplier: 2.0,   // Database can be I/O intensive
+			SafetyMargin:   1.5,   // 50% safety margin for production
 		},
 		References: []RequirementReference{
 			{
@@ -303,14 +304,14 @@ var RequirementsDatabase = map[string]SystemRequirements{
 			},
 		},
 		ScalingFactors: ScalingFactors{
-			UserScaling:    0.001,  // 1MB memory per concurrent user for session cache
-			DataScaling:    1.5,    // Redis overhead on stored data
-			LoadMultiplier: 1.3,    // Memory-based, handles load well
-			SafetyMargin:   1.3,    // 30% safety margin for memory headroom
+			UserScaling:    0.001, // 1MB memory per concurrent user for session cache
+			DataScaling:    1.5,   // Redis overhead on stored data
+			LoadMultiplier: 1.3,   // Memory-based, handles load well
+			SafetyMargin:   1.3,   // 30% safety margin for memory headroom
 		},
 		References: []RequirementReference{
 			{
-				Source:      "official_docs", 
+				Source:      "official_docs",
 				URL:         "https://redis.io/docs/latest/operate/rs/installing-upgrading/install/plan-deployment/hardware-requirements/",
 				Description: "Redis Enterprise hardware requirements documentation",
 				Date:        "2025-01-19",
@@ -333,9 +334,9 @@ var RequirementsDatabase = map[string]SystemRequirements{
 				Name: "Authentik SSO + Dependencies",
 				Type: ServiceType("sso"),
 				BaseRequirements: ResourceRequirements{
-					CPU:    CPURequirements{Cores: 2.0, Type: "general"},                    // Official minimum from Authentik docs
-					Memory: MemoryRequirements{GB: 4.0, Type: "standard"},                  // 2GB Authentik (official) + 1.5GB PostgreSQL + 0.5GB Redis (lightweight)
-					Disk:   DiskRequirements{GB: 30, Type: "ssd"},                          // 10GB Authentik + 15GB PostgreSQL + 5GB Redis
+					CPU:    CPURequirements{Cores: 2.0, Type: "general"},  // Official minimum from Authentik docs
+					Memory: MemoryRequirements{GB: 4.0, Type: "standard"}, // 2GB Authentik (official) + 1.5GB PostgreSQL + 0.5GB Redis (lightweight)
+					Disk:   DiskRequirements{GB: 30, Type: "ssd"},         // 10GB Authentik + 15GB PostgreSQL + 5GB Redis
 				},
 			},
 		},

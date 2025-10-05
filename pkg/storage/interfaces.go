@@ -1,8 +1,8 @@
 // pkg/storage/interfaces.go
 //
-// EOS Storage Management System - Core Interfaces and Architecture
+// # Eos Storage Management System - Core Interfaces and Architecture
 //
-// This package provides comprehensive storage management for EOS with a focus on
+// This package provides comprehensive storage management for Eos with a focus on
 // safety, performance, and multi-backend support. It implements a unified interface
 // for managing various storage technologies while maintaining strong type safety
 // and comprehensive monitoring capabilities.
@@ -28,7 +28,7 @@
 // - CephFS: Distributed storage for cluster environments
 // - Local: Direct filesystem operations
 //
-// # EOS Granular Storage Management Design
+// # Eos Granular Storage Management Design
 //
 // ## Core Design Principles
 //
@@ -43,7 +43,7 @@
 //
 // ```
 // ┌─────────────────────────────────────────────────────────────┐
-// │                    EOS Storage Manager                       │
+// │                    Eos Storage Manager                       │
 // ├─────────────────────────────────────────────────────────────┤
 // │  Plugin Registry  │  Metrics Engine  │  Safety Controller  │
 // ├─────────────────────────────────────────────────────────────┤
@@ -102,21 +102,22 @@
 // - Performance optimization recommendations
 //
 // Usage Examples:
-//   // Create storage manager
-//   manager := storage.NewManager(storage.Config{
-//       Backend: storage.BackendLVM,
-//       SafetyChecks: true,
-//   })
 //
-//   // Create volume with safety checks
-//   volume, err := manager.CreateVolume(ctx, storage.VolumeConfig{
-//       Name: "data-volume",
-//       Size: "100GB",
-//       Type: storage.VolumeTypeData,
-//   })
+//	// Create storage manager
+//	manager := storage.NewManager(storage.Config{
+//	    Backend: storage.BackendLVM,
+//	    SafetyChecks: true,
+//	})
+//
+//	// Create volume with safety checks
+//	volume, err := manager.CreateVolume(ctx, storage.VolumeConfig{
+//	    Name: "data-volume",
+//	    Size: "100GB",
+//	    Type: storage.VolumeTypeData,
+//	})
 //
 // Integration:
-// - EOS Infrastructure Compiler: Translates user intent to storage operations
+// - Eos Infrastructure Compiler: Translates user intent to storage operations
 // - HashiCorp Stack: Application-level storage orchestration
 // - Nomad: Container storage management and allocation
 // - Consul: Service discovery for distributed storage

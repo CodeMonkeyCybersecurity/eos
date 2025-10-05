@@ -1,5 +1,5 @@
 # Storage Operations Configuration
-# Default configuration for EOS storage management
+# Default configuration for Eos storage management
 
 storage:
   monitor:

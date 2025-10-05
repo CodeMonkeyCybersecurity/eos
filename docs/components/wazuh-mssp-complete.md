@@ -3368,7 +3368,7 @@ tracer:
 ```bash
 #!/bin/bash
 # modules/wazuh-mssp/scripts/eos-wazuh-ccs.sh
-# EOS integration script for Wazuh MSSP platform
+# Eos integration script for Wazuh MSSP platform
 
 set -euo pipefail
 

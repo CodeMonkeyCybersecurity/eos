@@ -334,22 +334,22 @@ func validatePorts(rc *eos_io.RuntimeContext, ports []int) error {
 		service := sm.getServiceFromPort(port)
 
 		if service != nil {
-			// Port is in use - check if it's an EOS-managed service
+			// Port is in use - check if it's an Eos-managed service
 			if service.Managed {
-				logger.Debug("Port in use by EOS-managed service",
+				logger.Debug("Port in use by Eos-managed service",
 					zap.Int("port", port),
 					zap.String("service", service.Name),
 					zap.Bool("managed", service.Managed))
-				// This is fine - EOS service using the port
+				// This is fine - Eos service using the port
 				continue
 			}
 
-			// Also check if it's a known EOS service by name (belt and suspenders)
+			// Also check if it's a known Eos service by name (belt and suspenders)
 			eosServices := []string{"-master", "-api", "vault", "consul", "nomad"}
 			isEOSService := false
 			for _, eosService := range eosServices {
 				if service.Name == eosService {
-					logger.Debug("Port in use by known EOS service",
+					logger.Debug("Port in use by known Eos service",
 						zap.Int("port", port),
 						zap.String("service", service.Name))
 					isEOSService = true
@@ -374,7 +374,7 @@ func validatePorts(rc *eos_io.RuntimeContext, ports []int) error {
 	return nil
 }
 
-// getEOSServicePorts returns a map of EOS services and their ports
+// getEOSServicePorts returns a map of Eos services and their ports
 func getEOSServicePorts() map[string][]int {
 	return map[string][]int{
 		"-master": {4505, 4506},

@@ -12,7 +12,7 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 - **Sustainable innovation**: Maintainable code, comprehensive documentation, iterative improvement, response ready, incorporates recent research and best practice. Solve problems once, encode in Eos, never solve again
 - **Collaboration and listening**: adversarial collaboration, transparent decision making, ownership accountability responsibility, open source, codesign
 
-**Iterative Philosophy**: Shells is built iteratively. We build on what exists, solve complex problems once, encode them in Shells, and never solve them again. Each improvement makes the next one easier. 
+**Iterative Philosophy**: Eos is built iteratively. We build on what exists, solve complex problems once, encode them in Eos, and never solve them again. Each improvement makes the next one easier. 
 
 ## 🚨 CRITICAL RULES (P0 - Breaking)
 
@@ -105,7 +105,7 @@ cmd/[verb]/          # Orchestration only
   ├── delete/        # Removal commands
   ├── list/          # Listing commands
   ├── backup/        # Backup operations
-  ├── self/          # Shells self-management
+  ├── self/          # Eos self-management
   ├── build/         # Build operations
   ├── deploy/        # Deployment commands
   ├── promote/       # Promotion workflows
@@ -414,7 +414,7 @@ logger.Debug("Post-operation verification",
 - Use inline comments for tactical notes
 - **Inline notation is strongly preferred** - documentation should be available at the exact place in the code where it's needed
 - Build iteratively on existing patterns
-- Solve complex problems once, encode in Shells, never solve again
+- Solve complex problems once, encode in Eos, never solve again
 
 ## External References
 
@@ -426,7 +426,7 @@ logger.Debug("Post-operation verification",
 
 ## License Awareness
 
-Shells is dual-licensed:
+Eos is dual-licensed:
 - GNU Affero General Public License v3 (AGPL-3.0-or-later)
 - Do No Harm License
 

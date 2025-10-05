@@ -9,7 +9,7 @@
 For detailed architecture documentation, see the inline comments in these files:
 
 - **Nomad Job Generation**: `pkg/nomad/job_generator.go` - Complete three-layer architecture guide and orchestration patterns
-- **Infrastructure Compiler**: `pkg/bootstrap/check.go` - EOS infrastructure compiler pattern implementation
+- **Infrastructure Compiler**: `pkg/bootstrap/check.go` - Eos infrastructure compiler pattern implementation
 - **Service Orchestration**: `pkg/orchestrator/` - Multi-layer orchestration coordination
 - **Container Management**: `pkg/nomad/` - Nomad job specifications and deployment patterns
 

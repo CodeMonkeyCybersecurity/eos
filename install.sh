@@ -301,7 +301,7 @@ check_libvirt_deps() {
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
       log ERR " Missing REQUIRED libvirt dependencies: ${missing_deps[*]}"
-      log ERR " EOS requires libvirt development libraries to build"
+      log ERR " Eos requires libvirt development libraries to build"
 
       # Only auto-install if running as root
       if [[ "$EUID" -eq 0 ]]; then
@@ -331,8 +331,8 @@ check_libvirt_deps() {
       log INFO " All required libvirt dependencies are satisfied"
     fi
   elif $IS_MAC; then
-    log ERR " EOS cannot be built on macOS - libvirt is required and not available on macOS"
-    log ERR " EOS is designed to run on Linux servers only"
+    log ERR " Eos cannot be built on macOS - libvirt is required and not available on macOS"
+    log ERR " Eos is designed to run on Linux servers only"
     exit 1
   fi
 }
@@ -428,7 +428,7 @@ build_eos_binary() {
   # but double-check here for safety
   if ! command -v pkg-config >/dev/null 2>&1 || ! pkg-config --exists libvirt 2>/dev/null; then
     log ERR " Libvirt development libraries not found - this should have been caught earlier"
-    log ERR " Cannot build EOS without libvirt. Please run: sudo apt-get install libvirt-dev libvirt-daemon-system pkg-config"
+    log ERR " Cannot build Eos without libvirt. Please run: sudo apt-get install libvirt-dev libvirt-daemon-system pkg-config"
     exit 1
   fi
 

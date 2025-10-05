@@ -11,7 +11,7 @@ import (
 var gitCmd = &cobra.Command{
 	Use:   "git",
 	Short: "Git automation commands",
-	Long: `Git automation commands for the EOS project.
+	Long: `Git automation commands for the Eos project.
 
 Provides intelligent automation for common git operations while maintaining
 safety and security standards.`,

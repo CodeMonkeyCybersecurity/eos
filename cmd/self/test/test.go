@@ -12,7 +12,7 @@ import (
 var TestCmd = &cobra.Command{
 	Use:     "test",
 	Short:   "Commands for testing and validation",
-	Long:    "Commands for running tests, fuzz tests, and validation across the EOS codebase.",
+	Long:    "Commands for running tests, fuzz tests, and validation across the Eos codebase.",
 	Aliases: []string{"t"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for test command.", zap.String("command", cmd.Use))

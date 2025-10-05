@@ -1,8 +1,8 @@
-# EOS Infrastructure Compiler
+# Eos Infrastructure Compiler
 
 > **📝 Documentation has been moved inline with the code for better maintainability.**
 > 
-> The comprehensive documentation for the EOS Infrastructure Compiler is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
+> The comprehensive documentation for the Eos Infrastructure Compiler is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 
 ## Quick Reference
 
