@@ -209,7 +209,7 @@ func init() {
 	CreateVaultCmd.Flags().String("storage-backend", "file", "Storage backend (file, consul, raft)")
 	CreateVaultCmd.Flags().Bool("ui", true, "Enable web UI")
 	CreateVaultCmd.Flags().String("listener-address", "0.0.0.0:8200", "Listener address")
-	CreateVaultCmd.Flags().Bool("tls", true, "Enable TLS")
+	CreateVaultCmd.Flags().Bool("tls", false, "Enable TLS (requires cert/key files)")
 	CreateVaultCmd.Flags().Bool("auto-unseal", false, "Enable auto-unseal")
 	CreateVaultCmd.Flags().String("kms-key", "", "KMS key ID for auto-unseal")
 	CreateVaultCmd.Flags().Bool("clean", false, "Clean install (remove existing)")

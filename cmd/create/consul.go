@@ -45,8 +45,11 @@ CONFIGURATION:
 • Consul Connect enabled for service mesh
 
 EXAMPLES:
-  # Install Consul using APT repository (recommended)
+  # Install Consul server using APT repository (recommended)
   eos create consul
+
+  # Install Consul client (agent mode)
+  eos create consul --client
 
   # Install specific version via binary download
   eos create consul --binary --version 1.17.1
@@ -73,6 +76,8 @@ var (
 	consulClean      bool
 	consulBinary     bool
 	consulVersion    string
+	consulServer     bool
+	consulClient     bool
 )
 
 func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -89,8 +94,16 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		logger.Debug("System not bootstrapped, continuing with Consul installation")
 	}
 
+	// Determine server/client mode
+	serverMode := consulServer
+	if !consulServer && !consulClient {
+		// Default to server mode if neither flag is specified
+		serverMode = true
+	}
+
 	logger.Info("Starting native Consul installation",
 		zap.String("datacenter", consulDatacenter),
+		zap.Bool("server_mode", serverMode),
 		zap.Bool("vault_integration", !consulNoVault),
 		zap.Bool("use_binary", consulBinary),
 		zap.String("version", consulVersion))
@@ -99,7 +112,7 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	installConfig := &consul.InstallConfig{
 		Version:          consulVersion,
 		Datacenter:       consulDatacenter,
-		ServerMode:       true,
+		ServerMode:       serverMode,
 		BootstrapExpect:  1,
 		UIEnabled:        true,
 		ConnectEnabled:   true,
@@ -144,6 +157,10 @@ func getConsulLogLevel(debug bool) string {
 func init() {
 	CreateConsulCmd.Flags().StringVarP(&consulDatacenter, "datacenter", "d", "dc1",
 		"Datacenter name for Consul cluster")
+	CreateConsulCmd.Flags().BoolVar(&consulServer, "server", false,
+		"Install as Consul server (default if neither --server nor --client specified)")
+	CreateConsulCmd.Flags().BoolVar(&consulClient, "client", false,
+		"Install as Consul client (agent mode)")
 	CreateConsulCmd.Flags().BoolVar(&consulNoVault, "no-vault-integration", false,
 		"Disable automatic Vault integration")
 	CreateConsulCmd.Flags().BoolVar(&consulDebug, "debug", false,

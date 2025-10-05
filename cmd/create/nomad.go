@@ -93,6 +93,8 @@ Examples:
 var (
 	nomadServerMode      bool
 	nomadClientMode      bool
+	nomadServerOnly      bool
+	nomadClientOnly      bool
 	nomadBootstrapExpect int
 	nomadDatacenter      string
 	nomadRegion          string
@@ -114,8 +116,8 @@ func init() {
 	// Server/Client mode flags
 	CreateNomadCmd.Flags().BoolVar(&nomadServerMode, "server", true, "Enable server mode")
 	CreateNomadCmd.Flags().BoolVar(&nomadClientMode, "client", true, "Enable client mode")
-	CreateNomadCmd.Flags().BoolVar(&nomadServerMode, "server-only", false, "Server mode only")
-	CreateNomadCmd.Flags().BoolVar(&nomadClientMode, "client-only", false, "Client mode only")
+	CreateNomadCmd.Flags().BoolVar(&nomadServerOnly, "server-only", false, "Server mode only (disables client)")
+	CreateNomadCmd.Flags().BoolVar(&nomadClientOnly, "client-only", false, "Client mode only (disables server)")
 
 	// Cluster configuration
 	CreateNomadCmd.Flags().IntVar(&nomadBootstrapExpect, "bootstrap-expect", 1, "Expected number of servers in cluster")
@@ -162,11 +164,24 @@ func runCreateNomadNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Nomad using native installer")
 
+	// Determine actual server/client modes based on flags
+	serverEnabled := nomadServerMode
+	clientEnabled := nomadClientMode
+
+	if nomadServerOnly {
+		serverEnabled = true
+		clientEnabled = false
+	}
+	if nomadClientOnly {
+		serverEnabled = false
+		clientEnabled = true
+	}
+
 	// Parse configuration from flags
 	config := &nomad.InstallConfig{
 		Version:           "latest",
-		ServerEnabled:     nomadServerMode,
-		ClientEnabled:     nomadClientMode,
+		ServerEnabled:     serverEnabled,
+		ClientEnabled:     clientEnabled,
 		Datacenter:        nomadDatacenter,
 		Region:            nomadRegion,
 		BootstrapExpect:   nomadBootstrapExpect,

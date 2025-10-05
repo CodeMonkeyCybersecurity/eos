@@ -500,16 +500,32 @@ func (vi *VaultInstaller) configure() error {
 }`, vi.config.KMSKeyID)
 	}
 
+	// Generate listener configuration based on TLS setting
+	var listenerConfig string
+	if vi.config.TLSEnabled {
+		// TLS enabled - would require cert/key files (not yet implemented)
+		// For now, this path shouldn't be reached since default is TLS disabled
+		vi.logger.Warn("TLS enabled but cert generation not yet implemented - using self-signed certs would go here")
+		listenerConfig = fmt.Sprintf(`listener "tcp" {
+  address     = "%s"
+  tls_disable = false
+  # TODO: Add tls_cert_file and tls_key_file when cert generation is implemented
+}`, vi.config.ListenerAddress)
+	} else {
+		// TLS disabled - simpler configuration
+		listenerConfig = fmt.Sprintf(`listener "tcp" {
+  address     = "%s"
+  tls_disable = true
+}`, vi.config.ListenerAddress)
+	}
+
 	// Generate complete configuration
 	config := fmt.Sprintf(`# Vault configuration managed by Eos
 %s
 
 %s
 
-listener "tcp" {
-  address     = "%s"
-  tls_disable = %t
-}
+%s
 
 api_addr     = "%s"
 cluster_addr = "%s"
@@ -519,8 +535,8 @@ disable_mlock = %t
 
 log_level = "%s"
 log_format = "json"
-`, storageConfig, sealConfig, vi.config.ListenerAddress,
-		!vi.config.TLSEnabled, vi.config.APIAddr, vi.config.ClusterAddr,
+`, storageConfig, sealConfig, listenerConfig,
+		vi.config.APIAddr, vi.config.ClusterAddr,
 		vi.config.UIEnabled, vi.config.DisableMlock, vi.config.LogLevel)
 
 	// Write configuration
