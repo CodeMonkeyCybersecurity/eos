@@ -11,10 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
-func ConfigureKVMBridge() error {
+func ConfigureKVMBridge(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	if os.Geteuid() != 0 {
 		return fmt.Errorf("must be run as root to configure netplan bridge")
 	}
@@ -31,7 +34,7 @@ func ConfigureKVMBridge() error {
 	// Check if a bridge already exists
 	existing, err := exec.Command("ip", "link", "show", "br0").CombinedOutput()
 	if err == nil && strings.Contains(string(existing), "br0") {
-		fmt.Println(" br0 already exists; skipping bridge creation.")
+		logger.Info("br0 bridge already exists, skipping creation")
 		return nil
 	}
 
@@ -64,7 +67,7 @@ func ConfigureKVMBridge() error {
 		return fmt.Errorf("failed to apply netplan: %w\nOutput: %s", err, string(out))
 	}
 
-	fmt.Println(" br0 bridge configured and applied.")
+	logger.Info("br0 bridge configured and applied successfully")
 	return nil
 }
 

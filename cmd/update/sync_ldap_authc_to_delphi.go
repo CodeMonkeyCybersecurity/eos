@@ -37,11 +37,11 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 			return fmt.Errorf("failed to download LDAP cert: %w", err)
 		}
 
-		if err := delphi.PatchConfigYML(cfg); err != nil {
+		if err := delphi.PatchConfigYML(rc, cfg); err != nil {
 			return fmt.Errorf("failed to patch config.yml: %w", err)
 		}
 
-		if err := delphi.PatchRolesMappingYML(cfg); err != nil {
+		if err := delphi.PatchRolesMappingYML(rc, cfg); err != nil {
 			return fmt.Errorf("failed to patch roles_mapping.yml: %w", err)
 		}
 

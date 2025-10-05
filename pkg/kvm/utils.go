@@ -10,11 +10,16 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // SetLibvirtACL sets ACL permissions for libvirt on a directory
-func SetLibvirtACL(dir string) {
-	fmt.Println("Setting libvirt ACL on directory:", dir)
+func SetLibvirtACL(rc *eos_io.RuntimeContext, dir string) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Setting libvirt ACL on directory", zap.String("path", dir))
 	cmd := exec.Command("setfacl", "-R", "-m", "u:libvirt-qemu:rx", dir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

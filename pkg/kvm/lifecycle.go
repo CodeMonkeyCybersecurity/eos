@@ -20,22 +20,23 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func InstallKVM() error {
+func InstallKVM(rc *eos_io.RuntimeContext) error {
 	if platform.IsCommandAvailable("apt") {
-		return runInstall("apt-get update && apt-get install -y qemu-system-x86 libvirt-daemon-system libvirt-clients bridge-utils virt-manager virt-viewer")
+		return runInstall(rc, "apt-get update && apt-get install -y qemu-system-x86 libvirt-daemon-system libvirt-clients bridge-utils virt-manager virt-viewer")
 	}
 	if platform.IsCommandAvailable("dnf") {
-		return runInstall("dnf install -y qemu-system-x86 libvirt libvirt-devel virt-install bridge-utils virt-viewer")
+		return runInstall(rc, "dnf install -y qemu-system-x86 libvirt libvirt-devel virt-install bridge-utils virt-viewer")
 	}
 	if platform.IsCommandAvailable("yum") {
-		return runInstall("yum install -y qemu-system-x86 libvirt libvirt-devel virt-install bridge-utils virt-viewer")
+		return runInstall(rc, "yum install -y qemu-system-x86 libvirt libvirt-devel virt-install bridge-utils virt-viewer")
 	}
 	return fmt.Errorf("no supported package manager found (apt, dnf, yum)")
 }
 
 // runInstall runs the given install command with stdout/stderr streaming.
-func runInstall(cmd string) error {
-	fmt.Println(" Installing KVM and dependencies...")
+func runInstall(rc *eos_io.RuntimeContext, cmd string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing KVM and dependencies")
 	c := exec.Command("bash", "-c", cmd)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -43,15 +44,16 @@ func runInstall(cmd string) error {
 }
 
 // EnsureLibvirtd ensures libvirtd is started and enabled.
-func EnsureLibvirtd() error {
-	fmt.Println(" Ensuring libvirtd service is running...")
+func EnsureLibvirtd(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Ensuring libvirtd service is running")
 	if err := exec.Command("systemctl", "start", "libvirtd").Run(); err != nil {
 		return fmt.Errorf("failed to start libvirtd: %w", err)
 	}
 	if err := exec.Command("systemctl", "enable", "libvirtd").Run(); err != nil {
 		return fmt.Errorf("failed to enable libvirtd: %w", err)
 	}
-	fmt.Println(" libvirtd is active and enabled.")
+	logger.Info("libvirtd is active and enabled")
 	return nil
 }
 
@@ -97,7 +99,7 @@ func checkVMExists(name string) bool {
 
 func runKickstartProvisioning(rc *eos_io.RuntimeContext, vmName string) error {
 
-	if err := ConfigureKVMBridge(); err != nil {
+	if err := ConfigureKVMBridge(rc); err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("Bridge setup failed; VM may not have external networking", zap.Error(err))
 	}
 
@@ -188,7 +190,7 @@ func RunCreateKvmInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	autostartExplicit := cmd.Flags().Changed("autostart")
 
 	otelzap.Ctx(rc.Ctx).Info(" Installing KVM and libvirt packages...")
-	if err := InstallKVM(); err != nil {
+	if err := InstallKVM(rc); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to install KVM", zap.Error(err))
 		return err
 	}
@@ -196,14 +198,14 @@ func RunCreateKvmInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	if enableBridge {
 		otelzap.Ctx(rc.Ctx).Info("  Configuring network bridge...")
-		if err := ConfigureKVMBridge(); err != nil {
+		if err := ConfigureKVMBridge(rc); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to configure network bridge", zap.Error(err))
 			return err
 		}
 		otelzap.Ctx(rc.Ctx).Info(" Network bridge configured")
 	}
 
-	if err := EnsureLibvirtd(); err != nil {
+	if err := EnsureLibvirtd(rc); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("libvirtd failed to start", zap.Error(err))
 		return err
 	}
@@ -211,7 +213,7 @@ func RunCreateKvmInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	isoDir := resolveIsoDir(rc, nonInteractive, isoOverride)
 	if info, err := os.Stat(isoDir); err == nil && info.IsDir() {
 		otelzap.Ctx(rc.Ctx).Info(" Setting ACL for ISO directory", zap.String("path", isoDir))
-		SetLibvirtACL(isoDir)
+		SetLibvirtACL(rc, isoDir)
 	} else {
 		otelzap.Ctx(rc.Ctx).Warn("ISO directory not found or invalid", zap.String("path", isoDir))
 	}

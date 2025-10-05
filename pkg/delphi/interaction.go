@@ -10,27 +10,27 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // ConfirmConfig allows the user to review and optionally edit the current config.
 func ConfirmConfig(rc *eos_io.RuntimeContext, cfg *Config) *Config {
-	fmt.Println("Current configuration:")
-	fmt.Printf("  Protocol:      %s\n", cfg.Protocol)
-	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
-	fmt.Printf("  Port:          %s\n", cfg.Port)
-	fmt.Printf("  APIUser:       %s\n", cfg.APIUser)
+	logger := otelzap.Ctx(rc.Ctx)
 
-	if ShowSecrets {
-		fmt.Printf("  APIPassword:   %s\n", cfg.APIPassword)
-	} else {
-		fmt.Printf("  APIPassword:   ********\n")
-	}
+	// Log configuration for review
+	logger.Info("Current configuration",
+		zap.String("protocol", cfg.Protocol),
+		zap.String("fqdn", cfg.FQDN),
+		zap.String("port", cfg.Port),
+		zap.String("api_user", cfg.APIUser),
+		zap.Bool("show_secrets", ShowSecrets),
+		zap.String("latest_version", cfg.LatestVersion))
 
-	fmt.Printf("  LatestVersion: %s\n", cfg.LatestVersion)
-
+	logger.Info("terminal prompt: Are these values correct? (y/n)")
 	answer := strings.ToLower(interaction.PromptInput(rc.Ctx, "Are these values correct? (y/n)", "y"))
 	if answer != "y" {
-		fmt.Println("Enter new values (press Enter to keep the current value):")
+		logger.Info("terminal prompt: Enter new values (press Enter to keep current)")
 
 		newVal := interaction.PromptInput(rc.Ctx, fmt.Sprintf("Protocol [%s]", cfg.Protocol), cfg.Protocol)
 		if newVal != "" {
@@ -54,7 +54,7 @@ func ConfirmConfig(rc *eos_io.RuntimeContext, cfg *Config) *Config {
 
 		pw, err := crypto.PromptPassword(rc, "API Password")
 		if err != nil {
-			fmt.Printf(" Failed to read password: %v\n", err)
+			logger.Error("Failed to read password", zap.Error(err))
 			os.Exit(1)
 		}
 		if pw != "" {
@@ -67,10 +67,10 @@ func ConfirmConfig(rc *eos_io.RuntimeContext, cfg *Config) *Config {
 		}
 
 		if err := WriteConfig(rc, cfg); err != nil {
-			fmt.Printf(" Error saving configuration: %v\n", err)
+			logger.Error("Error saving configuration", zap.Error(err))
 			os.Exit(1)
 		}
-		fmt.Println(" Configuration updated.")
+		logger.Info("Configuration updated successfully")
 	}
 	return cfg
 }

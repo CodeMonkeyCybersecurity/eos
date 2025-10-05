@@ -57,7 +57,7 @@ func RunInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *DatabaseManage
 	logger.Info("Executing Vault setup")
 
 	if err := manager.SetupVaultPostgreSQL(rc, options); err != nil {
-		return fmt.Errorf("Vault setup failed: %w", err)
+		return fmt.Errorf("vault setup failed: %w", err)
 	}
 
 	// EVALUATE - Display success message

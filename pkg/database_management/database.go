@@ -15,15 +15,15 @@ import (
 // GetDatabaseStatus retrieves database status information following Assess → Intervene → Evaluate pattern
 func GetDatabaseStatus(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*DatabaseStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	// ASSESS
-	logger.Info("Assessing database status request",
-		zap.String("database", config.Database),
-		zap.String("type", string(config.Type)))
 
+	// ASSESS - Check for nil config first (SA5011: prevent nil pointer dereference)
 	if config == nil {
 		return nil, fmt.Errorf("database config cannot be nil")
 	}
+
+	logger.Info("Assessing database status request",
+		zap.String("database", config.Database),
+		zap.String("type", string(config.Type)))
 
 	// INTERVENE
 	logger.Info("Getting database status", zap.String("database", config.Database))

@@ -10,6 +10,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/go-ldap/ldap/v3"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // Connect returns a default LDAP connection using autodiscovered config
@@ -23,12 +25,16 @@ func Connect(rc *eos_io.RuntimeContext) (*ldap.Conn, error) {
 
 // ConnectWithConfig tries all discovery methods to return an active LDAP connection
 func ConnectWithConfig(rc *eos_io.RuntimeContext) (*ldap.Conn, *LDAPConfig, error) {
+	logger := otelzap.Ctx(rc.Ctx)
 	cfg, source, err := ReadConfig(rc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not load LDAP config: %w", err)
 	}
 
-	fmt.Printf(" Connecting to LDAP via %s config (%s:%d)...\n", source, cfg.FQDN, cfg.Port)
+	logger.Info("Connecting to LDAP",
+		zap.String("source", source),
+		zap.String("fqdn", cfg.FQDN),
+		zap.Int("port", cfg.Port))
 
 	addr := fmt.Sprintf("ldap://%s:%d", cfg.FQDN, cfg.Port)
 	var conn *ldap.Conn
@@ -49,12 +55,13 @@ func ConnectWithConfig(rc *eos_io.RuntimeContext) (*ldap.Conn, *LDAPConfig, erro
 	if err != nil {
 		// Check the error return from conn.Close() when binding fails.
 		if cerr := conn.Close(); cerr != nil {
-			fmt.Printf("failed to close LDAP connection after bind failure: %v\n", cerr)
+			logger.Warn("Failed to close LDAP connection after bind failure", zap.Error(cerr))
 		}
 		return nil, nil, fmt.Errorf("failed to bind to LDAP as %s: %w", cfg.BindDN, err)
 	}
 
-	fmt.Println(" Connected and bound to LDAP successfully.")
+	logger.Info("Connected and bound to LDAP successfully",
+		zap.String("bind_dn", cfg.BindDN))
 	return conn, cfg, nil
 }
 

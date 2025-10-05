@@ -16,6 +16,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
 	"github.com/go-ldap/ldap/v3"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -80,7 +82,8 @@ func DownloadAndPlaceCert(fqdn string) error {
 	return cmd.Run()
 }
 
-func PatchConfigYML(cfg *LDAPConfig) error {
+func PatchConfigYML(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	configPath := "/etc/wazuh-indexer/opensearch-security/config.yml"
 	backupPath := configPath + ".bak"
 
@@ -90,7 +93,9 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 	}
 
 	if len(raw) < 10 {
-		fmt.Println(" Warning: config.yml appears to be mostly empty. Proceeding anyway.")
+		logger.Warn("config.yml appears to be mostly empty, proceeding anyway",
+			zap.String("path", configPath),
+			zap.Int("size_bytes", len(raw)))
 	}
 
 	var root map[string]interface{}
@@ -178,18 +183,20 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 	if err := os.WriteFile(backupPath, raw, 0644); err != nil {
 		return fmt.Errorf("failed to write backup of config.yml: %w", err)
 	}
-	fmt.Printf("🧾 Backup created: %s\n", backupPath)
+	logger.Info("Backup created", zap.String("path", backupPath))
 
 	// Write patched config
 	if err := os.WriteFile(configPath, out, 0644); err != nil {
 		return fmt.Errorf("failed to write config.yml: %w", err)
 	}
 
-	fmt.Println(" Patched config.yml with LDAP authc/authz blocks.")
+	logger.Info("Patched config.yml with LDAP authc/authz blocks successfully",
+		zap.String("path", configPath))
 	return nil
 }
 
-func PatchRolesMappingYML(cfg *LDAPConfig) error {
+func PatchRolesMappingYML(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	path := "/etc/wazuh-indexer/opensearch-security/roles_mapping.yml"
 	backupPath := path + ".bak"
 
@@ -199,7 +206,9 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 	}
 
 	if len(raw) < 10 {
-		fmt.Println(" Warning: roles_mapping.yml appears to be mostly empty. Proceeding anyway.")
+		logger.Warn("roles_mapping.yml appears to be mostly empty, proceeding anyway",
+			zap.String("path", path),
+			zap.Int("size_bytes", len(raw)))
 	}
 
 	var data map[string]interface{}
@@ -233,13 +242,14 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 	if err := os.WriteFile(backupPath, raw, 0644); err != nil {
 		return fmt.Errorf("failed to write backup of roles_mapping.yml: %w", err)
 	}
-	fmt.Printf("🧾 Backup created: %s\n", backupPath)
+	logger.Info("Backup created", zap.String("path", backupPath))
 
 	if err := os.WriteFile(path, out, 0644); err != nil {
 		return fmt.Errorf("failed to write roles_mapping.yml: %w", err)
 	}
 
-	fmt.Println(" Patched roles_mapping.yml with admin + readonly mappings.")
+	logger.Info("Patched roles_mapping.yml with admin + readonly mappings successfully",
+		zap.String("path", path))
 	return nil
 }
 
