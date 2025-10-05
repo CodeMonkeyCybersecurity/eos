@@ -241,16 +241,14 @@ func (om *OrchestratedVMManager) createVMWithVirsh(vmName, _ /* ip */, cloudInit
 	userDataPath := filepath.Join(workDir, "user-data")
 	metaDataPath := filepath.Join(workDir, "meta-data")
 
-	// Write user-data
-	writeCmd := exec.Command("bash", "-c", fmt.Sprintf("echo '%s' > %s", cloudInit, userDataPath))
-	if err := writeCmd.Run(); err != nil {
+	// SECURITY P0 #1: Use os.WriteFile instead of shell to prevent command injection
+	if err := os.WriteFile(userDataPath, []byte(cloudInit), 0644); err != nil {
 		return fmt.Errorf("failed to write user-data: %w", err)
 	}
 
 	// Write meta-data
 	metaData := fmt.Sprintf("instance-id: %s\nlocal-hostname: %s\n", vmName, vmName)
-	writeMetaCmd := exec.Command("bash", "-c", fmt.Sprintf("echo '%s' > %s", metaData, metaDataPath))
-	if err := writeMetaCmd.Run(); err != nil {
+	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
 		return fmt.Errorf("failed to write meta-data: %w", err)
 	}
 

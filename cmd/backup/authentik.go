@@ -112,6 +112,13 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		}
 		url = input
 	}
+
+	// Auto-add https:// if no protocol specified
+	if url != "" && !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		url = "https://" + url
+		logger.Info("Added https:// prefix to URL", zap.String("url", url))
+	}
+
 	if token == "" {
 		input, err := eos_io.PromptSecurePassword(rc, "Enter Authentik API token: ")
 		if err != nil {
@@ -124,10 +131,19 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		return eos_err.NewUserError("Authentik URL and token are required")
 	}
 
-	// Determine output file
+	// Determine output file - default to /mnt for centralized backup storage
 	if output == "" {
 		timestamp := time.Now().Format("20060102-150405")
-		output = fmt.Sprintf("authentik-backup-%s.%s", timestamp, format)
+		backupDir := "/mnt/eos-backups/authentik"
+
+		// Create backup directory if it doesn't exist
+		if err := os.MkdirAll(backupDir, 0755); err != nil {
+			logger.Warn("Failed to create /mnt backup directory, using current directory",
+				zap.Error(err))
+			output = fmt.Sprintf("authentik-backup-%s.%s", timestamp, format)
+		} else {
+			output = filepath.Join(backupDir, fmt.Sprintf("authentik-backup-%s.%s", timestamp, format))
+		}
 	}
 
 	// Create backup directory if needed

@@ -1,12 +1,13 @@
 package dev_environment
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -225,14 +226,27 @@ func InstallClaudeExtension(rc *eos_io.RuntimeContext, config *Config) error {
 // Helper functions
 
 func generatePassword() string {
-	// Simple password generation - you might want to use a more secure method
-	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
-	password := make([]byte, 16)
-	for i := range password {
-		password[i] = chars[time.Now().UnixNano()%int64(len(chars))]
-		time.Sleep(time.Nanosecond * 100) // Small delay for better randomness
+	// SECURITY P0 #2: Use crypto/rand instead of time-based generation
+	// Delegate to existing crypto.GeneratePassword which uses crypto/rand properly
+	password, err := crypto.GeneratePassword(16)
+	if err != nil {
+		// Fallback: generate from crypto/rand directly
+		const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+		passwordBytes := make([]byte, 16)
+		randomBytes := make([]byte, 16)
+
+		if _, readErr := rand.Read(randomBytes); readErr != nil {
+			// This should never happen, but if it does, panic is appropriate
+			// as we cannot generate secure passwords
+			panic(fmt.Sprintf("crypto/rand failed: %v", readErr))
+		}
+
+		for i, b := range randomBytes {
+			passwordBytes[i] = chars[int(b)%len(chars)]
+		}
+		return string(passwordBytes)
 	}
-	return string(password)
+	return password
 }
 
 func getServerIPAddresses(rc *eos_io.RuntimeContext) ([]string, error) {

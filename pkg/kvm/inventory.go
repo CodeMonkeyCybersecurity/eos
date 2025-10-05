@@ -340,13 +340,26 @@ func getVMIPs(domain *libvirt.Domain) []string {
 
 // getIPFromMAC attempts to find IP address for a given MAC address
 func getIPFromMAC(mac string) string {
-	// Try ARP cache first
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("arp -an | grep -i %s | awk '{print $2}' | tr -d '()'", mac))
+	// SECURITY P0 #3: Validate MAC address format to prevent command injection
+	macRegex := regexp.MustCompile(`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`)
+	if !macRegex.MatchString(mac) {
+		return "" // Invalid MAC format, refuse to process
+	}
+
+	// Try ARP cache first - use arp command directly, parse output in Go
+	cmd := exec.Command("arp", "-an")
 	output, err := cmd.Output()
 	if err == nil && len(output) > 0 {
-		ip := strings.TrimSpace(string(output))
-		if ip != "" {
-			return ip
+		// Parse ARP output safely in Go instead of shell pipeline
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(strings.ToLower(line), strings.ToLower(mac)) {
+				// Extract IP from format: hostname (192.168.1.1) at aa:bb:cc:dd:ee:ff
+				ipRegex := regexp.MustCompile(`\(([0-9.]+)\)`)
+				if matches := ipRegex.FindStringSubmatch(line); len(matches) > 1 {
+					return matches[1]
+				}
+			}
 		}
 	}
 
