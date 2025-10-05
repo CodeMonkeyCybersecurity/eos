@@ -177,6 +177,27 @@ func ShutdownDomain(ctx context.Context, vmName string) error {
 	return nil
 }
 
+// SetDomainAutostart sets the autostart flag for a VM
+func SetDomainAutostart(ctx context.Context, vmName string, autostart bool) error {
+	conn, err := libvirt.NewConnect("qemu:///system")
+	if err != nil {
+		return fmt.Errorf("failed to connect to libvirt: %w", err)
+	}
+	defer conn.Close()
+
+	domain, err := conn.LookupDomainByName(vmName)
+	if err != nil {
+		return fmt.Errorf("domain not found: %w", err)
+	}
+	defer domain.Free()
+
+	if err := domain.SetAutostart(autostart); err != nil {
+		return fmt.Errorf("failed to set autostart: %w", err)
+	}
+
+	return nil
+}
+
 // ListAllDomains returns all domain names
 func ListAllDomains(ctx context.Context) ([]string, error) {
 	conn, err := libvirt.NewConnect("qemu:///system")
