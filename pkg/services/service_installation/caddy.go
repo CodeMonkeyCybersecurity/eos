@@ -3,6 +3,9 @@ package service_installation
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -56,11 +59,31 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 	}
 	step2Start := time.Now()
 
-	// Download and add GPG key
-	cmd := exec.Command("bash", "-c", "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg")
+	// SECURITY P0 FIX: Download GPG key without shell piping
+	resp, err := http.Get("https://dl.cloudsmith.io/public/caddy/stable/gpg.key")
+	if err != nil {
+		step2.Status = "failed"
+		step2.Error = fmt.Sprintf("Failed to download GPG key: %v", err)
+		step2.Duration = time.Since(step2Start)
+		result.Steps = append(result.Steps, step2)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		step2.Status = "failed"
+		step2.Error = fmt.Sprintf("Failed to download GPG key: HTTP %d", resp.StatusCode)
+		step2.Duration = time.Since(step2Start)
+		result.Steps = append(result.Steps, step2)
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	// Run gpg --dearmor with stdin from downloaded key
+	cmd := exec.Command("gpg", "--dearmor", "-o", "/usr/share/keyrings/caddy-stable-archive-keyring.gpg")
+	cmd.Stdin = resp.Body
 	if err := cmd.Run(); err != nil {
 		step2.Status = "failed"
-		step2.Error = fmt.Sprintf("Failed to add GPG key: %v", err)
+		step2.Error = fmt.Sprintf("Failed to import GPG key: %v", err)
 		step2.Duration = time.Since(step2Start)
 		result.Steps = append(result.Steps, step2)
 		return err
@@ -78,11 +101,39 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 	}
 	step3Start := time.Now()
 
-	// Add repository source
-	cmd = exec.Command("bash", "-c", "curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list")
-	if err := cmd.Run(); err != nil {
+	// SECURITY P0 FIX: Download and write repository source without shell piping
+	resp2, err := http.Get("https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt")
+	if err != nil {
 		step3.Status = "failed"
-		step3.Error = fmt.Sprintf("Failed to add repository: %v", err)
+		step3.Error = fmt.Sprintf("Failed to download repository config: %v", err)
+		step3.Duration = time.Since(step3Start)
+		result.Steps = append(result.Steps, step3)
+		return err
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode != http.StatusOK {
+		step3.Status = "failed"
+		step3.Error = fmt.Sprintf("Failed to download repository config: HTTP %d", resp2.StatusCode)
+		step3.Duration = time.Since(step3Start)
+		result.Steps = append(result.Steps, step3)
+		return fmt.Errorf("HTTP %d", resp2.StatusCode)
+	}
+
+	// Write directly to file (no shell piping)
+	repoFile, err := os.Create("/etc/apt/sources.list.d/caddy-stable.list")
+	if err != nil {
+		step3.Status = "failed"
+		step3.Error = fmt.Sprintf("Failed to create repository file: %v", err)
+		step3.Duration = time.Since(step3Start)
+		result.Steps = append(result.Steps, step3)
+		return err
+	}
+	defer repoFile.Close()
+
+	if _, err := io.Copy(repoFile, resp2.Body); err != nil {
+		step3.Status = "failed"
+		step3.Error = fmt.Sprintf("Failed to write repository file: %v", err)
 		step3.Duration = time.Since(step3Start)
 		result.Steps = append(result.Steps, step3)
 		return err
@@ -142,7 +193,7 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 
 	// Use standardized service manager for consistent service operations
 	serviceManager := serviceutil.NewServiceManager(rc)
-	
+
 	if err := serviceManager.Enable("caddy"); err != nil {
 		logger.Warn("Failed to enable Caddy service", zap.Error(err))
 	}

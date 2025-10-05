@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -755,11 +756,36 @@ func (vi *VaultInstaller) getLatestVersion() (string, error) {
 // Helper methods for various operations
 
 func (vi *VaultInstaller) checkMemory() error {
-	// Use runtime.MemStats for cross-platform memory checking
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
+	// BUG FIX: Read SYSTEM memory, not Go runtime memory
+	// runtime.MemStats.Sys only shows Go runtime heap, not total RAM
 
-	totalMB := m.Sys / 1024 / 1024
+	// Read /proc/meminfo on Linux for actual system memory
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		// If we can't read meminfo, don't block installation
+		vi.logger.Warn("Could not check system memory, proceeding anyway", zap.Error(err))
+		return nil
+	}
+
+	// Parse MemTotal from /proc/meminfo
+	// Format: "MemTotal:       16384000 kB"
+	lines := strings.Split(string(data), "\n")
+	var totalKB int64
+	for _, line := range lines {
+		if strings.HasPrefix(line, "MemTotal:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				totalKB, _ = strconv.ParseInt(fields[1], 10, 64)
+				break
+			}
+		}
+	}
+
+	totalMB := totalKB / 1024
+	vi.logger.Info("System memory detected",
+		zap.Int64("total_mb", totalMB),
+		zap.Int64("required_mb", 256))
+
 	if totalMB < 256 {
 		return fmt.Errorf("insufficient memory: %dMB (minimum 256MB required)", totalMB)
 	}

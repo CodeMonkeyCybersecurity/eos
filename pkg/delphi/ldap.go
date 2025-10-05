@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -72,14 +73,31 @@ func PromptLDAPDetails(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 }
 
 func DownloadAndPlaceCert(fqdn string) error {
+	// SECURITY P0 FIX: Removed shell piping, use direct command execution with output file
 
-	cmd := exec.Command("bash", "-c", fmt.Sprintf(
-		`echo -n | openssl s_client -connect %s:636 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /etc/wazuh-indexer/opensearch-security/ldapcacert.pem`,
-		fqdn,
-	))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	// Run openssl s_client to get certificate
+	cmd := exec.Command("openssl", "s_client", "-connect", fqdn+":636")
+	cmd.Stdin = strings.NewReader("") // Empty input (equivalent to echo -n)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to connect to LDAP server: %w", err)
+	}
+
+	// Extract certificate from output (find BEGIN CERTIFICATE to END CERTIFICATE)
+	outputStr := string(output)
+	startIdx := strings.Index(outputStr, "-----BEGIN CERTIFICATE-----")
+	endIdx := strings.Index(outputStr, "-----END CERTIFICATE-----")
+
+	if startIdx == -1 || endIdx == -1 {
+		return fmt.Errorf("no certificate found in openssl output")
+	}
+
+	// Extract certificate including end marker
+	cert := outputStr[startIdx : endIdx+len("-----END CERTIFICATE-----")]
+
+	// Write directly to file (no shell redirection)
+	return os.WriteFile("/etc/wazuh-indexer/opensearch-security/ldapcacert.pem", []byte(cert), 0600)
 }
 
 func PatchConfigYML(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
@@ -256,10 +274,18 @@ func PatchRolesMappingYML(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
 func RunSecurityAdmin(filename string) error {
 	path := filepath.Join("/etc/wazuh-indexer/opensearch-security", filename)
 
-	cmd := exec.Command("bash", "-c", fmt.Sprintf(
-		`export JAVA_HOME=/usr/share/wazuh-indexer/jdk/ && bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f %s -icl -key /etc/wazuh-indexer/certs/admin-key.pem -cert /etc/wazuh-indexer/certs/admin.pem -cacert /etc/wazuh-indexer/certs/root-ca.pem -h 127.0.0.1 -nhnv`,
-		path,
-	))
+	// SECURITY P0 FIX: No shell wrapper, execute script directly with proper env
+	cmd := exec.Command("/usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh",
+		"-f", path,
+		"-icl",
+		"-key", "/etc/wazuh-indexer/certs/admin-key.pem",
+		"-cert", "/etc/wazuh-indexer/certs/admin.pem",
+		"-cacert", "/etc/wazuh-indexer/certs/root-ca.pem",
+		"-h", "127.0.0.1",
+		"-nhnv")
+
+	// Set JAVA_HOME environment variable
+	cmd.Env = append(os.Environ(), "JAVA_HOME=/usr/share/wazuh-indexer/jdk/")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

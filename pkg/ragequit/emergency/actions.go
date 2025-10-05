@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -153,10 +154,16 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 	}
 
 	// Email notification if mail is configured
-	if system.CommandExists("mail") || system.CommandExists("sendmail") {
-		// Try to send email to root
-		emailCmd := exec.Command("sh", "-c",
-			fmt.Sprintf("echo '%s' | mail -s 'RAGEQUIT: %s' root", message, hostname))
+	// SECURITY P0 FIX: Removed shell execution to prevent command injection
+	if system.CommandExists("mail") {
+		// Send email using direct command execution (no shell)
+		emailCmd := exec.Command("mail", "-s", fmt.Sprintf("RAGEQUIT: %s", hostname), "root")
+		emailCmd.Stdin = strings.NewReader(message)
+		emailCmd.Run() // Errors logged below
+	} else if system.CommandExists("sendmail") {
+		// Fallback to sendmail
+		emailCmd := exec.Command("sendmail", "root")
+		emailCmd.Stdin = strings.NewReader(fmt.Sprintf("Subject: RAGEQUIT: %s\n\n%s", hostname, message))
 		emailCmd.Run()
 	}
 

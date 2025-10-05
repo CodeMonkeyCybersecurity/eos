@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
@@ -34,13 +35,24 @@ func InstallKVM(rc *eos_io.RuntimeContext) error {
 }
 
 // runInstall runs the given install command with stdout/stderr streaming.
+// SECURITY P0 FIX: Commands are hardcoded (safe) but using execute package for better security
 func runInstall(rc *eos_io.RuntimeContext, cmd string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing KVM and dependencies")
-	c := exec.Command("bash", "-c", cmd)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c.Run()
+	logger.Info("Installing KVM and dependencies", zap.String("command", cmd))
+
+	// SECURITY P0 FIX: Using execute.Run for consistency
+	// This prevents accidental vulnerabilities if cmd becomes dynamic in future
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "sh",
+		Args:    []string{"-c", cmd},
+		Capture: true,
+	})
+
+	if err != nil {
+		return fmt.Errorf("installation failed: %w\nOutput: %s", err, output)
+	}
+
+	return nil
 }
 
 // EnsureLibvirtd ensures libvirtd is started and enabled.

@@ -25,7 +25,7 @@ import (
 func TestMain(m *testing.M) {
 	// Set up verbose logging for tests
 	os.Setenv("LOG_LEVEL", "DEBUG")
-	
+
 	// Initialize telemetry for tests
 	if err := telemetry.Init("eos-integration-test"); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize telemetry: %v\n", err)
@@ -36,12 +36,12 @@ func TestMain(m *testing.M) {
 	cfg.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
 	cfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	
+
 	// Add both console and file outputs for tests
 	logPath := "/tmp/eos-integration-test.log"
 	cfg.OutputPaths = []string{"stdout", logPath}
 	cfg.ErrorOutputPaths = []string{"stderr"}
-	
+
 	// Build the logger
 	baseLogger, err := cfg.Build()
 	if err != nil {
@@ -51,19 +51,19 @@ func TestMain(m *testing.M) {
 		// Replace global loggers
 		zap.ReplaceGlobals(baseLogger)
 		otelzap.ReplaceGlobals(otelzap.New(baseLogger))
-		
+
 		baseLogger.Info("Integration test logger initialized",
 			zap.String("log_level", "DEBUG"),
 			zap.String("log_file", logPath),
 		)
 	}
-	
+
 	// Run tests
 	code := m.Run()
-	
+
 	// Cleanup
 	_ = zap.L().Sync()
-	
+
 	os.Exit(code)
 }
 
@@ -78,12 +78,12 @@ func TestSecretGenerationAndPermissionSetting(t *testing.T) {
 		Log: zap.L().Named("TestSecretGeneration"),
 	}
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting secret generation and permission test")
-	
+
 	tempDir := t.TempDir()
 	secretFile := filepath.Join(tempDir, "secret.key")
-	
+
 	logger.Debug("Test directory created",
 		zap.String("temp_dir", tempDir),
 		zap.String("secret_file", secretFile))
@@ -105,12 +105,13 @@ func TestSecretGenerationAndPermissionSetting(t *testing.T) {
 
 	// Step 2: Write secret to file
 	logger.Info("Writing secret to file", zap.String("file", secretFile))
-	err = os.WriteFile(secretFile, []byte(secret), 0644)
+	// SECURITY P0 FIX: Use 0600 for secret files
+	err = os.WriteFile(secretFile, []byte(secret), 0600)
 	if err != nil {
 		logger.Error("Failed to write secret file", zap.Error(err))
 		t.Fatalf("Failed to write secret file: %v", err)
 	}
-	logger.Debug("Secret written to file with initial permissions 0644")
+	logger.Debug("Secret written to file with secure permissions 0600")
 
 	// Step 3: Check and fix permissions using os.Chmod directly
 	logger.Info("Checking file permissions")
@@ -119,15 +120,15 @@ func TestSecretGenerationAndPermissionSetting(t *testing.T) {
 		logger.Error("Failed to stat file", zap.Error(err))
 		t.Fatalf("Failed to stat file: %v", err)
 	}
-	
+
 	currentMode := stat.Mode() & os.ModePerm
 	logger.Debug("Current file permissions",
 		zap.String("mode", fmt.Sprintf("%o", currentMode)))
-		
+
 	if currentMode != 0644 {
 		t.Errorf("Expected initial permissions 0644, got %o", currentMode)
 	}
-	
+
 	// Fix permissions
 	logger.Info("Fixing file permissions to 0600")
 	err = os.Chmod(secretFile, 0600)
@@ -146,11 +147,11 @@ func TestSecretGenerationAndPermissionSetting(t *testing.T) {
 	finalMode := stat2.Mode() & os.ModePerm
 	logger.Debug("Final file permissions",
 		zap.String("mode", fmt.Sprintf("%o", finalMode)))
-		
+
 	if finalMode != 0600 {
 		t.Errorf("Permissions = %o, want %o", finalMode, 0600)
 	}
-	
+
 	logger.Info("Secret generation and permission test completed successfully")
 }
 
@@ -161,7 +162,7 @@ func TestPrivilegeCheckWorkflow(t *testing.T) {
 		Log: zap.L().Named("TestPrivilegeCheck"),
 	}
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting privilege check workflow test")
 
 	// Step 1: Check current privileges
@@ -178,7 +179,7 @@ func TestPrivilegeCheckWorkflow(t *testing.T) {
 		logger.Error("Failed to check privileges", zap.Error(err))
 		t.Fatalf("Failed to check privileges: %v", err)
 	}
-	
+
 	logger.Info("Privilege check completed",
 		zap.String("level", string(check.Level)),
 		zap.Bool("is_root", check.IsRoot),
@@ -232,7 +233,7 @@ func TestSecurityWorkflowWithTimeout(t *testing.T) {
 		Log: zap.L().Named("TestTimeout"),
 	}
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting timeout workflow test")
 
 	// Step 1: Quick privilege check
@@ -265,7 +266,8 @@ func TestSecurityWorkflowWithTimeout(t *testing.T) {
 			return
 		default:
 			filename := filepath.Join(tempDir, string(rune('a'+i))+".txt")
-			os.WriteFile(filename, []byte(secret), 0644)
+			// SECURITY P0 FIX: Use 0600 for secret files
+			os.WriteFile(filename, []byte(secret), 0600)
 			logger.Debug("Created test file", zap.String("file", filename))
 		}
 	}
@@ -273,7 +275,7 @@ func TestSecurityWorkflowWithTimeout(t *testing.T) {
 	// Simulate time-consuming operation
 	logger.Info("Simulating time-consuming operation")
 	time.Sleep(50 * time.Millisecond)
-	
+
 	select {
 	case <-ctx.Done():
 		logger.Info("Context timeout occurred as expected")

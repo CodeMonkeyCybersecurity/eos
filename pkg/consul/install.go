@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ type InstallConfig struct {
 	Version       string // Version to install (e.g., "1.21.3" or "latest")
 	UseRepository bool   // Use APT repository vs direct binary download
 	BinaryPath    string // Path for binary installation
-	
+
 	// Consul configuration
 	Datacenter      string
 	ServerMode      bool
@@ -57,11 +58,11 @@ type InstallConfig struct {
 	BindAddr        string
 	ClientAddr      string
 	LogLevel        string
-	
+
 	// Integration options
 	VaultIntegration bool
 	VaultAddr        string
-	
+
 	// Installation behavior
 	ForceReinstall bool // Force reinstallation even if already installed
 	CleanInstall   bool // Remove existing data before installation
@@ -279,11 +280,11 @@ func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated
 // Returns true if installation should proceed, false if already installed
 func (ci *ConsulInstaller) assess() (bool, error) {
 	ci.logger.Info("Assessing current Consul installation")
-	
+
 	// Create context with timeout for assessment operations
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 30*time.Second)
 	defer cancel()
-	
+
 	// First, check if Consul binary exists
 	if _, err := os.Stat(ci.config.BinaryPath); err == nil {
 		// Binary exists, check version with context
@@ -291,32 +292,32 @@ func (ci *ConsulInstaller) assess() (bool, error) {
 			ci.logger.Info("Consul binary found", zap.String("output", output))
 		}
 	}
-	
+
 	// Check context cancellation
 	select {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	default:
 	}
-	
+
 	// Check if Consul service exists
 	if status, err := ci.systemd.GetStatus(); err == nil {
 		ci.logger.Info("Consul service found", zap.String("status", status))
-		
+
 		if !ci.config.ForceReinstall {
 			// Check if it's running
 			if ci.systemd.IsActive() {
 				// Verify it's actually working
 				if ci.isConsulReady() {
 					ci.logger.Info("Consul is already installed and running properly")
-					
+
 					// Print service information
 					ci.logger.Info(fmt.Sprintf("terminal prompt: ✅ Consul is already installed and running"))
 					ci.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
 					ci.logger.Info("terminal prompt: ")
 					ci.logger.Info("terminal prompt: To check status: consul members")
 					ci.logger.Info("terminal prompt: To view logs: journalctl -u consul -f")
-					
+
 					return false, nil // Don't install, already running
 				}
 				ci.logger.Warn("Consul service is active but not responding properly")
@@ -337,7 +338,7 @@ func (ci *ConsulInstaller) assess() (bool, error) {
 			}
 		}
 	}
-	
+
 	return true, nil // Proceed with installation
 }
 
@@ -357,21 +358,21 @@ func (ci *ConsulInstaller) validatePrerequisites() error {
 
 	// Check for SELinux/AppArmor that might block Consul
 	ci.checkSecurityModules()
-	
+
 	// Create context for prerequisite checks
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 15*time.Second)
 	defer cancel()
-	
+
 	// Check memory requirements (minimum 256MB recommended)
 	if err := ci.checkMemoryWithContext(ctx); err != nil {
 		return fmt.Errorf("memory check failed: %w", err)
 	}
-	
+
 	// Check disk space (minimum 100MB for Consul)
 	if err := ci.checkDiskSpaceWithContext(ctx, "/var/lib", 100); err != nil {
 		return fmt.Errorf("disk space check failed: %w", err)
 	}
-	
+
 	// Check port availability - but be smart about it
 	// If we're doing a force reinstall, stop the existing service first
 	if ci.config.ForceReinstall && ci.systemd.IsActive() {
@@ -387,28 +388,28 @@ func (ci *ConsulInstaller) validatePrerequisites() error {
 			// Continue anyway - port check below will catch if still in use
 		}
 	}
-	
+
 	// Check port availability
 	requiredPorts := []int{
-		shared.PortConsul,     // HTTP API (8161)
-		8300,                   // Server RPC
-		8301,                   // Serf LAN
-		8302,                   // Serf WAN
-		8502,                   // gRPC
-		8600,                   // DNS
+		shared.PortConsul, // HTTP API (8161)
+		8300,              // Server RPC
+		8301,              // Serf LAN
+		8302,              // Serf WAN
+		8502,              // gRPC
+		8600,              // DNS
 	}
-	
+
 	var portErrors []string
 	for _, port := range requiredPorts {
 		if err := ci.checkPortAvailable(port); err != nil {
 			portErrors = append(portErrors, err.Error())
 		}
 	}
-	
+
 	if len(portErrors) > 0 {
 		return fmt.Errorf("port availability check failed:\n  - %s", strings.Join(portErrors, "\n  - "))
 	}
-	
+
 	return nil
 }
 
@@ -423,29 +424,29 @@ func (ci *ConsulInstaller) installBinary() error {
 // installViaRepository installs Consul using APT repository
 func (ci *ConsulInstaller) installViaRepository() error {
 	ci.logger.Info("Installing Consul via HashiCorp APT repository")
-	
+
 	// Add HashiCorp GPG key
 	ci.logger.Info("Adding HashiCorp GPG key")
 	if output, err := ci.runner.RunOutput("sh", "-c",
 		"wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg"); err != nil {
 		return fmt.Errorf("failed to add GPG key: %w (output: %s)", err, output)
 	}
-	
+
 	// Add HashiCorp repository
 	ci.logger.Info("Adding HashiCorp repository")
 	repoLine := fmt.Sprintf("deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com %s main",
 		getUbuntuCodename())
-	
+
 	if err := ci.writeFile("/etc/apt/sources.list.d/hashicorp.list", []byte(repoLine), 0644); err != nil {
 		return fmt.Errorf("failed to add repository: %w", err)
 	}
-	
+
 	// Update package list
 	ci.logger.Info("Updating package list")
 	if err := ci.runner.Run("apt-get", "update"); err != nil {
 		return fmt.Errorf("failed to update package list: %w", err)
 	}
-	
+
 	// Install Consul package
 	ci.logger.Info("Installing Consul package")
 	installCmd := []string{"apt-get", "install", "-y"}
@@ -454,18 +455,18 @@ func (ci *ConsulInstaller) installViaRepository() error {
 	} else {
 		installCmd = append(installCmd, "consul")
 	}
-	
+
 	if err := ci.runner.Run(installCmd[0], installCmd[1:]...); err != nil {
 		return fmt.Errorf("failed to install Consul package: %w", err)
 	}
-	
+
 	return nil
 }
 
 // installViaBinary downloads and installs Consul binary directly
 func (ci *ConsulInstaller) installViaBinary() error {
 	ci.logger.Info("Installing Consul via direct binary download")
-	
+
 	// Determine version to install
 	version := ci.config.Version
 	if version == "latest" {
@@ -475,7 +476,7 @@ func (ci *ConsulInstaller) installViaBinary() error {
 			return fmt.Errorf("failed to determine latest version: %w", err)
 		}
 	}
-	
+
 	// Download binary
 	arch := runtime.GOARCH
 	if arch == "amd64" {
@@ -483,36 +484,36 @@ func (ci *ConsulInstaller) installViaBinary() error {
 	} else if arch == "arm64" {
 		arch = "arm64"
 	}
-	
+
 	downloadURL := fmt.Sprintf("https://releases.hashicorp.com/consul/%s/consul_%s_linux_%s.zip",
 		version, version, arch)
-	
+
 	ci.logger.Info("Downloading Consul binary",
 		zap.String("version", version),
 		zap.String("url", downloadURL))
-	
+
 	tmpDir := "/tmp/consul-install"
 	if err := ci.createDirectory(tmpDir, 0755); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	
+
 	zipPath := filepath.Join(tmpDir, "consul.zip")
 	if err := ci.downloadFileWithWget(downloadURL, zipPath); err != nil {
 		return fmt.Errorf("failed to download Consul: %w", err)
 	}
-	
+
 	// Extract binary
 	if err := ci.runner.Run("unzip", "-o", zipPath, "-d", tmpDir); err != nil {
 		return fmt.Errorf("failed to extract Consul: %w", err)
 	}
-	
+
 	// Install binary
 	binaryPath := filepath.Join(tmpDir, "consul")
 	if err := ci.runner.Run("install", "-m", "755", binaryPath, ci.config.BinaryPath); err != nil {
 		return fmt.Errorf("failed to install binary: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -673,7 +674,7 @@ func (ci *ConsulInstaller) configure() error {
 	// Check if service is crash looping (activating with failures)
 	if status, err := ci.systemd.GetStatus(); err == nil {
 		if strings.Contains(strings.ToLower(status), "activating") &&
-		   strings.Contains(strings.ToLower(status), "exit-code") {
+			strings.Contains(strings.ToLower(status), "exit-code") {
 			ci.logger.Warn("Service is in crash loop, will stop before reconfiguration",
 				zap.String("status", status))
 			needsReconfiguration = true
@@ -845,15 +846,15 @@ func (ci *ConsulInstaller) setupService() error {
 		}
 		return fmt.Errorf("failed to start service: %w", err)
 	}
-	
+
 	// Wait for Consul to be ready
 	ci.logger.Info("Waiting for Consul to be ready")
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 30*time.Second)
 	defer cancel()
-	
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -870,24 +871,24 @@ func (ci *ConsulInstaller) setupService() error {
 // verify performs post-installation verification
 func (ci *ConsulInstaller) verify() error {
 	ci.logger.Info("Verifying Consul installation")
-	
+
 	// Check service status
 	if !ci.systemd.IsActive() {
 		return fmt.Errorf("Consul service is not active")
 	}
-	
+
 	// Check API endpoint
 	apiURL := fmt.Sprintf("http://127.0.0.1:%d/v1/agent/self", shared.PortConsul)
 	resp, err := ci.httpGet(apiURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Consul API: %w", err)
 	}
-	
+
 	var agentInfo map[string]interface{}
 	if err := json.Unmarshal(resp, &agentInfo); err != nil {
 		return fmt.Errorf("failed to parse API response: %w", err)
 	}
-	
+
 	// Check cluster members
 	membersURL := fmt.Sprintf("http://127.0.0.1:%d/v1/agent/members", shared.PortConsul)
 	membersResp, err := ci.httpGet(membersURL)
@@ -899,13 +900,13 @@ func (ci *ConsulInstaller) verify() error {
 			ci.logger.Info("Cluster has members", zap.Int("count", len(members)))
 		}
 	}
-	
+
 	// Log success information
 	ci.logger.Info("Consul installation verified successfully",
 		zap.String("datacenter", ci.config.Datacenter),
 		zap.Bool("server_mode", ci.config.ServerMode),
 		zap.String("api_url", fmt.Sprintf("http://%s:%d", ci.config.BindAddr, shared.PortConsul)))
-	
+
 	return nil
 }
 
@@ -914,12 +915,12 @@ func (ci *ConsulInstaller) isConsulReady() bool {
 	// Try to connect to the API
 	config := api.DefaultConfig()
 	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
-	
+
 	client, err := api.NewClient(config)
 	if err != nil {
 		return false
 	}
-	
+
 	// Check agent status
 	_, err = client.Agent().Self()
 	return err == nil
@@ -943,9 +944,9 @@ func (ci *ConsulInstaller) cleanExistingInstallation() error {
 
 	// Backup critical directories if they exist
 	backupTargets := []string{
-		"/var/lib/consul",  // KV store, Raft data, snapshots, ACL tokens
-		"/etc/consul.d",    // Configuration files
-		"/var/log/consul",  // Logs
+		"/var/lib/consul", // KV store, Raft data, snapshots, ACL tokens
+		"/etc/consul.d",   // Configuration files
+		"/var/log/consul", // Logs
 	}
 
 	for _, target := range backupTargets {
@@ -1004,19 +1005,19 @@ func (ci *ConsulInstaller) getLatestVersion() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch version info: %w", err)
 	}
-	
+
 	var versionInfo struct {
 		CurrentVersion string `json:"current_version"`
 	}
-	
+
 	if err := json.Unmarshal(resp, &versionInfo); err != nil {
 		return "", fmt.Errorf("failed to parse version info: %w", err)
 	}
-	
+
 	if versionInfo.CurrentVersion == "" {
 		return "", fmt.Errorf("no version found in response")
 	}
-	
+
 	return versionInfo.CurrentVersion, nil
 }
 
@@ -1028,35 +1029,37 @@ func (ci *ConsulInstaller) checkMemoryWithContext(ctx context.Context) error {
 		return ctx.Err()
 	default:
 	}
-	
-	// Use a more portable approach to check memory
-	cmd := exec.Command("free", "-m")
-	output, err := cmd.Output()
+
+	// CONSISTENCY FIX: Use same method as Vault (read /proc/meminfo directly)
+	data, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
-		ci.logger.Warn("Could not check memory", zap.Error(err))
-		return nil // Non-fatal, continue installation
-	}
-	
-	// Parse free command output to get total memory
-	lines := strings.Split(string(output), "\n")
-	if len(lines) < 2 {
+		ci.logger.Warn("Could not check system memory, proceeding anyway", zap.Error(err))
 		return nil
 	}
-	
-	fields := strings.Fields(lines[1])
-	if len(fields) < 2 {
-		return nil
+
+	// Parse MemTotal from /proc/meminfo
+	lines := strings.Split(string(data), "\n")
+	var totalKB int64
+	for _, line := range lines {
+		if strings.HasPrefix(line, "MemTotal:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				totalKB, _ = strconv.ParseInt(fields[1], 10, 64)
+				break
+			}
+		}
 	}
-	
-	totalMB := 0
-	if _, err := fmt.Sscanf(fields[1], "%d", &totalMB); err != nil {
-		return nil
-	}
+
+	totalMB := totalKB / 1024
+	ci.logger.Info("System memory detected",
+		zap.Int64("total_mb", totalMB),
+		zap.Int64("required_mb", 256))
+
 	if totalMB < 256 {
 		return eos_err.NewUserError("insufficient memory: %dMB (minimum 256MB required)", totalMB)
 	}
-	
-	ci.logger.Debug("Memory check passed", zap.Int("totalMB", totalMB))
+
+	ci.logger.Debug("Memory check passed", zap.Int64("totalMB", totalMB))
 	return nil
 }
 
@@ -1068,20 +1071,20 @@ func (ci *ConsulInstaller) checkDiskSpaceWithContext(ctx context.Context, path s
 		return ctx.Err()
 	default:
 	}
-	
+
 	var stat unix.Statfs_t
 	if err := unix.Statfs(path, &stat); err != nil {
 		ci.logger.Warn("Could not check disk space", zap.String("path", path), zap.Error(err))
 		return nil // Non-fatal, continue installation
 	}
-	
+
 	availableMB := int64(stat.Bavail) * int64(stat.Bsize) / 1024 / 1024
 	if availableMB < requiredMB {
-		return eos_err.NewUserError("insufficient disk space in %s: %dMB available (minimum %dMB required)", 
+		return eos_err.NewUserError("insufficient disk space in %s: %dMB available (minimum %dMB required)",
 			path, availableMB, requiredMB)
 	}
-	
-	ci.logger.Debug("Disk space check passed", 
+
+	ci.logger.Debug("Disk space check passed",
 		zap.String("path", path),
 		zap.Int64("availableMB", availableMB),
 		zap.Int64("requiredMB", requiredMB))
@@ -1344,17 +1347,17 @@ func (ci *ConsulInstaller) fileExists(path string) bool {
 func (ci *ConsulInstaller) downloadFileWithWget(url, dest string) error {
 	ctx, cancel := context.WithTimeout(ci.rc.Ctx, 5*time.Minute)
 	defer cancel()
-	
-	ci.logger.Info("Downloading file with wget", 
-		zap.String("url", url), 
+
+	ci.logger.Info("Downloading file with wget",
+		zap.String("url", url),
 		zap.String("dest", dest))
-	
+
 	// Use wget with timeout
 	cmd := exec.CommandContext(ctx, "wget", "-O", dest, url)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to download %s to %s: %w", url, dest, err)
 	}
-	
+
 	return nil
 }
 
@@ -1474,35 +1477,105 @@ func (ci *ConsulInstaller) findConsulProcesses() ([]string, error) {
 // isNetworkMount checks if a path is on a network-mounted filesystem
 // Network mounts (NFS, CIFS/SMB, etc.) can cause data loss during network outages
 func isNetworkMount(path string) (bool, error) {
+	// BUG FIX: Check if findmnt is available, install util-linux if missing
+	if _, err := exec.LookPath("findmnt"); err != nil {
+		// findmnt not found, try to install util-linux
+		installCmd := exec.Command("apt-get", "install", "-y", "util-linux")
+		if installErr := installCmd.Run(); installErr != nil {
+			// Failed to install, fall back to /proc/mounts parsing
+			return isNetworkMountFromProcMounts(path)
+		}
+		// Successfully installed, continue with findmnt
+	}
+
 	// Use findmnt to check mount point type (works on all modern Linux)
 	cmd := exec.Command("findmnt", "-n", "-o", "FSTYPE", "-T", path)
 	output, err := cmd.Output()
 	if err != nil {
-		// CRITICAL: If findmnt fails, we can't verify filesystem type
-		// FAIL-CLOSED: Return error to prevent data loss on network mounts
-		// Caller should handle this and either:
-		// 1. Skip network mount check (with explicit --allow-network-mount flag)
-		// 2. Fail the operation (safer default)
-		return false, fmt.Errorf("failed to check filesystem type: %w\nInstall 'findmnt' or use --allow-network-mount to skip this check", err)
+		// findmnt failed, fall back to /proc/mounts
+		return isNetworkMountFromProcMounts(path)
 	}
 
 	fsType := strings.TrimSpace(string(output))
 
 	// Network filesystem types
 	networkFS := []string{
-		"nfs", "nfs4", "nfs3",      // NFS
-		"cifs", "smb", "smbfs",     // CIFS/SMB
-		"glusterfs",                 // GlusterFS
-		"ceph", "cephfs",           // Ceph
-		"9p",                        // Plan 9 (QEMU shared folders)
-		"fuse.sshfs",               // SSHFS
-		"davfs", "fuse.davfs2",     // WebDAV
+		"nfs", "nfs4", "nfs3", // NFS
+		"cifs", "smb", "smbfs", // CIFS/SMB
+		"glusterfs",      // GlusterFS
+		"ceph", "cephfs", // Ceph
+		"9p",                   // Plan 9 (QEMU shared folders)
+		"fuse.sshfs",           // SSHFS
+		"davfs", "fuse.davfs2", // WebDAV
 	}
 
 	for _, nfs := range networkFS {
 		if fsType == nfs {
 			return true, nil
 		}
+	}
+
+	return false, nil
+}
+
+// isNetworkMountFromProcMounts checks if a path is on a network mount by parsing /proc/mounts
+// This is a fallback when findmnt is not available
+func isNetworkMountFromProcMounts(path string) (bool, error) {
+	// Read /proc/mounts
+	data, err := os.ReadFile("/proc/mounts")
+	if err != nil {
+		// Cannot check, assume not a network mount (fail open for local systems)
+		return false, nil
+	}
+
+	// Get absolute path to check
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		absPath = path
+	}
+
+	// Network filesystem types
+	networkFS := map[string]bool{
+		"nfs":       true,
+		"nfs4":      true,
+		"nfs3":      true,
+		"cifs":      true,
+		"smb":       true,
+		"smbfs":     true,
+		"glusterfs": true,
+		"ceph":      true,
+		"cephfs":    true,
+		"9p":        true,
+		"davfs":     true,
+	}
+
+	// Parse /proc/mounts (format: device mountpoint fstype options freq passno)
+	lines := strings.Split(string(data), "\n")
+	var longestMatch string
+	var longestMatchFS string
+
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+
+		mountPoint := fields[1]
+		fsType := fields[2]
+
+		// Check if path is under this mount point
+		if strings.HasPrefix(absPath, mountPoint) {
+			// Keep track of longest matching mount point (most specific)
+			if len(mountPoint) > len(longestMatch) {
+				longestMatch = mountPoint
+				longestMatchFS = fsType
+			}
+		}
+	}
+
+	// Check if the filesystem type is a network filesystem
+	if networkFS[longestMatchFS] {
+		return true, nil
 	}
 
 	return false, nil
@@ -1526,7 +1599,7 @@ func InstallConsul(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 		ForceReinstall:   config.Force,
 		CleanInstall:     config.Clean,
 	}
-	
+
 	installer, err := NewConsulInstaller(rc, installConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create consul installer: %w", err)
@@ -1539,21 +1612,21 @@ func InstallConsul(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 // CheckConsulHealth verifies Consul cluster health
 func CheckConsulHealth(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	config := api.DefaultConfig()
 	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
-	
+
 	client, err := api.NewClient(config)
 	if err != nil {
 		return fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	// Check agent health
 	health, _, err := client.Health().Node("_agent", nil)
 	if err != nil {
 		return fmt.Errorf("failed to check agent health: %w", err)
 	}
-	
+
 	for _, check := range health {
 		if check.Status != "passing" {
 			logger.Warn("Health check not passing",
@@ -1562,7 +1635,7 @@ func CheckConsulHealth(rc *eos_io.RuntimeContext) error {
 				zap.String("output", check.Output))
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1599,23 +1672,23 @@ func GetConsulMembers(rc *eos_io.RuntimeContext) ([]string, error) {
 func RestartConsul(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Restarting Consul service")
-	
+
 	runner := NewCommandRunner(rc)
 	systemd := NewSystemdService(runner, "consul")
-	
+
 	// Gracefully stop
 	if err := systemd.Stop(); err != nil {
 		return fmt.Errorf("failed to stop Consul: %w", err)
 	}
-	
+
 	// Wait a moment
 	time.Sleep(2 * time.Second)
-	
+
 	// Start again
 	if err := systemd.Start(); err != nil {
 		return fmt.Errorf("failed to start Consul: %w", err)
 	}
-	
+
 	// Wait for it to be ready
 	installer := &ConsulInstaller{
 		rc:      rc,
@@ -1623,13 +1696,13 @@ func RestartConsul(rc *eos_io.RuntimeContext) error {
 		network: NewHTTPClient(30 * time.Second),
 		config:  &InstallConfig{},
 	}
-	
+
 	ctx, cancel := context.WithTimeout(rc.Ctx, 30*time.Second)
 	defer cancel()
-	
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():

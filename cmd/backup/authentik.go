@@ -562,22 +562,22 @@ func showAuthentikBackup(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 }
 
 type backupFileInfo struct {
-	Path              string
-	Size              int64
-	ModTime           time.Time
-	SourceURL         string
-	AuthentikVersion  string
-	Providers         int
-	Applications      int
-	PropertyMappings  int
-	Flows             int
-	Stages            int
-	Groups            int
-	Policies          int
-	Certificates      int
-	Blueprints        int
-	Outposts          int
-	Tenants           int
+	Path             string
+	Size             int64
+	ModTime          time.Time
+	SourceURL        string
+	AuthentikVersion string
+	Providers        int
+	Applications     int
+	PropertyMappings int
+	Flows            int
+	Stages           int
+	Groups           int
+	Policies         int
+	Certificates     int
+	Blueprints       int
+	Outposts         int
+	Tenants          int
 }
 
 func parseBackupFile(path string) (backupFileInfo, error) {

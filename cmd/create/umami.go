@@ -122,9 +122,14 @@ var CreateUmamiCmd = &cobra.Command{
 			return fmt.Errorf("error running 'docker compose up -d': %w", err)
 		}
 
-		// Wait 5 seconds for the containers to start
+		// SECURITY P0 FIX: Use context-aware sleep instead of blocking time.Sleep
 		logger.Info("Waiting 5 seconds for containers to initialize...")
-		time.Sleep(5 * time.Second)
+		select {
+		case <-time.After(5 * time.Second):
+			// Timeout completed normally
+		case <-rc.Ctx.Done():
+			return fmt.Errorf("container initialization cancelled: %w", rc.Ctx.Err())
+		}
 
 		// EVALUATE - Execute "docker ps" to list running containers
 		if err := container.CheckDockerContainers(rc); err != nil {

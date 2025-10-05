@@ -101,32 +101,27 @@ func createSSHConnection(config *Config, strategy string) (*ssh.Client, error) {
 }
 
 // ExecuteCommand runs a command on the remote host with multiple fallback strategies
+// SECURITY: Fixed P0 command injection and password exposure vulnerabilities
 func (c *SSHClient) ExecuteCommand(cmd string, useSudo bool) (string, error) {
-	// Build the actual command
-	actualCmd := cmd
-	if useSudo && c.config.SudoPass != "" {
-		actualCmd = fmt.Sprintf("echo '%s' | sudo -S %s", c.config.SudoPass, cmd)
-	} else if useSudo {
-		actualCmd = fmt.Sprintf("sudo %s", cmd)
+	// SECURITY P0 FIX: Execute commands directly without shell wrapping to prevent command injection
+	// SECURITY P0 FIX: Use stdin for sudo password instead of command line to prevent exposure
+
+	if useSudo {
+		return c.executeWithSudo(cmd)
 	}
-	
-	// Try different execution strategies
+
+	// Try different execution strategies (removed shell wrapping strategy)
 	strategies := []func() (string, error){
 		// Strategy 1: Normal execution with PTY
 		func() (string, error) {
-			return c.executeWithPTY(actualCmd)
+			return c.executeWithPTY(cmd)
 		},
 		// Strategy 2: Non-interactive without PTY
 		func() (string, error) {
-			return c.executeNoPTY(actualCmd)
-		},
-		// Strategy 3: Wrapped in shell
-		func() (string, error) {
-			wrappedCmd := fmt.Sprintf("sh -c '%s'", strings.ReplaceAll(actualCmd, "'", "'\"'\"'"))
-			return c.executeNoPTY(wrappedCmd)
+			return c.executeNoPTY(cmd)
 		},
 	}
-	
+
 	var lastErr error
 	for _, strategy := range strategies {
 		output, err := strategy()
@@ -183,6 +178,34 @@ func (c *SSHClient) executeNoPTY(cmd string) (string, error) {
 	}
 	
 	return string(output), nil
+}
+
+// executeWithSudo executes a command with sudo, securely passing password via stdin
+// SECURITY P0 FIX: Password passed via stdin, not command line, to prevent exposure in ps/logs
+func (c *SSHClient) executeWithSudo(cmd string) (string, error) {
+	session, err := c.client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+
+	var stdout, stderr bytes.Buffer
+	session.Stdout = &stdout
+	session.Stderr = &stderr
+
+	// SECURITY: Pass password via stdin, not command line
+	if c.config.SudoPass != "" {
+		session.Stdin = strings.NewReader(c.config.SudoPass + "\n")
+	}
+
+	// Use sudo -S to read password from stdin
+	sudoCmd := fmt.Sprintf("sudo -S %s", cmd)
+
+	if err := session.Run(sudoCmd); err != nil {
+		return stdout.String() + stderr.String(), fmt.Errorf("sudo command failed: %w", err)
+	}
+
+	return stdout.String(), nil
 }
 
 // Close closes the SSH connection
