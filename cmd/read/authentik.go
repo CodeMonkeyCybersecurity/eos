@@ -4,10 +4,9 @@ package read
 
 import (
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/exportutil"
@@ -54,27 +53,18 @@ Examples:
 		if akBaseURL == "" || akToken == "" {
 			return fmt.Errorf("ak-url and ak-token are required (can come from env)")
 		}
-		url := fmt.Sprintf("%s/api/v3/blueprints/export/", akBaseURL)
 
-		req, _ := http.NewRequestWithContext(rc.Ctx, http.MethodGet, url, nil)
-		req.Header.Set("Authorization", "Bearer "+akToken)
-		req.Header.Set("Accept", "text/yaml")
-		l.Info("Authentik export", zap.String("url", url), zap.String("token", akToken[:6]+"…"))
+		// Use consolidated API client
+		client := authentik.NewClient(akBaseURL, akToken)
+		l.Info("Authentik export", zap.String("url", client.BaseURL))
 
-		resp, err := http.DefaultClient.Do(req)
+		// Export blueprints using consolidated client
+		data, err := client.ExportBlueprints(rc.Ctx)
 		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				l.Warn("Failed to close response body", zap.Error(err))
-			}
-		}()
-		if resp.StatusCode != http.StatusOK {
-			buf, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-			return fmt.Errorf("authentik export failed: %s – %s", resp.Status, string(buf))
+			return fmt.Errorf("blueprint export failed: %w", err)
 		}
 
+		// Determine output path
 		if akOut == "" {
 			if err := exportutil.EnsureDir(); err != nil {
 				return err
@@ -84,19 +74,13 @@ Examples:
 				return err
 			}
 		}
-		fd, err := os.OpenFile(akOut, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-		if err != nil {
-			return err
+
+		// Write to file
+		if err := os.WriteFile(akOut, data, 0o600); err != nil {
+			return fmt.Errorf("failed to write blueprints: %w", err)
 		}
-		defer func() {
-			if err := fd.Close(); err != nil {
-				l.Warn("Failed to close file", zap.String("file", akOut), zap.Error(err))
-			}
-		}()
-		n, err := io.Copy(fd, resp.Body)
-		if err != nil {
-			return err
-		}
+
+		n := len(data)
 		l.Info("Blueprints exported",
 			zap.String("file", akOut),
 			zap.Int64("bytes", n),

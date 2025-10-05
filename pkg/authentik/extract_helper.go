@@ -6,17 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 )
 
 // ExtractConfigurationAPI extracts Authentik configuration via API
 func ExtractConfigurationAPI(ctx context.Context, baseURL, token string, types, apps, providers []string, includeSecrets bool) (*AuthentikConfig, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
+	// Use consolidated API client
+	client := NewClient(baseURL, token)
 
 	config := &AuthentikConfig{
 		Metadata: ConfigMetadata{
@@ -34,29 +31,9 @@ func ExtractConfigurationAPI(ctx context.Context, baseURL, token string, types, 
 		Certificates:     []Certificate{},
 	}
 
-	// Helper function to make API calls
+	// Helper function to make API calls using consolidated client
 	makeAPICall := func(endpoint string) ([]byte, error) {
-		url := fmt.Sprintf("%s/api/v3/%s", strings.TrimSuffix(baseURL, "/"), endpoint)
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Accept", "application/json")
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("API request failed: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-			return nil, fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
-		}
-
-		return io.ReadAll(resp.Body)
+		return client.APICall(ctx, endpoint)
 	}
 
 	// Track extraction errors

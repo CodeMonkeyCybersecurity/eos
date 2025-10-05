@@ -3,6 +3,8 @@
 package backup
 
 import (
+	"fmt"
+
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -11,8 +13,9 @@ import (
 
 // AddSubcommands adds all backup subcommands to the backup command
 func AddSubcommands() {
-	// Add Authentik subcommand
+	// Add Authentik subcommand and its subcommands
 	BackupCmd.AddCommand(AuthentikCmd)
+	AddAuthentikSubcommands()
 }
 
 // BackupCmd is the main backup command that follows CRUD pattern

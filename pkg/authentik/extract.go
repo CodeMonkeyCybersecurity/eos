@@ -387,8 +387,8 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 
-	// Write to file
-	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+	// Write to file with secure permissions (0600 - owner read/write only)
+	if err := os.WriteFile(outputPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
 
