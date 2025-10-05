@@ -1477,15 +1477,11 @@ func (ci *ConsulInstaller) findConsulProcesses() ([]string, error) {
 // isNetworkMount checks if a path is on a network-mounted filesystem
 // Network mounts (NFS, CIFS/SMB, etc.) can cause data loss during network outages
 func isNetworkMount(path string) (bool, error) {
-	// BUG FIX: Check if findmnt is available, install util-linux if missing
+	// BUG FIX: If findmnt not available, fall back to /proc/mounts immediately
+	// Don't try to install util-linux during bootstrap - it may fail or require user interaction
 	if _, err := exec.LookPath("findmnt"); err != nil {
-		// findmnt not found, try to install util-linux
-		installCmd := exec.Command("apt-get", "install", "-y", "util-linux")
-		if installErr := installCmd.Run(); installErr != nil {
-			// Failed to install, fall back to /proc/mounts parsing
-			return isNetworkMountFromProcMounts(path)
-		}
-		// Successfully installed, continue with findmnt
+		// findmnt not found, fall back to /proc/mounts parsing
+		return isNetworkMountFromProcMounts(path)
 	}
 
 	// Use findmnt to check mount point type (works on all modern Linux)
