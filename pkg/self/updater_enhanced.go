@@ -45,6 +45,7 @@ type EnhancedEosUpdater struct {
 	*EosUpdater
 	enhancedConfig *EnhancedUpdateConfig
 	transaction    *UpdateTransaction
+	goPath         string // Path to Go compiler (may not be in PATH)
 }
 
 // NewEnhancedEosUpdater creates an updater with enhanced safety features
@@ -238,11 +239,30 @@ func (eeu *EnhancedEosUpdater) checkRunningProcesses() error {
 func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 	eeu.logger.Info("Verifying build dependencies")
 
-	// Check Go is installed
+	// Check Go is installed - check PATH first, then standard locations
 	goPath, err := exec.LookPath("go")
 	if err != nil {
-		return fmt.Errorf("go compiler not found in PATH")
+		// Not in PATH - check standard installation locations
+		standardLocations := []string{
+			"/usr/local/go/bin/go",
+			filepath.Join(os.Getenv("HOME"), "go", "bin", "go"),
+		}
+
+		for _, loc := range standardLocations {
+			if _, err := os.Stat(loc); err == nil {
+				goPath = loc
+				eeu.logger.Debug("Go found at standard location", zap.String("path", loc))
+				break
+			}
+		}
+
+		if goPath == "" {
+			return fmt.Errorf("go compiler not found in PATH or standard locations (/usr/local/go/bin/go, ~/go/bin/go)")
+		}
 	}
+
+	// Store Go path for later use in build
+	eeu.goPath = goPath
 
 	// Get Go version
 	goVersionCmd := exec.Command(goPath, "version")
@@ -306,6 +326,62 @@ func (eeu *EnhancedEosUpdater) recordGitState() error {
 	eeu.logger.Info("Git state recorded", zap.String("commit", eeu.transaction.GitCommitBefore[:8]))
 
 	return nil
+}
+
+// BuildBinary overrides base method to use the correct Go path
+func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
+	tempBinary := fmt.Sprintf("/tmp/eos-update-%d", time.Now().Unix())
+
+	eeu.logger.Info("Building Eos binary",
+		zap.String("temp_path", tempBinary),
+		zap.String("source_dir", eeu.config.SourceDir),
+		zap.String("go_path", eeu.goPath))
+
+	// Verify pkg-config and libvirt are available
+	pkgConfigPath, err := exec.LookPath("pkg-config")
+	if err != nil {
+		return "", fmt.Errorf("pkg-config not found in PATH - required for building Eos with libvirt: %w", err)
+	}
+
+	pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
+	if err := pkgConfigCmd.Run(); err != nil {
+		return "", fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel: %w", err)
+	}
+
+	eeu.logger.Info("Libvirt development libraries detected",
+		zap.String("pkg_config_path", pkgConfigPath))
+
+	// Build command - use the Go path we found during verification
+	buildArgs := []string{"build", "-o", tempBinary, "."}
+	buildCmd := exec.Command(eeu.goPath, buildArgs...)
+	buildCmd.Dir = eeu.config.SourceDir
+
+	// Set build environment - CGO must be enabled for libvirt
+	buildCmd.Env = append(os.Environ(),
+		"CGO_ENABLED=1",
+		"GO111MODULE=on",
+	)
+
+	buildOutput, err := buildCmd.CombinedOutput()
+	if err != nil {
+		eeu.logger.Error("Build failed",
+			zap.Error(err),
+			zap.String("output", string(buildOutput)))
+		os.Remove(tempBinary)
+		return "", fmt.Errorf("build failed: %w", err)
+	}
+
+	// Validate the binary was created and is valid
+	binaryInfo, err := os.Stat(tempBinary)
+	if err != nil {
+		return "", fmt.Errorf("built binary does not exist at %s: %w", tempBinary, err)
+	}
+
+	eeu.logger.Info("Build successful",
+		zap.String("binary", tempBinary),
+		zap.Int64("size_bytes", binaryInfo.Size()))
+
+	return tempBinary, nil
 }
 
 // executeUpdateTransaction performs the actual update with transaction tracking
