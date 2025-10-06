@@ -183,23 +183,31 @@ func enrollSystem(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Eos self-update")
+	logger.Info("Starting Eos self-update with enhanced safety features")
 
-	// Create updater with default configuration
-	config := &selfpkg.UpdateConfig{
-		SourceDir:  "/opt/eos",
-		BinaryPath: "/usr/local/bin/eos",
-		GitBranch:  "main",
-		MaxBackups: 3,
+	// Create enhanced updater configuration with safety features
+	config := &selfpkg.EnhancedUpdateConfig{
+		UpdateConfig: &selfpkg.UpdateConfig{
+			SourceDir:  "/opt/eos",
+			BinaryPath: "/usr/local/bin/eos",
+			GitBranch:  "main",
+			MaxBackups: 3,
+		},
+		RequireCleanWorkingTree: false, // Allow stashing
+		CheckRunningProcesses:   true,  // Warn about running processes
+		AtomicInstall:           true,  // Use atomic binary replacement
+		VerifyVersionChange:     true,  // Check if there's actually an update
+		MaxRollbackAttempts:     3,
 	}
 
-	updater := selfpkg.NewEosUpdater(rc, config)
+	updater := selfpkg.NewEnhancedEosUpdater(rc, config)
 
-	// Execute update
-	if err := updater.Update(); err != nil {
+	// Execute update with automatic rollback on failure
+	if err := updater.UpdateWithRollback(); err != nil {
+		logger.Error("Self-update failed", zap.Error(err))
 		return fmt.Errorf("self-update failed: %w", err)
 	}
 
-	logger.Info("Self-update completed successfully")
+	logger.Info("✅ Self-update completed successfully - please restart any running eos processes")
 	return nil
 }

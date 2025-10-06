@@ -191,6 +191,12 @@ func (vi *VaultInstaller) Install() error {
 		return fmt.Errorf("binary installation failed: %w", err)
 	}
 
+	// Cleanup duplicate binaries (non-fatal)
+	vi.logger.Debug("Checking for duplicate Vault binaries")
+	if err := CleanupDuplicateBinaries(vi.rc, vi.config.BinaryPath); err != nil {
+		vi.logger.Warn("Could not cleanup duplicate binaries (non-fatal)", zap.Error(err))
+	}
+
 	// Phase 4: User and directories
 	vi.progress.Update("[56%] Creating user and directories")
 	if err := vi.setupUserAndDirectories(); err != nil {
@@ -203,6 +209,17 @@ func (vi *VaultInstaller) Install() error {
 		return fmt.Errorf("configuration failed: %w", err)
 	}
 
+	// Validate configuration before starting service
+	vi.logger.Info("Validating Vault configuration")
+	configPath := filepath.Join(vi.config.ConfigPath, "vault.hcl")
+	if err := ValidateConfigBeforeStart(vi.rc); err != nil {
+		return eos_err.NewUserError("Configuration validation failed: %s\n"+
+			"Config file: %s\n"+
+			"Fix: Review configuration and correct any errors\n"+
+			"Help: Run 'sudo eos check vault --config' for details", err, configPath)
+	}
+	vi.logger.Info("✅ Configuration validated successfully")
+
 	// Phase 6: Setup Service
 	vi.progress.Update("[84%] Setting up systemd service")
 	if err := vi.setupService(); err != nil {
@@ -214,6 +231,10 @@ func (vi *VaultInstaller) Install() error {
 	if err := vi.verify(); err != nil {
 		return fmt.Errorf("verification failed: %w", err)
 	}
+
+	// Display post-installation security checklist
+	vi.logger.Info("📋 Displaying security guidance")
+	DisplayPostInstallSecurityChecklist(vi.rc)
 
 	// Phase 8: Register with Consul (if available)
 	vi.progress.Update("[100%] Registering with Consul")

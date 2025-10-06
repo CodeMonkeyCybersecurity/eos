@@ -20,6 +20,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/repair"
 
 	// "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi" // TODO: Migrate to verb directories
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
@@ -72,6 +73,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		update.UpdateCmd,     // VERB-FIRST ARCHITECTURE
 		delete.DeleteCmd,     // VERB-FIRST ARCHITECTURE
 		check.CheckCmd,       // VERB-FIRST ARCHITECTURE (health checks)
+		repair.RepairCmd,     // VERB-FIRST ARCHITECTURE (auto-fix issues)
 		config.ConfigCmd,     // Configuration management (Consul KV)
 		debug.GetDebugCmd(),  // VERB-FIRST ARCHITECTURE (debugging tools)
 		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
