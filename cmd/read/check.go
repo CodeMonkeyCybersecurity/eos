@@ -173,7 +173,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 	// 7. Check dependencies (if verbose)
 	if verbose {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: 🔗 Checking dependencies...")
+		logger.Info("terminal prompt:  Checking dependencies...")
 		deps := []string{"git", "systemctl", "curl", "which"}
 		for _, dep := range deps {
 			if _, err := exec.LookPath(dep); err == nil {

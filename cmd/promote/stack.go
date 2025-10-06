@@ -191,7 +191,7 @@ Examples:
 		case promotion.StackPromotionStrategyParallel:
 			fmt.Printf("⚡ Parallel Strategy: All components will be promoted simultaneously\n")
 		case promotion.StackPromotionStrategyDependency:
-			fmt.Printf("🔗 Dependency Strategy: Components will be promoted based on dependency order\n")
+			fmt.Printf(" Dependency Strategy: Components will be promoted based on dependency order\n")
 		}
 		fmt.Printf("\n")
 

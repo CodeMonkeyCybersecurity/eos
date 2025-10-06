@@ -141,7 +141,7 @@ Examples:
 			URL:       config.AddURL,
 		}
 
-		logger.Info("🔗 Adding Git remote",
+		logger.Info(" Adding Git remote",
 			zap.String("name", config.AddName),
 			zap.String("url", config.AddURL))
 

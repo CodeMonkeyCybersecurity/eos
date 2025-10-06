@@ -433,7 +433,7 @@ func promptFeatures(reader *bufio.Reader, config *Config) error {
 
 // promptIntegrations prompts for integration options
 func promptIntegrations(reader *bufio.Reader, config *Config) error {
-	fmt.Println("\n🔗 Integrations")
+	fmt.Println("\n Integrations")
 	fmt.Println("──────────────")
 
 	// Vault integration

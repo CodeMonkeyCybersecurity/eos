@@ -44,7 +44,7 @@ func OutputStatusText(rc *eos_io.RuntimeContext, status *WebhookStatus) error {
 	logger.Info("Assessing text status output")
 
 	// INTERVENE - Display formatted status information
-	logger.Info("🔗 Delphi Webhook Integration Status")
+	logger.Info(" Delphi Webhook Integration Status")
 	logger.Info(strings.Repeat("=", 50))
 
 	// Deployment status

@@ -631,7 +631,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	url, ok := secret.Data["url"].(string)
 	if ok && url != "" {
-		log.Info("🔗 Manual URL available for authenticator app")
+		log.Info(" Manual URL available for authenticator app")
 		log.Info("terminal prompt: Manual URL available for authenticator app setup")
 		// SECURITY: URLs contain sensitive secrets - use secure display method
 		// TODO: Implement secure URL display mechanism

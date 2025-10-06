@@ -31,7 +31,7 @@ Choose the license that best aligns with your use case and values.
 
 ---
 
-## 🔗 Resources
+##  Resources
 
 - AGPL v3: [https://www.gnu.org/licenses/agpl-3.0.html](https://www.gnu.org/licenses/agpl-3.0.html)  
 - Do No Harm: [https://github.com/raisely/NoHarm](https://github.com/raisely/NoHarm)

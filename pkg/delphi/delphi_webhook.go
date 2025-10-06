@@ -160,6 +160,6 @@ func printPostDeploymentInstructions(logger otelzap.LoggerWithCtx) {
 	logger.Info("   - Integration logs: tail -f /var/ossec/logs/integrations.log")
 	logger.Info("   - Payload logs: tail -f /var/ossec/logs/sent_payload.log")
 	logger.Info("")
-	logger.Info("🔗 The webhook will send alerts to your delphi-listener service")
+	logger.Info(" The webhook will send alerts to your delphi-listener service")
 	logger.Info(" Use 'eos delphi webhook status' to check deployment status")
 }

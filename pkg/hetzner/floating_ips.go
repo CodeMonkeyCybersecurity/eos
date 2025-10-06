@@ -39,7 +39,7 @@ func AssignFloatingIP(rc *eos_io.RuntimeContext, client *hcloud.Client, ip *hclo
 		otelzap.Ctx(rc.Ctx).Error("Failed to assign floating IP", zap.String("ip", ip.IP.String()), zap.String("server", server.Name), zap.Error(err))
 		return err
 	}
-	otelzap.Ctx(rc.Ctx).Info("🔗 Floating IP assigned", zap.String("ip", ip.IP.String()), zap.String("server", server.Name))
+	otelzap.Ctx(rc.Ctx).Info(" Floating IP assigned", zap.String("ip", ip.IP.String()), zap.String("server", server.Name))
 	return nil
 }
 

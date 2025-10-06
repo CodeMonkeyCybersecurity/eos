@@ -195,7 +195,7 @@ EOF
       
       # Symlink for global access
       if [ ! -f /usr/bin/go ]; then
-        log INFO "🔗 Creating symlink for global Go access..."
+        log INFO " Creating symlink for global Go access..."
         ln -sf /usr/local/go/bin/go /usr/bin/go
       fi
       

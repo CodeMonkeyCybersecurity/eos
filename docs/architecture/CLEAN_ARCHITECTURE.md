@@ -293,7 +293,7 @@ Maintain backward compatibility during migration:
 - ⏳ Performance validation
 - ⏳ Documentation updates
 
-## 🔗 Next Steps
+##  Next Steps
 
 1. **Review Architecture**: Validate interfaces and design patterns
 2. **Start Migration**: Begin with `pkg/vault` refactoring

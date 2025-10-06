@@ -60,7 +60,7 @@ func ShowInstallationSummary(rc *eos_io.RuntimeContext, config *openstack.Config
 
 	// Integration status
 	if config.VaultIntegration || config.ConsulIntegration {
-		fmt.Println("🔗 Integrations")
+		fmt.Println(" Integrations")
 		fmt.Println("══════════════")
 		if config.VaultIntegration {
 			fmt.Printf("   • Vault:   ✓ Enabled (%s)\n", config.VaultAddress)

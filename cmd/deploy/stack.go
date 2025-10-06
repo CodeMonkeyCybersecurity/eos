@@ -198,7 +198,7 @@ Examples:
 		case deploy.StackDeploymentStrategyParallel:
 			fmt.Printf("⚡ Parallel Strategy: All components will be deployed simultaneously\n")
 		case deploy.StackDeploymentStrategyDependencyOrder:
-			fmt.Printf("🔗 Dependency Strategy: Components will be deployed based on dependency order\n")
+			fmt.Printf(" Dependency Strategy: Components will be deployed based on dependency order\n")
 		}
 		fmt.Printf("\n")
 

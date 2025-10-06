@@ -579,7 +579,7 @@ func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfi
 	summary.WriteString(fmt.Sprintf("🎯 Role: %s\n", config.Role))
 	summary.WriteString(fmt.Sprintf("🌐 Datacenter: %s\n", config.DataCenter))
 	if config.NodeIP != "" {
-		summary.WriteString(fmt.Sprintf("🔗 Node IP: %s\n", config.NodeIP))
+		summary.WriteString(fmt.Sprintf(" Node IP: %s\n", config.NodeIP))
 	}
 
 	if config.Role == "server" {
@@ -592,7 +592,7 @@ func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfi
 		summary.WriteString("   • Access Web UI: http://localhost:4646\n")
 		summary.WriteString("   • Deploy jobs: nomad job run <job.hcl>\n")
 	} else {
-		summary.WriteString(fmt.Sprintf("🔗 Server Addresses: %s\n", strings.Join(config.ServerAddrs, ", ")))
+		summary.WriteString(fmt.Sprintf(" Server Addresses: %s\n", strings.Join(config.ServerAddrs, ", ")))
 		summary.WriteString("\n")
 		summary.WriteString("📋 Next Steps:\n")
 		summary.WriteString("   • Check client status: nomad node status\n")
