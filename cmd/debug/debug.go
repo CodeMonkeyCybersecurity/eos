@@ -10,10 +10,15 @@ var debugCmd = &cobra.Command{
 	Use:   "debug",
 	Short: "Debug and troubleshoot Eos services",
 	Long: `Debug provides comprehensive troubleshooting tools for various Eos services.
-	
+
 Available subcommands:
-  consul - Debug Consul service installation and configuration issues
-  watchdog-traces - Analyze resource watchdog traces from previous runs`,
+  bootstrap       - Debug bootstrap process and infrastructure setup
+  consul          - Debug Consul service installation and configuration issues
+  metis           - Debug Metis security alert processing system
+  watchdog-traces - Analyze resource watchdog traces from previous runs
+
+Each subcommand performs deep diagnostics specific to that component,
+identifies issues, and provides actionable recommendations for fixes.`,
 }
 
 func init() {
