@@ -4,17 +4,13 @@ package self
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/enrollment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	selfpkg "github.com/CodeMonkeyCybersecurity/eos/pkg/self"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -185,268 +181,25 @@ func enrollSystem(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	return nil
 }
 
-// cleanupOldBackups removes old backup files, keeping only the most recent 3
-func cleanupOldBackups(logger otelzap.LoggerWithCtx) {
-	backupFiles, err := filepath.Glob("/usr/local/bin/eos.backup.*")
-	if err != nil || len(backupFiles) <= 3 {
-		return
-	}
-
-	// Sort by name (which includes timestamp)
-	sort.Strings(backupFiles)
-
-	// Remove all but the last 3
-	for i := 0; i < len(backupFiles)-3; i++ {
-		if err := os.Remove(backupFiles[i]); err == nil {
-			logger.Debug("Removed old backup",
-				zap.String("file", backupFiles[i]))
-		}
-	}
-}
-
 func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting Eos self-update")
 
-	// ASSESS - Check current state
-	logger.Info("ASSESS: Checking current system state for self-update")
-
-	// Check if we're in the correct directory
-	if _, err := os.Stat("/opt/eos/.git"); os.IsNotExist(err) {
-		return fmt.Errorf("EOS source directory not found at /opt/eos - cannot self-update")
+	// Create updater with default configuration
+	config := &selfpkg.UpdateConfig{
+		SourceDir:  "/opt/eos",
+		BinaryPath: "/usr/local/bin/eos",
+		GitBranch:  "main",
+		MaxBackups: 3,
 	}
 
-	// Create backup of current binary before update
-	backupPath := fmt.Sprintf("/usr/local/bin/eos.backup.%d", time.Now().Unix())
-	currentBinary, err := os.ReadFile("/usr/local/bin/eos")
-	if err != nil {
-		logger.Warn("Could not read current binary for backup",
-			zap.Error(err))
-	} else {
-		if err := os.WriteFile(backupPath, currentBinary, 0755); err != nil {
-			logger.Warn("Could not create backup",
-				zap.String("backup_path", backupPath),
-				zap.Error(err))
-		} else {
-			logger.Info("Created backup of current binary",
-				zap.String("backup_path", backupPath),
-				zap.Int("size_bytes", len(currentBinary)))
-			// Clean up old backups (keep only last 3)
-			cleanupOldBackups(logger)
-		}
+	updater := selfpkg.NewEosUpdater(rc, config)
+
+	// Execute update
+	if err := updater.Update(); err != nil {
+		return fmt.Errorf("self-update failed: %w", err)
 	}
 
-	// INTERVENE - Pull latest code
-	logger.Info("INTERVENE: Pulling latest changes from git repository")
-	updateCmd := exec.Command("git", "-C", "/opt/eos", "pull", "origin", "main")
-	gitOutput, err := updateCmd.CombinedOutput()
-	if err != nil {
-		logger.Error("Git pull failed",
-			zap.Error(err),
-			zap.String("output", string(gitOutput)))
-		return fmt.Errorf("failed to pull latest code from GitHub: %w", err)
-	}
-
-	logger.Info("Git pull completed",
-		zap.String("output", strings.TrimSpace(string(gitOutput))))
-
-	// Detect the current system architecture
-	detectCmd := exec.Command("go", "env", "GOOS", "GOARCH")
-	detectOutput, err := detectCmd.Output()
-	if err != nil {
-		logger.Warn("Could not detect system architecture",
-			zap.Error(err))
-		// Continue anyway, Go will use defaults
-	}
-
-	// Build to a temporary location first to avoid corrupting the running binary
-	tempBinary := fmt.Sprintf("/tmp/eos-update-%d", time.Now().Unix())
-	logger.Info("Building Eos binary",
-		zap.String("temp_path", tempBinary),
-		zap.String("source_dir", "/opt/eos"))
-
-	// Libvirt is now a required dependency for Eos
-	// Verify pkg-config and libvirt are available
-	pkgConfigPath, err := exec.LookPath("pkg-config")
-	if err != nil {
-		return fmt.Errorf("pkg-config not found in PATH - required for building Eos with libvirt: %w", err)
-	}
-
-	pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
-	if err := pkgConfigCmd.Run(); err != nil {
-		return fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel: %w", err)
-	}
-
-	logger.Info("Libvirt development libraries detected - building Eos with KVM support",
-		zap.String("pkg_config_path", pkgConfigPath))
-
-	// Build command - CGO is required for libvirt
-	buildArgs := []string{"build", "-o", tempBinary, "."}
-
-	buildCmd := exec.Command("go", buildArgs...)
-	buildCmd.Dir = "/opt/eos"
-
-	// Set build environment to match current system - CGO must be enabled for libvirt
-	buildCmd.Env = append(os.Environ(),
-		"CGO_ENABLED=1",
-		"GO111MODULE=on",
-	)
-
-	// If we successfully detected architecture, log it
-	if detectOutput != nil {
-		arch := strings.TrimSpace(string(detectOutput))
-		parts := strings.Split(arch, "\n")
-		if len(parts) >= 2 {
-			logger.Info("Building for architecture",
-				zap.String("os", strings.TrimSpace(parts[0])),
-				zap.String("arch", strings.TrimSpace(parts[1])))
-		}
-	}
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		logger.Error("Build failed",
-			zap.Error(err),
-			zap.String("output", string(buildOutput)))
-		_ = os.Remove(tempBinary)
-		return fmt.Errorf("failed to build Eos binary: %w", err)
-	}
-
-	// Validate the binary was created and is valid
-	binaryInfo, err := os.Stat(tempBinary)
-	if err != nil {
-		return fmt.Errorf("built binary does not exist at %s: %w", tempBinary, err)
-	}
-
-	// Check the file size is reasonable (at least 1MB for a Go binary)
-	const minBinarySize = 1024 * 1024 // 1MB
-	if binaryInfo.Size() < minBinarySize {
-		_ = os.Remove(tempBinary)
-		return fmt.Errorf("built binary is too small (%d bytes), expected at least %d bytes",
-			binaryInfo.Size(), minBinarySize)
-	}
-
-	logger.Info("Binary built successfully",
-		zap.Int64("size_bytes", binaryInfo.Size()),
-		zap.String("size_human", fmt.Sprintf("%.2f MB", float64(binaryInfo.Size())/(1024*1024))))
-
-	// Set execute permissions on the temporary binary
-	if err := os.Chmod(tempBinary, 0755); err != nil {
-		_ = os.Remove(tempBinary)
-		return fmt.Errorf("failed to set execute permissions on temp binary: %w", err)
-	}
-
-	// First, check if it's a valid ELF binary (Linux) or Mach-O (Mac)
-	fileCmd := exec.Command("file", tempBinary)
-	if fileOutput, err := fileCmd.Output(); err == nil {
-		fileType := strings.TrimSpace(string(fileOutput))
-		logger.Info("Binary file analysis",
-			zap.String("file_type", fileType))
-
-		// Check if it's actually an executable
-		if !strings.Contains(fileType, "executable") && !strings.Contains(fileType, "ELF") && !strings.Contains(fileType, "Mach-O") {
-			_ = os.Remove(tempBinary)
-			return fmt.Errorf("built file is not an executable binary: %s", fileType)
-		}
-	}
-
-	// Test the new binary before replacing the old one
-	logger.Info("EVALUATE: Testing new binary with --help flag")
-	testCmd := exec.Command(tempBinary, "--help")
-	testOutput, err := testCmd.CombinedOutput()
-
-	// Log the full output for debugging
-	outputStr := strings.TrimSpace(string(testOutput))
-	if outputStr != "" {
-		// Log first 200 chars for context
-		preview := outputStr
-		if len(preview) > 200 {
-			preview = preview[:200] + "..."
-		}
-		logger.Debug("Binary test output preview",
-			zap.String("preview", preview),
-			zap.Int("total_length", len(outputStr)))
-	}
-
-	if err != nil {
-		logger.Error("Binary execution failed",
-			zap.Error(err),
-			zap.String("binary", tempBinary),
-			zap.String("output", outputStr))
-		_ = os.Remove(tempBinary)
-
-		// Provide helpful error message
-		if strings.Contains(outputStr, "permission denied") {
-			return fmt.Errorf("new binary cannot be executed (permission denied)")
-		} else if strings.Contains(outputStr, "not found") {
-			return fmt.Errorf("new binary has missing dependencies")
-		} else if outputStr == "" {
-			return fmt.Errorf("new binary crashed with no output: %w", err)
-		} else {
-			// Show actual output for debugging
-			if len(outputStr) > 500 {
-				outputStr = outputStr[:500] + "... (truncated)"
-			}
-			return fmt.Errorf("new binary validation failed: %w\nOutput: %s", err, outputStr)
-		}
-	}
-
-	// Check that the output contains expected text
-	if !strings.Contains(outputStr, "Eos CLI") &&
-		!strings.Contains(outputStr, "Available Commands") &&
-		!strings.Contains(outputStr, "Usage:") {
-		logger.Error("Binary produced unexpected output",
-			zap.String("output", outputStr))
-		_ = os.Remove(tempBinary)
-
-		if len(outputStr) > 500 {
-			outputStr = outputStr[:500] + "... (truncated)"
-		}
-		return fmt.Errorf("new binary output doesn't look like Eos CLI: %s", outputStr)
-	}
-
-	logger.Info("Binary validation successful",
-		zap.Bool("has_eos_cli", strings.Contains(outputStr, "Eos CLI")),
-		zap.Bool("has_commands", strings.Contains(outputStr, "Available Commands")),
-		zap.Bool("has_usage", strings.Contains(outputStr, "Usage:")))
-
-	// Atomically replace the old binary with the new one
-	logger.Info("Replacing old binary with new one")
-	if err := os.Rename(tempBinary, "/usr/local/bin/eos"); err != nil {
-		// Try to copy if rename fails (might be across filesystems)
-		logger.Info("Rename failed, trying copy instead")
-		input, err := os.ReadFile(tempBinary)
-		if err != nil {
-			_ = os.Remove(tempBinary)
-			return fmt.Errorf("failed to read temp binary for copy: %w", err)
-		}
-
-		if err := os.WriteFile("/usr/local/bin/eos", input, 0755); err != nil {
-			_ = os.Remove(tempBinary)
-			return fmt.Errorf("failed to copy new binary to destination: %w", err)
-		}
-
-		// Clean up temp file after successful copy
-		_ = os.Remove(tempBinary)
-	}
-
-	logger.Info("Binary replacement completed successfully")
-
-	// EVALUATE - Verify the update
-	logger.Info("Verifying Eos update")
-	versionCmd := exec.Command("/usr/local/bin/eos", "--help")
-	verifyOutput, err := versionCmd.CombinedOutput()
-
-	if err != nil {
-		logger.Warn("Could not verify Eos after update",
-			zap.Error(err),
-			zap.String("output", string(verifyOutput)))
-	} else if strings.Contains(string(verifyOutput), "Eos CLI") || strings.Contains(string(verifyOutput), "Available Commands:") {
-		logger.Info("Eos binary verified successfully")
-	} else {
-		logger.Warn("Eos binary verification produced unexpected output",
-			zap.String("output", string(verifyOutput)))
-	}
-
-	logger.Info("EVALUATE: Self-update completed successfully")
+	logger.Info("Self-update completed successfully")
 	return nil
 }

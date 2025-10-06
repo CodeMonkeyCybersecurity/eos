@@ -26,6 +26,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
@@ -1051,11 +1052,52 @@ func (vi *VaultInstaller) generateSelfSignedCert() error {
 		return nil
 	}
 
-	// Get hostname for certificate
+	// Get hostname and FQDN for certificate
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "vault-server"
 		vi.logger.Warn("Failed to get hostname, using default", zap.Error(err))
+	}
+
+	// Build list of DNS names for SAN
+	dnsNames := []string{hostname, "localhost", "vault"}
+
+	// Try to get FQDN (may be different from hostname)
+	if fqdnOutput, err := exec.Command("hostname", "-f").Output(); err == nil {
+		fqdn := strings.TrimSpace(string(fqdnOutput))
+		// Only add if different from hostname
+		if fqdn != "" && fqdn != hostname && !strings.EqualFold(fqdn, hostname) {
+			dnsNames = append(dnsNames, fqdn)
+			vi.logger.Info("Adding FQDN to certificate SAN",
+				zap.String("hostname", hostname),
+				zap.String("fqdn", fqdn))
+		}
+	}
+
+	// Also try to resolve hostname to get canonical name
+	if addrs, err := net.LookupHost(hostname); err == nil && len(addrs) > 0 {
+		// Get reverse DNS for first address
+		if names, err := net.LookupAddr(addrs[0]); err == nil {
+			for _, name := range names {
+				// Remove trailing dot and check if different
+				canonicalName := strings.TrimSuffix(name, ".")
+				if canonicalName != hostname && canonicalName != "" {
+					// Check if not already in list
+					found := false
+					for _, existing := range dnsNames {
+						if existing == canonicalName {
+							found = true
+							break
+						}
+					}
+					if !found {
+						dnsNames = append(dnsNames, canonicalName)
+						vi.logger.Debug("Adding canonical name to certificate SAN",
+							zap.String("canonical_name", canonicalName))
+					}
+				}
+			}
+		}
 	}
 
 	// Generate private key
@@ -1077,7 +1119,7 @@ func (vi *VaultInstaller) generateSelfSignedCert() error {
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
-		DNSNames:              []string{hostname, "localhost", "vault"},
+		DNSNames:              dnsNames,
 		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
 	}
 
@@ -1120,6 +1162,71 @@ func (vi *VaultInstaller) generateSelfSignedCert() error {
 	vi.logger.Info("TLS certificate generated successfully",
 		zap.String("cert_path", certPath),
 		zap.String("key_path", keyPath))
+
+	// Store certificate metadata in Consul KV
+	if err := vi.storeCertMetadataInConsul(certPath, keyPath, dnsNames, template.NotAfter); err != nil {
+		// Log warning but don't fail - Consul may not be available yet
+		vi.logger.Warn("Failed to store certificate metadata in Consul KV",
+			zap.Error(err),
+			zap.String("note", "This is not critical - metadata is advisory only"))
+	}
+
+	return nil
+}
+
+// storeCertMetadataInConsul stores TLS certificate metadata in Consul KV
+func (vi *VaultInstaller) storeCertMetadataInConsul(certPath, keyPath string, dnsNames []string, expiryTime time.Time) error {
+	vi.logger.Debug("Storing certificate metadata in Consul KV")
+
+	// Check if Consul is available
+	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
+	if consulAddr == "" {
+		consulAddr = "127.0.0.1:8500"
+	}
+
+	// Create Consul client
+	consulConfig := consulapi.DefaultConfig()
+	consulConfig.Address = consulAddr
+	client, err := consulapi.NewClient(consulConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create Consul client: %w", err)
+	}
+
+	// Prepare metadata
+	metadata := map[string]interface{}{
+		"service":      "vault",
+		"cert_path":    certPath,
+		"key_path":     keyPath,
+		"dns_names":    dnsNames,
+		"expiry":       expiryTime.Format(time.RFC3339),
+		"generated_at": time.Now().Format(time.RFC3339),
+		"generated_by": "eos",
+		"hostname":     vi.config.ServiceUser,
+	}
+
+	// Convert to JSON
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	// Store in Consul KV under vault/tls/certificate
+	kv := client.KV()
+	p := &consulapi.KVPair{
+		Key:   "vault/tls/certificate/metadata",
+		Value: metadataJSON,
+	}
+
+	// Put to Consul KV
+	_, err = kv.Put(p, nil)
+	if err != nil {
+		return fmt.Errorf("failed to write to Consul KV: %w", err)
+	}
+
+	vi.logger.Info("Certificate metadata stored in Consul KV",
+		zap.String("key", "vault/tls/certificate/metadata"),
+		zap.Strings("dns_names", dnsNames),
+		zap.String("expiry", expiryTime.Format(time.RFC3339)))
 
 	return nil
 }
