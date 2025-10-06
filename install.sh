@@ -314,7 +314,7 @@ check_libvirt_deps() {
         log INFO " Installing required libvirt dependencies..."
 
         if $IS_DEBIAN; then
-          apt-get install -y "${missing_deps[@]}"
+          apt-get install -y --no-install-recommends "${missing_deps[@]}"
         elif $IS_RHEL; then
           if command -v dnf >/dev/null 2>&1; then
             dnf install -y "${missing_deps[@]}"
