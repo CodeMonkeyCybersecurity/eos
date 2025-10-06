@@ -282,6 +282,15 @@ check_libvirt_deps() {
 
     local missing_deps=()
 
+    # Check for build tools (required for CGO)
+    if ! command -v gcc >/dev/null 2>&1; then
+      if $IS_DEBIAN; then
+        missing_deps+=("build-essential")
+      elif $IS_RHEL; then
+        missing_deps+=("gcc" "make")
+      fi
+    fi
+
     # Check for pkg-config
     if ! command -v pkg-config >/dev/null 2>&1; then
       missing_deps+=("pkg-config")
