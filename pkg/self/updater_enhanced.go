@@ -167,7 +167,7 @@ func (eeu *EnhancedEosUpdater) verifySourceDirectory() error {
 	return nil
 }
 
-// checkGitRepositoryState checks for uncommitted changes and handles stashing
+// checkGitRepositoryState checks for uncommitted changes
 func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 	eeu.logger.Info("Checking git repository state")
 
@@ -185,19 +185,9 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 			return fmt.Errorf("repository has uncommitted changes and clean working tree is required")
 		}
 
-		eeu.logger.Warn("Repository has uncommitted changes, will stash before update")
-
-		// Stash changes with a descriptive message
-		stashMsg := fmt.Sprintf("eos-self-update-auto-stash-%d", time.Now().Unix())
-		stashCmd := exec.Command("git", "-C", eeu.config.SourceDir, "stash", "push", "-m", stashMsg)
-		stashOutput, err := stashCmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to stash changes: %w, output: %s", err, string(stashOutput))
-		}
-
-		// Record stash reference for later recovery
-		eeu.transaction.GitStashRef = stashMsg
-		eeu.logger.Info(" Changes stashed", zap.String("stash_ref", stashMsg))
+		eeu.logger.Warn("Repository has uncommitted changes, will use git pull --autostash")
+		// Note: We don't stash here - we let git pull --autostash handle it
+		// This is more reliable and doesn't leave orphaned stashes
 	} else {
 		eeu.logger.Info(" Working tree is clean")
 	}
@@ -585,32 +575,9 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 		}
 	}
 
-	// Step 3: Restore stashed changes if any
-	if eeu.transaction.GitStashRef != "" {
-		eeu.logger.Info("Restoring stashed changes", zap.String("stash", eeu.transaction.GitStashRef))
-
-		// Find the stash
-		stashListCmd := exec.Command("git", "-C", eeu.config.SourceDir, "stash", "list")
-		stashListOutput, err := stashListCmd.Output()
-		if err != nil {
-			rollbackErrors = append(rollbackErrors, fmt.Errorf("failed to list stashes: %w", err))
-		} else {
-			stashList := string(stashListOutput)
-			if strings.Contains(stashList, eeu.transaction.GitStashRef) {
-				// Pop the stash
-				stashPopCmd := exec.Command("git", "-C", eeu.config.SourceDir, "stash", "pop")
-				if output, err := stashPopCmd.CombinedOutput(); err != nil {
-					eeu.logger.Warn("Failed to pop stash automatically",
-						zap.Error(err),
-						zap.String("output", string(output)),
-						zap.String("manual_recovery", fmt.Sprintf("git stash apply stash@{0}")))
-					rollbackErrors = append(rollbackErrors, fmt.Errorf("stash pop failed: %w", err))
-				} else {
-					eeu.logger.Info(" Stashed changes restored")
-				}
-			}
-		}
-	}
+	// Step 3: Note - we no longer manually manage stash
+	// git pull --autostash handles stash automatically, so on rollback the git reset
+	// will already have the correct state
 
 	// Step 4: Cleanup temp binary
 	if eeu.transaction.TempBinaryPath != "" {
@@ -637,33 +604,8 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 	// Cleanup old backups
 	eeu.CleanupOldBackups()
 
-	// Pop stash if update was successful and we stashed changes
-	if eeu.transaction.GitStashRef != "" {
-		eeu.logger.Info("Restoring stashed changes after successful update")
-
-		// Attempt to pop stash
-		// Note: git stash pop will handle merge conflicts gracefully
-		// If conflicts occur, user will be notified and can resolve manually
-		stashPopCmd := exec.Command("git", "-C", eeu.config.SourceDir, "stash", "pop")
-		if output, err := stashPopCmd.CombinedOutput(); err != nil {
-			// Check if this is a merge conflict or other error
-			if strings.Contains(string(output), "CONFLICT") {
-				eeu.logger.Warn("Stash pop resulted in merge conflicts - manual resolution required",
-					zap.String("stash_ref", eeu.transaction.GitStashRef),
-					zap.String("manual_recovery", "Resolve conflicts in /opt/eos, then: git add . && git stash drop"))
-			} else {
-				eeu.logger.Warn("Could not automatically restore stashed changes",
-					zap.Error(err),
-					zap.String("output", string(output)),
-					zap.String("stash_ref", eeu.transaction.GitStashRef),
-					zap.String("manual_recovery", "Run: cd /opt/eos && git stash list && git stash pop"))
-			}
-			// Don't return error - update was successful even if stash pop failed
-			return nil
-		}
-
-		eeu.logger.Info(" Stashed changes restored successfully")
-	}
+	// Note: We no longer manually manage stash - git pull --autostash handles it automatically
+	// This prevents orphaned stashes and merge conflicts
 
 	return nil
 }

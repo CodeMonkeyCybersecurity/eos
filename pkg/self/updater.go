@@ -202,7 +202,9 @@ func (eu *EosUpdater) PullLatestCode() error {
 	eu.logger.Info("Pulling latest changes from git repository",
 		zap.String("branch", eu.config.GitBranch))
 
-	cmd := exec.Command("git", "-C", eu.config.SourceDir, "pull", "origin", eu.config.GitBranch)
+	// Use --autostash to automatically handle uncommitted changes
+	// This is more reliable than manual stashing and prevents orphaned stashes
+	cmd := exec.Command("git", "-C", eu.config.SourceDir, "pull", "--autostash", "origin", eu.config.GitBranch)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		eu.logger.Error("Git pull failed",
