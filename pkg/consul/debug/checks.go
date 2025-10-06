@@ -2,9 +2,12 @@ package debug
 
 import (
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -331,7 +334,7 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 		}
 	} else {
 		result.Message = "No critical issues found in recent logs"
-		
+
 		// Check if Consul started successfully at some point
 		for _, line := range logLines {
 			if strings.Contains(line, "Consul agent running!") ||
@@ -341,6 +344,232 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 			}
 		}
 	}
-	
+
+	return result
+}
+
+// checkConsulBinary verifies Consul binary exists and is executable
+func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking Consul binary")
+
+	result := DiagnosticResult{
+		CheckName: "Consul Binary",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	binaryPath := "/usr/bin/consul"
+
+	// Check if binary exists
+	info, err := os.Stat(binaryPath)
+	if os.IsNotExist(err) {
+		// Try alternate location
+		binaryPath = "/usr/local/bin/consul"
+		info, err = os.Stat(binaryPath)
+		if err != nil {
+			result.Success = false
+			result.Message = "Consul binary not found"
+			result.Details = append(result.Details, "Checked: /usr/bin/consul and /usr/local/bin/consul")
+			return result
+		}
+	}
+
+	result.Details = append(result.Details, fmt.Sprintf("Binary found at: %s", binaryPath))
+
+	// Check if executable
+	mode := info.Mode()
+	if mode&0111 == 0 {
+		result.Success = false
+		result.Message = "Binary is not executable"
+		result.Details = append(result.Details, fmt.Sprintf("Permissions: %s", mode))
+		return result
+	}
+
+	result.Details = append(result.Details, fmt.Sprintf("Permissions: %s", mode))
+
+	// Check version
+	cmd := execute.Options{
+		Command: binaryPath,
+		Args:    []string{"version"},
+		Capture: true,
+	}
+
+	output, err := execute.Run(rc.Ctx, cmd)
+	if err != nil {
+		result.Success = false
+		result.Message = "Could not get Consul version"
+		result.Details = append(result.Details, output)
+	} else {
+		result.Message = "Binary is valid and executable"
+		result.Details = append(result.Details, "Version: "+strings.TrimSpace(output))
+	}
+
+	return result
+}
+
+// checkConsulPermissions verifies file and directory permissions
+func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking file permissions")
+
+	result := DiagnosticResult{
+		CheckName: "File Permissions",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	paths := map[string]string{
+		"/etc/consul.d":   "config directory",
+		"/var/lib/consul": "data directory",
+		"/opt/consul":     "opt directory",
+	}
+
+	allGood := true
+	for path, desc := range paths {
+		info, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			result.Details = append(result.Details, fmt.Sprintf("✗ %s (%s): NOT FOUND", desc, path))
+			if desc == "config directory" || desc == "data directory" {
+				allGood = false
+			}
+			continue
+		}
+
+		result.Details = append(result.Details,
+			fmt.Sprintf("✓ %s (%s): exists, mode=%s", desc, path, info.Mode()))
+	}
+
+	if allGood {
+		result.Message = "All required directories exist with proper permissions"
+	} else {
+		result.Success = false
+		result.Message = "Some critical directories are missing"
+	}
+
+	return result
+}
+
+// checkConsulNetwork verifies network configuration
+func checkConsulNetwork(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking network configuration")
+
+	result := DiagnosticResult{
+		CheckName: "Network Configuration",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// Get all network interfaces
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		result.Success = false
+		result.Message = "Failed to get network interfaces"
+		return result
+	}
+
+	hasValidInterface := false
+	for _, iface := range ifaces {
+		// Skip loopback
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		// Skip interfaces that are down
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+
+			// Skip IPv6 and loopback
+			if ipNet.IP.To4() == nil || ipNet.IP.IsLoopback() {
+				continue
+			}
+
+			hasValidInterface = true
+			result.Details = append(result.Details,
+				fmt.Sprintf("Interface: %s, IP: %s", iface.Name, ipNet.IP.String()))
+		}
+	}
+
+	if !hasValidInterface {
+		result.Success = false
+		result.Message = "No valid network interface found"
+	} else {
+		result.Message = "Network interface configured correctly"
+	}
+
+	return result
+}
+
+// checkConsulPorts performs comprehensive port connectivity checks
+func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking Consul port connectivity")
+
+	result := DiagnosticResult{
+		CheckName: "Port Connectivity",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	ports := map[int]string{
+		shared.PortConsul: "HTTP API",
+		8502:              "gRPC",
+		8600:              "DNS",
+		8301:              "Serf LAN",
+		8302:              "Serf WAN",
+		8300:              "RPC",
+	}
+
+	httpWorking := false
+	for port, desc := range ports {
+		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+		if err == nil {
+			conn.Close()
+			result.Details = append(result.Details,
+				fmt.Sprintf("✓ Port %d (%s): LISTENING", port, desc))
+			if port == shared.PortConsul {
+				httpWorking = true
+			}
+		} else {
+			result.Details = append(result.Details,
+				fmt.Sprintf("✗ Port %d (%s): NOT LISTENING", port, desc))
+		}
+	}
+
+	// Try HTTP request to Consul API
+	if httpWorking {
+		client := &http.Client{Timeout: 5 * time.Second}
+		apiURL := fmt.Sprintf("http://127.0.0.1:%d/v1/agent/self", shared.PortConsul)
+		resp, err := client.Get(apiURL)
+		if err == nil {
+			defer resp.Body.Close()
+			result.Details = append(result.Details,
+				fmt.Sprintf("\nHTTP API Response: %s", resp.Status))
+			result.Message = "Consul API is responding"
+		} else {
+			result.Success = false
+			result.Message = "Consul ports listening but API not responding"
+			result.Details = append(result.Details,
+				fmt.Sprintf("\nHTTP API Error: %v", err))
+		}
+	} else {
+		result.Success = false
+		result.Message = "Consul HTTP API port not listening"
+	}
+
 	return result
 }

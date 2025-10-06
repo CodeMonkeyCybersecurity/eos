@@ -42,13 +42,13 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	// ASSESS - Run all diagnostic checks
 	logger.Info("=== ASSESS PHASE: Running diagnostic checks ===")
 
-	// 1. Check for port conflicts
-	portResult := checkPortConflicts(rc)
-	results = append(results, portResult)
+	// 1. Check Consul binary
+	binaryResult := checkConsulBinary(rc)
+	results = append(results, binaryResult)
 
-	// 2. Check for lingering processes
-	processResult := checkLingeringProcesses(rc)
-	results = append(results, processResult)
+	// 2. Check file permissions
+	permissionsResult := checkConsulPermissions(rc)
+	results = append(results, permissionsResult)
 
 	// 3. Analyze configuration
 	configResult := analyzeConfiguration(rc)
@@ -58,7 +58,23 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	serviceResult := checkSystemdService(rc)
 	results = append(results, serviceResult)
 
-	// 5. Analyze logs
+	// 5. Check for lingering processes
+	processResult := checkLingeringProcesses(rc)
+	results = append(results, processResult)
+
+	// 6. Check network configuration
+	networkResult := checkConsulNetwork(rc)
+	results = append(results, networkResult)
+
+	// 7. Check port connectivity (enhanced)
+	portsResult := checkConsulPorts(rc)
+	results = append(results, portsResult)
+
+	// 8. Check for port conflicts
+	portConflictResult := checkPortConflicts(rc)
+	results = append(results, portConflictResult)
+
+	// 9. Analyze logs
 	logResult := analyzeLogs(rc, config.LogLines)
 	results = append(results, logResult)
 

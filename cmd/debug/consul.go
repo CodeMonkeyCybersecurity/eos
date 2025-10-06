@@ -12,14 +12,28 @@ var consulCmd = &cobra.Command{
 	Short: "Debug Consul service installation and configuration",
 	Long: `Debug Consul provides comprehensive troubleshooting for Consul service issues.
 
-This command will:
-- Check for port conflicts on Consul ports (HTTP and DNS)
-- Identify and optionally clean up lingering processes
-- Analyze Consul configuration for common issues
-- Test manual startup with detailed error reporting
-- Review systemd service configuration
-- Analyze extended logs from journalctl
-- Provide recommended fixes based on findings`,
+Diagnostic checks performed:
+1. Consul binary verification (existence, permissions, version)
+2. File permissions (config, data, and log directories)
+3. Configuration analysis (validation, common issues)
+4. Systemd service configuration
+5. Lingering processes detection
+6. Network configuration (interfaces, IP addresses)
+7. Port connectivity (HTTP API, gRPC, DNS, Serf, RPC)
+8. Port conflict detection
+9. Log analysis (errors, warnings, startup issues)
+
+Flags:
+  --fix              Automatically fix common issues
+  --kill-processes   Kill lingering Consul processes
+  --test-start       Test manual Consul startup
+  --minimal-config   Test with minimal configuration
+  --log-lines N      Number of log lines to analyze (default: 100)
+
+Example:
+  eos debug consul
+  eos debug consul --fix
+  eos debug consul --kill-processes --test-start`,
 	RunE: eos_cli.Wrap(runDebugConsul),
 }
 
