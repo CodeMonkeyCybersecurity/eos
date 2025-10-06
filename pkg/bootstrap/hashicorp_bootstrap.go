@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -104,23 +105,84 @@ func configureHashiCorp(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 	return nil
 }
 
-// startHashiCorpServices starts HashiCorp services
+// startHashiCorpServices starts HashiCorp services with proper dependency ordering
 func startHashiCorpServices(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting HashiCorp services")
+	logger.Info("Starting HashiCorp services in dependency order")
 
-	services := []string{"consul", "nomad", "vault"}
-	
-	for _, service := range services {
+	// P1 fix: Start services in correct dependency order
+	// 1. Consul must start first (service discovery + Vault storage backend)
+	// 2. Vault depends on Consul
+	// 3. Nomad depends on Consul (and optionally Vault)
+	serviceDependencyOrder := []string{"consul", "vault", "nomad"}
+
+	for _, service := range serviceDependencyOrder {
+		logger.Info("Starting service in dependency chain",
+			zap.String("service", service))
+
 		if err := startService(rc, service); err != nil {
-			return fmt.Errorf("failed to start %s: %w", service, err)
+			return fmt.Errorf("failed to start %s (dependency chain broken): %w", service, err)
+		}
+
+		// Verify service is responding before starting next service
+		if err := verifyServiceHealth(rc, service); err != nil {
+			logger.Warn("Service started but health check failed",
+				zap.String("service", service),
+				zap.Error(err),
+				zap.String("impact", "continuing anyway - may cause cascading failures"))
+			// Continue anyway as some services may not have health endpoints configured yet
 		}
 	}
 
-	// Wait for services to be ready
-	time.Sleep(10 * time.Second)
+	logger.Info("All HashiCorp services started successfully in dependency order")
+	return nil
+}
 
-	logger.Info("All HashiCorp services started successfully")
+// verifyServiceHealth performs basic health check on service
+func verifyServiceHealth(rc *eos_io.RuntimeContext, service string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Basic health checks by service type
+	switch service {
+	case "consul":
+		// Check Consul HTTP API
+		return verifyConsulHealth(rc)
+	case "vault":
+		// Check Vault HTTP API (may be sealed, that's OK)
+		return verifyVaultHealth(rc)
+	case "nomad":
+		// Check Nomad HTTP API
+		return verifyNomadHealth(rc)
+	default:
+		logger.Debug("No health check defined for service", zap.String("service", service))
+		return nil
+	}
+}
+
+func verifyConsulHealth(rc *eos_io.RuntimeContext) error {
+	// Basic HTTP check to Consul API
+	cmd := exec.CommandContext(rc.Ctx, "curl", "-sf", fmt.Sprintf("http://127.0.0.1:%d/v1/status/leader", shared.PortConsul))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("consul health check failed: %w", err)
+	}
+	return nil
+}
+
+func verifyVaultHealth(rc *eos_io.RuntimeContext) error {
+	// Vault may be sealed, so just check if API responds
+	cmd := exec.CommandContext(rc.Ctx, "curl", "-sf", fmt.Sprintf("http://127.0.0.1:%d/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200", shared.PortVault))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("vault health check failed: %w", err)
+	}
+	return nil
+}
+
+func verifyNomadHealth(rc *eos_io.RuntimeContext) error {
+	// Check Nomad agent info
+	cmd := exec.CommandContext(rc.Ctx, "curl", "-sf", fmt.Sprintf("http://127.0.0.1:%d/v1/agent/self", shared.PortNomad))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("nomad health check failed: %w", err)
+	}
 	return nil
 }
 
@@ -152,24 +214,42 @@ func installHashiCorpTool(rc *eos_io.RuntimeContext, tool string) error {
 	}
 }
 
+// TODO(P2): These installation functions are placeholders that redirect to dedicated installers.
+// Consider either:
+// 1. Implementing simplified binary-only installation here for bootstrap use case
+// 2. Removing and having BootstrapHashiCorpComplete require pre-installed binaries
+// 3. Calling the full installers from pkg/consul/install.go, pkg/vault/install.go, etc.
+
 func installHashiCorpConsul(rc *eos_io.RuntimeContext) error {
-	// Placeholder for Consul installation
-	return fmt.Errorf("consul installation requires administrator intervention - please use 'eos create consul'")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Error("Consul installation not implemented in bootstrap - use dedicated installer",
+		zap.String("command", "eos create consul"),
+		zap.String("reason", "bootstrap requires pre-configured installation"))
+	return fmt.Errorf("consul not installed - run 'eos create consul' first, then retry bootstrap")
 }
 
 func installHashiCorpNomad(rc *eos_io.RuntimeContext) error {
-	// Placeholder for Nomad installation
-	return fmt.Errorf("nomad installation requires administrator intervention - please use 'eos create nomad'")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Error("Nomad installation not implemented in bootstrap - use dedicated installer",
+		zap.String("command", "eos create nomad"),
+		zap.String("reason", "bootstrap requires pre-configured installation"))
+	return fmt.Errorf("nomad not installed - run 'eos create nomad' first, then retry bootstrap")
 }
 
 func installHashiCorpVault(rc *eos_io.RuntimeContext) error {
-	// Placeholder for Vault installation
-	return fmt.Errorf("vault installation requires administrator intervention - please use 'eos create vault'")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Error("Vault installation not implemented in bootstrap - use dedicated installer",
+		zap.String("command", "eos create vault"),
+		zap.String("reason", "bootstrap requires pre-configured installation"))
+	return fmt.Errorf("vault not installed - run 'eos create vault' first, then retry bootstrap")
 }
 
 func installTerraform(rc *eos_io.RuntimeContext) error {
-	// Placeholder for Terraform installation
-	return fmt.Errorf("terraform installation requires administrator intervention - please use 'eos create terraform'")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Error("Terraform installation not implemented in bootstrap - use dedicated installer",
+		zap.String("command", "eos create terraform"),
+		zap.String("reason", "bootstrap requires pre-configured installation"))
+	return fmt.Errorf("terraform not installed - run 'eos create terraform' first, then retry bootstrap")
 }
 
 func configureConsul(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
@@ -206,6 +286,18 @@ func configureConsul(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 }`, datacenter)
 
 	configPath := filepath.Join(configDir, "consul.json")
+
+	// P1 fix: Backup existing config before overwrite
+	if _, err := os.Stat(configPath); err == nil {
+		backupPath := configPath + ".backup." + time.Now().Format("20060102-150405")
+		logger.Info("Backing up existing config",
+			zap.String("config", configPath),
+			zap.String("backup", backupPath))
+		if err := os.Rename(configPath, backupPath); err != nil {
+			logger.Warn("Failed to backup config, continuing anyway", zap.Error(err))
+		}
+	}
+
 	// SECURITY: Use 0640 instead of 0644 to prevent world-readable HashiCorp configs
 	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write consul config: %w", err)
@@ -248,6 +340,18 @@ consul {
 }`, datacenter, shared.PortConsul)
 
 	configPath := filepath.Join(configDir, "nomad.hcl")
+
+	// P1 fix: Backup existing config before overwrite
+	if _, err := os.Stat(configPath); err == nil {
+		backupPath := configPath + ".backup." + time.Now().Format("20060102-150405")
+		logger.Info("Backing up existing config",
+			zap.String("config", configPath),
+			zap.String("backup", backupPath))
+		if err := os.Rename(configPath, backupPath); err != nil {
+			logger.Warn("Failed to backup config, continuing anyway", zap.Error(err))
+		}
+	}
+
 	// SECURITY: Use 0640 instead of 0644 to prevent world-readable HashiCorp configs
 	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write nomad config: %w", err)
@@ -273,15 +377,27 @@ func configureVault(rc *eos_io.RuntimeContext, info *ClusterInfo) error {
 }
 
 listener "tcp" {
-  address     = "0.0.0.0:8200"
+  address     = "0.0.0.0:%d"
   tls_disable = 1
 }
 
-api_addr = "http://127.0.0.1:8200"
-cluster_addr = "https://127.0.0.1:8201"
-ui = true`, shared.PortConsul)
+api_addr = "http://127.0.0.1:%d"
+cluster_addr = "https://127.0.0.1:%d"
+ui = true`, shared.PortConsul, shared.PortVault, shared.PortVault, shared.PortVault+1)
 
 	configPath := filepath.Join(configDir, "vault.hcl")
+
+	// P1 fix: Backup existing config before overwrite
+	if _, err := os.Stat(configPath); err == nil {
+		backupPath := configPath + ".backup." + time.Now().Format("20060102-150405")
+		logger.Info("Backing up existing config",
+			zap.String("config", configPath),
+			zap.String("backup", backupPath))
+		if err := os.Rename(configPath, backupPath); err != nil {
+			logger.Warn("Failed to backup config, continuing anyway", zap.Error(err))
+		}
+	}
+
 	// SECURITY: Use 0640 instead of 0644 to prevent world-readable HashiCorp configs
 	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
 		return fmt.Errorf("failed to write vault config: %w", err)
@@ -293,20 +409,44 @@ ui = true`, shared.PortConsul)
 func startService(rc *eos_io.RuntimeContext, service string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting service", zap.String("service", service))
-	
-	cmd := exec.Command("systemctl", "start", service)
+
+	// Start service
+	cmd := exec.CommandContext(rc.Ctx, "systemctl", "start", service)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to start %s service: %w", service, err)
 	}
 
 	// Enable service for auto-start
-	cmd = exec.Command("systemctl", "enable", service)
+	cmd = exec.CommandContext(rc.Ctx, "systemctl", "enable", service)
 	if err := cmd.Run(); err != nil {
-		logger.Warn("Failed to enable service for auto-start", 
-			zap.String("service", service), 
+		logger.Warn("Failed to enable service for auto-start",
+			zap.String("service", service),
 			zap.Error(err))
 	}
 
-	return nil
+	// Verify service actually started (P1 fix)
+	maxAttempts := 30 // 30 seconds timeout
+	for i := 0; i < maxAttempts; i++ {
+		checkCmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", service)
+		if output, err := checkCmd.Output(); err == nil {
+			status := strings.TrimSpace(string(output))
+			if status == "active" {
+				logger.Info("Service started successfully",
+					zap.String("service", service),
+					zap.Int("wait_seconds", i))
+				return nil
+			}
+		}
+
+		// Check if context cancelled
+		select {
+		case <-rc.Ctx.Done():
+			return fmt.Errorf("service start cancelled: %w", rc.Ctx.Err())
+		case <-time.After(1 * time.Second):
+			// Continue waiting
+		}
+	}
+
+	return fmt.Errorf("service %s failed to become active within %d seconds", service, maxAttempts)
 }
 

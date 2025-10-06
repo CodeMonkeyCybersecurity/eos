@@ -141,9 +141,15 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	}
 
 	// TODO: Implement Nomad job deployment for HashiCorp components
+	// For now, redirect users to native installers
 	_ = nomadConfig
-	_ = ctx // TODO: Use context for Nomad API calls
-	return fmt.Errorf("%s Nomad deployment not yet implemented", component)
+	_ = ctx
+
+	logger.Error("HashiCorp component installation via Nomad orchestration is not yet implemented",
+		zap.String("component", component),
+		zap.String("workaround", fmt.Sprintf("Use 'eos create %s' for native installation", component)))
+
+	return fmt.Errorf("nomad-based deployment not implemented - use 'eos create %s' for direct installation", component)
 }
 
 func contains(slice []string, item string) bool {
