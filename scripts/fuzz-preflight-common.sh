@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 eos_fuzz_preflight_check() {
     local script_name="$(basename "${BASH_SOURCE[1]}")"
     
-    echo -e "${CYAN}🔍 Running preflight checks...${NC}"
+    echo -e "${CYAN} Running preflight checks...${NC}"
     
     # Check if we're in the project root or can find it
     local current_dir="$(pwd)"

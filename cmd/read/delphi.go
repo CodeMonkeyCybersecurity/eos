@@ -39,9 +39,9 @@ Subcommands are required to specify which type of information to read.`,
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("'eos delphi read' was called without a subcommand")
 
-		logger.Info("terminal prompt: Missing subcommand for 'eos delphi read'.")                                // More specific message
+		logger.Info("terminal prompt: Missing subcommand for 'eos delphi read'.")                               // More specific message
 		logger.Info("terminal prompt: Run `eos delphi read --help` to see available options for reading data.") // More specific advice
-		_ = cmd.Help()                                                                                            // Print built-in help for 'read' command
+		_ = cmd.Help()                                                                                          // Print built-in help for 'read' command
 		return nil
 	}),
 }
@@ -240,7 +240,7 @@ to ensure your database schema is properly configured.`,
 		displaySchemaObjects(rc, "Triggers", result.Triggers)
 
 		if result.MissingCount > 0 {
-			logger.Info(fmt.Sprintf("terminal prompt: \n⚠️  Schema verification found %d missing objects.", result.MissingCount))
+			logger.Info(fmt.Sprintf("terminal prompt: \nSchema verification found %d missing objects.", result.MissingCount))
 			logger.Info("terminal prompt: Run 'eos create delphi deploy' to deploy the complete schema.")
 		} else {
 			logger.Info("terminal prompt: \n All schema objects are present and verified.")

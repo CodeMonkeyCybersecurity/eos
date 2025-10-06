@@ -143,7 +143,7 @@ func (aum *AgentUpgradeManager) UpgradeLocalAgent(rc *eos_io.RuntimeContext) (*A
 
 	// Step 2: Check if upgrade is needed
 	if !analysis.NeedsUpgrade && !aum.config.ForceUpgrade {
-		logger.Info("✅ Agent is already up to date")
+		logger.Info(" Agent is already up to date")
 		result.Success = true
 		result.Duration = time.Since(startTime)
 		return result, nil
@@ -194,7 +194,7 @@ func (aum *AgentUpgradeManager) UpgradeLocalAgent(rc *eos_io.RuntimeContext) (*A
 	result.Success = true
 	result.Duration = time.Since(startTime)
 
-	logger.Info("✅ Local Delphi agent upgrade completed successfully",
+	logger.Info(" Local Delphi agent upgrade completed successfully",
 		zap.Duration("duration", result.Duration))
 
 	return result, nil

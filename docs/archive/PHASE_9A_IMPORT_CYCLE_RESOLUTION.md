@@ -112,7 +112,7 @@ Low-level implementations (simple context/logger)
 
 ### Build Success
 ```bash
-✅ go build -o /tmp/eos-build ./cmd/  # SUCCESS!
+ go build -o /tmp/eos-build ./cmd/  # SUCCESS!
 ```
 
 ### Migration Statistics
@@ -131,10 +131,10 @@ Low-level implementations (simple context/logger)
 ## Next Steps
 
 The import cycle is now resolved, enabling:
-- ✅ Successful compilation
-- ✅ Further framework adoption
-- ✅ Migration of remaining systemctl/config operations
-- ✅ Full utilization of shared testing utilities
+-  Successful compilation
+-  Further framework adoption
+-  Migration of remaining systemctl/config operations
+-  Full utilization of shared testing utilities
 
 ## Lessons Learned
 

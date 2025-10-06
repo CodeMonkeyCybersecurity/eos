@@ -246,7 +246,7 @@ Examples:
 
 		// Dry run - show what would be deployed
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No actual deployment will be executed\n")
+			fmt.Printf(" Dry Run - No actual deployment will be executed\n")
 			fmt.Printf("\nService Deployment Steps (would execute):\n")
 			fmt.Printf("1. Validate service prerequisites and environment compatibility\n")
 			if verifyDependencies {
@@ -282,7 +282,7 @@ Examples:
 		}
 
 		// Display deployment results
-		fmt.Printf("✅ Service deployment completed successfully\n")
+		fmt.Printf(" Service deployment completed successfully\n")
 		fmt.Printf("\nDeployment Results:\n")
 		fmt.Printf("───────────────────\n")
 		fmt.Printf("Service:          %s\n", serviceName)
@@ -315,7 +315,7 @@ Examples:
 		if verifyDependencies && len(result.DependencyResults) > 0 {
 			fmt.Printf("\nDependency Verification:\n")
 			for _, dep := range result.DependencyResults {
-				status := "✅"
+				status := ""
 				if !dep.Healthy {
 					status = "❌"
 				}
@@ -327,7 +327,7 @@ Examples:
 		if len(result.StepsExecuted) > 0 {
 			fmt.Printf("\nSteps Executed:\n")
 			for _, step := range result.StepsExecuted {
-				status := "✅"
+				status := ""
 				if step.Status != "completed" {
 					status = "❌"
 				}
@@ -339,7 +339,7 @@ Examples:
 		if len(result.HealthCheckResults) > 0 {
 			fmt.Printf("\nHealth Check Results:\n")
 			for _, check := range result.HealthCheckResults {
-				status := "✅"
+				status := ""
 				if !check.Passed {
 					status = "❌"
 				}

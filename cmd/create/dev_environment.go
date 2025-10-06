@@ -92,7 +92,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	}
 
 	// INTERVENE - Install components
-	
+
 	// 1. Install code-server
 	logger.Info("Installing code-server")
 	fmt.Println("\n>>> Installing code-server...")
@@ -115,7 +115,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		if err := dev_environment.InstallClaudeExtension(rc, config); err != nil {
 			// Non-fatal error
 			logger.Warn("Failed to install Claude Code extension", zap.Error(err))
-			fmt.Printf("⚠️  Failed to install Claude Code extension: %v\n", err)
+			fmt.Printf("Failed to install Claude Code extension: %v\n", err)
 			fmt.Println("   You can install it manually from the VS Code marketplace")
 		}
 	}
@@ -134,7 +134,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		if err := dev_environment.AuthenticateGitHub(rc, config); err != nil {
 			// Non-fatal error
 			logger.Warn("GitHub authentication incomplete", zap.Error(err))
-			fmt.Printf("⚠️  GitHub authentication incomplete: %v\n", err)
+			fmt.Printf("GitHub authentication incomplete: %v\n", err)
 			fmt.Println("   You can authenticate later with: gh auth login")
 		}
 	}
@@ -145,7 +145,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	if err := dev_environment.InstallGoTools(rc); err != nil {
 		// Non-fatal error
 		logger.Warn("Failed to install some Go tools", zap.Error(err))
-		fmt.Printf("⚠️  Failed to install some Go tools: %v\n", err)
+		fmt.Printf("Failed to install some Go tools: %v\n", err)
 		fmt.Println("   You can install them manually later")
 	}
 
@@ -155,7 +155,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	if err := dev_environment.ConfigureFirewall(rc, config); err != nil {
 		// Non-fatal but important
 		logger.Warn("Firewall configuration failed", zap.Error(err))
-		fmt.Printf("⚠️  Firewall configuration failed: %v\n", err)
+		fmt.Printf("Firewall configuration failed: %v\n", err)
 		fmt.Println("   You may need to manually configure firewall rules")
 	}
 
@@ -170,7 +170,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	fmt.Println("DEVELOPMENT ENVIRONMENT READY!")
 	fmt.Println(strings.Repeat("=", 60))
 	fmt.Printf("\n%s\n", accessInfo)
-	
+
 	fmt.Println("\nQuick Start Guide:")
 	fmt.Println("==================")
 	fmt.Println("1. Access code-server from your browser using the URL above")
@@ -188,7 +188,7 @@ func runCreateDevEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	fmt.Println("✓ staticcheck - Advanced Go static analysis")
 	fmt.Println("✓ goimports - Auto-format and organize imports")
 	fmt.Println("Run 'golangci-lint run' in your Go projects for linting")
-	
+
 	fmt.Println("\nFirewall Configuration:")
 	fmt.Println("=======================")
 	fmt.Println("Port 8080 is now accessible from:")

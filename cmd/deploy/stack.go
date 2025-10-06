@@ -147,10 +147,10 @@ Examples:
 			Parallel:              parallel,
 			WaitBetweenComponents: waitBetweenComponents,
 			HealthCheck: deploy.StackHealthCheckConfig{
-				Enabled:               true,
-				ComponentTimeout:      5 * time.Minute,
-				StackValidationDelay:  2 * time.Minute,
-				CrossComponentChecks:  true,
+				Enabled:              true,
+				ComponentTimeout:     5 * time.Minute,
+				StackValidationDelay: 2 * time.Minute,
+				CrossComponentChecks: true,
 			},
 		}
 
@@ -229,7 +229,7 @@ Examples:
 
 		// Dry run - show what would be deployed
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No actual deployment will be executed\n")
+			fmt.Printf(" Dry Run - No actual deployment will be executed\n")
 			fmt.Printf("\nStack Deployment Steps (would execute):\n")
 			fmt.Printf("1. Validate stack prerequisites and environment compatibility\n")
 			fmt.Printf("2. Resolve component dependencies and determine deployment order\n")
@@ -277,7 +277,7 @@ Examples:
 		}
 
 		// Display deployment results
-		fmt.Printf("✅ Stack deployment completed\n")
+		fmt.Printf(" Stack deployment completed\n")
 		fmt.Printf("\nStack Deployment Results:\n")
 		fmt.Printf("─────────────────────────\n")
 		fmt.Printf("Stack:               %s\n", stackName)
@@ -291,7 +291,7 @@ Examples:
 		// Show component results
 		fmt.Printf("\nComponent Results:\n")
 		for _, componentResult := range result.ComponentResults {
-			status := "✅"
+			status := ""
 			if !componentResult.Success {
 				status = "❌"
 			}
@@ -312,7 +312,7 @@ Examples:
 			}
 
 			if !continueOnError {
-				fmt.Printf("\n⚠️  Stack deployment incomplete due to component failures.\n")
+				fmt.Printf("\nStack deployment incomplete due to component failures.\n")
 				fmt.Printf("Consider using --continue-on-error to deploy remaining components.\n")
 			}
 		}
@@ -321,7 +321,7 @@ Examples:
 		if len(result.StackHealthResults) > 0 {
 			fmt.Printf("\nStack Health Check Results:\n")
 			for _, check := range result.StackHealthResults {
-				status := "✅"
+				status := ""
 				if !check.Passed {
 					status = "❌"
 				}
@@ -456,7 +456,7 @@ func determineDeploymentOrder(rc *eos_io.RuntimeContext, config *deploy.StackDep
 	case deploy.StackDeploymentStrategyDependencyOrder:
 		// Order based on typical dependencies (infrastructure -> services -> frontend)
 		dependencyOrder := []string{"database", "cache", "redis", "postgres", "vault", "consul", "api-gateway", "auth-service", "user-service", "api", "frontend"}
-		
+
 		// Add components in dependency order
 		for _, dep := range dependencyOrder {
 			for _, component := range components {
@@ -466,7 +466,7 @@ func determineDeploymentOrder(rc *eos_io.RuntimeContext, config *deploy.StackDep
 				}
 			}
 		}
-		
+
 		// Add any remaining components
 		for _, component := range components {
 			found := false

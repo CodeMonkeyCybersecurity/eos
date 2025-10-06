@@ -27,7 +27,7 @@ func ConfirmIrreversibleDeletion(rc *eos_io.RuntimeContext) error {
 	if resp != "yes" {
 		return fmt.Errorf("user aborted deletion confirmation")
 	}
-	logger.Info("🧹 User confirmed deletion of in-memory secrets")
+	logger.Info(" User confirmed deletion of in-memory secrets")
 	return nil
 }
 

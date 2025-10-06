@@ -107,7 +107,7 @@ if [ "$FORCE" != "true" ] && [ "$DRY_RUN" != "true" ]; then
 fi
 
 if [ "$DRY_RUN" == "true" ]; then
-    echo -e "${BLUE}🔍 Dry run - no changes made${NC}"
+    echo -e "${BLUE} Dry run - no changes made${NC}"
     exit 0
 fi
 

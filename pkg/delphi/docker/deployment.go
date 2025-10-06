@@ -18,7 +18,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Check prerequisites
-	logger.Info("🔍 Assessing Docker deployment prerequisites",
+	logger.Info(" Assessing Docker deployment prerequisites",
 		zap.String("version", version),
 		zap.String("deploy_type", deployType),
 		zap.String("proxy_address", proxyAddress),
@@ -90,7 +90,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	}
 
 	// Clone repository
-	logger.Info("📥 Cloning Wazuh Docker repository", zap.String("version", version))
+	logger.Info(" Cloning Wazuh Docker repository", zap.String("version", version))
 	cloneCmd := exec.Command("git", "clone", "https://github.com/wazuh/wazuh-docker.git", "-b", "v"+version)
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
@@ -106,14 +106,14 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 
 	// Apply customizations
 	if proxyAddress != "" {
-		logger.Info("🔧 Configuring proxy settings", zap.String("proxy", proxyAddress))
+		logger.Info(" Configuring proxy settings", zap.String("proxy", proxyAddress))
 		if err := ConfigureProxy(proxyAddress); err != nil {
 			logger.Warn("⚠️ Failed to configure proxy", zap.Error(err))
 		}
 	}
 
 	if port != 443 {
-		logger.Info("🔧 Configuring custom port for Hecate compatibility", zap.Int("port", port))
+		logger.Info(" Configuring custom port for Hecate compatibility", zap.Int("port", port))
 		if err := ConfigurePortMapping(port); err != nil {
 			logger.Warn("⚠️ Failed to configure port mapping", zap.Error(err))
 		}

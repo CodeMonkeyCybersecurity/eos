@@ -57,7 +57,7 @@ func ServiceOperationToStdout(result *system_services.ServiceOperation, asJSON b
 	fmt.Printf("\nMessage: %s\n", result.Message)
 
 	if result.DryRun {
-		fmt.Println("\n🔍 This was a dry run - no actual changes were made.")
+		fmt.Println("\n This was a dry run - no actual changes were made.")
 	}
 
 	return nil

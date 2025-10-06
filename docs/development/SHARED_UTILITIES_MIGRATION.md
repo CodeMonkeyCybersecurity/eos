@@ -210,11 +210,11 @@ If issues arise during migration:
 
 The migration is complete when:
 
-1. ✅ No duplicate function implementations remain
-2. ✅ All tests pass with the same results as before
-3. ✅ Code compiles without errors
-4. ✅ Linting passes without violations
-5. ✅ No performance degradation observed
+1.  No duplicate function implementations remain
+2.  All tests pass with the same results as before
+3.  Code compiles without errors
+4.  Linting passes without violations
+5.  No performance degradation observed
 
 ## Support
 

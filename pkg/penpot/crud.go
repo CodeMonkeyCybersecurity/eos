@@ -99,7 +99,7 @@ func Read(rc *eos_io.RuntimeContext, namespace string) (*DeploymentInfo, error) 
 func Update(rc *eos_io.RuntimeContext, namespace string, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("🔄 Updating Penpot deployment",
+	logger.Info(" Updating Penpot deployment",
 		zap.String("namespace", namespace),
 		zap.Int("port", config.Port))
 
@@ -249,7 +249,7 @@ func Status(rc *eos_io.RuntimeContext, namespace string) (*HealthStatus, error) 
 func Restart(rc *eos_io.RuntimeContext, namespace string, services []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("🔄 Restarting Penpot deployment",
+	logger.Info(" Restarting Penpot deployment",
 		zap.String("namespace", namespace),
 		zap.Strings("services", services))
 
@@ -352,7 +352,7 @@ func Backup(rc *eos_io.RuntimeContext, namespace string, backupPath string) erro
 func Restore(rc *eos_io.RuntimeContext, namespace string, backupPath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("📥 Restoring Penpot backup",
+	logger.Info(" Restoring Penpot backup",
 		zap.String("namespace", namespace),
 		zap.String("backup_path", backupPath))
 

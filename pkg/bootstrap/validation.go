@@ -508,12 +508,12 @@ func PrintValidationReport(rc *eos_io.RuntimeContext, result *ValidationResult) 
 	if len(result.Warnings) > 0 {
 		logger.Warn("Validation Warnings:")
 		for _, warning := range result.Warnings {
-			logger.Warn("  ⚠️  " + warning)
+			logger.Warn("  " + warning)
 		}
 	}
 
 	if result.Passed {
-		logger.Info("✅ System validation PASSED")
+		logger.Info(" System validation PASSED")
 	} else {
 		logger.Error("❌ System validation FAILED")
 	}

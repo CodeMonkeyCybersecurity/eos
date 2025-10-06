@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -73,7 +73,7 @@ func runReadEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 // loadEnhancedEnvironmentConfig loads the enhanced environment configuration
 func loadEnhancedEnvironmentConfig() (*environment.EnhancedEnvironmentConfig, error) {
 	configPath := "/opt/eos/config/enhanced_environment.json"
-	
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("enhanced environment config not found")
 	}
@@ -116,7 +116,7 @@ func displayBasicEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, json
 	fmt.Printf("Region:          %s\n", basicConfig.Region)
 	fmt.Printf("Node Role:       %s\n", basicConfig.NodeRole)
 	fmt.Printf("Secret Backend:  %s\n", "Vault")
-	
+
 	if len(basicConfig.ClusterNodes) > 0 {
 		fmt.Printf("\nCluster Nodes:   %v\n", basicConfig.ClusterNodes)
 	}
@@ -178,7 +178,7 @@ func displayServicesFocus(config *environment.EnhancedEnvironmentConfig) error {
 		fmt.Println()
 	}
 
-	fmt.Printf("🔧 Default Service Ports:\n")
+	fmt.Printf(" Default Service Ports:\n")
 	for service, port := range config.Services.DefaultPorts {
 		fmt.Printf("  ├─ %-12s → :%d\n", service, port)
 	}
@@ -193,7 +193,7 @@ func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error
 
 	// Profile and basic info
 	fmt.Printf("📊 Deployment Profile: %s\n", config.Profile)
-	fmt.Printf("🌐 Environment:        %s\n", config.Environment)  
+	fmt.Printf("🌐 Environment:        %s\n", config.Environment)
 	fmt.Printf("🏢 Datacenter:         %s\n", config.Datacenter)
 	fmt.Printf("🌎 Region:             %s\n", config.Region)
 	fmt.Printf("📈 Cluster Size:       %d nodes\n", config.ClusterSize)
@@ -214,7 +214,7 @@ func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error
 	// Resource allocation
 	fmt.Printf("\n💾 Resource Allocation:\n")
 	for env, resources := range config.Services.Resources {
-		fmt.Printf("  %s: %dMHz CPU, %dMB RAM, %d replica(s)\n", 
+		fmt.Printf("  %s: %dMHz CPU, %dMB RAM, %d replica(s)\n",
 			env, resources.CPU, resources.Memory, resources.Replicas)
 	}
 

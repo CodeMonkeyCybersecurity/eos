@@ -193,7 +193,7 @@ Examples:
 			URL:       config.SetURLURL,
 		}
 
-		logger.Info("🔄 Changing Git remote URL",
+		logger.Info(" Changing Git remote URL",
 			zap.String("name", config.SetURLName),
 			zap.String("new_url", config.SetURLURL))
 

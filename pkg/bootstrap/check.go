@@ -32,7 +32,7 @@
 //
 // IMPLEMENTATION STATUS (September 20, 2025):
 //
-// ✅ COMPLETED COMPONENTS:
+//	COMPLETED COMPONENTS:
 //
 // Core Storage Operations Framework:
 // - Storage Analyzer (pkg/storage/analyzer/) - Real-time analysis and monitoring

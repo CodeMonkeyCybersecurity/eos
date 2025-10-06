@@ -290,7 +290,7 @@ EOF
         if [[ -f "$log_file" ]]; then
             local test_name=$(basename "$log_file" .log)
             if grep -q "PASS" "$log_file"; then
-                echo "- ✅ $test_name: PASSED" >> "$report_file"
+                echo "-  $test_name: PASSED" >> "$report_file"
                 ((passed_tests++))
             else
                 echo "- ❌ $test_name: FAILED" >> "$report_file"

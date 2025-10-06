@@ -69,7 +69,7 @@ func (vi *VaultInstaller) registerWithConsul() error {
 		zap.String("service_id", fmt.Sprintf("vault-%s", hostname)),
 		zap.String("datacenter", vi.config.Datacenter))
 
-	logger.Info("terminal prompt: ✅ Vault registered with Consul for service discovery")
+	logger.Info("terminal prompt:  Vault registered with Consul for service discovery")
 	logger.Info(fmt.Sprintf("terminal prompt: Services can now discover Vault at: vault.service.%s.consul", vi.config.Datacenter))
 
 	return nil

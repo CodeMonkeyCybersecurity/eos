@@ -41,7 +41,7 @@ func PromptConflictResolution(rc *eos_io.RuntimeContext, state *BootstrapState) 
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Display current state
-	logger.Info("🔍 Detected existing infrastructure components:")
+	logger.Info(" Detected existing infrastructure components:")
 
 	runningServices := []string{}
 	for name, component := range state.Components {
@@ -65,7 +65,7 @@ func PromptConflictResolution(rc *eos_io.RuntimeContext, state *BootstrapState) 
 
 	if len(state.PortConflicts) > 0 {
 		logger.Info("")
-		logger.Info("⚠️  Port conflicts detected:")
+		logger.Info("Port conflicts detected:")
 		for _, conflict := range state.PortConflicts {
 			status := "🔴"
 			if conflict.IsEosService {
@@ -95,12 +95,12 @@ func PromptConflictResolution(rc *eos_io.RuntimeContext, state *BootstrapState) 
 func promptExistingEosInstall(rc *eos_io.RuntimeContext, state *BootstrapState) (*ConflictResolutionOptions, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("✅ Found existing Eos installation")
+	logger.Info(" Found existing Eos installation")
 	logger.Info("")
 	logger.Info("What would you like to do?")
-	logger.Info("  1) 🔄 Use existing services (recommended)")
-	logger.Info("  2) 🧹 Clean slate - reconfigure all services")
-	logger.Info("  3) 🔧 Advanced - choose which services to reconfigure")
+	logger.Info("  1)  Use existing services (recommended)")
+	logger.Info("  2)  Clean slate - reconfigure all services")
+	logger.Info("  3)  Advanced - choose which services to reconfigure")
 	logger.Info("  4) ❌ Cancel")
 	logger.Info("")
 
@@ -145,7 +145,7 @@ func promptExistingEosInstall(rc *eos_io.RuntimeContext, state *BootstrapState) 
 func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState) (*ConflictResolutionOptions, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("⚠️  Port conflicts detected!")
+	logger.Info("Port conflicts detected!")
 	logger.Info("")
 
 	// Add quick fix suggestion early
@@ -175,7 +175,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	}
 
 	if len(stoppableServices) > 0 {
-		logger.Info("✅ The following services can be automatically stopped:")
+		logger.Info(" The following services can be automatically stopped:")
 		for _, service := range stoppableServices {
 			logger.Info("  • " + service)
 		}
@@ -183,7 +183,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	}
 
 	if len(eosServices) > 0 {
-		logger.Info("🔧 The following Eos services are running:")
+		logger.Info(" The following Eos services are running:")
 		for _, service := range eosServices {
 			logger.Info("  • " + service + " (EOS managed)")
 		}
@@ -191,7 +191,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	}
 
 	if len(criticalServices) > 0 {
-		logger.Info("⚠️  The following services cannot be automatically stopped:")
+		logger.Info("The following services cannot be automatically stopped:")
 		for _, service := range criticalServices {
 			logger.Info("  • " + service + " (requires manual intervention)")
 		}
@@ -206,15 +206,15 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 		optionNum++
 	}
 
-	logger.Info(fmt.Sprintf("  %d) 🧹 Clean slate - stop and reconfigure all services", optionNum))
+	logger.Info(fmt.Sprintf("  %d)  Clean slate - stop and reconfigure all services", optionNum))
 	optionNum++
 
 	if len(eosServices) > 0 {
-		logger.Info(fmt.Sprintf("  %d) 🔄 Keep existing Eos services", optionNum))
+		logger.Info(fmt.Sprintf("  %d)  Keep existing Eos services", optionNum))
 		optionNum++
 	}
 
-	logger.Info(fmt.Sprintf("  %d) 🔧 Advanced - manual service selection", optionNum))
+	logger.Info(fmt.Sprintf("  %d)  Advanced - manual service selection", optionNum))
 	optionNum++
 
 	logger.Info(fmt.Sprintf("  %d) ❌ Cancel", optionNum))
@@ -293,7 +293,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 func promptAdvancedOptions(rc *eos_io.RuntimeContext, state *BootstrapState) (*ConflictResolutionOptions, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("🔧 Advanced service management")
+	logger.Info(" Advanced service management")
 	logger.Info("")
 	logger.Info("Services detected:")
 
@@ -501,7 +501,7 @@ func stopService(rc *eos_io.RuntimeContext, serviceName string) error {
 		showServiceStoppingHelp(rc, *targetService, err)
 
 		// Try diagnostic mode
-		logger.Info("🔍 Running diagnostic analysis...")
+		logger.Info(" Running diagnostic analysis...")
 		for _, port := range targetService.Ports {
 			sm.DiagnosePortConflict(port)
 		}
@@ -686,7 +686,7 @@ func PromptGuidedBootstrap(rc *eos_io.RuntimeContext) error {
 	logger.Info("Step 2: Checking for conflicts...")
 
 	if len(state.PortConflicts) > 0 {
-		logger.Info("⚠️  Found some services already running")
+		logger.Info("Found some services already running")
 		logger.Info("")
 		logger.Info("Don't worry! This is common. Would you like me to:")
 		logger.Info("→ Set up alongside existing services (recommended)")

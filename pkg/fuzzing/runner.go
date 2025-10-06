@@ -492,7 +492,7 @@ func (r *Runner) generateMarkdownReport(session *FuzzSession) (string, error) {
 	// Test Results
 	report.WriteString("\n## Test Results\n\n")
 	for _, result := range session.Results {
-		status := "✅ PASS"
+		status := " PASS"
 		if !result.Success {
 			status = "❌ FAIL"
 		}

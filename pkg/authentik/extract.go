@@ -211,7 +211,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		Client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
-	fmt.Println("🔍 Extracting Authentik configuration...")
+	fmt.Println(" Extracting Authentik configuration...")
 	fmt.Printf("   Source: %s\n", url)
 
 	// Initialize config
@@ -227,7 +227,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	// Get Authentik version
 	version, err := client.GetVersion()
 	if err != nil {
-		fmt.Printf("⚠️  Warning: Could not get Authentik version: %v\n", err)
+		fmt.Printf("Warning: Could not get Authentik version: %v\n", err)
 	} else {
 		config.Metadata.AuthentikVersion = version
 		fmt.Printf("   Version: %s\n", version)
@@ -265,7 +265,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get providers: %w", err)
 			}
 			config.Providers = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "applications":
 			fmt.Print("   Extracting applications... ")
@@ -274,7 +274,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get applications: %w", err)
 			}
 			config.Applications = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "property_mappings":
 			fmt.Print("   Extracting property mappings... ")
@@ -283,7 +283,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get property mappings: %w", err)
 			}
 			config.PropertyMappings = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "flows":
 			fmt.Print("   Extracting flows... ")
@@ -292,7 +292,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get flows: %w", err)
 			}
 			config.Flows = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "stages":
 			fmt.Print("   Extracting stages... ")
@@ -301,7 +301,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get stages: %w", err)
 			}
 			config.Stages = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "groups":
 			fmt.Print("   Extracting groups... ")
@@ -310,7 +310,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get groups: %w", err)
 			}
 			config.Groups = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "policies":
 			fmt.Print("   Extracting policies... ")
@@ -319,7 +319,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get policies: %w", err)
 			}
 			config.Policies = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "certificates":
 			fmt.Print("   Extracting certificates... ")
@@ -328,7 +328,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get certificates: %w", err)
 			}
 			config.Certificates = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "outposts":
 			fmt.Print("   Extracting outposts... ")
@@ -337,7 +337,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get outposts: %w", err)
 			}
 			config.Outposts = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "tenants":
 			fmt.Print("   Extracting tenants... ")
@@ -346,7 +346,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get tenants: %w", err)
 			}
 			config.Tenants = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 
 		case "blueprints":
 			fmt.Print("   Extracting blueprints... ")
@@ -355,7 +355,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to get blueprints: %w", err)
 			}
 			config.Blueprints = items
-			fmt.Printf("✅ (%d found)\n", len(items))
+			fmt.Printf(" (%d found)\n", len(items))
 		}
 	}
 
@@ -392,7 +392,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
 
-	fmt.Printf("\n✅ Configuration exported to: %s\n", outputPath)
+	fmt.Printf("\n Configuration exported to: %s\n", outputPath)
 	fmt.Printf("   Total size: %.2f KB\n", float64(len(data))/1024)
 
 	// Show summary
@@ -410,7 +410,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Blueprints:       %d\n", len(config.Blueprints))
 
 	if !includeSecrets {
-		fmt.Println("\n⚠️  Note: Sensitive data (private keys, secrets) was excluded.")
+		fmt.Println("\nNote: Sensitive data (private keys, secrets) was excluded.")
 		fmt.Println("   Use --include-secrets flag to include sensitive data.")
 	}
 
@@ -541,7 +541,7 @@ func listFlows(client *AuthentikAPIClient, detailed bool) error {
 
 	for _, f := range flows {
 		if detailed {
-			fmt.Printf("\n🔄 %s\n", f.Name)
+			fmt.Printf("\n %s\n", f.Name)
 			fmt.Printf("   Slug: %s\n", f.Slug)
 			fmt.Printf("   Title: %s\n", f.Title)
 			fmt.Printf("   Designation: %s\n", f.Designation)

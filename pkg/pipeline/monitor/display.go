@@ -25,7 +25,7 @@ func DisplayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, a
 	fmt.Print("\033[2J\033[H")
 
 	currentTime := time.Now().Format("15:04:05")
-	fmt.Printf("🔍 Delphi Real-Time Monitor (Updated: %s)\n", currentTime)
+	fmt.Printf(" Delphi Real-Time Monitor (Updated: %s)\n", currentTime)
 	fmt.Println(strings.Repeat("=", 120))
 
 	// Display recent alerts section

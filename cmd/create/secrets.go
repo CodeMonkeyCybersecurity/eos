@@ -86,11 +86,11 @@
 //
 // ## Implementation Status:
 //
-// - ✅ Cryptographically secure secret generation implemented
-// - ✅ Multiple output formats supported (hex, base64, raw)
-// - ✅ Vault integration for secure storage operational
-// - ✅ Automatic secret validation and strength checking active
-// - ✅ Environment discovery and automatic configuration implemented
+// -  Cryptographically secure secret generation implemented
+// -  Multiple output formats supported (hex, base64, raw)
+// -  Vault integration for secure storage operational
+// -  Automatic secret validation and strength checking active
+// -  Environment discovery and automatic configuration implemented
 //
 // For detailed secret management implementation, see:
 // - cmd/create/secrets_terraform.go - Terraform integration for secret management

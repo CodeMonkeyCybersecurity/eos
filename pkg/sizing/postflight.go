@@ -64,7 +64,7 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 			issues = append(issues, fmt.Sprintf("%s service is not running", svcType))
 		} else {
 			if health.CPUUsage > 50 {
-				warnings = append(warnings, 
+				warnings = append(warnings,
 					fmt.Sprintf("%s using high CPU: %.1f%%", svcType, health.CPUUsage))
 			}
 			if health.MemoryMB > 1024 && health.MemoryMB > getExpectedMemory(svcType)*2 {
@@ -93,7 +93,7 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 	if len(serviceHealthMap) > 0 {
 		logger.Info("terminal prompt: Service Health:")
 		for svcType, health := range serviceHealthMap {
-			status := "✅ Running"
+			status := " Running"
 			if !health.Running {
 				status = "❌ Not Running"
 			}
@@ -121,7 +121,7 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 	// Show warnings if any
 	if len(warnings) > 0 {
 		logger.Warn("Performance warnings detected", zap.Strings("warnings", warnings))
-		logger.Info("terminal prompt: ⚠️  Performance Warnings:")
+		logger.Info("terminal prompt: Performance Warnings:")
 		for _, warning := range warnings {
 			logger.Info(fmt.Sprintf("terminal prompt:   • %s", warning))
 		}
@@ -138,17 +138,17 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 		logger.Info("terminal prompt: ")
 	}
 
-	logger.Info("terminal prompt: ✅ Postflight validation completed successfully")
+	logger.Info("terminal prompt:  Postflight validation completed successfully")
 	return nil
 }
 
 // SystemMetrics contains current system performance metrics
 type SystemMetrics struct {
-	CPUUsage     float64
-	MemoryUsage  float64
-	LoadAverage  float64
-	SwapUsage    float64
-	ActiveProcs  int
+	CPUUsage    float64
+	MemoryUsage float64
+	LoadAverage float64
+	SwapUsage   float64
+	ActiveProcs int
 }
 
 // ServiceHealth contains health information for a specific service
@@ -297,15 +297,15 @@ func checkServiceHealth(rc *eos_io.RuntimeContext, svcType ServiceType) (Service
 func getExpectedMemory(svcType ServiceType) float64 {
 	// These are baseline expectations
 	expectations := map[ServiceType]float64{
-		ServiceTypeWebServer:    512,   // 512 MB
-		ServiceTypeDatabase:     2048,  // 2 GB
-		ServiceTypeCache:        1024,  // 1 GB
-		ServiceTypeQueue:        512,   // 512 MB
-		ServiceTypeProxy:        256,   // 256 MB
-		ServiceTypeMonitoring:   1024,  // 1 GB
-		ServiceTypeLogging:      2048,  // 2 GB
-		ServiceTypeVault:        512,   // 512 MB
-		ServiceTypeOrchestrator: 512,   // 512 MB
+		ServiceTypeWebServer:    512,  // 512 MB
+		ServiceTypeDatabase:     2048, // 2 GB
+		ServiceTypeCache:        1024, // 1 GB
+		ServiceTypeQueue:        512,  // 512 MB
+		ServiceTypeProxy:        256,  // 256 MB
+		ServiceTypeMonitoring:   1024, // 1 GB
+		ServiceTypeLogging:      2048, // 2 GB
+		ServiceTypeVault:        512,  // 512 MB
+		ServiceTypeOrchestrator: 512,  // 512 MB
 	}
 
 	if expected, ok := expectations[svcType]; ok {

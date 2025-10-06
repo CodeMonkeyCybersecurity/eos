@@ -20,29 +20,29 @@ func NewAnalyzer(report *SystemReport) *Analyzer {
 // AnalyzeIssues identifies issues in the system
 func (a *Analyzer) AnalyzeIssues() []Issue {
 	var issues []Issue
-	
+
 	// Analyze disk space
 	issues = append(issues, a.analyzeDiskSpace()...)
-	
+
 	// Analyze memory usage
 	issues = append(issues, a.analyzeMemory()...)
-	
+
 	// Analyze processes
 	issues = append(issues, a.analyzeProcesses()...)
-	
+
 	// Analyze services
 	issues = append(issues, a.analyzeServices()...)
-	
+
 	// Analyze logs
 	issues = append(issues, a.analyzeLogs()...)
-	
+
 	return issues
 }
 
 // AnalyzeWarnings identifies potential problems
 func (a *Analyzer) AnalyzeWarnings() []Warning {
 	var warnings []Warning
-	
+
 	// Check disk usage warnings (70-80% threshold)
 	for _, disk := range a.report.DiskUsage {
 		if disk.UsePercent >= 70 && disk.UsePercent < 80 {
@@ -52,7 +52,7 @@ func (a *Analyzer) AnalyzeWarnings() []Warning {
 				Suggestion:  "Monitor disk usage and consider cleanup",
 			})
 		}
-		
+
 		// Inode warnings
 		if disk.InodesPercent >= 70 && disk.InodesPercent < 90 {
 			warnings = append(warnings, Warning{
@@ -62,7 +62,7 @@ func (a *Analyzer) AnalyzeWarnings() []Warning {
 			})
 		}
 	}
-	
+
 	// Memory warnings
 	if a.report.MemoryUsage.UsePercent >= 70 && a.report.MemoryUsage.UsePercent < 85 {
 		warnings = append(warnings, Warning{
@@ -71,7 +71,7 @@ func (a *Analyzer) AnalyzeWarnings() []Warning {
 			Suggestion:  "Monitor memory usage and identify memory-intensive processes",
 		})
 	}
-	
+
 	// Swap warnings
 	if a.report.MemoryUsage.SwapPercent > 50 {
 		warnings = append(warnings, Warning{
@@ -80,20 +80,20 @@ func (a *Analyzer) AnalyzeWarnings() []Warning {
 			Suggestion:  "High swap usage may indicate memory pressure",
 		})
 	}
-	
+
 	return warnings
 }
 
 // GenerateSummary creates an executive summary
 func (a *Analyzer) GenerateSummary() string {
 	var summary strings.Builder
-	
+
 	// Count issues by severity
 	criticalCount := 0
 	highCount := 0
 	mediumCount := 0
 	lowCount := 0
-	
+
 	for _, issue := range a.report.Issues {
 		switch issue.Severity {
 		case SeverityCritical:
@@ -106,11 +106,11 @@ func (a *Analyzer) GenerateSummary() string {
 			lowCount++
 		}
 	}
-	
+
 	summary.WriteString(fmt.Sprintf("System Health Summary for %s:\n", a.report.Hostname))
-	
+
 	if criticalCount == 0 && highCount == 0 && mediumCount == 0 && lowCount == 0 {
-		summary.WriteString("✅ No significant issues detected. System appears healthy.\n")
+		summary.WriteString(" No significant issues detected. System appears healthy.\n")
 	} else {
 		if criticalCount > 0 {
 			summary.WriteString(fmt.Sprintf("🔴 Critical Issues: %d\n", criticalCount))
@@ -125,14 +125,14 @@ func (a *Analyzer) GenerateSummary() string {
 			summary.WriteString(fmt.Sprintf("🟢 Low Priority Issues: %d\n", lowCount))
 		}
 	}
-	
+
 	if len(a.report.Warnings) > 0 {
-		summary.WriteString(fmt.Sprintf("⚠️  Warnings: %d\n", len(a.report.Warnings)))
+		summary.WriteString(fmt.Sprintf("Warnings: %d\n", len(a.report.Warnings)))
 	}
-	
+
 	// Add key metrics
 	summary.WriteString("\nKey Metrics:\n")
-	
+
 	// Find root disk
 	for _, disk := range a.report.DiskUsage {
 		if disk.Mount == "/" {
@@ -140,17 +140,17 @@ func (a *Analyzer) GenerateSummary() string {
 			break
 		}
 	}
-	
+
 	summary.WriteString(fmt.Sprintf("- Memory Usage: %.1f%%\n", a.report.MemoryUsage.UsePercent))
 	summary.WriteString(fmt.Sprintf("- Active Services: %d/%d\n", a.countActiveServices(), len(a.report.ServiceHealth)))
-	
+
 	return summary.String()
 }
 
 // analyzeDiskSpace checks for disk space issues
 func (a *Analyzer) analyzeDiskSpace() []Issue {
 	var issues []Issue
-	
+
 	for _, disk := range a.report.DiskUsage {
 		// Critical: >95% full
 		if disk.UsePercent >= 95 {
@@ -183,7 +183,7 @@ func (a *Analyzer) analyzeDiskSpace() []Issue {
 				Remediation: "Plan disk cleanup or expansion",
 			})
 		}
-		
+
 		// Check inode usage
 		if disk.InodesPercent >= 90 {
 			issues = append(issues, Issue{
@@ -196,14 +196,14 @@ func (a *Analyzer) analyzeDiskSpace() []Issue {
 			})
 		}
 	}
-	
+
 	// Check for large files
 	if len(a.report.LargeFiles) > 0 {
 		totalSize := int64(0)
 		for _, file := range a.report.LargeFiles {
 			totalSize += file.Size
 		}
-		
+
 		if totalSize > 10*1024*1024*1024 { // 10GB
 			issues = append(issues, Issue{
 				Severity:    SeverityMedium,
@@ -215,14 +215,14 @@ func (a *Analyzer) analyzeDiskSpace() []Issue {
 			})
 		}
 	}
-	
+
 	// Check for deleted but open files
 	if len(a.report.DeletedButOpenFiles) > 0 {
 		totalSize := int64(0)
 		for _, file := range a.report.DeletedButOpenFiles {
 			totalSize += file.Size
 		}
-		
+
 		if totalSize > 1024*1024*1024 { // 1GB
 			issues = append(issues, Issue{
 				Severity:    SeverityHigh,
@@ -234,14 +234,14 @@ func (a *Analyzer) analyzeDiskSpace() []Issue {
 			})
 		}
 	}
-	
+
 	return issues
 }
 
 // analyzeMemory checks for memory-related issues
 func (a *Analyzer) analyzeMemory() []Issue {
 	var issues []Issue
-	
+
 	// Check memory usage
 	if a.report.MemoryUsage.UsePercent >= 95 {
 		issues = append(issues, Issue{
@@ -262,7 +262,7 @@ func (a *Analyzer) analyzeMemory() []Issue {
 			Remediation: "Review memory usage and optimize applications",
 		})
 	}
-	
+
 	// Check swap usage
 	if a.report.MemoryUsage.SwapTotal > 0 && a.report.MemoryUsage.SwapPercent > 80 {
 		issues = append(issues, Issue{
@@ -274,14 +274,14 @@ func (a *Analyzer) analyzeMemory() []Issue {
 			Remediation: "Add more RAM or reduce memory usage",
 		})
 	}
-	
+
 	return issues
 }
 
 // analyzeProcesses checks for process-related issues
 func (a *Analyzer) analyzeProcesses() []Issue {
 	var issues []Issue
-	
+
 	// Check for high CPU usage
 	for _, proc := range a.report.ProcessInfo {
 		if proc.CPUPercent > 90 {
@@ -294,7 +294,7 @@ func (a *Analyzer) analyzeProcesses() []Issue {
 				Remediation: "Investigate process behavior and optimize if possible",
 			})
 		}
-		
+
 		if proc.MemPercent > 50 {
 			issues = append(issues, Issue{
 				Severity:    SeverityMedium,
@@ -306,21 +306,21 @@ func (a *Analyzer) analyzeProcesses() []Issue {
 			})
 		}
 	}
-	
+
 	return issues
 }
 
 // analyzeServices checks for service health issues
 func (a *Analyzer) analyzeServices() []Issue {
 	var issues []Issue
-	
+
 	// Check critical services
 	criticalServices := []string{"ssh", "sshd", "systemd-logind"}
-	
+
 	for service, active := range a.report.ServiceHealth {
 		if !active {
 			severity := SeverityMedium
-			
+
 			// Critical services get higher severity
 			for _, critical := range criticalServices {
 				if service == critical {
@@ -328,7 +328,7 @@ func (a *Analyzer) analyzeServices() []Issue {
 					break
 				}
 			}
-			
+
 			issues = append(issues, Issue{
 				Severity:    severity,
 				Category:    "service",
@@ -339,14 +339,14 @@ func (a *Analyzer) analyzeServices() []Issue {
 			})
 		}
 	}
-	
+
 	return issues
 }
 
 // analyzeLogs checks for log-related issues
 func (a *Analyzer) analyzeLogs() []Issue {
 	var issues []Issue
-	
+
 	// Check journal size
 	if a.report.JournalSize > 5*1024*1024*1024 { // 5GB
 		issues = append(issues, Issue{
@@ -358,12 +358,12 @@ func (a *Analyzer) analyzeLogs() []Issue {
 			Remediation: "Run: journalctl --vacuum-time=7d",
 		})
 	}
-	
+
 	// Check for large log files
 	totalLogSize := int64(0)
 	largestLog := ""
 	largestSize := int64(0)
-	
+
 	for path, size := range a.report.LogSizes {
 		totalLogSize += size
 		if size > largestSize {
@@ -371,7 +371,7 @@ func (a *Analyzer) analyzeLogs() []Issue {
 			largestLog = path
 		}
 	}
-	
+
 	if totalLogSize > 10*1024*1024*1024 { // 10GB
 		issues = append(issues, Issue{
 			Severity:    SeverityMedium,
@@ -382,7 +382,7 @@ func (a *Analyzer) analyzeLogs() []Issue {
 			Remediation: "Implement log rotation or clean old logs",
 		})
 	}
-	
+
 	return issues
 }
 

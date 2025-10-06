@@ -176,7 +176,7 @@ func runDeleteBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		// TODO: Implement proper status verification with Nomad
 	}
 
-	logger.Info("terminal prompt: ✅ Boundary removal completed successfully!")
+	logger.Info("terminal prompt:  Boundary removal completed successfully!")
 
 	// Show what was preserved
 	if deleteBoundaryKeepData || deleteBoundaryKeepConfig || deleteBoundaryKeepUser {

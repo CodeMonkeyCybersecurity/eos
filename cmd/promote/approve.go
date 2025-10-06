@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -127,7 +127,7 @@ Examples:
 
 		// Check if already approved/rejected
 		if promotionRequest.Status == promotion.PromotionStatusApproved {
-			fmt.Printf("⚠️  This promotion has already been approved.\n")
+			fmt.Printf("This promotion has already been approved.\n")
 			return nil
 		}
 		if promotionRequest.Status == promotion.PromotionStatusRejected {
@@ -135,7 +135,7 @@ Examples:
 			return nil
 		}
 		if promotionRequest.Status == promotion.PromotionStatusCompleted {
-			fmt.Printf("✅ This promotion has already been completed.\n")
+			fmt.Printf(" This promotion has already been completed.\n")
 			return nil
 		}
 		if promotionRequest.Status == promotion.PromotionStatusFailed {
@@ -153,13 +153,13 @@ Examples:
 		if len(existingApprovals) > 0 {
 			fmt.Printf("Existing Approvals:\n")
 			for _, approval := range existingApprovals {
-				status := "✅ Approved"
+				status := " Approved"
 				if approval.Status == "rejected" {
 					status = "❌ Rejected"
 				}
-				fmt.Printf("  %s by %s at %s\n", 
-					status, 
-					approval.ApproverID, 
+				fmt.Printf("  %s by %s at %s\n",
+					status,
+					approval.ApproverID,
 					approval.Timestamp.Format(time.RFC3339))
 				if approval.Comment != "" {
 					fmt.Printf("    Comment: %s\n", approval.Comment)
@@ -181,7 +181,7 @@ Examples:
 
 		remainingApprovals := promotionRequest.ApprovalPolicy.MinApprovals - approvedCount
 		if remainingApprovals > 0 && !reject {
-			fmt.Printf("📋 Approvals Status: %d/%d required approvals received\n", 
+			fmt.Printf("📋 Approvals Status: %d/%d required approvals received\n",
 				approvedCount, promotionRequest.ApprovalPolicy.MinApprovals)
 			fmt.Printf("   %d more approval(s) needed\n", remainingApprovals)
 			fmt.Printf("\n")
@@ -201,7 +201,7 @@ Examples:
 
 		// Emergency override warning
 		if emergencyOverride {
-			fmt.Printf("⚠️  Emergency Override Requested:\n")
+			fmt.Printf("Emergency Override Requested:\n")
 			fmt.Printf("   This will bypass normal approval thresholds.\n")
 			fmt.Printf("   Ensure this is justified for emergency circumstances.\n")
 			fmt.Printf("\n")
@@ -266,7 +266,7 @@ Examples:
 			fmt.Printf("Reason:           %s\n", approval.Comment)
 			fmt.Printf("Timestamp:        %s\n", approval.Timestamp.Format(time.RFC3339))
 		} else {
-			fmt.Printf("✅ Promotion request approved\n")
+			fmt.Printf(" Promotion request approved\n")
 			fmt.Printf("\nApproval Details:\n")
 			fmt.Printf("─────────────────\n")
 			fmt.Printf("Promotion ID:     %s\n", promotionID)
@@ -278,7 +278,7 @@ Examples:
 			newApprovedCount := approvedCount + 1
 			if emergencyOverride || newApprovedCount >= promotionRequest.ApprovalPolicy.MinApprovals {
 				fmt.Printf("\n🚀 Sufficient approvals received - promotion will proceed automatically\n")
-				
+
 				// In a real implementation, this would trigger the promotion execution
 				fmt.Printf("\nPromotion execution will begin shortly...\n")
 				fmt.Printf("Monitor progress with: eos promote history %s\n", promotionRequest.Component)
@@ -347,34 +347,34 @@ func listPendingApprovals(rc *eos_io.RuntimeContext) error {
 	// Implementation would query pending promotions from storage
 	// For now, return mock data
 	pendingApprovals := []struct {
-		ID               string
-		Component        string
-		FromEnvironment  string
-		ToEnvironment    string
-		RequesterID      string
-		CreatedAt        time.Time
+		ID                string
+		Component         string
+		FromEnvironment   string
+		ToEnvironment     string
+		RequesterID       string
+		CreatedAt         time.Time
 		RequiredApprovals int
 		CurrentApprovals  int
 		TimeRemaining     time.Duration
 	}{
 		{
-			ID:               "helen-prod-20240113154530-promo",
-			Component:        "helen",
-			FromEnvironment:  "staging",
-			ToEnvironment:    "production",
-			RequesterID:      "developer.user",
-			CreatedAt:        time.Now().Add(-2 * time.Hour),
+			ID:                "helen-prod-20240113154530-promo",
+			Component:         "helen",
+			FromEnvironment:   "staging",
+			ToEnvironment:     "production",
+			RequesterID:       "developer.user",
+			CreatedAt:         time.Now().Add(-2 * time.Hour),
 			RequiredApprovals: 2,
 			CurrentApprovals:  1,
 			TimeRemaining:     22 * time.Hour,
 		},
 		{
-			ID:               "api-staging-20240113160000-promo",
-			Component:        "api",
-			FromEnvironment:  "dev",
-			ToEnvironment:    "staging", 
-			RequesterID:      "api.developer",
-			CreatedAt:        time.Now().Add(-30 * time.Minute),
+			ID:                "api-staging-20240113160000-promo",
+			Component:         "api",
+			FromEnvironment:   "dev",
+			ToEnvironment:     "staging",
+			RequesterID:       "api.developer",
+			CreatedAt:         time.Now().Add(-30 * time.Minute),
 			RequiredApprovals: 1,
 			CurrentApprovals:  0,
 			TimeRemaining:     23*time.Hour + 30*time.Minute,

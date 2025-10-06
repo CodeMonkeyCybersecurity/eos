@@ -76,10 +76,10 @@ Examples:
 
 		// Create validator
 		validator, err := build.NewBuildValidator(rc, &build.ValidatorConfig{
-			Strict:         strict,
-			Environment:    environment,
+			Strict:           strict,
+			Environment:      environment,
 			DependenciesOnly: depsOnly,
-			AutoFix:        fix,
+			AutoFix:          fix,
 		})
 		if err != nil {
 			logger.Error("Failed to create build validator", zap.Error(err))
@@ -191,16 +191,16 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 	fmt.Printf("═════════════════════════\n\n")
 
 	for _, result := range results {
-		status := "✅ VALID"
+		status := " VALID"
 		if !result.Valid {
 			status = "❌ INVALID"
 		} else if len(result.Warnings) > 0 {
-			status = "⚠️  VALID (with warnings)"
+			status = "VALID (with warnings)"
 		}
 
 		fmt.Printf("Component: %s\n", result.Component)
 		fmt.Printf("Status:    %s\n", status)
-		fmt.Printf("Checks:    %d passed, %d failed, %d warnings\n", 
+		fmt.Printf("Checks:    %d passed, %d failed, %d warnings\n",
 			result.ChecksPassed, len(result.Errors), len(result.Warnings))
 		fmt.Printf("\n")
 
@@ -217,7 +217,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 		if len(result.Warnings) > 0 {
 			fmt.Printf("Warnings:\n")
 			for _, warning := range result.Warnings {
-				fmt.Printf("  ⚠️  %s\n", warning)
+				fmt.Printf("  %s\n", warning)
 			}
 			fmt.Printf("\n")
 		}
@@ -270,7 +270,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 	if invalid > 0 {
 		fmt.Printf("\n❌ %d component(s) failed validation\n", invalid)
 	} else {
-		fmt.Printf("\n✅ All components passed validation\n")
+		fmt.Printf("\n All components passed validation\n")
 	}
 
 	return nil
@@ -280,7 +280,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 func displayValidationResultsJSON(results []*build.ValidationResult) error {
 	fmt.Printf("{\n")
 	fmt.Printf("  \"validation_results\": [\n")
-	
+
 	for i, result := range results {
 		fmt.Printf("    {\n")
 		fmt.Printf("      \"component\": \"%s\",\n", result.Component)
@@ -289,14 +289,14 @@ func displayValidationResultsJSON(results []*build.ValidationResult) error {
 		fmt.Printf("      \"errors\": %d,\n", len(result.Errors))
 		fmt.Printf("      \"warnings\": %d,\n", len(result.Warnings))
 		fmt.Printf("      \"suggestions\": %d\n", len(result.Suggestions))
-		
+
 		if i < len(results)-1 {
 			fmt.Printf("    },\n")
 		} else {
 			fmt.Printf("    }\n")
 		}
 	}
-	
+
 	fmt.Printf("  ]\n")
 	fmt.Printf("}\n")
 	return nil
@@ -305,7 +305,7 @@ func displayValidationResultsJSON(results []*build.ValidationResult) error {
 // displayValidationResultsYAML displays validation results in YAML format
 func displayValidationResultsYAML(results []*build.ValidationResult) error {
 	fmt.Printf("validation_results:\n")
-	
+
 	for _, result := range results {
 		fmt.Printf("- component: %s\n", result.Component)
 		fmt.Printf("  valid: %t\n", result.Valid)
@@ -314,6 +314,6 @@ func displayValidationResultsYAML(results []*build.ValidationResult) error {
 		fmt.Printf("  warnings: %d\n", len(result.Warnings))
 		fmt.Printf("  suggestions: %d\n", len(result.Suggestions))
 	}
-	
+
 	return nil
 }

@@ -110,7 +110,7 @@ Examples:
 			}
 
 			// Final systemd daemon reload (lifecycle manager may have already done this, but safe to repeat)
-			logger.Info("🔄 Final systemd daemon reload")
+			logger.Info(" Final systemd daemon reload")
 			serviceManager := serviceutil.NewServiceManager(rc)
 			if err := serviceManager.DaemonReload(); err != nil {
 				logger.Warn(" Failed to reload systemd daemon", zap.Error(err))

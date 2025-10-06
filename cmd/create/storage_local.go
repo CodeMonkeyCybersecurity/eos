@@ -37,7 +37,7 @@ func init() {
 	StorageLocalCmd.Flags().StringVar(&localMountPoint, "mount", "", "Mount point (required)")
 	StorageLocalCmd.Flags().StringSliceVar(&localOptions, "options", []string{}, "Mount options")
 	StorageLocalCmd.Flags().BoolVar(&forceFormat, "force", false, "Force format even if device has data")
-	
+
 	StorageLocalCmd.MarkFlagRequired("mount")
 }
 
@@ -86,7 +86,7 @@ func runCreateStorageLocal(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 	}
 
 	// Display results
-	fmt.Printf("✅ Local storage volume created successfully:\n")
+	fmt.Printf(" Local storage volume created successfully:\n")
 	fmt.Printf("   Name: %s\n", volumeName)
 	fmt.Printf("   Device: %s\n", diskInfo.Device)
 	fmt.Printf("   UUID: %s\n", diskInfo.UUID)

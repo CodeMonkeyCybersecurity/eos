@@ -70,7 +70,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 			return fmt.Errorf("DNS reconciliation failed: %w", err)
 		}
 
-		fmt.Printf("🔄 DNS Reconciliation Results:\n")
+		fmt.Printf(" DNS Reconciliation Results:\n")
 		fmt.Printf("  Created: %d domains\n", len(result.Created))
 		fmt.Printf("  Updated: %d domains\n", len(result.Updated))
 		fmt.Printf("  Deleted: %d domains\n", len(result.Deleted))
@@ -81,7 +81,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 			fmt.Printf("📝 Created domains: %v\n", result.Created)
 		}
 		if len(result.Updated) > 0 {
-			fmt.Printf("🔄 Updated domains: %v\n", result.Updated)
+			fmt.Printf(" Updated domains: %v\n", result.Updated)
 		}
 		if len(result.Deleted) > 0 {
 			fmt.Printf("🗑️  Deleted domains: %v\n", result.Deleted)
@@ -110,7 +110,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		fmt.Printf("  Last Reconcile:    %s\n\n", metrics.LastReconcile.Format(time.RFC3339))
 
 		if metrics.OrphanedRecords > 0 {
-			fmt.Printf("⚠️  Found %d orphaned DNS records. Run with --reconcile to clean them up.\n\n", metrics.OrphanedRecords)
+			fmt.Printf("Found %d orphaned DNS records. Run with --reconcile to clean them up.\n\n", metrics.OrphanedRecords)
 		}
 	}
 

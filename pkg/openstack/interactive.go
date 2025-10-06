@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
@@ -18,7 +18,7 @@ func InteractiveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Println("\n🔧 OpenStack Interactive Configuration")
+	fmt.Println("\n OpenStack Interactive Configuration")
 	fmt.Println("══════════════════════════════════════")
 	fmt.Println("We'll guide you through the configuration process.")
 	fmt.Println("Press Enter to accept the default value [shown in brackets].")
@@ -65,7 +65,7 @@ func InteractiveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 	fmt.Print("\nProceed with this configuration? [Y/n]: ")
 	confirm, _ := reader.ReadString('\n')
 	confirm = strings.TrimSpace(strings.ToLower(confirm))
-	
+
 	if confirm == "n" || confirm == "no" {
 		return eos_err.NewUserError("Configuration cancelled by user")
 	}
@@ -82,11 +82,11 @@ func promptDeploymentMode(reader *bufio.Reader, config *Config) error {
 	fmt.Println("2. Controller Node (Production)")
 	fmt.Println("3. Compute Node (Add to existing cluster)")
 	fmt.Println("4. Storage Node (Add storage to cluster)")
-	
+
 	fmt.Printf("\nSelect deployment mode [1]: ")
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
-	
+
 	if choice == "" {
 		choice = "1"
 	}
@@ -125,7 +125,7 @@ func promptDeploymentMode(reader *bufio.Reader, config *Config) error {
 func promptNetworkConfig(reader *bufio.Reader, config *Config) error {
 	fmt.Println("\n🌐 Network Configuration")
 	fmt.Println("───────────────────────")
-	
+
 	// Skip for storage nodes
 	if config.Mode == ModeStorage {
 		config.NetworkType = NetworkProvider // Default
@@ -135,11 +135,11 @@ func promptNetworkConfig(reader *bufio.Reader, config *Config) error {
 	fmt.Println("1. Provider Networks (External network access)")
 	fmt.Println("2. Tenant Networks (Isolated overlay networks)")
 	fmt.Println("3. Hybrid (Both provider and tenant)")
-	
+
 	fmt.Printf("\nSelect network type [1]: ")
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
-	
+
 	if choice == "" {
 		choice = "1"
 	}
@@ -160,7 +160,7 @@ func promptNetworkConfig(reader *bufio.Reader, config *Config) error {
 		fmt.Print("Provider network interface (e.g., eth1): ")
 		iface, _ := reader.ReadString('\n')
 		config.ProviderInterface = strings.TrimSpace(iface)
-		
+
 		if config.ProviderInterface == "" {
 			// Try to detect available interfaces
 			interfaces := detectNetworkInterfaces()
@@ -199,7 +199,7 @@ func promptNetworkConfig(reader *bufio.Reader, config *Config) error {
 func promptStorageConfig(reader *bufio.Reader, config *Config) error {
 	fmt.Println("\n💾 Storage Configuration")
 	fmt.Println("───────────────────────")
-	
+
 	// Skip for compute-only nodes
 	if config.Mode == ModeCompute {
 		config.StorageBackend = StorageLVM // Default
@@ -209,11 +209,11 @@ func promptStorageConfig(reader *bufio.Reader, config *Config) error {
 	fmt.Println("1. LVM (Local storage)")
 	fmt.Println("2. Ceph (Distributed storage)")
 	fmt.Println("3. NFS (Network storage)")
-	
+
 	fmt.Printf("\nSelect storage backend [1]: ")
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
-	
+
 	if choice == "" {
 		choice = "1"
 	}
@@ -239,7 +239,7 @@ func promptStorageConfig(reader *bufio.Reader, config *Config) error {
 				config.CephMonitors[i] = strings.TrimSpace(config.CephMonitors[i])
 			}
 		}
-		
+
 		fmt.Printf("Ceph pool name [volumes]: ")
 		pool, _ := reader.ReadString('\n')
 		config.CephPool = strings.TrimSpace(pool)
@@ -255,7 +255,7 @@ func promptStorageConfig(reader *bufio.Reader, config *Config) error {
 		if config.NFSServer == "" {
 			return eos_err.NewUserError("NFS server address is required")
 		}
-		
+
 		fmt.Printf("NFS export path [/openstack/volumes]: ")
 		path, _ := reader.ReadString('\n')
 		config.NFSExportPath = strings.TrimSpace(path)
@@ -274,10 +274,10 @@ func promptStorageConfig(reader *bufio.Reader, config *Config) error {
 func promptEndpointConfig(reader *bufio.Reader, config *Config) error {
 	fmt.Println("\n🌍 Endpoint Configuration")
 	fmt.Println("────────────────────────")
-	
+
 	// Get hostname if not set
 	hostname, _ := os.Hostname()
-	
+
 	// Public endpoint
 	fmt.Printf("Public endpoint URL [http://%s]: ", hostname)
 	public, _ := reader.ReadString('\n')
@@ -309,28 +309,28 @@ func promptEndpointConfig(reader *bufio.Reader, config *Config) error {
 func promptAuthentication(reader *bufio.Reader, config *Config) error {
 	fmt.Println("\n🔐 Authentication")
 	fmt.Println("────────────────")
-	
+
 	// Admin password
 	if config.AdminPassword == "" {
 		for {
 			fmt.Print("Admin password (8+ characters): ")
 			password, _ := reader.ReadString('\n')
 			password = strings.TrimSpace(password)
-			
+
 			if len(password) < 8 {
 				fmt.Println("❌ Password must be at least 8 characters")
 				continue
 			}
-			
+
 			fmt.Print("Confirm admin password: ")
 			confirm, _ := reader.ReadString('\n')
 			confirm = strings.TrimSpace(confirm)
-			
+
 			if password != confirm {
 				fmt.Println("❌ Passwords do not match")
 				continue
 			}
-			
+
 			config.AdminPassword = password
 			break
 		}
@@ -365,7 +365,7 @@ func promptAuthentication(reader *bufio.Reader, config *Config) error {
 func promptFeatures(reader *bufio.Reader, config *Config) error {
 	fmt.Println("\n✨ Features")
 	fmt.Println("──────────")
-	
+
 	// Dashboard
 	if config.Mode == ModeController || config.Mode == ModeAllInOne {
 		fmt.Printf("Enable Horizon dashboard? [Y/n]: ")
@@ -384,13 +384,13 @@ func promptFeatures(reader *bufio.Reader, config *Config) error {
 		fmt.Print("SSL certificate path: ")
 		cert, _ := reader.ReadString('\n')
 		config.SSLCertPath = strings.TrimSpace(cert)
-		
+
 		fmt.Print("SSL key path: ")
 		key, _ := reader.ReadString('\n')
 		config.SSLKeyPath = strings.TrimSpace(key)
-		
+
 		if config.SSLCertPath == "" || config.SSLKeyPath == "" {
-			fmt.Println("⚠️  SSL enabled but no certificates provided")
+			fmt.Println("SSL enabled but no certificates provided")
 			fmt.Println("   Self-signed certificates will be generated")
 		}
 	}
@@ -401,11 +401,11 @@ func promptFeatures(reader *bufio.Reader, config *Config) error {
 		fmt.Printf("Enable Swift (Object Storage)? [y/N]: ")
 		swift, _ := reader.ReadString('\n')
 		swift = strings.TrimSpace(strings.ToLower(swift))
-		
+
 		fmt.Printf("Enable Heat (Orchestration)? [y/N]: ")
 		heat, _ := reader.ReadString('\n')
 		heat = strings.TrimSpace(strings.ToLower(heat))
-		
+
 		// Build enabled services list
 		services := []Service{
 			ServiceKeystone,
@@ -414,7 +414,7 @@ func promptFeatures(reader *bufio.Reader, config *Config) error {
 			ServiceNeutron,
 			ServiceCinder,
 		}
-		
+
 		if swift == "y" || swift == "yes" {
 			services = append(services, ServiceSwift)
 		}
@@ -424,7 +424,7 @@ func promptFeatures(reader *bufio.Reader, config *Config) error {
 		if config.EnableDashboard {
 			services = append(services, ServiceHorizon)
 		}
-		
+
 		config.EnabledServices = services
 	}
 
@@ -435,13 +435,13 @@ func promptFeatures(reader *bufio.Reader, config *Config) error {
 func promptIntegrations(reader *bufio.Reader, config *Config) error {
 	fmt.Println("\n🔗 Integrations")
 	fmt.Println("──────────────")
-	
+
 	// Vault integration
 	fmt.Printf("Enable Vault integration for secrets? [y/N]: ")
 	vault, _ := reader.ReadString('\n')
 	vault = strings.TrimSpace(strings.ToLower(vault))
 	config.VaultIntegration = vault == "y" || vault == "yes"
-	
+
 	if config.VaultIntegration {
 		fmt.Print("Vault server address: ")
 		addr, _ := reader.ReadString('\n')
@@ -460,7 +460,7 @@ func promptIntegrations(reader *bufio.Reader, config *Config) error {
 	consul, _ := reader.ReadString('\n')
 	consul = strings.TrimSpace(strings.ToLower(consul))
 	config.ConsulIntegration = consul == "y" || consul == "yes"
-	
+
 	if config.ConsulIntegration {
 		fmt.Print("Consul server address: ")
 		addr, _ := reader.ReadString('\n')
@@ -478,11 +478,11 @@ func promptIntegrations(reader *bufio.Reader, config *Config) error {
 	fmt.Printf("Enable LDAP/AD authentication? [y/N]: ")
 	ldap, _ := reader.ReadString('\n')
 	ldap = strings.TrimSpace(strings.ToLower(ldap))
-	
+
 	if ldap == "y" || ldap == "yes" {
 		// This would prompt for LDAP configuration
 		// Simplified for this example
-		fmt.Println("⚠️  LDAP configuration will be required post-installation")
+		fmt.Println("LDAP configuration will be required post-installation")
 	}
 
 	return nil
@@ -492,22 +492,22 @@ func promptIntegrations(reader *bufio.Reader, config *Config) error {
 func displayConfigSummary(config *Config) {
 	fmt.Println("\n📊 Configuration Summary")
 	fmt.Println("═══════════════════════")
-	
+
 	fmt.Printf("Deployment Mode:    %s\n", formatMode(config.Mode))
 	fmt.Printf("Network Type:       %s\n", formatNetworkType(config.NetworkType))
 	fmt.Printf("Storage Backend:    %s\n", formatStorageBackend(config.StorageBackend))
 	fmt.Printf("Dashboard:          %s\n", formatBool(config.EnableDashboard))
 	fmt.Printf("SSL/TLS:            %s\n", formatBool(config.EnableSSL))
-	
+
 	if config.ProviderInterface != "" {
 		fmt.Printf("Provider Interface: %s\n", config.ProviderInterface)
 	}
-	
+
 	fmt.Println("\nEndpoints:")
 	fmt.Printf("  Public:   %s\n", config.PublicEndpoint)
 	fmt.Printf("  Internal: %s\n", config.InternalEndpoint)
 	fmt.Printf("  Admin:    %s\n", config.AdminEndpoint)
-	
+
 	if config.VaultIntegration || config.ConsulIntegration {
 		fmt.Println("\nIntegrations:")
 		if config.VaultIntegration {
@@ -517,7 +517,7 @@ func displayConfigSummary(config *Config) {
 			fmt.Printf("  Consul: %s\n", config.ConsulAddress)
 		}
 	}
-	
+
 	fmt.Println("\nServices to Install:")
 	for _, svc := range config.GetEnabledServices() {
 		fmt.Printf("  • %s\n", svc)

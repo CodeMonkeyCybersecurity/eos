@@ -52,7 +52,7 @@ func RequireRoot(rc *eos_io.RuntimeContext, commandName string) error {
 			zap.String("command", commandName),
 			zap.Int("current_uid", os.Geteuid()))
 
-		fmt.Printf("\n⚠️  The '%s' command requires root privileges.\n", commandName)
+		fmt.Printf("\nThe '%s' command requires root privileges.\n", commandName)
 		fmt.Println("\nPlease run with sudo:")
 		fmt.Printf("  sudo %s\n\n", strings.Join(os.Args, " "))
 
@@ -71,7 +71,7 @@ func CheckDependency(command string) bool {
 func PromptInstallDependency(rc *eos_io.RuntimeContext, depName, depDescription string, installFunc func() error) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	fmt.Printf("\n⚠️  Required dependency '%s' is not installed.\n", depName)
+	fmt.Printf("\nRequired dependency '%s' is not installed.\n", depName)
 	if depDescription != "" {
 		fmt.Printf("   %s\n", depDescription)
 	}
@@ -97,6 +97,6 @@ func PromptInstallDependency(rc *eos_io.RuntimeContext, depName, depDescription 
 		return fmt.Errorf("failed to install %s: %w", depName, err)
 	}
 
-	fmt.Printf("\n✅ Successfully installed %s!\n", depName)
+	fmt.Printf("\n Successfully installed %s!\n", depName)
 	return nil
 }

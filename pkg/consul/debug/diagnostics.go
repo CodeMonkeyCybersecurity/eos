@@ -20,57 +20,57 @@ type Config struct {
 
 // DiagnosticResult holds the results of a diagnostic check
 type DiagnosticResult struct {
-	CheckName   string
-	Success     bool
-	Message     string
-	Details     []string
-	FixApplied  bool
-	FixMessage  string
+	CheckName  string
+	Success    bool
+	Message    string
+	Details    []string
+	FixApplied bool
+	FixMessage string
 }
 
 // RunDiagnostics performs comprehensive Consul debugging following Assess → Intervene → Evaluate pattern
 func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting Consul debug diagnostics",
 		zap.Bool("auto_fix", config.AutoFix),
 		zap.Bool("kill_processes", config.KillProcesses),
 		zap.Bool("test_start", config.TestStart))
-	
+
 	results := []DiagnosticResult{}
-	
+
 	// ASSESS - Run all diagnostic checks
 	logger.Info("=== ASSESS PHASE: Running diagnostic checks ===")
-	
+
 	// 1. Check for port conflicts
 	portResult := checkPortConflicts(rc)
 	results = append(results, portResult)
-	
+
 	// 2. Check for lingering processes
 	processResult := checkLingeringProcesses(rc)
 	results = append(results, processResult)
-	
+
 	// 3. Analyze configuration
 	configResult := analyzeConfiguration(rc)
 	results = append(results, configResult)
-	
+
 	// 4. Check systemd service
 	serviceResult := checkSystemdService(rc)
 	results = append(results, serviceResult)
-	
+
 	// 5. Analyze logs
 	logResult := analyzeLogs(rc, config.LogLines)
 	results = append(results, logResult)
-	
+
 	// INTERVENE - Apply fixes if requested
 	if config.AutoFix || config.KillProcesses {
 		logger.Info("=== INTERVENE PHASE: Applying fixes ===")
-		
+
 		if config.KillProcesses && !processResult.Success {
 			killResult := killLingeringProcesses(rc)
 			results = append(results, killResult)
 		}
-		
+
 		if config.AutoFix {
 			// Apply configuration fixes
 			if !configResult.Success {
@@ -79,11 +79,11 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 			}
 		}
 	}
-	
+
 	// Test manual start if requested
 	if config.TestStart {
 		logger.Info("=== TEST PHASE: Testing manual Consul start ===")
-		
+
 		if config.MinimalConfig {
 			minimalResult := testMinimalConfiguration(rc)
 			results = append(results, minimalResult)
@@ -92,11 +92,11 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 			results = append(results, manualResult)
 		}
 	}
-	
+
 	// EVALUATE - Display results and recommendations
 	logger.Info("=== EVALUATE PHASE: Diagnostic Summary ===")
 	displayResults(rc, results)
-	
+
 	// Check if any critical issues remain
 	hasErrors := false
 	for _, result := range results {
@@ -105,12 +105,12 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 			break
 		}
 	}
-	
+
 	if hasErrors {
 		logger.Warn("Consul debugging completed with issues found")
 		return fmt.Errorf("consul debugging found issues that need attention")
 	}
-	
+
 	logger.Info("Consul debugging completed successfully")
 	return nil
 }
@@ -118,33 +118,33 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 // displayResults shows a formatted summary of all diagnostic results
 func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("========================================")
 	logger.Info("CONSUL DEBUG DIAGNOSTIC SUMMARY")
 	logger.Info("========================================")
-	
+
 	for _, result := range results {
-		status := "✅ PASS"
+		status := " PASS"
 		if !result.Success {
 			status = "❌ FAIL"
 		}
-		
+
 		logger.Info(fmt.Sprintf("%s: %s", status, result.CheckName),
 			zap.String("message", result.Message))
-		
+
 		if len(result.Details) > 0 {
 			for _, detail := range result.Details {
 				logger.Info("  → " + detail)
 			}
 		}
-		
+
 		if result.FixApplied {
 			logger.Info("  ✓ FIX APPLIED: " + result.FixMessage)
 		}
 	}
-	
+
 	logger.Info("========================================")
-	
+
 	// Provide recommendations
 	provideRecommendations(rc, results)
 }
@@ -152,16 +152,16 @@ func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 // provideRecommendations gives actionable advice based on diagnostic results
 func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("RECOMMENDATIONS:")
-	
+
 	recommendations := []string{}
-	
+
 	for _, result := range results {
 		if !result.Success {
 			switch result.CheckName {
 			case "Port Conflicts":
-				recommendations = append(recommendations, 
+				recommendations = append(recommendations,
 					"• Stop conflicting services or change Consul ports in configuration")
 			case "Lingering Processes":
 				recommendations = append(recommendations,
@@ -179,7 +179,7 @@ func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResul
 			}
 		}
 	}
-	
+
 	if len(recommendations) == 0 {
 		logger.Info("  ✓ No issues found - Consul should be ready to start")
 		logger.Info("  → Try: sudo systemctl start consul")

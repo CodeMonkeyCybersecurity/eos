@@ -330,7 +330,7 @@ func (pc *PackageCleanup) promptYesNo(prompt string) bool {
 func (result *CleanupResult) FormatResult() string {
 	var buf strings.Builder
 
-	buf.WriteString("🧹 System Cleanup Results\n")
+	buf.WriteString(" System Cleanup Results\n")
 	buf.WriteString("=========================\n\n")
 
 	if len(result.OrphanedPackages) > 0 {

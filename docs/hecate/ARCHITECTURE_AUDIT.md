@@ -12,24 +12,24 @@ This audit examines the Eos codebase to identify services that should follow the
 
 ## Audit Findings
 
-### ✅ Compliant Services
+###  Compliant Services
 
 #### 1. n8n (`pkg/n8n/`)
-- **Status**: ✅ COMPLIANT (Recently updated)
+- **Status**:  COMPLIANT (Recently updated)
 - **Pattern**: Deploys local nginx → registers with Hecate frontend
 - **Architecture**: Two-layer with proper separation
 - **Notes**: Reference implementation for other services
 
-### 🔄 Partially Compliant Services
+###  Partially Compliant Services
 
 #### 2. Helen (`pkg/helen/`)
-- **Status**: 🔄 PARTIAL - Uses nginx but no Hecate integration
+- **Status**:  PARTIAL - Uses nginx but no Hecate integration
 - **Current**: Deploys nginx via Nomad with Consul service discovery
 - **Missing**: Hecate frontend registration
 - **Recommendation**: Add Hecate route registration to complete two-layer pattern
 
 #### 3. Nomad Ingress (`cmd/create/nomad.go`)
-- **Status**: 🔄 PARTIAL - Has ingress concept but standalone
+- **Status**:  PARTIAL - Has ingress concept but standalone
 - **Current**: Deploys Caddy + nginx via Nomad jobs
 - **Issue**: Standalone deployment, not integrated with Hecate
 - **Recommendation**: Integrate with existing Hecate stack instead of standalone

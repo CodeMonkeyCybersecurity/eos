@@ -20,14 +20,14 @@ import (
 
 // UpdateTransaction represents a complete update transaction with rollback capability
 type UpdateTransaction struct {
-	StartTime      time.Time
-	GitCommitBefore string
-	GitStashRef     string
+	StartTime        time.Time
+	GitCommitBefore  string
+	GitStashRef      string
 	BackupBinaryPath string
-	TempBinaryPath string
-	ChangesPulled  bool
-	BinaryInstalled bool
-	Success        bool
+	TempBinaryPath   string
+	ChangesPulled    bool
+	BinaryInstalled  bool
+	Success          bool
 }
 
 // EnhancedUpdateConfig extends UpdateConfig with safety features
@@ -67,7 +67,7 @@ func NewEnhancedEosUpdater(rc *eos_io.RuntimeContext, config *EnhancedUpdateConf
 
 // UpdateWithRollback performs update with automatic rollback on failure
 func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
-	eeu.logger.Info("🔄 Starting enhanced self-update with rollback capability")
+	eeu.logger.Info(" Starting enhanced self-update with rollback capability")
 
 	// Phase 1: ASSESS - Pre-update safety checks
 	if err := eeu.PreUpdateSafetyChecks(); err != nil {
@@ -87,7 +87,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 				updateErr, rollbackErr)
 		}
 
-		eeu.logger.Info("✅ Rollback successful, system restored to previous state")
+		eeu.logger.Info(" Rollback successful, system restored to previous state")
 		return fmt.Errorf("update failed but rolled back successfully: %w", updateErr)
 	}
 
@@ -97,7 +97,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	}
 
 	eeu.transaction.Success = true
-	eeu.logger.Info("✅ Enhanced self-update completed successfully",
+	eeu.logger.Info(" Enhanced self-update completed successfully",
 		zap.Duration("duration", time.Since(eeu.transaction.StartTime)))
 
 	return nil
@@ -105,7 +105,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 
 // PreUpdateSafetyChecks performs comprehensive safety checks before updating
 func (eeu *EnhancedEosUpdater) PreUpdateSafetyChecks() error {
-	eeu.logger.Info("🔍 Phase 1: ASSESS - Running pre-update safety checks")
+	eeu.logger.Info(" Phase 1: ASSESS - Running pre-update safety checks")
 
 	// 1. Check if we're in the source directory
 	if err := eeu.verifySourceDirectory(); err != nil {
@@ -139,7 +139,7 @@ func (eeu *EnhancedEosUpdater) PreUpdateSafetyChecks() error {
 		return err
 	}
 
-	eeu.logger.Info("✅ All pre-update safety checks passed")
+	eeu.logger.Info(" All pre-update safety checks passed")
 	return nil
 }
 
@@ -184,7 +184,7 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 			return fmt.Errorf("repository has uncommitted changes and clean working tree is required")
 		}
 
-		eeu.logger.Warn("⚠️  Repository has uncommitted changes, will stash before update")
+		eeu.logger.Warn("Repository has uncommitted changes, will stash before update")
 
 		// Stash changes with a descriptive message
 		stashMsg := fmt.Sprintf("eos-self-update-auto-stash-%d", time.Now().Unix())
@@ -196,9 +196,9 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 
 		// Record stash reference for later recovery
 		eeu.transaction.GitStashRef = stashMsg
-		eeu.logger.Info("✅ Changes stashed", zap.String("stash_ref", stashMsg))
+		eeu.logger.Info(" Changes stashed", zap.String("stash_ref", stashMsg))
 	} else {
-		eeu.logger.Info("✅ Working tree is clean")
+		eeu.logger.Info(" Working tree is clean")
 	}
 
 	return nil
@@ -225,7 +225,7 @@ func (eeu *EnhancedEosUpdater) checkRunningProcesses() error {
 		}
 
 		if len(otherProcesses) > 0 {
-			eeu.logger.Warn("⚠️  Other eos processes are running",
+			eeu.logger.Warn("Other eos processes are running",
 				zap.Strings("pids", otherProcesses),
 				zap.String("warning", "They will continue using the old binary until restarted"))
 		}
@@ -267,7 +267,7 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 		return fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel")
 	}
 
-	eeu.logger.Info("✅ Build dependencies verified")
+	eeu.logger.Info(" Build dependencies verified")
 	return nil
 }
 
@@ -310,7 +310,7 @@ func (eeu *EnhancedEosUpdater) recordGitState() error {
 
 // executeUpdateTransaction performs the actual update with transaction tracking
 func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
-	eeu.logger.Info("🔧 Phase 2: INTERVENE - Executing update transaction")
+	eeu.logger.Info(" Phase 2: INTERVENE - Executing update transaction")
 
 	// Step 1: Create binary backup
 	if err := eeu.createTransactionBackup(); err != nil {
@@ -348,7 +348,7 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 		return fmt.Errorf("installed binary verification failed: %w", err)
 	}
 
-	eeu.logger.Info("✅ Update transaction completed successfully")
+	eeu.logger.Info(" Update transaction completed successfully")
 	return nil
 }
 
@@ -397,7 +397,7 @@ func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() error {
 			zap.String("commit", afterCommit[:8]))
 		// Continue anyway in case binary was deleted or corrupted
 	} else {
-		eeu.logger.Info("📥 Updates pulled",
+		eeu.logger.Info(" Updates pulled",
 			zap.String("from", beforeCommit[:8]),
 			zap.String("to", afterCommit[:8]))
 	}
@@ -444,7 +444,7 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 			return fmt.Errorf("atomic rename failed: %w", err)
 		}
 
-		eeu.logger.Info("✅ Binary installed atomically with lock protection")
+		eeu.logger.Info(" Binary installed atomically with lock protection")
 	} else {
 		// Standard installation
 		if err := eeu.InstallBinary(sourcePath); err != nil {
@@ -472,7 +472,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 		} else if err := os.WriteFile(eeu.config.BinaryPath, backup, 0755); err != nil {
 			rollbackErrors = append(rollbackErrors, fmt.Errorf("failed to restore backup: %w", err))
 		} else {
-			eeu.logger.Info("✅ Binary restored from backup")
+			eeu.logger.Info(" Binary restored from backup")
 		}
 	}
 
@@ -493,7 +493,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 		}
 
 		if !canHardReset {
-			eeu.logger.Warn("⚠️  Skipping git reset --hard because working tree has changes and no stash exists",
+			eeu.logger.Warn("Skipping git reset --hard because working tree has changes and no stash exists",
 				zap.String("manual_recovery", "Manually review changes before running: git reset --hard "+eeu.transaction.GitCommitBefore))
 			rollbackErrors = append(rollbackErrors,
 				fmt.Errorf("skipped git reset to protect uncommitted changes"))
@@ -504,7 +504,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				rollbackErrors = append(rollbackErrors,
 					fmt.Errorf("git reset failed: %w, output: %s", err, string(output)))
 			} else {
-				eeu.logger.Info("✅ Git repository reset to previous commit")
+				eeu.logger.Info(" Git repository reset to previous commit")
 			}
 		}
 	}
@@ -530,7 +530,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 						zap.String("manual_recovery", fmt.Sprintf("git stash apply stash@{0}")))
 					rollbackErrors = append(rollbackErrors, fmt.Errorf("stash pop failed: %w", err))
 				} else {
-					eeu.logger.Info("✅ Stashed changes restored")
+					eeu.logger.Info(" Stashed changes restored")
 				}
 			}
 		}
@@ -545,13 +545,13 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 		return fmt.Errorf("rollback encountered %d errors: %v", len(rollbackErrors), rollbackErrors)
 	}
 
-	eeu.logger.Info("✅ Rollback completed successfully")
+	eeu.logger.Info(" Rollback completed successfully")
 	return nil
 }
 
 // PostUpdateCleanup performs cleanup after successful update
 func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
-	eeu.logger.Info("🧹 Phase 3: EVALUATE - Post-update cleanup")
+	eeu.logger.Info(" Phase 3: EVALUATE - Post-update cleanup")
 
 	// Cleanup temp binary if it still exists
 	if eeu.transaction.TempBinaryPath != "" {
@@ -572,7 +572,7 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 		if err != nil {
 			eeu.logger.Warn("Could not check git status before stash pop", zap.Error(err))
 		} else if len(statusOutput) > 0 {
-			eeu.logger.Warn("⚠️  Working tree has uncommitted changes, cannot auto-restore stash",
+			eeu.logger.Warn("Working tree has uncommitted changes, cannot auto-restore stash",
 				zap.String("stash_ref", eeu.transaction.GitStashRef),
 				zap.String("manual_recovery", "Run: cd /opt/eos && git status && git stash pop"),
 				zap.String("reason", "Prevents merge conflicts"))
@@ -590,7 +590,7 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 			return fmt.Errorf("stash pop failed: %w", err)
 		}
 
-		eeu.logger.Info("✅ Stashed changes restored successfully")
+		eeu.logger.Info(" Stashed changes restored successfully")
 	}
 
 	return nil

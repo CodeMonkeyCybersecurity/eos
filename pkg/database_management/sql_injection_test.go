@@ -211,21 +211,21 @@ func TestSQLInjectionPrevention(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateSQLQuerySafety(tt.query)
-			
+
 			if tt.shouldAllow && err != nil {
-				t.Errorf("Query should be allowed but was blocked: %s\nQuery: %s\nError: %v", 
+				t.Errorf("Query should be allowed but was blocked: %s\nQuery: %s\nError: %v",
 					tt.description, tt.query, err)
 			}
-			
+
 			if !tt.shouldAllow && err == nil {
-				t.Errorf("Query should be blocked but was allowed: %s\nQuery: %s", 
+				t.Errorf("Query should be blocked but was allowed: %s\nQuery: %s",
 					tt.description, tt.query)
 			}
 
 			// Additional logging for debugging
 			if testing.Verbose() {
 				if tt.shouldAllow {
-					t.Logf("✅ ALLOWED: %s", tt.name)
+					t.Logf(" ALLOWED: %s", tt.name)
 				} else {
 					t.Logf("🚫 BLOCKED: %s (reason: %v)", tt.name, err)
 				}
@@ -247,31 +247,31 @@ func TestSQLInjectionFuzzing(t *testing.T) {
 		"' OR '1'='1' --",
 		"' OR '1'='1' /*",
 		"'; INSERT INTO users VALUES ('hacker', 'password'); --",
-		
+
 		// Union-based
 		"' UNION SELECT null, username, password FROM admin --",
 		"' UNION ALL SELECT password FROM users --",
 		"1' UNION SELECT @@version --",
-		
+
 		// Boolean-based
 		"1' AND 1=1 --",
 		"1' AND 1=2 --",
 		"1' AND (SELECT COUNT(*) FROM users) > 0 --",
-		
+
 		// Time-based
 		"1'; WAITFOR DELAY '00:00:05' --",
 		"1' AND (SELECT SLEEP(5)) --",
 		"1'; SELECT PG_SLEEP(5) --",
-		
+
 		// Error-based
 		"1' AND EXTRACTVALUE(1, CONCAT(0x7e, (SELECT @@version), 0x7e)) --",
 		"1' AND (SELECT * FROM (SELECT COUNT(*),CONCAT(version(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a) --",
-		
+
 		// Stacked queries
 		"1'; DELETE FROM users WHERE id=1; --",
 		"1'; UPDATE users SET password='hacked'; --",
 		"1'; ALTER TABLE users ADD COLUMN backdoor TEXT; --",
-		
+
 		// Advanced evasion
 		"1'/**/OR/**/1=1/**/--",
 		"1' /*!OR*/ 1=1 --",
@@ -285,7 +285,7 @@ func TestSQLInjectionFuzzing(t *testing.T) {
 			if err == nil {
 				t.Errorf("Malicious SQL payload was not blocked:\nPayload: %s", payload)
 			} else {
-				t.Logf("✅ Successfully blocked payload: %s (reason: %v)", payload, err)
+				t.Logf(" Successfully blocked payload: %s (reason: %v)", payload, err)
 			}
 		})
 	}
@@ -294,7 +294,7 @@ func TestSQLInjectionFuzzing(t *testing.T) {
 // BenchmarkSQLValidation benchmarks the SQL validation performance
 func BenchmarkSQLValidation(b *testing.B) {
 	testQuery := "SELECT name, email FROM users WHERE active = true AND created_at > NOW() - INTERVAL '30 days'"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = validateSQLQuerySafety(testQuery)
@@ -304,7 +304,7 @@ func BenchmarkSQLValidation(b *testing.B) {
 // BenchmarkSQLValidationMalicious benchmarks validation with malicious input
 func BenchmarkSQLValidationMalicious(b *testing.B) {
 	maliciousQuery := "SELECT * FROM users WHERE id = 1' OR '1'='1' UNION SELECT password FROM admin --"
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = validateSQLQuerySafety(maliciousQuery)

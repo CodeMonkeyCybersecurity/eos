@@ -69,7 +69,7 @@ Examples:
 		// Check if target environment exists before switching
 		targetEnv, err := envManager.GetEnvironment(rc, envName)
 		if err != nil {
-			logger.Error("Target environment not found", 
+			logger.Error("Target environment not found",
 				zap.String("environment", envName),
 				zap.Error(err))
 			return fmt.Errorf("environment '%s' not found. Use 'eos env list' to see available environments", envName)
@@ -80,14 +80,14 @@ Examples:
 			logger.Warn("Switching to non-active environment",
 				zap.String("environment", envName),
 				zap.String("status", string(targetEnv.Status)))
-			
-			fmt.Printf("⚠️  Warning: Environment '%s' is in '%s' status.\n", envName, targetEnv.Status)
+
+			fmt.Printf("Warning: Environment '%s' is in '%s' status.\n", envName, targetEnv.Status)
 			fmt.Printf("   Some operations may not work as expected.\n\n")
 		}
 
 		// Perform the environment switch
 		if err := envManager.UseEnvironment(rc, envName); err != nil {
-			logger.Error("Failed to switch environment", 
+			logger.Error("Failed to switch environment",
 				zap.String("environment", envName),
 				zap.Error(err))
 			return fmt.Errorf("failed to switch to environment '%s': %w", envName, err)
@@ -95,9 +95,9 @@ Examples:
 
 		// Success message
 		if currentEnvName == envName {
-			fmt.Printf("✅ Already using environment '%s' (%s)\n", targetEnv.DisplayName, envName)
+			fmt.Printf(" Already using environment '%s' (%s)\n", targetEnv.DisplayName, envName)
 		} else {
-			fmt.Printf("✅ Switched from '%s' to '%s' (%s)\n", currentEnvName, targetEnv.DisplayName, envName)
+			fmt.Printf(" Switched from '%s' to '%s' (%s)\n", currentEnvName, targetEnv.DisplayName, envName)
 		}
 
 		// Display basic environment info
@@ -109,9 +109,9 @@ Examples:
 		fmt.Printf("  Nomad:        %s\n", targetEnv.Infrastructure.Nomad.Address)
 		fmt.Printf("  Consul:       %s\n", targetEnv.Infrastructure.Consul.Address)
 		fmt.Printf("  Vault:        %s\n", targetEnv.Infrastructure.Vault.Address)
-		
+
 		if targetEnv.Infrastructure.Provider.Name != "" {
-			fmt.Printf("  Provider:     %s (%s)\n", 
+			fmt.Printf("  Provider:     %s (%s)\n",
 				targetEnv.Infrastructure.Provider.Name,
 				targetEnv.Infrastructure.Provider.Region)
 		}
@@ -129,7 +129,7 @@ Examples:
 				fmt.Printf("   • MFA is required for all operations\n")
 			}
 			if targetEnv.Security.AccessControl.Approval.Required {
-				fmt.Printf("   • Deployment approval is required (%d approvers)\n", 
+				fmt.Printf("   • Deployment approval is required (%d approvers)\n",
 					targetEnv.Security.AccessControl.Approval.MinApprovals)
 			}
 			if targetEnv.Security.AccessControl.RBAC.Enabled {

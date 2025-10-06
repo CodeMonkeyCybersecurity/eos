@@ -190,7 +190,7 @@ Common Use Cases:
 			fmt.Printf("Repository Reachable: %t\n", result.Analysis.RepositoryReachable)
 
 			if len(result.Analysis.ConnectivityIssues) > 0 {
-				fmt.Printf("\n⚠️  Connectivity Issues:\n")
+				fmt.Printf("\nConnectivity Issues:\n")
 				for _, issue := range result.Analysis.ConnectivityIssues {
 					fmt.Printf("  - %s\n", issue)
 				}
@@ -206,11 +206,11 @@ Common Use Cases:
 
 		if result.Success {
 			if config.AnalyzeOnly {
-				fmt.Printf("\n✅ Analysis completed successfully\n")
+				fmt.Printf("\n Analysis completed successfully\n")
 			} else if config.UpgradeAgent {
-				fmt.Printf("\n✅ Agent upgrade completed successfully in %v\n", result.Duration)
+				fmt.Printf("\n Agent upgrade completed successfully in %v\n", result.Duration)
 			} else {
-				fmt.Printf("\n✅ Agent re-registration completed successfully in %v\n", result.Duration)
+				fmt.Printf("\n Agent re-registration completed successfully in %v\n", result.Duration)
 			}
 		} else {
 			fmt.Printf("\n❌ Operation failed: %s\n", result.Error)

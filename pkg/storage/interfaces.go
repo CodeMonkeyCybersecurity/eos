@@ -76,11 +76,11 @@
 //
 // ## Implementation Status
 //
-// - ✅ Core interfaces and type system implemented
-// - ✅ Multi-backend support (LVM, BTRFS, ZFS, CephFS) operational
-// - ✅ Safety mechanisms with journaling and rollback active
-// - ✅ HashiCorp stack integration completed
-// - ✅ Comprehensive monitoring and metrics collection implemented
+// -  Core interfaces and type system implemented
+// -  Multi-backend support (LVM, BTRFS, ZFS, CephFS) operational
+// -  Safety mechanisms with journaling and rollback active
+// -  HashiCorp stack integration completed
+// -  Comprehensive monitoring and metrics collection implemented
 //
 // For detailed storage implementation, see:
 // - pkg/storage/types.go - Comprehensive type definitions and data structures

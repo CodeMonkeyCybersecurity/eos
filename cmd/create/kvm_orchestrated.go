@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	consulAddr   string
-	nomadAddr    string
-	enableNomad  bool
-	poolName     string
-	poolMinSize  int
-	poolMaxSize  int
-	scalePoolTo  int
+	consulAddr  string
+	nomadAddr   string
+	enableNomad bool
+	poolName    string
+	poolMinSize int
+	poolMaxSize int
+	scalePoolTo int
 )
 
 // NewKVMOrchestratedCmd creates the orchestrated KVM command
@@ -137,11 +137,11 @@ func createKVMPool(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	// Define the pool
 	pool := &orchestration.VMPool{
-		Name:        poolName,
-		MinSize:     poolMinSize,
-		MaxSize:     poolMaxSize,
-		VMTemplate:  "ubuntu-24.04",
-		Tags:        []string{"pool", poolName},
+		Name:       poolName,
+		MinSize:    poolMinSize,
+		MaxSize:    poolMaxSize,
+		VMTemplate: "ubuntu-24.04",
+		Tags:       []string{"pool", poolName},
 		ScalingRules: &orchestration.ScalingRules{
 			CPUThresholdUp:     80.0,
 			CPUThresholdDown:   20.0,
@@ -162,7 +162,7 @@ func createKVMPool(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.String("name", poolName),
 		zap.Int("initial_size", poolMinSize))
 
-	fmt.Printf("\n✅ VM pool '%s' created successfully!\n", poolName)
+	fmt.Printf("\n VM pool '%s' created successfully!\n", poolName)
 	fmt.Printf("Minimum VMs: %d\n", poolMinSize)
 	fmt.Printf("Maximum VMs: %d\n", poolMaxSize)
 	fmt.Printf("Auto-scaling: Enabled\n")

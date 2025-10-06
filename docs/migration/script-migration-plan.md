@@ -72,7 +72,7 @@ As of March 7, 2025, the following high-priority scripts have been successfully 
 - **Commands Added**: `eos backup docker` - Comprehensive Docker environment backup
 - **Features**: Container export, image archival, volume backup with versioning, network configuration export, environment variable extraction, Swarm configuration backup, compose file discovery, parallel execution, compression, retention policies
 
-### 🔄 Remaining Scripts (Phases 2-4)
+###  Remaining Scripts (Phases 2-4)
 
 ## Detailed Migration Plan
 

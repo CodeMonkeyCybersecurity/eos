@@ -65,10 +65,10 @@
 //
 // ## Implementation Status:
 //
-// - ✅ All critical vulnerabilities patched
-// - ✅ Comprehensive security testing framework active
-// - ✅ Continuous security monitoring implemented
-// - ✅ Security metrics and compliance reporting operational
+// -  All critical vulnerabilities patched
+// -  Comprehensive security testing framework active
+// -  Continuous security monitoring implemented
+// -  Security metrics and compliance reporting operational
 //
 // For detailed security testing implementation, see:
 // - pkg/security/security_testing/ - Security test framework

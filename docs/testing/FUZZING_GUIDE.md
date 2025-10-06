@@ -60,7 +60,7 @@ SECURITY_FOCUS=true ./scripts/eos-fuzz.sh 5m
 # Architecture compliance testing  
 ARCHITECTURE_TESTING=true ./scripts/eos-fuzz.sh 2m
 
-# 🔄 Legacy Framework (Deprecated)
+#  Legacy Framework (Deprecated)
 ./scripts/run-fuzz-tests.sh 5s  # Use eos-fuzz.sh instead
 ```
 
@@ -70,7 +70,7 @@ ARCHITECTURE_TESTING=true ./scripts/eos-fuzz.sh 2m
 # 🆕 New Framework (Recommended)
 SECURITY_FOCUS=true ARCHITECTURE_TESTING=true ./scripts/eos-fuzz.sh 8h
 
-# 🔄 Legacy Framework (Deprecated)
+#  Legacy Framework (Deprecated)
 ./assets/overnight-fuzz.sh  # Use eos-fuzz.sh instead
 ```
 
@@ -99,7 +99,7 @@ Lightweight version optimized for continuous integration environments.
 - Security alerting
 - Performance optimized
 
-### 🔄 Legacy Scripts (Deprecated)
+###  Legacy Scripts (Deprecated)
 
 #### `run-fuzz-tests.sh` - Legacy Framework
 Original fuzzing script with architectural and security issues.

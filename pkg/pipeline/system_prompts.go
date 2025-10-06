@@ -1033,7 +1033,7 @@ func groupChangesByFile(changes []delphi_channels.ChannelChange) map[string][]de
 func getChangeTypeEmoji(changeType string) string {
 	switch changeType {
 	case "listen_channel":
-		return "📥"
+		return ""
 	case "notify_channel":
 		return "📤"
 	case "pg_notify":

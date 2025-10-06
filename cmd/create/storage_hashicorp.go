@@ -99,7 +99,7 @@ func runCreateStorageHashiCorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, ar
 		zap.Int64("size", volume.Size),
 		zap.String("status", volume.Status))
 
-	fmt.Printf("✅ Storage volume created:\n")
+	fmt.Printf(" Storage volume created:\n")
 	fmt.Printf("   ID: %s\n", volume.ID)
 	fmt.Printf("   Name: %s\n", volume.Name)
 	fmt.Printf("   Size: %s\n", formatBytes(volume.Size))

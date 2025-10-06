@@ -71,7 +71,7 @@ run_fuzz_test() {
         
         echo "${test_name} completed successfully"
         echo "📊 Found ${inputs} new interesting inputs"
-        echo "🔄 Executed ${executions} test cases"
+        echo " Executed ${executions} test cases"
         echo "⏰ Duration: ${elapsed}s"
         
         # Update report
@@ -101,7 +101,7 @@ run_parallel_tests() {
     # Get array contents dynamically (bash 3.x compatible)
     eval "local test_array=(\"\${${array_name}[@]}\")"
     
-    echo "🔄 Running ${#test_array[@]} tests with ${max_parallel} parallel jobs..."
+    echo " Running ${#test_array[@]} tests with ${max_parallel} parallel jobs..."
     
     local pids=()
     local active_jobs=0
@@ -331,7 +331,7 @@ echo "========================="
 echo " Log directory: ${LOG_DIR}"
 echo "📄 Main report: ${REPORT_FILE}"
 echo "📈 Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed)"
-echo "🔍 New inputs discovered: ${total_inputs}"
+echo " New inputs discovered: ${total_inputs}"
 echo "⚡ Total executions: ${total_executions}"
 echo "⏰ Estimated duration: ${estimated_hours}h"
 echo ""

@@ -705,7 +705,7 @@ func (sm *ServiceManager) RestartService(service Service) error {
 // DiagnosePortConflict provides detailed diagnostic information about a port conflict
 func (sm *ServiceManager) DiagnosePortConflict(port int) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
-	logger.Info("🔍 Diagnosing port conflict", zap.Int("port", port))
+	logger.Info(" Diagnosing port conflict", zap.Int("port", port))
 
 	// Show what's using the port with lsof
 	logger.Info("Process details from lsof:")

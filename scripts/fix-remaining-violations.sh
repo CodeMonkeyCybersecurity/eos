@@ -3,7 +3,7 @@
 
 set -e
 
-echo "🔧 Fixing remaining logging violations..."
+echo " Fixing remaining logging violations..."
 
 # Function to add logger initialization if missing
 add_logger_init() {

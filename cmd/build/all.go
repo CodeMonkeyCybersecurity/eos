@@ -127,7 +127,7 @@ Examples:
 
 		// Dry run - show what would be built
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No builds will be executed\n")
+			fmt.Printf(" Dry Run - No builds will be executed\n")
 			return nil
 		}
 
@@ -165,21 +165,21 @@ Examples:
 		if len(results) > 0 {
 			fmt.Printf("Component Results:\n")
 			fmt.Printf("──────────────────\n")
-			
+
 			// Sort results by name for consistent output
 			sort.Slice(results, func(i, j int) bool {
 				return results[i].Component < results[j].Component
 			})
 
 			for _, result := range results {
-				status := "✅"
+				status := ""
 				if !result.Success {
 					status = "❌"
 				}
-				fmt.Printf("%s %-20s %s (%s)\n", 
-					status, 
-					result.Component, 
-					result.Tag, 
+				fmt.Printf("%s %-20s %s (%s)\n",
+					status,
+					result.Component,
+					result.Tag,
 					result.Duration)
 			}
 		}

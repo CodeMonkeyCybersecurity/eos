@@ -15,7 +15,7 @@ import (
 // InstallGitHubCLI installs the GitHub CLI
 func InstallGitHubCLI(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if already installed
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "which",
@@ -24,7 +24,7 @@ func InstallGitHubCLI(rc *eos_io.RuntimeContext) error {
 		Timeout: 5 * time.Second,
 	}); err == nil {
 		logger.Info("GitHub CLI already installed")
-		
+
 		// Check version
 		if version, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "gh",
@@ -38,14 +38,14 @@ func InstallGitHubCLI(rc *eos_io.RuntimeContext) error {
 	}
 
 	logger.Info("Installing GitHub CLI")
-	
+
 	// Add GitHub CLI repository
 	logger.Info("Adding GitHub CLI repository")
-	
+
 	// Download and add GPG key
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "bash",
-		Args: []string{"-c", `curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg`},
+		Args:    []string{"-c", `curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg`},
 		Timeout: 30 * time.Second,
 	}); err != nil {
 		return fmt.Errorf("failed to add GitHub CLI GPG key: %w", err)
@@ -97,7 +97,7 @@ func InstallGitHubCLI(rc *eos_io.RuntimeContext) error {
 // AuthenticateGitHub guides the user through GitHub authentication
 func AuthenticateGitHub(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if already authenticated
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "gh",
@@ -119,7 +119,7 @@ func AuthenticateGitHub(rc *eos_io.RuntimeContext, config *Config) error {
 
 	// Ask user preference
 	useWeb := interaction.PromptYesNo(rc.Ctx, "Would you like to authenticate via web browser?", true)
-	
+
 	var authCmd []string
 	if useWeb {
 		fmt.Println("\nStarting web-based authentication...")
@@ -132,7 +132,7 @@ func AuthenticateGitHub(rc *eos_io.RuntimeContext, config *Config) error {
 		fmt.Println("3. Run: gh auth login")
 		fmt.Println("4. Choose 'GitHub.com' → 'Paste an authentication token'")
 		fmt.Println()
-		
+
 		if !interaction.PromptYesNo(rc.Ctx, "Ready to proceed with token authentication?", true) {
 			return fmt.Errorf("authentication cancelled by user")
 		}
@@ -150,7 +150,7 @@ func AuthenticateGitHub(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("Running GitHub authentication", zap.String("command", authCmdStr))
 	fmt.Printf("\nRunning: %s\n", authCmdStr)
 	fmt.Println("Please follow the prompts...")
-	
+
 	// Note: We can't capture interactive commands, so we let it run in the terminal
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "bash",
@@ -159,7 +159,7 @@ func AuthenticateGitHub(rc *eos_io.RuntimeContext, config *Config) error {
 	}); err != nil {
 		// Check if it's just a timeout or actual failure
 		if strings.Contains(err.Error(), "timeout") {
-			fmt.Println("\n⚠️  Authentication is taking longer than expected.")
+			fmt.Println("\nAuthentication is taking longer than expected.")
 			fmt.Println("   Please complete the authentication process manually.")
 			return nil
 		}
@@ -168,12 +168,12 @@ func AuthenticateGitHub(rc *eos_io.RuntimeContext, config *Config) error {
 
 	// Verify authentication
 	fmt.Println("\nVerifying authentication...")
-	
+
 	verifyCmdStr := fmt.Sprintf("gh auth status")
 	if config.User != "" && config.User != "root" {
 		verifyCmdStr = fmt.Sprintf("sudo -u %s gh auth status", config.User)
 	}
-	
+
 	if output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "bash",
 		Args:    []string{"-c", verifyCmdStr},

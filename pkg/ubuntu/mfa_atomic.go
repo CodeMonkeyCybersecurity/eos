@@ -401,7 +401,7 @@ func (a *AtomicMFAConfig) Cleanup() error {
 				_ = os.Remove(file) // Ignore errors for cleanup
 			}
 		}
-		a.logger.Info("🧹 Cleaned up temporary files", zap.String("backup_dir", a.backupDir))
+		a.logger.Info(" Cleaned up temporary files", zap.String("backup_dir", a.backupDir))
 	}
 	return nil
 }

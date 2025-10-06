@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -209,7 +209,7 @@ Examples:
 
 		// Dry run - show what would be promoted
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No actual promotion will be executed\n")
+			fmt.Printf(" Dry Run - No actual promotion will be executed\n")
 			fmt.Printf("\nStack Promotion Steps (would execute):\n")
 			fmt.Printf("1. Validate all stack components in source environment\n")
 			fmt.Printf("2. Check target environment compatibility for stack\n")
@@ -258,7 +258,7 @@ Examples:
 		}
 
 		// Display stack promotion results
-		fmt.Printf("✅ Stack promotion completed\n")
+		fmt.Printf(" Stack promotion completed\n")
 		fmt.Printf("\nStack Promotion Results:\n")
 		fmt.Printf("────────────────────────\n")
 		fmt.Printf("Stack:               %s\n", stackName)
@@ -272,13 +272,13 @@ Examples:
 		// Show component results
 		fmt.Printf("\nComponent Results:\n")
 		for _, componentResult := range result.Results {
-			status := "✅"
+			status := ""
 			if !componentResult.Success {
 				status = "❌"
 			}
-			fmt.Printf("  %s %s - %s (took %s)\n", 
-				status, 
-				componentResult.Request.Component, 
+			fmt.Printf("  %s %s - %s (took %s)\n",
+				status,
+				componentResult.Request.Component,
 				componentResult.Request.Version,
 				componentResult.Duration)
 		}
@@ -293,7 +293,7 @@ Examples:
 			}
 
 			if !continueOnError {
-				fmt.Printf("\n⚠️  Stack promotion incomplete due to component failures.\n")
+				fmt.Printf("\nStack promotion incomplete due to component failures.\n")
 				fmt.Printf("Consider using --continue-on-error to promote remaining components.\n")
 			}
 		}
@@ -304,8 +304,8 @@ Examples:
 			fmt.Printf("To rollback the entire stack:\n")
 			for _, componentResult := range result.Results {
 				if componentResult.Success && componentResult.RollbackPlan != nil {
-					fmt.Printf("  eos rollback %s --to-version %s\n", 
-						componentResult.Request.Component, 
+					fmt.Printf("  eos rollback %s --to-version %s\n",
+						componentResult.Request.Component,
 						componentResult.RollbackPlan.PreviousVersion)
 				}
 			}
@@ -378,7 +378,7 @@ func generateStackPromotionID(stack, from, to string) string {
 
 func discoverStackComponents(rc *eos_io.RuntimeContext, stackName, environment string) ([]string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Discovering stack components",
 		zap.String("stack", stackName),
 		zap.String("environment", environment))
@@ -388,7 +388,7 @@ func discoverStackComponents(rc *eos_io.RuntimeContext, stackName, environment s
 	// - Environment registries
 	// - Deployment manifests
 	// - Service discovery
-	
+
 	// For now, return example components based on stack name
 	switch stackName {
 	case "webapp", "helen":

@@ -76,11 +76,11 @@
 //
 // ## Implementation Status
 //
-// - ✅ Documented requirements database implemented
-// - ✅ Transparent calculation methodology operational
-// - ✅ Flexible sizing options with scaling factors active
-// - ✅ Source attribution and version tracking implemented
-// - ✅ Integration with Eos deployment system operational
+// -  Documented requirements database implemented
+// -  Transparent calculation methodology operational
+// -  Flexible sizing options with scaling factors active
+// -  Source attribution and version tracking implemented
+// -  Integration with Eos deployment system operational
 //
 // For detailed sizing implementation, see:
 // - pkg/sizing/calculator.go - Hardware requirements calculation engine

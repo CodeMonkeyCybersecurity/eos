@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"os/exec"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	"os/exec"
 )
 
 // CommandRunner provides a consistent interface for running commands with retry logic
@@ -296,7 +297,7 @@ func (p *ProgressReporter) Update(message string) {
 
 // Complete marks the task as complete
 func (p *ProgressReporter) Complete(message string) {
-	p.logger.Info(fmt.Sprintf("terminal prompt: ✅ %s", message))
+	p.logger.Info(fmt.Sprintf("terminal prompt:  %s", message))
 }
 
 // Failed marks the task as failed

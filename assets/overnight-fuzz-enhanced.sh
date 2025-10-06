@@ -81,7 +81,7 @@ run_fuzz_test() {
             grep -A 10 "FAIL" "$log_file" >> "$LOG_DIR/crashes_$TIMESTAMP.log"
             echo "" >> "$LOG_DIR/crashes_$TIMESTAMP.log"
         else
-            echo -e "${YELLOW}  ⚠️  $test_name timed out or failed${NC}"
+            echo -e "${YELLOW}  $test_name timed out or failed${NC}"
         fi
         
         echo -e "${CYAN}     Duration: ${duration_secs}s${NC}"
@@ -378,7 +378,7 @@ fi
 echo -e "${BLUE}📄 Full report: $REPORT_FILE${NC}"
 
 if [ $CRASHES_FOUND -gt 0 ]; then
-    echo -e "${RED}⚠️  Crashes detected! See: $LOG_DIR/crashes_$TIMESTAMP.log${NC}"
+    echo -e "${RED}Crashes detected! See: $LOG_DIR/crashes_$TIMESTAMP.log${NC}"
     exit 1
 else
     echo -e "${GREEN} Fuzzing completed successfully!${NC}"

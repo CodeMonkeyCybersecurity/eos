@@ -9,17 +9,17 @@
 
 ## Executive Summary
 
-### Overall Status: ✅ **GOOD - Most Critical Issues Already Fixed**
+### Overall Status:  **GOOD - Most Critical Issues Already Fixed**
 
 The current Vault implementation has **already addressed the majority of critical issues** documented in the historical issues document. The codebase shows evidence of thoughtful refactoring and security improvements.
 
 **Key Findings:**
-- ✅ **7/7 P0 Critical Issues:** FIXED or ADDRESSED
+-  **7/7 P0 Critical Issues:** FIXED or ADDRESSED
 - ⚠️ **3/5 Security Warnings:** Present but properly documented
-- ✅ **Architecture:** Follows Eos patterns (Assess→Intervene→Evaluate)
-- ✅ **TLS Generation:** Auto-generates with proper paths (NO EMPTY STRINGS)
-- ✅ **Systemd Service:** Uses modern AmbientCapabilities syntax
-- ✅ **Path Consistency:** Uses `/var/lib/eos/secret/` (singular)
+-  **Architecture:** Follows Eos patterns (Assess→Intervene→Evaluate)
+-  **TLS Generation:** Auto-generates with proper paths (NO EMPTY STRINGS)
+-  **Systemd Service:** Uses modern AmbientCapabilities syntax
+-  **Path Consistency:** Uses `/var/lib/eos/secret/` (singular)
 - ⚠️ **Debug Commands:** Partial implementation exists
 
 ---
@@ -30,7 +30,7 @@ The current Vault implementation has **already addressed the majority of critica
 - Empty TLS cert paths in config (`tls_cert_file = ""`)
 - Vault would crash on startup with "error loading TLS cert: open : no such file or directory"
 
-### Current Status: ✅ **FIXED**
+### Current Status:  **FIXED**
 
 **Evidence:**
 
@@ -121,7 +121,7 @@ The current Vault implementation has **already addressed the majority of critica
    vi.runner.Run("chown", "vault:vault", keyPath)
    ```
 
-**Verdict:** ✅ **FULLY IMPLEMENTED** - All requirements from historical document met.
+**Verdict:**  **FULLY IMPLEMENTED** - All requirements from historical document met.
 
 ---
 
@@ -131,7 +131,7 @@ The current Vault implementation has **already addressed the majority of critica
 - `vault validate` would fail with exit code 127 (command not found)
 - Installation would continue with invalid configs
 
-### Current Status: ✅ **ADDRESSED**
+### Current Status:  **ADDRESSED**
 
 **Evidence:**
 
@@ -216,7 +216,7 @@ func manualValidateConfig(configPath string) error {
 ### Historical Problem
 - Inconsistent paths: `/var/lib/eos/secrets/` (plural) vs `/var/lib/eos/secret/` (singular)
 
-### Current Status: ✅ **FIXED**
+### Current Status:  **FIXED**
 
 **Evidence:**
 
@@ -239,7 +239,7 @@ func manualValidateConfig(configPath string) error {
 
 **Note:** There are some old test fixtures with plural paths, but these are test data and not runtime code.
 
-**Verdict:** ✅ **FULLY COMPLIANT** - Uses singular `/secret/` consistently.
+**Verdict:**  **FULLY COMPLIANT** - Uses singular `/secret/` consistently.
 
 ---
 
@@ -248,7 +248,7 @@ func manualValidateConfig(configPath string) error {
 ### Historical Problem
 - Deprecated `Capabilities=CAP_IPC_LOCK+ep` syntax
 
-### Current Status: ✅ **FIXED**
+### Current Status:  **FIXED**
 
 **Evidence:**
 
@@ -265,7 +265,7 @@ func manualValidateConfig(configPath string) error {
    - `PrivateDevices=true`
    - `ReadWritePaths=/opt/vault/data`
 
-**Verdict:** ✅ **FULLY COMPLIANT** - Uses modern systemd syntax with security hardening.
+**Verdict:**  **FULLY COMPLIANT** - Uses modern systemd syntax with security hardening.
 
 ---
 
@@ -289,7 +289,7 @@ The implementation correctly stores keys in `/var/lib/eos/secret/vault_init.json
 ```go
 // Add to install.go after initialization
 func (vi *VaultInstaller) displaySecurityWarnings() {
-    vi.logger.Warn("⚠️  SECURITY WARNING ⚠️")
+    vi.logger.Warn("SECURITY WARNING ⚠️")
     vi.logger.Warn("All unseal keys are stored in /var/lib/eos/secret/vault_init.json")
     vi.logger.Warn("This is INSECURE and suitable for development/testing ONLY.")
     vi.logger.Warn("")
@@ -310,7 +310,7 @@ func (vi *VaultInstaller) displaySecurityWarnings() {
 ### Historical Problem
 - Multiple vault binaries in different locations
 
-### Current Status: ✅ **ADDRESSED**
+### Current Status:  **ADDRESSED**
 
 **Evidence:**
 
@@ -357,7 +357,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 - Token files created with 640 instead of 600
 - Directories created before vault user exists
 
-### Current Status: ✅ **FIXED**
+### Current Status:  **FIXED**
 
 **Evidence:**
 
@@ -375,7 +375,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
    - Private key: 0600 (vault user only)
    - Ownership set to vault:vault
 
-**Verdict:** ✅ **FULLY COMPLIANT** - Correct order and permissions.
+**Verdict:**  **FULLY COMPLIANT** - Correct order and permissions.
 
 ---
 
@@ -434,11 +434,11 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 
 | Check | Status | Evidence |
 |-------|--------|----------|
-| Empty strings in `tls_cert_file` | ✅ PREVENTED | Config uses actual paths from generateSelfSignedCert() |
-| Empty strings in `tls_key_file` | ✅ PREVENTED | Config uses actual paths from generateSelfSignedCert() |
-| Deprecated `Capabilities=` syntax | ✅ PREVENTED | Uses AmbientCapabilities |
+| Empty strings in `tls_cert_file` |  PREVENTED | Config uses actual paths from generateSelfSignedCert() |
+| Empty strings in `tls_key_file` |  PREVENTED | Config uses actual paths from generateSelfSignedCert() |
+| Deprecated `Capabilities=` syntax |  PREVENTED | Uses AmbientCapabilities |
 | Multiple vault binaries | ⚠️ POSSIBLE | No active cleanup (but standard path used) |
-| Plural `/secrets/` path | ✅ PREVENTED | Constants use singular `/secret/` |
+| Plural `/secrets/` path |  PREVENTED | Constants use singular `/secret/` |
 | Skipping config validation | ⚠️ POSSIBLE | No validation in install flow yet |
 | Start service with invalid config | ⚠️ POSSIBLE | No pre-start validation yet |
 
@@ -448,7 +448,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 
 ## Architecture Assessment
 
-### Current Architecture: ✅ **GOOD - Follows Eos Patterns**
+### Current Architecture:  **GOOD - Follows Eos Patterns**
 
 **Evidence:**
 
@@ -483,7 +483,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
    - `ValidationHelper` - Validation logic
    - `ProgressReporter` - User feedback
 
-**Verdict:** ✅ **EXCELLENT** - Well-structured, maintainable code.
+**Verdict:**  **EXCELLENT** - Well-structured, maintainable code.
 
 ---
 
@@ -491,13 +491,13 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 
 | Category | Historical Issue | Current Status | Priority | Action Needed |
 |----------|-----------------|----------------|----------|---------------|
-| **TLS Generation** | Empty cert paths causing crash | ✅ FIXED | P0 | None |
-| **FQDN in SAN** | Missing FQDN | ✅ FIXED | P1 | None |
-| **Consul KV Metadata** | Not stored | ✅ FIXED | P2 | None |
+| **TLS Generation** | Empty cert paths causing crash |  FIXED | P0 | None |
+| **FQDN in SAN** | Missing FQDN |  FIXED | P1 | None |
+| **Consul KV Metadata** | Not stored |  FIXED | P2 | None |
 | **Config Validation** | No fallback when unavailable | ⚠️ PARTIAL | P0 | Add manual validation |
-| **Path Consistency** | Plural vs singular | ✅ FIXED | P0 | None |
-| **Systemd Syntax** | Deprecated Capabilities | ✅ FIXED | P0 | None |
-| **File Permissions** | Wrong order, wrong perms | ✅ FIXED | P0 | None |
+| **Path Consistency** | Plural vs singular |  FIXED | P0 | None |
+| **Systemd Syntax** | Deprecated Capabilities |  FIXED | P0 | None |
+| **File Permissions** | Wrong order, wrong perms |  FIXED | P0 | None |
 | **Security Warnings** | Not displayed | ❌ MISSING | P0 | Add warnings |
 | **Binary Cleanup** | Duplicates not removed | ⚠️ PARTIAL | P1 | Add cleanup |
 | **Debug Command** | Not implemented | ⚠️ PARTIAL | P1 | Wire up CLI |
@@ -564,11 +564,11 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 ### Final Assessment: **7/10 - GOOD FOUNDATION**
 
 **Strengths:**
-- ✅ Core functionality solid (TLS, paths, systemd)
-- ✅ Well-architected (Assess→Intervene→Evaluate)
-- ✅ Security-conscious (permissions, ownership)
-- ✅ Modern Go practices (proper error handling, logging)
-- ✅ Diagnostic foundation exists
+-  Core functionality solid (TLS, paths, systemd)
+-  Well-architected (Assess→Intervene→Evaluate)
+-  Security-conscious (permissions, ownership)
+-  Modern Go practices (proper error handling, logging)
+-  Diagnostic foundation exists
 
 **Weaknesses:**
 - ⚠️ Missing CLI commands (debug, validate, repair)
@@ -581,7 +581,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 ---
 
 **Next Steps:**
-1. ✅ Option 1 Complete (this document)
+1.  Option 1 Complete (this document)
 2. ➡️ Option 2: Apply refactoring pattern (enhance existing code)
 3. ➡️ Option 3: Create test suite (comprehensive validation)
 4. ➡️ Option 4: Implement missing commands (debug, validate, repair, upgrade)

@@ -32,7 +32,7 @@ Examples:
   eos self fuzz security --duration 10m
   eos self fuzz overnight --long-duration 12h
   eos self fuzz ci --mode pr-validation`,
-	
+
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("No subcommand provided for fuzz command", zap.String("command", cmd.Use))
@@ -51,12 +51,12 @@ Default configuration:
 - Security focus: enabled
 - Parallel jobs: 4
 - Fail fast: enabled`,
-	
+
 	RunE: eos_cli.Wrap(runFuzzQuick),
 }
 
 var fuzzSecurityCmd = &cobra.Command{
-	Use:   "security", 
+	Use:   "security",
 	Short: "Run security-focused fuzzing (5m default)",
 	Long: `Run comprehensive security-focused fuzzing to identify potential
 vulnerabilities and security issues in critical components.
@@ -67,7 +67,7 @@ Default configuration:
 - Architecture testing: disabled
 - Verbose logging: enabled
 - Parallel jobs: 4`,
-	
+
 	RunE: eos_cli.Wrap(runFuzzSecurity),
 }
 
@@ -84,7 +84,7 @@ Default configuration:
 - Security focus: enabled
 - Architecture testing: enabled
 - Verbose logging: enabled`,
-	
+
 	RunE: eos_cli.Wrap(runFuzzOvernight),
 }
 
@@ -99,7 +99,7 @@ Available profiles:
 - security-focused: Security testing for merge requests
 - architecture: Architecture compliance testing
 - full: Complete testing suite`,
-	
+
 	RunE: eos_cli.Wrap(runFuzzCI),
 }
 
@@ -114,34 +114,34 @@ This command checks:
 - Fuzzing support availability
 - Test discovery and compilation
 - Environment configuration`,
-	
+
 	RunE: eos_cli.Wrap(runFuzzVerify),
 }
 
 func init() {
 	// Add fuzz command to self
 	SelfCmd.AddCommand(fuzzCmd)
-	
+
 	// Add subcommands to fuzz
 	fuzzCmd.AddCommand(fuzzQuickCmd)
 	fuzzCmd.AddCommand(fuzzSecurityCmd)
 	fuzzCmd.AddCommand(fuzzOvernightCmd)
 	fuzzCmd.AddCommand(fuzzCICmd)
 	fuzzCmd.AddCommand(fuzzVerifyCmd)
-	
+
 	// Quick command flags
 	fuzzQuickCmd.Flags().DurationP("duration", "d", 30*time.Second, "Duration for quick fuzzing")
 	fuzzQuickCmd.Flags().IntP("parallel-jobs", "j", 4, "Number of parallel jobs")
 	fuzzQuickCmd.Flags().String("log-dir", "", "Log directory (default: ~/.cache/eos-fuzz)")
 	fuzzQuickCmd.Flags().Bool("verbose", false, "Enable verbose logging")
-	
+
 	// Security command flags
 	fuzzSecurityCmd.Flags().DurationP("duration", "d", 5*time.Minute, "Duration for security fuzzing")
 	fuzzSecurityCmd.Flags().IntP("parallel-jobs", "j", 4, "Number of parallel jobs")
 	fuzzSecurityCmd.Flags().String("log-dir", "", "Log directory (default: ~/.cache/eos-fuzz)")
 	fuzzSecurityCmd.Flags().Bool("verbose", true, "Enable verbose logging")
 	fuzzSecurityCmd.Flags().Bool("fail-fast", false, "Stop on first failure")
-	
+
 	// Overnight command flags
 	fuzzOvernightCmd.Flags().Duration("short-duration", 30*time.Minute, "Duration for short tests")
 	fuzzOvernightCmd.Flags().Duration("medium-duration", 2*time.Hour, "Duration for medium tests")
@@ -149,7 +149,7 @@ func init() {
 	fuzzOvernightCmd.Flags().IntP("parallel-jobs", "j", 4, "Number of parallel jobs")
 	fuzzOvernightCmd.Flags().String("log-dir", "", "Log directory (default: ~/.cache/eos-fuzz)")
 	fuzzOvernightCmd.Flags().Bool("verbose", true, "Enable verbose logging")
-	
+
 	// CI command flags
 	fuzzCICmd.Flags().String("mode", "pr-validation", "CI mode (pr-validation, security-focused, architecture, full)")
 	fuzzCICmd.Flags().DurationP("duration", "d", 60*time.Second, "Duration for CI fuzzing")
@@ -157,7 +157,7 @@ func init() {
 	fuzzCICmd.Flags().String("log-dir", "", "Log directory (default: ./fuzz-results)")
 	fuzzCICmd.Flags().Bool("fail-fast", true, "Stop on first failure")
 	fuzzCICmd.Flags().String("report-format", "markdown", "Report format (markdown, json, text)")
-	
+
 	// Verify command flags
 	fuzzVerifyCmd.Flags().Bool("verbose", false, "Enable verbose verification output")
 }
@@ -165,58 +165,58 @@ func init() {
 func runFuzzQuick(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting quick fuzzing validation")
-	
+
 	// Parse flags
 	duration, _ := cmd.Flags().GetDuration("duration")
 	parallelJobs, _ := cmd.Flags().GetInt("parallel-jobs")
 	logDir, _ := cmd.Flags().GetString("log-dir")
 	verbose, _ := cmd.Flags().GetBool("verbose")
-	
+
 	// Create configuration
 	config := &fuzzing.Config{
-		Duration:      duration,
-		ParallelJobs:  parallelJobs,
-		LogDir:        logDir,
-		Verbose:       verbose,
-		SecurityFocus: true,
+		Duration:            duration,
+		ParallelJobs:        parallelJobs,
+		LogDir:              logDir,
+		Verbose:             verbose,
+		SecurityFocus:       true,
 		ArchitectureTesting: false,
-		FailFast:      true,
-		ReportFormat:  fuzzing.ReportFormatMarkdown,
+		FailFast:            true,
+		ReportFormat:        fuzzing.ReportFormatMarkdown,
 	}
-	
+
 	return executeFuzzing(rc, config, "quick")
 }
 
 func runFuzzSecurity(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting security-focused fuzzing")
-	
+
 	// Parse flags
 	duration, _ := cmd.Flags().GetDuration("duration")
 	parallelJobs, _ := cmd.Flags().GetInt("parallel-jobs")
 	logDir, _ := cmd.Flags().GetString("log-dir")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	failFast, _ := cmd.Flags().GetBool("fail-fast")
-	
+
 	// Create configuration
 	config := &fuzzing.Config{
-		Duration:      duration,
-		ParallelJobs:  parallelJobs,
-		LogDir:        logDir,
-		Verbose:       verbose,
-		SecurityFocus: true,
+		Duration:            duration,
+		ParallelJobs:        parallelJobs,
+		LogDir:              logDir,
+		Verbose:             verbose,
+		SecurityFocus:       true,
 		ArchitectureTesting: false,
-		FailFast:      failFast,
-		ReportFormat:  fuzzing.ReportFormatMarkdown,
+		FailFast:            failFast,
+		ReportFormat:        fuzzing.ReportFormatMarkdown,
 	}
-	
+
 	return executeFuzzing(rc, config, "security")
 }
 
 func runFuzzOvernight(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting overnight fuzzing session")
-	
+
 	// Parse flags
 	shortDuration, _ := cmd.Flags().GetDuration("short-duration")
 	mediumDuration, _ := cmd.Flags().GetDuration("medium-duration")
@@ -224,29 +224,29 @@ func runFuzzOvernight(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	parallelJobs, _ := cmd.Flags().GetInt("parallel-jobs")
 	logDir, _ := cmd.Flags().GetString("log-dir")
 	verbose, _ := cmd.Flags().GetBool("verbose")
-	
+
 	// Create configuration for overnight testing
 	config := &fuzzing.Config{
-		Duration:       longDuration, // Start with long duration
-		ShortDuration:  shortDuration,
-		MediumDuration: mediumDuration,
-		LongDuration:   longDuration,
-		ParallelJobs:   parallelJobs,
-		LogDir:         logDir,
-		Verbose:        verbose,
-		SecurityFocus:  true,
+		Duration:            longDuration, // Start with long duration
+		ShortDuration:       shortDuration,
+		MediumDuration:      mediumDuration,
+		LongDuration:        longDuration,
+		ParallelJobs:        parallelJobs,
+		LogDir:              logDir,
+		Verbose:             verbose,
+		SecurityFocus:       true,
 		ArchitectureTesting: true,
-		FailFast:       false,
-		ReportFormat:   fuzzing.ReportFormatMarkdown,
+		FailFast:            false,
+		ReportFormat:        fuzzing.ReportFormatMarkdown,
 	}
-	
+
 	return executeFuzzing(rc, config, "overnight")
 }
 
 func runFuzzCI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting CI fuzzing session")
-	
+
 	// Parse flags
 	mode, _ := cmd.Flags().GetString("mode")
 	duration, _ := cmd.Flags().GetDuration("duration")
@@ -254,12 +254,12 @@ func runFuzzCI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	logDir, _ := cmd.Flags().GetString("log-dir")
 	failFast, _ := cmd.Flags().GetBool("fail-fast")
 	reportFormat, _ := cmd.Flags().GetString("report-format")
-	
+
 	// Set CI-specific defaults
 	if logDir == "" {
 		logDir = "./fuzz-results"
 	}
-	
+
 	// Create configuration
 	config := &fuzzing.Config{
 		Duration:     duration,
@@ -271,7 +271,7 @@ func runFuzzCI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		FailFast:     failFast,
 		ReportFormat: reportFormat,
 	}
-	
+
 	// Configure based on CI mode
 	switch mode {
 	case fuzzing.CIProfilePRValidation:
@@ -294,73 +294,73 @@ func runFuzzCI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 			mode, fuzzing.CIProfilePRValidation, fuzzing.CIProfileSecurityFocus,
 			fuzzing.CIProfileArchitecture, fuzzing.CIProfileFull)
 	}
-	
+
 	return executeFuzzing(rc, config, "ci")
 }
 
 func runFuzzVerify(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Verifying fuzzing environment")
-	
+
 	verbose, _ := cmd.Flags().GetBool("verbose")
-	
+
 	// ASSESS - Check if verification is needed
 	logger.Info("Assessing fuzzing environment verification requirements")
-	
+
 	// INTERVENE - Run verification
 	if err := fuzzing.Verify(rc); err != nil {
 		logger.Error("Fuzzing environment verification failed", zap.Error(err))
 		return fmt.Errorf("fuzzing environment verification failed: %w", err)
 	}
-	
+
 	// EVALUATE - Report results
 	logger.Info("Fuzzing environment verification completed successfully")
-	
+
 	if verbose {
 		logger.Info("Fuzzing environment is ready for use",
 			zap.String("go_version", "detected"),
 			zap.String("fuzzing_support", "available"),
 			zap.String("status", "verified"))
 	}
-	
+
 	return nil
 }
 
 // executeFuzzing is the common fuzzing execution logic
 func executeFuzzing(rc *eos_io.RuntimeContext, config *fuzzing.Config, mode string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check prerequisites and setup
 	logger.Info("Assessing fuzzing prerequisites", zap.String("mode", mode))
-	
+
 	if err := fuzzing.Install(rc, config); err != nil {
 		return fmt.Errorf("fuzzing installation failed: %w", err)
 	}
-	
+
 	if err := fuzzing.Configure(rc, config); err != nil {
 		return fmt.Errorf("fuzzing configuration failed: %w", err)
 	}
-	
+
 	// INTERVENE - Execute fuzzing
 	logger.Info("Executing fuzzing session",
 		zap.String("mode", mode),
 		zap.Duration("duration", config.Duration),
 		zap.Int("parallel_jobs", config.ParallelJobs))
-	
+
 	runner := fuzzing.NewRunner(rc, config)
 	session, err := runner.RunSession(rc.Ctx, *config)
 	if err != nil {
 		return fmt.Errorf("fuzzing session failed: %w", err)
 	}
-	
+
 	// EVALUATE - Generate and save report
 	logger.Info("Generating fuzzing report")
-	
+
 	report, err := runner.GenerateReport(session)
 	if err != nil {
 		return fmt.Errorf("report generation failed: %w", err)
 	}
-	
+
 	// Save report to file
 	reportPath := filepath.Join(config.LogDir, fmt.Sprintf("fuzz-report-%s-%d.md", mode, time.Now().Unix()))
 	if err := os.WriteFile(reportPath, []byte(report), 0644); err != nil {
@@ -368,7 +368,7 @@ func executeFuzzing(rc *eos_io.RuntimeContext, config *fuzzing.Config, mode stri
 	} else {
 		logger.Info("Report saved", zap.String("path", reportPath))
 	}
-	
+
 	// Log summary
 	logger.Info("Fuzzing session completed",
 		zap.String("mode", mode),
@@ -378,32 +378,32 @@ func executeFuzzing(rc *eos_io.RuntimeContext, config *fuzzing.Config, mode stri
 		zap.Int("failed_tests", session.Summary.FailedTests),
 		zap.Float64("success_rate", session.Summary.SuccessRate),
 		zap.Duration("total_duration", session.Summary.TotalDuration))
-	
+
 	// Check for security alerts
 	if session.Summary.SecurityAlert {
 		logger.Error("🚨 SECURITY ALERT: Crashes detected during fuzzing!",
 			zap.Int("crashes_found", session.Summary.CrashesFound))
-		
+
 		if config.FailFast {
 			return fmt.Errorf("fuzzing detected security issues (crashes: %d)", session.Summary.CrashesFound)
 		}
 	}
-	
+
 	// Print summary to user
 	if config.Verbose {
 		logger.Info("terminal prompt: === Fuzzing Session Summary ===")
 		logger.Info("terminal prompt: Mode", zap.String("mode", mode))
-		fmt.Printf("Tests: %d/%d passed (%.1f%%)\n", 
-			session.Summary.PassedTests, 
+		fmt.Printf("Tests: %d/%d passed (%.1f%%)\n",
+			session.Summary.PassedTests,
 			session.Summary.TotalTests,
 			session.Summary.SuccessRate*100)
 		logger.Info("terminal prompt: Duration", zap.Duration("duration", session.Summary.TotalDuration))
 		logger.Info("terminal prompt: Report", zap.String("path", reportPath))
-		
+
 		if session.Summary.SecurityAlert {
-			logger.Info("terminal prompt: ⚠️  Security Alert - crashes detected", zap.Int("crashes", session.Summary.CrashesFound))
+			logger.Info("terminal prompt: Security Alert - crashes detected", zap.Int("crashes", session.Summary.CrashesFound))
 		}
 	}
-	
+
 	return nil
 }

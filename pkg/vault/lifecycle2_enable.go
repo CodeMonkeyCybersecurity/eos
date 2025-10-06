@@ -23,14 +23,12 @@ func VaultAddress() string {
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
 	log.Info(" Starting Vault enablement flow")
 
-
-
 	// Fall back to direct enablement
 	log.Info("Nomad not available, using direct enablement")
 
 	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
-		log.Info("🧹 Clearing existing VAULT_TOKEN environment variable for fresh setup")
+		log.Info(" Clearing existing VAULT_TOKEN environment variable for fresh setup")
 		if err := os.Unsetenv("VAULT_TOKEN"); err != nil {
 			log.Warn("Failed to unset VAULT_TOKEN", zap.Error(err))
 		}

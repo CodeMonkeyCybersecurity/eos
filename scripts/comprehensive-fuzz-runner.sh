@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 
 # Preflight check function
 preflight_check() {
-    echo -e "${CYAN}🔍 Running preflight checks...${NC}"
+    echo -e "${CYAN} Running preflight checks...${NC}"
     
     # Check if we're in the project root or can find it
     local current_dir="$(pwd)"
@@ -180,7 +180,7 @@ echo -e "${CYAN}🧪 Eos Comprehensive Fuzz Test Runner${NC}"
 echo "============================================="
 echo -e "📂 Working directory: ${YELLOW}$(pwd)${NC}"
 echo -e "⏰ Duration: ${YELLOW}${FUZZTIME}${NC}"
-echo -e "🔄 Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
+echo -e " Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
 echo -e "🎯 Security focus: ${YELLOW}${SECURITY_FOCUS}${NC}"
 echo -e "🏗️  Architecture testing: ${YELLOW}${ARCHITECTURE_TESTING}${NC}"
 echo -e "🌪️  Chaos mode: ${YELLOW}${CHAOS_MODE}${NC}"
@@ -217,7 +217,7 @@ EOF
 
 # Enhanced test discovery and categorization
 discover_enhanced_fuzz_tests() {
-    echo -e "${BLUE}🔍 Discovering comprehensive fuzz tests...${NC}"
+    echo -e "${BLUE} Discovering comprehensive fuzz tests...${NC}"
     
     # Security-critical tests (highest priority)
     SECURITY_TESTS=(
@@ -305,7 +305,7 @@ run_enhanced_fuzz_test() {
         # Check for interesting findings
         if [ "$inputs" -gt 0 ]; then
             echo -e "   🎯 ${YELLOW}Found ${inputs} interesting inputs!${NC}"
-            echo "  - 🔍 **${test_function}**: Found ${inputs} new interesting inputs" >> "${REPORT_FILE}"
+            echo "  -  **${test_function}**: Found ${inputs} new interesting inputs" >> "${REPORT_FILE}"
         fi
         
         return 0
@@ -382,7 +382,7 @@ run_property_based_tests() {
 EOF
     
     # Test orchestration properties
-    echo -e "   🔄 Orchestration workflow properties..."
+    echo -e "    Orchestration workflow properties..."
     go test -v -run TestOrchestrationProperties ./test \
         >> "${LOG_DIR}/property_orchestration.log" 2>&1 || true
     
@@ -428,12 +428,12 @@ run_continuous_fuzzing() {
     echo "============================="
     
     # This would run indefinitely, finding new test cases
-    echo -e "   🔄 Starting continuous fuzzing (press Ctrl+C to stop)..."
+    echo -e "    Starting continuous fuzzing (press Ctrl+C to stop)..."
     
     trap 'echo -e "\n${YELLOW}⏹️  Stopping continuous fuzzing...${NC}"; exit 0' INT
     
     while true; do
-        echo -e "   🔄 Continuous cycle: $(date)"
+        echo -e "    Continuous cycle: $(date)"
         
         # Run a subset of critical tests continuously
         for test_spec in "${SECURITY_TESTS[@]:0:5}"; do
@@ -575,7 +575,7 @@ EOF
     if [ $failed_tests -gt 0 ]; then
         echo ""
         echo -e "${RED}SECURITY ALERT: ${failed_tests} test(s) failed${NC}"
-        echo -e "🔍 Immediate investigation required"
+        echo -e " Immediate investigation required"
         exit 1
     else
         echo ""

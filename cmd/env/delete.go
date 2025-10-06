@@ -18,7 +18,7 @@ var deleteCmd = &cobra.Command{
 This command will permanently remove the environment configuration and optionally
 clean up any deployed resources in that environment.
 
-⚠️  WARNING: This is a destructive operation that cannot be undone.
+WARNING: This is a destructive operation that cannot be undone.
 
 The deletion process follows these steps:
 1. Assessment: Verify environment exists and check for active deployments
@@ -86,7 +86,7 @@ Examples:
 		// Check if it's the current environment
 		currentEnv, err := envManager.GetCurrentEnvironment(rc)
 		if err == nil && currentEnv.Name == envName {
-			fmt.Printf("⚠️  Warning: '%s' is currently the active environment.\n", envName)
+			fmt.Printf("Warning: '%s' is currently the active environment.\n", envName)
 			fmt.Printf("   You may want to switch to another environment first.\n\n")
 		}
 
@@ -122,14 +122,14 @@ Examples:
 		}
 
 		if env.Status == environments.EnvironmentStatusActive {
-			fmt.Printf("⚠️  Active Environment Warning:\n")
+			fmt.Printf("Active Environment Warning:\n")
 			fmt.Printf("   This environment is currently active with running services.\n")
 			fmt.Printf("   Deletion will stop all running services.\n\n")
 		}
 
 		// Dry run - show what would be deleted
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No changes will be made\n")
+			fmt.Printf(" Dry Run - No changes will be made\n")
 			return displayDeletionPlan(env, !noCleanup)
 		}
 
@@ -137,13 +137,13 @@ Examples:
 		if backup {
 			if err := createEnvironmentBackup(rc, env); err != nil {
 				logger.Warn("Failed to create backup", zap.Error(err))
-				fmt.Printf("⚠️  Warning: Failed to create backup: %v\n", err)
+				fmt.Printf("Warning: Failed to create backup: %v\n", err)
 				if !force {
 					fmt.Printf("Use --force to proceed without backup\n")
 					return err
 				}
 			} else {
-				fmt.Printf("✅ Backup created successfully\n")
+				fmt.Printf(" Backup created successfully\n")
 			}
 		}
 
@@ -172,7 +172,7 @@ Examples:
 		}
 
 		// Success message
-		fmt.Printf("✅ Environment '%s' deleted successfully\n", envName)
+		fmt.Printf(" Environment '%s' deleted successfully\n", envName)
 
 		// Show cleanup summary
 		if !noCleanup {

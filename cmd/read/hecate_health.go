@@ -87,7 +87,7 @@ func runSingleHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, service
 				{Domain: "admin.example.com", Upstream: &hecate.Upstream{URL: "http://localhost:9000"}},
 			}
 
-			logger.Info("terminal prompt: 🔍 Route Health Check")
+			logger.Info("terminal prompt:  Route Health Check")
 			logger.Info("terminal prompt: =====================")
 			allHealthy := true
 
@@ -122,7 +122,7 @@ func runSingleHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, service
 			return fmt.Errorf("failed to collect service health: %w", err)
 		}
 
-		logger.Info("terminal prompt: \n🔧 Service Health Check")
+		logger.Info("terminal prompt: \n Service Health Check")
 		logger.Info("terminal prompt: =======================")
 		allHealthy := true
 
@@ -149,7 +149,7 @@ func runContinuousHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, int
 	logger.Info("Starting continuous health monitoring",
 		zap.Duration("interval", interval))
 
-	logger.Info("terminal prompt: 🔄 Continuous Health Monitoring", zap.Duration("interval", interval))
+	logger.Info("terminal prompt:  Continuous Health Monitoring", zap.Duration("interval", interval))
 	logger.Info("terminal prompt: Press Ctrl+C to stop")
 	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 50))))
 
@@ -179,7 +179,7 @@ func runContinuousHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, int
 }
 
 func printSingleRouteHealth(logger otelzap.LoggerWithCtx, domain string, status *hecate.RouteStatus) {
-	logger.Info("terminal prompt: 🔍 Route Health", zap.String("domain", domain))
+	logger.Info("terminal prompt:  Route Health", zap.String("domain", domain))
 	logger.Info("terminal prompt: ==================")
 
 	healthIcon := "🟢"
@@ -204,7 +204,7 @@ func printRouteHealthStatus(logger otelzap.LoggerWithCtx, domain string, status 
 		healthText = "Unhealthy"
 	}
 
-	logger.Info("terminal prompt: Route health", 
+	logger.Info("terminal prompt: Route health",
 		zap.String("domain", domain),
 		zap.String("icon", healthIcon),
 		zap.String("status", healthText),

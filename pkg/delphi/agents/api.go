@@ -19,7 +19,7 @@ func FetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 	log := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Validate inputs
-	log.Info("🔍 Assessing API fetch parameters",
+	log.Info(" Assessing API fetch parameters",
 		zap.String("base_url", baseURL))
 
 	url := strings.TrimRight(baseURL, "/") + "/agents?select=id,os,version"

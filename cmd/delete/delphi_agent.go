@@ -63,7 +63,7 @@ Supported OS uninstallers:
 		prettyJSON, _ := json.MarshalIndent(resp, "", "  ")
 		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Agent deleted successfully from Wazuh", zap.String("response", string(prettyJSON)))
 
-		otelzap.Ctx(rc.Ctx).Info("🧹 Attempting local Wazuh agent uninstall...")
+		otelzap.Ctx(rc.Ctx).Info(" Attempting local Wazuh agent uninstall...")
 		switch runtime.GOOS {
 		case "darwin":
 			uninstallMacOS(rc)

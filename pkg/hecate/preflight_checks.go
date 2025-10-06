@@ -568,7 +568,7 @@ func displayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 
 	if len(result.Warnings) > 0 {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: ⚠️  WARNINGS (deployment may work with limitations):")
+		logger.Info("terminal prompt: WARNINGS (deployment may work with limitations):")
 		for _, warning := range result.Warnings {
 			logger.Info("terminal prompt:   • " + warning)
 		}
@@ -587,7 +587,7 @@ func displayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ════════════════════════════════════════════════════════════════")
 	if result.CanProceed {
-		logger.Info("terminal prompt: ✅ PREFLIGHT CHECKS PASSED - Ready to proceed with deployment")
+		logger.Info("terminal prompt:  PREFLIGHT CHECKS PASSED - Ready to proceed with deployment")
 	} else {
 		logger.Info("terminal prompt: ❌ PREFLIGHT CHECKS FAILED - Critical issues must be resolved")
 	}

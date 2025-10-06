@@ -31,7 +31,7 @@ func ConfigureFirewall(rc *eos_io.RuntimeContext, config *Config) error {
 	// Check if UFW is active
 	if !strings.Contains(ufwStatus, "Status: active") {
 		logger.Info("UFW is not active, enabling it")
-		
+
 		// First, ensure SSH is allowed
 		if _, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "ufw",
@@ -65,7 +65,7 @@ func ConfigureFirewall(rc *eos_io.RuntimeContext, config *Config) error {
 
 	// Add firewall rules for each network
 	for _, network := range networks {
-		logger.Info("Adding firewall rule", 
+		logger.Info("Adding firewall rule",
 			zap.String("network", network),
 			zap.Int("port", CodeServerPort))
 
@@ -109,7 +109,7 @@ func ConfigureFirewall(rc *eos_io.RuntimeContext, config *Config) error {
 				relevantRules = append(relevantRules, line)
 			}
 		}
-		
+
 		if len(relevantRules) > 0 {
 			logger.Info("Firewall rules added for code-server",
 				zap.Strings("rules", relevantRules))
@@ -175,8 +175,8 @@ func VerifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
 	if len(issues) > 0 {
 		logger.Warn("Verification found issues",
 			zap.Strings("issues", issues))
-		
-		fmt.Println("\n⚠️  Verification found some issues:")
+
+		fmt.Println("\nVerification found some issues:")
 		for _, issue := range issues {
 			fmt.Printf("   - %s\n", issue)
 		}

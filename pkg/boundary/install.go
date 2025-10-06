@@ -62,7 +62,7 @@ func NewBoundaryInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Bou
 	if config.RecoveryKmsType == "" {
 		config.RecoveryKmsType = "aead"
 	}
-	
+
 	runner := NewCommandRunner(rc)
 	return &BoundaryInstaller{
 		rc:      rc,
@@ -79,35 +79,35 @@ func (bi *BoundaryInstaller) Install() error {
 		zap.String("version", bi.config.Version),
 		zap.Bool("controller", bi.config.ControllerEnabled),
 		zap.Bool("worker", bi.config.WorkerEnabled))
-	
+
 	// Phase 1: ASSESS
 	if !bi.config.ForceReinstall {
 		if _, err := bi.runner.RunOutput("boundary", "version"); err == nil {
 			if bi.systemd.IsActive() {
 				bi.logger.Info("Boundary is already installed and running")
-				bi.logger.Info("terminal prompt: ✅ Boundary is already installed and running")
+				bi.logger.Info("terminal prompt:  Boundary is already installed and running")
 				bi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortBoundary))
 				return nil
 			}
 		}
 	}
-	
+
 	// Check prerequisites
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError("this command must be run as root")
 	}
-	
+
 	// Phase 2: INTERVENE - Install
 	bi.logger.Info("Downloading and installing Boundary")
-	
+
 	arch := runtime.GOARCH
 	downloadURL := fmt.Sprintf("https://releases.hashicorp.com/boundary/%s/boundary_%s_linux_%s.zip",
 		bi.config.Version, bi.config.Version, arch)
-	
+
 	tmpDir := "/tmp/boundary-install"
 	os.MkdirAll(tmpDir, 0755)
 	defer os.RemoveAll(tmpDir)
-	
+
 	// Download and extract
 	if err := bi.runner.Run("wget", "-O", tmpDir+"/boundary.zip", downloadURL); err != nil {
 		if bi.config.Version == "latest" {
@@ -120,15 +120,15 @@ func (bi *BoundaryInstaller) Install() error {
 			return fmt.Errorf("failed to download Boundary: %w", err)
 		}
 	}
-	
+
 	if err := bi.runner.Run("unzip", "-o", tmpDir+"/boundary.zip", "-d", tmpDir); err != nil {
 		return fmt.Errorf("failed to extract Boundary: %w", err)
 	}
-	
+
 	if err := bi.runner.Run("install", "-m", "755", tmpDir+"/boundary", "/usr/local/bin/boundary"); err != nil {
 		return fmt.Errorf("failed to install Boundary binary: %w", err)
 	}
-	
+
 	// Create user and directories
 	bi.runner.Run("useradd", "--system", "--group", "--home", "/var/lib/boundary", "--no-create-home", "--shell", "/bin/false", "boundary")
 	os.MkdirAll("/etc/boundary.d", 0755)
@@ -136,7 +136,7 @@ func (bi *BoundaryInstaller) Install() error {
 	os.MkdirAll("/var/log/boundary", 0755)
 	bi.runner.Run("chown", "-R", "boundary:boundary", "/var/lib/boundary")
 	bi.runner.Run("chown", "-R", "boundary:boundary", "/var/log/boundary")
-	
+
 	// Write basic configuration
 	if bi.config.DevMode {
 		config := `disable_mlock = true
@@ -181,7 +181,7 @@ kms "aead" {
 		os.WriteFile("/etc/boundary.d/boundary.hcl", []byte(config), 0640)
 		bi.runner.Run("chown", "boundary:boundary", "/etc/boundary.d/boundary.hcl")
 	}
-	
+
 	// Setup systemd service
 	serviceContent := `[Unit]
 Description=HashiCorp Boundary
@@ -199,10 +199,10 @@ LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target`
-	
+
 	os.WriteFile("/etc/systemd/system/boundary.service", []byte(serviceContent), 0644)
 	bi.runner.Run("systemctl", "daemon-reload")
-	
+
 	if !bi.config.DevMode {
 		// In production mode, don't start automatically
 		bi.logger.Info("Boundary installed. Configure /etc/boundary.d/boundary.hcl before starting")
@@ -213,17 +213,17 @@ WantedBy=multi-user.target`
 			bi.logger.Warn("Failed to start Boundary service", zap.Error(err))
 		}
 	}
-	
+
 	// Phase 3: EVALUATE
 	if output, err := bi.runner.RunOutput("boundary", "version"); err != nil {
 		return fmt.Errorf("Boundary installation verification failed: %w", err)
 	} else {
 		bi.logger.Info("Boundary installed successfully", zap.String("version", output))
 	}
-	
-	bi.logger.Info("terminal prompt: ✅ Boundary installation completed!")
+
+	bi.logger.Info("terminal prompt:  Boundary installation completed!")
 	bi.logger.Info(fmt.Sprintf("terminal prompt: Web UI will be available at: http://<server-ip>:%d", shared.PortBoundary))
 	bi.logger.Info("terminal prompt: Configure /etc/boundary.d/boundary.hcl then start with: systemctl start boundary")
-	
+
 	return nil
 }

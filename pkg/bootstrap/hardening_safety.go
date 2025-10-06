@@ -65,11 +65,11 @@
 //
 // ## Implementation Status
 //
-// - ✅ Pre-hardening safety checks implemented
-// - ✅ User consent mechanisms operational
-// - ✅ Non-breaking design with rollback capabilities
-// - ✅ Incremental application with validation active
-// - ✅ System state validation and monitoring implemented
+// -  Pre-hardening safety checks implemented
+// -  User consent mechanisms operational
+// -  Non-breaking design with rollback capabilities
+// -  Incremental application with validation active
+// -  System state validation and monitoring implemented
 //
 // For detailed hardening implementation, see:
 // - pkg/ubuntu/hardening.go - Ubuntu-specific hardening implementation

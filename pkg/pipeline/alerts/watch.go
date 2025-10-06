@@ -18,7 +18,7 @@ import (
 // Migrated from cmd/read/pipeline_alerts.go watchAlerts
 func WatchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit, refresh int) error {
 	// ASSESS - Prepare alerts monitoring
-	logger.Info("🔍 Assessing alerts monitoring setup",
+	logger.Info(" Assessing alerts monitoring setup",
 		zap.Int("limit", limit),
 		zap.Int("refresh_seconds", refresh))
 

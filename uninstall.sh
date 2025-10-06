@@ -24,7 +24,7 @@ sudo systemctl disable vault.service || true
 sudo systemctl stop vault-agent-eos.service || true
 sudo systemctl disable vault-agent-eos.service || true
 
-echo "🧹 Removing binaries and directories..."
+echo " Removing binaries and directories..."
 sudo rm -f "${Eos_BIN}"
 sudo rm -rf "${Eos_DIR}"
 sudo rm -rf "${Eos_CONFIG}"

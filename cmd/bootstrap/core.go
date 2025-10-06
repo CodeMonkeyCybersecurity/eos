@@ -117,7 +117,7 @@ func displayCoreSuccess(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: ✅ Core bootstrap completed successfully!")
+	logger.Info("terminal prompt:  Core bootstrap completed successfully!")
 	logger.Info("terminal prompt: ")
 
 	// Load and display API credentials - TODO: Replace with Nomad client

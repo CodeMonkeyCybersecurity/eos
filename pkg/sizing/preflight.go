@@ -36,7 +36,7 @@ func PreflightCheck(rc *eos_io.RuntimeContext, services []ServiceType, workload 
 
 	// Calculate requirements for requested services
 	calculator := NewCalculator(EnvironmentConfigs["production"], workload)
-	
+
 	// Add services to calculator
 	for _, svcType := range services {
 		calculator.AddService(svcType)
@@ -59,33 +59,33 @@ func PreflightCheck(rc *eos_io.RuntimeContext, services []ServiceType, workload 
 	// CPU check
 	if currentResources.CPU.Cores < result.TotalCPUCores {
 		insufficientResources = append(insufficientResources,
-			fmt.Sprintf("CPU: have %.1f cores, need %.1f cores", 
+			fmt.Sprintf("CPU: have %.1f cores, need %.1f cores",
 				currentResources.CPU.Cores, result.TotalCPUCores))
 	} else if currentResources.CPU.Cores < result.TotalCPUCores*1.2 {
 		warnings = append(warnings,
-			fmt.Sprintf("CPU: running close to capacity (%.1f/%.1f cores)", 
+			fmt.Sprintf("CPU: running close to capacity (%.1f/%.1f cores)",
 				result.TotalCPUCores, currentResources.CPU.Cores))
 	}
 
 	// Memory check
 	if currentResources.Memory.GB < result.TotalMemoryGB {
 		insufficientResources = append(insufficientResources,
-			fmt.Sprintf("Memory: have %.1f GB, need %.1f GB", 
+			fmt.Sprintf("Memory: have %.1f GB, need %.1f GB",
 				currentResources.Memory.GB, result.TotalMemoryGB))
 	} else if currentResources.Memory.GB < result.TotalMemoryGB*1.2 {
 		warnings = append(warnings,
-			fmt.Sprintf("Memory: running close to capacity (%.1f/%.1f GB)", 
+			fmt.Sprintf("Memory: running close to capacity (%.1f/%.1f GB)",
 				result.TotalMemoryGB, currentResources.Memory.GB))
 	}
 
 	// Disk check
 	if currentResources.Disk.GB < result.TotalDiskGB {
 		insufficientResources = append(insufficientResources,
-			fmt.Sprintf("Disk: have %.1f GB free, need %.1f GB", 
+			fmt.Sprintf("Disk: have %.1f GB free, need %.1f GB",
 				currentResources.Disk.GB, result.TotalDiskGB))
 	} else if currentResources.Disk.GB < result.TotalDiskGB*1.5 {
 		warnings = append(warnings,
-			fmt.Sprintf("Disk: limited headroom (%.1f/%.1f GB free)", 
+			fmt.Sprintf("Disk: limited headroom (%.1f/%.1f GB free)",
 				result.TotalDiskGB, currentResources.Disk.GB))
 	}
 
@@ -94,7 +94,7 @@ func PreflightCheck(rc *eos_io.RuntimeContext, services []ServiceType, workload 
 		// Check for high-performance requirements
 		if svcReq.Service.Type == ServiceTypeDatabase && currentResources.Disk.Type != "ssd" && currentResources.Disk.Type != "nvme" {
 			warnings = append(warnings,
-				fmt.Sprintf("Database performance: SSD or NVMe storage recommended (current: %s)", 
+				fmt.Sprintf("Database performance: SSD or NVMe storage recommended (current: %s)",
 					currentResources.Disk.Type))
 		}
 
@@ -149,7 +149,7 @@ func PreflightCheck(rc *eos_io.RuntimeContext, services []ServiceType, workload 
 	if len(warnings) > 0 {
 		logger.Warn("Resource warnings detected", zap.Strings("warnings", warnings))
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: ⚠️  Resource Warnings:")
+		logger.Info("terminal prompt: Resource Warnings:")
 		for _, warning := range warnings {
 			logger.Info(fmt.Sprintf("terminal prompt:   • %s", warning))
 		}
@@ -210,7 +210,7 @@ func getSystemResources(rc *eos_io.RuntimeContext) (*SystemResources, error) {
 
 	// Count logical CPUs
 	resources.CPU.Cores = float64(runtime.NumCPU())
-	
+
 	// Determine CPU type based on model
 	if len(cpuInfo) > 0 {
 		resources.CPU.Model = cpuInfo[0].ModelName
@@ -241,7 +241,7 @@ func getSystemResources(rc *eos_io.RuntimeContext) (*SystemResources, error) {
 
 	resources.Disk.GB = float64(diskInfo.Free) / (1024 * 1024 * 1024)
 	resources.Disk.MountPoint = "/"
-	
+
 	// Determine disk type
 	resources.Disk.Type = detectDiskType(rc)
 

@@ -111,10 +111,10 @@ func InstallGoTools(rc *eos_io.RuntimeContext) error {
 			Command: "go",
 			Args:    []string{"install", tool.pkg + "@" + tool.version},
 		}); err != nil {
-			logger.Warn("Failed to install tool", 
+			logger.Warn("Failed to install tool",
 				zap.String("tool", tool.name),
 				zap.Error(err))
-			fmt.Printf("⚠️  Failed to install %s: %v\n", tool.name, err)
+			fmt.Printf("Failed to install %s: %v\n", tool.name, err)
 		} else {
 			fmt.Printf("✓ %s installed successfully\n", tool.name)
 		}
@@ -154,10 +154,10 @@ func installGolangciLint(rc *eos_io.RuntimeContext) error {
 
 	// Download and install using the official installer script
 	installerURL := "https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh"
-	
+
 	// Create a temporary script file
 	tmpScript := "/tmp/golangci-lint-installer.sh"
-	
+
 	// Download the installer
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
@@ -179,21 +179,21 @@ func installGolangciLint(rc *eos_io.RuntimeContext) error {
 	}); err != nil {
 		// Try installing to user's go/bin as fallback
 		logger.Warn("Failed to install to /usr/local/bin, trying user install", zap.Error(err))
-		
+
 		gopath := os.Getenv("GOPATH")
 		if gopath == "" {
 			homeDir, _ := os.UserHomeDir()
 			gopath = filepath.Join(homeDir, "go")
 		}
 		goBin := filepath.Join(gopath, "bin")
-		
+
 		if output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "sh",
 			Args:    []string{tmpScript, "-b", goBin},
 		}); err != nil {
 			return fmt.Errorf("failed to install golangci-lint: %w", err)
 		} else {
-			logger.Info("golangci-lint installed to user directory", 
+			logger.Info("golangci-lint installed to user directory",
 				zap.String("path", goBin),
 				zap.String("output", output))
 		}

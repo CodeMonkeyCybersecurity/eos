@@ -157,7 +157,7 @@ Examples:
 
 		// Dry run - show what would be applied
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No changes will be applied\n\n")
+			fmt.Printf(" Dry Run - No changes will be applied\n\n")
 			return displayApplyPlan(env, operation)
 		}
 
@@ -184,7 +184,7 @@ Examples:
 		}
 
 		// Success message
-		fmt.Printf("✅ Environment '%s' %sd successfully\n", env.Name, operation)
+		fmt.Printf(" Environment '%s' %sd successfully\n", env.Name, operation)
 
 		// Show next steps
 		fmt.Printf("\nNext Steps:\n")

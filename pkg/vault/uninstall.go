@@ -360,10 +360,10 @@ func (vu *VaultUninstaller) Verify() ([]string, error) {
 
 	// Check directories
 	checkDirs := map[string]string{
-		"/etc/vault.d":            "config directory",
-		"/opt/vault":              "data directory",
-		"/var/lib/vault":          "data directory",
-		"/var/log/vault":          "log directory",
+		"/etc/vault.d":                            "config directory",
+		"/opt/vault":                              "data directory",
+		"/var/lib/vault":                          "data directory",
+		"/var/log/vault":                          "log directory",
 		"/etc/systemd/system/vault.service":       "systemd service",
 		"/etc/systemd/system/vault-agent.service": "vault-agent service",
 	}
@@ -380,7 +380,7 @@ func (vu *VaultUninstaller) Verify() ([]string, error) {
 		return stillPresent, nil
 	}
 
-	vu.logger.Info("✅ Vault removal completed successfully - all components removed")
+	vu.logger.Info(" Vault removal completed successfully - all components removed")
 	return stillPresent, nil
 }
 

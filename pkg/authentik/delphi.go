@@ -534,7 +534,7 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		logger.Info("Metadata endpoint accessible", zap.String("status", "✅"))
+		logger.Info("Metadata endpoint accessible", zap.String("status", ""))
 	} else {
 		logger.Error("Metadata endpoint check failed",
 			zap.String("status", "❌"),
@@ -544,7 +544,7 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 	// Test 2: Initiate SAML authentication flow
 	logger.Info("2. Testing SAML authentication flow...")
 	// This would initiate a SAML auth request
-	logger.Info("Ready for manual testing", zap.String("status", "✅"))
+	logger.Info("Ready for manual testing", zap.String("status", ""))
 
 	logger.Info("=== Manual Testing Steps ===")
 	logger.Info("Manual test instructions",

@@ -47,11 +47,11 @@
 //
 // ## Implementation Status
 //
-// - ✅ Mandatory  API setup implemented
-// - ✅ Comprehensive  bootstrap operational
-// - ✅ Enhanced error handling and retry mechanisms active
-// - ✅ Integration with HashiCorp stack completed
-// - ✅ Health monitoring and validation implemented
+// -  Mandatory  API setup implemented
+// -  Comprehensive  bootstrap operational
+// -  Enhanced error handling and retry mechanisms active
+// -  Integration with HashiCorp stack completed
+// -  Health monitoring and validation implemented
 //
 // ## Bootstrap Detection and Prompting
 //
@@ -175,7 +175,7 @@ func PromptForBootstrap(rc *eos_io.RuntimeContext) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("System has not been bootstrapped")
-	logger.Info("terminal prompt: ⚠️  This system has not been bootstrapped.")
+	logger.Info("terminal prompt: This system has not been bootstrapped.")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Bootstrap will install and configure:")
 	logger.Info("terminal prompt:   •  (configuration management)")

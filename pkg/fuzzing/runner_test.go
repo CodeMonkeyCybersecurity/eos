@@ -269,7 +269,7 @@ func TestGenerateMarkdownReport(t *testing.T) {
 	assert.Contains(t, report, "Total Tests: 2")
 	assert.Contains(t, report, "Success Rate: 50.0%")
 	assert.Contains(t, report, "SECURITY ALERT")
-	assert.Contains(t, report, "✅ PASS FuzzExample")
+	assert.Contains(t, report, " PASS FuzzExample")
 	assert.Contains(t, report, "❌ FAIL FuzzCrash")
 	assert.Contains(t, report, "index out of range")
 }

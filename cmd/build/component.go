@@ -106,7 +106,7 @@ Examples:
 		}
 
 		// Display build results
-		fmt.Printf("✅ Component '%s' built successfully\n", componentName)
+		fmt.Printf(" Component '%s' built successfully\n", componentName)
 		fmt.Printf("\nBuild Results:\n")
 		fmt.Printf("──────────────\n")
 		fmt.Printf("Component:    %s\n", result.Component)

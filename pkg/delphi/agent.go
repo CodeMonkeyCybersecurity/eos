@@ -632,8 +632,8 @@ func getDelphiTLSConfig() *tls.Config {
 	// SECURITY P0 #3: Allow insecure TLS only in development/testing environments
 	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
 		// SECURITY WARNING: This disables TLS certificate verification - only use in dev/test!
-		fmt.Fprintf(os.Stderr, "⚠️  WARNING: TLS certificate verification is DISABLED (Eos_INSECURE_TLS=true or GO_ENV=test)\n")
-		fmt.Fprintf(os.Stderr, "⚠️  This makes Delphi/Wazuh API connections vulnerable to MITM attacks. DO NOT USE IN PRODUCTION!\n")
+		fmt.Fprintf(os.Stderr, "WARNING: TLS certificate verification is DISABLED (Eos_INSECURE_TLS=true or GO_ENV=test)\n")
+		fmt.Fprintf(os.Stderr, "This makes Delphi/Wazuh API connections vulnerable to MITM attacks. DO NOT USE IN PRODUCTION!\n")
 		return &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS12,
@@ -655,10 +655,10 @@ func getDelphiTLSConfig() *tls.Config {
 	// SECURITY: Try to load custom CA certificate for self-signed Delphi/Wazuh servers
 	// This supports both system-trusted CAs and custom enterprise CAs
 	caPaths := []string{
-		"/etc/eos/delphi-ca.crt",       // Delphi-specific CA
-		"/etc/eos/ca.crt",               // Eos general CA
-		"/var/ossec/etc/tls/ca.crt",    // Wazuh standard location
-		"/etc/ssl/certs/wazuh-ca.crt",  // Alternative location
+		"/etc/eos/delphi-ca.crt",      // Delphi-specific CA
+		"/etc/eos/ca.crt",             // Eos general CA
+		"/var/ossec/etc/tls/ca.crt",   // Wazuh standard location
+		"/etc/ssl/certs/wazuh-ca.crt", // Alternative location
 	}
 
 	for _, caPath := range caPaths {

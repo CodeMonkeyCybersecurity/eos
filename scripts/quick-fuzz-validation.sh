@@ -75,6 +75,6 @@ if [ ${failed} -eq 0 ]; then
 else
     echo ""
     echo -e "${YELLOW}${failed} test(s) failed. Check logs in ${LOG_DIR}${NC}"
-    echo -e "${CYAN}🔍 Debug with: ${GREEN}go test -v -run=^$ -fuzz=^TestName$ -fuzztime=10s ./package${NC}"
+    echo -e "${CYAN} Debug with: ${GREEN}go test -v -run=^$ -fuzz=^TestName$ -fuzztime=10s ./package${NC}"
     exit 1
 fi

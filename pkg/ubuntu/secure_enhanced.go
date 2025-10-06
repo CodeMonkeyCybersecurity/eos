@@ -250,7 +250,7 @@ func displaySecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) error {
 		summary.WriteString("   • Emergency backup codes generated\n")
 		summary.WriteString("   • Other users can configure MFA manually with: google-authenticator\n")
 	case "disabled":
-		summary.WriteString("⚠️  Multi-Factor Authentication: DISABLED\n")
+		summary.WriteString("Multi-Factor Authentication: DISABLED\n")
 		summary.WriteString("   • Consider enabling: eos secure ubuntu --enforce-mfa --mfa-only\n")
 	}
 
@@ -272,7 +272,7 @@ func displaySecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) error {
 	// Important next steps for MFA
 	if mfaMode == "enforced" || mfaMode == "standard" {
 		summary.WriteString("\n")
-		summary.WriteString("⚠️  IMPORTANT NEXT STEPS:\n")
+		summary.WriteString("IMPORTANT NEXT STEPS:\n")
 		summary.WriteString("   1. Save the emergency backup codes in a secure location\n")
 		summary.WriteString("   2. Test 'sudo -i' or 'su' in a NEW terminal (should ask for password + MFA token)\n")
 		summary.WriteString("   3. Keep this terminal open until you confirm MFA is working\n")

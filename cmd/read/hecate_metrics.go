@@ -203,7 +203,7 @@ func printServiceHealthTable(services map[string]monitoring.ServiceHealth) {
 		return
 	}
 
-	fmt.Println("\n🔧 Service Health")
+	fmt.Println("\n Service Health")
 	fmt.Println("=================")
 	fmt.Printf("%-15s %-10s %-15s %-25s\n", "Service", "Status", "Response Time", "Last Check")
 	fmt.Println("-----------------------------------------------------------------------")

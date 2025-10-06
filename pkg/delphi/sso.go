@@ -428,7 +428,7 @@ func validateSSO(cmd *cobra.Command, args []string) error {
 			fmt.Printf("❌ %v\n", err)
 			failed = true
 		} else {
-			fmt.Println("✅")
+			fmt.Println("")
 		}
 	}
 
@@ -436,7 +436,7 @@ func validateSSO(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validation failed")
 	}
 
-	fmt.Println("\n✅ All validation checks passed!")
+	fmt.Println("\n All validation checks passed!")
 	return nil
 }
 

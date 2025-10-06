@@ -31,8 +31,8 @@ type EnvironmentSetupOptions struct {
 	BackendIP          string // e.g., "10.0.0.5"
 
 	// Services to enable
-	EnableVault bool
-	EnableNomad bool
+	EnableVault  bool
+	EnableNomad  bool
 	EnableConsul bool // Always true, but explicit
 
 	// Consul configuration
@@ -40,7 +40,7 @@ type EnvironmentSetupOptions struct {
 	ConsulUIEnabled  bool
 
 	// Vault configuration
-	VaultHost      string // Which host runs Vault (usually backend)
+	VaultHost       string // Which host runs Vault (usually backend)
 	VaultTLSEnabled bool
 
 	// Nomad configuration
@@ -127,7 +127,7 @@ func SetupEnvironment(rc *eos_io.RuntimeContext, opts *EnvironmentSetupOptions) 
 
 	// Print success message
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: ✅ Environment setup complete!")
+	logger.Info("terminal prompt:  Environment setup complete!")
 	logger.Info(fmt.Sprintf("terminal prompt:    Environment: %s", env.Name))
 	logger.Info(fmt.Sprintf("terminal prompt:    Frontend:    %s (%s)", env.FrontendHost, env.WireGuard.FrontendIP))
 	logger.Info(fmt.Sprintf("terminal prompt:    Backend:     %s (%s)", env.BackendHost, env.WireGuard.BackendIP))
@@ -263,7 +263,7 @@ func setupWireGuardMesh(rc *eos_io.RuntimeContext, opts *EnvironmentSetupOptions
 	// 4. Exchange keys with peer
 	// 5. Verify connectivity
 
-	logger.Info("terminal prompt: ⚠️  WireGuard setup not yet implemented")
+	logger.Info("terminal prompt: WireGuard setup not yet implemented")
 	logger.Info("terminal prompt:   Manual setup required:")
 	logger.Info(fmt.Sprintf("terminal prompt:   1. On %s: wg-quick up %s", opts.BackendHost, opts.WireGuardInterface))
 	logger.Info(fmt.Sprintf("terminal prompt:   2. On %s: wg-quick up %s", opts.FrontendHost, opts.WireGuardInterface))

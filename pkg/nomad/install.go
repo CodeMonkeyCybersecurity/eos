@@ -20,20 +20,20 @@ type InstallConfig struct {
 	Version       string // Version to install
 	UseRepository bool   // Use APT repository vs direct binary download
 	BinaryPath    string // Path for binary installation
-	
+
 	// Nomad configuration
-	ServerEnabled    bool
-	ClientEnabled    bool
-	Datacenter       string
-	Region           string
-	BootstrapExpect  int
+	ServerEnabled     bool
+	ClientEnabled     bool
+	Datacenter        string
+	Region            string
+	BootstrapExpect   int
 	ConsulIntegration bool
 	VaultIntegration  bool
 	DockerEnabled     bool
-	BindAddr         string
-	AdvertiseAddr    string
-	LogLevel         string
-	
+	BindAddr          string
+	AdvertiseAddr     string
+	LogLevel          string
+
 	// Installation behavior
 	ForceReinstall bool
 	CleanInstall   bool
@@ -74,7 +74,7 @@ func NewNomadInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *NomadI
 		config.ServerEnabled = true
 		config.ClientEnabled = true
 	}
-	
+
 	runner := NewCommandRunner(rc)
 	return &NomadInstaller{
 		rc:      rc,
@@ -91,35 +91,35 @@ func (ni *NomadInstaller) Install() error {
 		zap.String("version", ni.config.Version),
 		zap.Bool("server", ni.config.ServerEnabled),
 		zap.Bool("client", ni.config.ClientEnabled))
-	
+
 	// Phase 1: ASSESS
 	if !ni.config.ForceReinstall {
 		if _, err := ni.runner.RunOutput("nomad", "version"); err == nil {
 			if ni.systemd.IsActive() {
 				ni.logger.Info("Nomad is already installed and running")
-				ni.logger.Info("terminal prompt: ✅ Nomad is already installed and running")
+				ni.logger.Info("terminal prompt:  Nomad is already installed and running")
 				ni.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortNomad))
 				return nil
 			}
 		}
 	}
-	
+
 	// Check prerequisites
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError("this command must be run as root")
 	}
-	
+
 	// Phase 2: INTERVENE - Install binary
 	ni.logger.Info("Downloading and installing Nomad")
-	
+
 	arch := runtime.GOARCH
 	downloadURL := fmt.Sprintf("https://releases.hashicorp.com/nomad/%s/nomad_%s_linux_%s.zip",
 		ni.config.Version, ni.config.Version, arch)
-	
+
 	tmpDir := "/tmp/nomad-install"
 	os.MkdirAll(tmpDir, 0755)
 	defer os.RemoveAll(tmpDir)
-	
+
 	if err := ni.runner.Run("wget", "-O", tmpDir+"/nomad.zip", downloadURL); err != nil {
 		if ni.config.Version == "latest" {
 			downloadURL = fmt.Sprintf("https://releases.hashicorp.com/nomad/1.6.2/nomad_1.6.2_linux_%s.zip", arch)
@@ -130,15 +130,15 @@ func (ni *NomadInstaller) Install() error {
 			return fmt.Errorf("failed to download Nomad: %w", err)
 		}
 	}
-	
+
 	if err := ni.runner.Run("unzip", "-o", tmpDir+"/nomad.zip", "-d", tmpDir); err != nil {
 		return fmt.Errorf("failed to extract Nomad: %w", err)
 	}
-	
+
 	if err := ni.runner.Run("install", "-m", "755", tmpDir+"/nomad", "/usr/local/bin/nomad"); err != nil {
 		return fmt.Errorf("failed to install Nomad binary: %w", err)
 	}
-	
+
 	// Create user and directories
 	ni.runner.Run("useradd", "--system", "--group", "--home", "/var/lib/nomad", "--no-create-home", "--shell", "/bin/false", "nomad")
 	os.MkdirAll("/etc/nomad.d", 0755)
@@ -146,24 +146,24 @@ func (ni *NomadInstaller) Install() error {
 	os.MkdirAll("/var/log/nomad", 0755)
 	ni.runner.Run("chown", "-R", "nomad:nomad", "/opt/nomad")
 	ni.runner.Run("chown", "-R", "nomad:nomad", "/var/log/nomad")
-	
+
 	// Write configuration
 	ni.writeConfiguration()
-	
+
 	// Setup systemd service
 	ni.setupSystemdService()
-	
+
 	// Phase 3: EVALUATE
 	if output, err := ni.runner.RunOutput("nomad", "version"); err != nil {
 		return fmt.Errorf("Nomad installation verification failed: %w", err)
 	} else {
 		ni.logger.Info("Nomad installed successfully", zap.String("version", output))
 	}
-	
-	ni.logger.Info("terminal prompt: ✅ Nomad installation completed!")
+
+	ni.logger.Info("terminal prompt:  Nomad installation completed!")
 	ni.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortNomad))
 	ni.logger.Info("terminal prompt: Check status with: nomad node status")
-	
+
 	return nil
 }
 
@@ -176,7 +176,7 @@ server {
   bootstrap_expect = %d
 }`, ni.config.BootstrapExpect)
 	}
-	
+
 	var clientConfig string
 	if ni.config.ClientEnabled {
 		clientConfig = `
@@ -184,7 +184,7 @@ client {
   enabled = true
 }`
 	}
-	
+
 	config := fmt.Sprintf(`datacenter = "%s"
 region = "%s"
 data_dir = "/opt/nomad/data"

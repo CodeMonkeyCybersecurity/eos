@@ -208,6 +208,6 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		return fmt.Errorf("self-update failed: %w", err)
 	}
 
-	logger.Info("✅ Self-update completed successfully - please restart any running eos processes")
+	logger.Info(" Self-update completed successfully - please restart any running eos processes")
 	return nil
 }

@@ -382,7 +382,7 @@ func confirmRollback(rc *eos_io.RuntimeContext, plan *RollbackPlan) error {
 
 	logger.Info("Requesting rollback confirmation")
 
-	fmt.Printf("\n🔄 Rollback Plan for %s\n", plan.Request.AppName)
+	fmt.Printf("\n Rollback Plan for %s\n", plan.Request.AppName)
 	fmt.Printf("═══════════════════════════════\n")
 	fmt.Printf("From Version: %s\n", plan.Request.CurrentVersion)
 	fmt.Printf("To Version:   %s\n", plan.Request.TargetVersion)
@@ -392,7 +392,7 @@ func confirmRollback(rc *eos_io.RuntimeContext, plan *RollbackPlan) error {
 	fmt.Printf("\n")
 
 	if len(plan.Warnings) > 0 {
-		fmt.Printf("⚠️  Warnings:\n")
+		fmt.Printf("Warnings:\n")
 		for _, warning := range plan.Warnings {
 			fmt.Printf("   • %s\n", warning)
 		}
@@ -417,7 +417,7 @@ func confirmRollback(rc *eos_io.RuntimeContext, plan *RollbackPlan) error {
 
 // displayRollbackPlan displays the rollback plan for dry run
 func displayRollbackPlan(plan *RollbackPlan) error {
-	fmt.Printf("\n🔍 Rollback Plan (Dry Run) for %s\n", plan.Request.AppName)
+	fmt.Printf("\n Rollback Plan (Dry Run) for %s\n", plan.Request.AppName)
 	fmt.Printf("═══════════════════════════════════════\n")
 	fmt.Printf("Current Version: %s\n", plan.Request.CurrentVersion)
 	fmt.Printf("Target Version:  %s\n", plan.Request.TargetVersion)
@@ -590,7 +590,7 @@ func sendRollbackNotifications(rc *eos_io.RuntimeContext, result *RollbackResult
 
 	// Implementation would send notifications via configured channels
 	// For now, just log the notification
-	status := "✅ SUCCESS"
+	status := " SUCCESS"
 	if !result.Success {
 		status = "❌ FAILED"
 	}

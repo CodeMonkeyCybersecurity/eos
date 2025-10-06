@@ -238,7 +238,7 @@ func cleanupStaleHCPDirectory(rc *eos_io.RuntimeContext) error {
 		return nil
 	}
 
-	log.Info("🧹 Cleaning up stale HCP directory to prevent JSON parsing issues",
+	log.Info(" Cleaning up stale HCP directory to prevent JSON parsing issues",
 		zap.String("path", hcpDir))
 
 	// Remove the entire HCP directory

@@ -218,7 +218,7 @@ func displayHealthStatus(logger otelzap.LoggerWithCtx) error {
 		return err
 	}
 
-	logger.Info("terminal prompt:   Status: ✅ Consul agent is healthy")
+	logger.Info("terminal prompt:   Status:  Consul agent is healthy")
 
 	// Check service status
 	output, err := exec.Command("systemctl", "is-active", "consul").Output()
@@ -227,9 +227,9 @@ func displayHealthStatus(logger otelzap.LoggerWithCtx) error {
 	} else {
 		status := strings.TrimSpace(string(output))
 		if status == "active" {
-			logger.Info("terminal prompt:   Service: ✅ active")
+			logger.Info("terminal prompt:   Service:  active")
 		} else {
-			logger.Info("terminal prompt:   Service: ⚠️  " + status)
+			logger.Info("terminal prompt:   Service: " + status)
 		}
 	}
 

@@ -262,7 +262,7 @@ func displayDatabaseEngineIntroduction(rc *eos_io.RuntimeContext) error {
 This will guide you through configuring Vault's database secrets engine
 for dynamic PostgreSQL credential generation.
 
-⚠️  IMPORTANT: This requires PostgreSQL admin access on the target database.
+IMPORTANT: This requires PostgreSQL admin access on the target database.
 The database should be running in your guest VM.
 
 `

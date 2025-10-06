@@ -43,21 +43,21 @@ func PerformIdempotentBootstrap(rc *eos_io.RuntimeContext, opts *BootstrapOption
 		logger.Info("Checking component", zap.String("component", component))
 
 		status := checkComponentIdempotency(rc, component)
-		
+
 		switch status.State {
 		case IdempotentStateCompleted:
-			logger.Info("Component already in desired state", 
+			logger.Info("Component already in desired state",
 				zap.String("component", component),
 				zap.String("reason", status.Reason))
 			result.AlreadyCompleted = append(result.AlreadyCompleted, component)
 
 		case IdempotentStateNeedsUpdate:
-			logger.Info("Component needs update", 
+			logger.Info("Component needs update",
 				zap.String("component", component),
 				zap.String("reason", status.Reason))
-			
+
 			if err := performComponentUpdate(rc, component, status); err != nil {
-				logger.Error("Failed to update component", 
+				logger.Error("Failed to update component",
 					zap.String("component", component),
 					zap.Error(err))
 				result.Failed = append(result.Failed, component)
@@ -66,12 +66,12 @@ func PerformIdempotentBootstrap(rc *eos_io.RuntimeContext, opts *BootstrapOption
 			}
 
 		case IdempotentStateNeedsInstall:
-			logger.Info("Component needs installation", 
+			logger.Info("Component needs installation",
 				zap.String("component", component),
 				zap.String("reason", status.Reason))
-			
+
 			if err := performComponentInstall(rc, component, opts); err != nil {
-				logger.Error("Failed to install component", 
+				logger.Error("Failed to install component",
 					zap.String("component", component),
 					zap.Error(err))
 				result.Failed = append(result.Failed, component)
@@ -80,13 +80,13 @@ func PerformIdempotentBootstrap(rc *eos_io.RuntimeContext, opts *BootstrapOption
 			}
 
 		case IdempotentStateSkipped:
-			logger.Info("Component skipped", 
+			logger.Info("Component skipped",
 				zap.String("component", component),
 				zap.String("reason", status.Reason))
 			result.Skipped = append(result.Skipped, component)
 
 		case IdempotentStateError:
-			logger.Error("Component check failed", 
+			logger.Error("Component check failed",
 				zap.String("component", component),
 				zap.String("reason", status.Reason))
 			result.Failed = append(result.Failed, component)
@@ -95,8 +95,8 @@ func PerformIdempotentBootstrap(rc *eos_io.RuntimeContext, opts *BootstrapOption
 
 	// Generate summary
 	result.Summary = generateIdempotentSummary(result)
-	
-	logger.Info("Idempotent bootstrap completed", 
+
+	logger.Info("Idempotent bootstrap completed",
 		zap.String("summary", result.Summary),
 		zap.Int("completed", len(result.AlreadyCompleted)),
 		zap.Int("executed", len(result.Executed)),
@@ -173,7 +173,7 @@ func checkComponentIdempotency(rc *eos_io.RuntimeContext, component string) Comp
 	status.State = IdempotentStateCompleted
 	status.Reason = "Component in desired state"
 	status.Version = getComponentVersion(rc, component)
-	
+
 	return status
 }
 
@@ -198,7 +198,7 @@ func checkPackageInstalled(rc *eos_io.RuntimeContext, packageName string) bool {
 		Args:    []string{"-l", packageName},
 		Capture: true,
 	})
-	
+
 	return err == nil && strings.Contains(output, "ii")
 }
 
@@ -209,7 +209,7 @@ func checkBinaryExists(rc *eos_io.RuntimeContext, binaryName string) bool {
 		Args:    []string{binaryName},
 		Capture: true,
 	})
-	
+
 	return err == nil
 }
 
@@ -227,7 +227,7 @@ func isServiceComponent(component string) bool {
 // isConfigurationCorrect checks if component configuration is correct
 func isConfigurationCorrect(rc *eos_io.RuntimeContext, component string) bool {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	switch component {
 
 	case "vault":
@@ -242,8 +242,6 @@ func isConfigurationCorrect(rc *eos_io.RuntimeContext, component string) bool {
 	}
 }
 
-
-
 // checkVaultConfiguration checks if Vault configuration is correct
 func checkVaultConfiguration(rc *eos_io.RuntimeContext) bool {
 	// Check if Vault config exists
@@ -253,7 +251,7 @@ func checkVaultConfiguration(rc *eos_io.RuntimeContext) bool {
 		Args:    []string{"-f", configPath},
 		Capture: false,
 	})
-	
+
 	return err == nil
 }
 
@@ -266,7 +264,7 @@ func checkConsulConfiguration(rc *eos_io.RuntimeContext) bool {
 		Args:    []string{"-f", configPath},
 		Capture: false,
 	})
-	
+
 	return err == nil
 }
 
@@ -279,7 +277,7 @@ func checkNomadConfiguration(rc *eos_io.RuntimeContext) bool {
 		Args:    []string{"-f", configPath},
 		Capture: false,
 	})
-	
+
 	return err == nil
 }
 
@@ -332,7 +330,7 @@ func performComponentInstall(rc *eos_io.RuntimeContext, component string, _ *Boo
 // performComponentUpdate updates a component
 func performComponentUpdate(rc *eos_io.RuntimeContext, component string, status ComponentIdempotencyStatus) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Updating component", 
+	logger.Info("Updating component",
 		zap.String("component", component),
 		zap.String("reason", status.Reason))
 
@@ -379,50 +377,50 @@ func updateNomad(rc *eos_io.RuntimeContext) error {
 // generateIdempotentSummary generates a summary of the idempotent bootstrap
 func generateIdempotentSummary(result *IdempotentBootstrapResult) string {
 	total := len(result.AlreadyCompleted) + len(result.Executed) + len(result.Skipped) + len(result.Failed)
-	
+
 	if total == 0 {
 		return "No components processed"
 	}
-	
+
 	if len(result.Failed) > 0 {
 		return fmt.Sprintf("Completed with %d failures out of %d components", len(result.Failed), total)
 	}
-	
+
 	if len(result.Executed) == 0 {
 		return "All components already in desired state"
 	}
-	
-	return fmt.Sprintf("Successfully processed %d components (%d already complete, %d updated)", 
+
+	return fmt.Sprintf("Successfully processed %d components (%d already complete, %d updated)",
 		total, len(result.AlreadyCompleted), len(result.Executed))
 }
 
 // PrintIdempotentResult prints a formatted result of idempotent bootstrap
 func PrintIdempotentResult(rc *eos_io.RuntimeContext, result *IdempotentBootstrapResult) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("╔══════════════════════════════════════╗")
 	logger.Info("║      Idempotent Bootstrap Results    ║")
 	logger.Info("╚══════════════════════════════════════╝")
-	
+
 	logger.Info("Summary: " + result.Summary)
 	logger.Info("")
-	
+
 	if len(result.AlreadyCompleted) > 0 {
-		logger.Info("✅ Already in desired state:")
+		logger.Info(" Already in desired state:")
 		for _, component := range result.AlreadyCompleted {
 			logger.Info("   • " + component)
 		}
 		logger.Info("")
 	}
-	
+
 	if len(result.Executed) > 0 {
-		logger.Info("🔧 Updated/Installed:")
+		logger.Info(" Updated/Installed:")
 		for _, component := range result.Executed {
 			logger.Info("   • " + component)
 		}
 		logger.Info("")
 	}
-	
+
 	if len(result.Skipped) > 0 {
 		logger.Info("⏭️  Skipped:")
 		for _, component := range result.Skipped {
@@ -430,7 +428,7 @@ func PrintIdempotentResult(rc *eos_io.RuntimeContext, result *IdempotentBootstra
 		}
 		logger.Info("")
 	}
-	
+
 	if len(result.Failed) > 0 {
 		logger.Error("❌ Failed:")
 		for _, component := range result.Failed {

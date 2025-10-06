@@ -766,7 +766,7 @@ func PrintBootstrapStateReport(rc *eos_io.RuntimeContext, state *BootstrapState)
 	if state.IsEosInstall {
 		logger.Info("✓ Eos installation detected")
 	} else {
-		logger.Info("⚠️  No Eos installation markers found")
+		logger.Info("No Eos installation markers found")
 	}
 
 	// Service status
@@ -774,7 +774,7 @@ func PrintBootstrapStateReport(rc *eos_io.RuntimeContext, state *BootstrapState)
 	for name, component := range state.Components {
 		status := "❌"
 		if component.Installed && component.Running && component.Healthy {
-			status = "✅"
+			status = ""
 		} else if component.Installed && component.Running {
 			status = "⚠️"
 		} else if component.Installed {

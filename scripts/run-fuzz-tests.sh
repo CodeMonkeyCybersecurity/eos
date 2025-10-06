@@ -2,17 +2,17 @@
 # Enhanced fuzz test runner for Eos CLI
 # Supports individual test execution, reporting, and integration with overnight fuzzing
 #
-# ⚠️  DEPRECATED: This script has been integrated into the Eos framework
-# ⚠️  Use: eos self fuzz <subcommand> instead
-# ⚠️  Migration guide: docs/testing/FUZZING_GUIDE.md
+# DEPRECATED: This script has been integrated into the Eos framework
+# Use: eos self fuzz <subcommand> instead
+# Migration guide: docs/testing/FUZZING_GUIDE.md
 
 set -e
 
 # Display deprecation warning
-echo "⚠️  DEPRECATION WARNING: scripts/run-fuzz-tests.sh is deprecated" >&2
-echo "⚠️  Please use: eos self fuzz quick --duration <duration> instead" >&2
-echo "⚠️  Migration guide: docs/testing/FUZZING_GUIDE.md" >&2
-echo "⚠️  This script will be removed in a future version" >&2
+echo "DEPRECATION WARNING: scripts/run-fuzz-tests.sh is deprecated" >&2
+echo "Please use: eos self fuzz quick --duration <duration> instead" >&2
+echo "Migration guide: docs/testing/FUZZING_GUIDE.md" >&2
+echo "This script will be removed in a future version" >&2
 echo "" >&2
 
 # Colors for output
@@ -26,7 +26,7 @@ NC='\033[0m' # No Color
 
 # Preflight check function
 preflight_check() {
-    echo -e "${CYAN}🔍 Running preflight checks...${NC}"
+    echo -e "${CYAN} Running preflight checks...${NC}"
     
     # Check if we're in the project root or can find it
     local current_dir="$(pwd)"
@@ -109,7 +109,7 @@ echo -e "${CYAN}🧪 Eos Fuzz Test Runner${NC}"
 echo "======================="
 echo -e "📂 Working directory: ${YELLOW}$(pwd)${NC}"
 echo -e "⏰ Duration: ${YELLOW}${FUZZTIME}${NC}"
-echo -e "🔄 Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
+echo -e " Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
 echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
 echo ""
 
@@ -163,7 +163,7 @@ run_single_fuzz_test() {
 
 # Function to discover all available fuzz tests
 discover_fuzz_tests() {
-    echo "🔍 Discovering available fuzz tests..."
+    echo " Discovering available fuzz tests..."
     
     # Create temporary file for test mappings (bash 3.x compatible)
     local test_list="/tmp/eos_fuzz_tests_$$.txt"
@@ -373,7 +373,7 @@ if [ ${exit_code} -eq 0 ]; then
     echo "🚀 Ready for overnight fuzzing: ./assets/overnight-fuzz.sh"
 else
     echo "${exit_code} test(s) failed. Review logs for details."
-    echo "🔍 Check specific logs: ls ${LOG_DIR}/*_${TIMESTAMP}.log"
+    echo " Check specific logs: ls ${LOG_DIR}/*_${TIMESTAMP}.log"
 fi
 
 echo ""

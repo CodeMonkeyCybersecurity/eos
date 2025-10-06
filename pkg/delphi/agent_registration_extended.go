@@ -93,7 +93,7 @@ func NewAgentRegistrationManager(config *AgentRegistrationConfig) *AgentRegistra
 // DiscoverAgents discovers existing Wazuh agents that need re-registration
 func (arm *AgentRegistrationManager) DiscoverAgents(rc *eos_io.RuntimeContext) ([]Agent, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Discovering Wazuh agents for re-registration")
+	logger.Info(" Discovering Wazuh agents for re-registration")
 
 	// TODO: Use existing Delphi functionality to discover agents when API is complete
 	// For now, return empty list as placeholder
@@ -163,7 +163,7 @@ func (arm *AgentRegistrationManager) ReregisterAgents(rc *eos_io.RuntimeContext,
 
 	summary.Duration = time.Since(startTime)
 
-	logger.Info("✅ Wazuh agent re-registration completed",
+	logger.Info(" Wazuh agent re-registration completed",
 		zap.Int("total_agents", summary.TotalAgents),
 		zap.Int("success_count", summary.SuccessCount),
 		zap.Int("failure_count", summary.FailureCount),

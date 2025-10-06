@@ -28,7 +28,7 @@ type BinaryLocation struct {
 // This implements P1 requirement from audit: cleanup duplicate binaries
 func CleanupDuplicateBinaries(rc *eos_io.RuntimeContext, keepPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Searching for duplicate Vault binaries")
+	log.Info(" Searching for duplicate Vault binaries")
 
 	// ASSESS: Find all vault binaries
 	binaries, err := findVaultBinaries(rc)
@@ -161,7 +161,7 @@ func getVaultVersion(rc *eos_io.RuntimeContext, binaryPath string) (string, erro
 
 // displayBinaryFindings shows all discovered binaries to the user
 func displayBinaryFindings(binaries []BinaryLocation, keepPath string) {
-	fmt.Println("\n🔍 Vault Binary Discovery Results")
+	fmt.Println("\n Vault Binary Discovery Results")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	for i, binary := range binaries {
@@ -170,7 +170,7 @@ func displayBinaryFindings(binaries []BinaryLocation, keepPath string) {
 		if binary.Path == keepPath {
 			fmt.Println("   Status: 🎯 PRIMARY (will be kept)")
 		} else {
-			fmt.Println("   Status: ⚠️  DUPLICATE (will be removed)")
+			fmt.Println("   Status: DUPLICATE (will be removed)")
 		}
 
 		if binary.Version != "" {

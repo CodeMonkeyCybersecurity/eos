@@ -94,13 +94,13 @@ Examples:
 		// Display cleanup plan
 		fmt.Printf("Build Cleanup Plan:\n")
 		fmt.Printf("═══════════════════\n")
-		
+
 		if component != "" {
 			fmt.Printf("Component:     %s\n", component)
 		} else {
 			fmt.Printf("Scope:         %s\n", getScopeDescription(all, cache, artifacts))
 		}
-		
+
 		fmt.Printf("Mode:          %s\n", getCleanMode(aggressive, force))
 		fmt.Printf("Dry Run:       %t\n", dryRun)
 		fmt.Printf("\n")
@@ -155,13 +155,13 @@ Examples:
 
 		// Dry run - show what would be cleaned
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No items will be removed\n")
+			fmt.Printf(" Dry Run - No items will be removed\n")
 			return nil
 		}
 
 		// Get confirmation for destructive operations
 		if !force && (totalItems > 0) {
-			fmt.Printf("Proceed with cleanup? This will permanently remove %d items (%s). (y/N): ", 
+			fmt.Printf("Proceed with cleanup? This will permanently remove %d items (%s). (y/N): ",
 				totalItems, formatSize(totalSize))
 			// In real implementation, would read from stdin
 			fmt.Printf("y\n")
@@ -194,9 +194,9 @@ Examples:
 		}
 
 		if result.ItemsRemoved == result.ItemsTotal {
-			fmt.Printf("✅ Cleanup completed successfully\n")
+			fmt.Printf(" Cleanup completed successfully\n")
 		} else {
-			fmt.Printf("⚠️  Cleanup completed with %d errors\n", len(result.Errors))
+			fmt.Printf("Cleanup completed with %d errors\n", len(result.Errors))
 		}
 
 		logger.Info("Build cleanup completed",

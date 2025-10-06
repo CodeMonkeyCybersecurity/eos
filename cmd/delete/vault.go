@@ -33,7 +33,7 @@ This command will:
 - Remove systemd service files
 - Clean up repository configuration (APT/DNF)
 
-⚠️  WARNING: This will remove ALL Vault data including:
+WARNING: This will remove ALL Vault data including:
 - Encryption keys
 - Sealed/unsealed data
 - All secrets stored in Vault
@@ -110,7 +110,7 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 // promptForConfirmation handles user confirmation for deletion
 func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
-	prompt := `⚠️  WARNING: You are about to PERMANENTLY DELETE Vault and ALL its data!
+	prompt := `WARNING: You are about to PERMANENTLY DELETE Vault and ALL its data!
 
 This includes:
 - All secrets stored in Vault

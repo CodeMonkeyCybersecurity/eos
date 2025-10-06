@@ -15,11 +15,11 @@ The Vault implementation shows excellent architectural patterns and addresses mo
 ## 🟢 What's Good
 
 ### 1. **Excellent Code Quality**
-- ✅ Follows Assess→Intervene→Evaluate pattern consistently
-- ✅ Comprehensive error handling with context
-- ✅ Well-structured packages (separation of concerns)
-- ✅ Proper use of RuntimeContext throughout
-- ✅ Structured logging via `otelzap.Ctx(rc.Ctx)` - CLAUDE.md compliant
+-  Follows Assess→Intervene→Evaluate pattern consistently
+-  Comprehensive error handling with context
+-  Well-structured packages (separation of concerns)
+-  Proper use of RuntimeContext throughout
+-  Structured logging via `otelzap.Ctx(rc.Ctx)` - CLAUDE.md compliant
 
 ### 2. **Comprehensive Test Coverage**
 ```
@@ -35,21 +35,21 @@ All tests are well-designed with clear intent and edge case coverage.
 
 ### 3. **Historical Issues Protection**
 All 10 historical issues have regression protection:
-- ✅ Empty TLS paths
-- ✅ Missing FQDN in SAN
-- ✅ Incorrect file permissions
-- ✅ Config validation fallback
-- ✅ Legacy port 8200 detection
-- ✅ Systemd capabilities syntax
-- ✅ Path consistency (/secret/ vs /secrets/)
-- ✅ TLS disable string detection
-- ✅ Duplicate binary detection
-- ✅ Missing config blocks
+-  Empty TLS paths
+-  Missing FQDN in SAN
+-  Incorrect file permissions
+-  Config validation fallback
+-  Legacy port 8200 detection
+-  Systemd capabilities syntax
+-  Path consistency (/secret/ vs /secrets/)
+-  TLS disable string detection
+-  Duplicate binary detection
+-  Missing config blocks
 
 ### 4. **CLI Commands Properly Wired**
 ```
-✅ eos check vault --config --security --all
-✅ eos repair vault --all --dry-run --cleanup-binaries --permissions
+ eos check vault --config --security --all
+ eos repair vault --all --dry-run --cleanup-binaries --permissions
 ```
 
 Both commands are registered in root.go and follow Eos CLI patterns.
@@ -224,20 +224,20 @@ $ sudo eos create vault
 **Current Behavior:**
 ```bash
 $ sudo eos create vault
-✅ Vault installed successfully
+ Vault installed successfully
 # User never sees security warnings about insecure key storage!
 ```
 
 **Expected Behavior:**
 ```bash
 $ sudo eos create vault
-✅ Vault installed successfully
+ Vault installed successfully
 
 ╔═══════════════════════════════════════╗
 ║      🔐 SECURITY WARNINGS 🔐         ║
 ╚═══════════════════════════════════════╝
 
-⚠️  CRITICAL: All unseal keys stored in /var/lib/eos/secret/vault_init.json
+CRITICAL: All unseal keys stored in /var/lib/eos/secret/vault_init.json
 This violates Shamir's Secret Sharing!
 ...
 ```
@@ -321,19 +321,19 @@ Users who installed Vault *before* these fixes now have:
 **Should Implement:**
 ```bash
 $ sudo eos upgrade vault
-🔍 Analyzing current Vault installation...
-   ⚠️  Found 3 issues:
+ Analyzing current Vault installation...
+   Found 3 issues:
       1. Duplicate binary at /usr/bin/vault
       2. TLS key has insecure permissions (0644)
       3. Using legacy port 8200
 
-🔧 Fixing issues...
-   ✅ Removed duplicate binary
-   ✅ Fixed TLS key permissions to 0600
-   ✅ Updated config to port 8179
-   ✅ Restarted Vault service
+ Fixing issues...
+    Removed duplicate binary
+    Fixed TLS key permissions to 0600
+    Updated config to port 8179
+    Restarted Vault service
 
-✅ Upgrade complete
+ Upgrade complete
 ```
 
 ### 2. **Cluster-Wide Validation**
@@ -364,7 +364,7 @@ Vault might be running with different config than what's on disk.
 **Missing:**
 ```bash
 $ sudo eos check vault --running
-⚠️  Configuration drift detected:
+Configuration drift detected:
    File: /opt/vault/vault.hcl (port 8179)
    Running: --config=/old/vault.hcl (port 8200)
 ```
@@ -443,7 +443,7 @@ VAULT_AUDIT_REPORT.md says "7/10 - Good" but doesn't reflect that features aren'
 
 ---
 
-## 🔧 Prioritized Fix List
+##  Prioritized Fix List
 
 ### Immediate (Do First - 30 minutes)
 
@@ -588,7 +588,7 @@ Before marking as complete, verify:
 ```bash
 $ sudo eos create vault
 Installing Vault...
-✅ Done
+ Done
 
 $ cat /opt/vault/vault.hcl
 listener "tcp" {
@@ -613,9 +613,9 @@ Help: Run 'sudo eos check vault --config'
 
 $ sudo eos create vault  # After fixing
 Installing Vault...
-Validating configuration... ✅
+Validating configuration... 
 Cleaning up duplicate binaries... (removed 2)
-Initializing Vault... ✅
+Initializing Vault... 
 
 ╔═════════════════════════════════╗
 ║    🔐 SECURITY WARNINGS 🔐     ║
@@ -626,15 +626,15 @@ All unseal keys stored in:
   /var/lib/eos/secret/vault_init.json
 ...
 
-✅ Installation complete
+ Installation complete
 
 $ eos check vault
-✅ Configuration valid
-⚠️  vault_init.json still exists (development only)
+ Configuration valid
+vault_init.json still exists (development only)
 
 $ sudo eos repair vault --all
 Found 3 issues, fixed 3
-✅ All issues repaired
+ All issues repaired
 ```
 
 **Result:** Safe installation, clear warnings, working repair.
@@ -645,14 +645,14 @@ Found 3 issues, fixed 3
 
 Integration is complete when:
 
-1. ✅ All P0 issues fixed (commands work, validation runs)
-2. ✅ All P1 issues fixed (logging compliant, cleanup works)
-3. ✅ Build passes: `go build ./cmd/`
-4. ✅ Linter passes: `golangci-lint run`
-5. ✅ Tests pass: `go test -v ./pkg/vault/...`
-6. ✅ Integration test: Install Vault with validation enabled
-7. ✅ User sees security warnings during install
-8. ✅ Repair command accessible and functional
+1.  All P0 issues fixed (commands work, validation runs)
+2.  All P1 issues fixed (logging compliant, cleanup works)
+3.  Build passes: `go build ./cmd/`
+4.  Linter passes: `golangci-lint run`
+5.  Tests pass: `go test -v ./pkg/vault/...`
+6.  Integration test: Install Vault with validation enabled
+7.  User sees security warnings during install
+8.  Repair command accessible and functional
 
 ---
 

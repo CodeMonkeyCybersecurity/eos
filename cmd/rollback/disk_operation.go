@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -15,10 +15,10 @@ import (
 
 // Command flags
 var (
-	rollbackDryRun    bool
-	forceRollback     bool
-	showPlan          bool
-	skipConfirmation  bool
+	rollbackDryRun   bool
+	forceRollback    bool
+	showPlan         bool
+	skipConfirmation bool
 )
 
 // DiskOperationCmd handles rollback of disk operations
@@ -130,9 +130,9 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 			fmt.Printf("\nUse --force to skip safety validations (DANGEROUS).\n")
 			return fmt.Errorf("rollback safety validation failed: %w", err)
 		}
-		fmt.Printf("✅ Safety validations passed\n")
+		fmt.Printf(" Safety validations passed\n")
 	} else {
-		fmt.Printf("\n⚠️  SKIPPING SAFETY VALIDATIONS (--force enabled)\n")
+		fmt.Printf("\nSKIPPING SAFETY VALIDATIONS (--force enabled)\n")
 	}
 
 	// Get user confirmation (unless skipped)
@@ -170,8 +170,8 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	}
 
 	// Success
-	fmt.Printf("✅ Rollback completed successfully in %s\n", duration.Round(time.Second))
-	
+	fmt.Printf(" Rollback completed successfully in %s\n", duration.Round(time.Second))
+
 	// Display final status
 	updatedEntry, _ := journal.Load(journalID)
 	if updatedEntry != nil {
@@ -204,15 +204,15 @@ func getRollbackConfirmation(plan *storage.RollbackPlan) error {
 	fmt.Printf("Estimated time: %s\n", plan.EstimatedTime.Round(time.Second))
 
 	if plan.Method == storage.RollbackSnapshot {
-		fmt.Printf("\n⚠️  WARNING: Snapshot rollback will restore the volume to its\n")
+		fmt.Printf("\nWARNING: Snapshot rollback will restore the volume to its\n")
 		fmt.Printf("previous state, potentially losing any changes made after the snapshot.\n")
 	} else if plan.Method == storage.RollbackReverse {
-		fmt.Printf("\n⚠️  WARNING: Reverse operations will attempt to undo the changes.\n")
+		fmt.Printf("\nWARNING: Reverse operations will attempt to undo the changes.\n")
 		fmt.Printf("This may involve shrinking volumes or removing created resources.\n")
 	}
 
 	fmt.Printf("\nDo you want to proceed with the rollback? (yes/no): ")
-	
+
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
 		return fmt.Errorf("failed to read response: %w", err)

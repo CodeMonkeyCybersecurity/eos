@@ -18,7 +18,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Check prerequisites
-	logger.Info("🔍 Assessing credentials change prerequisites")
+	logger.Info(" Assessing credentials change prerequisites")
 
 	// Interactive mode prompts
 	if interactive {
@@ -95,7 +95,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	}
 
 	// EVALUATE - Restart containers
-	logger.Info("🔄 Restarting containers with new credentials")
+	logger.Info(" Restarting containers with new credentials")
 	if err := exec.Command("docker", "compose", "up", "-d").Run(); err != nil {
 		return fmt.Errorf("failed to restart containers: %w", err)
 	}

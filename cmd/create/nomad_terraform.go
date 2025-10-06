@@ -173,7 +173,7 @@ read -r response
 if [[ "$response" =~ ^[Yy]$ ]]; then
     terraform apply
     
-    echo "✅ Deployment complete!"
+    echo " Deployment complete!"
     echo ""
     echo "🎯 Cluster Details:"
     echo "   - Cluster: %s"
@@ -230,7 +230,7 @@ fi
 	}
 
 	logger.Info("Nomad+Consul Terraform configuration generated successfully")
-	logger.Info("terminal prompt: ✅ Nomad+Consul Terraform Generation Complete!")
+	logger.Info("terminal prompt:  Nomad+Consul Terraform Generation Complete!")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Configuration Details:")
 	logger.Info("terminal prompt:   - Cluster: " + clusterName)

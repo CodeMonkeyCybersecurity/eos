@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🔧 Fixing logging violations in Eos codebase..."
+echo " Fixing logging violations in Eos codebase..."
 
 # Function to check if file imports required packages
 has_logger() {
@@ -80,13 +80,13 @@ find ./cmd -name "*.go" -type f | while read -r file; do
         # Verify no violations remain
         remaining=$(grep -c "fmt\.Printf\|fmt\.Println\|fmt\.Print[^f^l]" "$file" || true)
         if [ "$remaining" -eq 0 ]; then
-            echo "✅ Fixed all violations in $file"
+            echo " Fixed all violations in $file"
             rm "$file.bak"
         else
-            echo "⚠️  $remaining violations remain in $file (manual fix needed)"
+            echo "$remaining violations remain in $file (manual fix needed)"
         fi
     fi
 done
 
 echo "🎉 Logging violation fixes complete!"
-echo "⚠️  Please review changes and run tests before committing"
+echo "Please review changes and run tests before committing"

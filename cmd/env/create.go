@@ -162,7 +162,7 @@ Examples:
 		}
 
 		// Success message
-		fmt.Printf("✅ Environment '%s' created successfully!\n\n", envName)
+		fmt.Printf(" Environment '%s' created successfully!\n\n", envName)
 
 		// Show next steps
 		fmt.Printf("Next Steps:\n")
@@ -238,7 +238,7 @@ func interactiveEnvironmentConfig(rc *eos_io.RuntimeContext, env *environments.E
 
 	logger.Info("Starting interactive environment configuration")
 
-	fmt.Printf("\n🔧 Interactive Environment Configuration\n")
+	fmt.Printf("\n Interactive Environment Configuration\n")
 	fmt.Printf("═══════════════════════════════════════\n")
 	fmt.Printf("We'll guide you through configuring your environment.\n")
 	fmt.Printf("Press Enter to keep the current value [in brackets].\n\n")

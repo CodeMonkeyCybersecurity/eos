@@ -66,10 +66,10 @@
 //
 // ## Implementation Status
 //
-// - ✅ Terraform state management implemented
-// - ✅ Component modules for HashiCorp stack active
-// - ✅ Environment-specific configurations implemented
-// - ✅ Unified deployment and rollback capabilities operational
+// -  Terraform state management implemented
+// -  Component modules for HashiCorp stack active
+// -  Environment-specific configurations implemented
+// -  Unified deployment and rollback capabilities operational
 //
 // For detailed Terraform integration, see:
 // - cmd/create/terraform_workflow.go - Terraform workflow orchestration

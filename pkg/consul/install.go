@@ -312,7 +312,7 @@ func (ci *ConsulInstaller) assess() (bool, error) {
 					ci.logger.Info("Consul is already installed and running properly")
 
 					// Print service information
-					ci.logger.Info(fmt.Sprintf("terminal prompt: ✅ Consul is already installed and running"))
+					ci.logger.Info(fmt.Sprintf("terminal prompt:  Consul is already installed and running"))
 					ci.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
 					ci.logger.Info("terminal prompt: ")
 					ci.logger.Info("terminal prompt: To check status: consul members")

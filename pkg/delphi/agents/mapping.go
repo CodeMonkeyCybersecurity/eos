@@ -18,7 +18,7 @@ func RunMapping(rc *eos_io.RuntimeContext, cfg interface{}, authenticateFunc fun
 	log := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Check configuration and connectivity
-	log.Info("🔍 Assessing Delphi configuration for agent mapping")
+	log.Info(" Assessing Delphi configuration for agent mapping")
 
 	// Extract FQDN and Port from config (assuming it has these fields)
 	// This is a temporary workaround to avoid circular imports

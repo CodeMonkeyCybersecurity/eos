@@ -244,7 +244,7 @@ func displayNomadHealthStatus(logger otelzap.LoggerWithCtx) {
 		return
 	}
 
-	logger.Info("terminal prompt:   Status: ✅ Nomad agent is healthy")
+	logger.Info("terminal prompt:   Status:  Nomad agent is healthy")
 
 	// Check service status
 	output, err := exec.Command("systemctl", "is-active", "nomad").Output()
@@ -253,9 +253,9 @@ func displayNomadHealthStatus(logger otelzap.LoggerWithCtx) {
 	} else {
 		status := strings.TrimSpace(string(output))
 		if status == "active" {
-			logger.Info("terminal prompt:   Service: ✅ active")
+			logger.Info("terminal prompt:   Service:  active")
 		} else {
-			logger.Info("terminal prompt:   Service: ⚠️  " + status)
+			logger.Info("terminal prompt:   Service: " + status)
 		}
 	}
 }

@@ -138,7 +138,7 @@ Examples:
 
 		// Interactive mode if no flags provided or explicitly requested
 		if interactive || (len(changes) == 0 && !dryRun) {
-			fmt.Printf("\n🔧 Interactive Environment Update\n")
+			fmt.Printf("\n Interactive Environment Update\n")
 			fmt.Printf("═════════════════════════════════\n")
 			fmt.Printf("Current configuration for '%s':\n\n", envName)
 
@@ -165,7 +165,7 @@ Examples:
 
 		// Dry run - show what would be updated
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No changes will be applied\n")
+			fmt.Printf(" Dry Run - No changes will be applied\n")
 			return nil
 		}
 
@@ -185,7 +185,7 @@ Examples:
 		}
 
 		// Success message
-		fmt.Printf("✅ Environment '%s' updated successfully\n", envName)
+		fmt.Printf(" Environment '%s' updated successfully\n", envName)
 
 		// Show next steps
 		fmt.Printf("\nNext Steps:\n")

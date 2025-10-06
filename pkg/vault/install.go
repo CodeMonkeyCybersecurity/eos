@@ -218,7 +218,7 @@ func (vi *VaultInstaller) Install() error {
 			"Fix: Review configuration and correct any errors\n"+
 			"Help: Run 'sudo eos check vault --config' for details", err, configPath)
 	}
-	vi.logger.Info("✅ Configuration validated successfully")
+	vi.logger.Info(" Configuration validated successfully")
 
 	// Phase 6: Setup Service
 	vi.progress.Update("[84%] Setting up systemd service")
@@ -273,7 +273,7 @@ func (vi *VaultInstaller) assess() (bool, error) {
 					vi.logger.Info("Vault is already installed and running properly")
 
 					// Print service information
-					vi.logger.Info("terminal prompt: ✅ Vault is already installed and running")
+					vi.logger.Info("terminal prompt:  Vault is already installed and running")
 					vi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", vi.config.Port))
 					vi.logger.Info("terminal prompt: ")
 					vi.logger.Info("terminal prompt: To check status: vault status")
@@ -301,7 +301,7 @@ func (vi *VaultInstaller) assess() (bool, error) {
 					}
 					if vi.isVaultReady() {
 						vi.logger.Info("Successfully started existing Vault service")
-						vi.logger.Info("terminal prompt: ✅ Vault service started successfully")
+						vi.logger.Info("terminal prompt:  Vault service started successfully")
 						vi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", vi.config.Port))
 						return false, nil // Don't install, successfully started existing
 					}
@@ -832,7 +832,7 @@ func (vi *VaultInstaller) verify() error {
 
 	// Print user instructions
 	vi.logger.Info("terminal prompt: ")
-	vi.logger.Info("terminal prompt: ✅ Vault installation completed successfully!")
+	vi.logger.Info("terminal prompt:  Vault installation completed successfully!")
 	vi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", vi.config.Port))
 	vi.logger.Info("terminal prompt: ")
 	vi.logger.Info("terminal prompt: IMPORTANT: Vault needs to be initialized and unsealed")
@@ -1131,9 +1131,9 @@ func (vi *VaultInstaller) generateSelfSignedCert() error {
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(time.Now().Unix()),
 		Subject: pkix.Name{
-			Organization:  []string{"Eos Vault"},
-			Country:       []string{"AU"},
-			CommonName:    hostname,
+			Organization: []string{"Eos Vault"},
+			Country:      []string{"AU"},
+			CommonName:   hostname,
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(365 * 24 * time.Hour), // 1 year

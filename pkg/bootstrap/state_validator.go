@@ -33,11 +33,11 @@
 //
 // ## Implementation Status
 //
-// - ✅ State-based validation implemented replacing marker files
-// - ✅ HashiCorp stack integration for service discovery
-// - ✅ Adaptive bootstrap with intelligent phase detection
-// - ✅ Consul, Nomad, and Vault health validation operational
-// - ✅ Administrator escalation for system-level operations
+// -  State-based validation implemented replacing marker files
+// -  HashiCorp stack integration for service discovery
+// -  Adaptive bootstrap with intelligent phase detection
+// -  Consul, Nomad, and Vault health validation operational
+// -  Administrator escalation for system-level operations
 //
 // For related bootstrap implementation, see:
 // - pkg/bootstrap/orchestrator.go - Bootstrap phase orchestration

@@ -13,24 +13,24 @@ import (
 
 // CalculatorV2 provides systematic hardware requirements calculation with detailed breakdown
 type CalculatorV2 struct {
-	workloadType   WorkloadType
-	environment    string
-	components     []string
-	customFactors  map[string]ScalingFactors
-	calculation    *CalculationBreakdown
+	workloadType  WorkloadType
+	environment   string
+	components    []string
+	customFactors map[string]ScalingFactors
+	calculation   *CalculationBreakdown
 }
 
 // CalculationBreakdown shows detailed calculation steps and reasoning
 type CalculationBreakdown struct {
-	OSBaseline         ResourceCalculation            `json:"os_baseline"`
+	OSBaseline         ResourceCalculation             `json:"os_baseline"`
 	ComponentDetails   map[string]ComponentCalculation `json:"component_details"`
-	TotalBeforeScaling ResourceCalculation            `json:"total_before_scaling"`
-	ScalingApplied     ScalingCalculation             `json:"scaling_applied"`
-	FinalRequirements  ResourceCalculation            `json:"final_requirements"`
-	NodeRecommendation NodeRecommendation             `json:"node_recommendation"`
-	Warnings           []string                       `json:"warnings"`
-	CalculationSteps   []CalculationStep              `json:"calculation_steps"`
-	Timestamp          time.Time                      `json:"timestamp"`
+	TotalBeforeScaling ResourceCalculation             `json:"total_before_scaling"`
+	ScalingApplied     ScalingCalculation              `json:"scaling_applied"`
+	FinalRequirements  ResourceCalculation             `json:"final_requirements"`
+	NodeRecommendation NodeRecommendation              `json:"node_recommendation"`
+	Warnings           []string                        `json:"warnings"`
+	CalculationSteps   []CalculationStep               `json:"calculation_steps"`
+	Timestamp          time.Time                       `json:"timestamp"`
 }
 
 // ResourceCalculation represents calculated resource requirements
@@ -44,13 +44,13 @@ type ResourceCalculation struct {
 
 // ComponentCalculation shows how each component contributes to requirements
 type ComponentCalculation struct {
-	Component       string              `json:"component"`
-	BaselineReqs    ResourceCalculation `json:"baseline_requirements"`
-	ScaledReqs      ResourceCalculation `json:"scaled_requirements"`
-	ScalingFactors  ScalingFactors      `json:"scaling_factors_used"`
-	WorkloadImpact  WorkloadImpact      `json:"workload_impact"`
-	References      []string            `json:"references"`
-	Notes           string              `json:"notes"`
+	Component      string              `json:"component"`
+	BaselineReqs   ResourceCalculation `json:"baseline_requirements"`
+	ScaledReqs     ResourceCalculation `json:"scaled_requirements"`
+	ScalingFactors ScalingFactors      `json:"scaling_factors_used"`
+	WorkloadImpact WorkloadImpact      `json:"workload_impact"`
+	References     []string            `json:"references"`
+	Notes          string              `json:"notes"`
 }
 
 // WorkloadImpact shows how workload characteristics affect this component
@@ -63,17 +63,17 @@ type WorkloadImpact struct {
 
 // ScalingCalculation shows what scaling factors were applied
 type ScalingCalculation struct {
-	EnvironmentFactor  float64 `json:"environment_factor"`  // Development/production multiplier
-	SafetyMargin       float64 `json:"safety_margin"`       // Safety buffer applied
-	GrowthBuffer       float64 `json:"growth_buffer"`       // Future growth accommodation
-	PeakLoadBuffer     float64 `json:"peak_load_buffer"`    // Peak traffic accommodation
-	TotalMultiplier    float64 `json:"total_multiplier"`    // Combined multiplier
+	EnvironmentFactor float64 `json:"environment_factor"` // Development/production multiplier
+	SafetyMargin      float64 `json:"safety_margin"`      // Safety buffer applied
+	GrowthBuffer      float64 `json:"growth_buffer"`      // Future growth accommodation
+	PeakLoadBuffer    float64 `json:"peak_load_buffer"`   // Peak traffic accommodation
+	TotalMultiplier   float64 `json:"total_multiplier"`   // Combined multiplier
 }
 
 // NodeRecommendation provides specific node configuration advice
 type NodeRecommendation struct {
-	RecommendedNodes int                `json:"recommended_nodes"`
-	NodeSpecs        NodeSpecification  `json:"node_specs"`
+	RecommendedNodes  int               `json:"recommended_nodes"`
+	NodeSpecs         NodeSpecification `json:"node_specs"`
 	PlacementStrategy string            `json:"placement_strategy"`
 	HAConsiderations  []string          `json:"ha_considerations"`
 	CostEstimate      *CostBreakdown    `json:"cost_estimate,omitempty"`
@@ -81,30 +81,30 @@ type NodeRecommendation struct {
 
 // CostBreakdown provides detailed cost analysis
 type CostBreakdown struct {
-	MonthlyTotal     float64            `json:"monthly_total"`
-	YearlyTotal      float64            `json:"yearly_total"`
-	ComponentCosts   map[string]float64 `json:"component_costs"`
-	Infrastructure   float64            `json:"infrastructure"`
-	Network          float64            `json:"network"`
-	Storage          float64            `json:"storage"`
-	Currency         string             `json:"currency"`
+	MonthlyTotal   float64            `json:"monthly_total"`
+	YearlyTotal    float64            `json:"yearly_total"`
+	ComponentCosts map[string]float64 `json:"component_costs"`
+	Infrastructure float64            `json:"infrastructure"`
+	Network        float64            `json:"network"`
+	Storage        float64            `json:"storage"`
+	Currency       string             `json:"currency"`
 }
 
 // CalculationStep represents one step in the calculation process
 type CalculationStep struct {
-	Step        int    `json:"step"`
-	Description string `json:"description"`
+	Step        int                 `json:"step"`
+	Description string              `json:"description"`
 	Before      ResourceCalculation `json:"before"`
 	After       ResourceCalculation `json:"after"`
-	Reasoning   string `json:"reasoning"`
+	Reasoning   string              `json:"reasoning"`
 }
 
 // WorkloadCharacteristics defines the expected workload for calculations
 type WorkloadCharacteristics struct {
-	ConcurrentUsers   int     `json:"concurrent_users"`
-	RequestsPerSecond int     `json:"requests_per_second"`
-	DataGrowthGB      float64 `json:"data_growth_gb"`
-	PeakMultiplier    float64 `json:"peak_multiplier"`
+	ConcurrentUsers   int          `json:"concurrent_users"`
+	RequestsPerSecond int          `json:"requests_per_second"`
+	DataGrowthGB      float64      `json:"data_growth_gb"`
+	PeakMultiplier    float64      `json:"peak_multiplier"`
 	Type              WorkloadType `json:"type"`
 }
 
@@ -129,7 +129,7 @@ func (c *CalculatorV2) AddComponent(component string) error {
 	if _, exists := RequirementsDatabase[component]; !exists {
 		return fmt.Errorf("component %s not found in requirements database", component)
 	}
-	
+
 	c.components = append(c.components, component)
 	return nil
 }
@@ -142,7 +142,7 @@ func (c *CalculatorV2) SetCustomScalingFactors(component string, factors Scaling
 // Calculate performs the systematic calculation with detailed breakdown
 func (c *CalculatorV2) Calculate(rc *eos_io.RuntimeContext, workload WorkloadCharacteristics) (*CalculationBreakdown, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting systematic hardware requirements calculation",
 		zap.String("workload_type", string(c.workloadType)),
 		zap.String("environment", c.environment),
@@ -188,7 +188,7 @@ func (c *CalculatorV2) Calculate(rc *eos_io.RuntimeContext, workload WorkloadCha
 // calculateOSBaseline determines base operating system requirements
 func (c *CalculatorV2) calculateOSBaseline(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	osReqs, exists := RequirementsDatabase["ubuntu_server_24.04"]
 	if !exists {
 		return fmt.Errorf("ubuntu server baseline requirements not found")
@@ -225,7 +225,7 @@ func (c *CalculatorV2) calculateOSBaseline(rc *eos_io.RuntimeContext) error {
 // calculateComponents calculates requirements for each component
 func (c *CalculatorV2) calculateComponents(rc *eos_io.RuntimeContext, workload WorkloadCharacteristics) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	for _, component := range c.components {
 		if err := c.calculateSingleComponent(rc, component, workload); err != nil {
 			return fmt.Errorf("failed to calculate component %s: %w", component, err)
@@ -241,7 +241,7 @@ func (c *CalculatorV2) calculateComponents(rc *eos_io.RuntimeContext, workload W
 // calculateSingleComponent calculates requirements for one component
 func (c *CalculatorV2) calculateSingleComponent(rc *eos_io.RuntimeContext, component string, workload WorkloadCharacteristics) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	req, exists := RequirementsDatabase[component]
 	if !exists {
 		return fmt.Errorf("component %s not found in requirements database", component)
@@ -317,7 +317,7 @@ func (c *CalculatorV2) calculateSingleComponent(rc *eos_io.RuntimeContext, compo
 // sumTotalRequirements calculates the sum of all component requirements
 func (c *CalculatorV2) sumTotalRequirements(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	total := c.calculation.OSBaseline
 
 	for component, calc := range c.calculation.ComponentDetails {
@@ -326,7 +326,7 @@ func (c *CalculatorV2) sumTotalRequirements(rc *eos_io.RuntimeContext) {
 		total.Storage += calc.ScaledReqs.Storage
 		total.IOPS += calc.ScaledReqs.IOPS
 		total.Network = max(total.Network, calc.ScaledReqs.Network) // Take max network requirement
-		
+
 		logger.Debug("Adding component to total",
 			zap.String("component", component),
 			zap.Float64("component_cpu", calc.ScaledReqs.CPU),
@@ -352,7 +352,7 @@ func (c *CalculatorV2) sumTotalRequirements(rc *eos_io.RuntimeContext) {
 // applyScalingFactors applies environment-specific scaling factors
 func (c *CalculatorV2) applyScalingFactors(rc *eos_io.RuntimeContext, workload WorkloadCharacteristics) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Get environment configuration
 	envConfig, exists := EnvironmentConfigs[c.environment]
 	if !exists {
@@ -401,7 +401,7 @@ func (c *CalculatorV2) applyScalingFactors(rc *eos_io.RuntimeContext, workload W
 // generateNodeRecommendations determines optimal node configuration
 func (c *CalculatorV2) generateNodeRecommendations(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	envConfig := EnvironmentConfigs[c.environment]
 	total := c.calculation.FinalRequirements
 
@@ -414,19 +414,19 @@ func (c *CalculatorV2) generateNodeRecommendations(rc *eos_io.RuntimeContext) er
 	// Calculate how many nodes fit within max node size
 	maxNodeCPU := float64(envConfig.MaxNodeSize.CPUCores)
 	maxNodeMemory := float64(envConfig.MaxNodeSize.MemoryGB)
-	
+
 	nodesByCD := int(math.Ceil(total.CPU / maxNodeCPU))
 	nodesByMemory := int(math.Ceil(total.Memory / maxNodeMemory))
-	
+
 	nodesNeeded := max(max(nodesByCD, nodesByMemory), minNodes)
 
 	// Calculate per-node specs
 	nodeSpecs := NodeSpecification{
-		CPUCores:       int(math.Ceil(total.CPU / float64(nodesNeeded))),
-		MemoryGB:       int(math.Ceil(total.Memory / float64(nodesNeeded))),
-		DiskGB:         int(math.Ceil(total.Storage / float64(nodesNeeded))),
-		DiskType:       "ssd", // Default to SSD for performance
-		NetworkGbps:    max(1, total.Network/1000), // Convert Mbps to Gbps
+		CPUCores:    int(math.Ceil(total.CPU / float64(nodesNeeded))),
+		MemoryGB:    int(math.Ceil(total.Memory / float64(nodesNeeded))),
+		DiskGB:      int(math.Ceil(total.Storage / float64(nodesNeeded))),
+		DiskType:    "ssd",                      // Default to SSD for performance
+		NetworkGbps: max(1, total.Network/1000), // Convert Mbps to Gbps
 	}
 
 	// Ensure specs meet minimum requirements
@@ -489,7 +489,7 @@ func (c *CalculatorV2) generateNodeRecommendations(rc *eos_io.RuntimeContext) er
 // validateAndWarn adds warnings for potential issues
 func (c *CalculatorV2) validateAndWarn(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	final := c.calculation.FinalRequirements
 	nodeRec := c.calculation.NodeRecommendation
 
@@ -571,13 +571,13 @@ func max(a, b int) int {
 // GenerateHumanReadableReport creates a detailed report of the calculation
 func (c *CalculatorV2) GenerateHumanReadableReport() string {
 	var report strings.Builder
-	
+
 	report.WriteString("=== Hardware Requirements Calculation Report ===\n\n")
-	
+
 	// Summary
 	final := c.calculation.FinalRequirements
 	nodes := c.calculation.NodeRecommendation
-	
+
 	report.WriteString("SUMMARY:\n")
 	report.WriteString(fmt.Sprintf("• Total CPU Cores: %.1f\n", final.CPU))
 	report.WriteString(fmt.Sprintf("• Total Memory: %.1f GB\n", final.Memory))
@@ -585,14 +585,14 @@ func (c *CalculatorV2) GenerateHumanReadableReport() string {
 	report.WriteString(fmt.Sprintf("• Recommended Nodes: %d\n", nodes.RecommendedNodes))
 	report.WriteString(fmt.Sprintf("• Per-Node Specs: %d cores, %d GB memory, %d GB storage\n\n",
 		nodes.NodeSpecs.CPUCores, nodes.NodeSpecs.MemoryGB, nodes.NodeSpecs.DiskGB))
-	
+
 	// OS Baseline
 	os := c.calculation.OSBaseline
 	report.WriteString("OS BASELINE (Ubuntu Server 24.04 LTS):\n")
 	report.WriteString(fmt.Sprintf("• CPU: %.1f cores\n", os.CPU))
 	report.WriteString(fmt.Sprintf("• Memory: %.1f GB\n", os.Memory))
 	report.WriteString(fmt.Sprintf("• Storage: %.1f GB\n\n", os.Storage))
-	
+
 	// Component Breakdown
 	report.WriteString("COMPONENT BREAKDOWN:\n")
 	for component, calc := range c.calculation.ComponentDetails {
@@ -606,7 +606,7 @@ func (c *CalculatorV2) GenerateHumanReadableReport() string {
 		}
 		report.WriteString("\n")
 	}
-	
+
 	// Scaling Applied
 	scaling := c.calculation.ScalingApplied
 	report.WriteString("SCALING FACTORS APPLIED:\n")
@@ -614,16 +614,16 @@ func (c *CalculatorV2) GenerateHumanReadableReport() string {
 	report.WriteString(fmt.Sprintf("• Growth buffer: %.1fx\n", scaling.GrowthBuffer))
 	report.WriteString(fmt.Sprintf("• Peak load buffer: %.1fx\n", scaling.PeakLoadBuffer))
 	report.WriteString(fmt.Sprintf("• Total multiplier: %.1fx\n\n", scaling.TotalMultiplier))
-	
+
 	// Warnings
 	if len(c.calculation.Warnings) > 0 {
 		report.WriteString("WARNINGS:\n")
 		for _, warning := range c.calculation.Warnings {
-			report.WriteString(fmt.Sprintf("⚠️  %s\n", warning))
+			report.WriteString(fmt.Sprintf("%s\n", warning))
 		}
 		report.WriteString("\n")
 	}
-	
+
 	// HA Considerations
 	if len(nodes.HAConsiderations) > 0 {
 		report.WriteString("HIGH AVAILABILITY CONSIDERATIONS:\n")
@@ -632,8 +632,8 @@ func (c *CalculatorV2) GenerateHumanReadableReport() string {
 		}
 		report.WriteString("\n")
 	}
-	
+
 	report.WriteString(fmt.Sprintf("Report generated: %s\n", c.calculation.Timestamp.Format("2006-01-02 15:04:05 UTC")))
-	
+
 	return report.String()
 }

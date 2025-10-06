@@ -29,7 +29,7 @@ type ConfigValidationResult struct {
 // This implements the P0 requirement from the audit: config validation with manual fallback
 func ValidateConfigWithFallback(rc *eos_io.RuntimeContext, configPath string) (*ConfigValidationResult, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Validating Vault configuration", zap.String("config", configPath))
+	log.Info(" Validating Vault configuration", zap.String("config", configPath))
 
 	result := &ConfigValidationResult{
 		Valid:       true,
@@ -45,12 +45,12 @@ func ValidateConfigWithFallback(rc *eos_io.RuntimeContext, configPath string) (*
 
 	// INTERVENE: Try vault binary validation first
 	if vaultBinaryValidation(rc, configPath, result) {
-		log.Info("✅ Configuration validated using vault binary")
+		log.Info(" Configuration validated using vault binary")
 		return result, nil
 	}
 
 	// FALLBACK: Manual HCL parsing if vault binary unavailable/fails
-	log.Warn("⚠️  Vault binary validation unavailable, using manual HCL parser")
+	log.Warn("Vault binary validation unavailable, using manual HCL parser")
 	if err := manualConfigValidation(rc, configPath, result); err != nil {
 		return result, err
 	}
@@ -62,7 +62,7 @@ func ValidateConfigWithFallback(rc *eos_io.RuntimeContext, configPath string) (*
 			zap.Int("errors", len(result.Errors)),
 			zap.Strings("error_list", result.Errors))
 	} else {
-		log.Info("✅ Configuration validated using manual parser",
+		log.Info(" Configuration validated using manual parser",
 			zap.Int("warnings", len(result.Warnings)))
 	}
 
@@ -245,7 +245,7 @@ func checkCommonMisconfigurations(rc *eos_io.RuntimeContext, content string, res
 	// Check for insecure configurations
 	if strings.Contains(content, "tls_disable = true") || strings.Contains(content, "tls_disable=true") {
 		result.Warnings = append(result.Warnings,
-			"⚠️  TLS is disabled - this is insecure for production use")
+			"TLS is disabled - this is insecure for production use")
 		result.Suggestions = append(result.Suggestions,
 			"Enable TLS with 'eos create vault --tls'")
 	}
@@ -398,7 +398,7 @@ func extractConfigValue(content, key string) string {
 // Called before starting Vault service to catch config errors early
 func ValidateConfigBeforeStart(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Pre-flight configuration validation")
+	log.Info(" Pre-flight configuration validation")
 
 	result, err := ValidateConfigWithFallback(rc, shared.VaultConfigPath)
 	if err != nil {
@@ -407,7 +407,7 @@ func ValidateConfigBeforeStart(rc *eos_io.RuntimeContext) error {
 
 	// Log all warnings and suggestions
 	for _, warning := range result.Warnings {
-		log.Warn("⚠️  Configuration warning", zap.String("warning", warning))
+		log.Warn("Configuration warning", zap.String("warning", warning))
 	}
 	for _, suggestion := range result.Suggestions {
 		log.Info("💡 Suggestion", zap.String("suggestion", suggestion))
@@ -420,6 +420,6 @@ func ValidateConfigBeforeStart(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("configuration invalid: %s", strings.Join(result.Errors, "; "))
 	}
 
-	log.Info("✅ Pre-flight validation passed", zap.String("method", result.Method))
+	log.Info(" Pre-flight validation passed", zap.String("method", result.Method))
 	return nil
 }

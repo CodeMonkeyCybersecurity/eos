@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -384,17 +384,17 @@ func outputHistoryTable(history []PromotionHistoryRecord, showDetails bool, grou
 			fmt.Printf("\n")
 		}
 
-		status := "✅"
+		status := ""
 		if !record.Success {
 			status = "❌"
 		} else if record.RolledBack {
-			status = "🔄"
+			status = ""
 		}
 
-		fmt.Printf("%s %s (%s) - %s → %s\n", 
-			status, record.Component, record.Version, 
+		fmt.Printf("%s %s (%s) - %s → %s\n",
+			status, record.Component, record.Version,
 			record.FromEnvironment, record.ToEnvironment)
-		
+
 		fmt.Printf("   Promoted by: %s\n", record.PromotedBy)
 		fmt.Printf("   When:        %s\n", record.PromotedAt.Format("2006-01-02 15:04:05"))
 		fmt.Printf("   Duration:    %s\n", record.Duration.Round(time.Second))
@@ -418,7 +418,7 @@ func outputHistoryTable(history []PromotionHistoryRecord, showDetails bool, grou
 
 		if showDetails {
 			fmt.Printf("   ID:          %s\n", record.ID)
-			
+
 			if len(record.ValidationErrors) > 0 {
 				fmt.Printf("   Validation errors:\n")
 				for _, err := range record.ValidationErrors {
@@ -482,24 +482,24 @@ func outputHistoryGrouped(history []PromotionHistoryRecord, groupBy string, show
 		}
 
 		fmt.Printf("── %s ──\n", strings.ToUpper(key))
-		
+
 		for j, record := range groups[key] {
 			if j > 0 {
 				fmt.Printf("\n")
 			}
 
-			status := "✅"
+			status := ""
 			if !record.Success {
 				status = "❌"
 			} else if record.RolledBack {
-				status = "🔄"
+				status = ""
 			}
 
-			fmt.Printf("  %s %s (%s) - %s → %s\n", 
+			fmt.Printf("  %s %s (%s) - %s → %s\n",
 				status, record.Component, record.Version,
 				record.FromEnvironment, record.ToEnvironment)
-			fmt.Printf("     %s by %s (%s)\n", 
-				record.PromotedAt.Format("2006-01-02 15:04"), 
+			fmt.Printf("     %s by %s (%s)\n",
+				record.PromotedAt.Format("2006-01-02 15:04"),
 				record.PromotedBy, record.Duration.Round(time.Second))
 
 			if record.Error != "" {

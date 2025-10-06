@@ -52,11 +52,11 @@
 //
 // ## Implementation Status
 //
-// - ✅ Dual-mode deployment (static and Ghost) implemented
-// - ✅ Hecate reverse proxy integration operational
-// - ✅ Nomad orchestration with resource management active
-// - ✅ Storage management and persistence implemented
-// - ✅ SSL certificate management and custom domains operational
+// -  Dual-mode deployment (static and Ghost) implemented
+// -  Hecate reverse proxy integration operational
+// -  Nomad orchestration with resource management active
+// -  Storage management and persistence implemented
+// -  SSL certificate management and custom domains operational
 //
 // For detailed Helen implementation, see:
 // - pkg/helen/ - Helen deployment and configuration logic

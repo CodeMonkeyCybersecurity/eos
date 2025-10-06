@@ -269,7 +269,7 @@ func SecurityErrorHandler(rc *eos_io.RuntimeContext, err error, operation string
 // ❌ DON'T - Exposes internal details
 return fmt.Errorf("failed to connect to database at %s: %v", dbURL, err)
 
-// ✅ DO - Generic message for users
+//  DO - Generic message for users
 logger.Error("Database connection failed", zap.Error(err))
 return fmt.Errorf("database connection error")
 ```
@@ -279,7 +279,7 @@ return fmt.Errorf("database connection error")
 // ❌ DON'T - Logs sensitive data
 fmt.Printf("User %s logged in with password %s", user, password)
 
-// ✅ DO - Structured logging without secrets
+//  DO - Structured logging without secrets
 logger.Info("User authentication successful",
     zap.String("user_id", user),
     zap.String("method", "password"))
@@ -292,7 +292,7 @@ if len(username) > 0 {
     // Process username
 }
 
-// ✅ DO - Comprehensive validation
+//  DO - Comprehensive validation
 if !isValidUsername(username) {
     return fmt.Errorf("invalid username format")
 }
@@ -303,7 +303,7 @@ if !isValidUsername(username) {
 // ❌ DON'T - Shell execution with user input
 exec.Command("sh", "-c", "grep "+userInput+" /etc/passwd").Run()
 
-// ✅ DO - Proper argument passing
+//  DO - Proper argument passing
 exec.Command("grep", userInput, "/etc/passwd").Run()
 ```
 
@@ -312,7 +312,7 @@ exec.Command("grep", userInput, "/etc/passwd").Run()
 // ❌ DON'T - Weak hashing
 hash := md5.Sum(data)
 
-// ✅ DO - Strong hashing
+//  DO - Strong hashing
 hash := sha256.Sum256(data)
 ```
 

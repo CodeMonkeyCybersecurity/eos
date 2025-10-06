@@ -128,7 +128,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Version: %s\n", config.Metadata.AuthentikVersion)
 
 	// Validate configuration
-	fmt.Print("\n🔍 Validating configuration... ")
+	fmt.Print("\n Validating configuration... ")
 	warnings, errors := validateConfig(config)
 
 	if len(errors) > 0 {
@@ -140,20 +140,20 @@ func runImport(cmd *cobra.Command, args []string) error {
 		if !options.Force {
 			return fmt.Errorf("validation failed, use --force to continue anyway")
 		}
-		fmt.Println("   ⚠️  Continuing with --force flag")
+		fmt.Println("   Continuing with --force flag")
 	} else {
-		fmt.Println("✅")
+		fmt.Println("")
 	}
 
 	if len(warnings) > 0 {
-		fmt.Println("\n⚠️  Validation warnings:")
+		fmt.Println("\nValidation warnings:")
 		for _, warn := range warnings {
 			fmt.Printf("   • %s\n", warn)
 		}
 	}
 
 	if options.ValidateOnly {
-		fmt.Println("\n✅ Validation complete (--validate-only flag set)")
+		fmt.Println("\n Validation complete (--validate-only flag set)")
 		return nil
 	}
 
@@ -168,9 +168,9 @@ func runImport(cmd *cobra.Command, args []string) error {
 		extractCmd.Flags().String("format", "yaml", "")
 
 		if err := runExtract(extractCmd, []string{}); err != nil {
-			fmt.Printf("⚠️  Warning: Could not create backup: %v\n", err)
+			fmt.Printf("Warning: Could not create backup: %v\n", err)
 		} else {
-			fmt.Printf("✅ Saved to %s\n", backupFile)
+			fmt.Printf(" Saved to %s\n", backupFile)
 		}
 	}
 
@@ -194,11 +194,11 @@ func runImport(cmd *cobra.Command, args []string) error {
 	// Check target version compatibility
 	targetVersion, err := client.GetVersion()
 	if err != nil {
-		fmt.Printf("⚠️  Warning: Could not check target version: %v\n", err)
+		fmt.Printf("Warning: Could not check target version: %v\n", err)
 	} else {
 		fmt.Printf("\n🎯 Target Authentik version: %s\n", targetVersion)
 		if !isVersionCompatible(config.Metadata.AuthentikVersion, targetVersion) {
-			fmt.Printf("⚠️  Warning: Version mismatch (source: %s, target: %s)\n",
+			fmt.Printf("Warning: Version mismatch (source: %s, target: %s)\n",
 				config.Metadata.AuthentikVersion, targetVersion)
 			if !options.Force {
 				return fmt.Errorf("version incompatibility detected, use --force to continue")
@@ -285,16 +285,16 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(result.Warnings) > 0 {
-		fmt.Println("\n⚠️  Warnings:")
+		fmt.Println("\nWarnings:")
 		for _, warn := range result.Warnings {
 			fmt.Printf("   • %s\n", warn)
 		}
 	}
 
 	if result.Failed == 0 {
-		fmt.Println("\n✅ Import completed successfully!")
+		fmt.Println("\n Import completed successfully!")
 	} else {
-		fmt.Printf("\n⚠️  Import completed with %d failures\n", result.Failed)
+		fmt.Printf("\nImport completed with %d failures\n", result.Failed)
 	}
 
 	return nil
@@ -308,7 +308,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	output, _ := cmd.Flags().GetString("output")
 	detailed, _ := cmd.Flags().GetBool("detailed")
 
-	fmt.Println("🔍 Comparing Authentik configurations...")
+	fmt.Println(" Comparing Authentik configurations...")
 
 	// Load source configuration
 	var sourceConfig *AuthentikConfig
@@ -369,7 +369,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 func runValidate(cmd *cobra.Command, args []string) error {
 	configFile := args[0]
 
-	fmt.Printf("🔍 Validating configuration file: %s\n\n", configFile)
+	fmt.Printf(" Validating configuration file: %s\n\n", configFile)
 
 	// Load configuration
 	config, err := loadConfigFile(configFile)
@@ -381,12 +381,12 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	warnings, errors := validateConfig(config)
 
 	if len(errors) == 0 && len(warnings) == 0 {
-		fmt.Println("✅ Configuration is valid!")
+		fmt.Println(" Configuration is valid!")
 		return nil
 	}
 
 	if len(warnings) > 0 {
-		fmt.Println("⚠️  Warnings found:")
+		fmt.Println("Warnings found:")
 		for _, warn := range warnings {
 			fmt.Printf("   • %s\n", warn)
 		}
@@ -432,13 +432,13 @@ func importCertificates(client *AuthentikAPIClient, certificates []Certificate, 
 		if exists {
 			err = client.UpdateCertificate(existingID, cert)
 			if err == nil {
-				fmt.Printf("   ✅ Updated certificate: %s\n", cert.Name)
+				fmt.Printf("    Updated certificate: %s\n", cert.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateCertificate(cert)
 			if err == nil {
-				fmt.Printf("   ✅ Created certificate: %s\n", cert.Name)
+				fmt.Printf("    Created certificate: %s\n", cert.Name)
 				result.Created++
 			}
 		}
@@ -460,7 +460,7 @@ func importPropertyMappings(client *AuthentikAPIClient, mappings []PropertyMappi
 
 		// Check for critical mappings (like Wazuh Roles)
 		if strings.Contains(mapping.Name, "Roles") && mapping.SAMLName == "Roles" {
-			fmt.Printf("   ⚠️  Critical mapping detected: %s (SAML Name: %s)\n", mapping.Name, mapping.SAMLName)
+			fmt.Printf("   Critical mapping detected: %s (SAML Name: %s)\n", mapping.Name, mapping.SAMLName)
 		}
 
 		exists, existingID := client.PropertyMappingExists(mapping.Name)
@@ -486,13 +486,13 @@ func importPropertyMappings(client *AuthentikAPIClient, mappings []PropertyMappi
 		if exists {
 			err = client.UpdatePropertyMapping(existingID, mapping)
 			if err == nil {
-				fmt.Printf("   ✅ Updated property mapping: %s\n", mapping.Name)
+				fmt.Printf("    Updated property mapping: %s\n", mapping.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreatePropertyMapping(mapping)
 			if err == nil {
-				fmt.Printf("   ✅ Created property mapping: %s\n", mapping.Name)
+				fmt.Printf("    Created property mapping: %s\n", mapping.Name)
 				result.Created++
 			}
 		}
@@ -530,13 +530,13 @@ func importFlows(client *AuthentikAPIClient, flows []Flow, options ImportOptions
 		if exists {
 			err = client.UpdateFlow(existingID, flow)
 			if err == nil {
-				fmt.Printf("   ✅ Updated flow: %s\n", flow.Name)
+				fmt.Printf("    Updated flow: %s\n", flow.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateFlow(flow)
 			if err == nil {
-				fmt.Printf("   ✅ Created flow: %s\n", flow.Name)
+				fmt.Printf("    Created flow: %s\n", flow.Name)
 				result.Created++
 			}
 		}
@@ -574,13 +574,13 @@ func importProviders(client *AuthentikAPIClient, providers []Provider, options I
 		if exists {
 			err = client.UpdateProvider(existingID, provider)
 			if err == nil {
-				fmt.Printf("   ✅ Updated %s provider: %s\n", provider.Type, provider.Name)
+				fmt.Printf("    Updated %s provider: %s\n", provider.Type, provider.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateProvider(provider)
 			if err == nil {
-				fmt.Printf("   ✅ Created %s provider: %s\n", provider.Type, provider.Name)
+				fmt.Printf("    Created %s provider: %s\n", provider.Type, provider.Name)
 				result.Created++
 			}
 		}
@@ -618,13 +618,13 @@ func importApplications(client *AuthentikAPIClient, apps []Application, options 
 		if exists {
 			err = client.UpdateApplication(existingID, app)
 			if err == nil {
-				fmt.Printf("   ✅ Updated application: %s\n", app.Name)
+				fmt.Printf("    Updated application: %s\n", app.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateApplication(app)
 			if err == nil {
-				fmt.Printf("   ✅ Created application: %s\n", app.Name)
+				fmt.Printf("    Created application: %s\n", app.Name)
 				result.Created++
 			}
 		}
@@ -685,13 +685,13 @@ func importSingleGroup(client *AuthentikAPIClient, group Group, options ImportOp
 	if exists {
 		err = client.UpdateGroup(existingID, group)
 		if err == nil {
-			fmt.Printf("   ✅ Updated group: %s\n", group.Name)
+			fmt.Printf("    Updated group: %s\n", group.Name)
 			result.Updated++
 		}
 	} else {
 		err = client.CreateGroup(group)
 		if err == nil {
-			fmt.Printf("   ✅ Created group: %s\n", group.Name)
+			fmt.Printf("    Created group: %s\n", group.Name)
 			result.Created++
 		}
 	}
@@ -728,13 +728,13 @@ func importPolicies(client *AuthentikAPIClient, policies []Policy, options Impor
 		if exists {
 			err = client.UpdatePolicy(existingID, policy)
 			if err == nil {
-				fmt.Printf("   ✅ Updated policy: %s\n", policy.Name)
+				fmt.Printf("    Updated policy: %s\n", policy.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreatePolicy(policy)
 			if err == nil {
-				fmt.Printf("   ✅ Created policy: %s\n", policy.Name)
+				fmt.Printf("    Created policy: %s\n", policy.Name)
 				result.Created++
 			}
 		}
@@ -773,13 +773,13 @@ func importStages(client *AuthentikAPIClient, stages []Stage, options ImportOpti
 		if exists {
 			err = client.UpdateStage(existingID, stage)
 			if err == nil {
-				fmt.Printf("   ✅ Updated stage: %s\n", stage.Name)
+				fmt.Printf("    Updated stage: %s\n", stage.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateStage(stage)
 			if err == nil {
-				fmt.Printf("   ✅ Created stage: %s\n", stage.Name)
+				fmt.Printf("    Created stage: %s\n", stage.Name)
 				result.Created++
 			}
 		}
@@ -817,13 +817,13 @@ func importOutposts(client *AuthentikAPIClient, outposts []Outpost, options Impo
 		if exists {
 			err = client.UpdateOutpost(existingID, outpost)
 			if err == nil {
-				fmt.Printf("   ✅ Updated outpost: %s\n", outpost.Name)
+				fmt.Printf("    Updated outpost: %s\n", outpost.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateOutpost(outpost)
 			if err == nil {
-				fmt.Printf("   ✅ Created outpost: %s\n", outpost.Name)
+				fmt.Printf("    Created outpost: %s\n", outpost.Name)
 				result.Created++
 			}
 		}
@@ -861,13 +861,13 @@ func importTenants(client *AuthentikAPIClient, tenants []Tenant, options ImportO
 		if exists {
 			err = client.UpdateTenant(existingID, tenant)
 			if err == nil {
-				fmt.Printf("   ✅ Updated tenant: %s\n", tenant.Domain)
+				fmt.Printf("    Updated tenant: %s\n", tenant.Domain)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateTenant(tenant)
 			if err == nil {
-				fmt.Printf("   ✅ Created tenant: %s\n", tenant.Domain)
+				fmt.Printf("    Created tenant: %s\n", tenant.Domain)
 				result.Created++
 			}
 		}
@@ -905,13 +905,13 @@ func importBlueprints(client *AuthentikAPIClient, blueprints []Blueprint, option
 		if exists {
 			err = client.UpdateBlueprint(existingID, blueprint)
 			if err == nil {
-				fmt.Printf("   ✅ Updated blueprint: %s\n", blueprint.Name)
+				fmt.Printf("    Updated blueprint: %s\n", blueprint.Name)
 				result.Updated++
 			}
 		} else {
 			err = client.CreateBlueprint(blueprint)
 			if err == nil {
-				fmt.Printf("   ✅ Created blueprint: %s\n", blueprint.Name)
+				fmt.Printf("    Created blueprint: %s\n", blueprint.Name)
 				result.Created++
 			}
 		}

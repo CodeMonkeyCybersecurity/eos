@@ -132,7 +132,7 @@ if go test -v -timeout="$TEST_TIMEOUT" \
     echo -e "${BLUE}📊 Total coverage: ${COVERAGE}%${NC}"
     
     if (( $(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then
-        echo -e "${YELLOW}⚠️  Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%${NC}"
+        echo -e "${YELLOW}Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%${NC}"
     else
         echo -e "${GREEN} Coverage ${COVERAGE}% meets threshold${NC}"
     fi
@@ -193,7 +193,7 @@ if [ -f "./integration_test.go" ]; then
     run_test_suite "Integration tests" "go test -v -timeout=5m -tags=integration ./..."
     ((TOTAL_TESTS++))
 else
-    echo -e "${YELLOW}⚠️  No integration tests found${NC}"
+    echo -e "${YELLOW}No integration tests found${NC}"
 fi
 
 # 7. Race Condition Detection
@@ -228,7 +228,7 @@ if [ "${RUN_BENCHMARKS:-false}" = "true" ]; then
     echo -e "${GREEN} Benchmarks completed${NC}"
     echo -e "${YELLOW}   See results: $LOG_DIR/benchmarks-$TIMESTAMP.log${NC}"
 else
-    echo -e "${YELLOW}⚠️  Benchmarks skipped (set RUN_BENCHMARKS=true to enable)${NC}"
+    echo -e "${YELLOW}Benchmarks skipped (set RUN_BENCHMARKS=true to enable)${NC}"
 fi
 
 # 9. Security Vulnerability Scan
@@ -240,26 +240,26 @@ if command -v gosec &> /dev/null; then
         echo -e "${GREEN} No security vulnerabilities found${NC}"
         ((PASSED_TESTS++))
     else
-        echo -e "${YELLOW}⚠️  Security issues found. See $LOG_DIR/security-$TIMESTAMP.json${NC}"
+        echo -e "${YELLOW}Security issues found. See $LOG_DIR/security-$TIMESTAMP.json${NC}"
         ((FAILED_TESTS++))
     fi
 else
-    echo -e "${YELLOW}⚠️  gosec not installed. Run: go install github.com/securego/gosec/v2/cmd/gosec@latest${NC}"
+    echo -e "${YELLOW}gosec not installed. Run: go install github.com/securego/gosec/v2/cmd/gosec@latest${NC}"
 fi
 
 # 10. Dependency Audit
 print_header "10. Dependency Audit"
 
-echo -e "${BLUE}🔍 Auditing dependencies...${NC}"
+echo -e "${BLUE} Auditing dependencies...${NC}"
 if go list -json -m all | nancy sleuth > "$LOG_DIR/deps-audit-$TIMESTAMP.log" 2>&1; then
     echo -e "${GREEN} No vulnerable dependencies found${NC}"
     ((PASSED_TESTS++))
 else
     if command -v nancy &> /dev/null; then
-        echo -e "${YELLOW}⚠️  Dependency vulnerabilities found. See $LOG_DIR/deps-audit-$TIMESTAMP.log${NC}"
+        echo -e "${YELLOW}Dependency vulnerabilities found. See $LOG_DIR/deps-audit-$TIMESTAMP.log${NC}"
         ((FAILED_TESTS++))
     else
-        echo -e "${YELLOW}⚠️  nancy not installed. Run: go install github.com/sonatype-nexus-community/nancy@latest${NC}"
+        echo -e "${YELLOW}nancy not installed. Run: go install github.com/sonatype-nexus-community/nancy@latest${NC}"
     fi
 fi
 

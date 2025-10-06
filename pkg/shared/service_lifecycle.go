@@ -205,7 +205,7 @@ func (slm *ServiceLifecycleManager) executeRemovalPlan(ctx context.Context, plan
 	}
 
 	// Step 4: Reload systemd daemon
-	logger.Info("🔄 Step 4: Reloading systemd daemon")
+	logger.Info(" Step 4: Reloading systemd daemon")
 	if err := slm.reloadSystemdDaemon(ctx); err != nil {
 		logger.Warn("Failed to reload systemd daemon",
 			zap.Error(err))

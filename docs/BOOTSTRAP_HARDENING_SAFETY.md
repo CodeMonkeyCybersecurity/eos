@@ -14,12 +14,12 @@ For detailed bootstrap hardening safety documentation, see the inline comments i
 - **Security Framework**: `pkg/security/hardening.go` - General security hardening framework
 - **Vault Hardening**: `pkg/vault/hardening.go` - Vault security hardening integration
 
-## Safety Status: ✅ IMPLEMENTED
+## Safety Status:  IMPLEMENTED
 
 **Date:** September 20, 2025  
-**Safety Mechanisms:** ✅ COMPREHENSIVE SAFETY CHECKS ACTIVE  
-**User Consent:** ✅ INTERACTIVE CONSENT MECHANISMS OPERATIONAL  
-**Rollback Capabilities:** ✅ AUTOMATIC ROLLBACK ON FAILURES IMPLEMENTED
+**Safety Mechanisms:**  COMPREHENSIVE SAFETY CHECKS ACTIVE  
+**User Consent:**  INTERACTIVE CONSENT MECHANISMS OPERATIONAL  
+**Rollback Capabilities:**  AUTOMATIC ROLLBACK ON FAILURES IMPLEMENTED
 
 The Eos bootstrap hardening safety system provides comprehensive safety mechanisms for Ubuntu security hardening with user consent, non-breaking design, and automatic rollback capabilities.
 

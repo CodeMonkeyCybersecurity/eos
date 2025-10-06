@@ -1055,7 +1055,7 @@ You can simplify the architecture by using direct API calls from eos commands. L
 
 ### What You Can Do Without Temporal/NATS:
 
-**Simple Operations** ✅
+**Simple Operations** 
 ```bash
 # Direct API calls work great for:
 - Creating/updating/deleting routes
@@ -1273,12 +1273,12 @@ func (c *SimpleClient) ReconcileState() error {
 - Eos CLI commands
 
 This gives you:
-- ✅ Route management
-- ✅ Authentication
-- ✅ State persistence
-- ✅ Secret management
-- ✅ Health checks
-- ✅ Most operations you need
+-  Route management
+-  Authentication
+-  State persistence
+-  Secret management
+-  Health checks
+-  Most operations you need
 
 Add Temporal/NATS later if you need:
 - ❓ Complex multi-region deployments

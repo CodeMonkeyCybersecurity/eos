@@ -136,7 +136,7 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		return fmt.Errorf("consul installation failed: %w", err)
 	}
 
-	logger.Info("terminal prompt: ✅ Consul installation completed successfully!")
+	logger.Info("terminal prompt:  Consul installation completed successfully!")
 	logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Next steps:")

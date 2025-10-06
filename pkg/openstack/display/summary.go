@@ -53,7 +53,7 @@ func ShowInstallationSummary(rc *eos_io.RuntimeContext, config *openstack.Config
 	fmt.Println()
 
 	// Enabled services
-	fmt.Println("✅ Enabled Services")
+	fmt.Println(" Enabled Services")
 	fmt.Println("══════════════════")
 	displayEnabledServices(config)
 	fmt.Println()
@@ -164,7 +164,7 @@ func ShowInstallationPlan(rc *eos_io.RuntimeContext, config *openstack.Config) {
 
 // ShowExistingInstallation displays information about an existing installation
 func ShowExistingInstallation(rc *eos_io.RuntimeContext, status *openstack.InstallationStatus) {
-	fmt.Println("\n⚠️  Existing OpenStack Installation Detected")
+	fmt.Println("\nExisting OpenStack Installation Detected")
 	fmt.Println("═══════════════════════════════════════════")
 	fmt.Println()
 
@@ -179,7 +179,7 @@ func ShowExistingInstallation(rc *eos_io.RuntimeContext, status *openstack.Insta
 		for _, svc := range status.Services {
 			statusIcon := "❌"
 			if svc.Healthy {
-				statusIcon = "✅"
+				statusIcon = ""
 			} else if svc.Running {
 				statusIcon = "⚠️"
 			}
@@ -361,8 +361,8 @@ func getDashboardURL(config *openstack.Config) string {
 		port = openstack.PortHorizonSSL
 	}
 
-	return fmt.Sprintf("%s://%s:%d", protocol, 
-		strings.TrimPrefix(strings.TrimPrefix(config.PublicEndpoint, "http://"), "https://"), 
+	return fmt.Sprintf("%s://%s:%d", protocol,
+		strings.TrimPrefix(strings.TrimPrefix(config.PublicEndpoint, "http://"), "https://"),
 		port)
 }
 

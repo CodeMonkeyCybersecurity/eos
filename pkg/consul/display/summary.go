@@ -34,7 +34,7 @@ func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	log.Info(fmt.Sprintf("   • HTTP API:      http://%s:%d", hostname, shared.PortConsul))
 	log.Info("   • DNS Interface: port 8600") // Standard Consul DNS port
 	log.Info(" ")
-	log.Info("🔧 Quick Commands:")
+	log.Info(" Quick Commands:")
 	log.Info("   • Check status:      consul-vault-helper status")
 	log.Info("   • List services:     consul-vault-helper services")
 	log.Info("   • Register service:  consul-vault-helper register-app <name> <port>")

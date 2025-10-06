@@ -82,9 +82,9 @@ func runDeleteHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	// Confirm deletion unless force flag is set
 	if !force {
-		logger.Info("terminal prompt: ⚠️  WARNING: This action cannot be undone!")
+		logger.Info("terminal prompt: WARNING: This action cannot be undone!")
 		logger.Info("terminal prompt: Are you sure you want to delete this route? (y/N)")
-		
+
 		confirm, err := eos_io.PromptInput(rc, "Confirm", "Delete route? (y/N)")
 		if err != nil {
 			return fmt.Errorf("failed to read confirmation: %w", err)
@@ -129,7 +129,7 @@ func runDeleteHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	// Display success message
 	logger.Info("terminal prompt: ✓ Route deleted successfully!")
 	logger.Info("terminal prompt: Domain", zap.String("value", domain))
-	
+
 	if keepDNS {
 		logger.Info("terminal prompt: DNS records were preserved as requested")
 		logger.Info("terminal prompt: You may need to update DNS records manually")

@@ -298,7 +298,7 @@ func DisplayPostInstallSecurityChecklist(rc *eos_io.RuntimeContext) {
 // ValidateSecurityPosture performs basic security posture checks
 func ValidateSecurityPosture(rc *eos_io.RuntimeContext) ([]string, []string) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Validating security posture")
+	log.Info(" Validating security posture")
 
 	var passed []string
 	var failed []string
@@ -337,7 +337,7 @@ func ValidateSecurityPosture(rc *eos_io.RuntimeContext) ([]string, []string) {
 		failed = append(failed, "Audit log not found - audit logging may not be enabled")
 	}
 
-	log.Info("🔍 Security posture validation completed",
+	log.Info(" Security posture validation completed",
 		zap.Int("passed", len(passed)),
 		zap.Int("failed", len(failed)))
 

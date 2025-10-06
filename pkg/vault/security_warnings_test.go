@@ -50,7 +50,7 @@ func TestValidateSecurityPosture(t *testing.T) {
 	t.Logf("  Failed: %d checks", len(failed))
 
 	for i, check := range passed {
-		t.Logf("  ✅ %d. %s", i+1, check)
+		t.Logf("   %d. %s", i+1, check)
 	}
 	for i, check := range failed {
 		t.Logf("  ❌ %d. %s", i+1, check)

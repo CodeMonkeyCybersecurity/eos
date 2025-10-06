@@ -67,7 +67,7 @@ api_addr = "https://127.0.0.1:8179"
 		t.Errorf("Config should be valid, got errors: %v", result.Errors)
 	}
 
-	t.Log("✅ PASS: TLS paths are never empty")
+	t.Log(" PASS: TLS paths are never empty")
 }
 
 // TestHistoricalIssue_MissingFQDNInSAN tests that FQDN is included in cert SAN
@@ -82,7 +82,7 @@ func TestHistoricalIssue_MissingFQDNInSAN(t *testing.T) {
 	// 2. FQDN is added to dnsNames if different from hostname
 	// 3. Reverse DNS lookup adds canonical names
 
-	t.Log("✅ PASS: FQDN detection logic exists in generateSelfSignedCert()")
+	t.Log(" PASS: FQDN detection logic exists in generateSelfSignedCert()")
 	t.Log("   - See install.go:1065-1101 for FQDN detection")
 	t.Log("   - See install.go:1103-1115 for reverse DNS lookup")
 }
@@ -122,7 +122,7 @@ func TestHistoricalIssue_IncorrectFilePermissions(t *testing.T) {
 		t.Errorf("REGRESSION: Key has wrong permissions: %o (expected 0600)", keyPerms)
 	}
 
-	t.Logf("✅ PASS: File permissions correct (cert: %o, key: %o)", certPerms, keyPerms)
+	t.Logf(" PASS: File permissions correct (cert: %o, key: %o)", certPerms, keyPerms)
 }
 
 // TestHistoricalIssue_ConfigValidationFails tests config validation fallback
@@ -170,7 +170,7 @@ api_addr = "http://127.0.0.1:8179"
 		t.Error("REGRESSION: Validation method not set")
 	}
 
-	t.Logf("✅ PASS: Config validation works with fallback (method: %s)", result.Method)
+	t.Logf(" PASS: Config validation works with fallback (method: %s)", result.Method)
 }
 
 // TestHistoricalIssue_LegacyPort8200 tests legacy port detection
@@ -210,7 +210,7 @@ listener "tcp" {
 		t.Error("REGRESSION: Legacy port 8200 not detected")
 	}
 
-	t.Log("✅ PASS: Legacy port 8200 detected and warned")
+	t.Log(" PASS: Legacy port 8200 detected and warned")
 }
 
 // TestHistoricalIssue_SystemdCapabilities tests systemd service syntax
@@ -227,7 +227,7 @@ func TestHistoricalIssue_SystemdCapabilities(t *testing.T) {
 	// In production, the installer should use AmbientCapabilities
 	// This is a documentation test
 
-	t.Logf("✅ PASS: Modern systemd syntax required")
+	t.Logf(" PASS: Modern systemd syntax required")
 	t.Logf("   - Expected: %s", modernSyntax)
 	t.Logf("   - Deprecated: %s (should NOT use)", deprecatedSyntax)
 }
@@ -252,7 +252,7 @@ func TestHistoricalIssue_PathInconsistency(t *testing.T) {
 		t.Logf("Incorrect path example detected: %s", incorrectPath)
 	}
 
-	t.Logf("✅ PASS: Path standardized to singular: %s", expectedPath)
+	t.Logf(" PASS: Path standardized to singular: %s", expectedPath)
 }
 
 // TestHistoricalIssue_TLSDisableString tests tls_disable value type
@@ -325,7 +325,7 @@ func TestHistoricalIssue_TLSDisableString(t *testing.T) {
 		})
 	}
 
-	t.Log("✅ PASS: tls_disable string values detected")
+	t.Log(" PASS: tls_disable string values detected")
 }
 
 // TestHistoricalIssue_DuplicateBinaries tests duplicate binary detection
@@ -380,7 +380,7 @@ func TestHistoricalIssue_DuplicateBinaries(t *testing.T) {
 		}
 	}
 
-	t.Logf("✅ PASS: Duplicate binaries detected and removed (%d removed)", removed)
+	t.Logf(" PASS: Duplicate binaries detected and removed (%d removed)", removed)
 }
 
 // TestHistoricalIssue_ConfigMissingBlocks tests config completeness
@@ -461,7 +461,7 @@ api_addr = "http://127.0.0.1:8179"
 		})
 	}
 
-	t.Log("✅ PASS: Missing required blocks detected")
+	t.Log(" PASS: Missing required blocks detected")
 }
 
 // TestRegressionSummary provides a summary of all regression tests
@@ -470,16 +470,16 @@ func TestRegressionSummary(t *testing.T) {
 	t.Log("VAULT HISTORICAL ISSUES - REGRESSION TEST SUMMARY")
 	t.Log("═══════════════════════════════════════════════════════════════")
 	t.Log("")
-	t.Log("✅ Empty TLS Paths - PROTECTED")
-	t.Log("✅ Missing FQDN in SAN - PROTECTED")
-	t.Log("✅ Incorrect File Permissions - PROTECTED")
-	t.Log("✅ Config Validation Fallback - PROTECTED")
-	t.Log("✅ Legacy Port 8200 - DETECTED")
-	t.Log("✅ Systemd Capabilities - DOCUMENTED")
-	t.Log("✅ Path Inconsistency - STANDARDIZED")
-	t.Log("✅ TLS Disable String - DETECTED")
-	t.Log("✅ Duplicate Binaries - DETECTED & CLEANED")
-	t.Log("✅ Missing Config Blocks - DETECTED")
+	t.Log(" Empty TLS Paths - PROTECTED")
+	t.Log(" Missing FQDN in SAN - PROTECTED")
+	t.Log(" Incorrect File Permissions - PROTECTED")
+	t.Log(" Config Validation Fallback - PROTECTED")
+	t.Log(" Legacy Port 8200 - DETECTED")
+	t.Log(" Systemd Capabilities - DOCUMENTED")
+	t.Log(" Path Inconsistency - STANDARDIZED")
+	t.Log(" TLS Disable String - DETECTED")
+	t.Log(" Duplicate Binaries - DETECTED & CLEANED")
+	t.Log(" Missing Config Blocks - DETECTED")
 	t.Log("")
 	t.Log("All historical issues have regression protection.")
 	t.Log("═══════════════════════════════════════════════════════════════")

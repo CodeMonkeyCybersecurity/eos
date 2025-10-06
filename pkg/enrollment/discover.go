@@ -329,7 +329,6 @@ func checkService(serviceName string) (*ServiceInfo, error) {
 	return nil, fmt.Errorf("service %s not found or not running", serviceName)
 }
 
-
 // discoverSystemMetrics discovers system performance metrics
 func discoverSystemMetrics(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -422,12 +421,6 @@ func parseDockerVersion(output string) string {
 	}
 	return ""
 }
-
-
-
-
-
-
 
 // selectBestMaster selects the best master from available options
 func selectBestMaster(rc *eos_io.RuntimeContext, masters []MasterInfo, info *SystemInfo) *MasterInfo {
@@ -727,10 +720,10 @@ System Information:
 
 Recommended Role: %s
 
-Prerequisites Status: ✅ PASSED
-- Memory requirement: ✅ %d GB (minimum 2GB)
-- CPU requirement: ✅ %d cores (minimum 1)
-- Network connectivity: ✅ Available
+Prerequisites Status:  PASSED
+- Memory requirement:  %d GB (minimum 2GB)
+- CPU requirement:  %d cores (minimum 1)
+- Network connectivity:  Available
 
 HashiCorp Services Configuration:
 - Consul: Ready for service discovery
@@ -763,7 +756,7 @@ func discoverConfiguration(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	// TODO: Implement HashiCorp configuration discovery
 	// This replaces SaltStack configuration discovery with Consul/Nomad/Vault discovery
 	logger.Info("HashiCorp configuration discovery requires administrator intervention")
-	
+
 	return nil
 }
 
@@ -776,6 +769,6 @@ func testMasterConnectivity(rc *eos_io.RuntimeContext, masterAddr string) error 
 	// TODO: Implement HashiCorp cluster connectivity test
 	// This replaces SaltStack master connectivity with Consul cluster connectivity
 	logger.Info("HashiCorp cluster connectivity test requires administrator intervention")
-	
+
 	return nil
 }

@@ -163,7 +163,7 @@ Examples:
 
 		// Dry run - show what would be promoted
 		if dryRun {
-			fmt.Printf("🔍 Dry Run - No actual promotion will be executed\n")
+			fmt.Printf(" Dry Run - No actual promotion will be executed\n")
 			fmt.Printf("\nPromotion Steps (would execute):\n")
 			fmt.Printf("1. Validate source environment and component\n")
 			fmt.Printf("2. Check target environment compatibility\n")
@@ -209,7 +209,7 @@ Examples:
 		}
 
 		// Display promotion results
-		fmt.Printf("✅ Component promotion completed successfully\n")
+		fmt.Printf(" Component promotion completed successfully\n")
 		fmt.Printf("\nPromotion Results:\n")
 		fmt.Printf("──────────────────\n")
 		fmt.Printf("Component:        %s\n", componentName)
@@ -231,7 +231,7 @@ Examples:
 		if len(result.ValidationResults) > 0 {
 			fmt.Printf("\nValidation Results:\n")
 			for _, validation := range result.ValidationResults {
-				status := "✅"
+				status := ""
 				if !validation.Passed {
 					status = "❌"
 				}

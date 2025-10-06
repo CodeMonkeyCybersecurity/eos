@@ -4,7 +4,7 @@
 
 ## Requirements vs Implementation Comparison
 
-### ✅ IMPLEMENTED CORRECTLY
+###  IMPLEMENTED CORRECTLY
 
 #### 1. Service Management
 **Requirement:**
@@ -19,21 +19,21 @@ systemctl reset-failed vault.service
 **Implementation:** [pkg/vault/uninstall.go:148-200](pkg/vault/uninstall.go#L148-L200)
 ```go
 // Stop() method covers:
-✅ systemctl stop vault
-✅ systemctl stop vault-agent
-✅ systemctl disable vault
-✅ systemctl disable vault-agent
-✅ pkill -f vault (cleanup remaining processes)
-✅ Remove service files from multiple locations:
+ systemctl stop vault
+ systemctl stop vault-agent
+ systemctl disable vault
+ systemctl disable vault-agent
+ pkill -f vault (cleanup remaining processes)
+ Remove service files from multiple locations:
    - /etc/systemd/system/vault.service
    - /etc/systemd/system/vault-agent.service
    - /lib/systemd/system/vault.service
    - /usr/lib/systemd/system/vault.service
-✅ systemctl reset-failed vault.service
-✅ systemctl reset-failed vault-agent.service
+ systemctl reset-failed vault.service
+ systemctl reset-failed vault-agent.service
 ```
 
-**Status:** ✅ **COMPLETE** - Actually better than requirements (covers more service file locations)
+**Status:**  **COMPLETE** - Actually better than requirements (covers more service file locations)
 
 #### 2. Configuration Directory
 **Requirement:** `rm -rf /etc/vault.d/`
@@ -45,7 +45,7 @@ shared.VaultConfigPath,  // "/etc/vault.d/vault.hcl"
 
 **Covered by:** `GetVaultPurgePaths()` → Purge()
 
-**Status:** ✅ **COMPLETE** - Removes entire `/etc/vault.d/` via parent directory
+**Status:**  **COMPLETE** - Removes entire `/etc/vault.d/` via parent directory
 
 #### 3. Data and Operational Directories
 **Requirement:** `rm -rf /opt/vault/`
@@ -60,7 +60,7 @@ shared.VaultDataPath,  // "/opt/vault/data/"
 shared.VaultDir,  // "/opt/vault/"
 ```
 
-**Status:** ✅ **COMPLETE** - Removes entire `/opt/vault/` directory tree
+**Status:**  **COMPLETE** - Removes entire `/opt/vault/` directory tree
 
 #### 4. Log Files
 **Requirement:** `rm -rf /var/log/vault/`
@@ -70,7 +70,7 @@ shared.VaultDir,  // "/opt/vault/"
 shared.VaultLogWildcard,  // Wildcard for log files
 ```
 
-**Status:** ✅ **COMPLETE** - Covered by wildcard
+**Status:**  **COMPLETE** - Covered by wildcard
 
 #### 5. Binary Removal
 **Requirement:** `rm -f /usr/local/bin/vault`
@@ -80,12 +80,12 @@ shared.VaultLogWildcard,  // Wildcard for log files
 shared.VaultBinaryPath,  // Defined as "/usr/bin/vault" in shared constants
 ```
 
-**⚠️  ISSUE FOUND:**
+**ISSUE FOUND:**
 - Shared constants define `/usr/bin/vault`
 - Install.go actually installs to `/usr/local/bin/vault`
 - Requirements specify `/usr/local/bin/vault`
 
-**Status:** ⚠️  **PARTIAL** - Only removes `/usr/bin/vault`, misses `/usr/local/bin/vault`
+**Status:** **PARTIAL** - Only removes `/usr/bin/vault`, misses `/usr/local/bin/vault`
 
 #### 6. User and Group Removal
 **Requirement:**
@@ -96,12 +96,12 @@ groupdel vault
 
 **Implementation:** [pkg/vault/uninstall.go:262-286](pkg/vault/uninstall.go#L262-L286)
 ```go
-✅ userdel -r vault  // -r removes home directory too (better than requirement)
-✅ groupdel vault
-✅ Error handling for non-existent user/group
+ userdel -r vault  // -r removes home directory too (better than requirement)
+ groupdel vault
+ Error handling for non-existent user/group
 ```
 
-**Status:** ✅ **COMPLETE** - Actually better (removes home directory)
+**Status:**  **COMPLETE** - Actually better (removes home directory)
 
 #### 7. Environment Variable Cleanup
 **Requirement:**
@@ -114,13 +114,13 @@ rm -f /etc/profile.d/vault.sh
 
 **Implementation:** [pkg/vault/uninstall.go:288-342](pkg/vault/uninstall.go#L288-L342)
 ```go
-✅ Removes from /etc/environment: VAULT_ADDR, VAULT_CACERT
-✅ Also removes: VAULT_CLIENT_CERT, VAULT_CLIENT_KEY, VAULT_SKIP_VERIFY, VAULT_TOKEN
-✅ rm -f /etc/profile.d/vault.sh
-✅ sed operations with error handling
+ Removes from /etc/environment: VAULT_ADDR, VAULT_CACERT
+ Also removes: VAULT_CLIENT_CERT, VAULT_CLIENT_KEY, VAULT_SKIP_VERIFY, VAULT_TOKEN
+ rm -f /etc/profile.d/vault.sh
+ sed operations with error handling
 ```
 
-**Status:** ✅ **COMPLETE** - Actually more comprehensive than requirements
+**Status:**  **COMPLETE** - Actually more comprehensive than requirements
 
 #### 8. systemd Reload
 **Requirement:** `systemctl daemon-reload`
@@ -129,7 +129,7 @@ rm -f /etc/profile.d/vault.sh
 - [pkg/vault/uninstall.go:345-348](pkg/vault/uninstall.go#L345-L348)
 - [pkg/vault/phase_delete.go:179](pkg/vault/phase_delete.go#L179)
 
-**Status:** ✅ **COMPLETE** - Called in both Uninstall() and Purge()
+**Status:**  **COMPLETE** - Called in both Uninstall() and Purge()
 
 ---
 
@@ -181,7 +181,7 @@ shared.TLSDir,  // "/opt/vault/tls/" - ONLY covers /opt/vault/tls/
 
 **Why It Still Works:** `/etc/vault.d/` parent directory is removed, so TLS certs ARE deleted
 
-**Status:** ✅ **ACTUALLY OK** - Parent directory removal handles this
+**Status:**  **ACTUALLY OK** - Parent directory removal handles this
 
 ### Issue #3: Deprecated systemd Capabilities Syntax (P2 - IMPORTANT)
 
@@ -268,7 +268,7 @@ Based on user requirements, verify after `eos delete vault`:
 
 ---
 
-## 🔧 REQUIRED FIXES
+##  REQUIRED FIXES
 
 ### Priority 0 - BREAKING (Must Fix)
 

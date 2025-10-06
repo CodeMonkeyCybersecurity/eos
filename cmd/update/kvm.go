@@ -219,7 +219,7 @@ func runRestartKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		return err
 	}
 
-	fmt.Printf("✅ VM %s restarted successfully\n", vmName)
+	fmt.Printf(" VM %s restarted successfully\n", vmName)
 	return nil
 }
 

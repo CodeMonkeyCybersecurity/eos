@@ -177,12 +177,12 @@ func (m *Manager) reportStatus(step string, success bool, message string, detail
 		// Note: Using background context since this is a fallback scenario
 		logger := otelzap.L()
 		if success {
-			logger.Info("Deployment status", 
-				zap.String("step", step), 
+			logger.Info("Deployment status",
+				zap.String("step", step),
 				zap.String("message", message))
 		} else {
-			logger.Error("Deployment status", 
-				zap.String("step", step), 
+			logger.Error("Deployment status",
+				zap.String("step", step),
 				zap.String("message", message))
 		}
 	}
@@ -370,7 +370,7 @@ func (m *Manager) GetHealthStatus(ctx context.Context) (*HealthStatus, error) {
 func (m *Manager) UpdateDeployment(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("🔄 Updating Penpot deployment")
+	logger.Info(" Updating Penpot deployment")
 
 	// Re-run deployment steps that support updates
 	steps := []DeploymentStep{

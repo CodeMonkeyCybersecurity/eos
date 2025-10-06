@@ -124,11 +124,11 @@ func discoverDisks(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) erro
 		fmt.Printf("  Connection: %s\n", disk.ConnectionBus)
 		fmt.Printf("  Removable: %t\n", disk.Removable)
 		fmt.Printf("  Health: %s\n", disk.Health.Status)
-		
+
 		if len(disk.Partitions) > 0 {
 			fmt.Printf("  Partitions:\n")
 			for _, part := range disk.Partitions {
-				fmt.Printf("    %s: %s (%s) - %s\n", 
+				fmt.Printf("    %s: %s (%s) - %s\n",
 					part.Device, formatDiskSize(part.Size), part.Filesystem, part.MountPoint)
 			}
 		}
@@ -158,7 +158,7 @@ func createDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 		zap.Bool("encrypted", diskEncrypted))
 
 	if diskDryRun {
-		fmt.Printf("🔍 DRY RUN - Would create volume:\n")
+		fmt.Printf(" DRY RUN - Would create volume:\n")
 		fmt.Printf("   Device: %s\n", diskDevice)
 		fmt.Printf("   Size: %s\n", diskSize)
 		fmt.Printf("   Filesystem: %s\n", diskFilesystem)
@@ -196,7 +196,7 @@ func createDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 		return fmt.Errorf("failed to create volume: %w", err)
 	}
 
-	fmt.Printf("✅ Volume created successfully:\n")
+	fmt.Printf(" Volume created successfully:\n")
 	fmt.Printf("   Device: %s\n", volumeInfo.Device)
 	fmt.Printf("   UUID: %s\n", volumeInfo.UUID)
 	fmt.Printf("   Size: %s\n", formatDiskSize(volumeInfo.Size))
@@ -238,9 +238,9 @@ func checkDiskHealth(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) er
 	// Health recommendations
 	switch health.Status {
 	case "healthy":
-		fmt.Printf("\n✅ Disk appears to be in good health\n")
+		fmt.Printf("\n Disk appears to be in good health\n")
 	case "warning":
-		fmt.Printf("\n⚠️  Disk shows warning signs - monitor closely\n")
+		fmt.Printf("\nDisk shows warning signs - monitor closely\n")
 	case "critical":
 		fmt.Printf("\n🚨 Disk is in critical condition - backup data immediately\n")
 	default:
@@ -268,7 +268,7 @@ func mountDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) er
 		return fmt.Errorf("failed to mount volume: %w", err)
 	}
 
-	fmt.Printf("✅ Volume mounted successfully:\n")
+	fmt.Printf(" Volume mounted successfully:\n")
 	fmt.Printf("   Device: %s\n", diskDevice)
 	fmt.Printf("   Mount Point: %s\n", diskMountPoint)
 
@@ -288,7 +288,7 @@ func unmountDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) 
 		return fmt.Errorf("failed to unmount volume: %w", err)
 	}
 
-	fmt.Printf("✅ Volume unmounted successfully: %s\n", diskDevice)
+	fmt.Printf(" Volume unmounted successfully: %s\n", diskDevice)
 	return nil
 }
 
@@ -312,7 +312,7 @@ func resizeDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 		zap.Uint64("new_size", newSizeBytes))
 
 	if diskDryRun {
-		fmt.Printf("🔍 DRY RUN - Would resize volume:\n")
+		fmt.Printf(" DRY RUN - Would resize volume:\n")
 		fmt.Printf("   Device: %s\n", diskDevice)
 		fmt.Printf("   New Size: %s\n", diskSize)
 		return nil
@@ -323,7 +323,7 @@ func resizeDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 		return fmt.Errorf("failed to resize volume: %w", err)
 	}
 
-	fmt.Printf("✅ Volume resized successfully:\n")
+	fmt.Printf(" Volume resized successfully:\n")
 	fmt.Printf("   Device: %s\n", diskDevice)
 	fmt.Printf("   New Size: %s\n", diskSize)
 
@@ -337,7 +337,7 @@ func parseDiskSize(size string) (uint64, error) {
 	}
 
 	size = strings.ToUpper(strings.TrimSpace(size))
-	
+
 	var multiplier uint64 = 1
 	var numStr string
 
