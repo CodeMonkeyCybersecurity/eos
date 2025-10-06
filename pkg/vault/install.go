@@ -686,7 +686,7 @@ SecureBits=keep-caps
 StandardOutput=journal
 StandardError=journal
 LimitMEMLOCK=infinity
-Capabilities=CAP_IPC_LOCK+ep
+AmbientCapabilities=CAP_IPC_LOCK
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 NoNewPrivileges=yes
 ExecStart=%s server -config=%s
