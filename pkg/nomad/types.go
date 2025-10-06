@@ -3,7 +3,10 @@
 package nomad
 
 import (
+	"fmt"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // Config represents Nomad configuration
@@ -205,7 +208,7 @@ func GetDefaultConfig() *Config {
 		ConsulIntegration: true,
 		VaultIntegration:  true,
 		ConsulAddress:     "127.0.0.1:8500",
-		VaultAddress:      "127.0.0.1:8200",
+		VaultAddress:      fmt.Sprintf("127.0.0.1:%d", shared.PortVault),
 		
 		EnableTLS:    true,
 		EnableACL:    true,

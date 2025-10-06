@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
@@ -50,7 +51,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	config := &hecate.ClientConfig{
 		CaddyAdminAddr:     getEnvOrDefault("CADDY_ADMIN_ADDR", "http://localhost:2019"),
 		ConsulAddr:         getEnvOrDefault("CONSUL_ADDR", "localhost:8500"),
-		VaultAddr:          getEnvOrDefault("VAULT_ADDR", "http://localhost:8200"),
+		VaultAddr:          getEnvOrDefault("VAULT_ADDR", fmt.Sprintf("http://localhost:%d", shared.PortVault)),
 		VaultToken:         getEnvOrDefault("VAULT_TOKEN", ""),
 		TerraformWorkspace: getEnvOrDefault("TERRAFORM_WORKSPACE", "/var/lib/hecate/terraform"),
 	}

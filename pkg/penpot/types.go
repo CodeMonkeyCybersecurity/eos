@@ -2,8 +2,10 @@ package penpot
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/nomad/api"
 	vault "github.com/hashicorp/vault/api"
 )
@@ -194,7 +196,7 @@ func DefaultConfig() *Config {
 		DatabasePort:       5432,
 		RedisPort:          6379,
 		NomadAddr:          "http://localhost:4646",
-		VaultAddr:          "http://localhost:8200",
+		VaultAddr:          fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		Namespace:          "penpot",
 		Datacenters:        []string{"dc1"},
 		WorkDir:            "/tmp/penpot-deploy",

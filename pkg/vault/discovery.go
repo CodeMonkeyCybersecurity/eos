@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -86,7 +87,7 @@ func (vd *VaultDiscovery) DiscoverVaultAddress(ctx context.Context) (string, err
 	}
 
 	// Method 4: DNS (simplest, but requires DNS resolution configured)
-	dnsAddr := fmt.Sprintf("https://vault.service.%s.consul:8200", vd.environment)
+	dnsAddr := fmt.Sprintf("https://vault.service.%s.consul:%d", vd.environment, shared.PortVault)
 	logger.Debug("Attempting Vault discovery via DNS",
 		zap.String("address", dnsAddr))
 

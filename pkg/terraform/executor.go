@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -39,7 +40,7 @@ func NewExecutor(workspaceDir string) (*Executor, error) {
 	logger := zap.NewNop() // TODO: Use proper logger from context
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if vaultAddr == "" {
-		vaultAddr = "http://127.0.0.1:8200"
+		vaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
 	}
 	vaultClient, err := vault.NewClient(vaultAddr, logger)
 	if err != nil {

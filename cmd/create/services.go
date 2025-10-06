@@ -8,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_deployment"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
@@ -54,7 +55,7 @@ Examples:
 		hashiConfig := &system.HashiCorpConfig{
 			NomadAddr:  "http://localhost:4646",
 			ConsulAddr: "http://localhost:8500",
-			VaultAddr:  "http://localhost:8200",
+			VaultAddr:  fmt.Sprintf("http://localhost:%d", shared.PortVault),
 			Datacenter: "dc1",
 		}
 
@@ -126,7 +127,7 @@ Examples:
 		hashiConfig := &system.HashiCorpConfig{
 			NomadAddr:  "http://localhost:4646",
 			ConsulAddr: "http://localhost:8500",
-			VaultAddr:  "http://localhost:8200",
+			VaultAddr:  fmt.Sprintf("http://localhost:%d", shared.PortVault),
 			Datacenter: "dc1",
 		}
 

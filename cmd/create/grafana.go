@@ -61,7 +61,7 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 			Environment: "production",
 			Datacenter:  "dc1",
 			Region:      "us-east-1",
-			VaultAddr:   "http://localhost:8200",
+			VaultAddr:   fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		}
 	}
 

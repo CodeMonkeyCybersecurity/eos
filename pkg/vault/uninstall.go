@@ -3,10 +3,14 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -36,12 +40,31 @@ type UninstallState struct {
 	PackageInstalled bool
 }
 
+// DeletionStep represents a single step in the deletion process
+type DeletionStep struct {
+	Name      string
+	Completed bool
+	Success   bool
+	Error     error
+	Timestamp time.Time
+}
+
+// DeletionTransaction tracks the deletion process for recovery
+type DeletionTransaction struct {
+	StartTime time.Time
+	Steps     []DeletionStep
+	LogPath   string
+	Interrupted bool
+}
+
 // VaultUninstaller handles safe removal of Vault
 type VaultUninstaller struct {
-	rc     *eos_io.RuntimeContext
-	config *UninstallConfig
-	logger otelzap.LoggerWithCtx
-	state  *UninstallState
+	rc          *eos_io.RuntimeContext
+	config      *UninstallConfig
+	logger      otelzap.LoggerWithCtx
+	state       *UninstallState
+	transaction *DeletionTransaction
+	sigChan     chan os.Signal
 }
 
 // NewVaultUninstaller creates a new Vault uninstaller
@@ -59,10 +82,26 @@ func NewVaultUninstaller(rc *eos_io.RuntimeContext, config *UninstallConfig) *Va
 		config.Distro = detectDistro()
 	}
 
+	// Initialize transaction tracking with secure log directory
+	logDir := "/var/log/eos"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		// If we can't create log directory, fall back to temp
+		logDir = os.TempDir()
+	}
+
+	logPath := fmt.Sprintf("%s/vault-deletion-%s.log", logDir, time.Now().Format("20060102-150405"))
+	transaction := &DeletionTransaction{
+		StartTime: time.Now(),
+		Steps:     []DeletionStep{},
+		LogPath:   logPath,
+	}
+
 	return &VaultUninstaller{
-		rc:     rc,
-		config: config,
-		logger: otelzap.Ctx(rc.Ctx),
+		rc:          rc,
+		config:      config,
+		logger:      otelzap.Ctx(rc.Ctx),
+		transaction: transaction,
+		sigChan:     make(chan os.Signal, 1),
 	}
 }
 
@@ -380,65 +419,294 @@ func (vu *VaultUninstaller) Verify() ([]string, error) {
 		return stillPresent, nil
 	}
 
-	vu.logger.Info(" Vault removal completed successfully - all components removed")
+	vu.logger.Info("✅ Vault removal completed successfully - all components removed")
 	return stillPresent, nil
 }
 
-// Uninstall performs the complete uninstallation process
-// Follows Assess → Intervene → Evaluate pattern
-func (vu *VaultUninstaller) Uninstall() error {
-	// ASSESS - Check current state
-	state, err := vu.Assess()
+// logStep records a deletion step to the transaction log
+func (vu *VaultUninstaller) logStep(stepName string, success bool, err error) {
+	step := DeletionStep{
+		Name:      stepName,
+		Completed: true,
+		Success:   success,
+		Error:     err,
+		Timestamp: time.Now(),
+	}
+	vu.transaction.Steps = append(vu.transaction.Steps, step)
+
+	// Write to log file
+	logEntry := fmt.Sprintf("%s - %s: %s",
+		step.Timestamp.Format(time.RFC3339),
+		map[bool]string{true: "SUCCESS", false: "FAILED"}[success],
+		stepName)
 	if err != nil {
-		return fmt.Errorf("assessment failed: %w", err)
+		logEntry += fmt.Sprintf(" - %v", err)
+	}
+	logEntry += "\n"
+
+	// Append to transaction log file with secure permissions (root-only readable)
+	f, fileErr := os.OpenFile(vu.transaction.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if fileErr != nil {
+		vu.logger.Debug("Failed to write transaction log", zap.Error(fileErr))
+		return
+	}
+	defer f.Close()
+	f.WriteString(logEntry)
+}
+
+// setupSignalHandling sets up graceful shutdown on interrupt
+func (vu *VaultUninstaller) setupSignalHandling(ctx context.Context, cancel context.CancelFunc) {
+	signal.Notify(vu.sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	go func() {
+		defer signal.Stop(vu.sigChan) // Clean up signal notifications
+		defer close(vu.sigChan)       // Close channel on exit
+
+		select {
+		case sig := <-vu.sigChan:
+			vu.logger.Error("⚠️  DELETION INTERRUPTED",
+				zap.String("signal", sig.String()),
+				zap.String("status", "partial_deletion"),
+				zap.String("transaction_log", vu.transaction.LogPath))
+
+			vu.transaction.Interrupted = true
+			vu.logStep(fmt.Sprintf("INTERRUPTED by signal %s", sig.String()), false, fmt.Errorf("user interrupt"))
+
+			// Log remaining components for recovery
+			vu.logger.Error("System may be in inconsistent state",
+				zap.String("recovery", "Run 'sudo eos rm vault --force' to retry deletion"),
+				zap.String("transaction_log", vu.transaction.LogPath))
+
+			cancel()
+			os.Exit(130) // Standard exit code for Ctrl+C
+		case <-ctx.Done():
+			// Context cancelled normally, clean exit
+			return
+		}
+	}()
+}
+
+// displayPreDeletionSummary shows what will be deleted
+func (vu *VaultUninstaller) displayPreDeletionSummary() {
+	vu.logger.Info("terminal prompt: \n╔════════════════════════════════════════════════════════════════╗")
+	vu.logger.Info("terminal prompt: ║  PRE-DELETION SUMMARY - Components to be REMOVED              ║")
+	vu.logger.Info("terminal prompt: ╚════════════════════════════════════════════════════════════════╝")
+	vu.logger.Info("terminal prompt: ")
+
+	if vu.state.BinaryInstalled {
+		vu.logger.Info("terminal prompt: 📦 Binary:")
+		vu.logger.Info(fmt.Sprintf("terminal prompt:    - /usr/local/bin/vault (%s)", vu.state.Version))
+		vu.logger.Info("terminal prompt:    - /usr/bin/vault (if present)")
+	}
+
+	if vu.state.ServiceRunning || vu.state.ServiceEnabled {
+		vu.logger.Info("terminal prompt: ")
+		vu.logger.Info("terminal prompt: 🔧 Service:")
+		vu.logger.Info("terminal prompt:    - /etc/systemd/system/vault.service")
+		if vu.state.ServiceRunning {
+			vu.logger.Info("terminal prompt:    - Currently RUNNING (will be stopped)")
+		}
+	}
+
+	if len(vu.state.ExistingPaths) > 0 {
+		vu.logger.Info("terminal prompt: ")
+		vu.logger.Info("terminal prompt: 📁 Files & Directories:")
+		for _, path := range vu.state.ExistingPaths {
+			vu.logger.Info(fmt.Sprintf("terminal prompt:    - %s", path))
+		}
+	}
+
+	if vu.state.UserExists {
+		vu.logger.Info("terminal prompt: ")
+		vu.logger.Info("terminal prompt: 👤 System Resources:")
+		vu.logger.Info("terminal prompt:    - User: vault")
+		vu.logger.Info("terminal prompt:    - Group: vault")
+	}
+
+	vu.logger.Info("terminal prompt: ")
+	vu.logger.Info("terminal prompt: 🌍 Environment Variables:")
+	vu.logger.Info("terminal prompt:    - VAULT_ADDR, VAULT_CACERT, and related variables")
+	vu.logger.Info("terminal prompt: ")
+}
+
+// displayPostDeletionSummary shows what was deleted and verification
+func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs map[string]error, stillPresent []string) {
+	vu.logger.Info("terminal prompt: \n╔════════════════════════════════════════════════════════════════╗")
+	vu.logger.Info("terminal prompt: ║  DELETION COMPLETE - Verification Report                      ║")
+	vu.logger.Info("terminal prompt: ╚════════════════════════════════════════════════════════════════╝")
+	vu.logger.Info("terminal prompt: ")
+
+	// Success metrics
+	vu.logger.Info(fmt.Sprintf("terminal prompt: ✅ Files Removed: %d", len(removed)))
+	if len(errs) > 0 {
+		vu.logger.Info(fmt.Sprintf("terminal prompt: ⚠️  Errors: %d", len(errs)))
+	}
+
+	// Component verification
+	vu.logger.Info("terminal prompt: ")
+	vu.logger.Info("terminal prompt: 🔍 Component Verification:")
+
+	checks := []struct {
+		name    string
+		present bool
+	}{
+		{"Binary removed", len(stillPresent) == 0 || !strings.Contains(strings.Join(stillPresent, " "), "binary")},
+		{"Service removed", len(stillPresent) == 0 || !strings.Contains(strings.Join(stillPresent, " "), "service")},
+		{"Config removed", len(stillPresent) == 0 || !strings.Contains(strings.Join(stillPresent, " "), "config")},
+		{"Data removed", len(stillPresent) == 0 || !strings.Contains(strings.Join(stillPresent, " "), "data")},
+	}
+
+	for _, check := range checks {
+		status := "✓"
+		if !check.present {
+			status = "✗"
+		}
+		vu.logger.Info(fmt.Sprintf("terminal prompt:    [%s] %s", status, check.name))
+	}
+
+	if len(stillPresent) > 0 {
+		vu.logger.Warn("terminal prompt: ")
+		vu.logger.Warn("terminal prompt: ⚠️  Remaining Components:")
+		for _, component := range stillPresent {
+			vu.logger.Warn(fmt.Sprintf("terminal prompt:    - %s", component))
+		}
+		vu.logger.Warn("terminal prompt: ")
+		vu.logger.Warn(fmt.Sprintf("terminal prompt: Run 'sudo eos rm vault --force' to retry removal"))
+	}
+
+	vu.logger.Info("terminal prompt: ")
+	vu.logger.Info(fmt.Sprintf("terminal prompt: 📄 Transaction Log: %s", vu.transaction.LogPath))
+	vu.logger.Info(fmt.Sprintf("terminal prompt: ⏱  Duration: %v", time.Since(vu.transaction.StartTime).Round(time.Second)))
+	vu.logger.Info("terminal prompt: ")
+}
+
+// Uninstall performs the complete uninstallation process
+// Follows Assess → Intervene → Evaluate pattern with signal handling and transaction logging
+func (vu *VaultUninstaller) Uninstall() error {
+	// Setup context with cancellation for signal handling
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Setup signal handling FIRST - before any operations
+	vu.setupSignalHandling(ctx, cancel)
+	vu.logStep("STARTED: Vault deletion process", true, nil)
+
+	// ASSESS - Use existing state (already assessed in command handler)
+	// This removes the duplicate assessment
+	if vu.state == nil {
+		// State should already be set, but if not, assess now
+		state, err := vu.Assess()
+		if err != nil {
+			return fmt.Errorf("assessment failed: %w", err)
+		}
+		vu.state = state
 	}
 
 	// If nothing is installed, return early
-	if !state.BinaryInstalled && !state.ServiceRunning && len(state.ExistingPaths) == 0 {
+	if !vu.state.BinaryInstalled && !vu.state.ServiceRunning && len(vu.state.ExistingPaths) == 0 {
 		vu.logger.Info("Vault is not installed and no data directories found")
+		vu.logStep("COMPLETE: Nothing to remove", true, nil)
 		return nil
 	}
 
-	// INTERVENE - Remove Vault
-	vu.logger.Info("Beginning Vault uninstallation")
+	// Display pre-deletion summary
+	vu.displayPreDeletionSummary()
 
-	// Stop services first (also removes systemd service files)
+	// INTERVENE - Remove Vault with progress tracking
+	vu.logger.Info("🗑️  Beginning Vault uninstallation")
+	totalSteps := 7
+	currentStep := 0
+
+	// Step 1: Stop services
+	currentStep++
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Stopping Vault services...", currentStep, totalSteps))
 	if err := vu.Stop(); err != nil {
 		vu.logger.Warn("Error stopping services", zap.Error(err))
+		vu.logStep("Stop services", false, err)
 		// Continue anyway
+	} else {
+		vu.logStep("Stop services", true, nil)
 	}
 
-	// Remove package if installed
+	// Step 2: Remove package
+	currentStep++
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Removing Vault package...", currentStep, totalSteps))
 	if err := vu.RemovePackage(); err != nil {
 		vu.logger.Warn("Error removing package", zap.Error(err))
+		vu.logStep("Remove package", false, err)
 		// Continue anyway
+	} else {
+		vu.logStep("Remove package", true, nil)
 	}
 
-	// Clean files and directories
+	// Step 3: Clean files and directories
+	currentStep++
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Cleaning files and directories...", currentStep, totalSteps))
 	removed, errs := vu.CleanFiles()
+	if len(errs) > 0 {
+		// Log each error individually for transparency
+		for path, err := range errs {
+			vu.logger.Warn("Failed to remove path during cleanup",
+				zap.String("path", path),
+				zap.Error(err))
+		}
+		vu.logStep(fmt.Sprintf("Clean files (removed %d, %d errors)", len(removed), len(errs)), false, fmt.Errorf("%d errors occurred", len(errs)))
+	} else {
+		vu.logStep(fmt.Sprintf("Clean files (removed %d)", len(removed)), true, nil)
+	}
 
-	// Remove user
+	// Step 4: Remove user and group
+	currentStep++
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Removing vault user and group...", currentStep, totalSteps))
 	if err := vu.RemoveUser(); err != nil {
 		vu.logger.Warn("Error removing user", zap.Error(err))
+		vu.logStep("Remove user/group", false, err)
+	} else {
+		vu.logStep("Remove user/group", true, nil)
 	}
 
-	// Clean environment variables
+	// Step 5: Clean environment variables
+	currentStep++
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Cleaning environment variables...", currentStep, totalSteps))
 	if err := vu.CleanEnvironmentVariables(); err != nil {
 		vu.logger.Warn("Error cleaning environment variables", zap.Error(err))
+		vu.logStep("Clean environment", false, err)
+	} else {
+		vu.logStep("Clean environment", true, nil)
 	}
 
-	// Reload systemd
+	// Step 6: Reload systemd
+	currentStep++
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Reloading systemd daemon...", currentStep, totalSteps))
 	if err := vu.ReloadSystemd(); err != nil {
 		vu.logger.Debug("Error reloading systemd", zap.Error(err))
+		vu.logStep("Reload systemd", false, err)
+	} else {
+		vu.logStep("Reload systemd", true, nil)
 	}
 
-	// EVALUATE - Verify removal
+	// Step 7: EVALUATE - Verify removal
+	currentStep++
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Verifying removal...", currentStep, totalSteps))
 	stillPresent, err := vu.Verify()
+	if len(stillPresent) > 0 {
+		vu.logStep(fmt.Sprintf("Verification: %d components remain", len(stillPresent)), false, nil)
+	} else {
+		vu.logStep("Verification: Complete removal confirmed", true, nil)
+	}
 
+	// Log completion
+	vu.logStep("FINISHED: Vault deletion process", len(stillPresent) == 0, nil)
+
+	// Display post-deletion summary
+	vu.displayPostDeletionSummary(removed, errs, stillPresent)
+
+	// Final status logging
 	vu.logger.Info("Vault uninstallation process finished",
 		zap.Int("files_removed", len(removed)),
 		zap.Int("errors", len(errs)),
-		zap.Int("remaining_components", len(stillPresent)))
+		zap.Int("remaining_components", len(stillPresent)),
+		zap.Duration("duration", time.Since(vu.transaction.StartTime)))
 
 	return err
 }

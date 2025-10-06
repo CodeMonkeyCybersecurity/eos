@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -345,7 +346,7 @@ func applyDefaults(config *EnvironmentConfig) {
 
 	// Vault/Consul addresses
 	if config.VaultAddr == "" {
-		config.VaultAddr = "http://127.0.0.1:8200"
+		config.VaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
 	}
 }
 
@@ -378,7 +379,7 @@ func determineEnvironmentFromContext(config *EnvironmentConfig) string {
 func determineVaultAddress() string {
 	// Check if Vault is available locally
 	if _, err := executeCommand("vault", "status"); err == nil {
-		return "http://localhost:8200" // Default local Vault address
+		return fmt.Sprintf("http://localhost:%d", shared.PortVault) // Eos standard Vault port (8179)
 	}
 
 	// Check environment variable
@@ -387,7 +388,7 @@ func determineVaultAddress() string {
 	}
 
 	// Default Vault address
-	return "http://localhost:8200"
+	return fmt.Sprintf("http://localhost:%d", shared.PortVault)
 }
 
 // saveConfig saves the discovered configuration

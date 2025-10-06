@@ -7,6 +7,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -43,7 +44,7 @@ func init() {
 	hashicorpCmd.Flags().Bool("enable-acl", false, "Enable ACL system")
 	hashicorpCmd.Flags().Bool("enable-tls", false, "Enable TLS encryption")
 	hashicorpCmd.Flags().String("consul-address", "127.0.0.1:8500", "Consul address for integration")
-	hashicorpCmd.Flags().String("vault-address", "https://127.0.0.1:8200", "Vault address for integration")
+	hashicorpCmd.Flags().String("vault-address", fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault), "Vault address for integration")
 	hashicorpCmd.Flags().Duration("timeout", 300*time.Second, "Installation timeout")
 	hashicorpCmd.Flags().Bool("test", false, "Test mode - show what would be installed")
 

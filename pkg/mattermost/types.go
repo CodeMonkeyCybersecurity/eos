@@ -4,8 +4,10 @@ package mattermost
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/nomad/api"
 	vault "github.com/hashicorp/vault/api"
 )
@@ -116,7 +118,7 @@ func DefaultConfig() *Config {
 		PostgresHost: "postgres",
 		PostgresPort: 5432,
 		NomadAddr:    "http://localhost:4646",
-		VaultAddr:    "http://localhost:8200",
+		VaultAddr:    fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		Datacenter:   "dc1",
 		Environment:  "development",
 		DataPath:     "/opt/mattermost/data",

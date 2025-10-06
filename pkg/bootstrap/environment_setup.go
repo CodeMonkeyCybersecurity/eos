@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -217,7 +218,7 @@ func createEnvironmentConfig(rc *eos_io.RuntimeContext, opts *EnvironmentSetupOp
 	// Add Vault config if enabled
 	if opts.EnableVault {
 		env.Vault = &environment.VaultConfig{
-			Address:    fmt.Sprintf("https://%s:8200", opts.BackendIP),
+			Address:    fmt.Sprintf("https://%s:%d", opts.BackendIP, shared.PortVault),
 			TLSEnabled: opts.VaultTLSEnabled,
 			SealType:   "shamir",
 			HAEnabled:  false,

@@ -2,8 +2,10 @@ package n8n
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/nomad/api"
 	vault "github.com/hashicorp/vault/api"
 )
@@ -144,7 +146,7 @@ func DefaultConfig() *Config {
 		RedisHost:            "redis",
 		RedisPort:            6379,
 		NomadAddr:            "http://localhost:4646",
-		VaultAddr:            "http://localhost:8200",
+		VaultAddr:            fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		Datacenter:           "dc1",
 		Environment:          "development",
 		DataPath:             "/opt/n8n/data",

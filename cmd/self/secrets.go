@@ -9,6 +9,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault/auth"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault/secrets"
@@ -75,7 +76,7 @@ that require access to secrets, including the Delphi dashboard.`,
 			logger.Info("terminal prompt: Current VAULT_ADDR", zap.String("addr", currentAddr))
 		}
 
-		logger.Info("terminal prompt: Enter Vault server address (e.g., https://vhost11:8200): ")
+		logger.Info(fmt.Sprintf("terminal prompt: Enter Vault server address (e.g., https://vhost11:%d): ", shared.PortVault))
 		vaultAddr, err := reader.ReadString('\n')
 		if err != nil {
 			return fmt.Errorf("failed to read vault address: %w", err)
@@ -318,7 +319,7 @@ Shows:
 			// Check for common secrets using simplified facade
 			staticSecrets := []string{
 				"secret/data/delphi/database/username",
-				"secret/data/delphi/database/password", 
+				"secret/data/delphi/database/password",
 				"secret/data/delphi/database/host",
 				"secret/data/smtp/username",
 				"secret/data/smtp/password",
@@ -397,7 +398,7 @@ Examples:
 			return fmt.Errorf("vault service not available")
 		}
 
-		// Use the simplified facade to retrieve secrets  
+		// Use the simplified facade to retrieve secrets
 		secretData, err := facade.RetrieveSecret(rc.Ctx, secretPath)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve secret %s: %w", secretPath, err)

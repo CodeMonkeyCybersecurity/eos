@@ -114,7 +114,7 @@ func runCreateN8n(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		CPU:                  1000,
 		Memory:               2048,
 		NomadAddr:            "http://localhost:4646",
-		VaultAddr:            "http://localhost:8200",
+		VaultAddr:            fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		EnableUserManagement: true,
 		EnablePublicAPI:      true,
 		EnableTelemetry:      false,

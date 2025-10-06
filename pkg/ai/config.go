@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -164,7 +165,7 @@ func (cm *ConfigManager) GetAPIKey(rc *eos_io.RuntimeContext) (string, error) {
 		// Get Vault address
 		vaultAddr := os.Getenv("VAULT_ADDR")
 		if vaultAddr == "" {
-			vaultAddr = "http://127.0.0.1:8200"
+			vaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
 		}
 		
 		// Try to get secret from Vault

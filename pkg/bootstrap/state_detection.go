@@ -337,7 +337,7 @@ func checkVaultHealthSimple(rc *eos_io.RuntimeContext) bool {
 			},
 		},
 	}
-	resp, err := client.Get("http://localhost:8200/v1/sys/health")
+	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/v1/sys/health", shared.PortVault))
 	if err != nil {
 		return false
 	}

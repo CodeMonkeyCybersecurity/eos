@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -99,7 +100,7 @@ func DiscoverEnhancedEnvironment(rc *eos_io.RuntimeContext) (*EnhancedEnvironmen
 		config.SecretBackend = determineEnhancedSecretBackend()
 	}
 	if config.VaultAddr == "" {
-		config.VaultAddr = "http://127.0.0.1:8200"
+		config.VaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
 	}
 	if config.Master == "" {
 		config.Master = "127.0.0.1"

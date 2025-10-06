@@ -136,7 +136,7 @@ func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 			Environment: "production",
 			Datacenter:  "dc1",
 			Region:      "us-east-1",
-			VaultAddr:   "http://localhost:8200",
+			VaultAddr:   fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		}
 	}
 
@@ -234,7 +234,7 @@ func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		CPU:              resourceConfig.CPU,
 		Memory:           resourceConfig.Memory,
 		NomadAddr:        "http://localhost:4646",
-		VaultAddr:        "http://localhost:8200",
+		VaultAddr:        fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		FilePublicKey:    filePublicKey,
 		FilePrivateKey:   filePrivateKey,
 		SupportEmail:     "support@example.com",

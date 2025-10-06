@@ -92,25 +92,53 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return nil
 	}
 
+	// Store state for use in Uninstall() (avoids duplicate assessment)
+	// This is a bit of a hack - we set it via reflection of the struct
+	// Actually, let's just call Uninstall which will use the already-assessed state
+
 	// Confirmation prompt unless forced
 	if !vaultForceDelete {
-		if err := promptForConfirmation(rc, logger); err != nil {
+		if err := promptForConfirmation(rc, logger, state); err != nil {
 			return err
 		}
 	}
 
-	// Execute uninstallation
+	// Execute uninstallation (will use already-assessed state)
 	if err := uninstaller.Uninstall(); err != nil {
 		return fmt.Errorf("vault uninstallation failed: %w", err)
 	}
 
-	logger.Info("Vault removal process completed successfully")
+	logger.Info("✅ Vault removal process completed successfully")
 	return nil
 }
 
 // promptForConfirmation handles user confirmation for deletion
-func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
-	prompt := `WARNING: You are about to PERMANENTLY DELETE Vault and ALL its data!
+func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, state *vault.UninstallState) error {
+	// Show what will be deleted
+	logger.Info("terminal prompt: \n═══════════════════════════════════════════════════════════════════")
+	logger.Info("terminal prompt: 📋 COMPONENTS TO BE DELETED")
+	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
+
+	if state.BinaryInstalled {
+		logger.Info(fmt.Sprintf("terminal prompt: 📦 Binary: %s", state.Version))
+	}
+	if state.ServiceRunning || state.ServiceEnabled {
+		status := "installed"
+		if state.ServiceRunning {
+			status = "RUNNING"
+		}
+		logger.Info(fmt.Sprintf("terminal prompt: 🔧 Service: %s", status))
+	}
+	if len(state.ExistingPaths) > 0 {
+		logger.Info(fmt.Sprintf("terminal prompt: 📁 Data: %d directories", len(state.ExistingPaths)))
+	}
+	if state.UserExists {
+		logger.Info("terminal prompt: 👤 User & Group: vault")
+	}
+	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
+	logger.Info("terminal prompt: ")
+
+	prompt := `⚠️  WARNING: You are about to PERMANENTLY DELETE Vault and ALL its data!
 
 This includes:
 - All secrets stored in Vault
