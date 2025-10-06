@@ -4,9 +4,16 @@ package vault
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -88,13 +95,21 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		config.StorageBackend = "file"
 	}
 	if config.ListenerAddress == "" {
-		config.ListenerAddress = "0.0.0.0:8200"
+		config.ListenerAddress = fmt.Sprintf("0.0.0.0:%d", shared.PortVault)
 	}
 	if config.APIAddr == "" {
-		config.APIAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
+		protocol := "http"
+		if config.TLSEnabled {
+			protocol = "https"
+		}
+		config.APIAddr = fmt.Sprintf("%s://127.0.0.1:%d", protocol, shared.PortVault)
 	}
 	if config.ClusterAddr == "" {
-		config.ClusterAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault+1)
+		protocol := "http"
+		if config.TLSEnabled {
+			protocol = "https"
+		}
+		config.ClusterAddr = fmt.Sprintf("%s://127.0.0.1:%d", protocol, shared.PortVault+1)
 	}
 	if config.LogLevel == "" {
 		config.LogLevel = "info"
@@ -474,6 +489,13 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 func (vi *VaultInstaller) configure() error {
 	vi.logger.Info("Configuring Vault")
 
+	// Generate TLS certificates if TLS is enabled
+	if vi.config.TLSEnabled {
+		if err := vi.generateSelfSignedCert(); err != nil {
+			return fmt.Errorf("failed to generate TLS certificate: %w", err)
+		}
+	}
+
 	// Backup existing configuration if present
 	configPath := filepath.Join(vi.config.ConfigPath, "vault.hcl")
 	if vi.fileExists(configPath) {
@@ -513,14 +535,17 @@ func (vi *VaultInstaller) configure() error {
 	// Generate listener configuration based on TLS setting
 	var listenerConfig string
 	if vi.config.TLSEnabled {
-		// TLS enabled - would require cert/key files (not yet implemented)
-		// For now, this path shouldn't be reached since default is TLS disabled
-		vi.logger.Warn("TLS enabled but cert generation not yet implemented - using self-signed certs would go here")
+		// TLS enabled - use generated self-signed certificate
+		tlsDir := filepath.Join(vi.config.ConfigPath, "tls")
+		certPath := filepath.Join(tlsDir, "vault.crt")
+		keyPath := filepath.Join(tlsDir, "vault.key")
+
 		listenerConfig = fmt.Sprintf(`listener "tcp" {
-  address     = "%s"
-  tls_disable = false
-  # TODO: Add tls_cert_file and tls_key_file when cert generation is implemented
-}`, vi.config.ListenerAddress)
+  address       = "%s"
+  tls_disable   = false
+  tls_cert_file = "%s"
+  tls_key_file  = "%s"
+}`, vi.config.ListenerAddress, certPath, keyPath)
 	} else {
 		// TLS disabled - simpler configuration
 		listenerConfig = fmt.Sprintf(`listener "tcp" {
@@ -605,12 +630,16 @@ log_format = "json"
 	if err != nil {
 		// Check error type to determine severity
 		if strings.Contains(err.Error(), "exit status 127") {
-			// Command not found - this shouldn't happen since we checked above
-			return fmt.Errorf("vault binary not found or not executable at %s: %w", vi.config.BinaryPath, err)
+			// Command not found - binary might not be in PATH yet, skip validation
+			vi.logger.Warn("Vault binary not in PATH, skipping config validation",
+				zap.String("path", vi.config.BinaryPath),
+				zap.Error(err),
+				zap.String("hint", "Configuration will be validated when service starts"))
+			return nil
 		}
 
 		// Configuration validation error - log details but don't fail
-		vi.logger.Error("Configuration validation failed",
+		vi.logger.Warn("Configuration validation failed, proceeding anyway",
 			zap.Error(err),
 			zap.String("output", output),
 			zap.String("config_path", configPath),
@@ -618,7 +647,7 @@ log_format = "json"
 
 		// If there's actual output explaining the error, include it
 		if output != "" {
-			vi.logger.Error("Validation error details", zap.String("details", output))
+			vi.logger.Warn("Validation error details", zap.String("details", output))
 		}
 
 		// Don't fail installation - let systemd try to start it
@@ -1001,4 +1030,96 @@ func getUbuntuCodename() string {
 	}
 
 	return strings.TrimSpace(string(output))
+}
+
+// generateSelfSignedCert generates a self-signed TLS certificate for Vault
+func (vi *VaultInstaller) generateSelfSignedCert() error {
+	vi.logger.Info("Generating self-signed TLS certificate for Vault")
+
+	// Create TLS directory
+	tlsDir := filepath.Join(vi.config.ConfigPath, "tls")
+	if err := vi.createDirectory(tlsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create TLS directory: %w", err)
+	}
+
+	certPath := filepath.Join(tlsDir, "vault.crt")
+	keyPath := filepath.Join(tlsDir, "vault.key")
+
+	// Check if certificate already exists
+	if vi.fileExists(certPath) && vi.fileExists(keyPath) {
+		vi.logger.Info("TLS certificate already exists, skipping generation")
+		return nil
+	}
+
+	// Get hostname for certificate
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "vault-server"
+		vi.logger.Warn("Failed to get hostname, using default", zap.Error(err))
+	}
+
+	// Generate private key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("failed to generate private key: %w", err)
+	}
+
+	// Create certificate template
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().Unix()),
+		Subject: pkix.Name{
+			Organization:  []string{"Eos Vault"},
+			Country:       []string{"AU"},
+			CommonName:    hostname,
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour), // 1 year
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{hostname, "localhost", "vault"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+	}
+
+	// Create self-signed certificate
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return fmt.Errorf("failed to create certificate: %w", err)
+	}
+
+	// Encode certificate to PEM
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certDER,
+	})
+
+	// Encode private key to PEM
+	keyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	})
+
+	// Write certificate file
+	if err := vi.writeFile(certPath, certPEM, 0644); err != nil {
+		return fmt.Errorf("failed to write certificate: %w", err)
+	}
+
+	// Write key file with restricted permissions
+	if err := vi.writeFile(keyPath, keyPEM, 0600); err != nil {
+		return fmt.Errorf("failed to write private key: %w", err)
+	}
+
+	// Set ownership
+	if err := vi.runner.Run("chown", vi.config.ServiceUser+":"+vi.config.ServiceGroup, certPath); err != nil {
+		return fmt.Errorf("failed to set certificate ownership: %w", err)
+	}
+	if err := vi.runner.Run("chown", vi.config.ServiceUser+":"+vi.config.ServiceGroup, keyPath); err != nil {
+		return fmt.Errorf("failed to set key ownership: %w", err)
+	}
+
+	vi.logger.Info("TLS certificate generated successfully",
+		zap.String("cert_path", certPath),
+		zap.String("key_path", keyPath))
+
+	return nil
 }

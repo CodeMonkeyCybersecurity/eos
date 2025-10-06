@@ -5,6 +5,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -115,13 +116,13 @@ func init() {
 	// Add commands to create command
 	// NOTE: Most commands are now integrated into existing command files
 	// Only adding Terraform here as it doesn't have a main command elsewhere
-	CreateCmd.AddCommand(createTerraformNativeCmd)  // No conflict, terraform command was only in hcl.go which is commented out
+	CreateCmd.AddCommand(createTerraformNativeCmd) // No conflict, terraform command was only in hcl.go which is commented out
 
 	// Vault flags
 	createVaultNativeCmd.Flags().String("version", "latest", "Vault version to install")
 	createVaultNativeCmd.Flags().String("storage-backend", "file", "Storage backend (file, consul, raft)")
 	createVaultNativeCmd.Flags().Bool("ui", true, "Enable web UI")
-	createVaultNativeCmd.Flags().String("listener-address", "0.0.0.0:8200", "Listener address")
+	createVaultNativeCmd.Flags().String("listener-address", fmt.Sprintf("0.0.0.0:%d", shared.PortVault), "Listener address")
 	createVaultNativeCmd.Flags().Bool("tls", true, "Enable TLS")
 	createVaultNativeCmd.Flags().Bool("auto-unseal", false, "Enable auto-unseal")
 	createVaultNativeCmd.Flags().String("kms-key", "", "KMS key ID for auto-unseal")
@@ -176,7 +177,6 @@ func init() {
 	createBoundaryNativeCmd.Flags().Bool("use-repository", false, "Install via APT repository")
 }
 
-
 // Terraform native installer
 func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -201,7 +201,6 @@ func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	logger.Info("terminal prompt: Terraform is installed. Check version with: terraform version")
 	return nil
 }
-
 
 // TODO: Native Consul installer - functionality moved to consul.go
 // This function is redundant with existing consul.go implementation

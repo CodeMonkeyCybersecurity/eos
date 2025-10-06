@@ -133,6 +133,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -208,8 +209,8 @@ func init() {
 	CreateVaultCmd.Flags().String("version", "latest", "Vault version to install")
 	CreateVaultCmd.Flags().String("storage-backend", "file", "Storage backend (file, consul, raft)")
 	CreateVaultCmd.Flags().Bool("ui", true, "Enable web UI")
-	CreateVaultCmd.Flags().String("listener-address", "0.0.0.0:8200", "Listener address")
-	CreateVaultCmd.Flags().Bool("tls", false, "Enable TLS (requires cert/key files)")
+	CreateVaultCmd.Flags().String("listener-address", fmt.Sprintf("0.0.0.0:%d", shared.PortVault), "Listener address")
+	CreateVaultCmd.Flags().Bool("tls", true, "Enable TLS (auto-generates self-signed cert if needed)")
 	CreateVaultCmd.Flags().Bool("auto-unseal", false, "Enable auto-unseal")
 	CreateVaultCmd.Flags().String("kms-key", "", "KMS key ID for auto-unseal")
 	CreateVaultCmd.Flags().Bool("clean", false, "Clean install (remove existing)")
