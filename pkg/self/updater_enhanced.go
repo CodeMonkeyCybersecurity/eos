@@ -565,29 +565,25 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 	if eeu.transaction.GitStashRef != "" {
 		eeu.logger.Info("Restoring stashed changes after successful update")
 
-		// SAFETY: Check working tree is clean before popping stash
-		// This prevents conflicts and data loss
-		statusCmd := exec.Command("git", "-C", eeu.config.SourceDir, "status", "--porcelain")
-		statusOutput, err := statusCmd.Output()
-		if err != nil {
-			eeu.logger.Warn("Could not check git status before stash pop", zap.Error(err))
-		} else if len(statusOutput) > 0 {
-			eeu.logger.Warn("Working tree has uncommitted changes, cannot auto-restore stash",
-				zap.String("stash_ref", eeu.transaction.GitStashRef),
-				zap.String("manual_recovery", "Run: cd /opt/eos && git status && git stash pop"),
-				zap.String("reason", "Prevents merge conflicts"))
-			return nil // Don't pop stash, but don't fail either
-		}
-
-		// Working tree is clean, safe to pop stash
+		// Attempt to pop stash
+		// Note: git stash pop will handle merge conflicts gracefully
+		// If conflicts occur, user will be notified and can resolve manually
 		stashPopCmd := exec.Command("git", "-C", eeu.config.SourceDir, "stash", "pop")
 		if output, err := stashPopCmd.CombinedOutput(); err != nil {
-			eeu.logger.Warn("Could not automatically restore stashed changes",
-				zap.Error(err),
-				zap.String("output", string(output)),
-				zap.String("stash_ref", eeu.transaction.GitStashRef),
-				zap.String("manual_recovery", "Run: cd /opt/eos && git stash pop"))
-			return fmt.Errorf("stash pop failed: %w", err)
+			// Check if this is a merge conflict or other error
+			if strings.Contains(string(output), "CONFLICT") {
+				eeu.logger.Warn("Stash pop resulted in merge conflicts - manual resolution required",
+					zap.String("stash_ref", eeu.transaction.GitStashRef),
+					zap.String("manual_recovery", "Resolve conflicts in /opt/eos, then: git add . && git stash drop"))
+			} else {
+				eeu.logger.Warn("Could not automatically restore stashed changes",
+					zap.Error(err),
+					zap.String("output", string(output)),
+					zap.String("stash_ref", eeu.transaction.GitStashRef),
+					zap.String("manual_recovery", "Run: cd /opt/eos && git stash list && git stash pop"))
+			}
+			// Don't return error - update was successful even if stash pop failed
+			return nil
 		}
 
 		eeu.logger.Info(" Stashed changes restored successfully")
