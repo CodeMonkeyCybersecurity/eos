@@ -73,7 +73,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	// Stop containers
 	logger.Info("🛑 Stopping containers for credential update")
 	if err := exec.Command("docker", "compose", "down").Run(); err != nil {
-		logger.Warn("⚠️ Failed to stop containers", zap.Error(err))
+		logger.Warn(" Failed to stop containers", zap.Error(err))
 	}
 
 	// Update admin password

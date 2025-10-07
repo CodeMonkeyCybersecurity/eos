@@ -273,7 +273,7 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 	case "healthy":
 		fmt.Fprint(os.Stderr, " Healthy\n")
 	case "degraded":
-		fmt.Fprint(os.Stderr, "⚠️ Degraded\n")
+		fmt.Fprint(os.Stderr, " Degraded\n")
 	case "unhealthy":
 		fmt.Fprint(os.Stderr, "❌ Unhealthy\n")
 	default:

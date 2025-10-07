@@ -16,7 +16,7 @@ import (
 // Individual packages can be installed via their specific 'eos create X' commands.
 var SetupToolsCmd = &cobra.Command{
 	Use:   "tools",
-	Short: "DEPRECATED: Use individual service commands instead", 
+	Short: "DEPRECATED: Use individual service commands instead",
 	Long: `DEPRECATED: This command is deprecated and will be removed in a future version.
 
 and reliability. Instead of installing bulk packages, use specific service commands:
@@ -45,7 +45,7 @@ Examples (DEPRECATED - for reference only):
 		// Show deprecation warning
 		logger.Warn("DEPRECATION WARNING: 'eos create tools' is deprecated")
 		logger.Info("Please use individual service commands instead:")
-		logger.Info("  eos create fail2ban     # Security tools")  
+		logger.Info("  eos create fail2ban     # Security tools")
 		logger.Info("  eos create trivy        # Security scanning")
 		logger.Info("  eos create docker       # Container runtime")
 		logger.Info("This command will continue to work but will be removed in a future version.")
@@ -105,13 +105,13 @@ Examples (DEPRECATED - for reference only):
 			if len(result.Changes) > 0 {
 				logger.Info("terminal prompt: 📝 Changes Made:")
 				for _, change := range result.Changes {
-					logger.Info(fmt.Sprintf("terminal prompt:    • %s: %s (%s)", 
+					logger.Info(fmt.Sprintf("terminal prompt:    • %s: %s (%s)",
 						change.Type, change.Target, change.Action))
 				}
 			}
 
 			if len(result.Warnings) > 0 {
-				logger.Info("terminal prompt: ⚠️ Warnings:")
+				logger.Info("terminal prompt:  Warnings:")
 				for _, warning := range result.Warnings {
 					logger.Info(fmt.Sprintf("terminal prompt:    • %s", warning))
 				}

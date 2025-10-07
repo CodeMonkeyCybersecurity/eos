@@ -181,7 +181,7 @@ func ShowExistingInstallation(rc *eos_io.RuntimeContext, status *openstack.Insta
 			if svc.Healthy {
 				statusIcon = ""
 			} else if svc.Running {
-				statusIcon = "⚠️"
+				statusIcon = ""
 			}
 			fmt.Printf("  %s %s - %s\n", statusIcon, svc.Name, svc.Message)
 		}

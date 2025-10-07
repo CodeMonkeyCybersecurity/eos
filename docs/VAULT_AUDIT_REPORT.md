@@ -15,12 +15,12 @@ The current Vault implementation has **already addressed the majority of critica
 
 **Key Findings:**
 -  **7/7 P0 Critical Issues:** FIXED or ADDRESSED
-- ⚠️ **3/5 Security Warnings:** Present but properly documented
+-  **3/5 Security Warnings:** Present but properly documented
 -  **Architecture:** Follows Eos patterns (Assess→Intervene→Evaluate)
 -  **TLS Generation:** Auto-generates with proper paths (NO EMPTY STRINGS)
 -  **Systemd Service:** Uses modern AmbientCapabilities syntax
 -  **Path Consistency:** Uses `/var/lib/eos/secret/` (singular)
-- ⚠️ **Debug Commands:** Partial implementation exists
+-  **Debug Commands:** Partial implementation exists
 
 ---
 
@@ -207,7 +207,7 @@ func manualValidateConfig(configPath string) error {
 }
 ```
 
-**Verdict:** ⚠️ **PARTIAL** - Validation exists in debug tools but needs integration into install flow.
+**Verdict:**  **PARTIAL** - Validation exists in debug tools but needs integration into install flow.
 
 ---
 
@@ -277,7 +277,7 @@ func manualValidateConfig(configPath string) error {
 - All 5 unseal keys stored in single file
 - Defeats Vault's security model
 
-### Current Status: ⚠️ **DOCUMENTED BUT NOT FIXED** (As expected)
+### Current Status:  **DOCUMENTED BUT NOT FIXED** (As expected)
 
 **Evidence:**
 
@@ -289,7 +289,7 @@ The implementation correctly stores keys in `/var/lib/eos/secret/vault_init.json
 ```go
 // Add to install.go after initialization
 func (vi *VaultInstaller) displaySecurityWarnings() {
-    vi.logger.Warn("SECURITY WARNING ⚠️")
+    vi.logger.Warn("SECURITY WARNING ")
     vi.logger.Warn("All unseal keys are stored in /var/lib/eos/secret/vault_init.json")
     vi.logger.Warn("This is INSECURE and suitable for development/testing ONLY.")
     vi.logger.Warn("")
@@ -301,7 +301,7 @@ func (vi *VaultInstaller) displaySecurityWarnings() {
 }
 ```
 
-**Verdict:** ⚠️ **REQUIRES WARNINGS** - Functionality is correct, but warnings needed.
+**Verdict:**  **REQUIRES WARNINGS** - Functionality is correct, but warnings needed.
 
 ---
 
@@ -347,7 +347,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 }
 ```
 
-**Verdict:** ⚠️ **NEEDS ENHANCEMENT** - Standard path used, but no active cleanup.
+**Verdict:**  **NEEDS ENHANCEMENT** - Standard path used, but no active cleanup.
 
 ---
 
@@ -387,7 +387,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 - `eos repair vault` - Auto-fix common issues
 - `eos upgrade vault` - Migration from broken installations
 
-### Current Status: ⚠️ **PARTIAL IMPLEMENTATION**
+### Current Status:  **PARTIAL IMPLEMENTATION**
 
 **What Exists:**
 
@@ -424,7 +424,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 
 **Recommendation:** These will be implemented in Options 2, 3, and 4.
 
-**Verdict:** ⚠️ **NEEDS COMPLETION** - Foundation exists, CLI wiring needed.
+**Verdict:**  **NEEDS COMPLETION** - Foundation exists, CLI wiring needed.
 
 ---
 
@@ -437,10 +437,10 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 | Empty strings in `tls_cert_file` |  PREVENTED | Config uses actual paths from generateSelfSignedCert() |
 | Empty strings in `tls_key_file` |  PREVENTED | Config uses actual paths from generateSelfSignedCert() |
 | Deprecated `Capabilities=` syntax |  PREVENTED | Uses AmbientCapabilities |
-| Multiple vault binaries | ⚠️ POSSIBLE | No active cleanup (but standard path used) |
+| Multiple vault binaries |  POSSIBLE | No active cleanup (but standard path used) |
 | Plural `/secrets/` path |  PREVENTED | Constants use singular `/secret/` |
-| Skipping config validation | ⚠️ POSSIBLE | No validation in install flow yet |
-| Start service with invalid config | ⚠️ POSSIBLE | No pre-start validation yet |
+| Skipping config validation |  POSSIBLE | No validation in install flow yet |
+| Start service with invalid config |  POSSIBLE | No pre-start validation yet |
 
 **3/7 checks need enhancement** - Will be addressed in Option 2 (refactoring).
 
@@ -494,13 +494,13 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 | **TLS Generation** | Empty cert paths causing crash |  FIXED | P0 | None |
 | **FQDN in SAN** | Missing FQDN |  FIXED | P1 | None |
 | **Consul KV Metadata** | Not stored |  FIXED | P2 | None |
-| **Config Validation** | No fallback when unavailable | ⚠️ PARTIAL | P0 | Add manual validation |
+| **Config Validation** | No fallback when unavailable |  PARTIAL | P0 | Add manual validation |
 | **Path Consistency** | Plural vs singular |  FIXED | P0 | None |
 | **Systemd Syntax** | Deprecated Capabilities |  FIXED | P0 | None |
 | **File Permissions** | Wrong order, wrong perms |  FIXED | P0 | None |
 | **Security Warnings** | Not displayed | ❌ MISSING | P0 | Add warnings |
-| **Binary Cleanup** | Duplicates not removed | ⚠️ PARTIAL | P1 | Add cleanup |
-| **Debug Command** | Not implemented | ⚠️ PARTIAL | P1 | Wire up CLI |
+| **Binary Cleanup** | Duplicates not removed |  PARTIAL | P1 | Add cleanup |
+| **Debug Command** | Not implemented |  PARTIAL | P1 | Wire up CLI |
 | **Validate Command** | Not implemented | ❌ MISSING | P0 | Create command |
 | **Repair Command** | Not implemented | ❌ MISSING | P1 | Create command |
 | **Upgrade/Migration** | Not implemented | ❌ MISSING | P2 | Create command |
@@ -571,10 +571,10 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 -  Diagnostic foundation exists
 
 **Weaknesses:**
-- ⚠️ Missing CLI commands (debug, validate, repair)
-- ⚠️ No security warnings displayed
-- ⚠️ Config validation not in install flow
-- ⚠️ No migration/upgrade path
+-  Missing CLI commands (debug, validate, repair)
+-  No security warnings displayed
+-  Config validation not in install flow
+-  No migration/upgrade path
 
 **Verdict:** **Ready for Options 2-4** - The foundation is excellent; we just need to complete the CLI tooling and add the safety checks from the historical document.
 

@@ -503,7 +503,7 @@ func (r *Runner) generateMarkdownReport(session *FuzzSession) (string, error) {
 		report.WriteString(fmt.Sprintf("- **Executions:** %d\n", result.Executions))
 
 		if result.CrashData != nil {
-			report.WriteString(fmt.Sprintf("- **⚠️ Crash Detected:** %s\n", result.CrashData.PanicReason))
+			report.WriteString(fmt.Sprintf("- ** Crash Detected:** %s\n", result.CrashData.PanicReason))
 		}
 
 		report.WriteString("\n")

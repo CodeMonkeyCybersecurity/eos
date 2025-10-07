@@ -160,10 +160,10 @@
  **Cloud-Native Workloads**: Microservices, API gateways, data processing
 
 ### When to Escalate to Administrator
-⚠️ **System Operations**: User management, package installation, system configuration
-⚠️ **Security Operations**: Firewall rules, access controls, security policies
-⚠️ **Storage Operations**: Disk partitioning, filesystem creation, hardware management
-⚠️ **Network Operations**: Interface configuration, routing, DNS management
+ **System Operations**: User management, package installation, system configuration
+ **Security Operations**: Firewall rules, access controls, security policies
+ **Storage Operations**: Disk partitioning, filesystem creation, hardware management
+ **Network Operations**: Interface configuration, routing, DNS management
 
 ### Hybrid Approach Examples
  **Database Services**: Nomad for container orchestration + Admin escalation for system tuning

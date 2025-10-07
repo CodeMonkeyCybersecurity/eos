@@ -140,7 +140,7 @@ func TestSecurityWarningLevels(t *testing.T) {
 		expectedText string
 	}{
 		{SecurityWarningCritical, "🚨", "CRITICAL"},
-		{SecurityWarningHigh, "⚠️ ", "HIGH"},
+		{SecurityWarningHigh, " ", "HIGH"},
 		{SecurityWarningMedium, "⚡", "MEDIUM"},
 		{SecurityWarningLow, " ", "LOW"},
 	}

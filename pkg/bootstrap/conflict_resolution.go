@@ -69,7 +69,7 @@ func PromptConflictResolution(rc *eos_io.RuntimeContext, state *BootstrapState) 
 		for _, conflict := range state.PortConflicts {
 			status := "🔴"
 			if conflict.IsEosService {
-				status = "⚠️"
+				status = ""
 			}
 			logger.Info(fmt.Sprintf("  %s Port %d: %s (PID %d)",
 				status, conflict.Port, conflict.ServiceName, conflict.ProcessID))

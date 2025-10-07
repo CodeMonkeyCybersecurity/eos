@@ -63,7 +63,7 @@
 
 ---
 
-## 2️⃣ What's Not Great ⚠️
+## 2️⃣ What's Not Great 
 
 ### **Design Issues**
 
@@ -367,7 +367,7 @@ Before deploying to production:
 
 ## 7️⃣ Final Verdict
 
-### **Current State**: **NOT PRODUCTION READY** ⚠️
+### **Current State**: **NOT PRODUCTION READY** 
 
 **Rationale**:
 - 4 P0 bugs that could cause data loss or rollback failures

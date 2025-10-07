@@ -288,7 +288,7 @@ func confirmResize(a *disk.Assessment) bool {
 	fmt.Println("")
 
 	if a.ChangeBytes < 0 {
-		fmt.Println("⚠️  WARNING: This is a SHRINK operation which can cause DATA LOSS!")
+		fmt.Println("  WARNING: This is a SHRINK operation which can cause DATA LOSS!")
 		fmt.Println("Make sure the guest filesystem has been shrunk first!")
 		fmt.Println("")
 	}

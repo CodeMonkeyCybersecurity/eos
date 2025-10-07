@@ -301,7 +301,7 @@ EOF
 # Add recommendations based on results
 if [ $FAILED_TESTS -gt 0 ]; then
     cat >> "$REPORT_FILE" << EOF
-### ⚠️ Action Required
+###  Action Required
 - Fix failing tests before deployment
 - Review logs for detailed error information
 EOF

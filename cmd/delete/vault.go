@@ -138,7 +138,7 @@ func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithC
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
 	logger.Info("terminal prompt: ")
 
-	prompt := `⚠️  WARNING: You are about to PERMANENTLY DELETE Vault and ALL its data!
+	prompt := `  WARNING: You are about to PERMANENTLY DELETE Vault and ALL its data!
 
 This includes:
 - All secrets stored in Vault

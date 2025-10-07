@@ -776,7 +776,7 @@ func PrintBootstrapStateReport(rc *eos_io.RuntimeContext, state *BootstrapState)
 		if component.Installed && component.Running && component.Healthy {
 			status = ""
 		} else if component.Installed && component.Running {
-			status = "⚠️"
+			status = ""
 		} else if component.Installed {
 			status = "🔴"
 		}
@@ -801,7 +801,7 @@ func PrintBootstrapStateReport(rc *eos_io.RuntimeContext, state *BootstrapState)
 		for _, conflict := range state.PortConflicts {
 			status := "🔴"
 			if conflict.IsEosService {
-				status = "⚠️"
+				status = ""
 			}
 
 			details := fmt.Sprintf("%s Port %d: %s (PID %d)",

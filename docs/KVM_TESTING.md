@@ -1,6 +1,6 @@
 # KVM Feature Testing Guide
 
-**⚠️ CRITICAL: DO NOT TEST ON PRODUCTION VMs WITHOUT BACKUPS**
+** CRITICAL: DO NOT TEST ON PRODUCTION VMs WITHOUT BACKUPS**
 
 ## Pre-Testing Requirements
 
@@ -72,7 +72,7 @@ CGO_ENABLED=1 go build -tags libvirt -o eos .
 
 ### Phase 3: Snapshot Operations (CRITICAL - Test First!)
 
-**⚠️ SNAPSHOT ROLLBACK IS UNTESTED - VERIFY BEFORE PRODUCTION**
+** SNAPSHOT ROLLBACK IS UNTESTED - VERIFY BEFORE PRODUCTION**
 
 - [ ] **Create Snapshot Manually**
   ```bash
@@ -112,7 +112,7 @@ CGO_ENABLED=1 go build -tags libvirt -o eos .
 
 ### Phase 4: VM Restart Operations (HIGH RISK)
 
-**⚠️ ONLY ON TEST VMs - NOT PRODUCTION**
+** ONLY ON TEST VMs - NOT PRODUCTION**
 
 - [ ] **Single VM Restart**
   ```bash
@@ -143,7 +143,7 @@ CGO_ENABLED=1 go build -tags libvirt -o eos .
 
 ### Phase 5: Bulk Operations (VERY HIGH RISK)
 
-**⚠️ NEVER RUN ON PRODUCTION WITHOUT TESTING ON DISPOSABLE VMs FIRST**
+** NEVER RUN ON PRODUCTION WITHOUT TESTING ON DISPOSABLE VMs FIRST**
 
 - [ ] **Multiple VM Restart**
   ```bash

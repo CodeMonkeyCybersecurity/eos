@@ -227,7 +227,7 @@ func (di *DiskInspector) GenerateASCIIDiagram(report *InspectionReport) string {
 		for _, alert := range report.HealthAlerts {
 			icon := ""
 			if alert.Level == "warning" {
-				icon = "⚠️"
+				icon = ""
 			} else if alert.Level == "critical" {
 				icon = "🔴"
 			}

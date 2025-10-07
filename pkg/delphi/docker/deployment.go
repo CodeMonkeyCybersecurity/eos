@@ -86,7 +86,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	// Set vm.max_map_count for Elasticsearch
 	logger.Info("⚙️ Setting vm.max_map_count for Elasticsearch")
 	if err := exec.Command("sysctl", "-w", "vm.max_map_count=262144").Run(); err != nil {
-		logger.Warn("⚠️ Failed to set vm.max_map_count", zap.Error(err))
+		logger.Warn(" Failed to set vm.max_map_count", zap.Error(err))
 	}
 
 	// Clone repository
@@ -108,14 +108,14 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	if proxyAddress != "" {
 		logger.Info(" Configuring proxy settings", zap.String("proxy", proxyAddress))
 		if err := ConfigureProxy(proxyAddress); err != nil {
-			logger.Warn("⚠️ Failed to configure proxy", zap.Error(err))
+			logger.Warn(" Failed to configure proxy", zap.Error(err))
 		}
 	}
 
 	if port != 443 {
 		logger.Info(" Configuring custom port for Hecate compatibility", zap.Int("port", port))
 		if err := ConfigurePortMapping(port); err != nil {
-			logger.Warn("⚠️ Failed to configure port mapping", zap.Error(err))
+			logger.Warn(" Failed to configure port mapping", zap.Error(err))
 		}
 	}
 
@@ -139,7 +139,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 
 	// Set file permissions
 	if err := exec.Command("chmod", "660", "*.conf").Run(); err != nil {
-		logger.Warn("⚠️ Failed to set file permissions", zap.Error(err))
+		logger.Warn(" Failed to set file permissions", zap.Error(err))
 	}
 
 	// Wait for services to be ready
@@ -153,7 +153,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	statusCmd.Stdout = os.Stdout
 	statusCmd.Stderr = os.Stderr
 	if err := statusCmd.Run(); err != nil {
-		logger.Warn("⚠️ Failed to check container status", zap.Error(err))
+		logger.Warn(" Failed to check container status", zap.Error(err))
 	}
 
 	logger.Info(" Wazuh Docker deployment completed successfully")

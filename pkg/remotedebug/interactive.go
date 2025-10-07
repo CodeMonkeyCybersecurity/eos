@@ -183,7 +183,7 @@ func (it *InteractiveTroubleshooter) troubleshootDiskSpace() error {
 			status = "✗"
 			criticalDisks = append(criticalDisks, disk)
 		} else if disk.UsePercent >= 80 {
-			status = "⚠️"
+			status = ""
 		}
 
 		fmt.Printf("%s %s: %.1f%% used (%.2f GB free)\n",

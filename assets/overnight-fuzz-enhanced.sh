@@ -294,7 +294,7 @@ EOF
 if [ $CRASHES_FOUND -gt 0 ]; then
     cat >> "$REPORT_FILE" << EOF
 
-### ⚠️ Crashes Detected
+###  Crashes Detected
 $CRASHES_FOUND crashes were found during fuzzing.
 See detailed crash logs: $LOG_DIR/crashes_$TIMESTAMP.log
 

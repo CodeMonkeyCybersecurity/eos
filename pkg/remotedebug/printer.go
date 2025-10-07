@@ -169,7 +169,7 @@ func (rp *ReportPrinter) printSystemMetrics(report *SystemReport) {
 			if disk.UsePercent >= 90 {
 				status = "✗"
 			} else if disk.UsePercent >= 80 {
-				status = "⚠️"
+				status = ""
 			}
 
 			fmt.Printf("  %s %s: %.1f%% used (%.2f GB free)\n",

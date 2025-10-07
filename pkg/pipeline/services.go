@@ -91,7 +91,7 @@ func UpdateServiceWorker(rc *eos_io.RuntimeContext, worker shared.ServiceWorkerI
 	if err := CopyFile(worker.SourcePath, worker.TargetPath); err != nil {
 		// Attempt to restore backup on failure
 		if _, backupErr := os.Stat(worker.BackupPath); backupErr == nil {
-			logger.Warn("⚠️ Copy failed, attempting to restore backup",
+			logger.Warn(" Copy failed, attempting to restore backup",
 				zap.Error(err))
 			_ = CopyFile(worker.BackupPath, worker.TargetPath)
 		}
@@ -105,7 +105,7 @@ func UpdateServiceWorker(rc *eos_io.RuntimeContext, worker shared.ServiceWorkerI
 
 	// EVALUATE - Restart service if it's running
 	if err := RestartServiceIfRunning(rc.Ctx, worker.ServiceName); err != nil {
-		logger.Warn("⚠️ Failed to restart service",
+		logger.Warn(" Failed to restart service",
 			zap.String("service", worker.ServiceName),
 			zap.Error(err))
 	}
@@ -116,7 +116,7 @@ func UpdateServiceWorker(rc *eos_io.RuntimeContext, worker shared.ServiceWorkerI
 			zap.String("service", worker.ServiceName))
 
 		if err := VerifyOneshotCompletion(rc.Ctx, worker.ServiceName); err != nil {
-			logger.Warn("⚠️ Oneshot service may not have completed successfully",
+			logger.Warn(" Oneshot service may not have completed successfully",
 				zap.String("service", worker.ServiceName),
 				zap.Error(err))
 		}

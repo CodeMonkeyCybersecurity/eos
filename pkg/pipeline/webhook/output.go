@@ -82,7 +82,7 @@ func OutputStatusText(rc *eos_io.RuntimeContext, status *WebhookStatus) error {
 
 	// Issues
 	if len(status.Issues) > 0 {
-		logger.Info("⚠️ Issues Found:")
+		logger.Info(" Issues Found:")
 		for _, issue := range status.Issues {
 			logger.Info(fmt.Sprintf("  • %s", issue))
 		}

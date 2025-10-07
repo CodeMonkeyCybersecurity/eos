@@ -51,9 +51,9 @@ type DeletionStep struct {
 
 // DeletionTransaction tracks the deletion process for recovery
 type DeletionTransaction struct {
-	StartTime time.Time
-	Steps     []DeletionStep
-	LogPath   string
+	StartTime   time.Time
+	Steps       []DeletionStep
+	LogPath     string
 	Interrupted bool
 }
 
@@ -464,7 +464,7 @@ func (vu *VaultUninstaller) setupSignalHandling(ctx context.Context, cancel cont
 
 		select {
 		case sig := <-vu.sigChan:
-			vu.logger.Error("⚠️  DELETION INTERRUPTED",
+			vu.logger.Error("  DELETION INTERRUPTED",
 				zap.String("signal", sig.String()),
 				zap.String("status", "partial_deletion"),
 				zap.String("transaction_log", vu.transaction.LogPath))
@@ -539,7 +539,7 @@ func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs ma
 	// Success metrics
 	vu.logger.Info(fmt.Sprintf("terminal prompt: ✅ Files Removed: %d", len(removed)))
 	if len(errs) > 0 {
-		vu.logger.Info(fmt.Sprintf("terminal prompt: ⚠️  Errors: %d", len(errs)))
+		vu.logger.Info(fmt.Sprintf("terminal prompt:   Errors: %d", len(errs)))
 	}
 
 	// Component verification
@@ -566,7 +566,7 @@ func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs ma
 
 	if len(stillPresent) > 0 {
 		vu.logger.Warn("terminal prompt: ")
-		vu.logger.Warn("terminal prompt: ⚠️  Remaining Components:")
+		vu.logger.Warn("terminal prompt:   Remaining Components:")
 		for _, component := range stillPresent {
 			vu.logger.Warn(fmt.Sprintf("terminal prompt:    - %s", component))
 		}
