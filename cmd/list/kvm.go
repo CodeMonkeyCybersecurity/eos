@@ -194,7 +194,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 			)
 		}
 	} else {
-		table.Header("NAME", "STATE", "OS", "MEM", "DISK", "CONSUL", "UPDATES", "IPS")
+		table.Header("NAME", "STATE", "VCPUS", "OS", "MEM", "DISK", "CONSUL", "UPDATES", "IPS")
 
 		for _, vm := range vms {
 			consul := "N/A"
@@ -243,6 +243,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 			table.Append(
 				vm.Name,
 				vm.State,
+				fmt.Sprintf("%d", vm.VCPUs),
 				osInfo,
 				memInfo,
 				diskInfo,

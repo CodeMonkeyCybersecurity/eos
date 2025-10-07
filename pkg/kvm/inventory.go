@@ -606,9 +606,16 @@ func getVMDiskSize(domain *libvirt.Domain) int {
 		return 0
 	}
 
-	// Parse disk paths from XML
-	diskRegex := regexp.MustCompile(`<source file='([^']+)'`)
+	// Parse disk paths from XML - try multiple formats
+	// Format 1: <source file='/path/to/disk.qcow2'/>
+	diskRegex := regexp.MustCompile(`<source file=['"]([^'"]+)['"]`)
 	matches := diskRegex.FindAllStringSubmatch(xmlDesc, -1)
+
+	// Format 2: <source dev='/dev/...'/>
+	if len(matches) == 0 {
+		diskRegex = regexp.MustCompile(`<source dev=['"]([^'"]+)['"]`)
+		matches = diskRegex.FindAllStringSubmatch(xmlDesc, -1)
+	}
 
 	if len(matches) == 0 {
 		return 0
@@ -621,6 +628,7 @@ func getVMDiskSize(domain *libvirt.Domain) int {
 	cmd := exec.Command("qemu-img", "info", "--output=json", diskPath)
 	output, err := cmd.Output()
 	if err != nil {
+		// qemu-img might not work for block devices, try different approach
 		return 0
 	}
 
