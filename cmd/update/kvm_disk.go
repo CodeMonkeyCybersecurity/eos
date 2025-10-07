@@ -1,9 +1,7 @@
 package update
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -205,7 +203,7 @@ func runUpdateKVMDisk(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	return nil
 }
 
-func displayAssessment(logger *otelzap.LoggerWithCtx, a *disk.Assessment) {
+func displayAssessment(logger otelzap.LoggerWithCtx, a *disk.Assessment) {
 	logger.Info("╔═══════════════════════════════════════════════════════════════╗")
 	logger.Info("║                    ASSESSMENT RESULTS                         ║")
 	logger.Info("╠═══════════════════════════════════════════════════════════════╣")
@@ -242,7 +240,7 @@ func displayAssessment(logger *otelzap.LoggerWithCtx, a *disk.Assessment) {
 	}
 }
 
-func displayPlan(logger *otelzap.LoggerWithCtx, a *disk.Assessment) {
+func displayPlan(logger otelzap.LoggerWithCtx, a *disk.Assessment) {
 	logger.Info("Planned Operations:")
 	logger.Info("  1. Create safety backup")
 	logger.Info(fmt.Sprintf("  2. Resize disk from %s to %s",
@@ -258,7 +256,7 @@ func displayPlan(logger *otelzap.LoggerWithCtx, a *disk.Assessment) {
 	logger.Info("  4. Verify resize success")
 }
 
-func displayPostResizeInstructions(logger *otelzap.LoggerWithCtx, a *disk.Assessment) {
+func displayPostResizeInstructions(logger otelzap.LoggerWithCtx, a *disk.Assessment) {
 	logger.Info("")
 	logger.Info("POST-RESIZE INSTRUCTIONS:")
 	logger.Info("The disk has been resized at the hypervisor level.")
