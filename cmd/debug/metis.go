@@ -53,134 +53,235 @@ func init() {
 	debugCmd.AddCommand(debugMetisCmd)
 }
 
+type checkResult struct {
+	name        string
+	category    string
+	passed      bool
+	error       error
+	remediation []string
+	details     string
+}
+
 func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Metis diagnostic checks")
+	logger.Debug("Starting Metis diagnostic checks")
 
 	projectDir := "/opt/metis"
-	passed := 0
-	failed := 0
+	results := []checkResult{}
 
-	// Check 1: Project structure
-	logger.Info("Check 1/9: Verifying project structure")
-	if err := checkProjectStructure(rc, projectDir); err != nil {
-		logger.Error("Project structure check failed", zap.Error(err))
-		failed++
-	} else {
-		logger.Info("✓ Project structure OK")
-		passed++
-	}
+	// Run all checks
+	results = append(results, checkProjectStructureWithResult(rc, projectDir))
 
-	// Check 2: Configuration file
-	logger.Info("Check 2/9: Validating configuration file")
-	config, err := checkConfiguration(rc, projectDir)
-	if err != nil {
-		logger.Error("Configuration check failed", zap.Error(err))
-		failed++
-	} else {
-		logger.Info("✓ Configuration valid")
-		passed++
-	}
+	config, configResult := checkConfigurationWithResult(rc, projectDir)
+	results = append(results, configResult)
 
-	// Check 3: Temporal server
-	logger.Info("Check 3/9: Testing Temporal server connectivity")
-	if err := checkTemporalServer(rc, config); err != nil {
-		logger.Error("Temporal server check failed", zap.Error(err))
-		logger.Info("terminal prompt: Start Temporal with: temporal server start-dev")
-		failed++
-	} else {
-		logger.Info("✓ Temporal server reachable")
-		passed++
-	}
+	results = append(results, checkTemporalServerWithResult(rc, config))
+	results = append(results, checkWorkerProcessWithResult(rc))
+	results = append(results, checkWebhookServerWithResult(rc, config))
+	results = append(results, checkAzureOpenAIWithResult(rc, config))
+	results = append(results, checkSMTPConfigWithResult(rc, config))
+	results = append(results, checkRecentWorkflowsWithResult(rc, config))
+	results = append(results, checkGoDependenciesWithResult(rc, projectDir))
 
-	// Check 4: Worker process
-	logger.Info("Check 4/9: Checking worker process")
-	if err := checkWorkerProcess(rc); err != nil {
-		logger.Warn("Worker process check failed", zap.Error(err))
-		logger.Info("terminal prompt: Start worker: cd /opt/metis/worker && go run main.go")
-		failed++
-	} else {
-		logger.Info("✓ Worker process running")
-		passed++
-	}
-
-	// Check 5: Webhook server
-	logger.Info("Check 5/9: Checking webhook server")
-	if err := checkWebhookServer(rc, config); err != nil {
-		logger.Warn("Webhook server check failed", zap.Error(err))
-		logger.Info("terminal prompt: Start webhook: cd /opt/metis/webhook && go run main.go")
-		failed++
-	} else {
-		logger.Info("✓ Webhook server responding")
-		passed++
-	}
-
-	// Check 6: Azure OpenAI configuration
-	logger.Info("Check 6/9: Validating Azure OpenAI configuration")
-	if err := checkAzureOpenAI(rc, config); err != nil {
-		logger.Warn("Azure OpenAI configuration check failed", zap.Error(err))
-		logger.Info("terminal prompt: Update config.yaml with valid Azure OpenAI credentials")
-		failed++
-	} else {
-		logger.Info("✓ Azure OpenAI configuration valid")
-		passed++
-	}
-
-	// Check 7: SMTP configuration
-	logger.Info("Check 7/9: Validating SMTP configuration")
-	if err := checkSMTPConfig(rc, config); err != nil {
-		logger.Warn("SMTP configuration check failed", zap.Error(err))
-		logger.Info("terminal prompt: Update config.yaml with valid SMTP credentials")
-		failed++
-	} else {
-		logger.Info("✓ SMTP configuration valid")
-		passed++
-	}
-
-	// Check 8: Recent workflows
-	logger.Info("Check 8/9: Checking recent Temporal workflows")
-	if err := checkRecentWorkflows(rc, config); err != nil {
-		logger.Debug("Recent workflows check skipped", zap.Error(err))
-		// Don't count as failure - might be fresh install
-	} else {
-		logger.Info("✓ Temporal workflows accessible")
-		passed++
-	}
-
-	// Check 9: Go dependencies
-	logger.Info("Check 9/9: Verifying Go dependencies")
-	if err := checkGoDependencies(rc, projectDir); err != nil {
-		logger.Warn("Go dependencies check failed", zap.Error(err))
-		logger.Info("terminal prompt: Run: cd /opt/metis/worker && go mod tidy")
-		failed++
-	} else {
-		logger.Info("✓ Go dependencies OK")
-		passed++
-	}
-
-	// Summary
-	logger.Info("Diagnostic summary",
-		zap.Int("passed", passed),
-		zap.Int("failed", failed),
-		zap.Int("total", 9))
+	// Display results
+	displayDiagnosticResults(results)
 
 	// Test alert if requested
 	if testAlert {
-		logger.Info("Sending test alert")
+		fmt.Println("\n╔════════════════════════════════════════════════════════════════╗")
+		fmt.Println("║                      SENDING TEST ALERT                        ║")
+		fmt.Println("╚════════════════════════════════════════════════════════════════╝")
+		fmt.Println()
 		if err := sendTestAlert(rc, config); err != nil {
-			logger.Error("Test alert failed", zap.Error(err))
+			fmt.Printf("✗ Test alert failed: %v\n", err)
+			fmt.Println("\nRemediation:")
+			fmt.Println("  • Ensure webhook server is running")
+			fmt.Println("  • Check webhook logs for errors")
+			fmt.Println("  • Verify Temporal server is accessible")
 			return fmt.Errorf("test alert failed: %w", err)
 		}
-		logger.Info("✓ Test alert sent - check Temporal UI at http://localhost:8233")
+		fmt.Println("✓ Test alert sent successfully")
+		fmt.Println()
+		fmt.Println("Next Steps:")
+		fmt.Println("  1. Check Temporal UI at http://localhost:8233")
+		fmt.Println("  2. Verify workflow execution completed")
+		fmt.Println("  3. Check email inbox for alert notification")
+	}
+
+	// Count failures
+	failed := 0
+	for _, r := range results {
+		if !r.passed {
+			failed++
+		}
 	}
 
 	if failed > 0 {
-		logger.Warn("Some checks failed - see messages above for remediation")
 		return fmt.Errorf("%d diagnostic checks failed", failed)
 	}
 
-	logger.Info("All diagnostic checks passed")
 	return nil
+}
+
+func displayDiagnosticResults(results []checkResult) {
+	// Count passed/failed by category
+	passed := 0
+	failed := 0
+	categoryMap := make(map[string][]checkResult)
+
+	for _, r := range results {
+		if r.passed {
+			passed++
+		} else {
+			failed++
+		}
+		categoryMap[r.category] = append(categoryMap[r.category], r)
+	}
+
+	total := passed + failed
+
+	// Header
+	fmt.Println()
+	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║              METIS DIAGNOSTIC REPORT                           ║")
+	fmt.Println("╚════════════════════════════════════════════════════════════════╝")
+	fmt.Println()
+
+	// Summary
+	status := "HEALTHY"
+	if failed > 0 {
+		status = "ISSUES DETECTED"
+	}
+
+	fmt.Printf("Status: %s\n", status)
+	fmt.Printf("Passed: %d/%d checks\n", passed, total)
+	if failed > 0 {
+		fmt.Printf("Failed: %d checks\n", failed)
+	}
+	fmt.Println()
+
+	// Group results by category
+	categories := []string{"Infrastructure", "Configuration", "Services", "Dependencies"}
+
+	for _, category := range categories {
+		checks := categoryMap[category]
+		if len(checks) == 0 {
+			continue
+		}
+
+		fmt.Printf("┌─ %s\n", category)
+		for _, check := range checks {
+			if check.passed {
+				fmt.Printf("│  ✓ %s\n", check.name)
+				if verbose && check.details != "" {
+					fmt.Printf("│    %s\n", check.details)
+				}
+			} else {
+				fmt.Printf("│  ✗ %s\n", check.name)
+			}
+		}
+		fmt.Println("│")
+	}
+
+	// Show failures with remediation
+	if failed > 0 {
+		fmt.Println()
+		fmt.Println("╔════════════════════════════════════════════════════════════════╗")
+		fmt.Println("║                   ISSUES & REMEDIATION                         ║")
+		fmt.Println("╚════════════════════════════════════════════════════════════════╝")
+		fmt.Println()
+
+		for i, r := range results {
+			if !r.passed {
+				fmt.Printf("Issue %d: %s\n", i+1, r.name)
+				fmt.Printf("Problem: %v\n", r.error)
+				fmt.Println()
+				fmt.Println("Solutions:")
+				for _, remedy := range r.remediation {
+					fmt.Printf("  • %s\n", remedy)
+				}
+				fmt.Println()
+			}
+		}
+
+		// Next steps summary
+		fmt.Println("╔════════════════════════════════════════════════════════════════╗")
+		fmt.Println("║                        NEXT STEPS                              ║")
+		fmt.Println("╚════════════════════════════════════════════════════════════════╝")
+		fmt.Println()
+		fmt.Println("Recommended action order:")
+		fmt.Println()
+
+		step := 1
+		// Infrastructure first
+		for _, r := range results {
+			if !r.passed && r.category == "Infrastructure" {
+				fmt.Printf("%d. Fix: %s\n", step, r.name)
+				step++
+			}
+		}
+		// Then configuration
+		for _, r := range results {
+			if !r.passed && r.category == "Configuration" {
+				fmt.Printf("%d. Fix: %s\n", step, r.name)
+				step++
+			}
+		}
+		// Then services
+		for _, r := range results {
+			if !r.passed && r.category == "Services" {
+				fmt.Printf("%d. Fix: %s\n", step, r.name)
+				step++
+			}
+		}
+		// Finally dependencies
+		for _, r := range results {
+			if !r.passed && r.category == "Dependencies" {
+				fmt.Printf("%d. Fix: %s\n", step, r.name)
+				step++
+			}
+		}
+		fmt.Println()
+		fmt.Println("After fixing issues, run: eos debug metis")
+		fmt.Println()
+	} else {
+		fmt.Println("╔════════════════════════════════════════════════════════════════╗")
+		fmt.Println("║                  ALL CHECKS PASSED                             ║")
+		fmt.Println("╚════════════════════════════════════════════════════════════════╝")
+		fmt.Println()
+		fmt.Println("Metis is configured and operational.")
+		fmt.Println()
+		fmt.Println("To test the alert processing pipeline:")
+		fmt.Println("  eos debug metis --test")
+		fmt.Println()
+		fmt.Println("To view Temporal workflows:")
+		fmt.Println("  • Open http://localhost:8233")
+		fmt.Println("  • Or use: temporal workflow list")
+		fmt.Println()
+	}
+}
+
+func checkProjectStructureWithResult(rc *eos_io.RuntimeContext, projectDir string) checkResult {
+	err := checkProjectStructure(rc, projectDir)
+	result := checkResult{
+		name:     "Project Structure",
+		category: "Infrastructure",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		result.remediation = []string{
+			"Install Metis using: eos create metis",
+			"Or clone from repository: git clone <metis-repo> /opt/metis",
+			fmt.Sprintf("Ensure directory exists: sudo mkdir -p %s", projectDir),
+			"Verify required subdirectories: worker/, webhook/",
+		}
+	} else {
+		result.details = fmt.Sprintf("All required files present in %s", projectDir)
+	}
+
+	return result
 }
 
 func checkProjectStructure(rc *eos_io.RuntimeContext, projectDir string) error {
@@ -232,6 +333,33 @@ type MetisConfig struct {
 	} `yaml:"webhook"`
 }
 
+func checkConfigurationWithResult(rc *eos_io.RuntimeContext, projectDir string) (*MetisConfig, checkResult) {
+	config, err := checkConfiguration(rc, projectDir)
+	result := checkResult{
+		name:     "Configuration File",
+		category: "Configuration",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		configPath := filepath.Join(projectDir, "config.yaml")
+		result.remediation = []string{
+			fmt.Sprintf("Edit configuration file: sudo nano %s", configPath),
+			"Verify YAML syntax is valid",
+			"Ensure all required fields are set:",
+			"  - temporal.host_port (e.g., localhost:7233)",
+			"  - azure_openai.endpoint (Azure OpenAI endpoint URL)",
+			"  - email.smtp_host (SMTP server address)",
+			"Example config: https://github.com/.../config.example.yaml",
+		}
+	} else {
+		result.details = "Configuration valid with all required fields"
+	}
+
+	return config, result
+}
+
 func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string) (*MetisConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -267,6 +395,32 @@ func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string) (*MetisCon
 	return &config, nil
 }
 
+func checkTemporalServerWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+	err := checkTemporalServer(rc, config)
+	result := checkResult{
+		name:     "Temporal Server",
+		category: "Infrastructure",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		result.remediation = []string{
+			"Start Temporal dev server: temporal server start-dev",
+			"Or use Docker: docker run -p 7233:7233 temporalio/auto-setup",
+			"Verify server is listening: netstat -tlnp | grep 7233",
+			"Check Temporal UI at http://localhost:8233",
+			"Update config.yaml temporal.host_port if using different address",
+		}
+	} else {
+		if config != nil {
+			result.details = fmt.Sprintf("Connected to Temporal at %s", config.Temporal.HostPort)
+		}
+	}
+
+	return result
+}
+
 func checkTemporalServer(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
@@ -292,6 +446,30 @@ func checkTemporalServer(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	return nil
 }
 
+func checkWorkerProcessWithResult(rc *eos_io.RuntimeContext) checkResult {
+	err := checkWorkerProcess(rc)
+	result := checkResult{
+		name:     "Worker Process",
+		category: "Services",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		result.remediation = []string{
+			"Start worker manually: cd /opt/metis/worker && go run main.go",
+			"Or enable systemd service: sudo systemctl start metis-worker",
+			"Check worker logs: journalctl -u metis-worker -f",
+			"Verify Go is installed: go version",
+			"Ensure Temporal server is running first",
+		}
+	} else {
+		result.details = "Worker process active and polling task queue"
+	}
+
+	return result
+}
+
 func checkWorkerProcess(rc *eos_io.RuntimeContext) error {
 	// Check if worker is running via systemd
 	checkCmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", "metis-worker")
@@ -309,6 +487,32 @@ func checkWorkerProcess(rc *eos_io.RuntimeContext) error {
 	}
 
 	return fmt.Errorf("worker process not running")
+}
+
+func checkWebhookServerWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+	err := checkWebhookServer(rc, config)
+	result := checkResult{
+		name:     "Webhook Server",
+		category: "Services",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		result.remediation = []string{
+			"Start webhook manually: cd /opt/metis/webhook && go run main.go",
+			"Or enable systemd service: sudo systemctl start metis-webhook",
+			"Check webhook logs: journalctl -u metis-webhook -f",
+			"Verify port is not in use: netstat -tlnp | grep <port>",
+			"Test health endpoint: curl http://localhost:<port>/health",
+		}
+	} else {
+		if config != nil {
+			result.details = fmt.Sprintf("Webhook server responding on port %d", config.Webhook.Port)
+		}
+	}
+
+	return result
 }
 
 func checkWebhookServer(rc *eos_io.RuntimeContext, config *MetisConfig) error {
@@ -355,6 +559,32 @@ func checkWebhookHTTP(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	return nil
 }
 
+func checkAzureOpenAIWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+	err := checkAzureOpenAI(rc, config)
+	result := checkResult{
+		name:     "Azure OpenAI Configuration",
+		category: "Configuration",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		result.remediation = []string{
+			"Get Azure OpenAI credentials from Azure Portal",
+			"Edit config.yaml and set azure_openai section:",
+			"  endpoint: https://<resource>.openai.azure.com/",
+			"  api_key: <your-api-key>",
+			"  deployment_name: <your-deployment>",
+			"  api_version: 2024-02-15-preview",
+			"Docs: https://learn.microsoft.com/azure/ai-services/openai/",
+		}
+	} else {
+		result.details = "Azure OpenAI credentials configured"
+	}
+
+	return result
+}
+
 func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
@@ -372,6 +602,33 @@ func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	}
 
 	return nil
+}
+
+func checkSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+	err := checkSMTPConfig(rc, config)
+	result := checkResult{
+		name:     "SMTP Configuration",
+		category: "Configuration",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		result.remediation = []string{
+			"Configure SMTP settings in config.yaml email section:",
+			"  smtp_host: smtp.gmail.com (or your SMTP server)",
+			"  smtp_port: 587 (or 465 for SSL)",
+			"  username: your-email@example.com",
+			"  password: <app-password>",
+			"  from: metis@example.com",
+			"  to: security-team@example.com",
+			"For Gmail: use App Password, not account password",
+		}
+	} else {
+		result.details = "SMTP configuration complete"
+	}
+
+	return result
 }
 
 func checkSMTPConfig(rc *eos_io.RuntimeContext, config *MetisConfig) error {
@@ -395,6 +652,182 @@ func checkSMTPConfig(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	return nil
 }
 
+func checkRecentWorkflowsWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+	err := checkRecentWorkflows(rc, config)
+	result := checkResult{
+		name:     "Temporal CLI",
+		category: "Infrastructure",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		// Run diagnostics to find where Temporal might be
+		diagnostics := findTemporalBinary(rc)
+
+		remediation := []string{
+			"Install Temporal CLI: brew install temporal (macOS)",
+			"Or download from: https://docs.temporal.io/cli",
+			"Or install via script: curl -sSf https://temporal.download/cli.sh | sh",
+		}
+
+		if diagnostics != "" {
+			remediation = append(remediation, "", "Diagnostics found:", diagnostics)
+		} else {
+			remediation = append(remediation, "", "No existing Temporal installation found on system")
+		}
+
+		remediation = append(remediation,
+			"After installing, verify: temporal --version",
+			"Ensure Temporal server is running",
+			"View workflows in UI: http://localhost:8233",
+		)
+
+		result.remediation = remediation
+	} else {
+		result.details = "Temporal CLI available and workflow history accessible"
+	}
+
+	return result
+}
+
+func findTemporalBinary(rc *eos_io.RuntimeContext) string {
+	logger := otelzap.Ctx(rc.Ctx)
+	var findings []string
+
+	// Check common installation locations
+	commonPaths := []string{
+		"/usr/local/bin/temporal",
+		"/usr/bin/temporal",
+		os.ExpandEnv("$HOME/.local/bin/temporal"),
+		os.ExpandEnv("$HOME/.temporalio/bin/temporal"), // Official installer location
+		"/root/.temporalio/bin/temporal",               // Root user installation
+		"/opt/temporal/temporal",
+	}
+
+	for _, path := range commonPaths {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			findings = append(findings, fmt.Sprintf("✓ Found at: %s", path))
+
+			// Check if executable
+			if info.Mode()&0111 == 0 {
+				findings = append(findings, "  ✗ NOT EXECUTABLE")
+				findings = append(findings, fmt.Sprintf("  Fix: sudo chmod +x %s", path))
+			} else {
+				// Binary is executable - check if it's in PATH
+				pathEnv := os.Getenv("PATH")
+				binaryDir := filepath.Dir(path)
+				inPath := false
+
+				for _, dir := range strings.Split(pathEnv, ":") {
+					if dir == binaryDir {
+						inPath = true
+						break
+					}
+				}
+
+				if !inPath {
+					findings = append(findings, fmt.Sprintf("  ✗ NOT IN PATH (directory %s not in PATH)", binaryDir))
+					findings = append(findings, "  This is why 'temporal' command is not found!")
+					findings = append(findings, "")
+					findings = append(findings, "  Quick Fix (works immediately): Create symlink")
+					findings = append(findings, fmt.Sprintf("    sudo ln -s %s /usr/local/bin/temporal", path))
+					findings = append(findings, "")
+					findings = append(findings, "  Permanent Fix (survives reboots): Add to PATH")
+
+					// Detect shell and provide appropriate config file
+					shell := os.Getenv("SHELL")
+					configFile := "~/.bashrc"
+					if strings.Contains(shell, "zsh") {
+						configFile = "~/.zshrc"
+					}
+
+					findings = append(findings, fmt.Sprintf("    echo 'export PATH=\"%s:$PATH\"' >> %s", binaryDir, configFile))
+					findings = append(findings, fmt.Sprintf("    source %s", configFile))
+					findings = append(findings, "")
+					findings = append(findings, "  Alternative: Move binary to system location")
+					findings = append(findings, fmt.Sprintf("    sudo mv %s /usr/local/bin/temporal", path))
+				} else {
+					findings = append(findings, "  ✓ Binary is in PATH and executable")
+				}
+			}
+
+			logger.Debug("Found temporal binary", zap.String("path", path), zap.Uint32("mode", uint32(info.Mode())))
+		}
+	}
+
+	// Search /tmp and /var/tmp for downloaded but not installed binaries
+	tmpDirs := []string{"/tmp", "/var/tmp"}
+	for _, tmpDir := range tmpDirs {
+		findCmd := exec.CommandContext(rc.Ctx, "find", tmpDir, "-name", "*temporal*", "-type", "f", "-maxdepth", "2")
+		if output, err := findCmd.Output(); err == nil && len(output) > 0 {
+			tmpFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
+			if len(tmpFiles) > 0 && tmpFiles[0] != "" {
+				findings = append(findings, fmt.Sprintf("Temporary files found in %s:", tmpDir))
+				for _, file := range tmpFiles {
+					if file != "" {
+						findings = append(findings, fmt.Sprintf("  %s", file))
+					}
+				}
+				findings = append(findings, "  These may be incomplete downloads or extracted archives")
+			}
+		}
+	}
+
+	// Check system-wide search (only if nothing found yet and running as root)
+	if len(findings) == 0 && os.Geteuid() == 0 {
+		logger.Debug("Running system-wide search for temporal binary")
+		findCmd := exec.CommandContext(rc.Ctx, "find", "/", "-name", "temporal", "-type", "f",
+			"-not", "-path", "*/.*", "-not", "-path", "*/go/*", "-maxdepth", "5")
+		if output, err := findCmd.Output(); err == nil && len(output) > 0 {
+			systemFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
+			if len(systemFiles) > 0 && systemFiles[0] != "" {
+				findings = append(findings, "System-wide search found:")
+				for _, file := range systemFiles {
+					if file != "" {
+						findings = append(findings, fmt.Sprintf("  %s", file))
+					}
+				}
+			}
+		}
+	}
+
+	// Check PATH environment variable
+	pathEnv := os.Getenv("PATH")
+	if pathEnv != "" {
+		findings = append(findings, fmt.Sprintf("Current PATH: %s", pathEnv))
+	}
+
+	// Check EOS installation logs for Temporal installation attempts
+	logPath := "/var/log/eos/eos.log"
+	if _, err := os.Stat(logPath); err == nil {
+		grepCmd := exec.CommandContext(rc.Ctx, "grep", "-i", "temporal", logPath)
+		tailCmd := exec.CommandContext(rc.Ctx, "tail", "-30")
+
+		grepCmd.Stdout, _ = tailCmd.StdinPipe()
+		if output, err := tailCmd.Output(); err == nil && len(output) > 0 {
+			if err := grepCmd.Start(); err == nil {
+				grepCmd.Wait()
+				logLines := strings.Split(strings.TrimSpace(string(output)), "\n")
+				if len(logLines) > 0 && logLines[0] != "" {
+					findings = append(findings, "", "Recent Temporal-related log entries:")
+					for _, line := range logLines {
+						if line != "" {
+							findings = append(findings, fmt.Sprintf("  %s", line))
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if len(findings) == 0 {
+		return ""
+	}
+
+	return strings.Join(findings, "\n  ")
+}
+
 func checkRecentWorkflows(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
@@ -414,6 +847,31 @@ func checkRecentWorkflows(rc *eos_io.RuntimeContext, config *MetisConfig) error 
 	}
 
 	return nil
+}
+
+func checkGoDependenciesWithResult(rc *eos_io.RuntimeContext, projectDir string) checkResult {
+	err := checkGoDependencies(rc, projectDir)
+	result := checkResult{
+		name:     "Go Dependencies",
+		category: "Dependencies",
+		passed:   err == nil,
+		error:    err,
+	}
+
+	if err != nil {
+		result.remediation = []string{
+			"Fix worker dependencies: cd /opt/metis/worker && go mod tidy",
+			"Fix webhook dependencies: cd /opt/metis/webhook && go mod tidy",
+			"Download modules: go mod download",
+			"Verify Go installation: go version",
+			"Check module cache: go clean -modcache",
+			"If behind proxy, set GOPROXY environment variable",
+		}
+	} else {
+		result.details = "Worker and webhook dependencies verified"
+	}
+
+	return result
 }
 
 func checkGoDependencies(rc *eos_io.RuntimeContext, projectDir string) error {

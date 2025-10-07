@@ -243,24 +243,287 @@ func checkPrerequisites(rc *eos_io.RuntimeContext) error {
 func installTemporal(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	if _, err := exec.LookPath("temporal"); err == nil {
-		logger.Info("Temporal CLI already installed")
-		return nil
+	// Step 1: Check if Temporal is already accessible
+	logger.Info("Checking if Temporal CLI is installed...")
+	if temporalPath, err := exec.LookPath("temporal"); err == nil {
+		// Verify it actually works
+		versionCmd := exec.CommandContext(rc.Ctx, temporalPath, "--version")
+		if output, err := versionCmd.CombinedOutput(); err == nil {
+			version := strings.TrimSpace(string(output))
+			logger.Info("Temporal CLI already installed and working",
+				zap.String("path", temporalPath),
+				zap.String("version", version))
+			return nil
+		}
+		logger.Warn("Temporal found in PATH but not working", zap.String("path", temporalPath))
 	}
 
-	logger.Info("Installing Temporal CLI")
+	// Step 2: Check common installation locations (might be installed but not in PATH)
+	logger.Info("Checking common Temporal installation locations...")
+	commonPaths := []string{
+		"/usr/local/bin/temporal",
+		"/usr/bin/temporal",
+		os.ExpandEnv("$HOME/.local/bin/temporal"),
+		os.ExpandEnv("$HOME/.temporalio/bin/temporal"),
+		"/root/.temporalio/bin/temporal",
+	}
+
+	for _, path := range commonPaths {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			// Found it! Verify it works
+			versionCmd := exec.CommandContext(rc.Ctx, path, "--version")
+			if output, err := versionCmd.CombinedOutput(); err == nil {
+				version := strings.TrimSpace(string(output))
+				logger.Info("Found working Temporal CLI (not in PATH)",
+					zap.String("path", path),
+					zap.String("version", version))
+
+				// Fix PATH issue by symlinking
+				return fixTemporalPath(rc, path)
+			}
+		}
+	}
+
+	// Step 3: Need to install - detect OS and architecture
+	logger.Info("Temporal CLI not found, will install")
+	goOS, goArch := detectOSAndArch()
+	logger.Info("Detected system architecture",
+		zap.String("os", goOS),
+		zap.String("arch", goArch))
+
+	// Step 4: Download and install using official installer
+	logger.Info("Downloading Temporal CLI installer...")
+	logger.Info("This may take a minute for the ~40MB download")
+
+	// Use the official install script with explicit error handling
 	installCmd := exec.CommandContext(rc.Ctx, "sh", "-c",
 		"curl -sSf https://temporal.download/cli.sh | sh")
-	if output, err := installCmd.CombinedOutput(); err != nil {
-		logger.Warn("Temporal CLI installation failed - you may need to install manually",
+
+	// Capture output for debugging
+	output, err := installCmd.CombinedOutput()
+	outputStr := strings.TrimSpace(string(output))
+
+	if err != nil {
+		logger.Error("Temporal CLI installation failed",
 			zap.Error(err),
-			zap.String("output", string(output)))
-		logger.Info("terminal prompt: Install Temporal manually: https://docs.temporal.io/cli")
-		return nil // Don't fail - user can install manually
+			zap.String("output", outputStr))
+
+		// Provide actionable error message
+		return fmt.Errorf(`Temporal CLI installation failed
+
+Problem: Installation script returned error
+Output: %s
+Error: %w
+
+This could mean:
+1. No internet connection or firewall blocking https://temporal.download
+2. Installation script has changed or is temporarily unavailable
+3. Insufficient disk space in download directory
+4. Permissions issue writing to installation directory
+
+To fix:
+1. Check internet: curl -I https://temporal.download/cli.sh
+2. Try manual install:
+   curl -sSf https://temporal.download/cli.sh | sh
+3. Or download from GitHub releases:
+   https://github.com/temporalio/cli/releases
+4. Ensure /usr/local/bin is writable or use sudo
+
+After manual install, verify with: temporal --version`,
+			outputStr, err)
 	}
 
-	logger.Info("Temporal CLI installed successfully")
+	// Log installation output for diagnostics
+	if outputStr != "" {
+		logger.Info("Installation output", zap.String("output", outputStr))
+	}
+
+	// Step 5: CRITICAL - Verify installation succeeded
+	logger.Info("Verifying Temporal CLI installation...")
+
+	// Check all possible locations again
+	var workingPath string
+	var version string
+
+	// First try PATH
+	if temporalPath, err := exec.LookPath("temporal"); err == nil {
+		versionCmd := exec.CommandContext(rc.Ctx, temporalPath, "--version")
+		if output, err := versionCmd.CombinedOutput(); err == nil {
+			workingPath = temporalPath
+			version = strings.TrimSpace(string(output))
+		}
+	}
+
+	// If not in PATH, check common locations
+	if workingPath == "" {
+		for _, path := range commonPaths {
+			if info, err := os.Stat(path); err == nil && !info.IsDir() {
+				versionCmd := exec.CommandContext(rc.Ctx, path, "--version")
+				if output, err := versionCmd.CombinedOutput(); err == nil {
+					workingPath = path
+					version = strings.TrimSpace(string(output))
+					break
+				}
+			}
+		}
+	}
+
+	if workingPath == "" {
+		return fmt.Errorf(`Temporal CLI installation verification failed
+
+Problem: Installation script completed but 'temporal' command not found
+
+Checked locations:
+- All directories in PATH: %s
+- Common locations: /usr/local/bin, /usr/bin, ~/.local/bin, ~/.temporalio/bin
+
+This usually means:
+1. Installation script succeeded but installed to unexpected location
+2. Installation directory is not in PATH
+3. Installation script failed silently
+
+To debug:
+1. Search for temporal binary: sudo find / -name temporal -type f 2>/dev/null
+2. Check installation logs above for clues
+3. Try manual installation: https://docs.temporal.io/cli
+
+If you find the binary, add its directory to PATH:
+  export PATH="/path/to/temporal/dir:$PATH"
+  echo 'export PATH="/path/to/temporal/dir:$PATH"' >> ~/.bashrc`,
+			os.Getenv("PATH"))
+	}
+
+	// Step 6: Binary found - check if it needs PATH fixing
+	logger.Info("Temporal CLI installed successfully",
+		zap.String("path", workingPath),
+		zap.String("version", version))
+
+	// If not in PATH, fix it
+	if _, err := exec.LookPath("temporal"); err != nil {
+		logger.Warn("Temporal installed but not in PATH, fixing...")
+		return fixTemporalPath(rc, workingPath)
+	}
+
+	logger.Info("Temporal CLI is ready to use")
 	return nil
+}
+
+func fixTemporalPath(rc *eos_io.RuntimeContext, temporalPath string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if /usr/local/bin is in PATH
+	pathEnv := os.Getenv("PATH")
+	hasUsrLocalBin := false
+	for _, dir := range strings.Split(pathEnv, ":") {
+		if dir == "/usr/local/bin" {
+			hasUsrLocalBin = true
+			break
+		}
+	}
+
+	if !hasUsrLocalBin {
+		return fmt.Errorf(`Temporal CLI found at %s but /usr/local/bin not in PATH
+
+Cannot create symlink because /usr/local/bin is not in your PATH.
+
+Your PATH: %s
+
+Fix Option 1 (Recommended): Add binary directory to PATH
+  echo 'export PATH="%s:$PATH"' >> ~/.bashrc
+  source ~/.bashrc
+
+Fix Option 2: Add /usr/local/bin to PATH
+  echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+  source ~/.bashrc
+  Then re-run: eos create metis`,
+			temporalPath, pathEnv, filepath.Dir(temporalPath))
+	}
+
+	// Create symlink in /usr/local/bin
+	symlinkPath := "/usr/local/bin/temporal"
+
+	// Check if symlink already exists
+	if existing, err := os.Readlink(symlinkPath); err == nil {
+		if existing == temporalPath {
+			logger.Info("Symlink already exists and is correct",
+				zap.String("symlink", symlinkPath),
+				zap.String("target", temporalPath))
+			return nil
+		}
+		logger.Warn("Symlink exists but points to different location",
+			zap.String("symlink", symlinkPath),
+			zap.String("existing_target", existing),
+			zap.String("desired_target", temporalPath))
+	}
+
+	// Try to create symlink
+	logger.Info("Creating symlink to make temporal accessible",
+		zap.String("symlink", symlinkPath),
+		zap.String("target", temporalPath))
+
+	if err := os.Symlink(temporalPath, symlinkPath); err != nil {
+		// If permission denied, provide helpful error
+		if os.IsPermission(err) {
+			return fmt.Errorf(`Cannot create symlink (permission denied)
+
+Problem: Need root access to create symlink in /usr/local/bin
+
+Temporal installed at: %s
+Need symlink at: %s
+
+Fix Option 1 (Quick): Create symlink with sudo
+  sudo ln -s %s %s
+
+Fix Option 2 (Permanent): Add to PATH
+  echo 'export PATH="%s:$PATH"' >> ~/.bashrc
+  source ~/.bashrc
+
+After fixing, verify with: temporal --version`,
+				temporalPath, symlinkPath, temporalPath, symlinkPath, filepath.Dir(temporalPath))
+		}
+
+		return fmt.Errorf("failed to create symlink: %w", err)
+	}
+
+	// Verify symlink works
+	versionCmd := exec.CommandContext(rc.Ctx, "temporal", "--version")
+	if output, err := versionCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("symlink created but temporal command still not working: %w\nOutput: %s", err, string(output))
+	}
+
+	logger.Info("Symlink created successfully - temporal command is now available")
+	return nil
+}
+
+func detectOSAndArch() (string, string) {
+	// Use Go's runtime to detect OS and arch
+	// This matches what Temporal's install script does
+	goOS := os.Getenv("GOOS")
+	if goOS == "" {
+		goOS = "linux" // Default assumption for eos
+	}
+
+	goArch := os.Getenv("GOARCH")
+	if goArch == "" {
+		// Try to detect from `uname -m`
+		if unameCmd := exec.Command("uname", "-m"); true {
+			if output, err := unameCmd.Output(); err == nil {
+				machine := strings.TrimSpace(string(output))
+				switch machine {
+				case "x86_64", "amd64":
+					goArch = "amd64"
+				case "aarch64", "arm64":
+					goArch = "arm64"
+				case "armv7l":
+					goArch = "arm"
+				default:
+					goArch = "amd64" // Default
+				}
+			}
+		}
+	}
+
+	return goOS, goArch
 }
 
 func createProjectStructure(rc *eos_io.RuntimeContext, projectDir string) error {
