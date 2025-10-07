@@ -11,9 +11,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -85,6 +83,9 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	results := []checkResult{}
 
 	// Run all checks
+	// Load configuration first (needed by other checks)
+	config, configResult := checkConfigurationWithResult(rc, projectDir)
+
 	// Infrastructure checks
 	results = append(results, checkProjectStructureWithResult(rc, projectDir))
 	results = append(results, checkTemporalCLIWithResult(rc))
@@ -93,7 +94,6 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	results = append(results, checkTemporalServerHealthDeepWithResult(rc, config)) // NEW: Phase 1 (replaces old check)
 
 	// Configuration checks
-	config, configResult := checkConfigurationWithResult(rc, projectDir)
 	results = append(results, configResult)
 	results = append(results, checkAzureOpenAIWithResult(rc, config))
 	results = append(results, checkSMTPConfigWithResult(rc, config))
