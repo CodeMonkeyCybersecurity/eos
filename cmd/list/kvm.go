@@ -112,12 +112,12 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 	table := tablewriter.NewWriter(os.Stdout)
 
 	if showUsage {
-		table.Header("NAME", "STATE", "CPU%", "MEM_USED", "MEM_TOTAL", "DISK_USED", "DISK_TOTAL", "IPS")
+		table.Header("NAME", "STATE", "LOAD", "MEM_USED", "MEM_TOTAL", "DISK_USED", "DISK_TOTAL", "IPS")
 
 		for _, vm := range vms {
-			cpuUsage := "N/A"
-			if vm.State == "running" && vm.CPUUsagePercent > 0 {
-				cpuUsage = fmt.Sprintf("%.1f%%", vm.CPUUsagePercent)
+			loadAvg := "N/A"
+			if vm.GuestAgentOK && vm.CPUUsagePercent > 0 {
+				loadAvg = fmt.Sprintf("%.2f", vm.CPUUsagePercent)
 			}
 
 			memUsed := "N/A"
@@ -148,7 +148,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 			table.Append(
 				vm.Name,
 				vm.State,
-				cpuUsage,
+				loadAvg,
 				memUsed,
 				memTotal,
 				diskUsed,

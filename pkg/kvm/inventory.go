@@ -94,8 +94,7 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string) (VMInfo, error) {
 		vm.GuestAgentOK = checkGuestAgent(domain)
 		vm.NetworkIPs = getVMIPs(domain)
 
-		// Get resource usage stats
-		vm.CPUUsagePercent = getVMCPUUsage(domain)
+		// Get memory usage (works without guest agent)
 		vm.MemoryUsageMB = getVMMemoryUsage(domain)
 
 		// Get OS info, Consul status, and updates status if guest agent is available
@@ -104,6 +103,7 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string) (VMInfo, error) {
 			vm.ConsulAgent = checkConsulAgent(domain)
 			vm.UpdatesNeeded = checkUpdatesNeeded(domain)
 			vm.DiskUsageGB = getVMDiskUsage(domain)
+			vm.CPUUsagePercent = getVMLoadAverage(domain) // Load average, not CPU%
 		}
 	}
 
@@ -675,29 +675,64 @@ func getVMDiskUsage(domain *libvirt.Domain) int {
 	return 0
 }
 
-// getVMCPUUsage gets current CPU usage percentage
-func getVMCPUUsage(domain *libvirt.Domain) float64 {
-	// Get domain stats for CPU info
-	stats, err := domain.GetStats(libvirt.DOMAIN_STATS_CPU_TOTAL, 0)
-	if err != nil || len(stats) == 0 {
-		return 0.0
-	}
-
-	// Try to get vcpu stats
-	vcpuStats, err := domain.GetVcpus()
+// getVMLoadAverage gets the 1-minute load average via guest agent
+func getVMLoadAverage(domain *libvirt.Domain) float64 {
+	// Execute uptime command to get load average
+	cmd := `{"execute":"guest-exec","arguments":{"path":"/usr/bin/uptime","capture-output":true}}`
+	result, err := domain.QemuAgentCommand(
+		cmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
 	if err != nil {
 		return 0.0
 	}
 
-	// Calculate total CPU time across all vCPUs
-	var totalCPUTime uint64
-	for _, vcpu := range vcpuStats {
-		totalCPUTime += vcpu.CpuTime
+	var execResponse struct {
+		Return struct {
+			PID int `json:"pid"`
+		} `json:"return"`
 	}
 
-	// This is cumulative CPU time, not current usage
-	// For current usage, we'd need to sample twice with a time delta
-	// For now, return 0 as this requires more complex tracking
+	if err := json.Unmarshal([]byte(result), &execResponse); err != nil {
+		return 0.0
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	statusCmd := fmt.Sprintf(`{"execute":"guest-exec-status","arguments":{"pid":%d}}`, execResponse.Return.PID)
+	statusResult, err := domain.QemuAgentCommand(
+		statusCmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+	if err != nil {
+		return 0.0
+	}
+
+	// Parse uptime output to extract load average
+	var statusResponse struct {
+		Return struct {
+			OutData string `json:"out-data"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(statusResult), &statusResponse); err != nil {
+		return 0.0
+	}
+
+	// Parse load average from uptime output
+	// Example: " 14:23:45 up 2 days,  3:45,  2 users,  load average: 0.52, 0.58, 0.59"
+	output := statusResponse.Return.OutData
+	loadAvgRegex := regexp.MustCompile(`load average:\s+([0-9.]+)`)
+	matches := loadAvgRegex.FindStringSubmatch(output)
+	if len(matches) > 1 {
+		var loadAvg float64
+		if _, err := fmt.Sscanf(matches[1], "%f", &loadAvg); err == nil {
+			return loadAvg
+		}
+	}
+
 	return 0.0
 }
 
