@@ -99,6 +99,7 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	results = append(results, checkSMTPConfigWithResult(rc, config))
 
 	// Services checks
+	results = append(results, checkSystemdServicesWithResult(rc))      // NEW: Check systemd units exist and status
 	results = append(results, checkWorkerProcessHealthWithResult(rc))  // NEW: Phase 1 (enhanced)
 	results = append(results, checkWebhookServerHealthWithResult(rc, config)) // NEW: Phase 1 (enhanced)
 	results = append(results, checkRecentWorkflowsWithResult(rc, config))
@@ -187,8 +188,15 @@ func displayDiagnosticResults(results []checkResult) {
 		for _, check := range checks {
 			if check.passed {
 				fmt.Printf("│  ✓ %s\n", check.name)
-				if verbose && check.details != "" {
-					fmt.Printf("│    %s\n", check.details)
+				// Show details if verbose OR if details contain structured info
+				if check.details != "" && (verbose || strings.Contains(check.details, "✓") || strings.Contains(check.details, "✗")) {
+					// Indent multi-line details
+					detailLines := strings.Split(check.details, "\n")
+					for _, line := range detailLines {
+						if line != "" {
+							fmt.Printf("│    %s\n", line)
+						}
+					}
 				}
 			} else {
 				fmt.Printf("│  ✗ %s\n", check.name)
@@ -205,16 +213,31 @@ func displayDiagnosticResults(results []checkResult) {
 		fmt.Println("╚════════════════════════════════════════════════════════════════╝")
 		fmt.Println()
 
-		for i, r := range results {
+		issueNum := 1
+		for _, r := range results {
 			if !r.passed {
-				fmt.Printf("Issue %d: %s\n", i+1, r.name)
+				fmt.Printf("Issue %d: %s\n", issueNum, r.name)
 				fmt.Printf("Problem: %v\n", r.error)
+
+				// Show details if available
+				if r.details != "" {
+					fmt.Println()
+					fmt.Println("Details:")
+					detailLines := strings.Split(r.details, "\n")
+					for _, line := range detailLines {
+						if line != "" {
+							fmt.Printf("  %s\n", line)
+						}
+					}
+				}
+
 				fmt.Println()
 				fmt.Println("Solutions:")
 				for _, remedy := range r.remediation {
 					fmt.Printf("  • %s\n", remedy)
 				}
 				fmt.Println()
+				issueNum++
 			}
 		}
 
@@ -577,59 +600,88 @@ func checkBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) checkResult {
 func checkPortStatusWithResult(rc *eos_io.RuntimeContext) checkResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	ports := map[int]string{
-		7233: "Temporal gRPC",
-		8233: "Temporal UI",
-		8080: "Metis Webhook",
+	ports := []struct {
+		port    int
+		service string
+	}{
+		{7233, "Temporal gRPC"},
+		{8233, "Temporal UI"},
+		{8080, "Metis Webhook"},
 	}
 
-	var issues []string
-	var details []string
+	var listening []string
+	var notListening []string
+	var allDetails []string
 
-	for port, service := range ports {
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 2*time.Second)
+	for _, p := range ports {
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", p.port), 2*time.Second)
 		if err != nil {
-			issues = append(issues, fmt.Sprintf("Port %d (%s) not listening", port, service))
+			notListening = append(notListening, fmt.Sprintf("%d (%s)", p.port, p.service))
+			allDetails = append(allDetails, fmt.Sprintf("  ✗ Port %d (%s): not listening", p.port, p.service))
+			logger.Debug("Port not listening",
+				zap.Int("port", p.port),
+				zap.String("service", p.service))
 			continue
 		}
 		conn.Close()
 
-		// Check what process is using it
-		cmd := exec.CommandContext(rc.Ctx, "lsof", "-i", fmt.Sprintf(":%d", port), "-t")
+		// Get process info using lsof
+		cmd := exec.CommandContext(rc.Ctx, "lsof", "-i", fmt.Sprintf(":%d", p.port), "-t")
 		output, err := cmd.Output()
+
+		var processInfo string
 		if err == nil && len(output) > 0 {
 			pid := strings.TrimSpace(string(output))
 			// Get process name
 			cmdName := exec.CommandContext(rc.Ctx, "ps", "-p", pid, "-o", "comm=")
 			processName, _ := cmdName.Output()
-			details = append(details, fmt.Sprintf("Port %d (%s): PID %s (%s)", port, service, pid, strings.TrimSpace(string(processName))))
+			processInfo = fmt.Sprintf("PID %s (%s)", pid, strings.TrimSpace(string(processName)))
+
+			logger.Debug("Port listening",
+				zap.Int("port", p.port),
+				zap.String("service", p.service),
+				zap.String("process", processInfo))
 		} else {
-			details = append(details, fmt.Sprintf("Port %d (%s): listening", port, service))
+			processInfo = "unknown process"
+			logger.Warn("Port listening but could not identify process",
+				zap.Int("port", p.port))
 		}
+
+		listening = append(listening, fmt.Sprintf("%d (%s)", p.port, p.service))
+		allDetails = append(allDetails, fmt.Sprintf("  ✓ Port %d (%s): %s", p.port, p.service, processInfo))
 	}
 
-	if len(issues) > 0 {
-		// Not all ports listening - this might be okay if services aren't started yet
-		logger.Debug("Port status check", zap.Strings("issues", issues))
+	// Always show all details
+	detailsText := strings.Join(allDetails, "\n")
+
+	if len(notListening) > 0 {
+		logger.Debug("Port status check failed",
+			zap.Strings("not_listening", notListening),
+			zap.Strings("listening", listening))
+
+		// Don't suggest systemctl unless we know services exist
+		// That will be checked by checkSystemdServicesWithResult
 		return checkResult{
 			name:     "Port Status",
 			category: "Infrastructure",
 			passed:   false,
-			error:    fmt.Errorf("%s", strings.Join(issues, "; ")),
+			error:    fmt.Errorf("%d ports not listening", len(notListening)),
 			remediation: []string{
-				"Start Temporal: sudo systemctl start temporal",
-				"Start Metis services: sudo systemctl start metis-worker metis-webhook",
-				"Or run manually: cd /opt/metis/worker && go run main.go",
+				"Check if services are installed: systemctl list-units 'metis*' 'temporal*'",
+				"If services exist but stopped: see 'Systemd Services' check for start commands",
+				"If services don't exist: run 'eos create metis' or 'eos repair metis'",
 			},
-			details: strings.Join(details, "; "),
+			details: detailsText,
 		}
 	}
+
+	logger.Debug("All ports listening", zap.Strings("ports", listening))
 
 	return checkResult{
 		name:     "Port Status",
 		category: "Infrastructure",
 		passed:   true,
-		details:  strings.Join(details, "\n"),
+		details:  detailsText,
 	}
 }
 
@@ -653,55 +705,128 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 		hostPort = "localhost:7233"
 	}
 
-	// Step 1: Check if port is listening
+	var healthDetails []string
+
+	// Step 1: Check if gRPC port is listening
 	conn, err := net.DialTimeout("tcp", hostPort, 2*time.Second)
 	if err != nil {
+		logger.Error("Temporal gRPC port not listening",
+			zap.String("hostPort", hostPort),
+			zap.Error(err))
+
+		// Check systemd status
+		statusCmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", "temporal")
+		statusOut, _ := statusCmd.Output()
+		systemdStatus := strings.TrimSpace(string(statusOut))
+
+		remediation := []string{
+			"Check if systemd service exists: systemctl list-unit-files temporal.service",
+		}
+
+		if systemdStatus == "inactive" || systemdStatus == "failed" {
+			remediation = append(remediation,
+				"Service exists but not running: sudo systemctl start temporal",
+				"Check logs: sudo journalctl -u temporal -n 50")
+		} else if systemdStatus == "" {
+			remediation = append(remediation,
+				"Service not installed: eos create metis or eos repair metis",
+				"Or start manually: temporal server start-dev")
+		}
+
+		remediation = append(remediation,
+			"Check if port is in use by another process: lsof -i :7233")
+
 		return checkResult{
 			name:     "Temporal Server Health",
 			category: "Infrastructure",
 			passed:   false,
-			error:    fmt.Errorf("port %s not listening: %w", hostPort, err),
-			remediation: []string{
-				"Start Temporal server: sudo systemctl start temporal",
-				"Or manually: temporal server start-dev",
-				"Check if port is in use: lsof -i :7233",
-				"View logs: sudo journalctl -u temporal -n 50",
-			},
+			error:    fmt.Errorf("port %s not listening", hostPort),
+			remediation: remediation,
+			details:  fmt.Sprintf("systemd status: %s", systemdStatus),
 		}
 	}
 	conn.Close()
-	logger.Debug("Port is listening", zap.String("hostPort", hostPort))
+	logger.Debug("Temporal gRPC port listening", zap.String("hostPort", hostPort))
+	healthDetails = append(healthDetails, fmt.Sprintf("  ✓ gRPC port %s: listening", hostPort))
 
-	// Step 2: Try HTTP health check
+	// Step 2: Check Temporal UI HTTP endpoint
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
 	defer cancel()
 
-	// Try the UI endpoint first (more reliable than gRPC health check without Temporal SDK)
 	uiHost := strings.Replace(hostPort, ":7233", ":8233", 1)
 	healthURL := fmt.Sprintf("http://%s/", uiHost)
 	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
 	if err != nil {
-		logger.Warn("Could not create HTTP request", zap.Error(err))
+		logger.Warn("Could not create HTTP request for UI", zap.Error(err))
+		healthDetails = append(healthDetails, "  ⚠ UI endpoint: could not test")
 	} else {
 		client := &http.Client{Timeout: 3 * time.Second}
 		resp, err := client.Do(req)
-		if err == nil {
-			defer resp.Body.Close()
-			logger.Debug("Temporal UI is accessible", zap.Int("status", resp.StatusCode))
+		if err != nil {
+			logger.Warn("Temporal UI not accessible", zap.Error(err))
+			healthDetails = append(healthDetails, fmt.Sprintf("  ⚠ UI endpoint %s: not accessible", healthURL))
 		} else {
-			logger.Debug("Temporal UI not accessible", zap.Error(err))
+			defer resp.Body.Close()
+			logger.Debug("Temporal UI accessible", zap.Int("status", resp.StatusCode))
+			healthDetails = append(healthDetails, fmt.Sprintf("  ✓ UI endpoint %s: accessible (HTTP %d)", healthURL, resp.StatusCode))
 		}
 	}
 
-	// Step 3: Try to run temporal CLI command as verification
+	// Step 3: API health check via HTTP API (preferred over CLI)
+	// Temporal exposes health endpoint at gRPC port via HTTP/1.1
+	apiHealthURL := fmt.Sprintf("http://%s/health", hostPort)
+	apiReq, err := http.NewRequestWithContext(ctx, "GET", apiHealthURL, nil)
+	if err == nil {
+		client := &http.Client{Timeout: 3 * time.Second}
+		apiResp, err := client.Do(apiReq)
+		if err == nil {
+			defer apiResp.Body.Close()
+			if apiResp.StatusCode == http.StatusOK {
+				logger.Debug("Temporal API health check passed", zap.Int("status", apiResp.StatusCode))
+				healthDetails = append(healthDetails, "  ✓ API health endpoint: OK")
+			} else {
+				logger.Warn("Temporal API health check returned non-200", zap.Int("status", apiResp.StatusCode))
+				healthDetails = append(healthDetails, fmt.Sprintf("  ⚠ API health endpoint: HTTP %d", apiResp.StatusCode))
+			}
+		} else {
+			logger.Debug("API health endpoint not available, trying CLI", zap.Error(err))
+			healthDetails = append(healthDetails, "  ⚠ API health endpoint: not available")
+		}
+	}
+
+	// Step 4: Fallback to CLI health check (if API not available)
 	cmd := exec.CommandContext(rc.Ctx, "temporal", "operator", "cluster", "health")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		logger.Error("Temporal health check failed",
+			zap.String("output", string(output)),
+			zap.Error(err))
+
+		// Check journalctl for recent errors
+		journalCmd := exec.CommandContext(rc.Ctx, "journalctl", "-u", "temporal", "-n", "10", "--no-pager")
+		journalOut, _ := journalCmd.Output()
+
+		var logErrors []string
+		if len(journalOut) > 0 {
+			lines := strings.Split(string(journalOut), "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "error") || strings.Contains(line, "Error") || strings.Contains(line, "ERROR") {
+					logErrors = append(logErrors, line)
+					logger.Warn("Error in temporal logs", zap.String("line", line))
+				}
+			}
+		}
+
+		detailsText := strings.Join(healthDetails, "\n")
+		if len(logErrors) > 0 {
+			detailsText += "\n\nRecent errors in logs:\n" + strings.Join(logErrors, "\n")
+		}
+
 		return checkResult{
 			name:     "Temporal Server Health",
 			category: "Infrastructure",
 			passed:   false,
-			error:    fmt.Errorf("server listening but not responding correctly: %s", string(output)),
+			error:    fmt.Errorf("server listening but health check failed: %s", string(output)),
 			remediation: []string{
 				"Server might be starting up - wait 30 seconds and retry",
 				"Check logs: sudo journalctl -u temporal -n 50",
@@ -709,16 +834,18 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 				"Check for port conflicts: lsof -i :7233",
 				"Verify process is healthy: ps aux | grep temporal",
 			},
+			details: detailsText,
 		}
 	}
 
 	logger.Debug("Temporal server health check passed", zap.String("output", string(output)))
+	healthDetails = append(healthDetails, "  ✓ CLI health check: passed")
 
 	return checkResult{
 		name:     "Temporal Server Health",
 		category: "Infrastructure",
 		passed:   true,
-		details:  fmt.Sprintf("Server healthy at %s", hostPort),
+		details:  strings.Join(healthDetails, "\n"),
 	}
 }
 
@@ -866,6 +993,135 @@ func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *Metis
 		category: "Services",
 		passed:   true,
 		details:  details,
+	}
+}
+
+func checkSystemdServicesWithResult(rc *eos_io.RuntimeContext) checkResult {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	services := []string{"temporal", "metis-worker", "metis-webhook"}
+
+	var missing []string
+	var inactive []string
+	var failed []string
+	var active []string
+	var allDetails []string
+
+	for _, svc := range services {
+		// Check if unit file exists
+		checkCmd := exec.CommandContext(rc.Ctx, "systemctl", "list-unit-files", svc+".service")
+		checkOut, err := checkCmd.Output()
+
+		if err != nil || !strings.Contains(string(checkOut), svc) {
+			missing = append(missing, svc)
+			allDetails = append(allDetails, fmt.Sprintf("  ✗ %s: unit file not found", svc))
+			logger.Debug("Systemd unit not found", zap.String("service", svc))
+			continue
+		}
+
+		// Check service status
+		statusCmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", svc)
+		output, err := statusCmd.Output()
+		status := strings.TrimSpace(string(output))
+
+		logger.Debug("Systemd service status",
+			zap.String("service", svc),
+			zap.String("status", status))
+
+		switch status {
+		case "active":
+			active = append(active, svc)
+			allDetails = append(allDetails, fmt.Sprintf("  ✓ %s: active", svc))
+
+			// Get additional details with systemctl show
+			showCmd := exec.CommandContext(rc.Ctx, "systemctl", "show", svc, "-p", "MainPID,ActiveEnterTimestamp")
+			showOut, _ := showCmd.Output()
+			logger.Debug("Service details", zap.String("service", svc), zap.String("details", string(showOut)))
+
+		case "inactive":
+			inactive = append(inactive, svc)
+			allDetails = append(allDetails, fmt.Sprintf("  ⚠ %s: inactive (stopped)", svc))
+
+		case "failed":
+			failed = append(failed, svc)
+			allDetails = append(allDetails, fmt.Sprintf("  ✗ %s: failed", svc))
+
+			// Get failure reason from journalctl
+			journalCmd := exec.CommandContext(rc.Ctx, "journalctl", "-u", svc, "-n", "5", "--no-pager")
+			journalOut, _ := journalCmd.Output()
+			if len(journalOut) > 0 {
+				logger.Warn("Service failed, recent logs",
+					zap.String("service", svc),
+					zap.String("logs", string(journalOut)))
+			}
+
+		default:
+			// activating, deactivating, etc
+			inactive = append(inactive, svc)
+			allDetails = append(allDetails, fmt.Sprintf("  ⚠ %s: %s", svc, status))
+		}
+	}
+
+	detailsText := strings.Join(allDetails, "\n")
+
+	// Handle missing services (not installed)
+	if len(missing) > 0 {
+		logger.Warn("Systemd services not installed", zap.Strings("missing", missing))
+		return checkResult{
+			name:     "Systemd Services",
+			category: "Services",
+			passed:   false,
+			error:    fmt.Errorf("service units not installed: %s", strings.Join(missing, ", ")),
+			remediation: []string{
+				"Install services: eos create metis",
+				"Or manually install: eos repair metis --auto-yes",
+				"Services should be installed to: /etc/systemd/system/",
+			},
+			details: detailsText,
+		}
+	}
+
+	// Handle inactive/failed services
+	if len(inactive) > 0 || len(failed) > 0 {
+		var problemServices []string
+		problemServices = append(problemServices, inactive...)
+		problemServices = append(problemServices, failed...)
+
+		logger.Warn("Systemd services not running",
+			zap.Strings("inactive", inactive),
+			zap.Strings("failed", failed))
+
+		remediation := []string{
+			fmt.Sprintf("Start services: sudo systemctl start %s", strings.Join(problemServices, " ")),
+		}
+
+		// Add service-specific remediation
+		for _, svc := range failed {
+			remediation = append(remediation,
+				fmt.Sprintf("Check %s logs: sudo journalctl -u %s -n 50", svc, svc))
+		}
+
+		remediation = append(remediation,
+			"Check status: sudo systemctl status "+strings.Join(problemServices, " "))
+
+		return checkResult{
+			name:     "Systemd Services",
+			category: "Services",
+			passed:   false,
+			error:    fmt.Errorf("%d services not active", len(problemServices)),
+			remediation: remediation,
+			details: detailsText,
+		}
+	}
+
+	// All services active
+	logger.Debug("All systemd services active", zap.Strings("services", active))
+
+	return checkResult{
+		name:     "Systemd Services",
+		category: "Services",
+		passed:   true,
+		details:  detailsText,
 	}
 }
 
