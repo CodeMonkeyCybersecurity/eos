@@ -5,6 +5,7 @@ package kvm
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,6 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 	"libvirt.org/go/libvirt"
 )
 
@@ -20,7 +24,9 @@ import (
 var hostQEMUVersionCache string
 
 // ListVMs returns all VMs with their information
-func ListVMs(ctx context.Context) ([]VMInfo, error) {
+func ListVMs(rc *eos_io.RuntimeContext) ([]VMInfo, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	conn, err := libvirt.NewConnect("qemu:///system")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to libvirt: %w", err)
@@ -37,9 +43,10 @@ func ListVMs(ctx context.Context) ([]VMInfo, error) {
 
 	var vms []VMInfo
 	for _, domain := range domains {
-		vm, err := getVMInfo(&domain, hostQEMUVersion)
+		vm, err := getVMInfo(&domain, hostQEMUVersion, logger)
 		if err != nil {
 			// Log error but continue with other VMs
+			logger.Warn("Failed to get VM info", zap.Error(err))
 			continue
 		}
 		vms = append(vms, vm)
@@ -50,7 +57,7 @@ func ListVMs(ctx context.Context) ([]VMInfo, error) {
 }
 
 // getVMInfo extracts comprehensive information from a domain
-func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string) (VMInfo, error) {
+func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string, logger otelzap.LoggerWithCtx) (VMInfo, error) {
 	vm := VMInfo{}
 
 	// Get basic info
@@ -59,6 +66,8 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string) (VMInfo, error) {
 		return vm, err
 	}
 	vm.Name = name
+
+	logger.Debug("Processing VM", zap.String("vm_name", name))
 
 	uuid, err := domain.GetUUIDString()
 	if err == nil {
@@ -93,16 +102,34 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string) (VMInfo, error) {
 		vm.GuestAgentOK = checkGuestAgent(domain)
 		vm.NetworkIPs = getVMIPs(domain)
 
-		// Get memory usage (works without guest agent)
-		vm.MemoryUsageMB = getVMMemoryUsage(domain)
+		// Get memory usage with balloon statistics
+		usedMB, availableMB, balloonMB := getVMMemoryUsage(domain, logger)
+		vm.MemoryUsageMB = usedMB
+		logger.Debug("Memory stats",
+			zap.String("vm", name),
+			zap.Int("used_mb", usedMB),
+			zap.Int("available_mb", availableMB),
+			zap.Int("balloon_mb", balloonMB),
+			zap.Int("allocated_mb", vm.MemoryMB))
+
+		// Get CPU usage percentage (requires 1-second sampling)
+		vm.CPUUsagePercent = getVMCPUUsage(domain, logger)
 
 		// Get OS info, Consul status, and updates status if guest agent is available
 		if vm.GuestAgentOK {
 			vm.OSInfo = getVMOSInfo(domain)
 			vm.ConsulAgent = checkConsulAgent(domain)
 			vm.UpdatesNeeded = checkUpdatesNeeded(domain)
-			vm.DiskUsageGB = getVMDiskUsage(domain)
-			vm.CPUUsagePercent = getVMLoadAverage(domain) // Load average, not CPU%
+
+			// Get disk usage percentage
+			usedGB, totalGB := getVMDiskUsagePercent(domain, logger)
+			vm.DiskUsageGB = usedGB
+			vm.DiskTotalGB = totalGB
+			logger.Debug("Disk usage",
+				zap.String("vm", name),
+				zap.Int("used_gb", usedGB),
+				zap.Int("total_gb", totalGB),
+				zap.Int("allocated_gb", vm.DiskSizeGB))
 		}
 	}
 
@@ -417,7 +444,9 @@ func FilterVMsWithDrift(vms []VMInfo) []VMInfo {
 
 // GetVMByName finds a specific VM by name
 func GetVMByName(ctx context.Context, name string) (*VMInfo, error) {
-	vms, err := ListVMs(ctx)
+	// Create RuntimeContext for ListVMs
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+	vms, err := ListVMs(rc)
 	if err != nil {
 		return nil, err
 	}
@@ -692,43 +721,6 @@ func getVMDiskSize(domain *libvirt.Domain) int {
 	return sizeGB
 }
 
-// getVMDiskUsage gets the used disk space in GB via guest agent
-func getVMDiskUsage(domain *libvirt.Domain) int {
-	// Use guest-get-fsinfo to get filesystem info
-	result, err := domain.QemuAgentCommand(
-		`{"execute":"guest-get-fsinfo"}`,
-		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
-		0,
-	)
-	if err != nil {
-		return 0
-	}
-
-	// Parse response to find root filesystem
-	var response struct {
-		Return []struct {
-			Name       string `json:"name"`
-			Mountpoint string `json:"mountpoint"`
-			Type       string `json:"type"`
-			UsedBytes  int64  `json:"used-bytes"`
-			TotalBytes int64  `json:"total-bytes"`
-		} `json:"return"`
-	}
-
-	if err := json.Unmarshal([]byte(result), &response); err != nil {
-		return 0
-	}
-
-	// Find root filesystem and return used space
-	for _, fs := range response.Return {
-		if fs.Mountpoint == "/" {
-			return int(fs.UsedBytes / (1024 * 1024 * 1024))
-		}
-	}
-
-	return 0
-}
-
 // getVMLoadAverage gets the 1-minute load average via guest agent
 func getVMLoadAverage(domain *libvirt.Domain) float64 {
 	// Execute uptime command to get load average
@@ -794,24 +786,295 @@ func getVMLoadAverage(domain *libvirt.Domain) float64 {
 	return 0.0
 }
 
-// getVMMemoryUsage gets current memory usage in MB
-func getVMMemoryUsage(domain *libvirt.Domain) int {
-	// Get memory stats
-	memStats, err := domain.MemoryStats(11, 0) // 11 = all stats
-	if err != nil {
-		return 0
+// getVMMemoryUsage gets current memory usage in MB using balloon statistics
+// Returns: usedMB, availableMB, actualBalloonMB
+func getVMMemoryUsage(domain *libvirt.Domain, logger otelzap.LoggerWithCtx) (int, int, int) {
+	// Enable balloon statistics collection (1 second period)
+	// This is required to get Tag 7 (available) and Tag 4 (unused)
+	// Using numeric value 1 for DOMAIN_AFFECT_LIVE (not available on macOS)
+	if err := domain.SetMemoryStatsPeriod(1, 1); err != nil {
+		logger.Debug("Failed to set memory stats period", zap.Error(err))
 	}
 
-	// Look for actual memory usage
-	var actualMB int64
+	// Small delay to allow balloon driver to collect stats
+	time.Sleep(100 * time.Millisecond)
+
+	// Get memory stats - request up to 20 stats
+	memStats, err := domain.MemoryStats(20, 0)
+	if err != nil {
+		logger.Debug("Failed to get memory stats", zap.Error(err))
+		return 0, 0, 0
+	}
+
+	// Memory stat tags from libvirt:
+	// Tag 0 (swap_in)     = Amount of memory swapped in (KB)
+	// Tag 1 (swap_out)    = Amount of memory swapped out (KB)
+	// Tag 2 (major_fault) = Number of major page faults
+	// Tag 3 (minor_fault) = Number of minor page faults
+	// Tag 4 (unused)      = Amount of memory left unused by system (KB) - requires balloon
+	// Tag 5 (available)   = Amount of usable memory (KB) - requires balloon
+	// Tag 6 (actual_balloon) = Current balloon size (KB) - memory given to guest
+	// Tag 7 (rss)         = Resident Set Size of QEMU process (KB) - hypervisor view
+	// Tag 8 (usable)      = Amount of memory that can be reclaimed (KB)
+	// Tag 9 (last_update) = Timestamp of last update
+
+	var unused, available, actualBalloon, rss int64
+
+	logger.Debug("Raw memory stats retrieved",
+		zap.Int("stat_count", len(memStats)))
+
 	for _, stat := range memStats {
-		// VIR_DOMAIN_MEMORY_STAT_ACTUAL_BALLOON = 6
-		// VIR_DOMAIN_MEMORY_STAT_RSS = 5
-		if stat.Tag == 5 { // RSS = Resident Set Size (actual usage)
-			actualMB = int64(stat.Val / 1024) // Convert KB to MB
-			break
+		logger.Debug("Memory stat",
+			zap.Int32("tag", stat.Tag),
+			zap.Uint64("value_kb", stat.Val))
+
+		switch stat.Tag {
+		case 4: // unused - memory left unused by guest
+			unused = int64(stat.Val)
+		case 5: // available - total memory available to guest
+			available = int64(stat.Val)
+		case 6: // actual_balloon - current balloon size
+			actualBalloon = int64(stat.Val)
+		case 7: // rss - QEMU process size (hypervisor view)
+			rss = int64(stat.Val)
 		}
 	}
 
-	return int(actualMB)
+	// Calculate memory usage:
+	// If we have balloon stats (unused + available), use them for guest OS view
+	// Otherwise fall back to RSS (hypervisor view, less accurate)
+	usedMB := 0
+	availableMB := 0
+	actualBalloonMB := int(actualBalloon / 1024)
+
+	if available > 0 && unused > 0 {
+		// Best case: We have balloon driver stats from guest OS
+		// available = total memory guest can use
+		// unused = memory guest is not using
+		// used = available - unused
+		usedMB = int((available - unused) / 1024)
+		availableMB = int(available / 1024)
+		logger.Debug("Using balloon stats (guest OS view)",
+			zap.Int("used_mb", usedMB),
+			zap.Int("available_mb", availableMB))
+	} else if actualBalloon > 0 && rss > 0 {
+		// Fallback: Use RSS as approximation
+		// Note: This is hypervisor view and includes QEMU overhead
+		// It's not accurate for guest OS usage but better than nothing
+		usedMB = int(rss / 1024)
+		availableMB = int(actualBalloon / 1024)
+		logger.Debug("Using RSS (hypervisor view, approximate)",
+			zap.Int("rss_mb", usedMB),
+			zap.Int("balloon_mb", availableMB))
+	}
+
+	return usedMB, availableMB, actualBalloonMB
+}
+
+// getVMDiskUsagePercent gets disk usage percentage via guest agent
+// Returns: usedGB, totalGB (both 0 if unavailable)
+func getVMDiskUsagePercent(domain *libvirt.Domain, logger otelzap.LoggerWithCtx) (int, int) {
+	// Try to get filesystem info via guest agent
+	// This requires guest-exec to be enabled
+	cmd := `{"execute":"guest-get-fsinfo"}`
+	result, err := domain.QemuAgentCommand(
+		cmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+
+	if err != nil {
+		// Check if guest-exec/commands are disabled
+		if strings.Contains(err.Error(), "has been disabled") || strings.Contains(err.Error(), "not supported") {
+			logger.Debug("Guest agent filesystem commands disabled")
+			return 0, 0
+		}
+		logger.Debug("Failed to get filesystem info", zap.Error(err))
+		return 0, 0
+	}
+
+	// Parse filesystem info response
+	var fsInfoResponse struct {
+		Return []struct {
+			Name       string `json:"name"`
+			Mountpoint string `json:"mountpoint"`
+			Type       string `json:"type"`
+			UsedBytes  uint64 `json:"used-bytes"`
+			TotalBytes uint64 `json:"total-bytes"`
+			Disk       []struct {
+				Target string `json:"target"`
+			} `json:"disk"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &fsInfoResponse); err != nil {
+		logger.Debug("Failed to parse filesystem info", zap.Error(err))
+		return 0, 0
+	}
+
+	// Find root filesystem (mountpoint = "/")
+	for _, fs := range fsInfoResponse.Return {
+		logger.Debug("Filesystem info",
+			zap.String("mountpoint", fs.Mountpoint),
+			zap.String("type", fs.Type),
+			zap.Uint64("used_bytes", fs.UsedBytes),
+			zap.Uint64("total_bytes", fs.TotalBytes))
+
+		if fs.Mountpoint == "/" && fs.TotalBytes > 0 {
+			usedGB := int(fs.UsedBytes / (1024 * 1024 * 1024))
+			totalGB := int(fs.TotalBytes / (1024 * 1024 * 1024))
+			logger.Debug("Root filesystem usage",
+				zap.Int("used_gb", usedGB),
+				zap.Int("total_gb", totalGB))
+			return usedGB, totalGB
+		}
+	}
+
+	// Fallback: Try using guest-exec with df command
+	// This is less reliable but works if guest-get-fsinfo is not available
+	dfCmd := `{"execute":"guest-exec","arguments":{"path":"/bin/df","arg":["-B","1","/"],"capture-output":true}}`
+	result, err = domain.QemuAgentCommand(
+		dfCmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+
+	if err != nil {
+		if strings.Contains(err.Error(), "has been disabled") {
+			logger.Debug("Guest-exec disabled, cannot get disk usage")
+		}
+		return 0, 0
+	}
+
+	// Parse guest-exec response to get PID
+	var execResponse struct {
+		Return struct {
+			PID int `json:"pid"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &execResponse); err != nil {
+		return 0, 0
+	}
+
+	// Wait for command to complete
+	time.Sleep(200 * time.Millisecond)
+
+	// Get command output
+	statusCmd := fmt.Sprintf(`{"execute":"guest-exec-status","arguments":{"pid":%d}}`, execResponse.Return.PID)
+	statusResult, err := domain.QemuAgentCommand(
+		statusCmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+
+	if err != nil {
+		return 0, 0
+	}
+
+	// Parse df output
+	var statusResponse struct {
+		Return struct {
+			Exited   bool   `json:"exited"`
+			ExitCode int    `json:"exitcode"`
+			OutData  string `json:"out-data"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(statusResult), &statusResponse); err != nil {
+		return 0, 0
+	}
+
+	if !statusResponse.Return.Exited || statusResponse.Return.ExitCode != 0 {
+		return 0, 0
+	}
+
+	// Parse df output (base64 encoded)
+	dfOutput, err := base64.StdEncoding.DecodeString(statusResponse.Return.OutData)
+	if err != nil {
+		return 0, 0
+	}
+
+	// Example df output:
+	// Filesystem     1B-blocks      Used Available Use% Mounted on
+	// /dev/vda1      42945478656 8589934592 ...    20%  /
+	lines := strings.Split(string(dfOutput), "\n")
+	if len(lines) < 2 {
+		return 0, 0
+	}
+
+	// Parse the data line (skip header)
+	fields := strings.Fields(lines[1])
+	if len(fields) >= 3 {
+		var totalBytes, usedBytes uint64
+		fmt.Sscanf(fields[1], "%d", &totalBytes)
+		fmt.Sscanf(fields[2], "%d", &usedBytes)
+
+		if totalBytes > 0 {
+			usedGB := int(usedBytes / (1024 * 1024 * 1024))
+			totalGB := int(totalBytes / (1024 * 1024 * 1024))
+			logger.Debug("Disk usage from df",
+				zap.Int("used_gb", usedGB),
+				zap.Int("total_gb", totalGB))
+			return usedGB, totalGB
+		}
+	}
+
+	return 0, 0
+}
+
+// getVMCPUUsage gets CPU usage percentage by sampling CPU time
+// Returns: cpuPercent (0.0 if unavailable)
+func getVMCPUUsage(domain *libvirt.Domain, logger otelzap.LoggerWithCtx) float64 {
+	// Get domain info for CPU time
+	// We need to sample twice to calculate CPU percentage
+
+	// First sample - get CPU time
+	info1, err := domain.GetInfo()
+	if err != nil {
+		logger.Debug("Failed to get domain info for CPU stats", zap.Error(err))
+		return 0.0
+	}
+	cpuTime1 := info1.CpuTime
+
+	// Wait 1 second
+	time.Sleep(1 * time.Second)
+
+	// Second sample
+	info2, err := domain.GetInfo()
+	if err != nil {
+		logger.Debug("Failed to get second domain info sample", zap.Error(err))
+		return 0.0
+	}
+	cpuTime2 := info2.CpuTime
+
+	vcpuCount := uint64(info2.NrVirtCpu)
+
+	if cpuTime1 == 0 || cpuTime2 == 0 || vcpuCount == 0 {
+		logger.Debug("Missing CPU time or VCPU count",
+			zap.Uint64("cpu_time1", cpuTime1),
+			zap.Uint64("cpu_time2", cpuTime2),
+			zap.Uint64("vcpu_count", vcpuCount))
+		return 0.0
+	}
+
+	// Calculate CPU percentage
+	// CpuTime is cumulative CPU time in nanoseconds
+	// Delta is how much CPU time was used in the 1-second interval
+	// Formula: (cpuTimeDelta / wallTimeDelta) * 100
+	//
+	// cpuTimeDelta is in nanoseconds
+	// wallTimeDelta = 1 second = 1,000,000,000 nanoseconds
+	cpuTimeDelta := float64(cpuTime2 - cpuTime1)
+	wallTimeDelta := 1000000000.0 // 1 second in nanoseconds
+
+	// CPU percentage (can exceed 100% with multiple vCPUs)
+	cpuPercent := (cpuTimeDelta / wallTimeDelta) * 100.0
+
+	logger.Debug("CPU usage calculated",
+		zap.Uint64("cpu_time_delta_ns", cpuTime2-cpuTime1),
+		zap.Float64("cpu_percent", cpuPercent),
+		zap.Uint64("vcpu_count", vcpuCount))
+
+	return cpuPercent
 }

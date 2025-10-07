@@ -20,16 +20,48 @@ import (
 var updateKvmCmd = &cobra.Command{
 	Use:   "kvm [vm-name]",
 	Short: "Update a KVM virtual machine (shutdown & open virt-rescue shell)",
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MaximumNArgs(1),
 	Long: `This command shuts down the specified KVM/libvirt virtual machine if it's running,
 waits for it to stop, and then opens a virt-rescue shell so you can troubleshoot it.
+
+FLAGS:
+  --enable-guest-exec    Enable QEMU guest agent guest-exec commands for monitoring
+  --all-disabled         Enable guest-exec for all VMs with DISABLED status (requires --enable-guest-exec)
+  --yes                  Skip confirmation prompt for bulk operations
+
 Example:
   eos update kvm centos-stream9-2
+  eos update kvm centos-stream9-2 --enable-guest-exec
+  eos update kvm --enable-guest-exec --all-disabled
+  eos update kvm --enable-guest-exec --all-disabled --yes
 `,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
+
+		// Handle --enable-guest-exec flag
+		if kvmEnableGuestExec {
+			// Handle bulk operation
+			if kvmAllDisabledGuestExec {
+				return kvm.EnableGuestExecBulk(rc, kvmYesConfirm)
+			}
+
+			// Single VM operation
+			if len(args) == 0 {
+				return fmt.Errorf("VM name required (or use --all-disabled for bulk operation)")
+			}
+
+			vmName := args[0]
+			log.Info("Enabling guest-exec for VM", zap.String("vm", vmName))
+			return kvm.EnableGuestExec(rc, vmName)
+		}
+
+		// Rescue mode requires VM name
+		if len(args) == 0 {
+			return fmt.Errorf("VM name required")
+		}
+
 		vmName := args[0]
 
-		log := otelzap.Ctx(rc.Ctx)
 		log.Info("🛠 Starting rescue for KVM VM", zap.String("vm", vmName))
 
 		// Check VM status
@@ -79,15 +111,18 @@ Example:
 }
 
 var (
-	kvmSafe         bool
-	kvmNoSafe       bool
-	kvmSnapshot     bool
-	kvmSnapshotName string
-	kvmTimeout      int
-	kvmAllDrift     bool
-	kvmRolling      bool
-	kvmBatchSize    int
-	kvmWaitBetween  int
+	kvmSafe                 bool
+	kvmNoSafe               bool
+	kvmSnapshot             bool
+	kvmSnapshotName         string
+	kvmTimeout              int
+	kvmAllDrift             bool
+	kvmRolling              bool
+	kvmBatchSize            int
+	kvmWaitBetween          int
+	kvmEnableGuestExec      bool
+	kvmAllDisabledGuestExec bool
+	kvmYesConfirm           bool
 )
 
 // restartKvmCmd represents safe VM restart command
@@ -223,6 +258,9 @@ func runRestartKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 func init() {
 	// Add the kvm subcommand to the parent 'update' command
 	UpdateCmd.AddCommand(updateKvmCmd)
+	updateKvmCmd.Flags().BoolVar(&kvmEnableGuestExec, "enable-guest-exec", false, "Enable QEMU guest agent guest-exec commands")
+	updateKvmCmd.Flags().BoolVar(&kvmAllDisabledGuestExec, "all-disabled", false, "Enable guest-exec for all VMs with DISABLED status")
+	updateKvmCmd.Flags().BoolVar(&kvmYesConfirm, "yes", false, "Skip confirmation prompt for bulk operations")
 
 	// Add restart kvm command
 	restartKvmCmd.Flags().BoolVar(&kvmSafe, "safe", true, "Enable safety checks (default)")

@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"libvirt.org/go/libvirt"
 )
-
 
 // RestartVM safely restarts a VM with health checks
 func RestartVM(ctx context.Context, vmName string, cfg *RestartConfig) error {
@@ -167,8 +167,11 @@ func RestartMultipleVMs(ctx context.Context, vmNames []string, cfg *RestartConfi
 func RestartVMsWithDrift(ctx context.Context, cfg *RestartConfig, rolling bool, batchSize int, waitBetween time.Duration) error {
 	logger := otelzap.Ctx(ctx)
 
+	// Create RuntimeContext for ListVMs
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
 	// Get all VMs
-	vms, err := ListVMs(ctx)
+	vms, err := ListVMs(rc)
 	if err != nil {
 		return fmt.Errorf("failed to list VMs: %w", err)
 	}

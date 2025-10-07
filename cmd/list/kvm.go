@@ -77,7 +77,7 @@ func runListKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 		zap.String("format", kvmFormat))
 
 	// Get all VMs
-	vms, err := kvm.ListVMs(rc.Ctx)
+	vms, err := kvm.ListVMs(rc)
 	if err != nil {
 		logger.Error("Failed to list VMs", zap.Error(err))
 		return fmt.Errorf("failed to list VMs: %w", err)
@@ -227,15 +227,23 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				memInfo = fmt.Sprintf("%d MB", vm.MemoryMB)
 			}
 
+			// Format disk with usage percentage if available
 			diskInfo := "N/A"
 			if vm.DiskSizeGB > 0 {
-				diskInfo = fmt.Sprintf("%d GB", vm.DiskSizeGB)
+				if vm.DiskUsageGB > 0 && vm.DiskTotalGB > 0 {
+					// Show guest filesystem usage
+					usagePercent := float64(vm.DiskUsageGB) / float64(vm.DiskTotalGB) * 100
+					diskInfo = fmt.Sprintf("%d GB (%.0f%%)", vm.DiskTotalGB, usagePercent)
+				} else {
+					// Show allocated disk image size only
+					diskInfo = fmt.Sprintf("%d GB", vm.DiskSizeGB)
+				}
 			}
 
-			// Format VCPUS with load average if available
+			// Format VCPUS with CPU% if available
 			vcpuInfo := fmt.Sprintf("%d", vm.VCPUs)
-			if vm.GuestAgentOK && vm.CPUUsagePercent > 0 {
-				vcpuInfo = fmt.Sprintf("%d (%.2f)", vm.VCPUs, vm.CPUUsagePercent)
+			if vm.State == "running" && vm.CPUUsagePercent > 0 {
+				vcpuInfo = fmt.Sprintf("%d (%.0f%%)", vm.VCPUs, vm.CPUUsagePercent)
 			}
 
 			// Format MEM with percentage if usage is available
@@ -263,9 +271,16 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 
 	// Show summary
 	driftCount := 0
+	disabledGuestExecCount := 0
+	disabledVMs := []string{}
+
 	for _, vm := range vms {
 		if vm.DriftDetected {
 			driftCount++
+		}
+		if vm.ConsulAgent == "DISABLED" || vm.UpdatesNeeded == "DISABLED" {
+			disabledGuestExecCount++
+			disabledVMs = append(disabledVMs, vm.Name)
 		}
 	}
 
@@ -274,6 +289,23 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 		fmt.Printf(" (⚠ %d with QEMU drift)", driftCount)
 	}
 	fmt.Println()
+
+	// Show warning about disabled guest-exec
+	if disabledGuestExecCount > 0 {
+		fmt.Println()
+		fmt.Printf("⚠ %d VM(s) have guest-exec DISABLED:\n", disabledGuestExecCount)
+		for _, vmName := range disabledVMs {
+			fmt.Printf("  - %s\n", vmName)
+		}
+		fmt.Println()
+		fmt.Println("To enable monitoring for these VMs, run:")
+		fmt.Println("  eos update kvm <vm-name> --enable-guest-exec")
+		fmt.Println()
+		fmt.Println("Or to fix all at once:")
+		for _, vmName := range disabledVMs {
+			fmt.Printf("  eos update kvm %s --enable-guest-exec\n", vmName)
+		}
+	}
 
 	return nil
 }

@@ -224,6 +224,40 @@ func getSecurityRunCommands(config *SecureVMConfig) string {
 	commands := `
 # Security hardening run commands
 runcmd:
+  # Enable QEMU guest agent guest-exec for eos monitoring
+  # Supports both Debian/Ubuntu and RHEL/CentOS/Rocky/Alma
+  - |
+    set -e
+    echo "eos: Enabling QEMU guest agent guest-exec for monitoring..."
+
+    # Detect OS family and configure appropriate file
+    if [ -f /etc/debian_version ] || [ -f /etc/lsb-release ]; then
+      # Ubuntu/Debian
+      echo "# Managed by eos - enable guest-exec for monitoring" > /etc/default/qemu-guest-agent
+      echo 'DAEMON_ARGS=""' >> /etc/default/qemu-guest-agent
+      echo "eos: Configured /etc/default/qemu-guest-agent (Debian/Ubuntu)"
+    elif [ -f /etc/redhat-release ] || [ -f /etc/centos-release ]; then
+      # CentOS/RHEL/Rocky/Alma
+      mkdir -p /etc/sysconfig
+      echo "# Managed by eos - enable guest-exec for monitoring" > /etc/sysconfig/qemu-ga
+      echo 'BLACKLIST_RPC=' >> /etc/sysconfig/qemu-ga
+      echo "eos: Configured /etc/sysconfig/qemu-ga (RHEL/CentOS)"
+    else
+      echo "eos: WARNING - Unknown OS, guest-exec may not be enabled"
+      exit 0
+    fi
+
+    # Restart guest agent
+    if systemctl restart qemu-guest-agent; then
+      echo "eos: guest-exec enabled successfully"
+    else
+      echo "eos: WARNING - Failed to restart qemu-guest-agent"
+      exit 0
+    fi
+
+    # Log the configuration for audit
+    echo "$(date -Iseconds) guest-exec enabled via cloud-init method=automatic" >> /var/log/eos-guest-exec.log
+
   # Secure shared memory
   - echo "tmpfs /run/shm tmpfs defaults,noexec,nosuid 0 0" >> /etc/fstab
   - mount -o remount /run/shm
