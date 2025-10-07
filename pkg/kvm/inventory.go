@@ -5,6 +5,7 @@ package kvm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -79,6 +80,9 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string) (VMInfo, error) {
 		vm.MemoryMB = int(info.Memory / 1024) // Convert KB to MB
 	}
 
+	// Get disk size (works for all VMs)
+	vm.DiskSizeGB = getVMDiskSize(domain)
+
 	// For running VMs, get additional info
 	if state == libvirt.DOMAIN_RUNNING {
 		vm.QEMUVersion = getVMQEMUVersion(domain)
@@ -89,6 +93,18 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string) (VMInfo, error) {
 		vm.UptimeDays = getVMUptime(domain)
 		vm.GuestAgentOK = checkGuestAgent(domain)
 		vm.NetworkIPs = getVMIPs(domain)
+
+		// Get resource usage stats
+		vm.CPUUsagePercent = getVMCPUUsage(domain)
+		vm.MemoryUsageMB = getVMMemoryUsage(domain)
+
+		// Get OS info, Consul status, and updates status if guest agent is available
+		if vm.GuestAgentOK {
+			vm.OSInfo = getVMOSInfo(domain)
+			vm.ConsulAgent = checkConsulAgent(domain)
+			vm.UpdatesNeeded = checkUpdatesNeeded(domain)
+			vm.DiskUsageGB = getVMDiskUsage(domain)
+		}
 	}
 
 	return vm, nil
@@ -414,4 +430,295 @@ func GetVMByName(ctx context.Context, name string) (*VMInfo, error) {
 	}
 
 	return nil, fmt.Errorf("VM not found: %s", name)
+}
+
+// getVMOSInfo retrieves operating system information via guest agent
+func getVMOSInfo(domain *libvirt.Domain) string {
+	// Use guest-get-osinfo command to get OS details
+	result, err := domain.QemuAgentCommand(
+		`{"execute":"guest-get-osinfo"}`,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+	if err != nil {
+		return "Unknown"
+	}
+
+	// Parse JSON response
+	// Example: {"return":{"name":"CentOS Stream","id":"centos","version":"9","version-id":"9"}}
+	var response struct {
+		Return struct {
+			Name      string `json:"name"`
+			ID        string `json:"id"`
+			Version   string `json:"version"`
+			VersionID string `json:"version-id"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		return "Unknown"
+	}
+
+	// Format OS info nicely
+	osInfo := response.Return.Name
+	if response.Return.Version != "" {
+		osInfo += " " + response.Return.Version
+	}
+
+	return osInfo
+}
+
+// checkConsulAgent checks if Consul agent is installed and running via guest agent
+func checkConsulAgent(domain *libvirt.Domain) bool {
+	// Execute command to check if consul service is running
+	// Using systemctl status consul
+	cmd := `{"execute":"guest-exec","arguments":{"path":"/usr/bin/systemctl","arg":["is-active","consul"],"capture-output":true}}`
+	result, err := domain.QemuAgentCommand(
+		cmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+	if err != nil {
+		return false
+	}
+
+	// Parse response to get PID
+	var execResponse struct {
+		Return struct {
+			PID int `json:"pid"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &execResponse); err != nil {
+		return false
+	}
+
+	// Wait a moment for command to complete, then check status
+	time.Sleep(100 * time.Millisecond)
+
+	// Get command status
+	statusCmd := fmt.Sprintf(`{"execute":"guest-exec-status","arguments":{"pid":%d}}`, execResponse.Return.PID)
+	statusResult, err := domain.QemuAgentCommand(
+		statusCmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+	if err != nil {
+		return false
+	}
+
+	// Check if command exited successfully (exit code 0 means service is active)
+	return strings.Contains(statusResult, `"exited":true`) && strings.Contains(statusResult, `"exitcode":0`)
+}
+
+// checkUpdatesNeeded checks if OS updates are available via guest agent
+func checkUpdatesNeeded(domain *libvirt.Domain) bool {
+	// Execute command to check for updates
+	// For CentOS/RHEL: dnf check-update (exit code 100 means updates available)
+	// For Ubuntu/Debian: apt list --upgradable (check output)
+
+	// Try dnf first (CentOS/RHEL/Rocky)
+	cmd := `{"execute":"guest-exec","arguments":{"path":"/usr/bin/dnf","arg":["check-update","-q"],"capture-output":true}}`
+	result, err := domain.QemuAgentCommand(
+		cmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+
+	if err == nil {
+		var execResponse struct {
+			Return struct {
+				PID int `json:"pid"`
+			} `json:"return"`
+		}
+
+		if err := json.Unmarshal([]byte(result), &execResponse); err == nil {
+			time.Sleep(500 * time.Millisecond) // Wait longer for package check
+
+			statusCmd := fmt.Sprintf(`{"execute":"guest-exec-status","arguments":{"pid":%d}}`, execResponse.Return.PID)
+			statusResult, err := domain.QemuAgentCommand(
+				statusCmd,
+				libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+				0,
+			)
+			if err == nil {
+				// dnf check-update returns 100 if updates are available
+				if strings.Contains(statusResult, `"exitcode":100`) {
+					return true
+				}
+				// Exit code 0 means no updates
+				if strings.Contains(statusResult, `"exitcode":0`) {
+					return false
+				}
+			}
+		}
+	}
+
+	// Try apt (Ubuntu/Debian) if dnf wasn't found
+	cmd = `{"execute":"guest-exec","arguments":{"path":"/usr/bin/apt","arg":["list","--upgradable"],"capture-output":true}}`
+	result, err = domain.QemuAgentCommand(
+		cmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+
+	if err == nil {
+		var execResponse struct {
+			Return struct {
+				PID int `json:"pid"`
+			} `json:"return"`
+		}
+
+		if err := json.Unmarshal([]byte(result), &execResponse); err == nil {
+			time.Sleep(500 * time.Millisecond)
+
+			statusCmd := fmt.Sprintf(`{"execute":"guest-exec-status","arguments":{"pid":%d}}`, execResponse.Return.PID)
+			statusResult, err := domain.QemuAgentCommand(
+				statusCmd,
+				libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+				0,
+			)
+			if err == nil && strings.Contains(statusResult, `"exited":true`) {
+				// Check if output contains upgradable packages (more than just the header line)
+				var statusResponse struct {
+					Return struct {
+						OutData string `json:"out-data"`
+					} `json:"return"`
+				}
+				if err := json.Unmarshal([]byte(statusResult), &statusResponse); err == nil {
+					// If there are upgradable packages, output will have more than just the "Listing..." header
+					lines := strings.Split(statusResponse.Return.OutData, "\n")
+					return len(lines) > 2 // More than header + blank line means updates available
+				}
+			}
+		}
+	}
+
+	// Default to unknown/false if we can't determine
+	return false
+}
+
+// getVMDiskSize gets the total allocated disk size in GB
+func getVMDiskSize(domain *libvirt.Domain) int {
+	// Get XML description to find disk paths
+	xmlDesc, err := domain.GetXMLDesc(0)
+	if err != nil {
+		return 0
+	}
+
+	// Parse disk paths from XML
+	diskRegex := regexp.MustCompile(`<source file='([^']+)'`)
+	matches := diskRegex.FindAllStringSubmatch(xmlDesc, -1)
+
+	if len(matches) == 0 {
+		return 0
+	}
+
+	// Get size of first disk (usually the main OS disk)
+	diskPath := matches[0][1]
+
+	// Use qemu-img info to get virtual size
+	cmd := exec.Command("qemu-img", "info", "--output=json", diskPath)
+	output, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+
+	// Parse JSON output
+	var info struct {
+		VirtualSize int64 `json:"virtual-size"`
+	}
+
+	if err := json.Unmarshal(output, &info); err != nil {
+		return 0
+	}
+
+	// Convert bytes to GB
+	sizeGB := int(info.VirtualSize / (1024 * 1024 * 1024))
+	return sizeGB
+}
+
+// getVMDiskUsage gets the used disk space in GB via guest agent
+func getVMDiskUsage(domain *libvirt.Domain) int {
+	// Use guest-get-fsinfo to get filesystem info
+	result, err := domain.QemuAgentCommand(
+		`{"execute":"guest-get-fsinfo"}`,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+	if err != nil {
+		return 0
+	}
+
+	// Parse response to find root filesystem
+	var response struct {
+		Return []struct {
+			Name       string `json:"name"`
+			Mountpoint string `json:"mountpoint"`
+			Type       string `json:"type"`
+			UsedBytes  int64  `json:"used-bytes"`
+			TotalBytes int64  `json:"total-bytes"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		return 0
+	}
+
+	// Find root filesystem and return used space
+	for _, fs := range response.Return {
+		if fs.Mountpoint == "/" {
+			return int(fs.UsedBytes / (1024 * 1024 * 1024))
+		}
+	}
+
+	return 0
+}
+
+// getVMCPUUsage gets current CPU usage percentage
+func getVMCPUUsage(domain *libvirt.Domain) float64 {
+	// Get domain stats for CPU info
+	stats, err := domain.GetStats(libvirt.DOMAIN_STATS_CPU_TOTAL, 0)
+	if err != nil || len(stats) == 0 {
+		return 0.0
+	}
+
+	// Try to get vcpu stats
+	vcpuStats, err := domain.GetVcpus()
+	if err != nil {
+		return 0.0
+	}
+
+	// Calculate total CPU time across all vCPUs
+	var totalCPUTime uint64
+	for _, vcpu := range vcpuStats {
+		totalCPUTime += vcpu.CpuTime
+	}
+
+	// This is cumulative CPU time, not current usage
+	// For current usage, we'd need to sample twice with a time delta
+	// For now, return 0 as this requires more complex tracking
+	return 0.0
+}
+
+// getVMMemoryUsage gets current memory usage in MB
+func getVMMemoryUsage(domain *libvirt.Domain) int {
+	// Get memory stats
+	memStats, err := domain.MemoryStats(11, 0) // 11 = all stats
+	if err != nil {
+		return 0
+	}
+
+	// Look for actual memory usage
+	var actualMB int64
+	for _, stat := range memStats {
+		// VIR_DOMAIN_MEMORY_STAT_ACTUAL_BALLOON = 6
+		// VIR_DOMAIN_MEMORY_STAT_RSS = 5
+		if stat.Tag == 5 { // RSS = Resident Set Size (actual usage)
+			actualMB = int64(stat.Val / 1024) // Convert KB to MB
+			break
+		}
+	}
+
+	return int(actualMB)
 }

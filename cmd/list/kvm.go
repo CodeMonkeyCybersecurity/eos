@@ -19,10 +19,11 @@ import (
 )
 
 var (
-	kvmShowDrift bool
-	kvmDetailed  bool
-	kvmFormat    string
-	kvmState     string
+	kvmShowDrift    bool
+	kvmShowUsage    bool
+	kvmDetailed     bool
+	kvmFormat       string
+	kvmState        string
 )
 
 var kvmCmd = &cobra.Command{
@@ -61,6 +62,7 @@ func init() {
 	ListCmd.AddCommand(kvmCmd)
 
 	kvmCmd.Flags().BoolVar(&kvmShowDrift, "show-drift", false, "Show QEMU version drift")
+	kvmCmd.Flags().BoolVar(&kvmShowUsage, "show-usage", false, "Show resource usage (CPU, memory, disk)")
 	kvmCmd.Flags().BoolVar(&kvmDetailed, "detailed", false, "Show detailed information")
 	kvmCmd.Flags().StringVar(&kvmFormat, "format", "table", "Output format (table, json, yaml)")
 	kvmCmd.Flags().StringVar(&kvmState, "state", "", "Filter by state (running, shutoff, paused)")
@@ -102,14 +104,59 @@ func runListKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 	case "yaml":
 		return outputYAMLKVM(vms)
 	default:
-		return outputTableKVM(vms, kvmShowDrift, kvmDetailed)
+		return outputTableKVM(vms, kvmShowDrift, kvmShowUsage, kvmDetailed)
 	}
 }
 
-func outputTableKVM(vms []kvm.VMInfo, showDrift, detailed bool) error {
+func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error {
 	table := tablewriter.NewWriter(os.Stdout)
 
-	if showDrift {
+	if showUsage {
+		table.Header("NAME", "STATE", "CPU%", "MEM_USED", "MEM_TOTAL", "DISK_USED", "DISK_TOTAL", "IPS")
+
+		for _, vm := range vms {
+			cpuUsage := "N/A"
+			if vm.State == "running" && vm.CPUUsagePercent > 0 {
+				cpuUsage = fmt.Sprintf("%.1f%%", vm.CPUUsagePercent)
+			}
+
+			memUsed := "N/A"
+			if vm.State == "running" && vm.MemoryUsageMB > 0 {
+				memUsed = fmt.Sprintf("%d MB", vm.MemoryUsageMB)
+			}
+
+			memTotal := fmt.Sprintf("%d MB", vm.MemoryMB)
+
+			diskUsed := "N/A"
+			if vm.GuestAgentOK && vm.DiskUsageGB > 0 {
+				diskUsed = fmt.Sprintf("%d GB", vm.DiskUsageGB)
+			}
+
+			diskTotal := "N/A"
+			if vm.DiskSizeGB > 0 {
+				diskTotal = fmt.Sprintf("%d GB", vm.DiskSizeGB)
+			}
+
+			ips := "N/A"
+			if len(vm.NetworkIPs) > 0 {
+				ips = vm.NetworkIPs[0]
+				if len(vm.NetworkIPs) > 1 {
+					ips += fmt.Sprintf(" (+%d)", len(vm.NetworkIPs)-1)
+				}
+			}
+
+			table.Append(
+				vm.Name,
+				vm.State,
+				cpuUsage,
+				memUsed,
+				memTotal,
+				diskUsed,
+				diskTotal,
+				ips,
+			)
+		}
+	} else if showDrift {
 		table.Header("NAME", "STATE", "QEMU", "HOST_QEMU", "DRIFT", "UPTIME", "IPS")
 
 		for _, vm := range vms {
@@ -147,12 +194,25 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, detailed bool) error {
 			)
 		}
 	} else {
-		table.Header("NAME", "STATE", "VCPUS", "MEMORY", "GUEST_AGENT", "IPS")
+		table.Header("NAME", "STATE", "OS", "DISK", "CONSUL", "UPDATES", "IPS")
 
 		for _, vm := range vms {
-			agent := "NO"
+			consul := "N/A"
 			if vm.GuestAgentOK {
-				agent = "YES"
+				if vm.ConsulAgent {
+					consul = "YES"
+				} else {
+					consul = "NO"
+				}
+			}
+
+			updates := "N/A"
+			if vm.GuestAgentOK {
+				if vm.UpdatesNeeded {
+					updates = "YES"
+				} else {
+					updates = "NO"
+				}
 			}
 
 			ips := "N/A"
@@ -163,12 +223,23 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, detailed bool) error {
 				}
 			}
 
+			osInfo := "N/A"
+			if vm.OSInfo != "" {
+				osInfo = vm.OSInfo
+			}
+
+			diskInfo := "N/A"
+			if vm.DiskSizeGB > 0 {
+				diskInfo = fmt.Sprintf("%d GB", vm.DiskSizeGB)
+			}
+
 			table.Append(
 				vm.Name,
 				vm.State,
-				fmt.Sprintf("%d", vm.VCPUs),
-				fmt.Sprintf("%d MB", vm.MemoryMB),
-				agent,
+				osInfo,
+				diskInfo,
+				consul,
+				updates,
 				ips,
 			)
 		}

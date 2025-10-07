@@ -76,6 +76,13 @@ type VMInfo struct {
 	GuestAgentOK    bool
 	NetworkIPs      []string
 	DiskPaths       []string
+	OSInfo          string // Operating system (e.g., "CentOS Stream 9", "Ubuntu 24.04")
+	ConsulAgent     bool   // Whether Consul agent is installed and running
+	UpdatesNeeded   bool   // Whether OS updates are available
+	DiskSizeGB      int    // Total allocated disk space in GB
+	DiskUsageGB     int    // Used disk space in GB (requires guest agent)
+	CPUUsagePercent float64 // CPU usage percentage (requires running VM)
+	MemoryUsageMB   int    // Memory usage in MB (requires running VM)
 }
 
 // RestartConfig contains configuration for VM restart operations
