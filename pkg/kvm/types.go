@@ -77,8 +77,8 @@ type VMInfo struct {
 	NetworkIPs      []string
 	DiskPaths       []string
 	OSInfo          string // Operating system (e.g., "CentOS Stream 9", "Ubuntu 24.04")
-	ConsulAgent     bool   // Whether Consul agent is installed and running
-	UpdatesNeeded   bool   // Whether OS updates are available
+	ConsulAgent     string // Consul agent status: "YES", "NO", "DISABLED", "N/A"
+	UpdatesNeeded   string // OS updates status: "YES", "NO", "DISABLED", "N/A"
 	DiskSizeGB      int    // Total allocated disk space in GB
 	DiskUsageGB     int    // Used disk space in GB (requires guest agent)
 	CPUUsagePercent float64 // CPU usage percentage (requires running VM)

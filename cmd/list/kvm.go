@@ -19,11 +19,11 @@ import (
 )
 
 var (
-	kvmShowDrift    bool
-	kvmShowUsage    bool
-	kvmDetailed     bool
-	kvmFormat       string
-	kvmState        string
+	kvmShowDrift bool
+	kvmShowUsage bool
+	kvmDetailed  bool
+	kvmFormat    string
+	kvmState     string
 )
 
 var kvmCmd = &cobra.Command{
@@ -199,20 +199,12 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 		for _, vm := range vms {
 			consul := "N/A"
 			if vm.GuestAgentOK {
-				if vm.ConsulAgent {
-					consul = "YES"
-				} else {
-					consul = "NO"
-				}
+				consul = vm.ConsulAgent
 			}
 
 			updates := "N/A"
 			if vm.GuestAgentOK {
-				if vm.UpdatesNeeded {
-					updates = "YES"
-				} else {
-					updates = "NO"
-				}
+				updates = vm.UpdatesNeeded
 			}
 
 			ips := "N/A"

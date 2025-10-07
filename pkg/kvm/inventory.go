@@ -16,7 +16,6 @@ import (
 	"libvirt.org/go/libvirt"
 )
 
-
 // hostQEMUVersionCache caches the host QEMU version to avoid repeated expensive checks
 var hostQEMUVersionCache string
 
@@ -469,7 +468,7 @@ func getVMOSInfo(domain *libvirt.Domain) string {
 }
 
 // checkConsulAgent checks if Consul agent is installed and running via guest agent
-func checkConsulAgent(domain *libvirt.Domain) bool {
+func checkConsulAgent(domain *libvirt.Domain) string {
 	// Execute command to check if consul service is running
 	// Using systemctl status consul
 	cmd := `{"execute":"guest-exec","arguments":{"path":"/usr/bin/systemctl","arg":["is-active","consul"],"capture-output":true}}`
@@ -479,7 +478,11 @@ func checkConsulAgent(domain *libvirt.Domain) bool {
 		0,
 	)
 	if err != nil {
-		return false
+		// Check if guest-exec is disabled
+		if strings.Contains(err.Error(), "has been disabled") {
+			return "DISABLED"
+		}
+		return "N/A"
 	}
 
 	// Parse response to get PID
@@ -490,7 +493,7 @@ func checkConsulAgent(domain *libvirt.Domain) bool {
 	}
 
 	if err := json.Unmarshal([]byte(result), &execResponse); err != nil {
-		return false
+		return "N/A"
 	}
 
 	// Wait a moment for command to complete, then check status
@@ -504,15 +507,18 @@ func checkConsulAgent(domain *libvirt.Domain) bool {
 		0,
 	)
 	if err != nil {
-		return false
+		return "N/A"
 	}
 
 	// Check if command exited successfully (exit code 0 means service is active)
-	return strings.Contains(statusResult, `"exited":true`) && strings.Contains(statusResult, `"exitcode":0`)
+	if strings.Contains(statusResult, `"exited":true`) && strings.Contains(statusResult, `"exitcode":0`) {
+		return "YES"
+	}
+	return "NO"
 }
 
 // checkUpdatesNeeded checks if OS updates are available via guest agent
-func checkUpdatesNeeded(domain *libvirt.Domain) bool {
+func checkUpdatesNeeded(domain *libvirt.Domain) string {
 	// Execute command to check for updates
 	// For CentOS/RHEL: dnf check-update (exit code 100 means updates available)
 	// For Ubuntu/Debian: apt list --upgradable (check output)
@@ -524,6 +530,11 @@ func checkUpdatesNeeded(domain *libvirt.Domain) bool {
 		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
 		0,
 	)
+
+	// Check if guest-exec is disabled
+	if err != nil && strings.Contains(err.Error(), "has been disabled") {
+		return "DISABLED"
+	}
 
 	if err == nil {
 		var execResponse struct {
@@ -544,11 +555,11 @@ func checkUpdatesNeeded(domain *libvirt.Domain) bool {
 			if err == nil {
 				// dnf check-update returns 100 if updates are available
 				if strings.Contains(statusResult, `"exitcode":100`) {
-					return true
+					return "YES"
 				}
 				// Exit code 0 means no updates
 				if strings.Contains(statusResult, `"exitcode":0`) {
-					return false
+					return "NO"
 				}
 			}
 		}
@@ -561,6 +572,11 @@ func checkUpdatesNeeded(domain *libvirt.Domain) bool {
 		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
 		0,
 	)
+
+	// Check if guest-exec is disabled (apt attempt)
+	if err != nil && strings.Contains(err.Error(), "has been disabled") {
+		return "DISABLED"
+	}
 
 	if err == nil {
 		var execResponse struct {
@@ -588,30 +604,55 @@ func checkUpdatesNeeded(domain *libvirt.Domain) bool {
 				if err := json.Unmarshal([]byte(statusResult), &statusResponse); err == nil {
 					// If there are upgradable packages, output will have more than just the "Listing..." header
 					lines := strings.Split(statusResponse.Return.OutData, "\n")
-					return len(lines) > 2 // More than header + blank line means updates available
+					if len(lines) > 2 { // More than header + blank line means updates available
+						return "YES"
+					}
+					return "NO"
 				}
 			}
 		}
 	}
 
-	// Default to unknown/false if we can't determine
-	return false
+	// Default to unknown if we can't determine
+	return "N/A"
 }
 
 // getVMDiskSize gets the total allocated disk size in GB
 func getVMDiskSize(domain *libvirt.Domain) int {
-	// Get XML description to find disk paths
+	// Get XML description to find disk paths and device names
 	xmlDesc, err := domain.GetXMLDesc(0)
 	if err != nil {
 		return 0
 	}
 
+	// For running VMs, use libvirt's GetBlockInfo (works without exclusive lock)
+	// For stopped VMs, use qemu-img as fallback
+	state, _, err := domain.GetState()
+	if err == nil && state == libvirt.DOMAIN_RUNNING {
+		// Extract target device name (usually vda, sda, etc.)
+		// Look for: <target dev='vda' bus='virtio'/>
+		targetRegex := regexp.MustCompile(`<disk[^>]*type=['"]file['"][^>]*device=['"]disk['"][^>]*>[\s\S]*?<target dev=['"]([^'"]+)['"]`)
+		targetMatches := targetRegex.FindStringSubmatch(xmlDesc)
+
+		if len(targetMatches) > 1 {
+			targetDev := targetMatches[1]
+
+			// Use GetBlockInfo to get disk capacity (works for running VMs)
+			blockInfo, err := domain.GetBlockInfo(targetDev, 0)
+			if err == nil {
+				// Capacity is in bytes, convert to GB
+				sizeGB := int(blockInfo.Capacity / (1024 * 1024 * 1024))
+				return sizeGB
+			}
+		}
+	}
+
+	// Fallback: For stopped VMs or if BlockInfo fails, use qemu-img
 	// Look for disk type='file' entries (most common for VMs)
-	// Example: <disk type='file' device='disk'>...<source file='/path/to/disk.qcow2'/>
 	diskTypeRegex := regexp.MustCompile(`<disk[^>]*type=['"]file['"][^>]*device=['"]disk['"][\s\S]*?<source file=['"]([^'"]+)['"]`)
 	matches := diskTypeRegex.FindAllStringSubmatch(xmlDesc, -1)
 
-	// Fallback: Try simpler pattern if above doesn't match
+	// Try simpler pattern if above doesn't match
 	if len(matches) == 0 {
 		diskRegex := regexp.MustCompile(`<source file=['"]([^'"]+)['"]`)
 		matches = diskRegex.FindAllStringSubmatch(xmlDesc, -1)
@@ -698,6 +739,10 @@ func getVMLoadAverage(domain *libvirt.Domain) float64 {
 		0,
 	)
 	if err != nil {
+		// Check if guest-exec is disabled (will show as just VCPU count without load average)
+		if strings.Contains(err.Error(), "has been disabled") {
+			return 0.0
+		}
 		return 0.0
 	}
 
