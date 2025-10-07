@@ -3,6 +3,7 @@ package update
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -467,7 +468,8 @@ func addGuestAgentToVM(rc *eos_io.RuntimeContext, vmName string) (backupPath str
 </controller>`
 
 		// Attach controller (persistent configuration)
-		if err := domain.AttachDeviceFlags(controllerXML, libvirt.DOMAIN_AFFECT_CONFIG); err != nil {
+		// Use 1 for DOMAIN_AFFECT_CONFIG
+		if err := domain.AttachDeviceFlags(controllerXML, 1); err != nil {
 			return backupPath, fmt.Errorf("failed to add virtio-serial controller: %w", err)
 		}
 
@@ -484,7 +486,8 @@ func addGuestAgentToVM(rc *eos_io.RuntimeContext, vmName string) (backupPath str
 </channel>`
 
 	// Attach channel (persistent configuration)
-	if err := domain.AttachDeviceFlags(channelXML, libvirt.DOMAIN_AFFECT_CONFIG); err != nil {
+	// Use 1 for DOMAIN_AFFECT_CONFIG
+	if err := domain.AttachDeviceFlags(channelXML, 1); err != nil {
 		return backupPath, fmt.Errorf("failed to add guest agent channel: %w", err)
 	}
 
@@ -497,14 +500,14 @@ func backupVMXML(rc *eos_io.RuntimeContext, vmName, xmlContent string) (string, 
 	logger := otelzap.Ctx(rc.Ctx)
 
 	backupDir := "/var/lib/eos/backups/kvm"
-	if err := eos_io.EnsureDir(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := fmt.Sprintf("%s/%s-qemu-agent-%s.xml", backupDir, vmName, timestamp)
 
-	if err := eos_io.WriteFile(backupPath, []byte(xmlContent), 0600); err != nil {
+	if err := os.WriteFile(backupPath, []byte(xmlContent), 0600); err != nil {
 		return "", fmt.Errorf("failed to write backup: %w", err)
 	}
 
@@ -520,7 +523,7 @@ func restoreVMXML(rc *eos_io.RuntimeContext, vmName, backupPath string) error {
 		zap.String("backup", backupPath))
 
 	// Read backup
-	xmlBytes, err := eos_io.ReadFile(backupPath)
+	xmlBytes, err := os.ReadFile(backupPath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup: %w", err)
 	}
