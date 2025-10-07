@@ -44,7 +44,7 @@ func RegisterVMWithConsul(rc *eos_io.RuntimeContext, vmName, ipAddress string) e
 	// Note: This is for FUTURE VMs - current VM is already created
 	// We're just documenting what SHOULD have been done
 	logger.Info("VM created without Consul auto-registration")
-	logger.Info("terminal prompt: ℹ️  To enable Consul auto-registration in future VMs:")
+	logger.Info("terminal prompt:   To enable Consul auto-registration in future VMs:")
 	logger.Info(fmt.Sprintf("terminal prompt:   Run: eos create kvm ubuntu --enable-consul --environment %s", env.Name))
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: To manually add this VM to Consul:")
@@ -69,13 +69,13 @@ func EnableConsulAutoRegistrationForVM(rc *eos_io.RuntimeContext, vmName string,
 
 	// Generate Consul cloud-init configuration
 	config := ConsulAutoRegisterConfig{
-		VMName:         vmName,
-		Environment:    env.Name,
-		ConsulServers:  env.Consul.RetryJoin,
-		Datacenter:     env.Datacenter,
-		NodeName:       vmName,
-		Tags:           []string{"kvm-guest", "eos-managed"},
-		EnableConnect:  false, // Can be enabled later
+		VMName:        vmName,
+		Environment:   env.Name,
+		ConsulServers: env.Consul.RetryJoin,
+		Datacenter:    env.Datacenter,
+		NodeName:      vmName,
+		Tags:          []string{"kvm-guest", "eos-managed"},
+		EnableConnect: false, // Can be enabled later
 	}
 
 	cloudInit, err := GenerateConsulCloudInit(rc, config)

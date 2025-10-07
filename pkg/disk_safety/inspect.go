@@ -39,36 +39,35 @@ func (di *DiskInspector) SetOptions(includeIO, includeSMART bool, focusVG string
 
 // InspectionReport contains comprehensive disk analysis
 type InspectionReport struct {
-	Timestamp         time.Time              `json:"timestamp"`
-	PhysicalDisks     []PhysicalDisk         `json:"physical_disks"`
-	LVMHierarchy      *LVMHierarchy          `json:"lvm_hierarchy"`
-	Filesystems       []FilesystemInfo       `json:"filesystems"`
-	MountPoints       []MountState           `json:"mount_points"`
-	ExpansionOps      []ExpansionOpportunity `json:"expansion_opportunities"`
-	HealthAlerts      []HealthAlert          `json:"health_alerts"`
-	SystemOverview    SystemOverview         `json:"system_overview"`
-	Recommendations   []string               `json:"recommendations"`
+	Timestamp       time.Time              `json:"timestamp"`
+	PhysicalDisks   []PhysicalDisk         `json:"physical_disks"`
+	LVMHierarchy    *LVMHierarchy          `json:"lvm_hierarchy"`
+	Filesystems     []FilesystemInfo       `json:"filesystems"`
+	MountPoints     []MountState           `json:"mount_points"`
+	ExpansionOps    []ExpansionOpportunity `json:"expansion_opportunities"`
+	HealthAlerts    []HealthAlert          `json:"health_alerts"`
+	SystemOverview  SystemOverview         `json:"system_overview"`
+	Recommendations []string               `json:"recommendations"`
 }
-
 
 // ExpansionOpportunity suggests possible disk expansions
 type ExpansionOpportunity struct {
-	Type           string `json:"type"` // extend_lv, add_pv, provision_disk
-	Target         string `json:"target"`
-	AvailableSpace uint64 `json:"available_space"`
-	Description    string `json:"description"`
+	Type           string   `json:"type"` // extend_lv, add_pv, provision_disk
+	Target         string   `json:"target"`
+	AvailableSpace uint64   `json:"available_space"`
+	Description    string   `json:"description"`
 	Commands       []string `json:"commands"`
-	Complexity     string `json:"complexity"` // easy, medium, hard
-	Risk           string `json:"risk"`       // low, medium, high
+	Complexity     string   `json:"complexity"` // easy, medium, hard
+	Risk           string   `json:"risk"`       // low, medium, high
 }
 
 // HealthAlert represents a system health concern
 type HealthAlert struct {
-	Level       string `json:"level"` // info, warning, critical
-	Component   string `json:"component"`
-	Message     string `json:"message"`
-	Action      string `json:"action"`
-	Urgency     string `json:"urgency"`
+	Level     string `json:"level"` // info, warning, critical
+	Component string `json:"component"`
+	Message   string `json:"message"`
+	Action    string `json:"action"`
+	Urgency   string `json:"urgency"`
 }
 
 // SystemOverview provides high-level statistics
@@ -154,14 +153,14 @@ func (di *DiskInspector) GenerateASCIIDiagram(report *InspectionReport) string {
 	// Physical disks section
 	diagram.WriteString("📀 Physical Disks\n")
 	diagram.WriteString("┌─────────────────────────────────────────────────────────────┐\n")
-	
+
 	for _, disk := range report.PhysicalDisks {
 		sizeGB := disk.Size / (1024 * 1024 * 1024)
 		usage := disk.UsageType
 		if usage == "" {
 			usage = "UNUSED ⚡"
 		}
-		
+
 		diagram.WriteString(fmt.Sprintf("│ ▶ %s (%dGB) - %s - %s%s\n",
 			disk.Device, sizeGB, disk.Type, usage, strings.Repeat(" ", 20)))
 	}
@@ -170,30 +169,30 @@ func (di *DiskInspector) GenerateASCIIDiagram(report *InspectionReport) string {
 	// LVM hierarchy
 	if report.LVMHierarchy != nil && len(report.LVMHierarchy.VolumeGroups) > 0 {
 		diagram.WriteString("🗂️  LVM Volume Groups\n")
-		
+
 		for _, vg := range report.LVMHierarchy.VolumeGroups {
 			if di.focusVG != "" && vg.Name != di.focusVG {
 				continue
 			}
-			
+
 			diagram.WriteString(fmt.Sprintf("┌─ %s (%.1fGB total) ───────────────────────────\n",
 				vg.Name, float64(vg.Size)/(1024*1024*1024)))
-			
+
 			// Usage bar
 			usedPercent := float64(vg.Size-vg.Free) / float64(vg.Size) * 100
 			barLength := 40
 			usedBars := int(usedPercent * float64(barLength) / 100)
 			freeBars := barLength - usedBars
-			
+
 			diagram.WriteString("│ Usage: ")
 			diagram.WriteString(strings.Repeat("█", usedBars))
 			diagram.WriteString(strings.Repeat("░", freeBars))
 			diagram.WriteString(fmt.Sprintf(" %.1f%%\n", usedPercent))
-			
+
 			diagram.WriteString(fmt.Sprintf("│ Free:  %.1fGB (%.1f%%)\n",
 				float64(vg.Free)/(1024*1024*1024),
 				float64(vg.Free)/float64(vg.Size)*100))
-			
+
 			// Logical volumes
 			for _, lv := range report.LVMHierarchy.LogicalVolumes {
 				if lv.VGName == vg.Name {
@@ -214,7 +213,7 @@ func (di *DiskInspector) GenerateASCIIDiagram(report *InspectionReport) string {
 			if i >= 3 { // Limit to top 3 opportunities
 				break
 			}
-			
+
 			spaceGB := op.AvailableSpace / (1024 * 1024 * 1024)
 			diagram.WriteString(fmt.Sprintf("   %d. %s (+%.1fGB) - %s risk\n",
 				i+1, op.Description, float64(spaceGB), op.Risk))
@@ -226,13 +225,13 @@ func (di *DiskInspector) GenerateASCIIDiagram(report *InspectionReport) string {
 	if len(report.HealthAlerts) > 0 {
 		diagram.WriteString("🚨 Health Alerts\n")
 		for _, alert := range report.HealthAlerts {
-			icon := "ℹ️"
+			icon := ""
 			if alert.Level == "warning" {
 				icon = "⚠️"
 			} else if alert.Level == "critical" {
 				icon = "🔴"
 			}
-			
+
 			diagram.WriteString(fmt.Sprintf("   %s %s: %s\n", icon, alert.Component, alert.Message))
 		}
 	}
@@ -255,11 +254,11 @@ func (di *DiskInspector) FormatReport(report *InspectionReport, format OutputFor
 	case FormatJSON:
 		data, err := json.MarshalIndent(report, "", "  ")
 		return string(data), err
-		
+
 	case FormatYAML:
 		// Simple YAML formatting (in production, use gopkg.in/yaml.v2)
 		return di.formatYAML(report), nil
-		
+
 	case FormatTable:
 		fallthrough
 	default:
@@ -334,13 +333,13 @@ func (di *DiskInspector) formatTable(report *InspectionReport) string {
 // formatYAML creates a simple YAML representation
 func (di *DiskInspector) formatYAML(report *InspectionReport) string {
 	var output strings.Builder
-	
+
 	output.WriteString("disk_inspection:\n")
 	output.WriteString(fmt.Sprintf("  timestamp: %s\n", report.Timestamp.Format(time.RFC3339)))
 	output.WriteString("  system_overview:\n")
 	output.WriteString(fmt.Sprintf("    total_disks: %d\n", report.SystemOverview.TotalDisks))
 	output.WriteString(fmt.Sprintf("    health_score: %d\n", report.SystemOverview.HealthScore))
-	
+
 	if len(report.ExpansionOps) > 0 {
 		output.WriteString("  expansion_opportunities:\n")
 		for _, op := range report.ExpansionOps {
@@ -350,7 +349,7 @@ func (di *DiskInspector) formatYAML(report *InspectionReport) string {
 			output.WriteString(fmt.Sprintf("      risk: %s\n", op.Risk))
 		}
 	}
-	
+
 	return output.String()
 }
 
@@ -439,7 +438,6 @@ func parseSize(sizeStr string) uint64 {
 	return uint64(value * float64(multiplier))
 }
 
-
 // Placeholder implementations for remaining methods
 func (di *DiskInspector) gatherLVMHierarchy(ctx context.Context) (*LVMHierarchy, error) {
 	// Implementation would gather PV, VG, LV information
@@ -458,7 +456,7 @@ func (di *DiskInspector) gatherMountPoints(ctx context.Context) ([]MountState, e
 
 func (di *DiskInspector) analyzeExpansionOpportunities(report *InspectionReport) []ExpansionOpportunity {
 	var opportunities []ExpansionOpportunity
-	
+
 	// Analyze VG free space for LV extensions
 	if report.LVMHierarchy != nil {
 		for _, vg := range report.LVMHierarchy.VolumeGroups {
@@ -474,18 +472,18 @@ func (di *DiskInspector) analyzeExpansionOpportunities(report *InspectionReport)
 			}
 		}
 	}
-	
+
 	// Sort by available space
 	sort.Slice(opportunities, func(i, j int) bool {
 		return opportunities[i].AvailableSpace > opportunities[j].AvailableSpace
 	})
-	
+
 	return opportunities
 }
 
 func (di *DiskInspector) generateHealthAlerts(report *InspectionReport) []HealthAlert {
 	var alerts []HealthAlert
-	
+
 	// Check for low disk space
 	for _, fs := range report.Filesystems {
 		if fs.UsePercent > 90 {
@@ -506,7 +504,7 @@ func (di *DiskInspector) generateHealthAlerts(report *InspectionReport) []Health
 			})
 		}
 	}
-	
+
 	return alerts
 }
 
@@ -515,7 +513,7 @@ func (di *DiskInspector) calculateSystemOverview(report *InspectionReport) Syste
 		TotalDisks:  len(report.PhysicalDisks),
 		HealthScore: 100, // Start with perfect score
 	}
-	
+
 	// Calculate totals
 	for _, disk := range report.PhysicalDisks {
 		overview.TotalCapacity += uint64(disk.Size)
@@ -523,16 +521,16 @@ func (di *DiskInspector) calculateSystemOverview(report *InspectionReport) Syste
 			overview.UnusedDisks++
 		}
 	}
-	
+
 	for _, fs := range report.Filesystems {
 		overview.UsedCapacity += uint64(fs.UsedSize)
 		overview.AvailableCapacity += uint64(fs.FreeSize)
 	}
-	
+
 	if overview.TotalCapacity > 0 {
 		overview.UtilizationPercent = float64(overview.UsedCapacity) / float64(overview.TotalCapacity) * 100
 	}
-	
+
 	// Reduce health score for issues
 	for _, alert := range report.HealthAlerts {
 		switch alert.Level {
@@ -542,30 +540,30 @@ func (di *DiskInspector) calculateSystemOverview(report *InspectionReport) Syste
 			overview.HealthScore -= 10
 		}
 	}
-	
+
 	if overview.HealthScore < 0 {
 		overview.HealthScore = 0
 	}
-	
+
 	return overview
 }
 
 func (di *DiskInspector) generateRecommendations(report *InspectionReport) []string {
 	var recommendations []string
-	
+
 	if len(report.ExpansionOps) > 0 {
-		recommendations = append(recommendations, 
+		recommendations = append(recommendations,
 			fmt.Sprintf("Consider expanding storage - %d expansion opportunities available", len(report.ExpansionOps)))
 	}
-	
+
 	if report.SystemOverview.UnusedDisks > 0 {
 		recommendations = append(recommendations,
 			fmt.Sprintf("You have %d unused disks that could be added to your storage pool", report.SystemOverview.UnusedDisks))
 	}
-	
+
 	if report.SystemOverview.UtilizationPercent > 80 {
 		recommendations = append(recommendations, "Storage utilization is high - consider adding more capacity")
 	}
-	
+
 	return recommendations
 }

@@ -459,7 +459,7 @@ func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() error {
 	afterCommit := strings.TrimSpace(string(afterOutput))
 
 	if eeu.enhancedConfig.VerifyVersionChange && beforeCommit == afterCommit {
-		eeu.logger.Info("ℹ️  Already on latest version",
+		eeu.logger.Info("  Already on latest version",
 			zap.String("commit", afterCommit[:8]))
 		// Continue anyway in case binary was deleted or corrupted
 	} else {

@@ -164,7 +164,7 @@ func assessEnvironmentState(rc *eos_io.RuntimeContext, opts *EnvironmentSetupOpt
 			zap.String("environment", env.Name),
 			zap.String("created_at", env.CreatedAt))
 
-		logger.Info("terminal prompt: ℹ️  Environment already configured")
+		logger.Info("terminal prompt:   Environment already configured")
 		logger.Info("terminal prompt:   Existing configuration will be updated if needed")
 		logger.Info("terminal prompt:   Use --force to completely recreate")
 	}
@@ -289,7 +289,7 @@ func setupConsul(rc *eos_io.RuntimeContext, opts *EnvironmentSetupOptions) error
 	// TODO: Call actual Consul installation
 	// This would use existing pkg/consul/install.go
 
-	logger.Info("terminal prompt: ℹ️  Consul setup placeholder")
+	logger.Info("terminal prompt:   Consul setup placeholder")
 	logger.Info(fmt.Sprintf("terminal prompt:   Run: eos create consul --%s", map[bool]string{true: "server", false: "client"}[isServer]))
 
 	return nil
@@ -315,7 +315,7 @@ func setupVault(rc *eos_io.RuntimeContext, opts *EnvironmentSetupOptions) error 
 	// TODO: Call actual Vault installation with Consul registration
 	// This would use existing pkg/vault/install.go with new Datacenter config
 
-	logger.Info("terminal prompt: ℹ️  Vault setup placeholder")
+	logger.Info("terminal prompt:   Vault setup placeholder")
 	logger.Info(fmt.Sprintf("terminal prompt:   Run: eos create vault --datacenter %s", opts.Datacenter))
 
 	return nil
@@ -333,7 +333,7 @@ func setupNomad(rc *eos_io.RuntimeContext, opts *EnvironmentSetupOptions) error 
 	// TODO: Call actual Nomad installation
 	// This would use existing pkg/nomad/install.go
 
-	logger.Info("terminal prompt: ℹ️  Nomad setup placeholder")
+	logger.Info("terminal prompt:   Nomad setup placeholder")
 	logger.Info("terminal prompt:   Run: eos create nomad --server --client")
 
 	return nil

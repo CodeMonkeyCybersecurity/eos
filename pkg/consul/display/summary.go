@@ -45,7 +45,7 @@ func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 		log.Info("   • Vault is registered as a Consul service")
 		log.Info("   • Service discovery: consul-vault-helper discover")
 	} else {
-		log.Info("ℹ️  Vault Integration: Not configured")
+		log.Info("  Vault Integration: Not configured")
 		log.Info("   • Install Vault to enable service discovery integration")
 	}
 

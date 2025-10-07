@@ -105,7 +105,7 @@ Examples:
 						zap.String("file", config.WorkerFile))
 				}
 			} else {
-				logger.Info("ℹ️  Worker script not found (already removed)",
+				logger.Info("  Worker script not found (already removed)",
 					zap.String("file", config.WorkerFile))
 			}
 

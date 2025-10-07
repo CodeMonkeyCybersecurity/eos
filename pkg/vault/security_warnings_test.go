@@ -142,7 +142,7 @@ func TestSecurityWarningLevels(t *testing.T) {
 		{SecurityWarningCritical, "🚨", "CRITICAL"},
 		{SecurityWarningHigh, "⚠️ ", "HIGH"},
 		{SecurityWarningMedium, "⚡", "MEDIUM"},
-		{SecurityWarningLow, "ℹ️ ", "LOW"},
+		{SecurityWarningLow, " ", "LOW"},
 	}
 
 	for _, tt := range tests {

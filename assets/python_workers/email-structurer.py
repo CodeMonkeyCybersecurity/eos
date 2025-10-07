@@ -399,7 +399,7 @@ class DelphiNotifyParser(BaseParser):
         elif risk_level == "MEDIUM":
             return f"  Medium Risk Security Alert - {agent_name}"
         elif risk_level == "LOW":
-            return f"ℹ️  Low Risk Security Notice - {agent_name}"
+            return f"  Low Risk Security Notice - {agent_name}"
         else:
             return f"🛡️ Security Alert - {agent_name}"
 
