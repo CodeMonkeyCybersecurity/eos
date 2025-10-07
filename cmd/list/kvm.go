@@ -240,12 +240,25 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				diskInfo = fmt.Sprintf("%d GB", vm.DiskSizeGB)
 			}
 
+			// Format VCPUS with load average if available
+			vcpuInfo := fmt.Sprintf("%d", vm.VCPUs)
+			if vm.GuestAgentOK && vm.CPUUsagePercent > 0 {
+				vcpuInfo = fmt.Sprintf("%d (%.2f)", vm.VCPUs, vm.CPUUsagePercent)
+			}
+
+			// Format MEM with percentage if usage is available
+			memInfoFormatted := memInfo
+			if vm.State == "running" && vm.MemoryUsageMB > 0 && vm.MemoryMB > 0 {
+				usagePercent := float64(vm.MemoryUsageMB) / float64(vm.MemoryMB) * 100
+				memInfoFormatted = fmt.Sprintf("%d MB (%.0f%%)", vm.MemoryMB, usagePercent)
+			}
+
 			table.Append(
 				vm.Name,
 				vm.State,
-				fmt.Sprintf("%d", vm.VCPUs),
+				vcpuInfo,
 				osInfo,
-				memInfo,
+				memInfoFormatted,
 				diskInfo,
 				consul,
 				updates,
