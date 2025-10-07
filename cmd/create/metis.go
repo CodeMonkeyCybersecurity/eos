@@ -411,6 +411,9 @@ If you find the binary, add its directory to PATH:
 func fixTemporalPath(rc *eos_io.RuntimeContext, temporalPath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// We copy the binary instead of symlinking, so no permission fixes needed on source
+	// This keeps /root/ secure with its default 0700 permissions
+
 	// Check if /usr/local/bin is in PATH
 	pathEnv := os.Getenv("PATH")
 	hasUsrLocalBin := false
@@ -439,59 +442,50 @@ Fix Option 2: Add /usr/local/bin to PATH
 			temporalPath, pathEnv, filepath.Dir(temporalPath))
 	}
 
-	// Create symlink in /usr/local/bin
-	symlinkPath := "/usr/local/bin/temporal"
+	// Copy binary to /usr/local/bin instead of symlinking
+	// Reason: If source is in /root/, symlink won't work for non-root users
+	targetPath := "/usr/local/bin/temporal"
 
-	// Check if symlink already exists
-	if existing, err := os.Readlink(symlinkPath); err == nil {
-		if existing == temporalPath {
-			logger.Info("Symlink already exists and is correct",
-				zap.String("symlink", symlinkPath),
-				zap.String("target", temporalPath))
+	// Check if target already exists and works
+	if info, err := os.Stat(targetPath); err == nil {
+		versionCmd := exec.CommandContext(rc.Ctx, targetPath, "--version")
+		if versionCmd.Run() == nil {
+			logger.Info("Temporal already installed in /usr/local/bin",
+				zap.String("path", targetPath),
+				zap.Int64("size", info.Size()))
 			return nil
 		}
-		logger.Warn("Symlink exists but points to different location",
-			zap.String("symlink", symlinkPath),
-			zap.String("existing_target", existing),
-			zap.String("desired_target", temporalPath))
+		// Exists but doesn't work - remove and replace
+		logger.Info("Existing temporal binary doesn't work, replacing")
+		os.Remove(targetPath)
 	}
 
-	// Try to create symlink
-	logger.Info("Creating symlink to make temporal accessible",
-		zap.String("symlink", symlinkPath),
-		zap.String("target", temporalPath))
+	// Copy the binary to /usr/local/bin
+	logger.Info("Copying temporal binary to /usr/local/bin",
+		zap.String("from", temporalPath),
+		zap.String("to", targetPath))
 
-	if err := os.Symlink(temporalPath, symlinkPath); err != nil {
-		// If permission denied, provide helpful error
-		if os.IsPermission(err) {
-			return fmt.Errorf(`Cannot create symlink (permission denied)
-
-Problem: Need root access to create symlink in /usr/local/bin
-
-Temporal installed at: %s
-Need symlink at: %s
-
-Fix Option 1 (Quick): Create symlink with sudo
-  sudo ln -s %s %s
-
-Fix Option 2 (Permanent): Add to PATH
-  echo 'export PATH="%s:$PATH"' >> ~/.bashrc
-  source ~/.bashrc
-
-After fixing, verify with: temporal --version`,
-				temporalPath, symlinkPath, temporalPath, symlinkPath, filepath.Dir(temporalPath))
-		}
-
-		return fmt.Errorf("failed to create symlink: %w", err)
+	sourceData, err := os.ReadFile(temporalPath)
+	if err != nil {
+		return fmt.Errorf("failed to read source binary: %w", err)
 	}
 
-	// Verify symlink works
+	// Write with executable permissions
+	if err := os.WriteFile(targetPath, sourceData, 0755); err != nil {
+		return fmt.Errorf("failed to write binary to %s: %w", targetPath, err)
+	}
+
+	logger.Info("Binary copied successfully",
+		zap.String("path", targetPath),
+		zap.Int("size_bytes", len(sourceData)))
+
+	// Verify it works
 	versionCmd := exec.CommandContext(rc.Ctx, "temporal", "--version")
 	if output, err := versionCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("symlink created but temporal command still not working: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("binary copied but temporal command still not working: %w\nOutput: %s", err, string(output))
 	}
 
-	logger.Info("Symlink created successfully - temporal command is now available")
+	logger.Info("Temporal CLI is now available system-wide")
 	return nil
 }
 

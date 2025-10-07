@@ -108,18 +108,9 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		fmt.Println("  3. Check email inbox for alert notification")
 	}
 
-	// Count failures
-	failed := 0
-	for _, r := range results {
-		if !r.passed {
-			failed++
-		}
-	}
-
-	if failed > 0 {
-		return fmt.Errorf("%d diagnostic checks failed", failed)
-	}
-
+	// Diagnostics are informational, not errors
+	// Always return nil (exit 0) - the display shows what passed/failed
+	// Only return error for actual system failures (can't connect, etc.)
 	return nil
 }
 
