@@ -109,7 +109,7 @@ func displayBasicEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, json
 	}
 
 	// Display basic environment info
-	fmt.Printf("🌍 Environment Configuration (Basic Mode)\n")
+	fmt.Printf(" Environment Configuration (Basic Mode)\n")
 	fmt.Printf("========================================\n\n")
 	fmt.Printf("Environment:     %s\n", basicConfig.Environment)
 	fmt.Printf("Datacenter:      %s\n", basicConfig.Datacenter)
@@ -188,7 +188,7 @@ func displayServicesFocus(config *environment.EnhancedEnvironmentConfig) error {
 
 // displayFullEnvironment displays complete environment information
 func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error {
-	fmt.Printf("🌍 Enhanced Environment Configuration\n")
+	fmt.Printf(" Enhanced Environment Configuration\n")
 	fmt.Printf("====================================\n\n")
 
 	// Profile and basic info

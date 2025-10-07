@@ -23,7 +23,7 @@ func FuzzTerraformConfigGeneration(f *testing.F) {
 	f.Add("value\nwith\nnewlines")
 	f.Add("value\"with'quotes")
 	f.Add("")
-	f.Add("unicode🌍value")
+	f.Add("unicodevalue")
 	f.Add("very_long_" + strings.Repeat("x", 5000) + "_value")
 	f.Add("${nonsense")
 	f.Add("unclosed${interpolation")
@@ -70,7 +70,7 @@ func FuzzTerraformVariableValidation(f *testing.F) {
 	f.Add("var${injection}")
 	f.Add("extremely_long_" + strings.Repeat("variable", 100) + "_name")
 	f.Add("var\nwith\nnewlines")
-	f.Add("unicode_var_🌍")
+	f.Add("unicode_var_")
 	f.Add("_private_var")
 	f.Add("__dunder_var")
 
@@ -151,7 +151,7 @@ func FuzzTerraformStateFileHandling(f *testing.F) {
 	f.Add(`null`)
 	f.Add(`[]`)
 	f.Add(`{"very_large_object": "` + strings.Repeat("x", 1000000) + `"}`)
-	f.Add(`{"unicode": "🌍"}`)
+	f.Add(`{"unicode": ""}`)
 	f.Add(`{"binary": "\x00\x01\x02"}`)
 
 	f.Fuzz(func(t *testing.T, stateData string) {

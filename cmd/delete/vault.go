@@ -108,7 +108,7 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return fmt.Errorf("vault uninstallation failed: %w", err)
 	}
 
-	logger.Info("✅ Vault removal process completed successfully")
+	logger.Info(" Vault removal process completed successfully")
 	return nil
 }
 
@@ -120,7 +120,7 @@ func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithC
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
 
 	if state.BinaryInstalled {
-		logger.Info(fmt.Sprintf("terminal prompt: 📦 Binary: %s", state.Version))
+		logger.Info(fmt.Sprintf("terminal prompt:  Binary: %s", state.Version))
 	}
 	if state.ServiceRunning || state.ServiceEnabled {
 		status := "installed"
@@ -130,10 +130,10 @@ func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithC
 		logger.Info(fmt.Sprintf("terminal prompt: 🔧 Service: %s", status))
 	}
 	if len(state.ExistingPaths) > 0 {
-		logger.Info(fmt.Sprintf("terminal prompt: 📁 Data: %d directories", len(state.ExistingPaths)))
+		logger.Info(fmt.Sprintf("terminal prompt:  Data: %d directories", len(state.ExistingPaths)))
 	}
 	if state.UserExists {
-		logger.Info("terminal prompt: 👤 User & Group: vault")
+		logger.Info("terminal prompt:  User & Group: vault")
 	}
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
 	logger.Info("terminal prompt: ")

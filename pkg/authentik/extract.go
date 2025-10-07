@@ -485,7 +485,7 @@ func listProviders(client *AuthentikAPIClient, detailed bool) error {
 
 	for _, p := range providers {
 		if detailed {
-			fmt.Printf("\n📦 %s\n", p.Name)
+			fmt.Printf("\n %s\n", p.Name)
 			fmt.Printf("   PK:   %s\n", p.PK)
 			fmt.Printf("   Type: %s\n", p.Type)
 			if p.Config["acs_url"] != nil {

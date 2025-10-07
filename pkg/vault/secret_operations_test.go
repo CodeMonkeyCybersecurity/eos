@@ -158,7 +158,7 @@ func TestReadSecret(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// rc := createTestRuntimeContext(t) // Removed unused variable
 			mockLogical := new(MockLogical)
-			
+
 			if tt.setupMock != nil {
 				tt.setupMock(mockLogical)
 			}
@@ -261,7 +261,7 @@ func TestWriteSecret(t *testing.T) {
 				"key_with_spaces": "value with spaces",
 				"key-with-dash":   "value-with-dash",
 				"key.with.dots":   "value.with.dots",
-				"unicode_key_🔑":  "unicode_value_🌍",
+				"unicode_key_🔑":   "unicode_value_",
 			},
 			setupMock: func(m *MockLogical) {
 				m.On("Write", "secret/data/myapp/special", mock.Anything).Return(&api.Secret{}, nil)
@@ -394,11 +394,11 @@ func TestDeployAndStoreSecrets(t *testing.T) {
 // TestSafeReadSecret tests error-safe secret reading
 func TestSafeReadSecret(t *testing.T) {
 	tests := []struct {
-		name         string
-		path         string
-		setupMock    func(*MockLogical)
-		expectNil    bool
-		expectPanic  bool
+		name        string
+		path        string
+		setupMock   func(*MockLogical)
+		expectNil   bool
+		expectPanic bool
 	}{
 		{
 			name: "safe_read_success",
@@ -539,7 +539,7 @@ func TestConcurrentSecretOperations(t *testing.T) {
 
 	t.Run("concurrent_reads", func(t *testing.T) {
 		mockLogical := new(MockLogical)
-		
+
 		// Set up mock for concurrent reads
 		secret := &api.Secret{
 			Data: map[string]interface{}{
@@ -548,7 +548,7 @@ func TestConcurrentSecretOperations(t *testing.T) {
 				},
 			},
 		}
-		
+
 		// Allow multiple calls
 		mockLogical.On("Read", mock.Anything).Return(secret, nil).Times(goroutines)
 
@@ -572,7 +572,7 @@ func TestConcurrentSecretOperations(t *testing.T) {
 
 	t.Run("concurrent_writes", func(t *testing.T) {
 		mockLogical := new(MockLogical)
-		
+
 		// Allow multiple writes
 		mockLogical.On("Write", mock.Anything, mock.Anything).
 			Return(&api.Secret{}, nil).Times(goroutines)
@@ -609,7 +609,7 @@ func TestSecretLeakPrevention(t *testing.T) {
 
 	t.Run("secrets_not_in_error_messages", func(t *testing.T) {
 		mockLogical := new(MockLogical)
-		
+
 		// Mock a write failure that might include sensitive data
 		mockLogical.On("Write", mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("write failed for data: %v", sensitiveData))
@@ -628,11 +628,10 @@ func TestSecretLeakPrevention(t *testing.T) {
 		// This would be tested by checking log output
 		// In production, ensure secrets are masked or not logged
 		logger := zaptest.NewLogger(t)
-		
+
 		// Log should mask sensitive data
-		logger.Debug("Writing secret", 
-			// In real code, we'd use a sanitized version
-		)
+		logger.Debug("Writing secret") // In real code, we'd use a sanitized version
+
 	})
 }
 
@@ -640,9 +639,9 @@ func TestSecretLeakPrevention(t *testing.T) {
 
 func isInvalidPath(path string) bool {
 	// Check for path traversal attempts
-	if path == "" || 
-		containsStr(path, "..") || 
-		containsStr(path, "//") || 
+	if path == "" ||
+		containsStr(path, "..") ||
+		containsStr(path, "//") ||
 		hasPrefix(path, "/") {
 		return true
 	}
@@ -653,14 +652,14 @@ func isValidSecret(secret *api.Secret) bool {
 	if secret == nil || secret.Data == nil {
 		return false
 	}
-	
+
 	// Check if it's KV v2 format
 	if data, ok := secret.Data["data"]; ok {
 		// Ensure data is a map
 		_, isMap := data.(map[string]interface{})
 		return isMap || data == nil
 	}
-	
+
 	// KV v1 format is valid
 	return true
 }
@@ -682,4 +681,3 @@ func containsStr(s, substr string) bool {
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }
-

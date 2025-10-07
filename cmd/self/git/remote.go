@@ -242,7 +242,7 @@ Examples:
 			Name:      config.RemoveName,
 		}
 
-		logger.Info("🗑️ Removing Git remote", zap.String("name", config.RemoveName))
+		logger.Info(" Removing Git remote", zap.String("name", config.RemoveName))
 
 		return manager.ManageRemote(rc, config.Path, operation)
 	}),

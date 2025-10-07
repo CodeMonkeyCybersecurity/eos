@@ -343,6 +343,6 @@ if [ $FAILED_TESTS -eq 0 ]; then
 else
     echo -e "${RED}❌ Some tests failed!${NC}"
     echo -e "${YELLOW}📄 See full report: $REPORT_FILE${NC}"
-    echo -e "${YELLOW}📁 Check logs in: $LOG_DIR${NC}"
+    echo -e "${YELLOW} Check logs in: $LOG_DIR${NC}"
     exit 1
 fi

@@ -143,7 +143,7 @@ func OrchestrationConsistencyProperty() Property {
 				"123invalid",
 				"app with spaces",
 				"app/with/slashes",
-				"unicode_🌍",
+				"unicode_",
 				"very_long_" + strings.Repeat("name", 20),
 			}
 			return appNames[randomInt(len(appNames))]

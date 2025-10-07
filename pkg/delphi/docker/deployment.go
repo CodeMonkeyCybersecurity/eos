@@ -72,7 +72,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 		var response string
 		fmt.Scanln(&response)
 		if response != "n" && response != "N" {
-			logger.Info("🗑️ Removing existing wazuh-docker directory")
+			logger.Info(" Removing existing wazuh-docker directory")
 			if err := exec.Command("rm", "-rf", "wazuh-docker").Run(); err != nil {
 				logger.Warn("Failed to remove wazuh-docker directory", zap.Error(err))
 			}

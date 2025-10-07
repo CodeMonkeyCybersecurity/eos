@@ -226,7 +226,7 @@ func removeDuplicates(rc *eos_io.RuntimeContext, binaries []BinaryLocation, keep
 			continue
 		}
 
-		fmt.Printf("🗑️  Removed: %s\n", binary.Path)
+		fmt.Printf("  Removed: %s\n", binary.Path)
 		removed++
 	}
 

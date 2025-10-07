@@ -88,7 +88,7 @@
    - **Risk**: Function returns fake hostname instead of error
    - **Impact**: Network configuration using wrong hostname
 
-### 📁 Hardcoded Paths
+###  Hardcoded Paths
 
 10. **Hardcoded System Paths** (`pkg/exportutil/outpath.go:13`)
     ```go

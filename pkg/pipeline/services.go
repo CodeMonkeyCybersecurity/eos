@@ -66,7 +66,7 @@ func UpdateServiceWorker(rc *eos_io.RuntimeContext, worker shared.ServiceWorkerI
 		return fmt.Errorf("source file not found: %s", worker.SourcePath)
 	}
 
-	logger.Info("📦 Updating service worker",
+	logger.Info(" Updating service worker",
 		zap.String("service", worker.ServiceName),
 		zap.String("source", worker.SourcePath),
 		zap.String("target", worker.TargetPath))

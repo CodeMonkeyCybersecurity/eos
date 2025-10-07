@@ -272,7 +272,7 @@ func promptStorageConfig(reader *bufio.Reader, config *Config) error {
 
 // promptEndpointConfig prompts for endpoint configuration
 func promptEndpointConfig(reader *bufio.Reader, config *Config) error {
-	fmt.Println("\n🌍 Endpoint Configuration")
+	fmt.Println("\n Endpoint Configuration")
 	fmt.Println("────────────────────────")
 
 	// Get hostname if not set

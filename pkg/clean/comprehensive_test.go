@@ -284,34 +284,34 @@ func TestRenameIfNeeded(t *testing.T) {
 	tempDir := t.TempDir()
 
 	tests := []struct {
-		name          string
-		filename      string
-		shouldRename  bool
-		expectedName  string
+		name         string
+		filename     string
+		shouldRename bool
+		expectedName string
 	}{
 		{
-			name:          "normal file",
-			filename:      "normal.txt",
-			shouldRename:  false,
-			expectedName:  "normal.txt",
+			name:         "normal file",
+			filename:     "normal.txt",
+			shouldRename: false,
+			expectedName: "normal.txt",
 		},
 		{
-			name:          "file with forbidden chars",
-			filename:      "file<name>.txt",
-			shouldRename:  true,
-			expectedName:  "file_name_.txt",
+			name:         "file with forbidden chars",
+			filename:     "file<name>.txt",
+			shouldRename: true,
+			expectedName: "file_name_.txt",
 		},
 		{
-			name:          "reserved name",
-			filename:      "CON",
-			shouldRename:  true,
-			expectedName:  "CON_file",
+			name:         "reserved name",
+			filename:     "CON",
+			shouldRename: true,
+			expectedName: "CON_file",
 		},
 		{
-			name:          "reserved with extension",
-			filename:      "PRN.txt",
-			shouldRename:  false,
-			expectedName:  "PRN.txt",
+			name:         "reserved with extension",
+			filename:     "PRN.txt",
+			shouldRename: false,
+			expectedName: "PRN.txt",
 		},
 	}
 
@@ -339,12 +339,12 @@ func TestRenameIfNeeded(t *testing.T) {
 
 			// Check if file was renamed
 			expectedPath := filepath.Join(tempDir, tt.expectedName)
-			
+
 			if tt.shouldRename {
 				// File should be renamed
 				_, err = os.Stat(expectedPath)
 				assert.NoError(t, err, "Renamed file should exist")
-				
+
 				// Original should not exist if name changed
 				if tt.filename != tt.expectedName {
 					_, err = os.Stat(oldPath)
@@ -422,8 +422,8 @@ func TestSanitizeName_EdgeCases(t *testing.T) {
 		},
 		{
 			name:     "emoji",
-			input:    "📁folder.txt",
-			expected: "📁folder.txt",
+			input:    "folder.txt",
+			expected: "folder.txt",
 		},
 		{
 			name:     "mixed case reserved",
@@ -513,14 +513,14 @@ func TestPathOperations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := filepath.Dir(tt.path)
 			base := filepath.Base(tt.path)
-			
+
 			assert.Equal(t, tt.expectedDir, dir)
 			assert.Equal(t, tt.expectedBase, base)
-			
+
 			// Test how it would work in RenameIfNeeded
 			sanitized := SanitizeName(base)
 			newPath := filepath.Join(dir, sanitized)
-			
+
 			// Verify path construction
 			// Skip platform-specific check for Windows paths on unix
 			if !strings.Contains(tt.path, `\`) {

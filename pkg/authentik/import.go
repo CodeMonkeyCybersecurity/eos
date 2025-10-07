@@ -241,7 +241,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		fmt.Printf("\n📦 Importing %s...\n", resourceType)
+		fmt.Printf("\n Importing %s...\n", resourceType)
 
 		switch resourceType {
 		case "certificates":

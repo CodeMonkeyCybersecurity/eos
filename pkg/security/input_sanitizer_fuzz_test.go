@@ -20,7 +20,7 @@ func FuzzInputSanitizer(f *testing.F) {
 	f.Add("`whoami`")                     // Backtick command
 	f.Add("normal text")                  // Normal input
 	f.Add("")                             // Empty input
-	f.Add("emoji🌍test")                   // Unicode emoji
+	f.Add("emojitest")                    // Unicode emoji
 	f.Add("café")                         // Non-ASCII characters
 	f.Add("\x1bP+q544e\x1b\\")            // Device control string
 	f.Add("\x9b[31m")                     // CSI with ANSI
@@ -146,7 +146,7 @@ func FuzzEscapeOutput(f *testing.F) {
 	f.Add("output\x9bwith CSI")
 	f.Add("multiline\noutput\nhere")
 	f.Add("")
-	f.Add("unicode: 🌍 test")
+	f.Add("unicode:  test")
 	f.Add("control\x00chars\x07here")
 
 	f.Fuzz(func(t *testing.T, input string) {

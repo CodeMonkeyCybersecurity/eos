@@ -132,7 +132,7 @@ func DisplayStatusOnly(rc *eos_io.RuntimeContext, info *VaultInitInfo) error {
 	// Display file information
 	if info.FileInfo != nil {
 		// Display file info via stderr
-		if _, err := fmt.Fprintf(os.Stderr, "\n📁 Init File: %s\n", info.FileInfo.Path); err != nil {
+		if _, err := fmt.Fprintf(os.Stderr, "\n Init File: %s\n", info.FileInfo.Path); err != nil {
 			return fmt.Errorf("failed to display file info: %w", err)
 		}
 		if _, err := fmt.Fprintf(os.Stderr, "   Exists: %v\n", info.FileInfo.Exists); err != nil {

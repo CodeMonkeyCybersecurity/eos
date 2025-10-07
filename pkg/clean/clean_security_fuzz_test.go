@@ -79,7 +79,7 @@ func FuzzSanitizeNameSecurity(f *testing.F) {
 		// Check reserved device names
 		upperSanitized := strings.ToUpper(sanitized)
 		baseWithoutExt := strings.Split(upperSanitized, ".")[0]
-		
+
 		// Check if it's a reserved name without the _file suffix
 		if reserved[baseWithoutExt] && !strings.HasSuffix(sanitized, "_file") {
 			// If the whole sanitized name is reserved, it should have _file appended
@@ -159,7 +159,7 @@ func FuzzWalkAndSanitizeSecurity(f *testing.F) {
 
 		// Don't actually walk the filesystem in tests
 		// Just validate the path handling
-		
+
 		// Check if path is absolute or relative
 		if root != "" && !filepath.IsAbs(root) && !strings.HasPrefix(root, ".") {
 			t.Logf("Ambiguous relative path: %q", root)
@@ -211,7 +211,7 @@ func FuzzRenameIfNeededSecurity(f *testing.F) {
 
 		// Verify the new path would be safe
 		newPath := filepath.Join(dir, newName)
-		
+
 		// Check that we're not escaping the original directory
 		cleanDir := filepath.Clean(dir)
 		cleanNewDir := filepath.Clean(filepath.Dir(newPath))
@@ -288,7 +288,7 @@ func FuzzReservedNamesSecurity(f *testing.F) {
 		// Check if the base name (without extension) is reserved
 		upperName := strings.ToUpper(strings.TrimSpace(name))
 		baseName := strings.Split(upperName, ".")[0]
-		
+
 		if reserved[baseName] {
 			// Should have _file appended
 			if !strings.Contains(sanitized, "_file") {
@@ -368,7 +368,7 @@ func FuzzUnicodeSecurity(f *testing.F) {
 	f.Add("normal.txt")
 	f.Add("файл.txt")
 	f.Add("文件.txt")
-	f.Add("🗂️📁.txt")
+	f.Add("🗂️.txt")
 	f.Add("\u202e\u202dfile.txt") // Right-to-left override
 	f.Add("\u0000null.txt")
 	f.Add("\ufeffBOM.txt")

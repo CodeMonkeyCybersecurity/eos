@@ -85,7 +85,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 			fmt.Printf(" Updated domains: %v\n", result.Updated)
 		}
 		if len(result.Deleted) > 0 {
-			fmt.Printf("🗑️  Deleted domains: %v\n", result.Deleted)
+			fmt.Printf("  Deleted domains: %v\n", result.Deleted)
 		}
 		if len(result.Errors) > 0 {
 			fmt.Printf("❌ Errors:\n")

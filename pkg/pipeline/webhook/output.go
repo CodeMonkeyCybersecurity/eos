@@ -55,7 +55,7 @@ func OutputStatusText(rc *eos_io.RuntimeContext, status *WebhookStatus) error {
 	}
 
 	// File presence
-	logger.Info("📁 File Status:")
+	logger.Info(" File Status:")
 	for file, present := range status.FilesPresent {
 		if present {
 			perm := status.Permissions[file]

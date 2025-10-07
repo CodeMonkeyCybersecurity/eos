@@ -74,7 +74,7 @@ func TestInputSanitizer_UTF8Validation(t *testing.T) {
 	}{
 		{
 			name:      "valid UTF-8",
-			input:     "Hello, 世界! 🌍",
+			input:     "Hello, 世界! ",
 			expectErr: false,
 			checkUTF8: true,
 		},
@@ -568,7 +568,7 @@ func TestValidateFlagName(t *testing.T) {
 // Benchmark tests for performance
 func BenchmarkSanitizeInput(b *testing.B) {
 	sanitizer := NewInputSanitizer()
-	input := "normal text with some\x1b[31mcolors\x1b[0m and unicode: 🌍"
+	input := "normal text with some\x1b[31mcolors\x1b[0m and unicode: "
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

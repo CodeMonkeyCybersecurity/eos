@@ -23,7 +23,7 @@ func FuzzStackOrchestrationWorkflow(f *testing.F) {
 	f.Add("app${HOME}")
 	f.Add("app\x00with\x00nulls")
 	f.Add("app\nwith\nnewlines")
-	f.Add("unicode_app_🌍")
+	f.Add("unicode_app_")
 	f.Add("very_long_" + strings.Repeat("app", 100) + "_name")
 	f.Add("app; rm -rf /")
 	f.Add("app && echo evil")

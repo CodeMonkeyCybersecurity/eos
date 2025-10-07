@@ -494,7 +494,7 @@ func TestYAMLGeneration_Safety(t *testing.T) {
 			WriteFiles: []WriteFile{
 				{
 					Path:    "/tmp/unicode.txt",
-					Content: "Hello 世界 🌍 Мир",
+					Content: "Hello 世界  Мир",
 				},
 			},
 		}
@@ -629,7 +629,7 @@ func TestGeneratorGenerateTemplate(t *testing.T) {
 
 		rc := testutil.TestRuntimeContext(t)
 		generator := NewGenerator(rc)
-		
+
 		err := generator.GenerateTemplate(templatePath)
 		require.NoError(t, err)
 

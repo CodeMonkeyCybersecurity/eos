@@ -104,7 +104,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 
 	// 3. Check working directory
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: 📁 Checking working directory...")
+	logger.Info("terminal prompt:  Checking working directory...")
 	if wd, err := os.Getwd(); err == nil {
 		logger.Info("terminal prompt:    Working directory: " + wd)
 
@@ -122,7 +122,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 
 	// 4. Check user context
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: 👤 Checking user context...")
+	logger.Info("terminal prompt:  Checking user context...")
 	logger.Info(fmt.Sprintf("terminal prompt:    User: %s (UID: %d, GID: %d)",
 		func() string {
 			if user := os.Getenv("USER"); user != "" {
@@ -137,7 +137,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 	if os.Geteuid() == 0 {
 		logger.Info("terminal prompt:   🔐 Running as root")
 	} else {
-		logger.Info("terminal prompt:   👤 Running as regular user")
+		logger.Info("terminal prompt:    Running as regular user")
 	}
 
 	// 5. Check system information
@@ -151,7 +151,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 
 	// 6. Check common installation locations
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: 📦 Checking common installation locations...")
+	logger.Info("terminal prompt:  Checking common installation locations...")
 	commonPaths := []string{
 		"/usr/local/bin/eos",
 		"/usr/bin/eos",

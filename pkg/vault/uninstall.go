@@ -419,7 +419,7 @@ func (vu *VaultUninstaller) Verify() ([]string, error) {
 		return stillPresent, nil
 	}
 
-	vu.logger.Info("✅ Vault removal completed successfully - all components removed")
+	vu.logger.Info(" Vault removal completed successfully - all components removed")
 	return stillPresent, nil
 }
 
@@ -494,7 +494,7 @@ func (vu *VaultUninstaller) displayPreDeletionSummary() {
 	vu.logger.Info("terminal prompt: ")
 
 	if vu.state.BinaryInstalled {
-		vu.logger.Info("terminal prompt: 📦 Binary:")
+		vu.logger.Info("terminal prompt:  Binary:")
 		vu.logger.Info(fmt.Sprintf("terminal prompt:    - /usr/local/bin/vault (%s)", vu.state.Version))
 		vu.logger.Info("terminal prompt:    - /usr/bin/vault (if present)")
 	}
@@ -510,7 +510,7 @@ func (vu *VaultUninstaller) displayPreDeletionSummary() {
 
 	if len(vu.state.ExistingPaths) > 0 {
 		vu.logger.Info("terminal prompt: ")
-		vu.logger.Info("terminal prompt: 📁 Files & Directories:")
+		vu.logger.Info("terminal prompt:  Files & Directories:")
 		for _, path := range vu.state.ExistingPaths {
 			vu.logger.Info(fmt.Sprintf("terminal prompt:    - %s", path))
 		}
@@ -518,13 +518,13 @@ func (vu *VaultUninstaller) displayPreDeletionSummary() {
 
 	if vu.state.UserExists {
 		vu.logger.Info("terminal prompt: ")
-		vu.logger.Info("terminal prompt: 👤 System Resources:")
+		vu.logger.Info("terminal prompt:  System Resources:")
 		vu.logger.Info("terminal prompt:    - User: vault")
 		vu.logger.Info("terminal prompt:    - Group: vault")
 	}
 
 	vu.logger.Info("terminal prompt: ")
-	vu.logger.Info("terminal prompt: 🌍 Environment Variables:")
+	vu.logger.Info("terminal prompt:  Environment Variables:")
 	vu.logger.Info("terminal prompt:    - VAULT_ADDR, VAULT_CACERT, and related variables")
 	vu.logger.Info("terminal prompt: ")
 }
@@ -537,7 +537,7 @@ func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs ma
 	vu.logger.Info("terminal prompt: ")
 
 	// Success metrics
-	vu.logger.Info(fmt.Sprintf("terminal prompt: ✅ Files Removed: %d", len(removed)))
+	vu.logger.Info(fmt.Sprintf("terminal prompt:  Files Removed: %d", len(removed)))
 	if len(errs) > 0 {
 		vu.logger.Info(fmt.Sprintf("terminal prompt:   Errors: %d", len(errs)))
 	}
@@ -613,7 +613,7 @@ func (vu *VaultUninstaller) Uninstall() error {
 	vu.displayPreDeletionSummary()
 
 	// INTERVENE - Remove Vault with progress tracking
-	vu.logger.Info("🗑️  Beginning Vault uninstallation")
+	vu.logger.Info("  Beginning Vault uninstallation")
 	totalSteps := 7
 	currentStep := 0
 

@@ -280,7 +280,7 @@ func displayProfileInfo(rc *eos_io.RuntimeContext, profile *Profile) error {
 	}
 
 	if len(profile.Paths) > 0 {
-		display.WriteString("\n📁 Backup Paths:\n")
+		display.WriteString("\n Backup Paths:\n")
 		for _, path := range profile.Paths {
 			display.WriteString(fmt.Sprintf("  • %s\n", path))
 		}
@@ -302,7 +302,7 @@ func displayProfileInfo(rc *eos_io.RuntimeContext, profile *Profile) error {
 	}
 
 	if profile.Retention != nil {
-		display.WriteString(fmt.Sprintf("🗑️  Retention: %+v\n", profile.Retention))
+		display.WriteString(fmt.Sprintf("  Retention: %+v\n", profile.Retention))
 	}
 
 	display.WriteString("\n")

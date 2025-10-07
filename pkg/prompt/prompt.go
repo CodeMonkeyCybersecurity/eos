@@ -88,7 +88,7 @@ func PromptInstallDependency(rc *eos_io.RuntimeContext, depName, depDescription 
 	}
 
 	// User wants to install
-	fmt.Printf("\n📦 Installing %s...\n", depName)
+	fmt.Printf("\n Installing %s...\n", depName)
 	logger.Info("Installing dependency", zap.String("dependency", depName))
 
 	if err := installFunc(); err != nil {
