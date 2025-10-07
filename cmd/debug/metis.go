@@ -776,18 +776,35 @@ func findTemporalBinary(rc *eos_io.RuntimeContext) string {
 
 	// Check system-wide search (only if nothing found yet and running as root)
 	if len(findings) == 0 && os.Geteuid() == 0 {
-		logger.Debug("Running system-wide search for temporal binary")
-		findCmd := exec.CommandContext(rc.Ctx, "find", "/", "-name", "temporal", "-type", "f",
-			"-not", "-path", "*/.*", "-not", "-path", "*/go/*", "-maxdepth", "5")
-		if output, err := findCmd.Output(); err == nil && len(output) > 0 {
-			systemFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
-			if len(systemFiles) > 0 && systemFiles[0] != "" {
-				findings = append(findings, "System-wide search found:")
-				for _, file := range systemFiles {
-					if file != "" {
-						findings = append(findings, fmt.Sprintf("  %s", file))
+		logger.Debug("Running limited system-wide search for temporal binary")
+		// Search specific locations with timeout to avoid hanging
+		ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+		defer cancel()
+
+		// Search specific directories likely to contain binaries
+		searchDirs := []string{"/usr", "/opt", "/root"}
+		for _, searchDir := range searchDirs {
+			findCmd := exec.CommandContext(ctx, "find", searchDir,
+				"-maxdepth", "4", // Limit depth FIRST
+				"-name", "temporal",
+				"-type", "f",
+				"-not", "-path", "*/.*",
+				"-not", "-path", "*/go/pkg/*")
+
+			if output, err := findCmd.Output(); err == nil && len(output) > 0 {
+				systemFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
+				if len(systemFiles) > 0 && systemFiles[0] != "" {
+					findings = append(findings, fmt.Sprintf("System-wide search found in %s:", searchDir))
+					for _, file := range systemFiles {
+						if file != "" && !strings.Contains(file, "/go/pkg/") {
+							findings = append(findings, fmt.Sprintf("  %s", file))
+						}
 					}
 				}
+			}
+			if ctx.Err() != nil {
+				logger.Debug("System search timed out", zap.String("dir", searchDir))
+				break
 			}
 		}
 	}
@@ -801,20 +818,21 @@ func findTemporalBinary(rc *eos_io.RuntimeContext) string {
 	// Check EOS installation logs for Temporal installation attempts
 	logPath := "/var/log/eos/eos.log"
 	if _, err := os.Stat(logPath); err == nil {
-		grepCmd := exec.CommandContext(rc.Ctx, "grep", "-i", "temporal", logPath)
-		tailCmd := exec.CommandContext(rc.Ctx, "tail", "-30")
+		// Use simpler approach: grep then take last N lines
+		grepCmd := exec.CommandContext(rc.Ctx, "sh", "-c",
+			fmt.Sprintf("grep -i temporal %s 2>/dev/null | tail -10 || true", logPath))
 
-		grepCmd.Stdout, _ = tailCmd.StdinPipe()
-		if output, err := tailCmd.Output(); err == nil && len(output) > 0 {
-			if err := grepCmd.Start(); err == nil {
-				grepCmd.Wait()
-				logLines := strings.Split(strings.TrimSpace(string(output)), "\n")
-				if len(logLines) > 0 && logLines[0] != "" {
-					findings = append(findings, "", "Recent Temporal-related log entries:")
-					for _, line := range logLines {
-						if line != "" {
-							findings = append(findings, fmt.Sprintf("  %s", line))
+		if output, err := grepCmd.Output(); err == nil && len(output) > 0 {
+			logLines := strings.Split(strings.TrimSpace(string(output)), "\n")
+			if len(logLines) > 0 && logLines[0] != "" {
+				findings = append(findings, "", "Recent Temporal-related log entries:")
+				for _, line := range logLines {
+					if line != "" {
+						// Truncate very long lines
+						if len(line) > 120 {
+							line = line[:117] + "..."
 						}
+						findings = append(findings, fmt.Sprintf("  %s", line))
 					}
 				}
 			}
