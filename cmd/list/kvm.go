@@ -194,7 +194,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 			)
 		}
 	} else {
-		table.Header("NAME", "STATE", "OS", "DISK", "CONSUL", "UPDATES", "IPS")
+		table.Header("NAME", "STATE", "OS", "MEM", "DISK", "CONSUL", "UPDATES", "IPS")
 
 		for _, vm := range vms {
 			consul := "N/A"
@@ -228,6 +228,13 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				osInfo = vm.OSInfo
 			}
 
+			memInfo := "N/A"
+			if vm.State == "running" && vm.MemoryUsageMB > 0 && vm.MemoryMB > 0 {
+				memInfo = fmt.Sprintf("%d/%d MB", vm.MemoryUsageMB, vm.MemoryMB)
+			} else if vm.MemoryMB > 0 {
+				memInfo = fmt.Sprintf("%d MB", vm.MemoryMB)
+			}
+
 			diskInfo := "N/A"
 			if vm.DiskSizeGB > 0 {
 				diskInfo = fmt.Sprintf("%d GB", vm.DiskSizeGB)
@@ -237,6 +244,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				vm.Name,
 				vm.State,
 				osInfo,
+				memInfo,
 				diskInfo,
 				consul,
 				updates,
