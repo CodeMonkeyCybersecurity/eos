@@ -18,19 +18,16 @@ import (
 
 // updateKvmCmd represents the 'eos update kvm' command.
 var updateKvmCmd = &cobra.Command{
-	Use:   "kvm",
+	Use:   "kvm [vm-name]",
 	Short: "Update a KVM virtual machine (shutdown & open virt-rescue shell)",
+	Args:  cobra.ExactArgs(1),
 	Long: `This command shuts down the specified KVM/libvirt virtual machine if it's running,
 waits for it to stop, and then opens a virt-rescue shell so you can troubleshoot it.
 Example:
-  eos update kvm --vm-name centos-stream9-2
+  eos update kvm centos-stream9-2
 `,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		// Grab the flag
-		vmName, _ := cmd.Flags().GetString("vm-name")
-		if vmName == "" {
-			return fmt.Errorf("You must provide a --vm-name (the libvirt/KVM domain name)")
-		}
+		vmName := args[0]
 
 		log := otelzap.Ctx(rc.Ctx)
 		log.Info("🛠 Starting rescue for KVM VM", zap.String("vm", vmName))
@@ -225,9 +222,6 @@ func runRestartKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 func init() {
 	// Add the kvm subcommand to the parent 'update' command
-	updateKvmCmd.Flags().String("vm-name", "", "Domain name of the KVM virtual machine (required)")
-	_ = updateKvmCmd.MarkFlagRequired("vm-name")
-
 	UpdateCmd.AddCommand(updateKvmCmd)
 
 	// Add restart kvm command

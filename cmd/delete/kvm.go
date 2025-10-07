@@ -19,8 +19,9 @@ var (
 
 // KvmCmd represents the 'eos delete kvm' command (also accessible via 'eos rm kvm')
 var KvmCmd = &cobra.Command{
-	Use:   "kvm",
+	Use:   "kvm [vm-name]",
 	Short: "Delete a KVM virtual machine",
+	Args:  cobra.ExactArgs(1),
 	Long: `Delete (remove) a KVM/libvirt virtual machine.
 
 This command will:
@@ -30,20 +31,17 @@ This command will:
 
 Examples:
   # Delete a VM (keeps storage)
-  eos delete kvm --vmname my-vm
-  eos rm kvm --vmname my-vm
+  eos delete kvm my-vm
+  eos rm kvm my-vm
 
   # Delete a VM and remove storage
-  eos delete kvm --vmname my-vm --remove-storage
+  eos delete kvm my-vm --remove-storage
 
   # Force delete a running VM
-  eos delete kvm --vmname my-vm --force --remove-storage`,
+  eos delete kvm my-vm --force --remove-storage`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		vmName, _ := cmd.Flags().GetString("vmname")
-		if vmName == "" {
-			return fmt.Errorf("--vmname is required")
-		}
+		vmName := args[0]
 
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Deleting KVM virtual machine",
@@ -94,11 +92,8 @@ Examples:
 }
 
 func init() {
-	KvmCmd.Flags().String("vmname", "", "Name of the VM to delete (required)")
 	KvmCmd.Flags().BoolVar(&kvmForce, "force", false, "Force delete even if VM is running")
 	KvmCmd.Flags().BoolVar(&kvmRemoveStorage, "remove-storage", false, "Remove associated storage volumes")
-
-	_ = KvmCmd.MarkFlagRequired("vmname")
 
 	DeleteCmd.AddCommand(KvmCmd)
 }
