@@ -16,20 +16,20 @@ import (
 	"go.uber.org/zap"
 )
 
-// rescueKvmCmd represents the 'eos rescue kvm' command.
-var rescueKvmCmd = &cobra.Command{
+// updateKvmCmd represents the 'eos update kvm' command.
+var updateKvmCmd = &cobra.Command{
 	Use:   "kvm",
-	Short: "Rescue a KVM virtual machine (shutdown & open virt-rescue shell)",
-	Long: `This command shuts down the specified KVM/libvirt virtual machine if it's running, 
+	Short: "Update a KVM virtual machine (shutdown & open virt-rescue shell)",
+	Long: `This command shuts down the specified KVM/libvirt virtual machine if it's running,
 waits for it to stop, and then opens a virt-rescue shell so you can troubleshoot it.
 Example:
-  eos rescue kvm --name centos-stream9-2
+  eos update kvm --vm-name centos-stream9-2
 `,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Grab the flag
-		vmName, _ := cmd.Flags().GetString("name")
+		vmName, _ := cmd.Flags().GetString("vm-name")
 		if vmName == "" {
-			return fmt.Errorf(" You must provide a --name (the libvirt/KVM domain name)")
+			return fmt.Errorf("You must provide a --vm-name (the libvirt/KVM domain name)")
 		}
 
 		log := otelzap.Ctx(rc.Ctx)
@@ -224,11 +224,11 @@ func runRestartKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 }
 
 func init() {
-	// Add the kvm subcommand to the parent 'refresh' command
-	rescueKvmCmd.Flags().String("name", "", "Domain name of the KVM virtual machine (required)")
-	_ = rescueKvmCmd.MarkFlagRequired("name")
+	// Add the kvm subcommand to the parent 'update' command
+	updateKvmCmd.Flags().String("vm-name", "", "Domain name of the KVM virtual machine (required)")
+	_ = updateKvmCmd.MarkFlagRequired("vm-name")
 
-	UpdateCmd.AddCommand(rescueKvmCmd)
+	UpdateCmd.AddCommand(updateKvmCmd)
 
 	// Add restart kvm command
 	restartKvmCmd.Flags().BoolVar(&kvmSafe, "safe", true, "Enable safety checks (default)")
