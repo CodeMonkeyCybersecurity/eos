@@ -5,11 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -25,16 +29,27 @@ var debugMetisCmd = &cobra.Command{
 	Short: "Debug Metis installation and configuration",
 	Long: `Comprehensive diagnostic tool for Metis security alert processing system.
 
-Checks performed:
-1. Project structure and files
-2. Configuration file validity
-3. Temporal server connectivity
-4. Worker process status
-5. Webhook server status
-6. Azure OpenAI configuration
-7. SMTP configuration
-8. Recent workflows in Temporal
-9. Go module dependencies
+Enhanced Phase 1 checks performed:
+
+Infrastructure (6 checks):
+  • Project structure and files
+  • Temporal CLI availability
+  • Binary accessibility (non-root user access)
+  • Port status (7233, 8233, 8080)
+  • Temporal server health (deep check with gRPC verification)
+
+Configuration (3 checks):
+  • Configuration file validity
+  • Azure OpenAI configuration
+  • SMTP configuration
+
+Services (3 checks):
+  • Worker process health (with uptime check)
+  • Webhook server health (with HTTP health endpoint)
+  • Recent workflows in Temporal
+
+System (1 check):
+  • Go module dependencies
 
 Flags:
   --test      Send a test alert through the system
@@ -70,17 +85,25 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	results := []checkResult{}
 
 	// Run all checks
+	// Infrastructure checks
 	results = append(results, checkProjectStructureWithResult(rc, projectDir))
+	results = append(results, checkTemporalCLIWithResult(rc))
+	results = append(results, checkBinaryAccessibilityWithResult(rc)) // NEW: Phase 1
+	results = append(results, checkPortStatusWithResult(rc))           // NEW: Phase 1
+	results = append(results, checkTemporalServerHealthDeepWithResult(rc, config)) // NEW: Phase 1 (replaces old check)
 
+	// Configuration checks
 	config, configResult := checkConfigurationWithResult(rc, projectDir)
 	results = append(results, configResult)
-
-	results = append(results, checkTemporalServerWithResult(rc, config))
-	results = append(results, checkWorkerProcessWithResult(rc))
-	results = append(results, checkWebhookServerWithResult(rc, config))
 	results = append(results, checkAzureOpenAIWithResult(rc, config))
 	results = append(results, checkSMTPConfigWithResult(rc, config))
+
+	// Services checks
+	results = append(results, checkWorkerProcessHealthWithResult(rc))  // NEW: Phase 1 (enhanced)
+	results = append(results, checkWebhookServerHealthWithResult(rc, config)) // NEW: Phase 1 (enhanced)
 	results = append(results, checkRecentWorkflowsWithResult(rc, config))
+
+	// System checks
 	results = append(results, checkGoDependenciesWithResult(rc, projectDir))
 
 	// Display results
@@ -435,6 +458,415 @@ func checkTemporalServer(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	defer resp.Body.Close()
 
 	return nil
+}
+
+// Phase 1 Enhanced Diagnostics
+
+func checkTemporalCLIWithResult(rc *eos_io.RuntimeContext) checkResult {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	temporalPath, err := exec.LookPath("temporal")
+	if err != nil {
+		return checkResult{
+			name:     "Temporal CLI",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("temporal CLI not found in PATH"),
+			remediation: []string{
+				"Install Temporal CLI: curl -sSf https://temporal.download/cli.sh | sh",
+				"Or run: eos repair metis --auto-yes",
+				"Verify installation: temporal --version",
+			},
+		}
+	}
+
+	// Verify it's executable
+	cmd := exec.CommandContext(rc.Ctx, temporalPath, "--version")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return checkResult{
+			name:     "Temporal CLI",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("temporal binary found but not executable: %w", err),
+			remediation: []string{
+				"Fix permissions: sudo chmod 755 " + temporalPath,
+				"Or reinstall: eos repair metis --auto-yes",
+			},
+		}
+	}
+
+	logger.Debug("Temporal CLI check passed", zap.String("path", temporalPath), zap.String("version", string(output)))
+
+	return checkResult{
+		name:     "Temporal CLI",
+		category: "Infrastructure",
+		passed:   true,
+		details:  fmt.Sprintf("Found at %s", temporalPath),
+	}
+}
+
+func checkBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) checkResult {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Get current user
+	currentUser, err := user.Current()
+	if err != nil {
+		logger.Warn("Could not determine current user", zap.Error(err))
+	}
+
+	// Check if temporal is in PATH and accessible
+	temporalPath, err := exec.LookPath("temporal")
+	if err != nil {
+		return checkResult{
+			name:     "Binary Accessibility",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("temporal not in PATH"),
+			remediation: []string{
+				"Run: eos repair metis --auto-yes",
+				"This will copy the binary to /usr/local/bin/temporal",
+			},
+		}
+	}
+
+	// Try to run as non-root user if we're root
+	if currentUser != nil && currentUser.Uid == "0" {
+		// We're running as root, test if ubuntu user can access it
+		cmd := exec.CommandContext(rc.Ctx, "sudo", "-u", "ubuntu", "temporal", "--version")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return checkResult{
+				name:     "Binary Accessibility",
+				category: "Infrastructure",
+				passed:   false,
+				error:    fmt.Errorf("temporal binary not accessible to non-root users: %s", string(output)),
+				remediation: []string{
+					"Binary might be in /root/ directory which non-root users can't access",
+					"Run: eos repair metis --auto-yes",
+					"This will copy the binary to /usr/local/bin/temporal",
+					"Or manually: sudo cp /root/.temporalio/bin/temporal /usr/local/bin/temporal",
+				},
+			}
+		}
+		logger.Debug("Binary accessible to non-root users", zap.String("output", string(output)))
+	}
+
+	// Test basic execution
+	cmd := exec.CommandContext(rc.Ctx, temporalPath, "--version")
+	if err := cmd.Run(); err != nil {
+		return checkResult{
+			name:     "Binary Accessibility",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("temporal binary not executable: %w", err),
+			remediation: []string{
+				"Fix permissions: sudo chmod 755 " + temporalPath,
+			},
+		}
+	}
+
+	return checkResult{
+		name:     "Binary Accessibility",
+		category: "Infrastructure",
+		passed:   true,
+		details:  fmt.Sprintf("Temporal binary accessible at %s", temporalPath),
+	}
+}
+
+func checkPortStatusWithResult(rc *eos_io.RuntimeContext) checkResult {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	ports := map[int]string{
+		7233: "Temporal gRPC",
+		8233: "Temporal UI",
+		8080: "Metis Webhook",
+	}
+
+	var issues []string
+	var details []string
+
+	for port, service := range ports {
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 2*time.Second)
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("Port %d (%s) not listening", port, service))
+			continue
+		}
+		conn.Close()
+
+		// Check what process is using it
+		cmd := exec.CommandContext(rc.Ctx, "lsof", "-i", fmt.Sprintf(":%d", port), "-t")
+		output, err := cmd.Output()
+		if err == nil && len(output) > 0 {
+			pid := strings.TrimSpace(string(output))
+			// Get process name
+			cmdName := exec.CommandContext(rc.Ctx, "ps", "-p", pid, "-o", "comm=")
+			processName, _ := cmdName.Output()
+			details = append(details, fmt.Sprintf("Port %d (%s): PID %s (%s)", port, service, pid, strings.TrimSpace(string(processName))))
+		} else {
+			details = append(details, fmt.Sprintf("Port %d (%s): listening", port, service))
+		}
+	}
+
+	if len(issues) > 0 {
+		// Not all ports listening - this might be okay if services aren't started yet
+		logger.Debug("Port status check", zap.Strings("issues", issues))
+		return checkResult{
+			name:     "Port Status",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("%s", strings.Join(issues, "; ")),
+			remediation: []string{
+				"Start Temporal: sudo systemctl start temporal",
+				"Start Metis services: sudo systemctl start metis-worker metis-webhook",
+				"Or run manually: cd /opt/metis/worker && go run main.go",
+			},
+			details: strings.Join(details, "; "),
+		}
+	}
+
+	return checkResult{
+		name:     "Port Status",
+		category: "Infrastructure",
+		passed:   true,
+		details:  strings.Join(details, "\n"),
+	}
+}
+
+func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if config == nil {
+		return checkResult{
+			name:     "Temporal Server Health",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("config not loaded"),
+			remediation: []string{
+				"Fix configuration first: eos create metis",
+			},
+		}
+	}
+
+	hostPort := config.Temporal.HostPort
+	if hostPort == "" {
+		hostPort = "localhost:7233"
+	}
+
+	// Step 1: Check if port is listening
+	conn, err := net.DialTimeout("tcp", hostPort, 2*time.Second)
+	if err != nil {
+		return checkResult{
+			name:     "Temporal Server Health",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("port %s not listening: %w", hostPort, err),
+			remediation: []string{
+				"Start Temporal server: sudo systemctl start temporal",
+				"Or manually: temporal server start-dev",
+				"Check if port is in use: lsof -i :7233",
+				"View logs: sudo journalctl -u temporal -n 50",
+			},
+		}
+	}
+	conn.Close()
+	logger.Debug("Port is listening", zap.String("hostPort", hostPort))
+
+	// Step 2: Try HTTP health check
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	defer cancel()
+
+	// Try the UI endpoint first (more reliable than gRPC health check without Temporal SDK)
+	uiHost := strings.Replace(hostPort, ":7233", ":8233", 1)
+	healthURL := fmt.Sprintf("http://%s/", uiHost)
+	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
+	if err != nil {
+		logger.Warn("Could not create HTTP request", zap.Error(err))
+	} else {
+		client := &http.Client{Timeout: 3 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			logger.Debug("Temporal UI is accessible", zap.Int("status", resp.StatusCode))
+		} else {
+			logger.Debug("Temporal UI not accessible", zap.Error(err))
+		}
+	}
+
+	// Step 3: Try to run temporal CLI command as verification
+	cmd := exec.CommandContext(rc.Ctx, "temporal", "operator", "cluster", "health")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return checkResult{
+			name:     "Temporal Server Health",
+			category: "Infrastructure",
+			passed:   false,
+			error:    fmt.Errorf("server listening but not responding correctly: %s", string(output)),
+			remediation: []string{
+				"Server might be starting up - wait 30 seconds and retry",
+				"Check logs: sudo journalctl -u temporal -n 50",
+				"Restart server: sudo systemctl restart temporal",
+				"Check for port conflicts: lsof -i :7233",
+				"Verify process is healthy: ps aux | grep temporal",
+			},
+		}
+	}
+
+	logger.Debug("Temporal server health check passed", zap.String("output", string(output)))
+
+	return checkResult{
+		name:     "Temporal Server Health",
+		category: "Infrastructure",
+		passed:   true,
+		details:  fmt.Sprintf("Server healthy at %s", hostPort),
+	}
+}
+
+func checkWorkerProcessHealthWithResult(rc *eos_io.RuntimeContext) checkResult {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if worker is running
+	cmd := exec.CommandContext(rc.Ctx, "pgrep", "-f", "metis.*worker")
+	output, err := cmd.Output()
+	if err != nil {
+		return checkResult{
+			name:     "Worker Process Health",
+			category: "Services",
+			passed:   false,
+			error:    fmt.Errorf("worker process not running"),
+			remediation: []string{
+				"Start worker: sudo systemctl start metis-worker",
+				"Or manually: cd /opt/metis/worker && go run main.go",
+				"Check logs: sudo journalctl -u metis-worker -n 50",
+				"Ensure Temporal server is running first",
+			},
+		}
+	}
+
+	pids := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(pids) == 0 || pids[0] == "" {
+		return checkResult{
+			name:     "Worker Process Health",
+			category: "Services",
+			passed:   false,
+			error:    fmt.Errorf("worker process not found"),
+			remediation: []string{
+				"Start worker: sudo systemctl start metis-worker",
+				"Check logs: sudo journalctl -u metis-worker -n 50",
+			},
+		}
+	}
+
+	pid := pids[0]
+	logger.Debug("Worker process found", zap.String("pid", pid))
+
+	// Check how long it's been running (basic health check)
+	cmdPs := exec.CommandContext(rc.Ctx, "ps", "-p", pid, "-o", "etime=")
+	uptime, err := cmdPs.Output()
+	if err != nil {
+		logger.Warn("Could not get process uptime", zap.Error(err))
+	}
+
+	details := fmt.Sprintf("Worker running (PID %s)", pid)
+	if len(uptime) > 0 {
+		details += fmt.Sprintf(", uptime: %s", strings.TrimSpace(string(uptime)))
+	}
+
+	return checkResult{
+		name:     "Worker Process Health",
+		category: "Services",
+		passed:   true,
+		details:  details,
+	}
+}
+
+func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if webhook is running
+	cmd := exec.CommandContext(rc.Ctx, "pgrep", "-f", "metis.*webhook")
+	output, err := cmd.Output()
+	if err != nil {
+		return checkResult{
+			name:     "Webhook Server Health",
+			category: "Services",
+			passed:   false,
+			error:    fmt.Errorf("webhook process not running"),
+			remediation: []string{
+				"Start webhook: sudo systemctl start metis-webhook",
+				"Or manually: cd /opt/metis/webhook && go run main.go",
+				"Check logs: sudo journalctl -u metis-webhook -n 50",
+			},
+		}
+	}
+
+	pids := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(pids) == 0 || pids[0] == "" {
+		return checkResult{
+			name:     "Webhook Server Health",
+			category: "Services",
+			passed:   false,
+			error:    fmt.Errorf("webhook process not found"),
+			remediation: []string{
+				"Start webhook: sudo systemctl start metis-webhook",
+			},
+		}
+	}
+
+	pid := pids[0]
+	logger.Debug("Webhook process found", zap.String("pid", pid))
+
+	// Try to hit the health endpoint
+	webhookPort := 8080
+	if config != nil && config.Webhook.Port > 0 {
+		webhookPort = config.Webhook.Port
+	}
+
+	healthURL := fmt.Sprintf("http://localhost:%d/health", webhookPort)
+	ctx, cancel := context.WithTimeout(rc.Ctx, 2*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
+	if err == nil {
+		client := &http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return checkResult{
+				name:     "Webhook Server Health",
+				category: "Services",
+				passed:   false,
+				error:    fmt.Errorf("webhook process running (PID %s) but health check failed: %w", pid, err),
+				remediation: []string{
+					"Check logs: sudo journalctl -u metis-webhook -n 50",
+					"Restart webhook: sudo systemctl restart metis-webhook",
+					"Verify port is correct in config.yaml",
+				},
+			}
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return checkResult{
+				name:     "Webhook Server Health",
+				category: "Services",
+				passed:   false,
+				error:    fmt.Errorf("webhook health check returned status %d", resp.StatusCode),
+				remediation: []string{
+					"Check logs: sudo journalctl -u metis-webhook -n 50",
+					"Restart webhook: sudo systemctl restart metis-webhook",
+				},
+			}
+		}
+	}
+
+	details := fmt.Sprintf("Webhook running (PID %s), health check passed", pid)
+
+	return checkResult{
+		name:     "Webhook Server Health",
+		category: "Services",
+		passed:   true,
+		details:  details,
+	}
 }
 
 func checkWorkerProcessWithResult(rc *eos_io.RuntimeContext) checkResult {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -386,42 +385,59 @@ func fixTemporalPath(rc *eos_io.RuntimeContext) error {
 func startTemporalServer(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Starting Temporal server in background...")
+	logger.Info("Starting Temporal server via systemd")
 
-	// Check if temporal CLI is available
-	temporalPath, err := exec.LookPath("temporal")
-	if err != nil {
-		return fmt.Errorf("temporal CLI not found in PATH - fix PATH issue first")
+	// Check if temporal service exists
+	checkCmd := exec.CommandContext(rc.Ctx, "systemctl", "status", "temporal.service")
+	if err := checkCmd.Run(); err != nil {
+		// Service doesn't exist - create it
+		logger.Info("Creating Temporal systemd service")
+
+		temporalService := `[Unit]
+Description=Temporal Server (Development Mode)
+After=network.target
+Documentation=https://docs.temporal.io/
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/temporal server start-dev --db-filename /var/lib/temporal/temporal.db
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Create data directory if it doesn't exist
+RuntimeDirectory=temporal
+StateDirectory=temporal
+
+[Install]
+WantedBy=multi-user.target
+`
+
+		temporalServicePath := "/etc/systemd/system/temporal.service"
+		if err := os.WriteFile(temporalServicePath, []byte(temporalService), 0644); err != nil {
+			return fmt.Errorf("failed to write temporal service: %w", err)
+		}
+
+		logger.Info("Temporal service file created", zap.String("path", temporalServicePath))
+
+		// Reload systemd
+		if err := exec.CommandContext(rc.Ctx, "systemctl", "daemon-reload").Run(); err != nil {
+			return fmt.Errorf("failed to reload systemd: %w", err)
+		}
 	}
 
-	// Start temporal server in background
-	cmd := exec.CommandContext(rc.Ctx, temporalPath, "server", "start-dev")
-
-	// Redirect output to log file
-	logFile := "/var/log/eos/temporal-server.log"
-	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-		logger.Warn("Could not create log directory", zap.Error(err))
+	// Enable the service
+	logger.Info("Enabling Temporal service")
+	if err := exec.CommandContext(rc.Ctx, "systemctl", "enable", "temporal.service").Run(); err != nil {
+		logger.Warn("Failed to enable temporal service", zap.Error(err))
 	}
 
-	if f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
-		cmd.Stdout = f
-		cmd.Stderr = f
-		defer f.Close()
-	}
-
-	// Start the process
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start temporal server: %w", err)
-	}
-
-	pid := cmd.Process.Pid
-	logger.Info("Temporal server started",
-		zap.Int("pid", pid),
-		zap.String("log", logFile))
-
-	// Detach the process so it continues after this command exits
-	if err := cmd.Process.Release(); err != nil {
-		logger.Warn("Could not release process", zap.Error(err))
+	// Start the service
+	logger.Info("Starting Temporal service")
+	if err := exec.CommandContext(rc.Ctx, "systemctl", "start", "temporal.service").Run(); err != nil {
+		return fmt.Errorf("failed to start temporal service: %w", err)
 	}
 
 	// Wait for server to be ready (with timeout)
@@ -442,6 +458,9 @@ func startTemporalServer(rc *eos_io.RuntimeContext) error {
 			checkCmd := exec.CommandContext(context.Background(), "nc", "-z", "localhost", "7233")
 			if checkCmd.Run() == nil {
 				fmt.Println(" ready!")
+				logger.Info("Temporal server is running",
+					zap.String("status", "active"),
+					zap.String("check", "systemctl status temporal"))
 				return nil
 			}
 		}

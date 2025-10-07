@@ -678,9 +678,33 @@ func installDependencies(rc *eos_io.RuntimeContext, projectDir string) error {
 func createSystemdServices(rc *eos_io.RuntimeContext, projectDir string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Temporal server service
+	temporalService := `[Unit]
+Description=Temporal Server (Development Mode)
+After=network.target
+Documentation=https://docs.temporal.io/
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/temporal server start-dev --db-filename /var/lib/temporal/temporal.db
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Create data directory if it doesn't exist
+RuntimeDirectory=temporal
+StateDirectory=temporal
+
+[Install]
+WantedBy=multi-user.target
+`
+
 	workerService := `[Unit]
 Description=Metis Temporal Worker
-After=network.target
+After=network.target temporal.service
+Requires=temporal.service
 
 [Service]
 Type=simple
@@ -696,7 +720,8 @@ WantedBy=multi-user.target
 
 	webhookService := `[Unit]
 Description=Metis Webhook Server
-After=network.target
+After=network.target temporal.service
+Requires=temporal.service
 
 [Service]
 Type=simple
@@ -710,6 +735,12 @@ RestartSec=10
 WantedBy=multi-user.target
 `
 
+	// Write Temporal service to /etc/systemd/system directly (requires root)
+	temporalServicePath := "/etc/systemd/system/temporal.service"
+	if err := os.WriteFile(temporalServicePath, []byte(temporalService), 0644); err != nil {
+		return fmt.Errorf("failed to write temporal service: %w", err)
+	}
+
 	workerServicePath := filepath.Join(projectDir, "metis-worker.service")
 	if err := os.WriteFile(workerServicePath, []byte(workerService), 0644); err != nil {
 		return fmt.Errorf("failed to write worker service: %w", err)
@@ -721,9 +752,25 @@ WantedBy=multi-user.target
 	}
 
 	logger.Info("Systemd service files created",
+		zap.String("temporal", temporalServicePath),
 		zap.String("worker", workerServicePath),
 		zap.String("webhook", webhookServicePath))
-	logger.Info("terminal prompt: To enable services: sudo cp /opt/metis/*.service /etc/systemd/system/ && sudo systemctl daemon-reload")
+
+	// Enable and start Temporal service
+	logger.Info("Enabling Temporal service")
+	if err := exec.CommandContext(rc.Ctx, "systemctl", "daemon-reload").Run(); err != nil {
+		logger.Warn("Failed to reload systemd daemon", zap.Error(err))
+	}
+
+	if err := exec.CommandContext(rc.Ctx, "systemctl", "enable", "temporal.service").Run(); err != nil {
+		logger.Warn("Failed to enable temporal service", zap.Error(err))
+	}
+
+	if err := exec.CommandContext(rc.Ctx, "systemctl", "start", "temporal.service").Run(); err != nil {
+		logger.Warn("Failed to start temporal service", zap.Error(err))
+	}
+
+	logger.Info("terminal prompt: To enable Metis services: sudo cp /opt/metis/*.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable metis-worker metis-webhook && sudo systemctl start metis-worker metis-webhook")
 
 	return nil
 }
