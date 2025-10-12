@@ -22,7 +22,7 @@ func TestParseOSRelease(t *testing.T) {
 	ubuntu2404Content := `PRETTY_NAME="Ubuntu 24.04.2 LTS"
 NAME="Ubuntu"
 VERSION_ID="24.04"
-VERSION="24.04.2 LTS (Noble Numbat)"
+VERSION="24.04.2 LTS"
 VERSION_CODENAME=noble
 ID=ubuntu
 ID_LIKE=debian
