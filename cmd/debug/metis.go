@@ -90,7 +90,7 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	results = append(results, checkProjectStructureWithResult(rc, projectDir))
 	results = append(results, checkTemporalCLIWithResult(rc))
 	results = append(results, checkBinaryAccessibilityWithResult(rc)) // NEW: Phase 1
-	results = append(results, checkPortStatusWithResult(rc))           // NEW: Phase 1
+	results = append(results, checkPortStatusWithResult(rc, config))   // NEW: Phase 1 - now accepts config for dynamic port
 	results = append(results, checkTemporalServerHealthDeepWithResult(rc, config)) // NEW: Phase 1 (replaces old check)
 
 	// Configuration checks
@@ -597,8 +597,14 @@ func checkBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) checkResult {
 	}
 }
 
-func checkPortStatusWithResult(rc *eos_io.RuntimeContext) checkResult {
+func checkPortStatusWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// Determine webhook port from config, default to 8080
+	webhookPort := 8080
+	if config != nil && config.Webhook.Port > 0 {
+		webhookPort = config.Webhook.Port
+	}
 
 	ports := []struct {
 		port    int
@@ -606,7 +612,7 @@ func checkPortStatusWithResult(rc *eos_io.RuntimeContext) checkResult {
 	}{
 		{7233, "Temporal gRPC"},
 		{8233, "Temporal UI"},
-		{8080, "Metis Webhook"},
+		{webhookPort, "Metis Webhook"},
 	}
 
 	var listening []string
@@ -676,6 +682,11 @@ func checkPortStatusWithResult(rc *eos_io.RuntimeContext) checkResult {
 	}
 
 	logger.Debug("All ports listening", zap.Strings("ports", listening))
+
+	// Add note about configured webhook port if different from default
+	if config != nil && config.Webhook.Port > 0 && config.Webhook.Port != 8080 {
+		detailsText += fmt.Sprintf("\n  ℹ Webhook port %d from config.yaml", config.Webhook.Port)
+	}
 
 	return checkResult{
 		name:     "Port Status",

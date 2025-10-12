@@ -42,9 +42,9 @@ eos_io → shared → eos_io (CYCLE!)
 - This creates circular dependencies that prevent compilation
 
 **Impact**: 
-- ❌ Build fails: `import cycle not allowed`
-- ❌ Cannot use shared frameworks in files that also use eos_io
-- ❌ Significantly limits adoption of our consolidation work
+-  Build fails: `import cycle not allowed`
+-  Cannot use shared frameworks in files that also use eos_io
+-  Significantly limits adoption of our consolidation work
 
 ### Architectural Design Flaw
 
@@ -90,7 +90,7 @@ Once import cycles are resolved:
 
 **Cannot run due to import cycle:**
 ```bash
-❌ go build -o /tmp/eos-build ./cmd/  # FAILS: import cycle not allowed
+ go build -o /tmp/eos-build ./cmd/  # FAILS: import cycle not allowed
 ⏳ golangci-lint run                  # Blocked by build failure  
 ⏳ go test -v ./pkg/...               # Blocked by build failure
 ```

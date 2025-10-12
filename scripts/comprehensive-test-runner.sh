@@ -58,7 +58,7 @@ run_test_suite() {
     else
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
-        echo -e "${RED}❌ $suite_name failed (${duration}s)${NC}"
+        echo -e "${RED} $suite_name failed (${duration}s)${NC}"
         echo -e "${YELLOW}   See log: $log_file${NC}"
         ((FAILED_TESTS++))
         return 1
@@ -90,7 +90,7 @@ echo -e "${BLUE}🔨 Compiling all packages...${NC}"
 if go build -o /tmp/eos-test-build ./cmd/ > "$LOG_DIR/build-$TIMESTAMP.log" 2>&1; then
     echo -e "${GREEN} Build successful${NC}"
 else
-    echo -e "${RED}❌ Build failed${NC}"
+    echo -e "${RED} Build failed${NC}"
     echo -e "${RED}Cannot continue with tests. See $LOG_DIR/build-$TIMESTAMP.log${NC}"
     exit 1
 fi
@@ -137,7 +137,7 @@ if go test -v -timeout="$TEST_TIMEOUT" \
         echo -e "${GREEN} Coverage ${COVERAGE}% meets threshold${NC}"
     fi
 else
-    echo -e "${RED}❌ Unit tests failed${NC}"
+    echo -e "${RED} Unit tests failed${NC}"
     ((FAILED_TESTS++))
 fi
 
@@ -172,7 +172,7 @@ for pkg in "${!FUZZ_TARGETS[@]}"; do
             > "$LOG_DIR/fuzz-${pkg##*/}-$test-$TIMESTAMP.log" 2>&1; then
             echo -e "${GREEN}     $test passed${NC}"
         else
-            echo -e "${RED}    ❌ $test failed or found crashes${NC}"
+            echo -e "${RED}     $test failed or found crashes${NC}"
             ((FUZZ_FAILED++))
         fi
     done
@@ -182,7 +182,7 @@ if [ $FUZZ_FAILED -eq 0 ]; then
     echo -e "${GREEN} All fuzz tests passed${NC}"
     ((PASSED_TESTS++))
 else
-    echo -e "${RED}❌ $FUZZ_FAILED fuzz tests failed${NC}"
+    echo -e "${RED} $FUZZ_FAILED fuzz tests failed${NC}"
     ((FAILED_TESTS++))
 fi
 
@@ -206,7 +206,7 @@ for pkg in "${CRITICAL_PACKAGES[@]}"; do
     if go test -race -timeout=2m "./pkg/$pkg/..." > "$LOG_DIR/race-$pkg-$TIMESTAMP.log" 2>&1; then
         echo -e "${GREEN}   $pkg: No races detected${NC}"
     else
-        echo -e "${RED}  ❌ $pkg: Race conditions detected${NC}"
+        echo -e "${RED}   $pkg: Race conditions detected${NC}"
         ((RACE_FAILED++))
     fi
 done
@@ -215,7 +215,7 @@ if [ $RACE_FAILED -eq 0 ]; then
     echo -e "${GREEN} No race conditions detected${NC}"
     ((PASSED_TESTS++))
 else
-    echo -e "${RED}❌ Race conditions found in $RACE_FAILED packages${NC}"
+    echo -e "${RED} Race conditions found in $RACE_FAILED packages${NC}"
     ((FAILED_TESTS++))
 fi
 
@@ -341,7 +341,7 @@ if [ $FAILED_TESTS -eq 0 ]; then
     echo -e "${BLUE}📄 Full report: $REPORT_FILE${NC}"
     exit 0
 else
-    echo -e "${RED}❌ Some tests failed!${NC}"
+    echo -e "${RED} Some tests failed!${NC}"
     echo -e "${YELLOW}📄 See full report: $REPORT_FILE${NC}"
     echo -e "${YELLOW} Check logs in: $LOG_DIR${NC}"
     exit 1

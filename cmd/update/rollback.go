@@ -592,7 +592,7 @@ func sendRollbackNotifications(rc *eos_io.RuntimeContext, result *RollbackResult
 	// For now, just log the notification
 	status := " SUCCESS"
 	if !result.Success {
-		status = "❌ FAILED"
+		status = " FAILED"
 	}
 
 	message := fmt.Sprintf("%s Rollback for %s: %s → %s (Duration: %s)",

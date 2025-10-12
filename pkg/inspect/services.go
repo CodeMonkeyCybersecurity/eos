@@ -30,19 +30,19 @@ func (i *Inspector) DiscoverServices() (*ServicesInfo, error) {
 	// Discover Nginx
 	if nginx, err := i.discoverNginx(); err == nil && nginx != nil {
 		info.Nginx = nginx
-		logger.Info("🌐 Discovered Nginx configuration")
+		logger.Info(" Discovered Nginx configuration")
 	}
 
 	// Discover Apache
 	if apache, err := i.discoverApache(); err == nil && apache != nil {
 		info.Apache = apache
-		logger.Info("🌐 Discovered Apache configuration")
+		logger.Info(" Discovered Apache configuration")
 	}
 
 	// Discover Caddy
 	if caddy, err := i.discoverCaddy(); err == nil && caddy != nil {
 		info.Caddy = caddy
-		logger.Info("🌐 Discovered Caddy configuration")
+		logger.Info(" Discovered Caddy configuration")
 	}
 
 	// Discover PostgreSQL

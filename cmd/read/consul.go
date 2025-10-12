@@ -214,7 +214,7 @@ func displayServices(logger otelzap.LoggerWithCtx) error {
 func displayHealthStatus(logger otelzap.LoggerWithCtx) error {
 	// Check if agent is responding
 	if err := exec.Command("consul", "info").Run(); err != nil {
-		logger.Info("terminal prompt:   Status: ❌ Consul agent not responding")
+		logger.Info("terminal prompt:   Status:  Consul agent not responding")
 		return err
 	}
 
@@ -223,7 +223,7 @@ func displayHealthStatus(logger otelzap.LoggerWithCtx) error {
 	// Check service status
 	output, err := exec.Command("systemctl", "is-active", "consul").Output()
 	if err != nil {
-		logger.Info("terminal prompt:   Service: ❌ not running")
+		logger.Info("terminal prompt:   Service:  not running")
 	} else {
 		status := strings.TrimSpace(string(output))
 		if status == "active" {

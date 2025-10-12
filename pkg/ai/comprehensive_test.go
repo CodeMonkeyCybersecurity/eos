@@ -16,7 +16,7 @@ func TestConfigManager(t *testing.T) {
 		cm := NewConfigManager()
 		assert.NotNil(t, cm)
 		assert.NotNil(t, cm.config)
-		
+
 		// Test default values
 		config := cm.GetConfig()
 		assert.NotNil(t, config)
@@ -24,13 +24,13 @@ func TestConfigManager(t *testing.T) {
 
 	t.Run("load config", func(t *testing.T) {
 		cm := NewConfigManager()
-		
+
 		// Test loading config (may fail if file doesn't exist, but shouldn't panic)
 		err := cm.LoadConfig()
 		if err != nil {
 			t.Logf("LoadConfig returned error (expected if no config file): %v", err)
 		}
-		
+
 		// Config should still be accessible
 		config := cm.GetConfig()
 		assert.NotNil(t, config)
@@ -38,18 +38,18 @@ func TestConfigManager(t *testing.T) {
 
 	t.Run("save and load config", func(t *testing.T) {
 		cm := NewConfigManager()
-		
+
 		// Create test config
 		testConfig := &AIConfig{
-			Provider: "azure-openai",
-			APIKey:   "test-key-456",
-			BaseURL:  "https://test.openai.azure.com",
-			Model:    "gpt-3.5-turbo",
+			Provider:  "azure-openai",
+			APIKey:    "test-key-456",
+			BaseURL:   "https://test.openai.azure.com",
+			Model:     "gpt-3.5-turbo",
 			MaxTokens: 2000,
 		}
-		
+
 		cm.config = testConfig
-		
+
 		// Test config retrieval
 		config := cm.GetConfig()
 		assert.Equal(t, testConfig.Provider, config.Provider)
@@ -61,7 +61,7 @@ func TestConfigManager(t *testing.T) {
 
 	t.Run("config validation", func(t *testing.T) {
 		cm := NewConfigManager()
-		
+
 		// Test valid config
 		validConfig := &AIConfig{
 			Provider:  "anthropic",
@@ -71,7 +71,7 @@ func TestConfigManager(t *testing.T) {
 			MaxTokens: 1000,
 		}
 		cm.config = validConfig
-		
+
 		// Test config fields are accessible
 		config := cm.GetConfig()
 		assert.Equal(t, "anthropic", config.Provider)
@@ -79,11 +79,11 @@ func TestConfigManager(t *testing.T) {
 		assert.Equal(t, "https://api.anthropic.com/v1", config.BaseURL)
 		assert.Equal(t, "claude-3-sonnet-20240229", config.Model)
 		assert.Equal(t, 1000, config.MaxTokens)
-		
+
 		// Test empty config handling
 		emptyConfig := &AIConfig{}
 		cm.config = emptyConfig
-		
+
 		config = cm.GetConfig()
 		assert.Equal(t, "", config.Provider)
 		assert.Equal(t, "", config.APIKey)
@@ -137,14 +137,14 @@ func TestGetProviderDefaults(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetProviderDefaults(tt.provider)
-			
+
 			require.NotNil(t, result)
 			assert.Equal(t, tt.expected.Provider, result.Provider)
 			assert.Equal(t, tt.expected.BaseURL, result.BaseURL)
 			assert.Equal(t, tt.expected.Model, result.Model)
 			assert.Equal(t, tt.expected.MaxTokens, result.MaxTokens)
 			assert.Equal(t, tt.expected.Timeout, result.Timeout)
-			
+
 			if tt.provider == "azure-openai" {
 				assert.Equal(t, tt.expected.AzureAPIVersion, result.AzureAPIVersion)
 			}
@@ -182,7 +182,7 @@ func TestAIConfigFields(t *testing.T) {
 
 	t.Run("zero values", func(t *testing.T) {
 		config := &AIConfig{}
-		
+
 		assert.Equal(t, "", config.Provider)
 		assert.Equal(t, "", config.APIKey)
 		assert.Equal(t, "", config.APIKeyVault)
@@ -268,13 +268,13 @@ func TestAIMessage(t *testing.T) {
 
 	t.Run("empty message", func(t *testing.T) {
 		msg := AIMessage{}
-		
+
 		assert.Equal(t, "", msg.Role)
 		assert.Equal(t, "", msg.Content)
 	})
 
 	t.Run("message with special characters", func(t *testing.T) {
-		specialContent := "Message with émojis 🚀 and\nnewlines\tand\ttabs"
+		specialContent := "Message with émojis  and\nnewlines\tand\ttabs"
 		msg := AIMessage{
 			Role:    "user",
 			Content: specialContent,
@@ -305,12 +305,12 @@ func TestAIAssistantStructure(t *testing.T) {
 	t.Run("assistant with azure config", func(t *testing.T) {
 		assistant := &AIAssistant{
 			provider:        "azure-openai",
-			apiKey:         "azure-key-123",
-			azureEndpoint:  "https://test.openai.azure.com",
+			apiKey:          "azure-key-123",
+			azureEndpoint:   "https://test.openai.azure.com",
 			azureAPIVersion: "2024-02-15-preview",
 			azureDeployment: "gpt-4-deployment",
-			model:          "gpt-4",
-			maxTokens:      2000,
+			model:           "gpt-4",
+			maxTokens:       2000,
 		}
 
 		assert.Equal(t, "azure-openai", assistant.provider)
@@ -348,7 +348,7 @@ func TestAIResponseStructure(t *testing.T) {
 
 	t.Run("empty response", func(t *testing.T) {
 		response := &AIResponse{}
-		
+
 		assert.Len(t, response.Choices, 0)
 		assert.Equal(t, 0, response.Usage.PromptTokens)
 		assert.Equal(t, 0, response.Usage.CompletionTokens)
@@ -367,14 +367,14 @@ func TestUsageTracking(t *testing.T) {
 		assert.Equal(t, 100, usage.PromptTokens)
 		assert.Equal(t, 50, usage.CompletionTokens)
 		assert.Equal(t, 150, usage.TotalTokens)
-		
+
 		// Verify total is sum of prompt and completion
 		assert.Equal(t, usage.PromptTokens+usage.CompletionTokens, usage.TotalTokens)
 	})
 
 	t.Run("zero usage", func(t *testing.T) {
 		usage := AIUsage{}
-		
+
 		assert.Equal(t, 0, usage.PromptTokens)
 		assert.Equal(t, 0, usage.CompletionTokens)
 		assert.Equal(t, 0, usage.TotalTokens)
@@ -384,9 +384,9 @@ func TestUsageTracking(t *testing.T) {
 func TestRequestStructure(t *testing.T) {
 	t.Run("request structure validation", func(t *testing.T) {
 		tests := []struct {
-			name     string
-			request  AIRequest
-			isValid  bool
+			name    string
+			request AIRequest
+			isValid bool
 		}{
 			{
 				name: "valid request",
@@ -447,14 +447,17 @@ func TestRequestStructure(t *testing.T) {
 func TestChatErrorHandling(t *testing.T) {
 	t.Run("chat with empty API key", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		assistant := &AIAssistant{
 			provider:  "anthropic",
 			apiKey:    "", // Empty API key
 			baseURL:   "https://api.anthropic.com/v1",
 			model:     "claude-3-sonnet-20240229",
 			maxTokens: 100,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second})
+				return c
+			}(),
 		}
 
 		ctx := &ConversationContext{
@@ -469,14 +472,17 @@ func TestChatErrorHandling(t *testing.T) {
 
 	t.Run("chat with invalid URL", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		assistant := &AIAssistant{
 			provider:  "anthropic",
 			apiKey:    "sk-test123",
 			baseURL:   "invalid-url", // Invalid URL
 			model:     "claude-3-sonnet-20240229",
 			maxTokens: 100,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second})
+				return c
+			}(),
 		}
 
 		ctx := &ConversationContext{

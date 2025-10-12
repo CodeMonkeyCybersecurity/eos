@@ -772,7 +772,7 @@ func PrintBootstrapStateReport(rc *eos_io.RuntimeContext, state *BootstrapState)
 	// Service status
 	logger.Info("\nService Status:")
 	for name, component := range state.Components {
-		status := "❌"
+		status := ""
 		if component.Installed && component.Running && component.Healthy {
 			status = ""
 		} else if component.Installed && component.Running {

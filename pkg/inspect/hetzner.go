@@ -39,7 +39,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("Failed to discover Hetzner networks", zap.Error(err))
 	} else {
 		info.Networks = networks
-		logger.Info("🌐 Discovered Hetzner networks", zap.Int("count", len(networks)))
+		logger.Info(" Discovered Hetzner networks", zap.Int("count", len(networks)))
 	}
 
 	// Discover firewalls
@@ -71,7 +71,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("Failed to discover Hetzner floating IPs", zap.Error(err))
 	} else {
 		info.FloatingIPs = fips
-		logger.Info("🌐 Discovered Hetzner floating IPs", zap.Int("count", len(fips)))
+		logger.Info(" Discovered Hetzner floating IPs", zap.Int("count", len(fips)))
 	}
 
 	logger.Info(" Hetzner discovery completed")

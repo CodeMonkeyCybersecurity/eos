@@ -121,7 +121,7 @@ func InstallGoTools(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Add GOPATH/bin to PATH reminder
-	fmt.Println("\n📝 Make sure your GOPATH/bin is in your PATH:")
+	fmt.Println("\n Make sure your GOPATH/bin is in your PATH:")
 	fmt.Printf("   export PATH=$PATH:%s\n", goBin)
 	fmt.Println("   Add this to your ~/.bashrc or ~/.zshrc to make it permanent")
 

@@ -45,7 +45,7 @@ func RunMapping(rc *eos_io.RuntimeContext, cfg interface{}, authenticateFunc fun
 		utils.DefaultStr(port, "55000"))
 
 	// INTERVENE - Fetch and process agent data
-	log.Info("🚀 Fetching agents from API")
+	log.Info(" Fetching agents from API")
 
 	// Authenticate using provided function
 	token, err := authenticateFunc(rc, cfg)
@@ -87,7 +87,7 @@ func RunMapping(rc *eos_io.RuntimeContext, cfg interface{}, authenticateFunc fun
 		if pkgName != "" {
 			fmt.Printf(" Recommended package: %s\n", pkgName)
 		} else {
-			fmt.Printf("❌ No suitable package for version %s (%s)\n",
+			fmt.Printf(" No suitable package for version %s (%s)\n",
 				agent.OS.Version, agent.OS.Architecture)
 		}
 	}

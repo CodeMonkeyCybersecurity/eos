@@ -52,13 +52,13 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	}
 
 	if proxyAddress == "" {
-		logger.Info("🌐 terminal prompt: Enter proxy address (or press Enter to skip)")
+		logger.Info(" terminal prompt: Enter proxy address (or press Enter to skip)")
 		fmt.Print("Enter proxy address (or press Enter to skip): ")
 		_, _ = fmt.Scanln(&proxyAddress)
 	}
 
 	// INTERVENE - Deploy Docker configuration
-	logger.Info("🚀 Starting Docker deployment")
+	logger.Info(" Starting Docker deployment")
 
 	// Change to /opt directory
 	if err := os.Chdir("/opt"); err != nil {

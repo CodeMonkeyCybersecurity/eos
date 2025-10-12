@@ -296,7 +296,7 @@ func (p *ProgressReporter) Complete(message string) {
 
 // Failed marks the task as failed
 func (p *ProgressReporter) Failed(message string, err error) {
-	p.logger.Error(fmt.Sprintf("terminal prompt: ❌ %s", message), zap.Error(err))
+	p.logger.Error(fmt.Sprintf("terminal prompt:  %s", message), zap.Error(err))
 }
 
 // UserHelper manages system users

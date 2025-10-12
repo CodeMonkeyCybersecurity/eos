@@ -62,7 +62,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	}
 
 	// INTERVENE - Update credentials
-	logger.Info("🚀 Updating Wazuh credentials", zap.String("deploy_type", deployType))
+	logger.Info(" Updating Wazuh credentials", zap.String("deploy_type", deployType))
 
 	// Change to deployment directory
 	deployDir := filepath.Join("/opt/wazuh-docker", deployType)
@@ -71,7 +71,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	}
 
 	// Stop containers
-	logger.Info("🛑 Stopping containers for credential update")
+	logger.Info(" Stopping containers for credential update")
 	if err := exec.Command("docker", "compose", "down").Run(); err != nil {
 		logger.Warn(" Failed to stop containers", zap.Error(err))
 	}

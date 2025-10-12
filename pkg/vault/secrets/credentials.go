@@ -83,7 +83,7 @@ func displayDatabaseCredentialsIntroduction(rc *eos_io.RuntimeContext) error {
 This will configure static database credentials in Vault.
 Use this for applications that need persistent database access.
 
-📝 Note: For enhanced security, consider using dynamic credentials instead.
+ Note: For enhanced security, consider using dynamic credentials instead.
 
 `
 

@@ -142,7 +142,7 @@ func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	for _, result := range results {
 		status := " PASS"
 		if !result.Success {
-			status = "❌ FAIL"
+			status = " FAIL"
 		}
 
 		logger.Info(fmt.Sprintf("%s: %s", status, result.CheckName),

@@ -56,7 +56,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 		logger.Warn("Failed to discover KVM networks", zap.Error(err))
 	} else {
 		info.Networks = networks
-		logger.Info("🌐 Discovered KVM networks", zap.Int("count", len(networks)))
+		logger.Info(" Discovered KVM networks", zap.Int("count", len(networks)))
 	}
 
 	// Discover storage pools

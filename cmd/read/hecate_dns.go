@@ -79,7 +79,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		fmt.Printf("  Duration: %s\n\n", result.Duration)
 
 		if len(result.Created) > 0 {
-			fmt.Printf("📝 Created domains: %v\n", result.Created)
+			fmt.Printf(" Created domains: %v\n", result.Created)
 		}
 		if len(result.Updated) > 0 {
 			fmt.Printf(" Updated domains: %v\n", result.Updated)
@@ -88,7 +88,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 			fmt.Printf("  Deleted domains: %v\n", result.Deleted)
 		}
 		if len(result.Errors) > 0 {
-			fmt.Printf("❌ Errors:\n")
+			fmt.Printf(" Errors:\n")
 			for _, errMsg := range result.Errors {
 				fmt.Printf("  - %s\n", errMsg)
 			}
@@ -125,12 +125,12 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	if domain != "" {
 		// Show specific domain
 		if record, exists := records[domain]; exists {
-			fmt.Printf("🌐 DNS Record: %s\n", domain)
+			fmt.Printf(" DNS Record: %s\n", domain)
 			fmt.Printf("  Type:  %s\n", record.Type)
 			fmt.Printf("  Value: %s\n", record.Value)
 			fmt.Printf("  TTL:   %d\n", record.TTL)
 		} else {
-			fmt.Printf("❌ Domain not found: %s\n", domain)
+			fmt.Printf(" Domain not found: %s\n", domain)
 		}
 		return nil
 	}
@@ -142,7 +142,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		return nil
 	}
 
-	fmt.Printf("🌐 Hecate DNS Records (%d total):\n\n", len(records))
+	fmt.Printf(" Hecate DNS Records (%d total):\n\n", len(records))
 
 	if format == "json" {
 		// JSON output

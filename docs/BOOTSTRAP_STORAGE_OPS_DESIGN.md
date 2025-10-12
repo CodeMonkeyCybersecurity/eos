@@ -1,6 +1,6 @@
 # Bootstrap Storage Operations Integration
 
-> **📝 Documentation has been moved inline with the code for better maintainability.**
+> ** Documentation has been moved inline with the code for better maintainability.**
 > 
 > The comprehensive bootstrap storage operations documentation is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 
@@ -14,7 +14,7 @@ For detailed bootstrap storage operations documentation, see the inline comments
 - **Role Assignment**: `pkg/environments/roles.go` - Dynamic role assignment logic
 - **Node Registration**: `pkg/bootstrap/registration.go` - Node registration and cluster joining
 
-## Implementation Status: ✅ HASHICORP STACK
+## Implementation Status:  HASHICORP STACK
 
 **Date:** 2025-10-10  
 **Architecture:** HashiCorp Stack (Consul, Nomad, Vault)  

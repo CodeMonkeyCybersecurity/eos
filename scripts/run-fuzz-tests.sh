@@ -40,12 +40,12 @@ preflight_check() {
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
         cd "$expected_root" || { 
-            echo -e "${RED}❌ Failed to change to project root${NC}"
+            echo -e "${RED} Failed to change to project root${NC}"
             exit 1
         }
         return 0
     else
-        echo -e "${RED}❌ ERROR: Not in Eos project directory${NC}"
+        echo -e "${RED} ERROR: Not in Eos project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
         echo -e "${YELLOW}To run this script correctly:${NC}"
@@ -70,7 +70,7 @@ verify_tools() {
     echo -e "${CYAN}Verifying required tools...${NC}"
     
     if ! command -v go &> /dev/null; then
-        echo -e "${RED}❌ ERROR: Go is not installed${NC}"
+        echo -e "${RED} ERROR: Go is not installed${NC}"
         echo ""
         echo -e "${YELLOW}To install Go:${NC}"
         echo -e "   ${GREEN}sudo apt-get update && sudo apt-get install -y golang-go${NC}"
@@ -82,7 +82,7 @@ verify_tools() {
 }
 
 # Run preflight checks
-echo -e "${PURPLE}🚀 Eos Fuzz Test Runner - Preflight${NC}"
+echo -e "${PURPLE} Eos Fuzz Test Runner - Preflight${NC}"
 echo "===================================="
 echo ""
 
@@ -133,7 +133,7 @@ run_single_fuzz_test() {
     local log_file="${LOG_DIR}/${test_function}_${TIMESTAMP}.log"
     local start_time=$(date +%s)
     
-    echo "🚀 Running ${test_function} in ${test_package} for ${duration}..."
+    echo " Running ${test_function} in ${test_package} for ${duration}..."
     
     if go test -v -run=^$ -fuzz=^${test_function}$ -fuzztime="${duration}" "${test_package}" > "${log_file}" 2>&1; then
         local end_time=$(date +%s)
@@ -152,11 +152,11 @@ run_single_fuzz_test() {
         local elapsed=$((end_time - start_time))
         local crash_info=$(grep -n "panic\|FAIL\|fatal error" "${log_file}" | head -1 || echo "Unknown error")
         
-        echo "❌ ${test_function} failed after ${elapsed}s"
+        echo " ${test_function} failed after ${elapsed}s"
         echo "💥 Error: ${crash_info}"
         
         # Update report
-        echo "- ❌ **${test_function}** (${test_package}): FAILED - ${elapsed}s, error: ${crash_info}" >> "${REPORT_FILE}"
+        echo "-  **${test_function}** (${test_package}): FAILED - ${elapsed}s, error: ${crash_info}" >> "${REPORT_FILE}"
         return 1
     fi
 }
@@ -257,7 +257,7 @@ elif [ -n "${PACKAGE}" ]; then
     done
     
     if [ ${#package_tests[@]} -eq 0 ]; then
-        echo "❌ No fuzz tests found in package ${PACKAGE}"
+        echo " No fuzz tests found in package ${PACKAGE}"
         exit 1
     fi
     
@@ -273,7 +273,7 @@ elif [ -n "${PACKAGE}" ]; then
     
     exit_code=$failed_tests
 else
-    echo "🌐 Running ALL available fuzz tests (quick mode)"
+    echo " Running ALL available fuzz tests (quick mode)"
     echo "💡 Use specific package/function for targeted testing"
     echo ""
     
@@ -343,7 +343,7 @@ fi
 # Generate final summary
 total_tests=$(grep -c "^- " "${REPORT_FILE}" || echo "0")
 passed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
-failed_tests=$(grep -c "❌" "${REPORT_FILE}" || echo "0")
+failed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
 
 # Add summary to report
 cat >> "${REPORT_FILE}" << EOF
@@ -370,7 +370,7 @@ echo ""
 
 if [ ${exit_code} -eq 0 ]; then
     echo "All fuzz tests completed successfully!"
-    echo "🚀 Ready for overnight fuzzing: ./assets/overnight-fuzz.sh"
+    echo " Ready for overnight fuzzing: ./assets/overnight-fuzz.sh"
 else
     echo "${exit_code} test(s) failed. Review logs for details."
     echo " Check specific logs: ls ${LOG_DIR}/*_${TIMESTAMP}.log"

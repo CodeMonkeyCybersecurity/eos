@@ -101,7 +101,7 @@ func promptExistingEosInstall(rc *eos_io.RuntimeContext, state *BootstrapState) 
 	logger.Info("  1)  Use existing services (recommended)")
 	logger.Info("  2)  Clean slate - reconfigure all services")
 	logger.Info("  3)  Advanced - choose which services to reconfigure")
-	logger.Info("  4) ❌ Cancel")
+	logger.Info("  4)  Cancel")
 	logger.Info("")
 
 	response, err := eos_io.PromptInput(rc, "Choose an option [1-4]: ", "conflict_resolution")
@@ -202,7 +202,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 
 	optionNum := 1
 	if len(stoppableServices) > 0 {
-		logger.Info(fmt.Sprintf("  %d) 🛑 Stop conflicting services and continue", optionNum))
+		logger.Info(fmt.Sprintf("  %d)  Stop conflicting services and continue", optionNum))
 		optionNum++
 	}
 
@@ -217,7 +217,7 @@ func promptConflictingServices(rc *eos_io.RuntimeContext, state *BootstrapState)
 	logger.Info(fmt.Sprintf("  %d)  Advanced - manual service selection", optionNum))
 	optionNum++
 
-	logger.Info(fmt.Sprintf("  %d) ❌ Cancel", optionNum))
+	logger.Info(fmt.Sprintf("  %d)  Cancel", optionNum))
 	logger.Info("")
 
 	response, err := eos_io.PromptInput(rc, fmt.Sprintf("Choose an option [1-%d]: ", optionNum), "conflict_resolution")

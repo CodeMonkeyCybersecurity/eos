@@ -3,8 +3,8 @@ package create
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/penpot"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
@@ -120,7 +120,7 @@ Examples:
 			zap.String("datacenter", envConfig.Datacenter),
 			zap.String("vault_addr", envConfig.VaultAddr))
 
-		logger.Info("🌐 Access Penpot",
+		logger.Info(" Access Penpot",
 			zap.String("web_interface", fmt.Sprintf("http://%s:%d", hostname, config.Port)),
 			zap.String("default_credentials", "Create account via registration form"))
 
@@ -149,7 +149,7 @@ func parsePenpotFlags(cmd *cobra.Command, envConfig *environment.EnvironmentConf
 			config.Resources.Frontend.CPU = resources.CPU / 2
 			config.Resources.Frontend.Memory = resources.Memory / 2
 		}
-		
+
 		// Use environment-specific namespace if not overridden
 		config.Namespace = envConfig.Environment
 	}

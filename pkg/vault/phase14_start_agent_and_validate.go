@@ -172,7 +172,10 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 }
 
 // readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
-func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
+// Prefixed with underscore to indicate it's intentionally unused (reserved for future token reading)
+//
+//nolint:unused
+func _readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Reading Vault Agent token from sink", zap.String("path", path))
 

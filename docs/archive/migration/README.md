@@ -16,7 +16,7 @@ This directory contains historical documentation from the EOS SaltStack to Hashi
 
 ### Phase 1-10: SaltStack to HashiCorp Migration
 **Date:** September 2025  
-**Status:** ✅ COMPLETED  
+**Status:**  COMPLETED  
 
 **Key Achievements:**
 - Migrated from SaltStack to HashiCorp stack (Consul, Nomad, Vault)
@@ -145,7 +145,7 @@ For questions about:
 
 ---
 
-**Status:** ✅ ARCHIVE COMPLETE  
+**Status:**  ARCHIVE COMPLETE  
 **Documents:** 15+ migration documents preserved  
 **Purpose:** Historical reference and learning  
 **Maintenance:** Read-only, annual review

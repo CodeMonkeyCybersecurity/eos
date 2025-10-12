@@ -174,7 +174,7 @@ Examples:
 			for _, result := range results {
 				status := ""
 				if !result.Success {
-					status = "❌"
+					status = ""
 				}
 				fmt.Printf("%s %-20s %s (%s)\n",
 					status,
@@ -190,7 +190,7 @@ Examples:
 			fmt.Printf("──────────────\n")
 			for _, result := range results {
 				if !result.Success {
-					fmt.Printf("❌ %s: %s\n", result.Component, result.Error)
+					fmt.Printf(" %s: %s\n", result.Component, result.Error)
 				}
 			}
 		}

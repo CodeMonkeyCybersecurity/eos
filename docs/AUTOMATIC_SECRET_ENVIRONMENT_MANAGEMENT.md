@@ -1,6 +1,6 @@
 # Eos Automatic Secret and Environment Management
 
-> **📝 Documentation has been moved inline with the code for better maintainability.**
+> ** Documentation has been moved inline with the code for better maintainability.**
 > 
 > The comprehensive automatic secret and environment management documentation is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 

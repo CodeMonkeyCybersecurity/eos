@@ -306,7 +306,7 @@ func displayDiagnosticReport(logger otelzap.LoggerWithCtx, issues, warnings, fix
 	logger.Info("terminal prompt: ")
 
 	if len(issues) > 0 {
-		logger.Info("terminal prompt: ❌ CRITICAL ISSUES:")
+		logger.Info("terminal prompt:  CRITICAL ISSUES:")
 		for _, issue := range issues {
 			logger.Info("terminal prompt:", zap.String("issue", fmt.Sprintf("  • %s", issue)))
 		}
@@ -347,7 +347,7 @@ func displayDiagnosticReport(logger otelzap.LoggerWithCtx, issues, warnings, fix
 	} else if len(issues) == 0 {
 		logger.Info("terminal prompt: Nomad has minor issues but should be functional")
 	} else {
-		logger.Info("terminal prompt: ❌ Nomad has critical issues that need resolution")
+		logger.Info("terminal prompt:  Nomad has critical issues that need resolution")
 		logger.Info("terminal prompt: ")
 		logger.Info("terminal prompt: Run 'eos debug nomad --fix' to attempt automatic fixes")
 	}

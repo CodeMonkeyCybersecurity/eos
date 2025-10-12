@@ -68,12 +68,12 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 
 			if mode&0111 == 0 {
 				issues = append(issues, "Executable is not executable")
-				logger.Info("terminal prompt:   ❌ File is not executable")
+				logger.Info("terminal prompt:    File is not executable")
 
 				if fix {
 					logger.Info("terminal prompt:    Attempting to fix permissions...")
 					if err := os.Chmod(execPath, mode|0111); err != nil {
-						logger.Info("terminal prompt:   ❌ Fix failed: " + err.Error())
+						logger.Info("terminal prompt:    Fix failed: " + err.Error())
 					} else {
 						logger.Info("terminal prompt:    Permissions fixed")
 					}
@@ -166,7 +166,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 				logger.Info("terminal prompt:   Found but not executable: " + path)
 			}
 		} else if verbose {
-			logger.Info("terminal prompt:   ❌ Not found: " + path)
+			logger.Info("terminal prompt:    Not found: " + path)
 		}
 	}
 
@@ -179,7 +179,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 			if _, err := exec.LookPath(dep); err == nil {
 				logger.Info("terminal prompt:    " + dep)
 			} else {
-				logger.Info("terminal prompt:   ❌ " + dep + " (not required)")
+				logger.Info("terminal prompt:    " + dep + " (not required)")
 			}
 		}
 	}
@@ -196,14 +196,14 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 
 		// Show helpful usage information
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: 🚀 Quick Start:")
+		logger.Info("terminal prompt:  Quick Start:")
 		logger.Info("terminal prompt:   eos create vault     # Install HashiCorp Vault")
 		logger.Info("terminal prompt:   eos read status      # Check system status")
 		logger.Info("terminal prompt:   eos --help           # Show all commands")
 
 	} else {
 		if len(issues) > 0 {
-			logger.Info("terminal prompt: ❌ Issues found:")
+			logger.Info("terminal prompt:  Issues found:")
 			for _, issue := range issues {
 				logger.Info("terminal prompt:   • " + issue)
 			}

@@ -706,7 +706,7 @@ go tool cover -html=fuzz.out -o fuzz-coverage.html
 #!/bin/bash
 echo "Running quick fuzz validation..."
 ./scripts/run-fuzz-tests.sh 5s || {
-    echo "❌ Fuzz tests failed - commit blocked"
+    echo " Fuzz tests failed - commit blocked"
     exit 1
 }
 echo " Fuzz tests passed"

@@ -39,7 +39,7 @@ find ./cmd -name "*.go" -type f | while read -r file; do
     violations=$(grep -c "fmt\.Printf\|fmt\.Println\|fmt\.Print[^f^l]" "$file" || true)
     
     if [ "$violations" -gt 0 ]; then
-        echo "📝 Processing $file ($violations violations)..."
+        echo " Processing $file ($violations violations)..."
         
         # Backup original file
         cp "$file" "$file.bak"

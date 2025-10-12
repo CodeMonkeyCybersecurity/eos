@@ -164,9 +164,10 @@ func (vu *VaultUninstaller) Assess() (*UninstallState, error) {
 
 	// Check if installed via package manager
 	var checkCmd *exec.Cmd
-	if vu.config.Distro == "debian" {
+	switch vu.config.Distro {
+	case "debian":
 		checkCmd = exec.Command("dpkg", "-l", "vault")
-	} else if vu.config.Distro == "rhel" {
+	case "rhel":
 		checkCmd = exec.Command("rpm", "-q", "vault")
 	}
 	if checkCmd != nil && checkCmd.Run() == nil {
@@ -249,11 +250,12 @@ func (vu *VaultUninstaller) RemovePackage() error {
 		zap.String("distro", vu.config.Distro))
 
 	var cmd *exec.Cmd
-	if vu.config.Distro == "debian" {
+	switch vu.config.Distro {
+	case "debian":
 		cmd = exec.Command("apt-get", "remove", "--purge", "-y", "vault")
-	} else if vu.config.Distro == "rhel" {
+	case "rhel":
 		cmd = exec.Command("dnf", "remove", "-y", "vault")
-	} else {
+	default:
 		vu.logger.Warn("Unknown distribution, skipping package removal",
 			zap.String("distro", vu.config.Distro))
 		return nil
@@ -501,7 +503,7 @@ func (vu *VaultUninstaller) displayPreDeletionSummary() {
 
 	if vu.state.ServiceRunning || vu.state.ServiceEnabled {
 		vu.logger.Info("terminal prompt: ")
-		vu.logger.Info("terminal prompt: 🔧 Service:")
+		vu.logger.Info("terminal prompt:  Service:")
 		vu.logger.Info("terminal prompt:    - /etc/systemd/system/vault.service")
 		if vu.state.ServiceRunning {
 			vu.logger.Info("terminal prompt:    - Currently RUNNING (will be stopped)")
@@ -571,7 +573,7 @@ func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs ma
 			vu.logger.Warn(fmt.Sprintf("terminal prompt:    - %s", component))
 		}
 		vu.logger.Warn("terminal prompt: ")
-		vu.logger.Warn(fmt.Sprintf("terminal prompt: Run 'sudo eos rm vault --force' to retry removal"))
+		vu.logger.Warn("terminal prompt: Run 'sudo eos rm vault --force' to retry removal")
 	}
 
 	vu.logger.Info("terminal prompt: ")

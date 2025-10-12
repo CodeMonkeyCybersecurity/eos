@@ -425,7 +425,7 @@ func validateSSO(cmd *cobra.Command, args []string) error {
 	for _, c := range checks {
 		fmt.Printf("Checking %s... ", c.name)
 		if err := c.check(); err != nil {
-			fmt.Printf("❌ %v\n", err)
+			fmt.Printf(" %v\n", err)
 			failed = true
 		} else {
 			fmt.Println("")

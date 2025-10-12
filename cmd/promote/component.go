@@ -233,7 +233,7 @@ Examples:
 			for _, validation := range result.ValidationResults {
 				status := ""
 				if !validation.Passed {
-					status = "❌"
+					status = ""
 				}
 				fmt.Printf("  %s %s: %s\n", status, validation.Check, validation.Message)
 			}

@@ -116,18 +116,18 @@ func CheckVaultHealth(rc *eos_io.RuntimeContext) (bool, error) {
 	}
 
 	url := strings.TrimRight(addr, "/") + shared.VaultHealthPath
-	otelzap.Ctx(rc.Ctx).Debug("🌐 Performing raw Vault health check", zap.String("url", url))
+	otelzap.Ctx(rc.Ctx).Debug(" Performing raw Vault health check", zap.String("url", url))
 
 	// Create HTTP client with timeout to prevent indefinite hangs
 	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
 	defer cancel()
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to create Vault health request", zap.Error(err))
 		return false, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
@@ -138,7 +138,7 @@ func CheckVaultHealth(rc *eos_io.RuntimeContext) (bool, error) {
 	}
 	defer shared.SafeClose(rc.Ctx, resp.Body)
 
-	otelzap.Ctx(rc.Ctx).Debug("📨 Vault health HTTP response", zap.Int("statusCode", resp.StatusCode))
+	otelzap.Ctx(rc.Ctx).Debug(" Vault health HTTP response", zap.Int("statusCode", resp.StatusCode))
 
 	switch resp.StatusCode {
 	case 200, 429:

@@ -51,7 +51,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Warn("Failed to discover networks", zap.Error(err))
 	} else {
 		info.Networks = networks
-		logger.Info("🌐 Discovered networks", zap.Int("count", len(networks)))
+		logger.Info(" Discovered networks", zap.Int("count", len(networks)))
 	}
 
 	// Discover volumes

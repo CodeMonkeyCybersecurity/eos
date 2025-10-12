@@ -224,7 +224,7 @@ func (m *Manager) setupVaultSecrets(ctx context.Context, mgr *Manager) error {
 func (m *Manager) createTerraformConfig(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("📝 Creating Terraform configuration")
+	logger.Info(" Creating Terraform configuration")
 
 	// Create work directory
 	if err := os.MkdirAll(m.config.WorkDir, 0755); err != nil {

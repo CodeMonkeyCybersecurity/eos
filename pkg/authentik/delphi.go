@@ -507,7 +507,7 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", metadataURL, nil)
 	if err != nil {
 		logger.Error("Failed to create request",
-			zap.String("status", "❌"),
+			zap.String("status", ""),
 			zap.Error(err))
 		return err
 	}
@@ -527,7 +527,7 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		logger.Error("Request failed",
-			zap.String("status", "❌"),
+			zap.String("status", ""),
 			zap.Error(err))
 		return err
 	}
@@ -537,7 +537,7 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 		logger.Info("Metadata endpoint accessible", zap.String("status", ""))
 	} else {
 		logger.Error("Metadata endpoint check failed",
-			zap.String("status", "❌"),
+			zap.String("status", ""),
 			zap.Int("http_status", resp.StatusCode))
 	}
 

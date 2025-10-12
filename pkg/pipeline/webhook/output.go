@@ -51,7 +51,7 @@ func OutputStatusText(rc *eos_io.RuntimeContext, status *WebhookStatus) error {
 	if status.Deployed {
 		logger.Info(" Deployment Status: DEPLOYED")
 	} else {
-		logger.Info("❌ Deployment Status: NOT DEPLOYED")
+		logger.Info(" Deployment Status: NOT DEPLOYED")
 	}
 
 	// File presence
@@ -61,7 +61,7 @@ func OutputStatusText(rc *eos_io.RuntimeContext, status *WebhookStatus) error {
 			perm := status.Permissions[file]
 			logger.Info(fmt.Sprintf("   %s (permissions: %s)", file, perm))
 		} else {
-			logger.Info(fmt.Sprintf("  ❌ %s (missing)", file))
+			logger.Info(fmt.Sprintf("   %s (missing)", file))
 		}
 	}
 
@@ -73,11 +73,11 @@ func OutputStatusText(rc *eos_io.RuntimeContext, status *WebhookStatus) error {
 			if present {
 				logger.Info(fmt.Sprintf("     %s configured", envVar))
 			} else {
-				logger.Info(fmt.Sprintf("    ❌ %s missing", envVar))
+				logger.Info(fmt.Sprintf("     %s missing", envVar))
 			}
 		}
 	} else {
-		logger.Info("  ❌ Environment file missing")
+		logger.Info("   Environment file missing")
 	}
 
 	// Issues

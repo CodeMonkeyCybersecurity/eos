@@ -73,7 +73,7 @@ run_fuzz_test() {
         
         # Check if it was a crash or timeout
         if grep -q "FAIL.*fuzz" "$log_file"; then
-            echo -e "${RED}  ❌ $test_name CRASHED!${NC}"
+            echo -e "${RED}   $test_name CRASHED!${NC}"
             ((CRASHES_FOUND++))
             
             # Extract crash details
@@ -364,7 +364,7 @@ echo ""
 
 # Send notifications if configured
 if [ "$EMAIL_REPORT" = "true" ] && [ -n "$EMAIL_ADDRESS" ]; then
-    echo -e "${BLUE}📧 Sending email report...${NC}"
+    echo -e "${BLUE} Sending email report...${NC}"
     mail -s "Eos Fuzzing Report - $CRASHES_FOUND crashes found" "$EMAIL_ADDRESS" < "$REPORT_FILE"
 fi
 

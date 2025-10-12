@@ -137,7 +137,7 @@ func (arm *AgentRegistrationManager) ReregisterAgents(rc *eos_io.RuntimeContext,
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
 
-	logger.Info("🚀 Starting Wazuh agent re-registration process",
+	logger.Info(" Starting Wazuh agent re-registration process",
 		zap.String("manager_host", arm.config.ManagerHost),
 		zap.Int("agent_count", len(targetAgents)),
 		zap.Bool("dry_run", arm.config.DryRun))

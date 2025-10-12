@@ -156,7 +156,7 @@ location = "%s"
 
 set -e
 
-echo "🚀 Deploying Nomad+Consul cluster..."
+echo " Deploying Nomad+Consul cluster..."
 
 # Initialize Terraform
 terraform init
@@ -180,7 +180,7 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
     echo "   - Domain: %s"
     echo "   - Nodes: %d (%d servers, %d clients)"
     echo ""
-    echo "🌐 Access URLs:"
+    echo " Access URLs:"
     %s
     echo ""
     echo "📋 Next Steps:"

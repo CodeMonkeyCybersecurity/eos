@@ -132,7 +132,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	warnings, errors := validateConfig(config)
 
 	if len(errors) > 0 {
-		fmt.Println("❌")
+		fmt.Println("")
 		fmt.Println("\nValidation errors:")
 		for _, err := range errors {
 			fmt.Printf("   • %s\n", err)
@@ -207,7 +207,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Start import process
-	fmt.Println("\n🚀 Starting import process...")
+	fmt.Println("\n Starting import process...")
 	if options.DryRun {
 		fmt.Println("   🔸 DRY RUN MODE - No changes will be made")
 	}
@@ -278,7 +278,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Failed:  %d\n", result.Failed)
 
 	if len(result.Errors) > 0 {
-		fmt.Println("\n❌ Errors encountered:")
+		fmt.Println("\n Errors encountered:")
 		for _, err := range result.Errors {
 			fmt.Printf("   • %s\n", err)
 		}
@@ -393,7 +393,7 @@ func runValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(errors) > 0 {
-		fmt.Println("\n❌ Errors found:")
+		fmt.Println("\n Errors found:")
 		for _, err := range errors {
 			fmt.Printf("   • %s\n", err)
 		}
@@ -444,7 +444,7 @@ func importCertificates(client *AuthentikAPIClient, certificates []Certificate, 
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import certificate %s: %v\n", cert.Name, err)
+			fmt.Printf("    Failed to import certificate %s: %v\n", cert.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Certificate %s: %v", cert.Name, err))
 		}
@@ -498,7 +498,7 @@ func importPropertyMappings(client *AuthentikAPIClient, mappings []PropertyMappi
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import property mapping %s: %v\n", mapping.Name, err)
+			fmt.Printf("    Failed to import property mapping %s: %v\n", mapping.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Property mapping %s: %v", mapping.Name, err))
 		}
@@ -542,7 +542,7 @@ func importFlows(client *AuthentikAPIClient, flows []Flow, options ImportOptions
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import flow %s: %v\n", flow.Name, err)
+			fmt.Printf("    Failed to import flow %s: %v\n", flow.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Flow %s: %v", flow.Name, err))
 		}
@@ -586,7 +586,7 @@ func importProviders(client *AuthentikAPIClient, providers []Provider, options I
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import provider %s: %v\n", provider.Name, err)
+			fmt.Printf("    Failed to import provider %s: %v\n", provider.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Provider %s: %v", provider.Name, err))
 		}
@@ -630,7 +630,7 @@ func importApplications(client *AuthentikAPIClient, apps []Application, options 
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import application %s: %v\n", app.Name, err)
+			fmt.Printf("    Failed to import application %s: %v\n", app.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Application %s: %v", app.Name, err))
 		}
@@ -697,7 +697,7 @@ func importSingleGroup(client *AuthentikAPIClient, group Group, options ImportOp
 	}
 
 	if err != nil {
-		fmt.Printf("   ❌ Failed to import group %s: %v\n", group.Name, err)
+		fmt.Printf("    Failed to import group %s: %v\n", group.Name, err)
 		result.Failed++
 		result.Errors = append(result.Errors, fmt.Sprintf("Group %s: %v", group.Name, err))
 	}
@@ -740,7 +740,7 @@ func importPolicies(client *AuthentikAPIClient, policies []Policy, options Impor
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import policy %s: %v\n", policy.Name, err)
+			fmt.Printf("    Failed to import policy %s: %v\n", policy.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Policy %s: %v", policy.Name, err))
 		}
@@ -785,7 +785,7 @@ func importStages(client *AuthentikAPIClient, stages []Stage, options ImportOpti
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import stage %s: %v\n", stage.Name, err)
+			fmt.Printf("    Failed to import stage %s: %v\n", stage.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Stage %s: %v", stage.Name, err))
 		}
@@ -829,7 +829,7 @@ func importOutposts(client *AuthentikAPIClient, outposts []Outpost, options Impo
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import outpost %s: %v\n", outpost.Name, err)
+			fmt.Printf("    Failed to import outpost %s: %v\n", outpost.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Outpost %s: %v", outpost.Name, err))
 		}
@@ -873,7 +873,7 @@ func importTenants(client *AuthentikAPIClient, tenants []Tenant, options ImportO
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import tenant %s: %v\n", tenant.Domain, err)
+			fmt.Printf("    Failed to import tenant %s: %v\n", tenant.Domain, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Tenant %s: %v", tenant.Domain, err))
 		}
@@ -917,7 +917,7 @@ func importBlueprints(client *AuthentikAPIClient, blueprints []Blueprint, option
 		}
 
 		if err != nil {
-			fmt.Printf("   ❌ Failed to import blueprint %s: %v\n", blueprint.Name, err)
+			fmt.Printf("    Failed to import blueprint %s: %v\n", blueprint.Name, err)
 			result.Failed++
 			result.Errors = append(result.Errors, fmt.Sprintf("Blueprint %s: %v", blueprint.Name, err))
 		}

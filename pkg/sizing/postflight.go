@@ -95,7 +95,7 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 		for svcType, health := range serviceHealthMap {
 			status := " Running"
 			if !health.Running {
-				status = "❌ Not Running"
+				status = " Not Running"
 			}
 			logger.Info(fmt.Sprintf("terminal prompt:   %s: %s (CPU: %.1f%%, Mem: %.0f MB)",
 				svcType, status, health.CPUUsage, health.MemoryMB))
@@ -106,7 +106,7 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 	// Show issues if any
 	if len(issues) > 0 {
 		logger.Error("Critical issues detected", zap.Strings("issues", issues))
-		logger.Info("terminal prompt: ❌ Critical Issues Detected:")
+		logger.Info("terminal prompt:  Critical Issues Detected:")
 		for _, issue := range issues {
 			logger.Info(fmt.Sprintf("terminal prompt:   • %s", issue))
 		}

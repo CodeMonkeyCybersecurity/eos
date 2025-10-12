@@ -123,26 +123,26 @@ echo "=== Vault Removal Verification ==="
 if systemctl status vault 2>&1 | grep -q "could not be found"; then
     echo " Service removed"
 else
-    echo "❌ Service still exists"
+    echo " Service still exists"
 fi
 
 # File checks
-[ ! -d /etc/vault.d ] && echo " Config removed" || echo "❌ Config exists"
-[ ! -d /opt/vault ] && echo " Data removed" || echo "❌ Data exists"
-[ ! -f /usr/local/bin/vault ] && echo " Binary removed (local)" || echo "❌ Binary exists (local)"
-[ ! -f /usr/bin/vault ] && echo " Binary removed (usr)" || echo "❌ Binary exists (usr)"
+[ ! -d /etc/vault.d ] && echo " Config removed" || echo " Config exists"
+[ ! -d /opt/vault ] && echo " Data removed" || echo " Data exists"
+[ ! -f /usr/local/bin/vault ] && echo " Binary removed (local)" || echo " Binary exists (local)"
+[ ! -f /usr/bin/vault ] && echo " Binary removed (usr)" || echo " Binary exists (usr)"
 
 # User/group check
-id vault 2>&1 | grep -q "no such user" && echo " User removed" || echo "❌ User exists"
-getent group vault >/dev/null 2>&1 && echo "❌ Group exists" || echo " Group removed"
+id vault 2>&1 | grep -q "no such user" && echo " User removed" || echo " User exists"
+getent group vault >/dev/null 2>&1 && echo " Group exists" || echo " Group removed"
 
 # Environment check
-grep -q VAULT_ /etc/environment 2>/dev/null && echo "❌ Env vars exist" || echo " Env vars removed"
-[ ! -f /etc/profile.d/vault.sh ] && echo " Profile removed" || echo "❌ Profile exists"
+grep -q VAULT_ /etc/environment 2>/dev/null && echo " Env vars exist" || echo " Env vars removed"
+[ ! -f /etc/profile.d/vault.sh ] && echo " Profile removed" || echo " Profile exists"
 
 echo ""
 echo "=== Reinstallation Test ==="
-sudo eos create vault --force && echo " Reinstall successful" || echo "❌ Reinstall failed"
+sudo eos create vault --force && echo " Reinstall successful" || echo " Reinstall failed"
 ```
 
 ### Expected Results

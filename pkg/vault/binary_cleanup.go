@@ -303,7 +303,7 @@ func RecommendBinaryCleanup(rc *eos_io.RuntimeContext) ([]string, error) {
 	recommendations = append(recommendations,
 		fmt.Sprintf("Recommended action: Keep %s, remove others", shared.VaultBinaryPath))
 	recommendations = append(recommendations,
-		fmt.Sprintf("Run: sudo eos repair vault --cleanup-binaries"))
+		"Run: sudo eos repair vault --cleanup-binaries")
 
 	return recommendations, nil
 }

@@ -112,7 +112,7 @@ func PreflightCheck(rc *eos_io.RuntimeContext, services []ServiceType, workload 
 
 		// Show detailed resource report
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: ❌ System Resource Check Failed")
+		logger.Info("terminal prompt:  System Resource Check Failed")
 		logger.Info("terminal prompt: ")
 		logger.Info("terminal prompt: The following resources are insufficient:")
 		for _, issue := range insufficientResources {

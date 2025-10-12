@@ -213,7 +213,7 @@ Common Use Cases:
 				fmt.Printf("\n Agent re-registration completed successfully in %v\n", result.Duration)
 			}
 		} else {
-			fmt.Printf("\n❌ Operation failed: %s\n", result.Error)
+			fmt.Printf("\n Operation failed: %s\n", result.Error)
 			return fmt.Errorf("operation failed: %s", result.Error)
 		}
 

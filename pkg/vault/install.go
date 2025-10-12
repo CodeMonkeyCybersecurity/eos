@@ -431,9 +431,10 @@ func (vi *VaultInstaller) installViaBinary() error {
 
 	// Download binary
 	arch := runtime.GOARCH
-	if arch == "amd64" {
+	switch arch {
+	case "amd64":
 		arch = "amd64"
-	} else if arch == "arm64" {
+	case "arm64":
 		arch = "arm64"
 	}
 

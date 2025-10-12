@@ -193,7 +193,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 	for _, result := range results {
 		status := " VALID"
 		if !result.Valid {
-			status = "❌ INVALID"
+			status = " INVALID"
 		} else if len(result.Warnings) > 0 {
 			status = "VALID (with warnings)"
 		}
@@ -208,7 +208,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 		if len(result.Errors) > 0 {
 			fmt.Printf("Errors:\n")
 			for _, err := range result.Errors {
-				fmt.Printf("  ❌ %s\n", err)
+				fmt.Printf("   %s\n", err)
 			}
 			fmt.Printf("\n")
 		}
@@ -268,7 +268,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 	fmt.Printf("Invalid:  %d\n", invalid)
 
 	if invalid > 0 {
-		fmt.Printf("\n❌ %d component(s) failed validation\n", invalid)
+		fmt.Printf("\n %d component(s) failed validation\n", invalid)
 	} else {
 		fmt.Printf("\n All components passed validation\n")
 	}

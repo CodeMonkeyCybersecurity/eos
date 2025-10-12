@@ -169,7 +169,7 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 }
 
 // ensureAppRoleCredentials ensures AppRole credentials are available
-func ensureAppRoleCredentials(rc *eos_io.RuntimeContext, client *api.Client) error {
+func ensureAppRoleCredentials(rc *eos_io.RuntimeContext, _ *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Ensuring AppRole credentials are available")
 
@@ -415,7 +415,7 @@ func checkAgentServiceStatus(rc *eos_io.RuntimeContext) error {
 }
 
 // configureAgentMonitoring sets up monitoring and health checks for the agent
-func configureAgentMonitoring(rc *eos_io.RuntimeContext, config *VaultAgentConfig) error {
+func configureAgentMonitoring(rc *eos_io.RuntimeContext, _ *VaultAgentConfig) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Configuring Vault Agent monitoring")
 

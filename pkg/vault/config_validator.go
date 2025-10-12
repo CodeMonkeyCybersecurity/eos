@@ -58,7 +58,7 @@ func ValidateConfigWithFallback(rc *eos_io.RuntimeContext, configPath string) (*
 	// EVALUATE: Final validation status
 	if len(result.Errors) > 0 {
 		result.Valid = false
-		log.Error("❌ Configuration validation failed",
+		log.Error(" Configuration validation failed",
 			zap.Int("errors", len(result.Errors)),
 			zap.Strings("error_list", result.Errors))
 	} else {
@@ -227,7 +227,7 @@ func validateSemantics(rc *eos_io.RuntimeContext, content string, result *Config
 }
 
 // checkCommonMisconfigurations checks for common Vault config mistakes
-func checkCommonMisconfigurations(rc *eos_io.RuntimeContext, content string, result *ConfigValidationResult) {
+func checkCommonMisconfigurations(_ *eos_io.RuntimeContext, content string, result *ConfigValidationResult) {
 	// Check for legacy port 8200 (should be 8179 in Eos)
 	if strings.Contains(content, ":8200") {
 		result.Warnings = append(result.Warnings,
@@ -320,7 +320,7 @@ func validateTLSConfig(rc *eos_io.RuntimeContext, content string, result *Config
 }
 
 // validateStorageBackend performs storage-backend specific validation
-func validateStorageBackend(rc *eos_io.RuntimeContext, content string, result *ConfigValidationResult) {
+func validateStorageBackend(_ *eos_io.RuntimeContext, content string, result *ConfigValidationResult) {
 	// Check for file storage backend
 	if strings.Contains(content, `storage "file"`) {
 		if !strings.Contains(content, "path") {
@@ -415,7 +415,7 @@ func ValidateConfigBeforeStart(rc *eos_io.RuntimeContext) error {
 
 	// Fail if there are errors
 	if !result.Valid {
-		log.Error("❌ Configuration validation failed",
+		log.Error(" Configuration validation failed",
 			zap.Strings("errors", result.Errors))
 		return fmt.Errorf("configuration invalid: %s", strings.Join(result.Errors, "; "))
 	}

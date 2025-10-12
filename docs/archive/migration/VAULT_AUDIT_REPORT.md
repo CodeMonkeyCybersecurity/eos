@@ -430,7 +430,7 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 
 ## Regression Prevention Checklist
 
-### ❌ MUST NOT HAPPEN (from historical document)
+###  MUST NOT HAPPEN (from historical document)
 
 | Check | Status | Evidence |
 |-------|--------|----------|
@@ -498,12 +498,12 @@ func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
 | **Path Consistency** | Plural vs singular |  FIXED | P0 | None |
 | **Systemd Syntax** | Deprecated Capabilities |  FIXED | P0 | None |
 | **File Permissions** | Wrong order, wrong perms |  FIXED | P0 | None |
-| **Security Warnings** | Not displayed | ❌ MISSING | P0 | Add warnings |
+| **Security Warnings** | Not displayed |  MISSING | P0 | Add warnings |
 | **Binary Cleanup** | Duplicates not removed |  PARTIAL | P1 | Add cleanup |
 | **Debug Command** | Not implemented |  PARTIAL | P1 | Wire up CLI |
-| **Validate Command** | Not implemented | ❌ MISSING | P0 | Create command |
-| **Repair Command** | Not implemented | ❌ MISSING | P1 | Create command |
-| **Upgrade/Migration** | Not implemented | ❌ MISSING | P2 | Create command |
+| **Validate Command** | Not implemented |  MISSING | P0 | Create command |
+| **Repair Command** | Not implemented |  MISSING | P1 | Create command |
+| **Upgrade/Migration** | Not implemented |  MISSING | P2 | Create command |
 
 ---
 

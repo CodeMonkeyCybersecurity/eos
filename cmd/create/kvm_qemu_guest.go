@@ -69,7 +69,7 @@ Examples:
 				logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
 			}
 
-			logger.Info("terminal prompt: 📝 Features Enabled:")
+			logger.Info("terminal prompt:  Features Enabled:")
 			logger.Info("terminal prompt:    - Guest shutdown/reboot from host")
 			logger.Info("terminal prompt:    - File system freeze/thaw for snapshots")
 			logger.Info("terminal prompt:    - Guest network information")
@@ -82,7 +82,7 @@ Examples:
 			logger.Info("terminal prompt:    - Check status: eos status qemu-guest-agent")
 		} else {
 			logger.Error("QEMU Guest Agent installation failed", zap.String("error", result.Error))
-			logger.Info("terminal prompt: ❌ QEMU Guest Agent Installation Failed!")
+			logger.Info("terminal prompt:  QEMU Guest Agent Installation Failed!")
 			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
@@ -91,7 +91,7 @@ Examples:
 					status := ""
 					switch step.Status {
 					case "failed":
-						status = "❌"
+						status = ""
 					case "running":
 						status = "⏳"
 					}

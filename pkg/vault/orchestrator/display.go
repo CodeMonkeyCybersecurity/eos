@@ -25,7 +25,7 @@ func DisplayOrchestrationResult(rc *eos_io.RuntimeContext, result *Orchestration
 	if result.Success {
 		fmt.Printf(" SUCCESS\n")
 	} else {
-		fmt.Printf("❌ FAILED\n")
+		fmt.Printf(" FAILED\n")
 	}
 	fmt.Printf("Duration: %s\n", result.Duration)
 	if result.Message != "" {

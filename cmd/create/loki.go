@@ -75,19 +75,19 @@ Examples:
 			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))
 
 			if len(result.Endpoints) > 0 {
-				logger.Info("terminal prompt: 🌐 Access URLs:")
+				logger.Info("terminal prompt:  Access URLs:")
 				for _, endpoint := range result.Endpoints {
 					logger.Info(fmt.Sprintf("terminal prompt:    %s", endpoint))
 				}
 			}
 
-			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:  Next Steps:")
 			logger.Info("terminal prompt:    1. Configure promtail or other log shippers to send logs to Loki")
 			logger.Info("terminal prompt:    2. Access Grafana (if included) to view logs")
 			logger.Info("terminal prompt:    3. Check status: docker compose ps")
 		} else {
 			logger.Error("Loki installation failed", zap.String("error", result.Error))
-			logger.Info("terminal prompt: ❌ Loki Installation Failed!")
+			logger.Info("terminal prompt:  Loki Installation Failed!")
 			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
@@ -96,7 +96,7 @@ Examples:
 					status := ""
 					switch step.Status {
 					case "failed":
-						status = "❌"
+						status = ""
 					case "running":
 						status = "⏳"
 					}

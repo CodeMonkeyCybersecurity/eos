@@ -127,7 +127,7 @@ func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithC
 		if state.ServiceRunning {
 			status = "RUNNING"
 		}
-		logger.Info(fmt.Sprintf("terminal prompt: 🔧 Service: %s", status))
+		logger.Info(fmt.Sprintf("terminal prompt:  Service: %s", status))
 	}
 	if len(state.ExistingPaths) > 0 {
 		logger.Info(fmt.Sprintf("terminal prompt:  Data: %d directories", len(state.ExistingPaths)))

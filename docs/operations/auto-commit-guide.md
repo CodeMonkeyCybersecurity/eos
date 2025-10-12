@@ -257,7 +257,7 @@ preferences:
 - Documentation updates
 - Configuration changes
 
-❌ **Avoid for:**
+ **Avoid for:**
 - Release commits (use manual messages)
 - Major feature completions
 - Merge commits

@@ -23,7 +23,7 @@ func GetAllNetworks(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, n := range networks {
-		log.Info("🌐 Network", zap.String("name", n.Name), zap.Int64("id", n.ID))
+		log.Info(" Network", zap.String("name", n.Name), zap.Int64("id", n.ID))
 	}
 	return nil
 }

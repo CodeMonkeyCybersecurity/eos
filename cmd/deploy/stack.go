@@ -264,7 +264,7 @@ Examples:
 
 			// Check if rollback was attempted
 			if rollbackOnFailure && result != nil && result.RollbackAttempted {
-				fmt.Printf("❌ Stack deployment failed, but rollback was %s\n",
+				fmt.Printf(" Stack deployment failed, but rollback was %s\n",
 					func() string {
 						if result.RollbackSuccessful {
 							return "successful"
@@ -293,7 +293,7 @@ Examples:
 		for _, componentResult := range result.ComponentResults {
 			status := ""
 			if !componentResult.Success {
-				status = "❌"
+				status = ""
 			}
 			fmt.Printf("  %s %s - %s (took %s)\n",
 				status,
@@ -307,7 +307,7 @@ Examples:
 			fmt.Printf("\nFailed Component Details:\n")
 			for _, componentResult := range result.ComponentResults {
 				if !componentResult.Success {
-					fmt.Printf("  ❌ %s: %s\n", componentResult.ComponentName, componentResult.Error)
+					fmt.Printf("   %s: %s\n", componentResult.ComponentName, componentResult.Error)
 				}
 			}
 
@@ -323,7 +323,7 @@ Examples:
 			for _, check := range result.StackHealthResults {
 				status := ""
 				if !check.Passed {
-					status = "❌"
+					status = ""
 				}
 				fmt.Printf("  %s %s: %s\n", status, check.Check, check.Message)
 			}

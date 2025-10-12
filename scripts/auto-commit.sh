@@ -25,12 +25,12 @@ FORCE=${FORCE:-false}
 PUSH=${PUSH:-false}
 DRY_RUN=${DRY_RUN:-false}
 
-echo -e "${CYAN}🚀 Eos Auto-Commit Script${NC}"
+echo -e "${CYAN} Eos Auto-Commit Script${NC}"
 echo "=========================="
 
 # Check if we're in the Eos project root
 if [ ! -f "go.mod" ] || ! grep -q "github.com/CodeMonkeyCybersecurity/eos" go.mod; then
-    echo -e "${RED}❌ Error: Must be run from Eos project root${NC}"
+    echo -e "${RED} Error: Must be run from Eos project root${NC}"
     exit 1
 fi
 
@@ -92,7 +92,7 @@ COMMIT_MSG="${COMMIT_MSG}
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 
-echo -e "${CYAN}📝 Commit message:${NC}"
+echo -e "${CYAN} Commit message:${NC}"
 echo "$COMMIT_MSG"
 echo
 
@@ -126,12 +126,12 @@ if [ $? -eq 0 ]; then
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}Push successful!${NC}"
         else
-            echo -e "${RED}❌ Push failed${NC}"
+            echo -e "${RED} Push failed${NC}"
             exit 1
         fi
     fi
 else
-    echo -e "${RED}❌ Commit failed${NC}"
+    echo -e "${RED} Commit failed${NC}"
     exit 1
 fi
 

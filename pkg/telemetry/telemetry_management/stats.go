@@ -179,7 +179,7 @@ func ShowTelemetryStatus(rc *eos_io.RuntimeContext, stateFile string) error {
 		zap.String("data_file", telemetryPath))
 
 	if !enabled {
-		logger.Info("❌ Telemetry is disabled",
+		logger.Info(" Telemetry is disabled",
 			zap.String("enable_command", "eos self telemetry on"))
 		return nil
 	}

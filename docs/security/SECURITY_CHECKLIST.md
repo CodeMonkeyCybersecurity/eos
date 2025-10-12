@@ -266,7 +266,7 @@ func SecurityErrorHandler(rc *eos_io.RuntimeContext, err error, operation string
 
 ### 1. Information Disclosure
 ```go
-// ❌ DON'T - Exposes internal details
+//  DON'T - Exposes internal details
 return fmt.Errorf("failed to connect to database at %s: %v", dbURL, err)
 
 //  DO - Generic message for users
@@ -276,7 +276,7 @@ return fmt.Errorf("database connection error")
 
 ### 2. Insecure Logging
 ```go
-// ❌ DON'T - Logs sensitive data
+//  DON'T - Logs sensitive data
 fmt.Printf("User %s logged in with password %s", user, password)
 
 //  DO - Structured logging without secrets
@@ -287,7 +287,7 @@ logger.Info("User authentication successful",
 
 ### 3. Weak Input Validation
 ```go
-// ❌ DON'T - Weak validation
+//  DON'T - Weak validation
 if len(username) > 0 {
     // Process username
 }
@@ -300,7 +300,7 @@ if !isValidUsername(username) {
 
 ### 4. Command Injection
 ```go
-// ❌ DON'T - Shell execution with user input
+//  DON'T - Shell execution with user input
 exec.Command("sh", "-c", "grep "+userInput+" /etc/passwd").Run()
 
 //  DO - Proper argument passing
@@ -309,7 +309,7 @@ exec.Command("grep", userInput, "/etc/passwd").Run()
 
 ### 5. Weak Cryptography
 ```go
-// ❌ DON'T - Weak hashing
+//  DON'T - Weak hashing
 hash := md5.Sum(data)
 
 //  DO - Strong hashing

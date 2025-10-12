@@ -386,7 +386,7 @@ func outputHistoryTable(history []PromotionHistoryRecord, showDetails bool, grou
 
 		status := ""
 		if !record.Success {
-			status = "❌"
+			status = ""
 		} else if record.RolledBack {
 			status = ""
 		}
@@ -490,7 +490,7 @@ func outputHistoryGrouped(history []PromotionHistoryRecord, groupBy string, show
 
 			status := ""
 			if !record.Success {
-				status = "❌"
+				status = ""
 			} else if record.RolledBack {
 				status = ""
 			}

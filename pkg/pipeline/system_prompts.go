@@ -1037,7 +1037,7 @@ func getChangeTypeEmoji(changeType string) string {
 	case "notify_channel":
 		return "📤"
 	case "pg_notify":
-		return "🔔"
+		return ""
 	case "listen_statement":
 		return "👂"
 	default:

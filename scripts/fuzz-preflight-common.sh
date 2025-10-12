@@ -29,12 +29,12 @@ eos_fuzz_preflight_check() {
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
         cd "$expected_root" || { 
-            echo -e "${RED}❌ Failed to change to project root${NC}"
+            echo -e "${RED} Failed to change to project root${NC}"
             exit 1
         }
         return 0
     else
-        echo -e "${RED}❌ ERROR: Not in Eos project directory${NC}"
+        echo -e "${RED} ERROR: Not in Eos project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
         echo -e "${YELLOW}To run this script correctly:${NC}"
@@ -80,7 +80,7 @@ eos_fuzz_verify_tools() {
     fi
     
     if [ ${#missing_tools[@]} -gt 0 ]; then
-        echo -e "${RED}❌ ERROR: Required tools are missing${NC}"
+        echo -e "${RED} ERROR: Required tools are missing${NC}"
         echo -e "${RED}Missing: ${missing_tools[*]}${NC}"
         echo ""
         echo -e "${YELLOW}Installation instructions:${NC}"
@@ -122,7 +122,7 @@ eos_fuzz_verify_test_files() {
     fi
     
     if [ ${#missing_packages[@]} -gt 0 ]; then
-        echo -e "${RED}❌ ERROR: Required test directories are missing${NC}"
+        echo -e "${RED} ERROR: Required test directories are missing${NC}"
         echo -e "${RED}Missing: ${missing_packages[*]}${NC}"
         echo ""
         echo -e "${YELLOW}This usually means:${NC}"
@@ -137,7 +137,7 @@ eos_fuzz_verify_test_files() {
     
     # Check for at least one fuzz test file
     if ! find pkg -name "*fuzz*.go" -type f 2>/dev/null | grep -q .; then
-        echo -e "${RED}❌ ERROR: No fuzz test files found${NC}"
+        echo -e "${RED} ERROR: No fuzz test files found${NC}"
         echo ""
         echo -e "${YELLOW}This could mean:${NC}"
         echo -e "  1. You're not in the Eos project root"
@@ -158,7 +158,7 @@ eos_fuzz_verify_test_files() {
 eos_run_preflight_checks() {
     local script_name="$(basename "${BASH_SOURCE[1]}")"
     
-    echo -e "${PURPLE}🚀 Eos Fuzz Testing - Preflight Check${NC}"
+    echo -e "${PURPLE} Eos Fuzz Testing - Preflight Check${NC}"
     echo -e "${PURPLE}Script: ${script_name}${NC}"
     echo "========================================"
     echo ""

@@ -57,7 +57,7 @@ func GetAllDatacentres(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, dc := range dcs {
-		log.Info("🏢 Datacenter", zap.String("name", dc.Name), zap.String("location", dc.Location.Name))
+		log.Info(" Datacenter", zap.String("name", dc.Name), zap.String("location", dc.Location.Name))
 	}
 	return nil
 }
@@ -73,6 +73,6 @@ func GetADatacentre(rc *eos_io.RuntimeContext, id int64) error {
 		return cerr.Wrap(err, "failed to get datacenter")
 	}
 
-	log.Info("🏢 Datacenter details", zap.String("name", dc.Name), zap.String("description", dc.Description), zap.String("location", dc.Location.Name))
+	log.Info(" Datacenter details", zap.String("name", dc.Name), zap.String("description", dc.Description), zap.String("location", dc.Location.Name))
 	return nil
 }

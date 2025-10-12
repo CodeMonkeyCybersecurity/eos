@@ -37,7 +37,7 @@ for test_spec in "${tests[@]}"; do
     test_name=$(echo ${test_spec} | cut -d' ' -f1)
     package=$(echo ${test_spec} | cut -d' ' -f2)
     
-    echo "🚀 Testing ${test_name} (${package}) for ${DURATION}..."
+    echo " Testing ${test_name} (${package}) for ${DURATION}..."
     
     # Check if test exists
     if ! go test -list=Fuzz "${package}" 2>/dev/null | grep -q "^${test_name}$"; then
@@ -53,7 +53,7 @@ for test_spec in "${tests[@]}"; do
         echo "${test_name}: PASSED (${executions} executions)"
         ((passed++))
     else
-        echo "❌ ${test_name}: FAILED (check ${log_file})"
+        echo " ${test_name}: FAILED (check ${log_file})"
         ((failed++))
     fi
 done
@@ -62,12 +62,12 @@ echo ""
 echo -e "${PURPLE}📊 Quick Validation Results:${NC}"
 echo -e "${PURPLE}==========================${NC}"
 echo -e "${GREEN}Passed: ${passed}/${total}${NC}"
-echo -e "${RED}❌ Failed: ${failed}/${total}${NC}"
+echo -e "${RED} Failed: ${failed}/${total}${NC}"
 
 if [ ${failed} -eq 0 ]; then
     echo ""
     echo -e "${GREEN}🎉 SUCCESS: All essential fuzz tests are working!${NC}"
-    echo -e "${CYAN}🚀 Ready for overnight fuzzing:${NC}"
+    echo -e "${CYAN} Ready for overnight fuzzing:${NC}"
     echo -e "   ${GREEN}./assets/overnight-fuzz-simple.sh${NC}"
     echo -e "   ${YELLOW}# or with custom durations:${NC}"
     echo -e "   ${GREEN}FUZZTIME_LONG=1h FUZZTIME_MEDIUM=30m FUZZTIME_SHORT=10m ./assets/overnight-fuzz-simple.sh${NC}"

@@ -109,7 +109,7 @@ func runSingleHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, service
 			if allHealthy {
 				logger.Info("terminal prompt: \n All routes are healthy")
 			} else {
-				logger.Info("terminal prompt: \n❌ Some routes are unhealthy")
+				logger.Info("terminal prompt: \n Some routes are unhealthy")
 			}
 		}
 	}
@@ -136,7 +136,7 @@ func runSingleHealthCheck(rc *eos_io.RuntimeContext, routeFilter string, service
 		if allHealthy {
 			logger.Info("terminal prompt: \n All services are healthy")
 		} else {
-			logger.Info("terminal prompt: \n❌ Some services are unhealthy")
+			logger.Info("terminal prompt: \n Some services are unhealthy")
 		}
 	}
 

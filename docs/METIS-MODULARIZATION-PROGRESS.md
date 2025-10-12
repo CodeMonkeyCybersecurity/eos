@@ -9,10 +9,10 @@
 
 ## Progress Tracker
 
-### ✅ Completed Modules (1/11)
-1. ✅ **types.go** (45 lines) - Shared types (checkResult, MetisConfig)
+###  Completed Modules (1/11)
+1.  **types.go** (45 lines) - Shared types (checkResult, MetisConfig)
 
-### 🔄 In Progress (0/11)
+###  In Progress (0/11)
 - None currently
 
 ### ⏳ Pending (10/11)
@@ -33,7 +33,7 @@
 
 ```
 cmd/debug/metis/
-├── types.go ✅                    # Shared types
+├── types.go                     # Shared types
 ├── checks/
 │   ├── infrastructure.go ⏳      # Infrastructure checks
 │   ├── configuration.go ⏳       # Config validation
@@ -54,7 +54,7 @@ cmd/debug/metis/
 
 ## Extraction Strategy
 
-### Phase 1: Foundation ✅
+### Phase 1: Foundation 
 - [x] Create directory structure
 - [x] Extract shared types
 

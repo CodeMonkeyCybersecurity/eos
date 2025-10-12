@@ -13,11 +13,11 @@
 #### Category A: INLINE (Move to source code)
 **Criteria:** Implementation details, architecture decisions, design patterns
 
-1. **AGENTS.md** → `pkg/delphi/agents/types.go` ✅ ALREADY DONE
-2. **BOOTSTRAP_DESIGN.md** → `pkg/bootstrap/check.go` ✅ ALREADY DONE
-3. **IMPLEMENTATION_STATUS.md** → `pkg/bootstrap/check.go` ✅ ALREADY DONE
-4. **SALTSTACK_TO_HASHICORP_MIGRATION.md** → `pkg/hashicorp/tools.go` ✅ ALREADY DONE
-5. **SECURITY_IMPROVEMENTS.md** → `pkg/security/hardening.go` ✅ ALREADY DONE
+1. **AGENTS.md** → `pkg/delphi/agents/types.go`  ALREADY DONE
+2. **BOOTSTRAP_DESIGN.md** → `pkg/bootstrap/check.go`  ALREADY DONE
+3. **IMPLEMENTATION_STATUS.md** → `pkg/bootstrap/check.go`  ALREADY DONE
+4. **SALTSTACK_TO_HASHICORP_MIGRATION.md** → `pkg/hashicorp/tools.go`  ALREADY DONE
+5. **SECURITY_IMPROVEMENTS.md** → `pkg/security/hardening.go`  ALREADY DONE
 6. **BOOTSTRAP_HARDENING_SAFETY.md** → `pkg/bootstrap/safety.go` (NEW)
 7. **BOOTSTRAP_IMPROVEMENTS.md** → `pkg/bootstrap/orchestrator.go` (NEW)
 8. **BOOTSTRAP_STATE_VALIDATION.md** → `pkg/bootstrap/validator.go` (NEW)
@@ -102,23 +102,23 @@
 **Argument:** "We need ALL documentation inline! Developers should never leave the code!"
 
 **Critique:**
-- ❌ User guides don't belong inline (they're for end users, not developers)
-- ❌ Operational guides are cross-cutting (not tied to single file)
-- ❌ Compliance docs are reference material (not implementation)
-- ✅ Architecture decisions SHOULD be inline
-- ✅ Implementation details SHOULD be inline
-- ✅ Design patterns SHOULD be inline
+-  User guides don't belong inline (they're for end users, not developers)
+-  Operational guides are cross-cutting (not tied to single file)
+-  Compliance docs are reference material (not implementation)
+-  Architecture decisions SHOULD be inline
+-  Implementation details SHOULD be inline
+-  Design patterns SHOULD be inline
 
 ### Perspective 2: Minimalist
 **Argument:** "Keep docs separate! Code should be self-documenting!"
 
 **Critique:**
-- ❌ Complex architecture needs explanation (code alone isn't enough)
-- ❌ Design decisions need context (why we chose this approach)
-- ❌ Integration patterns need examples (how to use this)
-- ✅ Simple code doesn't need verbose comments
-- ✅ User guides should stay separate
-- ✅ Operational docs should stay separate
+-  Complex architecture needs explanation (code alone isn't enough)
+-  Design decisions need context (why we chose this approach)
+-  Integration patterns need examples (how to use this)
+-  Simple code doesn't need verbose comments
+-  User guides should stay separate
+-  Operational docs should stay separate
 
 ### Resolution: Balanced Approach
 **Decision Matrix:**

@@ -122,7 +122,7 @@ func (aum *AgentUpgradeManager) UpgradeLocalAgent(rc *eos_io.RuntimeContext) (*A
 		Timestamp: startTime,
 	}
 
-	logger.Info("🚀 Starting local Delphi agent upgrade with comprehensive analysis")
+	logger.Info(" Starting local Delphi agent upgrade with comprehensive analysis")
 
 	// Step 1: Perform comprehensive pre-flight analysis
 	analysis, err := aum.analyzeLocalAgent(rc)

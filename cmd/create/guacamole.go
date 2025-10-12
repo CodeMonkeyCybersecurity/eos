@@ -83,7 +83,7 @@ Examples:
 			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))
 
 			if len(result.Endpoints) > 0 {
-				logger.Info("terminal prompt: 🌐 Access URLs:")
+				logger.Info("terminal prompt:  Access URLs:")
 				for _, endpoint := range result.Endpoints {
 					logger.Info(fmt.Sprintf("terminal prompt:    %s", endpoint))
 				}
@@ -98,7 +98,7 @@ Examples:
 				}
 			}
 
-			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:  Next Steps:")
 			logger.Info(fmt.Sprintf("terminal prompt:    1. Open Guacamole: http://localhost:%d/guacamole", result.Port))
 			logger.Info("terminal prompt:    2. Login with: guacadmin / guacadmin")
 			logger.Info("terminal prompt:    3. IMMEDIATELY change the default password")
@@ -120,7 +120,7 @@ Examples:
 			logger.Info("terminal prompt:    - Kubernetes")
 		} else {
 			logger.Error("Apache Guacamole installation failed", zap.String("error", result.Error))
-			logger.Info("terminal prompt: ❌ Apache Guacamole Installation Failed!")
+			logger.Info("terminal prompt:  Apache Guacamole Installation Failed!")
 			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
@@ -129,7 +129,7 @@ Examples:
 					status := ""
 					switch step.Status {
 					case "failed":
-						status = "❌"
+						status = ""
 					case "running":
 						status = "⏳"
 					}

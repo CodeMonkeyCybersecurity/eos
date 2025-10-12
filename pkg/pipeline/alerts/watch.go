@@ -79,11 +79,11 @@ func WatchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("🛑 Context cancelled, stopping alerts watch")
+			logger.Info(" Context cancelled, stopping alerts watch")
 			return nil
 
 		case sig := <-sigChan:
-			logger.Info("🛑 Received signal, stopping alerts watch", zap.String("signal", sig.String()))
+			logger.Info(" Received signal, stopping alerts watch", zap.String("signal", sig.String()))
 			return nil
 
 		case notification := <-listener.Notify:

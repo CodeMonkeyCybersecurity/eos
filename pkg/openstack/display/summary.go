@@ -22,7 +22,7 @@ func ShowInstallationSummary(rc *eos_io.RuntimeContext, config *openstack.Config
 	fmt.Println()
 
 	// Deployment summary
-	fmt.Println("🚀 Deployment Summary")
+	fmt.Println(" Deployment Summary")
 	fmt.Println("════════════════════")
 	fmt.Printf("   • Mode:              %s\n", formatMode(config.Mode))
 	fmt.Printf("   • Version:           %s (Caracal)\n", "2024.1")
@@ -33,7 +33,7 @@ func ShowInstallationSummary(rc *eos_io.RuntimeContext, config *openstack.Config
 	fmt.Println()
 
 	// Service endpoints
-	fmt.Println("🌐 Service Endpoints")
+	fmt.Println(" Service Endpoints")
 	fmt.Println("═══════════════════")
 	displayEndpoints(config)
 	fmt.Println()
@@ -177,7 +177,7 @@ func ShowExistingInstallation(rc *eos_io.RuntimeContext, status *openstack.Insta
 	if len(status.Services) > 0 {
 		fmt.Println("Services:")
 		for _, svc := range status.Services {
-			statusIcon := "❌"
+			statusIcon := ""
 			if svc.Healthy {
 				statusIcon = ""
 			} else if svc.Running {

@@ -130,7 +130,7 @@ func runWatchdogTraces(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 		// Read summary from main log
 		if summary := getSessionSummary(sessionPath); summary != "" {
-			fmt.Printf("   📝 %s\n", summary)
+			fmt.Printf("    %s\n", summary)
 		}
 
 		// Show size of traces

@@ -40,7 +40,7 @@ run_fuzz_test() {
     local log_file="${LOG_DIR}/${test_name}_${TIMESTAMP}.log"
     local start_time=$(date +%s)
     
-    echo "🚀 Starting ${test_name} (${duration}, priority: ${priority})..."
+    echo " Starting ${test_name} (${duration}, priority: ${priority})..."
     echo "Package: ${package}"
     echo "⏱️  Started at: $(date)"
     echo "📄 Log: ${log_file}"
@@ -80,7 +80,7 @@ run_fuzz_test() {
         local end_time=$(date +%s)
         local elapsed=$((end_time - start_time))
         
-        echo "❌ ${test_name} failed - check ${log_file}"
+        echo " ${test_name} failed - check ${log_file}"
         echo " CRASH DETECTED in ${test_name}!" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
         
         # Extract crash details
@@ -88,7 +88,7 @@ run_fuzz_test() {
         echo "💥 Crash details: ${crash_line}" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
         
         # Update report
-        echo "- ❌ **${test_name}** (${package}): FAILED - ${elapsed}s, crash: ${crash_line}" >> "${REPORT_FILE}"
+        echo "-  **${test_name}** (${package}): FAILED - ${elapsed}s, crash: ${crash_line}" >> "${REPORT_FILE}"
     fi
     echo ""
 }
@@ -221,7 +221,7 @@ echo "⚙️ Phase 3: Command Processing Tests (Parallel)"
 echo -e "\n### Phase 3: Command Processing Tests" >> "${REPORT_FILE}"
 run_parallel_tests command_tests 4
 
-echo "📝 Phase 4: Input Validation Tests (Parallel)"
+echo " Phase 4: Input Validation Tests (Parallel)"
 echo -e "\n### Phase 4: Input Validation Tests" >> "${REPORT_FILE}"
 run_parallel_tests input_validation_tests 4
 
@@ -259,7 +259,7 @@ done
 # Count passed/failed from report file
 if [ -f "${REPORT_FILE}" ]; then
     passed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
-    failed_tests=$(grep -c "❌" "${REPORT_FILE}" || echo "0")
+    failed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
 fi
 
 # Calculate estimated total duration
@@ -305,7 +305,7 @@ if [ -f "${LOG_DIR}/crashes_${TIMESTAMP}.log" ]; then
     
     # Send alert if configured
     if [ "${EMAIL_REPORT}" = "true" ] && [ -n "${EMAIL_ADDRESS}" ]; then
-        echo "📧 Sending crash alert email..."
+        echo " Sending crash alert email..."
         mail -s " Eos Fuzz Testing: ${crash_count} Crashes Detected" "${EMAIL_ADDRESS}" < "${REPORT_FILE}"
     fi
     
@@ -337,7 +337,7 @@ echo "⏰ Estimated duration: ${estimated_hours}h"
 echo ""
 
 # Generate next steps
-echo "🚀 NEXT STEPS:"
+echo " NEXT STEPS:"
 echo "=============="
 echo "1. Review detailed report: cat '${REPORT_FILE}'"
 echo "2. Examine individual logs: ls '${LOG_DIR}'/*_${TIMESTAMP}.log"
@@ -350,7 +350,7 @@ if [ "${failed_tests}" -eq 0 ]; then
     
     # Send success notification if configured
     if [ "${EMAIL_REPORT}" = "true" ] && [ -n "${EMAIL_ADDRESS}" ]; then
-        echo "📧 Sending success report email..."
+        echo " Sending success report email..."
         mail -s "Eos Fuzz Testing: All Tests Passed" "${EMAIL_ADDRESS}" < "${REPORT_FILE}"
     fi
 else

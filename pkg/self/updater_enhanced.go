@@ -80,7 +80,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 
 	// Phase 3: EVALUATE - Handle success or trigger rollback
 	if updateErr != nil {
-		eeu.logger.Error("❌ Update failed, initiating rollback", zap.Error(updateErr))
+		eeu.logger.Error(" Update failed, initiating rollback", zap.Error(updateErr))
 
 		if rollbackErr := eeu.Rollback(); rollbackErr != nil {
 			eeu.logger.Error("💥 CRITICAL: Rollback failed", zap.Error(rollbackErr))

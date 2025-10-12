@@ -31,7 +31,7 @@ func (c *RemoteConfig) SetDefaultPath(rc *eos_io.RuntimeContext) error {
 	var err error
 	c.Path, err = os.Getwd()
 	if err != nil {
-		logger.Error("❌ Failed to get current directory", zap.Error(err))
+		logger.Error(" Failed to get current directory", zap.Error(err))
 		return err
 	}
 

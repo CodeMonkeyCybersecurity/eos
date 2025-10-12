@@ -34,22 +34,22 @@ This audit examines the Eos codebase to identify services that should follow the
 - **Issue**: Standalone deployment, not integrated with Hecate
 - **Recommendation**: Integrate with existing Hecate stack instead of standalone
 
-### ❌ Non-Compliant Services
+###  Non-Compliant Services
 
 #### 4. Hera/Authentik (`cmd/create/hera.go`)
-- **Status**: ❌ NON-COMPLIANT - Uses docker-compose directly
+- **Status**:  NON-COMPLIANT - Uses docker-compose directly
 - **Current**: Direct docker-compose deployment with port exposure
 - **Issue**: No reverse proxy layer, direct port exposure (9000)
 - **Recommendation**: Add nginx proxy layer + Hecate integration
 
 #### 5. Traefik Infrastructure (`pkg/deploy/traefik.go`)
-- **Status**: ❌ NON-COMPLIANT - Standalone reverse proxy
+- **Status**:  NON-COMPLIANT - Standalone reverse proxy
 - **Current**: Standalone Traefik deployment
 - **Issue**: Conflicts with Hecate architecture
 - **Recommendation**: Deprecate in favor of Hecate or integrate as backend
 
 #### 6. ClusterFuzz (`pkg/clusterfuzz/nomad/jobs.go`)
-- **Status**: ❌ NON-COMPLIANT - No reverse proxy
+- **Status**:  NON-COMPLIANT - No reverse proxy
 - **Current**: Direct service exposure via Nomad
 - **Issue**: No proxy layer for web interface
 - **Recommendation**: Add nginx proxy + Hecate integration

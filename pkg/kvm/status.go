@@ -56,7 +56,7 @@ func StartInstallStatusTicker(ctx context.Context, log *zap.Logger, vmName, disk
 
 			// DHCP leases
 			if ip, err := parseDHCPIP(vmName); err == nil && ip != "" {
-				log.Info("🌐 DHCP lease detected", zap.String("vm", vmName), zap.String("ip", ip))
+				log.Info(" DHCP lease detected", zap.String("vm", vmName), zap.String("ip", ip))
 			} else if err != nil {
 				log.Debug("No DHCP lease yet", zap.String("vm", vmName), zap.Error(err))
 			}

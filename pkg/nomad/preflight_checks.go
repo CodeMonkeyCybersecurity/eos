@@ -340,7 +340,7 @@ func DisplayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 
 	if len(result.Issues) > 0 {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: ❌ CRITICAL ISSUES:")
+		logger.Info("terminal prompt:  CRITICAL ISSUES:")
 		for _, issue := range result.Issues {
 			logger.Info("terminal prompt:", zap.String("issue", fmt.Sprintf("  • %s", issue)))
 		}
@@ -358,7 +358,7 @@ func DisplayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 	if result.CanProceed {
 		logger.Info("terminal prompt:  Preflight checks passed - ready to install Nomad")
 	} else {
-		logger.Info("terminal prompt: ❌ Preflight checks failed - issues must be resolved")
+		logger.Info("terminal prompt:  Preflight checks failed - issues must be resolved")
 	}
 }
 

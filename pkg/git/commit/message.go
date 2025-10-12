@@ -35,7 +35,7 @@ func GenerateSmartMessage(rc *eos_io.RuntimeContext, status *git.GitStatus) (str
 	message := BuildCommitMessage(analysis)
 
 	// Add standard footer
-	message += "\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>"
+	message += "\n\n Generated with [Claude Code](https://claude.ai/code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>"
 
 	logger.Debug("Generated commit message", zap.String("message", message))
 	return message, nil

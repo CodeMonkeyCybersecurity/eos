@@ -159,7 +159,7 @@ func displayTopologyFocus(config *environment.EnhancedEnvironmentConfig) error {
 
 // displayServicesFocus displays service placement information
 func displayServicesFocus(config *environment.EnhancedEnvironmentConfig) error {
-	fmt.Printf("🚀 Service Placement\n")
+	fmt.Printf(" Service Placement\n")
 	fmt.Printf("===================\n\n")
 	fmt.Printf("Profile:         %s\n", config.Profile)
 	fmt.Printf("Resource Strategy: %s\n", config.ResourceStrategy)
@@ -193,8 +193,8 @@ func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error
 
 	// Profile and basic info
 	fmt.Printf("📊 Deployment Profile: %s\n", config.Profile)
-	fmt.Printf("🌐 Environment:        %s\n", config.Environment)
-	fmt.Printf("🏢 Datacenter:         %s\n", config.Datacenter)
+	fmt.Printf(" Environment:        %s\n", config.Environment)
+	fmt.Printf(" Datacenter:         %s\n", config.Datacenter)
 	fmt.Printf("🌎 Region:             %s\n", config.Region)
 	fmt.Printf("📈 Cluster Size:       %d nodes\n", config.ClusterSize)
 	fmt.Printf("⚙️  Resource Strategy:  %s\n", config.ResourceStrategy)

@@ -339,7 +339,7 @@ func enforceMFAForAllUsers(rc *eos_io.RuntimeContext, client *api.Client, config
 }
 
 // enforceIdentityMFAForUserpass creates a basic MFA enforcement for userpass auth
-func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client) error {
+func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, _ *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	// This is a simplified enforcement - in production, you'd want more sophisticated policies

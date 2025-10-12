@@ -22,7 +22,7 @@ Analysis of the EOS codebase identified **50+ files** requiring modularization t
 
 ### Priority 1 (P1) - Immediate Action Required (>1000 lines)
 
-#### 1. **pkg/consul/install.go** (1,713 lines) ⚠️ CRITICAL
+#### 1. **pkg/consul/install.go** (1,713 lines)  CRITICAL
 **Current Responsibilities:**
 - Consul binary installation (repository & direct download)
 - Version detection and management
@@ -69,7 +69,7 @@ pkg/consul/
 
 ---
 
-#### 2. **cmd/debug/metis.go** (1,659 lines) ⚠️ CRITICAL
+#### 2. **cmd/debug/metis.go** (1,659 lines)  CRITICAL
 **Current Responsibilities:**
 - Metis service diagnostics
 - Infrastructure checks (Temporal, PostgreSQL, Redis)
@@ -106,7 +106,7 @@ cmd/debug/metis/
 
 ---
 
-#### 3. **cmd/debug/delphi.go** (1,630 lines) ⚠️ CRITICAL
+#### 3. **cmd/debug/delphi.go** (1,630 lines)  CRITICAL
 **Current Responsibilities:**
 - Delphi/Wazuh diagnostics
 - Agent connectivity checks
@@ -140,7 +140,7 @@ cmd/debug/delphi/
 
 ---
 
-#### 4. **pkg/authentik/import.go** (1,266 lines) ⚠️ CRITICAL
+#### 4. **pkg/authentik/import.go** (1,266 lines)  CRITICAL
 **Current Responsibilities:**
 - Authentik configuration import
 - User/group import
@@ -169,7 +169,7 @@ pkg/authentik/import/
 
 ---
 
-#### 5. **pkg/vault/install.go** (1,253 lines) ⚠️ CRITICAL
+#### 5. **pkg/vault/install.go** (1,253 lines)  CRITICAL
 **Current Responsibilities:**
 - Vault binary installation
 - Configuration generation
@@ -586,22 +586,22 @@ pkg/watchdog/resource/
 ## Success Metrics
 
 ### Code Quality
-- ✅ Every file <300 lines OR single responsibility
-- ✅ Zero circular dependencies
-- ✅ 100% test coverage maintained
-- ✅ All security fixes preserved
+-  Every file <300 lines OR single responsibility
+-  Zero circular dependencies
+-  100% test coverage maintained
+-  All security fixes preserved
 
 ### Architecture
-- ✅ 50+ focused modules created
-- ✅ Clear dependency graph
-- ✅ Proper separation of concerns
-- ✅ Testable design
+-  50+ focused modules created
+-  Clear dependency graph
+-  Proper separation of concerns
+-  Testable design
 
 ### Functionality
-- ✅ 100% feature parity
-- ✅ Zero regressions
-- ✅ All tests passing
-- ✅ Production ready
+-  100% feature parity
+-  Zero regressions
+-  All tests passing
+-  Production ready
 
 ---
 
@@ -652,7 +652,7 @@ cmd/debug/metis.go
 
 ## Next Steps
 
-1. ✅ **Analysis Complete** - This document
+1.  **Analysis Complete** - This document
 2. ⏳ **Start P1 File #1** - pkg/consul/install.go
 3. ⏳ **Extract systematically** - Follow extraction process
 4. ⏳ **Report progress** - Update this document after each file
@@ -663,22 +663,22 @@ cmd/debug/metis.go
 ## Progress Tracking
 
 ### Completed Files
-- ✅ **pkg/consul/install.go** (1,713 lines → 13 modules created - 100% COMPLETE)
+-  **pkg/consul/install.go** (1,713 lines → 13 modules created - 100% COMPLETE)
 
 ### In Progress
 - None (ready for next P1 file)
-  - ✅ pkg/consul/installer/version.go (110 lines) - Version management
-  - ✅ pkg/consul/installer/binary.go (160 lines) - Binary installation
-  - ✅ pkg/consul/installer/repository.go (140 lines) - APT repository installation
-  - ✅ pkg/consul/validation/prerequisites.go (90 lines) - Prerequisites validation
-  - ✅ pkg/consul/validation/resources.go (130 lines) - Memory/disk validation
-  - ✅ pkg/consul/validation/ports.go (150 lines) - Port availability checking
-  - ✅ pkg/consul/validation/security.go (90 lines) - SELinux/AppArmor checking
-  - ✅ pkg/consul/service/lifecycle.go (150 lines) - Service lifecycle
-  - ✅ pkg/consul/service/systemd.go (195 lines) - Systemd management
-  - ✅ pkg/consul/config/setup.go (280 lines) - Configuration setup
-  - ✅ pkg/consul/rollback/manager.go (240 lines) - Rollback management
-  - ✅ pkg/consul/helpers/network.go (230 lines) - Network utilities
+  -  pkg/consul/installer/version.go (110 lines) - Version management
+  -  pkg/consul/installer/binary.go (160 lines) - Binary installation
+  -  pkg/consul/installer/repository.go (140 lines) - APT repository installation
+  -  pkg/consul/validation/prerequisites.go (90 lines) - Prerequisites validation
+  -  pkg/consul/validation/resources.go (130 lines) - Memory/disk validation
+  -  pkg/consul/validation/ports.go (150 lines) - Port availability checking
+  -  pkg/consul/validation/security.go (90 lines) - SELinux/AppArmor checking
+  -  pkg/consul/service/lifecycle.go (150 lines) - Service lifecycle
+  -  pkg/consul/service/systemd.go (195 lines) - Systemd management
+  -  pkg/consul/config/setup.go (280 lines) - Configuration setup
+  -  pkg/consul/rollback/manager.go (240 lines) - Rollback management
+  -  pkg/consul/helpers/network.go (230 lines) - Network utilities
   - ⏳ Main orchestrator refactor (pending - final step)
 
 ### Blocked

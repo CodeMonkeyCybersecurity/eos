@@ -430,7 +430,7 @@ func PrintIdempotentResult(rc *eos_io.RuntimeContext, result *IdempotentBootstra
 	}
 
 	if len(result.Failed) > 0 {
-		logger.Error("❌ Failed:")
+		logger.Error(" Failed:")
 		for _, component := range result.Failed {
 			logger.Error("   • " + component)
 		}

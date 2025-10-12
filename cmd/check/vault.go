@@ -70,7 +70,7 @@ func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	if runConfig {
 		logger.Info("📋 Running configuration validation")
 		if err := validateConfiguration(rc); err != nil {
-			logger.Error("❌ Configuration validation failed", zap.Error(err))
+			logger.Error(" Configuration validation failed", zap.Error(err))
 			hasErrors = true
 		} else {
 			logger.Info(" Configuration validation passed")
@@ -81,7 +81,7 @@ func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	if runSecurity {
 		logger.Info("🔒 Running security posture validation")
 		if err := validateSecurityPosture(rc); err != nil {
-			logger.Error("❌ Security posture validation failed", zap.Error(err))
+			logger.Error(" Security posture validation failed", zap.Error(err))
 			hasErrors = true
 		} else {
 			logger.Info(" Security posture validation passed")
@@ -115,7 +115,7 @@ func validateConfiguration(rc *eos_io.RuntimeContext) error {
 	if result.Valid {
 		fmt.Println(" Status: VALID")
 	} else {
-		fmt.Println("❌ Status: INVALID")
+		fmt.Println(" Status: INVALID")
 	}
 
 	fmt.Printf(" Method: %s\n", result.Method)
@@ -123,7 +123,7 @@ func validateConfiguration(rc *eos_io.RuntimeContext) error {
 
 	// Errors
 	if len(result.Errors) > 0 {
-		fmt.Printf("❌ Errors (%d):\n", len(result.Errors))
+		fmt.Printf(" Errors (%d):\n", len(result.Errors))
 		for i, err := range result.Errors {
 			fmt.Printf("  %d. %s\n", i+1, err)
 		}
@@ -174,7 +174,7 @@ func validateSecurityPosture(rc *eos_io.RuntimeContext) error {
 	}
 
 	if len(failed) > 0 {
-		fmt.Printf("\n❌ Failed Checks (%d):\n", len(failed))
+		fmt.Printf("\n Failed Checks (%d):\n", len(failed))
 		for i, check := range failed {
 			fmt.Printf("  %d. %s\n", i+1, check)
 		}

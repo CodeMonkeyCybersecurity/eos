@@ -143,7 +143,7 @@
    func (eeu *EnhancedEosUpdater) createTransactionBackup() error {
        backupPath := fmt.Sprintf("%s/eos.backup.%d", eeu.config.BackupDir, time.Now().Unix())
 
-       if err := eeu.CreateBackup(); err != nil {  // ❌ CreateBackup doesn't know about backupPath!
+       if err := eeu.CreateBackup(); err != nil {  //  CreateBackup doesn't know about backupPath!
            return err
        }
 

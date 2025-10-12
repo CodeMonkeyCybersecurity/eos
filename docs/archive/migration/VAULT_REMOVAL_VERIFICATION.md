@@ -214,24 +214,24 @@ After running `sudo eos delete vault`, verify with these commands:
 
 ```bash
 # Service verification
-systemctl status vault 2>&1 | grep -q "could not be found" && echo " Service removed" || echo "❌ Service still exists"
-systemctl is-enabled vault 2>&1 | grep -q "Failed" && echo " Service disabled" || echo "❌ Service still enabled"
+systemctl status vault 2>&1 | grep -q "could not be found" && echo " Service removed" || echo " Service still exists"
+systemctl is-enabled vault 2>&1 | grep -q "Failed" && echo " Service disabled" || echo " Service still enabled"
 
 # File verification
-[ ! -d /etc/vault.d ] && echo " Config removed" || echo "❌ Config exists"
-[ ! -d /opt/vault ] && echo " Data removed" || echo "❌ Data exists"
-[ ! -f /usr/local/bin/vault ] && echo " Binary removed" || echo "❌ Binary exists"
+[ ! -d /etc/vault.d ] && echo " Config removed" || echo " Config exists"
+[ ! -d /opt/vault ] && echo " Data removed" || echo " Data exists"
+[ ! -f /usr/local/bin/vault ] && echo " Binary removed" || echo " Binary exists"
 
 # User verification
-id vault 2>&1 | grep -q "no such user" && echo " User removed" || echo "❌ User exists"
-getent group vault > /dev/null 2>&1 && echo "❌ Group exists" || echo " Group removed"
+id vault 2>&1 | grep -q "no such user" && echo " User removed" || echo " User exists"
+getent group vault > /dev/null 2>&1 && echo " Group exists" || echo " Group removed"
 
 # Environment verification
-grep -q VAULT_ /etc/environment 2>/dev/null && echo "❌ Env vars exist" || echo " Env vars removed"
-[ ! -f /etc/profile.d/vault.sh ] && echo " Profile removed" || echo "❌ Profile exists"
+grep -q VAULT_ /etc/environment 2>/dev/null && echo " Env vars exist" || echo " Env vars removed"
+[ ! -f /etc/profile.d/vault.sh ] && echo " Profile removed" || echo " Profile exists"
 
 # Reinstallation test
-sudo eos create vault --force && echo " Reinstall successful" || echo "❌ Reinstall failed"
+sudo eos create vault --force && echo " Reinstall successful" || echo " Reinstall failed"
 ```
 
 ---

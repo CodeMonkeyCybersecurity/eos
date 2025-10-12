@@ -1,6 +1,6 @@
 # Eos Bootstrap System Improvements
 
-> **📝 Documentation has been moved inline with the code for better maintainability.**
+> ** Documentation has been moved inline with the code for better maintainability.**
 > 
 > The comprehensive bootstrap system improvements documentation is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 

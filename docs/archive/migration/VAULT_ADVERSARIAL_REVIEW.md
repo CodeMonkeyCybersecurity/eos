@@ -395,7 +395,7 @@ When validation fails, users get errors but no recovery documentation.
 **Example:**
 ```bash
 $ sudo eos check vault
-❌ Configuration validation failed
+ Configuration validation failed
    1. tls_cert_file specified but tls_key_file is missing
 
 # User thinks: "Now what?"
@@ -607,7 +607,7 @@ Error: unknown command "vault"
 $ sudo eos create vault
 Installing Vault...
 Validating configuration...
-❌ Error: tls_cert_file is empty string
+ Error: tls_cert_file is empty string
 Fix: Review config at /opt/vault/vault.hcl
 Help: Run 'sudo eos check vault --config'
 

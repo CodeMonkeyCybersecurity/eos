@@ -53,7 +53,7 @@ run_fuzz_test() {
     local log_file="${LOG_DIR}/${test_name}_${TIMESTAMP}.log"
     local start_time=$(date +%s)
     
-    echo "🚀 Running ${test_name} (${duration}, priority: ${priority})..."
+    echo " Running ${test_name} (${duration}, priority: ${priority})..."
     echo "Package: ${package}"
     echo "⏱️  Started at: $(date)"
     echo "📄 Log: ${log_file}"
@@ -84,7 +84,7 @@ run_fuzz_test() {
         local end_time=$(date +%s)
         local elapsed=$((end_time - start_time))
         
-        echo "❌ ${test_name} failed - check ${log_file}"
+        echo " ${test_name} failed - check ${log_file}"
         echo " CRASH DETECTED in ${test_name}!" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
         
         # Extract crash details
@@ -92,7 +92,7 @@ run_fuzz_test() {
         echo "💥 Crash details: ${crash_line}" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
         
         # Update report
-        echo "- ❌ **${test_name}** (${package}): FAILED - ${elapsed}s, crash: ${crash_line}" >> "${REPORT_FILE}"
+        echo "-  **${test_name}** (${package}): FAILED - ${elapsed}s, crash: ${crash_line}" >> "${REPORT_FILE}"
         echo ""
         return 1
     fi
@@ -124,7 +124,7 @@ run_fuzz_test "FuzzCommandParsing" "./pkg/eos_cli" "${FUZZTIME_SHORT}" "medium"
 run_fuzz_test "FuzzEosCommandFlags" "./test" "${FUZZTIME_SHORT}" "medium"
 
 # Phase 4: Input Validation Tests
-echo "📝 Phase 4: Input Validation Tests"
+echo " Phase 4: Input Validation Tests"
 echo -e "\n### Phase 4: Input Validation Tests" >> "${REPORT_FILE}"
 
 run_fuzz_test "FuzzNormalizeYesNoInput" "./pkg/interaction" "${FUZZTIME_SHORT}" "medium"
@@ -160,7 +160,7 @@ skipped_tests=0
 if [ -f "${REPORT_FILE}" ]; then
     total_tests=$(grep -c "^- " "${REPORT_FILE}" || echo "0")
     passed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
-    failed_tests=$(grep -c "❌" "${REPORT_FILE}" || echo "0")
+    failed_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
     skipped_tests=$(grep -c "" "${REPORT_FILE}" || echo "0")
 fi
 
@@ -214,7 +214,7 @@ echo "📄 Main report: ${REPORT_FILE}"
 echo "📈 Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed, ${skipped_tests} skipped)"
 echo ""
 
-echo "🚀 NEXT STEPS:"
+echo " NEXT STEPS:"
 echo "=============="
 echo "1. Review detailed report: cat '${REPORT_FILE}'"
 echo "2. Examine individual logs: ls '${LOG_DIR}'/*_${TIMESTAMP}.log"

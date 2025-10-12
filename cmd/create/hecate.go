@@ -234,7 +234,7 @@ Examples:
 				}
 			}
 
-			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:  Next Steps:")
 			logger.Info("terminal prompt:    1. Edit the Caddyfile: sudo nano /etc/caddy/Caddyfile")
 			logger.Info("terminal prompt:    2. Add your site configuration")
 			logger.Info("terminal prompt:    3. Reload configuration: sudo systemctl reload caddy")
@@ -243,7 +243,7 @@ Examples:
 			logger.Info("terminal prompt:    6. Check service status: eos status caddy")
 		} else {
 			logger.Error("Caddy installation failed", zap.String("error", result.Error))
-			logger.Info("terminal prompt: ❌ Caddy Installation Failed!")
+			logger.Info("terminal prompt:  Caddy Installation Failed!")
 			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
@@ -252,7 +252,7 @@ Examples:
 					status := ""
 					switch step.Status {
 					case "failed":
-						status = "❌"
+						status = ""
 					case "running":
 						status = "⏳"
 					}

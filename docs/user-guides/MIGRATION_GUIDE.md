@@ -23,7 +23,7 @@ This document provides comprehensive guidance for migrating the Eos codebase to 
 **Goal**: `cmd/` files should contain ONLY command orchestration. All business logic goes in `pkg/`.
 
 ```go
-// ❌ BAD: Business logic in cmd/
+//  BAD: Business logic in cmd/
 func runCommand(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
     // Don't implement business logic here
     exec.Command("apt-get", "install", "tool").Run()
@@ -73,7 +73,7 @@ func Operation(rc *eos_io.RuntimeContext, config *Config) error {
 **NEVER** use `fmt.Printf/Println`. Always use structured logging:
 
 ```go
-// ❌ BAD: Using fmt for output
+//  BAD: Using fmt for output
 fmt.Printf("Installing %s...\n", packageName)
 
 //  GOOD: Using structured logging
@@ -115,7 +115,7 @@ func ProcessData(rc *eos_io.RuntimeContext, data []byte) error {
 Transform from function-based to variable-based command definitions:
 
 ```go
-// ❌ OLD: Function-based command
+//  OLD: Function-based command
 func NewServiceCmd() *cobra.Command {
     return &cobra.Command{
         Use:   "service",
@@ -142,7 +142,7 @@ func init() {
 Move package-level flag variables to function parameters:
 
 ```go
-// ❌ OLD: Package-level flag variables
+//  OLD: Package-level flag variables
 var (
     flagOutputJSON bool
     flagDryRun     bool
@@ -172,7 +172,7 @@ func runCommand(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 Move helper functions from `cmd/` to appropriate `pkg/` packages:
 
 ```go
-// ❌ OLD: Helper in cmd/
+//  OLD: Helper in cmd/
 // cmd/create/tool.go
 func installTool(toolName string) error {
     return exec.Command("apt-get", "install", toolName).Run()
@@ -621,7 +621,7 @@ func TestVaultIntegration(t *testing.T) {
 Before and after comparison for a complete package:
 
 ```go
-// ❌ BEFORE: pkg/mytool/install.go
+//  BEFORE: pkg/mytool/install.go
 package mytool
 
 import (

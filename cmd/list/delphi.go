@@ -422,7 +422,7 @@ func outputTextResults(logger otelzap.LoggerWithCtx, summary *delphi_config.Vali
 	// Show errors
 	if len(summary.Errors) > 0 {
 		if !checkOnly {
-			logger.Info("terminal prompt: ❌ ERRORS", zap.Int("count", len(summary.Errors)))
+			logger.Info("terminal prompt:  ERRORS", zap.Int("count", len(summary.Errors)))
 			for _, err := range summary.Errors {
 				logger.Info("terminal prompt:    • Validation error",
 					zap.String("source", err.Source),
@@ -461,7 +461,7 @@ func outputTextResults(logger otelzap.LoggerWithCtx, summary *delphi_config.Vali
 	} else if len(summary.Errors) == 0 {
 		logger.Info("terminal prompt: WARNINGS FOUND - Delphi should work but check warnings")
 	} else {
-		logger.Info("terminal prompt: ❌ CRITICAL ERRORS FOUND - Fix errors before running Delphi")
+		logger.Info("terminal prompt:  CRITICAL ERRORS FOUND - Fix errors before running Delphi")
 
 		// Return error exit code for CI/CD integration
 		os.Exit(1)

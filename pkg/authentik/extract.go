@@ -513,7 +513,7 @@ func listApplications(client *AuthentikAPIClient, detailed bool) error {
 
 	for _, a := range apps {
 		if detailed {
-			fmt.Printf("\n🚀 %s\n", a.Name)
+			fmt.Printf("\n %s\n", a.Name)
 			fmt.Printf("   Slug: %s\n", a.Slug)
 			fmt.Printf("   Provider: %s\n", a.Provider)
 			if a.MetaLaunchURL != "" {

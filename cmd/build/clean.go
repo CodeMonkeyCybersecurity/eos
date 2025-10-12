@@ -188,7 +188,7 @@ Examples:
 			fmt.Printf("Cleanup Errors:\n")
 			fmt.Printf("───────────────\n")
 			for _, err := range result.Errors {
-				fmt.Printf("❌ %s\n", err)
+				fmt.Printf(" %s\n", err)
 			}
 			fmt.Printf("\n")
 		}

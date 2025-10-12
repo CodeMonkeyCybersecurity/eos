@@ -1,6 +1,6 @@
 # Eos Documentation Standards
 
-> **📝 Documentation strategy has evolved to inline documentation for better maintainability.**
+> ** Documentation strategy has evolved to inline documentation for better maintainability.**
 > 
 > Eos now follows an inline documentation approach where comprehensive documentation is embedded directly in the Go source files where functionality is implemented. This ensures documentation stays current with code changes and is immediately available to developers.
 
@@ -59,7 +59,7 @@ package service
 ```markdown
 # Eos Service Management
 
-> **📝 Documentation has been moved inline with the code for better maintainability.**
+> ** Documentation has been moved inline with the code for better maintainability.**
 
 ## Quick Reference
 

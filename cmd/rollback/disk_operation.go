@@ -126,7 +126,7 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	if !forceRollback {
 		fmt.Printf("\n=== SAFETY VALIDATIONS ===\n")
 		if err := rollbackManager.ValidateRollbackSafety(rc.Ctx, plan, journalID); err != nil {
-			fmt.Printf("❌ Safety validation failed: %s\n", err.Error())
+			fmt.Printf(" Safety validation failed: %s\n", err.Error())
 			fmt.Printf("\nUse --force to skip safety validations (DANGEROUS).\n")
 			return fmt.Errorf("rollback safety validation failed: %w", err)
 		}
@@ -161,7 +161,7 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	duration := time.Since(startTime)
 
 	if err != nil {
-		fmt.Printf("❌ Rollback failed after %s: %s\n", duration.Round(time.Second), err.Error())
+		fmt.Printf(" Rollback failed after %s: %s\n", duration.Round(time.Second), err.Error())
 		logger.Error("Rollback execution failed",
 			zap.String("journal_id", journalID),
 			zap.Duration("duration", duration),

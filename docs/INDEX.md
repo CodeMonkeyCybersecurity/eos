@@ -81,7 +81,7 @@ Historical documents and deprecated guides are stored in the [archive](archive/)
 - **Migration Archive**: [archive/migration/](archive/migration/) - SaltStack to HashiCorp migration history
 - **General Archive**: [archive/](archive/) - Other historical documentation
 
-> **📝 Note**: Most implementation documentation now lives inline with the code. See quick reference files in docs/ for pointers to inline documentation.
+> ** Note**: Most implementation documentation now lives inline with the code. See quick reference files in docs/ for pointers to inline documentation.
 
 ---
 

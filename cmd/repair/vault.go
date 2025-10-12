@@ -276,7 +276,7 @@ func repairConfiguration(rc *eos_io.RuntimeContext, dryRun bool) (int, int, erro
 	// Currently we don't have auto-fix for config errors
 	// User needs to manually fix configuration issues
 	fmt.Println()
-	fmt.Println("❌ Configuration errors require manual intervention")
+	fmt.Println(" Configuration errors require manual intervention")
 	fmt.Println("   Run 'sudo eos check vault --config' for detailed validation")
 
 	return issuesFound, 0, nil

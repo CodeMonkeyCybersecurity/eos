@@ -131,7 +131,7 @@ Examples:
 			return nil
 		}
 		if promotionRequest.Status == promotion.PromotionStatusRejected {
-			fmt.Printf("❌ This promotion has already been rejected.\n")
+			fmt.Printf(" This promotion has already been rejected.\n")
 			return nil
 		}
 		if promotionRequest.Status == promotion.PromotionStatusCompleted {
@@ -139,7 +139,7 @@ Examples:
 			return nil
 		}
 		if promotionRequest.Status == promotion.PromotionStatusFailed {
-			fmt.Printf("❌ This promotion has already failed.\n")
+			fmt.Printf(" This promotion has already failed.\n")
 			return nil
 		}
 
@@ -155,7 +155,7 @@ Examples:
 			for _, approval := range existingApprovals {
 				status := " Approved"
 				if approval.Status == "rejected" {
-					status = "❌ Rejected"
+					status = " Rejected"
 				}
 				fmt.Printf("  %s by %s at %s\n",
 					status,
@@ -258,7 +258,7 @@ Examples:
 
 		// Display results
 		if reject {
-			fmt.Printf("❌ Promotion request rejected\n")
+			fmt.Printf(" Promotion request rejected\n")
 			fmt.Printf("\nRejection Details:\n")
 			fmt.Printf("──────────────────\n")
 			fmt.Printf("Promotion ID:     %s\n", promotionID)
@@ -277,7 +277,7 @@ Examples:
 			// Check if promotion can now proceed
 			newApprovedCount := approvedCount + 1
 			if emergencyOverride || newApprovedCount >= promotionRequest.ApprovalPolicy.MinApprovals {
-				fmt.Printf("\n🚀 Sufficient approvals received - promotion will proceed automatically\n")
+				fmt.Printf("\n Sufficient approvals received - promotion will proceed automatically\n")
 
 				// In a real implementation, this would trigger the promotion execution
 				fmt.Printf("\nPromotion execution will begin shortly...\n")

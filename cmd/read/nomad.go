@@ -240,7 +240,7 @@ func displayJobs(logger otelzap.LoggerWithCtx) error {
 func displayNomadHealthStatus(logger otelzap.LoggerWithCtx) {
 	// Check if agent is responding
 	if err := exec.Command("nomad", "agent-info").Run(); err != nil {
-		logger.Info("terminal prompt:   Status: ❌ Nomad agent not responding")
+		logger.Info("terminal prompt:   Status:  Nomad agent not responding")
 		return
 	}
 
@@ -249,7 +249,7 @@ func displayNomadHealthStatus(logger otelzap.LoggerWithCtx) {
 	// Check service status
 	output, err := exec.Command("systemctl", "is-active", "nomad").Output()
 	if err != nil {
-		logger.Info("terminal prompt:   Service: ❌ not running")
+		logger.Info("terminal prompt:   Service:  not running")
 	} else {
 		status := strings.TrimSpace(string(output))
 		if status == "active" {

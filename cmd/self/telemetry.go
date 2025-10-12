@@ -51,7 +51,7 @@ Commands:
 				log.Error("Failed to remove telemetry toggle file", zap.Error(err))
 				return fmt.Errorf("disable telemetry: %w", err)
 			}
-			log.Info("❌ Telemetry disabled")
+			log.Info(" Telemetry disabled")
 		case "status":
 			return telemetry_management.ShowTelemetryStatus(rc, stateFile)
 		default:

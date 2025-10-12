@@ -51,7 +51,7 @@ func ServiceOperationToStdout(result *system_services.ServiceOperation, asJSON b
 	if result.Success {
 		fmt.Println("Operation completed successfully!")
 	} else {
-		fmt.Println("❌ Operation failed!")
+		fmt.Println(" Operation failed!")
 	}
 
 	fmt.Printf("\nMessage: %s\n", result.Message)
@@ -80,7 +80,7 @@ func ServiceStatusToStdout(result *system_services.ServiceInfo, asJSON bool) err
 	if result.Running {
 		fmt.Println("Status: RUNNING")
 	} else {
-		fmt.Println("Status: ❌ NOT RUNNING")
+		fmt.Println("Status:  NOT RUNNING")
 	}
 
 	return nil

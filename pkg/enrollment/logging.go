@@ -21,13 +21,13 @@ func LogEnrollmentResults(logger otelzap.LoggerWithCtx, result *EnrollmentResult
 
 		// Log additional success details
 		if len(result.ServicesSetup) > 0 {
-			logger.Info("🚀 Services successfully configured",
+			logger.Info(" Services successfully configured",
 				zap.Int("count", len(result.ServicesSetup)),
 				zap.Strings("services", result.ServicesSetup))
 		}
 
 		if len(result.ConfigsUpdated) > 0 {
-			logger.Info("📝 Configuration files updated",
+			logger.Info(" Configuration files updated",
 				zap.Int("count", len(result.ConfigsUpdated)),
 				zap.Strings("configs", result.ConfigsUpdated))
 		}
@@ -39,7 +39,7 @@ func LogEnrollmentResults(logger otelzap.LoggerWithCtx, result *EnrollmentResult
 		}
 	} else {
 		// EVALUATE - Log enrollment errors
-		logger.Error("❌ Enrollment completed with errors",
+		logger.Error(" Enrollment completed with errors",
 			zap.String("role", result.Role),
 			zap.String("master", result.MasterAddress),
 			zap.Strings("errors", result.Errors),

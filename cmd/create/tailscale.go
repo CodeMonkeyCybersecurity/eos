@@ -82,7 +82,7 @@ Examples:
 				logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
 			}
 
-			logger.Info("terminal prompt: 📝 Next Steps:")
+			logger.Info("terminal prompt:  Next Steps:")
 			logger.Info("terminal prompt:    1. Authenticate: sudo tailscale up")
 			logger.Info("terminal prompt:    2. Check status: tailscale status")
 			logger.Info("terminal prompt:    3. View IP: tailscale ip -4")
@@ -94,7 +94,7 @@ Examples:
 			logger.Info("terminal prompt:    - Check service: eos status tailscale")
 		} else {
 			logger.Error("Tailscale installation failed", zap.String("error", result.Error))
-			logger.Info("terminal prompt: ❌ Tailscale Installation Failed!")
+			logger.Info("terminal prompt:  Tailscale Installation Failed!")
 			logger.Info(fmt.Sprintf("terminal prompt: Error: %s", result.Error))
 
 			if len(result.Steps) > 0 {
@@ -103,7 +103,7 @@ Examples:
 					status := ""
 					switch step.Status {
 					case "failed":
-						status = "❌"
+						status = ""
 					case "running":
 						status = "⏳"
 					}

@@ -161,13 +161,13 @@ func (cm *ConfigManager) GetAPIKey(rc *eos_io.RuntimeContext) (string, error) {
 	// Check Vault if configured
 	if cm.config.APIKeyVault != "" {
 		logger.Debug("Attempting to retrieve API key from Vault", zap.String("path", cm.config.APIKeyVault))
-		
+
 		// Get Vault address
 		vaultAddr := os.Getenv("VAULT_ADDR")
 		if vaultAddr == "" {
 			vaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
 		}
-		
+
 		// Try to get secret from Vault
 		vaultClient, err := vault.NewClient(vaultAddr, logger.Logger().Logger)
 		if err != nil {
@@ -384,7 +384,7 @@ func DisplayEnvironmentAnalysis(env *EnvironmentContext, detailed bool) {
 			fmt.Printf("     Systemd Services: %d\n", len(services.SystemdServices))
 		}
 		if len(services.NetworkPorts) > 0 {
-			fmt.Printf("   🌐 Listening Ports: %d\n", len(services.NetworkPorts))
+			fmt.Printf("    Listening Ports: %d\n", len(services.NetworkPorts))
 		}
 		fmt.Println()
 	}

@@ -293,7 +293,7 @@ EOF
                 echo "-  $test_name: PASSED" >> "$report_file"
                 ((passed_tests++))
             else
-                echo "- ❌ $test_name: FAILED" >> "$report_file"
+                echo "-  $test_name: FAILED" >> "$report_file"
             fi
             ((total_tests++))
         fi

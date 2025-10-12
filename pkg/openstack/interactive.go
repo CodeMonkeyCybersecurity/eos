@@ -123,7 +123,7 @@ func promptDeploymentMode(reader *bufio.Reader, config *Config) error {
 
 // promptNetworkConfig prompts for network configuration
 func promptNetworkConfig(reader *bufio.Reader, config *Config) error {
-	fmt.Println("\n🌐 Network Configuration")
+	fmt.Println("\n Network Configuration")
 	fmt.Println("───────────────────────")
 
 	// Skip for storage nodes
@@ -318,7 +318,7 @@ func promptAuthentication(reader *bufio.Reader, config *Config) error {
 			password = strings.TrimSpace(password)
 
 			if len(password) < 8 {
-				fmt.Println("❌ Password must be at least 8 characters")
+				fmt.Println(" Password must be at least 8 characters")
 				continue
 			}
 
@@ -327,7 +327,7 @@ func promptAuthentication(reader *bufio.Reader, config *Config) error {
 			confirm = strings.TrimSpace(confirm)
 
 			if password != confirm {
-				fmt.Println("❌ Passwords do not match")
+				fmt.Println(" Passwords do not match")
 				continue
 			}
 

@@ -22,7 +22,7 @@ These components already follow the correct pattern where nuke delegates to comp
 - **hecate**: `pkg/hecate/removal.go:RemoveHecateCompletely()` -  MIGRATED
 - **services**: `pkg/services/removal.go:RemoveService()` -  MIGRATED (handles fail2ban, trivy, wazuh-agent, prometheus, grafana, nginx, glances, code-server, tailscale)
 
-### ❌ Components Missing Lifecycle Managers
+###  Components Missing Lifecycle Managers
 - **osquery**: Has `lifecycle.go` but no removal function
 - **boundary**: No removal function
 - **docker**: Has `cleanup.go` but missing complete removal

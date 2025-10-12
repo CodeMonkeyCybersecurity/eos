@@ -274,7 +274,7 @@ Examples:
 		for _, componentResult := range result.Results {
 			status := ""
 			if !componentResult.Success {
-				status = "❌"
+				status = ""
 			}
 			fmt.Printf("  %s %s - %s (took %s)\n",
 				status,
@@ -288,7 +288,7 @@ Examples:
 			fmt.Printf("\nFailed Component Details:\n")
 			for _, componentResult := range result.Results {
 				if !componentResult.Success {
-					fmt.Printf("  ❌ %s: %s\n", componentResult.Request.Component, componentResult.Error)
+					fmt.Printf("   %s: %s\n", componentResult.Request.Component, componentResult.Error)
 				}
 			}
 

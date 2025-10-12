@@ -221,7 +221,7 @@ func displayRepositoryInfo(rc *eos_io.RuntimeContext, repo *Repository, repoInfo
 	if repo.Name == defaultRepo {
 		display.WriteString("Default:      Yes\n")
 	} else {
-		display.WriteString("Default:     ❌ No\n")
+		display.WriteString("Default:      No\n")
 	}
 
 	// Environment variables (masked for security)

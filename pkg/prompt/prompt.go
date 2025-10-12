@@ -82,7 +82,7 @@ func PromptInstallDependency(rc *eos_io.RuntimeContext, depName, depDescription 
 	}
 
 	if !install {
-		fmt.Printf("\n❌ %s is required for this command. Please install it manually and try again.\n", depName)
+		fmt.Printf("\n %s is required for this command. Please install it manually and try again.\n", depName)
 		fmt.Printf("   For more information, visit: https://github.com/CodeMonkeyCybersecurity/eos/wiki/dependencies\n\n")
 		return fmt.Errorf("%s is required but not installed", depName)
 	}
@@ -92,7 +92,7 @@ func PromptInstallDependency(rc *eos_io.RuntimeContext, depName, depDescription 
 	logger.Info("Installing dependency", zap.String("dependency", depName))
 
 	if err := installFunc(); err != nil {
-		fmt.Printf("\n❌ Failed to install %s: %v\n", depName, err)
+		fmt.Printf("\n Failed to install %s: %v\n", depName, err)
 		fmt.Printf("   Please install it manually and try again.\n\n")
 		return fmt.Errorf("failed to install %s: %w", depName, err)
 	}

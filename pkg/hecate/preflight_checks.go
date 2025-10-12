@@ -560,7 +560,7 @@ func displayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 	// Issues Summary
 	if len(result.CriticalIssues) > 0 {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: ❌ CRITICAL ISSUES (must be resolved):")
+		logger.Info("terminal prompt:  CRITICAL ISSUES (must be resolved):")
 		for _, issue := range result.CriticalIssues {
 			logger.Info("terminal prompt:   • " + issue)
 		}
@@ -577,7 +577,7 @@ func displayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 	// Network issues details
 	if len(result.NetworkCheck.Issues) > 0 {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: 🌐 NETWORK NOTES:")
+		logger.Info("terminal prompt:  NETWORK NOTES:")
 		for _, issue := range result.NetworkCheck.Issues {
 			logger.Info("terminal prompt:   • " + issue)
 		}
@@ -589,7 +589,7 @@ func displayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 	if result.CanProceed {
 		logger.Info("terminal prompt:  PREFLIGHT CHECKS PASSED - Ready to proceed with deployment")
 	} else {
-		logger.Info("terminal prompt: ❌ PREFLIGHT CHECKS FAILED - Critical issues must be resolved")
+		logger.Info("terminal prompt:  PREFLIGHT CHECKS FAILED - Critical issues must be resolved")
 	}
 	logger.Info("terminal prompt: ")
 }

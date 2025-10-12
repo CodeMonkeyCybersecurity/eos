@@ -181,10 +181,10 @@ result, err := vaultService.AuthenticateUser(ctx, "admin", "userpass")
 ### Before: Integration Hell
 ```go
 func TestVaultOperations(t *testing.T) {
-    // ❌ Requires actual Vault server
-    // ❌ Requires file system access
-    // ❌ Requires network connectivity
-    // ❌ Slow, brittle, hard to debug
+    //  Requires actual Vault server
+    //  Requires file system access
+    //  Requires network connectivity
+    //  Slow, brittle, hard to debug
 }
 ```
 

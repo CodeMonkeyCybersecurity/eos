@@ -317,7 +317,7 @@ Examples:
 			for _, dep := range result.DependencyResults {
 				status := ""
 				if !dep.Healthy {
-					status = "❌"
+					status = ""
 				}
 				fmt.Printf("  %s %s: %s\n", status, dep.Name, dep.Status)
 			}
@@ -329,7 +329,7 @@ Examples:
 			for _, step := range result.StepsExecuted {
 				status := ""
 				if step.Status != "completed" {
-					status = "❌"
+					status = ""
 				}
 				fmt.Printf("  %s %s (%s)\n", status, step.Description, step.Duration)
 			}
@@ -341,7 +341,7 @@ Examples:
 			for _, check := range result.HealthCheckResults {
 				status := ""
 				if !check.Passed {
-					status = "❌"
+					status = ""
 				}
 				fmt.Printf("  %s %s: %s\n", status, check.Check, check.Message)
 			}

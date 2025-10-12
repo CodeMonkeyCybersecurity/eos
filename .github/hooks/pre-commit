@@ -26,10 +26,10 @@ if [ ! -f "go.mod" ]; then
 fi
 
 # 1. Check formatting
-print_color $BLUE "\n📝 Checking code formatting..."
+print_color $BLUE "\n Checking code formatting..."
 UNFORMATTED=$(gofmt -l .)
 if [ -n "$UNFORMATTED" ]; then
-    print_color $RED "❌ The following files are not properly formatted:"
+    print_color $RED " The following files are not properly formatted:"
     echo "$UNFORMATTED"
     print_color $YELLOW " Run 'gofmt -w .' to fix formatting"
     exit 1
@@ -40,7 +40,7 @@ fi
 # 2. Run go vet
 print_color $BLUE "\n Running go vet..."
 if ! go vet ./...; then
-    print_color $RED "❌ go vet found issues"
+    print_color $RED " go vet found issues"
     exit 1
 else
     print_color $GREEN " go vet passed"
@@ -78,13 +78,13 @@ FAILED_TESTS=0
 for pkg in $PACKAGES_TO_TEST; do
     print_color $BLUE "Testing $pkg..."
     if ! go test -race -timeout=30s "$pkg/..."; then
-        print_color $RED "❌ Tests failed in $pkg"
+        print_color $RED " Tests failed in $pkg"
         FAILED_TESTS=$((FAILED_TESTS + 1))
     fi
 done
 
 if [ $FAILED_TESTS -gt 0 ]; then
-    print_color $RED "\n❌ $FAILED_TESTS package(s) have failing tests"
+    print_color $RED "\n $FAILED_TESTS package(s) have failing tests"
     exit 1
 fi
 
@@ -105,7 +105,7 @@ for pkg in "${CRITICAL_PACKAGES[@]}"; do
             
             # Check if coverage is above 90%
             if awk "BEGIN {exit !($COV < 90)}"; then
-                print_color $RED "  ❌ ${pkg}: ${COV}% (minimum 90% required)"
+                print_color $RED "   ${pkg}: ${COV}% (minimum 90% required)"
                 print_color $YELLOW "   Add more tests to increase coverage"
                 exit 1
             else

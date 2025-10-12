@@ -126,7 +126,7 @@ func RequireBootstrap(rc *eos_io.RuntimeContext) error {
 		zap.Strings("missing_phases", missingPhases))
 
 	// Provide helpful error message
-	logger.Info("terminal prompt: ❌ ERROR: System bootstrap is incomplete!")
+	logger.Info("terminal prompt:  ERROR: System bootstrap is incomplete!")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: The following components are missing or not running:")
 

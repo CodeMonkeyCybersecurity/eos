@@ -22,7 +22,7 @@ add_logger_init() {
 }
 
 # Fix cmd/read/wazuh_ccs.go
-echo "📝 Fixing cmd/read/wazuh_ccs.go..."
+echo " Fixing cmd/read/wazuh_ccs.go..."
 file="./cmd/read/wazuh_ccs.go"
 add_logger_init "$file"
 
@@ -41,7 +41,7 @@ sed -i '' 's/fmt\.Printf("Memory: %.0f \/ %.0f %s (%.1f%%)\\n",/logger.Info("ter
 sed -i '' 's/fmt\.Printf("Disk: %.0f \/ %.0f %s (%.1f%%)\\n",/logger.Info("terminal prompt: Disk usage", zap.Float64("used",/' "$file"
 
 # Fix cmd/list/wazuh_ccs.go
-echo "📝 Fixing cmd/list/wazuh_ccs.go..."
+echo " Fixing cmd/list/wazuh_ccs.go..."
 file="./cmd/list/wazuh_ccs.go"
 add_logger_init "$file"
 
@@ -50,7 +50,7 @@ sed -i '' 's/fmt\.Printf("%-\*s %-\*s %-\*s %-\*s %-\*s %-\*s\\n",/logger.Info("
 sed -i '' 's/fmt\.Printf("%-\*s %-\*s %-\*s %-\*s %-\*s\\n",/logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-*s %-*s %-*s %-*s %-*s",/' "$file"
 
 # Fix cmd/self/ai/ai.go remaining issues
-echo "📝 Fixing cmd/self/ai/ai.go..."
+echo " Fixing cmd/self/ai/ai.go..."
 file="./cmd/self/ai/ai.go"
 # Replace complex Printf with logger
 sed -i '' 's/fmt\.Printf(" Environment analysis completed: %d files, %d containers, %d services\\n",/logger.Info("terminal prompt: Environment analysis completed", zap.Int("files",/' "$file"
@@ -58,7 +58,7 @@ sed -i '' 's/, zap\.Int("files",/, zap.Int("containers",/' "$file"
 sed -i '' 's/, zap\.Int("containers",/, zap.Int("services",/' "$file"
 
 # Fix cmd/backup/list.go
-echo "📝 Fixing cmd/backup/list.go..."
+echo " Fixing cmd/backup/list.go..."
 file="./cmd/backup/list.go"
 add_logger_init "$file"
 

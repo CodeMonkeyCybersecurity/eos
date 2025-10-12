@@ -624,7 +624,9 @@ func BenchmarkAuthn(b *testing.B) {
 	shared.VaultClient = client
 
 	// Mock successful validation
-	transport := &testutil.MockHTTPTransport{
+	// Note: testutil.WithMockHTTPClient expects *testing.T, not *testing.B
+	// For benchmarks, we skip the HTTP mocking
+	_ = testutil.MockHTTPTransport{
 		ResponseMap: map[string]testutil.MockResponse{
 			"/v1/auth/token/lookup-self": {
 				StatusCode: 200,
@@ -636,9 +638,6 @@ func BenchmarkAuthn(b *testing.B) {
 			},
 		},
 	}
-	// Note: testutil.WithMockHTTPClient expects *testing.T, not *testing.B
-	// For benchmarks, we'll skip the HTTP mocking
-	_ = transport
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -672,7 +671,9 @@ func BenchmarkTryAppRole(b *testing.B) {
 	})
 
 	// Mock successful login
-	transport := &testutil.MockHTTPTransport{
+	// Note: testutil.WithMockHTTPClient expects *testing.T, not *testing.B
+	// For benchmarks, we skip the HTTP mocking
+	_ = testutil.MockHTTPTransport{
 		ResponseMap: map[string]testutil.MockResponse{
 			"/v1/auth/approle/login": {
 				StatusCode: 200,
@@ -684,9 +685,6 @@ func BenchmarkTryAppRole(b *testing.B) {
 			},
 		},
 	}
-	// Note: testutil.WithMockHTTPClient expects *testing.T, not *testing.B
-	// For benchmarks, we'll skip the HTTP mocking
-	_ = transport
 
 	client, _ := api.NewClient(nil)
 

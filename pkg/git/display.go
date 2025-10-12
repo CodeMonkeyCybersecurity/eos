@@ -29,7 +29,7 @@ func ShowCommitSummary(rc *eos_io.RuntimeContext, status *GitStatus, message str
 		logger.Info("New files:", zap.Strings("files", status.Untracked))
 	}
 
-	logger.Info("\n📝 Commit Message:")
+	logger.Info("\n Commit Message:")
 	logger.Info("===================")
 	for _, line := range strings.Split(message, "\n") {
 		logger.Info(line)

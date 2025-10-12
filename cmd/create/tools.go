@@ -103,7 +103,7 @@ Examples (DEPRECATED - for reference only):
 			logger.Info(fmt.Sprintf("terminal prompt: ⏱️ Duration: %s", result.Duration))
 
 			if len(result.Changes) > 0 {
-				logger.Info("terminal prompt: 📝 Changes Made:")
+				logger.Info("terminal prompt:  Changes Made:")
 				for _, change := range result.Changes {
 					logger.Info(fmt.Sprintf("terminal prompt:    • %s: %s (%s)",
 						change.Type, change.Target, change.Action))

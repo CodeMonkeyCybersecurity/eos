@@ -57,7 +57,7 @@ func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	}
 	log.Info("   • Data directory: /opt/consul")
 	log.Info(" ")
-	log.Info("🚀 Next Steps:")
+	log.Info(" Next Steps:")
 	log.Info("   1. Access the Web UI to explore service discovery")
 	log.Info("   2. Register your applications with Consul")
 	log.Info("   3. Use DNS interface for service lookups: dig @localhost -p 8600 <service>.service.consul")

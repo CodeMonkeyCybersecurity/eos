@@ -501,7 +501,7 @@ func PrintValidationReport(rc *eos_io.RuntimeContext, result *ValidationResult) 
 	if len(result.Errors) > 0 {
 		logger.Error("Validation Errors:")
 		for _, err := range result.Errors {
-			logger.Error("  ❌ " + err)
+			logger.Error("   " + err)
 		}
 	}
 
@@ -515,6 +515,6 @@ func PrintValidationReport(rc *eos_io.RuntimeContext, result *ValidationResult) 
 	if result.Passed {
 		logger.Info(" System validation PASSED")
 	} else {
-		logger.Error("❌ System validation FAILED")
+		logger.Error(" System validation FAILED")
 	}
 }

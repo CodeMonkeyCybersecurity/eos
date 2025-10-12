@@ -73,7 +73,6 @@ func ComprehensiveHardening(rc *eos_io.RuntimeContext, client *api.Client, confi
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Starting comprehensive Vault hardening")
 
-
 	// Fall back to direct hardening
 	log.Info("Nomad not available, using direct hardening")
 
@@ -234,7 +233,7 @@ func performSecurityPolicyHardening(rc *eos_io.RuntimeContext, client *api.Clien
 // performNetworkHardening applies network security hardening
 func performNetworkHardening(rc *eos_io.RuntimeContext, config *HardeningConfig) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🌐 Applying network security hardening")
+	log.Info(" Applying network security hardening")
 
 	// Restrict network access
 	if config.RestrictNetworkAccess {
@@ -812,7 +811,7 @@ func configureLeaseManagement(rc *eos_io.RuntimeContext, client *api.Client) err
 
 func restrictNetworkAccess(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🌐 Restricting network access")
+	log.Info(" Restricting network access")
 
 	// Configure iptables rules for additional network security
 	// This is a basic example - production deployments should use more sophisticated rules

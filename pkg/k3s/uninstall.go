@@ -25,7 +25,7 @@ var UninstallScripts = map[string]string{
 // DEPRECATED: K3s support is deprecated. Use Nomad instead.
 func Uninstall(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// DEPRECATED: Show deprecation warning
 	logger.Warn("K3s support is deprecated and has been replaced with Nomad")
 	logger.Info("For removing Nomad clusters, use 'eos delete nomad' instead")
@@ -61,7 +61,7 @@ func Uninstall(rc *eos_io.RuntimeContext) error {
 
 			err := execute.RunSimple(rc.Ctx, path)
 			if err != nil {
-				logger.Error("❌ Script execution failed",
+				logger.Error(" Script execution failed",
 					zap.String("role", role),
 					zap.Error(err))
 				return fmt.Errorf("failed to run %s script: %w", role, err)

@@ -114,7 +114,7 @@
 8. **Return errors** from functions that can fail instead of fake defaults
 9. **Add prominent logging** when falling back to alternative implementations
 
-### 📝 LOW (Code Quality)
+###  LOW (Code Quality)
 10. **Document unexpected behavior** in function comments
 11. **Add configuration options** for network binding instead of localhost defaults
 

@@ -25,7 +25,7 @@ func FetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 	url := strings.TrimRight(baseURL, "/") + "/agents?select=id,os,version"
 
 	// INTERVENE - Make API request
-	log.Debug("🚀 Fetching agents from API", zap.String("url", url))
+	log.Debug(" Fetching agents from API", zap.String("url", url))
 
 	client := &http.Client{
 		Transport: &http.Transport{

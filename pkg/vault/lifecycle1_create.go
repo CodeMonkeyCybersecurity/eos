@@ -120,7 +120,7 @@ func generateVaultNomadJob(rc *eos_io.RuntimeContext) (*api.Job, error) {
 }
 
 // waitForVaultDeployment waits for Vault deployment and verifies its status
-func waitForVaultDeployment(rc *eos_io.RuntimeContext, nomadClient *api.Client) error {
+func waitForVaultDeployment(rc *eos_io.RuntimeContext, _ *api.Client) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Waiting for Vault deployment to complete")
 	

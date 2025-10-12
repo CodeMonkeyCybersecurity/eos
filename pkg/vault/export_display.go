@@ -32,7 +32,7 @@ func ExportToJSON(rc *eos_io.RuntimeContext, info *VaultInitInfo, options *ReadI
 	// INTERVENE - Marshal data to JSON
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
-		logger.Error("❌ Failed to marshal JSON", zap.Error(err))
+		logger.Error(" Failed to marshal JSON", zap.Error(err))
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
@@ -40,7 +40,7 @@ func ExportToJSON(rc *eos_io.RuntimeContext, info *VaultInitInfo, options *ReadI
 	if options.OutputPath != "" {
 		// Write to file
 		if err := os.WriteFile(options.OutputPath, data, 0600); err != nil {
-			logger.Error("❌ Failed to write JSON file",
+			logger.Error(" Failed to write JSON file",
 				zap.String("path", options.OutputPath),
 				zap.Error(err))
 			return err
@@ -78,7 +78,7 @@ func ExportToSecureFile(rc *eos_io.RuntimeContext, info *VaultInitInfo, options 
 	// Create secure directory
 	dir := filepath.Dir(options.OutputPath)
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		logger.Error("❌ Failed to create output directory",
+		logger.Error(" Failed to create output directory",
 			zap.String("directory", dir),
 			zap.Error(err))
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -87,13 +87,13 @@ func ExportToSecureFile(rc *eos_io.RuntimeContext, info *VaultInitInfo, options 
 	// Marshal with indentation
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
-		logger.Error("❌ Failed to marshal JSON", zap.Error(err))
+		logger.Error(" Failed to marshal JSON", zap.Error(err))
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
 	// Write with secure permissions
 	if err := os.WriteFile(options.OutputPath, data, 0600); err != nil {
-		logger.Error("❌ Failed to write secure file",
+		logger.Error(" Failed to write secure file",
 			zap.String("path", options.OutputPath),
 			zap.Error(err))
 		return fmt.Errorf("failed to write secure file: %w", err)
@@ -227,11 +227,11 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Prepare agent status display
-	logger.Info("🤖 Assessing agent status display",
+	logger.Info(" Assessing agent status display",
 		zap.String("health", status.HealthStatus))
 
 	// INTERVENE - Display formatted agent status via stderr
-	if _, err := fmt.Fprint(os.Stderr, "\n🤖 Vault Agent Status\n"); err != nil {
+	if _, err := fmt.Fprint(os.Stderr, "\n Vault Agent Status\n"); err != nil {
 		return
 	}
 	if _, err := fmt.Fprint(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"); err != nil {
@@ -242,7 +242,7 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 	if status.ServiceRunning {
 		fmt.Fprint(os.Stderr, " Service: Running\n")
 	} else {
-		fmt.Fprint(os.Stderr, "❌ Service: Not Running\n")
+		fmt.Fprint(os.Stderr, " Service: Not Running\n")
 	}
 
 	// Token status
@@ -254,17 +254,17 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 		if status.TokenValid {
 			fmt.Fprint(os.Stderr, " Token: Valid\n")
 		} else {
-			fmt.Fprint(os.Stderr, "❌ Token: Invalid or Empty\n")
+			fmt.Fprint(os.Stderr, " Token: Invalid or Empty\n")
 		}
 	} else {
-		fmt.Fprint(os.Stderr, "❌ Token: Not Available\n")
+		fmt.Fprint(os.Stderr, " Token: Not Available\n")
 	}
 
 	// Configuration status
 	if status.ConfigValid {
 		fmt.Fprint(os.Stderr, " Configuration: Valid\n")
 	} else {
-		fmt.Fprint(os.Stderr, "❌ Configuration: Missing or Invalid\n")
+		fmt.Fprint(os.Stderr, " Configuration: Missing or Invalid\n")
 	}
 
 	// Overall health
@@ -275,7 +275,7 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 	case "degraded":
 		fmt.Fprint(os.Stderr, " Degraded\n")
 	case "unhealthy":
-		fmt.Fprint(os.Stderr, "❌ Unhealthy\n")
+		fmt.Fprint(os.Stderr, " Unhealthy\n")
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "❓ Unknown (%s)\n", status.HealthStatus)
 	}

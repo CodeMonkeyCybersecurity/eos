@@ -1,6 +1,6 @@
 # Eos Implementation Status
 
-> **📝 Documentation has been moved inline with the code for better maintainability.**
+> ** Documentation has been moved inline with the code for better maintainability.**
 > 
 > The comprehensive implementation status documentation is now embedded directly in the Go source files where the functionality is implemented. This ensures the documentation stays current with code changes and is immediately available to developers.
 
@@ -17,7 +17,7 @@ For detailed implementation status, see the inline comments in these files:
 
 **Date:** September 20, 2025  
 **Migration Status:**  SUCCESSFUL  
-**Breaking Changes:** ❌ NONE  
+**Breaking Changes:**  NONE  
 
 The Eos bootstrap storage operations integration has been successfully completed following the  to HashiCorp migration.
 

@@ -21,7 +21,7 @@ func DisplayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
 
-	fmt.Printf("🔔 Delphi Alerts Monitor - Last %d alerts (Updated: %s)\n", limit, time.Now().Format("15:04:05"))
+	fmt.Printf(" Delphi Alerts Monitor - Last %d alerts (Updated: %s)\n", limit, time.Now().Format("15:04:05"))
 	fmt.Println(strings.Repeat("=", 120))
 
 	// INTERVENE - Query and display recent alerts

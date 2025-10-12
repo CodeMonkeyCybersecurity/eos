@@ -240,7 +240,7 @@ cmd/debug/metis/
 
 ## Estimated Effort
 
-- **Analysis:** 30 minutes ✅
+- **Analysis:** 30 minutes 
 - **Module Creation:** 2.5 hours
 - **Testing:** 30 minutes
 - **Documentation:** 20 minutes

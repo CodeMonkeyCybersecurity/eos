@@ -489,7 +489,7 @@ func (m *TUIModel) renderResultsView() string {
 	if m.opResult.Success {
 		s.WriteString(" Operation completed successfully!\n")
 	} else {
-		s.WriteString("❌ Operation failed!\n")
+		s.WriteString(" Operation failed!\n")
 	}
 
 	if m.opResult.Output != "" {

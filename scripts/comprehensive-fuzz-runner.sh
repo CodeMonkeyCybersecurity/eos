@@ -29,12 +29,12 @@ preflight_check() {
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
         cd "$expected_root" || { 
-            echo -e "${RED}❌ Failed to change to project root${NC}"
+            echo -e "${RED} Failed to change to project root${NC}"
             exit 1
         }
         return 0
     else
-        echo -e "${RED}❌ ERROR: Not in Eos project directory${NC}"
+        echo -e "${RED} ERROR: Not in Eos project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
         echo -e "${YELLOW}To run this script correctly:${NC}"
@@ -77,7 +77,7 @@ verify_tools() {
     fi
     
     if [ ${#missing_tools[@]} -gt 0 ]; then
-        echo -e "${RED}❌ ERROR: Required tools are missing${NC}"
+        echo -e "${RED} ERROR: Required tools are missing${NC}"
         echo -e "${RED}Missing: ${missing_tools[*]}${NC}"
         echo ""
         echo -e "${YELLOW}Installation instructions:${NC}"
@@ -121,7 +121,7 @@ verify_test_files() {
     fi
     
     if [ ${#missing_packages[@]} -gt 0 ]; then
-        echo -e "${RED}❌ ERROR: Required test directories are missing${NC}"
+        echo -e "${RED} ERROR: Required test directories are missing${NC}"
         echo -e "${RED}Missing: ${missing_packages[*]}${NC}"
         echo ""
         echo -e "${YELLOW}This usually means you're not in the Eos project root.${NC}"
@@ -132,7 +132,7 @@ verify_test_files() {
     
     # Check for at least one fuzz test file
     if ! find pkg -name "*fuzz*.go" -type f | grep -q .; then
-        echo -e "${RED}❌ ERROR: No fuzz test files found${NC}"
+        echo -e "${RED} ERROR: No fuzz test files found${NC}"
         echo ""
         echo -e "${YELLOW}This could mean:${NC}"
         echo -e "  1. You're not in the Eos project root"
@@ -149,7 +149,7 @@ verify_test_files() {
 
 # Run all preflight checks
 run_preflight_checks() {
-    echo -e "${PURPLE}🚀 Eos Comprehensive Fuzz Test Runner - Preflight${NC}"
+    echo -e "${PURPLE} Eos Comprehensive Fuzz Test Runner - Preflight${NC}"
     echo "================================================="
     echo ""
     
@@ -278,7 +278,7 @@ run_enhanced_fuzz_test() {
     # Create corpus directory
     mkdir -p "$corpus_dir"
     
-    echo -e "${PURPLE}🚀 Running ${test_function} (${category})${NC}"
+    echo -e "${PURPLE} Running ${test_function} (${category})${NC}"
     echo -e "   Package: ${test_package}"
     echo -e "   ⏱️  Duration: ${duration}"
     echo -e "    Corpus: ${corpus_dir}"
@@ -314,11 +314,11 @@ run_enhanced_fuzz_test() {
         local elapsed=$((end_time - start_time))
         local crash_info=$(grep -n "panic\|FAIL\|fatal error\|failing input" "${log_file}" | head -3 | tr '\n' '; ' || echo "Unknown error")
         
-        echo -e "   ❌ ${RED}FAILED${NC} after ${elapsed}s"
+        echo -e "    ${RED}FAILED${NC} after ${elapsed}s"
         echo -e "   💥 ${crash_info}"
         
         # Update report
-        echo "- ❌ **${test_function}** (${category}): FAILED - ${elapsed}s, error: ${crash_info}" >> "${REPORT_FILE}"
+        echo "-  **${test_function}** (${category}): FAILED - ${elapsed}s, error: ${crash_info}" >> "${REPORT_FILE}"
         
         # Save crash details
         if grep -q "failing input" "${log_file}"; then
@@ -362,7 +362,7 @@ EOF
     kill $STRESS_PID 2>/dev/null || true
     
     # Network disruption simulation
-    echo -e "   🌐 Network disruption simulation..."
+    echo -e "    Network disruption simulation..."
     # This would require network namespace manipulation in a real environment
     go test -v -fuzz=FuzzCrossBoundaryIntegration -fuzztime=30s ./test \
         >> "${LOG_DIR}/chaos/network_disruption.log" 2>&1 || true
@@ -570,7 +570,7 @@ EOF
     echo -e "📈 Tests: ${total_tests} total, ${GREEN}${passed_tests} passed${NC}, ${RED}${failed_tests} failed${NC}"
     echo -e "📄 Report: ${YELLOW}${REPORT_FILE}${NC}"
     echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
-    echo -e "🌐 Coverage: ${YELLOW}${LOG_DIR}/coverage.html${NC}"
+    echo -e " Coverage: ${YELLOW}${LOG_DIR}/coverage.html${NC}"
     
     if [ $failed_tests -gt 0 ]; then
         echo ""
@@ -580,7 +580,7 @@ EOF
     else
         echo ""
         echo -e "${GREEN}All comprehensive fuzz tests passed!${NC}"
-        echo -e "🚀 System appears robust against fuzzing attacks"
+        echo -e " System appears robust against fuzzing attacks"
     fi
     
     # Run continuous mode if requested
