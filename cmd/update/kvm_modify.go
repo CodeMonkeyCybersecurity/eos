@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/update/kvm_modify.go
 package update
 

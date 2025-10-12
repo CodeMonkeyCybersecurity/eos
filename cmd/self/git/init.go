@@ -100,7 +100,7 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 	// Repository path
 	logger.Info("terminal prompt: Enter repository path (or press Enter for current directory): ")
 	var pathInput string
-	fmt.Scanln(&pathInput)
+	_, _ = fmt.Scanln(&pathInput)
 	if pathInput != "" {
 		options.Path = pathInput
 	} else {
@@ -116,7 +116,7 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 		logger.Info(fmt.Sprintf("terminal prompt: Warning: %s is already a Git repository", options.Path))
 		logger.Info("terminal prompt: Continue anyway? [y/N]: ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if response != "y" && response != "Y" {
 			return fmt.Errorf("initialization cancelled")
 		}
@@ -125,7 +125,7 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 	// Default branch
 	logger.Info("terminal prompt: Enter default branch name [main]: ")
 	var branch string
-	fmt.Scanln(&branch)
+	_, _ = fmt.Scanln(&branch)
 	if branch != "" {
 		options.DefaultBranch = branch
 	} else {
@@ -135,13 +135,13 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 	// Remote URL
 	logger.Info("terminal prompt: Enter remote repository URL (optional): ")
 	var remoteURL string
-	fmt.Scanln(&remoteURL)
+	_, _ = fmt.Scanln(&remoteURL)
 	options.RemoteURL = remoteURL
 
 	if remoteURL != "" {
 		logger.Info("terminal prompt: Enter remote name [origin]: ")
 		var remoteName string
-		fmt.Scanln(&remoteName)
+		_, _ = fmt.Scanln(&remoteName)
 		if remoteName != "" {
 			options.RemoteName = remoteName
 		} else {
@@ -152,13 +152,13 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 	// Initial commit
 	logger.Info("terminal prompt: Create initial commit? [Y/n]: ")
 	var commitResponse string
-	fmt.Scanln(&commitResponse)
+	_, _ = fmt.Scanln(&commitResponse)
 	options.InitialCommit = commitResponse != "n" && commitResponse != "N"
 
 	if options.InitialCommit {
 		logger.Info("terminal prompt: Enter initial commit message [Initial commit]: ")
 		var commitMsg string
-		fmt.Scanln(&commitMsg)
+		_, _ = fmt.Scanln(&commitMsg)
 		if commitMsg != "" {
 			options.CommitMessage = commitMsg
 		} else {
@@ -170,7 +170,7 @@ func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitMa
 	if remoteURL != "" {
 		logger.Info("terminal prompt: Setup GitHub repository using gh CLI? [y/N]: ")
 		var githubResponse string
-		fmt.Scanln(&githubResponse)
+		_, _ = fmt.Scanln(&githubResponse)
 		options.SetupGitHub = githubResponse == "y" || githubResponse == "Y"
 	}
 

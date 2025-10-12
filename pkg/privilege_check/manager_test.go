@@ -552,7 +552,7 @@ func TestGroupDetection(t *testing.T) {
 	if strings.HasPrefix(check.Groupname, "gid-") {
 		// Extract the number after "gid-"
 		var gid int
-		fmt.Sscanf(check.Groupname, "gid-%d", &gid)
+		_, _ = fmt.Sscanf(check.Groupname, "gid-%d", &gid)
 		if gid != check.GroupID {
 			t.Errorf("Fallback group name gid-%d doesn't match GroupID %d", gid, check.GroupID)
 		}

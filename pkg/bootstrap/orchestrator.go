@@ -754,7 +754,7 @@ func getRecoveryFunction(phaseName string) func(*eos_io.RuntimeContext, error) e
 				backupDir := "/var/backups/eos--configs"
 				if err := os.MkdirAll(backupDir, 0755); err == nil {
 					// Best effort backup
-					execute.Run(rc.Ctx, execute.Options{
+					_, _ = execute.Run(rc.Ctx, execute.Options{
 						Command: "cp",
 						Args:    []string{"-r", "/etc/", backupDir},
 						Capture: false,

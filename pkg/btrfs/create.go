@@ -299,13 +299,13 @@ func GetSubvolumeInfo(rc *eos_io.RuntimeContext, path string) (*SubvolumeInfo, e
 		line = strings.TrimSpace(line)
 
 		if strings.HasPrefix(line, "Subvolume ID:") {
-			fmt.Sscanf(line, "Subvolume ID: %d", &info.ID)
+			_, _ = fmt.Sscanf(line, "Subvolume ID: %d", &info.ID)
 		} else if strings.HasPrefix(line, "Parent ID:") {
-			fmt.Sscanf(line, "Parent ID: %d", &info.ParentID)
+			_, _ = fmt.Sscanf(line, "Parent ID: %d", &info.ParentID)
 		} else if strings.HasPrefix(line, "Top level ID:") {
-			fmt.Sscanf(line, "Top level ID: %d", &info.TopLevel)
+			_, _ = fmt.Sscanf(line, "Top level ID: %d", &info.TopLevel)
 		} else if strings.HasPrefix(line, "Generation:") {
-			fmt.Sscanf(line, "Generation: %d", &info.Generation)
+			_, _ = fmt.Sscanf(line, "Generation: %d", &info.Generation)
 		} else if strings.HasPrefix(line, "UUID:") {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {

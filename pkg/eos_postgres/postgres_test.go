@@ -92,9 +92,9 @@ func TestConnect(t *testing.T) {
 
 			// Set test env var
 			if tt.envVar == "" {
-				os.Unsetenv("POSTGRES_DSN")
+				_ = os.Unsetenv("POSTGRES_DSN")
 			} else {
-				os.Setenv("POSTGRES_DSN", tt.envVar)
+				_ = os.Setenv("POSTGRES_DSN", tt.envVar)
 			}
 
 			db, err := Connect()
@@ -347,7 +347,7 @@ func TestNewPGHashStore(t *testing.T) {
 	defer os.Setenv("POSTGRES_DSN", original)
 
 	// Test missing POSTGRES_DSN
-	os.Unsetenv("POSTGRES_DSN")
+	_ = os.Unsetenv("POSTGRES_DSN")
 	ctx := context.Background()
 	store, err := NewPGHashStore(ctx)
 	assert.Error(t, err)
@@ -355,7 +355,7 @@ func TestNewPGHashStore(t *testing.T) {
 	assert.Contains(t, err.Error(), "POSTGRES_DSN environment variable is required")
 
 	// Test with invalid DSN (connection will fail)
-	os.Setenv("POSTGRES_DSN", "invalid-dsn")
+	_ = os.Setenv("POSTGRES_DSN", "invalid-dsn")
 	store, err = NewPGHashStore(ctx)
 	assert.Error(t, err)
 	assert.Nil(t, store)

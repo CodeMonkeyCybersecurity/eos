@@ -367,7 +367,7 @@ func checkUserPermissions(rc *eos_io.RuntimeContext) error {
 			inaccessible = append(inaccessible, dir)
 			continue
 		}
-		os.Remove(testFile)
+		_ = os.Remove(testFile)
 	}
 
 	if len(inaccessible) > 0 {

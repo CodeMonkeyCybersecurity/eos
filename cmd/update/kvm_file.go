@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/sync/kvm_file.go
 
 package update

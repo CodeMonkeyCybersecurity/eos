@@ -79,7 +79,7 @@ func (pi *PackerInstaller) Install() error {
 		pi.config.Version, pi.config.Version, arch)
 
 	tmpDir := "/tmp/packer-install"
-	os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, 0755)
 	defer os.RemoveAll(tmpDir)
 
 	// Download and extract
@@ -105,8 +105,8 @@ func (pi *PackerInstaller) Install() error {
 	}
 
 	// Setup directories
-	os.MkdirAll(pi.config.PluginDirectory, 0755)
-	os.MkdirAll(pi.config.CacheDirectory, 0755)
+	_ = os.MkdirAll(pi.config.PluginDirectory, 0755)
+	_ = os.MkdirAll(pi.config.CacheDirectory, 0755)
 
 	// Phase 3: EVALUATE
 	if output, err := pi.runner.RunOutput("packer", "version"); err != nil {

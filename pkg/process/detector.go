@@ -100,7 +100,7 @@ func KillProcesses(ctx context.Context, pattern string) (int, error) {
 	}
 	
 	// First try SIGTERM
-	execute.Run(ctx, execute.Options{
+	_, _ = execute.Run(ctx, execute.Options{
 		Command: "kill",
 		Args:    append([]string{"-TERM"}, pids...),
 		Timeout: 5 * time.Second,
@@ -124,7 +124,7 @@ func KillProcesses(ctx context.Context, pattern string) (int, error) {
 			remainingPids = append(remainingPids, strconv.Itoa(proc.PID))
 		}
 		
-		execute.Run(ctx, execute.Options{
+		_, _ = execute.Run(ctx, execute.Options{
 			Command: "kill",
 			Args:    append([]string{"-KILL"}, remainingPids...),
 			Timeout: 5 * time.Second,

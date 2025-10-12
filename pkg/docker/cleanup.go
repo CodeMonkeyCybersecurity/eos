@@ -200,7 +200,7 @@ func cleanupContainers(rc *eos_io.RuntimeContext, state *DockerState) error {
 			
 			// Force kill if graceful stop failed
 			logger.Info("Force killing remaining containers")
-			execute.Run(rc.Ctx, execute.Options{
+			_, _ = execute.Run(rc.Ctx, execute.Options{
 				Command: "docker",
 				Args:    append([]string{"kill"}, state.RunningContainers...),
 				Timeout: 30 * time.Second,
@@ -222,7 +222,7 @@ func cleanupContainers(rc *eos_io.RuntimeContext, state *DockerState) error {
 	if err != nil && len(state.AllContainers) > 0 {
 		logger.Warn("Batch container removal failed, removing individually")
 		for _, container := range state.AllContainers {
-			execute.Run(rc.Ctx, execute.Options{
+			_, _ = execute.Run(rc.Ctx, execute.Options{
 				Command: "docker",
 				Args:    []string{"rm", "-f", "-v", container},
 				Timeout: 10 * time.Second,
@@ -259,7 +259,7 @@ func cleanupVolumes(rc *eos_io.RuntimeContext, state *DockerState) error {
 		
 		// Remove volumes individually
 		for _, volume := range state.Volumes {
-			execute.Run(rc.Ctx, execute.Options{
+			_, _ = execute.Run(rc.Ctx, execute.Options{
 				Command: "docker",
 				Args:    []string{"volume", "rm", "-f", volume},
 				Timeout: 10 * time.Second,
@@ -292,7 +292,7 @@ func cleanupNetworks(rc *eos_io.RuntimeContext, state *DockerState) error {
 	// Remove custom networks
 	for _, network := range customNetworks {
 		logger.Debug("Removing network", zap.String("network", network))
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "docker",
 			Args:    []string{"network", "rm", network},
 			Timeout: 10 * time.Second,
@@ -300,7 +300,7 @@ func cleanupNetworks(rc *eos_io.RuntimeContext, state *DockerState) error {
 	}
 
 	// Prune any remaining networks
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"network", "prune", "-f"},
 		Timeout: 30 * time.Second,
@@ -339,7 +339,7 @@ func cleanupImages(rc *eos_io.RuntimeContext, state *DockerState) error {
 		}); err == nil && imageOutput != "" {
 			images := strings.Split(strings.TrimSpace(imageOutput), "\n")
 			args := append([]string{"rmi", "-f"}, images...)
-			execute.Run(rc.Ctx, execute.Options{
+			_, _ = execute.Run(rc.Ctx, execute.Options{
 				Command: "docker",
 				Args:    args,
 				Timeout: 120 * time.Second,
@@ -348,7 +348,7 @@ func cleanupImages(rc *eos_io.RuntimeContext, state *DockerState) error {
 	}
 
 	// Prune dangling images
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"image", "prune", "-f", "--all"},
 		Timeout: 60 * time.Second,
@@ -379,7 +379,7 @@ func cleanupSystem(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Clean build cache
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"builder", "prune", "-f", "--all"},
 		Timeout: 60 * time.Second,
@@ -461,12 +461,12 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 
 	// Stop Docker service
 	logger.Info("Stopping Docker service")
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"stop", "docker"},
 		Timeout: 30 * time.Second,
 	})
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"stop", "docker.socket"},
 		Timeout: 10 * time.Second,
@@ -474,12 +474,12 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 
 	// Disable Docker service
 	logger.Info("Disabling Docker service")
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"disable", "docker"},
 		Timeout: 10 * time.Second,
 	})
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"disable", "docker.socket"},
 		Timeout: 10 * time.Second,
@@ -487,7 +487,7 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 
 	// Kill any remaining Docker processes
 	logger.Info("Killing any remaining Docker processes")
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-f", "docker"},
 		Timeout: 5 * time.Second,
@@ -515,9 +515,9 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 		if err == nil && strings.Contains(output, "ii") {
 			logger.Info("Removing Docker package", zap.String("package", pkg))
 			if keepData {
-				execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", pkg)
+				_ = execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", pkg)
 			} else {
-				execute.RunSimple(rc.Ctx, "apt-get", "purge", "-y", pkg)
+				_ = execute.RunSimple(rc.Ctx, "apt-get", "purge", "-y", pkg)
 			}
 		}
 	}
@@ -529,7 +529,7 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 		"/etc/apt/sources.list.d/download_docker_com_linux_ubuntu.list",
 	}
 	for _, source := range dockerAPTSources {
-		os.Remove(source)
+		_ = os.Remove(source)
 	}
 
 	// Remove Docker GPG key
@@ -538,7 +538,7 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 		"/etc/apt/keyrings/docker.gpg",
 	}
 	for _, key := range dockerGPGKeys {
-		os.Remove(key)
+		_ = os.Remove(key)
 	}
 
 	// Remove Docker directories
@@ -572,12 +572,12 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 		"/usr/bin/docker-init",
 	}
 	for _, binary := range dockerBinaries {
-		os.Remove(binary)
+		_ = os.Remove(binary)
 	}
 
 	// Remove Docker group
 	logger.Info("Removing Docker group")
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "groupdel",
 		Args:    []string{"docker"},
 		Timeout: 5 * time.Second,
@@ -585,10 +585,10 @@ func removeDockerComponents(rc *eos_io.RuntimeContext, keepData bool) error {
 
 	// Update APT cache
 	logger.Info("Updating APT cache")
-	execute.RunSimple(rc.Ctx, "apt-get", "update")
+	_ = execute.RunSimple(rc.Ctx, "apt-get", "update")
 
 	// Reload systemd
-	execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
+	_ = execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
 
 	return nil
 }

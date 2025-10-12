@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/utils.go
 // Utility functions available in all builds (no build tags)
 

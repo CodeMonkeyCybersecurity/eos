@@ -235,7 +235,7 @@ func CreateUser(rc *eos_io.RuntimeContext, username string, auto bool, shell str
 		// Rollback user creation on failure
 		logger.Error("Failed to set password, rolling back user creation",
 			zap.Error(err))
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "userdel",
 			Args:    []string{"-r", username},
 			Capture: false,
@@ -456,7 +456,7 @@ func SetupSignalHandler() {
 
 	go func() {
 		<-c
-		fmt.Fprintln(os.Stderr, "\n⚠️  Operation canceled.")
+		_, _ = fmt.Fprintln(os.Stderr, "\n⚠️  Operation canceled.")
 		os.Exit(1)
 	}()
 }

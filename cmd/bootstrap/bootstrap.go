@@ -148,7 +148,7 @@ func runBootstrapAllTop(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// FIXME: [P3] Using environment variable for state management is fragile
 	// Set environment variable to prevent bootstrap prompt recursion
-	os.Setenv("EOS_BOOTSTRAP_IN_PROGRESS", "1")
+	_ = os.Setenv("EOS_BOOTSTRAP_IN_PROGRESS", "1")
 	logger.Info("Set Eos_BOOTSTRAP_IN_PROGRESS=1 to prevent recursion")
 
 	// Directly call the enhanced bootstrap function from bootstrap package

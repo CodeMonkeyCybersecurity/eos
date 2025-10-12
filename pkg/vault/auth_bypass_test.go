@@ -278,16 +278,16 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 
 		// Set malicious values
 		for key, value := range maliciousEnvVars {
-			os.Setenv(key, value)
+			_ = os.Setenv(key, value)
 		}
 
 		// Restore original values
 		defer func() {
 			for key, original := range originalValues {
 				if original == "" {
-					os.Unsetenv(key)
+					_ = os.Unsetenv(key)
 				} else {
-					os.Setenv(key, original)
+					_ = os.Setenv(key, original)
 				}
 			}
 		}()

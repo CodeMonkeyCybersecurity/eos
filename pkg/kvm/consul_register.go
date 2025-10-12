@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/consul_register.go
 // Register KVM guests with Consul after creation
 

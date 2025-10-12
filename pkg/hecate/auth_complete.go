@@ -102,7 +102,7 @@ func (c *AuthentikClient) CreateFlow(rc *eos_io.RuntimeContext, flow *AuthFlow) 
 	if err != nil {
 		return fmt.Errorf("failed to create flow: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
@@ -203,7 +203,7 @@ func (c *AuthentikClient) CreateProvider(rc *eos_io.RuntimeContext, provider *Au
 	if err != nil {
 		return fmt.Errorf("failed to create provider: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
@@ -265,7 +265,7 @@ func (c *AuthentikClient) CreateApplication(rc *eos_io.RuntimeContext, app *Auth
 	if err != nil {
 		return fmt.Errorf("failed to create application: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
@@ -320,7 +320,7 @@ func (c *AuthentikClient) CreateOutpost(rc *eos_io.RuntimeContext, outpost *Auth
 	if err != nil {
 		return fmt.Errorf("failed to create outpost: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
@@ -356,7 +356,7 @@ func (c *AuthentikClient) ListPolicies(rc *eos_io.RuntimeContext) ([]map[string]
 	if err != nil {
 		return nil, fmt.Errorf("failed to list policies: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}

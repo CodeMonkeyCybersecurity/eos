@@ -97,37 +97,37 @@ func outputTableStatus(logger otelzap.LoggerWithCtx, status *git_management.GitS
 	logger.Info("terminal prompt: =====================")
 
 	// Branch information
-	fmt.Fprintf(w, "Branch:\t%s\n", status.Branch)
+	_, _ = fmt.Fprintf(w, "Branch:\t%s\n", status.Branch)
 
 	if status.AheadCount > 0 || status.BehindCount > 0 {
-		fmt.Fprintf(w, "Tracking:\t")
+		_, _ = fmt.Fprintf(w, "Tracking:\t")
 		if status.AheadCount > 0 {
-			fmt.Fprintf(w, "%d ahead", status.AheadCount)
+			_, _ = fmt.Fprintf(w, "%d ahead", status.AheadCount)
 		}
 		if status.BehindCount > 0 {
 			if status.AheadCount > 0 {
-				fmt.Fprintf(w, ", ")
+				_, _ = fmt.Fprintf(w, ", ")
 			}
-			fmt.Fprintf(w, "%d behind", status.BehindCount)
+			_, _ = fmt.Fprintf(w, "%d behind", status.BehindCount)
 		}
-		fmt.Fprintf(w, "\n")
+		_, _ = fmt.Fprintf(w, "\n")
 	}
 
-	fmt.Fprintf(w, "Clean:\t%t\n", status.IsClean)
+	_, _ = fmt.Fprintf(w, "Clean:\t%t\n", status.IsClean)
 
 	if status.LastCommitHash != "" {
-		fmt.Fprintf(w, "Last Commit:\t%s\n", status.LastCommitHash[:8])
+		_, _ = fmt.Fprintf(w, "Last Commit:\t%s\n", status.LastCommitHash[:8])
 		if status.LastCommitDate != "" {
-			fmt.Fprintf(w, "Commit Date:\t%s\n", status.LastCommitDate)
+			_, _ = fmt.Fprintf(w, "Commit Date:\t%s\n", status.LastCommitDate)
 		}
 	}
 
-	fmt.Fprintf(w, "\n")
+	_, _ = fmt.Fprintf(w, "\n")
 
 	// File counts
-	fmt.Fprintf(w, "Staged Files:\t%d\n", len(status.Staged))
-	fmt.Fprintf(w, "Modified Files:\t%d\n", len(status.Modified))
-	fmt.Fprintf(w, "Untracked Files:\t%d\n", len(status.Untracked))
+	_, _ = fmt.Fprintf(w, "Staged Files:\t%d\n", len(status.Staged))
+	_, _ = fmt.Fprintf(w, "Modified Files:\t%d\n", len(status.Modified))
+	_, _ = fmt.Fprintf(w, "Untracked Files:\t%d\n", len(status.Untracked))
 
 	// Detailed file listing if requested
 	if detailed {

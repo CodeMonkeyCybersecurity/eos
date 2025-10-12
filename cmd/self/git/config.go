@@ -131,16 +131,16 @@ func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitMan
 	logger.Info(fmt.Sprintf("terminal prompt: Git Configuration (%s)", scope))
 	logger.Info("terminal prompt: ========================")
 
-	fmt.Fprintf(w, "Name:\t%s\n", config.Name)
-	fmt.Fprintf(w, "Email:\t%s\n", config.Email)
-	fmt.Fprintf(w, "Default Branch:\t%s\n", config.DefaultBranch)
-	fmt.Fprintf(w, "Pull Rebase:\t%t\n", config.PullRebase)
-	fmt.Fprintf(w, "Color UI:\t%t\n", config.ColorUI)
+	_, _ = fmt.Fprintf(w, "Name:\t%s\n", config.Name)
+	_, _ = fmt.Fprintf(w, "Email:\t%s\n", config.Email)
+	_, _ = fmt.Fprintf(w, "Default Branch:\t%s\n", config.DefaultBranch)
+	_, _ = fmt.Fprintf(w, "Pull Rebase:\t%t\n", config.PullRebase)
+	_, _ = fmt.Fprintf(w, "Color UI:\t%t\n", config.ColorUI)
 
 	if len(config.Custom) > 0 {
 		logger.Info("terminal prompt: Custom Settings:")
 		for key, value := range config.Custom {
-			fmt.Fprintf(w, "%s:\t%s\n", key, value)
+			_, _ = fmt.Fprintf(w, "%s:\t%s\n", key, value)
 		}
 	}
 
@@ -173,7 +173,7 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 	logger.Info(fmt.Sprintf("terminal prompt: Current name: %s", currentConfig.Name))
 	logger.Info("terminal prompt: Enter your name (or press Enter to keep current): ")
 	var name string
-	fmt.Scanln(&name)
+	_, _ = fmt.Scanln(&name)
 	if name != "" {
 		config.Name = name
 	} else {
@@ -184,7 +184,7 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 	logger.Info(fmt.Sprintf("terminal prompt: Current email: %s", currentConfig.Email))
 	logger.Info("terminal prompt: Enter your email (or press Enter to keep current): ")
 	var email string
-	fmt.Scanln(&email)
+	_, _ = fmt.Scanln(&email)
 	if email != "" {
 		config.Email = email
 	} else {
@@ -195,7 +195,7 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 	logger.Info(fmt.Sprintf("terminal prompt: Current default branch: %s", currentConfig.DefaultBranch))
 	logger.Info("terminal prompt: Enter default branch name [main] (or press Enter to keep current): ")
 	var branch string
-	fmt.Scanln(&branch)
+	_, _ = fmt.Scanln(&branch)
 	if branch != "" {
 		config.DefaultBranch = branch
 	} else if currentConfig.DefaultBranch == "" {
@@ -208,14 +208,14 @@ func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.Git
 	logger.Info(fmt.Sprintf("terminal prompt: Current pull rebase: %t", currentConfig.PullRebase))
 	logger.Info("terminal prompt: Use rebase for git pull? [y/N]: ")
 	var rebaseResponse string
-	fmt.Scanln(&rebaseResponse)
+	_, _ = fmt.Scanln(&rebaseResponse)
 	config.PullRebase = rebaseResponse == "y" || rebaseResponse == "Y"
 
 	// Color UI
 	logger.Info(fmt.Sprintf("terminal prompt: Current color UI: %t", currentConfig.ColorUI))
 	logger.Info("terminal prompt: Enable color output? [Y/n]: ")
 	var colorResponse string
-	fmt.Scanln(&colorResponse)
+	_, _ = fmt.Scanln(&colorResponse)
 	config.ColorUI = colorResponse != "n" && colorResponse != "N"
 
 	logger.Info("Applying interactive Git configuration", zap.Bool("global", global))

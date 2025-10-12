@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/transfers.go
 
 package kvm

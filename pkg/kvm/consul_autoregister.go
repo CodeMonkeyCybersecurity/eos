@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/consul_autoregister.go
 // Automatic Consul agent installation and registration for KVM guests
 

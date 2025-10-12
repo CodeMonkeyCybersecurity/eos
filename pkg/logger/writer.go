@@ -40,14 +40,14 @@ func GetFallbackLogWriter() zapcore.WriteSyncer {
 	if err == nil {
 		writer, err := GetLogFileWriter(path)
 		if err == nil {
-			fmt.Fprintf(os.Stderr, "\n Logging to file: %s\n", path)
+			_, _ = fmt.Fprintf(os.Stderr, "\n Logging to file: %s\n", path)
 			return writer
 		}
-		fmt.Fprintf(os.Stderr, "Logging fallback: could not open log file %s: %v\n", path, err)
+		_, _ = fmt.Fprintf(os.Stderr, "Logging fallback: could not open log file %s: %v\n", path, err)
 	} else {
-		fmt.Fprintf(os.Stderr, "Logging fallback: no valid log paths found\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Logging fallback: no valid log paths found\n")
 	}
 
-	fmt.Fprintln(os.Stderr, " Logging to stdout")
+	_, _ = fmt.Fprintln(os.Stderr, " Logging to stdout")
 	return zapcore.AddSync(os.Stdout)
 }

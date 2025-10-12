@@ -82,7 +82,7 @@ func runDiskManager(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	if err != nil {
 		return fmt.Errorf("failed to initialize disk manager: %w", err)
 	}
-	defer diskMgr.Close()
+	defer func() { _ = diskMgr.Close() }()
 
 	switch diskAction {
 	case "discover":
@@ -173,7 +173,7 @@ func createDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 	if diskEncrypted && passphrase == "" {
 		fmt.Print("Enter encryption passphrase: ")
 		// In a real implementation, use a secure password input
-		fmt.Scanln(&passphrase)
+		_, _ = fmt.Scanln(&passphrase)
 	}
 
 	volumeReq := &udisks2.VolumeRequest{

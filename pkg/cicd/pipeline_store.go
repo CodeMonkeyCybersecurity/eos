@@ -62,7 +62,7 @@ func (s *FilePipelineStore) SaveExecution(execution *PipelineExecution) error {
 
 	// Update latest symlink
 	latestLink := filepath.Join(execDir, "latest")
-	os.Remove(latestLink) // Ignore error
+	_ = os.Remove(latestLink) // Ignore error
 	if err := os.Symlink(execFile, latestLink); err != nil {
 		s.logger.Warn("Failed to create latest symlink", zap.Error(err))
 	}

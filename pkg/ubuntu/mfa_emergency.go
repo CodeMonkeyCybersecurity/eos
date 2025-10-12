@@ -104,7 +104,7 @@ func (m *MFAManager) createBackupAdmin() error {
 
 	// Add to emergency group to bypass MFA
 	if m.config.EmergencyGroupName != "" {
-		execute.RunSimple(m.rc.Ctx, "usermod", "-a", "-G",
+		_ = execute.RunSimple(m.rc.Ctx, "usermod", "-a", "-G",
 			m.config.EmergencyGroupName, username)
 	}
 

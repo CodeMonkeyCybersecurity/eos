@@ -55,7 +55,7 @@ func InstallCodeServer(rc *eos_io.RuntimeContext, config *Config) error {
 	}); err != nil {
 		// Try to fix dependencies if dpkg fails
 		logger.Debug("dpkg failed, attempting to fix dependencies")
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "apt-get",
 			Args:    []string{"install", "-f", "-y"},
 			Timeout: InstallTimeout,
@@ -211,7 +211,7 @@ func InstallClaudeExtension(rc *eos_io.RuntimeContext, config *Config) error {
 		}
 		
 		// Set ownership
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "chown",
 			Args:    []string{"-R", fmt.Sprintf("%s:%s", config.User, config.User), filepath.Join(userHome, ".local")},
 			Timeout: 5 * time.Second,

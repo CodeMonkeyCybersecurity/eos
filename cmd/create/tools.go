@@ -143,7 +143,7 @@ func runInteractiveToolsSetup(rc *eos_io.RuntimeContext, config *system_config.S
 	// System update
 	logger.Info("terminal prompt: Update system packages? [Y/n]: ")
 	var updateSystem string
-	fmt.Scanln(&updateSystem)
+	_, _ = fmt.Scanln(&updateSystem)
 	if updateSystem == "n" || updateSystem == "N" {
 		config.UpdateSystem = false
 	}
@@ -151,7 +151,7 @@ func runInteractiveToolsSetup(rc *eos_io.RuntimeContext, config *system_config.S
 	// Package installation
 	logger.Info("terminal prompt: Install essential packages? [Y/n]: ")
 	var installPackages string
-	fmt.Scanln(&installPackages)
+	_, _ = fmt.Scanln(&installPackages)
 	if installPackages == "n" || installPackages == "N" {
 		config.InstallPackages = false
 	}
@@ -159,14 +159,14 @@ func runInteractiveToolsSetup(rc *eos_io.RuntimeContext, config *system_config.S
 	// NPM installation
 	logger.Info("terminal prompt: Install npm and Node.js tools? [y/N]: ")
 	var installNpm string
-	fmt.Scanln(&installNpm)
+	_, _ = fmt.Scanln(&installNpm)
 	if installNpm == "y" || installNpm == "Y" {
 		config.InstallNpm = true
 
 		// ZX installation
 		logger.Info("terminal prompt: Install zx scripting tool? [y/N]: ")
 		var installZx string
-		fmt.Scanln(&installZx)
+		_, _ = fmt.Scanln(&installZx)
 		if installZx == "y" || installZx == "Y" {
 			config.InstallZx = true
 		}
@@ -175,7 +175,7 @@ func runInteractiveToolsSetup(rc *eos_io.RuntimeContext, config *system_config.S
 	// UFW configuration
 	logger.Info("terminal prompt: Configure UFW firewall? [y/N]: ")
 	var configureUFW string
-	fmt.Scanln(&configureUFW)
+	_, _ = fmt.Scanln(&configureUFW)
 	if configureUFW == "y" || configureUFW == "Y" {
 		config.ConfigureUFW = true
 	}
@@ -183,7 +183,7 @@ func runInteractiveToolsSetup(rc *eos_io.RuntimeContext, config *system_config.S
 	// Sensors setup
 	logger.Info("terminal prompt: Setup hardware sensors monitoring? [y/N]: ")
 	var setupSensors string
-	fmt.Scanln(&setupSensors)
+	_, _ = fmt.Scanln(&setupSensors)
 	if setupSensors == "y" || setupSensors == "Y" {
 		config.SetupSensors = true
 	}
@@ -198,7 +198,7 @@ func runInteractiveToolsSetup(rc *eos_io.RuntimeContext, config *system_config.S
 
 	logger.Info("terminal prompt: \nProceed with setup? [Y/n]: ")
 	var proceed string
-	fmt.Scanln(&proceed)
+	_, _ = fmt.Scanln(&proceed)
 	if proceed == "n" || proceed == "N" {
 		return fmt.Errorf("setup cancelled by user")
 	}

@@ -97,7 +97,7 @@ func (pe *PipelineEngine) executePipeline(rc *eos_io.RuntimeContext, orchestrato
 	// Update status to running
 	execution.Status = StatusRunning
 	execution.StartTime = time.Now()
-	pe.store.UpdateExecutionStatus(execution.ID, StatusRunning)
+	_ = pe.store.UpdateExecutionStatus(execution.ID, StatusRunning)
 
 	// Send status update
 	pe.sendStatusUpdate(StatusUpdate{
@@ -135,7 +135,7 @@ func (pe *PipelineEngine) executePipeline(rc *eos_io.RuntimeContext, orchestrato
 		}
 
 		execution.Stages = append(execution.Stages, *stageExecution)
-		pe.store.SaveStageExecution(execution.ID, stageExecution)
+		_ = pe.store.SaveStageExecution(execution.ID, stageExecution)
 
 		// Send stage start update
 		pe.sendStatusUpdate(StatusUpdate{
@@ -187,7 +187,7 @@ func (pe *PipelineEngine) executePipeline(rc *eos_io.RuntimeContext, orchestrato
 		}
 
 		// Save stage result
-		pe.store.SaveStageExecution(execution.ID, stageExecution)
+		_ = pe.store.SaveStageExecution(execution.ID, stageExecution)
 
 		// Send stage completion update
 		pe.sendStatusUpdate(StatusUpdate{
@@ -220,7 +220,7 @@ func (pe *PipelineEngine) executePipeline(rc *eos_io.RuntimeContext, orchestrato
 	}
 
 	// Save final state
-	pe.store.SaveExecution(execution)
+	_ = pe.store.SaveExecution(execution)
 
 	// Send completion update
 	pe.sendStatusUpdate(StatusUpdate{
@@ -420,7 +420,7 @@ func (pe *PipelineEngine) CancelExecution(executionID string) error {
 	}
 
 	execution.Status = StatusCancelled
-	pe.store.UpdateExecutionStatus(executionID, StatusCancelled)
+	_ = pe.store.UpdateExecutionStatus(executionID, StatusCancelled)
 
 	pe.sendStatusUpdate(StatusUpdate{
 		ExecutionID: executionID,

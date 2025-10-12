@@ -325,7 +325,7 @@ func AtomicCredentialWrite(rc *eos_io.RuntimeContext, credentialPath, credential
 	// Atomic move
 	err = os.Rename(tempPath, credentialPath)
 	if err != nil {
-		os.Remove(tempPath) // Clean up on failure
+		_ = os.Remove(tempPath) // Clean up on failure
 		return fmt.Errorf("failed to atomically write credential: %w", err)
 	}
 

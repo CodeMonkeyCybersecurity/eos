@@ -456,7 +456,7 @@ func (ds *DiagnosticSuite) TestHealthChecks() (*HealthTest, error) {
 		test.HealthEndpointReachable = false
 		return test, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	test.HealthEndpointReachable = true
 	test.ResponseTime = time.Since(start)
@@ -671,7 +671,7 @@ func (ds *DiagnosticSuite) testLocalReachability() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to %s: %w", ds.backend.LocalAddress, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	
 	logger.Debug("Local service is reachable")
 	return nil
@@ -698,7 +698,7 @@ func (ds *DiagnosticSuite) testFrontendReachability() error {
 	if err != nil {
 		return fmt.Errorf("failed to reach frontend %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	
 	logger.Debug("Frontend is reachable",
 		zap.String("url", url),

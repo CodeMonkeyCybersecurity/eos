@@ -155,9 +155,9 @@ func displayEnvironmentsTable(envs map[string]environments.Environment, currentE
 
 	// Print header
 	if detailed {
-		fmt.Fprintln(w, "CURRENT\tNAME\tTYPE\tSTATUS\tNOMAD\tCONSUL\tVAULT\tCREATED\tUPDATED")
+		_, _ = fmt.Fprintln(w, "CURRENT\tNAME\tTYPE\tSTATUS\tNOMAD\tCONSUL\tVAULT\tCREATED\tUPDATED")
 	} else {
-		fmt.Fprintln(w, "CURRENT\tNAME\tTYPE\tSTATUS\tINFRASTRUCTURE")
+		_, _ = fmt.Fprintln(w, "CURRENT\tNAME\tTYPE\tSTATUS\tINFRASTRUCTURE")
 	}
 
 	// Print environments
@@ -171,7 +171,7 @@ func displayEnvironmentsTable(envs map[string]environments.Environment, currentE
 		}
 
 		if detailed {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				current,
 				env.Name,
 				env.Type,
@@ -188,7 +188,7 @@ func displayEnvironmentsTable(envs map[string]environments.Environment, currentE
 				getShortAddress(env.Infrastructure.Consul.Address),
 				getShortAddress(env.Infrastructure.Vault.Address))
 
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 				current,
 				env.Name,
 				env.Type,

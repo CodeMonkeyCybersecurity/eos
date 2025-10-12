@@ -556,7 +556,7 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 		apiURL := fmt.Sprintf("http://127.0.0.1:%d/v1/agent/self", shared.PortConsul)
 		resp, err := client.Get(apiURL)
 		if err == nil {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			result.Details = append(result.Details,
 				fmt.Sprintf("\nHTTP API Response: %s", resp.Status))
 			result.Message = "Consul API is responding"

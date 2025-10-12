@@ -476,7 +476,7 @@ func checkSystemResources(rc *eos_io.RuntimeContext, config *Config) error {
 		if strings.HasPrefix(line, "Mem:") {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
-				fmt.Sscanf(fields[1], "%d", &totalRAM)
+				_, _ = fmt.Sscanf(fields[1], "%d", &totalRAM)
 				break
 			}
 		}

@@ -216,7 +216,7 @@ func stopHecateNomadJobs(rc *eos_io.RuntimeContext) error {
 			logger.Warn("Forcing termination of remaining jobs")
 			for _, job := range stillRunning {
 				logger.Info("Force stopping job", zap.String("job", job))
-				execute.Run(rc.Ctx, execute.Options{
+				_, _ = execute.Run(rc.Ctx, execute.Options{
 					Command: "nomad",
 					Args:    []string{"job", "stop", "-purge", "-force", job},
 					Capture: true,
@@ -395,7 +395,7 @@ func removeHecateDirectories(rc *eos_io.RuntimeContext, keepData bool) error {
 					if strings.HasPrefix(entry.Name(), "hecate-") && strings.HasSuffix(entry.Name(), ".service") {
 						fullPath := "/etc/systemd/system/" + entry.Name()
 						logger.Info("Removing service file", zap.String("file", fullPath))
-						os.Remove(fullPath)
+						_ = os.Remove(fullPath)
 					}
 				}
 			}
@@ -439,14 +439,14 @@ func removeHecateSystemdServices(rc *eos_io.RuntimeContext) error {
 				zap.String("service", service))
 
 			// Stop service
-			execute.Run(rc.Ctx, execute.Options{
+			_, _ = execute.Run(rc.Ctx, execute.Options{
 				Command: "systemctl",
 				Args:    []string{"stop", service},
 				Capture: true,
 			})
 
 			// Disable service
-			execute.Run(rc.Ctx, execute.Options{
+			_, _ = execute.Run(rc.Ctx, execute.Options{
 				Command: "systemctl",
 				Args:    []string{"disable", service},
 				Capture: true,
@@ -455,7 +455,7 @@ func removeHecateSystemdServices(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Reload systemd to clean up
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"daemon-reload"},
 		Capture: true,

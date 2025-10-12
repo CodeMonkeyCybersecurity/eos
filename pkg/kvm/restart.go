@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/restart.go
 // Safe VM restart operations with health checks
 
@@ -31,7 +33,7 @@ func RestartVM(ctx context.Context, vmName string, cfg *RestartConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {

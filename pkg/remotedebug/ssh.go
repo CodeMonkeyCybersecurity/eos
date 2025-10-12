@@ -140,7 +140,7 @@ func (c *SSHClient) executeWithPTY(cmd string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 	
 	// Request PTY
 	modes := ssh.TerminalModes{
@@ -169,7 +169,7 @@ func (c *SSHClient) executeNoPTY(cmd string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 	
 	// Don't request PTY
 	output, err := session.CombinedOutput(cmd)
@@ -187,7 +187,7 @@ func (c *SSHClient) executeWithSudo(cmd string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout

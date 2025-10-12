@@ -99,7 +99,7 @@ func (sso *SafeStorageOperations) SafeExtendLV(rc *eos_io.RuntimeContext, req *E
 	}
 
 	// Update journal status
-	sso.journal.UpdateStatus(entry.ID, StatusInProgress)
+	_ = sso.journal.UpdateStatus(entry.ID, StatusInProgress)
 
 	// Track the operation result
 	result := &OperationResult{
@@ -116,14 +116,14 @@ func (sso *SafeStorageOperations) SafeExtendLV(rc *eos_io.RuntimeContext, req *E
 		result.Duration = result.EndTime.Sub(result.StartTime)
 
 		if result.Success {
-			sso.journal.UpdateStatus(entry.ID, StatusCompleted)
+			_ = sso.journal.UpdateStatus(entry.ID, StatusCompleted)
 			logger.Info("Safe LV extension completed successfully",
 				zap.String("journal_id", entry.ID),
 				zap.Duration("duration", result.Duration))
 		} else {
-			sso.journal.UpdateStatus(entry.ID, StatusFailed)
+			_ = sso.journal.UpdateStatus(entry.ID, StatusFailed)
 			if result.Error != nil {
-				sso.journal.RecordError(entry.ID, result.Error)
+				_ = sso.journal.RecordError(entry.ID, result.Error)
 			}
 		}
 	}()
@@ -149,7 +149,7 @@ func (sso *SafeStorageOperations) SafeExtendLV(rc *eos_io.RuntimeContext, req *E
 		result.Error = fmt.Errorf("capture pre-state: %w", err)
 		return result, result.Error
 	}
-	sso.journal.SetPreState(entry.ID, preState)
+	_ = sso.journal.SetPreState(entry.ID, preState)
 
 	// 4. ASSESS - Create safety snapshot (always attempt, make required based on config)
 	var snapshot *Snapshot
@@ -186,7 +186,7 @@ func (sso *SafeStorageOperations) SafeExtendLV(rc *eos_io.RuntimeContext, req *E
 		if snapshot != nil {
 			rollbackPlan, planErr := sso.rollback.CreateRollbackPlan(ctx, entry.ID)
 			if planErr == nil {
-				sso.journal.SetRollbackPlan(entry.ID, rollbackPlan)
+				_ = sso.journal.SetRollbackPlan(entry.ID, rollbackPlan)
 				result.RollbackAvailable = true
 				logger.Info("Rollback plan created and available",
 					zap.String("rollback_method", string(rollbackPlan.Method)))
@@ -202,7 +202,7 @@ func (sso *SafeStorageOperations) SafeExtendLV(rc *eos_io.RuntimeContext, req *E
 	if err != nil {
 		logger.Warn("Failed to capture post-operation state", zap.Error(err))
 	} else {
-		sso.journal.SetPostState(entry.ID, postState)
+		_ = sso.journal.SetPostState(entry.ID, postState)
 	}
 
 	// 8. EVALUATE - Verify the operation succeeded

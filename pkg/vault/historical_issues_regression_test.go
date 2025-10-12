@@ -346,8 +346,8 @@ func TestHistoricalIssue_DuplicateBinaries(t *testing.T) {
 	}
 
 	for _, path := range paths {
-		os.MkdirAll(filepath.Dir(path), 0755)
-		os.WriteFile(path, []byte("#!/bin/sh\necho test"), 0755)
+		_ = os.MkdirAll(filepath.Dir(path), 0755)
+		_ = os.WriteFile(path, []byte("#!/bin/sh\necho test"), 0755)
 	}
 
 	// Create binaries slice

@@ -114,7 +114,7 @@ func runRepairMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	if !autoYes {
 		fmt.Print("Proceed with repairs? [y/N]: ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		response = strings.ToLower(strings.TrimSpace(response))
 		if response != "y" && response != "yes" {
 			fmt.Println("Repair cancelled.")
@@ -140,7 +140,7 @@ func runRepairMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 			fmt.Printf("  Run: %s\n", action.command)
 			fmt.Print("  Execute this fix? [Y/n]: ")
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			response = strings.ToLower(strings.TrimSpace(response))
 			if response == "n" || response == "no" {
 				fmt.Println("  ⊘ Skipped")
@@ -158,7 +158,7 @@ func runRepairMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 			if interactive && !autoYes {
 				fmt.Print("  Continue with remaining fixes? [y/N]: ")
 				var response string
-				fmt.Scanln(&response)
+				_, _ = fmt.Scanln(&response)
 				response = strings.ToLower(strings.TrimSpace(response))
 				if response != "y" && response != "yes" {
 					fmt.Println()
@@ -355,7 +355,7 @@ func fixTemporalPath(rc *eos_io.RuntimeContext) error {
 		// Exists but doesn't work - remove and replace
 		logger.Info("Existing temporal binary doesn't work, replacing",
 			zap.String("path", targetPath))
-		os.Remove(targetPath)
+		_ = os.Remove(targetPath)
 	}
 
 	// Copy the binary instead of symlinking

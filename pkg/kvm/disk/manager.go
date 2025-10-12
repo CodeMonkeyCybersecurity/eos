@@ -1,3 +1,5 @@
+//go:build linux
+
 package disk
 
 import (
@@ -230,7 +232,7 @@ func (m *Manager) Rollback(ctx context.Context, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {

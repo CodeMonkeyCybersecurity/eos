@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/templates.go
 
 package kvm

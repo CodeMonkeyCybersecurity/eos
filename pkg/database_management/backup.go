@@ -465,7 +465,7 @@ func (dbm *DatabaseBackupManager) createMongoDBBackup(rc *eos_io.RuntimeContext,
 		// SECURITY P2 #7: Validate backupDir path before os.RemoveAll
 		// Only remove if it's within our backup directory
 		if err := validateBackupPath(backupDir, dbm.config.BackupDir); err == nil {
-			os.RemoveAll(backupDir)
+			_ = os.RemoveAll(backupDir)
 		}
 
 		result.BackupPath = compressedPath
@@ -662,7 +662,7 @@ func (dbm *DatabaseBackupManager) verifyRedisBackup(rc *eos_io.RuntimeContext, b
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Check RDB magic header
 	header := make([]byte, 9)
@@ -1112,7 +1112,7 @@ func gzipDecompress(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("gzip reader creation failed: %w", err)
 	}
-	defer gzReader.Close()
+	defer func() { _ = gzReader.Close() }()
 
 	var out bytes.Buffer
 	if _, err := io.Copy(&out, gzReader); err != nil {

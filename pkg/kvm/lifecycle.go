@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/lifecycle.go
 
 package kvm

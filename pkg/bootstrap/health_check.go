@@ -161,7 +161,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 	// Extract available space in GB
 	availStr := strings.TrimSuffix(fields[3], "G")
 	var availGB int
-	fmt.Sscanf(availStr, "%d", &availGB)
+	_, _ = fmt.Sscanf(availStr, "%d", &availGB)
 
 	if availGB < 10 {
 		check.Passed = false
@@ -207,7 +207,7 @@ func checkMemory(rc *eos_io.RuntimeContext, consulAddr string) HealthCheck {
 			fields := strings.Fields(line)
 			if len(fields) > 1 {
 				var totalGB int
-				fmt.Sscanf(fields[1], "%d", &totalGB)
+				_, _ = fmt.Sscanf(fields[1], "%d", &totalGB)
 
 				if totalGB < 4 {
 					check.Passed = false

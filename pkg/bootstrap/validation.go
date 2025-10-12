@@ -201,7 +201,7 @@ func getCPUInfo(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 		return err
 	}
 
-	fmt.Sscanf(strings.TrimSpace(output), "%d", &info.CPUCores)
+	_, _ = fmt.Sscanf(strings.TrimSpace(output), "%d", &info.CPUCores)
 	return nil
 }
 
@@ -218,7 +218,7 @@ func getMemoryInfo(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	}
 
 	var memKB int64
-	fmt.Sscanf(output, "MemTotal: %d kB", &memKB)
+	_, _ = fmt.Sscanf(output, "MemTotal: %d kB", &memKB)
 	info.MemoryGB = int(memKB / 1024 / 1024)
 
 	return nil
@@ -239,7 +239,7 @@ func getDiskInfo(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	if len(lines) >= 2 {
 		availStr := strings.TrimSuffix(strings.TrimSpace(lines[1]), "G")
-		fmt.Sscanf(availStr, "%d", &info.DiskGB)
+		_, _ = fmt.Sscanf(availStr, "%d", &info.DiskGB)
 	}
 
 	return nil
@@ -465,8 +465,8 @@ func compareVersions(v1, v2 string) int {
 
 	for i := 0; i < len(parts1) && i < len(parts2); i++ {
 		var n1, n2 int
-		fmt.Sscanf(parts1[i], "%d", &n1)
-		fmt.Sscanf(parts2[i], "%d", &n2)
+		_, _ = fmt.Sscanf(parts1[i], "%d", &n1)
+		_, _ = fmt.Sscanf(parts2[i], "%d", &n2)
 
 		if n1 < n2 {
 			return -1

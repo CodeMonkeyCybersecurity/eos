@@ -105,7 +105,7 @@ func CreateLogicalVolume(rc *eos_io.RuntimeContext, config *LogicalVolumeConfig)
 			logger.Warn("Failed to create filesystem, rolling back LV creation",
 				zap.Error(err))
 			removeCmd := exec.CommandContext(rc.Ctx, "lvremove", "-y", "-f", lvPath)
-			removeCmd.Run()
+			_ = removeCmd.Run()
 			return fmt.Errorf("failed to create filesystem: %w", err)
 		}
 	}

@@ -1,3 +1,5 @@
+//go:build linux
+
 package update
 
 import (
@@ -295,7 +297,7 @@ func confirmResize(a *disk.Assessment) bool {
 
 	fmt.Print("Do you want to proceed? (type 'yes' to continue): ")
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 
 	return strings.ToLower(response) == "yes"
 }

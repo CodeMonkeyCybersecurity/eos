@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/ssh_key.go
 
 package kvm

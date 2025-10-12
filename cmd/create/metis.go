@@ -457,7 +457,7 @@ Fix Option 2: Add /usr/local/bin to PATH
 		}
 		// Exists but doesn't work - remove and replace
 		logger.Info("Existing temporal binary doesn't work, replacing")
-		os.Remove(targetPath)
+		_ = os.Remove(targetPath)
 	}
 
 	// Copy the binary to /usr/local/bin

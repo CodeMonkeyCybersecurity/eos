@@ -159,7 +159,7 @@ func fetchAuthentikMetadata(authentikURL, entityID string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch metadata: status %d", resp.StatusCode)
@@ -529,7 +529,7 @@ func checkSAMLEndpoint() error {
 	if err != nil {
 		return fmt.Errorf("SAML endpoint not accessible: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("SAML endpoint returned status %d", resp.StatusCode)

@@ -301,16 +301,16 @@ func displayBackendsTable(backends []BackendSummary, verbose bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
 	if verbose {
-		fmt.Fprintln(w, "ID\tNAME\tPUBLIC DOMAIN\tLOCAL ADDRESS\tDATACENTER\tSTATUS\tCREATED\tLAST SEEN")
-		fmt.Fprintln(w, "--\t----\t-------------\t-------------\t----------\t------\t-------\t---------")
+		_, _ = fmt.Fprintln(w, "ID\tNAME\tPUBLIC DOMAIN\tLOCAL ADDRESS\tDATACENTER\tSTATUS\tCREATED\tLAST SEEN")
+		_, _ = fmt.Fprintln(w, "--\t----\t-------------\t-------------\t----------\t------\t-------\t---------")
 	} else {
-		fmt.Fprintln(w, "ID\tNAME\tPUBLIC DOMAIN\tSTATUS\tLAST SEEN")
-		fmt.Fprintln(w, "--\t----\t-------------\t------\t---------")
+		_, _ = fmt.Fprintln(w, "ID\tNAME\tPUBLIC DOMAIN\tSTATUS\tLAST SEEN")
+		_, _ = fmt.Fprintln(w, "--\t----\t-------------\t------\t---------")
 	}
 
 	for _, backend := range backends {
 		if verbose {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				backend.ID,
 				backend.Name,
 				backend.PublicDomain,
@@ -320,7 +320,7 @@ func displayBackendsTable(backends []BackendSummary, verbose bool) error {
 				backend.Created.Format("2006-01-02 15:04"),
 				backend.LastSeen.Format("2006-01-02 15:04"))
 		} else {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 				backend.ID,
 				backend.Name,
 				backend.PublicDomain,
@@ -335,36 +335,36 @@ func displayBackendsTable(backends []BackendSummary, verbose bool) error {
 func displayBackendTable(backend *BackendDetails, verbose bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-	fmt.Fprintf(w, "Backend ID:\t%s\n", backend.ID)
-	fmt.Fprintf(w, "Name:\t%s\n", backend.Name)
-	fmt.Fprintf(w, "Public Domain:\t%s\n", backend.PublicDomain)
-	fmt.Fprintf(w, "Local Address:\t%s\n", backend.LocalAddress)
-	fmt.Fprintf(w, "Frontend DC:\t%s\n", backend.FrontendDC)
-	fmt.Fprintf(w, "Backend DC:\t%s\n", backend.BackendDC)
-	fmt.Fprintf(w, "Connection Type:\t%s\n", backend.ConnectionType)
-	fmt.Fprintf(w, "Status:\t%s\n", backend.Status)
-	fmt.Fprintf(w, "Created:\t%s\n", backend.Created.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(w, "Updated:\t%s\n", backend.Updated.Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(w, "Backend ID:\t%s\n", backend.ID)
+	_, _ = fmt.Fprintf(w, "Name:\t%s\n", backend.Name)
+	_, _ = fmt.Fprintf(w, "Public Domain:\t%s\n", backend.PublicDomain)
+	_, _ = fmt.Fprintf(w, "Local Address:\t%s\n", backend.LocalAddress)
+	_, _ = fmt.Fprintf(w, "Frontend DC:\t%s\n", backend.FrontendDC)
+	_, _ = fmt.Fprintf(w, "Backend DC:\t%s\n", backend.BackendDC)
+	_, _ = fmt.Fprintf(w, "Connection Type:\t%s\n", backend.ConnectionType)
+	_, _ = fmt.Fprintf(w, "Status:\t%s\n", backend.Status)
+	_, _ = fmt.Fprintf(w, "Created:\t%s\n", backend.Created.Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(w, "Updated:\t%s\n", backend.Updated.Format("2006-01-02 15:04:05"))
 
 	if verbose && backend.Tunnel != nil {
-		fmt.Fprintf(w, "\nTunnel Details:\n")
-		fmt.Fprintf(w, "  Type:\t%s\n", backend.Tunnel.Type)
-		fmt.Fprintf(w, "  Status:\t%s\n", backend.Tunnel.Status.State)
-		fmt.Fprintf(w, "  Created:\t%s\n", backend.Tunnel.Created.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(w, "\nTunnel Details:\n")
+		_, _ = fmt.Fprintf(w, "  Type:\t%s\n", backend.Tunnel.Type)
+		_, _ = fmt.Fprintf(w, "  Status:\t%s\n", backend.Tunnel.Status.State)
+		_, _ = fmt.Fprintf(w, "  Created:\t%s\n", backend.Tunnel.Created.Format("2006-01-02 15:04:05"))
 	}
 
 	if verbose && backend.Security != nil {
-		fmt.Fprintf(w, "\nSecurity Details:\n")
-		fmt.Fprintf(w, "  mTLS Enabled:\t%t\n", backend.Security.MTLS)
-		fmt.Fprintf(w, "  Encryption:\t%s\n", backend.Security.Encryption)
+		_, _ = fmt.Fprintf(w, "\nSecurity Details:\n")
+		_, _ = fmt.Fprintf(w, "  mTLS Enabled:\t%t\n", backend.Security.MTLS)
+		_, _ = fmt.Fprintf(w, "  Encryption:\t%s\n", backend.Security.Encryption)
 	}
 
 	if verbose && backend.Metrics != nil {
-		fmt.Fprintf(w, "\nMetrics:\n")
-		fmt.Fprintf(w, "  Latency:\t%v\n", backend.Metrics.Latency)
-		fmt.Fprintf(w, "  Throughput:\t%d req/s\n", backend.Metrics.Throughput)
-		fmt.Fprintf(w, "  Error Rate:\t%.2f%%\n", backend.Metrics.ErrorRate)
-		fmt.Fprintf(w, "  Uptime:\t%.2f%%\n", backend.Metrics.UptimePercent)
+		_, _ = fmt.Fprintf(w, "\nMetrics:\n")
+		_, _ = fmt.Fprintf(w, "  Latency:\t%v\n", backend.Metrics.Latency)
+		_, _ = fmt.Fprintf(w, "  Throughput:\t%d req/s\n", backend.Metrics.Throughput)
+		_, _ = fmt.Fprintf(w, "  Error Rate:\t%.2f%%\n", backend.Metrics.ErrorRate)
+		_, _ = fmt.Fprintf(w, "  Uptime:\t%.2f%%\n", backend.Metrics.UptimePercent)
 	}
 
 	return w.Flush()
@@ -373,19 +373,19 @@ func displayBackendTable(backend *BackendDetails, verbose bool) error {
 func displayHealthTable(status *hybrid.ConnectionStatus) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-	fmt.Fprintf(w, "Connection Status:\t%s\n", getStatusString(status.Connected))
-	fmt.Fprintf(w, "Last Seen:\t%s\n", status.LastSeen.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(w, "Latency:\t%v\n", status.Latency)
+	_, _ = fmt.Fprintf(w, "Connection Status:\t%s\n", getStatusString(status.Connected))
+	_, _ = fmt.Fprintf(w, "Last Seen:\t%s\n", status.LastSeen.Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(w, "Latency:\t%v\n", status.Latency)
 
-	fmt.Fprintf(w, "\nHealth Checks:\n")
+	_, _ = fmt.Fprintf(w, "\nHealth Checks:\n")
 	for name, passing := range status.HealthChecks {
-		fmt.Fprintf(w, "  %s:\t%s\n", strings.Title(name), getStatusString(passing))
+		_, _ = fmt.Fprintf(w, "  %s:\t%s\n", strings.Title(name), getStatusString(passing))
 	}
 
 	if len(status.Errors) > 0 {
-		fmt.Fprintf(w, "\nErrors:\n")
+		_, _ = fmt.Fprintf(w, "\nErrors:\n")
 		for _, err := range status.Errors {
-			fmt.Fprintf(w, "  - %s\n", err)
+			_, _ = fmt.Fprintf(w, "  - %s\n", err)
 		}
 	}
 
@@ -395,48 +395,48 @@ func displayHealthTable(status *hybrid.ConnectionStatus) error {
 func displayDiagnosticsTable(diagnostics *BackendDiagnostics) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-	fmt.Fprintf(w, "Diagnostics Report for Backend: %s\n", diagnostics.BackendID)
-	fmt.Fprintf(w, "Timestamp: %s\n\n", diagnostics.Timestamp.Format("2006-01-02 15:04:05"))
+	_, _ = fmt.Fprintf(w, "Diagnostics Report for Backend: %s\n", diagnostics.BackendID)
+	_, _ = fmt.Fprintf(w, "Timestamp: %s\n\n", diagnostics.Timestamp.Format("2006-01-02 15:04:05"))
 
 	if diagnostics.Connectivity != nil {
-		fmt.Fprintf(w, "Connectivity Test:\n")
-		fmt.Fprintf(w, "  Local Reachable:\t%s\n", getStatusString(diagnostics.Connectivity.LocalReachable))
-		fmt.Fprintf(w, "  Frontend Reachable:\t%s\n", getStatusString(diagnostics.Connectivity.FrontendReachable))
-		fmt.Fprintf(w, "  Tunnel Active:\t%s\n", getStatusString(diagnostics.Connectivity.TunnelActive))
-		fmt.Fprintf(w, "  Latency:\t%v\n", diagnostics.Connectivity.Latency)
+		_, _ = fmt.Fprintf(w, "Connectivity Test:\n")
+		_, _ = fmt.Fprintf(w, "  Local Reachable:\t%s\n", getStatusString(diagnostics.Connectivity.LocalReachable))
+		_, _ = fmt.Fprintf(w, "  Frontend Reachable:\t%s\n", getStatusString(diagnostics.Connectivity.FrontendReachable))
+		_, _ = fmt.Fprintf(w, "  Tunnel Active:\t%s\n", getStatusString(diagnostics.Connectivity.TunnelActive))
+		_, _ = fmt.Fprintf(w, "  Latency:\t%v\n", diagnostics.Connectivity.Latency)
 		if diagnostics.Connectivity.Error != "" {
-			fmt.Fprintf(w, "  Error:\t%s\n", diagnostics.Connectivity.Error)
+			_, _ = fmt.Fprintf(w, "  Error:\t%s\n", diagnostics.Connectivity.Error)
 		}
-		fmt.Fprintf(w, "\n")
+		_, _ = fmt.Fprintf(w, "\n")
 	}
 
 	if diagnostics.DNSResolution != nil {
-		fmt.Fprintf(w, "DNS Resolution Test:\n")
-		fmt.Fprintf(w, "  Public Domain Resolved:\t%s\n", getStatusString(diagnostics.DNSResolution.PublicDomainResolved))
-		fmt.Fprintf(w, "  Local DNS Working:\t%s\n", getStatusString(diagnostics.DNSResolution.LocalDNSWorking))
-		fmt.Fprintf(w, "  Resolution Time:\t%v\n", diagnostics.DNSResolution.ResolutionTime)
+		_, _ = fmt.Fprintf(w, "DNS Resolution Test:\n")
+		_, _ = fmt.Fprintf(w, "  Public Domain Resolved:\t%s\n", getStatusString(diagnostics.DNSResolution.PublicDomainResolved))
+		_, _ = fmt.Fprintf(w, "  Local DNS Working:\t%s\n", getStatusString(diagnostics.DNSResolution.LocalDNSWorking))
+		_, _ = fmt.Fprintf(w, "  Resolution Time:\t%v\n", diagnostics.DNSResolution.ResolutionTime)
 		if diagnostics.DNSResolution.Error != "" {
-			fmt.Fprintf(w, "  Error:\t%s\n", diagnostics.DNSResolution.Error)
+			_, _ = fmt.Fprintf(w, "  Error:\t%s\n", diagnostics.DNSResolution.Error)
 		}
-		fmt.Fprintf(w, "\n")
+		_, _ = fmt.Fprintf(w, "\n")
 	}
 
 	if diagnostics.Certificates != nil {
-		fmt.Fprintf(w, "Certificate Test:\n")
-		fmt.Fprintf(w, "  Certificate Valid:\t%s\n", getStatusString(diagnostics.Certificates.CertificateValid))
-		fmt.Fprintf(w, "  CA Valid:\t%s\n", getStatusString(diagnostics.Certificates.CAValid))
-		fmt.Fprintf(w, "  Expires At:\t%s\n", diagnostics.Certificates.ExpiresAt.Format("2006-01-02 15:04:05"))
-		fmt.Fprintf(w, "  Days Until Expiry:\t%d\n", diagnostics.Certificates.DaysUntilExpiry)
+		_, _ = fmt.Fprintf(w, "Certificate Test:\n")
+		_, _ = fmt.Fprintf(w, "  Certificate Valid:\t%s\n", getStatusString(diagnostics.Certificates.CertificateValid))
+		_, _ = fmt.Fprintf(w, "  CA Valid:\t%s\n", getStatusString(diagnostics.Certificates.CAValid))
+		_, _ = fmt.Fprintf(w, "  Expires At:\t%s\n", diagnostics.Certificates.ExpiresAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(w, "  Days Until Expiry:\t%d\n", diagnostics.Certificates.DaysUntilExpiry)
 		if diagnostics.Certificates.Error != "" {
-			fmt.Fprintf(w, "  Error:\t%s\n", diagnostics.Certificates.Error)
+			_, _ = fmt.Fprintf(w, "  Error:\t%s\n", diagnostics.Certificates.Error)
 		}
-		fmt.Fprintf(w, "\n")
+		_, _ = fmt.Fprintf(w, "\n")
 	}
 
 	if len(diagnostics.Recommendations) > 0 {
-		fmt.Fprintf(w, "Recommendations:\n")
+		_, _ = fmt.Fprintf(w, "Recommendations:\n")
 		for _, rec := range diagnostics.Recommendations {
-			fmt.Fprintf(w, "  - %s\n", rec)
+			_, _ = fmt.Fprintf(w, "  - %s\n", rec)
 		}
 	}
 

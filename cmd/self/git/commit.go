@@ -155,7 +155,7 @@ func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.Git
 	if push {
 		logger.Info("terminal prompt: Force push? [y/N]: ")
 		var forceResponse string
-		fmt.Scanln(&forceResponse)
+		_, _ = fmt.Scanln(&forceResponse)
 		force = forceResponse == "y" || forceResponse == "Y"
 	}
 

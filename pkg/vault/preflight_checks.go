@@ -99,7 +99,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 				return eos_err.NewUserError("Cannot create required directory: %s\nError: %v\n\nThis usually means you need to run with sudo privileges.", parentDir, err)
 			}
 			// Clean up the test directory
-			os.RemoveAll(parentDir)
+			_ = os.RemoveAll(parentDir)
 		}
 		
 		// Test if we can create the target directory
@@ -111,7 +111,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 		}
 		
 		// Clean up the test directory
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}
 	
 	logger.Debug("Directory permissions check passed")

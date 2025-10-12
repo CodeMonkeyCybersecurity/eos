@@ -65,13 +65,13 @@ func DeployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 		if err != nil {
 			return fmt.Errorf("failed to open source file %s: %w", src, err)
 		}
-		defer srcFile.Close()
+		defer func() { _ = srcFile.Close() }()
 
 		dstFile, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, perm)
 		if err != nil {
 			return fmt.Errorf("failed to create destination file %s: %w", dst, err)
 		}
-		defer dstFile.Close()
+		defer func() { _ = dstFile.Close() }()
 
 		if _, err := io.Copy(dstFile, srcFile); err != nil {
 			return fmt.Errorf("failed to copy file from %s to %s: %w", src, dst, err)

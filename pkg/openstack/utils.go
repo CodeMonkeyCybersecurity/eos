@@ -83,7 +83,7 @@ func configureMessageQueue(rc *eos_io.RuntimeContext, config *Config) error {
 	// Enable management plugin
 	enablePluginCmd := exec.CommandContext(rc.Ctx, "rabbitmq-plugins", "enable",
 		"rabbitmq_management")
-	enablePluginCmd.Run()
+	_ = enablePluginCmd.Run()
 
 	// Configure for OpenStack scale
 	if err := configureRabbitMQForOpenStack(rc); err != nil {
@@ -110,7 +110,7 @@ func secureMariaDB(rc *eos_io.RuntimeContext, config *Config) error {
 		return fmt.Errorf("failed to create temp mysql config: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	// Write password to defaults file with secure permissions
 	mysqlDefaults := fmt.Sprintf("[client]\npassword=%s\n", config.DBPassword)

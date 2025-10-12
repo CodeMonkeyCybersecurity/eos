@@ -194,7 +194,7 @@ func (c *AuthentikClient) createSAMLCertificate(entityID string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -250,7 +250,7 @@ else:
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -310,7 +310,7 @@ func (c *AuthentikClient) createStandardMappings() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
 			var result map[string]interface{}
@@ -358,7 +358,7 @@ func (c *AuthentikClient) createSAMLProvider(entityID, wazuhURL, certID string, 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -403,7 +403,7 @@ func (c *AuthentikClient) createApplication(entityID string, providerID string) 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -454,7 +454,7 @@ func (c *AuthentikClient) createWazuhGroups() error {
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
 			body, _ := io.ReadAll(resp.Body)
@@ -531,7 +531,7 @@ func testWazuhSSO(cmd *cobra.Command, args []string) error {
 			zap.Error(err))
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusOK {
 		logger.Info("Metadata endpoint accessible", zap.String("status", ""))

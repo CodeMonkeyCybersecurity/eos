@@ -779,13 +779,13 @@ func writeOssecFile(rc *eos_io.RuntimeContext, path string, config []byte) error
 	// Set ownership (root:wazuh)
 	cmd := exec.Command("chown", "root:wazuh", tmpFile)
 	if err := cmd.Run(); err != nil {
-		os.Remove(tmpFile)
+		_ = os.Remove(tmpFile)
 		return fmt.Errorf("failed to set ownership: %w", err)
 	}
 
 	// Atomic rename
 	if err := os.Rename(tmpFile, path); err != nil {
-		os.Remove(tmpFile)
+		_ = os.Remove(tmpFile)
 		return err
 	}
 
@@ -803,7 +803,7 @@ func syncFile(path string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	return f.Sync()
 }

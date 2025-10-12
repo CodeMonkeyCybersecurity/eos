@@ -183,7 +183,7 @@ func saveDiscoveryConfig(_ *discovery.InternalDiscoveryConfig, filename string) 
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	_, err = file.WriteString("# Discovery configuration saved\n")
 	return err
@@ -385,7 +385,7 @@ func saveDiscoveryResults(results []*discovery.DiscoveryResult, filename, format
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	switch strings.ToLower(format) {
 	case "json":

@@ -1,3 +1,5 @@
+//go:build linux
+
 package list
 
 import (
@@ -86,8 +88,8 @@ func listOrchestratedKVMs(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	// Display results in table format
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tIP ADDRESS\tHEALTH\tCONSUL ID\tNOMAD JOB\tCREATED")
-	fmt.Fprintln(w, "----\t----------\t------\t---------\t---------\t-------")
+	_, _ = fmt.Fprintln(w, "NAME\tIP ADDRESS\tHEALTH\tCONSUL ID\tNOMAD JOB\tCREATED")
+	_, _ = fmt.Fprintln(w, "----\t----------\t------\t---------\t---------\t-------")
 
 	for _, vm := range vms {
 		nomadJob := vm.NomadJobID
@@ -102,7 +104,7 @@ func listOrchestratedKVMs(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 			created = vm.Meta["created_at"]
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			vm.Name,
 			vm.IPAddress,
 			vm.Health,
@@ -137,8 +139,8 @@ func listKVMPools(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 	// Display results in table format
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tCURRENT\tMIN\tMAX\tAUTO-SCALE\tTAGS")
-	fmt.Fprintln(w, "----\t-------\t---\t---\t----------\t----")
+	_, _ = fmt.Fprintln(w, "NAME\tCURRENT\tMIN\tMAX\tAUTO-SCALE\tTAGS")
+	_, _ = fmt.Fprintln(w, "----\t-------\t---\t---\t----------\t----")
 
 	for _, pool := range pools {
 		autoScale := "Disabled"
@@ -157,7 +159,7 @@ func listKVMPools(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 			}
 		}
 
-		fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\t%s\n",
 			pool.Name,
 			pool.CurrentSize,
 			pool.MinSize,

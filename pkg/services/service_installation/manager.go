@@ -208,7 +208,7 @@ func (sim *ServiceInstallationManager) PerformHealthCheck(rc *eos_io.RuntimeCont
 				Message: err.Error(),
 			})
 		} else {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			result.StatusCode = resp.StatusCode
 			result.Healthy = resp.StatusCode >= 200 && resp.StatusCode < 400
 

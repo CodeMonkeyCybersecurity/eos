@@ -372,7 +372,7 @@ func autoDiscoverCluster(rc *eos_io.RuntimeContext) (*ClusterInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen for multicast: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Set read timeout
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))

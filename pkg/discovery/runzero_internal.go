@@ -484,7 +484,7 @@ func (m *InternalDiscoveryManager) scanPort(ip string, port int) *Service {
 	if err != nil {
 		return nil
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	service := &Service{
 		Port:     port,

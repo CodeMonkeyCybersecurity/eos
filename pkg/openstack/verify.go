@@ -171,7 +171,7 @@ func verifyKeystone(rc *eos_io.RuntimeContext, config *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to Keystone: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("Keystone authentication failed: status %d", resp.StatusCode)
@@ -212,7 +212,7 @@ func verifyGlance(rc *eos_io.RuntimeContext, config *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to Glance: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Glance API returned status %d", resp.StatusCode)
@@ -271,7 +271,7 @@ func verifyNova(rc *eos_io.RuntimeContext, config *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to Nova: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Nova API returned status %d", resp.StatusCode)
@@ -520,7 +520,7 @@ func checkEndpointConnectivity(rc *eos_io.RuntimeContext, url string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// We expect some response, even if it's an auth error
 	if resp.StatusCode == 0 {

@@ -175,7 +175,7 @@ func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 		logger.Warn("Mount point is read-only",
 			zap.String("mountPoint", config.MountPoint))
 	} else {
-		os.Remove(testFile)
+		_ = os.Remove(testFile)
 		logger.Debug("Mount point is writable")
 	}
 

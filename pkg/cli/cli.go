@@ -94,7 +94,7 @@ func AddStringFlag(cmd *cobra.Command, name, shorthand, def, help string, requir
 		if err := cmd.MarkFlagRequired(name); err != nil {
 			// Don't panic - Cobra will still validate required flags at runtime
 			// This error is extremely rare (only if flag doesn't exist)
-			fmt.Fprintf(os.Stderr, "warning: failed to mark flag %s as required: %v\n", name, err)
+			_, _ = fmt.Fprintf(os.Stderr, "warning: failed to mark flag %s as required: %v\n", name, err)
 		}
 	}
 }
@@ -116,7 +116,7 @@ func AddStringSliceFlag(cmd *cobra.Command, name, shorthand string, def []string
 	if required {
 		if err := cmd.MarkFlagRequired(name); err != nil {
 			// Don't panic - Cobra will still validate required flags at runtime
-			fmt.Fprintf(os.Stderr, "warning: failed to mark flag %s as required: %v\n", name, err)
+			_, _ = fmt.Fprintf(os.Stderr, "warning: failed to mark flag %s as required: %v\n", name, err)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func SetViperEnvPrefix(v *viper.Viper, prefix string) {
 func GetStringOrEmpty(cmd *cobra.Command, name string) string {
 	val, err := cmd.Flags().GetString(name)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to get flag %s: %v\n", name, err)
+		_, _ = fmt.Fprintf(os.Stderr, "warning: failed to get flag %s: %v\n", name, err)
 		return ""
 	}
 	return val

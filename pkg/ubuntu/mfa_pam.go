@@ -213,13 +213,13 @@ func (m *MFAManager) updatePAMFileSafely(pamFile string, content string) error {
 
 	// Validate PAM configuration syntax
 	if err := m.validatePAMConfig(tmpFile); err != nil {
-		os.Remove(tmpFile)
+		_ = os.Remove(tmpFile)
 		return fmt.Errorf("PAM validation failed: %w", err)
 	}
 
 	// Atomic replace
 	if err := os.Rename(tmpFile, pamFile); err != nil {
-		os.Remove(tmpFile)
+		_ = os.Remove(tmpFile)
 		return fmt.Errorf("replace PAM file: %w", err)
 	}
 
@@ -232,7 +232,7 @@ func (m *MFAManager) validatePAMConfig(path string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0

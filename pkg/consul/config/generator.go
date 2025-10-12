@@ -218,7 +218,7 @@ watches = [
 	defer func() {
 		file.Close()
 		if !writeSuccess {
-			os.Remove(tempPath)
+			_ = os.Remove(tempPath)
 		}
 	}()
 
@@ -241,7 +241,7 @@ watches = [
 		if string(existingConfig) == config {
 			log.Info("Configuration unchanged, skipping atomic rename",
 				zap.String("path", configPath))
-			os.Remove(tempPath) // Clean up temp file
+			_ = os.Remove(tempPath) // Clean up temp file
 			return nil
 		}
 		log.Info("Configuration changed, performing atomic rename",

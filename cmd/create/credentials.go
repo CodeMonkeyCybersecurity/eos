@@ -185,7 +185,7 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 	defer func() {
 		if err := w.Flush(); err != nil {
 			// Best effort - log but don't fail
-			fmt.Fprintf(os.Stderr, "Warning: failed to flush output: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "Warning: failed to flush output: %v\n", err)
 		}
 	}()
 

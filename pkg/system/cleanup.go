@@ -320,7 +320,7 @@ func (pc *PackageCleanup) promptYesNo(prompt string) bool {
 	fmt.Printf("%s (y/n): ", prompt)
 
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"

@@ -359,7 +359,7 @@ func copyFile(src, dst string, preservePermissions bool) error {
 	if preservePermissions {
 		sourceInfo, err := sourceFile.Stat()
 		if err == nil {
-			os.Chmod(dst, sourceInfo.Mode())
+			_ = os.Chmod(dst, sourceInfo.Mode())
 		}
 	}
 
@@ -389,7 +389,7 @@ func calculateFileHash(filePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
@@ -402,7 +402,7 @@ func calculateFileHash(filePath string) (string, error) {
 func createSymlink(target, linkPath string) error {
 	// Remove existing symlink if it exists
 	if _, err := os.Lstat(linkPath); err == nil {
-		os.Remove(linkPath)
+		_ = os.Remove(linkPath)
 	}
 
 	return os.Symlink(target, linkPath)

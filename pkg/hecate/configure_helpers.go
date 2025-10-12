@@ -89,8 +89,8 @@ server {
 	// Test configuration
 	if err := TestNginxConfig(rc); err != nil {
 		// Remove the bad configuration
-		os.Remove(enabledFile)
-		os.Remove(configFile)
+		_ = os.Remove(enabledFile)
+		_ = os.Remove(configFile)
 		return fmt.Errorf("nginx configuration test failed: %w", err)
 	}
 	
@@ -153,7 +153,7 @@ func configureCaddyBackend(rc *eos_io.RuntimeContext, config *BackendConfig) err
 		if err != nil {
 			return fmt.Errorf("failed to open Caddyfile: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		
 		if _, err := f.WriteString("\n" + importLine); err != nil {
 			return fmt.Errorf("failed to update Caddyfile: %w", err)
@@ -196,8 +196,8 @@ func RemoveBackend(rc *eos_io.RuntimeContext, name string) error {
 		configFile := fmt.Sprintf("/etc/nginx/sites-available/%s", name)
 		enabledFile := fmt.Sprintf("/etc/nginx/sites-enabled/%s", name)
 		
-		os.Remove(enabledFile)
-		os.Remove(configFile)
+		_ = os.Remove(enabledFile)
+		_ = os.Remove(configFile)
 		
 		// Reload nginx
 		if err := ReloadNginx(rc); err != nil {
@@ -207,7 +207,7 @@ func RemoveBackend(rc *eos_io.RuntimeContext, name string) error {
 	case "caddy":
 		// Remove caddy configuration
 		configFile := fmt.Sprintf("/etc/caddy/sites/%s.caddy", name)
-		os.Remove(configFile)
+		_ = os.Remove(configFile)
 		
 		// Reload caddy
 		if err := ReloadCaddy(rc); err != nil {

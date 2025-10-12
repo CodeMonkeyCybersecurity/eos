@@ -148,7 +148,7 @@ func checkSystemResources(rc *eos_io.RuntimeContext) error {
 	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
 		return eos_err.NewUserError("no write permission for storage path %s: %v", storagePath, err)
 	}
-	os.Remove(testFile)
+	_ = os.Remove(testFile)
 	
 	return nil
 }

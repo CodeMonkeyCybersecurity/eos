@@ -19,8 +19,8 @@ func TestVaultClientEnvironmentValidation(t *testing.T) {
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
 	defer func() {
-		os.Setenv("VAULT_ADDR", originalAddr)
-		os.Setenv("VAULT_TOKEN", originalToken)
+		_ = os.Setenv("VAULT_ADDR", originalAddr)
+		_ = os.Setenv("VAULT_TOKEN", originalToken)
 	}()
 
 	tests := []struct {
@@ -54,9 +54,9 @@ func TestVaultClientEnvironmentValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup environment
-			os.Setenv("VAULT_ADDR", tt.vaultAddr)
-			os.Setenv("VAULT_TOKEN", tt.vaultToken)
-			os.Setenv("VAULT_SKIP_VERIFY", "true") // Skip TLS in tests
+			_ = os.Setenv("VAULT_ADDR", tt.vaultAddr)
+			_ = os.Setenv("VAULT_TOKEN", tt.vaultToken)
+			_ = os.Setenv("VAULT_SKIP_VERIFY", "true") // Skip TLS in tests
 
 			// Create runtime context
 			rc := &eos_io.RuntimeContext{
@@ -88,14 +88,14 @@ func TestVaultClientCaching(t *testing.T) {
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
 	defer func() {
-		os.Setenv("VAULT_ADDR", originalAddr)
-		os.Setenv("VAULT_TOKEN", originalToken)
+		_ = os.Setenv("VAULT_ADDR", originalAddr)
+		_ = os.Setenv("VAULT_TOKEN", originalToken)
 	}()
 
 	// Setup test environment
-	os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
-	os.Setenv("VAULT_TOKEN", "test-token")
-	os.Setenv("VAULT_SKIP_VERIFY", "true")
+	_ = os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
+	_ = os.Setenv("VAULT_TOKEN", "test-token")
+	_ = os.Setenv("VAULT_SKIP_VERIFY", "true")
 
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
@@ -121,8 +121,8 @@ func TestVaultClientCreation(t *testing.T) {
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
 	defer func() {
-		os.Setenv("VAULT_ADDR", originalAddr)
-		os.Setenv("VAULT_TOKEN", originalToken)
+		_ = os.Setenv("VAULT_ADDR", originalAddr)
+		_ = os.Setenv("VAULT_TOKEN", originalToken)
 	}()
 
 	rc := &eos_io.RuntimeContext{
@@ -132,8 +132,8 @@ func TestVaultClientCreation(t *testing.T) {
 
 	t.Run("environment_requirement", func(t *testing.T) {
 		// Clear environment
-		os.Unsetenv("VAULT_ADDR")
-		os.Unsetenv("VAULT_TOKEN")
+		_ = os.Unsetenv("VAULT_ADDR")
+		_ = os.Unsetenv("VAULT_TOKEN")
 
 		_, err := GetRootClient(rc)
 		assert.Error(t, err)
@@ -141,9 +141,9 @@ func TestVaultClientCreation(t *testing.T) {
 	})
 
 	t.Run("address_validation", func(t *testing.T) {
-		os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
-		os.Setenv("VAULT_TOKEN", "test-token")
-		os.Setenv("VAULT_SKIP_VERIFY", "true")
+		_ = os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
+		_ = os.Setenv("VAULT_TOKEN", "test-token")
+		_ = os.Setenv("VAULT_SKIP_VERIFY", "true")
 
 		// This will fail on connection but should pass address validation
 		_, err := GetRootClient(rc)
@@ -160,14 +160,14 @@ func BenchmarkVaultClientOperations(b *testing.B) {
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
 	defer func() {
-		os.Setenv("VAULT_ADDR", originalAddr)
-		os.Setenv("VAULT_TOKEN", originalToken)
+		_ = os.Setenv("VAULT_ADDR", originalAddr)
+		_ = os.Setenv("VAULT_TOKEN", originalToken)
 	}()
 
 	// Setup test environment
-	os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
-	os.Setenv("VAULT_TOKEN", "test-token")
-	os.Setenv("VAULT_SKIP_VERIFY", "true")
+	_ = os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
+	_ = os.Setenv("VAULT_TOKEN", "test-token")
+	_ = os.Setenv("VAULT_SKIP_VERIFY", "true")
 
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),

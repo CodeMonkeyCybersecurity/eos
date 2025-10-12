@@ -101,7 +101,7 @@ func AcquireBootstrapLock(logger *zap.Logger) (*BootstrapLock, error) {
 	// Write our PID to the lock file
 	lock.Truncate(0)
 	lock.Seek(0, 0)
-	fmt.Fprintf(lock, "%d\n", os.Getpid())
+	_, _ = fmt.Fprintf(lock, "%d\n", os.Getpid())
 	lock.Sync()
 
 	logger.Info("Bootstrap lock acquired", 
@@ -133,7 +133,7 @@ func (bl *BootstrapLock) Release() error {
 	}
 
 	// Try to remove the lock file (best effort)
-	os.Remove("/var/run/eos-bootstrap.lock")
+	_ = os.Remove("/var/run/eos-bootstrap.lock")
 
 	return nil
 }

@@ -14,7 +14,7 @@ import (
 func InitFallback() {
 	path, err := FindWritableLogPath()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, " No writable log path found. Logging to console only.")
+		_, _ = fmt.Fprintln(os.Stderr, " No writable log path found. Logging to console only.")
 
 		cfg := DefaultConsoleEncoderConfig()
 		fallbackCore := zapcore.NewCore(
@@ -37,7 +37,7 @@ func InitFallback() {
 
 	writer, err := GetLogFileWriter(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, " Could not write to log file, falling back to stdout:", err)
+		_, _ = fmt.Fprintln(os.Stderr, " Could not write to log file, falling back to stdout:", err)
 		writer = zapcore.AddSync(os.Stdout)
 	}
 

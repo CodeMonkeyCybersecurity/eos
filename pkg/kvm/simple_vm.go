@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/simple_vm.go
 // Direct virsh-based VM creation using libvirt/virsh
 
@@ -235,7 +237,7 @@ func generateVMName() string {
 			// Extract number
 			suffix := strings.TrimPrefix(base, vmPrefix+"-")
 			var num int
-			fmt.Sscanf(suffix, "%d", &num)
+			_, _ = fmt.Sscanf(suffix, "%d", &num)
 			if num > max {
 				max = num
 			}
@@ -295,7 +297,7 @@ func generateSSHKeyED25519(seedDir, vmName string) (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create private key file: %w", err)
 	}
-	defer privKeyFile.Close()
+	defer func() { _ = privKeyFile.Close() }()
 
 	if err := pem.Encode(privKeyFile, privKeyPEM); err != nil {
 		return "", "", fmt.Errorf("failed to encode private key: %w", err)

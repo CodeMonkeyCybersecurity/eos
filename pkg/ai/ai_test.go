@@ -59,12 +59,12 @@ func TestAIAssistantCreation(t *testing.T) {
 	t.Run("azure_openai_configuration", func(t *testing.T) {
 		// Set up Azure OpenAI environment
 		_ = os.Setenv("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com") // Test setup, error not critical
-		os.Setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4-deployment")
-		os.Setenv("AZURE_OPENAI_API_KEY", "test-azure-key")
+		_ = os.Setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4-deployment")
+		_ = os.Setenv("AZURE_OPENAI_API_KEY", "test-azure-key")
 		defer func() {
-			os.Unsetenv("AZURE_OPENAI_ENDPOINT")
-			os.Unsetenv("AZURE_OPENAI_DEPLOYMENT")
-			os.Unsetenv("AZURE_OPENAI_API_KEY")
+			_ = os.Unsetenv("AZURE_OPENAI_ENDPOINT")
+			_ = os.Unsetenv("AZURE_OPENAI_DEPLOYMENT")
+			_ = os.Unsetenv("AZURE_OPENAI_API_KEY")
 		}()
 
 		// Create temp config file with Azure settings
@@ -176,12 +176,12 @@ func TestAPIKeySecurity(t *testing.T) {
 					"ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "AZURE_OPENAI_API_KEY",
 					"OPENAI_API_KEY", "AI_API_KEY",
 				} {
-					os.Unsetenv(envVar)
+					_ = os.Unsetenv(envVar)
 				}
 
 				// Set test environment variables
 				for key, value := range tc.envVars {
-					os.Setenv(key, value)
+					_ = os.Setenv(key, value)
 				}
 
 				// Create config manager with specific provider
@@ -194,7 +194,7 @@ func TestAPIKeySecurity(t *testing.T) {
 
 				// Cleanup
 				for key := range tc.envVars {
-					os.Unsetenv(key)
+					_ = os.Unsetenv(key)
 				}
 			})
 		}
@@ -252,13 +252,13 @@ func TestAPIKeySecurity(t *testing.T) {
 		originalValues := make(map[string]string)
 		for _, envVar := range envVars {
 			originalValues[envVar] = os.Getenv(envVar)
-			os.Unsetenv(envVar)
+			_ = os.Unsetenv(envVar)
 		}
 		defer func() {
 			// Restore original environment variables
 			for _, envVar := range envVars {
 				if val, exists := originalValues[envVar]; exists && val != "" {
-					os.Setenv(envVar, val)
+					_ = os.Setenv(envVar, val)
 				}
 			}
 		}()
@@ -307,7 +307,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			// Return a mock response
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"choices":[{"message":{"content":"test response"}}],"usage":{"total_tokens":10}}`))
+			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"test response"}}],"usage":{"total_tokens":10}}`))
 		}))
 		defer server.Close()
 
@@ -391,7 +391,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(tc.responseStatus)
-					w.Write([]byte(tc.responseBody))
+					_, _ = w.Write([]byte(tc.responseBody))
 				}))
 				defer server.Close()
 
@@ -426,7 +426,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 				return
 			case <-time.After(100 * time.Millisecond):
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"choices":[{"message":{"content":"test"}}],"usage":{"total_tokens":10}}`))
+				_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"test"}}],"usage":{"total_tokens":10}}`))
 			}
 		}))
 		defer server.Close()
@@ -482,8 +482,8 @@ func TestConfigurationSecurity(t *testing.T) {
 		assert.Equal(t, os.FileMode(0600), mode, "Config file should have 0600 permissions")
 
 		// Cleanup
-		os.Remove(configPath)
-		os.RemoveAll(configManager.configPath)
+		_ = os.Remove(configPath)
+		_ = os.RemoveAll(configManager.configPath)
 	})
 
 	t.Run("config_directory_permissions", func(t *testing.T) {
@@ -504,7 +504,7 @@ func TestConfigurationSecurity(t *testing.T) {
 		assert.Equal(t, os.FileMode(0700), mode, "Config directory should have 0700 permissions")
 
 		// Cleanup
-		os.RemoveAll(configDir)
+		_ = os.RemoveAll(configDir)
 	})
 
 	t.Run("sensitive_data_handling", func(t *testing.T) {

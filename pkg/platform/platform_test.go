@@ -247,7 +247,7 @@ func TestGetShellType(t *testing.T) {
 			defer os.Setenv("SHELL", originalShell)
 
 			// Set test environment
-			os.Setenv("SHELL", tt.Input.shellEnv)
+			_ = os.Setenv("SHELL", tt.Input.shellEnv)
 
 			result := GetShellType()
 			assert.Equal(t, tt.Input.expected, result)
@@ -294,9 +294,9 @@ func TestGetHomeDir(t *testing.T) {
 
 			// Set test environment
 			if tt.Input.homeEnv != "" {
-				os.Setenv("HOME", tt.Input.homeEnv)
+				_ = os.Setenv("HOME", tt.Input.homeEnv)
 			} else {
-				os.Unsetenv("HOME")
+				_ = os.Unsetenv("HOME")
 			}
 
 			result := GetHomeDir()
@@ -387,22 +387,22 @@ func TestGetShellInitFile(t *testing.T) {
 			originalShell := os.Getenv("SHELL")
 			originalOverride := os.Getenv("Eos_SHELL_RC")
 			defer func() {
-				os.Setenv("HOME", originalHome)
-				os.Setenv("SHELL", originalShell)
+				_ = os.Setenv("HOME", originalHome)
+				_ = os.Setenv("SHELL", originalShell)
 				if originalOverride != "" {
-					os.Setenv("Eos_SHELL_RC", originalOverride)
+					_ = os.Setenv("Eos_SHELL_RC", originalOverride)
 				} else {
-					os.Unsetenv("Eos_SHELL_RC")
+					_ = os.Unsetenv("Eos_SHELL_RC")
 				}
 			}()
 
 			// Set test environment
-			os.Setenv("HOME", tt.Input.homeDir)
-			os.Setenv("SHELL", tt.Input.shell)
+			_ = os.Setenv("HOME", tt.Input.homeDir)
+			_ = os.Setenv("SHELL", tt.Input.shell)
 			if tt.Input.override != "" {
-				os.Setenv("Eos_SHELL_RC", tt.Input.override)
+				_ = os.Setenv("Eos_SHELL_RC", tt.Input.override)
 			} else {
-				os.Unsetenv("Eos_SHELL_RC")
+				_ = os.Unsetenv("Eos_SHELL_RC")
 			}
 
 			result := GetShellInitFile()
@@ -452,14 +452,14 @@ func TestSecurityGetShellInitFile(t *testing.T) {
 			originalOverride := os.Getenv("Eos_SHELL_RC")
 			defer func() {
 				if originalOverride != "" {
-					os.Setenv("Eos_SHELL_RC", originalOverride)
+					_ = os.Setenv("Eos_SHELL_RC", originalOverride)
 				} else {
-					os.Unsetenv("Eos_SHELL_RC")
+					_ = os.Unsetenv("Eos_SHELL_RC")
 				}
 			}()
 
 			// Set malicious environment
-			os.Setenv("Eos_SHELL_RC", tt.Input.maliciousOverride)
+			_ = os.Setenv("Eos_SHELL_RC", tt.Input.maliciousOverride)
 
 			// Function should still return the override value
 			// Security should be handled at usage time

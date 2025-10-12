@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/secure_vm.go
 
 package kvm

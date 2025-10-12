@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/cloud_init.go
 
 package kvm

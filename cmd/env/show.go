@@ -233,18 +233,18 @@ func displayDetailedConfiguration(env *environments.Environment) error {
 
 	// Nomad details
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "COMPONENT\tENDPOINT\tREGION/DC\tNAMESPACE\tTLS")
-	fmt.Fprintf(w, "Nomad\t%s\t%s/%s\t%s\t%s\n",
+	_, _ = fmt.Fprintln(w, "COMPONENT\tENDPOINT\tREGION/DC\tNAMESPACE\tTLS")
+	_, _ = fmt.Fprintf(w, "Nomad\t%s\t%s/%s\t%s\t%s\n",
 		env.Infrastructure.Nomad.Address,
 		env.Infrastructure.Nomad.Region,
 		env.Infrastructure.Nomad.Datacenter,
 		env.Infrastructure.Nomad.Namespace,
 		enabledStatus(env.Infrastructure.Nomad.TLS.Enabled))
-	fmt.Fprintf(w, "Consul\t%s\t%s\t-\t%s\n",
+	_, _ = fmt.Fprintf(w, "Consul\t%s\t%s\t-\t%s\n",
 		env.Infrastructure.Consul.Address,
 		env.Infrastructure.Consul.Datacenter,
 		enabledStatus(env.Infrastructure.Consul.TLS.Enabled))
-	fmt.Fprintf(w, "Vault\t%s\t-\t%s\t%s\n",
+	_, _ = fmt.Fprintf(w, "Vault\t%s\t-\t%s\t%s\n",
 		env.Infrastructure.Vault.Address,
 		env.Infrastructure.Vault.Namespace,
 		enabledStatus(env.Infrastructure.Vault.TLS.Enabled))

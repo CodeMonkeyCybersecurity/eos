@@ -87,7 +87,7 @@ WantedBy=multi-user.target`, shared.PortConsul)
 			} else {
 				log.Info("Backup unit file restored successfully")
 				// Reload systemd with restored file
-				execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
+				_ = execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
 			}
 		}
 	}()
@@ -98,7 +98,7 @@ WantedBy=multi-user.target`, shared.PortConsul)
 	if err != nil {
 		return fmt.Errorf("failed to open service file for writing: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if _, err := file.WriteString(serviceContent); err != nil {
 		return fmt.Errorf("failed to write systemd service: %w", err)
@@ -171,13 +171,13 @@ func backupFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }()
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
 		return fmt.Errorf("failed to copy file: %w", err)

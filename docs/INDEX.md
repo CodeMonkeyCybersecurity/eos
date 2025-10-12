@@ -67,16 +67,21 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 - [Backup Example](operations/BACKUP_EXAMPLE.md) - Backup procedure examples
 - [Parser Monitoring](operations/PARSER_MONITORING.md) - Parser monitoring setup
 
+## Modularization & Code Quality
+- [Modularization Plan](CODEBASE-MODULARIZATION-PLAN.md) - Systematic codebase modularization
+- [Modularization Executive Summary](MODULARIZATION-EXECUTIVE-SUMMARY.md) - Progress and results
+- [Next Steps](NEXT-STEPS-MODULARIZATION.md) - Roadmap for remaining work
+- [Documentation Consolidation](DOCUMENTATION-CONSOLIDATION-COMPLETE.md) - Documentation strategy
+
 ## Migration Plans
 - [Script Migration Plan](migration/script-migration-plan.md) - Script migration procedures
-- [Remaining Migration Plan](REMAINING_MIGRATION_PLAN.md) - Future migration opportunities
-
-## Historical Records
-- [Consolidation Completion Report](CONSOLIDATION_COMPLETION_REPORT.md) - Final consolidation status
-- [Phase 10 Migration Completion](PHASE_10_MIGRATION_COMPLETION_REPORT.md) - Final phase completion
 
 ## Archive
-Historical documents and deprecated guides are stored in the [archive](archive/) directory.
+Historical documents and deprecated guides are stored in the [archive](archive/) directory:
+- **Migration Archive**: [archive/migration/](archive/migration/) - SaltStack to HashiCorp migration history
+- **General Archive**: [archive/](archive/) - Other historical documentation
+
+> **📝 Note**: Most implementation documentation now lives inline with the code. See quick reference files in docs/ for pointers to inline documentation.
 
 ---
 

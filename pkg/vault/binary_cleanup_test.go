@@ -66,7 +66,7 @@ func TestVerifyBinaryIntegrity(t *testing.T) {
 			name: "binary_not_executable",
 			setupFunc: func() string {
 				path := filepath.Join(tmpDir, "not_executable")
-				os.WriteFile(path, []byte("#!/bin/sh\necho test"), 0644) // No execute bit
+				_ = os.WriteFile(path, []byte("#!/bin/sh\necho test"), 0644) // No execute bit
 				return path
 			},
 			expectError: true,
@@ -76,7 +76,7 @@ func TestVerifyBinaryIntegrity(t *testing.T) {
 			name: "binary_empty",
 			setupFunc: func() string {
 				path := filepath.Join(tmpDir, "empty")
-				os.WriteFile(path, []byte(""), 0755)
+				_ = os.WriteFile(path, []byte(""), 0755)
 				return path
 			},
 			expectError: true,
@@ -86,7 +86,7 @@ func TestVerifyBinaryIntegrity(t *testing.T) {
 			name: "binary_not_vault",
 			setupFunc: func() string {
 				path := filepath.Join(tmpDir, "fake_vault")
-				os.WriteFile(path, []byte("#!/bin/sh\nexit 1"), 0755)
+				_ = os.WriteFile(path, []byte("#!/bin/sh\nexit 1"), 0755)
 				return path
 			},
 			expectError: true,
@@ -125,15 +125,15 @@ func TestCleanupDuplicateBinaries(t *testing.T) {
 	duplicatePath2 := filepath.Join(tmpDir, "duplicate2", "vault")
 
 	// Setup directories
-	os.MkdirAll(filepath.Dir(primaryPath), 0755)
-	os.MkdirAll(filepath.Dir(duplicatePath1), 0755)
-	os.MkdirAll(filepath.Dir(duplicatePath2), 0755)
+	_ = os.MkdirAll(filepath.Dir(primaryPath), 0755)
+	_ = os.MkdirAll(filepath.Dir(duplicatePath1), 0755)
+	_ = os.MkdirAll(filepath.Dir(duplicatePath2), 0755)
 
 	// Create mock binaries
 	mockBinary := []byte("#!/bin/sh\necho 'Vault v1.0.0'")
-	os.WriteFile(primaryPath, mockBinary, 0755)
-	os.WriteFile(duplicatePath1, mockBinary, 0755)
-	os.WriteFile(duplicatePath2, mockBinary, 0755)
+	_ = os.WriteFile(primaryPath, mockBinary, 0755)
+	_ = os.WriteFile(duplicatePath1, mockBinary, 0755)
+	_ = os.WriteFile(duplicatePath2, mockBinary, 0755)
 
 	// Create test binaries slice
 	binaries := []BinaryLocation{
@@ -180,12 +180,12 @@ func TestRemoveDuplicatesWithSymlinks(t *testing.T) {
 	realPath := filepath.Join(tmpDir, "real", "vault")
 	symlinkPath := filepath.Join(tmpDir, "link", "vault")
 
-	os.MkdirAll(filepath.Dir(realPath), 0755)
-	os.MkdirAll(filepath.Dir(symlinkPath), 0755)
+	_ = os.MkdirAll(filepath.Dir(realPath), 0755)
+	_ = os.MkdirAll(filepath.Dir(symlinkPath), 0755)
 
 	// Create real binary
 	mockBinary := []byte("#!/bin/sh\necho 'Vault v1.0.0'")
-	os.WriteFile(realPath, mockBinary, 0755)
+	_ = os.WriteFile(realPath, mockBinary, 0755)
 
 	// Create symlink
 	if err := os.Symlink(realPath, symlinkPath); err != nil {
@@ -308,7 +308,7 @@ func TestCleanupWithNoMultipleBinaries(t *testing.T) {
 	singlePath := filepath.Join(tmpDir, "vault")
 
 	// Create single binary
-	os.WriteFile(singlePath, []byte("#!/bin/sh\necho test"), 0755)
+	_ = os.WriteFile(singlePath, []byte("#!/bin/sh\necho test"), 0755)
 
 	binaries := []BinaryLocation{
 		{Path: singlePath, Version: "v1.0.0"},

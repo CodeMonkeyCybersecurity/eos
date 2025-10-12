@@ -29,7 +29,7 @@ func PruneVolumes(rc *eos_io.RuntimeContext, config *PruneConfig) (int64, error)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// Build filters
 	pruneFilters := filters.NewArgs()
@@ -101,7 +101,7 @@ func PruneUnusedVolumes(rc *eos_io.RuntimeContext, keepDays int) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// List all volumes
 	volumes, err := cli.VolumeList(rc.Ctx, volume.ListOptions{})
@@ -175,7 +175,7 @@ func PruneVolumesBySize(rc *eos_io.RuntimeContext, maxSize string, excludePatter
 	if err != nil {
 		return fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// INTERVENE
 	// Get volume sizes

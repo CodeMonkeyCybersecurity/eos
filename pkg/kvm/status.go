@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/status.go
 
 package kvm

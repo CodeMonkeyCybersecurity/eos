@@ -457,7 +457,7 @@ func getAvailableDiskSpace(ctx context.Context, path string) (int64, error) {
 
 	// Available space is typically in the 4th field
 	var available int64
-	fmt.Sscanf(fields[3], "%d", &available)
+	_, _ = fmt.Sscanf(fields[3], "%d", &available)
 
 	return available, nil
 }

@@ -105,7 +105,7 @@ func GetUbuntuCodename(rc *eos_io.RuntimeContext) string {
 		}
 	}
 	if codename == "" {
-		fmt.Fprintln(os.Stderr, "Could not determine Ubuntu codename.")
+		_, _ = fmt.Fprintln(os.Stderr, "Could not determine Ubuntu codename.")
 		os.Exit(1)
 	}
 	return codename
@@ -115,7 +115,7 @@ func GetUbuntuCodename(rc *eos_io.RuntimeContext) string {
 func GetArchitecture() string {
 	out, err := exec.Command("dpkg", "--print-architecture").Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to detect architecture: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to detect architecture: %v\n", err)
 		os.Exit(1)
 	}
 	return strings.TrimSpace(string(out))

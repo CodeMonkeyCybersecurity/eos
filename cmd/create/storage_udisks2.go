@@ -115,7 +115,7 @@ func createStorageUdisks2(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	if err != nil {
 		return fmt.Errorf("failed to initialize disk operations: %w", err)
 	}
-	defer diskMgr.Close()
+	defer func() { _ = diskMgr.Close() }()
 
 	// Check device safety if not forced
 	if !udisks2Force {

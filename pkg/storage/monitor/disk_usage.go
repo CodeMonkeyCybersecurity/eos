@@ -200,7 +200,7 @@ func FindLargeDirectories(rc *eos_io.RuntimeContext, path string, topN int) ([]D
 		}
 
 		var size int64
-		fmt.Sscanf(parts[0], "%d", &size)
+		_, _ = fmt.Sscanf(parts[0], "%d", &size)
 		dirPath := strings.Join(parts[1:], " ")
 
 		// Skip the root path itself
@@ -293,7 +293,7 @@ func FindLargeFiles(rc *eos_io.RuntimeContext, path string, minSize int64, topN 
 		}
 
 		var size int64
-		fmt.Sscanf(parts[0], "%d", &size)
+		_, _ = fmt.Sscanf(parts[0], "%d", &size)
 		filePath := parts[1]
 
 		fileInfo := FileInfo{

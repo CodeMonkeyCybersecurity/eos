@@ -42,7 +42,7 @@ func TestSecretManager_Secrets(t *testing.T) {
 	}
 	defer func() {
 		// Clean up test files
-		os.RemoveAll(testDir)
+		_ = os.RemoveAll(testDir)
 	}()
 
 	// Create test postgres secrets file

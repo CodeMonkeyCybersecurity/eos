@@ -248,13 +248,13 @@ func readDiskStats() (map[string]diskStats, error) {
 		}
 
 		var s diskStats
-		fmt.Sscanf(fields[3], "%d", &s.ReadOps)
-		fmt.Sscanf(fields[5], "%d", &s.ReadSectors)
-		fmt.Sscanf(fields[6], "%d", &s.ReadTime)
-		fmt.Sscanf(fields[7], "%d", &s.WriteOps)
-		fmt.Sscanf(fields[9], "%d", &s.WriteSectors)
-		fmt.Sscanf(fields[10], "%d", &s.WriteTime)
-		fmt.Sscanf(fields[12], "%d", &s.IOTime)
+		_, _ = fmt.Sscanf(fields[3], "%d", &s.ReadOps)
+		_, _ = fmt.Sscanf(fields[5], "%d", &s.ReadSectors)
+		_, _ = fmt.Sscanf(fields[6], "%d", &s.ReadTime)
+		_, _ = fmt.Sscanf(fields[7], "%d", &s.WriteOps)
+		_, _ = fmt.Sscanf(fields[9], "%d", &s.WriteSectors)
+		_, _ = fmt.Sscanf(fields[10], "%d", &s.WriteTime)
+		_, _ = fmt.Sscanf(fields[12], "%d", &s.IOTime)
 
 		stats[device] = s
 	}
@@ -316,18 +316,18 @@ func parseIOStatOutput(output, device string) *IOMetrics {
 		}
 
 		// Parse fields
-		fmt.Sscanf(fields[3], "%f", &metric.ReadOpsPerSec)
-		fmt.Sscanf(fields[4], "%f", &metric.WriteOpsPerSec)
+		_, _ = fmt.Sscanf(fields[3], "%f", &metric.ReadOpsPerSec)
+		_, _ = fmt.Sscanf(fields[4], "%f", &metric.WriteOpsPerSec)
 
 		var readKBps, writeKBps float64
-		fmt.Sscanf(fields[5], "%f", &readKBps)
-		fmt.Sscanf(fields[6], "%f", &writeKBps)
+		_, _ = fmt.Sscanf(fields[5], "%f", &readKBps)
+		_, _ = fmt.Sscanf(fields[6], "%f", &writeKBps)
 		metric.ReadBytesPerSec = readKBps * 1024
 		metric.WriteBytesPerSec = writeKBps * 1024
 
-		fmt.Sscanf(fields[9], "%f", &metric.AvgReadLatency)
-		fmt.Sscanf(fields[10], "%f", &metric.AvgWriteLatency)
-		fmt.Sscanf(fields[13], "%f", &metric.Utilization)
+		_, _ = fmt.Sscanf(fields[9], "%f", &metric.AvgReadLatency)
+		_, _ = fmt.Sscanf(fields[10], "%f", &metric.AvgWriteLatency)
+		_, _ = fmt.Sscanf(fields[13], "%f", &metric.Utilization)
 
 		return metric
 	}

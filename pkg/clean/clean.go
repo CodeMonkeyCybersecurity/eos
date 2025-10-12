@@ -67,7 +67,7 @@ func WalkAndSanitize(root string) error {
 			newPath := filepath.Join(dir, newName)
 			fmt.Printf("Renaming: %s → %s\n", oldPath, newPath)
 			if err := os.Rename(oldPath, newPath); err != nil {
-				fmt.Fprintf(os.Stderr, "Rename failed: %v\n", err)
+				_, _ = fmt.Fprintf(os.Stderr, "Rename failed: %v\n", err)
 				return err
 			}
 		}

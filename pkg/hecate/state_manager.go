@@ -72,7 +72,7 @@ func (sm *StateManager) SaveRoute(rc *eos_io.RuntimeContext, route *Route) error
 	})
 	if err != nil {
 		// Try to rollback the route storage
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "consul",
 			Args:    []string{"kv", "delete", key},
 			Capture: true,

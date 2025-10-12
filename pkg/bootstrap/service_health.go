@@ -211,7 +211,7 @@ func checkVaultHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 			return
 		}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Parse response
 	body, err := io.ReadAll(resp.Body)
@@ -285,7 +285,7 @@ func checkConsulHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 			return
 		}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -311,7 +311,7 @@ func checkConsulHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 	req, _ = http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	resp, err = client.Do(req)
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var agentInfo ConsulStatus
 		if json.NewDecoder(resp.Body).Decode(&agentInfo) == nil {
 			health.Version = agentInfo.Config.Version
@@ -354,7 +354,7 @@ func checkNomadHealth(rc *eos_io.RuntimeContext, health *ServiceHealth) {
 		health.Errors = append(health.Errors, fmt.Sprintf("Nomad API unreachable: %v", err))
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

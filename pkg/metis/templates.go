@@ -248,7 +248,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to create Temporal client: %v", err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	w := worker.New(c, config.Temporal.TaskQueue, worker.Options{})
 
@@ -410,7 +410,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to create Temporal client: %v", err)
 	}
-	defer temporalClient.Close()
+	defer func() { _ = temporalClient.Close() }()
 
 	log.Printf("Connected to Temporal at %s", config.Temporal.HostPort)
 

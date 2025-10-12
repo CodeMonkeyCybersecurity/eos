@@ -268,7 +268,7 @@ func (eu *EosUpdater) BuildBinary() (string, error) {
 		eu.logger.Error("Build failed",
 			zap.Error(err),
 			zap.String("output", string(buildOutput)))
-		os.Remove(tempBinary)
+		_ = os.Remove(tempBinary)
 		return "", fmt.Errorf("build failed: %w", err)
 	}
 
@@ -281,7 +281,7 @@ func (eu *EosUpdater) BuildBinary() (string, error) {
 	// Check the file size is reasonable (at least 1MB for a Go binary)
 	const minBinarySize = 1024 * 1024 // 1MB
 	if binaryInfo.Size() < minBinarySize {
-		os.Remove(tempBinary)
+		_ = os.Remove(tempBinary)
 		return "", fmt.Errorf("built binary is too small (%d bytes), expected at least %d bytes",
 			binaryInfo.Size(), minBinarySize)
 	}
@@ -292,7 +292,7 @@ func (eu *EosUpdater) BuildBinary() (string, error) {
 
 	// Set execute permissions
 	if err := os.Chmod(tempBinary, 0755); err != nil {
-		os.Remove(tempBinary)
+		_ = os.Remove(tempBinary)
 		return "", fmt.Errorf("failed to set execute permissions: %w", err)
 	}
 

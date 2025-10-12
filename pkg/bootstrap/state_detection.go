@@ -341,7 +341,7 @@ func checkVaultHealthSimple(rc *eos_io.RuntimeContext) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode == 200 || resp.StatusCode == 429 // 429 = sealed but running
 }
@@ -361,7 +361,7 @@ func checkConsulHealthSimple(rc *eos_io.RuntimeContext) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode == 200
 }
@@ -381,7 +381,7 @@ func checkNomadHealthSimple(rc *eos_io.RuntimeContext) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode == 200
 }

@@ -47,7 +47,7 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 		result.Steps = append(result.Steps, step1)
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		step1.Status = "failed"

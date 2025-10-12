@@ -426,7 +426,7 @@ func verifyQuickstart(rc *eos_io.RuntimeContext, _ *state.StateTracker) error {
 	}
 
 	// Test OSQuery
-	output, err = cmd.ExecString("osqueryi", "--json", "SELECT * FROM system_info;")
+	_, err = cmd.ExecString("osqueryi", "--json", "SELECT * FROM system_info;")
 	if err != nil {
 		logger.Warn("OSQuery test failed", zap.Error(err))
 	} else {

@@ -349,8 +349,8 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 		// Test connection security validation
 
 		// Test TLS configuration security
-		os.Unsetenv("Eos_INSECURE_TLS")
-		os.Unsetenv("GO_ENV")
+		_ = os.Unsetenv("Eos_INSECURE_TLS")
+		_ = os.Unsetenv("GO_ENV")
 
 		tlsConfig := getSecureTLSConfig()
 

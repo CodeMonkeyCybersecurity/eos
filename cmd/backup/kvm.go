@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/backup/kvm.go
 
 package backup

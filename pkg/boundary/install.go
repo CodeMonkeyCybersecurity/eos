@@ -105,7 +105,7 @@ func (bi *BoundaryInstaller) Install() error {
 		bi.config.Version, bi.config.Version, arch)
 
 	tmpDir := "/tmp/boundary-install"
-	os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, 0755)
 	defer os.RemoveAll(tmpDir)
 
 	// Download and extract
@@ -131,9 +131,9 @@ func (bi *BoundaryInstaller) Install() error {
 
 	// Create user and directories
 	bi.runner.Run("useradd", "--system", "--group", "--home", "/var/lib/boundary", "--no-create-home", "--shell", "/bin/false", "boundary")
-	os.MkdirAll("/etc/boundary.d", 0755)
-	os.MkdirAll("/var/lib/boundary", 0700)
-	os.MkdirAll("/var/log/boundary", 0755)
+	_ = os.MkdirAll("/etc/boundary.d", 0755)
+	_ = os.MkdirAll("/var/lib/boundary", 0700)
+	_ = os.MkdirAll("/var/log/boundary", 0755)
 	bi.runner.Run("chown", "-R", "boundary:boundary", "/var/lib/boundary")
 	bi.runner.Run("chown", "-R", "boundary:boundary", "/var/log/boundary")
 
@@ -178,7 +178,7 @@ kms "aead" {
   key = "8fZBjCUfN0TzjEGLQldGY4+iE9AkOvCfjh7+p0GcvFo="
   key_id = "global_recovery"
 }`
-		os.WriteFile("/etc/boundary.d/boundary.hcl", []byte(config), 0640)
+		_ = os.WriteFile("/etc/boundary.d/boundary.hcl", []byte(config), 0640)
 		bi.runner.Run("chown", "boundary:boundary", "/etc/boundary.d/boundary.hcl")
 	}
 
@@ -200,7 +200,7 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target`
 
-	os.WriteFile("/etc/systemd/system/boundary.service", []byte(serviceContent), 0644)
+	_ = os.WriteFile("/etc/systemd/system/boundary.service", []byte(serviceContent), 0644)
 	bi.runner.Run("systemctl", "daemon-reload")
 
 	if !bi.config.DevMode {

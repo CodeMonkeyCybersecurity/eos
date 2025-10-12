@@ -128,11 +128,11 @@ func FuzzRmRF(f *testing.F) {
 
 		// Create a test file/directory to remove
 		if err := os.MkdirAll(filepath.Dir(testPath), 0755); err == nil {
-			os.WriteFile(testPath, []byte("test"), 0644)
+			_ = os.WriteFile(testPath, []byte("test"), 0644)
 		}
 
 		// Test RmRF
-		RmRF(ctx, testPath, "fuzz-test")
+		_ = RmRF(ctx, testPath, "fuzz-test")
 	})
 }
 
@@ -180,7 +180,7 @@ func FuzzCopyFile(f *testing.F) {
 		if err := os.MkdirAll(filepath.Dir(srcPath), 0755); err == nil {
 			if err := os.WriteFile(srcPath, []byte("test content"), 0644); err == nil {
 				// Test copying
-				CopyFile(ctx, srcPath, dstPath, 0644)
+				_ = CopyFile(ctx, srcPath, dstPath, 0644)
 
 				// If copy succeeded, verify destination is within tmpDir
 				if absDst, err := filepath.Abs(dstPath); err == nil {
@@ -278,6 +278,6 @@ func FuzzWriteFile(f *testing.F) {
 		}()
 
 		// Test WriteFile - expect most to fail due to invalid owner, but shouldn't panic
-		WriteFile(ctx, testPath, data, 0644, owner)
+		_ = WriteFile(ctx, testPath, data, 0644, owner)
 	})
 }

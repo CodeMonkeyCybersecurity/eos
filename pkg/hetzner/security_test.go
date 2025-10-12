@@ -24,14 +24,14 @@ func TestAPITokenSecurity(t *testing.T) {
 		defer func() {
 			// Restore original tokens
 			if originalHCloudToken != "" {
-				os.Setenv("HCLOUD_TOKEN", originalHCloudToken)
+				_ = os.Setenv("HCLOUD_TOKEN", originalHCloudToken)
 			} else {
-				os.Unsetenv("HCLOUD_TOKEN")
+				_ = os.Unsetenv("HCLOUD_TOKEN")
 			}
 			if originalHetznerToken != "" {
-				os.Setenv("HETZNER_TOKEN", originalHetznerToken)
+				_ = os.Setenv("HETZNER_TOKEN", originalHetznerToken)
 			} else {
-				os.Unsetenv("HETZNER_TOKEN")
+				_ = os.Unsetenv("HETZNER_TOKEN")
 			}
 		}()
 
@@ -70,7 +70,7 @@ func TestAPITokenSecurity(t *testing.T) {
 		testToken := "secret-hetzner-token-12345678901234567890"
 
 		// Simulate token usage
-		os.Setenv("HCLOUD_TOKEN", testToken)
+		_ = os.Setenv("HCLOUD_TOKEN", testToken)
 		defer os.Unsetenv("HCLOUD_TOKEN")
 
 		// Token should not appear in string representations
@@ -86,12 +86,12 @@ func TestAPITokenSecurity(t *testing.T) {
 		originalToken := os.Getenv("HCLOUD_TOKEN")
 		defer func() {
 			if originalToken != "" {
-				os.Setenv("HCLOUD_TOKEN", originalToken)
+				_ = os.Setenv("HCLOUD_TOKEN", originalToken)
 			}
 		}()
 
 		// Clear token
-		os.Unsetenv("HCLOUD_TOKEN")
+		_ = os.Unsetenv("HCLOUD_TOKEN")
 
 		ctx := context.Background()
 		logger := zap.NewNop()
@@ -181,12 +181,12 @@ func TestSSHKeySecurityValidation(t *testing.T) {
 
 		// Store original token for testing
 		originalToken := os.Getenv("HCLOUD_TOKEN")
-		os.Setenv("HCLOUD_TOKEN", "test-token-for-security-test")
+		_ = os.Setenv("HCLOUD_TOKEN", "test-token-for-security-test")
 		defer func() {
 			if originalToken != "" {
-				os.Setenv("HCLOUD_TOKEN", originalToken)
+				_ = os.Setenv("HCLOUD_TOKEN", originalToken)
 			} else {
-				os.Unsetenv("HCLOUD_TOKEN")
+				_ = os.Unsetenv("HCLOUD_TOKEN")
 			}
 		}()
 
@@ -227,12 +227,12 @@ func TestSSHKeySecurityValidation(t *testing.T) {
 
 		// Store original token for testing
 		originalToken := os.Getenv("HCLOUD_TOKEN")
-		os.Setenv("HCLOUD_TOKEN", "test-token-for-security-test")
+		_ = os.Setenv("HCLOUD_TOKEN", "test-token-for-security-test")
 		defer func() {
 			if originalToken != "" {
-				os.Setenv("HCLOUD_TOKEN", originalToken)
+				_ = os.Setenv("HCLOUD_TOKEN", originalToken)
 			} else {
-				os.Unsetenv("HCLOUD_TOKEN")
+				_ = os.Unsetenv("HCLOUD_TOKEN")
 			}
 		}()
 

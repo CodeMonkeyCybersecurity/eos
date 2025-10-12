@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/update/kvm.go
 package update
 
@@ -199,7 +201,7 @@ func runRestartKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			fmt.Println("⚠ WARNING: Restarting all VMs with drift simultaneously may cause service disruption!")
 			fmt.Print("Continue? (yes/no): ")
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			if response != "yes" && response != "y" {
 				fmt.Println("Cancelled")
 				return nil
@@ -225,7 +227,7 @@ func runRestartKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			fmt.Printf("⚠ WARNING: Restarting %d VMs simultaneously!\n", len(args))
 			fmt.Print("Continue? (yes/no): ")
 			var response string
-			fmt.Scanln(&response)
+			_, _ = fmt.Scanln(&response)
 			if response != "yes" && response != "y" {
 				fmt.Println("Cancelled")
 				return nil

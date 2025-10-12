@@ -58,11 +58,11 @@ func TestGetEnvOrDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up any existing env var
-			os.Unsetenv(tt.envVar)
+			_ = os.Unsetenv(tt.envVar)
 			defer os.Unsetenv(tt.envVar)
 
 			if tt.shouldSetEnv {
-				os.Setenv(tt.envVar, tt.envValue)
+				_ = os.Setenv(tt.envVar, tt.envValue)
 			}
 
 			result := GetEnvOrDefault(tt.envVar, tt.fallback)
@@ -77,8 +77,8 @@ func TestXDGConfigPath(t *testing.T) {
 	origConfigHome := os.Getenv("XDG_CONFIG_HOME")
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("XDG_CONFIG_HOME", origConfigHome)
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("XDG_CONFIG_HOME", origConfigHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
 
 	tests := []struct {
@@ -139,8 +139,8 @@ func TestXDGConfigPath(t *testing.T) {
 				t.Skip("Skipping test on Windows")
 			}
 
-			os.Setenv("XDG_CONFIG_HOME", tt.xdgConfigHome)
-			os.Setenv("HOME", tt.homeDir)
+			_ = os.Setenv("XDG_CONFIG_HOME", tt.xdgConfigHome)
+			_ = os.Setenv("HOME", tt.homeDir)
 
 			result := XDGConfigPath(tt.app, tt.file)
 
@@ -160,8 +160,8 @@ func TestXDGDataPath(t *testing.T) {
 	origDataHome := os.Getenv("XDG_DATA_HOME")
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("XDG_DATA_HOME", origDataHome)
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("XDG_DATA_HOME", origDataHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
 
 	tests := []struct {
@@ -192,8 +192,8 @@ func TestXDGDataPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("XDG_DATA_HOME", tt.xdgDataHome)
-			os.Setenv("HOME", tt.homeDir)
+			_ = os.Setenv("XDG_DATA_HOME", tt.xdgDataHome)
+			_ = os.Setenv("HOME", tt.homeDir)
 
 			result := XDGDataPath(tt.app, tt.file)
 
@@ -213,8 +213,8 @@ func TestXDGCachePath(t *testing.T) {
 	origCacheHome := os.Getenv("XDG_CACHE_HOME")
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("XDG_CACHE_HOME", origCacheHome)
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("XDG_CACHE_HOME", origCacheHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
 
 	tests := []struct {
@@ -245,8 +245,8 @@ func TestXDGCachePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("XDG_CACHE_HOME", tt.xdgCacheHome)
-			os.Setenv("HOME", tt.homeDir)
+			_ = os.Setenv("XDG_CACHE_HOME", tt.xdgCacheHome)
+			_ = os.Setenv("HOME", tt.homeDir)
 
 			result := XDGCachePath(tt.app, tt.file)
 
@@ -266,8 +266,8 @@ func TestXDGStatePath(t *testing.T) {
 	origStateHome := os.Getenv("XDG_STATE_HOME")
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("XDG_STATE_HOME", origStateHome)
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("XDG_STATE_HOME", origStateHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
 
 	tests := []struct {
@@ -298,8 +298,8 @@ func TestXDGStatePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("XDG_STATE_HOME", tt.xdgStateHome)
-			os.Setenv("HOME", tt.homeDir)
+			_ = os.Setenv("XDG_STATE_HOME", tt.xdgStateHome)
+			_ = os.Setenv("HOME", tt.homeDir)
 
 			result := XDGStatePath(tt.app, tt.file)
 
@@ -318,7 +318,7 @@ func TestXDGStatePath(t *testing.T) {
 func TestXDGRuntimePath(t *testing.T) {
 	origRuntimeDir := os.Getenv("XDG_RUNTIME_DIR")
 	defer func() {
-		os.Setenv("XDG_RUNTIME_DIR", origRuntimeDir)
+		_ = os.Setenv("XDG_RUNTIME_DIR", origRuntimeDir)
 	}()
 
 	tests := []struct {
@@ -359,7 +359,7 @@ func TestXDGRuntimePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("XDG_RUNTIME_DIR", tt.xdgRuntimeDir)
+			_ = os.Setenv("XDG_RUNTIME_DIR", tt.xdgRuntimeDir)
 
 			result, err := XDGRuntimePath(tt.app, tt.file)
 
@@ -387,7 +387,7 @@ func TestXDGRuntimePath(t *testing.T) {
 // TestPathTraversalPrevention tests that path traversal is handled safely
 func TestPathTraversalPrevention(t *testing.T) {
 	// Set up test environment
-	os.Setenv("XDG_CONFIG_HOME", "/safe/config")
+	_ = os.Setenv("XDG_CONFIG_HOME", "/safe/config")
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	tests := []struct {
@@ -433,11 +433,11 @@ func TestPathTraversalPrevention(t *testing.T) {
 // TestConcurrentAccess tests thread safety of XDG functions
 func TestConcurrentAccess(t *testing.T) {
 	// Set up environment
-	os.Setenv("XDG_CONFIG_HOME", "/concurrent/config")
-	os.Setenv("HOME", "/home/concurrent")
+	_ = os.Setenv("XDG_CONFIG_HOME", "/concurrent/config")
+	_ = os.Setenv("HOME", "/home/concurrent")
 	defer func() {
-		os.Unsetenv("XDG_CONFIG_HOME")
-		os.Unsetenv("HOME")
+		_ = os.Unsetenv("XDG_CONFIG_HOME")
+		_ = os.Unsetenv("HOME")
 	}()
 
 	const goroutines = 50
@@ -473,7 +473,7 @@ func TestConcurrentAccess(t *testing.T) {
 		for i := 0; i < goroutines; i++ {
 			go func(idx int) {
 				if idx%2 == 0 {
-					os.Setenv("XDG_CONFIG_HOME", "/changed/config")
+					_ = os.Setenv("XDG_CONFIG_HOME", "/changed/config")
 				} else {
 					_ = XDGConfigPath("app", "file")
 				}
@@ -495,8 +495,8 @@ func TestEdgeCases(t *testing.T) {
 	t.Run("missing_home_env", func(t *testing.T) {
 		// Save and unset HOME
 		origHome := os.Getenv("HOME")
-		os.Unsetenv("HOME")
-		os.Unsetenv("XDG_CONFIG_HOME")
+		_ = os.Unsetenv("HOME")
+		_ = os.Unsetenv("XDG_CONFIG_HOME")
 		defer os.Setenv("HOME", origHome)
 
 		// Should still work but with empty base
@@ -505,7 +505,7 @@ func TestEdgeCases(t *testing.T) {
 	})
 
 	t.Run("special_characters_in_paths", func(t *testing.T) {
-		os.Setenv("XDG_CONFIG_HOME", "/config")
+		_ = os.Setenv("XDG_CONFIG_HOME", "/config")
 		defer os.Unsetenv("XDG_CONFIG_HOME")
 
 		specialCases := []struct {
@@ -528,7 +528,7 @@ func TestEdgeCases(t *testing.T) {
 	})
 
 	t.Run("very_long_paths", func(t *testing.T) {
-		os.Setenv("XDG_CONFIG_HOME", "/config")
+		_ = os.Setenv("XDG_CONFIG_HOME", "/config")
 		defer os.Unsetenv("XDG_CONFIG_HOME")
 
 		// Test with very long app and file names
@@ -546,11 +546,11 @@ func TestEdgeCases(t *testing.T) {
 
 // BenchmarkXDGPaths benchmarks path resolution performance
 func BenchmarkXDGPaths(b *testing.B) {
-	os.Setenv("XDG_CONFIG_HOME", "/bench/config")
-	os.Setenv("HOME", "/home/bench")
+	_ = os.Setenv("XDG_CONFIG_HOME", "/bench/config")
+	_ = os.Setenv("HOME", "/home/bench")
 	defer func() {
-		os.Unsetenv("XDG_CONFIG_HOME")
-		os.Unsetenv("HOME")
+		_ = os.Unsetenv("XDG_CONFIG_HOME")
+		_ = os.Unsetenv("HOME")
 	}()
 
 	b.Run("ConfigPath", func(b *testing.B) {
@@ -566,7 +566,7 @@ func BenchmarkXDGPaths(b *testing.B) {
 	})
 
 	b.Run("RuntimePath", func(b *testing.B) {
-		os.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
+		_ = os.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
 		defer os.Unsetenv("XDG_RUNTIME_DIR")
 
 		for i := 0; i < b.N; i++ {

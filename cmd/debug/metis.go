@@ -478,7 +478,7 @@ func checkTemporalServer(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	if err != nil {
 		return fmt.Errorf("temporal server not reachable at %s: %w", config.Temporal.HostPort, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return nil
 }
@@ -766,7 +766,7 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			logger.Warn("Temporal UI not accessible", zap.Error(err))
 			healthDetails = append(healthDetails, fmt.Sprintf("  ⚠ UI endpoint %s: not accessible", healthURL))
 		} else {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			logger.Debug("Temporal UI accessible", zap.Int("status", resp.StatusCode))
 			healthDetails = append(healthDetails, fmt.Sprintf("  ✓ UI endpoint %s: accessible (HTTP %d)", healthURL, resp.StatusCode))
 		}
@@ -780,7 +780,7 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 		client := &http.Client{Timeout: 3 * time.Second}
 		apiResp, err := client.Do(apiReq)
 		if err == nil {
-			defer apiResp.Body.Close()
+			defer func() { _ = apiResp.Body.Close() }()
 			if apiResp.StatusCode == http.StatusOK {
 				logger.Debug("Temporal API health check passed", zap.Int("status", apiResp.StatusCode))
 				healthDetails = append(healthDetails, "  ✓ API health endpoint: OK")
@@ -970,7 +970,7 @@ func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *Metis
 				},
 			}
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			return checkResult{
@@ -1021,7 +1021,7 @@ func checkSystemdServicesWithResult(rc *eos_io.RuntimeContext) checkResult {
 
 		// Check service status
 		statusCmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", svc)
-		output, err := statusCmd.Output()
+		output, _ := statusCmd.Output()
 		status := strings.TrimSpace(string(output))
 
 		logger.Debug("Systemd service status",
@@ -1233,7 +1233,7 @@ func checkWebhookHTTP(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	if err != nil {
 		return fmt.Errorf("webhook health endpoint not responding: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return nil
 }
@@ -1648,7 +1648,7 @@ func sendTestAlert(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to send test alert: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("webhook returned status %d", resp.StatusCode)

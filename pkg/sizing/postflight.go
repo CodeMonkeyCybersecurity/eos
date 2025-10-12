@@ -199,7 +199,7 @@ func collectSystemMetrics(rc *eos_io.RuntimeContext) (*SystemMetrics, error) {
 			parts := strings.Split(output[idx+13:], ",")
 			if len(parts) > 0 {
 				var load float64
-				fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &load)
+				_, _ = fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &load)
 				metrics.LoadAverage = load
 			}
 		}

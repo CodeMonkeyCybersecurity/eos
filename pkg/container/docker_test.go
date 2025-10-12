@@ -19,7 +19,7 @@ func TestMain(m *testing.M) {
 	// Initialize telemetry to prevent nil pointer dereference in tests
 	if err := telemetry.Init("test"); err != nil {
 		// Log to stderr as telemetry is not available
-		fmt.Fprintf(os.Stderr, "Failed to initialize telemetry: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to initialize telemetry: %v\n", err)
 		os.Exit(1)
 	}
 

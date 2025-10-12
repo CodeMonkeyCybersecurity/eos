@@ -534,7 +534,7 @@ func createTempCephFile(content string) (string, error) {
 	_, err = tmpFile.WriteString(content)
 	if err != nil {
 		_ = tmpFile.Close() // Test cleanup, error not critical
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", err
 	}
 
@@ -543,5 +543,5 @@ func createTempCephFile(content string) (string, error) {
 }
 
 func removeTempCephFile(path string) {
-	os.Remove(path)
+	_ = os.Remove(path)
 }

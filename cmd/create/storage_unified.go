@@ -137,7 +137,7 @@ func createStorageUnified(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	if err != nil {
 		return fmt.Errorf("failed to initialize storage manager: %w", err)
 	}
-	defer storageManager.Close()
+	defer func() { _ = storageManager.Close() }()
 
 	// Create storage
 	storageInfo, err := storageManager.CreateStorage(rc.Ctx, request)

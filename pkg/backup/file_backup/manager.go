@@ -433,6 +433,6 @@ func (fbm *FileBackupManager) createSymlink(target, linkPath string) error {
 func (fbm *FileBackupManager) promptForConfirmation(sourcePath, backupPath string) bool {
 	fmt.Printf("Backup %s to %s? [y/N]: ", sourcePath, backupPath)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	return response == "y" || response == "Y" || response == "yes"
 }

@@ -91,7 +91,7 @@ func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 
 	fmt.Print("\nProceed with installation? [Y/n]: ")
 	var proceed string
-	fmt.Scanln(&proceed)
+	_, _ = fmt.Scanln(&proceed)
 	if proceed == "n" || proceed == "N" {
 		return fmt.Errorf("installation cancelled by user")
 	}

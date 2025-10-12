@@ -385,7 +385,7 @@ func TestGetIntegration(t *testing.T) {
 		testutil.AssertEqual(t, value, got1)
 
 		// Try to manipulate the environment during test
-		os.Setenv(envVar, "manipulated-value")
+		_ = os.Setenv(envVar, "manipulated-value")
 
 		// Get should still work with new value
 		got2, err := Get(key)
@@ -467,7 +467,7 @@ func BenchmarkGet(b *testing.B) {
 	// Set up test environment
 	key := "benchmark-key"
 	envVar := "Eos_SECRET_" + sanitizeKey(key)
-	os.Setenv(envVar, "benchmark-value")
+	_ = os.Setenv(envVar, "benchmark-value")
 	defer os.Unsetenv(envVar)
 
 	b.ResetTimer()

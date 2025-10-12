@@ -164,7 +164,7 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 		output, err := execute.Run(rc.Ctx, validateCmd)
 		if err != nil {
 			// Restore backup
-			os.WriteFile(configPath, []byte(original), 0644)
+			_ = os.WriteFile(configPath, []byte(original), 0644)
 			result.Success = false
 			result.Message = "Fixed configuration failed validation, restored backup"
 			result.Details = append(result.Details, "Validation error: "+output)
@@ -262,7 +262,7 @@ func testMinimalConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	
 	if _, err := os.Stat(currentConfig); err == nil {
 		content, _ := os.ReadFile(currentConfig)
-		os.WriteFile(backupPath, content, 0644)
+		_ = os.WriteFile(backupPath, content, 0644)
 		result.Details = append(result.Details, "Backed up current config to: "+backupPath)
 	}
 	
@@ -321,7 +321,7 @@ ports {
 	}
 	
 	// Clean up
-	os.Remove(minimalPath)
+	_ = os.Remove(minimalPath)
 	
 	return result
 }

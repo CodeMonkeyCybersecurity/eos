@@ -310,10 +310,7 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		maxTokens = 4096
 	}
 
-	timeout := time.Duration(config.Timeout) * time.Second
-	if timeout == 0 {
-		timeout = 60 * time.Second
-	}
+	// Note: timeout configuration would be handled by httpclient.Client
 
 	// Create enhanced HTTP client using unified framework
 	client, err := httpclient.MigrateFromLLMClient(apiKey, string(provider))

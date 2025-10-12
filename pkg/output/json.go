@@ -43,7 +43,7 @@ func JSONToFile(filename string, data interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return JSONTo(file, data)
 }

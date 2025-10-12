@@ -27,7 +27,7 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		logger.InitFallback()
 		
 		// Debug logging
-		fmt.Fprintf(os.Stderr, "DEBUG: Wrap() called for command: %s\n", cmd.Name())
+		_, _ = fmt.Fprintf(os.Stderr, "DEBUG: Wrap() called for command: %s\n", cmd.Name())
 		
 		ctx := eos_io.NewContext(context.Background(), cmd.Name())
 		defer ctx.End(&err)
@@ -331,14 +331,14 @@ func sanitizeFlagValues(ctx *eos_io.RuntimeContext, cmd *cobra.Command, sanitize
 
 // startResourceWatchdog initializes resource monitoring for resource-intensive commands
 func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
-	fmt.Fprintf(os.Stderr, "DEBUG: startResourceWatchdog called for command: %s\n", commandName)
+	_, _ = fmt.Fprintf(os.Stderr, "DEBUG: startResourceWatchdog called for command: %s\n", commandName)
 
 	// Commands that should NEVER be monitored
 	// These commands have built-in recursion protection and legitimately spawn multiple processes
 	exemptCommands := []string{"bootstrap", "doctor", "self"}
 	for _, exempt := range exemptCommands {
 		if strings.Contains(commandName, exempt) {
-			fmt.Fprintf(os.Stderr, "DEBUG: Command %s exempt from watchdog (uses built-in recursion protection)\n", commandName)
+			_, _ = fmt.Fprintf(os.Stderr, "DEBUG: Command %s exempt from watchdog (uses built-in recursion protection)\n", commandName)
 			return
 		}
 	}
@@ -357,7 +357,7 @@ func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 	}
 
 	if !shouldMonitor {
-		fmt.Fprintf(os.Stderr, "DEBUG: Command %s doesn't need monitoring, returning\n", commandName)
+		_, _ = fmt.Fprintf(os.Stderr, "DEBUG: Command %s doesn't need monitoring, returning\n", commandName)
 		return
 	}
 	

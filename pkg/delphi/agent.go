@@ -632,8 +632,8 @@ func getDelphiTLSConfig() *tls.Config {
 	// SECURITY P0 #3: Allow insecure TLS only in development/testing environments
 	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
 		// SECURITY WARNING: This disables TLS certificate verification - only use in dev/test!
-		fmt.Fprintf(os.Stderr, "WARNING: TLS certificate verification is DISABLED (Eos_INSECURE_TLS=true or GO_ENV=test)\n")
-		fmt.Fprintf(os.Stderr, "This makes Delphi/Wazuh API connections vulnerable to MITM attacks. DO NOT USE IN PRODUCTION!\n")
+		_, _ = fmt.Fprintf(os.Stderr, "WARNING: TLS certificate verification is DISABLED (Eos_INSECURE_TLS=true or GO_ENV=test)\n")
+		_, _ = fmt.Fprintf(os.Stderr, "This makes Delphi/Wazuh API connections vulnerable to MITM attacks. DO NOT USE IN PRODUCTION!\n")
 		return &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS12,

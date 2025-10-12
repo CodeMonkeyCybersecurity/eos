@@ -110,16 +110,16 @@ func RenderEmail(a Alert) (Rendered, error) {
 func buildMime(from mail.Address, to []mail.Address, subj, txt, html string) []byte {
 	var buf bytes.Buffer
 	boundary := fmt.Sprintf("delphi-%d", time.Now().UnixNano())
-	fmt.Fprintf(&buf, "From: %s\r\n", from.String())
-	fmt.Fprintf(&buf, "To: %s\r\n", to[0].String())
-	fmt.Fprintf(&buf, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subj))
-	fmt.Fprintf(&buf, "MIME-Version: 1.0\r\n")
-	fmt.Fprintf(&buf, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n", boundary)
+	_, _ = fmt.Fprintf(&buf, "From: %s\r\n", from.String())
+	_, _ = fmt.Fprintf(&buf, "To: %s\r\n", to[0].String())
+	_, _ = fmt.Fprintf(&buf, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subj))
+	_, _ = fmt.Fprintf(&buf, "MIME-Version: 1.0\r\n")
+	_, _ = fmt.Fprintf(&buf, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n", boundary)
 
-	fmt.Fprintf(&buf, "--%s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n\r\n", boundary, txt)
+	_, _ = fmt.Fprintf(&buf, "--%s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n\r\n", boundary, txt)
 	if html != "" {
-		fmt.Fprintf(&buf, "--%s\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s\r\n\r\n", boundary, html)
+		_, _ = fmt.Fprintf(&buf, "--%s\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s\r\n\r\n", boundary, html)
 	}
-	fmt.Fprintf(&buf, "--%s--\r\n", boundary)
+	_, _ = fmt.Fprintf(&buf, "--%s--\r\n", boundary)
 	return buf.Bytes()
 }

@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/types.go
 // Common types used across KVM package (no build tags)
 

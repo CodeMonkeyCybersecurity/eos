@@ -270,8 +270,8 @@ func TestVaultSecurity_EnvironmentValidation(t *testing.T) {
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
 	defer func() {
-		os.Setenv("VAULT_ADDR", originalAddr)
-		os.Setenv("VAULT_TOKEN", originalToken)
+		_ = os.Setenv("VAULT_ADDR", originalAddr)
+		_ = os.Setenv("VAULT_TOKEN", originalToken)
 	}()
 
 	tests := []struct {
@@ -332,8 +332,8 @@ func TestVaultSecurity_EnvironmentValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set test environment
-			os.Setenv("VAULT_ADDR", tt.vaultAddr)
-			os.Setenv("VAULT_TOKEN", tt.vaultToken)
+			_ = os.Setenv("VAULT_ADDR", tt.vaultAddr)
+			_ = os.Setenv("VAULT_TOKEN", tt.vaultToken)
 
 			isValid := isValidVaultEnvironment()
 
@@ -541,13 +541,13 @@ func TestVaultClient_SecurityInitialization(t *testing.T) {
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
 	defer func() {
-		os.Setenv("VAULT_ADDR", originalAddr)
-		os.Setenv("VAULT_TOKEN", originalToken)
+		_ = os.Setenv("VAULT_ADDR", originalAddr)
+		_ = os.Setenv("VAULT_TOKEN", originalToken)
 	}()
 
 	t.Run("secure_initialization", func(t *testing.T) {
-		os.Setenv("VAULT_ADDR", "https://vault.example.com:8200")
-		os.Setenv("VAULT_TOKEN", "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx")
+		_ = os.Setenv("VAULT_ADDR", "https://vault.example.com:8200")
+		_ = os.Setenv("VAULT_TOKEN", "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx")
 
 		rc := createTestRuntimeContext(t)
 
@@ -564,8 +564,8 @@ func TestVaultClient_SecurityInitialization(t *testing.T) {
 	})
 
 	t.Run("insecure_environment_rejected", func(t *testing.T) {
-		os.Setenv("VAULT_ADDR", "")
-		os.Setenv("VAULT_TOKEN", "")
+		_ = os.Setenv("VAULT_ADDR", "")
+		_ = os.Setenv("VAULT_TOKEN", "")
 
 		rc := createTestRuntimeContext(t)
 

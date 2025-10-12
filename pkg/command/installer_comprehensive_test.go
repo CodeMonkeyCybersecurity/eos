@@ -533,7 +533,7 @@ func createTempScript(content string) (string, error) {
 	_, err = tmpFile.WriteString(content)
 	if err != nil {
 		tmpFile.Close()
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", err
 	}
 

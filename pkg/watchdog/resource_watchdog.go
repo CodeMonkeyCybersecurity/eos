@@ -320,8 +320,8 @@ func (rw *ResourceWatchdog) handleNormalStatus(status ResourceStatus) {
 
 	f, err := os.OpenFile(normalLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err == nil {
-		defer f.Close()
-		fmt.Fprintf(f, "[%s] CPU: %.1f%%, Mem: %.1f%%, Eos Procs: %d\n",
+		defer func() { _ = f.Close() }()
+		_, _ = fmt.Fprintf(f, "[%s] CPU: %.1f%%, Mem: %.1f%%, Eos Procs: %d\n",
 			time.Now().Format("15:04:05"),
 			status.CPUPercent,
 			status.MemoryPercent,
@@ -342,7 +342,7 @@ func (rw *ResourceWatchdog) handleWarningStatus(status ResourceStatus) {
 	// Capture warning-level traces
 	sessionDir := filepath.Join(rw.traceLogger.baseDir, rw.traceLogger.sessionID)
 	warningDir := filepath.Join(sessionDir, fmt.Sprintf("warning-%03d", rw.warningCount))
-	os.MkdirAll(warningDir, 0755)
+	_ = os.MkdirAll(warningDir, 0755)
 
 	// Write process list
 	rw.writeProcessList(warningDir, status)
@@ -397,7 +397,7 @@ func (rw *ResourceWatchdog) handleCriticalCondition(status ResourceStatus) {
 		// Create critical trace directory
 		sessionDir := filepath.Join(rw.traceLogger.baseDir, rw.traceLogger.sessionID)
 		criticalDir := filepath.Join(sessionDir, "critical")
-		os.MkdirAll(criticalDir, 0755)
+		_ = os.MkdirAll(criticalDir, 0755)
 
 		// Capture everything we can
 		rw.captureCriticalDiagnostics(criticalDir, status)
@@ -457,21 +457,21 @@ func (rw *ResourceWatchdog) captureDetailedProcessInfo(dir string, status Resour
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	fmt.Fprintf(f, "=== Process Information at Critical State ===\n")
-	fmt.Fprintf(f, "Time: %s\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(f, "Total Processes: %d\n", status.TotalProcesses)
-	fmt.Fprintf(f, "EOS Processes: %d\n\n", status.EosProcessCount)
+	_, _ = fmt.Fprintf(f, "=== Process Information at Critical State ===\n")
+	_, _ = fmt.Fprintf(f, "Time: %s\n", time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(f, "Total Processes: %d\n", status.TotalProcesses)
+	_, _ = fmt.Fprintf(f, "EOS Processes: %d\n\n", status.EosProcessCount)
 
 	// For each Eos process, get detailed information
 	for _, proc := range status.TopProcesses {
-		fmt.Fprintf(f, "--- Process PID %d ---\n", proc.PID)
-		fmt.Fprintf(f, "Name: %s\n", proc.Name)
-		fmt.Fprintf(f, "Command: %s\n", proc.CommandLine)
-		fmt.Fprintf(f, "CPU: %.2f%%\n", proc.CPUPercent)
-		fmt.Fprintf(f, "Memory: %.2f MB (RSS)\n", proc.MemoryMB)
-		fmt.Fprintf(f, "Created: %s (%.0f seconds ago)\n",
+		_, _ = fmt.Fprintf(f, "--- Process PID %d ---\n", proc.PID)
+		_, _ = fmt.Fprintf(f, "Name: %s\n", proc.Name)
+		_, _ = fmt.Fprintf(f, "Command: %s\n", proc.CommandLine)
+		_, _ = fmt.Fprintf(f, "CPU: %.2f%%\n", proc.CPUPercent)
+		_, _ = fmt.Fprintf(f, "Memory: %.2f MB (RSS)\n", proc.MemoryMB)
+		_, _ = fmt.Fprintf(f, "Created: %s (%.0f seconds ago)\n",
 			proc.CreateTime.Format(time.RFC3339),
 			time.Since(proc.CreateTime).Seconds())
 
@@ -480,30 +480,30 @@ func (rw *ResourceWatchdog) captureDetailedProcessInfo(dir string, status Resour
 			if ppid, err := p.Ppid(); err == nil {
 				if parent, err := process.NewProcess(ppid); err == nil {
 					if pname, err := parent.Name(); err == nil {
-						fmt.Fprintf(f, "Parent: PID %d (%s)\n", ppid, pname)
+						_, _ = fmt.Fprintf(f, "Parent: PID %d (%s)\n", ppid, pname)
 					}
 				}
 			}
 
 			// Get open files if possible
 			if files, err := p.OpenFiles(); err == nil && len(files) > 0 {
-				fmt.Fprintf(f, "Open Files (%d):\n", len(files))
+				_, _ = fmt.Fprintf(f, "Open Files (%d):\n", len(files))
 				for i, file := range files[:min(10, len(files))] {
-					fmt.Fprintf(f, "  %d. %s\n", i+1, file.Path)
+					_, _ = fmt.Fprintf(f, "  %d. %s\n", i+1, file.Path)
 				}
 			}
 
 			// Get connections
 			if conns, err := p.Connections(); err == nil && len(conns) > 0 {
-				fmt.Fprintf(f, "Connections (%d):\n", len(conns))
+				_, _ = fmt.Fprintf(f, "Connections (%d):\n", len(conns))
 				for i, conn := range conns[:min(5, len(conns))] {
-					fmt.Fprintf(f, "  %d. %s:%d -> %s:%d\n", i+1,
+					_, _ = fmt.Fprintf(f, "  %d. %s:%d -> %s:%d\n", i+1,
 						conn.Laddr.IP, conn.Laddr.Port,
 						conn.Raddr.IP, conn.Raddr.Port)
 				}
 			}
 		}
-		fmt.Fprintf(f, "\n")
+		_, _ = fmt.Fprintf(f, "\n")
 	}
 }
 
@@ -524,7 +524,7 @@ func (rw *ResourceWatchdog) captureSystemCommands(dir string) {
 	for _, cmd := range commands {
 		outputFile := filepath.Join(dir, fmt.Sprintf("%s.txt", cmd.name))
 		output, _ := exec.Command(cmd.cmd[0], cmd.cmd[1:]...).Output()
-		os.WriteFile(outputFile, output, 0644)
+		_ = os.WriteFile(outputFile, output, 0644)
 	}
 }
 
@@ -570,10 +570,10 @@ func (rw *ResourceWatchdog) captureNetworkState(dir string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	fmt.Fprintf(f, "=== Network State ===\n")
-	fmt.Fprintf(f, "Time: %s\n\n", time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(f, "=== Network State ===\n")
+	_, _ = fmt.Fprintf(f, "Time: %s\n\n", time.Now().Format(time.RFC3339))
 
 	// Get all connections
 	connections, err := net.Connections("all")
@@ -584,20 +584,20 @@ func (rw *ResourceWatchdog) captureNetworkState(dir string) {
 			byState[conn.Status]++
 		}
 
-		fmt.Fprintf(f, "Connection Summary:\n")
+		_, _ = fmt.Fprintf(f, "Connection Summary:\n")
 		for state, count := range byState {
-			fmt.Fprintf(f, "  %s: %d\n", state, count)
+			_, _ = fmt.Fprintf(f, "  %s: %d\n", state, count)
 		}
-		fmt.Fprintf(f, "\n")
+		_, _ = fmt.Fprintf(f, "\n")
 
 		// List Eos-related connections
-		fmt.Fprintf(f, "EOS Process Connections:\n")
+		_, _ = fmt.Fprintf(f, "EOS Process Connections:\n")
 		for _, proc := range rw.lastStatus.TopProcesses {
 			if p, err := process.NewProcess(proc.PID); err == nil {
 				if conns, err := p.Connections(); err == nil {
-					fmt.Fprintf(f, "\nPID %d (%s):\n", proc.PID, proc.Name)
+					_, _ = fmt.Fprintf(f, "\nPID %d (%s):\n", proc.PID, proc.Name)
 					for _, conn := range conns {
-						fmt.Fprintf(f, "  %d %s:%d -> %s:%d\n",
+						_, _ = fmt.Fprintf(f, "  %d %s:%d -> %s:%d\n",
 							conn.Type, conn.Laddr.IP, conn.Laddr.Port,
 							conn.Raddr.IP, conn.Raddr.Port)
 					}
@@ -614,10 +614,10 @@ func (rw *ResourceWatchdog) captureDiskUsage(dir string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	fmt.Fprintf(f, "=== Disk Usage ===\n")
-	fmt.Fprintf(f, "Time: %s\n\n", time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(f, "=== Disk Usage ===\n")
+	_, _ = fmt.Fprintf(f, "Time: %s\n\n", time.Now().Format(time.RFC3339))
 
 	// Get disk partitions
 	partitions, err := disk.Partitions(false)
@@ -625,13 +625,13 @@ func (rw *ResourceWatchdog) captureDiskUsage(dir string) {
 		for _, partition := range partitions {
 			usage, err := disk.Usage(partition.Mountpoint)
 			if err == nil {
-				fmt.Fprintf(f, "Mount: %s\n", partition.Mountpoint)
-				fmt.Fprintf(f, "  Device: %s\n", partition.Device)
-				fmt.Fprintf(f, "  Filesystem: %s\n", partition.Fstype)
-				fmt.Fprintf(f, "  Total: %.2f GB\n", float64(usage.Total)/1024/1024/1024)
-				fmt.Fprintf(f, "  Used: %.2f GB (%.1f%%)\n",
+				_, _ = fmt.Fprintf(f, "Mount: %s\n", partition.Mountpoint)
+				_, _ = fmt.Fprintf(f, "  Device: %s\n", partition.Device)
+				_, _ = fmt.Fprintf(f, "  Filesystem: %s\n", partition.Fstype)
+				_, _ = fmt.Fprintf(f, "  Total: %.2f GB\n", float64(usage.Total)/1024/1024/1024)
+				_, _ = fmt.Fprintf(f, "  Used: %.2f GB (%.1f%%)\n",
 					float64(usage.Used)/1024/1024/1024, usage.UsedPercent)
-				fmt.Fprintf(f, "  Free: %.2f GB\n\n", float64(usage.Free)/1024/1024/1024)
+				_, _ = fmt.Fprintf(f, "  Free: %.2f GB\n\n", float64(usage.Free)/1024/1024/1024)
 			}
 		}
 	}
@@ -644,18 +644,18 @@ func (rw *ResourceWatchdog) writeProcessList(dir string, status ResourceStatus) 
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	fmt.Fprintf(f, "=== Process Snapshot ===\n")
-	fmt.Fprintf(f, "Time: %s\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(f, "CPU: %.1f%%, Memory: %.1f%%\n", status.CPUPercent, status.MemoryPercent)
-	fmt.Fprintf(f, "Total Processes: %d, Eos Processes: %d\n\n",
+	_, _ = fmt.Fprintf(f, "=== Process Snapshot ===\n")
+	_, _ = fmt.Fprintf(f, "Time: %s\n", time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(f, "CPU: %.1f%%, Memory: %.1f%%\n", status.CPUPercent, status.MemoryPercent)
+	_, _ = fmt.Fprintf(f, "Total Processes: %d, Eos Processes: %d\n\n",
 		status.TotalProcesses, status.EosProcessCount)
 
 	for i, proc := range status.TopProcesses {
-		fmt.Fprintf(f, "%d. PID %d: %s\n", i+1, proc.PID, proc.Name)
-		fmt.Fprintf(f, "   CPU: %.1f%%, Memory: %.1fMB\n", proc.CPUPercent, proc.MemoryMB)
-		fmt.Fprintf(f, "   Command: %s\n\n", proc.CommandLine)
+		_, _ = fmt.Fprintf(f, "%d. PID %d: %s\n", i+1, proc.PID, proc.Name)
+		_, _ = fmt.Fprintf(f, "   CPU: %.1f%%, Memory: %.1fMB\n", proc.CPUPercent, proc.MemoryMB)
+		_, _ = fmt.Fprintf(f, "   Command: %s\n\n", proc.CommandLine)
 	}
 }
 
@@ -666,27 +666,27 @@ func (rw *ResourceWatchdog) captureSystemInfo(sessionDir string) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	fmt.Fprintf(f, "=== System Information ===\n")
-	fmt.Fprintf(f, "Capture Time: %s\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(f, "Hostname: %s\n", func() string {
+	_, _ = fmt.Fprintf(f, "=== System Information ===\n")
+	_, _ = fmt.Fprintf(f, "Capture Time: %s\n", time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(f, "Hostname: %s\n", func() string {
 		if h, err := os.Hostname(); err == nil {
 			return h
 		}
 		return "unknown"
 	}())
-	fmt.Fprintf(f, "OS: %s %s\n", runtime.GOOS, runtime.GOARCH)
-	fmt.Fprintf(f, "Go Version: %s\n", runtime.Version())
-	fmt.Fprintf(f, "NumCPU: %d\n", runtime.NumCPU())
-	fmt.Fprintf(f, "GOMAXPROCS: %d\n", runtime.GOMAXPROCS(0))
+	_, _ = fmt.Fprintf(f, "OS: %s %s\n", runtime.GOOS, runtime.GOARCH)
+	_, _ = fmt.Fprintf(f, "Go Version: %s\n", runtime.Version())
+	_, _ = fmt.Fprintf(f, "NumCPU: %d\n", runtime.NumCPU())
+	_, _ = fmt.Fprintf(f, "GOMAXPROCS: %d\n", runtime.GOMAXPROCS(0))
 
 	// Memory info
 	if memInfo, err := mem.VirtualMemory(); err == nil {
-		fmt.Fprintf(f, "\nMemory:\n")
-		fmt.Fprintf(f, "  Total: %.2f GB\n", float64(memInfo.Total)/1024/1024/1024)
-		fmt.Fprintf(f, "  Available: %.2f GB\n", float64(memInfo.Available)/1024/1024/1024)
-		fmt.Fprintf(f, "  Used: %.2f GB (%.1f%%)\n",
+		_, _ = fmt.Fprintf(f, "\nMemory:\n")
+		_, _ = fmt.Fprintf(f, "  Total: %.2f GB\n", float64(memInfo.Total)/1024/1024/1024)
+		_, _ = fmt.Fprintf(f, "  Available: %.2f GB\n", float64(memInfo.Available)/1024/1024/1024)
+		_, _ = fmt.Fprintf(f, "  Used: %.2f GB (%.1f%%)\n",
 			float64(memInfo.Used)/1024/1024/1024, memInfo.UsedPercent)
 	}
 }
@@ -734,7 +734,7 @@ func (rw *ResourceWatchdog) captureTrace(status ResourceStatus) {
 	processFile, err := os.Create(fmt.Sprintf("%s/processes.txt", traceDir))
 	if err == nil {
 		for _, p := range status.TopProcesses {
-			fmt.Fprintf(processFile, "PID: %d, Name: %s, CPU: %.2f%%, Mem: %.2fMB, Created: %s, Cmd: %s\n",
+			_, _ = fmt.Fprintf(processFile, "PID: %d, Name: %s, CPU: %.2f%%, Mem: %.2fMB, Created: %s, Cmd: %s\n",
 				p.PID, p.Name, p.CPUPercent, p.MemoryMB, p.CreateTime.Format(time.RFC3339), p.CommandLine)
 		}
 		processFile.Close()
@@ -948,15 +948,15 @@ func (rw *ResourceWatchdog) CapturePanic(panicInfo interface{}) {
 	// Create panic directory
 	sessionDir := filepath.Join(rw.traceLogger.baseDir, rw.traceLogger.sessionID)
 	panicDir := filepath.Join(sessionDir, "panic")
-	os.MkdirAll(panicDir, 0755)
+	_ = os.MkdirAll(panicDir, 0755)
 
 	// Write panic info
 	panicFile := filepath.Join(panicDir, "panic.txt")
 	f, err := os.Create(panicFile)
 	if err == nil {
-		fmt.Fprintf(f, "Panic Time: %s\n", time.Now().Format(time.RFC3339))
-		fmt.Fprintf(f, "Panic Info: %v\n\n", panicInfo)
-		fmt.Fprintf(f, "Stack Trace:\n%s\n", debug.Stack())
+		_, _ = fmt.Fprintf(f, "Panic Time: %s\n", time.Now().Format(time.RFC3339))
+		_, _ = fmt.Fprintf(f, "Panic Info: %v\n\n", panicInfo)
+		_, _ = fmt.Fprintf(f, "Stack Trace:\n%s\n", debug.Stack())
 		f.Close()
 	}
 

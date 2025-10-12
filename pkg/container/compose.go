@@ -79,7 +79,7 @@ func UncommentSegment(segmentComment string) error {
 	}
 	defer func() {
 		if cerr := outputFile.Close(); cerr != nil {
-			fmt.Fprintf(os.Stderr, "failed to close output file: %v\n", cerr)
+			_, _ = fmt.Fprintf(os.Stderr, "failed to close output file: %v\n", cerr)
 		}
 	}()
 

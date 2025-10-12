@@ -351,12 +351,12 @@ func parseSubvolumeListLine(line string) *SubvolumeInfo {
 	for i := 0; i < len(parts)-1; i++ {
 		switch parts[i] {
 		case "ID":
-			fmt.Sscanf(parts[i+1], "%d", &info.ID)
+			_, _ = fmt.Sscanf(parts[i+1], "%d", &info.ID)
 		case "parent":
-			fmt.Sscanf(parts[i+1], "%d", &info.ParentID)
+			_, _ = fmt.Sscanf(parts[i+1], "%d", &info.ParentID)
 		case "top":
 			if i+2 < len(parts) && parts[i+1] == "level" {
-				fmt.Sscanf(parts[i+2], "%d", &info.TopLevel)
+				_, _ = fmt.Sscanf(parts[i+2], "%d", &info.TopLevel)
 			}
 		case "parent_uuid":
 			if parts[i+1] != "-" {

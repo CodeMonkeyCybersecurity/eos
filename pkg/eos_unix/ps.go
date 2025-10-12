@@ -223,11 +223,11 @@ func PrintProcessTable(ctx context.Context, process []ProcessInfo) {
 
 	// Write table header
 	if _, err := fmt.Fprintln(w, "PID\tComm\tState\tName\tUser\tCPU%\tMemory%\tRunning Time"); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing header: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Error writing header: %v\n", err)
 		return
 	}
 	if _, err := fmt.Fprintln(w, "----\t----\t----\t----\t----\t----\t----\t----"); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing header divider: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Error writing header divider: %v\n", err)
 		return
 	}
 
@@ -235,13 +235,13 @@ func PrintProcessTable(ctx context.Context, process []ProcessInfo) {
 	for _, proc := range process {
 		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			proc.PID, proc.Comm, proc.State, proc.Name, proc.User, proc.CPUPercent, proc.MemPercent, proc.RunTime); err != nil {
-			fmt.Fprintf(os.Stderr, "Error writing process info: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "Error writing process info: %v\n", err)
 			return
 		}
 	}
 
 	// Flush the writer and check for errors.
 	if err := w.Flush(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error flushing tabwriter: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Error flushing tabwriter: %v\n", err)
 	}
 }

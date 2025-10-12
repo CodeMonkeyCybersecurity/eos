@@ -33,14 +33,14 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	if version == "" {
 		logger.Info("🔤 terminal prompt: Enter Wazuh version (e.g., 4.10.1)")
 		fmt.Print("Enter Wazuh version (e.g., 4.10.1): ")
-		fmt.Scanln(&version)
+		_, _ = fmt.Scanln(&version)
 	}
 
 	if deployType == "" {
 		logger.Info("🔢 terminal prompt: Deployment type (1 for single-node, 2 for multi-node)")
 		fmt.Print("Deployment type (1 for single-node, 2 for multi-node): ")
 		var choice string
-		fmt.Scanln(&choice)
+		_, _ = fmt.Scanln(&choice)
 		switch choice {
 		case "1":
 			deployType = "single-node"
@@ -54,7 +54,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	if proxyAddress == "" {
 		logger.Info("🌐 terminal prompt: Enter proxy address (or press Enter to skip)")
 		fmt.Print("Enter proxy address (or press Enter to skip): ")
-		fmt.Scanln(&proxyAddress)
+		_, _ = fmt.Scanln(&proxyAddress)
 	}
 
 	// INTERVENE - Deploy Docker configuration
@@ -70,7 +70,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 		logger.Info("❓ terminal prompt: Remove any existing Wazuh installation? [Y/n]")
 		fmt.Print("Remove any existing Wazuh installation? [Y/n]: ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if response != "n" && response != "N" {
 			logger.Info(" Removing existing wazuh-docker directory")
 			if err := exec.Command("rm", "-rf", "wazuh-docker").Run(); err != nil {

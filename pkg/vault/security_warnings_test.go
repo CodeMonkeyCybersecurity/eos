@@ -72,13 +72,13 @@ func TestValidateSecurityPostureWithMockFiles(t *testing.T) {
 
 	// Create mock TLS files
 	tlsDir := filepath.Join(tmpDir, "tls")
-	os.MkdirAll(tlsDir, 0755)
+	_ = os.MkdirAll(tlsDir, 0755)
 
 	certPath := filepath.Join(tlsDir, "vault.crt")
 	keyPath := filepath.Join(tlsDir, "vault.key")
 
 	// Good cert (644)
-	os.WriteFile(certPath, []byte("MOCK CERT"), 0644)
+	_ = os.WriteFile(certPath, []byte("MOCK CERT"), 0644)
 
 	tests := []struct {
 		name        string
@@ -109,7 +109,7 @@ func TestValidateSecurityPostureWithMockFiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create key with specific permissions
-			os.WriteFile(keyPath, []byte("MOCK KEY"), tt.keyPerms)
+			_ = os.WriteFile(keyPath, []byte("MOCK KEY"), tt.keyPerms)
 
 			// Check permissions
 			info, err := os.Stat(keyPath)
@@ -266,7 +266,7 @@ func TestSecurityPostureWithInitFilePresent(t *testing.T) {
 
 	// Create mock vault_init.json
 	initPath := filepath.Join(tmpDir, "vault_init.json")
-	os.WriteFile(initPath, []byte(`{"unseal_keys": ["key1", "key2"]}`), 0600)
+	_ = os.WriteFile(initPath, []byte(`{"unseal_keys": ["key1", "key2"]}`), 0600)
 
 	// In real implementation, we'd inject the path
 	// For now, just test the logic
@@ -283,7 +283,7 @@ func TestSecurityPostureWithInitFilePresent(t *testing.T) {
 	}
 
 	// Clean up
-	os.Remove(initPath)
+	_ = os.Remove(initPath)
 
 	// After deletion, should pass
 	_, err = os.Stat(initPath)

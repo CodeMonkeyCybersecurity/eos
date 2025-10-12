@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/guest_agent.go
 // QEMU Guest Agent management functions
 
@@ -34,7 +36,7 @@ func auditGuestExecChange(vmName, action, method, result string) {
 
 	// Ensure audit log directory exists
 	logDir := "/var/log/eos/audit"
-	os.MkdirAll(logDir, 0755)
+	_ = os.MkdirAll(logDir, 0755)
 
 	// Append to audit log
 	logFile := filepath.Join(logDir, "guest-exec.log")
@@ -48,7 +50,7 @@ func auditGuestExecChange(vmName, action, method, result string) {
 			return
 		}
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	f.WriteString(entry)
 }
@@ -66,7 +68,7 @@ func EnableGuestExec(rc *eos_io.RuntimeContext, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	// Get domain
 	domain, err := conn.LookupDomainByName(vmName)
@@ -359,7 +361,7 @@ func EnableGuestExecBulk(rc *eos_io.RuntimeContext, skipConfirm bool) error {
 	if !skipConfirm {
 		fmt.Print("Enable guest-exec for all these VMs? (yes/no): ")
 		var response string
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 		if response != "yes" && response != "y" {
 			fmt.Println("Cancelled")
 			return nil

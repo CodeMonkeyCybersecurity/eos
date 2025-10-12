@@ -67,8 +67,8 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 		// Test TLS configuration security
 
 		// Test secure TLS configuration
-		os.Unsetenv("Eos_INSECURE_TLS")
-		os.Unsetenv("GO_ENV")
+		_ = os.Unsetenv("Eos_INSECURE_TLS")
+		_ = os.Unsetenv("GO_ENV")
 
 		tlsConfig := getSecureTLSConfig()
 
@@ -340,7 +340,7 @@ func TestConfigurationSecurity(t *testing.T) {
 		}
 
 		for _, envVar := range envVars {
-			os.Unsetenv(envVar)
+			_ = os.Unsetenv(envVar)
 		}
 
 		// Test with no environment variables
@@ -355,9 +355,9 @@ func TestConfigurationSecurity(t *testing.T) {
 		}
 
 		for _, malicious := range maliciousValues {
-			os.Setenv("LDAP_FQDN", malicious)
-			os.Setenv("LDAP_BIND_DN", "cn=admin,dc=example,dc=com")
-			os.Setenv("LDAP_PASSWORD", "password123")
+			_ = os.Setenv("LDAP_FQDN", malicious)
+			_ = os.Setenv("LDAP_BIND_DN", "cn=admin,dc=example,dc=com")
+			_ = os.Setenv("LDAP_PASSWORD", "password123")
 
 			cfg := TryLoadFromEnv()
 			if cfg != nil {
@@ -365,9 +365,9 @@ func TestConfigurationSecurity(t *testing.T) {
 				assert.Equal(t, malicious, cfg.FQDN, "Should store the value without executing commands")
 			}
 
-			os.Unsetenv("LDAP_FQDN")
-			os.Unsetenv("LDAP_BIND_DN")
-			os.Unsetenv("LDAP_PASSWORD")
+			_ = os.Unsetenv("LDAP_FQDN")
+			_ = os.Unsetenv("LDAP_BIND_DN")
+			_ = os.Unsetenv("LDAP_PASSWORD")
 		}
 	})
 
@@ -386,20 +386,20 @@ func TestConfigurationSecurity(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			os.Setenv("LDAP_FQDN", "ldap.example.com")
-			os.Setenv("LDAP_BIND_DN", "cn=admin,dc=example,dc=com")
-			os.Setenv("LDAP_PASSWORD", "password123")
-			os.Setenv("LDAP_PORT", tc.portEnv)
+			_ = os.Setenv("LDAP_FQDN", "ldap.example.com")
+			_ = os.Setenv("LDAP_BIND_DN", "cn=admin,dc=example,dc=com")
+			_ = os.Setenv("LDAP_PASSWORD", "password123")
+			_ = os.Setenv("LDAP_PORT", tc.portEnv)
 
 			cfg := TryLoadFromEnv()
 			require.NotNil(t, cfg, "Should load configuration")
 			assert.Equal(t, tc.expectedPort, cfg.Port, "Port should be validated correctly for input: %s", tc.portEnv)
 
 			// Cleanup
-			os.Unsetenv("LDAP_FQDN")
-			os.Unsetenv("LDAP_BIND_DN")
-			os.Unsetenv("LDAP_PASSWORD")
-			os.Unsetenv("LDAP_PORT")
+			_ = os.Unsetenv("LDAP_FQDN")
+			_ = os.Unsetenv("LDAP_BIND_DN")
+			_ = os.Unsetenv("LDAP_PASSWORD")
+			_ = os.Unsetenv("LDAP_PORT")
 		}
 	})
 }
@@ -451,8 +451,8 @@ func TestNetworkSecurity(t *testing.T) {
 
 	t.Run("tls_cipher_suite_security", func(t *testing.T) {
 		// Test TLS cipher suite security
-		os.Unsetenv("Eos_INSECURE_TLS")
-		os.Unsetenv("GO_ENV")
+		_ = os.Unsetenv("Eos_INSECURE_TLS")
+		_ = os.Unsetenv("GO_ENV")
 
 		tlsConfig := getSecureTLSConfig()
 

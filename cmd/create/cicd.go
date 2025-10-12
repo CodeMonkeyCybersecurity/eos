@@ -366,7 +366,7 @@ func writePipelineConfig(config *cicd.PipelineConfig, filename string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Write a simple configuration placeholder
 	_, err = file.WriteString(fmt.Sprintf("# CI/CD Pipeline Configuration for %s\n", config.AppName))
@@ -451,7 +451,7 @@ func createTerraformMain(filename string, config *cicd.PipelineConfig) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	content := fmt.Sprintf("# Terraform configuration for %s\n# This file manages the infrastructure for the application\n\nterraform {\n  required_version = \">= 1.0\"\n  \n  backend \"consul\" {\n    address = \"%s:%d\"\n    path    = \"terraform/%s/state\"\n    lock    = true\n  }\n}\n\n# Application infrastructure configuration\nvariable \"app_name\" {\n  description = \"Application name\"\n  type        = string\n  default     = \"%s\"\n}\n\nvariable \"environment\" {\n  description = \"Deployment environment\"\n  type        = string\n  default     = \"%s\"\n}\n\nvariable \"domain\" {\n  description = \"Application domain\"\n  type        = string\n  default     = \"%s\"\n}\n", config.AppName, shared.GetInternalHostname(), shared.PortConsul, config.AppName, config.AppName, config.Deployment.Environment, config.Deployment.Domain)
 
@@ -464,7 +464,7 @@ func createNomadJobFile(filename string, config *cicd.PipelineConfig) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	content := fmt.Sprintf("# Nomad job template for %s\n# This file defines the container deployment specification\n\njob \"%s-web\" {\n  datacenters = [\"dc1\"]\n  type = \"service\"\n\n  group \"web\" {\n    count = 1\n\n    network {\n      port \"http\" {\n        to = 80\n      }\n    }\n\n    service {\n      name = \"%s-web\"\n      port = \"http\"\n      \n      tags = [\n        \"hugo\",\n        \"static-site\",\n        \"production\"\n      ]\n      \n      check {\n        type     = \"http\"\n        path     = \"%s\"\n        interval = \"30s\"\n        timeout  = \"5s\"\n      }\n    }\n\n    task \"%s\" {\n      driver = \"docker\"\n      \n      config {\n        image = \"{{ NOMAD_META_docker_image }}\"\n        ports = [\"http\"]\n      }\n      \n      resources {\n        cpu    = %d\n        memory = %d\n      }\n    }\n  }\n}\n", config.AppName, config.AppName, config.AppName, config.Deployment.Health.Path, config.AppName, config.Deployment.Resources.CPU, config.Deployment.Resources.Memory)
 

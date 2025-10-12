@@ -304,20 +304,20 @@ func (nu *NomadUninstaller) Stop() error {
 	}
 
 	// Reset failed state
-	execute.Run(nu.rc.Ctx, execute.Options{
+	_, _ = execute.Run(nu.rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"reset-failed", "nomad.service"},
 		Timeout: 5 * time.Second,
 	})
 
 	// Kill any remaining processes
-	execute.Run(nu.rc.Ctx, execute.Options{
+	_, _ = execute.Run(nu.rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-TERM", "-f", "nomad"},
 		Timeout: 5 * time.Second,
 	})
 	time.Sleep(2 * time.Second)
-	execute.Run(nu.rc.Ctx, execute.Options{
+	_, _ = execute.Run(nu.rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-KILL", "-f", "nomad"},
 		Timeout: 5 * time.Second,
@@ -340,7 +340,7 @@ func (nu *NomadUninstaller) Stop() error {
 	}
 
 	// Reload systemd
-	execute.Run(nu.rc.Ctx, execute.Options{
+	_, _ = execute.Run(nu.rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"daemon-reload"},
 		Timeout: 10 * time.Second,
@@ -361,12 +361,12 @@ func (nu *NomadUninstaller) RemovePackage() error {
 		Timeout: 5 * time.Second,
 	}); err == nil && strings.Contains(output, "nomad") {
 		nu.logger.Info("Removing Nomad via apt")
-		execute.Run(nu.rc.Ctx, execute.Options{
+		_, _ = execute.Run(nu.rc.Ctx, execute.Options{
 			Command: "apt-get",
 			Args:    []string{"remove", "-y", "nomad"},
 			Timeout: 60 * time.Second,
 		})
-		execute.Run(nu.rc.Ctx, execute.Options{
+		_, _ = execute.Run(nu.rc.Ctx, execute.Options{
 			Command: "apt-get",
 			Args:    []string{"purge", "-y", "nomad"},
 			Timeout: 60 * time.Second,
@@ -477,7 +477,7 @@ func (nu *NomadUninstaller) CleanEnvironmentVariables() error {
 			}
 		}
 		if len(filtered) != len(lines) {
-			os.WriteFile("/etc/environment", []byte(strings.Join(filtered, "\n")), 0644)
+			_ = os.WriteFile("/etc/environment", []byte(strings.Join(filtered, "\n")), 0644)
 		}
 	}
 
@@ -485,7 +485,7 @@ func (nu *NomadUninstaller) CleanEnvironmentVariables() error {
 	profileScript := "/etc/profile.d/nomad.sh"
 	if _, err := os.Stat(profileScript); err == nil {
 		nu.logger.Debug("Removing profile script", zap.String("file", profileScript))
-		os.Remove(profileScript)
+		_ = os.Remove(profileScript)
 	}
 
 	return nil
@@ -503,7 +503,7 @@ func (nu *NomadUninstaller) Verify() error {
 	}
 
 	// Check if service still exists
-	execute.Run(nu.rc.Ctx, execute.Options{
+	_, _ = execute.Run(nu.rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"daemon-reload"},
 		Timeout: 5 * time.Second,
@@ -689,13 +689,13 @@ func removeNomadComponents(rc *eos_io.RuntimeContext, state *NomadState, keepDat
 	if state.ServiceExists {
 		logger.Info("Stopping Nomad service")
 		// Stop service
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"stop", "nomad"},
 			Timeout: 30 * time.Second,
 		})
 		// Disable service
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"disable", "nomad"},
 			Timeout: 10 * time.Second,
@@ -704,13 +704,13 @@ func removeNomadComponents(rc *eos_io.RuntimeContext, state *NomadState, keepDat
 
 	// Kill any remaining Nomad processes
 	// TODO: Add graceful shutdown attempt before force kill
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-TERM", "-f", "nomad"},
 		Timeout: 5 * time.Second,
 	})
 	time.Sleep(2 * time.Second)
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-KILL", "-f", "nomad"},
 		Timeout: 5 * time.Second,
@@ -779,7 +779,7 @@ func removeNomadComponents(rc *eos_io.RuntimeContext, state *NomadState, keepDat
 	removeHashiCorpRepo(rc)
 
 	// Reload systemd
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"daemon-reload"},
 		Timeout: 10 * time.Second,
@@ -806,7 +806,7 @@ func verifyNomadRemoval(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Check if service still exists - but first reload systemd to ensure cache is fresh
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"daemon-reload"},
 		Timeout: 5 * time.Second,

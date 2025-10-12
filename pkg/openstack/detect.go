@@ -513,7 +513,7 @@ func getKernelVersion() string {
 func getCPUCores() int {
 	if output, err := exec.Command("nproc").Output(); err == nil {
 		var cores int
-		fmt.Sscanf(string(output), "%d", &cores)
+		_, _ = fmt.Sscanf(string(output), "%d", &cores)
 		return cores
 	}
 	return 0
@@ -528,7 +528,7 @@ func getMemoryGB() int {
 				fields := strings.Fields(line)
 				if len(fields) >= 2 {
 					var memKB int64
-					fmt.Sscanf(fields[1], "%d", &memKB)
+					_, _ = fmt.Sscanf(fields[1], "%d", &memKB)
 					return int(memKB / 1024 / 1024) // Convert KB to GB
 				}
 			}
@@ -546,7 +546,7 @@ func getDiskGB() int {
 			if len(fields) >= 2 {
 				sizeStr := strings.TrimSuffix(fields[1], "G")
 				var size int
-				fmt.Sscanf(sizeStr, "%d", &size)
+				_, _ = fmt.Sscanf(sizeStr, "%d", &size)
 				return size
 			}
 		}

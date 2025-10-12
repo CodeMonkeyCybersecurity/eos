@@ -67,12 +67,12 @@ func (sm *SecretManager) detectBackend() (SecretBackend, error) {
 
 	// Set environment variable for Vault
 	oldVaultAddr := os.Getenv("VAULT_ADDR")
-	os.Setenv("VAULT_ADDR", vaultAddr)
+	_ = os.Setenv("VAULT_ADDR", vaultAddr)
 	defer func() {
 		if oldVaultAddr != "" {
-			os.Setenv("VAULT_ADDR", oldVaultAddr)
+			_ = os.Setenv("VAULT_ADDR", oldVaultAddr)
 		} else {
-			os.Unsetenv("VAULT_ADDR")
+			_ = os.Unsetenv("VAULT_ADDR")
 		}
 	}()
 
@@ -170,12 +170,12 @@ func (sm *SecretManager) getVaultSecret(service, key string) (string, error) {
 
 	// Set environment variable for Vault
 	oldVaultAddr := os.Getenv("VAULT_ADDR")
-	os.Setenv("VAULT_ADDR", vaultAddr)
+	_ = os.Setenv("VAULT_ADDR", vaultAddr)
 	defer func() {
 		if oldVaultAddr != "" {
-			os.Setenv("VAULT_ADDR", oldVaultAddr)
+			_ = os.Setenv("VAULT_ADDR", oldVaultAddr)
 		} else {
-			os.Unsetenv("VAULT_ADDR")
+			_ = os.Unsetenv("VAULT_ADDR")
 		}
 	}()
 

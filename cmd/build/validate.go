@@ -235,13 +235,13 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 		if strict && len(result.Checks) > 0 {
 			fmt.Printf("Detailed Checks:\n")
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "CHECK\tSTATUS\tDESCRIPTION")
+			_, _ = fmt.Fprintln(w, "CHECK\tSTATUS\tDESCRIPTION")
 			for _, check := range result.Checks {
 				status := "PASS"
 				if !check.Passed {
 					status = "FAIL"
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\n", check.Name, status, check.Description)
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", check.Name, status, check.Description)
 			}
 			w.Flush()
 			fmt.Printf("\n")

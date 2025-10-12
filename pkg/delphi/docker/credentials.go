@@ -52,7 +52,7 @@ func RunCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 		if apiPassword == "" {
 			logger.Info("🔐 terminal prompt: Enter new API password")
 			fmt.Print("Enter new API password: ")
-			fmt.Scanln(&apiPassword)
+			_, _ = fmt.Scanln(&apiPassword)
 		}
 	}
 

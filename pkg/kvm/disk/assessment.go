@@ -1,3 +1,5 @@
+//go:build linux
+
 package disk
 
 import (
@@ -33,7 +35,7 @@ func Assess(ctx context.Context, vmName string, change *SizeChange) (*Assessment
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	// Get domain
 	domain, err := conn.LookupDomainByName(vmName)

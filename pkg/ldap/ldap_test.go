@@ -82,12 +82,12 @@ func TestTryLoadFromEnv(t *testing.T) {
 				"LDAP_PASSWORD", "LDAP_USER_BASE", "LDAP_GROUP_BASE",
 				"LDAP_ADMIN_ROLE", "LDAP_READONLY_ROLE",
 			} {
-				os.Unsetenv(envVar)
+				_ = os.Unsetenv(envVar)
 			}
 
 			// Set test environment variables
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				_ = os.Setenv(key, value)
 			}
 
 			cfg := TryLoadFromEnv()
@@ -101,7 +101,7 @@ func TestTryLoadFromEnv(t *testing.T) {
 
 			// Cleanup
 			for key := range tt.envVars {
-				os.Unsetenv(key)
+				_ = os.Unsetenv(key)
 			}
 		})
 	}
@@ -146,12 +146,12 @@ func TestGetSecureTLSConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear environment variables
-			os.Unsetenv("Eos_INSECURE_TLS")
-			os.Unsetenv("GO_ENV")
+			_ = os.Unsetenv("Eos_INSECURE_TLS")
+			_ = os.Unsetenv("GO_ENV")
 
 			// Set test environment variables
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				_ = os.Setenv(key, value)
 			}
 
 			cfg := getSecureTLSConfig()
@@ -166,7 +166,7 @@ func TestGetSecureTLSConfig(t *testing.T) {
 
 			// Cleanup
 			for key := range tt.envVars {
-				os.Unsetenv(key)
+				_ = os.Unsetenv(key)
 			}
 		})
 	}
@@ -341,8 +341,8 @@ func TestLDAPFieldMeta(t *testing.T) {
 
 func TestSecureTLSConfiguration(t *testing.T) {
 	// Test that secure TLS configuration uses appropriate settings
-	os.Unsetenv("Eos_INSECURE_TLS")
-	os.Unsetenv("GO_ENV")
+	_ = os.Unsetenv("Eos_INSECURE_TLS")
+	_ = os.Unsetenv("GO_ENV")
 
 	cfg := getSecureTLSConfig()
 

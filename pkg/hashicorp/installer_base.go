@@ -209,7 +209,7 @@ func (b *BaseInstaller) CleanExistingInstallation(config *InstallConfig) error {
 
 	// Remove systemd service file
 	servicePath := fmt.Sprintf("/etc/systemd/system/%s.service", config.ServiceName)
-	os.Remove(servicePath)
+	_ = os.Remove(servicePath)
 
 	// Reload systemd
 	b.systemd.ReloadDaemon()
@@ -276,7 +276,7 @@ func (b *BaseInstaller) InstallBinary(config *InstallConfig) error {
 
 	// Create symlink for compatibility
 	symlink := fmt.Sprintf("/usr/bin/%s", b.product)
-	os.Remove(symlink) // Remove if exists
+	_ = os.Remove(symlink) // Remove if exists
 	if err := os.Symlink(config.BinaryPath, symlink); err != nil {
 		logger.Warn("Failed to create symlink", zap.Error(err))
 	}
@@ -407,7 +407,7 @@ func (b *BaseInstaller) resolveLatestVersion() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -502,7 +502,7 @@ func (b *BaseInstaller) verifyChecksum(filepath, version string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {

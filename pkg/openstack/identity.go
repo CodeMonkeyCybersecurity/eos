@@ -298,7 +298,7 @@ func createServiceCatalog(rc *eos_io.RuntimeContext, config *Config) error {
 			"--user", svc.name,
 			"admin")
 		addRoleCmd.Env = append(os.Environ(), env...)
-		addRoleCmd.Run()
+		_ = addRoleCmd.Run()
 
 		// Create service
 		createServiceCmd := exec.CommandContext(rc.Ctx, "openstack", "service", "create",
@@ -406,7 +406,7 @@ func createDemoResources(rc *eos_io.RuntimeContext, config *Config, env []string
 		"--user", "demo",
 		"member")
 	addRoleCmd.Env = append(os.Environ(), env...)
-	addRoleCmd.Run()
+	_ = addRoleCmd.Run()
 
 	// Create demo environment file
 	demoEnvContent := fmt.Sprintf(`# Demo user environment

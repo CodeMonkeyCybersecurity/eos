@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/read/kvm.go
 
 package read

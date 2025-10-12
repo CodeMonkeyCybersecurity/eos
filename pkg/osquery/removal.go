@@ -99,14 +99,14 @@ func removeOsqueryComponents(rc *eos_io.RuntimeContext, state *OsqueryState, kee
 		logger.Info("Stopping and disabling osqueryd service")
 		
 		// Stop service
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"stop", "osqueryd"},
 			Timeout: 30 * time.Second,
 		})
 
 		// Disable service
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"disable", "osqueryd"},
 			Timeout: 10 * time.Second,
@@ -115,7 +115,7 @@ func removeOsqueryComponents(rc *eos_io.RuntimeContext, state *OsqueryState, kee
 
 	// Kill any remaining osquery processes
 	logger.Info("Killing any remaining osquery processes")
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-f", "osqueryd"},
 		Timeout: 5 * time.Second,
@@ -130,7 +130,7 @@ func removeOsqueryComponents(rc *eos_io.RuntimeContext, state *OsqueryState, kee
 		
 		// Purge configuration
 		if !keepData {
-			execute.RunSimple(rc.Ctx, "apt-get", "purge", "-y", "osquery")
+			_ = execute.RunSimple(rc.Ctx, "apt-get", "purge", "-y", "osquery")
 		}
 	}
 
@@ -203,11 +203,11 @@ func removeOsqueryComponents(rc *eos_io.RuntimeContext, state *OsqueryState, kee
 	}
 
 	// Reload systemd
-	execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
+	_ = execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
 
 	// Update APT cache
 	logger.Info("Updating APT cache")
-	execute.RunSimple(rc.Ctx, "apt-get", "update")
+	_ = execute.RunSimple(rc.Ctx, "apt-get", "update")
 
 	return nil
 }

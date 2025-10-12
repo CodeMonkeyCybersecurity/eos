@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/list/kvm.go
 // List KVM/QEMU virtual machines with drift detection
 
@@ -318,6 +320,6 @@ func outputJSONKVM(vms []kvm.VMInfo) error {
 
 func outputYAMLKVM(vms []kvm.VMInfo) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(vms)
 }

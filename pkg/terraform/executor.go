@@ -100,7 +100,7 @@ func (e *Executor) InitWorkspace(rc *eos_io.RuntimeContext, component, environme
 
 	// Set environment variables in current process for terraform
 	for k, v := range envVars {
-		os.Setenv(k, v)
+		_ = os.Setenv(k, v)
 	}
 
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -174,7 +174,7 @@ func (e *Executor) Plan(rc *eos_io.RuntimeContext, component, environment string
 
 	// Set environment variables in current process for terraform
 	for k, v := range envVars {
-		os.Setenv(k, v)
+		_ = os.Setenv(k, v)
 	}
 
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -297,7 +297,7 @@ func (e *Executor) Apply(rc *eos_io.RuntimeContext, component, environment strin
 
 	// Set environment variables in current process for terraform
 	for k, v := range envVars {
-		os.Setenv(k, v)
+		_ = os.Setenv(k, v)
 	}
 
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -829,7 +829,7 @@ func (e *Executor) rollbackToSnapshot(rc *eos_io.RuntimeContext, component, envi
 
 	// Set environment variables in current process for terraform
 	for k, v := range envVars {
-		os.Setenv(k, v)
+		_ = os.Setenv(k, v)
 	}
 
 	_, err = execute.Run(rc.Ctx, execute.Options{

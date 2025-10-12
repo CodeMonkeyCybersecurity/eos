@@ -237,7 +237,7 @@ func checkPing(rc *eos_io.RuntimeContext) delphiCheckResult {
 func checkTCPConnection(rc *eos_io.RuntimeContext) delphiCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	target := fmt.Sprintf("%s:%d", delphiMetisIP, delphiMetisPort)
+	target := net.JoinHostPort(delphiMetisIP, fmt.Sprint(delphiMetisPort))
 	conn, err := net.DialTimeout("tcp", target, 3*time.Second)
 
 	if err != nil {
@@ -271,7 +271,7 @@ func checkNetworkLatency(rc *eos_io.RuntimeContext) delphiCheckResult {
 
 	// Measure latency with multiple TCP connections
 	var latencies []time.Duration
-	target := fmt.Sprintf("%s:%d", delphiMetisIP, delphiMetisPort)
+	target := net.JoinHostPort(delphiMetisIP, fmt.Sprint(delphiMetisPort))
 
 	for i := 0; i < 3; i++ {
 		start := time.Now()
@@ -653,9 +653,9 @@ func checkMetisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
 	}
 }
 
-func checkMetisPortListening(rc *eos_io.RuntimeContext) delphiCheckResult {
+func checkMetisPortListening(_ *eos_io.RuntimeContext) delphiCheckResult {
 	// This is similar to TCP connectivity check but provides different context
-	target := fmt.Sprintf("%s:%d", delphiMetisIP, delphiMetisPort)
+	target := net.JoinHostPort(delphiMetisIP, fmt.Sprint(delphiMetisPort))
 	conn, err := net.DialTimeout("tcp", target, 2*time.Second)
 
 	if err != nil {

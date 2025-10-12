@@ -110,11 +110,11 @@ func (rm *RollbackManager) ExecuteRollback(ctx context.Context, plan *RollbackPl
 
 	// Update journal status based on result
 	if err != nil {
-		rm.journal.UpdateStatus(journalID, StatusFailed)
+		_ = rm.journal.UpdateStatus(journalID, StatusFailed)
 		return fmt.Errorf("rollback failed: %w", err)
 	}
 
-	rm.journal.UpdateStatus(journalID, StatusRolledBack)
+	_ = rm.journal.UpdateStatus(journalID, StatusRolledBack)
 	logger.Info("Rollback completed successfully", zap.String("journal_id", journalID))
 	return nil
 }

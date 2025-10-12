@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/inventory.go
 // VM inventory management with drift detection
 
@@ -31,7 +33,7 @@ func ListVMs(rc *eos_io.RuntimeContext) ([]VMInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domains, err := conn.ListAllDomains(0)
 	if err != nil {
@@ -1007,8 +1009,8 @@ func getVMDiskUsagePercent(domain *libvirt.Domain, logger otelzap.LoggerWithCtx)
 	fields := strings.Fields(lines[1])
 	if len(fields) >= 3 {
 		var totalBytes, usedBytes uint64
-		fmt.Sscanf(fields[1], "%d", &totalBytes)
-		fmt.Sscanf(fields[2], "%d", &usedBytes)
+		_, _ = fmt.Sscanf(fields[1], "%d", &totalBytes)
+		_, _ = fmt.Sscanf(fields[2], "%d", &usedBytes)
 
 		if totalBytes > 0 {
 			usedGB := int(usedBytes / (1024 * 1024 * 1024))

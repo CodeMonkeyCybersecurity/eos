@@ -180,7 +180,7 @@ func (lsm *LocalStorageManager) updateFstab(uuid, mountPoint, fsType string, opt
 	if err != nil {
 		return fmt.Errorf("failed to open fstab: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := f.WriteString(fstabEntry); err != nil {
 		return fmt.Errorf("failed to write fstab entry: %w", err)

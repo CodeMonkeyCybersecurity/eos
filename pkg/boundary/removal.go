@@ -84,14 +84,14 @@ func removeBoundaryComponents(rc *eos_io.RuntimeContext, state *BoundaryState, k
 		logger.Info("Stopping and disabling Boundary service")
 
 		// Stop service
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"stop", "boundary"},
 			Timeout: 30 * time.Second,
 		})
 
 		// Disable service
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"disable", "boundary"},
 			Timeout: 10 * time.Second,
@@ -100,7 +100,7 @@ func removeBoundaryComponents(rc *eos_io.RuntimeContext, state *BoundaryState, k
 
 	// Kill any remaining Boundary processes
 	logger.Info("Killing any remaining Boundary processes")
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-f", "boundary"},
 		Timeout: 5 * time.Second,
@@ -153,19 +153,19 @@ func removeBoundaryComponents(rc *eos_io.RuntimeContext, state *BoundaryState, k
 
 	// Remove Boundary user and group
 	logger.Info("Removing Boundary user and group")
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "userdel",
 		Args:    []string{"-r", "boundary"},
 		Timeout: 5 * time.Second,
 	})
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "groupdel",
 		Args:    []string{"boundary"},
 		Timeout: 5 * time.Second,
 	})
 
 	// Reload systemd
-	execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
+	_ = execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
 
 	return nil
 }

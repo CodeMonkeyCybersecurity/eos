@@ -24,7 +24,7 @@ func YAMLToStdout(data interface{}) error {
 // The encoder is properly closed after writing.
 func YAMLTo(w io.Writer, data interface{}) error {
 	encoder := yaml.NewEncoder(w)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 
 	// Set indent to 2 spaces for readability
 	encoder.SetIndent(2)
@@ -39,7 +39,7 @@ func YAMLToFile(filename string, data interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return YAMLTo(file, data)
 }

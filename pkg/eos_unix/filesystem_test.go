@@ -16,7 +16,7 @@ func TestMkdirP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	tests := []struct {
 		name        string
@@ -91,7 +91,7 @@ func TestMkdirP_ErrorCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	t.Run("file exists at path", func(t *testing.T) {
 		// Create a file at the target path
@@ -122,7 +122,7 @@ func TestMkdirP_Concurrency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Test concurrent creation of the same directory
 	targetDir := filepath.Join(tmpDir, "concurrent_dir")

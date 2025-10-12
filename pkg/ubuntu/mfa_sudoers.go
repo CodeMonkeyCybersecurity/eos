@@ -64,7 +64,7 @@ func (m *MFAManager) parseSudoersFile(path string) ([]SudoersEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var entries []SudoersEntry
 	scanner := bufio.NewScanner(file)

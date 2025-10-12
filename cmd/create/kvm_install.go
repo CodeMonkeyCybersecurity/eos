@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/create/kvm_install.go
 
 package create

@@ -143,7 +143,7 @@ func createVMLibvirt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	if err != nil {
 		return fmt.Errorf("failed to initialize libvirt manager: %w", err)
 	}
-	defer libvirtMgr.Close()
+	defer func() { _ = libvirtMgr.Close() }()
 
 	// Ensure storage pool exists
 	if err := ensureStoragePool(rc.Ctx, libvirtMgr, vmStoragePool); err != nil {

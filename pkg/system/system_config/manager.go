@@ -248,7 +248,7 @@ func AppendToFile(filePath, content string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file for append: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	if _, err := file.WriteString(content); err != nil {
 		return fmt.Errorf("failed to append to file: %w", err)

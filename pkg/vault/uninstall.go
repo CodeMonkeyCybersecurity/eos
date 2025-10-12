@@ -450,7 +450,7 @@ func (vu *VaultUninstaller) logStep(stepName string, success bool, err error) {
 		vu.logger.Debug("Failed to write transaction log", zap.Error(fileErr))
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	f.WriteString(logEntry)
 }
 

@@ -18,10 +18,10 @@ func DiskUsageTable(usage []monitor.DiskUsage, showInodes bool) error {
 
 	// INTERVENE - Write main disk usage table
 	// Header
-	fmt.Fprintf(w, "FILESYSTEM\tDEVICE\tSIZE\tUSED\tAVAIL\tUSE%%\tMOUNTED ON\n")
+	_, _ = fmt.Fprintf(w, "FILESYSTEM\tDEVICE\tSIZE\tUSED\tAVAIL\tUSE%%\tMOUNTED ON\n")
 
 	for _, u := range usage {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%.1f%%\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%.1f%%\t%s\n",
 			u.Filesystem,
 			u.Device,
 			utils.FormatBytes(u.TotalSize),
@@ -39,10 +39,10 @@ func DiskUsageTable(usage []monitor.DiskUsage, showInodes bool) error {
 	if showInodes {
 		fmt.Println("\nINODE USAGE:")
 		w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintf(w, "FILESYSTEM\tINODES\tIUSED\tIFREE\tIUSE%%\n")
+		_, _ = fmt.Fprintf(w, "FILESYSTEM\tINODES\tIUSED\tIFREE\tIUSE%%\n")
 
 		for _, u := range usage {
-			fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%.1f%%\n",
+			_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%.1f%%\n",
 				u.Filesystem,
 				u.InodesTotal,
 				u.InodesUsed,

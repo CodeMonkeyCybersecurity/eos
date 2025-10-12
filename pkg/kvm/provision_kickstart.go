@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/provision_kickstart.go
 
 package kvm

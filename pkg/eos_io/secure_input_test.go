@@ -34,7 +34,7 @@ func TestPromptSecurePassword(t *testing.T) {
 				oldStdin := os.Stdin
 				r, w, _ := os.Pipe()
 				os.Stdin = r
-				w.Write([]byte("\n"))
+				_, _ = w.Write([]byte("\n"))
 				w.Close()
 				return func() { os.Stdin = oldStdin }
 			},

@@ -367,7 +367,7 @@ func TestCredentialDirectoryStructure(t *testing.T) {
 		require.NoError(t, err)
 
 		// Save credential
-		os.Setenv("XDG_CONFIG_HOME", parentDir)
+		_ = os.Setenv("XDG_CONFIG_HOME", parentDir)
 		path, err := SaveCredential("app", "user", "pass")
 		assert.NoError(t, err)
 
@@ -388,7 +388,7 @@ func TestErrorScenarios(t *testing.T) {
 		}
 
 		// Try to write to a read-only location
-		os.Setenv("XDG_CONFIG_HOME", "/proc")
+		_ = os.Setenv("XDG_CONFIG_HOME", "/proc")
 		_, err := SaveCredential("app", "user", "pass")
 		assert.Error(t, err)
 		_ = os.Unsetenv("XDG_CONFIG_HOME")

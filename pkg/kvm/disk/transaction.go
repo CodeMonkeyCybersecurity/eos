@@ -19,7 +19,7 @@ type TransactionLog struct {
 // NewTransactionLog creates a new transaction log
 func NewTransactionLog() *TransactionLog {
 	logDir := "/var/log/eos/kvm-disk-transactions"
-	os.MkdirAll(logDir, 0755)
+	_ = os.MkdirAll(logDir, 0755)
 
 	return &TransactionLog{
 		logDir:       logDir,

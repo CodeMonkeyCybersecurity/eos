@@ -201,7 +201,7 @@ func TestAssessConfigFile(t *testing.T) {
 			name: "file_exists_valid_perms",
 			setupFunc: func(tmpDir string) string {
 				path := filepath.Join(tmpDir, "vault.hcl")
-				os.WriteFile(path, []byte("storage \"file\" { path = \"/tmp\" }\n"), 0640)
+				_ = os.WriteFile(path, []byte("storage \"file\" { path = \"/tmp\" }\n"), 0640)
 				return path
 			},
 			expectError: false,
@@ -219,7 +219,7 @@ func TestAssessConfigFile(t *testing.T) {
 			name: "file_empty",
 			setupFunc: func(tmpDir string) string {
 				path := filepath.Join(tmpDir, "empty.hcl")
-				os.WriteFile(path, []byte(""), 0640)
+				_ = os.WriteFile(path, []byte(""), 0640)
 				return path
 			},
 			expectError: true,
@@ -229,7 +229,7 @@ func TestAssessConfigFile(t *testing.T) {
 			name: "file_world_writable",
 			setupFunc: func(tmpDir string) string {
 				path := filepath.Join(tmpDir, "vault.hcl")
-				os.WriteFile(path, []byte("storage \"file\" { path = \"/tmp\" }\n"), 0646)
+				_ = os.WriteFile(path, []byte("storage \"file\" { path = \"/tmp\" }\n"), 0646)
 				return path
 			},
 			expectError: false, // Warning but not error

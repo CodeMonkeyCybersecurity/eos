@@ -102,41 +102,41 @@ func outputTableInfo(logger otelzap.LoggerWithCtx, repo *git_management.GitRepos
 	logger.Info("terminal prompt: =========================")
 
 	// Basic repository info
-	fmt.Fprintf(w, "Repository Path:\t%s\n", repo.Path)
+	_, _ = fmt.Fprintf(w, "Repository Path:\t%s\n", repo.Path)
 
 	// Status information
 	if repo.Status != nil {
-		fmt.Fprintf(w, "Current Branch:\t%s\n", repo.Status.Branch)
-		fmt.Fprintf(w, "Repository Status:\t")
+		_, _ = fmt.Fprintf(w, "Current Branch:\t%s\n", repo.Status.Branch)
+		_, _ = fmt.Fprintf(w, "Repository Status:\t")
 		if repo.Status.IsClean {
-			fmt.Fprintf(w, "Clean\n")
+			_, _ = fmt.Fprintf(w, "Clean\n")
 		} else {
-			fmt.Fprintf(w, "Has Changes\n")
+			_, _ = fmt.Fprintf(w, "Has Changes\n")
 		}
 
 		if repo.Status.LastCommitHash != "" {
-			fmt.Fprintf(w, "Last Commit:\t%s\n", repo.Status.LastCommitHash[:8])
+			_, _ = fmt.Fprintf(w, "Last Commit:\t%s\n", repo.Status.LastCommitHash[:8])
 			if repo.Status.LastCommitDate != "" {
-				fmt.Fprintf(w, "Commit Date:\t%s\n", repo.Status.LastCommitDate)
+				_, _ = fmt.Fprintf(w, "Commit Date:\t%s\n", repo.Status.LastCommitDate)
 			}
 		}
 
 		if repo.Status.AheadCount > 0 || repo.Status.BehindCount > 0 {
-			fmt.Fprintf(w, "Sync Status:\t")
+			_, _ = fmt.Fprintf(w, "Sync Status:\t")
 			if repo.Status.AheadCount > 0 {
-				fmt.Fprintf(w, "%d ahead", repo.Status.AheadCount)
+				_, _ = fmt.Fprintf(w, "%d ahead", repo.Status.AheadCount)
 			}
 			if repo.Status.BehindCount > 0 {
 				if repo.Status.AheadCount > 0 {
-					fmt.Fprintf(w, ", ")
+					_, _ = fmt.Fprintf(w, ", ")
 				}
-				fmt.Fprintf(w, "%d behind", repo.Status.BehindCount)
+				_, _ = fmt.Fprintf(w, "%d behind", repo.Status.BehindCount)
 			}
-			fmt.Fprintf(w, "\n")
+			_, _ = fmt.Fprintf(w, "\n")
 		}
 	}
 
-	fmt.Fprintf(w, "\n")
+	_, _ = fmt.Fprintf(w, "\n")
 
 	// Remote information
 	logger.Info("terminal prompt: Remotes:")

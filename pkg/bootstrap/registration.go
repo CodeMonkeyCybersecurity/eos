@@ -116,7 +116,7 @@ func gatherResources(rc *eos_io.RuntimeContext) (*ResourceInfo, error) {
 		Capture: true,
 	})
 	if err == nil {
-		fmt.Sscanf(output, "%d", &resources.CPUCores)
+		_, _ = fmt.Sscanf(output, "%d", &resources.CPUCores)
 	}
 
 	// Get memory in GB
@@ -127,7 +127,7 @@ func gatherResources(rc *eos_io.RuntimeContext) (*ResourceInfo, error) {
 	})
 	if err == nil {
 		// Parse free output to get total memory
-		fmt.Sscanf(output, "Mem: %d", &resources.MemoryGB)
+		_, _ = fmt.Sscanf(output, "Mem: %d", &resources.MemoryGB)
 	}
 
 	// Get storage capacity
@@ -139,7 +139,7 @@ func gatherResources(rc *eos_io.RuntimeContext) (*ResourceInfo, error) {
 	if err == nil {
 		// Parse df output
 		var total int
-		fmt.Sscanf(output, "%*s %dG", &total)
+		_, _ = fmt.Sscanf(output, "%*s %dG", &total)
 		resources.StorageGB = total
 	}
 
@@ -175,7 +175,7 @@ func generateNodeID(_ string) string {
 	if err != nil {
 		return ""
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String()

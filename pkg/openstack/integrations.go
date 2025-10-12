@@ -152,7 +152,7 @@ func configureConsulIntegration(rc *eos_io.RuntimeContext, config *Config) error
 // verifyVaultConnection checks if Vault is accessible
 func verifyVaultConnection(rc *eos_io.RuntimeContext, config *Config) error {
 	// Set Vault address
-	os.Setenv("VAULT_ADDR", config.VaultAddress)
+	_ = os.Setenv("VAULT_ADDR", config.VaultAddress)
 
 	// Check Vault status
 	statusCmd := exec.CommandContext(rc.Ctx, "vault", "status", "-format=json")
@@ -230,7 +230,7 @@ func storeOpenStackCredentials(rc *eos_io.RuntimeContext, config *Config) error 
 		svcCmd := exec.CommandContext(rc.Ctx, "vault", "kv", "put",
 			fmt.Sprintf("openstack/services/%s", svc), "-")
 		svcCmd.Stdin = strings.NewReader(string(svcJSON))
-		svcCmd.Run()
+		_ = svcCmd.Run()
 	}
 
 	return nil
@@ -301,10 +301,10 @@ path "openstack/metadata/*" {
 		// Create policy in Vault
 		policyCmd := exec.CommandContext(rc.Ctx, "vault", "policy", "write",
 			fmt.Sprintf("openstack-%s", svc), policyFile)
-		policyCmd.Run()
+		_ = policyCmd.Run()
 
 		// Clean up temp file
-		os.Remove(policyFile)
+		_ = os.Remove(policyFile)
 	}
 
 	return nil
@@ -313,7 +313,7 @@ path "openstack/metadata/*" {
 // verifyConsulConnection checks if Consul is accessible
 func verifyConsulConnection(rc *eos_io.RuntimeContext, config *Config) error {
 	// Set Consul address
-	os.Setenv("CONSUL_HTTP_ADDR", config.ConsulAddress)
+	_ = os.Setenv("CONSUL_HTTP_ADDR", config.ConsulAddress)
 
 	// Check Consul status
 	statusCmd := exec.CommandContext(rc.Ctx, "consul", "members")
@@ -463,7 +463,7 @@ func storeConfigInConsul(rc *eos_io.RuntimeContext, config *Config) error {
 	for key, value := range endpoints {
 		putCmd := exec.CommandContext(rc.Ctx, "consul", "kv", "put",
 			fmt.Sprintf("openstack/endpoints/%s", key), value)
-		putCmd.Run()
+		_ = putCmd.Run()
 	}
 
 	// Store service configuration
@@ -481,7 +481,7 @@ func storeConfigInConsul(rc *eos_io.RuntimeContext, config *Config) error {
 	configCmd := exec.CommandContext(rc.Ctx, "consul", "kv", "put",
 		"openstack/config", "-")
 	configCmd.Stdin = strings.NewReader(string(configJSON))
-	configCmd.Run()
+	_ = configCmd.Run()
 
 	return nil
 }
@@ -557,9 +557,9 @@ func applySecurityHardening(rc *eos_io.RuntimeContext, config *Config) error {
 	
 	for _, svc := range unnecessaryServices {
 		disableCmd := exec.CommandContext(rc.Ctx, "systemctl", "disable", svc)
-		disableCmd.Run()
+		_ = disableCmd.Run()
 		stopCmd := exec.CommandContext(rc.Ctx, "systemctl", "stop", svc)
-		stopCmd.Run()
+		_ = stopCmd.Run()
 	}
 
 	// Configure firewall rules
@@ -618,7 +618,7 @@ func configureFirewall(rc *eos_io.RuntimeContext, config *Config) error {
 
 		for _, rule := range rules {
 			allowCmd := exec.CommandContext(rc.Ctx, "ufw", "allow", fmt.Sprintf("%d/tcp", rule.port))
-			allowCmd.Run()
+			_ = allowCmd.Run()
 		}
 
 		// Enable UFW
@@ -645,10 +645,10 @@ func configureMAC(rc *eos_io.RuntimeContext) error {
 		for _, ctx := range contexts {
 			semanageCmd := exec.CommandContext(rc.Ctx, "semanage", "fcontext", "-a", "-t",
 				ctx.context, ctx.path+"(/.*)?")
-			semanageCmd.Run()
+			_ = semanageCmd.Run()
 			
 			restoreconCmd := exec.CommandContext(rc.Ctx, "restorecon", "-R", ctx.path)
-			restoreconCmd.Run()
+			_ = restoreconCmd.Run()
 		}
 	}
 
@@ -658,7 +658,7 @@ func configureMAC(rc *eos_io.RuntimeContext) error {
 		// Ensure they're loaded
 		parserCmd := exec.CommandContext(rc.Ctx, "apparmor_parser", "-r",
 			"/etc/apparmor.d/usr.bin.nova-*")
-		parserCmd.Run()
+		_ = parserCmd.Run()
 	}
 
 	return nil

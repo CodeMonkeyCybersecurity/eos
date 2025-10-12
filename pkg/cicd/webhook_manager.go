@@ -233,7 +233,7 @@ func (wm *WebhookManager) sendWebhook(webhookID string, config *WebhookConfig, u
 			lastErr = err
 			continue
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			wm.logger.Debug("Webhook sent successfully",
@@ -308,7 +308,7 @@ func (wm *WebhookManager) HandleIncomingWebhook(w http.ResponseWriter, r *http.R
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status": "accepted",
 		"id":     event.ID,
 	})
@@ -338,7 +338,7 @@ func (wm *WebhookManager) CreateWebhookServer(addr string) *http.Server {
 	mux.HandleFunc("/webhook", wm.HandleIncomingWebhook)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	return &http.Server{

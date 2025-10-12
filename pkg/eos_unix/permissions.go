@@ -40,7 +40,7 @@ func IsPrivilegedUser(ctx context.Context) bool {
 func EnforceSecretsAccess(ctx context.Context, show bool) bool {
 	if show && !IsPrivilegedUser(ctx) {
 		otelzap.Ctx(ctx).Warn("Non-root user attempted to use --show-secrets")
-		fmt.Fprintln(os.Stderr, " --show-secrets can only be used by root or sudo.")
+		_, _ = fmt.Fprintln(os.Stderr, " --show-secrets can only be used by root or sudo.")
 		return false
 	}
 	return true
@@ -49,7 +49,7 @@ func EnforceSecretsAccess(ctx context.Context, show bool) bool {
 func RequireRoot(ctx context.Context) {
 	if !IsPrivilegedUser(ctx) {
 		zap.L().Error("Root access required")
-		fmt.Fprintln(os.Stderr, " This command must be run as root (try sudo).")
+		_, _ = fmt.Fprintln(os.Stderr, " This command must be run as root (try sudo).")
 		os.Exit(1)
 	}
 }
@@ -80,9 +80,9 @@ func FailIfPermissionDenied(ctx context.Context, action, path string, err error)
 			zap.String("path", path),
 			zap.Error(err),
 		)
-		fmt.Fprintf(os.Stderr, "\n %s requires elevated privileges.\n", action)
-		fmt.Fprintln(os.Stderr, " Try rerunning the command with sudo:")
-		fmt.Fprintf(os.Stderr, "   sudo eos %s\n\n", os.Args[1:])
+		_, _ = fmt.Fprintf(os.Stderr, "\n %s requires elevated privileges.\n", action)
+		_, _ = fmt.Fprintln(os.Stderr, " Try rerunning the command with sudo:")
+		_, _ = fmt.Fprintf(os.Stderr, "   sudo eos %s\n\n", os.Args[1:])
 		os.Exit(1)
 	}
 }

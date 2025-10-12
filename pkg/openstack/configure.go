@@ -282,7 +282,7 @@ local_ip = %s
 
 	// Create symlink for Neutron
 	symlinkPath := "/etc/neutron/plugin.ini"
-	os.Remove(symlinkPath) // Remove if exists
+	_ = os.Remove(symlinkPath) // Remove if exists
 	if err := os.Symlink(configPath, symlinkPath); err != nil {
 		return fmt.Errorf("failed to create ML2 symlink: %w", err)
 	}

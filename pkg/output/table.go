@@ -70,25 +70,25 @@ func (t *TableWriter) Render() error {
 		for _, h := range t.headers {
 			totalWidth += len(h) + 4 // padding
 		}
-		fmt.Fprintln(t.writer, strings.Repeat(t.separator, totalWidth))
+		_, _ = fmt.Fprintln(t.writer, strings.Repeat(t.separator, totalWidth))
 	}
 
 	// Write headers
 	if len(t.headers) > 0 {
-		fmt.Fprintln(t.writer, strings.Join(t.headers, "\t"))
+		_, _ = fmt.Fprintln(t.writer, strings.Join(t.headers, "\t"))
 		if t.showBorder {
 			// Separator line under headers
 			separators := make([]string, len(t.headers))
 			for i, h := range t.headers {
 				separators[i] = strings.Repeat(t.separator, len(h))
 			}
-			fmt.Fprintln(t.writer, strings.Join(separators, "\t"))
+			_, _ = fmt.Fprintln(t.writer, strings.Join(separators, "\t"))
 		}
 	}
 
 	// Write rows
 	for _, row := range t.rows {
-		fmt.Fprintln(t.writer, strings.Join(row, "\t"))
+		_, _ = fmt.Fprintln(t.writer, strings.Join(row, "\t"))
 	}
 
 	return t.writer.Flush()

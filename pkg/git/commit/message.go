@@ -94,10 +94,10 @@ func AnalyzeChanges(status *git.GitStatus, diffStats string) *git.ChangeAnalysis
 			parts := strings.Fields(line)
 			for i, part := range parts {
 				if strings.Contains(part, "insertion") && i > 0 {
-					fmt.Sscanf(parts[i-1], "%d", &analysis.LinesAdded)
+					_, _ = fmt.Sscanf(parts[i-1], "%d", &analysis.LinesAdded)
 				}
 				if strings.Contains(part, "deletion") && i > 0 {
-					fmt.Sscanf(parts[i-1], "%d", &analysis.LinesRemoved)
+					_, _ = fmt.Sscanf(parts[i-1], "%d", &analysis.LinesRemoved)
 				}
 			}
 			break

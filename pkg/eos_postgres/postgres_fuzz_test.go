@@ -339,7 +339,7 @@ func FuzzEnvironmentDSN(f *testing.F) {
 		defer os.Setenv("POSTGRES_DSN", original)
 
 		// Set fuzzed DSN
-		os.Setenv("POSTGRES_DSN", dsn)
+		_ = os.Setenv("POSTGRES_DSN", dsn)
 
 		// Test Connect
 		db, err := Connect()

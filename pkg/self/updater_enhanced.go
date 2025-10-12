@@ -357,7 +357,7 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		eeu.logger.Error("Build failed",
 			zap.Error(err),
 			zap.String("output", string(buildOutput)))
-		os.Remove(tempBinary)
+		_ = os.Remove(tempBinary)
 		return "", fmt.Errorf("build failed: %w", err)
 	}
 
@@ -485,10 +485,10 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 		return fmt.Errorf("failed to create update lock: %w", err)
 	}
 	defer os.Remove(lockFile)
-	defer lock.Close()
+	defer func() { _ = lock.Close() }()
 
 	// Write PID to lock file for debugging
-	fmt.Fprintf(lock, "%d\n", os.Getpid())
+	_, _ = fmt.Fprintf(lock, "%d\n", os.Getpid())
 
 	if eeu.enhancedConfig.AtomicInstall {
 		// Atomic rename (same filesystem)
@@ -506,7 +506,7 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 
 		// Atomic rename - this is the critical operation
 		if err := os.Rename(tempName, eeu.config.BinaryPath); err != nil {
-			os.Remove(tempName) // Cleanup
+			_ = os.Remove(tempName) // Cleanup
 			return fmt.Errorf("atomic rename failed: %w", err)
 		}
 
@@ -581,7 +581,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 
 	// Step 4: Cleanup temp binary
 	if eeu.transaction.TempBinaryPath != "" {
-		os.Remove(eeu.transaction.TempBinaryPath)
+		_ = os.Remove(eeu.transaction.TempBinaryPath)
 	}
 
 	if len(rollbackErrors) > 0 {
@@ -598,7 +598,7 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 
 	// Cleanup temp binary if it still exists
 	if eeu.transaction.TempBinaryPath != "" {
-		os.Remove(eeu.transaction.TempBinaryPath)
+		_ = os.Remove(eeu.transaction.TempBinaryPath)
 	}
 
 	// Cleanup old backups

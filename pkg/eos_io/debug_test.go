@@ -12,13 +12,13 @@ func TestSetDebugMode(t *testing.T) {
 		if originalDebug != "" {
 			_ = os.Setenv("Eos_DEBUG", originalDebug) // Test cleanup, error not critical
 		} else {
-			os.Unsetenv("Eos_DEBUG")
+			_ = os.Unsetenv("Eos_DEBUG")
 		}
 	}()
 
 	t.Run("enables_debug_mode", func(t *testing.T) {
 		// Clear any existing debug setting
-		os.Unsetenv("Eos_DEBUG")
+		_ = os.Unsetenv("Eos_DEBUG")
 
 		// Enable debug
 		SetDebugMode(true)

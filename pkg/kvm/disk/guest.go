@@ -1,3 +1,5 @@
+//go:build linux
+
 package disk
 
 import (
@@ -24,7 +26,7 @@ func (gm *GuestManager) ResizeFilesystem(ctx context.Context, assessment *Assess
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(assessment.VMName)
 	if err != nil {

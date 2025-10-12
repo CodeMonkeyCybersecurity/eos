@@ -68,7 +68,7 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 		result.Steps = append(result.Steps, step2)
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		step2.Status = "failed"
@@ -110,7 +110,7 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 		result.Steps = append(result.Steps, step3)
 		return err
 	}
-	defer resp2.Body.Close()
+	defer func() { _ = resp2.Body.Close() }()
 
 	if resp2.StatusCode != http.StatusOK {
 		step3.Status = "failed"
@@ -129,7 +129,7 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 		result.Steps = append(result.Steps, step3)
 		return err
 	}
-	defer repoFile.Close()
+	defer func() { _ = repoFile.Close() }()
 
 	if _, err := io.Copy(repoFile, resp2.Body); err != nil {
 		step3.Status = "failed"

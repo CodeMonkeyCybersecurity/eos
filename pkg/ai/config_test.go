@@ -125,11 +125,11 @@ malicious_field: !!python/object/apply:os.system ["rm -rf /"]
 		defer func() {
 			// Clean up any files that were actually created
 			for _, file := range createdFiles {
-				os.Remove(file)
+				_ = os.Remove(file)
 				// Also try to remove parent directories if they're empty
 				dir := filepath.Dir(file)
 				for dir != "." && dir != "/" {
-					os.Remove(dir) // Will fail if not empty, which is fine
+					_ = os.Remove(dir) // Will fail if not empty, which is fine
 					dir = filepath.Dir(dir)
 				}
 			}
@@ -180,7 +180,7 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 		}
 
 		// Environment variable should take precedence over config file
-		os.Setenv("ANTHROPIC_API_KEY", "env-var-key")
+		_ = os.Setenv("ANTHROPIC_API_KEY", "env-var-key")
 		defer os.Unsetenv("ANTHROPIC_API_KEY")
 
 		apiKey, err := configManager.GetAPIKey(rc)
@@ -205,11 +205,11 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 			// Clear all environment variables
 			envVars := []string{"ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "AZURE_OPENAI_API_KEY", "OPENAI_API_KEY", "AI_API_KEY"}
 			for _, envVar := range envVars {
-				os.Unsetenv(envVar)
+				_ = os.Unsetenv(envVar)
 			}
 
 			// Set specific environment variable
-			os.Setenv(tc.envVar, tc.envValue)
+			_ = os.Setenv(tc.envVar, tc.envValue)
 
 			configManager := &ConfigManager{
 				configPath: filepath.Join(tempDir, "provider-test-config.yaml"),
@@ -222,7 +222,7 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.envValue, apiKey, "Should use provider-specific environment variable")
 
-			os.Unsetenv(tc.envVar)
+			_ = os.Unsetenv(tc.envVar)
 		}
 	})
 
@@ -230,11 +230,11 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 		// Clear all provider-specific environment variables
 		envVars := []string{"ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "AZURE_OPENAI_API_KEY", "OPENAI_API_KEY"}
 		for _, envVar := range envVars {
-			os.Unsetenv(envVar)
+			_ = os.Unsetenv(envVar)
 		}
 
 		// Set generic AI_API_KEY
-		os.Setenv("AI_API_KEY", "generic-api-key")
+		_ = os.Setenv("AI_API_KEY", "generic-api-key")
 		defer os.Unsetenv("AI_API_KEY")
 
 		configManager := &ConfigManager{
@@ -253,7 +253,7 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 		// Clear all environment variables
 		envVars := []string{"ANTHROPIC_API_KEY", "CLAUDE_API_KEY", "AZURE_OPENAI_API_KEY", "OPENAI_API_KEY", "AI_API_KEY"}
 		for _, envVar := range envVars {
-			os.Unsetenv(envVar)
+			_ = os.Unsetenv(envVar)
 		}
 
 		configManager := &ConfigManager{
@@ -649,11 +649,11 @@ func TestFileSystemSecurity(t *testing.T) {
 		defer func() {
 			// Clean up any files that were actually created
 			for _, file := range createdFiles {
-				os.Remove(file)
+				_ = os.Remove(file)
 				// Also try to remove parent directories if they're empty
 				dir := filepath.Dir(file)
 				for dir != "." && dir != "/" {
-					os.Remove(dir) // Will fail if not empty, which is fine
+					_ = os.Remove(dir) // Will fail if not empty, which is fine
 					dir = filepath.Dir(dir)
 				}
 			}

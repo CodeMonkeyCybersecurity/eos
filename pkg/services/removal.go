@@ -77,14 +77,14 @@ func RemoveService(rc *eos_io.RuntimeContext, config ServiceRemovalConfig, keepD
 
 	// Remove users and groups
 	for _, user := range config.Users {
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "userdel",
 			Args:    []string{"-r", user},
 			Timeout: 5 * time.Second,
 		})
 	}
 	for _, group := range config.Groups {
-		execute.Run(rc.Ctx, execute.Options{
+		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "groupdel",
 			Args:    []string{group},
 			Timeout: 5 * time.Second,
@@ -128,7 +128,7 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 				// Remove trivy binary if installed manually
 				binPaths := []string{"/usr/local/bin/trivy", "/usr/bin/trivy"}
 				for _, path := range binPaths {
-					os.Remove(path)
+					_ = os.Remove(path)
 				}
 				return nil
 			},
@@ -145,7 +145,7 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 			Groups:       []string{"ossec"},
 			CustomCleanup: func(rc *eos_io.RuntimeContext) error {
 				// Remove entire ossec directory
-				os.RemoveAll("/var/ossec")
+				_ = os.RemoveAll("/var/ossec")
 				return nil
 			},
 		},
@@ -172,8 +172,8 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 			Groups:       []string{"grafana"},
 			CustomCleanup: func(rc *eos_io.RuntimeContext) error {
 				// Remove Grafana APT repository
-				os.Remove("/etc/apt/sources.list.d/grafana.list")
-				os.Remove("/usr/share/keyrings/grafana.key")
+				_ = os.Remove("/etc/apt/sources.list.d/grafana.list")
+				_ = os.Remove("/usr/share/keyrings/grafana.key")
 				return nil
 			},
 		},
@@ -220,7 +220,7 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 					}
 				}
 				// Remove binary if installed manually
-				os.Remove("/usr/local/bin/code-server")
+				_ = os.Remove("/usr/local/bin/code-server")
 				return nil
 			},
 		},
@@ -242,14 +242,14 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 			LogDirs:      []string{"/var/log/tailscale"},
 			CustomCleanup: func(rc *eos_io.RuntimeContext) error {
 				// Logout from tailscale before removal
-				execute.Run(rc.Ctx, execute.Options{
+				_, _ = execute.Run(rc.Ctx, execute.Options{
 					Command: "tailscale",
 					Args:    []string{"logout"},
 					Timeout: 10 * time.Second,
 				})
 				// Remove APT repository
-				os.Remove("/etc/apt/sources.list.d/tailscale.list")
-				os.Remove("/usr/share/keyrings/tailscale-archive-keyring.gpg")
+				_ = os.Remove("/etc/apt/sources.list.d/tailscale.list")
+				_ = os.Remove("/usr/share/keyrings/tailscale-archive-keyring.gpg")
 				return nil
 			},
 		},
@@ -272,14 +272,14 @@ func stopAndDisableService(rc *eos_io.RuntimeContext, service string) error {
 	}
 
 	// Stop service
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"stop", service},
 		Timeout: 30 * time.Second,
 	})
 
 	// Disable service
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"disable", service},
 		Timeout: 10 * time.Second,
@@ -291,7 +291,7 @@ func stopAndDisableService(rc *eos_io.RuntimeContext, service string) error {
 
 func killProcess(rc *eos_io.RuntimeContext, process string) {
 	// First try graceful termination
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-TERM", "-f", process},
 		Timeout: 5 * time.Second,
@@ -300,7 +300,7 @@ func killProcess(rc *eos_io.RuntimeContext, process string) {
 	time.Sleep(2 * time.Second)
 	
 	// Force kill if still running
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
 		Args:    []string{"-KILL", "-f", process},
 		Timeout: 5 * time.Second,
@@ -330,7 +330,7 @@ func removePackages(rc *eos_io.RuntimeContext, packages []string) {
 	logger.Info("Removing packages", zap.Strings("packages", installedPackages))
 	
 	args := append([]string{"remove", "--purge", "-y"}, installedPackages...)
-	execute.Run(rc.Ctx, execute.Options{
+	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "apt-get",
 		Args:    args,
 		Timeout: 120 * time.Second,

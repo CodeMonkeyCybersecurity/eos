@@ -28,58 +28,58 @@ func NewTextWriterTo(w io.Writer) *TextWriter {
 // WritePermissionResult writes a permission fix result in text format
 func (tw *TextWriter) WritePermissionResult(result *security_permissions.PermissionFixResult, dryRun bool) error {
 	if dryRun {
-		fmt.Fprintln(tw.writer, "🔒 Security Permissions Check (DRY RUN)")
+		_, _ = fmt.Fprintln(tw.writer, "🔒 Security Permissions Check (DRY RUN)")
 	} else {
-		fmt.Fprintln(tw.writer, "🔒 Security Permissions Fix")
+		_, _ = fmt.Fprintln(tw.writer, "🔒 Security Permissions Fix")
 	}
-	fmt.Fprintln(tw.writer, strings.Repeat("=", 50))
+	_, _ = fmt.Fprintln(tw.writer, strings.Repeat("=", 50))
 
 	for category, scanResult := range result.Results {
-		fmt.Fprintf(tw.writer, "\n %s (%d files checked)\n", strings.ToUpper(category), scanResult.TotalChecks)
+		_, _ = fmt.Fprintf(tw.writer, "\n %s (%d files checked)\n", strings.ToUpper(category), scanResult.TotalChecks)
 
 		for _, check := range scanResult.Checks {
 			if check.Error != "" {
-				fmt.Fprintf(tw.writer, "   ❌ %s: %s\n", check.Rule.Description, check.Error)
+				_, _ = fmt.Fprintf(tw.writer, "   ❌ %s: %s\n", check.Rule.Description, check.Error)
 			} else if check.NeedsChange {
 				if dryRun {
-					fmt.Fprintf(tw.writer, "    %s: %o → %o (would fix)\n",
+					_, _ = fmt.Fprintf(tw.writer, "    %s: %o → %o (would fix)\n",
 						check.Rule.Description, check.CurrentMode, check.ExpectedMode)
 				} else {
-					fmt.Fprintf(tw.writer, "    %s: %o → %o (fixed)\n",
+					_, _ = fmt.Fprintf(tw.writer, "    %s: %o → %o (fixed)\n",
 						check.Rule.Description, check.CurrentMode, check.ExpectedMode)
 				}
 			} else {
-				fmt.Fprintf(tw.writer, "    %s: %o (correct)\n",
+				_, _ = fmt.Fprintf(tw.writer, "    %s: %o (correct)\n",
 					check.Rule.Description, check.CurrentMode)
 			}
 		}
 	}
 
 	// Summary
-	fmt.Fprintln(tw.writer, "\n"+strings.Repeat("=", 50))
-	fmt.Fprintf(tw.writer, " Summary: %d files processed, %d fixed, %d skipped\n",
+	_, _ = fmt.Fprintln(tw.writer, "\n"+strings.Repeat("=", 50))
+	_, _ = fmt.Fprintf(tw.writer, " Summary: %d files processed, %d fixed, %d skipped\n",
 		result.Summary.TotalFiles, result.Summary.FilesFixed, result.Summary.FilesSkipped)
 
 	if len(result.Summary.Errors) > 0 {
-		fmt.Fprintf(tw.writer, "❌ Errors: %d\n", len(result.Summary.Errors))
+		_, _ = fmt.Fprintf(tw.writer, "❌ Errors: %d\n", len(result.Summary.Errors))
 		for _, err := range result.Summary.Errors {
-			fmt.Fprintf(tw.writer, "   • %s\n", err)
+			_, _ = fmt.Fprintf(tw.writer, "   • %s\n", err)
 		}
 	}
 
 	if result.Summary.Success {
 		if dryRun && result.Summary.FilesFixed > 0 {
-			fmt.Fprintln(tw.writer, " Run without --dry-run to apply changes")
+			_, _ = fmt.Fprintln(tw.writer, " Run without --dry-run to apply changes")
 		} else if !dryRun {
-			fmt.Fprintln(tw.writer, " Permission fixes completed successfully")
+			_, _ = fmt.Fprintln(tw.writer, " Permission fixes completed successfully")
 		} else {
-			fmt.Fprintln(tw.writer, " All permissions are correctly configured")
+			_, _ = fmt.Fprintln(tw.writer, " All permissions are correctly configured")
 		}
-		fmt.Fprintln(tw.writer, strings.Repeat("=", 50))
+		_, _ = fmt.Fprintln(tw.writer, strings.Repeat("=", 50))
 		return nil
 	} else {
-		fmt.Fprintln(tw.writer, "❌ Permission operation completed with errors")
-		fmt.Fprintln(tw.writer, strings.Repeat("=", 50))
+		_, _ = fmt.Fprintln(tw.writer, "❌ Permission operation completed with errors")
+		_, _ = fmt.Fprintln(tw.writer, strings.Repeat("=", 50))
 		return fmt.Errorf("permission operation failed")
 	}
 }

@@ -1,3 +1,5 @@
+//go:build linux
+
 // pkg/kvm/libvirt.go
 // Libvirt Go bindings helper functions to replace virsh commands
 
@@ -15,7 +17,7 @@ func SetLibvirtDefaultNetworkAutostart() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	network, err := conn.LookupNetworkByName("default")
 	if err != nil {
@@ -49,7 +51,7 @@ func DestroyDomain(ctx context.Context, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -79,7 +81,7 @@ func UndefineDomain(ctx context.Context, vmName string, removeStorage bool) erro
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -108,7 +110,7 @@ func GetDomainState(ctx context.Context, vmName string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -130,7 +132,7 @@ func StartDomain(ctx context.Context, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -161,7 +163,7 @@ func ShutdownDomain(ctx context.Context, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -183,7 +185,7 @@ func SetDomainAutostart(ctx context.Context, vmName string, autostart bool) erro
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -204,7 +206,7 @@ func ListAllDomains(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domains, err := conn.ListAllDomains(0)
 	if err != nil {
@@ -229,7 +231,7 @@ func GetDomainInfo(ctx context.Context, vmName string) (map[string]interface{}, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {

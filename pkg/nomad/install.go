@@ -117,7 +117,7 @@ func (ni *NomadInstaller) Install() error {
 		ni.config.Version, ni.config.Version, arch)
 
 	tmpDir := "/tmp/nomad-install"
-	os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, 0755)
 	defer os.RemoveAll(tmpDir)
 
 	if err := ni.runner.Run("wget", "-O", tmpDir+"/nomad.zip", downloadURL); err != nil {
@@ -141,9 +141,9 @@ func (ni *NomadInstaller) Install() error {
 
 	// Create user and directories
 	ni.runner.Run("useradd", "--system", "--group", "--home", "/var/lib/nomad", "--no-create-home", "--shell", "/bin/false", "nomad")
-	os.MkdirAll("/etc/nomad.d", 0755)
-	os.MkdirAll("/opt/nomad/data", 0755)
-	os.MkdirAll("/var/log/nomad", 0755)
+	_ = os.MkdirAll("/etc/nomad.d", 0755)
+	_ = os.MkdirAll("/opt/nomad/data", 0755)
+	_ = os.MkdirAll("/var/log/nomad", 0755)
 	ni.runner.Run("chown", "-R", "nomad:nomad", "/opt/nomad")
 	ni.runner.Run("chown", "-R", "nomad:nomad", "/var/log/nomad")
 

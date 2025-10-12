@@ -70,7 +70,7 @@ func runVaultRepair(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	if vaultRepairDryRun {
 		logger.Info(" DRY-RUN MODE: No changes will be made")
-		fmt.Println(" DRY-RUN MODE: Analyzing issues without making changes\n")
+		fmt.Println(" DRY-RUN MODE: Analyzing issues without making changes")
 	}
 
 	// Default: run all repairs if no specific flag is set

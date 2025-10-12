@@ -255,7 +255,7 @@ func (h *Handler) clearPackageCaches() error {
 		Capture: true,
 	}); err == nil {
 		// Snap is installed, clean it
-		execute.Run(h.rc.Ctx, execute.Options{
+		_, _ = execute.Run(h.rc.Ctx, execute.Options{
 			Command: "sh",
 			Args:    []string{"-c", "snap list --all | awk '/disabled/{print $1, $3}' | while read name rev; do snap remove \"$name\" --revision=\"$rev\"; done"},
 			Capture: false,
@@ -322,7 +322,7 @@ func (h *Handler) dockerEmergencyCleanup() error {
 	}
 	
 	// Prune everything
-	execute.Run(h.rc.Ctx, execute.Options{
+	_, _ = execute.Run(h.rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"system", "prune", "-a", "-f", "--volumes"},
 		Capture: false,
@@ -341,7 +341,7 @@ func (h *Handler) clearUserCaches() error {
 	}
 	
 	for _, pattern := range cacheDirs {
-		execute.Run(h.rc.Ctx, execute.Options{
+		_, _ = execute.Run(h.rc.Ctx, execute.Options{
 			Command: "sh",
 			Args:    []string{"-c", fmt.Sprintf("rm -rf %s", pattern)},
 			Capture: false,

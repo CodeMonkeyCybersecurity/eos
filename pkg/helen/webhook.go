@@ -119,7 +119,7 @@ func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 				zap.String("ref", payload.Ref),
 				zap.String("expected", expectedRef))
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "Ignoring push to %s (expecting %s)", payload.Ref, expectedRef)
+			_, _ = fmt.Fprintf(w, "Ignoring push to %s (expecting %s)", payload.Ref, expectedRef)
 			return
 		}
 		
@@ -143,7 +143,7 @@ func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 		
 		// Return success
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Deployment triggered for environment: %s", environment)
+		_, _ = fmt.Fprintf(w, "Deployment triggered for environment: %s", environment)
 	}
 }
 
@@ -154,7 +154,7 @@ func readAndVerifyWebhook(r *http.Request, secret, signature string) ([]byte, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to read body: %w", err)
 	}
-	defer r.Body.Close()
+	defer func() { _ = r.Body.Close() }()
 	
 	// Verify signature if provided
 	if signature != "" && secret != "" {

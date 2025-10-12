@@ -459,7 +459,7 @@ func restoreSystemState(rc *eos_io.RuntimeContext, backup *BackupState) error {
 				if checkCmd.Run() != nil {
 					// Create bridge
 					createCmd := exec.CommandContext(rc.Ctx, "ovs-vsctl", "add-br", bridge)
-					createCmd.Run()
+					_ = createCmd.Run()
 				}
 			}
 		}
@@ -500,7 +500,7 @@ func removePackages(rc *eos_io.RuntimeContext) error {
 
 	// Autoremove dependencies
 	autoremoveCmd := exec.CommandContext(rc.Ctx, "apt-get", "autoremove", "-y")
-	autoremoveCmd.Run()
+	_ = autoremoveCmd.Run()
 
 	return nil
 }
@@ -521,7 +521,7 @@ func removeConfigFiles(rc *eos_io.RuntimeContext) error {
 
 	for _, dir := range configDirs {
 		removeCmd := exec.CommandContext(rc.Ctx, "rm", "-rf", dir)
-		removeCmd.Run()
+		_ = removeCmd.Run()
 	}
 
 	return nil
@@ -566,7 +566,7 @@ func removeDataDirectories(rc *eos_io.RuntimeContext) error {
 
 	for _, dir := range dataDirs {
 		removeCmd := exec.CommandContext(rc.Ctx, "rm", "-rf", dir)
-		removeCmd.Run()
+		_ = removeCmd.Run()
 	}
 
 	return nil
@@ -617,7 +617,7 @@ func cleanupOldBackups(rc *eos_io.RuntimeContext, keepCount int) {
 	if len(backups) > keepCount {
 		for i := keepCount; i < len(backups); i++ {
 			logger.Debug("Removing old backup", zap.String("path", backups[i].path))
-			os.RemoveAll(backups[i].path)
+			_ = os.RemoveAll(backups[i].path)
 		}
 	}
 }

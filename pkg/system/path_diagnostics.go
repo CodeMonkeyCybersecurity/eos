@@ -134,7 +134,7 @@ func (pd *PathDiagnostics) searchPathInFile(ctx context.Context, filename string
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var matches []string
 	scanner := bufio.NewScanner(file)

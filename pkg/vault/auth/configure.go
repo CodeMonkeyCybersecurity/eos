@@ -30,7 +30,7 @@ func ConfigureTokenAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error {
 	}
 
 	// Set token environment variable
-	os.Setenv("VAULT_TOKEN", string(token))
+	_ = os.Setenv("VAULT_TOKEN", string(token))
 
 	// EVALUATE - Log success
 	logger.Info("Token authentication configured successfully")
@@ -63,8 +63,8 @@ func ConfigureUserPassAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) erro
 	}
 
 	// Store credentials
-	os.Setenv("VAULT_AUTH_USERNAME", username)
-	os.Setenv("VAULT_AUTH_PASSWORD", string(password))
+	_ = os.Setenv("VAULT_AUTH_USERNAME", username)
+	_ = os.Setenv("VAULT_AUTH_PASSWORD", string(password))
 
 	// EVALUATE - Log success
 	logger.Info("Userpass authentication configured successfully",
@@ -98,8 +98,8 @@ func ConfigureAppRoleAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error
 	}
 
 	// Store credentials
-	os.Setenv("VAULT_ROLE_ID", roleID)
-	os.Setenv("VAULT_SECRET_ID", string(secretID))
+	_ = os.Setenv("VAULT_ROLE_ID", roleID)
+	_ = os.Setenv("VAULT_SECRET_ID", string(secretID))
 
 	// EVALUATE - Log success
 	logger.Info("AppRole authentication configured successfully",

@@ -43,7 +43,7 @@ func TestIsSystemBootstrapped(t *testing.T) {
 			if len(tt.setupMarkerFiles) > 0 {
 				// Create temporary directory and file for testing
 				tempDir := "/tmp/test-bootstrap"
-				os.MkdirAll(tempDir, 0755)
+				_ = os.MkdirAll(tempDir, 0755)
 				defer os.RemoveAll(tempDir)
 
 				// Override the variables temporarily for test
@@ -51,7 +51,7 @@ func TestIsSystemBootstrapped(t *testing.T) {
 				vaultMarkerFile = "/tmp/nonexistent-vault-marker"
 
 				if tt.setupMarkerFiles[0] != "" {
-					os.WriteFile(bootstrapMarkerFile, []byte("test"), 0644)
+					_ = os.WriteFile(bootstrapMarkerFile, []byte("test"), 0644)
 				}
 			} else {
 				// Set to non-existent paths for negative test

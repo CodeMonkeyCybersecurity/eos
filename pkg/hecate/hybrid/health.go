@@ -191,7 +191,7 @@ func (hm *HealthMonitor) checkServiceHealth(backend *Backend) bool {
 			zap.Error(err))
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -233,7 +233,7 @@ func (hm *HealthMonitor) measureLatency(backend *Backend) time.Duration {
 			zap.Error(err))
 		return 0
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	latency := time.Since(start)
 	logger.Debug("Measured latency",
@@ -288,7 +288,7 @@ func (hm *HealthMonitor) checkFrontendReachability(backend *Backend) bool {
 			zap.Error(err))
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check if we got a response (any status code is fine)
 	logger.Debug("Frontend reachability check passed",

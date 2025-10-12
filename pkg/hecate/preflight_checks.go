@@ -247,7 +247,7 @@ func checkNetworkAccessibility(rc *eos_io.RuntimeContext, result *PreflightCheck
 		resp, err := client.Get(service)
 
 		if err == nil && resp.StatusCode == 200 {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			buf := make([]byte, 100)
 			n, _ := resp.Body.Read(buf)
 			netCheck.PublicIP = strings.TrimSpace(string(buf[:n]))

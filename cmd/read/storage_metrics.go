@@ -93,10 +93,10 @@ func init() {
 func displayMetrics(metrics []monitor.IOMetrics) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
-	fmt.Fprintf(w, "DEVICE\tREAD MB/s\tWRITE MB/s\tREAD IOPS\tWRITE IOPS\tREAD LAT(ms)\tWRITE LAT(ms)\n")
+	_, _ = fmt.Fprintf(w, "DEVICE\tREAD MB/s\tWRITE MB/s\tREAD IOPS\tWRITE IOPS\tREAD LAT(ms)\tWRITE LAT(ms)\n")
 
 	for _, m := range metrics {
-		fmt.Fprintf(w, "%s\t%.2f\t%.2f\t%.0f\t%.0f\t%.2f\t%.2f\n",
+		_, _ = fmt.Fprintf(w, "%s\t%.2f\t%.2f\t%.0f\t%.0f\t%.2f\t%.2f\n",
 			m.Device,
 			m.ReadBytesPerSec/monitor.MB,
 			m.WriteBytesPerSec/monitor.MB,

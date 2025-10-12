@@ -249,7 +249,7 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 	if status.TokenAvailable {
 		fmt.Fprint(os.Stderr, " Token: Available\n")
 		if !status.LastTokenTime.IsZero() {
-			fmt.Fprintf(os.Stderr, "   Last Updated: %s\n", status.LastTokenTime.Format("2006-01-02 15:04:05"))
+			_, _ = fmt.Fprintf(os.Stderr, "   Last Updated: %s\n", status.LastTokenTime.Format("2006-01-02 15:04:05"))
 		}
 		if status.TokenValid {
 			fmt.Fprint(os.Stderr, " Token: Valid\n")
@@ -277,7 +277,7 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 	case "unhealthy":
 		fmt.Fprint(os.Stderr, "❌ Unhealthy\n")
 	default:
-		fmt.Fprintf(os.Stderr, "❓ Unknown (%s)\n", status.HealthStatus)
+		_, _ = fmt.Fprintf(os.Stderr, "❓ Unknown (%s)\n", status.HealthStatus)
 	}
 
 	// Recommendations

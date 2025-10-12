@@ -53,7 +53,7 @@ func (d *DiscoveryServer) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to listen on multicast: %w", err)
 	}
 	d.conn = conn
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	// Set read buffer
 	conn.SetReadBuffer(1024)
@@ -121,7 +121,7 @@ func (d *DiscoveryServer) sendResponse(clientAddr *net.UDPAddr) error {
 	if err != nil {
 		return fmt.Errorf("failed to create response connection: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	_, err = conn.Write(data)
 	if err != nil {
@@ -219,7 +219,7 @@ func getLocalIP() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	return localAddr.IP.String(), nil

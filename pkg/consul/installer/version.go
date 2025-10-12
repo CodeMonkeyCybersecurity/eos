@@ -93,7 +93,7 @@ func (vm *VersionManager) httpGet(url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("HTTP GET request failed for %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d: %s for URL %s", resp.StatusCode, resp.Status, url)

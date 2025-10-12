@@ -465,7 +465,7 @@ local stratum 10
 	if err := restartCmd.Run(); err != nil {
 		// Try NTP service
 		restartCmd = exec.CommandContext(rc.Ctx, "systemctl", "restart", "ntp")
-		restartCmd.Run()
+		_ = restartCmd.Run()
 	}
 
 	return nil
@@ -489,7 +489,7 @@ func appendToFile(filename, content string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	_, err = f.WriteString("\n" + content)
 	return err

@@ -169,21 +169,21 @@ func TestPrivilegeEscalation(t *testing.T) {
 		originalHome := os.Getenv("HOME")
 
 		// Temporarily modify environment
-		os.Setenv("USER", "root")
-		os.Setenv("HOME", "/root")
+		_ = os.Setenv("USER", "root")
+		_ = os.Setenv("HOME", "/root")
 
 		result1 := IsPrivilegedUser(ctx)
 
 		// Restore environment
 		if originalUser != "" {
-			os.Setenv("USER", originalUser)
+			_ = os.Setenv("USER", originalUser)
 		} else {
-			os.Unsetenv("USER")
+			_ = os.Unsetenv("USER")
 		}
 		if originalHome != "" {
-			os.Setenv("HOME", originalHome)
+			_ = os.Setenv("HOME", originalHome)
 		} else {
-			os.Unsetenv("HOME")
+			_ = os.Unsetenv("HOME")
 		}
 
 		result2 := IsPrivilegedUser(ctx)

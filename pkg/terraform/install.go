@@ -77,7 +77,7 @@ func (ti *TerraformInstaller) Install() error {
 		ti.config.Version, ti.config.Version, arch)
 
 	tmpDir := "/tmp/terraform-install"
-	os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, 0755)
 	defer os.RemoveAll(tmpDir)
 
 	// Download and extract
@@ -103,7 +103,7 @@ func (ti *TerraformInstaller) Install() error {
 	}
 
 	// Setup plugin cache dir
-	os.MkdirAll(ti.config.PluginCacheDir, 0755)
+	_ = os.MkdirAll(ti.config.PluginCacheDir, 0755)
 
 	// Phase 3: EVALUATE
 	if output, err := ti.runner.RunOutput("terraform", "version"); err != nil {

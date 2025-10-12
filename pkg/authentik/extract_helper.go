@@ -252,7 +252,7 @@ func ExtractConfigurationAPI(ctx context.Context, baseURL, token string, types, 
 		errorMsg += "  - Invalid or expired API token\n"
 		errorMsg += "  - Network connectivity issues\n"
 		errorMsg += "  - Authentik API not accessible at provided URL"
-		return nil, fmt.Errorf(errorMsg)
+		return nil, fmt.Errorf("%s", errorMsg)
 	}
 
 	// If SOME extractions failed, include warnings but return partial success

@@ -16,7 +16,7 @@ func Init(rc *eos_io.RuntimeContext, cfg zap.Config) {
 	for _, path := range cfg.OutputPaths {
 		if path != "stdout" && path != "stderr" {
 			if err := EnsureLogPermissions(path); err != nil {
-				fmt.Fprintln(os.Stderr, "Log permission error:", err)
+				_, _ = fmt.Fprintln(os.Stderr, "Log permission error:", err)
 				InitFallback()
 				return
 			}
@@ -25,7 +25,7 @@ func Init(rc *eos_io.RuntimeContext, cfg zap.Config) {
 
 	builtLogger, err := cfg.Build()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to build logger config, falling back:", err)
+		_, _ = fmt.Fprintln(os.Stderr, "Failed to build logger config, falling back:", err)
 		InitFallback()
 		return
 	}

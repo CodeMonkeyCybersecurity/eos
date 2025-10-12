@@ -131,7 +131,7 @@ func RotateContainerLogs(rc *eos_io.RuntimeContext, containerID string) (*LogRot
 	// Truncate original log file
 	if err := os.Truncate(logPath, 0); err != nil {
 		// Try to clean up rotated file
-		os.Remove(rotatedPath)
+		_ = os.Remove(rotatedPath)
 		return nil, fmt.Errorf("failed to truncate log file: %w", err)
 	}
 
@@ -141,7 +141,7 @@ func RotateContainerLogs(rc *eos_io.RuntimeContext, containerID string) (*LogRot
 			zap.Error(err))
 	} else {
 		// Remove uncompressed file after successful compression
-		os.Remove(rotatedPath)
+		_ = os.Remove(rotatedPath)
 		rotatedPath += ".gz"
 	}
 
@@ -327,7 +327,7 @@ func cleanupOldLogs(rc *eos_io.RuntimeContext, containerID string, keepCount int
 
 	// Delete oldest logs
 	for i := 0; i < len(matches)-keepCount; i++ {
-		os.Remove(matches[i])
+		_ = os.Remove(matches[i])
 	}
 
 	return nil

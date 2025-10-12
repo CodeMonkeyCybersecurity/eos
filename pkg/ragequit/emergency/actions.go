@@ -148,8 +148,8 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 	if shared.FileExists(motdPath) {
 		motdMsg := fmt.Sprintf("\n=== RAGEQUIT RECOVERY ===\n%s\nSee ~/RAGEQUIT-RECOVERY-PLAN.md for details\n\n", message)
 		if currentMotd, err := os.ReadFile(motdPath); err == nil {
-			os.WriteFile(motdPath+".bak", currentMotd, 0644)
-			os.WriteFile(motdPath, append([]byte(motdMsg), currentMotd...), 0644)
+			_ = os.WriteFile(motdPath+".bak", currentMotd, 0644)
+			_ = os.WriteFile(motdPath, append([]byte(motdMsg), currentMotd...), 0644)
 		}
 	}
 
@@ -164,7 +164,7 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 		// Fallback to sendmail
 		emailCmd := exec.Command("sendmail", "root")
 		emailCmd.Stdin = strings.NewReader(fmt.Sprintf("Subject: RAGEQUIT: %s\n\n%s", hostname, message))
-		emailCmd.Run()
+		_ = emailCmd.Run()
 	}
 
 	// EVALUATE - Log notification status

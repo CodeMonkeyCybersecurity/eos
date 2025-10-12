@@ -108,10 +108,10 @@ func TestClientGet(t *testing.T) {
 		switch r.URL.Path {
 		case "/success":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success"))
+			_, _ = w.Write([]byte("success"))
 		case "/error":
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("internal error"))
+			_, _ = w.Write([]byte("internal error"))
 		case "/timeout":
 			time.Sleep(2 * time.Second)
 			w.WriteHeader(http.StatusOK)
@@ -121,7 +121,7 @@ func TestClientGet(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			} else {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("authenticated"))
+				_, _ = w.Write([]byte("authenticated"))
 			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -222,7 +222,7 @@ func TestClientPost(t *testing.T) {
 		}
 		
 		w.WriteHeader(http.StatusOK)
-		w.Write(body)
+		_, _ = w.Write(body)
 	}))
 	defer server.Close()
 
@@ -604,7 +604,7 @@ func TestBodyReading(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		w.Header().Set("X-Body-Length", fmt.Sprintf("%d", len(body)))
 		w.WriteHeader(http.StatusOK)
-		w.Write(body)
+		_, _ = w.Write(body)
 	}))
 	defer server.Close()
 

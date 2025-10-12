@@ -270,13 +270,13 @@ func TestPathOperations(t *testing.T) {
 		}
 
 		// Test environment variable expansion
-		os.Setenv("TEST_VAR", "testvalue")
+		_ = os.Setenv("TEST_VAR", "testvalue")
 		result := pathOps.ExpandPath("$TEST_VAR/file")
 		assert.Equal(t, "testvalue/file", result)
 
 		// Test combined
 		if err == nil {
-			os.Setenv("TEST_DIR", "mydir")
+			_ = os.Setenv("TEST_DIR", "mydir")
 			result = pathOps.ExpandPath("~/$TEST_DIR/file")
 			expected := filepath.Join(home, "mydir", "file")
 			assert.Equal(t, expected, result)
@@ -322,7 +322,7 @@ func TestSafeFileOperations(t *testing.T) {
 
 		_, err = safeOps.WithBackup(ctx, testFile2, func() error {
 			// Partially modify file then fail
-			os.WriteFile(testFile2, []byte("partial"), 0644)
+			_ = os.WriteFile(testFile2, []byte("partial"), 0644)
 			return assert.AnError
 		})
 		assert.Error(t, err)

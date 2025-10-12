@@ -1,3 +1,5 @@
+//go:build linux
+
 // cmd/delete/kvm.go
 package delete
 

@@ -80,7 +80,7 @@ func ExecuteQuery(rc *eos_io.RuntimeContext, config *DatabaseConfig, operation *
 		logger.Error("Database connection failed", zap.Error(err))
 		return result, fmt.Errorf("database connection failed: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Execute operation
 	var operationResult *DatabaseOperationResult
@@ -163,7 +163,7 @@ func PerformHealthCheck(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*Dat
 		})
 		logger.Error("Health check connection failed", zap.Error(err))
 	} else {
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		healthCheck.Checks = append(healthCheck.Checks, HealthCheckItem{
 			Name:   "connection",
 			Status: "success",
@@ -313,7 +313,7 @@ func getPostgreSQLStatus(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*Da
 	if err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	status := &DatabaseStatus{
 		Type: config.Type,
@@ -366,7 +366,7 @@ func getPostgreSQLSchemaInfo(rc *eos_io.RuntimeContext, config *DatabaseConfig) 
 	if err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	schemaInfo := &SchemaInfo{
 		Database: config.Database,
@@ -385,7 +385,7 @@ func getPostgreSQLSchemaInfo(rc *eos_io.RuntimeContext, config *DatabaseConfig) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tables: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var tableName, tableSchema string
@@ -417,7 +417,7 @@ func getPostgreSQLSchemaInfo(rc *eos_io.RuntimeContext, config *DatabaseConfig) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query views: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var viewName, viewSchema string
@@ -447,7 +447,7 @@ func getTableColumns(db *sql.DB, tableName, tableSchema string) ([]ColumnInfo, e
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var columns []ColumnInfo
 	for rows.Next() {
@@ -492,7 +492,7 @@ func executeSimpleQuery(db *sql.DB, operation *DatabaseOperation, start time.Tim
 		result.Duration = time.Since(start)
 		return result, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Count rows affected
 	rowCount := 0

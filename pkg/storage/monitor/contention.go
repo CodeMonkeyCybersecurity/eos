@@ -312,9 +312,9 @@ func parseIostatForContention(output string) []ContentionMetrics {
 		}
 
 		// Parse relevant fields
-		fmt.Sscanf(fields[8], "%f", &metric.QueueDepth)   // avgqu-sz
-		fmt.Sscanf(fields[11], "%f", &metric.ServiceTime) // svctm
-		fmt.Sscanf(fields[13], "%f", &metric.Utilization) // %util
+		_, _ = fmt.Sscanf(fields[8], "%f", &metric.QueueDepth)   // avgqu-sz
+		_, _ = fmt.Sscanf(fields[11], "%f", &metric.ServiceTime) // svctm
+		_, _ = fmt.Sscanf(fields[13], "%f", &metric.Utilization) // %util
 
 		metrics = append(metrics, metric)
 	}

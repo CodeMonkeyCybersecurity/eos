@@ -135,7 +135,7 @@ func (no *NomadOrchestrator) generateJobFile(config *JobConfig) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("failed to create job file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	
 	// Execute template
 	if err := tmpl.Execute(file, variables); err != nil {

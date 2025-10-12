@@ -209,7 +209,7 @@ func TestBindEnv(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
-			os.Setenv(tt.envVar, tt.value)
+			_ = os.Setenv(tt.envVar, tt.value)
 			defer os.Unsetenv(tt.envVar)
 
 			// Bind and check
@@ -234,13 +234,13 @@ func TestBindEnvs(t *testing.T) {
 	}
 
 	// Set environment variables
-	os.Setenv("TEST_APP_NAME", "test-app")
-	os.Setenv("TEST_APP_VERSION", "1.2.3")
-	os.Setenv("TEST_APP_DEBUG", "true")
+	_ = os.Setenv("TEST_APP_NAME", "test-app")
+	_ = os.Setenv("TEST_APP_VERSION", "1.2.3")
+	_ = os.Setenv("TEST_APP_DEBUG", "true")
 	defer func() {
-		os.Unsetenv("TEST_APP_NAME")
-		os.Unsetenv("TEST_APP_VERSION")
-		os.Unsetenv("TEST_APP_DEBUG")
+		_ = os.Unsetenv("TEST_APP_NAME")
+		_ = os.Unsetenv("TEST_APP_VERSION")
+		_ = os.Unsetenv("TEST_APP_DEBUG")
 	}()
 
 	// Bind all
@@ -623,7 +623,7 @@ func TestSetDefaultEnvPrefix(t *testing.T) {
 	defer func() { Config = oldConfig }()
 
 	// Set environment variable
-	os.Setenv("EOS_TEST_KEY", "env_value")
+	_ = os.Setenv("EOS_TEST_KEY", "env_value")
 	defer os.Unsetenv("EOS_TEST_KEY")
 
 	// Set prefix

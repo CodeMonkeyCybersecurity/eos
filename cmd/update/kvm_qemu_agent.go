@@ -1,3 +1,5 @@
+//go:build linux
+
 package update
 
 import (
@@ -173,7 +175,7 @@ func listAllVMs(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domains, err := conn.ListAllDomains(0)
 	if err != nil {
@@ -198,7 +200,7 @@ func assessVMs(ctx context.Context, vmNames []string) (needsUpdate, hasAgent []s
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	for _, vmName := range vmNames {
 		domain, err := conn.LookupDomainByName(vmName)
@@ -259,7 +261,7 @@ func showImpactAndConfirm(rc *eos_io.RuntimeContext, vmsNeedingUpdate []string) 
 
 	var response string
 	fmt.Print("Do you want to proceed? (yes/no): ")
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 
 	return strings.ToLower(response) == "yes"
 }
@@ -269,7 +271,7 @@ func isVMRunning(ctx context.Context, vmName string) bool {
 	if err != nil {
 		return false
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -322,7 +324,7 @@ func updateSingleVM(rc *eos_io.RuntimeContext, vmName string) error {
 		logger.Info("terminal prompt: Restart VM now?")
 		var response string
 		fmt.Printf("Restart %s now? (yes/no): ", vmName)
-		fmt.Scanln(&response)
+		_, _ = fmt.Scanln(&response)
 
 		if strings.ToLower(response) == "yes" {
 			logger.Info("Restarting VM", zap.String("vm", vmName))
@@ -432,7 +434,7 @@ func addGuestAgentToVM(rc *eos_io.RuntimeContext, vmName string) (backupPath str
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
@@ -532,7 +534,7 @@ func restoreVMXML(rc *eos_io.RuntimeContext, vmName, backupPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	// Undefine current VM
 	domain, err := conn.LookupDomainByName(vmName)
@@ -561,7 +563,7 @@ func verifyGuestAgentChannel(ctx context.Context, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to libvirt: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _, _ = conn.Close() }()
 
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {

@@ -168,14 +168,14 @@ func TestHetznerTokenSecurity(t *testing.T) {
 		originalToken := os.Getenv("HCLOUD_TOKEN")
 		defer func() {
 			if originalToken != "" {
-				os.Setenv("HCLOUD_TOKEN", originalToken)
+				_ = os.Setenv("HCLOUD_TOKEN", originalToken)
 			} else {
-				os.Unsetenv("HCLOUD_TOKEN")
+				_ = os.Unsetenv("HCLOUD_TOKEN")
 			}
 		}()
 
 		// Clear token to test error handling
-		os.Unsetenv("HCLOUD_TOKEN")
+		_ = os.Unsetenv("HCLOUD_TOKEN")
 
 		// All SSH key operations should handle missing token
 		err := GetAllSshKeys(rc)
@@ -242,12 +242,12 @@ func TestSSHKeySecurity(t *testing.T) {
 	t.Run("ssh_key_name_validation", func(t *testing.T) {
 		// Store original token and set a test token
 		originalToken := os.Getenv("HCLOUD_TOKEN")
-		os.Setenv("HCLOUD_TOKEN", "test-token-12345")
+		_ = os.Setenv("HCLOUD_TOKEN", "test-token-12345")
 		defer func() {
 			if originalToken != "" {
-				os.Setenv("HCLOUD_TOKEN", originalToken)
+				_ = os.Setenv("HCLOUD_TOKEN", originalToken)
 			} else {
-				os.Unsetenv("HCLOUD_TOKEN")
+				_ = os.Unsetenv("HCLOUD_TOKEN")
 			}
 		}()
 
