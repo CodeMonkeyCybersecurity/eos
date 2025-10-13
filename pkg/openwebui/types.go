@@ -26,8 +26,18 @@ type InstallConfig struct {
 	// Network configuration
 	Port int // External port to expose (default: shared.PortOpenWebUI = 8501)
 
+	// LiteLLM Proxy Configuration
+	UseLiteLLM       bool   // Use LiteLLM proxy for production features
+	LiteLLMPort      int    // LiteLLM proxy port (default: 4000)
+	LiteLLMMasterKey string // LiteLLM master key (auto-generated if not provided)
+	LiteLLMSaltKey   string // LiteLLM salt key for encryption (auto-generated if not provided)
+
+	// PostgreSQL Configuration (for LiteLLM)
+	PostgresPassword string // PostgreSQL password (auto-generated if not provided)
+	PostgresUser     string // PostgreSQL user (default: litellm)
+
 	// Installation behavior
-	ForceReinstall bool // Force reinstall even if already installed
+	ForceReinstall  bool // Force reinstall even if already installed
 	SkipHealthCheck bool // Skip health check after installation
 }
 

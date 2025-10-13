@@ -21,6 +21,8 @@ var (
 	openwebuiName            string
 	openwebuiForce           bool
 	openwebuiSkipHealthCheck bool
+	openwebuiUseLiteLLM      bool
+	openwebuiLiteLLMPort     int
 )
 
 func init() {
@@ -32,27 +34,41 @@ func init() {
 Open WebUI provides a user-friendly chat interface for interacting with Azure OpenAI models.
 This command sets up Open WebUI in a Docker container with proper configuration and security.
 
+Deployment Options:
+1. Direct Azure OpenAI (default) - Simple setup, basic features
+2. LiteLLM Proxy (--use-litellm) - Production-ready with cost tracking, load balancing
+
 The deployment includes:
 - Docker Compose setup in /opt/openwebui
 - Secure environment variable configuration
-- Azure OpenAI integration
+- Azure OpenAI integration (direct or via LiteLLM)
+- PostgreSQL database (when using LiteLLM)
 - Health checks and verification
 - Persistent data storage
+- Cost tracking and usage monitoring (LiteLLM only)
 
 Examples:
   # Interactive installation (will prompt for Azure credentials)
   eos create openwebui
 
-  # Non-interactive with all flags
+  # Direct Azure OpenAI connection
   eos create openwebui \
     --azure-endpoint https://myopenai.openai.azure.com \
     --azure-deployment gpt-4 \
     --azure-api-key YOUR_API_KEY
 
-  # Custom port and name
+  # Production setup with LiteLLM proxy (recommended)
   eos create openwebui \
-    --port 9000 \
-    --name "My AI Assistant"
+    --use-litellm \
+    --azure-endpoint https://myopenai.openai.azure.com \
+    --azure-deployment gpt-4 \
+    --azure-api-key YOUR_API_KEY
+
+  # Custom ports
+  eos create openwebui \
+    --port 3000 \
+    --litellm-port 4000 \
+    --use-litellm
 
 Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 		RunE: eos.Wrap(runCreateOpenWebUI),
@@ -73,6 +89,12 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 		"External port to expose (default: 8501)")
 	openwebuiCmd.Flags().StringVar(&openwebuiName, "name", "Code Monkey AI Chat",
 		"Display name for the web UI")
+
+	// LiteLLM proxy flags
+	openwebuiCmd.Flags().BoolVar(&openwebuiUseLiteLLM, "use-litellm", false,
+		"Use LiteLLM proxy for production features (cost tracking, load balancing)")
+	openwebuiCmd.Flags().IntVar(&openwebuiLiteLLMPort, "litellm-port", 4000,
+		"Port for LiteLLM proxy (only used with --use-litellm)")
 
 	// Installation behavior flags
 	openwebuiCmd.Flags().BoolVar(&openwebuiForce, "force", false,
@@ -98,6 +120,8 @@ func runCreateOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		WebUIName:        openwebuiName,
 		ForceReinstall:   openwebuiForce,
 		SkipHealthCheck:  openwebuiSkipHealthCheck,
+		UseLiteLLM:       openwebuiUseLiteLLM,
+		LiteLLMPort:      openwebuiLiteLLMPort,
 	}
 
 	// Create installer
@@ -123,6 +147,18 @@ func runCreateOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	logger.Info("  2. Create your first user account (will be admin)")
 	logger.Info("  3. Start chatting with Azure OpenAI")
 	logger.Info("")
+	if config.UseLiteLLM {
+		logger.Info("LiteLLM Proxy:",
+			zap.String("ui_url", fmt.Sprintf("http://localhost:%d/ui", config.LiteLLMPort)),
+			zap.String("docs_url", fmt.Sprintf("http://localhost:%d/docs", config.LiteLLMPort)))
+		logger.Info("")
+		logger.Info("Features enabled:")
+		logger.Info("  ✓ Cost tracking and usage monitoring")
+		logger.Info("  ✓ Load balancing across multiple models")
+		logger.Info("  ✓ Request logging and analytics")
+		logger.Info("  ✓ Rate limiting and quotas")
+		logger.Info("")
+	}
 	logger.Info("Useful commands:")
 	logger.Info("  View logs:        docker compose -f /opt/openwebui/docker-compose.yml logs -f")
 	logger.Info("  Stop service:     docker compose -f /opt/openwebui/docker-compose.yml down")
