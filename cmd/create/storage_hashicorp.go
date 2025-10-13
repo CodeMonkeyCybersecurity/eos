@@ -5,6 +5,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage/hashicorp"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -58,9 +59,9 @@ func runCreateStorageHashiCorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, ar
 	// Initialize HashiCorp storage manager
 	manager, err := hashicorp.NewHashiCorpStorageManager(
 		rc,
-		"http://localhost:4646", // Nomad
-		"http://localhost:8500", // Consul
-		"http://localhost:8200", // Vault
+		"http://localhost:4646",                                 // Nomad
+		"http://localhost:8500",                                 // Consul
+		fmt.Sprintf("http://localhost:%d", shared.PortVault), // Vault
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize storage manager: %w", err)

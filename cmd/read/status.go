@@ -2,10 +2,12 @@ package read
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -52,7 +54,7 @@ func runStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		port    string
 	}{
 
-		{"Vault", "vault", "vault", "8200"},
+		{"Vault", "vault", "vault", strconv.Itoa(shared.PortVault)},
 		{"Nomad", "nomad", "nomad", "4646"},
 		{"OSQuery", "osqueryd", "osqueryi", ""},
 	}

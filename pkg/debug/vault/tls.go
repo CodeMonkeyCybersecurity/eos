@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
@@ -60,6 +61,17 @@ func TLSDiagnostic() *debug.Diagnostic {
 			if status.Enabled {
 				output.WriteString(fmt.Sprintf("  Certificate: %s\n", certStatus(status.CertPath, status.CertExists)))
 				output.WriteString(fmt.Sprintf("  Private Key: %s\n", certStatus(status.KeyPath, status.KeyExists)))
+
+				// Add certificate details if cert exists
+				if status.CertExists && status.CertPath != "" {
+					output.WriteString("\nCertificate Details:\n")
+					certDetails := getCertificateDetails(ctx, status.CertPath)
+					if certDetails != "" {
+						output.WriteString(certDetails)
+					} else {
+						output.WriteString("  (Unable to parse certificate details)\n")
+					}
+				}
 
 				result.Metadata["tls_enabled"] = true
 				result.Metadata["cert_path"] = status.CertPath
@@ -211,18 +223,17 @@ func extractConfigValue(config, key string) string {
 		}
 
 		// Find the end (quote or newline)
-		end := start
 		hasQuote := config[start-1] == '"'
 
 		if hasQuote {
 			// Look for closing quote
-			end = strings.Index(config[start:], `"`)
+			end := strings.Index(config[start:], `"`)
 			if end != -1 {
 				return config[start : start+end]
 			}
 		} else {
 			// Look for newline or space
-			end = strings.IndexAny(config[start:], "\n ")
+			end := strings.IndexAny(config[start:], "\n ")
 			if end != -1 {
 				return strings.TrimSpace(config[start : start+end])
 			}
@@ -239,6 +250,59 @@ func fileExists(path string) bool {
 	}
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// getCertificateDetails uses openssl to extract certificate information
+func getCertificateDetails(ctx context.Context, certPath string) string {
+	// Use openssl x509 to parse certificate details
+	cmd := exec.CommandContext(ctx, "openssl", "x509", "-in", certPath, "-noout", "-text")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+
+	// Parse and format the most relevant fields
+	lines := strings.Split(string(output), "\n")
+	var result strings.Builder
+	lineCount := 0
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Limit output to first 20 lines of relevant info
+		if lineCount >= 20 {
+			break
+		}
+
+		// Capture key sections
+		if strings.HasPrefix(trimmed, "Issuer:") {
+			result.WriteString("  " + trimmed + "\n")
+			lineCount++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "Subject:") {
+			result.WriteString("  " + trimmed + "\n")
+			lineCount++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "Validity") {
+			result.WriteString("  " + trimmed + "\n")
+			lineCount++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "Not Before:") || strings.HasPrefix(trimmed, "Not After:") {
+			result.WriteString("    " + trimmed + "\n")
+			lineCount++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "Subject Alternative Name:") {
+			result.WriteString("  " + trimmed + "\n")
+			lineCount++
+			continue
+		}
+	}
+
+	return result.String()
 }
 
 // Helper formatters

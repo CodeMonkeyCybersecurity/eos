@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -72,17 +73,17 @@ ORDER BY name;`
 	fmt.Println("\nListening Ports:")
 	fmt.Println("---------------")
 
-	portQuery := `SELECT DISTINCT 
-  process.name as process_name, 
-  listening.port, 
-  listening.protocol, 
-  listening.address 
-FROM listening_ports AS listening 
-JOIN processes AS process USING (pid) 
-WHERE listening.port != 0 
-  AND process.name != '' 
-  AND listening.port IN (4505, 4506, 8200, 8201, 4646, 4647, 4648, 8300, 8301, 8302, 8500, 8600)
-ORDER BY listening.port;`
+	portQuery := fmt.Sprintf(`SELECT DISTINCT
+  process.name as process_name,
+  listening.port,
+  listening.protocol,
+  listening.address
+FROM listening_ports AS listening
+JOIN processes AS process USING (pid)
+WHERE listening.port != 0
+  AND process.name != ''
+  AND listening.port IN (4505, 4506, %d, %d, 4646, 4647, 4648, 8300, 8301, 8302, 8500, 8600)
+ORDER BY listening.port;`, shared.PortVault, shared.PortVault+1)
 
 	if output, err := cli.ExecString("osqueryi", "--line", portQuery); err == nil {
 		fmt.Println(output)

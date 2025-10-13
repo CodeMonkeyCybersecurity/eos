@@ -2,10 +2,12 @@ package list
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/state"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -167,10 +169,10 @@ func runListAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 		fmt.Println("Network Ports:")
 		fmt.Println("-------------")
 		ports := map[string]string{
-			"8200": "Vault",
-			"4646": "Nomad HTTP",
-			"4647": "Nomad RPC",
-			"4648": "Nomad Serf",
+			strconv.Itoa(shared.PortVault): "Vault",
+			"4646":                         "Nomad HTTP",
+			"4647":                         "Nomad RPC",
+			"4648":                         "Nomad Serf",
 		}
 
 		for port, service := range ports {
