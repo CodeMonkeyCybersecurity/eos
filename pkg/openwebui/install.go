@@ -101,6 +101,9 @@ func NewOpenWebUIInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Op
 		if config.PostgresUser == "" {
 			config.PostgresUser = "litellm"
 		}
+		if config.PostgresDB == "" {
+			config.PostgresDB = "litellm"
+		}
 	}
 
 	return &OpenWebUIInstaller{
@@ -254,11 +257,29 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 
 	// Step 3: Create installation directory
 	logger.Info("Creating installation directory", zap.String("dir", owi.config.InstallDir))
+	logger.Debug("Pre-operation: directory check",
+		zap.String("target_dir", owi.config.InstallDir),
+		zap.String("compose_file", owi.config.ComposeFile),
+		zap.String("env_file", owi.config.EnvFile))
+
 	if err := os.MkdirAll(owi.config.InstallDir, 0755); err != nil {
 		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
 
+	// Verify directory was created
+	dirInfo, err := os.Stat(owi.config.InstallDir)
+	if err != nil {
+		return fmt.Errorf("directory creation verification failed: %w", err)
+	}
+	logger.Debug("Post-operation: directory created",
+		zap.String("path", owi.config.InstallDir),
+		zap.String("permissions", dirInfo.Mode().String()))
+
 	// Step 4: Generate secret keys if not provided
+	logger.Debug("Pre-operation: checking secret keys",
+		zap.Bool("webui_secret_exists", owi.config.WebUISecretKey != ""),
+		zap.Bool("litellm_enabled", owi.config.UseLiteLLM))
+
 	if owi.config.WebUISecretKey == "" {
 		logger.Info("Generating secure secret key")
 		secretKey, err := crypto.GeneratePassword(64)
@@ -266,6 +287,8 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 			return fmt.Errorf("failed to generate secret key: %w", err)
 		}
 		owi.config.WebUISecretKey = secretKey
+		logger.Debug("Post-operation: WebUI secret key generated",
+			zap.Int("length", len(secretKey)))
 	}
 
 	// Generate LiteLLM keys if using LiteLLM
@@ -277,6 +300,8 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 				return fmt.Errorf("failed to generate LiteLLM master key: %w", err)
 			}
 			owi.config.LiteLLMMasterKey = "sk-" + masterKey // Must start with sk-
+			logger.Debug("Post-operation: LiteLLM master key generated",
+				zap.Int("length", len(owi.config.LiteLLMMasterKey)))
 		}
 		if owi.config.LiteLLMSaltKey == "" {
 			logger.Info("Generating LiteLLM salt key")
@@ -285,6 +310,8 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 				return fmt.Errorf("failed to generate LiteLLM salt key: %w", err)
 			}
 			owi.config.LiteLLMSaltKey = saltKey
+			logger.Debug("Post-operation: LiteLLM salt key generated",
+				zap.Int("length", len(saltKey)))
 		}
 		if owi.config.PostgresPassword == "" {
 			logger.Info("Generating PostgreSQL password")
@@ -293,16 +320,27 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 				return fmt.Errorf("failed to generate PostgreSQL password: %w", err)
 			}
 			owi.config.PostgresPassword = pgPassword
+			logger.Debug("Post-operation: PostgreSQL password generated",
+				zap.Int("length", len(pgPassword)))
 		}
+		logger.Debug("Post-operation: all LiteLLM secrets configured",
+			zap.String("postgres_user", owi.config.PostgresUser),
+			zap.String("postgres_db", owi.config.PostgresDB))
 	}
 
 	// Step 5: Test Azure OpenAI connection
 	logger.Info("Testing Azure OpenAI connection")
+	logger.Debug("Pre-operation: Azure connection test",
+		zap.String("endpoint", owi.config.AzureEndpoint),
+		zap.String("deployment", owi.config.AzureDeployment),
+		zap.String("api_version", owi.config.AzureAPIVersion))
+
 	if err := owi.testAzureConnection(ctx); err != nil {
 		logger.Warn("Azure OpenAI connection test failed", zap.Error(err))
 		// Continue anyway - user might have network issues that will be resolved later
 	} else {
 		logger.Info("Successfully connected to Azure OpenAI")
+		logger.Debug("Post-operation: Azure connection verified")
 	}
 
 	// Step 6: Create .env file
@@ -321,21 +359,32 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 
 	// Step 8: Create docker-compose.yml
 	logger.Info("Creating Docker Compose configuration", zap.String("file", owi.config.ComposeFile))
+	logger.Debug("Pre-operation: compose file creation",
+		zap.String("install_dir", owi.config.InstallDir),
+		zap.Bool("litellm_mode", owi.config.UseLiteLLM))
 	if err := owi.createComposeFile(ctx); err != nil {
 		return err
 	}
+	logger.Debug("Post-operation: compose file created")
 
 	// Step 9: Pull Docker image
 	logger.Info("Pulling Docker images")
+	logger.Debug("Pre-operation: docker pull",
+		zap.String("compose_file", owi.config.ComposeFile))
 	if err := owi.pullDockerImage(ctx); err != nil {
 		return err
 	}
+	logger.Debug("Post-operation: images pulled successfully")
 
 	// Step 10: Start the service
 	logger.Info("Starting Open WebUI service")
+	logger.Debug("Pre-operation: service startup",
+		zap.Int("openwebui_port", owi.config.Port),
+		zap.Int("litellm_port", owi.config.LiteLLMPort))
 	if err := owi.startService(ctx); err != nil {
 		return err
 	}
+	logger.Debug("Post-operation: service started successfully")
 
 	return nil
 }
@@ -643,8 +692,9 @@ AZURE_API_VERSION=%s
 AZURE_MODEL=azure/%s
 
 # PostgreSQL Configuration
-POSTGRES_PASSWORD=%s
 POSTGRES_USER=%s
+POSTGRES_PASSWORD=%s
+POSTGRES_DB=%s
 
 # LiteLLM Configuration
 LITELLM_MASTER_KEY=%s
@@ -662,8 +712,9 @@ OPENAI_API_KEY=${LITELLM_MASTER_KEY}
 			owi.config.AzureAPIKey,
 			owi.config.AzureAPIVersion,
 			owi.config.AzureDeployment,
-			owi.config.PostgresPassword,
 			owi.config.PostgresUser,
+			owi.config.PostgresPassword,
+			owi.config.PostgresDB,
 			owi.config.LiteLLMMasterKey,
 			owi.config.LiteLLMSaltKey,
 			owi.config.WebUISecretKey,
@@ -782,9 +833,10 @@ services:
       - "%d:4000"
     env_file: .env
     depends_on:
-      - litellmproxy_db
+      litellmproxy_db:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@litellmproxy_db:5432/${POSTGRES_USER}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@litellmproxy_db:5432/${POSTGRES_DB}
     command: ["--config", "/app/config.yaml", "--detailed_debug", "--num_workers", "4"]
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
@@ -795,12 +847,21 @@ services:
     image: postgres:17.2-alpine3.21
     container_name: postgresql
     restart: unless-stopped
-    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     shm_size: 96mb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - webui_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 volumes:
   postgres_data:
@@ -903,6 +964,10 @@ func (owi *OpenWebUIInstaller) pullDockerImage(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
 	logger.Info("Pulling Docker image (this may take several minutes for large images)")
+	logger.Debug("Executing docker compose pull",
+		zap.String("command", "docker"),
+		zap.Strings("args", []string{"compose", "-f", owi.config.ComposeFile, "pull"}),
+		zap.String("working_dir", owi.config.InstallDir))
 
 	output, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
@@ -942,6 +1007,12 @@ func (owi *OpenWebUIInstaller) startService(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
 	logger.Info("Starting containers with docker compose up")
+	logger.Debug("Executing docker compose up",
+		zap.String("command", "docker"),
+		zap.Strings("args", []string{"compose", "-f", owi.config.ComposeFile, "up", "-d"}),
+		zap.String("working_dir", owi.config.InstallDir),
+		zap.Duration("timeout", 15*time.Minute))
+
 	output, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "-f", owi.config.ComposeFile, "up", "-d"},
@@ -957,6 +1028,9 @@ func (owi *OpenWebUIInstaller) startService(ctx context.Context) error {
 			zap.String("output", output))
 
 		// Verify if containers are actually running
+		logger.Debug("Checking container status after error",
+			zap.String("compose_file", owi.config.ComposeFile))
+
 		checkOutput, checkErr := execute.Run(ctx, execute.Options{
 			Command: "docker",
 			Args:    []string{"compose", "-f", owi.config.ComposeFile, "ps", "--format", "json"},
@@ -965,19 +1039,29 @@ func (owi *OpenWebUIInstaller) startService(ctx context.Context) error {
 		})
 
 		if checkErr != nil {
+			logger.Error("Container status check failed",
+				zap.Error(checkErr),
+				zap.String("check_output", checkOutput))
 			return fmt.Errorf("failed to start service: %s\nContainer check also failed: %s", output, checkOutput)
 		}
+
+		logger.Debug("Container status check result",
+			zap.String("status_output", checkOutput))
 
 		// If we can query containers, check if any are running
 		if strings.Contains(checkOutput, "running") || strings.Contains(checkOutput, "Up") {
 			logger.Info("Containers are running despite docker compose warnings")
+			logger.Debug("Post-operation: service started with warnings")
 			return nil
 		}
 
+		logger.Error("No running containers found after startup",
+			zap.String("status_output", checkOutput))
 		return fmt.Errorf("failed to start service: %s\nNo running containers found", output)
 	}
 
 	logger.Info("Service started successfully")
+	logger.Debug("Post-operation: all containers started cleanly")
 	return nil
 }
 

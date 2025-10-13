@@ -34,8 +34,9 @@ type InstallConfig struct {
 	LiteLLMSaltKey   string // LiteLLM salt key for encryption (auto-generated if not provided)
 
 	// PostgreSQL Configuration (for LiteLLM)
-	PostgresPassword string // PostgreSQL password (auto-generated if not provided)
 	PostgresUser     string // PostgreSQL user (default: litellm)
+	PostgresPassword string // PostgreSQL password (auto-generated if not provided)
+	PostgresDB       string // PostgreSQL database name (default: litellm)
 
 	// Installation behavior
 	ForceReinstall  bool // Force reinstall even if already installed
