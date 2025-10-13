@@ -63,7 +63,8 @@ const (
 	PortAuthentik      = 8447 // Authentik identity provider (not 9000)
 	PortPenpotBackend  = 8461 // Penpot backend API (not 6060)
 	PortPenpotExporter = 8467 // Penpot exporter (not 6061)
-	
+	PortOpenWebUI      = 8501 // Open WebUI (not 3000)
+
 	// Well-known ports that should remain standard
 	PortHTTP        = 80   // Standard HTTP
 	PortHTTPS       = 443  // Standard HTTPS
