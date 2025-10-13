@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
@@ -146,7 +146,7 @@ func getRemovableServicesDynamic(excluded map[string]bool) []ServiceConfig {
 		}
 	}
 
-	for _, svc := range docker.GetDockerServices() {
+	for _, svc := range container.GetDockerServices() {
 		serviceMap[svc.Name] = ServiceConfig{
 			Name:      svc.Name,
 			Component: svc.Component,
@@ -218,7 +218,7 @@ func getRemovableDirectoriesDynamic(excluded map[string]bool, keepData bool) []D
 		})
 	}
 
-	for _, dir := range docker.GetDockerDirectories() {
+	for _, dir := range container.GetDockerDirectories() {
 		allDirectories = append(allDirectories, DirectoryConfig{
 			Path:        dir.Path,
 			Component:   dir.Component,

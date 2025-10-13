@@ -8,7 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/boundary"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
@@ -107,7 +107,7 @@ func executePhase1DockerCleanup(rc *eos_io.RuntimeContext, cli *eos_cli.CLI, exc
 		return result
 	}
 
-	if err := docker.CleanupDockerResources(rc, keepData); err != nil {
+	if err := container.CleanupDockerResources(rc, keepData); err != nil {
 		logger.Warn("Docker cleanup had issues", zap.Error(err))
 		result.Error = err
 		result.Details["error"] = err.Error()
@@ -271,7 +271,7 @@ func executePhase4PackagesAndBinaries(rc *eos_io.RuntimeContext, excluded map[st
 	// Remove Docker completely (not just cleanup)
 	if !excluded["docker"] {
 		logger.Info("Removing Docker completely")
-		if err := docker.RemoveDockerCompletely(rc, keepData); err != nil {
+		if err := container.RemoveDockerCompletely(rc, keepData); err != nil {
 			logger.Warn("Docker removal had issues", zap.Error(err))
 			errors = append(errors, fmt.Sprintf("docker: %v", err))
 		}

@@ -447,7 +447,52 @@ func (owi *OpenWebUIInstaller) getAzureConfiguration(ctx context.Context) error 
 		owi.config.AzureEndpoint = shared.SanitizeURL(owi.config.AzureEndpoint)
 	}
 
-	// Validate endpoint format
+	// Azure endpoints can be provided in two formats:
+	// 1. Base URL: https://resource.openai.azure.com
+	// 2. Full completion URL: https://resource.openai.azure.com/openai/deployments/model/chat/completions?api-version=...
+	//
+	// We need to detect which format and handle accordingly
+	parsed, err := url.Parse(owi.config.AzureEndpoint)
+	if err != nil {
+		return fmt.Errorf("failed to parse Azure endpoint: %w", err)
+	}
+
+	// Check if this looks like a full completion URL (has /openai/deployments/ in path)
+	if strings.Contains(parsed.Path, "/openai/deployments/") {
+		logger.Info("Detected full Azure AI Foundry completion URL - extracting components")
+
+		// Extract base URL
+		baseURL := fmt.Sprintf("%s://%s", parsed.Scheme, parsed.Host)
+
+		// Extract deployment name from path if not already provided
+		// Path format: /openai/deployments/{deployment-name}/chat/completions
+		if owi.config.AzureDeployment == "" {
+			pathParts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+			for i, part := range pathParts {
+				if part == "deployments" && i+1 < len(pathParts) {
+					owi.config.AzureDeployment = pathParts[i+1]
+					logger.Info("Extracted deployment name from URL",
+						zap.String("deployment", owi.config.AzureDeployment))
+					break
+				}
+			}
+		}
+
+		// Extract API version from query params if not already provided
+		if owi.config.AzureAPIVersion == "2024-02-15-preview" { // Default value
+			if apiVersion := parsed.Query().Get("api-version"); apiVersion != "" {
+				owi.config.AzureAPIVersion = apiVersion
+				logger.Info("Extracted API version from URL",
+					zap.String("api_version", owi.config.AzureAPIVersion))
+			}
+		}
+
+		// Use base URL for configuration
+		owi.config.AzureEndpoint = baseURL
+		logger.Info("Using extracted base URL", zap.String("base_url", baseURL))
+	}
+
+	// Validate the endpoint format (should be base URL at this point)
 	if err := validateAzureEndpoint(owi.config.AzureEndpoint); err != nil {
 		return eos_err.NewUserError(
 			"Invalid Azure OpenAI endpoint format\n"+
@@ -1013,46 +1058,28 @@ func validateAzureAPIKey(apiKey string) error {
 		return fmt.Errorf("azure OpenAI API key cannot be empty")
 	}
 
-	// Azure provides two key formats:
-	// 1. Legacy format: 32 hexadecimal characters
-	// 2. New format: Base64-encoded string (typically 43-44 chars ending with =)
-
 	apiKeyLen := len(apiKey)
 
-	// Check for 32-character hex format (legacy)
-	if apiKeyLen == 32 {
-		for _, ch := range apiKey {
-			isHex := (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
-			if !isHex {
-				return fmt.Errorf("32-character key must be hexadecimal\nInvalid character found: %c", ch)
-			}
-		}
-		return nil
+	// Azure keys can be in various formats:
+	// - Legacy: 32 hex characters
+	// - Standard: 43-44 base64 characters
+	// - Azure AI Foundry: 88+ base64 characters
+	// Just validate it looks like a reasonable key (printable ASCII, no spaces)
+
+	if apiKeyLen < 20 {
+		return fmt.Errorf("API key seems too short (%d characters) - please check you copied the complete key", apiKeyLen)
 	}
 
-	// Check for base64 format (new Azure keys are typically 43-44 chars)
-	// Base64 uses: A-Z, a-z, 0-9, +, /, and = for padding
-	if apiKeyLen >= 40 && apiKeyLen <= 88 {
-		for _, ch := range apiKey {
-			isBase64 := (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-				(ch >= '0' && ch <= '9') || ch == '+' || ch == '/' || ch == '='
-			if !isBase64 {
-				return fmt.Errorf("API key contains invalid character: %c\n"+
-					"Azure API keys should be either:\n"+
-					"  - 32 hexadecimal characters (legacy format)\n"+
-					"  - 43-44 base64 characters (new format)", ch)
-			}
+	// Check for valid characters (alphanumeric + base64 chars)
+	for _, ch := range apiKey {
+		isValid := (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+			(ch >= '0' && ch <= '9') || ch == '+' || ch == '/' || ch == '=' || ch == '-' || ch == '_'
+		if !isValid {
+			return fmt.Errorf("API key contains invalid character: %c\nAPI keys should only contain alphanumeric and base64 characters", ch)
 		}
-		return nil
 	}
 
-	return fmt.Errorf("unexpected API key length: %d characters\n"+
-		"Azure API keys are typically:\n"+
-		"  - 32 characters (legacy hex format)\n"+
-		"  - 43-44 characters (new base64 format)\n"+
-		"You provided: %d characters\n"+
-		"Please check Azure Portal → Your OpenAI Resource → Keys and Endpoint",
-		apiKeyLen, apiKeyLen)
+	return nil
 }
 
 // validateAzureDeployment validates the deployment name
