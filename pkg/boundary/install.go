@@ -129,8 +129,11 @@ func (bi *BoundaryInstaller) Install() error {
 		return fmt.Errorf("failed to install Boundary binary: %w", err)
 	}
 
-	// Create user and directories
-	bi.runner.Run("useradd", "--system", "--group", "--home", "/var/lib/boundary", "--no-create-home", "--shell", "/bin/false", "boundary")
+	// Create user and directories using centralized user manager
+	userMgr := NewUserHelper(bi.runner)
+	if err := userMgr.CreateSystemUser("boundary", "/var/lib/boundary"); err != nil {
+		return fmt.Errorf("failed to create boundary user: %w", err)
+	}
 	_ = os.MkdirAll("/etc/boundary.d", 0755)
 	_ = os.MkdirAll("/var/lib/boundary", 0700)
 	_ = os.MkdirAll("/var/log/boundary", 0755)

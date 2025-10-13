@@ -139,8 +139,11 @@ func (ni *NomadInstaller) Install() error {
 		return fmt.Errorf("failed to install Nomad binary: %w", err)
 	}
 
-	// Create user and directories
-	ni.runner.Run("useradd", "--system", "--group", "--home", "/var/lib/nomad", "--no-create-home", "--shell", "/bin/false", "nomad")
+	// Create user and directories using centralized user manager
+	userMgr := NewUserHelper(ni.runner)
+	if err := userMgr.CreateSystemUser("nomad", "/var/lib/nomad"); err != nil {
+		return fmt.Errorf("failed to create nomad user: %w", err)
+	}
 	_ = os.MkdirAll("/etc/nomad.d", 0755)
 	_ = os.MkdirAll("/opt/nomad/data", 0755)
 	_ = os.MkdirAll("/var/log/nomad", 0755)

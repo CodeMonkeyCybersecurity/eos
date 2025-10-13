@@ -13,6 +13,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -409,27 +410,12 @@ func NewUserHelper(runner *CommandRunner) *UserHelper {
 }
 
 // CreateSystemUser creates a system user if it doesn't exist
+// This delegates to the centralized hashicorp.UserManager implementation
 func (u *UserHelper) CreateSystemUser(username string, home string) error {
-	// Check if user exists
-	if err := u.runner.RunQuiet("id", username); err == nil {
-		u.logger.Debug("User already exists", zap.String("user", username))
-		return nil
-	}
-
-	u.logger.Info("Creating system user", zap.String("user", username))
-	
-	args := []string{
-		"--system",
-		"--home", home,
-		"--shell", "/bin/false",
-		username,
-	}
-	
-	if err := u.runner.Run("useradd", args...); err != nil {
-		return fmt.Errorf("failed to create user %s: %w", username, err)
-	}
-	
-	return nil
+	// Create a hashicorp.CommandRunner from our RuntimeContext
+	hashicorpRunner := hashicorp.NewCommandRunner(u.runner.rc)
+	userMgr := hashicorp.NewUserManager(hashicorpRunner)
+	return userMgr.CreateSystemUser(username, home)
 }
 
 // ValidationHelper provides pre-installation validation

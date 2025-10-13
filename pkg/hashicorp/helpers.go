@@ -308,12 +308,23 @@ func (u *UserManager) CreateSystemUser(username, home string) error {
 
 	u.logger.Info("Creating system user", zap.String("user", username))
 
+	// Build useradd arguments
+	// Note: --user-group creates a group with the same name as the user
+	// This is different from --group which expects a GROUP NAME argument
 	args := []string{
 		"--system",
-		"--home", home,
-		"--shell", "/bin/false",
+		"--user-group",
+		"--home",
+		home,
+		"--no-create-home",
+		"--shell",
+		"/bin/false",
 		username,
 	}
+
+	u.logger.Debug("Executing useradd command",
+		zap.String("user", username),
+		zap.Strings("args", args))
 
 	if err := u.runner.Run("useradd", args...); err != nil {
 		return fmt.Errorf("failed to create user %s: %w", username, err)
