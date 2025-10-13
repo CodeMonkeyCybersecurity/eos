@@ -590,16 +590,35 @@ networks:
 func (owi *OpenWebUIInstaller) pullDockerImage(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
+	logger.Info("Pulling Docker image (this may take several minutes for large images)")
+
 	output, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "-f", owi.config.ComposeFile, "pull"},
 		Dir:     owi.config.InstallDir,
 		Capture: true,
-		Timeout: 5 * time.Minute,
+		Timeout: 10 * time.Minute, // Increased from 5 to 10 minutes for large images
 	})
 
+	// Docker compose pull can return non-zero even on success with warnings
+	// Check if the image was actually pulled by verifying it exists
 	if err != nil {
-		return fmt.Errorf("failed to pull Docker image: %s", output)
+		logger.Warn("Docker pull reported an error, checking if image exists", zap.Error(err))
+
+		// Verify the image exists locally
+		checkOutput, checkErr := execute.Run(ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"images", "ghcr.io/open-webui/open-webui", "--format", "{{.Repository}}:{{.Tag}}"},
+			Capture: true,
+		})
+
+		if checkErr != nil || !strings.Contains(checkOutput, "open-webui") {
+			// Image truly doesn't exist - this is a real failure
+			return fmt.Errorf("failed to pull Docker image: %s\nImage verification failed: %v", output, checkErr)
+		}
+
+		// Image exists, the "error" was likely just warnings or non-critical issues
+		logger.Info("Docker image verified present despite pull warnings")
 	}
 
 	logger.Debug("Docker image pulled successfully")
