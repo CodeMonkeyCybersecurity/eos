@@ -513,33 +513,109 @@ func (owu *OpenWebUIUpdater) backupData(ctx context.Context) (string, error) {
 	backupName := fmt.Sprintf("openwebui-backup-%s.tar.gz", timestamp)
 	backupPath := filepath.Join(owu.config.BackupDir, backupName)
 
+	logger.Debug("Backup configuration",
+		zap.String("backup_dir", owu.config.BackupDir),
+		zap.String("backup_name", backupName),
+		zap.String("backup_path", backupPath))
+
+	// Pre-flight checks with detailed logging
+	logger.Debug("Pre-flight checks starting")
+
+	// Check backup directory exists and is writable
+	if info, err := os.Stat(owu.config.BackupDir); err != nil {
+		logger.Error("Backup directory does not exist", zap.Error(err))
+		return "", fmt.Errorf("backup directory missing: %w", err)
+	} else {
+		logger.Debug("Backup directory status",
+			zap.Bool("is_dir", info.IsDir()),
+			zap.String("permissions", info.Mode().String()))
+	}
+
+	// Check if Docker volume exists
+	volumeCheck, err := execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"volume", "inspect", "open-webui-data"},
+		Capture: true,
+	})
+	if err != nil {
+		logger.Error("Docker volume check failed",
+			zap.Error(err),
+			zap.String("output", volumeCheck))
+		return "", fmt.Errorf("open-webui-data volume not found: %s", volumeCheck)
+	}
+	logger.Debug("Docker volume exists", zap.String("volume", "open-webui-data"))
+
+	// Check if alpine image is available
+	imageCheck, err := execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"image", "inspect", "alpine"},
+		Capture: true,
+	})
+	if err != nil {
+		logger.Warn("Alpine image not found locally, will be pulled automatically",
+			zap.String("output", imageCheck))
+	} else {
+		logger.Debug("Alpine image available locally")
+	}
+
 	// Use docker to create tarball of the volume
 	// This is safer than accessing /var/lib/docker/volumes directly
-	logger.Debug("Creating tarball of open-webui-data volume")
+	logger.Info("Executing Docker backup command")
+
+	dockerArgs := []string{
+		"run", "--rm",
+		"--security-opt", "no-new-privileges:true", // Prevent privilege escalation
+		"--cap-drop", "ALL",                        // Drop all capabilities
+		"--cap-add", "DAC_OVERRIDE",                // Only add minimal capability needed for tar
+		"--read-only",                              // Read-only root filesystem
+		"--network", "none",                        // No network access needed
+		"-v", "open-webui-data:/data:ro",           // Mount data volume read-only during backup
+		"-v", fmt.Sprintf("%s:/backup", owu.config.BackupDir),
+		"alpine",
+		"tar", "czf", fmt.Sprintf("/backup/%s", backupName),
+		"-C", "/data", ".",
+	}
+
+	logger.Debug("Docker command details",
+		zap.String("command", "docker"),
+		zap.Strings("args", dockerArgs),
+		zap.Int("timeout_ms", 5*60*1000))
 
 	// P1 Security Fix: Add container security restrictions
 	output, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
-		Args: []string{
-			"run", "--rm",
-			"--security-opt", "no-new-privileges:true", // Prevent privilege escalation
-			"--cap-drop", "ALL",                        // Drop all capabilities
-			"--cap-add", "DAC_OVERRIDE",                // Only add minimal capability needed for tar
-			"--read-only",                              // Read-only root filesystem
-			"--network", "none",                        // No network access needed
-			"-v", "open-webui-data:/data:ro",           // Mount data volume read-only during backup
-			"-v", fmt.Sprintf("%s:/backup", owu.config.BackupDir),
-			"alpine",
-			"tar", "czf", fmt.Sprintf("/backup/%s", backupName),
-			"-C", "/data", ".",
-		},
+		Args:    dockerArgs,
 		Capture: true,
 		Timeout: 5 * 60 * 1000, // 5 minutes in milliseconds
 	})
 
+	// Log the raw output and error details
+	logger.Debug("Docker command completed",
+		zap.Bool("success", err == nil),
+		zap.String("output", output),
+		zap.Int("output_length", len(output)))
+
 	if err != nil {
-		return "", fmt.Errorf("backup command failed: %s", output)
+		logger.Error("Backup command failed",
+			zap.Error(err),
+			zap.String("docker_output", output),
+			zap.Int("output_length", len(output)),
+			zap.String("error_type", fmt.Sprintf("%T", err)))
+
+		// Provide detailed error message
+		if len(output) == 0 {
+			return "", fmt.Errorf("backup command failed with no output (likely container startup failure)\n"+
+				"Error: %v\n"+
+				"This usually indicates:\n"+
+				"  - Docker security restrictions preventing container start\n"+
+				"  - Missing alpine image\n"+
+				"  - Volume mount permissions issue\n"+
+				"Run 'sudo eos debug openwebui' for detailed diagnostics", err)
+		}
+		return "", fmt.Errorf("backup command failed: %s\nError: %v", output, err)
 	}
+
+	logger.Debug("Docker command output captured", zap.String("output", output))
 
 	// Verify backup was created
 	info, err := os.Stat(backupPath)
