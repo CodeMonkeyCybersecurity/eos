@@ -32,7 +32,9 @@ func AllDiagnostics() []*debug.Diagnostic {
 		DataDirectoryDiagnostic(),
 		LogDirectoryDiagnostic(),
 		UserDiagnostic(),
+		PermissionsDiagnostic(),      // NEW: Comprehensive permissions check
 		ServiceDiagnostic(),
+		ServiceConfigDiagnostic(),    // NEW: Show User=/Group= from systemd
 		ServiceLogsDiagnostic(),
 		ProcessDiagnostic(),
 		PortDiagnostic(),
@@ -134,9 +136,226 @@ func UserDiagnostic() *debug.Diagnostic {
 	}
 }
 
+// PermissionsDiagnostic performs comprehensive permission checks
+// This combines checks from the bash diagnostic script
+func PermissionsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Permissions & Ownership",
+		Category:    "System",
+		Description: "Check vault user, data directory ownership, and permissions",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var output strings.Builder
+			output.WriteString("=== Vault Permission Diagnostics ===\n\n")
+
+			// 1. Check vault user exists with detailed ID output
+			output.WriteString("=== Vault User ===\n")
+			idCmd := exec.CommandContext(ctx, "id", "vault")
+			idOutput, idErr := idCmd.CombinedOutput()
+			if idErr != nil {
+				output.WriteString("ERROR: vault user doesn't exist!\n")
+				output.WriteString(fmt.Sprintf("Command output: %s\n", string(idOutput)))
+				result.Status = debug.StatusError
+				result.Message = "Vault user does not exist"
+				result.Remediation = "Create vault user: sudo useradd -r -s /bin/false vault"
+			} else {
+				output.WriteString(string(idOutput))
+				output.WriteString("\n")
+				result.Metadata["vault_user_exists"] = true
+				result.Metadata["vault_user_id"] = string(idOutput)
+			}
+
+			// 2. Check /opt/vault directory ownership
+			output.WriteString("=== /opt/vault Directory ===\n")
+			vaultOptCmd := exec.CommandContext(ctx, "ls", "-la", "/opt/vault/")
+			vaultOptOutput, vaultOptErr := vaultOptCmd.CombinedOutput()
+			if vaultOptErr != nil {
+				output.WriteString("ERROR: /opt/vault doesn't exist!\n")
+				output.WriteString(fmt.Sprintf("Command output: %s\n", string(vaultOptOutput)))
+				result.Metadata["vault_opt_exists"] = false
+			} else {
+				output.WriteString(string(vaultOptOutput))
+				output.WriteString("\n")
+				result.Metadata["vault_opt_exists"] = true
+			}
+
+			// 3. Check /opt/vault/data directory ownership
+			output.WriteString("=== /opt/vault/data Directory ===\n")
+			dataCmd := exec.CommandContext(ctx, "ls", "-la", "/opt/vault/data/")
+			dataOutput, dataErr := dataCmd.CombinedOutput()
+			if dataErr != nil {
+				output.WriteString("ERROR: /opt/vault/data doesn't exist!\n")
+				output.WriteString(fmt.Sprintf("Command output: %s\n", string(dataOutput)))
+				result.Metadata["vault_data_exists"] = false
+			} else {
+				output.WriteString(string(dataOutput))
+				output.WriteString("\n")
+				result.Metadata["vault_data_exists"] = true
+			}
+
+			// 4. Check config directory ownership
+			output.WriteString("=== /etc/vault.d Directory ===\n")
+			configCmd := exec.CommandContext(ctx, "ls", "-la", "/etc/vault.d/")
+			configOutput, configErr := configCmd.CombinedOutput()
+			if configErr != nil {
+				output.WriteString("ERROR: /etc/vault.d doesn't exist!\n")
+				output.WriteString(fmt.Sprintf("Command output: %s\n", string(configOutput)))
+				result.Metadata["vault_config_exists"] = false
+			} else {
+				output.WriteString(string(configOutput))
+				output.WriteString("\n")
+				result.Metadata["vault_config_exists"] = true
+			}
+
+			// 5. Check TLS directory permissions if it exists
+			output.WriteString("=== /etc/vault.d/tls Directory (if exists) ===\n")
+			tlsCmd := exec.CommandContext(ctx, "ls", "-la", "/etc/vault.d/tls/")
+			tlsOutput, tlsErr := tlsCmd.CombinedOutput()
+			if tlsErr != nil {
+				output.WriteString("TLS directory not present (may be using tls_disable=true)\n\n")
+				result.Metadata["vault_tls_exists"] = false
+			} else {
+				output.WriteString(string(tlsOutput))
+				output.WriteString("\n")
+				result.Metadata["vault_tls_exists"] = true
+
+				// Check for proper key file permissions (should be 0600)
+				if strings.Contains(string(tlsOutput), "vault.key") || strings.Contains(string(tlsOutput), "tls.key") {
+					if strings.Contains(string(tlsOutput), "rw-------") {
+						output.WriteString("✓ TLS key file has correct permissions (0600)\n\n")
+					} else {
+						output.WriteString("⚠ WARNING: TLS key file may have insecure permissions!\n")
+						output.WriteString("  Expected: rw------- (0600)\n\n")
+						if result.Status == "" {
+							result.Status = debug.StatusWarning
+							result.Message = "TLS key file has insecure permissions"
+							result.Remediation = "Fix permissions: sudo chmod 600 /etc/vault.d/tls/*.key"
+						}
+					}
+				}
+			}
+
+			// Set final status if not already set
+			if result.Status == "" {
+				if idErr == nil && vaultOptErr == nil && dataErr == nil {
+					result.Status = debug.StatusOK
+					result.Message = "Vault user and directories have correct ownership"
+				} else {
+					result.Status = debug.StatusError
+					result.Message = "Permission or ownership issues detected"
+					result.Remediation = "Ensure vault user exists and owns /opt/vault and /etc/vault.d directories:\n" +
+						"  sudo useradd -r -s /bin/false vault\n" +
+						"  sudo chown -R vault:vault /opt/vault /etc/vault.d"
+				}
+			}
+
+			result.Output = output.String()
+			return result, nil
+		},
+	}
+}
+
 // ServiceDiagnostic checks the systemd service status
 func ServiceDiagnostic() *debug.Diagnostic {
 	return debug.SystemdServiceCheck("vault")
+}
+
+// ServiceConfigDiagnostic shows the systemd service User and Group configuration
+func ServiceConfigDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Systemd Service Configuration",
+		Category:    "Systemd",
+		Description: "Show User= and Group= configuration from vault.service",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var output strings.Builder
+			output.WriteString("=== Systemd Service Configuration ===\n\n")
+
+			// Run systemctl cat to show full service file
+			catCmd := exec.CommandContext(ctx, "systemctl", "cat", "vault.service")
+			catOutput, catErr := catCmd.CombinedOutput()
+
+			if catErr != nil {
+				output.WriteString("ERROR: Could not read vault.service configuration\n")
+				output.WriteString(fmt.Sprintf("Command output: %s\n", string(catOutput)))
+				result.Status = debug.StatusError
+				result.Message = "Vault service file not found"
+				result.Remediation = "Install vault service: sudo eos create vault"
+				result.Output = output.String()
+				return result, nil
+			}
+
+			// Show full service file
+			output.WriteString("Full Service File:\n")
+			output.WriteString("─────────────────────────────────────────────────────────────\n")
+			output.WriteString(string(catOutput))
+			output.WriteString("\n")
+
+			// Extract and highlight User= and Group= lines
+			output.WriteString("Key Configuration:\n")
+			output.WriteString("─────────────────────────────────────────────────────────────\n")
+
+			lines := strings.Split(string(catOutput), "\n")
+			foundUser := false
+			foundGroup := false
+			var user, group string
+
+			for _, line := range lines {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "User=") {
+					output.WriteString(fmt.Sprintf("  %s\n", trimmed))
+					user = strings.TrimPrefix(trimmed, "User=")
+					result.Metadata["user"] = user
+					foundUser = true
+				} else if strings.HasPrefix(trimmed, "Group=") {
+					output.WriteString(fmt.Sprintf("  %s\n", trimmed))
+					group = strings.TrimPrefix(trimmed, "Group=")
+					result.Metadata["group"] = group
+					foundGroup = true
+				}
+			}
+
+			if !foundUser {
+				output.WriteString("  ⚠ WARNING: No User= directive found (will run as root!)\n")
+				result.Status = debug.StatusWarning
+				result.Message = "Service not configured to run as vault user"
+				result.Remediation = "Add 'User=vault' to [Service] section of vault.service"
+			}
+
+			if !foundGroup {
+				output.WriteString("  ⚠ WARNING: No Group= directive found\n")
+			}
+
+			// Verify the user exists
+			if foundUser && user != "" {
+				idCmd := exec.CommandContext(ctx, "id", user)
+				idOutput, idErr := idCmd.CombinedOutput()
+				output.WriteString("\nUser Verification:\n")
+				if idErr != nil {
+					output.WriteString(fmt.Sprintf("  ✗ User '%s' does not exist!\n", user))
+					result.Status = debug.StatusError
+					result.Message = fmt.Sprintf("Configured user '%s' does not exist", user)
+					result.Remediation = fmt.Sprintf("Create user: sudo useradd -r -s /bin/false %s", user)
+				} else {
+					output.WriteString(fmt.Sprintf("  ✓ User '%s' exists: %s\n", user, strings.TrimSpace(string(idOutput))))
+				}
+			}
+
+			if result.Status == "" {
+				result.Status = debug.StatusOK
+				result.Message = "Service configured correctly"
+			}
+
+			result.Output = output.String()
+			return result, nil
+		},
+	}
 }
 
 // ServiceLogsDiagnostic retrieves recent service logs
