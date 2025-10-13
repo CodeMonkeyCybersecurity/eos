@@ -190,24 +190,31 @@ func (owi *OpenWebUIInstaller) assessInstallation(ctx context.Context) (*Install
 	}
 
 	// Check if Docker volume exists
+	// Volume name depends on mode: "open-webui" for LiteLLM, "open-webui-data" for direct mode
+	volumeName := "open-webui"
+	if !owi.config.UseLiteLLM {
+		volumeName = "open-webui-data"
+	}
+
 	volumeOutput, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
-		Args:    []string{"volume", "inspect", "open-webui-data"},
+		Args:    []string{"volume", "inspect", volumeName},
 		Capture: true,
 	})
 	if err == nil {
 		state.VolumeExists = true
-		logger.Debug("Docker volume exists", zap.String("volume", "open-webui-data"))
+		logger.Debug("Docker volume exists", zap.String("volume", volumeName))
 	} else {
 		logger.Debug("Docker volume does not exist",
-			zap.String("volume", "open-webui-data"),
+			zap.String("volume", volumeName),
 			zap.String("output", volumeOutput))
 	}
 
-	// Check if container exists (running or stopped)
+	// Check if containers exist (running or stopped)
+	// Check for OpenWebUI container (always present)
 	output, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
-		Args:    []string{"ps", "-a", "--filter", "name=open-webui", "--format", "{{.ID}}\t{{.Status}}"},
+		Args:    []string{"ps", "-a", "--filter", "name=openwebui", "--format", "{{.ID}}\t{{.Status}}"},
 		Capture: true,
 	})
 	if err == nil && output != "" {
@@ -218,12 +225,33 @@ func (owi *OpenWebUIInstaller) assessInstallation(ctx context.Context) (*Install
 			if len(parts) >= 2 && strings.Contains(parts[1], "Up") {
 				state.Running = true
 			}
-			logger.Debug("Container found",
+			logger.Debug("OpenWebUI container found",
 				zap.String("container_id", state.ContainerID),
 				zap.Bool("running", state.Running))
 		}
 	} else {
-		logger.Debug("No container found")
+		logger.Debug("OpenWebUI container not found")
+	}
+
+	// If using LiteLLM, also check for LiteLLM and PostgreSQL containers
+	if owi.config.UseLiteLLM {
+		litellmOutput, _ := execute.Run(ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"ps", "-a", "--filter", "name=litellm-proxy", "--format", "{{.ID}}\t{{.Status}}"},
+			Capture: true,
+		})
+		if litellmOutput != "" {
+			logger.Debug("LiteLLM proxy container found")
+		}
+
+		pgOutput, _ := execute.Run(ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"ps", "-a", "--filter", "name=postgresql", "--format", "{{.ID}}\t{{.Status}}"},
+			Capture: true,
+		})
+		if pgOutput != "" {
+			logger.Debug("PostgreSQL container found")
+		}
 	}
 
 	// Determine if installation is complete
@@ -1089,11 +1117,18 @@ func (owi *OpenWebUIInstaller) verifyInstallation(ctx context.Context) error {
 
 	logger.Debug("Container is running, checking health endpoint")
 
-	// Verify health endpoint responds (retry up to 30 seconds)
+	// Verify health endpoint responds
+	// For LiteLLM mode: PostgreSQL (60s) + LiteLLM init (15s) + OpenWebUI (10s) = ~85s
+	// Allow 2 minutes total with retries every 10 seconds
 	healthURL := fmt.Sprintf("http://localhost:%d/health", owi.config.Port)
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	maxRetries := 6
+	maxRetries := 12     // 12 attempts
+	retryInterval := 10 * time.Second  // Every 10 seconds = 120 seconds total
+	logger.Info("Waiting for Open WebUI to become healthy",
+		zap.Duration("max_wait", time.Duration(maxRetries)*retryInterval),
+		zap.String("url", healthURL))
+
 	for i := 0; i < maxRetries; i++ {
 		logger.Debug("Checking health endpoint",
 			zap.String("url", healthURL),
@@ -1123,14 +1158,45 @@ func (owi *OpenWebUIInstaller) verifyInstallation(ctx context.Context) error {
 		}
 
 		if i < maxRetries-1 {
-			logger.Debug("Waiting before retry", zap.Duration("wait", 5*time.Second))
-			time.Sleep(5 * time.Second)
+			logger.Debug("Waiting before retry", zap.Duration("wait", retryInterval))
+			time.Sleep(retryInterval)
 		}
 	}
 
-	return fmt.Errorf("health endpoint did not respond after %d attempts\n"+
-		"Container is running but may not be fully initialized\n"+
-		"Check logs with: docker compose -f %s logs", maxRetries, owi.config.ComposeFile)
+	// Health check failed - gather diagnostics
+	logger.Error("Health endpoint did not respond within timeout",
+		zap.Duration("timeout", time.Duration(maxRetries)*retryInterval))
+
+	// Capture container logs for diagnostics
+	logger.Info("Gathering container logs for diagnostics")
+	logsOutput, _ := execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "-f", owi.config.ComposeFile, "logs", "--tail", "50"},
+		Dir:     owi.config.InstallDir,
+		Capture: true,
+		Timeout: 30 * time.Second,
+	})
+
+	if logsOutput != "" {
+		logger.Error("Container logs (last 50 lines)",
+			zap.String("logs", logsOutput))
+	}
+
+	// Check container status
+	statusOutput, _ := execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "-f", owi.config.ComposeFile, "ps"},
+		Dir:     owi.config.InstallDir,
+		Capture: true,
+	})
+
+	logger.Error("Container status", zap.String("status", statusOutput))
+
+	return fmt.Errorf("health endpoint did not respond after %d attempts (waited %v)\n"+
+		"Containers may still be initializing. Check logs above or run:\n"+
+		"  docker compose -f %s logs\n"+
+		"  docker compose -f %s ps",
+		maxRetries, time.Duration(maxRetries)*retryInterval, owi.config.ComposeFile, owi.config.ComposeFile)
 }
 
 // validateAzureEndpoint validates the Azure OpenAI endpoint format
