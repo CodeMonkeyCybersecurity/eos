@@ -16,6 +16,7 @@ Available subcommands:
   consul          - Debug Consul service installation and configuration issues
   delphi          - Debug Delphi (Metis/Temporal) webhook integration
   metis           - Debug Metis security alert processing system
+  openwebui       - Debug OpenWebUI backup and update issues
   watchdog-traces - Analyze resource watchdog traces from previous runs
 
 Each subcommand performs deep diagnostics specific to that component,
