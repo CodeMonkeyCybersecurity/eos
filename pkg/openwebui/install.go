@@ -348,7 +348,7 @@ func (owi *OpenWebUIInstaller) getAzureConfiguration(ctx context.Context) error 
 		return eos_err.NewUserError(
 			"Invalid Azure OpenAI deployment name\n"+
 				"%v\n"+
-				"Deployment names must be alphanumeric with hyphens", err)
+				"Deployment names must be alphanumeric with hyphens, periods, or underscores", err)
 	}
 
 	// Prompt for API key
@@ -747,11 +747,12 @@ func validateAzureDeployment(deployment string) error {
 		return fmt.Errorf("azure OpenAI deployment name cannot be empty")
 	}
 
-	// Deployment names must be alphanumeric with hyphens
+	// Azure deployment names: alphanumeric with hyphens, periods, and underscores
+	// Examples: gpt-4, gpt-4.1, gpt-35-turbo, my_deployment
 	for _, ch := range deployment {
-		isValid := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-'
+		isValid := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '.' || ch == '_'
 		if !isValid {
-			return fmt.Errorf("deployment name must be alphanumeric with hyphens\nProvided: %s", deployment)
+			return fmt.Errorf("deployment name must be alphanumeric with hyphens, periods, or underscores\nProvided: %s", deployment)
 		}
 	}
 
