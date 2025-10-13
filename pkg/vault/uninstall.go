@@ -695,35 +695,54 @@ func (vu *VaultUninstaller) Uninstall() error {
 	vu.displayPreDeletionSummary()
 
 	// INTERVENE - Remove Vault with progress tracking
-	vu.logger.Info("  Beginning Vault uninstallation")
+	vu.logger.Info("Beginning Vault uninstallation",
+		zap.Int("total_steps", 7))
 	totalSteps := 7
 	currentStep := 0
 
 	// Step 1: Stop services
 	currentStep++
-	vu.logger.Info(fmt.Sprintf("[%d/%d] Stopping Vault services...", currentStep, totalSteps))
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Stopping Vault services...", currentStep, totalSteps),
+		zap.Int("step", currentStep),
+		zap.Int("total", totalSteps))
+	stepStartTime := time.Now()
+
 	if err := vu.Stop(); err != nil {
-		vu.logger.Warn("Error stopping services", zap.Error(err))
+		vu.logger.Warn("Error stopping services",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Stop services", false, err)
 		// Continue anyway
 	} else {
+		vu.logger.Info("Services stopped successfully",
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Stop services", true, nil)
 	}
 
 	// Step 2: Remove package
 	currentStep++
-	vu.logger.Info(fmt.Sprintf("[%d/%d] Removing Vault package...", currentStep, totalSteps))
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Removing Vault package...", currentStep, totalSteps),
+		zap.Int("step", currentStep))
+	stepStartTime = time.Now()
+
 	if err := vu.RemovePackage(); err != nil {
-		vu.logger.Warn("Error removing package", zap.Error(err))
+		vu.logger.Warn("Error removing package",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Remove package", false, err)
 		// Continue anyway
 	} else {
+		vu.logger.Info("Package removed successfully",
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Remove package", true, nil)
 	}
 
 	// Step 3: Clean files and directories
 	currentStep++
-	vu.logger.Info(fmt.Sprintf("[%d/%d] Cleaning files and directories...", currentStep, totalSteps))
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Cleaning files and directories...", currentStep, totalSteps),
+		zap.Int("step", currentStep))
+	stepStartTime = time.Now()
+
 	removed, errs := vu.CleanFiles()
 	if len(errs) > 0 {
 		// Log each error individually for transparency
@@ -732,48 +751,87 @@ func (vu *VaultUninstaller) Uninstall() error {
 				zap.String("path", path),
 				zap.Error(err))
 		}
+		vu.logger.Warn("File cleanup completed with errors",
+			zap.Int("removed", len(removed)),
+			zap.Int("errors", len(errs)),
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep(fmt.Sprintf("Clean files (removed %d, %d errors)", len(removed), len(errs)), false, fmt.Errorf("%d errors occurred", len(errs)))
 	} else {
+		vu.logger.Info("File cleanup completed successfully",
+			zap.Int("removed", len(removed)),
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep(fmt.Sprintf("Clean files (removed %d)", len(removed)), true, nil)
 	}
 
 	// Step 4: Remove user and group
 	currentStep++
-	vu.logger.Info(fmt.Sprintf("[%d/%d] Removing vault user and group...", currentStep, totalSteps))
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Removing vault user and group...", currentStep, totalSteps),
+		zap.Int("step", currentStep))
+	stepStartTime = time.Now()
+
 	if err := vu.RemoveUser(); err != nil {
-		vu.logger.Warn("Error removing user", zap.Error(err))
+		vu.logger.Warn("Error removing user",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Remove user/group", false, err)
 	} else {
+		vu.logger.Info("User and group removed successfully",
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Remove user/group", true, nil)
 	}
 
 	// Step 5: Clean environment variables
 	currentStep++
-	vu.logger.Info(fmt.Sprintf("[%d/%d] Cleaning environment variables...", currentStep, totalSteps))
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Cleaning environment variables...", currentStep, totalSteps),
+		zap.Int("step", currentStep))
+	stepStartTime = time.Now()
+
 	if err := vu.CleanEnvironmentVariables(); err != nil {
-		vu.logger.Warn("Error cleaning environment variables", zap.Error(err))
+		vu.logger.Warn("Error cleaning environment variables",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Clean environment", false, err)
 	} else {
+		vu.logger.Info("Environment variables cleaned successfully",
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Clean environment", true, nil)
 	}
 
 	// Step 6: Reload systemd
 	currentStep++
-	vu.logger.Info(fmt.Sprintf("[%d/%d] Reloading systemd daemon...", currentStep, totalSteps))
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Reloading systemd daemon...", currentStep, totalSteps),
+		zap.Int("step", currentStep))
+	stepStartTime = time.Now()
+
 	if err := vu.ReloadSystemd(); err != nil {
-		vu.logger.Debug("Error reloading systemd", zap.Error(err))
+		vu.logger.Debug("Error reloading systemd",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Reload systemd", false, err)
 	} else {
+		vu.logger.Info("Systemd daemon reloaded successfully",
+			zap.Duration("duration", time.Since(stepStartTime)))
 		vu.logStep("Reload systemd", true, nil)
 	}
 
 	// Step 7: EVALUATE - Verify removal
 	currentStep++
-	vu.logger.Info(fmt.Sprintf("[%d/%d] Verifying removal...", currentStep, totalSteps))
+	vu.logger.Info(fmt.Sprintf("[%d/%d] Verifying removal...", currentStep, totalSteps),
+		zap.Int("step", currentStep))
+	stepStartTime = time.Now()
+
 	stillPresent, err := vu.Verify()
+	verifyDuration := time.Since(stepStartTime)
+
 	if len(stillPresent) > 0 {
+		vu.logger.Warn("Verification found remaining components",
+			zap.Int("remaining", len(stillPresent)),
+			zap.Strings("components", stillPresent),
+			zap.Duration("duration", verifyDuration))
 		vu.logStep(fmt.Sprintf("Verification: %d components remain", len(stillPresent)), false, nil)
 	} else {
+		vu.logger.Info("Verification complete - all components removed",
+			zap.Duration("duration", verifyDuration))
 		vu.logStep("Verification: Complete removal confirmed", true, nil)
 	}
 

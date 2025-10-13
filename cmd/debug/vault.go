@@ -73,86 +73,164 @@ func init() {
 
 func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Vault diagnostics using framework")
+	logger.Info("Starting Vault diagnostics",
+		zap.String("format", vaultDebugFormat),
+		zap.Bool("sanitize", vaultDebugSanitize),
+		zap.Bool("show_all", vaultDebugShowAll),
+		zap.String("output_file", vaultDebugOutput))
 
 	// Create collector with appropriate formatter
 	var formatter debug.Formatter
+	logger.Debug("Initializing diagnostic formatter", zap.String("format", vaultDebugFormat))
+
 	switch vaultDebugFormat {
 	case "json":
 		formatter = debug.NewJSONFormatter(true) // Pretty JSON
+		logger.Debug("Using JSON formatter with pretty printing enabled")
 	case "markdown":
 		formatter = debug.NewMarkdownFormatter()
+		logger.Debug("Using Markdown formatter")
 	default:
 		textFormatter := debug.NewTextFormatter()
 		textFormatter.ShowSkipped = vaultDebugShowAll
 		formatter = textFormatter
+		logger.Debug("Using text formatter", zap.Bool("show_skipped", vaultDebugShowAll))
 	}
 
 	collector := debug.NewCollector("Vault", formatter)
+	logger.Debug("Created diagnostic collector", zap.String("component", "Vault"))
 
 	// Add all vault diagnostics including TLS
-	collector.Add(debugvault.AllDiagnostics()...)
-	collector.Add(debugvault.TLSDiagnostic())
+	allDiagnostics := debugvault.AllDiagnostics()
+	tlsDiagnostic := debugvault.TLSDiagnostic()
+
+	logger.Debug("Registering diagnostics",
+		zap.Int("standard_diagnostics", len(allDiagnostics)),
+		zap.Bool("tls_diagnostic", true))
+
+	collector.Add(allDiagnostics...)
+	collector.Add(tlsDiagnostic)
+
+	totalDiagnostics := len(allDiagnostics) + 1
+	logger.Info("Registered diagnostics", zap.Int("total", totalDiagnostics))
 
 	// Run diagnostics
+	logger.Info("Running diagnostics collection", zap.Int("checks_to_run", totalDiagnostics))
 	report, err := collector.Run(rc.Ctx)
 	if err != nil {
+		logger.Error("Diagnostics collection failed", zap.Error(err))
 		return fmt.Errorf("diagnostics collection failed: %w", err)
 	}
 
+	logger.Info("Diagnostics collection completed",
+		zap.Int("checks_run", len(report.Results)),
+		zap.Int("ok", report.Summary.OK),
+		zap.Int("warnings", report.Summary.Warnings),
+		zap.Int("errors", report.Summary.Errors),
+		zap.Int("skipped", report.Summary.Skipped))
+
 	// Create analyzer with vault-specific rules
+	logger.Debug("Initializing diagnostic analyzer")
 	analyzer := debug.NewAnalyzer("vault")
-	for _, rule := range debugvault.VaultAnalysisRules() {
-		analyzer.AddRule(rule)
+
+	rules := debugvault.VaultAnalysisRules()
+	logger.Debug("Loading analysis rules", zap.Int("rule_count", len(rules)))
+
+	for i := range rules {
+		analyzer.AddRule(rules[i])
+		logger.Debug("Registered analysis rule", zap.Int("rule_number", i+1))
 	}
 
+	logger.Info("Analysis rules loaded", zap.Int("total_rules", len(rules)))
+
 	// Perform analysis
+	logger.Info("Performing diagnostic analysis")
 	analysis := analyzer.Analyze(report)
 
+	logger.Info("Analysis completed",
+		zap.Int("critical_issues", len(analysis.CriticalIssues)),
+		zap.Int("major_issues", len(analysis.MajorIssues)),
+		zap.Int("minor_issues", len(analysis.MinorIssues)),
+		zap.Int("warnings", len(analysis.Warnings)),
+		zap.String("overall_health", string(analysis.OverallHealth)))
+
 	// Generate output with analysis
+	logger.Debug("Generating formatted output", zap.String("format", vaultDebugFormat))
 	var output string
+
 	if vaultDebugFormat == "text" || vaultDebugFormat == "" {
+		logger.Debug("Generating text format with quick summary and next steps")
+
 		// Add quick health summary at top
+		logger.Debug("Generating quick health summary")
 		quickSummary := debug.GenerateQuickSummary(report, analysis)
 		output = debug.FormatQuickSummary(quickSummary, "vault")
 		output += "\n\n"
+
+		logger.Debug("Formatting diagnostic report")
 		output += formatter.Format(report)
 		output += "\n\n"
+
+		logger.Debug("Formatting analysis results")
 		output += debug.FormatAnalysis(analysis)
 		output += "\n\n"
+
 		// Add next steps
+		logger.Debug("Generating next steps recommendations")
 		nextSteps := debugvault.GenerateNextSteps(report, analysis)
+		logger.Debug("Next steps generated", zap.Int("step_count", len(nextSteps)))
+
 		if len(nextSteps) > 0 {
 			output += strings.Repeat("=", 80) + "\n"
 			output += "RECOMMENDED NEXT STEPS\n"
 			output += strings.Repeat("=", 80) + "\n\n"
 			for i, step := range nextSteps {
 				output += fmt.Sprintf("%d. %s\n", i+1, step)
+				logger.Debug("Next step", zap.Int("step", i+1), zap.String("action", step))
 			}
 			output += "\n"
 		}
 	} else {
 		// JSON/Markdown get full report
+		logger.Debug("Using formatter for structured output")
 		output = formatter.Format(report)
 	}
 
+	logger.Info("Output generated", zap.Int("output_size_bytes", len(output)))
+
 	// Sanitize if requested
 	if vaultDebugSanitize {
+		logger.Info("Sanitizing sensitive information from output")
+		originalSize := len(output)
 		output = sanitizeOutput(output)
+		logger.Debug("Sanitization complete",
+			zap.Int("original_size", originalSize),
+			zap.Int("sanitized_size", len(output)))
 	}
 
 	// Output to file or stdout
 	if vaultDebugOutput != "" {
+		logger.Info("Writing diagnostic report to file",
+			zap.String("file", vaultDebugOutput),
+			zap.Int("size_bytes", len(output)))
+
 		if err := os.WriteFile(vaultDebugOutput, []byte(output), 0644); err != nil {
+			logger.Error("Failed to write output file",
+				zap.String("file", vaultDebugOutput),
+				zap.Error(err))
 			return fmt.Errorf("failed to write output file: %w", err)
 		}
-		logger.Info("Diagnostic report saved",
+
+		logger.Info("Diagnostic report saved successfully",
 			zap.String("file", vaultDebugOutput),
-			zap.Int("size", len(output)))
+			zap.Int("size_bytes", len(output)))
 		fmt.Printf("Diagnostic report saved to: %s\n", vaultDebugOutput)
 	} else {
+		logger.Debug("Writing diagnostic report to stdout")
 		fmt.Print(output)
 	}
+
+	logger.Info("Vault diagnostics completed successfully")
 
 	return nil
 }

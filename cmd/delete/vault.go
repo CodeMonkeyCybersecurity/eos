@@ -63,14 +63,24 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if running as root
-	if os.Geteuid() != 0 {
+	currentUID := os.Geteuid()
+	logger.Debug("Checking user permissions", zap.Int("euid", currentUID))
+
+	if currentUID != 0 {
+		logger.Error("Insufficient permissions - root required", zap.Int("euid", currentUID))
 		return eos_err.NewUserError("this command must be run as root")
 	}
 
 	logger.Info("Starting Vault removal process",
-		zap.Bool("force", vaultForceDelete))
+		zap.Bool("force", vaultForceDelete),
+		zap.String("command", "delete vault"))
 
 	// Create uninstaller configuration
+	logger.Debug("Creating uninstaller configuration",
+		zap.Bool("force", vaultForceDelete),
+		zap.Bool("remove_data", true),
+		zap.Bool("remove_user", true))
+
 	config := &vault.UninstallConfig{
 		Force:      vaultForceDelete,
 		RemoveData: true,
@@ -78,37 +88,59 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	}
 
 	// Create uninstaller
+	logger.Debug("Initializing Vault uninstaller")
 	uninstaller := vault.NewVaultUninstaller(rc, config)
+	logger.Info("Uninstaller initialized successfully")
 
 	// Perform initial assessment
+	logger.Info("Assessing current Vault installation state")
 	state, err := uninstaller.Assess()
 	if err != nil {
+		logger.Error("Assessment failed", zap.Error(err))
 		return fmt.Errorf("failed to assess Vault installation: %w", err)
 	}
 
+	logger.Info("Assessment completed",
+		zap.Bool("binary_installed", state.BinaryInstalled),
+		zap.Bool("service_running", state.ServiceRunning),
+		zap.Bool("service_enabled", state.ServiceEnabled),
+		zap.Bool("config_exists", state.ConfigExists),
+		zap.Bool("data_exists", state.DataExists),
+		zap.Bool("user_exists", state.UserExists),
+		zap.Bool("package_installed", state.PackageInstalled),
+		zap.Int("existing_paths", len(state.ExistingPaths)),
+		zap.String("version", state.Version))
+
 	// If nothing is installed, return early
 	if !state.BinaryInstalled && !state.ServiceRunning && len(state.ExistingPaths) == 0 {
-		logger.Info("Vault is not installed and no data directories found")
+		logger.Info("Vault is not installed and no data directories found - nothing to remove")
 		return nil
 	}
 
-	// Store state for use in Uninstall() (avoids duplicate assessment)
-	// This is a bit of a hack - we set it via reflection of the struct
-	// Actually, let's just call Uninstall which will use the already-assessed state
-
 	// Confirmation prompt unless forced
 	if !vaultForceDelete {
+		logger.Debug("Force flag not set - prompting user for confirmation")
 		if err := promptForConfirmation(rc, logger, state); err != nil {
+			if err.Error() == "user cancelled" {
+				logger.Info("Deletion cancelled by user")
+				return nil
+			}
+			logger.Error("Confirmation prompt failed", zap.Error(err))
 			return err
 		}
+		logger.Info("User confirmed deletion - proceeding")
+	} else {
+		logger.Info("Force flag set - skipping confirmation prompt")
 	}
 
 	// Execute uninstallation (will use already-assessed state)
+	logger.Info("Beginning Vault uninstallation process")
 	if err := uninstaller.Uninstall(); err != nil {
+		logger.Error("Vault uninstallation failed", zap.Error(err))
 		return fmt.Errorf("vault uninstallation failed: %w", err)
 	}
 
-	logger.Info(" Vault removal process completed successfully")
+	logger.Info("Vault removal process completed successfully")
 	return nil
 }
 
@@ -152,28 +184,43 @@ This action CANNOT be undone!
 Are you absolutely sure you want to proceed? [y/N] `
 
 	logger.Info("terminal prompt: " + prompt)
+	logger.Debug("Waiting for user input (y/N)")
+
 	response, err := eos_io.ReadInput(rc)
 	if err != nil {
+		logger.Error("Failed to read user input", zap.Error(err))
 		return fmt.Errorf("failed to read user input: %w", err)
 	}
 
+	logger.Debug("User response received", zap.String("response", response))
+
 	if response != "y" && response != "Y" {
-		logger.Info("Vault deletion cancelled by user")
-		return nil
+		logger.Info("Vault deletion cancelled by user at first prompt")
+		return fmt.Errorf("user cancelled")
 	}
+
+	logger.Debug("First confirmation accepted - requesting final confirmation")
 
 	// Double confirmation for safety
 	logger.Info("terminal prompt: Type 'DELETE' to confirm (this is your last chance): ")
+	logger.Debug("Waiting for DELETE confirmation")
+
 	confirmResponse, err := eos_io.ReadInput(rc)
 	if err != nil {
+		logger.Error("Failed to read confirmation input", zap.Error(err))
 		return fmt.Errorf("failed to read confirmation: %w", err)
 	}
 
+	logger.Debug("Final confirmation received", zap.String("response", confirmResponse))
+
 	if confirmResponse != "DELETE" {
-		logger.Info("Vault deletion cancelled - confirmation did not match")
-		return nil
+		logger.Info("Vault deletion cancelled - confirmation did not match 'DELETE'",
+			zap.String("expected", "DELETE"),
+			zap.String("received", confirmResponse))
+		return fmt.Errorf("user cancelled")
 	}
 
+	logger.Info("Both confirmations accepted - deletion authorized")
 	return nil
 }
 
