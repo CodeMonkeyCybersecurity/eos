@@ -195,7 +195,8 @@ listener "tcp" {
 		Suggestions: []string{},
 	}
 
-	checkCommonMisconfigurations(rc, configContent, result)
+	// Use the new top-level config validation function
+	validateTopLevelConfig(rc, configContent, result)
 
 	// REGRESSION CHECK: Should detect legacy port 8200
 	foundWarning := false
@@ -304,7 +305,8 @@ func TestHistoricalIssue_TLSDisableString(t *testing.T) {
 				Suggestions: []string{},
 			}
 
-			checkCommonMisconfigurations(rc, tt.config, result)
+			// Use the new top-level config validation function
+		validateTopLevelConfig(rc, tt.config, result)
 
 			hasWarning := false
 			for _, warning := range result.Warnings {
@@ -436,7 +438,8 @@ api_addr = "http://127.0.0.1:8179"
 				Suggestions: []string{},
 			}
 
-			validateSemantics(rc, tt.config, result)
+			// Use the new structured validation via validateParsedConfig
+		validateParsedConfig(rc, tt.config, result)
 
 			// REGRESSION CHECK: Should detect missing blocks
 			if len(result.Errors) < tt.expectErrors {

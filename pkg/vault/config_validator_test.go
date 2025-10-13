@@ -348,7 +348,8 @@ api_addr = "https://127.0.0.1:8179"
 				Suggestions: []string{},
 			}
 
-			validateSemantics(rc, tt.content, result)
+			// Use the new structured validation via validateParsedConfig
+		validateParsedConfig(rc, tt.content, result)
 
 			if len(result.Errors) != tt.expectErrors {
 				t.Errorf("Expected %d errors, got %d: %v",
@@ -426,7 +427,8 @@ ui = true
 				Suggestions: []string{},
 			}
 
-			checkCommonMisconfigurations(rc, tt.content, result)
+			// Use the new top-level config validation
+		validateTopLevelConfig(rc, tt.content, result)
 
 			// Check if expected warnings are present
 			for _, expectedWarning := range tt.expectWarnings {
