@@ -66,26 +66,27 @@ type VMEntry struct {
 
 // VMInfo contains comprehensive information about a VM
 type VMInfo struct {
-	Name            string
-	UUID            string
-	State           string
-	VCPUs           int
-	MemoryMB        int
-	QEMUVersion     string
-	HostQEMUVersion string
-	DriftDetected   bool
-	UptimeDays      int
-	GuestAgentOK    bool
-	NetworkIPs      []string
-	DiskPaths       []string
-	OSInfo          string  // Operating system (e.g., "CentOS Stream 9", "Ubuntu 24.04")
-	ConsulAgent     string  // Consul agent status: "YES", "NO", "DISABLED", "N/A"
-	UpdatesNeeded   string  // OS updates status: "YES", "NO", "DISABLED", "N/A"
-	DiskSizeGB      int     // Total allocated disk image size in GB
-	DiskUsageGB     int     // Used disk space in GB (guest filesystem, requires guest agent)
-	DiskTotalGB     int     // Total disk size from guest perspective in GB (requires guest agent)
-	CPUUsagePercent float64 // CPU usage percentage (requires running VM)
-	MemoryUsageMB   int     // Memory usage in MB (requires running VM)
+	Name              string
+	UUID              string
+	State             string
+	VCPUs             int
+	MemoryMB          int
+	QEMUVersion       string
+	HostQEMUVersion   string
+	DriftDetected     bool
+	UptimeDays        int
+	GuestAgentOK      bool
+	GuestAgentStatus  string  // QEMU Guest Agent status: "INSTALLED", "NOT_INSTALLED", "DISABLED", "N/A"
+	NetworkIPs        []string
+	DiskPaths         []string
+	OSInfo            string  // Operating system (e.g., "CentOS Stream 9", "Ubuntu 24.04")
+	ConsulAgent       string  // Consul agent status: "YES", "NO", "DISABLED", "N/A"
+	UpdatesNeeded     string  // OS updates status: "YES", "NO", "DISABLED", "N/A"
+	DiskSizeGB        int     // Total allocated disk image size in GB
+	DiskUsageGB       int     // Used disk space in GB (guest filesystem, requires guest agent)
+	DiskTotalGB       int     // Total disk size from guest perspective in GB (requires guest agent)
+	CPUUsagePercent   float64 // CPU usage percentage (requires running VM)
+	MemoryUsageMB     int     // Memory usage in MB (requires running VM)
 }
 
 // RestartConfig contains configuration for VM restart operations

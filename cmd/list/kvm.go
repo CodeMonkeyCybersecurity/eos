@@ -196,7 +196,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 			)
 		}
 	} else {
-		table.Header("NAME", "STATE", "VCPUS", "OS", "MEM", "DISK", "CONSUL", "UPDATES", "IPS")
+		table.Header("NAME", "STATE", "VCPUS", "OS", "MEM", "DISK", "QEMU_GA", "CONSUL", "UPDATES", "IPS")
 
 		for _, vm := range vms {
 			consul := "N/A"
@@ -255,6 +255,12 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				memInfoFormatted = fmt.Sprintf("%d MB (%.0f%%)", vm.MemoryMB, usagePercent)
 			}
 
+			// Get QEMU Guest Agent status
+			qemuGA := vm.GuestAgentStatus
+			if qemuGA == "" {
+				qemuGA = "N/A"
+			}
+
 			table.Append(
 				vm.Name,
 				vm.State,
@@ -262,6 +268,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				osInfo,
 				memInfoFormatted,
 				diskInfo,
+				qemuGA,
 				consul,
 				updates,
 				ips,

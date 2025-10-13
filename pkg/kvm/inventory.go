@@ -102,6 +102,7 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string, logger otelzap.Lo
 
 		vm.UptimeDays = getVMUptime(domain)
 		vm.GuestAgentOK = checkGuestAgent(domain)
+		vm.GuestAgentStatus = checkGuestAgentInstalled(domain)
 		vm.NetworkIPs = getVMIPs(domain)
 
 		// Get memory usage with balloon statistics
@@ -133,6 +134,9 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string, logger otelzap.Lo
 				zap.Int("total_gb", totalGB),
 				zap.Int("allocated_gb", vm.DiskSizeGB))
 		}
+	} else {
+		// For non-running VMs, set status to N/A
+		vm.GuestAgentStatus = "N/A"
 	}
 
 	return vm, nil
@@ -331,6 +335,42 @@ func checkGuestAgent(domain *libvirt.Domain) bool {
 
 	// Check if we got a valid response (should be {"return":{}})
 	return result != "" && (result == `{"return":{}}` || result == `{"return": {}}`)
+}
+
+// checkGuestAgentInstalled determines if guest agent is installed, running, or has exec disabled
+// Returns: "INSTALLED", "NOT_INSTALLED", "DISABLED", or "N/A"
+func checkGuestAgentInstalled(domain *libvirt.Domain) string {
+	// Check if domain is running first (guest agent only works on running VMs)
+	state, _, err := domain.GetState()
+	if err != nil || state != libvirt.DOMAIN_RUNNING {
+		return "N/A"
+	}
+
+	// Try to ping the guest agent first
+	result, err := domain.QemuAgentCommand(
+		`{"execute":"guest-ping"}`,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+
+	if err != nil {
+		// Guest agent not responding - likely not installed or not running
+		return "NOT_INSTALLED"
+	}
+
+	// Check if we got a valid response
+	if result == "" || (result != `{"return":{}}` && result != `{"return": {}}`) {
+		return "NOT_INSTALLED"
+	}
+
+	// Guest agent is responsive, now check if guest-exec is enabled
+	execStatus := testGuestExec(domain)
+	if execStatus == "DISABLED" {
+		return "DISABLED"
+	}
+
+	// Guest agent is installed and guest-exec is enabled
+	return "INSTALLED"
 }
 
 // getVMIPs retrieves network IP addresses for the VM with retry logic
