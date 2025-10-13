@@ -115,6 +115,13 @@ func Run(ctx context.Context, opts Options) (string, error) {
 			cmd.Dir = opts.Dir
 		}
 
+		// Set environment variables if provided
+		// If Env is nil, command inherits parent process environment (default behavior)
+		// If Env is non-nil (even empty slice), command gets only those variables
+		if opts.Env != nil {
+			cmd.Env = opts.Env
+		}
+
 		var buf bytes.Buffer
 		// FIXED: Only capture to buffer, use structured logging for output
 		// Removed os.Stdout to prevent raw command output mixing with structured logs

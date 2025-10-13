@@ -64,6 +64,12 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 		return nil, fmt.Errorf("save vault init result: %w", err)
 	}
 
+	// CRITICAL FIX: Display security warnings about insecure key storage
+	// This addresses the security requirement from the specification:
+	// Users MUST be warned that storing all 5 unseal keys together violates
+	// Shamir's Secret Sharing model and is only safe for development/testing
+	DisplaySecurityWarnings(rc, shared.VaultInitPath)
+
 	otelzap.Ctx(rc.Ctx).Warn("Vault is initialized but NOT unsealed yet")
 	otelzap.Ctx(rc.Ctx).Info(" Please run 'eos inspect vault-init' to retrieve your keys and token")
 	otelzap.Ctx(rc.Ctx).Info(" Then run 'eos enable vault' to unseal and secure Vault")

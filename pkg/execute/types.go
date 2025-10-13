@@ -14,6 +14,7 @@ type Options struct {
 	Command     string          // Required
 	Args        []string        // Optional
 	Dir         string          // Optional working directory
+	Env         []string        // Optional environment variables (if nil, inherits from parent)
 	Shell       bool            // Shell mode (bash -c)
 	Retries     int             // Optional retry count
 	Capture     bool            // Return captured output

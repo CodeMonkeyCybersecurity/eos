@@ -112,14 +112,46 @@ func assessConfigFile(rc *eos_io.RuntimeContext, configPath string, result *Conf
 func vaultBinaryValidation(rc *eos_io.RuntimeContext, configPath string, result *ConfigValidationResult) bool {
 	log := otelzap.Ctx(rc.Ctx)
 
-	// Check if vault binary is available
-	vaultPath, err := exec.LookPath("vault")
-	if err != nil {
-		log.Debug("Vault binary not found in PATH, will use manual validation")
-		return false
+	// CRITICAL FIX: Use absolute path to vault binary to avoid PATH issues
+	// The vault binary is always installed at /usr/local/bin/vault
+	vaultPath := shared.VaultBinaryPath
+	if vaultPath == "" {
+		vaultPath = "/usr/local/bin/vault"
 	}
 
-	log.Debug("Found vault binary", zap.String("path", vaultPath))
+	// Check if vault binary exists at expected location
+	if _, err := os.Stat(vaultPath); err != nil {
+		// Binary not found at standard location, try PATH as fallback
+		foundPath, lookupErr := exec.LookPath("vault")
+		if lookupErr != nil {
+			log.Debug("Vault binary not found, will use manual validation",
+				zap.String("expected_path", vaultPath))
+			return false
+		}
+		vaultPath = foundPath
+		log.Debug("Found vault binary in PATH", zap.String("path", vaultPath))
+	} else {
+		log.Debug("Found vault binary at standard location", zap.String("path", vaultPath))
+	}
+
+	// CRITICAL FIX: Ensure PATH includes /usr/local/bin for subprocess
+	// When running as root during installation, the subprocess may not inherit the full PATH
+	env := os.Environ()
+	pathSet := false
+	for i, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			// Ensure /usr/local/bin is in PATH
+			if !strings.Contains(e, "/usr/local/bin") {
+				env[i] = e + ":/usr/local/bin"
+			}
+			pathSet = true
+			break
+		}
+	}
+	if !pathSet {
+		// No PATH variable exists, create one
+		env = append(env, "PATH=/usr/local/bin:/usr/bin:/bin")
+	}
 
 	// Try to run vault validate
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -127,6 +159,7 @@ func vaultBinaryValidation(rc *eos_io.RuntimeContext, configPath string, result 
 		Args:    []string{"operator", "validate", "-config", configPath},
 		Capture: true,
 		Timeout: 5000, // 5 second timeout
+		Env:     env,  // Pass environment with correct PATH
 	})
 
 	if err != nil {
@@ -138,9 +171,13 @@ func vaultBinaryValidation(rc *eos_io.RuntimeContext, configPath string, result 
 
 		// Validation failed - this is a real error
 		result.Valid = false
-		result.Errors = append(result.Errors, fmt.Sprintf("vault validate failed: %s", output))
+		// CRITICAL FIX: Include full error context, not just output
+		errorMsg := fmt.Sprintf("vault validate failed: %v\nOutput: %s", err, output)
+		result.Errors = append(result.Errors, errorMsg)
 		result.Method = "vault-binary"
-		log.Warn("Vault binary validation failed", zap.String("output", output))
+		log.Warn("Vault binary validation failed",
+			zap.String("output", output),
+			zap.Error(err))
 		return true // We did run validation, it just failed
 	}
 

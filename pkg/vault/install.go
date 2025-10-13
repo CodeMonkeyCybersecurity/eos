@@ -586,6 +586,26 @@ func (vi *VaultInstaller) configure() error {
 		certPath := filepath.Join(tlsDir, "vault.crt")
 		keyPath := filepath.Join(tlsDir, "vault.key")
 
+		// CRITICAL FIX: Validate certificate files exist before writing to config
+		// This prevents the #1 installation failure: empty cert paths causing
+		// "open : no such file or directory" when Vault starts
+		if !vi.fileExists(certPath) {
+			return fmt.Errorf("TLS enabled but certificate not found: %s\n"+
+				"This usually means certificate generation failed.\n"+
+				"Try: sudo rm -rf /etc/vault.d/tls && retry installation\n"+
+				"Or disable TLS: sudo eos create vault --tls=false", certPath)
+		}
+		if !vi.fileExists(keyPath) {
+			return fmt.Errorf("TLS enabled but private key not found: %s\n"+
+				"This usually means certificate generation failed.\n"+
+				"Try: sudo rm -rf /etc/vault.d/tls && retry installation\n"+
+				"Or disable TLS: sudo eos create vault --tls=false", keyPath)
+		}
+
+		vi.logger.Info("TLS certificate files validated",
+			zap.String("cert", certPath),
+			zap.String("key", keyPath))
+
 		listenerConfig = fmt.Sprintf(`listener "tcp" {
   address       = "%s"
   tls_disable   = false
@@ -630,78 +650,38 @@ log_format = "json"
 		return fmt.Errorf("failed to set configuration ownership: %w", err)
 	}
 
-	// Validate configuration
+	// Validate configuration using improved validation with fallback
 	vi.logger.Info("Validating Vault configuration")
 
-	// Check if binary exists before trying to validate
-	binaryInfo, err := os.Stat(vi.config.BinaryPath)
+	// CRITICAL FIX: Use ValidateConfigWithFallback which handles PATH issues
+	// and falls back to manual HCL parsing if binary validation fails
+	validationResult, err := ValidateConfigWithFallback(vi.rc, configPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			vi.logger.Warn("Vault binary not installed yet, skipping config validation",
-				zap.String("path", vi.config.BinaryPath),
-				zap.String("hint", "Binary will be validated when service starts"))
-			return nil
-		}
-		return fmt.Errorf("failed to check vault binary: %w", err)
-	}
-
-	// Log binary details for debugging
-	vi.logger.Debug("Vault binary details",
-		zap.String("path", vi.config.BinaryPath),
-		zap.Int64("size", binaryInfo.Size()),
-		zap.String("mode", binaryInfo.Mode().String()),
-		zap.Time("modified", binaryInfo.ModTime()))
-
-	// Make sure the binary is executable
-	if err := os.Chmod(vi.config.BinaryPath, 0755); err != nil {
-		vi.logger.Warn("Failed to set binary permissions", zap.Error(err))
-	}
-
-	// Verify it's actually executable by checking if it runs
-	versionOutput, versionErr := vi.runner.RunOutput(vi.config.BinaryPath, "version")
-	if versionErr != nil {
-		vi.logger.Error("Vault binary exists but cannot execute version command",
-			zap.String("path", vi.config.BinaryPath),
-			zap.Error(versionErr),
-			zap.String("output", versionOutput),
-			zap.String("remediation", fmt.Sprintf("Try running manually: %s version", vi.config.BinaryPath)))
-		// Skip validation if binary can't even run
-		return nil
-	}
-	vi.logger.Debug("Vault binary executable",
-		zap.String("version_output", versionOutput))
-
-	// Validate the configuration file
-	output, err := vi.runner.RunOutput(vi.config.BinaryPath, "validate", configPath)
-	if err != nil {
-		// Check error type to determine severity
-		if strings.Contains(err.Error(), "exit status 127") {
-			// Command not found - binary might not be in PATH yet, skip validation
-			vi.logger.Warn("Vault binary not in PATH, skipping config validation",
-				zap.String("path", vi.config.BinaryPath),
-				zap.Error(err),
-				zap.String("hint", "Configuration will be validated when service starts"))
-			return nil
-		}
-
-		// Configuration validation error - log details but don't fail
-		vi.logger.Warn("Configuration validation failed, proceeding anyway",
+		vi.logger.Error("Configuration validation encountered error",
 			zap.Error(err),
-			zap.String("output", output),
-			zap.String("config_path", configPath),
-			zap.String("remediation", fmt.Sprintf("Check config file: cat %s", configPath)))
-
-		// If there's actual output explaining the error, include it
-		if output != "" {
-			vi.logger.Warn("Validation error details", zap.String("details", output))
-		}
-
-		// Don't fail installation - let systemd try to start it
-		// This allows the service to fail with proper error messages in journalctl
-		return nil
+			zap.String("config_path", configPath))
+		return fmt.Errorf("configuration validation error: %w", err)
 	}
 
-	vi.logger.Info("Configuration validated successfully")
+	// Log warnings and suggestions
+	for _, warning := range validationResult.Warnings {
+		vi.logger.Warn("Configuration warning", zap.String("warning", warning))
+	}
+	for _, suggestion := range validationResult.Suggestions {
+		vi.logger.Info("Configuration suggestion", zap.String("suggestion", suggestion))
+	}
+
+	// Check if configuration is valid
+	if !validationResult.Valid {
+		vi.logger.Error("Configuration validation failed",
+			zap.Strings("errors", validationResult.Errors),
+			zap.String("method", validationResult.Method))
+		return fmt.Errorf("configuration invalid: %s\nConfig file: %s\nFix: Review configuration and correct any errors",
+			strings.Join(validationResult.Errors, "; "), configPath)
+	}
+
+	vi.logger.Info("Configuration validated successfully",
+		zap.String("method", validationResult.Method))
 	return nil
 }
 
@@ -836,7 +816,7 @@ func (vi *VaultInstaller) verify() error {
 
 	// Check service status
 	if !vi.systemd.IsActive() {
-		return fmt.Errorf("Vault service is not active")
+		return fmt.Errorf("vault service is not active")
 	}
 
 	// Check Vault status
@@ -845,7 +825,7 @@ func (vi *VaultInstaller) verify() error {
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
 			vi.logger.Info("Vault is installed and sealed (expected)")
 		} else {
-			return fmt.Errorf("Vault is not responding to commands: %w", err)
+			return fmt.Errorf("vault is not responding to commands: %w", err)
 		}
 	}
 
