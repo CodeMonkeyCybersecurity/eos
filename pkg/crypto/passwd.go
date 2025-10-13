@@ -23,6 +23,10 @@ var (
 	digitChars  = "0123456789"
 	symbolChars = "!@#%^&*()-_=+[]{}|;:,.<>?/" // Removed $ to prevent shell injection
 	allChars    = lowerChars + upperChars + digitChars + symbolChars
+
+	// URL-safe characters: alphanumeric + hyphen + underscore
+	// Safe for: URLs, command line, connection strings, environment variables
+	urlSafeChars = lowerChars + upperChars + digitChars + "-_"
 )
 
 // GeneratePassword creates a strong random password with at least 1 of each char class.
@@ -54,6 +58,35 @@ func GeneratePassword(length int) (string, error) {
 		return "", err
 	}
 	return string(pw), nil
+}
+
+// GenerateURLSafePassword generates a cryptographically secure password
+// using only URL-safe characters (alphanumeric + hyphen + underscore).
+// This prevents issues with special characters in connection strings like DATABASE_URL.
+//
+// Character set: [a-zA-Z0-9_-] (64 possible characters)
+// Entropy: log2(64^32) = 192 bits for 32-character password
+//
+// Use this for:
+//   - Database passwords in connection strings
+//   - Passwords that will appear in URLs
+//   - Passwords that need to work in shell commands without escaping
+//   - API keys/tokens that need to be URL-safe
+func GenerateURLSafePassword(length int) (string, error) {
+	if length < MinPasswordLen {
+		return "", errors.New("password too short: min length " + fmt.Sprintf("%d", MinPasswordLen))
+	}
+
+	password := make([]byte, length)
+	for i := 0; i < length; i++ {
+		c, err := randomChar(urlSafeChars)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate random character: %w", err)
+		}
+		password[i] = c
+	}
+
+	return string(password), nil
 }
 
 // ValidateStrongPassword checks that the password meets security policy.
