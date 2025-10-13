@@ -158,21 +158,39 @@ func (owi *OpenWebUIInstaller) assessInstallation(ctx context.Context) (*Install
 	// Check if installation directory exists
 	if _, err := os.Stat(owi.config.InstallDir); err == nil {
 		state.ExistingPaths = append(state.ExistingPaths, owi.config.InstallDir)
+		logger.Debug("Installation directory exists", zap.String("dir", owi.config.InstallDir))
 	}
 
 	// Check if compose file exists
 	if _, err := os.Stat(owi.config.ComposeFile); err == nil {
 		state.ComposeFileExists = true
 		state.ExistingPaths = append(state.ExistingPaths, owi.config.ComposeFile)
+		logger.Debug("Compose file exists", zap.String("file", owi.config.ComposeFile))
 	}
 
 	// Check if env file exists
 	if _, err := os.Stat(owi.config.EnvFile); err == nil {
 		state.EnvFileExists = true
 		state.ExistingPaths = append(state.ExistingPaths, owi.config.EnvFile)
+		logger.Debug("Environment file exists", zap.String("file", owi.config.EnvFile))
 	}
 
-	// Check if container is running
+	// Check if Docker volume exists
+	volumeOutput, err := execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"volume", "inspect", "open-webui-data"},
+		Capture: true,
+	})
+	if err == nil {
+		state.VolumeExists = true
+		logger.Debug("Docker volume exists", zap.String("volume", "open-webui-data"))
+	} else {
+		logger.Debug("Docker volume does not exist",
+			zap.String("volume", "open-webui-data"),
+			zap.String("output", volumeOutput))
+	}
+
+	// Check if container exists (running or stopped)
 	output, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"ps", "-a", "--filter", "name=open-webui", "--format", "{{.ID}}\t{{.Status}}"},
@@ -186,10 +204,21 @@ func (owi *OpenWebUIInstaller) assessInstallation(ctx context.Context) (*Install
 			if len(parts) >= 2 && strings.Contains(parts[1], "Up") {
 				state.Running = true
 			}
+			logger.Debug("Container found",
+				zap.String("container_id", state.ContainerID),
+				zap.Bool("running", state.Running))
 		}
+	} else {
+		logger.Debug("No container found")
 	}
 
-	logger.Debug("Assessment complete",
+	// Determine if installation is complete
+	state.Installed = state.ContainerID != "" || (state.ComposeFileExists && state.EnvFileExists && state.VolumeExists)
+
+	logger.Info("Assessment complete",
+		zap.Bool("installed", state.Installed),
+		zap.Bool("running", state.Running),
+		zap.Bool("volume_exists", state.VolumeExists),
 		zap.Int("existing_paths", len(state.ExistingPaths)),
 		zap.String("container_id", state.ContainerID))
 
@@ -270,7 +299,7 @@ func (owi *OpenWebUIInstaller) checkPrerequisites(ctx context.Context) error {
 
 	// Check Docker
 	logger.Debug("Checking for Docker")
-	_, err := execute.Run(ctx, execute.Options{
+	dockerVersion, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"--version"},
 		Capture: true,
@@ -280,11 +309,11 @@ func (owi *OpenWebUIInstaller) checkPrerequisites(ctx context.Context) error {
 			"Docker is not installed\n" +
 				"Please install Docker: https://docs.docker.com/get-docker/")
 	}
-	logger.Debug("Docker is available")
+	logger.Info("Docker is available", zap.String("version", strings.TrimSpace(dockerVersion)))
 
 	// Check Docker Compose
 	logger.Debug("Checking for Docker Compose")
-	_, err = execute.Run(ctx, execute.Options{
+	composeVersion, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "version"},
 		Capture: true,
@@ -294,7 +323,53 @@ func (owi *OpenWebUIInstaller) checkPrerequisites(ctx context.Context) error {
 			"Docker Compose is not installed\n" +
 				"Please install Docker Compose: https://docs.docker.com/compose/install/")
 	}
-	logger.Debug("Docker Compose is available")
+	logger.Info("Docker Compose is available", zap.String("version", strings.TrimSpace(composeVersion)))
+
+	// Check if Docker daemon is running
+	logger.Debug("Checking if Docker daemon is running")
+	_, err = execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"ps"},
+		Capture: true,
+	})
+	if err != nil {
+		return eos_err.NewUserError(
+			"Docker daemon is not running\n" +
+				"Please start Docker: sudo systemctl start docker")
+	}
+	logger.Debug("Docker daemon is running")
+
+	// Check if port is available
+	logger.Debug("Checking port availability", zap.Int("port", owi.config.Port))
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "sh",
+		Args:    []string{"-c", fmt.Sprintf("ss -tuln | grep ':%d ' || true", owi.config.Port)},
+		Capture: true,
+	})
+	if err == nil && strings.TrimSpace(output) != "" {
+		logger.Warn("Port is already in use",
+			zap.Int("port", owi.config.Port),
+			zap.String("output", output))
+
+		// Check if it's our own container
+		containerCheck, _ := execute.Run(ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"ps", "--filter", "name=open-webui", "--format", "{{.Ports}}"},
+			Capture: true,
+		})
+
+		if !strings.Contains(containerCheck, fmt.Sprintf("%d->", owi.config.Port)) {
+			return eos_err.NewUserError(
+				"Port %d is already in use by another process\n"+
+					"Either:\n"+
+					"  1. Stop the process using: sudo ss -tulnp | grep ':%d'\n"+
+					"  2. Use a different port with: --port XXXX",
+				owi.config.Port, owi.config.Port)
+		}
+		logger.Debug("Port is used by our own OpenWebUI container (acceptable)")
+	} else {
+		logger.Debug("Port is available", zap.Int("port", owi.config.Port))
+	}
 
 	return nil
 }

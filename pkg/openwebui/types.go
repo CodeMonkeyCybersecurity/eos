@@ -43,6 +43,7 @@ type InstallState struct {
 	Running           bool
 	ComposeFileExists bool
 	EnvFileExists     bool
+	VolumeExists      bool     // Docker volume exists
 	ContainerID       string
 	HealthStatus      string
 	Version           string
