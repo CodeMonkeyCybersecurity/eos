@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -153,38 +152,17 @@ func vaultBinaryValidation(rc *eos_io.RuntimeContext, configPath string, result 
 		env = append(env, "PATH=/usr/local/bin:/usr/bin:/bin")
 	}
 
-	// Try to run vault validate
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: vaultPath,
-		Args:    []string{"operator", "validate", "-config", configPath},
-		Capture: true,
-		Timeout: 5000, // 5 second timeout
-		Env:     env,  // Pass environment with correct PATH
-	})
+	// CRITICAL FIX: Vault 1.20.4+ doesn't have "operator validate" or "validate" commands
+	// The only way to validate config is to try starting vault with the config
+	// Since we can't actually start it (port in use, etc.), we fall back to manual validation
+	// This is a known limitation - vault doesn't provide a standalone config validation command
 
-	if err != nil {
-		// Check if it's a "command not found" error (old Vault version)
-		if strings.Contains(output, "No such command") || strings.Contains(output, "unknown command") {
-			log.Debug("vault operator validate not available (old version?), using manual validation")
-			return false
-		}
+	log.Debug("Vault binary config validation not available in v1.20.4+",
+		zap.String("version", "1.20.4"),
+		zap.String("note", "Vault removed standalone validate command"))
 
-		// Validation failed - this is a real error
-		result.Valid = false
-		// CRITICAL FIX: Include full error context, not just output
-		errorMsg := fmt.Sprintf("vault validate failed: %v\nOutput: %s", err, output)
-		result.Errors = append(result.Errors, errorMsg)
-		result.Method = "vault-binary"
-		log.Warn("Vault binary validation failed",
-			zap.String("output", output),
-			zap.Error(err))
-		return true // We did run validation, it just failed
-	}
-
-	// Validation succeeded
-	result.Method = "vault-binary"
-	log.Debug("Vault binary validation succeeded", zap.String("output", output))
-	return true
+	// Fallback to manual HCL parsing (which is actually more reliable anyway)
+	return false
 }
 
 // manualConfigValidation performs manual HCL parsing and semantic validation
