@@ -440,8 +440,20 @@ func (owu *OpenWebUIUpdater) performUpdate(ctx context.Context, state *UpdateSta
 		zap.String("from", state.CurrentVersion),
 		zap.String("to", state.TargetVersion))
 
-	// Step 1: Check disk space before backup (P1 Security Fix)
+	// Step 1: Stop container BEFORE backup (P0 Security Fix - prevents TOCTOU race condition)
+	logger.Info("Stopping Open WebUI container before backup to ensure data consistency")
+	if err := owu.stopContainer(ctx); err != nil {
+		return fmt.Errorf("failed to stop container: %w", err)
+	}
+
+	// Step 2: Ensure backup directory exists before checking disk space
 	if !owu.config.SkipBackup {
+		logger.Debug("Ensuring backup directory exists", zap.String("backup_dir", owu.config.BackupDir))
+		if err := os.MkdirAll(owu.config.BackupDir, 0755); err != nil {
+			return fmt.Errorf("failed to create backup directory: %w", err)
+		}
+
+		// Check disk space after creating directory (P1 Security Fix)
 		// Estimate backup size: typically 1-5GB for Open WebUI data
 		// Require at least 5GB available to be safe
 		requiredSpace := uint64(5 * 1024 * 1024 * 1024) // 5GB in bytes
@@ -450,12 +462,6 @@ func (owu *OpenWebUIUpdater) performUpdate(ctx context.Context, state *UpdateSta
 				"Free up disk space before attempting update", err)
 		}
 		logger.Debug("Disk space check passed")
-	}
-
-	// Step 2: Stop container BEFORE backup (P0 Security Fix - prevents TOCTOU race condition)
-	logger.Info("Stopping Open WebUI container before backup to ensure data consistency")
-	if err := owu.stopContainer(ctx); err != nil {
-		return fmt.Errorf("failed to stop container: %w", err)
 	}
 
 	// Step 3: Backup data (unless skipped)
@@ -501,11 +507,6 @@ func (owu *OpenWebUIUpdater) performUpdate(ctx context.Context, state *UpdateSta
 func (owu *OpenWebUIUpdater) backupData(ctx context.Context) (string, error) {
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Creating backup of Open WebUI data")
-
-	// Create backup directory if it doesn't exist
-	if err := os.MkdirAll(owu.config.BackupDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create backup directory: %w", err)
-	}
 
 	// Generate backup filename with timestamp
 	timestamp := time.Now().Format("20060102-150405")
