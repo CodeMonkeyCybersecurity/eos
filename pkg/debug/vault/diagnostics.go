@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	DefaultBinaryPath = "/usr/local/bin/vault"
-	DefaultConfigPath = "/etc/vault.d/vault.hcl"
-	DefaultDataPath   = "/opt/vault/data"
-	DefaultLogPath    = "/var/log/vault"
+	DefaultBinaryPath      = "/usr/local/bin/vault"
+	DefaultConfigPath      = "/etc/vault.d/vault.hcl"
+	DefaultDataPath        = "/opt/vault/data"
+	DefaultLogPath         = "/var/log/vault"
+	DeletionTransactionDir = "/var/log/eos"
 )
 
 // AllDiagnostics returns all vault diagnostic checks
@@ -38,6 +39,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		HealthCheckDiagnostic(),
 		EnvironmentDiagnostic(),
 		CapabilitiesDiagnostic(),
+		DeletionTransactionLogsDiagnostic(),
 	}
 }
 
@@ -304,4 +306,160 @@ func maskToken(token string) string {
 		return "***"
 	}
 	return token[:4] + "..." + token[len(token)-4:]
+}
+
+// DeletionTransactionLogsDiagnostic checks for vault deletion transaction logs
+func DeletionTransactionLogsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Deletion Transaction Logs",
+		Category:    "Deletion History",
+		Description: "Check for vault deletion transaction logs and analyze deletion attempts",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Check if transaction directory exists
+			if _, err := os.Stat(DeletionTransactionDir); os.IsNotExist(err) {
+				result.Status = debug.StatusOK
+				result.Message = "No deletion transaction logs found (vault has not been deleted)"
+				result.Output = fmt.Sprintf("Directory %s does not exist\n", DeletionTransactionDir)
+				return result, nil
+			}
+
+			// Find all vault-deletion-*.log files
+			entries, err := os.ReadDir(DeletionTransactionDir)
+			if err != nil {
+				result.Status = debug.StatusWarning
+				result.Message = "Could not read transaction log directory"
+				result.Output = fmt.Sprintf("Error reading %s: %v\n", DeletionTransactionDir, err)
+				return result, nil
+			}
+
+			var logFiles []string
+			var latestLog string
+			var latestTime time.Time
+
+			for _, entry := range entries {
+				if !entry.IsDir() && strings.HasPrefix(entry.Name(), "vault-deletion-") && strings.HasSuffix(entry.Name(), ".log") {
+					logPath := fmt.Sprintf("%s/%s", DeletionTransactionDir, entry.Name())
+					logFiles = append(logFiles, logPath)
+
+					// Track the latest log file
+					info, err := entry.Info()
+					if err == nil && info.ModTime().After(latestTime) {
+						latestTime = info.ModTime()
+						latestLog = logPath
+					}
+				}
+			}
+
+			result.Metadata["log_count"] = len(logFiles)
+			result.Metadata["log_files"] = logFiles
+
+			if len(logFiles) == 0 {
+				result.Status = debug.StatusOK
+				result.Message = "No vault deletion logs found"
+				result.Output = "No vault-deletion-*.log files in " + DeletionTransactionDir + "\n"
+				return result, nil
+			}
+
+			// Build output showing all logs
+			var output strings.Builder
+			output.WriteString(fmt.Sprintf("Found %d deletion transaction log(s):\n\n", len(logFiles)))
+
+			for _, logFile := range logFiles {
+				info, err := os.Stat(logFile)
+				if err != nil {
+					continue
+				}
+				marker := ""
+				if logFile == latestLog {
+					marker = " (LATEST)"
+				}
+				output.WriteString(fmt.Sprintf("  - %s%s\n", logFile, marker))
+				output.WriteString(fmt.Sprintf("    Modified: %s\n", info.ModTime().Format(time.RFC3339)))
+				output.WriteString(fmt.Sprintf("    Size: %d bytes\n", info.Size()))
+			}
+
+			// Read and display the latest log
+			if latestLog != "" {
+				output.WriteString("\n═══════════════════════════════════════════════════════════════\n")
+				output.WriteString(fmt.Sprintf("Latest Deletion Log: %s\n", latestLog))
+				output.WriteString("═══════════════════════════════════════════════════════════════\n\n")
+
+				content, err := os.ReadFile(latestLog)
+				if err != nil {
+					output.WriteString(fmt.Sprintf("Error reading log: %v\n", err))
+				} else {
+					output.WriteString(string(content))
+
+					// Analyze the log content for issues
+					contentStr := string(content)
+					result.Metadata["latest_log"] = latestLog
+					result.Metadata["log_content"] = contentStr
+
+					if strings.Contains(contentStr, "INTERRUPTED") {
+						result.Status = debug.StatusError
+						result.Message = "Deletion was interrupted - system may be in inconsistent state"
+						result.Remediation = "Run 'sudo eos delete vault --force' to retry deletion"
+					} else if strings.Contains(contentStr, "FAILED") {
+						result.Status = debug.StatusError
+						result.Message = "Deletion encountered failures"
+						result.Remediation = "Review log for errors, then retry with --force"
+					} else if strings.Contains(contentStr, "FINISHED") && strings.Contains(contentStr, "SUCCESS") {
+						result.Status = debug.StatusOK
+						result.Message = "Last deletion completed successfully"
+					} else {
+						result.Status = debug.StatusWarning
+						result.Message = "Deletion log exists but status unclear"
+						result.Remediation = "Review log contents to determine current state"
+					}
+				}
+
+				// Add analysis of what might still be present
+				output.WriteString("\n")
+				output.WriteString("Current System State Check:\n")
+				output.WriteString("─────────────────────────────────────────────────────────────\n")
+
+				// Check if components still exist
+				checks := map[string]string{
+					"/usr/local/bin/vault":           "Binary",
+					"/etc/vault.d":                   "Config directory",
+					"/opt/vault":                     "Data directory",
+					"/var/log/vault":                 "Log directory",
+					"/etc/systemd/system/vault.service": "Service file",
+				}
+
+				stillPresent := []string{}
+				for path, desc := range checks {
+					if _, err := os.Stat(path); err == nil {
+						stillPresent = append(stillPresent, fmt.Sprintf("%s (%s)", desc, path))
+						output.WriteString(fmt.Sprintf("  ✗ %s still exists: %s\n", desc, path))
+					} else {
+						output.WriteString(fmt.Sprintf("  ✓ %s removed: %s\n", desc, path))
+					}
+				}
+
+				result.Metadata["remaining_components"] = stillPresent
+
+				if len(stillPresent) > 0 {
+					output.WriteString("\n⚠ WARNING: Partial deletion detected - some components remain\n")
+					if result.Status == debug.StatusOK {
+						result.Status = debug.StatusWarning
+						result.Message = "Deletion completed but some components still present"
+						result.Remediation = "Run 'sudo eos delete vault --force' to complete removal"
+					}
+				}
+			}
+
+			result.Output = output.String()
+
+			if result.Status == "" {
+				result.Status = debug.StatusWarning
+			}
+
+			return result, nil
+		},
+	}
 }

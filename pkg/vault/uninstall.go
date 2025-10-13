@@ -186,28 +186,80 @@ func (vu *VaultUninstaller) Assess() (*UninstallState, error) {
 }
 
 // Stop stops all Vault services and removes systemd service files
+// Uses a robust multi-stage approach: graceful stop → force kill → process kill
 func (vu *VaultUninstaller) Stop() error {
 	vu.logger.Info("Stopping Vault services")
 
-	// Stop vault service
-	if err := exec.Command("systemctl", "stop", "vault").Run(); err != nil {
-		vu.logger.Warn("Failed to stop vault service (may not be running)", zap.Error(err))
+	// Stage 1: Try graceful stop with timeout
+	vu.logger.Debug("Stage 1: Attempting graceful stop of vault service (30s timeout)")
+	if err := vu.stopServiceWithTimeout("vault", 30*time.Second); err != nil {
+		vu.logger.Warn("Graceful stop failed or timed out", zap.Error(err))
+
+		// Stage 2: Force kill the service
+		vu.logger.Debug("Stage 2: Force killing vault service with systemctl kill")
+		killCtx, killCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer killCancel()
+		killCmd := exec.CommandContext(killCtx, "systemctl", "kill", "--signal=SIGKILL", "vault")
+		if killErr := killCmd.Run(); killErr != nil {
+			vu.logger.Warn("systemctl kill failed, will try direct process kill", zap.Error(killErr))
+		}
+		time.Sleep(2 * time.Second) // Give it time to die
 	}
 
-	// Stop vault-agent if present
-	if err := exec.Command("systemctl", "stop", "vault-agent").Run(); err != nil {
+	// Stage 3: Stop vault-agent if present (with timeout)
+	vu.logger.Debug("Stopping vault-agent (if present)")
+	if err := vu.stopServiceWithTimeout("vault-agent", 15*time.Second); err != nil {
 		vu.logger.Debug("vault-agent not running or doesn't exist")
+		// Force kill vault-agent too
+		killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer killCancel()
+		_ = exec.CommandContext(killCtx, "systemctl", "kill", "--signal=SIGKILL", "vault-agent").Run()
 	}
+
+	// Stage 4: Direct process termination - SIGTERM first
+	vu.logger.Debug("Stage 4: Sending SIGTERM to any remaining vault processes")
+	pkillCtx, pkillCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer pkillCancel()
+	if err := exec.CommandContext(pkillCtx, "pkill", "-TERM", "vault").Run(); err == nil {
+		vu.logger.Debug("Sent SIGTERM to vault processes, waiting 3s for graceful shutdown")
+		time.Sleep(3 * time.Second)
+	}
+
+	// Stage 5: Check if processes still exist, use SIGKILL if needed
+	checkCtx, checkCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer checkCancel()
+	if err := exec.CommandContext(checkCtx, "pgrep", "vault").Run(); err == nil {
+		vu.logger.Warn("Vault processes still running after SIGTERM, sending SIGKILL")
+		killCtx, killCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer killCancel()
+		if err := exec.CommandContext(killCtx, "pkill", "-9", "vault").Run(); err != nil {
+			vu.logger.Error("Failed to kill vault processes with SIGKILL", zap.Error(err))
+			return fmt.Errorf("vault processes could not be killed: %w", err)
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	// Stage 6: Final verification - no vault processes should remain
+	finalCheck, finalCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer finalCancel()
+	if err := exec.CommandContext(finalCheck, "pgrep", "vault").Run(); err == nil {
+		vu.logger.Error("CRITICAL: Vault processes still running after all kill attempts")
+		// List them for debugging
+		psCtx, psCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer psCancel()
+		if output, psErr := exec.CommandContext(psCtx, "ps", "aux").CombinedOutput(); psErr == nil {
+			vu.logger.Error("Current vault processes", zap.String("ps_output", string(output)))
+		}
+		return fmt.Errorf("vault processes could not be terminated after all attempts")
+	}
+
+	vu.logger.Info("All vault processes successfully stopped")
 
 	// Disable services
 	if vu.state != nil && vu.state.ServiceEnabled {
-		exec.Command("systemctl", "disable", "vault").Run()
-		exec.Command("systemctl", "disable", "vault-agent").Run()
-	}
-
-	// Kill any remaining vault processes
-	if err := exec.Command("pkill", "-f", "vault").Run(); err != nil {
-		vu.logger.Debug("No vault processes to kill")
+		vu.logger.Debug("Disabling vault services")
+		_ = exec.Command("systemctl", "disable", "vault").Run()
+		_ = exec.Command("systemctl", "disable", "vault-agent").Run()
 	}
 
 	// Remove systemd service files
@@ -236,6 +288,34 @@ func (vu *VaultUninstaller) Stop() error {
 	exec.Command("systemctl", "reset-failed", "vault-agent.service").Run()
 
 	vu.logger.Info("Vault services stopped and cleaned")
+	return nil
+}
+
+// stopServiceWithTimeout stops a systemd service with a specified timeout
+func (vu *VaultUninstaller) stopServiceWithTimeout(serviceName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "systemctl", "stop", serviceName)
+	startTime := time.Now()
+
+	vu.logger.Debug("Stopping service",
+		zap.String("service", serviceName),
+		zap.Duration("timeout", timeout))
+
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			vu.logger.Warn("Service stop timed out",
+				zap.String("service", serviceName),
+				zap.Duration("waited", time.Since(startTime)))
+			return fmt.Errorf("timeout after %v", timeout)
+		}
+		return err
+	}
+
+	vu.logger.Debug("Service stopped successfully",
+		zap.String("service", serviceName),
+		zap.Duration("duration", time.Since(startTime)))
 	return nil
 }
 
@@ -453,7 +533,7 @@ func (vu *VaultUninstaller) logStep(stepName string, success bool, err error) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	f.WriteString(logEntry)
+	_, _ = f.WriteString(logEntry)
 }
 
 // setupSignalHandling sets up graceful shutdown on interrupt
