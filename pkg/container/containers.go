@@ -90,13 +90,43 @@ func StopContainers(rc *eos_io.RuntimeContext, containers []string) error {
 	return nil
 }
 
+// RemoveContainers removes multiple Docker containers.
+// Idempotent: Returns success if containers already don't exist.
 func RemoveContainers(rc *eos_io.RuntimeContext, containers []string) error {
-	args := append([]string{"rm"}, containers...)
-	err := execute.RunSimple(rc.Ctx, "docker", args...)
-	if err != nil {
-		return fmt.Errorf("failed to remove containers %v: %w", containers, err)
+	for _, container := range containers {
+		if err := RemoveContainer(rc, container); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// RemoveContainer removes a single Docker container (with -f flag).
+// Idempotent: Returns success if container already doesn't exist.
+func RemoveContainer(rc *eos_io.RuntimeContext, containerName string) error {
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"rm", "-f", containerName},
+		Capture: true,
+	})
+
+	if err != nil {
+		// Check if error is because container doesn't exist (idempotent behavior)
+		if containsNoSuchContainer(output) {
+			// Container already gone - success
+			return nil
+		}
+		// Real error - return it
+		return fmt.Errorf("failed to remove container %s: %s", containerName, output)
+	}
+
+	return nil
+}
+
+// containsNoSuchContainer checks if Docker error indicates container doesn't exist
+func containsNoSuchContainer(output string) bool {
+	return strings.Contains(output, "No such container") ||
+		strings.Contains(output, "Error: No such container")
 }
 
 func ListDefaultContainers() error {

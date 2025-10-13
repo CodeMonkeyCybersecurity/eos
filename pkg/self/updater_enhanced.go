@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"go.uber.org/zap"
 )
@@ -367,9 +368,19 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		return "", fmt.Errorf("built binary does not exist at %s: %w", tempBinary, err)
 	}
 
+	newSizeMB := float64(binaryInfo.Size()) / (1024 * 1024)
+	newHash, err := crypto.HashFile(tempBinary)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash new binary: %w", err)
+	}
+
 	eeu.logger.Info("Build successful",
 		zap.String("binary", tempBinary),
 		zap.Int64("size_bytes", binaryInfo.Size()))
+
+	eeu.logger.Info("New binary metadata",
+		zap.String("sha256", newHash[:16]+"..."),
+		zap.Float64("size_mb", newSizeMB))
 
 	return tempBinary, nil
 }
@@ -420,6 +431,22 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 
 // createTransactionBackup creates a backup with transaction metadata
 func (eeu *EnhancedEosUpdater) createTransactionBackup() error {
+	// Get hash and size of current binary before backup
+	currentBinaryInfo, err := os.Stat(eeu.config.BinaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat current binary: %w", err)
+	}
+	currentSizeMB := float64(currentBinaryInfo.Size()) / (1024 * 1024)
+
+	currentHash, err := crypto.HashFile(eeu.config.BinaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to hash current binary: %w", err)
+	}
+
+	eeu.logger.Info("Current binary metadata",
+		zap.String("sha256", currentHash[:16]+"..."),
+		zap.Float64("size_mb", currentSizeMB))
+
 	if err := eeu.CreateBackup(); err != nil {
 		return err
 	}

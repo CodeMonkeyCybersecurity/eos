@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -16,14 +17,41 @@ import (
 )
 
 // RemoveVolumes deletes the specified Docker volumes.
+// Idempotent: Returns success if volume already doesn't exist.
 func RemoveVolumes(rc *eos_io.RuntimeContext, volumes []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	for _, volume := range volumes {
-		if err := execute.RunSimple(rc.Ctx, "docker", "volume", "rm", volume); err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("Failed to remove volume", zap.String("volume", volume), zap.Error(err))
-			return fmt.Errorf("failed to remove volume %s: %w", volume, err)
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"volume", "rm", volume},
+			Capture: true,
+		})
+
+		if err != nil {
+			// Check if error is because volume doesn't exist (idempotent behavior)
+			if containsNoSuchVolume(output) {
+				logger.Debug("Volume already removed or doesn't exist",
+					zap.String("volume", volume))
+				continue
+			}
+			// Real error - return it
+			logger.Warn("Failed to remove volume",
+				zap.String("volume", volume),
+				zap.Error(err),
+				zap.String("output", output))
+			return fmt.Errorf("failed to remove volume %s: %s", volume, output)
 		}
+
+		logger.Debug("Volume removed successfully", zap.String("volume", volume))
 	}
 	return nil
+}
+
+// containsNoSuchVolume checks if Docker error indicates volume doesn't exist
+func containsNoSuchVolume(output string) bool {
+	return strings.Contains(output, "no such volume") ||
+		strings.Contains(output, "Error: No such volume")
 }
 
 // BackupVolume creates a tar.gz backup of a single Docker volume.

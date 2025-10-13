@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -205,35 +206,29 @@ func runDeleteOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// Step 3: Remove container (in case it wasn't removed by compose down)
 	logger.Info("Removing Open WebUI container")
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"rm", "-f", "open-webui"},
-		Capture: true,
-	})
-	if err != nil {
-		logger.Debug("Container already removed or doesn't exist",
-			zap.String("output", output))
+	if err := container.RemoveContainer(rc, "open-webui"); err != nil {
+		logger.Warn("Failed to remove container", zap.Error(err))
+		if !openwebuiDeleteForce {
+			return fmt.Errorf("failed to remove container: %w", err)
+		}
 	} else {
 		logger.Info("Container removed")
 	}
 
 	// Step 4: Remove Docker volume
 	logger.Info("Removing Docker volume", zap.String("volume", "open-webui-data"))
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"volume", "rm", "open-webui-data"},
-		Capture: true,
-	})
-	if err != nil {
-		logger.Debug("Volume already removed or doesn't exist",
-			zap.String("output", output))
+	if err := container.RemoveVolumes(rc, []string{"open-webui-data"}); err != nil {
+		logger.Warn("Failed to remove volume", zap.Error(err))
+		if !openwebuiDeleteForce {
+			return fmt.Errorf("failed to remove volume: %w", err)
+		}
 	} else {
 		logger.Info("Volume removed successfully")
 	}
 
 	// Step 5: Remove Docker image
 	logger.Info("Removing Docker image")
-	output, err = execute.Run(rc.Ctx, execute.Options{
+	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"rmi", "ghcr.io/open-webui/open-webui"},
 		Capture: true,
