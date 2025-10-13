@@ -26,6 +26,7 @@ identifies issues, and provides actionable recommendations for fixes.`,
 func init() {
 	// Register subcommands here
 	debugCmd.AddCommand(consulCmd)
+	debugCmd.AddCommand(openwebuiDebugCmd)
 	debugCmd.AddCommand(watchdogTracesCmd)
 }
 

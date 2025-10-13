@@ -89,7 +89,9 @@ func GetVaultAddr() string {
 	return fmt.Sprintf(VaultDefaultAddr, LocalhostSAN)
 }
 
-const vaultConfigTemplate = `
+// DEPRECATED: File storage template - use Raft templates instead
+// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
+const vaultConfigTemplateFileLegacy = `
 listener "tcp" {
   address         = "0.0.0.0:{{ .Port }}"
   tls_cert_file   = "{{ .TLSCrt }}"
@@ -105,16 +107,123 @@ log_level = "{{ .LogLevel }}"
 log_format = "{{ .LogFormat }}"
 `
 
+// Raft Integrated Storage - Single Node (Development)
+// Recommended for: Development, testing, POC
+// As per vault-complete-specification-v1.0-raft-integrated.md
+const vaultConfigTemplateRaftSingleNode = `
+# Vault Configuration - Single Node Raft (Development)
+# Storage: Integrated Storage (Raft)
+# Reference: vault-complete-specification-v1.0-raft-integrated.md
+
+storage "raft" {
+  path    = "{{ .VaultDataPath }}"
+  node_id = "{{ .NodeID }}"
+}
+
+listener "tcp" {
+  address         = "0.0.0.0:{{ .Port }}"
+  cluster_address = "0.0.0.0:{{ .ClusterPort }}"
+  tls_cert_file   = "{{ .TLSCrt }}"
+  tls_key_file    = "{{ .TLSKey }}"
+  tls_min_version = "tls12"
+}
+
+cluster_addr = "{{ .ClusterAddr }}"
+api_addr     = "{{ .APIAddr }}"
+disable_mlock = true
+ui = true
+log_level = "{{ .LogLevel }}"
+log_format = "{{ .LogFormat }}"
+`
+
+// Raft Integrated Storage - Multi-Node (Production)
+// Recommended for: Production deployments with HA
+// Requires: 3-5 nodes across multiple availability zones
+const vaultConfigTemplateRaftMultiNode = `
+# Vault Configuration - Multi-Node Raft (Production)
+# Storage: Integrated Storage (Raft)
+# Reference: vault-complete-specification-v1.0-raft-integrated.md
+
+storage "raft" {
+  path    = "{{ .VaultDataPath }}"
+  node_id = "{{ .NodeID }}"
+  
+  # Production performance setting
+  performance_multiplier = 1
+  
+  {{- if .RetryJoinNodes }}
+  # Auto-join configuration
+  {{- range .RetryJoinNodes }}
+  retry_join {
+    leader_api_addr         = "{{ .APIAddr }}"
+    leader_client_cert_file = "{{ $.TLSCrt }}"
+    leader_client_key_file  = "{{ $.TLSKey }}"
+    leader_ca_cert_file     = "{{ $.TLSCrt }}"
+    leader_tls_servername   = "{{ .Hostname }}"
+  }
+  {{- end }}
+  {{- end }}
+}
+
+listener "tcp" {
+  address         = "0.0.0.0:{{ .Port }}"
+  cluster_address = "0.0.0.0:{{ .ClusterPort }}"
+  tls_cert_file   = "{{ .TLSCrt }}"
+  tls_key_file    = "{{ .TLSKey }}"
+  tls_min_version = "tls12"
+}
+
+# This node's addresses (MUST be unique per node)
+cluster_addr = "{{ .ClusterAddr }}"
+api_addr     = "{{ .APIAddr }}"
+
+# Production hardening
+disable_mlock = true  # Required for Raft
+ui = true
+log_level = "{{ .LogLevel }}"
+log_format = "{{ .LogFormat }}"
+
+# Telemetry for monitoring
+telemetry {
+  prometheus_retention_time = "30s"
+  disable_hostname          = true
+}
+
+{{- if .AutoUnseal }}
+# Auto-unseal configuration
+{{ .AutoUnsealConfig }}
+{{- end }}
+`
+
 type VaultConfigParams struct {
 	Port          string
+	ClusterPort   string // Raft cluster communication port (default: 8180)
 	TLSCrt        string
 	TLSKey        string
 	VaultDataPath string
 	APIAddr       string
+	ClusterAddr   string // This node's cluster address
+	NodeID        string // Unique node identifier for Raft
 	LogLevel      string
 	LogFormat     string
+	
+	// Multi-node Raft configuration
+	RetryJoinNodes []RetryJoinNode
+	
+	// Auto-unseal configuration
+	AutoUnseal       bool
+	AutoUnsealConfig string // HCL block for seal configuration
 }
 
+// RetryJoinNode represents a node to join in a Raft cluster
+type RetryJoinNode struct {
+	APIAddr  string
+	Hostname string
+}
+
+// RenderVaultConfig renders Vault configuration using Raft Integrated Storage (default)
+// DEPRECATED: This function defaults to file storage for backward compatibility
+// Use RenderVaultConfigRaft for new deployments
 func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, error) {
 	if addr == "" {
 		addr = VaultDefaultLocalAddr
@@ -132,7 +241,7 @@ func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, 
 		LogFormat:     logFormat,
 	}
 
-	tmpl, err := template.New("vaultConfig").Parse(vaultConfigTemplate)
+	tmpl, err := template.New("vaultConfig").Parse(vaultConfigTemplateFileLegacy)
 	if err != nil {
 		return "", err
 	}
@@ -143,6 +252,60 @@ func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, 
 		return "", err
 	}
 
+	return rendered.String(), nil
+}
+
+// RenderVaultConfigRaft renders Vault configuration with Raft Integrated Storage
+// This is the RECOMMENDED configuration for all deployments (dev and production)
+// Reference: vault-complete-specification-v1.0-raft-integrated.md
+func RenderVaultConfigRaft(params VaultConfigParams) (string, error) {
+	// Set defaults
+	if params.Port == "" {
+		params.Port = VaultDefaultPort
+	}
+	if params.ClusterPort == "" {
+		params.ClusterPort = "8180"
+	}
+	if params.TLSCrt == "" {
+		params.TLSCrt = TLSCrt
+	}
+	if params.TLSKey == "" {
+		params.TLSKey = TLSKey
+	}
+	if params.VaultDataPath == "" {
+		params.VaultDataPath = VaultDataPath
+	}
+	if params.NodeID == "" {
+		params.NodeID = "eos-vault-node1"
+	}
+	if params.LogLevel == "" {
+		params.LogLevel = "info"
+	}
+	if params.LogFormat == "" {
+		params.LogFormat = "json"
+	}
+	
+	// Choose template based on deployment type
+	var templateStr string
+	if len(params.RetryJoinNodes) > 0 {
+		// Multi-node production cluster
+		templateStr = vaultConfigTemplateRaftMultiNode
+	} else {
+		// Single-node development
+		templateStr = vaultConfigTemplateRaftSingleNode
+	}
+	
+	tmpl, err := template.New("vaultConfigRaft").Parse(templateStr)
+	if err != nil {
+		return "", fmt.Errorf("parse template: %w", err)
+	}
+	
+	var rendered bytes.Buffer
+	err = tmpl.Execute(&rendered, params)
+	if err != nil {
+		return "", fmt.Errorf("execute template: %w", err)
+	}
+	
 	return rendered.String(), nil
 }
 

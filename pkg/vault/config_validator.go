@@ -320,9 +320,18 @@ func validateTLSConfig(rc *eos_io.RuntimeContext, content string, result *Config
 }
 
 // validateStorageBackend performs storage-backend specific validation
+// Reference: vault-complete-specification-v1.0-raft-integrated.md
 func validateStorageBackend(_ *eos_io.RuntimeContext, content string, result *ConfigValidationResult) {
-	// Check for file storage backend
+	// Check for file storage backend (DEPRECATED)
 	if strings.Contains(content, `storage "file"`) {
+		// CRITICAL WARNING: File storage is deprecated
+		result.Warnings = append(result.Warnings,
+			"⚠️  DEPRECATED: File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+")
+		result.Warnings = append(result.Warnings,
+			"⚠️  HashiCorp recommends Raft Integrated Storage for all deployments")
+		result.Suggestions = append(result.Suggestions,
+			"Migrate to Raft Integrated Storage - see vault-complete-specification-v1.0-raft-integrated.md")
+		
 		if !strings.Contains(content, "path") {
 			result.Errors = append(result.Errors, "file storage backend requires 'path' attribute")
 		}
@@ -351,8 +360,9 @@ func validateStorageBackend(_ *eos_io.RuntimeContext, content string, result *Co
 			"Ensure Consul agent is running before starting Vault")
 	}
 
-	// Check for integrated storage (Raft)
+	// Check for integrated storage (Raft) - RECOMMENDED
 	if strings.Contains(content, `storage "raft"`) {
+		// Validate required Raft attributes
 		requiredRaftAttrs := []string{"path", "node_id"}
 		for _, attr := range requiredRaftAttrs {
 			if !strings.Contains(content, attr) {
@@ -360,9 +370,45 @@ func validateStorageBackend(_ *eos_io.RuntimeContext, content string, result *Co
 					fmt.Sprintf("raft storage backend requires '%s' attribute", attr))
 			}
 		}
-
-		result.Suggestions = append(result.Suggestions,
-			"Raft storage requires cluster_addr for HA - ensure it's configured")
+		
+		// Check for cluster_addr (required for HA)
+		if !strings.Contains(content, "cluster_addr") {
+			result.Warnings = append(result.Warnings,
+				"Raft storage requires 'cluster_addr' for HA deployments")
+		}
+		
+		// Check for api_addr
+		if !strings.Contains(content, "api_addr") {
+			result.Warnings = append(result.Warnings,
+				"Raft storage requires 'api_addr' to be explicitly set")
+		}
+		
+		// Check for TLS configuration (required for Raft)
+		if !strings.Contains(content, "tls_cert_file") || !strings.Contains(content, "tls_key_file") {
+			result.Errors = append(result.Errors,
+				"Raft storage REQUIRES TLS configuration (tls_cert_file and tls_key_file)")
+		}
+		
+		// Check for cluster_address in listener (Raft cluster communication)
+		if !strings.Contains(content, "cluster_address") {
+			result.Warnings = append(result.Warnings,
+				"Raft cluster requires 'cluster_address' in listener for node communication (default: 8180)")
+		}
+		
+		// Suggestions for production deployments
+		if strings.Contains(content, "retry_join") {
+			result.Suggestions = append(result.Suggestions,
+				"✅ Multi-node Raft cluster detected - ensure all nodes have unique node_id")
+		} else {
+			result.Suggestions = append(result.Suggestions,
+				"Single-node Raft detected - for production HA, configure retry_join with 3-5 nodes")
+		}
+		
+		// Check for auto-unseal (recommended for production)
+		if !strings.Contains(content, `seal "`) {
+			result.Suggestions = append(result.Suggestions,
+				"Consider configuring auto-unseal (awskms/azurekeyvault/gcpckms) for production deployments")
+		}
 	}
 }
 

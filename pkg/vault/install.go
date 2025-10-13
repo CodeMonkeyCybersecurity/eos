@@ -57,16 +57,36 @@ type InstallConfig struct {
 	// Vault configuration
 	UIEnabled       bool
 	ClusterName     string
-	StorageBackend  string // "file", "consul", "raft"
+	StorageBackend  string // "raft" (recommended), "consul", "file" (deprecated)
 	ListenerAddress string
 	BindAddr        string // Specific IP to bind to (for Consul registration)
 	APIAddr         string
 	ClusterAddr     string
+	ClusterPort     int    // Raft cluster communication port (default: 8180)
+	NodeID          string // Unique node identifier for Raft
 	DisableMlock    bool
-	AutoUnseal      bool
-	KMSKeyID        string // For AWS KMS auto-unseal
-	LogLevel        string
-	Datacenter      string // Consul datacenter for service registration
+	
+	// Auto-unseal configuration
+	AutoUnseal       bool
+	AutoUnsealType   string // "awskms", "azurekeyvault", "gcpckms"
+	KMSKeyID         string // For AWS KMS auto-unseal
+	KMSRegion        string // AWS region or Azure location
+	AzureTenantID    string // Azure tenant ID
+	AzureClientID    string // Azure client ID
+	AzureClientSecret string // Azure client secret
+	AzureVaultName   string // Azure Key Vault name
+	AzureKeyName     string // Azure Key Vault key name
+	GCPProject       string // GCP project ID
+	GCPLocation      string // GCP location
+	GCPKeyRing       string // GCP KMS keyring
+	GCPCryptoKey     string // GCP KMS crypto key
+	GCPCredentials   string // Path to GCP credentials file
+	
+	LogLevel   string
+	Datacenter string // Consul datacenter for service registration
+	
+	// Multi-node Raft cluster configuration
+	RetryJoinNodes []shared.RetryJoinNode
 
 	// Paths
 	ConfigPath string
@@ -93,7 +113,10 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		config.Version = "latest"
 	}
 	if config.StorageBackend == "" {
-		config.StorageBackend = "file"
+		// Default to Raft Integrated Storage (recommended by HashiCorp)
+		// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
+		// Reference: vault-complete-specification-v1.0-raft-integrated.md
+		config.StorageBackend = "raft"
 	}
 	if config.ListenerAddress == "" {
 		config.ListenerAddress = fmt.Sprintf("0.0.0.0:%d", shared.PortVault)

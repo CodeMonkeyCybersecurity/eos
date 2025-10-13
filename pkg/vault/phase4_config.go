@@ -118,14 +118,31 @@ func ValidateVaultConfig(rc *eos_io.RuntimeContext) error {
 // WriteVaultHCL renders the Vault server configuration (HCL) dynamically
 // and writes it to the expected config file on disk. Ensures the directory exists.
 // Returns a wrapped error if writing fails.
+// 
+// UPDATED: Now defaults to Raft Integrated Storage (recommended by HashiCorp)
+// Reference: vault-complete-specification-v1.0-raft-integrated.md
 func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 	vaultAddr := shared.GetVaultAddr()
 	// Add sane defaults
 	logLevel := "info"
 	logFormat := "json"
 
-	// Update call to handle new signature and error
-	hcl, err := shared.RenderVaultConfig(vaultAddr, logLevel, logFormat)
+	// Use Raft Integrated Storage (recommended)
+	// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
+	params := shared.VaultConfigParams{
+		Port:          shared.VaultDefaultPort,
+		ClusterPort:   "8180",
+		TLSCrt:        shared.TLSCrt,
+		TLSKey:        shared.TLSKey,
+		VaultDataPath: shared.VaultDataPath,
+		APIAddr:       vaultAddr,
+		ClusterAddr:   "https://127.0.0.1:8180",
+		NodeID:        "eos-vault-dev",
+		LogLevel:      logLevel,
+		LogFormat:     logFormat,
+	}
+	
+	hcl, err := shared.RenderVaultConfigRaft(params)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to render Vault HCL config", zap.Error(err))
 		return fmt.Errorf("render vault config: %w", err)
