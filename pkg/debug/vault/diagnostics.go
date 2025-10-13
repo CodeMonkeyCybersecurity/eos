@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 const (
@@ -176,29 +177,61 @@ func ProcessDiagnostic() *debug.Diagnostic {
 	return debug.CommandCheck("Running Processes", "System", "pgrep", "-a", "vault")
 }
 
-// PortDiagnostic checks if vault is listening on port 8200
+// PortDiagnostic checks if vault is listening on configured ports
 func PortDiagnostic() *debug.Diagnostic {
 	return &debug.Diagnostic{
-		Name:        "Port 8200 Status",
+		Name:        fmt.Sprintf("Vault Ports (%d API, %d Cluster)", shared.PortVault, shared.PortVault+1),
 		Category:    "Network",
-		Description: "Check if Vault is listening on port 8200",
+		Description: fmt.Sprintf("Check if Vault is listening on ports %d (API) and %d (Cluster)", shared.PortVault, shared.PortVault+1),
 		Collect: func(ctx context.Context) (*debug.Result, error) {
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
 			}
 
-			cmd := exec.CommandContext(ctx, "sh", "-c", "ss -tlnp | grep ':8200' || netstat -tlnp 2>/dev/null | grep ':8200'")
-			output, err := cmd.CombinedOutput()
+			// Check main API port (8179)
+			apiCmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("ss -tlnp | grep ':%d' || netstat -tlnp 2>/dev/null | grep ':%d'", shared.PortVault, shared.PortVault))
+			apiOutput, apiErr := apiCmd.CombinedOutput()
 
-			result.Output = string(output)
+			// Check cluster port (8180)
+			clusterCmd := exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("ss -tlnp | grep ':%d' || netstat -tlnp 2>/dev/null | grep ':%d'", shared.PortVault+1, shared.PortVault+1))
+			clusterOutput, _ := clusterCmd.CombinedOutput()
 
-			if len(output) > 0 {
+			var outputBuilder strings.Builder
+			apiListening := len(apiOutput) > 0
+			clusterListening := len(clusterOutput) > 0
+
+			result.Metadata["api_port"] = shared.PortVault
+			result.Metadata["cluster_port"] = shared.PortVault + 1
+			result.Metadata["api_listening"] = apiListening
+			result.Metadata["cluster_listening"] = clusterListening
+
+			if apiListening {
+				outputBuilder.WriteString(fmt.Sprintf("API Port %d: LISTENING\n", shared.PortVault))
+				outputBuilder.WriteString(string(apiOutput))
+				outputBuilder.WriteString("\n")
+			} else {
+				outputBuilder.WriteString(fmt.Sprintf("API Port %d: NOT IN USE\n", shared.PortVault))
+			}
+
+			if clusterListening {
+				outputBuilder.WriteString(fmt.Sprintf("Cluster Port %d: LISTENING\n", shared.PortVault+1))
+				outputBuilder.WriteString(string(clusterOutput))
+			} else {
+				outputBuilder.WriteString(fmt.Sprintf("Cluster Port %d: NOT IN USE\n", shared.PortVault+1))
+			}
+
+			result.Output = outputBuilder.String()
+
+			if apiListening && clusterListening {
 				result.Status = debug.StatusOK
-				result.Message = "Vault is listening on port 8200"
+				result.Message = "Both API and cluster ports are listening"
+			} else if apiListening {
+				result.Status = debug.StatusWarning
+				result.Message = "API port listening but cluster port not available (single-node mode)"
 			} else {
 				result.Status = debug.StatusWarning
-				result.Message = "Port 8200 not in use"
-				if err != nil {
+				result.Message = fmt.Sprintf("Port %d not in use", shared.PortVault)
+				if apiErr != nil {
 					result.Remediation = "Ensure vault service is running and configured correctly"
 				}
 			}

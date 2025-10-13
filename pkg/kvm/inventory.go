@@ -93,6 +93,20 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string, logger otelzap.Lo
 	// Get disk size (works for all VMs)
 	vm.DiskSizeGB = getVMDiskSize(domain)
 
+	// Get detailed disk information (for backup support)
+	vm.Disks = getVMDisks(domain)
+	vm.HasMultipleDisks = len(vm.Disks) > 1
+
+	// Find main disk (vda) for backup
+	for _, disk := range vm.Disks {
+		if disk.Target == "vda" {
+			vm.MainDiskPath = disk.Path
+			vm.DiskFormat = disk.Format
+			vm.SupportsSnapshot = (disk.Format == "qcow2")
+			break
+		}
+	}
+
 	// For running VMs, get additional info
 	if state == libvirt.DOMAIN_RUNNING {
 		vm.QEMUVersion = getVMQEMUVersion(domain)
@@ -1119,4 +1133,96 @@ func getVMCPUUsage(domain *libvirt.Domain, logger otelzap.LoggerWithCtx) float64
 		zap.Uint64("vcpu_count", vcpuCount))
 
 	return cpuPercent
+}
+
+// getVMDisks retrieves detailed disk information for a VM
+// Returns list of all disks with paths, formats, and cloud-init detection
+func getVMDisks(domain *libvirt.Domain) []DiskInfo {
+	disks := make([]DiskInfo, 0)
+
+	// Get domain XML
+	xmlDesc, err := domain.GetXMLDesc(0)
+	if err != nil {
+		return disks
+	}
+
+	// Parse disk devices from XML
+	// Looking for: <disk type='file' device='disk'>
+	//                <source file='/path/to/disk.qcow2'/>
+	//                <target dev='vda' bus='virtio'/>
+	//                <driver name='qemu' type='qcow2'/>
+	//              </disk>
+
+	lines := strings.Split(xmlDesc, "\n")
+	var currentDisk *DiskInfo
+	inDisk := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Start of disk element
+		if strings.HasPrefix(line, "<disk ") && strings.Contains(line, "device='disk'") {
+			inDisk = true
+			currentDisk = &DiskInfo{}
+			continue
+		}
+
+		// End of disk element
+		if strings.HasPrefix(line, "</disk>") && inDisk {
+			if currentDisk != nil && currentDisk.Target != "" && currentDisk.Path != "" {
+				// Detect cloud-init seed disks (typically sda or hdd)
+				currentDisk.IsCloudInitSeed = (currentDisk.Target == "sda" || currentDisk.Target == "hdd")
+				disks = append(disks, *currentDisk)
+			}
+			inDisk = false
+			currentDisk = nil
+			continue
+		}
+
+		if !inDisk || currentDisk == nil {
+			continue
+		}
+
+		// Parse source file path
+		if strings.Contains(line, "<source file=") {
+			// Extract: <source file='/path/to/disk.qcow2'/>
+			if start := strings.Index(line, "file='"); start != -1 {
+				start += 6 // len("file='")
+				if end := strings.Index(line[start:], "'"); end != -1 {
+					currentDisk.Path = line[start : start+end]
+				}
+			}
+		}
+
+		// Parse target device
+		if strings.Contains(line, "<target dev=") {
+			// Extract: <target dev='vda' bus='virtio'/>
+			if start := strings.Index(line, "dev='"); start != -1 {
+				start += 5 // len("dev='")
+				if end := strings.Index(line[start:], "'"); end != -1 {
+					currentDisk.Target = line[start : start+end]
+				}
+			}
+		}
+
+		// Parse driver type (format)
+		if strings.Contains(line, "<driver ") && strings.Contains(line, "type=") {
+			// Extract: <driver name='qemu' type='qcow2'/>
+			if start := strings.Index(line, "type='"); start != -1 {
+				start += 6 // len("type='")
+				if end := strings.Index(line[start:], "'"); end != -1 {
+					currentDisk.Format = line[start : start+end]
+				}
+			}
+		}
+	}
+
+	// Get size for each disk
+	for i := range disks {
+		if info, err := os.Stat(disks[i].Path); err == nil {
+			disks[i].SizeGB = info.Size() / (1024 * 1024 * 1024)
+		}
+	}
+
+	return disks
 }
