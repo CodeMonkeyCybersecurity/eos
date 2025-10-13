@@ -408,8 +408,6 @@ func GetClusterHealth(rc *eos_io.RuntimeContext) (*ClusterHealth, error) {
 	// Get Autopilot state (requires token - skip if not available)
 	// For now, we'll skip Autopilot state in health check
 	// TODO: Accept token parameter for complete health check
-	var autopilot *AutopilotState
-	_ = autopilot // Placeholder for future implementation
 	
 	// Count healthy nodes
 	healthyNodes := 0
@@ -431,10 +429,9 @@ func GetClusterHealth(rc *eos_io.RuntimeContext) (*ClusterHealth, error) {
 		Peers:        peers,
 	}
 	
-	if autopilot != nil {
-		health.AutopilotHealthy = autopilot.Healthy
-		health.FailureTolerance = autopilot.FailureTolerance
-	}
+	// Autopilot state would be added here if token was provided
+	// health.AutopilotHealthy = autopilot.Healthy
+	// health.FailureTolerance = autopilot.FailureTolerance
 	
 	// Determine overall health
 	health.Healthy = leaderFound && healthyNodes >= (len(peers)/2 + 1)

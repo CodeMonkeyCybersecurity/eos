@@ -287,7 +287,7 @@ func runVaultRaft(rc *eos_io.RuntimeContext, cmd *cobra.Command, _ []string) err
 		log.Info(fmt.Sprintf("terminal prompt: Node ID: %s", nodeID))
 		log.Info(fmt.Sprintf("terminal prompt: API Address: %s", apiAddr))
 		log.Info(fmt.Sprintf("terminal prompt: Cluster Address: %s", clusterAddr))
-		log.Info(fmt.Sprintf("terminal prompt: Storage Backend: Raft Integrated Storage"))
+		log.Info("terminal prompt: Storage Backend: Raft Integrated Storage")
 		if multiNode {
 			log.Info(fmt.Sprintf("terminal prompt: Cluster Nodes: %d", len(retryJoinNodes)))
 		}
