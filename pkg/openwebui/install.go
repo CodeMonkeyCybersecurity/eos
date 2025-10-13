@@ -364,9 +364,7 @@ func (owi *OpenWebUIInstaller) getAzureConfiguration(ctx context.Context) error 
 	// Validate API key format
 	if err := validateAzureAPIKey(owi.config.AzureAPIKey); err != nil {
 		return eos_err.NewUserError(
-			"Invalid Azure OpenAI API key format\n"+
-				"%v\n"+
-				"Azure OpenAI keys are 32 characters long", err)
+			"Invalid Azure OpenAI API key format\n%v", err)
 	}
 
 	logger.Debug("Azure configuration validated successfully")
@@ -725,20 +723,46 @@ func validateAzureAPIKey(apiKey string) error {
 		return fmt.Errorf("azure OpenAI API key cannot be empty")
 	}
 
-	// Azure OpenAI keys are 32 hexadecimal characters
-	if len(apiKey) != 32 {
-		return fmt.Errorf("azure OpenAI API key should be 32 characters long\nProvided length: %d", len(apiKey))
-	}
+	// Azure provides two key formats:
+	// 1. Legacy format: 32 hexadecimal characters
+	// 2. New format: Base64-encoded string (typically 43-44 chars ending with =)
 
-	// Validate hexadecimal format
-	for _, ch := range apiKey {
-		isHex := (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
-		if !isHex {
-			return fmt.Errorf("azure OpenAI API key must be 32 hexadecimal characters\nInvalid character found: %c", ch)
+	apiKeyLen := len(apiKey)
+
+	// Check for 32-character hex format (legacy)
+	if apiKeyLen == 32 {
+		for _, ch := range apiKey {
+			isHex := (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
+			if !isHex {
+				return fmt.Errorf("32-character key must be hexadecimal\nInvalid character found: %c", ch)
+			}
 		}
+		return nil
 	}
 
-	return nil
+	// Check for base64 format (new Azure keys are typically 43-44 chars)
+	// Base64 uses: A-Z, a-z, 0-9, +, /, and = for padding
+	if apiKeyLen >= 40 && apiKeyLen <= 88 {
+		for _, ch := range apiKey {
+			isBase64 := (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+				(ch >= '0' && ch <= '9') || ch == '+' || ch == '/' || ch == '='
+			if !isBase64 {
+				return fmt.Errorf("API key contains invalid character: %c\n"+
+					"Azure API keys should be either:\n"+
+					"  - 32 hexadecimal characters (legacy format)\n"+
+					"  - 43-44 base64 characters (new format)", ch)
+			}
+		}
+		return nil
+	}
+
+	return fmt.Errorf("unexpected API key length: %d characters\n"+
+		"Azure API keys are typically:\n"+
+		"  - 32 characters (legacy hex format)\n"+
+		"  - 43-44 characters (new base64 format)\n"+
+		"You provided: %d characters\n"+
+		"Please check Azure Portal → Your OpenAI Resource → Keys and Endpoint",
+		apiKeyLen, apiKeyLen)
 }
 
 // validateAzureDeployment validates the deployment name
