@@ -70,6 +70,7 @@ Command Structure?
 - Include remediation steps in error messages
 - Use Docker Compose for containerized services in `/opt/[service]`
 - Store service-specific configs in appropriate directories
+- Sanitize user-provided URLs with `shared.SanitizeURL()` before validation
 
 ### MUST NOT:
 - Use `fmt.Print/Printf/Println` for output (but `fmt.Errorf` is OK)
@@ -124,7 +125,8 @@ Key packages:
   ├── environment/   # Environment discovery
   ├── execute/       # Command execution utilities
   ├── crypto/        # Cryptographic utilities
-  └── container/     # Container operations
+  ├── container/     # Container operations
+  └── shared/        # Shared utilities including validation (SanitizeURL, ValidateURL)
 ```
 
 ### Command Flow
@@ -201,6 +203,7 @@ Work as a partner in an adversarially collaborative process, following the user'
 | Silent operations | Log before/during/after with context |
 | Hardcode credentials | Use `secrets.SecretManager` |
 | Skip environment discovery | Call `environment.DiscoverEnvironment()` |
+| `strings.TrimSpace(url)` only | Use `shared.SanitizeURL(url)` |
 
 ## Priority Levels
 

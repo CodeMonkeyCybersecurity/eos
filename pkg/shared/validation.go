@@ -72,6 +72,35 @@ func ValidateEmail(email string) error {
 	return nil
 }
 
+// SanitizeURL normalizes user-provided URLs by handling common input issues
+// - Trims whitespace
+// - Removes trailing slashes
+// - Handles path components if present
+// Returns the sanitized URL string
+func SanitizeURL(urlStr string) string {
+	// Trim whitespace
+	urlStr = strings.TrimSpace(urlStr)
+
+	// Parse to handle structure properly
+	parsed, err := url.Parse(urlStr)
+	if err != nil {
+		// If parsing fails, just do basic cleanup
+		return strings.TrimRight(strings.TrimSpace(urlStr), "/")
+	}
+
+	// Remove trailing slash from path (but preserve / if it's the only path)
+	if parsed.Path != "" && parsed.Path != "/" {
+		parsed.Path = strings.TrimRight(parsed.Path, "/")
+	} else if parsed.Path == "/" {
+		// If path is just "/", remove it entirely (unless there's a query or fragment)
+		if parsed.RawQuery == "" && parsed.Fragment == "" {
+			parsed.Path = ""
+		}
+	}
+
+	return parsed.String()
+}
+
 // ValidateURL validates a URL format with SSRF protection
 // SECURITY: Prevents Server-Side Request Forgery attacks by blocking:
 // - Private IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x)

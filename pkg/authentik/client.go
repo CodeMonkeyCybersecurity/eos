@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // APIClient represents an Authentik API client
@@ -25,8 +27,11 @@ func NewClient(baseURL, token string) *APIClient {
 		baseURL = "https://" + baseURL
 	}
 
+	// Use centralized URL sanitization to handle trailing slashes, whitespace, etc.
+	baseURL = shared.SanitizeURL(baseURL)
+
 	return &APIClient{
-		BaseURL: strings.TrimSuffix(baseURL, "/"),
+		BaseURL: baseURL,
 		Token:   token,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,

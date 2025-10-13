@@ -319,7 +319,10 @@ func (owi *OpenWebUIInstaller) getAzureConfiguration(ctx context.Context) error 
 		if err != nil {
 			return fmt.Errorf("failed to read Azure endpoint: %w", err)
 		}
-		owi.config.AzureEndpoint = strings.TrimSpace(endpoint)
+		owi.config.AzureEndpoint = shared.SanitizeURL(endpoint)
+	} else {
+		// Sanitize even if provided via flag
+		owi.config.AzureEndpoint = shared.SanitizeURL(owi.config.AzureEndpoint)
 	}
 
 	// Validate endpoint format
