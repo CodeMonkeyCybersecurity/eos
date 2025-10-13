@@ -1,11 +1,12 @@
 // cmd/debug/openwebui.go
-// OpenWebUI backup diagnostic command
+// OpenWebUI installation and runtime diagnostic command
 
 package debug
 
 import (
 	"fmt"
-	"os"
+	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -17,280 +18,297 @@ import (
 
 var openwebuiDebugCmd = &cobra.Command{
 	Use:   "openwebui",
-	Short: "Diagnose OpenWebUI backup and update issues",
-	Long: `Run comprehensive diagnostics on OpenWebUI backup functionality.
+	Short: "Diagnose OpenWebUI installation and runtime issues",
+	Long: `Run comprehensive diagnostics on OpenWebUI installation and runtime.
 
 This command tests:
-- Alpine image availability
-- Basic backup without security restrictions
-- Secure backup with security restrictions
-- Volume existence and accessibility
-- Backup directory permissions
+- Container status (OpenWebUI, LiteLLM, PostgreSQL)
+- Port bindings and network connectivity
+- Health endpoints (OpenWebUI and LiteLLM)
+- PostgreSQL readiness
+- Container logs (last 50 lines)
+- Environment variable configuration
+- File permissions
 
-This helps identify issues with the 'eos update openwebui' backup process.
+This helps identify issues with the 'eos create openwebui' installation process
+and runtime failures.
 
 EXAMPLES:
   # Run diagnostics
   sudo eos debug openwebui
 
   # Run and save output
-  sudo eos debug openwebui > /tmp/openwebui-debug.txt`,
+  sudo eos debug openwebui > /tmp/openwebui-diagnostic.txt`,
 
 	RunE: eos_cli.Wrap(runOpenWebUIDebug),
 }
 
-func init() {
-	debugCmd.AddCommand(openwebuiDebugCmd)
-}
-
 func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting OpenWebUI backup diagnostics")
+	logger.Info("Starting OpenWebUI installation diagnostics")
 
-	fmt.Println("=== OpenWebUI Backup Diagnostics ===")
+	installDir := "/opt/openwebui"
+	composeFile := installDir + "/docker-compose.yml"
+
+	fmt.Println("╔════════════════════════════════════════════════════════════╗")
+	fmt.Println("║      OpenWebUI Diagnostic Report                          ║")
+	fmt.Println("╚════════════════════════════════════════════════════════════╝")
+	fmt.Printf("Generated: %s\n", time.Now().Format(time.RFC1123))
 	fmt.Println()
 
-	// Test 1: Check if backup directory exists
-	fmt.Println("Test 1: Backup Directory")
-	backupDir := "/opt/openwebui/backups"
-	logger.Debug("Checking backup directory", zap.String("path", backupDir))
-
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		logger.Error("Failed to create backup directory",
-			zap.String("path", backupDir),
-			zap.Error(err))
-		fmt.Printf("  ✗ Failed to create backup directory: %v\n", err)
-		return fmt.Errorf("cannot create backup directory: %w", err)
-	}
-
-	logger.Info("Backup directory verified", zap.String("path", backupDir))
-	fmt.Printf("  ✓ Backup directory exists: %s\n", backupDir)
-	fmt.Println()
-
-	// Test 2: Check if alpine image exists (don't pull to avoid issues)
-	fmt.Println("Test 2: Alpine Image Availability")
-	logger.Debug("Checking for alpine image")
+	// Test 1: Container Status
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("1. CONTAINER STATUS")
+	fmt.Println("══════════════════════════════════════════════════════════")
+	logger.Debug("Checking container status")
 
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
-		Args:    []string{"image", "inspect", "alpine:latest"},
+		Args:    []string{"compose", "-f", composeFile, "ps", "--format", "table"},
 		Capture: true,
 	})
+
 	if err != nil {
-		logger.Warn("Alpine image not found locally",
-			zap.Error(err),
-			zap.String("output", output))
-		fmt.Printf("  ✗ Alpine image not found locally\n")
-		fmt.Println("     Please pull manually: docker pull alpine:latest")
-		fmt.Println("     Note: This diagnostic will continue to test with what's available")
+		logger.Warn("Failed to get container status", zap.Error(err), zap.String("output", output))
+		fmt.Printf("❌ Failed to get container status: %v\n", err)
+		fmt.Println("   Possible causes:")
+		fmt.Println("   - OpenWebUI not installed yet (run: sudo eos create openwebui)")
+		fmt.Println("   - docker-compose.yml missing or corrupted")
 		fmt.Println()
 	} else {
-		logger.Info("Alpine image available", zap.String("image", "alpine:latest"))
-		fmt.Println("  ✓ Alpine image available locally")
+		fmt.Println(output)
+		logger.Info("Container status retrieved successfully")
+	}
+	fmt.Println()
+
+	// Test 2: Port Bindings
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("2. PORT BINDINGS")
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("Checking if services are listening on expected ports...")
+	logger.Debug("Checking port bindings")
+
+	portOutput, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "ss",
+		Args:    []string{"-tlnp"},
+		Capture: true,
+	})
+
+	if err != nil {
+		logger.Warn("Failed to check ports", zap.Error(err))
+		fmt.Printf("❌ Failed to check ports: %v\n", err)
 		fmt.Println()
-	}
-
-	// Test 3: Check if open-webui-data volume exists
-	fmt.Println("Test 3: Open WebUI Data Volume")
-	logger.Debug("Checking for Docker volume", zap.String("volume", "open-webui-data"))
-
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"volume", "inspect", "open-webui-data"},
-		Capture: true,
-	})
-	if err != nil {
-		logger.Warn("Docker volume not found",
-			zap.String("volume", "open-webui-data"),
-			zap.Error(err))
-		fmt.Printf("  ✗ open-webui-data volume does not exist\n")
-		fmt.Println("     This is expected if OpenWebUI is not installed yet")
-		fmt.Println("     Install with: sudo eos create openwebui")
-		return fmt.Errorf("open-webui-data volume not found")
-	}
-
-	logger.Info("Docker volume exists",
-		zap.String("volume", "open-webui-data"))
-	fmt.Println("  ✓ open-webui-data volume exists")
-	fmt.Println()
-
-	// Test 4: Basic backup without security restrictions
-	fmt.Println("Test 4: Basic Backup (No Security Restrictions)")
-	testBackupBasic := "/opt/openwebui/backups/test-backup-basic.tar.gz"
-	logger.Info("Testing basic backup without security restrictions",
-		zap.String("output_file", testBackupBasic))
-
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args: []string{
-			"run", "--rm",
-			"-v", "open-webui-data:/data",
-			"-v", fmt.Sprintf("%s:/backup", backupDir),
-			"alpine",
-			"tar", "czf", "/backup/test-backup-basic.tar.gz",
-			"-C", "/data", ".",
-		},
-		Capture: true,
-		Timeout: 5 * 60 * 1000, // 5 minutes
-	})
-
-	if err != nil {
-		logger.Error("Basic backup failed",
-			zap.String("output", output),
-			zap.Error(err))
-		fmt.Printf("  ✗ Basic backup failed: %s\n", output)
-		return fmt.Errorf("basic backup failed: %w", err)
-	}
-
-	// Check if backup file was created
-	info, err := os.Stat(testBackupBasic)
-	if err != nil {
-		logger.Error("Backup file not found after creation",
-			zap.String("file", testBackupBasic),
-			zap.Error(err))
-		fmt.Printf("  ✗ Backup file not found: %s\n", testBackupBasic)
-		return fmt.Errorf("backup file not created")
-	}
-
-	logger.Info("Basic backup succeeded",
-		zap.String("file", testBackupBasic),
-		zap.Int64("size_bytes", info.Size()),
-		zap.Float64("size_mb", float64(info.Size())/(1024*1024)))
-
-	fmt.Printf("  ✓ Basic backup succeeded\n")
-	fmt.Printf("    File: %s\n", testBackupBasic)
-	fmt.Printf("    Size: %.2f MB\n", float64(info.Size())/(1024*1024))
-
-	// Clean up test file
-	_ = os.Remove(testBackupBasic)
-	fmt.Println()
-
-	// Test 5: Secure backup with read-only data volume
-	fmt.Println("Test 5: Secure Backup with :ro Data Volume (Current Implementation)")
-	testBackupSecureRO := "/opt/openwebui/backups/test-backup-secure-ro.tar.gz"
-	logger.Info("Testing secure backup WITH :ro mount",
-		zap.String("output_file", testBackupSecureRO),
-		zap.Bool("read_only_mount", true))
-
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args: []string{
-			"run", "--rm",
-			"--security-opt", "no-new-privileges:true",
-			"--cap-drop", "ALL",
-			"--cap-add", "DAC_OVERRIDE",
-			"--read-only",
-			"--network", "none",
-			"-v", "open-webui-data:/data:ro", // READ-ONLY mount
-			"-v", fmt.Sprintf("%s:/backup", backupDir),
-			"alpine",
-			"tar", "czf", "/backup/test-backup-secure-ro.tar.gz",
-			"-C", "/data", ".",
-		},
-		Capture: true,
-		Timeout: 5 * 60 * 1000,
-	})
-
-	if err != nil {
-		logger.Warn("Secure backup with :ro failed (expected)",
-			zap.String("output", output),
-			zap.Error(err),
-			zap.String("reason", ":ro mount prevents tar from updating atime"))
-		fmt.Printf("  ✗ Secure backup with :ro failed: %s\n", output)
-		fmt.Println("    This is THE BUG - the :ro mount prevents tar from working")
 	} else {
-		info, err := os.Stat(testBackupSecureRO)
+		// Filter for relevant ports
+		lines := strings.Split(portOutput, "\n")
+		found := false
+		for _, line := range lines {
+			if strings.Contains(line, "8501") || strings.Contains(line, "4000") || strings.Contains(line, "5432") {
+				if !found {
+					fmt.Println("Port       Status")
+					fmt.Println("----       ------")
+					found = true
+				}
+				if strings.Contains(line, "8501") {
+					fmt.Println("✅ 8501    OpenWebUI listening")
+				} else if strings.Contains(line, "4000") {
+					fmt.Println("✅ 4000    LiteLLM listening")
+				} else if strings.Contains(line, "5432") {
+					fmt.Println("✅ 5432    PostgreSQL listening")
+				}
+			}
+		}
+		if !found {
+			fmt.Println("❌ No services listening on expected ports (8501, 4000, 5432)")
+			fmt.Println("   Containers may not be running or still initializing")
+		}
+		logger.Info("Port check completed")
+	}
+	fmt.Println()
+
+	// Test 3: Health Endpoints
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("3. HEALTH ENDPOINT TESTS")
+	fmt.Println("══════════════════════════════════════════════════════════")
+	logger.Debug("Testing health endpoints")
+
+	// Test OpenWebUI health
+	fmt.Println("Testing OpenWebUI health endpoint (http://localhost:8501/health)...")
+	healthOutput, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "curl",
+		Args:    []string{"-s", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:8501/health"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	if err != nil || healthOutput != "200" {
+		logger.Warn("OpenWebUI health check failed",
+			zap.Error(err),
+			zap.String("status_code", healthOutput))
+		fmt.Printf("❌ OpenWebUI health endpoint not responding (HTTP %s)\n", healthOutput)
+		fmt.Println("   OpenWebUI may still be initializing or failed to start")
+	} else {
+		logger.Info("OpenWebUI health check passed")
+		fmt.Println("✅ OpenWebUI health endpoint responding (HTTP 200)")
+	}
+	fmt.Println()
+
+	// Test LiteLLM health
+	fmt.Println("Testing LiteLLM health endpoint (http://localhost:4000/health)...")
+	litellmOutput, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "curl",
+		Args:    []string{"-s", "-o", "/dev/null", "-w", "%{http_code}", "http://localhost:4000/health"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	if err != nil || litellmOutput != "200" {
+		logger.Warn("LiteLLM health check failed",
+			zap.Error(err),
+			zap.String("status_code", litellmOutput))
+		fmt.Printf("❌ LiteLLM health endpoint not responding (HTTP %s)\n", litellmOutput)
+		fmt.Println("   LiteLLM may be crashing or unable to connect to PostgreSQL")
+		fmt.Println("   Check logs below for connection errors")
+	} else {
+		logger.Info("LiteLLM health check passed")
+		fmt.Println("✅ LiteLLM health endpoint responding (HTTP 200)")
+	}
+	fmt.Println()
+
+	// Test 4: PostgreSQL Readiness
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("4. DATABASE CONNECTION TEST")
+	fmt.Println("══════════════════════════════════════════════════════════")
+	logger.Debug("Testing PostgreSQL readiness")
+
+	pgOutput, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "-f", composeFile, "exec", "-T", "litellmproxy_db", "pg_isready", "-U", "litellm", "-d", "litellm"},
+		Capture: true,
+		Timeout: 5 * time.Second,
+	})
+
+	if err != nil {
+		logger.Warn("PostgreSQL readiness check failed",
+			zap.Error(err),
+			zap.String("output", pgOutput))
+		fmt.Printf("❌ PostgreSQL not ready: %s\n", pgOutput)
+		fmt.Println("   Database may still be initializing")
+	} else {
+		logger.Info("PostgreSQL readiness check passed")
+		fmt.Println("✅ PostgreSQL accepting connections")
+	}
+	fmt.Println()
+
+	// Test 5: Container Logs
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("5. CONTAINER LOGS (Last 30 lines each)")
+	fmt.Println("══════════════════════════════════════════════════════════")
+	logger.Debug("Gathering container logs")
+
+	containers := []struct {
+		name    string
+		service string
+	}{
+		{"PostgreSQL", "litellmproxy_db"},
+		{"LiteLLM", "litellm-proxy"},
+		{"OpenWebUI", "openwebui"},
+	}
+
+	for _, container := range containers {
+		fmt.Printf("\n--- %s Logs ---\n", container.name)
+		logsOutput, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"compose", "-f", composeFile, "logs", "--tail", "30", container.service},
+			Capture: true,
+			Timeout: 10 * time.Second,
+		})
+
 		if err != nil {
-			logger.Error("Backup file not found despite success",
-				zap.String("file", testBackupSecureRO),
+			logger.Warn("Failed to get container logs",
+				zap.String("container", container.name),
 				zap.Error(err))
-			fmt.Printf("  ✗ Backup file not found\n")
+			fmt.Printf("❌ Failed to retrieve logs: %v\n", err)
 		} else {
-			logger.Info("Secure backup with :ro succeeded unexpectedly",
-				zap.String("file", testBackupSecureRO),
-				zap.Int64("size_bytes", info.Size()))
-			fmt.Printf("  ✓ Secure backup with :ro succeeded\n")
-			fmt.Printf("    Size: %.2f MB\n", float64(info.Size())/(1024*1024))
-			_ = os.Remove(testBackupSecureRO)
+			// Filter for important log lines
+			lines := strings.Split(logsOutput, "\n")
+			importantLines := 0
+			for _, line := range lines {
+				if strings.Contains(line, "ERROR") || strings.Contains(line, "WARN") ||
+					strings.Contains(line, "Failed") || strings.Contains(line, "Connection") ||
+					strings.Contains(line, "ready") || strings.Contains(line, "Starting") ||
+					strings.Contains(line, "Listening") || strings.Contains(line, "Uvicorn") {
+					fmt.Println(line)
+					importantLines++
+				}
+			}
+			if importantLines == 0 {
+				fmt.Println("(No significant log entries found)")
+			}
+			logger.Debug("Container logs retrieved",
+				zap.String("container", container.name),
+				zap.Int("lines_shown", importantLines))
 		}
 	}
 	fmt.Println()
 
-	// Test 6: Secure backup WITHOUT read-only data volume (proposed fix)
-	fmt.Println("Test 6: Secure Backup WITHOUT :ro Data Volume (Proposed Fix)")
-	testBackupSecureRW := "/opt/openwebui/backups/test-backup-secure-rw.tar.gz"
-	logger.Info("Testing secure backup WITHOUT :ro mount (proposed fix)",
-		zap.String("output_file", testBackupSecureRW),
-		zap.Bool("read_only_mount", false))
+	// Test 6: File Permissions
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("6. FILE PERMISSIONS")
+	fmt.Println("══════════════════════════════════════════════════════════")
+	logger.Debug("Checking file permissions")
 
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args: []string{
-			"run", "--rm",
-			"--security-opt", "no-new-privileges:true",
-			"--cap-drop", "ALL",
-			"--cap-add", "DAC_OVERRIDE",
-			"--read-only",
-			"--network", "none",
-			"-v", "open-webui-data:/data", // READ-WRITE mount (but container is stopped)
-			"-v", fmt.Sprintf("%s:/backup", backupDir),
-			"alpine",
-			"tar", "czf", "/backup/test-backup-secure-rw.tar.gz",
-			"-C", "/data", ".",
-		},
+	envFile := installDir + "/.env"
+	fmt.Printf("Checking %s permissions...\n", envFile)
+
+	lsOutput, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "ls",
+		Args:    []string{"-la", envFile},
 		Capture: true,
-		Timeout: 5 * 60 * 1000,
 	})
 
 	if err != nil {
-		logger.Error("Secure backup without :ro failed",
-			zap.String("output", output),
-			zap.Error(err))
-		fmt.Printf("  ✗ Secure backup without :ro failed: %s\n", output)
-		return fmt.Errorf("proposed fix also failed")
+		logger.Warn("Failed to check file permissions", zap.Error(err))
+		fmt.Printf("❌ Failed to check file: %v\n", err)
+	} else {
+		fmt.Println(lsOutput)
+		if strings.Contains(lsOutput, "rw-------") || strings.Contains(lsOutput, "600") {
+			logger.Warn(".env file has restrictive permissions",
+				zap.String("permissions", "0600"))
+			fmt.Println("⚠️  .env file is only readable by owner (0600)")
+			fmt.Println("   Docker Compose may fail to read environment variables")
+			fmt.Println("   Recommended: chmod 640 .env && chgrp docker .env")
+		} else {
+			logger.Info(".env file permissions look correct")
+			fmt.Println("✅ .env file permissions look correct")
+		}
 	}
-
-	info, err = os.Stat(testBackupSecureRW)
-	if err != nil {
-		logger.Error("Backup file not found",
-			zap.String("file", testBackupSecureRW),
-			zap.Error(err))
-		fmt.Printf("  ✗ Backup file not found\n")
-		return fmt.Errorf("backup file not created")
-	}
-
-	logger.Info("Secure backup without :ro succeeded (fix confirmed)",
-		zap.String("file", testBackupSecureRW),
-		zap.Int64("size_bytes", info.Size()),
-		zap.Float64("size_mb", float64(info.Size())/(1024*1024)))
-
-	fmt.Printf("  ✓ Secure backup without :ro succeeded\n")
-	fmt.Printf("    Size: %.2f MB\n", float64(info.Size())/(1024*1024))
-	_ = os.Remove(testBackupSecureRW)
 	fmt.Println()
 
 	// Summary
-	fmt.Println("=== Diagnostic Summary ===")
+	fmt.Println("══════════════════════════════════════════════════════════")
+	fmt.Println("NEXT STEPS")
+	fmt.Println("══════════════════════════════════════════════════════════")
 	fmt.Println()
-	fmt.Println("Result: The :ro (read-only) flag on the data volume is causing the backup to fail.")
+	fmt.Println("If you see issues above:")
 	fmt.Println()
-	fmt.Println("Why this happens:")
-	fmt.Println("  - tar needs to update file access times (atime) when reading")
-	fmt.Println("  - :ro mount prevents ANY writes, including metadata updates")
-	fmt.Println("  - This causes tar to fail silently")
+	fmt.Println("1. Container not running:")
+	fmt.Println("   cd /opt/openwebui && sudo docker compose up -d")
 	fmt.Println()
-	fmt.Println("The fix:")
-	fmt.Println("  1. Remove :ro from the data volume mount in pkg/openwebui/update.go")
-	fmt.Println("  2. Change: -v open-webui-data:/data:ro")
-	fmt.Println("  3. To:     -v open-webui-data:/data")
+	fmt.Println("2. LiteLLM not responding:")
+	fmt.Println("   sudo docker compose -f /opt/openwebui/docker-compose.yml logs litellm-proxy")
 	fmt.Println()
-	fmt.Println("Security note:")
-	fmt.Println("  - The container is already stopped before backup")
-	fmt.Println("  - Other security restrictions remain (no-new-privileges, cap-drop, etc.)")
-	fmt.Println("  - The backup container runs with --read-only root filesystem")
-	fmt.Println("  - No network access (--network none)")
+	fmt.Println("3. PostgreSQL not ready:")
+	fmt.Println("   sudo docker compose -f /opt/openwebui/docker-compose.yml logs litellmproxy_db")
+	fmt.Println()
+	fmt.Println("4. Health checks failing after 2+ minutes:")
+	fmt.Println("   Check logs above for specific errors")
+	fmt.Println()
+	fmt.Println("5. Permission issues:")
+	fmt.Println("   sudo chmod 640 /opt/openwebui/.env")
+	fmt.Println("   sudo chgrp docker /opt/openwebui/.env")
 	fmt.Println()
 
-	logger.Info("Diagnostics completed successfully")
+	logger.Info("Diagnostics completed")
 	return nil
 }

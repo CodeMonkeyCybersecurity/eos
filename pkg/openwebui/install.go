@@ -778,11 +778,23 @@ TZ=%s
 		)
 	}
 
-	if err := os.WriteFile(owi.config.EnvFile, []byte(content), 0600); err != nil {
+	// Create .env file with appropriate permissions for Docker Compose
+	// 0640 = owner read/write, group read, others none
+	if err := os.WriteFile(owi.config.EnvFile, []byte(content), 0640); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 
-	logger.Debug(".env file created", zap.String("path", owi.config.EnvFile))
+	// Attempt to set docker group ownership (best effort - may not exist)
+	// This allows docker compose to read the file
+	_, _ = execute.Run(ctx, execute.Options{
+		Command: "chgrp",
+		Args:    []string{"docker", owi.config.EnvFile},
+		Capture: true,
+	})
+
+	logger.Debug(".env file created",
+		zap.String("path", owi.config.EnvFile),
+		zap.String("permissions", "0640"))
 	return nil
 }
 
@@ -1129,7 +1141,7 @@ func (owi *OpenWebUIInstaller) verifyInstallation(ctx context.Context) error {
 		zap.Duration("max_wait", time.Duration(maxRetries)*retryInterval),
 		zap.String("url", healthURL))
 
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		logger.Debug("Checking health endpoint",
 			zap.String("url", healthURL),
 			zap.Int("attempt", i+1),
