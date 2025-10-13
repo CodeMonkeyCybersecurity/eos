@@ -10,6 +10,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -91,13 +92,8 @@ func runDeleteOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 			fmt.Println()
 		}
 
-		confirmation, err := eos_io.PromptInput(rc, "Type 'yes' to confirm deletion: ", "delete_confirmation")
-		if err != nil {
-			logger.Error("Failed to read confirmation", zap.Error(err))
-			return fmt.Errorf("confirmation failed: %w", err)
-		}
-
-		if confirmation != "yes" {
+		confirmed := interaction.PromptYesNo(rc.Ctx, "Type 'yes' (or 'y') to confirm deletion", false)
+		if !confirmed {
 			logger.Info("Deletion cancelled by user")
 			fmt.Println("Deletion cancelled")
 			return nil
