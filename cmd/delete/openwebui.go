@@ -225,12 +225,8 @@ func runDeleteOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		Capture: true,
 	})
 	if err != nil {
-		logger.Warn("Failed to remove volume",
-			zap.Error(err),
+		logger.Debug("Volume already removed or doesn't exist",
 			zap.String("output", output))
-		if !openwebuiDeleteForce {
-			return fmt.Errorf("failed to remove volume: %s", output)
-		}
 	} else {
 		logger.Info("Volume removed successfully")
 	}
