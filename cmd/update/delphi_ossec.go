@@ -536,7 +536,7 @@ func updateGlobalSection(config string, global *GlobalConfig) string {
 			global.AgentsDisconnectionAlertTime)
 	}
 	if global.LogFormat != "" {
-		newGlobal += fmt.Sprintf("    <logall>yes</logall>\n")
+		newGlobal += "    <logall>yes</logall>\n"
 		newGlobal += fmt.Sprintf("    <logall_json>%s</logall_json>\n",
 			boolToYesNo(global.LogFormat == "json"))
 	}
