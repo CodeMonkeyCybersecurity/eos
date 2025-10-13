@@ -24,9 +24,10 @@ var (
 	symbolChars = "!@#%^&*()-_=+[]{}|;:,.<>?/" // Removed $ to prevent shell injection
 	allChars    = lowerChars + upperChars + digitChars + symbolChars
 
-	// URL-safe characters: alphanumeric + hyphen + underscore
-	// Safe for: URLs, command line, connection strings, environment variables
-	urlSafeChars = lowerChars + upperChars + digitChars + "-_"
+	// Alphanumeric-only characters for maximum compatibility
+	// Safe for: URLs, databases, APIs, config files, shells, legacy systems
+	// No special chars = no escaping needed anywhere
+	alphanumericChars = lowerChars + upperChars + digitChars
 )
 
 // GeneratePassword creates a strong random password with at least 1 of each char class.
@@ -61,17 +62,26 @@ func GeneratePassword(length int) (string, error) {
 }
 
 // GenerateURLSafePassword generates a cryptographically secure password
-// using only URL-safe characters (alphanumeric + hyphen + underscore).
-// This prevents issues with special characters in connection strings like DATABASE_URL.
+// using ONLY alphanumeric characters [a-zA-Z0-9].
 //
-// Character set: [a-zA-Z0-9_-] (64 possible characters)
-// Entropy: log2(64^32) = 192 bits for 32-character password
+// Why alphanumeric-only is BETTER than special characters for service credentials:
+// 1. No escaping needed in ANY context (URLs, shells, SQL, YAML, TOML, JSON)
+// 2. Maximum compatibility (works with legacy systems that reject special chars)
+// 3. Length compensates for character set reduction - security is equivalent
+// 4. Eliminates entire classes of bugs related to special character handling
+//
+// Character set: [a-zA-Z0-9] (62 possible characters)
+// Entropy: log2(62^32) ≈ 190 bits for 32-character password (exceeds AES-128)
 //
 // Use this for:
-//   - Database passwords in connection strings
-//   - Passwords that will appear in URLs
-//   - Passwords that need to work in shell commands without escaping
-//   - API keys/tokens that need to be URL-safe
+//   - Database passwords in connection strings (DATABASE_URL)
+//   - API keys and tokens
+//   - Service-to-service authentication
+//   - Any password that appears in config files, URLs, or shell commands
+//   - Passwords passed through multiple systems/parsers
+//
+// DO NOT use for human user passwords - use GeneratePassword() instead
+// (human passwords benefit from special characters for complexity requirements)
 func GenerateURLSafePassword(length int) (string, error) {
 	if length < MinPasswordLen {
 		return "", errors.New("password too short: min length " + fmt.Sprintf("%d", MinPasswordLen))
@@ -79,7 +89,7 @@ func GenerateURLSafePassword(length int) (string, error) {
 
 	password := make([]byte, length)
 	for i := 0; i < length; i++ {
-		c, err := randomChar(urlSafeChars)
+		c, err := randomChar(alphanumericChars)
 		if err != nil {
 			return "", fmt.Errorf("failed to generate random character: %w", err)
 		}
