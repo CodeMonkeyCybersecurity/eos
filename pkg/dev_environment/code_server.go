@@ -227,12 +227,12 @@ func InstallClaudeExtension(rc *eos_io.RuntimeContext, config *Config) error {
 // Helper functions
 
 func generatePassword() string {
-	// SECURITY P0 #2: Use crypto/rand instead of time-based generation
-	// Delegate to existing crypto.GeneratePassword which uses crypto/rand properly
-	password, err := crypto.GeneratePassword(16)
+	// Use URL-safe password for code-server web authentication
+	// This avoids issues with special characters in web auth headers and URLs
+	password, err := crypto.GenerateURLSafePassword(16)
 	if err != nil {
-		// Fallback: generate from crypto/rand directly
-		const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+		// Fallback: generate from crypto/rand directly using URL-safe chars
+		const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
 		passwordBytes := make([]byte, 16)
 		randomBytes := make([]byte, 16)
 

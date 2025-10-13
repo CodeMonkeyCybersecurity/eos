@@ -92,7 +92,11 @@ func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
 		return "", cerr.Wrap(err, "fallback get user ID")
 	}
 
-	newPass, _ := crypto.GeneratePassword(20)
+	// Use URL-safe password for API authentication to avoid issues with special characters
+	newPass, err := crypto.GenerateURLSafePassword(20)
+	if err != nil {
+		return "", cerr.Wrap(err, "failed to generate password")
+	}
 	if err := UpdateUserPassword(rc, &cfg, userID, newPass); err != nil {
 		return "", cerr.Wrap(err, "fallback update password")
 	}

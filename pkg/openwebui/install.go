@@ -309,37 +309,40 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 		zap.Bool("litellm_enabled", owi.config.UseLiteLLM))
 
 	if owi.config.WebUISecretKey == "" {
-		logger.Info("Generating secure secret key")
-		secretKey, err := crypto.GeneratePassword(64)
+		logger.Info("Generating secure secret key (URL-safe)")
+		secretKey, err := crypto.GenerateURLSafePassword(64)
 		if err != nil {
 			return fmt.Errorf("failed to generate secret key: %w", err)
 		}
 		owi.config.WebUISecretKey = secretKey
-		logger.Debug("Post-operation: WebUI secret key generated",
-			zap.Int("length", len(secretKey)))
+		logger.Debug("Post-operation: WebUI secret key generated (URL-safe)",
+			zap.Int("length", len(secretKey)),
+			zap.String("charset", "[a-zA-Z0-9_-]"))
 	}
 
 	// Generate LiteLLM keys if using LiteLLM
 	if owi.config.UseLiteLLM {
 		if owi.config.LiteLLMMasterKey == "" {
-			logger.Info("Generating LiteLLM master key")
-			masterKey, err := crypto.GeneratePassword(32)
+			logger.Info("Generating LiteLLM master key (URL-safe)")
+			masterKey, err := crypto.GenerateURLSafePassword(32)
 			if err != nil {
 				return fmt.Errorf("failed to generate LiteLLM master key: %w", err)
 			}
 			owi.config.LiteLLMMasterKey = "sk-" + masterKey // Must start with sk-
-			logger.Debug("Post-operation: LiteLLM master key generated",
-				zap.Int("length", len(owi.config.LiteLLMMasterKey)))
+			logger.Debug("Post-operation: LiteLLM master key generated (URL-safe)",
+				zap.Int("length", len(owi.config.LiteLLMMasterKey)),
+				zap.String("charset", "[a-zA-Z0-9_-]"))
 		}
 		if owi.config.LiteLLMSaltKey == "" {
-			logger.Info("Generating LiteLLM salt key")
-			saltKey, err := crypto.GeneratePassword(32)
+			logger.Info("Generating LiteLLM salt key (URL-safe)")
+			saltKey, err := crypto.GenerateURLSafePassword(32)
 			if err != nil {
 				return fmt.Errorf("failed to generate LiteLLM salt key: %w", err)
 			}
 			owi.config.LiteLLMSaltKey = saltKey
-			logger.Debug("Post-operation: LiteLLM salt key generated",
-				zap.Int("length", len(saltKey)))
+			logger.Debug("Post-operation: LiteLLM salt key generated (URL-safe)",
+				zap.Int("length", len(saltKey)),
+				zap.String("charset", "[a-zA-Z0-9_-]"))
 		}
 		if owi.config.PostgresPassword == "" {
 			logger.Info("Generating PostgreSQL password (URL-safe for DATABASE_URL compatibility)")
