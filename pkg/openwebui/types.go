@@ -26,8 +26,9 @@ type InstallConfig struct {
 	// Network configuration
 	Port int // External port to expose (default: shared.PortOpenWebUI = 8501)
 
-	// LiteLLM Proxy Configuration
-	UseLiteLLM       bool   // Use LiteLLM proxy for production features
+	// LiteLLM Proxy Configuration (ENABLED BY DEFAULT)
+	UseLiteLLM       bool   // Use LiteLLM proxy for production features (default: true)
+	DirectMode       bool   // Use direct Azure OpenAI connection (disables LiteLLM)
 	LiteLLMPort      int    // LiteLLM proxy port (default: 4000)
 	LiteLLMMasterKey string // LiteLLM master key (auto-generated if not provided)
 	LiteLLMSaltKey   string // LiteLLM salt key for encryption (auto-generated if not provided)

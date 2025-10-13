@@ -92,8 +92,9 @@ func NewOpenWebUIInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Op
 	}
 	config.WebUIAuth = true // Always enable auth for security
 
-	// LiteLLM defaults
-	if config.UseLiteLLM {
+	// LiteLLM is DEFAULT unless DirectMode is explicitly enabled
+	if !config.DirectMode {
+		config.UseLiteLLM = true
 		if config.LiteLLMPort == 0 {
 			config.LiteLLMPort = 4000
 		}
@@ -607,6 +608,10 @@ LITELLM_SALT_KEY=%s
 # Open WebUI Settings
 WEBUI_SECRET_KEY=%s
 TZ=%s
+
+# Open WebUI Connection to LiteLLM
+OPENAI_API_BASE_URL=http://litellm-proxy:4000
+OPENAI_API_KEY=${LITELLM_MASTER_KEY}
 `,
 			owi.config.AzureEndpoint,
 			owi.config.AzureAPIKey,
@@ -720,6 +725,11 @@ services:
       - webui_network
     depends_on:
       - litellm-proxy
+    environment:
+      # Connect Open WebUI to LiteLLM proxy
+      - OPENAI_API_BASE_URL=http://litellm-proxy:4000
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY}
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
 
   litellm-proxy:
     image: ghcr.io/berriai/litellm:main-latest

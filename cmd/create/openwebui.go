@@ -21,7 +21,7 @@ var (
 	openwebuiName            string
 	openwebuiForce           bool
 	openwebuiSkipHealthCheck bool
-	openwebuiUseLiteLLM      bool
+	openwebuiDirectMode      bool
 	openwebuiLiteLLMPort     int
 )
 
@@ -35,8 +35,8 @@ Open WebUI provides a user-friendly chat interface for interacting with Azure Op
 This command sets up Open WebUI in a Docker container with proper configuration and security.
 
 Deployment Options:
-1. Direct Azure OpenAI (default) - Simple setup, basic features
-2. LiteLLM Proxy (--use-litellm) - Production-ready with cost tracking, load balancing
+1. LiteLLM Proxy (DEFAULT) - Production-ready with cost tracking, load balancing
+2. Direct Azure OpenAI (--direct-mode) - Simple setup, basic features only
 
 The deployment includes:
 - Docker Compose setup in /opt/openwebui
@@ -51,24 +51,23 @@ Examples:
   # Interactive installation (will prompt for Azure credentials)
   eos create openwebui
 
-  # Direct Azure OpenAI connection
+  # Production setup with LiteLLM proxy (DEFAULT - recommended)
   eos create openwebui \
     --azure-endpoint https://myopenai.openai.azure.com \
     --azure-deployment gpt-4 \
     --azure-api-key YOUR_API_KEY
 
-  # Production setup with LiteLLM proxy (recommended)
+  # Direct Azure OpenAI connection (simple, no cost tracking)
   eos create openwebui \
-    --use-litellm \
+    --direct-mode \
     --azure-endpoint https://myopenai.openai.azure.com \
     --azure-deployment gpt-4 \
     --azure-api-key YOUR_API_KEY
 
-  # Custom ports
+  # Custom ports (LiteLLM mode)
   eos create openwebui \
     --port 3000 \
-    --litellm-port 4000 \
-    --use-litellm
+    --litellm-port 4000
 
 Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 		RunE: eos.Wrap(runCreateOpenWebUI),
@@ -90,11 +89,11 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 	openwebuiCmd.Flags().StringVar(&openwebuiName, "name", "Code Monkey AI Chat",
 		"Display name for the web UI")
 
-	// LiteLLM proxy flags
-	openwebuiCmd.Flags().BoolVar(&openwebuiUseLiteLLM, "use-litellm", false,
-		"Use LiteLLM proxy for production features (cost tracking, load balancing)")
+	// LiteLLM proxy flags (ENABLED BY DEFAULT)
+	openwebuiCmd.Flags().BoolVar(&openwebuiDirectMode, "direct-mode", false,
+		"Use direct Azure OpenAI connection (disables LiteLLM production features)")
 	openwebuiCmd.Flags().IntVar(&openwebuiLiteLLMPort, "litellm-port", 4000,
-		"Port for LiteLLM proxy (only used with --use-litellm)")
+		"Port for LiteLLM proxy (default: 4000)")
 
 	// Installation behavior flags
 	openwebuiCmd.Flags().BoolVar(&openwebuiForce, "force", false,
@@ -120,7 +119,7 @@ func runCreateOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		WebUIName:        openwebuiName,
 		ForceReinstall:   openwebuiForce,
 		SkipHealthCheck:  openwebuiSkipHealthCheck,
-		UseLiteLLM:       openwebuiUseLiteLLM,
+		DirectMode:       openwebuiDirectMode,
 		LiteLLMPort:      openwebuiLiteLLMPort,
 	}
 
@@ -147,16 +146,21 @@ func runCreateOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	logger.Info("  2. Create your first user account (will be admin)")
 	logger.Info("  3. Start chatting with Azure OpenAI")
 	logger.Info("")
-	if config.UseLiteLLM {
-		logger.Info("LiteLLM Proxy:",
-			zap.String("ui_url", fmt.Sprintf("http://localhost:%d/ui", config.LiteLLMPort)),
-			zap.String("docs_url", fmt.Sprintf("http://localhost:%d/docs", config.LiteLLMPort)))
+	if !config.DirectMode {
+		logger.Info("🚀 LiteLLM Proxy (Production Mode):")
+		logger.Info(fmt.Sprintf("  UI:   http://localhost:%d/ui", config.LiteLLMPort))
+		logger.Info(fmt.Sprintf("  Docs: http://localhost:%d/docs", config.LiteLLMPort))
 		logger.Info("")
-		logger.Info("Features enabled:")
+		logger.Info("Production Features Enabled:")
 		logger.Info("  ✓ Cost tracking and usage monitoring")
 		logger.Info("  ✓ Load balancing across multiple models")
 		logger.Info("  ✓ Request logging and analytics")
 		logger.Info("  ✓ Rate limiting and quotas")
+		logger.Info("")
+	} else {
+		logger.Info("⚠️  Direct Mode (Development Only):")
+		logger.Info("  No cost tracking or production features")
+		logger.Info("  For production, remove --direct-mode flag")
 		logger.Info("")
 	}
 	logger.Info("Useful commands:")
