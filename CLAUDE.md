@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-05*
+*Last Updated: 2025-10-14*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 

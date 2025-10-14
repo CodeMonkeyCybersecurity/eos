@@ -14,7 +14,6 @@ import (
 
 	// Subcommands - Core verb-first architecture
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
@@ -73,7 +72,6 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		rollback.RollbackCmd, // VERB-FIRST ARCHITECTURE (rollback operations)
 
 		// Top-level aliases for convenience
-		bootstrap.BootstrapCmd, // Alias for create bootstrap
 		nuke.NukeCmd,           // Alias for delete nuke
 
 		// TODO: Migrate these to verb directories (Phase 4)
@@ -87,7 +85,6 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 	}
 
 	// Add subcommands after all init() functions have run
-	bootstrap.AddSubcommands()
 	update.AddSubcommands()
 	backup.AddSubcommands()
 	rollback.AddSubcommands()

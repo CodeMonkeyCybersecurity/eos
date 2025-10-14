@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/bootstrap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
@@ -86,12 +85,6 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// Check if running as root
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError("this command must be run as root")
-	}
-
-	// Check if system is bootstrapped
-	if err := bootstrap.RequireBootstrap(rc); err != nil {
-		// Bootstrap not required for fundamental services like Consul
-		logger.Debug("System not bootstrapped, continuing with Consul installation")
 	}
 
 	// Determine server/client mode
