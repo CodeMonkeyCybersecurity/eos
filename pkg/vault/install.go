@@ -1149,10 +1149,25 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 		zap.String("skip_verify", "true"))
 
 	statusCmd := exec.CommandContext(vi.rc.Ctx, vi.config.BinaryPath, "status")
-	statusCmd.Env = append(os.Environ(),
-		"VAULT_SKIP_VERIFY=1", // Skip TLS verification for self-signed certs
+
+	// Build clean environment for health check:
+	// - Copy parent environment
+	// - Remove VAULT_CACERT (we're skipping TLS verification anyway)
+	// - Set VAULT_SKIP_VERIFY=1 (skip TLS verification for self-signed certs)
+	// - Set VAULT_ADDR explicitly
+	cleanEnv := make([]string, 0, len(os.Environ())+2)
+	for _, env := range os.Environ() {
+		// Filter out VAULT_CACERT since we're using VAULT_SKIP_VERIFY
+		if !strings.HasPrefix(env, "VAULT_CACERT=") {
+			cleanEnv = append(cleanEnv, env)
+		}
+	}
+	cleanEnv = append(cleanEnv,
+		"VAULT_SKIP_VERIFY=1",
 		fmt.Sprintf("VAULT_ADDR=%s", vaultAddr),
 	)
+	statusCmd.Env = cleanEnv
+
 	statusOutputBytes, statusErr := statusCmd.CombinedOutput()
 	statusOutput := string(statusOutputBytes)
 

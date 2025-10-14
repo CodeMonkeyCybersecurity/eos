@@ -3,7 +3,6 @@
 package vault
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -70,7 +69,7 @@ func ensureTLS(rc *eos_io.RuntimeContext) (crt, key string, err error) {
 		if err := removeTLSFiles(); err != nil {
 			return "", "", err
 		}
-		if err := generateSelfSigned(); err != nil {
+		if err := generateSelfSigned(rc); err != nil {
 			return "", "", err
 		}
 	}
@@ -237,7 +236,7 @@ func removeTLSFiles() error {
 }
 
 // generateSelfSigned generates a self-signed cert using the consolidated TLS module
-func generateSelfSigned() error {
+func generateSelfSigned(rc *eos_io.RuntimeContext) error {
 	// Ensure TLS directory exists
 	if err := os.MkdirAll(shared.TLSDir, 0o755); err != nil {
 		return cerr.Wrapf(err, "create TLS directory %s", shared.TLSDir)
@@ -266,13 +265,6 @@ func generateSelfSigned() error {
 		DNSNames:    []string{hostname, "localhost"},
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 	}
-
-	// Create a minimal RuntimeContext for the certificate generation
-	// phase3_tls_cert.go functions receive RuntimeContext, so we need to pass it through
-	// Note: This requires the calling function to have rc available
-	// For now, we'll create a basic context
-	ctx := context.Background()
-	rc := &eos_io.RuntimeContext{Ctx: ctx}
 
 	// Generate certificate using consolidated module
 	// This will automatically enrich SANs with all network interfaces, FQDN, wildcards, etc.
