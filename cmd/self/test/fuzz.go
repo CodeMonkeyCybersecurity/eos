@@ -100,7 +100,7 @@ Examples:
 			zap.Duration("total_duration", report.Duration))
 
 		logger.Info("terminal prompt: All fuzz tests completed successfully!")
-		logger.Info("terminal prompt: 🎯 No issues found during fuzzing", zap.Duration("duration", duration))
+		logger.Info("terminal prompt:  No issues found during fuzzing", zap.Duration("duration", duration))
 
 		return nil
 	}),

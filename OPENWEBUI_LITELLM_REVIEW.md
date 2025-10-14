@@ -507,7 +507,7 @@ model_list:
 
 ---
 
-## 🎯 Summary
+##  Summary
 
 **Status:** 🚨 **CRITICAL ISSUES - DO NOT DEPLOY WITHOUT FIXES**
 

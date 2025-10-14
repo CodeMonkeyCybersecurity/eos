@@ -212,7 +212,7 @@ func DisplayStatusOnly(rc *eos_io.RuntimeContext, info *VaultInitInfo) error {
 	}
 
 	// Display usage tip via stderr
-	if _, err := fmt.Fprint(os.Stderr, "\n💡 Use --no-redact flag to view sensitive initialization data\n"); err != nil {
+	if _, err := fmt.Fprint(os.Stderr, "\n Use --no-redact flag to view sensitive initialization data\n"); err != nil {
 		return fmt.Errorf("failed to display usage tip: %w", err)
 	}
 
@@ -282,7 +282,7 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 
 	// Recommendations
 	if status.HealthStatus != "healthy" {
-		fmt.Fprint(os.Stderr, "\n💡 Recommendations:\n")
+		fmt.Fprint(os.Stderr, "\n Recommendations:\n")
 		if !status.ServiceRunning {
 			fmt.Fprint(os.Stderr, "   • Start the service: sudo systemctl start vault-agent-eos\n")
 		}

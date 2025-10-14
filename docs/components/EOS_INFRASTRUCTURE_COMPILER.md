@@ -44,4 +44,4 @@ eos create vault && eos enable vault && eos secure vault
 
 ---
 
-> **💡 For comprehensive architecture documentation, design patterns, and implementation details, see the inline documentation in the source files listed above.**
+> ** For comprehensive architecture documentation, design patterns, and implementation details, see the inline documentation in the source files listed above.**

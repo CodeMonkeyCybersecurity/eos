@@ -258,7 +258,7 @@ func getRemovableDirectories(excluded map[string]bool, keepData bool) []Director
    - Tests pass for dynamic discovery
    - Follows AIE (Assess → Intervene → Evaluate) pattern throughout
 
-### 🎯 Result:
+###  Result:
 
 The nuke package is now a thin orchestration layer that:
 - Dynamically discovers resources from components

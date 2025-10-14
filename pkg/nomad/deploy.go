@@ -576,7 +576,7 @@ func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfi
 	summary.WriteString("╚═══════════════════════════════════════════════════════════════════════╝\n")
 	summary.WriteString("\n")
 
-	summary.WriteString(fmt.Sprintf("🎯 Role: %s\n", config.Role))
+	summary.WriteString(fmt.Sprintf(" Role: %s\n", config.Role))
 	summary.WriteString(fmt.Sprintf(" Datacenter: %s\n", config.DataCenter))
 	if config.NodeIP != "" {
 		summary.WriteString(fmt.Sprintf(" Node IP: %s\n", config.NodeIP))

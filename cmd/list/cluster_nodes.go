@@ -213,8 +213,8 @@ func displayNodesTable(nodes map[string][]string, config *environment.EnhancedEn
 		}
 	}
 
-	fmt.Printf("\n💡 Use 'eos read environment' for complete configuration details\n")
-	fmt.Printf("💡 Use 'eos list nodes --role <role>' to filter by specific role\n")
+	fmt.Printf("\n Use 'eos read environment' for complete configuration details\n")
+	fmt.Printf(" Use 'eos list nodes --role <role>' to filter by specific role\n")
 
 	return nil
 }

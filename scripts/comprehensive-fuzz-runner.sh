@@ -45,7 +45,7 @@ preflight_check() {
         echo -e "  2. ${CYAN}Then run the script:${NC}"
         echo -e "     ${GREEN}./scripts/$(basename "$0")${NC}"
         echo ""
-        echo -e "${YELLOW}💡 The project root should contain:${NC}"
+        echo -e "${YELLOW} The project root should contain:${NC}"
         echo -e "   - go.mod file"
         echo -e "   - pkg/ directory"
         echo -e "   - cmd/ directory"
@@ -181,7 +181,7 @@ echo "============================================="
 echo -e "📂 Working directory: ${YELLOW}$(pwd)${NC}"
 echo -e "⏰ Duration: ${YELLOW}${FUZZTIME}${NC}"
 echo -e " Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
-echo -e "🎯 Security focus: ${YELLOW}${SECURITY_FOCUS}${NC}"
+echo -e " Security focus: ${YELLOW}${SECURITY_FOCUS}${NC}"
 echo -e "🏗️  Architecture testing: ${YELLOW}${ARCHITECTURE_TESTING}${NC}"
 echo -e "🌪️  Chaos mode: ${YELLOW}${CHAOS_MODE}${NC}"
 echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
@@ -280,7 +280,7 @@ run_enhanced_fuzz_test() {
     
     echo -e "${PURPLE} Running ${test_function} (${category})${NC}"
     echo -e "   Package: ${test_package}"
-    echo -e "   ⏱️  Duration: ${duration}"
+    echo -e "   ️  Duration: ${duration}"
     echo -e "    Corpus: ${corpus_dir}"
     
     # Set environment for enhanced fuzzing
@@ -304,7 +304,7 @@ run_enhanced_fuzz_test() {
         
         # Check for interesting findings
         if [ "$inputs" -gt 0 ]; then
-            echo -e "   🎯 ${YELLOW}Found ${inputs} interesting inputs!${NC}"
+            echo -e "    ${YELLOW}Found ${inputs} interesting inputs!${NC}"
             echo "  -  **${test_function}**: Found ${inputs} new interesting inputs" >> "${REPORT_FILE}"
         fi
         
@@ -568,7 +568,7 @@ EOF
     echo -e "${CYAN}📊 COMPREHENSIVE FUZZING COMPLETE${NC}"
     echo "=================================="
     echo -e "📈 Tests: ${total_tests} total, ${GREEN}${passed_tests} passed${NC}, ${RED}${failed_tests} failed${NC}"
-    echo -e "📄 Report: ${YELLOW}${REPORT_FILE}${NC}"
+    echo -e " Report: ${YELLOW}${REPORT_FILE}${NC}"
     echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
     echo -e " Coverage: ${YELLOW}${LOG_DIR}/coverage.html${NC}"
     

@@ -23,4 +23,4 @@ The Eos codebase has been successfully migrated from  to HashiCorp stack (Consul
 
 ---
 
-> **💡 For comprehensive migration documentation, architectural decisions, and implementation details, see the inline documentation in the source files listed above.**
+> ** For comprehensive migration documentation, architectural decisions, and implementation details, see the inline documentation in the source files listed above.**

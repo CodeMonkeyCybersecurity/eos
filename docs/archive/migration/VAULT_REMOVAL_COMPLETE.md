@@ -234,7 +234,7 @@ All checks should show :
 ### What Was Broken 🔴
 1. `/usr/local/bin/vault` not being removed (NOW FIXED)
 
-### What We Were Not Thinking About 💡
+### What We Were Not Thinking About 
 1. The implementation was already MORE comprehensive than requirements
 2. Binary cleanup logic already exists in `binary_cleanup.go` (could be leveraged)
 3. No unit tests, but integration is solid

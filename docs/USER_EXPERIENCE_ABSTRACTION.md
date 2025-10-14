@@ -25,4 +25,4 @@ The Eos user experience abstraction provides a consistent `eos create X` interfa
 
 ---
 
-> **💡 For comprehensive abstraction details, service classification logic, and implementation benefits, see the inline documentation in the source files listed above.**
+> ** For comprehensive abstraction details, service classification logic, and implementation benefits, see the inline documentation in the source files listed above.**

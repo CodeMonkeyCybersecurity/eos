@@ -226,7 +226,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 		if len(result.Suggestions) > 0 {
 			fmt.Printf("Suggestions:\n")
 			for _, suggestion := range result.Suggestions {
-				fmt.Printf("  💡 %s\n", suggestion)
+				fmt.Printf("   %s\n", suggestion)
 			}
 			fmt.Printf("\n")
 		}

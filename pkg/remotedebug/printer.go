@@ -39,7 +39,7 @@ func (rp *ReportPrinter) PrintDiagnosticReport(report *SystemReport) {
 			fmt.Printf("\n  Category: %s\n", warning.Category)
 			fmt.Printf("  %s\n", warning.Description)
 			if warning.Suggestion != "" {
-				fmt.Printf("  💡 %s\n", warning.Suggestion)
+				fmt.Printf("   %s\n", warning.Suggestion)
 			}
 		}
 	}

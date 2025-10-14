@@ -25,4 +25,4 @@ The Eos storage operations implementation has been successfully completed with c
 
 ---
 
-> **💡 For comprehensive implementation details, safety mechanisms, and integration patterns, see the inline documentation in the source files listed above.**
+> ** For comprehensive implementation details, safety mechanisms, and integration patterns, see the inline documentation in the source files listed above.**

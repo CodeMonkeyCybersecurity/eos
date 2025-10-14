@@ -55,8 +55,8 @@ run_fuzz_test() {
     
     echo " Running ${test_name} (${duration}, priority: ${priority})..."
     echo "Package: ${package}"
-    echo "⏱️  Started at: $(date)"
-    echo "📄 Log: ${log_file}"
+    echo "️  Started at: $(date)"
+    echo " Log: ${log_file}"
     
     # Check if test exists first
     if ! go test -list=Fuzz "${package}" 2>/dev/null | grep -q "^${test_name}$"; then
@@ -210,7 +210,7 @@ echo ""
 echo "📊 COMPREHENSIVE SUMMARY:"
 echo "========================="
 echo " Log directory: ${LOG_DIR}"
-echo "📄 Main report: ${REPORT_FILE}"
+echo " Main report: ${REPORT_FILE}"
 echo "📈 Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed, ${skipped_tests} skipped)"
 echo ""
 

@@ -25,4 +25,4 @@ EOS provides automatic secret generation and environment discovery to enable ult
 
 ---
 
-> **💡 For comprehensive secret management details, user experience transformation, and implementation specifics, see the inline documentation in the source files listed above.**
+> ** For comprehensive secret management details, user experience transformation, and implementation specifics, see the inline documentation in the source files listed above.**

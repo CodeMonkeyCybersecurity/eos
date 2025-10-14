@@ -275,7 +275,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		if strings.Contains(lsOutput, "rw-------") || strings.Contains(lsOutput, "600") {
 			logger.Warn(".env file has restrictive permissions",
 				zap.String("permissions", "0600"))
-			fmt.Println("⚠️  .env file is only readable by owner (0600)")
+			fmt.Println("  .env file is only readable by owner (0600)")
 			fmt.Println("   Docker Compose may fail to read environment variables")
 			fmt.Println("   Recommended: chmod 640 .env && chgrp docker .env")
 		} else {

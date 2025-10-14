@@ -25,4 +25,4 @@ The Eos bootstrap hardening safety system provides comprehensive safety mechanis
 
 ---
 
-> **💡 For comprehensive safety mechanisms, hardening categories, and implementation details, see the inline documentation in the source files listed above.**
+> ** For comprehensive safety mechanisms, hardening categories, and implementation details, see the inline documentation in the source files listed above.**

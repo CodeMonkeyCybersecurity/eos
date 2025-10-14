@@ -36,7 +36,7 @@
 └──────────────┘    └──────────────┘
 
 ❌ File Storage: Development/Learning ONLY
-⚠️  3-Node Raft: Small production (1 node failure tolerance)
+  3-Node Raft: Small production (1 node failure tolerance)
 ✅ 5-Node Raft: Recommended production (2 node failure tolerance)
 ```
 
@@ -263,7 +263,7 @@ vault kv get secret/test
 # ✅ SUCCESS if you can read the secret
 ```
 
-**⚠️ SECURITY WARNING:** This stores all unseal keys in one file. This is ONLY acceptable for development. For production, see [Auto-Unseal Setup](#auto-unseal).
+** SECURITY WARNING:** This stores all unseal keys in one file. This is ONLY acceptable for development. For production, see [Auto-Unseal Setup](#auto-unseal).
 
 ---
 
@@ -375,7 +375,7 @@ storage "raft" {
 
 ---
 
-#### File Storage - DEVELOPMENT ONLY ⚠️
+#### File Storage - DEVELOPMENT ONLY 
 
 **HashiCorp Official Guidance:**
 > "The Filesystem storage backend stores Vault's data on the filesystem using a standard directory structure. It can be used for durable single server situations, or to develop locally where durability is not critical."
@@ -394,7 +394,7 @@ storage "raft" {
 
 **Configuration Example:**
 ```hcl
-# ⚠️ DEVELOPMENT ONLY - NOT FOR PRODUCTION
+#  DEVELOPMENT ONLY - NOT FOR PRODUCTION
 storage "file" {
   path = "/opt/vault/data"
 }
@@ -1295,7 +1295,7 @@ vault read sys/storage/raft/snapshot-auto/status/daily
 
 #### Restore from Snapshot
 
-**⚠️ WARNING:** Restoring will overwrite current data. Always take a current snapshot before restoring.
+** WARNING:** Restoring will overwrite current data. Always take a current snapshot before restoring.
 
 ```bash
 # STEP 1: Take a "before restore" snapshot (safety net)
@@ -1493,7 +1493,7 @@ groups:
 
 ### Migration from File to Raft {#migration}
 
-**⚠️ CRITICAL:** You cannot convert file storage to Raft in-place. This requires a data migration with downtime.
+** CRITICAL:** You cannot convert file storage to Raft in-place. This requires a data migration with downtime.
 
 #### Migration Process Overview
 

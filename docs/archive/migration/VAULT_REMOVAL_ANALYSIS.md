@@ -359,7 +359,7 @@ AmbientCapabilities=CAP_IPC_LOCK
 
 ---
 
-## 💡 RECOMMENDATIONS
+##  RECOMMENDATIONS
 
 ### Immediate (Do Now)
 1. Fix binary path issue (add `/usr/local/bin/vault` to purge paths)

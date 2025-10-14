@@ -131,7 +131,7 @@ func PostflightValidation(rc *eos_io.RuntimeContext, services []ServiceType) err
 	// Provide optimization suggestions
 	suggestions := generateOptimizationSuggestions(metrics, serviceHealthMap)
 	if len(suggestions) > 0 {
-		logger.Info("terminal prompt: 💡 Optimization Suggestions:")
+		logger.Info("terminal prompt:  Optimization Suggestions:")
 		for _, suggestion := range suggestions {
 			logger.Info(fmt.Sprintf("terminal prompt:   • %s", suggestion))
 		}

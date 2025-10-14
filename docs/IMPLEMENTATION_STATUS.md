@@ -23,4 +23,4 @@ The Eos bootstrap storage operations integration has been successfully completed
 
 ---
 
-> **💡 For comprehensive implementation details, operational features, and CLI command documentation, see the inline documentation in the source files listed above.**
+> ** For comprehensive implementation details, operational features, and CLI command documentation, see the inline documentation in the source files listed above.**

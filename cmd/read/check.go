@@ -78,7 +78,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 						logger.Info("terminal prompt:    Permissions fixed")
 					}
 				} else {
-					logger.Info("terminal prompt:   💡 Run with --fix to attempt repair")
+					logger.Info("terminal prompt:    Run with --fix to attempt repair")
 				}
 			} else {
 				logger.Info("terminal prompt:    Executable permissions OK")
@@ -98,7 +98,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 		warnings = append(warnings, "eos not found in PATH")
 		logger.Info("terminal prompt:   Not found in PATH")
 		if verbose {
-			logger.Info("terminal prompt:   💡 Consider adding to PATH or installing system-wide")
+			logger.Info("terminal prompt:    Consider adding to PATH or installing system-wide")
 		}
 	}
 

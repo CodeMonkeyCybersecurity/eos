@@ -37,7 +37,7 @@ func ShowServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.Service
 			return fmt.Errorf("failed to read service file %s: %w", config.ServiceFile, err)
 		}
 
-		logger.Info("📄 " + filepath.Base(config.ServiceFile) + " content:")
+		logger.Info(" " + filepath.Base(config.ServiceFile) + " content:")
 		lines := strings.Split(string(content), "\n")
 		for _, line := range lines {
 			logger.Info("  " + line)

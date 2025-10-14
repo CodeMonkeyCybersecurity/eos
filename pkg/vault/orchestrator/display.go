@@ -33,7 +33,7 @@ func DisplayOrchestrationResult(rc *eos_io.RuntimeContext, result *Orchestration
 	}
 
 	if result.Mode == ModeNomad && result.Success {
-		fmt.Printf("\n💡 Next Steps:\n")
+		fmt.Printf("\n Next Steps:\n")
 		fmt.Printf("   • Check Vault status: nomad job status vault\n")
 		fmt.Printf("   • Initialize Vault: vault operator init\n")
 		fmt.Printf("   • Unseal Vault: vault operator unseal\n")

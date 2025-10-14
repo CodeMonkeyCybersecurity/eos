@@ -497,7 +497,7 @@ func stopService(rc *eos_io.RuntimeContext, serviceName string) error {
 			zap.Error(err))
 
 		// If the service manager fails, provide detailed help
-		logger.Info("💡 Service stopping failed. Let me help you fix this...")
+		logger.Info(" Service stopping failed. Let me help you fix this...")
 		showServiceStoppingHelp(rc, *targetService, err)
 
 		// Try diagnostic mode
@@ -801,7 +801,7 @@ func addQuickFixSuggestion(rc *eos_io.RuntimeContext, conflicts []PortConflict) 
 	}
 
 	logger.Info("")
-	logger.Info("💡 Quick Fix Suggestion:")
+	logger.Info(" Quick Fix Suggestion:")
 
 	// Build a command to stop all conflicting services
 	servicesToStop := []string{}

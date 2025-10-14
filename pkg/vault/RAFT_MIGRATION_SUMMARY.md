@@ -121,7 +121,7 @@ seal "awskms" {
 **Example Validation Output:**
 ```
 ✅ Multi-node Raft cluster detected - ensure all nodes have unique node_id
-⚠️  Consider configuring auto-unseal (awskms/azurekeyvault/gcpckms) for production
+  Consider configuring auto-unseal (awskms/azurekeyvault/gcpckms) for production
 ```
 
 ---
@@ -457,7 +457,7 @@ This implementation follows EOS architectural principles:
 
 ✅ **Overall Compliance: 90% (18/20 items)**
 - ✅ Critical Requirements: 100% (18/18 implemented)
-- ⚠️ Optional/Future Work: 0% (0/2 implemented)
+-  Optional/Future Work: 0% (0/2 implemented)
 
 **Certification:** ✅ EOS Vault Raft implementation is **PRODUCTION-READY** and **COMPLIANT** with HashiCorp specifications.
 

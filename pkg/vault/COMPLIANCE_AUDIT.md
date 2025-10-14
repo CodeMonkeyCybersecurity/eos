@@ -454,12 +454,12 @@ var vaultClusterCmd = &cobra.Command{
 
 ## Non-Compliant Items (Future Work)
 
-### ⚠️ 19. File-to-Raft Migration Tool
+###  19. File-to-Raft Migration Tool
 
 **Requirement:** Provide migration path from file storage to Raft  
 **Reference:** vault-complete-specification-v1.0-raft-integrated.md, Section 9
 
-**Implementation Status:** ⚠️ PENDING
+**Implementation Status:**  PENDING
 - Migration tool not yet implemented
 - Documented in RAFT_MIGRATION_SUMMARY.md as Phase 5
 - Not critical as new deployments default to Raft
@@ -468,12 +468,12 @@ var vaultClusterCmd = &cobra.Command{
 
 ---
 
-### ⚠️ 20. Comprehensive Test Suite
+###  20. Comprehensive Test Suite
 
 **Requirement:** Unit and integration tests for all Raft functionality  
 **Reference:** eos-raft-implementation-checklist.md
 
-**Implementation Status:** ⚠️ PENDING
+**Implementation Status:**  PENDING
 - Test suite not yet implemented
 - Documented in RAFT_MIGRATION_SUMMARY.md as Phase 6
 - Manual testing performed during development
@@ -492,7 +492,7 @@ var vaultClusterCmd = &cobra.Command{
 - Complete cluster operations support
 - Full CLI integration
 
-**Optional/Future Work:** ⚠️ 0% (0/2 implemented)
+**Optional/Future Work:**  0% (0/2 implemented)
 - Migration utilities (Phase 5)
 - Comprehensive testing (Phase 6)
 

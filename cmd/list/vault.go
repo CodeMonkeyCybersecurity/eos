@@ -141,7 +141,7 @@ func validateConfiguration(rc *eos_io.RuntimeContext) error {
 
 	// Suggestions
 	if len(result.Suggestions) > 0 {
-		fmt.Printf("💡 Suggestions (%d):\n", len(result.Suggestions))
+		fmt.Printf(" Suggestions (%d):\n", len(result.Suggestions))
 		for i, sugg := range result.Suggestions {
 			fmt.Printf("  %d. %s\n", i+1, sugg)
 		}

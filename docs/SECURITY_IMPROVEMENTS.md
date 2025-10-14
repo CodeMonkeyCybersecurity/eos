@@ -25,4 +25,4 @@ Through systematic fuzzing-driven security testing, Eos has identified and fixed
 
 ---
 
-> **💡 For comprehensive security details, vulnerability analysis, and testing methodology, see the inline documentation in the source files listed above.**
+> ** For comprehensive security details, vulnerability analysis, and testing methodology, see the inline documentation in the source files listed above.**

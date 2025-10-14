@@ -75,7 +75,7 @@ func runDeleteOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	if !openwebuiDeleteForce {
 		logger.Info("terminal prompt: Confirm deletion")
 		fmt.Println()
-		fmt.Println("⚠️  WARNING: This will permanently delete Open WebUI")
+		fmt.Println("  WARNING: This will permanently delete Open WebUI")
 		fmt.Println()
 		fmt.Println("The following will be removed:")
 		fmt.Println("  • Open WebUI container")
@@ -88,7 +88,7 @@ func runDeleteOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 			fmt.Println("A backup will be created in:", backupDir)
 			fmt.Println()
 		} else {
-			fmt.Println("⚠️  NO BACKUP will be created (--skip-backup specified)")
+			fmt.Println("  NO BACKUP will be created (--skip-backup specified)")
 			fmt.Println()
 		}
 

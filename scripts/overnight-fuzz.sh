@@ -42,8 +42,8 @@ run_fuzz_test() {
     
     echo " Starting ${test_name} (${duration}, priority: ${priority})..."
     echo "Package: ${package}"
-    echo "⏱️  Started at: $(date)"
-    echo "📄 Log: ${log_file}"
+    echo "️  Started at: $(date)"
+    echo " Log: ${log_file}"
     
     # Run test with timeout protection (macOS compatible)
     timeout_cmd="timeout"
@@ -329,7 +329,7 @@ echo ""
 echo "📊 COMPREHENSIVE SUMMARY:"
 echo "========================="
 echo " Log directory: ${LOG_DIR}"
-echo "📄 Main report: ${REPORT_FILE}"
+echo " Main report: ${REPORT_FILE}"
 echo "📈 Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed)"
 echo " New inputs discovered: ${total_inputs}"
 echo "⚡ Total executions: ${total_executions}"

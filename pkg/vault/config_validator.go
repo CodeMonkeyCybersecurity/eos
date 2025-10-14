@@ -40,12 +40,12 @@ type ConfigValidationResult struct {
 
 // VaultConfig represents the structured Vault configuration for validation
 type VaultConfig struct {
-	Listeners    []ListenerConfig    `hcl:"listener,block"`
-	Storage      *StorageConfig      `hcl:"storage,block"`
-	APIAddr      string              `hcl:"api_addr,optional"`
-	ClusterAddr  string              `hcl:"cluster_addr,optional"`
-	UI           bool                `hcl:"ui,optional"`
-	DisableMlock bool                `hcl:"disable_mlock,optional"`
+	Listeners    []ListenerConfig `hcl:"listener,block"`
+	Storage      *StorageConfig   `hcl:"storage,block"`
+	APIAddr      string           `hcl:"api_addr,optional"`
+	ClusterAddr  string           `hcl:"cluster_addr,optional"`
+	UI           bool             `hcl:"ui,optional"`
+	DisableMlock bool             `hcl:"disable_mlock,optional"`
 }
 
 // ListenerConfig represents a listener block configuration
@@ -376,9 +376,9 @@ func validateStorageDetailed(rc *eos_io.RuntimeContext, content string, result *
 		log.Debug("Validating file storage backend")
 
 		result.Warnings = append(result.Warnings,
-			"⚠️  DEPRECATED: File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+")
+			"  DEPRECATED: File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+")
 		result.Warnings = append(result.Warnings,
-			"⚠️  HashiCorp recommends Raft Integrated Storage for all deployments")
+			"  HashiCorp recommends Raft Integrated Storage for all deployments")
 		result.Suggestions = append(result.Suggestions,
 			"Migrate to Raft: see vault-complete-specification-v1.0-raft-integrated.md")
 
@@ -601,7 +601,7 @@ func ValidateConfigBeforeStart(rc *eos_io.RuntimeContext) error {
 		log.Warn("Configuration warning", zap.String("warning", warning))
 	}
 	for _, suggestion := range result.Suggestions {
-		log.Info("💡 Suggestion", zap.String("suggestion", suggestion))
+		log.Info(" Suggestion", zap.String("suggestion", suggestion))
 	}
 
 	// Fail if there are errors

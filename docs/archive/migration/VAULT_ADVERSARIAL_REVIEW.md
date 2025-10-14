@@ -641,7 +641,7 @@ Found 3 issues, fixed 3
 
 ---
 
-## 🎯 Success Criteria
+##  Success Criteria
 
 Integration is complete when:
 

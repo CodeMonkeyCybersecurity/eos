@@ -76,7 +76,7 @@ For detailed service management documentation, see the inline comments in these 
 
 ---
 
-> **💡 For comprehensive details, see the inline documentation in the source files listed above.**
+> ** For comprehensive details, see the inline documentation in the source files listed above.**
 ```
 
 ## Benefits of Inline Documentation
@@ -110,4 +110,4 @@ The Eos documentation strategy has been successfully transformed to inline-first
 
 ---
 
-> **💡 This represents the new gold standard for documentation in modern Go projects - comprehensive, maintainable, and always current.**
+> ** This represents the new gold standard for documentation in modern Go projects - comprehensive, maintainable, and always current.**

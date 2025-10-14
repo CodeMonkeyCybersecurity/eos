@@ -30,7 +30,7 @@ The updated documentation now:
 | Version | Storage Backend | Status | Use Case |
 |---------|----------------|--------|----------|
 | v0.0 (Original) | File (primary) | ❌ Not production-ready | Development only |
-| v0.1 (Red Team Review) | File (identified as problematic) | ⚠️ Gaps identified | N/A |
+| v0.1 (Red Team Review) | File (identified as problematic) |  Gaps identified | N/A |
 | **v1.0 (Current)** | **Raft (primary)** | ✅ **Production-ready** | **All environments** |
 
 ### Key Changes
@@ -279,7 +279,7 @@ storage "file" {
 
 **Updated (v1.0):**
 ```hcl
-# ⚠️ DEVELOPMENT ONLY - NOT FOR PRODUCTION
+#  DEVELOPMENT ONLY - NOT FOR PRODUCTION
 storage "file" {
   path = "/opt/vault/data"
 }

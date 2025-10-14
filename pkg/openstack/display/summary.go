@@ -91,7 +91,7 @@ func ShowInstallationSummary(rc *eos_io.RuntimeContext, config *openstack.Config
 	fmt.Println()
 
 	// Support information
-	fmt.Println("💡 Tips")
+	fmt.Println(" Tips")
 	fmt.Println("══════")
 	fmt.Println("   • Check service status:  eos read openstack status")
 	fmt.Println("   • View logs:             journalctl -u <service-name>")

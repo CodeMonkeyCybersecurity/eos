@@ -175,7 +175,7 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
     
     echo " Deployment complete!"
     echo ""
-    echo "🎯 Cluster Details:"
+    echo " Cluster Details:"
     echo "   - Cluster: %s"
     echo "   - Domain: %s"
     echo "   - Nodes: %d (%d servers, %d clients)"

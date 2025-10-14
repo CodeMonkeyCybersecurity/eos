@@ -196,7 +196,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		fmt.Printf("Warning: Could not check target version: %v\n", err)
 	} else {
-		fmt.Printf("\n🎯 Target Authentik version: %s\n", targetVersion)
+		fmt.Printf("\n Target Authentik version: %s\n", targetVersion)
 		if !isVersionCompatible(config.Metadata.AuthentikVersion, targetVersion) {
 			fmt.Printf("Warning: Version mismatch (source: %s, target: %s)\n",
 				config.Metadata.AuthentikVersion, targetVersion)
@@ -357,7 +357,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 		if err := os.WriteFile(output, data, 0644); err != nil {
 			return fmt.Errorf("failed to write output: %w", err)
 		}
-		fmt.Printf("\n📄 Comparison saved to: %s\n", output)
+		fmt.Printf("\n Comparison saved to: %s\n", output)
 	} else {
 		// Print to console
 		printComparison(comparison)

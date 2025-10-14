@@ -375,7 +375,7 @@ if [ -n "$SLACK_WEBHOOK" ]; then
         "$SLACK_WEBHOOK" 2>/dev/null
 fi
 
-echo -e "${BLUE}📄 Full report: $REPORT_FILE${NC}"
+echo -e "${BLUE} Full report: $REPORT_FILE${NC}"
 
 if [ $CRASHES_FOUND -gt 0 ]; then
     echo -e "${RED}Crashes detected! See: $LOG_DIR/crashes_$TIMESTAMP.log${NC}"

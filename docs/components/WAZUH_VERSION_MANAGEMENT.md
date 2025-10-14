@@ -49,4 +49,4 @@ eos update wazuh-version --latest --force
 
 ---
 
-> **💡 For comprehensive documentation, examples, troubleshooting, and advanced configuration options, see the inline documentation in the source files listed above.**
+> ** For comprehensive documentation, examples, troubleshooting, and advanced configuration options, see the inline documentation in the source files listed above.**

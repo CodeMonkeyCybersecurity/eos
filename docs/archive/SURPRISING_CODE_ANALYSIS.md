@@ -22,7 +22,7 @@
    - **Risk**: Trivial bypass of XSS protection
    - **Impact**: Security vulnerabilities in production
 
-### ⏱️ Network Timeout Issues
+### ️ Network Timeout Issues
 
 3. **Indefinite Network Hangs** (`pkg/vault/phase8_health_check.go:104`)
    ```go

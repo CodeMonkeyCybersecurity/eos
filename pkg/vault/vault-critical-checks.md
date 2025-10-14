@@ -94,7 +94,7 @@ test -f /usr/bin/vault && echo "WARNING: Duplicate binary"
 ### Security Warning
 ```bash
 # Installation output MUST include:
-⚠️  SECURITY WARNING ⚠️
+  SECURITY WARNING 
 All 5 unseal keys are stored in:
 /var/lib/eos/secret/vault_init.json
 
@@ -213,7 +213,7 @@ test -x /usr/local/bin/vault && echo "✅ PASS" || echo "❌ FAIL"
 
 # 7. No duplicates
 echo -n "No duplicate binary: "
-test ! -f /usr/bin/vault && echo "✅ PASS" || echo "⚠️  WARNING: Duplicate at /usr/bin/vault"
+test ! -f /usr/bin/vault && echo "✅ PASS" || echo "  WARNING: Duplicate at /usr/bin/vault"
 
 # 8. Init file permissions
 echo -n "Init file perms: "
@@ -302,7 +302,7 @@ sink "file" {
 
 ---
 
-## 💡 QUICK FIXES
+##  QUICK FIXES
 
 ### Fix #1: Empty TLS Paths
 ```go
@@ -386,7 +386,7 @@ sink "file" {
 
 ---
 
-## 🎯 SUCCESS CRITERIA
+##  SUCCESS CRITERIA
 
 Installation is correct when:
 

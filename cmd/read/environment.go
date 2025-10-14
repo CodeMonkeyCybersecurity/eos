@@ -169,7 +169,7 @@ func displayServicesFocus(config *environment.EnhancedEnvironmentConfig) error {
 		fmt.Printf("  ├─ %-12s → %s\n", service, nodeRole)
 	}
 
-	fmt.Printf("\n🎯 Resource Allocation by Environment:\n")
+	fmt.Printf("\n Resource Allocation by Environment:\n")
 	for env, resources := range config.Services.Resources {
 		fmt.Printf("  %s:\n", env)
 		fmt.Printf("    CPU:         %d MHz\n", resources.CPU)
@@ -231,9 +231,9 @@ func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error
 		fmt.Printf("  ├─ %-12s → %s role\n", service, nodeRole)
 	}
 
-	fmt.Printf("\n💡 Use 'eos read environment --topology' for cluster details")
-	fmt.Printf("\n💡 Use 'eos read environment --services' for service details")
-	fmt.Printf("\n💡 Use 'eos read environment --json' for machine-readable output\n")
+	fmt.Printf("\n Use 'eos read environment --topology' for cluster details")
+	fmt.Printf("\n Use 'eos read environment --services' for service details")
+	fmt.Printf("\n Use 'eos read environment --json' for machine-readable output\n")
 
 	return nil
 }

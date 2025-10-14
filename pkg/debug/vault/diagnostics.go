@@ -13,6 +13,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 const (
@@ -32,9 +34,9 @@ func AllDiagnostics() []*debug.Diagnostic {
 		DataDirectoryDiagnostic(),
 		LogDirectoryDiagnostic(),
 		UserDiagnostic(),
-		PermissionsDiagnostic(),      // NEW: Comprehensive permissions check
+		PermissionsDiagnostic(), // NEW: Comprehensive permissions check
 		ServiceDiagnostic(),
-		ServiceConfigDiagnostic(),    // NEW: Show User=/Group= from systemd
+		ServiceConfigDiagnostic(), // NEW: Show User=/Group= from systemd
 		ServiceLogsDiagnostic(),
 		ProcessDiagnostic(),
 		PortDiagnostic(),
@@ -62,12 +64,22 @@ func ConfigValidationDiagnostic() *debug.Diagnostic {
 		Category:    "Configuration",
 		Description: "Validate vault.hcl configuration",
 		Condition: func(ctx context.Context) bool {
+			logger := otelzap.Ctx(ctx)
 			// Only run if binary and config exist
 			_, binErr := os.Stat(DefaultBinaryPath)
 			_, cfgErr := os.Stat(DefaultConfigPath)
-			return binErr == nil && cfgErr == nil
+			canRun := binErr == nil && cfgErr == nil
+			logger.Debug("Checking config validation prerequisites",
+				zap.Bool("binary_exists", binErr == nil),
+				zap.Bool("config_exists", cfgErr == nil),
+				zap.Bool("will_run", canRun))
+			return canRun
 		},
 		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Starting Vault configuration validation",
+				zap.String("config_path", DefaultConfigPath))
+
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
 			}
@@ -79,10 +91,16 @@ func ConfigValidationDiagnostic() *debug.Diagnostic {
 			result.Metadata["config_path"] = DefaultConfigPath
 
 			if err != nil {
+				logger.Error("Configuration validation failed",
+					zap.String("config_path", DefaultConfigPath),
+					zap.String("output", string(output)),
+					zap.Error(err))
 				result.Status = debug.StatusError
 				result.Message = "Configuration validation failed"
 				result.Remediation = fmt.Sprintf("Fix configuration errors in %s", DefaultConfigPath)
 			} else {
+				logger.Info("Configuration validation successful",
+					zap.String("config_path", DefaultConfigPath))
 				result.Status = debug.StatusOK
 				result.Message = "Configuration is valid"
 			}
@@ -144,6 +162,9 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 		Category:    "System",
 		Description: "Check vault user, data directory ownership, and permissions",
 		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Starting comprehensive Vault permissions diagnostic")
+
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
 			}
@@ -152,16 +173,22 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 			output.WriteString("=== Vault Permission Diagnostics ===\n\n")
 
 			// 1. Check vault user exists with detailed ID output
+			logger.Debug("Checking vault user existence")
 			output.WriteString("=== Vault User ===\n")
 			idCmd := exec.CommandContext(ctx, "id", "vault")
 			idOutput, idErr := idCmd.CombinedOutput()
 			if idErr != nil {
+				logger.Error("Vault user does not exist",
+					zap.Error(idErr),
+					zap.String("output", string(idOutput)))
 				output.WriteString("ERROR: vault user doesn't exist!\n")
 				output.WriteString(fmt.Sprintf("Command output: %s\n", string(idOutput)))
 				result.Status = debug.StatusError
 				result.Message = "Vault user does not exist"
 				result.Remediation = "Create vault user: sudo useradd -r -s /bin/false vault"
 			} else {
+				logger.Info("Vault user exists",
+					zap.String("id_output", string(idOutput)))
 				output.WriteString(string(idOutput))
 				output.WriteString("\n")
 				result.Metadata["vault_user_exists"] = true
@@ -240,6 +267,7 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 
 			// 6. CRITICAL: Test vault user access to data directory
 			// This is the smoking gun for the "permission denied" bug
+			logger.Debug("Testing vault user access to data directory")
 			output.WriteString("=== Vault User Access Test ===\n")
 			if idErr == nil && dataErr == nil {
 				// Test if vault user can read the data directory
@@ -252,12 +280,22 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 				testTraverseCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-x", "/opt/vault/data")
 				canTraverse := testTraverseCmd.Run() == nil
 
+				logger.Info("Data directory access test results",
+					zap.Bool("can_read", canRead),
+					zap.Bool("can_write", canWrite),
+					zap.Bool("can_traverse", canTraverse))
+
 				if canRead && canWrite && canTraverse {
+					logger.Info("Vault user has full access to data directory")
 					output.WriteString("✓ vault user CAN read /opt/vault/data\n")
 					output.WriteString("✓ vault user CAN write to /opt/vault/data\n")
 					output.WriteString("✓ vault user CAN traverse /opt/vault/data\n\n")
 					result.Metadata["vault_user_can_access_data"] = true
 				} else {
+					logger.Error("CRITICAL: Vault user cannot properly access data directory",
+						zap.Bool("can_read", canRead),
+						zap.Bool("can_write", canWrite),
+						zap.Bool("can_traverse", canTraverse))
 					output.WriteString("✗ CRITICAL: vault user CANNOT properly access /opt/vault/data!\n")
 					if !canRead {
 						output.WriteString("  ✗ Cannot READ\n")
@@ -281,6 +319,7 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 				}
 
 				// Also test parent directory (/opt/vault)
+				logger.Debug("Testing vault user access to parent directory")
 				output.WriteString("=== Parent Directory Access Test ===\n")
 				testParentCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-x", "/opt/vault")
 				canAccessParent := testParentCmd.Run() == nil
@@ -289,7 +328,12 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 				statCmd := exec.CommandContext(ctx, "stat", "-c", "Owner: %U:%G, Perms: %a", "/opt/vault")
 				statOutput, statErr := statCmd.CombinedOutput()
 
+				logger.Info("Parent directory access test result",
+					zap.Bool("can_access", canAccessParent),
+					zap.String("stat_info", strings.TrimSpace(string(statOutput))))
+
 				if canAccessParent {
+					logger.Info("Vault user can traverse parent directory")
 					output.WriteString("✓ vault user CAN traverse /opt/vault (parent directory)\n")
 					if statErr == nil {
 						output.WriteString(fmt.Sprintf("  Directory info: %s\n", strings.TrimSpace(string(statOutput))))
@@ -297,6 +341,8 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 					output.WriteString("\n")
 					result.Metadata["vault_user_can_access_parent"] = true
 				} else {
+					logger.Error("CRITICAL: Vault user cannot traverse parent directory - this is the root cause of permission errors",
+						zap.String("current_permissions", strings.TrimSpace(string(statOutput))))
 					output.WriteString("✗ CRITICAL: vault user CANNOT traverse /opt/vault (parent directory)!\n")
 					output.WriteString("  This is the ROOT CAUSE of 'permission denied' errors!\n")
 					if statErr == nil {
@@ -446,6 +492,9 @@ func ServiceLogsDiagnostic() *debug.Diagnostic {
 		Category:    "Systemd",
 		Description: "Recent vault service logs with permission error detection",
 		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Retrieving and analyzing Vault service logs")
+
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
 			}
@@ -457,13 +506,18 @@ func ServiceLogsDiagnostic() *debug.Diagnostic {
 
 			// Count permission denied errors (the bug we're looking for!)
 			permDeniedCount := strings.Count(strings.ToLower(outputStr), "permission denied")
+			logger.Info("Analyzed service logs for permission errors",
+				zap.Int("permission_denied_count", permDeniedCount),
+				zap.Int("log_lines", strings.Count(outputStr, "\n")))
 
 			var enhancedOutput strings.Builder
 			enhancedOutput.WriteString("=== Vault Service Logs (last 100 lines) ===\n\n")
 
 			// If permission errors found, highlight them at the top
 			if permDeniedCount > 0 {
-				enhancedOutput.WriteString(fmt.Sprintf("⚠️  CRITICAL: Found %d 'permission denied' errors!\n", permDeniedCount))
+				logger.Error("CRITICAL: Permission denied errors found in service logs",
+					zap.Int("error_count", permDeniedCount))
+				enhancedOutput.WriteString(fmt.Sprintf("  CRITICAL: Found %d 'permission denied' errors!\n", permDeniedCount))
 				enhancedOutput.WriteString("This indicates the vault user cannot access required directories.\n")
 				enhancedOutput.WriteString("This is typically caused by /opt/vault having wrong permissions/ownership.\n\n")
 
@@ -536,6 +590,11 @@ func PortDiagnostic() *debug.Diagnostic {
 		Category:    "Network",
 		Description: fmt.Sprintf("Check if Vault is listening on ports %d (API) and %d (Cluster) using lsof, netstat, and ss", shared.PortVault, shared.PortVault+1),
 		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Checking Vault network ports",
+				zap.Int("api_port", shared.PortVault),
+				zap.Int("cluster_port", shared.PortVault+1))
+
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
 			}
@@ -626,12 +685,20 @@ func PortDiagnostic() *debug.Diagnostic {
 
 			// Set status based on results
 			if apiListening && clusterListening {
+				logger.Info("Both Vault ports are listening",
+					zap.Int("api_port", shared.PortVault),
+					zap.Int("cluster_port", shared.PortVault+1))
 				result.Status = debug.StatusOK
 				result.Message = "Both API and cluster ports are listening"
 			} else if apiListening {
+				logger.Info("Vault API port is listening (cluster port not active)",
+					zap.Int("api_port", shared.PortVault),
+					zap.Bool("cluster_listening", false))
 				result.Status = debug.StatusOK
 				result.Message = "API port listening (cluster port not needed for single-node)"
 			} else {
+				logger.Error("Vault is not listening on configured port",
+					zap.Int("expected_port", shared.PortVault))
 				result.Status = debug.StatusError
 				result.Message = fmt.Sprintf("Port %d not in use - Vault is not listening", shared.PortVault)
 				result.Remediation = "Ensure vault service is running: sudo systemctl status vault\n" +
@@ -826,10 +893,10 @@ func DeletionTransactionLogsDiagnostic() *debug.Diagnostic {
 
 				// Check if components still exist
 				checks := map[string]string{
-					"/usr/local/bin/vault":           "Binary",
-					"/etc/vault.d":                   "Config directory",
-					"/opt/vault":                     "Data directory",
-					"/var/log/vault":                 "Log directory",
+					"/usr/local/bin/vault":              "Binary",
+					"/etc/vault.d":                      "Config directory",
+					"/opt/vault":                        "Data directory",
+					"/var/log/vault":                    "Log directory",
 					"/etc/systemd/system/vault.service": "Service file",
 				}
 

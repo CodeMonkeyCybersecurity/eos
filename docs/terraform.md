@@ -25,4 +25,4 @@ The Eos infrastructure compiler provides comprehensive Terraform integration wit
 
 ---
 
-> **💡 For comprehensive integration details, architecture overview, and implementation status, see the inline documentation in the source files listed above.**
+> ** For comprehensive integration details, architecture overview, and implementation status, see the inline documentation in the source files listed above.**

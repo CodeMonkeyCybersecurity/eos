@@ -56,7 +56,7 @@ preflight_check() {
         echo -e "  2. ${CYAN}Then run the script:${NC}"
         echo -e "     ${GREEN}./scripts/$(basename "$0")${NC} [duration] [package] [function]"
         echo ""
-        echo -e "${YELLOW}💡 Examples:${NC}"
+        echo -e "${YELLOW} Examples:${NC}"
         echo -e "   ${GREEN}./scripts/$(basename "$0")${NC}              # Run all tests for 10s"
         echo -e "   ${GREEN}./scripts/$(basename "$0") 30s${NC}          # Run all tests for 30s"
         echo -e "   ${GREEN}./scripts/$(basename "$0") 1m ./pkg/security${NC}  # Run security tests for 1m"
@@ -240,7 +240,7 @@ get_test_package() {
 
 # Main execution logic
 if [ -n "${FUNCTION}" ] && [ -n "${PACKAGE}" ]; then
-    echo "🎯 Running specific test: ${FUNCTION} in ${PACKAGE}"
+    echo " Running specific test: ${FUNCTION} in ${PACKAGE}"
     run_single_fuzz_test "${FUNCTION}" "${PACKAGE}" "${FUZZTIME}"
     exit_code=$?
 elif [ -n "${PACKAGE}" ]; then
@@ -274,7 +274,7 @@ elif [ -n "${PACKAGE}" ]; then
     exit_code=$failed_tests
 else
     echo " Running ALL available fuzz tests (quick mode)"
-    echo "💡 Use specific package/function for targeted testing"
+    echo " Use specific package/function for targeted testing"
     echo ""
     
     # Use representative test set for quick execution
@@ -364,7 +364,7 @@ echo ""
 echo "📊 SUMMARY:"
 echo "==========="
 echo "📈 Tests: ${total_tests} total, ${passed_tests} passed, ${failed_tests} failed"
-echo "📄 Report: ${REPORT_FILE}"
+echo " Report: ${REPORT_FILE}"
 echo " Logs: ${LOG_DIR}/*_${TIMESTAMP}.log"
 echo ""
 

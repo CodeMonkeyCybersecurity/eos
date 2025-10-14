@@ -45,7 +45,7 @@ eos_fuzz_preflight_check() {
         echo -e "  2. ${CYAN}Then run the script:${NC}"
         echo -e "     ${GREEN}./scripts/${script_name}${NC} [arguments]"
         echo ""
-        echo -e "${YELLOW}💡 The project root should contain:${NC}"
+        echo -e "${YELLOW} The project root should contain:${NC}"
         echo -e "   - go.mod file"
         echo -e "   - pkg/ directory with fuzz tests"
         echo -e "   - cmd/ directory"

@@ -100,7 +100,7 @@ Examples (DEPRECATED - for reference only):
 
 			// Log completion information
 			logger.Info("terminal prompt: System Tools Setup Complete!")
-			logger.Info(fmt.Sprintf("terminal prompt: ⏱️ Duration: %s", result.Duration))
+			logger.Info(fmt.Sprintf("terminal prompt: ️ Duration: %s", result.Duration))
 
 			if len(result.Changes) > 0 {
 				logger.Info("terminal prompt:  Changes Made:")

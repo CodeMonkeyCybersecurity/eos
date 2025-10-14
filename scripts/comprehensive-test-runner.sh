@@ -338,11 +338,11 @@ echo ""
 if [ $FAILED_TESTS -eq 0 ]; then
     echo -e "${GREEN}🎉 All tests passed!${NC}"
     echo -e "${BLUE}📊 Coverage: ${COVERAGE:-N/A}%${NC}"
-    echo -e "${BLUE}📄 Full report: $REPORT_FILE${NC}"
+    echo -e "${BLUE} Full report: $REPORT_FILE${NC}"
     exit 0
 else
     echo -e "${RED} Some tests failed!${NC}"
-    echo -e "${YELLOW}📄 See full report: $REPORT_FILE${NC}"
+    echo -e "${YELLOW} See full report: $REPORT_FILE${NC}"
     echo -e "${YELLOW} Check logs in: $LOG_DIR${NC}"
     exit 1
 fi

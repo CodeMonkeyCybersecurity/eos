@@ -406,7 +406,7 @@ func DisplayPreflightSummary(rc *eos_io.RuntimeContext, result *PreflightCheckRe
 
 	if len(result.Recommendations) > 0 {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: 💡 RECOMMENDATIONS:")
+		logger.Info("terminal prompt:  RECOMMENDATIONS:")
 		for _, rec := range result.Recommendations {
 			logger.Info("terminal prompt:", zap.String("recommendation", fmt.Sprintf("  • %s", rec)))
 		}

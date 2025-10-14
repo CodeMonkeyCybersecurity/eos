@@ -593,7 +593,7 @@ The browser showing 404 for http://schemas.xmlsoap.org/claims/Group is normal.`,
 
 	for _, i := range issues {
 		fmt.Printf("❓ Issue: %s\n", i.issue)
-		fmt.Printf("💡 Solution: %s\n\n", i.solution)
+		fmt.Printf(" Solution: %s\n\n", i.solution)
 	}
 
 	fmt.Println("To capture SAML response for analysis:")

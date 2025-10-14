@@ -25,4 +25,4 @@ The Eos systematic hardware requirements calculator provides methodical, documen
 
 ---
 
-> **💡 For comprehensive calculator methodology, requirements database, and scaling logic, see the inline documentation in the source files listed above.**
+> ** For comprehensive calculator methodology, requirements database, and scaling logic, see the inline documentation in the source files listed above.**

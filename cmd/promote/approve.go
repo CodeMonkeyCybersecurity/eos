@@ -410,7 +410,7 @@ func listPendingApprovals(rc *eos_io.RuntimeContext) error {
 		fmt.Printf("  eos promote approve %s\n", approval.ID)
 	}
 
-	fmt.Printf("\n💡 Use 'eos promote approve <promotion-id>' to approve a specific request\n")
+	fmt.Printf("\n Use 'eos promote approve <promotion-id>' to approve a specific request\n")
 
 	return nil
 }

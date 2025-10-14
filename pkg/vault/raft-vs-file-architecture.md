@@ -240,9 +240,9 @@ Option 2: Restore from snapshot (if nodes unrecoverable)
 │ Cluster Size   │ Quorum Size │ Failure Tolerance│ Recommended │
 ├────────────────┼─────────────┼──────────────────┼─────────────┤
 │ 1 node         │ 1           │ 0                │ ❌ Dev only │
-│ 3 nodes        │ 2           │ 1                │ ⚠️  Minimal │
+│ 3 nodes        │ 2           │ 1                │   Minimal │
 │ 5 nodes        │ 3           │ 2                │ ✅ Ideal    │
-│ 7 nodes        │ 4           │ 3                │ ⚠️  Overkill│
+│ 7 nodes        │ 4           │ 3                │   Overkill│
 └────────────────┴─────────────┴──────────────────┴─────────────┘
 
 Why 5 nodes is optimal:

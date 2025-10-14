@@ -76,7 +76,7 @@ Examples:
 			logger.Info("terminal prompt:    - Guest exec commands")
 			logger.Info("terminal prompt:    - Time synchronization")
 
-			logger.Info("terminal prompt: 💡 Hypervisor Configuration:")
+			logger.Info("terminal prompt:  Hypervisor Configuration:")
 			logger.Info("terminal prompt:    - For Proxmox: Enable QEMU Guest Agent in VM options")
 			logger.Info("terminal prompt:    - For libvirt: Add channel device for guest agent")
 			logger.Info("terminal prompt:    - Check status: eos status qemu-guest-agent")

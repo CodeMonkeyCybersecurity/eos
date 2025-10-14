@@ -77,7 +77,7 @@ func runRepairMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	fmt.Println()
 
 	if dryRun {
-		fmt.Println("🔍 DRY RUN MODE - No changes will be made")
+		fmt.Println(" DRY RUN MODE - No changes will be made")
 		fmt.Println()
 	}
 

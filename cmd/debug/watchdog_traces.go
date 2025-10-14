@@ -140,7 +140,7 @@ func runWatchdogTraces(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		fmt.Println()
 	}
 
-	fmt.Printf("\n💡 Tips:\n")
+	fmt.Printf("\n Tips:\n")
 	fmt.Printf("  • Use --session=<session-id> to view detailed analysis\n")
 	fmt.Printf("  • Use --critical-only to filter critical events\n")
 	fmt.Printf("  • Use --detail with --session for complete trace data\n")

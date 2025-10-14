@@ -25,4 +25,4 @@ The Eos bootstrap system has been enhanced to ensure  and  API are always set up
 
 ---
 
-> **💡 For comprehensive improvement details, implementation status, and integration benefits, see the inline documentation in the source files listed above.**
+> ** For comprehensive improvement details, implementation status, and integration benefits, see the inline documentation in the source files listed above.**

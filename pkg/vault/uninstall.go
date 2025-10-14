@@ -626,7 +626,7 @@ func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs ma
 
 	// Component verification
 	vu.logger.Info("terminal prompt: ")
-	vu.logger.Info("terminal prompt: 🔍 Component Verification:")
+	vu.logger.Info("terminal prompt:  Component Verification:")
 
 	checks := []struct {
 		name    string
@@ -657,8 +657,8 @@ func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs ma
 	}
 
 	vu.logger.Info("terminal prompt: ")
-	vu.logger.Info(fmt.Sprintf("terminal prompt: 📄 Transaction Log: %s", vu.transaction.LogPath))
-	vu.logger.Info(fmt.Sprintf("terminal prompt: ⏱  Duration: %v", time.Since(vu.transaction.StartTime).Round(time.Second)))
+	vu.logger.Info(fmt.Sprintf("terminal prompt:  Transaction Log: %s", vu.transaction.LogPath))
+	vu.logger.Info(fmt.Sprintf("terminal prompt:   Duration: %v", time.Since(vu.transaction.StartTime).Round(time.Second)))
 	vu.logger.Info("terminal prompt: ")
 }
 

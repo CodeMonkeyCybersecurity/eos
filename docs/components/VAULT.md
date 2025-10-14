@@ -38,4 +38,4 @@ sudo eos read vault-init --status-only     # Status overview only
 
 ---
 
-> **💡 For comprehensive documentation, configuration examples, troubleshooting guides, and security considerations, see the inline documentation in the source files listed above.**
+> ** For comprehensive documentation, configuration examples, troubleshooting guides, and security considerations, see the inline documentation in the source files listed above.**

@@ -25,4 +25,4 @@ The Eos granular storage management design has been successfully implemented wit
 
 ---
 
-> **💡 For comprehensive design details, architecture diagrams, and implementation specifics, see the inline documentation in the source files listed above.**
+> ** For comprehensive design details, architecture diagrams, and implementation specifics, see the inline documentation in the source files listed above.**

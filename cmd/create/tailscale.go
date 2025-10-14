@@ -88,7 +88,7 @@ Examples:
 			logger.Info("terminal prompt:    3. View IP: tailscale ip -4")
 			logger.Info("terminal prompt:    4. Manage at: https://login.tailscale.com/admin")
 
-			logger.Info("terminal prompt: 💡 Tips:")
+			logger.Info("terminal prompt:  Tips:")
 			logger.Info("terminal prompt:    - Use 'tailscale up --ssh' to enable SSH access")
 			logger.Info("terminal prompt:    - Use 'tailscale up --advertise-routes=192.168.1.0/24' to share local networks")
 			logger.Info("terminal prompt:    - Check service: eos status tailscale")

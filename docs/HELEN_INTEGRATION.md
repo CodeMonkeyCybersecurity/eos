@@ -25,4 +25,4 @@ Helen is a dual-mode website deployment platform supporting both static website 
 
 ---
 
-> **💡 For comprehensive integration details, deployment modes, and implementation status, see the inline documentation in the source files listed above.**
+> ** For comprehensive integration details, deployment modes, and implementation status, see the inline documentation in the source files listed above.**

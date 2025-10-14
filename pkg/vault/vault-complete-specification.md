@@ -576,7 +576,7 @@ Storing all unseal keys in one file (`/var/lib/eos/secret/vault_init.json`) **co
 
 **Display this warning during installation:**
 ```
-⚠️  SECURITY WARNING ⚠️
+  SECURITY WARNING 
 
 All 5 unseal keys are stored in:
 /var/lib/eos/secret/vault_init.json

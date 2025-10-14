@@ -111,16 +111,16 @@ func runCreateOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// Create installation config from flags
 	config := &openwebui.InstallConfig{
-		AzureEndpoint:    openwebuiAzureEndpoint,
-		AzureDeployment:  openwebuiAzureDeployment,
-		AzureAPIKey:      openwebuiAzureAPIKey,
-		AzureAPIVersion:  openwebuiAzureAPIVersion,
-		Port:             openwebuiPort,
-		WebUIName:        openwebuiName,
-		ForceReinstall:   openwebuiForce,
-		SkipHealthCheck:  openwebuiSkipHealthCheck,
-		DirectMode:       openwebuiDirectMode,
-		LiteLLMPort:      openwebuiLiteLLMPort,
+		AzureEndpoint:   openwebuiAzureEndpoint,
+		AzureDeployment: openwebuiAzureDeployment,
+		AzureAPIKey:     openwebuiAzureAPIKey,
+		AzureAPIVersion: openwebuiAzureAPIVersion,
+		Port:            openwebuiPort,
+		WebUIName:       openwebuiName,
+		ForceReinstall:  openwebuiForce,
+		SkipHealthCheck: openwebuiSkipHealthCheck,
+		DirectMode:      openwebuiDirectMode,
+		LiteLLMPort:     openwebuiLiteLLMPort,
 	}
 
 	// Create installer
@@ -158,7 +158,7 @@ func runCreateOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		logger.Info("  ✓ Rate limiting and quotas")
 		logger.Info("")
 	} else {
-		logger.Info("⚠️  Direct Mode (Development Only):")
+		logger.Info("  Direct Mode (Development Only):")
 		logger.Info("  No cost tracking or production features")
 		logger.Info("  For production, remove --direct-mode flag")
 		logger.Info("")

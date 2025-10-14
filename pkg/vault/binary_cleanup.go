@@ -168,7 +168,7 @@ func displayBinaryFindings(binaries []BinaryLocation, keepPath string) {
 		fmt.Printf("\n%d. %s\n", i+1, binary.Path)
 
 		if binary.Path == keepPath {
-			fmt.Println("   Status: 🎯 PRIMARY (will be kept)")
+			fmt.Println("   Status:  PRIMARY (will be kept)")
 		} else {
 			fmt.Println("   Status: DUPLICATE (will be removed)")
 		}

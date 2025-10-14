@@ -53,4 +53,4 @@ The current implementation uses HashiCorp stack (Consul, Nomad, Vault) instead o
 
 ---
 
-> **💡 For comprehensive implementation details, see the inline documentation in the source files listed above.**
+> ** For comprehensive implementation details, see the inline documentation in the source files listed above.**

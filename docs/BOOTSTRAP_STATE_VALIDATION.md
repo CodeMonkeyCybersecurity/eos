@@ -25,4 +25,4 @@ The Eos bootstrap system uses state-based validation instead of arbitrary marker
 
 ---
 
-> **💡 For comprehensive validation architecture, implementation details, and HashiCorp integration patterns, see the inline documentation in the source files listed above.**
+> ** For comprehensive validation architecture, implementation details, and HashiCorp integration patterns, see the inline documentation in the source files listed above.**

@@ -24,4 +24,4 @@ The Eos four- agent consolidation architecture has been successfully implemented
 
 ---
 
-> **💡 For comprehensive architecture details, implementation examples, and integration patterns, see the inline documentation in the source files listed above.**
+> ** For comprehensive architecture details, implementation examples, and integration patterns, see the inline documentation in the source files listed above.**

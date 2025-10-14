@@ -158,7 +158,7 @@ func PreflightCheck(rc *eos_io.RuntimeContext, services []ServiceType, workload 
 
 	// Add recommendations from sizing result
 	if len(result.Recommendations) > 0 {
-		logger.Info("terminal prompt: 💡 Recommendations:")
+		logger.Info("terminal prompt:  Recommendations:")
 		for _, rec := range result.Recommendations {
 			logger.Info(fmt.Sprintf("terminal prompt:   • %s", rec))
 		}

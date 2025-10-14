@@ -40,4 +40,4 @@ eos bootstrap --verify
 
 ---
 
-> **💡 For comprehensive bootstrap documentation, implementation details, and troubleshooting guides, see the inline documentation in the source files listed above.**
+> ** For comprehensive bootstrap documentation, implementation details, and troubleshooting guides, see the inline documentation in the source files listed above.**

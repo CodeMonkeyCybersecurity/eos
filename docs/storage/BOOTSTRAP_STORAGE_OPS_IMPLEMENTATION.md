@@ -25,4 +25,4 @@ The Eos bootstrap storage operations implementation has been successfully comple
 
 ---
 
-> **💡 For comprehensive implementation details, integration patterns, and validation mechanisms, see the inline documentation in the source files listed above.**
+> ** For comprehensive implementation details, integration patterns, and validation mechanisms, see the inline documentation in the source files listed above.**
