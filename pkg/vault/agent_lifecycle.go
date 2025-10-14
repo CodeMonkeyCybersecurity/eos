@@ -346,6 +346,19 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 			zap.String("path", tokenPath),
 			zap.String("mode", stat.Mode().String()),
 			zap.Int64("size", stat.Size()))
+
+		// SECURITY: Enforce 0600 permissions on token file
+		actualPerms := stat.Mode().Perm()
+		expectedPerms := os.FileMode(0600)
+		if actualPerms != expectedPerms {
+			log.Error(" Agent token file has insecure permissions",
+				zap.String("path", tokenPath),
+				zap.String("actual", fmt.Sprintf("%04o", actualPerms)),
+				zap.String("expected", fmt.Sprintf("%04o", expectedPerms)))
+			return cerr.Newf("agent token file has insecure permissions: %04o (expected 0600). "+
+				"This is a security violation. Fix with: chmod 600 %s", actualPerms, tokenPath)
+		}
+		log.Debug(" Agent token file has secure permissions (0600)")
 	}
 
 	// Read the token

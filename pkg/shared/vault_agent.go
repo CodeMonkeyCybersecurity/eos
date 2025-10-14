@@ -70,6 +70,8 @@ const AgentSystemDUnit = `[Unit]
 Description={{ .Description }}
 After=network.target
 After=systemd-tmpfiles-setup.service
+After=vault.service
+Requires=vault.service
 StartLimitIntervalSec=30
 
 [Service]
