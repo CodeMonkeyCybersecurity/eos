@@ -238,17 +238,98 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 				}
 			}
 
-			// Set final status if not already set
+			// 6. CRITICAL: Test vault user access to data directory
+			// This is the smoking gun for the "permission denied" bug
+			output.WriteString("=== Vault User Access Test ===\n")
+			if idErr == nil && dataErr == nil {
+				// Test if vault user can read the data directory
+				testReadCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-r", "/opt/vault/data")
+				canRead := testReadCmd.Run() == nil
+
+				testWriteCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-w", "/opt/vault/data")
+				canWrite := testWriteCmd.Run() == nil
+
+				testTraverseCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-x", "/opt/vault/data")
+				canTraverse := testTraverseCmd.Run() == nil
+
+				if canRead && canWrite && canTraverse {
+					output.WriteString("✓ vault user CAN read /opt/vault/data\n")
+					output.WriteString("✓ vault user CAN write to /opt/vault/data\n")
+					output.WriteString("✓ vault user CAN traverse /opt/vault/data\n\n")
+					result.Metadata["vault_user_can_access_data"] = true
+				} else {
+					output.WriteString("✗ CRITICAL: vault user CANNOT properly access /opt/vault/data!\n")
+					if !canRead {
+						output.WriteString("  ✗ Cannot READ\n")
+					}
+					if !canWrite {
+						output.WriteString("  ✗ Cannot WRITE\n")
+					}
+					if !canTraverse {
+						output.WriteString("  ✗ Cannot TRAVERSE\n")
+					}
+					output.WriteString("\n")
+					result.Metadata["vault_user_can_access_data"] = false
+					result.Status = debug.StatusError
+					result.Message = "vault user cannot access data directory"
+					result.Remediation = "Fix parent directory permissions:\n" +
+						"  sudo chown vault:vault /opt/vault\n" +
+						"  sudo chmod 755 /opt/vault\n" +
+						"  sudo chown -R vault:vault /opt/vault/data\n" +
+						"  sudo chmod 700 /opt/vault/data\n" +
+						"  sudo systemctl restart vault"
+				}
+
+				// Also test parent directory (/opt/vault)
+				output.WriteString("=== Parent Directory Access Test ===\n")
+				testParentCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-x", "/opt/vault")
+				canAccessParent := testParentCmd.Run() == nil
+
+				// Get detailed info about /opt/vault
+				statCmd := exec.CommandContext(ctx, "stat", "-c", "Owner: %U:%G, Perms: %a", "/opt/vault")
+				statOutput, statErr := statCmd.CombinedOutput()
+
+				if canAccessParent {
+					output.WriteString("✓ vault user CAN traverse /opt/vault (parent directory)\n")
+					if statErr == nil {
+						output.WriteString(fmt.Sprintf("  Directory info: %s\n", strings.TrimSpace(string(statOutput))))
+					}
+					output.WriteString("\n")
+					result.Metadata["vault_user_can_access_parent"] = true
+				} else {
+					output.WriteString("✗ CRITICAL: vault user CANNOT traverse /opt/vault (parent directory)!\n")
+					output.WriteString("  This is the ROOT CAUSE of 'permission denied' errors!\n")
+					if statErr == nil {
+						output.WriteString(fmt.Sprintf("  Current: %s\n", strings.TrimSpace(string(statOutput))))
+						output.WriteString("  Expected: Owner: vault:vault, Perms: 755\n")
+					}
+					output.WriteString("\n")
+					result.Metadata["vault_user_can_access_parent"] = false
+					result.Status = debug.StatusError
+					result.Message = "vault user cannot traverse parent directory /opt/vault"
+					result.Remediation = "FIX PARENT DIRECTORY FIRST (this is the bug):\n" +
+						"  sudo chown vault:vault /opt/vault\n" +
+						"  sudo chmod 755 /opt/vault\n" +
+						"Then restart: sudo systemctl restart vault"
+				}
+			} else {
+				output.WriteString("Skipping access tests (vault user or data directory doesn't exist)\n\n")
+			}
+
+			// Set final status if not already set by access tests
 			if result.Status == "" {
 				if idErr == nil && vaultOptErr == nil && dataErr == nil {
 					result.Status = debug.StatusOK
-					result.Message = "Vault user and directories have correct ownership"
+					result.Message = "Vault user and directories have correct ownership and access"
 				} else {
 					result.Status = debug.StatusError
 					result.Message = "Permission or ownership issues detected"
-					result.Remediation = "Ensure vault user exists and owns /opt/vault and /etc/vault.d directories:\n" +
+					result.Remediation = "Ensure vault user exists and owns directories:\n" +
 						"  sudo useradd -r -s /bin/false vault\n" +
-						"  sudo chown -R vault:vault /opt/vault /etc/vault.d"
+						"  sudo chown vault:vault /opt/vault\n" +
+						"  sudo chmod 755 /opt/vault\n" +
+						"  sudo chown -R vault:vault /opt/vault/data /etc/vault.d\n" +
+						"  sudo chmod 700 /opt/vault/data"
 				}
 			}
 
@@ -363,7 +444,7 @@ func ServiceLogsDiagnostic() *debug.Diagnostic {
 	return &debug.Diagnostic{
 		Name:        "Service Logs",
 		Category:    "Systemd",
-		Description: "Recent vault service logs",
+		Description: "Recent vault service logs with permission error detection",
 		Collect: func(ctx context.Context) (*debug.Result, error) {
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
@@ -372,19 +453,69 @@ func ServiceLogsDiagnostic() *debug.Diagnostic {
 			cmd := exec.CommandContext(ctx, "journalctl", "-u", "vault.service", "-n", "100", "--no-pager")
 			output, err := cmd.CombinedOutput()
 
-			result.Output = string(output)
+			outputStr := string(output)
+
+			// Count permission denied errors (the bug we're looking for!)
+			permDeniedCount := strings.Count(strings.ToLower(outputStr), "permission denied")
+
+			var enhancedOutput strings.Builder
+			enhancedOutput.WriteString("=== Vault Service Logs (last 100 lines) ===\n\n")
+
+			// If permission errors found, highlight them at the top
+			if permDeniedCount > 0 {
+				enhancedOutput.WriteString(fmt.Sprintf("⚠️  CRITICAL: Found %d 'permission denied' errors!\n", permDeniedCount))
+				enhancedOutput.WriteString("This indicates the vault user cannot access required directories.\n")
+				enhancedOutput.WriteString("This is typically caused by /opt/vault having wrong permissions/ownership.\n\n")
+
+				// Extract just the permission denied lines
+				enhancedOutput.WriteString("Permission Denied Errors:\n")
+				enhancedOutput.WriteString("─────────────────────────────────────────────────────────────\n")
+				lines := strings.Split(outputStr, "\n")
+				count := 0
+				for _, line := range lines {
+					if strings.Contains(strings.ToLower(line), "permission denied") {
+						enhancedOutput.WriteString(line)
+						enhancedOutput.WriteString("\n")
+						count++
+						if count >= 5 { // Show first 5, then summarize
+							if permDeniedCount > 5 {
+								enhancedOutput.WriteString(fmt.Sprintf("... and %d more similar errors\n", permDeniedCount-5))
+							}
+							break
+						}
+					}
+				}
+				enhancedOutput.WriteString("\n")
+			}
+
+			// Add full log output
+			enhancedOutput.WriteString("Full Log Output:\n")
+			enhancedOutput.WriteString("─────────────────────────────────────────────────────────────\n")
+			enhancedOutput.WriteString(outputStr)
+
+			result.Output = enhancedOutput.String()
+			result.Metadata["permission_denied_count"] = permDeniedCount
 
 			if err != nil {
 				result.Status = debug.StatusWarning
 				result.Message = "Could not retrieve logs"
+			} else if permDeniedCount > 0 {
+				// CRITICAL: Permission errors found
+				result.Status = debug.StatusError
+				result.Message = fmt.Sprintf("CRITICAL: %d permission denied errors (see Permissions diagnostic)", permDeniedCount)
+				result.Remediation = "Fix parent directory permissions:\n" +
+					"  sudo chown vault:vault /opt/vault\n" +
+					"  sudo chmod 755 /opt/vault\n" +
+					"  sudo systemctl restart vault\n" +
+					"Run 'sudo eos debug vault' for detailed permission analysis"
 			} else {
-				// Check for errors in logs
-				if strings.Contains(string(output), "error") || strings.Contains(string(output), "Error") {
+				// Check for other errors in logs
+				if strings.Contains(outputStr, "error") || strings.Contains(outputStr, "Error") {
 					result.Status = debug.StatusWarning
 					result.Message = "Logs contain errors (see output)"
 				} else {
 					result.Status = debug.StatusInfo
-					result.Message = "Logs retrieved successfully"
+					result.Message = "Logs retrieved successfully, no critical errors"
 				}
 			}
 

@@ -507,6 +507,105 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 		return fmt.Errorf("failed to create vault user: %w", err)
 	}
 
+	// CRITICAL FIX: Ensure parent directories exist with correct permissions FIRST
+	// os.MkdirAll creates parent directories with the SAME mode as the target,
+	// which causes permission issues when the parent is mode 0700 but owned by root
+	// while the child needs to be accessed by the vault user.
+	//
+	// Root cause: When creating /opt/vault/data with mode 0700, MkdirAll creates
+	// /opt/vault with mode 0700 too. Then chown -R only changes /opt/vault/data
+	// ownership, leaving /opt/vault owned by root with 0700, which the vault user
+	// cannot traverse.
+	//
+	// Solution: Create parent with 0755 (traversable) and proper ownership first.
+	parentDirs := []struct {
+		path  string
+		mode  os.FileMode
+		owner string
+	}{
+		{"/opt/vault", 0755, vi.config.ServiceUser},  // Parent must be traversable (0755)
+	}
+
+	for _, dir := range parentDirs {
+		// Log what we're about to do
+		vi.logger.Info("Setting up parent directory",
+			zap.String("path", dir.path),
+			zap.String("target_mode", fmt.Sprintf("%04o", dir.mode)),
+			zap.String("target_owner", dir.owner+":"+dir.owner))
+
+		// Check if directory already exists
+		existingInfo, existsErr := os.Stat(dir.path)
+		if existsErr == nil {
+			vi.logger.Info("Parent directory already exists, will fix permissions",
+				zap.String("path", dir.path),
+				zap.String("current_mode", fmt.Sprintf("%04o", existingInfo.Mode().Perm())))
+		}
+
+		// Create parent directory if it doesn't exist
+		if err := vi.createDirectory(dir.path, dir.mode); err != nil {
+			return fmt.Errorf("failed to create parent directory %s: %w", dir.path, err)
+		}
+
+		// Fix ownership (not recursive - just the directory itself)
+		if err := vi.runner.Run("chown", dir.owner+":"+dir.owner, dir.path); err != nil {
+			// Include current state in error for debugging
+			if currentStat, statErr := os.Stat(dir.path); statErr == nil {
+				return fmt.Errorf("failed to chown %s to %s:%s: %w (current mode: %04o)",
+					dir.path, dir.owner, dir.owner, err, currentStat.Mode().Perm())
+			}
+			return fmt.Errorf("failed to set ownership for parent %s: %w", dir.path, err)
+		}
+
+		// Fix permissions (in case directory already existed with wrong permissions)
+		if err := vi.runner.Run("chmod", fmt.Sprintf("%04o", dir.mode), dir.path); err != nil {
+			return fmt.Errorf("failed to set permissions for parent %s: %w", dir.path, err)
+		}
+
+		// Verify permissions were set correctly
+		verifyInfo, err := os.Stat(dir.path)
+		if err != nil {
+			return fmt.Errorf("failed to verify parent directory %s: %w", dir.path, err)
+		}
+
+		actualMode := verifyInfo.Mode().Perm()
+		if actualMode != dir.mode {
+			vi.logger.Warn("Parent directory permissions mismatch",
+				zap.String("path", dir.path),
+				zap.String("expected", fmt.Sprintf("%04o", dir.mode)),
+				zap.String("actual", fmt.Sprintf("%04o", actualMode)))
+
+			// Try one more time to fix it
+			if err := vi.runner.Run("chmod", fmt.Sprintf("%04o", dir.mode), dir.path); err != nil {
+				return fmt.Errorf("failed to correct permissions for %s: %w", dir.path, err)
+			}
+
+			// VERIFY AGAIN after second attempt
+			verifyInfo2, err := os.Stat(dir.path)
+			if err != nil {
+				return fmt.Errorf("failed to verify parent directory after retry %s: %w", dir.path, err)
+			}
+
+			actualMode2 := verifyInfo2.Mode().Perm()
+			if actualMode2 != dir.mode {
+				vi.logger.Error("Permissions still incorrect after retry",
+					zap.String("path", dir.path),
+					zap.String("expected", fmt.Sprintf("%04o", dir.mode)),
+					zap.String("actual_after_retry", fmt.Sprintf("%04o", actualMode2)))
+				return fmt.Errorf("permissions still incorrect after retry for %s: expected %04o, got %04o (may be SELinux/AppArmor interference)",
+					dir.path, dir.mode, actualMode2)
+			}
+
+			vi.logger.Info("Permissions corrected successfully on retry",
+				zap.String("path", dir.path),
+				zap.String("mode", fmt.Sprintf("%04o", dir.mode)))
+		}
+
+		vi.logger.Info("Parent directory configured successfully",
+			zap.String("path", dir.path),
+			zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
+			zap.String("owner", dir.owner+":"+dir.owner))
+	}
+
 	// Create required directories
 	directories := []struct {
 		path  string
@@ -520,12 +619,23 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 	}
 
 	for _, dir := range directories {
+		vi.logger.Info("Creating service directory",
+			zap.String("path", dir.path),
+			zap.String("target_mode", fmt.Sprintf("%04o", dir.mode)),
+			zap.String("target_owner", dir.owner+":"+dir.owner))
+
 		if err := vi.createDirectory(dir.path, dir.mode); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir.path, err)
 		}
+
 		if err := vi.runner.Run("chown", "-R", dir.owner+":"+dir.owner, dir.path); err != nil {
 			return fmt.Errorf("failed to set ownership for %s: %w", dir.path, err)
 		}
+
+		vi.logger.Info("Service directory configured successfully",
+			zap.String("path", dir.path),
+			zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
+			zap.String("owner", dir.owner+":"+dir.owner))
 	}
 
 	return nil
