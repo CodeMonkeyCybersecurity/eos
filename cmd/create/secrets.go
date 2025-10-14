@@ -288,7 +288,37 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	logger.Info(" Phase 5 completed - Vault service is running")
 
+	// Phase 5.5: If joining existing cluster, join now (before enablement)
+	if config.RaftMode == "join" && len(config.RetryJoinNodes) > 0 {
+		logger.Info("[Phase 5.5] Joining existing Raft cluster")
+		logger.Info("This node will join the cluster and NOT be initialized independently")
+
+		for _, node := range config.RetryJoinNodes {
+			logger.Info("Attempting to join cluster", zap.String("leader", node.APIAddr))
+			if err := vault.JoinRaftCluster(rc, node.APIAddr); err != nil {
+				logger.Error("Failed to join cluster", zap.Error(err), zap.String("leader", node.APIAddr))
+				return fmt.Errorf("join raft cluster failed: %w", err)
+			}
+			logger.Info(" Successfully joined Raft cluster", zap.String("leader", node.APIAddr))
+			break // Successfully joined, no need to try other nodes
+		}
+
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Node successfully joined the Raft cluster!")
+		logger.Info("terminal prompt: IMPORTANT: This node needs to be unsealed using the SAME unseal keys as the cluster leader.")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Next steps:")
+		logger.Info("terminal prompt:   1. Obtain the 3 unseal keys from the cluster leader")
+		logger.Info("terminal prompt:   2. Run: vault operator unseal (3 times with different keys)")
+		logger.Info("terminal prompt:   3. Verify cluster membership: vault operator raft list-peers")
+		logger.Info("terminal prompt: ")
+
+		// Don't run EnableVault for joining nodes - they get config from the cluster
+		return nil
+	}
+
 	// Phases 6-15: Initialization, authentication, secrets, hardening
+	// ONLY run for new cluster creation (not for joining nodes)
 	logger.Info("[Phases 6-15] Starting Vault enablement (initialization, auth, secrets, hardening)")
 	logger.Info("This will initialize Vault, configure authentication, enable secrets engines, and set up the Vault Agent")
 

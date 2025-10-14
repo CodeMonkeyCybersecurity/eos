@@ -11,6 +11,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -43,58 +44,58 @@ func DefaultClusterInitConfig() *ClusterInitConfig {
 	}
 }
 
-// InitializeRaftCluster initializes a new Raft cluster on the first node
+// InitializeRaftCluster initializes a new Raft cluster on the first node using the Vault SDK/API
 // Reference: vault-complete-specification-v1.0-raft-integrated.md - Multi-Node Cluster Initialization
 func InitializeRaftCluster(rc *eos_io.RuntimeContext, config *ClusterInitConfig) (*VaultInitResult, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("Initializing Raft cluster",
+	log.Info("Initializing Raft cluster using Vault API",
 		zap.Int("key_shares", config.KeyShares),
 		zap.Int("key_threshold", config.KeyThreshold),
 		zap.Bool("auto_unseal", config.AutoUnseal))
 
-	// Build vault operator init command
-	args := []string{"operator", "init"}
-
-	if config.AutoUnseal {
-		// For auto-unseal, use recovery keys instead of unseal keys
-		args = append(args,
-			"-recovery-shares", fmt.Sprintf("%d", config.RecoveryShares),
-			"-recovery-threshold", fmt.Sprintf("%d", config.RecoveryThreshold))
-	} else {
-		// For manual unsealing, use standard Shamir's Secret Sharing
-		args = append(args,
-			"-key-shares", fmt.Sprintf("%d", config.KeyShares),
-			"-key-threshold", fmt.Sprintf("%d", config.KeyThreshold))
-	}
-
-	args = append(args, "-format=json")
-
-	// Execute vault operator init
-	cmd := exec.CommandContext(rc.Ctx, "vault", args...)
-	cmd.Env = append(cmd.Env,
-		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		"VAULT_SKIP_VERIFY=1") // For self-signed certs
-
-	log.Info("Executing vault operator init", zap.Strings("args", args))
-	output, err := cmd.CombinedOutput()
+	// Get Vault API client
+	client, err := GetVaultClient(rc)
 	if err != nil {
-		log.Error("Failed to initialize Vault", zap.Error(err), zap.String("output", string(output)))
-		return nil, fmt.Errorf("vault operator init failed: %w\nOutput: %s", err, string(output))
+		log.Error("Failed to create Vault client", zap.Error(err))
+		return nil, fmt.Errorf("create vault client: %w", err)
 	}
 
-	// Parse initialization output
-	var result VaultInitResult
-	if err := json.Unmarshal(output, &result); err != nil {
-		log.Error("Failed to parse init output", zap.Error(err))
-		return nil, fmt.Errorf("parse init output: %w", err)
+	// Build initialization request using Vault SDK
+	initRequest := &api.InitRequest{
+		SecretShares:    config.KeyShares,
+		SecretThreshold: config.KeyThreshold,
 	}
 
-	log.Info("Vault cluster initialized successfully",
+	// For auto-unseal, configure recovery keys instead of unseal keys
+	if config.AutoUnseal {
+		initRequest.RecoveryShares = config.RecoveryShares
+		initRequest.RecoveryThreshold = config.RecoveryThreshold
+		log.Info("Configuring auto-unseal with recovery keys",
+			zap.Int("recovery_shares", config.RecoveryShares),
+			zap.Int("recovery_threshold", config.RecoveryThreshold))
+	}
+
+	// Initialize Vault using SDK
+	log.Info("Calling Vault API to initialize cluster")
+	initResponse, err := client.Sys().Init(initRequest)
+	if err != nil {
+		log.Error("Failed to initialize Vault via API", zap.Error(err))
+		return nil, fmt.Errorf("vault API init failed: %w", err)
+	}
+
+	// Convert api.InitResponse to VaultInitResult
+	result := &VaultInitResult{
+		UnsealKeys:   initResponse.KeysB64,
+		RootToken:    initResponse.RootToken,
+		RecoveryKeys: initResponse.RecoveryKeysB64,
+	}
+
+	log.Info("Vault cluster initialized successfully via API",
 		zap.Int("unseal_keys", len(result.UnsealKeys)),
 		zap.Int("recovery_keys", len(result.RecoveryKeys)),
 		zap.Bool("has_root_token", result.RootToken != ""))
 
-	return &result, nil
+	return result, nil
 }
 
 // VaultInitResult contains the result of vault operator init
@@ -104,57 +105,90 @@ type VaultInitResult struct {
 	RecoveryKeys []string `json:"recovery_keys_b64,omitempty"`
 }
 
-// JoinRaftCluster joins a node to an existing Raft cluster
+// JoinRaftCluster joins a node to an existing Raft cluster using the Vault SDK/API
 // Reference: vault-complete-specification-v1.0-raft-integrated.md - Multi-Node Cluster Initialization
 func JoinRaftCluster(rc *eos_io.RuntimeContext, leaderAddr string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("Joining Raft cluster", zap.String("leader", leaderAddr))
+	log.Info("Joining Raft cluster using Vault API", zap.String("leader", leaderAddr))
 
-	// Execute vault operator raft join
-	cmd := exec.CommandContext(rc.Ctx, "vault", "operator", "raft", "join", leaderAddr)
-	cmd.Env = append(cmd.Env,
-		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		"VAULT_SKIP_VERIFY=1")
-
-	output, err := cmd.CombinedOutput()
+	// Get Vault API client
+	client, err := GetVaultClient(rc)
 	if err != nil {
-		log.Error("Failed to join cluster", zap.Error(err), zap.String("output", string(output)))
-		return fmt.Errorf("vault operator raft join failed: %w\nOutput: %s", err, string(output))
+		log.Error("Failed to create Vault client", zap.Error(err))
+		return fmt.Errorf("create vault client: %w", err)
 	}
 
-	log.Info("Successfully joined Raft cluster", zap.String("output", string(output)))
+	// Join the Raft cluster using the SDK
+	// The leader_api_addr is the address of an existing cluster member
+	joinRequest := &api.RaftJoinRequest{
+		LeaderAPIAddr: leaderAddr,
+		// TLS configuration - empty means use default client TLS settings
+		LeaderCACert:     "",
+		LeaderClientCert: "",
+		LeaderClientKey:  "",
+	}
+
+	log.Info("Sending join request to Raft cluster",
+		zap.String("leader_api_addr", leaderAddr))
+
+	// Call the Raft join API endpoint
+	secret, err := client.Sys().RaftJoin(joinRequest)
+	if err != nil {
+		log.Error("Failed to join Raft cluster via API", zap.Error(err))
+		return fmt.Errorf("raft join API failed: %w", err)
+	}
+
+	log.Info("Successfully joined Raft cluster via API",
+		zap.Bool("joined", secret != nil),
+		zap.String("leader", leaderAddr))
+
 	return nil
 }
 
-// UnsealVaultWithKeys unseals a Vault instance using provided unseal keys
+// UnsealVaultWithKeys unseals a Vault instance using provided unseal keys via the Vault SDK/API
 // Reference: vault-complete-specification-v1.0-raft-integrated.md - Initialization and Unsealing
 func UnsealVaultWithKeys(rc *eos_io.RuntimeContext, unsealKeys []string, threshold int) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("Unsealing Vault", zap.Int("keys_provided", len(unsealKeys)), zap.Int("threshold", threshold))
+	log.Info("Unsealing Vault using Vault API", zap.Int("keys_provided", len(unsealKeys)), zap.Int("threshold", threshold))
 
 	if len(unsealKeys) < threshold {
 		return fmt.Errorf("insufficient unseal keys: have %d, need %d", len(unsealKeys), threshold)
 	}
 
-	// Unseal using threshold number of keys
-	for i := 0; i < threshold; i++ {
-		log.Info("Applying unseal key", zap.Int("key_number", i+1))
-
-		cmd := exec.CommandContext(rc.Ctx, "vault", "operator", "unseal", unsealKeys[i])
-		cmd.Env = append(cmd.Env,
-			fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-			"VAULT_SKIP_VERIFY=1")
-
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Error("Failed to unseal", zap.Error(err), zap.String("output", string(output)))
-			return fmt.Errorf("vault operator unseal failed: %w", err)
-		}
-
-		log.Debug("Unseal key applied", zap.String("output", string(output)))
+	// Get Vault API client
+	client, err := GetVaultClient(rc)
+	if err != nil {
+		log.Error("Failed to create Vault client", zap.Error(err))
+		return fmt.Errorf("create vault client: %w", err)
 	}
 
-	log.Info("Vault unsealed successfully")
+	// Unseal using threshold number of keys via SDK
+	for i := 0; i < threshold; i++ {
+		log.Info("Applying unseal key via API", zap.Int("key_number", i+1), zap.Int("threshold", threshold))
+
+		// Call the unseal API
+		unsealResponse, err := client.Sys().Unseal(unsealKeys[i])
+		if err != nil {
+			log.Error("Failed to unseal via API", zap.Error(err), zap.Int("key_number", i+1))
+			return fmt.Errorf("vault unseal API failed on key %d: %w", i+1, err)
+		}
+
+		log.Debug("Unseal key applied",
+			zap.Int("key_number", i+1),
+			zap.Bool("sealed", unsealResponse.Sealed),
+			zap.Int("progress", unsealResponse.Progress),
+			zap.Int("threshold", unsealResponse.T))
+
+		// If unsealed, we're done
+		if !unsealResponse.Sealed {
+			log.Info("Vault unsealed successfully via API",
+				zap.Int("keys_used", i+1),
+				zap.Int("threshold", threshold))
+			return nil
+		}
+	}
+
+	log.Info("Vault unsealed successfully via API")
 	return nil
 }
 
