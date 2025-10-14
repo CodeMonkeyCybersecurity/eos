@@ -78,7 +78,7 @@ func TestCredentialFileBypassPrevention(t *testing.T) {
 		nonExistentPath := filepath.Join(tempDir, "non_existent_credential")
 
 		// Attempting to read non-existent credential should fail securely
-		_, err := SecureCredentialRead(nonExistentPath)
+		_, err := SecureCredentialRead(testutil.TestRuntimeContext(t), nonExistentPath)
 		testutil.AssertError(t, err)
 
 		// Should not create the file or return default credentials
@@ -107,7 +107,7 @@ func TestCredentialFileBypassPrevention(t *testing.T) {
 			}
 
 			// Reading corrupted file should fail or return sanitized content
-			data, err := SecureCredentialRead(credentialPath)
+			data, err := SecureCredentialRead(testutil.TestRuntimeContext(t), credentialPath)
 			if err == nil {
 				// If read succeeds, data should be sanitized
 				if len(data) > 1000 { // Reasonable length limit

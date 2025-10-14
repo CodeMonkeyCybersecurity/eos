@@ -35,7 +35,8 @@ import (
 //  2. Else try https://<internal‑hostname>:<VaultDefaultPort>
 //  3. Else fall back to the hostname form so callers have *something*
 
-// EnsureVaultEnv sets VAULT_ADDR and VAULT_CACERT if missing, using available network probes and fallbacks.
+// EnsureVaultEnv sets VAULT_ADDR if missing, using available network probes and fallbacks.
+// Note: VAULT_CACERT is NOT set - we use VAULT_SKIP_VERIFY=1 for self-signed certificates instead.
 
 //--------------------------------------------------------------------
 // Phase 2: Ensure Vault Environment and Directories
@@ -77,11 +78,11 @@ func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
 	}
 
-	// 4. Set CA cert path if missing
-	if os.Getenv(shared.VaultCA) == "" {
-		_ = os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath)
-		otelzap.Ctx(rc.Ctx).Debug(" Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
-	}
+	// Note: VAULT_CACERT not set here - we use VAULT_SKIP_VERIFY=1 for self-signed certs
+	// The ca.crt file path was causing "Error loading CA File" failures because the file
+	// doesn't exist at the expected location. For self-signed certificates, we skip
+	// verification in CLI commands instead.
+	otelzap.Ctx(rc.Ctx).Debug(" VAULT_CACERT not set - using VAULT_SKIP_VERIFY for self-signed certs")
 
 	return addr, nil
 }

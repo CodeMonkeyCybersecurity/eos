@@ -472,7 +472,7 @@ func TestCredentialMemorySecurity(t *testing.T) {
 		testutil.AssertNoError(t, err)
 
 		// Read credential with secure handling
-		credentialData, err := SecureCredentialRead(credentialPath)
+		credentialData, err := SecureCredentialRead(testutil.TestRuntimeContext(t), credentialPath)
 		testutil.AssertNoError(t, err)
 
 		// Verify credential was read correctly
