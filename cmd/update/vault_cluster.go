@@ -105,7 +105,7 @@ func runVaultClusterJoin(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 		return fmt.Errorf("join cluster: %w", err)
 	}
 
-	log.Info("✅ Successfully joined Raft cluster")
+	log.Info(" Successfully joined Raft cluster")
 	log.Info("terminal prompt: Next steps:")
 	log.Info("terminal prompt: 1. Unseal this node with the same unseal keys as the leader")
 	log.Info("terminal prompt: 2. Verify cluster status: eos update vault-cluster peers")
@@ -147,7 +147,7 @@ func runVaultClusterAutopilot(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 		return fmt.Errorf("configure autopilot: %w", err)
 	}
 
-	log.Info("✅ Autopilot configured successfully")
+	log.Info(" Autopilot configured successfully")
 	log.Info("terminal prompt: Autopilot will now automatically manage node lifecycle")
 
 	return nil
@@ -179,7 +179,7 @@ func runVaultClusterSnapshot(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 			return fmt.Errorf("restore snapshot: %w", err)
 		}
 
-		log.Info("✅ Snapshot restored successfully")
+		log.Info(" Snapshot restored successfully")
 		log.Info("terminal prompt: Cluster has been restored from snapshot")
 		log.Info("terminal prompt: All nodes should be restarted to sync with restored state")
 
@@ -192,7 +192,7 @@ func runVaultClusterSnapshot(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 			return fmt.Errorf("take snapshot: %w", err)
 		}
 
-		log.Info("✅ Snapshot created successfully", zap.String("path", outputPath))
+		log.Info(" Snapshot created successfully", zap.String("path", outputPath))
 		log.Info("terminal prompt: Snapshot saved - store securely for disaster recovery")
 
 	} else {

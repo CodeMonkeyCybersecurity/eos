@@ -462,7 +462,7 @@ func validateStorageDetailed(rc *eos_io.RuntimeContext, content string, result *
 		// Check for retry_join (multi-node cluster)
 		if strings.Contains(content, "retry_join") {
 			result.Suggestions = append(result.Suggestions,
-				"✅ Multi-node Raft cluster detected - ensure all nodes have unique node_id")
+				" Multi-node Raft cluster detected - ensure all nodes have unique node_id")
 		} else {
 			result.Suggestions = append(result.Suggestions,
 				"Single-node Raft - for production HA, configure retry_join with 3-5 nodes")

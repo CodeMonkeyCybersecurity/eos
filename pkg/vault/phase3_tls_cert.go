@@ -3,9 +3,11 @@
 package vault
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -234,17 +236,11 @@ func removeTLSFiles() error {
 	return nil
 }
 
-// generateSelfSigned invokes openssl to create a self-signed cert.
+// generateSelfSigned generates a self-signed cert using the consolidated TLS module
 func generateSelfSigned() error {
 	// Ensure TLS directory exists
 	if err := os.MkdirAll(shared.TLSDir, 0o755); err != nil {
 		return cerr.Wrapf(err, "create TLS directory %s", shared.TLSDir)
-	}
-
-	// Generate private key
-	keyCmd := exec.Command("openssl", "genrsa", "-out", shared.TLSKey, "2048")
-	if err := keyCmd.Run(); err != nil {
-		return cerr.Wrapf(err, "generate private key")
 	}
 
 	// Get hostname for certificate
@@ -253,43 +249,35 @@ func generateSelfSigned() error {
 		hostname = "localhost"
 	}
 
-	// Generate self-signed certificate with SAN extensions
-	certCmd := exec.Command("openssl", "req", "-new", "-x509", "-key", shared.TLSKey,
-		"-out", shared.TLSCrt, "-days", "365",
-		"-subj", fmt.Sprintf("/C=AU/ST=NSW/L=Sydney/O=CodeMonkey/OU=Eos/CN=%s", hostname),
-		"-extensions", "v3_req",
-		"-config", "/dev/stdin")
+	// Create certificate configuration using consolidated module
+	config := &CertificateConfig{
+		Country:      "AU",
+		State:        "WA",
+		Locality:     "Fremantle",
+		Organization: "Code Monkey Cybersecurity",
+		CommonName:   hostname,
+		ValidityDays: 3650, // 10 years for self-signed
+		KeySize:      4096, // Strong security
+		CertPath:     shared.TLSCrt,
+		KeyPath:      shared.TLSKey,
+		Owner:        "vault",
+		Group:        "vault",
+		// Initial SANs - enrichSANs() will add comprehensive list automatically
+		DNSNames:    []string{hostname, "localhost"},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+	}
 
-	// Provide OpenSSL config with SAN extensions via stdin
-	opensslConfig := fmt.Sprintf(`[req]
-distinguished_name = req_distinguished_name
-req_extensions = v3_req
-prompt = no
+	// Create a minimal RuntimeContext for the certificate generation
+	// phase3_tls_cert.go functions receive RuntimeContext, so we need to pass it through
+	// Note: This requires the calling function to have rc available
+	// For now, we'll create a basic context
+	ctx := context.Background()
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
 
-[req_distinguished_name]
-C = AU
-ST = NSW
-L = Sydney
-O = CodeMonkey
-OU = Eos
-CN = %s
-
-[v3_req]
-basicConstraints = CA:FALSE
-keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = %s
-DNS.2 = localhost
-DNS.3 = vhost1
-IP.1 = 127.0.0.1
-IP.2 = ::1
-`, hostname, hostname)
-
-	certCmd.Stdin = strings.NewReader(opensslConfig)
-	if err := certCmd.Run(); err != nil {
-		return cerr.Wrapf(err, "generate certificate")
+	// Generate certificate using consolidated module
+	// This will automatically enrich SANs with all network interfaces, FQDN, wildcards, etc.
+	if err := GenerateSelfSignedCertificate(rc, config); err != nil {
+		return cerr.Wrap(err, "generate certificate")
 	}
 
 	return nil

@@ -4,15 +4,9 @@ package vault
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -712,7 +706,7 @@ func (vi *VaultInstaller) configure() error {
 
 	// Generate TLS certificates if TLS is enabled
 	if vi.config.TLSEnabled {
-		if err := vi.generateSelfSignedCert(); err != nil {
+		if err := vi.generateTLSCertificate(); err != nil {
 			return fmt.Errorf("failed to generate TLS certificate: %w", err)
 		}
 	}
@@ -738,10 +732,8 @@ func (vi *VaultInstaller) configure() error {
   path    = "%s/raft"
   node_id = "node1"
 }`, vi.config.DataPath)
-	default: // file
-		storageConfig = fmt.Sprintf(`storage "file" {
-  path = "%s"
-}`, vi.config.DataPath)
+	default:
+		return fmt.Errorf("unsupported storage backend: %s (supported: raft, consul)", vi.config.StorageBackend)
 	}
 
 	// Generate seal configuration
@@ -1362,8 +1354,8 @@ func getUbuntuCodename() string {
 	return strings.TrimSpace(string(output))
 }
 
-// generateSelfSignedCert generates a self-signed TLS certificate for Vault
-func (vi *VaultInstaller) generateSelfSignedCert() error {
+// generateTLSCertificate generates a self-signed TLS certificate using the consolidated module
+func (vi *VaultInstaller) generateTLSCertificate() error {
 	vi.logger.Info("Generating self-signed TLS certificate for Vault")
 
 	// Create TLS directory
@@ -1381,119 +1373,43 @@ func (vi *VaultInstaller) generateSelfSignedCert() error {
 		return nil
 	}
 
-	// Get hostname and FQDN for certificate
+	// Get hostname for certificate
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "vault-server"
 		vi.logger.Warn("Failed to get hostname, using default", zap.Error(err))
 	}
 
-	// Build list of DNS names for SAN
-	dnsNames := []string{hostname, "localhost", "vault"}
-
-	// Try to get FQDN (may be different from hostname)
-	if fqdnOutput, err := exec.Command("hostname", "-f").Output(); err == nil {
-		fqdn := strings.TrimSpace(string(fqdnOutput))
-		// Only add if different from hostname
-		if fqdn != "" && fqdn != hostname && !strings.EqualFold(fqdn, hostname) {
-			dnsNames = append(dnsNames, fqdn)
-			vi.logger.Info("Adding FQDN to certificate SAN",
-				zap.String("hostname", hostname),
-				zap.String("fqdn", fqdn))
-		}
+	// Create certificate configuration using consolidated module
+	config := &CertificateConfig{
+		Country:      "AU",
+		State:        "WA",
+		Locality:     "Fremantle",
+		Organization: "Code Monkey Cybersecurity",
+		CommonName:   hostname,
+		ValidityDays: 3650, // 10 years for self-signed
+		KeySize:      4096, // Strong security
+		CertPath:     certPath,
+		KeyPath:      keyPath,
+		Owner:        vi.config.ServiceUser,
+		Group:        vi.config.ServiceGroup,
+		// Initial SANs - enrichSANs() will add comprehensive list automatically
+		DNSNames:    []string{hostname, "localhost", "vault"},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 	}
 
-	// Also try to resolve hostname to get canonical name
-	if addrs, err := net.LookupHost(hostname); err == nil && len(addrs) > 0 {
-		// Get reverse DNS for first address
-		if names, err := net.LookupAddr(addrs[0]); err == nil {
-			for _, name := range names {
-				// Remove trailing dot and check if different
-				canonicalName := strings.TrimSuffix(name, ".")
-				if canonicalName != hostname && canonicalName != "" {
-					// Check if not already in list
-					found := false
-					for _, existing := range dnsNames {
-						if existing == canonicalName {
-							found = true
-							break
-						}
-					}
-					if !found {
-						dnsNames = append(dnsNames, canonicalName)
-						vi.logger.Debug("Adding canonical name to certificate SAN",
-							zap.String("canonical_name", canonicalName))
-					}
-				}
-			}
-		}
-	}
-
-	// Generate private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return fmt.Errorf("failed to generate private key: %w", err)
-	}
-
-	// Create certificate template
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(time.Now().Unix()),
-		Subject: pkix.Name{
-			Organization: []string{"Eos Vault"},
-			Country:      []string{"AU"},
-			CommonName:   hostname,
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(365 * 24 * time.Hour), // 1 year
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
-		BasicConstraintsValid: true,
-		DNSNames:              dnsNames,
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
-	}
-
-	// Create self-signed certificate
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return fmt.Errorf("failed to create certificate: %w", err)
-	}
-
-	// Encode certificate to PEM
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certDER,
-	})
-
-	// Encode private key to PEM
-	keyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	})
-
-	// Write certificate file
-	if err := vi.writeFile(certPath, certPEM, 0644); err != nil {
-		return fmt.Errorf("failed to write certificate: %w", err)
-	}
-
-	// Write key file with restricted permissions
-	if err := vi.writeFile(keyPath, keyPEM, 0600); err != nil {
-		return fmt.Errorf("failed to write private key: %w", err)
-	}
-
-	// Set ownership
-	if err := vi.runner.Run("chown", vi.config.ServiceUser+":"+vi.config.ServiceGroup, certPath); err != nil {
-		return fmt.Errorf("failed to set certificate ownership: %w", err)
-	}
-	if err := vi.runner.Run("chown", vi.config.ServiceUser+":"+vi.config.ServiceGroup, keyPath); err != nil {
-		return fmt.Errorf("failed to set key ownership: %w", err)
+	// Generate certificate using consolidated module
+	// This will automatically enrich SANs with all network interfaces, FQDN, wildcards, etc.
+	if err := GenerateSelfSignedCertificate(vi.rc, config); err != nil {
+		return fmt.Errorf("failed to generate certificate: %w", err)
 	}
 
 	vi.logger.Info("TLS certificate generated successfully",
 		zap.String("cert_path", certPath),
 		zap.String("key_path", keyPath))
 
-	// Store certificate metadata in Consul KV
-	if err := vi.storeCertMetadataInConsul(certPath, keyPath, dnsNames, template.NotAfter); err != nil {
+	// Store certificate metadata in Consul KV (if available)
+	if err := vi.storeCertMetadataInConsul(certPath, keyPath, config.DNSNames, time.Now().Add(time.Duration(config.ValidityDays)*24*time.Hour)); err != nil {
 		// Log warning but don't fail - Consul may not be available yet
 		vi.logger.Warn("Failed to store certificate metadata in Consul KV",
 			zap.Error(err),

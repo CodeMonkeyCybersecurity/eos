@@ -110,11 +110,11 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 					found = true
 				}
 				if strings.Contains(line, "8501") {
-					fmt.Println("✅ 8501    OpenWebUI listening")
+					fmt.Println(" 8501    OpenWebUI listening")
 				} else if strings.Contains(line, "4000") {
-					fmt.Println("✅ 4000    LiteLLM listening")
+					fmt.Println(" 4000    LiteLLM listening")
 				} else if strings.Contains(line, "5432") {
-					fmt.Println("✅ 5432    PostgreSQL listening")
+					fmt.Println(" 5432    PostgreSQL listening")
 				}
 			}
 		}
@@ -149,7 +149,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		fmt.Println("   OpenWebUI may still be initializing or failed to start")
 	} else {
 		logger.Info("OpenWebUI health check passed")
-		fmt.Println("✅ OpenWebUI health endpoint responding (HTTP 200)")
+		fmt.Println(" OpenWebUI health endpoint responding (HTTP 200)")
 	}
 	fmt.Println()
 
@@ -171,7 +171,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		fmt.Println("   Check logs below for connection errors")
 	} else {
 		logger.Info("LiteLLM health check passed")
-		fmt.Println("✅ LiteLLM health endpoint responding (HTTP 200)")
+		fmt.Println(" LiteLLM health endpoint responding (HTTP 200)")
 	}
 	fmt.Println()
 
@@ -196,7 +196,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		fmt.Println("   Database may still be initializing")
 	} else {
 		logger.Info("PostgreSQL readiness check passed")
-		fmt.Println("✅ PostgreSQL accepting connections")
+		fmt.Println(" PostgreSQL accepting connections")
 	}
 	fmt.Println()
 
@@ -280,7 +280,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			fmt.Println("   Recommended: chmod 640 .env && chgrp docker .env")
 		} else {
 			logger.Info(".env file permissions look correct")
-			fmt.Println("✅ .env file permissions look correct")
+			fmt.Println(" .env file permissions look correct")
 		}
 	}
 	fmt.Println()

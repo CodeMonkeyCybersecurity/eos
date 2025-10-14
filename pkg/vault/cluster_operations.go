@@ -461,7 +461,7 @@ func (h *ClusterHealth) String() string {
 	var sb strings.Builder
 
 	if h.Healthy {
-		sb.WriteString("✅ Cluster is HEALTHY\n")
+		sb.WriteString(" Cluster is HEALTHY\n")
 	} else {
 		sb.WriteString("❌ Cluster is UNHEALTHY\n")
 	}
@@ -471,7 +471,7 @@ func (h *ClusterHealth) String() string {
 	sb.WriteString(fmt.Sprintf("Failure Tolerance: %d nodes\n", h.FailureTolerance))
 
 	if h.AutopilotHealthy {
-		sb.WriteString("Autopilot: ✅ Healthy\n")
+		sb.WriteString("Autopilot:  Healthy\n")
 	} else {
 		sb.WriteString("Autopilot:   Not healthy or not configured\n")
 	}

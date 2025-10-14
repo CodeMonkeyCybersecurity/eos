@@ -37,7 +37,7 @@
 
 ❌ File Storage: Development/Learning ONLY
   3-Node Raft: Small production (1 node failure tolerance)
-✅ 5-Node Raft: Recommended production (2 node failure tolerance)
+ 5-Node Raft: Recommended production (2 node failure tolerance)
 ```
 
 **For detailed decision guidance, see:** `eos-raft-decision-tree.md`
@@ -260,7 +260,7 @@ vault kv put secret/test value="single-node-raft-test"
 # Read test secret
 vault kv get secret/test
 
-# ✅ SUCCESS if you can read the secret
+#  SUCCESS if you can read the secret
 ```
 
 ** SECURITY WARNING:** This stores all unseal keys in one file. This is ONLY acceptable for development. For production, see [Auto-Unseal Setup](#auto-unseal).
@@ -319,17 +319,17 @@ vault kv get secret/test
 
 ### Storage Backends Comparison {#storage-backends}
 
-#### Raft (Integrated Storage) - RECOMMENDED ✅
+#### Raft (Integrated Storage) - RECOMMENDED 
 
 **HashiCorp Official Guidance:**
 > "HashiCorp recommends using Vault's integrated storage for most use cases rather than configuring another system to store Vault data externally. Integrated Storage is an embedded Vault data storage available in Vault 1.4 or later."
 
 **Use Cases:**
-- ✅ Production deployments (REQUIRED for Enterprise 1.12.0+)
-- ✅ High availability requirements
-- ✅ Multi-node clusters
-- ✅ Automatic failover needed
-- ✅ No external dependencies desired
+-  Production deployments (REQUIRED for Enterprise 1.12.0+)
+-  High availability requirements
+-  Multi-node clusters
+-  Automatic failover needed
+-  No external dependencies desired
 
 **Advantages:**
 - Built-in HA and automatic failover
@@ -388,9 +388,9 @@ storage "raft" {
 - ❌ NOT RECOMMENDED for production by HashiCorp
 
 **Use Cases:**
-- ✅ Local development only
-- ✅ Learning Vault concepts
-- ✅ Proof-of-concept (non-production)
+-  Local development only
+-  Learning Vault concepts
+-  Proof-of-concept (non-production)
 
 **Configuration Example:**
 ```hcl
@@ -785,7 +785,7 @@ From HashiCorp's official guidance:
 
 **Quorum Math:**
 - 3 nodes = Quorum of 2 (tolerates 1 failure)
-- 5 nodes = Quorum of 3 (tolerates 2 failures) ✅
+- 5 nodes = Quorum of 3 (tolerates 2 failures) 
 - 7 nodes = Quorum of 4 (tolerates 3 failures, but diminishing returns)
 
 **Cost-Benefit Analysis:**
@@ -1223,7 +1223,7 @@ vault operator raft snapshot save "$BACKUP_FILE"
 # Verify snapshot
 echo "Verifying snapshot integrity..."
 if vault operator raft snapshot inspect "$BACKUP_FILE" > /dev/null; then
-    echo "✅ Snapshot verified: $BACKUP_FILE"
+    echo " Snapshot verified: $BACKUP_FILE"
 else
     echo "❌ ERROR: Snapshot verification failed"
     exit 1
@@ -1233,14 +1233,14 @@ fi
 if [ -n "$S3_BUCKET" ]; then
     echo "Uploading to S3..."
     aws s3 cp "$BACKUP_FILE" "s3://$S3_BUCKET/vault-backups/"
-    echo "✅ Uploaded to S3"
+    echo " Uploaded to S3"
 fi
 
 # Cleanup old backups
 echo "Cleaning up old backups (retention: $RETENTION_DAYS days)..."
 find "$BACKUP_DIR" -name "vault-snapshot-*.snap" -mtime +"$RETENTION_DAYS" -delete
 
-echo "✅ Backup complete: $BACKUP_FILE"
+echo " Backup complete: $BACKUP_FILE"
 ```
 
 **Schedule with Cron:**
@@ -2560,7 +2560,7 @@ vault kv list secret/
 #### Scenario 5: Entire Availability Zone Loss
 
 **Impact:** 
-- 5-node cluster (2 nodes per AZ1/AZ2, 1 in AZ3): Cluster survives ✅
+- 5-node cluster (2 nodes per AZ1/AZ2, 1 in AZ3): Cluster survives 
 - 3-node cluster (1 node per AZ): Cluster down ❌
 
 **With 5-node cluster properly distributed:**
@@ -2705,6 +2705,6 @@ For step-by-step implementation, follow the detailed guides:
 
 ---
 
-**Document Status:** ✅ Production Ready  
+**Document Status:**  Production Ready  
 **Next Review Date:** January 2026 (or when Vault 1.21.x is released)  
 **Maintained By:** Code Monkey Cybersecurity - EOS Team

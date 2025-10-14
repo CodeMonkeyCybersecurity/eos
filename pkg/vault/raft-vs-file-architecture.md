@@ -65,12 +65,12 @@
 └──────────────────────────┴───────────────────┘
 
 **Benefits:**
-✅ High Availability
-✅ Automatic failover
-✅ Distributed consensus
-✅ Can lose 2 nodes and continue
-✅ Built-in replication
-✅ Required for Vault Enterprise 1.12.0+
+ High Availability
+ Automatic failover
+ Distributed consensus
+ Can lose 2 nodes and continue
+ Built-in replication
+ Required for Vault Enterprise 1.12.0+
 ```
 
 ## How Raft Consensus Works
@@ -161,7 +161,7 @@ Node3 fails:
 Leader:    Node1 ✓
 Followers: Node2 ✓, Node3 ✗, Node4 ✓, Node5 ✓
 
-Result: ✅ Cluster continues normally
+Result:  Cluster continues normally
 Quorum: 3 nodes needed, 4 available
 ```
 
@@ -184,7 +184,7 @@ Leader:    Node2 ✓ (newly elected)
 Followers: Node3 ✓, Node4 ✓, Node5 ✓
 Down:      Node1 ✗
 
-Result: ✅ Automatic failover (~1-5 seconds downtime)
+Result:  Automatic failover (~1-5 seconds downtime)
 ```
 
 ### Scenario 3: Multi-Node Failure (within tolerance)
@@ -197,7 +197,7 @@ Node3 and Node5 fail:
 Leader:    Node1 ✓
 Followers: Node2 ✓, Node3 ✗, Node4 ✓, Node5 ✗
 
-Result: ✅ Cluster continues
+Result:  Cluster continues
 Quorum: 3 nodes needed, 3 available (exactly at threshold)
 ```
 
@@ -241,7 +241,7 @@ Option 2: Restore from snapshot (if nodes unrecoverable)
 ├────────────────┼─────────────┼──────────────────┼─────────────┤
 │ 1 node         │ 1           │ 0                │ ❌ Dev only │
 │ 3 nodes        │ 2           │ 1                │   Minimal │
-│ 5 nodes        │ 3           │ 2                │ ✅ Ideal    │
+│ 5 nodes        │ 3           │ 2                │  Ideal    │
 │ 7 nodes        │ 4           │ 3                │   Overkill│
 └────────────────┴─────────────┴──────────────────┴─────────────┘
 

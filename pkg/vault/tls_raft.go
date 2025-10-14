@@ -365,48 +365,6 @@ func VerifyTLSCertificate(rc *eos_io.RuntimeContext, certPath string, expectedSA
 	return nil
 }
 
-// GetCertificateInfo returns information about a TLS certificate
-func GetCertificateInfo(certPath string) (*CertificateInfo, error) {
-	certPEM, err := os.ReadFile(certPath)
-	if err != nil {
-		return nil, fmt.Errorf("read certificate: %w", err)
-	}
-	
-	block, _ := pem.Decode(certPEM)
-	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block")
-	}
-	
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("parse certificate: %w", err)
-	}
-	
-	ipStrings := make([]string, len(cert.IPAddresses))
-	for i, ip := range cert.IPAddresses {
-		ipStrings[i] = ip.String()
-	}
-	
-	return &CertificateInfo{
-		Subject:      cert.Subject.CommonName,
-		Issuer:       cert.Issuer.CommonName,
-		NotBefore:    cert.NotBefore,
-		NotAfter:     cert.NotAfter,
-		DNSNames:     cert.DNSNames,
-		IPAddresses:  ipStrings,
-		IsCA:         cert.IsCA,
-		SerialNumber: cert.SerialNumber.String(),
-	}, nil
-}
-
-// CertificateInfo contains information about a TLS certificate
-type CertificateInfo struct {
-	Subject      string
-	Issuer       string
-	NotBefore    time.Time
-	NotAfter     time.Time
-	DNSNames     []string
-	IPAddresses  []string
-	IsCA         bool
-	SerialNumber string
-}
+// NOTE: GetCertificateInfo and CertificateInfo have been moved to tls_certificate.go
+// This file (tls_raft.go) is deprecated in favor of the consolidated tls_certificate.go module
+// See tls_certificate.go for the unified certificate generation implementation
