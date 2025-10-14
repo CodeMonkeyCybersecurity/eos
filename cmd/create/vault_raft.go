@@ -69,18 +69,18 @@ func init() {
 	vaultRaftCmd.Flags().String("api-addr", "", "This node's API address (e.g., https://10.0.1.10:8179)")
 	vaultRaftCmd.Flags().String("cluster-addr", "", "This node's cluster address (e.g., https://10.0.1.10:8180)")
 	vaultRaftCmd.Flags().Int("cluster-port", 8180, "Raft cluster communication port")
-	
+
 	// Multi-node configuration
 	vaultRaftCmd.Flags().Bool("multi-node", false, "Configure for multi-node cluster")
 	vaultRaftCmd.Flags().String("nodes", "", "Comma-separated list of nodes (hostname:ip)")
-	
+
 	// TLS configuration
 	vaultRaftCmd.Flags().Bool("generate-tls", false, "Generate TLS certificates")
 	vaultRaftCmd.Flags().String("tls-cert", shared.TLSCrt, "Path to TLS certificate")
 	vaultRaftCmd.Flags().String("tls-key", shared.TLSKey, "Path to TLS private key")
 	vaultRaftCmd.Flags().StringSlice("dns-names", []string{"localhost"}, "DNS names for TLS certificate")
 	vaultRaftCmd.Flags().StringSlice("ip-addresses", []string{"127.0.0.1"}, "IP addresses for TLS certificate")
-	
+
 	// Auto-unseal configuration
 	vaultRaftCmd.Flags().String("auto-unseal", "", "Auto-unseal type (awskms, azure, gcp)")
 	vaultRaftCmd.Flags().String("kms-key-id", "", "AWS KMS key ID")
@@ -95,14 +95,15 @@ func init() {
 	vaultRaftCmd.Flags().String("gcp-keyring", "", "GCP KMS keyring")
 	vaultRaftCmd.Flags().String("gcp-key", "", "GCP KMS crypto key")
 	vaultRaftCmd.Flags().String("gcp-credentials", "", "Path to GCP credentials file")
-	
+
 	// Storage configuration
 	vaultRaftCmd.Flags().String("data-path", shared.VaultDataPath, "Path for Raft data storage")
-	
+
 	// Operational flags
 	vaultRaftCmd.Flags().Bool("dry-run", false, "Show configuration without creating")
 	vaultRaftCmd.Flags().Bool("skip-install", false, "Skip Vault installation (config only)")
-	
+	vaultRaftCmd.Flags().Bool("skip-enable", false, "Skip automatic Vault enablement (initialization, auth setup, etc)")
+
 	CreateCmd.AddCommand(vaultRaftCmd)
 }
 
@@ -316,18 +317,63 @@ func runVaultRaft(rc *eos_io.RuntimeContext, cmd *cobra.Command, _ []string) err
 		log.Error("Failed to write Vault configuration", zap.Error(err))
 		return fmt.Errorf("write vault config: %w", err)
 	}
-	
+
 	log.Info("✅ Vault with Raft Integrated Storage created successfully")
-	log.Info("terminal prompt: ")
-	log.Info("terminal prompt: Next steps:")
-	log.Info("terminal prompt: 1. Start Vault: sudo systemctl start vault")
-	log.Info("terminal prompt: 2. Initialize cluster: eos bootstrap vault")
+
+	// Check if we should skip automatic enablement
+	skipEnable, _ := cmd.Flags().GetBool("skip-enable")
+	if skipEnable {
+		log.Info("⏭️  Skipping automatic Vault enablement (--skip-enable flag set)")
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: Next steps:")
+		log.Info("terminal prompt: 1. Start Vault: sudo systemctl start vault")
+		log.Info("terminal prompt: 2. Initialize and enable Vault manually")
+		if multiNode {
+			log.Info("terminal prompt: 3. Join additional nodes: eos update vault join-cluster --leader=<leader-addr>")
+			log.Info("terminal prompt: 4. Configure Autopilot: eos update vault autopilot")
+		}
+		log.Info("terminal prompt: ")
+		return nil
+	}
+
+	// Automatically enable Vault (initialization, auth setup, agent, etc.)
+	log.Info(" Starting automatic Vault enablement")
+	log.Info("This will initialize Vault, configure authentication, enable secrets engines, and set up the Vault Agent")
+
+	// Start Vault service (includes health check wait)
+	log.Info("Starting Vault service and waiting for it to be ready...")
+	if err := vault.StartVaultService(rc); err != nil {
+		log.Warn("Failed to start Vault service automatically", zap.Error(err))
+		log.Info("terminal prompt: Please start Vault manually: sudo systemctl start vault")
+		log.Info("terminal prompt: Then initialize with: eos bootstrap vault")
+		return nil
+	}
+
+	// Call EnableVault to perform full initialization and setup
+	// Note: EnableVault expects *zap.Logger - create a simple production logger for it
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		log.Error("Failed to create logger for vault enablement", zap.Error(err))
+		return fmt.Errorf("create logger: %w", err)
+	}
+	defer zapLogger.Sync()
+
+	if err := vault.EnableVault(rc, nil, zapLogger); err != nil {
+		log.Error("Failed to enable Vault", zap.Error(err))
+		log.Info("terminal prompt: Vault was installed but enablement failed")
+		log.Info("terminal prompt: You can retry enablement manually or troubleshoot the error")
+		return fmt.Errorf("enable vault: %w", err)
+	}
+
+	log.Info("🎉 Vault creation and enablement completed successfully!")
 	if multiNode {
-		log.Info("terminal prompt: 3. Join additional nodes: eos update vault join-cluster --leader=<leader-addr>")
-		log.Info("terminal prompt: 4. Configure Autopilot: eos update vault autopilot")
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: Multi-node cluster next steps:")
+		log.Info("terminal prompt: 1. Join additional nodes: eos update vault join-cluster --leader=<leader-addr>")
+		log.Info("terminal prompt: 2. Configure Autopilot: eos update vault autopilot")
 	}
 	log.Info("terminal prompt: ")
-	
+
 	return nil
 }
 

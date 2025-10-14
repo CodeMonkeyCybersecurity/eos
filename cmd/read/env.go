@@ -1,4 +1,4 @@
-package env
+package read
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var showCmd = &cobra.Command{
+var envCmd = &cobra.Command{
 	Use:   "show [environment-name]",
 	Short: "Show detailed information about an environment",
 	Long: `Show detailed information about a deployment environment including its
@@ -28,16 +28,16 @@ configuration.
 
 Examples:
   # Show current environment details
-  eos env show
+  eos read env
 
   # Show specific environment
-  eos env show production
+  eos read env production
 
   # Show detailed configuration
-  eos env show production --detailed
+  eos read env production --detailed
 
   # Show in JSON format
-  eos env show staging --format json`,
+  eos read env staging --format json`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -96,29 +96,29 @@ Examples:
 }
 
 func init() {
-	EnvCmd.AddCommand(showCmd)
+	ReadCmd.AddCommand(envCmd)
 
 	// Output formatting flags
-	showCmd.Flags().String("format", "table", "Output format: table, json, yaml")
-	showCmd.Flags().Bool("detailed", false, "Show detailed environment configuration")
+	envCmd.Flags().String("format", "table", "Output format: table, json, yaml")
+	envCmd.Flags().Bool("detailed", false, "Show detailed environment configuration")
 
 	// Section flags for detailed view
-	showCmd.Flags().Bool("infrastructure", false, "Show only infrastructure configuration")
-	showCmd.Flags().Bool("deployment", false, "Show only deployment configuration")
-	showCmd.Flags().Bool("security", false, "Show only security configuration")
-	showCmd.Flags().Bool("monitoring", false, "Show only monitoring configuration")
+	envCmd.Flags().Bool("infrastructure", false, "Show only infrastructure configuration")
+	envCmd.Flags().Bool("deployment", false, "Show only deployment configuration")
+	envCmd.Flags().Bool("security", false, "Show only security configuration")
+	envCmd.Flags().Bool("monitoring", false, "Show only monitoring configuration")
 
-	showCmd.Example = `  # Show current environment
-  eos env show
+	envCmd.Example = `  # Show current environment
+  eos read env
 
   # Show production environment details
-  eos env show production
+  eos read env production
 
   # Show detailed infrastructure configuration
-  eos env show production --detailed --infrastructure
+  eos read env production --detailed --infrastructure
 
   # Show environment in JSON format
-  eos env show staging --format json`
+  eos read env staging --format json`
 }
 
 // displayEnvironmentTable displays environment in table format

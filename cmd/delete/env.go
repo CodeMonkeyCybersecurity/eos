@@ -1,4 +1,4 @@
-package env
+package delete
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var deleteCmd = &cobra.Command{
+var envCmd = &cobra.Command{
 	Use:   "delete <environment-name>",
 	Short: "Delete an environment",
 	Long: `Delete a deployment environment and clean up its associated infrastructure.
@@ -31,19 +31,19 @@ performing the deletion.
 
 Examples:
   # Delete development environment
-  eos env delete development
+  eos delete env development
 
   # Delete with force (required for production)
-  eos env delete production --force
+  eos delete env production --force
 
   # Dry run to see what would be deleted
-  eos env delete staging --dry-run
+  eos delete env staging --dry-run
 
   # Delete without cleanup (keep infrastructure)
-  eos env delete testing --no-cleanup
+  eos delete env testing --no-cleanup
 
   # Delete and backup configuration first
-  eos env delete staging --backup`,
+  eos delete env staging --backup`,
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -200,35 +200,35 @@ Examples:
 }
 
 func init() {
-	EnvCmd.AddCommand(deleteCmd)
+	DeleteCmd.AddCommand(envCmd)
 
 	// Safety flags
-	deleteCmd.Flags().Bool("force", false, "Force deletion (required for production environments)")
-	deleteCmd.Flags().Bool("dry-run", false, "Show what would be deleted without actually deleting")
-	deleteCmd.Flags().Bool("yes", false, "Skip confirmation prompts")
+	envCmd.Flags().Bool("force", false, "Force deletion (required for production environments)")
+	envCmd.Flags().Bool("dry-run", false, "Show what would be deleted without actually deleting")
+	envCmd.Flags().Bool("yes", false, "Skip confirmation prompts")
 
 	// Cleanup flags
-	deleteCmd.Flags().Bool("no-cleanup", false, "Skip infrastructure cleanup (only remove config)")
-	deleteCmd.Flags().Bool("backup", false, "Create backup of environment configuration before deletion")
+	envCmd.Flags().Bool("no-cleanup", false, "Skip infrastructure cleanup (only remove config)")
+	envCmd.Flags().Bool("backup", false, "Create backup of environment configuration before deletion")
 
 	// Scope flags
-	deleteCmd.Flags().StringSlice("skip-components", nil, "Skip cleanup of specific components: nomad, consul, vault, terraform")
-	deleteCmd.Flags().Duration("timeout", 0, "Timeout for cleanup operations (default: 10m)")
+	envCmd.Flags().StringSlice("skip-components", nil, "Skip cleanup of specific components: nomad, consul, vault, terraform")
+	envCmd.Flags().Duration("timeout", 0, "Timeout for cleanup operations (default: 10m)")
 
-	deleteCmd.Example = `  # Delete development environment
-  eos env delete development
+	envCmd.Example = `  # Delete development environment
+  eos delete env development
 
   # Delete production environment (requires force)
-  eos env delete production --force
+  eos delete env production --force
 
   # Preview deletion without executing
-  eos env delete staging --dry-run
+  eos delete env staging --dry-run
 
   # Delete with backup and skip prompts
-  eos env delete testing --backup --yes
+  eos delete env testing --backup --yes
 
   # Delete config only (keep infrastructure)
-  eos env delete temporary --no-cleanup`
+  eos delete env temporary --no-cleanup`
 }
 
 // displayDeletionPlan shows what would be deleted in dry-run mode

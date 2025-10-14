@@ -1,4 +1,4 @@
-package build
+package create
 
 import (
 	"fmt"
@@ -137,7 +137,7 @@ Examples:
 }
 
 func init() {
-	BuildCmd.AddCommand(componentCmd)
+	buildCmd.AddCommand(componentCmd)
 
 	// Build configuration flags
 	componentCmd.Flags().String("tag", "", "Image tag (defaults to git commit hash)")

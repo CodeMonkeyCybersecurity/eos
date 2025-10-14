@@ -1,6 +1,6 @@
-// cmd/check/vault.go
+// cmd/list/vault.go
 
-package check
+package list
 
 import (
 	"fmt"
@@ -53,7 +53,7 @@ func init() {
 	vaultCheckCmd.Flags().BoolVar(&vaultCheckSecurity, "security", false, "Check security posture only")
 	vaultCheckCmd.Flags().BoolVar(&vaultCheckAll, "all", false, "Perform all validation checks")
 
-	CheckCmd.AddCommand(vaultCheckCmd)
+	ListCmd.AddCommand(vaultCheckCmd)
 }
 
 func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

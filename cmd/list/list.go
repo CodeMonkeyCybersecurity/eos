@@ -12,12 +12,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// ReadCmd is the root command for read operations
+// ListCmd is the root command for list operations
 var ListCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "List resources (e.g., processes, users, storage)",
 	Long:    `The list command list 'metadata' about various resources such as processes, users, or storage.`,
-	Aliases: []string{"ls"},
+	Aliases: []string{"ls", "check"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
@@ -29,6 +29,6 @@ var ListCmd = &cobra.Command{
 // log is a package-level variable for the Zap logger.
 
 func init() {
-	// Initialize the shared logger for the entire deploy package
-
+	// The 'check' alias on ListCmd allows 'eos check' to route to 'eos list'
+	// Individual check commands (like delphi check) are added as subcommands elsewhere
 }

@@ -1,5 +1,5 @@
 // cmd/check/authentik.go
-package check
+package list
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ func init() {
 	authentikFlags.Bool("fix", false, "Attempt to fix common issues")
 
 	// Register command
-	CheckCmd.AddCommand(AuthentikCmd)
+	ListCmd.AddCommand(AuthentikCmd)
 }
 
 func checkAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

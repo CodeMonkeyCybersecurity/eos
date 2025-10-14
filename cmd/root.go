@@ -15,23 +15,17 @@ import (
 	// Subcommands - Core verb-first architecture
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/bootstrap"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/check"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/config"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/repair"
-
-	// "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi" // TODO: Migrate to verb directories
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/nuke"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/repair"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/rollback"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
-	// "github.com/CodeMonkeyCybersecurity/eos/cmd/" // TODO: Migrate to verb directories
-	// Internal packages
 )
 
 // helpLogged removed as it's not needed with default Cobra help
@@ -72,9 +66,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		list.ListCmd,         // VERB-FIRST ARCHITECTURE
 		update.UpdateCmd,     // VERB-FIRST ARCHITECTURE
 		delete.DeleteCmd,     // VERB-FIRST ARCHITECTURE
-		check.CheckCmd,       // VERB-FIRST ARCHITECTURE (health checks)
 		repair.RepairCmd,     // VERB-FIRST ARCHITECTURE (auto-fix issues)
-		config.ConfigCmd,     // Configuration management (Consul KV)
 		debug.GetDebugCmd(),  // VERB-FIRST ARCHITECTURE (debugging tools)
 		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
 		backup.BackupCmd,     // SPECIAL CASE (Complex nomenclature)

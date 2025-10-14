@@ -1,4 +1,4 @@
-package build
+package create
 
 import (
 	"fmt"
@@ -209,7 +209,7 @@ Examples:
 }
 
 func init() {
-	BuildCmd.AddCommand(cleanCmd)
+	buildCmd.AddCommand(cleanCmd)
 
 	// Clean scope flags
 	cleanCmd.Flags().Bool("all", false, "Clean all artifacts, caches, and temporary files")

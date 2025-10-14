@@ -137,6 +137,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 var CreateSecretCmd = &cobra.Command{
@@ -243,7 +244,38 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	}
 
 	logger.Info("Vault installation completed successfully")
-	logger.Info("terminal prompt: Vault is installed. Initialize with: vault operator init")
+
+	// Automatically enable Vault (initialization, auth setup, agent, etc.)
+	logger.Info(" Starting automatic Vault enablement")
+	logger.Info("This will initialize Vault, configure authentication, enable secrets engines, and set up the Vault Agent")
+
+	// Start Vault service (includes health check wait)
+	logger.Info("Starting Vault service and waiting for it to be ready...")
+	if err := vault.StartVaultService(rc); err != nil {
+		logger.Warn("Failed to start Vault service automatically", zap.Error(err))
+		logger.Info("terminal prompt: Please start Vault manually: sudo systemctl start vault")
+		logger.Info("terminal prompt: Then initialize with: vault operator init")
+		return nil
+	}
+
+	// Call EnableVault to perform full initialization and setup
+	// Create a production logger for EnableVault
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		logger.Error("Failed to create logger for vault enablement", zap.Error(err))
+		return fmt.Errorf("create logger: %w", err)
+	}
+	defer zapLogger.Sync()
+
+	if err := vault.EnableVault(rc, nil, zapLogger); err != nil {
+		logger.Error("Failed to enable Vault", zap.Error(err))
+		logger.Info("terminal prompt: Vault was installed but enablement failed")
+		logger.Info("terminal prompt: You can retry enablement manually or troubleshoot the error")
+		return fmt.Errorf("enable vault: %w", err)
+	}
+
+	logger.Info("🎉 Vault creation and enablement completed successfully!")
+	logger.Info("terminal prompt: Vault is fully configured and ready to use")
 	return nil
 }
 

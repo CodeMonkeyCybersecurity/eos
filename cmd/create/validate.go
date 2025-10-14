@@ -1,4 +1,4 @@
-package build
+package create
 
 import (
 	"fmt"
@@ -144,7 +144,7 @@ Examples:
 }
 
 func init() {
-	BuildCmd.AddCommand(validateCmd)
+	buildCmd.AddCommand(validateCmd)
 
 	// Validation scope flags
 	validateCmd.Flags().Bool("all", false, "Validate all components")

@@ -1,4 +1,6 @@
-package env
+// cmd/create/env.go
+
+package create
 
 import (
 	"fmt"
@@ -13,32 +15,32 @@ import (
 	"go.uber.org/zap"
 )
 
-var createCmd = &cobra.Command{
-	Use:   "create <environment-name>",
-	Short: "Create a new environment interactively",
+var envCmd = &cobra.Command{
+	Use:   "env <environment-name>",
+	Short: "Create a new deployment environment",
 	Long: `Create a new deployment environment using interactive prompts to configure
 all aspects of the environment including infrastructure endpoints, deployment
 policies, security settings, and monitoring configuration.
 
 This command guides you through setting up a complete environment configuration
 step by step. For advanced users or automated deployments, consider using
-'eos env apply' with a configuration file instead.
+'eos update env --apply' with a configuration file instead.
 
 You can provide initial values using flags, and the interactive prompts will
 use these as defaults while allowing you to modify them.
 
 Examples:
   # Create a new development environment
-  eos env create development
+  eos create env development
 
   # Create environment with initial type
-  eos env create staging --type staging
+  eos create env staging --type staging
 
   # Create environment with basic infrastructure
-  eos env create production --type production --nomad-address https://nomad.prod.example.com:4646
+  eos create env production --type production --nomad-address https://nomad.prod.example.com:4646
 
   # Create environment from template
-  eos env create testing --template development`,
+  eos create env testing --template development`,
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -46,7 +48,7 @@ Examples:
 		envName := args[0]
 
 		logger.Info("Creating new environment interactively",
-			zap.String("command", "env create"),
+			zap.String("command", "create env"),
 			zap.String("environment", envName),
 			zap.String("component", rc.Component))
 
@@ -69,7 +71,7 @@ Examples:
 
 		// Check if environment already exists
 		if _, err := envManager.GetEnvironment(rc, envName); err == nil {
-			return fmt.Errorf("environment '%s' already exists. Use 'eos env update %s' to modify it", envName, envName)
+			return fmt.Errorf("environment '%s' already exists. Use 'eos update env %s' to modify it", envName, envName)
 		}
 
 		// Start with template or defaults
@@ -120,7 +122,7 @@ Examples:
 
 		// Interactive configuration if not skipping prompts
 		if !skipPrompts {
-			if err := interactiveEnvironmentConfig(rc, env); err != nil {
+			if err := interactiveEnvConfig(rc, env); err != nil {
 				return fmt.Errorf("interactive configuration failed: %w", err)
 			}
 		}
@@ -167,9 +169,9 @@ Examples:
 		// Show next steps
 		fmt.Printf("Next Steps:\n")
 		fmt.Printf("───────────\n")
-		fmt.Printf("• Switch to environment: eos env use %s\n", envName)
-		fmt.Printf("• View environment details: eos env show %s\n", envName)
-		fmt.Printf("• Export configuration: eos env show %s --format yaml > %s.yaml\n", envName, envName)
+		fmt.Printf("• Switch to environment: eos update env %s --use\n", envName)
+		fmt.Printf("• View environment details: eos read env %s\n", envName)
+		fmt.Printf("• Export configuration: eos read env %s --format yaml > %s.yaml\n", envName, envName)
 
 		logger.Info("Environment created successfully",
 			zap.String("environment", envName),
@@ -180,60 +182,60 @@ Examples:
 }
 
 func init() {
-	EnvCmd.AddCommand(createCmd)
+	CreateCmd.AddCommand(envCmd)
 
 	// Basic environment configuration
-	createCmd.Flags().String("type", "", "Environment type: development, staging, production, testing, preview")
-	createCmd.Flags().String("display-name", "", "Display name for the environment")
-	createCmd.Flags().String("description", "", "Description of the environment")
-	createCmd.Flags().String("template", "", "Use existing environment as template")
+	envCmd.Flags().String("type", "", "Environment type: development, staging, production, testing, preview")
+	envCmd.Flags().String("display-name", "", "Display name for the environment")
+	envCmd.Flags().String("description", "", "Description of the environment")
+	envCmd.Flags().String("template", "", "Use existing environment as template")
 
 	// Infrastructure configuration
-	createCmd.Flags().String("nomad-address", "", "Nomad cluster address")
-	createCmd.Flags().String("consul-address", "", "Consul cluster address")
-	createCmd.Flags().String("vault-address", "", "Vault cluster address")
+	envCmd.Flags().String("nomad-address", "", "Nomad cluster address")
+	envCmd.Flags().String("consul-address", "", "Consul cluster address")
+	envCmd.Flags().String("vault-address", "", "Vault cluster address")
 
 	// Terraform configuration
-	createCmd.Flags().String("terraform-backend", "", "Terraform backend type")
-	createCmd.Flags().String("terraform-workspace", "", "Terraform workspace name")
+	envCmd.Flags().String("terraform-backend", "", "Terraform backend type")
+	envCmd.Flags().String("terraform-workspace", "", "Terraform workspace name")
 
 	// Provider configuration
-	createCmd.Flags().String("provider", "", "Cloud provider: hetzner, aws, gcp, azure")
-	createCmd.Flags().String("provider-region", "", "Cloud provider region")
+	envCmd.Flags().String("provider", "", "Cloud provider: hetzner, aws, gcp, azure")
+	envCmd.Flags().String("provider-region", "", "Cloud provider region")
 
 	// Deployment configuration
-	createCmd.Flags().String("deploy-strategy", "", "Deployment strategy: rolling, blue-green, canary")
-	createCmd.Flags().Int("cpu", 0, "Default CPU allocation (MHz)")
-	createCmd.Flags().Int("memory", 0, "Default memory allocation (MB)")
+	envCmd.Flags().String("deploy-strategy", "", "Deployment strategy: rolling, blue-green, canary")
+	envCmd.Flags().Int("cpu", 0, "Default CPU allocation (MHz)")
+	envCmd.Flags().Int("memory", 0, "Default memory allocation (MB)")
 
 	// Security configuration
-	createCmd.Flags().Bool("enable-rbac", false, "Enable RBAC")
-	createCmd.Flags().Bool("require-mfa", false, "Require MFA for operations")
-	createCmd.Flags().Bool("require-approval", false, "Require approval for deployments")
+	envCmd.Flags().Bool("enable-rbac", false, "Enable RBAC")
+	envCmd.Flags().Bool("require-mfa", false, "Require MFA for operations")
+	envCmd.Flags().Bool("require-approval", false, "Require approval for deployments")
 
 	// Interactive mode
-	createCmd.Flags().Bool("skip-prompts", false, "Skip interactive prompts and use defaults/flags")
+	envCmd.Flags().Bool("skip-prompts", false, "Skip interactive prompts and use defaults/flags")
 
-	createCmd.Example = `  # Create development environment with prompts
-  eos env create development
+	envCmd.Example = `  # Create development environment with prompts
+  eos create env development
 
   # Create staging environment with type preset
-  eos env create staging --type staging
+  eos create env staging --type staging
 
   # Create production with security enabled
-  eos env create production --type production --enable-rbac --require-mfa
+  eos create env production --type production --enable-rbac --require-mfa
 
   # Create from template
-  eos env create testing --template development
+  eos create env testing --template development
 
   # Create with all options via flags (no prompts)
-  eos env create myenv --type development --skip-prompts \
+  eos create env myenv --type development --skip-prompts \
     --nomad-address https://nomad.example.com:4646 \
     --consul-address consul.example.com:8500`
 }
 
-// interactiveEnvironmentConfig guides user through environment configuration
-func interactiveEnvironmentConfig(rc *eos_io.RuntimeContext, env *environments.Environment) error {
+// interactiveEnvConfig guides user through environment configuration
+func interactiveEnvConfig(rc *eos_io.RuntimeContext, env *environments.Environment) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Starting interactive environment configuration")
@@ -292,15 +294,15 @@ func interactiveEnvironmentConfig(rc *eos_io.RuntimeContext, env *environments.E
 	fmt.Printf("───────────────────────\n")
 
 	// RBAC
-	fmt.Printf("Enable RBAC? (y/N) [%s]: ", boolToYesNo(env.Security.AccessControl.RBAC.Enabled))
+	fmt.Printf("Enable RBAC? (y/N) [%s]: ", boolToYesNoEnv(env.Security.AccessControl.RBAC.Enabled))
 	// In real implementation, would read from stdin and parse
 
 	// MFA
-	fmt.Printf("Require MFA? (y/N) [%s]: ", boolToYesNo(env.Security.AccessControl.MFA.Required))
+	fmt.Printf("Require MFA? (y/N) [%s]: ", boolToYesNoEnv(env.Security.AccessControl.MFA.Required))
 	// In real implementation, would read from stdin and parse
 
 	// Approval
-	fmt.Printf("Require deployment approval? (y/N) [%s]: ", boolToYesNo(env.Security.AccessControl.Approval.Required))
+	fmt.Printf("Require deployment approval? (y/N) [%s]: ", boolToYesNoEnv(env.Security.AccessControl.Approval.Required))
 	// In real implementation, would read from stdin and parse
 
 	fmt.Printf("\n")
@@ -325,8 +327,8 @@ func interactiveEnvironmentConfig(rc *eos_io.RuntimeContext, env *environments.E
 	return nil
 }
 
-// Helper function to convert bool to yes/no string
-func boolToYesNo(b bool) string {
+// Helper function to convert bool to yes/no string for env commands
+func boolToYesNoEnv(b bool) string {
 	if b {
 		return "y"
 	}

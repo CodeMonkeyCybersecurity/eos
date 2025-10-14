@@ -1,4 +1,4 @@
-package env
+package list
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var listCmd = &cobra.Command{
+var envCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all deployment environments",
 	Long: `List all deployment environments with their status and basic information.
@@ -26,19 +26,19 @@ information about each environment.
 
 Examples:
   # List all environments in table format
-  eos env list
+  eos list env
 
   # List environments with detailed information
-  eos env list --detailed
+  eos list env --detailed
 
   # List environments in JSON format
-  eos env list --format json
+  eos list env --format json
 
   # List only active environments
-  eos env list --status active
+  eos list env --status active
 
   # List environments of specific type
-  eos env list --type production`,
+  eos list env --type production`,
 	Aliases: []string{"ls"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -106,34 +106,34 @@ Examples:
 }
 
 func init() {
-	EnvCmd.AddCommand(listCmd)
+	ListCmd.AddCommand(envCmd)
 
 	// Output formatting flags
-	listCmd.Flags().String("format", "table", "Output format: table, json, yaml")
-	listCmd.Flags().Bool("detailed", false, "Show detailed environment information")
+	envCmd.Flags().String("format", "table", "Output format: table, json, yaml")
+	envCmd.Flags().Bool("detailed", false, "Show detailed environment information")
 
 	// Filtering flags
-	listCmd.Flags().String("status", "", "Filter by status: active, inactive, maintenance, destroyed, creating, updating")
-	listCmd.Flags().String("type", "", "Filter by type: development, staging, production, testing, preview")
+	envCmd.Flags().String("status", "", "Filter by status: active, inactive, maintenance, destroyed, creating, updating")
+	envCmd.Flags().String("type", "", "Filter by type: development, staging, production, testing, preview")
 
 	// Sorting flags
-	listCmd.Flags().String("sort", "name", "Sort by: name, type, status, created, updated")
-	listCmd.Flags().Bool("reverse", false, "Reverse sort order")
+	envCmd.Flags().String("sort", "name", "Sort by: name, type, status, created, updated")
+	envCmd.Flags().Bool("reverse", false, "Reverse sort order")
 
-	listCmd.Example = `  # List all environments
-  eos env list
+	envCmd.Example = `  # List all environments
+  eos list env
 
   # Show detailed information for all environments
-  eos env list --detailed
+  eos list env --detailed
 
   # List only production environments
-  eos env list --type production
+  eos list env --type production
 
   # List active environments in JSON format
-  eos env list --status active --format json
+  eos list env --status active --format json
 
   # List environments sorted by creation date
-  eos env list --sort created --reverse`
+  eos list env --sort created --reverse`
 }
 
 // displayEnvironmentsTable displays environments in table format
