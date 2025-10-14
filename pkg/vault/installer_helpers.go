@@ -1,14 +1,14 @@
 package vault
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
-
-	"os/exec"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -160,6 +160,63 @@ func (r *CommandRunner) RunQuiet(name string, args ...string) error {
 		Capture: true,
 	})
 	return err
+}
+
+// RunWithExitCode executes a command and returns the output and exit code
+// This is useful for commands where non-zero exit codes are expected and meaningful
+// Returns (output, exitCode, error) where:
+// - output is the combined stdout/stderr
+// - exitCode is the process exit code (0 for success, >0 for various conditions)
+// - error is only returned for actual execution failures (not non-zero exit codes)
+func (r *CommandRunner) RunWithExitCode(name string, args ...string) (string, int, error) {
+	r.logger.Debug("Executing command with exit code check",
+		zap.String("command", name),
+		zap.Strings("args", args))
+
+	if r.dryRun {
+		r.logger.Info("DRY RUN: Would execute with exit code check",
+			zap.String("command", name),
+			zap.Strings("args", args))
+		return "", 0, nil
+	}
+
+	// Build environment for vault commands with TLS skip for self-signed certs
+	env := r.buildVaultEnvironment()
+
+	// Use exec directly to get raw exit code without retry wrapping
+	cmd := exec.CommandContext(r.rc.Ctx, name, args...)
+	cmd.Env = env
+
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
+	err := cmd.Run()
+	output := buf.String()
+
+	// Extract exit code
+	exitCode := 0
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+			r.logger.Debug("Command returned non-zero exit code",
+				zap.String("command", name),
+				zap.Int("exit_code", exitCode),
+				zap.String("output", output))
+			// Return output and exit code, but no error (caller will interpret exit code)
+			return output, exitCode, nil
+		}
+		// This is an actual execution error (not just non-zero exit)
+		r.logger.Error("Command execution failed",
+			zap.String("command", name),
+			zap.Error(err))
+		return output, -1, fmt.Errorf("failed to execute command: %w", err)
+	}
+
+	r.logger.Debug("Command succeeded",
+		zap.String("command", name),
+		zap.Int("exit_code", 0))
+	return output, 0, nil
 }
 
 // SystemdService provides consistent systemd operations

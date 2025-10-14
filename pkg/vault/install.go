@@ -82,6 +82,7 @@ type InstallConfig struct {
 	Datacenter string // Consul datacenter for service registration
 	
 	// Multi-node Raft cluster configuration
+	RaftMode       string // "create" (default) or "join" - determines if this is a new cluster or joining existing
 	RetryJoinNodes []shared.RetryJoinNode
 
 	// Paths
@@ -157,6 +158,18 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 	}
 	if config.Port == 0 {
 		config.Port = shared.PortVault
+	}
+	if config.NodeID == "" {
+		// Default node ID to hostname
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "vault-node-1"
+		}
+		config.NodeID = hostname
+	}
+	if config.RaftMode == "" {
+		// Default to create mode (new cluster)
+		config.RaftMode = "create"
 	}
 
 	logger := otelzap.Ctx(rc.Ctx)
@@ -234,6 +247,14 @@ func (vi *VaultInstaller) Install() error {
 		return fmt.Errorf("user/directory setup failed: %w", err)
 	}
 
+	// Phase 1.5: Prompt for Raft cluster configuration (if using Raft storage)
+	if vi.config.StorageBackend == "raft" {
+		vi.progress.Update("[60%] Configuring Raft cluster mode")
+		if err := vi.promptRaftClusterConfig(); err != nil {
+			return fmt.Errorf("raft cluster configuration failed: %w", err)
+		}
+	}
+
 	// Phases 2-4: Configure (environment, TLS, config file)
 	vi.progress.Update("[70%] [Phases 2-4] Configuring Vault")
 	if err := vi.configure(); err != nil {
@@ -277,6 +298,81 @@ func (vi *VaultInstaller) Install() error {
 
 	vi.progress.Complete("Vault installation completed successfully (Phases 1-4 complete)")
 	vi.logger.Info("Next step: Call EnableVault() for Phases 5-15 (initialization, auth, secrets, hardening)")
+	return nil
+}
+
+// promptRaftClusterConfig prompts user for Raft cluster configuration (join vs create)
+func (vi *VaultInstaller) promptRaftClusterConfig() error {
+	// Only prompt if storage backend is raft and mode is not already set
+	if vi.config.StorageBackend != "raft" {
+		vi.logger.Debug("Skipping Raft cluster prompts - storage backend is not raft",
+			zap.String("backend", vi.config.StorageBackend))
+		return nil
+	}
+
+	if vi.config.RaftMode != "" {
+		vi.logger.Debug("Raft mode already configured",
+			zap.String("mode", vi.config.RaftMode))
+		return nil
+	}
+
+	vi.logger.Info("Configuring Raft cluster mode")
+	vi.logger.Info("terminal prompt: ")
+	vi.logger.Info("terminal prompt: Raft Cluster Configuration")
+	vi.logger.Info("terminal prompt: ===========================")
+	vi.logger.Info("terminal prompt: ")
+	vi.logger.Info("terminal prompt: Choose how this Vault node should operate:")
+	vi.logger.Info("terminal prompt:   1. Join existing Raft cluster (default)")
+	vi.logger.Info("terminal prompt:   2. Create new Raft cluster")
+	vi.logger.Info("terminal prompt: ")
+
+	mode, err := eos_io.PromptInput(vi.rc, "Select mode [1-2]", "1")
+	if err != nil {
+		return fmt.Errorf("failed to read cluster mode selection: %w", err)
+	}
+
+	switch mode {
+	case "1", "":
+		vi.config.RaftMode = "join"
+		vi.logger.Info("Selected mode: Join existing cluster")
+
+		// Prompt for leader node address
+		vi.logger.Info("terminal prompt: ")
+		vi.logger.Info("terminal prompt: To join an existing cluster, provide the API address of a cluster leader.")
+		vi.logger.Info("terminal prompt: Example: https://vault-leader.example.com:8200")
+		vi.logger.Info("terminal prompt: ")
+
+		leaderAddr, err := eos_io.PromptInput(vi.rc, "Leader API address", "")
+		if err != nil {
+			return fmt.Errorf("failed to read leader address: %w", err)
+		}
+		if leaderAddr == "" {
+			return fmt.Errorf("leader API address is required when joining a cluster")
+		}
+
+		// Add to retry_join configuration
+		vi.config.RetryJoinNodes = []shared.RetryJoinNode{
+			{
+				APIAddr:  leaderAddr,
+				Hostname: "", // Will be resolved from API address
+			},
+		}
+
+		vi.logger.Info("Configured to join existing cluster",
+			zap.String("leader_api_addr", leaderAddr))
+
+	case "2":
+		vi.config.RaftMode = "create"
+		vi.logger.Info("Selected mode: Create new cluster")
+		vi.logger.Info("terminal prompt: ")
+		vi.logger.Info("terminal prompt: This node will initialize as the first member of a new Raft cluster.")
+		vi.logger.Info("terminal prompt: Additional nodes can be added later by joining this cluster.")
+		vi.logger.Info("terminal prompt: ")
+
+	default:
+		return fmt.Errorf("invalid selection: %s (must be 1 or 2)", mode)
+	}
+
 	return nil
 }
 
@@ -753,10 +849,37 @@ func (vi *VaultInstaller) configure() error {
   path    = "vault"
 }`
 	case "raft":
-		storageConfig = fmt.Sprintf(`storage "raft" {
+		// Build Raft configuration based on cluster mode
+		var raftConfig string
+		if vi.config.RaftMode == "join" && len(vi.config.RetryJoinNodes) > 0 {
+			// Joining existing cluster - add retry_join configuration
+			raftConfig = fmt.Sprintf(`storage "raft" {
   path    = "%s/raft"
-  node_id = "node1"
-}`, vi.config.DataPath)
+  node_id = "%s"
+`, vi.config.DataPath, vi.config.NodeID)
+
+			// Add retry_join blocks for each leader node
+			for _, node := range vi.config.RetryJoinNodes {
+				raftConfig += fmt.Sprintf(`
+  retry_join {
+    leader_api_addr = "%s"
+  }
+`, node.APIAddr)
+			}
+			raftConfig += "}"
+
+			vi.logger.Info("Configured Raft to join existing cluster",
+				zap.Int("retry_join_nodes", len(vi.config.RetryJoinNodes)))
+		} else {
+			// Creating new cluster - standalone configuration
+			raftConfig = fmt.Sprintf(`storage "raft" {
+  path    = "%s/raft"
+  node_id = "%s"
+}`, vi.config.DataPath, vi.config.NodeID)
+
+			vi.logger.Info("Configured Raft as new cluster leader")
+		}
+		storageConfig = raftConfig
 	default:
 		return fmt.Errorf("unsupported storage backend: %s (supported: raft, consul)", vi.config.StorageBackend)
 	}
@@ -1072,14 +1195,28 @@ func (vi *VaultInstaller) verify() error {
 		return fmt.Errorf("vault service is not active")
 	}
 
-	// Check Vault status
-	if err := vi.runner.Run(vi.config.BinaryPath, "status"); err != nil {
-		// Vault returns exit code 2 when sealed, which is expected
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
-			vi.logger.Info("Vault is installed and sealed (expected)")
-		} else {
-			return fmt.Errorf("vault is not responding to commands: %w", err)
-		}
+	// Check Vault status using RunWithExitCode to properly handle exit code 2 (sealed)
+	// Vault returns different exit codes:
+	// - 0: unsealed and ready
+	// - 1: error occurred
+	// - 2: sealed (expected for new installation)
+	output, exitCode, err := vi.runner.RunWithExitCode(vi.config.BinaryPath, "status")
+	if err != nil {
+		// This is an actual execution error (not just non-zero exit code)
+		return fmt.Errorf("vault is not responding to commands: %w", err)
+	}
+
+	vi.logger.Debug("Vault status check completed",
+		zap.Int("exit_code", exitCode),
+		zap.String("output", output))
+
+	switch exitCode {
+	case 0:
+		vi.logger.Info("Vault is installed and unsealed")
+	case 2:
+		vi.logger.Info("Vault is installed and sealed (expected for new installation)")
+	default:
+		return fmt.Errorf("vault status returned unexpected exit code %d: %s", exitCode, output)
 	}
 
 	// Log success information
