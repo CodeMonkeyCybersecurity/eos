@@ -17,10 +17,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
@@ -541,23 +543,86 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 				zap.String("current_mode", fmt.Sprintf("%04o", existingInfo.Mode().Perm())))
 		}
 
-		// Create parent directory if it doesn't exist
-		if err := vi.createDirectory(dir.path, dir.mode); err != nil {
+		// Lookup vault user for atomic operations
+		vaultUser, err := user.Lookup(dir.owner)
+		if err != nil {
+			vi.logger.Error("Failed to lookup vault user",
+				zap.String("user", dir.owner),
+				zap.Error(err))
+			return fmt.Errorf("failed to lookup user %s: %w", dir.owner, err)
+		}
+
+		uid, err := strconv.Atoi(vaultUser.Uid)
+		if err != nil {
+			vi.logger.Error("Failed to parse UID",
+				zap.String("user", dir.owner),
+				zap.String("uid_string", vaultUser.Uid),
+				zap.Error(err))
+			return fmt.Errorf("failed to parse UID for user %s: %w", dir.owner, err)
+		}
+
+		gid, err := strconv.Atoi(vaultUser.Gid)
+		if err != nil {
+			vi.logger.Error("Failed to parse GID",
+				zap.String("user", dir.owner),
+				zap.String("gid_string", vaultUser.Gid),
+				zap.Error(err))
+			return fmt.Errorf("failed to parse GID for user %s: %w", dir.owner, err)
+		}
+
+		vi.logger.Debug("User lookup successful",
+			zap.String("user", dir.owner),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid))
+
+		// ATOMIC APPROACH: Create directory with exact permissions atomically
+		// Save current umask and set to 0 to ensure exact permissions
+		oldMask := syscall.Umask(0)
+		defer syscall.Umask(oldMask)
+
+		vi.logger.Debug("Creating directory with atomic approach",
+			zap.String("path", dir.path),
+			zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
+			zap.Int("old_umask", oldMask))
+
+		// Create directory with exact permissions (umask won't interfere)
+		if err := os.MkdirAll(dir.path, dir.mode); err != nil && !os.IsExist(err) {
+			syscall.Umask(oldMask) // Restore umask on error
+			vi.logger.Error("Failed to create parent directory",
+				zap.String("path", dir.path),
+				zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
+				zap.Error(err))
 			return fmt.Errorf("failed to create parent directory %s: %w", dir.path, err)
 		}
 
-		// Fix ownership (not recursive - just the directory itself)
-		if err := vi.runner.Run("chown", dir.owner+":"+dir.owner, dir.path); err != nil {
-			// Include current state in error for debugging
-			if currentStat, statErr := os.Stat(dir.path); statErr == nil {
-				return fmt.Errorf("failed to chown %s to %s:%s: %w (current mode: %04o)",
-					dir.path, dir.owner, dir.owner, err, currentStat.Mode().Perm())
-			}
+		// Restore umask immediately after directory creation
+		syscall.Umask(oldMask)
+
+		// ATOMIC APPROACH: Set ownership immediately using syscall (no shell command)
+		vi.logger.Debug("Setting ownership atomically via syscall",
+			zap.String("path", dir.path),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid))
+
+		if err := syscall.Chown(dir.path, uid, gid); err != nil {
+			vi.logger.Error("Failed to set ownership",
+				zap.String("path", dir.path),
+				zap.Int("uid", uid),
+				zap.Int("gid", gid),
+				zap.Error(err))
 			return fmt.Errorf("failed to set ownership for parent %s: %w", dir.path, err)
 		}
 
-		// Fix permissions (in case directory already existed with wrong permissions)
-		if err := vi.runner.Run("chmod", fmt.Sprintf("%04o", dir.mode), dir.path); err != nil {
+		// Ensure permissions are exactly correct (in case MkdirAll didn't set them perfectly)
+		vi.logger.Debug("Setting permissions atomically via syscall",
+			zap.String("path", dir.path),
+			zap.String("mode", fmt.Sprintf("%04o", dir.mode)))
+
+		if err := syscall.Chmod(dir.path, uint32(dir.mode)); err != nil {
+			vi.logger.Error("Failed to set permissions",
+				zap.String("path", dir.path),
+				zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
+				zap.Error(err))
 			return fmt.Errorf("failed to set permissions for parent %s: %w", dir.path, err)
 		}
 
@@ -899,21 +964,74 @@ VAULT_CLUSTER_ADDR=%s
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 
-	// Wait for Vault to be ready
-	vi.logger.Info("Waiting for Vault to be ready")
+	// Wait for Vault to be ready (with granular status checks)
+	vi.logger.Info("Waiting for Vault to become responsive")
 	ctx, cancel := context.WithTimeout(vi.rc.Ctx, 30*time.Second)
 	defer cancel()
 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
+	attempt := 0
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for Vault to be ready")
+			// Timeout occurred - provide detailed feedback
+			vi.logger.Warn("Timeout waiting for Vault, checking current state")
+
+			// Even though we timed out, check if vault is actually running
+			readiness := vi.checkVaultReadiness()
+
+			if readiness.ProcessRunning && readiness.PortListening {
+				// Vault IS running, just sealed/uninitialized (this is NORMAL)
+				vi.logger.Info("Vault process is running and listening",
+					zap.Bool("sealed", readiness.Sealed),
+					zap.Bool("initialized", readiness.Initialized))
+
+				if readiness.Sealed && !readiness.Initialized {
+					vi.logger.Info("Vault is sealed and uninitialized (this is expected for new installations)")
+					return nil // Success! This is the normal state for a fresh install
+				} else if readiness.Sealed {
+					vi.logger.Info("Vault is sealed but initialized (normal state after restart)")
+					return nil // Success! Just needs unsealing
+				}
+
+				// Process running but not responding correctly
+				vi.logger.Warn("Vault process is running but not responding as expected",
+					zap.String("details", readiness.Message))
+				return fmt.Errorf("vault is running but not responding properly: %s", readiness.Message)
+			}
+
+			// Process not running or not listening
+			vi.logger.Error("Vault failed to become ready",
+				zap.Bool("process_running", readiness.ProcessRunning),
+				zap.Bool("port_listening", readiness.PortListening),
+				zap.String("error", readiness.Message))
+			return fmt.Errorf("vault failed to start properly: %s", readiness.Message)
+
 		case <-ticker.C:
-			if vi.isVaultReady() {
-				vi.logger.Info("Vault is ready")
+			attempt++
+			readiness := vi.checkVaultReadiness()
+
+			vi.logger.Debug("Checking vault readiness",
+				zap.Int("attempt", attempt),
+				zap.Bool("process_running", readiness.ProcessRunning),
+				zap.Bool("port_listening", readiness.PortListening),
+				zap.Bool("responding", readiness.Responding),
+				zap.String("status", readiness.Message))
+
+			if readiness.Ready {
+				vi.logger.Info("Vault is ready",
+					zap.Bool("sealed", readiness.Sealed),
+					zap.Bool("initialized", readiness.Initialized))
+				return nil
+			}
+
+			// If vault is running and responding (even if sealed), that's good enough
+			if readiness.ProcessRunning && readiness.PortListening && readiness.Responding {
+				vi.logger.Info("Vault is responding",
+					zap.Bool("sealed", readiness.Sealed),
+					zap.Bool("initialized", readiness.Initialized))
 				return nil
 			}
 		}
@@ -962,19 +1080,95 @@ func (vi *VaultInstaller) verify() error {
 	return nil
 }
 
-// isVaultReady checks if Vault is ready to accept requests
-func (vi *VaultInstaller) isVaultReady() bool {
-	// Check if Vault process is responding
-	// Note: Vault may be sealed, but that's OK - we just want to know it's running
-	_, err := vi.runner.RunOutput(vi.config.BinaryPath, "status")
-	if err != nil {
-		// Exit code 2 means sealed, which is still "ready" for our purposes
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
-			return true
-		}
-		return false
+// VaultReadiness contains detailed readiness information
+type VaultReadiness struct {
+	Ready           bool   // Overall ready status
+	ProcessRunning  bool   // Is vault process running
+	PortListening   bool   // Is vault listening on port
+	Responding      bool   // Is vault responding to API calls
+	Sealed          bool   // Is vault sealed
+	Initialized     bool   // Is vault initialized
+	Message         string // Human-readable status message
+}
+
+// checkVaultReadiness performs comprehensive readiness checks
+func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
+	readiness := &VaultReadiness{}
+
+	// Check 1: Is vault process running?
+	cmd := exec.Command("pgrep", "-x", "vault")
+	if err := cmd.Run(); err == nil {
+		readiness.ProcessRunning = true
+	} else {
+		readiness.Message = "vault process not found"
+		return readiness
 	}
-	return true
+
+	// Check 2: Is vault listening on the port?
+	portCmd := exec.Command("sh", "-c", fmt.Sprintf("lsof -i :%d 2>/dev/null | grep -q vault || ss -tlnp 2>/dev/null | grep -q ':%d'", vi.config.Port, vi.config.Port))
+	if err := portCmd.Run(); err == nil {
+		readiness.PortListening = true
+	} else {
+		readiness.Message = "vault not listening on port"
+		return readiness
+	}
+
+	// Check 3: Is vault responding to status command?
+	statusOutput, statusErr := vi.runner.RunOutput(vi.config.BinaryPath, "status")
+
+	if statusErr != nil {
+		if exitErr, ok := statusErr.(*exec.ExitError); ok {
+			// Exit code 2 means sealed (this is NORMAL for new installs)
+			if exitErr.ExitCode() == 2 {
+				readiness.Responding = true
+				readiness.Sealed = true
+
+				// Parse output to check if initialized
+				if strings.Contains(statusOutput, "Initialized") {
+					if strings.Contains(statusOutput, "Initialized    true") ||
+					   strings.Contains(statusOutput, "Initialized: true") {
+						readiness.Initialized = true
+						readiness.Message = "vault is sealed but initialized (needs unsealing)"
+						readiness.Ready = true // Sealed + initialized = ready to unseal
+					} else {
+						readiness.Initialized = false
+						readiness.Message = "vault is sealed and uninitialized (needs 'vault operator init')"
+						readiness.Ready = true // Sealed + uninitialized = ready to initialize (normal for fresh install)
+					}
+				} else {
+					// Couldn't parse initialization status, but vault is responding
+					readiness.Message = "vault is responding but sealed"
+					readiness.Ready = true
+				}
+				return readiness
+			} else if exitErr.ExitCode() == 1 {
+				// Exit code 1 typically means vault is having issues
+				readiness.Responding = false
+				readiness.Message = fmt.Sprintf("vault returned error (exit code 1): %s", statusOutput)
+				return readiness
+			}
+		}
+
+		// Some other error
+		readiness.Responding = false
+		readiness.Message = fmt.Sprintf("vault status command failed: %v", statusErr)
+		return readiness
+	}
+
+	// Exit code 0 means vault is unsealed and ready
+	readiness.Responding = true
+	readiness.Sealed = false
+	readiness.Initialized = true
+	readiness.Ready = true
+	readiness.Message = "vault is unsealed and ready"
+
+	return readiness
+}
+
+// isVaultReady checks if Vault is ready to accept requests (simplified version)
+func (vi *VaultInstaller) isVaultReady() bool {
+	readiness := vi.checkVaultReadiness()
+	return readiness.Ready
 }
 
 // cleanExistingInstallation removes existing Vault installation
