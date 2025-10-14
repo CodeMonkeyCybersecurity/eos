@@ -42,21 +42,21 @@ WARNING: This will remove ALL Vault data including:
 BACKUP YOUR DATA before proceeding!
 
 EXAMPLES:
-  # Remove Vault with confirmation prompt
+  # Remove Vault (asks for confirmation)
   eos delete vault
 
-  # Remove Vault without confirmation (use with extreme caution)
-  eos delete vault --force
+  # Remove Vault without any confirmation prompts
+  eos delete vault --yes
 
 SAFETY:
-  By default, this command requires confirmation before proceeding.
-  Use --force only in non-production environments or when you're
-  absolutely certain you want to destroy all Vault data.`,
+  This command removes ALL Vault data permanently.
+  By default, it asks for a simple confirmation.
+  Use --yes to skip all prompts (use with caution).`,
 	RunE: eos_cli.Wrap(runDeleteVault),
 }
 
 var (
-	vaultForceDelete bool
+	vaultSkipConfirmation bool
 )
 
 func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -72,17 +72,18 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	}
 
 	logger.Info("Starting Vault removal process",
-		zap.Bool("force", vaultForceDelete),
+		zap.Bool("skip_confirmation", vaultSkipConfirmation),
 		zap.String("command", "delete vault"))
 
 	// Create uninstaller configuration
+	// Force is always true - we always do complete removal
 	logger.Debug("Creating uninstaller configuration",
-		zap.Bool("force", vaultForceDelete),
+		zap.Bool("skip_confirmation", vaultSkipConfirmation),
 		zap.Bool("remove_data", true),
 		zap.Bool("remove_user", true))
 
 	config := &vault.UninstallConfig{
-		Force:      vaultForceDelete,
+		Force:      true, // Always force complete removal
 		RemoveData: true,
 		RemoveUser: true,
 	}
@@ -117,9 +118,9 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return nil
 	}
 
-	// Confirmation prompt unless forced
-	if !vaultForceDelete {
-		logger.Debug("Force flag not set - prompting user for confirmation")
+	// Simple confirmation prompt unless --yes is used
+	if !vaultSkipConfirmation {
+		logger.Debug("Prompting user for confirmation")
 		if err := promptForConfirmation(rc, logger, state); err != nil {
 			if err.Error() == "user cancelled" {
 				logger.Info("Deletion cancelled by user")
@@ -130,7 +131,7 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		}
 		logger.Info("User confirmed deletion - proceeding")
 	} else {
-		logger.Info("Force flag set - skipping confirmation prompt")
+		logger.Info("--yes flag set - skipping confirmation prompt")
 	}
 
 	// Execute uninstallation (will use already-assessed state)
@@ -170,18 +171,12 @@ func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithC
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
 	logger.Info("terminal prompt: ")
 
-	prompt := `  WARNING: You are about to PERMANENTLY DELETE Vault and ALL its data!
+	prompt := `WARNING: This will PERMANENTLY DELETE Vault and ALL its data!
 
-This includes:
-- All secrets stored in Vault
-- Encryption keys (recovery will be IMPOSSIBLE)
-- TLS certificates
-- Configuration files
-- All Vault data directories
-
+This includes ALL secrets, encryption keys, TLS certificates, and configuration.
 This action CANNOT be undone!
 
-Are you absolutely sure you want to proceed? [y/N] `
+Continue? [y/N] `
 
 	logger.Info("terminal prompt: " + prompt)
 	logger.Debug("Waiting for user input (y/N)")
@@ -195,37 +190,16 @@ Are you absolutely sure you want to proceed? [y/N] `
 	logger.Debug("User response received", zap.String("response", response))
 
 	if response != "y" && response != "Y" {
-		logger.Info("Vault deletion cancelled by user at first prompt")
+		logger.Info("Vault deletion cancelled by user")
 		return fmt.Errorf("user cancelled")
 	}
 
-	logger.Debug("First confirmation accepted - requesting final confirmation")
-
-	// Double confirmation for safety
-	logger.Info("terminal prompt: Type 'DELETE' to confirm (this is your last chance): ")
-	logger.Debug("Waiting for DELETE confirmation")
-
-	confirmResponse, err := eos_io.ReadInput(rc)
-	if err != nil {
-		logger.Error("Failed to read confirmation input", zap.Error(err))
-		return fmt.Errorf("failed to read confirmation: %w", err)
-	}
-
-	logger.Debug("Final confirmation received", zap.String("response", confirmResponse))
-
-	if confirmResponse != "DELETE" {
-		logger.Info("Vault deletion cancelled - confirmation did not match 'DELETE'",
-			zap.String("expected", "DELETE"),
-			zap.String("received", confirmResponse))
-		return fmt.Errorf("user cancelled")
-	}
-
-	logger.Info("Both confirmations accepted - deletion authorized")
+	logger.Info("Confirmation accepted - deletion authorized")
 	return nil
 }
 
 func init() {
-	VaultCmd.Flags().BoolVarP(&vaultForceDelete, "force", "f", false, "Force deletion without confirmation (DANGEROUS)")
+	VaultCmd.Flags().BoolVarP(&vaultSkipConfirmation, "yes", "y", false, "Skip confirmation prompt (use with caution)")
 
 	// Register the command with the delete command
 	DeleteCmd.AddCommand(VaultCmd)
