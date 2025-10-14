@@ -646,7 +646,8 @@ func PortDiagnostic() *debug.Diagnostic {
 
 // HealthCheckDiagnostic performs HTTP health check
 func HealthCheckDiagnostic() *debug.Diagnostic {
-	return debug.NetworkCheck("HTTP Health Check", "http://127.0.0.1:8200/v1/sys/health", 5*time.Second)
+	healthURL := fmt.Sprintf("http://127.0.0.1:%d/v1/sys/health", shared.PortVault)
+	return debug.NetworkCheck("HTTP Health Check", healthURL, 5*time.Second)
 }
 
 // EnvironmentDiagnostic checks vault environment variables
