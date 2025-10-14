@@ -19,9 +19,38 @@ func VaultAddress() string {
 	return os.Getenv(shared.VaultAddrEnv)
 }
 
-// EnableVault now drives everything interactively.
+// EnableVault performs Vault initialization and enablement (Phases 5-15)
+//
+// Prerequisites: Call NewVaultInstaller().Install() first to complete Phases 1-4
+//
+// Complete Phase Breakdown:
+//   Phase 1-4: Handled by install.go (Install() method)
+//     Phase 1: Binary installation and user/directory creation
+//     Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, agent directories)
+//     Phase 3: TLS certificate generation
+//     Phase 4: Configuration file generation (vault.hcl)
+//
+//   Phase 5-15: Handled by this function (EnableVault)
+//     Phase 5: Service startup (happens in cmd/create/secrets.go before calling EnableVault)
+//     Phase 6a: Vault initialization (UnsealVault)
+//     Phase 6b: Vault unseal (UnsealVault)
+//     Phase 7: Root token verification (PhasePromptAndVerRootToken)
+//     Phase 7a: API client verification (GetRootClient)
+//     Phase 8: Health check (PhaseEnsureVaultHealthy)
+//     Phase 9a: KV v2 secrets engine (PhaseEnableKVv2)
+//     Phase 9b: Bootstrap secret verification (PhaseWriteBootstrapSecretAndRecheck)
+//     Phase 10a: Userpass authentication (PhaseEnableUserpass) - optional, interactive
+//     Phase 10b: AppRole authentication (PhaseEnableAppRole) - optional, interactive
+//     Phase 10c: Entity and alias creation (PhaseCreateEosEntity)
+//     Phase 11: Policy configuration (EnsurePolicy)
+//     Phase 12: Audit logging (EnableFileAudit)
+//     Phase 13: Multi-Factor Authentication (EnableMFAMethods) - optional, interactive
+//     Phase 14: Vault Agent service (PhaseEnableVaultAgent) - optional, interactive
+//     Phase 15: Comprehensive hardening (ComprehensiveHardening) - optional, interactive
+//
+// Interactive phases (10a, 10b, 13, 14, 15) prompt the user for confirmation.
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
-	log.Info(" Starting Vault enablement flow")
+	log.Info(" Starting Vault enablement flow (Phases 5-15)")
 
 	// Fall back to direct enablement
 	log.Info("Nomad not available, using direct enablement")
@@ -51,11 +80,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}{
 		{"verify root token", func() error { return PhasePromptAndVerRootToken(rc, client) }},
 		{"verify vault API client", func() error { _, err := GetRootClient(rc); return err }},
-		{"verify vault healthy", func() error {
-			// TODO: Implement a real health check if required.
-			otelzap.Ctx(rc.Ctx).Info("Vault health check not implemented yet — skipping")
-			return nil
-		}},
+		{"verify vault healthy (Phase 8)", func() error { return PhaseEnsureVaultHealthy(rc) }},
 	}
 	for _, step := range steps {
 		otelzap.Ctx(rc.Ctx).Info(fmt.Sprintf(" %s...", step.name))
@@ -133,17 +158,32 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		return logger.LogErrAndWrap(rc, "apply core secrets", err)
 	}
 
-	// Step 16: Optional root token revocation
-	if interaction.PromptYesNo(rc.Ctx, "Revoke root token for enhanced security? (Ensure alternative auth methods work first)", false) {
-		if err := revokeRootTokenSafely(rc, client); err != nil {
-			log.Warn("Root token revocation failed", zap.Error(err))
-			log.Info("terminal prompt: Root token revocation failed. You can revoke it later using 'eos secure vault --comprehensive'")
+	// Step 16: Optional Phase 15 - Comprehensive Hardening
+	if interaction.PromptYesNo(rc.Ctx, "Apply comprehensive security hardening (Phase 15)?", true) {
+		log.Info(" [Phase 15] Starting comprehensive hardening")
+		hardeningConfig := DefaultHardeningConfig()
+
+		// Ask user if they want to customize hardening
+		if interaction.PromptYesNo(rc.Ctx, "Use default hardening settings (recommended for production)?", true) {
+			log.Info(" Using default hardening configuration")
 		} else {
-			log.Info(" Root token revoked successfully")
-			log.Info("terminal prompt: Root token has been revoked. Use alternative authentication methods for future access.")
+			log.Info(" Skipping some aggressive hardening steps")
+			// Disable some more aggressive options if user wants to customize
+			hardeningConfig.RevokeRootToken = interaction.PromptYesNo(rc.Ctx, "Revoke root token? (Ensure alternative auth works first)", false)
+			hardeningConfig.DisableSwap = interaction.PromptYesNo(rc.Ctx, "Disable swap for security?", true)
+			hardeningConfig.ConfigureFirewall = interaction.PromptYesNo(rc.Ctx, "Configure firewall rules?", true)
+		}
+
+		if err := ComprehensiveHardening(rc, client, hardeningConfig); err != nil {
+			log.Warn("Comprehensive hardening failed (non-fatal)", zap.Error(err))
+			log.Info("terminal prompt: Some hardening steps failed. You can retry with: eos secure vault --comprehensive")
+		} else {
+			log.Info(" [Phase 15] Comprehensive hardening completed successfully")
+			log.Info("terminal prompt: Vault has been hardened for production use")
 		}
 	} else {
-		log.Info(" Root token kept active - remember to revoke it after setting up alternative auth")
+		log.Info("⏭️ [Phase 15] Hardening skipped by user")
+		log.Info("terminal prompt: IMPORTANT: Run 'eos secure vault --comprehensive' before production use")
 	}
 
 	log.Info(" Vault enablement process completed successfully")

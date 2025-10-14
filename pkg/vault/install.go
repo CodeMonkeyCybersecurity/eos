@@ -177,14 +177,26 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 	}
 }
 
-// Install performs the complete Vault installation
+// Install performs the complete Vault installation (Phases 1-4)
+//
+// This handles the base installation infrastructure. After Install() completes,
+// call EnableVault() to perform Phases 5-15 (initialization, auth, secrets, hardening).
+//
+// Phase Breakdown:
+//   Phase 1: Binary installation (via repository or direct download)
+//   Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, directories)
+//   Phase 3: TLS certificate generation
+//   Phase 4: Configuration file generation (vault.hcl)
+//
+// After this method completes, the Vault service is installed and ready to start,
+// but NOT initialized. Call EnableVault() for Phases 5-15.
 func (vi *VaultInstaller) Install() error {
-	vi.logger.Info("Starting Vault installation",
+	vi.logger.Info("Starting Vault installation (Phases 1-4)",
 		zap.String("version", vi.config.Version),
 		zap.String("storage_backend", vi.config.StorageBackend),
 		zap.Bool("use_repository", vi.config.UseRepository))
 
-	// Phase 1: ASSESS - Check if already installed
+	// Pre-Phase: ASSESS - Check if already installed
 	vi.progress.Update("[14%] Checking current Vault status")
 	shouldInstall, err := vi.assess()
 	if err != nil {
@@ -198,14 +210,14 @@ func (vi *VaultInstaller) Install() error {
 		return nil
 	}
 
-	// Phase 2: Prerequisites
+	// Pre-Phase: Validate prerequisites
 	vi.progress.Update("[28%] Validating prerequisites")
 	if err := vi.validatePrerequisites(); err != nil {
 		return fmt.Errorf("prerequisite validation failed: %w", err)
 	}
 
-	// Phase 3: INTERVENE - Install
-	vi.progress.Update("[42%] Installing Vault binary")
+	// Phase 1: Install Vault binary
+	vi.progress.Update("[42%] [Phase 1] Installing Vault binary")
 	if err := vi.installBinary(); err != nil {
 		return fmt.Errorf("binary installation failed: %w", err)
 	}
@@ -216,14 +228,14 @@ func (vi *VaultInstaller) Install() error {
 		vi.logger.Warn("Could not cleanup duplicate binaries (non-fatal)", zap.Error(err))
 	}
 
-	// Phase 4: User and directories
-	vi.progress.Update("[56%] Creating user and directories")
+	// Phase 1 (continued): Create vault user and directories
+	vi.progress.Update("[56%] [Phase 1] Creating user and directories")
 	if err := vi.setupUserAndDirectories(); err != nil {
 		return fmt.Errorf("user/directory setup failed: %w", err)
 	}
 
-	// Phase 5: Configure
-	vi.progress.Update("[70%] Configuring Vault")
+	// Phases 2-4: Configure (environment, TLS, config file)
+	vi.progress.Update("[70%] [Phases 2-4] Configuring Vault")
 	if err := vi.configure(); err != nil {
 		return fmt.Errorf("configuration failed: %w", err)
 	}
@@ -239,13 +251,13 @@ func (vi *VaultInstaller) Install() error {
 	}
 	vi.logger.Info(" Configuration validated successfully")
 
-	// Phase 6: Setup Service
+	// Post-Phase: Setup systemd service
 	vi.progress.Update("[84%] Setting up systemd service")
 	if err := vi.setupService(); err != nil {
 		return fmt.Errorf("service setup failed: %w", err)
 	}
 
-	// Phase 7: EVALUATE - Verify
+	// Post-Phase: EVALUATE - Verify installation
 	vi.progress.Update("[92%] Verifying installation")
 	if err := vi.verify(); err != nil {
 		return fmt.Errorf("verification failed: %w", err)
@@ -255,7 +267,7 @@ func (vi *VaultInstaller) Install() error {
 	vi.logger.Info("📋 Displaying security guidance")
 	DisplayPostInstallSecurityChecklist(vi.rc)
 
-	// Phase 8: Register with Consul (if available)
+	// Post-Phase: Register with Consul (if available)
 	vi.progress.Update("[100%] Registering with Consul")
 	if err := vi.registerWithConsul(); err != nil {
 		vi.logger.Warn("Failed to register with Consul (non-critical)",
@@ -263,7 +275,8 @@ func (vi *VaultInstaller) Install() error {
 		// Don't fail installation if Consul registration fails
 	}
 
-	vi.progress.Complete("Vault installation completed successfully")
+	vi.progress.Complete("Vault installation completed successfully (Phases 1-4 complete)")
+	vi.logger.Info("Next step: Call EnableVault() for Phases 5-15 (initialization, auth, secrets, hardening)")
 	return nil
 }
 
@@ -569,31 +582,27 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 			zap.Int("uid", uid),
 			zap.Int("gid", gid))
 
-		// ATOMIC APPROACH: Create directory with exact permissions atomically
-		// Save current umask and set to 0 to ensure exact permissions
-		oldMask := syscall.Umask(0)
-		defer syscall.Umask(oldMask)
+		// ATOMIC APPROACH: Create directory with restrictive permissions, then chown, then chmod
+		// NOTE: We don't use umask because it's process-global and racy in multi-threaded programs.
+		// Instead we use: create restrictive (0700) → chown → chmod to desired mode
+		restrictiveMode := os.FileMode(0700)
 
-		vi.logger.Debug("Creating directory with atomic approach",
+		vi.logger.Debug("Creating directory with restrictive→chown→chmod pattern",
 			zap.String("path", dir.path),
-			zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
-			zap.Int("old_umask", oldMask))
+			zap.String("initial_mode", fmt.Sprintf("%04o", restrictiveMode)),
+			zap.String("final_mode", fmt.Sprintf("%04o", dir.mode)))
 
-		// Create directory with exact permissions (umask won't interfere)
-		if err := os.MkdirAll(dir.path, dir.mode); err != nil && !os.IsExist(err) {
-			syscall.Umask(oldMask) // Restore umask on error
+		// Step 1: Create directory with restrictive permissions (0700)
+		if err := os.MkdirAll(dir.path, restrictiveMode); err != nil && !os.IsExist(err) {
 			vi.logger.Error("Failed to create parent directory",
 				zap.String("path", dir.path),
-				zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
+				zap.String("mode", fmt.Sprintf("%04o", restrictiveMode)),
 				zap.Error(err))
 			return fmt.Errorf("failed to create parent directory %s: %w", dir.path, err)
 		}
 
-		// Restore umask immediately after directory creation
-		syscall.Umask(oldMask)
-
-		// ATOMIC APPROACH: Set ownership immediately using syscall (no shell command)
-		vi.logger.Debug("Setting ownership atomically via syscall",
+		// Step 2: Set ownership BEFORE loosening permissions (security-critical order)
+		vi.logger.Debug("Setting ownership (step 2 of 3)",
 			zap.String("path", dir.path),
 			zap.Int("uid", uid),
 			zap.Int("gid", gid))
@@ -604,11 +613,12 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 				zap.Int("uid", uid),
 				zap.Int("gid", gid),
 				zap.Error(err))
-			return fmt.Errorf("failed to set ownership for parent %s: %w", dir.path, err)
+			return fmt.Errorf("failed to change ownership of %s to %s:%s: %w",
+				dir.path, dir.owner, dir.owner, err)
 		}
 
-		// Ensure permissions are exactly correct (in case MkdirAll didn't set them perfectly)
-		vi.logger.Debug("Setting permissions atomically via syscall",
+		// Step 3: Now set desired permissions (loosening from 0700 to target mode)
+		vi.logger.Debug("Setting final permissions (step 3 of 3)",
 			zap.String("path", dir.path),
 			zap.String("mode", fmt.Sprintf("%04o", dir.mode)))
 
@@ -617,7 +627,7 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 				zap.String("path", dir.path),
 				zap.String("mode", fmt.Sprintf("%04o", dir.mode)),
 				zap.Error(err))
-			return fmt.Errorf("failed to set permissions for parent %s: %w", dir.path, err)
+			return fmt.Errorf("failed to set permissions on %s: %w", dir.path, err)
 		}
 
 		// Verify permissions were set correctly
@@ -700,16 +710,31 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 	return nil
 }
 
-// configure sets up Vault configuration
+// configure sets up Vault configuration (Phases 2-4)
+//
+// Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, agent directories)
+// Phase 3: TLS certificate generation
+// Phase 4: Configuration file generation (vault.hcl)
 func (vi *VaultInstaller) configure() error {
-	vi.logger.Info("Configuring Vault")
+	vi.logger.Info("Configuring Vault (Phases 2-4)")
 
-	// Generate TLS certificates if TLS is enabled
+	// Phase 2: Set up Vault environment variables (VAULT_ADDR, VAULT_CACERT)
+	vi.logger.Info("[Phase 2] Setting up Vault environment variables")
+	if _, err := EnsureVaultEnv(vi.rc); err != nil {
+		vi.logger.Warn("Failed to set VAULT_ADDR (non-fatal)", zap.Error(err))
+		// Don't fail installation if env setup fails - user can set manually
+	}
+
+	// Phase 3: Generate TLS certificates if TLS is enabled
+	vi.logger.Info("[Phase 3] Generating TLS certificates")
 	if vi.config.TLSEnabled {
 		if err := vi.generateTLSCertificate(); err != nil {
 			return fmt.Errorf("failed to generate TLS certificate: %w", err)
 		}
 	}
+
+	// Phase 4: Generate Vault configuration file (vault.hcl)
+	vi.logger.Info("[Phase 4] Generating Vault configuration")
 
 	// Backup existing configuration if present
 	configPath := filepath.Join(vi.config.ConfigPath, "vault.hcl")
@@ -849,6 +874,14 @@ log_format = "json"
 
 	vi.logger.Info("Configuration validated successfully",
 		zap.String("method", validationResult.Method))
+
+	// Phase 2 (continued): Prepare Vault Agent environment
+	vi.logger.Info("Preparing Vault Agent environment")
+	if err := PrepareVaultAgentEnvironment(vi.rc); err != nil {
+		vi.logger.Warn("Failed to prepare Vault Agent environment (non-fatal)", zap.Error(err))
+		// Don't fail installation - agent setup happens in phase 14
+	}
+
 	return nil
 }
 

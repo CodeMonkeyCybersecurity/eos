@@ -219,9 +219,40 @@ func init() {
 	CreateVaultCmd.Flags().Bool("use-repository", false, "Install via APT repository")
 }
 
+// runCreateVaultNative performs complete Vault installation and enablement (Phases 1-15)
+//
+// This function orchestrates the complete Vault deployment lifecycle:
+//
+// Step 1: Phases 1-4 - Base Installation (vault.NewVaultInstaller().Install())
+//   Phase 1: Binary installation and user/directory creation
+//   Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, agent directories)
+//   Phase 3: TLS certificate generation
+//   Phase 4: Configuration file generation (vault.hcl)
+//
+// Step 2: Phase 5 - Service Startup (vault.StartVaultService())
+//   Starts systemd service and waits for Vault to be ready
+//
+// Step 3: Phases 6-15 - Initialization and Enablement (vault.EnableVault())
+//   Phase 6a: Vault initialization
+//   Phase 6b: Vault unseal
+//   Phase 7: Root token verification
+//   Phase 7a: API client verification
+//   Phase 8: Health check
+//   Phase 9a: KV v2 secrets engine
+//   Phase 9b: Bootstrap secret verification
+//   Phase 10a: Userpass authentication (optional, interactive)
+//   Phase 10b: AppRole authentication (optional, interactive)
+//   Phase 10c: Entity and alias creation
+//   Phase 11: Policy configuration
+//   Phase 12: Audit logging
+//   Phase 13: Multi-Factor Authentication (optional, interactive)
+//   Phase 14: Vault Agent service (optional, interactive)
+//   Phase 15: Comprehensive hardening (optional, interactive)
+//
+// Result: Fully configured, production-ready Vault installation
 func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Installing Vault using unified installer")
+	logger.Info("Installing Vault using unified installer (Phases 1-15)")
 
 	// Parse flags
 	config := &vault.InstallConfig{
@@ -237,20 +268,17 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		ForceReinstall:  cmd.Flag("force").Value.String() == "true",
 	}
 
-	// Create and run installer
+	// Phases 1-4: Base installation (binary, environment, TLS, config)
+	logger.Info("[Phases 1-4] Running base Vault installation")
 	installer := vault.NewVaultInstaller(rc, config)
 	if err := installer.Install(); err != nil {
 		return fmt.Errorf("vault installation failed: %w", err)
 	}
 
-	logger.Info("Vault installation completed successfully")
+	logger.Info(" Phases 1-4 completed successfully")
 
-	// Automatically enable Vault (initialization, auth setup, agent, etc.)
-	logger.Info(" Starting automatic Vault enablement")
-	logger.Info("This will initialize Vault, configure authentication, enable secrets engines, and set up the Vault Agent")
-
-	// Start Vault service (includes health check wait)
-	logger.Info("Starting Vault service and waiting for it to be ready...")
+	// Phase 5: Start Vault service and wait for readiness
+	logger.Info("[Phase 5] Starting Vault service and waiting for it to be ready...")
 	if err := vault.StartVaultService(rc); err != nil {
 		logger.Warn("Failed to start Vault service automatically", zap.Error(err))
 		logger.Info("terminal prompt: Please start Vault manually: sudo systemctl start vault")
@@ -258,7 +286,12 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		return nil
 	}
 
-	// Call EnableVault to perform full initialization and setup
+	logger.Info(" Phase 5 completed - Vault service is running")
+
+	// Phases 6-15: Initialization, authentication, secrets, hardening
+	logger.Info("[Phases 6-15] Starting Vault enablement (initialization, auth, secrets, hardening)")
+	logger.Info("This will initialize Vault, configure authentication, enable secrets engines, and set up the Vault Agent")
+
 	// Create a production logger for EnableVault
 	zapLogger, err := zap.NewProduction()
 	if err != nil {
@@ -281,72 +314,20 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 // Removed unused -based functions - now using native installer
 
-var CreateVaultEnhancedCmd = &cobra.Command{
-	Use:   "vault-enhanced",
-	Short: "Installs Vault with TLS, systemd service, and initial configuration ( orchestration supported)",
-	Long: `Install and configure HashiCorp Vault with comprehensive orchestration support.
-
-This enhanced version supports both direct execution and  orchestration,
-allowing for coordinated deployment across multiple nodes and integration
-with broader infrastructure automation.
-
-Direct Execution:
-  eos create vault-enhanced
-
-Features:
-  - TLS certificate generation and configuration
-  - Systemd service setup and management
-  - Initial Vault configuration and unsealing
-  - HA cluster support via  orchestration
-  - Integration with Consul backend when available
-  - Automated backup configuration
-  - Security hardening and best practices
-
-
-Environment Variables:
-  VAULT_VERSION: Specific Vault version to install
-  VAULT_CONFIG_PATH: Custom configuration directory
-  VAULT_DATA_PATH: Custom data directory`,
-
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := otelzap.Ctx(rc.Ctx)
-
-		// Use Nomad orchestration instead of
-		logger.Info("Using Nomad orchestration for Vault deployment")
-
-		logger.Info("Starting Vault creation with Nomad orchestration")
-
-		// Define direct execution function
-		directExec := func(rc *eos_io.RuntimeContext) error {
-			logger.Info("Executing direct Vault installation")
-			err := vault.OrchestrateVaultCreate(rc)
-			if err != nil {
-				return fmt.Errorf("vault create failed: %w", err)
-			}
-			return nil
-		}
-
-		//  operations removed - using Nomad orchestration
-
-		// Execute directly using Nomad orchestration
-		return directExec(rc)
-	}),
-}
-
-func init() {
-	// Nomad orchestration flags (replacing  orchestration)
-
-	// Add Vault-specific flags
-	CreateVaultEnhancedCmd.Flags().String("vault-version", "", "Specific Vault version to install")
-	CreateVaultEnhancedCmd.Flags().String("vault-config-path", "/etc/vault.d", "Vault configuration directory")
-	CreateVaultEnhancedCmd.Flags().String("vault-data-path", "/opt/vault/data", "Vault data directory")
-	CreateVaultEnhancedCmd.Flags().Bool("vault-ha", false, "Configure for high availability")
-	CreateVaultEnhancedCmd.Flags().String("vault-backend", "file", "Storage backend (file, consul, etc.)")
-	CreateVaultEnhancedCmd.Flags().String("vault-cluster-name", "vault-cluster", "Cluster name for HA setup")
-	CreateVaultEnhancedCmd.Flags().Int("vault-cluster-size", 3, "Number of nodes in HA cluster")
-	CreateVaultEnhancedCmd.Flags().Bool("vault-auto-unseal", false, "Configure auto-unseal with cloud providers")
-	CreateVaultEnhancedCmd.Flags().String("vault-tls-cert", "", "Path to TLS certificate")
-	CreateVaultEnhancedCmd.Flags().String("vault-tls-key", "", "Path to TLS private key")
-
-	CreateCmd.AddCommand(CreateVaultEnhancedCmd)
-}
+// DEPRECATED: vault-enhanced command removed
+// All functionality has been merged into the main 'eos create vault' command
+// which now includes all 15 phases:
+//   Phase 1-4: Installation, environment, TLS, config (via NewVaultInstaller)
+//   Phase 5: Start service
+//   Phase 6a-6b: Init and unseal
+//   Phase 7-7a: Root token verification and API client
+//   Phase 8: Health check (now implemented)
+//   Phase 9a-9b: KV v2 secrets engine
+//   Phase 10a-10c: Auth methods (userpass, approle, entity)
+//   Phase 11: Policies
+//   Phase 12: Audit logging
+//   Phase 13: MFA (optional, interactive)
+//   Phase 14: Vault Agent (optional, interactive)
+//   Phase 15: Comprehensive hardening (optional, interactive)
+//
+// Use: eos create vault

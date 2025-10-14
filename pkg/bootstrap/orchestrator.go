@@ -543,9 +543,17 @@ func phaseVault(rc *eos_io.RuntimeContext, opts *BootstrapOptions, info *Cluster
 	// Install Vault if not present
 	if !health.Enabled {
 		logger.Info("Vault not found, installing...")
-		// Intervene - Install Vault with error recovery
+		// Intervene - Install Vault with error recovery using new unified installer
 		logger.Info("Installing Vault")
-		if err := vault.PhaseInstallVault(rc); err != nil {
+		config := &vault.InstallConfig{
+			Version:        "latest",
+			UseRepository:  false, // Use binary download for bootstrap
+			UIEnabled:      true,
+			StorageBackend: "raft",
+			TLSEnabled:     true,
+		}
+		installer := vault.NewVaultInstaller(rc, config)
+		if err := installer.Install(); err != nil {
 			if strings.Contains(err.Error(), "permission denied") {
 				return fmt.Errorf("Vault installation requires sudo privileges: %w", err)
 			}

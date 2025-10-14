@@ -29,6 +29,20 @@ func (v ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", v.Field, v.Message)
 }
 
+// Is allows errors.Is() to match ValidationErrors by field name.
+// Two ValidationErrors are considered equal if they're for the same field.
+func (v ValidationError) Is(target error) bool {
+	t, ok := target.(ValidationError)
+	if !ok {
+		tPtr, ok := target.(*ValidationError)
+		if !ok {
+			return false
+		}
+		t = *tPtr
+	}
+	return v.Field == t.Field
+}
+
 // ConfigValidationResult contains configuration validation results
 type ConfigValidationResult struct {
 	Valid       bool     `json:"valid"`
