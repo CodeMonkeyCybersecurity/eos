@@ -165,7 +165,7 @@ func isVaultProcessRunning(rc *eos_io.RuntimeContext) bool {
 	}
 	for _, line := range strings.Split(string(out), "\n") {
 		// Check for vault process running as vault user
-		if strings.Contains(line, "vault") && strings.Contains(line, ":8200") {
+		if strings.Contains(line, "vault") && strings.Contains(line, ":"+shared.VaultDefaultPort) {
 			otelzap.Ctx(rc.Ctx).Debug(" Vault process detected in lsof output", zap.String("line", line))
 			return true
 		}

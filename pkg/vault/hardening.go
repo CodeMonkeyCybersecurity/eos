@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -366,8 +367,8 @@ func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 			{"ufw", "default", "deny", "incoming"},
 			{"ufw", "default", "allow", "outgoing"},
 			{"ufw", "allow", "ssh"},
-			{"ufw", "allow", "8200/tcp", "comment", "Vault API"},
-			{"ufw", "allow", "from", "127.0.0.1", "to", "any", "port", "8200"},
+			{"ufw", "allow", shared.VaultWebPortTCP, "comment", "Vault API"},
+			{"ufw", "allow", "from", "127.0.0.1", "to", "any", "port", shared.VaultDefaultPort},
 			{"ufw", "--force", "enable"},
 		}
 
@@ -380,8 +381,8 @@ func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 		// Configure firewalld rules
 		rules := [][]string{
 			{"firewall-cmd", "--permanent", "--add-service=ssh"},
-			{"firewall-cmd", "--permanent", "--add-port=8200/tcp"},
-			{"firewall-cmd", "--permanent", "--add-rich-rule=rule family=ipv4 source address=127.0.0.1 port protocol=tcp port=8200 accept"},
+			{"firewall-cmd", "--permanent", "--add-port=" + shared.VaultWebPortTCP},
+			{"firewall-cmd", "--permanent", "--add-rich-rule=rule family=ipv4 source address=127.0.0.1 port protocol=tcp port=" + shared.VaultDefaultPort + " accept"},
 			{"firewall-cmd", "--reload"},
 		}
 
@@ -673,7 +674,7 @@ Persistent=true
 WantedBy=timers.target
 `
 
-	serviceContent := `[Unit]
+	serviceContent := fmt.Sprintf(`[Unit]
 Description=Vault Backup Service
 Wants=vault.service
 After=vault.service
@@ -683,8 +684,8 @@ Type=oneshot
 User=vault
 Group=vault
 ExecStart=/usr/local/bin/vault-backup.sh
-Environment=VAULT_ADDR=https://127.0.0.1:8200
-`
+Environment=VAULT_ADDR=%s
+`, shared.VaultDefaultLocalAddr)
 
 	if err := os.WriteFile("/etc/systemd/system/vault-backup.timer", []byte(timerContent), 0644); err != nil {
 		log.Warn("Failed to write vault backup timer", zap.Error(err))
@@ -819,7 +820,7 @@ func restrictNetworkAccess(rc *eos_io.RuntimeContext) error {
 		{"iptables", "-A", "INPUT", "-i", "lo", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", "22", "-j", "ACCEPT"},
-		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", "8200", "-s", "127.0.0.1", "-j", "ACCEPT"},
+		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", shared.VaultDefaultPort, "-s", "127.0.0.1", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-j", "DROP"},
 	}
 

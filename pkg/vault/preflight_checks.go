@@ -196,18 +196,18 @@ func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 
 func checkNetworkRequirements(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if required ports are not already in use
-	requiredPorts := []int{8200, 8201} // Vault API and cluster ports
-	
+	requiredPorts := []int{shared.VaultDefaultPortInt, shared.VaultDefaultPortInt + 1} // Vault API (8179) and cluster (8180) ports
+
 	for _, port := range requiredPorts {
 		if isPortInUse(port) {
 			logger.Error("Required port is already in use",
 				zap.Int("port", port))
-			return eos_err.NewUserError("Port %d is already in use by another service.\n\nVault requires ports 8200 (API) and 8201 (cluster) to be available.\nPlease stop the conflicting service or choose different ports.", port)
+			return eos_err.NewUserError("Port %d is already in use by another service.\n\nVault requires ports %d (API) and %d (cluster) to be available.\nPlease stop the conflicting service or choose different ports.", port, shared.VaultDefaultPortInt, shared.VaultDefaultPortInt+1)
 		}
 	}
-	
+
 	logger.Debug("Network requirements check passed")
 	return nil
 }
