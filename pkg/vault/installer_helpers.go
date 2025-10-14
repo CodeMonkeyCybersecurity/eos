@@ -53,11 +53,15 @@ func (r *CommandRunner) RunWithRetries(name string, args []string, maxRetries in
 		return nil
 	}
 
+	// Build environment for vault commands with TLS skip for self-signed certs
+	env := r.buildVaultEnvironment()
+
 	var lastErr error
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		output, err := execute.Run(r.rc.Ctx, execute.Options{
 			Command: name,
 			Args:    args,
+			Env:     env, // Use our environment with VAULT_SKIP_VERIFY
 			Capture: true,
 		})
 
@@ -91,6 +95,29 @@ func (r *CommandRunner) RunWithRetries(name string, args []string, maxRetries in
 	return fmt.Errorf("command failed after %d attempts: %w", maxRetries, lastErr)
 }
 
+// buildVaultEnvironment creates an environment for vault commands with proper TLS handling
+func (r *CommandRunner) buildVaultEnvironment() []string {
+	// Start with parent environment
+	env := make([]string, 0, len(os.Environ())+2)
+
+	// Filter out VAULT_CACERT since it points to a non-existent file
+	for _, e := range os.Environ() {
+		if !strings.HasPrefix(e, "VAULT_CACERT=") {
+			env = append(env, e)
+		}
+	}
+
+	// Add VAULT_SKIP_VERIFY for self-signed certificates
+	// This is necessary because we generate self-signed TLS certificates during installation
+	env = append(env, "VAULT_SKIP_VERIFY=1")
+
+	r.logger.Debug("Built vault command environment",
+		zap.Bool("skip_verify", true),
+		zap.Bool("removed_cacert", true))
+
+	return env
+}
+
 // RunOutput executes a command and returns its output
 func (r *CommandRunner) RunOutput(name string, args ...string) (string, error) {
 	r.logger.Debug("Executing command for output",
@@ -104,9 +131,13 @@ func (r *CommandRunner) RunOutput(name string, args ...string) (string, error) {
 		return "", nil
 	}
 
+	// Build environment for vault commands with TLS skip for self-signed certs
+	env := r.buildVaultEnvironment()
+
 	output, err := execute.Run(r.rc.Ctx, execute.Options{
 		Command: name,
 		Args:    args,
+		Env:     env, // Use our environment with VAULT_SKIP_VERIFY
 		Capture: true,
 	})
 
