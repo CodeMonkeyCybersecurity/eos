@@ -1369,8 +1369,24 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 
 	// Check if certificate already exists
 	if vi.fileExists(certPath) && vi.fileExists(keyPath) {
-		vi.logger.Info("TLS certificate already exists, skipping generation")
-		return nil
+		if vi.config.ForceReinstall {
+			vi.logger.Info("Force flag set, regenerating TLS certificate")
+			// Backup existing certificate before regenerating
+			backupPath := certPath + ".backup." + time.Now().Format("20060102-150405")
+			if err := os.Rename(certPath, backupPath); err != nil {
+				vi.logger.Warn("Failed to backup existing certificate", zap.Error(err))
+			} else {
+				vi.logger.Info("Backed up existing certificate", zap.String("backup", backupPath))
+			}
+			if err := os.Rename(keyPath, keyPath+".backup."+time.Now().Format("20060102-150405")); err != nil {
+				vi.logger.Warn("Failed to backup existing key", zap.Error(err))
+			}
+			// Continue to regenerate
+		} else {
+			vi.logger.Info("TLS certificate already exists, skipping generation")
+			vi.logger.Info("Use --force flag to regenerate certificate with updated SANs")
+			return nil
+		}
 	}
 
 	// Get hostname for certificate
