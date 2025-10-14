@@ -70,6 +70,16 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 	// Shamir's Secret Sharing model and is only safe for development/testing
 	DisplaySecurityWarnings(rc, shared.VaultInitPath)
 
+	// CRITICAL: Prompt for key distribution immediately after initialization
+	// This ensures keys are properly distributed before continuing
+	otelzap.Ctx(rc.Ctx).Info(" Prompting for key distribution...")
+	if err := DistributeInitKeys(rc, initRes); err != nil {
+		otelzap.Ctx(rc.Ctx).Warn("Key distribution workflow failed (non-fatal)",
+			zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: ⚠️  Keys were saved but not distributed")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Run 'eos inspect vault-init' to retrieve keys later")
+	}
+
 	otelzap.Ctx(rc.Ctx).Warn("Vault is initialized but NOT unsealed yet")
 	otelzap.Ctx(rc.Ctx).Info(" Please run 'eos inspect vault-init' to retrieve your keys and token")
 	otelzap.Ctx(rc.Ctx).Info(" Then run 'eos enable vault' to unseal and secure Vault")

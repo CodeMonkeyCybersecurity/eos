@@ -192,40 +192,75 @@ func UnsealVaultWithKeys(rc *eos_io.RuntimeContext, unsealKeys []string, thresho
 	return nil
 }
 
-// GetRaftPeers retrieves the list of Raft peers in the cluster
+// GetRaftPeers retrieves the list of Raft peers in the cluster using the Vault SDK/API
 // Reference: vault-complete-specification-v1.0-raft-integrated.md - Multi-Node Raft Cluster
 func GetRaftPeers(rc *eos_io.RuntimeContext) ([]RaftPeer, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("Retrieving Raft peer list")
+	log.Info("Retrieving Raft peer list via API")
 
-	cmd := exec.CommandContext(rc.Ctx, "vault", "operator", "raft", "list-peers", "-format=json")
-	cmd.Env = append(cmd.Env,
-		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		"VAULT_SKIP_VERIFY=1")
-
-	output, err := cmd.CombinedOutput()
+	// Get Vault API client
+	client, err := GetVaultClient(rc)
 	if err != nil {
-		log.Error("Failed to list peers", zap.Error(err), zap.String("output", string(output)))
-		return nil, fmt.Errorf("vault operator raft list-peers failed: %w", err)
+		log.Error("Failed to create Vault client", zap.Error(err))
+		return nil, fmt.Errorf("create vault client: %w", err)
 	}
 
-	var result struct {
-		Data struct {
-			Config struct {
-				Servers []RaftPeer `json:"servers"`
-			} `json:"config"`
-		} `json:"data"`
+	// Use SDK to read Raft configuration
+	secret, err := client.Logical().Read("sys/storage/raft/configuration")
+	if err != nil {
+		log.Error("Failed to read Raft configuration via API", zap.Error(err))
+		return nil, fmt.Errorf("read raft config: %w", err)
 	}
 
-	if err := json.Unmarshal(output, &result); err != nil {
-		log.Error("Failed to parse peer list", zap.Error(err))
-		return nil, fmt.Errorf("parse peer list: %w", err)
+	// Parse peer information from response
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("no raft configuration found")
 	}
 
-	peers := result.Data.Config.Servers
-	log.Info("Retrieved Raft peers", zap.Int("peer_count", len(peers)))
+	// Extract servers from config
+	configData, ok := secret.Data["config"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid config format")
+	}
 
+	serversData, ok := configData["servers"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid servers format")
+	}
+
+	var peers []RaftPeer
+	for _, serverData := range serversData {
+		server, ok := serverData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		peer := RaftPeer{
+			NodeID:  getStringFromMap(server, "node_id"),
+			Address: getStringFromMap(server, "address"),
+			Leader:  getBoolFromMap(server, "leader"),
+			Voter:   getBoolFromMap(server, "voter"),
+		}
+		peers = append(peers, peer)
+	}
+
+	log.Info("Retrieved Raft peers via API", zap.Int("peer_count", len(peers)))
 	return peers, nil
+}
+
+// Helper functions for type assertions
+func getStringFromMap(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func getBoolFromMap(m map[string]interface{}, key string) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return false
 }
 
 // RaftPeer represents a node in the Raft cluster
