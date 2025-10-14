@@ -79,7 +79,7 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 	}
 
 	//  Print user instructions here
-	PrintNextSteps(rc.Ctx)
+	PrintNextSteps(rc)
 
 	return nil
 }

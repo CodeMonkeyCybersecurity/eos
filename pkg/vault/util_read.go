@@ -25,7 +25,7 @@ func Read(rc *eos_io.RuntimeContext, client *api.Client, name string, out any) e
 		}
 		otelzap.Ctx(rc.Ctx).Warn("Vault read failed, falling back", zap.String("path", name))
 	}
-	return readJSONFile(DiskPath(rc, name), out)
+	return readJSONFile(rc, DiskPath(rc, name), out)
 }
 
 // ReadVault reads a Vault secret at a path into a typed struct.
@@ -74,8 +74,8 @@ func ReadSecret(rc *eos_io.RuntimeContext, path string) (*api.Secret, error) {
 }
 
 // ReadFallbackJSON reads fallback JSON into any struct.
-func ReadFallbackJSON[T any](path string, target *T) error {
-	return readJSONFile(path, target)
+func ReadFallbackJSON[T any](rc *eos_io.RuntimeContext, path string, target *T) error {
+	return readJSONFile(rc, path, target)
 }
 
 // ReadVaultSecureData loads vault_init and userpass fallback files.
@@ -112,16 +112,16 @@ func ListUnder(rc *eos_io.RuntimeContext, path string) ([]string, error) {
 }
 
 // ReadVaultInitResult loads the Vault init result from disk.
-func ReadVaultInitResult() (*api.InitResponse, error) {
+func ReadVaultInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
 	var initRes api.InitResponse
-	return &initRes, readJSONFile(shared.VaultInitPath, &initRes)
+	return &initRes, readJSONFile(rc, shared.VaultInitPath, &initRes)
 }
 
 // InspectFromDisk reads and prints fallback test-data.
 func InspectFromDisk(rc *eos_io.RuntimeContext) error {
 	path := filepath.Join(shared.SecretsDir, shared.TestDataFilename)
 	var out map[string]interface{}
-	if err := readJSONFile(path, &out); err != nil {
+	if err := readJSONFile(rc, path, &out); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			otelzap.Ctx(rc.Ctx).Warn("Fallback test-data file not found", zap.String("path", path))
 			return fmt.Errorf("no test-data found in Vault or disk")
@@ -129,7 +129,7 @@ func InspectFromDisk(rc *eos_io.RuntimeContext) error {
 		otelzap.Ctx(rc.Ctx).Error("Failed to read fallback test-data", zap.Error(err))
 		return fmt.Errorf("disk fallback read failed: %w", err)
 	}
-	PrintData(rc.Ctx, out, "Disk", path)
+	PrintData(rc, out, "Disk", path)
 	otelzap.Ctx(rc.Ctx).Info(" Test-data read successfully from fallback")
 	return nil
 }
@@ -167,16 +167,31 @@ func unmarshalKVSecret(secret *api.KVSecret, path string, out any) error {
 	return json.Unmarshal([]byte(raw), out)
 }
 
-func readJSONFile(path string, out any) error {
+func readJSONFile(rc *eos_io.RuntimeContext, path string, out any) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Reading JSON file", zap.String("path", path))
+
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		logger.Error("Failed to read JSON file",
+			zap.String("path", path),
+			zap.Error(err))
+		return fmt.Errorf("failed to read %s: %w", path, err)
 	}
-	return json.Unmarshal(data, out)
+
+	if err := json.Unmarshal(data, out); err != nil {
+		logger.Error("Failed to unmarshal JSON file",
+			zap.String("path", path),
+			zap.Error(err))
+		return fmt.Errorf("failed to unmarshal JSON from %s: %w", path, err)
+	}
+
+	logger.Debug("Successfully read JSON file", zap.String("path", path))
+	return nil
 }
 
 func mustReadTypedFile[T any](rc *eos_io.RuntimeContext, path string, out *T) *T {
-	if err := ReadFallbackJSON(path, out); err != nil {
+	if err := ReadFallbackJSON(rc, path, out); err != nil {
 		otelzap.Ctx(rc.Ctx).Fatal("Failed to load fallback file", zap.String("path", path), zap.Error(err))
 	}
 	return out

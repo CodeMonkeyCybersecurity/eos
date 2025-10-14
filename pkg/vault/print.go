@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func PrintNextSteps(ctx context.Context) {
-	logger := otelzap.Ctx(ctx)
+func PrintNextSteps(rc *eos_io.RuntimeContext) {
+	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Displaying Vault next steps")
 
 	// Critical security warning - use stderr to ensure visibility
@@ -44,8 +45,8 @@ func PrintNextSteps(ctx context.Context) {
 		zap.String("next_command", "sudo eos enable vault"))
 }
 
-func PrintStorageSummary(ctx context.Context, primary string, primaryPath string, primaryResult string, fallback string, fallbackResult string) {
-	logger := otelzap.Ctx(ctx)
+func PrintStorageSummary(rc *eos_io.RuntimeContext, primary string, primaryPath string, primaryResult string, fallback string, fallbackResult string) {
+	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Displaying storage test summary",
 		zap.String("primary", primary),
 		zap.String("primary_result", primaryResult),
@@ -67,8 +68,8 @@ func PrintStorageSummary(ctx context.Context, primary string, primaryPath string
 	_, _ = fmt.Fprintln(os.Stderr, "")
 }
 
-func PrintData(ctx context.Context, data map[string]interface{}, source, path string) {
-	logger := otelzap.Ctx(ctx)
+func PrintData(rc *eos_io.RuntimeContext, data map[string]interface{}, source, path string) {
+	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Displaying test data contents",
 		zap.String("source", source),
 		zap.String("path", path),
@@ -80,11 +81,11 @@ func PrintData(ctx context.Context, data map[string]interface{}, source, path st
 	_, _ = fmt.Fprintln(os.Stderr, string(raw))
 	_, _ = fmt.Fprintln(os.Stderr, "")
 
-	PrintInspectSummary(ctx, source, path)
+	PrintInspectSummary(rc, source, path)
 }
 
-func PrintInspectSummary(ctx context.Context, source, path string) {
-	logger := otelzap.Ctx(ctx)
+func PrintInspectSummary(rc *eos_io.RuntimeContext, source, path string) {
+	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Displaying test data inspection summary",
 		zap.String("source", source),
 		zap.String("path", path))
@@ -105,49 +106,57 @@ func PrintInspectSummary(ctx context.Context, source, path string) {
 
 // Backward compatibility functions (deprecated)
 
-// PrintNextStepsCompat provides backward compatibility without context
-// DEPRECATED: Use PrintNextSteps with context
+// PrintNextStepsCompat provides backward compatibility without RuntimeContext
+// DEPRECATED: Use PrintNextSteps with RuntimeContext
 func PrintNextStepsCompat() {
-	PrintNextSteps(context.Background())
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintNextSteps(rc)
 }
 
-// PrintStorageSummaryCompat provides backward compatibility without context
-// DEPRECATED: Use PrintStorageSummary with context
+// PrintStorageSummaryCompat provides backward compatibility without RuntimeContext
+// DEPRECATED: Use PrintStorageSummary with RuntimeContext
 func PrintStorageSummaryCompat(primary string, primaryPath string, primaryResult string, fallback string, fallbackResult string) {
-	PrintStorageSummary(context.Background(), primary, primaryPath, primaryResult, fallback, fallbackResult)
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintStorageSummary(rc, primary, primaryPath, primaryResult, fallback, fallbackResult)
 }
 
-// PrintDataCompat provides backward compatibility without context
-// DEPRECATED: Use PrintData with context
+// PrintDataCompat provides backward compatibility without RuntimeContext
+// DEPRECATED: Use PrintData with RuntimeContext
 func PrintDataCompat(data map[string]interface{}, source, path string) {
-	PrintData(context.Background(), data, source, path)
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintData(rc, data, source, path)
 }
 
-// PrintInspectSummaryCompat provides backward compatibility without context
-// DEPRECATED: Use PrintInspectSummary with context
+// PrintInspectSummaryCompat provides backward compatibility without RuntimeContext
+// DEPRECATED: Use PrintInspectSummary with RuntimeContext
 func PrintInspectSummaryCompat(source, path string) {
-	PrintInspectSummary(context.Background(), source, path)
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintInspectSummary(rc, source, path)
 }
 
 // Original function name aliases for backward compatibility
 // These will be automatically used by existing callers
 
-// Original PrintNextSteps without context - DEPRECATED
+// Original PrintNextSteps without RuntimeContext - DEPRECATED
 func PrintNextStepsOriginal() {
-	PrintNextSteps(context.Background())
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintNextSteps(rc)
 }
 
-// Original PrintStorageSummary without context - DEPRECATED
+// Original PrintStorageSummary without RuntimeContext - DEPRECATED
 func PrintStorageSummaryOriginal(primary string, primaryPath string, primaryResult string, fallback string, fallbackResult string) {
-	PrintStorageSummary(context.Background(), primary, primaryPath, primaryResult, fallback, fallbackResult)
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintStorageSummary(rc, primary, primaryPath, primaryResult, fallback, fallbackResult)
 }
 
-// Original PrintData without context - DEPRECATED
+// Original PrintData without RuntimeContext - DEPRECATED
 func PrintDataOriginal(data map[string]interface{}, source, path string) {
-	PrintData(context.Background(), data, source, path)
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintData(rc, data, source, path)
 }
 
-// Original PrintInspectSummary without context - DEPRECATED
+// Original PrintInspectSummary without RuntimeContext - DEPRECATED
 func PrintInspectSummaryOriginal(source, path string) {
-	PrintInspectSummary(context.Background(), source, path)
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	PrintInspectSummary(rc, source, path)
 }

@@ -41,33 +41,50 @@ type RaftConfig struct {
 
 // GenerateAutoUnsealConfig generates the HCL configuration block for auto-unseal
 // Reference: vault-complete-specification-v1.0-raft-integrated.md Section: Auto-Unseal Setup
-func GenerateAutoUnsealConfig(config *InstallConfig) (string, error) {
+func GenerateAutoUnsealConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	if !config.AutoUnseal {
+		logger.Debug("Auto-unseal not enabled, skipping config generation")
 		return "", nil
 	}
-	
+
+	logger.Info("Generating auto-unseal configuration",
+		zap.String("type", config.AutoUnsealType))
+
 	switch strings.ToLower(config.AutoUnsealType) {
 	case "awskms", "aws":
-		return generateAWSKMSConfig(config)
+		return generateAWSKMSConfig(rc, config)
 	case "azurekeyvault", "azure":
-		return generateAzureKeyVaultConfig(config)
+		return generateAzureKeyVaultConfig(rc, config)
 	case "gcpckms", "gcp":
-		return generateGCPCKMSConfig(config)
+		return generateGCPCKMSConfig(rc, config)
 	default:
+		logger.Error("Unsupported auto-unseal type",
+			zap.String("type", config.AutoUnsealType),
+			zap.Strings("supported", []string{"awskms", "azurekeyvault", "gcpckms"}))
 		return "", fmt.Errorf("unsupported auto-unseal type: %s (supported: awskms, azurekeyvault, gcpckms)", config.AutoUnsealType)
 	}
 }
 
 // generateAWSKMSConfig generates AWS KMS auto-unseal configuration
 // Reference: vault-complete-specification-v1.0-raft-integrated.md - AWS KMS Auto-Unseal
-func generateAWSKMSConfig(config *InstallConfig) (string, error) {
+func generateAWSKMSConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	if config.KMSKeyID == "" {
+		logger.Error("AWS KMS auto-unseal configuration incomplete", zap.String("missing", "KMSKeyID"))
 		return "", fmt.Errorf("AWS KMS auto-unseal requires KMSKeyID")
 	}
 	if config.KMSRegion == "" {
 		config.KMSRegion = "ap-southeast-2" // Default to Australia
+		logger.Debug("Using default AWS region", zap.String("region", config.KMSRegion))
 	}
-	
+
+	logger.Info("Generated AWS KMS auto-unseal config",
+		zap.String("region", config.KMSRegion),
+		zap.String("kms_key_id", config.KMSKeyID))
+
 	return fmt.Sprintf(`seal "awskms" {
   region     = "%s"
   kms_key_id = "%s"
@@ -76,60 +93,78 @@ func generateAWSKMSConfig(config *InstallConfig) (string, error) {
 
 // generateAzureKeyVaultConfig generates Azure Key Vault auto-unseal configuration
 // Reference: vault-complete-specification-v1.0-raft-integrated.md - Azure Key Vault Auto-Unseal
-func generateAzureKeyVaultConfig(config *InstallConfig) (string, error) {
-	if config.AzureTenantID == "" {
-		return "", fmt.Errorf("Azure Key Vault auto-unseal requires AzureTenantID")
+func generateAzureKeyVaultConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	requiredFields := map[string]string{
+		"AzureTenantID":     config.AzureTenantID,
+		"AzureClientID":     config.AzureClientID,
+		"AzureClientSecret": config.AzureClientSecret,
+		"AzureVaultName":    config.AzureVaultName,
+		"AzureKeyName":      config.AzureKeyName,
 	}
-	if config.AzureClientID == "" {
-		return "", fmt.Errorf("Azure Key Vault auto-unseal requires AzureClientID")
+
+	for field, value := range requiredFields {
+		if value == "" {
+			logger.Error("Azure Key Vault auto-unseal configuration incomplete", zap.String("missing", field))
+			return "", fmt.Errorf("Azure Key Vault auto-unseal requires %s", field)
+		}
 	}
-	if config.AzureClientSecret == "" {
-		return "", fmt.Errorf("Azure Key Vault auto-unseal requires AzureClientSecret")
-	}
-	if config.AzureVaultName == "" {
-		return "", fmt.Errorf("Azure Key Vault auto-unseal requires AzureVaultName")
-	}
-	if config.AzureKeyName == "" {
-		return "", fmt.Errorf("Azure Key Vault auto-unseal requires AzureKeyName")
-	}
-	
+
+	logger.Info("Generated Azure Key Vault auto-unseal config",
+		zap.String("tenant_id", config.AzureTenantID),
+		zap.String("vault_name", config.AzureVaultName),
+		zap.String("key_name", config.AzureKeyName))
+
 	return fmt.Sprintf(`seal "azurekeyvault" {
   tenant_id      = "%s"
   client_id      = "%s"
   client_secret  = "%s"
   vault_name     = "%s"
   key_name       = "%s"
-}`, config.AzureTenantID, config.AzureClientID, config.AzureClientSecret, 
+}`, config.AzureTenantID, config.AzureClientID, config.AzureClientSecret,
 	config.AzureVaultName, config.AzureKeyName), nil
 }
 
 // generateGCPCKMSConfig generates GCP Cloud KMS auto-unseal configuration
 // Reference: vault-complete-specification-v1.0-raft-integrated.md - GCP Cloud KMS Auto-Unseal
-func generateGCPCKMSConfig(config *InstallConfig) (string, error) {
+func generateGCPCKMSConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	if config.GCPProject == "" {
+		logger.Error("GCP Cloud KMS auto-unseal configuration incomplete", zap.String("missing", "GCPProject"))
 		return "", fmt.Errorf("GCP Cloud KMS auto-unseal requires GCPProject")
 	}
 	if config.GCPLocation == "" {
 		config.GCPLocation = "australia-southeast1" // Default to Australia
+		logger.Debug("Using default GCP location", zap.String("location", config.GCPLocation))
 	}
 	if config.GCPKeyRing == "" {
+		logger.Error("GCP Cloud KMS auto-unseal configuration incomplete", zap.String("missing", "GCPKeyRing"))
 		return "", fmt.Errorf("GCP Cloud KMS auto-unseal requires GCPKeyRing")
 	}
 	if config.GCPCryptoKey == "" {
+		logger.Error("GCP Cloud KMS auto-unseal configuration incomplete", zap.String("missing", "GCPCryptoKey"))
 		return "", fmt.Errorf("GCP Cloud KMS auto-unseal requires GCPCryptoKey")
 	}
-	
+
 	credentialsLine := ""
 	if config.GCPCredentials != "" {
 		credentialsLine = fmt.Sprintf("\n  credentials = \"%s\"", config.GCPCredentials)
 	}
-	
+
+	logger.Info("Generated GCP Cloud KMS auto-unseal config",
+		zap.String("project", config.GCPProject),
+		zap.String("location", config.GCPLocation),
+		zap.String("key_ring", config.GCPKeyRing),
+		zap.String("crypto_key", config.GCPCryptoKey))
+
 	return fmt.Sprintf(`seal "gcpckms" {
   project     = "%s"
   region      = "%s"
   key_ring    = "%s"
   crypto_key  = "%s"%s
-}`, config.GCPProject, config.GCPLocation, config.GCPKeyRing, 
+}`, config.GCPProject, config.GCPLocation, config.GCPKeyRing,
 	config.GCPCryptoKey, credentialsLine), nil
 }
 
@@ -160,7 +195,7 @@ func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string,
 	autoUnsealConfig := ""
 	if config.AutoUnseal {
 		var err error
-		autoUnsealConfig, err = GenerateAutoUnsealConfig(config)
+		autoUnsealConfig, err = GenerateAutoUnsealConfig(rc, config)
 		if err != nil {
 			log.Error("Failed to generate auto-unseal configuration", zap.Error(err))
 			return "", fmt.Errorf("generate auto-unseal config: %w", err)

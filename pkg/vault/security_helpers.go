@@ -388,14 +388,40 @@ func SecureZeroCredential(data []byte) {
 }
 
 // SecureCredentialRead reads a credential file with secure handling
-func SecureCredentialRead(credentialPath string) ([]byte, error) {
+func SecureCredentialRead(rc *eos_io.RuntimeContext, credentialPath string) ([]byte, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Reading credential file securely", zap.String("path", credentialPath))
+
+	// Check file permissions first
+	info, err := os.Stat(credentialPath)
+	if err != nil {
+		logger.Error("Credential file not found",
+			zap.String("path", credentialPath),
+			zap.Error(err))
+		return nil, fmt.Errorf("credential file not found: %w", err)
+	}
+
+	// Warn if permissions are too permissive
+	if info.Mode().Perm() != 0600 {
+		logger.Warn("Credential file has insecure permissions",
+			zap.String("path", credentialPath),
+			zap.String("permissions", info.Mode().Perm().String()),
+			zap.String("expected", "0600"))
+	}
+
 	data, err := os.ReadFile(credentialPath)
 	if err != nil {
+		logger.Error("Failed to read credential file",
+			zap.String("path", credentialPath),
+			zap.Error(err))
 		return nil, fmt.Errorf("failed to read credential file: %w", err)
 	}
 
 	// Remove any trailing whitespace that might have been added
 	data = []byte(strings.TrimSpace(string(data)))
 
+	logger.Info("Successfully read credential file",
+		zap.String("path", credentialPath),
+		zap.Int("size_bytes", len(data)))
 	return data, nil
 }

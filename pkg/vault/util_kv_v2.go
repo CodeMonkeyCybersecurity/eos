@@ -51,7 +51,7 @@ func DeployAndStoreSecrets(rc *eos_io.RuntimeContext, client *api.Client, path s
 		data[k] = v
 	}
 
-	if err := WriteSecret(client, path, data); err != nil {
+	if err := WriteSecret(rc, client, path, data); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to write secrets to Vault", zap.String("path", path), zap.Error(err))
 		return err
 	}

@@ -116,7 +116,7 @@ func tryRootToken(rc *eos_io.RuntimeContext, _ *api.Client) (string, error) {
 
 func LoadOrPromptInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
 	var res api.InitResponse
-	if err := ReadFallbackJSON(shared.VaultInitPath, &res); err != nil {
+	if err := ReadFallbackJSON(rc, shared.VaultInitPath, &res); err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("Fallback file missing, prompting user", zap.Error(err))
 		return PromptForInitResult(rc)
 	}

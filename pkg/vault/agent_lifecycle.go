@@ -99,7 +99,7 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 	log.Info(" Verifying Vault Agent prerequisites")
 
 	// Check Vault is accessible
-	if IsVaultSealed(client) {
+	if IsVaultSealed(rc, client) {
 		log.Error(" Vault is sealed - cannot configure agent")
 		return cerr.New("Vault is sealed - cannot configure agent")
 	}

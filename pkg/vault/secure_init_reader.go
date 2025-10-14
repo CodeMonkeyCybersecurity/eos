@@ -365,7 +365,7 @@ func getSecurityStatus(rc *eos_io.RuntimeContext) (*SecurityStatusInfo, error) {
 	}
 
 	// Check if Vault is accessible
-	if IsVaultSealed(client) {
+	if IsVaultSealed(rc, client) {
 		return status, nil
 	}
 

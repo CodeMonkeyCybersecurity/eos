@@ -98,7 +98,7 @@ func TryLoadUnsealKeysFromFallback(rc *eos_io.RuntimeContext) (*api.InitResponse
 	otelzap.Ctx(rc.Ctx).Info(" Attempting fallback unseal using init file", zap.String("path", path))
 	initRes := new(api.InitResponse)
 
-	if err := ReadFallbackJSON(path, initRes); err != nil {
+	if err := ReadFallbackJSON(rc, path, initRes); err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("Failed to read fallback file", zap.Error(err))
 		return nil, fmt.Errorf("failed to read vault init fallback file: %w", err)
 	}

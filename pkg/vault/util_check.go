@@ -42,7 +42,7 @@ func Check(rc *eos_io.RuntimeContext, client *api.Client, storedHashes []string,
 		return failReport(rc, report, errMsg)
 	}
 
-	if !isInstalled() {
+	if !isInstalled(rc) {
 		return failReport(rc, report, "Vault CLI binary not found in PATH")
 	}
 	report.Installed = true
@@ -55,7 +55,7 @@ func Check(rc *eos_io.RuntimeContext, client *api.Client, storedHashes []string,
 		client = c
 	}
 
-	initStatus, err := IsVaultInitialized(client)
+	initStatus, err := IsVaultInitialized(rc, client)
 	if err != nil {
 		errMsg := fmt.Sprintf("Init check error: %v", err)
 		span.RecordError(err)
@@ -63,7 +63,7 @@ func Check(rc *eos_io.RuntimeContext, client *api.Client, storedHashes []string,
 		return failReport(rc, report, errMsg)
 	}
 	report.Initialized = initStatus
-	report.Sealed = IsVaultSealed(client)
+	report.Sealed = IsVaultSealed(rc, client)
 
 	if report.Sealed {
 		report.Notes = append(report.Notes, "Vault is sealed")
@@ -92,19 +92,47 @@ func verifyVaultSecrets(rc *eos_io.RuntimeContext, storedHashes []string, hashed
 		crypto.HashString(root) == hashedRoot
 }
 
-func isInstalled() bool {
-	_, err := exec.LookPath("vault")
-	return err == nil
+func isInstalled(rc *eos_io.RuntimeContext) bool {
+	logger := otelzap.Ctx(rc.Ctx)
+	path, err := exec.LookPath("vault")
+	if err != nil {
+		logger.Debug("Vault binary not found in PATH", zap.Error(err))
+		return false
+	}
+	logger.Debug("Vault binary found", zap.String("path", path))
+	return true
 }
 
-func IsVaultInitialized(client *api.Client) (bool, error) {
+func IsVaultInitialized(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault initialization status")
+
 	status, err := client.Sys().Health()
-	return err == nil && status.Initialized, err
+	if err != nil {
+		logger.Warn("Failed to check Vault health", zap.Error(err))
+		return false, err
+	}
+
+	logger.Debug("Vault initialization status checked",
+		zap.Bool("initialized", status.Initialized),
+		zap.Bool("sealed", status.Sealed))
+	return status.Initialized, nil
 }
 
-func IsVaultSealed(client *api.Client) bool {
+func IsVaultSealed(rc *eos_io.RuntimeContext, client *api.Client) bool {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault seal status")
+
 	status, err := client.Sys().Health()
-	return err == nil && status.Sealed
+	if err != nil {
+		logger.Warn("Failed to check Vault health", zap.Error(err))
+		return true // Assume sealed if we can't check
+	}
+
+	logger.Debug("Vault seal status checked",
+		zap.Bool("sealed", status.Sealed),
+		zap.Bool("initialized", status.Initialized))
+	return status.Sealed
 }
 
 func IsAlreadyInitialized(err error) bool {
@@ -137,10 +165,25 @@ func ListVault(rc *eos_io.RuntimeContext, path string) ([]string, error) {
 	return keys, nil
 }
 
-func CheckVaultTokenFile() error {
-	if _, err := os.Stat(shared.AgentToken); os.IsNotExist(err) {
+func CheckVaultTokenFile(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault token file", zap.String("path", shared.AgentToken))
+
+	info, err := os.Stat(shared.AgentToken)
+	if os.IsNotExist(err) {
+		logger.Error("Vault agent token file missing", zap.String("path", shared.AgentToken))
 		return cerr.Newf("vault agent token file missing: %s", shared.AgentToken)
 	}
+	if err != nil {
+		logger.Error("Failed to stat Vault token file",
+			zap.String("path", shared.AgentToken),
+			zap.Error(err))
+		return cerr.Wrapf(err, "failed to check token file %s", shared.AgentToken)
+	}
+
+	logger.Debug("Vault token file exists",
+		zap.String("path", shared.AgentToken),
+		zap.String("permissions", info.Mode().String()))
 	return nil
 }
 
@@ -241,6 +284,18 @@ func FindNextAvailableKVv2Path(rc *eos_io.RuntimeContext, client *api.Client, mo
 	return fmt.Sprintf("%s/%s", baseDir, nextLeaf), nil
 }
 
-func CheckVaultAgentService() error {
-	return exec.Command("systemctl", "is-active", "--quiet", shared.VaultAgentService).Run()
+func CheckVaultAgentService(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault Agent service status", zap.String("service", shared.VaultAgentService))
+
+	cmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", "--quiet", shared.VaultAgentService)
+	if err := cmd.Run(); err != nil {
+		logger.Warn("Vault Agent service is not active",
+			zap.String("service", shared.VaultAgentService),
+			zap.Error(err))
+		return fmt.Errorf("vault agent service %s is not active: %w", shared.VaultAgentService, err)
+	}
+
+	logger.Debug("Vault Agent service is active", zap.String("service", shared.VaultAgentService))
+	return nil
 }
