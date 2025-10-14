@@ -1139,12 +1139,44 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 	}
 
 	// Check 3: Is vault responding to status command?
-	statusOutput, statusErr := vi.runner.RunOutput(vi.config.BinaryPath, "status")
+	// For self-signed TLS certificates, we need to skip verification during health checks
+	vaultAddr := fmt.Sprintf("https://127.0.0.1:%d", vi.config.Port)
+
+	vi.logger.Debug("Running vault status health check",
+		zap.String("binary_path", vi.config.BinaryPath),
+		zap.String("vault_addr", vaultAddr),
+		zap.Bool("tls_enabled", vi.config.TLSEnabled),
+		zap.String("skip_verify", "true"))
+
+	statusCmd := exec.CommandContext(vi.rc.Ctx, vi.config.BinaryPath, "status")
+	statusCmd.Env = append(os.Environ(),
+		"VAULT_SKIP_VERIFY=1", // Skip TLS verification for self-signed certs
+		fmt.Sprintf("VAULT_ADDR=%s", vaultAddr),
+	)
+	statusOutputBytes, statusErr := statusCmd.CombinedOutput()
+	statusOutput := string(statusOutputBytes)
+
+	vi.logger.Debug("Vault status command completed",
+		zap.Bool("has_error", statusErr != nil),
+		zap.Int("output_length", len(statusOutput)),
+		zap.String("output_preview", func() string {
+			if len(statusOutput) > 200 {
+				return statusOutput[:200] + "..."
+			}
+			return statusOutput
+		}()))
 
 	if statusErr != nil {
 		if exitErr, ok := statusErr.(*exec.ExitError); ok {
+			exitCode := exitErr.ExitCode()
+			vi.logger.Debug("Vault status returned non-zero exit code",
+				zap.Int("exit_code", exitCode),
+				zap.String("stderr", string(exitErr.Stderr)))
+
 			// Exit code 2 means sealed (this is NORMAL for new installs)
-			if exitErr.ExitCode() == 2 {
+			if exitCode == 2 {
+				vi.logger.Info("Vault is sealed (normal for new installations)",
+					zap.Int("exit_code", exitCode))
 				readiness.Responding = true
 				readiness.Sealed = true
 
@@ -1155,26 +1187,43 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 						readiness.Initialized = true
 						readiness.Message = "vault is sealed but initialized (needs unsealing)"
 						readiness.Ready = true // Sealed + initialized = ready to unseal
+						vi.logger.Info("Vault is sealed but initialized - ready for unsealing")
 					} else {
 						readiness.Initialized = false
 						readiness.Message = "vault is sealed and uninitialized (needs 'vault operator init')"
 						readiness.Ready = true // Sealed + uninitialized = ready to initialize (normal for fresh install)
+						vi.logger.Info("Vault is sealed and uninitialized - ready for init")
 					}
 				} else {
 					// Couldn't parse initialization status, but vault is responding
 					readiness.Message = "vault is responding but sealed"
 					readiness.Ready = true
+					vi.logger.Warn("Could not parse initialization status from vault output")
 				}
 				return readiness
-			} else if exitErr.ExitCode() == 1 {
-				// Exit code 1 typically means vault is having issues
+			} else if exitCode == 1 {
+				// Exit code 1 typically means vault is having issues or TLS problems
+				vi.logger.Error("Vault status returned exit code 1",
+					zap.Int("exit_code", exitCode),
+					zap.String("output", statusOutput))
 				readiness.Responding = false
 				readiness.Message = fmt.Sprintf("vault returned error (exit code 1): %s", statusOutput)
+				return readiness
+			} else {
+				// Unexpected exit code
+				vi.logger.Error("Vault status returned unexpected exit code",
+					zap.Int("exit_code", exitCode),
+					zap.String("output", statusOutput))
+				readiness.Responding = false
+				readiness.Message = fmt.Sprintf("vault returned unexpected exit code %d: %s", exitCode, statusOutput)
 				return readiness
 			}
 		}
 
-		// Some other error
+		// Not an ExitError - something else went wrong
+		vi.logger.Error("Vault status command failed with non-exit error",
+			zap.Error(statusErr),
+			zap.String("error_type", fmt.Sprintf("%T", statusErr)))
 		readiness.Responding = false
 		readiness.Message = fmt.Sprintf("vault status command failed: %v", statusErr)
 		return readiness
