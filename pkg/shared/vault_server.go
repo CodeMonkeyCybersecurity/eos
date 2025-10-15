@@ -34,9 +34,11 @@ const (
 	VaultDataPath             = VaultDir + "data/"
 	VaultLogsPath             = VaultDir + "logs/"
 	VaultAuditLogPath         = VaultLogsPath + "vault_audit.log"
-	TLSDir                    = VaultDir + "tls/"
-	TLSKey                    = TLSDir + "tls.key"
-	TLSCrt                    = TLSDir + "tls.crt"
+	// CRITICAL FIX: TLS certs are created by install.go at /etc/vault.d/tls/, not /opt/vault/tls/
+	// This mismatch was causing "source certificate not found" errors in Phase 13 (agent config)
+	TLSDir                    = "/etc/vault.d/tls/"
+	TLSKey                    = TLSDir + "vault.key"
+	TLSCrt                    = TLSDir + "vault.crt"
 	VaultConfigDirDebian      = "/etc/vault.d"
 	VaultConfigPath           = "/etc/vault.d/vault.hcl"
 	VaultBinaryPath           = "/usr/bin/vault"

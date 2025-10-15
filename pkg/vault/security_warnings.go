@@ -311,8 +311,8 @@ func ValidateSecurityPosture(rc *eos_io.RuntimeContext) ([]string, []string) {
 	}
 
 	// Check 2: TLS cert/key should exist
-	tlsCertPath := "/opt/vault/tls/vault.crt"
-	tlsKeyPath := "/opt/vault/tls/vault.key"
+	tlsCertPath := shared.TLSCrt
+	tlsKeyPath := shared.TLSKey
 	if _, err := os.Stat(tlsCertPath); err == nil {
 		passed = append(passed, "TLS certificate exists")
 	} else {

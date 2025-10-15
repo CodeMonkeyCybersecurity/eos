@@ -200,8 +200,8 @@ func repairFilePermissions(rc *eos_io.RuntimeContext, dryRun bool) (int, int, er
 		expectedPerm uint32
 		description  string
 	}{
-		{"/opt/vault/tls/vault.crt", 0644, "TLS certificate"},
-		{"/opt/vault/tls/vault.key", 0600, "TLS private key"},
+		{shared.TLSCrt, 0644, "TLS certificate"},
+		{shared.TLSKey, 0600, "TLS private key"},
 		{shared.VaultConfigPath, 0640, "Vault configuration"},
 		{shared.VaultDataPath, 0750, "Vault data directory"},
 		{"/var/log/vault", 0750, "Vault log directory"},
