@@ -65,6 +65,7 @@ const (
 	PortPenpotBackend  = 8461 // Penpot backend API (not 6060)
 	PortPenpotExporter = 8467 // Penpot exporter (not 6061)
 	PortOpenWebUI      = 8501 // Open WebUI (not 3000)
+	PortBionicGPT      = 8513 // BionicGPT multi-tenant LLM platform (not 3000)
 
 	// Well-known ports that should remain standard
 	PortHTTP        = 80   // Standard HTTP
@@ -78,7 +79,7 @@ const (
 	PortIMAPSSL     = 993  // Standard IMAPS
 	PortPOP3SSL     = 995  // Standard POP3S
 	
-	// Next available primes: 8501, 8513, 8521, 8527, 8537, 8539, 8543, 8563...
+	// Next available primes: 8521, 8527, 8537, 8539, 8543, 8563...
 
 	// Legacy ports to be migrated
 	PortJenkinsLegacy   = 55000 // Should move to 8291
