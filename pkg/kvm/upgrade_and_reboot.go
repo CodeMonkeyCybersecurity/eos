@@ -271,7 +271,7 @@ func interveneUpgradeAndReboot(rc *eos_io.RuntimeContext, vmName string, cfg *Up
 			LiveSnapshot: true,
 		}
 
-		snapshotMgr := NewSnapshotManager(snapshotCfg, *otelzap.Ctx(rc.Ctx))
+		snapshotMgr := NewSnapshotManager(snapshotCfg, otelzap.Ctx(rc.Ctx))
 		_, err := snapshotMgr.CreateSnapshot(rc)
 		if err != nil {
 			return fmt.Errorf("failed to create snapshot: %w", err)
@@ -374,7 +374,7 @@ func evaluateUpgradeAndReboot(rc *eos_io.RuntimeContext, vmName string, cfg *Upg
 			VMName:       vmName,
 			SnapshotName: result.SnapshotName,
 		}
-		snapshotMgr := NewSnapshotManager(snapshotCfg, *otelzap.Ctx(rc.Ctx))
+		snapshotMgr := NewSnapshotManager(snapshotCfg, otelzap.Ctx(rc.Ctx))
 
 		if err := snapshotMgr.DeleteSnapshot(rc, result.SnapshotName, false); err != nil {
 			logger.Warn("Failed to delete snapshot", zap.Error(err))
