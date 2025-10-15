@@ -189,15 +189,15 @@ var CreateVaultCmd = &cobra.Command{
 
 This installer provides:
 - Direct binary or repository installation
-- Raft Integrated Storage (recommended) or Consul backend
+- Consul storage backend (recommended) or Raft Integrated Storage
 - Auto-unseal configuration
 - TLS setup
 - Systemd service management
 - Automatic version resolution
 
 Examples:
-  eos create vault                              # Raft storage (default, recommended)
-  eos create vault --storage-backend=consul     # Use Consul storage
+  eos create vault                              # Consul storage (default, recommended)
+  eos create vault --storage-backend=raft       # Use Raft storage (deprecated)
   eos create vault --auto-unseal --kms-key=...  # AWS KMS auto-unseal
   eos create vault --ui                         # Enable web UI`,
 	RunE: eos.Wrap(runCreateVaultNative),
@@ -208,7 +208,7 @@ func init() {
 
 	// Vault flags for native installer
 	CreateVaultCmd.Flags().String("version", "latest", "Vault version to install")
-	CreateVaultCmd.Flags().String("storage-backend", "raft", "Storage backend (raft, consul)")
+	CreateVaultCmd.Flags().String("storage-backend", "consul", "Storage backend (consul, raft)")
 	CreateVaultCmd.Flags().Bool("ui", true, "Enable web UI")
 	CreateVaultCmd.Flags().String("listener-address", fmt.Sprintf("0.0.0.0:%d", shared.PortVault), "Listener address")
 	CreateVaultCmd.Flags().Bool("tls", true, "Enable TLS (auto-generates self-signed cert if needed)")

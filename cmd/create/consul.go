@@ -69,6 +69,7 @@ EXAMPLES:
 
 var (
 	consulDatacenter string
+	consulBindAddr   string // CRITICAL: Missing flag causing error message confusion
 	consulNoVault    bool
 	consulDebug      bool
 	consulForce      bool
@@ -87,11 +88,24 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		return eos_err.NewUserError("this command must be run as root")
 	}
 
-	// Determine server/client mode
+	// Determine server/client mode with clear conflict handling
 	serverMode := consulServer
+	if consulServer && consulClient {
+		return eos_err.NewUserError("cannot specify both --server and --client flags. Choose one.\n" +
+			"  --server: Run as Consul server (stores data, participates in consensus)\n" +
+			"  --client: Run as Consul client (agent mode, forwards to servers)")
+	}
 	if !consulServer && !consulClient {
 		// Default to server mode if neither flag is specified
 		serverMode = true
+		logger.Info("Defaulting to server mode (neither --server nor --client specified)")
+	}
+
+	// Warn about destructive operations
+	if consulClean {
+		logger.Warn("--clean flag specified: This will DELETE all existing Consul data")
+		logger.Info("terminal prompt: Press Enter to continue or Ctrl+C to cancel...")
+		fmt.Scanln() // Wait for user confirmation
 	}
 
 	logger.Info("Starting native Consul installation",
@@ -99,7 +113,8 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.Bool("server_mode", serverMode),
 		zap.Bool("vault_integration", !consulNoVault),
 		zap.Bool("use_binary", consulBinary),
-		zap.String("version", consulVersion))
+		zap.String("version", consulVersion),
+		zap.String("bind_addr", consulBindAddr))
 
 	// Create installation config
 	installConfig := &consul.InstallConfig{
@@ -111,7 +126,7 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		ConnectEnabled:   true,
 		VaultIntegration: !consulNoVault,
 		LogLevel:         getConsulLogLevel(consulDebug),
-		BindAddr:         "0.0.0.0",
+		BindAddr:         consulBindAddr, // Use user-specified or auto-detect
 		ClientAddr:       "0.0.0.0",
 		ForceReinstall:   consulForce,
 		CleanInstall:     consulClean,
@@ -150,6 +165,8 @@ func getConsulLogLevel(debug bool) string {
 func init() {
 	CreateConsulCmd.Flags().StringVarP(&consulDatacenter, "datacenter", "d", "dc1",
 		"Datacenter name for Consul cluster")
+	CreateConsulCmd.Flags().StringVar(&consulBindAddr, "bind-addr", "",
+		"Network address to bind to (auto-detects primary interface if not specified)")
 	CreateConsulCmd.Flags().BoolVar(&consulServer, "server", false,
 		"Install as Consul server (default if neither --server nor --client specified)")
 	CreateConsulCmd.Flags().BoolVar(&consulClient, "client", false,
@@ -159,9 +176,9 @@ func init() {
 	CreateConsulCmd.Flags().BoolVar(&consulDebug, "debug", false,
 		"Enable debug logging for Consul")
 	CreateConsulCmd.Flags().BoolVar(&consulForce, "force", false,
-		"Force reconfiguration even if Consul is running")
+		"Force reconfiguration even if Consul is running (backs up existing config)")
 	CreateConsulCmd.Flags().BoolVar(&consulClean, "clean", false,
-		"Remove all data and perform clean installation")
+		"DESTRUCTIVE: Remove all data and perform clean installation (requires confirmation)")
 	CreateConsulCmd.Flags().BoolVar(&consulBinary, "binary", false,
 		"Use direct binary download instead of APT repository")
 	CreateConsulCmd.Flags().StringVar(&consulVersion, "version", "latest",

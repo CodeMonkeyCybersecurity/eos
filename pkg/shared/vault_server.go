@@ -120,13 +120,118 @@ log_level = "{{ .LogLevel }}"
 log_format = "{{ .LogFormat }}"
 `
 
-// Raft Integrated Storage - Single Node (Development)
+// Consul Storage - Single Node (Development/Production)
+// Recommended for: Production deployments with external Consul cluster
+// Provides HA without Raft complexity
+const vaultConfigTemplateConsulSingleNode = `
+# Vault Configuration - Consul Storage Backend
+# Storage: Consul KV Store
+# Reference: https://developer.hashicorp.com/vault/docs/configuration/storage/consul
+
+storage "consul" {
+  address = "{{ .ConsulAddress }}"
+  path    = "{{ .ConsulPath }}"
+  {{- if .ConsulToken }}
+  token   = "{{ .ConsulToken }}"
+  {{- end }}
+  {{- if .ConsulScheme }}
+  scheme  = "{{ .ConsulScheme }}"
+  {{- end }}
+}
+
+listener "tcp" {
+  address         = "0.0.0.0:{{ .Port }}"
+  cluster_address = "0.0.0.0:{{ .ClusterPort }}"
+  tls_cert_file   = "{{ .TLSCrt }}"
+  tls_key_file    = "{{ .TLSKey }}"
+  tls_min_version = "tls12"
+}
+
+cluster_addr = "{{ .ClusterAddr }}"
+api_addr     = "{{ .APIAddr }}"
+disable_mlock = true
+ui = true
+log_level = "{{ .LogLevel }}"
+log_format = "{{ .LogFormat }}"
+
+# Service registration with Consul
+service_registration "consul" {
+  address = "{{ .ConsulAddress }}"
+  {{- if .ConsulToken }}
+  token   = "{{ .ConsulToken }}"
+  {{- end }}
+}
+`
+
+// Consul Storage - Multi-Node (Production with Auto-Unseal)
+// Recommended for: Production HA deployments with Consul backend
+const vaultConfigTemplateConsulMultiNode = `
+# Vault Configuration - Multi-Node Consul Storage (Production)
+# Storage: Consul KV Store
+# Reference: https://developer.hashicorp.com/vault/docs/configuration/storage/consul
+
+storage "consul" {
+  address = "{{ .ConsulAddress }}"
+  path    = "{{ .ConsulPath }}"
+  {{- if .ConsulToken }}
+  token   = "{{ .ConsulToken }}"
+  {{- end }}
+  {{- if .ConsulScheme }}
+  scheme  = "{{ .ConsulScheme }}"
+  {{- end }}
+
+  # High availability settings
+  max_parallel    = "128"
+  consistency_mode = "default"
+}
+
+listener "tcp" {
+  address         = "0.0.0.0:{{ .Port }}"
+  cluster_address = "0.0.0.0:{{ .ClusterPort }}"
+  tls_cert_file   = "{{ .TLSCrt }}"
+  tls_key_file    = "{{ .TLSKey }}"
+  tls_min_version = "tls12"
+}
+
+# This node's addresses (MUST be unique per node)
+cluster_addr = "{{ .ClusterAddr }}"
+api_addr     = "{{ .APIAddr }}"
+
+# Production hardening
+disable_mlock = true
+ui = true
+log_level = "{{ .LogLevel }}"
+log_format = "{{ .LogFormat }}"
+
+# Service registration with Consul
+service_registration "consul" {
+  address = "{{ .ConsulAddress }}"
+  {{- if .ConsulToken }}
+  token   = "{{ .ConsulToken }}"
+  {{- end }}
+}
+
+# Telemetry for monitoring
+telemetry {
+  prometheus_retention_time = "30s"
+  disable_hostname          = true
+}
+
+{{- if .AutoUnseal }}
+# Auto-unseal configuration
+{{ .AutoUnsealConfig }}
+{{- end }}
+`
+
+// DEPRECATED: Raft Integrated Storage - Single Node (Development)
 // Recommended for: Development, testing, POC
 // As per vault-complete-specification-v1.0-raft-integrated.md
+// NOTE: Raft backend is being replaced with Consul backend
 const vaultConfigTemplateRaftSingleNode = `
 # Vault Configuration - Single Node Raft (Development)
 # Storage: Integrated Storage (Raft)
 # Reference: vault-complete-specification-v1.0-raft-integrated.md
+# DEPRECATED: Use Consul storage backend instead
 
 storage "raft" {
   path    = "{{ .VaultDataPath }}"
@@ -219,10 +324,16 @@ type VaultConfigParams struct {
 	NodeID        string // Unique node identifier for Raft
 	LogLevel      string
 	LogFormat     string
-	
-	// Multi-node Raft configuration
+
+	// Multi-node Raft configuration (DEPRECATED - use Consul instead)
 	RetryJoinNodes []RetryJoinNode
-	
+
+	// Consul storage backend configuration
+	ConsulAddress string // Consul agent address (default: 127.0.0.1:8161)
+	ConsulPath    string // Path in Consul KV store (default: "vault/")
+	ConsulToken   string // Consul ACL token (optional)
+	ConsulScheme  string // http or https (default: http)
+
 	// Auto-unseal configuration
 	AutoUnseal       bool
 	AutoUnsealConfig string // HCL block for seal configuration
@@ -268,8 +379,65 @@ func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, 
 	return rendered.String(), nil
 }
 
-// RenderVaultConfigRaft renders Vault configuration with Raft Integrated Storage
+// RenderVaultConfigConsul renders Vault configuration with Consul storage backend
 // This is the RECOMMENDED configuration for all deployments (dev and production)
+// Reference: https://developer.hashicorp.com/vault/docs/configuration/storage/consul
+func RenderVaultConfigConsul(params VaultConfigParams) (string, error) {
+	// Set defaults
+	if params.Port == "" {
+		params.Port = VaultDefaultPort
+	}
+	if params.ClusterPort == "" {
+		params.ClusterPort = "8180"
+	}
+	if params.TLSCrt == "" {
+		params.TLSCrt = TLSCrt
+	}
+	if params.TLSKey == "" {
+		params.TLSKey = TLSKey
+	}
+	if params.ConsulAddress == "" {
+		params.ConsulAddress = ConsulDefaultAddr
+	}
+	if params.ConsulPath == "" {
+		params.ConsulPath = "vault/"
+	}
+	if params.ConsulScheme == "" {
+		params.ConsulScheme = "http"
+	}
+	if params.LogLevel == "" {
+		params.LogLevel = "info"
+	}
+	if params.LogFormat == "" {
+		params.LogFormat = "json"
+	}
+
+	// Choose template based on deployment type
+	var templateStr string
+	if params.AutoUnseal {
+		// Multi-node production cluster with auto-unseal
+		templateStr = vaultConfigTemplateConsulMultiNode
+	} else {
+		// Single-node or basic multi-node
+		templateStr = vaultConfigTemplateConsulSingleNode
+	}
+
+	tmpl, err := template.New("vaultConfigConsul").Parse(templateStr)
+	if err != nil {
+		return "", fmt.Errorf("parse template: %w", err)
+	}
+
+	var rendered bytes.Buffer
+	err = tmpl.Execute(&rendered, params)
+	if err != nil {
+		return "", fmt.Errorf("execute template: %w", err)
+	}
+
+	return rendered.String(), nil
+}
+
+// DEPRECATED: RenderVaultConfigRaft renders Vault configuration with Raft Integrated Storage
+// This function is deprecated. Use RenderVaultConfigConsul instead.
 // Reference: vault-complete-specification-v1.0-raft-integrated.md
 func RenderVaultConfigRaft(params VaultConfigParams) (string, error) {
 	// Set defaults

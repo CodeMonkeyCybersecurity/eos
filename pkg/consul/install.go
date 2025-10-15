@@ -78,6 +78,8 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 	if config.Datacenter == "" {
 		config.Datacenter = "dc1"
 	}
+	logger := otelzap.Ctx(rc.Ctx)
+
 	// CRITICAL: Fail early if no network interface detected
 	if config.BindAddr == "" {
 		bindAddr, err := getDefaultBindAddr()
@@ -87,6 +89,12 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 			return nil, fmt.Errorf("failed to detect bind address: %w\nPlease specify --bind-addr explicitly", err)
 		}
 		config.BindAddr = bindAddr
+		logger.Info("Auto-detected network bind address",
+			zap.String("bind_addr", bindAddr),
+			zap.String("note", "Consul will advertise on this address"))
+	} else {
+		logger.Info("Using user-specified bind address",
+			zap.String("bind_addr", config.BindAddr))
 	}
 	if config.ClientAddr == "" {
 		config.ClientAddr = "0.0.0.0"
@@ -98,7 +106,6 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 		config.BinaryPath = "/usr/bin/consul"
 	}
 
-	logger := otelzap.Ctx(rc.Ctx)
 	runner := NewCommandRunner(rc)
 
 	return &ConsulInstaller{
