@@ -65,7 +65,7 @@ var (
 	VaultDefaultAddr        = "https://%s:" + VaultDefaultPort
 	VaultDefaultLocalAddr   = "https://127.0.0.1:" + VaultDefaultPort
 	VaultDefaultClusterAddr = "https://127.0.0.1:" + VaultClusterPort
-	ConsulDefaultAddr       = fmt.Sprintf("127.0.0.1:%d", PortConsulStandard) // Standard Consul HTTP API
+	ConsulDefaultAddr       = fmt.Sprintf("127.0.0.1:%d", PortConsul) // Consul HTTP API on custom port 8161
 )
 
 // Computed Vault directory paths - ALL derived from base directories

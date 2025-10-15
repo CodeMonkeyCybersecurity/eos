@@ -16,7 +16,7 @@ import (
 
 func TestNewEnhancedConsulManager(t *testing.T) {
 	config := &EnhancedConfig{
-		Address:    "127.0.0.1:8500",
+		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul), // Use correct port 8161
 		Datacenter: "dc1",
 		Token:      "",
 		CircuitBreakerConfig: &CBConfig{
