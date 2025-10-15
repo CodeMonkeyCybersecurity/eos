@@ -197,7 +197,7 @@ func printVaultInitializationInstructions() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, strings.Repeat("=", 70))
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "📋 STEP 1: Open a SECOND terminal session and run:")
+	fmt.Fprintln(os.Stderr, " STEP 1: Open a SECOND terminal session and run:")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "    sudo cat /var/lib/eos/secret/vault_init.json")
 	fmt.Fprintln(os.Stderr, "")
@@ -303,16 +303,37 @@ func ConfirmUnsealMaterialSaved(rc *eos_io.RuntimeContext, init *api.InitRespons
 
 	match := 0
 	for _, entered := range keys {
+		// Check against both base64 keys (KeysB64) and hex keys (Keys)
+		// Users might copy either format from the JSON file
+		matched := false
+
+		// Try base64 format first (most common)
 		for _, known := range init.KeysB64 {
 			if crypto.HashString(entered) == crypto.HashString(known) {
 				match++
+				matched = true
 				break
 			}
 		}
+
+		// If not matched in base64, try hex format
+		if !matched && len(init.Keys) > 0 {
+			for _, known := range init.Keys {
+				if crypto.HashString(entered) == crypto.HashString(known) {
+					match++
+					break
+				}
+			}
+		}
 	}
+
 	if match < 3 {
-		otelzap.Ctx(rc.Ctx).Error(" Less than 3 unseal keys matched", zap.Int("matched", match))
-		return fmt.Errorf("less than 3 unseal keys matched")
+		logger.Error(" Less than 3 unseal keys matched", zap.Int("matched", match))
+		logger.Debug("Comparison details",
+			zap.Int("entered_keys", len(keys)),
+			zap.Int("available_base64_keys", len(init.KeysB64)),
+			zap.Int("available_hex_keys", len(init.Keys)))
+		return fmt.Errorf("less than 3 unseal keys matched (got %d matches)", match)
 	}
 
 	otelzap.Ctx(rc.Ctx).Info(" User confirmed unseal material backup")
