@@ -51,15 +51,50 @@ func MkdirP(ctx context.Context, path string, perm os.FileMode) error {
 // EnsureOwnership sets the owner of `path`. On Unix, it calls os.Chown;
 // on Windows this could be replaced with ACL calls under a build tag.
 func EnsureOwnership(ctx context.Context, path, owner string) error {
-	uid, gid, err := LookupUser(ctx, owner) // assume elsewhere in eos_unix
+	log := otelzap.Ctx(ctx)
+
+	// Lookup target user/group
+	uid, gid, err := LookupUser(ctx, owner)
 	if err != nil {
-		otelzap.Ctx(ctx).Error("user lookup failed", zap.String("owner", owner), zap.Error(err))
+		log.Error("user lookup failed",
+			zap.String("owner", owner),
+			zap.Error(err))
 		return cerr.Wrapf(err, "lookup user %q", owner)
 	}
+
+	log.Debug("Setting file ownership",
+		zap.String("path", path),
+		zap.String("owner", owner),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
+	// Perform chown
 	if err := os.Chown(path, uid, gid); err != nil {
-		otelzap.Ctx(ctx).Error("chown failed", zap.String("path", path), zap.Error(err))
+		log.Error("chown failed",
+			zap.String("path", path),
+			zap.String("intended_owner", owner),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid),
+			zap.Error(err))
 		return cerr.Wrapf(err, "chown %s to %s", path, owner)
 	}
+
+	// Verify ownership was set correctly
+	stat, err := os.Stat(path)
+	if err != nil {
+		log.Warn("chown succeeded but verification stat failed",
+			zap.String("path", path),
+			zap.Error(err))
+	} else {
+		sys := stat.Sys()
+		log.Debug("Ownership set successfully",
+			zap.String("path", path),
+			zap.String("owner", owner),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid),
+			zap.Any("stat_sys", sys))
+	}
+
 	return nil
 }
 
@@ -75,11 +110,47 @@ func MultiMkdirP(ctx context.Context, paths []string, perm os.FileMode) error {
 
 // WriteFile writes data to a file and sets ownership to the given user.
 func WriteFile(ctx context.Context, path string, data []byte, perm os.FileMode, owner string) error {
+	log := otelzap.Ctx(ctx)
+
+	// Pre-operation logging
+	log.Debug("Writing file with ownership",
+		zap.String("path", path),
+		zap.String("owner", owner),
+		zap.String("permissions", perm.String()),
+		zap.Int("size_bytes", len(data)))
+
+	// Write file
 	if err := os.WriteFile(path, data, perm); err != nil {
-		otelzap.Ctx(ctx).Error("Failed to write file", zap.String("path", path), zap.Error(err))
+		log.Error("Failed to write file",
+			zap.String("path", path),
+			zap.Error(err))
 		return fmt.Errorf("write %s: %w", path, err)
 	}
-	return EnsureOwnership(ctx, path, owner)
+
+	// Set ownership
+	if err := EnsureOwnership(ctx, path, owner); err != nil {
+		log.Error("Failed to set ownership after writing file",
+			zap.String("path", path),
+			zap.String("intended_owner", owner),
+			zap.Error(err))
+		return err
+	}
+
+	// Post-operation verification logging
+	stat, err := os.Stat(path)
+	if err != nil {
+		log.Warn("File written but stat failed",
+			zap.String("path", path),
+			zap.Error(err))
+	} else {
+		log.Info("File written successfully with ownership",
+			zap.String("path", path),
+			zap.String("owner", owner),
+			zap.String("permissions", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
+	}
+
+	return nil
 }
 
 // RmRF removes file or dir, with tracing, policy, validation.

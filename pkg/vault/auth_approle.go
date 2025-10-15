@@ -136,41 +136,110 @@ func PhaseCreateAppRole(rc *eos_io.RuntimeContext, client *api.Client, log *zap.
 
 // WriteAppRoleFiles writes RoleID & SecretID to disk (with correct owner/perm).
 func WriteAppRoleFiles(rc *eos_io.RuntimeContext, roleID, secretID string) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	dir := filepath.Dir(shared.AppRolePaths.RoleID)
-	otelzap.Ctx(rc.Ctx).Info(" Ensuring AppRole directory", zap.String("path", dir))
+	rolePath := shared.AppRolePaths.RoleID
+	secretPath := shared.AppRolePaths.SecretID
+
+	log.Info("Starting AppRole credential file write operation",
+		zap.String("directory", dir),
+		zap.String("role_id_path", rolePath),
+		zap.String("secret_id_path", secretPath),
+		zap.String("target_owner", "vault"),
+		zap.String("target_permissions", "0600"))
 
 	// Use vault user instead of deprecated eos user
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("lookup vault user failed", zap.String("user", "vault"), zap.Error(err))
+		log.Error("Failed to lookup vault user",
+			zap.String("user", "vault"),
+			zap.Error(err))
 		return cerr.Wrapf(err, "lookup user %q", "vault")
 	}
 
+	log.Debug("Vault user resolved",
+		zap.String("user", "vault"),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
 	// Recursively chown the directory
+	log.Debug("Setting directory ownership recursively",
+		zap.String("path", dir),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
 	if err := eos_unix.ChownR(rc.Ctx, dir, uid, gid); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("chownR failed", zap.String("path", dir), zap.Error(err))
+		log.Error("Failed to set directory ownership",
+			zap.String("path", dir),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid),
+			zap.Error(err))
 		return cerr.Wrapf(err, "chownR %s", dir)
 	}
 
+	log.Debug("Directory ownership set successfully",
+		zap.String("path", dir))
+
 	// Write RoleID
-	rolePath := shared.AppRolePaths.RoleID
-	otelzap.Ctx(rc.Ctx).Debug(" Writing RoleID", zap.String("path", rolePath))
+	log.Debug("Writing RoleID file",
+		zap.String("path", rolePath),
+		zap.Int("role_id_length", len(roleID)))
+
 	if err := eos_unix.WriteFile(rc.Ctx, rolePath, []byte(roleID), 0o600, "vault"); err != nil {
+		log.Error("Failed to write RoleID file",
+			zap.String("path", rolePath),
+			zap.Error(err))
 		return cerr.Wrapf(err, "write file %s", rolePath)
 	}
 
 	// Write SecretID
-	secretPath := shared.AppRolePaths.SecretID
-	otelzap.Ctx(rc.Ctx).Debug(" Writing SecretID", zap.String("path", secretPath))
+	log.Debug("Writing SecretID file",
+		zap.String("path", secretPath),
+		zap.Int("secret_id_length", len(secretID)))
+
 	if err := eos_unix.WriteFile(rc.Ctx, secretPath, []byte(secretID), 0o600, "vault"); err != nil {
+		log.Error("Failed to write SecretID file",
+			zap.String("path", secretPath),
+			zap.Error(err))
 		return cerr.Wrapf(err, "write file %s", secretPath)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info(" AppRole credentials written",
+	// Final verification: check that vault user can actually read the files
+	log.Debug("Verifying vault user can read credential files")
+
+	// Verify role_id
+	roleIDStat, err := os.Stat(rolePath)
+	if err != nil {
+		log.Warn("Failed to stat role_id file after writing",
+			zap.String("path", rolePath),
+			zap.Error(err))
+	} else {
+		log.Debug("RoleID file verification",
+			zap.String("path", rolePath),
+			zap.String("mode", roleIDStat.Mode().String()),
+			zap.Int64("size", roleIDStat.Size()))
+	}
+
+	// Verify secret_id
+	secretIDStat, err := os.Stat(secretPath)
+	if err != nil {
+		log.Warn("Failed to stat secret_id file after writing",
+			zap.String("path", secretPath),
+			zap.Error(err))
+	} else {
+		log.Debug("SecretID file verification",
+			zap.String("path", secretPath),
+			zap.String("mode", secretIDStat.Mode().String()),
+			zap.Int64("size", secretIDStat.Size()))
+	}
+
+	log.Info("AppRole credentials written successfully",
 		zap.String("role_file", rolePath),
 		zap.String("secret_file", secretPath),
-	)
+		zap.String("owner", "vault"),
+		zap.String("permissions", "0600"))
+
 	return nil
 }
 
