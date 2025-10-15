@@ -142,17 +142,52 @@ func WriteAgentConfig(path string, tpl *template.Template, data any) error {
 }
 
 // EnsureFileExists writes value if file is missing.
+// NOTE: This function does NOT set ownership. Callers should use eos_unix.WriteFile
+// or eos_unix.EnsureOwnership if ownership needs to be set.
 func EnsureFileExists(ctx context.Context, path, value string, perm os.FileMode) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		zap.L().Warn(" File missing — creating", zap.String("path", path))
-		if err := os.WriteFile(path, []byte(value), perm); err != nil {
-			zap.L().Error(" Failed to write file", zap.String("path", path), zap.Error(err))
-			return err
-		}
-		zap.L().Info(" File written", zap.String("path", path), zap.String("perm", fmt.Sprintf("%#o", perm)))
-	} else {
-		zap.L().Info(" File already exists", zap.String("path", path))
+	log := zap.L()
+
+	stat, err := os.Stat(path)
+	if err == nil {
+		log.Info("File already exists",
+			zap.String("path", path),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
+		return nil
 	}
+
+	if !os.IsNotExist(err) {
+		log.Error("Failed to stat file",
+			zap.String("path", path),
+			zap.Error(err))
+		return fmt.Errorf("stat %s: %w", path, err)
+	}
+
+	log.Info("File missing, creating",
+		zap.String("path", path),
+		zap.String("permissions", fmt.Sprintf("%#o", perm)),
+		zap.Int("value_length", len(value)))
+
+	if err := os.WriteFile(path, []byte(value), perm); err != nil {
+		log.Error("Failed to write file",
+			zap.String("path", path),
+			zap.Error(err))
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+
+	// Verify final state
+	stat, err = os.Stat(path)
+	if err != nil {
+		log.Warn("File written but verification stat failed",
+			zap.String("path", path),
+			zap.Error(err))
+	} else {
+		log.Info("File created successfully",
+			zap.String("path", path),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
+	}
+
 	return nil
 }
 

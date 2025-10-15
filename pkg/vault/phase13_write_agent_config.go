@@ -3,6 +3,7 @@
 package vault
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -216,9 +217,10 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 		zap.String("config_path", shared.VaultAgentConfigPath),
 		zap.String("vault_addr", addr),
 		zap.String("role_id_path", shared.AppRolePaths.RoleID),
-		zap.String("secret_id_path", shared.AppRolePaths.SecretID))
+		zap.String("secret_id_path", shared.AppRolePaths.SecretID),
+		zap.String("target_owner", "vault"))
 
-	// Ensure AppRole files exist
+	// Ensure AppRole files exist WITH PROPER OWNERSHIP
 	log.Debug("Ensuring secrets directory exists",
 		zap.String("dir", filepath.Dir(shared.AppRolePaths.RoleID)))
 
@@ -228,68 +230,63 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 		return err
 	}
 
-	log.Debug("Ensuring AppRole credential files exist")
+	// Use eos_unix.WriteFile to ensure proper ownership on AppRole credential files
+	log.Info("Ensuring AppRole credential files exist with vault ownership")
 
-	if err := shared.EnsureFileExists(rc.Ctx, shared.AppRolePaths.RoleID, roleID, shared.OwnerReadOnly); err != nil {
-		log.Error("Failed to ensure role_id file exists",
+	// Write role_id with vault ownership
+	if err := eos_unix.WriteFile(rc.Ctx, shared.AppRolePaths.RoleID, []byte(roleID), shared.OwnerReadOnly, "vault"); err != nil {
+		log.Error("Failed to write role_id file with ownership",
 			zap.String("path", shared.AppRolePaths.RoleID),
 			zap.Error(err))
-		return err
+		return fmt.Errorf("write role_id: %w", err)
 	}
-	if err := shared.EnsureFileExists(rc.Ctx, shared.AppRolePaths.SecretID, secretID, shared.OwnerReadOnly); err != nil {
-		log.Error("Failed to ensure secret_id file exists",
+
+	// Write secret_id with vault ownership
+	if err := eos_unix.WriteFile(rc.Ctx, shared.AppRolePaths.SecretID, []byte(secretID), shared.OwnerReadOnly, "vault"); err != nil {
+		log.Error("Failed to write secret_id file with ownership",
 			zap.String("path", shared.AppRolePaths.SecretID),
 			zap.Error(err))
-		return err
+		return fmt.Errorf("write secret_id: %w", err)
 	}
+
+	log.Info("AppRole credential files written with vault ownership",
+		zap.String("role_id_path", shared.AppRolePaths.RoleID),
+		zap.String("secret_id_path", shared.AppRolePaths.SecretID))
 
 	// Build template data
 	data := shared.BuildAgentTemplateData(addr)
 	path := shared.VaultAgentConfigPath
 
-	log.Debug("Creating Vault Agent config file",
+	log.Info("Rendering Vault Agent config file",
 		zap.String("path", path),
 		zap.String("vault_addr", data.Addr),
-		zap.String("sink_path", data.SinkPath))
+		zap.String("sink_path", data.SinkPath),
+		zap.String("target_owner", "vault"))
 
-	// Create config file
-	f, err := os.Create(path)
-	if err != nil {
-		log.Error("Failed to create Vault Agent config file",
-			zap.String("path", path),
-			zap.Error(err))
-		return err
-	}
-	defer func() {
-		if cerr := f.Close(); cerr != nil {
-			log.Warn("Failed to close Vault Agent config file",
-				zap.String("path", path),
-				zap.Error(cerr))
-		}
-	}()
-
-	// Execute template
-	log.Debug("Rendering Vault Agent config template")
-
-	if err := agentHCLTpl.Execute(f, data); err != nil {
+	// Render template to memory first
+	var buf bytes.Buffer
+	if err := agentHCLTpl.Execute(&buf, data); err != nil {
 		log.Error("Failed to render Vault Agent config template",
 			zap.Error(err))
-		return err
+		return fmt.Errorf("render template: %w", err)
 	}
 
-	// Set permissions
-	log.Debug("Setting Vault Agent config file permissions",
+	log.Debug("Template rendered successfully",
+		zap.Int("size_bytes", buf.Len()))
+
+	// Write config file with vault ownership using eos_unix.WriteFile
+	log.Debug("Writing config file with vault ownership",
 		zap.String("path", path),
 		zap.String("mode", fmt.Sprintf("%#o", shared.RuntimeFilePerms)))
 
-	if err := os.Chmod(path, shared.RuntimeFilePerms); err != nil {
-		log.Error("Failed to set Vault Agent config file permissions",
+	if err := eos_unix.WriteFile(rc.Ctx, path, buf.Bytes(), shared.RuntimeFilePerms, "vault"); err != nil {
+		log.Error("Failed to write Vault Agent config file with ownership",
 			zap.String("path", path),
 			zap.Error(err))
-		return err
+		return fmt.Errorf("write config file: %w", err)
 	}
 
-	// Verify final state
+	// Final verification
 	stat, err := os.Stat(path)
 	if err != nil {
 		log.Warn("Config file written but verification stat failed",
@@ -299,7 +296,8 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 		log.Info("Vault Agent HCL configuration written successfully",
 			zap.String("path", path),
 			zap.String("mode", stat.Mode().String()),
-			zap.Int64("size", stat.Size()))
+			zap.Int64("size", stat.Size()),
+			zap.String("owner", "vault"))
 	}
 
 	return nil
