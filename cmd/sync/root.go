@@ -26,6 +26,7 @@ var (
 func init() {
 	// Register all available connectors
 	sync.RegisterConnector(connectors.NewConsulVaultConnector())
+	sync.RegisterConnector(connectors.NewConsulTailscaleAutoConnector())
 }
 
 // SyncCmd is the root command for service synchronization
@@ -41,6 +42,12 @@ detects the correct connector to use.
 Currently supported service pairs:
   - consul ↔ vault: Configure Vault to use Consul as storage backend,
                     register Vault in Consul service catalog
+  - consul ↔ tailscale: Configure local Consul to bind to Tailscale IP
+                        (order doesn't matter: "consul tailscale" or "tailscale consul")
+
+For joining Consul nodes into a cluster:
+  - eos sync consul --vhost7 --vhost11    # Join multiple Consul nodes together
+  - See: eos sync consul --help
 
 Safety Features:
   - Pre-flight checks verify both services are installed and running
@@ -53,6 +60,14 @@ Examples:
   # Sync Consul and Vault (order doesn't matter)
   eos sync consul vault
   eos sync vault consul
+
+  # Configure local Consul to use Tailscale IP
+  eos sync consul tailscale
+  eos sync tailscale consul
+
+  # Join Consul nodes into a cluster
+  eos sync consul --vhost7
+  eos sync consul --vhost7 --vhost11
 
   # Preview changes without applying (dry-run)
   eos sync consul vault --dry-run
@@ -101,7 +116,10 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 		return eos_err.NewUserError(
 			"Service pair not supported: %s ↔ %s\n\n"+
 				"Currently supported pairs:\n"+
-				"  - consul ↔ vault\n\n"+
+				"  - consul ↔ vault\n"+
+				"  - consul ↔ tailscale (auto-discovers and joins Consul nodes)\n\n"+
+				"For explicit node targeting:\n"+
+				"  - eos sync consul --vhost7 --vhost11\n\n"+
 				"Error: %v",
 			service1, service2, err)
 	}
