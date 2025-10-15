@@ -99,15 +99,19 @@ type AgentSystemdData struct {
 	Description, User, Group, RuntimeDir, RuntimePath, ExecStart, RuntimeMode string
 }
 
-// Vault Agent service + config paths
+// Vault Agent service constants
 const (
 	VaultAgentService      = "vault-agent-eos.service"
-	VaultAgentConfigPath   = "/etc/vault.d/agent-config.hcl" // FIXED: Was /etc/vault-agent-eos.hcl
-	VaultAgentCACopyPath   = "/etc/vault.d/ca.crt"
-	VaultAgentRoleIDPath   = "/etc/vault.d/role_id"
-	VaultAgentSecretIDPath = "/etc/vault.d/secret_id"
-	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt"
-	VaultAgentServicePath  = "/etc/systemd/system/vault-agent-eos.service"
+	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt" // System-wide trust store (RHEL)
+)
+
+// Vault Agent config paths - ALL derived from VaultConfigDirDebian (/etc/vault.d)
+var (
+	VaultAgentConfigPath   = filepath.Join(VaultConfigDirDebian, "agent-config.hcl")
+	VaultAgentCACopyPath   = filepath.Join(VaultConfigDirDebian, "ca.crt")
+	VaultAgentRoleIDPath   = filepath.Join(VaultConfigDirDebian, "role_id")
+	VaultAgentSecretIDPath = filepath.Join(VaultConfigDirDebian, "secret_id")
+	VaultAgentServicePath  = "/etc/systemd/system/" + VaultAgentService
 )
 
 func EnsureSecretsDir() error {

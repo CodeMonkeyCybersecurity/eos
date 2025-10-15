@@ -182,7 +182,7 @@ func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string,
 		config.NodeID = "eos-vault-node1"
 	}
 	if config.ClusterPort == 0 {
-		config.ClusterPort = 8180
+		config.ClusterPort = shared.PortVaultCluster
 	}
 	if config.DataPath == "" {
 		config.DataPath = shared.VaultDataPath

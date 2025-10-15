@@ -86,9 +86,12 @@ const (
 	PortResticAPI       = 9101  // Should move to 8xxx range
 	PortMinioAPI        = 9123  // Should move to 8xxx range
 	
+	// Standard upstream ports (used when integrating with external services)
+	PortConsulStandard     = 8500 // Standard Consul HTTP API port (used for Vault storage backend)
+
 	// Original well-known ports (for reference/migration)
 	PortVaultOriginal      = 8200 // Original Vault port
-	PortConsulOriginal     = 8500 // Original Consul HTTP port
+	PortConsulOriginal     = 8500 // Original Consul HTTP port (same as standard)
 	PortNomadOriginal      = 4646 // Original Nomad HTTP port
 	PortNomadRPCOriginal   = 4647 // Original Nomad RPC port
 	PortPostgreSQLOriginal = 5432 // Original PostgreSQL port

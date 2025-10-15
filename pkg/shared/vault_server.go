@@ -30,21 +30,12 @@ const (
 	VaultDefaultTokenMaxTTL   = "24h"
 	VaultDefaultSecretIDTTL   = "24h"
 	LocalhostSAN              = "127.0.0.1"
-	ConsulDefaultAddr         = "127.0.0.1:8500" // Standard Consul port (not Eos custom 8161)
-	VaultDir                  = "/opt/vault/"
-	VaultDataPath             = VaultDir + "data/"
-	VaultLogsPath             = VaultDir + "logs/"
-	VaultAuditLogPath         = VaultLogsPath + "vault_audit.log"
-	// CRITICAL FIX: TLS certs are created by install.go at /etc/vault.d/tls/, not /opt/vault/tls/
-	// This mismatch was causing "source certificate not found" errors in Phase 13 (agent config)
-	TLSDir                    = "/etc/vault.d/tls/"
-	TLSKey                    = TLSDir + "vault.key"
-	TLSCrt                    = TLSDir + "vault.crt"
-	VaultConfigDirDebian      = "/etc/vault.d"
-	VaultConfigPath           = "/etc/vault.d/vault.hcl"
-	VaultBinaryPath           = "/usr/bin/vault"
-	VaultServicePath          = "/etc/systemd/system/vault.service"
-	VaultServiceName          = "vault.service"
+
+	// === SINGLE SOURCE OF TRUTH: Base Directories ===
+	VaultDir                  = "/opt/vault/"           // Vault data and logs
+	VaultConfigDirDebian      = "/etc/vault.d"          // Vault config directory (all config files derive from this)
+	VaultBinaryPath           = "/usr/bin/vault"        // Vault binary
+	VaultServiceName          = "vault.service"         // Systemd service name
 	VaultConfigFileName       = "config.hcl"
 	EosVaultProfilePath       = "/etc/profile.d/eos_vault.sh"
 	VaultLegacyConfigWildcard = "/etc/vault*"
@@ -63,7 +54,7 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 	FallbackAbort  FallbackCode = "abort"
 )
 
-// Computed Vault port constants
+// Computed Vault port constants - ALL derived from ports.go
 var (
 	VaultDefaultPort        = fmt.Sprintf("%d", PortVault)
 	VaultDefaultPortInt     = PortVault
@@ -74,10 +65,24 @@ var (
 	VaultDefaultAddr        = "https://%s:" + VaultDefaultPort
 	VaultDefaultLocalAddr   = "https://127.0.0.1:" + VaultDefaultPort
 	VaultDefaultClusterAddr = "https://127.0.0.1:" + VaultClusterPort
+	ConsulDefaultAddr       = fmt.Sprintf("127.0.0.1:%d", PortConsulStandard) // Standard Consul HTTP API
 )
 
-// File paths and Vault client
+// Computed Vault directory paths - ALL derived from base directories
 var (
+	// Vault data directories (derived from VaultDir)
+	VaultDataPath   = VaultDir + "data/"
+	VaultLogsPath   = VaultDir + "logs/"
+	VaultAuditLogPath = VaultLogsPath + "vault_audit.log"
+
+	// Vault config paths (derived from VaultConfigDirDebian)
+	VaultConfigPath = filepath.Join(VaultConfigDirDebian, "vault.hcl")
+	TLSDir          = filepath.Join(VaultConfigDirDebian, "tls")
+	TLSCrt          = filepath.Join(TLSDir, "vault.crt")
+	TLSKey          = filepath.Join(TLSDir, "vault.key")
+	VaultServicePath = "/etc/systemd/system/" + VaultServiceName
+
+	// Eos directories and files
 	EosVarDir                 = "/var/lib/eos/"
 	SecretsDir                = filepath.Join(EosVarDir, "secret")
 	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
