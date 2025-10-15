@@ -148,26 +148,25 @@ func checkSystemTools(rc *eos_io.RuntimeContext) error {
 
 func checkVaultStatus(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Check if Vault binary already exists
+
+	// IDEMPOTENT: Check if Vault is already installed and running
+	// This is NOT an error - we'll handle existing installations gracefully
 	if _, err := exec.LookPath("vault"); err == nil {
-		logger.Info("Vault binary already installed")
-		
+		logger.Info("Vault binary already installed - will verify and update configuration if needed")
+
 		// Check if Vault service is running
 		if output, err := exec.Command("systemctl", "is-active", "vault").Output(); err == nil {
 			if strings.TrimSpace(string(output)) == "active" {
-				logger.Warn("Vault service is already running")
-				return eos_err.NewUserError(
-					"Vault service is already running.\n\n" +
-						"If you want to reinstall Vault, please first stop the service:\n" +
-						"  sudo systemctl stop vault\n\n" +
-						"Or use the update command to modify the existing installation:\n" +
-						"  eos update vault")
+				logger.Info("Vault service is already running - will verify state and configuration",
+					zap.String("status", "active"),
+					zap.String("behavior", "idempotent - will check and update if needed"))
+				// NOT AN ERROR - let the installation flow handle existing state
+				// Each phase will check if its work is already done and skip if so
 			}
 		}
 	}
-	
-	logger.Debug("Vault status check passed")
+
+	logger.Debug("Vault status check passed (idempotent operation)")
 	return nil
 }
 
@@ -202,9 +201,18 @@ func checkNetworkRequirements(rc *eos_io.RuntimeContext) error {
 
 	for _, port := range requiredPorts {
 		if isPortInUse(port) {
-			logger.Error("Required port is already in use",
+			// IDEMPOTENT: Check if it's Vault itself using the port (which is fine)
+			// Only fail if a DIFFERENT service is using the port
+			if isVaultUsingPort(port) {
+				logger.Info("Vault is already using required port (expected for existing installation)",
+					zap.Int("port", port),
+					zap.String("behavior", "idempotent - will verify configuration"))
+				continue // This is fine - Vault should be using these ports
+			}
+
+			logger.Error("Required port is already in use by another service",
 				zap.Int("port", port))
-			return eos_err.NewUserError("Port %d is already in use by another service.\n\nVault requires ports %d (API) and %d (cluster) to be available.\nPlease stop the conflicting service or choose different ports.", port, shared.VaultDefaultPortInt, shared.VaultDefaultPortInt+1)
+			return eos_err.NewUserError("Port %d is already in use by another service (not Vault).\n\nVault requires ports %d (API) and %d (cluster) to be available.\nPlease stop the conflicting service or choose different ports.", port, shared.VaultDefaultPortInt, shared.VaultDefaultPortInt+1)
 		}
 	}
 
@@ -232,5 +240,22 @@ func isPortInUse(port int) bool {
 		return true // Port is in use
 	}
 	conn.Close()
+	return false
+}
+
+func isVaultUsingPort(port int) bool {
+	// Check if vault process is listening on this port using lsof
+	out, err := exec.Command("lsof", "-i", fmt.Sprintf(":%d", port), "-sTCP:LISTEN").Output()
+	if err != nil {
+		return false // Can't determine, assume not vault
+	}
+
+	// Check if any line contains "vault" process
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		if strings.Contains(strings.ToLower(line), "vault") {
+			return true
+		}
+	}
 	return false
 }
