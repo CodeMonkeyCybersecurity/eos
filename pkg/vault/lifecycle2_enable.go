@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -118,18 +119,54 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}
 
 	// Step 10a: interactively configure userpass auth
-	if interaction.PromptYesNo(rc.Ctx, "Enable Userpass authentication?", false) {
-		// empty password => will prompt internally
-		if err := PhaseEnableUserpass(rc, client, log, ""); err != nil {
-			return logger.LogErrAndWrap(rc, "enable Userpass", err)
+	userpassConfigured, err := IsUserpassConfigured(rc, client)
+	if err != nil {
+		log.Warn("Failed to check userpass status, will prompt", zap.Error(err))
+		userpassConfigured = false // Default to prompting on error
+	}
+
+	if userpassConfigured {
+		log.Info("terminal prompt: ✓ Userpass authentication already configured")
+		if interaction.PromptYesNo(rc.Ctx, "  Rotate eos user password?", false) {
+			password, err := crypto.PromptPassword(rc, "Enter NEW password for Eos Vault user:")
+			if err != nil {
+				return logger.LogErrAndWrap(rc, "prompt password", err)
+			}
+			if err := UpdateUserpassPassword(rc, client, password); err != nil {
+				return logger.LogErrAndWrap(rc, "rotate password", err)
+			}
+			log.Info("terminal prompt: ✓ Password rotated successfully")
+		}
+	} else {
+		if interaction.PromptYesNo(rc.Ctx, "Enable Userpass authentication?", false) {
+			// empty password => will prompt internally
+			if err := PhaseEnableUserpass(rc, client, log, ""); err != nil {
+				return logger.LogErrAndWrap(rc, "enable Userpass", err)
+			}
 		}
 	}
 
 	// Step 10b: interactively configure AppRole auth
-	if interaction.PromptYesNo(rc.Ctx, "Enable AppRole authentication?", false) {
-		opts := shared.DefaultAppRoleOptions()
-		if err := PhaseEnableAppRole(rc, client, log, opts); err != nil {
-			return logger.LogErrAndWrap(rc, "enable AppRole", err)
+	approleConfigured, err := IsAppRoleConfigured(rc, client)
+	if err != nil {
+		log.Warn("Failed to check AppRole status, will prompt", zap.Error(err))
+		approleConfigured = false // Default to prompting on error
+	}
+
+	if approleConfigured {
+		log.Info("terminal prompt: ✓ AppRole authentication already configured")
+		if interaction.PromptYesNo(rc.Ctx, "  Regenerate AppRole credentials?", false) {
+			if err := RegenerateAppRoleCredentials(rc, client); err != nil {
+				return logger.LogErrAndWrap(rc, "regenerate approle credentials", err)
+			}
+			log.Info("terminal prompt: ✓ AppRole credentials regenerated successfully")
+		}
+	} else {
+		if interaction.PromptYesNo(rc.Ctx, "Enable AppRole authentication?", false) {
+			opts := shared.DefaultAppRoleOptions()
+			if err := PhaseEnableAppRole(rc, client, log, opts); err != nil {
+				return logger.LogErrAndWrap(rc, "enable AppRole", err)
+			}
 		}
 	}
 
@@ -160,7 +197,22 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}
 
 	// Step 14: Vault Agent comprehensive enablement
-	if interaction.PromptYesNo(rc.Ctx, "Enable Vault Agent service?", true) {
+	agentConfigured, err := IsAgentConfigured(rc)
+	if err != nil {
+		log.Warn("Failed to check Agent status, will prompt", zap.Error(err))
+		agentConfigured = false // Default to prompting on error
+	}
+
+	if agentConfigured {
+		log.Info("terminal prompt: ✓ Vault Agent already configured")
+		if interaction.PromptYesNo(rc.Ctx, "  Reconfigure Vault Agent?", false) {
+			log.Info(" Starting Vault Agent reconfiguration")
+			config := DefaultVaultAgentConfig()
+			if err := PhaseEnableVaultAgent(rc, client, config); err != nil {
+				return logger.LogErrAndWrap(rc, "reconfigure Vault Agent", err)
+			}
+		}
+	} else if interaction.PromptYesNo(rc.Ctx, "Enable Vault Agent service?", true) {
 		log.Info(" Starting Vault Agent enablement")
 		config := DefaultVaultAgentConfig()
 		if err := PhaseEnableVaultAgent(rc, client, config); err != nil {
