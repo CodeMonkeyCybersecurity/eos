@@ -871,11 +871,11 @@ func DeletionTransactionLogsDiagnostic() *debug.Diagnostic {
 					if strings.Contains(contentStr, "INTERRUPTED") {
 						result.Status = debug.StatusError
 						result.Message = "Deletion was interrupted - system may be in inconsistent state"
-						result.Remediation = "Run 'sudo eos delete vault --force' to retry deletion"
+						result.Remediation = "Run 'sudo eos delete vault' to retry deletion"
 					} else if strings.Contains(contentStr, "FAILED") {
 						result.Status = debug.StatusError
 						result.Message = "Deletion encountered failures"
-						result.Remediation = "Review log for errors, then retry with --force"
+						result.Remediation = "Review log for errors, then retry deletion"
 					} else if strings.Contains(contentStr, "FINISHED") && strings.Contains(contentStr, "SUCCESS") {
 						result.Status = debug.StatusOK
 						result.Message = "Last deletion completed successfully"
@@ -917,7 +917,7 @@ func DeletionTransactionLogsDiagnostic() *debug.Diagnostic {
 					if result.Status == debug.StatusOK {
 						result.Status = debug.StatusWarning
 						result.Message = "Deletion completed but some components still present"
-						result.Remediation = "Run 'sudo eos delete vault --force' to complete removal"
+						result.Remediation = "Run 'sudo eos delete vault' to complete removal"
 					}
 				}
 			}

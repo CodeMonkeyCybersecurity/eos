@@ -15,6 +15,8 @@ type contextKey string
 const vaultClientKey contextKey = "vault-client"
 
 // GetVaultClient retrieves the vault client from context or creates a new one
+// This function properly reads environment variables including VAULT_SKIP_VERIFY
+// for self-signed certificate support during installation.
 func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	// Check if client exists in context
 	if client, ok := rc.Ctx.Value(vaultClientKey).(*api.Client); ok && client != nil {
@@ -23,12 +25,18 @@ func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 	// Create new client with default config
 	config := api.DefaultConfig()
-	
+
+	// CRITICAL: Read environment variables including VAULT_SKIP_VERIFY
+	// This is necessary for self-signed certificates during installation
+	if err := config.ReadEnvironment(); err != nil {
+		return nil, fmt.Errorf("reading vault environment config: %w", err)
+	}
+
 	// Check for VAULT_ADDR environment variable or use default
 	if config.Address == "" {
 		config.Address = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
 	}
-	
+
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("creating vault client: %w", err)

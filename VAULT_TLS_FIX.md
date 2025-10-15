@@ -76,7 +76,7 @@ sudo eos create vault
 ### Option 3: Clean Reinstall
 ```bash
 # Nuclear option - full cleanup
-sudo eos delete vault --force
+sudo eos delete vault
 sudo eos create vault
 ```
 

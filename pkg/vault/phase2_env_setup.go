@@ -78,11 +78,18 @@ func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
 	}
 
+	// CRITICAL: Set VAULT_SKIP_VERIFY=1 for self-signed certificates
+	// This is required for API clients to trust self-signed TLS certificates
+	// during installation and initial setup. The Vault API SDK reads this
+	// environment variable via api.Config.ReadEnvironment().
+	//
 	// Note: VAULT_CACERT not set here - we use VAULT_SKIP_VERIFY=1 for self-signed certs
 	// The ca.crt file path was causing "Error loading CA File" failures because the file
 	// doesn't exist at the expected location. For self-signed certificates, we skip
-	// verification in CLI commands instead.
-	otelzap.Ctx(rc.Ctx).Debug(" VAULT_CACERT not set - using VAULT_SKIP_VERIFY for self-signed certs")
+	// verification in CLI commands AND API clients.
+	_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
+	otelzap.Ctx(rc.Ctx).Info(" VAULT_SKIP_VERIFY set for self-signed certificates",
+		zap.String("VAULT_SKIP_VERIFY", "1"))
 
 	return addr, nil
 }
