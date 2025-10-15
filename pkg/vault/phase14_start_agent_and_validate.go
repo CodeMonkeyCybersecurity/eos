@@ -379,6 +379,17 @@ func checkVaultAgentErrors(rc *eos_io.RuntimeContext) error {
 		},
 	}
 
+	// CRITICAL: Check for SUCCESS indicators first - if agent succeeded, ignore old error messages
+	hasAuthSuccess := strings.Contains(logText, "authentication successful")
+	hasTokenWritten := strings.Contains(logText, "token written")
+
+	if hasAuthSuccess && hasTokenWritten {
+		log.Debug(" Vault Agent has successfully authenticated and written token - ignoring any old error messages",
+			zap.Bool("auth_success", hasAuthSuccess),
+			zap.Bool("token_written", hasTokenWritten))
+		return nil // Agent is working correctly
+	}
+
 	for _, pattern := range deterministicPatterns {
 		if strings.Contains(logText, pattern.pattern) {
 			log.Error(" Vault Agent deterministic error detected",
