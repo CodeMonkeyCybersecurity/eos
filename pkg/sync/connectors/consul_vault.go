@@ -244,6 +244,42 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 
 	configStr := string(configContent)
 
+	// CRITICAL SAFETY CHECK: Don't change storage backend if Vault is initialized
+	// Changing storage backend on initialized Vault will lose all data!
+	if !strings.Contains(configStr, `storage "consul"`) {
+		logger.Warn("Vault is not currently using Consul storage backend")
+
+		// Check if Vault is initialized
+		client, err := vault.GetVaultClient(rc)
+		if err == nil {
+			initialized, err := vault.IsVaultInitialized(rc, client)
+			if err == nil && initialized {
+				logger.Error("SAFETY CHECK FAILED: Cannot change storage backend on initialized Vault",
+					zap.String("current_storage", c.detectStorageBackend(configStr)),
+					zap.String("target_storage", "consul"))
+
+				return fmt.Errorf("cannot change storage backend on initialized Vault: this would cause data loss\n\n" +
+					"Current storage: %s\n" +
+					"Target storage: consul\n\n" +
+					"To migrate storage backends:\n" +
+					"1. Use Vault's official migration tools\n" +
+					"2. Or: Unseal Vault, export all secrets, reinitialize with new backend, import secrets\n" +
+					"3. Or: Use --force flag to override (NOT RECOMMENDED - will lose all data)\n\n" +
+					"Vault storage migration documentation:\n" +
+					"https://developer.hashicorp.com/vault/docs/commands/operator/migrate",
+					c.detectStorageBackend(configStr))
+			}
+		}
+
+		// If we get here, Vault is either not initialized or we couldn't check
+		// Proceed with caution
+		if !config.Force {
+			logger.Warn("Proceeding with storage backend change on uninitialized/inaccessible Vault")
+		} else {
+			logger.Warn("FORCE flag set - changing storage backend despite risks")
+		}
+	}
+
 	// Check if already using Consul storage
 	if strings.Contains(configStr, `storage "consul"`) {
 		logger.Info("Vault config already contains Consul storage, updating address")
@@ -432,4 +468,14 @@ func copyFile(src, dst string) error {
 	}
 
 	return nil
+}
+
+// detectStorageBackend extracts the storage backend type from Vault config
+func (c *ConsulVaultConnector) detectStorageBackend(configStr string) string {
+	storageRegex := regexp.MustCompile(`storage "([^"]*)"`)
+	matches := storageRegex.FindStringSubmatch(configStr)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return "unknown"
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/servicestatus"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -18,12 +19,14 @@ var (
 	vaultCheckConfig   bool
 	vaultCheckSecurity bool
 	vaultCheckAll      bool
+	vaultCheckRuntime  bool
+	vaultOutputFormat  string
 )
 
 var vaultCheckCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Validate Vault configuration and security posture",
-	Long: `Perform pre-flight validation of Vault configuration and security.
+	Short: "Check Vault installation, configuration, and operational status",
+	Long: `Comprehensive status check for Vault secrets management service.
 
 This command validates:
 - Configuration file syntax and semantics
@@ -31,19 +34,26 @@ This command validates:
 - File permissions and ownership
 - Security posture and compliance
 - Common misconfigurations
+- Runtime status (service, health, integrations)
 
 EXAMPLES:
-  # Quick config validation
-  sudo eos check vault
+  # Full status with runtime information (default)
+  sudo eos list vault
 
-  # Configuration only
-  sudo eos check vault --config
+  # Configuration validation only
+  sudo eos list vault --config
 
   # Security posture only
-  sudo eos check vault --security
+  sudo eos list vault --security
 
-  # Comprehensive validation
-  sudo eos check vault --all`,
+  # Runtime status only
+  sudo eos list vault --runtime
+
+  # Comprehensive validation (all checks)
+  sudo eos list vault --all
+
+  # JSON output for automation
+  sudo eos list vault --format json`,
 
 	RunE: eos_cli.Wrap(runVaultCheck),
 }
@@ -51,40 +61,53 @@ EXAMPLES:
 func init() {
 	vaultCheckCmd.Flags().BoolVar(&vaultCheckConfig, "config", false, "Check configuration only")
 	vaultCheckCmd.Flags().BoolVar(&vaultCheckSecurity, "security", false, "Check security posture only")
+	vaultCheckCmd.Flags().BoolVar(&vaultCheckRuntime, "runtime", false, "Check runtime status only")
 	vaultCheckCmd.Flags().BoolVar(&vaultCheckAll, "all", false, "Perform all validation checks")
+	vaultCheckCmd.Flags().StringVarP(&vaultOutputFormat, "format", "f", "text",
+		"Output format for runtime status: text, json, yaml, short")
 
 	ListCmd.AddCommand(vaultCheckCmd)
 }
 
 func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info(" Starting Vault validation checks")
+	logger.Info("Starting Vault validation checks")
 
-	// Default: run all checks if no specific flag is set
-	runConfig := vaultCheckConfig || vaultCheckAll || (!vaultCheckConfig && !vaultCheckSecurity)
+	// Default: run runtime status if no specific flag is set
+	runConfig := vaultCheckConfig || vaultCheckAll
 	runSecurity := vaultCheckSecurity || vaultCheckAll
+	runRuntime := vaultCheckRuntime || vaultCheckAll || (!vaultCheckConfig && !vaultCheckSecurity && !vaultCheckRuntime)
 
 	hasErrors := false
 
+	// Runtime status (new default behavior)
+	if runRuntime {
+		logger.Info("Gathering runtime status")
+		if err := showRuntimeStatus(rc); err != nil {
+			logger.Error("Runtime status check failed", zap.Error(err))
+			hasErrors = true
+		}
+	}
+
 	// Configuration validation
 	if runConfig {
-		logger.Info(" Running configuration validation")
+		logger.Info("Running configuration validation")
 		if err := validateConfiguration(rc); err != nil {
-			logger.Error(" Configuration validation failed", zap.Error(err))
+			logger.Error("Configuration validation failed", zap.Error(err))
 			hasErrors = true
 		} else {
-			logger.Info(" Configuration validation passed")
+			logger.Info("Configuration validation passed")
 		}
 	}
 
 	// Security posture validation
 	if runSecurity {
-		logger.Info("🔒 Running security posture validation")
+		logger.Info("Running security posture validation")
 		if err := validateSecurityPosture(rc); err != nil {
-			logger.Error(" Security posture validation failed", zap.Error(err))
+			logger.Error("Security posture validation failed", zap.Error(err))
 			hasErrors = true
 		} else {
-			logger.Info(" Security posture validation passed")
+			logger.Info("Security posture validation passed")
 		}
 	}
 
@@ -92,8 +115,7 @@ func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		return fmt.Errorf("validation failed - see errors above")
 	}
 
-	logger.Info(" All validation checks passed")
-	fmt.Println("\n Vault validation successful")
+	logger.Info("All validation checks passed")
 	return nil
 }
 
@@ -192,6 +214,38 @@ func validateSecurityPosture(rc *eos_io.RuntimeContext) error {
 
 		return fmt.Errorf("security posture validation failed (%d issues)", len(failed))
 	}
+
+	return nil
+}
+
+// showRuntimeStatus displays comprehensive runtime status using the unified framework
+func showRuntimeStatus(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Creating Vault status provider")
+
+	// Create status provider
+	provider := servicestatus.NewVaultStatusProvider()
+
+	// Get comprehensive status
+	status, err := provider.GetStatus(rc)
+	if err != nil {
+		logger.Error("Failed to get Vault status", zap.Error(err))
+		return err
+	}
+
+	// Determine output format
+	format := servicestatus.FormatText
+	switch vaultOutputFormat {
+	case "json":
+		format = servicestatus.FormatJSON
+	case "yaml":
+		format = servicestatus.FormatYAML
+	case "short":
+		format = servicestatus.FormatShort
+	}
+
+	// Display status
+	logger.Info(status.Display(format))
 
 	return nil
 }
