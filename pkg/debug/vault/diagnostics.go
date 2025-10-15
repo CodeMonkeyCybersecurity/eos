@@ -265,6 +265,99 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 				}
 			}
 
+		// 5a. Check /opt/vault/logs directory (for audit logs)
+		output.WriteString("=== /opt/vault/logs Directory (for audit logs) ===\n")
+		logsCmd := exec.CommandContext(ctx, "ls", "-laZ", "/opt/vault/logs/")
+		logsOutput, logsErr := logsCmd.CombinedOutput()
+		var logsErrNoZ error
+		if logsErr != nil {
+			// Try without -Z flag (SELinux not available)
+			logsCmdNoZ := exec.CommandContext(ctx, "ls", "-la", "/opt/vault/logs/")
+			logsOutputNoZ, logsErrNoZ := logsCmdNoZ.CombinedOutput()
+			if logsErrNoZ != nil {
+				output.WriteString("ERROR: /opt/vault/logs doesn't exist!\n")
+				output.WriteString(fmt.Sprintf("Command output: %s\n", string(logsOutputNoZ)))
+				output.WriteString("This directory is required for Vault audit logging.\n\n")
+				result.Metadata["vault_logs_exists"] = false
+				if result.Status == "" {
+					result.Status = debug.StatusError
+					result.Message = "Vault logs directory missing"
+					result.Remediation = "Create logs directory:\n" +
+						"  sudo mkdir -p /opt/vault/logs\n" +
+						"  sudo chown vault:vault /opt/vault/logs\n" +
+						"  sudo chmod 750 /opt/vault/logs"
+				}
+			} else {
+				output.WriteString(string(logsOutputNoZ))
+				output.WriteString("\n")
+				result.Metadata["vault_logs_exists"] = true
+			}
+		} else {
+			output.WriteString(string(logsOutput))
+			output.WriteString("\n")
+			result.Metadata["vault_logs_exists"] = true
+			result.Metadata["selinux_labels_shown"] = true
+		}
+
+		// 5b. Check SELinux status
+		output.WriteString("=== SELinux Status ===\n")
+		selinuxCmd := exec.CommandContext(ctx, "getenforce")
+		selinuxOutput, selinuxErr := selinuxCmd.CombinedOutput()
+		if selinuxErr != nil {
+			output.WriteString("SELinux not available or not installed\n\n")
+			result.Metadata["selinux_available"] = false
+		} else {
+			selinuxStatus := strings.TrimSpace(string(selinuxOutput))
+			output.WriteString(fmt.Sprintf("SELinux status: %s\n", selinuxStatus))
+			result.Metadata["selinux_available"] = true
+			result.Metadata["selinux_status"] = selinuxStatus
+
+			if selinuxStatus == "Enforcing" {
+				output.WriteString("⚠ SELinux is enforcing - may block Vault file operations\n")
+				output.WriteString("If Vault has permission errors, check SELinux audit log:\n")
+				output.WriteString("  sudo ausearch -m avc -ts recent | grep vault\n\n")
+				if result.Status == "" {
+					result.Status = debug.StatusWarning
+					result.Message = "SELinux is enforcing - may affect Vault"
+					result.Remediation = "If permission errors occur, check SELinux contexts or set to permissive:\n" +
+						"  sudo setenforce 0  # Temporary\n" +
+						"  Or configure SELinux policy for Vault"
+				}
+			} else {
+				output.WriteString("SELinux is not blocking Vault operations\n\n")
+			}
+		}
+
+		// 5c. Test vault user can write to logs directory
+		output.WriteString("=== Vault User Write Test (logs directory) ===\n")
+		if idErr == nil && logsErrNoZ == nil {
+			testWriteLogsCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "touch", "/opt/vault/logs/test_write.log")
+			writeLogsErr := testWriteLogsCmd.Run()
+
+			if writeLogsErr == nil {
+				output.WriteString("✓ vault user CAN write to /opt/vault/logs\n\n")
+				// Clean up test file
+				_ = exec.CommandContext(ctx, "sudo", "rm", "-f", "/opt/vault/logs/test_write.log").Run()
+				result.Metadata["vault_user_can_write_logs"] = true
+			} else {
+				output.WriteString("✗ vault user CANNOT write to /opt/vault/logs\n")
+				output.WriteString(fmt.Sprintf("Error: %v\n", writeLogsErr))
+				output.WriteString("This will cause audit log failures!\n\n")
+				result.Metadata["vault_user_can_write_logs"] = false
+				if result.Status == "" || result.Status == debug.StatusWarning {
+					result.Status = debug.StatusError
+					result.Message = "vault user cannot write to logs directory"
+					result.Remediation = "Fix logs directory permissions:\n" +
+						"  sudo chown -R vault:vault /opt/vault/logs\n" +
+						"  sudo chmod 750 /opt/vault/logs\n" +
+						"  sudo systemctl restart vault"
+				}
+			}
+		} else {
+			output.WriteString("Skipping write test (vault user or logs directory doesn't exist)\n\n")
+		}
+
+
 			// 6. CRITICAL: Test vault user access to data directory
 			// This is the smoking gun for the "permission denied" bug
 			logger.Debug("Testing vault user access to data directory")
