@@ -561,7 +561,7 @@ func (bgi *BionicGPTInstaller) generateComposeContent() string {
 services:
   # Embeddings API - Document embeddings
   embeddings-api:
-    image: %s
+    image: %s:%s
     container_name: %s
     platform: linux/amd64
     networks:
@@ -686,6 +686,7 @@ networks:
 		DefaultBionicGPTVersion,
 		// Embeddings service
 		ImageEmbeddings,
+		VersionEmbeddings,
 		ContainerEmbeddings,
 		// Chunking service
 		ImageChunking,

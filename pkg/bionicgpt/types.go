@@ -137,7 +137,8 @@ const (
 	ImagePostgreSQL      = "ankane/pgvector"
 
 	// Docker image versions
-	VersionChunking = "4ffd8bc"
+	VersionEmbeddings = "cpu-0.6"
+	VersionChunking   = "4ffd8bc"
 
 	// Container names
 	ContainerApp        = "bionicgpt-app"
