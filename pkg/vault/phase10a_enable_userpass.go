@@ -54,51 +54,213 @@ func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logg
 
 // EnableUserpassAuth enables the userpass auth method if it is not already mounted.
 func EnableUserpassAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
-	otelzap.Ctx(rc.Ctx).Info(" Enabling userpass auth method if needed...")
+	log := otelzap.Ctx(rc.Ctx)
 
-	err := client.Sys().EnableAuthWithOptions("userpass", &api.EnableAuthOptions{Type: "userpass"})
+	// ASSESS: Check current auth methods
+	log.Info(" [ASSESS] Checking if userpass auth method is already enabled")
+	auths, err := client.Sys().ListAuth()
+	if err != nil {
+		log.Warn("Failed to list existing auth methods", zap.Error(err))
+		// Continue anyway - we'll find out if it exists when we try to enable it
+	} else {
+		log.Debug("Current auth methods",
+			zap.Int("count", len(auths)),
+			zap.Any("methods", getAuthMethodNames(auths)))
+
+		// Check if userpass is already mounted
+		for path, method := range auths {
+			if method.Type == "userpass" || strings.HasPrefix(path, "userpass") {
+				log.Info(" [EVALUATE] Userpass auth method already enabled",
+					zap.String("path", path),
+					zap.String("type", method.Type))
+				return nil
+			}
+		}
+		log.Info(" Userpass auth method not found, will enable it")
+	}
+
+	// INTERVENE: Enable userpass auth method
+	log.Info(" [INTERVENE] Enabling userpass auth method at path 'userpass/'")
+	err = client.Sys().EnableAuthWithOptions("userpass", &api.EnableAuthOptions{Type: "userpass"})
 	if err == nil {
-		otelzap.Ctx(rc.Ctx).Info(" Userpass auth method enabled")
+		log.Info(" [EVALUATE] Userpass auth method enabled successfully")
+
+		// Verify it was actually enabled
+		auths, verifyErr := client.Sys().ListAuth()
+		if verifyErr == nil {
+			for path, method := range auths {
+				if method.Type == "userpass" {
+					log.Info(" Verification: Userpass auth method confirmed in auth list",
+						zap.String("path", path),
+						zap.String("accessor", method.Accessor))
+					break
+				}
+			}
+		}
 		return nil
 	}
 
+	// Handle "already enabled" error gracefully
 	if strings.Contains(err.Error(), "path is already in use") {
-		otelzap.Ctx(rc.Ctx).Warn("Userpass auth method already enabled", zap.Error(err))
+		log.Info(" [EVALUATE] Userpass auth method already enabled (detected via error)",
+			zap.String("error_message", err.Error()))
 		return nil
 	}
 
-	otelzap.Ctx(rc.Ctx).Error(" Failed to enable userpass auth method", zap.Error(err))
+	log.Error(" [EVALUATE] Failed to enable userpass auth method",
+		zap.Error(err),
+		zap.String("error_detail", err.Error()))
 	return fmt.Errorf("enable userpass auth: %w", err)
+}
+
+// getAuthMethodNames extracts auth method names for logging
+func getAuthMethodNames(auths map[string]*api.AuthMount) []string {
+	names := make([]string, 0, len(auths))
+	for path := range auths {
+		names = append(names, path)
+	}
+	return names
 }
 
 // EnsureUserpassUser ensures the eos user exists under userpass auth.
 func EnsureUserpassUser(client *api.Client, rc *eos_io.RuntimeContext, password string) error {
-	zap.S().Infow("ensuring Eos user exists", "path", shared.EosUserpassPath)
-	if sec, _ := client.Logical().Read(shared.EosUserpassPath); sec != nil {
-		zap.S().Warn("Eos user already exists; skipping")
+	log := otelzap.Ctx(rc.Ctx)
+
+	// ASSESS: Check if eos user already exists
+	log.Info(" [ASSESS] Checking if eos user exists in userpass auth",
+		zap.String("path", shared.EosUserpassPath))
+
+	existingUser, readErr := client.Logical().Read(shared.EosUserpassPath)
+	if readErr != nil {
+		log.Warn("Failed to read existing user (may not exist yet)",
+			zap.Error(readErr),
+			zap.String("path", shared.EosUserpassPath))
+	}
+
+	if existingUser != nil {
+		log.Info(" [EVALUATE] Eos user already exists in userpass auth",
+			zap.String("path", shared.EosUserpassPath),
+			zap.Any("data_keys", getSecretDataKeys(existingUser)))
+		log.Info("terminal prompt: ✓ Eos userpass user already configured (skipping creation)")
+
+		// Still write fallback credentials in case they were lost
+		log.Info(" Ensuring fallback credentials are saved")
+		if err := WriteUserpassCredentialsFallback(rc, password); err != nil {
+			return cerr.Wrap(err, "write-credentials-fallback")
+		}
 		return nil
 	}
-	if _, err := client.Logical().Write(shared.EosUserpassPath, shared.UserDataTemplate(password)); err != nil {
+
+	// INTERVENE: Create eos user
+	log.Info(" [INTERVENE] Creating eos user in userpass auth",
+		zap.String("path", shared.EosUserpassPath),
+		zap.String("username", shared.EosID))
+
+	userData := shared.UserDataTemplate(password)
+	log.Debug("User data template prepared",
+		zap.Any("template_keys", getMapKeys(userData)))
+
+	writeResp, err := client.Logical().Write(shared.EosUserpassPath, userData)
+	if err != nil {
+		log.Error(" [EVALUATE] Failed to create userpass user",
+			zap.Error(err),
+			zap.String("path", shared.EosUserpassPath))
 		return cerr.Wrap(err, "create-userpass-user")
 	}
-	zap.S().Infow("Eos user created under userpass auth")
 
-	// fallback save
+	log.Info(" [EVALUATE] Eos user created successfully in userpass auth",
+		zap.String("path", shared.EosUserpassPath))
+
+	// Verify user was created by reading it back
+	log.Info(" Verifying user creation by reading back from Vault")
+	verifyUser, verifyErr := client.Logical().Read(shared.EosUserpassPath)
+	if verifyErr != nil {
+		log.Warn("Failed to verify user creation", zap.Error(verifyErr))
+	} else if verifyUser == nil {
+		log.Warn("User verification returned nil - user may not have been created properly")
+	} else {
+		log.Info(" User verification successful",
+			zap.String("path", shared.EosUserpassPath),
+			zap.Any("response_keys", getSecretDataKeys(verifyUser)))
+	}
+
+	if writeResp != nil && writeResp.Warnings != nil && len(writeResp.Warnings) > 0 {
+		log.Warn("Vault returned warnings during user creation",
+			zap.Strings("warnings", writeResp.Warnings))
+	}
+
+	// Write fallback credentials
+	log.Info(" Writing fallback credentials to disk and KV store")
 	if err := WriteUserpassCredentialsFallback(rc, password); err != nil {
 		return cerr.Wrap(err, "write-credentials-fallback")
 	}
+
 	return nil
 }
 
-// WriteUserpassCredentialsFallback writes the Eos user’s password to disk and Vault KV,
+// getSecretDataKeys extracts keys from a Vault secret for logging (avoids logging sensitive data)
+func getSecretDataKeys(secret *api.Secret) []string {
+	if secret == nil || secret.Data == nil {
+		return []string{}
+	}
+	keys := make([]string, 0, len(secret.Data))
+	for k := range secret.Data {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// getMapKeys extracts keys from a map for logging
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// WriteUserpassCredentialsFallback writes the Eos user's password to disk and Vault KV,
 // with telemetry, structured logging, and cockroachdb‐style error wrapping.
 func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string) error {
-	zap.S().Infow("saving fallback copy")
+	log := otelzap.Ctx(rc.Ctx)
 
+	// ASSESS: Check if secrets directory exists
+	log.Info(" [ASSESS] Preparing to save fallback credentials")
 	dir := filepath.Dir(shared.EosUserPassPasswordFile)
+
+	if stat, err := os.Stat(dir); err == nil {
+		log.Debug("Secrets directory already exists",
+			zap.String("path", dir),
+			zap.String("mode", stat.Mode().String()))
+	} else if os.IsNotExist(err) {
+		log.Info(" Secrets directory does not exist, will create it",
+			zap.String("path", dir))
+	}
+
+	// INTERVENE: Create secrets directory
+	log.Info(" [INTERVENE] Creating secrets directory",
+		zap.String("path", dir),
+		zap.String("permissions", "0700"))
 	if err := os.MkdirAll(dir, 0o700); err != nil {
+		log.Error(" Failed to create secrets directory",
+			zap.String("path", dir),
+			zap.Error(err))
 		return cerr.Wrapf(err, "mkdir %s", dir)
 	}
+
+	// Verify directory was created
+	if stat, err := os.Stat(dir); err == nil {
+		log.Debug("Secrets directory ready",
+			zap.String("path", dir),
+			zap.String("mode", stat.Mode().String()))
+	}
+
+	// Write password file
+	log.Info(" Writing fallback password file",
+		zap.String("path", shared.EosUserPassPasswordFile),
+		zap.String("permissions", "0600"),
+		zap.String("owner", "vault"))
+
 	if err := eos_unix.WriteFile(
 		rc.Ctx,
 		shared.EosUserPassPasswordFile,
@@ -106,26 +268,82 @@ func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string
 		0o600,
 		"vault",
 	); err != nil {
+		log.Error(" Failed to write fallback password file",
+			zap.String("path", shared.EosUserPassPasswordFile),
+			zap.Error(err))
 		return cerr.Wrapf(err, "write file %s", shared.EosUserPassPasswordFile)
 	}
-	zap.S().Infow("fallback file written", "path", shared.EosUserPassPasswordFile)
 
-	// Use vault user instead of deprecated eos user
+	log.Info(" [EVALUATE] Fallback password file written successfully",
+		zap.String("path", shared.EosUserPassPasswordFile))
+
+	// Verify file was written with correct permissions
+	if stat, err := os.Stat(shared.EosUserPassPasswordFile); err == nil {
+		log.Debug("Password file verification",
+			zap.String("path", shared.EosUserPassPasswordFile),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
+	}
+
+	// Set ownership on secrets directory
+	log.Info(" Setting ownership on secrets directory",
+		zap.String("path", shared.SecretsDir),
+		zap.String("owner", "vault:vault"))
+
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
+		log.Error(" Failed to lookup vault user for ownership",
+			zap.String("user", "vault"),
+			zap.Error(err))
 		return cerr.Wrapf(err, "lookup user %s", "vault")
 	}
+
+	log.Debug("Vault user IDs resolved",
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
 	if err := eos_unix.ChownR(rc.Ctx, shared.SecretsDir, uid, gid); err != nil {
-		zap.S().Warnw("chownR failed; continuing", "dir", shared.SecretsDir, "err", err)
+		log.Warn("Failed to set recursive ownership on secrets directory (non-fatal)",
+			zap.String("dir", shared.SecretsDir),
+			zap.Error(err))
+		// Continue anyway - file operations may still work
+	} else {
+		log.Info(" Ownership set successfully on secrets directory")
 	}
+
+	// Write to Vault KV store
+	log.Info(" Writing fallback credentials to Vault KV store",
+		zap.String("path", "secret/eos/userpass-password"))
 
 	client, err := GetRootClient(rc)
 	if err != nil {
+		log.Error(" Failed to get root client for KV write",
+			zap.Error(err))
 		return cerr.Wrap(err, "get-root-client")
 	}
+
 	if err := WriteKVv2(rc, client, "secret", "eos/userpass-password", shared.FallbackSecretsTemplate(password)); err != nil {
+		log.Error(" Failed to write fallback credentials to Vault KV",
+			zap.String("path", "secret/eos/userpass-password"),
+			zap.Error(err))
 		return cerr.Wrap(err, "write-kv-v2")
 	}
-	zap.S().Infow("secret written to Vault KV", "path", "secret/eos/userpass-password")
+
+	log.Info(" [EVALUATE] Fallback credentials written to Vault KV successfully",
+		zap.String("path", "secret/eos/userpass-password"))
+
+	// Verify KV write by reading it back
+	log.Info(" Verifying KV write by reading back from Vault")
+	verifySecret, verifyErr := client.Logical().Read("secret/data/eos/userpass-password")
+	if verifyErr != nil {
+		log.Warn("Failed to verify KV write", zap.Error(verifyErr))
+	} else if verifySecret == nil {
+		log.Warn("KV verification returned nil - secret may not have been written properly")
+	} else {
+		log.Info(" KV write verification successful",
+			zap.String("path", "secret/eos/userpass-password"),
+			zap.Any("metadata_keys", getSecretDataKeys(verifySecret)))
+	}
+
 	return nil
 }

@@ -357,12 +357,3 @@ func PrintActivityReport(rc *eos_io.RuntimeContext, report map[string]interface{
 	logger.Info("terminal prompt: For detailed breakdown: vault read sys/internal/counters/activity/monthly")
 	logger.Info("terminal prompt: ")
 }
-
-// getMapKeys is a helper function to extract keys from a map
-func getMapKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
-}

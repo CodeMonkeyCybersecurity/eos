@@ -5,6 +5,7 @@ package vault
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -53,72 +54,115 @@ func VaultAddress() string {
 //
 // Interactive phases (10a, 10b, 13, 14, 15) prompt the user for confirmation.
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
+	startTime := time.Now()
+	log.Info("═══════════════════════════════════════════════════════════════")
 	log.Info(" Starting Vault enablement flow (Phases 5-15)")
+	log.Info("═══════════════════════════════════════════════════════════════")
 
 	// Fall back to direct enablement
+	log.Info(" [ASSESS] Checking execution environment")
 	log.Info("Nomad not available, using direct enablement")
 
 	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
-		log.Info(" Clearing existing VAULT_TOKEN environment variable for fresh setup")
+		log.Info(" [ASSESS] Found existing VAULT_TOKEN, will clear for fresh setup")
+		log.Info(" [INTERVENE] Clearing existing VAULT_TOKEN environment variable")
 		if err := os.Unsetenv("VAULT_TOKEN"); err != nil {
 			log.Warn("Failed to unset VAULT_TOKEN", zap.Error(err))
 		}
-		log.Info(" VAULT_TOKEN cleared successfully")
+		log.Info(" [EVALUATE] VAULT_TOKEN cleared successfully")
 	} else {
-		log.Info(" No existing VAULT_TOKEN found - proceeding with fresh setup")
+		log.Info(" [ASSESS] No existing VAULT_TOKEN found - proceeding with fresh setup")
 	}
 
-	log.Info(" Starting Vault initialization and unseal process")
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 6] Starting Vault initialization and unseal process")
+	phaseStart := time.Now()
 	unsealedClient, err := UnsealVault(rc)
 	if err != nil {
 		return logger.LogErrAndWrap(rc, "initialize and unseal vault", err)
 	}
 	client = unsealedClient
-	log.Info(" Vault client initialized and unsealed successfully")
+	log.Info(" [Phase 6] Vault client initialized and unsealed successfully",
+		zap.Duration("duration", time.Since(phaseStart)))
+
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 7] Verifying root token and API client")
+	phaseStart = time.Now()
 
 	steps := []struct {
-		name string
-		fn   func() error
+		name  string
+		phase string
+		fn    func() error
 	}{
-		{"verify root token", func() error { return PhasePromptAndVerRootToken(rc, client) }},
-		{"verify vault API client", func() error { _, err := GetRootClient(rc); return err }},
-		{"verify vault healthy (Phase 8)", func() error { return PhaseEnsureVaultHealthy(rc) }},
+		{"verify root token", "7", func() error { return PhasePromptAndVerRootToken(rc, client) }},
+		{"verify vault API client", "7a", func() error { _, err := GetRootClient(rc); return err }},
+		{"verify vault healthy", "8", func() error { return PhaseEnsureVaultHealthy(rc) }},
 	}
+
 	for _, step := range steps {
-		otelzap.Ctx(rc.Ctx).Info(fmt.Sprintf(" %s...", step.name))
+		stepStart := time.Now()
+		log.Info(fmt.Sprintf(" [Phase %s] Starting: %s", step.phase, step.name))
 		if err := step.fn(); err != nil {
+			log.Error(fmt.Sprintf(" [Phase %s] Failed: %s", step.phase, step.name),
+				zap.Error(err),
+				zap.Duration("duration", time.Since(stepStart)))
 			return logger.LogErrAndWrap(rc, step.name, err)
 		}
+		log.Info(fmt.Sprintf(" [Phase %s] Completed: %s", step.phase, step.name),
+			zap.Duration("duration", time.Since(stepStart)))
 	}
+
+	log.Info(" [Phase 7-8] Verification complete",
+		zap.Duration("total_duration", time.Since(phaseStart)))
 
 	// Step 9a: Enable KV v2
-	log.Info(" Enabling KV v2 secrets engine")
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 9a] Enabling KV v2 secrets engine")
+	phaseStart = time.Now()
 	if err := PhaseEnableKVv2(rc, client); err != nil {
-		log.Error(" Failed to enable KV v2 secrets engine", zap.Error(err))
+		log.Error(" [Phase 9a] Failed to enable KV v2 secrets engine",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
 		return logger.LogErrAndWrap(rc, "enable KV v2", err)
 	}
-	log.Info(" KV v2 secrets engine enabled successfully")
+	log.Info(" [Phase 9a] KV v2 secrets engine enabled successfully",
+		zap.Duration("duration", time.Since(phaseStart)))
 
 	// Step 9d: Enable additional secrets engines (database, PKI)
-	log.Info(" Enabling additional secrets engines")
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 9d] Enabling additional secrets engines (interactive)")
+	phaseStart = time.Now()
 	if err := PhaseEnableSecretsEngines(rc, client); err != nil {
-		log.Error(" Failed to enable additional secrets engines", zap.Error(err))
+		log.Error(" [Phase 9d] Failed to enable additional secrets engines",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
 		return logger.LogErrAndWrap(rc, "enable additional secrets engines", err)
 	}
-	log.Info(" Additional secrets engines phase completed")
+	log.Info(" [Phase 9d] Additional secrets engines phase completed",
+		zap.Duration("duration", time.Since(phaseStart)))
 
 	// Step 9e: Enable activity tracking
-	log.Info(" Enabling activity tracking")
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 9e] Enabling activity tracking")
+	phaseStart = time.Now()
 	if err := PhaseEnableTracking(rc, client); err != nil {
-		log.Warn(" Failed to enable activity tracking (non-fatal)", zap.Error(err))
+		log.Warn(" [Phase 9e] Failed to enable activity tracking (non-fatal)",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
 		log.Info("terminal prompt: Activity tracking could not be enabled automatically")
 		log.Info("terminal prompt: You can enable it later with: vault write sys/internal/counters/config enabled=enable")
 	} else {
-		log.Info(" Activity tracking enabled successfully")
+		log.Info(" [Phase 9e] Activity tracking enabled successfully",
+			zap.Duration("duration", time.Since(phaseStart)))
 	}
 
 	// Step 10a: interactively configure userpass auth
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 10a] Configuring Userpass authentication (interactive)")
+	phaseStart = time.Now()
+
+	log.Info(" [ASSESS] Checking if Userpass is already configured")
 	userpassConfigured, err := IsUserpassConfigured(rc, client)
 	if err != nil {
 		log.Warn("Failed to check userpass status, will prompt", zap.Error(err))
@@ -126,27 +170,45 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}
 
 	if userpassConfigured {
+		log.Info(" [ASSESS] Userpass authentication already configured")
 		log.Info("terminal prompt: ✓ Userpass authentication already configured")
 		if interaction.PromptYesNo(rc.Ctx, "  Rotate eos user password?", false) {
 			password, err := crypto.PromptPassword(rc, "Enter NEW password for Eos Vault user:")
 			if err != nil {
 				return logger.LogErrAndWrap(rc, "prompt password", err)
 			}
+			log.Info(" [INTERVENE] Rotating eos user password")
 			if err := UpdateUserpassPassword(rc, client, password); err != nil {
 				return logger.LogErrAndWrap(rc, "rotate password", err)
 			}
+			log.Info(" [EVALUATE] Password rotated successfully")
 			log.Info("terminal prompt: ✓ Password rotated successfully")
+		} else {
+			log.Info(" User chose not to rotate password")
 		}
 	} else {
+		log.Info(" [ASSESS] Userpass not yet configured")
 		if interaction.PromptYesNo(rc.Ctx, "Enable Userpass authentication?", false) {
+			log.Info(" [INTERVENE] Enabling Userpass authentication")
 			// empty password => will prompt internally
 			if err := PhaseEnableUserpass(rc, client, log, ""); err != nil {
 				return logger.LogErrAndWrap(rc, "enable Userpass", err)
 			}
+			log.Info(" [EVALUATE] Userpass authentication enabled")
+		} else {
+			log.Info(" User chose to skip Userpass authentication")
 		}
 	}
 
+	log.Info(" [Phase 10a] Userpass configuration complete",
+		zap.Duration("duration", time.Since(phaseStart)))
+
 	// Step 10b: interactively configure AppRole auth
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 10b] Configuring AppRole authentication (interactive)")
+	phaseStart = time.Now()
+
+	log.Info(" [ASSESS] Checking if AppRole is already configured")
 	approleConfigured, err := IsAppRoleConfigured(rc, client)
 	if err != nil {
 		log.Warn("Failed to check AppRole status, will prompt", zap.Error(err))
@@ -154,36 +216,73 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}
 
 	if approleConfigured {
+		log.Info(" [ASSESS] AppRole authentication already configured")
 		log.Info("terminal prompt: ✓ AppRole authentication already configured")
 		if interaction.PromptYesNo(rc.Ctx, "  Regenerate AppRole credentials?", false) {
+			log.Info(" [INTERVENE] Regenerating AppRole credentials")
 			if err := RegenerateAppRoleCredentials(rc, client); err != nil {
 				return logger.LogErrAndWrap(rc, "regenerate approle credentials", err)
 			}
+			log.Info(" [EVALUATE] AppRole credentials regenerated successfully")
 			log.Info("terminal prompt: ✓ AppRole credentials regenerated successfully")
+		} else {
+			log.Info(" User chose not to regenerate credentials")
 		}
 	} else {
+		log.Info(" [ASSESS] AppRole not yet configured")
 		if interaction.PromptYesNo(rc.Ctx, "Enable AppRole authentication?", false) {
+			log.Info(" [INTERVENE] Enabling AppRole authentication")
 			opts := shared.DefaultAppRoleOptions()
 			if err := PhaseEnableAppRole(rc, client, log, opts); err != nil {
 				return logger.LogErrAndWrap(rc, "enable AppRole", err)
 			}
+			log.Info(" [EVALUATE] AppRole authentication enabled")
+		} else {
+			log.Info(" User chose to skip AppRole authentication")
 		}
 	}
 
+	log.Info(" [Phase 10b] AppRole configuration complete",
+		zap.Duration("duration", time.Since(phaseStart)))
+
 	// Step 10c: Create Eos entity and aliases
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 10c] Creating Eos entity and aliases")
+	phaseStart = time.Now()
 	if err := PhaseCreateEosEntity(rc); err != nil {
+		log.Error(" [Phase 10c] Failed to create entity",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
 		return logger.LogErrAndWrap(rc, "create eos entity", err)
 	}
+	log.Info(" [Phase 10c] Entity and aliases created successfully",
+		zap.Duration("duration", time.Since(phaseStart)))
 
 	// Step 11: Write core policies
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 11] Writing core Vault policies")
+	phaseStart = time.Now()
 	if err := EnsurePolicy(rc); err != nil {
+		log.Error(" [Phase 11] Failed to write policies",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
 		return logger.LogErrAndWrap(rc, "write policies", err)
 	}
+	log.Info(" [Phase 11] Core policies written successfully",
+		zap.Duration("duration", time.Since(phaseStart)))
 
 	// Step 12: Enable comprehensive audit logging
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 12] Enabling file-based audit logging")
+	phaseStart = time.Now()
 	if err := EnableFileAudit(rc, client); err != nil {
+		log.Error(" [Phase 12] Failed to enable audit logging",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
 		return logger.LogErrAndWrap(rc, "enable audit backend", err)
 	}
+	log.Info(" [Phase 12] Audit logging enabled successfully",
+		zap.Duration("duration", time.Since(phaseStart)))
 
 	// Step 13: Configure Multi-Factor Authentication
 	if interaction.PromptYesNo(rc.Ctx, "Enable Multi-Factor Authentication (MFA)?", true) {
@@ -258,9 +357,24 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Info("terminal prompt: IMPORTANT: Run 'eos secure vault --comprehensive' before production use")
 	}
 
-	log.Info(" Vault enablement process completed successfully")
+	duration := time.Since(startTime)
+	log.Info("═══════════════════════════════════════════════════════════════")
+	log.Info(" Vault enablement process completed successfully",
+		zap.Duration("total_duration", duration),
+		zap.String("duration_formatted", formatDuration(duration)))
+	log.Info("═══════════════════════════════════════════════════════════════")
 	PrintEnableNextSteps(rc)
 	return nil
+}
+
+// formatDuration formats a duration in a human-readable way
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%.1f seconds", d.Seconds())
+	}
+	minutes := int(d.Minutes())
+	seconds := int(d.Seconds()) % 60
+	return fmt.Sprintf("%dm %ds", minutes, seconds)
 }
 
 func PrintEnableNextSteps(rc *eos_io.RuntimeContext) {
