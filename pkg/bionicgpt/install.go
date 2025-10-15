@@ -58,12 +58,6 @@ func NewBionicGPTInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Bi
 	if config.EmbeddingsModel == "" {
 		config.EmbeddingsModel = DefaultEmbeddingsModel
 	}
-	if config.AppMemoryLimit == "" {
-		config.AppMemoryLimit = DefaultAppMemoryLimit
-	}
-	if config.AppCPULimit == "" {
-		config.AppCPULimit = DefaultAppCPULimit
-	}
 
 	// Enable RAG and multi-tenant by default
 	if !config.ForceReinstall {
@@ -665,8 +659,6 @@ services:
       migrations:
         condition: service_completed_successfully
     restart: unless-stopped
-    mem_limit: '%s'
-    cpus: %s
     logging:
       driver: "json-file"
       options:
@@ -717,8 +709,6 @@ networks:
 		DefaultBionicGPTVersion,
 		ContainerApp,
 		bgi.config.Port,
-		bgi.config.AppMemoryLimit,
-		bgi.config.AppCPULimit,
 		// Volumes
 		VolumePostgresData,
 		VolumeDocuments,

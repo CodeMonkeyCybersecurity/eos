@@ -78,12 +78,6 @@ type InstallConfig struct {
 	EnableAuditLog    bool // Enable audit logging (default: true)
 	EnableMultiTenant bool // Enable multi-tenant features (default: true)
 
-	// Resource limits
-	AppMemoryLimit string // Memory limit for app container (default: 2Gi)
-	AppCPULimit    string // CPU limit for app container (default: 2.0)
-	LLMMemoryLimit string // Memory limit for LLM container (default: 8Gi)
-	LLMCPULimit    string // CPU limit for LLM container (default: 4.0)
-
 	// Installation behavior
 	ForceReinstall  bool // Force reinstall even if already installed
 	SkipHealthCheck bool // Skip health check after installation
@@ -156,10 +150,6 @@ const (
 	// Docker volume names
 	VolumePostgresData = "bionicgpt-postgres-data"
 	VolumeDocuments    = "bionicgpt-documents"
-
-	// Default resource limits
-	DefaultAppMemoryLimit = "2Gi"
-	DefaultAppCPULimit    = "2.0"
 
 	// Vault paths for secrets
 	VaultPathBionicGPT = "secret/bionicgpt" // Base path in Vault for BionicGPT secrets
