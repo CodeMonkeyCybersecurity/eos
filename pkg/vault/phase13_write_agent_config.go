@@ -80,86 +80,234 @@ func prepareTokenSink(rc *eos_io.RuntimeContext, tokenPath, user string) error {
 	log := otelzap.Ctx(rc.Ctx)
 	runDir := filepath.Dir(tokenPath)
 
-	log.Info(" Preparing runtime directory", zap.String("dir", runDir))
+	log.Info("Preparing Vault Agent token sink",
+		zap.String("token_path", tokenPath),
+		zap.String("runtime_dir", runDir),
+		zap.String("target_owner", user),
+		zap.String("target_permissions", "0600"))
 
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		log.Error(" Failed to create runtime directory",
-			zap.String("dir", runDir),
-			zap.Error(err))
-		return err
-	}
-
-	uid, gid, err := eos_unix.LookupUser(rc.Ctx, user)
-	if err != nil {
-		log.Error(" Failed to lookup user for runtime directory ownership",
-			zap.String("user", user),
-			zap.Error(err))
-		return err
-	}
-
-	if err := os.Chown(runDir, uid, gid); err != nil {
-		log.Error(" Failed to set ownership on runtime directory",
-			zap.String("dir", runDir),
-			zap.String("user", user),
-			zap.Error(err))
-		return err
-	}
-
-	log.Info(" Runtime directory prepared successfully",
+	// Create runtime directory
+	log.Debug("Creating runtime directory if needed",
 		zap.String("dir", runDir),
-		zap.String("owner", user),
 		zap.String("mode", "0755"))
 
-	// remove stray directory if present
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		log.Error("Failed to create runtime directory",
+			zap.String("dir", runDir),
+			zap.Error(err))
+		return err
+	}
+
+	// Lookup target user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, user)
+	if err != nil {
+		log.Error("Failed to lookup user for runtime directory ownership",
+			zap.String("user", user),
+			zap.Error(err))
+		return err
+	}
+
+	log.Debug("User resolved for runtime directory ownership",
+		zap.String("user", user),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
+	// Set directory ownership
+	log.Debug("Setting runtime directory ownership",
+		zap.String("dir", runDir),
+		zap.String("user", user),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
+	if err := os.Chown(runDir, uid, gid); err != nil {
+		log.Error("Failed to set ownership on runtime directory",
+			zap.String("dir", runDir),
+			zap.String("user", user),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid),
+			zap.Error(err))
+		return err
+	}
+
+	// Verify directory ownership
+	dirStat, err := os.Stat(runDir)
+	if err != nil {
+		log.Warn("Directory created but verification stat failed",
+			zap.String("dir", runDir),
+			zap.Error(err))
+	} else {
+		log.Debug("Runtime directory ownership verified",
+			zap.String("dir", runDir),
+			zap.String("mode", dirStat.Mode().String()),
+			zap.String("owner", user))
+	}
+
+	// Remove stray directory if token path is a directory
 	if fi, err := os.Lstat(tokenPath); err == nil && fi.IsDir() {
+		log.Warn("Token path exists as directory, removing",
+			zap.String("path", tokenPath))
 		if err := os.RemoveAll(tokenPath); err != nil {
+			log.Error("Failed to remove stray directory at token path",
+				zap.String("path", tokenPath),
+				zap.Error(err))
 			return err
 		}
+		log.Debug("Stray directory removed", zap.String("path", tokenPath))
 	}
+
+	// Create empty token file
+	log.Debug("Creating empty token sink file",
+		zap.String("path", tokenPath),
+		zap.String("mode", "0600"))
+
 	f, err := os.OpenFile(tokenPath,
 		os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o600)
 	if err != nil {
+		log.Error("Failed to create token sink file",
+			zap.String("path", tokenPath),
+			zap.Error(err))
 		return err
 	}
 	if cerr := f.Close(); cerr != nil {
+		log.Error("Failed to close token sink file after creation",
+			zap.String("path", tokenPath),
+			zap.Error(cerr))
 		return cerr
 	}
-	return os.Chown(tokenPath, uid, gid)
+
+	// Set token file ownership
+	log.Debug("Setting token file ownership",
+		zap.String("path", tokenPath),
+		zap.String("user", user),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
+	if err := os.Chown(tokenPath, uid, gid); err != nil {
+		log.Error("Failed to set ownership on token file",
+			zap.String("path", tokenPath),
+			zap.String("user", user),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid),
+			zap.Error(err))
+		return err
+	}
+
+	// Final verification of token file
+	tokenStat, err := os.Stat(tokenPath)
+	if err != nil {
+		log.Warn("Token file created but verification stat failed",
+			zap.String("path", tokenPath),
+			zap.Error(err))
+	} else {
+		log.Info("Token sink prepared successfully",
+			zap.String("path", tokenPath),
+			zap.String("mode", tokenStat.Mode().String()),
+			zap.Int64("size", tokenStat.Size()),
+			zap.String("owner", user))
+	}
+
+	return nil
 }
 
 func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) error {
-	// ensure AppRole files exist
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Info("Writing Vault Agent HCL configuration",
+		zap.String("config_path", shared.VaultAgentConfigPath),
+		zap.String("vault_addr", addr),
+		zap.String("role_id_path", shared.AppRolePaths.RoleID),
+		zap.String("secret_id_path", shared.AppRolePaths.SecretID))
+
+	// Ensure AppRole files exist
+	log.Debug("Ensuring secrets directory exists",
+		zap.String("dir", filepath.Dir(shared.AppRolePaths.RoleID)))
+
 	if err := shared.EnsureSecretsDir(); err != nil {
+		log.Error("Failed to create secrets directory",
+			zap.Error(err))
 		return err
 	}
+
+	log.Debug("Ensuring AppRole credential files exist")
+
 	if err := shared.EnsureFileExists(rc.Ctx, shared.AppRolePaths.RoleID, roleID, shared.OwnerReadOnly); err != nil {
+		log.Error("Failed to ensure role_id file exists",
+			zap.String("path", shared.AppRolePaths.RoleID),
+			zap.Error(err))
 		return err
 	}
 	if err := shared.EnsureFileExists(rc.Ctx, shared.AppRolePaths.SecretID, secretID, shared.OwnerReadOnly); err != nil {
+		log.Error("Failed to ensure secret_id file exists",
+			zap.String("path", shared.AppRolePaths.SecretID),
+			zap.Error(err))
 		return err
 	}
 
+	// Build template data
 	data := shared.BuildAgentTemplateData(addr)
 	path := shared.VaultAgentConfigPath
+
+	log.Debug("Creating Vault Agent config file",
+		zap.String("path", path),
+		zap.String("vault_addr", data.Addr),
+		zap.String("sink_path", data.SinkPath))
+
+	// Create config file
 	f, err := os.Create(path)
 	if err != nil {
+		log.Error("Failed to create Vault Agent config file",
+			zap.String("path", path),
+			zap.Error(err))
 		return err
 	}
 	defer func() {
-		if err := f.Close(); err != nil {
-			// Log silently as this is a file write operation
-			_ = err
+		if cerr := f.Close(); cerr != nil {
+			log.Warn("Failed to close Vault Agent config file",
+				zap.String("path", path),
+				zap.Error(cerr))
 		}
 	}()
 
+	// Execute template
+	log.Debug("Rendering Vault Agent config template")
+
 	if err := agentHCLTpl.Execute(f, data); err != nil {
+		log.Error("Failed to render Vault Agent config template",
+			zap.Error(err))
 		return err
 	}
-	// SECURITY: Use 0640 for vault config files containing secrets (not world-readable)
-	return os.Chmod(path, shared.RuntimeFilePerms)
+
+	// Set permissions
+	log.Debug("Setting Vault Agent config file permissions",
+		zap.String("path", path),
+		zap.String("mode", fmt.Sprintf("%#o", shared.RuntimeFilePerms)))
+
+	if err := os.Chmod(path, shared.RuntimeFilePerms); err != nil {
+		log.Error("Failed to set Vault Agent config file permissions",
+			zap.String("path", path),
+			zap.Error(err))
+		return err
+	}
+
+	// Verify final state
+	stat, err := os.Stat(path)
+	if err != nil {
+		log.Warn("Config file written but verification stat failed",
+			zap.String("path", path),
+			zap.Error(err))
+	} else {
+		log.Info("Vault Agent HCL configuration written successfully",
+			zap.String("path", path),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
+	}
+
+	return nil
 }
 
 func writeAgentUnit() error {
+	log := otelzap.L()
+
 	data := shared.AgentSystemdData{
 		Description: "Vault Agent (Eos)",
 		User:        "vault",
@@ -170,21 +318,65 @@ func writeAgentUnit() error {
 	}
 
 	path := shared.VaultAgentServicePath
+
+	log.Info("Writing Vault Agent systemd unit file",
+		zap.String("path", path),
+		zap.String("user", data.User),
+		zap.String("group", data.Group),
+		zap.String("runtime_dir", data.RuntimeDir),
+		zap.String("exec_start", data.ExecStart))
+
+	log.Debug("Creating systemd unit file",
+		zap.String("path", path))
+
 	f, err := os.Create(path)
 	if err != nil {
+		log.Error("Failed to create systemd unit file",
+			zap.String("path", path),
+			zap.Error(err))
 		return err
 	}
 	defer func() {
-		if err := f.Close(); err != nil {
-			// Log silently as this is a file write operation
-			_ = err
+		if cerr := f.Close(); cerr != nil {
+			log.Warn("Failed to close systemd unit file",
+				zap.String("path", path),
+				zap.Error(cerr))
 		}
 	}()
 
+	log.Debug("Rendering systemd unit template")
+
 	if err := agentServiceTpl.Execute(f, data); err != nil {
+		log.Error("Failed to render systemd unit template",
+			zap.Error(err))
 		return err
 	}
-	return os.Chmod(path, 0o644)
+
+	log.Debug("Setting systemd unit file permissions",
+		zap.String("path", path),
+		zap.String("mode", "0644"))
+
+	if err := os.Chmod(path, 0o644); err != nil {
+		log.Error("Failed to set systemd unit file permissions",
+			zap.String("path", path),
+			zap.Error(err))
+		return err
+	}
+
+	// Verify final state
+	stat, err := os.Stat(path)
+	if err != nil {
+		log.Warn("Systemd unit file written but verification stat failed",
+			zap.String("path", path),
+			zap.Error(err))
+	} else {
+		log.Info("Vault Agent systemd unit file written successfully",
+			zap.String("path", path),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
+	}
+
+	return nil
 }
 
 // createTmpfilesConfig creates systemd tmpfiles configuration to ensure /run/eos persists across reboots
