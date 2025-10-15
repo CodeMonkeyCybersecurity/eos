@@ -28,7 +28,9 @@ var (
 const AgentConfigTmpl = `
 vault {
   address = "{{ .Addr }}"
-  {{- if .CACert }}
+  {{- if .TLSSkipVerify }}
+  tls_skip_verify = true
+  {{- else if .CACert }}
   tls_ca_file = "{{ .CACert }}"
   {{- end }}
 }
@@ -65,6 +67,7 @@ type AgentConfigData struct {
 	RoleFile, SecretFile       string
 	SinkType, SinkPath         string
 	EnableCache                bool
+	TLSSkipVerify              bool // For development environments with self-signed certs
 }
 
 // AgentSystemDUnit is the systemd unit template for running Vault Agent under eos.
@@ -410,14 +413,15 @@ func EnsureFileExists(ctx context.Context, path, value string, perm os.FileMode)
 
 func BuildAgentTemplateData(addr string) AgentConfigData {
 	return AgentConfigData{
-		Addr:         addr,
-		CACert:       VaultAgentCACopyPath,
-		RoleFile:     AppRolePaths.RoleID,
-		SecretFile:   AppRolePaths.SecretID,
-		SinkType:     "file",           // set explicitly
-		SinkPath:     AgentToken,       // fix: use AgentToken, not undefined VaultAgentTokenPath
-		ListenerAddr: "127.0.0.1:8180", // fix: use different port from Vault server (8179)
-		EnableCache:  false,            // fix: disable cache to avoid listener requirement
+		Addr:          addr,
+		CACert:        VaultAgentCACopyPath,
+		RoleFile:      AppRolePaths.RoleID,
+		SecretFile:    AppRolePaths.SecretID,
+		SinkType:      "file",           // set explicitly
+		SinkPath:      AgentToken,       // fix: use AgentToken, not undefined VaultAgentTokenPath
+		ListenerAddr:  "127.0.0.1:8180", // fix: use different port from Vault server (8179)
+		EnableCache:   false,            // fix: disable cache to avoid listener requirement
+		TLSSkipVerify: true,             // HISTORICAL FIX: Skip TLS verification for self-signed certs (development)
 	}
 }
 
