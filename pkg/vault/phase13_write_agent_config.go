@@ -50,10 +50,40 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 	}
 
 	// 2) render + write HCL
+	log.Info("Reading AppRole credentials from disk for agent configuration")
+
+	// Pre-read diagnostics: verify credential files exist and are readable
+	for _, credPath := range []struct {
+		path string
+		name string
+	}{
+		{shared.AppRolePaths.RoleID, "role_id"},
+		{shared.AppRolePaths.SecretID, "secret_id"},
+	} {
+		if stat, err := os.Stat(credPath.path); err != nil {
+			log.Error("Credential file missing or inaccessible before read",
+				zap.String("file", credPath.name),
+				zap.String("path", credPath.path),
+				zap.Error(err))
+			return fmt.Errorf("credential file %s not found at %s: %w", credPath.name, credPath.path, err)
+		} else {
+			log.Debug("Credential file exists and is accessible",
+				zap.String("file", credPath.name),
+				zap.String("path", credPath.path),
+				zap.String("mode", stat.Mode().String()),
+				zap.Int64("size", stat.Size()))
+		}
+	}
+
 	roleID, secretID, err := readAppRoleCredsFromDisk(rc, client)
 	if err != nil {
 		return fmt.Errorf("read AppRole creds: %w", err)
 	}
+
+	log.Info("AppRole credentials read successfully from disk",
+		zap.Int("role_id_length", len(roleID)),
+		zap.Int("secret_id_length", len(secretID)))
+
 	if err := writeAgentHCL(rc, addr, roleID, secretID); err != nil {
 		return fmt.Errorf("write agent HCL: %w", err)
 	}
@@ -220,38 +250,14 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 		zap.String("secret_id_path", shared.AppRolePaths.SecretID),
 		zap.String("target_owner", "vault"))
 
-	// Ensure AppRole files exist WITH PROPER OWNERSHIP
-	log.Debug("Ensuring secrets directory exists",
-		zap.String("dir", filepath.Dir(shared.AppRolePaths.RoleID)))
+	// NOTE: AppRole credential files should already exist from Phase 10b.
+	// We do NOT write them here to avoid race conditions and redundancy.
+	// Phase 10b is responsible for: 1) Creating AppRole in Vault, 2) Writing credential files
+	// Phase 13 is responsible for: 1) Reading credential files, 2) Writing agent HCL config
 
-	if err := shared.EnsureSecretsDir(); err != nil {
-		log.Error("Failed to create secrets directory",
-			zap.Error(err))
-		return err
-	}
-
-	// Use eos_unix.WriteFile to ensure proper ownership on AppRole credential files
-	log.Info("Ensuring AppRole credential files exist with vault ownership")
-
-	// Write role_id with vault ownership
-	if err := eos_unix.WriteFile(rc.Ctx, shared.AppRolePaths.RoleID, []byte(roleID), shared.OwnerReadOnly, "vault"); err != nil {
-		log.Error("Failed to write role_id file with ownership",
-			zap.String("path", shared.AppRolePaths.RoleID),
-			zap.Error(err))
-		return fmt.Errorf("write role_id: %w", err)
-	}
-
-	// Write secret_id with vault ownership
-	if err := eos_unix.WriteFile(rc.Ctx, shared.AppRolePaths.SecretID, []byte(secretID), shared.OwnerReadOnly, "vault"); err != nil {
-		log.Error("Failed to write secret_id file with ownership",
-			zap.String("path", shared.AppRolePaths.SecretID),
-			zap.Error(err))
-		return fmt.Errorf("write secret_id: %w", err)
-	}
-
-	log.Info("AppRole credential files written with vault ownership",
-		zap.String("role_id_path", shared.AppRolePaths.RoleID),
-		zap.String("secret_id_path", shared.AppRolePaths.SecretID))
+	log.Debug("Using AppRole credentials from Phase 10b",
+		zap.String("role_id_file", shared.AppRolePaths.RoleID),
+		zap.String("secret_id_file", shared.AppRolePaths.SecretID))
 
 	// Build template data
 	data := shared.BuildAgentTemplateData(addr)

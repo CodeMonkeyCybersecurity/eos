@@ -73,7 +73,24 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 		return "", "", cerr.Wrap(err, "read credential from disk")
 	}
 	roleID := strings.TrimSpace(string(roleIDBytes))
-	log.Info(" RoleID read successfully")
+
+	// VALIDATE: Ensure role_id is not empty and has valid format
+	if roleID == "" {
+		log.Error(" RoleID file is empty",
+			zap.String("path", shared.AppRolePaths.RoleID))
+		return "", "", cerr.New("role_id file is empty")
+	}
+
+	if len(roleID) < 36 { // UUIDs are at least 36 chars (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+		log.Error(" RoleID appears invalid (too short)",
+			zap.String("path", shared.AppRolePaths.RoleID),
+			zap.Int("length", len(roleID)),
+			zap.Int("min_expected", 36))
+		return "", "", cerr.Newf("role_id appears invalid: length %d < 36", len(roleID))
+	}
+
+	log.Info(" RoleID read and validated successfully",
+		zap.Int("length", len(roleID)))
 
 	log.Info(" Reading SecretID from disk", zap.String("path", shared.AppRolePaths.SecretID))
 	secretIDBytes, err := os.ReadFile(shared.AppRolePaths.SecretID)
@@ -84,6 +101,17 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 		return "", "", cerr.Wrap(err, "read credential from disk")
 	}
 	secretIDRaw := strings.TrimSpace(string(secretIDBytes))
+
+	// VALIDATE: Ensure secret_id is not empty
+	if secretIDRaw == "" {
+		log.Error(" SecretID file is empty",
+			zap.String("path", shared.AppRolePaths.SecretID))
+		return "", "", cerr.New("secret_id file is empty")
+	}
+
+	log.Debug(" SecretID read from disk",
+		zap.Int("length", len(secretIDRaw)),
+		zap.Bool("is_wrapped", strings.HasPrefix(secretIDRaw, "s.")))
 
 	if strings.HasPrefix(secretIDRaw, "s.") {
 		if client == nil {

@@ -72,7 +72,39 @@ func PhaseEnableAppRole(
 		return cerr.Wrapf(err, "write AppRole files")
 	}
 
-	log.Info(" AppRole setup complete", zap.String("role_id", roleID))
+	// 5) VERIFY: Confirm Vault actually has this AppRole registered
+	log.Info(" Verifying AppRole exists in Vault backend")
+	roleIDReadback, err := privilegedClient.Logical().Read("auth/approle/role/eos-agent/role-id")
+	if err != nil {
+		log.Error(" Failed to verify AppRole role-id in Vault after creation",
+			zap.Error(err))
+		return cerr.Wrap(err, "verify AppRole in Vault")
+	}
+
+	if roleIDReadback == nil || roleIDReadback.Data == nil {
+		log.Error(" AppRole role-id not found in Vault after creation")
+		return cerr.New("AppRole verification failed: role-id not found in Vault")
+	}
+
+	storedRoleID, ok := roleIDReadback.Data["role_id"].(string)
+	if !ok || storedRoleID == "" {
+		log.Error(" AppRole role-id is empty or invalid in Vault",
+			zap.Any("data", roleIDReadback.Data))
+		return cerr.New("AppRole verification failed: role-id invalid in Vault")
+	}
+
+	if storedRoleID != roleID {
+		log.Error(" AppRole role-id mismatch between file and Vault",
+			zap.String("expected", roleID),
+			zap.String("stored_in_vault", storedRoleID))
+		return cerr.New("AppRole verification failed: role-id mismatch")
+	}
+
+	log.Info(" AppRole verified in Vault backend",
+		zap.String("role_id", roleID),
+		zap.String("role_name", "eos-agent"))
+
+	log.Info(" AppRole setup complete and verified", zap.String("role_id", roleID))
 	return nil
 }
 
@@ -106,6 +138,38 @@ func EnableAppRoleFlow(
 		return cerr.Wrapf(err, "write AppRole files")
 	}
 
-	log.Info(" AppRole setup complete", zap.String("role_id", roleID))
+	// 5) VERIFY: Confirm Vault actually has this AppRole registered
+	log.Info(" Verifying AppRole exists in Vault backend")
+	roleIDReadback, err := client.Logical().Read("auth/approle/role/eos-agent/role-id")
+	if err != nil {
+		log.Error(" Failed to verify AppRole role-id in Vault after creation",
+			zap.Error(err))
+		return cerr.Wrap(err, "verify AppRole in Vault")
+	}
+
+	if roleIDReadback == nil || roleIDReadback.Data == nil {
+		log.Error(" AppRole role-id not found in Vault after creation")
+		return cerr.New("AppRole verification failed: role-id not found in Vault")
+	}
+
+	storedRoleID, ok := roleIDReadback.Data["role_id"].(string)
+	if !ok || storedRoleID == "" {
+		log.Error(" AppRole role-id is empty or invalid in Vault",
+			zap.Any("data", roleIDReadback.Data))
+		return cerr.New("AppRole verification failed: role-id invalid in Vault")
+	}
+
+	if storedRoleID != roleID {
+		log.Error(" AppRole role-id mismatch between file and Vault",
+			zap.String("expected", roleID),
+			zap.String("stored_in_vault", storedRoleID))
+		return cerr.New("AppRole verification failed: role-id mismatch")
+	}
+
+	log.Info(" AppRole verified in Vault backend",
+		zap.String("role_id", roleID),
+		zap.String("role_name", "eos-agent"))
+
+	log.Info(" AppRole setup complete and verified", zap.String("role_id", roleID))
 	return nil
 }
