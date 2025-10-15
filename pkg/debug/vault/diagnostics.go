@@ -44,6 +44,12 @@ func AllDiagnostics() []*debug.Diagnostic {
 		EnvironmentDiagnostic(),
 		CapabilitiesDiagnostic(),
 		DeletionTransactionLogsDiagnostic(),
+		// Vault Agent diagnostics
+		VaultAgentServiceDiagnostic(),
+		VaultAgentConfigDiagnostic(),
+		VaultAgentCredentialsDiagnostic(),
+		VaultAgentTokenDiagnostic(),
+		VaultAgentLogsDiagnostic(),
 	}
 }
 
@@ -1021,6 +1027,414 @@ func DeletionTransactionLogsDiagnostic() *debug.Diagnostic {
 				result.Status = debug.StatusWarning
 			}
 
+			return result, nil
+		},
+	}
+}
+
+//--------------------------------------------------------------------
+// Vault Agent Diagnostics
+//--------------------------------------------------------------------
+
+// VaultAgentServiceDiagnostic checks the vault-agent-eos service status
+func VaultAgentServiceDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Vault Agent Service",
+		Category:    "Vault Agent",
+		Description: "Check vault-agent-eos systemd service status",
+		Condition: func(ctx context.Context) bool {
+			// Check if systemd service file exists
+			_, err := os.Stat("/etc/systemd/system/vault-agent-eos.service")
+			return err == nil
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Checking Vault Agent service status")
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			cmd := exec.CommandContext(ctx, "systemctl", "status", "vault-agent-eos")
+			output, err := cmd.CombinedOutput()
+			result.Output = string(output)
+
+			// Check if service is active
+			isActiveCmd := exec.CommandContext(ctx, "systemctl", "is-active", "vault-agent-eos")
+			activeOutput, _ := isActiveCmd.CombinedOutput()
+			isActive := strings.TrimSpace(string(activeOutput)) == "active"
+
+			result.Metadata["is_active"] = isActive
+			result.Metadata["service_name"] = "vault-agent-eos.service"
+
+			if isActive {
+				result.Status = debug.StatusOK
+				result.Message = "Service is running"
+			} else if err == nil {
+				result.Status = debug.StatusWarning
+				result.Message = fmt.Sprintf("Service is not active: %s", strings.TrimSpace(string(activeOutput)))
+				result.Remediation = "Start service: sudo systemctl start vault-agent-eos"
+			} else {
+				result.Status = debug.StatusError
+				result.Message = "Service not found or failed to query"
+				result.Remediation = "Install Vault Agent: eos enable vault agent"
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// VaultAgentConfigDiagnostic checks the Vault Agent configuration file
+func VaultAgentConfigDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Vault Agent Configuration",
+		Category:    "Vault Agent",
+		Description: "Check Vault Agent config file existence and validity",
+		Condition: func(ctx context.Context) bool {
+			return true // Always run
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			configPath := "/etc/vault-agent.d/vault-agent-eos.hcl"
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+			result.Metadata["config_path"] = configPath
+
+			logger.Info("Checking Vault Agent configuration", zap.String("path", configPath))
+
+			// Check if config exists
+			stat, err := os.Stat(configPath)
+			if os.IsNotExist(err) {
+				result.Status = debug.StatusError
+				result.Message = "Configuration file not found"
+				result.Output = fmt.Sprintf("File does not exist: %s", configPath)
+				result.Remediation = "Configure Vault Agent: eos enable vault agent"
+				return result, nil
+			} else if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to stat configuration file"
+				result.Output = err.Error()
+				return result, nil
+			}
+
+			// Read and display config
+			content, err := os.ReadFile(configPath)
+			if err != nil {
+				result.Status = debug.StatusWarning
+				result.Message = fmt.Sprintf("File exists (%d bytes) but cannot read", stat.Size())
+				result.Output = err.Error()
+				return result, nil
+			}
+
+			result.Status = debug.StatusOK
+			result.Message = fmt.Sprintf("Configuration file exists (%d bytes)", len(content))
+			result.Output = string(content)
+			result.Metadata["size_bytes"] = len(content)
+			result.Metadata["mode"] = stat.Mode().String()
+
+			return result, nil
+		},
+	}
+}
+
+// VaultAgentCredentialsDiagnostic checks AppRole credentials for Vault Agent
+func VaultAgentCredentialsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Vault Agent Credentials",
+		Category:    "Vault Agent",
+		Description: "Check AppRole role_id and secret_id files",
+		Condition: func(ctx context.Context) bool {
+			return true // Always run
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			roleIDPath := "/var/lib/eos/secret/role_id"
+			secretIDPath := "/var/lib/eos/secret/secret_id"
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var output strings.Builder
+			output.WriteString("=== AppRole Credentials Check ===\n\n")
+
+			// Check role_id
+			roleIDStat, roleIDErr := os.Stat(roleIDPath)
+			result.Metadata["role_id_path"] = roleIDPath
+			result.Metadata["role_id_exists"] = roleIDErr == nil
+
+			if roleIDErr == nil {
+				output.WriteString(fmt.Sprintf("✓ role_id file exists: %s\n", roleIDPath))
+				output.WriteString(fmt.Sprintf("  Size: %d bytes\n", roleIDStat.Size()))
+				output.WriteString(fmt.Sprintf("  Mode: %s\n", roleIDStat.Mode().String()))
+				result.Metadata["role_id_size"] = roleIDStat.Size()
+				result.Metadata["role_id_mode"] = roleIDStat.Mode().String()
+
+				// Try to read (as root)
+				roleIDContent, err := os.ReadFile(roleIDPath)
+				if err == nil && len(roleIDContent) > 0 {
+					output.WriteString(fmt.Sprintf("  Content: %d characters (redacted)\n", len(strings.TrimSpace(string(roleIDContent)))))
+					result.Metadata["role_id_populated"] = true
+				} else {
+					output.WriteString("  ✗ File is empty or unreadable\n")
+					result.Metadata["role_id_populated"] = false
+				}
+			} else {
+				output.WriteString(fmt.Sprintf("✗ role_id file NOT found: %s\n", roleIDPath))
+				output.WriteString(fmt.Sprintf("  Error: %v\n", roleIDErr))
+			}
+
+			output.WriteString("\n")
+
+			// Check secret_id
+			secretIDStat, secretIDErr := os.Stat(secretIDPath)
+			result.Metadata["secret_id_path"] = secretIDPath
+			result.Metadata["secret_id_exists"] = secretIDErr == nil
+
+			if secretIDErr == nil {
+				output.WriteString(fmt.Sprintf("✓ secret_id file exists: %s\n", secretIDPath))
+				output.WriteString(fmt.Sprintf("  Size: %d bytes\n", secretIDStat.Size()))
+				output.WriteString(fmt.Sprintf("  Mode: %s\n", secretIDStat.Mode().String()))
+				result.Metadata["secret_id_size"] = secretIDStat.Size()
+				result.Metadata["secret_id_mode"] = secretIDStat.Mode().String()
+
+				// Try to read (as root)
+				secretIDContent, err := os.ReadFile(secretIDPath)
+				if err == nil && len(secretIDContent) > 0 {
+					output.WriteString(fmt.Sprintf("  Content: %d characters (redacted)\n", len(strings.TrimSpace(string(secretIDContent)))))
+					result.Metadata["secret_id_populated"] = true
+				} else {
+					output.WriteString("  ✗ File is empty or unreadable\n")
+					result.Metadata["secret_id_populated"] = false
+				}
+			} else {
+				output.WriteString(fmt.Sprintf("✗ secret_id file NOT found: %s\n", secretIDPath))
+				output.WriteString(fmt.Sprintf("  Error: %v\n", secretIDErr))
+			}
+
+			output.WriteString("\n")
+
+			// Test if vault user can read credentials
+			output.WriteString("=== Vault User Access Test ===\n")
+			testCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-r", roleIDPath)
+			if testCmd.Run() == nil {
+				output.WriteString(fmt.Sprintf("✓ vault user CAN read: %s\n", roleIDPath))
+			} else {
+				output.WriteString(fmt.Sprintf("✗ vault user CANNOT read: %s\n", roleIDPath))
+			}
+
+			testCmd = exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-r", secretIDPath)
+			if testCmd.Run() == nil {
+				output.WriteString(fmt.Sprintf("✓ vault user CAN read: %s\n", secretIDPath))
+			} else {
+				output.WriteString(fmt.Sprintf("✗ vault user CANNOT read: %s\n", secretIDPath))
+			}
+
+			result.Output = output.String()
+
+			// Determine status
+			bothExist := roleIDErr == nil && secretIDErr == nil
+			if bothExist {
+				result.Status = debug.StatusOK
+				result.Message = "AppRole credentials found"
+			} else {
+				result.Status = debug.StatusError
+				result.Message = "AppRole credentials missing"
+				result.Remediation = "Enable AppRole auth: eos enable vault approle"
+			}
+
+			logger.Info("Vault Agent credentials check complete",
+				zap.Bool("role_id_exists", roleIDErr == nil),
+				zap.Bool("secret_id_exists", secretIDErr == nil))
+
+			return result, nil
+		},
+	}
+}
+
+// VaultAgentTokenDiagnostic checks the Vault Agent token file
+func VaultAgentTokenDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Vault Agent Token",
+		Category:    "Vault Agent",
+		Description: "Check Vault Agent token sink file",
+		Condition: func(ctx context.Context) bool {
+			return true // Always run
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			tokenPath := "/run/eos/vault_agent_eos.token"
+			runtimeDir := "/run/eos"
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+			result.Metadata["token_path"] = tokenPath
+			result.Metadata["runtime_dir"] = runtimeDir
+
+			var output strings.Builder
+			output.WriteString("=== Vault Agent Token Sink Check ===\n\n")
+
+			// Check runtime directory
+			runtimeStat, runtimeErr := os.Stat(runtimeDir)
+			if runtimeErr == nil {
+				output.WriteString(fmt.Sprintf("✓ Runtime directory exists: %s\n", runtimeDir))
+				output.WriteString(fmt.Sprintf("  Mode: %s\n", runtimeStat.Mode().String()))
+
+				result.Metadata["runtime_dir_exists"] = true
+				result.Metadata["runtime_dir_mode"] = runtimeStat.Mode().String()
+
+				// List contents
+				entries, err := os.ReadDir(runtimeDir)
+				if err == nil {
+					output.WriteString(fmt.Sprintf("  Contents: %d files\n", len(entries)))
+					for _, entry := range entries {
+						info, _ := entry.Info()
+						if info != nil {
+							output.WriteString(fmt.Sprintf("    - %s (%s, %d bytes)\n",
+								entry.Name(), info.Mode().String(), info.Size()))
+						}
+					}
+				}
+			} else {
+				output.WriteString(fmt.Sprintf("✗ Runtime directory NOT found: %s\n", runtimeDir))
+				output.WriteString(fmt.Sprintf("  Error: %v\n", runtimeErr))
+				result.Metadata["runtime_dir_exists"] = false
+			}
+
+			output.WriteString("\n")
+
+			// Check token file
+			tokenStat, tokenErr := os.Stat(tokenPath)
+			result.Metadata["token_file_exists"] = tokenErr == nil
+
+			if tokenErr == nil {
+				output.WriteString(fmt.Sprintf("✓ Token file exists: %s\n", tokenPath))
+				output.WriteString(fmt.Sprintf("  Size: %d bytes\n", tokenStat.Size()))
+				output.WriteString(fmt.Sprintf("  Mode: %s\n", tokenStat.Mode().String()))
+				output.WriteString(fmt.Sprintf("  Modified: %s\n", tokenStat.ModTime().Format(time.RFC3339)))
+
+				result.Metadata["token_file_size"] = tokenStat.Size()
+				result.Metadata["token_file_mode"] = tokenStat.Mode().String()
+				result.Metadata["token_file_mtime"] = tokenStat.ModTime().Format(time.RFC3339)
+
+				if tokenStat.Size() == 0 {
+					output.WriteString("\n⚠ WARNING: Token file is EMPTY (0 bytes)\n")
+					output.WriteString("  This means Vault Agent has NOT successfully authenticated yet.\n")
+					output.WriteString("  Check Vault Agent logs for authentication errors.\n")
+					result.Status = debug.StatusWarning
+					result.Message = "Token file exists but is empty - Agent not authenticated"
+					result.Remediation = "Check Vault Agent logs: sudo journalctl -u vault-agent-eos -n 50"
+				} else {
+					// Try to read token (redacted)
+					tokenContent, err := os.ReadFile(tokenPath)
+					if err == nil {
+						token := strings.TrimSpace(string(tokenContent))
+						output.WriteString(fmt.Sprintf("\n✓ Token file has content: %d characters\n", len(token)))
+						if len(token) >= 16 {
+							output.WriteString(fmt.Sprintf("  Token preview: %s...%s (redacted)\n",
+								token[:8], token[len(token)-8:]))
+						}
+						result.Status = debug.StatusOK
+						result.Message = "Token file populated - Agent authenticated successfully"
+						result.Metadata["token_populated"] = true
+					} else {
+						output.WriteString(fmt.Sprintf("\n✗ Cannot read token file: %v\n", err))
+						result.Status = debug.StatusWarning
+						result.Message = "Token file exists but cannot be read"
+					}
+				}
+			} else {
+				output.WriteString(fmt.Sprintf("✗ Token file NOT found: %s\n", tokenPath))
+				output.WriteString(fmt.Sprintf("  Error: %v\n", tokenErr))
+				result.Status = debug.StatusError
+				result.Message = "Token file does not exist"
+				result.Remediation = "Start Vault Agent: sudo systemctl start vault-agent-eos"
+				result.Metadata["token_file_exists"] = false
+			}
+
+			result.Output = output.String()
+
+			logger.Info("Vault Agent token check complete",
+				zap.Bool("token_exists", tokenErr == nil),
+				zap.Int64("token_size", func() int64 {
+					if tokenStat != nil {
+						return tokenStat.Size()
+					}
+					return 0
+				}()))
+
+			return result, nil
+		},
+	}
+}
+
+// VaultAgentLogsDiagnostic retrieves recent Vault Agent service logs
+func VaultAgentLogsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Vault Agent Logs",
+		Category:    "Vault Agent",
+		Description: "Retrieve recent Vault Agent service logs",
+		Condition: func(ctx context.Context) bool {
+			// Only run if service file exists
+			_, err := os.Stat("/etc/systemd/system/vault-agent-eos.service")
+			return err == nil
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Retrieving Vault Agent service logs")
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var output strings.Builder
+			output.WriteString("=== Vault Agent Service Logs (last 100 lines) ===\n\n")
+
+			// Get logs
+			cmd := exec.CommandContext(ctx, "journalctl", "-u", "vault-agent-eos", "-n", "100", "--no-pager")
+			logOutput, err := cmd.CombinedOutput()
+
+			if err != nil {
+				output.WriteString(fmt.Sprintf("Failed to retrieve logs: %v\n", err))
+				result.Status = debug.StatusWarning
+				result.Message = "Could not retrieve service logs"
+			} else {
+				logs := string(logOutput)
+				output.WriteString(logs)
+
+				// Analyze logs for common errors
+				errorCount := strings.Count(logs, "level=error")
+				warnCount := strings.Count(logs, "level=warn")
+				authFailCount := strings.Count(logs, "auth") + strings.Count(logs, "authentication")
+
+				result.Metadata["error_count"] = errorCount
+				result.Metadata["warning_count"] = warnCount
+				result.Metadata["auth_mentions"] = authFailCount
+				result.Metadata["log_lines"] = strings.Count(logs, "\n")
+
+				output.WriteString("\n=== Log Analysis ===\n")
+				output.WriteString(fmt.Sprintf("Errors: %d\n", errorCount))
+				output.WriteString(fmt.Sprintf("Warnings: %d\n", warnCount))
+				output.WriteString(fmt.Sprintf("Auth mentions: %d\n", authFailCount))
+
+				if errorCount > 0 {
+					result.Status = debug.StatusError
+					result.Message = fmt.Sprintf("Logs contain %d error(s)", errorCount)
+					result.Remediation = "Review error messages in logs above"
+				} else if warnCount > 0 {
+					result.Status = debug.StatusWarning
+					result.Message = fmt.Sprintf("Logs contain %d warning(s)", warnCount)
+				} else {
+					result.Status = debug.StatusOK
+					result.Message = "No errors in recent logs"
+				}
+			}
+
+			result.Output = output.String()
 			return result, nil
 		},
 	}
