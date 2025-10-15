@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -37,17 +38,119 @@ func OrchestrateVaultAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
 	return SecureAuthenticationOrchestrator(rc, client)
 }
 
+// readAgentTokenWithRetry handles the race condition where the agent token file exists but is empty
+// because the agent hasn't finished authentication yet. We retry with backoff up to 30 seconds.
+func readAgentTokenWithRetry(rc *eos_io.RuntimeContext, path string) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	const (
+		maxAttempts = 15              // 15 attempts
+		retryDelay  = 2 * time.Second // 2 seconds between attempts = 30 seconds total
+	)
+
+	log.Info("Waiting for Vault Agent to authenticate and write token file",
+		zap.String("path", path),
+		zap.Int("max_attempts", maxAttempts),
+		zap.Duration("retry_delay", retryDelay),
+		zap.Duration("max_wait_time", time.Duration(maxAttempts)*retryDelay))
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		log.Debug("Attempting to read agent token file",
+			zap.Int("attempt", attempt),
+			zap.Int("max_attempts", maxAttempts),
+			zap.String("path", path))
+
+		// Try to read the token file
+		token, err := SecureReadTokenFile(rc, path)
+
+		// Check for file not found (agent not started yet)
+		if err != nil && strings.Contains(err.Error(), "no such file or directory") {
+			log.Debug("Agent token file not found yet, will retry",
+				zap.Int("attempt", attempt),
+				zap.Duration("retry_in", retryDelay))
+
+			if attempt < maxAttempts {
+				select {
+				case <-time.After(retryDelay):
+					continue
+				case <-rc.Ctx.Done():
+					return "", fmt.Errorf("context cancelled while waiting for agent token: %w", rc.Ctx.Err())
+				}
+			}
+			continue
+		}
+
+		// Check for other errors (permission denied, etc.) - these are deterministic, don't retry
+		if err != nil {
+			log.Error("Agent token file read error (not retryable)",
+				zap.String("path", path),
+				zap.Error(err),
+				zap.String("remediation", "Check file permissions and agent service status"))
+			return "", fmt.Errorf("failed to read agent token file: %w", err)
+		}
+
+		// Check if token is empty (agent hasn't written yet)
+		if token == "" {
+			log.Debug("Agent token file is empty, agent still authenticating",
+				zap.Int("attempt", attempt),
+				zap.Duration("retry_in", retryDelay))
+
+			if attempt < maxAttempts {
+				select {
+				case <-time.After(retryDelay):
+					continue
+				case <-rc.Ctx.Done():
+					return "", fmt.Errorf("context cancelled while waiting for agent token: %w", rc.Ctx.Err())
+				}
+			}
+			continue
+		}
+
+		// Success! Token is present and non-empty
+		log.Info("Agent token file read successfully",
+			zap.String("path", path),
+			zap.Int("attempt", attempt),
+			zap.Duration("wait_time", time.Duration(attempt-1)*retryDelay))
+		return token, nil
+	}
+
+	// All attempts exhausted
+	log.Error("Agent token file still empty after all retry attempts",
+		zap.String("path", path),
+		zap.Int("total_attempts", maxAttempts),
+		zap.Duration("total_wait_time", time.Duration(maxAttempts)*retryDelay),
+		zap.String("remediation", "Check Vault Agent service status: systemctl status vault-agent-eos"))
+
+	return "", fmt.Errorf("agent token file empty after %d attempts (%v): agent may have failed to authenticate",
+		maxAttempts, time.Duration(maxAttempts)*retryDelay)
+}
+
 func readTokenFile(rc *eos_io.RuntimeContext, path string) func(*api.Client) (string, error) {
 	return func(_ *api.Client) (string, error) {
-		// Use secure token file reading with permission validation
+		log := otelzap.Ctx(rc.Ctx)
+
+		// SECURITY FIX P0-4: Add retry logic to handle agent startup race condition
+		// The token file is created empty by prepareTokenSink(), then the agent writes to it
+		// We need to wait for the agent to actually write the token before reading
+
+		// For agent token files, implement retry with timeout
+		isAgentToken := strings.Contains(path, "vault_agent_eos.token")
+
+		if isAgentToken {
+			log.Debug("Reading agent token file with retry logic (agent may still be starting)",
+				zap.String("path", path))
+			return readAgentTokenWithRetry(rc, path)
+		}
+
+		// For non-agent tokens, read immediately (no race condition)
 		token, err := SecureReadTokenFile(rc, path)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Warn(" Failed to securely read token file", zap.String("path", path), zap.Error(err))
+			log.Warn(" Failed to securely read token file", zap.String("path", path), zap.Error(err))
 			return "", fmt.Errorf("secure read token file %s: %w", path, err)
 		}
 
 		// Additional security: Don't log successful reads in production to avoid token leakage
-		otelzap.Ctx(rc.Ctx).Debug(" Token file read successfully with security validation", zap.String("path", path))
+		log.Debug(" Token file read successfully with security validation", zap.String("path", path))
 		return token, nil
 	}
 }

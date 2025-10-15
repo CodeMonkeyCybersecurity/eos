@@ -20,6 +20,106 @@ import (
 // - All fmt.Printf/Println replaced with structured logging
 // - User-facing output uses stderr to preserve stdout
 // - Enhanced error handling and context
+// - Error type detection to fail fast on deterministic errors
+
+// ErrorType classifies errors for retry decision making
+type ErrorType int
+
+const (
+	// ErrorTypeTransient indicates a temporary failure that may succeed on retry
+	// Examples: network timeouts, temporary locks, service starting up
+	ErrorTypeTransient ErrorType = iota
+
+	// ErrorTypeDeterministic indicates a permanent failure that won't be fixed by retrying
+	// Examples: config validation, missing files, invalid credentials, permission denied
+	ErrorTypeDeterministic
+
+	// ErrorTypeUnknown indicates we can't classify the error
+	ErrorTypeUnknown
+)
+
+// ClassifyError determines if an error is transient (retry) or deterministic (fail fast)
+// Returns ErrorTypeDeterministic for: config errors, validation failures, missing files, permission denied
+// Returns ErrorTypeTransient for: network timeouts, locks, service not ready
+// Returns ErrorTypeUnknown when classification is uncertain (defaults to retrying)
+func ClassifyError(err error, output string) ErrorType {
+	if err == nil {
+		return ErrorTypeTransient
+	}
+
+	errStr := err.Error()
+	outStr := output
+
+	// Deterministic failures - DO NOT RETRY
+	deterministicPatterns := []string{
+		"no such file or directory",
+		"permission denied",
+		"command not found",
+		"invalid configuration",
+		"validation failed",
+		"invalid credentials",
+		"config error",
+		"syntax error",
+		"parse error",
+		"already exists",
+		"already in use",
+		"bind: address already in use",
+		"multiple network interfaces", // Requires user decision
+		"missing required",
+		"forbidden",
+		"unauthorized",
+		"bad request",
+		"invalid argument",
+	}
+
+	for _, pattern := range deterministicPatterns {
+		if bytes.Contains([]byte(errStr), []byte(pattern)) ||
+			bytes.Contains([]byte(outStr), []byte(pattern)) {
+			return ErrorTypeDeterministic
+		}
+	}
+
+	// Transient failures - RETRY
+	transientPatterns := []string{
+		"timeout",
+		"connection refused",
+		"connection reset",
+		"temporary failure",
+		"resource temporarily unavailable",
+		"try again",
+		"locked",
+		"not ready",
+		"starting up",
+		"dial tcp",
+		"network unreachable",
+		"i/o timeout",
+		"context deadline exceeded",
+	}
+
+	for _, pattern := range transientPatterns {
+		if bytes.Contains([]byte(errStr), []byte(pattern)) ||
+			bytes.Contains([]byte(outStr), []byte(pattern)) {
+			return ErrorTypeTransient
+		}
+	}
+
+	// Default to unknown (will retry conservatively)
+	return ErrorTypeUnknown
+}
+
+// errorTypeString converts ErrorType to string for logging
+func errorTypeString(et ErrorType) string {
+	switch et {
+	case ErrorTypeTransient:
+		return "transient"
+	case ErrorTypeDeterministic:
+		return "deterministic"
+	case ErrorTypeUnknown:
+		return "unknown"
+	default:
+		return "unknown"
+	}
+}
 
 // RetryCommand retries execution with structured logging and proper error handling
 func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) error {
@@ -63,14 +163,30 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 		}
 
 		lastErr = err
+		output := buf.String()
+
+		// Classify error type to decide if we should retry
+		errorType := ClassifyError(err, output)
+
 		logger.Warn("Command attempt failed",
 			zap.Int("attempt", i),
 			zap.String("command", name),
-			zap.Error(err))
+			zap.Error(err),
+			zap.String("error_type", errorTypeString(errorType)))
 
 		// Display failure info to user via stderr
 		if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command failed: %v\n", i, err); writeErr != nil {
 			logger.Warn("Failed to write failure info to stderr", zap.Error(writeErr))
+		}
+
+		// FAIL FAST on deterministic errors
+		if errorType == ErrorTypeDeterministic {
+			logger.Error("Deterministic error detected - not retrying",
+				zap.String("command", name),
+				zap.Error(err),
+				zap.String("output", output),
+				zap.String("remediation", "Fix the configuration or input and try again"))
+			return fmt.Errorf("deterministic error (will not retry): %w\nOutput: %s\nRemediation: Check configuration and inputs", err, output)
 		}
 
 		// Wait before retry (except on last attempt)
@@ -137,15 +253,30 @@ func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, d
 		}
 
 		lastErr = err
+
+		// Classify error type to decide if we should retry
+		errorType := ClassifyError(err, output)
+
 		logger.Warn("Command attempt with capture failed",
 			zap.Int("attempt", i),
 			zap.String("command", name),
 			zap.Error(err),
-			zap.String("output", output))
+			zap.String("output", output),
+			zap.String("error_type", errorTypeString(errorType)))
 
 		// Display failure info to user via stderr
 		if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command failed: %v\n", i, err); writeErr != nil {
 			logger.Warn("Failed to write failure info to stderr", zap.Error(writeErr))
+		}
+
+		// FAIL FAST on deterministic errors
+		if errorType == ErrorTypeDeterministic {
+			logger.Error("Deterministic error detected - not retrying",
+				zap.String("command", name),
+				zap.Error(err),
+				zap.String("output", output),
+				zap.String("remediation", "Fix the configuration or input and try again"))
+			return output, fmt.Errorf("deterministic error (will not retry): %w\nOutput: %s\nRemediation: Check configuration and inputs", err, output)
 		}
 
 		// Wait before retry (except on last attempt)

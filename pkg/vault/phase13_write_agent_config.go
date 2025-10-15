@@ -84,6 +84,13 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 		zap.Int("role_id_length", len(roleID)),
 		zap.Int("secret_id_length", len(secretID)))
 
+	// 2.5) Copy Vault TLS certificate for agent to trust
+	if err := copyVaultCertForAgent(rc); err != nil {
+		log.Warn("Failed to copy Vault CA cert for agent - agent may fail TLS verification",
+			zap.Error(err))
+		// Continue anyway - might work if VAULT_SKIP_VERIFY is set
+	}
+
 	if err := writeAgentHCL(rc, addr, roleID, secretID); err != nil {
 		return fmt.Errorf("write agent HCL: %w", err)
 	}
@@ -378,6 +385,73 @@ func writeAgentUnit() error {
 			zap.String("path", path),
 			zap.String("mode", stat.Mode().String()),
 			zap.Int64("size", stat.Size()))
+	}
+
+	return nil
+}
+
+// copyVaultCertForAgent copies the Vault TLS certificate to where the agent expects it
+func copyVaultCertForAgent(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
+
+	srcCert := shared.TLSCrt // /etc/vault.d/tls/vault.crt
+	dstCert := shared.VaultAgentCACopyPath // /etc/vault.d/ca.crt
+
+	log.Info("Copying Vault TLS certificate for agent trust",
+		zap.String("src", srcCert),
+		zap.String("dst", dstCert))
+
+	// Check if source cert exists
+	if _, err := os.Stat(srcCert); err != nil {
+		log.Error("Source Vault certificate not found",
+			zap.String("src", srcCert),
+			zap.Error(err))
+		return fmt.Errorf("source certificate not found at %s: %w", srcCert, err)
+	}
+
+	log.Debug("Source certificate exists",
+		zap.String("src", srcCert))
+
+	// Copy the certificate
+	if err := eos_unix.CopyFile(rc.Ctx, srcCert, dstCert, 0644); err != nil {
+		log.Error("Failed to copy certificate",
+			zap.String("src", srcCert),
+			zap.String("dst", dstCert),
+			zap.Error(err))
+		return fmt.Errorf("copy certificate: %w", err)
+	}
+
+	log.Debug("Certificate copied successfully",
+		zap.String("dst", dstCert))
+
+	// Set ownership to vault user
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
+	if err != nil {
+		log.Warn("Failed to lookup vault user for cert ownership, using root",
+			zap.Error(err))
+		uid = 0
+		gid = 0
+	}
+
+	if err := os.Chown(dstCert, uid, gid); err != nil {
+		log.Warn("Failed to set certificate ownership",
+			zap.String("dst", dstCert),
+			zap.Int("uid", uid),
+			zap.Int("gid", gid),
+			zap.Error(err))
+		// Not critical, continue
+	}
+
+	// Verify final state
+	if stat, err := os.Stat(dstCert); err == nil {
+		log.Info("Vault CA certificate copied for agent",
+			zap.String("path", dstCert),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
+	} else {
+		log.Warn("Certificate copied but verification failed",
+			zap.String("path", dstCert),
+			zap.Error(err))
 	}
 
 	return nil
