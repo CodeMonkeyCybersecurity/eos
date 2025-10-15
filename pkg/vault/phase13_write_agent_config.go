@@ -302,16 +302,26 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 	log.Info("[DIAGNOSTIC] Rendered Vault Agent HCL configuration:",
 		zap.String("content", renderedConfig))
 
-	// Verify TLS CA file is in the rendered config
-	if !bytes.Contains(buf.Bytes(), []byte("tls_ca_file")) {
-		log.Error("Agent config missing TLS CA file reference!",
-			zap.String("expected_field", "tls_ca_file"),
-			zap.String("ca_cert_path", data.CACert))
-		return fmt.Errorf("rendered agent config missing tls_ca_file reference")
+	// Verify TLS configuration is present (either tls_ca_file or tls_skip_verify)
+	hasTLSCaFile := bytes.Contains(buf.Bytes(), []byte("tls_ca_file"))
+	hasTLSSkipVerify := bytes.Contains(buf.Bytes(), []byte("tls_skip_verify"))
+
+	if !hasTLSCaFile && !hasTLSSkipVerify {
+		log.Error("Agent config missing TLS configuration!",
+			zap.String("expected", "either tls_ca_file or tls_skip_verify"),
+			zap.String("ca_cert_path", data.CACert),
+			zap.Bool("tls_skip_verify", data.TLSSkipVerify))
+		return fmt.Errorf("rendered agent config missing TLS configuration (neither tls_ca_file nor tls_skip_verify present)")
 	}
 
-	log.Debug("TLS CA file reference verified in rendered config",
-		zap.String("ca_cert", data.CACert))
+	if hasTLSSkipVerify {
+		log.Info("TLS skip verify enabled in agent config (development mode)",
+			zap.Bool("tls_skip_verify", true),
+			zap.String("reason", "Self-signed certificate with hostname/SAN mismatch"))
+	} else if hasTLSCaFile {
+		log.Debug("TLS CA file reference verified in rendered config",
+			zap.String("ca_cert", data.CACert))
+	}
 
 	// Write config file with vault ownership using eos_unix.WriteFile
 	log.Debug("Writing config file with vault ownership",
