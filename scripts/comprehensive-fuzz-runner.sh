@@ -349,7 +349,7 @@ EOF
     echo -e "${YELLOW}🔥 Resource Exhaustion Tests${NC}"
     
     # Memory pressure
-    echo -e "   💾 Memory pressure simulation..."
+    echo -e "    Memory pressure simulation..."
     GOMAXPROCS=1 GOMEMLIMIT=100MiB go test -v -fuzz=FuzzResourceContentionScenarios \
         -fuzztime=30s ./test >> "${LOG_DIR}/chaos/memory_pressure.log" 2>&1 || true
     

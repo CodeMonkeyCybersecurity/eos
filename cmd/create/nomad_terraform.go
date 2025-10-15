@@ -183,7 +183,7 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
     echo " Access URLs:"
     %s
     echo ""
-    echo "📋 Next Steps:"
+    echo " Next Steps:"
     echo "1. Update DNS to point %s to the load balancer IP"
     echo "2. Deploy applications: nomad job run <job-file>"
     echo "3. Check cluster status: nomad server members"

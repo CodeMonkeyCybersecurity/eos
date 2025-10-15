@@ -7,7 +7,7 @@
 
 **Philosophy Change:**
 ~~"Consolidate all duplication"~~
-✅ **"Fix what actually breaks, consolidate what actually hurts"**
+ **"Fix what actually breaks, consolidate what actually hurts"**
 
 **Key Learnings from Adversarial Review:**
 - Not all duplication is bad duplication
@@ -40,7 +40,7 @@ Analysis of 6 months of commits to `pkg/vault/` reveals **actual problems**:
 
 ## Proven Wins vs Premature Optimization
 
-### ✅ Proven Win: TLS Certificate Generation (COMPLETED)
+###  Proven Win: TLS Certificate Generation (COMPLETED)
 
 **Why This Worked:**
 - Fixed actual production bug (SANs missing host IP)
@@ -1080,12 +1080,12 @@ install.go
 
 ## Next Steps
 
-1. ✅ Review and approve this revised plan
-2. ✅ Create feature branch: `refactor/vault-easy-wins`
-3. ✅ Week 1: Config Generator
-4. ✅ Week 2: Permission Fixer
-5. ✅ Week 3: Config Validation
-6. ✅ Week 4: Polish
+1.  Review and approve this revised plan
+2.  Create feature branch: `refactor/vault-easy-wins`
+3.  Week 1: Config Generator
+4.  Week 2: Permission Fixer
+5.  Week 3: Config Validation
+6.  Week 4: Polish
 
 ---
 
@@ -1111,7 +1111,7 @@ install.go
 ### New Philosophy:
 
 ~~"Consolidate all duplication"~~
-✅ **"Fix what breaks, consolidate what hurts, document intentional duplication"**
+ **"Fix what breaks, consolidate what hurts, document intentional duplication"**
 
 ---
 

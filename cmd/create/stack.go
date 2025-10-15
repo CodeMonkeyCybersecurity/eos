@@ -191,7 +191,7 @@ Examples:
 		// Show strategy explanation
 		switch strategyEnum {
 		case deploy.StackDeploymentStrategySequential:
-			fmt.Printf("📋 Sequential Strategy: Components will be deployed one by one in order\n")
+			fmt.Printf(" Sequential Strategy: Components will be deployed one by one in order\n")
 			if waitBetweenComponents > 0 {
 				fmt.Printf("   Wait between components: %s\n", waitBetweenComponents)
 			}

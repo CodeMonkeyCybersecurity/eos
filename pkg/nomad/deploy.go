@@ -587,14 +587,14 @@ func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfi
 		summary.WriteString("🔐 Encryption Key (save this for client nodes):\n")
 		summary.WriteString(fmt.Sprintf("   %s\n", config.EncryptionKey))
 		summary.WriteString("\n")
-		summary.WriteString("📋 Next Steps:\n")
+		summary.WriteString(" Next Steps:\n")
 		summary.WriteString("   • Check server status: nomad server members\n")
 		summary.WriteString("   • Access Web UI: http://localhost:4646\n")
 		summary.WriteString("   • Deploy jobs: nomad job run <job.hcl>\n")
 	} else {
 		summary.WriteString(fmt.Sprintf(" Server Addresses: %s\n", strings.Join(config.ServerAddrs, ", ")))
 		summary.WriteString("\n")
-		summary.WriteString("📋 Next Steps:\n")
+		summary.WriteString(" Next Steps:\n")
 		summary.WriteString("   • Check client status: nomad node status\n")
 		summary.WriteString("   • Verify server connection: nomad server members\n")
 	}

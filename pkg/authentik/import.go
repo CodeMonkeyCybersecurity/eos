@@ -159,7 +159,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	// Create backup if requested
 	if options.CreateBackup && !options.DryRun {
-		fmt.Print("\n💾 Creating backup of target instance... ")
+		fmt.Print("\n Creating backup of target instance... ")
 		backupFile := fmt.Sprintf("authentik-backup-%s.yaml", time.Now().Format("20060102-150405"))
 		extractCmd := &cobra.Command{}
 		extractCmd.Flags().String("url", url, "")
@@ -176,7 +176,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	// Load mapping rules if provided
 	if options.MapFile != "" {
-		fmt.Printf("\n📋 Loading mapping rules from: %s\n", options.MapFile)
+		fmt.Printf("\n Loading mapping rules from: %s\n", options.MapFile)
 		options.MappingRules, err = loadMappingRules(options.MapFile)
 		if err != nil {
 			return fmt.Errorf("failed to load mapping rules: %w", err)

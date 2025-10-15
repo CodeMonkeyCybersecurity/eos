@@ -73,7 +73,7 @@ func UpdateServiceWorker(rc *eos_io.RuntimeContext, worker shared.ServiceWorkerI
 
 	// INTERVENE - Create backup of existing file
 	if _, err := os.Stat(worker.TargetPath); err == nil {
-		logger.Info("📋 Creating backup of existing worker",
+		logger.Info(" Creating backup of existing worker",
 			zap.String("backup", worker.BackupPath))
 
 		if err := CopyFile(worker.TargetPath, worker.BackupPath); err != nil {

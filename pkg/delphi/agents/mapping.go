@@ -63,7 +63,7 @@ func RunMapping(rc *eos_io.RuntimeContext, cfg interface{}, authenticateFunc fun
 		return nil
 	}
 
-	log.Info("📋 Found agents", zap.Int("count", len(agentsResp.Data.AffectedItems)))
+	log.Info(" Found agents", zap.Int("count", len(agentsResp.Data.AffectedItems)))
 
 	for _, agent := range agentsResp.Data.AffectedItems {
 		PrintAgentInfo(agent)

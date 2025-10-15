@@ -175,7 +175,7 @@ func displayNodesTable(nodes map[string][]string, config *environment.EnhancedEn
 	}
 	sort.Strings(sortedNodes)
 
-	fmt.Printf("📋 Node Inventory:\n")
+	fmt.Printf(" Node Inventory:\n")
 	fmt.Printf("  %-20s │ %-40s │ Status\n", "Node ID", "Roles")
 	fmt.Printf("  ────────────────────┼────────────────────────────────────────┼────────\n")
 

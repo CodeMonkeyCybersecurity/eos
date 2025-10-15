@@ -112,7 +112,7 @@ if [ "$DRY_RUN" == "true" ]; then
 fi
 
 # Commit
-echo -e "${CYAN}💾 Committing changes...${NC}"
+echo -e "${CYAN} Committing changes...${NC}"
 git add -A
 git commit -m "$COMMIT_MSG"
 

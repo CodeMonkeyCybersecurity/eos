@@ -144,7 +144,7 @@ func displayTopologyFocus(config *environment.EnhancedEnvironmentConfig) error {
 	fmt.Printf("Datacenter:      %s\n", config.Datacenter)
 	fmt.Printf("Resource Strategy: %s\n", config.ResourceStrategy)
 
-	fmt.Printf("\n📋 Node Inventory:\n")
+	fmt.Printf("\n Node Inventory:\n")
 	for nodeId, roles := range config.NodeRoles {
 		fmt.Printf("  ├─ %-15s → %v\n", nodeId, roles)
 	}
@@ -212,7 +212,7 @@ func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error
 	fmt.Printf("  Admin Separate: %t\n", config.Namespaces.Admin)
 
 	// Resource allocation
-	fmt.Printf("\n💾 Resource Allocation:\n")
+	fmt.Printf("\n Resource Allocation:\n")
 	for env, resources := range config.Services.Resources {
 		fmt.Printf("  %s: %dMHz CPU, %dMB RAM, %d replica(s)\n",
 			env, resources.CPU, resources.Memory, resources.Replicas)

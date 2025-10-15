@@ -146,7 +146,7 @@ that require access to secrets, including the Delphi dashboard.`,
 		}
 
 		// Step 4: Create environment file
-		logger.Info("terminal prompt: 💾 Saving configuration...")
+		logger.Info("terminal prompt:  Saving configuration...")
 		if err := auth.SaveVaultConfig(rc, vaultAddr, authMethod); err != nil {
 			logger.Error("Failed to save Vault configuration", zap.Error(err))
 			return fmt.Errorf("failed to save configuration: %w", err)

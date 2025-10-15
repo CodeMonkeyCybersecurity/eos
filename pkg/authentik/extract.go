@@ -242,7 +242,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	}
 
 	if dryRun {
-		fmt.Println("\n📋 Dry run - would export:")
+		fmt.Println("\n Dry run - would export:")
 		for _, t := range exportTypes {
 			fmt.Printf("   - %s\n", t)
 		}
@@ -429,7 +429,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		Client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
-	fmt.Printf("📋 Listing Authentik configurations from: %s\n\n", url)
+	fmt.Printf(" Listing Authentik configurations from: %s\n\n", url)
 
 	// If no specific type, show summary
 	if listType == "" {

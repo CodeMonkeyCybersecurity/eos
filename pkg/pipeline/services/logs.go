@@ -19,7 +19,7 @@ func ShowRecentLogs(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger.Info("Assessing recent logs display",
 		zap.String("service", serviceName))
 
-	logger.Info("📋 Recent Logs (last 10 lines)")
+	logger.Info(" Recent Logs (last 10 lines)")
 
 	// INTERVENE - Retrieve and display logs
 	logger.Debug("Retrieving service logs from journalctl")

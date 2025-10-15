@@ -68,7 +68,7 @@ func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	// Configuration validation
 	if runConfig {
-		logger.Info("📋 Running configuration validation")
+		logger.Info(" Running configuration validation")
 		if err := validateConfiguration(rc); err != nil {
 			logger.Error(" Configuration validation failed", zap.Error(err))
 			hasErrors = true
@@ -109,7 +109,7 @@ func validateConfiguration(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Display results
-	fmt.Println("\n📋 Configuration Validation Results")
+	fmt.Println("\n Configuration Validation Results")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	if result.Valid {
@@ -184,7 +184,7 @@ func validateSecurityPosture(rc *eos_io.RuntimeContext) error {
 
 	// Recommendations
 	if len(failed) > 0 {
-		fmt.Println("📋 Recommendations:")
+		fmt.Println(" Recommendations:")
 		fmt.Println("  • Review failed security checks above")
 		fmt.Println("  • Run 'sudo eos debug vault' for detailed diagnostics")
 		fmt.Println("  • Consult security documentation: https://wiki.cybermonkey.net.au")

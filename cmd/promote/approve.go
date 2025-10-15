@@ -181,7 +181,7 @@ Examples:
 
 		remainingApprovals := promotionRequest.ApprovalPolicy.MinApprovals - approvedCount
 		if remainingApprovals > 0 && !reject {
-			fmt.Printf("📋 Approvals Status: %d/%d required approvals received\n",
+			fmt.Printf(" Approvals Status: %d/%d required approvals received\n",
 				approvedCount, promotionRequest.ApprovalPolicy.MinApprovals)
 			fmt.Printf("   %d more approval(s) needed\n", remainingApprovals)
 			fmt.Printf("\n")

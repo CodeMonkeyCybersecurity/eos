@@ -316,7 +316,7 @@ func (a *AtomicMFAConfig) CommitTransaction() error {
 		return fmt.Errorf("no active transaction")
 	}
 
-	a.logger.Info("💾 Committing MFA configuration changes...")
+	a.logger.Info(" Committing MFA configuration changes...")
 
 	// Apply all configurations atomically
 	tempFiles := []string{"sudo", "su", "polkit", "login", "sshd", "passwd", "chpasswd"}

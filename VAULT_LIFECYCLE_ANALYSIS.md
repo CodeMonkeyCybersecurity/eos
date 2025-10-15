@@ -20,7 +20,7 @@ This document provides a comprehensive adversarial analysis of the Eos Vault lif
 5. User told: "Run `eos inspect vault-init` to retrieve keys"
 6. Vault continues with EnableVault (auto-unseals, configures)
 
-#### ✅ What Works:
+####  What Works:
 - Keys are saved automatically
 - File permissions are restrictive (0600)
 - User is instructed how to retrieve keys
@@ -73,7 +73,7 @@ This document provides a comprehensive adversarial analysis of the Eos Vault lif
 7. User told: "Get 3 unseal keys from leader, run `vault operator unseal` 3 times"
 8. EnableVault **SKIPPED** (gets config from cluster)
 
-#### ✅ What Works:
+####  What Works:
 - Prompts for join vs create
 - Automatically joins cluster using SDK
 - Correctly skips initialization
@@ -190,7 +190,7 @@ func SaveInitResult(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error 
 
 #### Current SDK Usage Audit:
 
-✅ **Using SDK Properly:**
+ **Using SDK Properly:**
 - `InitializeRaftCluster()` - uses `client.Sys().Init()`
 - `JoinRaftCluster()` - uses `client.Sys().RaftJoin()`
 - `UnsealVaultWithKeys()` - uses `client.Sys().Unseal()`
@@ -828,7 +828,7 @@ func VerifyKeyBackup(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error
   - Quorum monitoring
 
 ### SDK/API Usage Status:
-✅ **Using SDK**: 5 functions
+ **Using SDK**: 5 functions
 ❌ **Still Shelling Out**: 6 functions
 
 ### User Experience Gaps:

@@ -133,7 +133,7 @@ func gatherVaultSetupConfiguration(rc *eos_io.RuntimeContext, options *VaultSetu
 
 // displaySectionHeader displays a formatted section header
 func displaySectionHeader(title string) error {
-	header := fmt.Sprintf("\n📋 %s\n%s\n", title, strings.Repeat("-", len(title)+4))
+	header := fmt.Sprintf("\n %s\n%s\n", title, strings.Repeat("-", len(title)+4))
 	if _, err := fmt.Fprint(os.Stderr, header); err != nil {
 		return fmt.Errorf("failed to display section header: %w", err)
 	}
@@ -222,10 +222,10 @@ func displayConfigurationSummary(rc *eos_io.RuntimeContext, options *VaultSetupO
 
 	var summary strings.Builder
 	summary.WriteString("\n")
-	summary.WriteString("📋 Configuration Summary:\n")
+	summary.WriteString(" Configuration Summary:\n")
 	summary.WriteString("========================\n")
 	summary.WriteString(fmt.Sprintf("  🖥️  Host: %s:%d\n", options.DatabaseConfig.Host, options.DatabaseConfig.Port))
-	summary.WriteString(fmt.Sprintf("  💾 Database: %s\n", options.DatabaseConfig.Database))
+	summary.WriteString(fmt.Sprintf("   Database: %s\n", options.DatabaseConfig.Database))
 	summary.WriteString(fmt.Sprintf("   Admin User: %s\n", options.AdminUsername))
 	summary.WriteString(fmt.Sprintf("   Connection: %s\n", options.ConnectionName))
 	summary.WriteString(fmt.Sprintf("  ⚙️  Engine Mount: %s\n", options.EngineMount))
@@ -268,7 +268,7 @@ func displaySetupSuccess(rc *eos_io.RuntimeContext, options *VaultSetupOptions) 
 
  Vault dynamic PostgreSQL credentials have been configured successfully.
 
-📋 Next Steps:
+ Next Steps:
    • Test credential generation: vault read database/creds/delphi-role
    • Configure applications to use dynamic credentials
    • Monitor credential usage in Vault audit logs

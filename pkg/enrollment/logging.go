@@ -33,7 +33,7 @@ func LogEnrollmentResults(logger otelzap.LoggerWithCtx, result *EnrollmentResult
 		}
 
 		if len(result.BackupsCreated) > 0 {
-			logger.Info("💾 Backups created successfully",
+			logger.Info(" Backups created successfully",
 				zap.Int("count", len(result.BackupsCreated)),
 				zap.Strings("backups", result.BackupsCreated))
 		}

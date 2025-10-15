@@ -315,7 +315,7 @@ func Scale(rc *eos_io.RuntimeContext, namespace string, count int) error {
 func Backup(rc *eos_io.RuntimeContext, namespace string, backupPath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("💾 Creating Penpot backup",
+	logger.Info(" Creating Penpot backup",
 		zap.String("namespace", namespace),
 		zap.String("backup_path", backupPath))
 

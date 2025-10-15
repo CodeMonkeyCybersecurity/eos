@@ -61,26 +61,26 @@ type InstallConfig struct {
 	ClusterPort     int    // Raft cluster communication port (default: 8180)
 	NodeID          string // Unique node identifier for Raft
 	DisableMlock    bool
-	
+
 	// Auto-unseal configuration
-	AutoUnseal       bool
-	AutoUnsealType   string // "awskms", "azurekeyvault", "gcpckms"
-	KMSKeyID         string // For AWS KMS auto-unseal
-	KMSRegion        string // AWS region or Azure location
-	AzureTenantID    string // Azure tenant ID
-	AzureClientID    string // Azure client ID
+	AutoUnseal        bool
+	AutoUnsealType    string // "awskms", "azurekeyvault", "gcpckms"
+	KMSKeyID          string // For AWS KMS auto-unseal
+	KMSRegion         string // AWS region or Azure location
+	AzureTenantID     string // Azure tenant ID
+	AzureClientID     string // Azure client ID
 	AzureClientSecret string // Azure client secret
-	AzureVaultName   string // Azure Key Vault name
-	AzureKeyName     string // Azure Key Vault key name
-	GCPProject       string // GCP project ID
-	GCPLocation      string // GCP location
-	GCPKeyRing       string // GCP KMS keyring
-	GCPCryptoKey     string // GCP KMS crypto key
-	GCPCredentials   string // Path to GCP credentials file
-	
+	AzureVaultName    string // Azure Key Vault name
+	AzureKeyName      string // Azure Key Vault key name
+	GCPProject        string // GCP project ID
+	GCPLocation       string // GCP location
+	GCPKeyRing        string // GCP KMS keyring
+	GCPCryptoKey      string // GCP KMS crypto key
+	GCPCredentials    string // Path to GCP credentials file
+
 	LogLevel   string
 	Datacenter string // Consul datacenter for service registration
-	
+
 	// Multi-node Raft cluster configuration
 	RaftMode       string // "create" (default) or "join" - determines if this is a new cluster or joining existing
 	RetryJoinNodes []shared.RetryJoinNode
@@ -196,10 +196,11 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 // call EnableVault() to perform Phases 5-15 (initialization, auth, secrets, hardening).
 //
 // Phase Breakdown:
-//   Phase 1: Binary installation (via repository or direct download)
-//   Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, directories)
-//   Phase 3: TLS certificate generation
-//   Phase 4: Configuration file generation (vault.hcl)
+//
+//	Phase 1: Binary installation (via repository or direct download)
+//	Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, directories)
+//	Phase 3: TLS certificate generation
+//	Phase 4: Configuration file generation (vault.hcl)
 //
 // After this method completes, the Vault service is installed and ready to start,
 // but NOT initialized. Call EnableVault() for Phases 5-15.
@@ -285,7 +286,7 @@ func (vi *VaultInstaller) Install() error {
 	}
 
 	// Display post-installation security checklist
-	vi.logger.Info("📋 Displaying security guidance")
+	vi.logger.Info(" Displaying security guidance")
 	DisplayPostInstallSecurityChecklist(vi.rc)
 
 	// Post-Phase: Register with Consul (if available)
@@ -628,7 +629,7 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 		mode  os.FileMode
 		owner string
 	}{
-		{"/opt/vault", 0755, vi.config.ServiceUser},  // Parent must be traversable (0755)
+		{"/opt/vault", 0755, vi.config.ServiceUser}, // Parent must be traversable (0755)
 	}
 
 	for _, dir := range parentDirs {
@@ -1244,13 +1245,13 @@ func (vi *VaultInstaller) verify() error {
 
 // VaultReadiness contains detailed readiness information
 type VaultReadiness struct {
-	Ready           bool   // Overall ready status
-	ProcessRunning  bool   // Is vault process running
-	PortListening   bool   // Is vault listening on port
-	Responding      bool   // Is vault responding to API calls
-	Sealed          bool   // Is vault sealed
-	Initialized     bool   // Is vault initialized
-	Message         string // Human-readable status message
+	Ready          bool   // Overall ready status
+	ProcessRunning bool   // Is vault process running
+	PortListening  bool   // Is vault listening on port
+	Responding     bool   // Is vault responding to API calls
+	Sealed         bool   // Is vault sealed
+	Initialized    bool   // Is vault initialized
+	Message        string // Human-readable status message
 }
 
 // checkVaultReadiness performs comprehensive readiness checks
@@ -1335,7 +1336,7 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 				// Parse output to check if initialized
 				if strings.Contains(statusOutput, "Initialized") {
 					if strings.Contains(statusOutput, "Initialized    true") ||
-					   strings.Contains(statusOutput, "Initialized: true") {
+						strings.Contains(statusOutput, "Initialized: true") {
 						readiness.Initialized = true
 						readiness.Message = "vault is sealed but initialized (needs unsealing)"
 						readiness.Ready = true // Sealed + initialized = ready to unseal

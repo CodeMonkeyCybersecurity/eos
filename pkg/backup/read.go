@@ -210,7 +210,7 @@ func displayRepositoryInfo(rc *eos_io.RuntimeContext, repo *Repository, repoInfo
 
 	// Repository header
 	display.WriteString("\n")
-	display.WriteString(fmt.Sprintf("💾 Repository: %s\n", repo.Name))
+	display.WriteString(fmt.Sprintf(" Repository: %s\n", repo.Name))
 	display.WriteString(strings.Repeat("─", 60))
 	display.WriteString("\n")
 
@@ -270,7 +270,7 @@ func displayProfileInfo(rc *eos_io.RuntimeContext, profile *Profile) error {
 
 	// Profile header
 	display.WriteString("\n")
-	display.WriteString(fmt.Sprintf("📋 Profile: %s\n", profile.Name))
+	display.WriteString(fmt.Sprintf(" Profile: %s\n", profile.Name))
 	display.WriteString(strings.Repeat("─", 60))
 	display.WriteString("\n")
 
@@ -294,7 +294,7 @@ func displayProfileInfo(rc *eos_io.RuntimeContext, profile *Profile) error {
 	}
 
 	if profile.Repository != "" {
-		display.WriteString(fmt.Sprintf("\n💾 Repository: %s\n", profile.Repository))
+		display.WriteString(fmt.Sprintf("\n Repository: %s\n", profile.Repository))
 	}
 
 	if profile.Schedule != nil {

@@ -187,7 +187,7 @@ Examples:
 		// Show strategy explanation
 		switch strategyEnum {
 		case promotion.StackPromotionStrategySequential:
-			fmt.Printf("📋 Sequential Strategy: Components will be promoted one by one in order\n")
+			fmt.Printf(" Sequential Strategy: Components will be promoted one by one in order\n")
 		case promotion.StackPromotionStrategyParallel:
 			fmt.Printf("⚡ Parallel Strategy: All components will be promoted simultaneously\n")
 		case promotion.StackPromotionStrategyDependency:

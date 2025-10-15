@@ -229,7 +229,7 @@ echo "🗂️ Phase 5: Parsing & I/O Tests (Parallel)"
 echo -e "\n### Phase 5: Parsing & I/O Tests" >> "${REPORT_FILE}"
 run_parallel_tests parsing_tests 4
 
-echo "💾 Phase 6: Filesystem & Database Tests (Parallel)"
+echo " Phase 6: Filesystem & Database Tests (Parallel)"
 echo -e "\n### Phase 6: Filesystem & Database Tests" >> "${REPORT_FILE}"
 run_parallel_tests filesystem_tests 2
 run_parallel_tests database_tests 2

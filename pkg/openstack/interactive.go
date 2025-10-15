@@ -76,7 +76,7 @@ func InteractiveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 
 // promptDeploymentMode prompts for deployment mode selection
 func promptDeploymentMode(reader *bufio.Reader, config *Config) error {
-	fmt.Println("📋 Deployment Mode")
+	fmt.Println(" Deployment Mode")
 	fmt.Println("─────────────────")
 	fmt.Println("1. All-in-One (Development/Testing)")
 	fmt.Println("2. Controller Node (Production)")
@@ -197,7 +197,7 @@ func promptNetworkConfig(reader *bufio.Reader, config *Config) error {
 
 // promptStorageConfig prompts for storage configuration
 func promptStorageConfig(reader *bufio.Reader, config *Config) error {
-	fmt.Println("\n💾 Storage Configuration")
+	fmt.Println("\n Storage Configuration")
 	fmt.Println("───────────────────────")
 
 	// Skip for compute-only nodes

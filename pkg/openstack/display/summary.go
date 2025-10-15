@@ -85,7 +85,7 @@ func ShowInstallationSummary(rc *eos_io.RuntimeContext, config *openstack.Config
 	fmt.Println()
 
 	// Next steps
-	fmt.Println("📋 Next Steps")
+	fmt.Println(" Next Steps")
 	fmt.Println("════════════")
 	displayNextSteps(config)
 	fmt.Println()
@@ -109,7 +109,7 @@ func ShowInstallationSummary(rc *eos_io.RuntimeContext, config *openstack.Config
 
 // ShowInstallationPlan displays what will be installed
 func ShowInstallationPlan(rc *eos_io.RuntimeContext, config *openstack.Config) {
-	fmt.Println("\n📋 OpenStack Installation Plan")
+	fmt.Println("\n OpenStack Installation Plan")
 	fmt.Println("══════════════════════════════")
 	fmt.Println()
 

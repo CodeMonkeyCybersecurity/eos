@@ -6,8 +6,8 @@
 
 When running `sudo eos create vault`, users were immediately prompted to re-enter unseal keys and root token **before** they had a chance to view and save the credentials. This created a poor user experience where:
 
-1. Vault initialized successfully ✅
-2. Credentials saved to `/var/lib/eos/secret/vault_init.json` ✅
+1. Vault initialized successfully 
+2. Credentials saved to `/var/lib/eos/secret/vault_init.json` 
 3. User **immediately prompted** to re-enter credentials ❌
 4. User had **no time** to open second terminal and view credentials ❌
 5. User stuck at prompt, unable to proceed ❌
@@ -57,7 +57,7 @@ WITHOUT THESE CREDENTIALS YOU CANNOT RECOVER YOUR VAULT!
 
 ======================================================================
 
-📋 STEP 1: Open a SECOND terminal session and run:
+ STEP 1: Open a SECOND terminal session and run:
 
     sudo cat /var/lib/eos/secret/vault_init.json
 
@@ -65,12 +65,12 @@ WITHOUT THESE CREDENTIALS YOU CANNOT RECOVER YOUR VAULT!
 
     sudo eos read vault-init
 
-💾 STEP 2: Copy ALL credentials to your password manager:
+ STEP 2: Copy ALL credentials to your password manager:
 
     • All 5 unseal keys (you need 3 minimum to unseal)
     • Root token (provides admin access)
 
-✅ STEP 3: Verify you saved them correctly!
+ STEP 3: Verify you saved them correctly!
 
    Recommended password managers:
     • 1Password (use Secure Notes)
@@ -144,8 +144,8 @@ Delete local credentials file? (you MUST have saved them externally first) (yes/
 
 | Aspect | Status |
 |--------|--------|
-| **Credentials saved to file** | ✅ Yes |
-| **File permissions** | ✅ 0600 (root only) |
+| **Credentials saved to file** |  Yes |
+| **File permissions** |  0600 (root only) |
 | **User has time to save externally** | ❌ No |
 | **Verification of external save** | ❌ No |
 | **Option to delete local file** | ❌ No |
@@ -156,18 +156,18 @@ Delete local credentials file? (you MUST have saved them externally first) (yes/
 
 | Aspect | Status |
 |--------|--------|
-| **Credentials saved to file** | ✅ Yes (backup) |
-| **File permissions** | ✅ 0600 (root only) |
-| **User has time to save externally** | ✅ Yes (pause + instructions) |
-| **Verification of external save** | ✅ Yes (re-entry) |
-| **Option to delete local file** | ✅ Yes (recommended for prod) |
-| **Clear instructions** | ✅ Prominent, step-by-step |
-| **User experience** | ✅ Excellent (guided process) |
-| **Production ready** | ✅ Yes |
+| **Credentials saved to file** |  Yes (backup) |
+| **File permissions** |  0600 (root only) |
+| **User has time to save externally** |  Yes (pause + instructions) |
+| **Verification of external save** |  Yes (re-entry) |
+| **Option to delete local file** |  Yes (recommended for prod) |
+| **Clear instructions** |  Prominent, step-by-step |
+| **User experience** |  Excellent (guided process) |
+| **Production ready** |  Yes |
 
 ## Best Practices Followed
 
-### HashiCorp Recommendations ✅
+### HashiCorp Recommendations 
 
 1. **Never store unseal keys in plaintext** - File is 0600, encrypted at rest
 2. **Distribute keys to different operators** - Instructions mention Shamir sharing
@@ -175,7 +175,7 @@ Delete local credentials file? (you MUST have saved them externally first) (yes/
 4. **Revoke root token after setup** - (Future: auto-revoke after first use)
 5. **Use auto-unseal in production** - (Future: `--auto-unseal` flag)
 
-### Industry Standards ✅
+### Industry Standards 
 
 1. **Defense in depth** - File backup + external save + verification
 2. **Principle of least privilege** - Option to delete local file
@@ -270,14 +270,14 @@ sudo eos create vault --auto-unseal=aws-kms --kms-key-id=arn:aws:kms:...
 
 | Feature | `vault operator init` | `eos create vault` |
 |---------|----------------------|-------------------|
-| **Display keys immediately** | ✅ Yes (stdout) | ✅ Yes (after pause) |
-| **Save to file automatically** | ❌ No | ✅ Yes (backup) |
-| **Pause for user save** | ❌ No | ✅ Yes |
-| **Verify user saved** | ❌ No | ✅ Yes (re-entry) |
-| **Option to delete file** | N/A | ✅ Yes |
-| **PGP encryption support** | ✅ Yes | ⏳ Future |
-| **Auto-unseal support** | ✅ Yes | ⏳ Future |
-| **Clear instructions** | ⚠️ Warning only | ✅ Step-by-step |
+| **Display keys immediately** |  Yes (stdout) |  Yes (after pause) |
+| **Save to file automatically** | ❌ No |  Yes (backup) |
+| **Pause for user save** | ❌ No |  Yes |
+| **Verify user saved** | ❌ No |  Yes (re-entry) |
+| **Option to delete file** | N/A |  Yes |
+| **PGP encryption support** |  Yes | ⏳ Future |
+| **Auto-unseal support** |  Yes | ⏳ Future |
+| **Clear instructions** | ⚠️ Warning only |  Step-by-step |
 
 ## Future Enhancements
 
@@ -321,10 +321,10 @@ sudo eos create vault --auto-unseal=aws-kms --kms-key-id=arn:aws:kms:...
 ### Why Keep File as Backup?
 
 **Pros:**
-- ✅ Survives session disconnect
-- ✅ User can retrieve if they forget to save
-- ✅ Encrypted at rest (Linux filesystem encryption)
-- ✅ 0600 permissions (root only)
+-  Survives session disconnect
+-  User can retrieve if they forget to save
+-  Encrypted at rest (Linux filesystem encryption)
+-  0600 permissions (root only)
 
 **Cons:**
 - ⚠️ All keys in one location (violates Shamir principle)

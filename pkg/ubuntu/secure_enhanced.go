@@ -255,7 +255,7 @@ func displaySecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) error {
 	}
 
 	summary.WriteString("\n")
-	summary.WriteString("📋 Available Commands:\n")
+	summary.WriteString(" Available Commands:\n")
 	summary.WriteString("   • security-report     - Generate comprehensive security report\n")
 
 	if mfaMode == "enforced" || mfaMode == "standard" {

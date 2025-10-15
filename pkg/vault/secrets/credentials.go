@@ -243,7 +243,7 @@ func displayDatabaseCredentialsSuccess(rc *eos_io.RuntimeContext) error {
 	successMessage := `
  Database credentials stored securely in Vault
 
-📋 Next steps:
+ Next steps:
 - Applications can now retrieve credentials from: vault kv get secret/database/credentials/delphi
 - Configure applications to use these credentials for database access
 - Monitor credential usage in Vault audit logs

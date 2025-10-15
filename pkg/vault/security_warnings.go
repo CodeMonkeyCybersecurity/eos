@@ -256,7 +256,7 @@ func wrapText(text string, width int) []string {
 // DisplayPostInstallSecurityChecklist shows a checklist for post-installation security
 func DisplayPostInstallSecurityChecklist(rc *eos_io.RuntimeContext) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("📋 Displaying post-install security checklist")
+	log.Info(" Displaying post-install security checklist")
 
 	_, _ = fmt.Fprintln(os.Stderr, "")
 	_, _ = fmt.Fprintln(os.Stderr, "╔═══════════════════════════════════════════════════════════════════════════════╗")
@@ -292,7 +292,7 @@ func DisplayPostInstallSecurityChecklist(rc *eos_io.RuntimeContext) {
 	_, _ = fmt.Fprintln(os.Stderr, "╚═══════════════════════════════════════════════════════════════════════════════╝")
 	_, _ = fmt.Fprintln(os.Stderr, "")
 
-	log.Info("📋 Security checklist displayed")
+	log.Info(" Security checklist displayed")
 }
 
 // ValidateSecurityPosture performs basic security posture checks

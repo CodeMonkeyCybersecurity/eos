@@ -135,7 +135,7 @@ func runWatchdogTraces(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 		// Show size of traces
 		size := getDirectorySize(sessionPath)
-		fmt.Printf("   💾 Trace size: %s\n", formatBytes(size))
+		fmt.Printf("    Trace size: %s\n", formatBytes(size))
 
 		fmt.Println()
 	}

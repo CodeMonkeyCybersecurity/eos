@@ -141,7 +141,7 @@ run_fuzz_test "FuzzYAMLParsing" "./pkg/eos_io" "${FUZZTIME_SHORT}" "medium"
 run_fuzz_test "FuzzJSONParsing" "./pkg/parse" "${FUZZTIME_SHORT}" "medium"
 
 # Phase 6: Filesystem & Database Tests
-echo "💾 Phase 6: Filesystem & Database Tests"
+echo " Phase 6: Filesystem & Database Tests"
 echo -e "\n### Phase 6: Filesystem & Database Tests" >> "${REPORT_FILE}"
 
 run_fuzz_test "FuzzMkdirP" "./pkg/eos_unix" "${FUZZTIME_SHORT}" "medium"

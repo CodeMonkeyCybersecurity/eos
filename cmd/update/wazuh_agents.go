@@ -197,7 +197,7 @@ Common Use Cases:
 			}
 
 			if len(result.Analysis.Prerequisites) > 0 {
-				fmt.Printf("\n📋 Prerequisites:\n")
+				fmt.Printf("\n Prerequisites:\n")
 				for _, prereq := range result.Analysis.Prerequisites {
 					fmt.Printf("  - %s\n", prereq)
 				}

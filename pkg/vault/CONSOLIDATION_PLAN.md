@@ -15,14 +15,14 @@ This document identifies functions and patterns in `pkg/vault` that should be co
 
 ## Priority 0 (CRITICAL - Already Completed)
 
-### ✅ TLS Certificate Generation
+###  TLS Certificate Generation
 **Status:** COMPLETED
 
 **Consolidation:**
-- ✅ Created `tls_certificate.go` - unified certificate generation
-- ✅ Updated `install.go` to use `GenerateSelfSignedCertificate()`
-- ✅ Updated `phase3_tls_cert.go` to use consolidated module
-- ✅ Deprecated duplicate functions in `tls_raft.go`
+-  Created `tls_certificate.go` - unified certificate generation
+-  Updated `install.go` to use `GenerateSelfSignedCertificate()`
+-  Updated `phase3_tls_cert.go` to use consolidated module
+-  Deprecated duplicate functions in `tls_raft.go`
 
 **Result:**
 - **~327 lines of duplicated code eliminated**
@@ -533,7 +533,7 @@ Create `pkg/vault/validation/` package for common validations
 ## Implementation Strategy
 
 ### Phase 1: Critical (Week 1)
-1. ✅ TLS Certificate Generation (COMPLETED)
+1.  TLS Certificate Generation (COMPLETED)
 2. File I/O Operations
 3. User/Ownership Operations
 4. Network Operations

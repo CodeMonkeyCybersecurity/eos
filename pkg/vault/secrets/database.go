@@ -190,7 +190,7 @@ func displayDatabaseConfigSuccess(rc *eos_io.RuntimeContext) error {
 	successMessage := `
  Database configuration stored successfully
 
-📋 Next steps:
+ Next steps:
 - Set up database engine: eos self secrets set delphi-db-engine
 - Or set static credentials: eos self secrets set delphi-db
 
@@ -348,7 +348,7 @@ func displayDatabaseEngineSuccess(rc *eos_io.RuntimeContext) error {
 	successMessage := `
  Vault database secrets engine configured successfully
 
-📋 Next steps:
+ Next steps:
 - Test credential generation: vault read database/creds/delphi-role
 - Configure applications to use dynamic credentials
 - Monitor credential usage in Vault audit logs

@@ -155,11 +155,11 @@ The missing host IP in SANs causes:
 5. ❌ Cluster communication breaks
 
 With proper SANs:
-1. ✅ Vault CLI connects successfully
-2. ✅ Health checks pass
-3. ✅ Agent configuration works
-4. ✅ Cluster communication established
-5. ✅ Proper TLS validation throughout
+1.  Vault CLI connects successfully
+2.  Health checks pass
+3.  Agent configuration works
+4.  Cluster communication established
+5.  Proper TLS validation throughout
 
 ## Implementation Timeline
 

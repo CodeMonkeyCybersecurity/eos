@@ -25,7 +25,7 @@ func ExportToJSON(rc *eos_io.RuntimeContext, info *VaultInitInfo, options *ReadI
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Prepare JSON export
-	logger.Info("📋 Assessing JSON export requirements",
+	logger.Info(" Assessing JSON export requirements",
 		zap.String("output_path", options.OutputPath),
 		zap.Bool("redacted", options.RedactSensitive))
 
