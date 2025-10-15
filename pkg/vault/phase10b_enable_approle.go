@@ -73,8 +73,9 @@ func PhaseEnableAppRole(
 	}
 
 	// 5) VERIFY: Confirm Vault actually has this AppRole registered
-	log.Info(" Verifying AppRole exists in Vault backend")
-	roleIDReadback, err := privilegedClient.Logical().Read("auth/approle/role/eos-agent/role-id")
+	log.Info(" Verifying AppRole exists in Vault backend",
+		zap.String("role_name", shared.AppRoleName))
+	roleIDReadback, err := privilegedClient.Logical().Read("auth/approle/role/" + shared.AppRoleName + "/role-id")
 	if err != nil {
 		log.Error(" Failed to verify AppRole role-id in Vault after creation",
 			zap.Error(err))
@@ -102,7 +103,7 @@ func PhaseEnableAppRole(
 
 	log.Info(" AppRole verified in Vault backend",
 		zap.String("role_id", roleID),
-		zap.String("role_name", "eos-agent"))
+		zap.String("role_name", shared.AppRoleName))
 
 	log.Info(" AppRole setup complete and verified", zap.String("role_id", roleID))
 	return nil
@@ -139,8 +140,9 @@ func EnableAppRoleFlow(
 	}
 
 	// 5) VERIFY: Confirm Vault actually has this AppRole registered
-	log.Info(" Verifying AppRole exists in Vault backend")
-	roleIDReadback, err := client.Logical().Read("auth/approle/role/eos-agent/role-id")
+	log.Info(" Verifying AppRole exists in Vault backend",
+		zap.String("role_name", shared.AppRoleName))
+	roleIDReadback, err := client.Logical().Read("auth/approle/role/" + shared.AppRoleName + "/role-id")
 	if err != nil {
 		log.Error(" Failed to verify AppRole role-id in Vault after creation",
 			zap.Error(err))
@@ -168,7 +170,7 @@ func EnableAppRoleFlow(
 
 	log.Info(" AppRole verified in Vault backend",
 		zap.String("role_id", roleID),
-		zap.String("role_name", "eos-agent"))
+		zap.String("role_name", shared.AppRoleName))
 
 	log.Info(" AppRole setup complete and verified", zap.String("role_id", roleID))
 	return nil
