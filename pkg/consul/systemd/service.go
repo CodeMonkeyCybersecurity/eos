@@ -22,6 +22,17 @@ func CreateService(rc *eos_io.RuntimeContext) error {
 	// ASSESS - Prepare service configuration
 	log.Info("Assessing Consul systemd service requirements")
 
+	// CRITICAL: Detect actual Consul binary path
+	// APT install uses /usr/bin/consul, direct download uses /usr/bin/consul
+	// Don't hardcode - detect where binary actually is
+	consulBinaryPath := detectConsulBinaryPath(rc)
+	if consulBinaryPath == "" {
+		return fmt.Errorf("consul binary not found in standard locations (/usr/bin/consul, /usr/local/bin/consul)")
+	}
+
+	log.Info("Detected Consul binary path for systemd service",
+		zap.String("binary_path", consulBinaryPath))
+
 	// INTERVENE - Create systemd service file
 	log.Info("Creating Consul systemd service")
 
@@ -36,9 +47,9 @@ ConditionFileNotEmpty=/etc/consul.d/consul.hcl
 Type=simple
 User=consul
 Group=consul
-ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d/
+ExecStart=%s agent -config-dir=/etc/consul.d/
 ExecReload=/bin/kill -HUP $MAINPID
-ExecStop=/usr/local/bin/consul leave
+ExecStop=%s leave
 KillMode=process
 Restart=on-failure
 RestartSec=5
@@ -47,7 +58,7 @@ Environment="CONSUL_HTTP_ADDR=127.0.0.1:%d"
 TimeoutStartSec=60
 
 [Install]
-WantedBy=multi-user.target`, shared.PortConsul)
+WantedBy=multi-user.target`, consulBinaryPath, consulBinaryPath, shared.PortConsul)
 
 	servicePath := "/etc/systemd/system/consul.service"
 
@@ -163,6 +174,51 @@ WantedBy=multi-user.target`, shared.PortConsul)
 
 	serviceComplete = true // Mark as complete to prevent backup restore
 	return nil
+}
+
+// detectConsulBinaryPath finds the actual installed Consul binary path
+// Checks standard locations in order of preference
+func detectConsulBinaryPath(rc *eos_io.RuntimeContext) string {
+	log := otelzap.Ctx(rc.Ctx)
+
+	// Check common installation paths in order
+	// 1. APT/repository installs typically use /usr/bin
+	// 2. Manual installs often use /usr/local/bin
+	paths := []string{
+		"/usr/bin/consul",
+		"/usr/local/bin/consul",
+	}
+
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			// Binary exists, verify it's executable
+			if info, err := os.Stat(path); err == nil {
+				if info.Mode()&0111 != 0 {
+					log.Debug("Found executable Consul binary",
+						zap.String("path", path))
+					return path
+				}
+				log.Warn("Consul binary found but not executable",
+					zap.String("path", path),
+					zap.String("permissions", info.Mode().String()))
+			}
+		}
+	}
+
+	// Fallback: try to find via PATH
+	if output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "which",
+		Args:    []string{"consul"},
+		Capture: true,
+	}); err == nil && output != "" {
+		path := strings.TrimSpace(output)
+		log.Debug("Found Consul binary via which",
+			zap.String("path", path))
+		return path
+	}
+
+	log.Error("Consul binary not found in any standard location")
+	return ""
 }
 
 // backupFile creates a copy of a file
