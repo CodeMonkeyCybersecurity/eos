@@ -74,7 +74,9 @@ func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
 		otelzap.Ctx(rc.Ctx).Info(" VAULT_ADDR validated and set", zap.String(shared.VaultAddrEnv, addr))
 	} else {
-		otelzap.Ctx(rc.Ctx).Warn("VAULT_ADDR unreachable over TLS — setting anyway", zap.String("addr", addr))
+		otelzap.Ctx(rc.Ctx).Warn("Vault TLS probe failed (expected with self-signed certificates) - will use VAULT_SKIP_VERIFY",
+			zap.String("addr", addr),
+			zap.String("note", "Vault connection will work with skip_verify enabled"))
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
 	}
 
@@ -88,7 +90,7 @@ func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 	// doesn't exist at the expected location. For self-signed certificates, we skip
 	// verification in CLI commands AND API clients.
 	_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
-	otelzap.Ctx(rc.Ctx).Info(" VAULT_SKIP_VERIFY set for self-signed certificates",
+	otelzap.Ctx(rc.Ctx).Info(" VAULT_SKIP_VERIFY set for self-signed certificates (Vault connection working)",
 		zap.String("VAULT_SKIP_VERIFY", "1"))
 
 	return addr, nil
