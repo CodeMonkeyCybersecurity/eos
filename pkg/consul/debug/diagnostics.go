@@ -140,23 +140,28 @@ func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger.Info("========================================")
 
 	for _, result := range results {
-		status := " PASS"
-		if !result.Success {
-			status = " FAIL"
+		// Use simple text symbols for maximum compatibility
+		var status string
+		if result.Success {
+			status = "[PASS]"
+		} else {
+			status = "[FAIL]"
 		}
 
-		logger.Info(fmt.Sprintf("%s: %s", status, result.CheckName),
-			zap.String("message", result.Message))
+		logger.Info(fmt.Sprintf("%s %s", status, result.CheckName))
+		logger.Info(fmt.Sprintf("      %s", result.Message))
 
 		if len(result.Details) > 0 {
 			for _, detail := range result.Details {
-				logger.Info("  → " + detail)
+				logger.Info("      " + detail)
 			}
 		}
 
 		if result.FixApplied {
-			logger.Info("  ✓ FIX APPLIED: " + result.FixMessage)
+			logger.Info(fmt.Sprintf("      [FIX APPLIED] %s", result.FixMessage))
 		}
+
+		logger.Info("") // Blank line between checks
 	}
 
 	logger.Info("========================================")

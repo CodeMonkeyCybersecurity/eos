@@ -221,22 +221,25 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 func checkSystemdService(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking systemd service configuration")
-	
+
 	result := DiagnosticResult{
 		CheckName: "Systemd Service",
 		Success:   true,
 		Details:   []string{},
 	}
-	
+
 	servicePath := "/etc/systemd/system/consul.service"
-	
+
 	// Check if service file exists
 	if _, err := os.Stat(servicePath); err != nil {
 		result.Success = false
 		result.Message = "Consul service file not found"
+		result.Details = append(result.Details, "Service file missing: "+servicePath)
 		return result
 	}
-	
+
+	result.Details = append(result.Details, "Service file exists: "+servicePath)
+
 	// Read service file
 	content, err := os.ReadFile(servicePath)
 	if err != nil {
@@ -244,38 +247,106 @@ func checkSystemdService(rc *eos_io.RuntimeContext) DiagnosticResult {
 		result.Message = "Failed to read service file"
 		return result
 	}
-	
+
 	serviceStr := string(content)
-	
+
 	// Check for common service issues
 	if strings.Contains(serviceStr, "Type=notify") {
-		result.Details = append(result.Details, 
-			"Service uses Type=notify - may cause startup issues with some Consul versions")
+		result.Details = append(result.Details,
+			"NOTICE: Service uses Type=notify - may cause startup issues with some Consul versions")
 	}
-	
+
 	if !strings.Contains(serviceStr, "TimeoutStartSec") {
 		result.Details = append(result.Details,
-			"No TimeoutStartSec specified - using systemd default (90s)")
+			"NOTICE: No TimeoutStartSec specified - using systemd default (90s)")
 	}
-	
+
 	// Check if service is enabled
 	cmd := execute.Options{
 		Command: "systemctl",
 		Args:    []string{"is-enabled", "consul"},
 		Capture: true,
 	}
-	
+
 	output, _ := execute.Run(rc.Ctx, cmd)
 	enabled := strings.TrimSpace(output) == "enabled"
-	
+
 	if enabled {
-		result.Details = append(result.Details, "Service is enabled")
+		result.Details = append(result.Details, "Service is enabled (will start on boot)")
 	} else {
-		result.Details = append(result.Details, "Service is not enabled")
+		result.Details = append(result.Details, "Service is NOT enabled (will not start on boot)")
 	}
-	
-	result.Message = "Systemd service configuration checked"
-	
+
+	// CRITICAL: Get detailed service status
+	statusCmd := execute.Options{
+		Command: "systemctl",
+		Args:    []string{"status", "consul", "--no-pager"},
+		Capture: true,
+	}
+
+	statusOutput, _ := execute.Run(rc.Ctx, statusCmd)
+
+	// Parse service state
+	isActive := strings.Contains(statusOutput, "Active: active")
+	isFailed := strings.Contains(statusOutput, "Active: failed")
+	isInactive := strings.Contains(statusOutput, "Active: inactive")
+	isActivating := strings.Contains(statusOutput, "Active: activating")
+
+	if isActive {
+		result.Details = append(result.Details, "Service Status: ACTIVE (running)")
+
+		// Get MainPID
+		for _, line := range strings.Split(statusOutput, "\n") {
+			if strings.Contains(line, "Main PID:") {
+				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+			}
+			if strings.Contains(line, "Tasks:") {
+				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+			}
+			if strings.Contains(line, "Memory:") {
+				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+			}
+		}
+	} else if isFailed {
+		result.Success = false
+		result.Message = "Service is in FAILED state"
+		result.Details = append(result.Details, "Service Status: FAILED")
+
+		// Extract failure reason
+		for _, line := range strings.Split(statusOutput, "\n") {
+			if strings.Contains(line, "Process:") || strings.Contains(line, "code=") {
+				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+			}
+		}
+	} else if isInactive {
+		result.Details = append(result.Details, "Service Status: INACTIVE (not running)")
+	} else if isActivating {
+		result.Details = append(result.Details, "Service Status: ACTIVATING (starting up)")
+	} else {
+		result.Details = append(result.Details, "Service Status: UNKNOWN")
+	}
+
+	// Check for recent restarts/crashes
+	showCmd := execute.Options{
+		Command: "systemctl",
+		Args:    []string{"show", "consul", "--property=NRestarts"},
+		Capture: true,
+	}
+
+	if showOutput, err := execute.Run(rc.Ctx, showCmd); err == nil {
+		restarts := strings.TrimSpace(strings.TrimPrefix(showOutput, "NRestarts="))
+		if restarts != "0" && restarts != "" {
+			result.Details = append(result.Details, "WARNING: Service has restarted "+restarts+" times")
+			if !result.Success {
+				result.Message = "Service has crashed/restarted " + restarts + " times"
+			}
+		}
+	}
+
+	if result.Success {
+		result.Message = "Systemd service configuration is valid"
+	}
+
 	return result
 }
 
