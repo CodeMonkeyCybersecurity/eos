@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/sync/connectors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -21,11 +20,12 @@ var (
 	consulDryRun     bool
 	consulForce      bool
 	consulSkipBackup bool
+	consulNodes      []string
 )
 
 // ConsulSyncCmd handles Consul cluster synchronization over Tailscale
 var ConsulSyncCmd = &cobra.Command{
-	Use:   "consul --node1 [--node2 --node3 ...]",
+	Use:   "consul --nodes <node1> [node2] [node3] ...",
 	Short: "Join this Consul node to other nodes over Tailscale",
 	Long: `Join this Consul node to one or more Consul nodes over Tailscale network.
 
@@ -36,20 +36,18 @@ This command automatically:
   4. Reconfigures and restarts Consul
   5. Verifies cluster membership
 
-The magic: Just specify hostnames as flags and it "just works"!
-
 Examples:
   # Join THIS node to vhost7's Consul cluster
-  eos sync consul --vhost7
+  eos sync consul --nodes vhost7
 
   # Join THIS node to multiple Consul nodes
-  eos sync consul --vhost7 --vhost11 --vhost15
+  eos sync consul --nodes vhost7 vhost11 vhost15
 
   # Preview changes without applying
-  eos sync consul --vhost7 --dry-run
+  eos sync consul --nodes vhost7 vhost11 --dry-run
 
   # Force reconfiguration even if already joined
-  eos sync consul --vhost7 --force
+  eos sync consul --nodes vhost7 --force
 
 Requirements:
   - Tailscale must be installed and authenticated
@@ -61,6 +59,8 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 }
 
 func init() {
+	ConsulSyncCmd.Flags().StringSliceVar(&consulNodes, "nodes", []string{},
+		"Hostnames of Consul nodes to join (space-separated)")
 	ConsulSyncCmd.Flags().BoolVar(&consulDryRun, "dry-run", false,
 		"Preview changes without applying them")
 	ConsulSyncCmd.Flags().BoolVar(&consulForce, "force", false,
@@ -75,17 +75,16 @@ func init() {
 func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Extract node names from flags
-	// All flags starting with -- that aren't our known flags are treated as node names
-	nodeNames := extractNodeNames(cmd)
+	// Get node names from --nodes flag
+	nodeNames := consulNodes
 
 	if len(nodeNames) == 0 {
 		return eos_err.NewUserError(
-			"No nodes specified. Please specify at least one node as a flag.\n\n" +
+			"No nodes specified. Please specify at least one node.\n\n" +
 				"Examples:\n" +
-				"  eos sync consul --vhost7\n" +
-				"  eos sync consul --vhost7 --vhost11\n\n" +
-				"Each --nodename flag adds that node to the Consul cluster.")
+				"  eos sync consul --nodes vhost7\n" +
+				"  eos sync consul --nodes vhost7 vhost11 vhost15\n\n" +
+				"Use --nodes followed by one or more hostnames.")
 	}
 
 	logger.Info("Starting Consul cluster synchronization over Tailscale",
@@ -127,29 +126,6 @@ func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	logger.Info("================================================================================")
 
 	return nil
-}
-
-// extractNodeNames extracts node names from command flags
-// Any flag that isn't a known flag is treated as a node name
-func extractNodeNames(cmd *cobra.Command) []string {
-	knownFlags := map[string]bool{
-		"dry-run":     true,
-		"force":       true,
-		"skip-backup": true,
-		"help":        true,
-	}
-
-	var nodeNames []string
-
-	// Iterate through all flags
-	cmd.Flags().Visit(func(flag *pflag.Flag) {
-		if !knownFlags[flag.Name] {
-			// This is a node name flag
-			nodeNames = append(nodeNames, flag.Name)
-		}
-	})
-
-	return nodeNames
 }
 
 // TailscaleStatus represents the JSON output from `tailscale status --json`

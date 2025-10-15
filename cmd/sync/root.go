@@ -46,7 +46,7 @@ Currently supported service pairs:
                         (order doesn't matter: "consul tailscale" or "tailscale consul")
 
 For joining Consul nodes into a cluster:
-  - eos sync consul --vhost7 --vhost11    # Join multiple Consul nodes together
+  - eos sync consul --nodes vhost7 vhost11    # Join multiple Consul nodes together
   - See: eos sync consul --help
 
 Safety Features:
@@ -66,8 +66,8 @@ Examples:
   eos sync tailscale consul
 
   # Join Consul nodes into a cluster
-  eos sync consul --vhost7
-  eos sync consul --vhost7 --vhost11
+  eos sync consul --nodes vhost7
+  eos sync consul --nodes vhost7 vhost11 vhost15
 
   # Preview changes without applying (dry-run)
   eos sync consul vault --dry-run
