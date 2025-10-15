@@ -1220,17 +1220,58 @@ func VaultAgentCredentialsDiagnostic() *debug.Diagnostic {
 			// Test if vault user can read credentials
 			output.WriteString("=== Vault User Access Test ===\n")
 			testCmd := exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-r", roleIDPath)
-			if testCmd.Run() == nil {
+			canReadRoleID := testCmd.Run() == nil
+			if canReadRoleID {
 				output.WriteString(fmt.Sprintf("✓ vault user CAN read: %s\n", roleIDPath))
 			} else {
 				output.WriteString(fmt.Sprintf("✗ vault user CANNOT read: %s\n", roleIDPath))
 			}
 
 			testCmd = exec.CommandContext(ctx, "sudo", "-u", "vault", "test", "-r", secretIDPath)
-			if testCmd.Run() == nil {
+			canReadSecretID := testCmd.Run() == nil
+			if canReadSecretID {
 				output.WriteString(fmt.Sprintf("✓ vault user CAN read: %s\n", secretIDPath))
 			} else {
 				output.WriteString(fmt.Sprintf("✗ vault user CANNOT read: %s\n", secretIDPath))
+			}
+
+			// If vault user cannot read credentials, show directory permissions for debugging
+			if !canReadRoleID || !canReadSecretID {
+				output.WriteString("\n=== Directory Permissions Diagnostic ===\n")
+				output.WriteString("Checking parent directory permissions...\n\n")
+
+				// Check /var/lib/eos/
+				output.WriteString("Parent directory: /var/lib/eos/\n")
+				lsCmd := exec.CommandContext(ctx, "ls", "-ld", "/var/lib/eos/")
+				if lsOutput, err := lsCmd.CombinedOutput(); err == nil {
+					output.WriteString(string(lsOutput))
+				}
+
+				// Check /var/lib/eos/secret/
+				output.WriteString("\nSecrets directory: /var/lib/eos/secret/\n")
+				lsCmd = exec.CommandContext(ctx, "ls", "-ld", "/var/lib/eos/secret/")
+				if lsOutput, err := lsCmd.CombinedOutput(); err == nil {
+					output.WriteString(string(lsOutput))
+				}
+
+				// List contents of /var/lib/eos/secret/ as root
+				output.WriteString("\nSecrets directory contents (as root):\n")
+				lsCmd = exec.CommandContext(ctx, "ls", "-la", "/var/lib/eos/secret/")
+				if lsOutput, err := lsCmd.CombinedOutput(); err == nil {
+					output.WriteString(string(lsOutput))
+				}
+
+				// Try to list as vault user (will fail if permissions wrong)
+				output.WriteString("\nSecrets directory contents (as vault user):\n")
+				lsCmd = exec.CommandContext(ctx, "sudo", "-u", "vault", "ls", "-la", "/var/lib/eos/secret/")
+				if lsOutput, err := lsCmd.CombinedOutput(); err == nil {
+					output.WriteString(string(lsOutput))
+				} else {
+					output.WriteString(fmt.Sprintf("Error: %v\n", err))
+					output.WriteString(string(lsOutput))
+					output.WriteString("\n⚠ This indicates a directory traversal permission issue!\n")
+					output.WriteString("The vault user cannot traverse /var/lib/eos/ to reach /var/lib/eos/secret/\n")
+				}
 			}
 
 			result.Output = output.String()
