@@ -30,6 +30,7 @@ const (
 	VaultDefaultTokenMaxTTL   = "24h"
 	VaultDefaultSecretIDTTL   = "24h"
 	LocalhostSAN              = "127.0.0.1"
+	ConsulDefaultAddr         = "127.0.0.1:8500" // Standard Consul port (not Eos custom 8161)
 	VaultDir                  = "/opt/vault/"
 	VaultDataPath             = VaultDir + "data/"
 	VaultLogsPath             = VaultDir + "logs/"
@@ -64,12 +65,15 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 
 // Computed Vault port constants
 var (
-	VaultDefaultPort      = fmt.Sprintf("%d", PortVault)
-	VaultDefaultPortInt   = PortVault
-	VaultWebPortTCP       = VaultDefaultPort + "/tcp"
-	ListenerAddr          = "127.0.0.1:" + VaultDefaultPort
-	VaultDefaultAddr      = "https://%s:" + VaultDefaultPort
-	VaultDefaultLocalAddr = "https://127.0.0.1:" + VaultDefaultPort
+	VaultDefaultPort        = fmt.Sprintf("%d", PortVault)
+	VaultDefaultPortInt     = PortVault
+	VaultClusterPort        = fmt.Sprintf("%d", PortVaultCluster)
+	VaultClusterPortInt     = PortVaultCluster
+	VaultWebPortTCP         = VaultDefaultPort + "/tcp"
+	ListenerAddr            = "127.0.0.1:" + VaultDefaultPort
+	VaultDefaultAddr        = "https://%s:" + VaultDefaultPort
+	VaultDefaultLocalAddr   = "https://127.0.0.1:" + VaultDefaultPort
+	VaultDefaultClusterAddr = "https://127.0.0.1:" + VaultClusterPort
 )
 
 // File paths and Vault client

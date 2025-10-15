@@ -75,7 +75,8 @@ func PhasePatchVaultConfigIfNeeded(rc *eos_io.RuntimeContext) error {
 
 	// Replace and rewrite
 	newContent := strings.ReplaceAll(content, "8200", shared.VaultDefaultPort)
-	if err := os.WriteFile(shared.VaultConfigPath, []byte(newContent), 0644); err != nil {
+	// SECURITY: Use 0640 not 0644 to prevent world-readable config file
+	if err := os.WriteFile(shared.VaultConfigPath, []byte(newContent), shared.RuntimeFilePerms); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to patch vault.hcl", zap.Error(err))
 		return fmt.Errorf("failed to patch vault config: %w", err)
 	}
@@ -131,12 +132,12 @@ func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 	// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
 	params := shared.VaultConfigParams{
 		Port:          shared.VaultDefaultPort,
-		ClusterPort:   "8180",
+		ClusterPort:   shared.VaultClusterPort,
 		TLSCrt:        shared.TLSCrt,
 		TLSKey:        shared.TLSKey,
 		VaultDataPath: shared.VaultDataPath,
 		APIAddr:       vaultAddr,
-		ClusterAddr:   "https://127.0.0.1:8180",
+		ClusterAddr:   shared.VaultDefaultClusterAddr,
 		NodeID:        "eos-vault-dev",
 		LogLevel:      logLevel,
 		LogFormat:     logFormat,

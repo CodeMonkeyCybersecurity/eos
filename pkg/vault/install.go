@@ -895,10 +895,10 @@ func (vi *VaultInstaller) configure() error {
 	var storageConfig string
 	switch vi.config.StorageBackend {
 	case "consul":
-		storageConfig = `storage "consul" {
-  address = "127.0.0.1:8500"
+		storageConfig = fmt.Sprintf(`storage "consul" {
+  address = "%s"
   path    = "vault"
-}`
+}`, shared.ConsulDefaultAddr)
 	case "raft":
 		// Build Raft configuration based on cluster mode
 		var raftConfig string
@@ -1727,7 +1727,7 @@ func (vi *VaultInstaller) storeCertMetadataInConsul(certPath, keyPath string, dn
 	// Check if Consul is available
 	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
 	if consulAddr == "" {
-		consulAddr = "127.0.0.1:8500"
+		consulAddr = shared.ConsulDefaultAddr
 	}
 
 	// Create Consul client

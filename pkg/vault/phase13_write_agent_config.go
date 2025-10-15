@@ -546,17 +546,17 @@ func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 
 	tmpfilesPath := "/etc/tmpfiles.d/eos.conf"
 	// Use vault user instead of deprecated eos user
-	tmpfilesContent := "d /run/eos 0755 vault vault -\n"
+	tmpfilesContent := fmt.Sprintf("d %s 0755 vault vault -\n", shared.EosRunDir)
 
 	log.Info(" Creating systemd tmpfiles configuration", zap.String("path", tmpfilesPath))
 
-	if err := os.WriteFile(tmpfilesPath, []byte(tmpfilesContent), 0o644); err != nil {
+	if err := os.WriteFile(tmpfilesPath, []byte(tmpfilesContent), shared.FilePermStandard); err != nil {
 		return fmt.Errorf("write tmpfiles config %s: %w", tmpfilesPath, err)
 	}
 
-	// Apply tmpfiles configuration immediately to create /run/eos
+	// Apply tmpfiles configuration immediately to create runtime directory
 	log.Info(" Applying tmpfiles configuration immediately")
-	cmd := exec.CommandContext(rc.Ctx, "systemd-tmpfiles", "--create", "--prefix=/run/eos")
+	cmd := exec.CommandContext(rc.Ctx, "systemd-tmpfiles", "--create", fmt.Sprintf("--prefix=%s", shared.EosRunDir))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		log.Error(" Failed to apply tmpfiles config immediately",
 			zap.Error(err),

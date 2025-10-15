@@ -102,8 +102,10 @@ type AgentSystemdData struct {
 // Vault Agent service + config paths
 const (
 	VaultAgentService      = "vault-agent-eos.service"
-	VaultAgentConfigPath   = "/etc/vault-agent-eos.hcl"
+	VaultAgentConfigPath   = "/etc/vault.d/agent-config.hcl" // FIXED: Was /etc/vault-agent-eos.hcl
 	VaultAgentCACopyPath   = "/etc/vault.d/ca.crt"
+	VaultAgentRoleIDPath   = "/etc/vault.d/role_id"
+	VaultAgentSecretIDPath = "/etc/vault.d/secret_id"
 	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt"
 	VaultAgentServicePath  = "/etc/systemd/system/vault-agent-eos.service"
 )
