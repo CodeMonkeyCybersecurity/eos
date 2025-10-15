@@ -196,41 +196,49 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 func (vi *VaultInstaller) PreflightChecks() error {
 	vi.logger.Info("Running preflight checks to prevent race conditions")
 
-	// Check if Vault service is already running
+	// IDEMPOTENT: Check if Vault service is already running
+	// This is NOT an error - we'll verify and update configuration if needed
 	vi.logger.Debug("Checking if Vault service is active")
 	if output, err := exec.Command("systemctl", "is-active", "vault").Output(); err == nil {
 		status := strings.TrimSpace(string(output))
 		if status == "active" {
-			vi.logger.Error("Vault service is already running",
+			vi.logger.Info("Vault service is already running - will verify state and configuration",
+				zap.String("status", status),
+				zap.String("behavior", "idempotent - will check and update if needed"))
+			// NOT AN ERROR - let the installation flow handle existing state
+			// Each phase will check if its work is already done and skip if so
+		} else {
+			vi.logger.Debug("Vault service exists but not active",
 				zap.String("status", status))
-			return fmt.Errorf("Vault service is already running. Delete first: sudo eos delete vault")
 		}
-		vi.logger.Debug("Vault service exists but not active",
-			zap.String("status", status))
 	} else {
 		vi.logger.Debug("Vault service not found (expected for clean install)")
 	}
 
-	// Check if vault user exists
+	// IDEMPOTENT: Check if vault user exists
+	// Existing user is fine - we'll verify permissions and ownership
 	vi.logger.Debug("Checking if vault user exists")
 	if err := exec.Command("id", "vault").Run(); err == nil {
-		vi.logger.Error("Vault user already exists - deletion may not be complete")
-		return fmt.Errorf("Vault user already exists. Deletion may not be complete. Wait 10 seconds and retry")
+		vi.logger.Info("Vault user already exists - will verify permissions and ownership",
+			zap.String("behavior", "idempotent"))
+		// NOT AN ERROR - user should exist after first install
 	} else {
 		vi.logger.Debug("Vault user does not exist (expected for clean install)")
 	}
 
-	// Check if vault binary exists
+	// IDEMPOTENT: Check if vault binary exists
+	// Existing binary is fine - we'll verify version if needed
 	vi.logger.Debug("Checking if vault binary exists")
 	if binaryPath, err := exec.LookPath("vault"); err == nil {
-		vi.logger.Error("Vault binary still exists",
-			zap.String("path", binaryPath))
-		return fmt.Errorf("Vault binary still exists at %s. Delete first: sudo eos delete vault", binaryPath)
+		vi.logger.Info("Vault binary already installed - will verify configuration",
+			zap.String("path", binaryPath),
+			zap.String("behavior", "idempotent"))
+		// NOT AN ERROR - binary should exist after first install
 	} else {
 		vi.logger.Debug("Vault binary does not exist (expected for clean install)")
 	}
 
-	vi.logger.Info("Preflight checks passed - system is ready for installation")
+	vi.logger.Info("Preflight checks passed - system is ready (idempotent operation)")
 	return nil
 }
 
