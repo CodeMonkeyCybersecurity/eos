@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -128,8 +129,15 @@ func CheckVaultHealth(rc *eos_io.RuntimeContext) (bool, error) {
 		return false, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	// DEVELOPMENT: Skip TLS verification for self-signed certificates
+	// In development environments, Vault uses self-signed certificates that won't be in the system trust store
 	client := &http.Client{
 		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, // #nosec G402 - Development environment with self-signed certificates
+			},
+		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
