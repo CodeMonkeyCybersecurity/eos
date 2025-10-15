@@ -5,6 +5,7 @@ package create
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -18,7 +19,7 @@ import (
 
 var CreateConsulCmd = &cobra.Command{
 	Use:   "consul",
-	Short: "Install and configure HashiCorp Consul directly (without )",
+	Short: "Install and configure HashiCorp Consul using native methods",
 	Long: `Install and configure HashiCorp Consul using native installation methods.
 
 This command installs Consul directly without using configuration management tools,
@@ -101,11 +102,17 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		logger.Info("Defaulting to server mode (neither --server nor --client specified)")
 	}
 
-	// Warn about destructive operations
+	// Warn about destructive operations with explicit confirmation
 	if consulClean {
 		logger.Warn("--clean flag specified: This will DELETE all existing Consul data")
-		logger.Info("terminal prompt: Press Enter to continue or Ctrl+C to cancel...")
-		fmt.Scanln() // Wait for user confirmation
+		logger.Info("terminal prompt: Type 'yes' to confirm or Ctrl+C to cancel: ")
+
+		var confirmation string
+		fmt.Scanln(&confirmation)
+		if strings.ToLower(strings.TrimSpace(confirmation)) != "yes" {
+			return eos_err.NewUserError("clean install cancelled by user (did not type 'yes')")
+		}
+		logger.Info("Clean install confirmed")
 	}
 
 	logger.Info("Starting native Consul installation",
@@ -144,13 +151,17 @@ func runCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		return fmt.Errorf("consul installation failed: %w", err)
 	}
 
-	logger.Info("terminal prompt:  Consul installation completed successfully!")
-	logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
+	// CRITICAL: Success message is printed AFTER Install() returns successfully
+	// Install() includes verification, so if we reach here, Consul is actually working
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: Next steps:")
-	logger.Info("terminal prompt: 1. Check status: consul members")
-	logger.Info("terminal prompt: 2. View logs: journalctl -u consul -f")
-	logger.Info(fmt.Sprintf("terminal prompt: 3. Access UI: http://localhost:%d/ui", shared.PortConsul))
+	logger.Info("terminal prompt: ✓ Consul installation completed successfully!")
+	logger.Info("terminal prompt: ")
+	logger.Info(fmt.Sprintf("terminal prompt: Web UI: http://<server-ip>:%d/ui", shared.PortConsul))
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Quick Start:")
+	logger.Info("terminal prompt:   consul members              # View cluster members")
+	logger.Info("terminal prompt:   journalctl -u consul -f     # View live logs")
+	logger.Info(fmt.Sprintf("terminal prompt:   curl http://localhost:%d/v1/agent/self  # Test API", shared.PortConsul))
 
 	return nil
 }

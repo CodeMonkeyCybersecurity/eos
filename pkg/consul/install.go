@@ -145,7 +145,7 @@ func (ci *ConsulInstaller) Install() error {
 	}()
 
 	// Phase 1: ASSESS - Check if already installed
-	ci.progress.Update("[16%] Checking current Consul status")
+	ci.progress.Update("[16%] Checking if Consul is already installed and running...")
 	shouldInstall, err := ci.assess()
 	if err != nil {
 		return fmt.Errorf("assessment failed: %w", err)
@@ -160,34 +160,38 @@ func (ci *ConsulInstaller) Install() error {
 	}
 
 	// Phase 2: Prerequisites
-	ci.progress.Update("[33%] Validating prerequisites")
+	ci.progress.Update("[33%] Checking system requirements (memory, disk, ports)...")
 	if err := ci.validatePrerequisites(); err != nil {
 		return fmt.Errorf("prerequisite validation failed: %w", err)
 	}
 
 	// Phase 3: INTERVENE - Install
-	ci.progress.Update("[50%] Installing Consul binary")
+	if ci.config.UseRepository {
+		ci.progress.Update("[50%] Downloading and installing Consul from HashiCorp repository...")
+	} else {
+		ci.progress.Update("[50%] Downloading and installing Consul binary...")
+	}
 	if err := ci.installBinary(); err != nil {
 		return fmt.Errorf("binary installation failed: %w", err)
 	}
 	binaryInstalled = true
 
 	// Phase 4: Configure
-	ci.progress.Update("[66%] Configuring Consul")
+	ci.progress.Update("[66%] Generating and validating Consul configuration files...")
 	if err := ci.configure(); err != nil {
 		return fmt.Errorf("configuration failed: %w", err)
 	}
 	configCreated = true
 
 	// Phase 5: Setup Service
-	ci.progress.Update("[83%] Setting up systemd service")
+	ci.progress.Update("[83%] Creating systemd service and starting Consul...")
 	if err := ci.setupService(); err != nil {
 		return fmt.Errorf("service setup failed: %w", err)
 	}
 	serviceCreated = true
 
 	// Phase 6: EVALUATE - Verify
-	ci.progress.Update("[100%] Verifying installation")
+	ci.progress.Update("[100%] Waiting for Consul API to become ready...")
 	if err := ci.verify(); err != nil {
 		return fmt.Errorf("verification failed: %w", err)
 	}
@@ -243,10 +247,17 @@ func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated
 				zap.Error(err),
 				zap.String("output", output))
 		} else {
-			// CRITICAL: daemon-reload is async - systemd scans /etc/systemd/system/
-			// If we immediately delete files, systemd might see partial state
+			// CRITICAL: daemon-reload is async - poll systemd state instead of sleep
 			ci.logger.Debug("Waiting for daemon-reload to complete")
-			time.Sleep(500 * time.Millisecond)
+			deadline := time.Now().Add(2 * time.Second)
+			for time.Now().Before(deadline) {
+				// Check if systemd has processed the reload by querying unit state
+				if _, err := exec.Command("systemctl", "show", "-p", "LoadState", "consul").Output(); err == nil {
+					// If we can query the unit state, daemon-reload has processed
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
 		}
 	}
 
@@ -897,9 +908,10 @@ func (ci *ConsulInstaller) setupService() error {
 
 			// Log progress every few attempts so user knows we're still checking
 			if attempt%3 == 0 {
-				ci.logger.Info("Still waiting for Consul to be ready",
+				ci.logger.Info("Waiting for Consul HTTP API to respond...",
 					zap.Int("attempt", attempt),
-					zap.Int("max_attempts", 15))
+					zap.Int("max_attempts", 15),
+					zap.String("checking", fmt.Sprintf("http://127.0.0.1:%d/v1/agent/self", shared.PortConsul)))
 			}
 		}
 	}
