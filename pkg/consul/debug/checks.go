@@ -135,15 +135,15 @@ func checkLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Analyzing Consul configuration")
-	
+
 	result := DiagnosticResult{
 		CheckName: "Configuration Analysis",
 		Success:   true,
 		Details:   []string{},
 	}
-	
+
 	configPath := "/etc/consul.d/consul.hcl"
-	
+
 	// Check if config file exists
 	if _, err := os.Stat(configPath); err != nil {
 		result.Success = false
@@ -151,7 +151,7 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 		result.Details = append(result.Details, configPath+" does not exist")
 		return result
 	}
-	
+
 	// Read configuration
 	content, err := os.ReadFile(configPath)
 	if err != nil {
@@ -159,8 +159,40 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 		result.Message = "Failed to read configuration file"
 		return result
 	}
-	
+
 	configStr := string(content)
+
+	// Extract key configuration values
+	bindAddr := extractConfigValue(configStr, "bind_addr")
+	advertiseAddr := extractConfigValue(configStr, "advertise_addr")
+	clientAddr := extractConfigValue(configStr, "client_addr")
+	retryJoin := extractConfigArray(configStr, "retry_join")
+
+	// Report extracted configuration
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "=== Configuration Values ===")
+	if bindAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("bind_addr = %s", bindAddr))
+	} else {
+		result.Details = append(result.Details, "bind_addr = (not set - will use default interface)")
+	}
+
+	if advertiseAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("advertise_addr = %s", advertiseAddr))
+	}
+
+	if clientAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("client_addr = %s", clientAddr))
+	} else {
+		result.Details = append(result.Details, "client_addr = (not set - will use 127.0.0.1)")
+	}
+
+	if len(retryJoin) > 0 {
+		result.Details = append(result.Details, fmt.Sprintf("retry_join = [%s]", strings.Join(retryJoin, ", ")))
+	} else {
+		result.Details = append(result.Details, "retry_join = (not set - single node or manual join)")
+	}
+	result.Details = append(result.Details, "")
 	
 	// Check for common configuration issues
 	issues := []string{}
@@ -609,7 +641,7 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 		addr := fmt.Sprintf("127.0.0.1:%d", port)
 		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			result.Details = append(result.Details,
 				fmt.Sprintf("✓ Port %d (%s): LISTENING", port, desc))
 			if port == shared.PortConsul {

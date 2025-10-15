@@ -78,6 +78,24 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	logResult := analyzeLogs(rc, config.LogLines)
 	results = append(results, logResult)
 
+	// 10. Detailed port binding analysis
+	portBindingsResult := checkDetailedPortBindings(rc)
+	results = append(results, portBindingsResult)
+
+	// 11. Check cluster state
+	clusterResult := checkClusterState(rc)
+	results = append(results, clusterResult)
+
+	// 12. Check retry_join targets (if configured)
+	if configResult.Success {
+		// Extract retry_join from config for validation
+		retryJoinAddrs := extractRetryJoinFromConfig(rc)
+		if len(retryJoinAddrs) > 0 {
+			retryJoinResult := checkRetryJoinTargets(rc, retryJoinAddrs)
+			results = append(results, retryJoinResult)
+		}
+	}
+
 	// INTERVENE - Apply fixes if requested
 	if config.AutoFix || config.KillProcesses {
 		logger.Info("=== INTERVENE PHASE: Applying fixes ===")

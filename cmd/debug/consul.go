@@ -15,13 +15,16 @@ var consulCmd = &cobra.Command{
 Diagnostic checks performed:
 1. Consul binary verification (existence, permissions, version)
 2. File permissions (config, data, and log directories)
-3. Configuration analysis (validation, common issues)
+3. Configuration analysis (bind_addr, advertise_addr, client_addr, retry_join)
 4. Systemd service configuration
 5. Lingering processes detection
 6. Network configuration (interfaces, IP addresses)
 7. Port connectivity (HTTP API, gRPC, DNS, Serf, RPC)
 8. Port conflict detection
 9. Log analysis (errors, warnings, startup issues)
+10. Detailed port binding analysis (which addresses ports are bound to)
+11. Cluster state (members, leader, raft peers)
+12. Retry join target connectivity (reachability of join targets)
 
 Flags:
   --fix              Automatically fix common issues
