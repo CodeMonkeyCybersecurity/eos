@@ -2,9 +2,11 @@
 package debug
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -228,9 +230,22 @@ func checkCephBinaries(logger otelzap.LoggerWithCtx) error {
 }
 
 func checkCephConnectivity(logger otelzap.LoggerWithCtx) error {
-	cmd := exec.Command("ceph", "status")
+	// CRITICAL: Add timeout to prevent hanging on unreachable cluster
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "ceph", "status")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			logger.Error("Cluster connection timed out after 10 seconds")
+			logger.Info("Possible causes:")
+			logger.Info("  1. Ceph cluster is not running")
+			logger.Info("  2. Network connectivity issues")
+			logger.Info("  3. Ceph configuration missing or incorrect")
+			logger.Info("  4. Authentication (ceph.client.admin.keyring) issues")
+			return fmt.Errorf("cluster connection timeout - cluster may be down or unreachable")
+		}
 		logger.Error("Cannot connect to cluster", zap.String("output", string(output)))
 		return fmt.Errorf("cluster unreachable: %w", err)
 	}
