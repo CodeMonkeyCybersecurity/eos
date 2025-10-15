@@ -40,17 +40,68 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 I
 	}
 
 	// Create audit log directory with proper permissions
-	log.Info(" Creating audit log directory", zap.String("path", shared.VaultLogsPath))
+	log.Info(" Creating audit log directory", zap.String("path", shared.VaultLogsPath), zap.String("permissions", "0750"))
+
+	// Check if directory already exists
+	dirInfo, statErr := os.Stat(shared.VaultLogsPath)
+	if statErr == nil {
+		log.Info(" Audit directory already exists",
+			zap.String("path", shared.VaultLogsPath),
+			zap.String("mode", dirInfo.Mode().String()))
+	} else if os.IsNotExist(statErr) {
+		log.Debug(" Audit directory does not exist, creating", zap.String("path", shared.VaultLogsPath))
+	}
+
 	if err := os.MkdirAll(shared.VaultLogsPath, 0750); err != nil {
-		log.Error(" Failed to create audit directory", zap.Error(err))
+		log.Error(" Failed to create audit directory",
+			zap.String("path", shared.VaultLogsPath),
+			zap.Error(err))
 		return fmt.Errorf("failed to create audit directory: %w", err)
 	}
+	log.Info(" Audit directory ready", zap.String("path", shared.VaultLogsPath))
+
+	// Verify directory was created with correct permissions
+	verifyInfo, verifyErr := os.Stat(shared.VaultLogsPath)
+	if verifyErr != nil {
+		log.Error(" Failed to verify audit directory", zap.Error(verifyErr))
+		return fmt.Errorf("failed to verify audit directory: %w", verifyErr)
+	}
+	log.Debug(" Audit directory permissions verified",
+		zap.String("mode", verifyInfo.Mode().String()),
+		zap.String("expected", "drwxr-x---"))
 
 	// Set ownership to vault user
 	log.Info(" Setting audit directory ownership to vault:vault")
-	if err := execute.RunSimple(rc.Ctx, "chown", "-R", "vault:vault", shared.VaultLogsPath); err != nil {
-		log.Warn(" Failed to set audit directory ownership", zap.Error(err))
-		// Don't fail - Vault might still work with root ownership
+	chownCmd := execute.Options{
+		Command: "chown",
+		Args:    []string{"-R", "vault:vault", shared.VaultLogsPath},
+		Capture: true,
+	}
+	output, err := execute.Run(rc.Ctx, chownCmd)
+	if err != nil {
+		log.Error(" Failed to set audit directory ownership",
+			zap.Error(err),
+			zap.String("output", output),
+			zap.String("command", "chown -R vault:vault "+shared.VaultLogsPath))
+		// This is CRITICAL - fail instead of warning
+		return fmt.Errorf("failed to set audit directory ownership: %w (output: %s)", err, output)
+	}
+	log.Info(" Audit directory ownership set successfully",
+		zap.String("owner", "vault:vault"),
+		zap.String("path", shared.VaultLogsPath))
+
+	// Verify ownership was set correctly
+	lsCmd := execute.Options{
+		Command: "ls",
+		Args:    []string{"-ld", shared.VaultLogsPath},
+		Capture: true,
+	}
+	lsOutput, lsErr := execute.Run(rc.Ctx, lsCmd)
+	if lsErr == nil {
+		log.Info(" Audit directory final state",
+			zap.String("ls_output", lsOutput))
+	} else {
+		log.Warn(" Could not verify directory state", zap.Error(lsErr))
 	}
 
 	log.Info(" Enabling file-based audit device",
