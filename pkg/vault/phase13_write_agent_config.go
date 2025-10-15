@@ -85,10 +85,19 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 		zap.Int("secret_id_length", len(secretID)))
 
 	// 2.5) Copy Vault TLS certificate for agent to trust
+	// CRITICAL: Agent WILL fail TLS verification without this
 	if err := copyVaultCertForAgent(rc); err != nil {
-		log.Warn("Failed to copy Vault CA cert for agent - agent may fail TLS verification",
+		log.Error("Failed to copy Vault CA cert for agent - cannot proceed",
+			zap.Error(err),
+			zap.String("remediation", "Check that Vault TLS cert exists and is readable"))
+		return fmt.Errorf("copy vault CA cert for agent: %w", err)
+	}
+
+	// VERIFY: Cert was actually copied and is readable by vault user
+	if err := verifyCertCopyForAgent(rc); err != nil {
+		log.Error("Vault CA cert verification failed - agent will fail TLS",
 			zap.Error(err))
-		// Continue anyway - might work if VAULT_SKIP_VERIFY is set
+		return fmt.Errorf("verify vault CA cert for agent: %w", err)
 	}
 
 	if err := writeAgentHCL(rc, addr, roleID, secretID); err != nil {
@@ -284,8 +293,25 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 		return fmt.Errorf("render template: %w", err)
 	}
 
+	renderedConfig := buf.String()
+
 	log.Debug("Template rendered successfully",
 		zap.Int("size_bytes", buf.Len()))
+
+	// DIAGNOSTIC: Log the rendered config content for debugging
+	log.Info("[DIAGNOSTIC] Rendered Vault Agent HCL configuration:",
+		zap.String("content", renderedConfig))
+
+	// Verify TLS CA file is in the rendered config
+	if !bytes.Contains(buf.Bytes(), []byte("tls_ca_file")) {
+		log.Error("Agent config missing TLS CA file reference!",
+			zap.String("expected_field", "tls_ca_file"),
+			zap.String("ca_cert_path", data.CACert))
+		return fmt.Errorf("rendered agent config missing tls_ca_file reference")
+	}
+
+	log.Debug("TLS CA file reference verified in rendered config",
+		zap.String("ca_cert", data.CACert))
 
 	// Write config file with vault ownership using eos_unix.WriteFile
 	log.Debug("Writing config file with vault ownership",
@@ -427,32 +453,89 @@ func copyVaultCertForAgent(rc *eos_io.RuntimeContext) error {
 	// Set ownership to vault user
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
-		log.Warn("Failed to lookup vault user for cert ownership, using root",
+		log.Error("Failed to lookup vault user for cert ownership",
 			zap.Error(err))
-		uid = 0
-		gid = 0
+		return fmt.Errorf("lookup vault user: %w", err)
 	}
 
+	log.Debug("Setting certificate ownership",
+		zap.String("path", dstCert),
+		zap.String("owner", "vault"),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid))
+
 	if err := os.Chown(dstCert, uid, gid); err != nil {
-		log.Warn("Failed to set certificate ownership",
+		log.Error("Failed to set certificate ownership",
 			zap.String("dst", dstCert),
 			zap.Int("uid", uid),
 			zap.Int("gid", gid),
 			zap.Error(err))
-		// Not critical, continue
+		return fmt.Errorf("chown certificate: %w", err)
 	}
 
 	// Verify final state
-	if stat, err := os.Stat(dstCert); err == nil {
-		log.Info("Vault CA certificate copied for agent",
-			zap.String("path", dstCert),
-			zap.String("mode", stat.Mode().String()),
-			zap.Int64("size", stat.Size()))
-	} else {
-		log.Warn("Certificate copied but verification failed",
+	stat, err := os.Stat(dstCert)
+	if err != nil {
+		log.Error("Certificate stat failed after copy",
 			zap.String("path", dstCert),
 			zap.Error(err))
+		return fmt.Errorf("stat certificate after copy: %w", err)
 	}
+
+	log.Info("[INTERVENE] Vault CA certificate copied for agent",
+		zap.String("path", dstCert),
+		zap.String("mode", stat.Mode().String()),
+		zap.Int64("size", stat.Size()))
+
+	return nil
+}
+
+// verifyCertCopyForAgent verifies that the CA certificate was copied correctly and is readable by vault user
+func verifyCertCopyForAgent(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
+	dstCert := shared.VaultAgentCACopyPath // /etc/vault.d/ca.crt
+
+	log.Info("[ASSESS] Verifying CA certificate is readable by vault user",
+		zap.String("path", dstCert))
+
+	// 1. Check file exists
+	stat, err := os.Stat(dstCert)
+	if err != nil {
+		log.Error("CA certificate file not found after copy",
+			zap.String("path", dstCert),
+			zap.Error(err))
+		return fmt.Errorf("CA cert not found at %s: %w", dstCert, err)
+	}
+
+	log.Debug("CA certificate exists",
+		zap.String("path", dstCert),
+		zap.String("mode", stat.Mode().String()),
+		zap.Int64("size", stat.Size()))
+
+	// 2. Check file is not empty
+	if stat.Size() == 0 {
+		log.Error("CA certificate file is empty",
+			zap.String("path", dstCert))
+		return fmt.Errorf("CA cert at %s is empty", dstCert)
+	}
+
+	// 3. Verify vault user can read it
+	log.Debug("Testing vault user read access",
+		zap.String("path", dstCert))
+
+	testCmd := exec.Command("sudo", "-u", "vault", "test", "-r", dstCert)
+	if err := testCmd.Run(); err != nil {
+		log.Error("Vault user cannot read CA certificate",
+			zap.String("path", dstCert),
+			zap.Error(err),
+			zap.String("remediation", "Check file permissions and ownership"))
+		return fmt.Errorf("vault user cannot read CA cert at %s: %w", dstCert, err)
+	}
+
+	log.Info("[EVALUATE] CA certificate verified - vault user can read it",
+		zap.String("path", dstCert),
+		zap.Int64("size", stat.Size()),
+		zap.String("mode", stat.Mode().String()))
 
 	return nil
 }

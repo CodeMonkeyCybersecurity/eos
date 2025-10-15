@@ -96,6 +96,7 @@ func startVaultAgentService(rc *eos_io.RuntimeContext) error {
 
 // waitForAgentToken polls until the sink file contains non-empty content.
 // Runs as the eos user to avoid permission issues with /run/eos directory.
+// P0-5: FAIL FAST on deterministic errors (TLS cert issues, config errors)
 func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Duration) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Waiting for Vault Agent token",
@@ -107,6 +108,18 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 
 	for time.Now().Before(deadline) {
 		attempt++
+
+		// P0-5: Check systemd logs for deterministic failures BEFORE retrying
+		// Check every 5 attempts to avoid excessive log reads
+		if attempt%5 == 0 || attempt == 1 {
+			if agentErr := checkVaultAgentErrors(rc); agentErr != nil {
+				log.Error(" Vault Agent has deterministic error - failing fast",
+					zap.Int("attempt", attempt),
+					zap.Error(agentErr),
+					zap.String("remediation", "Fix the configuration error and retry"))
+				return "", fmt.Errorf("vault agent failed with configuration error (attempt %d): %w", attempt, agentErr)
+			}
+		}
 
 		// Check file and directory status on each attempt for detailed debugging
 		parentDir := "/run/eos"
@@ -162,6 +175,13 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 		}
 
 		time.Sleep(shared.Interval)
+	}
+
+	// Final check of agent logs before declaring timeout
+	if agentErr := checkVaultAgentErrors(rc); agentErr != nil {
+		log.Error(" Vault Agent has deterministic error after timeout",
+			zap.Error(agentErr))
+		return "", fmt.Errorf("vault agent failed: %w", agentErr)
 	}
 
 	log.Error(" Timeout waiting for token",
@@ -288,6 +308,92 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 		zap.String("path", runDir),
 		zap.String("owner", "vault"),
 		zap.String("mode", "0755"))
+	return nil
+}
+
+// checkVaultAgentErrors examines systemd journal logs for deterministic errors (TLS, config, etc)
+// Returns an error if a non-retryable failure is detected, nil if agent is still attempting auth
+// P0-5: FAIL FAST on deterministic errors instead of retrying for 30 seconds
+func checkVaultAgentErrors(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
+	serviceName := shared.VaultAgentService
+
+	// Get recent journal entries (last 50 lines to catch errors)
+	journalCmd := exec.CommandContext(rc.Ctx, "journalctl", "-u", serviceName, "--no-pager", "-n", "50")
+	journalOutput, err := journalCmd.CombinedOutput()
+	if err != nil {
+		// If we can't read logs, don't fail - let the retry continue
+		log.Debug(" Could not read agent journal logs (non-fatal)",
+			zap.String("service", serviceName),
+			zap.Error(err))
+		return nil
+	}
+
+	logText := string(journalOutput)
+
+	// Deterministic error patterns that indicate configuration issues
+	deterministicPatterns := []struct {
+		pattern     string
+		description string
+		remediation string
+	}{
+		{
+			pattern:     "x509: certificate signed by unknown authority",
+			description: "TLS certificate not trusted",
+			remediation: "Vault CA certificate is missing or incorrect at /etc/vault.d/ca.crt",
+		},
+		{
+			pattern:     "tls: failed to verify certificate",
+			description: "TLS certificate verification failed",
+			remediation: "Check that Vault CA certificate is properly copied to /etc/vault.d/ca.crt",
+		},
+		{
+			pattern:     "no such file or directory",
+			description: "Required file missing (likely role_id or secret_id)",
+			remediation: "AppRole credentials not properly written to /etc/vault.d/",
+		},
+		{
+			pattern:     "permission denied",
+			description: "File permission issue",
+			remediation: "Check ownership and permissions on /etc/vault.d/ and /run/eos/",
+		},
+		{
+			pattern:     "invalid configuration",
+			description: "Agent configuration file has errors",
+			remediation: "Check /etc/vault.d/agent-config.hcl for syntax errors",
+		},
+		{
+			pattern:     "failed to parse",
+			description: "Configuration parsing failed",
+			remediation: "Check HCL syntax in /etc/vault.d/agent-config.hcl",
+		},
+		{
+			pattern:     "role_id is empty",
+			description: "AppRole role_id is missing",
+			remediation: "Check that /etc/vault.d/role_id contains valid data",
+		},
+		{
+			pattern:     "secret_id is empty",
+			description: "AppRole secret_id is missing",
+			remediation: "Check that /etc/vault.d/secret_id contains valid data",
+		},
+	}
+
+	for _, pattern := range deterministicPatterns {
+		if strings.Contains(logText, pattern.pattern) {
+			log.Error(" Vault Agent deterministic error detected",
+				zap.String("error_type", pattern.description),
+				zap.String("pattern", pattern.pattern),
+				zap.String("remediation", pattern.remediation))
+
+			return fmt.Errorf("%s: %s (fix: %s)",
+				pattern.description,
+				pattern.pattern,
+				pattern.remediation)
+		}
+	}
+
+	// No deterministic errors found - agent is still trying or having transient issues
 	return nil
 }
 
