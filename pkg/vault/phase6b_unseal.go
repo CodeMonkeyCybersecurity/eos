@@ -3,14 +3,17 @@
 package vault
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -132,14 +135,117 @@ func initVaultWithTimeout(rc *eos_io.RuntimeContext, client *api.Client) (*api.I
 }
 
 func handleInitMaterial(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error {
-	otelzap.Ctx(rc.Ctx).Info(" Handling init material")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info(" Handling init material")
+
 	if len(initRes.Keys) == 0 || initRes.RootToken == "" {
 		return fmt.Errorf("invalid init result: missing keys or root token")
 	}
-	if err := ConfirmUnsealMaterialSaved(rc, initRes); err != nil {
-		return err
+
+	// STEP 1: Save credentials to file FIRST (backup/recovery)
+	logger.Info(" Saving Vault initialization credentials securely")
+	if err := SaveInitResult(rc, initRes); err != nil {
+		return fmt.Errorf("failed to save init credentials: %w", err)
 	}
-	return SaveInitResult(rc, initRes)
+	logger.Info(" Credentials saved to file", zap.String("path", shared.VaultInitPath))
+
+	// STEP 2: Display prominent instructions and PAUSE for user to save externally
+	printVaultInitializationInstructions()
+
+	// STEP 3: Wait for user to confirm they've saved the credentials
+	logger.Info("terminal prompt: Press ENTER after you have SAVED the credentials to your password manager...")
+	fmt.Fprintf(os.Stderr, "Press ENTER to continue...")
+	bufio.NewReader(os.Stdin).ReadBytes('\n')
+
+	// STEP 4: Verify they saved it by re-entering credentials
+	if err := ConfirmUnsealMaterialSaved(rc, initRes); err != nil {
+		return fmt.Errorf("credential confirmation failed: %w", err)
+	}
+
+	// STEP 5: Offer to delete local file (best practice for production)
+	if shouldDeleteLocalCredentials(rc) {
+		logger.Warn(" Deleting local credentials file - ensure you have saved them externally!")
+		logger.Info("terminal prompt: Deleting local credential file for security")
+
+		if err := os.Remove(shared.VaultInitPath); err != nil {
+			logger.Warn("Failed to delete local credentials file", zap.Error(err))
+			// Don't fail - this is optional cleanup
+		} else {
+			logger.Info(" Local credentials file deleted successfully")
+			fmt.Fprintln(os.Stderr, "\n✓ Local credentials file deleted for security")
+			fmt.Fprintln(os.Stderr, "  Credentials only exist in your password manager now.")
+		}
+	} else {
+		logger.Info(" Keeping local credentials file")
+		fmt.Fprintln(os.Stderr, "\nℹ Local credentials file kept at: "+shared.VaultInitPath)
+		fmt.Fprintln(os.Stderr, "  Consider deleting this file after distributing keys to operators.")
+	}
+
+	return nil
+}
+
+// printVaultInitializationInstructions displays clear, prominent instructions
+// for saving Vault initialization credentials (Tier 2 security best practice)
+func printVaultInitializationInstructions() {
+	fmt.Fprintln(os.Stderr, "\n"+strings.Repeat("=", 70))
+	fmt.Fprintln(os.Stderr, "  ⚠️  VAULT INITIALIZED SUCCESSFULLY")
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 70))
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "CRITICAL: Your unseal keys and root token are ready.")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "WITHOUT THESE CREDENTIALS YOU CANNOT RECOVER YOUR VAULT!")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 70))
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "📋 STEP 1: Open a SECOND terminal session and run:")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "    sudo cat /var/lib/eos/secret/vault_init.json")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "    OR")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "    sudo eos read vault-init")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "💾 STEP 2: Copy ALL credentials to your password manager:")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "    • All 5 unseal keys (you need 3 minimum to unseal)")
+	fmt.Fprintln(os.Stderr, "    • Root token (provides admin access)")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "✅ STEP 3: Verify you saved them correctly!")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "   Recommended password managers:")
+	fmt.Fprintln(os.Stderr, "    • 1Password (use Secure Notes)")
+	fmt.Fprintln(os.Stderr, "    • Bitwarden (use Secure Notes)")
+	fmt.Fprintln(os.Stderr, "    • KeePassXC (use Notes field)")
+	fmt.Fprintln(os.Stderr, "    • Encrypted file on separate device")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "⚠️  PRODUCTION TIP:")
+	fmt.Fprintln(os.Stderr, "   For high security, distribute different keys to different operators")
+	fmt.Fprintln(os.Stderr, "   (Shamir's Secret Sharing - requires 3 of 5 keys to unseal)")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 70))
+	fmt.Fprintln(os.Stderr, "")
+}
+
+// shouldDeleteLocalCredentials asks user if they want to delete the local file
+func shouldDeleteLocalCredentials(rc *eos_io.RuntimeContext) bool {
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, strings.Repeat("-", 70))
+	fmt.Fprintln(os.Stderr, "SECURITY RECOMMENDATION:")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "For production environments, you should DELETE the local credentials file")
+	fmt.Fprintln(os.Stderr, "after you've saved them to your password manager.")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "This prevents all keys from being stored in one location.")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "For development/lab environments, keeping the file is fine for convenience.")
+	fmt.Fprintln(os.Stderr, strings.Repeat("-", 70))
+	fmt.Fprintln(os.Stderr, "")
+
+	return interaction.PromptYesNo(
+		rc.Ctx,
+		"Delete local credentials file? (you MUST have saved them externally first)",
+		false, // Default: no (safe default)
+	)
 }
 
 func finalizeVaultSetup(rc *eos_io.RuntimeContext, client *api.Client, initRes *api.InitResponse) error {
