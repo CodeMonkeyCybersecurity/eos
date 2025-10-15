@@ -295,14 +295,23 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		logger.Info("[Phase 5.5] Joining existing Raft cluster")
 		logger.Info("This node will join the cluster and NOT be initialized independently")
 
+		var lastErr error
+		joined := false
 		for _, node := range config.RetryJoinNodes {
 			logger.Info("Attempting to join cluster", zap.String("leader", node.APIAddr))
 			if err := vault.JoinRaftCluster(rc, node.APIAddr); err != nil {
-				logger.Error("Failed to join cluster", zap.Error(err), zap.String("leader", node.APIAddr))
-				return fmt.Errorf("join raft cluster failed: %w", err)
+				logger.Warn("Failed to join this node, will try next", zap.Error(err), zap.String("leader", node.APIAddr))
+				lastErr = err
+				continue // Try next node
 			}
 			logger.Info(" Successfully joined Raft cluster", zap.String("leader", node.APIAddr))
+			joined = true
 			break // Successfully joined, no need to try other nodes
+		}
+
+		// If we tried all nodes and none worked, fail
+		if !joined {
+			return fmt.Errorf("failed to join any cluster nodes (last error: %w)", lastErr)
 		}
 
 		logger.Info("terminal prompt: ")
