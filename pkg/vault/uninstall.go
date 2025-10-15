@@ -570,8 +570,8 @@ func (vu *VaultUninstaller) setupSignalHandling(ctx context.Context, cancel cont
 
 // displayPreDeletionSummary shows what will be deleted
 func (vu *VaultUninstaller) displayPreDeletionSummary() {
-	vu.logger.Info("terminal prompt: \n╔════════════════════════════════════════════════════════════════╗")
-	vu.logger.Info("terminal prompt: ║  PRE-DELETION SUMMARY - Components to be REMOVED              ║")
+	vu.logger.Info("terminal prompt: ╔════════════════════════════════════════════════════════════════╗")
+	vu.logger.Info("terminal prompt: ║  PRE-DELETION SUMMARY - Components to be REMOVED               ║")
 	vu.logger.Info("terminal prompt: ╚════════════════════════════════════════════════════════════════╝")
 	vu.logger.Info("terminal prompt: ")
 
