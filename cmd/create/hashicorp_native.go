@@ -13,10 +13,15 @@ import (
 
 // Native installer commands for each HashiCorp product
 var (
+	// DEPRECATED: createVaultNativeCmd - This command is DEAD CODE and not registered
+	// The actual Vault command is in cmd/create/secrets.go (CreateVaultCmd)
+	// This code is kept for reference but should be removed in a future cleanup
+	// DO NOT USE THIS - It defaults to "file" storage backend which is DEPRECATED
 	createVaultNativeCmd = &cobra.Command{
 		Use:   "vault",
-		Short: "Install and configure HashiCorp Vault using native installer",
-		Long: `Install HashiCorp Vault for secrets management using the native installer.
+		Short: "DEPRECATED: Install and configure HashiCorp Vault using native installer",
+		Long: `DEPRECATED: This command is not registered and should not be used.
+Use 'eos create vault' (from cmd/create/secrets.go) instead.
 
 This installer provides:
 - Direct binary or repository installation

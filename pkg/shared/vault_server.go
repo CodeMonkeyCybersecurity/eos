@@ -345,38 +345,32 @@ type RetryJoinNode struct {
 	Hostname string
 }
 
-// RenderVaultConfig renders Vault configuration using Raft Integrated Storage (default)
-// DEPRECATED: This function defaults to file storage for backward compatibility
-// Use RenderVaultConfigRaft for new deployments
+// DEPRECATED: RenderVaultConfig renders Vault configuration
+// This function is deprecated and now defaults to Consul storage backend.
+// Use RenderVaultConfigConsul for new deployments.
+// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
 func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, error) {
 	if addr == "" {
 		addr = VaultDefaultLocalAddr
 	}
-	// TLS key and certificate files are expected to exist
-	// These will be handled by the vault configuration
 
+	// Use Consul backend (recommended) instead of deprecated file storage
 	params := VaultConfigParams{
 		Port:          VaultDefaultPort,
+		ClusterPort:   VaultClusterPort,
 		TLSCrt:        TLSCrt,
 		TLSKey:        TLSKey,
-		VaultDataPath: VaultDataPath,
 		APIAddr:       addr,
+		ClusterAddr:   VaultDefaultClusterAddr,
 		LogLevel:      logLevel,
 		LogFormat:     logFormat,
+		ConsulAddress: ConsulDefaultAddr,
+		ConsulPath:    "vault/",
+		ConsulScheme:  "http",
 	}
 
-	tmpl, err := template.New("vaultConfig").Parse(vaultConfigTemplateFileLegacy)
-	if err != nil {
-		return "", err
-	}
-
-	var rendered bytes.Buffer
-	err = tmpl.Execute(&rendered, params)
-	if err != nil {
-		return "", err
-	}
-
-	return rendered.String(), nil
+	// Delegate to Consul renderer
+	return RenderVaultConfigConsul(params)
 }
 
 // RenderVaultConfigConsul renders Vault configuration with Consul storage backend

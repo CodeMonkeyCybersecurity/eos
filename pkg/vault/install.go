@@ -116,10 +116,11 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		config.Version = "latest"
 	}
 	if config.StorageBackend == "" {
-		// Default to Raft Integrated Storage (recommended by HashiCorp)
+		// Default to Consul storage backend (recommended)
+		// Provides HA without Raft complexity
 		// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
-		// Reference: vault-complete-specification-v1.0-raft-integrated.md
-		config.StorageBackend = "raft"
+		// Raft storage is DEPRECATED - use Consul instead
+		config.StorageBackend = "consul"
 	}
 	if config.ListenerAddress == "" {
 		config.ListenerAddress = fmt.Sprintf("0.0.0.0:%d", shared.PortVault)
@@ -959,6 +960,14 @@ func (vi *VaultInstaller) configure() error {
 	// Generate configuration based on storage backend
 	var storageConfig string
 	switch vi.config.StorageBackend {
+	case "file":
+		// EXPLICITLY NOT SUPPORTED
+		return fmt.Errorf("file storage backend is NOT SUPPORTED in Vault Enterprise 1.12.0+\n"+
+			"Supported backends:\n"+
+			"  • consul (recommended) - HA storage with Consul\n"+
+			"  • raft (deprecated)    - Integrated storage\n"+
+			"Use: sudo eos create vault --storage-backend=consul")
+
 	case "consul", "": // Default to Consul if not specified
 		// Consul storage backend (RECOMMENDED)
 		consulToken := ""
