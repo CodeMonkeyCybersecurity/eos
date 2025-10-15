@@ -44,6 +44,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		EnvironmentDiagnostic(),
 		CapabilitiesDiagnostic(),
 		DeletionTransactionLogsDiagnostic(),
+		IdempotencyStatusDiagnostic(), // NEW: Shows current installation state for idempotent operations
 		// Vault Agent diagnostics
 		VaultAgentServiceDiagnostic(),
 		VaultAgentConfigDiagnostic(),
@@ -1476,6 +1477,188 @@ func VaultAgentLogsDiagnostic() *debug.Diagnostic {
 			}
 
 			result.Output = output.String()
+			return result, nil
+		},
+	}
+}
+
+// IdempotencyStatusDiagnostic checks the current installation state for idempotent operations
+// This helps users understand what already exists before running "eos create vault"
+func IdempotencyStatusDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Idempotency Status",
+		Category:    "Installation State",
+		Description: "Check current installation state for idempotent operations",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Checking idempotency status - what components already exist")
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var output strings.Builder
+			output.WriteString("=== Idempotency Status - Current Installation State ===\n\n")
+			output.WriteString("This shows what components already exist. Eos 'create vault' commands\n")
+			output.WriteString("are idempotent and will verify/update existing components rather than fail.\n\n")
+
+			componentCount := 0
+			existingCount := 0
+
+			// Check Vault binary
+			componentCount++
+			if binaryPath, err := exec.LookPath("vault"); err == nil {
+				existingCount++
+				output.WriteString("✓ Vault Binary: EXISTS\n")
+				result.Metadata["binary_exists"] = true
+				result.Metadata["binary_path"] = binaryPath
+
+				// Get version
+				if versionCmd := exec.CommandContext(ctx, "vault", "version"); versionCmd != nil {
+					if versionOut, err := versionCmd.Output(); err == nil {
+						version := strings.TrimSpace(string(versionOut))
+						output.WriteString(fmt.Sprintf("  └─ Version: %s\n", version))
+						result.Metadata["binary_version"] = version
+					}
+				}
+			} else {
+				output.WriteString("✗ Vault Binary: NOT FOUND\n")
+				result.Metadata["binary_exists"] = false
+			}
+
+			// Check Vault user
+			componentCount++
+			if userCmd := exec.CommandContext(ctx, "id", "vault"); userCmd.Run() == nil {
+				existingCount++
+				output.WriteString("✓ Vault User: EXISTS\n")
+				result.Metadata["user_exists"] = true
+
+				// Get user details
+				if idCmd := exec.CommandContext(ctx, "id", "vault"); idCmd != nil {
+					if idOut, err := idCmd.Output(); err == nil {
+						output.WriteString(fmt.Sprintf("  └─ %s\n", strings.TrimSpace(string(idOut))))
+					}
+				}
+			} else {
+				output.WriteString("✗ Vault User: NOT FOUND\n")
+				result.Metadata["user_exists"] = false
+			}
+
+			// Check Vault service
+			componentCount++
+			if statusCmd := exec.CommandContext(ctx, "systemctl", "is-active", "vault"); statusCmd != nil {
+				if statusOut, err := statusCmd.Output(); err == nil {
+					status := strings.TrimSpace(string(statusOut))
+					existingCount++
+					output.WriteString(fmt.Sprintf("✓ Vault Service: %s\n", strings.ToUpper(status)))
+					result.Metadata["service_exists"] = true
+					result.Metadata["service_status"] = status
+
+					// Get service uptime
+					if uptimeCmd := exec.CommandContext(ctx, "systemctl", "show", "vault", "--property=ActiveEnterTimestamp"); uptimeCmd != nil {
+						if uptimeOut, err := uptimeCmd.Output(); err == nil {
+							uptime := strings.TrimSpace(strings.TrimPrefix(string(uptimeOut), "ActiveEnterTimestamp="))
+							output.WriteString(fmt.Sprintf("  └─ Started: %s\n", uptime))
+						}
+					}
+				} else {
+					output.WriteString("✗ Vault Service: NOT ACTIVE\n")
+					result.Metadata["service_exists"] = false
+				}
+			}
+
+			// Check Vault Agent service
+			componentCount++
+			if agentStatusCmd := exec.CommandContext(ctx, "systemctl", "is-active", "vault-agent-eos"); agentStatusCmd != nil {
+				if agentOut, err := agentStatusCmd.Output(); err == nil {
+					status := strings.TrimSpace(string(agentOut))
+					existingCount++
+					output.WriteString(fmt.Sprintf("✓ Vault Agent Service: %s\n", strings.ToUpper(status)))
+					result.Metadata["agent_service_exists"] = true
+					result.Metadata["agent_service_status"] = status
+				} else {
+					output.WriteString("✗ Vault Agent Service: NOT ACTIVE\n")
+					result.Metadata["agent_service_exists"] = false
+				}
+			}
+
+			// Check ports in use
+			componentCount++
+			vaultPort := shared.PortVault // 8179
+			if conn, err := exec.CommandContext(ctx, "lsof", "-i", fmt.Sprintf(":%d", vaultPort), "-sTCP:LISTEN").Output(); err == nil && len(conn) > 0 {
+				existingCount++
+				output.WriteString(fmt.Sprintf("✓ Port %d: IN USE\n", vaultPort))
+				result.Metadata["port_in_use"] = true
+
+				// Check if it's vault using the port
+				if strings.Contains(strings.ToLower(string(conn)), "vault") {
+					output.WriteString("  └─ Used by: Vault process (expected)\n")
+					result.Metadata["port_used_by_vault"] = true
+				} else {
+					output.WriteString("  └─ Used by: OTHER process (conflict!)\n")
+					result.Metadata["port_used_by_vault"] = false
+				}
+			} else {
+				output.WriteString(fmt.Sprintf("✗ Port %d: NOT IN USE\n", vaultPort))
+				result.Metadata["port_in_use"] = false
+			}
+
+			// Check key directories
+			componentCount++
+			keyDirs := []string{
+				"/opt/vault/data",
+				"/opt/vault/logs",
+				"/etc/vault.d",
+				"/var/lib/eos/secret",
+			}
+			dirsExist := 0
+			for _, dir := range keyDirs {
+				if _, err := os.Stat(dir); err == nil {
+					dirsExist++
+				}
+			}
+			if dirsExist > 0 {
+				existingCount++
+				output.WriteString(fmt.Sprintf("✓ Key Directories: %d/%d exist\n", dirsExist, len(keyDirs)))
+				result.Metadata["directories_exist_count"] = dirsExist
+			} else {
+				output.WriteString("✗ Key Directories: NONE EXIST\n")
+				result.Metadata["directories_exist_count"] = 0
+			}
+
+			// Summary
+			output.WriteString("\n=== Summary ===\n")
+			output.WriteString(fmt.Sprintf("Existing Components: %d/%d\n", existingCount, componentCount))
+			result.Metadata["total_components"] = componentCount
+			result.Metadata["existing_components"] = existingCount
+
+			percentage := int(float64(existingCount) / float64(componentCount) * 100)
+			result.Metadata["installation_percentage"] = percentage
+
+			output.WriteString("\n=== Idempotency Behavior ===\n")
+			if existingCount == 0 {
+				output.WriteString("✓ Clean system - 'eos create vault' will perform full installation\n")
+				result.Status = debug.StatusOK
+				result.Message = "Clean system ready for installation"
+			} else if existingCount == componentCount {
+				output.WriteString("✓ Fully installed - 'eos create vault' will verify and update configuration\n")
+				output.WriteString("  Eos will check existing components and update if needed (idempotent)\n")
+				result.Status = debug.StatusOK
+				result.Message = "Vault fully installed - operations are idempotent"
+			} else {
+				output.WriteString(fmt.Sprintf("⚠ Partial installation (%d%%) - 'eos create vault' will complete missing components\n", percentage))
+				output.WriteString("  Existing components will be verified, missing ones will be created\n")
+				result.Status = debug.StatusWarning
+				result.Message = fmt.Sprintf("Partial installation detected (%d%%)", percentage)
+				result.Remediation = "Run 'eos create vault' to complete installation, or 'eos delete vault' for clean slate"
+			}
+
+			result.Output = output.String()
+			logger.Info("Idempotency status check complete",
+				zap.Int("total_components", componentCount),
+				zap.Int("existing_components", existingCount),
+				zap.Int("percentage", percentage))
+
 			return result, nil
 		},
 	}
