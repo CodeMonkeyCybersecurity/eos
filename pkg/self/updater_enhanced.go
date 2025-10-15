@@ -389,23 +389,64 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 	eeu.logger.Info(" Phase 2: INTERVENE - Executing update transaction")
 
-	// Step 1: Create binary backup
-	if err := eeu.createTransactionBackup(); err != nil {
+	// Step 1: Create binary backup and record current binary hash
+	currentHash, err := eeu.createTransactionBackup()
+	if err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
 	// Step 2: Pull latest code
-	if err := eeu.pullLatestCodeWithVerification(); err != nil {
+	codeChanged, err := eeu.pullLatestCodeWithVerification()
+	if err != nil {
 		return fmt.Errorf("failed to pull latest code: %w", err)
 	}
-	eeu.transaction.ChangesPulled = true
+	eeu.transaction.ChangesPulled = codeChanged
+
+	// If no code changes, check if binary needs rebuilding
+	if !codeChanged && eeu.enhancedConfig.VerifyVersionChange {
+		// Verify current binary is still valid and up-to-date
+		if _, err := os.Stat(eeu.config.BinaryPath); err == nil {
+			eeu.logger.Info(" No code changes detected, verifying current binary")
+
+			// Re-verify current binary hash matches what we expect
+			currentVerifyHash, err := crypto.HashFile(eeu.config.BinaryPath)
+			if err == nil && currentVerifyHash == currentHash {
+				eeu.logger.Info(" Current binary is up-to-date, skipping rebuild",
+					zap.String("sha256", currentHash[:16]+"..."))
+				eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
+				return nil
+			}
+		}
+		eeu.logger.Info(" Current binary needs verification, proceeding with rebuild")
+	}
 
 	// Step 3: Build new binary
+	eeu.logger.Info(" Building new binary from source")
 	tempBinary, err := eeu.BuildBinary()
 	if err != nil {
 		return fmt.Errorf("failed to build new binary: %w", err)
 	}
 	eeu.transaction.TempBinaryPath = tempBinary
+
+	// Step 3a: Compare new binary hash with current binary hash
+	newHash, err := crypto.HashFile(tempBinary)
+	if err != nil {
+		return fmt.Errorf("failed to hash new binary: %w", err)
+	}
+
+	if newHash == currentHash {
+		eeu.logger.Info(" New binary is identical to current binary (SHA256 match)",
+			zap.String("sha256", newHash[:16]+"..."))
+		eeu.logger.Info("terminal prompt: ✓ Binary unchanged - no update needed")
+
+		// Clean up temp binary
+		_ = os.Remove(tempBinary)
+		return nil
+	}
+
+	eeu.logger.Info(" Binary has changed, proceeding with installation",
+		zap.String("old_sha256", currentHash[:16]+"..."),
+		zap.String("new_sha256", newHash[:16]+"..."))
 
 	// Step 4: Validate new binary
 	if !eeu.config.SkipValidation {
@@ -429,18 +470,18 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 	return nil
 }
 
-// createTransactionBackup creates a backup with transaction metadata
-func (eeu *EnhancedEosUpdater) createTransactionBackup() error {
+// createTransactionBackup creates a backup with transaction metadata and returns current binary hash
+func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	// Get hash and size of current binary before backup
 	currentBinaryInfo, err := os.Stat(eeu.config.BinaryPath)
 	if err != nil {
-		return fmt.Errorf("failed to stat current binary: %w", err)
+		return "", fmt.Errorf("failed to stat current binary: %w", err)
 	}
 	currentSizeMB := float64(currentBinaryInfo.Size()) / (1024 * 1024)
 
 	currentHash, err := crypto.HashFile(eeu.config.BinaryPath)
 	if err != nil {
-		return fmt.Errorf("failed to hash current binary: %w", err)
+		return "", fmt.Errorf("failed to hash current binary: %w", err)
 	}
 
 	eeu.logger.Info("Current binary metadata",
@@ -448,25 +489,26 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() error {
 		zap.Float64("size_mb", currentSizeMB))
 
 	if err := eeu.CreateBackup(); err != nil {
-		return err
+		return "", err
 	}
 
 	// Get the actual backup path that was just created
 	// CreateBackup() generates its own timestamp, so find the most recent backup
 	backups, err := filepath.Glob(filepath.Join(eeu.config.BackupDir, "eos.backup.*"))
 	if err != nil || len(backups) == 0 {
-		return fmt.Errorf("backup created but cannot find backup file")
+		return "", fmt.Errorf("backup created but cannot find backup file")
 	}
 
 	sort.Strings(backups)
 	eeu.transaction.BackupBinaryPath = backups[len(backups)-1] // Most recent
 
 	eeu.logger.Debug("Transaction backup recorded", zap.String("path", eeu.transaction.BackupBinaryPath))
-	return nil
+	return currentHash, nil
 }
 
 // pullLatestCodeWithVerification pulls code and verifies something actually changed
-func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() error {
+// Returns true if code changed, false if already up-to-date
+func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
 	eeu.logger.Info("Pulling latest changes from git repository")
 
 	// Get current commit before pull
@@ -474,28 +516,30 @@ func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() error {
 
 	// Pull changes
 	if err := eeu.PullLatestCode(); err != nil {
-		return err
+		return false, err
 	}
 
 	// Get commit after pull
 	afterCmd := exec.Command("git", "-C", eeu.config.SourceDir, "rev-parse", "HEAD")
 	afterOutput, err := afterCmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to get commit after pull: %w", err)
+		return false, fmt.Errorf("failed to get commit after pull: %w", err)
 	}
 	afterCommit := strings.TrimSpace(string(afterOutput))
 
-	if eeu.enhancedConfig.VerifyVersionChange && beforeCommit == afterCommit {
+	codeChanged := beforeCommit != afterCommit
+
+	if !codeChanged {
 		eeu.logger.Info("  Already on latest version",
 			zap.String("commit", afterCommit[:8]))
-		// Continue anyway in case binary was deleted or corrupted
-	} else {
-		eeu.logger.Info(" Updates pulled",
-			zap.String("from", beforeCommit[:8]),
-			zap.String("to", afterCommit[:8]))
+		return false, nil
 	}
 
-	return nil
+	eeu.logger.Info(" Updates pulled",
+		zap.String("from", beforeCommit[:8]),
+		zap.String("to", afterCommit[:8]))
+
+	return true, nil
 }
 
 // installBinaryAtomic installs the binary atomically with file locking
