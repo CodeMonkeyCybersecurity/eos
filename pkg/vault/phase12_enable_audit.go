@@ -4,8 +4,10 @@ package vault
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -37,15 +39,29 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 I
 		return nil
 	}
 
+	// Create audit log directory with proper permissions
+	log.Info(" Creating audit log directory", zap.String("path", shared.VaultLogsPath))
+	if err := os.MkdirAll(shared.VaultLogsPath, 0750); err != nil {
+		log.Error(" Failed to create audit directory", zap.Error(err))
+		return fmt.Errorf("failed to create audit directory: %w", err)
+	}
+
+	// Set ownership to vault user
+	log.Info(" Setting audit directory ownership to vault:vault")
+	if err := execute.RunSimple(rc.Ctx, "chown", "-R", "vault:vault", shared.VaultLogsPath); err != nil {
+		log.Warn(" Failed to set audit directory ownership", zap.Error(err))
+		// Don't fail - Vault might still work with root ownership
+	}
+
 	log.Info(" Enabling file-based audit device",
 		zap.String("audit_id", shared.AuditID),
-		zap.String("file_path", "/opt/vault/logs/vault_audit.log"))
+		zap.String("file_path", shared.VaultAuditLogPath))
 
 	err = enableFeature(rc, client, shared.MountPath,
 		map[string]interface{}{
 			"type": "file",
 			"options": map[string]string{
-				"file_path": "/opt/vault/logs/vault_audit.log",
+				"file_path": shared.VaultAuditLogPath,
 			},
 		},
 		" File audit enabled.",

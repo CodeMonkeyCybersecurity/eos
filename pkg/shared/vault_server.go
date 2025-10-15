@@ -32,6 +32,8 @@ const (
 	LocalhostSAN              = "127.0.0.1"
 	VaultDir                  = "/opt/vault/"
 	VaultDataPath             = VaultDir + "data/"
+	VaultLogsPath             = VaultDir + "logs/"
+	VaultAuditLogPath         = VaultLogsPath + "vault_audit.log"
 	TLSDir                    = VaultDir + "tls/"
 	TLSKey                    = TLSDir + "tls.key"
 	TLSCrt                    = TLSDir + "tls.crt"
