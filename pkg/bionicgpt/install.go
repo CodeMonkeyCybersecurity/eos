@@ -669,7 +669,7 @@ services:
       resources:
         limits:
           cpus: '%s'
-          memory: %s
+          memory: '%s'
     logging:
       driver: "json-file"
       options:
