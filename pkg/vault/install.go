@@ -190,6 +190,50 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 	}
 }
 
+// PreflightChecks performs pre-creation validation to prevent race conditions
+// between deletion and creation. This ensures the system is in a clean state
+// before attempting installation.
+func (vi *VaultInstaller) PreflightChecks() error {
+	vi.logger.Info("Running preflight checks to prevent race conditions")
+
+	// Check if Vault service is already running
+	vi.logger.Debug("Checking if Vault service is active")
+	if output, err := exec.Command("systemctl", "is-active", "vault").Output(); err == nil {
+		status := strings.TrimSpace(string(output))
+		if status == "active" {
+			vi.logger.Error("Vault service is already running",
+				zap.String("status", status))
+			return fmt.Errorf("Vault service is already running. Delete first: sudo eos delete vault")
+		}
+		vi.logger.Debug("Vault service exists but not active",
+			zap.String("status", status))
+	} else {
+		vi.logger.Debug("Vault service not found (expected for clean install)")
+	}
+
+	// Check if vault user exists
+	vi.logger.Debug("Checking if vault user exists")
+	if err := exec.Command("id", "vault").Run(); err == nil {
+		vi.logger.Error("Vault user already exists - deletion may not be complete")
+		return fmt.Errorf("Vault user already exists. Deletion may not be complete. Wait 10 seconds and retry")
+	} else {
+		vi.logger.Debug("Vault user does not exist (expected for clean install)")
+	}
+
+	// Check if vault binary exists
+	vi.logger.Debug("Checking if vault binary exists")
+	if binaryPath, err := exec.LookPath("vault"); err == nil {
+		vi.logger.Error("Vault binary still exists",
+			zap.String("path", binaryPath))
+		return fmt.Errorf("Vault binary still exists at %s. Delete first: sudo eos delete vault", binaryPath)
+	} else {
+		vi.logger.Debug("Vault binary does not exist (expected for clean install)")
+	}
+
+	vi.logger.Info("Preflight checks passed - system is ready for installation")
+	return nil
+}
+
 // Install performs the complete Vault installation (Phases 1-4)
 //
 // This handles the base installation infrastructure. After Install() completes,
@@ -209,6 +253,12 @@ func (vi *VaultInstaller) Install() error {
 		zap.String("version", vi.config.Version),
 		zap.String("storage_backend", vi.config.StorageBackend),
 		zap.Bool("use_repository", vi.config.UseRepository))
+
+	// Pre-Phase: Run preflight checks to prevent race conditions
+	vi.progress.Update("[7%] Running preflight checks")
+	if err := vi.PreflightChecks(); err != nil {
+		return fmt.Errorf("preflight checks failed: %w", err)
+	}
 
 	// Pre-Phase: ASSESS - Check if already installed
 	vi.progress.Update("[14%] Checking current Vault status")

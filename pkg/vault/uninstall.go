@@ -472,11 +472,44 @@ func (vu *VaultUninstaller) ReloadSystemd() error {
 func (vu *VaultUninstaller) Verify() ([]string, error) {
 	vu.logger.Info("Verifying Vault removal")
 
+	// After removal, wait for systemd to stabilize
+	vu.logger.Debug("Reloading systemd daemon to ensure cleanup")
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		vu.logger.Warn("Failed to reload systemd daemon", zap.Error(err))
+	}
+
+	vu.logger.Debug("Waiting 2 seconds for system to stabilize after deletion")
+	time.Sleep(2 * time.Second)
+
 	stillPresent := []string{}
 
+	// Verify no vault processes remain
+	vu.logger.Debug("Checking for remaining Vault processes")
+	if err := exec.Command("pgrep", "vault").Run(); err == nil {
+		vu.logger.Error("Vault processes still running after deletion")
+		stillPresent = append(stillPresent, "Vault processes still running")
+		return stillPresent, fmt.Errorf("processes not cleaned up")
+	} else {
+		vu.logger.Debug("No Vault processes found (expected after deletion)")
+	}
+
+	// Verify user is gone
+	vu.logger.Debug("Checking if vault user was removed")
+	if err := exec.Command("id", "vault").Run(); err == nil {
+		vu.logger.Error("Vault user still exists after deletion")
+		stillPresent = append(stillPresent, "Vault user still exists")
+		return stillPresent, fmt.Errorf("user not removed")
+	} else {
+		vu.logger.Debug("Vault user successfully removed")
+	}
+
 	// Check if binary still in PATH
+	vu.logger.Debug("Checking if vault binary was removed")
 	if _, err := exec.LookPath("vault"); err == nil {
+		vu.logger.Warn("Vault binary still in PATH")
 		stillPresent = append(stillPresent, "vault binary still in PATH")
+	} else {
+		vu.logger.Debug("Vault binary successfully removed")
 	}
 
 	// Check directories
@@ -489,8 +522,12 @@ func (vu *VaultUninstaller) Verify() ([]string, error) {
 		"/etc/systemd/system/vault-agent.service": "vault-agent service",
 	}
 
+	vu.logger.Debug("Checking for remaining directories and files")
 	for dir, desc := range checkDirs {
 		if _, err := os.Stat(dir); err == nil {
+			vu.logger.Debug("Directory still exists",
+				zap.String("path", dir),
+				zap.String("description", desc))
 			stillPresent = append(stillPresent, fmt.Sprintf("%s (%s)", desc, dir))
 		}
 	}

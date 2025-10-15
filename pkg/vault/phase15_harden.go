@@ -3,7 +3,9 @@
 package vault
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -18,18 +20,39 @@ import (
 func ConfirmSecureStorage(rc *eos_io.RuntimeContext, original *api.InitResponse) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// ASSESS: Prompt user to re-enter credentials
+	// ASSESS: Prompt user to re-enter credentials with timeout
 	logger.Info(" [ASSESS] Prompting user to confirm secure storage of credentials")
 	logger.Info("terminal prompt: Please re-enter 3 unseal keys and the root token to confirm you've saved them")
+	logger.Info("terminal prompt: You have 5 minutes to complete this verification")
 
-	rekeys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
+	// Wrap with timeout to prevent hanging forever
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Minute)
+	defer cancel()
+
+	rekeys, err := interaction.PromptSecrets(ctx, "Unseal Key", 3)
 	if err != nil {
+		// Check if timeout occurred
+		if ctx.Err() == context.DeadlineExceeded {
+			logger.Error(" Credential confirmation timed out after 5 minutes")
+			logger.Info("terminal prompt: IMPORTANT: Skipping credential confirmation due to timeout")
+			logger.Info("terminal prompt: Please ensure you have securely saved your unseal keys and root token!")
+			logger.Info("terminal prompt: You can verify your credentials manually with: vault operator unseal")
+			return nil // Don't fail the entire installation, just skip verification
+		}
 		logger.Error(" Failed to prompt for unseal keys", zap.Error(err))
 		return fmt.Errorf("prompt for unseal keys: %w", err)
 	}
 
-	reroot, err := interaction.PromptSecrets(rc.Ctx, "Root Token", 1)
+	reroot, err := interaction.PromptSecrets(ctx, "Root Token", 1)
 	if err != nil {
+		// Check if timeout occurred
+		if ctx.Err() == context.DeadlineExceeded {
+			logger.Error(" Credential confirmation timed out after 5 minutes")
+			logger.Info("terminal prompt: IMPORTANT: Skipping credential confirmation due to timeout")
+			logger.Info("terminal prompt: Please ensure you have securely saved your unseal keys and root token!")
+			logger.Info("terminal prompt: You can verify your credentials manually with: vault operator unseal")
+			return nil // Don't fail the entire installation, just skip verification
+		}
 		logger.Error(" Failed to prompt for root token", zap.Error(err))
 		return fmt.Errorf("prompt for root token: %w", err)
 	}
