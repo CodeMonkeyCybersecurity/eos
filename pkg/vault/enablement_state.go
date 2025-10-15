@@ -19,8 +19,15 @@ import (
 func IsUserpassConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
+	// Get privileged client for auth method queries (requires root permissions)
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Warn("Failed to get privileged client for auth check", zap.Error(err))
+		return false, fmt.Errorf("get privileged client: %w", err)
+	}
+
 	// Check if userpass auth method is mounted
-	auths, err := client.Sys().ListAuth()
+	auths, err := privilegedClient.Sys().ListAuth()
 	if err != nil {
 		log.Warn("Failed to list auth methods", zap.Error(err))
 		return false, fmt.Errorf("list auth methods: %w", err)
@@ -41,7 +48,7 @@ func IsUserpassConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, 
 	}
 
 	// Check if eos user exists under userpass
-	secret, err := client.Logical().Read(shared.EosUserpassPath)
+	secret, err := privilegedClient.Logical().Read(shared.EosUserpassPath)
 	if err != nil {
 		log.Warn("Failed to read eos user from userpass",
 			zap.Error(err),
@@ -64,8 +71,15 @@ func IsUserpassConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, 
 func IsAppRoleConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
+	// Get privileged client for auth method queries (requires root permissions)
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Warn("Failed to get privileged client for auth check", zap.Error(err))
+		return false, fmt.Errorf("get privileged client: %w", err)
+	}
+
 	// Check if approle auth method is mounted
-	auths, err := client.Sys().ListAuth()
+	auths, err := privilegedClient.Sys().ListAuth()
 	if err != nil {
 		log.Warn("Failed to list auth methods", zap.Error(err))
 		return false, fmt.Errorf("list auth methods: %w", err)
@@ -87,7 +101,7 @@ func IsAppRoleConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, e
 
 	// Check if eos-approle role exists
 	rolePath := shared.AppRolePath
-	secret, err := client.Logical().Read(rolePath)
+	secret, err := privilegedClient.Logical().Read(rolePath)
 	if err != nil {
 		log.Warn("Failed to read AppRole",
 			zap.Error(err),
@@ -125,9 +139,16 @@ func IsAppRoleConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, e
 func IsEntityConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
+	// Get privileged client for entity queries (requires root permissions)
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Warn("Failed to get privileged client for entity check", zap.Error(err))
+		return false, fmt.Errorf("get privileged client: %w", err)
+	}
+
 	// Try to read the eos entity by name
 	entityLookupPath := fmt.Sprintf(shared.EosEntityLookupPath, shared.EosID)
-	secret, err := client.Logical().Read(entityLookupPath)
+	secret, err := privilegedClient.Logical().Read(entityLookupPath)
 	if err != nil {
 		log.Warn("Failed to read eos entity",
 			zap.Error(err),
@@ -156,7 +177,14 @@ func IsEntityConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, er
 func IsAuditConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
-	audits, err := client.Sys().ListAudit()
+	// Get privileged client for audit queries (requires root permissions)
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Warn("Failed to get privileged client for audit check", zap.Error(err))
+		return false, fmt.Errorf("get privileged client: %w", err)
+	}
+
+	audits, err := privilegedClient.Sys().ListAudit()
 	if err != nil {
 		log.Warn("Failed to list audit devices", zap.Error(err))
 		return false, fmt.Errorf("list audit devices: %w", err)
