@@ -103,7 +103,7 @@ All 5 unseal keys are stored in:
 
 ---
 
-## 📋 COMPLETE CHECKS BY PHASE
+## COMPLETE CHECKS BY PHASE
 
 ### Phase 0: Pre-Installation
 - [ ] Detects existing installation

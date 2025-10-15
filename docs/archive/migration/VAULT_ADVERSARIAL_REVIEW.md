@@ -549,7 +549,7 @@ if certPath == "" {
 
 ---
 
-## 📋 Testing Checklist
+## Testing Checklist
 
 Before marking as complete, verify:
 

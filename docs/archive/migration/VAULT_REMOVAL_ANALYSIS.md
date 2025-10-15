@@ -236,7 +236,7 @@ Every operation is logged with structured logging (zap)
 
 ---
 
-## 📋 TESTING CHECKLIST
+## TESTING CHECKLIST
 
 Based on user requirements, verify after `eos delete vault`:
 

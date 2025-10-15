@@ -613,8 +613,8 @@ func (vu *VaultUninstaller) displayPreDeletionSummary() {
 
 // displayPostDeletionSummary shows what was deleted and verification
 func (vu *VaultUninstaller) displayPostDeletionSummary(removed []string, errs map[string]error, stillPresent []string) {
-	vu.logger.Info("terminal prompt: \n╔════════════════════════════════════════════════════════════════╗")
-	vu.logger.Info("terminal prompt: ║  DELETION COMPLETE - Verification Report                      ║")
+	vu.logger.Info("terminal prompt: ╔════════════════════════════════════════════════════════════════╗")
+	vu.logger.Info("terminal prompt: ║  DELETION COMPLETE - Verification Report                       ║")
 	vu.logger.Info("terminal prompt: ╚════════════════════════════════════════════════════════════════╝")
 	vu.logger.Info("terminal prompt: ")
 

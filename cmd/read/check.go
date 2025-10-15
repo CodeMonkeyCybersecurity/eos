@@ -63,7 +63,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 		if info, err := os.Stat(execPath); err == nil {
 			mode := info.Mode()
 			if verbose {
-				logger.Info("terminal prompt:   📋 Permissions: " + mode.String())
+				logger.Info("terminal prompt:   Permissions: " + mode.String())
 			}
 
 			if mode&0111 == 0 {

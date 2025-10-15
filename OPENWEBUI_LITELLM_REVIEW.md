@@ -208,7 +208,7 @@ OPENAI_API_KEY=${LITELLM_MASTER_KEY}
 
 ---
 
-## 📋 Required Code Changes
+## Required Code Changes
 
 ### Change #1: Fix Docker Compose Template
 
