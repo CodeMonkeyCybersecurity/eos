@@ -855,14 +855,44 @@ func (ci *ConsulInstaller) setupService() error {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
+	attempt := 0
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for Consul to be ready")
+			// Gather diagnostic information on timeout
+			ci.logger.Error("Timeout waiting for Consul to become ready")
+
+			// Check if service is still active
+			if status, err := ci.systemd.GetStatus(); err == nil {
+				ci.logger.Info("Service status at timeout", zap.String("status", status))
+			}
+
+			// Check recent logs for errors
+			if output, err := ci.runner.RunOutput("journalctl", "-u", "consul", "-n", "50", "--no-pager"); err == nil {
+				ci.logger.Error("Recent Consul logs at timeout",
+					zap.String("logs", output))
+			}
+
+			// Check if ports are listening
+			if output, err := ci.runner.RunOutput("ss", "-tlnp"); err == nil {
+				ci.logger.Debug("Listening ports at timeout", zap.String("output", output))
+			}
+
+			return fmt.Errorf("timeout waiting for Consul to be ready after 30s\n" +
+				"Service appears to be running but not responding to health checks.\n" +
+				"Check logs above or run: sudo journalctl -u consul -f")
 		case <-ticker.C:
+			attempt++
 			if ci.isConsulReady() {
 				ci.logger.Info("Consul is ready")
 				return nil
+			}
+
+			// Log progress every few attempts so user knows we're still checking
+			if attempt%3 == 0 {
+				ci.logger.Info("Still waiting for Consul to be ready",
+					zap.Int("attempt", attempt),
+					zap.Int("max_attempts", 15))
 			}
 		}
 	}
