@@ -721,6 +721,7 @@ func (bgi *BionicGPTInstaller) pullDockerImages(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
 	logger.Info("Pulling Docker images (this may take 5-10 minutes)")
+	logger.Info("Note: SSH connection may appear to hang - this is normal for large image downloads")
 	logger.Debug("Executing docker compose pull",
 		zap.String("command", "docker"),
 		zap.Strings("args", []string{"compose", "-f", bgi.config.ComposeFile, "pull"}),
@@ -731,7 +732,7 @@ func (bgi *BionicGPTInstaller) pullDockerImages(ctx context.Context) error {
 		Args:    []string{"compose", "-f", bgi.config.ComposeFile, "pull"},
 		Dir:     bgi.config.InstallDir,
 		Capture: true,
-		Timeout: 15 * time.Minute, // 15 minutes for all images
+		Timeout: 30 * time.Minute, // 30 minutes for large images (embeddings, chunking, etc.)
 	})
 
 	if err != nil {
