@@ -177,6 +177,14 @@ func WriteAppRoleFiles(rc *eos_io.RuntimeContext, roleID, secretID string) error
 		zap.String("target_owner", "vault"),
 		zap.String("target_permissions", "0600"))
 
+	// Ensure secrets directory exists with proper parent directory permissions
+	log.Debug("Ensuring secrets directory structure with proper permissions")
+	if err := shared.EnsureSecretsDir(); err != nil {
+		log.Error("Failed to ensure secrets directory",
+			zap.Error(err))
+		return cerr.Wrap(err, "ensure secrets directory")
+	}
+
 	// Use vault user instead of deprecated eos user
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, "vault")
 	if err != nil {
