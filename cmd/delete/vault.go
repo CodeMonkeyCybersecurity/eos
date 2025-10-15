@@ -148,7 +148,7 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 // promptForConfirmation handles user confirmation for deletion
 func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, state *vault.UninstallState) error {
 	// Show what will be deleted
-	logger.Info("terminal prompt: \n═══════════════════════════════════════════════════════════════════")
+	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
 	logger.Info("terminal prompt: COMPONENTS TO BE DELETED")
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
 
