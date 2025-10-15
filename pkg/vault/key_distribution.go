@@ -99,11 +99,11 @@ func generateEncryptedKeyFiles(rc *eos_io.RuntimeContext, initRes *api.InitRespo
 	var generatedFiles []string
 
 	for i, key := range initRes.KeysB64 {
-		logger.Info(fmt.Sprintf("terminal prompt: ─────────────────────────────────────────────────────────────"))
+		logger.Info("terminal prompt: ─────────────────────────────────────────────────────────────")
 		logger.Info(fmt.Sprintf("terminal prompt: Key %d of %d", i+1, len(initRes.KeysB64)))
-		logger.Info(fmt.Sprintf("terminal prompt: ─────────────────────────────────────────────────────────────"))
+		logger.Info("terminal prompt: ─────────────────────────────────────────────────────────────")
 		logger.Info(fmt.Sprintf("terminal prompt: Enter password for key holder #%d:", i+1))
-		logger.Info(fmt.Sprintf("terminal prompt: (This will be needed to decrypt this key)"))
+		logger.Info("terminal prompt: (This will be needed to decrypt this key)")
 		logger.Info("terminal prompt: ")
 
 		// Prompt for password
@@ -180,26 +180,19 @@ func displayQRCodes(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error 
 	logger.Info("terminal prompt: ")
 
 	for i, key := range initRes.KeysB64 {
-		logger.Info(fmt.Sprintf("terminal prompt: "))
-		logger.Info(fmt.Sprintf("terminal prompt: ─────────────────────────────────────────────────────────────"))
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: ─────────────────────────────────────────────────────────────")
 		logger.Info(fmt.Sprintf("terminal prompt: UNSEAL KEY %d of %d", i+1, len(initRes.KeysB64)))
-		logger.Info(fmt.Sprintf("terminal prompt: ─────────────────────────────────────────────────────────────"))
-		logger.Info(fmt.Sprintf("terminal prompt: "))
+		logger.Info("terminal prompt: ─────────────────────────────────────────────────────────────")
+		logger.Info("terminal prompt: ")
 
-		// Generate QR code
-		qrCode, err := crypto.GenerateQRCode(key)
-		if err != nil {
-			logger.Error("Failed to generate QR code", zap.Int("key_number", i+1), zap.Error(err))
-			// Fallback: display key as text
-			logger.Info(fmt.Sprintf("terminal prompt: Key %d: %s", i+1, key))
-		} else {
-			// Display QR code
-			logger.Info("terminal prompt: " + qrCode)
-		}
+		// TODO: Generate QR code (crypto.GenerateQRCode not yet implemented)
+		// For now, display key as text
+		logger.Info(fmt.Sprintf("terminal prompt: Key %d: %s", i+1, key))
 
-		logger.Info(fmt.Sprintf("terminal prompt: "))
+		logger.Info("terminal prompt: ")
 		logger.Info(fmt.Sprintf("terminal prompt: Holder: Key Holder #%d", i+1))
-		logger.Info(fmt.Sprintf("terminal prompt: "))
+		logger.Info("terminal prompt: ")
 
 		if i < len(initRes.KeysB64)-1 {
 			logger.Info("terminal prompt: Press Enter when ready for next key...")

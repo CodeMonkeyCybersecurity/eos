@@ -38,6 +38,8 @@ func VaultAddress() string {
 //     Phase 7a: API client verification (GetRootClient)
 //     Phase 8: Health check (PhaseEnsureVaultHealthy)
 //     Phase 9a: KV v2 secrets engine (PhaseEnableKVv2)
+//     Phase 9d: Additional secrets engines - Database, PKI (PhaseEnableSecretsEngines)
+//     Phase 9e: Activity tracking enablement (PhaseEnableTracking)
 //     Phase 9b: Bootstrap secret verification (PhaseWriteBootstrapSecretAndRecheck)
 //     Phase 10a: Userpass authentication (PhaseEnableUserpass) - optional, interactive
 //     Phase 10b: AppRole authentication (PhaseEnableAppRole) - optional, interactive
@@ -96,6 +98,24 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		return logger.LogErrAndWrap(rc, "enable KV v2", err)
 	}
 	log.Info(" KV v2 secrets engine enabled successfully")
+
+	// Step 9d: Enable additional secrets engines (database, PKI)
+	log.Info(" Enabling additional secrets engines")
+	if err := PhaseEnableSecretsEngines(rc, client); err != nil {
+		log.Error(" Failed to enable additional secrets engines", zap.Error(err))
+		return logger.LogErrAndWrap(rc, "enable additional secrets engines", err)
+	}
+	log.Info(" Additional secrets engines phase completed")
+
+	// Step 9e: Enable activity tracking
+	log.Info(" Enabling activity tracking")
+	if err := PhaseEnableTracking(rc, client); err != nil {
+		log.Warn(" Failed to enable activity tracking (non-fatal)", zap.Error(err))
+		log.Info("terminal prompt: Activity tracking could not be enabled automatically")
+		log.Info("terminal prompt: You can enable it later with: vault write sys/internal/counters/config enabled=enable")
+	} else {
+		log.Info(" Activity tracking enabled successfully")
+	}
 
 	// Step 10a: interactively configure userpass auth
 	if interaction.PromptYesNo(rc.Ctx, "Enable Userpass authentication?", false) {

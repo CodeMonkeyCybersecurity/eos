@@ -239,6 +239,8 @@ func init() {
 //   Phase 7a: API client verification
 //   Phase 8: Health check
 //   Phase 9a: KV v2 secrets engine
+//   Phase 9d: Additional secrets engines (Database, PKI)
+//   Phase 9e: Activity tracking enablement
 //   Phase 9b: Bootstrap secret verification
 //   Phase 10a: Userpass authentication (optional, interactive)
 //   Phase 10b: AppRole authentication (optional, interactive)

@@ -3,9 +3,11 @@
 package crypto
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -23,17 +25,17 @@ func EncryptWithPassword(plaintext []byte, password string) ([]byte, error) {
 	// Create encryption operations instance
 	// Note: We're using a nil logger here for standalone function
 	// If logging is needed, could accept RuntimeContext parameter
-	encOps := NewEncryptionOperations(otelzap.L())
+	encOps := NewEncryptionOperations(otelzap.L().Logger)
 
 	// Derive key from password using PBKDF2
 	// Uses 600,000 iterations with SHA-256 (OWASP 2023 recommendation)
-	key, err := encOps.DeriveKey(nil, password, salt, 32) // 32 bytes = AES-256
+	key, err := encOps.DeriveKey(context.TODO(), password, salt, 32) // 32 bytes = AES-256
 	if err != nil {
 		return nil, fmt.Errorf("derive key: %w", err)
 	}
 
 	// Encrypt plaintext with derived key
-	ciphertext, err := encOps.Encrypt(nil, plaintext, key)
+	ciphertext, err := encOps.Encrypt(context.TODO(), plaintext, key)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt data: %w", err)
 	}
@@ -59,16 +61,16 @@ func DecryptWithPassword(encrypted []byte, password string) ([]byte, error) {
 	ciphertext := encrypted[32:]
 
 	// Create encryption operations instance
-	encOps := NewEncryptionOperations(otelzap.L())
+	encOps := NewEncryptionOperations(otelzap.L().Logger)
 
 	// Derive key from password using same parameters as encryption
-	key, err := encOps.DeriveKey(nil, password, salt, 32)
+	key, err := encOps.DeriveKey(context.TODO(), password, salt, 32)
 	if err != nil {
 		return nil, fmt.Errorf("derive key: %w", err)
 	}
 
 	// Decrypt ciphertext
-	plaintext, err := encOps.Decrypt(nil, ciphertext, key)
+	plaintext, err := encOps.Decrypt(context.TODO(), ciphertext, key)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt data: %w", err)
 	}
@@ -82,7 +84,7 @@ func DecryptWithPassword(encrypted []byte, password string) ([]byte, error) {
 // EncryptFileWithPassword encrypts a file with password-based encryption
 func EncryptFileWithPassword(inputPath, outputPath, password string) error {
 	// Read input file
-	plaintext, err := ReadFileSecurely(inputPath)
+	plaintext, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("read input file: %w", err)
 	}
@@ -94,7 +96,7 @@ func EncryptFileWithPassword(inputPath, outputPath, password string) error {
 	}
 
 	// Write encrypted data to output file
-	if err := WriteFileSecurely(outputPath, encrypted, 0600); err != nil {
+	if err := os.WriteFile(outputPath, encrypted, 0600); err != nil {
 		return fmt.Errorf("write encrypted file: %w", err)
 	}
 
@@ -110,7 +112,7 @@ func EncryptFileWithPassword(inputPath, outputPath, password string) error {
 // DecryptFileWithPassword decrypts a file that was encrypted with EncryptFileWithPassword
 func DecryptFileWithPassword(inputPath, outputPath, password string) error {
 	// Read encrypted file
-	encrypted, err := ReadFileSecurely(inputPath)
+	encrypted, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("read encrypted file: %w", err)
 	}
@@ -122,7 +124,7 @@ func DecryptFileWithPassword(inputPath, outputPath, password string) error {
 	}
 
 	// Write decrypted data to output file
-	if err := WriteFileSecurely(outputPath, plaintext, 0600); err != nil {
+	if err := os.WriteFile(outputPath, plaintext, 0600); err != nil {
 		return fmt.Errorf("write decrypted file: %w", err)
 	}
 
