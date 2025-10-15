@@ -21,9 +21,9 @@ func checkDetailedPortBindings(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	// Consul ports
+	// Consul ports (HashiCorp standards)
 	ports := map[int]string{
-		8161: "HTTP API",
+		8500: "HTTP API",
 		8502: "gRPC",
 		8600: "DNS",
 		8301: "Serf LAN",

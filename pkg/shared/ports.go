@@ -23,11 +23,11 @@ const (
 	PortUmami      = 8117
 	PortMinio      = 8123
 	PortN8n          = 8147 // Planned
-	PortConsul       = 8161 // Not 8500
+	PortConsul       = 8500 // HashiCorp Consul HTTP API (standard)
 	PortGitea        = 8167 // Planned
 	PortGophish      = 8171 // Planned, migrating from 8080
-	PortVault        = 8179 // Not 8200
-	PortVaultCluster = 8180 // Vault Raft cluster communication
+	PortVault        = 8200 // HashiCorp Vault API (standard)
+	PortVaultCluster = 8201 // Vault Raft cluster communication (standard)
 	PortConsulWeb    = 8191
 	PortConsulAPI  = 8209
 	PortGophishAPI = 8209 // Legacy Gophish port 3333→8209
@@ -55,10 +55,10 @@ const (
 	PortBoundary       = 8419 // HashiCorp Boundary (not 9200)
 	PortTerraform      = 8423 // Terraform Enterprise (if needed)
 	PortPacker         = 8429 // Packer (if server mode added)
-	PortConsulDNS      = 8389 // Consul DNS (not 8600)
-	PortConsulRPC      = 8431 // Consul server RPC (not 8300)
-	PortConsulSerfLAN  = 8443 // Consul Serf LAN (not 8301)
-	PortConsulSerfWAN  = 8447 // Consul Serf WAN (not 8302)
+	PortConsulDNS      = 8600 // Consul DNS (HashiCorp standard)
+	PortConsulRPC      = 8300 // Consul server RPC (HashiCorp standard)
+	PortConsulSerfLAN  = 8301 // Consul Serf LAN (HashiCorp standard)
+	PortConsulSerfWAN  = 8302 // Consul Serf WAN (HashiCorp standard)
 	PortBuildService   = 8431 // Build orchestrator service (not 8080)
 	PortCaddyAdmin     = 8443 // Caddy admin API (not 2019)
 	PortAuthentik      = 8447 // Authentik identity provider (not 9000)
@@ -87,17 +87,12 @@ const (
 	PortResticAPI       = 9101  // Should move to 8xxx range
 	PortMinioAPI        = 9123  // Should move to 8xxx range
 	
-	// Standard upstream ports (used when integrating with external services)
-	PortConsulStandard     = 8500 // Standard Consul HTTP API port (used for Vault storage backend)
-
-	// Original well-known ports (for reference/migration)
-	PortVaultOriginal      = 8200 // Original Vault port
-	PortConsulOriginal     = 8500 // Original Consul HTTP port (same as standard)
-	PortNomadOriginal      = 4646 // Original Nomad HTTP port
-	PortNomadRPCOriginal   = 4647 // Original Nomad RPC port
-	PortPostgreSQLOriginal = 5432 // Original PostgreSQL port
-	PortRedisOriginal      = 6379 // Original Redis port
-	PortGrafanaOriginal    = 3000 // Original Grafana port
+	// HashiCorp standard ports (now using defaults)
+	// Note: PortConsul and PortVault now use HashiCorp defaults
+	// Consul: 8500 (HTTP), 8501 (HTTPS), 8502 (gRPC), 8600 (DNS)
+	// Consul Serf: 8301 (LAN), 8302 (WAN)
+	// Consul RPC: 8300
+	// Vault: 8200 (HTTP), 8201 (cluster)
 	
 	// Additional port constants for legacy services
 	PortWazuh1514  = 1514  // Wazuh manager port

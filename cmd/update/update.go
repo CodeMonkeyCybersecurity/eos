@@ -16,6 +16,10 @@ import (
 func AddSubcommands() {
 	// Add Authentik subcommand
 	UpdateCmd.AddCommand(AuthentikCmd)
+
+	// Add HashiCorp update commands
+	UpdateCmd.AddCommand(VaultCmd)
+	UpdateCmd.AddCommand(ConsulCmd)
 }
 
 // UpdateCmd is the root command for update operations
