@@ -99,7 +99,7 @@ run_fuzz_test() {
 }
 
 # Phase 1: Critical System Tests (Sequential)
-echo "🔥 Phase 1: Critical System Tests"
+echo " Phase 1: Critical System Tests"
 echo "### Phase 1: Critical System Tests" >> "${REPORT_FILE}"
 
 run_fuzz_test "FuzzAllEosCommands" "./test" "${FUZZTIME_LONG}" "critical"
@@ -222,7 +222,7 @@ echo "3. Quick test run: FUZZTIME_LONG=1m FUZZTIME_MEDIUM=30s FUZZTIME_SHORT=10s
 echo ""
 
 if [ "${failed_tests}" -eq 0 ]; then
-    echo "🎉 Eos framework passed all fuzz tests!"
+    echo " Eos framework passed all fuzz tests!"
 else
     echo "Please address the ${failed_tests} failed tests before production deployment."
 fi

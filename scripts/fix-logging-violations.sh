@@ -88,5 +88,5 @@ find ./cmd -name "*.go" -type f | while read -r file; do
     fi
 done
 
-echo "🎉 Logging violation fixes complete!"
+echo " Logging violation fixes complete!"
 echo "Please review changes and run tests before committing"

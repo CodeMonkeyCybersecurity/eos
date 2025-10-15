@@ -142,7 +142,7 @@ func (pb PipelineBottleneck) SeverityIcon() string {
 	case "High":
 		return "▲"
 	case "Critical":
-		return "🔥"
+		return ""
 	default:
 		return "?"
 	}

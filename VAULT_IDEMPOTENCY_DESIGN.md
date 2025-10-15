@@ -21,7 +21,7 @@ This violates idempotency principles and wastes user time.
   - `EnsureAppRole()` checks for existing credentials
   - AppRole files are only written if needed
 
-### What's Broken 🔥
+### What's Broken 
 - **Prompts happen before checks**: `lifecycle2_enable.go:121-134`
 - **No state persistence**: No record of which enablement phases completed
 - **User has to remember**: Must answer "no" to avoid re-prompting

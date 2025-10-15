@@ -336,7 +336,7 @@ echo -e "${YELLOW}Skipped: $SKIPPED_TESTS${NC}"
 echo ""
 
 if [ $FAILED_TESTS -eq 0 ]; then
-    echo -e "${GREEN}🎉 All tests passed!${NC}"
+    echo -e "${GREEN} All tests passed!${NC}"
     echo -e "${BLUE}📊 Coverage: ${COVERAGE:-N/A}%${NC}"
     echo -e "${BLUE} Full report: $REPORT_FILE${NC}"
     exit 0

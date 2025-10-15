@@ -15,7 +15,7 @@ import (
 )
 
 // EnableFileAudit enables file-based Vault auditing at /opt/vault/logs/vault_audit.log.
-func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 Ignore the passed client!
+func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { //  Ignore the passed client!
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Starting file audit enablement process")
 

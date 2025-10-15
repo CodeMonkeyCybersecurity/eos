@@ -206,7 +206,7 @@ declare -a database_tests=(
 )
 
 # Execute test suites sequentially for critical tests, parallel for others
-echo "🔥 Phase 1: Critical System Tests (Sequential)"
+echo " Phase 1: Critical System Tests (Sequential)"
 echo "### Phase 1: Critical System Tests" >> "${REPORT_FILE}"
 for test_spec in "${critical_tests[@]}"; do
     IFS='|' read -r test_name package duration priority <<< "${test_spec}"
@@ -346,7 +346,7 @@ echo "4. Specific test: go test -run=^$ -fuzz=^FuzzAllEosCommands$ -fuzztime=1h 
 echo ""
 
 if [ "${failed_tests}" -eq 0 ]; then
-    echo "🎉 Eos framework is ready for extended production fuzzing!"
+    echo " Eos framework is ready for extended production fuzzing!"
     
     # Send success notification if configured
     if [ "${EMAIL_REPORT}" = "true" ] && [ -n "${EMAIL_ADDRESS}" ]; then

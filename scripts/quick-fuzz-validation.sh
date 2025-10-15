@@ -66,7 +66,7 @@ echo -e "${RED} Failed: ${failed}/${total}${NC}"
 
 if [ ${failed} -eq 0 ]; then
     echo ""
-    echo -e "${GREEN}🎉 SUCCESS: All essential fuzz tests are working!${NC}"
+    echo -e "${GREEN} SUCCESS: All essential fuzz tests are working!${NC}"
     echo -e "${CYAN} Ready for overnight fuzzing:${NC}"
     echo -e "   ${GREEN}./assets/overnight-fuzz-simple.sh${NC}"
     echo -e "   ${YELLOW}# or with custom durations:${NC}"

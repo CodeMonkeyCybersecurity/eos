@@ -149,7 +149,7 @@ Examples:
 		}
 
 		if !noReboot {
-			logger.Error("🔥 INITIATING EMERGENCY REBOOT",
+			logger.Error(" INITIATING EMERGENCY REBOOT",
 				zap.String("countdown", "5 seconds"),
 				zap.String("reason", reason))
 

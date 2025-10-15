@@ -235,7 +235,7 @@ eos delphi parser-health                   # → dashboard parsers
 - **Clear Boundaries**: Visual separation between different data sections
 
 ### Status Indicators
-- **Service Status**: 🟢 Active, 🔴 Inactive, 🔥 Failed, ⚫ Not Installed
+- **Service Status**: 🟢 Active, 🔴 Inactive,  Failed, ⚫ Not Installed
 - **Health Status**: ✓ Healthy, ⚠ Monitor, ✗ Critical
 - **Circuit Breakers**: ✓ Closed, ⚠ Half-Open, ✗ Open
 - **Processing Flow**: → Active flow, ⊗ Blocked flow

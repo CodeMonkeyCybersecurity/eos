@@ -318,7 +318,10 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			baseURL:   server.URL,
 			model:     "claude-3-sonnet",
 			maxTokens: 100,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second})
+				return c
+			}(),
 		}
 
 		ctx := NewConversationContext("test")
@@ -340,7 +343,10 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			baseURL:   server.URL,
 			model:     "claude-3-sonnet",
 			maxTokens: 100,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 500 * time.Millisecond}); return c }(), // Short timeout
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 500 * time.Millisecond})
+				return c
+			}(), // Short timeout
 		}
 
 		ctx := NewConversationContext("test")
@@ -401,7 +407,10 @@ func TestHTTPRequestSecurity(t *testing.T) {
 					baseURL:   server.URL,
 					model:     "claude-3-sonnet",
 					maxTokens: 100,
-					client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second}); return c }(),
+					client: func() *httpclient.Client {
+						c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second})
+						return c
+					}(),
 				}
 
 				ctx := NewConversationContext("test")
@@ -444,7 +453,10 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			baseURL:   server.URL,
 			model:     "claude-3-sonnet",
 			maxTokens: 100,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second})
+				return c
+			}(),
 		}
 
 		// Cancel context before making request
@@ -784,7 +796,7 @@ func TestInputValidation(t *testing.T) {
 		// Test handling of special characters and encoding
 		specialChars := []string{
 			"Hello 世界",                     // Unicode
-			"emoji test 🔥💻",                // Emojis
+			"emoji test 💻",                 // Emojis
 			"newlines\nand\ttabs",          // Control characters
 			"quotes \"and\" 'apostrophes'", // Quotes
 			"backslashes\\and/slashes",     // Slashes

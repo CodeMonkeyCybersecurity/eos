@@ -224,32 +224,35 @@ func init() {
 // This function orchestrates the complete Vault deployment lifecycle:
 //
 // Step 1: Phases 1-4 - Base Installation (vault.NewVaultInstaller().Install())
-//   Phase 1: Binary installation and user/directory creation
-//   Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, agent directories)
-//   Phase 3: TLS certificate generation
-//   Phase 4: Configuration file generation (vault.hcl)
+//
+//	Phase 1: Binary installation and user/directory creation
+//	Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, agent directories)
+//	Phase 3: TLS certificate generation
+//	Phase 4: Configuration file generation (vault.hcl)
 //
 // Step 2: Phase 5 - Service Startup (vault.StartVaultService())
-//   Starts systemd service and waits for Vault to be ready
+//
+//	Starts systemd service and waits for Vault to be ready
 //
 // Step 3: Phases 6-15 - Initialization and Enablement (vault.EnableVault())
-//   Phase 6a: Vault initialization
-//   Phase 6b: Vault unseal
-//   Phase 7: Root token verification
-//   Phase 7a: API client verification
-//   Phase 8: Health check
-//   Phase 9a: KV v2 secrets engine
-//   Phase 9d: Additional secrets engines (Database, PKI)
-//   Phase 9e: Activity tracking enablement
-//   Phase 9b: Bootstrap secret verification
-//   Phase 10a: Userpass authentication (optional, interactive)
-//   Phase 10b: AppRole authentication (optional, interactive)
-//   Phase 10c: Entity and alias creation
-//   Phase 11: Policy configuration
-//   Phase 12: Audit logging
-//   Phase 13: Multi-Factor Authentication (optional, interactive)
-//   Phase 14: Vault Agent service (optional, interactive)
-//   Phase 15: Comprehensive hardening (optional, interactive)
+//
+//	Phase 6a: Vault initialization
+//	Phase 6b: Vault unseal
+//	Phase 7: Root token verification
+//	Phase 7a: API client verification
+//	Phase 8: Health check
+//	Phase 9a: KV v2 secrets engine
+//	Phase 9d: Additional secrets engines (Database, PKI)
+//	Phase 9e: Activity tracking enablement
+//	Phase 9b: Bootstrap secret verification
+//	Phase 10a: Userpass authentication (optional, interactive)
+//	Phase 10b: AppRole authentication (optional, interactive)
+//	Phase 10c: Entity and alias creation
+//	Phase 11: Policy configuration
+//	Phase 12: Audit logging
+//	Phase 13: Multi-Factor Authentication (optional, interactive)
+//	Phase 14: Vault Agent service (optional, interactive)
+//	Phase 15: Comprehensive hardening (optional, interactive)
 //
 // Result: Fully configured, production-ready Vault installation
 func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -348,7 +351,7 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		return fmt.Errorf("enable vault: %w", err)
 	}
 
-	logger.Info("🎉 Vault creation and enablement completed successfully!")
+	logger.Info(" Vault creation and enablement completed successfully!")
 	logger.Info("terminal prompt: Vault is fully configured and ready to use")
 	return nil
 }

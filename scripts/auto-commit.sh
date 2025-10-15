@@ -135,4 +135,4 @@ else
     exit 1
 fi
 
-echo -e "${GREEN}🎉 Auto-commit complete!${NC}"
+echo -e "${GREEN} Auto-commit complete!${NC}"

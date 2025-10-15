@@ -358,7 +358,7 @@ vault hard nproc 4096
 
 func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔥 Configuring firewall for Vault")
+	log.Info(" Configuring firewall for Vault")
 
 	// Check if ufw is available
 	if err := execute.RunSimple(rc.Ctx, "which", "ufw"); err == nil {

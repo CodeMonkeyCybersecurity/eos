@@ -66,4 +66,4 @@ add_logger_init "$file"
 sed -i '' 's/fmt\.Printf("%-20s %-15s %-10s %-30s\\n",/logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-20s %-15s %-10s %-30s",/' "$file"
 sed -i '' 's/fmt\.Printf("\\n%d backup(s) found\\n",/logger.Info("terminal prompt: Backups found", zap.Int("count",/' "$file"
 
-echo "🎉 Manual fixes complete!"
+echo " Manual fixes complete!"

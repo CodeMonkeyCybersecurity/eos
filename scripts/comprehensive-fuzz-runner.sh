@@ -346,7 +346,7 @@ run_chaos_testing() {
 EOF
     
     # Resource exhaustion tests
-    echo -e "${YELLOW}🔥 Resource Exhaustion Tests${NC}"
+    echo -e "${YELLOW} Resource Exhaustion Tests${NC}"
     
     # Memory pressure
     echo -e "    Memory pressure simulation..."
@@ -354,7 +354,7 @@ EOF
         -fuzztime=30s ./test >> "${LOG_DIR}/chaos/memory_pressure.log" 2>&1 || true
     
     # CPU saturation
-    echo -e "   🔥 CPU saturation simulation..."
+    echo -e "    CPU saturation simulation..."
     stress-ng --cpu 4 --timeout 30s &
     STRESS_PID=$!
     go test -v -fuzz=FuzzStackOrchestrationWorkflow -fuzztime=30s ./test \

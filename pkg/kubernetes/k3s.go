@@ -67,7 +67,7 @@ func DeployK3s(rc *eos_io.RuntimeContext) {
 		}
 	}
 
-	// 🔥 Unified firewall status check
+	//  Unified firewall status check
 	platform.CheckFirewallStatus(rc)
 
 	var installCmd string

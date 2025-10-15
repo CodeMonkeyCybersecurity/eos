@@ -119,7 +119,7 @@ Examples:
 				if status.Active == "active" {
 					statusIcon = ""
 				} else if status.Active == "failed" {
-					statusIcon = "🔥"
+					statusIcon = ""
 				} else if isInstalled {
 					statusIcon = ""
 				}
