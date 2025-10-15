@@ -665,11 +665,8 @@ services:
       migrations:
         condition: service_completed_successfully
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '%s'
-          memory: '%s'
+    mem_limit: '%s'
+    cpus: %s
     logging:
       driver: "json-file"
       options:
@@ -720,8 +717,8 @@ networks:
 		DefaultBionicGPTVersion,
 		ContainerApp,
 		bgi.config.Port,
-		bgi.config.AppCPULimit,
 		bgi.config.AppMemoryLimit,
+		bgi.config.AppCPULimit,
 		// Volumes
 		VolumePostgresData,
 		VolumeDocuments,
