@@ -8,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/promotion"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -223,7 +224,7 @@ Examples:
 		if len(result.ArtifactsPromoted) > 0 {
 			fmt.Printf("\nPromoted Artifacts:\n")
 			for _, artifact := range result.ArtifactsPromoted {
-				fmt.Printf("  • %s (%s) - %s\n", artifact.Name, artifact.Type, formatSize(artifact.Size))
+				fmt.Printf("  • %s (%s) - %s\n", artifact.Name, artifact.Type, shared.FormatBytes(artifact.Size))
 			}
 		}
 
@@ -321,21 +322,4 @@ func getMinApprovalsForEnvironment(environment string) int {
 	return 1 // Other environments require 1 approval
 }
 
-func formatSize(bytes int64) string {
-	const (
-		KB = 1024
-		MB = KB * 1024
-		GB = MB * 1024
-	)
-
-	switch {
-	case bytes >= GB:
-		return fmt.Sprintf("%.1f GB", float64(bytes)/GB)
-	case bytes >= MB:
-		return fmt.Sprintf("%.1f MB", float64(bytes)/MB)
-	case bytes >= KB:
-		return fmt.Sprintf("%.1f KB", float64(bytes)/KB)
-	default:
-		return fmt.Sprintf("%d B", bytes)
-	}
-}
+// TODO: refactor - MIGRATED to pkg/shared/format.go - formatSize now uses shared.FormatBytes()

@@ -2,10 +2,10 @@ package create
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage/udisks2"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -116,7 +116,7 @@ func discoverDisks(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) erro
 
 	for _, disk := range disks {
 		fmt.Printf("Device: %s\n", disk.Device)
-		fmt.Printf("  Size: %s\n", formatDiskSize(uint64(disk.Size)))
+		fmt.Printf("  Size: %s\n", shared.FormatBytesUint64(uint64(disk.Size)))
 		fmt.Printf("  Model: %s\n", disk.Model)
 		fmt.Printf("  Vendor: %s\n", disk.Vendor)
 		fmt.Printf("  Serial: %s\n", disk.Serial)
@@ -129,7 +129,7 @@ func discoverDisks(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) erro
 			fmt.Printf("  Partitions:\n")
 			for _, part := range disk.Partitions {
 				fmt.Printf("    %s: %s (%s) - %s\n",
-					part.Device, formatDiskSize(part.Size), part.Filesystem, part.MountPoint)
+					part.Device, shared.FormatBytesUint64(part.Size), part.Filesystem, part.MountPoint)
 			}
 		}
 		fmt.Println()
@@ -146,7 +146,7 @@ func createDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 	}
 
 	// Parse size
-	sizeBytes, err := parseDiskSize(diskSize)
+	sizeBytes, err := shared.ParseSize(diskSize)
 	if err != nil {
 		return fmt.Errorf("invalid size: %w", err)
 	}
@@ -199,7 +199,7 @@ func createDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 	fmt.Printf(" Volume created successfully:\n")
 	fmt.Printf("   Device: %s\n", volumeInfo.Device)
 	fmt.Printf("   UUID: %s\n", volumeInfo.UUID)
-	fmt.Printf("   Size: %s\n", formatDiskSize(volumeInfo.Size))
+	fmt.Printf("   Size: %s\n", shared.FormatBytesUint64(volumeInfo.Size))
 	fmt.Printf("   Filesystem: %s\n", volumeInfo.Filesystem)
 	fmt.Printf("   Label: %s\n", volumeInfo.Label)
 	fmt.Printf("   Mount Point: %s\n", volumeInfo.MountPoint)
@@ -301,7 +301,7 @@ func resizeDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 	}
 
 	// Parse new size
-	newSizeBytes, err := parseDiskSize(diskSize)
+	newSizeBytes, err := shared.ParseSize(diskSize)
 	if err != nil {
 		return fmt.Errorf("invalid size: %w", err)
 	}
@@ -329,48 +329,4 @@ func resizeDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 
 	return nil
 }
-// TODO: refactor
-// Helper functions
-func parseDiskSize(size string) (uint64, error) {
-	if size == "" || size == "0" {
-		return 0, nil // Use entire device
-	}
-
-	size = strings.ToUpper(strings.TrimSpace(size))
-
-	var multiplier uint64 = 1
-	var numStr string
-
-	if strings.HasSuffix(size, "TB") {
-		multiplier = 1024 * 1024 * 1024 * 1024
-		numStr = strings.TrimSuffix(size, "TB")
-	} else if strings.HasSuffix(size, "GB") {
-		multiplier = 1024 * 1024 * 1024
-		numStr = strings.TrimSuffix(size, "GB")
-	} else if strings.HasSuffix(size, "MB") {
-		multiplier = 1024 * 1024
-		numStr = strings.TrimSuffix(size, "MB")
-	} else {
-		numStr = size
-	}
-
-	var num float64
-	if _, err := fmt.Sscanf(numStr, "%f", &num); err != nil {
-		return 0, fmt.Errorf("invalid number format: %s", numStr)
-	}
-
-	return uint64(num * float64(multiplier)), nil
-}
-// TODO: refactor
-func formatDiskSize(bytes uint64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := uint64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
+// TODO: refactor - MIGRATED to pkg/shared/format.go - parseDiskSize and formatDiskSize now use shared.ParseSize() and shared.FormatBytesUint64()

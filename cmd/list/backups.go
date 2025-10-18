@@ -5,11 +5,11 @@ package list
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -219,16 +219,16 @@ func displaySnapshots(logger otelzap.LoggerWithCtx, snapshots []backup.Snapshot,
 		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 140)))
 
 		for _, snap := range snapshots {
-			id := truncateString(snap.ID, 12)
+			id := shared.TruncateString(snap.ID, 12)
 			timeStr := snap.Time.Format("2006-01-02 15:04:05")
-			age := formatAge(snap.Time)
-			parent := truncateString(snap.Parent, 12)
+			age := shared.FormatAge(snap.Time)
+			parent := shared.TruncateString(snap.Parent, 12)
 			if parent == "" {
 				parent = "-"
 			}
 
 			paths := strings.Join(snap.Paths, ", ")
-			paths = truncateString(paths, 40)
+			paths = shared.TruncateString(paths, 40)
 
 			tags := strings.Join(snap.Tags, ", ")
 
@@ -242,12 +242,12 @@ func displaySnapshots(logger otelzap.LoggerWithCtx, snapshots []backup.Snapshot,
 		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 140)))
 
 		for _, snap := range snapshots {
-			id := truncateString(snap.ID, 12)
+			id := shared.TruncateString(snap.ID, 12)
 			timeStr := snap.Time.Format("2006-01-02 15:04:05")
-			age := formatAge(snap.Time)
+			age := shared.FormatAge(snap.Time)
 
 			paths := strings.Join(snap.Paths, ", ")
-			paths = truncateString(paths, 50)
+			paths = shared.TruncateString(paths, 50)
 
 			tags := strings.Join(snap.Tags, ", ")
 
@@ -298,7 +298,7 @@ func displaySnapshotsGrouped(logger otelzap.LoggerWithCtx, snapshots []backup.Sn
 // displayRepositoryStats shows repository statistics
 func displayRepositoryStats(logger otelzap.LoggerWithCtx, stats *backup.RepositoryStats) {
 	fmt.Printf("Repository: %s\n", stats.RepositoryID)
-	fmt.Printf("Total Size: %s\n", humanizeBytes(stats.TotalSize))
+	fmt.Printf("Total Size: %s\n", shared.FormatBytes(stats.TotalSize))
 	fmt.Printf("Total Files: %d\n", stats.TotalFileCount)
 	fmt.Printf("Total Snapshots: %d\n", stats.SnapshotCount)
 	fmt.Printf("Compression Ratio: %.2f%%\n", stats.CompressionRatio*100)
@@ -308,71 +308,15 @@ func displayRepositoryStats(logger otelzap.LoggerWithCtx, stats *backup.Reposito
 	} else {
 		fmt.Printf("Last Check: %s (%s ago)\n",
 			stats.LastCheck.Format("2006-01-02 15:04:05"),
-			formatAge(stats.LastCheck))
+			shared.FormatAge(stats.LastCheck))
 	}
 
 	if len(stats.HostStats) > 0 {
 		fmt.Printf("\nPer-Host Statistics:\n")
 		for host, hostStat := range stats.HostStats {
 			fmt.Printf("  %s: %d snapshots, %s\n",
-				host, hostStat.SnapshotCount, humanizeBytes(hostStat.Size))
+				host, hostStat.SnapshotCount, shared.FormatBytes(hostStat.Size))
 		}
 	}
 }
-// TODO: refactor - move to pkg/shared/format.go or pkg/shared/time.go - Time formatting is reusable across codebase
-// formatAge returns a human-readable age string
-func formatAge(t time.Time) string {
-	duration := time.Since(t)
-
-	if duration < time.Minute {
-		return "now"
-	}
-	if duration < time.Hour {
-		minutes := int(duration.Minutes())
-		return fmt.Sprintf("%dm", minutes)
-	}
-	if duration < 24*time.Hour {
-		hours := int(duration.Hours())
-		return fmt.Sprintf("%dh", hours)
-	}
-	if duration < 7*24*time.Hour {
-		days := int(duration.Hours() / 24)
-		return fmt.Sprintf("%dd", days)
-	}
-	if duration < 30*24*time.Hour {
-		weeks := int(duration.Hours() / 24 / 7)
-		return fmt.Sprintf("%dw", weeks)
-	}
-	if duration < 365*24*time.Hour {
-		months := int(duration.Hours() / 24 / 30)
-		return fmt.Sprintf("%dmo", months)
-	}
-
-	years := int(duration.Hours() / 24 / 365)
-	return fmt.Sprintf("%dy", years)
-}
-// TODO: refactor - move to pkg/shared/format.go - String formatting is reusable across codebase
-// truncateString truncates a string to the specified length
-func truncateString(s string, length int) string {
-	if len(s) <= length {
-		return s
-	}
-	if length < 3 {
-		return s[:length]
-	}
-	return s[:length-3] + "..."
-}
-// TODO: refactor - move to pkg/shared/format.go - Size formatting is reusable across codebase (same as formatSize)
-// humanizeBytes converts bytes to human-readable format
-func humanizeBytes(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
+// TODO: refactor - MIGRATED to pkg/shared/format.go - formatAge, truncateString, humanizeBytes now use shared.FormatAge(), shared.TruncateString(), shared.FormatBytes()

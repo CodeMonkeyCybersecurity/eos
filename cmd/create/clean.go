@@ -6,6 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/build"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -115,7 +116,7 @@ Examples:
 		if len(analysis.Artifacts) > 0 {
 			fmt.Printf("Build Artifacts:\n")
 			for _, artifact := range analysis.Artifacts {
-				fmt.Printf("  • %s (%s)\n", artifact.Path, formatSize(artifact.Size))
+				fmt.Printf("  • %s (%s)\n", artifact.Path, shared.FormatBytes(artifact.Size))
 				totalSize += artifact.Size
 				totalItems++
 			}
@@ -124,7 +125,7 @@ Examples:
 		if len(analysis.CacheItems) > 0 {
 			fmt.Printf("Cache Items:\n")
 			for _, cache := range analysis.CacheItems {
-				fmt.Printf("  • %s (%s)\n", cache.Path, formatSize(cache.Size))
+				fmt.Printf("  • %s (%s)\n", cache.Path, shared.FormatBytes(cache.Size))
 				totalSize += cache.Size
 				totalItems++
 			}
@@ -133,7 +134,7 @@ Examples:
 		if len(analysis.Images) > 0 {
 			fmt.Printf("Docker Images:\n")
 			for _, image := range analysis.Images {
-				fmt.Printf("  • %s (%s)\n", image.Name, formatSize(image.Size))
+				fmt.Printf("  • %s (%s)\n", image.Name, shared.FormatBytes(image.Size))
 				totalSize += image.Size
 				totalItems++
 			}
@@ -150,7 +151,7 @@ Examples:
 		fmt.Printf("\nSummary:\n")
 		fmt.Printf("────────\n")
 		fmt.Printf("Total Items:   %d\n", totalItems)
-		fmt.Printf("Total Size:    %s\n", formatSize(totalSize))
+		fmt.Printf("Total Size:    %s\n", shared.FormatBytes(totalSize))
 		fmt.Printf("\n")
 
 		// Dry run - show what would be cleaned
@@ -162,7 +163,7 @@ Examples:
 		// Get confirmation for destructive operations
 		if !force && (totalItems > 0) {
 			fmt.Printf("Proceed with cleanup? This will permanently remove %d items (%s). (y/N): ",
-				totalItems, formatSize(totalSize))
+				totalItems, shared.FormatBytes(totalSize))
 			// In real implementation, would read from stdin
 			fmt.Printf("y\n")
 		}
@@ -178,7 +179,7 @@ Examples:
 		fmt.Printf("Cleanup Results:\n")
 		fmt.Printf("════════════════\n")
 		fmt.Printf("Items Removed:    %d / %d\n", result.ItemsRemoved, result.ItemsTotal)
-		fmt.Printf("Size Freed:       %s\n", formatSize(result.SizeFreed))
+		fmt.Printf("Size Freed:       %s\n", shared.FormatBytes(result.SizeFreed))
 		fmt.Printf("Duration:         %s\n", result.Duration)
 		fmt.Printf("Errors:           %d\n", len(result.Errors))
 		fmt.Printf("\n")
@@ -281,22 +282,4 @@ func getCleanMode(aggressive, force bool) string {
 	return "normal"
 }
 
-// TODO: refactor - move to pkg/shared/format.go - Size formatting is reusable across codebase
-func formatSize(bytes int64) string {
-	const (
-		KB = 1024
-		MB = KB * 1024
-		GB = MB * 1024
-	)
-
-	switch {
-	case bytes >= GB:
-		return fmt.Sprintf("%.1f GB", float64(bytes)/GB)
-	case bytes >= MB:
-		return fmt.Sprintf("%.1f MB", float64(bytes)/MB)
-	case bytes >= KB:
-		return fmt.Sprintf("%.1f KB", float64(bytes)/KB)
-	default:
-		return fmt.Sprintf("%d B", bytes)
-	}
-}
+// TODO: refactor - MIGRATED to pkg/shared/format.go - formatSize now uses shared.FormatBytes()
