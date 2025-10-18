@@ -6,10 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -150,26 +152,88 @@ func FixMattermostPermissions(rc *eos_io.RuntimeContext, config *Config) error {
 	return nil
 }
 
-func checkContainerStatus(rc *eos_io.RuntimeContext, cli *client.Client, containerName string) (string, bool, error) {
+// checkContainerStatus finds a container using Docker Compose labels (version-agnostic)
+// This works with both Docker Compose v1 and v2, regardless of project naming
+func checkContainerStatus(rc *eos_io.RuntimeContext, cli *client.Client, serviceName string) (string, bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	containers, err := cli.ContainerList(rc.Ctx, container.ListOptions{All: true})
+	// Strategy 1: Use Docker Compose labels (most robust, works with v1 and v2)
+	// Docker Compose adds these labels to all containers:
+	// - com.docker.compose.service={service_name}
+	// - com.docker.compose.project={project_name}
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", fmt.Sprintf("com.docker.compose.service=%s", serviceName))
+	
+	logger.Debug("Searching for container using Docker Compose labels",
+		zap.String("service_name", serviceName),
+		zap.String("label_filter", fmt.Sprintf("com.docker.compose.service=%s", serviceName)))
+	
+	containers, err := cli.ContainerList(rc.Ctx, container.ListOptions{
+		All:     true,
+		Filters: filterArgs,
+	})
 	if err != nil {
 		return "", false, fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	for _, c := range containers {
+	// Found container(s) via Compose labels
+	if len(containers) > 0 {
+		c := containers[0] // Use first match (typically only one service instance)
+		isRunning := c.State == "running"
+		
+		// Extract useful metadata from labels
+		projectName := c.Labels["com.docker.compose.project"]
+		serviceName := c.Labels["com.docker.compose.service"]
+		containerNumber := c.Labels["com.docker.compose.container-number"]
+		
+		logger.Info("Container found via Docker Compose labels",
+			zap.String("id", c.ID[:12]),
+			zap.String("name", strings.TrimPrefix(c.Names[0], "/")),
+			zap.String("state", c.State),
+			zap.String("compose_project", projectName),
+			zap.String("compose_service", serviceName),
+			zap.String("compose_number", containerNumber))
+		
+		if len(containers) > 1 {
+			logger.Warn("Multiple containers found for service, using first one",
+				zap.Int("total_found", len(containers)))
+		}
+		
+		return c.ID, isRunning, nil
+	}
+
+	// Strategy 2: Fallback to name-based search (for non-Compose containers)
+	logger.Debug("No containers found via Compose labels, trying name-based search")
+	
+	allContainers, err := cli.ContainerList(rc.Ctx, container.ListOptions{All: true})
+	if err != nil {
+		return "", false, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	// Try common naming patterns
+	namingPatterns := []string{
+		serviceName,
+		"/" + serviceName,
+	}
+
+	for _, c := range allContainers {
 		for _, name := range c.Names {
-			if name == "/"+containerName || name == containerName {
-				isRunning := c.State == "running"
-				logger.Debug("Container found",
-					zap.String("id", c.ID[:12]),
-					zap.String("name", name),
-					zap.String("state", c.State))
-				return c.ID, isRunning, nil
+			for _, pattern := range namingPatterns {
+				if name == pattern {
+					isRunning := c.State == "running"
+					logger.Info("Container found via name matching (non-Compose)",
+						zap.String("id", c.ID[:12]),
+						zap.String("name", name),
+						zap.String("state", c.State))
+					return c.ID, isRunning, nil
+				}
 			}
 		}
 	}
+
+	logger.Warn("Container not found",
+		zap.String("service_name", serviceName),
+		zap.String("hint", "Ensure the service is deployed via Docker Compose or the container name matches the service name"))
 
 	return "", false, nil
 }
