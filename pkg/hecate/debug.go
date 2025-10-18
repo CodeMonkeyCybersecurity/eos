@@ -325,7 +325,7 @@ func diagnoseAuthentikBasic(_ *eos_io.RuntimeContext, hecatePath string) []Hecat
 	return results
 }
 
-func diagnosePostgreSQL(_ *eos_io.RuntimeContext, _ string) []HecateCheckResult {
+func diagnosePostgreSQL(rc *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
 	var results []HecateCheckResult
 
 	// Check PostgreSQL connectivity
@@ -360,7 +360,7 @@ func diagnosePostgreSQL(_ *eos_io.RuntimeContext, _ string) []HecateCheckResult 
 	return results
 }
 
-func diagnoseRedis(_ *eos_io.RuntimeContext, _ string) []HecateCheckResult {
+func diagnoseRedis(rc *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
 	var results []HecateCheckResult
 
 	// Check Redis connectivity
