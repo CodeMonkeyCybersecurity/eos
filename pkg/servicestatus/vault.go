@@ -324,7 +324,7 @@ func (p *VaultStatusProvider) getNetworkInfo() NetworkInfo {
 				Name:     "HTTPS API",
 				Protocol: "https",
 				Address:  "127.0.0.1",
-				Port:     shared.PortVault, // 8179
+				Port:     shared.PortVault, // 8200 (HashiCorp standard)
 				Healthy:  true,
 			},
 		},

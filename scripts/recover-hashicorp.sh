@@ -232,12 +232,9 @@ fix_nomad() {
     # Enable and start Nomad
     if enable_and_start_service "nomad"; then
         # Check standard Nomad ports
-        check_port 4646 "Nomad HTTP API"
-        check_port 4647 "Nomad RPC"
-        check_port 4648 "Nomad Serf"
-
-        # Also check Eos custom ports
-        check_port 8243 "Nomad (EOS custom)"
+        check_port 4646 "Nomad HTTP API (HashiCorp standard)"
+        check_port 4647 "Nomad RPC (HashiCorp standard)"
+        check_port 4648 "Nomad Serf (HashiCorp standard)"
 
         # Test Nomad API
         if curl -s http://localhost:4646/v1/status/leader >/dev/null 2>&1; then
@@ -364,10 +361,9 @@ generate_report() {
         ["8301"]="Consul LAN"
         ["8302"]="Consul WAN"
         ["8600"]="Consul DNS"
-        ["8243"]="Nomad (EOS)"
-        ["4646"]="Nomad HTTP"
-        ["4647"]="Nomad RPC"
-        ["4648"]="Nomad Serf"
+        ["4646"]="Nomad HTTP (HashiCorp standard)"
+        ["4647"]="Nomad RPC (HashiCorp standard)"
+        ["4648"]="Nomad Serf (HashiCorp standard)"
     )
 
     for port in "${!PORTS[@]}"; do

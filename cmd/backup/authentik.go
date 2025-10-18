@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul_config"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	consul_config "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"

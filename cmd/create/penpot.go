@@ -51,7 +51,7 @@ Examples:
   eos create penpot --namespace production
 
   # Deploy with custom Vault/Nomad addresses
-  eos create penpot --vault-addr https://vault.example.com:8179 --nomad-addr https://nomad.example.com:8243
+  eos create penpot --vault-addr https://vault.example.com:8200 --nomad-addr https://nomad.example.com:4646
 
   # Deploy with disabled registration
   eos create penpot --disable-registration

@@ -375,19 +375,20 @@ func determineEnvironmentFromContext(config *EnvironmentConfig) string {
 	return "development"
 }
 
-// determineVaultAddress determines the Vault server address (HashiCorp migration)
+// determineVaultAddress determines the Vault server address
+// Preference order: VAULT_ADDR env var > local vault detection > default port
 func determineVaultAddress() string {
-	// Check if Vault is available locally
-	if _, err := executeCommand("vault", "status"); err == nil {
-		return fmt.Sprintf("http://localhost:%d", shared.PortVault) // Eos standard Vault port (8179)
-	}
-
-	// Check environment variable
+	// 1. Check environment variable first (HashiCorp SDK standard)
 	if vaultAddr := os.Getenv("VAULT_ADDR"); vaultAddr != "" {
 		return vaultAddr
 	}
 
-	// Default Vault address
+	// 2. Check if Vault is available locally
+	if _, err := executeCommand("vault", "status"); err == nil {
+		return fmt.Sprintf("http://localhost:%d", shared.PortVault) // HashiCorp standard port (8200)
+	}
+
+	// 3. Default Vault address using HashiCorp standard port
 	return fmt.Sprintf("http://localhost:%d", shared.PortVault)
 }
 

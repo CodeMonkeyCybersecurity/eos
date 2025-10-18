@@ -34,7 +34,7 @@ const (
 	PortZabbix     = 8233
 	PortZabbixAPI  = 8237
 	PortPenpot     = 8239 // Design platform
-	PortNomad      = 8243 // Nomad API server (not 4646)
+	PortNomad      = 4646 // HashiCorp Nomad HTTP API (standard)
 	
 	// New port definitions using next available primes
 	PortPostgreSQL     = 8263 // PostgreSQL database (not 5432)
@@ -50,7 +50,8 @@ const (
 	PortZabbixServer   = 8353 // Zabbix server (not 10051)
 	PortZabbixAgent    = 8363 // Zabbix agent (not 10050)
 	PortHecateAPI      = 8369 // Hecate API server (not 8080)
-	PortNomadSerf      = 8377 // Nomad Serf (not 4648)
+	PortNomadSerf      = 4648 // HashiCorp Nomad Serf gossip (standard)
+	PortNomadRPC       = 4647 // HashiCorp Nomad RPC (standard)
 	PortHeadscaleGRPC  = 8387 // Headscale GRPC (not 50443)
 	PortBoundary       = 8419 // HashiCorp Boundary (not 9200)
 	PortTerraform      = 8423 // Terraform Enterprise (if needed)

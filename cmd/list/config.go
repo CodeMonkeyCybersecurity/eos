@@ -5,7 +5,7 @@ package list
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul_config"
+	consul_config "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"

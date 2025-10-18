@@ -65,7 +65,7 @@ var (
 	VaultDefaultAddr        = "https://%s:" + VaultDefaultPort
 	VaultDefaultLocalAddr   = "https://127.0.0.1:" + VaultDefaultPort
 	VaultDefaultClusterAddr = "https://127.0.0.1:" + VaultClusterPort
-	ConsulDefaultAddr       = fmt.Sprintf("127.0.0.1:%d", PortConsul) // Consul HTTP API on custom port 8161
+	ConsulDefaultAddr       = fmt.Sprintf("127.0.0.1:%d", PortConsul) // Consul HTTP API on HashiCorp standard port 8500
 )
 
 // Computed Vault directory paths - ALL derived from base directories
@@ -329,7 +329,7 @@ type VaultConfigParams struct {
 	RetryJoinNodes []RetryJoinNode
 
 	// Consul storage backend configuration
-	ConsulAddress string // Consul agent address (default: 127.0.0.1:8161)
+	ConsulAddress string // Consul agent address (default: 127.0.0.1:8500 - HashiCorp standard)
 	ConsulPath    string // Path in Consul KV store (default: "vault/")
 	ConsulToken   string // Consul ACL token (optional)
 	ConsulScheme  string // http or https (default: http)

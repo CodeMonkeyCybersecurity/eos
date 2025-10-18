@@ -55,12 +55,3 @@ func GetServiceAddr(port int, useHTTPS bool) string {
 	}
 	return fmt.Sprintf("%s://%s:%d", protocol, hostname, port)
 }
-
-// Legacy port constants for migration reference
-const (
-	LegacyNomadPort     = 4646
-	LegacyConsulPort    = 8500
-	LegacyVaultPort     = 8200
-	LegacyCaddyPort     = 2019
-	LegacyAuthentikPort = 9000
-)

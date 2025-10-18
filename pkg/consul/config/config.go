@@ -1,6 +1,6 @@
-// pkg/consul_config/config.go
+// pkg/consul/config/config.go
 
-package consul_config
+package config
 
 import (
 	"context"
