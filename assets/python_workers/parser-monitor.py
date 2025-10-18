@@ -432,7 +432,7 @@ class ParserMonitor:
             print("✓ All circuits operational")
         
         # Parser Performance
-        print("\n📈 PARSER PERFORMANCE (Last 7 days)")
+        print("\n PARSER PERFORMANCE (Last 7 days)")
         print("-" * 80)
         performance = self.get_parser_performance()
         if performance:

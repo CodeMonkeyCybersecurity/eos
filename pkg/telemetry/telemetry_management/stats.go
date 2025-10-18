@@ -191,7 +191,7 @@ func ShowTelemetryStatus(rc *eos_io.RuntimeContext, stateFile string) error {
 		return nil
 	}
 
-	logger.Info("📈 Telemetry Statistics",
+	logger.Info(" Telemetry Statistics",
 		zap.Int("total_commands", stats.TotalCommands),
 		zap.Int("successful_commands", stats.SuccessfulCommands),
 		zap.Int("failed_commands", stats.FailedCommands),

@@ -211,7 +211,7 @@ echo " COMPREHENSIVE SUMMARY:"
 echo "========================="
 echo " Log directory: ${LOG_DIR}"
 echo " Main report: ${REPORT_FILE}"
-echo "📈 Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed, ${skipped_tests} skipped)"
+echo " Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed, ${skipped_tests} skipped)"
 echo ""
 
 echo " NEXT STEPS:"

@@ -280,7 +280,7 @@ func Restart(rc *eos_io.RuntimeContext, namespace string, services []string) err
 func Scale(rc *eos_io.RuntimeContext, namespace string, count int) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("📈 Scaling Penpot deployment",
+	logger.Info(" Scaling Penpot deployment",
 		zap.String("namespace", namespace),
 		zap.Int("count", count))
 

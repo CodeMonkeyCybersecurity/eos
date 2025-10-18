@@ -411,7 +411,7 @@ run_performance_regression_tests() {
     
     # Analyze benchmark results
     if command -v benchstat >/dev/null 2>&1; then
-        echo -e "   📈 Analyzing benchmark statistics..."
+        echo -e "    Analyzing benchmark statistics..."
         benchstat "${LOG_DIR}/performance_benchmarks.log" > "${LOG_DIR}/benchmark_analysis.log" 2>&1 || true
     fi
     
@@ -450,7 +450,7 @@ analyze_coverage() {
     echo -e "${PURPLE} Coverage Analysis${NC}"
     echo "===================="
     
-    echo -e "   📈 Generating coverage report..."
+    echo -e "    Generating coverage report..."
     go test -v -coverprofile="${LOG_DIR}/coverage.out" -covermode=atomic ./pkg/... \
         >> "${LOG_DIR}/coverage.log" 2>&1 || true
     
@@ -567,7 +567,7 @@ EOF
     echo ""
     echo -e "${CYAN} COMPREHENSIVE FUZZING COMPLETE${NC}"
     echo "=================================="
-    echo -e "📈 Tests: ${total_tests} total, ${GREEN}${passed_tests} passed${NC}, ${RED}${failed_tests} failed${NC}"
+    echo -e " Tests: ${total_tests} total, ${GREEN}${passed_tests} passed${NC}, ${RED}${failed_tests} failed${NC}"
     echo -e " Report: ${YELLOW}${REPORT_FILE}${NC}"
     echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
     echo -e " Coverage: ${YELLOW}${LOG_DIR}/coverage.html${NC}"

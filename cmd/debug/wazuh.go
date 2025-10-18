@@ -1146,7 +1146,7 @@ func displayWazuhResults(results []DiagnosticResult) {
 		}
 	}
 
-	fmt.Printf("\n📈 Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
+	fmt.Printf("\n Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
 }
 
 func applyAutomaticFixes(rc *eos_io.RuntimeContext, results []DiagnosticResult) {

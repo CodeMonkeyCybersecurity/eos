@@ -363,7 +363,7 @@ EOF
 echo ""
 echo " SUMMARY:"
 echo "==========="
-echo "📈 Tests: ${total_tests} total, ${passed_tests} passed, ${failed_tests} failed"
+echo " Tests: ${total_tests} total, ${passed_tests} passed, ${failed_tests} failed"
 echo " Report: ${REPORT_FILE}"
 echo " Logs: ${LOG_DIR}/*_${TIMESTAMP}.log"
 echo ""

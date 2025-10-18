@@ -223,7 +223,7 @@ fi
 print_header "8. Benchmark Tests"
 
 if [ "${RUN_BENCHMARKS:-false}" = "true" ]; then
-    echo -e "${BLUE}📈 Running benchmarks...${NC}"
+    echo -e "${BLUE} Running benchmarks...${NC}"
     go test -bench=. -benchmem -timeout=5m ./pkg/... > "$LOG_DIR/benchmarks-$TIMESTAMP.log" 2>&1
     echo -e "${GREEN} Benchmarks completed${NC}"
     echo -e "${YELLOW}   See results: $LOG_DIR/benchmarks-$TIMESTAMP.log${NC}"
