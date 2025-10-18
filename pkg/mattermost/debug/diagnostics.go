@@ -233,66 +233,124 @@ func checkVolumePermissions(rc *eos_io.RuntimeContext, config *Config, result *D
 	logger.Info("Checking volume permissions",
 		zap.String("volumes_dir", config.MattermostVolumesDir))
 	
-	// ASSESS & INTERVENE - Check app volume permissions
-	appVolume := fmt.Sprintf("%s/volumes/app", config.MattermostVolumesDir)
-	if info, err := os.Stat(appVolume); err != nil {
-		logger.Warn("App volume not accessible",
-			zap.String("path", appVolume),
-			zap.Error(err))
-		result.Issues = append(result.Issues, fmt.Sprintf("App volume not accessible: %s", appVolume))
-	} else {
-		permInfo := fmt.Sprintf("Permissions: %s", info.Mode().String())
-		result.VolumePermissions["app"] = permInfo
-		logger.Info("App volume permissions",
-			zap.String("path", appVolume),
-			zap.String("permissions", info.Mode().String()))
-		
-		// List directory contents
-		if entries, err := os.ReadDir(appVolume); err == nil {
-			logger.Info("App volume contents",
-				zap.Int("item_count", len(entries)))
-			for _, entry := range entries {
-				info, _ := entry.Info()
-				logger.Debug("Volume entry",
-					zap.String("name", entry.Name()),
-					zap.String("mode", info.Mode().String()),
-					zap.Int64("size", info.Size()))
-			}
-		}
+	// All Mattermost volumes that need to be checked
+	volumes := map[string]string{
+		"config":         fmt.Sprintf("%s/volumes/app/mattermost/config", config.MattermostVolumesDir),
+		"data":           fmt.Sprintf("%s/volumes/app/mattermost/data", config.MattermostVolumesDir),
+		"logs":           fmt.Sprintf("%s/volumes/app/mattermost/logs", config.MattermostVolumesDir),
+		"plugins":        fmt.Sprintf("%s/volumes/app/mattermost/plugins", config.MattermostVolumesDir),
+		"client-plugins": fmt.Sprintf("%s/volumes/app/mattermost/client/plugins", config.MattermostVolumesDir),
+		"bleve-indexes":  fmt.Sprintf("%s/volumes/app/mattermost/bleve-indexes", config.MattermostVolumesDir),
+		"app":            fmt.Sprintf("%s/volumes/app", config.MattermostVolumesDir),
+		"db":             fmt.Sprintf("%s/volumes/db", config.MattermostVolumesDir),
 	}
 	
-	// ASSESS & INTERVENE - Check db volume permissions
-	dbVolume := fmt.Sprintf("%s/volumes/db", config.MattermostVolumesDir)
-	if info, err := os.Stat(dbVolume); err != nil {
-		logger.Warn("DB volume not accessible",
-			zap.String("path", dbVolume),
-			zap.Error(err))
-		result.Issues = append(result.Issues, fmt.Sprintf("DB volume not accessible: %s", dbVolume))
-	} else {
-		permInfo := fmt.Sprintf("Permissions: %s", info.Mode().String())
-		result.VolumePermissions["db"] = permInfo
-		logger.Info("DB volume permissions",
-			zap.String("path", dbVolume),
-			zap.String("permissions", info.Mode().String()))
+	volumesChecked := 0
+	permissionIssues := 0
+	
+	for volumeName, volumePath := range volumes {
+		info, err := os.Stat(volumePath)
+		if err != nil {
+			logger.Warn("Volume not accessible",
+				zap.String("volume", volumeName),
+				zap.String("path", volumePath),
+				zap.Error(err))
+			result.Issues = append(result.Issues, fmt.Sprintf("%s volume not accessible: %s", volumeName, volumePath))
+			permissionIssues++
+			continue
+		}
 		
-		// List directory contents
-		if entries, err := os.ReadDir(dbVolume); err == nil {
-			logger.Info("DB volume contents",
-				zap.Int("item_count", len(entries)))
-			for _, entry := range entries {
-				info, _ := entry.Info()
-				logger.Debug("Volume entry",
-					zap.String("name", entry.Name()),
-					zap.String("mode", info.Mode().String()),
-					zap.Int64("size", info.Size()))
+		volumesChecked++
+		
+		// Get detailed permission info including ownership
+		stat := info.Sys()
+		var uid, gid uint32
+		if stat != nil {
+			// Platform-specific: extract UID/GID from stat
+			// This works on Unix-like systems
+			if statT, ok := stat.(interface{ Uid() uint32 }); ok {
+				uid = statT.Uid()
+			}
+			if statT, ok := stat.(interface{ Gid() uint32 }); ok {
+				gid = statT.Gid()
+			}
+		}
+		
+		permInfo := fmt.Sprintf("%s (uid:%d gid:%d)", info.Mode().String(), uid, gid)
+		result.VolumePermissions[volumeName] = permInfo
+		
+		logger.Info("Volume permissions",
+			zap.String("volume", volumeName),
+			zap.String("path", volumePath),
+			zap.String("permissions", info.Mode().String()),
+			zap.Uint32("uid", uid),
+			zap.Uint32("gid", gid))
+		
+		// Check if permissions are correct for Mattermost (should be 2000:2000)
+		if uid != 2000 || gid != 2000 {
+			logger.Warn("Volume has incorrect ownership",
+				zap.String("volume", volumeName),
+				zap.Uint32("current_uid", uid),
+				zap.Uint32("current_gid", gid),
+				zap.Uint32("expected_uid", 2000),
+				zap.Uint32("expected_gid", 2000))
+			result.Issues = append(result.Issues, 
+				fmt.Sprintf("%s volume has incorrect ownership (uid:%d gid:%d, expected 2000:2000)", 
+					volumeName, uid, gid))
+			result.Recommendations = append(result.Recommendations,
+				fmt.Sprintf("Fix %s volume ownership: sudo chown -R 2000:2000 %s", volumeName, volumePath))
+			permissionIssues++
+		}
+		
+		// Check if directory is writable
+		if info.Mode().Perm()&0200 == 0 {
+			logger.Warn("Volume is not writable by owner",
+				zap.String("volume", volumeName),
+				zap.String("permissions", info.Mode().String()))
+			result.Issues = append(result.Issues,
+				fmt.Sprintf("%s volume is not writable: %s", volumeName, info.Mode().String()))
+			result.Recommendations = append(result.Recommendations,
+				fmt.Sprintf("Fix %s volume permissions: sudo chmod -R u+w %s", volumeName, volumePath))
+			permissionIssues++
+		}
+		
+		// List directory contents for important volumes
+		if volumeName == "config" || volumeName == "data" {
+			if entries, err := os.ReadDir(volumePath); err == nil {
+				logger.Info("Volume contents",
+					zap.String("volume", volumeName),
+					zap.Int("item_count", len(entries)))
+				
+				// Check config.json specifically
+				if volumeName == "config" {
+					configFile := fmt.Sprintf("%s/config.json", volumePath)
+					if configInfo, err := os.Stat(configFile); err != nil {
+						logger.Warn("config.json not found or not accessible",
+							zap.String("path", configFile),
+							zap.Error(err))
+						result.Issues = append(result.Issues, "config.json not found or not accessible")
+						result.Recommendations = append(result.Recommendations, 
+							"Ensure config.json exists and is readable/writable by uid:2000")
+					} else {
+						logger.Info("config.json found",
+							zap.String("permissions", configInfo.Mode().String()),
+							zap.Int64("size", configInfo.Size()))
+					}
+				}
 			}
 		}
 	}
 	
 	// EVALUATE
 	logger.Info("Volume permissions check complete",
-		zap.Int("volumes_checked", 2),
-		zap.Int("issues_found", len(result.Issues)))
+		zap.Int("volumes_checked", volumesChecked),
+		zap.Int("permission_issues", permissionIssues))
+	
+	if permissionIssues > 0 {
+		result.Recommendations = append(result.Recommendations,
+			fmt.Sprintf("Run 'sudo eos fix mattermost' to automatically fix all permission issues"))
+	}
+	
 	return nil
 }
 

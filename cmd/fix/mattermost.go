@@ -63,7 +63,16 @@ func runMattermostFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		ServiceName:     "mattermost",
 		TargetUID:       2000,
 		TargetGID:       2000,
-		VolumesToFix:    []string{"app"},
+		// Fix all Mattermost volumes that need correct ownership
+		VolumesToFix: []string{
+			"app",                           // Base app directory
+			"app/mattermost/config",         // Config directory (config.json)
+			"app/mattermost/data",           // Data directory
+			"app/mattermost/logs",           // Logs directory
+			"app/mattermost/plugins",        // Plugins directory
+			"app/mattermost/client/plugins", // Client plugins
+			"app/mattermost/bleve-indexes",  // Search indexes
+		},
 		WatchLogSeconds: 10,
 	}
 

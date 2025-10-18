@@ -6,19 +6,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/container_management"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 // OutputContainerJSON outputs container list in JSON format
-func OutputContainerJSON(result *container_management.ContainerListResult) error {
+func OutputContainerJSON(result *ContainerListResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
 // OutputContainerTable outputs container list in table format
-func OutputContainerTable(result *container_management.ContainerListResult) error {
+func OutputContainerTable(result *ContainerListResult) error {
 	if result.Total == 0 {
 		fmt.Println("No containers found.")
 		return nil
@@ -35,7 +34,8 @@ func OutputContainerTable(result *container_management.ContainerListResult) erro
 
 	// Print containers
 	for _, container := range result.Containers {
-		portStr := FormatPorts(container.Ports)
+		// TODO: Add Ports field to ContainerInfo or use Labels to extract ports
+		portStr := "-" // FormatPorts(container.Ports) - temporarily disabled
 		fmt.Printf("%-12s %-20s %-30s %-20s %s\n",
 			utils.TruncateString(container.ID, 12),
 			utils.TruncateString(container.Name, 20),
@@ -62,13 +62,13 @@ func FormatPorts(ports map[string]string) string {
 	return utils.TruncateString(result, 25)
 }
 
-func OutputComposeListJSON(result *container_management.ComposeSearchResult) error {
+func OutputComposeListJSON(result *ComposeSearchResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
-func OutputComposeListTable(result *container_management.ComposeSearchResult) error {
+func OutputComposeListTable(result *ComposeSearchResult) error {
 	if result.TotalFound == 0 {
 		fmt.Println("No compose projects found.")
 		return nil

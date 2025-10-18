@@ -2,7 +2,6 @@ package list
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/container_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -33,7 +32,7 @@ Examples:
 			zap.Bool("json", outputJSON),
 			zap.Bool("all", showAll))
 
-		result, err := container_management.ListRunningContainers(rc, nil)
+		result, err := container.ListRunningContainers(rc, nil)
 		if err != nil {
 			logger.Error("Failed to list containers", zap.Error(err))
 			return err
@@ -69,7 +68,7 @@ Examples:
 		logger.Info("Listing Docker Compose projects",
 			zap.Strings("search_paths", searchPaths))
 
-		result, err := container_management.FindComposeProjects(rc, nil, searchPaths)
+		result, err := container.FindComposeProjects(rc, nil, searchPaths)
 		if err != nil {
 			logger.Error("Failed to list compose projects", zap.Error(err))
 			return err
