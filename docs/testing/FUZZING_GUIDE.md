@@ -122,7 +122,7 @@ Original comprehensive fuzzing with complexity issues.
 - **FuzzWrappedCommand**: Tests the Wrap function with various contexts
 - **FuzzEnvironmentVariables**: Tests environment variable handling
 
-**`/cmd/delphi/services/fuzz_test.go`**
+**`/cmd/wazuh/services/fuzz_test.go`**
 - **FuzzUpdateCommand**: Tests the update command (addresses critical crashes)
 - **FuzzCreateCommand**: Tests service creation with random service names
 - **FuzzServiceWorkerPaths**: Tests GetServiceWorkers with various paths
@@ -145,7 +145,7 @@ Original comprehensive fuzzing with complexity issues.
 ```bash
 # Check that fuzz test files exist
 ls -la pkg/eos_cli/fuzz_test.go
-ls -la cmd/delphi/services/fuzz_test.go
+ls -la cmd/wazuh/services/fuzz_test.go
 ls -la scripts/run-fuzz-tests.sh
 ```
 
@@ -161,7 +161,7 @@ chmod +x assets/overnight-fuzz.sh
 ```bash
 # Verify all fuzz tests compile
 go test -c ./pkg/eos_cli
-go test -c ./cmd/delphi/services
+go test -c ./cmd/wazuh/services
 go test -c ./pkg/crypto
 ```
 
@@ -181,10 +181,10 @@ go test -c ./pkg/crypto
 go test -v -fuzz=FuzzCommandParsing -fuzztime=60m ./pkg/eos_cli
 
 # Run the update command fuzz test (targets critical crashes)
-go test -v -fuzz=FuzzUpdateCommand -fuzztime=60m ./cmd/delphi/services
+go test -v -fuzz=FuzzUpdateCommand -fuzztime=60m ./cmd/wazuh/services
 
 # Run service worker path testing
-go test -v -fuzz=FuzzServiceWorkerPaths -fuzztime=30m ./cmd/delphi/services
+go test -v -fuzz=FuzzServiceWorkerPaths -fuzztime=30m ./cmd/wazuh/services
 ```
 
 ### Advanced Execution
@@ -194,7 +194,7 @@ go test -v -fuzz=FuzzServiceWorkerPaths -fuzztime=30m ./cmd/delphi/services
 go test -v -fuzz=FuzzCommandParsing -fuzztime=60m -fuzzcachedir=./fuzz-cache ./pkg/eos_cli
 
 # Run with verbose output
-go test -v -fuzz=FuzzUpdateCommand -fuzztime=10m ./cmd/delphi/services
+go test -v -fuzz=FuzzUpdateCommand -fuzztime=10m ./cmd/wazuh/services
 
 # Run until first failure
 go test -v -fuzz=FuzzCommandParsing -fuzztime=0 ./pkg/eos_cli
@@ -245,7 +245,7 @@ export SLACK_WEBHOOK="https://hooks.slack.com/..."  # Slack notifications
 
 #### Phase 1: Critical System Tests (Sequential)
 - **FuzzAllEosCommands** - Comprehensive CLI command testing
-- **FuzzDelphiServicesCommands** - Service management operations
+- **FuzzWazuhServicesCommands** - Service management operations
 - Duration: `FUZZTIME_LONG` (default 8h each)
 
 #### Phase 2: Security-Focused Tests (Parallel)
@@ -620,7 +620,7 @@ brew install bc          # macOS
 ```bash
 # Check for missing imports or type issues
 go build ./pkg/eos_cli
-go build ./cmd/delphi/services
+go build ./cmd/wazuh/services
 ```
 
 #### Performance issues

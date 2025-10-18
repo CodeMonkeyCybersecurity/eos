@@ -14,8 +14,8 @@ type Package struct {
 	ImportName string
 }
 
-// GetDelphiPackages returns all Python packages required by Delphi services
-func GetDelphiPackages() []Package {
+// GetWazuhPackages returns all Python packages required by Wazuh services
+func GetWazuhPackages() []Package {
 	return []Package{
 		{PipName: "psycopg2-binary", ImportName: "psycopg2"},
 		{PipName: "python-dotenv", ImportName: "dotenv"},
@@ -84,7 +84,7 @@ func VerifyAllPackages(rc *eos_io.RuntimeContext) error {
 	// ASSESS - Get all packages to verify
 	logger.Info("Assessing package verification requirements")
 
-	packages := GetDelphiPackages()
+	packages := GetWazuhPackages()
 
 	// INTERVENE - Verify each package
 	logger.Info("Verifying package installation",
@@ -113,12 +113,12 @@ func VerifyAllPackages(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Show next steps
-	logger.Info("Delphi Python dependencies installation complete")
+	logger.Info("Wazuh Python dependencies installation complete")
 	logger.Info("Next steps:")
 	logger.Info("  1. Ensure PostgreSQL is installed and running")
-	logger.Info("  2. Configure .env file at /opt/stackstorm/packs/delphi/.env")
-	logger.Info("  3. Deploy Delphi services: eos create delphi")
-	logger.Info("  4. Start services: eos delphi services start --all")
+	logger.Info("  2. Configure .env file at /opt/stackstorm/packs/wazuh/.env")
+	logger.Info("  3. Deploy Wazuh services: eos create wazuh")
+	logger.Info("  4. Start services: eos wazuh services start --all")
 
 	return nil
 }

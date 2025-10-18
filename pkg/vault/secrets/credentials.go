@@ -112,12 +112,12 @@ func gatherDatabaseCredentials(rc *eos_io.RuntimeContext) (*DatabaseCredentials,
 	credentials.Port = strings.TrimSpace(port)
 
 	logger.Info("terminal prompt: Database name")
-	dbname := interaction.PromptInput(rc.Ctx, "Database name", "delphi")
+	dbname := interaction.PromptInput(rc.Ctx, "Database name", "wazuh")
 	credentials.DBName = strings.TrimSpace(dbname)
 
 	// Authentication details
 	logger.Info("terminal prompt: Database username")
-	username := interaction.PromptInput(rc.Ctx, "Database username", "delphi")
+	username := interaction.PromptInput(rc.Ctx, "Database username", "wazuh")
 	credentials.Username = strings.TrimSpace(username)
 
 	logger.Info("terminal prompt: Database password")
@@ -150,11 +150,11 @@ func storeDatabaseCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceFa
 
 	// Store credentials using simplified facade - store each credential separately for easier retrieval
 	credentialPaths := map[string]map[string]interface{}{
-		"secret/data/delphi/database/host":     {"data": map[string]interface{}{"value": credentials.Host}},
-		"secret/data/delphi/database/port":     {"data": map[string]interface{}{"value": credentials.Port}},
-		"secret/data/delphi/database/name":     {"data": map[string]interface{}{"value": credentials.DBName}},
-		"secret/data/delphi/database/username": {"data": map[string]interface{}{"value": credentials.Username}},
-		"secret/data/delphi/database/password": {"data": map[string]interface{}{"value": credentials.Password}},
+		"secret/data/wazuh/database/host":     {"data": map[string]interface{}{"value": credentials.Host}},
+		"secret/data/wazuh/database/port":     {"data": map[string]interface{}{"value": credentials.Port}},
+		"secret/data/wazuh/database/name":     {"data": map[string]interface{}{"value": credentials.DBName}},
+		"secret/data/wazuh/database/username": {"data": map[string]interface{}{"value": credentials.Username}},
+		"secret/data/wazuh/database/password": {"data": map[string]interface{}{"value": credentials.Password}},
 	}
 
 	// Store each credential separately
@@ -176,11 +176,11 @@ func verifyDatabaseCredentials(rc *eos_io.RuntimeContext, facade *vault.ServiceF
 
 	// Verify each stored credential
 	credentialPaths := map[string]string{
-		"secret/data/delphi/database/host":     credentials.Host,
-		"secret/data/delphi/database/port":     credentials.Port,
-		"secret/data/delphi/database/name":     credentials.DBName,
-		"secret/data/delphi/database/username": credentials.Username,
-		"secret/data/delphi/database/password": credentials.Password,
+		"secret/data/wazuh/database/host":     credentials.Host,
+		"secret/data/wazuh/database/port":     credentials.Port,
+		"secret/data/wazuh/database/name":     credentials.DBName,
+		"secret/data/wazuh/database/username": credentials.Username,
+		"secret/data/wazuh/database/password": credentials.Password,
 	}
 
 	for path, expectedValue := range credentialPaths {
@@ -244,7 +244,7 @@ func displayDatabaseCredentialsSuccess(rc *eos_io.RuntimeContext) error {
  Database credentials stored securely in Vault
 
  Next steps:
-- Applications can now retrieve credentials from: vault kv get secret/database/credentials/delphi
+- Applications can now retrieve credentials from: vault kv get secret/database/credentials/wazuh
 - Configure applications to use these credentials for database access
 - Monitor credential usage in Vault audit logs
 

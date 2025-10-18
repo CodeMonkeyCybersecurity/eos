@@ -1,13 +1,13 @@
-# /etc/systemd/system/delphi-emailer.service
+# /etc/systemd/system/wazuh-emailer.service
 [Unit]
-Description=Delphi Emailer Service
+Description=Wazuh Emailer Service
 After=network.target
 StartLimitIntervalSec=300
 
 [Service]
 Type=notify
 User=stanley
-ExecStart=/usr/bin/python3 /usr/local/bin/delphi-emailer.py
+ExecStart=/usr/bin/python3 /usr/local/bin/wazuh-emailer.py
 WorkingDirectory=/home/ubuntu
 Restart=always
 RestartSec=5
@@ -25,7 +25,7 @@ ReadWritePaths=/var/log
 Environment="PYTHONUNBUFFERED=1"
 StandardOutput=journal
 StandardError=journal
-EnvironmentFile=/opt/stackstorm/packs/delphi/.env
+EnvironmentFile=/opt/stackstorm/packs/wazuh/.env
 
 [Install]
 WantedBy=multi-user.target

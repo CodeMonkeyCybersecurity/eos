@@ -1,4 +1,4 @@
-// pkg/hecate/phase6_delphi.go
+// pkg/hecate/phase6_wazuh.go
 
 package hecate
 
@@ -20,8 +20,8 @@ func SetupWazuhWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBu
 	// Define the fields to prompt for.
 	fields := []PromptField{
 		{
-			Prompt:  "Enter Wazuh domain (e.g., delphi.domain.com)",
-			Default: "delphi.domain.com",
+			Prompt:  "Enter Wazuh domain (e.g., wazuh.domain.com)",
+			Default: "wazuh.domain.com",
 			EnvVar:  "WazuhDomain",
 			Reader:  reader,
 		},

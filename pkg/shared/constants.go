@@ -46,8 +46,8 @@ const (
 )
 
 const (
-	// Delphi Paths
-	VenvPath       = "/opt/delphi_venv"
+	// Wazuh Paths
+	VenvPath       = "/opt/wazuh_venv"
 	DockerListener = "/var/ossec/wodles/docker/DockerListener"
 
 	// Install Paths

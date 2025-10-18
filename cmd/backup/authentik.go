@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	consul_config "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -101,7 +101,7 @@ func init() {
 	authentikFlags.Bool("include-secrets", false,
 		"Include sensitive data like private keys and secrets")
 	authentikFlags.Bool("extract-wazuh", false,
-		"Extract only Wazuh/Delphi SSO specific configuration")
+		"Extract only Wazuh/Wazuh SSO specific configuration")
 
 	// Legacy filesystem backup flags (kept for compatibility)
 	authentikFlags.Bool("include-media", false, "Include media files (filesystem backup only)")
@@ -234,7 +234,7 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// If extracting Wazuh-specific config
 	if extractWazuh {
 		types = []string{"providers", "applications", "mappings", "groups"}
-		logger.Info("Extracting Wazuh/Delphi SSO specific configuration")
+		logger.Info("Extracting Wazuh/Wazuh SSO specific configuration")
 	}
 
 	// Default to all types if none specified
@@ -281,7 +281,7 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	// Check for critical Wazuh configuration
 	if extractWazuh || checkWazuhConfiguration(config) {
-		logger.Info("Found Wazuh/Delphi SSO configuration",
+		logger.Info("Found Wazuh/Wazuh SSO configuration",
 			zap.String("tip", "Use 'eos update authentik --from-backup' to import"))
 
 		// Verify critical Roles mapping
@@ -302,9 +302,9 @@ func backupAuthentikFilesystem(rc *eos_io.RuntimeContext, _ *cobra.Command) erro
 	return eos_err.NewUserError("Filesystem backup not yet implemented. Use API-based backup with --url and --token flags")
 }
 
-// checkWazuhConfiguration checks if the config contains Wazuh/Delphi related items
+// checkWazuhConfiguration checks if the config contains Wazuh/Wazuh related items
 func checkWazuhConfiguration(config *authentik.AuthentikConfig) bool {
-	keywords := []string{"wazuh", "delphi", "analyst", "soc", "siem"}
+	keywords := []string{"wazuh", "wazuh", "analyst", "soc", "siem"}
 
 	// Check providers
 	for _, provider := range config.Providers {

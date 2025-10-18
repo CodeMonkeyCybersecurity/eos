@@ -24,8 +24,8 @@ This command provides credential viewing functionality:
 - Check credential status and expiration
 
 Examples:
-  eos read database-credentials --role delphi-readonly
-  eos read database-credentials --role delphi-readonly --json
+  eos read database-credentials --role wazuh-readonly
+  eos read database-credentials --role wazuh-readonly --json
   eos read database-credentials --role myapp-user --show-password`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -122,10 +122,10 @@ func outputTableCredential(logger otelzap.LoggerWithCtx, credential *database_ma
 
 	logger.Info("terminal prompt: Connection String Example:")
 	if showPassword {
-		logger.Info("terminal prompt: psql -h localhost -U X -d delphi", zap.String("username", credential.Username))
+		logger.Info("terminal prompt: psql -h localhost -U X -d wazuh", zap.String("username", credential.Username))
 		logger.Info("terminal prompt: Password", zap.String("password", credential.Password))
 	} else {
-		logger.Info("terminal prompt: psql -h localhost -U X -d delphi", zap.String("username", credential.Username))
+		logger.Info("terminal prompt: psql -h localhost -U X -d wazuh", zap.String("username", credential.Username))
 		logger.Info("terminal prompt: Password: [Use --show-password to display]")
 	}
 

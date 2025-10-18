@@ -127,7 +127,7 @@ class TestABTestManager(unittest.TestCase):
             "database": {
                 "host": "localhost",
                 "port": 5432,
-                "name": "delphi",
+                "name": "wazuh",
                 "user": "test_user",
                 "password": "test_pass"
             }

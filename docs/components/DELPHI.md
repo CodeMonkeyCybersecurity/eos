@@ -1,12 +1,12 @@
-# Delphi Domain - Security Monitoring Platform
+# Wazuh Domain - Security Monitoring Platform
 
 *Last Updated: 2025-01-14*
 
-This package contains the domain layer for Delphi, a comprehensive security monitoring and tenant management platform.
+This package contains the domain layer for Wazuh, a comprehensive security monitoring and tenant management platform.
 
 ##  Fixed Issues
 
-The Delphi domain package had compilation errors due to missing entity type definitions. The following issues have been resolved:
+The Wazuh domain package had compilation errors due to missing entity type definitions. The following issues have been resolved:
 
 ###  **Compilation Errors Fixed**
 - **Removed unused import**: Removed unused `"io"` import from interfaces.go
@@ -121,7 +121,7 @@ The entities file provides comprehensive domain models including:
 
 ##  **Security Considerations**
 
-The Delphi domain implements security-first design principles:
+The Wazuh domain implements security-first design principles:
 
 - **Credential Isolation**: Sensitive data types separated from metadata
 - **Audit Logging**: Comprehensive security event tracking

@@ -204,7 +204,7 @@ Fragmented HTTP client implementations with inconsistent security, timeouts, ret
 - **Hetzner API Client**: Bearer token auth with rate limiting
 - **Vault Client**: High-security configuration with TLS 1.3
 - **LLM/AI Services**: Service-specific optimizations and timeouts
-- **Delphi Authentication**: Enhanced TLS and error handling
+- **Wazuh Authentication**: Enhanced TLS and error handling
 
 ### Benefits Achieved
 - **Security Enhancement**: TLS 1.2+ enforcement, proper certificate validation

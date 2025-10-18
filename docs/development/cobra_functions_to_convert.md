@@ -23,13 +23,13 @@ Total functions to convert: 75
 - `newGenerateCredentialsCmd()`
 - `newRevokeCredentialsCmd()`
 
-**delphi.go** (3 functions):
+**wazuh.go** (3 functions):
 - `newDockerDeployCmd()`
 - `newCredentialsCmd()`
 - `newCleanupCmd()`
 
-**delphi_pipeline_webhook.go** (1 function):
-- `NewDelphiWebhookCmd()`
+**wazuh_pipeline_webhook.go** (1 function):
+- `NewWazuhWebhookCmd()`
 
 **hecate_dns.go** (1 function):
 - `NewCreateHetznerWildcardCmd()`
@@ -60,35 +60,35 @@ Total functions to convert: 75
 **containers.go** (1 function):
 - `ListContainers()`
 
-**delphi-servicesstatus.go** (1 function):
+**wazuh-servicesstatus.go** (1 function):
 - `NewStatusCmd()`
 
-**delphi.go** (2 functions):
+**wazuh.go** (2 functions):
 - `CheckPipeline()`
 - `NewConfigCmd()`
 
-**delphi_pipeline_prompts.go** (1 function):
+**wazuh_pipeline_prompts.go** (1 function):
 - `NewValidateCmd()`
 
-**list-delphi-services.go** (1 function):
+**list-wazuh-services.go** (1 function):
 - `NewListCmd()`
 
 ### cmd/read/
 **analyze-ab-results.go** (1 function):
 - `NewAnalyzeABResultsCmd()`
 
-**delphi.go** (3 functions):
+**wazuh.go** (3 functions):
 - `NewInspectCmd()`
 - `NewPipelineFunctionalityCmd()`
 - `NewVerifyPipelineSchemaCmd()`
 
-**delphi_agents.go** (1 function):
+**wazuh_agents.go** (1 function):
 - `NewAgentsCmd()`
 
-**delphi_dashboard.go** (1 function):
+**wazuh_dashboard.go** (1 function):
 - `NewDashboardCmd()`
 
-**monitor-delphi.go** (1 function):
+**monitor-wazuh.go** (1 function):
 - `NewMonitorCmd()`
 
 **pipeline.go** (1 function):

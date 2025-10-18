@@ -3,7 +3,7 @@
 """
 Parser Health Monitoring Dashboard
 Provides real-time monitoring of the prompt-aware parser system
-Aligned with Delphi pipeline architecture v2
+Aligned with Wazuh pipeline architecture v2
 """
 import os
 import sys
@@ -23,7 +23,7 @@ except ImportError:
 
 try:
     from dotenv import load_dotenv
-    load_dotenv("/opt/stackstorm/packs/delphi/.env")
+    load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 except:
     pass
 
@@ -40,7 +40,7 @@ else:
 
 
 class ParserMonitor:
-    """Monitor for the Delphi alert processing pipeline parser phase"""
+    """Monitor for the Wazuh alert processing pipeline parser phase"""
     
     # Pipeline states aligned with actual architecture
     PIPELINE_STATES = {
@@ -246,7 +246,7 @@ class ParserMonitor:
             with conn.cursor() as cur:
                 # Parser mapping aligned with actual implementation
                 parser_mapping = {
-                    'delphi_notify': 'DelphiNotifyParser',
+                    'wazuh_notify': 'WazuhNotifyParser',
                     'isobar': 'ISOBARParser',
                     'security_analysis': 'SecurityIncidentParser',
                     'numbered_investigation': 'NumberedListParser',
@@ -354,7 +354,7 @@ class ParserMonitor:
     def display_dashboard(self):
         """Display complete monitoring dashboard with enhanced metrics"""
         print("\n" + "="*80)
-        print("DELPHI PARSER MONITORING DASHBOARD v2.0")
+        print("WAZUH PARSER MONITORING DASHBOARD v2.0")
         print(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
         print("="*80)
         
@@ -468,7 +468,7 @@ class ParserMonitor:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Monitor Delphi parser health and A/B testing performance',
+        description='Monitor Wazuh parser health and A/B testing performance',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

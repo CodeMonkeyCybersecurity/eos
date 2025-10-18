@@ -2,7 +2,7 @@
 # /usr/local/bin/email-sender.py
 # stanley:stanley 0750
 """
-Email Sender Worker - Final stage of the Delphi pipeline
+Email Sender Worker - Final stage of the Wazuh pipeline
 Sends formatted security alerts via SMTP with intelligent routing
 
 IMPROVEMENTS:
@@ -53,7 +53,7 @@ class SMTPConfig:
     password: str
     use_tls: bool
     from_email: str
-    from_name: str = "Delphi Security Alerts"
+    from_name: str = "Wazuh Security Alerts"
     
     def validate(self) -> List[str]:
         """Validate SMTP configuration"""
@@ -130,7 +130,7 @@ class CircuitBreaker:
 
 # ───── ENVIRONMENT SETUP ─────────────────────────────────
 # Load environment variables with clear naming
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
+load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 
 # Database configuration
 PG_DSN = os.getenv("PG_DSN", "").strip()
@@ -146,7 +146,7 @@ smtp_config = SMTPConfig(
     password=os.getenv("MAILCOW_SMTP_PASS", ""),
     use_tls=os.getenv("MAILCOW_USE_TLS", "true").lower() == "true",
     from_email=os.getenv("MAILCOW_FROM", "alerts@example.com"),
-    from_name=os.getenv("MAILCOW_FROM_NAME", "Delphi Security Alerts")
+    from_name=os.getenv("MAILCOW_FROM_NAME", "Wazuh Security Alerts")
 )
 
 # Validate configuration
@@ -336,7 +336,7 @@ class IntelligentEmailSender:
         if not formatted_data:
             return False, "No formatted data available"
             
-        subject = formatted_data.get('subject', f"Delphi Security Alert - Rule {alert_data.get('rule_id', 'Unknown')}")
+        subject = formatted_data.get('subject', f"Wazuh Security Alert - Rule {alert_data.get('rule_id', 'Unknown')}")
         html_body = formatted_data.get('html_body', '')
         plain_body = formatted_data.get('plain_body', '')
         
@@ -381,7 +381,7 @@ class IntelligentEmailSender:
         
         # Message ID for tracking
         timestamp = int(time.time())
-        msg['Message-ID'] = f"<alert-{alert_data.get('id', 'unknown')}-{timestamp}@delphi.security>"
+        msg['Message-ID'] = f"<alert-{alert_data.get('id', 'unknown')}-{timestamp}@wazuh.security>"
         
         # Add reply-to if support email is configured
         if SUPPORT_EMAIL:

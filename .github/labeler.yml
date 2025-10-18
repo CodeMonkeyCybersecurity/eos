@@ -32,8 +32,8 @@ pkg-vault:
 pkg-kvm:
   - pkg/kvm/**
 
-pkg-delphi:
-  - pkg/delphi/**
+pkg-wazuh:
+  - pkg/wazuh/**
 
 pkg-crypto:
   - pkg/crypto/**

@@ -140,7 +140,7 @@ func installWithPip3(rc *eos_io.RuntimeContext, useBreakSystemPackages bool) err
 	// ASSESS - Get packages to install
 	logger.Info("Assessing pip3 installation requirements")
 
-	packages := GetDelphiPackages()
+	packages := GetWazuhPackages()
 	packageNames := make([]string, len(packages))
 	for i, pkg := range packages {
 		packageNames[i] = pkg.PipName

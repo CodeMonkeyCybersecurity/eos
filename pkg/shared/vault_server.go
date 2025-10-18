@@ -19,23 +19,23 @@ type FallbackCode string
 
 // Vault constants and paths
 const (
-	VaultAddrEnv              = "VAULT_ADDR"
-	VaultCA                   = "VAULT_CACERT"
-	VaultHealthTimeout        = 5 * time.Second
-	TestTimeout               = 500 * time.Millisecond
-	VaultRetryCount           = 5
-	VaultRetryDelay           = 2 * time.Second
-	VaultMaxHealthWait        = 10 * time.Second
-	VaultDefaultTokenTTL      = "4h"
-	VaultDefaultTokenMaxTTL   = "24h"
-	VaultDefaultSecretIDTTL   = "24h"
-	LocalhostSAN              = "127.0.0.1"
+	VaultAddrEnv            = "VAULT_ADDR"
+	VaultCA                 = "VAULT_CACERT"
+	VaultHealthTimeout      = 5 * time.Second
+	TestTimeout             = 500 * time.Millisecond
+	VaultRetryCount         = 5
+	VaultRetryDelay         = 2 * time.Second
+	VaultMaxHealthWait      = 10 * time.Second
+	VaultDefaultTokenTTL    = "4h"
+	VaultDefaultTokenMaxTTL = "24h"
+	VaultDefaultSecretIDTTL = "24h"
+	LocalhostSAN            = "127.0.0.1"
 
 	// === SINGLE SOURCE OF TRUTH: Base Directories ===
-	VaultDir                  = "/opt/vault/"           // Vault data and logs
-	VaultConfigDirDebian      = "/etc/vault.d"          // Vault config directory (all config files derive from this)
-	VaultBinaryPath           = "/usr/bin/vault"        // Vault binary
-	VaultServiceName          = "vault.service"         // Systemd service name
+	VaultDir                  = "/opt/vault/"    // Vault data and logs
+	VaultConfigDirDebian      = "/etc/vault.d"   // Vault config directory (all config files derive from this)
+	VaultBinaryPath           = "/usr/bin/vault" // Vault binary
+	VaultServiceName          = "vault.service"  // Systemd service name
 	VaultConfigFileName       = "config.hcl"
 	EosVaultProfilePath       = "/etc/profile.d/eos_vault.sh"
 	VaultLegacyConfigWildcard = "/etc/vault*"
@@ -71,27 +71,27 @@ var (
 // Computed Vault directory paths - ALL derived from base directories
 var (
 	// Vault data directories (derived from VaultDir)
-	VaultDataPath   = VaultDir + "data/"
-	VaultLogsPath   = VaultDir + "logs/"
+	VaultDataPath     = VaultDir + "data/"
+	VaultLogsPath     = VaultDir + "logs/"
 	VaultAuditLogPath = VaultLogsPath + "vault_audit.log"
 
 	// Vault config paths (derived from VaultConfigDirDebian)
-	VaultConfigPath = filepath.Join(VaultConfigDirDebian, "vault.hcl")
-	TLSDir          = filepath.Join(VaultConfigDirDebian, "tls")
-	TLSCrt          = filepath.Join(TLSDir, "vault.crt")
-	TLSKey          = filepath.Join(TLSDir, "vault.key")
+	VaultConfigPath  = filepath.Join(VaultConfigDirDebian, "vault.hcl")
+	TLSDir           = filepath.Join(VaultConfigDirDebian, "tls")
+	TLSCrt           = filepath.Join(TLSDir, "vault.crt")
+	TLSKey           = filepath.Join(TLSDir, "vault.key")
 	VaultServicePath = "/etc/systemd/system/" + VaultServiceName
 
 	// Eos directories and files
-	EosVarDir                 = "/var/lib/eos/"
-	SecretsDir                = filepath.Join(EosVarDir, "secret")
-	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
-	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
-	EosRunDir                 = "/run/eos"
-	VaultPID                  = filepath.Join(EosRunDir, "vault.pid")
-	VaultTokenSinkPath        = filepath.Join(EosRunDir, ".vault-token")
-	VaultHealthEndpoint       = fmt.Sprintf("https://%s/v1/sys/health", strings.Split(ListenerAddr, ":")[0])
-	VaultClient               *api.Client
+	EosVarDir                = "/var/lib/eos/"
+	SecretsDir               = filepath.Join(EosVarDir, "secret")
+	VaultInitPath            = filepath.Join(SecretsDir, "vault_init.json")
+	WazuhFallbackSecretsPath = filepath.Join(SecretsDir, "wazuh_fallback.json")
+	EosRunDir                = "/run/eos"
+	VaultPID                 = filepath.Join(EosRunDir, "vault.pid")
+	VaultTokenSinkPath       = filepath.Join(EosRunDir, ".vault-token")
+	VaultHealthEndpoint      = fmt.Sprintf("https://%s/v1/sys/health", strings.Split(ListenerAddr, ":")[0])
+	VaultClient              *api.Client
 )
 
 // GetVaultAddr returns VAULT_ADDR or falls back to localhost
@@ -441,7 +441,7 @@ func RenderVaultConfigRaft(params VaultConfigParams) (string, error) {
 	if params.LogFormat == "" {
 		params.LogFormat = "json"
 	}
-	
+
 	// Choose template based on deployment type
 	var templateStr string
 	if len(params.RetryJoinNodes) > 0 {
@@ -451,18 +451,18 @@ func RenderVaultConfigRaft(params VaultConfigParams) (string, error) {
 		// Single-node development
 		templateStr = vaultConfigTemplateRaftSingleNode
 	}
-	
+
 	tmpl, err := template.New("vaultConfigRaft").Parse(templateStr)
 	if err != nil {
 		return "", fmt.Errorf("parse template: %w", err)
 	}
-	
+
 	var rendered bytes.Buffer
 	err = tmpl.Execute(&rendered, params)
 	if err != nil {
 		return "", fmt.Errorf("execute template: %w", err)
 	}
-	
+
 	return rendered.String(), nil
 }
 

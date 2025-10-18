@@ -103,7 +103,7 @@ echo " Phase 1: Critical System Tests"
 echo "### Phase 1: Critical System Tests" >> "${REPORT_FILE}"
 
 run_fuzz_test "FuzzAllEosCommands" "./test" "${FUZZTIME_LONG}" "critical"
-run_fuzz_test "FuzzDelphiServicesCommands" "./test" "${FUZZTIME_LONG}" "critical"
+run_fuzz_test "FuzzWazuhServicesCommands" "./test" "${FUZZTIME_LONG}" "critical"
 
 # Phase 2: Security-Focused Tests
 echo "🛡️ Phase 2: Security-Focused Tests"
@@ -118,8 +118,8 @@ run_fuzz_test "FuzzInjectSecretsFromPlaceholders" "./pkg/crypto" "${FUZZTIME_MED
 echo " Phase 3: Command Processing Tests"
 echo -e "\n### Phase 3: Command Processing Tests" >> "${REPORT_FILE}"
 
-run_fuzz_test "FuzzUpdateCommand" "./cmd/delphi/services" "${FUZZTIME_MEDIUM}" "high"
-run_fuzz_test "FuzzServiceWorkerPaths" "./cmd/delphi/services" "${FUZZTIME_SHORT}" "medium"
+run_fuzz_test "FuzzUpdateCommand" "./cmd/wazuh/services" "${FUZZTIME_MEDIUM}" "high"
+run_fuzz_test "FuzzServiceWorkerPaths" "./cmd/wazuh/services" "${FUZZTIME_SHORT}" "medium"
 run_fuzz_test "FuzzCommandParsing" "./pkg/eos_cli" "${FUZZTIME_SHORT}" "medium"
 run_fuzz_test "FuzzEosCommandFlags" "./test" "${FUZZTIME_SHORT}" "medium"
 

@@ -34,12 +34,12 @@ Subcommands:
 - status: Show Vault connection status and available secrets
 
 The configuration will be guided and interactive, ensuring proper setup
-of Vault integration for services like the Delphi dashboard.
+of Vault integration for services like the Wazuh dashboard.
 
 Examples:
   eos self secrets configure           # Interactive Vault setup
   eos self secrets test               # Test Vault connection
-  eos self secrets set delphi-db     # Set database credentials
+  eos self secrets set wazuh-db     # Set database credentials
   eos self secrets status            # Show configuration status`,
 	Aliases: []string{"vault", "creds"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -60,7 +60,7 @@ This will guide you through setting up:
 - Initial secret paths setup
 
 The configuration will be stored securely and used by all Eos services
-that require access to secrets, including the Delphi dashboard.`,
+that require access to secrets, including the Wazuh dashboard.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info("Starting Vault configuration setup")
@@ -155,8 +155,8 @@ that require access to secrets, including the Delphi dashboard.`,
 		logger.Info("terminal prompt:  Vault configuration saved successfully")
 		logger.Info("terminal prompt: Next steps:")
 		logger.Info("terminal prompt: - Test the configuration: eos self secrets test")
-		logger.Info("terminal prompt: - Set database credentials: eos self secrets set delphi-db")
-		logger.Info("terminal prompt: - Run the dashboard: eos delphi dashboard")
+		logger.Info("terminal prompt: - Set database credentials: eos self secrets set wazuh-db")
+		logger.Info("terminal prompt: - Run the dashboard: eos wazuh dashboard")
 
 		logger.Info("Vault configuration completed successfully")
 		return nil
@@ -169,21 +169,21 @@ var SecretsSetCmd = &cobra.Command{
 	Long: `Store secrets in Vault for use by Eos services.
 
 Available secret types:
-- delphi-db: Database credentials for Delphi pipeline (static)
-- delphi-db-config: Database connection configuration (host, port, database name)
-- delphi-db-engine: Configure Vault database secrets engine for dynamic credentials
+- wazuh-db: Database credentials for Wazuh pipeline (static)
+- wazuh-db-config: Database connection configuration (host, port, database name)
+- wazuh-db-engine: Configure Vault database secrets engine for dynamic credentials
 - smtp: SMTP credentials for email services
 - openai: OpenAI API keys for LLM services
 - custom: Custom key-value pairs
 
 Examples:
-  eos self secrets set delphi-db         # Set static database credentials
-  eos self secrets set delphi-db-config  # Set database connection parameters
-  eos self secrets set delphi-db-engine  # Configure dynamic database engine
+  eos self secrets set wazuh-db         # Set static database credentials
+  eos self secrets set wazuh-db-config  # Set database connection parameters
+  eos self secrets set wazuh-db-engine  # Configure dynamic database engine
   eos self secrets set smtp              # Set SMTP credentials  
   eos self secrets set openai            # Set OpenAI API key`,
 	Args:      cobra.ExactArgs(1),
-	ValidArgs: []string{"delphi-db", "delphi-db-config", "delphi-db-engine", "smtp", "openai", "custom"},
+	ValidArgs: []string{"wazuh-db", "wazuh-db-config", "wazuh-db-engine", "smtp", "openai", "custom"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		secretName := args[0]
@@ -201,11 +201,11 @@ Examples:
 		}
 
 		switch secretName {
-		case "delphi-db":
+		case "wazuh-db":
 			return secrets.SetDatabaseCredentials(rc, facade)
-		case "delphi-db-config":
+		case "wazuh-db-config":
 			return secrets.SetDatabaseConfig(rc, facade)
-		case "delphi-db-engine":
+		case "wazuh-db-engine":
 			return secrets.SetDatabaseEngine(rc, facade)
 		case "smtp":
 			return fmt.Errorf("smtp secrets not yet migrated - use legacy version")
@@ -260,7 +260,7 @@ This command will:
 		}
 
 		// Try to read a test secret using the simplified facade
-		testPath := "secret/data/delphi/database/username"
+		testPath := "secret/data/wazuh/database/username"
 		_, err := facade.RetrieveSecret(rc.Ctx, testPath)
 		if err != nil {
 			logger.Info("terminal prompt:   Secret access test failed", zap.Error(err))
@@ -318,18 +318,18 @@ Shows:
 		if facade != nil {
 			// Check for common secrets using simplified facade
 			staticSecrets := []string{
-				"secret/data/delphi/database/username",
-				"secret/data/delphi/database/password",
-				"secret/data/delphi/database/host",
+				"secret/data/wazuh/database/username",
+				"secret/data/wazuh/database/password",
+				"secret/data/wazuh/database/host",
 				"secret/data/smtp/username",
 				"secret/data/smtp/password",
 				"secret/data/openai/api_key",
 			}
 
 			configSecrets := []string{
-				"secret/data/delphi/config/host",
-				"secret/data/delphi/config/port",
-				"secret/data/delphi/config/database",
+				"secret/data/wazuh/config/host",
+				"secret/data/wazuh/config/port",
+				"secret/data/wazuh/config/database",
 			}
 
 			logger.Info("terminal prompt: Static Credentials:")
@@ -354,19 +354,19 @@ Shows:
 
 			logger.Info("terminal prompt: Dynamic Database Engine:")
 			// Test if dynamic credentials are available
-			_, err := facade.RetrieveSecret(rc.Ctx, "database/creds/delphi-readonly")
+			_, err := facade.RetrieveSecret(rc.Ctx, "database/creds/wazuh-readonly")
 			if err != nil {
-				logger.Info("terminal prompt:     database/creds/delphi-readonly (not configured)")
-				logger.Info("terminal prompt:     Run: eos self secrets set delphi-db-engine")
+				logger.Info("terminal prompt:     database/creds/wazuh-readonly (not configured)")
+				logger.Info("terminal prompt:     Run: eos self secrets set wazuh-db-engine")
 			} else {
-				logger.Info("terminal prompt:     database/creds/delphi-readonly (dynamic credentials available)")
+				logger.Info("terminal prompt:     database/creds/wazuh-readonly (dynamic credentials available)")
 			}
 		}
 
 		logger.Info("terminal prompt: Commands:")
-		logger.Info("terminal prompt: - Set static database credentials: eos self secrets set delphi-db")
-		logger.Info("terminal prompt: - Set database configuration: eos self secrets set delphi-db-config")
-		logger.Info("terminal prompt: - Setup dynamic credentials: eos self secrets set delphi-db-engine")
+		logger.Info("terminal prompt: - Set static database credentials: eos self secrets set wazuh-db")
+		logger.Info("terminal prompt: - Set database configuration: eos self secrets set wazuh-db-config")
+		logger.Info("terminal prompt: - Setup dynamic credentials: eos self secrets set wazuh-db-engine")
 		logger.Info("terminal prompt: - Test connectivity: eos self secrets test")
 
 		return nil
@@ -379,8 +379,8 @@ var SecretsGetCmd = &cobra.Command{
 	Long: `Retrieve and display secrets from Vault.
 
 Examples:
-  eos self secrets get delphi/database/username
-  eos self secrets get delphi/database/password --show-value
+  eos self secrets get wazuh/database/username
+  eos self secrets get wazuh/database/password --show-value
   eos self secrets get openai/api_key`,
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

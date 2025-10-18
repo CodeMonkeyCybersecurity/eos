@@ -34,12 +34,12 @@ func InitFallback()
 **Log Format Examples:**
 ```bash
 # Console output (human-readable)
-INFO  Checking Delphi services status
-WARN Service unit file not found {"service": "delphi-listener"}
+INFO  Checking Wazuh services status
+WARN Service unit file not found {"service": "wazuh-listener"}
 
 # File output (JSON structured)
-{"level":"INFO","ts":"2024-06-23T10:30:00.000Z","msg":" Checking Delphi services status"}
-{"level":"WARN","ts":"2024-06-23T10:30:01.000Z","msg":"Service unit file not found","service":"delphi-listener"}
+{"level":"INFO","ts":"2024-06-23T10:30:00.000Z","msg":" Checking Wazuh services status"}
+{"level":"WARN","ts":"2024-06-23T10:30:01.000Z","msg":"Service unit file not found","service":"wazuh-listener"}
 ```
 
 #### Configuration Management (`config.go`)

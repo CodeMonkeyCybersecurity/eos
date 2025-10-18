@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# /usr/local/bin/delphi-agent-enricher.py
+# /usr/local/bin/wazuh-agent-enricher.py
 """
-Delphi Agent Enricher - Phase 2 of Alert Processing Pipeline
+Wazuh Agent Enricher - Phase 2 of Alert Processing Pipeline
 
 This worker enriches new alerts with agent context from Wazuh API.
 It listens for 'new_alert' notifications and transitions alerts to 'enriched' state.
@@ -24,7 +24,7 @@ from functools import lru_cache
 # Import environment variables
 try:
     from dotenv import load_dotenv
-    load_dotenv("/opt/stackstorm/packs/delphi/.env")
+    load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 except ImportError:
     pass  # Optional dependency
 
@@ -33,7 +33,7 @@ PG_DSN = os.getenv("PG_DSN")
 if not PG_DSN:
     raise ValueError("PG_DSN environment variable not set")
 
-WAZUH_API_URL = os.getenv("WAZUH_API_URL", "https://delphi.cybermonkey.net.au:55000")
+WAZUH_API_URL = os.getenv("WAZUH_API_URL", "https://wazuh.cybermonkey.net.au:55000")
 WAZUH_API_USER = os.getenv("WAZUH_API_USER")
 WAZUH_API_PASSWD = os.getenv("WAZUH_API_PASSWD")
 
@@ -86,7 +86,7 @@ class AgentEnricher:
         
     def _setup_logging(self) -> logging.Logger:
         """Configure logging with rotation"""
-        logger = logging.getLogger("delphi-agent-enricher")
+        logger = logging.getLogger("wazuh-agent-enricher")
         logger.setLevel(logging.INFO)
         
         # Ensure log directory exists
@@ -95,7 +95,7 @@ class AgentEnricher:
         
         # File handler with rotation
         file_handler = RotatingFileHandler(
-            os.path.join(log_dir, "delphi-agent-enricher.log"),
+            os.path.join(log_dir, "wazuh-agent-enricher.log"),
             maxBytes=10 * 1024 * 1024,  # 10MB
             backupCount=5
         )

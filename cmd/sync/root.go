@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	syncDryRun        bool
-	syncForce         bool
-	syncSkipBackup    bool
+	syncDryRun          bool
+	syncForce           bool
+	syncSkipBackup      bool
 	syncSkipHealthCheck bool
 )
 
@@ -130,12 +130,12 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	// Create sync config
 	config := &sync.SyncConfig{
-		Service1:          service1,
-		Service2:          service2,
-		DryRun:            syncDryRun,
-		Force:             syncForce,
-		SkipBackup:        syncSkipBackup,
-		SkipHealthCheck:   syncSkipHealthCheck,
+		Service1:        service1,
+		Service2:        service2,
+		DryRun:          syncDryRun,
+		Force:           syncForce,
+		SkipBackup:      syncSkipBackup,
+		SkipHealthCheck: syncSkipHealthCheck,
 	}
 
 	// Execute sync
@@ -163,8 +163,9 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 // by sorting services alphabetically. This allows order-independent lookup.
 //
 // Examples:
-//   normalizeServicePair("consul", "vault") -> "consul-vault"
-//   normalizeServicePair("vault", "consul") -> "consul-vault"
+//
+//	normalizeServicePair("consul", "vault") -> "consul-vault"
+//	normalizeServicePair("vault", "consul") -> "consul-vault"
 func normalizeServicePair(service1, service2 string) string {
 	services := []string{service1, service2}
 	sort.Strings(services)

@@ -128,13 +128,13 @@ eos create container --name web --image ubuntu:22.04 --port 80:8080
 **Scripts to Migrate**:
 - `deployClamAV.py` - Antivirus deployment
 - `installGrafana.py`, `installLokiDocker.sh` - Monitoring stack
-- `delphi/` scripts (4 files) - Enhanced Wazuh/Delphi operations
+- `wazuh/` scripts (4 files) - Enhanced Wazuh/Wazuh operations
 
 **Proposed Commands**:
 ```bash
 eos create antivirus --type clamav --auto-update
 eos create monitoring --stack prometheus-grafana-loki
-eos delphi enhanced --cluster-mode --backup-enabled
+eos wazuh enhanced --cluster-mode --backup-enabled
 ```
 
 #### Network Services Extension (`pkg/network`)

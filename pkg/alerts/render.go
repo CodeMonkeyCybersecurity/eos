@@ -109,7 +109,7 @@ func RenderEmail(a Alert) (Rendered, error) {
 
 func buildMime(from mail.Address, to []mail.Address, subj, txt, html string) []byte {
 	var buf bytes.Buffer
-	boundary := fmt.Sprintf("delphi-%d", time.Now().UnixNano())
+	boundary := fmt.Sprintf("wazuh-%d", time.Now().UnixNano())
 	_, _ = fmt.Fprintf(&buf, "From: %s\r\n", from.String())
 	_, _ = fmt.Fprintf(&buf, "To: %s\r\n", to[0].String())
 	_, _ = fmt.Fprintf(&buf, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subj))

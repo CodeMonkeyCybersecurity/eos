@@ -1,4 +1,4 @@
-// pkg/shared/delphi_services_test.go
+// pkg/shared/wazuh_services_test.go
 
 package shared
 
@@ -8,23 +8,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDelphiServiceRegistry_GetService(t *testing.T) {
-	registry := GetDelphiServiceRegistry()
+func TestWazuhServiceRegistry_GetService(t *testing.T) {
+	registry := GetWazuhServiceRegistry()
 
 	tests := []struct {
 		name            string
 		serviceName     string
 		shouldExist     bool
-		expectedService DelphiServiceDefinition
+		expectedService WazuhServiceDefinition
 	}{
 		{
-			name:        "get delphi-listener service",
-			serviceName: "delphi-listener",
+			name:        "get wazuh-listener service",
+			serviceName: "wazuh-listener",
 			shouldExist: true,
-			expectedService: DelphiServiceDefinition{
-				Name:          "delphi-listener",
-				WorkerScript:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
-				ServiceFile:   "/etc/systemd/system/delphi-listener.service",
+			expectedService: WazuhServiceDefinition{
+				Name:          "wazuh-listener",
+				WorkerScript:  "/opt/stackstorm/packs/wazuh/wazuh-listener.py",
+				ServiceFile:   "/etc/systemd/system/wazuh-listener.service",
 				Description:   "Webhook listener for Wazuh alerts - Pipeline entry point (includes alert-to-db dependency)",
 				PipelineStage: "ingestion",
 				User:          "stanley",
@@ -33,20 +33,20 @@ func TestDelphiServiceRegistry_GetService(t *testing.T) {
 			},
 		},
 		{
-			name:        "get alert-to-db service (merged into delphi-listener)",
+			name:        "get alert-to-db service (merged into wazuh-listener)",
 			serviceName: "alert-to-db",
-			shouldExist: false, // Service was consolidated into delphi-listener
+			shouldExist: false, // Service was consolidated into wazuh-listener
 		},
 		{
 			name:        "get prompt-ab-tester service",
 			serviceName: "prompt-ab-tester",
 			shouldExist: true,
-			expectedService: DelphiServiceDefinition{
+			expectedService: WazuhServiceDefinition{
 				Name:          "prompt-ab-tester",
 				WorkerScript:  "/usr/local/bin/prompt-ab-tester.py",
 				ServiceFile:   "/etc/systemd/system/prompt-ab-tester.service",
 				Description:   "A/B testing coordinator for prompt optimization - Assigns prompt variants and tracks experiments",
-				PipelineStage: "analysis", 
+				PipelineStage: "analysis",
 				User:          "stanley",
 				Group:         "stanley",
 				Permissions:   "0750",
@@ -90,8 +90,8 @@ func TestDelphiServiceRegistry_GetService(t *testing.T) {
 	}
 }
 
-func TestDelphiServiceRegistry_GetActiveServices(t *testing.T) {
-	registry := GetDelphiServiceRegistry()
+func TestWazuhServiceRegistry_GetActiveServices(t *testing.T) {
+	registry := GetWazuhServiceRegistry()
 
 	services := registry.GetActiveServices()
 
@@ -99,18 +99,18 @@ func TestDelphiServiceRegistry_GetActiveServices(t *testing.T) {
 	assert.NotEmpty(t, services)
 
 	// Convert to map for easier testing
-	serviceMap := make(map[string]DelphiServiceDefinition)
+	serviceMap := make(map[string]WazuhServiceDefinition)
 	for _, service := range services {
 		serviceMap[service.Name] = service
 	}
 
 	// Check that critical services from the crash are present
 	criticalServices := []string{
-		"delphi-listener",
-		"delphi-agent-enricher", 
+		"wazuh-listener",
+		"wazuh-agent-enricher",
 		"prompt-ab-tester",
 		"llm-worker",
-		"delphi-emailer",
+		"wazuh-emailer",
 	}
 
 	for _, serviceName := range criticalServices {
@@ -133,8 +133,8 @@ func TestDelphiServiceRegistry_GetActiveServices(t *testing.T) {
 	}
 }
 
-func TestDelphiServiceRegistry_GetActiveServiceNames(t *testing.T) {
-	registry := GetDelphiServiceRegistry()
+func TestWazuhServiceRegistry_GetActiveServiceNames(t *testing.T) {
+	registry := GetWazuhServiceRegistry()
 
 	serviceNames := registry.GetActiveServiceNames()
 
@@ -161,8 +161,8 @@ func TestDelphiServiceRegistry_GetActiveServiceNames(t *testing.T) {
 	}
 }
 
-func TestDelphiServiceRegistry_ValidateService(t *testing.T) {
-	registry := GetDelphiServiceRegistry()
+func TestWazuhServiceRegistry_ValidateService(t *testing.T) {
+	registry := GetWazuhServiceRegistry()
 
 	tests := []struct {
 		name        string
@@ -171,8 +171,8 @@ func TestDelphiServiceRegistry_ValidateService(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name:        "valid service - delphi-listener",
-			serviceName: "delphi-listener",
+			name:        "valid service - wazuh-listener",
+			serviceName: "wazuh-listener",
 			expectError: false,
 		},
 		{
@@ -215,8 +215,8 @@ func TestDelphiServiceRegistry_ValidateService(t *testing.T) {
 	}
 }
 
-func TestDelphiServiceRegistry_GetPipelineOrder(t *testing.T) {
-	registry := GetDelphiServiceRegistry()
+func TestWazuhServiceRegistry_GetPipelineOrder(t *testing.T) {
+	registry := GetWazuhServiceRegistry()
 
 	pipelineOrder := registry.GetPipelineOrder()
 
@@ -245,8 +245,8 @@ func TestDelphiServiceRegistry_GetPipelineOrder(t *testing.T) {
 	}
 }
 
-func TestDelphiServiceRegistry_GetServicePipelineStage(t *testing.T) {
-	registry := GetDelphiServiceRegistry()
+func TestWazuhServiceRegistry_GetServicePipelineStage(t *testing.T) {
+	registry := GetWazuhServiceRegistry()
 
 	tests := []struct {
 		name          string
@@ -255,8 +255,8 @@ func TestDelphiServiceRegistry_GetServicePipelineStage(t *testing.T) {
 		shouldExist   bool
 	}{
 		{
-			name:          "delphi-listener stage",
-			serviceName:   "delphi-listener",
+			name:          "wazuh-listener stage",
+			serviceName:   "wazuh-listener",
 			expectedStage: "ingestion",
 			shouldExist:   true,
 		},
@@ -264,7 +264,7 @@ func TestDelphiServiceRegistry_GetServicePipelineStage(t *testing.T) {
 			name:          "alert-to-db stage (service merged)",
 			serviceName:   "alert-to-db",
 			expectedStage: "",
-			shouldExist:   false, // Service was consolidated into delphi-listener
+			shouldExist:   false, // Service was consolidated into wazuh-listener
 		},
 		{
 			name:          "prompt-ab-tester stage",
@@ -322,8 +322,8 @@ func TestServiceCategory(t *testing.T) {
 	assert.Equal(t, "deprecated", string(CategoryDeprecated))
 }
 
-func TestDelphiServiceDefinition_Structure(t *testing.T) {
-	registry := GetDelphiServiceRegistry()
+func TestWazuhServiceDefinition_Structure(t *testing.T) {
+	registry := GetWazuhServiceRegistry()
 	services := registry.GetActiveServices()
 
 	for _, service := range services {
@@ -381,8 +381,8 @@ func TestDelphiServiceDefinition_Structure(t *testing.T) {
 
 func TestGlobalServiceRegistryConsistency(t *testing.T) {
 	// Test that the global registry functions return consistent data
-	globalRegistry := GetGlobalDelphiServiceRegistry()
-	newRegistry := GetDelphiServiceRegistry()
+	globalRegistry := GetGlobalWazuhServiceRegistry()
+	newRegistry := GetWazuhServiceRegistry()
 
 	// Both should return the same services
 	globalServices := globalRegistry.GetActiveServices()
@@ -391,8 +391,8 @@ func TestGlobalServiceRegistryConsistency(t *testing.T) {
 	assert.Equal(t, len(globalServices), len(newServices))
 
 	// Convert to maps for comparison
-	globalMap := make(map[string]DelphiServiceDefinition)
-	newMap := make(map[string]DelphiServiceDefinition)
+	globalMap := make(map[string]WazuhServiceDefinition)
+	newMap := make(map[string]WazuhServiceDefinition)
 
 	for _, service := range globalServices {
 		globalMap[service.Name] = service
@@ -418,7 +418,7 @@ func TestGlobalServiceRegistryConsistency(t *testing.T) {
 
 // Benchmark service registry operations
 func BenchmarkGetActiveServices(b *testing.B) {
-	registry := GetDelphiServiceRegistry()
+	registry := GetWazuhServiceRegistry()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -427,19 +427,19 @@ func BenchmarkGetActiveServices(b *testing.B) {
 }
 
 func BenchmarkGetService(b *testing.B) {
-	registry := GetDelphiServiceRegistry()
+	registry := GetWazuhServiceRegistry()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = registry.GetService("delphi-listener")
+		_, _ = registry.GetService("wazuh-listener")
 	}
 }
 
 func BenchmarkValidateService(b *testing.B) {
-	registry := GetDelphiServiceRegistry()
+	registry := GetWazuhServiceRegistry()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = registry.ValidateService("delphi-listener")
+		_ = registry.ValidateService("wazuh-listener")
 	}
 }

@@ -23,7 +23,7 @@ func TestRunWithSizingChecks(t *testing.T) {
 			deploymentRan = true
 			return nil
 		})
-		
+
 		// In test environment, this may pass if system has enough resources
 		// or fail if user input is required (no TTY in test)
 		if err != nil {
@@ -42,7 +42,7 @@ func TestRunWithSizingChecks(t *testing.T) {
 			deploymentRan = true
 			return nil
 		})
-		
+
 		assert.NoError(t, err)
 		assert.True(t, deploymentRan) // Should run without sizing checks
 	})
@@ -61,7 +61,7 @@ func TestRunWithSizingChecks(t *testing.T) {
 			deploymentRan = true
 			return nil
 		})
-		
+
 		assert.NoError(t, err)
 		assert.True(t, deploymentRan) // Should run since preflight is skipped
 	})
@@ -104,7 +104,7 @@ func TestCommandServiceMappings(t *testing.T) {
 		{"postgres", ServiceTypeDatabase, 0},
 		{"grafana", ServiceTypeMonitoring, 1},
 		{"hecate", ServiceTypeProxy, 1},
-		{"delphi", ServiceTypeMonitoring, 2},
+		{"wazuh", ServiceTypeMonitoring, 2},
 	}
 
 	for _, tc := range testCases {
@@ -120,7 +120,7 @@ func TestCommandServiceMappings(t *testing.T) {
 func TestRegisterServiceMapping(t *testing.T) {
 	// Test registering a new mapping
 	customMapping := ServiceMapping{
-		ServiceType: ServiceTypeWebServer,
+		ServiceType:     ServiceTypeWebServer,
 		RelatedServices: []ServiceType{ServiceTypeCache},
 	}
 

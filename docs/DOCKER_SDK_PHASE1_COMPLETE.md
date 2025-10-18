@@ -188,7 +188,7 @@ All files compile without errors and integrate with existing types.
 Priority files with most shell command usage:
 - `pkg/hecate/update.go` (7 matches)
 - `pkg/build/builder.go` (6 matches)
-- `pkg/delphi/docker/deployment.go` (6 matches)
+- `pkg/wazuh/docker/deployment.go` (6 matches)
 - `pkg/container_management/containers.go` (4 matches)
 
 ## Reference Implementation

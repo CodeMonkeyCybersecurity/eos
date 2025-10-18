@@ -159,7 +159,7 @@ func TestCrossPackageSecurity(t *testing.T) {
 
 2. **Continue Coverage Improvements**:
    - Target remaining 0% coverage packages
-   - Focus on pkg/database, pkg/delphi, pkg/kvm
+   - Focus on pkg/database, pkg/wazuh, pkg/kvm
    - Aim for 80%+ coverage in all packages
 
 3. **CI/CD Integration**:

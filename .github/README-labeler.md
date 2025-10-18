@@ -36,7 +36,7 @@ Based on `.github/labeler.yml`, PRs are automatically labeled for:
 - `pkg-crypto` - Cryptographic functions  
 - `pkg-container` - Docker/container management
 - `pkg-hecate` - Hecate reverse proxy/mail server
-- `pkg-delphi` - Delphi monitoring platform
+- `pkg-wazuh` - Wazuh monitoring platform
 - `pkg-ldap` - LDAP directory services
 - `pkg-other` - Other package changes
 

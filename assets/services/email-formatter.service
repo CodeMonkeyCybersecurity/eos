@@ -1,6 +1,6 @@
 [Unit]
-Description=Delphi Email Formatter Worker
-Documentation=https://wiki.cybermonkey.net.au/delphi/email-formatter
+Description=Wazuh Email Formatter Worker
+Documentation=https://wiki.cybermonkey.net.au/wazuh/email-formatter
 After=network.target postgresql.service email-structurer.service
 Wants=postgresql.service
 Requires=network.target
@@ -9,20 +9,20 @@ Requires=network.target
 Type=notify
 User=stanley
 Group=stanley
-WorkingDirectory=/opt/stackstorm/packs/delphi
+WorkingDirectory=/opt/stackstorm/packs/wazuh
 
 # Main executable
 ExecStart=/usr/local/bin/email-formatter.py
 
 # Environment configuration
-Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/delphi"
+Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/wazuh"
 Environment="PYTHONUNBUFFERED=1"
-EnvironmentFile=-/opt/stackstorm/packs/delphi/.env
+EnvironmentFile=-/opt/stackstorm/packs/wazuh/.env
 
 # Email formatter specific configuration
-Environment="DELPHI_EMAIL_TEMPLATE_TYPE=file"
-Environment="DELPHI_EMAIL_TEMPLATE_PATH=/opt/stackstorm/packs/delphi/email.html"
-Environment="DELPHI_TIMEZONE=Australia/Perth"
+Environment="WAZUH_EMAIL_TEMPLATE_TYPE=file"
+Environment="WAZUH_EMAIL_TEMPLATE_PATH=/opt/stackstorm/packs/wazuh/email.html"
+Environment="WAZUH_TIMEZONE=Australia/Perth"
 Environment="SUPPORT_EMAIL=support@cybermonkey.net.au"
 
 # Logging configuration
@@ -44,7 +44,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/stackstorm /opt/stackstorm/packs/delphi /tmp
+ReadWritePaths=/var/log/stackstorm /opt/stackstorm/packs/wazuh /tmp
 
 # Monitoring and health checks
 TimeoutStartSec=30
@@ -58,7 +58,7 @@ SyslogIdentifier=email-formatter
 
 [Install]
 WantedBy=multi-user.target
-Alias=delphi-email-formatter.service
+Alias=wazuh-email-formatter.service
 
 # Service management commands:
 # sudo systemctl enable email-formatter.service

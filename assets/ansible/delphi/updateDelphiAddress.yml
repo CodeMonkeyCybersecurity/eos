@@ -5,15 +5,15 @@
   tasks:
 
     - name: Check if the old Wazuh address exists in ossec.conf
-      shell: "grep -q '<address>delphi.cybermonkey.sh</address>' /var/ossec/etc/ossec.conf"
+      shell: "grep -q '<address>wazuh.cybermonkey.sh</address>' /var/ossec/etc/ossec.conf"
       register: check_address
       ignore_errors: yes
 
     - name: Replace the old address with the new address in ossec.conf
       replace:
         path: /var/ossec/etc/ossec.conf
-        regexp: '<address>delphi\.domain\.com</address>'
-        replace: '<address>delphi.domain.com</address>'
+        regexp: '<address>wazuh\.domain\.com</address>'
+        replace: '<address>wazuh.domain.com</address>'
         backup: yes
       when: check_address.rc == 0
 

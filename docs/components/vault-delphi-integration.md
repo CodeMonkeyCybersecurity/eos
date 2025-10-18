@@ -1,17 +1,17 @@
-# Vault Integration for Delphi Dashboard
+# Vault Integration for Wazuh Dashboard
 
 *Last Updated: 2025-01-14*
 
 ## Overview
 
-The Eos Delphi dashboard now supports secure credential management through HashiCorp Vault integration. This ensures that database passwords and other sensitive configuration data are stored securely and retrieved dynamically, rather than being hardcoded or stored in environment files.
+The Eos Wazuh dashboard now supports secure credential management through HashiCorp Vault integration. This ensures that database passwords and other sensitive configuration data are stored securely and retrieved dynamically, rather than being hardcoded or stored in environment files.
 
 ## Quick Setup
 
 ### Option 1: Automated Setup (Recommended)
 ```bash
 # Run the setup script for guided configuration
-sudo /opt/eos/scripts/setup-vault-delphi.sh
+sudo /opt/eos/scripts/setup-vault-wazuh.sh
 ```
 
 ### Option 2: Manual Setup
@@ -20,13 +20,13 @@ sudo /opt/eos/scripts/setup-vault-delphi.sh
 eos self secrets configure
 
 # 2. Set database credentials
-eos self secrets set delphi-db
+eos self secrets set wazuh-db
 
 # 3. Test the configuration
 eos self secrets test
 
 # 4. Launch the dashboard
-eos delphi dashboard
+eos wazuh dashboard
 ```
 
 ## Detailed Configuration
@@ -48,17 +48,17 @@ This interactive command will prompt you for:
 
 ### Step 2: Database Credentials
 
-Store your Delphi database credentials securely in Vault:
+Store your Wazuh database credentials securely in Vault:
 
 ```bash
-eos self secrets set delphi-db
+eos self secrets set wazuh-db
 ```
 
 You'll be prompted for:
 - Database host (default: localhost)
 - Database port (default: 5432)
-- Database name (default: delphi)
-- Database username (default: delphi)
+- Database name (default: wazuh)
+- Database username (default: wazuh)
 - Database password (secure input)
 
 ### Step 3: Verification
@@ -73,7 +73,7 @@ eos self secrets test
 eos self secrets status
 
 # Verify specific secrets (without showing values)
-eos self secrets get delphi/database/username
+eos self secrets get wazuh/database/username
 ```
 
 ## Usage
@@ -83,7 +83,7 @@ eos self secrets get delphi/database/username
 Once configured, simply run:
 
 ```bash
-eos delphi dashboard
+eos wazuh dashboard
 ```
 
 The dashboard will automatically:
@@ -101,7 +101,7 @@ eos self secrets status
 
 #### Update Database Credentials
 ```bash
-eos self secrets set delphi-db
+eos self secrets set wazuh-db
 ```
 
 #### Set Additional Secrets
@@ -119,10 +119,10 @@ eos self secrets set custom
 #### Retrieve Secrets
 ```bash
 # Show masked values
-eos self secrets get delphi/database/username
+eos self secrets get wazuh/database/username
 
 # Show actual values (use with caution)
-eos self secrets get delphi/database/password --show-value
+eos self secrets get wazuh/database/password --show-value
 ```
 
 ## Authentication Methods
@@ -162,11 +162,11 @@ eos self secrets configure
 Secrets are stored in Vault with the following paths:
 
 ### Database Credentials
-- `delphi/database/host` - Database server hostname
-- `delphi/database/port` - Database port (usually 5432)
-- `delphi/database/name` - Database name (usually delphi)
-- `delphi/database/username` - Database username
-- `delphi/database/password` - Database password
+- `wazuh/database/host` - Database server hostname
+- `wazuh/database/port` - Database port (usually 5432)
+- `wazuh/database/name` - Database name (usually wazuh)
+- `wazuh/database/username` - Database username
+- `wazuh/database/password` - Database password
 
 ### SMTP Configuration
 - `smtp/host` - SMTP server hostname
@@ -193,13 +193,13 @@ curl -k https://vhost11:8200/v1/sys/health
 eos self secrets configure
 ```
 
-**Error**: `password authentication failed for user "delphi"`
+**Error**: `password authentication failed for user "wazuh"`
 ```bash
 # Check if credentials are set in Vault
 eos self secrets status
 
 # Reconfigure database credentials
-eos self secrets set delphi-db
+eos self secrets set wazuh-db
 
 # Test Vault connectivity
 eos self secrets test
@@ -239,14 +239,14 @@ vault policy read myPolicy  # check your policy permissions
 sudo systemctl status postgresql
 
 # Check database connectivity
-psql -h localhost -U delphi -d delphi
+psql -h localhost -U wazuh -d wazuh
 
 # Verify credentials in Vault
-eos self secrets get delphi/database/username
-eos self secrets get delphi/database/host
+eos self secrets get wazuh/database/username
+eos self secrets get wazuh/database/host
 
 # Test with correct credentials
-eos self secrets set delphi-db
+eos self secrets set wazuh-db
 ```
 
 ## Fallback Behavior
@@ -255,14 +255,14 @@ If Vault is unavailable, the system gracefully falls back to:
 
 1. **Environment Variables**: 
    - `PG_DSN` (PostgreSQL Data Source Name)
-   - `DELPHI_DB_HOST`, `DELPHI_DB_PORT`, etc.
+   - `WAZUH_DB_HOST`, `WAZUH_DB_PORT`, etc.
 
 2. **Default Values**:
    - Host: localhost
    - Port: 5432
-   - Database: delphi
-   - Username: delphi
-   - Password: delphi
+   - Database: wazuh
+   - Username: wazuh
+   - Password: wazuh
 
 ## Security Best Practices
 
@@ -292,7 +292,7 @@ The Python workers in `assets/python_workers/` can also be configured to use the
 from eos_vault import get_secret
 
 # Get database connection
-pg_dsn = get_secret("delphi/database/dsn")
+pg_dsn = get_secret("wazuh/database/dsn")
 
 # Get SMTP credentials  
 smtp_user = get_secret("smtp/username")
@@ -320,7 +320,7 @@ For multiple environments (dev/staging/prod):
 ```bash
 # Use environment-specific secret paths
 eos self secrets set custom
-# Path: environments/production/delphi/database/password
+# Path: environments/production/wazuh/database/password
 
 # Or use separate Vault namespaces
 export VAULT_NAMESPACE="production"
@@ -337,8 +337,8 @@ export VAULT_ADDR="https://vault.company.com"
 export VAULT_TOKEN="hvs.XXXXXXXXXXXXXXXX"
 
 # Run automated setup
-/opt/eos/scripts/setup-vault-delphi.sh --vault-only
-eos self secrets set delphi-db --non-interactive
+/opt/eos/scripts/setup-vault-wazuh.sh --vault-only
+eos self secrets set wazuh-db --non-interactive
 ```
 
 ## Monitoring and Logging
@@ -349,7 +349,7 @@ eos self secrets set delphi-db --non-interactive
 vault audit enable file file_path=/var/log/vault/audit.log
 
 # Monitor secret access
-tail -f /var/log/vault/audit.log | grep delphi
+tail -f /var/log/vault/audit.log | grep wazuh
 ```
 
 ### Application Logs
@@ -368,29 +368,29 @@ If you're migrating from environment-based configuration:
 1. **Backup Current Configuration**:
    ```bash
    # Save current environment variables
-   env | grep -E "(DELPHI_|PG_)" > backup.env
+   env | grep -E "(WAZUH_|PG_)" > backup.env
    ```
 
 2. **Set Up Vault**:
    ```bash
    eos self secrets configure
-   eos self secrets set delphi-db
+   eos self secrets set wazuh-db
    ```
 
 3. **Test Migration**:
    ```bash
    # Test with Vault
    eos self secrets test
-   eos delphi dashboard services  # Quick test
+   eos wazuh dashboard services  # Quick test
 
    # Verify all services work
-   eos delphi services status --all
+   eos wazuh services status --all
    ```
 
 4. **Clean Up** (optional):
    ```bash
    # Remove environment variables once confirmed working
-   unset PG_DSN DELPHI_DB_PASSWORD
+   unset PG_DSN WAZUH_DB_PASSWORD
    ```
 
 This integration provides a secure, scalable foundation for credential management while maintaining backward compatibility and graceful fallback behavior.

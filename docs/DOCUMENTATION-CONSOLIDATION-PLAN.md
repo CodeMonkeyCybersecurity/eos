@@ -13,7 +13,7 @@
 #### Category A: INLINE (Move to source code)
 **Criteria:** Implementation details, architecture decisions, design patterns
 
-1. **AGENTS.md** → `pkg/delphi/agents/types.go`  ALREADY DONE
+1. **AGENTS.md** → `pkg/wazuh/agents/types.go`  ALREADY DONE
 2. **BOOTSTRAP_DESIGN.md** → `pkg/bootstrap/check.go`  ALREADY DONE
 3. **IMPLEMENTATION_STATUS.md** → `pkg/bootstrap/check.go`  ALREADY DONE
 4. **SALTSTACK_TO_HASHICORP_MIGRATION.md** → `pkg/hashicorp/tools.go`  ALREADY DONE

@@ -33,7 +33,7 @@ CONSOLIDATE:
 PRESERVE:
 - BOOTSTRAP_ARCHITECTURE.md
 - improved_architecture.md  
-- delphi-dashboard-architecture.md
+- wazuh-dashboard-architecture.md
 ```
 
 #### B. Testing Documentation  
@@ -95,13 +95,13 @@ docs/
 ├── architecture/                      # [NEW] Architecture documentation
 │   ├── BOOTSTRAP_ARCHITECTURE.md
 │   ├── improved_architecture.md
-│   └── delphi-dashboard-architecture.md
+│   └── wazuh-dashboard-architecture.md
 │
 ├── components/                        # [NEW] Component-specific docs
 │   ├── BACKUP_EXAMPLE.md
 │   ├── CONSUL_ENHANCEMENT_SUMMARY.md
-│   ├── DELPHI_README.md
-│   ├── DELPHI\ READ\ README.md
+│   ├── WAZUH_README.md
+│   ├── WAZUH\ READ\ README.md
 │   ├── LOGGER_README.md
 │   ├── MINIO_DEPLOYMENT_ANALYSIS.md
 │   ├── PARSER_MONITORING.md
@@ -115,7 +115,7 @@ docs/
 ├── integrations/                      # [NEW] Integration documentation
 │   ├── README-terraform-integration.md
 │   ├── vault-database-dynamic-credentials.md
-│   ├── vault-delphi-integration.md
+│   ├── vault-wazuh-integration.md
 │   └── validation_README.md
 │
 ├── user-guides/                       # [NEW] User-facing documentation

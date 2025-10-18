@@ -11,7 +11,7 @@ This directory contains comprehensive documentation for the Eos Ubuntu server ad
 
 ### Components
 - **[components/](./components/)** - Component-specific documentation
-  - **[DELPHI.md](./components/DELPHI.md)** - Delphi monitoring platform
+  - **[WAZUH.md](./components/WAZUH.md)** - Wazuh monitoring platform
   - **[VAULT.md](./components/VAULT.md)** - HashiCorp Vault integration
   - **[UBUNTU.md](./components/UBUNTU.md)** - Ubuntu system operations
   - **[HECATE.md](./components/HECATE.md)** - Reverse proxy framework

@@ -145,7 +145,7 @@ eos list users --system
 ### Security & Monitoring
 - `eos create fail2ban` - Intrusion prevention
 - `eos create osquery` - System monitoring
-- `eos create delphi` - Security monitoring platform
+- `eos create wazuh` - Security monitoring platform
 - `eos create hecate` - Reverse proxy with security features
 - `eos create ldap` - Directory services
 - `eos create zabbix` - Infrastructure monitoring

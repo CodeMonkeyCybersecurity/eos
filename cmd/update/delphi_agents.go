@@ -1,4 +1,4 @@
-// cmd/delphi/update/agents.go
+// cmd/wazuh/update/agents.go
 
 package update
 
@@ -8,12 +8,13 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh/agents"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh"
 )
 
 var UpdateAgentsCmd = &cobra.Command{
@@ -22,16 +23,25 @@ var UpdateAgentsCmd = &cobra.Command{
 	Long:  "Upgrades one or more Wazuh agents using a remote package (WPK) via the API.",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ReadConfig(rc)
+		cfg, err := wazuh.ReadConfig(rc)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Error("Failed to load Delphi config", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to load Wazuh config", zap.Error(err))
 			return err
 		}
 
-		token, err := delphi.Authenticate(rc, cfg)
+		token, err := wazuh.Authenticate(rc, cfg)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Authentication failed", zap.Error(err))
 			return fmt.Errorf("authentication failed: %w", err)
+		}
+
+		// Convert wazuh.Config to agents.Config
+		agentCfg := &agents.Config{
+			Protocol:    cfg.Protocol,
+			FQDN:        cfg.FQDN,
+			Port:        cfg.Port,
+			APIUser:     cfg.APIUser,
+			APIPassword: cfg.APIPassword,
 		}
 
 		agentRaw := interaction.PromptInput(rc.Ctx, "Enter agent IDs (comma-separated)", "")
@@ -56,7 +66,7 @@ var UpdateAgentsCmd = &cobra.Command{
 			},
 		}
 
-		if err := delphi.UpgradeAgents(rc, cfg, token, agentIDs, payload); err != nil {
+		if err := agents.UpgradeAgents(rc, agentCfg, token, agentIDs, payload); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Upgrade failed", zap.Error(err))
 			return fmt.Errorf("upgrade failed: %w", err)
 		}

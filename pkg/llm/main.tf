@@ -61,7 +61,7 @@ resource "azurerm_openai_deployment" "gpt4" {
 
 # 4. Emit a .env file for your Go app
 resource "local_file" "env_file" {
-  filename = "${path.module}/delphi.env"
+  filename = "${path.module}/wazuh.env"
   content  = <<-EOF
     AZURE_API_KEY=${azurerm_cognitive_account.openai.primary_access_key}
     AZURE_ENDPOINT=${azurerm_cognitive_account.openai.endpoint}

@@ -71,10 +71,10 @@ Analysis of the scripts directory reveals 100+ shell scripts and Python utilitie
 - **installMattermost.py** → `eos create mattermost`
 - **installTraefik.py** → `eos create hecate` (reverse proxy)
 
-### Delphi Integration
-- **delphi/deleteAgent.py** → `eos delphi delete agent`
-- **custom-delphi-webhook** → `eos create delphi-webhook`
-- **validate-delphi-config.py** → `eos delphi services validate`
+### Wazuh Integration
+- **wazuh/deleteAgent.py** → `eos wazuh delete agent`
+- **custom-wazuh-webhook** → `eos create wazuh-webhook`
+- **validate-wazuh-config.py** → `eos wazuh services validate`
 
 ## High-Priority Scripts for Migration
 

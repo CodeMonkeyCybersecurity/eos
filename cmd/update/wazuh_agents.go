@@ -15,10 +15,10 @@
 // - Dry-run capabilities for testing
 //
 // Available Commands:
-// - eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au
-// - eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au --all-agents
-// - eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au --agents agent1,agent2
-// - eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au --dry-run
+// - eos update wazuh-agents --re-register --manager wazuh.cybermonkey.net.au
+// - eos update wazuh-agents --re-register --manager wazuh.cybermonkey.net.au --all-agents
+// - eos update wazuh-agents --re-register --manager wazuh.cybermonkey.net.au --agents agent1,agent2
+// - eos update wazuh-agents --re-register --manager wazuh.cybermonkey.net.au --dry-run
 //
 // Use Cases:
 // - New Wazuh server deployment (same hostname, different VM)
@@ -35,10 +35,10 @@ package update
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh/agents"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
@@ -76,7 +76,7 @@ principles of transparency and safety. It performs comprehensive checks includin
 - Prerequisites verification
 
 The command will:
-1. Discover existing Wazuh agents via Delphi API
+1. Discover existing Wazuh agents via Wazuh API
 2. Perform comprehensive analysis of each agent
 3. Generate platform-specific upgrade/re-registration commands
 4. Provide detailed status, recommendations, and results
@@ -93,10 +93,10 @@ Examples:
   eos update wazuh-agents --dry-run
 
   # Upgrade and re-register with new manager
-  eos update wazuh-agents --manager delphi.cybermonkey.net.au
+  eos update wazuh-agents --manager wazuh.cybermonkey.net.au
 
   # Re-register only (no upgrade)
-  eos update wazuh-agents --re-register --manager delphi.cybermonkey.net.au
+  eos update wazuh-agents --re-register --manager wazuh.cybermonkey.net.au
 
   # Force upgrade even if already current
   eos update wazuh-agents --force-upgrade
@@ -121,7 +121,7 @@ Common Use Cases:
 		logger := otelzap.Ctx(rc.Ctx)
 
 		// Build configuration for agent upgrade (default action)
-		config := delphi.GetDefaultAgentUpgradeConfig()
+		config := agents.GetDefaultAgentUpgradeConfig()
 
 		// Determine operation mode
 		if reRegister {
@@ -170,7 +170,7 @@ Common Use Cases:
 		}
 
 		// Create upgrade manager
-		upgradeManager := delphi.NewAgentUpgradeManager(config)
+		upgradeManager := agents.NewAgentUpgradeManager(config)
 
 		// Execute the operation
 		result, err := upgradeManager.UpgradeLocalAgent(rc)

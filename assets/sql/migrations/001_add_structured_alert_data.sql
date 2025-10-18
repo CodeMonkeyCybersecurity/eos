@@ -111,14 +111,14 @@ FROM alerts
 WHERE state IN ('summarized', 'structured', 'formatted', 'sent')
 ORDER BY created_at DESC;
 
--- Grant permissions for the delphi services
+-- Grant permissions for the wazuh services
 -- Note: Adjust role names based on your PostgreSQL setup
 DO $$
 BEGIN
     -- Grant SELECT, UPDATE on alerts table for structured data operations
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'delphi') THEN
-        GRANT SELECT, UPDATE ON alerts TO delphi;
-        GRANT SELECT ON alert_processing_status TO delphi;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'wazuh') THEN
+        GRANT SELECT, UPDATE ON alerts TO wazuh;
+        GRANT SELECT ON alert_processing_status TO wazuh;
     END IF;
     
     -- Grant similar permissions to stanley user if it exists

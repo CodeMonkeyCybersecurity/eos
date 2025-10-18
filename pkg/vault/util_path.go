@@ -32,8 +32,8 @@ func DiskPath(rc *eos_io.RuntimeContext, name string) string {
 	switch name {
 	case "vault_init":
 		final = filepath.Join(shared.SecretsDir, "vault_init.json")
-	case "delphi_fallback":
-		final = filepath.Join(shared.SecretsDir, "delphi_fallback.json")
+	case "wazuh_fallback":
+		final = filepath.Join(shared.SecretsDir, "wazuh_fallback.json")
 	case "vault_userpass":
 		final = filepath.Join(shared.SecretsDir, "vault_userpass.json")
 	default:

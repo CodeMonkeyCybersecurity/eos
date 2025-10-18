@@ -5,17 +5,17 @@ package shared
 import "time"
 
 // getDependencyWorkers returns additional workers for dependencies that need file updates
-func (sm *ServiceManager) getDependencyWorkers(service DelphiServiceDefinition, timestamp string) []ServiceWorkerInfo {
+func (sm *ServiceManager) getDependencyWorkers(service WazuhServiceDefinition, timestamp string) []ServiceWorkerInfo {
 	var dependencyWorkers []ServiceWorkerInfo
 
 	for _, dep := range service.Dependencies {
 		switch dep {
 		case "alert-to-db":
-			// alert-to-db.py is a script dependency of delphi-listener, not a service
+			// alert-to-db.py is a script dependency of wazuh-listener, not a service
 			dependencyWorkers = append(dependencyWorkers, ServiceWorkerInfo{
 				ServiceName:  "alert-to-db",
 				SourcePath:   "/opt/eos/assets/python_workers/alert-to-db.py",
-				TargetPath:   "/usr/local/bin/alert-to-db.py", // delphi-listener expects it here
+				TargetPath:   "/usr/local/bin/alert-to-db.py", // wazuh-listener expects it here
 				ServiceFile:  "",                              // No systemd service file
 				Dependencies: []string{},
 				BackupPath:   "/usr/local/bin/alert-to-db.py." + timestamp + ".bak",

@@ -1,6 +1,6 @@
 [Unit]
-Description=Delphi Parser Health Monitor
-Documentation=https://wiki.cybermonkey.net.au/delphi/parser-monitor
+Description=Wazuh Parser Health Monitor
+Documentation=https://wiki.cybermonkey.net.au/wazuh/parser-monitor
 After=network.target postgresql.service
 Wants=postgresql.service
 Requires=network.target
@@ -9,15 +9,15 @@ Requires=network.target
 Type=oneshot
 User=stanley
 Group=stanley
-WorkingDirectory=/opt/stackstorm/packs/delphi
+WorkingDirectory=/opt/stackstorm/packs/wazuh
 
 # Main executable (runs once on demand)
 ExecStart=/usr/local/bin/parser-monitor.py --health
 
 # Environment configuration
-Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/delphi"
+Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/wazuh"
 Environment="PYTHONUNBUFFERED=1"
-EnvironmentFile=-/opt/stackstorm/packs/delphi/.env
+EnvironmentFile=-/opt/stackstorm/packs/wazuh/.env
 
 # Parser monitor specific configuration
 Environment="MONITOR_DASHBOARD_MODE=health"
@@ -31,7 +31,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/stackstorm /opt/stackstorm/packs/delphi /tmp
+ReadWritePaths=/var/log/stackstorm /opt/stackstorm/packs/wazuh /tmp
 
 # Resource limits
 LimitNOFILE=1024
@@ -44,7 +44,7 @@ SyslogIdentifier=parser-monitor
 
 [Install]
 WantedBy=multi-user.target
-Alias=delphi-parser-monitor.service
+Alias=wazuh-parser-monitor.service
 
 # Service management commands:
 # sudo systemctl enable parser-monitor.service  

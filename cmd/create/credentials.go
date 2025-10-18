@@ -28,9 +28,9 @@ This command provides credential management functionality:
 - Renew credentials
 
 Examples:
-  eos create credentials generate --role delphi-readonly
+  eos create credentials generate --role wazuh-readonly
   eos create credentials revoke --lease-id vault:db:123
-  eos create credentials list --role delphi-readonly`,
+  eos create credentials list --role wazuh-readonly`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for credentials command")
@@ -47,8 +47,8 @@ var generateCredentialsCmd = &cobra.Command{
 	Long: `Generate new dynamic database credentials for a specific role.
 
 Examples:
-  eos create credentials generate --role delphi-readonly
-  eos create credentials generate --role delphi-readonly --json
+  eos create credentials generate --role wazuh-readonly
+  eos create credentials generate --role wazuh-readonly --json
   eos create credentials generate --role myapp-user --show-password`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -224,10 +224,10 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 
 	fmt.Println("\nConnection String Example:")
 	if showPassword {
-		fmt.Printf("psql -h localhost -U %s -d delphi\n", credential.Username)
+		fmt.Printf("psql -h localhost -U %s -d wazuh\n", credential.Username)
 		fmt.Printf("Password: %s\n", credential.Password)
 	} else {
-		fmt.Printf("psql -h localhost -U %s -d delphi\n", credential.Username)
+		fmt.Printf("psql -h localhost -U %s -d wazuh\n", credential.Username)
 		fmt.Println("Password: [Use --show-password to display]")
 	}
 

@@ -66,7 +66,7 @@ cmd/debug/iris/
 ### High Priority (Next 5)
 1.  **pkg/consul/install.go** (1,713 lines) - COMPLETE
 2. ⏳ **cmd/debug/iris.go** (1,659 lines) - NEXT
-3. **cmd/debug/delphi.go** (1,630 lines) - Delphi/Wazuh diagnostics
+3. **cmd/debug/wazuh.go** (1,630 lines) - Wazuh/Wazuh diagnostics
 4. **pkg/authentik/import.go** (1,266 lines) - Authentik configuration import
 5. **pkg/vault/install.go** (1,253 lines) - Vault installation
 6. **pkg/system/orchestration.go** (1,166 lines) - System orchestration

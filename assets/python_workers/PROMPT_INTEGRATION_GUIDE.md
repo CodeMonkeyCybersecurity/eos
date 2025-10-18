@@ -1,9 +1,9 @@
-Delphi Alert Processing Pipeline
+Wazuh Alert Processing Pipeline
 Overview: Intelligent Security Alert Communication
-The Delphi pipeline transforms raw Wazuh security alerts into intelligent, contextually-aware email notifications using Large Language Model (LLM) enrichment. Think of it as a sophisticated translation service that takes technical security alerts and converts them into clear, actionable communications tailored for different audiences.
+The Wazuh pipeline transforms raw Wazuh security alerts into intelligent, contextually-aware email notifications using Large Language Model (LLM) enrichment. Think of it as a sophisticated translation service that takes technical security alerts and converts them into clear, actionable communications tailored for different audiences.
 
 Core Architecture Philosophy
-Rather than sending the same generic alert to everyone, Delphi intelligently selects different communication approaches based on alert characteristics. A critical system breach might warrant a detailed investigation guide, while a routine policy violation could use a concise executive summary. This intelligent routing ensures that each recipient gets the right level of detail in the right format.
+Rather than sending the same generic alert to everyone, Wazuh intelligently selects different communication approaches based on alert characteristics. A critical system breach might warrant a detailed investigation guide, while a routine policy violation could use a concise executive summary. This intelligent routing ensures that each recipient gets the right level of detail in the right format.
 
 Pipeline States and Flow
 Your alerts progress through eight distinct states, each representing a completed processing phase:
@@ -43,7 +43,7 @@ Parser Type Selection: Your system can choose from six different communication a
 security_analysis: Detailed technical breakdown for security teams
 executive_summary: Business-focused summaries for leadership
 investigation_guide: Step-by-step response procedures
-delphi_notify_short: Concise notifications for routine alerts
+wazuh_notify_short: Concise notifications for routine alerts
 hybrid: Adaptive format based on alert characteristics
 custom: Specialized formatting for unique requirements
 Real-time Coordination: PostgreSQL notification channels enable seamless handoffs between workers:
@@ -55,7 +55,7 @@ alert_structured: Begins email formatting
 alert_formatted: Starts delivery process
 Worker Components and Responsibilities
 Phase 1: Alert Ingestion
-custom-delphi-webhook.py
+custom-wazuh-webhook.py
 
 Entry point for Wazuh webhooks
 Validates incoming alert data
@@ -68,7 +68,7 @@ Populates core fields: agent_id, rule_id, rule_level, rule_desc
 Stores complete raw alert in raw JSONB field
 Triggers new_alert notification
 Phase 2: Context Enrichment
-delphi-agent-enricher.py
+wazuh-agent-enricher.py
 
 Listens for new_alert notifications
 Queries agents table for endpoint context
@@ -131,7 +131,7 @@ Records delivery errors in email_error field
 Sets alert_sent_at on successful delivery
 Transitions state to 'sent' (success) or 'failed' (exhausted retries)
 Orchestration and Monitoring
-delphi-listener.py
+wazuh-listener.py
 
 Central coordination service for the entire pipeline
 Maintains persistent connections to all notification channels
@@ -200,5 +200,5 @@ Dynamic parser selection based on LLM response characteristics
 Recipient preference learning for communication style optimization
 Advanced A/B testing across the entire pipeline
 Integration with additional security tools and notification channels
-The Delphi pipeline represents a sophisticated approach to security alert communication that goes far beyond simple forwarding, creating intelligent, contextual communications that help recipients understand and respond to security events effectively.
+The Wazuh pipeline represents a sophisticated approach to security alert communication that goes far beyond simple forwarding, creating intelligent, contextual communications that help recipients understand and respond to security events effectively.
 

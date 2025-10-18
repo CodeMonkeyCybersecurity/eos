@@ -14,7 +14,7 @@ var debugCmd = &cobra.Command{
 Available subcommands:
   bootstrap       - Debug bootstrap process and infrastructure setup
   consul          - Debug Consul service installation and configuration issues
-  delphi          - Debug Delphi (Iris/Temporal) webhook integration
+  wazuh          - Debug Wazuh (Iris/Temporal) webhook integration
   mattermost      - Debug Mattermost deployment and troubleshoot issues
   iris           - Debug Iris security alert processing system
   openwebui       - Debug OpenWebUI backup and update issues

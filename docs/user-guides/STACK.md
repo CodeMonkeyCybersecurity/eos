@@ -59,7 +59,7 @@ Our infrastructure architecture combines multiple deployment strategies and orch
 - **PostgreSQL**: Relational database deployed per application to provide dedicated resources and configuration flexibility.
 
 **Security and Monitoring:**
-- **Wazuh**: XDR/SIEM implementation (deployed as "Delphi") for comprehensive security monitoring.
+- **Wazuh**: XDR/SIEM implementation (deployed as "Wazuh") for comprehensive security monitoring.
 - **ClusterFuzz**: Security testing infrastructure for continuous vulnerability assessment.
 
 **Runtime and Backup:**

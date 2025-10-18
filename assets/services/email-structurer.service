@@ -1,6 +1,6 @@
 [Unit]
-Description=Delphi Email Structurer Worker
-Documentation=https://wiki.cybermonkey.net.au/delphi/email-structurer
+Description=Wazuh Email Structurer Worker
+Documentation=https://wiki.cybermonkey.net.au/wazuh/email-structurer
 After=network.target postgresql.service
 Wants=postgresql.service
 Requires=network.target
@@ -9,19 +9,19 @@ Requires=network.target
 Type=notify
 User=stanley
 Group=stanley
-WorkingDirectory=/opt/stackstorm/packs/delphi
+WorkingDirectory=/opt/stackstorm/packs/wazuh
 
 # Main executable
 ExecStart=/usr/local/bin/email-structurer.py
 
 # Environment configuration
-Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/delphi"
+Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/wazuh"
 Environment="PYTHONUNBUFFERED=1"
-EnvironmentFile=-/opt/stackstorm/packs/delphi/.env
+EnvironmentFile=-/opt/stackstorm/packs/wazuh/.env
 
 # Email structurer specific configuration
-Environment="DELPHI_PARSER_TYPE=standard"
-Environment="DELPHI_CUSTOM_SECTIONS="
+Environment="WAZUH_PARSER_TYPE=standard"
+Environment="WAZUH_CUSTOM_SECTIONS="
 
 # Logging configuration
 Environment="LOG_FILE=/var/log/stackstorm/email-structurer.log"
@@ -42,7 +42,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/stackstorm /opt/stackstorm/packs/delphi /tmp
+ReadWritePaths=/var/log/stackstorm /opt/stackstorm/packs/wazuh /tmp
 
 # Monitoring and health checks
 TimeoutStartSec=30
@@ -56,7 +56,7 @@ SyslogIdentifier=email-structurer
 
 [Install]
 WantedBy=multi-user.target
-Alias=delphi-email-structurer.service
+Alias=wazuh-email-structurer.service
 
 # Service management commands:
 # sudo systemctl enable email-structurer.service

@@ -17,9 +17,9 @@ type MockSimpleServiceRegistry struct {
 	mock.Mock
 }
 
-func (m *MockSimpleServiceRegistry) GetActiveServices() map[string]DelphiServiceDefinition {
+func (m *MockSimpleServiceRegistry) GetActiveServices() map[string]WazuhServiceDefinition {
 	args := m.Called()
-	return args.Get(0).(map[string]DelphiServiceDefinition)
+	return args.Get(0).(map[string]WazuhServiceDefinition)
 }
 
 func (m *MockSimpleServiceRegistry) GetActiveServiceNames() []string {
@@ -27,9 +27,9 @@ func (m *MockSimpleServiceRegistry) GetActiveServiceNames() []string {
 	return args.Get(0).([]string)
 }
 
-func (m *MockSimpleServiceRegistry) GetService(name string) (DelphiServiceDefinition, bool) {
+func (m *MockSimpleServiceRegistry) GetService(name string) (WazuhServiceDefinition, bool) {
 	args := m.Called(name)
-	return args.Get(0).(DelphiServiceDefinition), args.Bool(1)
+	return args.Get(0).(WazuhServiceDefinition), args.Bool(1)
 }
 
 func (m *MockSimpleServiceRegistry) CheckServiceInstallationStatus(serviceName string) (ServiceInstallationStatus, error) {
@@ -94,7 +94,7 @@ func TestServiceManager_GetServicesRequiringInstallation_BasicFlow(t *testing.T)
 	}
 
 	// Mock return values
-	mockServices := map[string]DelphiServiceDefinition{
+	mockServices := map[string]WazuhServiceDefinition{
 		"test-service": {
 			Name:         "test-service",
 			WorkerScript: "/opt/test-service.py",

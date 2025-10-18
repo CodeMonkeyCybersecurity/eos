@@ -1,6 +1,6 @@
 [Unit]
-Description=Delphi Prompt A/B Testing Worker
-Documentation=https://wiki.cybermonkey.net.au/delphi/ab-testing
+Description=Wazuh Prompt A/B Testing Worker
+Documentation=https://wiki.cybermonkey.net.au/wazuh/ab-testing
 After=network.target postgresql.service
 Wants=postgresql.service
 Requires=network.target
@@ -9,18 +9,18 @@ Requires=network.target
 Type=notify
 User=stanley
 Group=stanley
-WorkingDirectory=/opt/stackstorm/packs/delphi
+WorkingDirectory=/opt/stackstorm/packs/wazuh
 
 # Main executable
 ExecStart=/usr/local/bin/prompt-ab-tester.py
 
 # Environment configuration
-Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/delphi"
+Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/wazuh"
 Environment="PYTHONUNBUFFERED=1"
-EnvironmentFile=-/opt/stackstorm/packs/delphi/.env
+EnvironmentFile=-/opt/stackstorm/packs/wazuh/.env
 
 # A/B Testing specific configuration
-Environment="EXPERIMENT_CONFIG_FILE=/opt/delphi/ab-test-config.json"
+Environment="EXPERIMENT_CONFIG_FILE=/opt/wazuh/ab-test-config.json"
 Environment="SYSTEM_PROMPTS_DIR=/srv/eos/system-prompts"
 Environment="DEFAULT_PROMPT_FILE=/srv/eos/system-prompts/default.txt"
 
@@ -45,7 +45,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/stackstorm /opt/delphi /tmp
+ReadWritePaths=/var/log/stackstorm /opt/wazuh /tmp
 
 # Monitoring and health checks
 TimeoutStartSec=30
@@ -59,7 +59,7 @@ SyslogIdentifier=prompt-ab-tester
 
 [Install]
 WantedBy=multi-user.target
-Alias=delphi-ab-tester.service
+Alias=wazuh-ab-tester.service
 
 # Service management commands:
 # sudo systemctl enable prompt-ab-tester.service

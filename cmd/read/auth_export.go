@@ -67,9 +67,6 @@ Examples:
 		switch authType {
 		case "authentik":
 			return exportAuthentik(rc)
-		case "keycloak":
-			l.Warn("Keycloak support is deprecated. Please migrate to Authentik.")
-			return exportKeycloak(rc)
 		default:
 			return fmt.Errorf("unsupported auth type: %s (supported: authentik, keycloak)", authType)
 		}
@@ -98,28 +95,6 @@ func exportAuthentik(rc *eos_io.RuntimeContext) error {
 	return AuthentikCmd.RunE(AuthentikCmd, []string{})
 }
 
-func exportKeycloak(rc *eos_io.RuntimeContext) error {
-	url := authURL
-	token := authToken
-	if url == "" {
-		url = authKcAdminURL
-	}
-	if token == "" {
-		token = authKcToken
-	}
-
-	if url == "" || token == "" || authRealm == "" {
-		return fmt.Errorf("URL, token, and realm are required for Keycloak export (use --url, --token, --realm or KC_ADMIN_URL/KC_ADMIN_TOKEN env vars)")
-	}
-
-	// Use the existing KeycloakCmd logic
-	kcAdminURL = url
-	kcToken = token
-	realm = authRealm
-	outFile = authOut
-
-	return KeycloakCmd.RunE(KeycloakCmd, []string{})
-}
 
 func init() {
 	// General flags

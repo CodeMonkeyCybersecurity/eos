@@ -283,7 +283,7 @@ Comprehensive error handling includes:
 #### External Services
 - `pkg/vault`: HashiCorp Vault integration
 - `pkg/ldap`: LDAP directory services
-- `pkg/delphi`: Wazuh security monitoring integration
+- `pkg/wazuh`: Wazuh security monitoring integration
 - `pkg/exportutil`: Export utilities for various formats
 
 #### System Tools

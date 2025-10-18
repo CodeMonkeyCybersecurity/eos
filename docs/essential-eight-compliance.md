@@ -27,7 +27,7 @@ eos update container security --cap-drop ALL
 **Eos Implementation:**
 - **Automated Updates**:  states for regular application patching
 - **Version Management**: `pkg/platform/version_resolver.go` ensures latest versions
-- **Monitoring**: Delphi tracks unpatched applications
+- **Monitoring**: Wazuh tracks unpatched applications
 
 **Commands:**
 ```bash
@@ -61,7 +61,7 @@ eos create hardening user-apps
 - **LDAP Integration**: Centralized user management with role-based access
 - **Sudo Policies**: Granular sudo rules via  states
 - **Vault Integration**: Time-bound credential leasing
-- **Audit Logging**: All privileged actions logged to Delphi
+- **Audit Logging**: All privileged actions logged to Wazuh
 
 **Commands:**
 ```bash
@@ -128,11 +128,11 @@ eos create backup-encryption --algorithm aes-256
 1. **MFA**: All remote access
 2. **Backups**: Daily with encryption
 3. **Application Hardening**: Browser and PDF security
-4. **Enhanced Monitoring**: Delphi integration
+4. **Enhanced Monitoring**: Wazuh integration
 
 ### Maturity Level 3 (Advanced)
 1. **Zero Trust**: Network segmentation via Hecate
-2. **Automated Response**: Delphi-triggered remediation
+2. **Automated Response**: Wazuh-triggered remediation
 3. **Continuous Compliance**: Real-time monitoring
 4. **Advanced Threat Detection**: ML-based analysis
 
@@ -150,7 +150,7 @@ eos read compliance --control application-control
 ### Continuous Monitoring
 ```bash
 # Enable compliance monitoring
-eos create delphi-compliance --framework essential-eight
+eos create wazuh-compliance --framework essential-eight
 
 # Set up alerts
 eos create alert --compliance-drift --severity high
@@ -172,7 +172,7 @@ essential_eight_compliance:
         - mfa_enforcement
 ```
 
-### Delphi Rules
+### Wazuh Rules
 ```yaml
 # Monitor compliance drift
 - rule: Essential Eight Compliance Drift

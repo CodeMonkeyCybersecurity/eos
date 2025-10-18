@@ -14,9 +14,6 @@ import (
 
 // AddSubcommands adds all update subcommands to the update command
 func AddSubcommands() {
-	// Add Authentik subcommand
-	UpdateCmd.AddCommand(AuthentikCmd)
-
 	// Add HashiCorp update commands
 	UpdateCmd.AddCommand(VaultCmd)
 	UpdateCmd.AddCommand(ConsulCmd)

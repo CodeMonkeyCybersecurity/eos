@@ -50,12 +50,12 @@ grep -r "mapstructure" pkg/ cmd/ --include="*.go"
 
 ### Priority 2: Resolve Documentation Inconsistencies
 **Issues**:
-- `DELPHI READ README.md` has space in filename
+- `WAZUH READ README.md` has space in filename
 - `PIPELINE_README_OLD.md` vs `PIPELINE.md` confusion
 - Inconsistent README naming patterns
 
 **Actions**:
-1. Rename `DELPHI READ README.md` → `DELPHI_COMMANDS.md`
+1. Rename `WAZUH READ README.md` → `WAZUH_COMMANDS.md`
 2. Review and consolidate pipeline documentation
 3. Standardize README naming convention
 
@@ -99,7 +99,7 @@ grep -r "mapstructure" pkg/ cmd/ --include="*.go"
 
 #### 2.2 Separation of Concerns
 **Target Packages**:
-- `delphi/` (47 files) - Split by domain (auth, monitoring, analytics)
+- `wazuh/` (47 files) - Split by domain (auth, monitoring, analytics)
 - `vault/` (52 files) - Separate client, lifecycle, security
 - `shared/` (23 files) - Move utilities to appropriate domains
 

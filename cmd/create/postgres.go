@@ -28,7 +28,7 @@ This command provides comprehensive Vault database integration:
 
 Examples:
   eos create database-vault-postgres --interactive                    # Interactive setup
-  eos create database-vault-postgres --host localhost --database delphi
+  eos create database-vault-postgres --host localhost --database wazuh
   eos create database-vault-postgres --host 192.168.1.100 --admin-username postgres
   eos create database-vault-postgres --connection-name myapp-db --test`,
 
@@ -85,13 +85,13 @@ Examples:
 			options.DatabaseConfig.Port = 5432
 		}
 		if options.DatabaseConfig.Database == "" {
-			options.DatabaseConfig.Database = "delphi"
+			options.DatabaseConfig.Database = "wazuh"
 		}
 		if options.AdminUsername == "" {
 			options.AdminUsername = "postgres"
 		}
 		if options.ConnectionName == "" {
-			options.ConnectionName = "delphi-postgresql"
+			options.ConnectionName = "wazuh-postgresql"
 		}
 		if options.EngineMount == "" {
 			options.EngineMount = "database"
@@ -100,7 +100,7 @@ Examples:
 		// Create default roles
 		options.Roles = []*database_management.Role{
 			{
-				Name:   "delphi-readonly",
+				Name:   "wazuh-readonly",
 				DBName: options.ConnectionName,
 				CreationStatements: []string{
 					`CREATE ROLE "{{name}}" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'`,
@@ -126,10 +126,10 @@ Examples:
 func init() {
 	databaseVaultPostgresCmd.Flags().String("host", "localhost", "Database host")
 	databaseVaultPostgresCmd.Flags().Int("port", shared.PortPostgreSQL, "Database port")
-	databaseVaultPostgresCmd.Flags().String("database", "delphi", "Database name")
+	databaseVaultPostgresCmd.Flags().String("database", "wazuh", "Database name")
 	databaseVaultPostgresCmd.Flags().String("admin-username", "postgres", "Database admin username")
 	databaseVaultPostgresCmd.Flags().String("admin-password", "", "Database admin password")
-	databaseVaultPostgresCmd.Flags().String("connection-name", "delphi-postgresql", "Vault connection name")
+	databaseVaultPostgresCmd.Flags().String("connection-name", "wazuh-postgresql", "Vault connection name")
 	databaseVaultPostgresCmd.Flags().String("engine-mount", "database", "Vault database engine mount point")
 	databaseVaultPostgresCmd.Flags().BoolP("interactive", "i", false, "Interactive setup mode")
 	databaseVaultPostgresCmd.Flags().Bool("test", true, "Test credential generation after setup")

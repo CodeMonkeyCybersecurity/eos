@@ -11,7 +11,7 @@
 
 - **Package Documentation**: Detailed package-level comments in Go source files
 - **Function Documentation**: Comprehensive function and method documentation
-- **Architecture Guides**: Embedded in relevant package files (e.g., `pkg/delphi/agents/types.go`)
+- **Architecture Guides**: Embedded in relevant package files (e.g., `pkg/wazuh/agents/types.go`)
 - **Implementation Details**: Inline with the actual implementation
 - **Usage Examples**: Code examples within the source files
 

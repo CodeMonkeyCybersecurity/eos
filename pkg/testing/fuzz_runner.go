@@ -140,7 +140,7 @@ func (fr *FuzzRunner) DiscoverFuzzTests() ([]FuzzTest, error) {
 			},
 		},
 		{
-			pkg: "./cmd/delphi/services",
+			pkg: "./cmd/wazuh/services",
 			funcs: []string{
 				"FuzzUpdateCommand",
 				"FuzzServiceWorkerPaths",
@@ -152,7 +152,7 @@ func (fr *FuzzRunner) DiscoverFuzzTests() ([]FuzzTest, error) {
 			funcs: []string{
 				"FuzzAllEosCommands",
 				"FuzzEosCommandFlags",
-				"FuzzDelphiServicesCommands",
+				"FuzzWazuhServicesCommands",
 			},
 		},
 	}

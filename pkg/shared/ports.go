@@ -14,14 +14,14 @@ const (
 	PortMailcow    = 8053
 	PortGrafana    = 8069
 	// Deprecated: Use PortAuthentik instead
-	PortKeycloak   = 8080
-	PortElk        = 8081
-	PortStack      = 8087
-	PortArachne    = 8089
-	PortSoc        = 8093
-	PortRestic     = 8101
-	PortUmami      = 8117
-	PortMinio      = 8123
+	PortKeycloak     = 8080
+	PortElk          = 8081
+	PortStack        = 8087
+	PortArachne      = 8089
+	PortSoc          = 8093
+	PortRestic       = 8101
+	PortUmami        = 8117
+	PortMinio        = 8123
 	PortN8n          = 8147 // Planned
 	PortConsul       = 8500 // HashiCorp Consul HTTP API (standard)
 	PortGitea        = 8167 // Planned
@@ -29,13 +29,13 @@ const (
 	PortVault        = 8200 // HashiCorp Vault API (standard)
 	PortVaultCluster = 8201 // Vault Raft cluster communication (standard)
 	PortConsulWeb    = 8191
-	PortConsulAPI  = 8209
-	PortGophishAPI = 8209 // Legacy Gophish port 3333→8209
-	PortZabbix     = 8233
-	PortZabbixAPI  = 8237
-	PortPenpot     = 8239 // Design platform
-	PortNomad      = 4646 // HashiCorp Nomad HTTP API (standard)
-	
+	PortConsulAPI    = 8209
+	PortGophishAPI   = 8209 // Legacy Gophish port 3333→8209
+	PortZabbix       = 8233
+	PortZabbixAPI    = 8237
+	PortPenpot       = 8239 // Design platform
+	PortNomad        = 4646 // HashiCorp Nomad HTTP API (standard)
+
 	// New port definitions using next available primes
 	PortPostgreSQL     = 8263 // PostgreSQL database (not 5432)
 	PortRedis          = 8269 // Redis cache (not 6379)
@@ -69,17 +69,17 @@ const (
 	PortBionicGPT      = 8513 // BionicGPT multi-tenant LLM platform (not 3000)
 
 	// Well-known ports that should remain standard
-	PortHTTP        = 80   // Standard HTTP
-	PortHTTPS       = 443  // Standard HTTPS
-	PortSSH         = 22   // Standard SSH
-	PortSMTP        = 25   // Standard SMTP
-	PortPOP3        = 110  // Standard POP3
-	PortIMAP        = 143  // Standard IMAP
-	PortSMTPS       = 465  // Standard SMTPS
-	PortSubmission  = 587  // Standard mail submission
-	PortIMAPSSL     = 993  // Standard IMAPS
-	PortPOP3SSL     = 995  // Standard POP3S
-	
+	PortHTTP       = 80  // Standard HTTP
+	PortHTTPS      = 443 // Standard HTTPS
+	PortSSH        = 22  // Standard SSH
+	PortSMTP       = 25  // Standard SMTP
+	PortPOP3       = 110 // Standard POP3
+	PortIMAP       = 143 // Standard IMAP
+	PortSMTPS      = 465 // Standard SMTPS
+	PortSubmission = 587 // Standard mail submission
+	PortIMAPSSL    = 993 // Standard IMAPS
+	PortPOP3SSL    = 995 // Standard POP3S
+
 	// Next available primes: 8521, 8527, 8537, 8539, 8543, 8563...
 
 	// Legacy ports to be migrated
@@ -87,14 +87,14 @@ const (
 	PortNextcloudLegacy = 11000 // Should move to 8xxx range
 	PortResticAPI       = 9101  // Should move to 8xxx range
 	PortMinioAPI        = 9123  // Should move to 8xxx range
-	
+
 	// HashiCorp standard ports (now using defaults)
 	// Note: PortConsul and PortVault now use HashiCorp defaults
 	// Consul: 8500 (HTTP), 8501 (HTTPS), 8502 (gRPC), 8600 (DNS)
 	// Consul Serf: 8301 (LAN), 8302 (WAN)
 	// Consul RPC: 8300
 	// Vault: 8200 (HTTP), 8201 (cluster)
-	
+
 	// Additional port constants for legacy services
 	PortWazuh1514  = 1514  // Wazuh manager port
 	PortWazuh1515  = 1515  // Wazuh manager port
@@ -124,7 +124,7 @@ type AppProxy struct {
 
 var AppProxies = []AppProxy{
 	{AppName: "helen", Subdomain: "", BackendPort: PortHelen},
-	{AppName: "wazuh", Subdomain: "delphi", BackendPort: PortWazuh},
+	{AppName: "wazuh", Subdomain: "wazuh", BackendPort: PortWazuh},
 	{AppName: "mattermost", Subdomain: "m", BackendPort: PortMattermost},
 	{AppName: "mailcow", Subdomain: "mail", BackendPort: PortMailcow},
 	{AppName: "grafana", Subdomain: "g", BackendPort: PortGrafana},

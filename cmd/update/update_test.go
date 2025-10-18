@@ -34,8 +34,8 @@ func TestGetServiceWorkers(t *testing.T) {
 			eosRoot:             "/opt/eos",
 			expectedWorkerCount: 9, // Total workers in GetServiceWorkers
 			expectedServices: []string{
-				"delphi-listener",
-				"delphi-agent-enricher",
+				"wazuh-listener",
+				"wazuh-agent-enricher",
 				"llm-worker",
 				"prompt-ab-tester",
 				"ab-test-analyzer",
@@ -566,7 +566,7 @@ func TestServiceWorkerListConsistency(t *testing.T) {
 	}
 
 	// Get services from registry
-	registry := shared.GetGlobalDelphiServiceRegistry()
+	registry := shared.GetGlobalWazuhServiceRegistry()
 	activeServices := registry.GetActiveServices()
 
 	// Check that all active services have corresponding workers
@@ -577,7 +577,7 @@ func TestServiceWorkerListConsistency(t *testing.T) {
 
 		// Special handling for services that might not be in GetServiceWorkers
 		// but are in the registry (e.g., parser-monitor)
-		if serviceName == "parser-monitor" || serviceName == "delphi-emailer" {
+		if serviceName == "parser-monitor" || serviceName == "wazuh-emailer" {
 			continue
 		}
 

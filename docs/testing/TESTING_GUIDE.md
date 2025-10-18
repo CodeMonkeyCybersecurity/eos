@@ -88,7 +88,7 @@ func TestVaultAgentConfiguration(t *testing.T) {
 ### Priority 2: External Service Integration (Target: 80%+ coverage)
 
 **Packages to test next:**
-- `pkg/delphi/` - Wazuh/OpenSearch security monitoring
+- `pkg/wazuh/` - Wazuh/OpenSearch security monitoring
 - `pkg/container/` - Docker operations
 - `pkg/ldap/` - Directory service operations
 - `pkg/hetzner/` - Cloud provider integration
@@ -536,12 +536,12 @@ func TestErrorHandling(t *testing.T) {
 **Week 2: Critical Services**
 1. Test `pkg/vault/` health checks and basic operations
 2. Test `pkg/container/` Docker client operations
-3. Expand `pkg/delphi/` test coverage
+3. Expand `pkg/wazuh/` test coverage
 
 **Week 3: Integration Testing**
 1. Test vault + crypto integration
 2. Test container + vault secret mounting
-3. Test delphi + vault authentication
+3. Test wazuh + vault authentication
 
 **Week 4: CLI Testing**
 1. Test core CRUD commands

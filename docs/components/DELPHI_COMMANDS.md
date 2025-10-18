@@ -1,15 +1,15 @@
-# Delphi Read Commands
+# Wazuh Read Commands
 
 *Last Updated: 2025-01-14*
 
-This directory contains the read and diagnostic commands for Delphi (Wazuh) security monitoring platform integration. These commands provide comprehensive visibility into Wazuh manager configuration, users, API status, and agent connectivity.
+This directory contains the read and diagnostic commands for Wazuh (Wazuh) security monitoring platform integration. These commands provide comprehensive visibility into Wazuh manager configuration, users, API status, and agent connectivity.
 
 ## Commands Overview
 
-### `eos delphi read`
-Parent command for all Delphi read operations. Requires a subcommand to specify the type of information to read.
+### `eos wazuh read`
+Parent command for all Wazuh read operations. Requires a subcommand to specify the type of information to read.
 
-**Usage:** `eos delphi read <subcommand> [flags]`
+**Usage:** `eos wazuh read <subcommand> [flags]`
 
 **Aliases:** `inspect`, `get`
 
@@ -18,7 +18,7 @@ Parent command for all Delphi read operations. Requires a subcommand to specify 
 ### `api`
 Read API details and perform authenticated queries against the Wazuh manager.
 
-**Usage:** `eos delphi read api [flags]`
+**Usage:** `eos wazuh read api [flags]`
 
 **Flags:**
 - `--show-secrets`: Display sensitive fields like passwords and tokens
@@ -28,19 +28,19 @@ Read API details and perform authenticated queries against the Wazuh manager.
 **Examples:**
 ```bash
 # Check user permissions
-eos delphi read api --permissions
+eos wazuh read api --permissions
 
 # Get Wazuh manager version
-eos delphi read api --version
+eos wazuh read api --version
 
 # Show sensitive data (requires elevated privileges)
-eos delphi read api --permissions --show-secrets
+eos wazuh read api --permissions --show-secrets
 ```
 
 ### `config`
-Read the currently loaded Delphi configuration file.
+Read the currently loaded Wazuh configuration file.
 
-**Usage:** `eos delphi read config [flags]`
+**Usage:** `eos wazuh read config [flags]`
 
 **Aliases:** `cfg`, `settings`
 
@@ -50,16 +50,16 @@ Read the currently loaded Delphi configuration file.
 **Examples:**
 ```bash
 # View configuration with masked secrets
-eos delphi read config
+eos wazuh read config
 
 # View full configuration including secrets (requires elevated privileges)
-eos delphi read config --show-secrets
+eos wazuh read config --show-secrets
 ```
 
 ### `credentials`
-List all Delphi (Wazuh) user credentials and their status.
+List all Wazuh (Wazuh) user credentials and their status.
 
-**Usage:** `eos delphi read credentials [flags]`
+**Usage:** `eos wazuh read credentials [flags]`
 
 **Flags:**
 - `--show-secrets`: Display sensitive fields like passwords and tokens
@@ -67,36 +67,36 @@ List all Delphi (Wazuh) user credentials and their status.
 **Examples:**
 ```bash
 # List all users with roles and status
-eos delphi read credentials
+eos wazuh read credentials
 
 # Include sensitive information (requires elevated privileges)
-eos delphi read credentials --show-secrets
+eos wazuh read credentials --show-secrets
 ```
 
 ### `keepalive`
 Check disconnected agents from the Wazuh API to monitor agent connectivity.
 
-**Usage:** `eos delphi read keepalive`
+**Usage:** `eos wazuh read keepalive`
 
 **Description:** Queries the Wazuh API for agents with disconnected status and displays their last keepalive information.
 
 **Examples:**
 ```bash
 # Check disconnected agents
-eos delphi read keepalive
+eos wazuh read keepalive
 ```
 
 ### `users`
 List Wazuh users and their associated user IDs.
 
-**Usage:** `eos delphi read users`
+**Usage:** `eos wazuh read users`
 
-**Description:** Fetches and displays all Wazuh users along with their user IDs from the Delphi (Wazuh) API.
+**Description:** Fetches and displays all Wazuh users along with their user IDs from the Wazuh (Wazuh) API.
 
 **Examples:**
 ```bash
 # List all Wazuh users
-eos delphi read users
+eos wazuh read users
 ```
 
 ## Security Features
@@ -112,7 +112,7 @@ All commands that can display sensitive information implement security controls:
 ### Authentication Flow
 Commands automatically handle Wazuh API authentication:
 
-1. **Configuration Resolution**: Loads and validates Delphi configuration
+1. **Configuration Resolution**: Loads and validates Wazuh configuration
 2. **Token Validation**: Checks for existing valid authentication token
 3. **Automatic Authentication**: Performs authentication if token is missing or expired
 4. **Token Persistence**: Saves new tokens to configuration file
@@ -120,8 +120,8 @@ Commands automatically handle Wazuh API authentication:
 
 ## Configuration
 
-### Delphi Configuration File
-Commands read from the standard Delphi configuration file (`delphi.json`) which includes:
+### Wazuh Configuration File
+Commands read from the standard Wazuh configuration file (`wazuh.json`) which includes:
 
 - **FQDN**: Wazuh manager hostname
 - **Protocol**: Connection protocol (https/http)
@@ -157,14 +157,14 @@ Commands use structured logging throughout:
 ## Development Notes
 
 ### Package Structure
-- **Authentication**: Shared authentication logic via `delphi.Authenticate()` and `delphi.ResolveConfig()`
-- **API Calls**: Standardized API calling patterns via `delphi.AuthenticatedGet()` and `delphi.GetJSON()`
-- **Response Handling**: Consistent response processing via `delphi.HandleAPIResponse()`
+- **Authentication**: Shared authentication logic via `wazuh.Authenticate()` and `wazuh.ResolveConfig()`
+- **API Calls**: Standardized API calling patterns via `wazuh.AuthenticatedGet()` and `wazuh.GetJSON()`
+- **Response Handling**: Consistent response processing via `wazuh.HandleAPIResponse()`
 - **Error Patterns**: Unified error handling using `eos.Wrap()` and structured logging
 
 ### Dependencies
 - **Cobra CLI**: Command structure and flag handling
-- **Delphi Package**: Core Wazuh integration functionality
+- **Wazuh Package**: Core Wazuh integration functionality
 - **Eos CLI**: Runtime context and command wrapping
 - **Eos Unix**: System-level security controls
 - **OpenTelemetry**: Structured logging and observability

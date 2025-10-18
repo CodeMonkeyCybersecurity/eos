@@ -50,7 +50,7 @@ except ImportError:
     sdnotify = None
 
 # ───── CONFIGURATION ─────────────────────────────────────
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
+load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 
 # Environment validation
 REQUIRED_ENV = ["PG_DSN"]
@@ -68,9 +68,9 @@ STATE_ENRICHED = "enriched"          # FIXED: Match schema enum values
 STATE_PROMPT_ASSIGNED = "enriched"   # Keep in enriched state until LLM processes
 
 # A/B Testing configuration
-EXPERIMENT_CONFIG_FILE = os.getenv("EXPERIMENT_CONFIG_FILE", "/opt/delphi/ab-test-config.json")
-PROMPTS_BASE_DIR = os.getenv("PROMPTS_BASE_DIR", "/opt/stackstorm/packs/delphi/prompts")
-DEFAULT_PROMPT_TYPE = os.getenv("DEFAULT_PROMPT_TYPE", "delphi_notify_short")
+EXPERIMENT_CONFIG_FILE = os.getenv("EXPERIMENT_CONFIG_FILE", "/opt/wazuh/ab-test-config.json")
+PROMPTS_BASE_DIR = os.getenv("PROMPTS_BASE_DIR", "/opt/stackstorm/packs/wazuh/prompts")
+DEFAULT_PROMPT_TYPE = os.getenv("DEFAULT_PROMPT_TYPE", "wazuh_notify_short")
 
 # Performance configuration
 BATCH_SIZE = int(os.getenv("AB_TESTER_BATCH_SIZE", "5"))

@@ -13,7 +13,7 @@ policies:
     rotationSupported: false
 
   - name: "Wazuh Alerts"
-    appliesTo: ["Wazuh", "Delphi"]
+    appliesTo: ["Wazuh", "Wazuh"]
     retention:
       default: 24mo
       min: 12mo

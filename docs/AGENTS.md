@@ -8,9 +8,9 @@
 
 For detailed agent architecture documentation, see the inline comments in these files:
 
-- **Agent Management**: `pkg/delphi/agents/types.go` - Complete agent architecture guide and consolidation strategy
-- **Agent Discovery**: `pkg/delphi/agents/mapping.go` - Agent mapping and package recommendation logic  
-- **Agent API**: `pkg/delphi/agents/api.go` - Delphi API integration for agent management
+- **Agent Management**: `pkg/wazuh/agents/types.go` - Complete agent architecture guide and consolidation strategy
+- **Agent Discovery**: `pkg/wazuh/agents/mapping.go` - Agent mapping and package recommendation logic  
+- **Agent API**: `pkg/wazuh/agents/api.go` - Wazuh API integration for agent management
 - **Monitoring Integration**: `pkg/monitoring/` - OpenTelemetry and Telegraf integration patterns
 - **Automation Layer**: `pkg/automation/` - Jenkins and  integration
 

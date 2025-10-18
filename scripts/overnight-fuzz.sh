@@ -160,7 +160,7 @@ echo " Report will be saved to: ${REPORT_FILE}"
 # Define test suites with priorities
 declare -a critical_tests=(
     "FuzzAllEosCommands|./test|${FUZZTIME_LONG}|critical"
-    "FuzzDelphiServicesCommands|./test|${FUZZTIME_LONG}|critical"
+    "FuzzWazuhServicesCommands|./test|${FUZZTIME_LONG}|critical"
 )
 
 declare -a security_tests=(
@@ -174,8 +174,8 @@ declare -a security_tests=(
 )
 
 declare -a command_tests=(
-    "FuzzUpdateCommand|./cmd/delphi/services|${FUZZTIME_MEDIUM}|high"
-    "FuzzServiceWorkerPaths|./cmd/delphi/services|${FUZZTIME_SHORT}|medium"
+    "FuzzUpdateCommand|./cmd/wazuh/services|${FUZZTIME_MEDIUM}|high"
+    "FuzzServiceWorkerPaths|./cmd/wazuh/services|${FUZZTIME_SHORT}|medium"
     "FuzzCommandParsing|./pkg/eos_cli|${FUZZTIME_SHORT}|medium"
     "FuzzEosCommandFlags|./test|${FUZZTIME_SHORT}|medium"
 )

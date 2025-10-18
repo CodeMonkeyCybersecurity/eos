@@ -36,13 +36,7 @@ func init() {
 	// Add the major sub-commands
 	ReadCmd.AddCommand(InspectCmd)
 	ReadCmd.AddCommand(ReadDiskCmd)
-	ReadCmd.AddCommand(readDelphiCmd)
+	ReadCmd.AddCommand(readWazuhCmd)
 	ReadCmd.AddCommand(readHecateCmd)
 	ReadCmd.AddCommand(readSecretsCmd)
-	ReadCmd.AddCommand(analyzeABResultsCmd)
-	ReadCmd.AddCommand(parserHealthCmd)
-	ReadCmd.AddCommand(pipelineAllCmd)
-	ReadCmd.AddCommand(pipelineAlertsCmd)
-	ReadCmd.AddCommand(pipelinePromptsCmd)
-	ReadCmd.AddCommand(pipelineServicesCmd)
 }

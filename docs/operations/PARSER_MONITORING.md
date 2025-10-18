@@ -2,7 +2,7 @@
 
 *Last Updated: 2025-01-14*
 
-The `parser-monitor` service provides comprehensive observability for the Delphi prompt-aware parsing system.
+The `parser-monitor` service provides comprehensive observability for the Wazuh prompt-aware parsing system.
 
 ## Overview
 
@@ -18,29 +18,29 @@ The parser monitoring dashboard tracks:
 
 ```bash
 # Deploy the parser monitoring service
-eos delphi services create parser-monitor
+eos wazuh services create parser-monitor
 
 # Check installation
-eos delphi services read parser-monitor
+eos wazuh services read parser-monitor
 ```
 
 ### 2. Access the Monitoring Dashboard
 
 ```bash
 # Full monitoring dashboard
-eos delphi parser-health
+eos wazuh parser-health
 
 # Health summary only
-eos delphi parser-health --health
+eos wazuh parser-health --health
 
 # Live monitoring (refreshes every 30s)
-eos delphi parser-health --continuous
+eos wazuh parser-health --continuous
 
 # Specific views
-eos delphi parser-health --performance      # Parser metrics
-eos delphi parser-health --failures         # Recent failures
-eos delphi parser-health --recommendations  # Optimization tips
-eos delphi parser-health --circuit-breaker  # Circuit breaker status
+eos wazuh parser-health --performance      # Parser metrics
+eos wazuh parser-health --failures         # Recent failures
+eos wazuh parser-health --recommendations  # Optimization tips
+eos wazuh parser-health --circuit-breaker  # Circuit breaker status
 ```
 
 ### 3. Direct Script Access
@@ -106,8 +106,8 @@ Identifies optimization opportunities:
 The service uses these environment variables:
 
 ```bash
-# In /opt/stackstorm/packs/delphi/.env
-PG_DSN=postgresql://user:pass@host:5432/delphi
+# In /opt/stackstorm/packs/wazuh/.env
+PG_DSN=postgresql://user:pass@host:5432/wazuh
 
 # Optional: Monitor configuration
 MONITOR_DASHBOARD_MODE=health
@@ -178,8 +178,8 @@ fi
 ### Common Issues
 
 **High Parser Failure Rate**
-1. Check recent failures: `eos delphi parser-health --failures`
-2. Review prompt/parser mismatches: `eos delphi parser-health --recommendations`
+1. Check recent failures: `eos wazuh parser-health --failures`
+2. Review prompt/parser mismatches: `eos wazuh parser-health --recommendations`
 3. Check database connectivity and prompt_type assignment
 
 **Circuit Breaker Open**
@@ -194,7 +194,7 @@ fi
 3. Check database notification channels
 
 **Performance Issues**
-1. Monitor parse times: `eos delphi parser-health --performance`
+1. Monitor parse times: `eos wazuh parser-health --performance`
 2. Check for complex regex patterns in parsers
 3. Review database query performance
 4. Consider parser optimization
@@ -217,7 +217,7 @@ tail -f /var/log/postgresql/postgresql-*.log | grep parser_metrics
 The parser-monitor service requires:
 - Python 3 with `psycopg2`, `tabulate`, `python-dotenv`
 - PostgreSQL database with parser_metrics table
-- Access to Delphi database via PG_DSN
+- Access to Wazuh database via PG_DSN
 
 Install dependencies:
 ```bash

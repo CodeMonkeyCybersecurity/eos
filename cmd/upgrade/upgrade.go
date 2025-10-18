@@ -35,4 +35,6 @@ Examples:
 func init() {
 	// Add subcommands here
 	UpgradeCmd.AddCommand(HecateCmd)
+	UpgradeCmd.AddCommand(KVMCmd)
+	UpgradeCmd.AddCommand(WazuhCmd)
 }

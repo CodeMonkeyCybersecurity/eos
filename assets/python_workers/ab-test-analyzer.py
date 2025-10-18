@@ -3,7 +3,7 @@
 # stanley:stanley 0750
 
 """
-A/B Testing Results Analyzer for Delphi Prompt Testing
+A/B Testing Results Analyzer for Wazuh Prompt Testing
 
 This script analyzes the metrics collected by the prompt-ab-tester.py worker
 and provides statistical insights into prompt effectiveness.
@@ -19,7 +19,7 @@ Features:
 Usage:
     python ab-test-analyzer.py --report daily
     python ab-test-analyzer.py --export csv
-    python ab-test-analyzer.py --compare cybersobar delphi_notify_long
+    python ab-test-analyzer.py --compare cybersobar wazuh_notify_long
 """
 
 import argparse
@@ -53,7 +53,7 @@ except ImportError:
 
 # Configuration
 if load_dotenv is not None:
-    load_dotenv("/opt/stackstorm/packs/delphi/.env")
+    load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 
 PG_DSN = os.getenv("PG_DSN")
 METRICS_FILE = os.environ.get("METRICS_FILE", "/var/log/stackstorm/ab-test-metrics.log")
@@ -408,7 +408,7 @@ class ABTestAnalyzer:
             else:
                 # Plain text report
                 with open(output_file, 'w', encoding='utf-8') as f:
-                    f.write("DELPHI A/B TESTING ANALYSIS REPORT\n")
+                    f.write("WAZUH A/B TESTING ANALYSIS REPORT\n")
                     f.write("=" * 50 + "\n\n")
                     f.write(f"Generated: {results['analysis_timestamp']}\n")
                     f.write(f"Data Points: {results['data_points']}\n\n")
@@ -439,7 +439,7 @@ class ABTestAnalyzer:
         recommendations = self.generate_recommendations()
         
         print("\n" + "=" * 60)
-        print("DELPHI A/B TESTING SUMMARY REPORT")
+        print("WAZUH A/B TESTING SUMMARY REPORT")
         print("=" * 60)
         print(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"Data Points Analyzed: {len(self.metrics_data)}")
@@ -468,7 +468,7 @@ class ABTestAnalyzer:
 
 def main():
     """Main CLI interface"""
-    parser = argparse.ArgumentParser(description="Delphi A/B Testing Analyzer")
+    parser = argparse.ArgumentParser(description="Wazuh A/B Testing Analyzer")
     parser.add_argument("--hours", type=int, default=24, help="Hours of data to analyze (default: 24)")
     parser.add_argument("--source", choices=["file", "database", "both"], default="both", 
                        help="Data source for analysis")

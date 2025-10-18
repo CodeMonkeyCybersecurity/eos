@@ -1,4 +1,4 @@
-# Vault Dynamic Database Credentials for Delphi Dashboard
+# Vault Dynamic Database Credentials for Wazuh Dashboard
 
 *Last Updated: 2025-01-14*
 
@@ -32,16 +32,16 @@ eos self secrets configure
 ### Step 2: Set Database Connection Parameters
 ```bash
 # Set database connection info (pointing to guest database)
-eos self secrets set delphi-db-config
+eos self secrets set wazuh-db-config
 # Host: 100.88.69.11 (or your guest VM IP)
 # Port: 5432
-# Database: delphi
+# Database: wazuh
 ```
 
 ### Step 3: Configure Vault Database Secrets Engine
 ```bash
 # Generate setup commands for database engine
-eos self secrets set delphi-db-engine
+eos self secrets set wazuh-db-engine
 # Follow the generated Vault commands to configure dynamic credentials
 ```
 
@@ -51,18 +51,18 @@ The setup will generate Vault commands like:
 vault secrets enable database
 
 # Configure PostgreSQL connection (run on host)
-vault write database/config/delphi-postgresql \
+vault write database/config/wazuh-postgresql \
     plugin_name=postgresql-database-plugin \
-    connection_url="postgresql://{{username}}:{{password}}@100.88.69.11:5432/delphi?sslmode=disable" \
-    allowed_roles="delphi-readonly" \
+    connection_url="postgresql://{{username}}:{{password}}@100.88.69.11:5432/wazuh?sslmode=disable" \
+    allowed_roles="wazuh-readonly" \
     username="postgres" \
     password="your_admin_password"
 
-# Create read-only role for Delphi
-vault write database/roles/delphi-readonly \
-    db_name=delphi-postgresql \
+# Create read-only role for Wazuh
+vault write database/roles/wazuh-readonly \
+    db_name=wazuh-postgresql \
     creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; \
-                          GRANT CONNECT ON DATABASE delphi TO \"{{name}}\"; \
+                          GRANT CONNECT ON DATABASE wazuh TO \"{{name}}\"; \
                           GRANT USAGE ON SCHEMA public TO \"{{name}}\"; \
                           GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\"; \
                           ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO \"{{name}}\";" \
@@ -79,7 +79,7 @@ eos self secrets test
 eos self secrets status
 
 # Launch dashboard with dynamic credentials
-eos delphi dashboard
+eos wazuh dashboard
 ```
 
 ## Security Benefits
@@ -117,7 +117,7 @@ eos self secrets status
 eos self secrets test
 
 # View dynamic credential info (masked)
-eos self secrets get database/creds/delphi-readonly
+eos self secrets get database/creds/wazuh-readonly
 ```
 
 ## Troubleshooting
@@ -130,10 +130,10 @@ eos self secrets get database/creds/delphi-readonly
 vault secrets list | grep database
 
 # Test direct credential generation
-vault read database/creds/delphi-readonly
+vault read database/creds/wazuh-readonly
 
 # Verify PostgreSQL connectivity from host
-psql -h 100.88.69.11 -U postgres -d delphi
+psql -h 100.88.69.11 -U postgres -d wazuh
 ```
 
 **Error**: `PostgreSQL connection failed`
@@ -165,7 +165,7 @@ eos self secrets configure
 For the database engine to work, ensure the PostgreSQL admin user has sufficient privileges:
 ```sql
 -- Grant necessary permissions to the admin user
-GRANT CREATE ON DATABASE delphi TO postgres;
+GRANT CREATE ON DATABASE wazuh TO postgres;
 GRANT ALL PRIVILEGES ON SCHEMA public TO postgres;
 ALTER USER postgres CREATEROLE;
 ```
@@ -181,21 +181,21 @@ port = 5432
 
 **pg_hba.conf** (add line for host access):
 ```
-host    delphi    all    100.88.69.0/24    md5
+host    wazuh    all    100.88.69.0/24    md5
 ```
 
 ## Fallback Behavior
 
 The system provides graceful fallback in this order:
 1. **Dynamic Credentials**: From Vault database engine
-2. **Static Credentials**: From Vault KV store (`delphi/database/*`)
-3. **Environment Variables**: `PG_DSN`, `DELPHI_DB_*`
+2. **Static Credentials**: From Vault KV store (`wazuh/database/*`)
+3. **Environment Variables**: `PG_DSN`, `WAZUH_DB_*`
 4. **Defaults**: localhost with default credentials
 
 ## Monitoring
 
 ### Vault Metrics
-- Monitor `database/creds/delphi-readonly` access patterns
+- Monitor `database/creds/wazuh-readonly` access patterns
 - Track credential TTL and renewal rates
 - Watch for authentication failures
 
@@ -219,20 +219,20 @@ To migrate from static to dynamic credentials:
 
 1. **Set up dynamic engine** (keeping static as fallback):
    ```bash
-   eos self secrets set delphi-db-config
-   eos self secrets set delphi-db-engine
+   eos self secrets set wazuh-db-config
+   eos self secrets set wazuh-db-engine
    ```
 
 2. **Test dynamic credentials**:
    ```bash
    eos self secrets test
-   eos delphi dashboard  # Should use dynamic credentials
+   eos wazuh dashboard  # Should use dynamic credentials
    ```
 
 3. **Remove static credentials** (optional):
    ```bash
    # Only after confirming dynamic credentials work
-   vault kv delete secret/delphi/database/password
+   vault kv delete secret/wazuh/database/password
    ```
 
 ## Python Worker Integration
@@ -240,7 +240,7 @@ To migrate from static to dynamic credentials:
 The Python workers can also be updated to use dynamic credentials:
 
 ```python
-# Example integration in delphi-listener.py
+# Example integration in wazuh-listener.py
 import hvac
 import os
 
@@ -249,7 +249,7 @@ def get_dynamic_db_credentials():
     client = hvac.Client(url=os.getenv('VAULT_ADDR'))
     client.token = os.getenv('VAULT_TOKEN')
     
-    response = client.read('database/creds/delphi-readonly')
+    response = client.read('database/creds/wazuh-readonly')
     return {
         'username': response['data']['username'],
         'password': response['data']['password'],

@@ -1,8 +1,8 @@
-# Delphi Prompt A/B Testing System
+# Wazuh Prompt A/B Testing System
 
 ## Overview
 
-The Delphi A/B Testing System enables sophisticated testing of different system prompts to optimize AI response quality, efficiency, and cost-effectiveness. Instead of using the same prompt for every alert, this system randomly selects from configured prompt variants and tracks their performance.
+The Wazuh A/B Testing System enables sophisticated testing of different system prompts to optimize AI response quality, efficiency, and cost-effectiveness. Instead of using the same prompt for every alert, this system randomly selects from configured prompt variants and tracks their performance.
 
 ## Architecture
 
@@ -17,7 +17,7 @@ The Delphi A/B Testing System enables sophisticated testing of different system 
 
 ```mermaid
 graph TD
-    A[Wazuh Alert] --> B[delphi-listener.py]
+    A[Wazuh Alert] --> B[wazuh-listener.py]
     B --> C[alert-to-db.py]
     C --> D[agent-enricher.py]
     D --> E[PostgreSQL Notification: 'agent_enriched']
@@ -27,7 +27,7 @@ graph TD
     H --> I[Azure OpenAI API]
     I --> J[Update Database + Metrics]
     J --> K[Notify: 'new_response']
-    K --> L[delphi-emailer.py]
+    K --> L[wazuh-emailer.py]
 ```
 
 ## Configuration
@@ -36,7 +36,7 @@ graph TD
 
 ```json
 {
-  "name": "delphi_prompt_effectiveness_test",
+  "name": "wazuh_prompt_effectiveness_test",
   "description": "A/B/C testing of different system prompts",
   "enabled": true,
   "start_date": "2025-01-01T00:00:00Z", 
@@ -50,8 +50,8 @@ graph TD
       "description": "ISOBAR framework for structured security communications"
     },
     {
-      "name": "delphi_notify_long", 
-      "prompt_file": "delphi-notify-long.txt",
+      "name": "wazuh_notify_long", 
+      "prompt_file": "wazuh-notify-long.txt",
       "weight": 0.3,
       "description": "Detailed user-friendly explanations"
     }
@@ -86,9 +86,9 @@ sudo cp prompt-ab-tester.service /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # Copy configuration
-sudo mkdir -p /opt/delphi
-sudo cp ab-test-config.json /opt/delphi/
-sudo chown stanley:stanley /opt/delphi/ab-test-config.json
+sudo mkdir -p /opt/wazuh
+sudo cp ab-test-config.json /opt/wazuh/
+sudo chown stanley:stanley /opt/wazuh/ab-test-config.json
 ```
 
 ### 2. Create Required Directories
@@ -101,11 +101,11 @@ sudo mkdir -p /srv/eos/system-prompts
 
 ### 3. Environment Variables
 
-Add to `/opt/stackstorm/packs/delphi/.env`:
+Add to `/opt/stackstorm/packs/wazuh/.env`:
 
 ```bash
 # A/B Testing Configuration
-EXPERIMENT_CONFIG_FILE=/opt/delphi/ab-test-config.json
+EXPERIMENT_CONFIG_FILE=/opt/wazuh/ab-test-config.json
 SYSTEM_PROMPTS_DIR=/srv/eos/system-prompts
 DEFAULT_PROMPT_FILE=/srv/eos/system-prompts/default.txt
 
@@ -151,7 +151,7 @@ cat /var/log/stackstorm/prompt-ab-tester.heartbeat
 python3 /usr/local/bin/ab-test-analyzer.py --hours 24
 
 # Compare two variants statistically
-python3 /usr/local/bin/ab-test-analyzer.py --compare cybersobar delphi_notify_long
+python3 /usr/local/bin/ab-test-analyzer.py --compare cybersobar wazuh_notify_long
 
 # Export results to CSV
 python3 /usr/local/bin/ab-test-analyzer.py --export csv --hours 168
@@ -163,7 +163,7 @@ python3 /usr/local/bin/ab-test-analyzer.py --cost-per-1k-tokens 0.002
 ### Sample Analysis Output
 
 ```
-DELPHI A/B TESTING SUMMARY REPORT
+WAZUH A/B TESTING SUMMARY REPORT
 ============================================================
 Generated: 2025-06-24 20:30:00
 Data Points Analyzed: 1,247
@@ -177,7 +177,7 @@ VARIANT PERFORMANCE:
    Avg Response Time: 2.34s
    Avg Tokens/Request: 892.1
 
- DELPHI_NOTIFY_LONG:
+ WAZUH_NOTIFY_LONG:
    Requests: 374
    Success Rate: 96.5%
    Avg Response Time: 1.87s
@@ -191,7 +191,7 @@ Avg Cost per Request: $0.0015
  RECOMMENDATIONS:
 ------------------
 1. Best performing variant: 'cybersobar' (success rate: 97.8%)
-2. Fastest variant: 'delphi_notify_long' (avg response time: 1.87s)
+2. Fastest variant: 'wazuh_notify_long' (avg response time: 1.87s)
 ```
 
 ## Prompt Management Integration
@@ -200,16 +200,16 @@ The A/B testing system integrates with the Eos CLI prompt management:
 
 ```bash
 # List available prompts for testing
-eos delphi prompts list
+eos wazuh prompts list
 
 # Create new test variant
-eos delphi prompts create security-focused --description "Security-focused prompt variant"
+eos wazuh prompts create security-focused --description "Security-focused prompt variant"
 
 # Validate prompt quality
-eos delphi prompts validate security-focused
+eos wazuh prompts validate security-focused
 
 # Update experiment configuration to include new variant
-# Edit /opt/delphi/ab-test-config.json
+# Edit /opt/wazuh/ab-test-config.json
 ```
 
 ## Advanced Features
@@ -284,7 +284,7 @@ Comprehensive metrics are logged including:
 # Test configuration loading
 python3 -c "
 import json
-with open('/opt/delphi/ab-test-config.json') as f:
+with open('/opt/wazuh/ab-test-config.json') as f:
     config = json.load(f)
 print('Config loaded successfully:', config['name'])
 "
@@ -296,7 +296,7 @@ ls -la /srv/eos/system-prompts/
 python3 -c "
 import psycopg2
 from dotenv import load_dotenv
-load_dotenv('/opt/stackstorm/packs/delphi/.env')
+load_dotenv('/opt/stackstorm/packs/wazuh/.env')
 import os
 conn = psycopg2.connect(os.getenv('PG_DSN'))
 print('Database connection: SUCCESS')
@@ -376,4 +376,4 @@ For issues or questions:
 - **Logs**: `/var/log/stackstorm/prompt-ab-tester.log`
 - **Metrics**: `/var/log/stackstorm/ab-test-metrics.log` 
 - **Service status**: `systemctl status prompt-ab-tester.service`
-- **Documentation**: https://wiki.cybermonkey.net.au/delphi/ab-testing
+- **Documentation**: https://wiki.cybermonkey.net.au/wazuh/ab-testing

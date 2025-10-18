@@ -1,9 +1,9 @@
 // cmd/read/wazuh_version.go
 //
-// Delphi Version Information Commands
+// # Wazuh Version Information Commands
 //
-// This file implements CLI commands for viewing Delphi version information,
-// checking for updates, and managing version cache. Since Delphi is your own
+// This file implements CLI commands for viewing Wazuh version information,
+// checking for updates, and managing version cache. Since Wazuh is your own
 // implementation of Wazuh, this provides a user-friendly interface to the
 // underlying version management system.
 //
@@ -16,8 +16,8 @@
 // - eos read wazuh-version --clear-cache      # Clear version cache
 //
 // Integration:
-// These commands work with the centralized Delphi version management system to provide
-// consistent version information across your Delphi infrastructure. The system
+// These commands work with the centralized Wazuh version management system to provide
+// consistent version information across your Wazuh infrastructure. The system
 // automatically fetches the latest versions and respects your configured policies.
 package read
 
@@ -27,7 +27,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/wazuh"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -65,12 +65,12 @@ func init() {
 
 func runReadWazuhVersion(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Get latest Delphi version
-	latestVersion, err := delphi.GetLatestDelphiVersion(rc)
+
+	// Get latest Wazuh version
+	latestVersion, err := wazuh.GetLatestWazuhVersion(rc)
 	if err != nil {
-		logger.Warn("Failed to get latest Delphi version", zap.Error(err))
-		latestVersion = delphi.DefaultDelphiVersion
+		logger.Warn("Failed to get latest Wazuh version", zap.Error(err))
+		latestVersion = wazuh.DefaultWazuhVersion
 	}
 
 	// Handle version comparison
@@ -79,10 +79,10 @@ func runReadWazuhVersion(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	}
 
 	// Default: show current and latest version info
-	logger.Info("=== Delphi Version Information ===")
+	logger.Info("=== Wazuh Version Information ===")
 	logger.Info(fmt.Sprintf("Latest Version: %s", latestVersion))
-	logger.Info("Note: This shows the latest Wazuh version compatible with your Delphi implementation")
-	
+	logger.Info("Note: This shows the latest Wazuh version compatible with your Wazuh implementation")
+
 	return nil
 }
 
@@ -101,7 +101,7 @@ func handleVersionComparison(rc *eos_io.RuntimeContext, compareStr string) error
 	logger.Info("=== Version Comparison ===")
 	logger.Info(fmt.Sprintf("Version 1: %s", v1))
 	logger.Info(fmt.Sprintf("Version 2: %s", v2))
-	
+
 	if v1 == v2 {
 		logger.Info(fmt.Sprintf("Result: %s = %s", v1, v2))
 	} else if v1 < v2 {

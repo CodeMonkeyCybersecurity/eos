@@ -73,7 +73,7 @@ func NewServiceManager(rc *eos_io.RuntimeContext) *shared.SystemdServiceManager 
 
 Resolved naming conflicts with existing ServiceManager:
 
-- **Old**: `shared.ServiceManager` (Delphi-specific with registry)
+- **Old**: `shared.ServiceManager` (Wazuh-specific with registry)
 - **New**: `shared.SystemdServiceManager` (General systemd operations)
 
 ## Files Modified

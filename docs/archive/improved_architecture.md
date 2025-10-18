@@ -1,11 +1,11 @@
-# Improved Delphi Architecture
+# Improved Wazuh Architecture
 
 ## Message Queue Migration
 
 Replace PostgreSQL NOTIFY/LISTEN with Redis Streams for true event-driven architecture:
 
 ```go
-// pkg/delphi/queue/redis_stream.go
+// pkg/wazuh/queue/redis_stream.go
 type StreamProcessor struct {
     client redis.Client
     logger *otelzap.Logger
@@ -13,7 +13,7 @@ type StreamProcessor struct {
 
 func (s *StreamProcessor) PublishAlert(alert *Alert) error {
     return s.client.XAdd(ctx, &redis.XAddArgs{
-        Stream: "delphi:alerts",
+        Stream: "wazuh:alerts",
         Values: map[string]interface{}{
             "alert_id": alert.ID,
             "level": alert.Level,
@@ -27,7 +27,7 @@ func (s *StreamProcessor) ConsumeAlerts(consumerGroup string, handler AlertHandl
         streams, err := s.client.XReadGroup(ctx, &redis.XReadGroupArgs{
             Group:    consumerGroup,
             Consumer: "worker-" + os.Getenv("HOSTNAME"),
-            Streams:  []string{"delphi:alerts", ">"},
+            Streams:  []string{"wazuh:alerts", ">"},
             Count:    10,
             Block:    time.Second * 5,
         }).Result()
@@ -47,7 +47,7 @@ func (s *StreamProcessor) ConsumeAlerts(consumerGroup string, handler AlertHandl
                 }
                 
                 // Acknowledge successful processing
-                s.client.XAck(ctx, "delphi:alerts", consumerGroup, message.ID)
+                s.client.XAck(ctx, "wazuh:alerts", consumerGroup, message.ID)
             }
         }
     }
@@ -57,7 +57,7 @@ func (s *StreamProcessor) ConsumeAlerts(consumerGroup string, handler AlertHandl
 ## State Machine Implementation
 
 ```go
-// pkg/delphi/state/machine.go
+// pkg/wazuh/state/machine.go
 type AlertState string
 
 const (
@@ -126,7 +126,7 @@ func (sm *StateMachine) Transition(alertID string, newState AlertState) error {
 ## Circuit Breaker Implementation
 
 ```go
-// pkg/delphi/circuit/breaker.go
+// pkg/wazuh/circuit/breaker.go
 type CircuitBreaker struct {
     name           string
     maxFailures    int

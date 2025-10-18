@@ -2,13 +2,13 @@
 # /usr/local/bin/email-formatter.py
 # stanley:stanley 0750
 """
-Email Formatter Worker - Phase 5 of Delphi Pipeline
+Email Formatter Worker - Phase 5 of Wazuh Pipeline
 Formats structured alert data into professional HTML/plain text emails
 
 IMPROVEMENTS:
 - Fixed state case sensitivity to match schema.sql ('structured' not 'STRUCTURED')
 - Simplified template system focused on actual LLM response formats
-- Added proper handling for ISOBAR, Delphi Notify, and Brief formats
+- Added proper handling for ISOBAR, Wazuh Notify, and Brief formats
 - Enhanced error handling and recovery
 - Improved database schema alignment
 - Added comprehensive monitoring and health checks
@@ -49,7 +49,7 @@ except ImportError:
     sdnotify = None
 
 # ───── CONFIGURATION ─────────────────────────────────────
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
+load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 
 # Environment validation
 REQUIRED_ENV = ["PG_DSN"]
@@ -67,9 +67,9 @@ STATE_STRUCTURED = "structured"  # FIXED: Lowercase to match schema.sql enum
 STATE_FORMATTED = "formatted"
 
 # Template and formatting configuration
-TIMEZONE = os.getenv("DELPHI_TIMEZONE", "Australia/Perth")
+TIMEZONE = os.getenv("WAZUH_TIMEZONE", "Australia/Perth")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@cybermonkey.net.au")
-ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "Delphi Security")
+ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "Wazuh Security")
 BRAND_COLOR = os.getenv("BRAND_COLOR", "#2c3e50")
 
 # Performance configuration
@@ -79,8 +79,8 @@ MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", "50000"))  # Prevent ma
 class PromptType(Enum):
     """Supported prompt types for specialized formatting"""
     ISOBAR = "security_analysis"
-    DELPHI_NOTIFY = "delphi_notify_short"
-    DELPHI_BRIEF = "delphi_notify_brief"
+    WAZUH_NOTIFY = "wazuh_notify_short"
+    WAZUH_BRIEF = "wazuh_notify_brief"
     EXECUTIVE = "executive_summary"
     INVESTIGATION = "investigation_guide"
     HYBRID = "hybrid"
@@ -360,11 +360,11 @@ class ISOBARFormatter(BaseEmailFormatter):
         
         return "\n".join(lines)
 
-class DelphiNotifyFormatter(BaseEmailFormatter):
-    """Formatter for Delphi Notify responses (user-friendly)"""
+class WazuhNotifyFormatter(BaseEmailFormatter):
+    """Formatter for Wazuh Notify responses (user-friendly)"""
     
     def format(self, data: Dict[str, Any]) -> FormattedEmail:
-        """Format Delphi Notify structured data"""
+        """Format Wazuh Notify structured data"""
         sections = data.get('sections', {})
         metadata = data.get('metadata', {})
         
@@ -386,22 +386,22 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
         subject = f"{risk_level} - Security Alert for {agent_name}"
         
         # Build content
-        html_body = self._build_delphi_html(sections, metadata, subject)
-        plain_body = self._build_delphi_plain(sections, metadata, subject)
+        html_body = self._build_wazuh_html(sections, metadata, subject)
+        plain_body = self._build_wazuh_plain(sections, metadata, subject)
         
         return FormattedEmail(
             subject=subject,
             html_body=html_body,
             plain_body=plain_body,
             metadata={
-                'prompt_type': 'DELPHI_NOTIFY',
+                'prompt_type': 'WAZUH_NOTIFY',
                 'risk_level': risk_level,
                 'formatted_at': datetime.now(timezone.utc).isoformat()
             }
         )
     
-    def _build_delphi_html(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
-        """Build HTML for Delphi Notify format"""
+    def _build_wazuh_html(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
+        """Build HTML for Wazuh Notify format"""
         timestamp_str = self._format_timestamp(metadata.get('timestamp', ''))
         
         # Friendly header
@@ -413,8 +413,8 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
         </div>
         """
         
-        # Delphi section mapping
-        delphi_sections = [
+        # Wazuh section mapping
+        wazuh_sections = [
             ('summary', 'Summary', '#3498db', ''),
             ('what_happened', 'What Happened', '#e74c3c', ''),
             ('further_investigation', 'Further Investigation', '#f39c12', ''),
@@ -425,7 +425,7 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
         ]
         
         cards = []
-        for section_key, section_title, color, icon in delphi_sections:
+        for section_key, section_title, color, icon in wazuh_sections:
             content = sections.get(section_key, '')
             if content:
                 content = self._truncate_content(content)
@@ -469,8 +469,8 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
         </body></html>
         """
     
-    def _build_delphi_plain(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
-        """Build plain text for Delphi Notify format"""
+    def _build_wazuh_plain(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
+        """Build plain text for Wazuh Notify format"""
         lines = [
             f"SECURITY ALERT",
             f"=" * 30,
@@ -479,7 +479,7 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
             "",
         ]
         
-        delphi_sections = [
+        wazuh_sections = [
             ('summary', 'SUMMARY'),
             ('what_happened', 'WHAT HAPPENED'),
             ('further_investigation', 'FURTHER INVESTIGATION'),
@@ -489,7 +489,7 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
             ('what_to_ask_next', 'WHAT TO ASK NEXT')
         ]
         
-        for section_key, section_title in delphi_sections:
+        for section_key, section_title in wazuh_sections:
             content = sections.get(section_key, '')
             if content:
                 content = self._truncate_content(content)
@@ -514,13 +514,13 @@ class EmailFormatterFactory:
         """Create formatter based on prompt type"""
         if prompt_type in ['security_analysis', 'isobar']:
             return ISOBARFormatter()
-        elif prompt_type in ['delphi_notify_short', 'delphi_notify_brief', 'delphi_brief']:
-            return DelphiNotifyFormatter()
+        elif prompt_type in ['wazuh_notify_short', 'wazuh_notify_brief', 'wazuh_brief']:
+            return WazuhNotifyFormatter()
         elif prompt_type in ['executive_summary', 'investigation_guide']:
             return ISOBARFormatter()  # These use similar structured format
         else:
-            log.warning("Unknown prompt type '%s', using Delphi Notify formatter", prompt_type)
-            return DelphiNotifyFormatter()
+            log.warning("Unknown prompt type '%s', using Wazuh Notify formatter", prompt_type)
+            return WazuhNotifyFormatter()
 
 # ───── DATABASE OPERATIONS ─────────────────────────────────
 class DatabaseManager:

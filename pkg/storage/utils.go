@@ -1,10 +1,14 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 // ParseSize parses size strings like "100G", "1T", "500M" to bytes
@@ -273,4 +277,49 @@ func StorageStateFromString(s string) StorageState {
 	default:
 		return StorageStateUnknown
 	}
+}
+
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
+func OutputDiskListJSON(result *DiskListResult) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(result)
+}
+
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos
+func OutputDiskListTable(result *DiskListResult) error {
+	if result.Total == 0 {
+		fmt.Println("No disk devices found.")
+		return nil
+	}
+
+	fmt.Printf("Found %d disk devices\n", result.Total)
+	fmt.Printf("Listed at: %s\n", result.Timestamp.Format("2006-01-02 15:04:05"))
+
+	// Print header
+	fmt.Printf("%-12s %-15s %-10s %-15s %-15s %s\n",
+		"DEVICE", "NAME", "SIZE", "VENDOR", "MODEL", "MOUNT POINTS")
+	fmt.Println(strings.Repeat("-", 90))
+
+	// Print disks
+	for _, disk := range result.Disks {
+		mountPoints := "-"
+		if len(disk.Mountpoints) > 0 {
+			var points []string
+			for _, mp := range disk.Mountpoints {
+				points = append(points, mp.Path)
+			}
+			mountPoints = strings.Join(points, ",")
+		}
+
+		fmt.Printf("%-12s %-15s %-10s %-15s %-15s %s\n",
+			disk.Device,
+			utils.TruncateString(disk.Name, 15),
+			disk.SizeHuman,
+			utils.TruncateString(disk.Vendor, 15),
+			utils.TruncateString(disk.Model, 15),
+			utils.TruncateString(mountPoints, 25))
+	}
+
+	return nil
 }

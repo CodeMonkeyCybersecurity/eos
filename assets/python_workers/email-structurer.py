@@ -2,7 +2,7 @@
 # /usr/local/bin/email-structurer.py
 # stanley:stanley 0750
 """
-Email Structurer Worker - Phase 4 of Delphi Pipeline
+Email Structurer Worker - Phase 4 of Wazuh Pipeline
 Parses LLM responses into structured sections for email formatting
 
 IMPROVEMENTS:
@@ -43,7 +43,7 @@ except ImportError:
     sdnotify = None
 
 # ───── CONFIGURATION ─────────────────────────────────────
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
+load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 
 # Environment validation
 REQUIRED_ENV = ["PG_DSN"]
@@ -68,8 +68,8 @@ CIRCUIT_BREAKER_TIMEOUT = int(os.getenv("PARSER_FAILURE_TIMEOUT", "300"))
 class PromptType(Enum):
     """Known prompt types from your LLM worker"""
     ISOBAR = "security_analysis"
-    DELPHI_NOTIFY = "delphi_notify_short" 
-    DELPHI_BRIEF = "delphi_notify_brief"
+    WAZUH_NOTIFY = "wazuh_notify_short" 
+    WAZUH_BRIEF = "wazuh_notify_brief"
     EXECUTIVE = "executive_summary"
     INVESTIGATION = "investigation_guide"
     HYBRID = "hybrid"
@@ -303,9 +303,9 @@ class ISOBARParser(BaseParser):
             
         return [ref.strip() for ref in references if ref.strip()]
 
-# ───── DELPHI NOTIFY PARSER ─────────────────────────────
-class DelphiNotifyParser(BaseParser):
-    """Parser for Delphi Notify responses (user-friendly format)"""
+# ───── WAZUH NOTIFY PARSER ─────────────────────────────
+class WazuhNotifyParser(BaseParser):
+    """Parser for Wazuh Notify responses (user-friendly format)"""
     
     def get_expected_sections(self) -> List[str]:
         return [
@@ -314,15 +314,15 @@ class DelphiNotifyParser(BaseParser):
         ]
     
     def parse(self, response_text: str, alert_context: Dict[str, Any]) -> ParseResult:
-        """Parse Delphi Notify response format"""
+        """Parse Wazuh Notify response format"""
         start_time = time.perf_counter()
         
         try:
-            sections = self._extract_delphi_sections(response_text)
-            subject = self._generate_delphi_subject(sections, alert_context)
+            sections = self._extract_wazuh_sections(response_text)
+            subject = self._generate_wazuh_subject(sections, alert_context)
             
             metadata = {
-                "format_type": "DELPHI_NOTIFY",
+                "format_type": "WAZUH_NOTIFY",
                 "risk_level": self._extract_risk_level(sections.get('summary', '')),
                 "confidence_indicators": self._extract_confidence_indicators(response_text)
             }
@@ -342,17 +342,17 @@ class DelphiNotifyParser(BaseParser):
             return ParseResult(
                 success=False,
                 sections={},
-                subject="Failed to Parse Delphi Notify Response",
-                metadata={"format_type": "DELPHI_NOTIFY"},
+                subject="Failed to Parse Wazuh Notify Response",
+                metadata={"format_type": "WAZUH_NOTIFY"},
                 error=str(e),
                 parse_time_ms=parse_time_ms
             )
     
-    def _extract_delphi_sections(self, text: str) -> Dict[str, str]:
-        """Extract Delphi Notify sections"""
+    def _extract_wazuh_sections(self, text: str) -> Dict[str, str]:
+        """Extract Wazuh Notify sections"""
         sections = {}
         
-        # Section patterns for Delphi format
+        # Section patterns for Wazuh format
         section_patterns = {
             "summary": r"(?:^|\n)Summary:\s*(.*?)(?=(?:\n(?:What happened|Further investigation|What to do|How to check|How to prevent|What to ask):|$))",
             "what_happened": r"(?:^|\n)What happened(?:\s*\([^)]*\))?:\s*(.*?)(?=(?:\n(?:Summary|Further investigation|What to do|How to check|How to prevent|What to ask):|$))",
@@ -379,15 +379,15 @@ class DelphiNotifyParser(BaseParser):
         return match.group(1).upper() if match else "UNKNOWN"
     
     def _extract_confidence_indicators(self, text: str) -> Dict[str, str]:
-        """Extract confidence indicators from Delphi text"""
+        """Extract confidence indicators from Wazuh text"""
         # Pattern for confidence expressions like "fairly sure - 80%"
         confidence_pattern = r"(?:very likely|probably|might be|unsure|fairly confident|very sure|best guess)(?:\s*[-–—]\s*\d+%?)?"
         matches = re.findall(confidence_pattern, text, re.IGNORECASE)
         
         return {"confidence_expressions": matches}
     
-    def _generate_delphi_subject(self, sections: Dict[str, str], alert_context: Dict[str, Any]) -> str:
-        """Generate user-friendly subject for Delphi Notify"""
+    def _generate_wazuh_subject(self, sections: Dict[str, str], alert_context: Dict[str, Any]) -> str:
+        """Generate user-friendly subject for Wazuh Notify"""
         agent_name = alert_context.get('agent_name', 'Your Computer')
         
         # Extract risk level from summary
@@ -412,13 +412,13 @@ class ParserFactory:
         """Create parser based on prompt type"""
         if prompt_type in ['security_analysis', 'isobar']:
             return ISOBARParser()
-        elif prompt_type in ['delphi_notify_short', 'delphi_notify_brief', 'delphi_brief']:
-            return DelphiNotifyParser()
+        elif prompt_type in ['wazuh_notify_short', 'wazuh_notify_brief', 'wazuh_brief']:
+            return WazuhNotifyParser()
         elif prompt_type in ['executive_summary', 'investigation_guide']:
             return ISOBARParser()  # These use similar structured format
         else:
-            log.warning("Unknown prompt type '%s', using Delphi Notify parser", prompt_type)
-            return DelphiNotifyParser()  # Safe default for user-facing content
+            log.warning("Unknown prompt type '%s', using Wazuh Notify parser", prompt_type)
+            return WazuhNotifyParser()  # Safe default for user-facing content
 
 # ───── CIRCUIT BREAKER ─────────────────────────────────
 class SimpleCircuitBreaker:

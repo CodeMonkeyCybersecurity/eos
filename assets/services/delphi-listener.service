@@ -1,11 +1,11 @@
-# /etc/systemd/system/delphi-listener.service
+# /etc/systemd/system/wazuh-listener.service
 [Unit]
-Description=Wazuh → Delphi webhook listener
+Description=Wazuh → Wazuh webhook listener
 After=network.target
 StartLimitIntervalSec=300
 
 [Service]
-ExecStart=/usr/bin/python3 /usr/local/bin/delphi-listener.py
+ExecStart=/usr/bin/python3 /usr/local/bin/wazuh-listener.py
 Restart=always
 RestartSec=5
 StartLimitBurst=5
@@ -13,7 +13,7 @@ Type=notify
 User=stanley
 StandardOutput=journal
 StandardError=journal
-EnvironmentFile=/opt/stackstorm/packs/delphi/.env
+EnvironmentFile=/opt/stackstorm/packs/wazuh/.env
 WorkingDirectory=/usr/local/bin
 Environment="PYTHONUNBUFFERED=1"
 

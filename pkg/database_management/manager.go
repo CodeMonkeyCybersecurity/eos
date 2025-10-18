@@ -318,7 +318,7 @@ func (dm *DatabaseManager) setupDatabaseEngine(rc *eos_io.RuntimeContext, option
 	// Configure PostgreSQL connection
 	connectionName := options.ConnectionName
 	if connectionName == "" {
-		connectionName = "delphi-postgresql"
+		connectionName = "wazuh-postgresql"
 	}
 
 	config := options.DatabaseConfig
@@ -330,7 +330,7 @@ func (dm *DatabaseManager) setupDatabaseEngine(rc *eos_io.RuntimeContext, option
 	configData := map[string]string{
 		"plugin_name":    "postgresql-database-plugin",
 		"connection_url": connectionURL,
-		"allowed_roles":  "delphi-readonly",
+		"allowed_roles":  "wazuh-readonly",
 		"username":       options.AdminUsername,
 		"password":       options.AdminPassword,
 	}

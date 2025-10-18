@@ -1,4 +1,4 @@
--- /opt/stackstorm/packs/delphi/sql/schema_v2.sql
+-- /opt/stackstorm/packs/wazuh/sql/schema_v2.sql
 -- This schema supports intelligent prompt selection and parsing
 -- Last Updated: Database migration completed with enhanced monitoring views
 
@@ -23,7 +23,7 @@ CREATE TYPE parser_type AS ENUM (
     'security_analysis',
     'executive_summary',
     'investigation_guide',
-    'delphi_notify_short',
+    'wazuh_notify_short',
     'hybrid',
     'custom'
 );

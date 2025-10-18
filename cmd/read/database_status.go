@@ -26,7 +26,7 @@ This command provides detailed database status including:
 - Uptime information
 
 Examples:
-  eos read database-status --host localhost --database delphi
+  eos read database-status --host localhost --database wazuh
   eos read database-status --json                           # JSON output
   eos read database-status --host 192.168.1.100 --username myuser`,
 

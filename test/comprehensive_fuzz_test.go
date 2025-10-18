@@ -33,15 +33,15 @@ func FuzzAllEosCommands(f *testing.F) {
 	f.Add("enable", "service", "")
 	f.Add("sync", "configs", "")
 	f.Add("hecate", "status", "")
-	f.Add("delphi", "services", "update")
-	f.Add("delphi", "services", "create")
-	f.Add("delphi", "status", "")
+	f.Add("wazuh", "services", "update")
+	f.Add("wazuh", "services", "create")
+	f.Add("wazuh", "status", "")
 	f.Add("inspect", "terraform", "")
 	f.Add("pandora", "status", "")
 	f.Add("ragequit", "", "")
 
 	// Seed with problematic patterns that previously caused crashes
-	f.Add("delphi", "services", "--all")
+	f.Add("wazuh", "services", "--all")
 	f.Add("", "", "")
 	f.Add("help", "", "")
 	f.Add("--help", "", "")
@@ -129,12 +129,12 @@ func FuzzEosCommandFlags(f *testing.F) {
 	})
 }
 
-// FuzzDelphiServicesCommands focuses on the problematic delphi services commands
-func FuzzDelphiServicesCommands(f *testing.F) {
+// FuzzWazuhServicesCommands focuses on the problematic wazuh services commands
+func FuzzWazuhServicesCommands(f *testing.F) {
 	// Seed with service names that caused crashes
 	f.Add("update", "alert-to-db")
 	f.Add("update", "ab-test-analyzer")
-	f.Add("update", "delphi-listener")
+	f.Add("update", "wazuh-listener")
 	f.Add("update", "--all")
 	f.Add("create", "alert-to-db")
 	f.Add("create", "ab-test-analyzer")
@@ -145,12 +145,12 @@ func FuzzDelphiServicesCommands(f *testing.F) {
 	f.Fuzz(func(t *testing.T, subCmd, serviceName string) {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("Delphi services command crashed with panic: %v, subCmd: %q, serviceName: %q", r, subCmd, serviceName)
+				t.Errorf("Wazuh services command crashed with panic: %v, subCmd: %q, serviceName: %q", r, subCmd, serviceName)
 			}
 		}()
 
-		// Build delphi services command
-		args := []string{"delphi", "services"}
+		// Build wazuh services command
+		args := []string{"wazuh", "services"}
 		if subCmd != "" {
 			args = append(args, subCmd)
 		}
@@ -199,22 +199,22 @@ func createTestEosCommandTree() *cobra.Command {
 		"enable":   {Use: "enable", RunE: noopRunE},
 		"sync":     {Use: "sync", RunE: noopRunE},
 		"hecate":   {Use: "hecate", RunE: noopRunE},
-		"delphi":   {Use: "delphi", RunE: noopRunE},
+		"wazuh":    {Use: "wazuh", RunE: noopRunE},
 		"inspect":  {Use: "inspect", RunE: noopRunE},
 		"pandora":  {Use: "pandora", RunE: noopRunE},
 		"ragequit": {Use: "ragequit", RunE: noopRunE},
 	}
 
 	// Add subcommands for complex commands
-	// Delphi subcommands
-	delphiServices := &cobra.Command{Use: "services", RunE: noopRunE}
-	delphiServices.AddCommand(
+	// Wazuh subcommands
+	wazuhServices := &cobra.Command{Use: "services", RunE: noopRunE}
+	wazuhServices.AddCommand(
 		&cobra.Command{Use: "update", RunE: noopRunE},
 		&cobra.Command{Use: "create", RunE: noopRunE},
 		&cobra.Command{Use: "status", RunE: noopRunE},
 		&cobra.Command{Use: "list", RunE: noopRunE},
 	)
-	commands["delphi"].AddCommand(delphiServices)
+	commands["wazuh"].AddCommand(wazuhServices)
 
 	// Create subcommands
 	createHCL := &cobra.Command{Use: "hcl", RunE: noopRunE}

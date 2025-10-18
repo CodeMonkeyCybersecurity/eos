@@ -1,6 +1,6 @@
 # Eos Assets Directory
 
-This directory contains all deployment assets for the Eos security monitoring platform, including the Delphi data pipeline, service configurations, and supporting resources.
+This directory contains all deployment assets for the Eos security monitoring platform, including the Wazuh data pipeline, service configurations, and supporting resources.
 
 ## Directory Structure
 
@@ -8,17 +8,17 @@ This directory contains all deployment assets for the Eos security monitoring pl
 assets/
 ├── README.md                    # This file
 ├── email.html                   # HTML email template for alerts
-├── python_workers/              # Core Delphi pipeline services
+├── python_workers/              # Core Wazuh pipeline services
 │   ├── alert-to-db.py           # Ingests alerts into PostgreSQL
-│   ├── custom-delphi-webhook.py # Wazuh webhook integration
-│   ├── delphi-agent-enricher.py # Agent enrichment service
-│   ├── delphi-emailer.py        # Email notification service
-│   ├── delphi-listener.py       # HTTP webhook listener
+│   ├── custom-wazuh-webhook.py # Wazuh webhook integration
+│   ├── wazuh-agent-enricher.py # Agent enrichment service
+│   ├── wazuh-emailer.py        # Email notification service
+│   ├── wazuh-listener.py       # HTTP webhook listener
 │   └── llm-worker.py            # LLM processing service
 ├── services/                    # Systemd service files
-│   ├── delphi-agent-enricher.service
-│   ├── delphi-emailer.service
-│   ├── delphi-listener.service
+│   ├── wazuh-agent-enricher.service
+│   ├── wazuh-emailer.service
+│   ├── wazuh-listener.service
 │   └── llm-worker.service
 └── stackstorm_rules/            # StackStorm integration
     ├── pack.yaml                # StackStorm pack definition
@@ -29,28 +29,28 @@ assets/
 
 ### 🐍 Python Workers (`python_workers/`)
 
-The Delphi security monitoring pipeline consists of six interconnected Python services that process security alerts from Wazuh through to email notifications.
+The Wazuh security monitoring pipeline consists of six interconnected Python services that process security alerts from Wazuh through to email notifications.
 
 #### **Data Flow Pipeline**
 ```
-Wazuh → custom-delphi-webhook.py → delphi-listener.py → alert-to-db.py → delphi-agent-enricher.py → llm-worker.py → delphi-emailer.py
+Wazuh → custom-wazuh-webhook.py → wazuh-listener.py → alert-to-db.py → wazuh-agent-enricher.py → llm-worker.py → wazuh-emailer.py
 ```
 
 #### **Service Descriptions**
 
-##### 1. **custom-delphi-webhook.py**
-- **Purpose**: Wazuh integration script that sends alerts to the Delphi listener
-- **Location**: `/var/ossec/integrations/custom-delphi-webhook.py`
+##### 1. **custom-wazuh-webhook.py**
+- **Purpose**: Wazuh integration script that sends alerts to the Wazuh listener
+- **Location**: `/var/ossec/integrations/custom-wazuh-webhook.py`
 - **Permissions**: `root:wazuh 0750`
 - **Dependencies**: `requests`
 - **Features**:
   - Receives alerts from Wazuh manager
-  - Forwards to delphi-listener via HTTP POST
+  - Forwards to wazuh-listener via HTTP POST
   - Uses X-Auth-Token for authentication
   - Includes test mode with `--test` flag
   - Logs payloads for debugging
 
-##### 2. **delphi-listener.py**
+##### 2. **wazuh-listener.py**
 - **Purpose**: HTTP webhook listener that receives alerts from Wazuh
 - **Port**: 9000 (configurable)
 - **Dependencies**: `python-dotenv` (optional)
@@ -71,7 +71,7 @@ Wazuh → custom-delphi-webhook.py → delphi-listener.py → alert-to-db.py →
   - Comprehensive error handling and logging
   - Configurable via environment variables
 
-##### 4. **delphi-agent-enricher.py**
+##### 4. **wazuh-agent-enricher.py**
 - **Purpose**: Enriches alerts with agent information from Wazuh API
 - **Dependencies**: `requests`, `psycopg2-binary`, `python-dotenv`
 - **Features**:
@@ -91,7 +91,7 @@ Wazuh → custom-delphi-webhook.py → delphi-listener.py → alert-to-db.py →
   - Database state management
   - Error handling and retry logic
 
-##### 6. **delphi-emailer.py**
+##### 6. **wazuh-emailer.py**
 - **Purpose**: Sends email notifications for processed alerts
 - **Dependencies**: `psycopg2-binary`, `python-dotenv`, `pytz`
 - **Features**:
@@ -103,12 +103,12 @@ Wazuh → custom-delphi-webhook.py → delphi-listener.py → alert-to-db.py →
 
 #### **Environment Configuration**
 
-All services read configuration from `/opt/stackstorm/packs/delphi/.env`:
+All services read configuration from `/opt/stackstorm/packs/wazuh/.env`:
 
 ```bash
 # Database Configuration
-PG_DSN="postgresql://user:password@localhost:5432/delphi"
-AGENTS_PG_DSN="postgresql://user:password@localhost:5432/delphi"
+PG_DSN="postgresql://user:password@localhost:5432/wazuh"
+AGENTS_PG_DSN="postgresql://user:password@localhost:5432/wazuh"
 
 # Wazuh API Configuration
 WAZUH_API_URL="https://wazuh-manager:55000"
@@ -134,7 +134,7 @@ WEBHOOK_AUTH_TOKEN="your-secure-token"
 
 ###  Service Files (`services/`)
 
-Systemd service files for managing the Delphi pipeline services.
+Systemd service files for managing the Wazuh pipeline services.
 
 #### **Service Features**
 - **Security Hardening**: `NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=strict`
@@ -145,16 +145,16 @@ Systemd service files for managing the Delphi pipeline services.
 #### **Service Management**
 ```bash
 # Install dependencies
-sudo eos delphi services preflight-install
+sudo eos wazuh services preflight-install
 
 # Start all services
-sudo eos delphi services start --all
+sudo eos wazuh services start --all
 
 # Check status
-sudo eos delphi services status --all
+sudo eos wazuh services status --all
 
 # View logs
-sudo eos delphi services logs delphi-listener
+sudo eos wazuh services logs wazuh-listener
 ```
 
 ###  Email Template (`email.html`)
@@ -172,7 +172,7 @@ Professional HTML email template for security alert notifications.
 - `$subject` - Email subject line
 - `$timestamp` - Alert timestamp
 - `$content` - Alert details and analysis
-- Additional variables populated by delphi-emailer.py
+- Additional variables populated by wazuh-emailer.py
 
 ###  StackStorm Integration (`stackstorm_rules/`)
 
@@ -192,7 +192,7 @@ StackStorm pack configuration for workflow automation.
 ### **Prerequisites**
 ```bash
 # Install Python dependencies
-sudo eos delphi services preflight-install
+sudo eos wazuh services preflight-install
 
 # Install PostgreSQL
 sudo apt install postgresql postgresql-contrib
@@ -203,27 +203,27 @@ sudo apt install postgresql postgresql-contrib
 ### **Database Setup**
 ```sql
 -- Create database and user
-CREATE DATABASE delphi;
-CREATE USER delphi_user WITH PASSWORD 'secure_password';
-GRANT ALL PRIVILEGES ON DATABASE delphi TO delphi_user;
+CREATE DATABASE wazuh;
+CREATE USER wazuh_user WITH PASSWORD 'secure_password';
+GRANT ALL PRIVILEGES ON DATABASE wazuh TO wazuh_user;
 
 -- Apply schema (see sql/schema.sql)
 ```
 
 ### **Service Deployment**
 ```bash
-# Deploy Delphi services
-sudo eos create delphi
+# Deploy Wazuh services
+sudo eos create wazuh
 
 # Deploy webhook integration
-sudo eos create delphi-webhook
+sudo eos create wazuh-webhook
 
 # Start services
-sudo eos delphi services start --all
+sudo eos wazuh services start --all
 ```
 
 ### **Configuration**
-1. Create `/opt/stackstorm/packs/delphi/.env` with required variables
+1. Create `/opt/stackstorm/packs/wazuh/.env` with required variables
 2. Configure Wazuh integration in `/var/ossec/etc/ossec.conf`
 3. Set up email SMTP configuration
 4. Configure Azure OpenAI credentials
@@ -238,20 +238,20 @@ sudo eos delphi services start --all
 ### **Health Checks**
 ```bash
 # Check service status
-sudo eos delphi services status --all
+sudo eos wazuh services status --all
 
 # Check Python dependencies
-sudo eos delphi services check
+sudo eos wazuh services check
 
 # View real-time alerts
-sudo eos delphi watch alerts
+sudo eos wazuh watch alerts
 
 # View agent status
-sudo eos delphi watch agents
+sudo eos wazuh watch agents
 ```
 
 ### **Common Issues**
-1. **Missing Dependencies**: Run `sudo eos delphi services preflight-install`
+1. **Missing Dependencies**: Run `sudo eos wazuh services preflight-install`
 2. **Database Connection**: Verify PostgreSQL is running and DSN is correct
 3. **Wazuh API**: Check API credentials and network connectivity
 4. **Email Delivery**: Verify SMTP configuration and credentials
@@ -317,13 +317,13 @@ sudo eos delphi watch agents
 
 ### **Backup Procedures**
 - Database: Regular PostgreSQL dumps
-- Configuration: Backup `/opt/stackstorm/packs/delphi/`
+- Configuration: Backup `/opt/stackstorm/packs/wazuh/`
 - Logs: Archive important log files
 
 ### **Update Procedures**
-1. Stop services: `sudo eos delphi services stop --all`
+1. Stop services: `sudo eos wazuh services stop --all`
 2. Update code and configurations
-3. Restart services: `sudo eos delphi services start --all`
+3. Restart services: `sudo eos wazuh services start --all`
 4. Verify functionality
 
 ### **Scaling Considerations**

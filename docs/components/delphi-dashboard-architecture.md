@@ -1,20 +1,20 @@
-# Delphi Pipeline Dashboard Architecture
+# Wazuh Pipeline Dashboard Architecture
 
 *Last Updated: 2025-01-14*
 
 ## Overview
 
-The Delphi Dashboard is a unified, interactive terminal-based observability platform built with Bubble Tea that provides comprehensive monitoring and management of the Delphi security alert processing pipeline. It replaces multiple disparate monitoring tools with a single, cohesive interface that offers real-time visibility into all aspects of the system.
+The Wazuh Dashboard is a unified, interactive terminal-based observability platform built with Bubble Tea that provides comprehensive monitoring and management of the Wazuh security alert processing pipeline. It replaces multiple disparate monitoring tools with a single, cohesive interface that offers real-time visibility into all aspects of the system.
 
 ## Core Philosophy
 
-**"Single Interface, Complete Visibility"** - The dashboard provides operators with one interface to monitor, troubleshoot, and manage the entire Delphi pipeline ecosystem, from webhook ingestion to email delivery.
+**"Single Interface, Complete Visibility"** - The dashboard provides operators with one interface to monitor, troubleshoot, and manage the entire Wazuh pipeline ecosystem, from webhook ingestion to email delivery.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Delphi Dashboard Hub                         │
+│                    Wazuh Dashboard Hub                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  F1: Pipeline  │  F2: Services  │  F3: Parsers  │  F4: Alerts  │
 │     Monitor    │   Management   │  Performance  │   Analysis   │
@@ -26,7 +26,7 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 
 ## Dashboard Modules
 
-### 1. Pipeline Monitor (`eos delphi dashboard pipeline`)
+### 1. Pipeline Monitor (`eos wazuh dashboard pipeline`)
 
 **Purpose**: Real-time monitoring of alert flow through processing stages
 
@@ -44,9 +44,9 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 - Bottleneck Analysis
 - Processing Metrics
 
-### 2. Services Management (`eos delphi dashboard services`)
+### 2. Services Management (`eos wazuh dashboard services`)
 
-**Purpose**: Interactive management of Delphi pipeline services
+**Purpose**: Interactive management of Wazuh pipeline services
 
 **Features**:
 - Real-time service status monitoring
@@ -58,8 +58,8 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 - Deployment operations
 
 **Services Managed**:
-- `delphi-listener` - Webhook receiver
-- `delphi-agent-enricher` - Agent metadata enrichment
+- `wazuh-listener` - Webhook receiver
+- `wazuh-agent-enricher` - Agent metadata enrichment
 - `llm-worker` - LLM processing service
 - `email-structurer` - Email structuring with prompt-aware parsing
 - `email-formatter` - HTML/text email generation
@@ -76,7 +76,7 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 - `c` - View configuration
 - `h` - Health check
 
-### 3. Parser Performance (`eos delphi dashboard parsers`)
+### 3. Parser Performance (`eos wazuh dashboard parsers`)
 
 **Purpose**: Monitoring of prompt-aware parsing system performance
 
@@ -89,7 +89,7 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 - Performance optimization recommendations
 
 **Parser Types Monitored**:
-- `delphi_notify_short` - Short notification format
+- `wazuh_notify_short` - Short notification format
 - `security_analysis` - Security incident analysis
 - `json_response` - JSON-structured responses
 - `conversational` - Natural language responses
@@ -101,7 +101,7 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 - 🟡 HALF_OPEN - Testing after failure
 - 🔴 OPEN - Protection mode active
 
-### 4. Alert Analysis (`eos delphi dashboard alerts`)
+### 4. Alert Analysis (`eos wazuh dashboard alerts`)
 
 **Purpose**: Detailed analysis of alert processing and failures
 
@@ -113,7 +113,7 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 - Agent-specific performance metrics
 - Rule-level analysis
 
-### 5. Performance Metrics (`eos delphi dashboard performance`)
+### 5. Performance Metrics (`eos wazuh dashboard performance`)
 
 **Purpose**: System-level performance monitoring
 
@@ -125,7 +125,7 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 - PostgreSQL query performance
 - Queue depth and processing rates
 
-### 6. Executive Overview (`eos delphi dashboard overview`)
+### 6. Executive Overview (`eos wazuh dashboard overview`)
 
 **Purpose**: High-level operational dashboard for management
 
@@ -141,29 +141,29 @@ The Delphi Dashboard is a unified, interactive terminal-based observability plat
 
 ### Primary Command
 ```bash
-eos delphi dashboard [module]
+eos wazuh dashboard [module]
 ```
 
 ### Module Commands
 ```bash
 # Individual module access
-eos delphi dashboard pipeline     # Pipeline monitoring
-eos delphi dashboard services     # Service management  
-eos delphi dashboard parsers      # Parser performance
-eos delphi dashboard alerts       # Alert analysis
-eos delphi dashboard performance  # System metrics
-eos delphi dashboard overview     # Executive summary
+eos wazuh dashboard pipeline     # Pipeline monitoring
+eos wazuh dashboard services     # Service management  
+eos wazuh dashboard parsers      # Parser performance
+eos wazuh dashboard alerts       # Alert analysis
+eos wazuh dashboard performance  # System metrics
+eos wazuh dashboard overview     # Executive summary
 
 # Default: launches overview with navigation
-eos delphi dashboard
+eos wazuh dashboard
 ```
 
 ### Backwards Compatibility
 ```bash
 # Legacy commands remain functional with deprecation warnings
-eos delphi inspect pipeline-functionality  # → dashboard pipeline
-eos delphi services status                 # → dashboard services
-eos delphi parser-health                   # → dashboard parsers
+eos wazuh inspect pipeline-functionality  # → dashboard pipeline
+eos wazuh services status                 # → dashboard services
+eos wazuh parser-health                   # → dashboard parsers
 ```
 
 ## Navigation and Controls
@@ -332,4 +332,4 @@ eos delphi parser-health                   # → dashboard parsers
 - **Resource Usage**: Minimal CPU and memory overhead
 - **Reliability**: 99.9% uptime and availability
 
-This architecture provides a comprehensive, unified approach to Delphi pipeline observability while maintaining the flexibility to evolve with changing operational needs.
+This architecture provides a comprehensive, unified approach to Wazuh pipeline observability while maintaining the flexibility to evolve with changing operational needs.

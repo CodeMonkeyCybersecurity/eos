@@ -31,7 +31,7 @@ Based on comprehensive analysis, the following migration opportunities remain:
 - pkg/terraform/*.go (8 instances) 
 - pkg/docker_volume/*.go (6 instances)
 - pkg/kvm/*.go (11 instances)
-- cmd/delphi/services/*.go (15 instances)
+- cmd/wazuh/services/*.go (15 instances)
 - pkg/system_config/*.go (7 instances)
 - Others scattered across 25+ files
 ```
@@ -57,7 +57,7 @@ type ExecutionResult struct {
 
 #### Step 2: Priority Migration Order
 1. **Security-critical commands** (15 instances in pkg/crypto, pkg/vault)
-2. **Service management commands** (20 instances in cmd/delphi, pkg/systemd)  
+2. **Service management commands** (20 instances in cmd/wazuh, pkg/systemd)  
 3. **Infrastructure commands** (25 instances in pkg/, pkg/terraform)
 4. **Utility commands** (24 instances in remaining packages)
 

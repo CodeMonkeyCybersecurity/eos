@@ -1,11 +1,11 @@
-# Delphi Services Update Command Test Summary
+# Wazuh Services Update Command Test Summary
 
 ## Overview
-Comprehensive test coverage has been implemented for the Delphi services update command, addressing the initial error found in the integration tests.
+Comprehensive test coverage has been implemented for the Wazuh services update command, addressing the initial error found in the integration tests.
 
 ## Test Files Created
 
-### 1. `/cmd/delphi/services/update_test.go`
+### 1. `/cmd/wazuh/services/update_test.go`
 Tests for the update command implementation:
 - **TestGetServiceWorkers**: Validates service worker definitions
 - **TestUpdateServiceWorkers**: Tests update logic including:
@@ -31,22 +31,22 @@ Tests for the service management functionality:
 - **TestSystemdHelpers**: Systemd helper functions
 - **BenchmarkGetServicesRequiringInstallation**: Performance benchmarks
 
-### 3. `/pkg/shared/delphi_services_test.go`
+### 3. `/pkg/shared/wazuh_services_test.go`
 Tests for the service registry:
-- **TestDelphiServiceRegistry_GetService**: Service retrieval
-- **TestDelphiServiceRegistry_GetActiveServices**: Active service filtering
-- **TestDelphiServiceRegistry_CheckServiceInstallationStatus**: Installation status
-- **TestDelphiServiceRegistry_ValidateService**: Service validation
-- **TestDelphiServiceRegistry_GetPipelineOrder**: Pipeline ordering
-- **TestDelphiServiceRegistry_ConfigFiles**: Configuration requirements
-- **TestDelphiServiceRegistry_ConsistentPaths**: Path consistency
+- **TestWazuhServiceRegistry_GetService**: Service retrieval
+- **TestWazuhServiceRegistry_GetActiveServices**: Active service filtering
+- **TestWazuhServiceRegistry_CheckServiceInstallationStatus**: Installation status
+- **TestWazuhServiceRegistry_ValidateService**: Service validation
+- **TestWazuhServiceRegistry_GetPipelineOrder**: Pipeline ordering
+- **TestWazuhServiceRegistry_ConfigFiles**: Configuration requirements
+- **TestWazuhServiceRegistry_ConsistentPaths**: Path consistency
 
 ### 4. `/pkg/shared/service_registry_interface.go`
 New interface for dependency injection and better testability:
 ```go
 type ServiceRegistryInterface interface {
-    GetService(name string) (DelphiServiceDefinition, bool)
-    GetActiveServices() map[string]DelphiServiceDefinition
+    GetService(name string) (WazuhServiceDefinition, bool)
+    GetActiveServices() map[string]WazuhServiceDefinition
     GetActiveServiceNames() []string
     CheckServiceInstallationStatus(serviceName string) (ServiceInstallationStatus, error)
 }
@@ -81,15 +81,15 @@ The original error was caused by missing services during update operations. The 
 
 ```bash
 # Run all service-related tests
-go test -v ./cmd/delphi/services/... ./pkg/shared/...
+go test -v ./cmd/wazuh/services/... ./pkg/shared/...
 
 # Run specific test suites
-go test -v ./cmd/delphi/services/... -run TestUpdate
+go test -v ./cmd/wazuh/services/... -run TestUpdate
 go test -v ./pkg/shared/... -run TestServiceManager
-go test -v ./pkg/shared/... -run TestDelphiServiceRegistry
+go test -v ./pkg/shared/... -run TestWazuhServiceRegistry
 
 # Run with coverage
-go test -v -coverprofile=coverage.out ./cmd/delphi/services/... ./pkg/shared/...
+go test -v -coverprofile=coverage.out ./cmd/wazuh/services/... ./pkg/shared/...
 go tool cover -html=coverage.out -o coverage.html
 ```
 

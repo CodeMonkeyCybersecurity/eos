@@ -39,8 +39,8 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 - [Secure Ubuntu](commands/secure-ubuntu.md) - Ubuntu security commands
 
 ## Components
-- [Delphi](components/DELPHI.md) - Delphi monitoring component
-- [Delphi Commands](components/DELPHI_COMMANDS.md) - Delphi-specific command reference
+- [Wazuh](components/WAZUH.md) - Wazuh monitoring component
+- [Wazuh Commands](components/WAZUH_COMMANDS.md) - Wazuh-specific command reference
 - [Hecate](components/HECATE.md) - Hecate reverse proxy component
 - [Hecate Complete Setup](components/hecate-complete.md) - Complete Hecate setup guide
 - [Hecate Advanced Usage](components/hecate_advanced_usage.md) - Advanced Hecate management
@@ -48,7 +48,7 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 - [Ubuntu](components/UBUNTU.md) - Ubuntu-specific components
 - [Vault](components/VAULT.md) - HashiCorp Vault integration
 - [Vault Database Dynamic Credentials](components/vault-database-dynamic-credentials.md) - Vault database integration
-- [Vault Delphi Integration](components/vault-delphi-integration.md) - Vault and Delphi integration
+- [Vault Wazuh Integration](components/vault-wazuh-integration.md) - Vault and Wazuh integration
 - [Wazuh MSSP Complete](components/wazuh-mssp-complete.md) - Complete Wazuh MSSP setup
 - [Infrastructure Compiler](components/EOS_INFRASTRUCTURE_COMPILER.md) - Infrastructure compiler design
 

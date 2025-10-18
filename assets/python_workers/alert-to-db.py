@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /usr/local/bin/alert-to-db.py
 """
-Alert Database Loader - Phase 1 of Delphi Pipeline
+Alert Database Loader - Phase 1 of Wazuh Pipeline
 
 This script receives Wazuh alerts from the webhook listener and stores them
 in PostgreSQL, initiating the alert processing pipeline.
@@ -44,7 +44,7 @@ except ModuleNotFoundError:
     )
 
 # ───── Configuration and Environment ─────
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
+load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 PG_DSN = os.getenv("PG_DSN")
 
 if not PG_DSN:

@@ -109,7 +109,7 @@ func gatherDatabaseConfiguration(rc *eos_io.RuntimeContext) (*DatabaseConfig, er
 
 	// Get database name
 	logger.Info("terminal prompt: Database name")
-	dbname := interaction.PromptInput(rc.Ctx, "Database name", "delphi")
+	dbname := interaction.PromptInput(rc.Ctx, "Database name", "wazuh")
 	config.DBName = strings.TrimSpace(dbname)
 
 	logger.Info("Database configuration gathered",
@@ -128,9 +128,9 @@ func storeDatabaseConfiguration(rc *eos_io.RuntimeContext, facade *vault.Service
 
 	// Store each config value individually for easier retrieval
 	configPaths := map[string]map[string]interface{}{
-		"secret/data/delphi/config/host":     {"data": map[string]interface{}{"value": config.Host}},
-		"secret/data/delphi/config/port":     {"data": map[string]interface{}{"value": config.Port}},
-		"secret/data/delphi/config/database": {"data": map[string]interface{}{"value": config.DBName}},
+		"secret/data/wazuh/config/host":     {"data": map[string]interface{}{"value": config.Host}},
+		"secret/data/wazuh/config/port":     {"data": map[string]interface{}{"value": config.Port}},
+		"secret/data/wazuh/config/database": {"data": map[string]interface{}{"value": config.DBName}},
 	}
 
 	// Store each configuration value
@@ -152,9 +152,9 @@ func verifyDatabaseConfigurationStorage(rc *eos_io.RuntimeContext, facade *vault
 
 	// Verify each stored configuration value
 	configPaths := map[string]string{
-		"secret/data/delphi/config/host":     config.Host,
-		"secret/data/delphi/config/port":     config.Port,
-		"secret/data/delphi/config/database": config.DBName,
+		"secret/data/wazuh/config/host":     config.Host,
+		"secret/data/wazuh/config/port":     config.Port,
+		"secret/data/wazuh/config/database": config.DBName,
 	}
 
 	for path, expectedValue := range configPaths {
@@ -191,8 +191,8 @@ func displayDatabaseConfigSuccess(rc *eos_io.RuntimeContext) error {
  Database configuration stored successfully
 
  Next steps:
-- Set up database engine: eos self secrets set delphi-db-engine
-- Or set static credentials: eos self secrets set delphi-db
+- Set up database engine: eos self secrets set wazuh-db-engine
+- Or set static credentials: eos self secrets set wazuh-db
 
 `
 
@@ -349,7 +349,7 @@ func displayDatabaseEngineSuccess(rc *eos_io.RuntimeContext) error {
  Vault database secrets engine configured successfully
 
  Next steps:
-- Test credential generation: vault read database/creds/delphi-role
+- Test credential generation: vault read database/creds/wazuh-role
 - Configure applications to use dynamic credentials
 - Monitor credential usage in Vault audit logs
 

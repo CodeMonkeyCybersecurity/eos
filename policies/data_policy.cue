@@ -6,7 +6,7 @@ package policies
 RetentionPolicy: {
     name:                string
     description:         string
-    appliesTo:           [...string] // e.g. ["Vault", "Delphi", "Wazuh"]
+    appliesTo:           [...string] // e.g. ["Vault", "Wazuh", "Wazuh"]
     defaultRetention:    duration
     maxRetention:        duration
     minRetention:        duration
@@ -37,7 +37,7 @@ policies: [RetentionPolicy, ...] & [
     {
         name:               "Wazuh Alerts"
         description:        "Alerts triggered by agent sensors"
-        appliesTo:          ["Wazuh", "Delphi"]
+        appliesTo:          ["Wazuh", "Wazuh"]
         defaultRetention:   "24mo"
         maxRetention:       "36mo"
         minRetention:       "12mo"
@@ -51,7 +51,7 @@ policies: [RetentionPolicy, ...] & [
     {
         name:               "Endpoint Telemetry"
         description:        "System logs and agent telemetry from monitored devices"
-        appliesTo:          ["Delphi"]
+        appliesTo:          ["Wazuh"]
         defaultRetention:   "24mo"
         maxRetention:       "36mo"
         minRetention:       "12mo"

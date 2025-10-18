@@ -12,7 +12,7 @@ For detailed security improvements and testing documentation, see the inline com
 - **Input Sanitization**: `pkg/security/input_sanitizer.go` - Input validation and injection prevention
 - **Security Testing**: `pkg/security/security_testing/` - Comprehensive security testing framework
 - **Audit System**: `pkg/security/audit.go` - Security audit and compliance logging
-- **Credential Security**: `pkg/security/delphi_credentials.go` - Secure credential management
+- **Credential Security**: `pkg/security/wazuh_credentials.go` - Secure credential management
 
 ## Security Status:  HARDENED
 

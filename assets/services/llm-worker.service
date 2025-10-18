@@ -24,7 +24,7 @@ User=stanley
 Environment="PYTHONUNBUFFERED=1"
 StandardOutput=journal
 StandardError=journal
-EnvironmentFile=/opt/stackstorm/packs/delphi/.env
+EnvironmentFile=/opt/stackstorm/packs/wazuh/.env
 WorkingDirectory=/usr/local/bin
 
 [Install]

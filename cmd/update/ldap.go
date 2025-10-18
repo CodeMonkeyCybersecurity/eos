@@ -24,7 +24,7 @@ var UpdateLDAPCmd = &cobra.Command{
 	Use:   "ldap",
 	Short: "Regenerate LDAP TLS certificate with IP SAN",
 	Long: `Regenerates the TLS certificate for your LDAP server, including the IP address
-in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP.`,
+in the SAN field. Useful when clients (like Wazuh/Wazuh) need to connect via IP.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		if ipSAN == "" {

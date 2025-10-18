@@ -30,5 +30,5 @@ var ListCmd = &cobra.Command{
 
 func init() {
 	// The 'check' alias on ListCmd allows 'eos check' to route to 'eos list'
-	// Individual check commands (like delphi check) are added as subcommands elsewhere
+	// Individual check commands (like wazuh check) are added as subcommands elsewhere
 }

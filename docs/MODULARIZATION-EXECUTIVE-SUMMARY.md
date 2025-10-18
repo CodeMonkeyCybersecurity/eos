@@ -134,7 +134,7 @@ pkg/consul/
 
 ### Next Priority (14 P1 Files Remaining)
 1. **cmd/debug/iris.go** (1,659 lines) - Diagnostics
-2. **cmd/debug/delphi.go** (1,630 lines) - Wazuh diagnostics
+2. **cmd/debug/wazuh.go** (1,630 lines) - Wazuh diagnostics
 3. **pkg/authentik/import.go** (1,266 lines) - Authentik import
 4. **pkg/vault/install.go** (1,253 lines) - Vault installation
 5. **pkg/system/orchestration.go** (1,166 lines) - System orchestration

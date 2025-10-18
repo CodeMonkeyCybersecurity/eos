@@ -153,7 +153,7 @@ func getDatabaseConfiguration(rc *eos_io.RuntimeContext, options *VaultSetupOpti
 	options.DatabaseConfig.Port = 5432 // Default, could parse from port string if needed
 
 	logger.Info("terminal prompt: Database name")
-	database := interaction.PromptInput(rc.Ctx, "Database name", "delphi")
+	database := interaction.PromptInput(rc.Ctx, "Database name", "wazuh")
 	options.DatabaseConfig.Database = strings.TrimSpace(database)
 
 	logger.Info("terminal prompt: SSL mode")
@@ -195,7 +195,7 @@ func getVaultConfiguration(rc *eos_io.RuntimeContext, options *VaultSetupOptions
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("terminal prompt: Connection name")
-	connectionName := interaction.PromptInput(rc.Ctx, "Connection name", "delphi-postgresql")
+	connectionName := interaction.PromptInput(rc.Ctx, "Connection name", "wazuh-postgresql")
 	options.ConnectionName = strings.TrimSpace(connectionName)
 
 	logger.Info("terminal prompt: Engine mount point")
@@ -269,7 +269,7 @@ func displaySetupSuccess(rc *eos_io.RuntimeContext, options *VaultSetupOptions) 
  Vault dynamic PostgreSQL credentials have been configured successfully.
 
  Next Steps:
-   • Test credential generation: vault read database/creds/delphi-role
+   • Test credential generation: vault read database/creds/wazuh-role
    • Configure applications to use dynamic credentials
    • Monitor credential usage in Vault audit logs
 

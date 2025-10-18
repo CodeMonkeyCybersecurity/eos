@@ -45,8 +45,8 @@ According to CLAUDE.md, all code must use structured logging with `otelzap.Ctx(r
 
 ### Application/Services
 - [ ] **pkg/application/config.go** - 6 violations (lines 52, 63, 87, 108, 114)
-- [ ] **pkg/delphi/docker/credentials.go** - 5 violations (lines 27, 33, 39, 45)
-- [ ] **pkg/delphi/docker/deployment.go** - 4 violations (lines 35, 41, 56, 71)
+- [ ] **pkg/wazuh/docker/credentials.go** - 5 violations (lines 27, 33, 39, 45)
+- [ ] **pkg/wazuh/docker/deployment.go** - 4 violations (lines 35, 41, 56, 71)
 - [ ] **pkg/helen/manager.go** - 2 violations (lines 164, 166)
 - [ ] **pkg/hecate/config.go** - 1 violation (line 111)
 - [ ] **pkg/ai/config.go** - 1 violation (line 408)

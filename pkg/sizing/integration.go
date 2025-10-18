@@ -15,16 +15,16 @@ import (
 type ServiceMapping struct {
 	// The sizing service type
 	ServiceType ServiceType
-	
+
 	// Optional custom workload profile (if nil, uses default based on environment)
 	WorkloadProfile *WorkloadProfile
-	
+
 	// Additional services that should be checked together
 	RelatedServices []ServiceType
-	
+
 	// Whether to skip preflight checks (useful for optional services)
 	SkipPreflight bool
-	
+
 	// Whether to skip postflight checks
 	SkipPostflight bool
 }
@@ -46,7 +46,7 @@ var CommandServiceMappings = map[string]ServiceMapping{
 		ServiceType:     ServiceTypeVault,
 		RelatedServices: []ServiceType{},
 	},
-	
+
 	// Container services
 	"k3s": {
 		ServiceType: ServiceTypeOrchestrator,
@@ -59,13 +59,13 @@ var CommandServiceMappings = map[string]ServiceMapping{
 		ServiceType:     ServiceTypeContainer,
 		RelatedServices: []ServiceType{},
 	},
-	
+
 	// Database services
 	"postgres": {
 		ServiceType:     ServiceTypeDatabase,
 		RelatedServices: []ServiceType{},
 	},
-	
+
 	// Monitoring stack
 	"grafana": {
 		ServiceType: ServiceTypeMonitoring,
@@ -81,7 +81,7 @@ var CommandServiceMappings = map[string]ServiceMapping{
 		ServiceType:     ServiceTypeLogging,
 		RelatedServices: []ServiceType{},
 	},
-	
+
 	// Security services
 	"hecate": {
 		ServiceType: ServiceTypeProxy,
@@ -89,7 +89,7 @@ var CommandServiceMappings = map[string]ServiceMapping{
 			ServiceTypeDatabase, // For configuration storage
 		},
 	},
-	"delphi": {
+	"wazuh": {
 		ServiceType: ServiceTypeMonitoring,
 		RelatedServices: []ServiceType{
 			ServiceTypeDatabase,
@@ -106,7 +106,7 @@ var CommandServiceMappings = map[string]ServiceMapping{
 			// Minimal resource requirements
 		},
 	},
-	
+
 	// Storage services
 	"minio": {
 		ServiceType:     ServiceTypeStorage,
@@ -116,7 +116,7 @@ var CommandServiceMappings = map[string]ServiceMapping{
 		ServiceType:     ServiceTypeStorage,
 		RelatedServices: []ServiceType{},
 	},
-	
+
 	// Web services
 	"jenkins": {
 		ServiceType: ServiceTypeWebServer,
@@ -138,7 +138,7 @@ type DeploymentFunc func(rc *eos_io.RuntimeContext) error
 // RunWithSizingChecks wraps a deployment function with preflight and postflight sizing checks
 func RunWithSizingChecks(rc *eos_io.RuntimeContext, serviceName string, deployFunc DeploymentFunc) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Look up service mapping
 	mapping, exists := CommandServiceMappings[strings.ToLower(serviceName)]
 	if !exists {
@@ -147,21 +147,21 @@ func RunWithSizingChecks(rc *eos_io.RuntimeContext, serviceName string, deployFu
 			zap.String("service", serviceName))
 		return deployFunc(rc)
 	}
-	
+
 	logger.Info("Running deployment with sizing checks",
 		zap.String("service", serviceName),
 		zap.String("service_type", string(mapping.ServiceType)))
-	
+
 	// Collect all services to check
 	servicesToCheck := []ServiceType{mapping.ServiceType}
 	servicesToCheck = append(servicesToCheck, mapping.RelatedServices...)
-	
+
 	// Determine workload profile
 	workload := DefaultWorkloadProfiles["medium"] // Default
 	if mapping.WorkloadProfile != nil {
 		workload = *mapping.WorkloadProfile
 	}
-	
+
 	// Run preflight checks
 	if !mapping.SkipPreflight {
 		logger.Info("Running preflight resource validation")
@@ -175,13 +175,13 @@ func RunWithSizingChecks(rc *eos_io.RuntimeContext, serviceName string, deployFu
 			logger.Warn("Preflight checks encountered issues", zap.Error(err))
 		}
 	}
-	
+
 	// Execute the deployment
 	logger.Info("Executing deployment function")
 	if err := deployFunc(rc); err != nil {
 		return fmt.Errorf("deployment failed: %w", err)
 	}
-	
+
 	// Run postflight validation
 	if !mapping.SkipPostflight {
 		logger.Info("Running postflight resource validation")
@@ -190,7 +190,7 @@ func RunWithSizingChecks(rc *eos_io.RuntimeContext, serviceName string, deployFu
 			// Don't fail the deployment, just warn
 		}
 	}
-	
+
 	return nil
 }
 
@@ -200,11 +200,11 @@ func CreateServiceMapping(serviceType ServiceType, opts ...ServiceMappingOption)
 		ServiceType:     serviceType,
 		RelatedServices: []ServiceType{},
 	}
-	
+
 	for _, opt := range opts {
 		opt(&mapping)
 	}
-	
+
 	return mapping
 }
 
@@ -232,7 +232,7 @@ func WithoutPreflight() ServiceMappingOption {
 	}
 }
 
-// WithoutPostflight disables postflight checks  
+// WithoutPostflight disables postflight checks
 func WithoutPostflight() ServiceMappingOption {
 	return func(sm *ServiceMapping) {
 		sm.SkipPostflight = true
@@ -252,7 +252,7 @@ Example 1: Basic Integration (using existing mapping)
 func runCreateNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
     // Parse configuration
     config := parseNomadConfig(cmd)
-    
+
     // Run deployment with sizing checks
     return sizing.RunWithSizingChecks(rc, "nomad", func(rc *eos_io.RuntimeContext) error {
         // Your existing deployment logic
@@ -282,10 +282,10 @@ func runCreateCustomService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args 
             sizing.ServiceTypeCache,
         ),
     )
-    
+
     // Register it
     sizing.RegisterServiceMapping("custom-api", mapping)
-    
+
     // Run with checks
     return sizing.RunWithSizingChecks(rc, "custom-api", func(rc *eos_io.RuntimeContext) error {
         // Deployment logic
@@ -298,12 +298,12 @@ Example 3: Conditional Sizing Checks
 func runCreateService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
     // Check if user wants sizing validation
     skipSizing, _ := cmd.Flags().GetBool("skip-sizing")
-    
+
     if skipSizing {
         // Direct deployment without checks
         return deployService(rc, config)
     }
-    
+
     // With sizing checks
     return sizing.RunWithSizingChecks(rc, "service", func(rc *eos_io.RuntimeContext) error {
         return deployService(rc, config)
@@ -314,16 +314,16 @@ Example 4: Manual Preflight/Postflight
 
 func runCreateComplex(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
     logger := otelzap.Ctx(rc.Ctx)
-    
+
     // Manual preflight for more control
     services := []sizing.ServiceType{
         sizing.ServiceTypeDatabase,
         sizing.ServiceTypeCache,
         sizing.ServiceTypeWebServer,
     }
-    
+
     workload := sizing.DefaultWorkloadProfiles["large"]
-    
+
     // Run preflight
     if err := sizing.PreflightCheck(rc, services, workload); err != nil {
         if eos_err.IsUserError(err) {
@@ -331,7 +331,7 @@ func runCreateComplex(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
         }
         logger.Warn("Proceeding despite preflight warnings", zap.Error(err))
     }
-    
+
     // Deploy components
     if err := deployDatabase(rc); err != nil {
         return err
@@ -342,7 +342,7 @@ func runCreateComplex(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
     if err := deployWebServer(rc); err != nil {
         return err
     }
-    
+
     // Run postflight
     return sizing.PostflightValidation(rc, services)
 }

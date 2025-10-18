@@ -186,12 +186,12 @@ FuzzValidateNoShellMeta ./pkg/interaction
 FuzzSplitAndTrim ./pkg/parse
 FuzzJSONParsing ./pkg/parse
 FuzzCommandParsing ./pkg/eos_cli
-FuzzUpdateCommand ./cmd/delphi/services
-FuzzServiceWorkerPaths ./cmd/delphi/services
-FuzzFileOperations ./cmd/delphi/services
+FuzzUpdateCommand ./cmd/wazuh/services
+FuzzServiceWorkerPaths ./cmd/wazuh/services
+FuzzFileOperations ./cmd/wazuh/services
 FuzzAllEosCommands ./test
 FuzzEosCommandFlags ./test
-FuzzDelphiServicesCommands ./test
+FuzzWazuhServicesCommands ./test
 FuzzYAMLParsing ./pkg/eos_io
 FuzzMkdirP ./pkg/eos_unix
 FuzzExecuteCommand ./pkg/execute
@@ -222,8 +222,8 @@ get_test_package() {
         FuzzCommandParsing)
             echo "./pkg/eos_cli" ;;
         FuzzUpdateCommand|FuzzServiceWorkerPaths|FuzzFileOperations)
-            echo "./cmd/delphi/services" ;;
-        FuzzAllEosCommands|FuzzEosCommandFlags|FuzzDelphiServicesCommands)
+            echo "./cmd/wazuh/services" ;;
+        FuzzAllEosCommands|FuzzEosCommandFlags|FuzzWazuhServicesCommands)
             echo "./test" ;;
         FuzzYAMLParsing)
             echo "./pkg/eos_io" ;;

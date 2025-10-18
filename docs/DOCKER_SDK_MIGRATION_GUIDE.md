@@ -308,7 +308,7 @@ func GetRunningContainers(rc *eos_io.RuntimeContext) ([]string, error) {
 
 1. `pkg/container_management/containers.go` (4 shell commands)
 2. `pkg/container_management/manager.go` (4 shell commands)
-3. `pkg/delphi/docker/deployment.go` (6 shell commands)
+3. `pkg/wazuh/docker/deployment.go` (6 shell commands)
 4. `pkg/build/builder.go` (6 shell commands)
 5. `pkg/hecate/update.go` (7 shell commands)
 

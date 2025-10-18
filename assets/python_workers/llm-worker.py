@@ -37,7 +37,7 @@ from typing import Union
 # Load environment variables from a single .env file.
 # This file should contain ALL necessary variables.
 if load_dotenv is not None:
-    load_dotenv("/opt/stackstorm/packs/delphi/.env")
+    load_dotenv("/opt/stackstorm/packs/wazuh/.env")
 
 # PostgreSQL Database Connection String (DSN)
 PG_DSN = os.getenv("PG_DSN")
@@ -66,7 +66,7 @@ NOTIFY_CHANNEL = "new_response"    # Notify when LLM response is ready
 # --- Logger Setup ---
 def setup_logging() -> logging.Logger:
     """Configure a rotating file logger and return it."""
-    logger = logging.getLogger("delphi-llm-worker") # Renamed logger for clarity
+    logger = logging.getLogger("wazuh-llm-worker") # Renamed logger for clarity
     logger.setLevel(logging.INFO) # Set to INFO for production, DEBUG for development
 
     log_dir = os.path.dirname(LOG_FILE)

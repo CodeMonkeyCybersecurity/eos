@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# /var/ossec/integrations/custom-delphi-webhook.py
+# /var/ossec/integrations/custom-wazuh-webhook.py
 # root:wazuh 0750
 # ─── Standard library ────────────────────────────────────────────────────────
 import sys, json, os

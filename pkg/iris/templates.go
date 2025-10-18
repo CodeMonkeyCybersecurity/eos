@@ -183,7 +183,7 @@ func SendEmail(ctx context.Context, alert WazuhAlert, llmResponse string) error 
 		alert.Agent.Name,
 	)
 
-	body := fmt.Sprintf(` + "`" + `Security Alert from Delphi Notify
+	body := fmt.Sprintf(` + "`" + `Security Alert from Wazuh Notify
 
 Alert: %s
 Agent: %s (ID: %s)
@@ -194,7 +194,7 @@ Severity: %s
 %s
 
 ---
-This alert was processed automatically by Delphi Notify
+This alert was processed automatically by Wazuh Notify
 Powered by Code Monkey Cybersecurity
 ` + "`" + `, alert.Data.Vulnerability.Title,
 		alert.Agent.Name,
@@ -384,7 +384,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "healthy",
-		"service": "delphi-webhook",
+		"service": "wazuh-webhook",
 	})
 }
 
@@ -431,7 +431,7 @@ func main() {
 
 // GetReadmeContent returns the README.md content
 func GetReadmeContent() string {
-	return `# Iris/Delphi - Security Alert Processing
+	return `# Iris/Wazuh - Security Alert Processing
 
 Automated processing of Wazuh security alerts using Azure OpenAI and Temporal workflows.
 

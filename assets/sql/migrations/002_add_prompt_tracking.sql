@@ -175,16 +175,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Grant permissions for the delphi services
+-- Grant permissions for the wazuh services
 DO $$
 BEGIN
     -- Grant INSERT/UPDATE on new tables for metric collection
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'delphi') THEN
-        GRANT SELECT, INSERT ON parser_metrics TO delphi;
-        GRANT USAGE ON SEQUENCE parser_metrics_id_seq TO delphi;
-        GRANT SELECT ON parser_performance TO delphi;
-        GRANT SELECT ON prompt_usage_stats TO delphi;
-        GRANT EXECUTE ON FUNCTION get_parser_health(INTERVAL) TO delphi;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'wazuh') THEN
+        GRANT SELECT, INSERT ON parser_metrics TO wazuh;
+        GRANT USAGE ON SEQUENCE parser_metrics_id_seq TO wazuh;
+        GRANT SELECT ON parser_performance TO wazuh;
+        GRANT SELECT ON prompt_usage_stats TO wazuh;
+        GRANT EXECUTE ON FUNCTION get_parser_health(INTERVAL) TO wazuh;
     END IF;
     
     -- Grant similar permissions to stanley user if it exists
@@ -233,5 +233,5 @@ SELECT * FROM prompt_usage_stats LIMIT 5;
 SELECT * FROM get_parser_health('24 hours'::INTERVAL);
 
 -- Test updating an alert with prompt information
--- UPDATE alerts SET prompt_type = 'delphi_notify_short', parser_used = 'DelphiNotifyShortParser' WHERE id = 1;
+-- UPDATE alerts SET prompt_type = 'wazuh_notify_short', parser_used = 'WazuhNotifyShortParser' WHERE id = 1;
 */

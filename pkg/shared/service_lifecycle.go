@@ -52,9 +52,9 @@ func (slm *ServiceLifecycleManager) DetectZombieServices(ctx context.Context) ([
 
 	// Also check for some common variations that might be zombies
 	commonVariations := []string{
-		"delphi-llm-worker", // This specific zombie mentioned in the issue
+		"wazuh-llm-worker", // This specific zombie mentioned in the issue
 		"llm-worker",
-		"delphi-emailer",
+		"wazuh-emailer",
 		"email-worker",
 	}
 

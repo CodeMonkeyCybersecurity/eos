@@ -1,4 +1,4 @@
-// pkg/shared/delphi_services.go
+// pkg/shared/wazuh_services.go
 
 package shared
 
@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// DelphiServiceDefinition represents a complete service definition
-type DelphiServiceDefinition struct {
+// WazuhServiceDefinition represents a complete service definition
+type WazuhServiceDefinition struct {
 	Name            string            `json:"name"`
 	WorkerScript    string            `json:"worker_script"`
 	ServiceFile     string            `json:"service_file"`
@@ -68,32 +68,32 @@ type ServiceInstallationStatus struct {
 	SourceServicePath string `json:"source_service_path"`
 }
 
-// DelphiServiceRegistry provides centralized service management
-type DelphiServiceRegistry struct {
-	services map[string]DelphiServiceDefinition
+// WazuhServiceRegistry provides centralized service management
+type WazuhServiceRegistry struct {
+	services map[string]WazuhServiceDefinition
 }
 
-// Ensure DelphiServiceRegistry implements ServiceRegistryInterface
-var _ ServiceRegistryInterface = (*DelphiServiceRegistry)(nil)
+// Ensure WazuhServiceRegistry implements ServiceRegistryInterface
+var _ ServiceRegistryInterface = (*WazuhServiceRegistry)(nil)
 
-// GetDelphiServiceRegistry returns the global service registry
-func GetDelphiServiceRegistry() *DelphiServiceRegistry {
-	registry := &DelphiServiceRegistry{
-		services: make(map[string]DelphiServiceDefinition),
+// GetWazuhServiceRegistry returns the global service registry
+func GetWazuhServiceRegistry() *WazuhServiceRegistry {
+	registry := &WazuhServiceRegistry{
+		services: make(map[string]WazuhServiceDefinition),
 	}
 
 	// Core pipeline services - centralized definitions
-	registry.registerService(DelphiServiceDefinition{
-		Name:          "delphi-listener",
-		WorkerScript:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
-		ServiceFile:   "/etc/systemd/system/delphi-listener.service",
-		SourceWorker:  "/opt/eos/assets/python_workers/delphi-listener.py",
-		SourceService: "/opt/eos/assets/services/delphi-listener.service",
+	registry.registerService(WazuhServiceDefinition{
+		Name:          "wazuh-listener",
+		WorkerScript:  "/opt/stackstorm/packs/wazuh/wazuh-listener.py",
+		ServiceFile:   "/etc/systemd/system/wazuh-listener.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/wazuh-listener.py",
+		SourceService: "/opt/eos/assets/services/wazuh-listener.service",
 		Description:   "Webhook listener for Wazuh alerts - Pipeline entry point (includes alert-to-db dependency)",
 		PipelineStage: "ingestion",
 		Dependencies:  []string{"python3", "requests", "psycopg2", "python-dotenv", "alert-to-db"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database and webhook configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database and webhook configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "WEBHOOK_PORT"},
 		Ports:           []int{8080},
@@ -103,17 +103,17 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:      []ServiceCategory{CategoryIngestion},
 	})
 
-	registry.registerService(DelphiServiceDefinition{
-		Name:          "delphi-agent-enricher",
-		WorkerScript:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py",
-		ServiceFile:   "/etc/systemd/system/delphi-agent-enricher.service",
-		SourceWorker:  "/opt/eos/assets/python_workers/delphi-agent-enricher.py",
-		SourceService: "/opt/eos/assets/services/delphi-agent-enricher.service",
+	registry.registerService(WazuhServiceDefinition{
+		Name:          "wazuh-agent-enricher",
+		WorkerScript:  "/opt/stackstorm/packs/wazuh/wazuh-agent-enricher.py",
+		ServiceFile:   "/etc/systemd/system/wazuh-agent-enricher.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/wazuh-agent-enricher.py",
+		SourceService: "/opt/eos/assets/services/wazuh-agent-enricher.service",
 		Description:   "Agent metadata enrichment service - Adds agent context to alerts",
 		PipelineStage: "enrichment",
 		Dependencies:  []string{"python3", "requests", "psycopg2", "python-dotenv"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN"},
 		User:            "stanley",
@@ -122,7 +122,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:      []ServiceCategory{CategoryEnrichment},
 	})
 
-	registry.registerService(DelphiServiceDefinition{
+	registry.registerService(WazuhServiceDefinition{
 		Name:          "prompt-ab-tester",
 		WorkerScript:  "/usr/local/bin/prompt-ab-tester.py",
 		ServiceFile:   "/etc/systemd/system/prompt-ab-tester.service",
@@ -132,9 +132,9 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		PipelineStage: "analysis",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
-			{Path: "/opt/delphi/ab-test-config.json", Required: true, Description: "A/B testing experiment configuration"},
-			{Path: "/opt/stackstorm/packs/delphi/prompts/", Required: true, Description: "Prompt template directory"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database configuration"},
+			{Path: "/opt/wazuh/ab-test-config.json", Required: true, Description: "A/B testing experiment configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/prompts/", Required: true, Description: "Prompt template directory"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "EXPERIMENT_CONFIG_FILE", "PROMPTS_BASE_DIR"},
 		User:            "stanley",
@@ -144,9 +144,9 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:      []ServiceCategory{CategoryTesting, CategoryAnalysis},
 	})
 
-	registry.registerService(DelphiServiceDefinition{
+	registry.registerService(WazuhServiceDefinition{
 		Name:          "llm-worker",
-		WorkerScript:  "/opt/stackstorm/packs/delphi/llm-worker.py",
+		WorkerScript:  "/opt/stackstorm/packs/wazuh/llm-worker.py",
 		ServiceFile:   "/etc/systemd/system/llm-worker.service",
 		SourceWorker:  "/opt/eos/assets/python_workers/llm-worker.py",
 		SourceService: "/opt/eos/assets/services/llm-worker.service",
@@ -154,7 +154,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		PipelineStage: "analysis",
 		Dependencies:  []string{"python3", "requests", "psycopg2", "openai", "python-dotenv"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database and OpenAI configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database and OpenAI configuration"},
 			{Path: "/srv/eos/system-prompts/default.txt", Required: true, Description: "Default system prompt"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "OPENAI_API_KEY", "DEFAULT_PROMPT_TYPE"},
@@ -165,7 +165,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:      []ServiceCategory{CategoryAnalysis, CategoryProcessing},
 	})
 
-	registry.registerService(DelphiServiceDefinition{
+	registry.registerService(WazuhServiceDefinition{
 		Name:          "email-structurer",
 		WorkerScript:  "/usr/local/bin/email-structurer.py",
 		ServiceFile:   "/etc/systemd/system/email-structurer.service",
@@ -175,7 +175,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		PipelineStage: "formatting",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN"},
 		User:            "stanley",
@@ -184,7 +184,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:      []ServiceCategory{CategoryFormatting},
 	})
 
-	registry.registerService(DelphiServiceDefinition{
+	registry.registerService(WazuhServiceDefinition{
 		Name:          "email-formatter",
 		WorkerScript:  "/usr/local/bin/email-formatter.py",
 		ServiceFile:   "/etc/systemd/system/email-formatter.service",
@@ -194,8 +194,8 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		PipelineStage: "formatting",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "jinja2"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
-			{Path: "/opt/stackstorm/packs/delphi/email.html", Required: true, Description: "Email HTML template"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/email.html", Required: true, Description: "Email HTML template"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "EMAIL_TEMPLATE_PATH"},
 		User:            "stanley",
@@ -204,7 +204,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:      []ServiceCategory{CategoryFormatting},
 	})
 
-	registry.registerService(DelphiServiceDefinition{
+	registry.registerService(WazuhServiceDefinition{
 		Name:          "email-sender",
 		WorkerScript:  "/usr/local/bin/email-sender.py",
 		ServiceFile:   "/etc/systemd/system/email-sender.service",
@@ -214,7 +214,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		PipelineStage: "delivery",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "smtplib"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database and SMTP configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database and SMTP configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS"},
 		User:            "stanley",
@@ -223,7 +223,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:      []ServiceCategory{CategoryDelivery},
 	})
 
-	registry.registerService(DelphiServiceDefinition{
+	registry.registerService(WazuhServiceDefinition{
 		Name:          "parser-monitor",
 		WorkerScript:  "/usr/local/bin/parser-monitor.py",
 		ServiceFile:   "/etc/systemd/system/parser-monitor.service",
@@ -233,7 +233,7 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		PipelineStage: "monitoring",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "tabulate"},
 		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
+			{Path: "/opt/stackstorm/packs/wazuh/.env", Required: true, Description: "Database configuration"},
 		},
 		EnvironmentVars: []string{"PG_DSN"},
 		User:            "stanley",
@@ -243,12 +243,12 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 	})
 
 	// Deprecated services
-	registry.registerService(DelphiServiceDefinition{
-		Name:          "delphi-emailer",
-		WorkerScript:  "/usr/local/bin/delphi-emailer.py",
-		ServiceFile:   "/etc/systemd/system/delphi-emailer.service",
-		SourceWorker:  "/opt/eos/assets/python_workers/delphi-emailer.py",
-		SourceService: "/opt/eos/assets/services/delphi-emailer.service",
+	registry.registerService(WazuhServiceDefinition{
+		Name:          "wazuh-emailer",
+		WorkerScript:  "/usr/local/bin/wazuh-emailer.py",
+		ServiceFile:   "/etc/systemd/system/wazuh-emailer.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/wazuh-emailer.py",
+		SourceService: "/opt/eos/assets/services/wazuh-emailer.service",
 		Description:   "Legacy email service - DEPRECATED: Use email-structurer, email-formatter, email-sender instead",
 		PipelineStage: "deprecated",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
@@ -264,24 +264,24 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 }
 
 // registerService adds a service to the registry
-func (r *DelphiServiceRegistry) registerService(service DelphiServiceDefinition) {
+func (r *WazuhServiceRegistry) registerService(service WazuhServiceDefinition) {
 	r.services[service.Name] = service
 }
 
 // GetService retrieves a service by name
-func (r *DelphiServiceRegistry) GetService(name string) (DelphiServiceDefinition, bool) {
+func (r *WazuhServiceRegistry) GetService(name string) (WazuhServiceDefinition, bool) {
 	service, exists := r.services[name]
 	return service, exists
 }
 
 // GetAllServices returns all services
-func (r *DelphiServiceRegistry) GetAllServices() map[string]DelphiServiceDefinition {
+func (r *WazuhServiceRegistry) GetAllServices() map[string]WazuhServiceDefinition {
 	return r.services
 }
 
 // GetActiveServices returns non-deprecated services
-func (r *DelphiServiceRegistry) GetActiveServices() map[string]DelphiServiceDefinition {
-	active := make(map[string]DelphiServiceDefinition)
+func (r *WazuhServiceRegistry) GetActiveServices() map[string]WazuhServiceDefinition {
+	active := make(map[string]WazuhServiceDefinition)
 	for name, service := range r.services {
 		if !service.Deprecated {
 			active[name] = service
@@ -291,7 +291,7 @@ func (r *DelphiServiceRegistry) GetActiveServices() map[string]DelphiServiceDefi
 }
 
 // GetServiceNames returns a list of all service names
-func (r *DelphiServiceRegistry) GetServiceNames() []string {
+func (r *WazuhServiceRegistry) GetServiceNames() []string {
 	var names []string
 	for name := range r.services {
 		names = append(names, name)
@@ -300,7 +300,7 @@ func (r *DelphiServiceRegistry) GetServiceNames() []string {
 }
 
 // GetActiveServiceNames returns names of non-deprecated services only
-func (r *DelphiServiceRegistry) GetActiveServiceNames() []string {
+func (r *WazuhServiceRegistry) GetActiveServiceNames() []string {
 	var names []string
 	for name, service := range r.services {
 		if !service.Deprecated {
@@ -311,7 +311,7 @@ func (r *DelphiServiceRegistry) GetActiveServiceNames() []string {
 }
 
 // CheckServiceInstallationStatus checks the installation status of a service
-func (r *DelphiServiceRegistry) CheckServiceInstallationStatus(serviceName string) (ServiceInstallationStatus, error) {
+func (r *WazuhServiceRegistry) CheckServiceInstallationStatus(serviceName string) (ServiceInstallationStatus, error) {
 	service, exists := r.GetService(serviceName)
 	if !exists {
 		return ServiceInstallationStatus{}, fmt.Errorf("service %s not found in registry", serviceName)
@@ -354,7 +354,7 @@ func (r *DelphiServiceRegistry) CheckServiceInstallationStatus(serviceName strin
 }
 
 // GetServicesRequiringInstallation returns services that need installation
-func (r *DelphiServiceRegistry) GetServicesRequiringInstallation() ([]string, error) {
+func (r *WazuhServiceRegistry) GetServicesRequiringInstallation() ([]string, error) {
 	var needingInstallation []string
 
 	for serviceName := range r.GetActiveServices() {
@@ -372,7 +372,7 @@ func (r *DelphiServiceRegistry) GetServicesRequiringInstallation() ([]string, er
 }
 
 // ValidateService checks if a service name is valid and provides helpful feedback
-func (r *DelphiServiceRegistry) ValidateService(name string) error {
+func (r *WazuhServiceRegistry) ValidateService(name string) error {
 	if service, exists := r.services[name]; exists {
 		if service.Deprecated {
 			replacement := service.ReplacedBy
@@ -395,11 +395,11 @@ func (r *DelphiServiceRegistry) ValidateService(name string) error {
 		return fmt.Errorf("service %s not found. Did you mean: %s", name, strings.Join(suggestions, ", "))
 	}
 
-	return fmt.Errorf("service %s not found. Use 'eos delphi services list' to see available services", name)
+	return fmt.Errorf("service %s not found. Use 'eos wazuh services list' to see available services", name)
 }
 
 // GetPipelineOrder returns services in pipeline execution order
-func (r *DelphiServiceRegistry) GetPipelineOrder() []string {
+func (r *WazuhServiceRegistry) GetPipelineOrder() []string {
 	stageOrder := []string{"ingestion", "enrichment", "processing", "analysis", "formatting", "delivery"}
 	var orderedServices []string
 
@@ -415,7 +415,7 @@ func (r *DelphiServiceRegistry) GetPipelineOrder() []string {
 }
 
 // GetMissingServices returns services that exist in python_workers but not deployed
-func (r *DelphiServiceRegistry) GetMissingServices(pythonWorkersPath string) ([]string, error) {
+func (r *WazuhServiceRegistry) GetMissingServices(pythonWorkersPath string) ([]string, error) {
 	var missing []string
 
 	files, err := filepath.Glob(filepath.Join(pythonWorkersPath, "*.py"))
@@ -439,9 +439,9 @@ func (r *DelphiServiceRegistry) GetMissingServices(pythonWorkersPath string) ([]
 }
 
 // Global registry instance
-var globalDelphiServiceRegistry = GetDelphiServiceRegistry()
+var globalWazuhServiceRegistry = GetWazuhServiceRegistry()
 
-// GetGlobalDelphiServiceRegistry returns the global service registry
-func GetGlobalDelphiServiceRegistry() *DelphiServiceRegistry {
-	return globalDelphiServiceRegistry
+// GetGlobalWazuhServiceRegistry returns the global service registry
+func GetGlobalWazuhServiceRegistry() *WazuhServiceRegistry {
+	return globalWazuhServiceRegistry
 }

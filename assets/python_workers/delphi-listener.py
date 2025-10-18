@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# /usr/local/bin/delphi-listener.py
+# /usr/local/bin/wazuh-listener.py
 """
 Production-ready HTTP webhook listener for Wazuh alerts.
 
-This service acts as the entry point for the Delphi security alert pipeline,
+This service acts as the entry point for the Wazuh security alert pipeline,
 receiving webhooks from Wazuh and initiating alert processing.
 
 Features:
@@ -40,12 +40,12 @@ except ImportError:
         pass
 
 # Configuration
-ENV_PATH = Path("/opt/stackstorm/packs/delphi/.env")
+ENV_PATH = Path("/opt/stackstorm/packs/wazuh/.env")
 load_dotenv(ENV_PATH)
 
 # Paths and settings
-LOG_PATH = "/var/log/stackstorm/delphi-listener.log"
-RAW_LOG_PATH = "/var/log/stackstorm/delphi-alerts.log"
+LOG_PATH = "/var/log/stackstorm/wazuh-listener.log"
+RAW_LOG_PATH = "/var/log/stackstorm/wazuh-alerts.log"
 ALERT_LOADER = "/usr/local/bin/alert-to-db.py"
 PORT = int(os.getenv("WEBHOOK_PORT", "9101"))
 BIND_ADDRESS = os.getenv("WEBHOOK_BIND_ADDRESS", "0.0.0.0")
@@ -93,7 +93,7 @@ class StructuredLogger:
 
 
 # Initialize logger
-structured_logger = StructuredLogger("delphi-listener", LOG_PATH)
+structured_logger = StructuredLogger("wazuh-listener", LOG_PATH)
 log = structured_logger.get_adapter("startup")
 
 
@@ -466,7 +466,7 @@ def main():
     signal.signal(signal.SIGINT, handle_shutdown)
     
     # Start server
-    log.info(f"Starting Delphi webhook listener on {BIND_ADDRESS}:{PORT}")
+    log.info(f"Starting Wazuh webhook listener on {BIND_ADDRESS}:{PORT}")
     log.info(f"Configuration: min_level={MIN_ALERT_LEVEL}, max_size={MAX_REQUEST_SIZE}, timeout={REQUEST_TIMEOUT}s")
     
     try:

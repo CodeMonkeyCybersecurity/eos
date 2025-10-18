@@ -101,14 +101,14 @@ cmd/debug/iris/
 ```
 
 **Estimated Effort:** 6-8 hours  
-**Dependencies:** pkg/delphi, pkg/iris  
+**Dependencies:** pkg/wazuh, pkg/iris  
 **Security Considerations:** Preserve credential handling in checks  
 
 ---
 
-#### 3. **cmd/debug/delphi.go** (1,630 lines)  CRITICAL
+#### 3. **cmd/debug/wazuh.go** (1,630 lines)  CRITICAL
 **Current Responsibilities:**
-- Delphi/Wazuh diagnostics
+- Wazuh/Wazuh diagnostics
 - Agent connectivity checks
 - API endpoint validation
 - Database connectivity
@@ -119,7 +119,7 @@ cmd/debug/iris/
 
 **Proposed Module Structure:**
 ```
-cmd/debug/delphi/
+cmd/debug/wazuh/
 ├── main.go (orchestrator, <150 lines)
 ├── checks/
 │   ├── agents.go          # Agent connectivity
@@ -136,7 +136,7 @@ cmd/debug/delphi/
 ```
 
 **Estimated Effort:** 6-8 hours  
-**Dependencies:** pkg/delphi  
+**Dependencies:** pkg/wazuh  
 
 ---
 
@@ -553,7 +553,7 @@ pkg/watchdog/resource/
 ### Week 1: P1 Files 1-5
 - Day 1-2: pkg/consul/install.go
 - Day 3: cmd/debug/iris.go
-- Day 4: cmd/debug/delphi.go
+- Day 4: cmd/debug/wazuh.go
 - Day 5: pkg/authentik/import.go + pkg/vault/install.go
 
 ### Week 2: P1 Files 6-10

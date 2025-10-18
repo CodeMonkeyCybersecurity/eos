@@ -1,4 +1,4 @@
-// cmd/delphi/services/fuzz_simple_test.go
+// cmd/wazuh/services/fuzz_simple_test.go
 
 package self
 
@@ -20,7 +20,7 @@ func FuzzUpdateCommand(f *testing.F) {
 	f.Add("--dry-run")
 	f.Add("alert-to-db")      // This was causing crashes
 	f.Add("ab-test-analyzer") // This was causing crashes
-	f.Add("delphi-listener")
+	f.Add("wazuh-listener")
 	f.Add("--timeout=5m")
 
 	f.Fuzz(func(t *testing.T, arg string) {

@@ -76,10 +76,10 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		rollback.RollbackCmd, // VERB-FIRST ARCHITECTURE (rollback operations)
 
 		// Top-level aliases for convenience
-		nuke.NukeCmd,           // Alias for delete nuke
+		nuke.NukeCmd, // Alias for delete nuke
 
 		// TODO: Migrate these to verb directories (Phase 4)
-		// delphi.DelphiCmd,    // TODO: Migrate to verb directories (Phase 4)
+		// wazuh.WazuhCmd,    // TODO: Migrate to verb directories (Phase 4)
 		// .Cmd,        // TODO: Migrate to verb directories (Phase 4)
 
 		// Legacy commands
@@ -87,7 +87,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 	} {
 		RootCmd.AddCommand(subCmd)
 	}
-	
+
 	// Create repair alias for backward compatibility
 	repairCmd := &cobra.Command{
 		Use:    "repair",

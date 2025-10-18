@@ -22,7 +22,7 @@ type ServiceManager struct {
 // NewServiceManager creates a new service manager
 func NewServiceManager() *ServiceManager {
 	return &ServiceManager{
-		registry: GetGlobalDelphiServiceRegistry(),
+		registry: GetGlobalWazuhServiceRegistry(),
 	}
 }
 
@@ -66,7 +66,7 @@ func (sm *ServiceManager) GetEnhancedServiceStatus(ctx context.Context, serviceN
 	enhancedStatus := EnhancedServiceStatus{
 		ServiceInstallationStatus: basicStatus,
 		CanInstall:                true,
-		InstallCommand:            fmt.Sprintf("eos delphi services create %s", serviceName),
+		InstallCommand:            fmt.Sprintf("eos wazuh services create %s", serviceName),
 	}
 
 	// Check systemd status if service is installed
@@ -289,8 +289,8 @@ func (sm *ServiceManager) AutoInstallServices(ctx context.Context, servicesToIns
 			zap.Int("progress", i+1),
 			zap.Int("total", len(servicesToInstall)))
 
-		// Execute: eos delphi services create <service-name>
-		cmd := exec.CommandContext(ctx, "eos", "delphi", "services", "create", serviceName)
+		// Execute: eos wazuh services create <service-name>
+		cmd := exec.CommandContext(ctx, "eos", "wazuh", "services", "create", serviceName)
 		output, err := cmd.CombinedOutput()
 
 		if err != nil {
@@ -306,7 +306,7 @@ func (sm *ServiceManager) AutoInstallServices(ctx context.Context, servicesToIns
 			zap.ByteString("output", output))
 
 		// Enable the service
-		enableCmd := exec.CommandContext(ctx, "eos", "delphi", "services", "enable", serviceName)
+		enableCmd := exec.CommandContext(ctx, "eos", "wazuh", "services", "enable", serviceName)
 		enableOutput, enableErr := enableCmd.CombinedOutput()
 
 		if enableErr != nil {
@@ -384,41 +384,41 @@ func (sm *ServiceManager) CheckServiceExists(serviceName string) bool {
 	return err == nil
 }
 
-// GetServiceWorkers returns information about all delphi service workers
+// GetServiceWorkers returns information about all wazuh service workers
 // This function needs the eosRoot to correctly determine source paths.
 func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 	timestamp := time.Now().Format("20060102_150405")
 
 	return []ServiceWorkerInfo{
 		{
-			ServiceName: "delphi-listener",
-			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-listener.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-listener.py.%s.bak", timestamp),
+			ServiceName: "wazuh-listener",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "wazuh-listener.py"),
+			TargetPath:  "/opt/stackstorm/packs/wazuh/wazuh-listener.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/wazuh/wazuh-listener.py.%s.bak", timestamp),
 		},
 		{
-			ServiceName: "delphi-agent-enricher",
-			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-agent-enricher.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-agent-enricher.py.%s.bak", timestamp),
+			ServiceName: "wazuh-agent-enricher",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "wazuh-agent-enricher.py"),
+			TargetPath:  "/opt/stackstorm/packs/wazuh/wazuh-agent-enricher.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/wazuh/wazuh-agent-enricher.py.%s.bak", timestamp),
 		},
 		{
 			ServiceName: "llm-worker",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "llm-worker.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/llm-worker.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/llm-worker.py.%s.bak", timestamp),
+			TargetPath:  "/opt/stackstorm/packs/wazuh/llm-worker.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/wazuh/llm-worker.py.%s.bak", timestamp),
 		},
 		{
 			ServiceName: "email-structurer",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "email-structurer.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/email-structurer.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/email-structurer.py.%s.bak", timestamp),
+			TargetPath:  "/opt/stackstorm/packs/wazuh/email-structurer.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/wazuh/email-structurer.py.%s.bak", timestamp),
 		},
 		{
 			ServiceName: "prompt-ab-tester",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "prompt-ab-tester.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/prompt-ab-tester.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/prompt-ab-tester.py.%s.bak", timestamp),
+			TargetPath:  "/opt/stackstorm/packs/wazuh/prompt-ab-tester.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/wazuh/prompt-ab-tester.py.%s.bak", timestamp),
 		},
 	}
 }

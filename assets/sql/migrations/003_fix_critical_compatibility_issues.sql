@@ -377,20 +377,20 @@ ON parser_metrics (created_at);
 
 DO $$
 BEGIN
-    -- Grant permissions for delphi services
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'delphi') THEN
+    -- Grant permissions for wazuh services
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'wazuh') THEN
         -- Table permissions
-        GRANT SELECT, INSERT, UPDATE ON alerts TO delphi;
-        GRANT SELECT, INSERT ON parser_metrics TO delphi;
-        GRANT USAGE ON SEQUENCE parser_metrics_id_seq TO delphi;
+        GRANT SELECT, INSERT, UPDATE ON alerts TO wazuh;
+        GRANT SELECT, INSERT ON parser_metrics TO wazuh;
+        GRANT USAGE ON SEQUENCE parser_metrics_id_seq TO wazuh;
         
         -- View permissions
-        GRANT SELECT ON parser_performance TO delphi;
-        GRANT SELECT ON prompt_usage_stats TO delphi;
-        GRANT SELECT ON alert_processing_status TO delphi;
+        GRANT SELECT ON parser_performance TO wazuh;
+        GRANT SELECT ON prompt_usage_stats TO wazuh;
+        GRANT SELECT ON alert_processing_status TO wazuh;
         
         -- Function permissions
-        GRANT EXECUTE ON FUNCTION get_parser_health(INTERVAL) TO delphi;
+        GRANT EXECUTE ON FUNCTION get_parser_health(INTERVAL) TO wazuh;
     END IF;
     
     -- Grant permissions for stanley user (commonly used)

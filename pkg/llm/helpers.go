@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 )
 
 // ───────────────────────── Config (env driven) ────────────────────────────
@@ -80,7 +80,7 @@ func ReadPrompt(ctx context.Context) string {
 		return string(b)
 	}
 	dbg(ctx, "Prompt file missing (%v); using default\n", err)
-	return "You are Delphi Notify, a digital cybersecurity first-responder. Please reply as a single line."
+	return "You are Wazuh Notify, a digital cybersecurity first-responder. Please reply as a single line."
 }
 
 func BuildUserPrompt(alertJSON any) (string, error) {
@@ -195,7 +195,7 @@ func CallAzure(ctx context.Context, payload map[string]any, retries int, delay t
 		// Fallback to basic client if migration fails
 		cl, _ = httpclient.NewClient(httpclient.DefaultConfig())
 	}
-	
+
 	for i := 0; i < retries; i++ {
 		resp, err := cl.DoWithContext(ctx, req)
 		if err == nil {
