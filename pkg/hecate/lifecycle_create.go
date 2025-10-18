@@ -83,6 +83,14 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 	logger.Info("  - /opt/hecate/.env")
 	logger.Info("  - /opt/hecate/Caddyfile")
 	logger.Info("")
+
+	// DNS Setup (before starting services)
+	if err := SetupHecateDNS(rc, domain); err != nil {
+		logger.Warn("DNS setup encountered issues", zap.Error(err))
+		logger.Info("You can configure DNS manually or run: eos create hecate hetzner-dns")
+		// Don't fail the entire deployment if DNS setup fails
+	}
+
 	logger.Info("Authentik will be accessible at: hera." + domain)
 	logger.Info("")
 
