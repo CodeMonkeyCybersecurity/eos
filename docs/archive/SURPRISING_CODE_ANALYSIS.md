@@ -109,7 +109,7 @@
 5. **Fix TOCTOU race** in SSH config handling with proper file locking
 6. **Handle all errors explicitly** - never use `_` to ignore errors
 
-### 📊 MEDIUM (User Experience)
+###  MEDIUM (User Experience)
 7. **Make paths configurable** instead of hardcoding system directories
 8. **Return errors** from functions that can fail instead of fake defaults
 9. **Add prominent logging** when falling back to alternative implementations

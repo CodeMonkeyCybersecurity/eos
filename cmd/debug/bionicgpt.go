@@ -75,7 +75,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	if err != nil {
 		logger.Warn("Failed to get container status", zap.Error(err), zap.String("output", output))
-		fmt.Printf("❌ Failed to get container status: %v\n", err)
+		fmt.Printf(" Failed to get container status: %v\n", err)
 		fmt.Println("   Possible causes:")
 		fmt.Println("   - BionicGPT not installed yet (run: sudo eos create bionicgpt)")
 		fmt.Println("   - docker-compose.yml missing or corrupted")
@@ -101,7 +101,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	if err != nil {
 		logger.Warn("Failed to check ports", zap.Error(err))
-		fmt.Printf("❌ Failed to check ports: %v\n", err)
+		fmt.Printf(" Failed to check ports: %v\n", err)
 		fmt.Println()
 	} else {
 		// Filter for BionicGPT port (3000)
@@ -118,7 +118,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			}
 		}
 		if !found {
-			fmt.Printf("❌ BionicGPT not listening on expected port %d\n", bionicgpt.DefaultPort)
+			fmt.Printf(" BionicGPT not listening on expected port %d\n", bionicgpt.DefaultPort)
 			fmt.Println("   Containers may not be running or still initializing")
 		}
 		logger.Info("Port check completed")
@@ -144,7 +144,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		})
 
 		if err != nil {
-			fmt.Printf("❌ Volume %s: Not found\n", vol)
+			fmt.Printf(" Volume %s: Not found\n", vol)
 		} else {
 			fmt.Printf("✓ Volume %s: %s\n", vol, strings.TrimSpace(volOutput))
 		}
@@ -168,7 +168,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		logger.Warn("PostgreSQL readiness check failed",
 			zap.Error(err),
 			zap.String("output", pgOutput))
-		fmt.Printf("❌ PostgreSQL not ready: %s\n", pgOutput)
+		fmt.Printf(" PostgreSQL not ready: %s\n", pgOutput)
 		fmt.Println("   Database may still be initializing")
 	} else {
 		logger.Info("PostgreSQL readiness check passed")
@@ -207,7 +207,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			logger.Warn("Failed to get container logs",
 				zap.String("container", container.name),
 				zap.Error(err))
-			fmt.Printf("❌ Failed to retrieve logs: %v\n", err)
+			fmt.Printf(" Failed to retrieve logs: %v\n", err)
 		} else {
 			// Filter for important log lines
 			lines := strings.Split(logsOutput, "\n")
@@ -246,7 +246,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	if err != nil {
 		logger.Warn("Failed to get resource stats", zap.Error(err))
-		fmt.Printf("❌ Failed to get resource stats: %v\n", err)
+		fmt.Printf(" Failed to get resource stats: %v\n", err)
 	} else {
 		fmt.Println(statsOutput)
 		logger.Info("Resource stats retrieved")

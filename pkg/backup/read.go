@@ -235,7 +235,7 @@ func displayRepositoryInfo(rc *eos_io.RuntimeContext, repo *Repository, repoInfo
 
 	// Repository statistics
 	if repoInfo != nil {
-		display.WriteString("\n📊 Repository Statistics:\n")
+		display.WriteString("\n Repository Statistics:\n")
 		display.WriteString(fmt.Sprintf("  Total Snapshots: %d\n", len(repoInfo.Snapshots)))
 
 		if repoInfo.OldestSnapshot != nil {

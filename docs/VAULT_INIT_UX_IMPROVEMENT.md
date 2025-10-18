@@ -8,9 +8,9 @@ When running `sudo eos create vault`, users were immediately prompted to re-ente
 
 1. Vault initialized successfully 
 2. Credentials saved to `/var/lib/eos/secret/vault_init.json` 
-3. User **immediately prompted** to re-enter credentials ❌
-4. User had **no time** to open second terminal and view credentials ❌
-5. User stuck at prompt, unable to proceed ❌
+3. User **immediately prompted** to re-enter credentials 
+4. User had **no time** to open second terminal and view credentials 
+5. User stuck at prompt, unable to proceed 
 
 ## Solution Implemented
 
@@ -146,11 +146,11 @@ Delete local credentials file? (you MUST have saved them externally first) (yes/
 |--------|--------|
 | **Credentials saved to file** |  Yes |
 | **File permissions** |  0600 (root only) |
-| **User has time to save externally** | ❌ No |
-| **Verification of external save** | ❌ No |
-| **Option to delete local file** | ❌ No |
+| **User has time to save externally** |  No |
+| **Verification of external save** |  No |
+| **Option to delete local file** |  No |
 | **Clear instructions** | ⚠️ Minimal |
-| **User experience** | ❌ Poor (blocked immediately) |
+| **User experience** |  Poor (blocked immediately) |
 
 ### After (Tier 2)
 
@@ -271,9 +271,9 @@ sudo eos create vault --auto-unseal=aws-kms --kms-key-id=arn:aws:kms:...
 | Feature | `vault operator init` | `eos create vault` |
 |---------|----------------------|-------------------|
 | **Display keys immediately** |  Yes (stdout) |  Yes (after pause) |
-| **Save to file automatically** | ❌ No |  Yes (backup) |
-| **Pause for user save** | ❌ No |  Yes |
-| **Verify user saved** | ❌ No |  Yes (re-entry) |
+| **Save to file automatically** |  No |  Yes (backup) |
+| **Pause for user save** |  No |  Yes |
+| **Verify user saved** |  No |  Yes (re-entry) |
 | **Option to delete file** | N/A |  Yes |
 | **PGP encryption support** |  Yes | ⏳ Future |
 | **Auto-unseal support** |  Yes | ⏳ Future |

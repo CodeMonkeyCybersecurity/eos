@@ -40,7 +40,7 @@ func ShowTelemetryInfo(rc *eos_io.RuntimeContext) {
 		zap.String("format", "JSONL (JSON Lines)"),
 		zap.String("privacy", "Local storage only - no external transmission"))
 
-	logger.Info("📊 Analysis commands",
+	logger.Info(" Analysis commands",
 		zap.String("command_frequency", "jq -r '.name' "+telemetryPath+" | sort | uniq -c | sort -nr"),
 		zap.String("success_rate", "jq -r 'select(.attributes.success == true) | .name' "+telemetryPath+" | wc -l"),
 		zap.String("avg_duration", "jq -r 'select(.attributes.duration_ms) | \"\\(.name) \\(.attributes.duration_ms)\"' "+telemetryPath))

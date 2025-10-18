@@ -70,7 +70,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	if err != nil {
 		logger.Warn("Failed to get container status", zap.Error(err), zap.String("output", output))
-		fmt.Printf("❌ Failed to get container status: %v\n", err)
+		fmt.Printf(" Failed to get container status: %v\n", err)
 		fmt.Println("   Possible causes:")
 		fmt.Println("   - OpenWebUI not installed yet (run: sudo eos create openwebui)")
 		fmt.Println("   - docker-compose.yml missing or corrupted")
@@ -96,7 +96,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	if err != nil {
 		logger.Warn("Failed to check ports", zap.Error(err))
-		fmt.Printf("❌ Failed to check ports: %v\n", err)
+		fmt.Printf(" Failed to check ports: %v\n", err)
 		fmt.Println()
 	} else {
 		// Filter for relevant ports
@@ -119,7 +119,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			}
 		}
 		if !found {
-			fmt.Println("❌ No services listening on expected ports (8501, 4000, 5432)")
+			fmt.Println(" No services listening on expected ports (8501, 4000, 5432)")
 			fmt.Println("   Containers may not be running or still initializing")
 		}
 		logger.Info("Port check completed")
@@ -145,7 +145,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		logger.Warn("OpenWebUI health check failed",
 			zap.Error(err),
 			zap.String("status_code", healthOutput))
-		fmt.Printf("❌ OpenWebUI health endpoint not responding (HTTP %s)\n", healthOutput)
+		fmt.Printf(" OpenWebUI health endpoint not responding (HTTP %s)\n", healthOutput)
 		fmt.Println("   OpenWebUI may still be initializing or failed to start")
 	} else {
 		logger.Info("OpenWebUI health check passed")
@@ -166,7 +166,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		logger.Warn("LiteLLM health check failed",
 			zap.Error(err),
 			zap.String("status_code", litellmOutput))
-		fmt.Printf("❌ LiteLLM health endpoint not responding (HTTP %s)\n", litellmOutput)
+		fmt.Printf(" LiteLLM health endpoint not responding (HTTP %s)\n", litellmOutput)
 		fmt.Println("   LiteLLM may be crashing or unable to connect to PostgreSQL")
 		fmt.Println("   Check logs below for connection errors")
 	} else {
@@ -192,7 +192,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		logger.Warn("PostgreSQL readiness check failed",
 			zap.Error(err),
 			zap.String("output", pgOutput))
-		fmt.Printf("❌ PostgreSQL not ready: %s\n", pgOutput)
+		fmt.Printf(" PostgreSQL not ready: %s\n", pgOutput)
 		fmt.Println("   Database may still be initializing")
 	} else {
 		logger.Info("PostgreSQL readiness check passed")
@@ -228,7 +228,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			logger.Warn("Failed to get container logs",
 				zap.String("container", container.name),
 				zap.Error(err))
-			fmt.Printf("❌ Failed to retrieve logs: %v\n", err)
+			fmt.Printf(" Failed to retrieve logs: %v\n", err)
 		} else {
 			// Filter for important log lines
 			lines := strings.Split(logsOutput, "\n")
@@ -269,7 +269,7 @@ func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	if err != nil {
 		logger.Warn("Failed to check file permissions", zap.Error(err))
-		fmt.Printf("❌ Failed to check file: %v\n", err)
+		fmt.Printf(" Failed to check file: %v\n", err)
 	} else {
 		fmt.Println(lsOutput)
 		if strings.Contains(lsOutput, "rw-------") || strings.Contains(lsOutput, "600") {

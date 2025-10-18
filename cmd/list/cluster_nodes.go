@@ -161,7 +161,7 @@ func outputNodesJSON(nodes map[string][]string, config *environment.EnhancedEnvi
 func displayNodesTable(nodes map[string][]string, config *environment.EnhancedEnvironmentConfig) error {
 	fmt.Printf("🏗️  Cluster Topology (%s)\n", config.Profile)
 	fmt.Printf("========================================\n\n")
-	fmt.Printf("📊 Overview:\n")
+	fmt.Printf(" Overview:\n")
 	fmt.Printf("  Profile:          %s\n", config.Profile)
 	fmt.Printf("  Environment:      %s\n", config.Environment)
 	fmt.Printf("  Cluster Size:     %d nodes\n", config.ClusterSize)

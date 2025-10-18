@@ -35,7 +35,7 @@ func RunMapping(rc *eos_io.RuntimeContext, cfg interface{}, authenticateFunc fun
 		}
 	}
 
-	log.Info("📊 Using API",
+	log.Info(" Using API",
 		zap.String("fqdn", fqdn),
 		zap.String("port", utils.DefaultStr(port, "55000")))
 

@@ -104,7 +104,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 			return fmt.Errorf("failed to get DNS metrics: %w", err)
 		}
 
-		fmt.Printf("📊 DNS Management Metrics:\n")
+		fmt.Printf(" DNS Management Metrics:\n")
 		fmt.Printf("  Total Routes:      %d\n", metrics.TotalRoutes)
 		fmt.Printf("  Managed Domains:   %d\n", metrics.ManagedDomains)
 		fmt.Printf("  Orphaned Records:  %d\n", metrics.OrphanedRecords)

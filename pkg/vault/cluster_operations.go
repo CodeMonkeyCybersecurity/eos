@@ -532,7 +532,7 @@ func (h *ClusterHealth) String() string {
 	if h.Healthy {
 		sb.WriteString(" Cluster is HEALTHY\n")
 	} else {
-		sb.WriteString("❌ Cluster is UNHEALTHY\n")
+		sb.WriteString(" Cluster is UNHEALTHY\n")
 	}
 
 	sb.WriteString(fmt.Sprintf("Nodes: %d total, %d healthy\n", h.TotalNodes, h.HealthyNodes))

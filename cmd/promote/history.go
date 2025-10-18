@@ -428,7 +428,7 @@ func outputHistoryTable(history []PromotionHistoryRecord, showDetails bool, grou
 		}
 	}
 
-	fmt.Printf("\n📊 Showing %d promotion record(s)\n", len(history))
+	fmt.Printf("\n Showing %d promotion record(s)\n", len(history))
 
 	// Show quick stats
 	successful := 0

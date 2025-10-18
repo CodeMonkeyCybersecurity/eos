@@ -113,7 +113,7 @@ CRITICAL_PACKAGES=(
     "security"
 )
 
-echo -e "${BLUE}📊 Running unit tests for critical packages...${NC}"
+echo -e "${BLUE} Running unit tests for critical packages...${NC}"
 COVERAGE_FILE="$LOG_DIR/coverage-$TIMESTAMP.out"
 
 # Run tests with coverage
@@ -129,7 +129,7 @@ if go test -v -timeout="$TEST_TIMEOUT" \
     
     # Check coverage percentage
     COVERAGE=$(go tool cover -func="$COVERAGE_FILE" | grep total | awk '{print $3}' | sed 's/%//')
-    echo -e "${BLUE}📊 Total coverage: ${COVERAGE}%${NC}"
+    echo -e "${BLUE} Total coverage: ${COVERAGE}%${NC}"
     
     if (( $(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then
         echo -e "${YELLOW}Coverage ${COVERAGE}% is below threshold ${COVERAGE_THRESHOLD}%${NC}"
@@ -309,7 +309,7 @@ fi
 
 if (( $(echo "${COVERAGE:-0} < $COVERAGE_THRESHOLD" | bc -l) )); then
     cat >> "$REPORT_FILE" << EOF
-### 📊 Coverage Improvement Needed
+###  Coverage Improvement Needed
 - Current coverage (${COVERAGE}%) is below threshold ($COVERAGE_THRESHOLD%)
 - Add tests for uncovered code paths
 EOF
@@ -337,7 +337,7 @@ echo ""
 
 if [ $FAILED_TESTS -eq 0 ]; then
     echo -e "${GREEN} All tests passed!${NC}"
-    echo -e "${BLUE}📊 Coverage: ${COVERAGE:-N/A}%${NC}"
+    echo -e "${BLUE} Coverage: ${COVERAGE:-N/A}%${NC}"
     echo -e "${BLUE} Full report: $REPORT_FILE${NC}"
     exit 0
 else

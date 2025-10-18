@@ -248,7 +248,7 @@ func VerifyKeyBackup(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error
 	}
 
 	if matchCount < 3 {
-		logger.Error("❌ Key verification failed - keys do not match")
+		logger.Error(" Key verification failed - keys do not match")
 		logger.Info("terminal prompt: ")
 		logger.Info("terminal prompt: The keys you entered do not match the generated keys.")
 		logger.Info("terminal prompt: Please double-check your backup and try again.")

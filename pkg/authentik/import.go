@@ -271,7 +271,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	// Show import summary
 	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Println("📊 Import Summary:")
+	fmt.Println(" Import Summary:")
 	fmt.Printf("   Created: %d\n", result.Created)
 	fmt.Printf("   Updated: %d\n", result.Updated)
 	fmt.Printf("   Skipped: %d\n", result.Skipped)
@@ -1152,7 +1152,7 @@ func compareConfigurations(source, target *AuthentikConfig, detailed bool) Confi
 }
 
 func printComparison(comp ConfigComparison) {
-	fmt.Println("\n📊 Configuration Comparison:")
+	fmt.Println("\n Configuration Comparison:")
 	fmt.Println(strings.Repeat("=", 50))
 
 	fmt.Println("\n📌 Source:")

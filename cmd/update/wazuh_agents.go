@@ -180,7 +180,7 @@ Common Use Cases:
 
 		// Display results
 		if result.Analysis != nil {
-			fmt.Printf("\n📊 Agent Analysis Results:\n")
+			fmt.Printf("\n Agent Analysis Results:\n")
 			fmt.Printf("Current Version: %s\n", result.Analysis.CurrentVersion)
 			fmt.Printf("Latest Version: %s\n", result.Analysis.LatestVersion)
 			fmt.Printf("Platform: %s (%s)\n", result.Analysis.Platform, result.Analysis.Architecture)

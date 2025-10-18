@@ -83,7 +83,7 @@ func DisplaySummaryStats(ctx context.Context, db *sql.DB) {
 	}
 
 	// EVALUATE - Display statistics
-	fmt.Printf("📊 Alerts: %d total | %d new | %d sent | %d failed | %d (24h) | "+
+	fmt.Printf(" Alerts: %d total | %d new | %d sent | %d failed | %d (24h) | "+
 		"Agents: %d total | %d active | %d disconnected | %d (1h)",
 		alertStats.total, alertStats.new, alertStats.sent, alertStats.failed, alertStats.last24h,
 		agentStats.total, agentStats.active, agentStats.disconnected, agentStats.lastHour)

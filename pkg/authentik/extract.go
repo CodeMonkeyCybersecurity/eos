@@ -396,7 +396,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Total size: %.2f KB\n", float64(len(data))/1024)
 
 	// Show summary
-	fmt.Println("\n📊 Export Summary:")
+	fmt.Println("\n Export Summary:")
 	fmt.Printf("   Providers:         %d\n", len(config.Providers))
 	fmt.Printf("   Applications:      %d\n", len(config.Applications))
 	fmt.Printf("   Property Mappings: %d\n", len(config.PropertyMappings))

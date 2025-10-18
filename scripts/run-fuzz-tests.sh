@@ -142,7 +142,7 @@ run_single_fuzz_test() {
         local executions=$(grep -o 'execs: [0-9]*' "${log_file}" | tail -1 | grep -o '[0-9]*' || echo "0")
         
         echo "${test_function} completed successfully"
-        echo "📊 Found ${inputs} new inputs, executed ${executions} cases in ${elapsed}s"
+        echo " Found ${inputs} new inputs, executed ${executions} cases in ${elapsed}s"
         
         # Update report
         echo "- **${test_function}** (${test_package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
@@ -361,7 +361,7 @@ cat >> "${REPORT_FILE}" << EOF
 EOF
 
 echo ""
-echo "📊 SUMMARY:"
+echo " SUMMARY:"
 echo "==========="
 echo "📈 Tests: ${total_tests} total, ${passed_tests} passed, ${failed_tests} failed"
 echo " Report: ${REPORT_FILE}"

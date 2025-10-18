@@ -751,7 +751,7 @@ func (eeu *EnhancedEosUpdater) updateApt() error {
 		return fmt.Errorf("apt update failed: %w", err)
 	}
 
-	eeu.logger.Info("✅ Package lists updated")
+	eeu.logger.Info(" Package lists updated")
 
 	// Step 2: apt upgrade (install updates)
 	eeu.logger.Info("  Step 2/2: Installing package updates (apt upgrade)")
@@ -763,7 +763,7 @@ func (eeu *EnhancedEosUpdater) updateApt() error {
 		return fmt.Errorf("apt upgrade failed: %w", err)
 	}
 
-	eeu.logger.Info("✅ System packages updated successfully")
+	eeu.logger.Info(" System packages updated successfully")
 	return nil
 }
 
@@ -779,7 +779,7 @@ func (eeu *EnhancedEosUpdater) updateYumDnf(manager string) error {
 		return fmt.Errorf("%s update failed: %w", manager, err)
 	}
 
-	eeu.logger.Info("✅ System packages updated successfully")
+	eeu.logger.Info(" System packages updated successfully")
 	return nil
 }
 
@@ -795,7 +795,7 @@ func (eeu *EnhancedEosUpdater) updatePacman() error {
 		return fmt.Errorf("pacman update failed: %w", err)
 	}
 
-	eeu.logger.Info("✅ System packages updated successfully")
+	eeu.logger.Info(" System packages updated successfully")
 	return nil
 }
 
@@ -822,7 +822,7 @@ func (eeu *EnhancedEosUpdater) UpdateGoVersion() error {
 
 	// Compare versions
 	if currentVersion == latestVersion {
-		eeu.logger.Info("✅ Go compiler is already up-to-date")
+		eeu.logger.Info(" Go compiler is already up-to-date")
 		return nil
 	}
 
@@ -835,7 +835,7 @@ func (eeu *EnhancedEosUpdater) UpdateGoVersion() error {
 		return fmt.Errorf("failed to install Go %s: %w", latestVersion, err)
 	}
 
-	eeu.logger.Info("✅ Go compiler updated successfully", zap.String("version", latestVersion))
+	eeu.logger.Info(" Go compiler updated successfully", zap.String("version", latestVersion))
 	return nil
 }
 
@@ -939,7 +939,7 @@ func (eeu *EnhancedEosUpdater) installGoVersion(version string) error {
 		return fmt.Errorf("extraction failed: %w", err)
 	}
 
-	eeu.logger.Info("✅ Go installed successfully")
+	eeu.logger.Info(" Go installed successfully")
 
 	// Update goPath to new installation
 	eeu.goPath = "/usr/local/go/bin/go"

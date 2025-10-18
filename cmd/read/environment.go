@@ -192,7 +192,7 @@ func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error
 	fmt.Printf("====================================\n\n")
 
 	// Profile and basic info
-	fmt.Printf("📊 Deployment Profile: %s\n", config.Profile)
+	fmt.Printf(" Deployment Profile: %s\n", config.Profile)
 	fmt.Printf(" Environment:        %s\n", config.Environment)
 	fmt.Printf(" Datacenter:         %s\n", config.Datacenter)
 	fmt.Printf("🌎 Region:             %s\n", config.Region)

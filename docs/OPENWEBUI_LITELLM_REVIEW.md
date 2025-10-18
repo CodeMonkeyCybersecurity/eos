@@ -71,7 +71,7 @@ services:
       - webui_network
     depends_on:
       - litellm-proxy
-    # ❌ NO ENVIRONMENT VARIABLES TO CONNECT TO LITELLM!
+    #  NO ENVIRONMENT VARIABLES TO CONNECT TO LITELLM!
 ```
 
 **Required Fix:**
@@ -400,7 +400,7 @@ open http://localhost:3000
 
 ---
 
-## 📊 Expected Generated Files
+##  Expected Generated Files
 
 ### docker-compose.yml (CORRECTED)
 ```yaml

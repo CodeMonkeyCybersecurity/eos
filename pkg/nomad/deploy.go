@@ -600,7 +600,7 @@ func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfi
 	}
 
 	summary.WriteString("\n")
-	summary.WriteString("📊 Monitoring:\n")
+	summary.WriteString(" Monitoring:\n")
 	summary.WriteString("   • Service status: systemctl status nomad\n")
 	summary.WriteString("   • Logs: journalctl -u nomad -f\n")
 	summary.WriteString("   • Metrics: http://localhost:4646/v1/metrics\n")

@@ -133,7 +133,7 @@ func (aum *AgentUpgradeManager) UpgradeLocalAgent(rc *eos_io.RuntimeContext) (*A
 	}
 	result.Analysis = analysis
 
-	logger.Info("📊 Pre-flight analysis completed",
+	logger.Info(" Pre-flight analysis completed",
 		zap.String("current_version", analysis.CurrentVersion),
 		zap.String("target_version", analysis.LatestVersion),
 		zap.String("platform", analysis.Platform),

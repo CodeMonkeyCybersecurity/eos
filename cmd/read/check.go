@@ -186,7 +186,7 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 
 	// Summary
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: 📊 Summary")
+	logger.Info("terminal prompt:  Summary")
 	logger.Info("terminal prompt: =======")
 
 	if len(issues) == 0 && len(warnings) == 0 {

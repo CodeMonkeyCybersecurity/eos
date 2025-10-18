@@ -340,7 +340,7 @@ AmbientCapabilities=CAP_IPC_LOCK
 
 ---
 
-## 📊 IMPLEMENTATION QUALITY SCORE
+##  IMPLEMENTATION QUALITY SCORE
 
 **Overall: 9/10**
 

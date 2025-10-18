@@ -74,7 +74,7 @@ run_fuzz_test() {
         local executions=$(grep -o 'execs: [0-9]*' "${log_file}" | tail -1 | sed 's/execs: //' || echo "0")
         
         echo "${test_name} completed successfully"
-        echo "📊 Found ${inputs} new inputs, executed ${executions} cases in ${elapsed}s"
+        echo " Found ${inputs} new inputs, executed ${executions} cases in ${elapsed}s"
         
         # Update report
         echo "- **${test_name}** (${package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
@@ -207,7 +207,7 @@ else
 fi
 
 echo ""
-echo "📊 COMPREHENSIVE SUMMARY:"
+echo " COMPREHENSIVE SUMMARY:"
 echo "========================="
 echo " Log directory: ${LOG_DIR}"
 echo " Main report: ${REPORT_FILE}"

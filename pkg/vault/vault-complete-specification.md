@@ -155,8 +155,8 @@ sudo chmod 700 /var/lib/eos/secret
 **CRITICAL ISSUE:** Config file would have **empty strings** for certificate paths:
 ```hcl
 listener "tcp" {
-  tls_cert_file = ""   # ❌ EMPTY STRING - causes crash!
-  tls_key_file = ""    # ❌ EMPTY STRING - causes crash!
+  tls_cert_file = ""   #  EMPTY STRING - causes crash!
+  tls_key_file = ""    #  EMPTY STRING - causes crash!
 }
 ```
 

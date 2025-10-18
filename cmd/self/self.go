@@ -203,7 +203,7 @@ func enrollSystem(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🚀 Starting Eos self-update with enhanced safety features")
+	logger.Info(" Starting Eos self-update with enhanced safety features")
 
 	// Create enhanced updater configuration with safety features
 	config := &selfpkg.EnhancedUpdateConfig{
@@ -230,6 +230,6 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		return fmt.Errorf("self-update failed: %w", err)
 	}
 
-	logger.Info("✅ Self-update completed successfully - please restart any running eos processes")
+	logger.Info(" Self-update completed successfully - please restart any running eos processes")
 	return nil
 }

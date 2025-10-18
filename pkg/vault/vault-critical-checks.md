@@ -188,28 +188,28 @@ echo "=== Critical Checks ==="
 
 # 1. Empty paths check
 echo -n "Empty TLS paths: "
-grep -qE 'tls_(cert|key)_file.*""' /etc/vault.d/vault.hcl && echo "❌ FAIL" || echo " PASS"
+grep -qE 'tls_(cert|key)_file.*""' /etc/vault.d/vault.hcl && echo " FAIL" || echo " PASS"
 
 # 2. Cert files exist
 echo -n "Cert files exist: "
-test -f /etc/vault.d/tls/vault-cert.pem && test -f /etc/vault.d/tls/vault-key.pem && echo " PASS" || echo "❌ FAIL"
+test -f /etc/vault.d/tls/vault-cert.pem && test -f /etc/vault.d/tls/vault-key.pem && echo " PASS" || echo " FAIL"
 
 # 3. Key permissions
 echo -n "Key permissions: "
-test "$(stat -c %a /etc/vault.d/tls/vault-key.pem)" = "600" && echo " PASS" || echo "❌ FAIL"
+test "$(stat -c %a /etc/vault.d/tls/vault-key.pem)" = "600" && echo " PASS" || echo " FAIL"
 
 # 4. Systemd syntax
 echo -n "Systemd syntax: "
-grep -q "AmbientCapabilities=CAP_IPC_LOCK" /etc/systemd/system/vault.service && echo " PASS" || echo "❌ FAIL"
-grep -q "^Capabilities=" /etc/systemd/system/vault.service && echo "❌ FAIL (deprecated)" || echo " PASS"
+grep -q "AmbientCapabilities=CAP_IPC_LOCK" /etc/systemd/system/vault.service && echo " PASS" || echo " FAIL"
+grep -q "^Capabilities=" /etc/systemd/system/vault.service && echo " FAIL (deprecated)" || echo " PASS"
 
 # 5. Vault running
 echo -n "Vault running: "
-systemctl is-active vault && echo " PASS" || echo "❌ FAIL"
+systemctl is-active vault && echo " PASS" || echo " FAIL"
 
 # 6. Binary location
 echo -n "Binary location: "
-test -x /usr/local/bin/vault && echo " PASS" || echo "❌ FAIL"
+test -x /usr/local/bin/vault && echo " PASS" || echo " FAIL"
 
 # 7. No duplicates
 echo -n "No duplicate binary: "
@@ -217,15 +217,15 @@ test ! -f /usr/bin/vault && echo " PASS" || echo "  WARNING: Duplicate at /usr/b
 
 # 8. Init file permissions
 echo -n "Init file perms: "
-test "$(stat -c %a /var/lib/eos/secret/vault_init.json)" = "600" && echo " PASS" || echo "❌ FAIL"
+test "$(stat -c %a /var/lib/eos/secret/vault_init.json)" = "600" && echo " PASS" || echo " FAIL"
 
 # 9. Config validation
 echo -n "Config valid: "
-vault validate /etc/vault.d/vault.hcl &>/dev/null && echo " PASS" || echo "❌ FAIL"
+vault validate /etc/vault.d/vault.hcl &>/dev/null && echo " PASS" || echo " FAIL"
 
 # 10. User created first
 echo -n "Vault user exists: "
-id vault &>/dev/null && echo " PASS" || echo "❌ FAIL"
+id vault &>/dev/null && echo " PASS" || echo " FAIL"
 
 echo ""
 echo "=== End Checks ==="
@@ -243,7 +243,7 @@ sudo ./check-vault-install.sh
 
 ### Anti-Pattern #1: Empty String Paths
 ```go
-// ❌ DANGEROUS
+//  DANGEROUS
 config := fmt.Sprintf(`
 listener "tcp" {
   tls_cert_file = "%s"
@@ -254,7 +254,7 @@ listener "tcp" {
 
 ### Anti-Pattern #2: Ignoring Validation Errors
 ```go
-// ❌ DANGEROUS
+//  DANGEROUS
 err := validateConfig()
 if err != nil {
     log.Warn("Validation failed, continuing anyway...")
@@ -264,7 +264,7 @@ if err != nil {
 
 ### Anti-Pattern #3: Wrong Path Variables
 ```go
-// ❌ WRONG
+//  WRONG
 secretsDir := "/var/lib/eos/secrets"  // Plural!
 
 //  CORRECT
@@ -273,7 +273,7 @@ secretDir := "/var/lib/eos/secret"    // Singular!
 
 ### Anti-Pattern #4: Creating Dirs Before User
 ```go
-// ❌ WRONG ORDER
+//  WRONG ORDER
 createDirectories()
 createUser()
 
@@ -284,7 +284,7 @@ createDirectories()
 
 ### Anti-Pattern #5: Not Setting Sink Mode
 ```hcl
-# ❌ WRONG
+#  WRONG
 sink "file" {
   config = {
     path = "/run/eos/vault_agent_eos.token"
@@ -371,7 +371,7 @@ sink "file" {
 
 ---
 
-## 📊 FILE PERMISSIONS MATRIX (QUICK REF)
+##  FILE PERMISSIONS MATRIX (QUICK REF)
 
 | File | Perms | Owner | WHY |
 |------|-------|-------|-----|

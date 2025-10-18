@@ -81,7 +81,7 @@ Examples:
 					zap.String("file", reportFile),
 					zap.Error(err))
 			} else {
-				logger.Info("terminal prompt: 📊 Detailed report saved", zap.String("file", reportFile))
+				logger.Info("terminal prompt:  Detailed report saved", zap.String("file", reportFile))
 			}
 		}
 

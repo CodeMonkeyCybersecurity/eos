@@ -148,11 +148,11 @@ sudo eos debug vault
 ## Why This Matters
 
 The missing host IP in SANs causes:
-1. ❌ Vault CLI cannot connect over TLS
-2. ❌ Health checks fail with certificate validation errors
-3. ❌ Vault appears "running but not responding"
-4. ❌ Agent configuration fails
-5. ❌ Cluster communication breaks
+1.  Vault CLI cannot connect over TLS
+2.  Health checks fail with certificate validation errors
+3.  Vault appears "running but not responding"
+4.  Agent configuration fails
+5.  Cluster communication breaks
 
 With proper SANs:
 1.  Vault CLI connects successfully

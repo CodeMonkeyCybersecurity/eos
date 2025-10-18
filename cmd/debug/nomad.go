@@ -330,7 +330,7 @@ func displayDiagnosticReport(logger otelzap.LoggerWithCtx, issues, warnings, fix
 	}
 
 	if diagnostics != nil {
-		logger.Info("terminal prompt: 📊 DIAGNOSTIC SUMMARY:")
+		logger.Info("terminal prompt:  DIAGNOSTIC SUMMARY:")
 		logger.Info("terminal prompt:", zap.String("summary", fmt.Sprintf("  • Installed: %v", diagnostics["installed"])))
 		logger.Info("terminal prompt:", zap.String("summary", fmt.Sprintf("  • Service Active: %v", diagnostics["service_active"])))
 		logger.Info("terminal prompt:", zap.String("summary", fmt.Sprintf("  • Service Enabled: %v", diagnostics["service_enabled"])))

@@ -18,11 +18,11 @@
 └─────────────────────────────────────────┘
 
 **Problems:**
-❌ No High Availability
-❌ Single Point of Failure
-❌ Manual backup required
-❌ No automatic failover
-❌ Doesn't work with Vault Enterprise 1.12.0+
+ No High Availability
+ Single Point of Failure
+ Manual backup required
+ No automatic failover
+ Doesn't work with Vault Enterprise 1.12.0+
 ```
 
 ## Raft Storage (RECOMMENDED)
@@ -211,7 +211,7 @@ Node2, Node3, and Node4 fail:
 Leader:    Node1 ✓
 Followers: Node2 ✗, Node3 ✗, Node4 ✗, Node5 ✓
 
-Result: ❌ CLUSTER UNAVAILABLE
+Result:  CLUSTER UNAVAILABLE
 Quorum: 3 nodes needed, only 2 available
 Vault returns 503 errors
 Cannot elect leader
@@ -239,7 +239,7 @@ Option 2: Restore from snapshot (if nodes unrecoverable)
 ┌────────────────┬─────────────┬──────────────────┬─────────────┐
 │ Cluster Size   │ Quorum Size │ Failure Tolerance│ Recommended │
 ├────────────────┼─────────────┼──────────────────┼─────────────┤
-│ 1 node         │ 1           │ 0                │ ❌ Dev only │
+│ 1 node         │ 1           │ 0                │  Dev only │
 │ 3 nodes        │ 2           │ 1                │   Minimal │
 │ 5 nodes        │ 3           │ 2                │  Ideal    │
 │ 7 nodes        │ 4           │ 3                │   Overkill│

@@ -2,10 +2,10 @@
 
 **Goal:** Merge `pkg/container_management/` into `pkg/container/` to eliminate import cycles
 
-## ✅ Completed
+##  Completed
 
 ### Step 1: Types Migration
-- ✅ Moved Compose types to `pkg/container/types.go`:
+-  Moved Compose types to `pkg/container/types.go`:
   - `ComposeProject`
   - `ComposeSearchResult`
   - `ComposeOperation`
@@ -16,25 +16,25 @@
   - `ContainerListResult`
 
 ### Step 2: Import Updates
-- ✅ Updated `pkg/container/list.go` - removed container_management import
-- ✅ Updated `cmd/list/containers.go` - removed container_management import
-- ✅ Fixed type references in list.go
+-  Updated `pkg/container/list.go` - removed container_management import
+-  Updated `cmd/list/containers.go` - removed container_management import
+-  Fixed type references in list.go
 
 ### Step 3: Compilation
-- ✅ `pkg/container/` compiles successfully
+-  `pkg/container/` compiles successfully
 
-## ✅ Phase 2 Complete!
+##  Phase 2 Complete!
 
-### Step 4: Move Functions ✅ DONE
-- ✅ Created `pkg/container/compose_management.go` (309 lines)
-- ✅ Moved `FindComposeProjects()` with SDK integration
-- ✅ Moved `ListRunningContainers()` using `Manager.ListRunning()`
-- ✅ Helper functions migrated
+### Step 4: Move Functions  DONE
+-  Created `pkg/container/compose_management.go` (309 lines)
+-  Moved `FindComposeProjects()` with SDK integration
+-  Moved `ListRunningContainers()` using `Manager.ListRunning()`
+-  Helper functions migrated
 
-### Step 5: Update Callers ✅ DONE
-- ✅ `cmd/list/containers.go` - Updated to use `container.ListRunningContainers()`
-- ✅ `cmd/list/containers.go` - Updated to use `container.FindComposeProjects()`
-- ✅ All function calls working
+### Step 5: Update Callers  DONE
+-  `cmd/list/containers.go` - Updated to use `container.ListRunningContainers()`
+-  `cmd/list/containers.go` - Updated to use `container.FindComposeProjects()`
+-  All function calls working
 
 ### Step 6: Remove Old Package 🔄 READY
 - ⏳ Delete `pkg/container_management/` directory (safe to remove)
@@ -76,13 +76,13 @@
 - **Backward compatibility**: Functions will have same signatures, just different package
 - **ContainerInfo**: Multiple definitions exist (backup.go, types.go) - need to consolidate eventually
 
-## 🚀 Benefits After Merge
+##  Benefits After Merge
 
-1. ✅ No import cycles
-2. ✅ Single source of truth for container operations
-3. ✅ Can use SDK methods internally without circular dependencies
-4. ✅ Cleaner architecture
-5. ✅ Easier to maintain
+1.  No import cycles
+2.  Single source of truth for container operations
+3.  Can use SDK methods internally without circular dependencies
+4.  Cleaner architecture
+5.  Easier to maintain
 
 ---
 

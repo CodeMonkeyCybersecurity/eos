@@ -97,7 +97,7 @@ Next steps:
   2. Create your first user account (will be admin)
   3. Start chatting with Azure OpenAI
 
-🚀 LiteLLM Proxy (Production Mode):
+ LiteLLM Proxy (Production Mode):
   UI:   http://localhost:4000/ui
   Docs: http://localhost:4000/docs
 ```

@@ -147,7 +147,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	time.Sleep(30 * time.Second)
 
 	// EVALUATE - Check deployment status
-	logger.Info("📊 Evaluating deployment status")
+	logger.Info(" Evaluating deployment status")
 
 	statusCmd := exec.Command("docker", "compose", "ps")
 	statusCmd.Stdout = os.Stdout

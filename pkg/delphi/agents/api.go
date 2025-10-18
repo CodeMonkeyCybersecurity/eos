@@ -56,7 +56,7 @@ func FetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 	}
 
 	// EVALUATE - Parse and validate response
-	log.Debug("📊 Parsing API response", zap.Int("status_code", resp.StatusCode))
+	log.Debug(" Parsing API response", zap.Int("status_code", resp.StatusCode))
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))

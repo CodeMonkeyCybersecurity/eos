@@ -100,7 +100,7 @@ func DisplayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	}
 
 	// EVALUATE - Display summary
-	fmt.Printf("\n📊 Total alerts shown: %d | Press Ctrl+C to exit\n", len(alerts))
+	fmt.Printf("\n Total alerts shown: %d | Press Ctrl+C to exit\n", len(alerts))
 
 	logger.Debug("Alerts display completed successfully",
 		zap.Int("alerts_shown", len(alerts)))

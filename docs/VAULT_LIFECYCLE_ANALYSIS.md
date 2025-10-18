@@ -27,7 +27,7 @@ This document provides a comprehensive adversarial analysis of the Eos Vault lif
 - SecurityWarnings displayed about key storage
 - Vault is fully configured and operational
 
-#### ❌ What's Broken/Missing:
+####  What's Broken/Missing:
 
 **CRITICAL GAP #1: No Immediate Key Distribution**
 - **Problem**: Keys are on disk on the SAME machine Vault is running on
@@ -79,7 +79,7 @@ This document provides a comprehensive adversarial analysis of the Eos Vault lif
 - Correctly skips initialization
 - Informs user to use leader's keys
 
-#### ❌ What's Broken/Missing:
+####  What's Broken/Missing:
 
 **CRITICAL GAP #6: No Automated Key Retrieval from Leader**
 - **Problem**: User must manually get keys from leader node
@@ -118,7 +118,7 @@ This document provides a comprehensive adversarial analysis of the Eos Vault lif
 #### Current Flow:
 None - no documented disaster recovery workflow
 
-#### ❌ What's Completely Missing:
+####  What's Completely Missing:
 
 **CRITICAL GAP #11: No DR Documentation**
 - **Problem**: No documented procedure for server failure
@@ -195,7 +195,7 @@ func SaveInitResult(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error 
 - `JoinRaftCluster()` - uses `client.Sys().RaftJoin()`
 - `UnsealVaultWithKeys()` - uses `client.Sys().Unseal()`
 
-❌ **Still Shelling Out:**
+ **Still Shelling Out:**
 ```go
 // cluster_operations.go:197 - GetRaftPeers
 cmd := exec.CommandContext(rc.Ctx, "vault", "operator", "raft", "list-peers", "-format=json")
@@ -829,7 +829,7 @@ func VerifyKeyBackup(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error
 
 ### SDK/API Usage Status:
  **Using SDK**: 5 functions
-❌ **Still Shelling Out**: 6 functions
+ **Still Shelling Out**: 6 functions
 
 ### User Experience Gaps:
 - No automated key distribution

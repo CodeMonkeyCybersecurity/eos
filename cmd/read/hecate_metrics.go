@@ -157,7 +157,7 @@ func printRouteMetricsTable(routes map[string]monitoring.RouteMetrics) {
 		return
 	}
 
-	fmt.Println("\n📊 Route Metrics")
+	fmt.Println("\n Route Metrics")
 	fmt.Println("================")
 	fmt.Printf("%-25s %-12s %-12s %-15s %-12s %-10s\n",
 		"Domain", "Requests", "Errors", "Response Time", "Health", "Error Rate")

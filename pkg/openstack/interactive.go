@@ -490,7 +490,7 @@ func promptIntegrations(reader *bufio.Reader, config *Config) error {
 
 // displayConfigSummary shows a summary of the configuration
 func displayConfigSummary(config *Config) {
-	fmt.Println("\n📊 Configuration Summary")
+	fmt.Println("\n Configuration Summary")
 	fmt.Println("═══════════════════════")
 
 	fmt.Printf("Deployment Mode:    %s\n", formatMode(config.Mode))

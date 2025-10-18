@@ -147,7 +147,7 @@ func runCreateOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	logger.Info("  3. Start chatting with Azure OpenAI")
 	logger.Info("")
 	if !config.DirectMode {
-		logger.Info("🚀 LiteLLM Proxy (Production Mode):")
+		logger.Info(" LiteLLM Proxy (Production Mode):")
 		logger.Info(fmt.Sprintf("  UI:   http://localhost:%d/ui", config.LiteLLMPort))
 		logger.Info(fmt.Sprintf("  Docs: http://localhost:%d/docs", config.LiteLLMPort))
 		logger.Info("")

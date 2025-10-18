@@ -69,7 +69,7 @@ Examples:
 				zap.Duration("duration", result.Duration))
 
 			logger.Info("terminal prompt: Loki Installation Complete!\n")
-			logger.Info("terminal prompt: 📊 Service Details:")
+			logger.Info("terminal prompt:  Service Details:")
 			logger.Info(fmt.Sprintf("terminal prompt:    Version: %s", result.Version))
 			logger.Info(fmt.Sprintf("terminal prompt:    Method: %s", result.Method))
 			logger.Info(fmt.Sprintf("terminal prompt:    Duration: %s", result.Duration))

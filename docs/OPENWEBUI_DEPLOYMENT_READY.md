@@ -137,7 +137,7 @@ cat /opt/openwebui/litellm_config.yaml | grep "model:"
 
 ---
 
-## 🚀 Deployment Steps
+##  Deployment Steps
 
 ### 1. Generate Configuration
 ```bash
@@ -205,7 +205,7 @@ open http://localhost:4000/ui
 
 ---
 
-## 📊 Expected Success Output
+##  Expected Success Output
 
 ```
 ================================================================================
@@ -221,7 +221,7 @@ Next steps:
   2. Create your first user account (will be admin)
   3. Start chatting with Azure OpenAI
 
-🚀 LiteLLM Proxy (Production Mode):
+ LiteLLM Proxy (Production Mode):
   UI:   http://localhost:4000/ui
   Docs: http://localhost:4000/docs
 
@@ -254,7 +254,7 @@ Code Monkey Cybersecurity - 'Cybersecurity. With humans.'
  Environment variables complete  
  Code compiles successfully  
 
-**The implementation is production-ready and safe to deploy!** 🚀
+**The implementation is production-ready and safe to deploy!** 
 
 ---
 

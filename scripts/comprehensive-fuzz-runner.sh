@@ -401,7 +401,7 @@ EOF
 
 # Performance regression detection
 run_performance_regression_tests() {
-    echo -e "${BLUE}📊 Performance Regression Detection${NC}"
+    echo -e "${BLUE} Performance Regression Detection${NC}"
     echo "===================================="
     
     # Benchmark key functions
@@ -415,7 +415,7 @@ run_performance_regression_tests() {
         benchstat "${LOG_DIR}/performance_benchmarks.log" > "${LOG_DIR}/benchmark_analysis.log" 2>&1 || true
     fi
     
-    echo "- 📊 **Performance Testing**: Completed benchmarks for security, crypto, and execute packages" >> "${REPORT_FILE}"
+    echo "-  **Performance Testing**: Completed benchmarks for security, crypto, and execute packages" >> "${REPORT_FILE}"
 }
 
 # Continuous fuzzing mode
@@ -447,7 +447,7 @@ run_continuous_fuzzing() {
 
 # Coverage analysis
 analyze_coverage() {
-    echo -e "${PURPLE}📊 Coverage Analysis${NC}"
+    echo -e "${PURPLE} Coverage Analysis${NC}"
     echo "===================="
     
     echo -e "   📈 Generating coverage report..."
@@ -459,9 +459,9 @@ analyze_coverage() {
         
         # Extract coverage percentage
         local coverage_pct=$(go tool cover -func="${LOG_DIR}/coverage.out" | grep total | awk '{print $3}')
-        echo -e "   📊 Total coverage: ${GREEN}${coverage_pct}${NC}"
+        echo -e "    Total coverage: ${GREEN}${coverage_pct}${NC}"
         
-        echo "- 📊 **Coverage Analysis**: Total coverage ${coverage_pct}" >> "${REPORT_FILE}"
+        echo "-  **Coverage Analysis**: Total coverage ${coverage_pct}" >> "${REPORT_FILE}"
     fi
 }
 
@@ -565,7 +565,7 @@ EOF
     fi
     
     echo ""
-    echo -e "${CYAN}📊 COMPREHENSIVE FUZZING COMPLETE${NC}"
+    echo -e "${CYAN} COMPREHENSIVE FUZZING COMPLETE${NC}"
     echo "=================================="
     echo -e "📈 Tests: ${total_tests} total, ${GREEN}${passed_tests} passed${NC}, ${RED}${failed_tests} failed${NC}"
     echo -e " Report: ${YELLOW}${REPORT_FILE}${NC}"

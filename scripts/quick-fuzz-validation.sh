@@ -59,7 +59,7 @@ for test_spec in "${tests[@]}"; do
 done
 
 echo ""
-echo -e "${PURPLE}📊 Quick Validation Results:${NC}"
+echo -e "${PURPLE} Quick Validation Results:${NC}"
 echo -e "${PURPLE}==========================${NC}"
 echo -e "${GREEN}Passed: ${passed}/${total}${NC}"
 echo -e "${RED} Failed: ${failed}/${total}${NC}"

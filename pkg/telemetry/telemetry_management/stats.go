@@ -173,7 +173,7 @@ func ShowTelemetryStatus(rc *eos_io.RuntimeContext, stateFile string) error {
 	telemetryPath := GetTelemetryFilePath()
 
 	// INTERVENE - Display telemetry status
-	logger.Info("📊 Telemetry Status",
+	logger.Info(" Telemetry Status",
 		zap.Bool("enabled", enabled),
 		zap.String("config_file", stateFile),
 		zap.String("data_file", telemetryPath))

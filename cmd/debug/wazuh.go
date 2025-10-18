@@ -101,15 +101,15 @@ type DiagnosticResult struct {
 
 func runWazuhDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting Wazuh diagnostics",
 		zap.String("component_filter", wazuhComponent),
 		zap.Int("log_lines", wazuhLogLines))
 
 	components := detectWazuhComponents(rc)
-	
+
 	if len(components) == 0 {
-		fmt.Println("\n❌ No Wazuh components detected on this system")
+		fmt.Println("\n No Wazuh components detected on this system")
 		fmt.Println("\nTo install Wazuh components:")
 		fmt.Println("  • Agent:     eos create wazuh-agent")
 		fmt.Println("  • Manager:   eos create delphi")
@@ -134,7 +134,7 @@ func runWazuhDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		if !info.Detected {
 			continue
 		}
-		
+
 		results := diagnoseComponent(rc, info)
 		allResults = append(allResults, results...)
 	}
@@ -191,12 +191,12 @@ func detectWazuhComponents(rc *eos_io.RuntimeContext) map[WazuhComponent]*Compon
 
 		if err == nil && strings.Contains(string(output), info.ServiceName) {
 			info.Detected = true
-			
+
 			ctx2, cancel2 := context.WithTimeout(rc.Ctx, 2*time.Second)
 			statusCmd := exec.CommandContext(ctx2, "systemctl", "is-active", info.ServiceName)
 			statusOutput, _ := statusCmd.Output()
 			cancel2()
-			
+
 			info.Running = strings.TrimSpace(string(statusOutput)) == "active"
 		}
 	}
@@ -210,7 +210,7 @@ func diagnoseComponent(rc *eos_io.RuntimeContext, info *ComponentInfo) []Diagnos
 	results = append(results, checkServiceStatus(info))
 	results = append(results, checkConfigFiles(rc, info)...)
 	results = append(results, analyzeComponentLogs(rc, info)...)
-	
+
 	if len(info.Ports) > 0 {
 		results = append(results, checkPorts(rc, info)...)
 	}
@@ -260,7 +260,7 @@ func checkConfigFiles(_ *eos_io.RuntimeContext, info *ComponentInfo) []Diagnosti
 
 	for _, configPath := range info.ConfigPaths {
 		fileInfo, err := os.Stat(configPath)
-		
+
 		if os.IsNotExist(err) {
 			results = append(results, DiagnosticResult{
 				Component: info.Name,
@@ -306,7 +306,7 @@ func analyzeComponentLogs(rc *eos_io.RuntimeContext, info *ComponentInfo) []Diag
 		logContent := string(output)
 		var errors []string
 		lines := strings.Split(logContent, "\n")
-		
+
 		for _, line := range lines {
 			lineLower := strings.ToLower(line)
 			if strings.Contains(lineLower, "error") || strings.Contains(lineLower, "fatal") {
@@ -348,7 +348,7 @@ func checkPorts(rc *eos_io.RuntimeContext, info *ComponentInfo) []DiagnosticResu
 
 	cmd := exec.CommandContext(ctx, "ss", "-tlnp")
 	output, err := cmd.Output()
-	
+
 	if err != nil {
 		return results
 	}
@@ -397,7 +397,7 @@ func checkProcessResources(rc *eos_io.RuntimeContext, info *ComponentInfo) Diagn
 
 	cmd := exec.CommandContext(ctx, "ps", "aux")
 	output, err := cmd.Output()
-	
+
 	if err != nil {
 		return DiagnosticResult{
 			Component: info.Name,
@@ -977,11 +977,11 @@ func checkAgentErrors(rc *eos_io.RuntimeContext) []DiagnosticResult {
 	remediation = append(remediation, "View full log: sudo tail -50 /var/ossec/logs/ossec.log")
 
 	results = append(results, DiagnosticResult{
-		Component: ComponentAgent,
-		CheckName: "Recent Agent Errors",
-		Category:  "Logs",
-		Passed:    false,
-		Details:   details,
+		Component:   ComponentAgent,
+		CheckName:   "Recent Agent Errors",
+		Category:    "Logs",
+		Passed:      false,
+		Details:     details,
 		Remediation: remediation,
 	})
 
@@ -1018,7 +1018,7 @@ func diagnoseIndexer(rc *eos_io.RuntimeContext, info *ComponentInfo) []Diagnosti
 	var results []DiagnosticResult
 
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
-	cmd := exec.CommandContext(ctx, "curl", "-s", "-k", "-u", "admin:admin", 
+	cmd := exec.CommandContext(ctx, "curl", "-s", "-k", "-u", "admin:admin",
 		"https://localhost:9200/_cluster/health")
 	output, err := cmd.Output()
 	cancel()
@@ -1073,17 +1073,17 @@ func diagnoseDashboard(rc *eos_io.RuntimeContext, info *ComponentInfo) []Diagnos
 func displayDetectedComponents(components map[WazuhComponent]*ComponentInfo) {
 	fmt.Println("\n🔍 Detected Wazuh Components:")
 	fmt.Println(strings.Repeat("=", 60))
-	
+
 	for _, info := range components {
 		if !info.Detected {
 			continue
 		}
-		
-		status := "❌ Stopped"
+
+		status := " Stopped"
 		if info.Running {
-			status = "✅ Running"
+			status = " Running"
 		}
-		
+
 		fmt.Printf("  • %-15s %s\n", string(info.Name), status)
 	}
 	fmt.Println()
@@ -1094,36 +1094,36 @@ func displayWazuhResults(results []DiagnosticResult) {
 		return
 	}
 
-	fmt.Println("\n📊 Diagnostic Results:")
+	fmt.Println("\n Diagnostic Results:")
 	fmt.Println(strings.Repeat("=", 60))
 
 	currentComponent := WazuhComponent("")
-	
+
 	for _, result := range results {
 		if result.Component != currentComponent {
 			currentComponent = result.Component
 			fmt.Printf("\n[%s]\n", strings.ToUpper(string(currentComponent)))
 		}
 
-		icon := "✅"
+		icon := ""
 		if !result.Passed {
 			if result.Warning {
 				icon = "⚠️ "
 			} else {
-				icon = "❌"
+				icon = ""
 			}
 		}
 
 		fmt.Printf("%s %s (%s)\n", icon, result.CheckName, result.Category)
-		
+
 		if result.Details != "" {
 			fmt.Printf("   %s\n", result.Details)
 		}
-		
+
 		if result.Error != nil {
 			fmt.Printf("   Error: %s\n", result.Error)
 		}
-		
+
 		if len(result.Remediation) > 0 {
 			fmt.Println("   Remediation:")
 			for _, rem := range result.Remediation {
@@ -1131,11 +1131,11 @@ func displayWazuhResults(results []DiagnosticResult) {
 			}
 		}
 	}
-	
+
 	passed := 0
 	failed := 0
 	warnings := 0
-	
+
 	for _, r := range results {
 		if r.Passed {
 			passed++
@@ -1145,17 +1145,17 @@ func displayWazuhResults(results []DiagnosticResult) {
 			failed++
 		}
 	}
-	
+
 	fmt.Printf("\n📈 Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
 }
 
 func applyAutomaticFixes(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Attempting automatic fixes")
-	
+
 	fmt.Println("\n🔧 Attempting Automatic Fixes:")
 	fmt.Println(strings.Repeat("=", 60))
-	
+
 	for _, result := range results {
 		if result.Passed || len(result.Remediation) == 0 {
 			continue
@@ -1173,22 +1173,22 @@ func applyAutomaticFixes(rc *eos_io.RuntimeContext, results []DiagnosticResult) 
 					}
 				}
 			}
-			
+
 			if serviceName != "" {
 				fmt.Printf("  Starting %s...\n", serviceName)
 				ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
 				cmd := exec.CommandContext(ctx, "sudo", "systemctl", "start", serviceName)
 				err := cmd.Run()
 				cancel()
-				
+
 				if err != nil {
-					fmt.Printf("    ❌ Failed to start %s: %v\n", serviceName, err)
+					fmt.Printf("     Failed to start %s: %v\n", serviceName, err)
 				} else {
-					fmt.Printf("    ✅ Successfully started %s\n", serviceName)
+					fmt.Printf("     Successfully started %s\n", serviceName)
 				}
 			}
 		}
 	}
-	
+
 	fmt.Println()
 }

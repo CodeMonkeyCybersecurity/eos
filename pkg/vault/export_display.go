@@ -118,7 +118,7 @@ func DisplayStatusOnly(rc *eos_io.RuntimeContext, info *VaultInitInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// ASSESS - Prepare status display
-	logger.Info("📊 Assessing status display requirements")
+	logger.Info(" Assessing status display requirements")
 
 	// INTERVENE - Display formatted status information
 	// User display via stderr

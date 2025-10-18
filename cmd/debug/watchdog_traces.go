@@ -263,7 +263,7 @@ func showSessionDetail(rc *eos_io.RuntimeContext, traceDir, sessionID string) er
 	}
 
 	// Provide analysis commands
-	fmt.Printf("📊 Analysis Commands:\n")
+	fmt.Printf(" Analysis Commands:\n")
 	fmt.Printf("   • View CPU profile: go tool pprof %s\n", filepath.Join(criticalDir, "cpu.prof"))
 	fmt.Printf("   • View memory profile: go tool pprof %s\n", filepath.Join(criticalDir, "mem.prof"))
 	fmt.Printf("   • View process tree: cat %s\n", filepath.Join(criticalDir, "ps-tree.txt"))

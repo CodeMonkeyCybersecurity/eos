@@ -70,7 +70,7 @@ run_fuzz_test() {
         local executions=$(grep -oP 'elapsed: \d+.*?execs: \K\d+' "${log_file}" | tail -1 || echo "0")
         
         echo "${test_name} completed successfully"
-        echo "📊 Found ${inputs} new interesting inputs"
+        echo " Found ${inputs} new interesting inputs"
         echo " Executed ${executions} test cases"
         echo "⏰ Duration: ${elapsed}s"
         
@@ -326,7 +326,7 @@ else
 fi
 
 echo ""
-echo "📊 COMPREHENSIVE SUMMARY:"
+echo " COMPREHENSIVE SUMMARY:"
 echo "========================="
 echo " Log directory: ${LOG_DIR}"
 echo " Main report: ${REPORT_FILE}"

@@ -8,22 +8,22 @@ This document lists all hardcoded port numbers found in the Eos codebase, exclud
 
 The following hardcoded ports were found across the codebase. These should be migrated to use the centralized port definitions in `pkg/shared/ports.go`.
 
-## ✅ HashiCorp Tools Port Standardization (Completed 2025-10-18)
+##  HashiCorp Tools Port Standardization (Completed 2025-10-18)
 
 **All HashiCorp tools now use their official default ports:**
 
 | Service | Old Eos Port | New Standard Port | Status |
 |---------|--------------|-------------------|---------|
-| Vault API | 8200 ✅ | 8200 | Already standard |
-| Vault Cluster | 8201 ✅ | 8201 | Already standard |
-| Consul HTTP | 8500 ✅ | 8500 | Already standard |
-| Consul DNS | 8600 ✅ | 8600 | Already standard |
-| Consul RPC | 8300 ✅ | 8300 | Already standard |
-| Consul Serf LAN | 8301 ✅ | 8301 | Already standard |
-| Consul Serf WAN | 8302 ✅ | 8302 | Already standard |
-| **Nomad HTTP** | **8243** → **4646** | **4646** | ✅ **Migrated** |
-| **Nomad RPC** | **4647** ✅ | **4647** | Already standard |
-| **Nomad Serf** | **8377** → **4648** | **4648** | ✅ **Migrated** |
+| Vault API | 8200  | 8200 | Already standard |
+| Vault Cluster | 8201  | 8201 | Already standard |
+| Consul HTTP | 8500  | 8500 | Already standard |
+| Consul DNS | 8600  | 8600 | Already standard |
+| Consul RPC | 8300  | 8300 | Already standard |
+| Consul Serf LAN | 8301  | 8301 | Already standard |
+| Consul Serf WAN | 8302  | 8302 | Already standard |
+| **Nomad HTTP** | **8243** → **4646** | **4646** |  **Migrated** |
+| **Nomad RPC** | **4647**  | **4647** | Already standard |
+| **Nomad Serf** | **8377** → **4648** | **4648** |  **Migrated** |
 
 **Changes made:**
 - Updated `pkg/shared/ports.go` constants to use HashiCorp defaults
@@ -64,29 +64,29 @@ The following hardcoded ports were found across the codebase. These should be mi
   - Port 5432: Default in flag definition: `databaseVaultPostgresCmd.Flags().Int("port", 5432, "Database port")`
 
 ### 3. Vault Services
-- ✅ **MIGRATED**: All Vault references now use port 8200 (HashiCorp standard)
+-  **MIGRATED**: All Vault references now use port 8200 (HashiCorp standard)
 
 - **Location**: `pkg/shared/vault_server.go`
-  - Port 8200: `VaultDefaultPort` (HashiCorp standard) ✅
+  - Port 8200: `VaultDefaultPort` (HashiCorp standard) 
 
 - **Location**: `pkg/vault/constants.go`
-  - Port 8200: `DefaultAddress = "https://127.0.0.1:8200"` ✅
+  - Port 8200: `DefaultAddress = "https://127.0.0.1:8200"` 
 
 - **Location**: Multiple vault-related files
-  - Port 8200: Used consistently across test files and configurations ✅
+  - Port 8200: Used consistently across test files and configurations 
 
 ### 4. Consul Services
-- ✅ **MIGRATED**: All Consul references now use HashiCorp standard ports
+-  **MIGRATED**: All Consul references now use HashiCorp standard ports
 
 - **Location**: `pkg/terraform/consul_templates.go`
-  - Port 8500: Consul HTTP API (HashiCorp standard) ✅
-  - Port 8600: Consul DNS (HashiCorp standard) ✅
-  - Port 8300: Consul server RPC (HashiCorp standard) ✅
-  - Port 8301: Consul Serf LAN (HashiCorp standard) ✅
-  - Port 8302: Consul Serf WAN (HashiCorp standard) ✅
+  - Port 8500: Consul HTTP API (HashiCorp standard) 
+  - Port 8600: Consul DNS (HashiCorp standard) 
+  - Port 8300: Consul server RPC (HashiCorp standard) 
+  - Port 8301: Consul Serf LAN (HashiCorp standard) 
+  - Port 8302: Consul Serf WAN (HashiCorp standard) 
 
 - **Location**: `cmd/create/consul_orchestrated.go`
-  - Port 8200: Vault integration default ✅
+  - Port 8200: Vault integration default 
 
 ### 5. Monitoring Services
 - **Location**: `pkg/wazuh_mssp/configure.go`
@@ -134,15 +134,15 @@ The following hardcoded ports were found across the codebase. These should be mi
   - Port 8080: Build service default
 
 ### 9. Nomad Services
-- ✅ **MIGRATED**: All Nomad references now use HashiCorp standard ports
+-  **MIGRATED**: All Nomad references now use HashiCorp standard ports
 
 - **Location**: `pkg/nomad/deploy.go`, `pkg/shared/ports.go`
-  - Port 4646: Nomad HTTP API (HashiCorp standard) ✅
-  - Port 4647: Nomad RPC (HashiCorp standard) ✅
-  - Port 4648: Nomad Serf (HashiCorp standard) ✅
+  - Port 4646: Nomad HTTP API (HashiCorp standard) 
+  - Port 4647: Nomad RPC (HashiCorp standard) 
+  - Port 4648: Nomad Serf (HashiCorp standard) 
 
 - **Location**: `pkg/orchestrator/terraform/provider.go`
-  - Port 4646: Nomad HTTP default ✅
+  - Port 4646: Nomad HTTP default 
 
 ### 10. SSH Services
 - **Location**: Multiple terraform files
@@ -179,10 +179,10 @@ The following hardcoded ports were found across the codebase. These should be mi
 
 ## Migration Priority
 
-1. **✅ Completed** (HashiCorp Tools - 2025-10-18):
-   - ✅ Vault (8200) - Now using HashiCorp standard
-   - ✅ Consul (8500, 8600, 8300-8302) - Now using HashiCorp standards
-   - ✅ Nomad (4646, 4647, 4648) - Migrated from 8243/8377 to HashiCorp standards
+1. ** Completed** (HashiCorp Tools - 2025-10-18):
+   -  Vault (8200) - Now using HashiCorp standard
+   -  Consul (8500, 8600, 8300-8302) - Now using HashiCorp standards
+   -  Nomad (4646, 4647, 4648) - Migrated from 8243/8377 to HashiCorp standards
 
 2. **High Priority Remaining** (Production Services):
    - PostgreSQL (5432)

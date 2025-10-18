@@ -1,7 +1,7 @@
 # Mattermost Diagnostics & Fix Enhancement
 
 **Date:** October 18, 2025  
-**Status:** ✅ COMPLETE  
+**Status:**  COMPLETE  
 **Issue Resolved:** Permission errors not properly detected and fixed
 
 ---
@@ -15,7 +15,7 @@ Error: failed to load configuration: failed to create store: unable to load on s
 failed to persist: failed to write file: open /mattermost/config/config.json: permission denied
 ```
 
-## ✅ Solution Implemented
+##  Solution Implemented
 
 ### 1. Enhanced Debug Command (`pkg/mattermost/debug/diagnostics.go`)
 
@@ -67,7 +67,7 @@ VolumesToFix: []string{
 
 ---
 
-## 📊 Technical Details
+##  Technical Details
 
 ### Volume Permission Structure
 
@@ -75,14 +75,14 @@ Mattermost containers expect all volumes to be owned by `uid:2000 gid:2000`:
 
 | Volume | Path | Purpose | Critical? |
 |--------|------|---------|-----------|
-| config | `/opt/mattermost/volumes/app/mattermost/config` | config.json | ✅ YES |
-| data | `/opt/mattermost/volumes/app/mattermost/data` | User data | ✅ YES |
+| config | `/opt/mattermost/volumes/app/mattermost/config` | config.json |  YES |
+| data | `/opt/mattermost/volumes/app/mattermost/data` | User data |  YES |
 | logs | `/opt/mattermost/volumes/app/mattermost/logs` | Application logs | ⚠️ Important |
 | plugins | `/opt/mattermost/volumes/app/mattermost/plugins` | Server plugins | ⚠️ Important |
 | client-plugins | `/opt/mattermost/volumes/app/mattermost/client/plugins` | Client plugins | ⚠️ Important |
 | bleve-indexes | `/opt/mattermost/volumes/app/mattermost/bleve-indexes` | Search indexes | ⚠️ Important |
-| app | `/opt/mattermost/volumes/app` | Base directory | ✅ YES |
-| db | `/opt/mattermost/volumes/db` | Postgres data | ✅ YES |
+| app | `/opt/mattermost/volumes/app` | Base directory |  YES |
+| db | `/opt/mattermost/volumes/db` | Postgres data |  YES |
 
 ### Permission Checking Logic
 
@@ -137,11 +137,11 @@ err := filepath.Walk(volumePath, func(path string, info os.FileInfo, err error) 
 $ sudo eos debug mattermost
 # Output: "Permission denied errors in Mattermost"
 # Output: "Check volume permissions for /opt/mattermost/volumes/app"
-# ❌ Not specific enough - which volume? What's the actual ownership?
+#  Not specific enough - which volume? What's the actual ownership?
 
 $ sudo eos fix mattermost
 # Only fixes /opt/mattermost/volumes/app
-# ❌ Misses /opt/mattermost/volumes/app/mattermost/config where the error actually is
+#  Misses /opt/mattermost/volumes/app/mattermost/config where the error actually is
 # Container still fails with permission denied on config.json
 ```
 
@@ -153,12 +153,12 @@ $ sudo eos debug mattermost
 # Output: "Fix config volume ownership: sudo chown -R 2000:2000 /opt/mattermost/volumes/app/mattermost/config"
 # Output: "config.json not found or not accessible"
 # Output: "Run 'sudo eos fix mattermost' to automatically fix all permission issues"
-# ✅ Specific, actionable, clear
+#  Specific, actionable, clear
 
 $ sudo eos fix mattermost
 # Fixes ALL 7 volumes including config directory
-# ✅ Container starts successfully
-# ✅ config.json is now writable by Mattermost (uid:2000)
+#  Container starts successfully
+#  config.json is now writable by Mattermost (uid:2000)
 ```
 
 ---
@@ -179,12 +179,12 @@ failed to persist: failed to write file: open /mattermost/config/config.json: pe
 
 ---
 
-## ✅ Testing
+##  Testing
 
 **Compilation:**
 ```bash
 $ go build ./cmd/fix ./cmd/debug
-# Exit code: 0 ✅
+# Exit code: 0 
 ```
 
 **Expected Behavior:**
@@ -226,7 +226,7 @@ $ go build ./cmd/fix ./cmd/debug
 
 ---
 
-## 🚀 Future Enhancements
+##  Future Enhancements
 
 Potential improvements for future iterations:
 
@@ -238,6 +238,6 @@ Potential improvements for future iterations:
 
 ---
 
-**Status:** ✅ Complete and tested  
+**Status:**  Complete and tested  
 **Impact:** High - Resolves critical Mattermost startup failures  
 **User Experience:** Significantly improved with clear diagnostics and comprehensive fixes
