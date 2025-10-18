@@ -103,37 +103,49 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 func checkDockerComposeConfig(rc *eos_io.RuntimeContext, config *Config, result *DiagnosticsResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	fmt.Println("\n=== Docker Compose Configuration ===")
-	fmt.Println("-------------------------------------------------------")
+	// ASSESS - Check if docker-compose.yml exists
+	logger.Info("Checking docker-compose configuration",
+		zap.String("directory", config.DockerComposeDir))
 	
-	// Read docker-compose.yml file
 	composeFile := fmt.Sprintf("%s/docker-compose.yml", config.DockerComposeDir)
+	if _, err := os.Stat(composeFile); err != nil {
+		return fmt.Errorf("docker-compose.yml not found at %s: %w", composeFile, err)
+	}
+	
+	// INTERVENE - Read docker-compose.yml file
 	data, err := os.ReadFile(composeFile)
 	if err != nil {
 		return fmt.Errorf("failed to read docker-compose.yml: %w", err)
 	}
 	
+	// EVALUATE - Store and log results
 	result.DockerComposeConfig = string(data)
-	fmt.Println(result.DockerComposeConfig)
+	logger.Info("Docker-compose configuration retrieved",
+		zap.Int("size_bytes", len(data)),
+		zap.String("file", composeFile))
 	
-	logger.Info("Docker-compose configuration checked successfully")
+	// Output for user visibility
+	logger.Info("=== Docker Compose Configuration ===")
+	logger.Info(result.DockerComposeConfig)
+	
 	return nil
 }
 
 func checkMattermostLogs(rc *eos_io.RuntimeContext, config *Config, result *DiagnosticsResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	fmt.Printf("\n=== Mattermost Container Logs (last %d lines) ===\n", config.LogTailLines)
-	fmt.Println("---------------------------------------------------------")
+	logger.Info("Checking Mattermost container logs",
+		zap.Int("tail_lines", config.LogTailLines),
+		zap.String("container", "docker-mattermost-1"))
 	
-	// Create Docker client
+	// ASSESS - Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
 	defer cli.Close()
 	
-	// Get container logs
+	// INTERVENE - Get container logs
 	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -142,40 +154,46 @@ func checkMattermostLogs(rc *eos_io.RuntimeContext, config *Config, result *Diag
 	
 	logs, err := cli.ContainerLogs(rc.Ctx, "docker-mattermost-1", options)
 	if err != nil {
-		return fmt.Errorf("failed to get Mattermost logs: %w", err)
+		return fmt.Errorf("failed to get Mattermost container logs: %w", err)
 	}
 	defer logs.Close()
 	
 	// Read logs
 	logData, err := io.ReadAll(logs)
 	if err != nil {
-		return fmt.Errorf("failed to read Mattermost logs: %w", err)
+		return fmt.Errorf("failed to read Mattermost log stream: %w", err)
 	}
 	
+	// EVALUATE - Analyze logs for issues
 	result.MattermostLogs = string(logData)
-	fmt.Println(result.MattermostLogs)
-	
-	// Analyze logs for common issues
 	analyzeMattermostLogs(result.MattermostLogs, result)
 	
-	logger.Info("Mattermost logs checked successfully")
+	logger.Info("Mattermost logs retrieved and analyzed",
+		zap.Int("log_size_bytes", len(logData)),
+		zap.Int("issues_found", len(result.Issues)))
+	
+	// Output for user visibility
+	logger.Info("=== Mattermost Container Logs ===")
+	logger.Info(result.MattermostLogs)
+	
 	return nil
 }
 
 func checkPostgresLogs(rc *eos_io.RuntimeContext, config *Config, result *DiagnosticsResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	fmt.Printf("\n=== Postgres Container Logs (last %d lines) ===\n", config.PostgresLogLines)
-	fmt.Println("------------------------------------------------")
+	logger.Info("Checking Postgres container logs",
+		zap.Int("tail_lines", config.PostgresLogLines),
+		zap.String("container", "docker-postgres-1"))
 	
-	// Create Docker client
+	// ASSESS - Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
 	defer cli.Close()
 	
-	// Get container logs
+	// INTERVENE - Get container logs
 	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -184,81 +202,105 @@ func checkPostgresLogs(rc *eos_io.RuntimeContext, config *Config, result *Diagno
 	
 	logs, err := cli.ContainerLogs(rc.Ctx, "docker-postgres-1", options)
 	if err != nil {
-		return fmt.Errorf("failed to get Postgres logs: %w", err)
+		return fmt.Errorf("failed to get Postgres container logs: %w", err)
 	}
 	defer logs.Close()
 	
 	// Read logs
 	logData, err := io.ReadAll(logs)
 	if err != nil {
-		return fmt.Errorf("failed to read Postgres logs: %w", err)
+		return fmt.Errorf("failed to read Postgres log stream: %w", err)
 	}
 	
+	// EVALUATE - Analyze logs for issues
 	result.PostgresLogs = string(logData)
-	fmt.Println(result.PostgresLogs)
-	
-	// Analyze logs for common issues
 	analyzePostgresLogs(result.PostgresLogs, result)
 	
-	logger.Info("Postgres logs checked successfully")
+	logger.Info("Postgres logs retrieved and analyzed",
+		zap.Int("log_size_bytes", len(logData)),
+		zap.Int("issues_found", len(result.Issues)))
+	
+	// Output for user visibility
+	logger.Info("=== Postgres Container Logs ===")
+	logger.Info(result.PostgresLogs)
+	
 	return nil
 }
 
 func checkVolumePermissions(rc *eos_io.RuntimeContext, config *Config, result *DiagnosticsResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	fmt.Println("\n=== Volume Permissions ===")
-	fmt.Println("--------------------------------")
+	logger.Info("Checking volume permissions",
+		zap.String("volumes_dir", config.MattermostVolumesDir))
 	
-	// Check app volume permissions
+	// ASSESS & INTERVENE - Check app volume permissions
 	appVolume := fmt.Sprintf("%s/volumes/app", config.MattermostVolumesDir)
 	if info, err := os.Stat(appVolume); err != nil {
-		logger.Warn("Failed to check app volume permissions", zap.Error(err))
+		logger.Warn("App volume not accessible",
+			zap.String("path", appVolume),
+			zap.Error(err))
 		result.Issues = append(result.Issues, fmt.Sprintf("App volume not accessible: %s", appVolume))
 	} else {
-		permInfo := fmt.Sprintf("Permissions: %s, Owner: %s", info.Mode().String(), "(use stat for details)")
+		permInfo := fmt.Sprintf("Permissions: %s", info.Mode().String())
 		result.VolumePermissions["app"] = permInfo
-		fmt.Printf("App volume (%s):\n%s\n", appVolume, permInfo)
+		logger.Info("App volume permissions",
+			zap.String("path", appVolume),
+			zap.String("permissions", info.Mode().String()))
 		
 		// List directory contents
 		if entries, err := os.ReadDir(appVolume); err == nil {
-			fmt.Printf("Contents (%d items):\n", len(entries))
+			logger.Info("App volume contents",
+				zap.Int("item_count", len(entries)))
 			for _, entry := range entries {
 				info, _ := entry.Info()
-				fmt.Printf("  %s %10d %s\n", info.Mode().String(), info.Size(), entry.Name())
+				logger.Debug("Volume entry",
+					zap.String("name", entry.Name()),
+					zap.String("mode", info.Mode().String()),
+					zap.Int64("size", info.Size()))
 			}
 		}
 	}
 	
-	// Check db volume permissions
+	// ASSESS & INTERVENE - Check db volume permissions
 	dbVolume := fmt.Sprintf("%s/volumes/db", config.MattermostVolumesDir)
 	if info, err := os.Stat(dbVolume); err != nil {
-		logger.Warn("Failed to check db volume permissions", zap.Error(err))
+		logger.Warn("DB volume not accessible",
+			zap.String("path", dbVolume),
+			zap.Error(err))
 		result.Issues = append(result.Issues, fmt.Sprintf("DB volume not accessible: %s", dbVolume))
 	} else {
-		permInfo := fmt.Sprintf("Permissions: %s, Owner: %s", info.Mode().String(), "(use stat for details)")
+		permInfo := fmt.Sprintf("Permissions: %s", info.Mode().String())
 		result.VolumePermissions["db"] = permInfo
-		fmt.Printf("DB volume (%s):\n%s\n", dbVolume, permInfo)
+		logger.Info("DB volume permissions",
+			zap.String("path", dbVolume),
+			zap.String("permissions", info.Mode().String()))
 		
 		// List directory contents
 		if entries, err := os.ReadDir(dbVolume); err == nil {
-			fmt.Printf("Contents (%d items):\n", len(entries))
+			logger.Info("DB volume contents",
+				zap.Int("item_count", len(entries)))
 			for _, entry := range entries {
 				info, _ := entry.Info()
-				fmt.Printf("  %s %10d %s\n", info.Mode().String(), info.Size(), entry.Name())
+				logger.Debug("Volume entry",
+					zap.String("name", entry.Name()),
+					zap.String("mode", info.Mode().String()),
+					zap.Int64("size", info.Size()))
 			}
 		}
 	}
 	
-	logger.Info("Volume permissions checked successfully")
+	// EVALUATE
+	logger.Info("Volume permissions check complete",
+		zap.Int("volumes_checked", 2),
+		zap.Int("issues_found", len(result.Issues)))
 	return nil
 }
 
 func checkPostgresAccessibility(rc *eos_io.RuntimeContext, config *Config, result *DiagnosticsResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	fmt.Println("\n=== Postgres Accessibility ===")
-	fmt.Println("---------------------------------------")
+	logger.Info("Checking Postgres accessibility",
+		zap.String("container", "docker-postgres-1"))
 	
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -298,30 +340,32 @@ func checkPostgresAccessibility(rc *eos_io.RuntimeContext, config *Config, resul
 	}
 	
 	result.PostgresStatus = string(output)
-	fmt.Println(result.PostgresStatus)
+	logger.Info("Postgres status output", zap.String("output", string(output)))
 	
-	// Check exit code
+	// EVALUATE - Check exit code
 	inspect, err := cli.ContainerExecInspect(rc.Ctx, execResp.ID)
 	if err != nil {
 		return fmt.Errorf("failed to inspect exec: %w", err)
 	}
 	
 	if inspect.ExitCode != 0 {
+		logger.Warn("Postgres not accessible",
+			zap.Int("exit_code", inspect.ExitCode))
 		result.Issues = append(result.Issues, "Postgres is not accessible")
 		result.Recommendations = append(result.Recommendations, "Check if Postgres container is running")
 		result.Recommendations = append(result.Recommendations, "Check Postgres logs for connection issues")
 		return fmt.Errorf("postgres not accessible, exit code: %d", inspect.ExitCode)
 	}
 	
-	logger.Info("Postgres accessibility checked successfully")
+	logger.Info("Postgres is accessible and ready",
+		zap.Int("exit_code", inspect.ExitCode))
 	return nil
 }
 
 func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *Config, result *DiagnosticsResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	fmt.Println("\n=== Network Connectivity ===")
-	fmt.Println("----------------------------------")
+	logger.Info("Checking Docker network connectivity")
 	
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -336,34 +380,39 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *Config, result 
 		return fmt.Errorf("failed to list networks: %w", err)
 	}
 	
-	fmt.Println("Docker Networks:")
-	fmt.Printf("%-20s %-15s %-10s %s\n", "NETWORK ID", "NAME", "DRIVER", "SCOPE")
+	logger.Info("Docker networks found", zap.Int("count", len(networks)))
 	var networkInfo strings.Builder
-	for _, network := range networks {
+	for _, net := range networks {
 		line := fmt.Sprintf("%-20s %-15s %-10s %s\n", 
-			network.ID[:12], network.Name, network.Driver, network.Scope)
-		fmt.Print(line)
+			net.ID[:12], net.Name, net.Driver, net.Scope)
 		networkInfo.WriteString(line)
+		logger.Debug("Network details",
+			zap.String("id", net.ID[:12]),
+			zap.String("name", net.Name),
+			zap.String("driver", net.Driver),
+			zap.String("scope", net.Scope))
 	}
 	result.NetworkInfo = networkInfo.String()
 	
-	// Inspect docker_default network
+	// EVALUATE - Inspect docker_default network
 	networkResource, err := cli.NetworkInspect(rc.Ctx, "docker_default", network.InspectOptions{})
 	if err != nil {
 		logger.Warn("Failed to inspect docker_default network", zap.Error(err))
 		result.Issues = append(result.Issues, "Failed to inspect docker_default network")
 	} else {
-		fmt.Println("\nDocker Default Network Details:")
-		fmt.Printf("  Name: %s\n", networkResource.Name)
-		fmt.Printf("  ID: %s\n", networkResource.ID)
-		fmt.Printf("  Driver: %s\n", networkResource.Driver)
-		fmt.Printf("  Scope: %s\n", networkResource.Scope)
-		fmt.Printf("  Containers: %d\n", len(networkResource.Containers))
+		logger.Info("Docker default network details",
+			zap.String("name", networkResource.Name),
+			zap.String("id", networkResource.ID),
+			zap.String("driver", networkResource.Driver),
+			zap.String("scope", networkResource.Scope),
+			zap.Int("containers", len(networkResource.Containers)))
 		
 		if len(networkResource.Containers) > 0 {
-			fmt.Println("  Connected Containers:")
+			logger.Info("Connected containers in docker_default network")
 			for containerID, endpoint := range networkResource.Containers {
-				fmt.Printf("    - %s: %s\n", containerID[:12], endpoint.Name)
+				logger.Debug("Container connection",
+					zap.String("container_id", containerID[:12]),
+					zap.String("name", endpoint.Name))
 			}
 		}
 		
@@ -371,7 +420,8 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *Config, result 
 			networkResource.Name, networkResource.Driver, len(networkResource.Containers))
 	}
 	
-	logger.Info("Network connectivity checked successfully")
+	logger.Info("Network connectivity check complete",
+		zap.Int("networks_found", len(networks)))
 	return nil
 }
 
@@ -432,27 +482,29 @@ func analyzePostgresLogs(logs string, result *DiagnosticsResult) {
 func displayResults(rc *eos_io.RuntimeContext, result *DiagnosticsResult) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	fmt.Println("\n=== Diagnostics Summary ===")
-	fmt.Println("===========================")
+	logger.Info("=== Diagnostics Summary ===")
 	
 	if len(result.Issues) == 0 {
-		fmt.Println("\n✓ No critical issues detected")
-		logger.Info("No critical issues detected")
+		logger.Info("✓ No critical issues detected")
 	} else {
-		fmt.Printf("\n⚠ Found %d issue(s):\n", len(result.Issues))
+		logger.Warn("Issues detected", zap.Int("count", len(result.Issues)))
 		for i, issue := range result.Issues {
-			fmt.Printf("  %d. %s\n", i+1, issue)
-			logger.Warn("Issue detected", zap.Int("number", i+1), zap.String("issue", issue))
+			logger.Warn("Issue",
+				zap.Int("number", i+1),
+				zap.String("description", issue))
 		}
 	}
 	
 	if len(result.Recommendations) > 0 {
-		fmt.Printf("\n💡 Recommendations:\n")
+		logger.Info("Recommendations", zap.Int("count", len(result.Recommendations)))
 		for i, rec := range result.Recommendations {
-			fmt.Printf("  %d. %s\n", i+1, rec)
-			logger.Info("Recommendation", zap.Int("number", i+1), zap.String("recommendation", rec))
+			logger.Info("Recommendation",
+				zap.Int("number", i+1),
+				zap.String("action", rec))
 		}
 	}
 	
-	fmt.Println("\n=== Diagnostics Complete ===")
+	logger.Info("=== Diagnostics Complete ===",
+		zap.Int("total_issues", len(result.Issues)),
+		zap.Int("total_recommendations", len(result.Recommendations)))
 }
