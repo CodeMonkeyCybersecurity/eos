@@ -17,11 +17,11 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/fix"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/nuke"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/repair"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/rollback"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
@@ -66,7 +66,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		list.ListCmd,         // VERB-FIRST ARCHITECTURE
 		update.UpdateCmd,     // VERB-FIRST ARCHITECTURE
 		delete.DeleteCmd,     // VERB-FIRST ARCHITECTURE
-		repair.RepairCmd,     // VERB-FIRST ARCHITECTURE (auto-fix issues)
+		fix.FixCmd,           // VERB-FIRST ARCHITECTURE (auto-fix issues)
 		debug.GetDebugCmd(),  // VERB-FIRST ARCHITECTURE (debugging tools)
 		sync.SyncCmd,         // VERB-FIRST ARCHITECTURE (service synchronization)
 		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
@@ -85,6 +85,20 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 	} {
 		RootCmd.AddCommand(subCmd)
 	}
+	
+	// Create repair alias for backward compatibility
+	repairCmd := &cobra.Command{
+		Use:    "repair",
+		Short:  "Alias for 'fix' command (deprecated, use 'fix' instead)",
+		Hidden: false,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Redirect to fix command
+			fixArgs := append([]string{"fix"}, args...)
+			RootCmd.SetArgs(fixArgs)
+			return RootCmd.Execute()
+		},
+	}
+	RootCmd.AddCommand(repairCmd)
 
 	// Add subcommands after all init() functions have run
 	update.AddSubcommands()
