@@ -58,7 +58,7 @@ require (
 	golang.org/x/text v0.27.0
 	golang.org/x/time v0.11.0
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/driver/postgres v1.5.11
+	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.26.1
 	libvirt.org/go/libvirt v1.11006.0
 	mvdan.cc/sh/v3 v3.11.0
