@@ -329,26 +329,6 @@ func (ci *ConsulInstaller) downloadFileWithWget(url, dest string) error {
 	return nil
 }
 
-// getBinaryVersion returns the version of the installed Consul binary
-func (ci *ConsulInstaller) getBinaryVersion(binaryPath string) (string, error) {
-	cmd := exec.Command(binaryPath, "version")
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-
-	// Parse version from output (e.g., "Consul v1.17.1")
-	lines := strings.Split(string(output), "\n")
-	if len(lines) > 0 {
-		parts := strings.Fields(lines[0])
-		if len(parts) >= 2 {
-			return strings.TrimPrefix(parts[1], "v"), nil
-		}
-	}
-
-	return "", fmt.Errorf("could not parse version from output")
-}
-
 // cleanExistingInstallation removes existing Consul installation with backup
 func (ci *ConsulInstaller) cleanExistingInstallation() error {
 	ci.logger.Info("Cleaning existing Consul installation")
