@@ -11,6 +11,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -94,15 +95,8 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 	logger.Info("Authentik will be accessible at: hera." + domain)
 	logger.Info("")
 
-	// Ask if user wants to start services
-	logger.Info("terminal prompt: Start services now? [Y/n]:")
-	response, err := eos_io.ReadInput(rc)
-	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response == "n" || response == "no" {
+	// Ask if user wants to start services (defaults to Yes on empty input)
+	if !interaction.PromptYesNo(rc.Ctx, "Start services now?", true) {
 		logger.Info("Skipped starting services")
 		logger.Info("To start manually, run: cd /opt/hecate && docker compose up -d")
 		return nil

@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hetzner"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -52,15 +53,9 @@ func SetupHecateDNS(rc *eos_io.RuntimeContext, domain string) error {
 	logger.Info("  Type: A")
 	logger.Info("  Target: " + serverIP)
 	logger.Info("")
-	logger.Info("terminal prompt: Create this DNS record automatically? [Y/n]:")
 
-	response, err := eos_io.ReadInput(rc)
-	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
-	}
-
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response == "n" || response == "no" {
+	// Use PromptYesNo which handles empty input gracefully (defaults to Yes)
+	if !interaction.PromptYesNo(rc.Ctx, "Create this DNS record automatically?", true) {
 		logger.Info("Skipped automatic DNS setup")
 		logger.Info("Manual DNS setup required:")
 		logger.Info("  - Create A record: hera." + domain + " → " + serverIP)
