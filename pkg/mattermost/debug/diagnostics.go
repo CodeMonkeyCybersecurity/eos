@@ -3,10 +3,14 @@ package debug
 
 import (
 	"fmt"
-	"os/exec"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -102,13 +106,14 @@ func checkDockerComposeConfig(rc *eos_io.RuntimeContext, config *Config, result 
 	fmt.Println("\n=== Docker Compose Configuration ===")
 	fmt.Println("-------------------------------------------------------")
 	
-	cmd := exec.CommandContext(rc.Ctx, "cat", fmt.Sprintf("%s/docker-compose.yml", config.DockerComposeDir))
-	output, err := cmd.CombinedOutput()
+	// Read docker-compose.yml file
+	composeFile := fmt.Sprintf("%s/docker-compose.yml", config.DockerComposeDir)
+	data, err := os.ReadFile(composeFile)
 	if err != nil {
 		return fmt.Errorf("failed to read docker-compose.yml: %w", err)
 	}
 	
-	result.DockerComposeConfig = string(output)
+	result.DockerComposeConfig = string(data)
 	fmt.Println(result.DockerComposeConfig)
 	
 	logger.Info("Docker-compose configuration checked successfully")
@@ -121,13 +126,33 @@ func checkMattermostLogs(rc *eos_io.RuntimeContext, config *Config, result *Diag
 	fmt.Printf("\n=== Mattermost Container Logs (last %d lines) ===\n", config.LogTailLines)
 	fmt.Println("---------------------------------------------------------")
 	
-	cmd := exec.CommandContext(rc.Ctx, "docker", "logs", "--tail", fmt.Sprintf("%d", config.LogTailLines), "docker-mattermost-1")
-	output, err := cmd.CombinedOutput()
+	// Create Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer cli.Close()
+	
+	// Get container logs
+	options := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       fmt.Sprintf("%d", config.LogTailLines),
+	}
+	
+	logs, err := cli.ContainerLogs(rc.Ctx, "docker-mattermost-1", options)
 	if err != nil {
 		return fmt.Errorf("failed to get Mattermost logs: %w", err)
 	}
+	defer logs.Close()
 	
-	result.MattermostLogs = string(output)
+	// Read logs
+	logData, err := io.ReadAll(logs)
+	if err != nil {
+		return fmt.Errorf("failed to read Mattermost logs: %w", err)
+	}
+	
+	result.MattermostLogs = string(logData)
 	fmt.Println(result.MattermostLogs)
 	
 	// Analyze logs for common issues
@@ -143,13 +168,33 @@ func checkPostgresLogs(rc *eos_io.RuntimeContext, config *Config, result *Diagno
 	fmt.Printf("\n=== Postgres Container Logs (last %d lines) ===\n", config.PostgresLogLines)
 	fmt.Println("------------------------------------------------")
 	
-	cmd := exec.CommandContext(rc.Ctx, "docker", "logs", "--tail", fmt.Sprintf("%d", config.PostgresLogLines), "docker-postgres-1")
-	output, err := cmd.CombinedOutput()
+	// Create Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer cli.Close()
+	
+	// Get container logs
+	options := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       fmt.Sprintf("%d", config.PostgresLogLines),
+	}
+	
+	logs, err := cli.ContainerLogs(rc.Ctx, "docker-postgres-1", options)
 	if err != nil {
 		return fmt.Errorf("failed to get Postgres logs: %w", err)
 	}
+	defer logs.Close()
 	
-	result.PostgresLogs = string(output)
+	// Read logs
+	logData, err := io.ReadAll(logs)
+	if err != nil {
+		return fmt.Errorf("failed to read Postgres logs: %w", err)
+	}
+	
+	result.PostgresLogs = string(logData)
 	fmt.Println(result.PostgresLogs)
 	
 	// Analyze logs for common issues
@@ -167,26 +212,42 @@ func checkVolumePermissions(rc *eos_io.RuntimeContext, config *Config, result *D
 	
 	// Check app volume permissions
 	appVolume := fmt.Sprintf("%s/volumes/app", config.MattermostVolumesDir)
-	cmd := exec.CommandContext(rc.Ctx, "ls", "-lah", appVolume)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
+	if info, err := os.Stat(appVolume); err != nil {
 		logger.Warn("Failed to check app volume permissions", zap.Error(err))
 		result.Issues = append(result.Issues, fmt.Sprintf("App volume not accessible: %s", appVolume))
 	} else {
-		result.VolumePermissions["app"] = string(output)
-		fmt.Printf("App volume (%s):\n%s\n", appVolume, string(output))
+		permInfo := fmt.Sprintf("Permissions: %s, Owner: %s", info.Mode().String(), "(use stat for details)")
+		result.VolumePermissions["app"] = permInfo
+		fmt.Printf("App volume (%s):\n%s\n", appVolume, permInfo)
+		
+		// List directory contents
+		if entries, err := os.ReadDir(appVolume); err == nil {
+			fmt.Printf("Contents (%d items):\n", len(entries))
+			for _, entry := range entries {
+				info, _ := entry.Info()
+				fmt.Printf("  %s %10d %s\n", info.Mode().String(), info.Size(), entry.Name())
+			}
+		}
 	}
 	
 	// Check db volume permissions
 	dbVolume := fmt.Sprintf("%s/volumes/db", config.MattermostVolumesDir)
-	cmd = exec.CommandContext(rc.Ctx, "ls", "-lah", dbVolume)
-	output, err = cmd.CombinedOutput()
-	if err != nil {
+	if info, err := os.Stat(dbVolume); err != nil {
 		logger.Warn("Failed to check db volume permissions", zap.Error(err))
 		result.Issues = append(result.Issues, fmt.Sprintf("DB volume not accessible: %s", dbVolume))
 	} else {
-		result.VolumePermissions["db"] = string(output)
-		fmt.Printf("DB volume (%s):\n%s\n", dbVolume, string(output))
+		permInfo := fmt.Sprintf("Permissions: %s, Owner: %s", info.Mode().String(), "(use stat for details)")
+		result.VolumePermissions["db"] = permInfo
+		fmt.Printf("DB volume (%s):\n%s\n", dbVolume, permInfo)
+		
+		// List directory contents
+		if entries, err := os.ReadDir(dbVolume); err == nil {
+			fmt.Printf("Contents (%d items):\n", len(entries))
+			for _, entry := range entries {
+				info, _ := entry.Info()
+				fmt.Printf("  %s %10d %s\n", info.Mode().String(), info.Size(), entry.Name())
+			}
+		}
 	}
 	
 	logger.Info("Volume permissions checked successfully")
@@ -199,17 +260,57 @@ func checkPostgresAccessibility(rc *eos_io.RuntimeContext, config *Config, resul
 	fmt.Println("\n=== Postgres Accessibility ===")
 	fmt.Println("---------------------------------------")
 	
-	cmd := exec.CommandContext(rc.Ctx, "docker", "exec", "docker-postgres-1", "pg_isready", "-U", "mmuser", "-d", "mattermost")
-	output, err := cmd.CombinedOutput()
+	// Create Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer cli.Close()
+	
+	// Create exec instance to run pg_isready
+	execConfig := container.ExecOptions{
+		Cmd:          []string{"pg_isready", "-U", "mmuser", "-d", "mattermost"},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+	
+	execResp, err := cli.ContainerExecCreate(rc.Ctx, "docker-postgres-1", execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create exec instance: %w", err)
+	}
+	
+	// Attach to exec
+	attachResp, err := cli.ContainerExecAttach(rc.Ctx, execResp.ID, container.ExecAttachOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to attach to exec: %w", err)
+	}
+	defer attachResp.Close()
+	
+	// Start exec
+	if err := cli.ContainerExecStart(rc.Ctx, execResp.ID, container.ExecStartOptions{}); err != nil {
+		return fmt.Errorf("failed to start exec: %w", err)
+	}
+	
+	// Read output
+	output, err := io.ReadAll(attachResp.Reader)
+	if err != nil {
+		return fmt.Errorf("failed to read exec output: %w", err)
+	}
 	
 	result.PostgresStatus = string(output)
 	fmt.Println(result.PostgresStatus)
 	
+	// Check exit code
+	inspect, err := cli.ContainerExecInspect(rc.Ctx, execResp.ID)
 	if err != nil {
+		return fmt.Errorf("failed to inspect exec: %w", err)
+	}
+	
+	if inspect.ExitCode != 0 {
 		result.Issues = append(result.Issues, "Postgres is not accessible")
-		result.Recommendations = append(result.Recommendations, "Check if Postgres container is running: docker ps | grep postgres")
+		result.Recommendations = append(result.Recommendations, "Check if Postgres container is running")
 		result.Recommendations = append(result.Recommendations, "Check Postgres logs for connection issues")
-		return fmt.Errorf("postgres not accessible: %w", err)
+		return fmt.Errorf("postgres not accessible, exit code: %d", inspect.ExitCode)
 	}
 	
 	logger.Info("Postgres accessibility checked successfully")
@@ -222,27 +323,52 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *Config, result 
 	fmt.Println("\n=== Network Connectivity ===")
 	fmt.Println("----------------------------------")
 	
+	// Create Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer cli.Close()
+	
 	// List networks
-	cmd := exec.CommandContext(rc.Ctx, "docker", "network", "ls")
-	output, err := cmd.CombinedOutput()
+	networks, err := cli.NetworkList(rc.Ctx, network.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list networks: %w", err)
 	}
 	
-	result.NetworkInfo = string(output)
 	fmt.Println("Docker Networks:")
-	fmt.Println(result.NetworkInfo)
+	fmt.Printf("%-20s %-15s %-10s %s\n", "NETWORK ID", "NAME", "DRIVER", "SCOPE")
+	var networkInfo strings.Builder
+	for _, network := range networks {
+		line := fmt.Sprintf("%-20s %-15s %-10s %s\n", 
+			network.ID[:12], network.Name, network.Driver, network.Scope)
+		fmt.Print(line)
+		networkInfo.WriteString(line)
+	}
+	result.NetworkInfo = networkInfo.String()
 	
-	// Inspect default network
-	cmd = exec.CommandContext(rc.Ctx, "docker", "network", "inspect", "docker_default")
-	output, err = cmd.CombinedOutput()
+	// Inspect docker_default network
+	networkResource, err := cli.NetworkInspect(rc.Ctx, "docker_default", network.InspectOptions{})
 	if err != nil {
 		logger.Warn("Failed to inspect docker_default network", zap.Error(err))
 		result.Issues = append(result.Issues, "Failed to inspect docker_default network")
 	} else {
-		result.NetworkDetails = string(output)
 		fmt.Println("\nDocker Default Network Details:")
-		fmt.Println(result.NetworkDetails)
+		fmt.Printf("  Name: %s\n", networkResource.Name)
+		fmt.Printf("  ID: %s\n", networkResource.ID)
+		fmt.Printf("  Driver: %s\n", networkResource.Driver)
+		fmt.Printf("  Scope: %s\n", networkResource.Scope)
+		fmt.Printf("  Containers: %d\n", len(networkResource.Containers))
+		
+		if len(networkResource.Containers) > 0 {
+			fmt.Println("  Connected Containers:")
+			for containerID, endpoint := range networkResource.Containers {
+				fmt.Printf("    - %s: %s\n", containerID[:12], endpoint.Name)
+			}
+		}
+		
+		result.NetworkDetails = fmt.Sprintf("Name: %s, Driver: %s, Containers: %d",
+			networkResource.Name, networkResource.Driver, len(networkResource.Containers))
 	}
 	
 	logger.Info("Network connectivity checked successfully")
