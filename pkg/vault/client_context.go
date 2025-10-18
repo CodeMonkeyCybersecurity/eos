@@ -51,16 +51,3 @@ func SetVaultClient(rc *eos_io.RuntimeContext, client *api.Client) {
 	// we'd need to create a new context with the value and update rc.Ctx
 	// For now, this is a no-op to satisfy the compilation
 }
-
-// validateAndCacheClient validates the vault client and caches it
-// This is a helper function used internally
-// Prefixed with underscore to indicate it's intentionally unused (future caching implementation)
-//
-//nolint:unused
-func _validateAndCacheClient(rc *eos_io.RuntimeContext, client *api.Client) {
-	// This is a placeholder implementation
-	// In a real implementation, this would validate the client connection
-	// and cache it appropriately
-	_ = rc
-	_ = client
-}

@@ -39,6 +39,8 @@ type EnhancedUpdateConfig struct {
 	AtomicInstall           bool
 	VerifyVersionChange     bool
 	MaxRollbackAttempts     int
+	UpdateSystemPackages    bool // Run system package manager update (apt/yum/dnf)
+	UpdateGoVersion         bool // Check and update Go compiler if needed
 }
 
 // EnhancedEosUpdater handles self-update with comprehensive error recovery
@@ -96,6 +98,22 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	// Post-update cleanup
 	if err := eeu.PostUpdateCleanup(); err != nil {
 		eeu.logger.Warn("Post-update cleanup had issues", zap.Error(err))
+	}
+
+	// Update system packages if requested
+	if eeu.enhancedConfig.UpdateSystemPackages {
+		if err := eeu.UpdateSystemPackages(); err != nil {
+			eeu.logger.Warn("System package update had issues", zap.Error(err))
+			// Non-fatal - continue
+		}
+	}
+
+	// Update Go version if requested
+	if eeu.enhancedConfig.UpdateGoVersion {
+		if err := eeu.UpdateGoVersion(); err != nil {
+			eeu.logger.Warn("Go version update had issues", zap.Error(err))
+			// Non-fatal - continue
+		}
 	}
 
 	eeu.transaction.Success = true
@@ -677,6 +695,254 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 
 	// Note: We no longer manually manage stash - git pull --autostash handles it automatically
 	// This prevents orphaned stashes and merge conflicts
+
+	return nil
+}
+
+// UpdateSystemPackages updates the system package manager (apt/yum/dnf/pacman)
+func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
+	eeu.logger.Info("📦 Updating system packages")
+
+	// Detect package manager
+	packageManager := eeu.detectPackageManager()
+	if packageManager == "" {
+		eeu.logger.Warn("No supported package manager detected (apt/yum/dnf/pacman)")
+		return fmt.Errorf("no supported package manager found")
+	}
+
+	eeu.logger.Info("Detected package manager", zap.String("manager", packageManager))
+
+	switch packageManager {
+	case "apt":
+		return eeu.updateApt()
+	case "yum", "dnf":
+		return eeu.updateYumDnf(packageManager)
+	case "pacman":
+		return eeu.updatePacman()
+	default:
+		return fmt.Errorf("unsupported package manager: %s", packageManager)
+	}
+}
+
+// detectPackageManager detects which package manager is available
+func (eeu *EnhancedEosUpdater) detectPackageManager() string {
+	managers := []string{"apt", "dnf", "yum", "pacman"}
+
+	for _, mgr := range managers {
+		if _, err := exec.LookPath(mgr); err == nil {
+			return mgr
+		}
+	}
+
+	return ""
+}
+
+// updateApt runs apt update && apt upgrade on Debian/Ubuntu systems
+func (eeu *EnhancedEosUpdater) updateApt() error {
+	eeu.logger.Info("Running apt update && apt upgrade")
+
+	// Step 1: apt update (refresh package lists)
+	eeu.logger.Info("  Step 1/2: Refreshing package lists (apt update)")
+	updateCmd := exec.Command("sudo", "apt", "update")
+	updateCmd.Stdout = os.Stdout
+	updateCmd.Stderr = os.Stderr
+
+	if err := updateCmd.Run(); err != nil {
+		return fmt.Errorf("apt update failed: %w", err)
+	}
+
+	eeu.logger.Info("✅ Package lists updated")
+
+	// Step 2: apt upgrade (install updates)
+	eeu.logger.Info("  Step 2/2: Installing package updates (apt upgrade)")
+	upgradeCmd := exec.Command("sudo", "apt", "upgrade", "-y")
+	upgradeCmd.Stdout = os.Stdout
+	upgradeCmd.Stderr = os.Stderr
+
+	if err := upgradeCmd.Run(); err != nil {
+		return fmt.Errorf("apt upgrade failed: %w", err)
+	}
+
+	eeu.logger.Info("✅ System packages updated successfully")
+	return nil
+}
+
+// updateYumDnf runs yum/dnf update on RHEL/CentOS/Fedora systems
+func (eeu *EnhancedEosUpdater) updateYumDnf(manager string) error {
+	eeu.logger.Info(fmt.Sprintf("Running %s update", manager))
+
+	updateCmd := exec.Command("sudo", manager, "update", "-y")
+	updateCmd.Stdout = os.Stdout
+	updateCmd.Stderr = os.Stderr
+
+	if err := updateCmd.Run(); err != nil {
+		return fmt.Errorf("%s update failed: %w", manager, err)
+	}
+
+	eeu.logger.Info("✅ System packages updated successfully")
+	return nil
+}
+
+// updatePacman runs pacman -Syu on Arch Linux systems
+func (eeu *EnhancedEosUpdater) updatePacman() error {
+	eeu.logger.Info("Running pacman -Syu")
+
+	updateCmd := exec.Command("sudo", "pacman", "-Syu", "--noconfirm")
+	updateCmd.Stdout = os.Stdout
+	updateCmd.Stderr = os.Stderr
+
+	if err := updateCmd.Run(); err != nil {
+		return fmt.Errorf("pacman update failed: %w", err)
+	}
+
+	eeu.logger.Info("✅ System packages updated successfully")
+	return nil
+}
+
+// UpdateGoVersion checks and updates the Go compiler if a newer version is available
+func (eeu *EnhancedEosUpdater) UpdateGoVersion() error {
+	eeu.logger.Info("🔧 Checking Go compiler version")
+
+	// Get current Go version
+	currentVersion, err := eeu.getCurrentGoVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get current Go version: %w", err)
+	}
+
+	eeu.logger.Info("Current Go version", zap.String("version", currentVersion))
+
+	// Get latest Go version from golang.org
+	latestVersion, err := eeu.getLatestGoVersion()
+	if err != nil {
+		eeu.logger.Warn("Could not check for latest Go version", zap.Error(err))
+		return nil // Non-fatal
+	}
+
+	eeu.logger.Info("Latest Go version", zap.String("version", latestVersion))
+
+	// Compare versions
+	if currentVersion == latestVersion {
+		eeu.logger.Info("✅ Go compiler is already up-to-date")
+		return nil
+	}
+
+	eeu.logger.Info("📥 Newer Go version available",
+		zap.String("current", currentVersion),
+		zap.String("latest", latestVersion))
+
+	// Download and install new Go version
+	if err := eeu.installGoVersion(latestVersion); err != nil {
+		return fmt.Errorf("failed to install Go %s: %w", latestVersion, err)
+	}
+
+	eeu.logger.Info("✅ Go compiler updated successfully", zap.String("version", latestVersion))
+	return nil
+}
+
+// getCurrentGoVersion returns the currently installed Go version
+func (eeu *EnhancedEosUpdater) getCurrentGoVersion() (string, error) {
+	cmd := exec.Command(eeu.goPath, "version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	// Parse "go version go1.21.5 linux/amd64" -> "1.21.5"
+	version := strings.TrimSpace(string(output))
+	parts := strings.Fields(version)
+	if len(parts) < 3 {
+		return "", fmt.Errorf("unexpected go version output: %s", version)
+	}
+
+	// Remove "go" prefix from version
+	goVersion := strings.TrimPrefix(parts[2], "go")
+	return goVersion, nil
+}
+
+// getLatestGoVersion fetches the latest stable Go version from golang.org
+func (eeu *EnhancedEosUpdater) getLatestGoVersion() (string, error) {
+	// Use curl to get the latest version from golang.org/VERSION?m=text
+	cmd := exec.Command("curl", "-s", "https://go.dev/VERSION?m=text")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch latest Go version: %w", err)
+	}
+
+	// Parse "go1.21.5" -> "1.21.5"
+	version := strings.TrimSpace(string(output))
+	lines := strings.Split(version, "\n")
+	if len(lines) == 0 {
+		return "", fmt.Errorf("empty response from golang.org")
+	}
+
+	latestVersion := strings.TrimPrefix(lines[0], "go")
+	return latestVersion, nil
+}
+
+// installGoVersion downloads and installs a specific Go version
+func (eeu *EnhancedEosUpdater) installGoVersion(version string) error {
+	eeu.logger.Info("Installing Go version", zap.String("version", version))
+
+	// Detect architecture
+	arch := "amd64"
+	unameMCmd := exec.Command("uname", "-m")
+	if unameOutput, err := unameMCmd.Output(); err == nil {
+		machine := strings.TrimSpace(string(unameOutput))
+		if strings.Contains(machine, "arm") || strings.Contains(machine, "aarch64") {
+			arch = "arm64"
+		}
+	}
+
+	// Detect OS
+	goos := "linux"
+	unameCmd := exec.Command("uname", "-s")
+	if unameOutput, err := unameCmd.Output(); err == nil {
+		osName := strings.ToLower(strings.TrimSpace(string(unameOutput)))
+		if strings.Contains(osName, "darwin") {
+			goos = "darwin"
+		}
+	}
+
+	filename := fmt.Sprintf("go%s.%s-%s.tar.gz", version, goos, arch)
+	downloadURL := fmt.Sprintf("https://go.dev/dl/%s", filename)
+	tempFile := filepath.Join("/tmp", filename)
+
+	eeu.logger.Info("Downloading Go",
+		zap.String("url", downloadURL),
+		zap.String("dest", tempFile))
+
+	// Download
+	downloadCmd := exec.Command("curl", "-L", "-o", tempFile, downloadURL)
+	downloadCmd.Stdout = os.Stdout
+	downloadCmd.Stderr = os.Stderr
+
+	if err := downloadCmd.Run(); err != nil {
+		return fmt.Errorf("download failed: %w", err)
+	}
+
+	defer os.Remove(tempFile)
+
+	eeu.logger.Info("Installing Go to /usr/local")
+
+	// Remove old Go installation
+	removeCmd := exec.Command("sudo", "rm", "-rf", "/usr/local/go")
+	if err := removeCmd.Run(); err != nil {
+		eeu.logger.Warn("Could not remove old Go installation", zap.Error(err))
+	}
+
+	// Extract new Go
+	extractCmd := exec.Command("sudo", "tar", "-C", "/usr/local", "-xzf", tempFile)
+	extractCmd.Stdout = os.Stdout
+	extractCmd.Stderr = os.Stderr
+
+	if err := extractCmd.Run(); err != nil {
+		return fmt.Errorf("extraction failed: %w", err)
+	}
+
+	eeu.logger.Info("✅ Go installed successfully")
+
+	// Update goPath to new installation
+	eeu.goPath = "/usr/local/go/bin/go"
 
 	return nil
 }

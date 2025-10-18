@@ -294,7 +294,7 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 }
 
 // backupAuthentikFilesystem handles legacy filesystem-based backups
-func backupAuthentikFilesystem(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
+func backupAuthentikFilesystem(rc *eos_io.RuntimeContext, _ *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Warn("Filesystem backup mode is deprecated. Consider using API-based backup instead.")
 

@@ -185,7 +185,7 @@ func init() {
 // Related functions: None visible in this file
 // Dependencies: container.BackupConfig, cobra, fmt
 // parseDockerBackupFlags parses Docker backup configuration from flags
-func parseDockerBackupFlags(cmd *cobra.Command) (*container.BackupConfig, error) {
+func parseDockerBackupFlags(_ *cobra.Command) (*container.BackupConfig, error) {
 	// TODO: Implement Docker backup flag parsing
 	return nil, fmt.Errorf("parseDockerBackupFlags not yet implemented")
 }

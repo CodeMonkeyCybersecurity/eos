@@ -29,7 +29,20 @@ including telemetry, authentication, environment defaults, and other Eos behavio
 	UpdateCmd = &cobra.Command{
 		Use:   "update",
 		Short: "Update Eos to the latest version",
-		RunE:  eos.Wrap(updateEos),
+		Long: `Update Eos to the latest version from the git repository.
+
+Optionally update system packages and Go compiler version.
+
+Flags:
+  --system-packages   Update system packages (apt/yum/dnf/pacman)
+  --go-version        Update Go compiler to latest version
+
+Examples:
+  eos self update                              # Update only EOS binary
+  eos self update --system-packages            # Update EOS + system packages
+  eos self update --go-version                 # Update EOS + Go compiler
+  eos self update --system-packages --go-version  # Update everything`,
+		RunE: eos.Wrap(updateEos),
 	}
 
 	// EnrollCmd handles system enrollment into Eos infrastructure
@@ -40,12 +53,19 @@ including telemetry, authentication, environment defaults, and other Eos behavio
 from masterless mode to a fully managed node.`,
 		RunE: eos.Wrap(enrollSystem),
 	}
+
+	updateSystemPackages bool
+	updateGoVersion      bool
 )
 
 func init() {
 	// Add subcommands to SelfCmd
 	SelfCmd.AddCommand(UpdateCmd)
 	SelfCmd.AddCommand(EnrollCmd)
+
+	// Setup UpdateCmd flags
+	UpdateCmd.Flags().BoolVar(&updateSystemPackages, "system-packages", false, "Update system packages (apt/yum/dnf/pacman)")
+	UpdateCmd.Flags().BoolVar(&updateGoVersion, "go-version", false, "Update Go compiler to latest version")
 
 	// Setup EnrollCmd flags
 	setupEnrollFlags()
@@ -183,7 +203,7 @@ func enrollSystem(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Eos self-update with enhanced safety features")
+	logger.Info("🚀 Starting Eos self-update with enhanced safety features")
 
 	// Create enhanced updater configuration with safety features
 	config := &selfpkg.EnhancedUpdateConfig{
@@ -198,6 +218,8 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		AtomicInstall:           true,  // Use atomic binary replacement
 		VerifyVersionChange:     true,  // Check if there's actually an update
 		MaxRollbackAttempts:     3,
+		UpdateSystemPackages:    updateSystemPackages, // Update system packages if requested
+		UpdateGoVersion:         updateGoVersion,      // Update Go version if requested
 	}
 
 	updater := selfpkg.NewEnhancedEosUpdater(rc, config)
@@ -208,6 +230,6 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		return fmt.Errorf("self-update failed: %w", err)
 	}
 
-	logger.Info(" Self-update completed successfully - please restart any running eos processes")
+	logger.Info("✅ Self-update completed successfully - please restart any running eos processes")
 	return nil
 }

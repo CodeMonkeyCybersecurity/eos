@@ -191,66 +191,6 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 	return "", fmt.Errorf("token not found at %s after %s", path, timeout)
 }
 
-// readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
-// Prefixed with underscore to indicate it's intentionally unused (reserved for future token reading)
-//
-//nolint:unused
-func _readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
-	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Reading Vault Agent token from sink", zap.String("path", path))
-
-	if path == "" {
-		path = shared.AgentToken
-	}
-
-	// Check file existence and permissions before attempting to read
-	if stat, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			log.Error(" Token file does not exist",
-				zap.String("path", path),
-				zap.Error(err))
-		} else {
-			log.Error(" Cannot stat token file",
-				zap.String("path", path),
-				zap.Error(err))
-		}
-		return "", fmt.Errorf("token file not accessible at %s: %w", path, err)
-	} else {
-		log.Info(" Token file exists",
-			zap.String("path", path),
-			zap.String("mode", stat.Mode().String()),
-			zap.Int64("size", stat.Size()),
-			zap.Time("mod_time", stat.ModTime()))
-	}
-
-	// Check parent directory permissions
-	parentDir := "/run/eos"
-	if dirStat, err := os.Stat(parentDir); err != nil {
-		log.Error(" Cannot stat parent directory",
-			zap.String("dir", parentDir),
-			zap.Error(err))
-	} else {
-		log.Info(" Parent directory status",
-			zap.String("dir", parentDir),
-			zap.String("mode", dirStat.Mode().String()))
-	}
-
-	// SECURITY P0 #1: Use os.ReadFile instead of exec.Command("cat") to prevent command injection
-	tokenBytes, err := os.ReadFile(path)
-	if err != nil {
-		log.Error(" Failed to read token file",
-			zap.String("path", path),
-			zap.Error(err))
-		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
-	}
-	token := strings.TrimSpace(string(tokenBytes))
-	log.Info(" Token read successfully",
-		zap.String("path", path),
-		zap.Int("token_length", len(token)))
-
-	return token, nil
-}
-
 // ensureRuntimeDirectory creates /run/eos directory with proper permissions before starting Vault Agent
 func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)

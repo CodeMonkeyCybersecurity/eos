@@ -207,7 +207,7 @@ func detectWazuhComponents(rc *eos_io.RuntimeContext) map[WazuhComponent]*Compon
 func diagnoseComponent(rc *eos_io.RuntimeContext, info *ComponentInfo) []DiagnosticResult {
 	var results []DiagnosticResult
 
-	results = append(results, checkServiceStatus(rc, info))
+	results = append(results, checkServiceStatus(info))
 	results = append(results, checkConfigFiles(rc, info)...)
 	results = append(results, analyzeComponentLogs(rc, info)...)
 	
@@ -231,7 +231,7 @@ func diagnoseComponent(rc *eos_io.RuntimeContext, info *ComponentInfo) []Diagnos
 	return results
 }
 
-func checkServiceStatus(rc *eos_io.RuntimeContext, info *ComponentInfo) DiagnosticResult {
+func checkServiceStatus(info *ComponentInfo) DiagnosticResult {
 	if !info.Running {
 		return DiagnosticResult{
 			Component: info.Name,
@@ -255,7 +255,7 @@ func checkServiceStatus(rc *eos_io.RuntimeContext, info *ComponentInfo) Diagnost
 	}
 }
 
-func checkConfigFiles(rc *eos_io.RuntimeContext, info *ComponentInfo) []DiagnosticResult {
+func checkConfigFiles(_ *eos_io.RuntimeContext, info *ComponentInfo) []DiagnosticResult {
 	var results []DiagnosticResult
 
 	for _, configPath := range info.ConfigPaths {

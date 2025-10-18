@@ -102,24 +102,6 @@ func GetVaultAddr() string {
 	return fmt.Sprintf(VaultDefaultAddr, LocalhostSAN)
 }
 
-// DEPRECATED: File storage template - use Raft templates instead
-// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
-const vaultConfigTemplateFileLegacy = `
-listener "tcp" {
-  address         = "0.0.0.0:{{ .Port }}"
-  tls_cert_file   = "{{ .TLSCrt }}"
-  tls_key_file    = "{{ .TLSKey }}"
-}
-storage "file" {
-  path = "{{ .VaultDataPath }}"
-}
-disable_mlock = true
-api_addr = "{{ .APIAddr }}"
-ui = true
-log_level = "{{ .LogLevel }}"
-log_format = "{{ .LogFormat }}"
-`
-
 // Consul Storage - Single Node (Development/Production)
 // Recommended for: Production deployments with external Consul cluster
 // Provides HA without Raft complexity

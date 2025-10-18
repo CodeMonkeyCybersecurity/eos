@@ -280,7 +280,8 @@ func PermissionsDiagnostic() *debug.Diagnostic {
 		if logsErr != nil {
 			// Try without -Z flag (SELinux not available)
 			logsCmdNoZ := exec.CommandContext(ctx, "ls", "-la", "/opt/vault/logs/")
-			logsOutputNoZ, logsErrNoZ := logsCmdNoZ.CombinedOutput()
+			var logsOutputNoZ []byte
+			logsOutputNoZ, logsErrNoZ = logsCmdNoZ.CombinedOutput()
 			if logsErrNoZ != nil {
 				output.WriteString("ERROR: /opt/vault/logs doesn't exist!\n")
 				output.WriteString(fmt.Sprintf("Command output: %s\n", string(logsOutputNoZ)))

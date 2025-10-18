@@ -5,7 +5,6 @@
 package container
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,9 +20,9 @@ import (
 // ListRunningContainers lists all running Docker containers using SDK
 func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeManagementConfig) (*ContainerListResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Listing running Docker containers via SDK")
-	
+
 	// Create Docker manager
 	manager, err := NewManager(rc)
 	if err != nil {
@@ -31,19 +30,19 @@ func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeManagementC
 		return nil, fmt.Errorf("failed to create docker manager: %w", err)
 	}
 	defer manager.Close()
-	
+
 	// List running containers using SDK
 	containers, err := manager.ListRunning(rc.Ctx)
 	if err != nil {
 		logger.Error("Failed to list containers", zap.Error(err))
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	// Convert to ContainerInfo format
 	containerInfos := make([]ContainerInfo, len(containers))
 	runningCount := 0
 	stoppedCount := 0
-	
+
 	for i, c := range containers {
 		containerInfos[i] = ContainerInfo{
 			ID:     c.ID,
@@ -58,7 +57,7 @@ func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeManagementC
 			stoppedCount++
 		}
 	}
-	
+
 	result := &ContainerListResult{
 		Containers: containerInfos,
 		Total:      len(containerInfos),
@@ -66,11 +65,11 @@ func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeManagementC
 		Stopped:    stoppedCount,
 		Timestamp:  time.Now(),
 	}
-	
+
 	logger.Info("Container listing completed via SDK",
 		zap.Int("container_count", result.Total),
 		zap.Int("running", result.Running))
-	
+
 	return result, nil
 }
 
@@ -78,22 +77,22 @@ func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeManagementC
 func FindComposeProjects(rc *eos_io.RuntimeContext, config *ComposeManagementConfig, searchPaths []string) (*ComposeSearchResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
-	
+
 	// Use default config if none provided
 	if config == nil {
 		config = DefaultComposeManagementConfig()
 	}
-	
+
 	// Use default search paths if none provided
 	if len(searchPaths) == 0 {
 		searchPaths = expandSearchPaths(config)
 	}
-	
+
 	logger.Info("Searching for Docker Compose projects",
 		zap.Strings("search_paths", searchPaths))
-	
+
 	var allProjects []ComposeProject
-	
+
 	// Search each path
 	for _, path := range searchPaths {
 		projects, err := searchDirectory(rc, config, path, 0)
@@ -105,7 +104,7 @@ func FindComposeProjects(rc *eos_io.RuntimeContext, config *ComposeManagementCon
 		}
 		allProjects = append(allProjects, projects...)
 	}
-	
+
 	result := &ComposeSearchResult{
 		SearchPaths:    searchPaths,
 		Projects:       allProjects,
@@ -113,11 +112,11 @@ func FindComposeProjects(rc *eos_io.RuntimeContext, config *ComposeManagementCon
 		Timestamp:      time.Now(),
 		SearchDuration: time.Since(startTime),
 	}
-	
+
 	logger.Info("Compose project search completed",
 		zap.Int("projects_found", result.TotalFound),
 		zap.Duration("duration", result.SearchDuration))
-	
+
 	return result, nil
 }
 
@@ -127,7 +126,7 @@ func expandSearchPaths(config *ComposeManagementConfig) []string {
 	if len(config.DefaultSearchPaths) > 0 {
 		return config.DefaultSearchPaths
 	}
-	
+
 	// Default search paths
 	defaultPaths := []string{
 		os.Getenv("HOME"),
@@ -135,7 +134,7 @@ func expandSearchPaths(config *ComposeManagementConfig) []string {
 		"/srv",
 		"/home",
 	}
-	
+
 	// Filter out paths that don't exist
 	var existingPaths []string
 	for _, path := range defaultPaths {
@@ -143,29 +142,29 @@ func expandSearchPaths(config *ComposeManagementConfig) []string {
 			existingPaths = append(existingPaths, path)
 		}
 	}
-	
+
 	return existingPaths
 }
 
 func searchDirectory(rc *eos_io.RuntimeContext, config *ComposeManagementConfig, rootPath string, depth int) ([]ComposeProject, error) {
 	var projects []ComposeProject
-	
+
 	if depth > config.MaxDepth {
 		return nil, nil
 	}
-	
+
 	entries, err := os.ReadDir(rootPath)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, entry := range entries {
 		if isExcluded(config, entry.Name()) {
 			continue
 		}
-		
+
 		fullPath := filepath.Join(rootPath, entry.Name())
-		
+
 		if entry.IsDir() {
 			// Check if this directory contains a compose file
 			for _, composeFileName := range config.ComposeFileNames {
@@ -177,17 +176,17 @@ func searchDirectory(rc *eos_io.RuntimeContext, config *ComposeManagementConfig,
 						ComposeFile: composeFileName,
 						LastSeen:    time.Now(),
 					}
-					
+
 					// Get status if configured
 					if config.CheckStatus {
 						project.Status = getProjectStatus(rc, project)
 					}
-					
+
 					projects = append(projects, project)
 					break // Found a compose file, don't check others
 				}
 			}
-			
+
 			// Recursively search subdirectories
 			if config.FollowSymlinks || !isSymlink(fullPath) {
 				subProjects, _ := searchDirectory(rc, config, fullPath, depth+1)
@@ -195,24 +194,8 @@ func searchDirectory(rc *eos_io.RuntimeContext, config *ComposeManagementConfig,
 			}
 		}
 	}
-	
-	return projects, nil
-}
 
-func isComposeFile(filename string) bool {
-	composeFiles := []string{
-		"docker-compose.yml",
-		"docker-compose.yaml",
-		"compose.yml",
-		"compose.yaml",
-	}
-	
-	for _, cf := range composeFiles {
-		if filename == cf {
-			return true
-		}
-	}
-	return false
+	return projects, nil
 }
 
 func isExcluded(config *ComposeManagementConfig, name string) bool {
@@ -226,20 +209,20 @@ func isExcluded(config *ComposeManagementConfig, name string) bool {
 
 func getProjectStatus(rc *eos_io.RuntimeContext, project ComposeProject) string {
 	composeFilePath := filepath.Join(project.Path, project.ComposeFile)
-	
+
 	cmd := exec.CommandContext(rc.Ctx, "docker-compose", "-f", composeFilePath, "ps", "-q")
 	cmd.Dir = project.Path
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return "unknown"
 	}
-	
+
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
 		return "stopped"
 	}
-	
+
 	// Check if all containers are running
 	for _, containerID := range lines {
 		if containerID = strings.TrimSpace(containerID); containerID != "" {
@@ -248,14 +231,14 @@ func getProjectStatus(rc *eos_io.RuntimeContext, project ComposeProject) string 
 			if err != nil {
 				return "unknown"
 			}
-			
+
 			status := strings.TrimSpace(string(statusOutput))
 			if status != "running" {
 				return "partial"
 			}
 		}
 	}
-	
+
 	return "running"
 }
 
@@ -270,39 +253,4 @@ func isSymlink(path string) bool {
 		return false
 	}
 	return info.Mode()&os.ModeSymlink != 0
-}
-
-func parseContainerList(output string) ([]ContainerInfo, error) {
-	var containers []ContainerInfo
-	scanner := bufio.NewScanner(strings.NewReader(output))
-	
-	// Skip header line
-	if scanner.Scan() {
-		// header
-	}
-	
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-		
-		// Parse table format: ID  NAME  IMAGE  STATUS  PORTS  LABELS
-		fields := strings.Fields(line)
-		if len(fields) < 4 {
-			continue
-		}
-		
-		container := ContainerInfo{
-			ID:     fields[0],
-			Name:   fields[1],
-			Image:  fields[2],
-			Status: fields[3],
-			Size:   0,
-		}
-		
-		containers = append(containers, container)
-	}
-	
-	return containers, scanner.Err()
 }

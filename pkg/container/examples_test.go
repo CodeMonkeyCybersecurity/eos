@@ -34,7 +34,7 @@ func Example_basicUsage() {
 	
 	fmt.Printf("Found %d containers\n", len(containers))
 	for _, c := range containers {
-		fmt.Printf("  - %s (%s): %s\n", c.Name, c.ShortID(), c.State)
+		fmt.Printf("  - %s (%s): %v\n", c.Name, c.ShortID(), c.State)
 	}
 }
 
