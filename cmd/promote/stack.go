@@ -197,7 +197,7 @@ Examples:
 
 		// Show production warning
 		if isProductionTarget(toEnv) {
-			fmt.Printf("🚨 Production Stack Promotion Warning:\n")
+			fmt.Printf(" Production Stack Promotion Warning:\n")
 			fmt.Printf("   This stack promotion targets the production environment.\n")
 			fmt.Printf("   Components: %s\n", strings.Join(components, ", "))
 			fmt.Printf("   Ensure all components have been tested together in lower environments.\n")

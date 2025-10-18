@@ -197,7 +197,7 @@ func displayFullEnvironment(config *environment.EnhancedEnvironmentConfig) error
 	fmt.Printf(" Datacenter:         %s\n", config.Datacenter)
 	fmt.Printf("🌎 Region:             %s\n", config.Region)
 	fmt.Printf(" Cluster Size:       %d nodes\n", config.ClusterSize)
-	fmt.Printf("⚙️  Resource Strategy:  %s\n", config.ResourceStrategy)
+	fmt.Printf("  Resource Strategy:  %s\n", config.ResourceStrategy)
 
 	// Node topology
 	fmt.Printf("\n🏗️  Cluster Topology:\n")

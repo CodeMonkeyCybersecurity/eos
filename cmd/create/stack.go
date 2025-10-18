@@ -217,7 +217,7 @@ Examples:
 
 		// Show production deployment warning
 		if isProductionEnvironment(environment) {
-			fmt.Printf("🚨 Production Stack Deployment Warning:\n")
+			fmt.Printf(" Production Stack Deployment Warning:\n")
 			fmt.Printf("   This stack deployment targets the production environment.\n")
 			fmt.Printf("   Components: %s\n", strings.Join(components, ", "))
 			fmt.Printf("   Ensure all components have been tested together in lower environments.\n")

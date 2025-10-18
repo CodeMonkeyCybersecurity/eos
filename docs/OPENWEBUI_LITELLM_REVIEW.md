@@ -49,7 +49,7 @@ volumes:
 
 ---
 
-## 🚨 CRITICAL ISSUES
+##  CRITICAL ISSUES
 
 ### Issue #1: Open WebUI Not Configured to Use LiteLLM
 
@@ -509,7 +509,7 @@ model_list:
 
 ##  Summary
 
-**Status:** 🚨 **CRITICAL ISSUES - DO NOT DEPLOY WITHOUT FIXES**
+**Status:**  **CRITICAL ISSUES - DO NOT DEPLOY WITHOUT FIXES**
 
 **Issues Found:** 3 critical
 **Issues Fixed:** 0

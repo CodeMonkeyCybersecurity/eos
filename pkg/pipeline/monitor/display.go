@@ -29,7 +29,7 @@ func DisplayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, a
 	fmt.Println(strings.Repeat("=", 120))
 
 	// Display recent alerts section
-	fmt.Printf("\n🚨 Recent Alerts (Last %d)\n", alertLimit)
+	fmt.Printf("\n Recent Alerts (Last %d)\n", alertLimit)
 	fmt.Println(strings.Repeat("-", 80))
 
 	DisplayRecentAlerts(ctx, logger, db, alertLimit)

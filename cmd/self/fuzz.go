@@ -381,7 +381,7 @@ func executeFuzzing(rc *eos_io.RuntimeContext, config *fuzzing.Config, mode stri
 
 	// Check for security alerts
 	if session.Summary.SecurityAlert {
-		logger.Error("🚨 SECURITY ALERT: Crashes detected during fuzzing!",
+		logger.Error(" SECURITY ALERT: Crashes detected during fuzzing!",
 			zap.Int("crashes_found", session.Summary.CrashesFound))
 
 		if config.FailFast {

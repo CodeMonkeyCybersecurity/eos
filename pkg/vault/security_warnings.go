@@ -161,7 +161,7 @@ func displayWarning(warning SecurityWarning, num, total int) {
 func getWarningIcon(level SecurityWarningLevel) string {
 	switch level {
 	case SecurityWarningCritical:
-		return "🚨"
+		return ""
 	case SecurityWarningHigh:
 		return " "
 	case SecurityWarningMedium:

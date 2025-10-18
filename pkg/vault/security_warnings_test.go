@@ -139,7 +139,7 @@ func TestSecurityWarningLevels(t *testing.T) {
 		expectedIcon string
 		expectedText string
 	}{
-		{SecurityWarningCritical, "🚨", "CRITICAL"},
+		{SecurityWarningCritical, "", "CRITICAL"},
 		{SecurityWarningHigh, " ", "HIGH"},
 		{SecurityWarningMedium, "⚡", "MEDIUM"},
 		{SecurityWarningLow, " ", "LOW"},

@@ -66,7 +66,7 @@ func OutputStatusText(rc *eos_io.RuntimeContext, status *WebhookStatus) error {
 	}
 
 	// Configuration status
-	logger.Info("⚙️ Configuration Status:")
+	logger.Info(" Configuration Status:")
 	if status.ConfigPresent {
 		logger.Info("   Environment file present")
 		for envVar, present := range status.EnvironmentVars {

@@ -48,7 +48,7 @@ Before prompting, the user sees:
 
 ```
 ======================================================================
-  ⚠️  VAULT INITIALIZED SUCCESSFULLY
+    VAULT INITIALIZED SUCCESSFULLY
 ======================================================================
 
 CRITICAL: Your unseal keys and root token are ready.
@@ -78,7 +78,7 @@ WITHOUT THESE CREDENTIALS YOU CANNOT RECOVER YOUR VAULT!
     • KeePassXC (use Notes field)
     • Encrypted file on separate device
 
-⚠️  PRODUCTION TIP:
+  PRODUCTION TIP:
    For high security, distribute different keys to different operators
    (Shamir's Secret Sharing - requires 3 of 5 keys to unseal)
 
@@ -149,7 +149,7 @@ Delete local credentials file? (you MUST have saved them externally first) (yes/
 | **User has time to save externally** |  No |
 | **Verification of external save** |  No |
 | **Option to delete local file** |  No |
-| **Clear instructions** | ⚠️ Minimal |
+| **Clear instructions** |  Minimal |
 | **User experience** |  Poor (blocked immediately) |
 
 ### After (Tier 2)
@@ -277,7 +277,7 @@ sudo eos create vault --auto-unseal=aws-kms --kms-key-id=arn:aws:kms:...
 | **Option to delete file** | N/A |  Yes |
 | **PGP encryption support** |  Yes | ⏳ Future |
 | **Auto-unseal support** |  Yes | ⏳ Future |
-| **Clear instructions** | ⚠️ Warning only |  Step-by-step |
+| **Clear instructions** |  Warning only |  Step-by-step |
 
 ## Future Enhancements
 
@@ -327,9 +327,9 @@ sudo eos create vault --auto-unseal=aws-kms --kms-key-id=arn:aws:kms:...
 -  0600 permissions (root only)
 
 **Cons:**
-- ⚠️ All keys in one location (violates Shamir principle)
-- ⚠️ Single point of compromise
-- ⚠️ Not suitable for high-security environments
+-  All keys in one location (violates Shamir principle)
+-  Single point of compromise
+-  Not suitable for high-security environments
 
 **Recommendation:**
 - **Dev/Lab:** Keep file (convenience)

@@ -22,7 +22,7 @@ The Eos auto-commit feature provides intelligent, safe automation for git commit
 - **Statistics**: Includes file counts and line changes
 - **Consistent Format**: Follows project conventions with automatic footers
 
-### ⚙️ **Flexible Configuration**
+###  **Flexible Configuration**
 - **Multiple Interfaces**: Native Go command, shell script, and configuration files
 - **Customizable Patterns**: Configure secret detection and exclusion rules
 - **Behavior Controls**: Auto-push, confirmations, and verification options
@@ -290,7 +290,7 @@ message_generation:
   templates:
     test_changes: "🧪 Test updates for {packages}"
     doc_changes: "📚 Documentation improvements"
-    config_changes: "⚙️ Configuration updates"
+    config_changes: " Configuration updates"
     security_fix: "🔒 Security improvements"
 ```
 

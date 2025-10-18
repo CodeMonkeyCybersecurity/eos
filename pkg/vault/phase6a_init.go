@@ -76,7 +76,7 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 	if err := DistributeInitKeys(rc, initRes); err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("Key distribution workflow failed (non-fatal)",
 			zap.Error(err))
-		otelzap.Ctx(rc.Ctx).Info("terminal prompt: ⚠️  Keys were saved but not distributed")
+		otelzap.Ctx(rc.Ctx).Info("terminal prompt:   Keys were saved but not distributed")
 		otelzap.Ctx(rc.Ctx).Info("terminal prompt: Run 'eos inspect vault-init' to retrieve keys later")
 	}
 

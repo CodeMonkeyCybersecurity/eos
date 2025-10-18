@@ -26,6 +26,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/upgrade"
 )
 
 // helpLogged removed as it's not needed with default Cobra help
@@ -65,6 +66,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		read.ReadCmd,         // VERB-FIRST ARCHITECTURE
 		list.ListCmd,         // VERB-FIRST ARCHITECTURE
 		update.UpdateCmd,     // VERB-FIRST ARCHITECTURE
+		upgrade.UpgradeCmd,   // VERB-FIRST ARCHITECTURE (version upgrades)
 		delete.DeleteCmd,     // VERB-FIRST ARCHITECTURE
 		fix.FixCmd,           // VERB-FIRST ARCHITECTURE (auto-fix issues)
 		debug.GetDebugCmd(),  // VERB-FIRST ARCHITECTURE (debugging tools)

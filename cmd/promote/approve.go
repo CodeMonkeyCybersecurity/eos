@@ -189,7 +189,7 @@ Examples:
 
 		// Show production warning
 		if isProductionTarget(promotionRequest.ToEnvironment) && !reject {
-			fmt.Printf("🚨 Production Deployment Approval:\n")
+			fmt.Printf(" Production Deployment Approval:\n")
 			fmt.Printf("   This approval will enable deployment to the production environment.\n")
 			fmt.Printf("   Please ensure:\n")
 			fmt.Printf("   • All testing has been completed in lower environments\n")
@@ -403,7 +403,7 @@ func listPendingApprovals(rc *eos_io.RuntimeContext) error {
 		fmt.Printf("Time remaining:   %s\n", approval.TimeRemaining.Round(time.Minute))
 
 		if isProductionTarget(approval.ToEnvironment) {
-			fmt.Printf("Environment:      🚨 PRODUCTION\n")
+			fmt.Printf("Environment:       PRODUCTION\n")
 		}
 
 		fmt.Printf("\nTo approve:\n")

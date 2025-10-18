@@ -1071,7 +1071,7 @@ func diagnoseDashboard(rc *eos_io.RuntimeContext, info *ComponentInfo) []Diagnos
 }
 
 func displayDetectedComponents(components map[WazuhComponent]*ComponentInfo) {
-	fmt.Println("\n🔍 Detected Wazuh Components:")
+	fmt.Println("\n Detected Wazuh Components:")
 	fmt.Println(strings.Repeat("=", 60))
 
 	for _, info := range components {
@@ -1108,7 +1108,7 @@ func displayWazuhResults(results []DiagnosticResult) {
 		icon := ""
 		if !result.Passed {
 			if result.Warning {
-				icon = "⚠️ "
+				icon = " "
 			} else {
 				icon = ""
 			}

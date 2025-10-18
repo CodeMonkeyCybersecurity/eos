@@ -25,7 +25,7 @@ func FuzzRenderEmail(f *testing.F) {
 		{"", "", "", "", ""},
 		{"Alert with <script>", "Description with <script>alert('xss')</script>", "host", "xss-test", "<script>alert('xss')</script>"},
 		{"Very Long Title " + strings.Repeat("A", 1000), strings.Repeat("B", 10000), "host", "long", ""},
-		{"Unicode 测试 Тест", "Unicode description 中文 русский", "🚨-host", "unicode", ""},
+		{"Unicode 测试 Тест", "Unicode description 中文 русский", "-host", "unicode", ""},
 		{"Special Chars !@#$%^&*()", "Special <>&\"'", "host", "special", ""},
 		{"Newlines\nand\rcarriage\r\nreturns", "Multiple\n\nlines", "host", "newline", ""},
 		{"${variable} injection", "$(command) `backtick`", "host", "injection", ""},
@@ -239,7 +239,7 @@ func FuzzAlertMeta(f *testing.F) {
 	// Add various metadata combinations
 	f.Add("key1", "value1", "key2", "value2")
 	f.Add("", "", "", "")
-	f.Add("unicode_key_中文", "unicode_value_русский", "emoji_🔑", "emoji_value_🚨")
+	f.Add("unicode_key_中文", "unicode_value_русский", "emoji_🔑", "emoji_value_")
 	f.Add("injection_${}", "injection_$()", "backtick_`", "semicolon_;")
 	f.Add(strings.Repeat("long_key_", 100), strings.Repeat("long_value_", 100), "k", "v")
 

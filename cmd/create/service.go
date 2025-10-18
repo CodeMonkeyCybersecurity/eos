@@ -232,7 +232,7 @@ Examples:
 
 		// Show production deployment warning
 		if isProductionEnvironment(environment) {
-			fmt.Printf("🚨 Production Service Deployment Warning:\n")
+			fmt.Printf(" Production Service Deployment Warning:\n")
 			fmt.Printf("   This service deployment targets the production environment.\n")
 			fmt.Printf("   Ensure service dependencies are properly configured.\n")
 			if !verifyDependencies {

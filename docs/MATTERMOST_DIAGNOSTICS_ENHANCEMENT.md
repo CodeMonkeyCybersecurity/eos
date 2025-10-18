@@ -77,10 +77,10 @@ Mattermost containers expect all volumes to be owned by `uid:2000 gid:2000`:
 |--------|------|---------|-----------|
 | config | `/opt/mattermost/volumes/app/mattermost/config` | config.json |  YES |
 | data | `/opt/mattermost/volumes/app/mattermost/data` | User data |  YES |
-| logs | `/opt/mattermost/volumes/app/mattermost/logs` | Application logs | ⚠️ Important |
-| plugins | `/opt/mattermost/volumes/app/mattermost/plugins` | Server plugins | ⚠️ Important |
-| client-plugins | `/opt/mattermost/volumes/app/mattermost/client/plugins` | Client plugins | ⚠️ Important |
-| bleve-indexes | `/opt/mattermost/volumes/app/mattermost/bleve-indexes` | Search indexes | ⚠️ Important |
+| logs | `/opt/mattermost/volumes/app/mattermost/logs` | Application logs |  Important |
+| plugins | `/opt/mattermost/volumes/app/mattermost/plugins` | Server plugins |  Important |
+| client-plugins | `/opt/mattermost/volumes/app/mattermost/client/plugins` | Client plugins |  Important |
+| bleve-indexes | `/opt/mattermost/volumes/app/mattermost/bleve-indexes` | Search indexes |  Important |
 | app | `/opt/mattermost/volumes/app` | Base directory |  YES |
 | db | `/opt/mattermost/volumes/db` | Postgres data |  YES |
 
@@ -163,7 +163,7 @@ $ sudo eos fix mattermost
 
 ---
 
-## 🔍 Root Cause Analysis
+##  Root Cause Analysis
 
 The original error:
 ```

@@ -233,7 +233,7 @@ func showSessionDetail(rc *eos_io.RuntimeContext, traceDir, sessionID string) er
 	// Show critical diagnostics if available
 	criticalDir := filepath.Join(sessionPath, "critical")
 	if _, err := os.Stat(criticalDir); err == nil {
-		fmt.Printf("🚨 Critical Diagnostics Available:\n")
+		fmt.Printf(" Critical Diagnostics Available:\n")
 
 		// List files in critical directory
 		if files, err := ioutil.ReadDir(criticalDir); err == nil {

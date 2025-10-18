@@ -396,7 +396,7 @@ func (m *ServicesModule) View() string {
 		if len(operation) > 0 {
 			operation = strings.ToUpper(operation[:1]) + operation[1:]
 		}
-		opStatus := fmt.Sprintf("⚙️  %s %s...", operation, m.currentOp.serviceName)
+		opStatus := fmt.Sprintf("  %s %s...", operation, m.currentOp.serviceName)
 		header += "\n" + m.statusStyle.Render(opStatus)
 	}
 

@@ -22,12 +22,12 @@ func DistributeInitKeys(rc *eos_io.RuntimeContext, initRes *api.InitResponse) er
 
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════")
-	logger.Info("terminal prompt: ⚠️  CRITICAL: KEY DISTRIBUTION REQUIRED")
+	logger.Info("terminal prompt:   CRITICAL: KEY DISTRIBUTION REQUIRED")
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: You have 5 unseal keys that MUST be distributed to 5 different key holders.")
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: ⚠️  SECURITY WARNING:")
+	logger.Info("terminal prompt:   SECURITY WARNING:")
 	logger.Info("terminal prompt: Storing all keys together defeats Shamir's Secret Sharing and creates")
 	logger.Info("terminal prompt: a single point of failure. Each key should be held by a different person.")
 	logger.Info("terminal prompt: ")
@@ -74,7 +74,7 @@ func DistributeInitKeys(rc *eos_io.RuntimeContext, initRes *api.InitResponse) er
 	logger.Info("terminal prompt:   - Use 'eos inspect vault-init' to view keys")
 	logger.Info("terminal prompt: ")
 
-	logger.Warn("⚠️  Keys were NOT automatically distributed - you must distribute them manually!")
+	logger.Warn("  Keys were NOT automatically distributed - you must distribute them manually!")
 	logger.Info("terminal prompt: Run 'eos inspect vault-init' to retrieve keys for distribution")
 
 	return nil
@@ -113,7 +113,7 @@ func generateEncryptedKeyFiles(rc *eos_io.RuntimeContext, initRes *api.InitRespo
 		}
 
 		if len(password) < 12 {
-			logger.Warn("⚠️  Password is short - recommend 12+ characters for security")
+			logger.Warn("  Password is short - recommend 12+ characters for security")
 		}
 
 		// Encrypt key with password using AES-256

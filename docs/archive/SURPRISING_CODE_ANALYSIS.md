@@ -2,7 +2,7 @@
 
 ## Critical Issues Found
 
-### 🚨 Security Vulnerabilities
+###  Security Vulnerabilities
 
 1. **Hardcoded Default Credentials** (`pkg/eos_postgres/postgres.go:36-37`)
    ```go
@@ -99,7 +99,7 @@
 
 ## Recommendations by Priority
 
-### 🚨 IMMEDIATE (Security Critical)
+###  IMMEDIATE (Security Critical)
 1. **Remove hardcoded credentials** - require explicit database configuration
 2. **Complete security sanitization** - implement proper input validation
 3. **Add synchronization** to global credential store

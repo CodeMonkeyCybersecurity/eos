@@ -217,7 +217,7 @@ echo "🛡️ Phase 2: Security-Focused Tests (Parallel)"
 echo -e "\n### Phase 2: Security-Focused Tests" >> "${REPORT_FILE}"
 run_parallel_tests security_tests 3
 
-echo "⚙️ Phase 3: Command Processing Tests (Parallel)" 
+echo " Phase 3: Command Processing Tests (Parallel)" 
 echo -e "\n### Phase 3: Command Processing Tests" >> "${REPORT_FILE}"
 run_parallel_tests command_tests 4
 

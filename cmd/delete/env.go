@@ -116,7 +116,7 @@ Examples:
 
 		// Show warnings
 		if env.Type == environments.EnvironmentTypeProduction {
-			fmt.Printf("🚨 PRODUCTION ENVIRONMENT WARNING:\n")
+			fmt.Printf(" PRODUCTION ENVIRONMENT WARNING:\n")
 			fmt.Printf("   This will delete a production environment!\n")
 			fmt.Printf("   This action is irreversible and may cause service disruption.\n\n")
 		}

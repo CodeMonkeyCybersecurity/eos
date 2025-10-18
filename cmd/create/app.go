@@ -211,7 +211,7 @@ Examples:
 
 		// Show production deployment warning
 		if isProductionEnvironment(environment) {
-			fmt.Printf("🚨 Production Deployment Warning:\n")
+			fmt.Printf(" Production Deployment Warning:\n")
 			fmt.Printf("   This deployment targets the production environment.\n")
 			fmt.Printf("   Ensure all testing has been completed in lower environments.\n")
 			fmt.Printf("   Consider using --rollback-on-failure for additional safety.\n")

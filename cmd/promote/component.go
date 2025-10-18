@@ -152,7 +152,7 @@ Examples:
 
 		// Show warnings for production promotions
 		if isProductionTarget(toEnv) {
-			fmt.Printf("🚨 Production Promotion Warning:\n")
+			fmt.Printf(" Production Promotion Warning:\n")
 			fmt.Printf("   This promotion targets the production environment.\n")
 			fmt.Printf("   Ensure all testing has been completed in lower environments.\n")
 			if !request.ApprovalPolicy.Required {

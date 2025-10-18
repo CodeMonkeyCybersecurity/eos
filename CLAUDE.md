@@ -14,7 +14,7 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 
 **Iterative Philosophy**: Eos is built iteratively. We build on what exists, solve complex problems once, encode them in Eos, and never solve them again. Each improvement makes the next one easier. 
 
-## 🚨 CRITICAL RULES (P0 - Breaking)
+##  CRITICAL RULES (P0 - Breaking)
 
 These violations cause immediate failure:
 

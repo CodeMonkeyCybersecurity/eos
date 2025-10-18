@@ -621,7 +621,7 @@ Initializing Vault...
 ║    🔐 SECURITY WARNINGS 🔐     ║
 ╚═════════════════════════════════╝
 
-🚨 CRITICAL: INSECURE KEY STORAGE
+ CRITICAL: INSECURE KEY STORAGE
 All unseal keys stored in:
   /var/lib/eos/secret/vault_init.json
 ...

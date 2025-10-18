@@ -392,7 +392,7 @@ func (am *AlertManager) sendSlackNotification(alert *Alert, config map[string]in
 
 	// Create Slack message
 	message := map[string]interface{}{
-		"text": fmt.Sprintf("🚨 Alert: %s", alert.Name),
+		"text": fmt.Sprintf(" Alert: %s", alert.Name),
 		"attachments": []map[string]interface{}{
 			{
 				"color": getSeverityColor(alert.Severity),

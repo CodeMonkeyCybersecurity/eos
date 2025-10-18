@@ -115,7 +115,7 @@ run_fuzz_test "FuzzRedact" "./pkg/crypto" "${FUZZTIME_MEDIUM}" "high"
 run_fuzz_test "FuzzInjectSecretsFromPlaceholders" "./pkg/crypto" "${FUZZTIME_MEDIUM}" "high"
 
 # Phase 3: Command Processing Tests
-echo "⚙️ Phase 3: Command Processing Tests"
+echo " Phase 3: Command Processing Tests"
 echo -e "\n### Phase 3: Command Processing Tests" >> "${REPORT_FILE}"
 
 run_fuzz_test "FuzzUpdateCommand" "./cmd/delphi/services" "${FUZZTIME_MEDIUM}" "high"

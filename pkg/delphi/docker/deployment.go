@@ -84,7 +84,7 @@ func RunDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress 
 	}
 
 	// Set vm.max_map_count for Elasticsearch
-	logger.Info("⚙️ Setting vm.max_map_count for Elasticsearch")
+	logger.Info(" Setting vm.max_map_count for Elasticsearch")
 	if err := exec.Command("sysctl", "-w", "vm.max_map_count=262144").Run(); err != nil {
 		logger.Warn(" Failed to set vm.max_map_count", zap.Error(err))
 	}

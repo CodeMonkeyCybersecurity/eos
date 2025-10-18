@@ -239,7 +239,7 @@ sudo ./check-vault-install.sh
 
 ---
 
-## 🚨 RED FLAGS IN CODE
+##  RED FLAGS IN CODE
 
 ### Anti-Pattern #1: Empty String Paths
 ```go

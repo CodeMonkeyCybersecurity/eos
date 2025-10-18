@@ -188,7 +188,7 @@ func handleInitMaterial(rc *eos_io.RuntimeContext, initRes *api.InitResponse) er
 // for saving Vault initialization credentials (Tier 2 security best practice)
 func printVaultInitializationInstructions() {
 	fmt.Fprintln(os.Stderr, "\n"+strings.Repeat("=", 70))
-	fmt.Fprintln(os.Stderr, "  ⚠️  VAULT INITIALIZED SUCCESSFULLY")
+	fmt.Fprintln(os.Stderr, "    VAULT INITIALIZED SUCCESSFULLY")
 	fmt.Fprintln(os.Stderr, strings.Repeat("=", 70))
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "CRITICAL: Your unseal keys and root token are ready.")
@@ -218,7 +218,7 @@ func printVaultInitializationInstructions() {
 	fmt.Fprintln(os.Stderr, "    • KeePassXC (use Notes field)")
 	fmt.Fprintln(os.Stderr, "    • Encrypted file on separate device")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "⚠️  PRODUCTION TIP:")
+	fmt.Fprintln(os.Stderr, "  PRODUCTION TIP:")
 	fmt.Fprintln(os.Stderr, "   For high security, distribute different keys to different operators")
 	fmt.Fprintln(os.Stderr, "   (Shamir's Secret Sharing - requires 3 of 5 keys to unseal)")
 	fmt.Fprintln(os.Stderr, "")

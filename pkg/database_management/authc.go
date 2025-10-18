@@ -228,7 +228,7 @@ func displayConfigurationSummary(rc *eos_io.RuntimeContext, options *VaultSetupO
 	summary.WriteString(fmt.Sprintf("   Database: %s\n", options.DatabaseConfig.Database))
 	summary.WriteString(fmt.Sprintf("   Admin User: %s\n", options.AdminUsername))
 	summary.WriteString(fmt.Sprintf("   Connection: %s\n", options.ConnectionName))
-	summary.WriteString(fmt.Sprintf("  ⚙️  Engine Mount: %s\n", options.EngineMount))
+	summary.WriteString(fmt.Sprintf("    Engine Mount: %s\n", options.EngineMount))
 	summary.WriteString(fmt.Sprintf("  🧪 Test Connection: %t\n", options.TestConnection))
 	summary.WriteString("\n")
 

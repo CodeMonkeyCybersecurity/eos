@@ -486,7 +486,7 @@ func (r *Runner) generateMarkdownReport(session *FuzzSession) (string, error) {
 	report.WriteString(fmt.Sprintf("- **Total Executions:** %d\n", session.Summary.TotalExecutions))
 
 	if session.Summary.SecurityAlert {
-		report.WriteString("\n🚨 **SECURITY ALERT:** Crashes detected during fuzzing!\n")
+		report.WriteString("\n **SECURITY ALERT:** Crashes detected during fuzzing!\n")
 	}
 
 	// Test Results

@@ -235,7 +235,7 @@ func TestRenderEmailErrorCases(t *testing.T) {
 			// Alert with Unicode
 			Title:       "测试警报",
 			Description: "Тестовое предупреждение",
-			Host:        "🚨-server",
+			Host:        "-server",
 		},
 	}
 

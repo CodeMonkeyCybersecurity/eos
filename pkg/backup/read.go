@@ -226,7 +226,7 @@ func displayRepositoryInfo(rc *eos_io.RuntimeContext, repo *Repository, repoInfo
 
 	// Environment variables (masked for security)
 	if len(repo.Environment) > 0 {
-		display.WriteString("\n⚙️  Environment Variables:\n")
+		display.WriteString("\n  Environment Variables:\n")
 		for k, v := range repo.Environment {
 			displayValue := maskEnvironmentValue(k, v)
 			display.WriteString(fmt.Sprintf("  %s: %s\n", k, displayValue))

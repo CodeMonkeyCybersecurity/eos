@@ -242,7 +242,7 @@ func checkDiskHealth(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) er
 	case "warning":
 		fmt.Printf("\nDisk shows warning signs - monitor closely\n")
 	case "critical":
-		fmt.Printf("\n🚨 Disk is in critical condition - backup data immediately\n")
+		fmt.Printf("\n Disk is in critical condition - backup data immediately\n")
 	default:
 		fmt.Printf("\n❓ Disk health status unknown\n")
 	}

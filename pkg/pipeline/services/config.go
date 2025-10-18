@@ -23,7 +23,7 @@ func ShowServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.Service
 		zap.String("service", config.Name),
 		zap.String("service_file", config.ServiceFile))
 
-	logger.Info("⚙️ Service Configuration Content")
+	logger.Info(" Service Configuration Content")
 
 	// INTERVENE - Display configuration content
 	if shared.FileExists(config.ServiceFile) {
