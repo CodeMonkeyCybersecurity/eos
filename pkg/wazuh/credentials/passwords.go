@@ -1,20 +1,17 @@
 package credentials
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	"golang.org/x/term"
 )
 
 // ExtractWazuhPasswords extracts and displays Wazuh installation passwords
@@ -333,36 +330,4 @@ func generatePasswordHash(password string) (string, error) {
 	}
 
 	return "", fmt.Errorf("failed to extract hash from output: %s", output)
-}
-
-// readInput reads a line of input from stdin
-// DEPRECATED: Use readPassword() for sensitive input
-func readInput() (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(input), nil
-}
-
-// readPassword reads a password from stdin without echoing to terminal
-// SECURITY: Prevents password from being visible in:
-// - Terminal display (echoing disabled)
-// - Terminal scrollback buffer
-// - Screen recordings
-func readPassword() (string, error) {
-	// Get file descriptor for stdin
-	fd := int(syscall.Stdin)
-
-	// Read password with terminal echo disabled
-	password, err := term.ReadPassword(fd)
-	if err != nil {
-		return "", fmt.Errorf("failed to read password: %w", err)
-	}
-
-	// Print newline since ReadPassword doesn't echo it (not using fmt.Println per CLAUDE.md)
-	// Newline handled by terminal automatically after password input
-
-	return string(password), nil
 }

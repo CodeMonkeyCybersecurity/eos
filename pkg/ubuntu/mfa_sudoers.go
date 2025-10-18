@@ -2,7 +2,6 @@ package ubuntu
 
 import (
 	"bufio"
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -251,32 +250,4 @@ func (m *MFAManager) getSudoersFingerprint() (string, error) {
 	}
 
 	return fingerprint.String(), nil
-}
-
-// verifySudoersIntegrity ensures sudoers configuration wasn't corrupted
-func (m *MFAManager) verifySudoersIntegrity(originalFingerprint string) error {
-	currentFingerprint, err := m.getSudoersFingerprint()
-	if err != nil {
-		return fmt.Errorf("get current fingerprint: %w", err)
-	}
-
-	if originalFingerprint != currentFingerprint {
-		m.logger.Warn("Sudoers configuration changed during MFA setup",
-			zap.String("original_hash", fmt.Sprintf("%x", sha256.Sum256([]byte(originalFingerprint)))),
-			zap.String("current_hash", fmt.Sprintf("%x", sha256.Sum256([]byte(currentFingerprint)))))
-		// This is a warning, not an error - configuration may have legitimately changed
-	}
-
-	// Validate all sudoers files are syntactically correct
-	files := []string{"/etc/sudoers"}
-	sudoersDFiles, _ := filepath.Glob("/etc/sudoers.d/*")
-	files = append(files, sudoersDFiles...)
-
-	for _, file := range files {
-		if err := m.validateSudoersFile(file); err != nil {
-			return fmt.Errorf("sudoers validation failed for %s: %w", file, err)
-		}
-	}
-
-	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/deploy"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -438,43 +437,7 @@ func (em *EnvironmentManager) DeleteEnvironment(rc *eos_io.RuntimeContext, name 
 	return nil
 }
 
-// GetDeploymentManager returns a deployment manager for the environment
-func (em *EnvironmentManager) GetDeploymentManager(rc *eos_io.RuntimeContext, envName string) (*deploy.DeploymentManager, error) {
-	env, err := em.GetEnvironment(rc, envName)
-	if err != nil {
-		return nil, err
-	}
 
-	// Create deployment config from environment
-	deployConfig := &deploy.DeploymentConfig{
-		WorkDir: "/tmp/eos-deploy",
-		NomadConfig: deploy.NomadClientConfig{
-			Address:   env.Infrastructure.Nomad.Address,
-			Region:    env.Infrastructure.Nomad.Region,
-			Namespace: env.Infrastructure.Nomad.Namespace,
-			Timeout:   5 * time.Minute,
-		},
-		VaultConfig: deploy.VaultClientConfig{
-			Address: env.Infrastructure.Vault.Address,
-			Token:   env.Infrastructure.Vault.Token,
-			Timeout: 30 * time.Second,
-		},
-		ConsulConfig: deploy.ConsulClientConfig{
-			Address:    env.Infrastructure.Consul.Address,
-			Datacenter: env.Infrastructure.Consul.Datacenter,
-			Timeout:    30 * time.Second,
-		},
-		TerraformConfig: deploy.TerraformClientConfig{
-			WorkingDir:    fmt.Sprintf("/srv/terraform/%s", envName),
-			StateBackend:  env.Infrastructure.Terraform.Backend,
-			BackendConfig: env.Infrastructure.Terraform.BackendConfig,
-			Variables:     env.Infrastructure.Terraform.Variables,
-			Timeout:       30 * time.Minute,
-		},
-	}
-
-	return deploy.NewDeploymentManager(deployConfig)
-}
 
 // validateEnvironment validates an environment configuration
 func (em *EnvironmentManager) validateEnvironment(rc *eos_io.RuntimeContext, env *Environment) error {

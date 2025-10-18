@@ -30,17 +30,6 @@ func TestMFAScriptGeneration(t *testing.T) {
 	assert.Contains(t, mfaStatusScript, "PAM Configuration", "Status script should check PAM config")
 }
 
-func TestPAMConfigurations(t *testing.T) {
-	// Test enforced PAM configurations
-	assert.Contains(t, enforcedPAMSudoConfig, "required", "Enforced config should require MFA")
-	assert.Contains(t, enforcedPAMSudoConfig, "pam_google_authenticator.so", "Should use Google Authenticator")
-	assert.NotContains(t, enforcedPAMSudoConfig, "nullok", "Enforced config should not allow nullok")
-
-	// Test graceful PAM configurations
-	assert.Contains(t, gracefulPAMSudoConfig, "sufficient", "Graceful config should use sufficient")
-	assert.Contains(t, gracefulPAMSudoConfig, "nullok", "Graceful config should allow nullok during setup")
-}
-
 func TestConfigureEnforcedMFADryRun(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping MFA configuration test in short mode")
@@ -58,22 +47,6 @@ func TestConfigureEnforcedMFADryRun(t *testing.T) {
 		Ctx: ctx,
 	}
 	_ = logger
-
-	// This would normally require root permissions and actual system files
-	// For testing, we'll just verify the function doesn't panic
-	t.Run("MFA config structure", func(t *testing.T) {
-		// Test the configuration structure without actually applying it
-		config := DefaultEnforcedMFAConfig()
-		assert.NotNil(t, config)
-
-		// Verify PAM configs are well-formed
-		assert.Greater(t, len(enforcedPAMSudoConfig), 50, "PAM config should be substantial")
-		assert.Greater(t, len(enforcedPAMSuConfig), 50, "PAM config should be substantial")
-
-		// Verify scripts are well-formed
-		assert.Greater(t, len(mfaEnforcementScript), 1000, "MFA script should be comprehensive")
-		assert.Greater(t, len(mfaStatusScript), 500, "Status script should be substantial")
-	})
 
 	// Test script creation functions (would need write permissions)
 	t.Run("Script paths", func(t *testing.T) {

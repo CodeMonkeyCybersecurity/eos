@@ -18,137 +18,42 @@ func init() {
 	// Attach the hetzner-dns subcommand here
 	CreateCmd.AddCommand(hetznerWildcardCmd)
 	CreateCmd.AddCommand(CreateHecateCmd)
-
-	// Add flags for Hecate deployment
-	CreateHecateCmd.Flags().Bool("legacy", false, "Use legacy Docker Compose deployment method")
-
-	// Add service-specific flags for monitoring and observability
-	CreateHecateCmd.Flags().Bool("wazuh", false, "Deploy Wazuh SIEM for security monitoring")
-	CreateHecateCmd.Flags().Bool("grafana", false, "Deploy Grafana with Prometheus and Loki for monitoring")
-	CreateHecateCmd.Flags().Bool("elk", false, "Deploy Elasticsearch, Logstash, and Kibana stack")
-	CreateHecateCmd.Flags().Bool("prometheus", false, "Deploy Prometheus monitoring (included with --grafana)")
-	CreateHecateCmd.Flags().Bool("loki", false, "Deploy Loki log aggregation (included with --grafana)")
-
-	// Add flags for other services
-	CreateHecateCmd.Flags().Bool("mattermost", false, "Deploy Mattermost team chat")
-	CreateHecateCmd.Flags().Bool("vault", false, "Deploy HashiCorp Vault for secrets management")
-	CreateHecateCmd.Flags().Bool("consul", false, "Deploy HashiCorp Consul for service discovery")
-
-	// Add flags for deployment options
-	CreateHecateCmd.Flags().Bool("all-monitoring", false, "Deploy all monitoring services (Grafana, Prometheus, Loki, Elasticsearch)")
-	CreateHecateCmd.Flags().Bool("minimal", false, "Deploy minimal Hecate stack without additional services")
 }
 
 // CreateHecateCmd creates the `create hecate` subcommand
 var CreateHecateCmd = &cobra.Command{
 	Use:   "hecate",
-	Short: "Deploy Hecate reverse proxy framework with ",
-	Long: `Deploy Hecate reverse proxy framework using  orchestration.
-This command deploys a complete reverse proxy stack with:
-- Caddy reverse proxy
-- Authentik identity provider
-- PostgreSQL database
-- Redis cache
-- Nomad job orchestration
+	Short: "Deploy Hecate reverse proxy framework",
+	Long: `Deploy Hecate reverse proxy framework using Docker Compose.
 
-The deployment requires a working HashiCorp stack (Consul, Vault, Nomad).
+This command deploys a minimal reverse proxy stack with:
+- Caddy reverse proxy (HTTP/HTTPS with automatic Let's Encrypt)
+- Authentik identity provider (SSO at hera.yourdomain.com)
+- PostgreSQL database (for Authentik)
+- Redis cache (for Authentik)
 
-Prerequisites:
-- Running Consul cluster
-- Running Vault server
-- Running Nomad cluster
+Additional components can be added later:
+- Nginx stream proxy (for TCP/UDP non-HTTP services) - coming soon
+- Coturn TURN/STUN server (for WebRTC services) - coming soon
 
-The deployment follows a phased approach:
-1. HashiCorp stack verification
-2. Vault secrets creation
-3. PostgreSQL deployment
-4. Redis deployment
-5. Authentik deployment
-6. Caddy deployment
-7. Integration configuration
+The deployment creates configuration files at /opt/hecate/:
+- docker-compose.yml - Container orchestration
+- Caddyfile - Caddy reverse proxy configuration
+- .env - Environment variables and secrets
 
-Optional services can be deployed alongside Hecate:
-- Wazuh SIEM for security monitoring
-- Grafana, Prometheus, and Loki for observability
-- Elasticsearch and Kibana for log analysis
-- Mattermost for team collaboration
-- Additional HashiCorp stack components
+Interactive wizard will collect:
+- Primary domain name (e.g., example.com)
 
 Examples:
-  eos create hecate                           # Core Hecate deployment
-  eos create hecate --wazuh                   # Deploy with Wazuh SIEM
-  eos create hecate --grafana                 # Deploy with Grafana, Prometheus, Loki
-  eos create hecate --elk                     # Deploy with Elasticsearch and Kibana
-  eos create hecate --all-monitoring          # Deploy all monitoring services
-  eos create hecate --wazuh --grafana         # Deploy with multiple services
-  eos create hecate --legacy                  # Use legacy Docker Compose method`,
+  eos create hecate                # Deploy Hecate with interactive wizard
+  eos create hecate --help         # Show this help message`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
-		log.Info("Starting Hecate deployment with ")
+		log.Info("Starting Hecate deployment")
 
-		// Check for legacy flag
-		useLegacy, _ := cmd.Flags().GetBool("legacy")
-
-		if useLegacy {
-			log.Info("Using legacy Docker Compose deployment method")
-			return hecate.OrchestrateHecateWizard(rc)
-		}
-
-		// Collect requested services
-		var requestedServices []string
-
-		// Check individual service flags
-		if wazuh, _ := cmd.Flags().GetBool("wazuh"); wazuh {
-			requestedServices = append(requestedServices, "wazuh")
-		}
-		if grafana, _ := cmd.Flags().GetBool("grafana"); grafana {
-			requestedServices = append(requestedServices, "grafana", "prometheus", "loki")
-		}
-		if elk, _ := cmd.Flags().GetBool("elk"); elk {
-			requestedServices = append(requestedServices, "elasticsearch", "kibana")
-		}
-		if prometheus, _ := cmd.Flags().GetBool("prometheus"); prometheus {
-			requestedServices = append(requestedServices, "prometheus")
-		}
-		if loki, _ := cmd.Flags().GetBool("loki"); loki {
-			requestedServices = append(requestedServices, "loki")
-		}
-		if mattermost, _ := cmd.Flags().GetBool("mattermost"); mattermost {
-			requestedServices = append(requestedServices, "mattermost")
-		}
-		if vault, _ := cmd.Flags().GetBool("vault"); vault {
-			requestedServices = append(requestedServices, "vault")
-		}
-		if consul, _ := cmd.Flags().GetBool("consul"); consul {
-			requestedServices = append(requestedServices, "consul")
-		}
-
-		// Check aggregate flags
-		if allMonitoring, _ := cmd.Flags().GetBool("all-monitoring"); allMonitoring {
-			requestedServices = append(requestedServices, "grafana", "prometheus", "loki", "elasticsearch", "kibana")
-		}
-
-		// Remove duplicates
-		serviceMap := make(map[string]bool)
-		for _, service := range requestedServices {
-			serviceMap[service] = true
-		}
-
-		// Convert back to slice
-		var services []string
-		for service := range serviceMap {
-			services = append(services, service)
-		}
-
-		// Log requested services
-		if len(services) > 0 {
-			log.Info("Deploying Hecate with additional services",
-				zap.Strings("services", services))
-		}
-
-		// Default to  deployment with services
-		log.Info("Using  deployment method")
-		return fmt.Errorf(" deployment has been migrated to HashiCorp stack. Please use 'eos create hecate' for Docker-based deployment, or contact your administrator for system-level deployment assistance")
+		// Default deployment method is Docker Compose
+		log.Info("Using Docker Compose deployment method")
+		return hecate.OrchestrateHecateWizard(rc)
 	}),
 }
 

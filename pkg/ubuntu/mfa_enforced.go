@@ -34,22 +34,7 @@ func DefaultEnforcedMFAConfig() EnforcedMFAConfig {
 	}
 }
 
-const enforcedPAMSudoConfig = `# PAM configuration for sudo with ENFORCED MFA
-# /etc/pam.d/sudo - No fallback to password-only authentication
-auth       required   pam_google_authenticator.so forward_pass
-auth       required   pam_unix.so use_first_pass
-account    include    system-account
-session    include    system-session
-`
 
-const enforcedPAMSuConfig = `# PAM configuration for su with ENFORCED MFA
-# /etc/pam.d/su - No fallback to password-only authentication  
-auth       sufficient pam_rootok.so
-auth       required   pam_google_authenticator.so forward_pass
-auth       required   pam_unix.so use_first_pass
-account    include    system-account
-session    include    system-session
-`
 
 const gracefulPAMSudoConfig = `# PAM configuration for sudo with GRACEFUL MFA (temporary)
 # /etc/pam.d/sudo - Allows password fallback during grace period

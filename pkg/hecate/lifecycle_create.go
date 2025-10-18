@@ -3,64 +3,106 @@
 package hecate
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// OrchestrateHecateWizard runs the Hecate setup phases in order.
-func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
-	log := otelzap.Ctx(rc.Ctx)
+// startHecateServices starts the Hecate Docker Compose stack
+func startHecateServices(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting Hecate services with docker compose")
 
-	log.Info(" Welcome to the Hecate setup wizard!")
-
-	// Phase 0: ensure /opt/hecate exists
-	if err := eos_unix.MkdirP(rc.Ctx, BaseDir, 0o755); err != nil {
-		log.Error("Failed to create base directory", zap.Error(err))
-		return fmt.Errorf("failed to create %s: %w", BaseDir, err)
+	// ASSESS - Check if docker compose is available
+	if _, err := exec.LookPath("docker"); err != nil {
+		return fmt.Errorf("docker not found in PATH. Please install Docker first")
 	}
 
-	// Collect configuration from user interactively
-	config, err := collectHecateConfiguration(rc)
+	// INTERVENE - Run docker compose up -d
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "up", "-d"},
+		Dir:     BaseDir,
+		Capture: true,
+	})
+
 	if err != nil {
-		log.Error("Failed to collect configuration", zap.Error(err))
-		return fmt.Errorf("configuration collection failed: %w", err)
+		return fmt.Errorf("failed to start services: %s\nError: %w", output, err)
 	}
 
-	// Phase 1: Docker Compose (no context arg)
-	log.Info(" Running Phase Docker Compose…")
-	if err := PhaseDockerCompose(rc, "hecate-compose-orchestrator", HecateDockerCompose); err != nil {
-		log.Error("Phase Docker Compose failed", zap.Error(err))
-		return fmt.Errorf("phase docker compose failed: %w", err)
-	}
+	// EVALUATE - Verify services started
+	logger.Info("Services started successfully")
+	logger.Debug("Docker compose output", zap.String("output", output))
 
-	// Phase 2: Caddy (this one does take context+spec)
-	spec := CaddySpec{
-		AuthentikDomain: config.AuthentikDomain,
-		Proxies:        config.Proxies,
-	}
-	log.Info(" Running Phase Caddy setup…")
-	if err := PhaseCaddy(rc, spec); err != nil {
-		log.Error("Phase Caddy failed", zap.Error(err))
-		return fmt.Errorf("phase caddy failed: %w", err)
-	}
+	logger.Info("")
+	logger.Info("Hecate deployment completed!")
+	logger.Info("Next steps:")
+	logger.Info("  1. Configure DNS to point hera.yourdomain.com to this server")
+	logger.Info("  2. Access Authentik at https://hera.yourdomain.com")
+	logger.Info("  3. Complete Authentik initial setup")
+	logger.Info("")
 
-	// Phase 3: Nginx (only backendIP)
-	log.Info(" Running Phase Nginx setup…")
-	if err := PhaseNginx(config.BackendIP, rc); err != nil {
-		log.Error("Phase Nginx failed", zap.Error(err))
-		return fmt.Errorf("phase nginx failed: %w", err)
-	}
-
-	log.Info(" Hecate setup wizard completed successfully!")
 	return nil
+}
+
+// OrchestrateHecateWizard runs the Hecate setup wizard
+func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting Hecate deployment wizard")
+
+	// ASSESS - Prompt for required configuration
+	logger.Info("terminal prompt: Enter your domain (e.g., example.com):")
+	domain, err := eos_io.ReadInput(rc)
+	if err != nil {
+		return fmt.Errorf("failed to read domain input: %w", err)
+	}
+
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		return fmt.Errorf("domain is required")
+	}
+
+	logger.Info("Using domain", zap.String("domain", domain))
+
+	// INTERVENE - Generate all configuration files
+	if err := GenerateCompleteHecateStack(rc, domain); err != nil {
+		return fmt.Errorf("failed to generate Hecate stack: %w", err)
+	}
+
+	// Show summary
+	logger.Info("")
+	logger.Info("Successfully generated Hecate configuration files:")
+	logger.Info("  - /opt/hecate/docker-compose.yml")
+	logger.Info("  - /opt/hecate/.env")
+	logger.Info("  - /opt/hecate/Caddyfile")
+	logger.Info("")
+	logger.Info("Authentik will be accessible at: hera." + domain)
+	logger.Info("")
+
+	// Ask if user wants to start services
+	logger.Info("terminal prompt: Start services now? [Y/n]:")
+	response, err := eos_io.ReadInput(rc)
+	if err != nil {
+		return fmt.Errorf("failed to read input: %w", err)
+	}
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response == "n" || response == "no" {
+		logger.Info("Skipped starting services")
+		logger.Info("To start manually, run: cd /opt/hecate && docker compose up -d")
+		return nil
+	}
+
+	// EVALUATE - Start services with docker compose
+	logger.Info("Starting Hecate services...")
+	return startHecateServices(rc)
 }
 
 // ShouldExitNoServicesSelected checks if no services were selected and logs a friendly exit message.
@@ -130,58 +172,5 @@ type HecateConfiguration struct {
 	Proxies         []CaddyAppProxy
 	EnabledServices map[string]bool
 	// Deprecated: Use AuthentikDomain instead
-	KeycloakDomain  string
-}
-
-// collectHecateConfiguration interactively collects configuration from the user
-func collectHecateConfiguration(rc *eos_io.RuntimeContext) (*HecateConfiguration, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-	reader := bufio.NewReader(os.Stdin)
-
-	config := &HecateConfiguration{
-		EnabledServices: make(map[string]bool),
-		Proxies:         []CaddyAppProxy{},
-	}
-
-	logger.Info(" Welcome to Hecate Setup Wizard")
-	logger.Info("This wizard will help you set up a reverse proxy for your applications")
-	logger.Info("")
-
-	// Collect domain name
-	logger.Info(" Enter your primary domain name (e.g., example.com):")
-	domain, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("failed to read domain: %w", err)
-	}
-	config.DomainName = strings.TrimSpace(domain)
-
-	if config.DomainName == "" {
-		config.DomainName = "localhost"
-		logger.Info(" Using default domain: localhost")
-	}
-
-	// Collect backend IP
-	logger.Info(" Enter your backend server IP (default: 127.0.0.1):")
-	backendIP, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("failed to read backend IP: %w", err)
-	}
-	config.BackendIP = strings.TrimSpace(backendIP)
-
-	if config.BackendIP == "" {
-		config.BackendIP = "127.0.0.1"
-		logger.Info(" Using default backend IP: 127.0.0.1")
-	}
-
-	// For now, we'll set up a basic vanilla reverse proxy
-	// Future versions can add more service selection
-	config.AuthentikDomain = "" // No Authentik for vanilla setup
-	config.KeycloakDomain = ""  // Deprecated, for backward compatibility
-
-	logger.Info(" Configuration collected successfully",
-		zap.String("domain", config.DomainName),
-		zap.String("backend_ip", config.BackendIP),
-	)
-
-	return config, nil
+	KeycloakDomain string
 }
