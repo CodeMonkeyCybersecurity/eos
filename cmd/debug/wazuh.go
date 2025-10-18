@@ -433,6 +433,7 @@ func checkProcessResources(rc *eos_io.RuntimeContext, info *ComponentInfo) Diagn
 func diagnoseAgent(rc *eos_io.RuntimeContext, info *ComponentInfo) []DiagnosticResult {
 	var results []DiagnosticResult
 
+	// Check agent registration
 	clientKeysPath := "/var/ossec/etc/client.keys"
 	if data, err := os.ReadFile(clientKeysPath); err == nil {
 		if len(data) == 0 {
@@ -456,6 +457,533 @@ func diagnoseAgent(rc *eos_io.RuntimeContext, info *ComponentInfo) []DiagnosticR
 			})
 		}
 	}
+
+	// Comprehensive connectivity diagnostics
+	results = append(results, diagnoseAgentConnectivity(rc)...)
+
+	return results
+}
+
+// diagnoseAgentConnectivity performs comprehensive agent connectivity diagnostics
+func diagnoseAgentConnectivity(rc *eos_io.RuntimeContext) []DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	var results []DiagnosticResult
+
+	// Extract server configuration from ossec.conf
+	serverAddr, serverPort := extractAgentServerConfig(rc)
+	if serverAddr == "" {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "Server Configuration",
+			Category:  "Connectivity",
+			Passed:    false,
+			Error:     fmt.Errorf("could not extract server address from configuration"),
+		})
+		return results
+	}
+
+	// 1. DNS Resolution Check
+	results = append(results, checkDNSResolution(rc, serverAddr)...)
+
+	// 2. Network Interface Check
+	results = append(results, checkNetworkInterfaces(rc)...)
+
+	// 3. IPv4 Connectivity Test
+	ipv4Addrs := resolveIPv4(rc, serverAddr)
+	if len(ipv4Addrs) > 0 {
+		results = append(results, checkIPv4Connectivity(rc, ipv4Addrs[0], serverPort)...)
+	}
+
+	// 4. IPv6 Connectivity Test
+	ipv6Addrs := resolveIPv6(rc, serverAddr)
+	if len(ipv6Addrs) > 0 {
+		results = append(results, checkIPv6Connectivity(rc, ipv6Addrs[0], serverPort)...)
+	}
+
+	// 5. Firewall Check
+	results = append(results, checkAgentFirewallRules(rc)...)
+
+	// 6. Self-Connection Detection (is this host the manager?)
+	if len(ipv4Addrs) > 0 {
+		results = append(results, checkSelfConnection(rc, serverAddr, ipv4Addrs[0])...)
+	}
+
+	// 7. Recent Agent Errors
+	results = append(results, checkAgentErrors(rc)...)
+
+	logger.Debug("Agent connectivity diagnostics completed",
+		zap.String("server", serverAddr),
+		zap.String("port", serverPort),
+		zap.Int("checks_performed", len(results)))
+
+	return results
+}
+
+// extractAgentServerConfig extracts server address and port from ossec.conf
+func extractAgentServerConfig(rc *eos_io.RuntimeContext) (string, string) {
+	configPath := "/var/ossec/etc/ossec.conf"
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return "", ""
+	}
+
+	content := string(data)
+
+	// Extract address
+	addressStart := strings.Index(content, "<address>")
+	addressEnd := strings.Index(content, "</address>")
+	serverAddr := ""
+	if addressStart != -1 && addressEnd != -1 && addressEnd > addressStart {
+		serverAddr = strings.TrimSpace(content[addressStart+9 : addressEnd])
+	}
+
+	// Extract port
+	portStart := strings.Index(content, "<port>")
+	portEnd := strings.Index(content, "</port>")
+	serverPort := "1514" // default
+	if portStart != -1 && portEnd != -1 && portEnd > portStart {
+		serverPort = strings.TrimSpace(content[portStart+6 : portEnd])
+	}
+
+	return serverAddr, serverPort
+}
+
+// checkDNSResolution checks DNS resolution for the server
+func checkDNSResolution(rc *eos_io.RuntimeContext, serverAddr string) []DiagnosticResult {
+	var results []DiagnosticResult
+
+	// Check IPv4 resolution
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	cmd := exec.CommandContext(ctx, "dig", "+short", "A", serverAddr)
+	output, err := cmd.Output()
+	cancel()
+
+	ipv4Addrs := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if err == nil && len(ipv4Addrs) > 0 && ipv4Addrs[0] != "" {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "DNS IPv4 Resolution",
+			Category:  "Connectivity",
+			Passed:    true,
+			Details:   fmt.Sprintf("Resolved to: %s", strings.Join(ipv4Addrs, ", ")),
+		})
+	} else {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "DNS IPv4 Resolution",
+			Category:  "Connectivity",
+			Passed:    false,
+			Error:     fmt.Errorf("no IPv4 addresses resolved"),
+			Remediation: []string{
+				fmt.Sprintf("Verify DNS: dig +short A %s", serverAddr),
+				"Check /etc/resolv.conf for correct nameservers",
+			},
+		})
+	}
+
+	// Check IPv6 resolution
+	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 5*time.Second)
+	cmd2 := exec.CommandContext(ctx2, "dig", "+short", "AAAA", serverAddr)
+	output2, err2 := cmd2.Output()
+	cancel2()
+
+	ipv6Addrs := strings.Split(strings.TrimSpace(string(output2)), "\n")
+	if err2 == nil && len(ipv6Addrs) > 0 && ipv6Addrs[0] != "" {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "DNS IPv6 Resolution",
+			Category:  "Connectivity",
+			Passed:    true,
+			Details:   fmt.Sprintf("Resolved to: %s", strings.Join(ipv6Addrs, ", ")),
+		})
+	}
+
+	return results
+}
+
+// resolveIPv4 returns IPv4 addresses for the given hostname
+func resolveIPv4(rc *eos_io.RuntimeContext, serverAddr string) []string {
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "dig", "+short", "A", serverAddr)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	addrs := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var validAddrs []string
+	for _, addr := range addrs {
+		if addr != "" {
+			validAddrs = append(validAddrs, addr)
+		}
+	}
+	return validAddrs
+}
+
+// resolveIPv6 returns IPv6 addresses for the given hostname
+func resolveIPv6(rc *eos_io.RuntimeContext, serverAddr string) []string {
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "dig", "+short", "AAAA", serverAddr)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+
+	addrs := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var validAddrs []string
+	for _, addr := range addrs {
+		if addr != "" {
+			validAddrs = append(validAddrs, addr)
+		}
+	}
+	return validAddrs
+}
+
+// checkIPv4Connectivity tests IPv4 connectivity to the server
+func checkIPv4Connectivity(rc *eos_io.RuntimeContext, ipv4Addr, port string) []DiagnosticResult {
+	var results []DiagnosticResult
+
+	// Ping test
+	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
+	cmd := exec.CommandContext(ctx, "ping", "-c", "3", "-W", "2", ipv4Addr)
+	err := cmd.Run()
+	cancel()
+
+	if err == nil {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "IPv4 Ping Test",
+			Category:  "Connectivity",
+			Passed:    true,
+			Details:   fmt.Sprintf("Successfully pinged %s", ipv4Addr),
+		})
+	} else {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "IPv4 Ping Test",
+			Category:  "Connectivity",
+			Passed:    false,
+			Warning:   true,
+			Error:     fmt.Errorf("ping failed to %s", ipv4Addr),
+			Remediation: []string{
+				"Check network connectivity",
+				"Verify firewall allows ICMP",
+			},
+		})
+	}
+
+	// TCP port connectivity test
+	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	cmd2 := exec.CommandContext(ctx2, "nc", "-zv", "-w", "5", ipv4Addr, port)
+	output2, err2 := cmd2.CombinedOutput()
+	cancel2()
+
+	if err2 == nil || strings.Contains(string(output2), "succeeded") {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: fmt.Sprintf("IPv4 Port %s Connectivity", port),
+			Category:  "Connectivity",
+			Passed:    true,
+			Details:   fmt.Sprintf("Port %s is reachable on %s", port, ipv4Addr),
+		})
+	} else {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: fmt.Sprintf("IPv4 Port %s Connectivity", port),
+			Category:  "Connectivity",
+			Passed:    false,
+			Error:     fmt.Errorf("cannot connect to port %s on %s", port, ipv4Addr),
+			Details:   string(output2),
+			Remediation: []string{
+				fmt.Sprintf("Verify Wazuh manager is listening on port %s", port),
+				"Check firewall rules: sudo ufw status",
+				fmt.Sprintf("Test manually: nc -zv %s %s", ipv4Addr, port),
+			},
+		})
+	}
+
+	return results
+}
+
+// checkIPv6Connectivity tests IPv6 connectivity to the server
+func checkIPv6Connectivity(rc *eos_io.RuntimeContext, ipv6Addr, port string) []DiagnosticResult {
+	var results []DiagnosticResult
+
+	// Ping test
+	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
+	cmd := exec.CommandContext(ctx, "ping6", "-c", "3", "-W", "2", ipv6Addr)
+	err := cmd.Run()
+	cancel()
+
+	if err == nil {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "IPv6 Ping Test",
+			Category:  "Connectivity",
+			Passed:    true,
+			Details:   fmt.Sprintf("Successfully pinged %s", ipv6Addr),
+		})
+	} else {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "IPv6 Ping Test",
+			Category:  "Connectivity",
+			Passed:    false,
+			Warning:   true,
+			Details:   fmt.Sprintf("IPv6 ping failed (may not be configured): %s", ipv6Addr),
+		})
+	}
+
+	// TCP port connectivity test
+	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	cmd2 := exec.CommandContext(ctx2, "nc", "-6", "-zv", "-w", "5", ipv6Addr, port)
+	output2, err2 := cmd2.CombinedOutput()
+	cancel2()
+
+	if err2 == nil || strings.Contains(string(output2), "succeeded") {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: fmt.Sprintf("IPv6 Port %s Connectivity", port),
+			Category:  "Connectivity",
+			Passed:    true,
+			Details:   fmt.Sprintf("Port %s is reachable on %s", port, ipv6Addr),
+		})
+	}
+
+	return results
+}
+
+// checkNetworkInterfaces checks available network interfaces
+func checkNetworkInterfaces(rc *eos_io.RuntimeContext) []DiagnosticResult {
+	var results []DiagnosticResult
+
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	cmd := exec.CommandContext(ctx, "ip", "-brief", "addr", "show")
+	output, err := cmd.Output()
+	cancel()
+
+	if err == nil {
+		details := "Network interfaces:\n" + string(output)
+
+		// Check for default route
+		ctx2, cancel2 := context.WithTimeout(rc.Ctx, 5*time.Second)
+		routeCmd := exec.CommandContext(ctx2, "ip", "route", "show")
+		routeOutput, routeErr := routeCmd.Output()
+		cancel2()
+
+		hasDefaultRoute := false
+		if routeErr == nil {
+			hasDefaultRoute = strings.Contains(string(routeOutput), "default")
+			details += "\n\nDefault route: "
+			if hasDefaultRoute {
+				details += "configured"
+			} else {
+				details += "NOT configured"
+			}
+		}
+
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "Network Interfaces",
+			Category:  "Connectivity",
+			Passed:    hasDefaultRoute,
+			Warning:   !hasDefaultRoute,
+			Details:   details,
+			Remediation: func() []string {
+				if !hasDefaultRoute {
+					return []string{"No default route configured - check network settings"}
+				}
+				return nil
+			}(),
+		})
+	}
+
+	return results
+}
+
+// checkAgentFirewallRules checks firewall configuration for agent connectivity
+func checkAgentFirewallRules(rc *eos_io.RuntimeContext) []DiagnosticResult {
+	var results []DiagnosticResult
+
+	// Check UFW
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	cmd := exec.CommandContext(ctx, "ufw", "status", "verbose")
+	output, err := cmd.Output()
+	cancel()
+
+	if err == nil {
+		isActive := strings.Contains(string(output), "Status: active")
+		details := "UFW Status:\n" + string(output)
+
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "Firewall Status (UFW)",
+			Category:  "Connectivity",
+			Passed:    true,
+			Warning:   isActive, // Active firewall might block connections
+			Details:   details,
+			Remediation: func() []string {
+				if isActive {
+					return []string{
+						"UFW is active - ensure outbound connections to Wazuh manager are allowed",
+						"Allow outbound: sudo ufw allow out to <manager-ip> port 1514 proto tcp",
+					}
+				}
+				return nil
+			}(),
+		})
+	}
+
+	return results
+}
+
+// checkSelfConnection detects if this host is trying to connect to itself
+func checkSelfConnection(rc *eos_io.RuntimeContext, serverAddr, serverIP string) []DiagnosticResult {
+	var results []DiagnosticResult
+
+	// Get current hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		return results
+	}
+
+	// Get current host IPs
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	cmd := exec.CommandContext(ctx, "hostname", "-I")
+	output, err := cmd.Output()
+	cancel()
+
+	if err != nil {
+		return results
+	}
+
+	currentIPs := strings.Fields(string(output))
+	isSelf := false
+
+	for _, ip := range currentIPs {
+		if ip == serverIP {
+			isSelf = true
+			break
+		}
+	}
+
+	if isSelf {
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "Self-Connection Detection",
+			Category:  "Configuration",
+			Passed:    false,
+			Error:     fmt.Errorf("agent is configured to connect to itself"),
+			Details: fmt.Sprintf(
+				"WARNING: This host (%s) appears to BE %s!\n"+
+					"Current IPs: %s\n"+
+					"Server resolves to: %s\n"+
+					"Agents should not be installed on the manager server.",
+				hostname, serverAddr, strings.Join(currentIPs, ", "), serverIP),
+			Remediation: []string{
+				"Remove Wazuh agent from the manager server",
+				"Install agent on a different host",
+				"Or configure a separate manager if this should be an agent",
+			},
+		})
+	}
+
+	return results
+}
+
+// checkAgentErrors analyzes recent agent errors
+func checkAgentErrors(rc *eos_io.RuntimeContext) []DiagnosticResult {
+	var results []DiagnosticResult
+
+	logPath := "/var/ossec/logs/ossec.log"
+	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
+	cmd := exec.CommandContext(ctx, "grep", "ERROR", logPath)
+	output, err := cmd.Output()
+	cancel()
+
+	if err != nil && len(output) == 0 {
+		// No errors found - this is good
+		results = append(results, DiagnosticResult{
+			Component: ComponentAgent,
+			CheckName: "Recent Agent Errors",
+			Category:  "Logs",
+			Passed:    true,
+			Details:   "No recent ERROR entries in agent log",
+		})
+		return results
+	}
+
+	// Parse and categorize errors
+	errorLines := strings.Split(string(output), "\n")
+	var connectErrors, authErrors, configErrors, otherErrors []string
+
+	for _, line := range errorLines {
+		if line == "" {
+			continue
+		}
+		lineLower := strings.ToLower(line)
+
+		if strings.Contains(lineLower, "connect") || strings.Contains(lineLower, "connection") {
+			connectErrors = append(connectErrors, line)
+		} else if strings.Contains(lineLower, "auth") || strings.Contains(lineLower, "key") {
+			authErrors = append(authErrors, line)
+		} else if strings.Contains(lineLower, "config") {
+			configErrors = append(configErrors, line)
+		} else {
+			otherErrors = append(otherErrors, line)
+		}
+	}
+
+	details := fmt.Sprintf("Found %d error entries:\n", len(errorLines)-1)
+	if len(connectErrors) > 0 {
+		details += fmt.Sprintf("  • Connection errors: %d\n", len(connectErrors))
+	}
+	if len(authErrors) > 0 {
+		details += fmt.Sprintf("  • Authentication errors: %d\n", len(authErrors))
+	}
+	if len(configErrors) > 0 {
+		details += fmt.Sprintf("  • Configuration errors: %d\n", len(configErrors))
+	}
+	if len(otherErrors) > 0 {
+		details += fmt.Sprintf("  • Other errors: %d\n", len(otherErrors))
+	}
+
+	// Show last 3 errors
+	details += "\nMost recent errors:\n"
+	recentErrors := errorLines
+	if len(recentErrors) > 10 {
+		recentErrors = recentErrors[len(recentErrors)-10:]
+	}
+	for i, line := range recentErrors {
+		if line != "" && i < 3 {
+			details += "  " + line + "\n"
+		}
+	}
+
+	remediation := []string{}
+	if len(connectErrors) > 0 {
+		remediation = append(remediation, "Connection errors detected - check network connectivity to manager")
+	}
+	if len(authErrors) > 0 {
+		remediation = append(remediation, "Authentication errors detected - verify agent registration")
+	}
+	if len(configErrors) > 0 {
+		remediation = append(remediation, "Configuration errors detected - check /var/ossec/etc/ossec.conf")
+	}
+	remediation = append(remediation, "View full log: sudo tail -50 /var/ossec/logs/ossec.log")
+
+	results = append(results, DiagnosticResult{
+		Component: ComponentAgent,
+		CheckName: "Recent Agent Errors",
+		Category:  "Logs",
+		Passed:    false,
+		Details:   details,
+		Remediation: remediation,
+	})
 
 	return results
 }
