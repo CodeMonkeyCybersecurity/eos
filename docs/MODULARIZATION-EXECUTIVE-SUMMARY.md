@@ -133,7 +133,7 @@ pkg/consul/
 -  pkg/consul/install.go (1,713 lines → 13 modules)
 
 ### Next Priority (14 P1 Files Remaining)
-1. **cmd/debug/metis.go** (1,659 lines) - Diagnostics
+1. **cmd/debug/iris.go** (1,659 lines) - Diagnostics
 2. **cmd/debug/delphi.go** (1,630 lines) - Wazuh diagnostics
 3. **pkg/authentik/import.go** (1,266 lines) - Authentik import
 4. **pkg/vault/install.go** (1,253 lines) - Vault installation
@@ -151,7 +151,7 @@ pkg/consul/
 ## Recommendations
 
 ### Immediate Actions
-1.  **Proceed to next P1 file** (cmd/debug/metis.go)
+1.  **Proceed to next P1 file** (cmd/debug/iris.go)
 2.  **Apply established patterns** systematically
 3.  **Document lessons learned** after each file
 4.  **Maintain quality standards** throughout
@@ -235,7 +235,7 @@ With proven patterns and a systematic approach, we're ready to apply this method
 ## Next Steps
 
 ### Immediate (Next Session)
-1. **Start:** cmd/debug/metis.go (1,659 lines)
+1. **Start:** cmd/debug/iris.go (1,659 lines)
 2. **Apply:** Established patterns
 3. **Verify:** Compilation and testing
 4. **Document:** Progress and lessons
@@ -257,7 +257,7 @@ With proven patterns and a systematic approach, we're ready to apply this method
 **Status:**  **FIRST P1 FILE COMPLETE**  
 **Momentum:** Strong - patterns established, ready to scale  
 **Confidence:** High - proven methodology, measurable results  
-**Next:** cmd/debug/metis.go (1,659 lines)  
+**Next:** cmd/debug/iris.go (1,659 lines)  
 
 ---
 

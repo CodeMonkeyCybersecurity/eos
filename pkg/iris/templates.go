@@ -1,9 +1,9 @@
-// pkg/metis/templates.go
+// pkg/iris/templates.go
 //
-// Embedded source code templates for Metis components
-// These are written out during 'eos create metis'
+// Embedded source code templates for Iris components
+// These are written out during 'eos create iris'
 
-package metis
+package iris
 
 // GetWorkerSource returns the complete worker/main.go source code
 func GetWorkerSource() string {
@@ -431,7 +431,7 @@ func main() {
 
 // GetReadmeContent returns the README.md content
 func GetReadmeContent() string {
-	return `# Metis/Delphi - Security Alert Processing
+	return `# Iris/Delphi - Security Alert Processing
 
 Automated processing of Wazuh security alerts using Azure OpenAI and Temporal workflows.
 
@@ -481,10 +481,10 @@ go run webhook/main.go
 **Production (systemd):**
 
 ` + "```bash" + `
-sudo cp metis-*.service /etc/systemd/system/
+sudo cp iris-*.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable metis-worker metis-webhook
-sudo systemctl start metis-worker metis-webhook
+sudo systemctl enable iris-worker iris-webhook
+sudo systemctl start iris-worker iris-webhook
 ` + "```" + `
 
 ### 4. Test
@@ -493,22 +493,22 @@ sudo systemctl start metis-worker metis-webhook
 ./scripts/test-alert.sh
 
 # Or
-eos debug metis --test
+eos debug iris --test
 ` + "```" + `
 
 ## Monitoring
 
 - **Temporal UI:** http://localhost:8233
-- **Worker logs:** ` + "`journalctl -u metis-worker -f`" + `
-- **Webhook logs:** ` + "`journalctl -u metis-webhook -f`" + `
-- **Debug tool:** ` + "`eos debug metis`" + `
+- **Worker logs:** ` + "`journalctl -u iris-worker -f`" + `
+- **Webhook logs:** ` + "`journalctl -u iris-webhook -f`" + `
+- **Debug tool:** ` + "`eos debug iris`" + `
 
 ## Troubleshooting
 
 ### Quick Diagnostic
 
 ` + "```bash" + `
-eos debug metis
+eos debug iris
 ` + "```" + `
 
 This checks:
@@ -531,7 +531,7 @@ temporal server start-dev
 
 **Worker not processing:**
 ` + "```bash" + `
-sudo systemctl restart metis-worker
+sudo systemctl restart iris-worker
 # Or
 go run worker/main.go
 ` + "```" + `
@@ -539,7 +539,7 @@ go run worker/main.go
 **Configuration issues:**
 ` + "```bash" + `
 nano config.yaml
-eos debug metis --verbose
+eos debug iris --verbose
 ` + "```" + `
 
 **Dependencies issues:**
@@ -598,8 +598,8 @@ ABN: 77 177 673 061
 Motto: "Cybersecurity. With humans."
 
 For issues:
-- Run: ` + "`eos debug metis --verbose`" + `
+- Run: ` + "`eos debug iris --verbose`" + `
 - Check: http://localhost:8233
-- Logs: ` + "`journalctl -u metis-worker -f`" + `
+- Logs: ` + "`journalctl -u iris-worker -f`" + `
 `
 }

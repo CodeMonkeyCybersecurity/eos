@@ -16,14 +16,14 @@ Successfully modularized first P1 file into 13 focused modules:
 
 ---
 
-## Next P1 File: cmd/debug/metis.go
+## Next P1 File: cmd/debug/iris.go
 
-**File:** cmd/debug/metis.go  
+**File:** cmd/debug/iris.go  
 **Size:** 1,659 lines  
 **Priority:** P1 (>1000 lines, critical diagnostics)  
 
 ### Identified Responsibilities (Preliminary)
-1. Metis service diagnostics
+1. Iris service diagnostics
 2. Infrastructure checks (Temporal, PostgreSQL, Redis)
 3. Configuration validation
 4. Service health monitoring
@@ -35,7 +35,7 @@ Successfully modularized first P1 file into 13 focused modules:
 
 ### Proposed Module Structure
 ```
-cmd/debug/metis/
+cmd/debug/iris/
 ├── main.go (orchestrator, <150 lines)
 ├── checks/
 │   ├── infrastructure.go  # Temporal, DB, Redis checks
@@ -65,14 +65,14 @@ cmd/debug/metis/
 
 ### High Priority (Next 5)
 1.  **pkg/consul/install.go** (1,713 lines) - COMPLETE
-2. ⏳ **cmd/debug/metis.go** (1,659 lines) - NEXT
+2. ⏳ **cmd/debug/iris.go** (1,659 lines) - NEXT
 3. **cmd/debug/delphi.go** (1,630 lines) - Delphi/Wazuh diagnostics
 4. **pkg/authentik/import.go** (1,266 lines) - Authentik configuration import
 5. **pkg/vault/install.go** (1,253 lines) - Vault installation
 6. **pkg/system/orchestration.go** (1,166 lines) - System orchestration
 
 ### Medium Priority (Next 5)
-7. **cmd/create/metis.go** (1,154 lines) - Metis service creation
+7. **cmd/create/iris.go** (1,154 lines) - Iris service creation
 8. **pkg/database_management/backup.go** (1,123 lines) - Database backup
 9. **pkg/storage/types.go** (1,086 lines) - Storage type definitions
 10. **pkg/kvm/inventory.go** (1,080 lines) - KVM inventory management
@@ -276,7 +276,7 @@ wc -l pkg/consul/**/*.go
 - [x] Success metrics clear
 
 ### Next Actions
-1. **Analyze** cmd/debug/metis.go
+1. **Analyze** cmd/debug/iris.go
 2. **Design** module structure
 3. **Extract** systematically
 4. **Verify** compilation
@@ -285,7 +285,7 @@ wc -l pkg/consul/**/*.go
 ---
 
 **Status:** Ready for next P1 file  
-**Target:** cmd/debug/metis.go (1,659 lines)  
+**Target:** cmd/debug/iris.go (1,659 lines)  
 **Estimated Completion:** 3 hours  
 **Start When:** User confirms readiness  
 

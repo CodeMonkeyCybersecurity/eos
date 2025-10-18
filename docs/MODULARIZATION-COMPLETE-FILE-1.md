@@ -358,7 +358,7 @@ go build ./pkg/consul/helpers/...      #  SUCCESS
 4.  Update documentation
 
 ### Short Term (This Week)
-1. Move to next P1 file: **cmd/debug/metis.go** (1,659 lines)
+1. Move to next P1 file: **cmd/debug/iris.go** (1,659 lines)
 2. Apply same modularization patterns
 3. Document lessons learned
 4. Create reusable templates
@@ -425,7 +425,7 @@ With proven patterns and best practices established, we're ready to apply this a
 ---
 
 **Status:**  **COMPLETE**  
-**Next File:** cmd/debug/metis.go (1,659 lines)  
+**Next File:** cmd/debug/iris.go (1,659 lines)  
 **Estimated Completion:** 2025-10-24 (all 15 P1 files)  
 
 ---

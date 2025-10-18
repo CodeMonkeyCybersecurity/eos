@@ -491,18 +491,7 @@ func verifyRoute(_ *eos_io.RuntimeContext, _ *Route) error {
 	return nil
 }
 
-func configureCaddy(_ *eos_io.RuntimeContext, _ *HecateConfig, _ *RouteInfo) error {
-	// TODO: Implement state backend saving
-	return nil
-}
-
 func deleteRouteState(_ *eos_io.RuntimeContext, _ *HecateConfig, _ string) error {
 	// TODO: Implement state backend deletion
-	return nil
-}
-
-func getFromStateStore(_ *eos_io.RuntimeContext, _, _ string, _ interface{}) error {
-	// TODO: Implement state store retrieval
-	// This would retrieve the value from the configured state backend
 	return nil
 }

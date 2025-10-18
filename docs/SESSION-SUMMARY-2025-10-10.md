@@ -168,7 +168,7 @@ docs/archive/migration/
 - **Orchestrator:** 236 lines (86% reduction)
 - **Compilation:** 100% success
 
-**File 2:** cmd/debug/metis.go - Analysis Complete
+**File 2:** cmd/debug/iris.go - Analysis Complete
 - **Size:** 1,660 lines
 - **Plan:** 11 modules identified
 - **Status:** Ready for extraction
@@ -224,7 +224,7 @@ docs/archive/migration/
 ## Next Steps
 
 ### Option 1: Continue Modularization
-**Target:** cmd/debug/metis.go (1,660 lines)
+**Target:** cmd/debug/iris.go (1,660 lines)
 - Analysis complete
 - 11 modules planned
 - Estimated time: 3 hours
@@ -251,7 +251,7 @@ docs/archive/migration/
 3.  **Index updated** - Clear navigation
 
 ### Short Term
-1. **Continue modularization** - cmd/debug/metis.go ready
+1. **Continue modularization** - cmd/debug/iris.go ready
 2. **Review subdirectories** - Check components/, security/ for consolidation
 3. **Maintain inline docs** - Keep updating as code changes
 
@@ -305,6 +305,6 @@ The documentation consolidation analysis revealed that **previous sessions had a
 ---
 
 **Status:**  DOCUMENTATION CONSOLIDATION COMPLETE  
-**Next Session:** Continue with cmd/debug/metis.go modularization or other priorities  
+**Next Session:** Continue with cmd/debug/iris.go modularization or other priorities  
 **Quality:** Excellent - adversarial review confirms correct architecture  
 **Momentum:** Strong - ready for next phase of work

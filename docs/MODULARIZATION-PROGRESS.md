@@ -232,7 +232,7 @@ pkg/consul/
 
 ### Short Term (This Week)
 1. Complete pkg/consul/install.go modularization
-2. Start next P1 file: cmd/debug/metis.go (1,659 lines)
+2. Start next P1 file: cmd/debug/iris.go (1,659 lines)
 3. Document patterns and best practices
 4. Create reusable templates for future modularization
 

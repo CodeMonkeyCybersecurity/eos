@@ -1,7 +1,7 @@
-// cmd/debug/metis/types.go
-// Shared types for Metis diagnostics
+// cmd/debug/iris/types.go
+// Shared types for Iris diagnostics
 
-package metis
+package iris
 
 // CheckResult represents the result of a diagnostic check
 type CheckResult struct {
@@ -13,8 +13,8 @@ type CheckResult struct {
 	Details     string
 }
 
-// MetisConfig represents the Metis configuration file structure
-type MetisConfig struct {
+// IrisConfig represents the Iris configuration file structure
+type IrisConfig struct {
 	Temporal struct {
 		HostPort  string `yaml:"host_port"`
 		Namespace string `yaml:"namespace"`

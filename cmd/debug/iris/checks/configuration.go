@@ -6,17 +6,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug/metis"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug/iris"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
-// CheckConfigurationWithResult validates the Metis configuration file.
-func CheckConfigurationWithResult(rc *eos_io.RuntimeContext, projectDir string, verbose bool) (*metis.MetisConfig, metis.CheckResult) {
+// CheckConfigurationWithResult validates the Iris configuration file.
+func CheckConfigurationWithResult(rc *eos_io.RuntimeContext, projectDir string, verbose bool) (*iris.IrisConfig, iris.CheckResult) {
 	config, err := checkConfiguration(rc, projectDir, verbose)
-	result := metis.CheckResult{
+	result := iris.CheckResult{
 		Name:     "Configuration File",
 		Category: "Configuration",
 		Passed:   err == nil,
@@ -41,7 +41,7 @@ func CheckConfigurationWithResult(rc *eos_io.RuntimeContext, projectDir string, 
 	return config, result
 }
 
-func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string, verbose bool) (*metis.MetisConfig, error) {
+func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string, verbose bool) (*iris.IrisConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	configPath := filepath.Join(projectDir, "config.yaml")
@@ -50,7 +50,7 @@ func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string, verbose bo
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var config metis.MetisConfig
+	var config iris.IrisConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -77,9 +77,9 @@ func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string, verbose bo
 }
 
 // CheckAzureOpenAIWithResult validates Azure OpenAI configuration.
-func CheckAzureOpenAIWithResult(rc *eos_io.RuntimeContext, config *metis.MetisConfig) metis.CheckResult {
+func CheckAzureOpenAIWithResult(rc *eos_io.RuntimeContext, config *iris.IrisConfig) iris.CheckResult {
 	err := checkAzureOpenAI(rc, config)
-	result := metis.CheckResult{
+	result := iris.CheckResult{
 		Name:     "Azure OpenAI Configuration",
 		Category: "Configuration",
 		Passed:   err == nil,
@@ -103,7 +103,7 @@ func CheckAzureOpenAIWithResult(rc *eos_io.RuntimeContext, config *metis.MetisCo
 	return result
 }
 
-func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *metis.MetisConfig) error {
+func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *iris.IrisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
 	}
@@ -123,9 +123,9 @@ func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *metis.MetisConfig) erro
 }
 
 // CheckSMTPConfigWithResult validates SMTP configuration.
-func CheckSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *metis.MetisConfig) metis.CheckResult {
+func CheckSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *iris.IrisConfig) iris.CheckResult {
 	err := checkSMTPConfig(rc, config)
-	result := metis.CheckResult{
+	result := iris.CheckResult{
 		Name:     "SMTP Configuration",
 		Category: "Configuration",
 		Passed:   err == nil,
@@ -139,7 +139,7 @@ func CheckSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *metis.MetisCon
 			"  smtp_port: 587 (or 465 for SSL)",
 			"  username: your-email@example.com",
 			"  password: <app-password>",
-			"  from: metis@example.com",
+			"  from: iris@example.com",
 			"  to: security-team@example.com",
 			"For Gmail: use App Password, not account password",
 		}
@@ -150,7 +150,7 @@ func CheckSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *metis.MetisCon
 	return result
 }
 
-func checkSMTPConfig(rc *eos_io.RuntimeContext, config *metis.MetisConfig) error {
+func checkSMTPConfig(rc *eos_io.RuntimeContext, config *iris.IrisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
 	}

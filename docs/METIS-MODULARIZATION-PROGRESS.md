@@ -1,6 +1,6 @@
-# Metis Modularization Progress
+# Iris Modularization Progress
 
-**File:** cmd/debug/metis.go  
+**File:** cmd/debug/iris.go  
 **Original Size:** 1,660 lines  
 **Target:** 11 focused modules  
 **Status:** IN PROGRESS  
@@ -10,7 +10,7 @@
 ## Progress Tracker
 
 ###  Completed Modules (1/11)
-1.  **types.go** (45 lines) - Shared types (checkResult, MetisConfig)
+1.  **types.go** (45 lines) - Shared types (checkResult, IrisConfig)
 
 ###  In Progress (0/11)
 - None currently
@@ -32,7 +32,7 @@
 ## Module Structure
 
 ```
-cmd/debug/metis/
+cmd/debug/iris/
 ├── types.go                     # Shared types
 ├── checks/
 │   ├── infrastructure.go ⏳      # Infrastructure checks

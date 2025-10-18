@@ -12,16 +12,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug/metis"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/debug/iris"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// CheckProjectStructureWithResult validates that all required Metis project files and directories exist.
-func CheckProjectStructureWithResult(rc *eos_io.RuntimeContext, projectDir string, verbose bool) metis.CheckResult {
+// CheckProjectStructureWithResult validates that all required Iris project files and directories exist.
+func CheckProjectStructureWithResult(rc *eos_io.RuntimeContext, projectDir string, verbose bool) iris.CheckResult {
 	err := checkProjectStructure(rc, projectDir, verbose)
-	result := metis.CheckResult{
+	result := iris.CheckResult{
 		Name:     "Project Structure",
 		Category: "Infrastructure",
 		Passed:   err == nil,
@@ -30,8 +30,8 @@ func CheckProjectStructureWithResult(rc *eos_io.RuntimeContext, projectDir strin
 
 	if err != nil {
 		result.Remediation = []string{
-			"Install Metis using: eos create metis",
-			"Or clone from repository: git clone <metis-repo> /opt/metis",
+			"Install Iris using: eos create iris",
+			"Or clone from repository: git clone <iris-repo> /opt/iris",
 			fmt.Sprintf("Ensure directory exists: sudo mkdir -p %s", projectDir),
 			"Verify required subdirectories: worker/, webhook/",
 		}
@@ -67,19 +67,19 @@ func checkProjectStructure(rc *eos_io.RuntimeContext, projectDir string, verbose
 }
 
 // CheckTemporalCLIWithResult verifies the Temporal CLI is installed and executable.
-func CheckTemporalCLIWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
+func CheckTemporalCLIWithResult(rc *eos_io.RuntimeContext) iris.CheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	temporalPath, err := exec.LookPath("temporal")
 	if err != nil {
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:     "Temporal CLI",
 			Category: "Infrastructure",
 			Passed:   false,
 			Error:    fmt.Errorf("temporal CLI not found in PATH"),
 			Remediation: []string{
 				"Install Temporal CLI: curl -sSf https://temporal.download/cli.sh | sh",
-				"Or run: eos repair metis --auto-yes",
+				"Or run: eos repair iris --auto-yes",
 				"Verify installation: temporal --version",
 			},
 		}
@@ -89,21 +89,21 @@ func CheckTemporalCLIWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
 	cmd := exec.CommandContext(rc.Ctx, temporalPath, "--version")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:     "Temporal CLI",
 			Category: "Infrastructure",
 			Passed:   false,
 			Error:    fmt.Errorf("temporal binary found but not executable: %w", err),
 			Remediation: []string{
 				"Fix permissions: sudo chmod 755 " + temporalPath,
-				"Or reinstall: eos repair metis --auto-yes",
+				"Or reinstall: eos repair iris --auto-yes",
 			},
 		}
 	}
 
 	logger.Debug("Temporal CLI check passed", zap.String("path", temporalPath), zap.String("version", string(output)))
 
-	return metis.CheckResult{
+	return iris.CheckResult{
 		Name:     "Temporal CLI",
 		Category: "Infrastructure",
 		Passed:   true,
@@ -112,7 +112,7 @@ func CheckTemporalCLIWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
 }
 
 // CheckBinaryAccessibilityWithResult ensures Temporal binary is accessible to non-root users.
-func CheckBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
+func CheckBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) iris.CheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Get current user
@@ -124,13 +124,13 @@ func CheckBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) metis.CheckRe
 	// Check if temporal is in PATH and accessible
 	temporalPath, err := exec.LookPath("temporal")
 	if err != nil {
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:     "Binary Accessibility",
 			Category: "Infrastructure",
 			Passed:   false,
 			Error:    fmt.Errorf("temporal not in PATH"),
 			Remediation: []string{
-				"Run: eos repair metis --auto-yes",
+				"Run: eos repair iris --auto-yes",
 				"This will copy the binary to /usr/local/bin/temporal",
 			},
 		}
@@ -142,14 +142,14 @@ func CheckBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) metis.CheckRe
 		cmd := exec.CommandContext(rc.Ctx, "sudo", "-u", "ubuntu", "temporal", "--version")
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			return metis.CheckResult{
+			return iris.CheckResult{
 				Name:     "Binary Accessibility",
 				Category: "Infrastructure",
 				Passed:   false,
 				Error:    fmt.Errorf("temporal binary not accessible to non-root users: %s", string(output)),
 				Remediation: []string{
 					"Binary might be in /root/ directory which non-root users can't access",
-					"Run: eos repair metis --auto-yes",
+					"Run: eos repair iris --auto-yes",
 					"This will copy the binary to /usr/local/bin/temporal",
 					"Or manually: sudo cp /root/.temporalio/bin/temporal /usr/local/bin/temporal",
 				},
@@ -161,7 +161,7 @@ func CheckBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) metis.CheckRe
 	// Test basic execution
 	cmd := exec.CommandContext(rc.Ctx, temporalPath, "--version")
 	if err := cmd.Run(); err != nil {
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:     "Binary Accessibility",
 			Category: "Infrastructure",
 			Passed:   false,
@@ -172,7 +172,7 @@ func CheckBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) metis.CheckRe
 		}
 	}
 
-	return metis.CheckResult{
+	return iris.CheckResult{
 		Name:     "Binary Accessibility",
 		Category: "Infrastructure",
 		Passed:   true,
@@ -181,7 +181,7 @@ func CheckBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) metis.CheckRe
 }
 
 // CheckPortStatusWithResult checks if required ports are listening and identifies processes.
-func CheckPortStatusWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
+func CheckPortStatusWithResult(rc *eos_io.RuntimeContext) iris.CheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	ports := []struct {
@@ -190,7 +190,7 @@ func CheckPortStatusWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
 	}{
 		{7233, "Temporal gRPC"},
 		{8233, "Temporal UI"},
-		{8080, "Metis Webhook"},
+		{8080, "Iris Webhook"},
 	}
 
 	var listening []string
@@ -245,15 +245,15 @@ func CheckPortStatusWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
 
 		// Don't suggest systemctl unless we know services exist
 		// That will be checked by CheckSystemdServicesWithResult
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:     "Port Status",
 			Category: "Infrastructure",
 			Passed:   false,
 			Error:    fmt.Errorf("%d ports not listening", len(notListening)),
 			Remediation: []string{
-				"Check if services are installed: systemctl list-units 'metis*' 'temporal*'",
+				"Check if services are installed: systemctl list-units 'iris*' 'temporal*'",
 				"If services exist but stopped: see 'Systemd Services' check for start commands",
-				"If services don't exist: run 'eos create metis' or 'eos repair metis'",
+				"If services don't exist: run 'eos create iris' or 'eos repair iris'",
 			},
 			Details: detailsText,
 		}
@@ -261,7 +261,7 @@ func CheckPortStatusWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
 
 	logger.Debug("All ports listening", zap.Strings("ports", listening))
 
-	return metis.CheckResult{
+	return iris.CheckResult{
 		Name:     "Port Status",
 		Category: "Infrastructure",
 		Passed:   true,
@@ -270,17 +270,17 @@ func CheckPortStatusWithResult(rc *eos_io.RuntimeContext) metis.CheckResult {
 }
 
 // CheckTemporalServerHealthDeepWithResult performs comprehensive health checks on Temporal server.
-func CheckTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *metis.MetisConfig) metis.CheckResult {
+func CheckTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *iris.IrisConfig) iris.CheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	if config == nil {
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:     "Temporal Server Health",
 			Category: "Infrastructure",
 			Passed:   false,
 			Error:    fmt.Errorf("config not loaded"),
 			Remediation: []string{
-				"Fix configuration first: eos create metis",
+				"Fix configuration first: eos create iris",
 			},
 		}
 	}
@@ -314,14 +314,14 @@ func CheckTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 				"Check logs: sudo journalctl -u temporal -n 50")
 		} else if systemdStatus == "" {
 			remediation = append(remediation,
-				"Service not installed: eos create metis or eos repair metis",
+				"Service not installed: eos create iris or eos repair iris",
 				"Or start manually: temporal server start-dev")
 		}
 
 		remediation = append(remediation,
 			"Check if port is in use by another process: lsof -i :7233")
 
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:        "Temporal Server Health",
 			Category:    "Infrastructure",
 			Passed:      false,
@@ -367,7 +367,7 @@ func CheckTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			zap.Error(err))
 		healthDetails = append(healthDetails, "✗ CLI health check failed")
 
-		return metis.CheckResult{
+		return iris.CheckResult{
 			Name:     "Temporal Server Health",
 			Category: "Infrastructure",
 			Passed:   false,
@@ -385,7 +385,7 @@ func CheckTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 	logger.Debug("Temporal CLI health check passed", zap.String("output", string(output)))
 	healthDetails = append(healthDetails, "✓ CLI health check passed")
 
-	return metis.CheckResult{
+	return iris.CheckResult{
 		Name:     "Temporal Server Health",
 		Category: "Infrastructure",
 		Passed:   true,

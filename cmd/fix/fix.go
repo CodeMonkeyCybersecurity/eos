@@ -41,7 +41,7 @@ EXAMPLES:
 // AddSubcommands adds all fix subcommands
 func AddSubcommands() {
 	FixCmd.AddCommand(vaultFixCmd)
-	FixCmd.AddCommand(metisFixCmd)
+	FixCmd.AddCommand(irisFixCmd)
 	FixCmd.AddCommand(mattermostFixCmd)
 }
 

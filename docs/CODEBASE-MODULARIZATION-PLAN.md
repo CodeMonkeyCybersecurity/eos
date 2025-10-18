@@ -69,9 +69,9 @@ pkg/consul/
 
 ---
 
-#### 2. **cmd/debug/metis.go** (1,659 lines)  CRITICAL
+#### 2. **cmd/debug/iris.go** (1,659 lines)  CRITICAL
 **Current Responsibilities:**
-- Metis service diagnostics
+- Iris service diagnostics
 - Infrastructure checks (Temporal, PostgreSQL, Redis)
 - Configuration validation
 - Service health monitoring
@@ -83,7 +83,7 @@ pkg/consul/
 
 **Proposed Module Structure:**
 ```
-cmd/debug/metis/
+cmd/debug/iris/
 ├── main.go (orchestrator, <150 lines)
 ├── checks/
 │   ├── infrastructure.go  # Temporal, DB, Redis checks
@@ -101,7 +101,7 @@ cmd/debug/metis/
 ```
 
 **Estimated Effort:** 6-8 hours  
-**Dependencies:** pkg/delphi, pkg/metis  
+**Dependencies:** pkg/delphi, pkg/iris  
 **Security Considerations:** Preserve credential handling in checks  
 
 ---
@@ -232,9 +232,9 @@ pkg/system/orchestration/
 
 ---
 
-#### 7. **cmd/create/metis.go** (1,154 lines)
+#### 7. **cmd/create/iris.go** (1,154 lines)
 **Current Responsibilities:**
-- Metis service creation
+- Iris service creation
 - Temporal setup
 - Database provisioning
 - Worker configuration
@@ -243,7 +243,7 @@ pkg/system/orchestration/
 
 **Proposed Module Structure:**
 ```
-cmd/create/metis/
+cmd/create/iris/
 ├── main.go (<150 lines)
 ├── temporal.go           # Temporal setup
 ├── database.go           # Database provisioning
@@ -552,13 +552,13 @@ pkg/watchdog/resource/
 
 ### Week 1: P1 Files 1-5
 - Day 1-2: pkg/consul/install.go
-- Day 3: cmd/debug/metis.go
+- Day 3: cmd/debug/iris.go
 - Day 4: cmd/debug/delphi.go
 - Day 5: pkg/authentik/import.go + pkg/vault/install.go
 
 ### Week 2: P1 Files 6-10
 - Day 1: pkg/system/orchestration.go
-- Day 2: cmd/create/metis.go
+- Day 2: cmd/create/iris.go
 - Day 3: pkg/database_management/backup.go
 - Day 4: pkg/storage/types.go
 - Day 5: pkg/kvm/inventory.go
@@ -640,10 +640,10 @@ pkg/consul/install.go
 ├── pkg/consul/rollback/
 └── pkg/consul/helpers/
 
-cmd/debug/metis.go
-├── cmd/debug/metis/checks/
-├── cmd/debug/metis/testing/
-└── cmd/debug/metis/reporting/
+cmd/debug/iris.go
+├── cmd/debug/iris/checks/
+├── cmd/debug/iris/testing/
+└── cmd/debug/iris/reporting/
 
 [Similar structure for other P1 files]
 ```

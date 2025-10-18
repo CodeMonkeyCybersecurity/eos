@@ -470,48 +470,6 @@ func _configureMFAForOIDC(rc *eos_io.RuntimeContext, client *api.Client, authPat
 	return nil
 }
 
-// _createMFAEnforcementPolicy creates a Vault policy that enforces MFA
-// Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
-//
-//nolint:unused
-func _createMFAEnforcementPolicy(config *MFAConfig) string {
-	_ = config // TODO: Use config to customize policy based on MFA settings
-	policy := `
-# MFA Enforcement Policy
-# This policy requires MFA for all secret access
-
-# Deny access to secrets without MFA
-path "secret/*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
-  control_group = {
-    max_ttl = "4h"
-    factor "mfa" {
-      identity {
-        group_ids = ["*"]
-        group_names = ["*"]
-      }
-    }
-  }
-}
-
-# Allow MFA method configuration
-path "auth/*/mfa_config" {
-  capabilities = ["read", "update"]
-}
-
-# Allow TOTP secret generation
-path "auth/totp/keys/*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
-}
-
-# Allow TOTP code verification
-path "auth/totp/code/*" {
-  capabilities = ["update"]
-}
-`
-	return policy
-}
-
 // Helper functions for prompting MFA configurations
 
 func promptDuoConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {

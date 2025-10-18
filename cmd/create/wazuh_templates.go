@@ -3,11 +3,11 @@
 
 package create
 
-func getCustomMetisShellScript() string {
+func getCustomIrisShellScript() string {
 	return `#!/bin/sh
 # Copyright (C) 2015, Wazuh Inc.
 # Created by Wazuh, Inc. <info@wazuh.com>.
-# Modified for Metis integration by Code Monkey Cybersecurity
+# Modified for Iris integration by Code Monkey Cybersecurity
 # This program is free software; you can redistribute it and/or modify it under the terms of GPLv2
 
 WPYTHON_BIN="framework/python/bin/python3"
@@ -45,11 +45,11 @@ ${WAZUH_PATH}/${WPYTHON_BIN} ${PYTHON_SCRIPT} "$@"
 `
 }
 
-func getCustomMetisPythonScript() string {
+func getCustomIrisPythonScript() string {
 	return `#!/usr/bin/env python3
 """
-Wazuh Metis Integration
-Sends Wazuh alerts to Metis webhook for AI-powered analysis
+Wazuh Iris Integration
+Sends Wazuh alerts to Iris webhook for AI-powered analysis
 
 Created by Code Monkey Cybersecurity
 ABN: 77 177 673 061
@@ -129,7 +129,7 @@ def log_payload(payload):
 
 
 def send_to_webhook(alert_data, hook_url, auth_token):
-    """Send alert to Metis webhook"""
+    """Send alert to Iris webhook"""
     headers = {
         "Content-Type": "application/json",
         "X-Auth-Token": auth_token
@@ -156,7 +156,7 @@ def main(args):
     # Check for debug flag
     debug_enabled = 'debug' in args
 
-    debug(f"# Metis integration started")
+    debug(f"# Iris integration started")
     debug(f"# Args: {args}")
     debug(f"# Script: {__file__}")
     debug(f"# BASE_DIR: {BASE_DIR}")

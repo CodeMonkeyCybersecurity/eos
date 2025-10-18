@@ -1,4 +1,4 @@
-// cmd/create/metis.go
+// cmd/create/iris.go
 package create
 
 import (
@@ -12,7 +12,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/metis"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/iris"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -34,19 +34,19 @@ var (
 	emailTo           string
 )
 
-var createMetisCmd = &cobra.Command{
-	Use:   "metis",
-	Short: "Install Metis security alert processing system",
-	Long: `Install Metis (Delphi Notify) for automated processing of Wazuh security alerts.
+var createIrisCmd = &cobra.Command{
+	Use:   "iris",
+	Short: "Install Iris security alert processing system",
+	Long: `Install Iris (Delphi Notify) for automated processing of Wazuh security alerts.
 
-Metis uses:
+Iris uses:
 - Temporal workflows for durable execution
 - Azure OpenAI for alert analysis
 - Email notifications via SMTP
 - Webhook receiver for Wazuh integration
 
 Installation creates:
-- /opt/metis project directory
+- /opt/iris project directory
 - Worker and webhook Go programs
 - Configuration files
 - Systemd services
@@ -59,33 +59,33 @@ Prerequisites:
 - SMTP server for email
 
 Examples:
-  eos create metis                                    # Interactive (default)
-  eos create metis --skip-config                      # Use placeholders
-  eos create metis --azure-endpoint=https://...       # Non-interactive`,
-	RunE: eos.Wrap(runCreateMetis),
+  eos create iris                                    # Interactive (default)
+  eos create iris --skip-config                      # Use placeholders
+  eos create iris --azure-endpoint=https://...       # Non-interactive`,
+	RunE: eos.Wrap(runCreateIris),
 }
 
 func init() {
-	CreateCmd.AddCommand(createMetisCmd)
+	CreateCmd.AddCommand(createIrisCmd)
 
-	createMetisCmd.Flags().BoolVar(&interactiveConfig, "interactive", true, "Interactive configuration (default)")
-	createMetisCmd.Flags().BoolVar(&skipConfig, "skip-config", false, "Skip configuration, use placeholders")
+	createIrisCmd.Flags().BoolVar(&interactiveConfig, "interactive", true, "Interactive configuration (default)")
+	createIrisCmd.Flags().BoolVar(&skipConfig, "skip-config", false, "Skip configuration, use placeholders")
 
 	// Azure OpenAI flags
-	createMetisCmd.Flags().StringVar(&azureEndpoint, "azure-endpoint", "", "Azure OpenAI endpoint")
-	createMetisCmd.Flags().StringVar(&azureAPIKey, "azure-key", "", "Azure OpenAI API key")
-	createMetisCmd.Flags().StringVar(&azureDeployment, "azure-deployment", "gpt-4o", "Azure deployment name")
+	createIrisCmd.Flags().StringVar(&azureEndpoint, "azure-endpoint", "", "Azure OpenAI endpoint")
+	createIrisCmd.Flags().StringVar(&azureAPIKey, "azure-key", "", "Azure OpenAI API key")
+	createIrisCmd.Flags().StringVar(&azureDeployment, "azure-deployment", "gpt-4o", "Azure deployment name")
 
 	// SMTP flags
-	createMetisCmd.Flags().StringVar(&smtpHost, "smtp-host", "", "SMTP server host")
-	createMetisCmd.Flags().IntVar(&smtpPort, "smtp-port", 587, "SMTP server port")
-	createMetisCmd.Flags().StringVar(&smtpUsername, "smtp-user", "", "SMTP username")
-	createMetisCmd.Flags().StringVar(&smtpPassword, "smtp-pass", "", "SMTP password")
-	createMetisCmd.Flags().StringVar(&emailFrom, "email-from", "", "From email address")
-	createMetisCmd.Flags().StringVar(&emailTo, "email-to", "", "To email address")
+	createIrisCmd.Flags().StringVar(&smtpHost, "smtp-host", "", "SMTP server host")
+	createIrisCmd.Flags().IntVar(&smtpPort, "smtp-port", 587, "SMTP server port")
+	createIrisCmd.Flags().StringVar(&smtpUsername, "smtp-user", "", "SMTP username")
+	createIrisCmd.Flags().StringVar(&smtpPassword, "smtp-pass", "", "SMTP password")
+	createIrisCmd.Flags().StringVar(&emailFrom, "email-from", "", "From email address")
+	createIrisCmd.Flags().StringVar(&emailTo, "email-to", "", "To email address")
 }
 
-type MetisConfiguration struct {
+type IrisConfiguration struct {
 	Azure struct {
 		Endpoint       string
 		APIKey         string
@@ -110,11 +110,11 @@ type MetisConfiguration struct {
 	}
 }
 
-func runCreateMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runCreateIris(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Metis installation")
+	logger.Info("Starting Iris installation")
 
-	projectDir := "/opt/metis"
+	projectDir := "/opt/iris"
 
 	// Step 1: Check prerequisites
 	logger.Info("Step 1/8: Checking prerequisites")
@@ -136,7 +136,7 @@ func runCreateMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	// Step 4: Gather configuration (interactive or from flags)
 	logger.Info("Step 4/8: Configuration setup")
-	metisConfig := MetisConfiguration{
+	irisConfig := IrisConfiguration{
 		Temporal: struct {
 			HostPort  string
 			Namespace string
@@ -163,22 +163,22 @@ func runCreateMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	if skipConfig {
 		logger.Info("Skipping configuration - using placeholders")
-		metisConfig = getPlaceholderConfig()
+		irisConfig = getPlaceholderConfig()
 	} else if hasConfigFlags() {
 		logger.Info("Using configuration from flags")
-		metisConfig = getConfigFromFlags()
-		if err := validateConfiguration(metisConfig); err != nil {
+		irisConfig = getConfigFromFlags()
+		if err := validateConfiguration(irisConfig); err != nil {
 			return fmt.Errorf("configuration validation failed: %w", err)
 		}
 	} else if interactiveConfig {
 		logger.Info("Starting interactive configuration")
-		if err := gatherInteractiveConfig(rc, &metisConfig); err != nil {
+		if err := gatherInteractiveConfig(rc, &irisConfig); err != nil {
 			return fmt.Errorf("configuration failed: %w", err)
 		}
 	}
 
 	// Create configuration file with gathered config
-	if err := createConfigFile(rc, projectDir, metisConfig); err != nil {
+	if err := createConfigFile(rc, projectDir, irisConfig); err != nil {
 		return fmt.Errorf("failed to create config: %w", err)
 	}
 
@@ -206,13 +206,13 @@ func runCreateMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return fmt.Errorf("failed to create test script: %w", err)
 	}
 
-	logger.Info("Metis installation completed successfully",
+	logger.Info("Iris installation completed successfully",
 		zap.String("project_dir", projectDir))
 	logger.Info("terminal prompt: Next steps:")
-	logger.Info("terminal prompt:   1. Edit config: nano /opt/metis/config.yaml")
+	logger.Info("terminal prompt:   1. Edit config: nano /opt/iris/config.yaml")
 	logger.Info("terminal prompt:   2. Start Temporal: temporal server start-dev")
-	logger.Info("terminal prompt:   3. Test install: eos debug metis")
-	logger.Info("terminal prompt:   4. Start services: sudo systemctl start metis-worker metis-webhook")
+	logger.Info("terminal prompt:   3. Test install: eos debug iris")
+	logger.Info("terminal prompt:   4. Start services: sudo systemctl start iris-worker iris-webhook")
 	logger.Info("terminal prompt:   5. View Temporal UI: http://localhost:8233")
 
 	return nil
@@ -438,7 +438,7 @@ Fix Option 1 (Recommended): Add binary directory to PATH
 Fix Option 2: Add /usr/local/bin to PATH
   echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
   source ~/.bashrc
-  Then re-run: eos create metis`,
+  Then re-run: eos create iris`,
 			temporalPath, pathEnv, filepath.Dir(temporalPath))
 	}
 
@@ -540,12 +540,12 @@ func createProjectStructure(rc *eos_io.RuntimeContext, projectDir string) error 
 	return nil
 }
 
-func createConfigFile(rc *eos_io.RuntimeContext, projectDir string, metisConfig MetisConfiguration) error {
+func createConfigFile(rc *eos_io.RuntimeContext, projectDir string, irisConfig IrisConfiguration) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Generate config.yaml from template with actual values
-	configYAML := fmt.Sprintf(`# Metis/Delphi Configuration
-# Generated by eos create metis
+	configYAML := fmt.Sprintf(`# Iris/Delphi Configuration
+# Generated by eos create iris
 
 temporal:
   host_port: "%s"
@@ -571,22 +571,22 @@ webhook:
 
 logging:
   level: "info"
-  file: "logs/metis.log"
+  file: "logs/iris.log"
 `,
-		metisConfig.Temporal.HostPort,
-		metisConfig.Temporal.Namespace,
-		metisConfig.Temporal.TaskQueue,
-		metisConfig.Azure.Endpoint,
-		metisConfig.Azure.APIKey,
-		metisConfig.Azure.DeploymentName,
-		metisConfig.Azure.APIVersion,
-		metisConfig.Email.SMTPHost,
-		metisConfig.Email.SMTPPort,
-		metisConfig.Email.Username,
-		metisConfig.Email.Password,
-		metisConfig.Email.From,
-		metisConfig.Email.To,
-		metisConfig.Webhook.Port,
+		irisConfig.Temporal.HostPort,
+		irisConfig.Temporal.Namespace,
+		irisConfig.Temporal.TaskQueue,
+		irisConfig.Azure.Endpoint,
+		irisConfig.Azure.APIKey,
+		irisConfig.Azure.DeploymentName,
+		irisConfig.Azure.APIVersion,
+		irisConfig.Email.SMTPHost,
+		irisConfig.Email.SMTPPort,
+		irisConfig.Email.Username,
+		irisConfig.Email.Password,
+		irisConfig.Email.From,
+		irisConfig.Email.To,
+		irisConfig.Webhook.Port,
 	)
 
 	configPath := filepath.Join(projectDir, "config.yaml")
@@ -621,14 +621,14 @@ func generateSourceFiles(rc *eos_io.RuntimeContext, projectDir string) error {
 
 	// Generate worker/main.go
 	workerPath := filepath.Join(projectDir, "worker", "main.go")
-	if err := os.WriteFile(workerPath, []byte(metis.GetWorkerSource()), 0644); err != nil {
+	if err := os.WriteFile(workerPath, []byte(iris.GetWorkerSource()), 0644); err != nil {
 		return fmt.Errorf("failed to write worker source: %w", err)
 	}
 	logger.Info("Worker source generated", zap.String("path", workerPath))
 
 	// Generate webhook/main.go
 	webhookPath := filepath.Join(projectDir, "webhook", "main.go")
-	if err := os.WriteFile(webhookPath, []byte(metis.GetWebhookSource()), 0644); err != nil {
+	if err := os.WriteFile(webhookPath, []byte(iris.GetWebhookSource()), 0644); err != nil {
 		return fmt.Errorf("failed to write webhook source: %w", err)
 	}
 	logger.Info("Webhook source generated", zap.String("path", webhookPath))
@@ -641,7 +641,7 @@ func installDependencies(rc *eos_io.RuntimeContext, projectDir string) error {
 
 	// Initialize go.mod in worker directory
 	workerDir := filepath.Join(projectDir, "worker")
-	initCmd := exec.CommandContext(rc.Ctx, "go", "mod", "init", "metis/worker")
+	initCmd := exec.CommandContext(rc.Ctx, "go", "mod", "init", "iris/worker")
 	initCmd.Dir = workerDir
 	if output, err := initCmd.CombinedOutput(); err != nil {
 		logger.Debug("go mod init output", zap.String("output", string(output)))
@@ -657,7 +657,7 @@ func installDependencies(rc *eos_io.RuntimeContext, projectDir string) error {
 
 	// Initialize go.mod in webhook directory
 	webhookDir := filepath.Join(projectDir, "webhook")
-	initCmd = exec.CommandContext(rc.Ctx, "go", "mod", "init", "metis/webhook")
+	initCmd = exec.CommandContext(rc.Ctx, "go", "mod", "init", "iris/webhook")
 	initCmd.Dir = webhookDir
 	if output, err := initCmd.CombinedOutput(); err != nil {
 		logger.Debug("go mod init output", zap.String("output", string(output)))
@@ -702,14 +702,14 @@ WantedBy=multi-user.target
 `
 
 	workerService := `[Unit]
-Description=Metis Temporal Worker
+Description=Iris Temporal Worker
 After=network.target temporal.service
 Requires=temporal.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/metis/worker
+WorkingDirectory=/opt/iris/worker
 ExecStart=/usr/bin/go run main.go
 Restart=always
 RestartSec=10
@@ -719,14 +719,14 @@ WantedBy=multi-user.target
 `
 
 	webhookService := `[Unit]
-Description=Metis Webhook Server
+Description=Iris Webhook Server
 After=network.target temporal.service
 Requires=temporal.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/metis/webhook
+WorkingDirectory=/opt/iris/webhook
 ExecStart=/usr/bin/go run main.go
 Restart=always
 RestartSec=10
@@ -741,12 +741,12 @@ WantedBy=multi-user.target
 		return fmt.Errorf("failed to write temporal service: %w", err)
 	}
 
-	workerServicePath := filepath.Join(projectDir, "metis-worker.service")
+	workerServicePath := filepath.Join(projectDir, "iris-worker.service")
 	if err := os.WriteFile(workerServicePath, []byte(workerService), 0644); err != nil {
 		return fmt.Errorf("failed to write worker service: %w", err)
 	}
 
-	webhookServicePath := filepath.Join(projectDir, "metis-webhook.service")
+	webhookServicePath := filepath.Join(projectDir, "iris-webhook.service")
 	if err := os.WriteFile(webhookServicePath, []byte(webhookService), 0644); err != nil {
 		return fmt.Errorf("failed to write webhook service: %w", err)
 	}
@@ -770,7 +770,7 @@ WantedBy=multi-user.target
 		logger.Warn("Failed to start temporal service", zap.Error(err))
 	}
 
-	logger.Info("terminal prompt: To enable Metis services: sudo cp /opt/metis/*.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable metis-worker metis-webhook && sudo systemctl start metis-worker metis-webhook")
+	logger.Info("terminal prompt: To enable Iris services: sudo cp /opt/iris/*.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable iris-worker iris-webhook && sudo systemctl start iris-worker iris-webhook")
 
 	return nil
 }
@@ -779,9 +779,9 @@ func createTestScriptAndDocs(rc *eos_io.RuntimeContext, projectDir string) error
 	logger := otelzap.Ctx(rc.Ctx)
 
 	testScript := `#!/bin/bash
-# Test script for Metis installation
+# Test script for Iris installation
 
-echo "Testing Metis alert processing..."
+echo "Testing Iris alert processing..."
 
 curl -X POST http://localhost:8080/webhook \
   -H "Content-Type: application/json" \
@@ -804,7 +804,7 @@ curl -X POST http://localhost:8080/webhook \
 echo ""
 echo "Alert sent! Check:"
 echo "  - Temporal UI: http://localhost:8233"
-echo "  - Worker logs: journalctl -u metis-worker -f"
+echo "  - Worker logs: journalctl -u iris-worker -f"
 echo "  - Email inbox for notification"
 `
 
@@ -816,13 +816,14 @@ echo "  - Email inbox for notification"
 
 	// Create README
 	readmePath := filepath.Join(projectDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte(metis.GetReadmeContent()), 0644); err != nil {
+	if err := os.WriteFile(readmePath, []byte(iris.GetReadmeContent()), 0644); err != nil {
 		return fmt.Errorf("failed to write README: %w", err)
 	}
 	logger.Info("README created", zap.String("path", readmePath))
 
 	return nil
 }
+
 // Configuration helper functions
 
 func hasConfigFlags() bool {
@@ -830,8 +831,8 @@ func hasConfigFlags() bool {
 		smtpHost != "" || smtpUsername != ""
 }
 
-func getPlaceholderConfig() MetisConfiguration {
-	return MetisConfiguration{
+func getPlaceholderConfig() IrisConfiguration {
+	return IrisConfiguration{
 		Azure: struct {
 			Endpoint       string
 			APIKey         string
@@ -871,8 +872,8 @@ func getPlaceholderConfig() MetisConfiguration {
 	}
 }
 
-func getConfigFromFlags() MetisConfiguration {
-	config := MetisConfiguration{
+func getConfigFromFlags() IrisConfiguration {
+	config := IrisConfiguration{
 		Azure: struct {
 			Endpoint       string
 			APIKey         string
@@ -922,7 +923,7 @@ func getConfigFromFlags() MetisConfiguration {
 	return config
 }
 
-func gatherInteractiveConfig(rc *eos_io.RuntimeContext, config *MetisConfiguration) error {
+func gatherInteractiveConfig(rc *eos_io.RuntimeContext, config *IrisConfiguration) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	reader := bufio.NewReader(os.Stdin)
 
@@ -1113,7 +1114,7 @@ func validateEmail(email string) error {
 	return nil
 }
 
-func validateConfiguration(config MetisConfiguration) error {
+func validateConfiguration(config IrisConfiguration) error {
 	// Validate Azure
 	if err := validateAzureEndpoint(config.Azure.Endpoint); err != nil {
 		return fmt.Errorf("azure endpoint: %w", err)

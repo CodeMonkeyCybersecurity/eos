@@ -1,4 +1,4 @@
-// cmd/fix/metis.go
+// cmd/fix/iris.go
 package fix
 
 import (
@@ -22,10 +22,10 @@ var (
 	interactive bool
 )
 
-var metisFixCmd = &cobra.Command{
-	Use:   "metis",
-	Short: "Fix and repair Metis installation issues",
-	Long: `Automatically detect and fix common Metis installation issues.
+var irisFixCmd = &cobra.Command{
+	Use:   "iris",
+	Short: "Fix and repair Iris installation issues",
+	Long: `Automatically detect and fix common Iris installation issues.
 
 The repair command can fix:
 - Temporal CLI not in PATH (creates symlink)
@@ -38,24 +38,24 @@ before making any changes. You'll be asked to confirm each fix.
 
 EXAMPLES:
   # Interactive repair (recommended)
-  sudo eos repair metis
+  sudo eos repair iris
 
   # Show what would be fixed without doing it
-  sudo eos repair metis --dry-run
+  sudo eos repair iris --dry-run
 
   # Fix everything automatically without prompts
-  sudo eos repair metis --yes
+  sudo eos repair iris --yes
 
   # Fix specific issues only
-  sudo eos repair metis --interactive`,
+  sudo eos repair iris --interactive`,
 
-	RunE: eos.Wrap(runRepairMetis),
+	RunE: eos.Wrap(runRepairIris),
 }
 
 func init() {
-	metisFixCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be fixed without making changes")
-	metisFixCmd.Flags().BoolVar(&autoYes, "yes", false, "Automatically approve all fixes")
-	metisFixCmd.Flags().BoolVar(&interactive, "interactive", true, "Ask for confirmation before each fix (default)")
+	irisFixCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be fixed without making changes")
+	irisFixCmd.Flags().BoolVar(&autoYes, "yes", false, "Automatically approve all fixes")
+	irisFixCmd.Flags().BoolVar(&interactive, "interactive", true, "Ask for confirmation before each fix (default)")
 }
 
 type repairAction struct {
@@ -67,7 +67,7 @@ type repairAction struct {
 	verify      func(*eos_io.RuntimeContext) error
 }
 
-func runRepairMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runRepairIris(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	fmt.Println()
@@ -85,9 +85,9 @@ func runRepairMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	actions := buildRepairPlan(rc)
 
 	if len(actions) == 0 {
-		fmt.Println("✓ No issues detected - Metis is healthy!")
+		fmt.Println("✓ No issues detected - Iris is healthy!")
 		fmt.Println()
-		fmt.Println("To verify, run: eos debug metis")
+		fmt.Println("To verify, run: eos debug iris")
 		return nil
 	}
 
@@ -200,11 +200,11 @@ func runRepairMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		fmt.Println("All repairs completed successfully!")
 		fmt.Println()
 		fmt.Println("Next steps:")
-		fmt.Println("  1. Verify: eos debug metis")
-		fmt.Println("  2. Test: eos debug metis --test")
+		fmt.Println("  1. Verify: eos debug iris")
+		fmt.Println("  2. Test: eos debug iris --test")
 	} else {
 		fmt.Println("Some repairs failed. Check the errors above and fix manually.")
-		fmt.Println("Run 'eos debug metis' for more details.")
+		fmt.Println("Run 'eos debug iris' for more details.")
 	}
 
 	return nil
@@ -237,15 +237,15 @@ func buildRepairPlan(rc *eos_io.RuntimeContext) []repairAction {
 		})
 	}
 
-	// Check 3: Metis project structure
-	if needsFixing, reason := checkMetisStructure(rc); needsFixing {
+	// Check 3: Iris project structure
+	if needsFixing, reason := checkIrisStructure(rc); needsFixing {
 		actions = append(actions, repairAction{
-			name:        "Create Metis Directories",
+			name:        "Create Iris Directories",
 			description: reason,
-			command:     "mkdir -p /opt/metis/{worker,webhook,scripts}",
-			check:       checkMetisStructure,
-			execute:     fixMetisStructure,
-			verify:      verifyMetisStructure,
+			command:     "mkdir -p /opt/iris/{worker,webhook,scripts}",
+			check:       checkIrisStructure,
+			execute:     fixIrisStructure,
+			verify:      verifyIrisStructure,
 		})
 	}
 
@@ -292,11 +292,11 @@ func checkTemporalServer(rc *eos_io.RuntimeContext) (bool, string) {
 	return false, ""
 }
 
-func checkMetisStructure(rc *eos_io.RuntimeContext) (bool, string) {
+func checkIrisStructure(rc *eos_io.RuntimeContext) (bool, string) {
 	requiredDirs := []string{
-		"/opt/metis",
-		"/opt/metis/worker",
-		"/opt/metis/webhook",
+		"/opt/iris",
+		"/opt/iris/worker",
+		"/opt/iris/webhook",
 	}
 
 	var missing []string
@@ -467,14 +467,14 @@ WantedBy=multi-user.target
 	}
 }
 
-func fixMetisStructure(rc *eos_io.RuntimeContext) error {
+func fixIrisStructure(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	dirs := []string{
-		"/opt/metis",
-		"/opt/metis/worker",
-		"/opt/metis/webhook",
-		"/opt/metis/scripts",
+		"/opt/iris",
+		"/opt/iris/worker",
+		"/opt/iris/webhook",
+		"/opt/iris/scripts",
 	}
 
 	for _, dir := range dirs {
@@ -508,11 +508,11 @@ func verifyTemporalServer(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func verifyMetisStructure(rc *eos_io.RuntimeContext) error {
+func verifyIrisStructure(rc *eos_io.RuntimeContext) error {
 	requiredDirs := []string{
-		"/opt/metis",
-		"/opt/metis/worker",
-		"/opt/metis/webhook",
+		"/opt/iris",
+		"/opt/iris/worker",
+		"/opt/iris/webhook",
 	}
 
 	for _, dir := range requiredDirs {

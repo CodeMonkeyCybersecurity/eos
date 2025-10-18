@@ -40,7 +40,7 @@ EXAMPLES:
 // AddSubcommands adds all repair subcommands
 func AddSubcommands() {
 	RepairCmd.AddCommand(vaultRepairCmd)
-	RepairCmd.AddCommand(metisRepairCmd)
+	RepairCmd.AddCommand(irisRepairCmd)
 }
 
 func init() {

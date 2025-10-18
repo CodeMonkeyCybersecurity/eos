@@ -23,18 +23,18 @@ import (
 
 var delphiCmd = &cobra.Command{
 	Use:   "delphi",
-	Short: "Diagnose Delphi (Metis/Temporal) integration issues",
-	Long: `Comprehensive diagnostic tool for Wazuh → Metis webhook integration.
+	Short: "Diagnose Delphi (Iris/Temporal) integration issues",
+	Long: `Comprehensive diagnostic tool for Wazuh → Iris webhook integration.
 
 Diagnostic checks performed with --webhook-out:
 
 Network Connectivity (4 checks):
-  • Ping Metis machine
+  • Ping Iris machine
   • TCP connection to webhook port
   • Network latency measurement
   • Firewall rule analysis
 
-Metis Service Health (4 checks):
+Iris Service Health (4 checks):
   • HTTP health endpoint verification
   • Temporal connection status
   • Systemd service status
@@ -63,14 +63,14 @@ Log Analysis (2 checks):
   • Sent payload logs review
 
 Remote Checks (optional with --ssh-key):
-  • Metis service status on remote machine
+  • Iris service status on remote machine
   • Port status verification
   • Temporal service logs
 
 Flags:
-  --webhook-out      Check outbound webhook from Wazuh to Metis
-  --metis-ip         Metis machine IP address (default: 192.168.122.133)
-  --metis-port       Metis webhook port (default: 9101)
+  --webhook-out      Check outbound webhook from Wazuh to Iris
+  --iris-ip         Iris machine IP address (default: 192.168.122.133)
+  --iris-port       Iris webhook port (default: 9101)
   --ssh-key          SSH private key for remote checks (optional)
   --verbose          Show detailed output
   --auto-start       Automatically start Temporal server if not running (local only)
@@ -80,7 +80,7 @@ Flags:
 
 Example:
   eos debug delphi --webhook-out
-  eos debug delphi --webhook-out --metis-ip 192.168.122.133 --metis-port 9101
+  eos debug delphi --webhook-out --iris-ip 192.168.122.133 --iris-port 9101
   eos debug delphi --webhook-out --ssh-key ~/.ssh/id_rsa --verbose
   eos debug delphi --webhook-out --auto-start --temporal-ip 0.0.0.0 --temporal-db /tmp/temporal.db`,
 	RunE: eos.Wrap(runDelphi),
@@ -88,8 +88,8 @@ Example:
 
 var (
 	delphiWebhookOut   bool
-	delphiMetisIP      string
-	delphiMetisPort    int
+	delphiIrisIP       string
+	delphiIrisPort     int
 	delphiSSHKey       string
 	delphiVerbose      bool
 	delphiAutoStart    bool
@@ -99,9 +99,9 @@ var (
 )
 
 func init() {
-	delphiCmd.Flags().BoolVar(&delphiWebhookOut, "webhook-out", false, "Check outbound webhook from Wazuh to Metis")
-	delphiCmd.Flags().StringVar(&delphiMetisIP, "metis-ip", "192.168.122.133", "Metis machine IP address")
-	delphiCmd.Flags().IntVar(&delphiMetisPort, "metis-port", 9101, "Metis webhook port")
+	delphiCmd.Flags().BoolVar(&delphiWebhookOut, "webhook-out", false, "Check outbound webhook from Wazuh to Iris")
+	delphiCmd.Flags().StringVar(&delphiIrisIP, "iris-ip", "192.168.122.133", "Iris machine IP address")
+	delphiCmd.Flags().IntVar(&delphiIrisPort, "iris-port", 9101, "Iris webhook port")
 	delphiCmd.Flags().StringVar(&delphiSSHKey, "ssh-key", "", "SSH private key for remote checks")
 	delphiCmd.Flags().BoolVar(&delphiVerbose, "verbose", false, "Show detailed output")
 	delphiCmd.Flags().BoolVar(&delphiAutoStart, "auto-start", false, "Automatically start Temporal server if not running")
@@ -130,8 +130,8 @@ func runDelphi(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	}
 
 	logger.Info("Starting Delphi webhook diagnostics",
-		zap.String("metis_ip", delphiMetisIP),
-		zap.Int("metis_port", delphiMetisPort),
+		zap.String("iris_ip", delphiIrisIP),
+		zap.Int("iris_port", delphiIrisPort),
 		zap.Bool("delphiVerbose", delphiVerbose))
 
 	results := runWebhookOutDiagnostics(rc)
@@ -150,8 +150,8 @@ func runWebhookOutDiagnostics(rc *eos_io.RuntimeContext) []delphiCheckResult {
 	// 1. Network Connectivity
 	results = append(results, checkNetworkConnectivity(rc)...)
 
-	// 2. Metis Service Health
-	results = append(results, checkMetisServiceHealth(rc)...)
+	// 2. Iris Service Health
+	results = append(results, checkIrisServiceHealth(rc)...)
 
 	// 3. Wazuh Integration Configuration
 	results = append(results, checkWazuhIntegrationConfig(rc)...)
@@ -165,9 +165,9 @@ func runWebhookOutDiagnostics(rc *eos_io.RuntimeContext) []delphiCheckResult {
 	// 6. Log Analysis
 	results = append(results, analyzeLogs(rc)...)
 
-	// 7. Remote Metis Checks (if SSH key provided)
+	// 7. Remote Iris Checks (if SSH key provided)
 	if delphiSSHKey != "" {
-		results = append(results, checkRemoteMetis(rc)...)
+		results = append(results, checkRemoteIris(rc)...)
 	}
 
 	return results
@@ -176,7 +176,7 @@ func runWebhookOutDiagnostics(rc *eos_io.RuntimeContext) []delphiCheckResult {
 // Network Connectivity Checks
 func checkNetworkConnectivity(rc *eos_io.RuntimeContext) []delphiCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("Checking network connectivity", zap.String("target", delphiMetisIP))
+	logger.Debug("Checking network connectivity", zap.String("target", delphiIrisIP))
 
 	var results []delphiCheckResult
 
@@ -205,7 +205,7 @@ func checkPing(rc *eos_io.RuntimeContext) delphiCheckResult {
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ping", "-c", "3", "-W", "1", delphiMetisIP)
+	cmd := exec.CommandContext(ctx, "ping", "-c", "3", "-W", "1", delphiIrisIP)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -214,10 +214,10 @@ func checkPing(rc *eos_io.RuntimeContext) delphiCheckResult {
 			name:     "Ping Connectivity",
 			category: "Network",
 			passed:   false,
-			error:    fmt.Errorf("cannot ping %s: %w", delphiMetisIP, err),
+			error:    fmt.Errorf("cannot ping %s: %w", delphiIrisIP, err),
 			remediation: []string{
-				fmt.Sprintf("Verify Metis machine (%s) is powered on and accessible", delphiMetisIP),
-				"Check network connectivity: ip route get " + delphiMetisIP,
+				fmt.Sprintf("Verify Iris machine (%s) is powered on and accessible", delphiIrisIP),
+				"Check network connectivity: ip route get " + delphiIrisIP,
 				"Verify IP address is correct",
 				"Check if ICMP is blocked by firewall",
 			},
@@ -230,14 +230,14 @@ func checkPing(rc *eos_io.RuntimeContext) delphiCheckResult {
 		name:     "Ping Connectivity",
 		category: "Network",
 		passed:   true,
-		details:  fmt.Sprintf("Successfully pinged %s", delphiMetisIP),
+		details:  fmt.Sprintf("Successfully pinged %s", delphiIrisIP),
 	}
 }
 
 func checkTCPConnection(rc *eos_io.RuntimeContext) delphiCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	target := net.JoinHostPort(delphiMetisIP, fmt.Sprint(delphiMetisPort))
+	target := net.JoinHostPort(delphiIrisIP, fmt.Sprint(delphiIrisPort))
 	conn, err := net.DialTimeout("tcp", target, 3*time.Second)
 
 	if err != nil {
@@ -246,10 +246,10 @@ func checkTCPConnection(rc *eos_io.RuntimeContext) delphiCheckResult {
 			name:     "TCP Port Connectivity",
 			category: "Network",
 			passed:   false,
-			error:    fmt.Errorf("port %d not accessible: %w", delphiMetisPort, err),
+			error:    fmt.Errorf("port %d not accessible: %w", delphiIrisPort, err),
 			remediation: []string{
-				fmt.Sprintf("Verify Metis webhook service is running on %s", delphiMetisIP),
-				"Check if service is listening: sudo ss -tulpn | grep " + fmt.Sprint(delphiMetisPort),
+				fmt.Sprintf("Verify Iris webhook service is running on %s", delphiIrisIP),
+				"Check if service is listening: sudo ss -tulpn | grep " + fmt.Sprint(delphiIrisPort),
 				"Check firewall rules on both machines",
 				"Verify port number is correct in configuration",
 			},
@@ -262,7 +262,7 @@ func checkTCPConnection(rc *eos_io.RuntimeContext) delphiCheckResult {
 		name:     "TCP Port Connectivity",
 		category: "Network",
 		passed:   true,
-		details:  fmt.Sprintf("Port %d is open and accepting connections", delphiMetisPort),
+		details:  fmt.Sprintf("Port %d is open and accepting connections", delphiIrisPort),
 	}
 }
 
@@ -271,7 +271,7 @@ func checkNetworkLatency(rc *eos_io.RuntimeContext) delphiCheckResult {
 
 	// Measure latency with multiple TCP connections
 	var latencies []time.Duration
-	target := net.JoinHostPort(delphiMetisIP, fmt.Sprint(delphiMetisPort))
+	target := net.JoinHostPort(delphiIrisIP, fmt.Sprint(delphiIrisPort))
 
 	for i := 0; i < 3; i++ {
 		start := time.Now()
@@ -295,7 +295,7 @@ func checkNetworkLatency(rc *eos_io.RuntimeContext) delphiCheckResult {
 			remediation: []string{
 				"Network appears unstable or port is not consistently accessible",
 				"Check network congestion",
-				"Verify Metis service is stable",
+				"Verify Iris service is stable",
 			},
 		}
 	}
@@ -350,8 +350,8 @@ func checkFirewallRules(rc *eos_io.RuntimeContext) delphiCheckResult {
 	if err == nil && strings.Contains(string(ufwOutput), "Status: active") {
 		details = append(details, "UFW firewall is active")
 		// Check for specific rule
-		if !strings.Contains(string(ufwOutput), fmt.Sprint(delphiMetisPort)) {
-			details = append(details, fmt.Sprintf("No explicit UFW rule for port %d", delphiMetisPort))
+		if !strings.Contains(string(ufwOutput), fmt.Sprint(delphiIrisPort)) {
+			details = append(details, fmt.Sprintf("No explicit UFW rule for port %d", delphiIrisPort))
 		}
 	}
 
@@ -363,7 +363,7 @@ func checkFirewallRules(rc *eos_io.RuntimeContext) delphiCheckResult {
 		lines := strings.Split(string(iptablesOutput), "\n")
 		for _, line := range lines {
 			if (strings.Contains(line, "DROP") || strings.Contains(line, "REJECT")) &&
-				strings.Contains(line, delphiMetisIP) {
+				strings.Contains(line, delphiIrisIP) {
 				details = append(details, "Found potential blocking iptables rule: "+line)
 			}
 		}
@@ -395,28 +395,28 @@ func checkFirewallRules(rc *eos_io.RuntimeContext) delphiCheckResult {
 	}
 }
 
-// Metis Service Health Checks
-func checkMetisServiceHealth(rc *eos_io.RuntimeContext) []delphiCheckResult {
+// Iris Service Health Checks
+func checkIrisServiceHealth(rc *eos_io.RuntimeContext) []delphiCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("Checking Metis service health")
+	logger.Debug("Checking Iris service health")
 
 	var results []delphiCheckResult
 
-	// Check if we're running on the Metis machine itself
-	isLocalMetis := delphiMetisIP == "localhost" || delphiMetisIP == "127.0.0.1" || delphiMetisIP == "0.0.0.0"
+	// Check if we're running on the Iris machine itself
+	isLocalIris := delphiIrisIP == "localhost" || delphiIrisIP == "127.0.0.1" || delphiIrisIP == "0.0.0.0"
 
 	// If local and auto-start enabled, check and start Temporal server
-	if isLocalMetis && delphiAutoStart {
+	if isLocalIris && delphiAutoStart {
 		temporalResult := checkAndStartTemporalServer(rc)
 		results = append(results, temporalResult)
 	}
 
 	// HTTP health endpoint
-	healthResult := checkMetisHealthEndpoint(rc)
+	healthResult := checkIrisHealthEndpoint(rc)
 	results = append(results, healthResult)
 
 	// Port listening status (from this machine's perspective)
-	portResult := checkMetisPortListening(rc)
+	portResult := checkIrisPortListening(rc)
 	results = append(results, portResult)
 
 	return results
@@ -439,7 +439,7 @@ func checkAndStartTemporalServer(rc *eos_io.RuntimeContext) delphiCheckResult {
 		logger.Info("Temporal server already running", zap.String("target", target))
 		return delphiCheckResult{
 			name:     "Temporal Server Auto-Start",
-			category: "Metis Service",
+			category: "Iris Service",
 			passed:   true,
 			details:  fmt.Sprintf("Temporal server already running on port %d", delphiTemporalPort),
 		}
@@ -457,12 +457,12 @@ func checkAndStartTemporalServer(rc *eos_io.RuntimeContext) delphiCheckResult {
 		logger.Error("Temporal CLI not found in PATH", zap.Error(err))
 		return delphiCheckResult{
 			name:     "Temporal Server Auto-Start",
-			category: "Metis Service",
+			category: "Iris Service",
 			passed:   false,
 			error:    fmt.Errorf("temporal CLI not found: %w", err),
 			remediation: []string{
 				"Install Temporal CLI: curl -sSf https://temporal.download/cli.sh | sh",
-				"Or run: eos create metis",
+				"Or run: eos create iris",
 				"Verify installation: temporal --version",
 			},
 		}
@@ -490,7 +490,7 @@ func checkAndStartTemporalServer(rc *eos_io.RuntimeContext) delphiCheckResult {
 		logger.Error("Failed to start Temporal server", zap.Error(err))
 		return delphiCheckResult{
 			name:     "Temporal Server Auto-Start",
-			category: "Metis Service",
+			category: "Iris Service",
 			passed:   false,
 			error:    fmt.Errorf("failed to start temporal server: %w", err),
 			remediation: []string{
@@ -523,7 +523,7 @@ func checkAndStartTemporalServer(rc *eos_io.RuntimeContext) delphiCheckResult {
 
 			return delphiCheckResult{
 				name:     "Temporal Server Auto-Start",
-				category: "Metis Service",
+				category: "Iris Service",
 				passed:   true,
 				details: fmt.Sprintf("Temporal server started successfully on %s:%d\n"+
 					"  PID: %d\n"+
@@ -546,7 +546,7 @@ func checkAndStartTemporalServer(rc *eos_io.RuntimeContext) delphiCheckResult {
 
 	return delphiCheckResult{
 		name:     "Temporal Server Auto-Start",
-		category: "Metis Service",
+		category: "Iris Service",
 		passed:   false,
 		warning:  true,
 		error:    fmt.Errorf("server started (PID %d) but not listening after %d seconds", cmd.Process.Pid, maxAttempts),
@@ -561,10 +561,10 @@ func checkAndStartTemporalServer(rc *eos_io.RuntimeContext) delphiCheckResult {
 	}
 }
 
-func checkMetisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
+func checkIrisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	healthURL := fmt.Sprintf("http://%s:%d/health", delphiMetisIP, delphiMetisPort)
+	healthURL := fmt.Sprintf("http://%s:%d/health", delphiIrisIP, delphiIrisPort)
 
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
 	defer cancel()
@@ -572,8 +572,8 @@ func checkMetisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
 	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
 	if err != nil {
 		return delphiCheckResult{
-			name:     "Metis Health Endpoint",
-			category: "Metis Service",
+			name:     "Iris Health Endpoint",
+			category: "Iris Service",
 			passed:   false,
 			error:    fmt.Errorf("failed to create request: %w", err),
 		}
@@ -584,15 +584,15 @@ func checkMetisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
 	if err != nil {
 		logger.Error("Health endpoint check failed", zap.Error(err), zap.String("url", healthURL))
 		return delphiCheckResult{
-			name:     "Metis Health Endpoint",
-			category: "Metis Service",
+			name:     "Iris Health Endpoint",
+			category: "Iris Service",
 			passed:   false,
 			error:    fmt.Errorf("health endpoint not responding: %w", err),
 			remediation: []string{
-				fmt.Sprintf("Verify Metis webhook service is running on %s", delphiMetisIP),
-				"Check service status: sudo systemctl status metis-webhook",
-				"Start service if stopped: sudo systemctl start metis-webhook",
-				"Check service logs: sudo journalctl -u metis-webhook -n 50",
+				fmt.Sprintf("Verify Iris webhook service is running on %s", delphiIrisIP),
+				"Check service status: sudo systemctl status iris-webhook",
+				"Start service if stopped: sudo systemctl start iris-webhook",
+				"Check service logs: sudo journalctl -u iris-webhook -n 50",
 			},
 		}
 	}
@@ -610,22 +610,22 @@ func checkMetisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
 
 		if status != "healthy" || !temporalConnected {
 			return delphiCheckResult{
-				name:     "Metis Health Endpoint",
-				category: "Metis Service",
+				name:     "Iris Health Endpoint",
+				category: "Iris Service",
 				passed:   false,
 				error:    fmt.Errorf("service unhealthy or Temporal not connected"),
 				details:  details,
 				remediation: []string{
 					"Check Temporal service: sudo systemctl status temporal",
-					"Verify Temporal is accessible from Metis machine",
-					"Review Metis configuration: cat /opt/metis/config.yaml",
+					"Verify Temporal is accessible from Iris machine",
+					"Review Iris configuration: cat /opt/iris/config.yaml",
 				},
 			}
 		}
 
 		return delphiCheckResult{
-			name:     "Metis Health Endpoint",
-			category: "Metis Service",
+			name:     "Iris Health Endpoint",
+			category: "Iris Service",
 			passed:   true,
 			details:  details,
 		}
@@ -634,8 +634,8 @@ func checkMetisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
 	// Response code check if parsing failed
 	if resp.StatusCode != http.StatusOK {
 		return delphiCheckResult{
-			name:     "Metis Health Endpoint",
-			category: "Metis Service",
+			name:     "Iris Health Endpoint",
+			category: "Iris Service",
 			passed:   false,
 			error:    fmt.Errorf("health check returned HTTP %d", resp.StatusCode),
 			remediation: []string{
@@ -646,27 +646,27 @@ func checkMetisHealthEndpoint(rc *eos_io.RuntimeContext) delphiCheckResult {
 	}
 
 	return delphiCheckResult{
-		name:     "Metis Health Endpoint",
-		category: "Metis Service",
+		name:     "Iris Health Endpoint",
+		category: "Iris Service",
 		passed:   true,
 		details:  fmt.Sprintf("HTTP %d (response parsing failed, but service responding)", resp.StatusCode),
 	}
 }
 
-func checkMetisPortListening(_ *eos_io.RuntimeContext) delphiCheckResult {
+func checkIrisPortListening(_ *eos_io.RuntimeContext) delphiCheckResult {
 	// This is similar to TCP connectivity check but provides different context
-	target := net.JoinHostPort(delphiMetisIP, fmt.Sprint(delphiMetisPort))
+	target := net.JoinHostPort(delphiIrisIP, fmt.Sprint(delphiIrisPort))
 	conn, err := net.DialTimeout("tcp", target, 2*time.Second)
 
 	if err != nil {
 		return delphiCheckResult{
 			name:     "Port Listening Status",
-			category: "Metis Service",
+			category: "Iris Service",
 			passed:   false,
-			error:    fmt.Errorf("port %d not listening", delphiMetisPort),
+			error:    fmt.Errorf("port %d not listening", delphiIrisPort),
 			remediation: []string{
-				"Start Metis webhook service: sudo systemctl start metis-webhook",
-				"Check what's using the port: sudo ss -tulpn | grep " + fmt.Sprint(delphiMetisPort),
+				"Start Iris webhook service: sudo systemctl start iris-webhook",
+				"Check what's using the port: sudo ss -tulpn | grep " + fmt.Sprint(delphiIrisPort),
 			},
 		}
 	}
@@ -674,9 +674,9 @@ func checkMetisPortListening(_ *eos_io.RuntimeContext) delphiCheckResult {
 
 	return delphiCheckResult{
 		name:     "Port Listening Status",
-		category: "Metis Service",
+		category: "Iris Service",
 		passed:   true,
-		details:  fmt.Sprintf("Port %d is listening", delphiMetisPort),
+		details:  fmt.Sprintf("Port %d is listening", delphiIrisPort),
 	}
 }
 
@@ -722,7 +722,7 @@ func checkIntegrationEnvFile(rc *eos_io.RuntimeContext) delphiCheckResult {
 			remediation: []string{
 				"Create .env file: sudo nano " + envPath,
 				"Add required variables:",
-				fmt.Sprintf("  HOOK_URL=http://%s:%d/webhooks/wazuh_alert", delphiMetisIP, delphiMetisPort),
+				fmt.Sprintf("  HOOK_URL=http://%s:%d/webhooks/wazuh_alert", delphiIrisIP, delphiIrisPort),
 				"  API_KEY=<your-api-key>",
 				"Set permissions: sudo chmod 640 " + envPath,
 				"Set ownership: sudo chown root:ossec " + envPath,
@@ -765,15 +765,15 @@ func checkIntegrationEnvFile(rc *eos_io.RuntimeContext) delphiCheckResult {
 			error:    fmt.Errorf("HOOK_URL not found in .env file"),
 			remediation: []string{
 				"Add HOOK_URL to .env file: sudo nano " + envPath,
-				fmt.Sprintf("  HOOK_URL=http://%s:%d/webhooks/wazuh_alert", delphiMetisIP, delphiMetisPort),
+				fmt.Sprintf("  HOOK_URL=http://%s:%d/webhooks/wazuh_alert", delphiIrisIP, delphiIrisPort),
 			},
 		}
 	}
 
 	// Validate HOOK_URL points to correct IP
-	expectedURL := fmt.Sprintf("http://%s:%d", delphiMetisIP, delphiMetisPort)
+	expectedURL := fmt.Sprintf("http://%s:%d", delphiIrisIP, delphiIrisPort)
 	if !strings.Contains(hookURL, expectedURL) {
-		logger.Warn("HOOK_URL does not match expected Metis address",
+		logger.Warn("HOOK_URL does not match expected Iris address",
 			zap.String("found", hookURL),
 			zap.String("expected", expectedURL))
 		return delphiCheckResult{
@@ -783,7 +783,7 @@ func checkIntegrationEnvFile(rc *eos_io.RuntimeContext) delphiCheckResult {
 			error:    fmt.Errorf("HOOK_URL points to wrong address: %s", hookURL),
 			remediation: []string{
 				fmt.Sprintf("Update HOOK_URL in %s to: http://%s:%d/webhooks/wazuh_alert",
-					envPath, delphiMetisIP, delphiMetisPort),
+					envPath, delphiIrisIP, delphiIrisPort),
 			},
 			details: fmt.Sprintf("Current: %s\nExpected: %s/webhooks/wazuh_alert", hookURL, expectedURL),
 		}
@@ -802,8 +802,8 @@ func checkIntegrationScripts(rc *eos_io.RuntimeContext) delphiCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptsToCheck := []string{
-		"/var/ossec/integrations/custom-metis",
-		"/var/ossec/integrations/custom-metis.py",
+		"/var/ossec/integrations/custom-iris",
+		"/var/ossec/integrations/custom-iris.py",
 	}
 
 	var missingScripts []string
@@ -832,8 +832,8 @@ func checkIntegrationScripts(rc *eos_io.RuntimeContext) delphiCheckResult {
 			error:    fmt.Errorf("missing scripts: %s", strings.Join(missingScripts, ", ")),
 			remediation: []string{
 				"Create missing integration scripts in /var/ossec/integrations/",
-				"Ensure scripts are executable: sudo chmod 750 /var/ossec/integrations/custom-metis*",
-				"Set ownership: sudo chown root:ossec /var/ossec/integrations/custom-metis*",
+				"Ensure scripts are executable: sudo chmod 750 /var/ossec/integrations/custom-iris*",
+				"Set ownership: sudo chown root:ossec /var/ossec/integrations/custom-iris*",
 			},
 		}
 	}
@@ -883,17 +883,17 @@ func checkOssecIntegrationConfig(rc *eos_io.RuntimeContext) delphiCheckResult {
 
 	content := string(data)
 
-	// Check for custom-metis integration
-	if !strings.Contains(content, "custom-metis") {
+	// Check for custom-iris integration
+	if !strings.Contains(content, "custom-iris") {
 		return delphiCheckResult{
 			name:     "Ossec Integration Config",
 			category: "Wazuh Configuration",
 			passed:   false,
-			error:    fmt.Errorf("custom-metis integration not found in ossec.conf"),
+			error:    fmt.Errorf("custom-iris integration not found in ossec.conf"),
 			remediation: []string{
 				"Add integration block to " + ossecConfPath,
 				"<integration>",
-				"  <name>custom-metis</name>",
+				"  <name>custom-iris</name>",
 				"  <level>8</level>",
 				"  <alert_format>json</alert_format>",
 				"</integration>",
@@ -914,18 +914,18 @@ func checkOssecIntegrationConfig(rc *eos_io.RuntimeContext) delphiCheckResult {
 	// Extract alert level
 	var alertLevel string
 	lines := strings.Split(content, "\n")
-	inMetisBlock := false
+	inIrisBlock := false
 	for _, line := range lines {
-		if strings.Contains(line, "<name>custom-metis</name>") {
-			inMetisBlock = true
+		if strings.Contains(line, "<name>custom-iris</name>") {
+			inIrisBlock = true
 		}
-		if inMetisBlock && strings.Contains(line, "<level>") {
+		if inIrisBlock && strings.Contains(line, "<level>") {
 			alertLevel = strings.TrimSpace(line)
 			alertLevel = strings.TrimPrefix(alertLevel, "<level>")
 			alertLevel = strings.TrimSuffix(alertLevel, "</level>")
 			break
 		}
-		if inMetisBlock && strings.Contains(line, "</integration>") {
+		if inIrisBlock && strings.Contains(line, "</integration>") {
 			break
 		}
 	}
@@ -1110,7 +1110,7 @@ func sendTestWebhook(rc *eos_io.RuntimeContext) []delphiCheckResult {
 	})
 
 	// Execute integration script
-	scriptPath := "/var/ossec/integrations/custom-metis"
+	scriptPath := "/var/ossec/integrations/custom-iris"
 	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
 	defer cancel()
 
@@ -1149,7 +1149,7 @@ func sendTestWebhook(rc *eos_io.RuntimeContext) []delphiCheckResult {
 			name:     "Webhook Response",
 			category: "Test Webhook",
 			passed:   true,
-			details:  "Received HTTP 200 response from Metis",
+			details:  "Received HTTP 200 response from Iris",
 		})
 	} else {
 		results = append(results, delphiCheckResult{
@@ -1241,7 +1241,7 @@ func analyzeIntegrationLog(rc *eos_io.RuntimeContext) delphiCheckResult {
 				remediation: []string{
 					"Review full logs: sudo tail -f " + logPath,
 					"Look for specific error messages",
-					"Check network connectivity to Metis",
+					"Check network connectivity to Iris",
 				},
 			}
 		}
@@ -1317,10 +1317,10 @@ func analyzeSentPayloadLog(rc *eos_io.RuntimeContext) delphiCheckResult {
 	}
 }
 
-// Remote Metis Checks
-func checkRemoteMetis(rc *eos_io.RuntimeContext) []delphiCheckResult {
+// Remote Iris Checks
+func checkRemoteIris(rc *eos_io.RuntimeContext) []delphiCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("Checking remote Metis machine", zap.String("ssh_key", delphiSSHKey))
+	logger.Debug("Checking remote Iris machine", zap.String("ssh_key", delphiSSHKey))
 
 	var results []delphiCheckResult
 
@@ -1355,7 +1355,7 @@ func testSSHConnection(rc *eos_io.RuntimeContext) delphiCheckResult {
 		"-i", delphiSSHKey,
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "ConnectTimeout=3",
-		fmt.Sprintf("ubuntu@%s", delphiMetisIP),
+		fmt.Sprintf("ubuntu@%s", delphiIrisIP),
 		"echo", "connected")
 
 	output, err := cmd.CombinedOutput()
@@ -1366,11 +1366,11 @@ func testSSHConnection(rc *eos_io.RuntimeContext) delphiCheckResult {
 			name:     "SSH Connectivity",
 			category: "Remote Checks",
 			passed:   false,
-			error:    fmt.Errorf("cannot SSH to %s: %w", delphiMetisIP, err),
+			error:    fmt.Errorf("cannot SSH to %s: %w", delphiIrisIP, err),
 			remediation: []string{
 				"Verify SSH key is correct: " + delphiSSHKey,
-				"Check SSH is enabled on Metis machine",
-				"Test manually: ssh -i " + delphiSSHKey + " ubuntu@" + delphiMetisIP,
+				"Check SSH is enabled on Iris machine",
+				"Test manually: ssh -i " + delphiSSHKey + " ubuntu@" + delphiIrisIP,
 				"Verify SSH port 22 is open",
 			},
 			details: string(output),
@@ -1382,7 +1382,7 @@ func testSSHConnection(rc *eos_io.RuntimeContext) delphiCheckResult {
 		name:     "SSH Connectivity",
 		category: "Remote Checks",
 		passed:   true,
-		details:  fmt.Sprintf("Successfully connected to ubuntu@%s", delphiMetisIP),
+		details:  fmt.Sprintf("Successfully connected to ubuntu@%s", delphiIrisIP),
 	}
 }
 
@@ -1395,8 +1395,8 @@ func checkRemotePortStatus(rc *eos_io.RuntimeContext) delphiCheckResult {
 	cmd := exec.CommandContext(ctx, "ssh",
 		"-i", delphiSSHKey,
 		"-o", "StrictHostKeyChecking=no",
-		fmt.Sprintf("ubuntu@%s", delphiMetisIP),
-		"sudo", "ss", "-tulpn", "|", "grep", fmt.Sprint(delphiMetisPort))
+		fmt.Sprintf("ubuntu@%s", delphiIrisIP),
+		"sudo", "ss", "-tulpn", "|", "grep", fmt.Sprint(delphiIrisPort))
 
 	output, err := cmd.CombinedOutput()
 
@@ -1406,10 +1406,10 @@ func checkRemotePortStatus(rc *eos_io.RuntimeContext) delphiCheckResult {
 			name:     "Remote Port Status",
 			category: "Remote Checks",
 			passed:   false,
-			error:    fmt.Errorf("port %d not listening on Metis", delphiMetisPort),
+			error:    fmt.Errorf("port %d not listening on Iris", delphiIrisPort),
 			remediation: []string{
-				"Start webhook service on Metis: sudo systemctl start metis-webhook",
-				"Check what's using the port: sudo ss -tulpn | grep " + fmt.Sprint(delphiMetisPort),
+				"Start webhook service on Iris: sudo systemctl start iris-webhook",
+				"Check what's using the port: sudo ss -tulpn | grep " + fmt.Sprint(delphiIrisPort),
 			},
 			details: string(output),
 		}
@@ -1420,7 +1420,7 @@ func checkRemotePortStatus(rc *eos_io.RuntimeContext) delphiCheckResult {
 		name:     "Remote Port Status",
 		category: "Remote Checks",
 		passed:   true,
-		details:  fmt.Sprintf("Port %d is listening on Metis:\n  %s", delphiMetisPort, string(output)),
+		details:  fmt.Sprintf("Port %d is listening on Iris:\n  %s", delphiIrisPort, string(output)),
 	}
 }
 
@@ -1433,8 +1433,8 @@ func checkRemoteServiceStatus(rc *eos_io.RuntimeContext) delphiCheckResult {
 	cmd := exec.CommandContext(ctx, "ssh",
 		"-i", delphiSSHKey,
 		"-o", "StrictHostKeyChecking=no",
-		fmt.Sprintf("ubuntu@%s", delphiMetisIP),
-		"systemctl", "status", "metis-webhook", "metis-worker", "--no-pager")
+		fmt.Sprintf("ubuntu@%s", delphiIrisIP),
+		"systemctl", "status", "iris-webhook", "iris-worker", "--no-pager")
 
 	output, err := cmd.CombinedOutput()
 
@@ -1451,11 +1451,11 @@ func checkRemoteServiceStatus(rc *eos_io.RuntimeContext) delphiCheckResult {
 			error:    fmt.Errorf("one or more services not active"),
 			details:  details,
 			remediation: []string{
-				"Start services on Metis:",
-				"  sudo systemctl start metis-webhook metis-worker",
+				"Start services on Iris:",
+				"  sudo systemctl start iris-webhook iris-worker",
 				"Check logs:",
-				"  sudo journalctl -u metis-webhook -n 50",
-				"  sudo journalctl -u metis-worker -n 50",
+				"  sudo journalctl -u iris-webhook -n 50",
+				"  sudo journalctl -u iris-worker -n 50",
 			},
 		}
 	}
@@ -1465,7 +1465,7 @@ func checkRemoteServiceStatus(rc *eos_io.RuntimeContext) delphiCheckResult {
 		name:     "Remote Service Status",
 		category: "Remote Checks",
 		passed:   true,
-		details:  "All Metis services are active",
+		details:  "All Iris services are active",
 	}
 }
 
@@ -1516,7 +1516,7 @@ func displayDelphiResults(results []delphiCheckResult) {
 	fmt.Println()
 
 	// Group by category
-	categories := []string{"Network", "Metis Service", "Wazuh Configuration", "Python Dependencies", "Test Webhook", "Logs", "Remote Checks"}
+	categories := []string{"Network", "Iris Service", "Wazuh Configuration", "Python Dependencies", "Test Webhook", "Logs", "Remote Checks"}
 
 	for _, category := range categories {
 		checks := categoryMap[category]
@@ -1617,14 +1617,14 @@ func displayDelphiResults(results []delphiCheckResult) {
 		fmt.Println("Next Steps:")
 		fmt.Println("  • Generate a real Wazuh alert (level ≥ configured threshold)")
 		fmt.Println("  • Monitor logs: sudo tail -f /var/ossec/logs/integrations.log")
-		fmt.Printf("  • Check Temporal UI: http://%s:8233\n", delphiMetisIP)
+		fmt.Printf("  • Check Temporal UI: http://%s:8233\n", delphiIrisIP)
 	} else {
 		fmt.Println("Issues detected - follow remediation steps above")
 		fmt.Println()
 		fmt.Println("After fixing issues:")
 		fmt.Println("  1. Run this diagnostic again: eos debug delphi --webhook-out")
 		fmt.Println("  2. Monitor integration logs: sudo tail -f /var/ossec/logs/integrations.log")
-		fmt.Printf("  3. Check Temporal UI: http://%s:8233\n", delphiMetisIP)
+		fmt.Printf("  3. Check Temporal UI: http://%s:8233\n", delphiIrisIP)
 	}
 	fmt.Println()
 }

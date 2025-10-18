@@ -1,4 +1,4 @@
-// cmd/debug/metis.go
+// cmd/debug/iris.go
 package debug
 
 import (
@@ -22,10 +22,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var debugMetisCmd = &cobra.Command{
-	Use:   "metis",
-	Short: "Debug Metis installation and configuration",
-	Long: `Comprehensive diagnostic tool for Metis security alert processing system.
+var debugIrisCmd = &cobra.Command{
+	Use:   "iris",
+	Short: "Debug Iris installation and configuration",
+	Long: `Comprehensive diagnostic tool for Iris security alert processing system.
 
 Enhanced Phase 1 checks performed:
 
@@ -52,7 +52,7 @@ System (1 check):
 Flags:
   --test      Send a test alert through the system
   --verbose   Show detailed diagnostic output`,
-	RunE: eos.Wrap(runDebugMetis),
+	RunE: eos.Wrap(runDebugIris),
 }
 
 var (
@@ -61,9 +61,9 @@ var (
 )
 
 func init() {
-	debugMetisCmd.Flags().BoolVar(&testAlert, "test", false, "Send a test alert")
-	debugMetisCmd.Flags().BoolVar(&verbose, "verbose", false, "Verbose output")
-	debugCmd.AddCommand(debugMetisCmd)
+	debugIrisCmd.Flags().BoolVar(&testAlert, "test", false, "Send a test alert")
+	debugIrisCmd.Flags().BoolVar(&verbose, "verbose", false, "Verbose output")
+	debugCmd.AddCommand(debugIrisCmd)
 }
 
 type checkResult struct {
@@ -75,11 +75,11 @@ type checkResult struct {
 	details     string
 }
 
-func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runDebugIris(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("Starting Metis diagnostic checks")
+	logger.Debug("Starting Iris diagnostic checks")
 
-	projectDir := "/opt/metis"
+	projectDir := "/opt/iris"
 	results := []checkResult{}
 
 	// Run all checks
@@ -89,8 +89,8 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	// Infrastructure checks
 	results = append(results, checkProjectStructureWithResult(rc, projectDir))
 	results = append(results, checkTemporalCLIWithResult(rc))
-	results = append(results, checkBinaryAccessibilityWithResult(rc)) // NEW: Phase 1
-	results = append(results, checkPortStatusWithResult(rc, config))   // NEW: Phase 1 - now accepts config for dynamic port
+	results = append(results, checkBinaryAccessibilityWithResult(rc))              // NEW: Phase 1
+	results = append(results, checkPortStatusWithResult(rc, config))               // NEW: Phase 1 - now accepts config for dynamic port
 	results = append(results, checkTemporalServerHealthDeepWithResult(rc, config)) // NEW: Phase 1 (replaces old check)
 
 	// Configuration checks
@@ -99,8 +99,8 @@ func runDebugMetis(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	results = append(results, checkSMTPConfigWithResult(rc, config))
 
 	// Services checks
-	results = append(results, checkSystemdServicesWithResult(rc))      // NEW: Check systemd units exist and status
-	results = append(results, checkWorkerProcessHealthWithResult(rc))  // NEW: Phase 1 (enhanced)
+	results = append(results, checkSystemdServicesWithResult(rc))             // NEW: Check systemd units exist and status
+	results = append(results, checkWorkerProcessHealthWithResult(rc))         // NEW: Phase 1 (enhanced)
 	results = append(results, checkWebhookServerHealthWithResult(rc, config)) // NEW: Phase 1 (enhanced)
 	results = append(results, checkRecentWorkflowsWithResult(rc, config))
 
@@ -279,17 +279,17 @@ func displayDiagnosticResults(results []checkResult) {
 			}
 		}
 		fmt.Println()
-		fmt.Println("After fixing issues, run: eos debug metis")
+		fmt.Println("After fixing issues, run: eos debug iris")
 		fmt.Println()
 	} else {
 		fmt.Println("╔════════════════════════════════════════════════════════════════╗")
 		fmt.Println("║                  ALL CHECKS PASSED                             ║")
 		fmt.Println("╚════════════════════════════════════════════════════════════════╝")
 		fmt.Println()
-		fmt.Println("Metis is configured and operational.")
+		fmt.Println("Iris is configured and operational.")
 		fmt.Println()
 		fmt.Println("To test the alert processing pipeline:")
-		fmt.Println("  eos debug metis --test")
+		fmt.Println("  eos debug iris --test")
 		fmt.Println()
 		fmt.Println("To view Temporal workflows:")
 		fmt.Println("  • Open http://localhost:8233")
@@ -309,8 +309,8 @@ func checkProjectStructureWithResult(rc *eos_io.RuntimeContext, projectDir strin
 
 	if err != nil {
 		result.remediation = []string{
-			"Install Metis using: eos create metis",
-			"Or clone from repository: git clone <metis-repo> /opt/metis",
+			"Install Iris using: eos create iris",
+			"Or clone from repository: git clone <iris-repo> /opt/iris",
 			fmt.Sprintf("Ensure directory exists: sudo mkdir -p %s", projectDir),
 			"Verify required subdirectories: worker/, webhook/",
 		}
@@ -345,7 +345,7 @@ func checkProjectStructure(rc *eos_io.RuntimeContext, projectDir string) error {
 	return nil
 }
 
-type MetisConfig struct {
+type IrisConfig struct {
 	Temporal struct {
 		HostPort  string `yaml:"host_port"`
 		Namespace string `yaml:"namespace"`
@@ -370,7 +370,7 @@ type MetisConfig struct {
 	} `yaml:"webhook"`
 }
 
-func checkConfigurationWithResult(rc *eos_io.RuntimeContext, projectDir string) (*MetisConfig, checkResult) {
+func checkConfigurationWithResult(rc *eos_io.RuntimeContext, projectDir string) (*IrisConfig, checkResult) {
 	config, err := checkConfiguration(rc, projectDir)
 	result := checkResult{
 		name:     "Configuration File",
@@ -397,7 +397,7 @@ func checkConfigurationWithResult(rc *eos_io.RuntimeContext, projectDir string) 
 	return config, result
 }
 
-func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string) (*MetisConfig, error) {
+func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string) (*IrisConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	configPath := filepath.Join(projectDir, "config.yaml")
@@ -406,7 +406,7 @@ func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string) (*MetisCon
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var config MetisConfig
+	var config IrisConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -432,9 +432,6 @@ func checkConfiguration(rc *eos_io.RuntimeContext, projectDir string) (*MetisCon
 	return &config, nil
 }
 
-
-
-
 // Phase 1 Enhanced Diagnostics
 
 func checkTemporalCLIWithResult(rc *eos_io.RuntimeContext) checkResult {
@@ -449,7 +446,7 @@ func checkTemporalCLIWithResult(rc *eos_io.RuntimeContext) checkResult {
 			error:    fmt.Errorf("temporal CLI not found in PATH"),
 			remediation: []string{
 				"Install Temporal CLI: curl -sSf https://temporal.download/cli.sh | sh",
-				"Or run: eos repair metis --auto-yes",
+				"Or run: eos repair iris --auto-yes",
 				"Verify installation: temporal --version",
 			},
 		}
@@ -466,7 +463,7 @@ func checkTemporalCLIWithResult(rc *eos_io.RuntimeContext) checkResult {
 			error:    fmt.Errorf("temporal binary found but not executable: %w", err),
 			remediation: []string{
 				"Fix permissions: sudo chmod 755 " + temporalPath,
-				"Or reinstall: eos repair metis --auto-yes",
+				"Or reinstall: eos repair iris --auto-yes",
 			},
 		}
 	}
@@ -499,7 +496,7 @@ func checkBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) checkResult {
 			passed:   false,
 			error:    fmt.Errorf("temporal not in PATH"),
 			remediation: []string{
-				"Run: eos repair metis --auto-yes",
+				"Run: eos repair iris --auto-yes",
 				"This will copy the binary to /usr/local/bin/temporal",
 			},
 		}
@@ -518,7 +515,7 @@ func checkBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) checkResult {
 				error:    fmt.Errorf("temporal binary not accessible to non-root users: %s", string(output)),
 				remediation: []string{
 					"Binary might be in /root/ directory which non-root users can't access",
-					"Run: eos repair metis --auto-yes",
+					"Run: eos repair iris --auto-yes",
 					"This will copy the binary to /usr/local/bin/temporal",
 					"Or manually: sudo cp /root/.temporalio/bin/temporal /usr/local/bin/temporal",
 				},
@@ -549,7 +546,7 @@ func checkBinaryAccessibilityWithResult(rc *eos_io.RuntimeContext) checkResult {
 	}
 }
 
-func checkPortStatusWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+func checkPortStatusWithResult(rc *eos_io.RuntimeContext, config *IrisConfig) checkResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Determine webhook port from config, default to 8080
@@ -564,7 +561,7 @@ func checkPortStatusWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) c
 	}{
 		{7233, "Temporal gRPC"},
 		{8233, "Temporal UI"},
-		{webhookPort, "Metis Webhook"},
+		{webhookPort, "Iris Webhook"},
 	}
 
 	var listening []string
@@ -625,9 +622,9 @@ func checkPortStatusWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) c
 			passed:   false,
 			error:    fmt.Errorf("%d ports not listening", len(notListening)),
 			remediation: []string{
-				"Check if services are installed: systemctl list-units 'metis*' 'temporal*'",
+				"Check if services are installed: systemctl list-units 'iris*' 'temporal*'",
 				"If services exist but stopped: see 'Systemd Services' check for start commands",
-				"If services don't exist: run 'eos create metis' or 'eos repair metis'",
+				"If services don't exist: run 'eos create iris' or 'eos repair iris'",
 			},
 			details: detailsText,
 		}
@@ -648,7 +645,7 @@ func checkPortStatusWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) c
 	}
 }
 
-func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *IrisConfig) checkResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	if config == nil {
@@ -658,7 +655,7 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			passed:   false,
 			error:    fmt.Errorf("config not loaded"),
 			remediation: []string{
-				"Fix configuration first: eos create metis",
+				"Fix configuration first: eos create iris",
 			},
 		}
 	}
@@ -692,7 +689,7 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 				"Check logs: sudo journalctl -u temporal -n 50")
 		} else if systemdStatus == "" {
 			remediation = append(remediation,
-				"Service not installed: eos create metis or eos repair metis",
+				"Service not installed: eos create iris or eos repair iris",
 				"Or start manually: temporal server start-dev")
 		}
 
@@ -700,12 +697,12 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			"Check if port is in use by another process: lsof -i :7233")
 
 		return checkResult{
-			name:     "Temporal Server Health",
-			category: "Infrastructure",
-			passed:   false,
-			error:    fmt.Errorf("port %s not listening", hostPort),
+			name:        "Temporal Server Health",
+			category:    "Infrastructure",
+			passed:      false,
+			error:       fmt.Errorf("port %s not listening", hostPort),
 			remediation: remediation,
-			details:  fmt.Sprintf("systemd status: %s", systemdStatus),
+			details:     fmt.Sprintf("systemd status: %s", systemdStatus),
 		}
 	}
 	conn.Close()
@@ -816,7 +813,7 @@ func checkWorkerProcessHealthWithResult(rc *eos_io.RuntimeContext) checkResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if worker is running
-	cmd := exec.CommandContext(rc.Ctx, "pgrep", "-f", "metis.*worker")
+	cmd := exec.CommandContext(rc.Ctx, "pgrep", "-f", "iris.*worker")
 	output, err := cmd.Output()
 	if err != nil {
 		return checkResult{
@@ -825,9 +822,9 @@ func checkWorkerProcessHealthWithResult(rc *eos_io.RuntimeContext) checkResult {
 			passed:   false,
 			error:    fmt.Errorf("worker process not running"),
 			remediation: []string{
-				"Start worker: sudo systemctl start metis-worker",
-				"Or manually: cd /opt/metis/worker && go run main.go",
-				"Check logs: sudo journalctl -u metis-worker -n 50",
+				"Start worker: sudo systemctl start iris-worker",
+				"Or manually: cd /opt/iris/worker && go run main.go",
+				"Check logs: sudo journalctl -u iris-worker -n 50",
 				"Ensure Temporal server is running first",
 			},
 		}
@@ -841,8 +838,8 @@ func checkWorkerProcessHealthWithResult(rc *eos_io.RuntimeContext) checkResult {
 			passed:   false,
 			error:    fmt.Errorf("worker process not found"),
 			remediation: []string{
-				"Start worker: sudo systemctl start metis-worker",
-				"Check logs: sudo journalctl -u metis-worker -n 50",
+				"Start worker: sudo systemctl start iris-worker",
+				"Check logs: sudo journalctl -u iris-worker -n 50",
 			},
 		}
 	}
@@ -870,11 +867,11 @@ func checkWorkerProcessHealthWithResult(rc *eos_io.RuntimeContext) checkResult {
 	}
 }
 
-func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *IrisConfig) checkResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if webhook is running
-	cmd := exec.CommandContext(rc.Ctx, "pgrep", "-f", "metis.*webhook")
+	cmd := exec.CommandContext(rc.Ctx, "pgrep", "-f", "iris.*webhook")
 	output, err := cmd.Output()
 	if err != nil {
 		return checkResult{
@@ -883,9 +880,9 @@ func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *Metis
 			passed:   false,
 			error:    fmt.Errorf("webhook process not running"),
 			remediation: []string{
-				"Start webhook: sudo systemctl start metis-webhook",
-				"Or manually: cd /opt/metis/webhook && go run main.go",
-				"Check logs: sudo journalctl -u metis-webhook -n 50",
+				"Start webhook: sudo systemctl start iris-webhook",
+				"Or manually: cd /opt/iris/webhook && go run main.go",
+				"Check logs: sudo journalctl -u iris-webhook -n 50",
 			},
 		}
 	}
@@ -898,7 +895,7 @@ func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *Metis
 			passed:   false,
 			error:    fmt.Errorf("webhook process not found"),
 			remediation: []string{
-				"Start webhook: sudo systemctl start metis-webhook",
+				"Start webhook: sudo systemctl start iris-webhook",
 			},
 		}
 	}
@@ -927,8 +924,8 @@ func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *Metis
 				passed:   false,
 				error:    fmt.Errorf("webhook process running (PID %s) but health check failed: %w", pid, err),
 				remediation: []string{
-					"Check logs: sudo journalctl -u metis-webhook -n 50",
-					"Restart webhook: sudo systemctl restart metis-webhook",
+					"Check logs: sudo journalctl -u iris-webhook -n 50",
+					"Restart webhook: sudo systemctl restart iris-webhook",
 					"Verify port is correct in config.yaml",
 				},
 			}
@@ -942,8 +939,8 @@ func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *Metis
 				passed:   false,
 				error:    fmt.Errorf("webhook health check returned status %d", resp.StatusCode),
 				remediation: []string{
-					"Check logs: sudo journalctl -u metis-webhook -n 50",
-					"Restart webhook: sudo systemctl restart metis-webhook",
+					"Check logs: sudo journalctl -u iris-webhook -n 50",
+					"Restart webhook: sudo systemctl restart iris-webhook",
 				},
 			}
 		}
@@ -962,7 +959,7 @@ func checkWebhookServerHealthWithResult(rc *eos_io.RuntimeContext, config *Metis
 func checkSystemdServicesWithResult(rc *eos_io.RuntimeContext) checkResult {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	services := []string{"temporal", "metis-worker", "metis-webhook"}
+	services := []string{"temporal", "iris-worker", "iris-webhook"}
 
 	var missing []string
 	var inactive []string
@@ -1036,8 +1033,8 @@ func checkSystemdServicesWithResult(rc *eos_io.RuntimeContext) checkResult {
 			passed:   false,
 			error:    fmt.Errorf("service units not installed: %s", strings.Join(missing, ", ")),
 			remediation: []string{
-				"Install services: eos create metis",
-				"Or manually install: eos repair metis --auto-yes",
+				"Install services: eos create iris",
+				"Or manually install: eos repair iris --auto-yes",
 				"Services should be installed to: /etc/systemd/system/",
 			},
 			details: detailsText,
@@ -1068,12 +1065,12 @@ func checkSystemdServicesWithResult(rc *eos_io.RuntimeContext) checkResult {
 			"Check status: sudo systemctl status "+strings.Join(problemServices, " "))
 
 		return checkResult{
-			name:     "Systemd Services",
-			category: "Services",
-			passed:   false,
-			error:    fmt.Errorf("%d services not active", len(problemServices)),
+			name:        "Systemd Services",
+			category:    "Services",
+			passed:      false,
+			error:       fmt.Errorf("%d services not active", len(problemServices)),
 			remediation: remediation,
-			details: detailsText,
+			details:     detailsText,
 		}
 	}
 
@@ -1088,7 +1085,7 @@ func checkSystemdServicesWithResult(rc *eos_io.RuntimeContext) checkResult {
 	}
 }
 
-func checkAzureOpenAIWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+func checkAzureOpenAIWithResult(rc *eos_io.RuntimeContext, config *IrisConfig) checkResult {
 	err := checkAzureOpenAI(rc, config)
 	result := checkResult{
 		name:     "Azure OpenAI Configuration",
@@ -1114,7 +1111,7 @@ func checkAzureOpenAIWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) 
 	return result
 }
 
-func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *MetisConfig) error {
+func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *IrisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
 	}
@@ -1133,7 +1130,7 @@ func checkAzureOpenAI(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	return nil
 }
 
-func checkSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+func checkSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *IrisConfig) checkResult {
 	err := checkSMTPConfig(rc, config)
 	result := checkResult{
 		name:     "SMTP Configuration",
@@ -1149,7 +1146,7 @@ func checkSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) c
 			"  smtp_port: 587 (or 465 for SSL)",
 			"  username: your-email@example.com",
 			"  password: <app-password>",
-			"  from: metis@example.com",
+			"  from: iris@example.com",
 			"  to: security-team@example.com",
 			"For Gmail: use App Password, not account password",
 		}
@@ -1160,7 +1157,7 @@ func checkSMTPConfigWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) c
 	return result
 }
 
-func checkSMTPConfig(rc *eos_io.RuntimeContext, config *MetisConfig) error {
+func checkSMTPConfig(rc *eos_io.RuntimeContext, config *IrisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
 	}
@@ -1181,7 +1178,7 @@ func checkSMTPConfig(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 	return nil
 }
 
-func checkRecentWorkflowsWithResult(rc *eos_io.RuntimeContext, config *MetisConfig) checkResult {
+func checkRecentWorkflowsWithResult(rc *eos_io.RuntimeContext, config *IrisConfig) checkResult {
 	err := checkRecentWorkflows(rc, config)
 	result := checkResult{
 		name:     "Temporal CLI",
@@ -1375,7 +1372,7 @@ func findTemporalBinary(rc *eos_io.RuntimeContext) string {
 	return strings.Join(findings, "\n  ")
 }
 
-func checkRecentWorkflows(rc *eos_io.RuntimeContext, config *MetisConfig) error {
+func checkRecentWorkflows(rc *eos_io.RuntimeContext, config *IrisConfig) error {
 	if config == nil {
 		return fmt.Errorf("config not loaded")
 	}
@@ -1407,8 +1404,8 @@ func checkGoDependenciesWithResult(rc *eos_io.RuntimeContext, projectDir string)
 
 	if err != nil {
 		result.remediation = []string{
-			"Fix worker dependencies: cd /opt/metis/worker && go mod tidy",
-			"Fix webhook dependencies: cd /opt/metis/webhook && go mod tidy",
+			"Fix worker dependencies: cd /opt/iris/worker && go mod tidy",
+			"Fix webhook dependencies: cd /opt/iris/webhook && go mod tidy",
 			"Download modules: go mod download",
 			"Verify Go installation: go version",
 			"Check module cache: go clean -modcache",
@@ -1453,7 +1450,7 @@ func checkGoDependencies(rc *eos_io.RuntimeContext, projectDir string) error {
 	return nil
 }
 
-func sendTestAlert(rc *eos_io.RuntimeContext, config *MetisConfig) error {
+func sendTestAlert(rc *eos_io.RuntimeContext, config *IrisConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	if config == nil {
@@ -1471,7 +1468,7 @@ func sendTestAlert(rc *eos_io.RuntimeContext, config *MetisConfig) error {
 				"package": map[string]string{
 					"name": "test-package",
 				},
-				"title": "TEST: Metis diagnostic test alert",
+				"title": "TEST: Iris diagnostic test alert",
 			},
 		},
 	}

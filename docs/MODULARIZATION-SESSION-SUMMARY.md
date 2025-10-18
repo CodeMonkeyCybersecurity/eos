@@ -281,7 +281,7 @@ All modules: **YES**
 4.  Update documentation
 
 ### Short Term (This Week)
-1. Move to next P1 file: **cmd/debug/metis.go** (1,659 lines)
+1. Move to next P1 file: **cmd/debug/iris.go** (1,659 lines)
 2. Apply same modularization patterns
 3. Document lessons learned
 4. Create reusable templates
@@ -429,4 +429,4 @@ With 92% completion on the first P1 file, we've established solid patterns and b
 ---
 
 **Session End:** 2025-10-09 01:25:00  
-**Next Session:** Complete orchestrator + start cmd/debug/metis.go
+**Next Session:** Complete orchestrator + start cmd/debug/iris.go

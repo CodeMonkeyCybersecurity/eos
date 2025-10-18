@@ -1,6 +1,6 @@
-# Metis Diagnostics Modularization Analysis
+# Iris Diagnostics Modularization Analysis
 
-**File:** cmd/debug/metis.go  
+**File:** cmd/debug/iris.go  
 **Size:** 1,660 lines  
 **Functions:** 30+  
 **Status:** Ready for modularization  
@@ -75,14 +75,14 @@
 ### 7. Main Orchestrator (1 function, ~60 lines)
 **Lines:** 78-139  
 **Functions:**
-- `runDebugMetis()` - Main diagnostic orchestrator
+- `runDebugIris()` - Main diagnostic orchestrator
 
 ---
 
 ## Proposed Module Structure
 
 ```
-cmd/debug/metis/
+cmd/debug/iris/
 ├── main.go (orchestrator, <100 lines)
 ├── checks/
 │   ├── infrastructure.go      # Infrastructure checks (~200 lines)
@@ -97,7 +97,7 @@ cmd/debug/metis/
 │   └── formatter.go           # Result formatting (~50 lines)
 ├── helpers/
 │   └── temporal.go            # Temporal binary discovery (~150 lines)
-└── types.go                   # Shared types (checkResult, MetisConfig)
+└── types.go                   # Shared types (checkResult, IrisConfig)
 ```
 
 ---
@@ -107,7 +107,7 @@ cmd/debug/metis/
 ### Module 1: types.go (~50 lines)
 **Responsibility:** Shared type definitions
 - `checkResult` struct
-- `MetisConfig` struct
+- `IrisConfig` struct
 - Helper types
 
 ### Module 2: checks/infrastructure.go (~200 lines)
@@ -180,7 +180,7 @@ cmd/debug/metis/
 
 ### Phase 1: Extract Types
 1. Create `types.go` with shared types
-2. Move `checkResult` and `MetisConfig`
+2. Move `checkResult` and `IrisConfig`
 
 ### Phase 2: Extract Checks
 1. Create `checks/infrastructure.go`
