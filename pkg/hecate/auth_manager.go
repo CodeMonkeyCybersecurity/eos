@@ -299,7 +299,7 @@ func (am *AuthManager) buildAuthentikPolicy(policy *AuthPolicyInfo) *AuthentikPo
 }
 
 // TODO: refactor
-func (am *AuthManager) storePolicy(ctx context.Context, policy *AuthPolicyInfo) error {
+func (am *AuthManager) storePolicy(_ context.Context, policy *AuthPolicyInfo) error {
 	data, err := json.Marshal(policy)
 	if err != nil {
 		return err
@@ -314,7 +314,7 @@ func (am *AuthManager) storePolicy(ctx context.Context, policy *AuthPolicyInfo) 
 }
 
 // TODO: refactor
-func (am *AuthManager) deletePolicyFromConsul(ctx context.Context, name string) error {
+func (am *AuthManager) deletePolicyFromConsul(_ context.Context, name string) error {
 	_, err := am.client.consul.KV().Delete(fmt.Sprintf("hecate/auth-policies/%s", name), nil)
 	return err
 }

@@ -1,7 +1,7 @@
-// pkg/consul/verification.go
+// pkg/consul/lifecycle/verification.go
 // Post-installation verification for Consul
 
-package consul
+package lifecycle
 
 import (
 	"fmt"

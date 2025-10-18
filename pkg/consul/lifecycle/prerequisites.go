@@ -1,7 +1,7 @@
 // pkg/consul/prerequisites.go
 // System prerequisite validation for Consul installation
 
-package consul
+package lifecycle
 
 import (
 	"context"

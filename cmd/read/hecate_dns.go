@@ -163,7 +163,7 @@ func runReadHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	return nil
 }
 
-func getEnvOrDefault(envVar, defaultValue string) string {
+func getEnvOrDefault(_ string, defaultValue string) string {
 	// Implementation would be the same as in other files
 	return defaultValue
 }

@@ -1,6 +1,6 @@
 // pkg/consul/preflight.go
 
-package consul
+package lifecycle
 
 import (
 	"fmt"

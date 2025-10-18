@@ -1,7 +1,7 @@
 // pkg/consul/installer/version.go
 // Version detection and management for Consul installation
 
-package installer
+package lifecycle
 
 import (
 	"encoding/json"

@@ -58,16 +58,33 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Hecate deployment wizard")
 
-	// ASSESS - Prompt for required configuration
-	logger.Info("terminal prompt: Enter your domain (e.g., example.com):")
-	domain, err := eos_io.ReadInput(rc)
-	if err != nil {
-		return fmt.Errorf("failed to read domain input: %w", err)
-	}
+	var domain string
+	var config *HecateConsulConfig
 
-	domain = strings.TrimSpace(domain)
-	if domain == "" {
-		return fmt.Errorf("domain is required")
+	// ASSESS - Try to load config from Consul first
+	consulMgr, err := NewConsulConfigManager(rc)
+	if err != nil {
+		logger.Warn("Consul not available, using interactive prompts", zap.Error(err))
+		logger.Info("Tip: Install Consul to save configuration for future use")
+		logger.Info("")
+
+		// Fallback to manual prompt
+		logger.Info("terminal prompt: Enter your domain (e.g., example.com):")
+		domain, err = eos_io.ReadInput(rc)
+		if err != nil {
+			return fmt.Errorf("failed to read domain input: %w", err)
+		}
+		domain = strings.TrimSpace(domain)
+		if domain == "" {
+			return fmt.Errorf("domain is required")
+		}
+	} else {
+		// Consul is available - try to load or prompt for config
+		config, err = consulMgr.LoadOrPromptConfig(rc, true)
+		if err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+		domain = config.Domain
 	}
 
 	logger.Info("Using domain", zap.String("domain", domain))
@@ -104,7 +121,31 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 
 	// EVALUATE - Start services with docker compose
 	logger.Info("Starting Hecate services...")
-	return startHecateServices(rc)
+	if err := startHecateServices(rc); err != nil {
+		return err
+	}
+
+	// Save configuration to Consul for future use (if Consul is available)
+	if consulMgr != nil {
+		logger.Info("Saving configuration to Consul for future use")
+		saveConfig := &HecateConsulConfig{
+			Domain:          domain,
+			ConsulAvailable: true,
+		}
+		// Include server IP if we detected it during DNS setup
+		if config != nil && config.ServerIP != "" {
+			saveConfig.ServerIP = config.ServerIP
+		}
+		if err := consulMgr.SaveConfig(rc, saveConfig); err != nil {
+			logger.Warn("Failed to save configuration to Consul", zap.Error(err))
+			// Don't fail deployment if Consul save fails
+		} else {
+			logger.Info("Configuration saved to Consul successfully")
+			logger.Info("Next time you run 'eos create hecate', these settings will be suggested")
+		}
+	}
+
+	return nil
 }
 
 // ShouldExitNoServicesSelected checks if no services were selected and logs a friendly exit message.

@@ -5,6 +5,7 @@ package create
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/lifecycle"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -59,7 +60,7 @@ EXAMPLES:
 
   # Install without Vault integration
   eos create consul --no-vault-integration`,
-	RunE: eos_cli.Wrap(consul.RunCreateConsul),
+	RunE: eos_cli.Wrap(lifecycle.RunCreateConsul),
 }
 
 func init() {

@@ -92,7 +92,7 @@ func loadEnhancedEnvironmentConfig() (*environment.EnhancedEnvironmentConfig, er
 }
 
 // displayBasicEnvironment displays basic environment information
-func displayBasicEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, jsonOutput bool) error {
+func displayBasicEnvironment(rc *eos_io.RuntimeContext, _ *cobra.Command, jsonOutput bool) error {
 	// Fallback to basic discovery
 	basicConfig, err := environment.DiscoverEnvironment(rc)
 	if err != nil {

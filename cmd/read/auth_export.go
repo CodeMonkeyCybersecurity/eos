@@ -73,7 +73,7 @@ Examples:
 	}),
 }
 
-func exportAuthentik(rc *eos_io.RuntimeContext) error {
+func exportAuthentik(_ *eos_io.RuntimeContext) error {
 	url := authURL
 	token := authToken
 	if url == "" {

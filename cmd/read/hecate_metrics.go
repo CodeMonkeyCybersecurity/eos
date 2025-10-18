@@ -114,7 +114,7 @@ func outputMetricsJSON(rc *eos_io.RuntimeContext, snapshot *monitoring.MetricsSn
 	return nil
 }
 
-func outputMetricsPrometheus(rc *eos_io.RuntimeContext, routeFilter string) error {
+func outputMetricsPrometheus(rc *eos_io.RuntimeContext, _ string) error {
 	prometheusData, err := monitoring.CollectPrometheusMetrics(rc)
 	if err != nil {
 		return fmt.Errorf("failed to collect Prometheus metrics: %w", err)

@@ -1,14 +1,13 @@
 // pkg/consul/install_orchestrator.go
 // Clean orchestrator for Consul installation - coordinates all modules
 
-package consul
+package lifecycle
 
 import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/helpers"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/installer"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/rollback"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/service"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/validation"
@@ -24,9 +23,9 @@ type Orchestrator struct {
 	rc            *eos_io.RuntimeContext
 	config        *InstallConfig
 	logger        otelzap.LoggerWithCtx
-	versionMgr    *installer.VersionManager
-	binaryInst    *installer.BinaryInstaller
-	repoInst      *installer.RepositoryInstaller
+	versionMgr    *VersionManager
+	binaryInst    *BinaryInstaller
+	repoInst      *RepositoryInstaller
 	validator     *validation.PrerequisitesValidator
 	configSetup   *config.SetupManager
 	lifecycle     *service.LifecycleManager
@@ -69,9 +68,9 @@ func NewOrchestrator(rc *eos_io.RuntimeContext, cfg *InstallConfig) (*Orchestrat
 		rc:            rc,
 		config:        cfg,
 		logger:        logger,
-		versionMgr:    installer.NewVersionManager(rc),
-		binaryInst:    installer.NewBinaryInstaller(rc, cfg.BinaryPath),
-		repoInst:      installer.NewRepositoryInstaller(rc),
+		versionMgr:    NewVersionManager(rc),
+		binaryInst:    NewBinaryInstaller(rc, cfg.BinaryPath),
+		repoInst:      NewRepositoryInstaller(rc),
 		validator:     validation.NewPrerequisitesValidator(rc),
 		configSetup:   config.NewSetupManager(rc, cfg.BinaryPath),
 		lifecycle:     service.NewLifecycleManager(rc),

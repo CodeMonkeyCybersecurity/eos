@@ -451,58 +451,58 @@ func getStatusString(status bool) string {
 }
 
 // TODO: Implement JSON and YAML display functions
-func displayBackendsJSON(backends []BackendSummary) error {
+func displayBackendsJSON(_ []BackendSummary) error {
 	// TODO: Implement JSON output
 	return nil
 }
 
-func displayBackendsYAML(backends []BackendSummary) error {
+func displayBackendsYAML(_ []BackendSummary) error {
 	// TODO: Implement YAML output
 	return nil
 }
 
-func displayBackendJSON(backend *BackendDetails) error {
+func displayBackendJSON(_ *BackendDetails) error {
 	// TODO: Implement JSON output
 	return nil
 }
 
-func displayBackendYAML(backend *BackendDetails) error {
+func displayBackendYAML(_ *BackendDetails) error {
 	// TODO: Implement YAML output
 	return nil
 }
 
-func displayHealthJSON(status *hybrid.ConnectionStatus) error {
+func displayHealthJSON(_ *hybrid.ConnectionStatus) error {
 	// TODO: Implement JSON output
 	return nil
 }
 
-func displayHealthYAML(status *hybrid.ConnectionStatus) error {
+func displayHealthYAML(_ *hybrid.ConnectionStatus) error {
 	// TODO: Implement YAML output
 	return nil
 }
 
-func displayDiagnosticsJSON(diagnostics *BackendDiagnostics) error {
+func displayDiagnosticsJSON(_ *BackendDiagnostics) error {
 	// TODO: Implement JSON output
 	return nil
 }
 
-func displayDiagnosticsYAML(diagnostics *BackendDiagnostics) error {
+func displayDiagnosticsYAML(_ *BackendDiagnostics) error {
 	// TODO: Implement YAML output
 	return nil
 }
 
 // TODO: Implement data retrieval functions
-func getAllBackends(rc *eos_io.RuntimeContext, datacenter, statusFilter string) ([]BackendSummary, error) {
+func getAllBackends(_ *eos_io.RuntimeContext, _, _ string) ([]BackendSummary, error) {
 	// TODO: Implement backend retrieval from state store
 	return []BackendSummary{}, nil
 }
 
-func getBackendDetails(rc *eos_io.RuntimeContext, backendID string) (*BackendDetails, error) {
+func getBackendDetails(_ *eos_io.RuntimeContext, _ string) (*BackendDetails, error) {
 	// TODO: Implement backend details retrieval
 	return &BackendDetails{}, nil
 }
 
-func runBackendDiagnostics(rc *eos_io.RuntimeContext, backendID string) (*BackendDiagnostics, error) {
+func runBackendDiagnostics(_ *eos_io.RuntimeContext, _ string) (*BackendDiagnostics, error) {
 	// TODO: Implement diagnostic tests
 	return &BackendDiagnostics{}, nil
 }

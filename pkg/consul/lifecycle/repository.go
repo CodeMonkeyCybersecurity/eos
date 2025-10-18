@@ -1,7 +1,7 @@
 // pkg/consul/installer/repository.go
 // APT repository installation for Consul
 
-package installer
+package lifecycle
 
 import (
 	"fmt"

@@ -133,7 +133,7 @@ func runReadNomad(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	return nil
 }
 
-func getNomadAgentInfo(logger otelzap.LoggerWithCtx) (map[string]interface{}, error) {
+func getNomadAgentInfo(_ otelzap.LoggerWithCtx) (map[string]interface{}, error) {
 	output, err := exec.Command("nomad", "agent-info").Output()
 	if err != nil {
 		return nil, err

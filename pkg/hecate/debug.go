@@ -176,7 +176,7 @@ func detectHecateComponents(rc *eos_io.RuntimeContext, hecatePath string) map[He
 	return components
 }
 
-func diagnoseHecateComponent(rc *eos_io.RuntimeContext, info *HecateComponentInfo, hecatePath string, verbose bool) []HecateCheckResult {
+func diagnoseHecateComponent(rc *eos_io.RuntimeContext, info *HecateComponentInfo, hecatePath string, _ bool) []HecateCheckResult {
 	var results []HecateCheckResult
 
 	// Service status check
@@ -205,7 +205,7 @@ func diagnoseHecateComponent(rc *eos_io.RuntimeContext, info *HecateComponentInf
 	return results
 }
 
-func checkHecateServiceStatus(rc *eos_io.RuntimeContext, info *HecateComponentInfo, hecatePath string) HecateCheckResult {
+func checkHecateServiceStatus(_ *eos_io.RuntimeContext, info *HecateComponentInfo, hecatePath string) HecateCheckResult {
 	if !info.Running {
 		return HecateCheckResult{
 			Component: info.Name,
@@ -295,7 +295,7 @@ func checkHecatePorts(rc *eos_io.RuntimeContext, info *HecateComponentInfo) []He
 	return results
 }
 
-func diagnoseAuthentikBasic(rc *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
+func diagnoseAuthentikBasic(_ *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
 	var results []HecateCheckResult
 
 	// Check if docker-compose.yml exists
@@ -325,7 +325,7 @@ func diagnoseAuthentikBasic(rc *eos_io.RuntimeContext, hecatePath string) []Heca
 	return results
 }
 
-func diagnosePostgreSQL(rc *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
+func diagnosePostgreSQL(_ *eos_io.RuntimeContext, _ string) []HecateCheckResult {
 	var results []HecateCheckResult
 
 	// Check PostgreSQL connectivity
@@ -360,7 +360,7 @@ func diagnosePostgreSQL(rc *eos_io.RuntimeContext, hecatePath string) []HecateCh
 	return results
 }
 
-func diagnoseRedis(rc *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
+func diagnoseRedis(_ *eos_io.RuntimeContext, _ string) []HecateCheckResult {
 	var results []HecateCheckResult
 
 	// Check Redis connectivity

@@ -1,7 +1,7 @@
 // pkg/consul/install.go
 // Core types and constructor for Consul installation
 
-package consul
+package lifecycle
 
 import (
 	"fmt"

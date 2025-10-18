@@ -1,7 +1,7 @@
 // pkg/consul/install_core.go
 // Core installation orchestration (moved from install.go)
 
-package consul
+package lifecycle
 
 import (
 	"context"
@@ -134,7 +134,7 @@ func (ci *ConsulInstaller) assess() (bool, error) {
 					ci.logger.Info("Consul is already installed and running properly")
 
 					// Print service information
-					ci.logger.Info(fmt.Sprintf("terminal prompt: ✓ Consul is already installed and running"))
+					ci.logger.Info("terminal prompt: ✓ Consul is already installed and running")
 					ci.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", shared.PortConsul))
 					ci.logger.Info("terminal prompt: ")
 					ci.logger.Info("terminal prompt: To check status: consul members")
@@ -364,18 +364,22 @@ func RunCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		return eos_err.NewUserError("this command must be run as root")
 	}
 
-	// Determine server/client mode
-	serverMode := ConsulServer
-	if ConsulServer && ConsulClient {
+	// Determine server/client mode by reading flags from command
+	consulServer, _ := cmd.Flags().GetBool("server")
+	consulClient, _ := cmd.Flags().GetBool("client")
+	consulClean, _ := cmd.Flags().GetBool("clean")
+
+	serverMode := consulServer
+	if consulServer && consulClient {
 		return eos_err.NewUserError("cannot specify both --server and --client flags")
 	}
-	if !ConsulServer && !ConsulClient {
+	if !consulServer && !consulClient {
 		serverMode = true
 		logger.Info("Defaulting to server mode")
 	}
 
 	// Warn about destructive operations
-	if ConsulClean {
+	if consulClean {
 		logger.Warn("--clean flag specified: This will DELETE all existing Consul data")
 		logger.Info("terminal prompt: Type 'yes' to confirm or Ctrl+C to cancel: ")
 
@@ -386,26 +390,35 @@ func RunCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		}
 	}
 
+	// Read all flags from command
+	consulDatacenter, _ := cmd.Flags().GetString("datacenter")
+	consulVersion, _ := cmd.Flags().GetString("version")
+	consulNoVault, _ := cmd.Flags().GetBool("no-vault-integration")
+	consulDebug, _ := cmd.Flags().GetBool("debug")
+	consulBindAddr, _ := cmd.Flags().GetString("bind-addr")
+	consulForce, _ := cmd.Flags().GetBool("force")
+	consulBinary, _ := cmd.Flags().GetBool("binary")
+
 	logger.Info("Starting native Consul installation",
-		zap.String("datacenter", ConsulDatacenter),
+		zap.String("datacenter", consulDatacenter),
 		zap.Bool("server_mode", serverMode),
-		zap.String("version", ConsulVersion))
+		zap.String("version", consulVersion))
 
 	// Create installation config
 	installConfig := &InstallConfig{
-		Version:          ConsulVersion,
-		Datacenter:       ConsulDatacenter,
+		Version:          consulVersion,
+		Datacenter:       consulDatacenter,
 		ServerMode:       serverMode,
 		BootstrapExpect:  1,
 		UIEnabled:        true,
 		ConnectEnabled:   true,
-		VaultIntegration: !ConsulNoVault,
-		LogLevel:         GetConsulLogLevel(ConsulDebug),
-		BindAddr:         ConsulBindAddr,
+		VaultIntegration: !consulNoVault,
+		LogLevel:         GetConsulLogLevel(consulDebug),
+		BindAddr:         consulBindAddr,
 		ClientAddr:       "0.0.0.0",
-		ForceReinstall:   ConsulForce,
-		CleanInstall:     ConsulClean,
-		UseRepository:    !ConsulBinary,
+		ForceReinstall:   consulForce,
+		CleanInstall:     consulClean,
+		UseRepository:    !consulBinary,
 	}
 
 	// Create installer

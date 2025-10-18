@@ -118,7 +118,7 @@ func runReadConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	return nil
 }
 
-func getConsulAgentInfo(logger otelzap.LoggerWithCtx) (map[string]interface{}, error) {
+func getConsulAgentInfo(_ otelzap.LoggerWithCtx) (map[string]interface{}, error) {
 	output, err := exec.Command("consul", "info").Output()
 	if err != nil {
 		return nil, err
