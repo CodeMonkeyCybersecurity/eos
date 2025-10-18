@@ -569,7 +569,7 @@ func outputDetailedCustomerTable(logger otelzap.LoggerWithCtx, list CustomerList
 		logger.Info("terminal prompt:   Created:", zap.String("created", customer.CreatedAt.Format("2006-01-02 15:04:05")))
 		logger.Info("terminal prompt:   Agents:", zap.Int("agents", customer.AgentCount))
 		logger.Info("terminal prompt:   Events/Day:", zap.Int("events_per_day", customer.EventsPerDay))
-		logger.Info("terminal prompt:   Resources:", 
+		logger.Info("terminal prompt:   Resources:",
 			zap.Int("cpu_cores", customer.Resources.CPUCores),
 			zap.Int("memory_gb", customer.Resources.MemoryGB),
 			zap.Int("disk_gb", customer.Resources.DiskGB))
@@ -599,7 +599,7 @@ func outputDeploymentTable(logger otelzap.LoggerWithCtx, list DeploymentList) er
 	}
 
 	logger.Info("terminal prompt: Summary:")
-	logger.Info("terminal prompt: Total Jobs:", 
+	logger.Info("terminal prompt: Total Jobs:",
 		zap.Int("total", list.Summary.TotalJobs),
 		zap.Int("running", list.Summary.RunningJobs),
 		zap.Int("failed", list.Summary.FailedJobs))

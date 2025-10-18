@@ -35,7 +35,7 @@ var (
 
 func init() {
 	ReadCmd.AddCommand(storageAnalyzeCmd)
-	
+
 	storageAnalyzeCmd.Flags().BoolVar(&analyzeDetailed, "detailed", false,
 		"Show detailed analysis including file classification")
 	storageAnalyzeCmd.Flags().BoolVar(&analyzeJSON, "json", false,
@@ -45,43 +45,43 @@ func init() {
 func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting storage analysis")
-	
+
 	// ASSESS - Detect environment
 	env, err := environment.Detect(rc)
 	if err != nil {
 		logger.Warn("Failed to detect environment, using defaults", zap.Error(err))
 		env = &environment.Environment{MachineCount: 1}
 	}
-	
+
 	profile := env.GetStorageProfile()
 	logger.Info("Environment profile",
 		zap.String("scale", string(profile.Scale)),
 		zap.String("role", string(env.MyRole)),
 		zap.Any("thresholds", profile.DefaultThresholds))
-	
+
 	// Create threshold manager
 	thresholdMgr := threshold.NewManager(rc, env)
-	
+
 	// Create analyzer
 	config := analyzer.Config{
 		Thresholds: thresholdMgr.GetConfig(),
 	}
 	storageAnalyzer := analyzer.New(rc, config, thresholdMgr)
-	
+
 	// INTERVENE - Perform analysis
 	statuses, err := storageAnalyzer.Analyze()
 	if err != nil {
 		return fmt.Errorf("analysis failed: %w", err)
 	}
-	
+
 	// Create filesystem detector
 	fsDetector := filesystem.NewDetector(rc)
-	
+
 	// EVALUATE - Display results
 	logger.Info("=== Storage Analysis Report ===")
-	
+
 	var criticalCount, warningCount int
-	
+
 	for _, status := range statuses {
 		// Determine status level
 		level := "OK"
@@ -92,7 +92,7 @@ func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			level = "WARNING"
 			warningCount++
 		}
-		
+
 		logger.Info("Mount point analysis",
 			zap.String("mount", status.MountPoint),
 			zap.String("status", level),
@@ -101,12 +101,12 @@ func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			zap.Uint64("total_gb", status.TotalBytes/(1024*1024*1024)),
 			zap.Uint64("free_gb", status.FreeBytes/(1024*1024*1024)),
 			zap.Float64("growth_gb_day", status.GrowthRate))
-		
+
 		// Show projected full date
 		if status.GrowthRate > 0 {
 			freeGB := float64(status.FreeBytes) / (1024 * 1024 * 1024)
 			daysUntilFull := freeGB / status.GrowthRate
-			
+
 			if daysUntilFull < 365 {
 				logger.Warn("Storage projection",
 					zap.String("mount", status.MountPoint),
@@ -114,7 +114,7 @@ func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 					zap.Float64("months_until_full", daysUntilFull/30))
 			}
 		}
-		
+
 		// Show filesystem optimization opportunities
 		if analyzeDetailed {
 			fs := filesystem.Filesystem(status.Filesystem)
@@ -125,7 +125,7 @@ func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 					zap.Any("options", opts))
 			}
 		}
-		
+
 		// Show alerts
 		for _, alert := range status.Alerts {
 			switch alert.Level {
@@ -141,14 +141,14 @@ func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			}
 		}
 	}
-	
+
 	// Summary
 	logger.Info("=== Analysis Summary ===")
 	logger.Info("Storage health",
 		zap.Int("total_mounts", len(statuses)),
 		zap.Int("critical", criticalCount),
 		zap.Int("warnings", warningCount))
-	
+
 	// Recommendations
 	if criticalCount > 0 {
 		logger.Error("IMMEDIATE ACTION REQUIRED")
@@ -157,7 +157,7 @@ func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		logger.Warn("Preventive action recommended")
 		logger.Warn("Run: eos update storage-cleanup --level=compress")
 	}
-	
+
 	// Environment-specific recommendations
 	switch profile.Scale {
 	case environment.ScaleSingle:
@@ -167,6 +167,6 @@ func runStorageAnalyze(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	case environment.ScaleDistributed:
 		logger.Info("Distributed environment: Consider data migration to less utilized nodes")
 	}
-	
+
 	return nil
 }

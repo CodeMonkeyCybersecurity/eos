@@ -437,8 +437,6 @@ func mergeRouteUpdates(existing *Route, updates *Route) *Route {
 	return &merged
 }
 
-
-
 func createRouteInBackend(_ *eos_io.RuntimeContext, _ *HecateConfig, _ *Route) error {
 	// TODO: Implement backend-specific route creation
 	return nil
@@ -459,12 +457,10 @@ func createDNSRecord(_ *eos_io.RuntimeContext, _ *HecateConfig, _ string) error 
 	return nil
 }
 
-
 func deleteDNSRecord(_ *eos_io.RuntimeContext, _ *HecateConfig, _ string) error {
 	// TODO: Implement DNS record deletion
 	return nil
 }
-
 
 func verifyRouteDeleted(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implement route deletion verification

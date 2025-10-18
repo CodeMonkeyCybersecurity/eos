@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	vaultPorts   string
-	vaultDryRun  bool
+	vaultPorts  string
+	vaultDryRun bool
 )
 
 // VaultCmd updates Vault configuration
@@ -365,7 +365,7 @@ func updateVaultPorts(config string, apiPort, clusterPort int) string {
 
 	// Update API port (address = "0.0.0.0:PORT")
 	if apiPort > 0 {
-		addressPattern := regexp.MustCompile(`(address\s*=\s*"[^:]*:)\d+(")`  )
+		addressPattern := regexp.MustCompile(`(address\s*=\s*"[^:]*:)\d+(")`)
 		result = addressPattern.ReplaceAllString(result, fmt.Sprintf(`${1}%d${2}`, apiPort))
 	}
 

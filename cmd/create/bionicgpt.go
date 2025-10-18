@@ -13,15 +13,15 @@ import (
 )
 
 var (
-	bionicgptPort            int
+	bionicgptPort             int
 	bionicgptPostgresPassword string
-	bionicgptJWTSecret       string
-	bionicgptAppName         string
-	bionicgptAzureEndpoint   string
-	bionicgptAzureDeployment string
-	bionicgptAzureAPIKey     string
-	bionicgptForce           bool
-	bionicgptSkipHealthCheck bool
+	bionicgptJWTSecret        string
+	bionicgptAppName          string
+	bionicgptAzureEndpoint    string
+	bionicgptAzureDeployment  string
+	bionicgptAzureAPIKey      string
+	bionicgptForce            bool
+	bionicgptSkipHealthCheck  bool
 )
 
 func init() {
@@ -102,15 +102,15 @@ func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// Create installation config from flags
 	config := &bionicgpt.InstallConfig{
-		Port:              bionicgptPort,
-		PostgresPassword:  bionicgptPostgresPassword,
-		JWTSecret:         bionicgptJWTSecret,
-		AppName:           bionicgptAppName,
-		AzureEndpoint:     bionicgptAzureEndpoint,
-		AzureDeployment:   bionicgptAzureDeployment,
-		AzureAPIKey:       bionicgptAzureAPIKey,
-		ForceReinstall:    bionicgptForce,
-		SkipHealthCheck:   bionicgptSkipHealthCheck,
+		Port:             bionicgptPort,
+		PostgresPassword: bionicgptPostgresPassword,
+		JWTSecret:        bionicgptJWTSecret,
+		AppName:          bionicgptAppName,
+		AzureEndpoint:    bionicgptAzureEndpoint,
+		AzureDeployment:  bionicgptAzureDeployment,
+		AzureAPIKey:      bionicgptAzureAPIKey,
+		ForceReinstall:   bionicgptForce,
+		SkipHealthCheck:  bionicgptSkipHealthCheck,
 	}
 
 	// Create installer

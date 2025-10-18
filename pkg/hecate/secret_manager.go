@@ -195,10 +195,10 @@ func (sm *SecretManager) getVaultSecret(service, key string) (string, error) {
 // getConsulSecret retrieves a secret from HashiCorp Consul KV store
 func (sm *SecretManager) getConsulSecret(service, key string) (string, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
-	
+
 	// Build Consul KV path for the secret
 	consulPath := fmt.Sprintf("hecate/secrets/%s/%s", service, key)
-	
+
 	logger.Debug("Retrieving secret from Consul KV",
 		zap.String("path", consulPath),
 		zap.String("service", service),
@@ -282,10 +282,10 @@ func (sm *SecretManager) generateConsulSecrets() error {
 
 	// Generate secrets and store them in Consul KV
 	secrets := map[string]string{
-		"hecate/secrets/postgres/password":      sm.generateRandomSecret(32),
-		"hecate/secrets/postgres/root_password": sm.generateRandomSecret(32),
-		"hecate/secrets/redis/password":         sm.generateRandomSecret(32),
-		"hecate/secrets/authentik/secret_key":   sm.generateRandomSecret(64),
+		"hecate/secrets/postgres/password":        sm.generateRandomSecret(32),
+		"hecate/secrets/postgres/root_password":   sm.generateRandomSecret(32),
+		"hecate/secrets/redis/password":           sm.generateRandomSecret(32),
+		"hecate/secrets/authentik/secret_key":     sm.generateRandomSecret(64),
 		"hecate/secrets/authentik/admin_password": sm.generateRandomSecret(16),
 	}
 
@@ -296,14 +296,14 @@ func (sm *SecretManager) generateConsulSecrets() error {
 			Args:    []string{"kv", "put", path, value},
 			Capture: true,
 		})
-		
+
 		if err != nil {
 			logger.Error("Failed to store secret in Consul KV",
 				zap.String("path", path),
 				zap.Error(err))
 			return fmt.Errorf("failed to store secret %s in Consul KV: %w", path, err)
 		}
-		
+
 		logger.Debug("Secret stored in Consul KV", zap.String("path", path))
 	}
 
@@ -353,7 +353,7 @@ func (sm *SecretManager) generateRandomSecret(length int) string {
 		logger := otelzap.Ctx(sm.rc.Ctx)
 		logger.Warn("Failed to generate cryptographically secure random secret, using fallback",
 			zap.Error(err))
-		
+
 		// Use timestamp-based fallback (not cryptographically secure but unique)
 		fallback := fmt.Sprintf("eos-secret-%d-%d", time.Now().Unix(), length)
 		if len(fallback) > length {
@@ -361,7 +361,7 @@ func (sm *SecretManager) generateRandomSecret(length int) string {
 		}
 		return fallback
 	}
-	
+
 	// Encode to base64 and trim to desired length
 	encoded := base64.URLEncoding.EncodeToString(bytes)
 	if len(encoded) > length {

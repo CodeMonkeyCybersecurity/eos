@@ -50,7 +50,7 @@ Supported OS uninstallers:
 		}
 
 		otelzap.Ctx(rc.Ctx).Info("  Deleting Wazuh agent via API", zap.String("agentID", agentID))
-		
+
 		// Convert wazuh.Config to agents.Config
 		agentConfig := &agents.Config{
 			Protocol: config.Protocol,

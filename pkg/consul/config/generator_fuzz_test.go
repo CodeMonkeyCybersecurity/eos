@@ -16,7 +16,7 @@ func FuzzGenerate(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, datacenter string, enableDebugLogging, vaultAvailable bool) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		cfg := &ConsulConfig{
 			DatacenterName:     datacenter,
 			EnableDebugLogging: enableDebugLogging,
@@ -31,7 +31,7 @@ func FuzzGenerate(f *testing.F) {
 		}()
 
 		err := Generate(rc, cfg)
-		
+
 		// Function should handle all inputs gracefully
 		// We expect it might fail for certain invalid inputs, but should not panic
 		if err != nil {

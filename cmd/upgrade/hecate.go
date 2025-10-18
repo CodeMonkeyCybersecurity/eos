@@ -46,14 +46,14 @@ Examples:
 }
 
 var (
-	hecateUpgradeAuthentik     bool
-	hecateTargetVersion        string
-	hecateSkipBackup           bool
-	hecateSkipHealthCheck      bool
-	hecateForce                bool
-	hecateUpgradePath          string
-	hecateWaitForTasks         bool
-	hecateRestartAfterUpgrade  bool
+	hecateUpgradeAuthentik    bool
+	hecateTargetVersion       string
+	hecateSkipBackup          bool
+	hecateSkipHealthCheck     bool
+	hecateForce               bool
+	hecateUpgradePath         string
+	hecateWaitForTasks        bool
+	hecateRestartAfterUpgrade bool
 )
 
 func init() {

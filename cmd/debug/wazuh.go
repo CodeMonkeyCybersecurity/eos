@@ -107,7 +107,7 @@ func init() {
 	wazuhCmd.Flags().IntVar(&wazuh.LogLines, "logs", 30, "Number of log lines to display")
 	wazuhCmd.Flags().BoolVar(&wazuh.Verbose, "verbose", false, "Show detailed diagnostic output")
 	wazuhCmd.Flags().BoolVar(&wazuh.Fix, "fix", false, "Attempt automatic fixes")
-	
+
 	// Webhook diagnostics flags
 	wazuhCmd.Flags().BoolVar(&wazuh.WebhookOut, "webhook-out", false, "Check outbound webhook from Wazuh to Iris")
 	wazuhCmd.Flags().StringVar(&wazuh.IrisIP, "iris-ip", "192.168.122.133", "Iris machine IP address")
@@ -117,6 +117,6 @@ func init() {
 	wazuhCmd.Flags().StringVar(&wazuh.TemporalDB, "temporal-db", "/tmp/temporal.db", "Path to Temporal database file")
 	wazuhCmd.Flags().StringVar(&wazuh.TemporalIP, "temporal-ip", "0.0.0.0", "IP address for Temporal server to bind to")
 	wazuhCmd.Flags().IntVar(&wazuh.TemporalPort, "temporal-port", 7233, "Port for Temporal server to listen on")
-	
+
 	debugCmd.AddCommand(wazuhCmd)
 }

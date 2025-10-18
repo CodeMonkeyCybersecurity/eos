@@ -28,13 +28,13 @@ type CheckResult struct {
 
 // IrisConfig holds configuration for Iris checks
 type IrisConfig struct {
-	IrisIP      string
-	IrisPort    int
-	SSHKey      string
-	TemporalIP  string
+	IrisIP       string
+	IrisPort     int
+	SSHKey       string
+	TemporalIP   string
 	TemporalPort int
-	TemporalDB  string
-	AutoStart   bool
+	TemporalDB   string
+	AutoStart    bool
 }
 
 // CheckRemoteIris performs remote checks on Iris machine

@@ -7,8 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
-
 var deleteBionicGPTCmd = &cobra.Command{
 	Use:   "bionicgpt",
 	Short: "Delete BionicGPT installation and optionally backup data",

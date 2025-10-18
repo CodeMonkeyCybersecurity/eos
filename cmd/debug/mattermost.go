@@ -1,10 +1,10 @@
 package debug
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/mattermost/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/mattermost/debug"
+	"github.com/spf13/cobra"
 )
 
 var mattermostCmd = &cobra.Command{
@@ -44,7 +44,7 @@ Example:
 
 func init() {
 	debugCmd.AddCommand(mattermostCmd)
-	
+
 	// Add flags
 	mattermostCmd.Flags().String("compose-dir", "/opt/docker", "Docker compose directory")
 	mattermostCmd.Flags().String("volumes-dir", "/opt/mattermost", "Mattermost volumes directory")
@@ -58,14 +58,14 @@ func runDebugMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	volumesDir, _ := cmd.Flags().GetString("volumes-dir")
 	logLines, _ := cmd.Flags().GetInt("log-lines")
 	postgresLogLines, _ := cmd.Flags().GetInt("postgres-log-lines")
-	
+
 	config := &debug.Config{
 		DockerComposeDir:     composeDir,
 		MattermostVolumesDir: volumesDir,
 		LogTailLines:         logLines,
 		PostgresLogLines:     postgresLogLines,
 	}
-	
+
 	// Run debug diagnostics
 	return debug.RunDiagnostics(rc, config)
 }

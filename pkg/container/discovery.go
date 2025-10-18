@@ -26,101 +26,101 @@ type ComposeMetadata struct {
 // Works with both Compose v1 and v2, regardless of project naming
 func (m *Manager) FindByService(ctx context.Context, serviceName string) ([]Container, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("label", fmt.Sprintf("com.docker.compose.service=%s", serviceName))
-	
+
 	logger.Debug("Searching for containers by service",
 		zap.String("service_name", serviceName),
 		zap.String("label_filter", fmt.Sprintf("com.docker.compose.service=%s", serviceName)))
-	
+
 	m.mu.RLock()
 	containers, err := m.client.ContainerList(ctx, container.ListOptions{
 		All:     true,
 		Filters: filterArgs,
 	})
 	m.mu.RUnlock()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	result := make([]Container, 0, len(containers))
 	for _, c := range containers {
 		result = append(result, m.toContainer(c))
 	}
-	
+
 	logger.Debug("Containers found by service",
 		zap.String("service_name", serviceName),
 		zap.Int("count", len(result)))
-	
+
 	return result, nil
 }
 
 // FindByProject finds all containers in a Docker Compose project
 func (m *Manager) FindByProject(ctx context.Context, projectName string) ([]Container, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("label", fmt.Sprintf("com.docker.compose.project=%s", projectName))
-	
+
 	logger.Debug("Searching for containers by project",
 		zap.String("project_name", projectName))
-	
+
 	m.mu.RLock()
 	containers, err := m.client.ContainerList(ctx, container.ListOptions{
 		All:     true,
 		Filters: filterArgs,
 	})
 	m.mu.RUnlock()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	result := make([]Container, 0, len(containers))
 	for _, c := range containers {
 		result = append(result, m.toContainer(c))
 	}
-	
+
 	logger.Debug("Containers found by project",
 		zap.String("project_name", projectName),
 		zap.Int("count", len(result)))
-	
+
 	return result, nil
 }
 
 // FindByLabels finds containers matching label filters
 func (m *Manager) FindByLabels(ctx context.Context, labels map[string]string) ([]Container, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	filterArgs := filters.NewArgs()
 	for key, value := range labels {
 		filterArgs.Add("label", fmt.Sprintf("%s=%s", key, value))
 	}
-	
+
 	logger.Debug("Searching for containers by labels",
 		zap.Any("labels", labels))
-	
+
 	m.mu.RLock()
 	containers, err := m.client.ContainerList(ctx, container.ListOptions{
 		All:     true,
 		Filters: filterArgs,
 	})
 	m.mu.RUnlock()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	result := make([]Container, 0, len(containers))
 	for _, c := range containers {
 		result = append(result, m.toContainer(c))
 	}
-	
+
 	logger.Debug("Containers found by labels",
 		zap.Int("count", len(result)))
-	
+
 	return result, nil
 }
 
@@ -128,20 +128,20 @@ func (m *Manager) FindByLabels(ctx context.Context, labels map[string]string) ([
 // Falls back to name-based search for non-Compose containers
 func (m *Manager) FindByName(ctx context.Context, name string) (*Container, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Debug("Searching for container by name",
 		zap.String("name", name))
-	
+
 	m.mu.RLock()
 	containers, err := m.client.ContainerList(ctx, container.ListOptions{
 		All: true,
 	})
 	m.mu.RUnlock()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	// Try exact name matches (with and without leading slash)
 	for _, c := range containers {
 		for _, containerName := range c.Names {
@@ -155,61 +155,61 @@ func (m *Manager) FindByName(ctx context.Context, name string) (*Container, erro
 			}
 		}
 	}
-	
+
 	return nil, fmt.Errorf("container not found: %s", name)
 }
 
 // ListAll lists all containers (running and stopped)
 func (m *Manager) ListAll(ctx context.Context) ([]Container, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Debug("Listing all containers")
-	
+
 	m.mu.RLock()
 	containers, err := m.client.ContainerList(ctx, container.ListOptions{
 		All: true,
 	})
 	m.mu.RUnlock()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	result := make([]Container, 0, len(containers))
 	for _, c := range containers {
 		result = append(result, m.toContainer(c))
 	}
-	
+
 	logger.Debug("Containers listed",
 		zap.Int("count", len(result)))
-	
+
 	return result, nil
 }
 
 // ListRunning lists only running containers
 func (m *Manager) ListRunning(ctx context.Context) ([]Container, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Debug("Listing running containers")
-	
+
 	m.mu.RLock()
 	containers, err := m.client.ContainerList(ctx, container.ListOptions{
 		All: false, // Only running
 	})
 	m.mu.RUnlock()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
-	
+
 	result := make([]Container, 0, len(containers))
 	for _, c := range containers {
 		result = append(result, m.toContainer(c))
 	}
-	
+
 	logger.Debug("Running containers listed",
 		zap.Int("count", len(result)))
-	
+
 	return result, nil
 }
 
@@ -220,16 +220,16 @@ func (m *Manager) toContainer(c container.Summary) Container {
 	if len(c.Names) > 0 {
 		name = strings.TrimPrefix(c.Names[0], "/")
 	}
-	
+
 	// Convert status string to ContainerStatus
 	status := ContainerStatus(c.State)
-	
+
 	// Convert Created timestamp to time.Time
 	created := time.Unix(c.Created, 0)
-	
+
 	// Labels already include Compose metadata if present
 	// com.docker.compose.project, com.docker.compose.service, etc.
-	
+
 	return Container{
 		ID:      c.ID,
 		Name:    name,

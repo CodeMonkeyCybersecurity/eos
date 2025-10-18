@@ -33,7 +33,7 @@ type Config struct {
 // FixMattermostPermissions fixes common Mattermost permission issues
 func FixMattermostPermissions(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting Mattermost permission fix",
 		zap.Bool("dry_run", config.DryRun),
 		zap.String("compose_dir", config.ComposeDir),
@@ -91,7 +91,7 @@ func FixMattermostPermissions(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("Step 4: Fixing volume permissions",
 		zap.Int("target_uid", config.TargetUID),
 		zap.Int("target_gid", config.TargetGID))
-	
+
 	for _, volumeName := range config.VolumesToFix {
 		volumePath := filepath.Join(config.VolumesDir, "volumes", volumeName)
 		if !config.DryRun {
@@ -156,18 +156,18 @@ func FixMattermostPermissions(rc *eos_io.RuntimeContext, config *Config) error {
 // This works with both Docker Compose v1 and v2, regardless of project naming
 func checkContainerStatus(rc *eos_io.RuntimeContext, cli *client.Client, serviceName string) (string, bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Strategy 1: Use Docker Compose labels (most robust, works with v1 and v2)
 	// Docker Compose adds these labels to all containers:
 	// - com.docker.compose.service={service_name}
 	// - com.docker.compose.project={project_name}
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("label", fmt.Sprintf("com.docker.compose.service=%s", serviceName))
-	
+
 	logger.Debug("Searching for container using Docker Compose labels",
 		zap.String("service_name", serviceName),
 		zap.String("label_filter", fmt.Sprintf("com.docker.compose.service=%s", serviceName)))
-	
+
 	containers, err := cli.ContainerList(rc.Ctx, container.ListOptions{
 		All:     true,
 		Filters: filterArgs,
@@ -180,12 +180,12 @@ func checkContainerStatus(rc *eos_io.RuntimeContext, cli *client.Client, service
 	if len(containers) > 0 {
 		c := containers[0] // Use first match (typically only one service instance)
 		isRunning := c.State == "running"
-		
+
 		// Extract useful metadata from labels
 		projectName := c.Labels["com.docker.compose.project"]
 		serviceName := c.Labels["com.docker.compose.service"]
 		containerNumber := c.Labels["com.docker.compose.container-number"]
-		
+
 		logger.Info("Container found via Docker Compose labels",
 			zap.String("id", c.ID[:12]),
 			zap.String("name", strings.TrimPrefix(c.Names[0], "/")),
@@ -193,18 +193,18 @@ func checkContainerStatus(rc *eos_io.RuntimeContext, cli *client.Client, service
 			zap.String("compose_project", projectName),
 			zap.String("compose_service", serviceName),
 			zap.String("compose_number", containerNumber))
-		
+
 		if len(containers) > 1 {
 			logger.Warn("Multiple containers found for service, using first one",
 				zap.Int("total_found", len(containers)))
 		}
-		
+
 		return c.ID, isRunning, nil
 	}
 
 	// Strategy 2: Fallback to name-based search (for non-Compose containers)
 	logger.Debug("No containers found via Compose labels, trying name-based search")
-	
+
 	allContainers, err := cli.ContainerList(rc.Ctx, container.ListOptions{All: true})
 	if err != nil {
 		return "", false, fmt.Errorf("failed to list containers: %w", err)
@@ -240,12 +240,12 @@ func checkContainerStatus(rc *eos_io.RuntimeContext, cli *client.Client, service
 
 func stopContainer(rc *eos_io.RuntimeContext, cli *client.Client, containerID string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	timeout := 30
 	stopOptions := container.StopOptions{
 		Timeout: &timeout,
 	}
-	
+
 	if err := cli.ContainerStop(rc.Ctx, containerID, stopOptions); err != nil {
 		return fmt.Errorf("failed to stop container: %w", err)
 	}
@@ -256,7 +256,7 @@ func stopContainer(rc *eos_io.RuntimeContext, cli *client.Client, containerID st
 
 func startContainer(rc *eos_io.RuntimeContext, cli *client.Client, containerID string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if err := cli.ContainerStart(rc.Ctx, containerID, container.StartOptions{}); err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
@@ -267,7 +267,7 @@ func startContainer(rc *eos_io.RuntimeContext, cli *client.Client, containerID s
 
 func checkVolumePermissions(rc *eos_io.RuntimeContext, volumePath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	info, err := os.Stat(volumePath)
 	if err != nil {
 		return fmt.Errorf("failed to stat volume: %w", err)
@@ -300,7 +300,7 @@ func checkVolumePermissions(rc *eos_io.RuntimeContext, volumePath string) error 
 
 func fixVolumePermissions(rc *eos_io.RuntimeContext, volumePath string, uid, gid int) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Fixing volume permissions",
 		zap.String("path", volumePath),
 		zap.Int("uid", uid),
@@ -336,7 +336,7 @@ func fixVolumePermissions(rc *eos_io.RuntimeContext, volumePath string, uid, gid
 
 func watchContainerLogs(rc *eos_io.RuntimeContext, cli *client.Client, containerID string, seconds int) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,

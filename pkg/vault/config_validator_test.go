@@ -349,7 +349,7 @@ api_addr = "https://127.0.0.1:8179"
 			}
 
 			// Use the new structured validation via validateParsedConfig
-		validateParsedConfig(rc, tt.content, result)
+			validateParsedConfig(rc, tt.content, result)
 
 			if len(result.Errors) != tt.expectErrors {
 				t.Errorf("Expected %d errors, got %d: %v",
@@ -428,7 +428,7 @@ ui = true
 			}
 
 			// Use the new top-level config validation
-		validateTopLevelConfig(rc, tt.content, result)
+			validateTopLevelConfig(rc, tt.content, result)
 
 			// Check if expected warnings are present
 			for _, expectedWarning := range tt.expectWarnings {
@@ -455,8 +455,8 @@ ui = true
 func containsSubstring(s, substr string) bool {
 	return len(s) >= len(substr) &&
 		(s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		findSubstring(s, substr)))
+			(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+				findSubstring(s, substr)))
 }
 
 func findSubstring(s, substr string) bool {

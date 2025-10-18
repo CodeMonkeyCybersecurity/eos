@@ -56,13 +56,13 @@ func init() {
 
 func runMattermostFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	config := &fix.Config{
-		DryRun:          mattermostFixDryRun,
-		ComposeDir:      mattermostFixComposeDir,
-		VolumesDir:      mattermostFixVolumesDir,
-		ContainerName:   "mattermost",
-		ServiceName:     "mattermost",
-		TargetUID:       2000,
-		TargetGID:       2000,
+		DryRun:        mattermostFixDryRun,
+		ComposeDir:    mattermostFixComposeDir,
+		VolumesDir:    mattermostFixVolumesDir,
+		ContainerName: "mattermost",
+		ServiceName:   "mattermost",
+		TargetUID:     2000,
+		TargetGID:     2000,
 		// Fix all Mattermost volumes that need correct ownership
 		VolumesToFix: []string{
 			"app",                           // Base app directory

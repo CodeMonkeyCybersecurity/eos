@@ -146,5 +146,3 @@ func containsInvalidAttributes(policy string) bool {
 	}
 	return false
 }
-
-

@@ -111,8 +111,6 @@ type DaemonStatus struct {
 	Started time.Time `json:"started"`
 }
 
-
-
 // TerraformConfig represents the Terraform configuration for CephFS
 type TerraformConfig struct {
 	WorkingDir   string            // Terraform working directory
@@ -144,7 +142,6 @@ const (
 	CephDataDir   = "/var/lib/ceph"
 	CephLogDir    = "/var/log/ceph"
 	CephadmPath   = "/usr/local/bin/cephadm"
-
 
 	// Terraform paths
 	TerraformCephDir   = "/opt/eos/terraform/ceph"
@@ -220,8 +217,6 @@ func GetCephMGRPort() int {
 	// Use the next available port from shared/ports.go
 	return 8263 // Next available prime after shared ports
 }
-
-
 
 // GetTerraformCephConfigPath returns the path to the Terraform configuration
 func GetTerraformCephConfigPath() string {

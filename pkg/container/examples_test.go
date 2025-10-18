@@ -18,20 +18,20 @@ func Example_basicUsage() {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	// Create Docker manager
 	manager, err := container.NewManager(rc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer manager.Close()
-	
+
 	// List all containers
 	containers, err := manager.ListAll(rc.Ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	fmt.Printf("Found %d containers\n", len(containers))
 	for _, c := range containers {
 		fmt.Printf("  - %s (%s): %v\n", c.Name, c.ShortID(), c.State)
@@ -43,24 +43,24 @@ func Example_composeDiscovery() {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	manager, err := container.NewManager(rc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer manager.Close()
-	
+
 	// Find Mattermost service (works with Compose v1 and v2)
 	containers, err := manager.FindByService(rc.Ctx, "mattermost")
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	if len(containers) == 0 {
 		fmt.Println("Mattermost service not found")
 		return
 	}
-	
+
 	c := containers[0]
 	fmt.Printf("Found Mattermost container:\n")
 	fmt.Printf("  ID: %s\n", c.ShortID())
@@ -75,19 +75,19 @@ func Example_containerLifecycle() {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	manager, err := container.NewManager(rc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer manager.Close()
-	
+
 	// Find container by name
 	c, err := manager.FindByName(rc.Ctx, "mattermost")
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	// Stop container
 	if c.IsRunning() {
 		fmt.Println("Stopping container...")
@@ -96,14 +96,14 @@ func Example_containerLifecycle() {
 			log.Fatal(err)
 		}
 	}
-	
+
 	// Start container
 	fmt.Println("Starting container...")
 	err = manager.Start(rc.Ctx, c.ID)
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	fmt.Println("Container restarted successfully")
 }
 
@@ -112,19 +112,19 @@ func Example_projectDiscovery() {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	manager, err := container.NewManager(rc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer manager.Close()
-	
+
 	// Find all containers in the "docker" project
 	containers, err := manager.FindByProject(rc.Ctx, "docker")
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	fmt.Printf("Found %d containers in 'docker' project:\n", len(containers))
 	for _, c := range containers {
 		fmt.Printf("  - %s (service: %s): %s\n", c.Name, c.GetComposeService(), c.Status)
@@ -136,19 +136,19 @@ func Example_logs() {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	manager, err := container.NewManager(rc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer manager.Close()
-	
+
 	// Find container
 	c, err := manager.FindByName(rc.Ctx, "mattermost")
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	// Get last 50 lines of logs
 	logOptions := container.LogOptions{
 		ShowStdout: true,
@@ -156,13 +156,13 @@ func Example_logs() {
 		Tail:       "50",
 		Timestamps: true,
 	}
-	
+
 	logs, err := manager.Logs(rc.Ctx, c.ID, logOptions)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer logs.Close()
-	
+
 	fmt.Println("Container logs retrieved successfully")
 }
 
@@ -171,24 +171,24 @@ func Example_labelBasedDiscovery() {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	manager, err := container.NewManager(rc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer manager.Close()
-	
+
 	// Find containers with custom labels
 	labels := map[string]string{
 		"app":         "web",
 		"environment": "production",
 	}
-	
+
 	containers, err := manager.FindByLabels(rc.Ctx, labels)
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	fmt.Printf("Found %d containers matching labels\n", len(containers))
 }
 
@@ -197,19 +197,19 @@ func Example_dockerInfo() {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 	}
-	
+
 	manager, err := container.NewManager(rc)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer manager.Close()
-	
+
 	// Get Docker system info
 	info, err := manager.Info(rc.Ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	fmt.Printf("Docker Info:\n")
 	fmt.Printf("  Version: %s\n", info.ServerVersion)
 	fmt.Printf("  OS: %s\n", info.OperatingSystem)

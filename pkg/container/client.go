@@ -25,9 +25,9 @@ type Manager struct {
 // Uses Docker SDK with API version negotiation for compatibility
 func NewManager(rc *eos_io.RuntimeContext) (*Manager, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Creating Docker SDK client with API version negotiation")
-	
+
 	cli, err := client.NewClientWithOpts(
 		client.FromEnv,
 		client.WithAPIVersionNegotiation(),
@@ -35,16 +35,16 @@ func NewManager(rc *eos_io.RuntimeContext) (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
-	
+
 	// Verify connection by pinging Docker daemon
 	_, err = cli.Ping(rc.Ctx)
 	if err != nil {
 		cli.Close()
 		return nil, fmt.Errorf("failed to connect to docker daemon: %w", err)
 	}
-	
+
 	logger.Info("Docker SDK client initialized successfully")
-	
+
 	return &Manager{
 		client: cli,
 		ctx:    rc.Ctx,
@@ -64,7 +64,7 @@ func (m *Manager) Client() *client.Client {
 func (m *Manager) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.client != nil {
 		return m.client.Close()
 	}
@@ -75,7 +75,7 @@ func (m *Manager) Close() error {
 func (m *Manager) Ping(ctx context.Context) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	_, err := m.client.Ping(ctx)
 	return err
 }
@@ -84,25 +84,25 @@ func (m *Manager) Ping(ctx context.Context) error {
 func (m *Manager) Info(ctx context.Context) (*DockerInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	info, err := m.client.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get docker info: %w", err)
 	}
-	
+
 	return &DockerInfo{
-		ID:              info.ID,
-		Containers:      info.Containers,
+		ID:                info.ID,
+		Containers:        info.Containers,
 		ContainersRunning: info.ContainersRunning,
-		ContainersPaused: info.ContainersPaused,
+		ContainersPaused:  info.ContainersPaused,
 		ContainersStopped: info.ContainersStopped,
-		Images:          info.Images,
-		Driver:          info.Driver,
-		ServerVersion:   info.ServerVersion,
-		OperatingSystem: info.OperatingSystem,
-		Architecture:    info.Architecture,
-		NCPU:            info.NCPU,
-		MemTotal:        info.MemTotal,
+		Images:            info.Images,
+		Driver:            info.Driver,
+		ServerVersion:     info.ServerVersion,
+		OperatingSystem:   info.OperatingSystem,
+		Architecture:      info.Architecture,
+		NCPU:              info.NCPU,
+		MemTotal:          info.MemTotal,
 	}, nil
 }
 

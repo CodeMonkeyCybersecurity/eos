@@ -3,8 +3,8 @@ package debug
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
-	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	"github.com/spf13/cobra"
 )
 
 var (
