@@ -176,7 +176,7 @@ func createVMLibvirt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 func parseMemorySize(memStr string) (uint, error) {
 	memStr = strings.ToUpper(strings.TrimSpace(memStr))
-	
+
 	var multiplier uint = 1
 	var numStr string
 
@@ -210,7 +210,7 @@ func parseVolumes(volumeSpecs []string) ([]libvirt.VolumeConfig, error) {
 		name := parts[0]
 		sizeStr := parts[1]
 		format := "qcow2"
-		
+
 		if len(parts) == 3 {
 			format = parts[2]
 		}
@@ -312,7 +312,7 @@ func showVMDryRun(_ *eos_io.RuntimeContext, config *libvirt.VMConfig) error {
 	fmt.Printf("Disk Size:    %s\n", utils.FormatBytes(config.DiskSize))
 	fmt.Printf("Network:      %s\n", config.NetworkName)
 	fmt.Printf("OS Variant:   %s\n", config.OSVariant)
-	
+
 	if config.ImagePath != "" {
 		fmt.Printf("Base Image:   %s\n", config.ImagePath)
 	}
@@ -332,11 +332,11 @@ func showVMDryRun(_ *eos_io.RuntimeContext, config *libvirt.VMConfig) error {
 	fmt.Printf("1. Validate libvirt connection\n")
 	fmt.Printf("2. Create storage pool if needed\n")
 	fmt.Printf("3. Create primary disk (%s)\n", utils.FormatBytes(config.DiskSize))
-	
+
 	for i, vol := range config.Volumes {
 		fmt.Printf("%d. Create volume %s (%s)\n", 4+i, vol.Name, utils.FormatBytes(vol.Size))
 	}
-	
+
 	fmt.Printf("%d. Generate cloud-init ISO\n", 4+len(config.Volumes))
 	fmt.Printf("%d. Define VM in libvirt\n", 5+len(config.Volumes))
 	fmt.Printf("%d. Start VM\n", 6+len(config.Volumes))
@@ -354,7 +354,7 @@ func displayVMInfo(_ *eos_io.RuntimeContext, vm *libvirt.VMInfo) {
 	fmt.Printf("vCPUs:        %d\n", vm.VCPUs)
 	fmt.Printf("Autostart:    %t\n", vm.Autostart)
 	fmt.Printf("Persistent:   %t\n", vm.Persistent)
-	
+
 	if len(vm.Networks) > 0 {
 		fmt.Printf("Networks:\n")
 		for _, net := range vm.Networks {
@@ -380,7 +380,7 @@ func displayVMInfo(_ *eos_io.RuntimeContext, vm *libvirt.VMInfo) {
 	fmt.Printf("  Stop:       eos stop vm %s\n", vm.Name)
 	fmt.Printf("  Info:       eos info vm %s\n", vm.Name)
 	fmt.Printf("  Console:    virsh console %s\n", vm.Name)
-	
+
 	if vm.State == "running" {
 		fmt.Printf("\nVM is running and ready for use!\n")
 	}

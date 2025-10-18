@@ -34,8 +34,6 @@ func DefaultEnforcedMFAConfig() EnforcedMFAConfig {
 	}
 }
 
-
-
 const gracefulPAMSudoConfig = `# PAM configuration for sudo with GRACEFUL MFA (temporary)
 # /etc/pam.d/sudo - Allows password fallback during grace period
 auth       sufficient pam_unix.so try_first_pass

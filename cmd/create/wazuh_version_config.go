@@ -127,16 +127,20 @@ func init() {
 	// Other options
 	CreateWazuhVersionConfigCmd.Flags().Bool("force", false, "Overwrite existing configuration")
 }
+
 // TODO: refactor - Move to pkg/wazuh/config_create.go
 // GOOD PATTERN: This file actually follows best practices!
 // POSITIVE OBSERVATIONS:
-//   ✓ No package-level flag variables - uses cmd.Flags().Get*()
-//   ✓ Uses logger.Info() with "terminal prompt:" prefix (follows CLAUDE.md)
-//   ✓ Proper error handling with eos_err.NewUserError
-//   ✓ Business logic delegated to pkg/wazuh.ConfigManager
+//
+//	✓ No package-level flag variables - uses cmd.Flags().Get*()
+//	✓ Uses logger.Info() with "terminal prompt:" prefix (follows CLAUDE.md)
+//	✓ Proper error handling with eos_err.NewUserError
+//	✓ Business logic delegated to pkg/wazuh.ConfigManager
+//
 // MINOR IMPROVEMENTS:
 //   - Helper functions below could still move to pkg/wazuh/config_helpers.go
 //   - This is more orchestration which is appropriate for cmd/
+//
 // MOVE: createFromTemplate, createFromFlags, configureMaintenanceWindow, showConfigurationSummary to pkg/
 func runCreateWazuhVersionConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -165,6 +169,7 @@ func runCreateWazuhVersionConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command, 
 	// Handle flag-based configuration
 	return createFromFlags(rc, configManager, cmd)
 }
+
 // TODO: refactor - Move to pkg/wazuh/templates.go
 // BUSINESS LOGIC: Template creation with hardcoded configurations
 // This is pure business logic - creates config structs from template names
@@ -238,6 +243,7 @@ func createFromTemplate(rc *eos_io.RuntimeContext, configManager *wazuh.ConfigMa
 	logger.Info("Wazuh version configuration created successfully")
 	return showConfigurationSummary(rc, config)
 }
+
 // TODO: refactor
 func createInteractiveConfig(rc *eos_io.RuntimeContext, _ *wazuh.ConfigManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -257,6 +263,7 @@ func createInteractiveConfig(rc *eos_io.RuntimeContext, _ *wazuh.ConfigManager) 
 
 	return eos_err.NewUserError("interactive mode not fully implemented. Please use --template or flag-based configuration")
 }
+
 // TODO: refactor - Move to pkg/wazuh/config_parser.go
 // BUSINESS LOGIC: Flag parsing and config creation
 // ISSUE: Complex flag parsing logic belongs in pkg/
@@ -340,6 +347,7 @@ func createFromFlags(rc *eos_io.RuntimeContext, configManager *wazuh.ConfigManag
 	logger.Info("Wazuh version configuration created successfully")
 	return showConfigurationSummary(rc, config)
 }
+
 // TODO: refactor - Move to pkg/wazuh/config_parser.go
 // BUSINESS LOGIC: Parsing and validation of maintenance window settings
 // MOVE TO: pkg/wazuh/config_parser.go as ParseMaintenanceWindow(cmd) (*TimeWindow, error)
@@ -397,6 +405,7 @@ func configureMaintenanceWindow(config *wazuh.VersionConfig, cmd *cobra.Command)
 
 	return nil
 }
+
 // TODO: refactor - Move to pkg/output/ or pkg/wazuh/display.go
 // DISPLAY LOGIC: Formatting and displaying configuration summary
 // GOOD: Uses logger.Info() with "terminal prompt:" (follows CLAUDE.md P0)

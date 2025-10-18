@@ -50,8 +50,15 @@ func MkdirP(ctx context.Context, path string, perm os.FileMode) error {
 
 // EnsureOwnership sets the owner of `path`. On Unix, it calls os.Chown;
 // on Windows this could be replaced with ACL calls under a build tag.
+// If owner is empty string, ownership is not changed (file keeps current owner).
 func EnsureOwnership(ctx context.Context, path, owner string) error {
 	log := otelzap.Ctx(ctx)
+
+	// Skip ownership change if no owner specified
+	if owner == "" {
+		log.Debug("Skipping ownership change (no owner specified)", zap.String("path", path))
+		return nil
+	}
 
 	// Lookup target user/group
 	uid, gid, err := LookupUser(ctx, owner)

@@ -437,8 +437,6 @@ func (em *EnvironmentManager) DeleteEnvironment(rc *eos_io.RuntimeContext, name 
 	return nil
 }
 
-
-
 // validateEnvironment validates an environment configuration
 func (em *EnvironmentManager) validateEnvironment(rc *eos_io.RuntimeContext, env *Environment) error {
 	logger := otelzap.Ctx(rc.Ctx)

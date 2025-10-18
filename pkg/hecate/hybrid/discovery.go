@@ -224,7 +224,7 @@ func getLocalConsulClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	config := api.DefaultConfig()
 	// TODO: Make this configurable
 	config.Address = fmt.Sprintf("localhost:%d", shared.PortConsul)
-	
+
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
@@ -244,7 +244,7 @@ func getFrontendConsulClient(rc *eos_io.RuntimeContext, frontendDC string) (*api
 	// TODO: Make this configurable based on frontendDC
 	config.Address = fmt.Sprintf("frontend-consul.example.com:%d", shared.PortConsul)
 	config.Datacenter = frontendDC
-	
+
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create frontend Consul client: %w", err)
@@ -296,7 +296,7 @@ func deleteCrossDCQuery(rc *eos_io.RuntimeContext, backend *Backend) error {
 
 	// TODO: Implement query deletion by name
 	// This requires getting the query ID first, then deleting it
-	
+
 	return nil
 }
 
@@ -315,8 +315,8 @@ func createFrontendRoute(rc *eos_io.RuntimeContext, backend *Backend) error {
 
 	// Create route configuration
 	route := &hecate.Route{
-		ID:       fmt.Sprintf("hybrid-%s", backend.ID),
-		Domain:   backend.PublicDomain,
+		ID:     fmt.Sprintf("hybrid-%s", backend.ID),
+		Domain: backend.PublicDomain,
 		Upstream: &hecate.Upstream{
 			URL: fmt.Sprintf("http://%s.connect", backend.ConsulService.Name),
 		},
@@ -408,7 +408,7 @@ func verifyHybridConnection(rc *eos_io.RuntimeContext, backend *Backend) error {
 	// 3. Verify service is reachable from frontend
 	// 4. Check DNS resolution
 	// 5. Verify SSL/TLS certificates
-	
+
 	return nil
 }
 
@@ -419,96 +419,96 @@ func backendExists(rc *eos_io.RuntimeContext, backendID string) (bool, error) {
 
 func storeBackendConfig(rc *eos_io.RuntimeContext, backend *Backend) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Storing backend configuration",
 		zap.String("backend_id", backend.ID))
-	
+
 	// Get Consul client
 	client, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	// Serialize backend configuration to JSON
 	backendData, err := json.Marshal(backend)
 	if err != nil {
 		return fmt.Errorf("failed to serialize backend configuration: %w", err)
 	}
-	
+
 	// Store in Consul KV
 	key := fmt.Sprintf("hecate/backends/%s", backend.ID)
 	pair := &api.KVPair{
 		Key:   key,
 		Value: backendData,
 	}
-	
+
 	_, err = client.KV().Put(pair, nil)
 	if err != nil {
 		return fmt.Errorf("failed to store backend configuration: %w", err)
 	}
-	
+
 	logger.Info("Backend configuration stored successfully",
 		zap.String("backend_id", backend.ID),
 		zap.String("key", key))
-	
+
 	return nil
 }
 
 func getBackendConfig(rc *eos_io.RuntimeContext, backendID string) (*Backend, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Retrieving backend configuration",
 		zap.String("backend_id", backendID))
-	
+
 	// Get Consul client
 	client, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	// Retrieve from Consul KV
 	key := fmt.Sprintf("hecate/backends/%s", backendID)
 	pair, _, err := client.KV().Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve backend configuration: %w", err)
 	}
-	
+
 	if pair == nil {
 		return nil, fmt.Errorf("backend configuration not found for ID: %s", backendID)
 	}
-	
+
 	// Deserialize backend configuration
 	var backend Backend
 	err = json.Unmarshal(pair.Value, &backend)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize backend configuration: %w", err)
 	}
-	
+
 	logger.Info("Backend configuration retrieved successfully",
 		zap.String("backend_id", backendID))
-	
+
 	return &backend, nil
 }
 
 func getAllBackendConfigs(rc *eos_io.RuntimeContext) ([]*Backend, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Retrieving all backend configurations")
-	
+
 	// Get Consul client
 	client, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	// List all backend keys
 	pairs, _, err := client.KV().List("hecate/backends/", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list backend configurations: %w", err)
 	}
-	
+
 	backends := make([]*Backend, 0, len(pairs))
-	
+
 	for _, pair := range pairs {
 		var backend Backend
 		err = json.Unmarshal(pair.Value, &backend)
@@ -520,36 +520,36 @@ func getAllBackendConfigs(rc *eos_io.RuntimeContext) ([]*Backend, error) {
 		}
 		backends = append(backends, &backend)
 	}
-	
+
 	logger.Info("All backend configurations retrieved",
 		zap.Int("count", len(backends)))
-	
+
 	return backends, nil
 }
 
 func deleteBackendConfig(rc *eos_io.RuntimeContext, backendID string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Deleting backend configuration",
 		zap.String("backend_id", backendID))
-	
+
 	// Get Consul client
 	client, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	// Delete from Consul KV
 	key := fmt.Sprintf("hecate/backends/%s", backendID)
 	_, err = client.KV().Delete(key, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete backend configuration: %w", err)
 	}
-	
+
 	logger.Info("Backend configuration deleted successfully",
 		zap.String("backend_id", backendID),
 		zap.String("key", key))
-	
+
 	return nil
 }
 
@@ -572,6 +572,6 @@ func CreateRemoteRoute(rc *eos_io.RuntimeContext, frontendDC string, route *heca
 	// 2. Send route creation request
 	// 3. Handle authentication/authorization
 	// 4. Verify route was created successfully
-	
+
 	return nil
 }
