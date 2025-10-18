@@ -14,7 +14,11 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO: refactor - ANTI-PATTERN: Package-level mutable state for flags
+// ISSUE: These package-level vars make the command non-reentrant and harder to test
+// FIX: Pass these as parameters or use a config struct
+// IMPACT: Testing difficulty, potential race conditions in concurrent usage
+// MOVE TO: Consider using cobra's PersistentFlags or cmd.Flags().Get*() in RunE
 var (
 	vaultCheckConfig   bool
 	vaultCheckSecurity bool
@@ -68,7 +72,12 @@ func init() {
 
 	ListCmd.AddCommand(vaultCheckCmd)
 }
-
+// TODO: refactor - Move to pkg/vault/check.go
+// BUSINESS LOGIC: Orchestration of multiple validation checks
+// ANTI-PATTERN: Complex flag logic in cmd/ instead of pkg/
+// FIX: Create VaultCheckConfig struct in pkg/vault/types.go with ParseFlags() method
+// DEPENDENCIES: validateConfiguration, validateSecurityPosture, showRuntimeStatus (all need moving)
+// MOVE TO: pkg/vault/check.go as RunVaultValidation(rc, config)
 func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Vault validation checks")
@@ -118,8 +127,13 @@ func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	logger.Info("All validation checks passed")
 	return nil
 }
-
-// validateConfiguration performs comprehensive configuration validation
+// TODO: refactor - Move to pkg/vault/validation.go
+// BUSINESS LOGIC: Configuration validation and result display
+// ANTI-PATTERN: Display logic mixed with validation logic
+// FIX: Split into validation (pkg/vault/validation.go) and display (pkg/output/vault.go)
+// ISSUES: Direct fmt.Println instead of logger, hardcoded formatting
+// MOVE TO: pkg/vault/validation.go as ValidateConfiguration(rc, configPath) (*ValidationResult, error)
+// THEN: Create displayValidationResult(result) in pkg/output/ or pkg/vault/display.go
 func validateConfiguration(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Validating Vault configuration", zap.String("config", shared.VaultConfigPath))
@@ -176,8 +190,13 @@ func validateConfiguration(rc *eos_io.RuntimeContext) error {
 
 	return nil
 }
-
-// validateSecurityPosture performs security posture checks
+// TODO: refactor - Move to pkg/vault/security.go
+// BUSINESS LOGIC: Security validation and result display
+// ANTI-PATTERN: Display logic mixed with validation logic, direct fmt.Println usage
+// FIX: Split into security checks (pkg/vault/security.go) and display (pkg/output/)
+// ISSUES: Hardcoded URLs, direct console output instead of structured logging
+// MOVE TO: pkg/vault/security.go as ValidateSecurityPosture(rc) (*SecurityResult, error)
+// THEN: Create displaySecurityResult(result) in pkg/output/ or pkg/vault/display.go
 func validateSecurityPosture(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Validating Vault security posture")
@@ -185,7 +204,7 @@ func validateSecurityPosture(rc *eos_io.RuntimeContext) error {
 	passed, failed := vault.ValidateSecurityPosture(rc)
 
 	// Display results
-	fmt.Println("\n🔒 Security Posture Validation Results")
+	fmt.Println("Security Posture Validation Results")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	if len(passed) > 0 {
@@ -217,8 +236,13 @@ func validateSecurityPosture(rc *eos_io.RuntimeContext) error {
 
 	return nil
 }
-
-// showRuntimeStatus displays comprehensive runtime status using the unified framework
+// TODO: refactor - Move to pkg/vault/status.go
+// BUSINESS LOGIC: Status retrieval and format conversion
+// ANTI-PATTERN: Format string parsing in cmd/, direct logger.Info for display
+// FIX: Move format parsing to pkg/servicestatus/formats.go
+// ISSUES: Switch statement for format parsing should be in pkg/
+// MOVE TO: pkg/vault/status.go as ShowVaultStatus(rc, format) error
+// OR: Use existing pkg/servicestatus pattern and just call from cmd/
 func showRuntimeStatus(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Creating Vault status provider")

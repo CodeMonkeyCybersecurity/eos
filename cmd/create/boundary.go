@@ -31,7 +31,7 @@ Examples:
   eos create boundary --database-url=...        # With PostgreSQL`,
 	RunE: eos.Wrap(runCreateBoundaryNative),
 }
-
+//TODO: refactor
 var (
 	// Installation options
 	boundaryRole        string
@@ -63,7 +63,7 @@ var (
 	// Stream output
 	boundaryStreamOutput bool
 )
-
+//TODO: refactor
 func runCreateBoundaryNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Boundary using native installer")

@@ -197,6 +197,7 @@ func init() {
   eos promote history --format summary --stats`
 }
 
+// TODO: refactor - move to pkg/promotion/types.go - Data structures should be in pkg/
 // HistoryFilter represents filters for promotion history queries
 type HistoryFilter struct {
 	Component        string
@@ -208,6 +209,7 @@ type HistoryFilter struct {
 	IncludeRollbacks bool
 }
 
+// TODO: refactor - move to pkg/promotion/types.go - Data structures should be in pkg/
 // PromotionHistoryRecord represents a single promotion history record
 type PromotionHistoryRecord struct {
 	ID               string
@@ -228,6 +230,7 @@ type PromotionHistoryRecord struct {
 	ArtifactCount    int
 }
 
+// TODO: refactor - move to pkg/promotion/history.go - History retrieval and filtering is business logic
 func getPromotionHistory(rc *eos_io.RuntimeContext, filter HistoryFilter) ([]PromotionHistoryRecord, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -366,6 +369,7 @@ func getPromotionHistory(rc *eos_io.RuntimeContext, filter HistoryFilter) ([]Pro
 	return filtered, nil
 }
 
+// TODO: refactor - move to pkg/output/ or pkg/promotion/display.go - Output formatting should be in pkg/
 func outputHistoryTable(history []PromotionHistoryRecord, showDetails bool, groupBy string) error {
 	if len(history) == 0 {
 		fmt.Printf("📭 No promotion history found matching the specified criteria.\n")
@@ -450,6 +454,7 @@ func outputHistoryTable(history []PromotionHistoryRecord, showDetails bool, grou
 	return nil
 }
 
+// TODO: refactor - move to pkg/output/ or pkg/promotion/display.go - Output formatting should be in pkg/
 func outputHistoryGrouped(history []PromotionHistoryRecord, groupBy string, showDetails bool) error {
 	groups := make(map[string][]PromotionHistoryRecord)
 
@@ -513,6 +518,7 @@ func outputHistoryGrouped(history []PromotionHistoryRecord, groupBy string, show
 	return nil
 }
 
+// TODO: refactor - move to pkg/output/ or pkg/promotion/display.go - Output formatting should be in pkg/
 func outputHistorySummary(history []PromotionHistoryRecord) error {
 	if len(history) == 0 {
 		fmt.Printf("📭 No promotion history found.\n")
@@ -576,12 +582,14 @@ func outputHistorySummary(history []PromotionHistoryRecord) error {
 	return nil
 }
 
+// TODO: refactor - move to pkg/output/ or pkg/promotion/display.go - Output formatting should be in pkg/
 func outputHistoryJSON(history []PromotionHistoryRecord, outputFile string) error {
 	// Implementation would marshal to JSON and write to file or stdout
 	fmt.Printf("JSON export not implemented yet\n")
 	return nil
 }
 
+// TODO: refactor - move to pkg/output/ or pkg/promotion/display.go - Output formatting should be in pkg/
 func outputHistoryCSV(history []PromotionHistoryRecord, outputFile string) error {
 	// Implementation would write CSV format to file or stdout
 	fmt.Printf("CSV export not implemented yet\n")

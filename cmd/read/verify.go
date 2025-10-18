@@ -165,6 +165,7 @@ ORDER BY path;`
 	return nil
 }
 
+// TODO: refactor - move to pkg/verify/ or pkg/osquery/verify.go - Verification logic should be in pkg/
 func verifyCleanState(rc *eos_io.RuntimeContext, cli *eos_cli.CLI, jsonOutput bool) error {
 
 	fmt.Println("Verifying Clean State")

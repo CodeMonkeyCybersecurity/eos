@@ -110,7 +110,7 @@ Examples:
 		return nil
 	}),
 }
-
+// TODO: refactor
 var (
 	showAll bool
 )

@@ -181,7 +181,7 @@ func init() {
 	createBoundaryNativeCmd.Flags().Bool("force", false, "Force reinstall")
 	createBoundaryNativeCmd.Flags().Bool("use-repository", false, "Install via APT repository")
 }
-
+// TODO: refactor
 // Terraform native installer
 func runCreateTerraformNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)

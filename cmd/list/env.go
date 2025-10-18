@@ -135,7 +135,7 @@ func init() {
   # List environments sorted by creation date
   eos list env --sort created --reverse`
 }
-
+// TODO: refactor
 // displayEnvironmentsTable displays environments in table format
 func displayEnvironmentsTable(envs map[string]environments.Environment, currentEnv *environments.Environment, detailed bool) error {
 	if len(envs) == 0 {
@@ -208,7 +208,7 @@ func displayEnvironmentsTable(envs map[string]environments.Environment, currentE
 
 	return nil
 }
-
+// TODO: refactor
 // displayEnvironmentsJSON displays environments in JSON format
 func displayEnvironmentsJSON(envs map[string]environments.Environment, currentEnv *environments.Environment) error {
 	// This would implement JSON output
@@ -240,7 +240,7 @@ func displayEnvironmentsJSON(envs map[string]environments.Environment, currentEn
 	fmt.Printf("}\n")
 	return nil
 }
-
+// TODO: refactor
 // displayEnvironmentsYAML displays environments in YAML format
 func displayEnvironmentsYAML(envs map[string]environments.Environment, currentEnv *environments.Environment) error {
 	// This would implement YAML output
@@ -266,7 +266,7 @@ func displayEnvironmentsYAML(envs map[string]environments.Environment, currentEn
 }
 
 // Helper functions
-
+// TODO: refactor
 func getShortAddress(address string) string {
 	// Remove protocol and port for compact display
 	addr := strings.TrimPrefix(address, "http://")
@@ -276,7 +276,7 @@ func getShortAddress(address string) string {
 	}
 	return addr
 }
-
+// TODO: refactor
 func getCurrentEnvName(env *environments.Environment) string {
 	if env == nil {
 		return ""

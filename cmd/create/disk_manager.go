@@ -42,7 +42,7 @@ Examples:
   eos create disk mount --device /dev/sdb1 --mount /mnt/existing`,
 	RunE: eos_cli.Wrap(runDiskManager),
 }
-
+// TODO: refactor
 var (
 	diskAction     string
 	diskDevice     string
@@ -68,7 +68,7 @@ func init() {
 	diskManagerCmd.Flags().StringSliceVar(&diskOptions, "options", []string{}, "Mount options")
 	diskManagerCmd.Flags().BoolVar(&diskDryRun, "dry-run", false, "Show what would be done without executing")
 }
-
+// TODO: refactor
 func runDiskManager(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -101,7 +101,7 @@ func runDiskManager(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return fmt.Errorf("unsupported action: %s", diskAction)
 	}
 }
-
+// TODO: refactor
 func discoverDisks(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -137,7 +137,7 @@ func discoverDisks(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) erro
 
 	return nil
 }
-
+// TODO: refactor
 func createDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -208,7 +208,7 @@ func createDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 
 	return nil
 }
-
+// TODO: refactor
 func checkDiskHealth(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) error {
 	if diskDevice == "" {
 		return fmt.Errorf("device is required for health check")
@@ -249,7 +249,7 @@ func checkDiskHealth(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) er
 
 	return nil
 }
-
+// TODO: refactor
 func mountDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) error {
 	if diskDevice == "" {
 		return fmt.Errorf("device is required for mounting")
@@ -274,7 +274,7 @@ func mountDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) er
 
 	return nil
 }
-
+// TODO: refactor
 func unmountDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) error {
 	if diskDevice == "" {
 		return fmt.Errorf("device is required for unmounting")
@@ -291,7 +291,7 @@ func unmountDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) 
 	fmt.Printf(" Volume unmounted successfully: %s\n", diskDevice)
 	return nil
 }
-
+// TODO: refactor
 func resizeDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) error {
 	if diskDevice == "" {
 		return fmt.Errorf("device is required for resizing")
@@ -329,7 +329,7 @@ func resizeDiskVolume(rc *eos_io.RuntimeContext, diskMgr *udisks2.DiskManager) e
 
 	return nil
 }
-
+// TODO: refactor
 // Helper functions
 func parseDiskSize(size string) (uint64, error) {
 	if size == "" || size == "0" {
@@ -361,7 +361,7 @@ func parseDiskSize(size string) (uint64, error) {
 
 	return uint64(num * float64(multiplier)), nil
 }
-
+// TODO: refactor
 func formatDiskSize(bytes uint64) string {
 	const unit = 1024
 	if bytes < unit {

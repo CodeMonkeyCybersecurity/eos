@@ -363,8 +363,6 @@ Examples:
 }
 
 func init() {
-	DeployCmd.AddCommand(stackCmd)
-
 	// Required deployment flags
 	stackCmd.Flags().String("environment", "", "Target environment (required)")
 

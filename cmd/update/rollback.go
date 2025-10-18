@@ -132,6 +132,7 @@ func init() {
   eos update rollback helen --timeout 15m --notify-users user1,user2`
 }
 
+// TODO: refactor - move all these types to pkg/deploy/rollback_types.go - Data structures should be in pkg/
 // RollbackRequest represents a rollback request configuration
 type RollbackRequest struct {
 	AppName             string        `json:"app_name"`
@@ -199,6 +200,7 @@ type RollbackStepResult struct {
 	Error     string        `json:"error,omitempty"`
 }
 
+// TODO: refactor - move to pkg/deploy/rollback.go - Rollback orchestration is complex business logic
 // executeRollback performs the complete rollback operation
 func executeRollback(rc *eos_io.RuntimeContext, appName, toVersion, reason string, emergency, dryRun bool, timeout time.Duration, force bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -259,6 +261,7 @@ func executeRollback(rc *eos_io.RuntimeContext, appName, toVersion, reason strin
 	return nil
 }
 
+// TODO: refactor - move to pkg/deploy/rollback.go - Assessment and planning is business logic
 // assessRollback analyzes current state and creates rollback plan
 func assessRollback(rc *eos_io.RuntimeContext, request *RollbackRequest) (*RollbackPlan, error) {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -377,6 +380,7 @@ func assessRollback(rc *eos_io.RuntimeContext, request *RollbackRequest) (*Rollb
 }
 
 // confirmRollback gets user confirmation for the rollback
+// TODO: refactor - move to pkg/deploy/rollback.go or pkg/eos_io - User confirmation logic with display
 func confirmRollback(rc *eos_io.RuntimeContext, plan *RollbackPlan) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -415,6 +419,7 @@ func confirmRollback(rc *eos_io.RuntimeContext, plan *RollbackPlan) error {
 	return nil
 }
 
+// TODO: refactor - move to pkg/output/ or pkg/deploy/display.go - Plan display formatting
 // displayRollbackPlan displays the rollback plan for dry run
 func displayRollbackPlan(plan *RollbackPlan) error {
 	fmt.Printf("\n Rollback Plan (Dry Run) for %s\n", plan.Request.AppName)
@@ -437,6 +442,7 @@ func displayRollbackPlan(plan *RollbackPlan) error {
 	return nil
 }
 
+// TODO: refactor - move to pkg/deploy/rollback.go - Core rollback execution logic
 // executeRollbackPlan executes the rollback plan
 func executeRollbackPlan(rc *eos_io.RuntimeContext, plan *RollbackPlan) (*RollbackResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -527,6 +533,7 @@ func executeRollbackPlan(rc *eos_io.RuntimeContext, plan *RollbackPlan) (*Rollba
 	return result, nil
 }
 
+// TODO: refactor - move to pkg/deploy/rollback.go - Consul rollback is business logic
 // executeConsulRollback handles Consul service registration/deregistration
 func executeConsulRollback(rc *eos_io.RuntimeContext, manager *deploy.DeploymentManager, request *RollbackRequest, action string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -546,6 +553,7 @@ func executeConsulRollback(rc *eos_io.RuntimeContext, manager *deploy.Deployment
 	}
 }
 
+// TODO: refactor - move to pkg/deploy/rollback.go - Backup step is business logic
 // executeBackupStep creates a backup before rollback
 func executeBackupStep(rc *eos_io.RuntimeContext, request *RollbackRequest) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -559,6 +567,7 @@ func executeBackupStep(rc *eos_io.RuntimeContext, request *RollbackRequest) erro
 	return nil
 }
 
+// TODO: refactor - move to pkg/deploy/rollback.go - Health verification is business logic
 // executeHealthVerification verifies rollback health
 func executeHealthVerification(rc *eos_io.RuntimeContext, manager *deploy.DeploymentManager, request *RollbackRequest) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -580,6 +589,7 @@ func executeHealthVerification(rc *eos_io.RuntimeContext, manager *deploy.Deploy
 	return nil
 }
 
+// TODO: refactor - move to pkg/notification/ or pkg/deploy/notifications.go - Notification logic should be in pkg/
 // sendRollbackNotifications sends notifications about rollback completion
 func sendRollbackNotifications(rc *eos_io.RuntimeContext, result *RollbackResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -605,12 +615,14 @@ func sendRollbackNotifications(rc *eos_io.RuntimeContext, result *RollbackResult
 
 // Helper functions
 
+// TODO: refactor - move to pkg/deploy/version.go - Version retrieval is business logic
 // rollbackApplication gets the current deployed version
 func rollbackApplication(_ *eos_io.RuntimeContext, _ string) error {
 	// TODO: Implementation would query current version from deployment system
 	return nil
 }
 
+// TODO: refactor - move to pkg/deploy/version.go - Version history retrieval is business logic
 // getPreviousStableVersion gets the previous stable version for rollback
 func getPreviousStableVersion(rc *eos_io.RuntimeContext, appName string) (string, error) {
 	// Implementation would query deployment history to find previous stable version

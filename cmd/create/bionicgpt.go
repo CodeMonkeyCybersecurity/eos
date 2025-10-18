@@ -11,7 +11,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+//TODO: refactor
 var (
 	bionicgptPort             int
 	bionicgptPostgresPassword string
@@ -94,7 +94,7 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 
 	CreateCmd.AddCommand(bionicgptCmd)
 }
-
+//TODO: refactor
 func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

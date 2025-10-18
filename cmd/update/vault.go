@@ -63,7 +63,7 @@ func init() {
 	VaultCmd.Flags().BoolVar(&vaultDryRun, "dry-run", false,
 		"Preview changes without applying them")
 }
-
+// TODO: refactor
 func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -261,7 +261,7 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	return nil
 }
-
+// TODO: refactor
 // parsePortMigration parses port migration syntax: "FROM -> TO"
 // Returns: fromPort, toPort, portType, error
 func parsePortMigration(portsArg string) (int, int, string, error) {
@@ -338,7 +338,7 @@ func parsePortMigration(portsArg string) (int, int, string, error) {
 
 	return fromPort, toPort, portType, nil
 }
-
+// TODO: refactor
 // extractVaultPort extracts the port number from Vault listener configuration
 // Looks for patterns like: address = "0.0.0.0:8200"
 func extractVaultPort(config, addressType string) int {
@@ -357,7 +357,7 @@ func extractVaultPort(config, addressType string) int {
 	}
 	return 8201 // Default cluster port
 }
-
+// TODO: refactor
 // updateVaultPorts updates port numbers in Vault configuration
 // Pass 0 for ports that should not be changed
 func updateVaultPorts(config string, apiPort, clusterPort int) string {

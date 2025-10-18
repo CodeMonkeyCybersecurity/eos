@@ -144,7 +144,6 @@ Examples:
 }
 
 func init() {
-	buildCmd.AddCommand(validateCmd)
 
 	// Validation scope flags
 	validateCmd.Flags().Bool("all", false, "Validate all components")
@@ -179,7 +178,7 @@ func init() {
   # Validate and auto-fix issues
   eos build validate helen --fix`
 }
-
+// TODO: refactor
 // displayValidationResultsTable displays validation results in table format
 func displayValidationResultsTable(results []*build.ValidationResult, strict bool) error {
 	if len(results) == 0 {
@@ -275,7 +274,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 
 	return nil
 }
-
+// TODO: refactor
 // displayValidationResultsJSON displays validation results in JSON format
 func displayValidationResultsJSON(results []*build.ValidationResult) error {
 	fmt.Printf("{\n")
@@ -301,7 +300,7 @@ func displayValidationResultsJSON(results []*build.ValidationResult) error {
 	fmt.Printf("}\n")
 	return nil
 }
-
+// TODO: refactor
 // displayValidationResultsYAML displays validation results in YAML format
 func displayValidationResultsYAML(results []*build.ValidationResult) error {
 	fmt.Printf("validation_results:\n")

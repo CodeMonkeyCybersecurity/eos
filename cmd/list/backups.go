@@ -137,6 +137,27 @@ Examples:
 	}),
 }
 
+
+func init() {
+	ListCmd.AddCommand(backupsCmd)
+
+	// Repository selection
+	backupsCmd.Flags().String("repo", "", "Repository to list snapshots from (uses default if not specified)")
+
+	// Filtering options
+	backupsCmd.Flags().StringSlice("tags", nil, "Filter by tags (comma-separated)")
+	backupsCmd.Flags().String("host", "", "Filter by hostname")
+	backupsCmd.Flags().String("path", "", "Filter by path")
+	backupsCmd.Flags().Int("last", 0, "Show only the last N snapshots")
+
+	// Display options
+	backupsCmd.Flags().Bool("detailed", false, "Show detailed snapshot information")
+	backupsCmd.Flags().String("group-by", "", "Group snapshots by field (host, tag, date)")
+	backupsCmd.Flags().Bool("stats", false, "Show repository statistics")
+}
+
+
+// TODO: refactor - move to pkg/backup/filter.go - Snapshot filtering is business logic
 // filterSnapshots applies filters to snapshot list
 func filterSnapshots(snapshots []backup.Snapshot, filterTags []string, filterHost, filterPath string) []backup.Snapshot {
 	filtered := []backup.Snapshot{}
@@ -185,7 +206,7 @@ func filterSnapshots(snapshots []backup.Snapshot, filterTags []string, filterHos
 
 	return filtered
 }
-
+// TODO: refactor - move to pkg/output/ or pkg/backup/display.go - Display formatting should be in pkg/
 // displaySnapshots shows snapshots in tabular format
 func displaySnapshots(logger otelzap.LoggerWithCtx, snapshots []backup.Snapshot, detailed bool) {
 	logger.Info("terminal prompt: \nBackup Snapshots:")
@@ -238,7 +259,7 @@ func displaySnapshots(logger otelzap.LoggerWithCtx, snapshots []backup.Snapshot,
 	logger.Info("terminal prompt:", zap.String("output", strings.Repeat("=", 140)))
 	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Total snapshots: %d", len(snapshots))))
 }
-
+// TODO: refactor - move to pkg/output/ or pkg/backup/display.go - Grouped display logic should be in pkg/
 // displaySnapshotsGrouped shows snapshots grouped by a field
 func displaySnapshotsGrouped(logger otelzap.LoggerWithCtx, snapshots []backup.Snapshot, groupBy string, detailed bool) {
 	// Group snapshots
@@ -273,7 +294,7 @@ func displaySnapshotsGrouped(logger otelzap.LoggerWithCtx, snapshots []backup.Sn
 		displaySnapshots(logger, groupSnapshots, detailed)
 	}
 }
-
+// TODO: refactor - move to pkg/output/ or pkg/backup/display.go - Stats display formatting should be in pkg/
 // displayRepositoryStats shows repository statistics
 func displayRepositoryStats(logger otelzap.LoggerWithCtx, stats *backup.RepositoryStats) {
 	fmt.Printf("Repository: %s\n", stats.RepositoryID)
@@ -298,7 +319,7 @@ func displayRepositoryStats(logger otelzap.LoggerWithCtx, stats *backup.Reposito
 		}
 	}
 }
-
+// TODO: refactor - move to pkg/shared/format.go or pkg/shared/time.go - Time formatting is reusable across codebase
 // formatAge returns a human-readable age string
 func formatAge(t time.Time) string {
 	duration := time.Since(t)
@@ -330,7 +351,7 @@ func formatAge(t time.Time) string {
 	years := int(duration.Hours() / 24 / 365)
 	return fmt.Sprintf("%dy", years)
 }
-
+// TODO: refactor - move to pkg/shared/format.go - String formatting is reusable across codebase
 // truncateString truncates a string to the specified length
 func truncateString(s string, length int) string {
 	if len(s) <= length {
@@ -341,7 +362,7 @@ func truncateString(s string, length int) string {
 	}
 	return s[:length-3] + "..."
 }
-
+// TODO: refactor - move to pkg/shared/format.go - Size formatting is reusable across codebase (same as formatSize)
 // humanizeBytes converts bytes to human-readable format
 func humanizeBytes(bytes int64) string {
 	const unit = 1024
@@ -354,22 +375,4 @@ func humanizeBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
-
-func init() {
-	ListCmd.AddCommand(backupsCmd)
-
-	// Repository selection
-	backupsCmd.Flags().String("repo", "", "Repository to list snapshots from (uses default if not specified)")
-
-	// Filtering options
-	backupsCmd.Flags().StringSlice("tags", nil, "Filter by tags (comma-separated)")
-	backupsCmd.Flags().String("host", "", "Filter by hostname")
-	backupsCmd.Flags().String("path", "", "Filter by path")
-	backupsCmd.Flags().Int("last", 0, "Show only the last N snapshots")
-
-	// Display options
-	backupsCmd.Flags().Bool("detailed", false, "Show detailed snapshot information")
-	backupsCmd.Flags().String("group-by", "", "Group snapshots by field (host, tag, date)")
-	backupsCmd.Flags().Bool("stats", false, "Show repository statistics")
 }

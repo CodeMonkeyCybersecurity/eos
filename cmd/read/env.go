@@ -1,6 +1,7 @@
 package read
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -122,6 +123,18 @@ func init() {
 }
 
 // displayEnvironmentTable displays environment in table format
+// TODO: refactor - Move to pkg/output/environment.go or pkg/environments/display.go
+// ANTI-PATTERN: Massive display function with 100+ lines of fmt.Printf calls
+// ISSUES:
+//   1. Direct fmt.Printf instead of logger (violates CLAUDE.md P0 rule)
+//   2. Display logic in cmd/ instead of pkg/
+//   3. Hardcoded formatting makes it untestable
+//   4. No separation of concerns (formatting + output)
+// FIX:
+//   - Create pkg/environments/display.go with displayEnvironmentTable(env, detailed, w io.Writer)
+//   - Use tabwriter or template for formatting
+//   - Return formatted string/bytes instead of direct printing
+// MOVE TO: pkg/environments/display.go as RenderEnvironmentTable(env, detailed) string
 func displayEnvironmentTable(env *environments.Environment, detailed bool) error {
 	// Basic environment information
 	fmt.Printf("Environment: %s (%s)\n", env.DisplayName, env.Name)
@@ -222,7 +235,10 @@ func displayEnvironmentTable(env *environments.Environment, detailed bool) error
 	return nil
 }
 
-// displayDetailedConfiguration shows comprehensive configuration details
+// TODO: refactor - Move to pkg/environments/display.go
+// ANTI-PATTERN: 60+ lines of fmt.Printf and tabwriter usage in cmd/
+// ISSUES: Same as displayEnvironmentTable - display logic doesn't belong in cmd/
+// MOVE TO: pkg/environments/display.go as RenderDetailedConfiguration(env) string
 func displayDetailedConfiguration(env *environments.Environment) error {
 	fmt.Printf("Detailed Configuration:\n")
 	fmt.Printf("═══════════════════════\n\n")
@@ -287,50 +303,27 @@ func displayDetailedConfiguration(env *environments.Environment) error {
 	return nil
 }
 
-// displayEnvironmentJSON displays environment in JSON format
+// FIXED: Security vulnerability - replaced manual JSON with proper marshaling
+// TODO: refactor - Move to pkg/environments/display.go as RenderEnvironmentJSON(env) ([]byte, error)
+// PREVIOUS ISSUE: Manual JSON construction without escaping = JSON injection vulnerability
+// FIX APPLIED: Use json.MarshalIndent for proper escaping and structure
 func displayEnvironmentJSON(env *environments.Environment) error {
-	// This would implement proper JSON marshaling
-	fmt.Printf("{\n")
-	fmt.Printf("  \"name\": \"%s\",\n", env.Name)
-	fmt.Printf("  \"display_name\": \"%s\",\n", env.DisplayName)
-	fmt.Printf("  \"type\": \"%s\",\n", env.Type)
-	fmt.Printf("  \"status\": \"%s\",\n", env.Status)
-	fmt.Printf("  \"description\": \"%s\",\n", env.Description)
-	fmt.Printf("  \"created_at\": \"%s\",\n", env.CreatedAt.Format(time.RFC3339))
-	fmt.Printf("  \"updated_at\": \"%s\",\n", env.UpdatedAt.Format(time.RFC3339))
-	fmt.Printf("  \"infrastructure\": {\n")
-	fmt.Printf("    \"nomad\": {\n")
-	fmt.Printf("      \"address\": \"%s\",\n", env.Infrastructure.Nomad.Address)
-	fmt.Printf("      \"region\": \"%s\",\n", env.Infrastructure.Nomad.Region)
-	fmt.Printf("      \"datacenter\": \"%s\",\n", env.Infrastructure.Nomad.Datacenter)
-	fmt.Printf("      \"namespace\": \"%s\"\n", env.Infrastructure.Nomad.Namespace)
-	fmt.Printf("    },\n")
-	fmt.Printf("    \"consul\": {\n")
-	fmt.Printf("      \"address\": \"%s\",\n", env.Infrastructure.Consul.Address)
-	fmt.Printf("      \"datacenter\": \"%s\"\n", env.Infrastructure.Consul.Datacenter)
-	fmt.Printf("    },\n")
-	fmt.Printf("    \"vault\": {\n")
-	fmt.Printf("      \"address\": \"%s\"\n", env.Infrastructure.Vault.Address)
-	fmt.Printf("    }\n")
-	fmt.Printf("  },\n")
-	fmt.Printf("  \"deployment\": {\n")
-	fmt.Printf("    \"strategy\": {\n")
-	fmt.Printf("      \"type\": \"%s\",\n", env.Deployment.Strategy.Type)
-	fmt.Printf("      \"max_parallel\": %d,\n", env.Deployment.Strategy.MaxParallel)
-	fmt.Printf("      \"auto_revert\": %t,\n", env.Deployment.Strategy.AutoRevert)
-	fmt.Printf("      \"auto_promote\": %t\n", env.Deployment.Strategy.AutoPromote)
-	fmt.Printf("    },\n")
-	fmt.Printf("    \"resources\": {\n")
-	fmt.Printf("      \"cpu\": %d,\n", env.Deployment.Resources.CPU)
-	fmt.Printf("      \"memory\": %d,\n", env.Deployment.Resources.Memory)
-	fmt.Printf("      \"memory_max\": %d\n", env.Deployment.Resources.MemoryMax)
-	fmt.Printf("    }\n")
-	fmt.Printf("  }\n")
-	fmt.Printf("}\n")
+	// Use proper JSON marshaling with indentation
+	jsonData, err := json.MarshalIndent(env, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal environment to JSON: %w", err)
+	}
+
+	// Print the JSON output
+	fmt.Println(string(jsonData))
 	return nil
 }
 
-// displayEnvironmentYAML displays environment in YAML format
+// TODO: refactor - Move to pkg/environments/display.go
+// ANTI-PATTERN: Incomplete YAML implementation with manual fmt.Printf
+// ISSUES: Same as displayEnvironmentJSON - should use yaml.Marshal
+// FIX: Use yaml.Marshal(env) from gopkg.in/yaml.v3
+// MOVE TO: pkg/environments/display.go as RenderEnvironmentYAML(env) ([]byte, error)
 func displayEnvironmentYAML(env *environments.Environment) error {
 	// This would implement proper YAML marshaling
 	fmt.Printf("name: %s\n", env.Name)

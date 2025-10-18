@@ -9,6 +9,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+// TODO: refactor
 
 var (
 	cephOutputFormat string
@@ -58,6 +59,7 @@ func init() {
 	ListCmd.AddCommand(cephCmd)
 }
 
+// TODO: refactor
 func runCephCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Ceph status check")

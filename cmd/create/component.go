@@ -137,7 +137,6 @@ Examples:
 }
 
 func init() {
-	buildCmd.AddCommand(componentCmd)
 
 	// Build configuration flags
 	componentCmd.Flags().String("tag", "", "Image tag (defaults to git commit hash)")

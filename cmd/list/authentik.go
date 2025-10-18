@@ -36,7 +36,7 @@ func init() {
 	// Register command
 	ListCmd.AddCommand(AuthentikCmd)
 }
-
+// TODO: refactor
 func checkAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	// Implementation will be moved from the check functionality
 	// This is a placeholder that matches the expected function signature

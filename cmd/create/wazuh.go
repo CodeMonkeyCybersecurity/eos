@@ -68,7 +68,7 @@ func init() {
 	createWazuhCmd.Flags().StringVar(&webhookPort, "port", "8080", "Webhook port (default: 8080)")
 	createWazuhCmd.Flags().BoolVar(&autoRestart, "auto-restart", false, "Automatically restart wazuh-manager")
 }
-
+// TODO: refactor
 type WazuhConfig struct {
 	IntegrationsDir string
 	OssecConfPath   string
@@ -76,7 +76,7 @@ type WazuhConfig struct {
 	WebhookToken    string
 	IntegrationName string
 }
-
+//TODO: refactor
 func runCreateWazuh(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -156,7 +156,7 @@ func runCreateWazuh(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	return nil
 }
-
+//TODO: refactor
 func checkWazuhInstalled(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -181,7 +181,7 @@ func checkWazuhInstalled(rc *eos_io.RuntimeContext) error {
 
 	return nil
 }
-
+//TODO: refactor
 func getWebhookURL(rc *eos_io.RuntimeContext, config *WazuhConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -217,7 +217,7 @@ func getWebhookURL(rc *eos_io.RuntimeContext, config *WazuhConfig) error {
 	logger.Info("Webhook URL configured", zap.String("url", config.HookURL))
 	return nil
 }
-
+//TODO: refactor
 func generateWebhookToken(rc *eos_io.RuntimeContext, config *WazuhConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -234,7 +234,7 @@ func generateWebhookToken(rc *eos_io.RuntimeContext, config *WazuhConfig) error 
 
 	return nil
 }
-
+//TODO: refactor
 func installIntegrationScripts(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -277,7 +277,7 @@ func installIntegrationScripts(rc *eos_io.RuntimeContext, config WazuhConfig) er
 
 	return nil
 }
-
+//TODO: refactor
 func createEnvFile(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -308,7 +308,7 @@ WEBHOOK_TOKEN=%s
 
 	return nil
 }
-
+//TODO: refactor
 func installPythonDependencies(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -340,7 +340,7 @@ func installPythonDependencies(rc *eos_io.RuntimeContext) error {
 
 	return nil
 }
-
+//TODO: refactor
 func updateOssecConf(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -403,14 +403,14 @@ func updateOssecConf(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 
 	return nil
 }
-
+//TODO: refactor
 func removeExistingIntegration(content, integrationName string) string {
 	// Remove existing integration block using regex
 	pattern := `(?s)<integration>\s*<name>` + regexp.QuoteMeta(integrationName) + `</name>.*?</integration>\s*`
 	re := regexp.MustCompile(pattern)
 	return re.ReplaceAllString(content, "")
 }
-
+//TODO: refactor
 func testIntegration(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -465,7 +465,7 @@ func testIntegration(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 
 	return nil
 }
-
+//TODO: refactor
 func restartWazuhManager(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -486,7 +486,7 @@ func restartWazuhManager(rc *eos_io.RuntimeContext) error {
 
 	return nil
 }
-
+//TODO: refactor
 func printWazuhSuccessMessage(logger otelzap.LoggerWithCtx, config WazuhConfig) {
 	logger.Info("Wazuh webhook integration configured successfully",
 		zap.String("webhook_url", config.HookURL),
@@ -520,7 +520,7 @@ func printWazuhSuccessMessage(logger otelzap.LoggerWithCtx, config WazuhConfig) 
 }
 
 // Helper functions
-
+//TODO: refactor
 func promptYesNo(prompt string) bool {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s [y/N]: ", prompt)
@@ -528,7 +528,7 @@ func promptYesNo(prompt string) bool {
 	response = strings.TrimSpace(strings.ToLower(response))
 	return response == "y" || response == "yes"
 }
-
+//TODO: refactor
 func copyFile(src, dst string) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
@@ -536,7 +536,7 @@ func copyFile(src, dst string) error {
 	}
 	return os.WriteFile(dst, data, 0640)
 }
-
+//TODO: refactor
 // Configuration flags moved to pkg/wazuh/config
 var wazuhFlags = config.DefaultFlags()
 
@@ -548,7 +548,7 @@ func init() {
 	// Add mapping command
 	CreateCmd.AddCommand(mappingCmd)
 }
-
+//TODO: refactor
 var CreateWazuhCmd = &cobra.Command{
 	Use:     "wazuh",
 	Aliases: []string{"wazuh"},
@@ -665,7 +665,7 @@ EXAMPLES:
 		return nil
 	}),
 }
-
+//TODO: refactor
 var mappingCmd = &cobra.Command{
 	Use:   "mapping",
 	Short: "Suggest the best agent package for each endpoint",
@@ -689,37 +689,8 @@ var mappingCmd = &cobra.Command{
 	}),
 }
 
-// DeployCmd is the root command for Wazuh deployment operations
-var DeployCmd = &cobra.Command{
-	Use:     "deploy",
-	Aliases: []string{"install"},
-	Short:   "Deploy Wazuh/Wazuh with Docker containers",
-	Long: `Deploy Wazuh/Wazuh using Docker containers with enhanced configuration.
-
-This command provides comprehensive Wazuh deployment functionality including:
-- Single-node and multi-node deployment options
-- Automatic certificate generation
-- Port configuration for Hecate compatibility
-- Custom credential setup with secure password hashing
-
-Examples:
-  eos wazuh deploy docker                    # Interactive Docker deployment
-  eos wazuh deploy docker --single-node     # Single-node deployment
-  eos wazuh deploy docker --multi-node      # Multi-node deployment
-  eos wazuh deploy credentials              # Change default credentials`,
-
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for deploy command")
-		_ = cmd.Help()
-		return nil
-	}),
-}
 
 func init() {
-	// Add subcommands
-	DeployCmd.AddCommand(dockerDeployCmd)
-	DeployCmd.AddCommand(wazuhCredentialsCmd)
-	DeployCmd.AddCommand(cleanupCmd)
 
 	// Set up flags for dockerDeployCmd
 	dockerDeployCmd.Flags().StringP("version", "v", "", "Wazuh version to deploy (e.g., 4.10.1)")

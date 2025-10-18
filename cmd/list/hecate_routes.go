@@ -40,7 +40,7 @@ func init() {
 	listHecateRoutesCmd.Flags().Bool("health-only", false, "Show only health status information")
 	listHecateRoutesCmd.Flags().Bool("verbose", false, "Show detailed route information")
 }
-
+// TODO: refactor
 func runListHecateRoutes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -99,7 +99,7 @@ func runListHecateRoutes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		return displayRoutesTable(rc, routes, routeStatuses, healthOnly, verbose)
 	}
 }
-
+// TODO: refactor
 func displayRoutesTable(rc *eos_io.RuntimeContext, routes []*hecate.Route, statuses map[string]*hecate.RouteStatus, healthOnly, verbose bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -208,7 +208,7 @@ func displayRoutesTable(rc *eos_io.RuntimeContext, routes []*hecate.Route, statu
 
 	return nil
 }
-
+// TODO: refactor
 func displayRoutesJSON(rc *eos_io.RuntimeContext, routes []*hecate.Route, statuses map[string]*hecate.RouteStatus) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -233,6 +233,7 @@ func displayRoutesJSON(rc *eos_io.RuntimeContext, routes []*hecate.Route, status
 	return nil
 }
 
+// TODO: refactor
 func displayRoutesYAML(rc *eos_io.RuntimeContext, routes []*hecate.Route, statuses map[string]*hecate.RouteStatus) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -257,6 +258,7 @@ func displayRoutesYAML(rc *eos_io.RuntimeContext, routes []*hecate.Route, status
 	return nil
 }
 
+// TODO: refactor
 func matchesDomainFilter(domain, filter string) bool {
 	// Simple wildcard matching
 	if strings.Contains(filter, "*") {

@@ -13,7 +13,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO: refactor
 // getEnvOrDefault gets environment variable or returns default value
 func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
@@ -164,7 +164,7 @@ Examples:
   eos create hecate dns --domain api.example.com --target 5.6.7.8 --ttl 600`,
 	RunE: eos.Wrap(runCreateHecateDNS),
 }
-
+// TODO: refactor
 func runCreateHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Creating Hecate DNS record")
@@ -224,4 +224,3 @@ func runCreateHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	return nil
 }
 
-// getEnvOrDefault is defined in hecate_example.go

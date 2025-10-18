@@ -53,6 +53,7 @@ func init() {
 	UpdateWazuhCCSCmd.Flags().Bool("rotate-secrets", false, "Rotate all secrets")
 }
 
+// TODO: refactor
 func runUpdateWazuhCCS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Wazuh MSSP update")
@@ -77,6 +78,7 @@ func runUpdateWazuhCCS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	}
 }
 
+// TODO: refactor
 func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Scaling customer tier")
@@ -151,7 +153,7 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 
 	return nil
 }
-
+// TODO: refactor
 func updatePlatformConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Updating platform configuration")
@@ -199,6 +201,7 @@ func updatePlatformConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 	return nil
 }
 
+// TODO: refactor
 func updateCustomerConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Updating customer configuration")
@@ -267,7 +270,7 @@ func updateCustomerConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 
 	return nil
 }
-
+// TODO: refactor
 func applySecurityUpdates(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Applying security updates")

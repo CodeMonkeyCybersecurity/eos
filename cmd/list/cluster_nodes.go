@@ -42,6 +42,7 @@ Examples:
 
 	RunE: eos.Wrap(runListClusterNodes),
 }
+// TODO: refactor
 
 func runListClusterNodes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -74,6 +75,7 @@ func runListClusterNodes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	return displayNodesTable(filteredNodes, enhancedConfig)
 }
+// TODO: refactor
 
 // loadEnhancedEnvironmentConfig loads the enhanced environment configuration
 func loadEnhancedEnvironmentConfig() (*environment.EnhancedEnvironmentConfig, error) {
@@ -96,6 +98,7 @@ func loadEnhancedEnvironmentConfig() (*environment.EnhancedEnvironmentConfig, er
 	return &config, nil
 }
 
+// TODO: refactor
 // filterNodes filters nodes based on role and status criteria
 func filterNodes(allNodes map[string][]string, roleFilter, statusFilter string) map[string][]string {
 	if roleFilter == "" && statusFilter == "" {
@@ -137,7 +140,7 @@ func filterNodes(allNodes map[string][]string, roleFilter, statusFilter string) 
 
 	return filtered
 }
-
+// TODO: refactor
 // outputNodesJSON outputs nodes information as JSON
 func outputNodesJSON(nodes map[string][]string, config *environment.EnhancedEnvironmentConfig) error {
 	output := map[string]interface{}{
@@ -156,7 +159,7 @@ func outputNodesJSON(nodes map[string][]string, config *environment.EnhancedEnvi
 	fmt.Println(string(data))
 	return nil
 }
-
+// TODO: refactor
 // displayNodesTable displays nodes in a formatted table
 func displayNodesTable(nodes map[string][]string, config *environment.EnhancedEnvironmentConfig) error {
 	fmt.Printf("🏗️  Cluster Topology (%s)\n", config.Profile)

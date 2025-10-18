@@ -210,7 +210,6 @@ Examples:
 }
 
 func init() {
-	buildCmd.AddCommand(allCmd)
 
 	// Build configuration flags
 	allCmd.Flags().String("tag", "", "Image tag for all components (defaults to git commit hash)")

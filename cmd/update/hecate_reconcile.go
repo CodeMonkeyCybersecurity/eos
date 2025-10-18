@@ -45,6 +45,7 @@ func init() {
 	updateHecateReconcileCmd.Flags().String("authentik-url", "", "Authentik base URL")
 }
 
+// TODO: refactor
 func runUpdateHecateReconcile(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

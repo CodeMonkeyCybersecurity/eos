@@ -209,7 +209,6 @@ Examples:
 }
 
 func init() {
-	buildCmd.AddCommand(cleanCmd)
 
 	// Clean scope flags
 	cleanCmd.Flags().Bool("all", false, "Clean all artifacts, caches, and temporary files")
@@ -254,6 +253,7 @@ func init() {
 
 // Helper functions
 
+// TODO: refactor - move to pkg/shared/format.go or pkg/build/display.go - String formatting helpers should be in pkg/
 func getScopeDescription(all, cache, artifacts bool) string {
 	if all {
 		return "all artifacts and caches"
@@ -270,6 +270,7 @@ func getScopeDescription(all, cache, artifacts bool) string {
 	return "workspace cleanup"
 }
 
+// TODO: refactor - move to pkg/shared/format.go or pkg/build/display.go - String formatting helpers should be in pkg/
 func getCleanMode(aggressive, force bool) string {
 	if aggressive {
 		return "aggressive"
@@ -280,6 +281,7 @@ func getCleanMode(aggressive, force bool) string {
 	return "normal"
 }
 
+// TODO: refactor - move to pkg/shared/format.go - Size formatting is reusable across codebase
 func formatSize(bytes int64) string {
 	const (
 		KB = 1024
