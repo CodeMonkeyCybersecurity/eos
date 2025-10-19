@@ -41,25 +41,17 @@ WARNING: This will remove ALL Vault data including:
 
 BACKUP YOUR DATA before proceeding!
 
-SECURITY REQUIREMENTS:
-  To prevent accidental deletion, if Vault is running you MUST provide:
-  1. Root token (verified against Vault API)
-  2. Three (3) unseal keys (verified by sealing and unsealing Vault)
-
-  This ensures you have the necessary credentials to recover the Vault
-  instance if deletion is a mistake.
-
 EXAMPLES:
-  # Remove Vault (requires root token + 3 unseal keys if Vault is running)
+  # Remove Vault (asks for confirmation)
   eos delete vault
 
-  # Remove Vault without any security checks (DANGEROUS - use with extreme caution)
+  # Remove Vault without confirmation (use with caution)
   eos delete vault --yes
 
 SAFETY:
   This command removes ALL Vault data permanently.
-  By default, it requires root token and unseal keys for verification.
-  Use --yes to skip all prompts and security checks (NOT RECOMMENDED).`,
+  By default, it asks for confirmation before deletion.
+  Use --yes to skip the confirmation prompt.`,
 	RunE: eos_cli.Wrap(runDeleteVault),
 }
 
@@ -126,54 +118,22 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return nil
 	}
 
-	// SECURITY: Require root token and unseal keys verification
-	// This prevents accidental deletion and ensures user has recovery credentials
+	// Simple confirmation prompt unless --yes is used
+	// NOTE: We removed the root token/unseal key verification as it was too aggressive
+	// and blocked deletion of broken/inaccessible Vault installations
 	if !vaultSkipConfirmation {
-		logger.Info("Starting security credential verification")
-
-		// Try to connect to Vault for credential verification
-		vaultClient, err := vault.GetVaultClient(rc)
-		if err != nil {
-			logger.Warn("Could not connect to Vault for credential verification",
-				zap.Error(err),
-				zap.String("note", "Will proceed with basic confirmation only"))
-
-			// Fallback to basic confirmation if Vault is not accessible
-			if err := promptForConfirmation(rc, logger, state); err != nil {
-				if err.Error() == "user cancelled" {
-					logger.Info("Deletion cancelled by user")
-					return nil
-				}
-				logger.Error("Confirmation prompt failed", zap.Error(err))
-				return err
+		logger.Debug("Prompting user for confirmation")
+		if err := promptForConfirmation(rc, logger, state); err != nil {
+			if err.Error() == "user cancelled" {
+				logger.Info("Deletion cancelled by user")
+				return nil
 			}
-		} else {
-			// Vault is accessible - require full credential verification
-			logger.Info("Vault is accessible - requiring root token and unseal key verification")
-
-			if err := vault.VerifyDeletionCredentials(rc, vaultClient); err != nil {
-				logger.Error("Credential verification failed",
-					zap.Error(err),
-					zap.String("remediation", "Provide correct root token and 3 unseal keys to proceed"))
-				return fmt.Errorf("vault deletion cancelled: %w", err)
-			}
-
-			// Additional confirmation after credential verification
-			logger.Debug("Credentials verified - prompting for final confirmation")
-			if err := promptForConfirmation(rc, logger, state); err != nil {
-				if err.Error() == "user cancelled" {
-					logger.Info("Deletion cancelled by user")
-					return nil
-				}
-				logger.Error("Confirmation prompt failed", zap.Error(err))
-				return err
-			}
+			logger.Error("Confirmation prompt failed", zap.Error(err))
+			return err
 		}
-
 		logger.Info("User confirmed deletion - proceeding")
 	} else {
-		logger.Info("--yes flag set - skipping all confirmation prompts and credential verification")
-		logger.Warn("WARNING: --yes flag bypasses security checks - use with extreme caution")
+		logger.Info("--yes flag set - skipping confirmation prompt")
 	}
 
 	// Execute uninstallation (will use already-assessed state)
