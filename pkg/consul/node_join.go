@@ -88,10 +88,21 @@ func JoinNodes(rc *eos_io.RuntimeContext, config *NodeJoinConfig) (*NodeJoinResu
 		zap.String("hostname", localNode.Hostname),
 		zap.String("tailscale_ip", localNode.TailscaleIP))
 
-	// ASSESS - Phase 2: Resolve target nodes
-	logger.Info("[2/6] Resolving target nodes on Tailscale...")
+	// ASSESS - Phase 2: Get existing cluster members (for idempotency)
+	logger.Info("[2/8] Checking existing cluster configuration...")
+	existingMembers, err := getExistingClusterMembers(rc)
+	if err != nil {
+		logger.Debug("No existing cluster members found (this might be first run)", zap.Error(err))
+		existingMembers = make(map[string]string) // Empty map if no existing members
+	}
+
+	logger.Debug("Found existing cluster members",
+		zap.Int("count", len(existingMembers)))
+
+	// ASSESS - Phase 3: Resolve target nodes on Tailscale
+	logger.Info("[3/8] Resolving target nodes on Tailscale...")
 	var joinedNodes []NodeInfo
-	var retryJoinAddrs []string
+	targetNodeMap := make(map[string]string) // hostname -> IP
 
 	for _, nodeName := range config.TargetNodes {
 		peer, err := tsClient.FindPeerByHostname(nodeName)
@@ -117,7 +128,7 @@ func JoinNodes(rc *eos_io.RuntimeContext, config *NodeJoinConfig) (*NodeJoinResu
 		}
 
 		joinedNodes = append(joinedNodes, nodeInfo)
-		retryJoinAddrs = append(retryJoinAddrs, targetIP)
+		targetNodeMap[peer.HostName] = targetIP
 
 		logger.Info("Resolved target node",
 			zap.String("node", nodeName),
@@ -126,10 +137,18 @@ func JoinNodes(rc *eos_io.RuntimeContext, config *NodeJoinConfig) (*NodeJoinResu
 			zap.Bool("online", peer.Online))
 	}
 
-	// ASSESS - Phase 3: Backup existing Consul configuration
+	// ASSESS - Phase 4: Build complete retry_join list (merge existing + new)
+	logger.Info("[4/8] Building complete cluster configuration...")
+	retryJoinAddrs := buildCompleteRetryJoinList(existingMembers, targetNodeMap, myTailscaleIP)
+
+	logger.Info("Complete retry_join list",
+		zap.Strings("addresses", retryJoinAddrs),
+		zap.Int("total_members", len(retryJoinAddrs)))
+
+	// ASSESS - Phase 5: Backup existing Consul configuration
 	var backupPath string
 	if !config.SkipBackup && !config.DryRun {
-		logger.Info("[3/6] Backing up Consul configuration...")
+		logger.Info("[5/8] Backing up Consul configuration...")
 		backupPath = fmt.Sprintf("%s.backup.%d", config.ConfigPath, time.Now().Unix())
 
 		if err := copyFile(config.ConfigPath, backupPath); err != nil {
@@ -138,12 +157,12 @@ func JoinNodes(rc *eos_io.RuntimeContext, config *NodeJoinConfig) (*NodeJoinResu
 			logger.Info("Configuration backed up", zap.String("backup", backupPath))
 		}
 	} else {
-		logger.Info("[3/6] Skipping configuration backup")
+		logger.Info("[5/8] Skipping configuration backup")
 	}
 
 	// Return early if dry run
 	if config.DryRun {
-		logger.Info("[4/6] DRY RUN MODE - No changes will be made")
+		logger.Info("[6/8] DRY RUN MODE - No changes will be made")
 		logger.Info("Would configure Consul with:",
 			zap.String("bind_addr", myTailscaleIP),
 			zap.Strings("retry_join", retryJoinAddrs))
@@ -155,8 +174,8 @@ func JoinNodes(rc *eos_io.RuntimeContext, config *NodeJoinConfig) (*NodeJoinResu
 		}, nil
 	}
 
-	// INTERVENE - Phase 4: Update Consul configuration
-	logger.Info("[4/6] Updating Consul configuration...")
+	// INTERVENE - Phase 6: Update Consul configuration
+	logger.Info("[6/8] Updating Consul configuration...")
 
 	existingConfig, err := os.ReadFile(config.ConfigPath)
 	if err != nil {
@@ -174,8 +193,8 @@ func JoinNodes(rc *eos_io.RuntimeContext, config *NodeJoinConfig) (*NodeJoinResu
 	logger.Info("Consul configuration updated",
 		zap.String("config", config.ConfigPath))
 
-	// INTERVENE - Phase 5: Restart Consul service
-	logger.Info("[5/6] Restarting Consul service...")
+	// INTERVENE - Phase 7: Restart Consul service
+	logger.Info("[7/8] Restarting Consul service...")
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"restart", "consul"},
@@ -200,8 +219,8 @@ func JoinNodes(rc *eos_io.RuntimeContext, config *NodeJoinConfig) (*NodeJoinResu
 	logger.Info("Waiting for Consul to start...")
 	time.Sleep(3 * time.Second)
 
-	// EVALUATE - Phase 6: Verify cluster membership
-	logger.Info("[6/6] Verifying cluster membership...")
+	// EVALUATE - Phase 8: Verify cluster membership
+	logger.Info("[8/8] Verifying cluster membership...")
 	var clusterMembers []string
 
 	membersOutput, err := execute.Run(rc.Ctx, execute.Options{
@@ -317,4 +336,102 @@ func parseConsulMembers(output string) []string {
 	}
 
 	return members
+}
+
+// getExistingClusterMembers gets current cluster members with their addresses
+// Returns a map of hostname -> IP address
+func getExistingClusterMembers(rc *eos_io.RuntimeContext) (map[string]string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	members := make(map[string]string)
+
+	// Get cluster members with detailed output
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "consul",
+		Args:    []string{"members", "-detailed"},
+		Capture: true,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster members: %w", err)
+	}
+
+	lines := strings.Split(output, "\n")
+	for i, line := range lines {
+		// Skip header line
+		if i == 0 || strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		// Parse: Node Address Status Type Build Protocol DC Partition Segment
+		// Example: codemonkey-net-consul  100.122.172.67:8301  alive   server  1.18.0  2         dc1  default  <all>
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		nodeName := fields[0]
+		address := fields[1]
+
+		// Extract IP from "IP:PORT" format
+		parts := strings.Split(address, ":")
+		if len(parts) >= 1 {
+			ip := parts[0]
+
+			// Only include Tailscale IPs (100.x.x.x)
+			if strings.HasPrefix(ip, "100.") {
+				members[nodeName] = ip
+				logger.Debug("Found existing cluster member",
+					zap.String("node", nodeName),
+					zap.String("ip", ip))
+			}
+		}
+	}
+
+	return members, nil
+}
+
+// buildCompleteRetryJoinList merges existing members with new targets
+// Ensures all cluster members are in retry_join (idempotency)
+// Excludes the local node's IP to prevent self-join
+func buildCompleteRetryJoinList(existingMembers, targetNodes map[string]string, localIP string) []string {
+	// Use a map to deduplicate IPs
+	ipSet := make(map[string]bool)
+
+	// Add existing member IPs (preserving cluster knowledge)
+	for _, ip := range existingMembers {
+		if ip != localIP { // Don't join to ourselves
+			ipSet[ip] = true
+		}
+	}
+
+	// Add new target IPs
+	for _, ip := range targetNodes {
+		if ip != localIP { // Don't join to ourselves
+			ipSet[ip] = true
+		}
+	}
+
+	// Convert set to sorted slice for consistency
+	var ips []string
+	for ip := range ipSet {
+		ips = append(ips, ip)
+	}
+
+	// Sort for deterministic output
+	sortIPs(ips)
+
+	return ips
+}
+
+// sortIPs sorts IP addresses in a consistent way
+func sortIPs(ips []string) {
+	// Simple string sort works for our purposes
+	// Could enhance with proper IP sorting if needed
+	for i := 0; i < len(ips); i++ {
+		for j := i + 1; j < len(ips); j++ {
+			if ips[i] > ips[j] {
+				ips[i], ips[j] = ips[j], ips[i]
+			}
+		}
+	}
 }
