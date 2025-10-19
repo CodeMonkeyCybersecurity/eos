@@ -26,7 +26,34 @@ func startHecateServices(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("docker not found in PATH. Please install Docker first")
 	}
 
+	// Pre-operation diagnostics (claude.md P2 - Debug Verbosity)
+	composeFile := BaseDir + "/docker-compose.yml"
+	composeExists := false
+	if _, err := os.Stat(composeFile); err == nil {
+		composeExists = true
+	}
+
+	// Get Docker version for diagnostics
+	dockerVersionCmd := exec.Command("docker", "version", "--format", "{{.Server.Version}}")
+	dockerVersion, _ := dockerVersionCmd.Output()
+
+	// Get available memory for diagnostics
+	memCmd := exec.Command("free", "-h")
+	memOutput, _ := memCmd.Output()
+
+	logger.Debug("Pre-operation diagnostics",
+		zap.String("service_dir", BaseDir),
+		zap.Bool("compose_file_exists", composeExists),
+		zap.String("compose_file", composeFile),
+		zap.String("docker_version", strings.TrimSpace(string(dockerVersion))),
+		zap.String("memory_status", strings.TrimSpace(string(memOutput))))
+
 	// INTERVENE - Run docker compose up -d
+	logger.Debug("Executing docker compose",
+		zap.String("command", "docker"),
+		zap.Strings("args", []string{"compose", "up", "-d"}),
+		zap.String("working_dir", BaseDir))
+
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "up", "-d"},
@@ -35,12 +62,31 @@ func startHecateServices(rc *eos_io.RuntimeContext) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to start services: %s\nError: %w", output, err)
+		// Enhanced error context per claude.md P1 - Error Context
+		logger.Error("Docker compose failed",
+			zap.Error(err),
+			zap.String("output", output),
+			zap.String("working_dir", BaseDir))
+		return fmt.Errorf("failed to start services: %s\n"+
+			"Working directory: %s\n"+
+			"Remediation:\n"+
+			"  1. Check available memory: free -h\n"+
+			"  2. Try pulling images separately: cd %s && docker compose pull\n"+
+			"  3. Check Docker logs: docker compose logs\n"+
+			"Error: %w",
+			output, BaseDir, BaseDir, err)
 	}
 
 	// EVALUATE - Verify services started
 	logger.Info("Services started successfully")
 	logger.Debug("Docker compose output", zap.String("output", output))
+
+	// Post-operation verification (claude.md P2 - Debug Verbosity)
+	psCmd := exec.Command("docker", "compose", "ps", "--format", "json")
+	psCmd.Dir = BaseDir
+	psOutput, _ := psCmd.Output()
+	logger.Debug("Post-operation verification",
+		zap.String("containers_status", strings.TrimSpace(string(psOutput))))
 
 	logger.Info("")
 	logger.Info("Hecate deployment completed!")
