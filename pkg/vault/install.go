@@ -21,6 +21,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -248,21 +249,22 @@ func (vi *VaultInstaller) PreflightChecks() error {
 		vi.logger.Info("Consul storage backend selected - verifying Consul availability")
 
 		// Check if Consul service is running
-		if output, err := exec.Command("systemctl", "is-active", "consul").Output(); err != nil || strings.TrimSpace(string(output)) != "active" {
-			vi.logger.Error("Consul storage backend requires running Consul service",
-				zap.String("consul_status", strings.TrimSpace(string(output))),
-				zap.String("consul_address", vi.config.ConsulAddress))
-			return fmt.Errorf("Consul storage backend requires running Consul service.\n"+
-				"Consul status: %s\n"+
-				"Expected address: %s\n"+
-				"Fix:\n"+
-				"  1. Install Consul: sudo eos create consul\n"+
-				"  2. Or use Raft storage: sudo eos create vault --storage-backend=raft",
-				strings.TrimSpace(string(output)), vi.config.ConsulAddress)
-		}
+		output, err := exec.Command("systemctl", "is-active", "consul").Output()
+		consulStatus := strings.TrimSpace(string(output))
 
-		vi.logger.Info("Consul service is running - storage backend available",
-			zap.String("consul_address", vi.config.ConsulAddress))
+		if err != nil || consulStatus != "active" {
+			vi.logger.Warn("Consul storage backend requires running Consul service",
+				zap.String("consul_status", consulStatus),
+				zap.String("consul_address", vi.config.ConsulAddress))
+
+			// Offer to install Consul interactively
+			if err := vi.handleMissingConsul(consulStatus); err != nil {
+				return err
+			}
+		} else {
+			vi.logger.Info("Consul service is running - storage backend available",
+				zap.String("consul_address", vi.config.ConsulAddress))
+		}
 	}
 
 	// IDEMPOTENT: Check if vault binary exists
@@ -278,6 +280,78 @@ func (vi *VaultInstaller) PreflightChecks() error {
 	}
 
 	vi.logger.Info("Preflight checks passed - system is ready (idempotent operation)")
+	return nil
+}
+
+// handleMissingConsul prompts user to install Consul if it's not running
+func (vi *VaultInstaller) handleMissingConsul(consulStatus string) error {
+	logger := vi.logger
+
+	logger.Info("terminal prompt: Consul not available")
+	fmt.Printf("\nVault requires Consul for storage backend.\n")
+	fmt.Printf("Consul status: %s\n", consulStatus)
+	fmt.Printf("Expected address: %s\n\n", vi.config.ConsulAddress)
+	fmt.Printf("Options:\n")
+	fmt.Printf("  1. Install Consul now (recommended)\n")
+	fmt.Printf("  2. Use Raft storage instead (single-node only)\n")
+	fmt.Printf("  3. Cancel\n\n")
+
+	// Use interaction.PromptYesNo for install confirmation
+	if !interaction.PromptYesNo(vi.rc.Ctx, "Would you like to install Consul now?", true) {
+		logger.Info("User declined Consul installation")
+		return eos_err.NewUserError(
+			"Consul storage backend requires running Consul service.\n\n" +
+				"Options:\n" +
+				"  1. Install Consul manually: sudo eos create consul\n" +
+				"  2. Use Raft storage: sudo eos create vault --storage-backend=raft\n\n" +
+				"Then run this command again.")
+	}
+
+	logger.Info("User approved Consul installation, proceeding with installation")
+	fmt.Println("\nInstalling Consul...")
+
+	// Install Consul by calling the lifecycle function
+	if err := vi.installConsul(); err != nil {
+		return fmt.Errorf("failed to install Consul: %w", err)
+	}
+
+	fmt.Println("\nConsul installed successfully!")
+	logger.Info("Consul installation completed, continuing with Vault installation")
+	return nil
+}
+
+// installConsul installs Consul by calling 'eos create consul' as a subprocess
+// This avoids circular dependencies between vault and consul packages
+func (vi *VaultInstaller) installConsul() error {
+	logger := vi.logger
+
+	logger.Info("Starting Consul installation for Vault storage backend")
+
+	// Find the eos binary path
+	eosBinaryPath, err := exec.LookPath("eos")
+	if err != nil {
+		// Try current executable path as fallback
+		eosBinaryPath, err = os.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to locate eos binary: %w", err)
+		}
+	}
+
+	logger.Info("Installing Consul using eos binary",
+		zap.String("eos_path", eosBinaryPath))
+
+	// Run 'eos create consul' as a subprocess
+	// Note: This runs in server mode by default, uses APT repository
+	cmd := exec.CommandContext(vi.rc.Ctx, eosBinaryPath, "create", "consul")
+	cmd.Stdout = os.Stdout // Show output to user
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin // Allow user interaction if needed
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Consul installation failed: %w", err)
+	}
+
+	logger.Info("Consul installation completed successfully")
 	return nil
 }
 
