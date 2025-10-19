@@ -48,6 +48,22 @@ func startHecateServices(rc *eos_io.RuntimeContext) error {
 		zap.String("docker_version", strings.TrimSpace(string(dockerVersion))),
 		zap.String("memory_status", strings.TrimSpace(string(memOutput))))
 
+	// Pre-pull images to avoid OOM during parallel pulls
+	logger.Info("Pulling Docker images (this may take a few minutes)...")
+	pullOutput, pullErr := execute.Run(rc.Ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "pull", "--ignore-pull-failures"},
+		Dir:     BaseDir,
+		Capture: true,
+	})
+	if pullErr != nil {
+		logger.Warn("Some images failed to pull, will retry during up",
+			zap.Error(pullErr),
+			zap.String("output", pullOutput))
+	} else {
+		logger.Info("Images pulled successfully")
+	}
+
 	// INTERVENE - Run docker compose up -d
 	logger.Debug("Executing docker compose",
 		zap.String("command", "docker"),

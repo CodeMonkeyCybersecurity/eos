@@ -170,9 +170,7 @@ func generateDockerCompose(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating docker-compose.yml (minimal stack: Caddy + Authentik)")
 
-	composeContent := `version: '3.8'
-
-services:
+	composeContent := `services:
 
   caddy:
     image: caddy:latest

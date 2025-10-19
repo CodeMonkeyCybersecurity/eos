@@ -4,15 +4,13 @@
 
 ## Issues Fixed
 
-### 1. Added Docker Compose Version Field
+### 1. Removed Obsolete Version Field
 **File:** `pkg/hecate/compose_generator.go:173`
 ```yaml
-version: '3.8'
-
 services:
   ...
 ```
-**Reason:** Some Docker Compose implementations still require the version field for compatibility.
+**Reason:** Docker Compose v2 considers the `version` field obsolete and warns about it. Removing it eliminates confusion in logs.
 
 ### 2. Fixed Authentik Version Tag
 **Files:** 
@@ -32,13 +30,28 @@ networks:
 ```
 **Reason:** Explicit driver specification improves compatibility and clarity.
 
+### 4. Added Pre-Pull Step for OOM Prevention
+**File:** `pkg/hecate/lifecycle_create.go:51-65`
+```go
+// Pre-pull images to avoid OOM during parallel pulls
+logger.Info("Pulling Docker images (this may take a few minutes)...")
+pullOutput, pullErr := execute.Run(rc.Ctx, execute.Options{
+    Command: "docker",
+    Args:    []string{"compose", "pull", "--ignore-pull-failures"},
+    Dir:     BaseDir,
+    Capture: true,
+})
+```
+**Reason:** Pulling images separately before `docker compose up` prevents OOM kills during parallel image extraction on low-memory systems (< 4GB RAM). The `--ignore-pull-failures` flag allows the process to continue even if some images fail, which will be retried during the `up` phase.
+
 ## Validation
 
 The generated docker-compose.yml now includes:
 
-✅ Valid Docker Compose version field  
+✅ No obsolete version field (Docker Compose v2 compatible)  
 ✅ Correct Authentik image tag (2024.8.3)  
 ✅ Explicit network driver (bridge)  
+✅ Pre-pull step to prevent OOM kills  
 ✅ All health checks and dependencies  
 ✅ Proper volume configurations  
 ✅ Security-hardened Caddyfile  
