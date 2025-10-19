@@ -174,20 +174,7 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 	logger.Info("Authentik will be accessible at: hera." + domain)
 	logger.Info("")
 
-	// Ask if user wants to start services (defaults to Yes on empty input)
-	if !interaction.PromptYesNo(rc.Ctx, "Start services now?", true) {
-		logger.Info("Skipped starting services")
-		logger.Info("To start manually, run: cd /opt/hecate && docker compose up -d")
-		return nil
-	}
-
-	// EVALUATE - Start services with docker compose
-	logger.Info("Starting Hecate services...")
-	if err := startHecateServices(rc); err != nil {
-		return err
-	}
-
-	// Save configuration to Consul for future use (if Consul is available)
+	// Save configuration to Consul BEFORE starting services (so it persists even if startup fails)
 	if consulMgr != nil {
 		logger.Info("Saving configuration to Consul for future use")
 		saveConfig := &HecateConsulConfig{
@@ -206,6 +193,23 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 			logger.Info("Next time you run 'eos create hecate', these settings will be suggested")
 		}
 	}
+
+	// Ask if user wants to start services (defaults to Yes on empty input)
+	if !interaction.PromptYesNo(rc.Ctx, "Start services now?", true) {
+		logger.Info("Skipped starting services")
+		logger.Info("To start manually, run: cd /opt/hecate && docker compose up -d")
+		return nil
+	}
+
+	// EVALUATE - Start services with docker compose
+	logger.Info("Starting Hecate services...")
+	if err := startHecateServices(rc); err != nil {
+		return err
+	}
+
+	logger.Info("")
+	logger.Info("terminal prompt: ✓ Hecate deployment completed successfully!")
+	logger.Info("")
 
 	return nil
 }
