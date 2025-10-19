@@ -1,4 +1,4 @@
-// cmd/sync/root.go
+// cmd/sync/sync.go
 package sync
 
 import (
@@ -15,35 +15,42 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO: refactor
 var (
 	syncDryRun          bool
 	syncForce           bool
 	syncSkipBackup      bool
 	syncSkipHealthCheck bool
+	// Service flags
+	syncConsul     bool
+	syncVault      bool
+	syncTailscale  bool
+	syncAuthentik  bool
+	syncWazuh      bool
 )
 
 func init() {
 	// Register all available connectors
 	sync.RegisterConnector(connectors.NewConsulVaultConnector())
 	sync.RegisterConnector(connectors.NewConsulTailscaleAutoConnector())
+	sync.RegisterConnector(connectors.NewAuthentikWazuhConnector())
 }
 
-// SyncCmd is the root command for service synchronization
+	// SyncCmd is the root command for service synchronization
 var SyncCmd = &cobra.Command{
-	Use:   "sync <service1> <service2>",
+	Use:   "sync",
 	Short: "Connect and synchronize two services",
 	Long: `Connect and synchronize two services bidirectionally.
 
 The sync command establishes connections between two services, enabling them
-to work together. Service order doesn't matter - the command automatically
-detects the correct connector to use.
+to work together using service flags. The command automatically detects the
+correct connector to use based on which services are specified.
 
 Currently supported service pairs:
-  - consul ↔ vault: Configure Vault to use Consul as storage backend,
-                    register Vault in Consul service catalog
-  - consul ↔ tailscale: Configure local Consul to bind to Tailscale IP
-                        (order doesn't matter: "consul tailscale" or "tailscale consul")
+  - --consul --vault: Configure Vault to use Consul as storage backend,
+                      register Vault in Consul service catalog
+  - --consul --tailscale: Configure local Consul to bind to Tailscale IP
+  - --authentik --wazuh: Configure Wazuh SSO integration with Authentik
 
 For joining Consul nodes into a cluster:
   - eos sync consul --nodes vhost7 vhost11    # Join multiple Consul nodes together
@@ -57,33 +64,43 @@ Safety Features:
   - Atomic operations with automatic rollback on failure
 
 Examples:
-  # Sync Consul and Vault (order doesn't matter)
-  eos sync consul vault
-  eos sync vault consul
+  # Sync Consul and Vault
+  eos sync --consul --vault
 
   # Configure local Consul to use Tailscale IP
-  eos sync consul tailscale
-  eos sync tailscale consul
+  eos sync --consul --tailscale
 
-  # Join Consul nodes into a cluster
-  eos sync consul --nodes vhost7
-  eos sync consul --nodes vhost7 vhost11 vhost15
+  # Configure Wazuh SSO with Authentik
+  eos sync --authentik --wazuh
 
   # Preview changes without applying (dry-run)
-  eos sync consul vault --dry-run
+  eos sync --consul --vault --dry-run
 
   # Force sync even if already connected
-  eos sync consul vault --force
+  eos sync --consul --vault --force
 
   # Skip backup (use with caution in development)
-  eos sync consul vault --skip-backup
+  eos sync --consul --vault --skip-backup
 
 Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
-	Args: cobra.ExactArgs(2),
+	Args: cobra.NoArgs,
 	RunE: eos.Wrap(runSync),
 }
 
 func init() {
+	// Service selection flags
+	SyncCmd.Flags().BoolVar(&syncConsul, "consul", false,
+		"Sync Consul service")
+	SyncCmd.Flags().BoolVar(&syncVault, "vault", false,
+		"Sync Vault service")
+	SyncCmd.Flags().BoolVar(&syncTailscale, "tailscale", false,
+		"Sync Tailscale service")
+	SyncCmd.Flags().BoolVar(&syncAuthentik, "authentik", false,
+		"Sync Authentik service")
+	SyncCmd.Flags().BoolVar(&syncWazuh, "wazuh", false,
+		"Sync Wazuh service")
+
+	// Operation flags
 	SyncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false,
 		"Preview changes without applying them")
 	SyncCmd.Flags().BoolVar(&syncForce, "force", false,
@@ -97,8 +114,51 @@ func init() {
 func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	service1 := strings.ToLower(strings.TrimSpace(args[0]))
-	service2 := strings.ToLower(strings.TrimSpace(args[1]))
+	// Collect selected services from flags
+	var selectedServices []string
+	if syncConsul {
+		selectedServices = append(selectedServices, "consul")
+	}
+	if syncVault {
+		selectedServices = append(selectedServices, "vault")
+	}
+	if syncTailscale {
+		selectedServices = append(selectedServices, "tailscale")
+	}
+	if syncAuthentik {
+		selectedServices = append(selectedServices, "authentik")
+	}
+	if syncWazuh {
+		selectedServices = append(selectedServices, "wazuh")
+	}
+
+	// Validate exactly 2 services selected
+	if len(selectedServices) == 0 {
+		return eos_err.NewUserError(
+			"No services specified. Please specify exactly 2 services to sync.\n\n" +
+				"Available services: --consul, --vault, --tailscale, --authentik, --wazuh\n\n" +
+				"Examples:\n" +
+				"  eos sync --consul --vault\n" +
+				"  eos sync --authentik --wazuh\n" +
+				"  eos sync --consul --tailscale")
+	}
+	if len(selectedServices) == 1 {
+		return eos_err.NewUserError(
+			"Only one service specified (%s). Please specify exactly 2 services to sync.\n\n" +
+				"Examples:\n" +
+				"  eos sync --consul --vault\n" +
+				"  eos sync --authentik --wazuh",
+			selectedServices[0])
+	}
+	if len(selectedServices) > 2 {
+		return eos_err.NewUserError(
+			"Too many services specified (%d). Please specify exactly 2 services to sync.\n\n" +
+				"You specified: %s",
+			len(selectedServices), strings.Join(selectedServices, ", "))
+	}
+
+	service1 := selectedServices[0]
+	service2 := selectedServices[1]
 
 	logger.Info("Starting service synchronization",
 		zap.String("service1", service1),
@@ -158,7 +218,7 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	return nil
 }
-
+// TODO: refactor
 // normalizeServicePair creates a consistent service pair identifier
 // by sorting services alphabetically. This allows order-independent lookup.
 //

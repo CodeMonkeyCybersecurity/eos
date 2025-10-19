@@ -29,9 +29,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/upgrade"
 )
 
-// helpLogged removed as it's not needed with default Cobra help
-// var helpLogged bool // global guard to log help only once
-
 // RootCmd is the base command for eos.
 var RootCmd = &cobra.Command{
 	Use:   "eos",

@@ -16,12 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	consulDryRun     bool
-	consulForce      bool
-	consulSkipBackup bool
-	consulNodes      []string
-)
+
 
 // ConsulSyncCmd handles Consul cluster synchronization over Tailscale
 var ConsulSyncCmd = &cobra.Command{
@@ -72,6 +67,14 @@ func init() {
 	SyncCmd.AddCommand(ConsulSyncCmd)
 }
 
+// TODO: refactor
+var (
+	consulDryRun     bool
+	consulForce      bool
+	consulSkipBackup bool
+	consulNodes      []string
+)
+// TODO: refactor
 func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -127,14 +130,14 @@ func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	return nil
 }
-
+// TODO: refactor
 // TailscaleStatus represents the JSON output from `tailscale status --json`
 type TailscaleStatus struct {
 	TailscaleIPs []string                     `json:"TailscaleIPs"`
 	Self         TailscalePeer                `json:"Self"`
 	Peer         map[string]TailscalePeer     `json:"Peer"`
 }
-
+// TODO: refactor
 type TailscalePeer struct {
 	ID           string   `json:"ID"`
 	HostName     string   `json:"HostName"`
@@ -142,7 +145,7 @@ type TailscalePeer struct {
 	TailscaleIPs []string `json:"TailscaleIPs"`
 	Online       bool     `json:"Online"`
 }
-
+// TODO: refactor
 // GetTailscaleStatus returns the current Tailscale status
 func GetTailscaleStatus(rc *eos_io.RuntimeContext) (*TailscaleStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -174,7 +177,7 @@ func GetTailscaleStatus(rc *eos_io.RuntimeContext) (*TailscaleStatus, error) {
 
 	return &status, nil
 }
-
+// TODO: refactor
 // FindPeerByHostname finds a Tailscale peer by hostname (case-insensitive, fuzzy)
 func FindPeerByHostname(status *TailscaleStatus, hostname string) (*TailscalePeer, error) {
 	hostname = strings.ToLower(strings.TrimSpace(hostname))
