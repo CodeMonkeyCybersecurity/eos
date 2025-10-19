@@ -113,7 +113,7 @@ func generateHecateSecrets(rc *eos_io.RuntimeContext) (*HecateSecrets, error) {
 		PGUser:                 "authentik",
 		PGDatabase:             "authentik",
 		AuthentikSecretKey:     authentikKey,
-		AuthentikTag:           "2025.8",
+		AuthentikTag:           "2024.8.3",
 		ComposePortHTTP:        "9000",
 		ComposePortHTTPS:       "9443",
 		AuthentikWorkerThreads: "4",
@@ -170,7 +170,9 @@ func generateDockerCompose(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating docker-compose.yml (minimal stack: Caddy + Authentik)")
 
-	composeContent := `services:
+	composeContent := `version: '3.8'
+
+services:
 
   caddy:
     image: caddy:latest
@@ -224,7 +226,7 @@ func generateDockerCompose(rc *eos_io.RuntimeContext) error {
       - hecate-net
 
   server:
-    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.8}
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2024.8.3}
     restart: unless-stopped
     command: server
     environment:
@@ -253,7 +255,7 @@ func generateDockerCompose(rc *eos_io.RuntimeContext) error {
       - hecate-net
 
   worker:
-    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.8}
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2024.8.3}
     restart: unless-stopped
     command: worker
     environment:
@@ -283,6 +285,7 @@ func generateDockerCompose(rc *eos_io.RuntimeContext) error {
 
 networks:
   hecate-net:
+    driver: bridge
 
 volumes:
   database:
