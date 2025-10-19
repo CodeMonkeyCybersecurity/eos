@@ -2,21 +2,22 @@
 package sync
 
 import (
-	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/sync/connectors"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-
+var (
+	consulDryRun     bool
+	consulSkipBackup bool
+	consulNodes      []string
+)
 
 // ConsulSyncCmd handles Consul cluster synchronization over Tailscale
 var ConsulSyncCmd = &cobra.Command{
@@ -41,9 +42,6 @@ Examples:
   # Preview changes without applying
   eos sync consul --nodes vhost7 vhost11 --dry-run
 
-  # Force reconfiguration even if already joined
-  eos sync consul --nodes vhost7 --force
-
 Requirements:
   - Tailscale must be installed and authenticated
   - Consul must be installed on all nodes
@@ -58,30 +56,18 @@ func init() {
 		"Hostnames of Consul nodes to join (space-separated)")
 	ConsulSyncCmd.Flags().BoolVar(&consulDryRun, "dry-run", false,
 		"Preview changes without applying them")
-	ConsulSyncCmd.Flags().BoolVar(&consulForce, "force", false,
-		"Force reconfiguration even if already joined")
 	ConsulSyncCmd.Flags().BoolVar(&consulSkipBackup, "skip-backup", false,
 		"Skip configuration backup (use with caution)")
 
-	// Add the consul command to the sync root
+	// Register as subcommand of sync
 	SyncCmd.AddCommand(ConsulSyncCmd)
 }
 
-// TODO: refactor
-var (
-	consulDryRun     bool
-	consulForce      bool
-	consulSkipBackup bool
-	consulNodes      []string
-)
-// TODO: refactor
 func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Get node names from --nodes flag
-	nodeNames := consulNodes
-
-	if len(nodeNames) == 0 {
+	// ASSESS - Validate we have at least one target node
+	if len(consulNodes) == 0 {
 		return eos_err.NewUserError(
 			"No nodes specified. Please specify at least one node.\n\n" +
 				"Examples:\n" +
@@ -91,131 +77,63 @@ func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	}
 
 	logger.Info("Starting Consul cluster synchronization over Tailscale",
-		zap.Strings("target_nodes", nodeNames),
+		zap.Strings("target_nodes", consulNodes),
 		zap.Bool("dry_run", consulDryRun))
 
-	// Use the Consul-Tailscale connector
-	connector, err := connectors.NewConsulTailscaleConnector(rc, nodeNames)
+	// Create configuration (business logic in pkg/consul/node_join.go)
+	config := consul.DefaultNodeJoinConfig()
+	config.TargetNodes = consulNodes
+	config.DryRun = consulDryRun
+	config.SkipBackup = consulSkipBackup
+
+	// Execute node join operation
+	result, err := consul.JoinNodes(rc, config)
 	if err != nil {
-		return eos_err.NewUserError("Failed to initialize Consul-Tailscale connector: %v", err)
-	}
-
-	config := &connectors.ConsulTailscaleSyncConfig{
-		TargetNodes: nodeNames,
-		DryRun:      consulDryRun,
-		Force:       consulForce,
-		SkipBackup:  consulSkipBackup,
-	}
-
-	// Execute sync
-	if err := connector.Sync(rc, config); err != nil {
-		logger.Error("Consul synchronization failed", zap.Error(err))
 		return err
 	}
 
-	logger.Info("================================================================================")
-	logger.Info("Consul cluster synchronization completed successfully")
-	logger.Info("================================================================================")
-	logger.Info("",
-		zap.Strings("joined_nodes", nodeNames))
-	logger.Info("")
-	logger.Info("This Consul node is now part of the cluster")
-	logger.Info("")
-	logger.Info("Verify with:")
-	logger.Info("  consul members")
-	logger.Info("  consul catalog services")
-	logger.Info("")
-	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
-	logger.Info("================================================================================")
+	// Display results
+	displayNodeJoinResults(logger, result)
 
 	return nil
 }
-// TODO: refactor
-// TailscaleStatus represents the JSON output from `tailscale status --json`
-type TailscaleStatus struct {
-	TailscaleIPs []string                     `json:"TailscaleIPs"`
-	Self         TailscalePeer                `json:"Self"`
-	Peer         map[string]TailscalePeer     `json:"Peer"`
-}
-// TODO: refactor
-type TailscalePeer struct {
-	ID           string   `json:"ID"`
-	HostName     string   `json:"HostName"`
-	DNSName      string   `json:"DNSName"`
-	TailscaleIPs []string `json:"TailscaleIPs"`
-	Online       bool     `json:"Online"`
-}
-// TODO: refactor
-// GetTailscaleStatus returns the current Tailscale status
-func GetTailscaleStatus(rc *eos_io.RuntimeContext) (*TailscaleStatus, error) {
-	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check if tailscale is installed
-	if _, err := exec.LookPath("tailscale"); err != nil {
-		return nil, eos_err.NewUserError(
-			"Tailscale is not installed. Please install Tailscale first:\n" +
-				"  sudo eos create tailscale\n" +
-				"  sudo tailscale up")
+// displayNodeJoinResults displays the results of node join operation
+func displayNodeJoinResults(logger otelzap.LoggerWithCtx, result *consul.NodeJoinResult) {
+	logger.Info("================================================================================")
+	logger.Info("Consul cluster join completed successfully")
+	logger.Info("================================================================================")
+	logger.Info("")
+	logger.Info("Local Node:")
+	logger.Info("  Hostname:     " + result.LocalNode.Hostname)
+	logger.Info("  Tailscale IP: " + result.LocalNode.TailscaleIP)
+	logger.Info("")
+
+	logger.Info("Joined Nodes:")
+	for i, node := range result.JoinedNodes {
+		logger.Info(fmt.Sprintf("  [%d] %s", i+1, node.Hostname))
+		logger.Info("      Tailscale IP: " + node.TailscaleIP)
+		logger.Info("      Status:       online")
 	}
+	logger.Info("")
 
-	// Get status as JSON
-	cmd := exec.Command("tailscale", "status", "--json")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Tailscale status: %w\n"+
-			"Is Tailscale authenticated? Run: sudo tailscale up", err)
-	}
-
-	var status TailscaleStatus
-	if err := json.Unmarshal(output, &status); err != nil {
-		return nil, fmt.Errorf("failed to parse Tailscale status: %w", err)
-	}
-
-	logger.Debug("Got Tailscale status",
-		zap.Int("peer_count", len(status.Peer)),
-		zap.String("self_hostname", status.Self.HostName))
-
-	return &status, nil
-}
-// TODO: refactor
-// FindPeerByHostname finds a Tailscale peer by hostname (case-insensitive, fuzzy)
-func FindPeerByHostname(status *TailscaleStatus, hostname string) (*TailscalePeer, error) {
-	hostname = strings.ToLower(strings.TrimSpace(hostname))
-
-	// Try exact hostname match first
-	for _, peer := range status.Peer {
-		peerHostname := strings.ToLower(peer.HostName)
-		if peerHostname == hostname {
-			return &peer, nil
+	if len(result.ClusterMembers) > 0 {
+		logger.Info("Cluster Members:")
+		for _, member := range result.ClusterMembers {
+			logger.Info("  • " + member)
 		}
-
-		// Also try without spaces and special chars
-		peerSimple := strings.ReplaceAll(peerHostname, " ", "")
-		peerSimple = strings.ReplaceAll(peerSimple, "-", "")
-		hostnameSimple := strings.ReplaceAll(hostname, " ", "")
-		hostnameSimple = strings.ReplaceAll(hostnameSimple, "-", "")
-
-		if peerSimple == hostnameSimple {
-			return &peer, nil
-		}
-
-		// Try DNS name match
-		if strings.HasPrefix(strings.ToLower(peer.DNSName), hostname+".") {
-			return &peer, nil
-		}
+		logger.Info("")
 	}
 
-	// Build helpful error message
-	availableHosts := make([]string, 0, len(status.Peer))
-	for _, peer := range status.Peer {
-		availableHosts = append(availableHosts, peer.HostName)
+	if result.BackupPath != "" {
+		logger.Info("Backup saved: " + result.BackupPath)
+		logger.Info("")
 	}
 
-	return nil, fmt.Errorf("node '%s' not found on Tailscale network\n"+
-		"Available nodes:\n  - %s\n\n"+
-		"Make sure the remote node is:\n"+
-		"  1. Running Tailscale (sudo tailscale up)\n"+
-		"  2. Connected to the same Tailnet\n"+
-		"  3. Online and accessible",
-		hostname, strings.Join(availableHosts, "\n  - "))
+	logger.Info("Next Steps:")
+	logger.Info("  • Verify cluster: consul members")
+	logger.Info("  • Check logs: sudo journalctl -u consul -f")
+	logger.Info("")
+	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
+	logger.Info("================================================================================")
 }
