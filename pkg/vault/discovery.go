@@ -6,7 +6,11 @@ package vault
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -212,4 +216,126 @@ func DetectEnvironment(ctx context.Context) string {
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && s[:len(substr)] == substr ||
 		len(s) > len(substr) && s[len(s)-len(substr):] == substr
+}
+
+// ValidateVaultAddress validates and normalizes a Vault address
+// Accepts: IP addresses, DNS names, Tailscale names (e.g., vhost5)
+// Returns: normalized address with protocol and port
+func (vd *VaultDiscovery) ValidateVaultAddress(ctx context.Context, address string) (string, error) {
+	logger := vd.logger
+
+	// ASSESS - Validate address format
+	logger.Debug("Validating Vault address", zap.String("input", address))
+
+	// Sanitize the address
+	address = shared.SanitizeURL(address)
+
+	// Parse as URL if it has a scheme
+	if strings.HasPrefix(address, "http://") || strings.HasPrefix(address, "https://") {
+		parsedURL, err := url.Parse(address)
+		if err != nil {
+			return "", fmt.Errorf("invalid URL format: %w", err)
+		}
+
+		// Ensure https (Vault should always use TLS)
+		if parsedURL.Scheme == "http" {
+			logger.Warn("Converting http to https for Vault security")
+			parsedURL.Scheme = "https"
+		}
+
+		// If no port specified, add default Vault port
+		if parsedURL.Port() == "" {
+			parsedURL.Host = net.JoinHostPort(parsedURL.Hostname(), strconv.Itoa(shared.PortVault))
+		}
+
+		normalized := parsedURL.String()
+		logger.Debug("Normalized URL address", zap.String("normalized", normalized))
+		return normalized, nil
+	}
+
+	// No scheme provided - treat as hostname or IP
+	host := address
+	port := shared.PortVault // Default Vault port
+
+	// Check if port is included (e.g., "vhost5:8200" or "192.168.1.10:8200")
+	if strings.Contains(address, ":") {
+		parts := strings.Split(address, ":")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid address format: %s (expected host:port or just host)", address)
+		}
+		host = parts[0]
+		parsedPort, err := strconv.Atoi(parts[1])
+		if err != nil {
+			return "", fmt.Errorf("invalid port number: %s", parts[1])
+		}
+		port = parsedPort
+	}
+
+	// Validate host is either IP or valid hostname
+	if net.ParseIP(host) == nil {
+		// Not an IP, must be a hostname/DNS name
+		// Simple validation: no spaces, no special chars except dots and hyphens
+		if strings.ContainsAny(host, " !@#$%^&*()+=[]{}|\\;'\"<>?/") {
+			return "", fmt.Errorf("invalid hostname: %s (contains invalid characters)", host)
+		}
+	}
+
+	// Construct final address
+	normalized := fmt.Sprintf("https://%s:%d", host, port)
+	logger.Info("Validated and normalized Vault address",
+		zap.String("input", address),
+		zap.String("normalized", normalized))
+
+	return normalized, nil
+}
+
+// StoreVaultAddress stores the Vault address in Consul KV
+// This becomes the source of truth for Vault discovery (Method 3)
+func (vd *VaultDiscovery) StoreVaultAddress(ctx context.Context, address string) error {
+	logger := vd.logger
+
+	// ASSESS - Validate address first
+	normalizedAddr, err := vd.ValidateVaultAddress(ctx, address)
+	if err != nil {
+		return fmt.Errorf("invalid Vault address: %w", err)
+	}
+
+	// INTERVENE - Store in Consul KV
+	kvKey := fmt.Sprintf("eos/config/%s/vault_address", vd.environment)
+	pair := &api.KVPair{
+		Key:   kvKey,
+		Value: []byte(normalizedAddr),
+	}
+
+	logger.Debug("Storing Vault address in Consul KV",
+		zap.String("key", kvKey),
+		zap.String("address", normalizedAddr),
+		zap.String("environment", vd.environment))
+
+	if _, err := vd.consulClient.KV().Put(pair, &api.WriteOptions{
+		Datacenter: vd.environment,
+	}); err != nil {
+		return fmt.Errorf("failed to store Vault address in Consul KV: %w", err)
+	}
+
+	// EVALUATE - Verify storage
+	storedPair, _, err := vd.consulClient.KV().Get(kvKey, &api.QueryOptions{
+		Datacenter: vd.environment,
+	})
+	if err != nil {
+		logger.Warn("Failed to verify stored address (non-critical)",
+			zap.Error(err))
+	} else if storedPair == nil {
+		logger.Warn("Stored address not found during verification (possible replication delay)")
+	} else if string(storedPair.Value) != normalizedAddr {
+		return fmt.Errorf("verification failed: stored value mismatch (expected %s, got %s)",
+			normalizedAddr, string(storedPair.Value))
+	}
+
+	logger.Info("Vault address stored successfully",
+		zap.String("key", kvKey),
+		zap.String("address", normalizedAddr),
+		zap.String("environment", vd.environment))
+
+	return nil
 }

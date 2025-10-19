@@ -73,6 +73,7 @@ const (
 	// File paths
 	VaultBinaryPath      = "/usr/local/bin/vault"
 	VaultConfigFile      = "vault.hcl"
+	VaultConfigPath      = "/etc/vault.d/vault.hcl"
 	VaultAgentConfigFile = "vault-agent.hcl"
 	VaultInitDataFile    = "/var/lib/eos/secret/vault_init.json"
 
