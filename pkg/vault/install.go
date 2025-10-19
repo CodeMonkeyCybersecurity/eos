@@ -214,6 +214,12 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 func (vi *VaultInstaller) PreflightChecks() error {
 	vi.logger.Info("Running preflight checks to prevent race conditions")
 
+	// CRITICAL: Run comprehensive preflight checks (includes dependency checks)
+	// This is in preflight_checks.go and includes interactive dependency installation
+	if err := PreflightChecks(vi.rc); err != nil {
+		return fmt.Errorf("comprehensive preflight checks failed: %w", err)
+	}
+
 	// IDEMPOTENT: Check if Vault service is already running
 	// This is NOT an error - we'll verify and update configuration if needed
 	vi.logger.Debug("Checking if Vault service is active")
