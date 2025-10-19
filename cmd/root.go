@@ -25,6 +25,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/rollback"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/unsync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/upgrade"
 )
@@ -68,6 +69,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		fix.FixCmd,           // VERB-FIRST ARCHITECTURE (auto-fix issues)
 		debug.GetDebugCmd(),  // VERB-FIRST ARCHITECTURE (debugging tools)
 		sync.SyncCmd,         // VERB-FIRST ARCHITECTURE (service synchronization)
+		unsync.UnsyncCmd,     // VERB-FIRST ARCHITECTURE (reverse synchronization)
 		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
 		backup.BackupCmd,     // SPECIAL CASE (Complex nomenclature)
 		rollback.RollbackCmd, // VERB-FIRST ARCHITECTURE (rollback operations)

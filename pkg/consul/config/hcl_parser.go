@@ -186,6 +186,46 @@ func UpdateConfig(existingConfig, bindAddr string, retryJoinAddrs []string, pres
 	return strings.Join(newLines, "\n")
 }
 
+// UpdateRetryJoin updates only the retry_join configuration
+// Used by unsync to remove specific nodes from retry_join
+func UpdateRetryJoin(existingConfig string, newRetryJoin []string) string {
+	lines := strings.Split(existingConfig, "\n")
+	var newLines []string
+	inRetryJoinBlock := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Skip existing retry_join lines
+		if strings.HasPrefix(trimmed, "retry_join") {
+			inRetryJoinBlock = true
+			continue
+		}
+		if inRetryJoinBlock && (trimmed == "]" || trimmed == "") {
+			inRetryJoinBlock = false
+			continue
+		}
+		if inRetryJoinBlock {
+			continue
+		}
+
+		newLines = append(newLines, line)
+	}
+
+	// Add new retry_join configuration
+	if len(newRetryJoin) > 0 {
+		newLines = append(newLines, "")
+		newLines = append(newLines, "# Cluster join configuration")
+		newLines = append(newLines, "retry_join = [")
+		for _, addr := range newRetryJoin {
+			newLines = append(newLines, fmt.Sprintf(`  "%s",`, addr))
+		}
+		newLines = append(newLines, "]")
+	}
+
+	return strings.Join(newLines, "\n")
+}
+
 // IsTailscaleIP checks if an IP is in the Tailscale CGNAT range (100.64.0.0/10)
 func IsTailscaleIP(ip string) bool {
 	// Tailscale uses 100.64.0.0/10 (100.64.0.0 - 100.127.255.255)
