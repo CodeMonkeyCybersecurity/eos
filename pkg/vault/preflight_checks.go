@@ -8,9 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -120,29 +121,94 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 
 func checkSystemTools(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	requiredTools := []string{
-		"systemctl",
-		"openssl",
-		"curl",
-		"apt-get", // For Ubuntu/Debian
+
+	// Define required tools with their package names
+	// Format: command -> package name (for apt-get install)
+	requiredTools := map[string]string{
+		"systemctl": "systemd",
+		"openssl":   "openssl",
+		"curl":      "curl",
+		"unzip":     "unzip",
+		"apt-get":   "apt", // For Ubuntu/Debian
 	}
-	
+
 	var missingTools []string
-	
-	for _, tool := range requiredTools {
+	var missingPackages []string
+
+	for tool, pkg := range requiredTools {
 		if _, err := exec.LookPath(tool); err != nil {
 			missingTools = append(missingTools, tool)
+			missingPackages = append(missingPackages, pkg)
 		}
 	}
-	
+
 	if len(missingTools) > 0 {
-		logger.Error("Missing required system tools",
-			zap.Strings("missing_tools", missingTools))
-		return eos_err.NewUserError("Missing required system tools: %s\n\nPlease install the missing tools and try again.\nOn Ubuntu/Debian: sudo apt-get update && sudo apt-get install %s", strings.Join(missingTools, ", "), strings.Join(missingTools, " "))
+		logger.Warn("Missing required system tools",
+			zap.Strings("missing_tools", missingTools),
+			zap.Strings("packages", missingPackages))
+
+		// Prompt user if they want to install the missing dependencies
+		logger.Info("terminal prompt: Missing dependencies detected")
+		fmt.Printf("\nMissing required tools: %s\n", strings.Join(missingTools, ", "))
+		fmt.Printf("Required packages: %s\n\n", strings.Join(missingPackages, " "))
+
+		// Use interaction.PromptYesNo for y/N prompt (default: No)
+		if !interaction.PromptYesNo(rc.Ctx, "Would you like to install these dependencies now?", false) {
+			logger.Info("User declined dependency installation")
+			return eos_err.NewUserError(
+				"Missing required system tools: %s\n\n"+
+					"Please install them manually:\n"+
+					"  sudo apt-get update && sudo apt-get install %s\n\n"+
+					"Then run the command again.",
+				strings.Join(missingTools, ", "),
+				strings.Join(missingPackages, " "))
+		}
+
+		logger.Info("User approved dependency installation, proceeding with installation")
+
+		// Install the missing packages
+		if err := installDependencies(rc, missingPackages); err != nil {
+			return fmt.Errorf("failed to install dependencies: %w", err)
+		}
+
+		logger.Info("Dependencies installed successfully")
 	}
-	
+
 	logger.Debug("System tools check passed")
+	return nil
+}
+
+// installDependencies installs the specified packages using apt-get
+func installDependencies(rc *eos_io.RuntimeContext, packages []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Updating package lists")
+	fmt.Println("\nUpdating package lists...")
+
+	// Run apt-get update
+	updateCmd := exec.CommandContext(rc.Ctx, "apt-get", "update")
+	updateCmd.Stdout = os.Stdout
+	updateCmd.Stderr = os.Stderr
+
+	if err := updateCmd.Run(); err != nil {
+		return fmt.Errorf("failed to update package lists: %w", err)
+	}
+
+	logger.Info("Installing packages",
+		zap.Strings("packages", packages))
+	fmt.Printf("\nInstalling packages: %s\n", strings.Join(packages, " "))
+
+	// Run apt-get install with -y flag
+	installArgs := append([]string{"install", "-y"}, packages...)
+	installCmd := exec.CommandContext(rc.Ctx, "apt-get", installArgs...)
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("failed to install packages: %w", err)
+	}
+
+	fmt.Println("\nDependencies installed successfully!")
 	return nil
 }
 
@@ -239,7 +305,7 @@ func isPortInUse(port int) bool {
 	if err != nil {
 		return true // Port is in use
 	}
-	conn.Close()
+	_ = conn.Close() // Best effort close for port check
 	return false
 }
 

@@ -690,14 +690,6 @@ func (vi *VaultInstaller) installViaBinary() error {
 		zap.String("version", version),
 		zap.String("url", downloadURL))
 
-	// Check for unzip before attempting to use it (fail fast on missing dependency)
-	if _, err := exec.LookPath("unzip"); err != nil {
-		return eos_err.NewUserError(
-			"unzip command not found. Please install unzip:\n" +
-				"  Ubuntu/Debian: sudo apt install unzip\n" +
-				"  RHEL/CentOS:   sudo yum install unzip")
-	}
-
 	tmpDir := "/tmp/vault-install"
 	if err := vi.createDirectory(tmpDir, 0755); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
