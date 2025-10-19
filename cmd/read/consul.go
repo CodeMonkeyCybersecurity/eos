@@ -125,6 +125,13 @@ func runReadConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		logger.Warn("Failed to get health status", zap.Error(err))
 	}
 
+	// Vault integration status
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: === Vault Integration ===")
+	if err := displayVaultIntegration(rc, logger); err != nil {
+		logger.Warn("Failed to check Vault integration", zap.Error(err))
+	}
+
 	return nil
 }
 
@@ -414,6 +421,95 @@ func getOrDefault(m map[string]string, key, defaultValue string) string {
 		return val
 	}
 	return defaultValue
+}
+
+// displayVaultIntegration shows Vault/Consul integration status
+func displayVaultIntegration(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
+	status, err := consul.CheckVaultIntegration(rc.Ctx)
+	if err != nil {
+		logger.Info("terminal prompt:   Unable to check Vault integration")
+		return err
+	}
+
+	if !status.VaultInstalled {
+		logger.Info("terminal prompt:   Status: Vault not installed")
+		logger.Info("terminal prompt:   Install with: sudo eos create vault")
+		return nil
+	}
+
+	// Display overall status
+	if status.IntegrationHealthy {
+		logger.Info("terminal prompt:   Status: ✓ Fully integrated and healthy")
+	} else if status.VaultRunning && status.VaultRegistered {
+		logger.Info("terminal prompt:   Status: ⚠ Integrated with issues")
+	} else if status.VaultRunning {
+		logger.Info("terminal prompt:   Status: ⚠ Vault running but not registered")
+	} else {
+		logger.Info("terminal prompt:   Status: ✗ Vault not running")
+	}
+
+	// Display details
+	logger.Info(fmt.Sprintf("terminal prompt:   Vault Installed:  %s", formatCheckmark(status.VaultInstalled)))
+	logger.Info(fmt.Sprintf("terminal prompt:   Vault Running:    %s", formatCheckmark(status.VaultRunning)))
+
+	if status.VaultRunning {
+		logger.Info(fmt.Sprintf("terminal prompt:   Service Registered: %s", formatCheckmark(status.VaultRegistered)))
+
+		if status.VaultRegistered {
+			logger.Info(fmt.Sprintf("terminal prompt:   Health Checks:    %s", formatCheckmark(status.VaultHealthy)))
+
+			if status.VaultAddress != "" {
+				logger.Info("terminal prompt:   Service Address: " + status.VaultAddress)
+			}
+
+			// Show health check details
+			if len(status.HealthChecks) > 0 {
+				logger.Info("terminal prompt:   ")
+				logger.Info("terminal prompt:   Health Checks:")
+				for _, check := range status.HealthChecks {
+					checkIcon := "✓"
+					if check.Status != "passing" {
+						checkIcon = "✗"
+					}
+					logger.Info(fmt.Sprintf("terminal prompt:     %s %s (%s)", checkIcon, check.Name, check.Status))
+				}
+			}
+		}
+
+		// Show KV store usage
+		if status.KVStoreUsed {
+			logger.Info(fmt.Sprintf("terminal prompt:   Storage Backend:  Consul KV (in use)"))
+			logger.Info(fmt.Sprintf("terminal prompt:   KV Path:          %s", status.KVPath))
+			logger.Info(fmt.Sprintf("terminal prompt:   KV Keys:          %d keys stored", status.KVKeyCount))
+		} else {
+			logger.Info("terminal prompt:   Storage Backend:  Not using Consul KV")
+		}
+	}
+
+	// Show issues if any
+	if len(status.Issues) > 0 {
+		logger.Info("terminal prompt:   ")
+		logger.Info("terminal prompt:   Issues:")
+		for _, issue := range status.Issues {
+			logger.Info("terminal prompt:     • " + issue)
+		}
+	}
+
+	// Show recommendations
+	if !status.VaultRegistered && status.VaultRunning {
+		logger.Info("terminal prompt:   ")
+		logger.Info("terminal prompt:   Recommendation: Run 'sudo eos sync --vault --consul' to register Vault")
+	}
+
+	return nil
+}
+
+// formatCheckmark returns a checkmark or X based on boolean value
+func formatCheckmark(b bool) string {
+	if b {
+		return "✓ yes"
+	}
+	return "✗ no"
 }
 
 func init() {
