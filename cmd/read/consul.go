@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -33,6 +34,9 @@ EXAMPLES:
   # Show full Consul status
   eos read consul
 
+  # Run comprehensive health check (recommended after cluster setup)
+  eos read consul --health
+
   # Show Consul status in JSON format
   eos read consul --json
 
@@ -48,10 +52,16 @@ var (
 	consulJSON     bool
 	consulMembers  bool
 	consulServices bool
+	consulHealth   bool
 )
 
 func runReadConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// If --health flag is set, run comprehensive health check
+	if consulHealth {
+		return runConsulHealthCheck(rc)
+	}
 
 	// Check if Consul is installed
 	consulPath, err := exec.LookPath("consul")
@@ -116,6 +126,169 @@ func runReadConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	}
 
 	return nil
+}
+
+// runConsulHealthCheck runs comprehensive health check using pkg/consul business logic
+func runConsulHealthCheck(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: ================================================================================")
+	logger.Info("terminal prompt: Consul Cluster Health Check")
+	logger.Info("terminal prompt: ================================================================================")
+	logger.Info("terminal prompt: ")
+
+	// Run health check (business logic in pkg/consul/health_check.go)
+	result, err := consul.CheckHealth(rc)
+	if err != nil {
+		return fmt.Errorf("health check failed: %w", err)
+	}
+
+	// Display results
+	displayHealthCheckResults(logger, result)
+
+	return nil
+}
+
+// displayHealthCheckResults displays comprehensive health check results
+func displayHealthCheckResults(logger otelzap.LoggerWithCtx, result *consul.HealthCheckResult) {
+	// Overall status
+	statusIcon := getStatusIcon(result.Overall)
+	logger.Info("terminal prompt: OVERALL STATUS: " + statusIcon + " " + string(result.Overall))
+	logger.Info("terminal prompt: ")
+
+	// Agent Health
+	logger.Info("terminal prompt: === Local Agent Health ===")
+	agentIcon := getStatusIcon(result.Agent.Status)
+	logger.Info("terminal prompt:   Status:      " + agentIcon + " " + string(result.Agent.Status))
+	logger.Info("terminal prompt:   Running:     " + formatBool(result.Agent.Running))
+	logger.Info("terminal prompt:   Reachable:   " + formatBool(result.Agent.Reachable))
+	if result.Agent.NodeName != "" {
+		logger.Info("terminal prompt:   Node:        " + result.Agent.NodeName)
+	}
+	if result.Agent.Datacenter != "" {
+		logger.Info("terminal prompt:   Datacenter:  " + result.Agent.Datacenter)
+	}
+	if result.Agent.Version != "" {
+		logger.Info("terminal prompt:   Version:     " + result.Agent.Version)
+	}
+	if len(result.Agent.Issues) > 0 {
+		logger.Info("terminal prompt:   Issues:")
+		for _, issue := range result.Agent.Issues {
+			logger.Info("terminal prompt:     • " + issue)
+		}
+	}
+	logger.Info("terminal prompt: ")
+
+	// Cluster Health
+	if result.Agent.Running {
+		logger.Info("terminal prompt: === Cluster Health ===")
+		clusterIcon := getStatusIcon(result.Cluster.Status)
+		logger.Info("terminal prompt:   Status:      " + clusterIcon + " " + string(result.Cluster.Status))
+		logger.Info("terminal prompt:   Members:     " + fmt.Sprintf("%d", result.Cluster.MemberCount))
+		logger.Info("terminal prompt:   Leader:      " + formatBool(result.Cluster.LeaderPresent))
+		if result.Cluster.Leader != "" {
+			logger.Info("terminal prompt:   Leader Node: " + result.Cluster.Leader)
+		}
+
+		if len(result.Cluster.Members) > 0 {
+			logger.Info("terminal prompt: ")
+			logger.Info("terminal prompt:   Cluster Members:")
+			for _, member := range result.Cluster.Members {
+				memberStatus := "✓"
+				if member.Status != "alive" {
+					memberStatus = "✗"
+				}
+				logger.Info("terminal prompt:     " + memberStatus + " " + member.Name + " (" + member.Address + ") - " + member.Status)
+			}
+		}
+
+		if len(result.Cluster.Issues) > 0 {
+			logger.Info("terminal prompt:   Issues:")
+			for _, issue := range result.Cluster.Issues {
+				logger.Info("terminal prompt:     • " + issue)
+			}
+		}
+		logger.Info("terminal prompt: ")
+
+		// Services Health
+		logger.Info("terminal prompt: === Services Health ===")
+		servicesIcon := getStatusIcon(result.Services.Status)
+		logger.Info("terminal prompt:   Status:      " + servicesIcon + " " + string(result.Services.Status))
+		logger.Info("terminal prompt:   Total:       " + fmt.Sprintf("%d", result.Services.TotalServices))
+		logger.Info("terminal prompt:   Healthy:     " + fmt.Sprintf("%d", result.Services.HealthyServices))
+
+		if len(result.Services.Services) > 0 {
+			logger.Info("terminal prompt: ")
+			logger.Info("terminal prompt:   Registered Services:")
+			for _, service := range result.Services.Services {
+				serviceStatus := "✓"
+				if !service.Healthy {
+					serviceStatus = "✗"
+				}
+				logger.Info("terminal prompt:     " + serviceStatus + " " + service.Name +
+					fmt.Sprintf(" (passing: %d, warning: %d, critical: %d)",
+						service.Passing, service.Warning, service.Critical))
+			}
+		}
+
+		if len(result.Services.Issues) > 0 {
+			logger.Info("terminal prompt:   Issues:")
+			for _, issue := range result.Services.Issues {
+				logger.Info("terminal prompt:     • " + issue)
+			}
+		}
+		logger.Info("terminal prompt: ")
+
+		// KV Store Health
+		logger.Info("terminal prompt: === KV Store Health ===")
+		kvIcon := getStatusIcon(result.KV.Status)
+		logger.Info("terminal prompt:   Status:      " + kvIcon + " " + string(result.KV.Status))
+		logger.Info("terminal prompt:   Accessible:  " + formatBool(result.KV.Accessible))
+		logger.Info("terminal prompt:   Writeable:   " + formatBool(result.KV.Writeable))
+
+		if len(result.KV.Issues) > 0 {
+			logger.Info("terminal prompt:   Issues:")
+			for _, issue := range result.KV.Issues {
+				logger.Info("terminal prompt:     • " + issue)
+			}
+		}
+		logger.Info("terminal prompt: ")
+	}
+
+	// Recommendations
+	if len(result.Recommendations) > 0 {
+		logger.Info("terminal prompt: === Recommendations ===")
+		for i, rec := range result.Recommendations {
+			logger.Info("terminal prompt:   " + fmt.Sprintf("%d.", i+1) + " " + rec)
+		}
+		logger.Info("terminal prompt: ")
+	}
+
+	logger.Info("terminal prompt: ================================================================================")
+	logger.Info("terminal prompt: Health Check completed at: " + result.Timestamp.Format("2006-01-02 15:04:05"))
+	logger.Info("terminal prompt: ================================================================================")
+}
+
+// Helper functions for display
+func getStatusIcon(status consul.HealthStatus) string {
+	switch status {
+	case consul.HealthStatusHealthy:
+		return "✓"
+	case consul.HealthStatusDegraded:
+		return "⚠"
+	case consul.HealthStatusUnhealthy:
+		return "✗"
+	default:
+		return "?"
+	}
+}
+
+func formatBool(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
 }
 
 func getConsulAgentInfo(_ otelzap.LoggerWithCtx) (map[string]interface{}, error) {
@@ -247,6 +420,7 @@ func init() {
 	ConsulCmd.Flags().BoolVar(&consulJSON, "json", false, "Output in JSON format")
 	ConsulCmd.Flags().BoolVar(&consulMembers, "members", false, "Show only cluster members")
 	ConsulCmd.Flags().BoolVar(&consulServices, "services", false, "Show only registered services")
+	ConsulCmd.Flags().BoolVar(&consulHealth, "health", false, "Run comprehensive cluster health check")
 
 	ReadCmd.AddCommand(ConsulCmd)
 }
