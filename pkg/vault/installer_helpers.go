@@ -3,6 +3,7 @@ package vault
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -40,6 +41,52 @@ func (r *CommandRunner) Run(name string, args ...string) error {
 	return r.RunWithRetries(name, args, r.retries)
 }
 
+// RunWithoutRetry executes a command without retry logic (for deterministic operations)
+func (r *CommandRunner) RunWithoutRetry(name string, args ...string) error {
+	return r.RunWithRetries(name, args, 1)
+}
+
+// isDeterministicError checks if an error is deterministic (should not be retried)
+func isDeterministicError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check for exec.Error (command not found)
+	var execErr *exec.Error
+	if errors.As(err, &execErr) {
+		return true
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	// Deterministic errors that should not be retried:
+	// - Command not found
+	// - Configuration/validation errors
+	// - Permission denied (won't fix itself)
+	// - File not found (deterministic)
+	deterministicPatterns := []string{
+		"executable file not found",
+		"command not found",
+		"permission denied",
+		"no such file or directory",
+		"invalid argument",
+		"validation failed",
+		"configuration error",
+		"config error",
+		"syntax error",
+		"parse error",
+	}
+
+	for _, pattern := range deterministicPatterns {
+		if strings.Contains(errStr, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // RunWithRetries executes a command with custom retry count
 func (r *CommandRunner) RunWithRetries(name string, args []string, maxRetries int) error {
 	r.logger.Debug("Executing command",
@@ -73,12 +120,25 @@ func (r *CommandRunner) RunWithRetries(name string, args []string, maxRetries in
 		}
 
 		lastErr = err
-		r.logger.Warn("Command failed, retrying",
+
+		// Fail fast on deterministic errors (P1 CRITICAL: don't retry config/validation errors)
+		if isDeterministicError(err) {
+			r.logger.Error("Command failed with deterministic error, not retrying",
+				zap.String("command", name),
+				zap.Error(err),
+				zap.String("output", output),
+				zap.String("reason", "deterministic failure - retrying won't help"))
+			return fmt.Errorf("command failed (deterministic error): %w", err)
+		}
+
+		// Only log retry warning for transient errors
+		r.logger.Warn("Command failed with transient error, will retry",
 			zap.String("command", name),
 			zap.Int("attempt", attempt),
 			zap.Int("max_retries", maxRetries),
 			zap.Error(err),
-			zap.String("output", output))
+			zap.String("output", output),
+			zap.String("reason", "transient failure - may succeed on retry"))
 
 		if attempt < maxRetries {
 			backoff := time.Duration(attempt) * time.Second

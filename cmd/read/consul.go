@@ -478,7 +478,7 @@ func displayVaultIntegration(rc *eos_io.RuntimeContext, logger otelzap.LoggerWit
 
 		// Show KV store usage
 		if status.KVStoreUsed {
-			logger.Info(fmt.Sprintf("terminal prompt:   Storage Backend:  Consul KV (in use)"))
+			logger.Info("terminal prompt:   Storage Backend:  Consul KV (in use)")
 			logger.Info(fmt.Sprintf("terminal prompt:   KV Path:          %s", status.KVPath))
 			logger.Info(fmt.Sprintf("terminal prompt:   KV Keys:          %d keys stored", status.KVKeyCount))
 		} else {
