@@ -275,9 +275,13 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 
 	// Get Go version
 	goVersionCmd := exec.Command(goPath, "version")
-	goVersionOutput, err := goVersionCmd.Output()
+	goVersionOutput, err := goVersionCmd.CombinedOutput() // Capture both stdout and stderr
 	if err != nil {
-		return fmt.Errorf("failed to check go version: %w", err)
+		return fmt.Errorf("failed to check go version at %s: %s\n"+
+			"Command: %s version\n"+
+			"Error: %w\n"+
+			"Fix: Ensure Go is properly installed and executable",
+			goPath, strings.TrimSpace(string(goVersionOutput)), goPath, err)
 	}
 
 	eeu.logger.Debug("Go compiler found",
@@ -292,8 +296,15 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 
 	// Check libvirt development libraries
 	libvirtCheck := exec.Command(pkgConfigPath, "--exists", "libvirt")
-	if err := libvirtCheck.Run(); err != nil {
-		return fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel")
+	libvirtOutput, err := libvirtCheck.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("libvirt development libraries not found: %s\n"+
+			"Command: %s --exists libvirt\n"+
+			"Fix: Install libvirt development libraries:\n"+
+			"  Ubuntu/Debian: sudo apt install libvirt-dev\n"+
+			"  RHEL/CentOS:   sudo yum install libvirt-devel\n"+
+			"  Fedora:        sudo dnf install libvirt-devel",
+			strings.TrimSpace(string(libvirtOutput)), pkgConfigPath)
 	}
 
 	eeu.logger.Info(" Build dependencies verified")
