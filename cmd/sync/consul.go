@@ -14,9 +14,12 @@ import (
 )
 
 var (
-	consulDryRun     bool
-	consulSkipBackup bool
-	consulNodes      []string
+	consulDryRun          bool
+	consulSkipBackup      bool
+	consulNodes           []string
+	consulACLToken        string
+	consulAllowOffline    bool
+	consulForceNoPreserve bool
 )
 
 // ConsulSyncCmd handles Consul cluster synchronization over Tailscale
@@ -58,6 +61,12 @@ func init() {
 		"Preview changes without applying them")
 	ConsulSyncCmd.Flags().BoolVar(&consulSkipBackup, "skip-backup", false,
 		"Skip configuration backup (use with caution)")
+	ConsulSyncCmd.Flags().StringVar(&consulACLToken, "acl-token", "",
+		"ACL token for Consul API access (or set CONSUL_HTTP_TOKEN)")
+	ConsulSyncCmd.Flags().BoolVar(&consulAllowOffline, "allow-offline", true,
+		"Allow adding offline nodes to retry_join (default: true)")
+	ConsulSyncCmd.Flags().BoolVar(&consulForceNoPreserve, "no-preserve-ips", false,
+		"Do NOT preserve non-Tailscale IPs (dangerous in mixed networks)")
 
 	// Register as subcommand of sync
 	SyncCmd.AddCommand(ConsulSyncCmd)
@@ -80,30 +89,61 @@ func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.Strings("target_nodes", consulNodes),
 		zap.Bool("dry_run", consulDryRun))
 
-	// Create configuration (business logic in pkg/consul/node_join.go)
-	config := consul.DefaultNodeJoinConfig()
+	// Create enhanced V2 configuration with all P0-P3 fixes
+	config := consul.DefaultNodeJoinConfigV2()
 	config.TargetNodes = consulNodes
 	config.DryRun = consulDryRun
 	config.SkipBackup = consulSkipBackup
+	config.ACLToken = consulACLToken
+	config.AllowOffline = consulAllowOffline
+	config.PreserveNonTailscale = !consulForceNoPreserve
 
-	// Execute node join operation
-	result, err := consul.JoinNodes(rc, config)
+	// Execute enhanced node join operation (V2 with all fixes)
+	result, err := consul.JoinNodesV2(rc, config)
 	if err != nil {
 		return err
 	}
 
-	// Display results
-	displayNodeJoinResults(logger, result)
+	// Display enhanced results
+	displayNodeJoinResultsV2(logger, result)
 
 	return nil
 }
 
-// displayNodeJoinResults displays the results of node join operation
-func displayNodeJoinResults(logger otelzap.LoggerWithCtx, result *consul.NodeJoinResult) {
+// displayNodeJoinResultsV2 displays the enhanced results with P0-P3 status
+func displayNodeJoinResultsV2(logger otelzap.LoggerWithCtx, result *consul.NodeJoinResultV2) {
 	logger.Info("================================================================================")
+
+	if !result.ConfigChanged {
+		logger.Info("Consul cluster configuration already correct - no changes made")
+		logger.Info("================================================================================")
+		logger.Info("")
+		logger.Info("✓ Configuration is idempotent - already properly configured")
+		logger.Info("✓ No restart needed - Consul continues running")
+		logger.Info("")
+		logger.Info("Current Configuration:")
+		logger.Info("  Hostname:     " + result.LocalNode.Hostname)
+		logger.Info("  Tailscale IP: " + result.LocalNode.TailscaleIP)
+		if len(result.ClusterMembers) > 0 {
+			logger.Info(fmt.Sprintf("  Cluster size: %d members", len(result.ClusterMembers)))
+		}
+		logger.Info("")
+		logger.Info("No action required!")
+		logger.Info("================================================================================")
+		return
+	}
+
 	logger.Info("Consul cluster join completed successfully")
 	logger.Info("================================================================================")
 	logger.Info("")
+
+	// Show what changed
+	logger.Info("Changes Applied:")
+	logger.Info("  ✓ Configuration updated")
+	logger.Info("  ✓ Consul service restarted")
+	logger.Info("  ✓ Cluster membership verified")
+	logger.Info("")
+
 	logger.Info("Local Node:")
 	logger.Info("  Hostname:     " + result.LocalNode.Hostname)
 	logger.Info("  Tailscale IP: " + result.LocalNode.TailscaleIP)
@@ -111,17 +151,37 @@ func displayNodeJoinResults(logger otelzap.LoggerWithCtx, result *consul.NodeJoi
 
 	logger.Info("Joined Nodes:")
 	for i, node := range result.JoinedNodes {
+		status := "online"
+		if !node.Online {
+			status = "offline (will join when online)"
+		}
 		logger.Info(fmt.Sprintf("  [%d] %s", i+1, node.Hostname))
 		logger.Info("      Tailscale IP: " + node.TailscaleIP)
-		logger.Info("      Status:       online")
+		logger.Info("      Status:       " + status)
 	}
 	logger.Info("")
+
+	// Show mixed network warning if applicable
+	if result.MixedNetwork {
+		logger.Info("⚠ Mixed Network Topology Detected:")
+		logger.Info(fmt.Sprintf("  Tailscale members:     %d", len(result.JoinedNodes)))
+		if len(result.PreservedIPs) > 0 {
+			logger.Info(fmt.Sprintf("  Non-Tailscale members: %d (preserved)", len(result.PreservedIPs)))
+			logger.Info("  Preserved IPs: " + fmt.Sprintf("%v", result.PreservedIPs))
+		}
+		logger.Info("")
+	}
 
 	if len(result.ClusterMembers) > 0 {
 		logger.Info("Cluster Members:")
 		for _, member := range result.ClusterMembers {
 			logger.Info("  • " + member)
 		}
+		logger.Info("")
+	}
+
+	if result.ACLEnabled {
+		logger.Info("✓ ACL Mode: Enabled (token configured)")
 		logger.Info("")
 	}
 
@@ -132,7 +192,11 @@ func displayNodeJoinResults(logger otelzap.LoggerWithCtx, result *consul.NodeJoi
 
 	logger.Info("Next Steps:")
 	logger.Info("  • Verify cluster: consul members")
-	logger.Info("  • Check logs: sudo journalctl -u consul -f")
+	logger.Info("  • Check health: sudo eos read consul --health")
+	logger.Info("  • View logs: sudo journalctl -u consul -f")
+	if result.MixedNetwork {
+		logger.Info("  • Review network topology: Consider migrating all nodes to Tailscale")
+	}
 	logger.Info("")
 	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
 	logger.Info("================================================================================")
