@@ -15,8 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/build"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/process"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -167,41 +171,19 @@ func (eeu *EnhancedEosUpdater) PreUpdateSafetyChecks() error {
 
 // verifySourceDirectory ensures we have a valid git repository
 func (eeu *EnhancedEosUpdater) verifySourceDirectory() error {
-	gitDir := filepath.Join(eeu.config.SourceDir, ".git")
-	if _, err := os.Stat(gitDir); err != nil {
-		return fmt.Errorf("not a git repository: %s", eeu.config.SourceDir)
-	}
-
-	// Verify it's the eos repository
-	cmd := exec.Command("git", "-C", eeu.config.SourceDir, "remote", "get-url", "origin")
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to get git remote: %w", err)
-	}
-
-	remoteURL := strings.TrimSpace(string(output))
-	if !strings.Contains(remoteURL, "eos") {
-		eeu.logger.Warn("Repository remote doesn't contain 'eos'", zap.String("remote", remoteURL))
-	}
-
-	eeu.logger.Debug("Source directory verified", zap.String("remote", remoteURL))
-	return nil
+	return git.VerifyRepository(eeu.rc, eeu.config.SourceDir)
 }
 
 // checkGitRepositoryState checks for uncommitted changes
 func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 	eeu.logger.Info("Checking git repository state")
 
-	// Check for uncommitted changes
-	statusCmd := exec.Command("git", "-C", eeu.config.SourceDir, "status", "--porcelain")
-	statusOutput, err := statusCmd.Output()
+	state, err := git.CheckRepositoryState(eeu.rc, eeu.config.SourceDir)
 	if err != nil {
 		return fmt.Errorf("failed to check git status: %w", err)
 	}
 
-	hasChanges := len(statusOutput) > 0
-
-	if hasChanges {
+	if state.HasChanges {
 		if eeu.enhancedConfig.RequireCleanWorkingTree {
 			return fmt.Errorf("repository has uncommitted changes and clean working tree is required")
 		}
@@ -219,147 +201,41 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 // checkRunningProcesses warns about running eos processes
 func (eeu *EnhancedEosUpdater) checkRunningProcesses() error {
 	eeu.logger.Info("Checking for running eos processes")
-
-	// Use pgrep to find eos processes (excluding this one)
-	cmd := exec.Command("pgrep", "-f", "eos")
-	output, err := cmd.Output()
-
-	if err == nil && len(output) > 0 {
-		processes := strings.Split(strings.TrimSpace(string(output)), "\n")
-		currentPID := os.Getpid()
-
-		otherProcesses := []string{}
-		for _, pidStr := range processes {
-			pidStr = strings.TrimSpace(pidStr)
-			if pidStr != "" && pidStr != fmt.Sprintf("%d", currentPID) {
-				otherProcesses = append(otherProcesses, pidStr)
-			}
-		}
-
-		if len(otherProcesses) > 0 {
-			eeu.logger.Warn("Other eos processes are running",
-				zap.Strings("pids", otherProcesses),
-				zap.String("warning", "They will continue using the old binary until restarted"))
-		}
-	}
-
-	return nil
+	return process.WarnAboutRunningProcesses(eeu.rc, "eos")
 }
 
 // verifyBuildDependencies checks that we can build eos
 func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 	eeu.logger.Info("Verifying build dependencies")
 
-	// Check Go is installed - check PATH first, then standard locations
-	goPath, err := exec.LookPath("go")
+	// Use the new build.VerifyAllDependencies function
+	result, err := build.VerifyAllDependencies(eeu.rc)
 	if err != nil {
-		// Not in PATH - check standard installation locations
-		standardLocations := []string{
-			"/usr/local/go/bin/go",
-			filepath.Join(os.Getenv("HOME"), "go", "bin", "go"),
-		}
-
-		for _, loc := range standardLocations {
-			if _, err := os.Stat(loc); err == nil {
-				goPath = loc
-				eeu.logger.Debug("Go found at standard location", zap.String("path", loc))
-				break
-			}
-		}
-
-		if goPath == "" {
-			return fmt.Errorf("go compiler not found in PATH or standard locations (/usr/local/go/bin/go, ~/go/bin/go)")
-		}
+		return err
 	}
 
 	// Store Go path for later use in build
-	eeu.goPath = goPath
+	eeu.goPath = result.GoPath
 
-	// Get Go version
-	goVersionCmd := exec.Command(goPath, "version")
-	goVersionOutput, err := goVersionCmd.CombinedOutput() // Capture both stdout and stderr
-	if err != nil {
-		return fmt.Errorf("failed to check go version at %s: %s\n"+
-			"Command: %s version\n"+
-			"Error: %w\n"+
-			"Fix: Ensure Go is properly installed and executable",
-			goPath, strings.TrimSpace(string(goVersionOutput)), goPath, err)
-	}
-
-	eeu.logger.Debug("Go compiler found",
-		zap.String("path", goPath),
-		zap.String("version", strings.TrimSpace(string(goVersionOutput))))
-
-	// Check pkg-config (required for libvirt)
-	pkgConfigPath, err := exec.LookPath("pkg-config")
-	if err != nil {
-		return fmt.Errorf("pkg-config not found - required for libvirt integration")
-	}
-
-	// Check libvirt development libraries
-	libvirtCheck := exec.Command(pkgConfigPath, "--exists", "libvirt")
-	libvirtOutput, err := libvirtCheck.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("libvirt development libraries not found: %s\n"+
-			"Command: %s --exists libvirt\n"+
-			"Fix: Install libvirt development libraries:\n"+
-			"  Ubuntu/Debian: sudo apt install libvirt-dev\n"+
-			"  RHEL/CentOS:   sudo yum install libvirt-devel\n"+
-			"  Fedora:        sudo dnf install libvirt-devel",
-			strings.TrimSpace(string(libvirtOutput)), pkgConfigPath)
-	}
-
-	// Check Ceph development libraries (required for CephFS features)
-	// NOTE: Ubuntu Ceph packages don't provide .pc files, so we check for headers instead
-	var missingCephLibs []string
-	cephLibs := map[string]string{
-		"librados":  "/usr/include/rados/librados.h",
-		"librbd":    "/usr/include/rbd/librbd.h",
-		"libcephfs": "/usr/include/cephfs/libcephfs.h",
-	}
-
-	for lib, headerPath := range cephLibs {
-		// First try pkg-config (works on some distros)
-		cephCheck := exec.Command(pkgConfigPath, "--exists", lib)
-		if err := cephCheck.Run(); err != nil {
-			// pkg-config failed, check for header file directly (Ubuntu Ceph packages don't provide .pc files)
-			if _, err := os.Stat(headerPath); os.IsNotExist(err) {
-				eeu.logger.Debug("Ceph library not found",
-					zap.String("library", lib),
-					zap.String("pkg_config_failed", "true"),
-					zap.String("header_path", headerPath),
-					zap.String("header_exists", "false"))
-				missingCephLibs = append(missingCephLibs, lib)
-			} else {
-				eeu.logger.Debug("Ceph library found via header check (pkg-config unavailable)",
-					zap.String("library", lib),
-					zap.String("header_path", headerPath))
-			}
-		} else {
-			eeu.logger.Debug("Ceph library found via pkg-config",
-				zap.String("library", lib))
-		}
-	}
-
-	if len(missingCephLibs) > 0 {
+	// If Ceph libraries are missing, attempt to install them
+	if !result.CephLibsOK {
 		eeu.logger.Warn("Ceph development libraries not found, attempting to install",
-			zap.Strings("missing", missingCephLibs))
+			zap.Strings("missing", result.MissingCephLibs))
+
+		// Detect package manager
+		pkgMgr := system.DetectPackageManager()
+		if pkgMgr == system.PackageManagerNone {
+			return fmt.Errorf("%s\nAuto-install failed: no supported package manager found",
+				build.FormatMissingCephLibsError(result.MissingCephLibs))
+		}
 
 		// Attempt to install missing Ceph libraries automatically
-		if err := eeu.installCephLibraries(missingCephLibs); err != nil {
-			return fmt.Errorf("Ceph development libraries not found: %v\n"+
-				"Checked paths: pkg-config and header files in /usr/include/\n"+
-				"Auto-install failed: %v\n"+
-				"Fix: Install Ceph development libraries manually:\n"+
-				"  Ubuntu/Debian: sudo apt install librados-dev librbd-dev libcephfs-dev\n"+
-				"  RHEL/CentOS:   sudo yum install librados-devel librbd-devel libcephfs-devel\n"+
-				"  Fedora:        sudo dnf install librados-devel librbd-devel libcephfs-devel",
-				missingCephLibs, err)
+		if err := system.InstallCephLibraries(eeu.rc, pkgMgr, result.MissingCephLibs); err != nil {
+			return fmt.Errorf("%s\nAuto-install failed: %w",
+				build.FormatMissingCephLibsError(result.MissingCephLibs), err)
 		}
 
 		eeu.logger.Info(" Ceph development libraries installed successfully")
-	} else {
-		eeu.logger.Debug("All Ceph development libraries found")
 	}
 
 	eeu.logger.Info(" Build dependencies verified")
@@ -369,20 +245,7 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 // checkDiskSpace ensures we have enough space for the update
 func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 	eeu.logger.Info("Checking available disk space")
-
-	// Get disk usage of /tmp (where we build) and install location
-	dfCmd := exec.Command("df", "-h", "/tmp", filepath.Dir(eeu.config.BinaryPath))
-	output, err := dfCmd.Output()
-	if err != nil {
-		eeu.logger.Warn("Could not check disk space", zap.Error(err))
-		return nil // Non-fatal
-	}
-
-	eeu.logger.Debug("Disk space", zap.String("df_output", string(output)))
-
-	// TODO: Parse df output and ensure we have at least 500MB free
-	// For now, just log it
-
+	_, _ = system.CheckDiskSpace(eeu.rc, "/tmp", filepath.Dir(eeu.config.BinaryPath))
 	return nil
 }
 
@@ -390,15 +253,13 @@ func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 func (eeu *EnhancedEosUpdater) recordGitState() error {
 	eeu.logger.Info("Recording current git state for rollback")
 
-	// Get current commit hash
-	commitCmd := exec.Command("git", "-C", eeu.config.SourceDir, "rev-parse", "HEAD")
-	commitOutput, err := commitCmd.Output()
+	commitHash, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir)
 	if err != nil {
 		return fmt.Errorf("failed to get current commit: %w", err)
 	}
 
-	eeu.transaction.GitCommitBefore = strings.TrimSpace(string(commitOutput))
-	eeu.logger.Info("Git state recorded", zap.String("commit", eeu.transaction.GitCommitBefore[:8]))
+	eeu.transaction.GitCommitBefore = commitHash
+	eeu.logger.Info("Git state recorded", zap.String("commit", commitHash[:8]))
 
 	return nil
 }
@@ -412,43 +273,17 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		zap.String("source_dir", eeu.config.SourceDir),
 		zap.String("go_path", eeu.goPath))
 
-	// Verify pkg-config and libvirt are available
-	pkgConfigPath, err := exec.LookPath("pkg-config")
+	// Verify dependencies are available (quick recheck before build)
+	result, err := build.VerifyAllDependencies(eeu.rc)
 	if err != nil {
-		return "", fmt.Errorf("pkg-config not found in PATH - required for building Eos with libvirt: %w", err)
+		return "", fmt.Errorf("build dependencies not satisfied: %w", err)
 	}
 
-	pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
-	if err := pkgConfigCmd.Run(); err != nil {
-		return "", fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel: %w", err)
+	if !result.CephLibsOK {
+		return "", fmt.Errorf("Ceph libraries missing at build time: %v", result.MissingCephLibs)
 	}
 
-	eeu.logger.Info("Libvirt development libraries detected",
-		zap.String("pkg_config_path", pkgConfigPath))
-
-	// Verify Ceph libraries are available (required for CephFS features)
-	// NOTE: Ubuntu Ceph packages don't provide .pc files, so we check for headers instead
-	cephLibs := map[string]string{
-		"librados":  "/usr/include/rados/librados.h",
-		"librbd":    "/usr/include/rbd/librbd.h",
-		"libcephfs": "/usr/include/cephfs/libcephfs.h",
-	}
-
-	for lib, headerPath := range cephLibs {
-		// First try pkg-config (works on some distros)
-		cephCheckCmd := exec.Command(pkgConfigPath, "--exists", lib)
-		if err := cephCheckCmd.Run(); err != nil {
-			// pkg-config failed, check for header file directly
-			if _, err := os.Stat(headerPath); os.IsNotExist(err) {
-				return "", fmt.Errorf("%s development libraries not found (checked pkg-config and %s) - install librados-dev librbd-dev libcephfs-dev (Debian) or librados-devel librbd-devel libcephfs-devel (RHEL)", lib, headerPath)
-			}
-			eeu.logger.Debug("Ceph library found via header check",
-				zap.String("library", lib),
-				zap.String("header_path", headerPath))
-		}
-	}
-
-	eeu.logger.Info("Ceph development libraries detected")
+	eeu.logger.Info("Build dependencies verified")
 
 	// Build command - use the Go path we found during verification
 	buildArgs := []string{"build", "-o", tempBinary, "."}
@@ -617,37 +452,7 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 // pullLatestCodeWithVerification pulls code and verifies something actually changed
 // Returns true if code changed, false if already up-to-date
 func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
-	eeu.logger.Info("Pulling latest changes from git repository")
-
-	// Get current commit before pull
-	beforeCommit := eeu.transaction.GitCommitBefore
-
-	// Pull changes
-	if err := eeu.PullLatestCode(); err != nil {
-		return false, err
-	}
-
-	// Get commit after pull
-	afterCmd := exec.Command("git", "-C", eeu.config.SourceDir, "rev-parse", "HEAD")
-	afterOutput, err := afterCmd.Output()
-	if err != nil {
-		return false, fmt.Errorf("failed to get commit after pull: %w", err)
-	}
-	afterCommit := strings.TrimSpace(string(afterOutput))
-
-	codeChanged := beforeCommit != afterCommit
-
-	if !codeChanged {
-		eeu.logger.Info("  Already on latest version",
-			zap.String("commit", afterCommit[:8]))
-		return false, nil
-	}
-
-	eeu.logger.Info(" Updates pulled",
-		zap.String("from", beforeCommit[:8]),
-		zap.String("to", afterCommit[:8]))
-
-	return true, nil
+	return git.PullWithVerification(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
 }
 
 // installBinaryAtomic installs the binary atomically with file locking
@@ -791,239 +596,16 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 
 // UpdateSystemPackages updates the system package manager (apt/yum/dnf/pacman)
 func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
-	eeu.logger.Info("Updating system packages")
-
-	// Detect package manager
-	packageManager := eeu.detectPackageManager()
-	if packageManager == "" {
-		eeu.logger.Warn("No supported package manager detected (apt/yum/dnf/pacman)")
+	packageManager := system.DetectPackageManager()
+	if packageManager == system.PackageManagerNone {
+		eeu.logger.Warn("No supported package manager detected")
 		return fmt.Errorf("no supported package manager found")
 	}
 
-	eeu.logger.Info("Detected package manager", zap.String("manager", packageManager))
-
-	switch packageManager {
-	case "apt":
-		return eeu.updateApt()
-	case "yum", "dnf":
-		return eeu.updateYumDnf(packageManager)
-	case "pacman":
-		return eeu.updatePacman()
-	default:
-		return fmt.Errorf("unsupported package manager: %s", packageManager)
-	}
+	eeu.logger.Info("Detected package manager", zap.String("manager", string(packageManager)))
+	return system.UpdateSystemPackages(eeu.rc, packageManager)
 }
 
-// detectPackageManager detects which package manager is available
-func (eeu *EnhancedEosUpdater) detectPackageManager() string {
-	managers := []string{"apt", "dnf", "yum", "pacman"}
-
-	for _, mgr := range managers {
-		if _, err := exec.LookPath(mgr); err == nil {
-			return mgr
-		}
-	}
-
-	return ""
-}
-
-// updateApt runs apt update && apt upgrade on Debian/Ubuntu systems
-func (eeu *EnhancedEosUpdater) updateApt() error {
-	eeu.logger.Info("Running apt update && apt upgrade")
-
-	// Check if running as root
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("system package updates require root privileges - run with sudo")
-	}
-
-	// Step 1: apt update (refresh package lists)
-	eeu.logger.Info("  Step 1/2: Refreshing package lists (apt update)")
-	updateCmd := exec.Command("apt", "update")
-	updateCmd.Stdout = os.Stdout
-	updateCmd.Stderr = os.Stderr
-
-	if err := updateCmd.Run(); err != nil {
-		return fmt.Errorf("apt update failed: %w", err)
-	}
-
-	eeu.logger.Info(" Package lists updated")
-
-	// Step 2: apt upgrade (install updates)
-	eeu.logger.Info("  Step 2/2: Installing package updates (apt upgrade)")
-	upgradeCmd := exec.Command("apt", "upgrade", "-y")
-	upgradeCmd.Stdout = os.Stdout
-	upgradeCmd.Stderr = os.Stderr
-
-	if err := upgradeCmd.Run(); err != nil {
-		return fmt.Errorf("apt upgrade failed: %w", err)
-	}
-
-	eeu.logger.Info(" System packages updated successfully")
-	return nil
-}
-
-// updateYumDnf runs yum/dnf update on RHEL/CentOS/Fedora systems
-func (eeu *EnhancedEosUpdater) updateYumDnf(manager string) error {
-	eeu.logger.Info(fmt.Sprintf("Running %s update", manager))
-
-	// Check if running as root
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("system package updates require root privileges - run with sudo")
-	}
-
-	updateCmd := exec.Command(manager, "update", "-y")
-	updateCmd.Stdout = os.Stdout
-	updateCmd.Stderr = os.Stderr
-
-	if err := updateCmd.Run(); err != nil {
-		return fmt.Errorf("%s update failed: %w", manager, err)
-	}
-
-	eeu.logger.Info(" System packages updated successfully")
-	return nil
-}
-
-// updatePacman runs pacman -Syu on Arch Linux systems
-func (eeu *EnhancedEosUpdater) updatePacman() error {
-	eeu.logger.Info("Running pacman -Syu")
-
-	// Check if running as root
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("system package updates require root privileges - run with sudo")
-	}
-
-	updateCmd := exec.Command("pacman", "-Syu", "--noconfirm")
-	updateCmd.Stdout = os.Stdout
-	updateCmd.Stderr = os.Stderr
-
-	if err := updateCmd.Run(); err != nil {
-		return fmt.Errorf("pacman update failed: %w", err)
-	}
-
-	eeu.logger.Info(" System packages updated successfully")
-	return nil
-}
-
-// installCephLibraries automatically installs missing Ceph development libraries
-func (eeu *EnhancedEosUpdater) installCephLibraries(missingLibs []string) error {
-	eeu.logger.Info("Attempting to install missing Ceph development libraries",
-		zap.Strings("libraries", missingLibs))
-
-	// Check if running as root
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("installing system packages requires root privileges - run with sudo")
-	}
-
-	// Detect package manager
-	packageManager := eeu.detectPackageManager()
-	if packageManager == "" {
-		return fmt.Errorf("no supported package manager found (apt/yum/dnf/pacman)")
-	}
-
-	eeu.logger.Info("Using package manager", zap.String("manager", packageManager))
-
-	// Map library names to package names for each distro
-	var packages []string
-	switch packageManager {
-	case "apt":
-		// Debian/Ubuntu package names
-		pkgMap := map[string]string{
-			"librados":  "librados-dev",
-			"librbd":    "librbd-dev",
-			"libcephfs": "libcephfs-dev",
-		}
-		for _, lib := range missingLibs {
-			if pkg, ok := pkgMap[lib]; ok {
-				packages = append(packages, pkg)
-			}
-		}
-
-	case "yum", "dnf":
-		// RHEL/CentOS/Fedora package names
-		pkgMap := map[string]string{
-			"librados":  "librados-devel",
-			"librbd":    "librbd-devel",
-			"libcephfs": "libcephfs-devel",
-		}
-		for _, lib := range missingLibs {
-			if pkg, ok := pkgMap[lib]; ok {
-				packages = append(packages, pkg)
-			}
-		}
-
-	case "pacman":
-		// Arch Linux package names
-		pkgMap := map[string]string{
-			"librados":  "ceph-libs",
-			"librbd":    "ceph-libs",
-			"libcephfs": "ceph-libs",
-		}
-		// Deduplicate packages (ceph-libs provides all three)
-		pkgSet := make(map[string]bool)
-		for _, lib := range missingLibs {
-			if pkg, ok := pkgMap[lib]; ok {
-				pkgSet[pkg] = true
-			}
-		}
-		for pkg := range pkgSet {
-			packages = append(packages, pkg)
-		}
-
-	default:
-		return fmt.Errorf("unsupported package manager: %s", packageManager)
-	}
-
-	if len(packages) == 0 {
-		return fmt.Errorf("could not map libraries to packages for %s", packageManager)
-	}
-
-	eeu.logger.Info("Installing packages", zap.Strings("packages", packages))
-
-	// Install packages based on package manager
-	var installCmd *exec.Cmd
-	switch packageManager {
-	case "apt":
-		// Update package lists first
-		eeu.logger.Info("  Updating package lists...")
-		updateCmd := exec.Command("apt", "update")
-		updateCmd.Stdout = os.Stdout
-		updateCmd.Stderr = os.Stderr
-		if err := updateCmd.Run(); err != nil {
-			return fmt.Errorf("apt update failed: %w", err)
-		}
-
-		// Install packages
-		args := append([]string{"install", "-y"}, packages...)
-		installCmd = exec.Command("apt", args...)
-
-	case "yum":
-		args := append([]string{"install", "-y"}, packages...)
-		installCmd = exec.Command("yum", args...)
-
-	case "dnf":
-		args := append([]string{"install", "-y"}, packages...)
-		installCmd = exec.Command("dnf", args...)
-
-	case "pacman":
-		args := append([]string{"-S", "--noconfirm"}, packages...)
-		installCmd = exec.Command("pacman", args...)
-
-	default:
-		return fmt.Errorf("unsupported package manager: %s", packageManager)
-	}
-
-	installCmd.Stdout = os.Stdout
-	installCmd.Stderr = os.Stderr
-
-	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("%s install failed: %w", packageManager, err)
-	}
-
-	eeu.logger.Info(" Ceph development libraries installed",
-		zap.Strings("packages", packages))
-
-	return nil
-}
 
 // UpdateGoVersion checks and updates the Go compiler if a newer version is available
 func (eeu *EnhancedEosUpdater) UpdateGoVersion() error {

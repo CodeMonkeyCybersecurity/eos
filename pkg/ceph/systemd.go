@@ -1,0 +1,133 @@
+// pkg/ceph/systemd.go
+package ceph
+
+import (
+	"fmt"
+	"os/exec"
+	"strings"
+
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+)
+
+// CheckSystemdUnits checks Ceph systemd unit files and their states
+func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
+	logger.Info("Checking systemd units...")
+
+	// Get detailed status of critical Ceph units
+	criticalUnits := []string{"ceph.target", "ceph-mon.target", "ceph-mgr.target", "ceph-osd.target"}
+
+	// Check if any specific mon/mgr/osd instances exist
+	cmd := exec.Command("systemctl", "list-units", "ceph-mon@*", "ceph-mgr@*", "ceph-osd@*", "--all", "--no-pager")
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "ceph-mon@") || strings.Contains(line, "ceph-mgr@") || strings.Contains(line, "ceph-osd@") {
+				// Extract just the unit name (first field)
+				fields := strings.Fields(line)
+				if len(fields) > 0 {
+					unitName := fields[0]
+					// Avoid duplicates
+					found := false
+					for _, existing := range criticalUnits {
+						if existing == unitName {
+							found = true
+							break
+						}
+					}
+					if !found {
+						criticalUnits = append(criticalUnits, unitName)
+					}
+				}
+			}
+		}
+	}
+
+	// Check status of each unit
+	activeCount := 0
+	inactiveCount := 0
+	failedCount := 0
+
+	logger.Info("Systemd unit status:")
+	for _, unit := range criticalUnits {
+		cmd = exec.Command("systemctl", "is-active", unit)
+		output, _ := cmd.Output()
+		status := strings.TrimSpace(string(output))
+
+		cmd = exec.Command("systemctl", "is-enabled", unit)
+		enabledOutput, _ := cmd.Output()
+		enabled := strings.TrimSpace(string(enabledOutput))
+
+		var symbol string
+		var statusMsg string
+
+		switch status {
+		case "active":
+			symbol = "✓"
+			statusMsg = "active"
+			activeCount++
+		case "inactive":
+			symbol = "○"
+			statusMsg = "inactive"
+			inactiveCount++
+		case "failed":
+			symbol = "✗"
+			statusMsg = "FAILED"
+			failedCount++
+		default:
+			symbol = "?"
+			statusMsg = status
+		}
+
+		// Show enabled status
+		if enabled == "enabled" {
+			logger.Info(fmt.Sprintf("  %s %-30s %s (enabled)", symbol, unit, statusMsg))
+		} else {
+			logger.Info(fmt.Sprintf("  %s %-30s %s (%s)", symbol, unit, statusMsg, enabled))
+		}
+
+		// If failed, show why
+		if status == "failed" {
+			cmd = exec.Command("systemctl", "status", unit, "--no-pager", "-n", "3")
+			if output, err := cmd.Output(); err == nil {
+				if verbose {
+					logger.Error(fmt.Sprintf("    Failure details for %s:", unit))
+					for _, line := range strings.Split(string(output), "\n") {
+						if strings.TrimSpace(line) != "" {
+							logger.Error("      " + line)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Summary
+	logger.Info("")
+	logger.Info(fmt.Sprintf("Summary: %d active, %d inactive, %d failed", activeCount, inactiveCount, failedCount))
+
+	if failedCount > 0 {
+		logger.Error("❌ Some units have failed - check logs with: journalctl -u <unit-name> -xe")
+		return DiagnosticResult{
+			CheckName: "Systemd Units",
+			Passed:    false,
+			Error:     fmt.Errorf("%d systemd units failed", failedCount),
+		}
+	}
+
+	if activeCount == 0 {
+		logger.Warn("⚠️  No active Ceph units")
+		logger.Info("  → Try: systemctl start ceph.target")
+		return DiagnosticResult{
+			CheckName: "Systemd Units",
+			Passed:    false,
+			Error:     fmt.Errorf("no active ceph units"),
+		}
+	}
+
+	return DiagnosticResult{
+		CheckName: "Systemd Units",
+		Passed:    true,
+	}
+}
