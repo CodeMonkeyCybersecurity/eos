@@ -30,8 +30,11 @@ var ReadWazuhCCSCmd = &cobra.Command{
 }
 
 func init() {
-	ReadCmd.AddCommand(ReadWazuhCCSCmd)
+	// NOTE: ReadWazuhCCSCmd is NO LONGER registered at top level
+	// It is now accessed via: eos read wazuh --ccs
+	// Top-level registration removed as part of command refactoring
 
+	// Flags are still defined here for when called via wazuh.go router
 	// Status flags
 	ReadWazuhCCSCmd.Flags().Bool("status", false, "Show platform status")
 	ReadWazuhCCSCmd.Flags().String("customer-id", "", "Customer ID for detailed status")

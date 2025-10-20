@@ -21,12 +21,30 @@ import (
 )
 
 func init() {
+	// Add subcommands to vault command (these stay as subcommands)
 	InspectVaultCmd.AddCommand(InspectVaultAgentCmd)
 	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
-	ReadCmd.AddCommand(InspectVaultCmd)
-	ReadCmd.AddCommand(InspectVaultInitCmd)
 
-	// Add flags for enhanced vault-init command
+	// Register main vault command
+	ReadCmd.AddCommand(InspectVaultCmd)
+
+	// NOTE: InspectVaultInitCmd is NO LONGER registered at top level
+	// It is now accessed via: eos read vault --init
+	// Top-level registration removed as part of command refactoring
+
+	// Add flags for command variants
+	InspectVaultCmd.Flags().Bool("init", false, "Securely inspect Vault initialization data")
+	InspectVaultCmd.Flags().Bool("status", false, "Show comprehensive Vault status and integration")
+
+	// Flags for --init variant (forwarded to InspectVaultInitCmd)
+	InspectVaultCmd.Flags().Bool("no-redact", false, "Show sensitive data in plaintext (requires confirmation)")
+	InspectVaultCmd.Flags().String("export", "console", "Export format: console, json, secure")
+	InspectVaultCmd.Flags().Bool("status-only", false, "Show only Vault status information (no sensitive data)")
+	InspectVaultCmd.Flags().String("output", "", "Output file path for export formats")
+	InspectVaultCmd.Flags().String("reason", "", "Access reason for audit logging")
+	InspectVaultCmd.Flags().Bool("no-confirm", false, "Skip confirmation prompts (use with caution)")
+
+	// Keep existing flags for InspectVaultInitCmd (for backward compat if called directly)
 	InspectVaultInitCmd.Flags().Bool("no-redact", false, "Show sensitive data in plaintext (requires confirmation)")
 	InspectVaultInitCmd.Flags().String("export", "console", "Export format: console, json, secure")
 	InspectVaultInitCmd.Flags().Bool("status-only", false, "Show only Vault status information (no sensitive data)")
@@ -34,7 +52,7 @@ func init() {
 	InspectVaultInitCmd.Flags().String("reason", "", "Access reason for audit logging")
 	InspectVaultInitCmd.Flags().Bool("no-confirm", false, "Skip confirmation prompts (use with caution)")
 
-	// Add flags for vault agent command
+	// Flags for vault agent subcommand
 	InspectVaultAgentCmd.Flags().Bool("json", false, "Output status in JSON format for automation")
 }
 

@@ -39,4 +39,5 @@ func init() {
 	ReadCmd.AddCommand(readWazuhCmd)
 	ReadCmd.AddCommand(readHecateCmd)
 	ReadCmd.AddCommand(readSecretsCmd)
+	ReadCmd.AddCommand(readCephCmd)
 }

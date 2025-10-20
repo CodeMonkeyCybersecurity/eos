@@ -52,9 +52,11 @@ Examples:
 }
 
 func init() {
-	ReadCmd.AddCommand(ReadWazuhVersionCmd)
+	// NOTE: ReadWazuhVersionCmd is NO LONGER registered at top level
+	// It is now accessed via: eos read wazuh --version
+	// Top-level registration removed as part of command refactoring
 
-	// Flags
+	// Flags are still defined here for when called via wazuh.go router
 	ReadWazuhVersionCmd.Flags().Bool("list", false, "List all available versions")
 	ReadWazuhVersionCmd.Flags().Bool("list-prerelease", false, "Include pre-release versions in list")
 	ReadWazuhVersionCmd.Flags().Bool("check-update", false, "Check if updates are available")
