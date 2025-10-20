@@ -7,9 +7,6 @@ package update
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -132,7 +129,10 @@ EXAMPLES:
 
 		// If no action flags, default to rescue mode (legacy behavior)
 		if actionCount == 0 {
-			return runRescueMode(rc, args)
+			if len(args) == 0 {
+				return fmt.Errorf("rescue mode requires VM name, or use --add/--enable/--restart flags")
+			}
+			return kvm.RunRescueModeOperation(rc, args[0])
 		}
 
 		// Validate: only one action at a time
@@ -142,21 +142,21 @@ EXAMPLES:
 
 		// Route to appropriate handler
 		if kvmAdd {
-			return runAddOperation(rc)
+			return handleAddOperation(rc)
 		}
 		if kvmEnable {
-			return runEnableOperation(rc)
+			return handleEnableOperation(rc)
 		}
 		if kvmRestart {
-			return runRestartOperation(rc)
+			return handleRestartOperation(rc)
 		}
 
 		return fmt.Errorf("no valid operation specified")
 	}),
 }
 
-// runAddOperation handles --add operations (orchestration only)
-func runAddOperation(rc *eos_io.RuntimeContext) error {
+// handleAddOperation processes --add flag operations
+func handleAddOperation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Validate target
@@ -165,7 +165,7 @@ func runAddOperation(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Get target VMs
-	targetVMs, err := getTargetVMs(rc, false, false)
+	targetVMs, err := getTargetVMs(rc)
 	if err != nil {
 		return err
 	}
@@ -174,13 +174,19 @@ func runAddOperation(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("no VMs specified (use --name, --all, or provide VM names)")
 	}
 
-	logger.Info("Adding guest agent channel to VMs",
-		zap.Int("vm_count", len(targetVMs)),
-		zap.Bool("dry_run", kvmDryRun))
+	// Show impact and get confirmation (unless --yes or --force)
+	if !(kvmYes || kvmForce) && !kvmDryRun {
+		kvm.ShowImpactSummary(rc, targetVMs, kvmBatchSize, kvmWaitBetween)
+		logger.Info("terminal prompt: Type 'yes' to continue")
+		if !kvm.PromptConfirmation(rc, "Do you want to proceed?") {
+			logger.Info("Operation cancelled by user")
+			return nil
+		}
+	}
 
-	// Build configuration
-	config := &kvm.GuestAgentAddConfig{
-		VMNames:     targetVMs,
+	// Build configuration and call pkg
+	config := &kvm.AddOperationConfig{
+		TargetVMs:   targetVMs,
 		DryRun:      kvmDryRun,
 		Force:       kvmYes || kvmForce,
 		BatchSize:   kvmBatchSize,
@@ -189,53 +195,11 @@ func runAddOperation(rc *eos_io.RuntimeContext) error {
 		NoRestart:   kvmNoRestart,
 	}
 
-	// Show impact and get confirmation (unless --yes or --force)
-	if !config.Force && !config.DryRun {
-		if !showImpactAndConfirm(rc, targetVMs) {
-			logger.Info("Operation cancelled by user")
-			return nil
-		}
-	}
-
-	// Call business logic in pkg
-	result, err := kvm.AddGuestAgentToVMs(rc, config)
-	if err != nil {
-		return err
-	}
-
-	// Handle restart prompts for running VMs
-	if !kvmNoRestart && !kvmDryRun && len(result.UpdatedVMs) > 0 {
-		for _, vmName := range result.UpdatedVMs {
-			if kvm.IsVMRunning(rc.Ctx, vmName) {
-				logger.Info("")
-				logger.Info("VM is running - restart required for guest agent channel to be available",
-					zap.String("vm", vmName))
-				logger.Info("terminal prompt: Restart VM now?")
-				var response string
-				fmt.Printf("Restart %s now? (yes/no): ", vmName)
-				_, _ = fmt.Scanln(&response)
-
-				if strings.ToLower(response) == "yes" {
-					logger.Info("Restarting VM", zap.String("vm", vmName))
-					if err := kvm.RestartVM(rc.Ctx, vmName, kvm.DefaultRestartConfig()); err != nil {
-						logger.Warn("Failed to restart VM - you can restart manually later", zap.Error(err))
-					} else {
-						logger.Info("VM restarted successfully", zap.String("vm", vmName))
-					}
-				} else {
-					logger.Info("Skipped restart - remember to restart VM later for changes to take effect")
-				}
-			}
-		}
-	}
-
-	return nil
+	return kvm.RunAddGuestAgentOperation(rc, config)
 }
 
-// runEnableOperation handles --enable operations (orchestration only)
-func runEnableOperation(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
+// handleEnableOperation processes --enable flag operations
+func handleEnableOperation(rc *eos_io.RuntimeContext) error {
 	// Validate target
 	if !kvmGuestExec && !kvmGuestAgent {
 		return fmt.Errorf("--enable requires a target: --guest-exec or --guest-agent")
@@ -246,183 +210,79 @@ func runEnableOperation(rc *eos_io.RuntimeContext) error {
 		kvmGuestExec = true
 	}
 
-	// Handle bulk operation for all-disabled
-	if kvmAllDisabled {
-		logger.Info("Enabling guest-exec for all VMs with DISABLED status")
-		return kvm.EnableGuestExecBulk(rc, kvmYes || kvmForce)
-	}
-
-	// Get target VMs
-	targetVMs, err := getTargetVMs(rc, false, false)
-	if err != nil {
-		return err
-	}
-
-	if len(targetVMs) == 0 {
-		return fmt.Errorf("no VMs specified (use --name, --all, --all-disabled)")
-	}
-
-	// Enable guest-exec for each VM
-	logger.Info("Enabling guest-exec for VMs", zap.Int("vm_count", len(targetVMs)))
-
-	for _, vmName := range targetVMs {
-		logger.Info("Enabling guest-exec", zap.String("vm", vmName))
-		if err := kvm.EnableGuestExec(rc, vmName); err != nil {
-			logger.Error("Failed to enable guest-exec",
-				zap.String("vm", vmName),
-				zap.Error(err))
+	// Get target VMs (unless using --all-disabled)
+	var targetVMs []string
+	var err error
+	if !kvmAllDisabled {
+		targetVMs, err = getTargetVMs(rc)
+		if err != nil {
 			return err
+		}
+
+		if len(targetVMs) == 0 {
+			return fmt.Errorf("no VMs specified (use --name, --all, --all-disabled)")
 		}
 	}
 
-	logger.Info("Successfully enabled guest-exec for all VMs")
-	return nil
+	// Build configuration and call pkg
+	config := &kvm.EnableOperationConfig{
+		TargetVMs:   targetVMs,
+		AllDisabled: kvmAllDisabled,
+		Force:       kvmYes || kvmForce,
+	}
+
+	return kvm.RunEnableGuestExecOperation(rc, config)
 }
 
-// runRestartOperation handles --restart operations (orchestration only)
-func runRestartOperation(rc *eos_io.RuntimeContext) error {
+// handleRestartOperation processes --restart flag operations
+func handleRestartOperation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Get target VMs (unless using --all-drift)
+	var targetVMs []string
+	var err error
+	if !kvmAllDrift {
+		targetVMs, err = getTargetVMs(rc)
+		if err != nil {
+			return err
+		}
+
+		if len(targetVMs) == 0 {
+			return fmt.Errorf("no VMs specified (use --name, --all, --all-drift)")
+		}
+	}
+
 	// Build restart configuration
-	cfg := kvm.DefaultRestartConfig()
-	cfg.SkipSafetyChecks = kvmNoSafe
-	cfg.CreateSnapshot = kvmSnapshot
-	cfg.ShutdownTimeout = time.Duration(kvmTimeout) * time.Second
+	restartCfg := kvm.DefaultRestartConfig()
+	restartCfg.SkipSafetyChecks = kvmNoSafe
+	restartCfg.CreateSnapshot = kvmSnapshot
+	restartCfg.ShutdownTimeout = time.Duration(kvmTimeout) * time.Second
 
 	if kvmSnapshotName != "" {
-		cfg.SnapshotName = kvmSnapshotName
+		restartCfg.SnapshotName = kvmSnapshotName
 	}
 
 	logger.Info("KVM restart configuration",
-		zap.Bool("safe_mode", !cfg.SkipSafetyChecks),
-		zap.Bool("snapshot", cfg.CreateSnapshot),
-		zap.Duration("timeout", cfg.ShutdownTimeout))
+		zap.Bool("safe_mode", !restartCfg.SkipSafetyChecks),
+		zap.Bool("snapshot", restartCfg.CreateSnapshot),
+		zap.Duration("timeout", restartCfg.ShutdownTimeout))
 
-	// Handle --all-drift flag
-	if kvmAllDrift {
-		logger.Info("Restarting all VMs with QEMU drift",
-			zap.Bool("rolling", kvmRolling),
-			zap.Int("batch_size", kvmBatchSize))
-
-		if !kvmRolling && !(kvmYes || kvmForce) {
-			fmt.Println("⚠ WARNING: Restarting all VMs with drift simultaneously may cause service disruption!")
-			fmt.Print("Continue? (yes/no): ")
-			var response string
-			_, _ = fmt.Scanln(&response)
-			if response != "yes" && response != "y" {
-				fmt.Println("Cancelled")
-				return nil
-			}
-		}
-
-		waitBetween := time.Duration(kvmWaitBetween) * time.Second
-		return kvm.RestartVMsWithDrift(rc.Ctx, cfg, kvmRolling, kvmBatchSize, waitBetween)
+	// Build operation configuration and call pkg
+	config := &kvm.RestartOperationConfig{
+		TargetVMs:     targetVMs,
+		AllDrift:      kvmAllDrift,
+		Rolling:       kvmRolling,
+		BatchSize:     kvmBatchSize,
+		WaitBetween:   time.Duration(kvmWaitBetween) * time.Second,
+		RestartConfig: restartCfg,
+		Force:         kvmYes || kvmForce,
 	}
 
-	// Get target VMs
-	targetVMs, err := getTargetVMs(rc, false, false)
-	if err != nil {
-		return err
-	}
-
-	if len(targetVMs) == 0 {
-		return fmt.Errorf("no VMs specified (use --name, --all, --all-drift)")
-	}
-
-	// Handle multiple VMs
-	if len(targetVMs) > 1 {
-		logger.Info("Restarting multiple VMs",
-			zap.Int("count", len(targetVMs)),
-			zap.Bool("rolling", kvmRolling))
-
-		if !kvmRolling && !(kvmYes || kvmForce) {
-			fmt.Printf("⚠ WARNING: Restarting %d VMs simultaneously!\n", len(targetVMs))
-			fmt.Print("Continue? (yes/no): ")
-			var response string
-			_, _ = fmt.Scanln(&response)
-			if response != "yes" && response != "y" {
-				fmt.Println("Cancelled")
-				return nil
-			}
-		}
-
-		waitBetween := time.Duration(kvmWaitBetween) * time.Second
-		return kvm.RestartMultipleVMs(rc.Ctx, targetVMs, cfg, kvmRolling, kvmBatchSize, waitBetween)
-	}
-
-	// Single VM restart
-	vmName := targetVMs[0]
-	logger.Info("Restarting VM", zap.String("vm", vmName))
-
-	if !cfg.CreateSnapshot && !cfg.SkipSafetyChecks {
-		fmt.Println("ℹ Tip: Use --snapshot to create a safety snapshot before restart")
-	}
-
-	if err := kvm.RestartVM(rc.Ctx, vmName, cfg); err != nil {
-		logger.Error("Failed to restart VM", zap.String("vm", vmName), zap.Error(err))
-		return err
-	}
-
-	fmt.Printf("✓ VM %s restarted successfully\n", vmName)
-	return nil
-}
-
-// runRescueMode opens virt-rescue shell (legacy behavior)
-func runRescueMode(rc *eos_io.RuntimeContext, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	if len(args) == 0 {
-		return fmt.Errorf("rescue mode requires VM name, or use --add/--enable/--restart flags")
-	}
-
-	vmName := args[0]
-	logger.Info("🛠 Starting rescue for KVM VM", zap.String("vm", vmName))
-
-	// Check VM status
-	state, err := kvm.GetDomainState(rc.Ctx, vmName)
-	if err != nil {
-		return fmt.Errorf("failed to get VM state: %w", err)
-	}
-
-	if state == "shutoff" {
-		logger.Info("✓ VM is already shut off", zap.String("vm", vmName))
-	} else {
-		logger.Info("Shutting down VM...", zap.String("vm", vmName))
-		if err := kvm.ShutdownDomain(rc.Ctx, vmName); err != nil {
-			return fmt.Errorf("failed to shutdown VM: %w", err)
-		}
-
-		logger.Info("⏳ Waiting for VM to shut off...")
-		for i := 0; i < 100; i++ {
-			time.Sleep(3 * time.Second)
-			state, err := kvm.GetDomainState(rc.Ctx, vmName)
-			if err != nil {
-				return fmt.Errorf("failed to get VM state: %w", err)
-			}
-			if state == "shutoff" {
-				logger.Info("✓ VM is now shut off", zap.String("vm", vmName))
-				break
-			}
-			logger.Debug("...still waiting for VM to shut off")
-		}
-	}
-
-	// Launch virt-rescue
-	logger.Info("🚀 Launching virt-rescue shell (requires sudo)", zap.String("vm", vmName))
-	cmdRescue := exec.Command("sudo", "virt-rescue", "-d", vmName)
-	cmdRescue.Stdout = os.Stdout
-	cmdRescue.Stderr = os.Stderr
-	cmdRescue.Stdin = os.Stdin
-	if err := cmdRescue.Run(); err != nil {
-		return fmt.Errorf("virt-rescue failed: %w", err)
-	}
-
-	logger.Info("✓ Rescue session completed")
-	return nil
+	return kvm.RunRestartVMsOperation(rc, config)
 }
 
 // getTargetVMs returns list of VMs based on selection flags
-func getTargetVMs(rc *eos_io.RuntimeContext, onlyDisabled bool, onlyDrift bool) ([]string, error) {
+func getTargetVMs(rc *eos_io.RuntimeContext) ([]string, error) {
 	// If specific names provided, use those
 	if len(kvmName) > 0 {
 		return kvmName, nil
@@ -433,49 +293,7 @@ func getTargetVMs(rc *eos_io.RuntimeContext, onlyDisabled bool, onlyDrift bool) 
 		return kvm.ListAllVMNames(rc.Ctx)
 	}
 
-	// If --all-disabled flag
-	if kvmAllDisabled && onlyDisabled {
-		// This is handled specially in runEnableOperation
-		return nil, nil
-	}
-
 	return nil, nil
-}
-
-// showImpactAndConfirm shows impact summary and gets user confirmation
-func showImpactAndConfirm(rc *eos_io.RuntimeContext, vmsNeedingUpdate []string) bool {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	runningCount := 0
-	for _, vmName := range vmsNeedingUpdate {
-		if kvm.IsVMRunning(rc.Ctx, vmName) {
-			runningCount++
-		}
-	}
-
-	logger.Info("╔═══════════════════════════════════════════════════════════════╗")
-	logger.Info("║                    OPERATION SUMMARY                          ║")
-	logger.Info("╠═══════════════════════════════════════════════════════════════╣")
-	logger.Info(fmt.Sprintf("║ Operation: Add QEMU Guest Agent Channel                       ║"))
-	logger.Info(fmt.Sprintf("║ Total VMs to update: %-41d║", len(vmsNeedingUpdate)))
-	logger.Info(fmt.Sprintf("║ Running VMs (may need restart): %-26d║", runningCount))
-	logger.Info(fmt.Sprintf("║ Batch size: %-50d║", kvmBatchSize))
-	logger.Info(fmt.Sprintf("║ Wait between batches: %-39ds║", kvmWaitBetween))
-	logger.Info("╚═══════════════════════════════════════════════════════════════╝")
-	logger.Info("")
-	logger.Info("This operation will:")
-	logger.Info("  ✓ Modify VM XML configurations")
-	logger.Info("  ✓ Add virtio-serial controller (if missing)")
-	logger.Info("  ✓ Add guest agent channel device")
-	logger.Info("  ✓ Create backups before modification")
-	logger.Info("")
-	logger.Info("terminal prompt: Type 'yes' to continue")
-
-	var response string
-	fmt.Print("Do you want to proceed? (yes/no): ")
-	_, _ = fmt.Scanln(&response)
-
-	return strings.ToLower(response) == "yes"
 }
 
 func init() {
