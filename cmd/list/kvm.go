@@ -6,21 +6,16 @@
 package list
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/kvm"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	"gopkg.in/yaml.v3"
 )
 
-// TODO: refactor
 var (
 	kvmShowDrift bool
 	kvmShowUsage bool
@@ -71,7 +66,6 @@ func init() {
 	kvmCmd.Flags().StringVar(&kvmState, "state", "", "Filter by state (running, shutoff, paused)")
 }
 
-// TODO: refactor
 func runListKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -95,261 +89,13 @@ func runListKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 			zap.Int("count", len(vms)))
 	}
 
-	if len(vms) == 0 {
-		logger.Info("No VMs found")
-		fmt.Println("No VMs found")
-		return nil
+	// Build output configuration and delegate to pkg
+	outputConfig := &kvm.OutputConfig{
+		Format:    kvmFormat,
+		ShowDrift: kvmShowDrift,
+		ShowUsage: kvmShowUsage,
+		Detailed:  kvmDetailed,
 	}
 
-	// Output based on format
-	switch kvmFormat {
-	case "json":
-		return outputJSONKVM(vms)
-	case "yaml":
-		return outputYAMLKVM(vms)
-	default:
-		return outputTableKVM(vms, kvmShowDrift, kvmShowUsage, kvmDetailed)
-	}
-}
-
-// TODO: refactor
-func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error {
-	table := tablewriter.NewWriter(os.Stdout)
-
-	if showUsage {
-		table.Header("NAME", "STATE", "LOAD", "MEM_USED", "MEM_TOTAL", "DISK_USED", "DISK_TOTAL", "IPS", "TAILSCALE_IP")
-
-		for _, vm := range vms {
-			loadAvg := "N/A"
-			if vm.GuestAgentOK && vm.CPUUsagePercent > 0 {
-				loadAvg = fmt.Sprintf("%.2f", vm.CPUUsagePercent)
-			}
-
-			memUsed := "N/A"
-			if vm.State == "running" && vm.MemoryUsageMB > 0 {
-				memUsed = fmt.Sprintf("%d MB", vm.MemoryUsageMB)
-			}
-
-			memTotal := fmt.Sprintf("%d MB", vm.MemoryMB)
-
-			diskUsed := "N/A"
-			if vm.GuestAgentOK && vm.DiskUsageGB > 0 {
-				diskUsed = fmt.Sprintf("%d GB", vm.DiskUsageGB)
-			}
-
-			diskTotal := "N/A"
-			if vm.DiskSizeGB > 0 {
-				diskTotal = fmt.Sprintf("%d GB", vm.DiskSizeGB)
-			}
-
-			ips := "N/A"
-			if len(vm.NetworkIPs) > 0 {
-				ips = vm.NetworkIPs[0]
-				if len(vm.NetworkIPs) > 1 {
-					ips += fmt.Sprintf(" (+%d)", len(vm.NetworkIPs)-1)
-				}
-			}
-
-			tailscaleIP := "N/A"
-			if vm.TailscaleIP != "" {
-				tailscaleIP = vm.TailscaleIP
-			}
-
-			table.Append(
-				vm.Name,
-				vm.State,
-				loadAvg,
-				memUsed,
-				memTotal,
-				diskUsed,
-				diskTotal,
-				ips,
-				tailscaleIP,
-			)
-		}
-	} else if showDrift {
-		table.Header("NAME", "STATE", "QEMU", "HOST_QEMU", "DRIFT", "UPTIME", "IPS", "TAILSCALE_IP")
-
-		for _, vm := range vms {
-			drift := "NO"
-			if vm.DriftDetected {
-				drift = "YES"
-			}
-
-			ips := "N/A"
-			if len(vm.NetworkIPs) > 0 {
-				ips = vm.NetworkIPs[0]
-				if len(vm.NetworkIPs) > 1 {
-					ips += fmt.Sprintf(" (+%d)", len(vm.NetworkIPs)-1)
-				}
-			}
-
-			tailscaleIP := "N/A"
-			if vm.TailscaleIP != "" {
-				tailscaleIP = vm.TailscaleIP
-			}
-
-			qemuVer := vm.QEMUVersion
-			if qemuVer == "" {
-				qemuVer = "N/A"
-			}
-
-			hostVer := vm.HostQEMUVersion
-			if hostVer == "" {
-				hostVer = "N/A"
-			}
-
-			table.Append(
-				vm.Name,
-				vm.State,
-				qemuVer,
-				hostVer,
-				drift,
-				fmt.Sprintf("%dd", vm.UptimeDays),
-				ips,
-				tailscaleIP,
-			)
-		}
-	} else {
-		table.Header("NAME", "STATE", "VCPUS", "OS", "MEM", "DISK", "QEMU_GA", "CONSUL", "UPDATES", "IPS", "TAILSCALE_IP")
-
-		for _, vm := range vms {
-			consul := "N/A"
-			if vm.GuestAgentOK {
-				consul = vm.ConsulAgent
-			}
-
-			updates := "N/A"
-			if vm.GuestAgentOK {
-				updates = vm.UpdatesNeeded
-			}
-
-			ips := "N/A"
-			if len(vm.NetworkIPs) > 0 {
-				ips = vm.NetworkIPs[0]
-				if len(vm.NetworkIPs) > 1 {
-					ips += fmt.Sprintf(" (+%d)", len(vm.NetworkIPs)-1)
-				}
-			}
-
-			tailscaleIP := "N/A"
-			if vm.TailscaleIP != "" {
-				tailscaleIP = vm.TailscaleIP
-			}
-
-			osInfo := "N/A"
-			if vm.OSInfo != "" {
-				osInfo = vm.OSInfo
-			}
-
-			memInfo := "N/A"
-			if vm.State == "running" && vm.MemoryUsageMB > 0 && vm.MemoryMB > 0 {
-				memInfo = fmt.Sprintf("%d/%d MB", vm.MemoryUsageMB, vm.MemoryMB)
-			} else if vm.MemoryMB > 0 {
-				memInfo = fmt.Sprintf("%d MB", vm.MemoryMB)
-			}
-
-			// Format disk with usage percentage if available
-			diskInfo := "N/A"
-			if vm.DiskSizeGB > 0 {
-				if vm.DiskUsageGB > 0 && vm.DiskTotalGB > 0 {
-					// Show guest filesystem usage
-					usagePercent := float64(vm.DiskUsageGB) / float64(vm.DiskTotalGB) * 100
-					diskInfo = fmt.Sprintf("%d GB (%.0f%%)", vm.DiskTotalGB, usagePercent)
-				} else {
-					// Show allocated disk image size only
-					diskInfo = fmt.Sprintf("%d GB", vm.DiskSizeGB)
-				}
-			}
-
-			// Format VCPUS with CPU% if available
-			vcpuInfo := fmt.Sprintf("%d", vm.VCPUs)
-			if vm.State == "running" && vm.CPUUsagePercent > 0 {
-				vcpuInfo = fmt.Sprintf("%d (%.0f%%)", vm.VCPUs, vm.CPUUsagePercent)
-			}
-
-			// Format MEM with percentage if usage is available
-			memInfoFormatted := memInfo
-			if vm.State == "running" && vm.MemoryUsageMB > 0 && vm.MemoryMB > 0 {
-				usagePercent := float64(vm.MemoryUsageMB) / float64(vm.MemoryMB) * 100
-				memInfoFormatted = fmt.Sprintf("%d MB (%.0f%%)", vm.MemoryMB, usagePercent)
-			}
-
-			// Get QEMU Guest Agent status
-			qemuGA := vm.GuestAgentStatus
-			if qemuGA == "" {
-				qemuGA = "N/A"
-			}
-
-			table.Append(
-				vm.Name,
-				vm.State,
-				vcpuInfo,
-				osInfo,
-				memInfoFormatted,
-				diskInfo,
-				qemuGA,
-				consul,
-				updates,
-				ips,
-				tailscaleIP,
-			)
-		}
-	}
-
-	table.Render()
-
-	// Show summary
-	driftCount := 0
-	disabledGuestExecCount := 0
-	disabledVMs := []string{}
-
-	for _, vm := range vms {
-		if vm.DriftDetected {
-			driftCount++
-		}
-		if vm.ConsulAgent == "DISABLED" || vm.UpdatesNeeded == "DISABLED" {
-			disabledGuestExecCount++
-			disabledVMs = append(disabledVMs, vm.Name)
-		}
-	}
-
-	fmt.Printf("\nTotal VMs: %d", len(vms))
-	if showDrift && driftCount > 0 {
-		fmt.Printf(" (⚠ %d with QEMU drift)", driftCount)
-	}
-	fmt.Println()
-
-	// Show warning about disabled guest-exec
-	if disabledGuestExecCount > 0 {
-		fmt.Println()
-		fmt.Printf("⚠ %d VM(s) have guest-exec DISABLED:\n", disabledGuestExecCount)
-		for _, vmName := range disabledVMs {
-			fmt.Printf("  - %s\n", vmName)
-		}
-		fmt.Println()
-		fmt.Println("To enable monitoring for these VMs, run:")
-		fmt.Println("  eos update kvm <vm-name> --enable-guest-exec")
-		fmt.Println()
-		fmt.Println("Or to fix all at once:")
-		for _, vmName := range disabledVMs {
-			fmt.Printf("  eos update kvm %s --enable-guest-exec\n", vmName)
-		}
-	}
-
-	return nil
-}
-
-// TODO: refactor
-func outputJSONKVM(vms []kvm.VMInfo) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(vms)
-}
-
-// TODO: refactor
-func outputYAMLKVM(vms []kvm.VMInfo) error {
-	encoder := yaml.NewEncoder(os.Stdout)
-	defer func() { _ = encoder.Close() }()
-	return encoder.Encode(vms)
+	return kvm.OutputVMs(vms, outputConfig)
 }

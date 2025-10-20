@@ -136,7 +136,7 @@ func runUpgradeKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		waitBetween := time.Duration(kvmWaitBetween) * time.Second
 		results, err := kvm.UpgradeAndRebootVMsWithDrift(rc, cfg, kvmRolling, kvmBatchSize, waitBetween)
 
-		printUpgradeResults(results)
+		kvm.PrintUpgradeResults(results)
 
 		return err
 	}
@@ -166,7 +166,7 @@ func runUpgradeKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		waitBetween := time.Duration(kvmWaitBetween) * time.Second
 		results, err := kvm.UpgradeAndRebootMultiple(rc, args, cfg, kvmRolling, kvmBatchSize, waitBetween)
 
-		printUpgradeResults(results)
+		kvm.PrintUpgradeResults(results)
 
 		return err
 	}
@@ -197,65 +197,7 @@ func runUpgradeKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		return err
 	}
 
-	printUpgradeResults([]*kvm.UpgradeAndRebootResult{result})
+	kvm.PrintUpgradeResults([]*kvm.UpgradeAndRebootResult{result})
 
 	return nil
-}
-
-// printUpgradeResults displays a summary of upgrade operations
-func printUpgradeResults(results []*kvm.UpgradeAndRebootResult) {
-	if len(results) == 0 {
-		return
-	}
-
-	fmt.Println()
-	fmt.Println("═══════════════════════════════════════")
-	fmt.Printf("UPGRADE SUMMARY: %d VM(s) processed\n", len(results))
-	fmt.Println("═══════════════════════════════════════")
-
-	successCount := 0
-	failedCount := 0
-	driftResolvedCount := 0
-
-	for _, r := range results {
-		if r.Success {
-			successCount++
-			if r.DriftResolved {
-				driftResolvedCount++
-			}
-		} else {
-			failedCount++
-		}
-
-		status := "✓"
-		if !r.Success {
-			status = "✗"
-		}
-
-		fmt.Printf("%s %s\n", status, r.VMName)
-		if r.PackageResult != nil {
-			fmt.Printf("  Packages upgraded: %d\n", r.PackageResult.PackagesUpgraded)
-		}
-		if r.RestartedVM {
-			fmt.Printf("  Restarted: yes\n")
-		}
-		if r.DriftResolved {
-			fmt.Printf("  QEMU drift: resolved\n")
-		} else if r.RestartedVM {
-			fmt.Printf("  QEMU drift: still present (check manually)\n")
-		}
-		if r.SnapshotCreated {
-			fmt.Printf("  Snapshot: %s\n", r.SnapshotName)
-		}
-		if r.ErrorMessage != "" {
-			fmt.Printf("  Error: %s\n", r.ErrorMessage)
-		}
-		fmt.Printf("  Duration: %s\n", r.Duration)
-		fmt.Println()
-	}
-
-	fmt.Println("═══════════════════════════════════════")
-	fmt.Printf("Success: %d  Failed: %d  Drift Resolved: %d\n",
-		successCount, failedCount, driftResolvedCount)
-	fmt.Println("═══════════════════════════════════════")
 }

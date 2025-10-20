@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/synctypes"
@@ -44,6 +45,47 @@ func (c *AuthentikWazuhConnector) ServicePair() string {
 func (c *AuthentikWazuhConnector) PreflightCheck(rc *eos_io.RuntimeContext, config *synctypes.SyncConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Running pre-flight checks for Authentik and Wazuh")
+
+	// ASSESS - Detect server role to provide helpful guidance
+	logger.Debug("Detecting server role")
+	serverRole, err := environment.DetectServerRole(rc)
+	if err != nil {
+		logger.Warn("Server role detection failed, continuing with basic checks", zap.Error(err))
+	}
+
+	if serverRole != nil {
+		logger.Info("Detected server configuration",
+			zap.String("roles", serverRole.DescribeRoles()),
+			zap.String("confidence", serverRole.Confidence))
+
+		// Provide helpful error if running on wrong server
+		if serverRole.IsHecateServer && !serverRole.IsWazuhServer {
+			return eos_err.NewUserError(
+				"This command must be run on the Wazuh backend server.\n\n" +
+					"Current server: " + serverRole.Hostname + "\n" +
+					"Detected as: Hecate reverse proxy server\n" +
+					"Detected services: " + serverRole.DescribeRoles() + "\n\n" +
+					"Wazuh SSO configuration requires:\n" +
+					"  1. Direct access to Wazuh config files (/etc/wazuh-indexer/)\n" +
+					"  2. Ability to restart Wazuh services\n" +
+					"  3. Network access to Authentik API\n\n" +
+					"Please SSH to your Wazuh backend server and run:\n" +
+					"  export AUTHENTIK_URL=https://hera.yourdomain.com\n" +
+					"  export AUTHENTIK_TOKEN=<your-token>\n" +
+					"  export WAZUH_URL=https://wazuh.yourdomain.com\n" +
+					"  eos sync --authentik --wazuh")
+		}
+
+		if !serverRole.IsWazuhServer {
+			return eos_err.NewUserError(
+				"Wazuh not detected on this server.\n\n" +
+					"Current server: " + serverRole.Hostname + "\n" +
+					"Detected services: " + serverRole.DescribeRoles() + "\n\n" +
+					"This command requires Wazuh to be installed locally.\n" +
+					"If Wazuh is on a different server, please SSH there first.\n\n" +
+					"To install Wazuh: eos create wazuh")
+		}
+	}
 
 	// Check for required environment variables
 	authentikURL := os.Getenv("AUTHENTIK_URL")

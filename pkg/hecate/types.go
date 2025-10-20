@@ -13,6 +13,7 @@ type Route struct {
 	Domain       string            `json:"domain" yaml:"domain"`
 	Upstream     *Upstream         `json:"upstream" yaml:"upstream"`
 	AuthPolicy   *AuthPolicy       `json:"auth_policy,omitempty" yaml:"auth_policy,omitempty"`
+	RequireAuth  bool              `json:"require_auth" yaml:"require_auth"` // Enable Authentik forward_auth
 	Headers      map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 	HealthCheck  *HealthCheck      `json:"health_check,omitempty" yaml:"health_check,omitempty"`
 	RateLimit    *RateLimit        `json:"rate_limit,omitempty" yaml:"rate_limit,omitempty"`

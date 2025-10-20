@@ -197,6 +197,28 @@ func ValidateEnvironmentVariable(name, value string) error {
 	return nil
 }
 
+// IsReservedDomain checks if a domain is reserved for SSO/auth infrastructure
+// These domains should NEVER be protected with forward_auth to prevent lockout
+func IsReservedDomain(domain string) bool {
+	// Reserved subdomains/prefixes for Authentik SSO
+	reservedPrefixes := []string{
+		"hera.",      // Authentik SSO provider
+		"auth.",      // Generic auth subdomain
+		"login.",     // Generic login subdomain
+		"sso.",       // Generic SSO subdomain
+		"authentik.", // Explicit Authentik subdomain
+	}
+
+	lowerDomain := strings.ToLower(domain)
+	for _, prefix := range reservedPrefixes {
+		if strings.HasPrefix(lowerDomain, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ValidateRoute validates a complete route configuration
 func ValidateRoute(route *Route) error {
 	if route == nil {
@@ -206,6 +228,11 @@ func ValidateRoute(route *Route) error {
 	// Validate domain
 	if err := ValidateDomain(route.Domain); err != nil {
 		return fmt.Errorf("invalid route domain: %w", err)
+	}
+
+	// Check for reserved domain with auth enabled
+	if route.RequireAuth && IsReservedDomain(route.Domain) {
+		return fmt.Errorf("cannot enable authentication on reserved domain '%s' - this prevents access to the SSO provider", route.Domain)
 	}
 
 	// Validate upstream

@@ -42,6 +42,7 @@ func init() {
 	createHecateRouteCmd.Flags().String("health-check-path", "", "Health check endpoint path")
 	createHecateRouteCmd.Flags().String("health-check-interval", "30s", "Health check interval")
 	createHecateRouteCmd.Flags().Bool("require-mfa", false, "Require MFA for authentication")
+	createHecateRouteCmd.Flags().Bool("require-auth", false, "Require Authentik SSO authentication (forward_auth)")
 
 	// Domain and upstream are required but will be prompted if not provided
 }
@@ -59,6 +60,7 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	healthCheckPath, _ := cmd.Flags().GetString("health-check-path")
 	healthCheckInterval, _ := cmd.Flags().GetString("health-check-interval")
 	requireMFA, _ := cmd.Flags().GetBool("require-mfa")
+	requireAuth, _ := cmd.Flags().GetBool("require-auth")
 
 	// Prompt for domain if not provided
 	if domain == "" {
@@ -84,10 +86,16 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		upstream = input
 	}
 
+	// Validate reserved domains cannot be protected with auth
+	if requireAuth && hecate.IsReservedDomain(domain) {
+		return fmt.Errorf("cannot enable authentication on reserved domain '%s' - this would lock you out of the SSO provider itself", domain)
+	}
+
 	logger.Info("Creating new Hecate route",
 		zap.String("domain", domain),
 		zap.String("upstream", upstream),
-		zap.String("auth_policy", authPolicy))
+		zap.String("auth_policy", authPolicy),
+		zap.Bool("require_auth", requireAuth))
 
 	// Parse headers
 	headers := make(map[string]string)
@@ -105,10 +113,11 @@ func runCreateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	// Build route configuration
 	route := &hecate.Route{
-		Domain:     domain,
-		Upstream:   &hecate.Upstream{URL: upstream},
-		AuthPolicy: nil, // Will be set below if needed
-		Headers:    headers,
+		Domain:      domain,
+		Upstream:    &hecate.Upstream{URL: upstream},
+		AuthPolicy:  nil, // Will be set below if needed
+		RequireAuth: requireAuth,
+		Headers:     headers,
 		TLS: &hecate.TLSConfig{
 			Enabled: autoHTTPS,
 		},
