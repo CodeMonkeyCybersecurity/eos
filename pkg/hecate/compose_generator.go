@@ -40,11 +40,29 @@ func GenerateCompleteHecateStack(rc *eos_io.RuntimeContext, domain string) error
 
 	logger.Info("Created directory structure", zap.String("base", BaseDir))
 
+	// INTERVENE - Prompt for and generate bootstrap credentials
+	bootstrapCreds, err := PromptAndGenerateBootstrapCredentials(rc)
+	if err != nil {
+		return fmt.Errorf("failed to generate bootstrap credentials: %w", err)
+	}
+
+	// Store bootstrap credentials in Consul (or will fall back to .env)
+	if err := StoreBootstrapCredentials(rc, bootstrapCreds); err != nil {
+		logger.Warn("Failed to store bootstrap credentials in Consul, will use .env fallback",
+			zap.Error(err))
+		// Not fatal - credentials will be in .env file
+	}
+
 	// INTERVENE - Generate secrets
 	secrets, err := generateHecateSecrets(rc)
 	if err != nil {
 		return fmt.Errorf("failed to generate secrets: %w", err)
 	}
+
+	// Add bootstrap credentials to secrets struct
+	secrets.AuthentikBootstrapEmail = bootstrapCreds.Email
+	secrets.AuthentikBootstrapPassword = bootstrapCreds.Password
+	secrets.AuthentikBootstrapToken = bootstrapCreds.Token
 
 	// Generate .env file
 	if err := generateEnvFile(rc, secrets); err != nil {
@@ -82,14 +100,17 @@ func GenerateCompleteHecateStack(rc *eos_io.RuntimeContext, domain string) error
 
 // HecateSecrets holds generated secrets for Hecate services
 type HecateSecrets struct {
-	PGPass                 string
-	PGUser                 string
-	PGDatabase             string
-	AuthentikSecretKey     string
-	AuthentikTag           string
-	ComposePortHTTP        string
-	ComposePortHTTPS       string
-	AuthentikWorkerThreads string
+	PGPass                    string
+	PGUser                    string
+	PGDatabase                string
+	AuthentikSecretKey        string
+	AuthentikTag              string
+	ComposePortHTTP           string
+	ComposePortHTTPS          string
+	AuthentikWorkerThreads    string
+	AuthentikBootstrapEmail   string
+	AuthentikBootstrapPassword string
+	AuthentikBootstrapToken   string
 }
 
 // generateHecateSecrets generates all required secrets for Hecate
@@ -142,6 +163,12 @@ AUTHENTIK_TAG=%s
 AUTHENTIK_IMAGE=ghcr.io/goauthentik/server
 AUTHENTIK_WORKER__THREADS=%s
 
+# Authentik Bootstrap Credentials
+# These are used for initial admin user creation
+AUTHENTIK_BOOTSTRAP_EMAIL=%s
+AUTHENTIK_BOOTSTRAP_PASSWORD=%s
+AUTHENTIK_BOOTSTRAP_TOKEN=%s
+
 # Compose Port Configuration
 COMPOSE_PORT_HTTP=%s
 COMPOSE_PORT_HTTPS=%s
@@ -152,6 +179,9 @@ COMPOSE_PORT_HTTPS=%s
 		secrets.AuthentikSecretKey,
 		secrets.AuthentikTag,
 		secrets.AuthentikWorkerThreads,
+		secrets.AuthentikBootstrapEmail,
+		secrets.AuthentikBootstrapPassword,
+		secrets.AuthentikBootstrapToken,
 		secrets.ComposePortHTTP,
 		secrets.ComposePortHTTPS,
 	)
@@ -235,6 +265,9 @@ func generateDockerCompose(rc *eos_io.RuntimeContext) error {
       AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
       AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
       AUTHENTIK_WORKER__THREADS: ${AUTHENTIK_WORKER__THREADS:-4}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN}
     volumes:
       - ./media:/media
       - ./custom-templates:/templates
