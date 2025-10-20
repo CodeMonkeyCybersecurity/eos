@@ -2,11 +2,14 @@
 package ceph
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // CheckSystemdUnits checks Ceph systemd unit files and their states
@@ -20,40 +23,56 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 	monInstances := []string{}
 	mgrInstances := []string{}
 	osdInstances := []string{}
+	seenUnits := make(map[string]bool) // Track to avoid duplicates
+
+	// Mark base targets as seen
+	for _, unit := range criticalUnits {
+		seenUnits[unit] = true
+	}
 
 	// Check if any specific mon/mgr/osd instances exist
 	cmd := exec.Command("systemctl", "list-units", "ceph-mon@*", "ceph-mgr@*", "ceph-osd@*", "--all", "--no-pager")
 	output, err := cmd.Output()
-	if err == nil {
+	if err != nil {
+		logger.Warn("Failed to list systemd units", zap.Error(err))
+	} else {
 		lines := strings.Split(string(output), "\n")
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
-			if strings.Contains(line, "ceph-mon@") || strings.Contains(line, "ceph-mgr@") || strings.Contains(line, "ceph-osd@") {
-				// Extract just the unit name (first field)
-				fields := strings.Fields(line)
-				if len(fields) > 0 {
-					unitName := fields[0]
-					// Avoid duplicates
-					found := false
-					for _, existing := range criticalUnits {
-						if existing == unitName {
-							found = true
-							break
-						}
-					}
-					if !found {
-						criticalUnits = append(criticalUnits, unitName)
+			if line == "" {
+				continue
+			}
 
-						// Track by daemon type
-						if strings.Contains(unitName, "ceph-mon@") {
-							monInstances = append(monInstances, unitName)
-						} else if strings.Contains(unitName, "ceph-mgr@") {
-							mgrInstances = append(mgrInstances, unitName)
-						} else if strings.Contains(unitName, "ceph-osd@") {
-							osdInstances = append(osdInstances, unitName)
-						}
-					}
-				}
+			// Only process lines with Ceph daemon instances
+			if !strings.Contains(line, "ceph-mon@") &&
+				!strings.Contains(line, "ceph-mgr@") &&
+				!strings.Contains(line, "ceph-osd@") {
+				continue
+			}
+
+			// Extract just the unit name (first field)
+			fields := strings.Fields(line)
+			if len(fields) == 0 {
+				continue
+			}
+
+			unitName := fields[0]
+
+			// Skip if already seen
+			if seenUnits[unitName] {
+				continue
+			}
+
+			seenUnits[unitName] = true
+			criticalUnits = append(criticalUnits, unitName)
+
+			// Track by daemon type
+			if strings.Contains(unitName, "ceph-mon@") {
+				monInstances = append(monInstances, unitName)
+			} else if strings.Contains(unitName, "ceph-mgr@") {
+				mgrInstances = append(mgrInstances, unitName)
+			} else if strings.Contains(unitName, "ceph-osd@") {
+				osdInstances = append(osdInstances, unitName)
 			}
 		}
 	}
@@ -133,8 +152,19 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 		if verbose {
 			logger.Info("")
 			logger.Info("Checking journal for mon daemon errors...")
-			cmd = exec.Command("journalctl", "-u", "ceph-mon@*", "-n", "20", "--no-pager")
-			if output, err := cmd.Output(); err == nil {
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			journalCmd := exec.CommandContext(ctx, "journalctl", "-u", "ceph-mon@*", "-n", "20", "--no-pager")
+			output, err := journalCmd.Output()
+			if err != nil {
+				if ctx.Err() == context.DeadlineExceeded {
+					logger.Warn("  → Journal query timed out after 10 seconds")
+				} else {
+					logger.Warn("  → Could not access journal logs", zap.Error(err))
+				}
+			} else {
 				outputStr := strings.TrimSpace(string(output))
 				if outputStr != "" && !strings.Contains(outputStr, "No entries") {
 					logger.Info("Recent mon journal entries:")

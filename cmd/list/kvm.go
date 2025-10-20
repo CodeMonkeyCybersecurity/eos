@@ -117,7 +117,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 	table := tablewriter.NewWriter(os.Stdout)
 
 	if showUsage {
-		table.Header("NAME", "STATE", "LOAD", "MEM_USED", "MEM_TOTAL", "DISK_USED", "DISK_TOTAL", "IPS")
+		table.Header("NAME", "STATE", "LOAD", "MEM_USED", "MEM_TOTAL", "DISK_USED", "DISK_TOTAL", "IPS", "TAILSCALE_IP")
 
 		for _, vm := range vms {
 			loadAvg := "N/A"
@@ -150,6 +150,11 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				}
 			}
 
+			tailscaleIP := "N/A"
+			if vm.TailscaleIP != "" {
+				tailscaleIP = vm.TailscaleIP
+			}
+
 			table.Append(
 				vm.Name,
 				vm.State,
@@ -159,10 +164,11 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				diskUsed,
 				diskTotal,
 				ips,
+				tailscaleIP,
 			)
 		}
 	} else if showDrift {
-		table.Header("NAME", "STATE", "QEMU", "HOST_QEMU", "DRIFT", "UPTIME", "IPS")
+		table.Header("NAME", "STATE", "QEMU", "HOST_QEMU", "DRIFT", "UPTIME", "IPS", "TAILSCALE_IP")
 
 		for _, vm := range vms {
 			drift := "NO"
@@ -176,6 +182,11 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				if len(vm.NetworkIPs) > 1 {
 					ips += fmt.Sprintf(" (+%d)", len(vm.NetworkIPs)-1)
 				}
+			}
+
+			tailscaleIP := "N/A"
+			if vm.TailscaleIP != "" {
+				tailscaleIP = vm.TailscaleIP
 			}
 
 			qemuVer := vm.QEMUVersion
@@ -196,10 +207,11 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				drift,
 				fmt.Sprintf("%dd", vm.UptimeDays),
 				ips,
+				tailscaleIP,
 			)
 		}
 	} else {
-		table.Header("NAME", "STATE", "VCPUS", "OS", "MEM", "DISK", "QEMU_GA", "CONSUL", "UPDATES", "IPS")
+		table.Header("NAME", "STATE", "VCPUS", "OS", "MEM", "DISK", "QEMU_GA", "CONSUL", "UPDATES", "IPS", "TAILSCALE_IP")
 
 		for _, vm := range vms {
 			consul := "N/A"
@@ -218,6 +230,11 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				if len(vm.NetworkIPs) > 1 {
 					ips += fmt.Sprintf(" (+%d)", len(vm.NetworkIPs)-1)
 				}
+			}
+
+			tailscaleIP := "N/A"
+			if vm.TailscaleIP != "" {
+				tailscaleIP = vm.TailscaleIP
 			}
 
 			osInfo := "N/A"
@@ -275,6 +292,7 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 				consul,
 				updates,
 				ips,
+				tailscaleIP,
 			)
 		}
 	}

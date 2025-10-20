@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // CheckNetwork checks network connectivity to monitors
@@ -82,7 +83,15 @@ func CheckNetwork(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	logger.Info("")
 	logger.Info("Checking if monitor ports are listening on this host:")
 	cmd = exec.Command("ss", "-tlnp")
-	output, _ = cmd.Output()
+	output, err = cmd.Output()
+	if err != nil {
+		logger.Warn("Failed to check listening ports", zap.Error(err))
+		return DiagnosticResult{
+			CheckName: "Network",
+			Passed:    false,
+			Error:     fmt.Errorf("cannot check listening ports: %w", err),
+		}
+	}
 	ssOutput := string(output)
 
 	monPortsListening := false
@@ -94,7 +103,10 @@ func CheckNetwork(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 
 		lines := strings.Split(ssOutput, "\n")
 		for _, line := range lines {
-			if strings.Contains(line, ":"+port) {
+			// Match port more precisely to avoid false positives
+			// Look for :PORT followed by whitespace or end of address
+			// Valid formats: *:3300, 0.0.0.0:3300, [::]:3300, 192.168.1.1:3300
+			if strings.Contains(line, ":"+port+" ") || strings.Contains(line, ":"+port+"\t") {
 				listening = true
 				// Extract process info from ss output
 				// Format: LISTEN 0 128 *:3300 *:* users:(("ceph-mon",pid=1234,fd=42))

@@ -67,32 +67,33 @@ type VMEntry struct {
 
 // VMInfo contains comprehensive information about a VM
 type VMInfo struct {
-	Name              string
-	UUID              string
-	State             string
-	VCPUs             int
-	MemoryMB          int
-	QEMUVersion       string
-	HostQEMUVersion   string
-	DriftDetected     bool
-	UptimeDays        int
-	GuestAgentOK      bool
-	GuestAgentStatus  string     // QEMU Guest Agent status: "INSTALLED", "NOT_INSTALLED", "DISABLED", "N/A"
-	NetworkIPs        []string
-	DiskPaths         []string
-	Disks             []DiskInfo // Detailed disk information (added for backup support)
-	MainDiskPath      string     // Path to vda (main disk for backup)
-	DiskFormat        string     // Disk format: qcow2, raw, etc. (main disk)
-	HasMultipleDisks  bool       // True if VM has more than one disk
-	SupportsSnapshot  bool       // True if disk format supports snapshots (qcow2)
-	OSInfo            string     // Operating system (e.g., "CentOS Stream 9", "Ubuntu 24.04")
-	ConsulAgent       string     // Consul agent status: "YES", "NO", "DISABLED", "N/A"
-	UpdatesNeeded     string     // OS updates status: "YES", "NO", "DISABLED", "N/A"
-	DiskSizeGB        int        // Total allocated disk image size in GB
-	DiskUsageGB       int        // Used disk space in GB (guest filesystem, requires guest agent)
-	DiskTotalGB       int        // Total disk size from guest perspective in GB (requires guest agent)
-	CPUUsagePercent   float64    // CPU usage percentage (requires running VM)
-	MemoryUsageMB     int        // Memory usage in MB (requires running VM)
+	Name             string
+	UUID             string
+	State            string
+	VCPUs            int
+	MemoryMB         int
+	QEMUVersion      string
+	HostQEMUVersion  string
+	DriftDetected    bool
+	UptimeDays       int
+	GuestAgentOK     bool
+	GuestAgentStatus string   // QEMU Guest Agent status: "INSTALLED", "NOT_INSTALLED", "DISABLED", "N/A"
+	NetworkIPs       []string // Regular network IPs (e.g., 192.168.122.x)
+	TailscaleIP      string   // Tailscale IP if detected (e.g., 100.64.x.x)
+	DiskPaths        []string
+	Disks            []DiskInfo // Detailed disk information (added for backup support)
+	MainDiskPath     string     // Path to vda (main disk for backup)
+	DiskFormat       string     // Disk format: qcow2, raw, etc. (main disk)
+	HasMultipleDisks bool       // True if VM has more than one disk
+	SupportsSnapshot bool       // True if disk format supports snapshots (qcow2)
+	OSInfo           string     // Operating system (e.g., "CentOS Stream 9", "Ubuntu 24.04")
+	ConsulAgent      string     // Consul agent status: "YES", "NO", "DISABLED", "N/A"
+	UpdatesNeeded    string     // OS updates status: "YES", "NO", "DISABLED", "N/A"
+	DiskSizeGB       int        // Total allocated disk image size in GB
+	DiskUsageGB      int        // Used disk space in GB (guest filesystem, requires guest agent)
+	DiskTotalGB      int        // Total disk size from guest perspective in GB (requires guest agent)
+	CPUUsagePercent  float64    // CPU usage percentage (requires running VM)
+	MemoryUsageMB    int        // Memory usage in MB (requires running VM)
 }
 
 // DiskInfo represents detailed information about a single disk

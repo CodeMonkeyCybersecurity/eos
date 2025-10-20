@@ -138,6 +138,14 @@ func getVMInfo(domain *libvirt.Domain, hostQEMUVersion string, logger otelzap.Lo
 			vm.ConsulAgent = checkConsulAgent(domain)
 			vm.UpdatesNeeded = checkUpdatesNeeded(domain)
 
+			// Get Tailscale IP if available
+			vm.TailscaleIP = getTailscaleIP(domain)
+			if vm.TailscaleIP != "" {
+				logger.Debug("Tailscale IP detected",
+					zap.String("vm", name),
+					zap.String("tailscale_ip", vm.TailscaleIP))
+			}
+
 			// Get disk usage percentage
 			usedGB, totalGB := getVMDiskUsagePercent(domain, logger)
 			vm.DiskUsageGB = usedGB
@@ -700,6 +708,77 @@ func checkUpdatesNeeded(domain *libvirt.Domain) string {
 
 	// Default to unknown if we can't determine
 	return "N/A"
+}
+
+// getTailscaleIP detects the Tailscale IP address (100.64.x.x range) via guest agent
+func getTailscaleIP(domain *libvirt.Domain) string {
+	// Execute: ip -4 addr show tailscale0 to get Tailscale IP
+	// Tailscale interface is typically named tailscale0
+	// Tailscale IPs are in the 100.64.0.0/10 range (CGNAT range used by Tailscale)
+	cmd := `{"execute":"guest-exec","arguments":{"path":"/usr/bin/ip","arg":["-4","addr","show","tailscale0"],"capture-output":true}}`
+	result, err := domain.QemuAgentCommand(
+		cmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+
+	// If guest-exec is disabled or command fails, return empty
+	if err != nil {
+		return ""
+	}
+
+	var execResponse struct {
+		Return struct {
+			PID int `json:"pid"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(result), &execResponse); err != nil {
+		return ""
+	}
+
+	// Wait for command to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Get command output
+	statusCmd := fmt.Sprintf(`{"execute":"guest-exec-status","arguments":{"pid":%d}}`, execResponse.Return.PID)
+	statusResult, err := domain.QemuAgentCommand(
+		statusCmd,
+		libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT),
+		0,
+	)
+	if err != nil {
+		return ""
+	}
+
+	// Parse the output to extract Tailscale IP
+	var statusResponse struct {
+		Return struct {
+			Exited   bool   `json:"exited"`
+			Exitcode int    `json:"exitcode"`
+			OutData  string `json:"out-data"`
+		} `json:"return"`
+	}
+
+	if err := json.Unmarshal([]byte(statusResult), &statusResponse); err != nil {
+		return ""
+	}
+
+	// Check if command was successful
+	if !statusResponse.Return.Exited || statusResponse.Return.Exitcode != 0 {
+		return ""
+	}
+
+	// Parse IP from output
+	// Expected format: "inet 100.64.x.x/32 scope global tailscale0"
+	// Use regex to extract IP in 100.64.0.0/10 range (100.64.0.0 - 100.127.255.255)
+	ipRegex := regexp.MustCompile(`inet\s+(100\.(?:6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.\d+\.\d+)`)
+	matches := ipRegex.FindStringSubmatch(statusResponse.Return.OutData)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+
+	return ""
 }
 
 // getVMDiskSize gets the total allocated disk size in GB

@@ -2,20 +2,26 @@
 package ceph
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // CheckProcesses checks if any Ceph processes are running
 func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	logger.Info("Checking for Ceph processes...")
 
-	cmd := exec.Command("ps", "aux")
+	// Use ps with specific format for reliable parsing
+	// Format: PID,COMMAND (no spaces, easier to parse)
+	cmd := exec.Command("ps", "-eo", "pid,comm,args")
 	output, err := cmd.Output()
 	if err != nil {
+		logger.Error("Failed to list processes", zap.Error(err))
 		return DiagnosticResult{
 			CheckName: "Processes",
 			Passed:    false,
@@ -39,42 +45,66 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 	cephProcesses := []string{}
 	otherProcesses := []string{} // Track what "other" processes are
 	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "ceph") && !strings.Contains(line, "grep") && !strings.Contains(line, "ps aux") {
-			cephProcesses = append(cephProcesses, strings.TrimSpace(line))
 
-			// Extract process name from ps output
-			fields := strings.Fields(line)
-			var processName string
-			if len(fields) >= 11 {
-				// ps aux format: USER PID ... COMMAND
-				processName = fields[10]
-			}
+	for i, line := range lines {
+		if i == 0 {
+			continue // Skip header line
+		}
 
-			// Count by type
-			switch {
-			case strings.Contains(line, "ceph-mon"):
-				processCounts["ceph-mon"]++
-			case strings.Contains(line, "ceph-mgr"):
-				processCounts["ceph-mgr"]++
-			case strings.Contains(line, "ceph-osd"):
-				processCounts["ceph-osd"]++
-			case strings.Contains(line, "ceph-mds"):
-				processCounts["ceph-mds"]++
-			case strings.Contains(line, "ceph-crash"):
-				processCounts["ceph-crash"]++
-			case strings.Contains(line, "ceph-volume"):
-				processCounts["ceph-volume"]++
-			case strings.Contains(line, "radosgw"):
-				processCounts["radosgw"]++
-			case strings.Contains(line, "rbd-mirror"):
-				processCounts["rbd-mirror"]++
-			default:
-				processCounts["other"]++
-				// Track what these "other" processes are
-				if processName != "" && !strings.Contains(processName, "ps") {
-					otherProcesses = append(otherProcesses, processName)
-				}
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Parse: PID COMMAND ARGS
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+
+		command := fields[1]
+		fullLine := strings.Join(fields[2:], " ")
+
+		// Only match actual Ceph daemon processes (not scripts/logs mentioning ceph)
+		// Check the command name itself, not arguments
+		if !strings.HasPrefix(command, "ceph-") &&
+		   command != "radosgw" &&
+		   command != "rbd-mirror" &&
+		   !strings.Contains(fullLine, "/usr/bin/ceph-") &&
+		   !strings.Contains(fullLine, "/usr/local/bin/ceph-") {
+			continue
+		}
+
+		// Skip our own process and grep
+		if strings.Contains(fullLine, "ps -eo") || strings.Contains(command, "grep") {
+			continue
+		}
+
+		cephProcesses = append(cephProcesses, strings.TrimSpace(line))
+
+		// Count by type using command name (more reliable)
+		switch {
+		case strings.HasPrefix(command, "ceph-mon") || strings.Contains(fullLine, "ceph-mon"):
+			processCounts["ceph-mon"]++
+		case strings.HasPrefix(command, "ceph-mgr") || strings.Contains(fullLine, "ceph-mgr"):
+			processCounts["ceph-mgr"]++
+		case strings.HasPrefix(command, "ceph-osd") || strings.Contains(fullLine, "ceph-osd"):
+			processCounts["ceph-osd"]++
+		case strings.HasPrefix(command, "ceph-mds") || strings.Contains(fullLine, "ceph-mds"):
+			processCounts["ceph-mds"]++
+		case strings.HasPrefix(command, "ceph-crash") || strings.Contains(fullLine, "ceph-crash"):
+			processCounts["ceph-crash"]++
+		case strings.HasPrefix(command, "ceph-volume") || strings.Contains(fullLine, "ceph-volume"):
+			processCounts["ceph-volume"]++
+		case command == "radosgw" || strings.Contains(fullLine, "radosgw"):
+			processCounts["radosgw"]++
+		case command == "rbd-mirror" || strings.Contains(fullLine, "rbd-mirror"):
+			processCounts["rbd-mirror"]++
+		default:
+			processCounts["other"]++
+			// Track what these "other" processes are
+			if command != "" {
+				otherProcesses = append(otherProcesses, command)
 			}
 		}
 	}
@@ -136,9 +166,20 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 		// Show recent journal logs to understand why mon isn't running
 		logger.Info("")
 		logger.Info("Checking recent mon journal logs for errors...")
-		cmd := exec.Command("journalctl", "-u", "ceph-mon@*", "-n", "50", "--no-pager")
-		output, err := cmd.Output()
-		if err == nil {
+
+		// Use context with timeout to prevent hanging
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		journalCmd := exec.CommandContext(ctx, "journalctl", "-u", "ceph-mon@*", "-n", "50", "--no-pager")
+		output, err := journalCmd.Output()
+		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				logger.Warn("  → Journal query timed out after 10 seconds")
+			} else {
+				logger.Warn("  → Could not access journal logs", zap.Error(err))
+			}
+		} else {
 			outputStr := strings.TrimSpace(string(output))
 			if outputStr != "" && !strings.Contains(outputStr, "No entries") {
 				logger.Info("Recent mon journal entries (last 50 lines):")
@@ -163,8 +204,6 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 				logger.Info("  → No journal entries found for ceph-mon")
 				logger.Info("  → This suggests the mon service has never been started")
 			}
-		} else {
-			logger.Warn("  → Could not access journal logs")
 		}
 
 		return DiagnosticResult{
