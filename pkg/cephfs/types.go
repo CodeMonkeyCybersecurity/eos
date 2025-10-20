@@ -287,6 +287,9 @@ type VolumeInfo struct {
 	MountPoints   []string
 	DataPools     []string
 	MetadataPools []string
+	UID           int    // Volume owner UID
+	GID           int    // Volume owner GID
+	Mode          int    // Octal permissions mode
 }
 
 // PerformanceConfig represents CephFS performance tuning options

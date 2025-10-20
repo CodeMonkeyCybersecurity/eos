@@ -110,26 +110,114 @@ Examples:
 	}),
 }
 
-// InspectVaultCmd lists secrets stored in Vault using enhanced container pattern
+// InspectVaultCmd lists secrets stored in Vault
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Inspect current Vault paths using enhanced architecture",
-	Long: `Lists secrets stored in Vault using the new clean architecture pattern.
+	Short: "Inspect Vault secrets and status",
+	Long: `Lists secrets and paths stored in Vault with comprehensive status information.
 
-This command demonstrates:
-- Enhanced dependency injection container
-- Domain services for secret operations
-- Graceful fallback when vault is unavailable
-- Proper error handling and structured logging`,
+This command provides:
+- Current Vault server status
+- List of secret mounts and paths
+- Health check results
+- Authentication status
+
+Available subcommands:
+  agent       - Check Vault Agent status
+  ldap        - View LDAP configuration in Vault
+  vault-init  - Inspect Vault initialization data
+
+Examples:
+  eos read vault              # Show Vault status and available paths
+  eos read vault agent        # Check Vault Agent status
+  eos read vault ldap         # View LDAP config
+  eos read vault-init         # Inspect initialization data`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := rc.Log.Named("vault.inspect")
+		log := otelzap.Ctx(rc.Ctx)
 
-		logger.Info(" Starting vault secrets inspection with enhanced architecture")
+		log.Info("Starting Vault inspection")
 
-		// TODO: Fix vault container implementation
-		// The NewEnhancedVaultContainer function needs to be implemented
-		logger.Error("Vault inspection is temporarily disabled due to missing implementation")
-		return fmt.Errorf("vault inspection not yet implemented")
+		// ASSESS: Check Vault availability
+		vaultAddr := os.Getenv("VAULT_ADDR")
+		if vaultAddr == "" {
+			vaultAddr = "http://127.0.0.1:8200"
+		}
+
+		log.Info("Checking Vault status",
+			zap.String("vault_addr", vaultAddr))
+
+		// Get Vault client
+		client, err := vault.GetVaultClient(rc)
+		if err != nil {
+			return fmt.Errorf("failed to get Vault client: %w", err)
+		}
+
+		// INTERVENE: Get Vault health and status
+		health, err := client.Sys().Health()
+		if err != nil {
+			log.Warn("Failed to get Vault health", zap.Error(err))
+		} else {
+			log.Info("Vault Health Status",
+				zap.Bool("initialized", health.Initialized),
+				zap.Bool("sealed", health.Sealed),
+				zap.String("version", health.Version),
+				zap.String("cluster_name", health.ClusterName))
+		}
+
+		// Check if we're authenticated
+		token := os.Getenv("VAULT_TOKEN")
+		if token == "" {
+			log.Info("No VAULT_TOKEN set. Authentication may be required.")
+		}
+
+		// Try to list secret mounts
+		log.Info("Listing secret engine mounts")
+		mounts, err := client.Sys().ListMounts()
+		if err != nil {
+			log.Warn("Failed to list mounts (may need authentication)", zap.Error(err))
+			log.Info("Available subcommands:")
+			log.Info("  eos read vault agent       - Check Vault Agent status")
+			log.Info("  eos read vault ldap        - View LDAP configuration")
+			log.Info("  eos read vault-init        - Inspect initialization data")
+			return nil
+		}
+
+		log.Info("Secret Engine Mounts")
+		for path, mount := range mounts {
+			log.Info("Mount",
+				zap.String("path", path),
+				zap.String("type", mount.Type),
+				zap.String("description", mount.Description))
+
+			// Try to list secrets at this mount (only for KV engines)
+			if mount.Type == "kv" || mount.Type == "generic" {
+				secrets, err := client.Logical().List(path)
+				if err != nil {
+					log.Debug("Could not list secrets at mount", zap.String("path", path))
+					continue
+				}
+
+				if secrets != nil && secrets.Data != nil {
+					if keys, ok := secrets.Data["keys"].([]interface{}); ok {
+						log.Info("Secrets in mount",
+							zap.String("path", path),
+							zap.Int("count", len(keys)))
+						for _, key := range keys {
+							log.Info("  Secret key", zap.String("key", fmt.Sprintf("%v", key)))
+						}
+					}
+				}
+			}
+		}
+
+		// EVALUATE: Summary
+		log.Info("Vault inspection completed successfully")
+		log.Info("Use subcommands for detailed information:")
+		log.Info("  eos read vault agent       - Agent status")
+		log.Info("  eos read vault ldap        - LDAP config")
+		log.Info("  eos read vault-init        - Init data")
+
+		return nil
 	}),
 }
 

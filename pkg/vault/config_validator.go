@@ -533,7 +533,7 @@ func validateTopLevelConfig(rc *eos_io.RuntimeContext, content string, result *C
 	// Check for legacy port 8200
 	if strings.Contains(content, ":8200") {
 		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("Using legacy port 8200, Eos standard is %s", shared.VaultDefaultPort))
+			fmt.Sprintf("Eos standard port is %s", shared.VaultDefaultPort))
 		result.Suggestions = append(result.Suggestions,
 			"Run 'eos update vault' to migrate to standard port configuration")
 	}
