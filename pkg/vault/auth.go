@@ -217,16 +217,57 @@ func tryRootToken(rc *eos_io.RuntimeContext, _ *api.Client) (string, error) {
 	return initRes.RootToken, nil
 }
 
+// Global circuit breaker to prevent infinite prompting loops
+var (
+	promptAttemptCount    = 0
+	maxPromptAttempts     = 1 // Only allow ONE manual prompt per process
+	lastPromptAttemptTime time.Time
+)
+
 func LoadOrPromptInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	// CIRCUIT BREAKER P0: Prevent infinite prompt loops
+	// This addresses the bug where each phase prompts independently
+	if promptAttemptCount >= maxPromptAttempts {
+		log.Error(" Circuit breaker activated: manual prompt limit exceeded",
+			zap.Int("attempts", promptAttemptCount),
+			zap.Int("max_attempts", maxPromptAttempts),
+			zap.Time("last_attempt", lastPromptAttemptTime))
+		log.Error("This indicates vault_init.json is missing or invalid")
+		log.Info("Recovery options:")
+		log.Info("  1. Run: sudo eos read vault-init --status-only")
+		log.Info("  2. Check if /var/lib/eos/secret/vault_init.json exists")
+		log.Info("  3. Run: sudo eos create vault (will detect and offer recovery)")
+		return nil, fmt.Errorf("authentication prompt limit exceeded (%d attempts): vault_init.json missing or invalid", promptAttemptCount)
+	}
+
 	var res api.InitResponse
 	if err := ReadFallbackJSON(rc, shared.VaultInitPath, &res); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("Fallback file missing, prompting user", zap.Error(err))
+		log.Warn("Fallback file missing, prompting user once only",
+			zap.Error(err),
+			zap.Int("attempt_count", promptAttemptCount+1))
+
+		// Increment attempt counter BEFORE prompting
+		promptAttemptCount++
+		lastPromptAttemptTime = time.Now()
+
 		return PromptForInitResult(rc)
 	}
 	if err := VerifyInitResult(rc, &res); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("Loaded init result invalid, prompting user", zap.Error(err))
+		log.Warn("Loaded init result invalid, prompting user once only",
+			zap.Error(err),
+			zap.Int("attempt_count", promptAttemptCount+1))
+
+		// Increment attempt counter BEFORE prompting
+		promptAttemptCount++
+		lastPromptAttemptTime = time.Now()
+
 		return PromptForInitResult(rc)
 	}
+
+	// Reset counter on successful load
+	promptAttemptCount = 0
 	return &res, nil
 }
 

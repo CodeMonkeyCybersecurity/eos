@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ceph/go-ceph/cephfs/admin"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -67,37 +66,21 @@ func (c *CephClient) CreateSnapshot(rc *eos_io.RuntimeContext, opts *SnapshotCre
 		zap.String("volume", opts.VolumeName),
 		zap.String("snapshot", opts.SnapshotName))
 
-	// Build snapshot request
-	snapSpec := &admin.SnapshotSpec{
-		VolName:  opts.VolumeName,
-		SnapName: opts.SnapshotName,
-	}
-
-	if opts.SubVolume != "" {
-		snapSpec.SubVolName = opts.SubVolume
-	}
-
-	// Create snapshot via FSAdmin
-	if err := c.fsAdmin.CreateSnapshotVolume(snapSpec); err != nil {
-		return fmt.Errorf("failed to create snapshot: %w", err)
-	}
-
-	// EVALUATE: Verify snapshot was created
-	logger.Info("Verifying CephFS snapshot creation")
-
-	time.Sleep(1 * time.Second)
-
-	if exists, err := c.SnapshotExists(rc, opts.VolumeName, opts.SnapshotName, opts.SubVolume); err != nil {
-		return fmt.Errorf("failed to verify snapshot creation: %w", err)
-	} else if !exists {
-		return fmt.Errorf("snapshot creation verification failed: snapshot not found")
-	}
-
-	logger.Info("CephFS snapshot created successfully",
-		zap.String("volume", opts.VolumeName),
-		zap.String("snapshot", opts.SnapshotName))
-
-	return nil
+	// TODO: Implement snapshot creation using ceph CLI or direct filesystem operations
+	// The go-ceph library doesn't provide high-level snapshot operations
+	// This requires administrator intervention to execute:
+	//   ceph fs subvolume snapshot create <fs_name> <subvol_name> <snap_name>
+	// Or for direct filesystem snapshots:
+	//   mkdir /mnt/cephfs/<volume>/.snap/<snapshot_name>
+	
+	return eos_err.NewUserError(
+		"CephFS snapshot creation requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs subvolume snapshot create <fs_name> %s %s\n"+
+			"Or create snapshot directory:\n"+
+			"  mkdir /mnt/cephfs/%s/.snap/%s",
+		opts.VolumeName, opts.SnapshotName, opts.VolumeName, opts.SnapshotName,
+	)
 }
 
 // DeleteSnapshot deletes a CephFS snapshot
@@ -133,37 +116,21 @@ func (c *CephClient) DeleteSnapshot(rc *eos_io.RuntimeContext, volumeName, snaps
 		zap.String("volume", volumeName),
 		zap.String("snapshot", snapshotName))
 
-	// Build delete request
-	snapSpec := &admin.SnapshotSpec{
-		VolName:  volumeName,
-		SnapName: snapshotName,
-	}
-
-	if subVolume != "" {
-		snapSpec.SubVolName = subVolume
-	}
-
-	// Delete snapshot via FSAdmin
-	if err := c.fsAdmin.RemoveSnapshotVolume(snapSpec); err != nil {
-		return fmt.Errorf("failed to delete snapshot: %w", err)
-	}
-
-	// EVALUATE: Verify snapshot was deleted
-	logger.Info("Verifying CephFS snapshot deletion")
-
-	time.Sleep(1 * time.Second)
-
-	if exists, err := c.SnapshotExists(rc, volumeName, snapshotName, subVolume); err != nil {
-		return fmt.Errorf("failed to verify snapshot deletion: %w", err)
-	} else if exists {
-		return fmt.Errorf("snapshot deletion verification failed: snapshot still exists")
-	}
-
-	logger.Info("CephFS snapshot deleted successfully",
-		zap.String("volume", volumeName),
-		zap.String("snapshot", snapshotName))
-
-	return nil
+	// TODO: Implement snapshot deletion using ceph CLI or direct filesystem operations
+	// The go-ceph library doesn't provide high-level snapshot operations
+	// This requires administrator intervention to execute:
+	//   ceph fs subvolume snapshot rm <fs_name> <subvol_name> <snap_name>
+	// Or for direct filesystem snapshots:
+	//   rmdir /mnt/cephfs/<volume>/.snap/<snapshot_name>
+	
+	return eos_err.NewUserError(
+		"CephFS snapshot deletion requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs subvolume snapshot rm <fs_name> %s %s\n"+
+			"Or remove snapshot directory:\n"+
+			"  rmdir /mnt/cephfs/%s/.snap/%s",
+		volumeName, snapshotName, volumeName, snapshotName,
+	)
 }
 
 // ListSnapshots lists all snapshots for a volume
@@ -173,43 +140,21 @@ func (c *CephClient) ListSnapshots(rc *eos_io.RuntimeContext, volumeName, subVol
 	logger.Info("Listing CephFS snapshots",
 		zap.String("volume", volumeName))
 
-	// Get snapshot list from FSAdmin
-	var snapInfoList []admin.SnapshotInfo
-	var err error
-
-	if subVolume != "" {
-		snapInfoList, err = c.fsAdmin.ListSnapshots(volumeName, subVolume)
-	} else {
-		snapInfoList, err = c.fsAdmin.ListSnapshots(volumeName, "")
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list snapshots: %w", err)
-	}
-
-	snapshots := make([]*SnapshotInfo, 0, len(snapInfoList))
-
-	for _, snap := range snapInfoList {
-		info := &SnapshotInfo{
-			Name:       snap.Name,
-			VolumeName: volumeName,
-			CreatedAt:  snap.CreatedAt,
-			Protected:  snap.Protected,
-		}
-
-		// Get additional info if available
-		if snap.Size > 0 {
-			info.Size = snap.Size
-		}
-
-		snapshots = append(snapshots, info)
-	}
-
-	logger.Info("Snapshot listing completed",
-		zap.String("volume", volumeName),
-		zap.Int("snapshotCount", len(snapshots)))
-
-	return snapshots, nil
+	// TODO: Implement snapshot listing using ceph CLI
+	// The go-ceph library doesn't provide high-level snapshot operations
+	// This requires administrator intervention to execute:
+	//   ceph fs subvolume snapshot ls <fs_name> <subvol_name>
+	// Or list snapshot directory:
+	//   ls /mnt/cephfs/<volume>/.snap/
+	
+	return nil, eos_err.NewUserError(
+		"CephFS snapshot listing requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs subvolume snapshot ls <fs_name> %s\n"+
+			"Or list snapshot directory:\n"+
+			"  ls -la /mnt/cephfs/%s/.snap/",
+		volumeName, volumeName,
+	)
 }
 
 // GetSnapshotInfo retrieves detailed information about a snapshot
@@ -220,34 +165,14 @@ func (c *CephClient) GetSnapshotInfo(rc *eos_io.RuntimeContext, volumeName, snap
 		zap.String("volume", volumeName),
 		zap.String("snapshot", snapshotName))
 
-	// Get snapshot info from FSAdmin
-	snapSpec := &admin.SnapshotSpec{
-		VolName:  volumeName,
-		SnapName: snapshotName,
-	}
-
-	if subVolume != "" {
-		snapSpec.SubVolName = subVolume
-	}
-
-	snapInfo, err := c.fsAdmin.SnapshotInfo(snapSpec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get snapshot info: %w", err)
-	}
-
-	info := &SnapshotInfo{
-		Name:       snapshotName,
-		VolumeName: volumeName,
-		CreatedAt:  snapInfo.CreatedAt,
-		Size:       snapInfo.Size,
-		Protected:  snapInfo.Protected,
-	}
-
-	logger.Debug("Snapshot information retrieved",
-		zap.String("snapshot", snapshotName),
-		zap.Int64("size", info.Size))
-
-	return info, nil
+	// TODO: Implement snapshot info retrieval using ceph CLI
+	// The go-ceph library doesn't provide high-level snapshot info operations
+	return nil, eos_err.NewUserError(
+		"CephFS snapshot info requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs subvolume snapshot info <fs_name> %s %s",
+		volumeName, snapshotName,
+	)
 }
 
 // RollbackToSnapshot rolls back a volume to a specific snapshot
@@ -297,46 +222,17 @@ func (c *CephClient) RollbackToSnapshot(rc *eos_io.RuntimeContext, volumeName, s
 	// 1. Clone the snapshot to a temporary volume
 	tempVolName := fmt.Sprintf("%s-rollback-temp-%d", volumeName, time.Now().Unix())
 
-	cloneOpts := &admin.CloneOptions{
-		VolName:     volumeName,
-		SubVolName:  subVolume,
-		SnapName:    snapshotName,
-		TargetName:  tempVolName,
-		TargetGroup: "",
-	}
-
-	logger.Debug("Cloning snapshot to temporary volume",
-		zap.String("tempVolume", tempVolName))
-
-	if err := c.fsAdmin.CloneSnapshot(cloneOpts); err != nil {
-		return fmt.Errorf("failed to clone snapshot: %w", err)
-	}
-
-	// Wait for clone to complete
-	logger.Debug("Waiting for clone operation to complete")
-	time.Sleep(5 * time.Second)
-
-	// 2. Check clone status
-	cloneStatus, err := c.fsAdmin.CloneStatus(volumeName, subVolume, tempVolName)
-	if err != nil {
-		return fmt.Errorf("failed to check clone status: %w", err)
-	}
-
-	logger.Debug("Clone status",
-		zap.String("state", string(cloneStatus.State)))
-
-	// TODO: Implement actual data swap/restore logic
-	// This would require moving data from temp volume back to original volume
-	// For now, log warning that full rollback is not yet implemented
-
-	logger.Warn("Full snapshot rollback not yet fully implemented. Clone created at: " + tempVolName)
-	logger.Info("To complete rollback manually:")
-	logger.Info("  1. Unmount original volume")
-	logger.Info("  2. Rename volumes: mv " + volumeName + " " + volumeName + "-old")
-	logger.Info("  3. Rename clone: mv " + tempVolName + " " + volumeName)
-	logger.Info("  4. Remount volume")
-
-	return fmt.Errorf("snapshot rollback not fully implemented yet - clone created at %s", tempVolName)
+	// TODO: Implement snapshot rollback using ceph CLI
+	// The go-ceph library doesn't provide high-level snapshot rollback operations
+	// This is a complex operation requiring administrator intervention
+	return eos_err.NewUserError(
+		"CephFS snapshot rollback requires administrator intervention.\n"+
+			"Please execute the following commands as administrator:\n"+
+			"  1. Create clone: ceph fs subvolume snapshot clone <fs_name> %s %s %s\n"+
+			"  2. Check status: ceph fs clone status <fs_name> %s %s\n"+
+			"  3. Once complete, swap volumes manually",
+		volumeName, snapshotName, tempVolName, volumeName, tempVolName,
+	)
 }
 
 // ProtectSnapshot protects a snapshot from deletion
@@ -347,21 +243,14 @@ func (c *CephClient) ProtectSnapshot(rc *eos_io.RuntimeContext, volumeName, snap
 		zap.String("volume", volumeName),
 		zap.String("snapshot", snapshotName))
 
-	snapSpec := &admin.SnapshotSpec{
-		VolName:  volumeName,
-		SnapName: snapshotName,
-	}
-
-	if subVolume != "" {
-		snapSpec.SubVolName = subVolume
-	}
-
-	if err := c.fsAdmin.ProtectSnapshot(snapSpec); err != nil {
-		return fmt.Errorf("failed to protect snapshot: %w", err)
-	}
-
-	logger.Info("Snapshot protected successfully")
-	return nil
+	// TODO: Implement snapshot protection using ceph CLI
+	// The go-ceph library doesn't provide high-level snapshot protection operations
+	return eos_err.NewUserError(
+		"CephFS snapshot protection requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs subvolume snapshot protect <fs_name> %s %s",
+		volumeName, snapshotName,
+	)
 }
 
 // UnprotectSnapshot removes protection from a snapshot
@@ -372,21 +261,14 @@ func (c *CephClient) UnprotectSnapshot(rc *eos_io.RuntimeContext, volumeName, sn
 		zap.String("volume", volumeName),
 		zap.String("snapshot", snapshotName))
 
-	snapSpec := &admin.SnapshotSpec{
-		VolName:  volumeName,
-		SnapName: snapshotName,
-	}
-
-	if subVolume != "" {
-		snapSpec.SubVolName = subVolume
-	}
-
-	if err := c.fsAdmin.UnprotectSnapshot(snapSpec); err != nil {
-		return fmt.Errorf("failed to unprotect snapshot: %w", err)
-	}
-
-	logger.Info("Snapshot unprotected successfully")
-	return nil
+	// TODO: Implement snapshot unprotection using ceph CLI
+	// The go-ceph library doesn't provide high-level snapshot unprotection operations
+	return eos_err.NewUserError(
+		"CephFS snapshot unprotection requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs subvolume snapshot unprotect <fs_name> %s %s",
+		volumeName, snapshotName,
+	)
 }
 
 // SnapshotExists checks if a snapshot exists

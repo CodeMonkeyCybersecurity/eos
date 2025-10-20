@@ -256,7 +256,7 @@ func prepareTokenSink(rc *eos_io.RuntimeContext, tokenPath, user string) error {
 	return nil
 }
 
-func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) error {
+func writeAgentHCL(rc *eos_io.RuntimeContext, addr, _roleID, _secretID string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("Writing Vault Agent HCL configuration",

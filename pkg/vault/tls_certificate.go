@@ -381,7 +381,7 @@ func generateSerialNumber() (*big.Int, error) {
 }
 
 // setFileOwnership sets ownership of certificate files to specified user:group
-func setFileOwnership(rc *eos_io.RuntimeContext, certPath, keyPath, owner, group string) error {
+func setFileOwnership(rc *eos_io.RuntimeContext, certPath, keyPath, owner, _group string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, owner)

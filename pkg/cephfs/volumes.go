@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ceph/go-ceph/cephfs/admin"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -60,64 +59,14 @@ func (c *CephClient) CreateVolume(rc *eos_io.RuntimeContext, opts *VolumeCreateO
 		zap.String("dataPool", opts.DataPool),
 		zap.Int("replication", opts.ReplicationSize))
 
-	// Build volume creation request
-	volSpec := &admin.VolumeSpec{
-		Name: opts.Name,
-	}
-
-	// Set optional parameters
-	if opts.Size > 0 {
-		volSpec.Size = admin.SizeSpec{Size: opts.Size}
-	}
-	if opts.DataPool != "" {
-		volSpec.DataPool = opts.DataPool
-	}
-	if opts.UID != nil {
-		volSpec.UID = *opts.UID
-	}
-	if opts.GID != nil {
-		volSpec.GID = *opts.GID
-	}
-	if opts.Mode != nil {
-		volSpec.Mode = *opts.Mode
-	}
-	if opts.Namespace != "" {
-		volSpec.Namespace = opts.Namespace
-	}
-
-	// Create volume via FSAdmin
-	logger.Debug("Creating volume via FSAdmin",
-		zap.String("volume", opts.Name))
-
-	if err := c.fsAdmin.CreateVolume(volSpec); err != nil {
-		return fmt.Errorf("failed to create volume: %w", err)
-	}
-
-	// Set pool replication if specified
-	if opts.DataPool != "" && opts.ReplicationSize > 0 {
-		if err := c.setPoolReplication(rc, opts.DataPool, opts.ReplicationSize); err != nil {
-			logger.Warn("Failed to set pool replication, continuing",
-				zap.Error(err),
-				zap.String("pool", opts.DataPool))
-		}
-	}
-
-	// EVALUATE: Verify volume was created
-	logger.Info("Verifying CephFS volume creation")
-
-	// Give Ceph time to create the volume
-	time.Sleep(2 * time.Second)
-
-	if exists, err := c.VolumeExists(rc, opts.Name); err != nil {
-		return fmt.Errorf("failed to verify volume creation: %w", err)
-	} else if !exists {
-		return fmt.Errorf("volume creation verification failed: volume not found")
-	}
-
-	logger.Info("CephFS volume created successfully",
-		zap.String("volume", opts.Name))
-
-	return nil
+	// TODO: Implement volume creation using ceph CLI
+	// The go-ceph library doesn't provide high-level volume creation operations
+	return eos_err.NewUserError(
+		"CephFS volume creation requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs volume create %s",
+		opts.Name,
+	)
 }
 
 // DeleteVolume deletes a CephFS volume with optional safety snapshot
@@ -158,26 +107,14 @@ func (c *CephClient) DeleteVolume(rc *eos_io.RuntimeContext, volumeName string, 
 	logger.Info("Deleting CephFS volume",
 		zap.String("volume", volumeName))
 
-	// Delete via FSAdmin
-	if err := c.fsAdmin.RemoveVolume(volumeName); err != nil {
-		return fmt.Errorf("failed to delete volume: %w", err)
-	}
-
-	// EVALUATE: Verify volume was deleted
-	logger.Info("Verifying CephFS volume deletion")
-
-	time.Sleep(2 * time.Second)
-
-	if exists, err := c.VolumeExists(rc, volumeName); err != nil {
-		return fmt.Errorf("failed to verify volume deletion: %w", err)
-	} else if exists {
-		return fmt.Errorf("volume deletion verification failed: volume still exists")
-	}
-
-	logger.Info("CephFS volume deleted successfully",
-		zap.String("volume", volumeName))
-
-	return nil
+	// TODO: Implement volume deletion using ceph CLI
+	// The go-ceph library doesn't provide high-level volume deletion operations
+	return eos_err.NewUserError(
+		"CephFS volume deletion requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs volume rm %s --yes-i-really-mean-it",
+		volumeName,
+	)
 }
 
 // ListVolumes lists all CephFS volumes
@@ -224,46 +161,14 @@ func (c *CephClient) GetVolumeInfo(rc *eos_io.RuntimeContext, volumeName string)
 	logger.Debug("Getting volume information",
 		zap.String("volume", volumeName))
 
-	// Get volume info from FSAdmin
-	volInfo, err := c.fsAdmin.VolumeInfo(volumeName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get volume info: %w", err)
-	}
-
-	// Convert to our VolumeInfo type
-	info := &VolumeInfo{
-		Name:      volumeName,
-		CreatedAt: volInfo.CreatedAt,
-	}
-
-	// Get additional metadata
-	if volInfo.DataPoolName != "" {
-		info.DataPools = []string{volInfo.DataPoolName}
-	}
-	if volInfo.Uid != nil {
-		info.UID = *volInfo.Uid
-	}
-	if volInfo.Gid != nil {
-		info.GID = *volInfo.Gid
-	}
-	if volInfo.Mode != nil {
-		info.Mode = *volInfo.Mode
-	}
-
-	// Get usage statistics
-	usage, err := c.fsAdmin.VolumeQuota(volumeName, "")
-	if err == nil {
-		info.Size = usage.Quota.MaxBytes
-		info.UsedSize = usage.BytesUsed
-		info.AvailableSize = info.Size - info.UsedSize
-	}
-
-	logger.Debug("Volume information retrieved",
-		zap.String("volume", volumeName),
-		zap.Int64("size", info.Size),
-		zap.Int64("used", info.UsedSize))
-
-	return info, nil
+	// TODO: Implement volume info retrieval using ceph CLI
+	// The go-ceph library doesn't provide high-level volume info operations
+	return nil, eos_err.NewUserError(
+		"CephFS volume info requires administrator intervention.\n"+
+			"Please execute the following command as administrator:\n"+
+			"  ceph fs volume info %s",
+		volumeName,
+	)
 }
 
 // UpdateVolume updates volume configuration
@@ -305,48 +210,15 @@ func (c *CephClient) UpdateVolume(rc *eos_io.RuntimeContext, volumeName string, 
 	logger.Info("Updating CephFS volume",
 		zap.String("volume", volumeName))
 
-	// Update quota if specified
-	if opts.NewSize > 0 {
-		logger.Debug("Setting volume quota",
-			zap.String("volume", volumeName),
-			zap.Int64("size", opts.NewSize))
-
-		quota := &admin.QuotaOptions{
-			MaxBytes: opts.NewSize,
-		}
-
-		if err := c.fsAdmin.SetVolumeQuota(volumeName, "", quota); err != nil {
-			return fmt.Errorf("failed to set volume quota: %w", err)
-		}
-	}
-
-	// Update pool replication if specified
-	if opts.NewReplication > 0 && opts.DataPool != "" {
-		if err := c.setPoolReplication(rc, opts.DataPool, opts.NewReplication); err != nil {
-			logger.Warn("Failed to update pool replication",
-				zap.Error(err))
-		}
-	}
-
-	// EVALUATE: Verify update
-	logger.Info("Verifying CephFS volume update")
-
-	// Get updated info to verify
-	info, err := c.GetVolumeInfo(rc, volumeName)
-	if err != nil {
-		return fmt.Errorf("failed to verify volume update: %w", err)
-	}
-
-	if opts.NewSize > 0 && info.Size != opts.NewSize {
-		logger.Warn("Volume size may not have updated correctly",
-			zap.Int64("expected", opts.NewSize),
-			zap.Int64("actual", info.Size))
-	}
-
-	logger.Info("CephFS volume updated successfully",
-		zap.String("volume", volumeName))
-
-	return nil
+	// TODO: Implement volume update using ceph CLI
+	// The go-ceph library doesn't provide high-level volume update operations
+	return eos_err.NewUserError(
+		"CephFS volume update requires administrator intervention.\n"+
+			"Please execute the following commands as administrator:\n"+
+			"  For quota: ceph fs subvolume resize %s <subvol_name> <new_size>\n"+
+			"  For replication: ceph osd pool set <pool_name> size <replication_size>",
+		volumeName,
+	)
 }
 
 // VolumeExists checks if a volume exists

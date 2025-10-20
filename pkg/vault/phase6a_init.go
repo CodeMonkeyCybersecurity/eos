@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -44,7 +45,13 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 		return nil, fmt.Errorf("check vault init status: %w", err)
 	}
 	if status {
-		otelzap.Ctx(rc.Ctx).Info(" Vault already initialized — skipping Phase 6a")
+		otelzap.Ctx(rc.Ctx).Info(" Vault already initialized — checking for credentials file")
+
+		// SECURITY FIX P0: Handle "already initialized but missing credentials file" edge case
+		// This prevents infinite authentication prompts in later phases
+		if err := handleAlreadyInitialized(rc, client); err != nil {
+			return nil, fmt.Errorf("handle already initialized vault: %w", err)
+		}
 		return client, nil
 	}
 
@@ -112,6 +119,99 @@ func InitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.InitResponse
 }
 
 // SaveInitResult saves the Vault initialization result securely to disk.
+// handleAlreadyInitialized checks if vault_init.json exists when Vault is already initialized.
+// If the file is missing, it prompts the user for recovery and saves the credentials.
+// This prevents the infinite authentication prompt loop in later phases.
+func handleAlreadyInitialized(rc *eos_io.RuntimeContext, client *api.Client) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	path := shared.VaultInitPath
+
+	// Check if credentials file exists
+	logger.Debug("Checking for vault init credentials file", zap.String("path", path))
+	if _, err := os.Stat(path); err == nil {
+		// File exists - verify it's valid
+		logger.Info(" Vault credentials file found", zap.String("path", path))
+		var initRes api.InitResponse
+		if err := ReadFallbackJSON(rc, path, &initRes); err != nil {
+			logger.Warn("Vault credentials file is corrupted", zap.Error(err))
+			return handleMissingOrCorruptedCredentials(rc, client, path)
+		}
+		if err := VerifyInitResult(rc, &initRes); err != nil {
+			logger.Warn("Vault credentials file is invalid", zap.Error(err))
+			return handleMissingOrCorruptedCredentials(rc, client, path)
+		}
+		logger.Info(" Vault credentials file is valid")
+		return nil
+	}
+
+	// File doesn't exist - this is the problematic edge case
+	logger.Warn(" Vault is initialized but credentials file is missing",
+		zap.String("expected_path", path),
+		zap.String("issue", "This will cause authentication prompts in every phase"))
+
+	return handleMissingOrCorruptedCredentials(rc, client, path)
+}
+
+// handleMissingOrCorruptedCredentials prompts the user for Vault credentials and saves them.
+// This provides recovery for the edge case where Vault is initialized but vault_init.json is missing.
+func handleMissingOrCorruptedCredentials(rc *eos_io.RuntimeContext, client *api.Client, path string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Warn(" VAULT CREDENTIALS RECOVERY MODE")
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Vault is already initialized but the credentials file is missing or corrupted.")
+	logger.Info("This can happen if:")
+	logger.Info("  1. Vault was initialized previously and the file was deleted")
+	logger.Info("  2. A previous installation was interrupted")
+	logger.Info("  3. File permissions prevented writing the credentials")
+	logger.Info("")
+	logger.Info("You will be prompted to enter the Vault unseal keys and root token.")
+	logger.Info("These credentials will be saved securely to prevent repeated prompts.")
+	logger.Info("")
+
+	logger.Info("terminal prompt: Do you have the Vault unseal keys and root token? (y/N)")
+	var response string
+	shared.SafeScanln(&response)
+
+	if strings.ToLower(strings.TrimSpace(response)) != "y" {
+		logger.Error(" Cannot proceed without Vault credentials")
+		logger.Info("Options:")
+		logger.Info("  1. If this is a test/dev environment: sudo eos delete vault && sudo eos create vault")
+		logger.Info("  2. If this is production: Locate the vault_init.json backup")
+		logger.Info("  3. Contact your Vault administrator for the unseal keys and root token")
+		return fmt.Errorf("vault credentials recovery aborted by user")
+	}
+
+	// Prompt for credentials with recovery context
+	logger.Info(" Please enter the Vault credentials for recovery")
+	initRes, err := PromptForInitResult(rc)
+	if err != nil {
+		logger.Error("Failed to read credentials from prompt", zap.Error(err))
+		return fmt.Errorf("credential recovery prompt failed: %w", err)
+	}
+
+	// Verify the credentials work before saving
+	logger.Info(" Verifying provided credentials against Vault")
+	if err := VerifyRootToken(rc, client, initRes.RootToken); err != nil {
+		logger.Error(" Provided root token is invalid", zap.Error(err))
+		return fmt.Errorf("credential verification failed: %w", err)
+	}
+
+	// Save the verified credentials
+	logger.Info(" Credentials verified — saving to prevent future prompts")
+	if err := SaveInitResult(rc, initRes); err != nil {
+		logger.Error("Failed to save verified credentials", zap.Error(err))
+		return fmt.Errorf("save credentials failed: %w", err)
+	}
+
+	logger.Info(" Vault credentials recovered and saved successfully",
+		zap.String("path", path))
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	return nil
+}
+
 func SaveInitResult(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error {
 	path := shared.VaultInitPath
 	dir := filepath.Dir(path)

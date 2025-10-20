@@ -296,7 +296,7 @@ func validateRaftTLSConfig(config *TLSCertificateConfig) error {
 }
 
 // setVaultOwnership sets ownership of certificate files to vault:vault
-func setVaultOwnership(certPath, keyPath string) error {
+func setVaultOwnership(_certPath, _keyPath string) error {
 	// TODO: Implement proper ownership setting
 	// This requires looking up vault user/group IDs and using os.Chown
 	// For now, this is a placeholder
