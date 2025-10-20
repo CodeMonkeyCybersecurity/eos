@@ -72,7 +72,7 @@ func runRepairIris(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                  METIS REPAIR TOOL                             ║")
+	fmt.Println("║                  IRIS REPAIR TOOL                             ║")
 	fmt.Println("╚════════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 

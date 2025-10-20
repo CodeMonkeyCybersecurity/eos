@@ -158,7 +158,7 @@ func displayDiagnosticResults(results []checkResult) {
 	// Header
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║              METIS DIAGNOSTIC REPORT                           ║")
+	fmt.Println("║              IRIS DIAGNOSTIC REPORT                           ║")
 	fmt.Println("╚════════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 

@@ -39,7 +39,7 @@
 **Criteria:** Current modularization work in progress
 
 18. **CODEBASE-MODULARIZATION-PLAN.md** - Keep (active planning)
-19. **METIS-MODULARIZATION-ANALYSIS.md** - Keep (active work)
+19. **IRIS-MODULARIZATION-ANALYSIS.md** - Keep (active work)
 20. **MODULARIZATION-COMPLETE-FILE-1.md** - Keep (completion record)
 21. **MODULARIZATION-EXECUTIVE-SUMMARY.md** - Keep (summary)
 22. **MODULARIZATION-PROGRESS.md** - Keep (tracking)

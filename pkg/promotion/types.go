@@ -7,6 +7,37 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
 )
 
+// HistoryFilter represents filters for promotion history queries
+type HistoryFilter struct {
+	Component        string
+	Environment      string
+	Status           string
+	Since            *time.Time
+	Until            *time.Time
+	Limit            int
+	IncludeRollbacks bool
+}
+
+// PromotionHistoryRecord represents a single promotion history record
+type PromotionHistoryRecord struct {
+	ID               string
+	Component        string
+	FromEnvironment  string
+	ToEnvironment    string
+	Version          string
+	Status           string
+	PromotedBy       string
+	PromotedAt       time.Time
+	Duration         time.Duration
+	Success          bool
+	Error            string
+	RolledBack       bool
+	RollbackAt       *time.Time
+	ApprovalCount    int
+	ValidationErrors []string
+	ArtifactCount    int
+}
+
 // PromotionManager handles cross-environment deployment promotions
 type PromotionManager struct {
 	environmentManager *environments.EnvironmentManager
