@@ -320,13 +320,22 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 	}
 
 	if len(missingCephLibs) > 0 {
-		return fmt.Errorf("Ceph development libraries not found: %v\n"+
-			"Command: %s --exists %s\n"+
-			"Fix: Install Ceph development libraries:\n"+
-			"  Ubuntu/Debian: sudo apt install librados-dev librbd-dev libcephfs-dev\n"+
-			"  RHEL/CentOS:   sudo yum install librados-devel librbd-devel libcephfs-devel\n"+
-			"  Fedora:        sudo dnf install librados-devel librbd-devel libcephfs-devel",
-			missingCephLibs, pkgConfigPath, strings.Join(missingCephLibs, ", "))
+		eeu.logger.Warn("Ceph development libraries not found, attempting to install",
+			zap.Strings("missing", missingCephLibs))
+
+		// Attempt to install missing Ceph libraries automatically
+		if err := eeu.installCephLibraries(missingCephLibs); err != nil {
+			return fmt.Errorf("Ceph development libraries not found: %v\n"+
+				"Command: %s --exists <library>\n"+
+				"Auto-install failed: %v\n"+
+				"Fix: Install Ceph development libraries manually:\n"+
+				"  Ubuntu/Debian: sudo apt install librados-dev librbd-dev libcephfs-dev\n"+
+				"  RHEL/CentOS:   sudo yum install librados-devel librbd-devel libcephfs-devel\n"+
+				"  Fedora:        sudo dnf install libcephfs-devel librbd-devel librados-devel",
+				missingCephLibs, pkgConfigPath, err)
+		}
+
+		eeu.logger.Info(" Ceph development libraries installed successfully")
 	}
 
 	eeu.logger.Info(" Build dependencies verified")
@@ -856,6 +865,127 @@ func (eeu *EnhancedEosUpdater) updatePacman() error {
 	}
 
 	eeu.logger.Info(" System packages updated successfully")
+	return nil
+}
+
+// installCephLibraries automatically installs missing Ceph development libraries
+func (eeu *EnhancedEosUpdater) installCephLibraries(missingLibs []string) error {
+	eeu.logger.Info("Attempting to install missing Ceph development libraries",
+		zap.Strings("libraries", missingLibs))
+
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("installing system packages requires root privileges - run with sudo")
+	}
+
+	// Detect package manager
+	packageManager := eeu.detectPackageManager()
+	if packageManager == "" {
+		return fmt.Errorf("no supported package manager found (apt/yum/dnf/pacman)")
+	}
+
+	eeu.logger.Info("Using package manager", zap.String("manager", packageManager))
+
+	// Map library names to package names for each distro
+	var packages []string
+	switch packageManager {
+	case "apt":
+		// Debian/Ubuntu package names
+		pkgMap := map[string]string{
+			"librados":  "librados-dev",
+			"librbd":    "librbd-dev",
+			"libcephfs": "libcephfs-dev",
+		}
+		for _, lib := range missingLibs {
+			if pkg, ok := pkgMap[lib]; ok {
+				packages = append(packages, pkg)
+			}
+		}
+
+	case "yum", "dnf":
+		// RHEL/CentOS/Fedora package names
+		pkgMap := map[string]string{
+			"librados":  "librados-devel",
+			"librbd":    "librbd-devel",
+			"libcephfs": "libcephfs-devel",
+		}
+		for _, lib := range missingLibs {
+			if pkg, ok := pkgMap[lib]; ok {
+				packages = append(packages, pkg)
+			}
+		}
+
+	case "pacman":
+		// Arch Linux package names
+		pkgMap := map[string]string{
+			"librados":  "ceph-libs",
+			"librbd":    "ceph-libs",
+			"libcephfs": "ceph-libs",
+		}
+		// Deduplicate packages (ceph-libs provides all three)
+		pkgSet := make(map[string]bool)
+		for _, lib := range missingLibs {
+			if pkg, ok := pkgMap[lib]; ok {
+				pkgSet[pkg] = true
+			}
+		}
+		for pkg := range pkgSet {
+			packages = append(packages, pkg)
+		}
+
+	default:
+		return fmt.Errorf("unsupported package manager: %s", packageManager)
+	}
+
+	if len(packages) == 0 {
+		return fmt.Errorf("could not map libraries to packages for %s", packageManager)
+	}
+
+	eeu.logger.Info("Installing packages", zap.Strings("packages", packages))
+
+	// Install packages based on package manager
+	var installCmd *exec.Cmd
+	switch packageManager {
+	case "apt":
+		// Update package lists first
+		eeu.logger.Info("  Updating package lists...")
+		updateCmd := exec.Command("apt", "update")
+		updateCmd.Stdout = os.Stdout
+		updateCmd.Stderr = os.Stderr
+		if err := updateCmd.Run(); err != nil {
+			return fmt.Errorf("apt update failed: %w", err)
+		}
+
+		// Install packages
+		args := append([]string{"install", "-y"}, packages...)
+		installCmd = exec.Command("apt", args...)
+
+	case "yum":
+		args := append([]string{"install", "-y"}, packages...)
+		installCmd = exec.Command("yum", args...)
+
+	case "dnf":
+		args := append([]string{"install", "-y"}, packages...)
+		installCmd = exec.Command("dnf", args...)
+
+	case "pacman":
+		args := append([]string{"-S", "--noconfirm"}, packages...)
+		installCmd = exec.Command("pacman", args...)
+
+	default:
+		return fmt.Errorf("unsupported package manager: %s", packageManager)
+	}
+
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("%s install failed: %w", packageManager, err)
+	}
+
+	eeu.logger.Info(" Ceph development libraries installed",
+		zap.Strings("packages", packages))
+
 	return nil
 }
 
