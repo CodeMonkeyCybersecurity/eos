@@ -207,7 +207,6 @@ var StreamConfigs = map[string]StreamConfig{
 ### Hera Auth Plugin
 
 **Package Location**: `/opt/eos/pkg/hera/`
-- `keycloak_client.go` - Keycloak/Authentik client implementation
 - `types.go` - Type definitions for auth events
 
 **Purpose**: 

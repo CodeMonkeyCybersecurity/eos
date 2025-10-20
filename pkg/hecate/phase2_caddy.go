@@ -18,7 +18,6 @@ func PhaseCaddy(rc *eos_io.RuntimeContext, spec CaddySpec) error {
 	log.Info(" Phase 2: Caddy setup",
 		zap.Int("proxy_count", len(spec.Proxies)),
 		zap.String("authentik_domain", spec.AuthentikDomain),
-		zap.String("keycloak_domain", spec.KeycloakDomain), // Deprecated
 	)
 
 	// 1) Ensure Caddy directories
@@ -30,12 +29,6 @@ func PhaseCaddy(rc *eos_io.RuntimeContext, spec CaddySpec) error {
 		}
 	}
 	log.Info(" Caddy directories ensured")
-
-	// 2) Skip if nothing to do
-	if len(spec.Proxies) == 0 && spec.AuthentikDomain == "" && spec.KeycloakDomain == "" {
-		log.Info("No proxies or SSO; skipping Caddyfile")
-		return nil
-	}
 
 	// 3) Build + deploy Caddyfile
 	if err := buildAndDeployCaddyfile(rc, spec); err != nil {
@@ -68,7 +61,7 @@ func BuildAndPlaceCaddyfile(rc *eos_io.RuntimeContext, spec CaddySpec) error {
 // GenerateCaddySpecMulti creates the Caddyfile content from spec.
 func GenerateCaddySpecMulti(rc *eos_io.RuntimeContext, spec CaddySpec) string {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Starting Caddyfile generation", zap.Int("proxy_count", len(spec.Proxies)), zap.String("authentik_domain", spec.AuthentikDomain), zap.String("keycloak_domain", spec.KeycloakDomain))
+	log.Info(" Starting Caddyfile generation", zap.Int("proxy_count", len(spec.Proxies)), zap.String("authentik_domain", spec.AuthentikDomain))
 
 	var builder strings.Builder
 
@@ -91,11 +84,6 @@ func GenerateCaddySpecMulti(rc *eos_io.RuntimeContext, spec CaddySpec) string {
 	// Handle Authentik SSO (preferred)
 	if spec.AuthentikDomain != "" {
 		builder.WriteString(fmt.Sprintf("%s {\n    reverse_proxy authentik-server:9000\n    # Authentik forward auth configuration\n}\n\n", spec.AuthentikDomain))
-	}
-	
-	// Handle legacy Keycloak (deprecated)
-	if spec.KeycloakDomain != "" {
-		builder.WriteString(fmt.Sprintf("%s {\n    reverse_proxy hecate-kc:8080\n    # Keycloak special settings can be added here if needed (deprecated)\n}\n\n", spec.KeycloakDomain))
 	}
 
 	log.Info(" Caddyfile generation complete")

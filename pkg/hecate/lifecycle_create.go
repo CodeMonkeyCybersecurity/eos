@@ -223,11 +223,6 @@ func ShouldExitNoServicesSelected(rc *eos_io.RuntimeContext, authentik, nextclou
 	return false
 }
 
-// Deprecated: Use ShouldExitNoServicesSelected with authentik parameter instead
-func ShouldExitNoServicesSelectedKeycloak(rc *eos_io.RuntimeContext, keycloak, nextcloud, wazuh, jenkins bool) bool {
-	return ShouldExitNoServicesSelected(rc, keycloak, nextcloud, wazuh, jenkins)
-}
-
 func CollateAndWriteFile[T any](
 	rc *eos_io.RuntimeContext,
 	logName string,
@@ -280,6 +275,4 @@ type HecateConfiguration struct {
 	BackendIP       string
 	Proxies         []CaddyAppProxy
 	EnabledServices map[string]bool
-	// Deprecated: Use AuthentikDomain instead
-	KeycloakDomain string
 }

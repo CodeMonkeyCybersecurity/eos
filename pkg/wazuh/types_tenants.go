@@ -22,7 +22,7 @@ const roleMappingTemplate = `
 
 type RoleMappingInput struct {
 	Name            string
-	Users           []string // TODO: inject Keycloak usernames
+	Users           []string // TODO: inject usernames
 	Hosts           []string // TODO: inject IPs or hostnames
 	AndBackendRoles []string // TODO: for composite roles
 	Reserved        bool     // TODO: enable read-only control
@@ -44,7 +44,7 @@ func GenerateRoleMappingYAML(input RoleMappingInput) (string, error) {
 
 type TenantSpec struct {
 	Name     string `json:"name"`                // Logical tenant name (e.g. "alice")
-	User     string `json:"user"`                // Keycloak username (e.g. "alice")
+	User     string `json:"user"`                //  username (e.g. "alice")
 	GroupID  string `json:"group_id"`            // Wazuh agent group (e.g. "group_alice")
 	RoleID   string `json:"role_id,omitempty"`   // Optional explicit Wazuh role ID
 	PolicyID string `json:"policy_id,omitempty"` // Optional explicit Wazuh policy ID

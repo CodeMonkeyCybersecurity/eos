@@ -31,17 +31,17 @@ including telemetry, authentication, environment defaults, and other Eos behavio
 		Short: "Update Eos to the latest version",
 		Long: `Update Eos to the latest version from the git repository.
 
-Optionally update system packages and Go compiler version.
+By default, system packages are updated. Use flags to control behavior.
 
 Flags:
-  --system-packages   Update system packages (apt/yum/dnf/pacman)
+  --system-packages   Update system packages (default: true)
   --go-version        Update Go compiler to latest version
 
 Examples:
-  eos self update                              # Update only EOS binary
-  eos self update --system-packages            # Update EOS + system packages
-  eos self update --go-version                 # Update EOS + Go compiler
-  eos self update --system-packages --go-version  # Update everything`,
+  eos self update                              # Update EOS binary + system packages (default)
+  eos self update --system-packages=false      # Update only EOS binary
+  eos self update --go-version                 # Update EOS + system packages + Go compiler
+  eos self update --system-packages=false --go-version  # Update EOS + Go compiler only`,
 		RunE: eos.Wrap(updateEos),
 	}
 
@@ -64,7 +64,7 @@ func init() {
 	SelfCmd.AddCommand(EnrollCmd)
 
 	// Setup UpdateCmd flags
-	UpdateCmd.Flags().BoolVar(&updateSystemPackages, "system-packages", false, "Update system packages (apt/yum/dnf/pacman)")
+	UpdateCmd.Flags().BoolVar(&updateSystemPackages, "system-packages", true, "Update system packages (apt/yum/dnf/pacman)")
 	UpdateCmd.Flags().BoolVar(&updateGoVersion, "go-version", false, "Update Go compiler to latest version")
 
 	// Setup EnrollCmd flags

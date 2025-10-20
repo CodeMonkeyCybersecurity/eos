@@ -14,9 +14,7 @@ import (
 
 var (
 	authType, authURL, authToken, authOut string
-	authRealm, authKcAdminURL, authKcToken string // Legacy Keycloak support
 	authAkBaseURL, authAkToken             string // Authentik support
-	authWithClients, authWithGroupsAndRoles bool   // Keycloak specific
 )
 
 var AuthExportCmd = &cobra.Command{
@@ -24,24 +22,16 @@ var AuthExportCmd = &cobra.Command{
 	Short: "Export authentication configuration (Authentik blueprints or Keycloak realm)",
 	Long: `Export authentication system configuration to local files.
 
-Supports both Authentik (recommended) and Keycloak (deprecated) systems:
+Supports Authentik systems:
 
 Authentik Export:
   - Exports complete Authentik configuration as blueprints
   - Saves to timestamped YAML file
   - Includes flows, policies, property mappings, and providers
 
-Keycloak Export (Deprecated):
-  - Performs partial export of Keycloak realm
-  - Saves to timestamped JSON file  
-  - Optionally includes clients, groups, and roles
-
 Examples:
   # Export Authentik configuration (recommended)
   eos read auth --type authentik --url https://id.example.com --token $AK_TOKEN
-  
-  # Export Keycloak realm (deprecated)
-  eos read auth --type keycloak --realm demo --url https://sso.example.com --token $KC_TOKEN
   
   # Using environment variables
   export AUTH_URL=https://id.example.com
@@ -55,8 +45,6 @@ Examples:
 			// Try to detect from URL or environment
 			if authAkBaseURL != "" || os.Getenv("AK_URL") != "" {
 				authType = "authentik"
-			} else if authKcAdminURL != "" || os.Getenv("KC_ADMIN_URL") != "" {
-				authType = "keycloak"
 			} else {
 				// Default to Authentik for new deployments
 				authType = "authentik"
@@ -68,7 +56,7 @@ Examples:
 		case "authentik":
 			return exportAuthentik(rc)
 		default:
-			return fmt.Errorf("unsupported auth type: %s (supported: authentik, keycloak)", authType)
+			return fmt.Errorf("unsupported auth type: %s (supported: authentik)", authType)
 		}
 	}),
 }
@@ -98,7 +86,7 @@ func exportAuthentik(_ *eos_io.RuntimeContext) error {
 
 func init() {
 	// General flags
-	AuthExportCmd.Flags().StringVar(&authType, "type", "", "Auth system type: authentik (recommended) or keycloak (deprecated)")
+	AuthExportCmd.Flags().StringVar(&authType, "type", "", "Auth system type: authentik (recommended)")
 	AuthExportCmd.Flags().StringVar(&authURL, "url", os.Getenv("AUTH_URL"), "Authentication system base URL")
 	AuthExportCmd.Flags().StringVar(&authToken, "token", os.Getenv("AUTH_TOKEN"), "API token")
 	AuthExportCmd.Flags().StringVar(&authOut, "out", "", "Override output path")
@@ -106,11 +94,4 @@ func init() {
 	// Authentik-specific flags
 	AuthExportCmd.Flags().StringVar(&authAkBaseURL, "ak-url", os.Getenv("AK_URL"), "Authentik base URL")
 	AuthExportCmd.Flags().StringVar(&authAkToken, "ak-token", os.Getenv("AK_TOKEN"), "Authentik API token")
-
-	// Keycloak-specific flags (deprecated)
-	AuthExportCmd.Flags().StringVar(&authRealm, "realm", "", "Keycloak realm name (required for Keycloak)")
-	AuthExportCmd.Flags().StringVar(&authKcAdminURL, "kc-admin-url", os.Getenv("KC_ADMIN_URL"), "Keycloak admin URL")
-	AuthExportCmd.Flags().StringVar(&authKcToken, "kc-token", os.Getenv("KC_ADMIN_TOKEN"), "Keycloak bearer token")
-	AuthExportCmd.Flags().BoolVar(&authWithClients, "clients", true, "Include clients (Keycloak only)")
-	AuthExportCmd.Flags().BoolVar(&authWithGroupsAndRoles, "groups-roles", true, "Include groups & roles (Keycloak only)")
 }

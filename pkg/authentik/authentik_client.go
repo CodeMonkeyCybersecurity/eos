@@ -323,7 +323,7 @@ func (c *AuthentikClient) GetEvents(action string, since time.Time) ([]Authentik
 	return filtered, nil
 }
 
-// GetRegistrationEvents retrieves user registration events (equivalent to Keycloak REGISTER events)
+// GetRegistrationEvents retrieves user registration events
 func (c *AuthentikClient) GetRegistrationEvents(since time.Time) ([]AuthentikEvent, error) {
 	return c.GetEvents("user_write", since)
 }

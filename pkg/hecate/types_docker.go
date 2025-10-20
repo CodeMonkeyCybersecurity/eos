@@ -18,14 +18,7 @@ type DockerConfig struct {
 	AuthentikDBPassword   string
 	AuthentikSecretKey    string
 	AuthentikRedisPassword string
-	// Deprecated: Use Authentik instead
-	KeycloakEnabled       bool
-	KeycloakDomain        string
-	KeycloakDBName        string
-	KeycloakDBUser        string
-	KeycloakDBPassword    string
-	KeycloakAdminUser     string
-	KeycloakAdminPassword string
+
 }
 
 // ServiceSpec defines a service block for Docker Compose.
@@ -228,39 +221,6 @@ const DockerAuthentikService = `
       - hecate-net
 `
 
-// Deprecated: Use DockerAuthentikService instead
-const DockerKeycloakService = `
-  kc-db:
-    image: postgres:15
-    container_name: hecate-kc-db
-    environment:
-      POSTGRES_DB: {{ .KeycloakDBName }}
-      POSTGRES_USER: {{ .KeycloakDBUser }}
-      POSTGRES_PASSWORD: {{ .KeycloakDBPassword }}
-    volumes:
-      - kc-db-data:/var/lib/postgresql/data
-    networks:
-      - hecate-net
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:22.0
-    container_name: hecate-kc
-    command: start-dev --hostname-strict=false --hostname-url=https://{{ .KeycloakDomain }} --proxy=edge
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://hecate-kc-db:5432/{{ .KeycloakDBName }}
-      KC_DB_USERNAME: {{ .KeycloakDBUser }}
-      KC_DB_PASSWORD: {{ .KeycloakDBPassword }}
-      KEYCLOAK_ADMIN: {{ .KeycloakAdminUser }}
-      KEYCLOAK_ADMIN_PASSWORD: {{ .KeycloakAdminPassword }}
-      KC_HOSTNAME_ADMIN_URL: https://{{ .KeycloakDomain }}
-      KC_HOSTNAME_URL: https://{{ .KeycloakDomain }}
-    depends_on:
-      - kc-db
-    networks:
-      - hecate-net
-`
-
 // Centralized constants for Docker Compose sections
 const (
 	DockerNetworkName                = "hecate-net"
@@ -280,13 +240,6 @@ networks:
 volumes:
   ` + DockerVolumeAuthentikPostgresName + `:
   ` + DockerVolumeAuthentikRedisName + `:
-`
-
-	// Deprecated: Use DockerVolumesSection instead
-	DockerVolumesKeycloakSection = `
-
-volumes:
-  ` + DockerVolumeKCDBName + `:
 `
 )
 

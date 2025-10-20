@@ -20,7 +20,6 @@ type Client struct {
 type ClientType string
 
 const (
-	ClientTypeKeycloak  ClientType = "keycloak"  // Deprecated
 	ClientTypeAuthentik ClientType = "authentik"
 )
 

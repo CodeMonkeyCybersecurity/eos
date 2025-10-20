@@ -86,7 +86,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 		eeu.logger.Error(" Update failed, initiating rollback", zap.Error(updateErr))
 
 		if rollbackErr := eeu.Rollback(); rollbackErr != nil {
-			eeu.logger.Error("💥 CRITICAL: Rollback failed", zap.Error(rollbackErr))
+			eeu.logger.Error("CRITICAL: Rollback failed", zap.Error(rollbackErr))
 			return fmt.Errorf("update failed and rollback failed: update error: %w, rollback error: %v",
 				updateErr, rollbackErr)
 		}
@@ -307,6 +307,27 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 			strings.TrimSpace(string(libvirtOutput)), pkgConfigPath)
 	}
 
+	// Check Ceph development libraries (required for CephFS features)
+	var missingCephLibs []string
+	cephLibs := []string{"librados", "librbd", "libcephfs"}
+
+	for _, lib := range cephLibs {
+		cephCheck := exec.Command(pkgConfigPath, "--exists", lib)
+		if err := cephCheck.Run(); err != nil {
+			missingCephLibs = append(missingCephLibs, lib)
+		}
+	}
+
+	if len(missingCephLibs) > 0 {
+		return fmt.Errorf("Ceph development libraries not found: %v\n"+
+			"Command: %s --exists %s\n"+
+			"Fix: Install Ceph development libraries:\n"+
+			"  Ubuntu/Debian: sudo apt install librados-dev librbd-dev libcephfs-dev\n"+
+			"  RHEL/CentOS:   sudo yum install librados-devel librbd-devel libcephfs-devel\n"+
+			"  Fedora:        sudo dnf install librados-devel librbd-devel libcephfs-devel",
+			missingCephLibs, pkgConfigPath, strings.Join(missingCephLibs, ", "))
+	}
+
 	eeu.logger.Info(" Build dependencies verified")
 	return nil
 }
@@ -371,12 +392,24 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 	eeu.logger.Info("Libvirt development libraries detected",
 		zap.String("pkg_config_path", pkgConfigPath))
 
+	// Verify Ceph libraries are available (required for CephFS features)
+	cephLibs := []string{"librados", "librbd", "libcephfs"}
+	for _, lib := range cephLibs {
+		cephCheckCmd := exec.Command(pkgConfigPath, "--exists", lib)
+		if err := cephCheckCmd.Run(); err != nil {
+			return "", fmt.Errorf("%s development libraries not found - install librados-dev librbd-dev libcephfs-dev (Debian) or librados-devel librbd-devel libcephfs-devel (RHEL): %w", lib, err)
+		}
+	}
+
+	eeu.logger.Info("Ceph development libraries detected",
+		zap.String("pkg_config_path", pkgConfigPath))
+
 	// Build command - use the Go path we found during verification
 	buildArgs := []string{"build", "-o", tempBinary, "."}
 	buildCmd := exec.Command(eeu.goPath, buildArgs...)
 	buildCmd.Dir = eeu.config.SourceDir
 
-	// Set build environment - CGO must be enabled for libvirt
+	// Set build environment - CGO must be enabled for libvirt and Ceph
 	buildCmd.Env = append(os.Environ(),
 		"CGO_ENABLED=1",
 		"GO111MODULE=on",
@@ -623,7 +656,7 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 
 // Rollback reverts all changes made during the update
 func (eeu *EnhancedEosUpdater) Rollback() error {
-	eeu.logger.Warn("🔙 Initiating rollback procedure")
+	eeu.logger.Warn("Initiating rollback procedure")
 
 	var rollbackErrors []error
 
@@ -712,7 +745,7 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 
 // UpdateSystemPackages updates the system package manager (apt/yum/dnf/pacman)
 func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
-	eeu.logger.Info("📦 Updating system packages")
+	eeu.logger.Info("Updating system packages")
 
 	// Detect package manager
 	packageManager := eeu.detectPackageManager()
@@ -752,9 +785,14 @@ func (eeu *EnhancedEosUpdater) detectPackageManager() string {
 func (eeu *EnhancedEosUpdater) updateApt() error {
 	eeu.logger.Info("Running apt update && apt upgrade")
 
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("system package updates require root privileges - run with sudo")
+	}
+
 	// Step 1: apt update (refresh package lists)
 	eeu.logger.Info("  Step 1/2: Refreshing package lists (apt update)")
-	updateCmd := exec.Command("sudo", "apt", "update")
+	updateCmd := exec.Command("apt", "update")
 	updateCmd.Stdout = os.Stdout
 	updateCmd.Stderr = os.Stderr
 
@@ -766,7 +804,7 @@ func (eeu *EnhancedEosUpdater) updateApt() error {
 
 	// Step 2: apt upgrade (install updates)
 	eeu.logger.Info("  Step 2/2: Installing package updates (apt upgrade)")
-	upgradeCmd := exec.Command("sudo", "apt", "upgrade", "-y")
+	upgradeCmd := exec.Command("apt", "upgrade", "-y")
 	upgradeCmd.Stdout = os.Stdout
 	upgradeCmd.Stderr = os.Stderr
 
@@ -782,7 +820,12 @@ func (eeu *EnhancedEosUpdater) updateApt() error {
 func (eeu *EnhancedEosUpdater) updateYumDnf(manager string) error {
 	eeu.logger.Info(fmt.Sprintf("Running %s update", manager))
 
-	updateCmd := exec.Command("sudo", manager, "update", "-y")
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("system package updates require root privileges - run with sudo")
+	}
+
+	updateCmd := exec.Command(manager, "update", "-y")
 	updateCmd.Stdout = os.Stdout
 	updateCmd.Stderr = os.Stderr
 
@@ -798,7 +841,12 @@ func (eeu *EnhancedEosUpdater) updateYumDnf(manager string) error {
 func (eeu *EnhancedEosUpdater) updatePacman() error {
 	eeu.logger.Info("Running pacman -Syu")
 
-	updateCmd := exec.Command("sudo", "pacman", "-Syu", "--noconfirm")
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("system package updates require root privileges - run with sudo")
+	}
+
+	updateCmd := exec.Command("pacman", "-Syu", "--noconfirm")
 	updateCmd.Stdout = os.Stdout
 	updateCmd.Stderr = os.Stderr
 
@@ -812,7 +860,7 @@ func (eeu *EnhancedEosUpdater) updatePacman() error {
 
 // UpdateGoVersion checks and updates the Go compiler if a newer version is available
 func (eeu *EnhancedEosUpdater) UpdateGoVersion() error {
-	eeu.logger.Info("🔧 Checking Go compiler version")
+	eeu.logger.Info("Checking Go compiler version")
 
 	// Get current Go version
 	currentVersion, err := eeu.getCurrentGoVersion()
@@ -837,7 +885,7 @@ func (eeu *EnhancedEosUpdater) UpdateGoVersion() error {
 		return nil
 	}
 
-	eeu.logger.Info("📥 Newer Go version available",
+	eeu.logger.Info("Newer Go version available",
 		zap.String("current", currentVersion),
 		zap.String("latest", latestVersion))
 
@@ -935,14 +983,19 @@ func (eeu *EnhancedEosUpdater) installGoVersion(version string) error {
 
 	eeu.logger.Info("Installing Go to /usr/local")
 
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("Go installation requires root privileges - run with sudo")
+	}
+
 	// Remove old Go installation
-	removeCmd := exec.Command("sudo", "rm", "-rf", "/usr/local/go")
+	removeCmd := exec.Command("rm", "-rf", "/usr/local/go")
 	if err := removeCmd.Run(); err != nil {
 		eeu.logger.Warn("Could not remove old Go installation", zap.Error(err))
 	}
 
 	// Extract new Go
-	extractCmd := exec.Command("sudo", "tar", "-C", "/usr/local", "-xzf", tempFile)
+	extractCmd := exec.Command("tar", "-C", "/usr/local", "-xzf", tempFile)
 	extractCmd.Stdout = os.Stdout
 	extractCmd.Stderr = os.Stderr
 

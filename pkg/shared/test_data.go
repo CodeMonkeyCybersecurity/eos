@@ -10,7 +10,7 @@ func GenerateTestData() map[string]interface{} {
 				"username": "alice",
 				"fullname": "Alice Wonderland",
 				"email":    "alice@cybermonkey.dev",
-				"groups":   []string{"users", "nextcloud", "keycloak"},
+				"groups":   []string{"users", "nextcloud", "hera"},
 				"password": "S3cr3tP@ssw0rd!",
 			},
 			{
@@ -21,10 +21,10 @@ func GenerateTestData() map[string]interface{} {
 				"password": "CanWeFixIt?YesWeCan!",
 			},
 		},
-		"groups": []string{"users", "admins", "nextcloud", "keycloak", "ldap", "scim"},
+		"groups": []string{"users", "admins", "nextcloud", "hera", "ldap", "scim"},
 		"services": map[string]string{
 			"wazuh_api_url": "https://wazuh.cybermonkey.dev",
-			"keycloak_url":  "https://keycloak.cybermonkey.dev",
+			"hera_url":  "https://hera.cybermonkey.dev",
 			"nextcloud_url": "https://nextcloud.cybermonkey.dev",
 		},
 	}

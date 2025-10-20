@@ -38,7 +38,7 @@ type Upstream struct {
 // AuthPolicy represents authentication and authorization configuration
 type AuthPolicy struct {
 	Name         string            `json:"name" yaml:"name"`
-	Provider     string            `json:"provider" yaml:"provider"` // authentik, keycloak, etc
+	Provider     string            `json:"provider" yaml:"provider"` // authentik, etc
 	Flow         string            `json:"flow,omitempty" yaml:"flow,omitempty"`
 	Groups       []string          `json:"groups,omitempty" yaml:"groups,omitempty"`
 	RequireMFA   bool              `json:"require_mfa" yaml:"require_mfa"`
@@ -146,7 +146,6 @@ type SSLInfo struct {
 type HecateConfig struct {
 	CaddyAPIEndpoint     string            `json:"caddy_api_endpoint" yaml:"caddy_api_endpoint"`
 	AuthentikAPIEndpoint string            `json:"authentik_api_endpoint" yaml:"authentik_api_endpoint"`
-	KeycloakAPIEndpoint  string            `json:"keycloak_api_endpoint,omitempty" yaml:"keycloak_api_endpoint,omitempty"`
 	HetznerAPIToken      string            `json:"hetzner_api_token,omitempty" yaml:"hetzner_api_token,omitempty"`
 	CloudflareAPIToken   string            `json:"cloudflare_api_token,omitempty" yaml:"cloudflare_api_token,omitempty"`
 	StateBackend         string            `json:"state_backend" yaml:"state_backend"` // consul, file, etcd, etc
@@ -202,7 +201,7 @@ type ReconcileError struct {
 // AuthProvider represents an authentication provider configuration
 type AuthProvider struct {
 	Name         string            `json:"name" yaml:"name"`
-	Type         string            `json:"type" yaml:"type"` // authentik, keycloak, oauth2, saml
+	Type         string            `json:"type" yaml:"type"` // authentik, oauth2, saml
 	Endpoint     string            `json:"endpoint" yaml:"endpoint"`
 	ClientID     string            `json:"client_id" yaml:"client_id"`
 	ClientSecret string            `json:"client_secret,omitempty" yaml:"client_secret,omitempty"`

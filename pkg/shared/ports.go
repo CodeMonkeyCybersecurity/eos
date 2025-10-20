@@ -14,7 +14,6 @@ const (
 	PortMailcow    = 8053
 	PortGrafana    = 8069
 	// Deprecated: Use PortAuthentik instead
-	PortKeycloak     = 8080
 	PortElk          = 8081
 	PortStack        = 8087
 	PortArachne      = 8089
@@ -130,7 +129,6 @@ var AppProxies = []AppProxy{
 	{AppName: "grafana", Subdomain: "g", BackendPort: PortGrafana},
 	{AppName: "authentik", Subdomain: "hera", BackendPort: PortAuthentik},
 	// Deprecated: Use authentik instead
-	{AppName: "keycloak", Subdomain: "hera", BackendPort: PortKeycloak},
 	{AppName: "elk", Subdomain: "e", BackendPort: PortElk},
 	{AppName: "stack", Subdomain: "e", BackendPort: PortStack},
 	{AppName: "arachne", Subdomain: "arachne", BackendPort: PortArachne},

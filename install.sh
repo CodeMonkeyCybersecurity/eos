@@ -352,6 +352,82 @@ check_libvirt_deps() {
   fi
 }
 
+check_ceph_deps() {
+  if $IS_LINUX; then
+    log INFO " Checking for Ceph development dependencies (REQUIRED)..."
+
+    local missing_deps=()
+
+    # Check for pkg-config (should already be installed by check_libvirt_deps, but verify)
+    if ! command -v pkg-config >/dev/null 2>&1; then
+      missing_deps+=("pkg-config")
+    fi
+
+    # Check for librados development files
+    if ! pkg-config --exists librados 2>/dev/null; then
+      if $IS_DEBIAN; then
+        missing_deps+=("librados-dev")
+      elif $IS_RHEL; then
+        missing_deps+=("librados-devel")
+      fi
+    fi
+
+    # Check for librbd development files
+    if ! pkg-config --exists librbd 2>/dev/null; then
+      if $IS_DEBIAN; then
+        missing_deps+=("librbd-dev")
+      elif $IS_RHEL; then
+        missing_deps+=("librbd-devel")
+      fi
+    fi
+
+    # Check for libcephfs development files
+    if ! pkg-config --exists libcephfs 2>/dev/null; then
+      if $IS_DEBIAN; then
+        missing_deps+=("libcephfs-dev")
+      elif $IS_RHEL; then
+        missing_deps+=("libcephfs-devel")
+      fi
+    fi
+
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+      log ERR " Missing REQUIRED Ceph dependencies: ${missing_deps[*]}"
+      log ERR " Eos requires Ceph development libraries to build CephFS support"
+
+      # Only auto-install if running as root
+      if [[ "$EUID" -eq 0 ]]; then
+        log INFO " Installing required Ceph dependencies..."
+
+        if $IS_DEBIAN; then
+          apt-get install -y --no-install-recommends "${missing_deps[@]}"
+        elif $IS_RHEL; then
+          if command -v dnf >/dev/null 2>&1; then
+            dnf install -y "${missing_deps[@]}"
+          elif command -v yum >/dev/null 2>&1; then
+            yum install -y "${missing_deps[@]}"
+          fi
+        fi
+
+        log INFO " Ceph dependencies installed successfully"
+      else
+        log ERR " Cannot continue without Ceph libraries. Install manually:"
+        if $IS_DEBIAN; then
+          log ERR "   sudo apt-get install ${missing_deps[*]}"
+        elif $IS_RHEL; then
+          log ERR "   sudo yum install ${missing_deps[*]}"
+        fi
+        exit 1
+      fi
+    else
+      log INFO " All required Ceph dependencies are satisfied"
+    fi
+  elif $IS_MAC; then
+    log ERR " Eos cannot be built on macOS - Ceph libraries are required and not available on macOS"
+    log ERR " Eos is designed to run on Linux servers only"
+    exit 1
+  fi
+}
+
 check_prerequisites() {
   local go_found=false
 
@@ -384,6 +460,9 @@ check_prerequisites() {
 
   # Check for libvirt dependencies (required for KVM features)
   check_libvirt_deps
+
+  # Check for Ceph dependencies (required for CephFS features)
+  check_ceph_deps
 
   # Verify Go is now available
   log INFO "Go detected and ready. Version details: $(go version)"
@@ -433,13 +512,13 @@ backup_existing_binary() {
 }
 
 build_eos_binary() {
-  log INFO " Building Eos with libvirt support..."
+  log INFO " Building Eos with libvirt and Ceph support..."
   cd "$Eos_SRC_DIR"
 
   # Build to temp location first
   TEMP_BINARY="/tmp/eos-build-$(date +%s)"
 
-  # Libvirt is required - this should have been checked by check_libvirt_deps()
+  # Libvirt and Ceph are required - this should have been checked by check_libvirt_deps() and check_ceph_deps()
   # but double-check here for safety
   if ! command -v pkg-config >/dev/null 2>&1 || ! pkg-config --exists libvirt 2>/dev/null; then
     log ERR " Libvirt development libraries not found - this should have been caught earlier"
@@ -447,9 +526,15 @@ build_eos_binary() {
     exit 1
   fi
 
-  log INFO " Building with CGO enabled for libvirt"
+  if ! pkg-config --exists librados 2>/dev/null || ! pkg-config --exists librbd 2>/dev/null || ! pkg-config --exists libcephfs 2>/dev/null; then
+    log ERR " Ceph development libraries not found - this should have been caught earlier"
+    log ERR " Cannot build Eos without Ceph libraries. Please run: sudo apt-get install librados-dev librbd-dev libcephfs-dev"
+    exit 1
+  fi
 
-  # Build with CGO enabled (required for libvirt)
+  log INFO " Building with CGO enabled for libvirt and Ceph"
+
+  # Build with CGO enabled (required for libvirt and Ceph)
   CGO_ENABLED=1 GO111MODULE=on go build -o "$TEMP_BINARY" .
 
   if [ $? -ne 0 ]; then
