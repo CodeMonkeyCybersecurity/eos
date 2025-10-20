@@ -4,6 +4,7 @@ package create
 
 import (
 	"fmt"
+	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -20,41 +21,134 @@ func init() {
 	CreateCmd.AddCommand(CreateHecateCmd)
 }
 
+var (
+	configFile string
+	outputDir  string
+)
+
 // CreateHecateCmd creates the `create hecate` subcommand
 var CreateHecateCmd = &cobra.Command{
 	Use:   "hecate",
 	Short: "Deploy Hecate reverse proxy framework",
 	Long: `Deploy Hecate reverse proxy framework using Docker Compose.
 
-This command deploys a minimal reverse proxy stack with:
-- Caddy reverse proxy (HTTP/HTTPS with automatic Let's Encrypt)
-- Authentik identity provider (SSO at hera.yourdomain.com)
-- PostgreSQL database (for Authentik)
-- Redis cache (for Authentik)
+MODE 1: YAML Configuration (Recommended)
+  Deploy from a simple YAML config file that defines your apps and their backends.
 
-Additional components can be added later:
-- Nginx stream proxy (for TCP/UDP non-HTTP services) - coming soon
-- Coturn TURN/STUN server (for WebRTC services) - coming soon
+  Example config.yaml:
+    apps:
+      main:
+        domain: cybermonkey.dev
+        backend: 100.65.138.128:8009
+
+      wazuh:
+        domain: delphi.cybermonkey.dev
+        backend: 100.88.163.85
+
+      authentik:
+        domain: hera.cybermonkey.dev
+
+  eos create hecate --config config.yaml
+
+MODE 2: Interactive Wizard
+  Interactive setup that guides you through configuration.
+
+  eos create hecate
 
 The deployment creates configuration files at /opt/hecate/:
 - docker-compose.yml - Container orchestration
 - Caddyfile - Caddy reverse proxy configuration
-- .env - Environment variables and secrets
-
-Interactive wizard will collect:
-- Primary domain name (e.g., example.com)
+- .env - Environment variables (if Authentik is configured)
 
 Examples:
-  eos create hecate                # Deploy Hecate with interactive wizard
-  eos create hecate --help         # Show this help message`,
+  eos create hecate --config example.yaml           # Deploy from YAML config
+  eos create hecate --config example.yaml --output /opt/hecate  # Custom output dir
+  eos create hecate                                 # Interactive wizard
+  eos create hecate --help                          # Show this help message`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 		log.Info("Starting Hecate deployment")
 
-		// Default deployment method is Docker Compose
-		log.Info("Using Docker Compose deployment method")
+		// Check if config file was provided
+		if configFile != "" {
+			log.Info("Using YAML configuration mode",
+				zap.String("config_file", configFile),
+				zap.String("output_dir", outputDir))
+
+			// Load YAML configuration
+			config, err := hecate.LoadYAMLConfig(rc, configFile)
+			if err != nil {
+				return fmt.Errorf("failed to load YAML config: %w", err)
+			}
+
+			// Display detected apps
+			log.Info("Configuration loaded successfully")
+			log.Info("terminal prompt: Detected apps:")
+			for appName, app := range config.Apps {
+				features := []string{}
+				if len(app.TCPPorts) > 0 {
+					features = append(features, "TCP")
+				}
+				if app.RequiresCoturn {
+					features = append(features, "WebRTC")
+				}
+				if app.SSO {
+					features = append(features, "SSO")
+				}
+
+				featureStr := ""
+				if len(features) > 0 {
+					featureStr = fmt.Sprintf(" (%s)", strings.Join(features, ", "))
+				}
+
+				log.Info(fmt.Sprintf("terminal prompt:   %s (%s)%s -> %s:%d",
+					appName, app.Type, featureStr, app.Backend, app.BackendPort))
+			}
+
+			if config.HasAuthentik {
+				log.Info("terminal prompt: Infrastructure:")
+				log.Info("terminal prompt:   Authentik SSO at " + config.AuthentikDomain)
+			}
+			if config.NeedsCoturn {
+				log.Info("terminal prompt:   Coturn TURN/STUN server (WebRTC)")
+			}
+			if config.NeedsNginx {
+				log.Info("terminal prompt:   Nginx stream proxy (TCP/UDP)")
+			}
+
+			// Generate infrastructure
+			log.Info("Generating infrastructure configuration")
+			if err := hecate.GenerateFromYAML(rc, config, outputDir); err != nil {
+				return fmt.Errorf("failed to generate configuration: %w", err)
+			}
+
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: Hecate infrastructure generated successfully!")
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: Next steps:")
+			log.Info("terminal prompt:   1. Review generated files in " + outputDir)
+			if config.HasAuthentik {
+				log.Info("terminal prompt:   2. Edit .env file with secure passwords")
+				log.Info("terminal prompt:   3. Start services: cd " + outputDir + " && docker compose up -d")
+			} else {
+				log.Info("terminal prompt:   2. Start services: cd " + outputDir + " && docker compose up -d")
+			}
+			log.Info("terminal prompt:   4. Check status: docker compose ps")
+			log.Info("terminal prompt:   5. View logs: docker compose logs -f")
+
+			return nil
+		}
+
+		// Default to interactive wizard
+		log.Info("Using interactive wizard mode")
 		return hecate.OrchestrateHecateWizard(rc)
 	}),
+}
+
+func init() {
+	// Add flags
+	CreateHecateCmd.Flags().StringVarP(&configFile, "config", "c", "", "Path to YAML configuration file")
+	CreateHecateCmd.Flags().StringVarP(&outputDir, "output", "o", "/opt/hecate", "Output directory for generated files")
 }
 
 // CreateCaddyCmd installs Caddy web server
