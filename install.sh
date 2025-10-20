@@ -315,24 +315,54 @@ check_libvirt_deps() {
     fi
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
-      log ERR " Missing REQUIRED libvirt dependencies: ${missing_deps[*]}"
-      log ERR " Eos requires libvirt development libraries to build"
+      log WARN " Missing REQUIRED libvirt dependencies: ${missing_deps[*]}"
+      log INFO " Eos requires libvirt development libraries to build"
 
       # Only auto-install if running as root
       if [[ "$EUID" -eq 0 ]]; then
-        log INFO " Installing required libvirt dependencies..."
-
-        if $IS_DEBIAN; then
-          apt-get install -y --no-install-recommends "${missing_deps[@]}"
-        elif $IS_RHEL; then
-          if command -v dnf >/dev/null 2>&1; then
-            dnf install -y "${missing_deps[@]}"
-          elif command -v yum >/dev/null 2>&1; then
-            yum install -y "${missing_deps[@]}"
-          fi
+        # Informed consent prompt (unless --yes flag provided)
+        if [ "$AUTO_YES" = true ]; then
+          log INFO " Auto-installing libvirt dependencies (--yes flag provided)"
+          REPLY="y"
+        else
+          echo ""
+          echo "The following packages need to be installed:"
+          for dep in "${missing_deps[@]}"; do
+            echo "  - $dep"
+          done
+          echo ""
+          read -p "Install these packages now? [y/N] " -n 1 -r
+          echo ""
         fi
 
-        log INFO " Libvirt dependencies installed successfully"
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+          log INFO " Installing required libvirt dependencies..."
+
+          if $IS_DEBIAN; then
+            apt-get install -y --no-install-recommends "${missing_deps[@]}"
+          elif $IS_RHEL; then
+            if command -v dnf >/dev/null 2>&1; then
+              dnf install -y "${missing_deps[@]}"
+            elif command -v yum >/dev/null 2>&1; then
+              yum install -y "${missing_deps[@]}"
+            fi
+          fi
+
+          # Update library cache so pkg-config can find the libraries
+          log INFO " Updating library cache (ldconfig)"
+          ldconfig 2>/dev/null || true
+
+          log INFO " Libvirt dependencies installed successfully"
+        else
+          log ERR " Cannot continue without libvirt dependencies"
+          log INFO " Install manually and run again:"
+          if $IS_DEBIAN; then
+            log INFO "   sudo apt-get install ${missing_deps[*]}"
+          elif $IS_RHEL; then
+            log INFO "   sudo yum install ${missing_deps[*]}"
+          fi
+          exit 1
+        fi
       else
         log ERR " Cannot continue without libvirt. Install manually:"
         if $IS_DEBIAN; then
@@ -391,24 +421,54 @@ check_ceph_deps() {
     fi
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
-      log ERR " Missing REQUIRED Ceph dependencies: ${missing_deps[*]}"
-      log ERR " Eos requires Ceph development libraries to build CephFS support"
+      log WARN " Missing REQUIRED Ceph dependencies: ${missing_deps[*]}"
+      log INFO " Eos requires Ceph development libraries to build CephFS support"
 
       # Only auto-install if running as root
       if [[ "$EUID" -eq 0 ]]; then
-        log INFO " Installing required Ceph dependencies..."
-
-        if $IS_DEBIAN; then
-          apt-get install -y --no-install-recommends "${missing_deps[@]}"
-        elif $IS_RHEL; then
-          if command -v dnf >/dev/null 2>&1; then
-            dnf install -y "${missing_deps[@]}"
-          elif command -v yum >/dev/null 2>&1; then
-            yum install -y "${missing_deps[@]}"
-          fi
+        # Informed consent prompt (unless --yes flag provided)
+        if [ "$AUTO_YES" = true ]; then
+          log INFO " Auto-installing Ceph dependencies (--yes flag provided)"
+          REPLY="y"
+        else
+          echo ""
+          echo "The following packages need to be installed:"
+          for dep in "${missing_deps[@]}"; do
+            echo "  - $dep"
+          done
+          echo ""
+          read -p "Install these packages now? [y/N] " -n 1 -r
+          echo ""
         fi
 
-        log INFO " Ceph dependencies installed successfully"
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+          log INFO " Installing required Ceph dependencies..."
+
+          if $IS_DEBIAN; then
+            apt-get install -y --no-install-recommends "${missing_deps[@]}"
+          elif $IS_RHEL; then
+            if command -v dnf >/dev/null 2>&1; then
+              dnf install -y "${missing_deps[@]}"
+            elif command -v yum >/dev/null 2>&1; then
+              yum install -y "${missing_deps[@]}"
+            fi
+          fi
+
+          # Update library cache so pkg-config can find the libraries
+          log INFO " Updating library cache (ldconfig)"
+          ldconfig 2>/dev/null || true
+
+          log INFO " Ceph dependencies installed successfully"
+        else
+          log ERR " Cannot continue without Ceph dependencies"
+          log INFO " Install manually and run again:"
+          if $IS_DEBIAN; then
+            log INFO "   sudo apt-get install ${missing_deps[*]}"
+          elif $IS_RHEL; then
+            log INFO "   sudo yum install ${missing_deps[*]}"
+          fi
+          exit 1
+        fi
       else
         log ERR " Cannot continue without Ceph libraries. Install manually:"
         if $IS_DEBIAN; then
@@ -526,9 +586,23 @@ build_eos_binary() {
     exit 1
   fi
 
-  if ! pkg-config --exists librados 2>/dev/null || ! pkg-config --exists librbd 2>/dev/null || ! pkg-config --exists libcephfs 2>/dev/null; then
-    log ERR " Ceph development libraries not found - this should have been caught earlier"
-    log ERR " Cannot build Eos without Ceph libraries. Please run: sudo apt-get install librados-dev librbd-dev libcephfs-dev"
+  # Check each Ceph library individually for better error messages
+  local missing_ceph_libs=()
+  if ! pkg-config --exists librados 2>/dev/null; then
+    missing_ceph_libs+=("librados")
+  fi
+  if ! pkg-config --exists librbd 2>/dev/null; then
+    missing_ceph_libs+=("librbd")
+  fi
+  if ! pkg-config --exists libcephfs 2>/dev/null; then
+    missing_ceph_libs+=("libcephfs")
+  fi
+
+  if [ ${#missing_ceph_libs[@]} -gt 0 ]; then
+    log ERR " Missing Ceph libraries: ${missing_ceph_libs[*]}"
+    log ERR " This should have been caught earlier by check_ceph_deps()"
+    log ERR " Please run: sudo apt-get install librados-dev librbd-dev libcephfs-dev"
+    log ERR " Then run ldconfig to update library cache: sudo ldconfig"
     exit 1
   fi
 
@@ -628,6 +702,7 @@ create_directories() {
 main() {
   # Parse command line arguments
   local skip_update=false
+  local auto_yes=false
   for arg in "$@"; do
     case $arg in
       --skip-update)
@@ -635,16 +710,25 @@ main() {
         log INFO " Skipping system package update (--skip-update flag provided)"
         shift
         ;;
+      --yes|-y)
+        auto_yes=true
+        log INFO " Auto-accepting all prompts (--yes flag provided)"
+        shift
+        ;;
       --help|-h)
         echo "Usage: $0 [OPTIONS]"
         echo ""
         echo "Options:"
         echo "  --skip-update    Skip system package updates (apt/yum/dnf)"
+        echo "  --yes, -y        Auto-accept all prompts (for automation/CI)"
         echo "  --help, -h       Show this help message"
         exit 0
         ;;
     esac
   done
+
+  # Export for use in functions
+  export AUTO_YES=$auto_yes
   
   detect_platform
   

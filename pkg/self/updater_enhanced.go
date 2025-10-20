@@ -100,8 +100,9 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 		eeu.logger.Warn("Post-update cleanup had issues", zap.Error(err))
 	}
 
-	// Update system packages if requested
+	// Update system packages if requested (default: true)
 	if eeu.enhancedConfig.UpdateSystemPackages {
+		eeu.logger.Info("System package updates enabled (use --system-packages=false to skip)")
 		if err := eeu.UpdateSystemPackages(); err != nil {
 			eeu.logger.Warn("System package update had issues", zap.Error(err))
 			// Non-fatal - continue
