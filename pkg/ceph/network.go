@@ -80,26 +80,43 @@ func CheckNetwork(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 
 	// First, check if monitor ports are listening locally
 	logger.Info("")
-	logger.Info("Checking if monitor ports are listening:")
+	logger.Info("Checking if monitor ports are listening on this host:")
 	cmd = exec.Command("ss", "-tlnp")
 	output, _ = cmd.Output()
 	ssOutput := string(output)
 
 	monPortsListening := false
-	for _, port := range []string{"3300", "6789"} {
-		if strings.Contains(ssOutput, ":"+port) {
-			logger.Info(fmt.Sprintf("  ✓ Port %s is LISTENING", port))
-			monPortsListening = true
+	portDetails := make(map[string]string) // port -> process info
 
-			// Extract which process is listening
-			if verbose {
-				lines := strings.Split(ssOutput, "\n")
-				for _, line := range lines {
-					if strings.Contains(line, ":"+port) {
-						logger.Info("    " + strings.TrimSpace(line))
+	for _, port := range []string{"3300", "6789"} {
+		listening := false
+		processInfo := ""
+
+		lines := strings.Split(ssOutput, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, ":"+port) {
+				listening = true
+				// Extract process info from ss output
+				// Format: LISTEN 0 128 *:3300 *:* users:(("ceph-mon",pid=1234,fd=42))
+				if strings.Contains(line, "users:") {
+					parts := strings.Split(line, "users:")
+					if len(parts) > 1 {
+						processInfo = strings.TrimSpace(parts[1])
 					}
 				}
+				break
 			}
+		}
+
+		if listening {
+			logger.Info(fmt.Sprintf("  ✓ Port %s is LISTENING", port))
+			if processInfo != "" {
+				portDetails[port] = processInfo
+				if verbose {
+					logger.Info(fmt.Sprintf("    Process: %s", processInfo))
+				}
+			}
+			monPortsListening = true
 		} else {
 			logger.Warn(fmt.Sprintf("  ✗ Port %s is NOT listening", port))
 		}
@@ -109,11 +126,28 @@ func CheckNetwork(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 		logger.Error("❌ CRITICAL: No monitor ports are listening!")
 		logger.Info("  → This means ceph-mon is not running or failed to bind ports")
 		logger.Info("  → Check: journalctl -u ceph-mon@* -n 50")
+		logger.Info("  → Or check if mon is listening on different ports")
+		logger.Info("")
+		logger.Info("Current listening ports:")
+		cmd = exec.Command("ss", "-tlnp")
+		if output, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			for i, line := range lines {
+				if i < 10 && strings.TrimSpace(line) != "" { // Show first 10 lines
+					logger.Info("  " + line)
+				}
+			}
+		}
 		return DiagnosticResult{
 			CheckName: "Network",
 			Passed:    false,
 			Error:     fmt.Errorf("monitor ports not listening - daemon not running"),
 		}
+	}
+
+	// Show summary of listening ports
+	if !verbose && len(portDetails) > 0 {
+		logger.Info("  → Monitor daemon is listening and ready")
 	}
 
 	// Now check connectivity to configured IPs

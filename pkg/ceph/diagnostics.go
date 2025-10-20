@@ -184,26 +184,41 @@ func CheckConnectivity(logger otelzap.LoggerWithCtx) DiagnosticResult {
 		// Try to provide specific guidance based on error message
 		outputLower := strings.ToLower(outputStr)
 		logger.Info("")
-		logger.Info("Likely cause:")
+		logger.Info("Likely cause and remediation:")
 		switch {
 		case strings.Contains(outputLower, "no such file"):
 			logger.Info("  → Configuration file or keyring not found")
 			logger.Info("  → Check: ls -la /etc/ceph/")
+			logger.Info("  → Expected files: ceph.conf, ceph.client.admin.keyring")
 		case strings.Contains(outputLower, "permission denied"):
 			logger.Info("  → Insufficient permissions to read keyring")
 			logger.Info("  → Check: ls -la /etc/ceph/*.keyring")
+			logger.Info("  → Fix: sudo chmod 644 /etc/ceph/*.keyring")
 		case strings.Contains(outputLower, "connection refused"):
 			logger.Info("  → Monitor is not listening on expected ports")
 			logger.Info("  → Check: ss -tlnp | grep -E '(3300|6789)'")
+			logger.Info("  → Check: ps aux | grep ceph-mon")
+			logger.Info("  → Start: systemctl start ceph-mon.target")
 		case strings.Contains(outputLower, "connection timed out"):
 			logger.Info("  → Network cannot reach monitor host")
-			logger.Info("  → Check firewall or network configuration")
+			logger.Info("  → Check firewall: sudo ufw status")
+			logger.Info("  → Check routing: ip route get <monitor-ip>")
+			logger.Info("  → Test connectivity: ping <monitor-ip>")
 		case strings.Contains(outputLower, "authentication"):
 			logger.Info("  → Keyring authentication failed")
 			logger.Info("  → Verify keyring matches cluster")
+			logger.Info("  → Try: ceph auth list (from working node)")
+		case strings.Contains(outputLower, "timed out"):
+			logger.Info("  → Connection to monitor timed out")
+			logger.Info("  → Possible causes:")
+			logger.Info("    1. Monitor process is not running (check: ps aux | grep ceph-mon)")
+			logger.Info("    2. Monitor ports not listening (check: ss -tlnp | grep -E '(3300|6789)')")
+			logger.Info("    3. Firewall blocking connection (check: sudo ufw status)")
+			logger.Info("    4. Wrong monitor address in config (check: grep mon_host /etc/ceph/ceph.conf)")
 		default:
 			logger.Info("  → Unknown connection error (see output above)")
 			logger.Info("  → Try: ceph -s --debug-ms 1 for detailed output")
+			logger.Info("  → Check: journalctl -u ceph-mon@* -n 50")
 		}
 
 		return DiagnosticResult{

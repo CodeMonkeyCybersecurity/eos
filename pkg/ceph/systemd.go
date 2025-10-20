@@ -16,6 +16,11 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 	// Get detailed status of critical Ceph units
 	criticalUnits := []string{"ceph.target", "ceph-mon.target", "ceph-mgr.target", "ceph-osd.target"}
 
+	// Track specific instance units separately to detect missing daemons
+	monInstances := []string{}
+	mgrInstances := []string{}
+	osdInstances := []string{}
+
 	// Check if any specific mon/mgr/osd instances exist
 	cmd := exec.Command("systemctl", "list-units", "ceph-mon@*", "ceph-mgr@*", "ceph-osd@*", "--all", "--no-pager")
 	output, err := cmd.Output()
@@ -38,6 +43,15 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 					}
 					if !found {
 						criticalUnits = append(criticalUnits, unitName)
+
+						// Track by daemon type
+						if strings.Contains(unitName, "ceph-mon@") {
+							monInstances = append(monInstances, unitName)
+						} else if strings.Contains(unitName, "ceph-mgr@") {
+							mgrInstances = append(mgrInstances, unitName)
+						} else if strings.Contains(unitName, "ceph-osd@") {
+							osdInstances = append(osdInstances, unitName)
+						}
 					}
 				}
 			}
@@ -107,6 +121,48 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 	logger.Info("")
 	logger.Info(fmt.Sprintf("Summary: %d active, %d inactive, %d failed", activeCount, inactiveCount, failedCount))
 
+	// Check for critical missing daemon instances
+	logger.Info("")
+	if len(monInstances) == 0 {
+		logger.Error("❌ CRITICAL: No ceph-mon instances found in systemd!")
+		logger.Info("  → Expected format: ceph-mon@<hostname>.service")
+		logger.Info("  → Check if mon was ever initialized on this host")
+		logger.Info("  → Try: systemctl list-unit-files | grep ceph-mon")
+
+		// Try to get more context from journal
+		if verbose {
+			logger.Info("")
+			logger.Info("Checking journal for mon daemon errors...")
+			cmd = exec.Command("journalctl", "-u", "ceph-mon@*", "-n", "20", "--no-pager")
+			if output, err := cmd.Output(); err == nil {
+				outputStr := strings.TrimSpace(string(output))
+				if outputStr != "" && !strings.Contains(outputStr, "No entries") {
+					logger.Info("Recent mon journal entries:")
+					for _, line := range strings.Split(outputStr, "\n") {
+						logger.Info("  " + line)
+					}
+				} else {
+					logger.Info("  → No journal entries found for ceph-mon")
+				}
+			}
+		}
+	} else {
+		logger.Info(fmt.Sprintf("Found %d mon instance(s): %v", len(monInstances), monInstances))
+	}
+
+	if len(mgrInstances) == 0 {
+		logger.Warn("⚠️  No ceph-mgr instances found in systemd")
+	} else {
+		logger.Info(fmt.Sprintf("Found %d mgr instance(s): %v", len(mgrInstances), mgrInstances))
+	}
+
+	if len(osdInstances) == 0 {
+		logger.Warn("⚠️  No ceph-osd instances found in systemd")
+		logger.Info("  → OSDs must be created with: ceph-volume lvm create")
+	} else {
+		logger.Info(fmt.Sprintf("Found %d osd instance(s): %v", len(osdInstances), osdInstances))
+	}
+
 	if failedCount > 0 {
 		logger.Error("❌ Some units have failed - check logs with: journalctl -u <unit-name> -xe")
 		return DiagnosticResult{
@@ -123,6 +179,14 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 			CheckName: "Systemd Units",
 			Passed:    false,
 			Error:     fmt.Errorf("no active ceph units"),
+		}
+	}
+
+	if len(monInstances) == 0 {
+		return DiagnosticResult{
+			CheckName: "Systemd Units",
+			Passed:    false,
+			Error:     fmt.Errorf("no monitor instances configured"),
 		}
 	}
 
