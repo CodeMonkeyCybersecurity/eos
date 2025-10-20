@@ -5,7 +5,9 @@ package hecate
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
@@ -77,6 +79,24 @@ func GenerateMinimalCaddyfile(rc *eos_io.RuntimeContext, domain string) error {
     }
 }
 
+# Authentik forward_auth snippet - protects routes with SSO
+# Usage: import authentik_forward_auth
+(authentik_forward_auth) {
+    # Forward authentication to Authentik
+    forward_auth http://server:9000 {
+        uri /outpost.goauthentik.io/auth/caddy
+        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid
+
+        # Trusted proxies - allow Authentik to set headers
+        trusted_proxies private_ranges
+    }
+
+    # Set user context headers for backend applications
+    header_up X-Forwarded-User {http.request.header.X-Authentik-Username}
+    header_up X-Forwarded-Groups {http.request.header.X-Authentik-Groups}
+    header_up X-Forwarded-Email {http.request.header.X-Authentik-Email}
+}
+
 # Authentik SSO - exposed at hera subdomain
 hera.%s {
     import common
@@ -99,5 +119,92 @@ hera.%s {
 	}
 
 	logger.Info("Generated Caddyfile", zap.String("path", caddyfilePath))
+	return nil
+}
+
+// GenerateRouteBlock generates a Caddyfile block for a single route
+func GenerateRouteBlock(route *Route) string {
+	var block strings.Builder
+
+	block.WriteString(fmt.Sprintf("\n# Route: %s\n", route.Domain))
+	block.WriteString(fmt.Sprintf("%s {\n", route.Domain))
+	block.WriteString("    import common\n")
+
+	// Add forward_auth if required
+	if route.RequireAuth {
+		block.WriteString("    import authentik_forward_auth\n")
+		block.WriteString("\n")
+		block.WriteString("    # This route is protected with Authentik SSO\n")
+		block.WriteString("    # Users must authenticate before accessing\n")
+	}
+
+	// Add custom headers
+	if len(route.Headers) > 0 {
+		block.WriteString("\n")
+		block.WriteString("    # Custom headers\n")
+		for key, value := range route.Headers {
+			block.WriteString(fmt.Sprintf("    header_up %s \"%s\"\n", key, value))
+		}
+	}
+
+	// Add health check if configured
+	if route.HealthCheck != nil && route.HealthCheck.Enabled {
+		block.WriteString("\n")
+		block.WriteString("    # Health check configuration\n")
+		block.WriteString(fmt.Sprintf("    health_path %s\n", route.HealthCheck.Path))
+		block.WriteString(fmt.Sprintf("    health_interval %s\n", route.HealthCheck.Interval.String()))
+		block.WriteString(fmt.Sprintf("    health_timeout %s\n", route.HealthCheck.Timeout.String()))
+	}
+
+	// Add reverse proxy to upstream
+	block.WriteString("\n")
+	block.WriteString("    # Upstream backend\n")
+	block.WriteString(fmt.Sprintf("    reverse_proxy %s", route.Upstream.URL))
+
+	// Add upstream options
+	if route.Upstream.TLSSkipVerify {
+		block.WriteString(" {\n")
+		block.WriteString("        transport http {\n")
+		block.WriteString("            tls_insecure_skip_verify\n")
+		block.WriteString("        }\n")
+		block.WriteString("    }\n")
+	} else {
+		block.WriteString("\n")
+	}
+
+	block.WriteString("}\n")
+
+	return block.String()
+}
+
+// AppendRouteToMainCaddyfile appends a route block to the main Caddyfile
+func AppendRouteToMainCaddyfile(rc *eos_io.RuntimeContext, route *Route) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Appending route to Caddyfile",
+		zap.String("domain", route.Domain),
+		zap.Bool("require_auth", route.RequireAuth))
+
+	caddyfilePath := filepath.Join(BaseDir, "Caddyfile")
+
+	// Read existing Caddyfile
+	existingContent, err := os.ReadFile(caddyfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read Caddyfile: %w", err)
+	}
+
+	// Generate route block
+	routeBlock := GenerateRouteBlock(route)
+
+	// Append to existing content
+	updatedContent := string(existingContent) + "\n" + routeBlock
+
+	// Write updated Caddyfile
+	if err := eos_unix.WriteFile(rc.Ctx, caddyfilePath, []byte(updatedContent), 0644, ""); err != nil {
+		return fmt.Errorf("failed to write updated Caddyfile: %w", err)
+	}
+
+	logger.Info("Successfully appended route to Caddyfile",
+		zap.String("domain", route.Domain))
+
 	return nil
 }

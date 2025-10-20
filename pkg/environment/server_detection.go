@@ -292,7 +292,7 @@ func (r *ServerRole) CheckRequirements(req ServerRoleRequirement) error {
 
 		// None of the required roles found
 		if req.ErrorMessage != "" {
-			return fmt.Errorf(req.ErrorMessage)
+			return fmt.Errorf("%s", req.ErrorMessage)
 		}
 		return fmt.Errorf("this command requires one of: %v\nDetected roles: %s",
 			req.RequiredRoles, r.DescribeRoles())
@@ -308,7 +308,7 @@ func (r *ServerRole) CheckRequirements(req ServerRoleRequirement) error {
 
 	if len(missing) > 0 {
 		if req.ErrorMessage != "" {
-			return fmt.Errorf(req.ErrorMessage)
+			return fmt.Errorf("%s", req.ErrorMessage)
 		}
 		return fmt.Errorf("this command requires all of: %v\nMissing: %v\nDetected roles: %s",
 			req.RequiredRoles, missing, r.DescribeRoles())

@@ -437,8 +437,15 @@ func mergeRouteUpdates(existing *Route, updates *Route) *Route {
 	return &merged
 }
 
-func createRouteInBackend(_ *eos_io.RuntimeContext, _ *HecateConfig, _ *Route) error {
-	// TODO: Implement backend-specific route creation
+func createRouteInBackend(rc *eos_io.RuntimeContext, _ *HecateConfig, route *Route) error {
+	// Generate and append Caddyfile configuration for this route
+	if err := AppendRouteToMainCaddyfile(rc, route); err != nil {
+		return fmt.Errorf("failed to add route to Caddyfile: %w", err)
+	}
+
+	// TODO: Reload Caddy to apply changes
+	// docker exec caddy caddy reload --config /etc/caddy/Caddyfile
+
 	return nil
 }
 
