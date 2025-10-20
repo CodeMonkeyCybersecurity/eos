@@ -647,7 +647,7 @@ func verifyDockerRemoval(rc *eos_io.RuntimeContext) error {
 	}
 
 	if len(issues) > 0 {
-		return fmt.Errorf("Docker removal incomplete: %v", issues)
+		return fmt.Errorf("docker removal incomplete: %v", issues)
 	}
 
 	logger.Info("Docker removal verified successfully")
