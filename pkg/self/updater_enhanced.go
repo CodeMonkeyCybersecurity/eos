@@ -310,13 +310,34 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 	}
 
 	// Check Ceph development libraries (required for CephFS features)
+	// NOTE: Ubuntu Ceph packages don't provide .pc files, so we check for headers instead
 	var missingCephLibs []string
-	cephLibs := []string{"librados", "librbd", "libcephfs"}
+	cephLibs := map[string]string{
+		"librados":  "/usr/include/rados/librados.h",
+		"librbd":    "/usr/include/rbd/librbd.h",
+		"libcephfs": "/usr/include/cephfs/libcephfs.h",
+	}
 
-	for _, lib := range cephLibs {
+	for lib, headerPath := range cephLibs {
+		// First try pkg-config (works on some distros)
 		cephCheck := exec.Command(pkgConfigPath, "--exists", lib)
 		if err := cephCheck.Run(); err != nil {
-			missingCephLibs = append(missingCephLibs, lib)
+			// pkg-config failed, check for header file directly (Ubuntu Ceph packages don't provide .pc files)
+			if _, err := os.Stat(headerPath); os.IsNotExist(err) {
+				eeu.logger.Debug("Ceph library not found",
+					zap.String("library", lib),
+					zap.String("pkg_config_failed", "true"),
+					zap.String("header_path", headerPath),
+					zap.String("header_exists", "false"))
+				missingCephLibs = append(missingCephLibs, lib)
+			} else {
+				eeu.logger.Debug("Ceph library found via header check (pkg-config unavailable)",
+					zap.String("library", lib),
+					zap.String("header_path", headerPath))
+			}
+		} else {
+			eeu.logger.Debug("Ceph library found via pkg-config",
+				zap.String("library", lib))
 		}
 	}
 
@@ -327,16 +348,18 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 		// Attempt to install missing Ceph libraries automatically
 		if err := eeu.installCephLibraries(missingCephLibs); err != nil {
 			return fmt.Errorf("Ceph development libraries not found: %v\n"+
-				"Command: %s --exists <library>\n"+
+				"Checked paths: pkg-config and header files in /usr/include/\n"+
 				"Auto-install failed: %v\n"+
 				"Fix: Install Ceph development libraries manually:\n"+
 				"  Ubuntu/Debian: sudo apt install librados-dev librbd-dev libcephfs-dev\n"+
 				"  RHEL/CentOS:   sudo yum install librados-devel librbd-devel libcephfs-devel\n"+
-				"  Fedora:        sudo dnf install libcephfs-devel librbd-devel librados-devel",
-				missingCephLibs, pkgConfigPath, err)
+				"  Fedora:        sudo dnf install librados-devel librbd-devel libcephfs-devel",
+				missingCephLibs, err)
 		}
 
 		eeu.logger.Info(" Ceph development libraries installed successfully")
+	} else {
+		eeu.logger.Debug("All Ceph development libraries found")
 	}
 
 	eeu.logger.Info(" Build dependencies verified")
@@ -404,16 +427,28 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		zap.String("pkg_config_path", pkgConfigPath))
 
 	// Verify Ceph libraries are available (required for CephFS features)
-	cephLibs := []string{"librados", "librbd", "libcephfs"}
-	for _, lib := range cephLibs {
+	// NOTE: Ubuntu Ceph packages don't provide .pc files, so we check for headers instead
+	cephLibs := map[string]string{
+		"librados":  "/usr/include/rados/librados.h",
+		"librbd":    "/usr/include/rbd/librbd.h",
+		"libcephfs": "/usr/include/cephfs/libcephfs.h",
+	}
+
+	for lib, headerPath := range cephLibs {
+		// First try pkg-config (works on some distros)
 		cephCheckCmd := exec.Command(pkgConfigPath, "--exists", lib)
 		if err := cephCheckCmd.Run(); err != nil {
-			return "", fmt.Errorf("%s development libraries not found - install librados-dev librbd-dev libcephfs-dev (Debian) or librados-devel librbd-devel libcephfs-devel (RHEL): %w", lib, err)
+			// pkg-config failed, check for header file directly
+			if _, err := os.Stat(headerPath); os.IsNotExist(err) {
+				return "", fmt.Errorf("%s development libraries not found (checked pkg-config and %s) - install librados-dev librbd-dev libcephfs-dev (Debian) or librados-devel librbd-devel libcephfs-devel (RHEL)", lib, headerPath)
+			}
+			eeu.logger.Debug("Ceph library found via header check",
+				zap.String("library", lib),
+				zap.String("header_path", headerPath))
 		}
 	}
 
-	eeu.logger.Info("Ceph development libraries detected",
-		zap.String("pkg_config_path", pkgConfigPath))
+	eeu.logger.Info("Ceph development libraries detected")
 
 	// Build command - use the Go path we found during verification
 	buildArgs := []string{"build", "-o", tempBinary, "."}

@@ -394,29 +394,39 @@ check_ceph_deps() {
     fi
 
     # Check for librados development files
+    # NOTE: Ubuntu Ceph packages don't provide .pc files, so we check for headers instead
     if ! pkg-config --exists librados 2>/dev/null; then
-      if $IS_DEBIAN; then
-        missing_deps+=("librados-dev")
-      elif $IS_RHEL; then
-        missing_deps+=("librados-devel")
+      # pkg-config failed, check for header file directly
+      if [ ! -f "/usr/include/rados/librados.h" ]; then
+        if $IS_DEBIAN; then
+          missing_deps+=("librados-dev")
+        elif $IS_RHEL; then
+          missing_deps+=("librados-devel")
+        fi
       fi
     fi
 
     # Check for librbd development files
     if ! pkg-config --exists librbd 2>/dev/null; then
-      if $IS_DEBIAN; then
-        missing_deps+=("librbd-dev")
-      elif $IS_RHEL; then
-        missing_deps+=("librbd-devel")
+      # pkg-config failed, check for header file directly
+      if [ ! -f "/usr/include/rbd/librbd.h" ]; then
+        if $IS_DEBIAN; then
+          missing_deps+=("librbd-dev")
+        elif $IS_RHEL; then
+          missing_deps+=("librbd-devel")
+        fi
       fi
     fi
 
     # Check for libcephfs development files
     if ! pkg-config --exists libcephfs 2>/dev/null; then
-      if $IS_DEBIAN; then
-        missing_deps+=("libcephfs-dev")
-      elif $IS_RHEL; then
-        missing_deps+=("libcephfs-devel")
+      # pkg-config failed, check for header file directly
+      if [ ! -f "/usr/include/cephfs/libcephfs.h" ]; then
+        if $IS_DEBIAN; then
+          missing_deps+=("libcephfs-dev")
+        elif $IS_RHEL; then
+          missing_deps+=("libcephfs-devel")
+        fi
       fi
     fi
 
@@ -587,15 +597,25 @@ build_eos_binary() {
   fi
 
   # Check each Ceph library individually for better error messages
+  # NOTE: Ubuntu Ceph packages don't provide .pc files, so we check for headers instead
   local missing_ceph_libs=()
   if ! pkg-config --exists librados 2>/dev/null; then
-    missing_ceph_libs+=("librados")
+    # pkg-config failed, check for header file directly
+    if [ ! -f "/usr/include/rados/librados.h" ]; then
+      missing_ceph_libs+=("librados")
+    fi
   fi
   if ! pkg-config --exists librbd 2>/dev/null; then
-    missing_ceph_libs+=("librbd")
+    # pkg-config failed, check for header file directly
+    if [ ! -f "/usr/include/rbd/librbd.h" ]; then
+      missing_ceph_libs+=("librbd")
+    fi
   fi
   if ! pkg-config --exists libcephfs 2>/dev/null; then
-    missing_ceph_libs+=("libcephfs")
+    # pkg-config failed, check for header file directly
+    if [ ! -f "/usr/include/cephfs/libcephfs.h" ]; then
+      missing_ceph_libs+=("libcephfs")
+    fi
   fi
 
   if [ ${#missing_ceph_libs[@]} -gt 0 ]; then
