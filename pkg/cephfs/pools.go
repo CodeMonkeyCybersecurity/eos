@@ -14,10 +14,10 @@ import (
 type PoolInfo struct {
 	Name            string
 	ID              int64
-	Size            int // Replication size
-	MinSize         int // Minimum replication size
-	PGNum           int // Placement groups
-	PGPNum          int // Placement groups for placement
+	Size            int    // Replication size
+	MinSize         int    // Minimum replication size
+	PGNum           int    // Placement groups
+	PGPNum          int    // Placement groups for placement
 	Type            string // replicated or erasure
 	Application     string // cephfs, rbd, rgw
 	CrushRule       string
@@ -318,11 +318,11 @@ func (c *CephClient) PoolExists(rc *eos_io.RuntimeContext, poolName string) (boo
 
 // PoolUpdateOptions contains options for updating a pool
 type PoolUpdateOptions struct {
-	NewSize     int   // New replication size (0 = no change)
-	NewMinSize  int   // New minimum size (0 = no change)
-	NewPGNum    int   // New PG num (0 = no change)
-	MaxBytes    int64 // Quota max bytes (0 = no change)
-	MaxObjects  int64 // Quota max objects (0 = no change)
+	NewSize    int   // New replication size (0 = no change)
+	NewMinSize int   // New minimum size (0 = no change)
+	NewPGNum   int   // New PG num (0 = no change)
+	MaxBytes   int64 // Quota max bytes (0 = no change)
+	MaxObjects int64 // Quota max objects (0 = no change)
 }
 
 // Helper functions for mon commands
@@ -357,9 +357,9 @@ func (c *CephClient) deletePoolViaMonCommand(rc *eos_io.RuntimeContext, poolName
 
 func (c *CephClient) setPoolApplication(rc *eos_io.RuntimeContext, poolName, application string) error {
 	cmd := map[string]interface{}{
-		"prefix":      "osd pool application enable",
-		"pool":        poolName,
-		"app":         application,
+		"prefix": "osd pool application enable",
+		"pool":   poolName,
+		"app":    application,
 	}
 
 	return c.executeMonCommand(rc, cmd)

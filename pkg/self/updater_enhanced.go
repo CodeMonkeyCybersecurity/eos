@@ -1,3 +1,4 @@
+
 // pkg/self/updater_enhanced.go
 //
 // Enhanced self-update with comprehensive error recovery and rollback capabilities.

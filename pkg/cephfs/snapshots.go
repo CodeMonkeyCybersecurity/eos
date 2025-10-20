@@ -72,7 +72,7 @@ func (c *CephClient) CreateSnapshot(rc *eos_io.RuntimeContext, opts *SnapshotCre
 	//   ceph fs subvolume snapshot create <fs_name> <subvol_name> <snap_name>
 	// Or for direct filesystem snapshots:
 	//   mkdir /mnt/cephfs/<volume>/.snap/<snapshot_name>
-	
+
 	return eos_err.NewUserError(
 		"CephFS snapshot creation requires administrator intervention.\n"+
 			"Please execute the following command as administrator:\n"+
@@ -122,7 +122,7 @@ func (c *CephClient) DeleteSnapshot(rc *eos_io.RuntimeContext, volumeName, snaps
 	//   ceph fs subvolume snapshot rm <fs_name> <subvol_name> <snap_name>
 	// Or for direct filesystem snapshots:
 	//   rmdir /mnt/cephfs/<volume>/.snap/<snapshot_name>
-	
+
 	return eos_err.NewUserError(
 		"CephFS snapshot deletion requires administrator intervention.\n"+
 			"Please execute the following command as administrator:\n"+
@@ -146,7 +146,7 @@ func (c *CephClient) ListSnapshots(rc *eos_io.RuntimeContext, volumeName, subVol
 	//   ceph fs subvolume snapshot ls <fs_name> <subvol_name>
 	// Or list snapshot directory:
 	//   ls /mnt/cephfs/<volume>/.snap/
-	
+
 	return nil, eos_err.NewUserError(
 		"CephFS snapshot listing requires administrator intervention.\n"+
 			"Please execute the following command as administrator:\n"+

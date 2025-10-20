@@ -5,20 +5,19 @@ package hecate
 var composeFragments []DockerComposeFragment
 
 type DockerConfig struct {
-	AppName               string
-	TCPPorts              []string
-	UDPPorts              []string
-	NginxEnabled          bool
-	CoturnEnabled         bool
-	CoturnAuthSecret      string
-	AuthentikEnabled      bool
-	AuthentikDomain       string
-	AuthentikDBName       string
-	AuthentikDBUser       string
-	AuthentikDBPassword   string
-	AuthentikSecretKey    string
+	AppName                string
+	TCPPorts               []string
+	UDPPorts               []string
+	NginxEnabled           bool
+	CoturnEnabled          bool
+	CoturnAuthSecret       string
+	AuthentikEnabled       bool
+	AuthentikDomain        string
+	AuthentikDBName        string
+	AuthentikDBUser        string
+	AuthentikDBPassword    string
+	AuthentikSecretKey     string
 	AuthentikRedisPassword string
-
 }
 
 // ServiceSpec defines a service block for Docker Compose.
@@ -223,9 +222,9 @@ const DockerAuthentikService = `
 
 // Centralized constants for Docker Compose sections
 const (
-	DockerNetworkName                = "hecate-net"
+	DockerNetworkName                 = "hecate-net"
 	DockerVolumeAuthentikPostgresName = "authentik-postgres-data"
-	DockerVolumeAuthentikRedisName   = "authentik-redis-data"
+	DockerVolumeAuthentikRedisName    = "authentik-redis-data"
 	// Deprecated: Use Authentik volumes instead
 	DockerVolumeKCDBName = "kc-db-data"
 

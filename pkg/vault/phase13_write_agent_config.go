@@ -430,7 +430,7 @@ func writeAgentUnit() error {
 func copyVaultCertForAgent(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	srcCert := shared.TLSCrt // /etc/vault.d/tls/vault.crt
+	srcCert := shared.TLSCrt               // /etc/vault.d/tls/vault.crt
 	dstCert := shared.VaultAgentCACopyPath // /etc/vault.d/ca.crt
 
 	log.Info("Copying Vault TLS certificate for agent trust",
