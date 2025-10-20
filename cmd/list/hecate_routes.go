@@ -40,6 +40,7 @@ func init() {
 	listHecateRoutesCmd.Flags().Bool("health-only", false, "Show only health status information")
 	listHecateRoutesCmd.Flags().Bool("verbose", false, "Show detailed route information")
 }
+
 // TODO: refactor
 func runListHecateRoutes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -99,6 +100,7 @@ func runListHecateRoutes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		return displayRoutesTable(rc, routes, routeStatuses, healthOnly, verbose)
 	}
 }
+
 // TODO: refactor
 func displayRoutesTable(rc *eos_io.RuntimeContext, routes []*hecate.Route, statuses map[string]*hecate.RouteStatus, healthOnly, verbose bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -208,15 +210,16 @@ func displayRoutesTable(rc *eos_io.RuntimeContext, routes []*hecate.Route, statu
 
 	return nil
 }
+
 // TODO: refactor
 func displayRoutesJSON(rc *eos_io.RuntimeContext, routes []*hecate.Route, statuses map[string]*hecate.RouteStatus) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Build output structure
 	output := struct {
-		Routes   []*hecate.Route                    `json:"routes"`
-		Statuses map[string]*hecate.RouteStatus     `json:"statuses,omitempty"`
-		Count    int                                `json:"count"`
+		Routes   []*hecate.Route                `json:"routes"`
+		Statuses map[string]*hecate.RouteStatus `json:"statuses,omitempty"`
+		Count    int                            `json:"count"`
 	}{
 		Routes:   routes,
 		Statuses: statuses,
@@ -239,9 +242,9 @@ func displayRoutesYAML(rc *eos_io.RuntimeContext, routes []*hecate.Route, status
 
 	// Build output structure
 	output := struct {
-		Routes   []*hecate.Route                    `yaml:"routes"`
-		Statuses map[string]*hecate.RouteStatus     `yaml:"statuses,omitempty"`
-		Count    int                                `yaml:"count"`
+		Routes   []*hecate.Route                `yaml:"routes"`
+		Statuses map[string]*hecate.RouteStatus `yaml:"statuses,omitempty"`
+		Count    int                            `yaml:"count"`
 	}{
 		Routes:   routes,
 		Statuses: statuses,

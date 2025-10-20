@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
+
 // TODO: refactor
 var (
 	consulAddr string
@@ -64,6 +65,7 @@ func init() {
 	ListKVMPoolsCmd.Flags().StringVar(&consulAddr, "consul-addr", "", "Consul server address")
 	ListKVMPoolsCmd.Flags().StringVar(&nomadAddr, "nomad-addr", "", "Nomad server address")
 }
+
 // TODO: refactor
 func listOrchestratedKVMs(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -118,6 +120,7 @@ func listOrchestratedKVMs(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	fmt.Printf("\nTotal orchestrated VMs: %d\n", len(vms))
 	return nil
 }
+
 // TODO: refactor
 func listKVMPools(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)

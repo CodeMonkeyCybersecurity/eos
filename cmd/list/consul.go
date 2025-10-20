@@ -52,6 +52,7 @@ func init() {
 
 	ListCmd.AddCommand(consulCmd)
 }
+
 // TODO: refactor
 func runConsulCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)

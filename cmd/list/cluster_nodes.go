@@ -42,6 +42,7 @@ Examples:
 
 	RunE: eos.Wrap(runListClusterNodes),
 }
+
 // TODO: refactor
 
 func runListClusterNodes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -75,6 +76,7 @@ func runListClusterNodes(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	return displayNodesTable(filteredNodes, enhancedConfig)
 }
+
 // TODO: refactor
 
 // loadEnhancedEnvironmentConfig loads the enhanced environment configuration
@@ -140,6 +142,7 @@ func filterNodes(allNodes map[string][]string, roleFilter, statusFilter string) 
 
 	return filtered
 }
+
 // TODO: refactor
 // outputNodesJSON outputs nodes information as JSON
 func outputNodesJSON(nodes map[string][]string, config *environment.EnhancedEnvironmentConfig) error {
@@ -159,6 +162,7 @@ func outputNodesJSON(nodes map[string][]string, config *environment.EnhancedEnvi
 	fmt.Println(string(data))
 	return nil
 }
+
 // TODO: refactor
 // displayNodesTable displays nodes in a formatted table
 func displayNodesTable(nodes map[string][]string, config *environment.EnhancedEnvironmentConfig) error {

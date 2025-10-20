@@ -178,6 +178,7 @@ func init() {
   # Validate and auto-fix issues
   eos build validate helen --fix`
 }
+
 // TODO: refactor
 // displayValidationResultsTable displays validation results in table format
 func displayValidationResultsTable(results []*build.ValidationResult, strict bool) error {
@@ -274,6 +275,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 
 	return nil
 }
+
 // TODO: refactor
 // displayValidationResultsJSON displays validation results in JSON format
 func displayValidationResultsJSON(results []*build.ValidationResult) error {
@@ -300,6 +302,7 @@ func displayValidationResultsJSON(results []*build.ValidationResult) error {
 	fmt.Printf("}\n")
 	return nil
 }
+
 // TODO: refactor
 // displayValidationResultsYAML displays validation results in YAML format
 func displayValidationResultsYAML(results []*build.ValidationResult) error {

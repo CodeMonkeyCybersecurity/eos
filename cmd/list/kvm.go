@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
+
 // TODO: refactor
 var (
 	kvmShowDrift bool
@@ -69,6 +70,7 @@ func init() {
 	kvmCmd.Flags().StringVar(&kvmFormat, "format", "table", "Output format (table, json, yaml)")
 	kvmCmd.Flags().StringVar(&kvmState, "state", "", "Filter by state (running, shutoff, paused)")
 }
+
 // TODO: refactor
 func runListKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -109,6 +111,7 @@ func runListKVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 		return outputTableKVM(vms, kvmShowDrift, kvmShowUsage, kvmDetailed)
 	}
 }
+
 // TODO: refactor
 func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error {
 	table := tablewriter.NewWriter(os.Stdout)
@@ -318,12 +321,14 @@ func outputTableKVM(vms []kvm.VMInfo, showDrift, showUsage, detailed bool) error
 
 	return nil
 }
+
 // TODO: refactor
 func outputJSONKVM(vms []kvm.VMInfo) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(vms)
 }
+
 // TODO: refactor
 func outputYAMLKVM(vms []kvm.VMInfo) error {
 	encoder := yaml.NewEncoder(os.Stdout)

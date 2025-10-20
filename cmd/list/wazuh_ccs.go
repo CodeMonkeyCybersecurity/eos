@@ -47,6 +47,7 @@ func init() {
 	ListWazuhCCSCmd.Flags().String("output", "table", "Output format (table/json/yaml)")
 	ListWazuhCCSCmd.Flags().Bool("detailed", false, "Show detailed information")
 }
+
 // TODO: refactor
 func runListWazuhCCS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -78,6 +79,7 @@ func runListWazuhCCS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		return cmd.Help()
 	}
 }
+
 // TODO: refactor
 func listCustomers(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -177,6 +179,7 @@ func listCustomers(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string)
 		return outputCustomerTable(logger, response)
 	}
 }
+
 // TODO: refactor
 func listDeployments(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -255,6 +258,7 @@ func listDeployments(rc *eos_io.RuntimeContext, cmd *cobra.Command, format strin
 		return outputDeploymentTable(logger, response)
 	}
 }
+
 // TODO: refactor
 func listBackups(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -330,6 +334,7 @@ func listBackups(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) e
 		return outputBackupTable(logger, response)
 	}
 }
+
 // TODO: refactor
 func listEvents(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -417,12 +422,14 @@ type CustomerListItem struct {
 	EventsPerDay int                     `json:"events_per_day"`
 	Resources    CustomerResourceSummary `json:"resources"`
 }
+
 // TODO: refactor
 type CustomerResourceSummary struct {
 	CPUCores int `json:"cpu_cores"`
 	MemoryGB int `json:"memory_gb"`
 	DiskGB   int `json:"disk_gb"`
 }
+
 // TODO: refactor
 type CustomerList struct {
 	Customers []CustomerListItem  `json:"customers"`
@@ -430,11 +437,13 @@ type CustomerList struct {
 	Summary   CustomerListSummary `json:"summary"`
 	Timestamp time.Time           `json:"timestamp"`
 }
+
 // TODO: refactor
 type CustomerListSummary struct {
 	ByTier   map[string]int `json:"by_tier"`
 	ByStatus map[string]int `json:"by_status"`
 }
+
 // TODO: refactor
 type DeploymentListItem struct {
 	JobName     string    `json:"job_name"`
@@ -448,6 +457,7 @@ type DeploymentListItem struct {
 	MemoryUsage float64   `json:"memory_usage"`
 	LastUpdated time.Time `json:"last_updated"`
 }
+
 // TODO: refactor
 type DeploymentList struct {
 	Deployments []DeploymentListItem `json:"deployments"`
@@ -455,6 +465,7 @@ type DeploymentList struct {
 	Summary     DeploymentSummary    `json:"summary"`
 	Timestamp   time.Time            `json:"timestamp"`
 }
+
 // TODO: refactor
 type DeploymentSummary struct {
 	TotalJobs      int `json:"total_jobs"`
@@ -462,6 +473,7 @@ type DeploymentSummary struct {
 	FailedJobs     int `json:"failed_jobs"`
 	TotalInstances int `json:"total_instances"`
 }
+
 // TODO: refactor
 type BackupListItem struct {
 	BackupID    string        `json:"backup_id"`
@@ -474,6 +486,7 @@ type BackupListItem struct {
 	Duration    time.Duration `json:"duration"`
 	Location    string        `json:"location"`
 }
+
 // TODO: refactor
 type BackupList struct {
 	Backups   []BackupListItem `json:"backups"`
@@ -481,6 +494,7 @@ type BackupList struct {
 	Summary   BackupSummary    `json:"summary"`
 	Timestamp time.Time        `json:"timestamp"`
 }
+
 // TODO: refactor
 type BackupSummary struct {
 	TotalBackups int       `json:"total_backups"`
@@ -488,6 +502,7 @@ type BackupSummary struct {
 	OldestBackup time.Time `json:"oldest_backup"`
 	LatestBackup time.Time `json:"latest_backup"`
 }
+
 // TODO: refactor
 type EventListItem struct {
 	EventID     string                 `json:"event_id"`
@@ -498,12 +513,13 @@ type EventListItem struct {
 	Message     string                 `json:"message"`
 	Details     map[string]interface{} `json:"details"`
 }
+
 // TODO: refactor
 type EventList struct {
 	Events    []EventListItem `json:"events"`
 	Total     int             `json:"total"`
 	Timestamp time.Time       `json:"timestamp"`
-}// TODO: refactor
+} // TODO: refactor
 // Output formatting functions
 
 func outputJSON(logger otelzap.LoggerWithCtx, data interface{}) error {
@@ -514,6 +530,7 @@ func outputJSON(logger otelzap.LoggerWithCtx, data interface{}) error {
 	logger.Info("terminal prompt:", zap.String("output", string(output)))
 	return nil
 }
+
 // TODO: refactor
 func outputYAML(logger otelzap.LoggerWithCtx, data interface{}) error {
 	// Simplified YAML output using JSON
@@ -524,6 +541,7 @@ func outputYAML(logger otelzap.LoggerWithCtx, data interface{}) error {
 	logger.Info("terminal prompt:", zap.String("output", string(output)))
 	return nil
 }
+
 // TODO: refactor
 func outputCustomerTable(logger otelzap.LoggerWithCtx, list CustomerList) error {
 	logger.Info("terminal prompt: Customers", zap.Int("total", list.Total))
@@ -554,6 +572,7 @@ func outputCustomerTable(logger otelzap.LoggerWithCtx, list CustomerList) error 
 
 	return nil
 }
+
 // TODO: refactor
 func outputDetailedCustomerTable(logger otelzap.LoggerWithCtx, list CustomerList) error {
 	logger.Info("terminal prompt: Customers - Detailed View", zap.Int("total", list.Total))
@@ -577,6 +596,7 @@ func outputDetailedCustomerTable(logger otelzap.LoggerWithCtx, list CustomerList
 
 	return nil
 }
+
 // TODO: refactor
 func outputDeploymentTable(logger otelzap.LoggerWithCtx, list DeploymentList) error {
 	logger.Info("terminal prompt: Deployments", zap.Int("total", list.Total))
@@ -606,6 +626,7 @@ func outputDeploymentTable(logger otelzap.LoggerWithCtx, list DeploymentList) er
 
 	return nil
 }
+
 // TODO: refactor
 func outputBackupTable(logger otelzap.LoggerWithCtx, list BackupList) error {
 	logger.Info("terminal prompt: Backups", zap.Int("total", list.Total))
@@ -633,6 +654,7 @@ func outputBackupTable(logger otelzap.LoggerWithCtx, list BackupList) error {
 
 	return nil
 }
+
 // TODO: refactor
 func outputEventTable(logger otelzap.LoggerWithCtx, list EventList) error {
 	logger.Info("terminal prompt: Recent Events", zap.Int("total", list.Total))
@@ -652,6 +674,7 @@ func outputEventTable(logger otelzap.LoggerWithCtx, list EventList) error {
 
 	return nil
 }
+
 // TODO: refactor
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {

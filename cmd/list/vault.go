@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO: refactor - ANTI-PATTERN: Package-level mutable state for flags
 // ISSUE: These package-level vars make the command non-reentrant and harder to test
 // FIX: Pass these as parameters or use a config struct
@@ -72,6 +73,7 @@ func init() {
 
 	ListCmd.AddCommand(vaultCheckCmd)
 }
+
 // TODO: refactor - Move to pkg/vault/check.go
 // BUSINESS LOGIC: Orchestration of multiple validation checks
 // ANTI-PATTERN: Complex flag logic in cmd/ instead of pkg/
@@ -127,6 +129,7 @@ func runVaultCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	logger.Info("All validation checks passed")
 	return nil
 }
+
 // TODO: refactor - Move to pkg/vault/validation.go
 // BUSINESS LOGIC: Configuration validation and result display
 // ANTI-PATTERN: Display logic mixed with validation logic
@@ -190,6 +193,7 @@ func validateConfiguration(rc *eos_io.RuntimeContext) error {
 
 	return nil
 }
+
 // TODO: refactor - Move to pkg/vault/security.go
 // BUSINESS LOGIC: Security validation and result display
 // ANTI-PATTERN: Display logic mixed with validation logic, direct fmt.Println usage
@@ -236,6 +240,7 @@ func validateSecurityPosture(rc *eos_io.RuntimeContext) error {
 
 	return nil
 }
+
 // TODO: refactor - Move to pkg/vault/status.go
 // BUSINESS LOGIC: Status retrieval and format conversion
 // ANTI-PATTERN: Format string parsing in cmd/, direct logger.Info for display

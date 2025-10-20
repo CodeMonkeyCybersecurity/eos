@@ -42,6 +42,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
+
 // TODO: refactor
 var (
 	// Operation mode flags

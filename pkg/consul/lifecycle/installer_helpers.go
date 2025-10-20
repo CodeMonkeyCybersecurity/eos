@@ -440,7 +440,7 @@ func (v *ValidationHelper) ValidatePort(port int) {
 	conn, err := exec.Command("lsof", "-i", addr).Output()
 	if err == nil && len(conn) > 0 {
 		v.errors = append(v.errors, fmt.Sprintf("Port %d is already in use", port))
-		v.logger.Warn("Port in use", 
+		v.logger.Warn("Port in use",
 			zap.Int("port", port),
 			zap.String("output", string(conn)))
 	}
@@ -508,34 +508,35 @@ func NewHTTPClient(timeout time.Duration) *HTTPClient {
 // GetWithRetry performs GET request with automatic retry
 func (h *HTTPClient) GetWithRetry(ctx context.Context, url string) (*http.Response, error) {
 	var lastErr error
-	
+
 	for attempt := 1; attempt <= h.maxRetry; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		resp, err := h.client.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return resp, nil
 		}
-		
+
 		if resp != nil {
 			resp.Body.Close()
 		}
-		
+
 		lastErr = err
 		if err == nil {
 			lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
 		}
-		
+
 		if attempt < h.maxRetry {
 			time.Sleep(h.retryWait * time.Duration(attempt))
 		}
 	}
-	
+
 	return nil, fmt.Errorf("failed after %d attempts: %w", h.maxRetry, lastErr)
 }
+
 // File operations helpers for ConsulInstaller
 
 func (ci *ConsulInstaller) writeFile(path string, content []byte, mode os.FileMode) error {

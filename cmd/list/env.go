@@ -135,6 +135,7 @@ func init() {
   # List environments sorted by creation date
   eos list env --sort created --reverse`
 }
+
 // TODO: refactor
 // displayEnvironmentsTable displays environments in table format
 func displayEnvironmentsTable(envs map[string]environments.Environment, currentEnv *environments.Environment, detailed bool) error {
@@ -163,7 +164,7 @@ func displayEnvironmentsTable(envs map[string]environments.Environment, currentE
 	// Print environments
 	for _, name := range names {
 		env := envs[name]
-		
+
 		// Check if this is the current environment
 		current := ""
 		if currentEnv != nil && currentEnv.Name == name {
@@ -208,6 +209,7 @@ func displayEnvironmentsTable(envs map[string]environments.Environment, currentE
 
 	return nil
 }
+
 // TODO: refactor
 // displayEnvironmentsJSON displays environments in JSON format
 func displayEnvironmentsJSON(envs map[string]environments.Environment, currentEnv *environments.Environment) error {
@@ -240,6 +242,7 @@ func displayEnvironmentsJSON(envs map[string]environments.Environment, currentEn
 	fmt.Printf("}\n")
 	return nil
 }
+
 // TODO: refactor
 // displayEnvironmentsYAML displays environments in YAML format
 func displayEnvironmentsYAML(envs map[string]environments.Environment, currentEnv *environments.Environment) error {
@@ -276,6 +279,7 @@ func getShortAddress(address string) string {
 	}
 	return addr
 }
+
 // TODO: refactor
 func getCurrentEnvName(env *environments.Environment) string {
 	if env == nil {

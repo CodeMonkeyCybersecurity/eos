@@ -39,6 +39,7 @@ func init() {
 	createHecateAPICmd.Flags().Bool("enable-cors", false, "Enable CORS for the API")
 	createHecateAPICmd.Flags().String("cors-origins", "*", "Allowed CORS origins")
 }
+
 // TODO: refactor
 func runCreateHecateAPI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)

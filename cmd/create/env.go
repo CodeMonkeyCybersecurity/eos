@@ -233,6 +233,7 @@ func init() {
     --nomad-address https://nomad.example.com:4646 \
     --consul-address consul.example.com:8500`
 }
+
 // TODO: refactor
 // interactiveEnvConfig guides user through environment configuration
 func interactiveEnvConfig(rc *eos_io.RuntimeContext, env *environments.Environment) error {
