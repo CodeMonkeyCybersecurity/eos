@@ -233,13 +233,29 @@ func (cm *ConfigManager) configureEmbeddingsDeployment(ctx context.Context) erro
 }
 
 // configureAPIKey handles API key configuration with Vault storage
+// IDEMPOTENT: Checks Vault first, only prompts if secret doesn't exist
 func (cm *ConfigManager) configureAPIKey(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
 	if cm.config.APIKey != "" {
 		// Already provided via flag
-		logger.Debug("API key already provided")
-		return ValidateAPIKey(cm.config.APIKey)
+		logger.Debug("API key already provided via flag")
+		if err := ValidateAPIKey(cm.config.APIKey); err != nil {
+			return err
+		}
+		// Store in Vault for future use
+		return cm.storeAPIKeyInVault()
+	}
+
+	// IDEMPOTENT: Check Vault first before prompting
+	if cm.secretManager != nil {
+		logger.Debug("Checking Vault for existing API key")
+		if existingKey, err := cm.retrieveAPIKeyFromVault(); err == nil && existingKey != "" {
+			logger.Info("✓ Using existing API key from Vault")
+			cm.config.APIKey = existingKey
+			return nil
+		}
+		logger.Debug("No existing API key found in Vault, will prompt")
 	}
 
 	// Prompt for API key with Vault option
@@ -251,10 +267,12 @@ func (cm *ConfigManager) configureAPIKey(ctx context.Context) error {
 
 	cm.config.APIKey = strings.TrimSpace(apiKey)
 
-	// If empty, try to retrieve from Vault
+	// If empty and secret manager not available, error
 	if cm.config.APIKey == "" {
-		logger.Info("Retrieving API key from Vault")
-		return cm.retrieveAPIKeyFromVault()
+		if cm.secretManager == nil {
+			return fmt.Errorf("API key required but secret manager not initialized")
+		}
+		return fmt.Errorf("API key required - Vault is empty and no key provided")
 	}
 
 	// Validate and store in Vault

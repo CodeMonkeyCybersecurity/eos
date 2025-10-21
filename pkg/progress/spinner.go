@@ -22,15 +22,15 @@ var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 
 // VisualOperation provides visual progress feedback with spinners and status
 type VisualOperation struct {
-	Name        string
-	Duration    string
-	Stage       string // Current stage description
-	frame       int
-	elapsed     time.Duration
-	logger      otelzap.LoggerWithCtx
-	ctx         context.Context
-	done        chan struct{}
-	ticker      *time.Ticker
+	Name     string
+	Duration string
+	Stage    string // Current stage description
+	frame    int
+	elapsed  time.Duration
+	logger   otelzap.LoggerWithCtx
+	ctx      context.Context
+	done     chan struct{}
+	ticker   *time.Ticker
 }
 
 // NewVisual creates a visual progress operation

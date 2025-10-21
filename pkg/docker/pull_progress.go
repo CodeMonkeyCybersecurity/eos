@@ -24,33 +24,36 @@ import (
 
 // PullProgress represents the progress of a Docker image pull
 type PullProgress struct {
-	ID             string `json:"id"`       // Layer ID
-	Status         string `json:"status"`   // Status message
-	Progress       string `json:"progress"` // Progress bar string
+	ID             string `json:"id"`              // Layer ID
+	Status         string `json:"status"`          // Status message (e.g., "Downloading", "Extracting", "Pull complete")
+	Error          string `json:"error,omitempty"` // Error message if operation fails
+	Progress       string `json:"progress"`        // Progress bar string from Docker (human-readable)
 	ProgressDetail struct {
-		Current int64 `json:"current"` // Bytes downloaded
-		Total   int64 `json:"total"`   // Total bytes
+		Current int64 `json:"current"` // Bytes downloaded/extracted
+		Total   int64 `json:"total"`   // Total bytes for this operation
 	} `json:"progressDetail"`
 }
 
 // LayerProgress tracks progress of a single layer
 type LayerProgress struct {
-	ID       string
-	Status   string
-	Current  int64
-	Total    int64
-	Complete bool
+	ID          string
+	Status      string
+	Current     int64
+	Total       int64
+	Complete    bool
+	Downloading bool // Actively downloading
+	Extracting  bool // Actively extracting
 }
 
 // PullTracker tracks overall pull progress across multiple layers
 type PullTracker struct {
-	layers      map[string]*LayerProgress
-	visual      *progress.VisualOperation
-	logger      otelzap.LoggerWithCtx
-	maxPercent  float64   // Track maximum seen percentage (monotonic)
-	lastUpdate  time.Time // Rate limiting for updates
-	totalSize   int64     // Total download size in bytes
-	startTime   time.Time // For download rate calculation
+	layers     map[string]*LayerProgress
+	visual     *progress.VisualOperation
+	logger     otelzap.LoggerWithCtx
+	maxPercent float64   // Track maximum seen percentage (monotonic)
+	lastUpdate time.Time // Rate limiting for updates
+	totalSize  int64     // Total download size in bytes
+	startTime  time.Time // For download rate calculation
 }
 
 // NewPullTracker creates a pull progress tracker
@@ -72,9 +75,18 @@ func (pt *PullTracker) Start() {
 
 // Update processes a pull progress event
 func (pt *PullTracker) Update(event *PullProgress) {
+	// Handle errors from Docker
+	if event.Error != "" {
+		pt.logger.Error("Docker pull error", zap.String("error", event.Error))
+		return
+	}
+
 	if event.ID == "" {
-		// Status messages without layer ID
-		pt.visual.UpdateStage(event.Status)
+		// Status messages without layer ID (global messages)
+		// Only update visual if it's a meaningful status
+		if event.Status != "" && !strings.Contains(event.Status, "working") {
+			pt.visual.UpdateStage(event.Status)
+		}
 		return
 	}
 
@@ -91,11 +103,18 @@ func (pt *PullTracker) Update(event *PullProgress) {
 	layer.Current = event.ProgressDetail.Current
 	layer.Total = event.ProgressDetail.Total
 
+	// Track phase of operation for better UX
+	status := strings.ToLower(event.Status)
+	layer.Downloading = strings.Contains(status, "downloading")
+	layer.Extracting = strings.Contains(status, "extracting")
+
 	// Mark as complete for certain statuses
 	if strings.Contains(event.Status, "Pull complete") ||
 		strings.Contains(event.Status, "Download complete") ||
 		strings.Contains(event.Status, "Already exists") {
 		layer.Complete = true
+		layer.Downloading = false
+		layer.Extracting = false
 		// When complete, set current = total for accurate percentage
 		if layer.Total > 0 {
 			layer.Current = layer.Total
@@ -117,12 +136,20 @@ func (pt *PullTracker) Update(event *PullProgress) {
 func (pt *PullTracker) getSummary() string {
 	totalLayers := len(pt.layers)
 	completeLayers := 0
+	downloadingLayers := 0
+	extractingLayers := 0
 	var totalBytes int64
 	var downloadedBytes int64
 
 	for _, layer := range pt.layers {
 		if layer.Complete {
 			completeLayers++
+		}
+		if layer.Downloading {
+			downloadingLayers++
+		}
+		if layer.Extracting {
+			extractingLayers++
 		}
 		totalBytes += layer.Total
 		downloadedBytes += layer.Current
@@ -166,8 +193,21 @@ func (pt *PullTracker) getSummary() string {
 			formatBytes(pt.totalSize))
 	}
 
-	return fmt.Sprintf("%d/%d layers (%.1f%% complete)%s%s",
-		completeLayers, totalLayers, percent, sizeStr, rateStr)
+	// Add phase information (what's currently happening)
+	phaseStr := ""
+	if downloadingLayers > 0 {
+		phaseStr = fmt.Sprintf(" | downloading %d", downloadingLayers)
+	}
+	if extractingLayers > 0 {
+		if phaseStr != "" {
+			phaseStr += fmt.Sprintf(", extracting %d", extractingLayers)
+		} else {
+			phaseStr = fmt.Sprintf(" | extracting %d", extractingLayers)
+		}
+	}
+
+	return fmt.Sprintf("%d/%d layers (%.1f%% complete)%s%s%s",
+		completeLayers, totalLayers, percent, sizeStr, rateStr, phaseStr)
 }
 
 // formatBytes formats bytes into human-readable format
@@ -232,11 +272,6 @@ func PullImageWithProgress(rc *eos_io.RuntimeContext, imageName string) error {
 		}
 
 		tracker.Update(&event)
-
-		// Log errors from Docker
-		if strings.Contains(strings.ToLower(event.Status), "error") {
-			logger.Error("Docker pull error", zap.String("status", event.Status))
-		}
 	}
 
 	if err := scanner.Err(); err != nil {

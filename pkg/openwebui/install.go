@@ -52,11 +52,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/azure"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -502,120 +502,40 @@ func (owi *OpenWebUIInstaller) checkPrerequisites(ctx context.Context) error {
 	return nil
 }
 
-// getAzureConfiguration prompts for Azure OpenAI configuration if not provided
+// getAzureConfiguration uses centralized pkg/azure for Azure OpenAI configuration
+// with smart URL parsing, validation, and connection testing
 func (owi *OpenWebUIInstaller) getAzureConfiguration(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	// If all required fields are provided, skip prompts
-	if owi.config.AzureEndpoint != "" && owi.config.AzureDeployment != "" && owi.config.AzureAPIKey != "" {
-		logger.Debug("Azure configuration provided via flags")
-		return nil
+	// Create existing config from flags (if provided)
+	existingConfig := &azure.OpenAIConfig{
+		Endpoint:       owi.config.AzureEndpoint,
+		ChatDeployment: owi.config.AzureDeployment,
+		APIKey:         owi.config.AzureAPIKey,
+		APIVersion:     owi.config.AzureAPIVersion,
+		ServiceName:    "openwebui",
+		Environment:    "production", // TODO: Get from environment discovery
 	}
 
-	logger.Info("terminal prompt: Azure OpenAI configuration required")
-	logger.Info("terminal prompt: You can find these in Azure Portal → Your OpenAI Resource → Keys and Endpoint")
+	// Create Azure OpenAI configuration manager
+	azureManager := azure.NewConfigManager(owi.rc, nil, "openwebui")
 
-	// Prompt for endpoint
-	if owi.config.AzureEndpoint == "" {
-		logger.Info("terminal prompt: Enter Azure OpenAI Endpoint (e.g., https://myopenai.openai.azure.com)")
-		endpoint, err := eos_io.PromptInput(owi.rc, "Azure OpenAI Endpoint: ", "azure_endpoint")
-		if err != nil {
-			return fmt.Errorf("failed to read Azure endpoint: %w", err)
-		}
-		owi.config.AzureEndpoint = shared.SanitizeURL(endpoint)
-	} else {
-		// Sanitize even if provided via flag
-		owi.config.AzureEndpoint = shared.SanitizeURL(owi.config.AzureEndpoint)
-	}
-
-	// Azure endpoints can be provided in two formats:
-	// 1. Base URL: https://resource.openai.azure.com
-	// 2. Full completion URL: https://resource.openai.azure.com/openai/deployments/model/chat/completions?api-version=...
-	//
-	// We need to detect which format and handle accordingly
-	parsed, err := url.Parse(owi.config.AzureEndpoint)
+	// Configure Azure OpenAI (handles validation, auto-detection, testing)
+	azureConfig, err := azureManager.Configure(ctx, existingConfig)
 	if err != nil {
-		return fmt.Errorf("failed to parse Azure endpoint: %w", err)
+		return fmt.Errorf("failed to configure Azure OpenAI: %w", err)
 	}
 
-	// Check if this looks like a full completion URL (has /openai/deployments/ in path)
-	if strings.Contains(parsed.Path, "/openai/deployments/") {
-		logger.Info("Detected full Azure AI Foundry completion URL - extracting components")
+	// Update OpenWebUI config with validated Azure config
+	owi.config.AzureEndpoint = azureConfig.Endpoint
+	owi.config.AzureDeployment = azureConfig.ChatDeployment
+	owi.config.AzureAPIKey = azureConfig.APIKey
+	owi.config.AzureAPIVersion = azureConfig.APIVersion
 
-		// Extract base URL
-		baseURL := fmt.Sprintf("%s://%s", parsed.Scheme, parsed.Host)
+	logger.Info("Azure OpenAI configuration completed successfully",
+		zap.String("endpoint", azure.RedactEndpoint(azureConfig.Endpoint)),
+		zap.String("deployment", azureConfig.ChatDeployment))
 
-		// Extract deployment name from path if not already provided
-		// Path format: /openai/deployments/{deployment-name}/chat/completions
-		if owi.config.AzureDeployment == "" {
-			pathParts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-			for i, part := range pathParts {
-				if part == "deployments" && i+1 < len(pathParts) {
-					owi.config.AzureDeployment = pathParts[i+1]
-					logger.Info("Extracted deployment name from URL",
-						zap.String("deployment", owi.config.AzureDeployment))
-					break
-				}
-			}
-		}
-
-		// Extract API version from query params if not already provided
-		if owi.config.AzureAPIVersion == "2024-02-15-preview" { // Default value
-			if apiVersion := parsed.Query().Get("api-version"); apiVersion != "" {
-				owi.config.AzureAPIVersion = apiVersion
-				logger.Info("Extracted API version from URL",
-					zap.String("api_version", owi.config.AzureAPIVersion))
-			}
-		}
-
-		// Use base URL for configuration
-		owi.config.AzureEndpoint = baseURL
-		logger.Info("Using extracted base URL", zap.String("base_url", baseURL))
-	}
-
-	// Validate the endpoint format (should be base URL at this point)
-	if err := validateAzureEndpoint(owi.config.AzureEndpoint); err != nil {
-		return eos_err.NewUserError(
-			"Invalid Azure OpenAI endpoint format\n"+
-				"%v\n"+
-				"Example: https://myresource.openai.azure.com", err)
-	}
-
-	// Prompt for deployment name
-	if owi.config.AzureDeployment == "" {
-		logger.Info("terminal prompt: Enter Deployment Name (e.g., gpt-4)")
-		deployment, err := eos_io.PromptInput(owi.rc, "Deployment Name: ", "deployment_name")
-		if err != nil {
-			return fmt.Errorf("failed to read deployment name: %w", err)
-		}
-		owi.config.AzureDeployment = strings.TrimSpace(deployment)
-	}
-
-	// Validate deployment name
-	if err := validateAzureDeployment(owi.config.AzureDeployment); err != nil {
-		return eos_err.NewUserError(
-			"Invalid Azure OpenAI deployment name\n"+
-				"%v\n"+
-				"Deployment names must be alphanumeric with hyphens, periods, or underscores", err)
-	}
-
-	// Prompt for API key
-	if owi.config.AzureAPIKey == "" {
-		logger.Info("terminal prompt: Enter API Key (input will be hidden)")
-		apiKey, err := interaction.PromptSecret(owi.rc.Ctx, "API Key: ")
-		if err != nil {
-			return fmt.Errorf("failed to read API key: %w", err)
-		}
-		owi.config.AzureAPIKey = strings.TrimSpace(apiKey)
-	}
-
-	// Validate API key format
-	if err := validateAzureAPIKey(owi.config.AzureAPIKey); err != nil {
-		return eos_err.NewUserError(
-			"Invalid Azure OpenAI API key format\n%v", err)
-	}
-
-	logger.Debug("Azure configuration validated successfully")
 	return nil
 }
 

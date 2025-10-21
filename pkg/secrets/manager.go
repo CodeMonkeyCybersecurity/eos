@@ -1,7 +1,8 @@
-// Package secrets provides automatic secret management across Vault, , and file backends
+// Package secrets provides automatic secret management across Vault and file backends
 package secrets
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -252,32 +254,96 @@ func (sm *SecretManager) generateJWTSecret(length int) (string, error) {
 // Vault Backend Implementation
 type VaultBackend struct {
 	address string
-	client  interface{} // Would be actual Vault client
+	client  *api.Client
 }
 
 func NewVaultBackend(address string) (*VaultBackend, error) {
-	// Implementation would create actual Vault client
-	return &VaultBackend{address: address}, nil
+	// Create Vault client configuration
+	config := api.DefaultConfig()
+	config.Address = address
+
+	// Create client
+	client, err := api.NewClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Vault client: %w", err)
+	}
+
+	// Token should be set via VAULT_TOKEN environment variable
+	// or read from ~/.vault-token by the SDK
+
+	return &VaultBackend{
+		address: address,
+		client:  client,
+	}, nil
 }
 
 func (vb *VaultBackend) Store(path string, secret map[string]interface{}) error {
-	// Implementation would store in Vault
-	return fmt.Errorf("vault backend not fully implemented")
+	// Store secret in Vault KV v2
+	// Path format: secret/data/{path}
+	_, err := vb.client.KVv2("secret").Put(context.Background(), path, secret)
+	if err != nil {
+		return fmt.Errorf("failed to store secret in Vault at %s: %w", path, err)
+	}
+	return nil
 }
 
 func (vb *VaultBackend) Retrieve(path string) (map[string]interface{}, error) {
-	// Implementation would retrieve from Vault
-	return nil, fmt.Errorf("vault backend not fully implemented")
+	// Retrieve secret from Vault KV v2
+	secretData, err := vb.client.KVv2("secret").Get(context.Background(), path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve secret from Vault at %s: %w", path, err)
+	}
+
+	if secretData == nil || secretData.Data == nil {
+		return nil, fmt.Errorf("secret not found at %s", path)
+	}
+
+	return secretData.Data, nil
 }
 
 func (vb *VaultBackend) Generate(path string, secretType SecretType) (string, error) {
-	// Implementation would use Vault's secret generation
-	return "", fmt.Errorf("vault backend not fully implemented")
+	// Generate secret using local crypto (Vault doesn't generate secrets for us)
+	// Then store it in Vault
+	var secret string
+	var err error
+
+	switch secretType {
+	case SecretTypePassword:
+		secret, err = generatePassword(32)
+	case SecretTypeAPIKey:
+		secret, err = generateAPIKey(44)
+	case SecretTypeToken:
+		secret, err = generateToken(64)
+	case SecretTypeJWT:
+		secret, err = generateToken(64)
+	default:
+		secret, err = generatePassword(32)
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to generate secret: %w", err)
+	}
+
+	// Store in Vault
+	secretMap := map[string]interface{}{
+		"value": secret,
+		"type":  string(secretType),
+	}
+
+	if err := vb.Store(path, secretMap); err != nil {
+		return "", fmt.Errorf("failed to store generated secret: %w", err)
+	}
+
+	return secret, nil
 }
 
 func (vb *VaultBackend) Exists(path string) bool {
-	// Implementation would check if path exists in Vault
-	return false
+	// Check if secret exists in Vault
+	secretData, err := vb.client.KVv2("secret").Get(context.Background(), path)
+	if err != nil || secretData == nil {
+		return false
+	}
+	return secretData.Data != nil
 }
 
 // File Backend Implementation (fallback)
