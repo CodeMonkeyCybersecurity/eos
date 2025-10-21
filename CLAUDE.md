@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-01-21*
+*Last Updated: 2025-10-21*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -93,9 +93,15 @@ Docker Operations (P1 - CRITICAL)?
 │  └─ Example: pkg/container/docker.go, pkg/docker/compose_precipitate.go
 │
 ├─ Docker Compose validation:
-│  ├─ PREFER: Docker SDK with YAML parsing (gopkg.in/yaml.v3)
-│  ├─ FALLBACK: Shell to 'docker compose config' only if SDK unavailable
-│  └─ Example: pkg/container/compose.go uses SDK ✓
+│  ├─ ALWAYS use: docker.ValidateComposeWithShellFallback(ctx, composeFile, envFile)
+│  ├─ Strategy: SDK first (35μs), shell fallback if SDK fails
+│  │  1. SDK validation (pkg/docker/compose_validate.go:ValidateComposeFile)
+│  │     - YAML parsing + variable substitution + image validation
+│  │     - No docker CLI dependency, works in CI
+│  │  2. Shell fallback ('docker compose config')
+│  │     - Handles edge cases, authoritative validation
+│  ├─ Example: pkg/hecate/validation_files.go:49 ✓
+│  └─ Tests: pkg/docker/compose_validate_test.go (12 tests, all passing)
 │
 ├─ User-facing operations (docker compose up -d):
 │  ├─ Shell acceptable (user needs to see output)
@@ -111,6 +117,20 @@ Flag Validation (P0 - CRITICAL)?
    ├─ Prevents '--' separator bypass (e.g., 'eos delete env prod -- --force')
    ├─ Required for ALL commands with positional arguments
    └─ See: pkg/verify/validators.go:ValidateNoFlagLikeArgs()
+
+Dependency Not Found (P0 - CRITICAL - Human-Centric)?
+├─ NEVER error out immediately when dependency missing
+├─ ALWAYS offer informed consent to install:
+│  ├─ Explain what the dependency is and why it's needed
+│  ├─ Show installation command(s) clearly
+│  ├─ Ask y/N (default No for safety)
+│  └─ If yes: attempt auto-install OR guide user through manual install
+│
+└─ Pattern (use pkg/interaction/dependency.go):
+   ├─ Check: interaction.CheckDependencyWithPrompt(rc, interaction.DependencyConfig{...})
+   ├─ Provides: Clear explanation, install commands, consent prompt
+   ├─ Handles: Auto-install (if safe) or graceful exit with instructions
+   └─ Example: Ollama, Docker, system packages
 ```
 
 ## Secret and Configuration Management (P0 - CRITICAL)
@@ -625,6 +645,8 @@ Before completing any task, verify:
 | Hardcode credentials | Use `secrets.SecretManager` |
 | Skip environment discovery | Call `environment.DiscoverEnvironment()` |
 | `strings.TrimSpace(url)` only | Use `shared.SanitizeURL(url)` |
+| Error when dependency missing | Offer informed consent to install (see Dependency Not Found) |
+| Silent dependency checks | Use `interaction.CheckDependencyWithPrompt()` |
 
 ## Priority Levels
 

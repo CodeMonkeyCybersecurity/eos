@@ -104,7 +104,6 @@ func updateApt(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("apt autoremove failed: %w", err)
 	}
 
-
 	// Step 4: apt autoclean (remove old packages)
 	logger.Info("Cleaning up old packages (apt autoclean)")
 	cleanCmd := exec.Command("apt", "autoclean", "-y")

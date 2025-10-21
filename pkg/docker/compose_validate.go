@@ -35,19 +35,19 @@ type ComposeConfig struct {
 
 // Service represents a service in docker-compose.yml
 type Service struct {
-	Image       string                 `yaml:"image,omitempty"`
-	Build       interface{}            `yaml:"build,omitempty"` // Can be string or struct
-	ContainerName string               `yaml:"container_name,omitempty"`
-	Command     interface{}            `yaml:"command,omitempty"` // Can be string or []string
-	Environment map[string]string      `yaml:"environment,omitempty"`
-	EnvFile     interface{}            `yaml:"env_file,omitempty"` // Can be string or []string
-	Ports       []interface{}          `yaml:"ports,omitempty"` // Can be string or struct
-	Volumes     []interface{}          `yaml:"volumes,omitempty"`
-	Networks    interface{}            `yaml:"networks,omitempty"` // Can be []string or map
-	DependsOn   interface{}            `yaml:"depends_on,omitempty"` // Can be []string or map
-	Restart     string                 `yaml:"restart,omitempty"`
-	Labels      map[string]string      `yaml:"labels,omitempty"`
-	Raw         map[string]interface{} `yaml:",inline"` // Catch-all
+	Image         string                 `yaml:"image,omitempty"`
+	Build         interface{}            `yaml:"build,omitempty"`     // Can be string or struct
+	ContainerName string                 `yaml:"container_name,omitempty"`
+	Command       interface{}            `yaml:"command,omitempty"`   // Can be string or []string
+	Environment   interface{}            `yaml:"environment,omitempty"` // Can be map[string]string or []string
+	EnvFile       interface{}            `yaml:"env_file,omitempty"`  // Can be string or []string
+	Ports         []interface{}          `yaml:"ports,omitempty"`     // Can be string or struct
+	Volumes       []interface{}          `yaml:"volumes,omitempty"`
+	Networks      interface{}            `yaml:"networks,omitempty"`  // Can be []string or map
+	DependsOn     interface{}            `yaml:"depends_on,omitempty"` // Can be []string or map
+	Restart       string                 `yaml:"restart,omitempty"`
+	Labels        map[string]string      `yaml:"labels,omitempty"`
+	Raw           map[string]interface{} `yaml:",inline"` // Catch-all
 }
 
 // Network represents a network configuration
@@ -285,17 +285,40 @@ func substituteVariables(compose *ComposeConfig, envVars map[string]string) erro
 			compose.Services[name] = service
 		}
 
-		// Substitute environment variables
-		for key, value := range service.Environment {
-			substituted, err := substituteString(value, envVars)
-			if err != nil {
-				return &ValidationError{
-					Service: name,
-					Field:   fmt.Sprintf("environment.%s", key),
-					Message: err.Error(),
+		// Substitute environment variables (supports both map and list formats)
+		if service.Environment != nil {
+			switch env := service.Environment.(type) {
+			case map[string]interface{}:
+				// Map format: KEY: value
+				for key, val := range env {
+					if strVal, ok := val.(string); ok {
+						substituted, err := substituteString(strVal, envVars)
+						if err != nil {
+							return &ValidationError{
+								Service: name,
+								Field:   fmt.Sprintf("environment.%s", key),
+								Message: err.Error(),
+							}
+						}
+						env[key] = substituted
+					}
+				}
+			case []interface{}:
+				// List format: - KEY=value
+				for i, val := range env {
+					if strVal, ok := val.(string); ok {
+						substituted, err := substituteString(strVal, envVars)
+						if err != nil {
+							return &ValidationError{
+								Service: name,
+								Field:   fmt.Sprintf("environment[%d]", i),
+								Message: err.Error(),
+							}
+						}
+						env[i] = substituted
+					}
 				}
 			}
-			service.Environment[key] = substituted
 		}
 	}
 

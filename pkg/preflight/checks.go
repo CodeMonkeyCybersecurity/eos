@@ -156,6 +156,7 @@ func CheckDiskSpace(minGB int) func(context.Context) error {
 }
 
 // CheckOllama verifies Ollama is running and accessible
+// Note: For human-centric prompting with install offers, use CheckOllamaWithPrompt instead
 func CheckOllama(ctx context.Context) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 
@@ -182,6 +183,20 @@ func CheckOllama(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// CheckOllamaWithPrompt checks Ollama and offers to install if missing
+// This is the human-centric version that follows informed consent pattern
+// Returns (found, userDeclined, error)
+func CheckOllamaWithPrompt(ctx context.Context) (bool, bool, error) {
+	// First try the standard check
+	if err := CheckOllama(ctx); err == nil {
+		return true, false, nil
+	}
+
+	// Ollama not found - return detailed info for caller to handle prompting
+	// The caller should use interaction.CheckDependencyWithPrompt for full flow
+	return false, false, fmt.Errorf("Ollama check failed - use interaction.CheckDependencyWithPrompt for guided installation")
 }
 
 // CommonChecks returns the standard set of checks for Docker-based services

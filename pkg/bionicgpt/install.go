@@ -467,40 +467,41 @@ func (bgi *BionicGPTInstaller) configureEmbeddings(ctx context.Context) error {
 }
 
 // setupLocalEmbeddings configures and validates local embeddings via Ollama
-// Following ASSESS → INTERVENE → EVALUATE pattern
+// Following ASSESS → INTERVENE → EVALUATE pattern with human-centric informed consent
 func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
 	logger.Info("=== ASSESS: Checking Ollama availability ===")
 
-	// Import preflight and ollama packages
-	// Run Ollama preflight check
-	checks := []preflight.Check{
-		{
-			Name:        "Ollama",
-			Description: "Ollama is running and accessible",
-			Check:       preflight.CheckOllama,
-			Required:    true,
-		},
+	// Use human-centric dependency checking with informed consent
+	depConfig := interaction.DependencyConfig{
+		Name:        "Ollama",
+		Description: "Local LLM server for embeddings (document search). Runs models locally for FREE.",
+		CheckCommand: "curl",
+		CheckArgs:   []string{"-s", "http://localhost:11434/api/version"},
+		InstallCmd:  "curl -fsSL https://ollama.ai/install.sh | sh",
+		StartCmd:    "ollama serve &",
+		Required:    true,
+		AutoInstall: true,  // Safe to auto-install via official script
+		AutoStart:   false, // Let user start manually (daemon management varies)
+		CustomCheckFn: preflight.CheckOllama,
 	}
 
-	results, err := preflight.RunChecks(ctx, checks)
+	result, err := interaction.CheckDependencyWithPrompt(bgi.rc, depConfig)
 	if err != nil {
-		logger.Error("Ollama preflight check failed",
-			zap.Error(err))
-		const ollamaErrorMsg = "Ollama is required for local embeddings but is not available.\n\n" +
-			"Fix: Install and start Ollama:\n" +
-			"  curl -fsSL https://ollama.ai/install.sh | sh\n" +
-			"  ollama serve\n\n" +
-			"Or choose Azure embeddings instead:\n" +
-			"  eos create bionicgpt --azure-embeddings-deployment <deployment-name>"
-		return fmt.Errorf("%s\n\nError: %w", ollamaErrorMsg, err)
+		// Add context about Azure alternative
+		return fmt.Errorf("%w\n\n"+
+			"Alternative: Use Azure OpenAI embeddings instead:\n"+
+			"  eos create bionicgpt --azure-embeddings-deployment <deployment-name>",
+			err)
 	}
 
-	for _, result := range results {
-		if !result.Passed {
-			return fmt.Errorf("check %s failed: %w", result.Name, result.Error)
-		}
+	if !result.Found {
+		// User declined or dependency not available
+		return eos_err.NewUserError(
+			"Ollama is required for local embeddings.\n\n" +
+				"Alternative: Use Azure OpenAI embeddings:\n" +
+				"  eos create bionicgpt --azure-embeddings-deployment <deployment-name>")
 	}
 
 	logger.Info("✓ Ollama is accessible")
