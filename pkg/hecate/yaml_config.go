@@ -132,6 +132,42 @@ func LoadYAMLConfig(rc *eos_io.RuntimeContext, configPath string) (*YAMLHecateCo
 		}
 	}
 
+	// EVALUATE - Validate duplicate domains (BLOCKING)
+	domainMap := make(map[string]string) // domain -> app name
+	for appName, app := range config.Apps {
+		if existingApp, exists := domainMap[app.Domain]; exists {
+			return nil, eos_err.NewUserError(
+				"Duplicate domain detected: %s\n\n"+
+					"Both '%s' and '%s' are configured to use domain: %s\n\n"+
+					"Each app MUST have a unique domain. Caddy cannot route the same domain to multiple backends.\n\n"+
+					"Fix this by choosing ONE of these options:\n\n"+
+					"OPTION 1: Use subdomains (recommended)\n"+
+					"  Edit your config file: %s\n"+
+					"  Change one app to use a subdomain:\n"+
+					"    %s:\n"+
+					"      domain: %s.%s  # Example subdomain\n"+
+					"    %s:\n"+
+					"      domain: %s.%s  # Different subdomain\n\n"+
+					"OPTION 2: Use different base domains\n"+
+					"  If you have multiple domains, assign each app to a different domain\n\n"+
+					"OPTION 3: Regenerate config\n"+
+					"  Run: eos create config --hecate\n"+
+					"  Ensure each app gets a unique domain\n\n"+
+					"Common patterns:\n"+
+					"  - Main site: example.com\n"+
+					"  - Wazuh: wazuh.example.com\n"+
+					"  - Authentik: auth.example.com\n"+
+					"  - Nextcloud: cloud.example.com",
+				app.Domain,
+				existingApp, appName, app.Domain,
+				configPath,
+				existingApp, existingApp, extractBaseDomain(app.Domain),
+				appName, appName, extractBaseDomain(app.Domain),
+			)
+		}
+		domainMap[app.Domain] = appName
+	}
+
 	// EVALUATE - Validate SSO requirements
 	for appName, app := range config.Apps {
 		if app.SSO && !config.HasAuthentik {
