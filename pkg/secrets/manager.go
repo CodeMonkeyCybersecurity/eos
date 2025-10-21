@@ -210,7 +210,9 @@ func (sm *SecretManager) generatePassword(length int) (string, error) {
 	lowercase := "abcdefghijklmnopqrstuvwxyz"
 	uppercase := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digits := "0123456789"
-	special := "!@#$%^&*"
+	// NOTE: Excludes $ to prevent variable substitution in .env files (Docker Compose, shell)
+	// Excludes ` and \ to prevent shell escaping issues
+	special := "!@#%^&*-_+=:;,.?"
 
 	allChars := lowercase + uppercase + digits + special
 
