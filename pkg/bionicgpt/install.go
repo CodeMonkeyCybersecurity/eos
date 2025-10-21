@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/azure"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
@@ -574,80 +575,50 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 	return nil
 }
 
-// getAzureConfiguration prompts for Azure OpenAI configuration if not provided
-// Now includes separate deployments for chat and embeddings (for LiteLLM)
+// getAzureConfiguration uses centralized pkg/azure for Azure OpenAI configuration
+// with smart URL parsing, validation, and Vault/Consul integration
 func (bgi *BionicGPTInstaller) getAzureConfiguration(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	// If all required fields are provided, skip prompts
-	if bgi.config.AzureEndpoint != "" &&
-		bgi.config.AzureChatDeployment != "" &&
-		bgi.config.AzureEmbeddingsDeployment != "" &&
-		bgi.config.AzureAPIKey != "" {
-		logger.Debug("Azure configuration provided via flags")
-		return nil
+	// Create existing config from flags (if provided)
+	existingConfig := &azure.OpenAIConfig{
+		Endpoint:             bgi.config.AzureEndpoint,
+		ChatDeployment:       bgi.config.AzureChatDeployment,
+		EmbeddingsDeployment: bgi.config.AzureEmbeddingsDeployment,
+		APIKey:               bgi.config.AzureAPIKey,
+		APIVersion:           bgi.config.AzureAPIVersion,
+		ServiceName:          "bionicgpt",
+		Environment:          "production", // TODO: Get from environment discovery
 	}
 
-	logger.Info("terminal prompt: Azure OpenAI configuration required for LiteLLM proxy")
-	logger.Info("terminal prompt: You can find these in Azure Portal → Your OpenAI Resource → Keys and Endpoint")
-	logger.Info("terminal prompt: Deployment names are under: Deployments tab")
+	// Create Azure OpenAI configuration manager
+	// Note: secretManager should be stored in bgi for access here
+	// For now, pass nil and it will prompt for API key
+	azureManager := azure.NewConfigManager(bgi.rc, nil, "bionicgpt")
 
-	// Prompt for endpoint
-	if bgi.config.AzureEndpoint == "" {
-		logger.Info("terminal prompt: Enter Azure OpenAI Endpoint (e.g., https://myresource.openai.azure.com)")
-		endpoint, err := eos_io.PromptInput(bgi.rc, "Azure OpenAI Endpoint: ", "azure_endpoint")
-		if err != nil {
-			return fmt.Errorf("failed to read Azure endpoint: %w", err)
-		}
-		bgi.config.AzureEndpoint = shared.SanitizeURL(endpoint)
-	} else {
-		// Sanitize even if provided via flag
-		bgi.config.AzureEndpoint = shared.SanitizeURL(bgi.config.AzureEndpoint)
+	// Configure Azure OpenAI (handles validation, auto-detection, etc.)
+	azureConfig, err := azureManager.Configure(ctx, existingConfig)
+	if err != nil {
+		return fmt.Errorf("failed to configure Azure OpenAI: %w", err)
 	}
 
-	// Prompt for chat deployment name
-	if bgi.config.AzureChatDeployment == "" {
-		logger.Info("terminal prompt: Enter Chat Model Deployment Name (e.g., gpt-4-deployment)")
-		logger.Info("terminal prompt: This is the DEPLOYMENT name, not the model name")
-		chatDeployment, err := eos_io.PromptInput(bgi.rc, "Chat Deployment Name: ", "chat_deployment")
-		if err != nil {
-			return fmt.Errorf("failed to read chat deployment name: %w", err)
-		}
-		bgi.config.AzureChatDeployment = strings.TrimSpace(chatDeployment)
+	// Handle local embeddings override
+	if bgi.config.UseLocalEmbeddings {
+		logger.Info("Using local embeddings (Ollama), overriding Azure embeddings deployment")
+		azureConfig.EmbeddingsDeployment = "local" // Placeholder for LiteLLM config
 	}
 
-	// Prompt for embeddings deployment name (skip if using local embeddings)
-	if bgi.config.AzureEmbeddingsDeployment == "" {
-		if bgi.config.UseLocalEmbeddings {
-			// Using local embeddings (Ollama), skip Azure embeddings prompt
-			logger.Info("Using local embeddings, skipping Azure embeddings configuration")
-			bgi.config.AzureEmbeddingsDeployment = "local" // Placeholder for LiteLLM config
-		} else {
-			// Using Azure embeddings, prompt for deployment name
-			logger.Info("terminal prompt: Enter Embeddings Model Deployment Name (e.g., text-embedding-ada-002)")
-			embeddingsDeployment, err := eos_io.PromptInput(bgi.rc, "Embeddings Deployment Name: ", "embeddings_deployment")
-			if err != nil {
-				return fmt.Errorf("failed to read embeddings deployment name: %w", err)
-			}
-			bgi.config.AzureEmbeddingsDeployment = strings.TrimSpace(embeddingsDeployment)
-		}
-	}
+	// Update BionicGPT config with validated Azure config
+	bgi.config.AzureEndpoint = azureConfig.Endpoint
+	bgi.config.AzureChatDeployment = azureConfig.ChatDeployment
+	bgi.config.AzureEmbeddingsDeployment = azureConfig.EmbeddingsDeployment
+	bgi.config.AzureAPIKey = azureConfig.APIKey
+	bgi.config.AzureAPIVersion = azureConfig.APIVersion
 
-	// Prompt for API key (only if not managing via Vault)
-	if bgi.config.AzureAPIKey == "" {
-		logger.Info("terminal prompt: Enter API Key (input will be hidden, or leave blank to use Vault)")
-		apiKey, err := interaction.PromptSecret(ctx, "API Key (or Enter for Vault): ")
-		if err != nil {
-			return fmt.Errorf("failed to read API key: %w", err)
-		}
-		// If empty, will be retrieved from Vault later
-		bgi.config.AzureAPIKey = strings.TrimSpace(apiKey)
-	}
-
-	logger.Debug("Azure configuration validated successfully",
-		zap.String("endpoint", bgi.config.AzureEndpoint),
-		zap.String("chat_deployment", bgi.config.AzureChatDeployment),
-		zap.String("embeddings_deployment", bgi.config.AzureEmbeddingsDeployment))
+	logger.Info("Azure OpenAI configuration completed successfully",
+		zap.String("endpoint", azure.RedactEndpoint(azureConfig.Endpoint)),
+		zap.String("chat_deployment", azureConfig.ChatDeployment),
+		zap.String("embeddings_deployment", azureConfig.EmbeddingsDeployment))
 
 	return nil
 }

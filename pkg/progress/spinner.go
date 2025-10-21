@@ -8,11 +8,13 @@ package progress
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 // Spinner frames for animation
@@ -47,7 +49,7 @@ func (vo *VisualOperation) Start() {
 	vo.logger.Info(fmt.Sprintf("┌─ %s", vo.Name),
 		zap.String("duration", vo.Duration))
 
-	vo.ticker = time.NewTicker(500 * time.Millisecond) // Update twice per second
+	vo.ticker = time.NewTicker(1 * time.Second) // Update once per second
 	go vo.animate()
 }
 
@@ -121,9 +123,22 @@ type ProgressBar struct {
 
 // NewProgressBar creates a new progress bar
 func NewProgressBar(ctx context.Context, total int64) *ProgressBar {
+	// Calculate progress bar width as 50% of terminal width
+	width := 40 // Default fallback
+	if termWidth, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && termWidth > 0 {
+		// Use 50% of terminal width for progress bar, min 20, max 100
+		width = termWidth / 2
+		if width < 20 {
+			width = 20
+		}
+		if width > 100 {
+			width = 100
+		}
+	}
+
 	return &ProgressBar{
 		Total:  total,
-		Width:  40,
+		Width:  width,
 		logger: otelzap.Ctx(ctx),
 	}
 }

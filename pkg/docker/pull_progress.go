@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/progress"
@@ -43,17 +44,24 @@ type LayerProgress struct {
 
 // PullTracker tracks overall pull progress across multiple layers
 type PullTracker struct {
-	layers map[string]*LayerProgress
-	visual *progress.VisualOperation
-	logger otelzap.LoggerWithCtx
+	layers      map[string]*LayerProgress
+	visual      *progress.VisualOperation
+	logger      otelzap.LoggerWithCtx
+	maxPercent  float64   // Track maximum seen percentage (monotonic)
+	lastUpdate  time.Time // Rate limiting for updates
+	totalSize   int64     // Total download size in bytes
+	startTime   time.Time // For download rate calculation
 }
 
 // NewPullTracker creates a pull progress tracker
 func NewPullTracker(ctx context.Context, imageName string) *PullTracker {
 	return &PullTracker{
-		layers: make(map[string]*LayerProgress),
-		visual: progress.NewVisual(ctx, fmt.Sprintf("Pulling %s", imageName), "varies by size"),
-		logger: otelzap.Ctx(ctx),
+		layers:     make(map[string]*LayerProgress),
+		visual:     progress.NewVisual(ctx, fmt.Sprintf("Pulling %s", imageName), "varies by size"),
+		logger:     otelzap.Ctx(ctx),
+		maxPercent: 0.0,
+		lastUpdate: time.Now(),
+		startTime:  time.Now(),
 	}
 }
 
@@ -85,9 +93,20 @@ func (pt *PullTracker) Update(event *PullProgress) {
 
 	// Mark as complete for certain statuses
 	if strings.Contains(event.Status, "Pull complete") ||
+		strings.Contains(event.Status, "Download complete") ||
 		strings.Contains(event.Status, "Already exists") {
 		layer.Complete = true
+		// When complete, set current = total for accurate percentage
+		if layer.Total > 0 {
+			layer.Current = layer.Total
+		}
 	}
+
+	// Rate limit updates to once per second
+	if time.Since(pt.lastUpdate) < time.Second {
+		return
+	}
+	pt.lastUpdate = time.Now()
 
 	// Update visual stage with summary
 	summary := pt.getSummary()
@@ -109,17 +128,61 @@ func (pt *PullTracker) getSummary() string {
 		downloadedBytes += layer.Current
 	}
 
+	// Store total size when we first discover it
+	if totalBytes > pt.totalSize {
+		pt.totalSize = totalBytes
+	}
+
 	if totalLayers == 0 {
 		return "starting pull"
 	}
 
 	// Calculate overall progress percentage
 	var percent float64
-	if totalBytes > 0 {
-		percent = float64(downloadedBytes) / float64(totalBytes) * 100
+	if pt.totalSize > 0 {
+		percent = float64(downloadedBytes) / float64(pt.totalSize) * 100
 	}
 
-	return fmt.Sprintf("%d/%d layers (%.1f%% complete)", completeLayers, totalLayers, percent)
+	// MONOTONIC: Never let percentage decrease
+	if percent > pt.maxPercent {
+		pt.maxPercent = percent
+	} else {
+		percent = pt.maxPercent
+	}
+
+	// Calculate download rate (bytes per second)
+	elapsed := time.Since(pt.startTime).Seconds()
+	var rateStr string
+	if elapsed > 0 && downloadedBytes > 0 {
+		rate := float64(downloadedBytes) / elapsed
+		rateStr = fmt.Sprintf(" | %s/s", formatBytes(int64(rate)))
+	}
+
+	// Format total size
+	sizeStr := ""
+	if pt.totalSize > 0 {
+		sizeStr = fmt.Sprintf(" | %s/%s",
+			formatBytes(downloadedBytes),
+			formatBytes(pt.totalSize))
+	}
+
+	return fmt.Sprintf("%d/%d layers (%.1f%% complete)%s%s",
+		completeLayers, totalLayers, percent, sizeStr, rateStr)
+}
+
+// formatBytes formats bytes into human-readable format
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	units := []string{"KB", "MB", "GB", "TB"}
+	return fmt.Sprintf("%.1f %s", float64(bytes)/float64(div), units[exp])
 }
 
 // Done marks pull as complete
