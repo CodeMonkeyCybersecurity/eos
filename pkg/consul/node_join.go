@@ -43,16 +43,16 @@ type NodeJoinConfigV2 struct {
 
 // NodeJoinResultV2 contains enhanced result information
 type NodeJoinResultV2 struct {
-	Success             bool
-	LocalNode           NodeInfo
-	JoinedNodes         []NodeInfo
-	ExistingMembers     []cluster.Member
-	BackupPath          string
-	ClusterMembers      []string
-	ConfigChanged       bool   // P0 fix: Track if config actually changed
-	MixedNetwork        bool   // P0 fix: Flag mixed Tailscale/non-Tailscale
-	PreservedIPs        []string // P0 fix: Non-Tailscale IPs preserved
-	ACLEnabled          bool   // P1 fix: ACL detection
+	Success         bool
+	LocalNode       NodeInfo
+	JoinedNodes     []NodeInfo
+	ExistingMembers []cluster.Member
+	BackupPath      string
+	ClusterMembers  []string
+	ConfigChanged   bool     // P0 fix: Track if config actually changed
+	MixedNetwork    bool     // P0 fix: Flag mixed Tailscale/non-Tailscale
+	PreservedIPs    []string // P0 fix: Non-Tailscale IPs preserved
+	ACLEnabled      bool     // P1 fix: ACL detection
 }
 
 // Default timeouts
@@ -277,22 +277,41 @@ func JoinNodesV2(rc *eos_io.RuntimeContext, cfg *NodeJoinConfigV2) (*NodeJoinRes
 	result.ConfigChanged = needsUpdate
 
 	if !needsUpdate {
-		logger.Info("Configuration is already correct - no changes needed")
+		logger.Info("Configuration is already correct - checking cluster membership...")
 		logger.Info("Current bind_addr: " + existingConfig.BindAddr)
 		logger.Info("Current retry_join: " + fmt.Sprintf("%v", existingConfig.RetryJoin))
 		logger.Info("Desired bind_addr: " + myTailscaleIP)
 		logger.Info("Desired retry_join: " + fmt.Sprintf("%v", allTailscaleIPs))
 
-		result.Success = true
-		result.ClusterMembers = parseConsulMembersSimple(memberDiscovery)
-		return result, nil // Skip update, restart, etc.
-	}
+		// P0 FIX: Even if config is correct, verify cluster is actually joined
+		// Config might be right but Consul might not have connected yet (network issues, remote nodes down, etc.)
+		currentMemberCount := len(memberDiscovery.Members)
+		expectedMemberCount := len(allTailscaleIPs) + 1 // +1 for self
 
-	logger.Info("Configuration needs updating",
-		zap.String("current_bind", existingConfig.BindAddr),
-		zap.String("desired_bind", myTailscaleIP),
-		zap.Int("current_retry_join_count", len(existingConfig.RetryJoin)),
-		zap.Int("desired_retry_join_count", len(allTailscaleIPs)))
+		if currentMemberCount >= expectedMemberCount {
+			// Cluster is actually joined - truly idempotent
+			logger.Info("Cluster membership verified - all nodes connected")
+			result.Success = true
+			result.ClusterMembers = parseConsulMembersSimple(memberDiscovery)
+			return result, nil
+		}
+
+		// Config is correct BUT cluster not fully joined - need to trigger join
+		logger.Warn("Configuration correct but cluster not fully joined",
+			zap.Int("current_members", currentMemberCount),
+			zap.Int("expected_members", expectedMemberCount))
+		logger.Info("Will restart Consul to trigger cluster join...")
+
+		// Continue to restart Consul to trigger join (without updating config)
+		result.ConfigChanged = false // Config stays the same
+		// Fall through to restart logic below
+	} else {
+		logger.Info("Configuration needs updating",
+			zap.String("current_bind", existingConfig.BindAddr),
+			zap.String("desired_bind", myTailscaleIP),
+			zap.Int("current_retry_join_count", len(existingConfig.RetryJoin)),
+			zap.Int("desired_retry_join_count", len(allTailscaleIPs)))
+	}
 
 	// Dry-run: Show what would change
 	if cfg.DryRun {
@@ -321,49 +340,54 @@ func JoinNodesV2(rc *eos_io.RuntimeContext, cfg *NodeJoinConfigV2) (*NodeJoinRes
 		return result, nil
 	}
 
-	// Phase 6: Backup configuration
+	// Phase 6: Backup configuration (only if config will change)
 	var backupPath string
-	if !cfg.SkipBackup {
-		logger.Info("[9/12] Backing up Consul configuration...")
-		backupPath = fmt.Sprintf("%s.backup.%d", cfg.ConfigPath, time.Now().Unix())
+	if needsUpdate {
+		if !cfg.SkipBackup {
+			logger.Info("[9/12] Backing up Consul configuration...")
+			backupPath = fmt.Sprintf("%s.backup.%d", cfg.ConfigPath, time.Now().Unix())
 
-		if err := copyFile(cfg.ConfigPath, backupPath); err != nil {
-			logger.Warn("Failed to backup configuration (non-critical)", zap.Error(err))
+			if err := copyFile(cfg.ConfigPath, backupPath); err != nil {
+				logger.Warn("Failed to backup configuration (non-critical)", zap.Error(err))
+			} else {
+				logger.Info("Configuration backed up", zap.String("backup", backupPath))
+				result.BackupPath = backupPath
+			}
 		} else {
-			logger.Info("Configuration backed up", zap.String("backup", backupPath))
-			result.BackupPath = backupPath
+			logger.Info("[9/12] Skipping configuration backup")
 		}
+
+		// Phase 7: Generate new configuration
+		logger.Info("[10/12] Generating new configuration...")
+		newConfigContent := config.UpdateConfig(
+			string(existingConfigData),
+			myTailscaleIP,
+			allTailscaleIPs,
+			cfg.PreserveNonTailscale,
+		)
+
+		// P0: Write configuration atomically
+		logger.Debug("Writing configuration atomically")
+		if err := service.WriteConfigAtomic(cfg.ConfigPath, []byte(newConfigContent)); err != nil {
+			return nil, fmt.Errorf("failed to write configuration: %w", err)
+		}
+
+		// P0: Validate configuration before applying
+		logger.Debug("Validating new configuration")
+		if err := service.ValidateConfig(rc.Ctx, cfg.ConfigPath); err != nil {
+			// Validation failed - restore backup
+			if backupPath != "" {
+				logger.Error("Configuration validation failed, restoring backup")
+				os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
+			}
+			return nil, err
+		}
+
+		logger.Info("Configuration updated successfully")
 	} else {
-		logger.Info("[9/12] Skipping configuration backup")
+		logger.Info("[9/12] Skipping config backup (config already correct)")
+		logger.Info("[10/12] Skipping config update (config already correct)")
 	}
-
-	// Phase 7: Generate new configuration
-	logger.Info("[10/12] Generating new configuration...")
-	newConfigContent := config.UpdateConfig(
-		string(existingConfigData),
-		myTailscaleIP,
-		allTailscaleIPs,
-		cfg.PreserveNonTailscale,
-	)
-
-	// P0: Write configuration atomically
-	logger.Debug("Writing configuration atomically")
-	if err := service.WriteConfigAtomic(cfg.ConfigPath, []byte(newConfigContent)); err != nil {
-		return nil, fmt.Errorf("failed to write configuration: %w", err)
-	}
-
-	// P0: Validate configuration before applying
-	logger.Debug("Validating new configuration")
-	if err := service.ValidateConfig(rc.Ctx, cfg.ConfigPath); err != nil {
-		// Validation failed - restore backup
-		if backupPath != "" {
-			logger.Error("Configuration validation failed, restoring backup")
-			os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
-		}
-		return nil, err
-	}
-
-	logger.Info("Configuration updated successfully")
 
 	// Phase 8: Restart Consul with rollback support
 	logger.Info("[11/12] Restarting Consul service...")

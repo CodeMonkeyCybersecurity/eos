@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/debug"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/scripts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -77,6 +78,10 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) error {
 			fixPermResult := fixPermissions(rc)
 			results = append(results, fixPermResult)
 		}
+
+		// Fix missing helper script (P0 - causes watch handler errors)
+		helperResult := fixHelperScript(rc)
+		results = append(results, helperResult)
 
 		// Fix configuration issues if not permissions-only mode
 		if !config.PermissionsOnly && configIssues {
@@ -197,6 +202,51 @@ func assessPermissions(rc *eos_io.RuntimeContext) FixResult {
 	} else {
 		result.Message = "All permissions are correct"
 	}
+
+	return result
+}
+
+// fixHelperScript creates the consul-vault-helper script if missing
+func fixHelperScript(rc *eos_io.RuntimeContext) FixResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking for consul-vault-helper script")
+
+	result := FixResult{
+		Operation: "Helper Script Fix",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	scriptPath := "/usr/local/bin/consul-vault-helper"
+
+	// ASSESS - Check if script exists
+	if _, err := os.Stat(scriptPath); err == nil {
+		result.Message = "Helper script already exists"
+		result.Details = append(result.Details, fmt.Sprintf("✓ %s: exists", scriptPath))
+		result.ChangesMade = false
+		return result
+	}
+
+	// INTERVENE - Create the script
+	logger.Info("Creating missing consul-vault-helper script")
+	if err := scripts.CreateHelper(rc); err != nil {
+		result.Success = false
+		result.Message = "Failed to create helper script"
+		result.Details = append(result.Details, fmt.Sprintf("✗ Error: %v", err))
+		return result
+	}
+
+	// EVALUATE - Verify creation
+	if _, err := os.Stat(scriptPath); err != nil {
+		result.Success = false
+		result.Message = "Helper script creation failed verification"
+		result.Details = append(result.Details, fmt.Sprintf("✗ %s: not found after creation", scriptPath))
+		return result
+	}
+
+	result.Message = "Helper script created successfully"
+	result.Details = append(result.Details, fmt.Sprintf("✓ %s: created", scriptPath))
+	result.ChangesMade = true
 
 	return result
 }

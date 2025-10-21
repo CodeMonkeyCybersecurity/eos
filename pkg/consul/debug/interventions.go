@@ -17,33 +17,33 @@ import (
 func killLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Killing lingering Consul processes")
-	
+
 	result := DiagnosticResult{
 		CheckName:  "Process Cleanup",
 		Success:    true,
 		FixApplied: true,
 		Details:    []string{},
 	}
-	
+
 	// First try graceful termination
 	cmd := execute.Options{
 		Command: "pkill",
 		Args:    []string{"-TERM", "-f", "consul"},
 	}
-	
+
 	_, err := execute.Run(rc.Ctx, cmd)
 	if err == nil {
 		result.Details = append(result.Details, "Sent TERM signal to Consul processes")
 		time.Sleep(2 * time.Second)
 	}
-	
+
 	// Check if processes are still running
 	checkCmd := execute.Options{
 		Command: "pgrep",
 		Args:    []string{"-f", "consul"},
 		Capture: true,
 	}
-	
+
 	output, err := execute.Run(rc.Ctx, checkCmd)
 	if err == nil && output != "" {
 		// Force kill if still running
@@ -51,15 +51,15 @@ func killLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 			Command: "pkill",
 			Args:    []string{"-KILL", "-f", "consul"},
 		}
-		
+
 		_, _ = execute.Run(rc.Ctx, killCmd)
 		result.Details = append(result.Details, "Force killed remaining Consul processes")
 	}
-	
+
 	// Verify all processes are gone
 	time.Sleep(1 * time.Second)
 	output, err = execute.Run(rc.Ctx, checkCmd)
-	
+
 	if err != nil || output == "" {
 		result.Message = "Successfully cleaned up all Consul processes"
 		result.FixMessage = "All Consul processes terminated"
@@ -68,7 +68,7 @@ func killLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 		result.Message = "Some Consul processes could not be terminated"
 		result.FixMessage = "Failed to terminate all processes"
 	}
-	
+
 	return result
 }
 
@@ -76,16 +76,16 @@ func killLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Applying configuration fixes")
-	
+
 	result := DiagnosticResult{
 		CheckName:  "Configuration Fix",
 		Success:    true,
 		FixApplied: true,
 		Details:    []string{},
 	}
-	
+
 	configPath := "/etc/consul.d/consul.hcl"
-	
+
 	// Read current configuration
 	content, err := os.ReadFile(configPath)
 	if err != nil {
@@ -93,13 +93,52 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 		result.Message = "Failed to read configuration file"
 		return result
 	}
-	
+
 	original := string(content)
 	modified := original
 	fixCount := 0
-	
+
 	// Apply fixes based on detected issues
 	for _, detail := range configResult.Details {
+		// P0 - Fix advertise_addr mismatch with bind_addr
+		if strings.Contains(detail, "bind_addr") && strings.Contains(detail, "differs from advertise_addr") {
+			// Extract bind_addr value from config
+			bindAddrLine := ""
+			lines := strings.Split(modified, "\n")
+			for _, line := range lines {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "bind_addr") && !strings.HasPrefix(trimmed, "bind_addr_wan") {
+					bindAddrLine = line
+					break
+				}
+			}
+
+			if bindAddrLine != "" {
+				// Extract IP from bind_addr = "IP"
+				start := strings.Index(bindAddrLine, "\"")
+				end := strings.LastIndex(bindAddrLine, "\"")
+				if start != -1 && end != -1 && start < end {
+					bindIP := bindAddrLine[start+1 : end]
+
+					// Replace advertise_addr lines to match bind_addr
+					newLines := []string{}
+					for _, line := range lines {
+						trimmed := strings.TrimSpace(line)
+						if strings.HasPrefix(trimmed, "advertise_addr") && !strings.HasPrefix(trimmed, "advertise_addr_wan") {
+							newLines = append(newLines, fmt.Sprintf(`advertise_addr = "%s"  # Fixed to match bind_addr`, bindIP))
+						} else if strings.HasPrefix(trimmed, "advertise_addr_wan") {
+							newLines = append(newLines, fmt.Sprintf(`advertise_addr_wan = "%s"  # Fixed to match bind_addr`, bindIP))
+						} else {
+							newLines = append(newLines, line)
+						}
+					}
+					modified = strings.Join(newLines, "\n")
+					result.Details = append(result.Details, fmt.Sprintf("Fixed advertise_addr to match bind_addr (%s)", bindIP))
+					fixCount++
+				}
+			}
+		}
+
 		if strings.Contains(detail, "bootstrap_expect") {
 			// Remove bootstrap_expect if bootstrap = true exists
 			if strings.Contains(modified, "bootstrap = true") {
@@ -109,17 +148,17 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 				fixCount++
 			}
 		}
-		
+
 		if strings.Contains(detail, "enable_script_checks") {
 			// Replace with enable_local_script_checks
-			modified = strings.ReplaceAll(modified, 
+			modified = strings.ReplaceAll(modified,
 				"enable_script_checks = true",
 				"enable_local_script_checks = true")
 			result.Details = append(result.Details, "Changed to enable_local_script_checks")
 			fixCount++
 		}
-		
-		if strings.Contains(detail, "bind_addr") {
+
+		if strings.Contains(detail, "bind_addr") && !strings.Contains(detail, "advertise_addr") {
 			// Add bind_addr if missing
 			if !strings.Contains(modified, "bind_addr") {
 				// Insert after datacenter line
@@ -136,7 +175,7 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 			}
 		}
 	}
-	
+
 	if fixCount > 0 {
 		// Backup original
 		backupPath := configPath + ".backup." + time.Now().Format("20060102-150405")
@@ -146,21 +185,21 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 			return result
 		}
 		result.Details = append(result.Details, "Created backup: "+backupPath)
-		
+
 		// Write modified configuration
 		if err := os.WriteFile(configPath, []byte(modified), 0644); err != nil {
 			result.Success = false
 			result.Message = "Failed to write fixed configuration"
 			return result
 		}
-		
+
 		// Validate the new configuration
 		validateCmd := execute.Options{
 			Command: "/usr/local/bin/consul",
 			Args:    []string{"validate", "/etc/consul.d/"},
 			Capture: true,
 		}
-		
+
 		output, err := execute.Run(rc.Ctx, validateCmd)
 		if err != nil {
 			// Restore backup
@@ -170,14 +209,14 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 			result.Details = append(result.Details, "Validation error: "+output)
 			return result
 		}
-		
+
 		result.Message = fmt.Sprintf("Applied %d configuration fix(es)", fixCount)
 		result.FixMessage = "Configuration issues resolved"
 	} else {
 		result.Message = "No configuration fixes needed"
 		result.FixMessage = "Configuration already optimal"
 	}
-	
+
 	return result
 }
 
@@ -185,17 +224,17 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 func testManualStart(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Testing manual Consul start")
-	
+
 	result := DiagnosticResult{
 		CheckName: "Manual Start Test",
 		Success:   true,
 		Details:   []string{},
 	}
-	
+
 	// Create a context with timeout for the test
 	testCtx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
 	defer cancel()
-	
+
 	// Run consul manually as consul user
 	cmd := execute.Options{
 		Command: "sudo",
@@ -203,12 +242,12 @@ func testManualStart(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Capture: true,
 		Timeout: 10000, // 10 seconds
 	}
-	
+
 	output, err := execute.Run(testCtx, cmd)
-	
+
 	if err != nil {
 		result.Success = false
-		
+
 		// Check if it was a timeout
 		if strings.Contains(err.Error(), "context deadline exceeded") {
 			result.Message = "Manual start timed out after 10 seconds (this might be normal)"
@@ -217,7 +256,7 @@ func testManualStart(rc *eos_io.RuntimeContext) DiagnosticResult {
 			result.Message = "Manual start failed with error"
 			result.Details = append(result.Details, err.Error())
 		}
-		
+
 		// Include any output we got
 		if output != "" {
 			outputLines := strings.Split(output, "\n")
@@ -227,7 +266,7 @@ func testManualStart(rc *eos_io.RuntimeContext) DiagnosticResult {
 				}
 			}
 		}
-		
+
 		// Look for specific error patterns
 		if strings.Contains(output, "bind: address already in use") {
 			result.Details = append(result.Details, "→ Port conflict detected - stop conflicting service first")
@@ -240,7 +279,7 @@ func testManualStart(rc *eos_io.RuntimeContext) DiagnosticResult {
 		result.Details = append(result.Details, "Consul started without immediate errors")
 		result.Details = append(result.Details, "Check 'ps aux | grep consul' to verify it's running")
 	}
-	
+
 	return result
 }
 
@@ -248,24 +287,24 @@ func testManualStart(rc *eos_io.RuntimeContext) DiagnosticResult {
 func testMinimalConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Testing with minimal configuration")
-	
+
 	result := DiagnosticResult{
 		CheckName:  "Minimal Config Test",
 		Success:    true,
 		FixApplied: true,
 		Details:    []string{},
 	}
-	
+
 	// Backup current config
 	currentConfig := "/etc/consul.d/consul.hcl"
 	backupPath := currentConfig + ".debug-backup"
-	
+
 	if _, err := os.Stat(currentConfig); err == nil {
 		content, _ := os.ReadFile(currentConfig)
 		_ = os.WriteFile(backupPath, content, 0644)
 		result.Details = append(result.Details, "Backed up current config to: "+backupPath)
 	}
-	
+
 	// Create minimal configuration
 	minimalConfig := fmt.Sprintf(`datacenter = "dc1"
 data_dir = "/opt/consul"
@@ -283,29 +322,29 @@ ports {
   http = %d
 }
 `, shared.PortConsul)
-	
+
 	minimalPath := "/etc/consul.d/consul-minimal.hcl"
 	if err := os.WriteFile(minimalPath, []byte(minimalConfig), 0644); err != nil {
 		result.Success = false
 		result.Message = "Failed to create minimal configuration"
 		return result
 	}
-	
+
 	result.Details = append(result.Details, "Created minimal config at: "+minimalPath)
-	
+
 	// Test with minimal config
 	testCtx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
 	defer cancel()
-	
+
 	cmd := execute.Options{
 		Command: "sudo",
 		Args:    []string{"-u", "consul", "/usr/local/bin/consul", "agent", "-config-file=" + minimalPath},
 		Capture: true,
 		Timeout: 10000,
 	}
-	
+
 	output, err := execute.Run(testCtx, cmd)
-	
+
 	if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
 		result.Success = false
 		result.Message = "Minimal configuration test failed"
@@ -319,9 +358,9 @@ ports {
 		result.Details = append(result.Details, "Issue is likely in the main configuration")
 		result.FixMessage = "Consider using minimal config as starting point"
 	}
-	
+
 	// Clean up
 	_ = os.Remove(minimalPath)
-	
+
 	return result
 }

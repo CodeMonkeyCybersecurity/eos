@@ -122,11 +122,13 @@ func ValidateEncryptKeyMatch(configs map[string]*ParsedHCL) error {
 
 // UpdateConfig updates the Consul configuration with new values
 // Preserves non-Tailscale IPs in retry_join (mixed network support)
+// CRITICAL: Also updates advertise_addr to match bind_addr to prevent cluster join failures
 func UpdateConfig(existingConfig, bindAddr string, retryJoinAddrs []string, preserveNonTailscale bool) string {
 	lines := strings.Split(existingConfig, "\n")
 	var newLines []string
 	inRetryJoinBlock := false
 	foundBindAddr := false
+	foundAdvertiseAddr := false
 
 	// If preserving non-Tailscale IPs, parse existing config first
 	var existingNonTailscaleIPs []string
@@ -156,9 +158,22 @@ func UpdateConfig(existingConfig, bindAddr string, retryJoinAddrs []string, pres
 		}
 
 		// Update bind_addr
-		if strings.HasPrefix(trimmed, "bind_addr") {
+		if strings.HasPrefix(trimmed, "bind_addr") && !strings.HasPrefix(trimmed, "bind_addr_wan") {
 			newLines = append(newLines, fmt.Sprintf(`bind_addr = "%s"  # Tailscale IP`, bindAddr))
 			foundBindAddr = true
+			continue
+		}
+
+		// Update advertise_addr to match bind_addr (P0 - prevents cluster join failures)
+		if strings.HasPrefix(trimmed, "advertise_addr") && !strings.HasPrefix(trimmed, "advertise_addr_wan") {
+			newLines = append(newLines, fmt.Sprintf(`advertise_addr = "%s"  # Tailscale IP (must match bind_addr)`, bindAddr))
+			foundAdvertiseAddr = true
+			continue
+		}
+
+		// Update advertise_addr_wan to match bind_addr
+		if strings.HasPrefix(trimmed, "advertise_addr_wan") {
+			newLines = append(newLines, fmt.Sprintf(`advertise_addr_wan = "%s"  # Tailscale IP`, bindAddr))
 			continue
 		}
 
@@ -169,6 +184,11 @@ func UpdateConfig(existingConfig, bindAddr string, retryJoinAddrs []string, pres
 	if !foundBindAddr {
 		newLines = append(newLines, "")
 		newLines = append(newLines, fmt.Sprintf(`bind_addr = "%s"  # Tailscale IP`, bindAddr))
+	}
+
+	// Add advertise_addr if not found (P0 - critical for cluster formation)
+	if !foundAdvertiseAddr {
+		newLines = append(newLines, fmt.Sprintf(`advertise_addr = "%s"  # Tailscale IP (must match bind_addr)`, bindAddr))
 	}
 
 	// Add retry_join configuration

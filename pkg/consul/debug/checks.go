@@ -210,6 +210,16 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Check for common configuration issues
 	issues := []string{}
 
+	// P0 - Critical: Check for bind_addr vs advertise_addr mismatch
+	// This causes cluster join failures when using Tailscale
+	if bindAddr != "" && advertiseAddr != "" && bindAddr != advertiseAddr {
+		issues = append(issues, fmt.Sprintf("bind_addr (%s) differs from advertise_addr (%s) - cluster join will fail", bindAddr, advertiseAddr))
+		result.Details = append(result.Details, "Fix: Set advertise_addr = bind_addr or run 'eos fix consul'")
+		result.Details = append(result.Details, fmt.Sprintf("  Current bind_addr:      %s", bindAddr))
+		result.Details = append(result.Details, fmt.Sprintf("  Current advertise_addr: %s", advertiseAddr))
+		result.Details = append(result.Details, fmt.Sprintf("  Should be:              %s", bindAddr))
+	}
+
 	// Bootstrap configuration check
 	if strings.Contains(configStr, "bootstrap = true") && strings.Contains(configStr, "bootstrap_expect") {
 		issues = append(issues, "Both 'bootstrap' and 'bootstrap_expect' are set - use only one")
