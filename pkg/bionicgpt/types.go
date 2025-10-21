@@ -64,14 +64,16 @@ type InstallConfig struct {
 	// Network configuration
 	Port int // External port to expose (default: shared.PortBionicGPT = 8513)
 
-	// Azure OpenAI Configuration
-	AzureEndpoint    string // Azure OpenAI endpoint URL
-	AzureDeployment  string // Azure OpenAI deployment name
-	AzureAPIKey      string // Azure OpenAI API key (retrieved from Vault)
-	AzureAPIVersion  string // Azure OpenAI API version (default: 2024-02-15-preview)
+	// Azure OpenAI Configuration (via LiteLLM proxy)
+	AzureEndpoint           string // Azure OpenAI endpoint URL
+	AzureChatDeployment     string // Azure OpenAI chat deployment name (e.g., gpt-4-deployment)
+	AzureEmbeddingsDeployment string // Azure OpenAI embeddings deployment name (e.g., embeddings-deployment)
+	AzureAPIKey             string // Azure OpenAI API key (retrieved from Vault)
+	AzureAPIVersion         string // Azure OpenAI API version (default: 2024-02-15-preview)
 
-	// Embeddings Configuration
-	EmbeddingsModel string // Embeddings model (default: bionicgpt-embeddings-api:cpu-0.6)
+	// LiteLLM Proxy Configuration
+	LiteLLMMasterKey string // LiteLLM proxy master key (retrieved from Vault or generated)
+	LiteLLMPort      int    // LiteLLM proxy port (default: 4000)
 
 	// Feature flags
 	EnableRAG         bool // Enable Retrieval-Augmented Generation (default: true)
@@ -122,8 +124,8 @@ const (
 	// Default Azure OpenAI configuration
 	DefaultAzureAPIVersion = "2024-02-15-preview"
 
-	// Default embeddings configuration
-	DefaultEmbeddingsModel = "bionicgpt-embeddings-api:cpu-0.6"
+	// Default LiteLLM configuration
+	DefaultLiteLLMPort = 4000
 
 	// Default BionicGPT version
 	DefaultBionicGPTVersion = "1.11.7"
@@ -135,10 +137,12 @@ const (
 	ImageEmbeddings      = "ghcr.io/bionic-gpt/bionicgpt-embeddings-api"
 	ImageChunking        = "downloads.unstructured.io/unstructured-io/unstructured-api"
 	ImagePostgreSQL      = "ankane/pgvector"
+	ImageLiteLLM         = "ghcr.io/berriai/litellm"
 
 	// Docker image versions
 	VersionEmbeddings = "cpu-0.6"
 	VersionChunking   = "4ffd8bc"
+	VersionLiteLLM    = "main-latest"
 
 	// Container names
 	ContainerApp        = "bionicgpt-app"
@@ -147,6 +151,7 @@ const (
 	ContainerChunking   = "bionicgpt-chunking"
 	ContainerMigrations = "bionicgpt-migrations"
 	ContainerRAGEngine  = "bionicgpt-rag-engine"
+	ContainerLiteLLM    = "bionicgpt-litellm"
 
 	// Docker volume names
 	VolumePostgresData = "bionicgpt-postgres-data"

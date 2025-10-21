@@ -13,26 +13,27 @@ import (
 )
 //TODO: refactor
 var (
-	bionicgptPort             int
-	bionicgptPostgresPassword string
-	bionicgptJWTSecret        string
-	bionicgptAppName          string
-	bionicgptAzureEndpoint    string
-	bionicgptAzureDeployment  string
-	bionicgptAzureAPIKey      string
-	bionicgptForce            bool
-	bionicgptSkipHealthCheck  bool
+	bionicgptPort                   int
+	bionicgptPostgresPassword       string
+	bionicgptJWTSecret              string
+	bionicgptAppName                string
+	bionicgptAzureEndpoint          string
+	bionicgptAzureChatDeployment    string
+	bionicgptAzureEmbeddingsDeployment string
+	bionicgptAzureAPIKey            string
+	bionicgptForce                  bool
+	bionicgptSkipHealthCheck        bool
 )
 
 func init() {
 	bionicgptCmd := &cobra.Command{
 		Use:   "bionicgpt",
 		Short: "Deploy BionicGPT multi-tenant LLM platform with Azure OpenAI",
-		Long: `Deploy BionicGPT configured for multi-tenant LLM deployment with Azure OpenAI.
+		Long: `Deploy BionicGPT configured for multi-tenant LLM deployment with Azure OpenAI via LiteLLM proxy.
 
 BionicGPT provides an enterprise-grade ChatGPT replacement with:
 • Multi-tenant team isolation with PostgreSQL Row-Level Security
-• Azure OpenAI integration for enterprise LLM hosting
+• Azure OpenAI integration via LiteLLM translation proxy
 • Retrieval-Augmented Generation (RAG) with document processing
 • Comprehensive audit logging and governance
 • Team-based access control
@@ -42,21 +43,30 @@ BionicGPT provides an enterprise-grade ChatGPT replacement with:
 The deployment includes:
 - Docker Compose setup in /opt/bionicgpt
 - PostgreSQL with pgVector for embeddings
+- LiteLLM proxy for Azure OpenAI compatibility (translates OpenAI format ↔ Azure format)
 - Azure OpenAI integration (no local LLM required)
 - Document parsing and chunking engine
 - RAG pipeline for document retrieval
 - Web interface on port 8513 (next available prime)
+- LiteLLM proxy on port 4000 (internal)
+- Comprehensive multi-tenancy validation
 - Health checks and verification
 - Persistent data storage
 - HashiCorp Vault secret management
+
+Architecture:
+  BionicGPT (OpenAI format) → LiteLLM Proxy (translator) → Azure OpenAI → Your Credits
 
 Examples:
   # Interactive installation (will prompt for Azure configuration)
   eos create bionicgpt
 
-  # Specify Azure OpenAI configuration
-  eos create bionicgpt --azure-endpoint https://my-resource.openai.azure.com \
-    --azure-deployment gpt-4 --azure-api-key $AZURE_KEY
+  # Specify Azure OpenAI configuration with deployment names
+  eos create bionicgpt \
+    --azure-endpoint https://my-resource.openai.azure.com \
+    --azure-chat-deployment gpt-4-deployment \
+    --azure-embeddings-deployment text-embedding-ada-002 \
+    --azure-api-key $AZURE_KEY
 
   # Custom port
   eos create bionicgpt --port 8080
@@ -78,11 +88,13 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 	bionicgptCmd.Flags().StringVar(&bionicgptAppName, "app-name", "BionicGPT",
 		"Display name for the application")
 
-	// Azure OpenAI configuration
+	// Azure OpenAI configuration (via LiteLLM proxy)
 	bionicgptCmd.Flags().StringVar(&bionicgptAzureEndpoint, "azure-endpoint", "",
 		"Azure OpenAI endpoint URL (will prompt if not provided)")
-	bionicgptCmd.Flags().StringVar(&bionicgptAzureDeployment, "azure-deployment", "",
-		"Azure OpenAI deployment name (will prompt if not provided)")
+	bionicgptCmd.Flags().StringVar(&bionicgptAzureChatDeployment, "azure-chat-deployment", "",
+		"Azure OpenAI chat deployment name, e.g., gpt-4-deployment (will prompt if not provided)")
+	bionicgptCmd.Flags().StringVar(&bionicgptAzureEmbeddingsDeployment, "azure-embeddings-deployment", "",
+		"Azure OpenAI embeddings deployment name, e.g., text-embedding-ada-002 (will prompt if not provided)")
 	bionicgptCmd.Flags().StringVar(&bionicgptAzureAPIKey, "azure-api-key", "",
 		"Azure OpenAI API key (retrieved from Vault if not provided)")
 
@@ -102,15 +114,16 @@ func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// Create installation config from flags
 	config := &bionicgpt.InstallConfig{
-		Port:             bionicgptPort,
-		PostgresPassword: bionicgptPostgresPassword,
-		JWTSecret:        bionicgptJWTSecret,
-		AppName:          bionicgptAppName,
-		AzureEndpoint:    bionicgptAzureEndpoint,
-		AzureDeployment:  bionicgptAzureDeployment,
-		AzureAPIKey:      bionicgptAzureAPIKey,
-		ForceReinstall:   bionicgptForce,
-		SkipHealthCheck:  bionicgptSkipHealthCheck,
+		Port:                      bionicgptPort,
+		PostgresPassword:          bionicgptPostgresPassword,
+		JWTSecret:                 bionicgptJWTSecret,
+		AppName:                   bionicgptAppName,
+		AzureEndpoint:             bionicgptAzureEndpoint,
+		AzureChatDeployment:       bionicgptAzureChatDeployment,
+		AzureEmbeddingsDeployment: bionicgptAzureEmbeddingsDeployment,
+		AzureAPIKey:               bionicgptAzureAPIKey,
+		ForceReinstall:            bionicgptForce,
+		SkipHealthCheck:           bionicgptSkipHealthCheck,
 	}
 
 	// Create installer

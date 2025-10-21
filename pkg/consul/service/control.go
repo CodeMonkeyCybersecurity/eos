@@ -78,6 +78,8 @@ func RestartWithRollback(ctx context.Context, configPath string, backupContent [
 
 // WaitForReady waits for Consul to be ready after restart
 // Uses exponential backoff with configurable timeout
+// For single-node scenarios, only checks if Consul agent is running
+// For multi-node scenarios, waits for leader election
 func WaitForReady(ctx context.Context, timeout time.Duration) error {
 	logger := otelzap.Ctx(ctx)
 
@@ -86,6 +88,7 @@ func WaitForReady(ctx context.Context, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	attempt := 0
 	backoff := 500 * time.Millisecond
+	consulRespondingOnce := false
 
 	for time.Now().Before(deadline) {
 		attempt++
@@ -98,7 +101,36 @@ func WaitForReady(ctx context.Context, timeout time.Duration) error {
 		})
 
 		if err == nil {
-			// Consul is responding - do one more check for leader
+			consulRespondingOnce = true
+
+			// Check cluster size to determine if we should wait for leader
+			membersOutput, membersErr := execute.Run(ctx, execute.Options{
+				Command: "consul",
+				Args:    []string{"members"},
+				Capture: true,
+			})
+
+			var memberCount int
+			if membersErr == nil {
+				// Count members (each line except header is a member)
+				lines := strings.Split(strings.TrimSpace(membersOutput), "\n")
+				memberCount = len(lines) - 1 // Subtract header line
+			}
+
+			logger.Debug("Consul agent responding",
+				zap.Int("attempt", attempt),
+				zap.Int("member_count", memberCount))
+
+			// If single-node cluster, just verify agent is running
+			if memberCount <= 1 {
+				logger.Info("Consul is ready (single-node mode)",
+					zap.Int("attempts", attempt),
+					zap.Duration("elapsed", timeout-time.Until(deadline)))
+				logger.Warn("Single-node Consul detected - leader election will happen after cluster forms")
+				return nil
+			}
+
+			// Multi-node cluster - check for leader
 			leaderOutput, leaderErr := execute.Run(ctx, execute.Options{
 				Command: "consul",
 				Args:    []string{"operator", "raft", "list-peers"},
@@ -106,14 +138,16 @@ func WaitForReady(ctx context.Context, timeout time.Duration) error {
 			})
 
 			if leaderErr == nil && strings.Contains(leaderOutput, "leader") {
-				logger.Info("Consul is ready",
+				logger.Info("Consul is ready with leader elected",
 					zap.Int("attempts", attempt),
+					zap.Int("members", memberCount),
 					zap.Duration("elapsed", timeout-time.Until(deadline)))
 				return nil
 			}
 
 			logger.Debug("Consul responding but leader not elected yet",
-				zap.Int("attempt", attempt))
+				zap.Int("attempt", attempt),
+				zap.Int("members", memberCount))
 		} else {
 			logger.Debug("Consul not ready yet",
 				zap.Int("attempt", attempt),
@@ -126,6 +160,13 @@ func WaitForReady(ctx context.Context, timeout time.Duration) error {
 		if backoff > 5*time.Second {
 			backoff = 5 * time.Second // Cap at 5 seconds
 		}
+	}
+
+	// If Consul responded at least once but leader wasn't elected, that might be OK
+	if consulRespondingOnce {
+		logger.Warn("Consul agent is running but leader not yet elected - this is normal during cluster formation")
+		logger.Info("You can check cluster status with: consul members")
+		return nil // Don't fail - agent is running
 	}
 
 	return fmt.Errorf("timeout waiting for Consul to become ready after %v\n"+

@@ -130,6 +130,7 @@ package create
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
@@ -363,6 +364,21 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	logger.Info(" Vault creation and enablement completed successfully!")
 	logger.Info("terminal prompt: Vault is fully configured and ready to use")
+
+	// Post-Installation: Migrate Consul ACL token from Consul KV to Vault (if exists)
+	// This happens after Vault is fully initialized and ready
+	logger.Info("Checking for Consul ACL token to migrate to Vault...")
+	if err := consul.MigrateTokenToVault(rc); err != nil {
+		// Migration failure is non-critical - token might not exist or Consul might not be installed
+		logger.Debug("Consul token migration not needed or failed (non-critical)",
+			zap.Error(err),
+			zap.String("note", "Token may not exist, or Consul may not be installed"))
+	} else {
+		logger.Info(" Consul ACL token successfully migrated to Vault",
+			zap.String("vault_path", "secret/consul/acl_management_token"),
+			zap.String("note", "Token removed from Consul KV and now stored securely in Vault"))
+	}
+
 	return nil
 }
 

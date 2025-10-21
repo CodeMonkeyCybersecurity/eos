@@ -274,7 +274,7 @@ func bootstrapACLSystem(rc *eos_io.RuntimeContext, config *ConsulConfig) (string
 			"  1. Check if ACLs already bootstrapped: consul acl bootstrap\n"+
 			"  2. If already bootstrapped, retrieve existing token from Consul KV\n"+
 			"  3. Verify Consul is running: systemctl status consul",
-			string(output))
+			err, string(output))
 	}
 
 	// Extract the initial root token from output

@@ -55,8 +55,8 @@ func NewBionicGPTInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Bi
 	if config.AzureAPIVersion == "" {
 		config.AzureAPIVersion = DefaultAzureAPIVersion
 	}
-	if config.EmbeddingsModel == "" {
-		config.EmbeddingsModel = DefaultEmbeddingsModel
+	if config.LiteLLMPort == 0 {
+		config.LiteLLMPort = DefaultLiteLLMPort
 	}
 
 	// Enable RAG and multi-tenant by default
@@ -240,8 +240,9 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	// Step 5: Get or generate secrets from Vault
 	logger.Info("Managing secrets via Vault")
 	requiredSecrets := map[string]secrets.SecretType{
-		"postgres_password": secrets.SecretTypePassword,
-		"jwt_secret":        secrets.SecretTypeToken,
+		"postgres_password":   secrets.SecretTypePassword,
+		"jwt_secret":          secrets.SecretTypeToken,
+		"litellm_master_key":  secrets.SecretTypeAPIKey, // LiteLLM proxy master key
 	}
 
 	// Only manage Azure API key if not provided via flags
@@ -260,6 +261,9 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	}
 	if jwt, ok := serviceSecrets.Secrets["jwt_secret"].(string); ok {
 		bgi.config.JWTSecret = jwt
+	}
+	if litellmKey, ok := serviceSecrets.Secrets["litellm_master_key"].(string); ok {
+		bgi.config.LiteLLMMasterKey = litellmKey
 	}
 	if bgi.config.AzureAPIKey == "" {
 		if apiKey, ok := serviceSecrets.Secrets["azure_api_key"].(string); ok {
@@ -290,13 +294,22 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		zap.String("path", bgi.config.InstallDir),
 		zap.String("permissions", dirInfo.Mode().String()))
 
-	// Step 7: Create .env file
+	// Step 7: Create LiteLLM configuration files
+	logger.Info("Creating LiteLLM proxy configuration")
+	if err := bgi.createLiteLLMConfig(ctx); err != nil {
+		return fmt.Errorf("failed to create LiteLLM config: %w", err)
+	}
+	if err := bgi.createLiteLLMEnvFile(ctx); err != nil {
+		return fmt.Errorf("failed to create LiteLLM env file: %w", err)
+	}
+
+	// Step 8: Create .env file
 	logger.Info("Creating environment configuration", zap.String("file", bgi.config.EnvFile))
 	if err := bgi.createEnvFile(ctx); err != nil {
 		return err
 	}
 
-	// Step 8: Create docker-compose.yml
+	// Step 9: Create docker-compose.yml
 	logger.Info("Creating Docker Compose configuration", zap.String("file", bgi.config.ComposeFile))
 	logger.Debug("Pre-operation: compose file creation",
 		zap.String("install_dir", bgi.config.InstallDir))
@@ -408,21 +421,26 @@ func (bgi *BionicGPTInstaller) checkPrerequisites(ctx context.Context) error {
 }
 
 // getAzureConfiguration prompts for Azure OpenAI configuration if not provided
+// Now includes separate deployments for chat and embeddings (for LiteLLM)
 func (bgi *BionicGPTInstaller) getAzureConfiguration(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
 	// If all required fields are provided, skip prompts
-	if bgi.config.AzureEndpoint != "" && bgi.config.AzureDeployment != "" && bgi.config.AzureAPIKey != "" {
+	if bgi.config.AzureEndpoint != "" &&
+		bgi.config.AzureChatDeployment != "" &&
+		bgi.config.AzureEmbeddingsDeployment != "" &&
+		bgi.config.AzureAPIKey != "" {
 		logger.Debug("Azure configuration provided via flags")
 		return nil
 	}
 
-	logger.Info("terminal prompt: Azure OpenAI configuration required")
+	logger.Info("terminal prompt: Azure OpenAI configuration required for LiteLLM proxy")
 	logger.Info("terminal prompt: You can find these in Azure Portal → Your OpenAI Resource → Keys and Endpoint")
+	logger.Info("terminal prompt: Deployment names are under: Deployments tab")
 
 	// Prompt for endpoint
 	if bgi.config.AzureEndpoint == "" {
-		logger.Info("terminal prompt: Enter Azure OpenAI Endpoint (e.g., https://myopenai.openai.azure.com)")
+		logger.Info("terminal prompt: Enter Azure OpenAI Endpoint (e.g., https://myresource.openai.azure.com)")
 		endpoint, err := eos_io.PromptInput(bgi.rc, "Azure OpenAI Endpoint: ", "azure_endpoint")
 		if err != nil {
 			return fmt.Errorf("failed to read Azure endpoint: %w", err)
@@ -433,14 +451,25 @@ func (bgi *BionicGPTInstaller) getAzureConfiguration(ctx context.Context) error 
 		bgi.config.AzureEndpoint = shared.SanitizeURL(bgi.config.AzureEndpoint)
 	}
 
-	// Prompt for deployment name
-	if bgi.config.AzureDeployment == "" {
-		logger.Info("terminal prompt: Enter Deployment Name (e.g., gpt-4)")
-		deployment, err := eos_io.PromptInput(bgi.rc, "Deployment Name: ", "deployment_name")
+	// Prompt for chat deployment name
+	if bgi.config.AzureChatDeployment == "" {
+		logger.Info("terminal prompt: Enter Chat Model Deployment Name (e.g., gpt-4-deployment)")
+		logger.Info("terminal prompt: This is the DEPLOYMENT name, not the model name")
+		chatDeployment, err := eos_io.PromptInput(bgi.rc, "Chat Deployment Name: ", "chat_deployment")
 		if err != nil {
-			return fmt.Errorf("failed to read deployment name: %w", err)
+			return fmt.Errorf("failed to read chat deployment name: %w", err)
 		}
-		bgi.config.AzureDeployment = strings.TrimSpace(deployment)
+		bgi.config.AzureChatDeployment = strings.TrimSpace(chatDeployment)
+	}
+
+	// Prompt for embeddings deployment name
+	if bgi.config.AzureEmbeddingsDeployment == "" {
+		logger.Info("terminal prompt: Enter Embeddings Model Deployment Name (e.g., text-embedding-ada-002)")
+		embeddingsDeployment, err := eos_io.PromptInput(bgi.rc, "Embeddings Deployment Name: ", "embeddings_deployment")
+		if err != nil {
+			return fmt.Errorf("failed to read embeddings deployment name: %w", err)
+		}
+		bgi.config.AzureEmbeddingsDeployment = strings.TrimSpace(embeddingsDeployment)
 	}
 
 	// Prompt for API key (only if not managing via Vault)
@@ -454,11 +483,16 @@ func (bgi *BionicGPTInstaller) getAzureConfiguration(ctx context.Context) error 
 		bgi.config.AzureAPIKey = strings.TrimSpace(apiKey)
 	}
 
-	logger.Debug("Azure configuration validated successfully")
+	logger.Debug("Azure configuration validated successfully",
+		zap.String("endpoint", bgi.config.AzureEndpoint),
+		zap.String("chat_deployment", bgi.config.AzureChatDeployment),
+		zap.String("embeddings_deployment", bgi.config.AzureEmbeddingsDeployment))
+
 	return nil
 }
 
 // createEnvFile creates the .env file with configuration
+// Now configured to use LiteLLM proxy instead of direct Azure connection
 func (bgi *BionicGPTInstaller) createEnvFile(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
@@ -482,19 +516,21 @@ JWT_SECRET=%s
 # Database Connection
 APP_DATABASE_URL=postgresql://%s:%s@postgres:5432/%s?sslmode=disable
 
-# Azure OpenAI Configuration
-AZURE_OPENAI_ENDPOINT=%s
-AZURE_OPENAI_DEPLOYMENT=%s
-AZURE_OPENAI_API_KEY=%s
-AZURE_OPENAI_API_VERSION=%s
+# OpenAI Configuration (via LiteLLM Proxy)
+# LiteLLM translates OpenAI format to Azure OpenAI format
+OPENAI_API_BASE=http://litellm-proxy:4000
+OPENAI_API_KEY=%s
+OPENAI_MODEL=gpt-4
 
 # Feature Flags
 ENABLE_RAG=%t
 ENABLE_AUDIT_LOG=%t
 ENABLE_MULTI_TENANT=%t
 
-# Embeddings Configuration
-EMBEDDINGS_MODEL=%s
+# Embeddings Configuration (via LiteLLM)
+EMBEDDINGS_API_BASE=http://litellm-proxy:4000
+EMBEDDINGS_API_KEY=%s
+EMBEDDINGS_MODEL=text-embedding-ada-002
 `,
 		bgi.config.PostgresUser,
 		bgi.config.PostgresPassword,
@@ -506,14 +542,11 @@ EMBEDDINGS_MODEL=%s
 		"bionic_application",
 		bgi.config.PostgresPassword,
 		bgi.config.PostgresDB,
-		bgi.config.AzureEndpoint,
-		bgi.config.AzureDeployment,
-		bgi.config.AzureAPIKey,
-		bgi.config.AzureAPIVersion,
+		bgi.config.LiteLLMMasterKey,
 		bgi.config.EnableRAG,
 		bgi.config.EnableAuditLog,
 		bgi.config.EnableMultiTenant,
-		bgi.config.EmbeddingsModel,
+		bgi.config.LiteLLMMasterKey,
 	)
 
 	// Create .env file with appropriate permissions

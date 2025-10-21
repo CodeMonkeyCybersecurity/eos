@@ -500,6 +500,10 @@ func (vi *VaultInstaller) Install() error {
 		// Don't fail installation if Consul registration fails
 	}
 
+	// NOTE: Consul ACL token migration happens in cmd/create/secrets.go
+	// to avoid import cycle (vault -> consul -> vault)
+	// The orchestration layer calls consul.MigrateTokenToVault(rc) after vault installation
+
 	vi.progress.Complete("Vault installation completed successfully (Phases 1-4 complete)")
 	vi.logger.Info("Next step: Call EnableVault() for Phases 5-15 (initialization, auth, secrets, hardening)")
 	return nil
