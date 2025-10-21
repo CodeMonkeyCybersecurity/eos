@@ -152,6 +152,17 @@ func (ci *ConsulInstaller) CheckPortAvailable(port int) error {
 	}
 
 	processName := strings.TrimSpace(output)
+
+	// If it's Consul already using the port, this is acceptable for idempotency
+	if strings.EqualFold(processName, "consul") {
+		ci.logger.Debug("Port already in use by Consul (idempotent - acceptable)",
+			zap.Int("port", port),
+			zap.String("note", "Existing Consul installation detected - this is expected for idempotent operations"))
+		// Return nil - this is NOT an error, it's expected behavior
+		return nil
+	}
+
+	// Some other process is using the port - this IS an error
 	return fmt.Errorf("port %d is already in use by process: %s\nRemediation:\n  1. If this is an old Consul instance: sudo systemctl stop consul\n  2. If this is another service: Check with 'sudo lsof -i :%d'", port, processName, port)
 }
 

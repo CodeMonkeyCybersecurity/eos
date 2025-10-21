@@ -103,6 +103,7 @@ type InstallConfig struct {
 	ServiceGroup string
 	Port         int
 	TLSEnabled   bool
+	TLSMode      string // "self-signed" (default), "internal-ca", "acme-dns", "disabled"
 
 	// Installation behavior
 	ForceReinstall bool // Force reinstallation even if already installed
@@ -166,6 +167,12 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 	}
 	if config.Port == 0 {
 		config.Port = shared.PortVault
+	}
+	if config.TLSMode == "" && config.TLSEnabled {
+		config.TLSMode = "self-signed" // Default to self-signed certs
+	}
+	if config.TLSMode == "disabled" {
+		config.TLSEnabled = false
 	}
 	if config.NodeID == "" {
 		// DEPRECATED: Default node ID to hostname (only used for Raft)
@@ -1024,6 +1031,18 @@ func (vi *VaultInstaller) configure() error {
 		if err := vi.generateTLSCertificate(); err != nil {
 			return fmt.Errorf("failed to generate TLS certificate: %w", err)
 		}
+
+		// Phase 3.5: Install automatic certificate renewal timer
+		vi.logger.Info("[Phase 3.5] Installing automatic certificate renewal timer")
+		if err := InstallRenewalTimer(); err != nil {
+			vi.logger.Warn("Failed to install renewal timer (non-critical)", zap.Error(err))
+			vi.logger.Info("terminal prompt: Note: Certificate auto-renewal not configured")
+			vi.logger.Info("terminal prompt: You can install it manually with: eos self install-cert-renewal-timer")
+		} else {
+			vi.logger.Info("Certificate auto-renewal timer installed successfully")
+			vi.logger.Info("terminal prompt: Certificates will auto-renew 30 days before expiration")
+			vi.logger.Info("terminal prompt: Check status: sudo systemctl status vault-cert-renewal.timer")
+		}
 	}
 
 	// Phase 4: Generate Vault configuration file (vault.hcl)
@@ -1816,9 +1835,11 @@ func getUbuntuCodename() string {
 	return strings.TrimSpace(string(output))
 }
 
-// generateTLSCertificate generates a self-signed TLS certificate using the consolidated module
+// generateTLSCertificate generates TLS certificate based on TLSMode
+// Supports: self-signed, internal-ca, acme-dns
 func (vi *VaultInstaller) generateTLSCertificate() error {
-	vi.logger.Info("Generating self-signed TLS certificate for Vault")
+	vi.logger.Info("Generating TLS certificate for Vault",
+		zap.String("tls_mode", vi.config.TLSMode))
 
 	// Create TLS directory
 	tlsDir := filepath.Join(vi.config.ConfigPath, "tls")
@@ -1828,6 +1849,7 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 
 	certPath := filepath.Join(tlsDir, "vault.crt")
 	keyPath := filepath.Join(tlsDir, "vault.key")
+	caPath := filepath.Join(tlsDir, "ca.crt")
 
 	// Check if certificate already exists
 	if vi.fileExists(certPath) && vi.fileExists(keyPath) {
@@ -1858,8 +1880,8 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 		vi.logger.Warn("Failed to get hostname, using default", zap.Error(err))
 	}
 
-	// Create certificate configuration using consolidated module
-	config := &CertificateConfig{
+	// Create certificate configuration
+	certConfig := &CertificateConfig{
 		Country:      "AU",
 		State:        "WA",
 		Locality:     "Fremantle",
@@ -1869,6 +1891,7 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 		KeySize:      4096, // Strong security
 		CertPath:     certPath,
 		KeyPath:      keyPath,
+		CAPath:       caPath, // For internal-ca mode
 		Owner:        vi.config.ServiceUser,
 		Group:        vi.config.ServiceGroup,
 		// Initial SANs - enrichSANs() will add comprehensive list automatically
@@ -1876,18 +1899,56 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 	}
 
-	// Generate certificate using consolidated module
-	// This will automatically enrich SANs with all network interfaces, FQDN, wildcards, etc.
-	if err := GenerateSelfSignedCertificate(vi.rc, config); err != nil {
-		return fmt.Errorf("failed to generate certificate: %w", err)
+	// Generate certificate based on TLS mode
+	switch vi.config.TLSMode {
+	case "internal-ca":
+		vi.logger.Info("Using internal CA for certificate signing")
+
+		// Create or load internal CA
+		caConfig := DefaultCAConfig(vi.config.Datacenter)
+		ca, err := NewInternalCA(vi.rc, caConfig)
+		if err != nil {
+			return fmt.Errorf("failed to initialize internal CA: %w", err)
+		}
+
+		// Issue server certificate signed by CA
+		if err := ca.IssueServerCertificate(certConfig); err != nil {
+			return fmt.Errorf("failed to issue server certificate from CA: %w", err)
+		}
+
+		// Distribute CA certificate to system trust store
+		if err := ca.DistributeCAToClients(); err != nil {
+			vi.logger.Warn("Failed to distribute CA to system trust store (non-critical)",
+				zap.Error(err))
+		}
+
+		vi.logger.Info("Server certificate issued by internal CA",
+			zap.String("ca_subject", ca.GetCAInfo().Subject),
+			zap.String("ca_path", caPath))
+
+	case "acme-dns":
+		// TODO: Implement ACME DNS-01 challenge
+		return fmt.Errorf("ACME DNS-01 challenge not yet implemented. Use --tls-mode=internal-ca or --tls-mode=self-signed")
+
+	case "self-signed", "":
+		vi.logger.Info("Generating self-signed TLS certificate")
+		// Generate self-signed certificate using consolidated module
+		// This will automatically enrich SANs with all network interfaces, FQDN, wildcards, etc.
+		if err := GenerateSelfSignedCertificate(vi.rc, certConfig); err != nil {
+			return fmt.Errorf("failed to generate self-signed certificate: %w", err)
+		}
+
+	default:
+		return fmt.Errorf("invalid TLS mode: %s (valid options: self-signed, internal-ca, acme-dns)", vi.config.TLSMode)
 	}
 
 	vi.logger.Info("TLS certificate generated successfully",
 		zap.String("cert_path", certPath),
-		zap.String("key_path", keyPath))
+		zap.String("key_path", keyPath),
+		zap.String("tls_mode", vi.config.TLSMode))
 
 	// Store certificate metadata in Consul KV (if available)
-	if err := vi.storeCertMetadataInConsul(certPath, keyPath, config.DNSNames, time.Now().Add(time.Duration(config.ValidityDays)*24*time.Hour)); err != nil {
+	if err := vi.storeCertMetadataInConsul(certPath, keyPath, certConfig.DNSNames, time.Now().Add(time.Duration(certConfig.ValidityDays)*24*time.Hour)); err != nil {
 		// Log warning but don't fail - Consul may not be available yet
 		vi.logger.Warn("Failed to store certificate metadata in Consul KV",
 			zap.Error(err),

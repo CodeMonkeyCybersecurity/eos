@@ -253,31 +253,34 @@ func (p *ConsulStatusProvider) getHealthInfo(rc *eos_io.RuntimeContext) HealthIn
 }
 
 func (p *ConsulStatusProvider) getNetworkInfo(rc *eos_io.RuntimeContext) NetworkInfo {
+	// Use internal hostname for network endpoints (same as Vault)
+	hostname := shared.GetInternalHostname()
+
 	info := NetworkInfo{
 		Endpoints: []Endpoint{
 			{
 				Name:     "HTTP API",
 				Protocol: "http",
-				Address:  "127.0.0.1",
+				Address:  hostname, // Use internal hostname (e.g., vhost11)
 				Port:     shared.PortConsul, // 8161
 				Healthy:  true,
 			},
 			{
 				Name:     "DNS",
 				Protocol: "udp",
-				Address:  "127.0.0.1",
+				Address:  hostname, // Use internal hostname for consistency
 				Port:     8600,
 				Healthy:  true,
 			},
 			{
 				Name:     "Serf LAN",
 				Protocol: "tcp",
-				Address:  "0.0.0.0",
+				Address:  "0.0.0.0", // Keep as 0.0.0.0 (listens on all interfaces)
 				Port:     8301,
 				Healthy:  true,
 			},
 		},
-		ListenAddr: "127.0.0.1",
+		ListenAddr: hostname,
 	}
 
 	// Test HTTP API endpoint

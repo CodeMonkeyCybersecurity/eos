@@ -191,15 +191,23 @@ This installer provides:
 - Direct binary or repository installation
 - Consul storage backend (recommended) or Raft Integrated Storage
 - Auto-unseal configuration
-- TLS setup
+- TLS setup with multiple modes (self-signed, internal CA, ACME DNS)
 - Systemd service management
 - Automatic version resolution
 
+TLS Modes:
+  self-signed  - Self-signed certificates (default, works offline)
+  internal-ca  - Internal CA for trusted certificates (recommended for production)
+  acme-dns     - Let's Encrypt via DNS-01 challenge (requires internet + DNS API)
+  disabled     - No TLS (not recommended for production)
+
 Examples:
-  eos create vault                              # Consul storage (default, recommended)
-  eos create vault --storage-backend=raft       # Use Raft storage (deprecated)
-  eos create vault --auto-unseal --kms-key=...  # AWS KMS auto-unseal
-  eos create vault --ui                         # Enable web UI`,
+  eos create vault                                    # Consul storage with self-signed TLS
+  eos create vault --tls-mode=internal-ca             # Use internal CA (recommended)
+  eos create vault --tls-mode=acme-dns                # Let's Encrypt certificates
+  eos create vault --storage-backend=raft             # Use Raft storage (deprecated)
+  eos create vault --auto-unseal --kms-key=...        # AWS KMS auto-unseal
+  eos create vault --ui                               # Enable web UI`,
 	RunE: eos.Wrap(runCreateVaultNative),
 }
 
@@ -212,6 +220,7 @@ func init() {
 	CreateVaultCmd.Flags().Bool("ui", true, "Enable web UI")
 	CreateVaultCmd.Flags().String("listener-address", fmt.Sprintf("0.0.0.0:%d", shared.PortVault), "Listener address")
 	CreateVaultCmd.Flags().Bool("tls", true, "Enable TLS (auto-generates self-signed cert if needed)")
+	CreateVaultCmd.Flags().String("tls-mode", "self-signed", "TLS certificate mode: self-signed (default), internal-ca (trusted CA), acme-dns (Let's Encrypt), disabled")
 	CreateVaultCmd.Flags().Bool("auto-unseal", false, "Enable auto-unseal")
 	CreateVaultCmd.Flags().String("kms-key", "", "KMS key ID for auto-unseal")
 	CreateVaultCmd.Flags().Bool("clean", false, "Clean install (remove existing)")
@@ -269,6 +278,7 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		AutoUnseal:      cmd.Flag("auto-unseal").Value.String() == "true",
 		KMSKeyID:        cmd.Flag("kms-key").Value.String(),
 		TLSEnabled:      cmd.Flag("tls").Value.String() == "true",
+		TLSMode:         cmd.Flag("tls-mode").Value.String(),
 		CleanInstall:    cmd.Flag("clean").Value.String() == "true",
 		ForceReinstall:  cmd.Flag("force").Value.String() == "true",
 	}

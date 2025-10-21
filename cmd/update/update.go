@@ -22,7 +22,7 @@ func AddSubcommands() {
 // UpdateCmd is the root command for update operations
 var UpdateCmd = &cobra.Command{
 	Use:     "update",
-	Aliases: []string{"modify", "change", "restart", "set"},
+	Aliases: []string{"modify", "change", "restart", "set", "edit"},
 	Short:   "Update resources (e.g., processes, users, storage)",
 	Long:    `The update command allows you to modify existing resources such as processes, users, or storage.`,
 
