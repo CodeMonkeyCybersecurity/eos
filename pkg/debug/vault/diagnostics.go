@@ -17,8 +17,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// NOTE: These constants duplicate values from pkg/vault/constants.go
+// This is intentional to avoid circular import (pkg/debug/vault cannot import pkg/vault)
+// If you change these values, also update pkg/vault/constants.go
 const (
-	DefaultBinaryPath      = "/usr/local/bin/vault"
+	DefaultBinaryPath      = "/usr/local/bin/vault"  // Matches vault.VaultBinaryPath
 	DefaultConfigPath      = "/etc/vault.d/vault.hcl"
 	DefaultDataPath        = "/opt/vault/data"
 	DefaultLogPath         = "/var/log/vault"
@@ -45,6 +48,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		CapabilitiesDiagnostic(),
 		DeletionTransactionLogsDiagnostic(),
 		IdempotencyStatusDiagnostic(), // NEW: Shows current installation state for idempotent operations
+		OrphanedStateDiagnostic(),     // NEW: Detects orphaned Vault state (initialized but credentials lost)
 		// Vault Agent diagnostics
 		VaultAgentServiceDiagnostic(),
 		VaultAgentConfigDiagnostic(),
@@ -993,7 +997,7 @@ func DeletionTransactionLogsDiagnostic() *debug.Diagnostic {
 
 				// Check if components still exist
 				checks := map[string]string{
-					"/usr/local/bin/vault":              "Binary",
+					"VaultBinaryPath":                   "Binary",
 					"/etc/vault.d":                      "Config directory",
 					"/opt/vault":                        "Data directory",
 					"/var/log/vault":                    "Log directory",
@@ -1658,6 +1662,141 @@ func IdempotencyStatusDiagnostic() *debug.Diagnostic {
 				zap.Int("total_components", componentCount),
 				zap.Int("existing_components", existingCount),
 				zap.Int("percentage", percentage))
+
+			return result, nil
+		},
+	}
+}
+
+// OrphanedStateDiagnostic detects orphaned Vault state
+// (Vault initialized in Consul but credentials file missing)
+func OrphanedStateDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Orphaned State Detection",
+		Category:    "Critical Issues",
+		Description: "Detect if Vault is initialized but credentials are lost",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Checking for orphaned Vault state")
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var output strings.Builder
+
+			// Check 1: Does Consul storage have Vault data?
+			_, err := exec.LookPath("consul")
+			consulStorageExists := false
+			consulKeyCount := 0
+
+			if err == nil {
+				checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+
+				cmd := exec.CommandContext(checkCtx, "consul", "kv", "get", "-keys", "-recurse", "vault/")
+				consulOutput, err := cmd.CombinedOutput()
+
+				if err == nil {
+					lines := strings.Split(strings.TrimSpace(string(consulOutput)), "\n")
+					for _, line := range lines {
+						if strings.TrimSpace(line) != "" {
+							consulKeyCount++
+						}
+					}
+					if consulKeyCount > 0 {
+						consulStorageExists = true
+					}
+				}
+			}
+
+			// Check 2: Does credentials file exist?
+			credentialsPath := "/var/lib/eos/secret/vault_init.json"
+			_, credErr := os.Stat(credentialsPath)
+			credentialsExist := credErr == nil
+
+			// Check 3: Is Vault initialized? (requires Vault to be running)
+			vaultInitialized := false
+			vaultAddr := os.Getenv("VAULT_ADDR")
+			if vaultAddr == "" {
+				vaultAddr = "https://127.0.0.1:8200"
+			}
+
+			// Try to check init status (this requires VAULT_SKIP_VERIFY=1 for self-signed certs)
+			initCheckCtx, initCancel := context.WithTimeout(ctx, 3*time.Second)
+			defer initCancel()
+			os.Setenv("VAULT_SKIP_VERIFY", "1")
+			initCmd := exec.CommandContext(initCheckCtx, "vault", "status", "-format=json")
+			initOutput, err := initCmd.CombinedOutput()
+			if err == nil {
+				// Parse for initialized field (simple string search)
+				if strings.Contains(string(initOutput), `"initialized":true`) {
+					vaultInitialized = true
+				}
+			}
+
+			// Store findings
+			result.Metadata["consul_storage_exists"] = consulStorageExists
+			result.Metadata["consul_key_count"] = consulKeyCount
+			result.Metadata["credentials_exist"] = credentialsExist
+			result.Metadata["vault_initialized"] = vaultInitialized
+
+			output.WriteString("=== Orphaned State Detection ===\n\n")
+			output.WriteString(fmt.Sprintf("Consul Storage Exists: %v (%d keys)\n", consulStorageExists, consulKeyCount))
+			output.WriteString(fmt.Sprintf("Credentials File: %v (%s)\n", credentialsExist, credentialsPath))
+			output.WriteString(fmt.Sprintf("Vault Initialized: %v\n\n", vaultInitialized))
+
+			// Detect orphaned state
+			isOrphaned := (consulStorageExists || vaultInitialized) && !credentialsExist
+
+			if isOrphaned {
+				output.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+				output.WriteString("⚠  CRITICAL: ORPHANED VAULT STATE DETECTED!\n")
+				output.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+				output.WriteString("What this means:\n")
+				output.WriteString("  • Vault is initialized in Consul storage backend\n")
+				output.WriteString("  • Credentials file (vault_init.json) is missing\n")
+				output.WriteString("  • You CANNOT unseal Vault (unseal keys lost)\n")
+				output.WriteString("  • You CANNOT access any secrets\n")
+				output.WriteString("  • Reinstalling Vault will FAIL (data already exists)\n\n")
+				output.WriteString("How this happened:\n")
+				output.WriteString("  1. Vault was initialized and vault_init.json was created\n")
+				output.WriteString("  2. The credentials file was deleted (following security checklist)\n")
+				output.WriteString("  3. 'eos delete vault' was run WITHOUT --purge flag\n")
+				output.WriteString("  4. Consul storage data was NOT deleted\n\n")
+				output.WriteString("How to fix:\n")
+				output.WriteString("  Option 1: Complete teardown and fresh install\n")
+				output.WriteString("    $ sudo eos delete vault --purge --yes\n")
+				output.WriteString("    $ sudo eos create vault\n\n")
+				output.WriteString("  Option 2: If you have the unseal keys and root token saved elsewhere\n")
+				output.WriteString("    $ sudo eos enable vault\n")
+				output.WriteString("    (You will be prompted to enter credentials manually)\n\n")
+				output.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+
+				result.Status = debug.StatusError
+				result.Message = "Orphaned Vault state detected - initialized but credentials lost"
+				result.Remediation = "Run: sudo eos delete vault --purge --yes && sudo eos create vault"
+			} else if consulStorageExists && credentialsExist {
+				output.WriteString("✓ Vault state is healthy\n")
+				output.WriteString("  • Storage backend has data\n")
+				output.WriteString("  • Credentials file exists\n")
+				result.Status = debug.StatusOK
+				result.Message = "Vault state is healthy"
+			} else if !consulStorageExists && !vaultInitialized {
+				output.WriteString("✓ No Vault data detected (clean state)\n")
+				result.Status = debug.StatusOK
+				result.Message = "No Vault installation detected"
+			} else {
+				output.WriteString("ℹ Vault state is ambiguous\n")
+				result.Status = debug.StatusWarning
+				result.Message = "Vault state could not be fully determined"
+			}
+
+			result.Output = output.String()
+			logger.Info("Orphaned state check complete",
+				zap.Bool("is_orphaned", isOrphaned),
+				zap.Bool("consul_storage_exists", consulStorageExists),
+				zap.Bool("credentials_exist", credentialsExist))
 
 			return result, nil
 		},

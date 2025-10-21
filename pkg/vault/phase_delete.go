@@ -40,8 +40,7 @@ func GetVaultPurgePaths() []string {
 		shared.SecretsDir,
 		shared.EosRunDir,
 		shared.VaultDataPath,
-		shared.VaultBinaryPath,          // /usr/bin/vault (shared constant)
-		"/usr/local/bin/vault",          // Alternate binary location (used by install.go)
+		VaultBinaryPath, // PRIMARY vault binary location (VaultBinaryPath)
 		shared.VaultPID,
 		shared.AgentPID,
 		shared.VaultSystemCATrustPath,

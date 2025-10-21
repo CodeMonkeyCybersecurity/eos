@@ -302,7 +302,7 @@ func disableCoreDumps(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Create systemd override for vault service
-	vaultServiceDir := "/etc/systemd/system/vault.service.d"
+	vaultServiceDir := VaultServiceDropinDir
 	if err := os.MkdirAll(vaultServiceDir, 0755); err == nil {
 		overrideContent := `[Service]
 LimitCORE=0
@@ -656,7 +656,7 @@ find "$BACKUP_DIR" -name "vault-snapshot-*.snap.gz" -mtime +30 -delete
 echo "Vault snapshot saved to $BACKUP_FILE.gz"
 `
 
-	scriptPath := "/usr/local/bin/vault-backup.sh"
+	scriptPath := VaultBackupScriptPath
 	if err := os.WriteFile(scriptPath, []byte(backupScript), 0755); err != nil {
 		return fmt.Errorf("failed to write backup script: %w", err)
 	}
@@ -683,14 +683,14 @@ After=vault.service
 Type=oneshot
 User=vault
 Group=vault
-ExecStart=/usr/local/bin/vault-backup.sh
+ExecStart=%s
 Environment=VAULT_ADDR=%s
-`, shared.VaultDefaultLocalAddr)
+`, VaultBackupScriptPath, shared.VaultDefaultLocalAddr)
 
-	if err := os.WriteFile("/etc/systemd/system/vault-backup.timer", []byte(timerContent), 0644); err != nil {
+	if err := os.WriteFile(VaultBackupTimerPath, []byte(timerContent), 0644); err != nil {
 		log.Warn("Failed to write vault backup timer", zap.Error(err))
 	}
-	if err := os.WriteFile("/etc/systemd/system/vault-backup.service", []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile(VaultBackupServicePath, []byte(serviceContent), 0644); err != nil {
 		log.Warn("Failed to write vault backup service", zap.Error(err))
 	}
 
@@ -882,7 +882,7 @@ func GetHardeningStatus(rc *eos_io.RuntimeContext) map[string]interface{} {
 	}
 
 	// Check if backup is configured
-	if _, err := os.Stat("/usr/local/bin/vault-backup.sh"); err == nil {
+	if _, err := os.Stat(VaultBackupScriptPath); err == nil {
 		checks["backup_configured"] = true
 	} else {
 		checks["backup_configured"] = false

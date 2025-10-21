@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -247,7 +248,7 @@ func generateEosProfiles(rc *eos_io.RuntimeContext, config *AppArmorConfig) erro
 		},
 		"eos-vault-agent": {
 			Name: "eos-vault-agent",
-			Path: "/usr/bin/vault",
+			Path: vault.VaultBinaryPath,
 			Mode: "enforce",
 			Capabilities: []string{
 				"net_admin",

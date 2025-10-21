@@ -48,9 +48,9 @@ type RenewalConfig struct {
 // DefaultRenewalConfig returns default renewal configuration
 func DefaultRenewalConfig(datacenter string) *RenewalConfig {
 	return &RenewalConfig{
-		CertPath:        "/etc/vault.d/tls/vault.crt",
-		KeyPath:         "/etc/vault.d/tls/vault.key",
-		CAPath:          "/etc/vault.d/tls/ca.crt",
+		CertPath:        VaultTLSCert,
+		KeyPath:         VaultTLSKey,
+		CAPath:          VaultTLSCA,
 		RenewBeforeDays: 30, // Renew 30 days before expiration
 		Datacenter:      datacenter,
 		TLSMode:         "internal-ca",
@@ -497,12 +497,12 @@ WantedBy=timers.target
 `
 
 	// Write service unit
-	if err := os.WriteFile("/etc/systemd/system/vault-cert-renewal.service", []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile(VaultCertRenewalServicePath, []byte(serviceContent), 0644); err != nil {
 		return fmt.Errorf("failed to write service unit: %w", err)
 	}
 
 	// Write timer unit
-	if err := os.WriteFile("/etc/systemd/system/vault-cert-renewal.timer", []byte(timerContent), 0644); err != nil {
+	if err := os.WriteFile(VaultCertRenewalTimerPath, []byte(timerContent), 0644); err != nil {
 		return fmt.Errorf("failed to write timer unit: %w", err)
 	}
 

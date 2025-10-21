@@ -17,42 +17,59 @@ import (
 type FallbackMode int
 type FallbackCode string
 
-// Vault constants and paths
+// ============================================================================
+// Vault Runtime Constants
+// ============================================================================
+// NOTE: File paths now centralized in pkg/vault/constants.go
+// These are runtime/operational constants only
+
 const (
-	VaultAddrEnv            = "VAULT_ADDR"
-	VaultCA                 = "VAULT_CACERT"
-	VaultHealthTimeout      = 5 * time.Second
-	TestTimeout             = 500 * time.Millisecond
-	VaultRetryCount         = 5
-	VaultRetryDelay         = 2 * time.Second
-	VaultMaxHealthWait      = 10 * time.Second
+	// === Environment Variables ===
+	VaultAddrEnv = "VAULT_ADDR"
+	VaultCA      = "VAULT_CACERT"
+
+	// === Timeouts and Retry Settings ===
+	VaultHealthTimeout = 5 * time.Second
+	TestTimeout        = 500 * time.Millisecond
+	VaultRetryCount    = 5
+	VaultRetryDelay    = 2 * time.Second
+	VaultMaxHealthWait = 10 * time.Second
+
+	// === Token/Secret TTLs ===
 	VaultDefaultTokenTTL    = "4h"
 	VaultDefaultTokenMaxTTL = "24h"
 	VaultDefaultSecretIDTTL = "24h"
-	LocalhostSAN            = "127.0.0.1"
 
-	// === SINGLE SOURCE OF TRUTH: Base Directories ===
-	VaultDir                  = "/opt/vault/"    // Vault data and logs
-	VaultConfigDirDebian      = "/etc/vault.d"   // Vault config directory (all config files derive from this)
-	VaultBinaryPath           = "/usr/bin/vault" // Vault binary
-	VaultServiceName          = "vault.service"  // Systemd service name
-	VaultConfigFileName       = "config.hcl"
+	// === Network Constants ===
+	LocalhostSAN = "127.0.0.1"
+
+	// === Legacy/Compatibility ===
+	VaultDir                  = "/opt/vault/"  // DEPRECATED: Use vault.VaultDataDir
+	VaultConfigDirDebian      = "/etc/vault.d" // DEPRECATED: Use vault.VaultConfigDir
+	VaultConfigFileName       = "config.hcl"   // DEPRECATED: Use vault.VaultConfigFile
 	EosVaultProfilePath       = "/etc/profile.d/eos_vault.sh"
 	VaultLegacyConfigWildcard = "/etc/vault*"
 	VaultLogWildcard          = "/var/log/vault*"
-	AptKeyringPath            = "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
-	AptListPath               = "/etc/apt/sources.list.d/hashicorp.list"
-	DnfRepoFilePath           = "/etc/yum.repos.d/hashicorp.repo"
-	DnfRepoContent            = `[hashicorp]
+
+	// === Package Manager Paths ===
+	AptKeyringPath  = "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
+	AptListPath     = "/etc/apt/sources.list.d/hashicorp.list"
+	DnfRepoFilePath = "/etc/yum.repos.d/hashicorp.repo"
+	DnfRepoContent  = `[hashicorp]
 name=HashiCorp Stable - $basearch
 baseurl=https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable
 enabled=1
 gpgcheck=1
 gpgkey=https://rpm.releases.hashicorp.com/gpg`
+
+	// === Fallback Modes ===
 	FallbackDeploy FallbackCode = "deploy"
 	FallbackDisk   FallbackCode = "disk"
 	FallbackAbort  FallbackCode = "abort"
 )
+
+// DEPRECATED: Use vault.VaultServiceName instead
+const VaultServiceName = "vault.service"
 
 // Computed Vault port constants - ALL derived from ports.go
 var (

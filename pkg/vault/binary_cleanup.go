@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -75,11 +74,10 @@ func findVaultBinaries(rc *eos_io.RuntimeContext) ([]BinaryLocation, error) {
 
 	// Common installation locations
 	searchPaths := []string{
-		"/usr/bin/vault",
-		"/usr/local/bin/vault",
-		"/opt/vault/bin/vault",
-		"/snap/bin/vault",
-		shared.VaultBinaryPath, // /usr/local/bin/vault
+		VaultBinaryPath,        // Legacy location
+		VaultBinaryPath,        // PRIMARY: VaultBinaryPath
+		"/opt/vault/bin/vault", // Alternative
+		"/snap/bin/vault",      // Snap package
 	}
 
 	// Also search PATH
@@ -301,7 +299,7 @@ func RecommendBinaryCleanup(rc *eos_io.RuntimeContext) ([]string, error) {
 
 	recommendations = append(recommendations, "")
 	recommendations = append(recommendations,
-		fmt.Sprintf("Recommended action: Keep %s, remove others", shared.VaultBinaryPath))
+		fmt.Sprintf("Recommended action: Keep %s, remove others", VaultBinaryPath))
 	recommendations = append(recommendations,
 		"Run: sudo eos repair vault --cleanup-binaries")
 

@@ -397,7 +397,7 @@ func getSecurityStatus(rc *eos_io.RuntimeContext) (*SecurityStatusInfo, error) {
 // Helper functions for security status checks
 func checkHardeningStatus() bool {
 	// Check if hardening script exists
-	_, err := os.Stat("/usr/local/bin/vault-backup.sh")
+	_, err := os.Stat("VaultBinaryPath-backup.sh")
 	return err == nil
 }
 
@@ -507,7 +507,7 @@ func DisplayVaultInitInfo(rc *eos_io.RuntimeContext, info *VaultInitInfo, option
 			logger.Info("Vault initialization credentials (redacted)",
 				zap.String("root_token", crypto.Redact(info.InitResponse.RootToken)),
 				zap.Int("unseal_keys_count", len(info.InitResponse.KeysB64)))
-			
+
 			for i, key := range info.InitResponse.KeysB64 {
 				logger.Info("Unseal key (redacted)",
 					zap.Int("key_number", i+1),
@@ -519,11 +519,11 @@ func DisplayVaultInitInfo(rc *eos_io.RuntimeContext, info *VaultInitInfo, option
 			logger.Error("SECURITY AUDIT: Displaying plaintext Vault credentials",
 				zap.String("event_type", "sensitive_data_display"),
 				zap.String("data_type", "vault_init_credentials"))
-			
+
 			logger.Info("Vault initialization credentials (PLAINTEXT)",
 				zap.String("root_token", info.InitResponse.RootToken),
 				zap.Int("unseal_keys_count", len(info.InitResponse.KeysB64)))
-			
+
 			for i, key := range info.InitResponse.KeysB64 {
 				logger.Info("Unseal key (PLAINTEXT)",
 					zap.Int("key_number", i+1),
@@ -535,7 +535,7 @@ func DisplayVaultInitInfo(rc *eos_io.RuntimeContext, info *VaultInitInfo, option
 	// Display Eos credentials
 	if info.EosCredentials != nil {
 		logger.Info("Eos User Credentials")
-		
+
 		if options.RedactSensitive {
 			logger.Info("Eos credentials (redacted)",
 				zap.String("username", info.EosCredentials.Username),
@@ -545,7 +545,7 @@ func DisplayVaultInitInfo(rc *eos_io.RuntimeContext, info *VaultInitInfo, option
 			logger.Error("SECURITY AUDIT: Displaying plaintext Eos credentials",
 				zap.String("event_type", "sensitive_data_display"),
 				zap.String("data_type", "eos_user_credentials"))
-			
+
 			logger.Info("Eos credentials (PLAINTEXT)",
 				zap.String("username", info.EosCredentials.Username),
 				zap.String("password", info.EosCredentials.Password))
@@ -583,7 +583,7 @@ func displayNextSteps(rc *eos_io.RuntimeContext, info *VaultInitInfo) {
 	}
 
 	var nextSteps []string
-	
+
 	if !info.VaultStatus.Running {
 		nextSteps = append(nextSteps, "Start Vault service: systemctl start vault")
 	} else if info.VaultStatus.Sealed {
@@ -593,11 +593,11 @@ func displayNextSteps(rc *eos_io.RuntimeContext, info *VaultInitInfo) {
 	} else if !info.SecurityStatus.HardeningApplied {
 		nextSteps = append(nextSteps, "Apply security hardening: eos secure vault --comprehensive")
 	} else {
-		nextSteps = append(nextSteps, 
+		nextSteps = append(nextSteps,
 			"Vault appears to be properly configured",
 			"Consider backing up this initialization data securely",
 			"Review audit logs regularly")
 	}
-	
+
 	logger.Info("Recommended actions", zap.Strings("next_steps", nextSteps))
 }

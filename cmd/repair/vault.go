@@ -158,7 +158,7 @@ func repairDuplicateBinaries(rc *eos_io.RuntimeContext, dryRun bool) (int, int, 
 	// Count duplicates (anything not at standard path)
 	duplicates := 0
 	for _, binary := range binaries {
-		if binary.Path != shared.VaultBinaryPath {
+		if binary.Path != vault.VaultBinaryPath {
 			duplicates++
 		}
 	}
@@ -170,7 +170,7 @@ func repairDuplicateBinaries(rc *eos_io.RuntimeContext, dryRun bool) (int, int, 
 
 	fmt.Printf("\n Found %d duplicate vault binaries\n", duplicates)
 	for _, binary := range binaries {
-		if binary.Path != shared.VaultBinaryPath {
+		if binary.Path != vault.VaultBinaryPath {
 			fmt.Printf("   - %s (%s)\n", binary.Path, binary.Version)
 		}
 	}
@@ -181,7 +181,7 @@ func repairDuplicateBinaries(rc *eos_io.RuntimeContext, dryRun bool) (int, int, 
 	}
 
 	// Actually remove duplicates
-	if err := vault.CleanupDuplicateBinaries(rc, shared.VaultBinaryPath); err != nil {
+	if err := vault.CleanupDuplicateBinaries(rc, vault.VaultBinaryPath); err != nil {
 		return duplicates, 0, fmt.Errorf("failed to cleanup binaries: %w", err)
 	}
 

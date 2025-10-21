@@ -51,7 +51,7 @@ sudo rm -f /etc/systemd/system/vault-agent-eos.service
 sudo systemctl daemon-reload
 
 # Clean up binaries
-sudo rm -f /usr/local/bin/vault
+sudo rm -f VaultBinaryPath
 sudo rm -f /usr/bin/vault
 
 # Backup and remove configurations (don't delete data!)
@@ -258,11 +258,11 @@ fi
 unzip "vault_${VAULT_VERSION}_linux_amd64.zip"
 
 # Install to standard location
-sudo mv vault /usr/local/bin/vault
-sudo chmod 755 /usr/local/bin/vault
+sudo mv vault VaultBinaryPath
+sudo chmod 755 VaultBinaryPath
 
 # Verify installation
-/usr/local/bin/vault version
+VaultBinaryPath version
 ```
 
 ### 4.2 Check for Duplicate Binaries
@@ -273,9 +273,9 @@ sudo chmod 755 /usr/local/bin/vault
 # Find all vault binaries
 VAULT_BINS=$(which -a vault 2>/dev/null)
 
-# If multiple found, remove all except /usr/local/bin/vault
+# If multiple found, remove all except VaultBinaryPath
 for BIN in $VAULT_BINS; do
-    if [ "$BIN" != "/usr/local/bin/vault" ]; then
+    if [ "$BIN" != "VaultBinaryPath" ]; then
         sudo rm -f "$BIN"
     fi
 done
@@ -284,11 +284,11 @@ done
 ### 4.3 Set Up mlock Capability
 ```bash
 # Allow vault to lock memory (prevents secrets from being swapped to disk)
-sudo setcap cap_ipc_lock=+ep /usr/local/bin/vault
+sudo setcap cap_ipc_lock=+ep VaultBinaryPath
 
 # Verify capability was set
-getcap /usr/local/bin/vault
-# Expected: /usr/local/bin/vault = cap_ipc_lock+ep
+getcap VaultBinaryPath
+# Expected: VaultBinaryPath = cap_ipc_lock+ep
 ```
 
 ---
@@ -445,7 +445,7 @@ LimitNOFILE=65536
 LimitMEMLOCK=infinity
 
 # Service execution
-ExecStart=/usr/local/bin/vault server -config=/etc/vault.d/vault.hcl
+ExecStart=VaultBinaryPath server -config=/etc/vault.d/vault.hcl
 ExecReload=/bin/kill --signal HUP $MAINPID
 
 # Process management
@@ -861,7 +861,7 @@ ExecStartPre=/bin/chown eos:eos /run/eos
 ExecStartPre=/bin/chmod 700 /run/eos
 
 # Main process
-ExecStart=/usr/local/bin/vault agent -config=/etc/vault.d/vault-agent-eos.hcl
+ExecStart=VaultBinaryPath agent -config=/etc/vault.d/vault-agent-eos.hcl
 
 # Restart on failure
 Restart=on-failure
@@ -882,7 +882,7 @@ WantedBy=multi-user.target
 
 | File/Directory | Owner | Group | Mode | Octal | Symbolic | Notes |
 |---------------|-------|-------|------|-------|----------|-------|
-| `/usr/local/bin/vault` | root | root | 0755 | 755 | rwxr-xr-x | Binary |
+| `VaultBinaryPath` | root | root | 0755 | 755 | rwxr-xr-x | Binary |
 | `/etc/vault.d/` | vault | vault | 0755 | 755 | rwxr-xr-x | Config dir |
 | `/etc/vault.d/vault.hcl` | vault | vault | 0644 | 644 | rw-r--r-- | Config file |
 | `/etc/vault.d/tls/` | vault | vault | 0755 | 755 | rwxr-xr-x | TLS dir |
@@ -1020,7 +1020,7 @@ After refactoring, verify ALL of the following:
 ### Binary Tests
 
 - [ ] Only one vault binary exists
-- [ ] Binary is in `/usr/local/bin/vault`
+- [ ] Binary is in `VaultBinaryPath`
 - [ ] Binary has correct version
 - [ ] Binary has execute permissions
 - [ ] No duplicate binaries in PATH

@@ -469,7 +469,7 @@ echo "OK: Vault Agent is healthy"
 exit 0
 `
 
-	healthCheckPath := "/usr/local/bin/vault-agent-health-check.sh"
+	healthCheckPath := VaultAgentHealthCheckPath
 	log.Info(" Writing health check script", zap.String("path", healthCheckPath))
 	if err := os.WriteFile(healthCheckPath, []byte(healthCheckScript), 0755); err != nil {
 		log.Error(" Failed to write health check script",
@@ -503,8 +503,8 @@ Group=vault
 `
 
 	// Write timer and service files
-	timerPath := "/etc/systemd/system/vault-agent-health-check.timer"
-	servicePath := "/etc/systemd/system/vault-agent-health-check.service"
+	timerPath := VaultAgentHealthCheckTimerPath
+	servicePath := VaultAgentHealthCheckServicePath
 
 	log.Info(" Writing systemd timer", zap.String("path", timerPath))
 	if err := os.WriteFile(timerPath, []byte(timerContent), 0644); err != nil {

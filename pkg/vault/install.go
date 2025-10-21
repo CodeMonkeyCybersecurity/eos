@@ -145,25 +145,25 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		config.LogLevel = "info"
 	}
 	if config.BinaryPath == "" {
-		config.BinaryPath = "/usr/local/bin/vault"
+		config.BinaryPath = VaultBinaryPath
 	}
 	if config.ConfigPath == "" {
-		config.ConfigPath = "/etc/vault.d"
+		config.ConfigPath = VaultConfigDir
 	}
 	if config.DataPath == "" {
-		config.DataPath = "/opt/vault/data"
+		config.DataPath = VaultDataDir
 	}
 	if config.LogPath == "" {
-		config.LogPath = "/var/log/vault"
+		config.LogPath = VaultLogsDir
 	}
 	if config.ServiceName == "" {
-		config.ServiceName = "vault"
+		config.ServiceName = VaultServiceUser // Service name matches user
 	}
 	if config.ServiceUser == "" {
-		config.ServiceUser = "vault"
+		config.ServiceUser = VaultServiceUser
 	}
 	if config.ServiceGroup == "" {
-		config.ServiceGroup = "vault"
+		config.ServiceGroup = VaultServiceGroup
 	}
 	if config.Port == 0 {
 		config.Port = shared.PortVault
@@ -395,7 +395,7 @@ func (vi *VaultInstaller) Install() error {
 	}
 
 	// CRITICAL DATA MIGRATION WARNING: Check for existing Raft data when switching to Consul
-	if (vi.config.StorageBackend == "consul" || vi.config.StorageBackend == "") {
+	if vi.config.StorageBackend == "consul" || vi.config.StorageBackend == "" {
 		raftDataPath := filepath.Join(vi.config.DataPath, "raft")
 		if _, err := os.Stat(raftDataPath); err == nil {
 			vi.logger.Warn("CRITICAL: Existing Raft storage data detected",
@@ -1065,10 +1065,10 @@ func (vi *VaultInstaller) configure() error {
 	switch vi.config.StorageBackend {
 	case "file":
 		// EXPLICITLY NOT SUPPORTED
-		return fmt.Errorf("file storage backend is NOT SUPPORTED in Vault Enterprise 1.12.0+\n"+
-			"Supported backends:\n"+
-			"  • consul (recommended) - HA storage with Consul\n"+
-			"  • raft (deprecated)    - Integrated storage\n"+
+		return fmt.Errorf("file storage backend is NOT SUPPORTED in Vault Enterprise 1.12.0+\n" +
+			"Supported backends:\n" +
+			"  • consul (recommended) - HA storage with Consul\n" +
+			"  • raft (deprecated)    - Integrated storage\n" +
 			"Use: sudo eos create vault --storage-backend=consul")
 
 	case "consul", "": // Default to Consul if not specified

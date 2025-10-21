@@ -73,19 +73,19 @@ shared.VaultLogWildcard,  // Wildcard for log files
 **Status:**  **COMPLETE** - Covered by wildcard
 
 #### 5. Binary Removal
-**Requirement:** `rm -f /usr/local/bin/vault`
+**Requirement:** `rm -f VaultBinaryPath`
 
 **Implementation:** [pkg/vault/phase_delete.go:43](pkg/vault/phase_delete.go#L43)
 ```go
-shared.VaultBinaryPath,  // Defined as "/usr/bin/vault" in shared constants
+shared.VaultBinaryPath,  // Defined as VaultBinaryPath in shared constants
 ```
 
 **ISSUE FOUND:**
 - Shared constants define `/usr/bin/vault`
-- Install.go actually installs to `/usr/local/bin/vault`
-- Requirements specify `/usr/local/bin/vault`
+- Install.go actually installs to `VaultBinaryPath`
+- Requirements specify `VaultBinaryPath`
 
-**Status:** **PARTIAL** - Only removes `/usr/bin/vault`, misses `/usr/local/bin/vault`
+**Status:** **PARTIAL** - Only removes `/usr/bin/vault`, misses `VaultBinaryPath`
 
 #### 6. User and Group Removal
 **Requirement:**
@@ -137,18 +137,18 @@ rm -f /etc/profile.d/vault.sh
 
 ### Issue #1: Binary Path Inconsistency (P0 - CRITICAL)
 
-**Problem:** Code uses `/usr/bin/vault` but actually installs to `/usr/local/bin/vault`
+**Problem:** Code uses `/usr/bin/vault` but actually installs to `VaultBinaryPath`
 
 **Evidence:**
 ```go
 // shared/vault_server.go:40
-VaultBinaryPath = "/usr/bin/vault"
+VaultBinaryPath = VaultBinaryPath
 
 // vault/install.go:119
-config.BinaryPath = "/usr/local/bin/vault"  // ← DIFFERENT!
+config.BinaryPath = "VaultBinaryPath"  // ← DIFFERENT!
 ```
 
-**Impact:** After `eos delete vault`, the binary at `/usr/local/bin/vault` remains on the system.
+**Impact:** After `eos delete vault`, the binary at `VaultBinaryPath` remains on the system.
 
 **Fix Required:**
 ```go
@@ -156,8 +156,8 @@ config.BinaryPath = "/usr/local/bin/vault"  // ← DIFFERENT!
 func GetVaultPurgePaths() []string {
     return []string{
         // ... existing paths ...
-        "/usr/bin/vault",        // Old location
-        "/usr/local/bin/vault",  // Current installation location
+        VaultBinaryPath,        // Old location
+        "VaultBinaryPath",  // Current installation location
     }
 }
 
@@ -249,7 +249,7 @@ Based on user requirements, verify after `eos delete vault`:
 ### Files and Directories
 - [ ] `/etc/vault.d/` does not exist
 - [ ] `/opt/vault/` does not exist
-- [ ] `/usr/local/bin/vault` does not exist **← CURRENTLY FAILS**
+- [ ] `VaultBinaryPath` does not exist **← CURRENTLY FAILS**
 - [ ] `/usr/bin/vault` does not exist
 - [ ] `/var/log/vault/` does not exist
 
@@ -274,7 +274,7 @@ Based on user requirements, verify after `eos delete vault`:
 
 **FIX #1: Binary Path Coverage**
 
-Add `/usr/local/bin/vault` to purge paths:
+Add `VaultBinaryPath` to purge paths:
 
 ```go
 // File: pkg/vault/phase_delete.go
@@ -284,8 +284,8 @@ func GetVaultPurgePaths() []string {
     return []string{
         shared.VaultConfigPath,
         // ... existing paths ...
-        shared.VaultBinaryPath,           // "/usr/bin/vault"
-        "/usr/local/bin/vault",           // ADD THIS LINE
+        shared.VaultBinaryPath,           // VaultBinaryPath
+        "VaultBinaryPath",           // ADD THIS LINE
         // ... rest of paths ...
     }
 }
@@ -346,7 +346,7 @@ AmbientCapabilities=CAP_IPC_LOCK
 
 | Category | Score | Notes |
 |----------|-------|-------|
-| Completeness | 9/10 | Missing /usr/local/bin/vault |
+| Completeness | 9/10 | Missing VaultBinaryPath |
 | Safety | 10/10 | Excellent confirmation prompts |
 | Idempotency | 10/10 | All operations safe to re-run |
 | Error Handling | 10/10 | Comprehensive, non-fatal errors |
@@ -362,7 +362,7 @@ AmbientCapabilities=CAP_IPC_LOCK
 ##  RECOMMENDATIONS
 
 ### Immediate (Do Now)
-1. Fix binary path issue (add `/usr/local/bin/vault` to purge paths)
+1. Fix binary path issue (add `VaultBinaryPath` to purge paths)
 2. Test complete removal flow
 3. Verify reinstallation works
 

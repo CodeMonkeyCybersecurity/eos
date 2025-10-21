@@ -317,7 +317,7 @@ func (vi *VaultInstaller) displaySecurityWarnings() {
 1. **Single binary path** ([install.go:119](install.go:119))
    ```go
    if config.BinaryPath == "" {
-       config.BinaryPath = "/usr/local/bin/vault"  // Standardized
+       config.BinaryPath = "VaultBinaryPath"  // Standardized
    }
    ```
 
@@ -330,7 +330,7 @@ func (vi *VaultInstaller) displaySecurityWarnings() {
 // Add to install.go
 func (vi *VaultInstaller) cleanupDuplicateBinaries() error {
     duplicates := []string{
-        "/usr/bin/vault",
+        VaultBinaryPath,
         "/opt/vault/bin/vault",
     }
 

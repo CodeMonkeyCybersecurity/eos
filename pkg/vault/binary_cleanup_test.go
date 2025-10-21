@@ -194,10 +194,10 @@ func TestRemoveDuplicatesWithSymlinks(t *testing.T) {
 
 	binaries := []BinaryLocation{
 		{
-			Path:       realPath,
-			Version:    "v1.0.0",
-			Size:       int64(len(mockBinary)),
-			IsSymlink:  false,
+			Path:      realPath,
+			Version:   "v1.0.0",
+			Size:      int64(len(mockBinary)),
+			IsSymlink: false,
 		},
 		{
 			Path:       symlinkPath,
@@ -256,13 +256,13 @@ func TestRecommendBinaryCleanup(t *testing.T) {
 func TestDisplayBinaryFindings(t *testing.T) {
 	binaries := []BinaryLocation{
 		{
-			Path:      "/usr/local/bin/vault",
+			Path:      "VaultBinaryPath",
 			Version:   "Vault v1.15.0",
 			Size:      123456789,
 			IsSymlink: false,
 		},
 		{
-			Path:       "/usr/bin/vault",
+			Path:       VaultBinaryPath,
 			Version:    "Vault v1.14.0",
 			Size:       112233445,
 			IsSymlink:  true,
@@ -272,21 +272,21 @@ func TestDisplayBinaryFindings(t *testing.T) {
 
 	// This test just verifies it doesn't crash
 	// Output will go to stdout (visible in test output)
-	displayBinaryFindings(binaries, "/usr/local/bin/vault")
+	displayBinaryFindings(binaries, "VaultBinaryPath")
 
 	t.Log("Display function executed without errors")
 }
 
 func TestBinaryLocationStruct(t *testing.T) {
 	binary := BinaryLocation{
-		Path:       "/usr/local/bin/vault",
+		Path:       "VaultBinaryPath",
 		Version:    "Vault v1.15.0",
 		Size:       123456789,
 		IsSymlink:  false,
 		LinkTarget: "",
 	}
 
-	if binary.Path != "/usr/local/bin/vault" {
+	if binary.Path != "VaultBinaryPath" {
 		t.Errorf("Unexpected path: %s", binary.Path)
 	}
 	if binary.IsSymlink {

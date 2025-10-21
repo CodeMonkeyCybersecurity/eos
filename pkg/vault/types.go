@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -300,5 +301,196 @@ type VaultInitResponse struct {
 	RecoveryShares    int      `json:"recovery_keys_shares"`
 	RecoveryThreshold int      `json:"recovery_keys_threshold"`
 	RootToken         string   `json:"root_token"`
+}
+
+// ============================================================================
+// Path and Network Configuration Types
+// ============================================================================
+
+// VaultPaths provides structured access to all Vault-related filesystem paths.
+// Use this instead of hardcoding paths throughout the codebase.
+type VaultPaths struct {
+	// Binary locations
+	Binary       string   // Primary vault binary location
+	BinaryLegacy []string // Legacy locations to check/cleanup
+
+	// Configuration
+	ConfigDir   string // Base config directory
+	ConfigFile  string // Main server config file
+	AgentConfig string // Agent config file
+
+	// TLS/Certificates
+	TLSDir  string // TLS directory
+	TLSCert string // Server certificate
+	TLSKey  string // Server private key
+	TLSCA   string // CA certificate
+
+	// Data storage
+	DataDir  string // Vault data directory
+	LogsDir  string // Log directory
+	AuditLog string // Audit log file
+
+	// Systemd services
+	ServiceFile      string // Server service file
+	AgentServiceFile string // Agent service file
+
+	// Helper scripts
+	BackupScript      string // Backup script path
+	HealthCheckScript string // Agent health check script
+	SnapshotScript    string // Snapshot script path
+
+	// Secrets/initialization
+	InitDataFile string // Vault initialization data
+}
+
+// DefaultVaultPaths returns the standard Vault paths using constants from constants.go
+func DefaultVaultPaths() *VaultPaths {
+	return &VaultPaths{
+		Binary: VaultBinaryPath,
+		BinaryLegacy: []string{
+			VaultBinaryPathLegacy, // /usr/bin/vault
+			VaultBinaryPathOpt,    // /opt/vault/bin/vault
+			VaultBinaryPathSnap,   // /snap/bin/vault
+		},
+		ConfigDir:         VaultConfigDir,
+		ConfigFile:        VaultConfigPath,
+		AgentConfig:       filepath.Join(VaultConfigDir, VaultAgentConfigFile),
+		TLSDir:            VaultTLSDir,
+		TLSCert:           VaultTLSCert,
+		TLSKey:            VaultTLSKey,
+		TLSCA:             VaultTLSCA,
+		DataDir:           VaultDataDir,
+		LogsDir:           VaultLogsDir,
+		AuditLog:          VaultAuditLogPath,
+		ServiceFile:       VaultServicePath,
+		AgentServiceFile:  VaultAgentServicePath,
+		BackupScript:      VaultBackupScriptPath,
+		HealthCheckScript: VaultAgentHealthCheckPath,
+		SnapshotScript:    VaultSnapshotScriptPath,
+		InitDataFile:      VaultInitDataFile,
+	}
+}
+
+// AllPaths returns all paths as a flat list (useful for cleanup/deletion)
+func (vp *VaultPaths) AllPaths() []string {
+	paths := []string{
+		vp.Binary,
+		vp.ConfigDir,
+		vp.ConfigFile,
+		vp.AgentConfig,
+		vp.TLSDir,
+		vp.TLSCert,
+		vp.TLSKey,
+		vp.TLSCA,
+		vp.DataDir,
+		vp.LogsDir,
+		vp.AuditLog,
+		vp.ServiceFile,
+		vp.AgentServiceFile,
+		vp.BackupScript,
+		vp.HealthCheckScript,
+		vp.SnapshotScript,
+		vp.InitDataFile,
+	}
+	// Add legacy binary paths
+	paths = append(paths, vp.BinaryLegacy...)
+	return paths
+}
+
+// VaultNetworkConfig defines network addresses and ports for Vault
+type VaultNetworkConfig struct {
+	// Listen addresses
+	ListenAddr        string // Address to bind to (0.0.0.0 for all interfaces)
+	ClusterListenAddr string // Cluster communication address
+
+	// Client connection addresses
+	ClientAddr string // Address clients use to connect (127.0.0.1 or hostname)
+
+	// Ports
+	APIPort     int // Vault API port (default: 8179)
+	ClusterPort int // Raft cluster port (default: 8180)
+
+	// Computed addresses
+	APIAddress     string // Full API address (e.g., https://hostname:8179)
+	ClusterAddress string // Full cluster address (e.g., https://hostname:8180)
+}
+
+// DefaultVaultNetwork returns standard network configuration
+func DefaultVaultNetwork(hostname string) *VaultNetworkConfig {
+	if hostname == "" {
+		hostname = VaultClientAddr // Default to localhost
+	}
+
+	return &VaultNetworkConfig{
+		ListenAddr:        VaultListenAddr,  // 0.0.0.0
+		ClusterListenAddr: VaultListenAddr,  // 0.0.0.0
+		ClientAddr:        hostname,         // Provided hostname or 127.0.0.1
+		APIPort:           VaultDefaultPort, // 8179
+		ClusterPort:       VaultClusterPort, // 8180
+		APIAddress:        fmt.Sprintf("https://%s:%d", hostname, VaultDefaultPort),
+		ClusterAddress:    fmt.Sprintf("https://%s:%d", hostname, VaultClusterPort),
+	}
+}
+
+// APIListenAddress returns the full listen address for the API (e.g., "0.0.0.0:8179")
+func (vnc *VaultNetworkConfig) APIListenAddress() string {
+	return fmt.Sprintf("%s:%d", vnc.ListenAddr, vnc.APIPort)
+}
+
+// ClusterListenAddress returns the full listen address for cluster comm (e.g., "0.0.0.0:8180")
+func (vnc *VaultNetworkConfig) ClusterListenAddress() string {
+	return fmt.Sprintf("%s:%d", vnc.ClusterListenAddr, vnc.ClusterPort)
+}
+
+// LocalAPIAddress returns the local client connection address (e.g., "https://127.0.0.1:8179")
+func (vnc *VaultNetworkConfig) LocalAPIAddress() string {
+	return fmt.Sprintf("https://%s:%d", VaultClientAddr, vnc.APIPort)
+}
+
+// VaultServiceConfig defines systemd service parameters
+type VaultServiceConfig struct {
+	ServiceName string // Service name (e.g., "vault.service")
+	User        string // Run as user
+	Group       string // Run as group
+	BinaryPath  string // Path to vault binary
+	ConfigPath  string // Path to config file
+}
+
+// DefaultVaultService returns standard service configuration
+func DefaultVaultService() *VaultServiceConfig {
+	return &VaultServiceConfig{
+		ServiceName: VaultServiceName,
+		User:        VaultServiceUser,
+		Group:       VaultServiceGroup,
+		BinaryPath:  VaultBinaryPath,
+		ConfigPath:  VaultConfigPath,
+	}
+}
+
+// ExecStartCommand returns the systemd ExecStart command line
+func (vsc *VaultServiceConfig) ExecStartCommand() string {
+	return fmt.Sprintf("%s server -config=%s", vsc.BinaryPath, vsc.ConfigPath)
+}
+
+// VaultInstallConfig aggregates all configuration for Vault installation
+type VaultInstallConfig struct {
+	Paths   *VaultPaths
+	Network *VaultNetworkConfig
+	Service *VaultServiceConfig
+
+	// Additional options
+	LogLevel  string
+	LogFormat string
+}
+
+// DefaultInstallConfig returns a complete default configuration
+func DefaultInstallConfig(hostname string) *VaultInstallConfig {
+	return &VaultInstallConfig{
+		Paths:     DefaultVaultPaths(),
+		Network:   DefaultVaultNetwork(hostname),
+		Service:   DefaultVaultService(),
+		LogLevel:  "info",
+		LogFormat: "json",
+	}
 }
 

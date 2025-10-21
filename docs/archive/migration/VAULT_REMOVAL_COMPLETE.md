@@ -17,17 +17,17 @@ Created detailed analysis documents:
 
 ### 2. Critical Bug Fix Applied
 
-**Problem:** Binary at `/usr/local/bin/vault` was not being removed
+**Problem:** Binary at `VaultBinaryPath` was not being removed
 
 **Root Cause:**
-- Shared constants define `VaultBinaryPath = "/usr/bin/vault"`
-- install.go actually installs to `/usr/local/bin/vault`
+- Shared constants define `VaultBinaryPath = VaultBinaryPath`
+- install.go actually installs to `VaultBinaryPath`
 - Removal only cleaned up `/usr/bin/vault`
 
 **Fix:** [pkg/vault/phase_delete.go:44](pkg/vault/phase_delete.go#L44)
 ```go
 shared.VaultBinaryPath,          // /usr/bin/vault (shared constant)
-"/usr/local/bin/vault",          // Alternate binary location (used by install.go)
+"VaultBinaryPath",          // Alternate binary location (used by install.go)
 ```
 
 **Impact:** Users can now reinstall Vault cleanly without binary conflicts
@@ -58,7 +58,7 @@ $ go build -o /tmp/eos-deletion-test ./cmd/
 | File Removal |  COMPLETE | Config, data, logs, binaries - all removed |
 | User/Group Removal |  COMPLETE | userdel -r, groupdel |
 | Environment Cleanup |  COMPLETE | All VAULT_* variables removed |
-| Binary Removal |  FIXED | Both /usr/bin/vault AND /usr/local/bin/vault |
+| Binary Removal |  FIXED | Both /usr/bin/vault AND VaultBinaryPath |
 | Edge Case Handling |  COMPLETE | Idempotent, handles missing resources |
 | Safety Features |  COMPLETE | Double confirmation, force flag |
 | Verification |  COMPLETE | Post-deletion checks |
@@ -129,7 +129,7 @@ fi
 # File checks
 [ ! -d /etc/vault.d ] && echo " Config removed" || echo " Config exists"
 [ ! -d /opt/vault ] && echo " Data removed" || echo " Data exists"
-[ ! -f /usr/local/bin/vault ] && echo " Binary removed (local)" || echo " Binary exists (local)"
+[ ! -f VaultBinaryPath ] && echo " Binary removed (local)" || echo " Binary exists (local)"
 [ ! -f /usr/bin/vault ] && echo " Binary removed (usr)" || echo " Binary exists (usr)"
 
 # User/group check
@@ -165,7 +165,7 @@ All checks should show :
 **[pkg/vault/phase_delete.go](pkg/vault/phase_delete.go#L44)**
 ```diff
  		shared.VaultBinaryPath,          // /usr/bin/vault (shared constant)
-+		"/usr/local/bin/vault",          // Alternate binary location (used by install.go)
++		"VaultBinaryPath",          // Alternate binary location (used by install.go)
  		shared.VaultPID,
 ```
 
@@ -200,7 +200,7 @@ All checks should show :
 - Assessed implementation completeness
 
 ### Iteration 3: Fix Application
-- Added `/usr/local/bin/vault` to purge paths
+- Added `VaultBinaryPath` to purge paths
 - Verified modern systemd syntax already in use
 - No other fixes needed - implementation was already excellent
 
@@ -232,7 +232,7 @@ All checks should show :
 2. Missing unit tests (not blocking for production)
 
 ### What Was Broken 🔴
-1. `/usr/local/bin/vault` not being removed (NOW FIXED)
+1. `VaultBinaryPath` not being removed (NOW FIXED)
 
 ### What We Were Not Thinking About 
 1. The implementation was already MORE comprehensive than requirements

@@ -84,7 +84,7 @@ grep -r "/var/lib/eos/secrets/" cmd/ pkg/
 ```bash
 # Only one location
 which -a vault
-# Should return: /usr/local/bin/vault
+# Should return: VaultBinaryPath
 # NOT: Multiple paths
 
 # No duplicate in /usr/bin
@@ -130,7 +130,7 @@ All 5 unseal keys are stored in:
 - [ ] Correct SANs (hostname, localhost, 127.0.0.1)
 
 ### Phase 4: Binary
-- [ ] In `/usr/local/bin/vault`
+- [ ] In `VaultBinaryPath`
 - [ ] Correct version (1.20.4 or newer)
 - [ ] Has CAP_IPC_LOCK capability
 - [ ] 755 permissions
@@ -209,7 +209,7 @@ systemctl is-active vault && echo " PASS" || echo " FAIL"
 
 # 6. Binary location
 echo -n "Binary location: "
-test -x /usr/local/bin/vault && echo " PASS" || echo " FAIL"
+test -x VaultBinaryPath && echo " PASS" || echo " FAIL"
 
 # 7. No duplicates
 echo -n "No duplicate binary: "

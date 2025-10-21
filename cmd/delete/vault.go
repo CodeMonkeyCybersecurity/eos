@@ -48,15 +48,21 @@ EXAMPLES:
   # Remove Vault without confirmation (use with caution)
   eos delete vault --yes
 
+  # Complete purge including Consul storage backend (for lost credentials)
+  eos delete vault --purge --yes
+
 SAFETY:
   This command removes ALL Vault data permanently.
   By default, it asks for confirmation before deletion.
-  Use --yes to skip the confirmation prompt.`,
+  Use --yes to skip the confirmation prompt.
+  Use --purge to also delete Vault's storage backend data in Consul
+  (useful when Vault credentials are lost and you need a fresh start).`,
 	RunE: eos_cli.Wrap(runDeleteVault),
 }
 
 var (
 	vaultSkipConfirmation bool
+	vaultPurge            bool // Purge Consul storage backend data
 )
 
 func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -83,9 +89,10 @@ func runDeleteVault(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		zap.Bool("remove_user", true))
 
 	config := &vault.UninstallConfig{
-		Force:      true, // Always force complete removal
-		RemoveData: true,
-		RemoveUser: true,
+		Force:              true, // Always force complete removal
+		RemoveData:         true,
+		RemoveUser:         true,
+		PurgeConsulStorage: vaultPurge, // Purge Consul storage backend data
 	}
 
 	// Create uninstaller
@@ -170,8 +177,30 @@ func promptForConfirmation(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithC
 	if state.UserExists {
 		logger.Info("terminal prompt:  User & Group: vault")
 	}
+	if state.ConsulStorageExists {
+		logger.Info(fmt.Sprintf("terminal prompt:  Consul Storage: %d keys (NOT DELETED)", state.ConsulStorageKeys))
+	}
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════")
 	logger.Info("terminal prompt: ")
+
+	// Check for orphaned state scenario
+	if state.ConsulStorageExists && !state.CredentialsExist {
+		logger.Info("terminal prompt: WARNING: ORPHANED VAULT STATE DETECTED!")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Vault is initialized in Consul storage but credentials file is missing.")
+		logger.Info("terminal prompt: This means:")
+		logger.Info("terminal prompt:   - Vault cannot be unsealed (unseal keys lost)")
+		logger.Info("terminal prompt:   - Reinstalling Vault will fail (data still exists)")
+		logger.Info("terminal prompt:   - You cannot access any secrets")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: To completely remove Vault AND its storage data, run:")
+		logger.Info("terminal prompt:   sudo eos delete vault --purge --yes")
+		logger.Info("terminal prompt: ")
+	} else if state.ConsulStorageExists && !vaultPurge {
+		logger.Info("terminal prompt: NOTE: Vault storage in Consul will NOT be deleted.")
+		logger.Info("terminal prompt: Use --purge flag to also delete Consul storage backend data.")
+		logger.Info("terminal prompt: ")
+	}
 
 	prompt := `WARNING: This will PERMANENTLY DELETE Vault and ALL its data!
 
@@ -202,6 +231,7 @@ Continue? [y/N] `
 
 func init() {
 	VaultCmd.Flags().BoolVarP(&vaultSkipConfirmation, "yes", "y", false, "Skip confirmation prompt (use with caution)")
+	VaultCmd.Flags().BoolVar(&vaultPurge, "purge", false, "Also delete Vault data from Consul storage backend (use when credentials are lost)")
 
 	// Register the command with the delete command
 	DeleteCmd.AddCommand(VaultCmd)

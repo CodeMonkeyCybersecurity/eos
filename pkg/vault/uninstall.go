@@ -19,25 +19,30 @@ import (
 
 // UninstallConfig contains configuration for Vault uninstallation
 type UninstallConfig struct {
-	Force          bool   // Skip confirmation prompts
-	RemoveData     bool   // Remove data directories
-	RemoveUser     bool   // Remove vault user/group
-	Distro         string // Distribution type (debian, rhel)
-	PreserveLogs   bool   // Keep log files
-	PreserveBackup bool   // Keep backup files
+	Force              bool   // Skip confirmation prompts
+	RemoveData         bool   // Remove data directories
+	RemoveUser         bool   // Remove vault user/group
+	Distro             string // Distribution type (debian, rhel)
+	PreserveLogs       bool   // Keep log files
+	PreserveBackup     bool   // Keep backup files
+	PurgeConsulStorage bool   // Delete Vault data from Consul storage backend
 }
 
 // UninstallState represents the current state of Vault installation
 type UninstallState struct {
-	BinaryInstalled  bool
-	ServiceRunning   bool
-	ServiceEnabled   bool
-	ConfigExists     bool
-	DataExists       bool
-	UserExists       bool
-	Version          string
-	ExistingPaths    []string
-	PackageInstalled bool
+	BinaryInstalled     bool
+	ServiceRunning      bool
+	ServiceEnabled      bool
+	ConfigExists        bool
+	DataExists          bool
+	UserExists          bool
+	Version             string
+	ExistingPaths       []string
+	PackageInstalled    bool
+	ConsulStorageExists bool   // Vault data exists in Consul storage backend
+	ConsulStorageKeys   int    // Number of keys in Consul storage
+	VaultInitialized    bool   // Vault is initialized (from API check)
+	CredentialsExist    bool   // vault_init.json file exists
 }
 
 // DeletionStep represents a single step in the deletion process
@@ -141,10 +146,10 @@ func (vu *VaultUninstaller) Assess() (*UninstallState, error) {
 
 	// Check for configuration and data directories
 	checkPaths := map[string]*bool{
-		"/etc/vault.d":   &state.ConfigExists,
-		"/opt/vault":     &state.DataExists,
+		VaultConfigDir: &state.ConfigExists,
+		VaultDataDir:   &state.DataExists,
 		"/var/lib/vault": nil, // Just track existence
-		"/var/log/vault": nil,
+		VaultLogsDir:     nil,
 	}
 
 	for path, stateFlag := range checkPaths {
@@ -174,12 +179,29 @@ func (vu *VaultUninstaller) Assess() (*UninstallState, error) {
 		state.PackageInstalled = true
 	}
 
+	// Check if credentials file exists
+	if _, err := os.Stat("/var/lib/eos/secret/vault_init.json"); err == nil {
+		state.CredentialsExist = true
+		vu.logger.Debug("Vault credentials file exists")
+	} else {
+		vu.logger.Debug("Vault credentials file not found")
+	}
+
+	// Check Consul storage backend for Vault data
+	if err := vu.checkConsulStorage(state); err != nil {
+		vu.logger.Warn("Failed to check Consul storage backend", zap.Error(err))
+		// Non-fatal - continue with assessment
+	}
+
 	vu.state = state
 	vu.logger.Info("Assessment complete",
 		zap.Bool("binary_installed", state.BinaryInstalled),
 		zap.Bool("service_running", state.ServiceRunning),
 		zap.Bool("config_exists", state.ConfigExists),
 		zap.Bool("data_exists", state.DataExists),
+		zap.Bool("consul_storage_exists", state.ConsulStorageExists),
+		zap.Int("consul_storage_keys", state.ConsulStorageKeys),
+		zap.Bool("credentials_exist", state.CredentialsExist),
 		zap.Int("existing_paths", len(state.ExistingPaths)))
 
 	return state, nil
@@ -614,7 +636,7 @@ func (vu *VaultUninstaller) displayPreDeletionSummary() {
 
 	if vu.state.BinaryInstalled {
 		vu.logger.Info("terminal prompt:  Binary:")
-		vu.logger.Info(fmt.Sprintf("terminal prompt:    - /usr/local/bin/vault (%s)", vu.state.Version))
+		vu.logger.Info(fmt.Sprintf("terminal prompt:    - VaultBinaryPath (%s)", vu.state.Version))
 		vu.logger.Info("terminal prompt:    - /usr/bin/vault (if present)")
 	}
 
@@ -732,9 +754,13 @@ func (vu *VaultUninstaller) Uninstall() error {
 	vu.displayPreDeletionSummary()
 
 	// INTERVENE - Remove Vault with progress tracking
-	vu.logger.Info("Beginning Vault uninstallation",
-		zap.Int("total_steps", 7))
 	totalSteps := 7
+	if vu.config.PurgeConsulStorage {
+		totalSteps = 8 // Add extra step for Consul purge
+	}
+	vu.logger.Info("Beginning Vault uninstallation",
+		zap.Int("total_steps", totalSteps),
+		zap.Bool("purge_consul", vu.config.PurgeConsulStorage))
 	currentStep := 0
 
 	// Step 1: Stop services
@@ -851,7 +877,27 @@ func (vu *VaultUninstaller) Uninstall() error {
 		vu.logStep("Reload systemd", true, nil)
 	}
 
-	// Step 7: EVALUATE - Verify removal
+	// Step 7: Purge Consul storage (if requested)
+	if vu.config.PurgeConsulStorage {
+		currentStep++
+		vu.logger.Info(fmt.Sprintf("[%d/%d] Purging Vault data from Consul storage backend...", currentStep, totalSteps),
+			zap.Int("step", currentStep))
+		stepStartTime = time.Now()
+
+		if err := vu.purgeConsulStorage(); err != nil {
+			vu.logger.Warn("Error purging Consul storage",
+				zap.Error(err),
+				zap.Duration("duration", time.Since(stepStartTime)))
+			vu.logStep("Purge Consul storage", false, err)
+			// This is non-fatal - user can manually run: consul kv delete -recurse vault/
+		} else {
+			vu.logger.Info("Consul storage purged successfully",
+				zap.Duration("duration", time.Since(stepStartTime)))
+			vu.logStep("Purge Consul storage", true, nil)
+		}
+	}
+
+	// Step 8 (or 7 if no purge): EVALUATE - Verify removal
 	currentStep++
 	vu.logger.Info(fmt.Sprintf("[%d/%d] Verifying removal...", currentStep, totalSteps),
 		zap.Int("step", currentStep))
@@ -897,4 +943,91 @@ func detectDistro() string {
 		return "debian"
 	}
 	return "unknown"
+}
+
+// checkConsulStorage checks if Vault data exists in Consul storage backend
+func (vu *VaultUninstaller) checkConsulStorage(state *UninstallState) error {
+	vu.logger.Debug("Checking Consul storage backend for Vault data")
+
+	// Check if consul CLI is available
+	consulPath, err := exec.LookPath("consul")
+	if err != nil {
+		vu.logger.Debug("Consul CLI not found - skipping Consul storage check")
+		return nil // Not an error - Consul may not be installed
+	}
+
+	vu.logger.Debug("Consul CLI found", zap.String("path", consulPath))
+
+	// Try to list keys in vault/ prefix
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "consul", "kv", "get", "-keys", "-recurse", "vault/")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		// Check if it's just "no keys found" vs actual error
+		if strings.Contains(string(output), "No key exists") || strings.Contains(string(output), "no keys found") {
+			vu.logger.Debug("No Vault data found in Consul storage backend")
+			state.ConsulStorageExists = false
+			state.ConsulStorageKeys = 0
+			return nil
+		}
+
+		vu.logger.Debug("Failed to query Consul storage backend",
+			zap.Error(err),
+			zap.String("output", string(output)))
+		return nil // Non-fatal
+	}
+
+	// Count keys
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	keyCount := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			keyCount++
+		}
+	}
+
+	if keyCount > 0 {
+		state.ConsulStorageExists = true
+		state.ConsulStorageKeys = keyCount
+		vu.logger.Info("Found Vault data in Consul storage backend",
+			zap.Int("key_count", keyCount))
+	}
+
+	return nil
+}
+
+// purgeConsulStorage deletes all Vault data from Consul storage backend
+func (vu *VaultUninstaller) purgeConsulStorage() error {
+	vu.logger.Info("Purging Vault data from Consul storage backend")
+
+	// Check if consul CLI is available
+	consulPath, err := exec.LookPath("consul")
+	if err != nil {
+		vu.logger.Warn("Consul CLI not found - cannot purge Consul storage")
+		return fmt.Errorf("consul CLI not found: %w", err)
+	}
+
+	vu.logger.Debug("Using Consul CLI", zap.String("path", consulPath))
+
+	// Delete all keys under vault/ prefix
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "consul", "kv", "delete", "-recurse", "vault/")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		vu.logger.Error("Failed to purge Consul storage backend",
+			zap.Error(err),
+			zap.String("output", string(output)))
+		return fmt.Errorf("failed to delete vault/ keys from Consul: %w", err)
+	}
+
+	vu.logger.Info("Successfully purged Vault data from Consul storage backend",
+		zap.String("output", string(output)))
+
+	return nil
 }

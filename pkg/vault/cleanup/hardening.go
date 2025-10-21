@@ -19,7 +19,7 @@ func CleanupSystemHardening(rc *eos_io.RuntimeContext) error {
 		"/etc/security/limits.d/vault-hardening.conf",
 		"/etc/security/limits.d/vault-ulimits.conf",
 		"/etc/logrotate.d/vault",
-		"/usr/local/bin/vault-backup.sh",
+		"VaultBinaryPath-backup.sh",
 		"/etc/systemd/system/vault-backup.timer",
 		"/etc/systemd/system/vault-backup.service",
 		"/etc/tmpfiles.d/eos.conf",

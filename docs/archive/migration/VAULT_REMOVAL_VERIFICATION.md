@@ -35,7 +35,7 @@ The `eos delete vault` command implementation is **comprehensive and production-
 | `/etc/vault.d/` | Remove recursively | [phase_delete.go:33](pkg/vault/phase_delete.go#L33) via `VaultConfigPath` |  |
 | `/opt/vault/` | Remove recursively | [phase_delete.go:25,42](pkg/vault/phase_delete.go#L25) via `VaultDir` + `VaultDataPath` |  |
 | `/var/log/vault/` | Remove if exists | [phase_delete.go:24](pkg/vault/phase_delete.go#L24) via `VaultLogWildcard` |  |
-| `/usr/local/bin/vault` | Remove binary | [phase_delete.go:44](pkg/vault/phase_delete.go#L44) **FIXED** |  |
+| `VaultBinaryPath` | Remove binary | [phase_delete.go:44](pkg/vault/phase_delete.go#L44) **FIXED** |  |
 
 **Extras Beyond Requirements:**
 -  Also removes `/usr/bin/vault` (alternate location)
@@ -76,17 +76,17 @@ The `eos delete vault` command implementation is **comprehensive and production-
 
 ### Fix #1: Binary Path Inconsistency (P0 - BREAKING)
 
-**Problem:** `/usr/local/bin/vault` was not being removed
+**Problem:** `VaultBinaryPath` was not being removed
 
 **Evidence:**
 ```bash
-$ grep -n "/usr/local/bin/vault" pkg/vault/phase_delete.go
-44:		"/usr/local/bin/vault",          // Alternate binary location
+$ grep -n "VaultBinaryPath" pkg/vault/phase_delete.go
+44:		"VaultBinaryPath",          // Alternate binary location
 ```
 
 **Fix Applied:** [phase_delete.go:44](pkg/vault/phase_delete.go#L44)
 ```diff
-+		"/usr/local/bin/vault",          // Alternate binary location (used by install.go)
++		"VaultBinaryPath",          // Alternate binary location (used by install.go)
 ```
 
 **Status:**  **FIXED**
@@ -117,7 +117,7 @@ CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 - [x] `/etc/vault.d/` removed
 - [x] `/opt/vault/` removed
 - [x] `/var/log/vault/` removed (if present)
-- [x] `/usr/local/bin/vault` removed ← **NOW FIXED**
+- [x] `VaultBinaryPath` removed ← **NOW FIXED**
 - [x] `/usr/bin/vault` removed
 
 ###  User and Group
@@ -220,7 +220,7 @@ systemctl is-enabled vault 2>&1 | grep -q "Failed" && echo " Service disabled" |
 # File verification
 [ ! -d /etc/vault.d ] && echo " Config removed" || echo " Config exists"
 [ ! -d /opt/vault ] && echo " Data removed" || echo " Data exists"
-[ ! -f /usr/local/bin/vault ] && echo " Binary removed" || echo " Binary exists"
+[ ! -f VaultBinaryPath ] && echo " Binary removed" || echo " Binary exists"
 
 # User verification
 id vault 2>&1 | grep -q "no such user" && echo " User removed" || echo " User exists"

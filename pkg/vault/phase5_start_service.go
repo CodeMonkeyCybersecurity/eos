@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 
@@ -85,12 +84,32 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 }
 
 func WriteVaultServerSystemdUnit(rc *eos_io.RuntimeContext) error {
-	unit := strings.TrimSpace(shared.ServerSystemDUnit) + "\n"
-	err := os.WriteFile(shared.VaultServicePath, []byte(unit), shared.FilePermStandard)
+	// Generate systemd unit with correct paths from constants
+	svc := DefaultVaultService()
+
+	unit := fmt.Sprintf(`[Unit]
+Description=Vault Server (Eos)
+After=network.target
+
+[Service]
+User=%s
+Group=%s
+ExecStart=%s
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+`, svc.User, svc.Group, svc.ExecStartCommand())
+
+	err := os.WriteFile(svc.ServiceName, []byte(unit), shared.FilePermStandard)
 	if err != nil {
 		return fmt.Errorf("write vault server unit: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info(" Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
+	otelzap.Ctx(rc.Ctx).Info(" Vault server systemd unit written",
+		zap.String("path", VaultServicePath),
+		zap.String("binary", VaultBinaryPath),
+		zap.String("config", VaultConfigPath))
 	return nil
 }
 

@@ -16,6 +16,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -576,7 +577,7 @@ func checkBootstrapPhases(rc *eos_io.RuntimeContext) CheckResult {
 			"Phase 2: Vault",
 			"vault",
 			func() string {
-				if _, err := os.Stat("/usr/bin/vault"); err == nil {
+				if _, err := os.Stat(vault.VaultBinaryPath); err == nil {
 					if out, err := exec.CommandContext(rc.Ctx, "systemctl", "is-active", "vault").Output(); err == nil {
 						if strings.TrimSpace(string(out)) == "active" {
 							return "COMPLETE"

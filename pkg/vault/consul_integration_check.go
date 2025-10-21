@@ -56,7 +56,7 @@ func CheckConsulIntegration(ctx context.Context) (*ConsulIntegrationStatus, erro
 	}
 
 	// Check Vault configuration for Consul storage backend
-	configPath := "/etc/vault.d/vault.hcl"
+	configPath := VaultConfigPath
 	status.ConfigurationPath = configPath
 
 	if _, err := os.Stat(configPath); err == nil {

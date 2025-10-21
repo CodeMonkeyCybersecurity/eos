@@ -111,7 +111,7 @@ func DetectDuplicateBinaries(report *debug.Report, analysis *debug.Analysis) {
 		analysis.Warnings = append(analysis.Warnings, debug.Warning{
 			Message: fmt.Sprintf("Multiple Vault binaries found at: %s",
 				strings.Join(binaryPaths, ", ")),
-			Recommendation: "Remove old binaries to avoid confusion. Keep only /usr/local/bin/vault",
+			Recommendation: "Remove old binaries to avoid confusion. Keep only VaultBinaryPath",
 		})
 
 		analysis.Recommendations = append(analysis.Recommendations,
