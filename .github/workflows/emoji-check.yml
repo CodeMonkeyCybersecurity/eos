@@ -1,5 +1,4 @@
 name: Emoji Check
-
 on:
   pull_request:
     paths:
