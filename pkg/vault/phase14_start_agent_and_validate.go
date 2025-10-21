@@ -300,22 +300,22 @@ func checkVaultAgentErrors(rc *eos_io.RuntimeContext) error {
 		{
 			pattern:     "invalid configuration",
 			description: "Agent configuration file has errors",
-			remediation: "Check /etc/vault.d/agent-config.hcl for syntax errors",
+			remediation: fmt.Sprintf("Check %s for syntax errors", VaultAgentConfigPath),
 		},
 		{
 			pattern:     "failed to parse",
 			description: "Configuration parsing failed",
-			remediation: "Check HCL syntax in /etc/vault.d/agent-config.hcl",
+			remediation: fmt.Sprintf("Check HCL syntax in %s", VaultAgentConfigPath),
 		},
 		{
 			pattern:     "role_id is empty",
 			description: "AppRole role_id is missing",
-			remediation: "Check that /etc/vault.d/role_id contains valid data",
+			remediation: fmt.Sprintf("Check that %s contains valid data", VaultAgentRoleIDPath),
 		},
 		{
 			pattern:     "secret_id is empty",
 			description: "AppRole secret_id is missing",
-			remediation: "Check that /etc/vault.d/secret_id contains valid data",
+			remediation: fmt.Sprintf("Check that %s contains valid data", VaultAgentSecretIDPath),
 		},
 	}
 

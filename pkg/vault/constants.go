@@ -77,10 +77,14 @@ const (
 	VaultBinaryPath = "/usr/local/bin/vault" // PRIMARY location for vault binary
 
 	// === Configuration Directories ===
-	VaultConfigDir       = "/etc/vault.d"           // Base config directory
-	VaultConfigPath      = "/etc/vault.d/vault.hcl" // Main server config
-	VaultConfigFile      = "vault.hcl"              // Config filename only
-	VaultAgentConfigFile = "vault-agent.hcl"        // Agent config filename
+	VaultConfigDir         = "/etc/vault.d"                  // Base config directory
+	VaultConfigPath        = "/etc/vault.d/vault.hcl"        // Main server config
+	VaultConfigFile        = "vault.hcl"                     // Config filename only
+	VaultAgentConfigFile   = "vault-agent.hcl"               // Agent config filename (legacy)
+	VaultAgentConfigPath   = "/etc/vault.d/agent-config.hcl" // Vault Agent config file
+	VaultAgentCACopyPath   = "/etc/vault.d/ca.crt"           // Vault Agent CA copy
+	VaultAgentRoleIDPath   = "/etc/vault.d/role_id"          // Vault Agent AppRole role_id (legacy location)
+	VaultAgentSecretIDPath = "/etc/vault.d/secret_id"        // Vault Agent AppRole secret_id (legacy location)
 
 	// === TLS Certificate Locations ===
 	VaultTLSDir  = "/etc/vault.d/tls"           // TLS certificate directory
@@ -98,11 +102,17 @@ const (
 	AuditLogSyslogPath = "vault-audit"                    // Syslog identifier
 
 	// === Eos Integration Paths ===
-	EosSecretsDir     = "/var/lib/eos/secret"                 // Eos secrets directory
-	VaultInitDataFile = "/var/lib/eos/secret/vault_init.json" // Vault initialization data
-	EosRunDir         = "/run/eos"                            // Eos runtime directory
-	VaultPIDFile      = "/run/eos/vault.pid"                  // Vault PID file
-	VaultTokenSink    = "/run/eos/.vault-token"               // Vault Agent token sink
+	EosSecretsDir       = "/var/lib/eos/secret"                 // Eos secrets directory
+	VaultInitDataFile   = "/var/lib/eos/secret/vault_init.json" // Vault initialization data
+	EosRunDir           = "/run/eos"                            // Eos runtime directory
+	VaultPIDFile        = "/run/eos/vault.pid"                  // Vault PID file
+	VaultTokenSink      = "/run/eos/.vault-token"               // Vault Agent token sink (legacy)
+	VaultAgentTokenPath = "/run/eos/vault_agent_eos.token"      // Vault Agent token file (current)
+
+	// AppRole credential paths (actual storage location in /var/lib/eos/secret)
+	// NOTE: These are duplicated in pkg/shared/vault_auth.go as AppRolePaths to avoid circular imports
+	VaultRoleIDFilePath   = "/var/lib/eos/secret/role_id"   // AppRole role_id file (matches shared.AppRolePaths.RoleID)
+	VaultSecretIDFilePath = "/var/lib/eos/secret/secret_id" // AppRole secret_id file (matches shared.AppRolePaths.SecretID)
 
 	// === Systemd Service ===
 	VaultServiceName      = "vault.service"           // Systemd service name

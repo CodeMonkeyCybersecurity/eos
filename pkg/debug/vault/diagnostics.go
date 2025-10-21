@@ -20,11 +20,19 @@ import (
 // NOTE: These constants duplicate values from pkg/vault/constants.go
 // This is intentional to avoid circular import (pkg/debug/vault cannot import pkg/vault)
 // If you change these values, also update pkg/vault/constants.go
+//
+// For runtime paths that don't cause circular imports, use pkg/shared constants:
+// - shared.AgentToken (vault.VaultAgentTokenPath)
+// - shared.AppRolePaths.RoleID (vault.VaultRoleIDFilePath)
+// - shared.AppRolePaths.SecretID (vault.VaultSecretIDFilePath)
+// - shared.EosRunDir (vault.EosRunDir)
+// - shared.VaultAgentConfigPath (vault.VaultAgentConfigPath)
 const (
-	DefaultBinaryPath      = "/usr/local/bin/vault" // Matches vault.VaultBinaryPath
-	DefaultConfigPath      = "/etc/vault.d/vault.hcl"
-	DefaultDataPath        = "/opt/vault/data"
-	DefaultLogPath         = "/var/log/vault"
+	DefaultBinaryPath      = "/usr/local/bin/vault"          // Matches vault.VaultBinaryPath
+	DefaultConfigPath      = "/etc/vault.d/vault.hcl"        // Matches vault.VaultConfigPath
+	DefaultAgentConfigPath = "/etc/vault.d/agent-config.hcl" // Matches vault.VaultAgentConfigPath & shared.VaultAgentConfigPath
+	DefaultDataPath        = "/opt/vault/data"               // Matches vault.VaultDataDir
+	DefaultLogPath         = "/var/log/vault"                // Matches vault.VaultLogsDir
 	DeletionTransactionDir = "/var/log/eos"
 )
 
@@ -1102,7 +1110,7 @@ func VaultAgentConfigDiagnostic() *debug.Diagnostic {
 		},
 		Collect: func(ctx context.Context) (*debug.Result, error) {
 			logger := otelzap.Ctx(ctx)
-			configPath := "/etc/vault.d/agent-config.hcl"
+			configPath := DefaultAgentConfigPath
 
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
@@ -1157,8 +1165,9 @@ func VaultAgentCredentialsDiagnostic() *debug.Diagnostic {
 		},
 		Collect: func(ctx context.Context) (*debug.Result, error) {
 			logger := otelzap.Ctx(ctx)
-			roleIDPath := "/var/lib/eos/secret/role_id"
-			secretIDPath := "/var/lib/eos/secret/secret_id"
+			// Use shared constants instead of hardcoded paths
+			roleIDPath := shared.AppRolePaths.RoleID
+			secretIDPath := shared.AppRolePaths.SecretID
 
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
@@ -1313,8 +1322,9 @@ func VaultAgentTokenDiagnostic() *debug.Diagnostic {
 		},
 		Collect: func(ctx context.Context) (*debug.Result, error) {
 			logger := otelzap.Ctx(ctx)
-			tokenPath := "/run/eos/vault_agent_eos.token"
-			runtimeDir := "/run/eos"
+			// Use shared constants instead of hardcoded paths
+			tokenPath := shared.AgentToken
+			runtimeDir := shared.EosRunDir
 
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
@@ -1818,7 +1828,7 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 		Description: "Comprehensive token permissions and policy analysis",
 		Condition: func(ctx context.Context) bool {
 			// Only run if token file exists
-			_, err := os.Stat("/run/eos/vault_agent_eos.token")
+			_, err := os.Stat(shared.AgentToken)
 			return err == nil
 		},
 		Collect: func(ctx context.Context) (*debug.Result, error) {
@@ -1839,11 +1849,11 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 			vaultAddr := fmt.Sprintf("https://%s:8200", hostname)
 
 			// Read token
-			tokenContent, err := os.ReadFile("/run/eos/vault_agent_eos.token")
+			tokenContent, err := os.ReadFile(shared.AgentToken)
 			if err != nil {
 				result.Status = debug.StatusError
 				result.Message = "Cannot read token file"
-				result.Remediation = "Check file permissions: ls -la /run/eos/vault_agent_eos.token"
+				result.Remediation = fmt.Sprintf("Check file permissions: ls -la %s", shared.AgentToken)
 				output.WriteString(fmt.Sprintf("❌ ERROR: Cannot read token file: %v\n", err))
 				result.Output = output.String()
 				return result, nil
@@ -1861,7 +1871,7 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 
 			output.WriteString("1. Vault Agent Token File\n")
 			output.WriteString("───────────────────────────────────────────────────────────────\n")
-			output.WriteString(fmt.Sprintf("   Path: /run/eos/vault_agent_eos.token\n"))
+			output.WriteString(fmt.Sprintf("   Path: %s\n", shared.AgentToken))
 			output.WriteString(fmt.Sprintf("   Token (first 8 chars): %s...\n", token[:min(8, len(token))]))
 			output.WriteString("\n")
 
