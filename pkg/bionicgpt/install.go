@@ -15,6 +15,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ollama"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/preflight"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
@@ -232,7 +234,12 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
 
-	// Step 4: Get Azure OpenAI configuration if not provided
+	// Step 4: Get embeddings configuration (local or Azure)
+	if err := bgi.configureEmbeddings(ctx); err != nil {
+		return err
+	}
+
+	// Step 5: Get Azure OpenAI configuration if not fully provided
 	if err := bgi.getAzureConfiguration(ctx); err != nil {
 		return err
 	}
@@ -240,9 +247,9 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	// Step 5: Get or generate secrets from Vault
 	logger.Info("Managing secrets via Vault")
 	requiredSecrets := map[string]secrets.SecretType{
-		"postgres_password":   secrets.SecretTypePassword,
-		"jwt_secret":          secrets.SecretTypeToken,
-		"litellm_master_key":  secrets.SecretTypeAPIKey, // LiteLLM proxy master key
+		"postgres_password":  secrets.SecretTypePassword,
+		"jwt_secret":         secrets.SecretTypeToken,
+		"litellm_master_key": secrets.SecretTypeAPIKey, // LiteLLM proxy master key
 	}
 
 	// Only manage Azure API key if not provided via flags
@@ -420,6 +427,152 @@ func (bgi *BionicGPTInstaller) checkPrerequisites(ctx context.Context) error {
 	return nil
 }
 
+// configureEmbeddings determines embeddings strategy (local vs Azure)
+// and runs appropriate preflight checks
+// Following ASSESS → INTERVENE → EVALUATE pattern
+func (bgi *BionicGPTInstaller) configureEmbeddings(ctx context.Context) error {
+	logger := otelzap.Ctx(ctx)
+
+	// If embeddings choice already made via flags, validate and return
+	if bgi.config.UseLocalEmbeddings {
+		logger.Info("Local embeddings selected via flags, validating Ollama setup")
+		return bgi.setupLocalEmbeddings(ctx)
+	}
+
+	// If Azure embeddings deployment provided, use Azure
+	if bgi.config.AzureEmbeddingsDeployment != "" {
+		logger.Info("Azure embeddings deployment provided via flags")
+		bgi.config.UseLocalEmbeddings = false
+		return nil
+	}
+
+	// Interactive: Ask user which embeddings backend to use
+	logger.Info("terminal prompt: Embeddings Configuration")
+	logger.Info("terminal prompt: BionicGPT needs embeddings for document search (RAG)")
+	logger.Info("terminal prompt:")
+	logger.Info("terminal prompt: Options:")
+	logger.Info("terminal prompt:   1. Local embeddings (via Ollama) - FREE, requires ~1GB RAM")
+	logger.Info("terminal prompt:   2. Azure OpenAI embeddings - PAID, higher quality")
+	logger.Info("terminal prompt:")
+
+	useLocal := interaction.PromptYesNo(ctx, "Use local embeddings (Ollama)?", true)
+	bgi.config.UseLocalEmbeddings = useLocal
+
+	if useLocal {
+		return bgi.setupLocalEmbeddings(ctx)
+	}
+
+	logger.Info("Azure embeddings selected - will prompt for deployment name")
+	return nil
+}
+
+// setupLocalEmbeddings configures and validates local embeddings via Ollama
+// Following ASSESS → INTERVENE → EVALUATE pattern
+func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Info("=== ASSESS: Checking Ollama availability ===")
+
+	// Import preflight and ollama packages
+	// Run Ollama preflight check
+	checks := []preflight.Check{
+		{
+			Name:        "Ollama",
+			Description: "Ollama is running and accessible",
+			Check:       preflight.CheckOllama,
+			Required:    true,
+		},
+	}
+
+	results, err := preflight.RunChecks(ctx, checks)
+	if err != nil {
+		logger.Error("Ollama preflight check failed",
+			zap.Error(err))
+		const ollamaErrorMsg = "Ollama is required for local embeddings but is not available.\n\n" +
+			"Fix: Install and start Ollama:\n" +
+			"  curl -fsSL https://ollama.ai/install.sh | sh\n" +
+			"  ollama serve\n\n" +
+			"Or choose Azure embeddings instead:\n" +
+			"  eos create bionicgpt --azure-embeddings-deployment <deployment-name>"
+		return fmt.Errorf("%s\n\nError: %w", ollamaErrorMsg, err)
+	}
+
+	for _, result := range results {
+		if !result.Passed {
+			return fmt.Errorf("check %s failed: %w", result.Name, result.Error)
+		}
+	}
+
+	logger.Info("✓ Ollama is accessible")
+
+	// Set defaults for local embeddings
+	if bgi.config.LocalEmbeddingsModel == "" {
+		bgi.config.LocalEmbeddingsModel = DefaultLocalEmbeddingsModel
+	}
+	if bgi.config.OllamaEndpoint == "" {
+		bgi.config.OllamaEndpoint = DefaultOllamaEndpoint
+	}
+
+	logger.Info("=== INTERVENE: Ensuring embeddings model is available ===")
+
+	// Check if model exists, pull if necessary
+	ollamaClient := ollama.NewClient(bgi.config.OllamaEndpoint)
+
+	hasModel, err := ollamaClient.HasModel(ctx, bgi.config.LocalEmbeddingsModel)
+	if err != nil {
+		return fmt.Errorf("failed to check for model: %w", err)
+	}
+
+	if hasModel {
+		logger.Info("✓ Embeddings model already available",
+			zap.String("model", bgi.config.LocalEmbeddingsModel))
+	} else {
+		// Get model info for size estimate
+		logger.Info("terminal prompt: Model not found, need to download")
+		logger.Info("terminal prompt:", zap.String("model", bgi.config.LocalEmbeddingsModel))
+		logger.Info("terminal prompt: Size: ~274MB")
+
+		shouldPull := interaction.PromptYesNo(ctx,
+			fmt.Sprintf("Pull %s model now?", bgi.config.LocalEmbeddingsModel),
+			true)
+
+		if !shouldPull {
+			const modelRequiredMsg = "Embeddings model is required but not available.\n" +
+				"Please pull the model manually:\n" +
+				"  ollama pull %s"
+			return fmt.Errorf(modelRequiredMsg, bgi.config.LocalEmbeddingsModel)
+		}
+
+		// Pull the model with progress
+		logger.Info("Pulling embeddings model (this may take a few minutes)...",
+			zap.String("model", bgi.config.LocalEmbeddingsModel))
+
+		err = ollamaClient.PullModel(ctx, bgi.config.LocalEmbeddingsModel, func(progress ollama.PullProgress) {
+			if progress.Total > 0 {
+				percent := (progress.Completed * 100) / progress.Total
+				if percent%10 == 0 { // Log every 10%
+					logger.Info("Download progress",
+						zap.Int64("percent", percent),
+						zap.String("status", progress.Status))
+				}
+			}
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to pull model: %w", err)
+		}
+
+		logger.Info("✓ Model downloaded successfully",
+			zap.String("model", bgi.config.LocalEmbeddingsModel))
+	}
+
+	logger.Info("=== EVALUATE: Local embeddings configured successfully ===",
+		zap.String("model", bgi.config.LocalEmbeddingsModel),
+		zap.String("endpoint", bgi.config.OllamaEndpoint))
+
+	return nil
+}
+
 // getAzureConfiguration prompts for Azure OpenAI configuration if not provided
 // Now includes separate deployments for chat and embeddings (for LiteLLM)
 func (bgi *BionicGPTInstaller) getAzureConfiguration(ctx context.Context) error {
@@ -516,6 +669,9 @@ JWT_SECRET=%s
 # Database Connection
 APP_DATABASE_URL=postgresql://%s:%s@postgres:5432/%s?sslmode=disable
 
+# LiteLLM Proxy Configuration
+LITELLM_MASTER_KEY=%s
+
 # OpenAI Configuration (via LiteLLM Proxy)
 # LiteLLM translates OpenAI format to Azure OpenAI format
 OPENAI_API_BASE=http://litellm-proxy:4000
@@ -542,11 +698,12 @@ EMBEDDINGS_MODEL=text-embedding-ada-002
 		"bionic_application",
 		bgi.config.PostgresPassword,
 		bgi.config.PostgresDB,
-		bgi.config.LiteLLMMasterKey,
+		bgi.config.LiteLLMMasterKey, // LITELLM_MASTER_KEY
+		bgi.config.LiteLLMMasterKey, // OPENAI_API_KEY
 		bgi.config.EnableRAG,
 		bgi.config.EnableAuditLog,
 		bgi.config.EnableMultiTenant,
-		bgi.config.LiteLLMMasterKey,
+		bgi.config.LiteLLMMasterKey, // EMBEDDINGS_API_KEY
 	)
 
 	// Create .env file with appropriate permissions
@@ -667,6 +824,37 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # LiteLLM Proxy - Translates OpenAI format to Azure OpenAI / Ollama
+  litellm-proxy:
+    image: %s:%s
+    container_name: %s
+    platform: linux/amd64
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+    env_file:
+      - .env.litellm
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "8"]
+    ports:
+      - "%d:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - bionicgpt-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Main application - Web interface with Azure OpenAI integration
   app:
     image: %s:%s
@@ -677,11 +865,14 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       LOG_LEVEL: ${LOG_LEVEL}
       TZ: ${TZ}
-      # Azure OpenAI Configuration
-      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT}
-      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT}
-      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
-      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION}
+      # OpenAI Configuration (via LiteLLM Proxy)
+      OPENAI_API_BASE: ${OPENAI_API_BASE}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      # Embeddings Configuration (via LiteLLM)
+      EMBEDDINGS_API_BASE: ${EMBEDDINGS_API_BASE}
+      EMBEDDINGS_API_KEY: ${EMBEDDINGS_API_KEY}
+      EMBEDDINGS_MODEL: ${EMBEDDINGS_MODEL}
     ports:
       - "%d:7703"
     networks:
@@ -691,6 +882,8 @@ services:
         condition: service_healthy
       migrations:
         condition: service_completed_successfully
+      litellm-proxy:
+        condition: service_healthy
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -738,7 +931,12 @@ networks:
 		DefaultBionicGPTVersion,
 		ContainerRAGEngine,
 		VolumeDocuments,
-		// App (with Azure OpenAI)
+		// LiteLLM proxy
+		ImageLiteLLM,
+		VersionLiteLLM,
+		ContainerLiteLLM,
+		bgi.config.LiteLLMPort,
+		// App (with Azure OpenAI via LiteLLM)
 		ImageBionicGPT,
 		DefaultBionicGPTVersion,
 		ContainerApp,

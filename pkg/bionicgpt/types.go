@@ -56,20 +56,25 @@ type InstallConfig struct {
 	PostgresDB       string // PostgreSQL database name (default: bionic-gpt)
 
 	// Application Settings
-	AppName      string // Display name for the application
-	JWTSecret    string // JWT secret for authentication (retrieved from Vault)
-	LogLevel     string // Log level (default: INFO)
-	Timezone     string // Timezone (default: Australia/Perth)
+	AppName   string // Display name for the application
+	JWTSecret string // JWT secret for authentication (retrieved from Vault)
+	LogLevel  string // Log level (default: INFO)
+	Timezone  string // Timezone (default: Australia/Perth)
 
 	// Network configuration
 	Port int // External port to expose (default: shared.PortBionicGPT = 8513)
 
 	// Azure OpenAI Configuration (via LiteLLM proxy)
-	AzureEndpoint           string // Azure OpenAI endpoint URL
-	AzureChatDeployment     string // Azure OpenAI chat deployment name (e.g., gpt-4-deployment)
+	AzureEndpoint             string // Azure OpenAI endpoint URL
+	AzureChatDeployment       string // Azure OpenAI chat deployment name (e.g., gpt-4-deployment)
 	AzureEmbeddingsDeployment string // Azure OpenAI embeddings deployment name (e.g., embeddings-deployment)
-	AzureAPIKey             string // Azure OpenAI API key (retrieved from Vault)
-	AzureAPIVersion         string // Azure OpenAI API version (default: 2024-02-15-preview)
+	AzureAPIKey               string // Azure OpenAI API key (retrieved from Vault)
+	AzureAPIVersion           string // Azure OpenAI API version (default: 2024-02-15-preview)
+
+	// Local Embeddings Configuration (Ollama)
+	UseLocalEmbeddings   bool   // Use local embeddings via Ollama instead of Azure
+	LocalEmbeddingsModel string // Local embeddings model name (default: nomic-embed-text)
+	OllamaEndpoint       string // Ollama endpoint URL (default: http://localhost:11434)
 
 	// LiteLLM Proxy Configuration
 	LiteLLMMasterKey string // LiteLLM proxy master key (retrieved from Vault or generated)
@@ -127,17 +132,22 @@ const (
 	// Default LiteLLM configuration
 	DefaultLiteLLMPort = 4000
 
+	// Default Ollama configuration
+	DefaultOllamaEndpoint       = "http://localhost:11434"
+	DefaultOllamaDockerEndpoint = "http://host.docker.internal:11434"
+	DefaultLocalEmbeddingsModel = "nomic-embed-text"
+
 	// Default BionicGPT version
 	DefaultBionicGPTVersion = "1.11.7"
 
 	// Docker image references
-	ImageBionicGPT       = "ghcr.io/bionic-gpt/bionicgpt"
-	ImageMigrations      = "ghcr.io/bionic-gpt/bionicgpt-db-migrations"
-	ImageRAGEngine       = "ghcr.io/bionic-gpt/bionicgpt-rag-engine"
-	ImageEmbeddings      = "ghcr.io/bionic-gpt/bionicgpt-embeddings-api"
-	ImageChunking        = "downloads.unstructured.io/unstructured-io/unstructured-api"
-	ImagePostgreSQL      = "ankane/pgvector"
-	ImageLiteLLM         = "ghcr.io/berriai/litellm"
+	ImageBionicGPT  = "ghcr.io/bionic-gpt/bionicgpt"
+	ImageMigrations = "ghcr.io/bionic-gpt/bionicgpt-db-migrations"
+	ImageRAGEngine  = "ghcr.io/bionic-gpt/bionicgpt-rag-engine"
+	ImageEmbeddings = "ghcr.io/bionic-gpt/bionicgpt-embeddings-api"
+	ImageChunking   = "downloads.unstructured.io/unstructured-io/unstructured-api"
+	ImagePostgreSQL = "ankane/pgvector"
+	ImageLiteLLM    = "ghcr.io/berriai/litellm"
 
 	// Docker image versions
 	VersionEmbeddings = "cpu-0.6"

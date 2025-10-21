@@ -11,18 +11,21 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-//TODO: refactor
+
+// TODO: refactor
 var (
-	bionicgptPort                   int
-	bionicgptPostgresPassword       string
-	bionicgptJWTSecret              string
-	bionicgptAppName                string
-	bionicgptAzureEndpoint          string
-	bionicgptAzureChatDeployment    string
+	bionicgptPort                      int
+	bionicgptPostgresPassword          string
+	bionicgptJWTSecret                 string
+	bionicgptAppName                   string
+	bionicgptAzureEndpoint             string
+	bionicgptAzureChatDeployment       string
 	bionicgptAzureEmbeddingsDeployment string
-	bionicgptAzureAPIKey            string
-	bionicgptForce                  bool
-	bionicgptSkipHealthCheck        bool
+	bionicgptAzureAPIKey               string
+	bionicgptUseLocalEmbeddings        bool
+	bionicgptLocalEmbeddingsModel      string
+	bionicgptForce                     bool
+	bionicgptSkipHealthCheck           bool
 )
 
 func init() {
@@ -98,6 +101,12 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 	bionicgptCmd.Flags().StringVar(&bionicgptAzureAPIKey, "azure-api-key", "",
 		"Azure OpenAI API key (retrieved from Vault if not provided)")
 
+	// Local embeddings configuration (Ollama)
+	bionicgptCmd.Flags().BoolVar(&bionicgptUseLocalEmbeddings, "use-local-embeddings", false,
+		"Use local embeddings via Ollama instead of Azure (FREE, requires Ollama)")
+	bionicgptCmd.Flags().StringVar(&bionicgptLocalEmbeddingsModel, "local-embeddings-model", "nomic-embed-text",
+		"Local embeddings model to use with Ollama")
+
 	// Installation behavior flags
 	bionicgptCmd.Flags().BoolVar(&bionicgptForce, "force", false,
 		"Force reinstall even if already installed")
@@ -106,7 +115,8 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 
 	CreateCmd.AddCommand(bionicgptCmd)
 }
-//TODO: refactor
+
+// TODO: refactor
 func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -122,6 +132,8 @@ func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		AzureChatDeployment:       bionicgptAzureChatDeployment,
 		AzureEmbeddingsDeployment: bionicgptAzureEmbeddingsDeployment,
 		AzureAPIKey:               bionicgptAzureAPIKey,
+		UseLocalEmbeddings:        bionicgptUseLocalEmbeddings,
+		LocalEmbeddingsModel:      bionicgptLocalEmbeddingsModel,
 		ForceReinstall:            bionicgptForce,
 		SkipHealthCheck:           bionicgptSkipHealthCheck,
 	}

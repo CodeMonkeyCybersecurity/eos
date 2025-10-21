@@ -70,7 +70,284 @@ Writing New Command?
    ├─ INTERVENE: Apply changes if needed
    ├─ EVALUATE: Verify and report results
    └─ Use RuntimeContext, structured logging
+
+Secret/Config Delivery?
+├─ Secrets (passwords, API keys, tokens):
+│  ├─ Store: Vault via secrets.SecretManager
+│  ├─ Deliver: Vault Agent template rendering
+│  └─ Rotate: Automatic via Vault Agent watch
+│
+├─ Non-secret config (ports, URLs, feature flags):
+│  ├─ Store: Consul KV at service/[name]/config/
+│  ├─ Deliver: Consul Template or direct read
+│  └─ Update: Dynamic via Consul KV updates
+│
+└─ Mixed (secrets + config):
+   └─ Use Consul Template with both Vault and Consul backends
 ```
+
+## Secret and Configuration Management (P0 - CRITICAL)
+
+**Philosophy**: Secrets belong in Vault, configuration belongs in Consul, delivery is automated.
+
+### Storage Layer
+
+#### Secrets (Vault)
+**What belongs in Vault:**
+- Passwords (database, service accounts)
+- API keys (third-party services, internal APIs)
+- Tokens (JWT secrets, session keys, ACL tokens)
+- TLS certificates and private keys
+- Encryption keys
+
+**Storage pattern:**
+```go
+// At service installation time
+secretManager, err := secrets.NewSecretManager(rc, envConfig)
+requiredSecrets := map[string]secrets.SecretType{
+    "db_password":    secrets.SecretTypePassword,
+    "api_key":        secrets.SecretTypeAPIKey,
+    "jwt_secret":     secrets.SecretTypeToken,
+}
+serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("myservice", requiredSecrets)
+
+// Secrets stored at: secret/myservice/{db_password,api_key,jwt_secret}
+```
+
+**Path convention**: `secret/[service-name]/[secret-key]`
+
+#### Configuration (Consul KV)
+**What belongs in Consul KV:**
+- Feature flags (enable_rag, enable_audit_log)
+- Service endpoints (http://service:port)
+- Port numbers
+- Timeouts and retry limits
+- Log levels
+- Non-sensitive connection strings
+
+**Storage pattern:**
+```go
+// Write config to Consul KV
+consul.KV().Put(&api.KVPair{
+    Key:   "service/myservice/config/port",
+    Value: []byte("8080"),
+}, nil)
+
+consul.KV().Put(&api.KVPair{
+    Key:   "service/myservice/config/feature_flags/enable_rag",
+    Value: []byte("true"),
+}, nil)
+```
+
+**Path convention**: `service/[service-name]/config/[category]/[key]`
+
+### Delivery Layer
+
+#### Option 1: Vault Agent Template (Secrets Only)
+
+**When to use:**
+- Service only needs secrets from Vault
+- No dynamic configuration from Consul
+- Simple .env file or config file generation
+- Examples: PostgreSQL passwords, API keys
+
+**How it works:**
+1. Vault Agent runs as systemd service (`vault-agent-eos.service`)
+2. Agent authenticates via AppRole
+3. Renders template files with secrets from Vault
+4. Watches Vault for changes, re-renders on rotation
+
+**Implementation:**
+```hcl
+# /etc/vault.d/templates/myservice.env.ctmpl
+DATABASE_PASSWORD={{ with secret "secret/myservice/db_password" }}{{ .Data.data.value }}{{ end }}
+API_KEY={{ with secret "secret/myservice/api_key" }}{{ .Data.data.value }}{{ end }}
+JWT_SECRET={{ with secret "secret/myservice/jwt_secret" }}{{ .Data.data.value }}{{ end }}
+```
+
+```hcl
+# Add to vault agent config
+template {
+  source      = "/etc/vault.d/templates/myservice.env.ctmpl"
+  destination = "/opt/myservice/.env"
+  perms       = "0640"
+  command     = "docker compose -f /opt/myservice/docker-compose.yml up -d --force-recreate"
+}
+```
+
+**Pros:**
+- Already integrated in Eos (vault-agent-eos.service exists)
+- Automatic secret rotation
+- Secure: secrets never written to disk except in final config
+- Simple for secrets-only scenarios
+
+**Cons:**
+- Cannot access Consul KV
+- Vault Agent must be running
+- Limited to Vault data sources
+
+#### Option 2: Consul Template (Secrets + Config)
+
+**When to use:**
+- Service needs both Vault secrets AND Consul configuration
+- Dynamic configuration changes without redeployment
+- Service discovery via Consul
+- Examples: Multi-tenant apps, microservices with dynamic config
+
+**How it works:**
+1. Consul Template runs as systemd service or Docker sidecar
+2. Connects to both Consul and Vault
+3. Renders templates combining both data sources
+4. Watches both for changes, re-renders on updates
+
+**Implementation:**
+```hcl
+# /etc/consul-template.d/myservice.env.ctmpl
+# From Consul KV
+PORT={{ key "service/myservice/config/port" }}
+ENABLE_RAG={{ key "service/myservice/config/feature_flags/enable_rag" }}
+LOG_LEVEL={{ key "service/myservice/config/log_level" }}
+
+# From Vault
+DATABASE_PASSWORD={{ with secret "secret/myservice/db_password" }}{{ .Data.data.value }}{{ end }}
+API_KEY={{ with secret "secret/myservice/api_key" }}{{ .Data.data.value }}{{ end }}
+
+# Service discovery via Consul
+{{ range service "database" }}
+DATABASE_URL=postgresql://user:password@{{ .Address }}:{{ .Port }}/mydb
+{{ end }}
+```
+
+```hcl
+# /etc/consul-template.d/myservice.hcl
+consul {
+  address = "localhost:8500"
+}
+
+vault {
+  address = "https://localhost:8200"
+  token   = "{{ file "/run/eos/vault_agent_eos.token" }}" # Reuse Vault Agent token
+  unwrap_token = false
+  renew_token = true
+}
+
+template {
+  source      = "/etc/consul-template.d/myservice.env.ctmpl"
+  destination = "/opt/myservice/.env"
+  perms       = "0640"
+  command     = "docker compose -f /opt/myservice/docker-compose.yml up -d --force-recreate"
+  wait {
+    min = "2s"
+    max = "10s"
+  }
+}
+```
+
+**Pros:**
+- Access to both Vault AND Consul
+- Service discovery built-in
+- Dynamic config updates
+- Can template ANY file format (env, JSON, YAML, HCL)
+
+**Cons:**
+- Additional service to manage
+- More complex than Vault Agent alone
+- Requires both Consul and Vault to be healthy
+
+#### Option 3: Custom Entrypoint (Simple/Legacy)
+
+**When to use:**
+- Quick prototyping
+- Legacy services not yet migrated
+- Temporary deployments
+- Services that don't support file-based config
+
+**Implementation:**
+```bash
+#!/bin/bash
+# /opt/myservice/entrypoint.sh
+
+# Fetch secrets from Vault using agent token
+export DATABASE_PASSWORD=$(VAULT_TOKEN=$(cat /run/eos/vault_agent_eos.token) vault kv get -field=value secret/myservice/db_password)
+export API_KEY=$(VAULT_TOKEN=$(cat /run/eos/vault_agent_eos.token) vault kv get -field=value secret/myservice/api_key)
+
+# Fetch config from Consul
+export PORT=$(consul kv get service/myservice/config/port)
+export ENABLE_RAG=$(consul kv get service/myservice/config/feature_flags/enable_rag)
+
+# Start main process
+exec /app/myservice
+```
+
+**Pros:**
+- Simple, no additional daemons
+- Works with any service
+- Easy to debug
+
+**Cons:**
+- No automatic rotation
+- Secrets in environment variables (less secure)
+- No watch/reload on changes
+- Must restart container for updates
+
+### Decision Matrix
+
+| Scenario | Storage | Delivery | Example |
+|----------|---------|----------|---------|
+| **Secrets only, static** | Vault | Vault Agent Template | Database passwords, TLS certs |
+| **Secrets + static config** | Vault + .env file | Vault Agent + static file | Simple web apps |
+| **Secrets + dynamic config** | Vault + Consul KV | Consul Template | Multi-tenant SaaS, microservices |
+| **Service discovery needed** | Vault + Consul | Consul Template | Distributed systems |
+| **Quick prototype** | Vault | Custom entrypoint | Development, testing |
+
+### Eos Standard Pattern (Recommended)
+
+For new services in Eos, use **Consul Template** as the standard:
+
+**Rationale:**
+1. **Unified approach**: One tool for all use cases
+2. **Future-proof**: Supports adding Consul config later without refactoring
+3. **Service discovery**: Built-in support for Consul catalog
+4. **Consistent**: All services use same pattern
+5. **Observable**: Consul Template has built-in monitoring
+
+**Implementation checklist:**
+- [ ] Store secrets in Vault via `secrets.SecretManager.GetOrGenerateServiceSecrets()`
+- [ ] Store non-secret config in Consul KV at `service/[name]/config/`
+- [ ] Create template file at `/etc/consul-template.d/[service].env.ctmpl`
+- [ ] Create Consul Template config at `/etc/consul-template.d/[service].hcl`
+- [ ] Add systemd service `consul-template-[service].service` OR Docker sidecar
+- [ ] Template renders to `/opt/[service]/.env` with perms 0640
+- [ ] Command triggers service restart on template change
+
+### Migration Path
+
+**Existing services using static .env:**
+1. Phase 1: Continue using `secretManager.GetOrGenerateServiceSecrets()` (no change)
+2. Phase 2: Create Consul Template to render .env from Vault (secrets.SecretManager still stores)
+3. Phase 3: Move non-secret config to Consul KV
+4. Phase 4: Remove static .env generation from Eos install code
+
+**Example: BionicGPT Migration**
+```
+Current: Eos writes .env file at install time with secrets from Vault
+Target:  Consul Template renders .env from Vault (secrets) + Consul KV (config)
+
+Steps:
+1. Create /etc/consul-template.d/bionicgpt.env.ctmpl
+2. Create /etc/consul-template.d/bionicgpt.hcl
+3. Create consul-template-bionicgpt.service
+4. Move feature flags to Consul KV (ENABLE_RAG, ENABLE_AUDIT_LOG)
+5. Keep secrets in Vault (POSTGRES_PASSWORD, JWT_SECRET, LITELLM_MASTER_KEY)
+6. Remove static .env generation from pkg/bionicgpt/install.go
+```
+
+### Reference Implementation
+
+See existing patterns:
+- Vault Agent: [pkg/vault/phase13_write_agent_config.go](pkg/vault/phase13_write_agent_config.go)
+- Vault Agent template: [pkg/shared/vault_agent.go](pkg/shared/vault_agent.go)
+- Secret storage: [pkg/secrets/manager.go](pkg/secrets/manager.go)
 
 ## Architecture Enforcement: cmd/ vs pkg/
 
