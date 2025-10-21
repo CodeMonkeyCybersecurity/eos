@@ -28,12 +28,59 @@ func RemoveConsul(rc *eos_io.RuntimeContext) error {
 		logger.Info("Consul assessment completed", zap.Error(err))
 	}
 
-	// INTERVENE - Perform removal steps
+	// P1: Check for registered services and warn user
+	services, err := checkRegisteredServices(rc)
+	if err != nil {
+		logger.Debug("Could not check registered services (Consul may not be running)", zap.Error(err))
+	} else if len(services) > 0 {
+		logger.Warn("⚠️  Found registered services in Consul",
+			zap.Int("service_count", len(services)),
+			zap.Strings("services", services))
+		logger.Info("These services will lose Consul-based service discovery after deletion")
 
-	// 1. Gracefully leave cluster if part of one
+		// Prompt for confirmation
+		logger.Info("terminal prompt: Continue with Consul deletion anyway? These services will lose service discovery. [y/N] ")
+		response, err := eos_io.ReadInput(rc)
+		if err != nil {
+			return fmt.Errorf("failed to read user input: %w", err)
+		}
+		if response != "y" && response != "Y" {
+			logger.Info("Consul deletion cancelled by user due to registered services")
+			return nil
+		}
+	}
+
+	// P1: Check cluster quorum and warn if critical
 	if clusterInfo != nil && clusterInfo.IsInCluster {
-		logger.Info("Detected Consul cluster membership - attempting graceful leave",
-			zap.Int("cluster_members", clusterInfo.MemberCount))
+		logger.Info("Detected Consul cluster membership",
+			zap.Int("cluster_members", clusterInfo.MemberCount),
+			zap.Bool("is_server", clusterInfo.IsServer))
+
+		// Warn about quorum risks
+		if clusterInfo.IsServer {
+			if clusterInfo.MemberCount <= 3 {
+				logger.Warn("⚠️  CRITICAL: Removing a server from a 3-node cluster will break quorum!",
+					zap.Int("current_servers", clusterInfo.MemberCount),
+					zap.String("impact", "Cluster will become read-only and unable to elect a leader"))
+
+				// Prompt for confirmation
+				logger.Info("terminal prompt: Are you SURE you want to remove this server node? Cluster quorum will be lost! [y/N] ")
+				response, err := eos_io.ReadInput(rc)
+				if err != nil {
+					return fmt.Errorf("failed to read user input: %w", err)
+				}
+				if response != "y" && response != "Y" {
+					logger.Info("Consul deletion cancelled by user to preserve cluster quorum")
+					return nil
+				}
+			} else if clusterInfo.MemberCount == 5 {
+				logger.Warn("⚠️  WARNING: Removing a server from a 5-node cluster reduces fault tolerance",
+					zap.String("current_tolerance", "2 server failures"),
+					zap.String("after_removal", "1 server failure"))
+			}
+		}
+
+		// Attempt graceful leave
 		if err := gracefullyLeaveCluster(rc); err != nil {
 			logger.Warn("Failed to gracefully leave cluster - continuing with forced removal",
 				zap.Error(err),
@@ -169,6 +216,40 @@ func assessConsulState(rc *eos_io.RuntimeContext) (*ClusterInfo, error) {
 	}
 
 	return clusterInfo, nil
+}
+
+// checkRegisteredServices returns a list of non-consul services registered in Consul
+func checkRegisteredServices(rc *eos_io.RuntimeContext) ([]string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Debug("Checking for registered services in Consul")
+
+	// Try to connect to Consul
+	client, err := api.NewClient(api.DefaultConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+	}
+
+	// Get all services from catalog
+	services, _, err := client.Catalog().Services(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Consul catalog: %w", err)
+	}
+
+	// Filter out consul itself
+	var userServices []string
+	for serviceName := range services {
+		if serviceName != "consul" {
+			userServices = append(userServices, serviceName)
+		}
+	}
+
+	logger.Debug("Found registered services",
+		zap.Int("total_count", len(services)),
+		zap.Int("user_services", len(userServices)),
+		zap.Strings("services", userServices))
+
+	return userServices, nil
 }
 
 func gracefullyLeaveCluster(rc *eos_io.RuntimeContext) error {
