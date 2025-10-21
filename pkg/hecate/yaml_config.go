@@ -32,31 +32,31 @@ type RawYAMLConfig struct {
 
 // AppConfig represents a fully parsed and resolved app configuration
 type AppConfig struct {
-	Name              string
-	Type              string
-	Domain            string
-	Backend           string
-	BackendPort       int
-	BackendProtocol   string
-	TLSSkipVerify     bool
-	WebSocket         bool
-	HealthCheck       string
-	LogLevel          string
-	TCPPorts          map[int]int
-	SSO               bool
-	SSOPublicPaths    []string
-	Talk              bool
-	RequiresCoturn    bool
-	DockerDeps        []string
+	Name            string
+	Type            string
+	Domain          string
+	Backend         string
+	BackendPort     int
+	BackendProtocol string
+	TLSSkipVerify   bool
+	WebSocket       bool
+	HealthCheck     string
+	LogLevel        string
+	TCPPorts        map[int]int
+	SSO             bool
+	SSOPublicPaths  []string
+	Talk            bool
+	RequiresCoturn  bool
+	DockerDeps      []string
 }
 
 // YAMLHecateConfig represents the complete parsed and validated configuration
 type YAMLHecateConfig struct {
-	Apps              map[string]AppConfig
-	HasAuthentik      bool
-	NeedsCoturn       bool
-	NeedsNginx        bool
-	AuthentikDomain   string
+	Apps            map[string]AppConfig
+	HasAuthentik    bool
+	NeedsCoturn     bool
+	NeedsNginx      bool
+	AuthentikDomain string
 }
 
 // LoadYAMLConfig reads and parses a YAML configuration file
@@ -135,9 +135,25 @@ func LoadYAMLConfig(rc *eos_io.RuntimeContext, configPath string) (*YAMLHecateCo
 	// EVALUATE - Validate SSO requirements
 	for appName, app := range config.Apps {
 		if app.SSO && !config.HasAuthentik {
-			return nil, fmt.Errorf(
-				"app '%s' has sso=true but no authentik app configured. "+
-					"Add an authentik app to your config", appName,
+			return nil, eos_err.NewUserError(
+				"App '%s' requires SSO but no Authentik instance is configured.\n\n"+
+					"SSO (Single Sign-On) authentication requires Authentik to be deployed.\n\n"+
+					"Fix this by choosing ONE of these options:\n\n"+
+					"OPTION 1: Disable SSO for this app (simplest)\n"+
+					"  Edit your config file: %s\n"+
+					"  Change the '%s' app to:\n"+
+					"    sso: false\n\n"+
+					"OPTION 2: Add Authentik to your config (enables SSO)\n"+
+					"  Add this to your config file under 'apps:':\n"+
+					"    authentik:\n"+
+					"      domain: auth.%s  # Your SSO login domain\n"+
+					"      # Note: Backend is automatic, no need to specify\n\n"+
+					"OPTION 3: Regenerate config with Authentik included\n"+
+					"  1. Run: eos create config --hecate\n"+
+					"  2. When prompted, add an 'authentik' app FIRST\n"+
+					"  3. Then enable SSO (sso: y) for apps that need it\n\n"+
+					"For more info: https://goauthentik.io/docs/",
+				appName, configPath, appName, extractBaseDomain(app.Domain),
 			)
 		}
 	}
@@ -298,7 +314,7 @@ func validateBackend(backend string) error {
 	// Allow: IPs (192.168.1.1), hostnames (server.local), FQDNs (app.example.com)
 	// Reject: URLs with protocols, paths, queries
 	if strings.Contains(host, "/") || strings.Contains(host, "?") ||
-	   strings.Contains(host, "@") || strings.Contains(host, "#") {
+		strings.Contains(host, "@") || strings.Contains(host, "#") {
 		return fmt.Errorf("invalid backend format: %s\n"+
 			"Use IP address (192.168.1.100) or hostname (server.local)\n"+
 			"Do not include protocol (http://), path (/api), or query (?key=val)", backend)
@@ -315,6 +331,18 @@ func validateBackend(backend string) error {
 	}
 
 	return nil
+}
+
+// extractBaseDomain extracts the base domain from a subdomain
+// e.g., "delphi.cybermonkey.net.au" -> "cybermonkey.net.au"
+func extractBaseDomain(domain string) string {
+	parts := strings.Split(domain, ".")
+	if len(parts) <= 2 {
+		return domain // Already a base domain
+	}
+	// Return last two parts (handles .com, .net, etc.)
+	// For .co.uk, .net.au, etc., this is still reasonable
+	return strings.Join(parts[len(parts)-2:], ".")
 }
 
 // validateDomain checks if domain is a valid format

@@ -168,6 +168,73 @@ func gatherApps(rc *eos_io.RuntimeContext) (map[string]RawAppConfig, error) {
 		return nil, fmt.Errorf("no apps configured")
 	}
 
+	// Validate SSO requirements early (BLOCKING validation)
+	hasAuthentik := false
+	appsRequiringSSO := []string{}
+
+	for appName, app := range apps {
+		if DetectAppType(appName, app.Type) == "authentik" {
+			hasAuthentik = true
+		}
+		if app.SSO {
+			appsRequiringSSO = append(appsRequiringSSO, appName)
+		}
+	}
+
+	// BLOCKING: Force Authentik configuration if SSO is enabled
+	if len(appsRequiringSSO) > 0 && !hasAuthentik {
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: ⚠️  SSO Configuration Required")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: The following apps have SSO enabled:")
+		for _, appName := range appsRequiringSSO {
+			logger.Info("terminal prompt:   - " + appName)
+		}
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: SSO authentication requires Authentik to be configured.")
+		logger.Info("terminal prompt: You MUST provide an Authentik domain to continue.")
+		logger.Info("terminal prompt: ")
+
+		reader := bufio.NewReader(os.Stdin)
+
+		// Loop until valid Authentik domain is provided
+		for {
+			logger.Info("terminal prompt: Authentik domain (e.g., auth.example.com): ")
+			fmt.Print("Domain: ")
+			authentikDomain := strings.TrimSpace(mustReadLine(reader))
+
+			if authentikDomain == "" {
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: ❌ Domain is required for SSO to work.")
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: Options:")
+				logger.Info("terminal prompt:   1. Enter a domain (e.g., auth.cybermonkey.net.au)")
+				logger.Info("terminal prompt:   2. Exit and manually disable SSO in your config file")
+				logger.Info("terminal prompt: ")
+				continue // Keep looping until they provide a domain
+			}
+
+			// Validate domain format
+			sanitizedDomain := shared.SanitizeURL(authentikDomain)
+			if err := validateDomain(sanitizedDomain); err != nil {
+				logger.Info("terminal prompt: ")
+				logger.Info(fmt.Sprintf("terminal prompt: ❌ Invalid domain: %v", err))
+				logger.Info("terminal prompt: ")
+				continue // Keep looping until valid domain
+			}
+
+			// Valid domain provided - add Authentik
+			apps["authentik"] = RawAppConfig{
+				Domain: sanitizedDomain,
+			}
+			logger.Info("terminal prompt: ")
+			logger.Info("terminal prompt: ✓ Added Authentik SSO")
+			logger.Info("terminal prompt:   Domain: " + apps["authentik"].Domain)
+			logger.Info("terminal prompt:   Backend: hecate-server-1:9000 (automatic)")
+			break // Exit the loop
+		}
+	}
+
 	logger.Info("terminal prompt: ")
 	logger.Info(fmt.Sprintf("terminal prompt: Total apps configured: %d", len(apps)))
 
