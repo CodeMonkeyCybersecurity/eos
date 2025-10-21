@@ -28,6 +28,15 @@ These violations cause immediate failure:
 8. **Evidence-based, adversarially collaborative** approach always with yourself and with me
 9. **READMEs** Put a README.md in each directory to document the purpose of the directory and how to use it.
 10. **Pre-commit validation**: ALWAYS run `go build -o /tmp/eos-build ./cmd/` before completing a task. If build fails, fix ALL errors before responding to user. Zero tolerance for compile-time errors.
+11. **Constants - SINGLE SOURCE OF TRUTH**: NEVER duplicate hardcoded values across files. Each constant/path/URL must be defined in EXACTLY ONE place. Use constants, NOT string/number literals.
+    - **Vault paths**: ONLY in `pkg/vault/constants.go`
+    - **Consul paths**: ONLY in `pkg/consul/constants.go`
+    - **Ports**: ONLY in `pkg/shared/ports.go`
+    - **Violation examples**:
+      - ✗ `"/usr/local/bin/vault"` in multiple files
+      - ✗ `8200` hardcoded in code (use `shared.PortVault`)
+      - ✗ `VaultBinaryPath` defined in TWO different files
+    - **Circular import exception**: If package A cannot import package B (circular dependency), document with comment: `// NOTE: Duplicates B.ConstName to avoid circular import`
 
 
 ## Quick Decision Trees
@@ -58,6 +67,14 @@ Secrets Management?
 
 Command Structure?
 └─ VERB-FIRST only: create, read, list, update, delete (+ self, backup, build, deploy, promote, env)
+
+Adding a Constant?
+├─ Vault-related path/URL → pkg/vault/constants.go ONLY
+├─ Consul-related path/URL → pkg/consul/constants.go ONLY
+├─ Port number → pkg/shared/ports.go ONLY
+├─ Service-specific config → pkg/[service]/constants.go
+├─ Found duplicate constant → DELETE all but ONE, update all references
+└─ Circular import prevents use → Document duplication reason in comment
 
 Writing New Command?
 ├─ In cmd/[verb]/*.go (ORCHESTRATION ONLY):

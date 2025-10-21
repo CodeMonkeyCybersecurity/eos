@@ -22,7 +22,7 @@ func GetVaultWildcardPurgePaths() []string {
 		shared.VaultLegacyConfigWildcard, // wildcard for legacy configs
 		"/var/snap/vault*",               // snap installs
 		shared.VaultLogWildcard,          // log spill
-		shared.VaultDir,
+		VaultBaseDir,
 		shared.EosRunDir,
 	}
 }

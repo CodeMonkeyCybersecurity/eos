@@ -181,13 +181,13 @@ func createBaseDirs(rc *eos_io.RuntimeContext) error {
 		path string
 		perm os.FileMode
 	}{
-		{path: shared.VaultDir, perm: shared.FilePermOwnerRWX},
-		{path: filepath.Join(shared.VaultDir, "data"), perm: shared.FilePermOwnerRWX},
+		{path: VaultBaseDir, perm: shared.FilePermOwnerRWX},
+		{path: VaultDataDir, perm: shared.FilePermOwnerRWX},
 		{path: shared.TLSDir, perm: 0750},
 		{path: shared.SecretsDir, perm: shared.FilePermOwnerRWX},
 		{path: shared.EosRunDir, perm: shared.FilePermOwnerRWX},
 		{path: filepath.Dir(shared.VaultAgentCACopyPath), perm: shared.FilePermOwnerRWX},
-		{path: filepath.Join(shared.VaultDir, "logs"), perm: 0700},
+		{path: VaultLogsDir, perm: 0700},
 	}
 
 	for _, d := range dirs {
@@ -219,20 +219,20 @@ func secureVaultDirOwnership(rc *eos_io.RuntimeContext) error {
 
 	// log intent
 	zap.S().Infow("fixing Vault directory ownership",
-		"path", shared.VaultDir,
+		"path", VaultBaseDir,
 		"uid", vaultUID,
 		"gid", vaultGID,
 	)
 
 	// perform recursive chown
-	if err := eos_unix.ChownR(rc.Ctx, shared.VaultDir, vaultUID, vaultGID); err != nil {
+	if err := eos_unix.ChownR(rc.Ctx, VaultBaseDir, vaultUID, vaultGID); err != nil {
 		zap.S().Errorw("chownR failed",
-			"path", shared.VaultDir, "error", err,
+			"path", VaultBaseDir, "error", err,
 		)
-		return cerr.Wrapf(err, "chownR %s", shared.VaultDir)
+		return cerr.Wrapf(err, "chownR %s", VaultBaseDir)
 	}
 
-	zap.S().Infow("Vault directory ownership fixed", "path", shared.VaultDir)
+	zap.S().Infow("Vault directory ownership fixed", "path", VaultBaseDir)
 	return nil
 }
 

@@ -80,7 +80,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 	
 	// List of directories that need to be created
 	requiredDirs := []string{
-		shared.VaultDir,           // /opt/vault
+		VaultBaseDir,           // /opt/vault
 		shared.TLSDir,             // /opt/vault/tls
 		shared.SecretsDir,         // /var/lib/eos/secret
 		shared.EosRunDir,          // /var/run/eos

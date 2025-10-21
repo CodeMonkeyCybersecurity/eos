@@ -88,6 +88,8 @@ const (
 	VaultTLSCA   = "/etc/vault.d/tls/ca.crt"    // CA certificate
 
 	// === Data and Log Directories ===
+	VaultDir           = "/opt/vault"                     // Base vault directory (alias for VaultBaseDir)
+	VaultBaseDir       = "/opt/vault"                     // Base directory for Vault
 	VaultDataDir       = "/opt/vault/data"                // Data storage
 	VaultLogsDir       = "/var/log/vault"                 // Log directory
 	VaultAuditLogPath  = "/var/log/vault/vault-audit.log" // Audit log file

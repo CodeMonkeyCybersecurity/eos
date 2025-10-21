@@ -57,7 +57,7 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 	}
 
 	otelzap.Ctx(rc.Ctx).Info(" Reloading systemd daemon and enabling vault.service")
-	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, shared.VaultServiceName); err != nil {
+	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, VaultServiceName); err != nil {
 		return fmt.Errorf("reload/enable vault.service: %w", err)
 	}
 
@@ -116,7 +116,7 @@ WantedBy=multi-user.target
 // startVaultSystemdService safely starts the vault.service.
 func startVaultSystemdService(rc *eos_io.RuntimeContext) error {
 
-	cmd := exec.CommandContext(rc.Ctx, "systemctl", "start", shared.VaultServiceName)
+	cmd := exec.CommandContext(rc.Ctx, "systemctl", "start", VaultServiceName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

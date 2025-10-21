@@ -108,12 +108,14 @@ const (
 	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt" // System-wide trust store (RHEL)
 )
 
-// Vault Agent config paths - ALL derived from VaultConfigDirDebian (/etc/vault.d)
+// Vault Agent config paths
+// NOTE: Hardcoded "/etc/vault.d" to avoid circular import (pkg/shared cannot import pkg/vault)
+// This duplicates vault.VaultConfigDir - if that changes, update here too
 var (
-	VaultAgentConfigPath   = filepath.Join(VaultConfigDirDebian, "agent-config.hcl")
-	VaultAgentCACopyPath   = filepath.Join(VaultConfigDirDebian, "ca.crt")
-	VaultAgentRoleIDPath   = filepath.Join(VaultConfigDirDebian, "role_id")
-	VaultAgentSecretIDPath = filepath.Join(VaultConfigDirDebian, "secret_id")
+	VaultAgentConfigPath   = filepath.Join("/etc/vault.d", "agent-config.hcl")
+	VaultAgentCACopyPath   = filepath.Join("/etc/vault.d", "ca.crt")
+	VaultAgentRoleIDPath   = filepath.Join("/etc/vault.d", "role_id")
+	VaultAgentSecretIDPath = filepath.Join("/etc/vault.d", "secret_id")
 	VaultAgentServicePath  = "/etc/systemd/system/" + VaultAgentService
 )
 

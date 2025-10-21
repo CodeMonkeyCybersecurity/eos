@@ -44,9 +44,8 @@ const (
 	LocalhostSAN = "127.0.0.1"
 
 	// === Legacy/Compatibility ===
-	VaultDir                  = "/opt/vault/"  // DEPRECATED: Use vault.VaultDataDir
-	VaultConfigDirDebian      = "/etc/vault.d" // DEPRECATED: Use vault.VaultConfigDir
-	VaultConfigFileName       = "config.hcl"   // DEPRECATED: Use vault.VaultConfigFile
+	// NOTE: VaultDir, VaultConfigDirDebian, VaultConfigFileName moved to pkg/vault/constants.go
+	// Use vault.VaultDataDir, vault.VaultConfigDir, vault.VaultConfigFile instead
 	EosVaultProfilePath       = "/etc/profile.d/eos_vault.sh"
 	VaultLegacyConfigWildcard = "/etc/vault*"
 	VaultLogWildcard          = "/var/log/vault*"
@@ -68,8 +67,8 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 	FallbackAbort  FallbackCode = "abort"
 )
 
-// DEPRECATED: Use vault.VaultServiceName instead
-const VaultServiceName = "vault.service"
+// NOTE: VaultServiceName moved to pkg/vault/constants.go
+// Use vault.VaultServiceName instead
 
 // Computed Vault port constants - ALL derived from ports.go
 var (
@@ -85,19 +84,21 @@ var (
 	ConsulDefaultAddr       = fmt.Sprintf("127.0.0.1:%d", PortConsul) // Consul HTTP API on HashiCorp standard port 8500
 )
 
-// Computed Vault directory paths - ALL derived from base directories
+// Computed Vault directory paths
+// NOTE: Hardcoded paths to avoid circular import (pkg/shared cannot import pkg/vault)
+// These duplicate values from vault.VaultDataDir, vault.VaultConfigDir, vault.VaultServiceName
 var (
-	// Vault data directories (derived from VaultDir)
-	VaultDataPath     = VaultDir + "data/"
-	VaultLogsPath     = VaultDir + "logs/"
-	VaultAuditLogPath = VaultLogsPath + "vault_audit.log"
+	// Vault data directories
+	VaultDataPath     = "/opt/vault/data/"
+	VaultLogsPath     = "/opt/vault/logs/"
+	VaultAuditLogPath = "/opt/vault/logs/vault_audit.log"
 
-	// Vault config paths (derived from VaultConfigDirDebian)
-	VaultConfigPath  = filepath.Join(VaultConfigDirDebian, "vault.hcl")
-	TLSDir           = filepath.Join(VaultConfigDirDebian, "tls")
+	// Vault config paths
+	VaultConfigPath  = filepath.Join("/etc/vault.d", "vault.hcl")
+	TLSDir           = filepath.Join("/etc/vault.d", "tls")
 	TLSCrt           = filepath.Join(TLSDir, "vault.crt")
 	TLSKey           = filepath.Join(TLSDir, "vault.key")
-	VaultServicePath = "/etc/systemd/system/" + VaultServiceName
+	VaultServicePath = "/etc/systemd/system/vault.service"
 
 	// Eos directories and files
 	EosVarDir                = "/var/lib/eos/"
