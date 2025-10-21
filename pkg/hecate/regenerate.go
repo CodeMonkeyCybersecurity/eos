@@ -106,7 +106,7 @@ func RegenerateFromConsulKV(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to regenerate deployment files: %w", err)
 	}
 
-	// EVALUATE: Verify files were created
+	// EVALUATE: Verify files were created and validate them
 	logger.Info("Verifying generated files")
 
 	for _, file := range filesToBackup {
@@ -115,6 +115,14 @@ func RegenerateFromConsulKV(rc *eos_io.RuntimeContext) error {
 		}
 		logger.Debug("File verified",
 			zap.String("file", file))
+	}
+
+	// CRITICAL: Validate generated files for syntax errors
+	logger.Info("Validating generated configuration files")
+	if err := ValidateGeneratedFiles(rc, outputDir); err != nil {
+		return fmt.Errorf("validation failed: %w\n\n"+
+			"Generated files have errors. This is a bug in Eos.\n"+
+			"Please report this issue with the validation output above.", err)
 	}
 
 	logger.Info("terminal prompt: ")

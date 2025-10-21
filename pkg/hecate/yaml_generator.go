@@ -472,16 +472,6 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 	}
 	logger.Info("Generated docker-compose.yml")
 
-	// Validate docker-compose.yml if docker is available
-	if err := validateDockerCompose(rc, outputDir); err != nil {
-		logger.Warn("Docker compose validation failed (file may have issues)",
-			zap.Error(err))
-		logger.Info("terminal prompt: ⚠️  Warning: Generated docker-compose.yml may have syntax issues")
-		logger.Info("terminal prompt:    Validate with: docker compose -f " + filepath.Join(outputDir, "docker-compose.yml") + " config")
-	} else {
-		logger.Debug("Docker compose validation passed")
-	}
-
 	// Generate Caddyfile
 	if err := generateYAMLCaddyfile(config, outputDir); err != nil {
 		return fmt.Errorf("failed to generate Caddyfile: %w", err)
@@ -497,11 +487,23 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 	}
 
 	// Generate .env file with real secrets if Authentik is present
+	// CRITICAL: This must be generated BEFORE validation since docker-compose.yml references it
 	if config.HasAuthentik {
 		if err := generateYAMLEnvFile(rc, outputDir, hecateSecrets); err != nil {
 			return fmt.Errorf("failed to generate .env file: %w", err)
 		}
 		logger.Info("Generated .env file with secure credentials")
+	}
+
+	// EVALUATE: Validate docker-compose.yml AFTER all files are generated
+	// This validation is informational only - we don't fail the operation since files are already written
+	logger.Debug("Validating docker-compose.yml syntax")
+	if err := validateDockerCompose(rc, outputDir); err != nil {
+		logger.Warn("Docker compose validation found issues (continuing anyway)",
+			zap.Error(err))
+		// Don't show terminal prompt here - this is handled by ValidateGeneratedFiles in cmd/
+	} else {
+		logger.Debug("Docker compose validation passed")
 	}
 
 	logger.Info("Successfully generated all configuration files")
