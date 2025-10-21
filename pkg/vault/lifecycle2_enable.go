@@ -26,31 +26,33 @@ func VaultAddress() string {
 // Prerequisites: Call NewVaultInstaller().Install() first to complete Phases 1-4
 //
 // Complete Phase Breakdown:
-//   Phase 1-4: Handled by install.go (Install() method)
-//     Phase 1: Binary installation and user/directory creation
-//     Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, agent directories)
-//     Phase 3: TLS certificate generation
-//     Phase 4: Configuration file generation (vault.hcl)
 //
-//   Phase 5-15: Handled by this function (EnableVault)
-//     Phase 5: Service startup (happens in cmd/create/secrets.go before calling EnableVault)
-//     Phase 6a: Vault initialization (UnsealVault)
-//     Phase 6b: Vault unseal (UnsealVault)
-//     Phase 7: Root token verification (PhasePromptAndVerRootToken)
-//     Phase 7a: API client verification (GetRootClient)
-//     Phase 8: Health check (PhaseEnsureVaultHealthy)
-//     Phase 9a: KV v2 secrets engine (PhaseEnableKVv2)
-//     Phase 9d: Additional secrets engines - Database, PKI (PhaseEnableSecretsEngines)
-//     Phase 9e: Activity tracking enablement (PhaseEnableTracking)
-//     Phase 9b: Bootstrap secret verification (PhaseWriteBootstrapSecretAndRecheck)
-//     Phase 10a: Userpass authentication (PhaseEnableUserpass) - optional, interactive
-//     Phase 10b: AppRole authentication (PhaseEnableAppRole) - optional, interactive
-//     Phase 10c: Entity and alias creation (PhaseCreateEosEntity)
-//     Phase 11: Policy configuration (EnsurePolicy)
-//     Phase 12: Audit logging (EnableFileAudit)
-//     Phase 13: Multi-Factor Authentication (EnableMFAMethods) - optional, interactive
-//     Phase 14: Vault Agent service (PhaseEnableVaultAgent) - optional, interactive
-//     Phase 15: Comprehensive hardening (ComprehensiveHardening) - optional, interactive
+//	Phase 1-4: Handled by install.go (Install() method)
+//	  Phase 1: Binary installation and user/directory creation
+//	  Phase 2: Environment setup (VAULT_ADDR, VAULT_CACERT, agent directories)
+//	  Phase 3: TLS certificate generation
+//	  Phase 4: Configuration file generation (vault.hcl)
+//
+//	Phase 5-15: Handled by this function (EnableVault)
+//	  Phase 5: Service startup (happens in cmd/create/secrets.go before calling EnableVault)
+//	  Phase 6a: Vault initialization (UnsealVault)
+//	  Phase 6b: Vault unseal (UnsealVault)
+//	  Phase 6c: IMMEDIATE audit device enablement (PhaseEnableAuditImmediately) - CRITICAL SECURITY
+//	  Phase 7: Root token verification (PhasePromptAndVerRootToken)
+//	  Phase 7a: API client verification (GetRootClient)
+//	  Phase 8: Health check (PhaseEnsureVaultHealthy)
+//	  Phase 9a: KV v2 secrets engine (PhaseEnableKVv2)
+//	  Phase 9d: Additional secrets engines - Database, PKI (PhaseEnableSecretsEngines)
+//	  Phase 9e: Activity tracking enablement (PhaseEnableTracking)
+//	  Phase 9b: Bootstrap secret verification (PhaseWriteBootstrapSecretAndRecheck)
+//	  Phase 10a: Userpass authentication (PhaseEnableUserpass) - optional, interactive
+//	  Phase 10b: AppRole authentication (PhaseEnableAppRole) - optional, interactive
+//	  Phase 10c: Entity and alias creation (PhaseCreateEosEntity)
+//	  Phase 11: Policy configuration (EnsurePolicy)
+//	  Phase 12: Audit logging verification (EnableFileAudit) - NOW REDUNDANT, audit enabled in 6c
+//	  Phase 13: Multi-Factor Authentication (EnableMFAMethods) - optional, interactive
+//	  Phase 14: Vault Agent service (PhaseEnableVaultAgent) - optional, interactive
+//	  Phase 15: Comprehensive hardening (ComprehensiveHardening) - optional, interactive
 //
 // Interactive phases (10a, 10b, 13, 14, 15) prompt the user for confirmation.
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
@@ -84,6 +86,23 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}
 	client = unsealedClient
 	log.Info(" [Phase 6] Vault client initialized and unsealed successfully",
+		zap.Duration("duration", time.Since(phaseStart)))
+
+	// CRITICAL SECURITY: Enable audit devices IMMEDIATELY after initialization
+	// This ensures ALL subsequent operations are audited (policies, users, secrets, etc.)
+	// HashiCorp best practice: "Enable at least one audit device immediately after initialization"
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 6c] Enabling audit devices IMMEDIATELY (CRITICAL)")
+	phaseStart = time.Now()
+	if err := PhaseEnableAuditImmediately(rc, client); err != nil {
+		log.Error(" [Phase 6c] CRITICAL: Failed to enable audit devices",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
+		log.Error(" ⚠️  SECURITY IMPACT: Vault operations will NOT be audited")
+		log.Error(" ⚠️  This violates compliance requirements (SOC2, PCI-DSS, HIPAA)")
+		return logger.LogErrAndWrap(rc, "enable audit devices immediately", err)
+	}
+	log.Info(" [Phase 6c] Audit devices enabled successfully - ALL operations now audited",
 		zap.Duration("duration", time.Since(phaseStart)))
 
 	log.Info("───────────────────────────────────────────────────────────────")

@@ -263,6 +263,7 @@ func (sm *SecretManager) GetBackend() SecretBackend {
 type VaultBackend struct {
 	address string
 	client  *api.Client
+	rc      *eos_io.RuntimeContext // For logging in diagnostic functions
 }
 
 // NewVaultBackend creates a Vault backend using the centralized GetVaultClient()
@@ -282,10 +283,20 @@ func NewVaultBackend(rc *eos_io.RuntimeContext, address string) (*VaultBackend, 
 	return &VaultBackend{
 		address: address,
 		client:  client,
+		rc:      rc,
 	}, nil
 }
 
 func (vb *VaultBackend) Store(path string, secret map[string]interface{}) error {
+	logger := otelzap.Ctx(vb.rc.Ctx)
+
+	// DIAGNOSTIC: Log token information before operation
+	if err := vb.logTokenDiagnostics(path); err != nil {
+		logger.Warn("Failed to retrieve token diagnostics (non-critical)",
+			zap.Error(err),
+			zap.String("target_path", path))
+	}
+
 	// Store secret in Vault KV v2
 	// Path format: secret/data/{path}
 	_, err := vb.client.KVv2("secret").Put(context.Background(), path, secret)
@@ -304,10 +315,105 @@ func (vb *VaultBackend) Store(path string, secret map[string]interface{}) error 
 	return nil
 }
 
+// logTokenDiagnostics logs detailed information about the current Vault token
+// to help diagnose permission denied errors
+func (vb *VaultBackend) logTokenDiagnostics(targetPath string) error {
+	logger := otelzap.Ctx(vb.rc.Ctx)
+
+	// Lookup current token information
+	tokenInfo, err := vb.client.Auth().Token().LookupSelf()
+	if err != nil {
+		return fmt.Errorf("failed to lookup token: %w", err)
+	}
+
+	// Extract token details
+	accessor := "unknown"
+	if acc, ok := tokenInfo.Data["accessor"].(string); ok && len(acc) >= 8 {
+		accessor = acc[:8] + "..." // Show first 8 chars for identification
+	}
+
+	policies := []string{}
+	if pols, ok := tokenInfo.Data["policies"].([]interface{}); ok {
+		for _, p := range pols {
+			if pstr, ok := p.(string); ok {
+				policies = append(policies, pstr)
+			}
+		}
+	}
+
+	ttl := "unknown"
+	if ttlRaw, ok := tokenInfo.Data["ttl"].(json.Number); ok {
+		ttl = ttlRaw.String() + "s"
+	}
+
+	// Log token diagnostics
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Vault Token Diagnostics (for permission troubleshooting)")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Token Information:",
+		zap.String("accessor", accessor),
+		zap.Strings("policies", policies),
+		zap.String("ttl_remaining", ttl),
+		zap.String("target_path", "secret/data/"+targetPath))
+
+	// Check token capabilities on the target path
+	fullPath := fmt.Sprintf("secret/data/%s", targetPath)
+	caps, err := vb.client.Sys().CapabilitiesSelf(fullPath)
+	if err != nil {
+		logger.Warn("Failed to check token capabilities", zap.Error(err))
+	} else {
+		logger.Info("Token Capabilities on Target Path:",
+			zap.String("path", fullPath),
+			zap.Strings("capabilities", caps))
+
+		// Analyze capabilities
+		hasCreate := false
+		hasUpdate := false
+		for _, cap := range caps {
+			if cap == "create" {
+				hasCreate = true
+			}
+			if cap == "update" {
+				hasUpdate = true
+			}
+		}
+
+		if !hasCreate && !hasUpdate {
+			logger.Error("❌ Token DOES NOT have 'create' or 'update' capability on target path",
+				zap.String("path", fullPath),
+				zap.Strings("actual_capabilities", caps))
+		} else {
+			logger.Info("✓ Token has required capabilities",
+				zap.Bool("has_create", hasCreate),
+				zap.Bool("has_update", hasUpdate))
+		}
+	}
+
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	return nil
+}
+
 func (vb *VaultBackend) Retrieve(path string) (map[string]interface{}, error) {
+	logger := otelzap.Ctx(vb.rc.Ctx)
+
+	// DIAGNOSTIC: Log token information before operation
+	if err := vb.logTokenDiagnostics(path); err != nil {
+		logger.Warn("Failed to retrieve token diagnostics (non-critical)",
+			zap.Error(err),
+			zap.String("target_path", path))
+	}
+
 	// Retrieve secret from Vault KV v2
 	secretData, err := vb.client.KVv2("secret").Get(context.Background(), path)
 	if err != nil {
+		// Check if this is a permission denied error
+		if strings.Contains(err.Error(), "permission denied") {
+			return nil, fmt.Errorf("failed to retrieve secret from Vault at %s: %w\n\n"+
+				"HINT: The Vault token may not have read permissions on this path.\n"+
+				"Check the token's policies with:\n"+
+				"  vault token lookup", path, err)
+		}
 		return nil, fmt.Errorf("failed to retrieve secret from Vault at %s: %w", path, err)
 	}
 
