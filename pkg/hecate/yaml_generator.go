@@ -682,10 +682,10 @@ AUTHENTIK_IMAGE=ghcr.io/goauthentik/server
 AUTHENTIK_WORKER__THREADS=%s
 
 # Authentik Bootstrap Credentials
-# Use these to login for the first time:
-# Email: %s
-# Password: %s
-# Token: %s
+# Use these to login for the first time - Email: %s, Password: %s
+AUTHENTIK_BOOTSTRAP_EMAIL=%s
+AUTHENTIK_BOOTSTRAP_PASSWORD=%s
+AUTHENTIK_BOOTSTRAP_TOKEN=%s
 
 # Ports
 COMPOSE_PORT_HTTP=%s
@@ -697,6 +697,8 @@ COMPOSE_PORT_HTTPS=%s
 		hecateSecrets.AuthentikSecretKey,
 		hecateSecrets.AuthentikTag,
 		hecateSecrets.AuthentikWorkerThreads,
+		hecateSecrets.AuthentikBootstrapEmail,
+		hecateSecrets.AuthentikBootstrapPassword,
 		hecateSecrets.AuthentikBootstrapEmail,
 		hecateSecrets.AuthentikBootstrapPassword,
 		hecateSecrets.AuthentikBootstrapToken,

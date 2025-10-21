@@ -228,9 +228,16 @@ Examples:
 		log.Info("terminal prompt: ")
 		log.Info("terminal prompt: ⚠️  PREREQUISITES:")
 		log.Info("terminal prompt:   • DNS records must point to this server:")
+
+		// Deduplicate domains for display
+		uniqueDomains := make(map[string]bool)
 		for _, app := range config.Apps {
-			log.Info(fmt.Sprintf("terminal prompt:     - %s (A record → your server IP)", app.Domain))
+			uniqueDomains[app.Domain] = true
 		}
+		for domain := range uniqueDomains {
+			log.Info(fmt.Sprintf("terminal prompt:     - %s (A record → your server IP)", domain))
+		}
+
 		log.Info("terminal prompt:   • Ports 80, 443 must be available (not in use)")
 		if config.NeedsCoturn {
 			log.Info("terminal prompt:   • Coturn ports: 3478, 5349, 49160-49200/udp must be available")
