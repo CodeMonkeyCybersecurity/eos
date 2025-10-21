@@ -399,6 +399,47 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 	log.Info(" Agent token is valid")
 
+	// CRITICAL P0: Verify agent token has service secrets access
+	// This prevents permission denied errors when deploying services (bionicgpt, etc.)
+	log.Info(" Verifying agent token has service secrets access")
+	testPath := "secret/data/services/test"
+	caps, err := agentClient.Sys().CapabilitiesSelf(testPath)
+	if err != nil {
+		log.Error(" Failed to check agent token capabilities",
+			zap.String("path", testPath),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to check agent token capabilities")
+	}
+
+	// Check if token has create/update permissions (required for service deployment)
+	hasCreate := false
+	hasUpdate := false
+	for _, cap := range caps {
+		if cap == "create" {
+			hasCreate = true
+		}
+		if cap == "update" {
+			hasUpdate = true
+		}
+	}
+
+	if !hasCreate || !hasUpdate {
+		log.Error(" Agent token lacks permission to store service secrets",
+			zap.String("path", testPath),
+			zap.Strings("capabilities", caps),
+			zap.Bool("has_create", hasCreate),
+			zap.Bool("has_update", hasUpdate))
+		log.Error(" ⚠️  SERVICE DEPLOYMENT BLOCKED: Cannot deploy services (bionicgpt, etc.)")
+		log.Error(" ⚠️  Missing capabilities: create, update on secret/data/services/*")
+		log.Error(" ⚠️  This indicates eos-default-policy was not written correctly")
+		log.Error(" ⚠️  Fix with: sudo eos update vault --update-policies && sudo systemctl restart vault-agent-eos")
+		return cerr.Newf("agent token missing required capabilities on %s: got %v, need [create, update]",
+			testPath, caps)
+	}
+	log.Info(" Agent token has service secrets access",
+		zap.String("path", testPath),
+		zap.Strings("capabilities", caps))
+
 	// Check agent service status
 	log.Info(" Checking agent service status")
 	if err := checkAgentServiceStatus(rc); err != nil {
