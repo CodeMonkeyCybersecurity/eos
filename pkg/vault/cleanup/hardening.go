@@ -2,6 +2,7 @@ package cleanup
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -15,14 +16,14 @@ func CleanupSystemHardening(rc *eos_io.RuntimeContext) error {
 	logger.Info("Assessing system hardening configurations")
 
 	hardeningPaths := []string{
-		"/etc/systemd/system/vault.service.d/",
-		"/etc/security/limits.d/vault-hardening.conf",
-		"/etc/security/limits.d/vault-ulimits.conf",
-		"/etc/logrotate.d/vault",
-		"VaultBinaryPath-backup.sh",
-		"/etc/systemd/system/vault-backup.timer",
-		"/etc/systemd/system/vault-backup.service",
-		"/etc/tmpfiles.d/eos.conf",
+		vault.VaultServiceDropinDir,
+		vault.VaultHardeningConfigPath,
+		vault.VaultUlimitsConfigPath,
+		vault.LogrotateVaultPath,
+		vault.VaultBackupScriptPath,
+		vault.VaultBackupTimerPath,
+		vault.VaultBackupServicePath,
+		vault.EosTmpfilesPath,
 	}
 
 	// INTERVENE - Remove hardening configurations

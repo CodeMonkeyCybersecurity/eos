@@ -283,9 +283,9 @@ func (p *ConsulStatusProvider) getNetworkInfo(rc *eos_io.RuntimeContext) Network
 		ListenAddr: hostname,
 	}
 
-	// Test HTTP API endpoint
+	// Test HTTP API endpoint using internal hostname
 	cmd := exec.Command("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-		fmt.Sprintf("http://127.0.0.1:%d/v1/status/leader", shared.PortConsul))
+		fmt.Sprintf("http://%s:%d/v1/status/leader", hostname, shared.PortConsul))
 	if output, err := cmd.Output(); err != nil || string(output) != "200" {
 		info.Endpoints[0].Healthy = false
 	}

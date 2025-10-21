@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -68,7 +69,7 @@ func NewSecretManager(rc *eos_io.RuntimeContext, envConfig *environment.Environm
 
 	switch backendType {
 	case "vault":
-		backend, err = NewVaultBackend(envConfig.VaultAddr)
+		backend, err = NewVaultBackend(rc, envConfig.VaultAddr)
 		if err != nil {
 			logger.Error("Vault backend initialization failed", zap.Error(err))
 			// SECURITY: Fail-closed in production, only allow fallback in dev/test
@@ -263,19 +264,19 @@ type VaultBackend struct {
 	client  *api.Client
 }
 
-func NewVaultBackend(address string) (*VaultBackend, error) {
-	// Create Vault client configuration
-	config := api.DefaultConfig()
-	config.Address = address
-
-	// Create client
-	client, err := api.NewClient(config)
+// NewVaultBackend creates a Vault backend using the centralized GetVaultClient()
+// This ensures consistent TLS settings, VAULT_SKIP_VERIFY handling, and token management
+func NewVaultBackend(rc *eos_io.RuntimeContext, address string) (*VaultBackend, error) {
+	// CRITICAL FIX P0: Use centralized vault.GetVaultClient() instead of creating our own
+	// This respects VAULT_SKIP_VERIFY, TLS settings, and environment variables
+	// Fixes: "Client sent an HTTP request to an HTTPS server" error
+	client, err := vault.GetVaultClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
 	// Token should be set via VAULT_TOKEN environment variable
-	// or read from ~/.vault-token by the SDK
+	// or read from ~/.vault-token by the SDK (handled by GetVaultClient)
 
 	return &VaultBackend{
 		address: address,

@@ -28,15 +28,34 @@ These violations cause immediate failure:
 8. **Evidence-based, adversarially collaborative** approach always with yourself and with me
 9. **READMEs** Put a README.md in each directory to document the purpose of the directory and how to use it.
 10. **Pre-commit validation**: ALWAYS run `go build -o /tmp/eos-build ./cmd/` before completing a task. If build fails, fix ALL errors before responding to user. Zero tolerance for compile-time errors.
-11. **Constants - SINGLE SOURCE OF TRUTH**: NEVER duplicate hardcoded values across files. Each constant/path/URL must be defined in EXACTLY ONE place. Use constants, NOT string/number literals.
-    - **Vault paths**: ONLY in `pkg/vault/constants.go`
-    - **Consul paths**: ONLY in `pkg/consul/constants.go`
-    - **Ports**: ONLY in `pkg/shared/ports.go`
+11. **Constants - SINGLE SOURCE OF TRUTH (ZERO HARDCODED VALUES - P0)**: NEVER use hardcoded literal values in code. Each value must be a named constant defined in EXACTLY ONE place.
+    - **Service-specific constants**: `pkg/[service]/constants.go`
+      - Vault: `pkg/vault/constants.go`
+      - Consul: `pkg/consul/constants.go`
+      - Nomad: `pkg/nomad/constants.go`
+    - **Shared infrastructure**: `pkg/shared/`
+      - Ports: `pkg/shared/ports.go`
+      - Common paths: `pkg/shared/paths.go`
+    - **COMPREHENSIVE list of FORBIDDEN hardcoded values**:
+      - ✗ **File paths**: `"/usr/local/bin/vault"`, `"/etc/vault.d"`, `"/opt/vault"`
+      - ✗ **IP addresses**: `"127.0.0.1"`, `"0.0.0.0"`, `"localhost"`
+      - ✗ **Port numbers**: `8200`, `8500`, `4646`
+      - ✗ **Hostnames**: `"localhost"`, `"vault"`, `"consul"`
+      - ✗ **User/Group names**: `"vault"`, `"consul"`, `"root"`
+      - ✗ **UID/GID values**: `995`, `0`, `1000` (lookup dynamically via user.Lookup)
+      - ✗ **File permissions**: `0755`, `0644`, `0600`
+      - ✗ **Environment variable names**: `"VAULT_ADDR"`, `"CONSUL_HTTP_ADDR"`
+      - ✗ **Service names**: `"vault.service"`, `"consul.service"`
+      - ✗ **URLs/Endpoints**: `"https://127.0.0.1:8200"`, `"/v1/sys/health"`
+      - ✗ **Timeouts/Durations**: `5 * time.Second`, `30 * time.Minute`
+      - ✗ **Retry counts**: `5`, `3`, delay values
+      - ✗ **Storage paths**: `"secret/vault"`, `"service/consul/config"`
     - **Violation examples**:
-      - ✗ `"/usr/local/bin/vault"` in multiple files
-      - ✗ `8200` hardcoded in code (use `shared.PortVault`)
-      - ✗ `VaultBinaryPath` defined in TWO different files
-    - **Circular import exception**: If package A cannot import package B (circular dependency), document with comment: `// NOTE: Duplicates B.ConstName to avoid circular import`
+      - ✗ `os.MkdirAll("/etc/vault.d", 0755)` → use `vault.VaultConfigDir, vault.VaultDirPerm`
+      - ✗ `net.Listen("tcp", "127.0.0.1:8200")` → use `vault.LocalhostIP, shared.PortVault`
+      - ✗ `exec.Command("systemctl", "start", "vault.service")` → use `vault.VaultServiceName`
+    - **Circular import exception**: Document with `// NOTE: Duplicates B.ConstName to avoid circular import`
+    - **Enforcement**: Run monthly audit: `scripts/audit_hardcoded_values.sh`
 12. **File Permissions - SECURITY CRITICAL (P0)**: NEVER hardcode chmod/chown permissions (0755, 0600, etc.) in code. Use centralized permission constants.
     - **Vault permissions**: ONLY in `pkg/vault/constants.go` (VaultConfigPerm, VaultTLSKeyPerm, etc.)
     - **Consul permissions**: ONLY in `pkg/consul/constants.go`

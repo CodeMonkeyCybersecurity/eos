@@ -46,6 +46,20 @@ func GetMinioAPIAddr() string {
 	return fmt.Sprintf("http://%s:%d", hostname, PortMinioAPI)
 }
 
+// GetVaultHTTPSAddr returns the Vault HTTPS address using internal hostname resolution
+// Uses HTTPS (Vault standard for production)
+func GetVaultHTTPSAddr() string {
+	hostname := GetInternalHostname()
+	return fmt.Sprintf("https://%s:%d", hostname, PortVault)
+}
+
+// GetVaultHTTPAddr returns the Vault HTTP address using internal hostname resolution
+// Uses HTTP (for non-TLS setups only)
+func GetVaultHTTPAddr() string {
+	hostname := GetInternalHostname()
+	return fmt.Sprintf("http://%s:%d", hostname, PortVault)
+}
+
 // GetServiceAddr returns a generic service address for any port
 func GetServiceAddr(port int, useHTTPS bool) string {
 	hostname := GetInternalHostname()

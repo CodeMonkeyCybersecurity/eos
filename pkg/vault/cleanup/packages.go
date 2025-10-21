@@ -5,6 +5,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -61,8 +62,8 @@ func CleanupPackageRepos(rc *eos_io.RuntimeContext, distro string) error {
 	switch distro {
 	case "debian":
 		repoPaths := []string{
-			"/usr/share/keyrings/hashicorp-archive-keyring.gpg",
-			"/etc/apt/sources.list.d/hashicorp.list",
+			vault.HashiCorpKeyring,
+			vault.HashiCorpAptList,
 		}
 		for _, path := range repoPaths {
 			if err := RemovePathSecurely(rc, path); err != nil {
@@ -78,7 +79,7 @@ func CleanupPackageRepos(rc *eos_io.RuntimeContext, distro string) error {
 		}
 
 	case "rhel":
-		if err := RemovePathSecurely(rc, "/etc/yum.repos.d/hashicorp.repo"); err != nil {
+		if err := RemovePathSecurely(rc, vault.HashiCorpYumRepo); err != nil {
 			logger.Warn("Failed to remove repo file", zap.Error(err))
 		}
 

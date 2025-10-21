@@ -318,12 +318,15 @@ func (p *VaultStatusProvider) getHealthInfo(rc *eos_io.RuntimeContext) HealthInf
 }
 
 func (p *VaultStatusProvider) getNetworkInfo() NetworkInfo {
+	// Use internal hostname for network endpoints (same as Consul)
+	hostname := shared.GetInternalHostname()
+
 	info := NetworkInfo{
 		Endpoints: []Endpoint{
 			{
 				Name:     "HTTPS API",
 				Protocol: "https",
-				Address:  "127.0.0.1",
+				Address:  hostname, // Use internal hostname (e.g., vhost11)
 				Port:     shared.PortVault, // 8200 (HashiCorp standard)
 				Healthy:  true,
 			},
@@ -332,8 +335,9 @@ func (p *VaultStatusProvider) getNetworkInfo() NetworkInfo {
 	}
 
 	// Test HTTPS API endpoint (with skip-verify for self-signed certs)
+	// Use hostname for health check to match displayed endpoint
 	cmd := exec.Command("curl", "-s", "-k", "-o", "/dev/null", "-w", "%{http_code}",
-		fmt.Sprintf("https://127.0.0.1:%d/v1/sys/health", shared.PortVault))
+		fmt.Sprintf("https://%s:%d/v1/sys/health", hostname, shared.PortVault))
 	if output, err := cmd.Output(); err != nil {
 		info.Endpoints[0].Healthy = false
 	} else {

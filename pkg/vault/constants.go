@@ -133,6 +133,65 @@ const (
 	VaultBinaryPathOpt    = "/opt/vault/bin/vault" // Alternative location
 	VaultBinaryPathSnap   = "/snap/bin/vault"      // Snap package location
 
+	// === System Integration Paths (non-Vault specific) ===
+	// These paths are for system-level configuration that Vault integrates with
+
+	// Logrotate configuration
+	LogrotateConfigDir = "/etc/logrotate.d"        // Logrotate configuration directory
+	LogrotateVaultPath = "/etc/logrotate.d/vault" // Vault logrotate config
+
+	// Security limits configuration
+	SecurityLimitsDir        = "/etc/security/limits.d"                       // Security limits directory
+	VaultHardeningConfigPath = "/etc/security/limits.d/vault-hardening.conf" // Vault hardening limits
+	VaultUlimitsConfigPath   = "/etc/security/limits.d/vault-ulimits.conf"   // Vault ulimits config
+
+	// Tmpfiles configuration
+	TmpfilesConfigDir = "/etc/tmpfiles.d"         // Tmpfiles configuration directory
+	EosTmpfilesPath   = "/etc/tmpfiles.d/eos.conf" // Eos tmpfiles config
+
+	// System CA certificates
+	SystemCACertDir   = "/usr/local/share/ca-certificates"                       // System CA cert directory
+	VaultSystemCACert = "/usr/local/share/ca-certificates/vault-local-ca.crt"   // Vault CA in system trust
+	EosInternalCACert = "/usr/local/share/ca-certificates/code-monkey-internal-ca.crt" // Eos internal CA
+
+	// Firewall command paths
+	UFWPath        = "/usr/sbin/ufw"          // UFW firewall command
+	FirewalldPath  = "/usr/bin/firewall-cmd" // Firewalld command
+
+	// Environment configuration
+	SystemEnvironmentFile = "/etc/environment"       // System-wide environment
+	ProfileDDir           = "/etc/profile.d"         // Profile.d directory
+	VaultProfilePath      = "/etc/profile.d/eos_vault.sh" // Vault environment profile
+
+	// System configuration files
+	FstabPath      = "/etc/fstab"           // Filesystem table
+	SSHConfigPath  = "/etc/ssh/sshd_config" // SSH daemon config
+
+	// Package management
+	AptSourcesDir         = "/etc/apt/sources.list.d"                        // APT sources directory
+	HashiCorpAptList      = "/etc/apt/sources.list.d/hashicorp.list"        // HashiCorp APT repository
+	HashiCorpKeyring      = "/usr/share/keyrings/hashicorp-archive-keyring.gpg" // HashiCorp GPG key
+	YumReposDir           = "/etc/yum.repos.d"                               // YUM repos directory
+	HashiCorpYumRepo      = "/etc/yum.repos.d/hashicorp.repo"                // HashiCorp YUM repository
+
+	// Distribution detection files
+	RedhatReleaseFile = "/etc/redhat-release"   // RHEL/CentOS/Fedora release file
+	DebianVersionFile = "/etc/debian_version"   // Debian/Ubuntu version file
+
+	// Backup directory
+	VaultBackupDir = "/var/backups/vault" // Vault backup storage
+
+	// Temporary installation directory
+	TmpInstallDir = "/tmp/vault-install" // Temporary directory for installation files
+
+	// === Consul Storage Paths (KV API paths) ===
+	// These are Consul KV store paths, not filesystem paths
+	ConsulVaultStoragePrefix = "vault/" // Consul KV prefix for Vault storage backend
+	ConsulTLSMetadataKey     = "vault/tls/certificate/metadata" // TLS cert metadata in Consul
+
+	// === Snap Package Paths (for cleanup) ===
+	SnapVaultGlob = "/var/snap/vault*" // Snap install directories (glob pattern)
+
 	// === Network Endpoints ===
 	// Vault listens on 0.0.0.0 but clients connect to hostname or 127.0.0.1
 	VaultListenAddr  = "0.0.0.0"   // Bind address (all interfaces)
@@ -185,7 +244,17 @@ const (
 	VaultDefaultSecretIDTTL = "24h"
 
 	// === Network Constants ===
-	LocalhostIP = "127.0.0.1"
+	LocalhostIP       = "127.0.0.1" // Localhost IPv4 address
+	LocalhostIPv6     = "::1"       // Localhost IPv6 address
+	LocalhostHostname = "localhost" // Localhost hostname
+	AllInterfacesIP   = "0.0.0.0"   // Bind to all network interfaces
+
+	// === Common Timeouts ===
+	ServiceStartTimeout = 10 * time.Second // systemctl start timeout
+	ServiceStopTimeout  = 30 * time.Second // systemctl stop timeout
+	HTTPClientTimeout   = 30 * time.Second // HTTP client default timeout
+	HTTPIdleTimeout     = 30 * time.Second // HTTP idle connection timeout
+	TLSHandshakeTimeout = 10 * time.Second // TLS handshake timeout
 )
 
 // ============================================================================

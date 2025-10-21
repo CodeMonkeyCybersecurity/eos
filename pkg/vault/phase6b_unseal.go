@@ -49,6 +49,7 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 			otelzap.Ctx(rc.Ctx).Warn(" Vault is initialized but sealed — attempting unseal")
 
 			initRes, loadErr := LoadOrPromptInitResult(rc)
+			credentialsFromPrompt := false
 			if loadErr != nil {
 				otelzap.Ctx(rc.Ctx).Warn("Failed to load init result file, falling back to manual prompt", zap.Error(loadErr))
 
@@ -65,6 +66,7 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 					KeysB64:   keys,
 					RootToken: root[0],
 				}
+				credentialsFromPrompt = true
 			}
 			otelzap.Ctx(rc.Ctx).Info(" Init result (or manual input) loaded successfully")
 
@@ -79,6 +81,20 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 				return nil, fmt.Errorf("vault remains sealed after unseal attempt")
 			}
 			otelzap.Ctx(rc.Ctx).Info(" Vault unsealed successfully")
+
+			// CRITICAL FIX P0: Save credentials if they were provided interactively
+			// This prevents infinite prompt loops when vault_init.json is missing
+			if credentialsFromPrompt {
+				otelzap.Ctx(rc.Ctx).Info(" Saving credentials from interactive prompt to prevent future prompts")
+				if err := SaveInitResult(rc, initRes); err != nil {
+					otelzap.Ctx(rc.Ctx).Warn("Failed to save credentials (non-fatal)", zap.Error(err))
+					otelzap.Ctx(rc.Ctx).Info("terminal prompt: You may be prompted for credentials again in future operations")
+					otelzap.Ctx(rc.Ctx).Info("terminal prompt: To fix this, securely save your keys and token")
+				} else {
+					otelzap.Ctx(rc.Ctx).Info(" Credentials saved successfully", zap.String("path", shared.VaultInitPath))
+					otelzap.Ctx(rc.Ctx).Info("terminal prompt: Vault credentials saved - future operations won't prompt")
+				}
+			}
 		} else {
 			otelzap.Ctx(rc.Ctx).Info(" Vault is already unsealed")
 		}
