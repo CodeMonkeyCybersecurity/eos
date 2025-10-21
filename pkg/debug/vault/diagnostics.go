@@ -21,7 +21,7 @@ import (
 // This is intentional to avoid circular import (pkg/debug/vault cannot import pkg/vault)
 // If you change these values, also update pkg/vault/constants.go
 const (
-	DefaultBinaryPath      = "/usr/local/bin/vault"  // Matches vault.VaultBinaryPath
+	DefaultBinaryPath      = "/usr/local/bin/vault" // Matches vault.VaultBinaryPath
 	DefaultConfigPath      = "/etc/vault.d/vault.hcl"
 	DefaultDataPath        = "/opt/vault/data"
 	DefaultLogPath         = "/var/log/vault"
@@ -54,6 +54,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		VaultAgentConfigDiagnostic(),
 		VaultAgentCredentialsDiagnostic(),
 		VaultAgentTokenDiagnostic(),
+		VaultAgentTokenPermissionsDiagnostic(), // Comprehensive token permissions analysis
 		VaultAgentLogsDiagnostic(),
 	}
 }
@@ -1801,4 +1802,235 @@ func OrphanedStateDiagnostic() *debug.Diagnostic {
 			return result, nil
 		},
 	}
+}
+
+// VaultAgentTokenPermissionsDiagnostic provides comprehensive token permissions analysis
+// This diagnostic helps troubleshoot "permission denied" errors by showing:
+// - Token policies
+// - Token TTL and renewal status
+// - Token capabilities on specific paths
+// - Policy content verification
+// - AppRole configuration
+func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Vault Agent Token Permissions",
+		Category:    "Vault Agent",
+		Description: "Comprehensive token permissions and policy analysis",
+		Condition: func(ctx context.Context) bool {
+			// Only run if token file exists
+			_, err := os.Stat("/run/eos/vault_agent_eos.token")
+			return err == nil
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			logger.Info("Analyzing Vault Agent token permissions")
+
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var output strings.Builder
+			output.WriteString("═══════════════════════════════════════════════════════════════\n")
+			output.WriteString(" Vault Token Permissions Analysis\n")
+			output.WriteString("═══════════════════════════════════════════════════════════════\n\n")
+
+			// Get hostname for Vault address
+			hostname, _ := os.Hostname()
+			vaultAddr := fmt.Sprintf("https://%s:8200", hostname)
+
+			// Read token
+			tokenContent, err := os.ReadFile("/run/eos/vault_agent_eos.token")
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Cannot read token file"
+				result.Remediation = "Check file permissions: ls -la /run/eos/vault_agent_eos.token"
+				output.WriteString(fmt.Sprintf("❌ ERROR: Cannot read token file: %v\n", err))
+				result.Output = output.String()
+				return result, nil
+			}
+
+			token := strings.TrimSpace(string(tokenContent))
+			if len(token) == 0 {
+				result.Status = debug.StatusError
+				result.Message = "Token file is empty"
+				result.Remediation = "Restart Vault Agent: sudo systemctl restart vault-agent-eos"
+				output.WriteString("❌ ERROR: Token file is empty\n")
+				result.Output = output.String()
+				return result, nil
+			}
+
+			output.WriteString("1. Vault Agent Token File\n")
+			output.WriteString("───────────────────────────────────────────────────────────────\n")
+			output.WriteString(fmt.Sprintf("   Path: /run/eos/vault_agent_eos.token\n"))
+			output.WriteString(fmt.Sprintf("   Token (first 8 chars): %s...\n", token[:min(8, len(token))]))
+			output.WriteString("\n")
+
+			// Set environment variables for vault CLI
+			os.Setenv("VAULT_ADDR", vaultAddr)
+			os.Setenv("VAULT_SKIP_VERIFY", "1")
+			os.Setenv("VAULT_TOKEN", token)
+
+			// 2. Token Lookup
+			output.WriteString("2. Token Lookup (full details)\n")
+			output.WriteString("───────────────────────────────────────────────────────────────\n")
+
+			cmd := exec.Command("vault", "token", "lookup", "-format=json")
+			lookupOutput, err := cmd.CombinedOutput()
+			if err != nil {
+				output.WriteString(fmt.Sprintf("❌ Failed to lookup token: %v\n", err))
+				output.WriteString(fmt.Sprintf("   Output: %s\n", string(lookupOutput)))
+				result.Status = debug.StatusError
+				result.Message = "Token lookup failed"
+				result.Remediation = "Token may be expired or invalid. Restart Vault Agent."
+			} else {
+				output.WriteString(fmt.Sprintf("   %s\n", string(lookupOutput)))
+				result.Metadata["token_lookup"] = string(lookupOutput)
+			}
+			output.WriteString("\n")
+
+			// 3. Token Capabilities on services/* path
+			output.WriteString("3. Token Capabilities on services/* Path\n")
+			output.WriteString("───────────────────────────────────────────────────────────────\n")
+
+			testPaths := []string{
+				"secret/data/services/production/bionicgpt/azure_openai_api_key",
+				"secret/data/services/*",
+				"secret/metadata/services/*",
+			}
+
+			hasCreateOrUpdate := false
+			for _, testPath := range testPaths {
+				output.WriteString(fmt.Sprintf("   Testing path: %s\n", testPath))
+
+				cmd = exec.Command("vault", "token", "capabilities", testPath)
+				capsOutput, err := cmd.CombinedOutput()
+				if err != nil {
+					output.WriteString(fmt.Sprintf("   ❌ Failed to check capabilities: %v\n", err))
+				} else {
+					caps := strings.TrimSpace(string(capsOutput))
+					output.WriteString(fmt.Sprintf("   Capabilities: %s\n", caps))
+
+					if strings.Contains(caps, "create") || strings.Contains(caps, "update") {
+						output.WriteString("   ✓ Token has write permissions\n")
+						hasCreateOrUpdate = true
+					} else if strings.Contains(caps, "deny") {
+						output.WriteString("   ❌ Token is DENIED access\n")
+					}
+				}
+				output.WriteString("\n")
+			}
+
+			if !hasCreateOrUpdate {
+				result.Status = debug.StatusError
+				result.Message = "Token does NOT have create/update on services/* path"
+				result.Remediation = "Update policy: sudo eos update vault --update-policies && sudo systemctl restart vault-agent-eos"
+			}
+
+			// 4. Check eos-default-policy content
+			output.WriteString("4. eos-default-policy Content\n")
+			output.WriteString("───────────────────────────────────────────────────────────────\n")
+
+			cmd = exec.Command("vault", "policy", "read", "eos-default-policy")
+			policyOutput, err := cmd.CombinedOutput()
+			if err != nil {
+				output.WriteString(fmt.Sprintf("❌ Failed to read policy: %v\n", err))
+			} else {
+				policyContent := string(policyOutput)
+
+				// Check if services/* path is in policy
+				if strings.Contains(policyContent, "secret/data/services") {
+					output.WriteString("✓ Policy includes services/* path\n\n")
+
+					// Extract and show the services section
+					lines := strings.Split(policyContent, "\n")
+					inServicesSection := false
+					for _, line := range lines {
+						if strings.Contains(line, "secret/data/services") || strings.Contains(line, "secret/metadata/services") {
+							inServicesSection = true
+						}
+						if inServicesSection {
+							output.WriteString(fmt.Sprintf("   %s\n", line))
+							if strings.Contains(line, "}") && !strings.Contains(line, "capabilities") {
+								inServicesSection = false
+								output.WriteString("\n")
+							}
+						}
+					}
+				} else {
+					output.WriteString("❌ ERROR: services/* path NOT FOUND in eos-default-policy\n\n")
+					output.WriteString("   Expected to find something like:\n")
+					output.WriteString("   path \"secret/data/services/*\" {\n")
+					output.WriteString("     capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"]\n")
+					output.WriteString("   }\n\n")
+
+					result.Status = debug.StatusError
+					result.Message = "Policy missing services/* path"
+					result.Remediation = "Update policy: sudo eos update vault --update-policies"
+				}
+			}
+
+			// 5. AppRole Configuration
+			output.WriteString("5. AppRole Configuration\n")
+			output.WriteString("───────────────────────────────────────────────────────────────\n")
+
+			cmd = exec.Command("vault", "read", "auth/approle/role/eos-approle", "-format=json")
+			appRoleOutput, err := cmd.CombinedOutput()
+			if err != nil {
+				output.WriteString(fmt.Sprintf("❌ Failed to read AppRole: %v\n", err))
+			} else {
+				output.WriteString(fmt.Sprintf("   %s\n", string(appRoleOutput)))
+				result.Metadata["approle_config"] = string(appRoleOutput)
+			}
+			output.WriteString("\n")
+
+			// 6. Vault Agent Service Status
+			output.WriteString("6. Vault Agent Service Status\n")
+			output.WriteString("───────────────────────────────────────────────────────────────\n")
+
+			cmd = exec.Command("systemctl", "status", "vault-agent-eos", "--no-pager")
+			statusOutput, err := cmd.CombinedOutput()
+			if err == nil {
+				// Just show first 20 lines
+				lines := strings.Split(string(statusOutput), "\n")
+				for i := 0; i < min(20, len(lines)); i++ {
+					output.WriteString(fmt.Sprintf("   %s\n", lines[i]))
+				}
+			} else {
+				output.WriteString(fmt.Sprintf("   %s\n", string(statusOutput)))
+			}
+			output.WriteString("\n")
+
+			// Final summary
+			output.WriteString("═══════════════════════════════════════════════════════════════\n")
+			output.WriteString(" Diagnosis Complete\n")
+			output.WriteString("═══════════════════════════════════════════════════════════════\n\n")
+
+			if result.Status == "" {
+				result.Status = debug.StatusOK
+				result.Message = "Token has valid permissions"
+			}
+
+			if result.Status == debug.StatusError {
+				output.WriteString("Next steps:\n")
+				output.WriteString("  1. Check section 4 - does eos-default-policy have services/* path?\n")
+				output.WriteString("  2. Check section 5 - does AppRole have eos-default-policy attached?\n")
+				output.WriteString("  3. If policy is correct, restart Vault Agent to get new token:\n")
+				output.WriteString("     sudo systemctl restart vault-agent-eos\n")
+				output.WriteString("  4. Run this command again to verify: sudo eos debug vault\n\n")
+			}
+
+			result.Output = output.String()
+			logger.Info("Token permissions analysis complete", zap.String("status", string(result.Status)))
+
+			return result, nil
+		},
+	}
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
