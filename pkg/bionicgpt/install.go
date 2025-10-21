@@ -774,49 +774,173 @@ func (bgi *BionicGPTInstaller) startService(ctx context.Context) error {
 }
 
 // verifyInstallation verifies that BionicGPT is running correctly
+// Uses comprehensive validator with Docker SDK and multi-tenancy checks
 func (bgi *BionicGPTInstaller) verifyInstallation(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("Verifying installation")
-
-	// Check if containers are running
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"compose", "-f", bgi.config.ComposeFile, "ps"},
-		Dir:     bgi.config.InstallDir,
-		Capture: true,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to check service status: %s", output)
-	}
-
-	if !strings.Contains(output, "Up") && !strings.Contains(output, "running") {
-		return fmt.Errorf("containers are not running. Check logs with: docker compose -f %s logs",
-			bgi.config.ComposeFile)
-	}
-
-	logger.Debug("Containers are running")
+	logger.Info("Verifying installation with comprehensive validation")
 
 	// Wait for services to be ready (database initialization can take time)
 	logger.Info("Waiting for services to initialize (this may take 1-2 minutes)")
-	time.Sleep(30 * time.Second)
+	time.Sleep(60 * time.Second)
 
-	// Check database health
-	logger.Debug("Checking PostgreSQL health")
-	pgCheck, _ := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"exec", ContainerPostgres, "pg_isready", "-U", bgi.config.PostgresUser},
-		Capture: true,
-		Timeout: 10 * time.Second,
-	})
-	if !strings.Contains(pgCheck, "accepting connections") {
-		logger.Warn("PostgreSQL may still be initializing")
-	} else {
-		logger.Info("PostgreSQL is accepting connections")
+	// Create comprehensive validator
+	validator, err := NewValidator(bgi.rc, bgi.config)
+	if err != nil {
+		return fmt.Errorf("failed to create validator: %w", err)
+	}
+	defer validator.Close()
+
+	// Run comprehensive validation
+	result, err := validator.ValidateDeployment(ctx)
+	if err != nil {
+		return fmt.Errorf("validation execution failed: %w", err)
 	}
 
-	logger.Info("BionicGPT installation verified",
+	// Display validation results
+	bgi.displayValidationResults(ctx, result)
+
+	// Check for critical errors
+	if !result.OverallHealth {
+		logger.Error("Installation validation failed - critical issues detected")
+		return fmt.Errorf("installation validation failed: %d errors, %d warnings",
+			len(result.Errors), len(result.Warnings))
+	}
+
+	logger.Info("BionicGPT installation verified successfully",
 		zap.String("access_url", fmt.Sprintf("http://localhost:%d", bgi.config.Port)))
 
 	return nil
+}
+
+// displayValidationResults shows detailed validation results to the user
+func (bgi *BionicGPTInstaller) displayValidationResults(ctx context.Context, result *ValidationResult) {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Info("================================================================================")
+	logger.Info("BionicGPT Validation Results")
+	logger.Info("================================================================================")
+
+	// Resource Check
+	if result.ResourceCheck != nil {
+		logger.Info("Resource Availability:")
+		logger.Info(fmt.Sprintf("  CPU Cores:    %d", result.ResourceCheck.CPUCores))
+		logger.Info(fmt.Sprintf("  Memory (GB):  %.1f", result.ResourceCheck.MemoryTotalGB))
+		logger.Info(fmt.Sprintf("  Status:       %s", bgi.statusString(result.ResourceCheck.MeetsMinimum)))
+		if len(result.ResourceCheck.Issues) > 0 {
+			for _, issue := range result.ResourceCheck.Issues {
+				logger.Warn(fmt.Sprintf("    ⚠ %s", issue))
+			}
+		}
+	}
+
+	// Container Check
+	if result.ContainerCheck != nil {
+		logger.Info("")
+		logger.Info("Container Health:")
+		logger.Info(fmt.Sprintf("  Application:  %s", bgi.statusString(result.ContainerCheck.AppRunning)))
+		logger.Info(fmt.Sprintf("  PostgreSQL:   %s", bgi.statusString(result.ContainerCheck.PostgresRunning)))
+		logger.Info(fmt.Sprintf("  Embeddings:   %s", bgi.statusString(result.ContainerCheck.EmbeddingsRunning)))
+		logger.Info(fmt.Sprintf("  RAG Engine:   %s", bgi.statusString(result.ContainerCheck.RAGEngineRunning)))
+		logger.Info(fmt.Sprintf("  Chunking:     %s", bgi.statusString(result.ContainerCheck.ChunkingRunning)))
+	}
+
+	// PostgreSQL and RLS Check
+	if result.PostgreSQLCheck != nil {
+		logger.Info("")
+		logger.Info("PostgreSQL & Multi-Tenancy:")
+		logger.Info(fmt.Sprintf("  Connected:        %s", bgi.statusString(result.PostgreSQLCheck.Connected)))
+		logger.Info(fmt.Sprintf("  RLS Enabled:      %s", bgi.statusString(result.PostgreSQLCheck.RLSEnabled)))
+		logger.Info(fmt.Sprintf("  RLS Policies:     %d", len(result.PostgreSQLCheck.RLSPolicies)))
+		logger.Info(fmt.Sprintf("  pgVector:         %s", bgi.statusString(result.PostgreSQLCheck.PgVectorInstalled)))
+		if len(result.PostgreSQLCheck.RLSPolicies) > 0 {
+			for _, policy := range result.PostgreSQLCheck.RLSPolicies {
+				logger.Info(fmt.Sprintf("    • %s", policy))
+			}
+		}
+		if len(result.PostgreSQLCheck.Issues) > 0 {
+			for _, issue := range result.PostgreSQLCheck.Issues {
+				logger.Warn(fmt.Sprintf("    ⚠ %s", issue))
+			}
+		}
+	}
+
+	// Multi-Tenancy Check
+	if result.MultiTenancyCheck != nil {
+		logger.Info("")
+		logger.Info("Multi-Tenancy Features:")
+		logger.Info(fmt.Sprintf("  Teams Table:      %s", bgi.statusString(result.MultiTenancyCheck.TeamsTableExists)))
+		logger.Info(fmt.Sprintf("  Users Table:      %s", bgi.statusString(result.MultiTenancyCheck.UsersTableExists)))
+		logger.Info(fmt.Sprintf("  RLS Enforced:     %s", bgi.statusString(result.MultiTenancyCheck.RLSEnforced)))
+		if len(result.MultiTenancyCheck.Issues) > 0 {
+			for _, issue := range result.MultiTenancyCheck.Issues {
+				logger.Warn(fmt.Sprintf("    ⚠ %s", issue))
+			}
+		}
+	}
+
+	// Audit Log Check
+	if result.AuditLogCheck != nil {
+		logger.Info("")
+		logger.Info("Audit Logging:")
+		logger.Info(fmt.Sprintf("  Table Exists:     %s", bgi.statusString(result.AuditLogCheck.AuditTableExists)))
+		logger.Info(fmt.Sprintf("  Logs Writing:     %s", bgi.statusString(result.AuditLogCheck.LogsBeingWritten)))
+		logger.Info(fmt.Sprintf("  Recent Entries:   %d", result.AuditLogCheck.RecentEntryCount))
+		if len(result.AuditLogCheck.Issues) > 0 {
+			for _, issue := range result.AuditLogCheck.Issues {
+				logger.Warn(fmt.Sprintf("    ⚠ %s", issue))
+			}
+		}
+	}
+
+	// RAG Pipeline Check
+	if result.RAGPipelineCheck != nil {
+		logger.Info("")
+		logger.Info("RAG Pipeline:")
+		logger.Info(fmt.Sprintf("  Documents Volume: %s", bgi.statusString(result.RAGPipelineCheck.DocumentsVolumeExists)))
+		logger.Info(fmt.Sprintf("  Embeddings:       %s", bgi.statusString(result.RAGPipelineCheck.EmbeddingsServiceHealthy)))
+		logger.Info(fmt.Sprintf("  Chunking:         %s", bgi.statusString(result.RAGPipelineCheck.ChunkingServiceHealthy)))
+		logger.Info(fmt.Sprintf("  RAG Engine:       %s", bgi.statusString(result.RAGPipelineCheck.RAGEngineHealthy)))
+		if len(result.RAGPipelineCheck.Issues) > 0 {
+			for _, issue := range result.RAGPipelineCheck.Issues {
+				logger.Warn(fmt.Sprintf("    ⚠ %s", issue))
+			}
+		}
+	}
+
+	// Summary
+	logger.Info("")
+	logger.Info("Overall Status:")
+	if result.OverallHealth {
+		logger.Info("  ✓ All critical checks passed")
+	} else {
+		logger.Error("  ✗ Critical issues detected")
+	}
+	logger.Info(fmt.Sprintf("  Errors:   %d", len(result.Errors)))
+	logger.Info(fmt.Sprintf("  Warnings: %d", len(result.Warnings)))
+
+	if len(result.Errors) > 0 {
+		logger.Info("")
+		logger.Info("Critical Errors:")
+		for _, err := range result.Errors {
+			logger.Error(fmt.Sprintf("  • %s", err))
+		}
+	}
+
+	if len(result.Warnings) > 0 {
+		logger.Info("")
+		logger.Info("Warnings:")
+		for _, warn := range result.Warnings {
+			logger.Warn(fmt.Sprintf("  • %s", warn))
+		}
+	}
+
+	logger.Info("================================================================================")
+}
+
+// statusString converts boolean to status string
+func (bgi *BionicGPTInstaller) statusString(status bool) string {
+	if status {
+		return "✓ OK"
+	}
+	return "✗ FAILED"
 }

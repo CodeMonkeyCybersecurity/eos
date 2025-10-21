@@ -4,8 +4,8 @@ package sync
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -89,12 +89,47 @@ func runConsulSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.Strings("target_nodes", consulNodes),
 		zap.Bool("dry_run", consulDryRun))
 
+	// Retrieve ACL token from multiple sources (flag, env, vault, consul-kv, file)
+	tokenResult, err := consul.GetConsulACLToken(rc, consulACLToken)
+	if err != nil {
+		// Check if ACLs are actually enabled before failing
+		logger.Debug("Token retrieval failed - checking if ACLs are required", zap.Error(err))
+
+		// Try to create a test client without token
+		_, clientErr := consul.ConfigureConsulClient(rc, "")
+		if clientErr == nil {
+			// ACLs not required - proceed without token
+			logger.Info("Consul ACLs not enabled - proceeding without token")
+			config := consul.DefaultNodeJoinConfigV2()
+			config.TargetNodes = consulNodes
+			config.DryRun = consulDryRun
+			config.SkipBackup = consulSkipBackup
+			config.ACLToken = "" // No token needed
+			config.AllowOffline = consulAllowOffline
+			config.PreserveNonTailscale = !consulForceNoPreserve
+
+			result, err := consul.JoinNodesV2(rc, config)
+			if err != nil {
+				return err
+			}
+			displayNodeJoinResultsV2(logger, result)
+			return nil
+		}
+
+		// ACLs are enabled but no token found - fail with helpful error
+		return err
+	}
+
+	logger.Info("ACL token retrieved successfully",
+		zap.String("source", string(tokenResult.Source)),
+		zap.String("location", tokenResult.Path))
+
 	// Create enhanced V2 configuration with all P0-P3 fixes
 	config := consul.DefaultNodeJoinConfigV2()
 	config.TargetNodes = consulNodes
 	config.DryRun = consulDryRun
 	config.SkipBackup = consulSkipBackup
-	config.ACLToken = consulACLToken
+	config.ACLToken = tokenResult.Token // Use retrieved token
 	config.AllowOffline = consulAllowOffline
 	config.PreserveNonTailscale = !consulForceNoPreserve
 

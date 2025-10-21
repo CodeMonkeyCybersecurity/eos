@@ -35,10 +35,11 @@ require (
 	github.com/hashicorp/vault/api/auth/approle v0.9.0
 	github.com/hashicorp/vault/api/auth/userpass v0.9.0
 	github.com/hetznercloud/hcloud-go/v2 v2.21.0
-	github.com/lib/pq v1.10.7
+	github.com/lib/pq v1.10.9
 	github.com/olekukonko/tablewriter v1.1.0
 	github.com/open-policy-agent/opa v1.4.2
 	github.com/redis/go-redis/v9 v9.11.0
+	github.com/sashabaranov/go-openai v1.41.2
 	github.com/shirou/gopsutil/v4 v4.25.1
 	github.com/sony/gobreaker v1.0.0
 	github.com/spf13/cobra v1.9.1

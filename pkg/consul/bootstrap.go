@@ -266,19 +266,113 @@ func bootstrapACLSystem(rc *eos_io.RuntimeContext, config *ConsulConfig) (string
 
 	// Bootstrap ACL system
 	cmd := exec.Command("consul", "acl", "bootstrap")
-	_, err := cmd.Output()
+	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to bootstrap ACL system: %w", err)
+		return "", fmt.Errorf("failed to bootstrap ACL system: %w\n"+
+			"Output: %s\n"+
+			"Remediation:\n"+
+			"  1. Check if ACLs already bootstrapped: consul acl bootstrap\n"+
+			"  2. If already bootstrapped, retrieve existing token from Consul KV\n"+
+			"  3. Verify Consul is running: systemctl status consul",
+			string(output))
 	}
 
 	// Extract the initial root token from output
-	// TODO: Parse the output to extract the token
-	token := "bootstrap-token-placeholder"
+	// The output contains: SecretID: <token>
+	token, err := parseACLBootstrapOutput(string(output))
+	if err != nil {
+		logger.Warn("Failed to parse ACL bootstrap token from output",
+			zap.Error(err),
+			zap.String("output", string(output)))
+		return "", fmt.Errorf("failed to parse ACL bootstrap token: %w", err)
+	}
 
 	logger.Info("ACL system bootstrapped successfully",
-		zap.String("token_id", token[:8]+"..."))
+		zap.String("token_id", token[:min(8, len(token))]+"..."))
+
+	// Store token in Consul KV for other nodes to retrieve (bootstrap storage)
+	// This allows nodes to join the cluster before Vault is installed
+	logger.Info("Storing ACL bootstrap token in Consul KV for cluster nodes")
+
+	// Create Consul client with the bootstrap token we just created
+	clientConfig := api.DefaultConfig()
+	clientConfig.Token = token
+	client, err := api.NewClient(clientConfig)
+	if err != nil {
+		logger.Warn("Failed to create Consul client to store token",
+			zap.Error(err),
+			zap.String("note", "Token not stored in Consul KV - manual distribution required"))
+		return token, nil // Return token anyway, storage failure is non-fatal
+	}
+
+	// Store token in Consul KV using our auth package function
+	if err := StoreTokenInConsulKV(rc, token, client); err != nil {
+		logger.Warn("Failed to store ACL token in Consul KV",
+			zap.Error(err),
+			zap.String("note", "Token not stored - other nodes will need manual token configuration"))
+		// Non-fatal - return token anyway
+	} else {
+		logger.Info("ACL bootstrap token stored successfully in Consul KV",
+			zap.String("path", "eos/consul/acl_token"),
+			zap.String("note", "Other nodes can now retrieve token automatically via 'eos sync consul'"))
+	}
 
 	return token, nil
+}
+
+// parseACLBootstrapOutput parses the consul acl bootstrap output to extract SecretID
+// Example output:
+//   AccessorID:       e5f93a48-e7c5-4f1e-9f9e-8b8e1c9e0a1d
+//   SecretID:         3b9c3c0a-1234-5678-9abc-def123456789
+//   ...
+func parseACLBootstrapOutput(output string) (string, error) {
+	lines := splitLines(output)
+	for _, line := range lines {
+		// Look for line starting with "SecretID:"
+		if len(line) > 10 && line[:9] == "SecretID:" {
+			// Extract token after "SecretID:"
+			token := trimSpace(line[9:])
+			if token != "" {
+				return token, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("SecretID not found in bootstrap output")
+}
+
+// Helper functions to avoid importing strings
+func splitLines(s string) []string {
+	var lines []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			lines = append(lines, s[start:i])
+			start = i + 1
+		}
+	}
+	if start < len(s) {
+		lines = append(lines, s[start:])
+	}
+	return lines
+}
+
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+	return s[start:end]
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // configureInitialServices configures initial services and policies
