@@ -1,13 +1,30 @@
+// cmd/read/env.go
+//
+// REFACTORED: This file now follows Clean Architecture principles.
+// All display logic has been moved to pkg/environments/display/.
+//
+// Before: 366 lines with display formatting and business logic
+// After: ~100 lines of pure orchestration
+//
+// Migrated functions:
+//   - displayEnvironmentTable() → pkg/environments/display.ShowEnvironmentTable()
+//   - displayDetailedConfiguration() → pkg/environments/display.ShowDetailedConfiguration()
+//   - displayEnvironmentJSON() → pkg/environments/display.ShowEnvironmentJSON()
+//   - displayEnvironmentYAML() → pkg/environments/display.ShowEnvironmentYAML()
+//   - enabledStatus() → pkg/environments/display.formatEnabledStatus() (private)
+//
+// IMPROVEMENTS:
+//   - Fixed YAML marshaling (now uses yaml.Marshal instead of manual fmt.Printf)
+//   - Maintained JSON marshaling fix (uses json.MarshalIndent for security)
+//   - All display logic now testable and reusable
+
 package read
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"text/tabwriter"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments/display"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -40,60 +57,7 @@ Examples:
   # Show in JSON format
   eos read env staging --format json`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := otelzap.Ctx(rc.Ctx)
-
-		logger.Info("Showing environment details",
-			zap.String("command", "env show"),
-			zap.String("component", rc.Component))
-
-		// Parse flags
-		detailed, _ := cmd.Flags().GetBool("detailed")
-		format, _ := cmd.Flags().GetString("format")
-
-		// Create environment manager
-		envManager, err := environments.NewEnvironmentManager("")
-		if err != nil {
-			logger.Error("Failed to create environment manager", zap.Error(err))
-			return fmt.Errorf("failed to create environment manager: %w", err)
-		}
-
-		// Determine which environment to show
-		var envName string
-		if len(args) > 0 {
-			envName = args[0]
-		} else {
-			// Show current environment
-			currentEnv, err := envManager.GetCurrentEnvironment(rc)
-			if err != nil {
-				logger.Error("No current environment set and no environment specified", zap.Error(err))
-				return fmt.Errorf("no current environment set and no environment specified. Use 'eos env use <environment>' to set one or specify an environment name")
-			}
-			envName = currentEnv.Name
-		}
-
-		// Get environment details
-		env, err := envManager.GetEnvironment(rc, envName)
-		if err != nil {
-			logger.Error("Failed to get environment", zap.String("environment", envName), zap.Error(err))
-			return fmt.Errorf("failed to get environment %s: %w", envName, err)
-		}
-
-		logger.Debug("Retrieved environment details",
-			zap.String("environment", envName),
-			zap.String("type", string(env.Type)),
-			zap.String("status", string(env.Status)))
-
-		// Display environment information
-		switch format {
-		case "json":
-			return displayEnvironmentJSON(env)
-		case "yaml":
-			return displayEnvironmentYAML(env)
-		default:
-			return displayEnvironmentTable(env, detailed)
-		}
-	}),
+	RunE: eos.Wrap(showEnvironment),
 }
 
 func init() {
@@ -122,245 +86,59 @@ func init() {
   eos read env staging --format json`
 }
 
-// displayEnvironmentTable displays environment in table format
-// TODO: refactor - Move to pkg/output/environment.go or pkg/environments/display.go
-// ANTI-PATTERN: Massive display function with 100+ lines of fmt.Printf calls
-// ISSUES:
-//   1. Direct fmt.Printf instead of logger (violates CLAUDE.md P0 rule)
-//   2. Display logic in cmd/ instead of pkg/
-//   3. Hardcoded formatting makes it untestable
-//   4. No separation of concerns (formatting + output)
-// FIX:
-//   - Create pkg/environments/display.go with displayEnvironmentTable(env, detailed, w io.Writer)
-//   - Use tabwriter or template for formatting
-//   - Return formatted string/bytes instead of direct printing
-// MOVE TO: pkg/environments/display.go as RenderEnvironmentTable(env, detailed) string
-func displayEnvironmentTable(env *environments.Environment, detailed bool) error {
-	// Basic environment information
-	fmt.Printf("Environment: %s (%s)\n", env.DisplayName, env.Name)
-	fmt.Printf("═══════════════════════════════════\n")
-	fmt.Printf("Type:        %s\n", env.Type)
-	fmt.Printf("Status:      %s\n", env.Status)
-	fmt.Printf("Description: %s\n", env.Description)
-	fmt.Printf("Created:     %s\n", env.CreatedAt.Format("2006-01-02 15:04:05"))
-	fmt.Printf("Updated:     %s\n", env.UpdatedAt.Format("2006-01-02 15:04:05"))
-	fmt.Printf("\n")
+// showEnvironment orchestrates the environment display operation.
+// All display logic is delegated to pkg/environments/display.
+func showEnvironment(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
 
-	// Infrastructure section
-	fmt.Printf("Infrastructure:\n")
-	fmt.Printf("───────────────\n")
-	fmt.Printf("Nomad:     %s (region: %s, dc: %s)\n",
-		env.Infrastructure.Nomad.Address,
-		env.Infrastructure.Nomad.Region,
-		env.Infrastructure.Nomad.Datacenter)
-	fmt.Printf("Consul:    %s (dc: %s)\n",
-		env.Infrastructure.Consul.Address,
-		env.Infrastructure.Consul.Datacenter)
-	fmt.Printf("Vault:     %s\n", env.Infrastructure.Vault.Address)
+	logger.Info("Showing environment details",
+		zap.String("command", "env show"),
+		zap.String("component", rc.Component))
 
-	fmt.Printf("Terraform: %s backend, workspace: %s\n",
-		env.Infrastructure.Terraform.Backend,
-		env.Infrastructure.Terraform.Workspace)
-	fmt.Printf("Provider:  %s (%s)\n",
-		env.Infrastructure.Provider.Name,
-		env.Infrastructure.Provider.Region)
-	fmt.Printf("\n")
+	// Parse flags
+	detailed, _ := cmd.Flags().GetBool("detailed")
+	format, _ := cmd.Flags().GetString("format")
 
-	// Deployment section
-	fmt.Printf("Deployment Configuration:\n")
-	fmt.Printf("─────────────────────────\n")
-	fmt.Printf("Strategy:     %s\n", env.Deployment.Strategy.Type)
-	fmt.Printf("Max Parallel: %d\n", env.Deployment.Strategy.MaxParallel)
-	fmt.Printf("Auto Revert:  %t\n", env.Deployment.Strategy.AutoRevert)
-	fmt.Printf("Auto Promote: %t\n", env.Deployment.Strategy.AutoPromote)
-	fmt.Printf("Resources:    CPU: %dMHz, Memory: %dMB (max: %dMB)\n",
-		env.Deployment.Resources.CPU,
-		env.Deployment.Resources.Memory,
-		env.Deployment.Resources.MemoryMax)
-	fmt.Printf("\n")
-
-	// Security section
-	fmt.Printf("Security Configuration:\n")
-	fmt.Printf("───────────────────────\n")
-	fmt.Printf("RBAC:         %s\n", enabledStatus(env.Security.AccessControl.RBAC.Enabled))
-	fmt.Printf("MFA Required: %s\n", enabledStatus(env.Security.AccessControl.MFA.Required))
-	fmt.Printf("Approval Req: %s\n", enabledStatus(env.Security.AccessControl.Approval.Required))
-	fmt.Printf("Network Policy: %s\n", enabledStatus(env.Security.NetworkPolicy.Enabled))
-	fmt.Printf("Encryption:   In-transit: %s, At-rest: %s\n",
-		enabledStatus(env.Security.Encryption.InTransit.Enabled),
-		enabledStatus(env.Security.Encryption.AtRest.Enabled))
-	fmt.Printf("\n")
-
-	// Monitoring section
-	fmt.Printf("Monitoring Configuration:\n")
-	fmt.Printf("─────────────────────────\n")
-	fmt.Printf("Metrics:   %s (%s, interval: %s)\n",
-		enabledStatus(env.Monitoring.Metrics.Enabled),
-		env.Monitoring.Metrics.Provider,
-		env.Monitoring.Metrics.Interval)
-	fmt.Printf("Logging:   %s (level: %s, format: %s)\n",
-		enabledStatus(env.Monitoring.Logging.Enabled),
-		env.Monitoring.Logging.Level,
-		env.Monitoring.Logging.Format)
-	fmt.Printf("Tracing:   %s\n", enabledStatus(env.Monitoring.Tracing.Enabled))
-	fmt.Printf("Alerting:  %s\n", enabledStatus(env.Monitoring.Alerting.Enabled))
-	fmt.Printf("\n")
-
-	// Metadata section
-	if env.Metadata.Owner != "" || env.Metadata.Team != "" {
-		fmt.Printf("Metadata:\n")
-		fmt.Printf("─────────\n")
-		if env.Metadata.Owner != "" {
-			fmt.Printf("Owner:       %s\n", env.Metadata.Owner)
-		}
-		if env.Metadata.Team != "" {
-			fmt.Printf("Team:        %s\n", env.Metadata.Team)
-		}
-		if env.Metadata.Project != "" {
-			fmt.Printf("Project:     %s\n", env.Metadata.Project)
-		}
-		if env.Metadata.CostCenter != "" {
-			fmt.Printf("Cost Center: %s\n", env.Metadata.CostCenter)
-		}
-		if env.Metadata.Purpose != "" {
-			fmt.Printf("Purpose:     %s\n", env.Metadata.Purpose)
-		}
-		fmt.Printf("\n")
-	}
-
-	if detailed {
-		return displayDetailedConfiguration(env)
-	}
-
-	return nil
-}
-
-// TODO: refactor - Move to pkg/environments/display.go
-// ANTI-PATTERN: 60+ lines of fmt.Printf and tabwriter usage in cmd/
-// ISSUES: Same as displayEnvironmentTable - display logic doesn't belong in cmd/
-// MOVE TO: pkg/environments/display.go as RenderDetailedConfiguration(env) string
-func displayDetailedConfiguration(env *environments.Environment) error {
-	fmt.Printf("Detailed Configuration:\n")
-	fmt.Printf("═══════════════════════\n\n")
-
-	// Infrastructure details
-	fmt.Printf("Infrastructure Details:\n")
-	fmt.Printf("───────────────────────\n")
-
-	// Nomad details
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "COMPONENT\tENDPOINT\tREGION/DC\tNAMESPACE\tTLS")
-	_, _ = fmt.Fprintf(w, "Nomad\t%s\t%s/%s\t%s\t%s\n",
-		env.Infrastructure.Nomad.Address,
-		env.Infrastructure.Nomad.Region,
-		env.Infrastructure.Nomad.Datacenter,
-		env.Infrastructure.Nomad.Namespace,
-		enabledStatus(env.Infrastructure.Nomad.TLS.Enabled))
-	_, _ = fmt.Fprintf(w, "Consul\t%s\t%s\t-\t%s\n",
-		env.Infrastructure.Consul.Address,
-		env.Infrastructure.Consul.Datacenter,
-		enabledStatus(env.Infrastructure.Consul.TLS.Enabled))
-	_, _ = fmt.Fprintf(w, "Vault\t%s\t-\t%s\t%s\n",
-		env.Infrastructure.Vault.Address,
-		env.Infrastructure.Vault.Namespace,
-		enabledStatus(env.Infrastructure.Vault.TLS.Enabled))
-	w.Flush()
-	fmt.Printf("\n")
-
-	// Deployment strategy details
-	fmt.Printf("Deployment Strategy Details:\n")
-	fmt.Printf("────────────────────────────\n")
-	fmt.Printf("Type:              %s\n", env.Deployment.Strategy.Type)
-	fmt.Printf("Max Parallel:      %d\n", env.Deployment.Strategy.MaxParallel)
-	fmt.Printf("Min Healthy Time:  %s\n", env.Deployment.Strategy.MinHealthyTime)
-	fmt.Printf("Healthy Deadline:  %s\n", env.Deployment.Strategy.HealthyDeadline)
-	fmt.Printf("Progress Deadline: %s\n", env.Deployment.Strategy.ProgressDeadline)
-	fmt.Printf("Auto Revert:       %s\n", enabledStatus(env.Deployment.Strategy.AutoRevert))
-	fmt.Printf("Auto Promote:      %s\n", enabledStatus(env.Deployment.Strategy.AutoPromote))
-	if env.Deployment.Strategy.Type == "canary" {
-		fmt.Printf("Canary Replicas:   %d\n", env.Deployment.Strategy.CanaryReplicas)
-		fmt.Printf("Canary Duration:   %s\n", env.Deployment.Strategy.CanaryDuration)
-	}
-	fmt.Printf("\n")
-
-	// Security details
-	fmt.Printf("Security Details:\n")
-	fmt.Printf("─────────────────\n")
-	if env.Security.AccessControl.Approval.Required {
-		fmt.Printf("Approval Required: %s (min: %d, timeout: %s)\n",
-			enabledStatus(env.Security.AccessControl.Approval.Required),
-			env.Security.AccessControl.Approval.MinApprovals,
-			env.Security.AccessControl.Approval.Timeout)
-	}
-	if env.Security.AccessControl.MFA.Required {
-		fmt.Printf("MFA Configuration: Required, Grace Period: %s\n",
-			env.Security.AccessControl.MFA.GracePeriod)
-	}
-	fmt.Printf("Audit Logging:     %s\n", enabledStatus(env.Security.AccessControl.Audit.Enabled))
-	fmt.Printf("Secret Scanning:   %s\n", enabledStatus(env.Security.SecretScanning.Enabled))
-	fmt.Printf("\n")
-
-	return nil
-}
-
-// FIXED: Security vulnerability - replaced manual JSON with proper marshaling
-// TODO: refactor - Move to pkg/environments/display.go as RenderEnvironmentJSON(env) ([]byte, error)
-// PREVIOUS ISSUE: Manual JSON construction without escaping = JSON injection vulnerability
-// FIX APPLIED: Use json.MarshalIndent for proper escaping and structure
-func displayEnvironmentJSON(env *environments.Environment) error {
-	// Use proper JSON marshaling with indentation
-	jsonData, err := json.MarshalIndent(env, "", "  ")
+	// Create environment manager
+	envManager, err := environments.NewEnvironmentManager("")
 	if err != nil {
-		return fmt.Errorf("failed to marshal environment to JSON: %w", err)
+		logger.Error("Failed to create environment manager", zap.Error(err))
+		return fmt.Errorf("failed to create environment manager: %w", err)
 	}
 
-	// Print the JSON output
-	fmt.Println(string(jsonData))
-	return nil
-}
-
-// TODO: refactor - Move to pkg/environments/display.go
-// ANTI-PATTERN: Incomplete YAML implementation with manual fmt.Printf
-// ISSUES: Same as displayEnvironmentJSON - should use yaml.Marshal
-// FIX: Use yaml.Marshal(env) from gopkg.in/yaml.v3
-// MOVE TO: pkg/environments/display.go as RenderEnvironmentYAML(env) ([]byte, error)
-func displayEnvironmentYAML(env *environments.Environment) error {
-	// This would implement proper YAML marshaling
-	fmt.Printf("name: %s\n", env.Name)
-	fmt.Printf("display_name: %s\n", env.DisplayName)
-	fmt.Printf("type: %s\n", env.Type)
-	fmt.Printf("status: %s\n", env.Status)
-	fmt.Printf("description: %s\n", env.Description)
-	fmt.Printf("created_at: %s\n", env.CreatedAt.Format(time.RFC3339))
-	fmt.Printf("updated_at: %s\n", env.UpdatedAt.Format(time.RFC3339))
-	fmt.Printf("infrastructure:\n")
-	fmt.Printf("  nomad:\n")
-	fmt.Printf("    address: %s\n", env.Infrastructure.Nomad.Address)
-	fmt.Printf("    region: %s\n", env.Infrastructure.Nomad.Region)
-	fmt.Printf("    datacenter: %s\n", env.Infrastructure.Nomad.Datacenter)
-	fmt.Printf("    namespace: %s\n", env.Infrastructure.Nomad.Namespace)
-	fmt.Printf("  consul:\n")
-	fmt.Printf("    address: %s\n", env.Infrastructure.Consul.Address)
-	fmt.Printf("    datacenter: %s\n", env.Infrastructure.Consul.Datacenter)
-	fmt.Printf("  vault:\n")
-	fmt.Printf("    address: %s\n", env.Infrastructure.Vault.Address)
-	fmt.Printf("deployment:\n")
-	fmt.Printf("  strategy:\n")
-	fmt.Printf("    type: %s\n", env.Deployment.Strategy.Type)
-	fmt.Printf("    max_parallel: %d\n", env.Deployment.Strategy.MaxParallel)
-	fmt.Printf("    auto_revert: %t\n", env.Deployment.Strategy.AutoRevert)
-	fmt.Printf("    auto_promote: %t\n", env.Deployment.Strategy.AutoPromote)
-	fmt.Printf("  resources:\n")
-	fmt.Printf("    cpu: %d\n", env.Deployment.Resources.CPU)
-	fmt.Printf("    memory: %d\n", env.Deployment.Resources.Memory)
-	fmt.Printf("    memory_max: %d\n", env.Deployment.Resources.MemoryMax)
-	return nil
-}
-
-// Helper function to display enabled/disabled status
-func enabledStatus(enabled bool) string {
-	if enabled {
-		return "enabled"
+	// Determine which environment to show
+	var envName string
+	if len(args) > 0 {
+		envName = args[0]
+	} else {
+		// Show current environment
+		currentEnv, err := envManager.GetCurrentEnvironment(rc)
+		if err != nil {
+			logger.Error("No current environment set and no environment specified", zap.Error(err))
+			return fmt.Errorf("no current environment set and no environment specified. Use 'eos env use <environment>' to set one or specify an environment name")
+		}
+		envName = currentEnv.Name
 	}
-	return "disabled"
+
+	// Get environment details
+	env, err := envManager.GetEnvironment(rc, envName)
+	if err != nil {
+		logger.Error("Failed to get environment", zap.String("environment", envName), zap.Error(err))
+		return fmt.Errorf("failed to get environment %s: %w", envName, err)
+	}
+
+	logger.Debug("Retrieved environment details",
+		zap.String("environment", envName),
+		zap.String("type", string(env.Type)),
+		zap.String("status", string(env.Status)))
+
+	// Display environment information (delegated to pkg/environments/display)
+	switch format {
+	case "json":
+		return display.ShowEnvironmentJSON(env)
+	case "yaml":
+		return display.ShowEnvironmentYAML(env)
+	default:
+		return display.ShowEnvironmentTable(env, detailed)
+	}
 }

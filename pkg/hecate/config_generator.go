@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -96,10 +97,16 @@ func gatherApps(rc *eos_io.RuntimeContext) (map[string]RawAppConfig, error) {
 		// Domain
 		logger.Info("terminal prompt: Domain (e.g., example.com): ")
 		fmt.Print("Domain: ")
-		app.Domain = strings.TrimSpace(mustReadLine(reader))
-		if app.Domain == "" {
+		domainInput := strings.TrimSpace(mustReadLine(reader))
+		if domainInput == "" {
 			logger.Warn("Domain is required, skipping app")
 			continue
+		}
+
+		// Sanitize domain input
+		app.Domain = shared.SanitizeURL(domainInput)
+		if app.Domain != domainInput {
+			logger.Info("terminal prompt: ℹ️  Domain sanitized: " + app.Domain)
 		}
 
 		// Detect if this is authentik (special case)

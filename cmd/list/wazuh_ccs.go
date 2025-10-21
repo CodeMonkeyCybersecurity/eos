@@ -66,19 +66,19 @@ func runListWazuhCCS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	switch {
 	case showCustomers:
-		return listCustomers(rc, cmd, outputFormat)
+		return listWazuhCustomers(rc, cmd, outputFormat)
 	case showDeployments:
-		return listDeployments(rc, cmd, outputFormat)
+		return listWazuhDeployments(rc, cmd, outputFormat)
 	case showBackups:
-		return listBackups(rc, cmd, outputFormat)
+		return listWazuhBackups(rc, cmd, outputFormat)
 	case showEvents:
-		return listEvents(rc, cmd, outputFormat)
+		return listWazuhEvents(rc, cmd, outputFormat)
 	default:
 		return cmd.Help()
 	}
 }
 
-func listCustomers(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
+func listWazuhCustomers(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Get filters
@@ -111,7 +111,7 @@ func listCustomers(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string)
 	}
 }
 
-func listDeployments(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
+func listWazuhDeployments(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	customerFilter, _ := cmd.Flags().GetString("customer-id")
@@ -136,7 +136,7 @@ func listDeployments(rc *eos_io.RuntimeContext, cmd *cobra.Command, format strin
 	}
 }
 
-func listBackups(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
+func listWazuhBackups(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	customerFilter, _ := cmd.Flags().GetString("customer-id")
@@ -161,7 +161,7 @@ func listBackups(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) e
 	}
 }
 
-func listEvents(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
+func listWazuhEvents(rc *eos_io.RuntimeContext, cmd *cobra.Command, format string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	customerFilter, _ := cmd.Flags().GetString("customer-id")

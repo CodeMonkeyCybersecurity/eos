@@ -163,7 +163,7 @@ func DetectAppType(appName string, explicitType string) string {
 	if strings.Contains(nameLower, "minio") || strings.Contains(nameLower, "s3") {
 		return "minio"
 	}
-	if strings.Contains(nameLower, "authentik") || strings.Contains(nameLower, "auth") || strings.Contains(nameLower, "hera") {
+	if strings.Contains(nameLower, "authentik") || nameLower == "auth" || nameLower == "hera" {
 		return "authentik"
 	}
 	if strings.Contains(nameLower, "grafana") {

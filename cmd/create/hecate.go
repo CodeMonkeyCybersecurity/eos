@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
@@ -75,6 +76,13 @@ Examples:
 				zap.String("config_file", configFile),
 				zap.String("output_dir", outputDir))
 
+			// ASSESS - Discover environment for secret management
+			log.Info("Discovering environment configuration")
+			envConfig, err := environment.DiscoverEnvironment(rc)
+			if err != nil {
+				return fmt.Errorf("failed to discover environment: %w", err)
+			}
+
 			// Load YAML configuration
 			config, err := hecate.LoadYAMLConfig(rc, configFile)
 			if err != nil {
@@ -116,19 +124,32 @@ Examples:
 				log.Info("terminal prompt:   Nginx stream proxy (TCP/UDP)")
 			}
 
-			// Generate infrastructure
+			// Generate infrastructure with secrets
 			log.Info("Generating infrastructure configuration")
-			if err := hecate.GenerateFromYAML(rc, config, outputDir); err != nil {
+			if err := hecate.GenerateFromYAML(rc, config, outputDir, envConfig); err != nil {
 				return fmt.Errorf("failed to generate configuration: %w", err)
 			}
 
 			log.Info("terminal prompt: ")
-			log.Info("terminal prompt: Hecate infrastructure generated successfully!")
+			log.Info("terminal prompt: ✓ Hecate infrastructure generated successfully!")
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: ⚠️  PREREQUISITES:")
+			log.Info("terminal prompt:   • DNS records must point to this server:")
+			for _, app := range config.Apps {
+				log.Info(fmt.Sprintf("terminal prompt:     - %s (A record → your server IP)", app.Domain))
+			}
+			log.Info("terminal prompt:   • Ports 80, 443 must be available (not in use)")
+			if config.NeedsCoturn {
+				log.Info("terminal prompt:   • Coturn ports: 3478, 5349, 49160-49200/udp must be available")
+			}
+			if config.NeedsNginx {
+				log.Info("terminal prompt:   • TCP ports must be available for stream proxying")
+			}
 			log.Info("terminal prompt: ")
 			log.Info("terminal prompt: Next steps:")
 			log.Info("terminal prompt:   1. Review generated files in " + outputDir)
 			if config.HasAuthentik {
-				log.Info("terminal prompt:   2. Edit .env file with secure passwords")
+				log.Info("terminal prompt:   2. Check .env file for Authentik bootstrap credentials")
 				log.Info("terminal prompt:   3. Start services: cd " + outputDir + " && docker compose up -d")
 			} else {
 				log.Info("terminal prompt:   2. Start services: cd " + outputDir + " && docker compose up -d")

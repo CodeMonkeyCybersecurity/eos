@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -73,12 +74,36 @@ func LoadYAMLConfig(rc *eos_io.RuntimeContext, configPath string) (*YAMLHecateCo
 	// ASSESS - Read YAML file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		if os.IsNotExist(err) {
+			return nil, eos_err.NewUserError(
+				"Configuration file not found: %s\n\n"+
+					"To create a new configuration:\n"+
+					"  1. Generate interactively: eos create config --hecate\n"+
+					"  2. Or copy example: cp examples/hecate-config.yaml %s\n"+
+					"  3. Then edit: nano %s\n\n"+
+					"See examples/hecate-config.yaml for configuration format",
+				configPath, configPath, configPath)
+		}
+		if os.IsPermission(err) {
+			return nil, eos_err.NewUserError(
+				"Permission denied reading config file: %s\n"+
+					"Fix: chmod +r %s", configPath, configPath)
+		}
+		return nil, fmt.Errorf("failed to read config file %s: %w", configPath, err)
 	}
 
 	var raw RawYAMLConfig
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		return nil, eos_err.NewUserError(
+			"Failed to parse YAML configuration file: %s\n\n"+
+				"Error: %v\n\n"+
+				"Common issues:\n"+
+				"  - Invalid YAML syntax (check indentation)\n"+
+				"  - Missing required fields (domain, backend)\n"+
+				"  - Invalid field names\n\n"+
+				"Validate YAML syntax: https://www.yamllint.com/\n"+
+				"See examples/hecate-config.yaml for correct format",
+			configPath, err)
 	}
 
 	config := &YAMLHecateConfig{
@@ -138,9 +163,22 @@ func parseApp(rc *eos_io.RuntimeContext, appName string, rawApp RawAppConfig) (A
 		zap.String("app_name", appName),
 		zap.String("detected_type", appType))
 
-	// Validate required fields
+	// Validate and sanitize required fields
 	if rawApp.Domain == "" {
 		return AppConfig{}, fmt.Errorf("missing required field: domain")
+	}
+
+	// Sanitize domain input
+	sanitizedDomain := shared.SanitizeURL(rawApp.Domain)
+	if sanitizedDomain != rawApp.Domain {
+		logger.Debug("Domain sanitized",
+			zap.String("original", rawApp.Domain),
+			zap.String("sanitized", sanitizedDomain))
+	}
+
+	// Validate domain format
+	if err := validateDomain(sanitizedDomain); err != nil {
+		return AppConfig{}, fmt.Errorf("invalid domain for app '%s': %w", appName, err)
 	}
 
 	// SPECIAL CASE: Authentik is always internal
@@ -154,7 +192,7 @@ func parseApp(rc *eos_io.RuntimeContext, appName string, rawApp RawAppConfig) (A
 		return AppConfig{
 			Name:            appName,
 			Type:            "authentik",
-			Domain:          rawApp.Domain,
+			Domain:          sanitizedDomain,
 			Backend:         "hecate-server-1",
 			BackendPort:     shared.PortAuthentik,
 			BackendProtocol: "http",
@@ -171,13 +209,18 @@ func parseApp(rc *eos_io.RuntimeContext, appName string, rawApp RawAppConfig) (A
 		return AppConfig{}, fmt.Errorf("missing required field: backend")
 	}
 
+	// Validate backend format
+	if err := validateBackend(rawApp.Backend); err != nil {
+		return AppConfig{}, fmt.Errorf("invalid backend for app '%s': %w", appName, err)
+	}
+
 	// Parse backend (host:port or just host)
 	backendHost, backendPort := parseBackend(rawApp.Backend, defaults.BackendPort, appType, appName)
 
 	app := AppConfig{
 		Name:            appName,
 		Type:            appType,
-		Domain:          rawApp.Domain,
+		Domain:          sanitizedDomain,
 		Backend:         backendHost,
 		BackendPort:     backendPort,
 		BackendProtocol: defaults.BackendProtocol,
@@ -227,4 +270,84 @@ func copyIntMap(m map[int]int) map[int]int {
 		result[k] = v
 	}
 	return result
+}
+
+// validateBackend checks if backend is a valid IP address or hostname
+func validateBackend(backend string) error {
+	if backend == "" {
+		return fmt.Errorf("backend cannot be empty")
+	}
+
+	// Extract host part (remove :port if present)
+	host := backend
+	if strings.Contains(backend, ":") {
+		parts := strings.Split(backend, ":")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid backend format (too many colons): %s", backend)
+		}
+		host = parts[0]
+
+		// Validate port
+		port := parts[1]
+		if portNum, err := strconv.Atoi(port); err != nil || portNum < 1 || portNum > 65535 {
+			return fmt.Errorf("invalid port number: %s (must be 1-65535)", port)
+		}
+	}
+
+	// Check if it's a valid format (IP or hostname)
+	// Allow: IPs (192.168.1.1), hostnames (server.local), FQDNs (app.example.com)
+	// Reject: URLs with protocols, paths, queries
+	if strings.Contains(host, "/") || strings.Contains(host, "?") ||
+	   strings.Contains(host, "@") || strings.Contains(host, "#") {
+		return fmt.Errorf("invalid backend format: %s\n"+
+			"Use IP address (192.168.1.100) or hostname (server.local)\n"+
+			"Do not include protocol (http://), path (/api), or query (?key=val)", backend)
+	}
+
+	// Very basic hostname/IP validation - just check reasonable characters
+	validChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_"
+	for _, char := range host {
+		if !strings.ContainsRune(validChars, char) {
+			return fmt.Errorf("invalid character '%c' in backend: %s\n"+
+				"Backend must be IP address or hostname (alphanumeric, dots, hyphens only)",
+				char, backend)
+		}
+	}
+
+	return nil
+}
+
+// validateDomain checks if domain is a valid format
+func validateDomain(domain string) error {
+	if domain == "" {
+		return fmt.Errorf("domain cannot be empty")
+	}
+
+	// Remove protocol if accidentally included
+	if strings.HasPrefix(domain, "http://") || strings.HasPrefix(domain, "https://") {
+		return fmt.Errorf("domain should not include protocol: %s\n"+
+			"Use: example.com (not https://example.com)", domain)
+	}
+
+	// Check for path, query, or fragment
+	if strings.Contains(domain, "/") || strings.Contains(domain, "?") || strings.Contains(domain, "#") {
+		return fmt.Errorf("domain should not include path, query, or fragment: %s\n"+
+			"Use: example.com (not example.com/path)", domain)
+	}
+
+	// Check for spaces or other invalid characters
+	if strings.Contains(domain, " ") || strings.Contains(domain, "\t") {
+		return fmt.Errorf("domain contains whitespace: %s", domain)
+	}
+
+	// Very basic domain validation - must have at least one dot for FQDN
+	// (Allow localhost, etc. for development)
+	parts := strings.Split(domain, ".")
+	if len(parts) < 2 && domain != "localhost" {
+		return fmt.Errorf("invalid domain format: %s\n"+
+			"Use fully qualified domain name (example.com)\n"+
+			"or 'localhost' for local development", domain)
+	}
+
+	return nil
 }

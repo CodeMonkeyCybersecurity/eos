@@ -6,48 +6,48 @@
 apps:
   # Simple web application
   main:
-    domain: cybermonkey.dev
-    backend: 100.65.138.128:8009
+    domain: example.com
+    backend: 192.0.2.10:8009
 
   # Wazuh security monitoring (auto-detected type)
   wazuh:
-    domain: delphi.cybermonkey.dev
-    backend: 100.88.163.85
+    domain: wazuh.example.com
+    backend: 192.0.2.20
     # Automatically includes TCP ports 1514, 1515, 55000
 
   # Nextcloud with SSO protection
   nextcloud:
-    domain: cloud.cybermonkey.dev
-    backend: 100.65.138.128
+    domain: cloud.example.com
+    backend: 192.0.2.30
     sso: true      # Requires authentication via Authentik
     talk: true     # Enables WebRTC/Coturn for Nextcloud Talk
 
   # MinIO object storage
   minio:
-    domain: s3.cybermonkey.dev
-    backend: 100.65.138.128:8123
+    domain: s3.example.com
+    backend: 192.0.2.40:9000
 
   # MinIO API endpoint
   minio-api:
-    domain: s3api.cybermonkey.dev
-    backend: 100.65.138.128
+    domain: s3api.example.com
+    backend: 192.0.2.40
     # Port automatically detected as 9123 for MinIO API
 
   # Authentik identity provider (SSO)
   # Backend is automatic - always uses hecate-server-1:9000
   authentik:
-    domain: hera.cybermonkey.dev
+    domain: auth.example.com
 
   # Grafana monitoring with SSO
   grafana:
-    domain: grafana.cybermonkey.dev
-    backend: 100.65.138.128:8069
+    domain: grafana.example.com
+    backend: 192.0.2.50:3000
     sso: true
 
   # Umami analytics
   umami:
-    domain: umami.cybermonkey.dev
-    backend: 100.65.138.128:8117
+    domain: umami.example.com
+    backend: 192.0.2.60:3000
 
 # What Hecate generates:
 #
