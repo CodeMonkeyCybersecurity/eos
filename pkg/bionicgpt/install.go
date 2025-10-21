@@ -229,24 +229,25 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		return fmt.Errorf("failed to discover environment: %w", err)
 	}
 
-	// Step 3: Initialize secret manager
+	// Step 3: Get embeddings configuration (local or Azure)
+	if err := bgi.configureEmbeddings(ctx); err != nil {
+		return err
+	}
+
+	// Step 4: Get Azure OpenAI configuration
+	// Note: Azure package now initializes secret manager internally
+	if err := bgi.getAzureConfiguration(ctx); err != nil {
+		return err
+	}
+
+	// Step 5: Initialize secret manager for service secrets
 	logger.Info("Initializing secret manager")
 	secretManager, err := secrets.NewSecretManager(bgi.rc, envConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
 
-	// Step 4: Get embeddings configuration (local or Azure)
-	if err := bgi.configureEmbeddings(ctx); err != nil {
-		return err
-	}
-
-	// Step 5: Get Azure OpenAI configuration if not fully provided
-	if err := bgi.getAzureConfiguration(ctx); err != nil {
-		return err
-	}
-
-	// Step 5: Get or generate secrets from Vault
+	// Step 6: Get or generate secrets from Vault
 	logger.Info("Managing secrets via Vault")
 	requiredSecrets := map[string]secrets.SecretType{
 		"postgres_password":  secrets.SecretTypePassword,
@@ -592,8 +593,7 @@ func (bgi *BionicGPTInstaller) getAzureConfiguration(ctx context.Context) error 
 	}
 
 	// Create Azure OpenAI configuration manager
-	// Note: secretManager should be stored in bgi for access here
-	// For now, pass nil and it will prompt for API key
+	// Pass nil for secretManager - Azure package will initialize it internally via environment discovery
 	azureManager := azure.NewConfigManager(bgi.rc, nil, "bionicgpt")
 
 	// Configure Azure OpenAI (handles validation, auto-detection, etc.)

@@ -251,6 +251,12 @@ func (sm *SecretManager) generateJWTSecret(length int) (string, error) {
 	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
+// GetBackend returns the secret backend for direct access (for advanced use cases)
+// Most code should use GetOrGenerateServiceSecrets instead
+func (sm *SecretManager) GetBackend() SecretBackend {
+	return sm.backend
+}
+
 // Vault Backend Implementation
 type VaultBackend struct {
 	address string
@@ -304,22 +310,7 @@ func (vb *VaultBackend) Retrieve(path string) (map[string]interface{}, error) {
 func (vb *VaultBackend) Generate(path string, secretType SecretType) (string, error) {
 	// Generate secret using local crypto (Vault doesn't generate secrets for us)
 	// Then store it in Vault
-	var secret string
-	var err error
-
-	switch secretType {
-	case SecretTypePassword:
-		secret, err = generatePassword(32)
-	case SecretTypeAPIKey:
-		secret, err = generateAPIKey(44)
-	case SecretTypeToken:
-		secret, err = generateToken(64)
-	case SecretTypeJWT:
-		secret, err = generateToken(64)
-	default:
-		secret, err = generatePassword(32)
-	}
-
+	secret, err := generateSecretValue(secretType)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate secret: %w", err)
 	}
@@ -335,6 +326,24 @@ func (vb *VaultBackend) Generate(path string, secretType SecretType) (string, er
 	}
 
 	return secret, nil
+}
+
+// generateSecretValue generates a secret value based on type
+func generateSecretValue(secretType SecretType) (string, error) {
+	bytes := make([]byte, 32) // Default 32 bytes = 256 bits
+
+	switch secretType {
+	case SecretTypeAPIKey:
+		bytes = make([]byte, 44) // 44 bytes for base64 API keys
+	case SecretTypeToken, SecretTypeJWT:
+		bytes = make([]byte, 64) // 64 bytes for tokens
+	}
+
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
 func (vb *VaultBackend) Exists(path string) bool {

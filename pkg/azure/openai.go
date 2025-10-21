@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	consulapi "github.com/hashicorp/consul/api"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -44,10 +46,11 @@ type ConfigManager struct {
 }
 
 // NewConfigManager creates a new Azure OpenAI configuration manager
+// If secretManager is nil, it will initialize one automatically via environment discovery
 func NewConfigManager(rc *eos_io.RuntimeContext, secretManager *secrets.SecretManager, serviceName string) *ConfigManager {
 	return &ConfigManager{
 		rc:            rc,
-		secretManager: secretManager,
+		secretManager: secretManager, // May be nil - will initialize on demand
 		config: &OpenAIConfig{
 			ServiceName: serviceName,
 			APIVersion:  "2024-02-15-preview", // Default API version
@@ -55,10 +58,99 @@ func NewConfigManager(rc *eos_io.RuntimeContext, secretManager *secrets.SecretMa
 	}
 }
 
+// discoverEnvironment discovers the current Eos environment configuration
+func (cm *ConfigManager) discoverEnvironment(ctx context.Context) (*environment.EnvironmentConfig, error) {
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Discovering Eos environment")
+
+	envConfig, err := environment.DiscoverEnvironment(cm.rc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover environment: %w", err)
+	}
+
+	return envConfig, nil
+}
+
+// ensureEnvironment ensures the environment is set in config
+func (cm *ConfigManager) ensureEnvironment(ctx context.Context) error {
+	if cm.config.Environment != "" {
+		return nil // Already set
+	}
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Environment not set, discovering")
+
+	envConfig, err := cm.discoverEnvironment(ctx)
+	if err != nil {
+		return err
+	}
+
+	cm.config.Environment = envConfig.Environment
+	logger.Debug("Environment discovered", zap.String("environment", cm.config.Environment))
+	return nil
+}
+
+// ensureSecretManager initializes secret manager on demand if not provided
+func (cm *ConfigManager) ensureSecretManager(ctx context.Context) error {
+	if cm.secretManager != nil {
+		return nil // Already initialized
+	}
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Secret manager not provided, initializing via environment discovery")
+
+	// Discover environment
+	envConfig, err := cm.discoverEnvironment(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to discover environment: %w", err)
+	}
+
+	// Set environment in config if not set
+	if cm.config.Environment == "" {
+		cm.config.Environment = envConfig.Environment
+	}
+
+	// Initialize secret manager
+	secretManager, err := secrets.NewSecretManager(cm.rc, envConfig)
+	if err != nil {
+		return fmt.Errorf("failed to initialize secret manager: %w", err)
+	}
+
+	cm.secretManager = secretManager
+	logger.Debug("Secret manager initialized successfully", zap.String("backend", "vault"))
+	return nil
+}
+
+// getConsulClient creates a Consul client for KV storage
+func (cm *ConfigManager) getConsulClient() (*consulapi.Client, error) {
+	// Use default Consul configuration (localhost:8500)
+	config := consulapi.DefaultConfig()
+
+	client, err := consulapi.NewClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+	}
+
+	return client, nil
+}
+
 // Configure interactively configures Azure OpenAI with smart auto-detection
 // ASSESS → INFORM → CONSENT → INTERVENE → EVALUATE pattern
 func (cm *ConfigManager) Configure(ctx context.Context, existingConfig *OpenAIConfig) (*OpenAIConfig, error) {
 	logger := otelzap.Ctx(ctx)
+
+	// ASSESS: Initialize secret manager if needed
+	if err := cm.ensureSecretManager(ctx); err != nil {
+		logger.Warn("Failed to initialize secret manager, will prompt for API key", zap.Error(err))
+	}
+
+	// ASSESS: Discover environment if not set
+	if cm.config.Environment == "" {
+		if err := cm.ensureEnvironment(ctx); err != nil {
+			logger.Warn("Failed to discover environment, using 'production'", zap.Error(err))
+			cm.config.Environment = "production"
+		}
+	}
 
 	// ASSESS: Check if configuration already complete
 	if existingConfig != nil && cm.isComplete(existingConfig) {
@@ -110,6 +202,12 @@ func (cm *ConfigManager) Configure(ctx context.Context, existingConfig *OpenAICo
 	if err := cm.TestConnection(ctx); err != nil {
 		logger.Warn("Azure OpenAI connection test failed - configuration saved but may need adjustment", zap.Error(err))
 		// Don't fail - let user proceed with potentially invalid config
+	}
+
+	// PERSIST: Store non-secret configuration in Consul KV
+	if err := cm.storeConfigInConsul(ctx); err != nil {
+		logger.Warn("Failed to store configuration in Consul KV", zap.Error(err))
+		// Don't fail - Consul might not be available yet
 	}
 
 	logger.Info("Azure OpenAI configuration completed successfully")
@@ -283,6 +381,28 @@ func (cm *ConfigManager) configureAPIKey(ctx context.Context) error {
 	return cm.storeAPIKeyInVault()
 }
 
+// storeConfigInConsul stores non-secret configuration in Consul KV
+func (cm *ConfigManager) storeConfigInConsul(ctx context.Context) error {
+	logger := otelzap.Ctx(ctx)
+
+	// Check if Consul is available
+	consulClient, err := cm.getConsulClient()
+	if err != nil {
+		logger.Debug("Consul not available, skipping KV storage", zap.Error(err))
+		return nil // Graceful degradation
+	}
+
+	logger.Info("Storing Azure OpenAI configuration in Consul KV")
+
+	// Use the standalone function from consul.go
+	if err := StoreConfigInConsul(ctx, consulClient, cm.config); err != nil {
+		return fmt.Errorf("failed to store config in Consul: %w", err)
+	}
+
+	logger.Info("✓ Azure OpenAI configuration stored in Consul KV successfully")
+	return nil
+}
+
 // storeAPIKeyInVault stores the API key in Vault
 func (cm *ConfigManager) storeAPIKeyInVault() error {
 	logger := otelzap.Ctx(cm.rc.Ctx)
@@ -298,30 +418,59 @@ func (cm *ConfigManager) storeAPIKeyInVault() error {
 
 	logger.Info("Storing Azure OpenAI API key in Vault", zap.String("path", vaultPath))
 
-	// TODO: Implement actual Vault storage via secretManager
-	// For now, the VaultBackend in pkg/secrets/manager.go:265 returns "vault backend not fully implemented"
-	// This needs to be completed to actually store the key
+	// Store via secret manager backend
+	secretData := map[string]interface{}{
+		"value": cm.config.APIKey,
+		"type":  "azure_openai_api_key",
+	}
 
-	logger.Debug("API key will be stored in Vault when backend is fully implemented")
+	backend := cm.secretManager.GetBackend()
+	if err := backend.Store(vaultPath, secretData); err != nil {
+		logger.Error("Failed to store API key in Vault", zap.Error(err))
+		return fmt.Errorf("failed to store API key in Vault: %w", err)
+	}
+
+	logger.Info("✓ Azure OpenAI API key stored in Vault successfully",
+		zap.String("path", vaultPath))
 	return nil
 }
 
 // retrieveAPIKeyFromVault retrieves the API key from Vault
-func (cm *ConfigManager) retrieveAPIKeyFromVault() error {
+func (cm *ConfigManager) retrieveAPIKeyFromVault() (string, error) {
 	logger := otelzap.Ctx(cm.rc.Ctx)
 
 	if cm.secretManager == nil {
-		return fmt.Errorf("secret manager not initialized - cannot retrieve API key from Vault")
+		return "", fmt.Errorf("secret manager not initialized")
 	}
 
 	vaultPath := fmt.Sprintf("services/%s/%s/azure_openai_api_key",
 		cm.config.Environment, cm.config.ServiceName)
 
-	logger.Info("Retrieving Azure OpenAI API key from Vault", zap.String("path", vaultPath))
+	logger.Debug("Retrieving Azure OpenAI API key from Vault", zap.String("path", vaultPath))
 
-	// TODO: Implement actual Vault retrieval via secretManager
-	// For now, return error to prompt user to provide key
-	return fmt.Errorf("Vault backend not fully implemented - please provide API key manually")
+	backend := cm.secretManager.GetBackend()
+
+	// Check if exists first (idempotent)
+	if !backend.Exists(vaultPath) {
+		logger.Debug("API key does not exist in Vault")
+		return "", fmt.Errorf("API key not found in Vault")
+	}
+
+	// Retrieve via secret manager backend
+	secretData, err := backend.Retrieve(vaultPath)
+	if err != nil {
+		logger.Debug("Failed to retrieve API key from Vault", zap.Error(err))
+		return "", fmt.Errorf("failed to retrieve API key from Vault: %w", err)
+	}
+
+	// Extract value
+	apiKey, ok := secretData["value"].(string)
+	if !ok {
+		return "", fmt.Errorf("invalid API key format in Vault")
+	}
+
+	logger.Debug("✓ Retrieved API key from Vault successfully")
+	return apiKey, nil
 }
 
 // TestConnection tests the Azure OpenAI connection
