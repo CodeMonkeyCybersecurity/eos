@@ -4,15 +4,9 @@
 package verify
 
 import (
-	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 // ValidateDomain checks if domain is a valid format
@@ -98,55 +92,13 @@ func ValidateBackend(backend string) error {
 	return nil
 }
 
-// ValidateCaddyfile validates Caddyfile using 'caddy validate'
+// NOTE: ValidateDockerCompose, ValidateCaddyfile, and ValidateGeneratedFiles have been
+// moved to pkg/docker/compose_validate.go to avoid import cycles.
 //
-// This function validates Caddyfile syntax by running 'caddy validate'.
-// If caddy binary is not available, validation is skipped (not an error).
-//
-// Parameters:
-//   - ctx: Context for logging
-//   - caddyfile: Path to Caddyfile
-//
-// Returns error with validation details if syntax is invalid.
-func ValidateCaddyfile(ctx context.Context, caddyfile string) error {
-	logger := otelzap.Ctx(ctx)
-
-	logger.Debug("Validating Caddyfile")
-
-	// Check if caddy is available
-	caddyPath, err := exec.LookPath("caddy")
-	if err != nil {
-		// Caddy binary not available - this is expected if using Docker
-		logger.Debug("Caddy binary not found, skipping Caddyfile validation")
-		return nil
-	}
-
-	// Run caddy validate
-	cmdCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(cmdCtx, caddyPath, "validate", "--config", caddyfile)
-	output, err := cmd.CombinedOutput()
-
-	if err != nil {
-		// Validation failed
-		logger.Error("Caddyfile validation failed",
-			zap.String("caddyfile", caddyfile),
-			zap.String("output", string(output)))
-
-		return fmt.Errorf("Caddyfile syntax error:\n%s\n\n"+
-			"Run manually to debug:\n"+
-			"  caddy validate --config %s",
-			string(output),
-			caddyfile)
-	}
-
-	// Validation succeeded
-	logger.Info("Caddyfile validation passed",
-		zap.String("file", caddyfile))
-
-	return nil
-}
+// Use these functions directly from the docker package:
+// - docker.ValidateComposeWithShellFallback(ctx, composeFile, envFile)
+// - docker.ValidateCaddyfile(ctx, caddyfile)
+// - docker.ValidateGeneratedFiles(ctx, baseDir)
 
 // ValidateNoFlagLikeArgs detects if positional arguments look like flags
 //
