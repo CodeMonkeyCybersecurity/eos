@@ -16,23 +16,23 @@ import (
 
 // Member represents a Consul cluster member
 type Member struct {
-	Name       string
-	Address    string
-	IP         string
-	Port       string
-	Status     string // alive, left, failed
-	Type       string // server, client
-	Datacenter string
+	Name        string
+	Address     string
+	IP          string
+	Port        string
+	Status      string // alive, left, failed
+	Type        string // server, client
+	Datacenter  string
 	IsTailscale bool
 }
 
 // MemberDiscoveryResult contains discovered members and metadata
 type MemberDiscoveryResult struct {
-	Members           []Member
-	TailscaleMembers  []Member
+	Members             []Member
+	TailscaleMembers    []Member
 	NonTailscaleMembers []Member
-	HasMixedNetwork   bool
-	AllAlive          bool
+	HasMixedNetwork     bool
+	AllAlive            bool
 }
 
 // DiscoverMembers discovers existing Consul cluster members
@@ -57,14 +57,20 @@ func DiscoverMembers(ctx context.Context, allowOffline bool) (*MemberDiscoveryRe
 	if err != nil {
 		// If Consul isn't running yet, that's OK for first-time setup
 		if strings.Contains(err.Error(), "connection refused") ||
-		   strings.Contains(err.Error(), "No such file") {
-			logger.Debug("Consul not running - no existing members")
+			strings.Contains(output, "connection refused") ||
+			strings.Contains(err.Error(), "No such file") {
+			logger.Debug("Consul not running - no existing members",
+				zap.String("output", output))
 			return result, nil
 		}
 
+		// Include actual command output in error for diagnostics
 		return nil, fmt.Errorf("failed to discover cluster members: %w\n"+
-			"Consul may not be running or accessible.\n"+
-			"Check: sudo systemctl status consul", err)
+			"Command output: %s\n"+
+			"This is required for safe operation.\n"+
+			"Check: sudo systemctl status consul\n"+
+			"Fix: sudo eos fix consul\n"+
+			"Debug: sudo eos debug consul", err, output)
 	}
 
 	lines := strings.Split(output, "\n")

@@ -43,6 +43,7 @@ func AddSubcommands() {
 	FixCmd.AddCommand(vaultFixCmd)
 	FixCmd.AddCommand(irisFixCmd)
 	FixCmd.AddCommand(mattermostFixCmd)
+	FixCmd.AddCommand(consulFixCmd)
 }
 
 func init() {
