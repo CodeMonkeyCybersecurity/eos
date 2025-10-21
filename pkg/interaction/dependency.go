@@ -230,19 +230,19 @@ func installDependency(rc *eos_io.RuntimeContext, config DependencyConfig) error
 
 	// Execute installation command
 	// Note: This uses shell execution because install commands often use pipes, etc.
-	output, err := execute.Run(rc.Ctx, execute.Options{
+	// Capture: false allows user to see progress and provide input (e.g., sudo password)
+	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "/bin/bash",
 		Args:    []string{"-c", config.InstallCmd},
-		Capture: true,
+		Capture: false, // Show output to user for interactive scripts
 	})
 
 	if err != nil {
-		return fmt.Errorf("installation command failed: %w\nOutput: %s", err, output)
+		return fmt.Errorf("installation command failed: %w", err)
 	}
 
-	logger.Debug("Installation command succeeded",
-		zap.String("dependency", config.Name),
-		zap.String("output", output))
+	logger.Info("Installation command completed",
+		zap.String("dependency", config.Name))
 
 	// If auto-start is enabled and start command provided, start the service
 	if config.AutoStart && config.StartCmd != "" {
@@ -250,17 +250,16 @@ func installDependency(rc *eos_io.RuntimeContext, config DependencyConfig) error
 			zap.String("dependency", config.Name),
 			zap.String("command", config.StartCmd))
 
-		output, err := execute.Run(rc.Ctx, execute.Options{
+		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "/bin/bash",
 			Args:    []string{"-c", config.StartCmd},
-			Capture: true,
+			Capture: false, // Show output to user
 		})
 
 		if err != nil {
 			logger.Warn("Failed to start service (may need manual start)",
 				zap.String("dependency", config.Name),
-				zap.Error(err),
-				zap.String("output", output))
+				zap.Error(err))
 			// Don't fail on start errors - user can start manually
 		}
 	}
