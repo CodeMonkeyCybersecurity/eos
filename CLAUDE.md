@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-14*
+*Last Updated: 2025-10-21*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -19,11 +19,14 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 These violations cause immediate failure:
 
 1. **Logging**: ONLY use `otelzap.Ctx(rc.Ctx)` - NEVER `fmt.Print*/Println`
-2. **Pattern**: ALWAYS follow Assess → Intervene → Evaluate in helpers
-3. **Context**: Always use `*eos_io.RuntimeContext` for all operations
-4. **Completion**: Must pass `go build`, `golangci-lint run`, `go test -v ./pkg/...`
-5. **Secrets**: Use `secrets.SecretManager` for credentials - NEVER hardcode
-6. **Security**: Follow defensive security only - refuse malicious code assistance
+2. **Architecture**: Business logic in `pkg/`, orchestration ONLY in `cmd/` (see Architecture Enforcement below). Use official and well supported SDKs and APIs where possible.
+3. **Pattern**: ALWAYS follow Assess → Intervene → Evaluate in helpers
+4. **Context**: Always use `*eos_io.RuntimeContext` for all operations
+5. **Completion**: Must pass `go build`, `golangci-lint run`, `go test -v ./pkg/...`
+6. **Secrets**: Use `secrets.SecretManager` for credentials - NEVER hardcode. Use `secrets.SecretManager.GetOrGenerateServiceSecrets()` for service secrets. And leverage vault for secrets management.
+7. **Security**: Complease a red team code review and generic targetted criticism of your work before you commit
+8. **evidence-based, adverserially collaborative** approach always with yourself and with me
+
 
 ## Quick Decision Trees
 
@@ -53,7 +56,95 @@ Secrets Management?
 
 Command Structure?
 └─ VERB-FIRST only: create, read, list, update, delete (+ self, backup, build, deploy, promote, env)
+
+Writing New Command?
+├─ In cmd/[verb]/*.go (ORCHESTRATION ONLY):
+│  ├─ Define cobra.Command with flags
+│  ├─ Parse flags into config struct
+│  ├─ Call pkg/[feature]/Function(rc, config)
+│  └─ Return result (no business logic!)
+│  └─ RULE: If cmd/ file >100 lines, move logic to pkg/
+│
+└─ In pkg/[feature]/*.go (ALL BUSINESS LOGIC):
+   ├─ ASSESS: Check current state
+   ├─ INTERVENE: Apply changes if needed
+   ├─ EVALUATE: Verify and report results
+   └─ Use RuntimeContext, structured logging
 ```
+
+## Architecture Enforcement: cmd/ vs pkg/
+
+**The Iron Rule**: `cmd/` = Cobra orchestration ONLY. `pkg/` = ALL business logic.
+
+### Good Example: cmd/fix/consul.go (✓ ~60 lines)
+```go
+// cmd/fix/consul.go - PURE ORCHESTRATION
+func runConsulFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    // Parse flags
+    dryRun, _ := cmd.Flags().GetBool("dry-run")
+    permissionsOnly, _ := cmd.Flags().GetBool("permissions-only")
+
+    // Create config
+    config := &fix.Config{
+        DryRun:          dryRun,
+        PermissionsOnly: permissionsOnly,
+    }
+
+    // Delegate to pkg/ - ALL business logic lives there
+    return fix.RunFixes(rc, config)
+}
+```
+
+### Bad Example: Business Logic in cmd/ (✗ 400+ lines)
+```go
+// cmd/fix/something.go - VIOLATES ARCHITECTURE
+func runSomethingFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    // ✗ WRONG: File operations in cmd/
+    info, err := os.Stat("/etc/something/config.hcl")
+    if err != nil { ... }
+
+    // ✗ WRONG: Permission fixing in cmd/
+    if err := os.Chmod(path, 0640); err != nil { ... }
+
+    // ✗ WRONG: Loops and complex logic in cmd/
+    for _, path := range paths {
+        // Business logic here...
+    }
+
+    // This should ALL be in pkg/something/fix/fix.go!
+}
+```
+
+### Correct Pattern: Move to pkg/
+```go
+// cmd/fix/something.go (~60 lines)
+func runSomethingFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    config := parseFlags(cmd)
+    return somethingfix.RunFixes(rc, config) // ✓ Delegate to pkg/
+}
+
+// pkg/something/fix/fix.go
+func RunFixes(rc *eos_io.RuntimeContext, config *Config) error {
+    // ✓ ASSESS
+    issues := assessPermissions(rc)
+
+    // ✓ INTERVENE
+    if !config.DryRun {
+        results := fixPermissions(rc, issues)
+    }
+
+    // ✓ EVALUATE
+    displayResults(rc, results)
+    return nil
+}
+```
+
+### Enforcement Heuristics
+- **cmd/ file >100 lines?** → Move business logic to pkg/
+- **File operations (os.Stat, os.Chmod)?** → Must be in pkg/
+- **Loops over data structures?** → Must be in pkg/
+- **Complex conditionals?** → Must be in pkg/
+- **Only cobra, flag parsing, delegation?** → OK in cmd/
 
 ## Project Constraints
 
@@ -189,12 +280,38 @@ When looking for context:
 
 Work as a partner in an adversarially collaborative process, following the user's lead and providing fact-based targeted criticism.
 
+### Pre-Completion Review Checklist
+
+Before completing any task, verify:
+
+**Architecture Compliance (P0)**:
+- [ ] All business logic is in `pkg/`
+- [ ] `cmd/` files only contain orchestration
+- [ ] `cmd/` files are <100 lines (if not, refactor to pkg/)
+- [ ] No file operations (os.Stat, os.Chmod) in cmd/
+- [ ] No loops or complex conditionals in cmd/
+
+**Pattern Compliance (P0)**:
+- [ ] pkg/ functions follow Assess → Intervene → Evaluate
+- [ ] All operations use RuntimeContext
+- [ ] All logging uses otelzap.Ctx(rc.Ctx)
+- [ ] Secrets use SecretManager
+- [ ] Errors include context and remediation
+
+**Testing (P0)**:
+- [ ] `go build -o /tmp/eos-build ./cmd/` compiles
+- [ ] `go vet ./pkg/...` passes
+- [ ] `go vet ./cmd/...` passes
+- [ ] `gofmt -l` returns nothing
+
 ## Common Anti-Patterns
 
 | Never Do This | Always Do This |
 |--------------|----------------|
 | `fmt.Println("text")` | `logger.Info("text")` |
-| Business logic in `cmd/` | Delegate to `pkg/` |
+| Business logic in `cmd/` | Delegate to `pkg/` (see Architecture Enforcement) |
+| `os.Stat()` in `cmd/*.go` | Move to `pkg/*/assess.go` |
+| File operations in `runCommand()` | Create `pkg/*/fix.go` with business logic |
 | `exec.Command().Run()` | Check with `exec.LookPath()` first |
 | Skip verification | Explicit verification checks |
 | Create tactical .md files | Use inline `// TODO:` comments |

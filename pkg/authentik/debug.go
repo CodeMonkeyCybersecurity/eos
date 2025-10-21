@@ -50,7 +50,7 @@ func RunAuthentikDebug(rc *eos_io.RuntimeContext, config *DebugConfig) error {
 
 	// Check if hecate directory exists
 	if _, err := os.Stat(config.HecatePath); os.IsNotExist(err) {
-		return fmt.Errorf("Hecate installation not found at %s\n"+
+		return fmt.Errorf("hecate installation not found at %s\n"+
 			"Install Hecate first: eos create hecate", config.HecatePath)
 	}
 

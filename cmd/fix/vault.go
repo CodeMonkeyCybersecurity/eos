@@ -4,23 +4,13 @@ package fix
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	vaultfix "github.com/CodeMonkeyCybersecurity/eos/pkg/vault/fix"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-)
-
-var (
-	vaultRepairDryRun          bool
-	vaultRepairCleanupBinaries bool
-	vaultRepairPermissions     bool
-	vaultRepairConfig          bool
-	vaultRepairAll             bool
 )
 
 var vaultFixCmd = &cobra.Command{
@@ -37,245 +27,102 @@ This command can repair:
 
 EXAMPLES:
   # Auto-repair all detected issues
-  sudo eos repair vault --all
+  sudo eos fix vault --all
 
   # Dry-run to see what would be fixed (no changes made)
-  sudo eos repair vault --all --dry-run
+  sudo eos fix vault --all --dry-run
 
   # Only cleanup duplicate binaries
-  sudo eos repair vault --cleanup-binaries
+  sudo eos fix vault --cleanup-binaries
 
   # Only fix file permissions
-  sudo eos repair vault --permissions
+  sudo eos fix vault --permissions
 
   # Only repair configuration
-  sudo eos repair vault --config`,
+  sudo eos fix vault --config`,
 
-	RunE: eos_cli.Wrap(runVaultRepair),
+	RunE: eos_cli.Wrap(runVaultFix),
 }
 
 func init() {
-	vaultFixCmd.Flags().BoolVar(&vaultRepairDryRun, "dry-run", false, "Show what would be fixed without making changes")
-	vaultFixCmd.Flags().BoolVar(&vaultRepairCleanupBinaries, "cleanup-binaries", false, "Remove duplicate vault binaries")
-	vaultFixCmd.Flags().BoolVar(&vaultRepairPermissions, "permissions", false, "Fix file permissions and ownership")
-	vaultFixCmd.Flags().BoolVar(&vaultRepairConfig, "config", false, "Repair configuration files")
-	vaultFixCmd.Flags().BoolVar(&vaultRepairAll, "all", false, "Repair all detected issues")
+	vaultFixCmd.Flags().Bool("dry-run", false, "Show what would be fixed without making changes")
+	vaultFixCmd.Flags().Bool("cleanup-binaries", false, "Remove duplicate vault binaries")
+	vaultFixCmd.Flags().Bool("permissions", false, "Fix file permissions and ownership")
+	vaultFixCmd.Flags().Bool("config", false, "Repair configuration files")
+	vaultFixCmd.Flags().Bool("all", false, "Repair all detected issues")
 }
 
-func runVaultRepair(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runVaultFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info(" Starting Vault repair")
+	logger.Info("Starting Vault repair")
 
-	if vaultRepairDryRun {
-		logger.Info(" DRY-RUN MODE: No changes will be made")
-		fmt.Println(" DRY-RUN MODE: Analyzing issues without making changes")
+	// Parse flags into config
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	cleanupBinaries, _ := cmd.Flags().GetBool("cleanup-binaries")
+	permissions, _ := cmd.Flags().GetBool("permissions")
+	repairConfig, _ := cmd.Flags().GetBool("config")
+	all, _ := cmd.Flags().GetBool("all")
+
+	config := &vaultfix.Config{
+		DryRun:          dryRun,
+		CleanupBinaries: cleanupBinaries,
+		FixPermissions:  permissions,
+		RepairConfig:    repairConfig,
+		All:             all,
 	}
 
-	// Default: run all repairs if no specific flag is set
-	runBinaries := vaultRepairCleanupBinaries || vaultRepairAll || (!vaultRepairCleanupBinaries && !vaultRepairPermissions && !vaultRepairConfig)
-	runPermissions := vaultRepairPermissions || vaultRepairAll
-	runConfig := vaultRepairConfig || vaultRepairAll
-
-	issuesFound := 0
-	issuesFixed := 0
-
-	// Repair: Cleanup duplicate binaries
-	if runBinaries {
-		logger.Info(" Checking for duplicate vault binaries")
-		found, fixed, err := repairDuplicateBinaries(rc, vaultRepairDryRun)
-		if err != nil {
-			logger.Warn("Binary cleanup encountered errors", zap.Error(err))
-		}
-		issuesFound += found
-		issuesFixed += fixed
+	if dryRun {
+		logger.Info("DRY-RUN MODE: No changes will be made")
+		fmt.Println("DRY-RUN MODE: Analyzing issues without making changes")
 	}
 
-	// Repair: Fix permissions
-	if runPermissions {
-		logger.Info(" Checking file permissions")
-		found, fixed, err := repairFilePermissions(rc, vaultRepairDryRun)
-		if err != nil {
-			logger.Warn("Permission repair encountered errors", zap.Error(err))
-		}
-		issuesFound += found
-		issuesFixed += fixed
+	// Delegate to pkg/vault/fix - ALL business logic lives there
+	result, err := vaultfix.RunFixes(rc, config)
+	if err != nil {
+		return err
 	}
 
-	// Repair: Fix configuration
-	if runConfig {
-		logger.Info(" Checking configuration files")
-		found, fixed, err := repairConfiguration(rc, vaultRepairDryRun)
-		if err != nil {
-			logger.Warn("Configuration repair encountered errors", zap.Error(err))
-		}
-		issuesFound += found
-		issuesFixed += fixed
-	}
-
-	// Summary
-	fmt.Println()
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println(" Repair Summary")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("Issues found: %d\n", issuesFound)
-
-	if vaultRepairDryRun {
-		fmt.Printf("Would fix: %d (DRY-RUN - no changes made)\n", issuesFixed)
-		fmt.Println("\nRun without --dry-run to apply fixes")
-	} else {
-		fmt.Printf("Issues fixed: %d\n", issuesFixed)
-	}
-
-	if issuesFound == 0 {
-		fmt.Println("\n No issues detected - Vault installation is healthy")
-	} else if !vaultRepairDryRun && issuesFixed == issuesFound {
-		fmt.Println("\n All issues successfully repaired")
-	} else if !vaultRepairDryRun && issuesFixed < issuesFound {
-		fmt.Printf("\n%d issues could not be automatically repaired\n", issuesFound-issuesFixed)
-		fmt.Println("Run 'sudo eos debug vault' for detailed diagnostics")
-	}
-
-	logger.Info(" Vault repair completed",
-		zap.Int("issues_found", issuesFound),
-		zap.Int("issues_fixed", issuesFixed),
-		zap.Bool("dry_run", vaultRepairDryRun))
+	// Display summary (simple orchestration)
+	displaySummary(rc, result, dryRun)
 
 	return nil
 }
 
-// repairDuplicateBinaries finds and removes duplicate vault binaries
-func repairDuplicateBinaries(rc *eos_io.RuntimeContext, dryRun bool) (int, int, error) {
+// displaySummary shows the repair results
+func displaySummary(rc *eos_io.RuntimeContext, result *vaultfix.RepairResult, dryRun bool) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking for duplicate Vault binaries")
 
-	binaries, err := vault.FindVaultBinaries(rc)
-	if err != nil {
-		return 0, 0, fmt.Errorf("failed to find binaries: %w", err)
-	}
-
-	// Count duplicates (anything not at standard path)
-	duplicates := 0
-	for _, binary := range binaries {
-		if binary.Path != shared.VaultBinaryPath {
-			duplicates++
-		}
-	}
-
-	if duplicates == 0 {
-		logger.Info("No duplicate binaries found")
-		return 0, 0, nil
-	}
-
-	fmt.Printf("\n Found %d duplicate vault binaries\n", duplicates)
-	for _, binary := range binaries {
-		if binary.Path != shared.VaultBinaryPath {
-			fmt.Printf("   - %s (%s)\n", binary.Path, binary.Version)
-		}
-	}
+	fmt.Println()
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("Repair Summary")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("Issues found: %d\n", result.IssuesFound)
 
 	if dryRun {
-		fmt.Printf("Would remove %d duplicate binaries\n", duplicates)
-		return duplicates, duplicates, nil
+		fmt.Printf("Would fix: %d (DRY-RUN - no changes made)\n", result.IssuesFixed)
+		fmt.Println("\nRun without --dry-run to apply fixes")
+	} else {
+		fmt.Printf("Issues fixed: %d\n", result.IssuesFixed)
 	}
 
-	// Actually remove duplicates
-	if err := vault.CleanupDuplicateBinaries(rc, shared.VaultBinaryPath); err != nil {
-		return duplicates, 0, fmt.Errorf("failed to cleanup binaries: %w", err)
+	if result.IssuesFound == 0 {
+		fmt.Println("\nNo issues detected - Vault installation is healthy")
+	} else if !dryRun && result.IssuesFixed == result.IssuesFound {
+		fmt.Println("\nAll issues successfully repaired")
+	} else if !dryRun && result.IssuesFixed < result.IssuesFound {
+		fmt.Printf("\n%d issues could not be automatically repaired\n", result.IssuesFound-result.IssuesFixed)
+		fmt.Println("Run 'sudo eos debug vault' for detailed diagnostics")
 	}
 
-	fmt.Printf(" Removed %d duplicate binaries\n", duplicates)
-	return duplicates, duplicates, nil
-}
-
-// repairFilePermissions fixes file permissions and ownership
-func repairFilePermissions(rc *eos_io.RuntimeContext, dryRun bool) (int, int, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking file permissions")
-
-	// Define expected permissions for Vault files
-	fileChecks := []struct {
-		path         string
-		expectedPerm uint32
-		description  string
-	}{
-		{shared.TLSCrt, 0644, "TLS certificate"},
-		{shared.TLSKey, 0600, "TLS private key"},
-		{shared.VaultConfigPath, 0640, "Vault configuration"},
-		{shared.VaultDataPath, 0750, "Vault data directory"},
-		{"/var/log/vault", 0750, "Vault log directory"},
-	}
-
-	issuesFound := 0
-	issuesFixed := 0
-
-	fmt.Println()
-	for _, check := range fileChecks {
-		info, err := os.Stat(check.path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				logger.Debug("File does not exist", zap.String("path", check.path))
-				continue
-			}
-			logger.Warn("Cannot check file", zap.String("path", check.path), zap.Error(err))
-			continue
-		}
-
-		actualPerm := uint32(info.Mode().Perm())
-		if actualPerm != check.expectedPerm {
-			issuesFound++
-			fmt.Printf("%s has incorrect permissions: %o (expected %o)\n",
-				check.description, actualPerm, check.expectedPerm)
-
-			if !dryRun {
-				if err := os.Chmod(check.path, os.FileMode(check.expectedPerm)); err != nil {
-					logger.Error("Failed to fix permissions",
-						zap.String("path", check.path),
-						zap.Error(err))
-				} else {
-					issuesFixed++
-					fmt.Printf("    Fixed: %s\n", check.path)
-				}
-			} else {
-				issuesFixed++ // Would fix
-			}
+	if len(result.Errors) > 0 {
+		fmt.Printf("\nEncountered %d errors during repair:\n", len(result.Errors))
+		for i, err := range result.Errors {
+			fmt.Printf("  %d. %v\n", i+1, err)
 		}
 	}
 
-	if issuesFound == 0 {
-		logger.Info("All file permissions are correct")
-	}
-
-	return issuesFound, issuesFixed, nil
-}
-
-// repairConfiguration validates and repairs configuration files
-func repairConfiguration(rc *eos_io.RuntimeContext, dryRun bool) (int, int, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking configuration files")
-
-	// Validate config
-	result, err := vault.ValidateConfigWithFallback(rc, shared.VaultConfigPath)
-	if err != nil {
-		return 1, 0, fmt.Errorf("configuration validation failed: %w", err)
-	}
-
-	issuesFound := len(result.Errors)
-	if issuesFound == 0 {
-		logger.Info("Configuration is valid")
-		return 0, 0, nil
-	}
-
-	fmt.Println()
-	fmt.Printf("Configuration has %d errors:\n", issuesFound)
-	for i, err := range result.Errors {
-		fmt.Printf("   %d. %s\n", i+1, err)
-	}
-
-	// Currently we don't have auto-fix for config errors
-	// User needs to manually fix configuration issues
-	fmt.Println()
-	fmt.Println(" Configuration errors require manual intervention")
-	fmt.Println("   Run 'sudo eos check vault --config' for detailed validation")
-
-	return issuesFound, 0, nil
+	logger.Info("Vault repair completed",
+		zap.Int("issues_found", result.IssuesFound),
+		zap.Int("issues_fixed", result.IssuesFixed),
+		zap.Bool("dry_run", dryRun))
 }
