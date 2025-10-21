@@ -223,6 +223,14 @@ Examples:
 			return fmt.Errorf("failed to generate configuration: %w", err)
 		}
 
+		// CRITICAL: Validate generated files before declaring success
+		log.Info("Validating generated configuration files")
+		if err := hecate.ValidateGeneratedFiles(rc, outputDir); err != nil {
+			return fmt.Errorf("validation failed: %w\n\n"+
+				"Generated files have errors. This is a bug in Eos.\n"+
+				"Please report this issue with the validation output above.", err)
+		}
+
 		log.Info("terminal prompt: ")
 		log.Info("terminal prompt: ✓ Hecate infrastructure generated successfully!")
 		log.Info("terminal prompt: ")

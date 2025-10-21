@@ -26,6 +26,7 @@ These violations cause immediate failure:
 6. **Secrets**: Use `secrets.SecretManager` for credentials - NEVER hardcode. Use `secrets.SecretManager.GetOrGenerateServiceSecrets()` for service secrets. And leverage vault for secrets management.
 7. **Security**: Complease a red team code review and generic targetted criticism of your work before you commit
 8. **evidence-based, adverserially collaborative** approach always with yourself and with me
+9. **READMEs** Put a README.md in each directory to document the purpose of the directory and how to use it.
 
 
 ## Quick Decision Trees

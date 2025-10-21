@@ -16,7 +16,7 @@ var (
 
 var hecateCmd = &cobra.Command{
 	Use:   "hecate",
-	Short: "Diagnose Hecate components (Caddy, Authentik, PostgreSQL, Redis)",
+	Short: "Diagnose Hecate components and display configuration files",
 	Long: `Comprehensive diagnostic tool for Hecate reverse proxy framework.
 
 Automatically detects which Hecate components are running:
@@ -35,6 +35,13 @@ For each detected component, performs relevant diagnostics:
   • Resource usage
   • Common issue detection
   • Actionable remediation steps
+
+Configuration file display (NEW):
+  • .env file (with sensitive values redacted)
+  • docker-compose.yml (full content with line numbers)
+  • Caddyfile (full content with line numbers)
+  • Consul KV configuration dump
+  • Docker container status and recent logs
 
 Authentik-specific diagnostics (--authentik flag):
   • Current version check
@@ -55,7 +62,7 @@ Flags:
   --verbose           Show detailed diagnostic output
 
 Examples:
-  eos debug hecate                      # Auto-detect and diagnose all components
+  eos debug hecate                      # Full diagnostics + file display
   eos debug hecate --component authentik  # Only diagnose Authentik
   eos debug hecate --authentik          # Full Authentik pre-upgrade check
   eos debug hecate --path /custom/path  # Custom installation path`,

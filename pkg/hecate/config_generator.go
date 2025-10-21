@@ -56,6 +56,10 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 					logger.Info(fmt.Sprintf("terminal prompt:   - %s (domain: %s)", appName, app.Domain))
 				}
 				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: Options:")
+				logger.Info("terminal prompt:   1. Press Enter to use this configuration")
+				logger.Info("terminal prompt:   2. Add apps to create NEW configuration")
+				logger.Info("terminal prompt: ")
 			}
 		}
 
@@ -84,6 +88,17 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 	// Write YAML file
 	if err := writeYAMLConfig(config, outputPath); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	// CRITICAL: Validate the generated YAML file by loading it back
+	logger.Info("Validating generated configuration file")
+	if _, err := LoadYAMLConfig(rc, outputPath); err != nil {
+		logger.Error("Generated config file validation failed",
+			zap.Error(err),
+			zap.String("path", outputPath))
+		return fmt.Errorf("generated config file is invalid: %w\n\n"+
+			"This is a bug in Eos. Please report this issue.\n"+
+			"File location: %s", err, outputPath)
 	}
 
 	logger.Info("Configuration file created successfully",
@@ -292,6 +307,19 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 			fmt.Print("Talk: ")
 			talkInput := strings.TrimSpace(strings.ToLower(mustReadLine(reader)))
 			app.Talk = (talkInput == "y" || talkInput == "yes")
+		}
+
+		// Check for duplicate domain BEFORE adding
+		for existingAppName, existingApp := range apps {
+			if existingApp.Domain == app.Domain {
+				logger.Warn("Duplicate domain detected",
+					zap.String("domain", app.Domain),
+					zap.String("existing_app", existingAppName),
+					zap.String("new_app", appName))
+				logger.Info(fmt.Sprintf("terminal prompt: ⚠️  Warning: '%s' and '%s' both use domain: %s", existingAppName, appName, app.Domain))
+				logger.Info("terminal prompt: Each app should have a unique domain (e.g., use subdomains)")
+				logger.Info(fmt.Sprintf("terminal prompt: Consider: %s.yourdomain.com and %s.yourdomain.com", existingAppName, appName))
+			}
 		}
 
 		apps[appName] = app

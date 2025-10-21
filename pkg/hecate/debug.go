@@ -97,6 +97,7 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	displayDetectedHecateComponents(components)
 
+	// ASSESS: Perform standard component diagnostics
 	var allResults []HecateCheckResult
 	for _, info := range components {
 		if !info.Detected {
@@ -107,6 +108,22 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		allResults = append(allResults, results...)
 	}
 
+	// INTERVENE: Display comprehensive file contents (new functionality)
+	logger.Info("Displaying configuration file contents")
+	fileResults := displayHecateConfigFiles(rc, hecatePath)
+	allResults = append(allResults, fileResults...)
+
+	// INTERVENE: Display Consul KV configuration
+	logger.Info("Displaying Consul KV configuration")
+	consulResults := displayConsulKVConfig(rc)
+	allResults = append(allResults, consulResults...)
+
+	// INTERVENE: Display container status and logs
+	logger.Info("Displaying container status")
+	containerResults := displayContainerStatus(rc, hecatePath)
+	allResults = append(allResults, containerResults...)
+
+	// EVALUATE: Display all diagnostic results
 	displayHecateResults(allResults)
 
 	return nil
@@ -478,4 +495,329 @@ func displayHecateResults(results []HecateCheckResult) {
 	}
 
 	fmt.Printf("\n📈 Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
+}
+
+// displayHecateConfigFiles displays the content of key Hecate configuration files
+//
+// This function implements the Assess → Intervene → Evaluate pattern:
+// - Assess: Check if configuration files exist
+// - Intervene: Read and display file contents with proper formatting
+// - Evaluate: Report which files were displayed successfully
+func displayHecateConfigFiles(rc *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	var results []HecateCheckResult
+
+	logger.Info("Displaying Hecate configuration files",
+		zap.String("path", hecatePath))
+
+	// ASSESS: Define files to display
+	filesToDisplay := map[string]string{
+		".env":               "Environment variables (contains secrets - handle with care)",
+		"docker-compose.yml": "Docker Compose service definitions",
+		"Caddyfile":          "Caddy reverse proxy configuration",
+	}
+
+	fmt.Println("\n📄 Configuration Files:")
+	fmt.Println(strings.Repeat("=", 80))
+
+	// INTERVENE: Display each file
+	for filename, description := range filesToDisplay {
+		filePath := filepath.Join(hecatePath, filename)
+
+		fmt.Printf("\n▼ %s (%s)\n", filename, description)
+		fmt.Println(strings.Repeat("-", 80))
+
+		// ASSESS: Check if file exists
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				fmt.Printf("   ⚠️  File not found: %s\n", filePath)
+				results = append(results, HecateCheckResult{
+					Component:   HecateComponentCaddy,
+					CheckName:   fmt.Sprintf("Display %s", filename),
+					Category:    "File Display",
+					Passed:      false,
+					Warning:     true,
+					Details:     fmt.Sprintf("File not found: %s", filePath),
+					Remediation: []string{"Run: eos create hecate --config hecate-config.yaml"},
+				})
+				continue
+			}
+
+			// Read error (permissions, etc.)
+			fmt.Printf("   ❌ Error reading file: %v\n", err)
+			results = append(results, HecateCheckResult{
+				Component: HecateComponentCaddy,
+				CheckName: fmt.Sprintf("Display %s", filename),
+				Category:  "File Display",
+				Passed:    false,
+				Error:     err,
+				Details:   fmt.Sprintf("Cannot read %s", filePath),
+				Remediation: []string{
+					fmt.Sprintf("Check permissions: ls -l %s", filePath),
+					fmt.Sprintf("Fix permissions: sudo chmod 644 %s", filePath),
+				},
+			})
+			continue
+		}
+
+		// INTERVENE: Display file content with line numbers
+		lines := strings.Split(string(content), "\n")
+		for i, line := range lines {
+			// Redact sensitive values in .env file
+			if filename == ".env" {
+				line = redactSensitiveValue(line)
+			}
+			fmt.Printf("   %4d │ %s\n", i+1, line)
+		}
+
+		// EVALUATE: File displayed successfully
+		results = append(results, HecateCheckResult{
+			Component: HecateComponentCaddy,
+			CheckName: fmt.Sprintf("Display %s", filename),
+			Category:  "File Display",
+			Passed:    true,
+			Details:   fmt.Sprintf("Displayed %d lines from %s", len(lines), filePath),
+		})
+
+		logger.Debug("Displayed configuration file",
+			zap.String("file", filename),
+			zap.Int("lines", len(lines)))
+	}
+
+	fmt.Println()
+	return results
+}
+
+// redactSensitiveValue redacts password/secret values in .env files for security
+func redactSensitiveValue(line string) string {
+	// Don't redact comments or empty lines
+	if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+		return line
+	}
+
+	// Check if line contains sensitive keys
+	sensitiveKeys := []string{
+		"PASSWORD", "SECRET", "TOKEN", "KEY", "PASS",
+	}
+
+	parts := strings.SplitN(line, "=", 2)
+	if len(parts) != 2 {
+		return line
+	}
+
+	key := strings.ToUpper(strings.TrimSpace(parts[0]))
+	value := parts[1]
+
+	// Check if key contains sensitive keywords
+	for _, sensitiveKey := range sensitiveKeys {
+		if strings.Contains(key, sensitiveKey) {
+			// Redact the value but show first/last 2 characters
+			if len(value) > 8 {
+				return fmt.Sprintf("%s=%s...%s (redacted)", parts[0], value[:2], value[len(value)-2:])
+			}
+			return fmt.Sprintf("%s=*** (redacted)", parts[0])
+		}
+	}
+
+	return line
+}
+
+// displayConsulKVConfig displays Hecate configuration stored in Consul KV
+//
+// This function implements the Assess → Intervene → Evaluate pattern:
+// - Assess: Check Consul availability and look for config data
+// - Intervene: Retrieve and display config from Consul KV
+// - Evaluate: Report success or provide remediation steps
+func displayConsulKVConfig(rc *eos_io.RuntimeContext) []HecateCheckResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	var results []HecateCheckResult
+
+	logger.Info("Checking Consul KV for Hecate configuration")
+
+	fmt.Println("\n🗄️  Consul KV Configuration:")
+	fmt.Println(strings.Repeat("=", 80))
+
+	// ASSESS: Try to connect to Consul
+	configStorage, err := NewConfigStorage(rc)
+	if err != nil {
+		fmt.Printf("   ⚠️  Cannot connect to Consul: %v\n", err)
+		fmt.Println("   Consul KV configuration not available")
+		results = append(results, HecateCheckResult{
+			Component: HecateComponentCaddy,
+			CheckName: "Consul KV Config",
+			Category:  "Configuration Storage",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Consul not available",
+			Remediation: []string{
+				"Check Consul is running: systemctl status consul",
+				"Start Consul: systemctl start consul",
+			},
+		})
+		return results
+	}
+
+	// INTERVENE: Load configuration from Consul KV
+	rawConfig, err := configStorage.LoadConfig(rc)
+	if err != nil {
+		fmt.Printf("   ⚠️  Cannot load config from Consul: %v\n", err)
+		results = append(results, HecateCheckResult{
+			Component: HecateComponentCaddy,
+			CheckName: "Consul KV Config",
+			Category:  "Configuration Storage",
+			Passed:    false,
+			Warning:   true,
+			Details:   "No configuration in Consul KV",
+			Remediation: []string{
+				"Generate config: eos create config --hecate",
+				"Deploy Hecate: eos create hecate --config hecate-config.yaml",
+			},
+		})
+		return results
+	}
+
+	if rawConfig == nil || len(rawConfig.Apps) == 0 {
+		fmt.Println("   ℹ️  No Hecate configuration found in Consul KV")
+		results = append(results, HecateCheckResult{
+			Component: HecateComponentCaddy,
+			CheckName: "Consul KV Config",
+			Category:  "Configuration Storage",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Consul KV is empty",
+			Remediation: []string{
+				"Generate and store config: eos create config --hecate",
+			},
+		})
+		return results
+	}
+
+	// INTERVENE: Display configuration
+	fmt.Printf("\n   Found configuration for %d app(s):\n\n", len(rawConfig.Apps))
+
+	for appName, app := range rawConfig.Apps {
+		fmt.Printf("   ▸ %s\n", appName)
+		fmt.Printf("     Domain:  %s\n", app.Domain)
+		if app.Backend != "" {
+			fmt.Printf("     Backend: %s\n", app.Backend)
+		}
+		if app.Type != "" {
+			fmt.Printf("     Type:    %s\n", app.Type)
+		}
+		if app.SSO {
+			fmt.Printf("     SSO:     enabled\n")
+		}
+		if app.Talk {
+			fmt.Printf("     Talk:    enabled\n")
+		}
+		fmt.Println()
+	}
+
+	// EVALUATE: Success
+	results = append(results, HecateCheckResult{
+		Component: HecateComponentCaddy,
+		CheckName: "Consul KV Config",
+		Category:  "Configuration Storage",
+		Passed:    true,
+		Details:   fmt.Sprintf("Found %d apps in Consul KV", len(rawConfig.Apps)),
+	})
+
+	logger.Info("Consul KV configuration displayed",
+		zap.Int("app_count", len(rawConfig.Apps)))
+
+	return results
+}
+
+// displayContainerStatus displays Docker container status and recent logs
+//
+// This function implements the Assess → Intervene → Evaluate pattern:
+// - Assess: Check if Docker is available and containers exist
+// - Intervene: Get container status and recent logs
+// - Evaluate: Display results with remediation if needed
+func displayContainerStatus(rc *eos_io.RuntimeContext, hecatePath string) []HecateCheckResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	var results []HecateCheckResult
+
+	logger.Info("Checking Docker container status",
+		zap.String("path", hecatePath))
+
+	fmt.Println("\n🐳 Container Status:")
+	fmt.Println(strings.Repeat("=", 80))
+
+	// ASSESS: Check if docker-compose.yml exists
+	composeFile := filepath.Join(hecatePath, "docker-compose.yml")
+	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
+		fmt.Printf("   ⚠️  No docker-compose.yml found at %s\n", composeFile)
+		results = append(results, HecateCheckResult{
+			Component: HecateComponentCaddy,
+			CheckName: "Container Status",
+			Category:  "Docker",
+			Passed:    false,
+			Warning:   true,
+			Details:   "No docker-compose.yml found",
+			Remediation: []string{
+				"Deploy Hecate: eos create hecate --config hecate-config.yaml",
+			},
+		})
+		return results
+	}
+
+	// INTERVENE: Get container status using docker compose ps
+	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", composeFile, "ps", "--format", "table")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		fmt.Printf("   ❌ Failed to get container status: %v\n", err)
+		fmt.Printf("   Output: %s\n", string(output))
+		results = append(results, HecateCheckResult{
+			Component: HecateComponentCaddy,
+			CheckName: "Container Status",
+			Category:  "Docker",
+			Passed:    false,
+			Error:     err,
+			Details:   "Cannot run docker compose ps",
+			Remediation: []string{
+				"Check Docker is running: systemctl status docker",
+				"Start Docker: systemctl start docker",
+				fmt.Sprintf("Check compose file: docker compose -f %s config", composeFile),
+			},
+		})
+		return results
+	}
+
+	// INTERVENE: Display container status
+	fmt.Printf("\n%s\n", string(output))
+
+	// INTERVENE: Get recent logs (last 20 lines)
+	fmt.Println("\n📋 Recent Logs (last 20 lines):")
+	fmt.Println(strings.Repeat("-", 80))
+
+	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	defer cancel2()
+
+	logCmd := exec.CommandContext(ctx2, "docker", "compose", "-f", composeFile, "logs", "--tail=20")
+	logOutput, err := logCmd.CombinedOutput()
+
+	if err != nil {
+		fmt.Printf("   ⚠️  Could not retrieve logs: %v\n", err)
+	} else {
+		fmt.Printf("%s\n", string(logOutput))
+	}
+
+	// EVALUATE: Success
+	results = append(results, HecateCheckResult{
+		Component: HecateComponentCaddy,
+		CheckName: "Container Status",
+		Category:  "Docker",
+		Passed:    true,
+		Details:   "Container status retrieved successfully",
+	})
+
+	logger.Debug("Container status displayed")
+
+	return results
 }
