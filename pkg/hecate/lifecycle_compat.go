@@ -141,8 +141,8 @@ func generateEnvFileLegacy(rc *eos_io.RuntimeContext, secrets *HecateSecrets) er
 
 # PostgreSQL Configuration
 PG_PASS=%s
-PG_USER=%s
-PG_DB=%s
+POSTGRES_USER=%s
+POSTGRES_DB=%s
 
 # Authentik Configuration
 AUTHENTIK_SECRET_KEY=%s
@@ -218,8 +218,8 @@ func generateDockerComposeLegacy(rc *eos_io.RuntimeContext) error {
       - database:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: ${PG_PASS:?database password required}
-      POSTGRES_USER: ${PG_USER:-authentik}
-      POSTGRES_DB: ${PG_DB:-authentik}
+      POSTGRES_USER: ${POSTGRES_USER:-authentik}
+      POSTGRES_DB: ${POSTGRES_DB:-authentik}
     env_file:
       - .env
     networks:
@@ -248,8 +248,8 @@ func generateDockerComposeLegacy(rc *eos_io.RuntimeContext) error {
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
       AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
-      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${POSTGRES_DB:-authentik}
       AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
       AUTHENTIK_WORKER__THREADS: ${AUTHENTIK_WORKER__THREADS:-4}
       AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
@@ -280,8 +280,8 @@ func generateDockerComposeLegacy(rc *eos_io.RuntimeContext) error {
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
       AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
-      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__USER: ${POSTGRES_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${POSTGRES_DB:-authentik}
       AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
       AUTHENTIK_WORKER__THREADS: ${AUTHENTIK_WORKER__THREADS:-4}
     user: root
