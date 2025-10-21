@@ -137,46 +137,46 @@ const (
 	// These paths are for system-level configuration that Vault integrates with
 
 	// Logrotate configuration
-	LogrotateConfigDir = "/etc/logrotate.d"        // Logrotate configuration directory
+	LogrotateConfigDir = "/etc/logrotate.d"       // Logrotate configuration directory
 	LogrotateVaultPath = "/etc/logrotate.d/vault" // Vault logrotate config
 
 	// Security limits configuration
-	SecurityLimitsDir        = "/etc/security/limits.d"                       // Security limits directory
+	SecurityLimitsDir        = "/etc/security/limits.d"                      // Security limits directory
 	VaultHardeningConfigPath = "/etc/security/limits.d/vault-hardening.conf" // Vault hardening limits
 	VaultUlimitsConfigPath   = "/etc/security/limits.d/vault-ulimits.conf"   // Vault ulimits config
 
 	// Tmpfiles configuration
-	TmpfilesConfigDir = "/etc/tmpfiles.d"         // Tmpfiles configuration directory
+	TmpfilesConfigDir = "/etc/tmpfiles.d"          // Tmpfiles configuration directory
 	EosTmpfilesPath   = "/etc/tmpfiles.d/eos.conf" // Eos tmpfiles config
 
 	// System CA certificates
-	SystemCACertDir   = "/usr/local/share/ca-certificates"                       // System CA cert directory
-	VaultSystemCACert = "/usr/local/share/ca-certificates/vault-local-ca.crt"   // Vault CA in system trust
+	SystemCACertDir   = "/usr/local/share/ca-certificates"                             // System CA cert directory
+	VaultSystemCACert = "/usr/local/share/ca-certificates/vault-local-ca.crt"          // Vault CA in system trust
 	EosInternalCACert = "/usr/local/share/ca-certificates/code-monkey-internal-ca.crt" // Eos internal CA
 
 	// Firewall command paths
-	UFWPath        = "/usr/sbin/ufw"          // UFW firewall command
-	FirewalldPath  = "/usr/bin/firewall-cmd" // Firewalld command
+	UFWPath       = "/usr/sbin/ufw"         // UFW firewall command
+	FirewalldPath = "/usr/bin/firewall-cmd" // Firewalld command
 
 	// Environment configuration
-	SystemEnvironmentFile = "/etc/environment"       // System-wide environment
-	ProfileDDir           = "/etc/profile.d"         // Profile.d directory
+	SystemEnvironmentFile = "/etc/environment"            // System-wide environment
+	ProfileDDir           = "/etc/profile.d"              // Profile.d directory
 	VaultProfilePath      = "/etc/profile.d/eos_vault.sh" // Vault environment profile
 
 	// System configuration files
-	FstabPath      = "/etc/fstab"           // Filesystem table
-	SSHConfigPath  = "/etc/ssh/sshd_config" // SSH daemon config
+	FstabPath     = "/etc/fstab"           // Filesystem table
+	SSHConfigPath = "/etc/ssh/sshd_config" // SSH daemon config
 
 	// Package management
-	AptSourcesDir         = "/etc/apt/sources.list.d"                        // APT sources directory
-	HashiCorpAptList      = "/etc/apt/sources.list.d/hashicorp.list"        // HashiCorp APT repository
-	HashiCorpKeyring      = "/usr/share/keyrings/hashicorp-archive-keyring.gpg" // HashiCorp GPG key
-	YumReposDir           = "/etc/yum.repos.d"                               // YUM repos directory
-	HashiCorpYumRepo      = "/etc/yum.repos.d/hashicorp.repo"                // HashiCorp YUM repository
+	AptSourcesDir    = "/etc/apt/sources.list.d"                           // APT sources directory
+	HashiCorpAptList = "/etc/apt/sources.list.d/hashicorp.list"            // HashiCorp APT repository
+	HashiCorpKeyring = "/usr/share/keyrings/hashicorp-archive-keyring.gpg" // HashiCorp GPG key
+	YumReposDir      = "/etc/yum.repos.d"                                  // YUM repos directory
+	HashiCorpYumRepo = "/etc/yum.repos.d/hashicorp.repo"                   // HashiCorp YUM repository
 
 	// Distribution detection files
-	RedhatReleaseFile = "/etc/redhat-release"   // RHEL/CentOS/Fedora release file
-	DebianVersionFile = "/etc/debian_version"   // Debian/Ubuntu version file
+	RedhatReleaseFile = "/etc/redhat-release" // RHEL/CentOS/Fedora release file
+	DebianVersionFile = "/etc/debian_version" // Debian/Ubuntu version file
 
 	// Backup directory
 	VaultBackupDir = "/var/backups/vault" // Vault backup storage
@@ -186,7 +186,7 @@ const (
 
 	// === Consul Storage Paths (KV API paths) ===
 	// These are Consul KV store paths, not filesystem paths
-	ConsulVaultStoragePrefix = "vault/" // Consul KV prefix for Vault storage backend
+	ConsulVaultStoragePrefix = "vault/"                         // Consul KV prefix for Vault storage backend
 	ConsulTLSMetadataKey     = "vault/tls/certificate/metadata" // TLS cert metadata in Consul
 
 	// === Snap Package Paths (for cleanup) ===
@@ -381,20 +381,20 @@ type FilePermission struct {
 
 // VaultFilePermissions defines the COMPLETE permissions map for all Vault files and directories.
 // This is used for:
-//   1. Initial setup (eos create vault)
-//   2. Permission validation (eos debug vault)
-//   3. Permission fixing (eos fix vault --permissions-only)
-//   4. Security audits
+//  1. Initial setup (eos create vault)
+//  2. Permission validation (eos debug vault)
+//  3. Permission fixing (eos fix vault --permissions-only)
+//  4. Security audits
 //
 // IMPORTANT: This list must be kept in sync with actual file system structure.
 // Add new paths here when adding new Vault components.
 var VaultFilePermissions = []FilePermission{
 	// === Directories (create in dependency order) ===
-	{Path: VaultBaseDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultBaseDirPerm},        // /opt/vault
-	{Path: VaultDataDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDataDirPerm},        // /opt/vault/data
-	{Path: VaultLogsDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultLogsDirPerm},        // /var/log/vault
-	{Path: VaultConfigDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDirPerm},          // /etc/vault.d
-	{Path: VaultTLSDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSDirPerm},          // /etc/vault.d/tls
+	{Path: VaultBaseDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultBaseDirPerm},           // /opt/vault
+	{Path: VaultDataDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDataDirPerm},           // /opt/vault/data
+	{Path: VaultLogsDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultLogsDirPerm},           // /var/log/vault
+	{Path: VaultConfigDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDirPerm},             // /etc/vault.d
+	{Path: VaultTLSDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSDirPerm},             // /etc/vault.d/tls
 	{Path: "/var/lib/eos/secret", Owner: RootOwner, Group: RootGroup, Mode: VaultSecretsDirPerm}, // Eos secrets
 
 	// === Config Files ===

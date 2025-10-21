@@ -8,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -273,11 +274,11 @@ func runVaultPolicyUpdate(rc *eos_io.RuntimeContext) error {
 
 	// ASSESS - Get root client
 	logger.Info("Authenticating to Vault (requires root token)...")
-	client, err := vault.GetRootClient(rc)
+	_, err := vault.GetRootClient(rc)
 	if err != nil {
 		return fmt.Errorf("failed to get root client: %w\n\n"+
 			"This operation requires root token access.\n"+
-			"The root token is stored in: %s", err, vault.VaultInitPath)
+			"The root token is stored in: %s", err, shared.VaultInitPath)
 	}
 
 	logger.Info("✓ Authenticated with root token")
