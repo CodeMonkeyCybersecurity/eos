@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -19,16 +20,19 @@ import (
 
 // DependencyConfig defines a dependency to check and potentially install
 type DependencyConfig struct {
-	Name          string                      // Friendly name (e.g., "Ollama", "Docker")
-	Description   string                      // What it's for (e.g., "local LLM embeddings")
-	CheckCommand  string                      // Command to check if installed (e.g., "docker")
-	CheckArgs     []string                    // Args for check command (e.g., ["info"])
-	InstallCmd    string                      // Installation command (shown to user)
-	StartCmd      string                      // Optional: command to start service
-	Required      bool                        // If true, operation cannot continue without it
-	AutoInstall   bool                        // If true, attempt automatic installation (must be safe)
-	AutoStart     bool                        // If true, attempt automatic start (must be safe)
-	CustomCheckFn func(context.Context) error // Optional custom check function
+	Name           string                      // Friendly name (e.g., "Ollama", "Docker")
+	Description    string                      // What it's for (e.g., "local LLM embeddings")
+	CheckCommand   string                      // Command to check if installed (e.g., "docker")
+	CheckArgs      []string                    // Args for check command (e.g., ["info"])
+	InstallCmd     string                      // Installation command (shown to user)
+	StartCmd       string                      // Optional: command to start service
+	Required       bool                        // If true, operation cannot continue without it
+	AutoInstall    bool                        // If true, attempt automatic installation (must be safe)
+	AutoStart      bool                        // If true, attempt automatic start (must be safe)
+	CustomCheckFn  func(context.Context) error // Optional custom check function
+	InstallTimeout time.Duration               // Optional: timeout for installation (default: 10 minutes)
+	StartTimeout   time.Duration               // Optional: timeout for service start (default: 2 minutes)
+	CheckTimeout   time.Duration               // Optional: timeout for check commands (default: 30 seconds)
 }
 
 // DependencyCheckResult contains the result of a dependency check
@@ -39,6 +43,13 @@ type DependencyCheckResult struct {
 	Version     string
 	UserDecline bool // User declined to install
 }
+
+// Default timeouts for dependency operations
+const (
+	DefaultInstallTimeout = 10 * time.Minute // Large downloads (e.g., Ollama binary)
+	DefaultStartTimeout   = 2 * time.Minute  // Service startup (e.g., systemd)
+	DefaultCheckTimeout   = 30 * time.Second // Quick health checks
+)
 
 // CheckDependencyWithPrompt checks if a dependency exists and prompts user to install if missing
 // This is the human-centric pattern: NEVER silently fail, ALWAYS offer informed consent
@@ -54,13 +65,19 @@ func CheckDependencyWithPrompt(rc *eos_io.RuntimeContext, config DependencyConfi
 	// === ASSESS: Check if dependency exists ===
 	logger.Debug("Checking dependency", zap.String("dependency", config.Name))
 
+	// Set default timeouts if not provided
+	checkTimeout := config.CheckTimeout
+	if checkTimeout == 0 {
+		checkTimeout = DefaultCheckTimeout
+	}
+
 	var checkErr error
 	if config.CustomCheckFn != nil {
 		// Use custom check function if provided
 		checkErr = config.CustomCheckFn(rc.Ctx)
 	} else {
-		// Use standard command check
-		checkErr = checkDependencyCommand(rc.Ctx, config.CheckCommand, config.CheckArgs)
+		// Use standard command check with timeout
+		checkErr = checkDependencyCommand(rc.Ctx, config.CheckCommand, config.CheckArgs, checkTimeout)
 	}
 
 	if checkErr == nil {
@@ -169,7 +186,7 @@ func CheckDependencyWithPrompt(rc *eos_io.RuntimeContext, config DependencyConfi
 	if config.CustomCheckFn != nil {
 		checkErr = config.CustomCheckFn(rc.Ctx)
 	} else {
-		checkErr = checkDependencyCommand(rc.Ctx, config.CheckCommand, config.CheckArgs)
+		checkErr = checkDependencyCommand(rc.Ctx, config.CheckCommand, config.CheckArgs, checkTimeout)
 	}
 
 	if checkErr != nil {
@@ -189,7 +206,7 @@ func CheckDependencyWithPrompt(rc *eos_io.RuntimeContext, config DependencyConfi
 }
 
 // checkDependencyCommand checks if a command exists and runs successfully
-func checkDependencyCommand(ctx context.Context, command string, args []string) error {
+func checkDependencyCommand(ctx context.Context, command string, args []string, timeout time.Duration) error {
 	logger := otelzap.Ctx(ctx)
 
 	// First check if command exists in PATH
@@ -202,9 +219,12 @@ func checkDependencyCommand(ctx context.Context, command string, args []string) 
 		zap.String("command", command),
 		zap.String("path", path))
 
-	// If args provided, try running the command
+	// If args provided, try running the command with timeout
 	if len(args) > 0 {
-		cmd := exec.CommandContext(ctx, command, args...)
+		checkCtx, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(checkCtx, command, args...)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("command '%s %v' failed: %w\nOutput: %s",
@@ -224,17 +244,30 @@ func installDependency(rc *eos_io.RuntimeContext, config DependencyConfig) error
 		return fmt.Errorf("no installation command provided")
 	}
 
+	// Set default timeouts if not provided
+	installTimeout := config.InstallTimeout
+	if installTimeout == 0 {
+		installTimeout = DefaultInstallTimeout
+	}
+	startTimeout := config.StartTimeout
+	if startTimeout == 0 {
+		startTimeout = DefaultStartTimeout
+	}
+
 	logger.Info("Executing installation command",
 		zap.String("dependency", config.Name),
-		zap.String("command", config.InstallCmd))
+		zap.String("command", config.InstallCmd),
+		zap.Duration("timeout", installTimeout))
 
 	// Execute installation command
 	// Note: This uses shell execution because install commands often use pipes, etc.
-	// Capture: false allows user to see progress and provide input (e.g., sudo password)
+	// Output is captured to buffer (not shown in real-time) but logged on error for debugging
+	// Capture: false means don't return the output string, but it's still captured internally
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "/bin/bash",
 		Args:    []string{"-c", config.InstallCmd},
-		Capture: false, // Show output to user for interactive scripts
+		Capture: false,
+		Timeout: installTimeout,
 	})
 
 	if err != nil {
@@ -248,12 +281,14 @@ func installDependency(rc *eos_io.RuntimeContext, config DependencyConfig) error
 	if config.AutoStart && config.StartCmd != "" {
 		logger.Info("Starting service",
 			zap.String("dependency", config.Name),
-			zap.String("command", config.StartCmd))
+			zap.String("command", config.StartCmd),
+			zap.Duration("timeout", startTimeout))
 
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "/bin/bash",
 			Args:    []string{"-c", config.StartCmd},
-			Capture: false, // Show output to user
+			Capture: false,
+			Timeout: startTimeout,
 		})
 
 		if err != nil {
