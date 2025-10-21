@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -17,7 +18,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ollama"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/preflight"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/progress"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
@@ -955,36 +955,21 @@ networks:
 	)
 }
 
-// pullDockerImages pulls all required Docker images
+// pullDockerImages pulls all required Docker images with real progress tracking
 func (bgi *BionicGPTInstaller) pullDockerImages(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	// Start progress display with periodic updates
-	op := progress.NewOperation(ctx, "Pulling Docker images", "5-10 minutes").
-		WithNote("SSH connection may appear to hang - this is normal for large image downloads").
-		WithPollInterval(30) // Update every 30 seconds
-	op.Start()
-	defer op.Done()
+	logger.Info("Pulling Docker images with real progress tracking",
+		zap.String("compose_file", bgi.config.ComposeFile))
 
-	logger.Debug("Executing docker compose pull",
-		zap.String("command", "docker"),
-		zap.Strings("args", []string{"compose", "-f", bgi.config.ComposeFile, "pull"}),
-		zap.String("working_dir", bgi.config.InstallDir))
-
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"compose", "-f", bgi.config.ComposeFile, "pull"},
-		Dir:     bgi.config.InstallDir,
-		Capture: true,
-		Timeout: 30 * time.Minute, // 30 minutes for large images (embeddings, chunking, etc.)
-	})
-
-	if err != nil {
-		logger.Warn("Docker pull reported an error", zap.Error(err))
-		return fmt.Errorf("failed to pull Docker images: %s", output)
+	// Use real Docker SDK progress tracking instead of fake timers
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+	if err := docker.PullComposeImagesWithProgress(rc, bgi.config.ComposeFile); err != nil {
+		logger.Error("Failed to pull Docker images", zap.Error(err))
+		return fmt.Errorf("failed to pull Docker images: %w", err)
 	}
 
-	logger.Debug("Docker images pulled successfully")
+	logger.Info("Docker images pulled successfully")
 	return nil
 }
 

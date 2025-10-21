@@ -24,6 +24,7 @@ This command can repair:
 - Systemd service configuration
 - Configuration file syntax
 - Missing directories
+- Incorrect API and cluster addresses (localhost → hostname)
 
 EXAMPLES:
   # Auto-repair all detected issues
@@ -39,7 +40,10 @@ EXAMPLES:
   sudo eos fix vault --permissions
 
   # Only repair configuration
-  sudo eos fix vault --config`,
+  sudo eos fix vault --config
+
+  # Only fix API/cluster addresses
+  sudo eos fix vault --addresses`,
 
 	RunE: eos_cli.Wrap(runVaultFix),
 }
@@ -49,6 +53,7 @@ func init() {
 	vaultFixCmd.Flags().Bool("cleanup-binaries", false, "Remove duplicate vault binaries")
 	vaultFixCmd.Flags().Bool("permissions", false, "Fix file permissions and ownership")
 	vaultFixCmd.Flags().Bool("config", false, "Repair configuration files")
+	vaultFixCmd.Flags().Bool("addresses", false, "Fix incorrect API and cluster addresses")
 	vaultFixCmd.Flags().Bool("all", false, "Repair all detected issues")
 }
 
@@ -61,6 +66,7 @@ func runVaultFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 	cleanupBinaries, _ := cmd.Flags().GetBool("cleanup-binaries")
 	permissions, _ := cmd.Flags().GetBool("permissions")
 	repairConfig, _ := cmd.Flags().GetBool("config")
+	fixAddresses, _ := cmd.Flags().GetBool("addresses")
 	all, _ := cmd.Flags().GetBool("all")
 
 	config := &vaultfix.Config{
@@ -68,6 +74,7 @@ func runVaultFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 		CleanupBinaries: cleanupBinaries,
 		FixPermissions:  permissions,
 		RepairConfig:    repairConfig,
+		FixAddresses:    fixAddresses,
 		All:             all,
 	}
 

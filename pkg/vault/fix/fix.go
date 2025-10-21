@@ -6,6 +6,7 @@ package fix
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -20,6 +21,7 @@ type Config struct {
 	CleanupBinaries bool
 	FixPermissions  bool
 	RepairConfig    bool
+	FixAddresses    bool
 	All             bool
 }
 
@@ -42,9 +44,10 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 	}
 
 	// Default: run all repairs if no specific flag is set
-	runBinaries := config.CleanupBinaries || config.All || (!config.CleanupBinaries && !config.FixPermissions && !config.RepairConfig)
+	runBinaries := config.CleanupBinaries || config.All || (!config.CleanupBinaries && !config.FixPermissions && !config.RepairConfig && !config.FixAddresses)
 	runPermissions := config.FixPermissions || config.All
 	runConfig := config.RepairConfig || config.All
+	runAddresses := config.FixAddresses || config.All
 
 	result := &RepairResult{
 		IssuesFound: 0,
@@ -84,6 +87,18 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 		result.IssuesFixed += fixed
 		if err != nil {
 			logger.Warn("Configuration repair encountered errors", zap.Error(err))
+			result.Errors = append(result.Errors, err)
+		}
+	}
+
+	// ASSESS & INTERVENE: Fix API and cluster addresses
+	if runAddresses {
+		logger.Info("Checking API and cluster addresses")
+		found, fixed, err := RepairVaultAddresses(rc, config.DryRun)
+		result.IssuesFound += found
+		result.IssuesFixed += fixed
+		if err != nil {
+			logger.Warn("Address repair encountered errors", zap.Error(err))
 			result.Errors = append(result.Errors, err)
 		}
 	}
@@ -263,4 +278,121 @@ func GetDuplicateBinaries(rc *eos_io.RuntimeContext) ([]vault.BinaryLocation, er
 	}
 
 	return duplicates, nil
+}
+
+// RepairVaultAddresses checks and fixes incorrect api_addr and cluster_addr in vault.hcl
+// ASSESS → INTERVENE → EVALUATE pattern
+func RepairVaultAddresses(rc *eos_io.RuntimeContext, dryRun bool) (int, int, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking Vault API and cluster addresses")
+
+	// ASSESS: Read current configuration
+	configPath := shared.VaultConfigPath
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		logger.Info("Vault config file does not exist", zap.String("path", configPath))
+		return 0, 0, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read vault config: %w", err)
+	}
+
+	content := string(data)
+	hostname, err := os.Hostname()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	// Check for incorrect localhost addresses
+	issuesFound := 0
+	var oldAPIAddr, oldClusterAddr string
+	newAPIAddr := fmt.Sprintf("https://%s:%s", hostname, shared.VaultDefaultPort)
+	newClusterAddr := fmt.Sprintf("https://%s:%s", hostname, shared.VaultClusterPort)
+
+	// Detect current api_addr
+	if strings.Contains(content, `api_addr     = "https://127.0.0.1:`) ||
+		strings.Contains(content, `api_addr     = "https://localhost:`) {
+		issuesFound++
+		if strings.Contains(content, "127.0.0.1") {
+			oldAPIAddr = fmt.Sprintf("https://127.0.0.1:%s", shared.VaultDefaultPort)
+		} else {
+			oldAPIAddr = fmt.Sprintf("https://localhost:%s", shared.VaultDefaultPort)
+		}
+		logger.Warn("Found incorrect api_addr using localhost",
+			zap.String("current", oldAPIAddr),
+			zap.String("should_be", newAPIAddr))
+	}
+
+	// Detect current cluster_addr
+	if strings.Contains(content, `cluster_addr = "https://127.0.0.1:`) ||
+		strings.Contains(content, `cluster_addr = "https://localhost:`) {
+		issuesFound++
+		if strings.Contains(content, "127.0.0.1") {
+			oldClusterAddr = fmt.Sprintf("https://127.0.0.1:%s", shared.VaultClusterPort)
+		} else {
+			oldClusterAddr = fmt.Sprintf("https://localhost:%s", shared.VaultClusterPort)
+		}
+		logger.Warn("Found incorrect cluster_addr using localhost",
+			zap.String("current", oldClusterAddr),
+			zap.String("should_be", newClusterAddr))
+	}
+
+	if issuesFound == 0 {
+		logger.Info("API and cluster addresses are correct")
+		return 0, 0, nil
+	}
+
+	if dryRun {
+		logger.Info("Would fix address configuration (dry-run)",
+			zap.Int("issues", issuesFound))
+		return issuesFound, issuesFound, nil
+	}
+
+	// INTERVENE: Create backup before modification
+	backupPath := fmt.Sprintf("%s.backup.%s", configPath, fmt.Sprintf("%d", os.Getpid()))
+	if err := os.WriteFile(backupPath, data, 0640); err != nil {
+		return issuesFound, 0, fmt.Errorf("failed to create backup: %w", err)
+	}
+	logger.Info("Created configuration backup", zap.String("backup_path", backupPath))
+
+	// Replace addresses
+	newContent := content
+	issuesFixed := 0
+
+	if oldAPIAddr != "" {
+		oldLine := fmt.Sprintf(`api_addr     = "%s"`, oldAPIAddr)
+		newLine := fmt.Sprintf(`api_addr     = "%s"`, newAPIAddr)
+		newContent = strings.ReplaceAll(newContent, oldLine, newLine)
+		issuesFixed++
+		logger.Info("Fixed api_addr",
+			zap.String("old", oldAPIAddr),
+			zap.String("new", newAPIAddr))
+	}
+
+	if oldClusterAddr != "" {
+		oldLine := fmt.Sprintf(`cluster_addr = "%s"`, oldClusterAddr)
+		newLine := fmt.Sprintf(`cluster_addr = "%s"`, newClusterAddr)
+		newContent = strings.ReplaceAll(newContent, oldLine, newLine)
+		issuesFixed++
+		logger.Info("Fixed cluster_addr",
+			zap.String("old", oldClusterAddr),
+			zap.String("new", newClusterAddr))
+	}
+
+	// Write updated configuration
+	if err := os.WriteFile(configPath, []byte(newContent), 0640); err != nil {
+		return issuesFound, 0, fmt.Errorf("failed to write updated config: %w", err)
+	}
+
+	// EVALUATE: Verify the fix
+	logger.Info("Vault address configuration updated successfully",
+		zap.Int("issues_found", issuesFound),
+		zap.Int("issues_fixed", issuesFixed),
+		zap.String("backup", backupPath))
+
+	logger.Warn("Vault service must be restarted for changes to take effect",
+		zap.String("command", "sudo systemctl restart vault.service"))
+
+	return issuesFound, issuesFixed, nil
 }

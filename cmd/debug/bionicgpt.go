@@ -1,285 +1,265 @@
 // cmd/debug/bionicgpt.go
-// BionicGPT installation and runtime diagnostic command
+// BionicGPT installation and runtime diagnostic command using debug framework
 
 package debug
 
 import (
 	"fmt"
+	"os"
 	"strings"
-	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
+	debugbionicgpt "github.com/CodeMonkeyCybersecurity/eos/pkg/debug/bionicgpt"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
+var (
+	bionicgptDebugFormat   string
+	bionicgptDebugOutput   string
+	bionicgptDebugSanitize bool
+	bionicgptDebugShowAll  bool
+)
+
 var bionicgptDebugCmd = &cobra.Command{
 	Use:   "bionicgpt",
-	Short: "Diagnose BionicGPT installation and runtime issues",
-	Long: `Run comprehensive diagnostics on BionicGPT installation and runtime.
+	Short: "Comprehensive BionicGPT diagnostics and troubleshooting",
+	Long: `Collect and analyze comprehensive BionicGPT diagnostic information.
 
-This command tests:
-- Container status (app, postgres, embeddings, RAG, chunking, migrations)
-- Port bindings and network connectivity
-- PostgreSQL readiness and connection
-- Docker volume mounts
-- Container logs (last 50 lines)
-- Resource utilization
-- Health endpoints
-
-This helps identify issues with the 'eos create bionicgpt' installation process
-and runtime failures.
+This command performs extensive checks on:
+- Installation status and directory structure
+- Docker daemon and container status
+- All service containers (app, postgres, embeddings, RAG, chunking, LiteLLM)
+- PostgreSQL database health and connectivity
+- Docker volumes and data persistence
+- Port bindings and network accessibility
+- Container logs for errors
+- Resource usage (CPU, memory)
+- Ollama integration (for local embeddings)
 
 EXAMPLES:
-  # Run diagnostics
+  # Run diagnostics with text output
   sudo eos debug bionicgpt
 
-  # Run and save output
-  sudo eos debug bionicgpt > /tmp/bionicgpt-diagnostic.txt`,
+  # Save to file
+  sudo eos debug bionicgpt --output=/tmp/bionicgpt-debug.txt
+
+  # JSON format for automation
+  sudo eos debug bionicgpt --format=json
+
+  # Markdown format for GitHub issues
+  sudo eos debug bionicgpt --format=markdown > issue.md
+
+  # Sanitize sensitive data before sharing
+  sudo eos debug bionicgpt --sanitize --output=bionicgpt-debug-safe.txt
+
+  # Show all results including skipped checks
+  sudo eos debug bionicgpt --show-all`,
 
 	RunE: eos_cli.Wrap(runBionicGPTDebug),
 }
 
 func init() {
+	bionicgptDebugCmd.Flags().StringVar(&bionicgptDebugFormat, "format", "text", "Output format: text, json, markdown")
+	bionicgptDebugCmd.Flags().StringVar(&bionicgptDebugOutput, "output", "", "Save output to file instead of stdout")
+	bionicgptDebugCmd.Flags().BoolVar(&bionicgptDebugSanitize, "sanitize", false, "Redact sensitive information (passwords, keys)")
+	bionicgptDebugCmd.Flags().BoolVar(&bionicgptDebugShowAll, "show-all", false, "Show all checks including skipped ones")
+
 	debugCmd.AddCommand(bionicgptDebugCmd)
 }
 
 func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting BionicGPT installation diagnostics")
+	logger.Info("Starting BionicGPT diagnostics",
+		zap.String("format", bionicgptDebugFormat),
+		zap.Bool("sanitize", bionicgptDebugSanitize),
+		zap.Bool("show_all", bionicgptDebugShowAll),
+		zap.String("output_file", bionicgptDebugOutput))
 
-	installDir := bionicgpt.DefaultInstallDir
-	composeFile := installDir + "/docker-compose.yml"
+	// Create collector with appropriate formatter
+	var formatter debug.Formatter
+	logger.Debug("Initializing diagnostic formatter", zap.String("format", bionicgptDebugFormat))
 
-	fmt.Println("╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║      BionicGPT Diagnostic Report                          ║")
-	fmt.Println("╚════════════════════════════════════════════════════════════╝")
-	fmt.Printf("Generated: %s\n", time.Now().Format(time.RFC1123))
-	fmt.Println()
-
-	// Test 1: Container Status
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("1. CONTAINER STATUS")
-	fmt.Println("══════════════════════════════════════════════════════════")
-	logger.Debug("Checking container status")
-
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"compose", "-f", composeFile, "ps", "--format", "table"},
-		Capture: true,
-	})
-
-	if err != nil {
-		logger.Warn("Failed to get container status", zap.Error(err), zap.String("output", output))
-		fmt.Printf(" Failed to get container status: %v\n", err)
-		fmt.Println("   Possible causes:")
-		fmt.Println("   - BionicGPT not installed yet (run: sudo eos create bionicgpt)")
-		fmt.Println("   - docker-compose.yml missing or corrupted")
-		fmt.Println()
-	} else {
-		fmt.Println(output)
-		logger.Info("Container status retrieved successfully")
+	switch bionicgptDebugFormat {
+	case "json":
+		formatter = debug.NewJSONFormatter(true) // Pretty JSON
+		logger.Debug("Using JSON formatter with pretty printing enabled")
+	case "markdown":
+		formatter = debug.NewMarkdownFormatter()
+		logger.Debug("Using Markdown formatter")
+	default:
+		textFormatter := debug.NewTextFormatter()
+		textFormatter.ShowSkipped = bionicgptDebugShowAll
+		formatter = textFormatter
+		logger.Debug("Using text formatter", zap.Bool("show_skipped", bionicgptDebugShowAll))
 	}
-	fmt.Println()
 
-	// Test 2: Port Bindings
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("2. PORT BINDINGS")
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("Checking if services are listening on expected ports...")
-	logger.Debug("Checking port bindings")
+	collector := debug.NewCollector("BionicGPT", formatter)
+	logger.Debug("Created diagnostic collector", zap.String("component", "BionicGPT"))
 
-	portOutput, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "ss",
-		Args:    []string{"-tlnp"},
-		Capture: true,
-	})
+	// Add all BionicGPT diagnostics
+	allDiagnostics := debugbionicgpt.AllDiagnostics()
 
+	logger.Debug("Registering diagnostics",
+		zap.Int("diagnostics_count", len(allDiagnostics)))
+
+	collector.Add(allDiagnostics...)
+
+	logger.Info("Registered diagnostics", zap.Int("total", len(allDiagnostics)))
+
+	// Run diagnostics
+	logger.Info("Running diagnostics collection", zap.Int("checks_to_run", len(allDiagnostics)))
+	report, err := collector.Run(rc.Ctx)
 	if err != nil {
-		logger.Warn("Failed to check ports", zap.Error(err))
-		fmt.Printf(" Failed to check ports: %v\n", err)
-		fmt.Println()
-	} else {
-		// Filter for BionicGPT port (3000)
-		lines := strings.Split(portOutput, "\n")
-		found := false
-		for _, line := range lines {
-			if strings.Contains(line, ":3000") || strings.Contains(line, fmt.Sprintf(":%d", bionicgpt.DefaultPort)) {
-				if !found {
-					fmt.Println("Port       Status")
-					fmt.Println("----       ------")
-					found = true
-				}
-				fmt.Printf(" %d    BionicGPT listening\n", bionicgpt.DefaultPort)
+		logger.Error("Diagnostics collection failed", zap.Error(err))
+		return fmt.Errorf("diagnostics collection failed: %w", err)
+	}
+
+	logger.Info("Diagnostics collection completed",
+		zap.Int("checks_run", len(report.Results)),
+		zap.Int("ok", report.Summary.OK),
+		zap.Int("warnings", report.Summary.Warnings),
+		zap.Int("errors", report.Summary.Errors),
+		zap.Int("skipped", report.Summary.Skipped))
+
+	// Create analyzer with BionicGPT-specific rules
+	logger.Debug("Initializing diagnostic analyzer")
+	analyzer := debug.NewAnalyzer("bionicgpt")
+
+	rules := debugbionicgpt.BionicGPTAnalysisRules()
+	logger.Debug("Loading analysis rules", zap.Int("rule_count", len(rules)))
+
+	for i := range rules {
+		analyzer.AddRule(rules[i])
+		logger.Debug("Registered analysis rule", zap.Int("rule_number", i+1))
+	}
+
+	logger.Info("Analysis rules loaded", zap.Int("total_rules", len(rules)))
+
+	// Perform analysis
+	logger.Info("Performing diagnostic analysis")
+	analysis := analyzer.Analyze(report)
+
+	logger.Info("Analysis completed",
+		zap.Int("critical_issues", len(analysis.CriticalIssues)),
+		zap.Int("major_issues", len(analysis.MajorIssues)),
+		zap.Int("minor_issues", len(analysis.MinorIssues)),
+		zap.Int("warnings", len(analysis.Warnings)),
+		zap.String("overall_health", string(analysis.OverallHealth)))
+
+	// Generate output with analysis
+	logger.Debug("Generating formatted output", zap.String("format", bionicgptDebugFormat))
+	var output string
+
+	if bionicgptDebugFormat == "text" || bionicgptDebugFormat == "" {
+		logger.Debug("Generating text format with quick summary and next steps")
+
+		// Add quick health summary at top
+		logger.Debug("Generating quick health summary")
+		quickSummary := debug.GenerateQuickSummary(report, analysis)
+		output = debug.FormatQuickSummary(quickSummary, "bionicgpt")
+		output += "\n\n"
+
+		logger.Debug("Formatting diagnostic report")
+		output += formatter.Format(report)
+		output += "\n\n"
+
+		logger.Debug("Formatting analysis results")
+		output += debug.FormatAnalysis(analysis)
+		output += "\n\n"
+
+		// Add next steps
+		logger.Debug("Generating next steps recommendations")
+		nextSteps := debugbionicgpt.GenerateNextSteps(report, analysis)
+		logger.Debug("Next steps generated", zap.Int("step_count", len(nextSteps)))
+
+		if len(nextSteps) > 0 {
+			output += strings.Repeat("=", 80) + "\n"
+			output += "RECOMMENDED NEXT STEPS\n"
+			output += strings.Repeat("=", 80) + "\n\n"
+			for i, step := range nextSteps {
+				output += fmt.Sprintf("%d. %s\n", i+1, step)
+				logger.Debug("Next step", zap.Int("step", i+1), zap.String("action", step))
 			}
+			output += "\n"
 		}
-		if !found {
-			fmt.Printf(" BionicGPT not listening on expected port %d\n", bionicgpt.DefaultPort)
-			fmt.Println("   Containers may not be running or still initializing")
-		}
-		logger.Info("Port check completed")
-	}
-	fmt.Println()
-
-	// Test 3: Docker Volumes
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("3. DOCKER VOLUMES")
-	fmt.Println("══════════════════════════════════════════════════════════")
-	logger.Debug("Checking Docker volumes")
-
-	volumes := []string{
-		bionicgpt.VolumePostgresData,
-		bionicgpt.VolumeDocuments,
-	}
-
-	for _, vol := range volumes {
-		volOutput, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "docker",
-			Args:    []string{"volume", "inspect", vol, "--format", "{{.Mountpoint}} ({{.Driver}})"},
-			Capture: true,
-		})
-
-		if err != nil {
-			fmt.Printf(" Volume %s: Not found\n", vol)
-		} else {
-			fmt.Printf("✓ Volume %s: %s\n", vol, strings.TrimSpace(volOutput))
-		}
-	}
-	fmt.Println()
-
-	// Test 4: PostgreSQL Readiness
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("4. DATABASE CONNECTION TEST")
-	fmt.Println("══════════════════════════════════════════════════════════")
-	logger.Debug("Testing PostgreSQL readiness")
-
-	pgOutput, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"exec", bionicgpt.ContainerPostgres, "pg_isready", "-U", "postgres"},
-		Capture: true,
-		Timeout: 5 * time.Second,
-	})
-
-	if err != nil {
-		logger.Warn("PostgreSQL readiness check failed",
-			zap.Error(err),
-			zap.String("output", pgOutput))
-		fmt.Printf(" PostgreSQL not ready: %s\n", pgOutput)
-		fmt.Println("   Database may still be initializing")
 	} else {
-		logger.Info("PostgreSQL readiness check passed")
-		fmt.Printf("✓ PostgreSQL ready: %s\n", strings.TrimSpace(pgOutput))
-	}
-	fmt.Println()
-
-	// Test 5: Container Logs
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("5. CONTAINER LOGS (Last 30 lines each)")
-	fmt.Println("══════════════════════════════════════════════════════════")
-	logger.Debug("Gathering container logs")
-
-	containers := []struct {
-		name    string
-		service string
-	}{
-		{"PostgreSQL", "postgres"},
-		{"Migrations", "migrations"},
-		{"RAG Engine", "rag-engine"},
-		{"Embeddings API", "embeddings-api"},
-		{"Chunking Engine", "chunking-engine"},
-		{"BionicGPT App", "app"},
+		// JSON/Markdown get full report
+		logger.Debug("Using formatter for structured output")
+		output = formatter.Format(report)
 	}
 
-	for _, container := range containers {
-		fmt.Printf("\n--- %s Logs ---\n", container.name)
-		logsOutput, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "docker",
-			Args:    []string{"compose", "-f", composeFile, "logs", "--tail", "30", container.service},
-			Capture: true,
-			Timeout: 10 * time.Second,
-		})
+	logger.Info("Output generated", zap.Int("output_size_bytes", len(output)))
 
-		if err != nil {
-			logger.Warn("Failed to get container logs",
-				zap.String("container", container.name),
+	// Sanitize if requested
+	if bionicgptDebugSanitize {
+		logger.Info("Sanitizing sensitive information from output")
+		originalSize := len(output)
+		output = sanitizeBionicGPTOutput(output)
+		logger.Debug("Sanitization complete",
+			zap.Int("original_size", originalSize),
+			zap.Int("sanitized_size", len(output)))
+	}
+
+	// Output to file or stdout
+	if bionicgptDebugOutput != "" {
+		logger.Info("Writing diagnostic report to file",
+			zap.String("file", bionicgptDebugOutput),
+			zap.Int("size_bytes", len(output)))
+
+		if err := os.WriteFile(bionicgptDebugOutput, []byte(output), 0644); err != nil {
+			logger.Error("Failed to write output file",
+				zap.String("file", bionicgptDebugOutput),
 				zap.Error(err))
-			fmt.Printf(" Failed to retrieve logs: %v\n", err)
-		} else {
-			// Filter for important log lines
-			lines := strings.Split(logsOutput, "\n")
-			importantLines := 0
-			for _, line := range lines {
-				if strings.Contains(line, "ERROR") || strings.Contains(line, "WARN") ||
-					strings.Contains(line, "Failed") || strings.Contains(line, "Connection") ||
-					strings.Contains(line, "ready") || strings.Contains(line, "Starting") ||
-					strings.Contains(line, "Listening") || strings.Contains(line, "Accepting") {
-					fmt.Println(line)
-					importantLines++
-				}
-			}
-			if importantLines == 0 {
-				fmt.Println("(No significant log entries found)")
-			}
-			logger.Debug("Container logs retrieved",
-				zap.String("container", container.name),
-				zap.Int("lines_shown", importantLines))
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+
+		logger.Info("Diagnostic report saved successfully",
+			zap.String("file", bionicgptDebugOutput),
+			zap.Int("size_bytes", len(output)))
+		fmt.Printf("Diagnostic report saved to: %s\n", bionicgptDebugOutput)
+	} else {
+		logger.Debug("Writing diagnostic report to stdout")
+		fmt.Print(output)
+	}
+
+	logger.Info("BionicGPT diagnostics completed successfully")
+
+	return nil
+}
+
+// sanitizeBionicGPTOutput redacts sensitive information
+func sanitizeBionicGPTOutput(output string) string {
+	sanitized := output
+
+	// Redact PostgreSQL passwords
+	sanitized = strings.ReplaceAll(sanitized, "POSTGRES_PASSWORD=", "POSTGRES_PASSWORD=[REDACTED]")
+
+	// Redact Azure OpenAI keys
+	sanitized = strings.ReplaceAll(sanitized, "AZURE_API_KEY=", "AZURE_API_KEY=[REDACTED]")
+	sanitized = strings.ReplaceAll(sanitized, "AZURE_OPENAI_API_KEY=", "AZURE_OPENAI_API_KEY=[REDACTED]")
+
+	// Redact JWT secrets
+	sanitized = strings.ReplaceAll(sanitized, "JWT_SECRET=", "JWT_SECRET=[REDACTED]")
+
+	// Redact LiteLLM master key
+	sanitized = strings.ReplaceAll(sanitized, "LITELLM_MASTER_KEY=", "LITELLM_MASTER_KEY=[REDACTED]")
+
+	// Redact connection strings with passwords
+	lines := strings.Split(sanitized, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "postgresql://") && strings.Contains(line, "@") {
+			// Redact password in connection string
+			lines[i] = "DATABASE_URL=postgresql://[REDACTED]@[REDACTED]"
+		}
+		if strings.Contains(line, "password=") {
+			lines[i] = strings.Split(line, "password=")[0] + "password=[REDACTED]"
 		}
 	}
-	fmt.Println()
+	sanitized = strings.Join(lines, "\n")
 
-	// Test 6: Resource Usage
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("6. RESOURCE USAGE")
-	fmt.Println("══════════════════════════════════════════════════════════")
-	logger.Debug("Checking resource usage")
-
-	statsOutput, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"stats", "--no-stream", "--format", "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"},
-		Capture: true,
-		Timeout: 10 * time.Second,
-	})
-
-	if err != nil {
-		logger.Warn("Failed to get resource stats", zap.Error(err))
-		fmt.Printf(" Failed to get resource stats: %v\n", err)
-	} else {
-		fmt.Println(statsOutput)
-		logger.Info("Resource stats retrieved")
-	}
-	fmt.Println()
-
-	// Summary
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println("NEXT STEPS")
-	fmt.Println("══════════════════════════════════════════════════════════")
-	fmt.Println()
-	fmt.Println("If you see issues above:")
-	fmt.Println()
-	fmt.Println("1. Containers not running:")
-	fmt.Println("   cd /opt/bionicgpt && sudo docker compose up -d")
-	fmt.Println()
-	fmt.Println("2. PostgreSQL not ready:")
-	fmt.Println("   sudo docker compose -f /opt/bionicgpt/docker-compose.yml logs postgres")
-	fmt.Println()
-	fmt.Println("3. Azure OpenAI connection issues:")
-	fmt.Println("   Check Azure OpenAI credentials in .env file")
-	fmt.Println("   Verify Azure OpenAI endpoint is accessible")
-	fmt.Println()
-	fmt.Println("4. RAG engine issues:")
-	fmt.Println("   sudo docker compose -f /opt/bionicgpt/docker-compose.yml logs rag-engine")
-	fmt.Println()
-	fmt.Println("5. Embeddings API not responding:")
-	fmt.Println("   sudo docker compose -f /opt/bionicgpt/docker-compose.yml logs embeddings-api")
-	fmt.Println()
-	fmt.Println("6. Service fails after 5+ minutes:")
-	fmt.Println("   Check logs above for specific errors")
-	fmt.Println()
-
-	logger.Info("Diagnostics completed")
-	return nil
+	return sanitized
 }
