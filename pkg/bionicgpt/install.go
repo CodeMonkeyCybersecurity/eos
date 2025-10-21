@@ -17,6 +17,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ollama"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/preflight"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/progress"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
@@ -326,7 +327,6 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	logger.Debug("Post-operation: compose file created")
 
 	// Step 9: Pull Docker images
-	logger.Info("Pulling Docker images (this may take several minutes)")
 	logger.Debug("Pre-operation: docker pull",
 		zap.String("compose_file", bgi.config.ComposeFile))
 	if err := bgi.pullDockerImages(ctx); err != nil {
@@ -475,15 +475,15 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 
 	// Use human-centric dependency checking with informed consent
 	depConfig := interaction.DependencyConfig{
-		Name:        "Ollama",
-		Description: "Local LLM server for embeddings (document search). Runs models locally for FREE.",
-		CheckCommand: "curl",
-		CheckArgs:   []string{"-s", "http://localhost:11434/api/version"},
-		InstallCmd:  "curl -fsSL https://ollama.ai/install.sh | sh",
-		StartCmd:    "ollama serve &",
-		Required:    true,
-		AutoInstall: true,  // Safe to auto-install via official script
-		AutoStart:   false, // Let user start manually (daemon management varies)
+		Name:          "Ollama",
+		Description:   "Local LLM server for embeddings (document search). Runs models locally for FREE.",
+		CheckCommand:  "curl",
+		CheckArgs:     []string{"-s", "http://localhost:11434/api/version"},
+		InstallCmd:    "curl -fsSL https://ollama.ai/install.sh | sh",
+		StartCmd:      "ollama serve &",
+		Required:      true,
+		AutoInstall:   true,  // Safe to auto-install via official script
+		AutoStart:     false, // Let user start manually (daemon management varies)
 		CustomCheckFn: preflight.CheckOllama,
 	}
 
@@ -616,14 +616,21 @@ func (bgi *BionicGPTInstaller) getAzureConfiguration(ctx context.Context) error 
 		bgi.config.AzureChatDeployment = strings.TrimSpace(chatDeployment)
 	}
 
-	// Prompt for embeddings deployment name
+	// Prompt for embeddings deployment name (skip if using local embeddings)
 	if bgi.config.AzureEmbeddingsDeployment == "" {
-		logger.Info("terminal prompt: Enter Embeddings Model Deployment Name (e.g., text-embedding-ada-002)")
-		embeddingsDeployment, err := eos_io.PromptInput(bgi.rc, "Embeddings Deployment Name: ", "embeddings_deployment")
-		if err != nil {
-			return fmt.Errorf("failed to read embeddings deployment name: %w", err)
+		if bgi.config.UseLocalEmbeddings {
+			// Using local embeddings (Ollama), skip Azure embeddings prompt
+			logger.Info("Using local embeddings, skipping Azure embeddings configuration")
+			bgi.config.AzureEmbeddingsDeployment = "local" // Placeholder for LiteLLM config
+		} else {
+			// Using Azure embeddings, prompt for deployment name
+			logger.Info("terminal prompt: Enter Embeddings Model Deployment Name (e.g., text-embedding-ada-002)")
+			embeddingsDeployment, err := eos_io.PromptInput(bgi.rc, "Embeddings Deployment Name: ", "embeddings_deployment")
+			if err != nil {
+				return fmt.Errorf("failed to read embeddings deployment name: %w", err)
+			}
+			bgi.config.AzureEmbeddingsDeployment = strings.TrimSpace(embeddingsDeployment)
 		}
-		bgi.config.AzureEmbeddingsDeployment = strings.TrimSpace(embeddingsDeployment)
 	}
 
 	// Prompt for API key (only if not managing via Vault)
@@ -952,8 +959,13 @@ networks:
 func (bgi *BionicGPTInstaller) pullDockerImages(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("Pulling Docker images (this may take 5-10 minutes)")
-	logger.Info("Note: SSH connection may appear to hang - this is normal for large image downloads")
+	// Start progress display with periodic updates
+	op := progress.NewOperation(ctx, "Pulling Docker images", "5-10 minutes").
+		WithNote("SSH connection may appear to hang - this is normal for large image downloads").
+		WithPollInterval(30) // Update every 30 seconds
+	op.Start()
+	defer op.Done()
+
 	logger.Debug("Executing docker compose pull",
 		zap.String("command", "docker"),
 		zap.Strings("args", []string{"compose", "-f", bgi.config.ComposeFile, "pull"}),
