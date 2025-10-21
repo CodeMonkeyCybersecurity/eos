@@ -1102,7 +1102,7 @@ func VaultAgentConfigDiagnostic() *debug.Diagnostic {
 		},
 		Collect: func(ctx context.Context) (*debug.Result, error) {
 			logger := otelzap.Ctx(ctx)
-			configPath := "/etc/vault-agent.d/vault-agent-eos.hcl"
+			configPath := "/etc/vault.d/agent-config.hcl"
 
 			result := &debug.Result{
 				Metadata: make(map[string]interface{}),
