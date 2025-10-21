@@ -264,6 +264,18 @@ func (pb *PolicyBuilder) AddSharedSecretsReadOnly() *PolicyBuilder {
 	return pb
 }
 
+// AddServiceSecrets adds full access to service secrets
+// RATIONALE: Services deployed by Eos need to store their secrets (API keys, passwords, etc.)
+// SECURITY: Scoped to secret/data/services/* - cannot access user or shared secrets
+// THREAT MODEL: Prevents privilege escalation - services can't read other users' secrets
+func (pb *PolicyBuilder) AddServiceSecrets() *PolicyBuilder {
+	pb.AddSection("Service Secrets (Full Access)")
+	pb.AddComment("Services deployed by Eos store their secrets here")
+	pb.AddPath("secret/data/services/*", "create", "read", "update", "delete", "list")
+	pb.AddPath("secret/metadata/services/*", "read", "list", "delete")
+	return pb
+}
+
 // AddSelfServiceUserpass adds self-service userpass management with restrictions
 func (pb *PolicyBuilder) AddSelfServiceUserpass() *PolicyBuilder {
 	pb.AddSection("Self-Service User Management")

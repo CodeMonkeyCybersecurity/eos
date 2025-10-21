@@ -17,6 +17,7 @@ func BuildEosDefaultPolicy(rc *eos_io.RuntimeContext) (string, error) {
 		AddCubbyholeAccess().
 		AddUserSecrets().
 		AddSharedSecretsReadOnly().
+		AddServiceSecrets(). // CRITICAL P0: Allow service deployments to store secrets
 		AddSelfServiceUserpass().
 		AddMFAManagement().
 		AddSection("Essential Tools").

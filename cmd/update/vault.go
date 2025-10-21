@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	vaultPorts   string
-	vaultAddress string
-	vaultDryRun  bool
+	vaultPorts         string
+	vaultAddress       string
+	vaultDryRun        bool
+	vaultUpdatePolicies bool
 )
 
 // VaultCmd updates Vault configuration
@@ -75,29 +76,41 @@ func init() {
 		"Port migration in format: FROM -> TO (e.g., '8179 -> default' or '8179 -> 8200')")
 	VaultCmd.Flags().BoolVar(&vaultDryRun, "dry-run", false,
 		"Preview changes without applying them")
+	VaultCmd.Flags().BoolVar(&vaultUpdatePolicies, "update-policies", false,
+		"Update Vault policies to latest version (requires root token)")
 }
 
 func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	// ASSESS - Determine which operation to perform
+
+	// Policy update is standalone
+	if vaultUpdatePolicies {
+		return runVaultPolicyUpdate(rc)
+	}
+
 	if vaultAddress != "" && vaultPorts != "" {
 		return eos_err.NewUserError(
 			"Cannot specify both --address and --ports.\n\n" +
 				"Use --address to update Vault address in Consul KV:\n" +
 				"  eos update vault --address vhost5\n\n" +
 				"Use --ports to migrate Vault ports:\n" +
-				"  eos update vault --ports 8179 -> default")
+				"  eos update vault --ports 8179 -> default\n\n" +
+				"Use --update-policies to update Vault policies:\n" +
+				"  eos update vault --update-policies")
 	}
 
 	if vaultAddress == "" && vaultPorts == "" {
 		return eos_err.NewUserError(
-			"Must specify either --address or --ports.\n\n" +
+			"Must specify either --address, --ports, or --update-policies.\n\n" +
 				"Update Vault address in Consul KV:\n" +
 				"  eos update vault --address vhost5\n" +
 				"  eos update vault --address 192.168.1.10\n" +
 				"  eos update vault --address vault.example.com:8200\n\n" +
 				"Migrate Vault ports:\n" +
 				"  eos update vault --ports 8179 -> default\n" +
-				"  eos update vault --ports 8179 -> 8200")
+				"  eos update vault --ports 8179 -> 8200\n\n" +
+				"Update policies to latest version:\n" +
+				"  eos update vault --update-policies")
 	}
 
 	// Route to appropriate handler
@@ -247,4 +260,51 @@ func displayPortMigrationResults(logger otelzap.LoggerWithCtx, result *vault.Por
 
 	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
 	logger.Info("================================================================================")
+}
+
+// runVaultPolicyUpdate updates Vault policies to the latest version
+func runVaultPolicyUpdate(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("================================================================================")
+	logger.Info("Updating Vault Policies to Latest Version")
+	logger.Info("================================================================================")
+	logger.Info("")
+
+	// ASSESS - Get root client
+	logger.Info("Authenticating to Vault (requires root token)...")
+	client, err := vault.GetRootClient(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get root client: %w\n\n"+
+			"This operation requires root token access.\n"+
+			"The root token is stored in: %s", err, vault.VaultInitPath)
+	}
+
+	logger.Info("✓ Authenticated with root token")
+	logger.Info("")
+
+	// INTERVENE - Write policies using existing infrastructure
+	logger.Info("Updating policies...")
+	if err := vault.WritePolicies(rc, client, rc.Log); err != nil {
+		return fmt.Errorf("failed to write policies: %w", err)
+	}
+
+	logger.Info("")
+	logger.Info("================================================================================")
+	logger.Info("✓ Vault Policies Updated Successfully")
+	logger.Info("================================================================================")
+	logger.Info("")
+	logger.Info("Updated policies:")
+	logger.Info("  • eos-policy (default) - Now includes secret/data/services/* access")
+	logger.Info("  • eos-admin")
+	logger.Info("  • eos-emergency")
+	logger.Info("  • eos-readonly")
+	logger.Info("")
+	logger.Info("All tokens using these policies now have the updated permissions.")
+	logger.Info("No restart or re-authentication required - changes are immediate.")
+	logger.Info("")
+	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
+	logger.Info("================================================================================")
+
+	return nil
 }
