@@ -1,4 +1,3 @@
-
 // pkg/self/updater_enhanced.go
 //
 // Enhanced self-update with comprehensive error recovery and rollback capabilities.
@@ -605,7 +604,6 @@ func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
 	eeu.logger.Info("Detected package manager", zap.String("manager", string(packageManager)))
 	return system.UpdateSystemPackages(eeu.rc, packageManager)
 }
-
 
 // UpdateGoVersion checks and updates the Go compiler if a newer version is available
 func (eeu *EnhancedEosUpdater) UpdateGoVersion() error {
