@@ -4,10 +4,10 @@ package update
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	vaultPorts         string
-	vaultAddress       string
-	vaultDryRun        bool
+	vaultPorts          string
+	vaultAddress        string
+	vaultDryRun         bool
 	vaultUpdatePolicies bool
 )
 
@@ -285,7 +285,7 @@ func runVaultPolicyUpdate(rc *eos_io.RuntimeContext) error {
 
 	// INTERVENE - Write policies using existing infrastructure
 	logger.Info("Updating policies...")
-	if err := vault.WritePolicies(rc, client, rc.Log); err != nil {
+	if err := vault.EnsurePolicy(rc); err != nil {
 		return fmt.Errorf("failed to write policies: %w", err)
 	}
 

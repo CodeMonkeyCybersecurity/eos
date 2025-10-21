@@ -197,3 +197,35 @@ func truncatePolicy(policy string) string {
 	}
 	return policy
 }
+
+// CheckServiceSecretsPolicy verifies that the eos-default-policy includes service secrets access
+// This prevents permission denied errors when deploying services
+// Returns true if policy includes "secret/data/services/*", false otherwise
+func CheckServiceSecretsPolicy(rc *eos_io.RuntimeContext) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	client, err := GetVaultClient(rc)
+	if err != nil {
+		return false, fmt.Errorf("failed to get Vault client: %w", err)
+	}
+
+	// Read the current eos-default-policy
+	policyContent, err := client.Sys().GetPolicy(shared.EosDefaultPolicyName)
+	if err != nil {
+		logger.Warn("Failed to read eos-default-policy",
+			zap.String("policy", shared.EosDefaultPolicyName),
+			zap.Error(err))
+		return false, fmt.Errorf("failed to read policy: %w", err)
+	}
+
+	// Check if policy includes service secrets path
+	hasServiceSecrets := strings.Contains(policyContent, "secret/data/services/*")
+
+	if !hasServiceSecrets {
+		logger.Warn("Policy missing service secrets access",
+			zap.String("policy", shared.EosDefaultPolicyName),
+			zap.String("missing_path", "secret/data/services/*"))
+	}
+
+	return hasServiceSecrets, nil
+}

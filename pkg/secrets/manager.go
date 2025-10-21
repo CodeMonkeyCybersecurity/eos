@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -289,6 +290,15 @@ func (vb *VaultBackend) Store(path string, secret map[string]interface{}) error 
 	// Path format: secret/data/{path}
 	_, err := vb.client.KVv2("secret").Put(context.Background(), path, secret)
 	if err != nil {
+		// Check if this is a permission denied error on service secrets path
+		if strings.Contains(err.Error(), "permission denied") && strings.HasPrefix(path, "services/") {
+			return fmt.Errorf("failed to store secret in Vault at %s: %w\n\n"+
+				"HINT: The Vault policy may be missing service secrets access.\n"+
+				"Run this command to update Vault policies:\n"+
+				"  sudo eos update vault --update-policies\n\n"+
+				"Then restart Vault Agent to get a new token:\n"+
+				"  sudo systemctl restart vault-agent-eos", path, err)
+		}
 		return fmt.Errorf("failed to store secret in Vault at %s: %w", path, err)
 	}
 	return nil
