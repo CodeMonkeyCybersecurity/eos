@@ -18,8 +18,8 @@ import (
 // GenerateConfigFile creates a Hecate YAML configuration file interactively
 //
 // This function implements the Assess → Intervene → Evaluate pattern:
-// - Assess: Prompt user for apps and their configuration
-// - Intervene: Build configuration structure
+// - Assess: Check for previous config in Consul KV, prompt user for apps
+// - Intervene: Build configuration structure, store in Consul KV
 // - Evaluate: Write YAML file and validate structure
 func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactive bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -27,6 +27,14 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 	logger.Info("Generating Hecate configuration file",
 		zap.String("output_path", outputPath),
 		zap.Bool("interactive", interactive))
+
+	// Try to initialize Consul KV storage (non-fatal if unavailable)
+	configStorage, err := NewConfigStorage(rc)
+	if err != nil {
+		logger.Warn("Consul KV not available, configuration will not be persisted",
+			zap.Error(err))
+		// Continue without Consul storage
+	}
 
 	var config RawYAMLConfig
 
@@ -37,7 +45,21 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 		logger.Info("terminal prompt: You can add multiple apps. Press Enter to finish.")
 		logger.Info("terminal prompt: ")
 
-		apps, err := gatherApps(rc)
+		// Load previous config from Consul KV if available
+		var previousConfig *RawYAMLConfig
+		if configStorage != nil {
+			previousConfig, _ = configStorage.LoadConfig(rc)
+			if previousConfig != nil && len(previousConfig.Apps) > 0 {
+				logger.Info("terminal prompt: ℹ️  Found previous configuration in Consul KV")
+				logger.Info("terminal prompt: Previous apps:")
+				for appName, app := range previousConfig.Apps {
+					logger.Info(fmt.Sprintf("terminal prompt:   - %s (domain: %s)", appName, app.Domain))
+				}
+				logger.Info("terminal prompt: ")
+			}
+		}
+
+		apps, err := gatherApps(rc, previousConfig)
 		if err != nil {
 			return fmt.Errorf("failed to gather app configuration: %w", err)
 		}
@@ -45,6 +67,18 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 	} else {
 		// Generate example config
 		config = generateExampleConfig()
+	}
+
+	// Store configuration in Consul KV (if available)
+	if configStorage != nil {
+		if err := configStorage.StoreConfig(rc, config); err != nil {
+			logger.Warn("Failed to store configuration in Consul KV",
+				zap.Error(err))
+			// Continue even if Consul storage fails
+		} else {
+			logger.Info("Configuration stored in Consul KV",
+				zap.Int("apps", len(config.Apps)))
+		}
 	}
 
 	// Write YAML file
@@ -58,6 +92,9 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ✓ Configuration file created: " + outputPath)
+	if configStorage != nil {
+		logger.Info("terminal prompt: ✓ Configuration stored in Consul KV for future use")
+	}
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Next steps:")
 	logger.Info("terminal prompt:   1. Review and edit: nano " + outputPath)
@@ -68,7 +105,7 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 }
 
 // gatherApps prompts the user to add apps interactively
-func gatherApps(rc *eos_io.RuntimeContext) (map[string]RawAppConfig, error) {
+func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[string]RawAppConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	reader := bufio.NewReader(os.Stdin)
 	apps := make(map[string]RawAppConfig)
@@ -85,28 +122,74 @@ func gatherApps(rc *eos_io.RuntimeContext) (map[string]RawAppConfig, error) {
 			break
 		}
 
-		// Check if already exists
+		// Check if already exists in current session
 		if _, exists := apps[appName]; exists {
-			logger.Warn("App already configured, skipping",
+			logger.Warn("App already configured in this session, skipping",
 				zap.String("app_name", appName))
 			continue
 		}
 
 		app := RawAppConfig{}
 
-		// Domain
-		logger.Info("terminal prompt: Domain (e.g., example.com): ")
-		fmt.Print("Domain: ")
-		domainInput := strings.TrimSpace(mustReadLine(reader))
-		if domainInput == "" {
-			logger.Warn("Domain is required, skipping app")
-			continue
+		// Check for previous config defaults
+		var previousApp *RawAppConfig
+		if previousConfig != nil {
+			if prevApp, exists := previousConfig.Apps[appName]; exists {
+				previousApp = &prevApp
+				logger.Info("terminal prompt: ℹ️  Found previous config for '" + appName + "'")
+			}
 		}
 
-		// Sanitize domain input
-		app.Domain = shared.SanitizeURL(domainInput)
-		if app.Domain != domainInput {
-			logger.Info("terminal prompt: ℹ️  Domain sanitized: " + app.Domain)
+		// Domain (with validation retry loop)
+		defaultDomain := ""
+		if previousApp != nil {
+			defaultDomain = previousApp.Domain
+		}
+
+		// Loop until valid domain is provided
+		for {
+			if defaultDomain != "" {
+				logger.Info(fmt.Sprintf("terminal prompt: Domain (e.g., example.com) [%s]: ", defaultDomain))
+			} else {
+				logger.Info("terminal prompt: Domain (e.g., example.com): ")
+			}
+			fmt.Print("Domain: ")
+			domainInput := strings.TrimSpace(mustReadLine(reader))
+
+			// Use default if empty
+			if domainInput == "" {
+				if defaultDomain != "" {
+					domainInput = defaultDomain
+					logger.Info("terminal prompt: Using previous domain: " + defaultDomain)
+				} else {
+					logger.Info("terminal prompt: ❌ Domain is required (cannot be empty)")
+					logger.Info("terminal prompt: ")
+					continue
+				}
+			}
+
+			// Sanitize domain input
+			sanitizedDomain := shared.SanitizeURL(domainInput)
+			if sanitizedDomain != domainInput {
+				logger.Info("terminal prompt: ℹ️  Domain sanitized: " + sanitizedDomain)
+			}
+
+			// Validate domain format
+			if err := validateDomain(sanitizedDomain); err != nil {
+				logger.Info("terminal prompt: ")
+				logger.Info(fmt.Sprintf("terminal prompt: ❌ Invalid domain: %v", err))
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: Examples of valid domains:")
+				logger.Info("terminal prompt:   - example.com")
+				logger.Info("terminal prompt:   - subdomain.example.com")
+				logger.Info("terminal prompt:   - app.cybermonkey.net.au")
+				logger.Info("terminal prompt: ")
+				continue
+			}
+
+			// Valid domain
+			app.Domain = sanitizedDomain
+			break
 		}
 
 		// Detect if this is authentik (special case)
@@ -117,30 +200,90 @@ func gatherApps(rc *eos_io.RuntimeContext) (map[string]RawAppConfig, error) {
 			continue
 		}
 
-		// Backend
-		logger.Info("terminal prompt: Backend IP or IP:port (e.g., 192.168.1.100 or 192.168.1.100:8009): ")
-		fmt.Print("Backend: ")
-		app.Backend = strings.TrimSpace(mustReadLine(reader))
-		if app.Backend == "" {
-			logger.Warn("Backend is required, skipping app")
-			continue
+		// Backend (with validation retry loop)
+		defaultBackend := ""
+		if previousApp != nil {
+			defaultBackend = previousApp.Backend
 		}
 
-		// Optional: Explicit type
+		// Loop until valid backend is provided
+		for {
+			if defaultBackend != "" {
+				logger.Info(fmt.Sprintf("terminal prompt: Backend IP or IP:port [%s]: ", defaultBackend))
+			} else {
+				logger.Info("terminal prompt: Backend IP or IP:port (e.g., 192.168.1.100 or 192.168.1.100:8009): ")
+			}
+			fmt.Print("Backend: ")
+			backendInput := strings.TrimSpace(mustReadLine(reader))
+
+			// Use default if empty
+			if backendInput == "" {
+				if defaultBackend != "" {
+					backendInput = defaultBackend
+					logger.Info("terminal prompt: Using previous backend: " + defaultBackend)
+				} else {
+					logger.Info("terminal prompt: ❌ Backend is required (cannot be empty)")
+					logger.Info("terminal prompt: ")
+					continue
+				}
+			}
+
+			// Validate backend format
+			if err := validateBackend(backendInput); err != nil {
+				logger.Info("terminal prompt: ")
+				logger.Info(fmt.Sprintf("terminal prompt: ❌ Invalid backend: %v", err))
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: Examples of valid backends:")
+				logger.Info("terminal prompt:   - 192.168.1.100 (IP address)")
+				logger.Info("terminal prompt:   - 192.168.1.100:8009 (IP:port)")
+				logger.Info("terminal prompt:   - 100.88.69.11 (Tailscale IP)")
+				logger.Info("terminal prompt:   - server.local (hostname)")
+				logger.Info("terminal prompt: ")
+				continue
+			}
+
+			// Valid backend
+			app.Backend = backendInput
+			break
+		}
+
+		// Optional: Explicit type (with default from previous config)
 		defaults := GetAppDefaults(appType)
-		logger.Info(fmt.Sprintf("terminal prompt: App type (auto-detected: %s) [Enter to use auto-detection]: ", appType))
+		defaultType := ""
+		if previousApp != nil && previousApp.Type != "" {
+			defaultType = previousApp.Type
+		}
+		if defaultType != "" {
+			logger.Info(fmt.Sprintf("terminal prompt: App type (auto-detected: %s) [%s]: ", appType, defaultType))
+		} else {
+			logger.Info(fmt.Sprintf("terminal prompt: App type (auto-detected: %s) [Enter to use auto-detection]: ", appType))
+		}
 		fmt.Print("Type: ")
 		explicitType := strings.TrimSpace(mustReadLine(reader))
 		if explicitType != "" {
 			app.Type = explicitType
+		} else if defaultType != "" {
+			app.Type = defaultType
 		}
 
-		// Optional: SSO
+		// Optional: SSO (with default from previous config)
 		if appType != "authentik" {
-			logger.Info("terminal prompt: Enable SSO authentication? (y/N): ")
+			defaultSSO := false
+			if previousApp != nil {
+				defaultSSO = previousApp.SSO
+			}
+			ssoDefault := "N"
+			if defaultSSO {
+				ssoDefault = "y"
+			}
+			logger.Info(fmt.Sprintf("terminal prompt: Enable SSO authentication? (y/N) [%s]: ", ssoDefault))
 			fmt.Print("SSO: ")
 			ssoInput := strings.TrimSpace(strings.ToLower(mustReadLine(reader)))
-			app.SSO = (ssoInput == "y" || ssoInput == "yes")
+			if ssoInput == "" {
+				app.SSO = defaultSSO
+			} else {
+				app.SSO = (ssoInput == "y" || ssoInput == "yes")
+			}
 		}
 
 		// Optional: WebRTC/Talk (for Nextcloud)

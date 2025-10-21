@@ -4,16 +4,18 @@ package create
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 )
 
 func init() {
@@ -70,99 +72,144 @@ Examples:
 		log := otelzap.Ctx(rc.Ctx)
 		log.Info("Starting Hecate deployment")
 
-		// Check if config file was provided
+		// ASSESS - Discover environment for secret management
+		log.Info("Discovering environment configuration")
+		envConfig, err := environment.DiscoverEnvironment(rc)
+		if err != nil {
+			return fmt.Errorf("failed to discover environment: %w", err)
+		}
+
+		var config *hecate.YAMLHecateConfig
+
+		// Check if config file was provided (YAML override)
 		if configFile != "" {
-			log.Info("Using YAML configuration mode",
+			log.Info("Using YAML configuration file",
 				zap.String("config_file", configFile),
 				zap.String("output_dir", outputDir))
 
-			// ASSESS - Discover environment for secret management
-			log.Info("Discovering environment configuration")
-			envConfig, err := environment.DiscoverEnvironment(rc)
-			if err != nil {
-				return fmt.Errorf("failed to discover environment: %w", err)
-			}
-
 			// Load YAML configuration
-			config, err := hecate.LoadYAMLConfig(rc, configFile)
+			config, err = hecate.LoadYAMLConfig(rc, configFile)
 			if err != nil {
 				return fmt.Errorf("failed to load YAML config: %w", err)
 			}
+		} else {
+			// No YAML file provided - try loading from Consul KV
+			log.Info("No config file provided, checking Consul KV")
 
-			// Display detected apps
-			log.Info("Configuration loaded successfully")
-			log.Info("terminal prompt: Detected apps:")
-			for appName, app := range config.Apps {
-				features := []string{}
-				if len(app.TCPPorts) > 0 {
-					features = append(features, "TCP")
-				}
-				if app.RequiresCoturn {
-					features = append(features, "WebRTC")
-				}
-				if app.SSO {
-					features = append(features, "SSO")
-				}
-
-				featureStr := ""
-				if len(features) > 0 {
-					featureStr = fmt.Sprintf(" (%s)", strings.Join(features, ", "))
-				}
-
-				log.Info(fmt.Sprintf("terminal prompt:   %s (%s)%s -> %s:%d",
-					appName, app.Type, featureStr, app.Backend, app.BackendPort))
+			configStorage, err := hecate.NewConfigStorage(rc)
+			if err != nil {
+				return fmt.Errorf("failed to initialize Consul storage: %w\n\n"+
+					"Either:\n"+
+					"  1. Provide a YAML config file: eos create hecate --config hecate-config.yaml\n"+
+					"  2. Generate config first: eos create config --hecate\n"+
+					"  3. Ensure Consul is running and accessible", err)
 			}
 
-			if config.HasAuthentik {
-				log.Info("terminal prompt: Infrastructure:")
-				log.Info("terminal prompt:   Authentik SSO at " + config.AuthentikDomain)
-			}
-			if config.NeedsCoturn {
-				log.Info("terminal prompt:   Coturn TURN/STUN server (WebRTC)")
-			}
-			if config.NeedsNginx {
-				log.Info("terminal prompt:   Nginx stream proxy (TCP/UDP)")
+			rawConfig, err := configStorage.LoadConfig(rc)
+			if err != nil {
+				return fmt.Errorf("failed to load config from Consul KV: %w", err)
 			}
 
-			// Generate infrastructure with secrets
-			log.Info("Generating infrastructure configuration")
-			if err := hecate.GenerateFromYAML(rc, config, outputDir, envConfig); err != nil {
-				return fmt.Errorf("failed to generate configuration: %w", err)
+			if rawConfig == nil || len(rawConfig.Apps) == 0 {
+				return fmt.Errorf("no configuration found in Consul KV\n\n" +
+					"Please run one of:\n" +
+					"  1. Generate config: eos create config --hecate\n" +
+					"  2. Provide YAML file: eos create hecate --config hecate-config.yaml")
 			}
 
-			log.Info("terminal prompt: ")
-			log.Info("terminal prompt: ✓ Hecate infrastructure generated successfully!")
-			log.Info("terminal prompt: ")
-			log.Info("terminal prompt: ⚠️  PREREQUISITES:")
-			log.Info("terminal prompt:   • DNS records must point to this server:")
-			for _, app := range config.Apps {
-				log.Info(fmt.Sprintf("terminal prompt:     - %s (A record → your server IP)", app.Domain))
-			}
-			log.Info("terminal prompt:   • Ports 80, 443 must be available (not in use)")
-			if config.NeedsCoturn {
-				log.Info("terminal prompt:   • Coturn ports: 3478, 5349, 49160-49200/udp must be available")
-			}
-			if config.NeedsNginx {
-				log.Info("terminal prompt:   • TCP ports must be available for stream proxying")
-			}
-			log.Info("terminal prompt: ")
-			log.Info("terminal prompt: Next steps:")
-			log.Info("terminal prompt:   1. Review generated files in " + outputDir)
-			if config.HasAuthentik {
-				log.Info("terminal prompt:   2. Check .env file for Authentik bootstrap credentials")
-				log.Info("terminal prompt:   3. Start services: cd " + outputDir + " && docker compose up -d")
-			} else {
-				log.Info("terminal prompt:   2. Start services: cd " + outputDir + " && docker compose up -d")
-			}
-			log.Info("terminal prompt:   4. Check status: docker compose ps")
-			log.Info("terminal prompt:   5. View logs: docker compose logs -f")
+			log.Info("Configuration loaded from Consul KV",
+				zap.Int("app_count", len(rawConfig.Apps)))
 
-			return nil
+			// Convert RawYAMLConfig to parsed YAMLHecateConfig
+			// We need to create a temporary YAML file to reuse LoadYAMLConfig
+			// Or we can parse it directly here
+			tempYAMLPath := "/tmp/hecate-config-from-consul.yaml"
+			yamlData, err := yaml.Marshal(rawConfig)
+			if err != nil {
+				return fmt.Errorf("failed to marshal config: %w", err)
+			}
+			if err := os.WriteFile(tempYAMLPath, yamlData, 0644); err != nil {
+				return fmt.Errorf("failed to write temp config: %w", err)
+			}
+			defer os.Remove(tempYAMLPath)
+
+			config, err = hecate.LoadYAMLConfig(rc, tempYAMLPath)
+			if err != nil {
+				return fmt.Errorf("failed to parse config from Consul: %w", err)
+			}
+
+			log.Info("terminal prompt: Using configuration from Consul KV")
 		}
 
-		// Default to interactive wizard
-		log.Info("Using interactive wizard mode")
-		return hecate.OrchestrateHecateWizard(rc)
+		// Display detected apps
+		log.Info("Configuration loaded successfully")
+		log.Info("terminal prompt: Detected apps:")
+		for appName, app := range config.Apps {
+			features := []string{}
+			if len(app.TCPPorts) > 0 {
+				features = append(features, "TCP")
+			}
+			if app.RequiresCoturn {
+				features = append(features, "WebRTC")
+			}
+			if app.SSO {
+				features = append(features, "SSO")
+			}
+
+			featureStr := ""
+			if len(features) > 0 {
+				featureStr = fmt.Sprintf(" (%s)", strings.Join(features, ", "))
+			}
+
+			log.Info(fmt.Sprintf("terminal prompt:   %s (%s)%s -> %s:%d",
+				appName, app.Type, featureStr, app.Backend, app.BackendPort))
+		}
+
+		if config.HasAuthentik {
+			log.Info("terminal prompt: Infrastructure:")
+			log.Info("terminal prompt:   Authentik SSO at " + config.AuthentikDomain)
+		}
+		if config.NeedsCoturn {
+			log.Info("terminal prompt:   Coturn TURN/STUN server (WebRTC)")
+		}
+		if config.NeedsNginx {
+			log.Info("terminal prompt:   Nginx stream proxy (TCP/UDP)")
+		}
+
+		// Generate infrastructure with secrets
+		log.Info("Generating infrastructure configuration")
+		if err := hecate.GenerateFromYAML(rc, config, outputDir, envConfig); err != nil {
+			return fmt.Errorf("failed to generate configuration: %w", err)
+		}
+
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: ✓ Hecate infrastructure generated successfully!")
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: ⚠️  PREREQUISITES:")
+		log.Info("terminal prompt:   • DNS records must point to this server:")
+		for _, app := range config.Apps {
+			log.Info(fmt.Sprintf("terminal prompt:     - %s (A record → your server IP)", app.Domain))
+		}
+		log.Info("terminal prompt:   • Ports 80, 443 must be available (not in use)")
+		if config.NeedsCoturn {
+			log.Info("terminal prompt:   • Coturn ports: 3478, 5349, 49160-49200/udp must be available")
+		}
+		if config.NeedsNginx {
+			log.Info("terminal prompt:   • TCP ports must be available for stream proxying")
+		}
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: Next steps:")
+		log.Info("terminal prompt:   1. Review generated files in " + outputDir)
+		if config.HasAuthentik {
+			log.Info("terminal prompt:   2. Check .env file for Authentik bootstrap credentials")
+			log.Info("terminal prompt:   3. Start services: cd " + outputDir + " && docker compose up -d")
+		} else {
+			log.Info("terminal prompt:   2. Start services: cd " + outputDir + " && docker compose up -d")
+		}
+		log.Info("terminal prompt:   4. Check status: docker compose ps")
+		log.Info("terminal prompt:   5. View logs: docker compose logs -f")
+
+		return nil
 	}),
 }
 
