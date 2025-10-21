@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"text/template"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
@@ -60,25 +61,26 @@ func generateYAMLHecateSecrets(rc *eos_io.RuntimeContext, secretManager *secrets
 		if !ok {
 			pgPass = fmt.Sprintf("%v", serviceSecrets.Secrets["pg_pass"])
 		}
-		hecateSecrets.PGPass = pgPass
+		// Trim whitespace and newlines to prevent corruption in .env file
+		hecateSecrets.PGPass = strings.TrimSpace(pgPass)
 
 		authKey, ok := serviceSecrets.Secrets["authentik_secret_key"].(string)
 		if !ok {
 			authKey = fmt.Sprintf("%v", serviceSecrets.Secrets["authentik_secret_key"])
 		}
-		hecateSecrets.AuthentikSecretKey = authKey
+		hecateSecrets.AuthentikSecretKey = strings.TrimSpace(authKey)
 
 		bootstrapPass, ok := serviceSecrets.Secrets["authentik_bootstrap_password"].(string)
 		if !ok {
 			bootstrapPass = fmt.Sprintf("%v", serviceSecrets.Secrets["authentik_bootstrap_password"])
 		}
-		hecateSecrets.AuthentikBootstrapPassword = bootstrapPass
+		hecateSecrets.AuthentikBootstrapPassword = strings.TrimSpace(bootstrapPass)
 
 		bootstrapToken, ok := serviceSecrets.Secrets["authentik_bootstrap_token"].(string)
 		if !ok {
 			bootstrapToken = fmt.Sprintf("%v", serviceSecrets.Secrets["authentik_bootstrap_token"])
 		}
-		hecateSecrets.AuthentikBootstrapToken = bootstrapToken
+		hecateSecrets.AuthentikBootstrapToken = strings.TrimSpace(bootstrapToken)
 		hecateSecrets.AuthentikBootstrapEmail = "admin@localhost"
 
 		logger.Info("Generated Authentik secrets",
@@ -92,7 +94,8 @@ func generateYAMLHecateSecrets(rc *eos_io.RuntimeContext, secretManager *secrets
 		if !ok {
 			secret = fmt.Sprintf("%v", serviceSecrets.Secrets["coturn_static_auth_secret"])
 		}
-		coturnSecret = &secret
+		trimmedSecret := strings.TrimSpace(secret)
+		coturnSecret = &trimmedSecret
 		logger.Info("Generated Coturn static auth secret")
 	}
 
@@ -725,7 +728,6 @@ COMPOSE_PORT_HTTPS=%s
 
 	return nil
 }
-
 
 // validateDockerCompose validates the generated docker-compose.yml using docker compose config
 func validateDockerCompose(rc *eos_io.RuntimeContext, outputDir string) error {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
@@ -71,6 +72,20 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 		log.Info("Starting Hecate deployment")
+
+		// ASSESS - Check permissions for output directory
+		if strings.HasPrefix(outputDir, "/opt/") || strings.HasPrefix(outputDir, "/etc/") {
+			if os.Geteuid() != 0 {
+				return eos_err.NewUserError(
+					"Permission denied: %s requires root access\n\n"+
+						"Run with sudo:\n"+
+						"  sudo eos create hecate --config %s\n"+
+						"  sudo eos create hecate\n\n"+
+						"Or use a user-writable directory:\n"+
+						"  eos create hecate --output ~/hecate",
+					outputDir, configFile)
+			}
+		}
 
 		// ASSESS - Discover environment for secret management
 		log.Info("Discovering environment configuration")
@@ -174,6 +189,32 @@ Examples:
 		}
 		if config.NeedsNginx {
 			log.Info("terminal prompt:   Nginx stream proxy (TCP/UDP)")
+		}
+
+		// Validate DNS records
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: Validating DNS records...")
+		dnsResults, err := hecate.ValidateDNSWithHetzner(rc, config)
+		if err != nil {
+			log.Warn("DNS validation failed, continuing anyway",
+				zap.Error(err))
+		} else {
+			allValid := true
+			for _, result := range dnsResults {
+				log.Info(fmt.Sprintf("terminal prompt:   %s: %s",
+					result.Domain, result.Message))
+				if !result.IsValid {
+					allValid = false
+				}
+			}
+
+			if !allValid {
+				log.Info("terminal prompt: ")
+				log.Info("terminal prompt: ⚠️  WARNING: Some DNS records are not configured correctly")
+				log.Info("terminal prompt:    Caddy will not be able to issue TLS certificates until DNS is fixed")
+				log.Info("terminal prompt:    You can continue deployment, but services may not be accessible")
+				log.Info("terminal prompt: ")
+			}
 		}
 
 		// Generate infrastructure with secrets

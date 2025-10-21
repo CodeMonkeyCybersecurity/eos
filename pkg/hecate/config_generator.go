@@ -378,8 +378,59 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 		}
 	}
 
+	// Display configuration summary
 	logger.Info("terminal prompt: ")
-	logger.Info(fmt.Sprintf("terminal prompt: Total apps configured: %d", len(apps)))
+	logger.Info("terminal prompt: ═══════════════════════════════════════════")
+	logger.Info("terminal prompt: Configuration Summary")
+	logger.Info("terminal prompt: ═══════════════════════════════════════════")
+	logger.Info("terminal prompt: ")
+
+	for appName, app := range apps {
+		appType := DetectAppType(appName, app.Type)
+		defaults := GetAppDefaults(appType)
+
+		logger.Info(fmt.Sprintf("terminal prompt: • %s (%s)", appName, appType))
+		logger.Info(fmt.Sprintf("terminal prompt:   Domain:  %s", app.Domain))
+
+		if appType != "authentik" {
+			logger.Info(fmt.Sprintf("terminal prompt:   Backend: %s", app.Backend))
+		} else {
+			logger.Info("terminal prompt:   Backend: hecate-server-1:9000 (automatic)")
+		}
+
+		if app.SSO {
+			logger.Info("terminal prompt:   SSO:     Enabled (requires Authentik)")
+		}
+		if app.Talk {
+			logger.Info("terminal prompt:   WebRTC:  Enabled (requires Coturn)")
+		}
+		if len(defaults.TCPPorts) > 0 {
+			logger.Info(fmt.Sprintf("terminal prompt:   Ports:   TCP %v", func() []int {
+				ports := make([]int, 0, len(defaults.TCPPorts))
+				for port := range defaults.TCPPorts {
+					ports = append(ports, port)
+				}
+				return ports
+			}()))
+		}
+		logger.Info("terminal prompt: ")
+	}
+
+	logger.Info("terminal prompt: ═══════════════════════════════════════════")
+	logger.Info(fmt.Sprintf("terminal prompt: Total apps: %d", len(apps)))
+	logger.Info("terminal prompt: ═══════════════════════════════════════════")
+	logger.Info("terminal prompt: ")
+
+	// Confirmation prompt
+	logger.Info("terminal prompt: Save this configuration? (Y/n): ")
+	fmt.Print("Confirm: ")
+	confirmation := strings.TrimSpace(strings.ToLower(mustReadLine(reader)))
+
+	if confirmation == "n" || confirmation == "no" {
+		return nil, fmt.Errorf("configuration cancelled by user")
+	}
+
+	logger.Info("terminal prompt: ")
 
 	return apps, nil
 }
