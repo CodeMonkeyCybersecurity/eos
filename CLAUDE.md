@@ -37,6 +37,18 @@ These violations cause immediate failure:
       - ✗ `8200` hardcoded in code (use `shared.PortVault`)
       - ✗ `VaultBinaryPath` defined in TWO different files
     - **Circular import exception**: If package A cannot import package B (circular dependency), document with comment: `// NOTE: Duplicates B.ConstName to avoid circular import`
+12. **File Permissions - SECURITY CRITICAL (P0)**: NEVER hardcode chmod/chown permissions (0755, 0600, etc.) in code. Use centralized permission constants.
+    - **Vault permissions**: ONLY in `pkg/vault/constants.go` (VaultConfigPerm, VaultTLSKeyPerm, etc.)
+    - **Consul permissions**: ONLY in `pkg/consul/constants.go`
+    - **MUST document security rationale**: Each permission constant must include:
+      - `// RATIONALE: Why this permission level`
+      - `// SECURITY: What threats this mitigates`
+      - `// THREAT MODEL: Attack scenarios prevented`
+    - **Violation examples**:
+      - ✗ `os.MkdirAll(dir, 0755)` - use `vault.VaultDirPerm`
+      - ✗ `os.WriteFile(file, data, 0600)` - use `vault.VaultSecretFilePerm`
+      - ✗ `os.Chmod(file, 0644)` - use `vault.VaultConfigPerm`
+    - **Required for**: SOC2, PCI-DSS, HIPAA compliance audits
 
 
 ## Quick Decision Trees

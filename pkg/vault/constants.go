@@ -5,6 +5,7 @@ package vault
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
@@ -96,8 +97,12 @@ const (
 	AuditLogFilePath   = "/var/log/vault/vault-audit.log" // Alias for compatibility
 	AuditLogSyslogPath = "vault-audit"                    // Syslog identifier
 
-	// === Eos Secret Storage ===
+	// === Eos Integration Paths ===
+	EosSecretsDir     = "/var/lib/eos/secret"                 // Eos secrets directory
 	VaultInitDataFile = "/var/lib/eos/secret/vault_init.json" // Vault initialization data
+	EosRunDir         = "/run/eos"                            // Eos runtime directory
+	VaultPIDFile      = "/run/eos/vault.pid"                  // Vault PID file
+	VaultTokenSink    = "/run/eos/.vault-token"               // Vault Agent token sink
 
 	// === Systemd Service ===
 	VaultServiceName      = "vault.service"           // Systemd service name
@@ -158,8 +163,29 @@ const (
 
 const (
 	VaultAddrEnvVar       = "VAULT_ADDR"
+	VaultCACertEnvVar     = "VAULT_CACERT"
 	VaultTokenEnvVar      = "VAULT_TOKEN"
 	VaultSkipVerifyEnvVar = "VAULT_SKIP_VERIFY"
+)
+
+// ============================================================================
+// Runtime Configuration (Timeouts, Retries, TTLs)
+// ============================================================================
+
+const (
+	// === Health Check and Retry Settings ===
+	VaultHealthTimeout = 5 * time.Second
+	VaultRetryCount    = 5
+	VaultRetryDelay    = 2 * time.Second
+	VaultMaxHealthWait = 10 * time.Second
+
+	// === Token and Secret TTLs ===
+	VaultDefaultTokenTTL    = "4h"
+	VaultDefaultTokenMaxTTL = "24h"
+	VaultDefaultSecretIDTTL = "24h"
+
+	// === Network Constants ===
+	LocalhostIP = "127.0.0.1"
 )
 
 // ============================================================================
@@ -173,24 +199,101 @@ const (
 )
 
 // ============================================================================
-// File Permissions and Ownership
+// File Permissions and Ownership (SECURITY-CRITICAL - P0)
 // ============================================================================
-// Standard Unix permissions for Vault-related files and directories
+// SINGLE SOURCE OF TRUTH for all Vault file permissions and ownership.
+// These values are security-critical - changing them can introduce vulnerabilities.
+//
+// NEVER hardcode permissions (0755, 0600, etc.) in code - ALWAYS use these constants.
+// NEVER use generic shared.FilePermOwnerRWX - use specific Vault constants.
+//
+// Security Principles:
+// 1. Principle of Least Privilege: Only grant minimum required permissions
+// 2. Defense in Depth: Multiple layers of security (file perms + AppArmor + systemd)
+// 3. Fail Secure: If unsure, default to MORE restrictive permissions
+// 4. Audit Trail: Document WHY each permission is set (see rationale below)
+//
+// Permission Notation: Unix octal (rwxrwxrwx = owner/group/other)
+//   r=4 (read), w=2 (write), x=1 (execute)
+//   Example: 0640 = rw-r----- = owner:rw, group:r, other:none
 
 const (
 	// === Directory Permissions ===
-	VaultDirPerm        = 0755 // rwxr-xr-x - Directories (vault:vault)
-	VaultTLSDirPerm     = 0755 // rwxr-xr-x - TLS directory (vault:vault)
-	VaultDataDirPerm    = 0700 // rwx------ - Data directory (vault:vault)
-	VaultSecretsDirPerm = 0700 // rwx------ - Secrets directory (vault:vault)
+
+	// VaultBaseDirPerm - Base directory /opt/vault (0755 = rwxr-xr-x)
+	// RATIONALE: Readable by all to allow systemd/monitoring to check status
+	// SECURITY: Contains only subdirectories with stricter permissions
+	VaultBaseDirPerm = 0755 // vault:vault
+
+	// VaultDirPerm - Config directory /etc/vault.d (0750 = rwxr-x---)
+	// RATIONALE: Group-readable for vault service, no world access
+	// SECURITY: Contains sensitive config files, restrict to vault user/group
+	VaultDirPerm = 0750 // vault:vault
+
+	// VaultTLSDirPerm - TLS directory /etc/vault.d/tls (0750 = rwxr-x---)
+	// RATIONALE: Group-readable for vault service to load certs
+	// SECURITY: Contains private keys, strict access control
+	VaultTLSDirPerm = 0750 // vault:vault
+
+	// VaultDataDirPerm - Data directory /opt/vault/data (0700 = rwx------)
+	// RATIONALE: ONLY vault user can access encrypted data
+	// SECURITY: Contains encrypted secrets, maximum restriction
+	// THREAT MODEL: Prevents local privilege escalation via data exfiltration
+	VaultDataDirPerm = 0700 // vault:vault
+
+	// VaultSecretsDirPerm - Secrets directory /var/lib/eos/secret (0700 = rwx------)
+	// RATIONALE: Contains vault_init.json with unseal keys + root token
+	// SECURITY: Most sensitive file in the system, owner-only access
+	// THREAT MODEL: Compromise of this file = complete Vault compromise
+	VaultSecretsDirPerm = 0700 // vault:vault
+
+	// VaultLogsDirPerm - Log directory /var/log/vault (0750 = rwxr-x---)
+	// RATIONALE: Group-readable for log aggregation (rsyslog, etc.)
+	// SECURITY: May contain sensitive audit data, restrict access
+	VaultLogsDirPerm = 0750 // vault:vault
 
 	// === File Permissions ===
-	VaultConfigPerm     = 0644 // rw-r--r-- - Config files (vault:vault)
-	VaultTLSCertPerm    = 0644 // rw-r--r-- - Public certificates (vault:vault)
-	VaultTLSKeyPerm     = 0600 // rw------- - Private keys (vault:vault)
-	VaultSecretFilePerm = 0600 // rw------- - Secret files (vault:vault)
-	VaultBinaryPerm     = 0755 // rwxr-xr-x - Binary executable (root:root)
-	VaultLogPerm        = 0640 // rw-r----- - Log files (vault:vault)
+
+	// VaultConfigPerm - Config files vault.hcl (0640 = rw-r-----)
+	// RATIONALE: Vault service needs to read, group may contain monitoring
+	// SECURITY: May contain storage backend credentials (Consul token)
+	// THREAT MODEL: Prevents unauthorized users from reading config
+	VaultConfigPerm = 0640 // vault:vault
+
+	// VaultTLSCertPerm - Public certificates (0644 = rw-r--r--)
+	// RATIONALE: Public certificates can be world-readable (they're public)
+	// SECURITY: No sensitive data, standard cert permissions
+	VaultTLSCertPerm = 0644 // vault:vault
+
+	// VaultTLSKeyPerm - Private TLS keys (0600 = rw-------)
+	// RATIONALE: Private keys must be protected from all but owner
+	// SECURITY: Compromise allows man-in-the-middle attacks
+	// THREAT MODEL: Critical - protects TLS session integrity
+	VaultTLSKeyPerm = 0600 // vault:vault
+
+	// VaultSecretFilePerm - vault_init.json unseal keys (0600 = rw-------)
+	// RATIONALE: Contains root token + unseal keys = complete Vault access
+	// SECURITY: Most sensitive file - owner-only access mandatory
+	// THREAT MODEL: Compromise = total system compromise
+	// COMPLIANCE: Required for SOC2, PCI-DSS, HIPAA
+	VaultSecretFilePerm = 0600 // vault:vault
+
+	// VaultBinaryPerm - Vault executable (0755 = rwxr-xr-x)
+	// RATIONALE: Standard executable permissions, world-executable
+	// SECURITY: Owned by root to prevent tampering, executable by all
+	VaultBinaryPerm = 0755 // root:root
+
+	// VaultLogPerm - Log files (0640 = rw-r-----)
+	// RATIONALE: Vault writes, group can read (log aggregators)
+	// SECURITY: Audit logs may contain sensitive request data
+	// COMPLIANCE: Audit log integrity required for compliance
+	VaultLogPerm = 0640 // vault:vault
+
+	// VaultTokenFilePerm - Vault Agent token file (0600 = rw-------)
+	// RATIONALE: Contains active Vault token for agent authentication
+	// SECURITY: Token grants Vault access, must be owner-only
+	// THREAT MODEL: Token theft = unauthorized Vault access
+	VaultTokenFilePerm = 0600 // vault:vault
 
 	// === Owner/Group (string identifiers) ===
 	VaultOwner = "vault"
@@ -207,25 +310,38 @@ type FilePermission struct {
 	Mode  os.FileMode // Unix permissions (e.g., 0644, 0755)
 }
 
-// VaultFilePermissions defines the standard permissions for all Vault files
-// Use this to validate or enforce correct permissions after installation
+// VaultFilePermissions defines the COMPLETE permissions map for all Vault files and directories.
+// This is used for:
+//   1. Initial setup (eos create vault)
+//   2. Permission validation (eos debug vault)
+//   3. Permission fixing (eos fix vault --permissions-only)
+//   4. Security audits
+//
+// IMPORTANT: This list must be kept in sync with actual file system structure.
+// Add new paths here when adding new Vault components.
 var VaultFilePermissions = []FilePermission{
-	// Directories
-	{Path: VaultConfigDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDirPerm},
-	{Path: VaultTLSDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSDirPerm},
-	{Path: VaultDataDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDataDirPerm},
+	// === Directories (create in dependency order) ===
+	{Path: VaultBaseDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultBaseDirPerm},        // /opt/vault
+	{Path: VaultDataDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDataDirPerm},        // /opt/vault/data
+	{Path: VaultLogsDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultLogsDirPerm},        // /var/log/vault
+	{Path: VaultConfigDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultDirPerm},          // /etc/vault.d
+	{Path: VaultTLSDir, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSDirPerm},          // /etc/vault.d/tls
+	{Path: "/var/lib/eos/secret", Owner: RootOwner, Group: RootGroup, Mode: VaultSecretsDirPerm}, // Eos secrets
 
-	// Config files
-	{Path: VaultConfigPath, Owner: VaultOwner, Group: VaultGroup, Mode: VaultConfigPerm},
+	// === Config Files ===
+	{Path: VaultConfigPath, Owner: VaultOwner, Group: VaultGroup, Mode: VaultConfigPerm}, // vault.hcl
 
-	// TLS files
-	{Path: VaultTLSCert, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSCertPerm},
-	{Path: VaultTLSKey, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSKeyPerm},
+	// === TLS Files ===
+	{Path: VaultTLSCert, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSCertPerm}, // vault.crt
+	{Path: VaultTLSKey, Owner: VaultOwner, Group: VaultGroup, Mode: VaultTLSKeyPerm},   // vault.key (CRITICAL)
 
-	// Binary
-	{Path: VaultBinaryPath, Owner: RootOwner, Group: RootGroup, Mode: VaultBinaryPerm},
+	// === Secret Files (MOST SENSITIVE) ===
+	{Path: VaultInitDataFile, Owner: RootOwner, Group: RootGroup, Mode: VaultSecretFilePerm}, // vault_init.json
 
-	// Systemd services (owned by root)
-	{Path: VaultServicePath, Owner: RootOwner, Group: RootGroup, Mode: 0644},
-	{Path: VaultAgentServicePath, Owner: RootOwner, Group: RootGroup, Mode: 0644},
+	// === Binary ===
+	{Path: VaultBinaryPath, Owner: RootOwner, Group: RootGroup, Mode: VaultBinaryPerm}, // /usr/local/bin/vault
+
+	// === Systemd Services (owned by root) ===
+	{Path: VaultServicePath, Owner: RootOwner, Group: RootGroup, Mode: 0644},      // vault.service
+	{Path: VaultAgentServicePath, Owner: RootOwner, Group: RootGroup, Mode: 0644}, // vault-agent-eos.service
 }

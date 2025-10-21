@@ -23,25 +23,29 @@ type FallbackCode string
 // NOTE: File paths now centralized in pkg/vault/constants.go
 // These are runtime/operational constants only
 
+// NOTE: Environment variables, timeouts, retries, and TTLs moved to pkg/vault/constants.go
+// Use vault.VaultAddrEnvVar, vault.VaultHealthTimeout, vault.VaultRetryCount, etc.
+// These constants kept for backward compatibility only - will be removed in future version
+
 const (
-	// === Environment Variables ===
-	VaultAddrEnv = "VAULT_ADDR"
-	VaultCA      = "VAULT_CACERT"
+	// === Environment Variables (DEPRECATED) ===
+	VaultAddrEnv = "VAULT_ADDR" // Use vault.VaultAddrEnvVar
+	VaultCA      = "VAULT_CACERT" // Use vault.VaultCACertEnvVar
 
-	// === Timeouts and Retry Settings ===
-	VaultHealthTimeout = 5 * time.Second
+	// === Timeouts and Retry Settings (DEPRECATED) ===
+	VaultHealthTimeout = 5 * time.Second // Use vault.VaultHealthTimeout
 	TestTimeout        = 500 * time.Millisecond
-	VaultRetryCount    = 5
-	VaultRetryDelay    = 2 * time.Second
-	VaultMaxHealthWait = 10 * time.Second
+	VaultRetryCount    = 5 // Use vault.VaultRetryCount
+	VaultRetryDelay    = 2 * time.Second // Use vault.VaultRetryDelay
+	VaultMaxHealthWait = 10 * time.Second // Use vault.VaultMaxHealthWait
 
-	// === Token/Secret TTLs ===
-	VaultDefaultTokenTTL    = "4h"
-	VaultDefaultTokenMaxTTL = "24h"
-	VaultDefaultSecretIDTTL = "24h"
+	// === Token/Secret TTLs (DEPRECATED) ===
+	VaultDefaultTokenTTL    = "4h" // Use vault.VaultDefaultTokenTTL
+	VaultDefaultTokenMaxTTL = "24h" // Use vault.VaultDefaultTokenMaxTTL
+	VaultDefaultSecretIDTTL = "24h" // Use vault.VaultDefaultSecretIDTTL
 
-	// === Network Constants ===
-	LocalhostSAN = "127.0.0.1"
+	// === Network Constants (DEPRECATED) ===
+	LocalhostSAN = "127.0.0.1" // Use vault.LocalhostIP
 
 	// === Legacy/Compatibility ===
 	// NOTE: VaultDir, VaultConfigDirDebian, VaultConfigFileName moved to pkg/vault/constants.go
