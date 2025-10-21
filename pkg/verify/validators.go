@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -99,110 +98,6 @@ func ValidateBackend(backend string) error {
 	return nil
 }
 
-// ValidateDockerCompose validates docker-compose.yml using 'docker compose config'
-//
-// This function validates docker-compose.yml and .env file syntax by running
-// 'docker compose config' which parses and validates the configuration.
-//
-// Parameters:
-//   - ctx: Context for logging
-//   - composeFile: Path to docker-compose.yml
-//   - envFile: Path to .env file (can be empty string if not using env file)
-//
-// Returns error with detailed validation information if validation fails.
-func ValidateDockerCompose(ctx context.Context, composeFile, envFile string) error {
-	logger := otelzap.Ctx(ctx)
-
-	logger.Debug("Validating docker-compose.yml")
-
-	// Check if docker is available
-	if _, err := exec.LookPath("docker"); err != nil {
-		logger.Warn("Docker not found, skipping validation",
-			zap.Error(err))
-		return nil // Don't fail if docker isn't available
-	}
-
-	// Build docker compose command
-	cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	args := []string{"compose", "-f", composeFile}
-	if envFile != "" {
-		args = append(args, "--env-file", envFile)
-	}
-	args = append(args, "config")
-
-	cmd := exec.CommandContext(cmdCtx, "docker", args...)
-	output, err := cmd.CombinedOutput()
-
-	if err != nil {
-		// Validation failed - parse error for details
-		outputStr := string(output)
-
-		// Extract useful error information
-		var errorLines []string
-		for _, line := range strings.Split(outputStr, "\n") {
-			// Collect WARN and error lines
-			if strings.Contains(line, "WARN") || strings.Contains(line, "invalid") || strings.Contains(line, "Error") {
-				errorLines = append(errorLines, line)
-			}
-		}
-
-		logger.Error("Docker Compose validation failed",
-			zap.String("compose_file", composeFile),
-			zap.String("env_file", envFile),
-			zap.Strings("errors", errorLines))
-
-		// Check for specific error patterns
-		if strings.Contains(outputStr, "variable is not set") {
-			return fmt.Errorf("docker-compose.yml contains undefined variables:\n%s\n\n"+
-				"This indicates missing or improperly escaped variables in .env file.\n"+
-				"Full output:\n%s",
-				strings.Join(errorLines, "\n"),
-				outputStr)
-		}
-
-		if strings.Contains(outputStr, "invalid IP address") {
-			return fmt.Errorf("docker-compose.yml contains invalid port mapping:\n%s\n\n"+
-				"This indicates a bug in port variable substitution.\n"+
-				"Check COMPOSE_PORT_* variables in .env file.\n"+
-				"Full output:\n%s",
-				strings.Join(errorLines, "\n"),
-				outputStr)
-		}
-
-		if strings.Contains(outputStr, "couldn't find env file") {
-			return fmt.Errorf("docker-compose.yml references .env file that doesn't exist:\n%s\n\n"+
-				"Expected: %s\n"+
-				"Full output:\n%s",
-				strings.Join(errorLines, "\n"),
-				envFile,
-				outputStr)
-		}
-
-		// Generic validation failure
-		return fmt.Errorf("docker-compose.yml validation failed:\n%s\n\n"+
-			"Run manually to debug:\n"+
-			"  docker compose -f %s%s config\n\n"+
-			"Full output:\n%s",
-			strings.Join(errorLines, "\n"),
-			composeFile,
-			func() string {
-				if envFile != "" {
-					return " --env-file " + envFile
-				}
-				return ""
-			}(),
-			outputStr)
-	}
-
-	// Validation succeeded
-	logger.Info("docker-compose.yml validation passed",
-		zap.String("file", composeFile))
-
-	return nil
-}
-
 // ValidateCaddyfile validates Caddyfile using 'caddy validate'
 //
 // This function validates Caddyfile syntax by running 'caddy validate'.
@@ -290,44 +185,5 @@ func ValidateNoFlagLikeArgs(args []string) error {
 			}
 		}
 	}
-	return nil
-}
-
-// ValidateGeneratedFiles validates all generated configuration files
-//
-// This is a convenience function that validates:
-// - docker-compose.yml
-// - .env file (via docker compose config)
-// - Caddyfile
-//
-// Parameters:
-//   - ctx: Context for logging
-//   - baseDir: Base directory containing the files
-//
-// Returns error if any validation fails.
-func ValidateGeneratedFiles(ctx context.Context, baseDir string) error {
-	logger := otelzap.Ctx(ctx)
-
-	logger.Info("Validating generated configuration files",
-		zap.String("path", baseDir))
-
-	// Validate docker-compose.yml with .env
-	composeFile := filepath.Join(baseDir, "docker-compose.yml")
-	envFile := filepath.Join(baseDir, ".env")
-
-	if err := ValidateDockerCompose(ctx, composeFile, envFile); err != nil {
-		return fmt.Errorf("docker-compose.yml validation failed: %w", err)
-	}
-
-	// Validate Caddyfile (optional - won't fail if caddy not installed)
-	caddyfile := filepath.Join(baseDir, "Caddyfile")
-	if err := ValidateCaddyfile(ctx, caddyfile); err != nil {
-		// Caddyfile validation is optional (Caddy binary may not be available)
-		logger.Warn("Caddyfile validation skipped or failed",
-			zap.Error(err))
-	}
-
-	// All validations passed
-	logger.Info("File validation completed successfully")
 	return nil
 }

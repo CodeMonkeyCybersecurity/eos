@@ -10,10 +10,10 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -61,11 +61,24 @@ func generateYAMLHecateSecrets(rc *eos_io.RuntimeContext, secretManager *secrets
 		return nil, nil, fmt.Errorf("failed to manage secrets: %w", err)
 	}
 
+	// Fetch latest Authentik version
+	authentikVersion, err := GetLatestAuthentikVersion(rc)
+	if err != nil {
+		logger.Warn("Failed to fetch latest Authentik version, using default",
+			zap.Error(err),
+			zap.String("default", DefaultAuthentikVersion))
+		authentikVersion = DefaultAuthentikVersion
+	}
+
+	logger.Info("Using Authentik version",
+		zap.String("version", authentikVersion),
+		zap.String("image", fmt.Sprintf("%s:%s", AuthentikImage, authentikVersion)))
+
 	// Populate HecateSecrets using the existing type structure
 	hecateSecrets := &HecateSecrets{
 		PGUser:                 "authentik",
 		PGDatabase:             "authentik",
-		AuthentikTag:           "2025.8",
+		AuthentikTag:           authentikVersion,
 		ComposePortHTTP:        "9000",
 		ComposePortHTTPS:       "9443",
 		AuthentikWorkerThreads: "4",
@@ -516,7 +529,7 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 	logger.Debug("Validating docker-compose.yml syntax")
 	composeFile := filepath.Join(outputDir, "docker-compose.yml")
 	envFile := filepath.Join(outputDir, ".env")
-	if err := verify.ValidateDockerCompose(rc.Ctx, composeFile, envFile); err != nil {
+	if err := docker.ValidateComposeWithShellFallback(rc.Ctx, composeFile, envFile); err != nil {
 		logger.Warn("Docker compose validation found issues (continuing anyway)",
 			zap.Error(err))
 		// Don't show terminal prompt here - this is handled by ValidateGeneratedFiles in cmd/

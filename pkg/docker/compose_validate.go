@@ -11,7 +11,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -356,4 +359,248 @@ func substituteString(s string, envVars map[string]string) (string, error) {
 	}
 
 	return result, nil
+}
+
+// ValidateComposeWithShellFallback validates docker-compose.yml using SDK with shell fallback
+//
+// This function tries SDK-based validation first, then falls back to shell command.
+// This is the recommended validation function for production use.
+//
+// Validation strategy:
+// 1. Try SDK-based validation (preferred: faster, better errors, no CLI dependency)
+// 2. If SDK fails, try 'docker compose config' shell command (fallback)
+// 3. If both fail, return combined error with remediation
+//
+// Parameters:
+//   - ctx: Context for logging
+//   - composeFile: Path to docker-compose.yml
+//   - envFile: Path to .env file (can be empty string if not using env file)
+//
+// Returns error with detailed validation information if both methods fail.
+func ValidateComposeWithShellFallback(ctx context.Context, composeFile, envFile string) error {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Validating docker-compose.yml with SDK and shell fallback")
+
+	// INTERVENE: Try SDK-based validation first (preferred method)
+	sdkErr := ValidateComposeFile(ctx, composeFile, envFile)
+	if sdkErr == nil {
+		// SDK validation succeeded
+		logger.Info("docker-compose.yml validation passed (SDK)",
+			zap.String("file", composeFile),
+			zap.String("method", "docker-sdk"))
+		return nil
+	}
+
+	// SDK validation failed - log and try shell fallback
+	logger.Warn("SDK validation failed, falling back to shell command",
+		zap.Error(sdkErr),
+		zap.String("compose_file", composeFile))
+
+	// INTERVENE: Fallback to shell-based validation
+	shellErr := validateWithShellCommand(ctx, composeFile, envFile)
+	if shellErr == nil {
+		// Shell validation succeeded (SDK failed but shell passed)
+		logger.Info("docker-compose.yml validation passed (shell fallback)",
+			zap.String("file", composeFile),
+			zap.String("method", "docker-cli-fallback"),
+			zap.String("sdk_error", sdkErr.Error()))
+		return nil
+	}
+
+	// Both SDK and shell validation failed - return shell error (more detailed)
+	logger.Error("Both SDK and shell validation failed",
+		zap.Error(shellErr),
+		zap.String("sdk_error", sdkErr.Error()))
+
+	return shellErr
+}
+
+// validateWithShellCommand validates using 'docker compose config' shell command
+//
+// This is the fallback validation method when SDK validation fails.
+// It shells out to 'docker compose config' which is slower but handles
+// edge cases the SDK may not support yet.
+func validateWithShellCommand(ctx context.Context, composeFile, envFile string) error {
+	logger := otelzap.Ctx(ctx)
+
+	// Check if docker is available
+	if _, err := exec.LookPath("docker"); err != nil {
+		logger.Error("Docker CLI not found, cannot perform shell validation",
+			zap.Error(err))
+		return fmt.Errorf("docker CLI not available for validation:\n%w\n\n"+
+			"Install Docker CLI with:\n"+
+			"  Ubuntu: sudo apt install docker.io docker-compose-v2\n"+
+			"  Or visit: https://docs.docker.com/engine/install/ubuntu/",
+			err)
+	}
+
+	// Build docker compose command
+	cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	args := []string{"compose", "-f", composeFile}
+	if envFile != "" {
+		args = append(args, "--env-file", envFile)
+	}
+	args = append(args, "config")
+
+	cmd := exec.CommandContext(cmdCtx, "docker", args...)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		// Shell validation failed - parse error for details
+		outputStr := string(output)
+
+		// Extract useful error information
+		var errorLines []string
+		for _, line := range strings.Split(outputStr, "\n") {
+			// Collect WARN and error lines
+			if strings.Contains(line, "WARN") || strings.Contains(line, "invalid") || strings.Contains(line, "Error") {
+				errorLines = append(errorLines, line)
+			}
+		}
+
+		logger.Error("Docker Compose shell validation failed",
+			zap.String("compose_file", composeFile),
+			zap.String("env_file", envFile),
+			zap.Strings("errors", errorLines))
+
+		// Check for specific error patterns
+		if strings.Contains(outputStr, "variable is not set") {
+			return fmt.Errorf("docker-compose.yml contains undefined variables:\n%s\n\n"+
+				"This indicates missing or improperly escaped variables in .env file.\n"+
+				"Full output:\n%s",
+				strings.Join(errorLines, "\n"),
+				outputStr)
+		}
+
+		if strings.Contains(outputStr, "invalid IP address") {
+			return fmt.Errorf("docker-compose.yml contains invalid port mapping:\n%s\n\n"+
+				"This indicates a bug in port variable substitution.\n"+
+				"Check COMPOSE_PORT_* variables in .env file.\n"+
+				"Full output:\n%s",
+				strings.Join(errorLines, "\n"),
+				outputStr)
+		}
+
+		if strings.Contains(outputStr, "couldn't find env file") {
+			return fmt.Errorf("docker-compose.yml references .env file that doesn't exist:\n%s\n\n"+
+				"Expected: %s\n"+
+				"Full output:\n%s",
+				strings.Join(errorLines, "\n"),
+				envFile,
+				outputStr)
+		}
+
+		// Generic validation failure
+		return fmt.Errorf("docker-compose.yml validation failed:\n%s\n\n"+
+			"Run manually to debug:\n"+
+			"  docker compose -f %s%s config\n\n"+
+			"Full output:\n%s",
+			strings.Join(errorLines, "\n"),
+			composeFile,
+			func() string {
+				if envFile != "" {
+					return " --env-file " + envFile
+				}
+				return ""
+			}(),
+			outputStr)
+	}
+
+	// Shell validation succeeded
+	logger.Debug("Shell validation passed",
+		zap.String("file", composeFile))
+
+	return nil
+}
+
+// ValidateCaddyfile validates Caddyfile using 'caddy validate'
+//
+// This function validates Caddyfile syntax by running 'caddy validate'.
+// If caddy binary is not available, validation is skipped (not an error).
+//
+// Parameters:
+//   - ctx: Context for logging
+//   - caddyfile: Path to Caddyfile
+//
+// Returns error with validation details if syntax is invalid.
+func ValidateCaddyfile(ctx context.Context, caddyfile string) error {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Validating Caddyfile")
+
+	// Check if caddy is available
+	caddyPath, err := exec.LookPath("caddy")
+	if err != nil {
+		// Caddy binary not available - this is expected if using Docker
+		logger.Debug("Caddy binary not found, skipping Caddyfile validation")
+		return nil
+	}
+
+	// Run caddy validate
+	cmdCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(cmdCtx, caddyPath, "validate", "--config", caddyfile)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		// Validation failed
+		logger.Error("Caddyfile validation failed",
+			zap.String("caddyfile", caddyfile),
+			zap.String("output", string(output)))
+
+		return fmt.Errorf("Caddyfile syntax error:\n%s\n\n"+
+			"Run manually to debug:\n"+
+			"  caddy validate --config %s",
+			string(output),
+			caddyfile)
+	}
+
+	// Validation succeeded
+	logger.Info("Caddyfile validation passed",
+		zap.String("file", caddyfile))
+
+	return nil
+}
+
+// ValidateGeneratedFiles validates all generated configuration files
+//
+// This is a convenience function that validates:
+// - docker-compose.yml (with SDK + shell fallback)
+// - .env file (via docker compose config)
+// - Caddyfile (optional, skipped if caddy not installed)
+//
+// Parameters:
+//   - ctx: Context for logging
+//   - baseDir: Base directory containing the files
+//
+// Returns error if any validation fails.
+func ValidateGeneratedFiles(ctx context.Context, baseDir string) error {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Info("Validating generated configuration files",
+		zap.String("path", baseDir))
+
+	// Validate docker-compose.yml with .env
+	composeFile := filepath.Join(baseDir, "docker-compose.yml")
+	envFile := filepath.Join(baseDir, ".env")
+
+	if err := ValidateComposeWithShellFallback(ctx, composeFile, envFile); err != nil {
+		return fmt.Errorf("docker-compose.yml validation failed: %w", err)
+	}
+
+	// Validate Caddyfile (optional - won't fail if caddy not installed)
+	caddyfile := filepath.Join(baseDir, "Caddyfile")
+	if err := ValidateCaddyfile(ctx, caddyfile); err != nil {
+		// Caddyfile validation is optional (Caddy binary may not be available)
+		logger.Warn("Caddyfile validation skipped or failed",
+			zap.Error(err))
+	}
+
+	// All validations passed
+	logger.Info("File validation completed successfully")
+	return nil
 }

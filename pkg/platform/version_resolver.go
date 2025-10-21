@@ -90,6 +90,21 @@ func (r *VersionResolver) initializeStrategies() {
 				Fn:          r.getFallbackVersion,
 			},
 		}
+	case "authentik":
+		r.strategies = []VersionStrategy{
+			{
+				Name:        "GitHub API",
+				Description: "Query Authentik's GitHub releases API",
+				Timeout:     10 * time.Second,
+				Fn:          r.getAuthentikVersionFromGitHub,
+			},
+			{
+				Name:        "Fallback to Known Good",
+				Description: "Use hardcoded stable Authentik version",
+				Timeout:     1 * time.Second,
+				Fn:          r.getAuthentikFallbackVersion,
+			},
+		}
 	case "consul":
 		r.strategies = []VersionStrategy{
 			{
@@ -601,6 +616,73 @@ func (r *VersionResolver) getConsulFallbackVersion(resolver *VersionResolver) (s
 		zap.String("software", r.software),
 		zap.String("version", fallbackVersion),
 		zap.String("note", "Update this periodically"))
+
+	return fallbackVersion, nil
+}
+
+// getAuthentikVersionFromGitHub queries Authentik's GitHub releases API
+func (r *VersionResolver) getAuthentikVersionFromGitHub(resolver *VersionResolver) (string, error) {
+	logger := otelzap.Ctx(r.rc.Ctx)
+
+	// Authentik GitHub API endpoint
+	apiURL := "https://api.github.com/repos/goauthentik/authentik/releases/latest"
+
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// GitHub API headers
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "EOS-Authentik-Installer/1.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to query GitHub API: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Warn("Failed to close HTTP response body", zap.Error(closeErr))
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("failed to decode GitHub response: %w", err)
+	}
+
+	// Skip pre-releases and drafts
+	if release.Prerelease || release.Draft {
+		return "", fmt.Errorf("latest release is a pre-release or draft")
+	}
+
+	// Authentik uses version tags like "version/2024.8.3" or just "2024.8.3"
+	version := strings.TrimPrefix(release.TagName, "version/")
+	version = strings.TrimPrefix(version, "v")
+
+	logger.Info("Found latest Authentik version from GitHub",
+		zap.String("version", version),
+		zap.String("tag", release.TagName),
+		zap.Time("released", release.CreatedAt))
+
+	return version, nil
+}
+
+// getAuthentikFallbackVersion returns a known stable Authentik version
+func (r *VersionResolver) getAuthentikFallbackVersion(resolver *VersionResolver) (string, error) {
+	// Fallback to a recent stable version (update periodically)
+	fallbackVersion := "2024.8.3"
+
+	logger := otelzap.Ctx(r.rc.Ctx)
+	logger.Info("Using fallback Authentik version",
+		zap.String("version", fallbackVersion),
+		zap.String("note", "Consider updating fallback version periodically"))
 
 	return fallbackVersion, nil
 }

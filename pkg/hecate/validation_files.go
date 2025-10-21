@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -45,8 +45,8 @@ func ValidateGeneratedFiles(rc *eos_io.RuntimeContext, hecatePath string) error 
 			zap.String("file", filename))
 	}
 
-	// INTERVENE & EVALUATE: Validate all files using verify package
-	if err := verify.ValidateGeneratedFiles(rc.Ctx, hecatePath); err != nil {
+	// INTERVENE & EVALUATE: Validate all files using docker package
+	if err := docker.ValidateGeneratedFiles(rc.Ctx, hecatePath); err != nil {
 		return fmt.Errorf("file validation failed: %w", err)
 	}
 

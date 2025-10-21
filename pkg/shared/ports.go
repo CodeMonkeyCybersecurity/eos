@@ -67,6 +67,11 @@ const (
 	PortOpenWebUI      = 8501 // Open WebUI (not 3000)
 	PortBionicGPT      = 8513 // BionicGPT multi-tenant LLM platform (not 3000)
 
+	// Temporal/Iris ports
+	PortTemporalGRPC    = 7233 // Temporal gRPC frontend (standard)
+	PortTemporalUI      = 8233 // Temporal Web UI
+	PortTemporalMetrics = 9090 // Temporal Prometheus metrics
+
 	// Well-known ports that should remain standard
 	PortHTTP       = 80  // Standard HTTP
 	PortHTTPS      = 443 // Standard HTTPS

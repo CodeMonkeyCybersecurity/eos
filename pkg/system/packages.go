@@ -94,6 +94,27 @@ func updateApt(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("apt upgrade failed: %w", err)
 	}
 
+	// Step 3: apt autoremove (remove old packages)
+	logger.Info("Removing old packages (apt autoremove)")
+	removeCmd := exec.Command("apt", "autoremove", "-y")
+	removeCmd.Stdout = os.Stdout
+	removeCmd.Stderr = os.Stderr
+
+	if err := removeCmd.Run(); err != nil {
+		return fmt.Errorf("apt autoremove failed: %w", err)
+	}
+
+
+	// Step 4: apt autoclean (remove old packages)
+	logger.Info("Cleaning up old packages (apt autoclean)")
+	cleanCmd := exec.Command("apt", "autoclean", "-y")
+	cleanCmd.Stdout = os.Stdout
+	cleanCmd.Stderr = os.Stderr
+
+	if err := cleanCmd.Run(); err != nil {
+		return fmt.Errorf("apt autoclean failed: %w", err)
+	}
+
 	logger.Info("System packages updated successfully")
 	return nil
 }
