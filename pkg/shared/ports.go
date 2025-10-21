@@ -61,7 +61,7 @@ const (
 	PortConsulSerfWAN  = 8302 // Consul Serf WAN (HashiCorp standard)
 	PortBuildService   = 8431 // Build orchestrator service (not 8080)
 	PortCaddyAdmin     = 8443 // Caddy admin API (not 2019)
-	PortAuthentik      = 8447 // Authentik identity provider (not 9000)
+	PortAuthentik      = 9000 // Authentik identity provider (HTTP)
 	PortPenpotBackend  = 8461 // Penpot backend API (not 6060)
 	PortPenpotExporter = 8467 // Penpot exporter (not 6061)
 	PortOpenWebUI      = 8501 // Open WebUI (not 3000)
