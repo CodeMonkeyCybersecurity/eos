@@ -307,7 +307,12 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 		}
 	}
 
+	// If no new apps added but previous config exists, use it
 	if len(apps) == 0 {
+		if previousConfig != nil && len(previousConfig.Apps) > 0 {
+			logger.Info("terminal prompt: ℹ️  Using existing configuration from Consul KV")
+			return previousConfig.Apps, nil
+		}
 		return nil, fmt.Errorf("no apps configured")
 	}
 

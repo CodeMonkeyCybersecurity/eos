@@ -8,24 +8,36 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 // updateHecateCmd represents the "update hecate" command.
 var updateHecateCmd = &cobra.Command{
 	Use:   "hecate",
-	Short: "Update Hecate configurations and services",
-	Long: `Update Hecate configurations, renew certificates, or update specific services.
+	Short: "Update Hecate deployment (regenerate files from Consul KV)",
+	Long: `Regenerate Hecate docker-compose.yml and .env files from configuration stored in Consul KV.
+
+This command:
+  1. Backs up existing files with timestamp
+  2. Loads configuration from Consul KV (service/hecate/config/apps/)
+  3. Regenerates docker-compose.yml and .env with latest templates
+  4. Restarts containers to apply changes
+
+Use this when:
+  - Eos code has been updated with bug fixes
+  - You need to apply configuration changes
+  - Files were manually deleted or corrupted
 
 Examples:
-  eos update hecate certs
-  eos update hecate eos
-  eos update hecate http
-  eos update hecate k3s`,
+  eos update hecate              # Regenerate from Consul KV
+  eos update hecate certs        # Only renew certificates
+  eos update hecate k3s          # Update k3s deployment`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for update hecate command.", zap.String("command", cmd.Use))
-		_ = cmd.Help() // Display help if no subcommand is provided
-		return nil
+		logger := otelzap.Ctx(rc.Ctx)
+
+		logger.Info("Regenerating Hecate deployment from Consul KV configuration")
+
+		// Regenerate from Consul KV with backup
+		return hecate.RegenerateFromConsulKV(rc)
 	}),
 }
 

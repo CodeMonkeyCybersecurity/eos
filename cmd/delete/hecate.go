@@ -25,7 +25,7 @@ var (
 func init() {
 	hecateCmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Skip confirmation prompts")
 	hecateCmd.Flags().BoolVar(&keepData, "keep-data", false, "Keep Consul KV data (only remove containers and files)")
-	
+
 	// Register with delete command
 	DeleteCmd.AddCommand(hecateCmd)
 }
@@ -189,6 +189,7 @@ func cleanConsulData(rc *eos_io.RuntimeContext) error {
 		"hecate/hybrid/",
 		"hecate/backends/",
 		"hecate/config/",
+		"service/hecate/config/", // Hecate YAML config storage (from eos create config --hecate)
 	}
 
 	for _, prefix := range prefixes {
