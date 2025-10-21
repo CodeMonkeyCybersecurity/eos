@@ -260,7 +260,7 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		requiredSecrets["azure_api_key"] = secrets.SecretTypeAPIKey
 	}
 
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("bionicgpt", requiredSecrets)
+	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets(VaultServiceName, requiredSecrets)
 	if err != nil {
 		return fmt.Errorf("failed to manage secrets: %w", err)
 	}

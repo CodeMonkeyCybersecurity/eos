@@ -168,5 +168,7 @@ const (
 	VolumeDocuments    = "bionicgpt-documents"
 
 	// Vault paths for secrets
-	VaultPathBionicGPT = "secret/bionicgpt" // Base path in Vault for BionicGPT secrets
+	// NOTE: Actual path is secret/data/services/{environment}/bionicgpt (managed by secrets.SecretManager)
+	// This constant documents the service name used in GetOrGenerateServiceSecrets()
+	VaultServiceName = "bionicgpt" // Service name for Vault secrets (stored at secret/data/services/{env}/bionicgpt)
 )
