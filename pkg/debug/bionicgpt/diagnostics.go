@@ -30,6 +30,8 @@ func AllDiagnostics() []*debug.Diagnostic {
 		InstallationDiagnostic(),
 		ComposeFileDiagnostic(),
 		EnvFileDiagnostic(),
+		EnvFileContentDiagnostic(),
+		SrHDVariableCheckDiagnostic(),
 		DockerDaemonDiagnostic(),
 		ContainerStatusDiagnostic(),
 		PostgresContainerDiagnostic(),
@@ -38,6 +40,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		EmbeddingsAPIDiagnostic(),
 		ChunkingEngineDiagnostic(),
 		MigrationsDiagnostic(),
+		MigrationsLogsDiagnostic(),
 		LiteLLMProxyDiagnostic(),
 		VolumesDiagnostic(),
 		PostgresHealthDiagnostic(),
@@ -530,6 +533,167 @@ func OllamaConnectivityDiagnostic() *debug.Diagnostic {
 				result.Status = debug.StatusOK
 				result.Message = "Ollama service is running"
 				result.Output = fmt.Sprintf("Service status: %s", status)
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// EnvFileContentDiagnostic checks the content of .env files
+func EnvFileContentDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Environment Files Content",
+		Category:    "Configuration",
+		Description: "Display contents of .env configuration files",
+		Condition: func(ctx context.Context) bool {
+			_, err := os.Stat(DefaultInstallDir)
+			return err == nil
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			envFiles := []string{
+				DefaultInstallDir + "/.env",
+				DefaultInstallDir + "/.env.litellm",
+				DefaultInstallDir + "/.env.azure_openai",
+			}
+
+			var output strings.Builder
+			foundFiles := 0
+
+			for _, envFile := range envFiles {
+				if data, err := os.ReadFile(envFile); err == nil {
+					foundFiles++
+					output.WriteString(fmt.Sprintf("\n=== %s ===\n", envFile))
+					output.WriteString(string(data))
+					output.WriteString("\n")
+				}
+			}
+
+			if foundFiles == 0 {
+				result.Status = debug.StatusWarning
+				result.Message = "No environment files found"
+				result.Output = "Checked: " + strings.Join(envFiles, ", ")
+				result.Remediation = "Environment files missing - reinstall: sudo eos create bionicgpt --force"
+			} else {
+				result.Status = debug.StatusOK
+				result.Message = fmt.Sprintf("Found %d environment file(s)", foundFiles)
+				result.Output = output.String()
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// SrHDVariableCheckDiagnostic checks for the mysterious SrHD variable
+// NOTE: SrHD is NOT a valid BionicGPT variable - it's likely file corruption or encoding issue
+// If found, it should be removed from configuration files
+func SrHDVariableCheckDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "SrHD Variable Check",
+		Category:    "Configuration",
+		Description: "Search for undefined SrHD variable in compose and env files",
+		Condition: func(ctx context.Context) bool {
+			_, err := os.Stat(DefaultInstallDir)
+			return err == nil
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			searchFiles := []string{
+				DefaultInstallDir + "/docker-compose.yml",
+				DefaultInstallDir + "/.env",
+				DefaultInstallDir + "/.env.litellm",
+				DefaultInstallDir + "/.env.azure_openai",
+			}
+
+			var output strings.Builder
+			foundSrHD := false
+
+			for _, file := range searchFiles {
+				data, err := os.ReadFile(file)
+				if err != nil {
+					continue // File doesn't exist, skip
+				}
+
+				lines := strings.Split(string(data), "\n")
+				for lineNum, line := range lines {
+					if strings.Contains(line, "SrHD") {
+						foundSrHD = true
+						output.WriteString(fmt.Sprintf("%s:%d: %s\n", file, lineNum+1, line))
+					}
+				}
+			}
+
+			if foundSrHD {
+				result.Status = debug.StatusError
+				result.Message = "Found undefined SrHD variable (likely corruption)"
+				result.Output = output.String()
+				result.Remediation = "SrHD is NOT a valid BionicGPT variable. This is likely file corruption.\nFix: sudo eos create bionicgpt --force"
+			} else {
+				result.Status = debug.StatusOK
+				result.Message = "No SrHD variable found"
+				result.Output = "Checked: " + strings.Join(searchFiles, ", ")
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// MigrationsLogsDiagnostic gets the logs from the migrations container
+func MigrationsLogsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Migrations Container Logs",
+		Category:    "Containers",
+		Description: "Retrieve last 50 lines of migrations container logs",
+		Condition: func(ctx context.Context) bool {
+			// Check if migrations container exists
+			cmd := exec.Command("docker", "inspect", bionicgpt.ContainerMigrations)
+			return cmd.Run() == nil
+		},
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+			result.Metadata["container_name"] = bionicgpt.ContainerMigrations
+
+			logger := otelzap.Ctx(ctx)
+			logger.Debug("Fetching migrations container logs",
+				zap.String("container", bionicgpt.ContainerMigrations))
+
+			cmd := exec.CommandContext(ctx, "docker", "logs", "--tail", "50", bionicgpt.ContainerMigrations)
+			output, err := cmd.CombinedOutput()
+
+			if err != nil {
+				result.Status = debug.StatusWarning
+				result.Message = "Could not retrieve migrations logs"
+				result.Output = string(output)
+				result.Remediation = fmt.Sprintf("Check if container exists: docker ps -a | grep %s", bionicgpt.ContainerMigrations)
+			} else {
+				outputStr := string(output)
+				result.Metadata["log_lines"] = strings.Count(outputStr, "\n")
+
+				// Check for common error patterns
+				if strings.Contains(outputStr, "exit 2") || strings.Contains(outputStr, "error") || strings.Contains(outputStr, "Error") || strings.Contains(outputStr, "FATAL") {
+					result.Status = debug.StatusError
+					result.Message = "Migrations container logs contain errors"
+					result.Remediation = "Check database connectivity and migration scripts. View full logs: docker logs " + bionicgpt.ContainerMigrations
+				} else if outputStr == "" {
+					result.Status = debug.StatusWarning
+					result.Message = "Migrations container has no logs"
+				} else {
+					result.Status = debug.StatusOK
+					result.Message = "Migrations container logs retrieved"
+				}
+
+				result.Output = outputStr
 			}
 
 			return result, nil
