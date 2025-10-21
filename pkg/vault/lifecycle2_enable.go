@@ -290,6 +290,23 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	log.Info(" [Phase 11] Core policies written successfully",
 		zap.Duration("duration", time.Since(phaseStart)))
 
+	// CRITICAL P0: Validate that eos-default-policy includes service secrets access
+	// This prevents permission denied errors when deploying services (bionicgpt, etc.)
+	log.Info(" [Phase 11.1] Validating eos-default-policy includes service secrets access")
+	hasServiceSecrets, err := CheckServiceSecretsPolicy(rc)
+	if err != nil {
+		log.Warn(" [Phase 11.1] Could not verify service secrets policy (non-fatal)",
+			zap.Error(err))
+	} else if !hasServiceSecrets {
+		log.Error(" [Phase 11.1] CRITICAL: eos-default-policy missing service secrets access")
+		log.Error(" ⚠️  SERVICE DEPLOYMENT BLOCKED: Cannot deploy services (bionicgpt, etc.)")
+		log.Error(" ⚠️  Missing path: secret/data/services/*")
+		log.Error(" ⚠️  Fix with: sudo eos update vault --update-policies")
+		return fmt.Errorf("eos-default-policy missing required service secrets path")
+	} else {
+		log.Info(" [Phase 11.1] ✓ Verified: eos-default-policy includes service secrets access")
+	}
+
 	// Step 12: Enable comprehensive audit logging
 	log.Info("───────────────────────────────────────────────────────────────")
 	log.Info(" [Phase 12] Enabling file-based audit logging")
