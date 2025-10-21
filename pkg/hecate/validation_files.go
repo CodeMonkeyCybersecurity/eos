@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -20,7 +21,7 @@ import (
 //
 // This function implements the Assess → Intervene → Evaluate pattern:
 // - Assess: Check if required files exist
-// - Intervene: Run validation tools (docker compose config, caddy validate)
+// - Intervene: Run validation tools (docker compose config, caddy validate) via verify package
 // - Evaluate: Return errors with remediation if validation fails
 func ValidateGeneratedFiles(rc *eos_io.RuntimeContext, hecatePath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -44,20 +45,12 @@ func ValidateGeneratedFiles(rc *eos_io.RuntimeContext, hecatePath string) error 
 			zap.String("file", filename))
 	}
 
-	// INTERVENE: Validate docker-compose.yml
-	if err := validateDockerCompose(rc, hecatePath); err != nil {
-		return fmt.Errorf("docker-compose.yml validation failed: %w", err)
+	// INTERVENE & EVALUATE: Validate all files using verify package
+	if err := verify.ValidateGeneratedFiles(rc.Ctx, hecatePath); err != nil {
+		return fmt.Errorf("file validation failed: %w", err)
 	}
 
-	// INTERVENE: Validate Caddyfile
-	if err := validateCaddyfile(rc, hecatePath); err != nil {
-		// Caddyfile validation is optional (Caddy binary may not be available)
-		logger.Warn("Caddyfile validation skipped",
-			zap.Error(err),
-			zap.String("reason", "caddy binary not available or validation failed"))
-	}
-
-	// EVALUATE: All validations passed
+	// All validations passed
 	logger.Info("File validation completed successfully")
 	return nil
 }

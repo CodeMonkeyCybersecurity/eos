@@ -13,9 +13,25 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// HecateSecrets holds generated secrets for Hecate services
+type HecateSecrets struct {
+	PGPass                     string
+	PGUser                     string
+	PGDatabase                 string
+	AuthentikSecretKey         string
+	AuthentikTag               string
+	ComposePortHTTP            string
+	ComposePortHTTPS           string
+	AuthentikWorkerThreads     string
+	AuthentikBootstrapEmail    string
+	AuthentikBootstrapPassword string
+	AuthentikBootstrapToken    string
+}
 
 // generateYAMLHecateSecrets generates or retrieves all required secrets for Hecate YAML mode
 func generateYAMLHecateSecrets(rc *eos_io.RuntimeContext, secretManager *secrets.SecretManager, config *YAMLHecateConfig) (*HecateSecrets, *string, error) {
@@ -285,7 +301,7 @@ services:
     image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
       start_period: 20s
       interval: 30s
       retries: 5
@@ -293,9 +309,9 @@ services:
     volumes:
       - database:/var/lib/postgresql/data
     environment:
-      POSTGRES_PASSWORD: $${PG_PASS:?database password required}
-      POSTGRES_USER: $${PG_USER:-authentik}
-      POSTGRES_DB: $${PG_DB:-authentik}
+      POSTGRES_PASSWORD: ${PG_PASS:?database password required}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_DB: ${PG_DB:-authentik}
     env_file:
       - .env
     networks:
@@ -317,18 +333,18 @@ services:
       - hecate-net
 
   server:
-    image: $${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:$${AUTHENTIK_TAG:-2025.8}
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.8}
     restart: unless-stopped
     command: server
     container_name: hecate-server-1
     environment:
-      AUTHENTIK_SECRET_KEY: $${AUTHENTIK_SECRET_KEY:?secret key required}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
       AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: $${PG_USER:-authentik}
-      AUTHENTIK_POSTGRESQL__NAME: $${PG_DB:-authentik}
-      AUTHENTIK_POSTGRESQL__PASSWORD: $${PG_PASS}
-      AUTHENTIK_WORKER__THREADS: $${AUTHENTIK_WORKER__THREADS:-4}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_WORKER__THREADS: ${AUTHENTIK_WORKER__THREADS:-4}
     volumes:
       - ./media:/media
       - ./custom-templates:/templates
@@ -346,17 +362,17 @@ services:
       - hecate-net
 
   worker:
-    image: $${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:$${AUTHENTIK_TAG:-2025.8}
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2025.8}
     restart: unless-stopped
     command: worker
     environment:
-      AUTHENTIK_SECRET_KEY: $${AUTHENTIK_SECRET_KEY:?secret key required}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?secret key required}
       AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
-      AUTHENTIK_POSTGRESQL__USER: $${PG_USER:-authentik}
-      AUTHENTIK_POSTGRESQL__NAME: $${PG_DB:-authentik}
-      AUTHENTIK_POSTGRESQL__PASSWORD: $${PG_PASS}
-      AUTHENTIK_WORKER__THREADS: $${AUTHENTIK_WORKER__THREADS:-4}
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_WORKER__THREADS: ${AUTHENTIK_WORKER__THREADS:-4}
     user: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -498,7 +514,9 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 	// EVALUATE: Validate docker-compose.yml AFTER all files are generated
 	// This validation is informational only - we don't fail the operation since files are already written
 	logger.Debug("Validating docker-compose.yml syntax")
-	if err := validateDockerCompose(rc, outputDir); err != nil {
+	composeFile := filepath.Join(outputDir, "docker-compose.yml")
+	envFile := filepath.Join(outputDir, ".env")
+	if err := verify.ValidateDockerCompose(rc.Ctx, composeFile, envFile); err != nil {
 		logger.Warn("Docker compose validation found issues (continuing anyway)",
 			zap.Error(err))
 		// Don't show terminal prompt here - this is handled by ValidateGeneratedFiles in cmd/

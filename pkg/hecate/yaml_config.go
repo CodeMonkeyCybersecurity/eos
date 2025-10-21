@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -325,48 +326,9 @@ func copyIntMap(m map[int]int) map[int]int {
 }
 
 // validateBackend checks if backend is a valid IP address or hostname
+// Delegates to verify.ValidateBackend for the actual validation logic
 func validateBackend(backend string) error {
-	if backend == "" {
-		return fmt.Errorf("backend cannot be empty")
-	}
-
-	// Extract host part (remove :port if present)
-	host := backend
-	if strings.Contains(backend, ":") {
-		parts := strings.Split(backend, ":")
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid backend format (too many colons): %s", backend)
-		}
-		host = parts[0]
-
-		// Validate port
-		port := parts[1]
-		if portNum, err := strconv.Atoi(port); err != nil || portNum < 1 || portNum > 65535 {
-			return fmt.Errorf("invalid port number: %s (must be 1-65535)", port)
-		}
-	}
-
-	// Check if it's a valid format (IP or hostname)
-	// Allow: IPs (192.168.1.1), hostnames (server.local), FQDNs (app.example.com)
-	// Reject: URLs with protocols, paths, queries
-	if strings.Contains(host, "/") || strings.Contains(host, "?") ||
-		strings.Contains(host, "@") || strings.Contains(host, "#") {
-		return fmt.Errorf("invalid backend format: %s\n"+
-			"Use IP address (192.168.1.100) or hostname (server.local)\n"+
-			"Do not include protocol (http://), path (/api), or query (?key=val)", backend)
-	}
-
-	// Very basic hostname/IP validation - just check reasonable characters
-	validChars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_"
-	for _, char := range host {
-		if !strings.ContainsRune(validChars, char) {
-			return fmt.Errorf("invalid character '%c' in backend: %s\n"+
-				"Backend must be IP address or hostname (alphanumeric, dots, hyphens only)",
-				char, backend)
-		}
-	}
-
-	return nil
+	return verify.ValidateBackend(backend)
 }
 
 // extractBaseDomain extracts the base domain from a subdomain
@@ -382,36 +344,7 @@ func extractBaseDomain(domain string) string {
 }
 
 // validateDomain checks if domain is a valid format
+// Delegates to verify.ValidateDomain for the actual validation logic
 func validateDomain(domain string) error {
-	if domain == "" {
-		return fmt.Errorf("domain cannot be empty")
-	}
-
-	// Remove protocol if accidentally included
-	if strings.HasPrefix(domain, "http://") || strings.HasPrefix(domain, "https://") {
-		return fmt.Errorf("domain should not include protocol: %s\n"+
-			"Use: example.com (not https://example.com)", domain)
-	}
-
-	// Check for path, query, or fragment
-	if strings.Contains(domain, "/") || strings.Contains(domain, "?") || strings.Contains(domain, "#") {
-		return fmt.Errorf("domain should not include path, query, or fragment: %s\n"+
-			"Use: example.com (not example.com/path)", domain)
-	}
-
-	// Check for spaces or other invalid characters
-	if strings.Contains(domain, " ") || strings.Contains(domain, "\t") {
-		return fmt.Errorf("domain contains whitespace: %s", domain)
-	}
-
-	// Very basic domain validation - must have at least one dot for FQDN
-	// (Allow localhost, etc. for development)
-	parts := strings.Split(domain, ".")
-	if len(parts) < 2 && domain != "localhost" {
-		return fmt.Errorf("invalid domain format: %s\n"+
-			"Use fully qualified domain name (example.com)\n"+
-			"or 'localhost' for local development", domain)
-	}
-
-	return nil
+	return verify.ValidateDomain(domain)
 }

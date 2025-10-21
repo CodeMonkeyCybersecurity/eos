@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/kvm"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -43,6 +44,11 @@ Examples:
   eos delete kvm my-vm --force --remove-storage`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		// Detect if user accidentally used '--' separator (e.g., 'eos delete kvm vm-name -- --force')
+		if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+			return err
+		}
+
 		vmName := args[0]
 
 		logger := otelzap.Ctx(rc.Ctx)

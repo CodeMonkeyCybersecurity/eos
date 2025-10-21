@@ -8,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -41,6 +42,11 @@ Examples:
   eos create config --hecate --no-interactive      # Generate example config`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+		// Detect if user accidentally used '--' separator (e.g., 'eos create config -- hecate')
+		if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+			return err
+		}
 
 		// Validate that a config type was specified
 		if !hecateConfigMode {

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-21*
+*Last Updated: 2025-01-21*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -24,9 +24,10 @@ These violations cause immediate failure:
 4. **Context**: Always use `*eos_io.RuntimeContext` for all operations
 5. **Completion**: Must pass `go build`, `golangci-lint run`, `go test -v ./pkg/...`
 6. **Secrets**: Use `secrets.SecretManager` for credentials - NEVER hardcode. Use `secrets.SecretManager.GetOrGenerateServiceSecrets()` for service secrets. And leverage vault for secrets management.
-7. **Security**: Complease a red team code review and generic targetted criticism of your work before you commit
-8. **evidence-based, adverserially collaborative** approach always with yourself and with me
+7. **Security**: Complete a red team code review and generic targeted criticism of your work before you commit
+8. **Evidence-based, adversarially collaborative** approach always with yourself and with me
 9. **READMEs** Put a README.md in each directory to document the purpose of the directory and how to use it.
+10. **Pre-commit validation**: ALWAYS run `go build -o /tmp/eos-build ./cmd/` before completing a task. If build fails, fix ALL errors before responding to user. Zero tolerance for compile-time errors.
 
 
 ## Quick Decision Trees
@@ -85,6 +86,31 @@ Secret/Config Delivery?
 │
 └─ Mixed (secrets + config):
    └─ Use Consul Template with both Vault and Consul backends
+
+Docker Operations (P1 - CRITICAL)?
+├─ Container operations (start, stop, inspect, logs):
+│  └─ ALWAYS use Docker SDK (github.com/docker/docker/client)
+│  └─ Example: pkg/container/docker.go, pkg/docker/compose_precipitate.go
+│
+├─ Docker Compose validation:
+│  ├─ PREFER: Docker SDK with YAML parsing (gopkg.in/yaml.v3)
+│  ├─ FALLBACK: Shell to 'docker compose config' only if SDK unavailable
+│  └─ Example: pkg/container/compose.go uses SDK ✓
+│
+├─ User-facing operations (docker compose up -d):
+│  ├─ Shell acceptable (user needs to see output)
+│  └─ BUT validate with SDK FIRST
+│
+└─ Template rendering:
+   └─ Use pkg/templates/render.go (unified, security-hardened)
+   └─ NO ad-hoc template.New() scattered in packages
+
+Flag Validation (P0 - CRITICAL)?
+└─ Command accepts positional args (cobra.ExactArgs, cobra.MaximumNArgs)?
+   ├─ ALWAYS add at start of RunE: if err := verify.ValidateNoFlagLikeArgs(args); err != nil { return err }
+   ├─ Prevents '--' separator bypass (e.g., 'eos delete env prod -- --force')
+   ├─ Required for ALL commands with positional arguments
+   └─ See: pkg/verify/validators.go:ValidateNoFlagLikeArgs()
 ```
 
 ## Secret and Configuration Management (P0 - CRITICAL)
@@ -802,6 +828,99 @@ logger.Debug("Executing command",
 logger.Debug("Post-operation verification",
     zap.Bool("container_running", running),
     zap.String("container_id", containerID))
+```
+
+## Flag Bypass Vulnerability Prevention (P0 - CRITICAL)
+
+### The Vulnerability
+
+When Cobra encounters the `--` separator in command-line arguments, it **stops parsing flags** and treats everything after it as positional arguments. This creates a security vulnerability where users can accidentally (or maliciously) bypass flag-based safety checks.
+
+**Example:**
+```bash
+# User intends to use --force flag
+sudo eos delete env production -- --force
+
+# What Cobra sees:
+# - Command: delete env
+# - Args: ["production", "--force"]  # Both are positional args!
+# - Flags: force=false  # Flag was never set!
+```
+
+**Security Impact:**
+- Bypasses `--force` safety checks (production deletion, running VM deletion)
+- Bypasses `--dry-run` validation
+- Bypasses `--emergency-override` authentication
+- Bypasses approval workflow requirements
+
+### Affected Commands (40+ files)
+
+Any command using `cobra.ExactArgs()`, `cobra.MaximumNArgs()`, or `cobra.MinimumNArgs()` is vulnerable.
+
+**Priority 1 (Safety-Critical):**
+- `cmd/delete/env.go` - Production environment deletion
+- `cmd/delete/kvm.go` - Running VM forced deletion
+- `cmd/promote/approve.go` - Emergency approval override
+- `cmd/promote/stack.go` - Multi-environment promotion
+
+**All affected:** See backup/*, create/*, delete/*, update/*, promote/* commands
+
+### Mandatory Mitigation Pattern
+
+**RULE**: ALL commands that accept positional arguments MUST validate them at the start of `RunE`.
+
+```go
+// REQUIRED at start of every RunE that accepts args
+RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    logger := otelzap.Ctx(rc.Ctx)
+
+    // CRITICAL: Detect flag-like args (--force, -f, etc.)
+    if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+        return err  // User-friendly error with remediation
+    }
+
+    // Rest of command logic...
+})
+```
+
+### Implementation Details
+
+See [pkg/verify/validators.go:271-294](pkg/verify/validators.go#L271-L294) for the validator implementation.
+
+**What it catches:**
+- Long flags: `--force`, `--dry-run`, `--emergency-override`
+- Short flags: `-f`, `-v`, `-i`
+- Allows negative numbers: `-1`, `-42` (distinguishes from flags)
+
+**Error message example:**
+```
+argument 1 looks like a long flag: '--force'
+Did you use the '--' separator by mistake?
+Remove the '--' separator to use flags properly.
+Example: Use 'eos delete env prod --force' instead of 'eos delete env prod -- --force'
+```
+
+### Migration Checklist
+
+When adding this to existing commands:
+
+1. Add import: `"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"`
+2. Add validation as FIRST line in RunE (after logger initialization)
+3. Test with: `eos [command] arg -- --flag` (should error)
+4. Test normal usage: `eos [command] arg --flag` (should work)
+
+### Testing
+
+```bash
+# Should FAIL with clear error
+eos delete env production -- --force
+eos create config -- hecate
+eos promote approve id -- --emergency-override
+
+# Should SUCCEED
+eos delete env production --force
+eos create config --hecate
+eos promote approve id --emergency-override
 ```
 
 ## Memory Notes

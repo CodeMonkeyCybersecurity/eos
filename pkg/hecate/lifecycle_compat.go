@@ -1,5 +1,6 @@
-// pkg/hecate/compose_generator.go
-// Complete docker-compose.yml generation for Hecate
+// pkg/hecate/lifecycle_compat.go
+// Compatibility shim for old lifecycle_create.go code that uses GenerateCompleteHecateStack
+// TODO: Migrate lifecycle_create.go to use GenerateFromYAML instead
 
 package hecate
 
@@ -15,6 +16,7 @@ import (
 )
 
 // GenerateCompleteHecateStack generates a complete docker-compose.yml with all Hecate components
+// DEPRECATED: Use GenerateFromYAML with YAML config instead
 func GenerateCompleteHecateStack(rc *eos_io.RuntimeContext, domain string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating complete Hecate docker-compose stack")
@@ -54,7 +56,7 @@ func GenerateCompleteHecateStack(rc *eos_io.RuntimeContext, domain string) error
 	}
 
 	// INTERVENE - Generate secrets
-	secrets, err := generateHecateSecrets(rc)
+	secrets, err := generateHecateSecretsLegacy(rc)
 	if err != nil {
 		return fmt.Errorf("failed to generate secrets: %w", err)
 	}
@@ -65,12 +67,12 @@ func GenerateCompleteHecateStack(rc *eos_io.RuntimeContext, domain string) error
 	secrets.AuthentikBootstrapToken = bootstrapCreds.Token
 
 	// Generate .env file
-	if err := generateEnvFile(rc, secrets); err != nil {
+	if err := generateEnvFileLegacy(rc, secrets); err != nil {
 		return fmt.Errorf("failed to generate .env file: %w", err)
 	}
 
 	// Generate docker-compose.yml
-	if err := generateDockerCompose(rc); err != nil {
+	if err := generateDockerComposeLegacy(rc); err != nil {
 		return fmt.Errorf("failed to generate docker-compose.yml: %w", err)
 	}
 
@@ -98,23 +100,8 @@ func GenerateCompleteHecateStack(rc *eos_io.RuntimeContext, domain string) error
 	return nil
 }
 
-// HecateSecrets holds generated secrets for Hecate services
-type HecateSecrets struct {
-	PGPass                    string
-	PGUser                    string
-	PGDatabase                string
-	AuthentikSecretKey        string
-	AuthentikTag              string
-	ComposePortHTTP           string
-	ComposePortHTTPS          string
-	AuthentikWorkerThreads    string
-	AuthentikBootstrapEmail   string
-	AuthentikBootstrapPassword string
-	AuthentikBootstrapToken   string
-}
-
-// generateHecateSecrets generates all required secrets for Hecate
-func generateHecateSecrets(rc *eos_io.RuntimeContext) (*HecateSecrets, error) {
+// generateHecateSecretsLegacy generates all required secrets for Hecate (legacy single-domain mode)
+func generateHecateSecretsLegacy(rc *eos_io.RuntimeContext) (*HecateSecrets, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating secrets for Hecate services")
 
@@ -144,8 +131,8 @@ func generateHecateSecrets(rc *eos_io.RuntimeContext) (*HecateSecrets, error) {
 	return secrets, nil
 }
 
-// generateEnvFile creates the .env file with secrets
-func generateEnvFile(rc *eos_io.RuntimeContext, secrets *HecateSecrets) error {
+// generateEnvFileLegacy creates the .env file with secrets (legacy mode)
+func generateEnvFileLegacy(rc *eos_io.RuntimeContext, secrets *HecateSecrets) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating .env file")
 
@@ -195,8 +182,8 @@ COMPOSE_PORT_HTTPS=%s
 	return nil
 }
 
-// generateDockerCompose creates the docker-compose.yml file with minimal stack
-func generateDockerCompose(rc *eos_io.RuntimeContext) error {
+// generateDockerComposeLegacy creates the docker-compose.yml file with minimal stack (legacy mode)
+func generateDockerComposeLegacy(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating docker-compose.yml (minimal stack: Caddy + Authentik)")
 
@@ -222,7 +209,7 @@ func generateDockerCompose(rc *eos_io.RuntimeContext) error {
     image: docker.io/library/postgres:16-alpine
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
       start_period: 20s
       interval: 30s
       retries: 5
