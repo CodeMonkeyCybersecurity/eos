@@ -4,15 +4,19 @@
 package bionicgpt
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -50,6 +54,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		OllamaConnectivityDiagnostic(),
 		AppContainerMissingDiagnostic(),
 		LiteLLMHealthCheckDiagnostic(),
+		LiteLLMErrorLogsDiagnostic(),
 		DatabaseConnectionTestDiagnostic(),
 		NetworkConnectivityDiagnostic(),
 		PortListenerDiagnostic(),
@@ -972,4 +977,168 @@ func ZombieProcessesDiagnostic() *debug.Diagnostic {
 			return result, nil
 		},
 	}
+}
+
+// LiteLLMErrorLogsDiagnostic filters litellm logs for errors, failures, and exceptions
+// This diagnostic uses Docker SDK to retrieve and filter logs efficiently
+func LiteLLMErrorLogsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "LiteLLM Error Logs",
+		Category:    "Containers",
+		Description: "Filter litellm-proxy logs for errors, failures, and exceptions (last 20 matching lines)",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Create RuntimeContext for Docker manager
+			rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+			// Initialize Docker manager using SDK
+			mgr, err := container.NewManager(rc)
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to initialize Docker SDK client"
+				result.Error = err
+				result.Remediation = "Ensure Docker daemon is running and accessible"
+				logger.Error("Failed to create Docker manager", zap.Error(err))
+				return result, nil
+			}
+			defer mgr.Close()
+
+			// Get logs from litellm container via SDK
+			logReader, err := mgr.Logs(ctx, bionicgpt.ContainerLiteLLM, container.LogOptions{
+				ShowStdout: true,
+				ShowStderr: true,
+				Tail:       "200", // Get more logs to filter through
+				Timestamps: false,
+			})
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to retrieve litellm logs"
+				result.Error = err
+				result.Remediation = "Check if litellm-proxy container exists and is running: docker ps | grep litellm"
+				logger.Error("Failed to get litellm logs", zap.Error(err))
+				return result, nil
+			}
+			defer logReader.Close()
+
+			// Filter logs for error patterns
+			errorLines := filterLogsForErrors(logReader, 20)
+
+			if len(errorLines) == 0 {
+				result.Status = debug.StatusOK
+				result.Message = "✓ No errors, failures, or exceptions found in recent litellm logs"
+				result.Output = "LiteLLM proxy logs are clean (checked last 200 lines)"
+			} else {
+				result.Status = debug.StatusWarning
+				result.Message = fmt.Sprintf("⚠ Found %d error/failure/exception lines in litellm logs", len(errorLines))
+				result.Output = strings.Join(errorLines, "\n")
+				result.Metadata["error_count"] = len(errorLines)
+				result.Remediation = "Review errors above. Common issues: Azure OpenAI credentials, network connectivity, litellm_config.yaml syntax"
+				logger.Warn("Found errors in litellm logs", zap.Int("count", len(errorLines)))
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// Helper Functions for Docker SDK operations
+
+// filterLogsForErrors reads container logs and filters for error patterns
+// Returns the last N matching lines containing "error", "fail", or "exception" (case-insensitive)
+func filterLogsForErrors(logReader io.ReadCloser, maxLines int) []string {
+	var errorLines []string
+	scanner := bufio.NewScanner(logReader)
+
+	// Docker SDK returns logs with 8-byte header (stream type + size)
+	// We need to strip this header for each line
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Strip Docker log header (8 bytes at start of each line)
+		// Format: 1 byte stream type (stdout=1, stderr=2) + 3 bytes padding + 4 bytes size
+		if len(line) > 8 {
+			line = line[8:]
+		}
+
+		// Filter for error patterns (case-insensitive)
+		lowerLine := strings.ToLower(line)
+		if strings.Contains(lowerLine, "error") ||
+			strings.Contains(lowerLine, "fail") ||
+			strings.Contains(lowerLine, "exception") {
+			errorLines = append(errorLines, line)
+		}
+	}
+
+	// Return last N lines if we have more than maxLines
+	if len(errorLines) > maxLines {
+		return errorLines[len(errorLines)-maxLines:]
+	}
+	return errorLines
+}
+
+// getContainerLogs retrieves logs from a container using Docker SDK
+// This helper function encapsulates the common pattern of getting logs with error handling
+func getContainerLogs(ctx context.Context, containerName string, tail string) (string, error) {
+	logger := otelzap.Ctx(ctx)
+
+	// Create RuntimeContext for Docker manager
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+	// Initialize Docker manager
+	mgr, err := container.NewManager(rc)
+	if err != nil {
+		logger.Error("Failed to create Docker manager", zap.Error(err))
+		return "", fmt.Errorf("failed to initialize Docker SDK: %w", err)
+	}
+	defer mgr.Close()
+
+	// Get logs via SDK
+	logReader, err := mgr.Logs(ctx, containerName, container.LogOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       tail,
+		Timestamps: false,
+	})
+	if err != nil {
+		logger.Error("Failed to get container logs",
+			zap.String("container", containerName),
+			zap.Error(err))
+		return "", fmt.Errorf("failed to get logs for %s: %w", containerName, err)
+	}
+	defer logReader.Close()
+
+	// Read all log content
+	logBytes, err := io.ReadAll(logReader)
+	if err != nil {
+		logger.Error("Failed to read log content",
+			zap.String("container", containerName),
+			zap.Error(err))
+		return "", fmt.Errorf("failed to read logs: %w", err)
+	}
+
+	// Strip Docker log headers from output
+	return stripDockerLogHeaders(string(logBytes)), nil
+}
+
+// stripDockerLogHeaders removes the 8-byte Docker log headers from log output
+// Docker SDK includes headers: 1 byte stream type + 3 bytes padding + 4 bytes size
+func stripDockerLogHeaders(logs string) string {
+	lines := strings.Split(logs, "\n")
+	var cleaned []string
+
+	for _, line := range lines {
+		if len(line) > 8 {
+			// Strip the 8-byte header
+			cleaned = append(cleaned, line[8:])
+		} else if len(line) > 0 {
+			// Keep short lines as-is (shouldn't happen but be safe)
+			cleaned = append(cleaned, line)
+		}
+	}
+
+	return strings.Join(cleaned, "\n")
 }

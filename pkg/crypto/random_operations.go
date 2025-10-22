@@ -67,4 +67,3 @@ func (r *RandomOperationsImpl) GeneratePassword(ctx context.Context, length int,
 
 	return r.GenerateRandomString(ctx, length, charset)
 }
-
