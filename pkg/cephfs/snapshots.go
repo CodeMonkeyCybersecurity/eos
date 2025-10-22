@@ -1,3 +1,6 @@
+//go:build !darwin
+// +build !darwin
+
 package cephfs
 
 import (
@@ -9,22 +12,6 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
-// SnapshotInfo represents information about a CephFS snapshot
-type SnapshotInfo struct {
-	Name       string
-	VolumeName string
-	CreatedAt  time.Time
-	Size       int64 // Snapshot size (if available)
-	Protected  bool  // Whether snapshot is protected from deletion
-}
-
-// SnapshotCreateOptions contains options for creating a snapshot
-type SnapshotCreateOptions struct {
-	VolumeName   string
-	SnapshotName string
-	SubVolume    string // Optional: snapshot a specific subvolume
-}
 
 // CreateSnapshot creates a new snapshot of a CephFS volume
 func (c *CephClient) CreateSnapshot(rc *eos_io.RuntimeContext, opts *SnapshotCreateOptions) error {

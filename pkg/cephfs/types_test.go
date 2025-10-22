@@ -171,7 +171,6 @@ func TestGetCephMGRPort(t *testing.T) {
 	}
 }
 
-
 func TestGetTerraformCephConfigPath(t *testing.T) {
 	expected := TerraformCephDir + "/main.tf"
 	if got := GetTerraformCephConfigPath(); got != expected {

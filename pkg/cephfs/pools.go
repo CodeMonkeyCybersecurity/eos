@@ -1,3 +1,6 @@
+//go:build !darwin
+// +build !darwin
+
 package cephfs
 
 import (
@@ -9,32 +12,6 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
-// PoolInfo represents information about a Ceph pool
-type PoolInfo struct {
-	Name            string
-	ID              int64
-	Size            int    // Replication size
-	MinSize         int    // Minimum replication size
-	PGNum           int    // Placement groups
-	PGPNum          int    // Placement groups for placement
-	Type            string // replicated or erasure
-	Application     string // cephfs, rbd, rgw
-	CrushRule       string
-	QuotaMaxBytes   int64
-	QuotaMaxObjects int64
-}
-
-// PoolCreateOptions contains options for creating a pool
-type PoolCreateOptions struct {
-	Name        string
-	PGNum       int    // Number of placement groups
-	Size        int    // Replication size
-	MinSize     int    // Minimum replication size (optional)
-	PoolType    string // "replicated" or "erasure"
-	Application string // "cephfs", "rbd", "rgw"
-	CrushRule   string // CRUSH rule name (optional)
-}
 
 // CreatePool creates a new Ceph pool
 func (c *CephClient) CreatePool(rc *eos_io.RuntimeContext, opts *PoolCreateOptions) error {
@@ -314,15 +291,6 @@ func (c *CephClient) PoolExists(rc *eos_io.RuntimeContext, poolName string) (boo
 		return false, nil
 	}
 	return true, nil
-}
-
-// PoolUpdateOptions contains options for updating a pool
-type PoolUpdateOptions struct {
-	NewSize    int   // New replication size (0 = no change)
-	NewMinSize int   // New minimum size (0 = no change)
-	NewPGNum   int   // New PG num (0 = no change)
-	MaxBytes   int64 // Quota max bytes (0 = no change)
-	MaxObjects int64 // Quota max objects (0 = no change)
 }
 
 // Helper functions for mon commands

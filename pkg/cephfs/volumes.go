@@ -1,3 +1,6 @@
+//go:build !darwin
+// +build !darwin
+
 package cephfs
 
 import (
@@ -9,20 +12,6 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
-// VolumeCreateOptions contains options for creating a CephFS volume
-type VolumeCreateOptions struct {
-	Name            string
-	Size            int64  // Size in bytes (optional, 0 = unlimited)
-	DataPool        string // Data pool name (optional)
-	MetadataPool    string // Metadata pool name (optional)
-	UID             *int   // UID for volume ownership (optional)
-	GID             *int   // GID for volume ownership (optional)
-	Mode            *int   // Octal permissions mode (optional)
-	Namespace       string // Namespace/path within CephFS (optional)
-	ReplicationSize int    // Replication size (default: 3)
-	PGNum           int    // Placement groups (default: 128)
-}
 
 // CreateVolume creates a new CephFS volume using the SDK
 func (c *CephClient) CreateVolume(rc *eos_io.RuntimeContext, opts *VolumeCreateOptions) error {
@@ -235,14 +224,6 @@ func (c *CephClient) VolumeExists(rc *eos_io.RuntimeContext, volumeName string) 
 	}
 
 	return false, nil
-}
-
-// VolumeUpdateOptions contains options for updating a volume
-type VolumeUpdateOptions struct {
-	NewSize        int64  // New size in bytes (0 = no change)
-	NewReplication int    // New replication size (0 = no change)
-	DataPool       string // Data pool name (for replication update)
-	SkipSnapshot   bool   // Skip safety snapshot
 }
 
 // setPoolReplication sets the replication size for a pool

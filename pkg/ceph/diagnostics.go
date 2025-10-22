@@ -42,6 +42,14 @@ func RunFullDiagnostics(logger otelzap.LoggerWithCtx, opts DiagnosticOptions) ([
 	results := []DiagnosticResult{}
 	clusterReachable := false
 
+	// Check if SDK is available
+	sdkAvailable := SDKAvailable()
+	if sdkAvailable {
+		logger.Debug("Ceph SDK available - will use native API when possible")
+	} else {
+		logger.Debug("Ceph SDK not available - using shell commands only")
+	}
+
 	// 0. Installation State
 	result := CheckInstallation(logger, opts.Verbose)
 	results = append(results, result)
@@ -74,17 +82,31 @@ func RunFullDiagnostics(logger otelzap.LoggerWithCtx, opts DiagnosticOptions) ([
 	result = CheckStorage(logger, opts.Verbose)
 	results = append(results, result)
 
-	// 2. Connectivity
-	result = CheckConnectivity(logger)
+	// 2. Connectivity - Try SDK first, fallback to shell
+	if sdkAvailable {
+		result = CheckConnectivitySDK(logger, opts.Verbose)
+	} else {
+		result = CheckConnectivity(logger)
+	}
 	results = append(results, result)
 	clusterReachable = result.Passed
 
 	// Cluster-level checks (only if reachable)
 	if clusterReachable {
-		result = CheckHealth(logger, opts.Verbose)
+		// Try SDK-enhanced health check
+		if sdkAvailable {
+			result = CheckHealthSDK(logger, opts.Verbose)
+		} else {
+			result = CheckHealth(logger, opts.Verbose)
+		}
 		results = append(results, result)
 
-		result = CheckMonStatus(logger)
+		// Try SDK-enhanced monitor status
+		if sdkAvailable {
+			result = CheckMonStatusSDK(logger, opts.Verbose)
+		} else {
+			result = CheckMonStatus(logger)
+		}
 		results = append(results, result)
 
 		result = CheckMgrStatus(logger)

@@ -507,7 +507,7 @@ func verifyInstallation(rc *eos_io.RuntimeContext, config *Config) error {
 // generateClusterFSID generates a new cluster FSID for Ceph
 func generateClusterFSID(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Use uuidgen to generate a new UUID for the cluster
 	cmd := exec.Command("uuidgen")
 	output, err := cmd.Output()
@@ -515,9 +515,9 @@ func generateClusterFSID(rc *eos_io.RuntimeContext) (string, error) {
 		logger.Error("Failed to generate UUID", zap.Error(err))
 		return "", fmt.Errorf("failed to generate cluster FSID: %w", err)
 	}
-	
+
 	fsid := strings.TrimSpace(string(output))
 	logger.Info("Generated new cluster FSID", zap.String("fsid", fsid))
-	
+
 	return fsid, nil
 }

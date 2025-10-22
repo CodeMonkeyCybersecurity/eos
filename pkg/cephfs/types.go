@@ -287,9 +287,84 @@ type VolumeInfo struct {
 	MountPoints   []string
 	DataPools     []string
 	MetadataPools []string
-	UID           int    // Volume owner UID
-	GID           int    // Volume owner GID
-	Mode          int    // Octal permissions mode
+	UID           int // Volume owner UID
+	GID           int // Volume owner GID
+	Mode          int // Octal permissions mode
+}
+
+// VolumeCreateOptions contains options for creating a CephFS volume
+type VolumeCreateOptions struct {
+	Name            string
+	Size            int64  // Size in bytes (optional, 0 = unlimited)
+	DataPool        string // Data pool name (optional)
+	MetadataPool    string // Metadata pool name (optional)
+	UID             *int   // UID for volume ownership (optional)
+	GID             *int   // GID for volume ownership (optional)
+	Mode            *int   // Octal permissions mode (optional)
+	Namespace       string // Namespace/path within CephFS (optional)
+	ReplicationSize int    // Replication size (default: 3)
+	PGNum           int    // Placement groups (default: 128)
+}
+
+// VolumeUpdateOptions contains options for updating a volume
+type VolumeUpdateOptions struct {
+	Name           string
+	NewSize        int64  // New size in bytes (0 = no change)
+	NewReplication int    // New replication size (0 = no change)
+	DataPool       string // Data pool name (for replication update)
+	SkipSnapshot   bool   // Skip safety snapshot
+}
+
+// PoolInfo represents information about a Ceph pool
+type PoolInfo struct {
+	Name            string
+	ID              int64
+	Size            int    // Replication size
+	MinSize         int    // Minimum replication size
+	PGNum           int    // Placement groups
+	PGPNum          int    // Placement groups for placement
+	Type            string // replicated or erasure
+	Application     string // cephfs, rbd, rgw
+	CrushRule       string
+	QuotaMaxBytes   int64
+	QuotaMaxObjects int64
+}
+
+// PoolCreateOptions contains options for creating a pool
+type PoolCreateOptions struct {
+	Name        string
+	PGNum       int    // Number of placement groups
+	Size        int    // Replication size
+	MinSize     int    // Minimum replication size (optional)
+	PoolType    string // "replicated" or "erasure"
+	Application string // "cephfs", "rbd", "rgw"
+	CrushRule   string // CRUSH rule name (optional)
+}
+
+// PoolUpdateOptions contains options for updating a pool
+type PoolUpdateOptions struct {
+	Name       string
+	NewSize    int   // New replication size (0 = no change)
+	NewMinSize int   // New minimum size (0 = no change)
+	NewPGNum   int   // New PG num (0 = no change)
+	MaxBytes   int64 // Quota max bytes (0 = no change)
+	MaxObjects int64 // Quota max objects (0 = no change)
+}
+
+// SnapshotInfo represents information about a CephFS snapshot
+type SnapshotInfo struct {
+	Name       string
+	VolumeName string
+	CreatedAt  time.Time
+	Size       int64 // Snapshot size (if available)
+	Protected  bool  // Whether snapshot is protected from deletion
+}
+
+// SnapshotCreateOptions contains options for creating a snapshot
+type SnapshotCreateOptions struct {
+	VolumeName   string
+	SnapshotName string
+	SubVolume    string // Optional: snapshot a specific subvolume
 }
 
 // PerformanceConfig represents CephFS performance tuning options

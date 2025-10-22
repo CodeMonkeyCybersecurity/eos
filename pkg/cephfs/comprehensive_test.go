@@ -159,7 +159,6 @@ func TestCephFSGetterFunctions(t *testing.T) {
 		assert.Less(t, port, 65536)
 	})
 
-
 	t.Run("GetTerraformCephConfigPath returns correct path", func(t *testing.T) {
 		expected := TerraformCephDir + "/main.tf"
 		result := GetTerraformCephConfigPath()
