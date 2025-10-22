@@ -87,11 +87,17 @@ func runCephDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 	results, clusterReachable := ceph.RunFullDiagnostics(logger, opts)
 
-	// Count issues
-	issueCount := 0
+	// Collect all issues from results
+	criticalIssues := []ceph.Issue{}
+	warnings := []ceph.Issue{}
+
 	for _, result := range results {
-		if !result.Passed {
-			issueCount++
+		for _, issue := range result.Issues {
+			if issue.Severity == "critical" {
+				criticalIssues = append(criticalIssues, issue)
+			} else if issue.Severity == "warning" {
+				warnings = append(warnings, issue)
+			}
 		}
 	}
 
@@ -99,34 +105,60 @@ func runCephDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	logger.Info("================================================================================")
 	logger.Info("Diagnostics Summary")
 	logger.Info("================================================================================")
-	if issueCount == 0 {
-		logger.Info("✓ No issues detected - cluster is healthy")
-	} else {
-		logger.Warn(fmt.Sprintf("❌ Found %d issue(s) requiring attention", issueCount))
-		logger.Info("")
 
-		if !clusterReachable {
-			logger.Info("⚠️  CRITICAL: Cluster is not reachable or not running")
+	if len(criticalIssues) == 0 && len(warnings) == 0 {
+		logger.Info("✓ No critical issues detected - cluster appears healthy!")
+	} else {
+		if len(criticalIssues) > 0 {
+			logger.Warn(fmt.Sprintf("❌ Found %d critical issue(s) requiring attention", len(criticalIssues)))
 			logger.Info("")
-			logger.Info("Next Steps:")
+			logger.Info("⚠️  CRITICAL ISSUES:")
+			for i, issue := range criticalIssues {
+				logger.Info(fmt.Sprintf("  %d. %s: %s", i+1, issue.Component, issue.Description))
+				if issue.Impact != "" {
+					logger.Info(fmt.Sprintf("     Impact: %s", issue.Impact))
+				}
+			}
+		}
+
+		if len(warnings) > 0 {
+			logger.Info("")
+			logger.Info("⚠️  WARNINGS:")
+			for i, issue := range warnings {
+				logger.Info(fmt.Sprintf("  %d. %s: %s", i+1, issue.Component, issue.Description))
+			}
+		}
+
+		// Generate prioritized next steps
+		logger.Info("")
+		logger.Info("Next Steps (Prioritized):")
+
+		if len(criticalIssues) > 0 {
+			// Show remediation for highest priority critical issue
+			highestPriority := criticalIssues[0]
+			logger.Info(fmt.Sprintf("Fix CRITICAL issue: %s", highestPriority.Description))
+			for i, step := range highestPriority.Remediation {
+				logger.Info(fmt.Sprintf("  %d. %s", i+1, step))
+			}
+		} else if !clusterReachable {
 			logger.Info("  1. Check if Ceph services are enabled: systemctl list-unit-files | grep ceph")
 			logger.Info("  2. Start Ceph services: systemctl start ceph.target")
 			logger.Info("  3. Check service logs: journalctl -u ceph-mon@* -xe")
 			logger.Info("  4. Verify configuration: cat /etc/ceph/ceph.conf")
 			logger.Info("  5. Check keyring permissions: ls -la /etc/ceph/*.keyring")
-			logger.Info("")
+		} else {
+			logger.Info("  1. Review warnings above for specific issues")
+			logger.Info("  2. Use 'ceph health detail' for more information")
 		}
 
+		logger.Info("")
 		logger.Info("General Recommendations:")
-		logger.Info("  1. Review error messages above for specific issues")
+		logger.Info("  1. Review all error messages above for context")
 		logger.Info("  2. Check Ceph documentation: https://docs.ceph.com/")
-		if clusterReachable {
-			logger.Info("  3. Use 'ceph health detail' for more information")
-		}
-		logger.Info("  4. Check logs: journalctl -u 'ceph*' --since '1 hour ago'")
-		logger.Info("  5. Review file permissions in /var/lib/ceph/ and /etc/ceph/")
+		logger.Info("  3. Check logs: journalctl -u 'ceph*' --since '1 hour ago'")
+		logger.Info("  4. Review file permissions in /var/lib/ceph/ and /etc/ceph/")
 		if !cephDebugFix {
-			logger.Info("  6. Run with --fix flag to auto-fix common issues")
+			logger.Info("  5. Run with --fix flag to auto-fix common issues")
 		}
 	}
 	logger.Info("")
