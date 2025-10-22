@@ -16,6 +16,12 @@ import (
 func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	logger.Info("Checking for Ceph processes...")
 
+	result := DiagnosticResult{
+		CheckName: "Processes",
+		Passed:    true,
+		Issues:    []Issue{},
+	}
+
 	// Use ps with specific format for reliable parsing
 	// Format: PID,COMMAND (no spaces, easier to parse)
 	cmd := exec.Command("ps", "-eo", "pid,comm,args")
@@ -113,11 +119,21 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 		logger.Error("❌ No Ceph processes running")
 		logger.Info("  → Ceph cluster is not started")
 		logger.Info("  → Try: systemctl start ceph.target")
-		return DiagnosticResult{
-			CheckName: "Processes",
-			Passed:    false,
-			Error:     fmt.Errorf("no ceph processes found"),
-		}
+
+		result.Passed = false
+		result.Error = fmt.Errorf("no ceph processes found")
+		result.Issues = append(result.Issues, Issue{
+			Component:   "ceph",
+			Severity:    "critical",
+			Description: "No Ceph processes running at all",
+			Impact:      "Ceph cluster is completely down - no services are running",
+			Remediation: []string{
+				"systemctl start ceph.target",
+				"systemctl status ceph.target",
+				"journalctl -u 'ceph*' -n 50",
+			},
+		})
+		return result
 	}
 
 	// Show breakdown by daemon type
@@ -206,17 +222,37 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 			}
 		}
 
-		return DiagnosticResult{
-			CheckName: "Processes",
-			Passed:    false,
-			Error:     fmt.Errorf("no ceph-mon processes - cluster cannot operate"),
-		}
+		result.Passed = false
+		result.Error = fmt.Errorf("no ceph-mon processes - cluster cannot operate")
+		result.Issues = append(result.Issues, Issue{
+			Component:   "ceph-mon",
+			Severity:    "critical",
+			Description: "No monitor (ceph-mon) processes running",
+			Impact:      "Monitor daemon is required for cluster operation - cluster cannot function without it",
+			Remediation: []string{
+				"Check if monitor was bootstrapped (see Monitor Bootstrap section above)",
+				"journalctl -u ceph-mon@* -n 50",
+				"systemctl start ceph-mon.target",
+			},
+		})
+		return result
 	}
 
 	if processCounts["ceph-mgr"] == 0 {
 		logger.Warn("  ⚠️  WARNING: No ceph-mgr processes found")
 		logger.Info("    → Manager daemon is required for modern Ceph")
 		logger.Info("    → Try: systemctl start ceph-mgr.target")
+
+		result.Issues = append(result.Issues, Issue{
+			Component:   "ceph-mgr",
+			Severity:    "warning",
+			Description: "No manager (ceph-mgr) processes running",
+			Impact:      "Manager daemon provides monitoring, dashboard, and management features",
+			Remediation: []string{
+				"systemctl start ceph-mgr.target",
+				"systemctl status ceph-mgr.target",
+			},
+		})
 	}
 
 	// Show full process list in verbose mode
@@ -228,8 +264,5 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 		}
 	}
 
-	return DiagnosticResult{
-		CheckName: "Processes",
-		Passed:    true,
-	}
+	return result
 }

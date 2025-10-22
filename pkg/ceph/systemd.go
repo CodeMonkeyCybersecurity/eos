@@ -16,6 +16,12 @@ import (
 func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	logger.Info("Checking systemd units...")
 
+	result := DiagnosticResult{
+		CheckName: "Systemd Units",
+		Passed:    true,
+		Issues:    []Issue{},
+	}
+
 	// Get detailed status of critical Ceph units
 	criticalUnits := []string{"ceph.target", "ceph-mon.target", "ceph-mgr.target", "ceph-osd.target"}
 
@@ -148,6 +154,18 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 		logger.Info("  → Check if mon was ever initialized on this host")
 		logger.Info("  → Try: systemctl list-unit-files | grep ceph-mon")
 
+		result.Passed = false
+		result.Issues = append(result.Issues, Issue{
+			Component:   "ceph-mon",
+			Severity:    "critical",
+			Description: "No ceph-mon service instances found in systemd",
+			Impact:      "Monitor service was never created - likely never bootstrapped",
+			Remediation: []string{
+				"Check if monitor was ever initialized (see Monitor Bootstrap section)",
+				"systemctl list-unit-files | grep ceph-mon",
+			},
+		})
+
 		// Try to get more context from journal
 		if verbose {
 			logger.Info("")
@@ -195,33 +213,42 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 
 	if failedCount > 0 {
 		logger.Error("❌ Some units have failed - check logs with: journalctl -u <unit-name> -xe")
-		return DiagnosticResult{
-			CheckName: "Systemd Units",
-			Passed:    false,
-			Error:     fmt.Errorf("%d systemd units failed", failedCount),
-		}
+		result.Passed = false
+		result.Error = fmt.Errorf("%d systemd units failed", failedCount)
+		result.Issues = append(result.Issues, Issue{
+			Component:   "systemd",
+			Severity:    "critical",
+			Description: fmt.Sprintf("%d systemd units in failed state", failedCount),
+			Impact:      "Failed units cannot provide their services",
+			Remediation: []string{
+				"journalctl -u ceph.target -xe",
+				"systemctl status ceph.target",
+			},
+		})
 	}
 
 	if activeCount == 0 {
 		logger.Warn("⚠️  No active Ceph units")
 		logger.Info("  → Try: systemctl start ceph.target")
-		return DiagnosticResult{
-			CheckName: "Systemd Units",
-			Passed:    false,
-			Error:     fmt.Errorf("no active ceph units"),
-		}
+		result.Passed = false
+		result.Error = fmt.Errorf("no active ceph units")
+		result.Issues = append(result.Issues, Issue{
+			Component:   "systemd",
+			Severity:    "critical",
+			Description: "No active Ceph systemd units",
+			Impact:      "Ceph services are not running",
+			Remediation: []string{
+				"systemctl start ceph.target",
+				"systemctl enable ceph.target",
+			},
+		})
 	}
 
 	if len(monInstances) == 0 {
-		return DiagnosticResult{
-			CheckName: "Systemd Units",
-			Passed:    false,
-			Error:     fmt.Errorf("no monitor instances configured"),
-		}
+		result.Passed = false
+		result.Error = fmt.Errorf("no monitor instances configured")
+		// Issue already added above
 	}
 
-	return DiagnosticResult{
-		CheckName: "Systemd Units",
-		Passed:    true,
-	}
+	return result
 }

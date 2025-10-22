@@ -12,12 +12,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// Issue represents a specific problem found during diagnostics
+type Issue struct {
+	Component   string   // e.g., "ceph-mon", "configuration"
+	Severity    string   // "critical", "warning", "info"
+	Description string   // Human-readable description
+	Impact      string   // Why this matters
+	Remediation []string // Specific commands to fix
+}
+
 // DiagnosticResult represents the result of a diagnostic check
 type DiagnosticResult struct {
 	CheckName string
 	Passed    bool
 	Error     error
 	Details   string
+	Issues    []Issue // Detailed issues found in this check
 }
 
 // DiagnosticOptions contains options for running diagnostics
@@ -48,15 +58,19 @@ func RunFullDiagnostics(logger otelzap.LoggerWithCtx, opts DiagnosticOptions) ([
 	result = CheckSystemdUnits(logger, opts.Verbose)
 	results = append(results, result)
 
-	// 1c. Configuration
+	// 1c. Monitor Bootstrap Check (NEW - Critical diagnostic)
+	result = CheckMonitorBootstrap(logger, opts.Verbose)
+	results = append(results, result)
+
+	// 1d. Configuration
 	result = CheckConfiguration(logger, opts.Verbose)
 	results = append(results, result)
 
-	// 1d. Network
+	// 1e. Network
 	result = CheckNetwork(logger, opts.Verbose)
 	results = append(results, result)
 
-	// 1e. Storage
+	// 1f. Storage
 	result = CheckStorage(logger, opts.Verbose)
 	results = append(results, result)
 
