@@ -3,6 +3,7 @@ package update
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ceph"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/cephfs"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -19,15 +20,15 @@ var (
 	cephUseConsul  bool
 
 	// Volume update flags
-	cephVolumeName    string
-	cephVolumeNewSize int64
-	cephVolumeDataPool string
+	cephVolumeName           string
+	cephVolumeNewSize        int64
+	cephVolumeDataPool       string
 	cephVolumeNewReplication int
 
 	// Snapshot update flags
-	cephSnapshotName   string
-	cephSnapshotVolume string
-	cephSnapshotProtect bool
+	cephSnapshotName      string
+	cephSnapshotVolume    string
+	cephSnapshotProtect   bool
 	cephSnapshotUnprotect bool
 
 	// Pool update flags
@@ -39,19 +40,45 @@ var (
 
 	// Safety flags
 	cephSkipSnapshot bool
+
+	// Fix flags
+	cephFix             bool
+	cephDryRun          bool
+	cephBootstrapMon    bool
+	cephPermissionsOnly bool
 )
 
 var updateCephCmd = &cobra.Command{
 	Use:   "ceph",
-	Short: "Update Ceph resources (volumes, snapshots, pools)",
-	Long: `Update configuration of CephFS storage resources.
+	Short: "Update Ceph resources (volumes, snapshots, pools) or fix drift",
+	Long: `Update configuration of CephFS storage resources or apply automated drift corrections.
+
+DRIFT CORRECTION (--fix):
+The --fix flag automatically corrects common Ceph configuration drift issues:
+- Monitor not bootstrapped → Bootstrap and start monitor
+- Services not running → Start systemd services
+- Services not enabled → Enable for auto-start on boot
+- Permission issues → Fix file/directory permissions
 
 SAFETY FEATURES:
 - Automatic safety snapshots before updates (unless --skip-snapshot)
 - Validation of new settings before applying
 - Rollback capability via snapshots
+- Dry-run mode (--dry-run) to preview changes
 
 EXAMPLES:
+  # Apply automated drift corrections
+  eos update ceph --fix
+
+  # Preview fixes without applying (dry-run)
+  eos update ceph --fix --dry-run
+
+  # Bootstrap monitor automatically if needed
+  eos update ceph --fix --bootstrap-mon
+
+  # Only fix permissions, don't modify services
+  eos update ceph --fix --permissions-only
+
   # Update volume size
   eos update ceph --volume mydata --size 200GB
 
@@ -71,6 +98,12 @@ EXAMPLES:
   eos update ceph --pool mypool --max-bytes 1TB --max-objects 1000000
 
 FLAGS:
+  Fix/Drift Correction:
+    --fix                 Apply automated drift corrections
+    --dry-run            Preview fixes without applying
+    --bootstrap-mon      Bootstrap monitor if never initialized
+    --permissions-only   Only fix permissions, not services
+
   Common:
     --monitors         Ceph monitor addresses
     --user            Ceph user name (default: admin)
@@ -131,15 +164,26 @@ func init() {
 	// Safety flags
 	updateCephCmd.Flags().BoolVar(&cephSkipSnapshot, "skip-snapshot", false, "Skip automatic safety snapshot")
 
+	// Fix flags
+	updateCephCmd.Flags().BoolVar(&cephFix, "fix", false, "Apply automated drift corrections")
+	updateCephCmd.Flags().BoolVar(&cephDryRun, "dry-run", false, "Preview fixes without applying")
+	updateCephCmd.Flags().BoolVar(&cephBootstrapMon, "bootstrap-mon", false, "Bootstrap monitor if never initialized")
+	updateCephCmd.Flags().BoolVar(&cephPermissionsOnly, "permissions-only", false, "Only fix permissions, not services")
+
 	UpdateCmd.AddCommand(updateCephCmd)
 }
 
 func runCephUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Check if this is a fix operation
+	if cephFix {
+		return runCephFix(rc)
+	}
+
 	// Determine what to update based on flags
 	if cephVolumeName == "" && cephSnapshotName == "" && cephPoolName == "" {
-		return fmt.Errorf("must specify one of: --volume, --snapshot, or --pool")
+		return fmt.Errorf("must specify one of: --volume, --snapshot, --pool, or --fix")
 	}
 
 	// Create Ceph client
@@ -261,6 +305,53 @@ func updatePool(rc *eos_io.RuntimeContext, client *cephfs.CephClient) error {
 
 	logger.Info("Pool updated successfully",
 		zap.String("pool", cephPoolName))
+
+	return nil
+}
+
+// runCephFix runs the automated drift correction engine
+func runCephFix(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Starting Ceph drift correction...")
+
+	// Create fix options
+	opts := ceph.FixOptions{
+		DryRun:          cephDryRun,
+		PermissionsOnly: cephPermissionsOnly,
+		BootstrapMon:    cephBootstrapMon,
+		RestartServices: true, // Always restart services after fixes
+	}
+
+	// Create fix engine
+	engine := ceph.NewFixEngine(rc, opts)
+
+	// Run fixes
+	results, err := engine.RunFixes()
+	if err != nil {
+		return fmt.Errorf("fix engine failed: %w", err)
+	}
+
+	// Check if any fixes failed
+	failedCount := 0
+	for _, result := range results {
+		if result.Applied && !result.Success {
+			failedCount++
+		}
+	}
+
+	if failedCount > 0 {
+		return fmt.Errorf("%d fix(es) failed - see output above for details", failedCount)
+	}
+
+	if cephDryRun {
+		logger.Info("")
+		logger.Info("DRY RUN completed successfully")
+		logger.Info("Run without --dry-run to apply these fixes")
+	} else {
+		logger.Info("")
+		logger.Info("Drift correction completed successfully")
+	}
 
 	return nil
 }
