@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-22*
+*Last Updated: 2025-01-22*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -927,38 +927,45 @@ logger.Debug("Post-operation verification",
     zap.String("container_id", containerID))
 ```
 
-### Automatic Debug Output Capture (P1 - CRITICAL)
+### Automatic Debug Output Capture (PLANNED - Infrastructure Ready)
 
-**Philosophy**: All `eos debug ...` commands automatically save their output to the user's directory for forensic analysis. No flags required - fully automatic, non-fatal if capture fails.
+**Current Status**: Infrastructure implemented in [pkg/debug/capture.go](pkg/debug/capture.go) (151 lines), but NOT YET integrated into debug commands.
 
-**Capture Location**: `~/.eos/debug/eos-debug-{service}-{timestamp}.{ext}`
+**Evidence of Non-Integration**:
+- ✅ `pkg/debug/capture.go` exists with `CaptureDebugOutput()` and `CaptureStdoutFunc()`
+- ❌ Zero debug commands in `cmd/debug/*.go` use these functions
+- ❌ Commands like [cmd/debug/vault.go:266-285](cmd/debug/vault.go#L266-L285) implement their own file writing instead
+
+**When to Migrate**: After completing current work (drift correction, Ceph integration), migrate debug commands one at a time with comprehensive testing.
+
+**Target Philosophy**: All `eos debug ...` commands automatically save their output to the user's directory for forensic analysis. No flags required - fully automatic, non-fatal if capture fails.
+
+**Target Capture Location**: `~/.eos/debug/eos-debug-{service}-{timestamp}.{ext}`
 - Fallback to `/tmp` if home directory unavailable
 - Timestamped filenames: `20060102-150405` format
 - Format-aware extensions: `.txt`, `.json`, `.md`
 
-**Two Capture Patterns**:
+**Two Available Capture Patterns**:
 
 1. **Direct Capture** (for commands returning strings):
 ```go
-// cmd/debug/vault.go
+// EXAMPLE - Not yet implemented in actual commands
 func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-    // Generate debug output
     output, err := vault.GenerateDebugReport(rc, format)
     if err != nil {
         return fmt.Errorf("failed to generate debug report: %w", err)
     }
 
-    // AUTOMATIC CAPTURE: Save debug output (no flags needed)
+    // Automatic capture
     captureConfig := &debug.CaptureConfig{
         ServiceName: "vault",
         Output:      output,
-        Format:      format,  // "json", "text", or "markdown"
+        Format:      format,
     }
     if _, captureErr := debug.CaptureDebugOutput(rc, captureConfig); captureErr != nil {
         logger.Warn("Failed to auto-capture debug output", zap.Error(captureErr))
     }
 
-    // Display output to user
     fmt.Print(output)
     return nil
 }
@@ -966,36 +973,210 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 2. **Stdout Wrapper** (for commands printing directly):
 ```go
-// cmd/debug/consul.go
+// EXAMPLE - Not yet implemented in actual commands
 func runDebugConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-    config := &consuldebug.Config{
-        AutoFix:       autoFix,
-        LogLines:      100,
-    }
-
-    // AUTOMATIC CAPTURE: Wrap the debug function to capture stdout
-    // The consul debug prints directly to stdout, so we intercept it
     return debug.CaptureStdoutFunc(rc, "consul", func() error {
         return consuldebug.RunDiagnostics(rc, config)
     })
 }
 ```
 
-**User Notification**:
+**Migration Checklist (Per Debug Command)**:
+- [ ] Read current command implementation
+- [ ] Identify if command returns output string or prints to stdout
+- [ ] Choose appropriate capture pattern (Direct vs Stdout Wrapper)
+- [ ] Integrate capture function
+- [ ] Remove any existing `--output` flag logic (replaced by automatic capture)
+- [ ] Test with `go build && sudo eos debug [service]`
+- [ ] Verify file saved to `~/.eos/debug/`
+- [ ] Verify user sees log message with file location
+- [ ] Verify output still displays correctly to user
+
+**Affected Commands** (13 files to migrate):
 ```
-INFO  Debug output automatically saved
-      service=vault
-      file=/home/user/.eos/debug/eos-debug-vault-20251022-143052.json
-      size=47.3 KB
+cmd/debug/vault.go          (266 lines - has --output flag, remove it)
+cmd/debug/consul.go         (272 lines)
+cmd/debug/nomad.go          (512 lines)
+cmd/debug/bionicgpt.go      (9210 bytes)
+cmd/debug/ceph.go           (5451 bytes)
+cmd/debug/hecate.go         (2889 bytes)
+cmd/debug/mattermost.go     (2586 bytes)
+cmd/debug/openwebui.go      (12715 bytes)
+cmd/debug/wazuh.go          (5160 bytes)
+cmd/debug/bootstrap.go      (26483 bytes - may not need capture)
+cmd/debug/iris.go           (48743 bytes - may not need capture)
+cmd/debug/watchdog_traces.go (10189 bytes - may not need capture)
 ```
 
-**Implementation Requirements**:
-- ALL `eos debug ...` commands MUST use one of these patterns
-- Capture is automatic - NO extra flags required
-- Capture failures are non-fatal - log warning and continue
-- Use otelzap logging to notify user of saved file location
+**Reference**: See [pkg/debug/capture.go](pkg/debug/capture.go) for implementation details
 
-**Reference**: See `pkg/debug/capture.go` for implementation details
+### Evidence Collection (PLANNED - Infrastructure Ready)
+
+**Current Status**: Infrastructure implemented in [pkg/remotedebug/evidence.go](pkg/remotedebug/evidence.go) (265 lines), but NOT YET integrated into remotedebug commands.
+
+**Evidence of Non-Integration**:
+- ✅ `pkg/remotedebug/evidence.go` exists with full evidence repository implementation
+- ❌ Zero commands in `cmd/` use `NewEvidenceRepository()`, `CreateEvidence()`, or `StoreSession()`
+- ❌ Remote debug SSH command doesn't persist evidence to disk yet
+
+**Why We Built This**: Original remotedebug implementation had critical gaps:
+- ❌ Evidence only lived in memory during execution
+- ❌ No forensic trail if remotedebug crashed or connection dropped
+- ❌ Evidence was only human-readable strings, not machine-parseable
+- ❌ No metadata for chain of custody or integrity verification
+
+**Solution Built (Not Yet Used)**: Structured evidence collection with automatic capture to disk.
+
+**Evidence vs Debug Output (Important Distinction)**:
+- **Debug output**: Interactive diagnostic sessions, capture is backup
+- **Evidence collection**: Automated gathering over SSH, capture IS the primary artifact
+- **Different requirements**: Evidence needs chain of custody, integrity verification, structured storage
+
+**Evidence Types**:
+```go
+type EvidenceType string
+
+const (
+    EvidenceTypeFile      EvidenceType = "file"       // File system evidence
+    EvidenceTypeCommand   EvidenceType = "command"    // Command output
+    EvidenceTypeLogEntry  EvidenceType = "log"        // Log file entry
+    EvidenceTypeMetric    EvidenceType = "metric"     // System metric
+    EvidenceTypeConfig    EvidenceType = "config"     // Configuration file
+    EvidenceTypeProcess   EvidenceType = "process"    // Process information
+    EvidenceTypeNetwork   EvidenceType = "network"    // Network state
+    EvidenceTypeSnapshot  EvidenceType = "snapshot"   // System snapshot
+)
+```
+
+**Structured Evidence**:
+```go
+type StructuredEvidence struct {
+    Type      EvidenceType      // Type of evidence
+    Timestamp time.Time         // When collected
+    Source    string            // Where from (hostname/IP)
+    Collector string            // Who collected (user@host)
+    Data      json.RawMessage   // Actual evidence (structured JSON)
+    Checksum  string            // SHA256 for integrity verification
+    Metadata  map[string]string // Additional context
+}
+```
+
+**Evidence Session**:
+```go
+type EvidenceSession struct {
+    SessionID   string               // Unique session identifier
+    StartTime   time.Time            // Session start
+    EndTime     time.Time            // Session end
+    Host        string               // Target hostname
+    Collector   string               // Who ran the collection
+    Command     string               // Command that triggered collection
+    Evidence    []StructuredEvidence // All collected evidence
+    Issues      []Issue              // Detected issues
+    Warnings    []Warning            // Warnings
+    Report      *SystemReport        // Complete system report
+}
+```
+
+**Storage Structure**:
+```
+~/.eos/evidence/
+  ├── index.json                      # Searchable index (future)
+  ├── 20251022-143052-vhost5/        # Per-session evidence
+  │   ├── manifest.json               # Session metadata
+  │   ├── evidence.json               # All structured evidence
+  │   ├── issues.json                 # Detected issues with evidence
+  │   ├── warnings.json               # Warnings
+  │   ├── report.json                 # Complete system report
+  │   └── summary.txt                 # Human-readable summary
+```
+
+**Usage Pattern**:
+```go
+// Create evidence repository
+repo, err := remotedebug.NewEvidenceRepository()
+if err != nil {
+    return fmt.Errorf("failed to create evidence repository: %w", err)
+}
+
+// Create evidence item
+diskEvidence, err := remotedebug.CreateEvidence(
+    remotedebug.EvidenceTypeMetric,
+    hostname,
+    diskInfo, // Any struct that can be marshaled to JSON
+)
+
+// Store complete session
+session := &remotedebug.EvidenceSession{
+    SessionID:   "session-" + time.Now().Format("20060102-150405"),
+    StartTime:   startTime,
+    EndTime:     time.Now(),
+    Host:        hostname,
+    Collector:   "user@workstation",
+    Command:     "eos remotedebug ssh",
+    Evidence:    collectedEvidence,
+    Issues:      analyzedIssues,
+    Warnings:    warnings,
+    Report:      systemReport,
+}
+
+sessionDir, err := repo.StoreSession(session)
+if err != nil {
+    logger.Warn("Failed to store evidence session", zap.Error(err))
+} else {
+    logger.Info("Evidence session saved",
+        zap.String("location", sessionDir),
+        zap.Int("evidence_count", len(session.Evidence)))
+}
+```
+
+**Integrity Verification**:
+```go
+// Verify evidence hasn't been tampered with
+if evidence.VerifyEvidence() {
+    logger.Info("Evidence integrity verified")
+} else {
+    logger.Error("Evidence checksum mismatch - possible tampering")
+}
+```
+
+**What We Did NOT Implement (With Reasons)**:
+
+1. **❌ Evidence Signing/Encryption**
+   - **WHY NOT**: Dev/ops tool, not forensic investigation tool
+   - **ALTERNATIVE**: File permissions + checksums sufficient for integrity
+   - **IF NEEDED**: Add when compliance requirements are clear
+
+2. **❌ Chain-of-Custody Signatures**
+   - **WHY NOT**: No legal requirement stated
+   - **ALTERNATIVE**: Metadata tracking sufficient for troubleshooting
+   - **IF NEEDED**: Add for specific compliance (SOC2, PCI-DSS, etc.)
+
+3. **❌ Centralized Evidence Server**
+   - **WHY NOT**: Over-engineering, network dependency
+   - **ALTERNATIVE**: Local storage + optional rsync to central location
+   - **IF NEEDED**: Users script `rsync ~/.eos/evidence/` to server
+
+4. **❌ Automatic Retention/Rotation**
+   - **WHY NOT**: User's machine, user's policy
+   - **ALTERNATIVE**: Manual cleanup: `rm -rf ~/.eos/evidence/2024*`
+   - **IF NEEDED**: Add optional `--cleanup` flag later
+
+**Cleanup Commands**:
+```bash
+# View evidence sessions
+ls -lh ~/.eos/evidence/
+
+# View specific session
+cat ~/.eos/evidence/20251022-143052-vhost5/summary.txt
+
+# Cleanup old evidence (manual)
+find ~/.eos/evidence/ -type d -mtime +30 -exec rm -rf {} \;
+
+# Cleanup by size (keep only 1GB)
+du -sh ~/.eos/evidence/ | awk '$1 > 1 {print "Evidence directory exceeds 1GB"}'
+```
+
+**Reference**: See `pkg/remotedebug/evidence.go` for implementation details
 
 ## Flag Bypass Vulnerability Prevention (P0 - CRITICAL)
 
