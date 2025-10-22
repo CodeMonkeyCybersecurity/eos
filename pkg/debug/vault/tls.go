@@ -15,14 +15,14 @@ import (
 
 // TLSStatus holds TLS configuration status
 type TLSStatus struct {
-	Enabled         bool
-	CertPath        string
-	KeyPath         string
-	CertExists      bool
-	KeyExists       bool
-	Issue           string
-	Reason          string
-	CertLocations   []CertLocation
+	Enabled       bool
+	CertPath      string
+	KeyPath       string
+	CertExists    bool
+	KeyExists     bool
+	Issue         string
+	Reason        string
+	CertLocations []CertLocation
 }
 
 // CertLocation represents a potential certificate location

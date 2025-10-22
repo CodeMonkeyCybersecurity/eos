@@ -39,7 +39,7 @@ Eos_BUILD_PATH="$Eos_SRC_DIR/$Eos_BINARY_NAME"
 INSTALL_PATH="/usr/local/bin/$Eos_BINARY_NAME"
 
 # Go installation settings
-GO_VERSION="1.24.0"
+GO_VERSION="1.25.0"
 GO_INSTALL_DIR="/usr/local"
 
 # --- Directories ---

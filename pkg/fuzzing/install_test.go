@@ -12,7 +12,7 @@ func TestCheckGoVersion(t *testing.T) {
 	// This test assumes Go is installed on the system
 	// It's mainly testing the version parsing logic
 	err := checkGoVersion()
-	
+
 	// Should pass on any system with Go 1.18+ installed
 	assert.NoError(t, err, "Go version check should pass on systems with Go 1.18+")
 }
@@ -49,7 +49,7 @@ func TestExtractPackageNameFromPath(t *testing.T) {
 			expected: "./pkg/fuzzing",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractPackageName(tt.filePath)
@@ -82,7 +82,7 @@ func TestValidateGoVersionStrings(t *testing.T) {
 			shouldMatch: true,
 		},
 		{
-			name:        "go 1.24",
+			name:        "go 1.25",
 			versionStr:  "go version go1.24 darwin/arm64",
 			shouldMatch: true,
 		},
@@ -107,7 +107,7 @@ func TestValidateGoVersionStrings(t *testing.T) {
 			shouldMatch: false, // Only go1.X is supported
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test if version string contains "go1."
@@ -120,10 +120,10 @@ func TestValidateGoVersionStrings(t *testing.T) {
 func TestInstallDependencyPaths(t *testing.T) {
 	// Test that expected package paths are correctly formatted
 	packages := []string{"./pkg/...", "./cmd/..."}
-	
+
 	for _, pkg := range packages {
 		assert.True(t, strings.HasSuffix(pkg, "/..."), "Package should use /... pattern")
-		
+
 		// Extract base directory
 		baseDir := strings.TrimSuffix(pkg, "/...")
 		assert.True(t, strings.HasPrefix(baseDir, "./"), "Package should start with ./")
@@ -134,7 +134,7 @@ func TestCheckFuzzingSupport(t *testing.T) {
 	// This test verifies fuzzing support detection
 	// Should pass on Go 1.18+ systems
 	err := checkFuzzingSupport()
-	
+
 	// The test might fail on older Go versions
 	if err != nil {
 		t.Logf("Fuzzing support check failed (might be running on Go < 1.18): %v", err)
@@ -145,7 +145,7 @@ func TestCheckFuzzingSupport(t *testing.T) {
 func TestCompileTestPackagesSkipsNonExistent(t *testing.T) {
 	rc := NewTestContext(t)
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// This should not error even if directories don't exist
 	err := compileTestPackages(logger)
 	assert.NoError(t, err, "Should not error on missing directories")

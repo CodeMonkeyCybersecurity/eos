@@ -115,7 +115,7 @@ type Config struct {
 ### Environment Check
 ```bash
 $ eos self fuzz verify
- Go version: 1.24.4 (fuzzing supported)
+ Go version: 1.2 (fuzzing supported)
  Environment prerequisites satisfied
  37 fuzz tests discovered
  2 packages verified for compilation

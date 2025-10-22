@@ -53,8 +53,8 @@ Multiple workflows check the same things:
 ### 🟡 Warning Issues
 
 #### 3. **Inconsistent Go Version**
-- All workflows use `go-version: 1.24`
-- Go 1.24 doesn't exist yet (current stable is 1.23)
+- All workflows use `go-version: 1.25`
+- Go 1.25 doesn't exist yet (current stable is 1.23)
 - **Impact**: May use pre-release or fallback to latest
 - **Fix**: Update to `go-version: '1.23'` or use `go-version-file: go.mod`
 
@@ -276,7 +276,7 @@ on:
 
 ### Immediate (P0)
 1. [ ] Fix Ceph build dependency in all workflows
-2. [ ] Update Go version from 1.24 to 1.23
+2. [ ] Update Go version from 1.25 to 1.23
 3. [ ] Add emoji-check.yml to workflow validation
 
 ### Short-term (P1)

@@ -121,7 +121,7 @@ To modify the analysis:
 ### Environment Variables
 
 The workflow supports:
-- **Go Version**: Configurable Go version (default: 1.24)
+- **Go Version**: Configurable Go version (default: 1.25)
 - **Timeout**: Analysis timeout (default: 360 minutes)
 - **Cache**: Automatic Go module caching
 
