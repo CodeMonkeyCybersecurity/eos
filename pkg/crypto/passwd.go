@@ -153,3 +153,167 @@ func ReadPassword(reader *bufio.Reader) (string, error) {
 	}
 	return strings.TrimSpace(pw), nil
 }
+
+// GenerateAPIKey generates a secure alphanumeric API key of specified length.
+// Uses only [a-zA-Z0-9] for maximum compatibility (no base64 padding issues).
+//
+// Character set: [a-zA-Z0-9] (62 possible characters)
+// Default length: 32 characters = log2(62^32) ≈ 190 bits entropy
+//
+// Use this for:
+//   - API authentication keys
+//   - Service access tokens
+//   - Client credentials
+//   - Any key stored in headers, URLs, or config files
+func GenerateAPIKey(length int) (string, error) {
+	if length < MinPasswordLen {
+		return "", errors.New("API key too short: min length " + fmt.Sprintf("%d", MinPasswordLen))
+	}
+
+	return GenerateURLSafePassword(length)
+}
+
+// GenerateToken generates a secure alphanumeric token of specified length.
+// Identical to GenerateAPIKey but semantically distinct (for tokens vs keys).
+//
+// Character set: [a-zA-Z0-9] (62 possible characters)
+// Default length: 32 characters = log2(62^32) ≈ 190 bits entropy
+//
+// Use this for:
+//   - Session tokens
+//   - CSRF tokens
+//   - One-time use tokens
+//   - Temporary access credentials
+func GenerateToken(length int) (string, error) {
+	if length < MinPasswordLen {
+		return "", errors.New("token too short: min length " + fmt.Sprintf("%d", MinPasswordLen))
+	}
+
+	return GenerateURLSafePassword(length)
+}
+
+// GenerateJWTSecret generates a secure alphanumeric JWT signing secret.
+//
+// Character set: [a-zA-Z0-9] (62 possible characters)
+// Default length: 32 characters = log2(62^32) ≈ 190 bits entropy
+//
+// Use this for:
+//   - JWT HMAC signing keys (HS256, HS384, HS512)
+//   - Symmetric encryption keys
+//   - Cookie signing secrets
+//   - Session encryption keys
+//
+// Security note: For production JWT signing, consider asymmetric keys (RS256, ES256)
+// instead of symmetric HMAC. This function is suitable for development or symmetric scenarios.
+func GenerateJWTSecret(length int) (string, error) {
+	if length < MinPasswordLen {
+		return "", errors.New("JWT secret too short: min length " + fmt.Sprintf("%d", MinPasswordLen))
+	}
+
+	// For JWT secrets, use longer default for extra security margin
+	if length < 32 {
+		length = 32
+	}
+
+	return GenerateURLSafePassword(length)
+}
+
+// GenerateHex generates a hex-encoded secret of the specified byte length.
+//
+// Character set: [0-9a-f] (16 possible characters)
+// Output length: byteLength * 2 (hex encoding doubles the length)
+// Entropy: log2(256^byteLength) = byteLength * 8 bits
+//
+// Use this for:
+//   - Cryptographic keys in hex format
+//   - Hash digests
+//   - Binary data representation
+//   - Systems requiring hex-only input
+//
+// Example: GenerateHex(32) → 64 hex characters representing 32 bytes (256 bits)
+func GenerateHex(byteLength int) (string, error) {
+	if byteLength < MinPasswordLen/2 {
+		return "", errors.New("hex secret too short: min byte length " + fmt.Sprintf("%d", MinPasswordLen/2))
+	}
+
+	bytes := make([]byte, byteLength)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	// Convert to hex string
+	hexChars := "0123456789abcdef"
+	hex := make([]byte, byteLength*2)
+	for i, b := range bytes {
+		hex[i*2] = hexChars[b>>4]
+		hex[i*2+1] = hexChars[b&0x0f]
+	}
+
+	return string(hex), nil
+}
+
+// GenerateBase64 generates a base64-encoded secret of the specified byte length.
+//
+// Character set: [A-Za-z0-9+/] with optional padding (=)
+// Output length: ceiling(byteLength * 4/3) (base64 encoding increases by ~33%)
+// Entropy: log2(256^byteLength) = byteLength * 8 bits
+//
+// Use this for:
+//   - Legacy systems requiring base64 format
+//   - Binary data in JSON/XML
+//   - Email-safe encoding (consider base64url variant)
+//
+// Example: GenerateBase64(32) → 44 base64 characters representing 32 bytes (256 bits)
+//
+// NOTE: For most use cases, GenerateAPIKey/GenerateToken (alphanumeric-only) is preferred
+// because base64 padding (=) and special chars (+/) can cause issues in URLs and shells.
+func GenerateBase64(byteLength int) (string, error) {
+	if byteLength < MinPasswordLen/2 {
+		return "", errors.New("base64 secret too short: min byte length " + fmt.Sprintf("%d", MinPasswordLen/2))
+	}
+
+	bytes := make([]byte, byteLength)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	// Manual base64 encoding to avoid import
+	const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+	// Calculate output length with padding
+	outputLen := ((byteLength + 2) / 3) * 4
+	output := make([]byte, outputLen)
+
+	var j int
+	for i := 0; i < byteLength; i += 3 {
+		// Get three bytes (or remaining bytes)
+		b1 := bytes[i]
+		var b2, b3 byte
+		if i+1 < byteLength {
+			b2 = bytes[i+1]
+		}
+		if i+2 < byteLength {
+			b3 = bytes[i+2]
+		}
+
+		// Encode to 4 base64 characters
+		output[j] = base64Chars[b1>>2]
+		output[j+1] = base64Chars[((b1&0x03)<<4)|(b2>>4)]
+
+		if i+1 < byteLength {
+			output[j+2] = base64Chars[((b2&0x0f)<<2)|(b3>>6)]
+		} else {
+			output[j+2] = '='
+		}
+
+		if i+2 < byteLength {
+			output[j+3] = base64Chars[b3&0x3f]
+		} else {
+			output[j+3] = '='
+		}
+
+		j += 4
+	}
+
+	return string(output), nil
+}

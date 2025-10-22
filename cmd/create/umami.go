@@ -77,9 +77,9 @@ var CreateUmamiCmd = &cobra.Command{
 			return fmt.Errorf("failed to read Docker Compose file from assets: %w", err)
 		}
 
-		// Generate a strong random alphanumeric password (20 characters)
-		logger.Info("Generating strong random password")
-		password, err := crypto.GeneratePassword(20)
+		// Generate a strong random alphanumeric-only password (32 characters)
+		logger.Info("Generating strong alphanumeric-only password")
+		password, err := crypto.GenerateURLSafePassword(32)
 		if err != nil {
 			return fmt.Errorf("failed to generate password: %w", err)
 		}

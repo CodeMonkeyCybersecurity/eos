@@ -103,15 +103,15 @@ func GenerateCompleteHecateStack(rc *eos_io.RuntimeContext, domain string) error
 // generateHecateSecretsLegacy generates all required secrets for Hecate (legacy single-domain mode)
 func generateHecateSecretsLegacy(rc *eos_io.RuntimeContext) (*HecateSecrets, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Generating secrets for Hecate services")
+	logger.Info("Generating secrets for Hecate services (alphanumeric-only)")
 
-	// Generate strong passwords
-	pgPass, err := crypto.GeneratePassword(32)
+	// Generate strong alphanumeric-only passwords for maximum compatibility
+	pgPass, err := crypto.GenerateURLSafePassword(32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate PostgreSQL password: %w", err)
 	}
 
-	authentikKey, err := crypto.GeneratePassword(50)
+	authentikKey, err := crypto.GenerateURLSafePassword(50)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate Authentik secret key: %w", err)
 	}

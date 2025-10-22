@@ -345,6 +345,31 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	}
 	logger.Debug("Post-operation: services started successfully")
 
+	// Step 11: Create database application user
+	// CRITICAL: This must happen after migrations but before app containers fully start
+	// The RAG engine and app need this user to connect to the database
+	logger.Info("Setting up database users")
+	if err := bgi.createDatabaseUser(ctx); err != nil {
+		return fmt.Errorf("failed to create database user: %w", err)
+	}
+
+	// Step 12: Restart containers that depend on the database user
+	// This ensures RAG engine and app pick up the new user
+	logger.Info("Restarting application containers")
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "-f", bgi.config.ComposeFile, "restart", "rag-engine", "app"},
+		Dir:     bgi.config.InstallDir,
+		Capture: true,
+		Timeout: 2 * time.Minute,
+	})
+	if err != nil {
+		logger.Warn("Failed to restart containers (they may start on their own)",
+			zap.Error(err),
+			zap.String("output", output))
+		// Don't fail installation - containers will retry connection
+	}
+
 	return nil
 }
 
@@ -970,6 +995,69 @@ func (bgi *BionicGPTInstaller) startService(ctx context.Context) error {
 
 	logger.Info("Services started successfully")
 	logger.Debug("Post-operation: all containers started")
+	return nil
+}
+
+// createDatabaseUser creates the bionic_application database user
+// This is required because BionicGPT migrations don't create the application user
+// The user needs to exist before the RAG engine and app containers can connect
+func (bgi *BionicGPTInstaller) createDatabaseUser(ctx context.Context) error {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Info("Creating bionic_application database user")
+
+	// Wait for postgres to be healthy (already done by docker compose dependencies, but be safe)
+	logger.Debug("Waiting for postgres container to be ready")
+	time.Sleep(5 * time.Second)
+
+	// Create the application user with the same password as in .env
+	sqlCommands := fmt.Sprintf(`
+		-- Create user if it doesn't exist
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'bionic_application') THEN
+				CREATE USER bionic_application WITH PASSWORD '%s';
+			END IF;
+		END
+		$$;
+
+		-- Grant necessary privileges
+		GRANT ALL PRIVILEGES ON DATABASE "bionic-gpt" TO bionic_application;
+		GRANT ALL ON SCHEMA public TO bionic_application;
+		GRANT ALL ON ALL TABLES IN SCHEMA public TO bionic_application;
+		GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO bionic_application;
+		ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bionic_application;
+		ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bionic_application;
+	`, bgi.config.PostgresPassword)
+
+	logger.Debug("Executing SQL to create user",
+		zap.String("container", ContainerPostgres),
+		zap.String("user", "postgres"),
+		zap.String("database", bgi.config.PostgresDB))
+
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "docker",
+		Args: []string{
+			"exec", "-i", ContainerPostgres,
+			"psql", "-U", "postgres", "-d", bgi.config.PostgresDB,
+			"-c", sqlCommands,
+		},
+		Capture: true,
+		Timeout: 30 * time.Second,
+	})
+
+	if err != nil {
+		logger.Error("Failed to create database user",
+			zap.Error(err),
+			zap.String("output", output))
+		return fmt.Errorf("failed to create bionic_application user: %s", output)
+	}
+
+	logger.Info("Database user created successfully",
+		zap.String("user", "bionic_application"),
+		zap.String("database", bgi.config.PostgresDB))
+	logger.Debug("SQL execution output", zap.String("output", output))
+
 	return nil
 }
 

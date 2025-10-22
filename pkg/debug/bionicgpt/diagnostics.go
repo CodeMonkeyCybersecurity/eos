@@ -48,6 +48,12 @@ func AllDiagnostics() []*debug.Diagnostic {
 		ResourceUsageDiagnostic(),
 		LogHealthDiagnostic(),
 		OllamaConnectivityDiagnostic(),
+		AppContainerMissingDiagnostic(),
+		LiteLLMHealthCheckDiagnostic(),
+		DatabaseConnectionTestDiagnostic(),
+		NetworkConnectivityDiagnostic(),
+		PortListenerDiagnostic(),
+		ZombieProcessesDiagnostic(),
 	}
 }
 
@@ -694,6 +700,273 @@ func MigrationsLogsDiagnostic() *debug.Diagnostic {
 				}
 
 				result.Output = outputStr
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// AppContainerMissingDiagnostic checks if bionicgpt-app container is running
+// This diagnostic was added after discovering app container failures due to litellm dependency
+func AppContainerMissingDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "App Container Running Check",
+		Category:    "Containers",
+		Description: "Check if bionicgpt-app container is running (often fails due to litellm dependency)",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Check if app container is running
+			cmd := exec.CommandContext(ctx, "docker", "ps", "--filter", "name=bionicgpt-app", "--format", "{{.Names}}")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to check for app container"
+				result.Error = err
+				result.Remediation = "Ensure Docker is running and accessible"
+				logger.Error("Failed to check app container", zap.Error(err))
+				return result, nil
+			}
+
+			outputStr := strings.TrimSpace(string(output))
+			if strings.Contains(outputStr, "bionicgpt-app") {
+				result.Status = debug.StatusOK
+				result.Message = "✓ bionicgpt-app is running"
+				result.Output = "Container found: " + outputStr
+			} else {
+				result.Status = debug.StatusError
+				result.Message = "✗ bionicgpt-app is NOT running"
+				result.Output = "This container failed to start, likely due to litellm-proxy dependency or database authentication issues"
+				result.Remediation = "Check litellm-proxy health and database credentials. Try: docker compose logs app"
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// LiteLLMHealthCheckDiagnostic checks the health status of litellm-proxy container
+func LiteLLMHealthCheckDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "LiteLLM Proxy Health",
+		Category:    "Containers",
+		Description: "Check health status and recent logs of litellm-proxy container",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var outputParts []string
+
+			// Check health status
+			healthCmd := exec.CommandContext(ctx, "docker", "inspect", bionicgpt.ContainerLiteLLM,
+				"--format", "{{.State.Health.Status}}")
+			healthOutput, healthErr := healthCmd.CombinedOutput()
+
+			if healthErr != nil {
+				result.Status = debug.StatusError
+				result.Message = "LiteLLM container not found or not accessible"
+				result.Error = healthErr
+				logger.Warn("LiteLLM container check failed", zap.Error(healthErr))
+			} else {
+				healthStatus := strings.TrimSpace(string(healthOutput))
+				outputParts = append(outputParts, fmt.Sprintf("Health Status: %s", healthStatus))
+
+				if healthStatus == "healthy" {
+					result.Status = debug.StatusOK
+					result.Message = "LiteLLM proxy is healthy"
+				} else if healthStatus == "starting" {
+					result.Status = debug.StatusWarning
+					result.Message = "LiteLLM proxy is still starting"
+				} else {
+					result.Status = debug.StatusError
+					result.Message = fmt.Sprintf("LiteLLM proxy is unhealthy: %s", healthStatus)
+					result.Remediation = "Check litellm_config.yaml and Azure OpenAI credentials. View logs: docker logs bionicgpt-litellm"
+				}
+			}
+
+			// Get recent logs (last 30 lines)
+			logsCmd := exec.CommandContext(ctx, "docker", "logs", bionicgpt.ContainerLiteLLM, "--tail", "30")
+			logsOutput, logsErr := logsCmd.CombinedOutput()
+			if logsErr == nil {
+				outputParts = append(outputParts, "\nRecent Logs (last 30 lines):")
+				outputParts = append(outputParts, string(logsOutput))
+			}
+
+			result.Output = strings.Join(outputParts, "\n")
+			return result, nil
+		},
+	}
+}
+
+// DatabaseConnectionTestDiagnostic tests if bionic_application user can connect to database
+func DatabaseConnectionTestDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Database Connection Test",
+		Category:    "Database",
+		Description: "Test if bionic_application user can authenticate to PostgreSQL database",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Test connection as bionic_application user
+			cmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerPostgres,
+				"psql", "-U", "bionic_application", "-d", "bionic-gpt",
+				"-c", "SELECT current_user, current_database();")
+			output, err := cmd.CombinedOutput()
+
+			outputStr := string(output)
+			result.Output = outputStr
+
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "✗ Database authentication failed for bionic_application user"
+				result.Error = err
+				result.Remediation = "User may not exist or password is incorrect. Check .env file for APP_DATABASE_URL. May need to run: docker exec bionicgpt-postgres psql -U postgres -d bionic-gpt -c \"CREATE USER bionic_application WITH PASSWORD 'your_password';\""
+				logger.Error("Database connection test failed", zap.Error(err), zap.String("output", outputStr))
+			} else {
+				result.Status = debug.StatusOK
+				result.Message = "✓ Database authentication successful"
+				logger.Info("Database connection test passed")
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// NetworkConnectivityDiagnostic tests network connectivity between containers
+func NetworkConnectivityDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Container Network Connectivity",
+		Category:    "Network",
+		Description: "Test if containers can reach each other (e.g., app -> litellm-proxy)",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var outputParts []string
+
+			// Test if postgres can reach litellm-proxy on port 4000
+			// Using postgres container since it's always running
+			cmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerPostgres,
+				"sh", "-c", "command -v nc >/dev/null 2>&1 && nc -zv litellm-proxy 4000 || echo 'nc not available'")
+			output, err := cmd.CombinedOutput()
+
+			outputStr := strings.TrimSpace(string(output))
+			outputParts = append(outputParts, fmt.Sprintf("litellm-proxy:4000 connectivity test:\n%s", outputStr))
+
+			if err != nil {
+				if strings.Contains(outputStr, "nc not available") {
+					result.Status = debug.StatusWarning
+					result.Message = "Network testing tools (nc) not available in container"
+					logger.Warn("nc command not available for network testing")
+				} else {
+					result.Status = debug.StatusError
+					result.Message = "Network connectivity test failed"
+					result.Error = err
+					result.Remediation = "Check Docker network configuration and ensure all containers are on the same network"
+					logger.Error("Network connectivity test failed", zap.Error(err))
+				}
+			} else if strings.Contains(outputStr, "nc not available") {
+				result.Status = debug.StatusWarning
+				result.Message = "Network testing tools not available (nc missing)"
+			} else if strings.Contains(outputStr, "succeeded") || strings.Contains(outputStr, "open") {
+				result.Status = debug.StatusOK
+				result.Message = "✓ Network connectivity test successful"
+			} else {
+				result.Status = debug.StatusError
+				result.Message = "✗ Cannot reach litellm-proxy"
+				result.Remediation = "Check if litellm-proxy container is running and healthy"
+			}
+
+			result.Output = strings.Join(outputParts, "\n")
+			return result, nil
+		},
+	}
+}
+
+// PortListenerDiagnostic checks what's listening on the BionicGPT port (8513)
+func PortListenerDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Port 8513 Listener Check",
+		Category:    "Network",
+		Description: "Check what process is listening on BionicGPT port 8513",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Check what's listening on port 8513
+			// Try netstat first, fall back to lsof
+			cmd := exec.CommandContext(ctx, "sh", "-c", "netstat -tlnp 2>/dev/null | grep 8513 || lsof -i :8513 2>/dev/null || ss -tlnp | grep 8513")
+			output, err := cmd.CombinedOutput()
+
+			outputStr := strings.TrimSpace(string(output))
+
+			if err != nil || outputStr == "" {
+				result.Status = debug.StatusError
+				result.Message = "✗ Nothing listening on port 8513"
+				result.Output = "BionicGPT should be accessible on port 8513 but no listener found"
+				result.Remediation = "Check if bionicgpt-app container is running: docker ps | grep bionicgpt-app"
+				logger.Warn("No listener found on port 8513")
+			} else {
+				result.Status = debug.StatusOK
+				result.Message = "✓ Service listening on port 8513"
+				result.Output = outputStr
+				logger.Info("Port 8513 listener found", zap.String("output", outputStr))
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// ZombieProcessesDiagnostic checks for zombie (defunct) processes
+func ZombieProcessesDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Zombie Processes Check",
+		Category:    "System",
+		Description: "Check for zombie (defunct) processes that might indicate issues",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Look for defunct processes
+			cmd := exec.CommandContext(ctx, "sh", "-c", "ps aux | grep -i defunct | grep -v grep || echo 'none'")
+			output, err := cmd.CombinedOutput()
+
+			outputStr := strings.TrimSpace(string(output))
+
+			if err != nil {
+				result.Status = debug.StatusWarning
+				result.Message = "Unable to check for zombie processes"
+				result.Error = err
+				logger.Warn("Failed to check for zombie processes", zap.Error(err))
+			} else if outputStr == "none" || outputStr == "" {
+				result.Status = debug.StatusOK
+				result.Message = "✓ No zombie processes found"
+				result.Output = "System is healthy - no defunct processes"
+				logger.Info("No zombie processes found")
+			} else {
+				result.Status = debug.StatusWarning
+				result.Message = "⚠ Zombie processes detected"
+				result.Output = outputStr
+				result.Remediation = "Zombie processes usually indicate a parent process not reaping its children. May need to restart affected services."
+				result.Metadata["zombie_count"] = strings.Count(outputStr, "\n")
+				logger.Warn("Zombie processes detected", zap.String("processes", outputStr))
 			}
 
 			return result, nil

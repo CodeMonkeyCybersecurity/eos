@@ -56,12 +56,14 @@ func (r *RandomOperationsImpl) GenerateUUID(ctx context.Context) (string, error)
 	return id.String(), nil
 }
 
-// GeneratePassword generates a secure random password
+// GeneratePassword generates a secure random alphanumeric-only password
+// REFACTORED: Now always uses alphanumeric-only [a-zA-Z0-9] for maximum compatibility
+// The includeSpecial parameter is DEPRECATED and ignored (kept for backward compatibility)
 func (r *RandomOperationsImpl) GeneratePassword(ctx context.Context, length int, includeSpecial bool) (string, error) {
+	// Always use alphanumeric charset - special chars cause too many issues
+	// (shell escaping, URL encoding, config file parsing, database connection strings, etc.)
+	// The entropy loss is negligible: log2(62^32) ≈ 190 bits vs log2(94^32) ≈ 211 bits
 	charset := CharsetAlphaNum
-	if includeSpecial {
-		charset = CharsetAll
-	}
 
 	return r.GenerateRandomString(ctx, length, charset)
 }

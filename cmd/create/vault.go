@@ -131,9 +131,9 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -155,19 +155,25 @@ var CreateSecretCmd = &cobra.Command{
 
 		// Set defaults
 		if length <= 0 {
-			length = 32 // Default to openssl rand -hex 32
+			length = 32 // Default 32 bytes = 256 bits entropy
 		}
 		if format == "" {
 			format = "hex"
 		}
 
-		// Generate secret using the secrets package
-		opts := &secrets.GenerateSecretOptions{
-			Length: length,
-			Format: format,
+		// Generate secret using the crypto package (single source of truth)
+		var secret string
+		var err error
+
+		switch format {
+		case "hex":
+			secret, err = crypto.GenerateHex(length)
+		case "base64":
+			secret, err = crypto.GenerateBase64(length)
+		default:
+			return fmt.Errorf("unsupported format: %s (supported: hex, base64)", format)
 		}
 
-		secret, err := secrets.Generate(opts)
 		if err != nil {
 			return err
 		}

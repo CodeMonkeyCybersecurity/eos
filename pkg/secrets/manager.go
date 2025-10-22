@@ -3,14 +3,13 @@ package secrets
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -189,70 +188,26 @@ func (sm *SecretManager) validateSecrets(secrets *ServiceSecrets, required map[s
 }
 
 // generateSecret generates a secret of the specified type
+// REFACTORED: Now delegates to pkg/crypto for all generation (single source of truth)
+// All secrets use alphanumeric-only [a-zA-Z0-9] for maximum compatibility
 func (sm *SecretManager) generateSecret(secretType SecretType) (string, error) {
 	switch secretType {
 	case SecretTypePassword:
-		return sm.generatePassword(16)
+		// Use 32 chars for strong security (log2(62^32) ≈ 190 bits)
+		return crypto.GenerateURLSafePassword(32)
 	case SecretTypeAPIKey:
-		return sm.generateAPIKey(32)
+		// Use 32 chars for API keys (industry standard)
+		return crypto.GenerateAPIKey(32)
 	case SecretTypeToken:
-		return sm.generateToken(24)
+		// Use 32 chars for tokens (consistent with other secrets)
+		return crypto.GenerateToken(32)
 	case SecretTypeJWT:
-		return sm.generateJWTSecret(32)
+		// Use 32 chars minimum (enforced by GenerateJWTSecret)
+		return crypto.GenerateJWTSecret(32)
 	default:
-		return sm.generatePassword(16)
+		// Default to password generation
+		return crypto.GenerateURLSafePassword(32)
 	}
-}
-
-// generatePassword generates a secure random password
-func (sm *SecretManager) generatePassword(length int) (string, error) {
-	// Character sets for password generation
-	lowercase := "abcdefghijklmnopqrstuvwxyz"
-	uppercase := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	digits := "0123456789"
-	// NOTE: Excludes $ to prevent variable substitution in .env files (Docker Compose, shell)
-	// Excludes ` and \ to prevent shell escaping issues
-	special := "!@#%^&*-_+=:;,.?"
-
-	allChars := lowercase + uppercase + digits + special
-
-	password := make([]byte, length)
-	for i := range password {
-		randomBytes := make([]byte, 1)
-		if _, err := rand.Read(randomBytes); err != nil {
-			return "", fmt.Errorf("failed to generate random bytes: %w", err)
-		}
-		password[i] = allChars[int(randomBytes[0])%len(allChars)]
-	}
-
-	return string(password), nil
-}
-
-// generateAPIKey generates a secure API key
-func (sm *SecretManager) generateAPIKey(length int) (string, error) {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
-}
-
-// generateToken generates a secure token
-func (sm *SecretManager) generateToken(length int) (string, error) {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(bytes), nil
-}
-
-// generateJWTSecret generates a JWT signing secret
-func (sm *SecretManager) generateJWTSecret(length int) (string, error) {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
 // GetBackend returns the secret backend for direct access (for advanced use cases)
@@ -448,21 +403,21 @@ func (vb *VaultBackend) Generate(path string, secretType SecretType) (string, er
 }
 
 // generateSecretValue generates a secret value based on type
+// REFACTORED: Now delegates to pkg/crypto for all generation (single source of truth)
+// All secrets use alphanumeric-only [a-zA-Z0-9] for maximum compatibility
 func generateSecretValue(secretType SecretType) (string, error) {
-	bytes := make([]byte, 32) // Default 32 bytes = 256 bits
-
 	switch secretType {
+	case SecretTypePassword:
+		return crypto.GenerateURLSafePassword(32)
 	case SecretTypeAPIKey:
-		bytes = make([]byte, 44) // 44 bytes for base64 API keys
-	case SecretTypeToken, SecretTypeJWT:
-		bytes = make([]byte, 64) // 64 bytes for tokens
+		return crypto.GenerateAPIKey(32)
+	case SecretTypeToken:
+		return crypto.GenerateToken(32)
+	case SecretTypeJWT:
+		return crypto.GenerateJWTSecret(32)
+	default:
+		return crypto.GenerateURLSafePassword(32)
 	}
-
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-
-	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
 func (vb *VaultBackend) Exists(path string) bool {

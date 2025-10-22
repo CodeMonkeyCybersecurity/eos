@@ -46,15 +46,16 @@ func PromptAndGenerateBootstrapCredentials(rc *eos_io.RuntimeContext) (*Authenti
 
 	logger.Info("Using admin email", zap.String("email", email))
 
-	// INTERVENE - Auto-generate secure password and token
-	logger.Info("Generating secure bootstrap credentials...")
+	// INTERVENE - Auto-generate secure alphanumeric-only credentials
+	logger.Info("Generating secure bootstrap credentials (alphanumeric-only)...")
 
-	password, err := crypto.GeneratePassword(32)
+	// Use alphanumeric-only for maximum compatibility (no shell/URL escaping issues)
+	password, err := crypto.GenerateURLSafePassword(32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate bootstrap password: %w", err)
 	}
 
-	token, err := crypto.GeneratePassword(64)
+	token, err := crypto.GenerateToken(64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate bootstrap token: %w", err)
 	}
