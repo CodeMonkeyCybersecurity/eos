@@ -22,6 +22,8 @@ var (
 	vaultDebugOutput   string
 	vaultDebugSanitize bool
 	vaultDebugShowAll  bool
+	vaultDebugAgent    bool
+	vaultDebugAuth     bool
 )
 
 var vaultDebugCmd = &cobra.Command{
@@ -39,10 +41,22 @@ This command performs extensive checks on:
 - User/group configuration
 - Environment variables
 - Resource usage
+- Vault Agent service and authentication
+- Authentication and authorization (AppRole, tokens, policies)
+
+DIAGNOSTIC MODES:
+  --agent    Vault Agent service diagnostics (service, config, credentials, token, logs)
+  --auth     Authentication & authorization deep-dive (policies, permissions, AppRole, token capabilities)
 
 EXAMPLES:
-  # Run diagnostics with text output
+  # Run full diagnostics with text output
   sudo eos debug vault
+
+  # Run Vault Agent-only diagnostics
+  sudo eos debug vault --agent
+
+  # Deep-dive authentication troubleshooting (permission denied, policy issues)
+  sudo eos debug vault --auth
 
   # Save to file
   sudo eos debug vault --output=/tmp/vault-debug.txt
@@ -57,7 +71,13 @@ EXAMPLES:
   sudo eos debug vault --sanitize --output=vault-debug-safe.txt
 
   # Show all results including skipped checks
-  sudo eos debug vault --show-all`,
+  sudo eos debug vault --show-all
+
+  # Debug specific authentication flow issues
+  sudo eos debug vault --auth --show-all
+
+  # Debug Agent service issues
+  sudo eos debug vault --agent --show-all`,
 
 	RunE: eos_cli.Wrap(runVaultDebug),
 }
@@ -67,16 +87,26 @@ func init() {
 	vaultDebugCmd.Flags().StringVar(&vaultDebugOutput, "output", "", "Save output to file instead of stdout")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugSanitize, "sanitize", false, "Redact sensitive information (tokens, paths)")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugShowAll, "show-all", false, "Show all checks including skipped ones")
+	vaultDebugCmd.Flags().BoolVar(&vaultDebugAgent, "agent", false, "Run Vault Agent diagnostics only (service, config, credentials, token, logs)")
+	vaultDebugCmd.Flags().BoolVar(&vaultDebugAuth, "auth", false, "Run authentication & authorization diagnostics (health, AppRole, token, policies, permissions)")
 
 	debugCmd.AddCommand(vaultDebugCmd)
 }
 
 func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// Validate mutually exclusive flags
+	if vaultDebugAgent && vaultDebugAuth {
+		return fmt.Errorf("--agent and --auth flags are mutually exclusive; use only one at a time")
+	}
+
 	logger.Info("Starting Vault diagnostics",
 		zap.String("format", vaultDebugFormat),
 		zap.Bool("sanitize", vaultDebugSanitize),
 		zap.Bool("show_all", vaultDebugShowAll),
+		zap.Bool("agent_mode", vaultDebugAgent),
+		zap.Bool("auth_mode", vaultDebugAuth),
 		zap.String("output_file", vaultDebugOutput))
 
 	// Create collector with appropriate formatter
@@ -97,22 +127,40 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		logger.Debug("Using text formatter", zap.Bool("show_skipped", vaultDebugShowAll))
 	}
 
-	collector := debug.NewCollector("Vault", formatter)
-	logger.Debug("Created diagnostic collector", zap.String("component", "Vault"))
+	// Determine component name and diagnostics based on mode
+	componentName := "Vault"
+	var allDiagnostics []*debug.Diagnostic
+	var totalDiagnostics int
 
-	// Add all vault diagnostics including TLS
-	allDiagnostics := debugvault.AllDiagnostics()
-	tlsDiagnostic := debugvault.TLSDiagnostic()
+	if vaultDebugAgent {
+		componentName = "Vault Agent"
+		allDiagnostics = debugvault.AgentDiagnostics()
+		logger.Debug("Running in Agent-only mode",
+			zap.Int("agent_diagnostics", len(allDiagnostics)))
+		totalDiagnostics = len(allDiagnostics)
+		logger.Info("Registered agent diagnostics", zap.Int("total", totalDiagnostics))
+	} else if vaultDebugAuth {
+		componentName = "Vault Authentication"
+		allDiagnostics = debugvault.AuthDiagnostics()
+		logger.Debug("Running in Auth-only mode",
+			zap.Int("auth_diagnostics", len(allDiagnostics)))
+		totalDiagnostics = len(allDiagnostics)
+		logger.Info("Registered auth diagnostics", zap.Int("total", totalDiagnostics))
+	} else {
+		// Full mode: all diagnostics including TLS
+		allDiagnostics = debugvault.AllDiagnostics()
+		tlsDiagnostic := debugvault.TLSDiagnostic()
+		logger.Debug("Running in full mode",
+			zap.Int("standard_diagnostics", len(allDiagnostics)),
+			zap.Bool("tls_diagnostic", true))
+		allDiagnostics = append(allDiagnostics, tlsDiagnostic)
+		totalDiagnostics = len(allDiagnostics)
+		logger.Info("Registered diagnostics", zap.Int("total", totalDiagnostics))
+	}
 
-	logger.Debug("Registering diagnostics",
-		zap.Int("standard_diagnostics", len(allDiagnostics)),
-		zap.Bool("tls_diagnostic", true))
-
+	collector := debug.NewCollector(componentName, formatter)
+	logger.Debug("Created diagnostic collector", zap.String("component", componentName))
 	collector.Add(allDiagnostics...)
-	collector.Add(tlsDiagnostic)
-
-	totalDiagnostics := len(allDiagnostics) + 1
-	logger.Info("Registered diagnostics", zap.Int("total", totalDiagnostics))
 
 	// Run diagnostics
 	logger.Info("Running diagnostics collection", zap.Int("checks_to_run", totalDiagnostics))
@@ -164,7 +212,13 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		// Add quick health summary at top
 		logger.Debug("Generating quick health summary")
 		quickSummary := debug.GenerateQuickSummary(report, analysis)
-		output = debug.FormatQuickSummary(quickSummary, "vault")
+		summaryComponent := "vault"
+		if vaultDebugAgent {
+			summaryComponent = "vault-agent"
+		} else if vaultDebugAuth {
+			summaryComponent = "vault-auth"
+		}
+		output = debug.FormatQuickSummary(quickSummary, summaryComponent)
 		output += "\n\n"
 
 		logger.Debug("Formatting diagnostic report")
