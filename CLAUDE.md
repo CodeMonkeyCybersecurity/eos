@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-21*
+*Last Updated: 2025-10-22*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -926,6 +926,76 @@ logger.Debug("Post-operation verification",
     zap.Bool("container_running", running),
     zap.String("container_id", containerID))
 ```
+
+### Automatic Debug Output Capture (P1 - CRITICAL)
+
+**Philosophy**: All `eos debug ...` commands automatically save their output to the user's directory for forensic analysis. No flags required - fully automatic, non-fatal if capture fails.
+
+**Capture Location**: `~/.eos/debug/eos-debug-{service}-{timestamp}.{ext}`
+- Fallback to `/tmp` if home directory unavailable
+- Timestamped filenames: `20060102-150405` format
+- Format-aware extensions: `.txt`, `.json`, `.md`
+
+**Two Capture Patterns**:
+
+1. **Direct Capture** (for commands returning strings):
+```go
+// cmd/debug/vault.go
+func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    // Generate debug output
+    output, err := vault.GenerateDebugReport(rc, format)
+    if err != nil {
+        return fmt.Errorf("failed to generate debug report: %w", err)
+    }
+
+    // AUTOMATIC CAPTURE: Save debug output (no flags needed)
+    captureConfig := &debug.CaptureConfig{
+        ServiceName: "vault",
+        Output:      output,
+        Format:      format,  // "json", "text", or "markdown"
+    }
+    if _, captureErr := debug.CaptureDebugOutput(rc, captureConfig); captureErr != nil {
+        logger.Warn("Failed to auto-capture debug output", zap.Error(captureErr))
+    }
+
+    // Display output to user
+    fmt.Print(output)
+    return nil
+}
+```
+
+2. **Stdout Wrapper** (for commands printing directly):
+```go
+// cmd/debug/consul.go
+func runDebugConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    config := &consuldebug.Config{
+        AutoFix:       autoFix,
+        LogLines:      100,
+    }
+
+    // AUTOMATIC CAPTURE: Wrap the debug function to capture stdout
+    // The consul debug prints directly to stdout, so we intercept it
+    return debug.CaptureStdoutFunc(rc, "consul", func() error {
+        return consuldebug.RunDiagnostics(rc, config)
+    })
+}
+```
+
+**User Notification**:
+```
+INFO  Debug output automatically saved
+      service=vault
+      file=/home/user/.eos/debug/eos-debug-vault-20251022-143052.json
+      size=47.3 KB
+```
+
+**Implementation Requirements**:
+- ALL `eos debug ...` commands MUST use one of these patterns
+- Capture is automatic - NO extra flags required
+- Capture failures are non-fatal - log warning and continue
+- Use otelzap logging to notify user of saved file location
+
+**Reference**: See `pkg/debug/capture.go` for implementation details
 
 ## Flag Bypass Vulnerability Prevention (P0 - CRITICAL)
 

@@ -52,7 +52,7 @@ System (1 check):
 Flags:
   --test      Send a test alert through the system
   --verbose   Show detailed diagnostic output`,
-	RunE: eos.Wrap(runDebugIris),
+	RunE: eos.WrapDebug("iris", runDebugIris),
 }
 
 var (

@@ -39,7 +39,7 @@ Example:
   eos debug mattermost
   eos debug mattermost --log-lines 200
   eos debug mattermost --compose-dir /opt/docker --volumes-dir /opt/mattermost`,
-	RunE: eos_cli.Wrap(runDebugMattermost),
+	RunE: eos_cli.WrapDebug("mattermost", runDebugMattermost),
 }
 
 func init() {

@@ -40,7 +40,7 @@ EXAMPLES:
   # Run and save output
   sudo eos debug openwebui > /tmp/openwebui-diagnostic.txt`,
 
-	RunE: eos_cli.Wrap(runOpenWebUIDebug),
+	RunE: eos_cli.WrapDebug("openwebui", runOpenWebUIDebug),
 }
 
 func runOpenWebUIDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

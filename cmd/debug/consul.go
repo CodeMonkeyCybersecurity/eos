@@ -36,8 +36,10 @@ Flags:
 Example:
   eos debug consul
   eos debug consul --fix
-  eos debug consul --kill-processes --test-start`,
-	RunE: eos_cli.Wrap(runDebugConsul),
+  eos debug consul --kill-processes --test-start
+
+Output is automatically saved to ~/.eos/debug/eos-debug-consul-{timestamp}.txt`,
+	RunE: eos_cli.WrapDebug("consul", runDebugConsul),
 }
 
 func init() {

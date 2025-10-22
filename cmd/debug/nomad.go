@@ -28,7 +28,7 @@ This command will:
 - Check service status and logs
 - Test connectivity
 - Provide fix recommendations`,
-	RunE: eos_cli.Wrap(runDebugNomad),
+	RunE: eos_cli.WrapDebug("nomad", runDebugNomad),
 }
 
 func init() {

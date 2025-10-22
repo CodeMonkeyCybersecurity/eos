@@ -57,7 +57,7 @@ EXAMPLES:
 
 CODE MONKEY CYBERSECURITY - "Cybersecurity. With humans."`,
 
-	RunE: eos_cli.Wrap(runCephDebug),
+	RunE: eos_cli.WrapDebug("ceph", runCephDebug),
 }
 
 func init() {

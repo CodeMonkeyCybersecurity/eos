@@ -79,7 +79,7 @@ EXAMPLES:
   # Debug Agent service issues
   sudo eos debug vault --agent --show-all`,
 
-	RunE: eos_cli.Wrap(runVaultDebug),
+	RunE: eos_cli.WrapDebug("vault", runVaultDebug),
 }
 
 func init() {

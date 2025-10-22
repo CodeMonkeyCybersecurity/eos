@@ -65,8 +65,10 @@ Examples:
   eos debug hecate                      # Full diagnostics + file display
   eos debug hecate --component authentik  # Only diagnose Authentik
   eos debug hecate --authentik          # Full Authentik pre-upgrade check
-  eos debug hecate --path /custom/path  # Custom installation path`,
-	RunE: eos.Wrap(hecate.RunHecateDebug),
+  eos debug hecate --path /custom/path  # Custom installation path
+
+Output is automatically saved to ~/.eos/debug/eos-debug-hecate-{timestamp}.txt`,
+	RunE: eos.WrapDebug("hecate", hecate.RunHecateDebug),
 }
 
 func init() {

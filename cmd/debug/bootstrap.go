@@ -45,7 +45,7 @@ Checks performed:
 
 Example:
   eos debug bootstrap`,
-	RunE: eos.Wrap(runDebugBootstrap),
+	RunE: eos.WrapDebug("bootstrap", runDebugBootstrap),
 }
 
 func init() {

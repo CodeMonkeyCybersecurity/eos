@@ -59,7 +59,7 @@ EXAMPLES:
   # Show all results including skipped checks
   sudo eos debug bionicgpt --show-all`,
 
-	RunE: eos_cli.Wrap(runBionicGPTDebug),
+	RunE: eos_cli.WrapDebug("bionicgpt", runBionicGPTDebug),
 }
 
 func init() {

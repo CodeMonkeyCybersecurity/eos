@@ -25,7 +25,7 @@ var watchdogTracesCmd = &cobra.Command{
 
 This command helps diagnose resource exhaustion issues by examining the detailed traces
 captured when the system experienced high CPU, memory usage, or excessive process counts.`,
-	RunE: eos_cli.Wrap(runWatchdogTraces),
+	RunE: eos_cli.WrapDebug("watchdog-traces", runWatchdogTraces),
 }
 
 var (
