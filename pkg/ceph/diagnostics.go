@@ -32,8 +32,8 @@ type DiagnosticResult struct {
 
 // DiagnosticOptions contains options for running diagnostics
 type DiagnosticOptions struct {
-	Verbose bool
-	Fix     bool
+	Verbose  bool
+	Fix      bool
 	LogLines int
 }
 

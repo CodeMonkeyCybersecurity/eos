@@ -74,10 +74,10 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 		// Only match actual Ceph daemon processes (not scripts/logs mentioning ceph)
 		// Check the command name itself, not arguments
 		if !strings.HasPrefix(command, "ceph-") &&
-		   command != "radosgw" &&
-		   command != "rbd-mirror" &&
-		   !strings.Contains(fullLine, "/usr/bin/ceph-") &&
-		   !strings.Contains(fullLine, "/usr/local/bin/ceph-") {
+			command != "radosgw" &&
+			command != "rbd-mirror" &&
+			!strings.Contains(fullLine, "/usr/bin/ceph-") &&
+			!strings.Contains(fullLine, "/usr/local/bin/ceph-") {
 			continue
 		}
 
