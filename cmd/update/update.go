@@ -17,6 +17,9 @@ func AddSubcommands() {
 	// Add HashiCorp update commands
 	UpdateCmd.AddCommand(VaultCmd)
 	UpdateCmd.AddCommand(ConsulCmd)
+
+	// Add service update commands
+	UpdateCmd.AddCommand(MattermostCmd)
 }
 
 // UpdateCmd is the root command for update operations

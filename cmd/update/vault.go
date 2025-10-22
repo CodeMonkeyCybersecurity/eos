@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	vaultfix "github.com/CodeMonkeyCybersecurity/eos/pkg/vault/fix"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -20,6 +21,7 @@ var (
 	vaultAddress        string
 	vaultDryRun         bool
 	vaultUpdatePolicies bool
+	vaultFix            bool
 )
 
 // VaultCmd updates Vault configuration
@@ -31,10 +33,31 @@ var VaultCmd = &cobra.Command{
 The command intelligently updates:
 1. Vault address stored in Consul KV (--address)
 2. Vault HCL configuration file ports (--ports)
-3. Restarts Vault service to apply changes (ports only)
-4. Verifies new configuration is accessible
+3. Vault policies to latest version (--update-policies)
+4. Configuration drift correction (--fix)
+5. Restarts Vault service to apply changes (ports only)
+6. Verifies new configuration is accessible
+
+Configuration Drift Correction:
+  --fix        Detect and correct drift from canonical state
+  --dry-run    Preview changes without applying (works with --fix, --ports, --address)
+
+  The --fix flag compares current Vault installation against the canonical
+  state from 'eos create vault' and automatically corrects:
+  - File permissions (config, data, TLS certs)
+  - Duplicate binaries
+  - Configuration file syntax
+  - API/cluster addresses (localhost → hostname)
+
+  Like combing through the configuration to correct any settings that drifted.
 
 Examples:
+  # Detect and fix all configuration drift
+  eos update vault --fix
+
+  # Show what would be fixed (dry-run)
+  eos update vault --fix --dry-run
+
   # Update Vault address (stored in Consul KV for discovery)
   eos update vault --address vhost5
   eos update vault --address 192.168.1.10
@@ -76,13 +99,69 @@ func init() {
 	VaultCmd.Flags().StringVar(&vaultPorts, "ports", "",
 		"Port migration in format: FROM -> TO (e.g., '8179 -> default' or '8179 -> 8200')")
 	VaultCmd.Flags().BoolVar(&vaultDryRun, "dry-run", false,
-		"Preview changes without applying them")
+		"Preview changes without applying them (works with --fix, --ports, --address)")
 	VaultCmd.Flags().BoolVar(&vaultUpdatePolicies, "update-policies", false,
 		"Update Vault policies to latest version (requires root token)")
+	VaultCmd.Flags().BoolVar(&vaultFix, "fix", false,
+		"Fix configuration drift from canonical state (use --dry-run to preview)")
 }
 
 func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	// ASSESS - Determine which operation to perform
+
+	// Count how many operation types were requested (--dry-run is a modifier, not an operation)
+	operationCount := 0
+	if vaultFix {
+		operationCount++
+	}
+	if vaultUpdatePolicies {
+		operationCount++
+	}
+	if vaultAddress != "" {
+		operationCount++
+	}
+	if vaultPorts != "" {
+		operationCount++
+	}
+
+	// CRITICAL: Only allow ONE operation at a time
+	if operationCount > 1 {
+		return eos_err.NewUserError(
+			"Cannot specify multiple operations simultaneously.\n\n" +
+				"Choose ONE of:\n" +
+				"  --fix             Fix configuration drift\n" +
+				"  --address         Update Vault address\n" +
+				"  --ports           Migrate ports\n" +
+				"  --update-policies Update policies\n\n" +
+				"Use --dry-run to preview changes for any operation.\n\n" +
+				"Examples:\n" +
+				"  eos update vault --fix\n" +
+				"  eos update vault --fix --dry-run\n" +
+				"  eos update vault --address vhost5\n" +
+				"  eos update vault --ports 8179 -> default --dry-run")
+	}
+
+	// Handle --fix flag (configuration drift correction)
+	if vaultFix {
+		logger.Info("Running configuration drift correction",
+			zap.Bool("dry_run", vaultDryRun))
+
+		// Delegate to pkg/vault/fix - same logic as 'eos fix vault'
+		config := &vaultfix.Config{
+			DryRun: vaultDryRun,
+			All:    true, // Check all drift types
+		}
+
+		result, err := vaultfix.RunFixes(rc, config)
+		if err != nil {
+			return fmt.Errorf("drift correction failed: %w", err)
+		}
+
+		displayFixSummary(rc, result, vaultDryRun)
+		return nil
+	}
 
 	// Policy update is standalone
 	if vaultUpdatePolicies {
@@ -97,19 +176,24 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 				"Use --ports to migrate Vault ports:\n" +
 				"  eos update vault --ports 8179 -> default\n\n" +
 				"Use --update-policies to update Vault policies:\n" +
-				"  eos update vault --update-policies")
+				"  eos update vault --update-policies\n\n" +
+				"Use --fix to correct configuration drift:\n" +
+				"  eos update vault --fix")
 	}
 
 	if vaultAddress == "" && vaultPorts == "" {
 		return eos_err.NewUserError(
-			"Must specify either --address, --ports, or --update-policies.\n\n" +
+			"Must specify either --address, --ports, --update-policies, or --fix.\n\n" +
+				"Fix configuration drift:\n" +
+				"  eos update vault --fix\n" +
+				"  eos update vault --fix --dry-run  (preview without applying)\n\n" +
 				"Update Vault address in Consul KV:\n" +
 				"  eos update vault --address vhost5\n" +
 				"  eos update vault --address 192.168.1.10\n" +
 				"  eos update vault --address vault.example.com:8200\n\n" +
 				"Migrate Vault ports:\n" +
 				"  eos update vault --ports 8179 -> default\n" +
-				"  eos update vault --ports 8179 -> 8200\n\n" +
+				"  eos update vault --ports 8179 -> 8200 --dry-run\n\n" +
 				"Update policies to latest version:\n" +
 				"  eos update vault --update-policies")
 	}
@@ -308,4 +392,43 @@ func runVaultPolicyUpdate(rc *eos_io.RuntimeContext) error {
 	logger.Info("================================================================================")
 
 	return nil
+}
+
+// displayFixSummary shows the results of drift correction
+func displayFixSummary(rc *eos_io.RuntimeContext, result *vaultfix.RepairResult, dryRun bool) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("================================================================================")
+	if dryRun {
+		logger.Info("Configuration Drift Detection Report (Dry-Run)")
+	} else {
+		logger.Info("Configuration Drift Correction Results")
+	}
+	logger.Info("================================================================================")
+	logger.Info(fmt.Sprintf("  Issues detected: %d", result.IssuesFound))
+
+	if dryRun {
+		logger.Info(fmt.Sprintf("  Would fix: %d issues", result.IssuesFixed))
+		logger.Info("")
+		logger.Info("Run with --fix (without --drift) to apply corrections")
+	} else {
+		logger.Info(fmt.Sprintf("  Issues corrected: %d", result.IssuesFixed))
+		if result.IssuesFixed == result.IssuesFound && result.IssuesFound > 0 {
+			logger.Info("")
+			logger.Info("✓ All drift corrected - Vault matches canonical state")
+		} else if result.IssuesFound == 0 {
+			logger.Info("")
+			logger.Info("✓ No drift detected - Vault matches canonical state")
+		}
+	}
+
+	if len(result.Errors) > 0 {
+		logger.Info("")
+		logger.Info(fmt.Sprintf("Encountered %d errors during correction:", len(result.Errors)))
+		for i, err := range result.Errors {
+			logger.Info(fmt.Sprintf("  %d. %v", i+1, err))
+		}
+	}
+
+	logger.Info("================================================================================")
 }

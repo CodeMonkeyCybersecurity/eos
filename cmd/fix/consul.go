@@ -7,14 +7,25 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 var consulFixCmd = &cobra.Command{
 	Use:   "consul",
-	Short: "Fix common Consul service issues",
-	Long: `Automatically detect and fix common Consul service issues.
+	Short: "[DEPRECATED] Fix common Consul service issues - use 'eos update consul --fix'",
+	Long: `⚠️  DEPRECATION WARNING:
+This command is deprecated and will be removed in Eos v2.0.0 (approximately 6 months from now).
 
-The fix command can:
+Use 'eos update consul --fix' instead for configuration drift correction.
+
+Migration guide:
+  eos fix consul            →  eos update consul --fix
+  eos fix consul --dry-run  →  eos update consul --drift
+
+The new 'eos update consul --fix' provides the same functionality with better
+semantics: it compares current state against canonical state and corrects drift.
+
+Legacy functionality (still works):
 - Fix file permissions on configuration and data directories
 - Fix ownership of Consul files (consul user/group)
 - Repair systemd service configuration
@@ -24,7 +35,7 @@ The fix command can:
 This command combines the functionality of 'eos debug consul --fix'
 with additional permission and ownership repairs.
 
-EXAMPLES:
+EXAMPLES (DEPRECATED - use 'eos update consul --fix' instead):
   # Auto-fix all Consul issues
   sudo eos fix consul
 
@@ -44,6 +55,14 @@ func init() {
 }
 
 func runConsulFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Print deprecation warning
+	logger.Warn("⚠️  DEPRECATION WARNING: 'eos fix consul' is deprecated")
+	logger.Warn("   Use 'eos update consul --fix' instead")
+	logger.Warn("   This command will be removed in Eos v2.0.0 (approximately 6 months from now)")
+	logger.Info("")
+
 	// Parse flags
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	permissionsOnly, _ := cmd.Flags().GetBool("permissions-only")

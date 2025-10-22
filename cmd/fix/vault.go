@@ -15,10 +15,20 @@ import (
 
 var vaultFixCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Fix common Vault installation issues",
-	Long: `Automatically detect and fix common Vault installation issues.
+	Short: "[DEPRECATED] Fix common Vault installation issues - use 'eos update vault --fix'",
+	Long: `⚠️  DEPRECATION WARNING:
+This command is deprecated and will be removed in Eos v2.0.0 (approximately 6 months from now).
 
-This command can repair:
+Use 'eos update vault --fix' instead for configuration drift correction.
+
+Migration guide:
+  eos fix vault --all           →  eos update vault --fix
+  eos fix vault --all --dry-run →  eos update vault --drift
+
+The new 'eos update vault --fix' provides the same functionality with better
+semantics: it compares current state against canonical state and corrects drift.
+
+Legacy functionality (still works):
 - Duplicate binary installations
 - File permissions on config/data/TLS files
 - Systemd service configuration
@@ -26,7 +36,7 @@ This command can repair:
 - Missing directories
 - Incorrect API and cluster addresses (localhost → hostname)
 
-EXAMPLES:
+EXAMPLES (DEPRECATED - use 'eos update vault --fix' instead):
   # Auto-repair all detected issues
   sudo eos fix vault --all
 
@@ -59,6 +69,13 @@ func init() {
 
 func runVaultFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// Print deprecation warning
+	logger.Warn("⚠️  DEPRECATION WARNING: 'eos fix vault' is deprecated")
+	logger.Warn("   Use 'eos update vault --fix' instead")
+	logger.Warn("   This command will be removed in Eos v2.0.0 (approximately 6 months from now)")
+	logger.Info("")
+
 	logger.Info("Starting Vault repair")
 
 	// Parse flags into config

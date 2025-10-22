@@ -97,7 +97,31 @@ Secrets Management?
 └─ Never hardcode → Store via secretManager.StoreSecret()
 
 Command Structure?
-└─ VERB-FIRST only: create, read, list, update, delete (+ self, backup, build, deploy, promote, env)
+└─ VERB-FIRST only: create, read, list, update (includes --fix), delete (+ self, backup, build, deploy, promote, env)
+
+Configuration Drift Correction (P0 - NEW PATTERN)?
+├─ Service has drifted from canonical state (permissions, config values)?
+│  ├─ Use: eos update <service> --fix
+│  ├─ Compares: Current state vs. 'eos create <service>' canonical state
+│  ├─ Corrects: Permissions, ownership, config values, duplicate binaries
+│  ├─ Verifies: Post-fix state matches canonical
+│  └─ Example: eos update vault --fix
+│
+├─ Want to check drift without fixing?
+│  ├─ Use: eos update <service> --fix --dry-run
+│  ├─ Pattern: --dry-run works consistently across all update operations
+│  ├─ Example: eos update consul --fix --dry-run
+│  └─ Example: eos update vault --ports X->Y --dry-run
+│
+├─ CI/CD pipeline verification?
+│  └─ Use: eos update <service> --fix --dry-run && check exit code
+│
+└─ Old 'eos fix' commands?
+   ├─ DEPRECATED: Use 'eos update <service> --fix' instead
+   ├─ eos fix vault       →  eos update vault --fix
+   ├─ eos fix consul      →  eos update consul --fix
+   ├─ eos fix mattermost  →  eos update mattermost --fix
+   └─ Will be removed in Eos v2.0.0 (approximately 6 months)
 
 Adding a Constant?
 ├─ Vault-related path/URL → pkg/vault/constants.go ONLY
@@ -695,6 +719,9 @@ Before completing any task, verify:
 | `strings.TrimSpace(url)` only | Use `shared.SanitizeURL(url)` |
 | Error when dependency missing | Offer informed consent to install (see Dependency Not Found) |
 | Silent dependency checks | Use `interaction.CheckDependencyWithPrompt()` |
+| `eos fix vault` | `eos update vault --fix` (fix is deprecated) |
+| `eos fix consul` | `eos update consul --fix` |
+| `eos fix mattermost` | `eos update mattermost --fix` |
 
 ## Priority Levels
 

@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/mattermost/fix"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 var (
@@ -19,10 +20,20 @@ var (
 
 var mattermostFixCmd = &cobra.Command{
 	Use:   "mattermost",
-	Short: "Fix Mattermost container permission issues",
-	Long: `Automatically fix common Mattermost container permission issues.
+	Short: "[DEPRECATED] Fix Mattermost container permission issues - use 'eos update mattermost --fix'",
+	Long: `⚠️  DEPRECATION WARNING:
+This command is deprecated and will be removed in Eos v2.0.0 (approximately 6 months from now).
 
-This command fixes:
+Use 'eos update mattermost --fix' instead for configuration drift correction.
+
+Migration guide:
+  eos fix mattermost            →  eos update mattermost --fix
+  eos fix mattermost --dry-run  →  eos update mattermost --drift
+
+The new 'eos update mattermost --fix' provides the same functionality with better
+semantics: it compares current state against canonical state and corrects drift.
+
+Legacy functionality (still works):
 - Volume permission issues (chown 2000:2000)
 - Container restart after permission fix
 - Verification of successful startup
@@ -35,7 +46,7 @@ The fix process:
 5. Start Mattermost container
 6. Watch logs to verify successful startup
 
-EXAMPLES:
+EXAMPLES (DEPRECATED - use 'eos update mattermost --fix' instead):
   # Fix Mattermost permissions
   sudo eos fix mattermost
 
@@ -55,6 +66,14 @@ func init() {
 }
 
 func runMattermostFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Print deprecation warning
+	logger.Warn("⚠️  DEPRECATION WARNING: 'eos fix mattermost' is deprecated")
+	logger.Warn("   Use 'eos update mattermost --fix' instead")
+	logger.Warn("   This command will be removed in Eos v2.0.0 (approximately 6 months from now)")
+	logger.Info("")
+
 	config := &fix.Config{
 		DryRun:        mattermostFixDryRun,
 		ComposeDir:    mattermostFixComposeDir,
