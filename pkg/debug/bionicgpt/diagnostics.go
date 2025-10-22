@@ -59,6 +59,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		NetworkConnectivityDiagnostic(),
 		PortListenerDiagnostic(),
 		ZombieProcessesDiagnostic(),
+		AuthenticationIssueDiagnostic(),
 	}
 }
 

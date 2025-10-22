@@ -106,6 +106,26 @@ func (bgi *BionicGPTInstaller) Install() error {
 			bgi.config.InstallDir)
 	}
 
+	// SHIFT-LEFT: Run pre-flight validation checks BEFORE starting installation
+	// This catches configuration issues early, before deployment begins
+	logger.Info("")
+	logger.Info("Running pre-deployment validation...")
+	preflightResult, err := bgi.runPreflightChecks(ctx)
+	if err != nil {
+		return fmt.Errorf("pre-flight checks failed: %w", err)
+	}
+
+	if !preflightResult.Passed {
+		return eos_err.NewUserError(
+			"Pre-deployment validation failed with %d error(s)\n"+
+				"Please fix the errors above before retrying installation",
+			len(preflightResult.Errors))
+	}
+
+	logger.Info("")
+	logger.Info("✓ Pre-deployment validation passed - safe to proceed")
+	logger.Info("")
+
 	// INTERVENE: Perform installation
 	if err := bgi.performInstallation(ctx); err != nil {
 		return fmt.Errorf("installation failed: %w", err)
@@ -313,13 +333,20 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		return fmt.Errorf("failed to create LiteLLM env file: %w", err)
 	}
 
-	// Step 8: Create .env file
+	// Step 8: Create database initialization script
+	// SHIFT-LEFT FIX: Automate database user creation instead of manual post-deployment step
+	logger.Info("Creating database initialization script")
+	if err := bgi.createDatabaseInitScript(ctx); err != nil {
+		return fmt.Errorf("failed to create database init script: %w", err)
+	}
+
+	// Step 9: Create .env file
 	logger.Info("Creating environment configuration", zap.String("file", bgi.config.EnvFile))
 	if err := bgi.createEnvFile(ctx); err != nil {
 		return err
 	}
 
-	// Step 9: Create docker-compose.yml
+	// Step 10: Create docker-compose.yml
 	logger.Info("Creating Docker Compose configuration", zap.String("file", bgi.config.ComposeFile))
 	logger.Debug("Pre-operation: compose file creation",
 		zap.String("install_dir", bgi.config.InstallDir))
@@ -328,7 +355,7 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	}
 	logger.Debug("Post-operation: compose file created")
 
-	// Step 9: Pull Docker images
+	// Step 11: Pull Docker images
 	logger.Debug("Pre-operation: docker pull",
 		zap.String("compose_file", bgi.config.ComposeFile))
 	if err := bgi.pullDockerImages(ctx); err != nil {
@@ -336,8 +363,11 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	}
 	logger.Debug("Post-operation: images pulled successfully")
 
-	// Step 10: Start the service
+	// Step 12: Start the service with phased deployment
+	// The database init script will automatically create bionic_application user
+	// on first startup, so no manual user creation needed
 	logger.Info("Starting BionicGPT services")
+	logger.Info("Database will automatically create application user on first startup")
 	logger.Debug("Pre-operation: service startup",
 		zap.Int("port", bgi.config.Port))
 	if err := bgi.startService(ctx); err != nil {
@@ -345,30 +375,23 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	}
 	logger.Debug("Post-operation: services started successfully")
 
-	// Step 11: Create database application user
-	// CRITICAL: This must happen after migrations but before app containers fully start
-	// The RAG engine and app need this user to connect to the database
-	logger.Info("Setting up database users")
-	if err := bgi.createDatabaseUser(ctx); err != nil {
-		return fmt.Errorf("failed to create database user: %w", err)
+	// Step 13: Post-deployment verification
+	// SHIFT-LEFT: Comprehensive verification immediately after deployment
+	logger.Info("")
+	logger.Info("Running post-deployment verification...")
+	verificationResult, err := bgi.runPostDeploymentVerification(ctx)
+	if err != nil {
+		return fmt.Errorf("post-deployment verification failed: %w", err)
 	}
 
-	// Step 12: Restart containers that depend on the database user
-	// This ensures RAG engine and app pick up the new user
-	logger.Info("Restarting application containers")
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"compose", "-f", bgi.config.ComposeFile, "restart", "rag-engine", "app"},
-		Dir:     bgi.config.InstallDir,
-		Capture: true,
-		Timeout: 2 * time.Minute,
-	})
-	if err != nil {
-		logger.Warn("Failed to restart containers (they may start on their own)",
-			zap.Error(err),
-			zap.String("output", output))
-		// Don't fail installation - containers will retry connection
+	// Don't fail on warnings, but report them
+	if len(verificationResult.Issues) > 0 {
+		logger.Warn(fmt.Sprintf("Deployment completed with %d issue(s)", len(verificationResult.Issues)))
+		logger.Info("Services may need a few more minutes to fully initialize")
 	}
+
+	// Note: Database user creation is automated via init script
+	logger.Info("Database initialization complete (automated via init script)")
 
 	return nil
 }
@@ -782,6 +805,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - %s:/var/lib/postgresql/data
+      - ./%s:%s:ro  # SHIFT-LEFT: Automated user creation via init script
     networks:
       - bionicgpt-network
     restart: unless-stopped
@@ -848,11 +872,15 @@ services:
       - bionicgpt-network
     restart: unless-stopped
     healthcheck:
+      # SHIFT-LEFT FIX: More tolerant health check configuration
+      # - Increased start_period: 90s (was 30s) - allows Azure OpenAI connection time
+      # - Increased retries: 5 (was 3) - more tolerant of transient failures
+      # - Increased interval: 60s (was 30s) - reduce check frequency
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 30s
+      interval: 60s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 90s
     logging:
       driver: "json-file"
       options:
@@ -926,6 +954,8 @@ networks:
 		ImagePostgreSQL,
 		ContainerPostgres,
 		VolumePostgresData,
+		InitScriptFilename,       // Init script filename
+		InitScriptDockerPath,     // Init script mount path
 		// Migrations
 		ImageMigrations,
 		DefaultBionicGPTVersion,
@@ -969,97 +999,28 @@ func (bgi *BionicGPTInstaller) pullDockerImages(ctx context.Context) error {
 	return nil
 }
 
-// startService starts the BionicGPT services
+// startService starts the BionicGPT services using phased deployment
+// SHIFT-LEFT FIX: Phased deployment instead of "docker compose up -d" all at once
 func (bgi *BionicGPTInstaller) startService(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("Starting containers with docker compose up")
-	logger.Debug("Executing docker compose up",
-		zap.String("command", "docker"),
-		zap.Strings("args", []string{"compose", "-f", bgi.config.ComposeFile, "up", "-d"}),
-		zap.String("working_dir", bgi.config.InstallDir),
-		zap.Duration("timeout", 10*time.Minute))
+	logger.Info("Starting BionicGPT services using phased deployment")
+	logger.Info("This ensures services start in correct dependency order")
 
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"compose", "-f", bgi.config.ComposeFile, "up", "-d"},
-		Dir:     bgi.config.InstallDir,
-		Capture: true,
-		Timeout: 10 * time.Minute,
-	})
-
-	if err != nil {
-		logger.Error("Docker compose failed", zap.Error(err), zap.String("output", output))
-		return fmt.Errorf("failed to start services: %s", output)
+	// Use intelligent phased deployment instead of starting all at once
+	if err := bgi.phasedDeployment(ctx); err != nil {
+		logger.Error("Phased deployment failed", zap.Error(err))
+		return fmt.Errorf("phased deployment failed: %w", err)
 	}
 
-	logger.Info("Services started successfully")
-	logger.Debug("Post-operation: all containers started")
+	logger.Info("Phased deployment completed successfully")
+	logger.Debug("Post-operation: all containers started and verified")
 	return nil
 }
 
-// createDatabaseUser creates the bionic_application database user
-// This is required because BionicGPT migrations don't create the application user
-// The user needs to exist before the RAG engine and app containers can connect
-func (bgi *BionicGPTInstaller) createDatabaseUser(ctx context.Context) error {
-	logger := otelzap.Ctx(ctx)
-
-	logger.Info("Creating bionic_application database user")
-
-	// Wait for postgres to be healthy (already done by docker compose dependencies, but be safe)
-	logger.Debug("Waiting for postgres container to be ready")
-	time.Sleep(5 * time.Second)
-
-	// Create the application user with the same password as in .env
-	sqlCommands := fmt.Sprintf(`
-		-- Create user if it doesn't exist
-		DO $$
-		BEGIN
-			IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'bionic_application') THEN
-				CREATE USER bionic_application WITH PASSWORD '%s';
-			END IF;
-		END
-		$$;
-
-		-- Grant necessary privileges
-		GRANT ALL PRIVILEGES ON DATABASE "bionic-gpt" TO bionic_application;
-		GRANT ALL ON SCHEMA public TO bionic_application;
-		GRANT ALL ON ALL TABLES IN SCHEMA public TO bionic_application;
-		GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO bionic_application;
-		ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bionic_application;
-		ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bionic_application;
-	`, bgi.config.PostgresPassword)
-
-	logger.Debug("Executing SQL to create user",
-		zap.String("container", ContainerPostgres),
-		zap.String("user", "postgres"),
-		zap.String("database", bgi.config.PostgresDB))
-
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args: []string{
-			"exec", "-i", ContainerPostgres,
-			"psql", "-U", "postgres", "-d", bgi.config.PostgresDB,
-			"-c", sqlCommands,
-		},
-		Capture: true,
-		Timeout: 30 * time.Second,
-	})
-
-	if err != nil {
-		logger.Error("Failed to create database user",
-			zap.Error(err),
-			zap.String("output", output))
-		return fmt.Errorf("failed to create bionic_application user: %s", output)
-	}
-
-	logger.Info("Database user created successfully",
-		zap.String("user", "bionic_application"),
-		zap.String("database", bgi.config.PostgresDB))
-	logger.Debug("SQL execution output", zap.String("output", output))
-
-	return nil
-}
+// Note: createDatabaseUser function removed - database user creation is now
+// automated via init-db.sh script that runs on postgres first startup.
+// See dbinit.go for the new implementation.
 
 // verifyInstallation verifies that BionicGPT is running correctly
 // Uses comprehensive validator with Docker SDK and multi-tenancy checks
