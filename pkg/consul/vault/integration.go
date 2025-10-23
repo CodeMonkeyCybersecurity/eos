@@ -18,8 +18,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/registry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -37,12 +37,12 @@ type VaultIntegration struct {
 
 // IntegrationConfig configures Vault-Consul integration
 type IntegrationConfig struct {
-	ConsulAddress    string // Consul API address
-	ConsulACLToken   string // Consul management token for ACL operations
-	VaultAddress     string // Vault API address
-	ServiceID        string // Custom service ID (default: vault-<hostname>)
-	AutoCreatePolicy bool   // Automatically create Vault ACL policy
-	AutoCreateToken  bool   // Automatically create ACL token for Vault
+	ConsulAddress    string        // Consul API address
+	ConsulACLToken   string        // Consul management token for ACL operations
+	VaultAddress     string        // Vault API address
+	ServiceID        string        // Custom service ID (default: vault-<hostname>)
+	AutoCreatePolicy bool          // Automatically create Vault ACL policy
+	AutoCreateToken  bool          // Automatically create ACL token for Vault
 	TokenTTL         time.Duration // ACL token expiration TTL
 }
 
