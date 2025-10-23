@@ -36,6 +36,8 @@ func AllDiagnostics() []*debug.Diagnostic {
 		EnvFileDiagnostic(),
 		EnvFileContentDiagnostic(),
 		SrHDVariableCheckDiagnostic(),
+		VaultConfigDiagnostic(),          // NEW: Verify secrets in Vault
+		ConsulConfigDiagnostic(),         // NEW: Verify config in Consul KV
 		DockerDaemonDiagnostic(),
 		ContainerStatusDiagnostic(),
 		PostgresContainerDiagnostic(),
