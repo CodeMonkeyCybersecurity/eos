@@ -117,12 +117,138 @@ func init() {
 	CreateCmd.AddCommand(createCephCmd)
 }
 
+func runInteractiveCephCreate(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Starting interactive Ceph resource creation")
+	fmt.Println("\nCeph Resource Creation Wizard")
+	fmt.Println("==============================")
+	fmt.Println("\nWhat would you like to create?")
+	fmt.Println("  1) Volume   - CephFS volume for file storage")
+	fmt.Println("  2) Snapshot - Snapshot of an existing volume")
+	fmt.Println("  3) Pool     - Storage pool for data replication")
+	fmt.Println()
+
+	choice, err := eos_io.PromptInput(rc, "Enter choice (1-3) [1]: ", "choice")
+	if err != nil {
+		return fmt.Errorf("failed to get choice: %w", err)
+	}
+	if choice == "" {
+		choice = "1"
+	}
+
+	switch choice {
+	case "1":
+		// Create volume interactively
+		cephVolumeName, err = eos_io.PromptInput(rc, "Volume name [mydata]: ", "volume_name")
+		if err != nil {
+			return fmt.Errorf("failed to get volume name: %w", err)
+		}
+		if cephVolumeName == "" {
+			cephVolumeName = "mydata"
+		}
+
+		sizeStr, err := eos_io.PromptInput(rc, "Volume size (e.g., 100GB, 1TB, or 0 for unlimited) [0]: ", "volume_size")
+		if err != nil {
+			return fmt.Errorf("failed to get volume size: %w", err)
+		}
+		if sizeStr == "" || sizeStr == "0" {
+			cephVolumeSize = 0 // Unlimited
+		}
+
+		replStr, err := eos_io.PromptInput(rc, "Replication size [3]: ", "replication")
+		if err != nil {
+			return fmt.Errorf("failed to get replication: %w", err)
+		}
+		if replStr == "" {
+			cephVolumeReplication = 3
+		} else {
+			fmt.Sscanf(replStr, "%d", &cephVolumeReplication)
+		}
+
+		// Set defaults for pools
+		cephVolumeDataPool = cephVolumeName + "_data"
+		cephVolumeMetaPool = cephVolumeName + "_metadata"
+
+	case "2":
+		// Create snapshot interactively
+		cephSnapshotVolume, err = eos_io.PromptInput(rc, "Volume to snapshot: ", "snapshot_volume")
+		if err != nil {
+			return fmt.Errorf("failed to get volume name: %w", err)
+		}
+		if cephSnapshotVolume == "" {
+			return fmt.Errorf("volume name is required for snapshots")
+		}
+
+		defaultSnapName := fmt.Sprintf("snapshot-%s", cephSnapshotVolume)
+		cephSnapshotName, err = eos_io.PromptInput(rc, fmt.Sprintf("Snapshot name [%s]: ", defaultSnapName), "snapshot_name")
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot name: %w", err)
+		}
+		if cephSnapshotName == "" {
+			cephSnapshotName = defaultSnapName
+		}
+
+	case "3":
+		// Create pool interactively
+		cephPoolName, err = eos_io.PromptInput(rc, "Pool name [mypool]: ", "pool_name")
+		if err != nil {
+			return fmt.Errorf("failed to get pool name: %w", err)
+		}
+		if cephPoolName == "" {
+			cephPoolName = "mypool"
+		}
+
+		pgStr, err := eos_io.PromptInput(rc, "Number of placement groups (PGs) [128]: ", "pg_num")
+		if err != nil {
+			return fmt.Errorf("failed to get PG number: %w", err)
+		}
+		if pgStr == "" {
+			cephPoolPGNum = 128
+		} else {
+			fmt.Sscanf(pgStr, "%d", &cephPoolPGNum)
+		}
+
+		sizeStr, err := eos_io.PromptInput(rc, "Replication size [3]: ", "replication_size")
+		if err != nil {
+			return fmt.Errorf("failed to get replication size: %w", err)
+		}
+		if sizeStr == "" {
+			cephPoolSize = 3
+		} else {
+			fmt.Sscanf(sizeStr, "%d", &cephPoolSize)
+		}
+
+		cephPoolType, err = eos_io.PromptInput(rc, "Pool type (replicated/erasure) [replicated]: ", "pool_type")
+		if err != nil {
+			return fmt.Errorf("failed to get pool type: %w", err)
+		}
+		if cephPoolType == "" {
+			cephPoolType = "replicated"
+		}
+
+		cephPoolApplication, err = eos_io.PromptInput(rc, "Application (cephfs/rbd/rgw) [cephfs]: ", "application")
+		if err != nil {
+			return fmt.Errorf("failed to get application: %w", err)
+		}
+		if cephPoolApplication == "" {
+			cephPoolApplication = "cephfs"
+		}
+
+	default:
+		return fmt.Errorf("invalid choice: %s", choice)
+	}
+
+	// Now run the normal creation flow
+	return runCephCreate(rc, cmd, nil)
+}
+
 func runCephCreate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Determine what to create based on flags
+	// If no flags specified, offer interactive mode
 	if cephVolumeName == "" && cephSnapshotName == "" && cephPoolName == "" {
-		return fmt.Errorf("must specify one of: --volume, --snapshot, or --pool")
+		return runInteractiveCephCreate(rc, cmd)
 	}
 
 	// Create Ceph client
@@ -180,6 +306,10 @@ func createVolume(rc *eos_io.RuntimeContext, client *cephfs.CephClient) error {
 		opts.MetadataPool = cephVolumeName + "_metadata"
 	}
 
+	// Actually create the volume
+	if err := client.CreateVolume(rc, opts); err != nil {
+		return fmt.Errorf("failed to create volume: %w", err)
+	}
 
 	logger.Info("Volume created successfully",
 		zap.String("volume", cephVolumeName))

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 	"time"
 
@@ -81,12 +80,43 @@ var (
 	VaultClusterPort        = fmt.Sprintf("%d", PortVaultCluster)
 	VaultClusterPortInt     = PortVaultCluster
 	VaultWebPortTCP         = VaultDefaultPort + "/tcp"
-	ListenerAddr            = "127.0.0.1:" + VaultDefaultPort
 	VaultDefaultAddr        = "https://%s:" + VaultDefaultPort
-	VaultDefaultLocalAddr   = "https://127.0.0.1:" + VaultDefaultPort
-	VaultDefaultClusterAddr = "https://127.0.0.1:" + VaultClusterPort
-	ConsulDefaultAddr       = fmt.Sprintf("127.0.0.1:%d", PortConsul) // Consul HTTP API on HashiCorp standard port 8500
 )
+
+// GetListenerAddr returns the Vault listener address using hostname resolution
+// Replaces hardcoded ListenerAddr = "127.0.0.1:8200"
+func GetListenerAddr() string {
+	hostname := GetInternalHostname()
+	return fmt.Sprintf("%s:%s", hostname, VaultDefaultPort)
+}
+
+// GetVaultDefaultLocalAddr returns the Vault local address using hostname resolution
+// Replaces hardcoded VaultDefaultLocalAddr = "https://127.0.0.1:8200"
+func GetVaultDefaultLocalAddr() string {
+	hostname := GetInternalHostname()
+	return fmt.Sprintf("https://%s:%s", hostname, VaultDefaultPort)
+}
+
+// GetVaultDefaultClusterAddr returns the Vault cluster address using hostname resolution
+// Replaces hardcoded VaultDefaultClusterAddr = "https://127.0.0.1:8201"
+func GetVaultDefaultClusterAddr() string {
+	hostname := GetInternalHostname()
+	return fmt.Sprintf("https://%s:%s", hostname, VaultClusterPort)
+}
+
+// GetConsulDefaultAddr returns the Consul address using hostname resolution
+// Replaces hardcoded ConsulDefaultAddr = "127.0.0.1:8500"
+func GetConsulDefaultAddr() string {
+	hostname := GetInternalHostname()
+	return fmt.Sprintf("%s:%d", hostname, PortConsul)
+}
+
+// GetVaultHealthEndpoint returns the Vault health check endpoint using hostname resolution
+// Replaces hardcoded VaultHealthEndpoint
+func GetVaultHealthEndpoint() string {
+	hostname := GetInternalHostname()
+	return fmt.Sprintf("https://%s/v1/sys/health", hostname)
+}
 
 // Computed Vault directory paths
 // NOTE: Hardcoded paths to avoid circular import (pkg/shared cannot import pkg/vault)
@@ -110,9 +140,8 @@ var (
 	VaultInitPath            = filepath.Join(SecretsDir, "vault_init.json")
 	WazuhFallbackSecretsPath = filepath.Join(SecretsDir, "wazuh_fallback.json")
 	EosRunDir                = "/run/eos"
-	VaultPID                 = filepath.Join(EosRunDir, "vault.pid")
-	VaultTokenSinkPath       = filepath.Join(EosRunDir, ".vault-token")
-	VaultHealthEndpoint      = fmt.Sprintf("https://%s/v1/sys/health", strings.Split(ListenerAddr, ":")[0])
+	VaultPID           = filepath.Join(EosRunDir, "vault.pid")
+	VaultTokenSinkPath = filepath.Join(EosRunDir, ".vault-token")
 	VaultClient              *api.Client
 )
 
@@ -355,7 +384,7 @@ type RetryJoinNode struct {
 // File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
 func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, error) {
 	if addr == "" {
-		addr = VaultDefaultLocalAddr
+		addr = GetVaultDefaultLocalAddr()
 	}
 
 	// Use Consul backend (recommended) instead of deprecated file storage
@@ -365,10 +394,10 @@ func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, 
 		TLSCrt:        TLSCrt,
 		TLSKey:        TLSKey,
 		APIAddr:       addr,
-		ClusterAddr:   VaultDefaultClusterAddr,
+		ClusterAddr:   GetVaultDefaultClusterAddr(),
 		LogLevel:      logLevel,
 		LogFormat:     logFormat,
-		ConsulAddress: ConsulDefaultAddr,
+		ConsulAddress: GetConsulDefaultAddr(),
 		ConsulPath:    "vault/",
 		ConsulScheme:  "http",
 	}
@@ -395,7 +424,7 @@ func RenderVaultConfigConsul(params VaultConfigParams) (string, error) {
 		params.TLSKey = TLSKey
 	}
 	if params.ConsulAddress == "" {
-		params.ConsulAddress = ConsulDefaultAddr
+		params.ConsulAddress = GetConsulDefaultAddr()
 	}
 	if params.ConsulPath == "" {
 		params.ConsulPath = "vault/"

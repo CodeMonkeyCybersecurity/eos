@@ -685,7 +685,7 @@ User=vault
 Group=vault
 ExecStart=%s
 Environment=VAULT_ADDR=%s
-`, VaultBackupScriptPath, shared.VaultDefaultLocalAddr)
+`, VaultBackupScriptPath, shared.GetVaultDefaultLocalAddr())
 
 	if err := os.WriteFile(VaultBackupTimerPath, []byte(timerContent), 0644); err != nil {
 		log.Warn("Failed to write vault backup timer", zap.Error(err))
