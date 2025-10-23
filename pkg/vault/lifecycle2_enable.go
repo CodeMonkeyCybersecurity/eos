@@ -77,26 +77,37 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Info(" [ASSESS] No existing VAULT_TOKEN found - proceeding with fresh setup")
 	}
 
-	// CRITICAL P0 FIX: Initialize privileged client ONCE and cache it
-	// This eliminates 34 duplicate GetRootClient() calls throughout the setup phases
-	// Impact: 306 fewer log lines + ~30 seconds faster setup
+	// ============================================================================
+	// CRITICAL P0 FIX: Run Phase 6 FIRST to get root-authenticated client
+	// Then cache it for all subsequent phases (6c, 7, 8, 9, 10, 11, 12, etc.)
+	//
+	// Why this order matters:
+	// - Phase 6 (UnsealVault) provides root-authenticated client from vault_init.json
+	// - Vault Agent doesn't exist until Phase 14 (can't use agent token yet)
+	// - AppRole doesn't exist until Phase 10b (can't use AppRole auth yet)
+	// - Userpass doesn't exist until Phase 10a (can't use userpass yet)
+	//
+	// Before this fix: Phase 0 tried to authenticate before credentials existed,
+	// causing 30s wait for agent token + confusing userpass prompt
+	// ============================================================================
 	log.Info("───────────────────────────────────────────────────────────────")
-	log.Info(" [Phase 0] Initializing privileged Vault client for setup")
-	privilegedClient, err := GetPrivilegedClient(rc)
-	if err != nil {
-		return logger.LogErrAndWrap(rc, "initialize privileged client", err)
-	}
-	log.Info(" [Phase 0] Privileged client initialized and cached",
-		zap.String("vault_addr", privilegedClient.Address()))
-	log.Info("───────────────────────────────────────────────────────────────")
-	log.Info(" [Phase 6] Starting Vault initialization and unseal process")
+	log.Info(" [Phase 6] Initializing and unsealing Vault (provides root-authenticated client)")
 	phaseStart := time.Now()
 	unsealedClient, err := UnsealVault(rc)
 	if err != nil {
 		return logger.LogErrAndWrap(rc, "initialize and unseal vault", err)
 	}
+
+	// CRITICAL: Cache the privileged client for ALL subsequent phases
+	// This prevents re-authentication attempts that would fail (Agent/AppRole not configured yet)
+	log.Info(" [Phase 6] Caching authenticated client for subsequent phases",
+		zap.String("vault_addr", unsealedClient.Address()),
+		zap.Bool("authenticated", unsealedClient.Token() != ""))
+	SetPrivilegedClient(rc, unsealedClient) // Cache for GetPrivilegedClient() calls
+	SetVaultClient(rc, unsealedClient)      // Also cache as regular client
+
 	client = unsealedClient
-	log.Info(" [Phase 6] Vault client initialized and unsealed successfully",
+	log.Info(" [Phase 6] Vault initialized, unsealed, and client cached successfully",
 		zap.Duration("duration", time.Since(phaseStart)))
 
 	// CRITICAL SECURITY: Enable audit devices IMMEDIATELY after initialization
