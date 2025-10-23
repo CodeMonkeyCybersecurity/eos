@@ -450,28 +450,37 @@ func GetRenewalHistory(datacenter string) ([]string, error) {
 
 // InstallRenewalTimer installs systemd timer for automatic renewal
 func InstallRenewalTimer() error {
-	// Create systemd service unit
-	serviceContent := `[Unit]
+	// Create systemd service unit using centralized security directives
+	serviceContent := fmt.Sprintf(`[Unit]
 Description=Vault TLS Certificate Renewal Check
 Documentation=https://wiki.cybermonkey.net.au/vault/tls-renewal
 
 [Service]
-Type=oneshot
+Type=%s
 User=root
 ExecStart=/usr/local/bin/eos update vault-cert --check-renewal
-StandardOutput=journal
-StandardError=journal
+StandardOutput=%s
+StandardError=%s
 
-# Security hardening
-PrivateTmp=yes
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/etc/vault.d/tls /opt/vault/ca
+# Security hardening (from pkg/vault/constants.go)
+PrivateTmp=%s
+NoNewPrivileges=%s
+ProtectSystem=%s
+ProtectHome=%s
+ReadWritePaths=%s
 
 [Install]
 WantedBy=multi-user.target
-`
+`,
+		VaultCertRenewalServiceType,
+		VaultCertRenewalStandardOutput,
+		VaultCertRenewalStandardError,
+		VaultCertRenewalPrivateTmp,
+		VaultCertRenewalNoNewPrivileges,
+		VaultCertRenewalProtectSystem,
+		VaultCertRenewalProtectHome,
+		VaultCertRenewalReadWritePaths,
+	)
 
 	// Create systemd timer unit
 	timerContent := `[Unit]

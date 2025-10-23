@@ -301,22 +301,25 @@ func disableCoreDumps(rc *eos_io.RuntimeContext) error {
 		log.Warn("Failed to set ulimit for core dumps", zap.Error(err))
 	}
 
-	// Create systemd override for vault service
+	// NOTE: Systemd security hardening is now centralized in the main unit file
+	// (pkg/vault/constants.go VaultSystemd* constants) rather than using drop-in overrides.
+	// This prevents conflicts and ensures consistency.
+	//
+	// Previous approach: Created /etc/systemd/system/vault.service.d/security.conf drop-in
+	// New approach: All security directives in main vault.service unit file
+	//
+	// If drop-in already exists from old installs, it should be removed:
 	vaultServiceDir := VaultServiceDropinDir
-	if err := os.MkdirAll(vaultServiceDir, 0755); err == nil {
-		overrideContent := `[Service]
-LimitCORE=0
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/vault
-`
-		if err := os.WriteFile(filepath.Join(vaultServiceDir, "security.conf"), []byte(overrideContent), 0644); err != nil {
-			log.Warn("Failed to write vault security override", zap.Error(err))
-		}
-		if err := execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload"); err != nil {
-			log.Warn("Failed to reload systemd", zap.Error(err))
+	oldOverrideFile := filepath.Join(vaultServiceDir, "security.conf")
+	if _, err := os.Stat(oldOverrideFile); err == nil {
+		log.Info("Removing legacy systemd override (security now in main unit)",
+			zap.String("file", oldOverrideFile))
+		if err := os.Remove(oldOverrideFile); err != nil {
+			log.Warn("Failed to remove legacy override", zap.Error(err))
+		} else {
+			if err := execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload"); err != nil {
+				log.Warn("Failed to reload systemd after removing override", zap.Error(err))
+			}
 		}
 	}
 

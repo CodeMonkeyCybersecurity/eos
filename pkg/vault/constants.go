@@ -382,6 +382,219 @@ const (
 	RootGroup  = "root"
 )
 
+// ============================================================================
+// Systemd Security Hardening Configuration (SECURITY-CRITICAL - P0)
+// ============================================================================
+// SINGLE SOURCE OF TRUTH for Vault systemd service security directives.
+//
+// Security Model: Defense in Depth
+//  Layer 1: File Permissions (above constants)
+//  Layer 2: Systemd Sandboxing (these constants)
+//  Layer 3: AppArmor/SELinux (future)
+//  Layer 4: Network Policies (firewall)
+//
+// CRITICAL: These directives MUST include ReadWritePaths for directories Vault needs to write to.
+//          Failure to do so causes "read-only file system" errors.
+//
+// References:
+//  - systemd.exec(5): https://www.freedesktop.org/software/systemd/man/systemd.exec.html
+//  - HashiCorp Production Hardening: https://developer.hashicorp.com/vault/docs/production-hardening
+
+const (
+	// === Systemd Service Type ===
+	// Type=notify: Vault sends systemd notification when startup is complete
+	// This enables systemd to track Vault's ready state accurately
+	VaultSystemdServiceType = "notify"
+
+	// === Systemd Restart Policy ===
+	VaultSystemdRestart    = "on-failure" // Restart only on abnormal exits
+	VaultSystemdRestartSec = "5"          // Wait 5 seconds between restart attempts
+
+	// === Startup Rate Limiting ===
+	// Prevent restart loops from DOSing the system
+	VaultSystemdStartLimitInterval = "60"  // 60-second window
+	VaultSystemdStartLimitBurst    = "3"   // Max 3 restarts in window
+
+	// === Resource Limits ===
+	VaultSystemdLimitNOFILE  = "65536" // Open file descriptors (Vault needs many connections)
+	VaultSystemdLimitNPROC   = "512"   // Max processes (reasonable limit for vault service)
+	VaultSystemdLimitMEMLOCK = "infinity" // Unlimited memory locking for mlock() (required by Vault)
+
+	// === Timeout Configuration ===
+	VaultSystemdTimeoutStopSec = "30" // Graceful shutdown timeout
+
+	// === Linux Capabilities ===
+	// CRITICAL: Vault requires CAP_IPC_LOCK for mlock() to prevent secrets from being swapped to disk
+	// SECURITY: Only grant minimum required capabilities
+	VaultSystemdCapabilityBoundingSet = "CAP_SYSLOG CAP_IPC_LOCK"
+	VaultSystemdAmbientCapabilities   = "CAP_IPC_LOCK"
+	VaultSystemdSecureBits            = "keep-caps" // Retain capabilities across setuid
+
+	// === Privilege Management ===
+	VaultSystemdNoNewPrivileges = "yes" // Prevent privilege escalation via execve()
+
+	// === Filesystem Sandboxing ===
+	// ProtectSystem=full: /usr, /boot, /efi read-only; /etc, /var writable
+	// CRITICAL: We use "full" not "strict" because Vault needs to write to /var/log/vault
+	//           "strict" would make ALL of /var read-only except what's in ReadWritePaths
+	VaultSystemdProtectSystem = "full"
+
+	// ReadWritePaths: CRITICAL - Directories Vault MUST be able to write to
+	// Without these, Vault gets "read-only file system" errors
+	// NOTE: Space-separated list, will be split in template
+	VaultSystemdReadWritePaths = "/opt/vault /var/log/vault"
+
+	// ProtectHome: Make /home, /root, /run/user inaccessible to Vault
+	// RATIONALE: Vault has no business accessing user home directories
+	VaultSystemdProtectHome = "read-only"
+
+	// === Temporary Directory Isolation ===
+	// PrivateTmp: Give Vault its own private /tmp and /var/tmp namespaces
+	// SECURITY: Prevents /tmp-based privilege escalation attacks
+	VaultSystemdPrivateTmp = "yes"
+
+	// === Device Isolation ===
+	// PrivateDevices: Vault gets a minimal /dev with only pseudo-devices
+	// SECURITY: Prevents access to physical hardware devices
+	VaultSystemdPrivateDevices = "yes"
+
+	// === Kernel Protections ===
+	VaultSystemdProtectKernelTunables = "yes" // Make /proc/sys, /sys read-only
+	VaultSystemdProtectKernelModules  = "yes" // Deny module loading
+	VaultSystemdProtectKernelLogs     = "yes" // Deny access to kernel logs
+	VaultSystemdProtectControlGroups  = "yes" // Make cgroup hierarchy read-only
+
+	// === Process Restrictions ===
+	VaultSystemdRestrictRealtime       = "yes" // Deny realtime scheduling
+	VaultSystemdRestrictNamespaces     = "yes" // Deny creating new namespaces
+	VaultSystemdRestrictAddressFamilies = "AF_INET AF_INET6 AF_UNIX" // Only allow IP and Unix sockets
+
+	// === Memory Protection ===
+	VaultSystemdMemoryDenyWriteExecute = "no" // Must be "no" - Vault's Go runtime needs this
+	VaultSystemdLockPersonality        = "yes" // Prevent personality() syscall
+
+	// === System Call Filtering ===
+	// NOTE: SystemCallFilter is intentionally NOT set here because it requires
+	//       extensive testing with Vault's operations. Future hardening can add:
+	//       SystemCallFilter=@system-service
+	//       SystemCallFilter=~@privileged @resources
+	//       But needs validation against Vault's actual syscall requirements.
+
+	// === Logging ===
+	VaultSystemdStandardOutput = "journal"
+	VaultSystemdStandardError  = "journal"
+	VaultSystemdKillMode       = "process" // Only kill main process, not entire cgroup
+)
+
+// VaultSystemdSecurityDirectives returns all security directives as a structured map
+// This allows templates and code to iterate over directives programmatically
+func VaultSystemdSecurityDirectives() map[string]string {
+	return map[string]string{
+		// Service configuration
+		"Type":                 VaultSystemdServiceType,
+		"Restart":              VaultSystemdRestart,
+		"RestartSec":           VaultSystemdRestartSec,
+		"StartLimitIntervalSec": VaultSystemdStartLimitInterval,
+		"StartLimitBurst":      VaultSystemdStartLimitBurst,
+
+		// Resource limits
+		"LimitNOFILE":  VaultSystemdLimitNOFILE,
+		"LimitNPROC":   VaultSystemdLimitNPROC,
+		"LimitMEMLOCK": VaultSystemdLimitMEMLOCK,
+		"TimeoutStopSec": VaultSystemdTimeoutStopSec,
+
+		// Capabilities
+		"CapabilityBoundingSet": VaultSystemdCapabilityBoundingSet,
+		"AmbientCapabilities":   VaultSystemdAmbientCapabilities,
+		"SecureBits":            VaultSystemdSecureBits,
+		"NoNewPrivileges":       VaultSystemdNoNewPrivileges,
+
+		// Filesystem sandboxing
+		"ProtectSystem":     VaultSystemdProtectSystem,
+		"ReadWritePaths":    VaultSystemdReadWritePaths,
+		"ProtectHome":       VaultSystemdProtectHome,
+		"PrivateTmp":        VaultSystemdPrivateTmp,
+		"PrivateDevices":    VaultSystemdPrivateDevices,
+
+		// Kernel protections
+		"ProtectKernelTunables": VaultSystemdProtectKernelTunables,
+		"ProtectKernelModules":  VaultSystemdProtectKernelModules,
+		"ProtectKernelLogs":     VaultSystemdProtectKernelLogs,
+		"ProtectControlGroups":  VaultSystemdProtectControlGroups,
+
+		// Process restrictions
+		"RestrictRealtime":        VaultSystemdRestrictRealtime,
+		"RestrictNamespaces":      VaultSystemdRestrictNamespaces,
+		"RestrictAddressFamilies": VaultSystemdRestrictAddressFamilies,
+
+		// Memory protection
+		"MemoryDenyWriteExecute": VaultSystemdMemoryDenyWriteExecute,
+		"LockPersonality":        VaultSystemdLockPersonality,
+
+		// Logging
+		"StandardOutput": VaultSystemdStandardOutput,
+		"StandardError":  VaultSystemdStandardError,
+		"KillMode":       VaultSystemdKillMode,
+	}
+}
+
+// ============================================================================
+// Certificate Renewal Service Systemd Configuration (SECURITY-CRITICAL - P0)
+// ============================================================================
+// Configuration for vault-cert-renewal.service (oneshot service for TLS renewal)
+//
+// RATIONALE: Certificate renewal is a different workload than the main Vault service:
+//  - Type=oneshot (runs periodically via timer, not continuously)
+//  - User=root (needs to write to /etc/vault.d/tls/)
+//  - Different ReadWritePaths (only cert directories, not data directories)
+//
+// Security Model:
+//  - More restrictive than main Vault service (ProtectSystem=strict)
+//  - Only grants write access to specific paths needed for cert renewal
+//  - Runs as root (required for cert management) but with heavy sandboxing
+
+const (
+	// === Certificate Renewal Service Type ===
+	VaultCertRenewalServiceType = "oneshot" // Runs once per timer trigger
+
+	// === Filesystem Sandboxing ===
+	// ProtectSystem=strict: ALL of /usr, /boot, /efi, AND /etc, /var are read-only
+	// This is MORE restrictive than the main Vault service which uses "full"
+	VaultCertRenewalProtectSystem = "strict"
+
+	// ReadWritePaths: ONLY allow writes to TLS cert directories
+	// /etc/vault.d/tls - Where new certificates are written
+	// /opt/vault/ca - Internal CA files (if using internal CA mode)
+	VaultCertRenewalReadWritePaths = "/etc/vault.d/tls /opt/vault/ca"
+
+	// ProtectHome: Make /home, /root completely inaccessible
+	VaultCertRenewalProtectHome = "yes" // "yes" = stronger than "read-only"
+
+	// === Temporary Directory Isolation ===
+	VaultCertRenewalPrivateTmp = "yes"
+
+	// === Privilege Management ===
+	VaultCertRenewalNoNewPrivileges = "yes"
+
+	// === Logging ===
+	VaultCertRenewalStandardOutput = "journal"
+	VaultCertRenewalStandardError  = "journal"
+)
+
+// VaultCertRenewalSystemdDirectives returns systemd directives for cert renewal service
+func VaultCertRenewalSystemdDirectives() map[string]string {
+	return map[string]string{
+		"Type":               VaultCertRenewalServiceType,
+		"ProtectSystem":      VaultCertRenewalProtectSystem,
+		"ReadWritePaths":     VaultCertRenewalReadWritePaths,
+		"ProtectHome":        VaultCertRenewalProtectHome,
+		"PrivateTmp":         VaultCertRenewalPrivateTmp,
+		"NoNewPrivileges":    VaultCertRenewalNoNewPrivileges,
+		"StandardOutput":     VaultCertRenewalStandardOutput,
+		"StandardError":      VaultCertRenewalStandardError,
+	}
+}
+
 // FilePermission represents a file/directory with ownership and permissions
 type FilePermission struct {
 	Path  string      // Full file path

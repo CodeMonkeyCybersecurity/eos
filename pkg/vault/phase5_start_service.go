@@ -80,23 +80,105 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 }
 
 func WriteVaultServerSystemdUnit(rc *eos_io.RuntimeContext) error {
-	// Generate systemd unit with correct paths from constants
+	// Generate systemd unit with comprehensive security hardening from centralized constants
 	svc := DefaultVaultService()
 
+	// Build systemd unit using centralized security directives
 	unit := fmt.Sprintf(`[Unit]
-Description=Vault Server (Eos)
-After=network.target
+Description=HashiCorp Vault
+Documentation=https://www.vaultproject.io/docs/
+Requires=network-online.target
+After=network-online.target
+ConditionFileNotEmpty=%s
+StartLimitIntervalSec=%s
+StartLimitBurst=%s
 
 [Service]
+Type=%s
 User=%s
 Group=%s
 ExecStart=%s
-Restart=on-failure
-LimitNOFILE=65536
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=%s
+RestartSec=%s
+TimeoutStopSec=%s
+KillMode=%s
+
+# Resource Limits
+LimitNOFILE=%s
+LimitNPROC=%s
+LimitMEMLOCK=%s
+
+# Linux Capabilities
+CapabilityBoundingSet=%s
+AmbientCapabilities=%s
+SecureBits=%s
+NoNewPrivileges=%s
+
+# Filesystem Sandboxing
+ProtectSystem=%s
+ReadWritePaths=%s
+ProtectHome=%s
+PrivateTmp=%s
+PrivateDevices=%s
+
+# Kernel Protections
+ProtectKernelTunables=%s
+ProtectKernelModules=%s
+ProtectKernelLogs=%s
+ProtectControlGroups=%s
+
+# Process Restrictions
+RestrictRealtime=%s
+RestrictNamespaces=%s
+RestrictAddressFamilies=%s
+
+# Memory Protection
+MemoryDenyWriteExecute=%s
+LockPersonality=%s
+
+# Logging
+StandardOutput=%s
+StandardError=%s
 
 [Install]
 WantedBy=multi-user.target
-`, svc.User, svc.Group, svc.ExecStartCommand())
+`,
+		VaultConfigPath,
+		VaultSystemdStartLimitInterval,
+		VaultSystemdStartLimitBurst,
+		VaultSystemdServiceType,
+		svc.User,
+		svc.Group,
+		svc.ExecStartCommand(),
+		VaultSystemdRestart,
+		VaultSystemdRestartSec,
+		VaultSystemdTimeoutStopSec,
+		VaultSystemdKillMode,
+		VaultSystemdLimitNOFILE,
+		VaultSystemdLimitNPROC,
+		VaultSystemdLimitMEMLOCK,
+		VaultSystemdCapabilityBoundingSet,
+		VaultSystemdAmbientCapabilities,
+		VaultSystemdSecureBits,
+		VaultSystemdNoNewPrivileges,
+		VaultSystemdProtectSystem,
+		VaultSystemdReadWritePaths,
+		VaultSystemdProtectHome,
+		VaultSystemdPrivateTmp,
+		VaultSystemdPrivateDevices,
+		VaultSystemdProtectKernelTunables,
+		VaultSystemdProtectKernelModules,
+		VaultSystemdProtectKernelLogs,
+		VaultSystemdProtectControlGroups,
+		VaultSystemdRestrictRealtime,
+		VaultSystemdRestrictNamespaces,
+		VaultSystemdRestrictAddressFamilies,
+		VaultSystemdMemoryDenyWriteExecute,
+		VaultSystemdLockPersonality,
+		VaultSystemdStandardOutput,
+		VaultSystemdStandardError,
+	)
 
 	err := os.WriteFile(svc.ServiceName, []byte(unit), shared.FilePermStandard)
 	if err != nil {
@@ -105,7 +187,8 @@ WantedBy=multi-user.target
 	otelzap.Ctx(rc.Ctx).Info(" Vault server systemd unit written",
 		zap.String("path", VaultServicePath),
 		zap.String("binary", VaultBinaryPath),
-		zap.String("config", VaultConfigPath))
+		zap.String("config", VaultConfigPath),
+		zap.String("read_write_paths", VaultSystemdReadWritePaths))
 	return nil
 }
 

@@ -1258,11 +1258,189 @@ log_format = "json"
 	return nil
 }
 
-
-// NOTE: The old setupService() method has been removed (was lines 1261-1443).
-// Systemd service setup is now handled in Phase 5 (StartVaultService) which uses
+// setupService configures and starts the Vault systemd service
+// DEPRECATED: This method is no longer called. Systemd service setup is now handled
+// in Phase 5 (StartVaultService in pkg/vault/phase5_start_service.go) which uses
 // centralized security configuration from pkg/vault/constants.go.
+// This method will be removed in a future version.
+//
+// DO NOT USE - kept only for reference during migration period.
+func (vi *VaultInstaller) setupService() error {
+	vi.logger.Info("Setting up Vault systemd service")
 
+	// Create systemd service file
+	serviceContent := fmt.Sprintf(`[Unit]
+Description=HashiCorp Vault
+Documentation=https://www.vaultproject.io/docs/
+Requires=network-online.target
+After=network-online.target
+ConditionFileNotEmpty=%s/vault.hcl
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=notify
+EnvironmentFile=%s/vault.env
+User=%s
+Group=%s
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+SecureBits=keep-caps
+StandardOutput=journal
+StandardError=journal
+LimitMEMLOCK=infinity
+AmbientCapabilities=CAP_IPC_LOCK
+CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
+NoNewPrivileges=yes
+ExecStart=%s server -config=%s
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+LimitNOFILE=65536
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target
+`, vi.config.ConfigPath, vi.config.ConfigPath,
+		vi.config.ServiceUser, vi.config.ServiceGroup,
+		vi.config.BinaryPath, vi.config.ConfigPath)
+
+	servicePath := fmt.Sprintf("/etc/systemd/system/%s.service", vi.config.ServiceName)
+	if err := vi.writeFile(servicePath, []byte(serviceContent), 0644); err != nil {
+		return fmt.Errorf("failed to create service file: %w", err)
+	}
+
+	// Create environment file
+	envContent := fmt.Sprintf(`VAULT_API_ADDR=%s
+VAULT_CLUSTER_ADDR=%s
+`, vi.config.APIAddr, vi.config.ClusterAddr)
+
+	envPath := filepath.Join(vi.config.ConfigPath, "vault.env")
+	if err := vi.writeFile(envPath, []byte(envContent), 0640); err != nil {
+		return fmt.Errorf("failed to write environment file: %w", err)
+	}
+
+	// Set ownership for env file
+	if err := vi.runner.Run("chown", vi.config.ServiceUser+":"+vi.config.ServiceGroup, envPath); err != nil {
+		return fmt.Errorf("failed to set env file ownership: %w", err)
+	}
+
+	// Reload systemd
+	if err := vi.runner.Run("systemctl", "daemon-reload"); err != nil {
+		return fmt.Errorf("failed to reload systemd: %w", err)
+	}
+
+	// Enable service
+	if err := vi.systemd.Enable(); err != nil {
+		return fmt.Errorf("failed to enable service: %w", err)
+	}
+
+	// Start service with retries
+	vi.logger.Info("Starting Vault service")
+	if err := vi.systemd.Start(); err != nil {
+		// Get detailed service status and logs for debugging
+		if status, statusErr := vi.systemd.GetStatus(); statusErr == nil {
+			vi.logger.Error("Failed to start Vault service",
+				zap.String("status", status))
+		}
+
+		// Get journalctl logs to understand WHY vault failed
+		if output, logErr := vi.runner.RunOutput("journalctl", "-xeu", "vault.service", "-n", "50", "--no-pager"); logErr == nil {
+			vi.logger.Error("Vault service logs",
+				zap.String("journalctl_output", output))
+		}
+
+		// Check if config file exists and is readable
+		if _, statErr := os.Stat(vi.config.ConfigPath); statErr != nil {
+			vi.logger.Error("Config file issue",
+				zap.String("path", vi.config.ConfigPath),
+				zap.Error(statErr))
+		}
+
+		// Provide actionable remediation
+		vi.logger.Error("Vault failed to start - check the logs above for details",
+			zap.String("remediation", "Run: sudo journalctl -xeu vault.service | tail -50"))
+
+		return fmt.Errorf("failed to start service: %w", err)
+	}
+
+	// Wait for Vault to be ready (with granular status checks)
+	vi.logger.Info("Waiting for Vault to become responsive")
+	ctx, cancel := context.WithTimeout(vi.rc.Ctx, 30*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	attempt := 0
+	for {
+		select {
+		case <-ctx.Done():
+			// Timeout occurred - provide detailed feedback
+			vi.logger.Warn("Timeout waiting for Vault, checking current state")
+
+			// Even though we timed out, check if vault is actually running
+			readiness := vi.checkVaultReadiness()
+
+			if readiness.ProcessRunning && readiness.PortListening {
+				// Vault IS running, just sealed/uninitialized (this is NORMAL)
+				vi.logger.Info("Vault process is running and listening",
+					zap.Bool("sealed", readiness.Sealed),
+					zap.Bool("initialized", readiness.Initialized))
+
+				if readiness.Sealed && !readiness.Initialized {
+					vi.logger.Info("Vault is sealed and uninitialized (this is expected for new installations)")
+					return nil // Success! This is the normal state for a fresh install
+				} else if readiness.Sealed {
+					vi.logger.Info("Vault is sealed but initialized (normal state after restart)")
+					return nil // Success! Just needs unsealing
+				}
+
+				// Process running but not responding correctly
+				vi.logger.Warn("Vault process is running but not responding as expected",
+					zap.String("details", readiness.Message))
+				return fmt.Errorf("vault is running but not responding properly: %s", readiness.Message)
+			}
+
+			// Process not running or not listening
+			vi.logger.Error("Vault failed to become ready",
+				zap.Bool("process_running", readiness.ProcessRunning),
+				zap.Bool("port_listening", readiness.PortListening),
+				zap.String("error", readiness.Message))
+			return fmt.Errorf("vault failed to start properly: %s", readiness.Message)
+
+		case <-ticker.C:
+			attempt++
+			readiness := vi.checkVaultReadiness()
+
+			vi.logger.Debug("Checking vault readiness",
+				zap.Int("attempt", attempt),
+				zap.Bool("process_running", readiness.ProcessRunning),
+				zap.Bool("port_listening", readiness.PortListening),
+				zap.Bool("responding", readiness.Responding),
+				zap.String("status", readiness.Message))
+
+			if readiness.Ready {
+				vi.logger.Info("Vault is ready",
+					zap.Bool("sealed", readiness.Sealed),
+					zap.Bool("initialized", readiness.Initialized))
+				return nil
+			}
+
+			// If vault is running and responding (even if sealed), that's good enough
+			if readiness.ProcessRunning && readiness.PortListening && readiness.Responding {
+				vi.logger.Info("Vault is responding",
+					zap.Bool("sealed", readiness.Sealed),
+					zap.Bool("initialized", readiness.Initialized))
+				return nil
+			}
+		}
+	}
+}
 
 // verify performs post-installation verification
 func (vi *VaultInstaller) verify() error {
