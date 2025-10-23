@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -25,10 +26,12 @@ func (vi *VaultInstaller) registerWithConsul() error {
 		return nil // Not an error - Consul may not be installed yet
 	}
 
-	// Determine Vault address
-	// Use WireGuard IP if available, otherwise use localhost
-	vaultAddress := "127.0.0.1"
+	// Determine Vault address for Consul service discovery
+	// Uses intelligent address resolution: hostname → Tailscale → local IP → localhost
+	// This enables other services to discover and reach Vault for dynamic secret management
+	vaultAddress := shared.GetInternalHostname()
 	if vi.config.BindAddr != "" && vi.config.BindAddr != "0.0.0.0" {
+		// Explicit BindAddr overrides (e.g., specific interface for multi-homed systems)
 		vaultAddress = vi.config.BindAddr
 	}
 

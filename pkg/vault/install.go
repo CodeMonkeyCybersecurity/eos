@@ -132,14 +132,14 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		if config.TLSEnabled {
 			protocol = "https"
 		}
-		config.APIAddr = fmt.Sprintf("%s://127.0.0.1:%d", protocol, shared.PortVault)
+		config.APIAddr = fmt.Sprintf("%s://%s:%d", protocol, shared.GetInternalHostname(), shared.PortVault)
 	}
 	if config.ClusterAddr == "" {
 		protocol := "http"
 		if config.TLSEnabled {
 			protocol = "https"
 		}
-		config.ClusterAddr = fmt.Sprintf("%s://127.0.0.1:%d", protocol, shared.PortVault+1)
+		config.ClusterAddr = fmt.Sprintf("%s://%s:%d", protocol, shared.GetInternalHostname(), shared.PortVault+1)
 	}
 	if config.LogLevel == "" {
 		config.LogLevel = "info"
@@ -1258,11 +1258,9 @@ log_format = "json"
 	return nil
 }
 
-
 // NOTE: The old setupService() method has been removed (was lines 1261-1443).
 // Systemd service setup is now handled in Phase 5 (StartVaultService) which uses
 // centralized security configuration from pkg/vault/constants.go.
-
 
 // verify performs post-installation verification
 func (vi *VaultInstaller) verify() error {

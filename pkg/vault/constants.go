@@ -205,7 +205,7 @@ const (
 	// === Network Endpoints ===
 	// Vault listens on 0.0.0.0 but clients connect to hostname or 127.0.0.1
 	VaultListenAddr  = "0.0.0.0"   // Bind address (all interfaces)
-	VaultClientAddr  = "127.0.0.1" // Client connection address (localhost)
+	VaultClientAddr  = "127.0.0.1" // DEPRECATED: Only for local CLI. Use shared.GetInternalHostname() for service registration
 	VaultDefaultPort = 8179        // CUSTOM: Vault API port (not HashiCorp default 8200)
 	VaultClusterPort = 8180        // Raft cluster port
 
@@ -412,12 +412,12 @@ const (
 
 	// === Startup Rate Limiting ===
 	// Prevent restart loops from DOSing the system
-	VaultSystemdStartLimitInterval = "60"  // 60-second window
-	VaultSystemdStartLimitBurst    = "3"   // Max 3 restarts in window
+	VaultSystemdStartLimitInterval = "60" // 60-second window
+	VaultSystemdStartLimitBurst    = "3"  // Max 3 restarts in window
 
 	// === Resource Limits ===
-	VaultSystemdLimitNOFILE  = "65536" // Open file descriptors (Vault needs many connections)
-	VaultSystemdLimitNPROC   = "512"   // Max processes (reasonable limit for vault service)
+	VaultSystemdLimitNOFILE  = "65536"    // Open file descriptors (Vault needs many connections)
+	VaultSystemdLimitNPROC   = "512"      // Max processes (reasonable limit for vault service)
 	VaultSystemdLimitMEMLOCK = "infinity" // Unlimited memory locking for mlock() (required by Vault)
 
 	// === Timeout Configuration ===
@@ -465,12 +465,12 @@ const (
 	VaultSystemdProtectControlGroups  = "yes" // Make cgroup hierarchy read-only
 
 	// === Process Restrictions ===
-	VaultSystemdRestrictRealtime       = "yes" // Deny realtime scheduling
-	VaultSystemdRestrictNamespaces     = "yes" // Deny creating new namespaces
+	VaultSystemdRestrictRealtime        = "yes"                      // Deny realtime scheduling
+	VaultSystemdRestrictNamespaces      = "yes"                      // Deny creating new namespaces
 	VaultSystemdRestrictAddressFamilies = "AF_INET AF_INET6 AF_UNIX" // Only allow IP and Unix sockets
 
 	// === Memory Protection ===
-	VaultSystemdMemoryDenyWriteExecute = "no" // Must be "no" - Vault's Go runtime needs this
+	VaultSystemdMemoryDenyWriteExecute = "no"  // Must be "no" - Vault's Go runtime needs this
 	VaultSystemdLockPersonality        = "yes" // Prevent personality() syscall
 
 	// === System Call Filtering ===
@@ -491,16 +491,16 @@ const (
 func VaultSystemdSecurityDirectives() map[string]string {
 	return map[string]string{
 		// Service configuration
-		"Type":                 VaultSystemdServiceType,
-		"Restart":              VaultSystemdRestart,
-		"RestartSec":           VaultSystemdRestartSec,
+		"Type":                  VaultSystemdServiceType,
+		"Restart":               VaultSystemdRestart,
+		"RestartSec":            VaultSystemdRestartSec,
 		"StartLimitIntervalSec": VaultSystemdStartLimitInterval,
-		"StartLimitBurst":      VaultSystemdStartLimitBurst,
+		"StartLimitBurst":       VaultSystemdStartLimitBurst,
 
 		// Resource limits
-		"LimitNOFILE":  VaultSystemdLimitNOFILE,
-		"LimitNPROC":   VaultSystemdLimitNPROC,
-		"LimitMEMLOCK": VaultSystemdLimitMEMLOCK,
+		"LimitNOFILE":    VaultSystemdLimitNOFILE,
+		"LimitNPROC":     VaultSystemdLimitNPROC,
+		"LimitMEMLOCK":   VaultSystemdLimitMEMLOCK,
 		"TimeoutStopSec": VaultSystemdTimeoutStopSec,
 
 		// Capabilities
@@ -510,11 +510,11 @@ func VaultSystemdSecurityDirectives() map[string]string {
 		"NoNewPrivileges":       VaultSystemdNoNewPrivileges,
 
 		// Filesystem sandboxing
-		"ProtectSystem":     VaultSystemdProtectSystem,
-		"ReadWritePaths":    VaultSystemdReadWritePaths,
-		"ProtectHome":       VaultSystemdProtectHome,
-		"PrivateTmp":        VaultSystemdPrivateTmp,
-		"PrivateDevices":    VaultSystemdPrivateDevices,
+		"ProtectSystem":  VaultSystemdProtectSystem,
+		"ReadWritePaths": VaultSystemdReadWritePaths,
+		"ProtectHome":    VaultSystemdProtectHome,
+		"PrivateTmp":     VaultSystemdPrivateTmp,
+		"PrivateDevices": VaultSystemdPrivateDevices,
 
 		// Kernel protections
 		"ProtectKernelTunables": VaultSystemdProtectKernelTunables,
@@ -584,14 +584,14 @@ const (
 // VaultCertRenewalSystemdDirectives returns systemd directives for cert renewal service
 func VaultCertRenewalSystemdDirectives() map[string]string {
 	return map[string]string{
-		"Type":               VaultCertRenewalServiceType,
-		"ProtectSystem":      VaultCertRenewalProtectSystem,
-		"ReadWritePaths":     VaultCertRenewalReadWritePaths,
-		"ProtectHome":        VaultCertRenewalProtectHome,
-		"PrivateTmp":         VaultCertRenewalPrivateTmp,
-		"NoNewPrivileges":    VaultCertRenewalNoNewPrivileges,
-		"StandardOutput":     VaultCertRenewalStandardOutput,
-		"StandardError":      VaultCertRenewalStandardError,
+		"Type":            VaultCertRenewalServiceType,
+		"ProtectSystem":   VaultCertRenewalProtectSystem,
+		"ReadWritePaths":  VaultCertRenewalReadWritePaths,
+		"ProtectHome":     VaultCertRenewalProtectHome,
+		"PrivateTmp":      VaultCertRenewalPrivateTmp,
+		"NoNewPrivileges": VaultCertRenewalNoNewPrivileges,
+		"StandardOutput":  VaultCertRenewalStandardOutput,
+		"StandardError":   VaultCertRenewalStandardError,
 	}
 }
 

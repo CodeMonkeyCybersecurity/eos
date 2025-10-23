@@ -363,7 +363,7 @@ func validateListeners(rc *eos_io.RuntimeContext, content string, result *Config
 		// Check for cluster_address (needed for HA/Raft)
 		if !strings.Contains(content, "cluster_address") {
 			result.Suggestions = append(result.Suggestions,
-				"Consider setting cluster_address for HA deployments (default: 127.0.0.1:8201)")
+				fmt.Sprintf("Consider setting cluster_address for HA deployments (default: %s:8201)", shared.GetInternalHostname()))
 		}
 	}
 
@@ -449,7 +449,7 @@ func validateStorageDetailed(rc *eos_io.RuntimeContext, content string, result *
 			result.Warnings = append(result.Warnings,
 				"Raft storage requires 'cluster_addr' for HA deployments")
 			result.Suggestions = append(result.Suggestions,
-				"Set cluster_addr = \"https://127.0.0.1:8180\" (or your server's address)")
+				fmt.Sprintf("Set cluster_addr = \"https://%s:8180\" (replace with your server's hostname)", shared.GetInternalHostname()))
 		}
 
 		// Check for api_addr
@@ -457,7 +457,7 @@ func validateStorageDetailed(rc *eos_io.RuntimeContext, content string, result *
 			result.Warnings = append(result.Warnings,
 				"Raft storage requires 'api_addr' to be explicitly set")
 			result.Suggestions = append(result.Suggestions,
-				"Set api_addr = \"https://127.0.0.1:8179\" (or your server's address)")
+				fmt.Sprintf("Set api_addr = \"https://%s:8179\" (replace with your server's hostname)", shared.GetInternalHostname()))
 		}
 
 		// Raft REQUIRES TLS

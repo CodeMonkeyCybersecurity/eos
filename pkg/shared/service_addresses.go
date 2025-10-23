@@ -3,17 +3,97 @@ package shared
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"os/exec"
+	"strings"
 )
 
-// GetInternalHostname returns the machine's hostname.
-// If os.Hostname() fails, it returns "localhost".
+// GetInternalHostname returns the best address for service discovery and registration.
+// Priority: 1. Hostname  2. Tailscale IP  3. Primary interface IP  4. localhost
+//
+// This is the SINGLE SOURCE OF TRUTH for all service address resolution.
+// Used by: GetVaultHTTPSAddr(), GetConsulAddr(), GetNomadAddr(), and all service registration.
+//
+// Enables proper service discovery in Consul and allows services to reach Vault/Consul
+// for dynamic secret management instead of relying on static .env files.
 func GetInternalHostname() string {
+	// 1. Try hostname (PREFERRED - enables service discovery via DNS)
 	hostname, err := os.Hostname()
-	if err != nil {
-		return "localhost"
+	if err == nil && hostname != "" && hostname != "localhost" {
+		return hostname
 	}
-	return hostname
+
+	// 2. Try Tailscale IP (VPN address for secure mesh networking)
+	if tsIP := getTailscaleIPv4(); tsIP != "" {
+		return tsIP
+	}
+
+	// 3. Try primary network interface IP (local network access)
+	if localIP := getPrimaryInterfaceIP(); localIP != "" {
+		return localIP
+	}
+
+	// 4. Fallback to localhost (last resort - local access only)
+	return "localhost"
+}
+
+// getTailscaleIPv4 retrieves Tailscale IPv4 address
+// Returns empty string if Tailscale is not installed or not running
+func getTailscaleIPv4() string {
+	cmd := exec.Command("tailscale", "ip", "-4")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(output), "\n")
+	if len(lines) > 0 {
+		ip := strings.TrimSpace(lines[0])
+		// Validate it's a proper IP address
+		if net.ParseIP(ip) != nil {
+			return ip
+		}
+	}
+	return ""
+}
+
+// getPrimaryInterfaceIP gets IP of the primary network interface
+// Filters out loopback, Docker, and other virtual interfaces
+// Returns empty string if no suitable interface is found
+func getPrimaryInterfaceIP() string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+
+	for _, iface := range ifaces {
+		// Skip down interfaces
+		if iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+
+		// Skip virtual/loopback interfaces
+		if iface.Name == "lo" ||
+			strings.HasPrefix(iface.Name, "docker") ||
+			strings.HasPrefix(iface.Name, "virbr") ||
+			strings.HasPrefix(iface.Name, "veth") ||
+			strings.HasPrefix(iface.Name, "br-") ||
+			strings.HasPrefix(iface.Name, "lxc") {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
 
 // GetServiceAddrWithEnv returns a service address, checking environment variable first.
@@ -21,8 +101,9 @@ func GetInternalHostname() string {
 // This eliminates the duplicated "if env := os.Getenv(...)" pattern across the codebase.
 //
 // Usage:
-//   GetServiceAddrWithEnv("VAULT_ADDR", GetVaultHTTPSAddr)
-//   GetServiceAddrWithEnv("CONSUL_HTTP_ADDR", GetConsulAddr)
+//
+//	GetServiceAddrWithEnv("VAULT_ADDR", GetVaultHTTPSAddr)
+//	GetServiceAddrWithEnv("CONSUL_HTTP_ADDR", GetConsulAddr)
 func GetServiceAddrWithEnv(envVar string, fallbackFunc func() string) string {
 	if addr := os.Getenv(envVar); addr != "" {
 		return addr
