@@ -15,12 +15,12 @@ func (c *CephClient) CreatePool(rc *eos_io.RuntimeContext, opts *PoolCreateOptio
 }
 
 // ListPools stub for Mac
-func (c *CephClient) ListPools(rc *eos_io.RuntimeContext) ([]PoolInfo, error) {
+func (c *CephClient) ListPools(rc *eos_io.RuntimeContext) ([]*PoolInfo, error) {
 	return nil, fmt.Errorf("Ceph SDK not available on macOS - deploy to Linux to use this feature")
 }
 
-// GetPool stub for Mac
-func (c *CephClient) GetPool(rc *eos_io.RuntimeContext, name string) (*PoolInfo, error) {
+// GetPoolInfo stub for Mac (matches real implementation name)
+func (c *CephClient) GetPoolInfo(rc *eos_io.RuntimeContext, name string) (*PoolInfo, error) {
 	return nil, fmt.Errorf("Ceph SDK not available on macOS - deploy to Linux to use this feature")
 }
 

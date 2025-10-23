@@ -59,7 +59,7 @@ cd eos
 ./install.sh
 
 # Verify installation
-eos --version
+eos --help
 ```
 
 The install script will:

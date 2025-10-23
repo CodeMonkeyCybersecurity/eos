@@ -19,10 +19,10 @@ var (
 	cephUseConsul  bool
 
 	// Operation flags
-	cephVolumeName   string
-	cephSnapshotName string
+	cephVolumeName     string
+	cephSnapshotName   string
 	cephSnapshotVolume string
-	cephPoolName     string
+	cephPoolName       string
 
 	// Safety flags
 	cephSkipSnapshot bool
@@ -139,11 +139,36 @@ func runCephDelete(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 func deleteVolume(rc *eos_io.RuntimeContext, client *cephfs.CephClient) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// ASSESS: Check if volume exists
+	logger.Info("Assessing volume for deletion",
+		zap.String("volume", cephVolumeName),
+		zap.Bool("skipSnapshot", cephSkipSnapshot))
+
+	exists, err := client.VolumeExists(rc, cephVolumeName)
+	if err != nil {
+		return fmt.Errorf("failed to check if volume exists: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("volume %s does not exist", cephVolumeName)
+	}
+
+	// INTERVENE: Delete volume
 	logger.Info("Deleting CephFS volume",
 		zap.String("volume", cephVolumeName),
 		zap.Bool("skipSnapshot", cephSkipSnapshot))
 
+	if err := client.DeleteVolume(rc, cephVolumeName, cephSkipSnapshot); err != nil {
+		return fmt.Errorf("failed to delete volume: %w", err)
+	}
 
+	// EVALUATE: Verify deletion
+	exists, err = client.VolumeExists(rc, cephVolumeName)
+	if err != nil {
+		return fmt.Errorf("failed to verify deletion: %w", err)
+	}
+	if exists {
+		return fmt.Errorf("volume still exists after deletion attempt")
+	}
 
 	logger.Info("Volume deleted successfully",
 		zap.String("volume", cephVolumeName))

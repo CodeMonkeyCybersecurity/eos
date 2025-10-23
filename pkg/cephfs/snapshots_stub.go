@@ -15,7 +15,7 @@ func (c *CephClient) CreateSnapshot(rc *eos_io.RuntimeContext, opts *SnapshotCre
 }
 
 // ListSnapshots stub for Mac
-func (c *CephClient) ListSnapshots(rc *eos_io.RuntimeContext, volumeName string, subVolume ...string) ([]SnapshotInfo, error) {
+func (c *CephClient) ListSnapshots(rc *eos_io.RuntimeContext, volumeName string, subVolume ...string) ([]*SnapshotInfo, error) {
 	return nil, fmt.Errorf("Ceph SDK not available on macOS - deploy to Linux to use this feature")
 }
 
