@@ -363,6 +363,10 @@ func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Configuring firewall for Vault")
 
+	// CRITICAL P2 FIX: Get internal hostname at runtime, not as literal string
+	// Previous bug: Used "shared.GetInternalHostname" as literal string in firewall rules
+	internalHostname := shared.GetInternalHostname()
+
 	// Check if ufw is available
 	if err := execute.RunSimple(rc.Ctx, "which", "ufw"); err == nil {
 		// Configure UFW rules
@@ -371,7 +375,7 @@ func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 			{"ufw", "default", "allow", "outgoing"},
 			{"ufw", "allow", "ssh"},
 			{"ufw", "allow", shared.VaultWebPortTCP, "comment", "Vault API"},
-			{"ufw", "allow", "from", "shared.GetInternalHostname", "to", "any", "port", shared.VaultDefaultPort},
+			{"ufw", "allow", "from", internalHostname, "to", "any", "port", shared.VaultDefaultPort},
 			{"ufw", "--force", "enable"},
 		}
 
@@ -385,7 +389,7 @@ func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 		rules := [][]string{
 			{"firewall-cmd", "--permanent", "--add-service=ssh"},
 			{"firewall-cmd", "--permanent", "--add-port=" + shared.VaultWebPortTCP},
-			{"firewall-cmd", "--permanent", "--add-rich-rule=rule family=ipv4 source address=shared.GetInternalHostname port protocol=tcp port=" + shared.VaultDefaultPort + " accept"},
+			{"firewall-cmd", "--permanent", "--add-rich-rule=rule family=ipv4 source address=" + internalHostname + " port protocol=tcp port=" + shared.VaultDefaultPort + " accept"},
 			{"firewall-cmd", "--reload"},
 		}
 
@@ -826,13 +830,16 @@ func restrictNetworkAccess(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Restricting network access")
 
+	// CRITICAL P2 FIX: Get internal hostname at runtime
+	internalHostname := shared.GetInternalHostname()
+
 	// Configure iptables rules for additional network security
 	// This is a basic example - production deployments should use more sophisticated rules
 	rules := [][]string{
 		{"iptables", "-A", "INPUT", "-i", "lo", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", "22", "-j", "ACCEPT"},
-		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", shared.VaultDefaultPort, "-s", "shared.GetInternalHostname", "-j", "ACCEPT"},
+		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", shared.VaultDefaultPort, "-s", internalHostname, "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-j", "DROP"},
 	}
 

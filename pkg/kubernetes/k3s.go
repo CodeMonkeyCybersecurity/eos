@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
@@ -74,11 +73,11 @@ func DeployK3s(rc *eos_io.RuntimeContext) {
 
 	switch role {
 	case "server":
-		fmt.Printf("enter TLS SAN (default: %s): ", eos_unix.GetInternalHostname())
+		fmt.Printf("enter TLS SAN (default: %s): ", shared.GetInternalHostname())
 		tlsSANInput, _ := reader.ReadString('\n')
 		tlsSAN := strings.TrimSpace(tlsSANInput)
 		if tlsSAN == "" { // user hit <Enter> → use auto-detected default
-			tlsSAN = eos_unix.GetInternalHostname()
+			tlsSAN = shared.GetInternalHostname()
 		}
 		installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | sh -s - server --tls-san %s", tlsSAN)
 		if nodeIP != "" {

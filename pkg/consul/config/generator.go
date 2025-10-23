@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -57,7 +56,7 @@ func Generate(rc *eos_io.RuntimeContext, cfg *ConsulConfig) error {
 		zap.String("datacenter", cfg.DatacenterName),
 		zap.Bool("vault_integration", cfg.VaultAvailable))
 
-	hostname := eos_unix.GetInternalHostname()
+	hostname := shared.GetInternalHostname()
 	nodeName := fmt.Sprintf("%s-consul", hostname)
 
 	logLevel := "INFO"

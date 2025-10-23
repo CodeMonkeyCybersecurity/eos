@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
@@ -570,8 +571,17 @@ Group=vault
 	}
 
 	// Enable the health check timer
-	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, "vault-agent-health-check.timer"); err != nil {
-		log.Warn("Failed to enable health check timer", zap.Error(err))
+	// CRITICAL P2 FIX: Don't use ReloadDaemonAndEnable for timers
+	// ReloadDaemonAndEnable calls CheckServiceStatus which expects "active" status,
+	// but timers return "waiting" status when enabled, not "active".
+	log.Info(" Enabling health check timer")
+	if err := execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload"); err != nil {
+		log.Warn("Failed to reload systemd daemon", zap.Error(err))
+	}
+	if err := execute.RunSimple(rc.Ctx, "systemctl", "enable", "--now", "vault-agent-health-check.timer"); err != nil {
+		log.Warn("Failed to enable health check timer (non-fatal)", zap.Error(err))
+	} else {
+		log.Info(" Vault Agent health check timer enabled")
 	}
 
 	log.Info(" Vault Agent monitoring configured")

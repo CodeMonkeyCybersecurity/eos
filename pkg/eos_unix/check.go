@@ -70,18 +70,6 @@ func FileExists(path string) bool {
 	return err == nil
 }
 
-/**/
-
-// GetInternalHostname returns the machine's hostname.
-// If os.Hostname() fails, it logs the error and returns "localhost".
-func GetInternalHostname() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "localhost"
-	}
-	return hostname
-}
-
 // GetUbuntuCodename reads /etc/os-release and returns UBUNTU_CODENAME or VERSION_CODENAME
 func GetUbuntuCodename(rc *eos_io.RuntimeContext) string {
 

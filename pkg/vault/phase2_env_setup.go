@@ -66,7 +66,7 @@ func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 	}
 
 	// 2. Always use internal hostname as the Vault address
-	host := eos_unix.GetInternalHostname()
+	host := shared.GetInternalHostname()
 	addr := fmt.Sprintf(shared.VaultDefaultAddr, host)
 
 	// 3. Probe TLS before setting

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -15,7 +14,7 @@ import (
 func InstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	log := otelzap.Ctx(rc.Ctx)
 
-	hostname := eos_unix.GetInternalHostname()
+	hostname := shared.GetInternalHostname()
 
 	// Log structured summary
 	log.Info("Consul installation completed successfully",

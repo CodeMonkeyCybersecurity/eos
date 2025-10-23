@@ -13,7 +13,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -144,7 +143,7 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// SECURITY P0 #3: Never log credentials in plaintext - use redaction
 		logger.Info("Umami is now available",
-			zap.String("web_ui", fmt.Sprintf("http://%s:%d", eos_unix.GetInternalHostname(), shared.PortUmami)),
+			zap.String("web_ui", fmt.Sprintf("http://%s:%d", shared.GetInternalHostname(), shared.PortUmami)),
 			zap.String("username", "admin"),
 			zap.String("password_note", "Default password set - CHANGE IMMEDIATELY after first login"),
 			zap.String("security_warning", "Default credentials are publicly known - change password at first login"))

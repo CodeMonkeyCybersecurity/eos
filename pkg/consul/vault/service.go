@@ -7,7 +7,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -27,7 +26,7 @@ func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
 	vaultAddr := shared.GetVaultAddrWithEnv()
 	log.Debug("Using Vault address", zap.String("addr", vaultAddr))
 
-	hostname := eos_unix.GetInternalHostname()
+	hostname := shared.GetInternalHostname()
 
 	// Extract hostname and port from VAULT_ADDR
 	vaultURL := strings.TrimPrefix(vaultAddr, "https://")

@@ -18,7 +18,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/registry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -141,7 +140,7 @@ func (vi *VaultIntegration) RegisterVault(ctx context.Context, config *Integrati
 	// Step 3: Register service
 	serviceID := config.ServiceID
 	if serviceID == "" {
-		hostname := eos_unix.GetInternalHostname()
+		hostname := shared.GetInternalHostname()
 		serviceID = fmt.Sprintf("vault-%s", hostname)
 	}
 
@@ -231,7 +230,7 @@ func (vi *VaultIntegration) buildServiceRegistration(serviceID string) (*registr
 		return nil, fmt.Errorf("failed to parse Vault address: %w", err)
 	}
 
-	hostname := eos_unix.GetInternalHostname()
+	hostname := shared.GetInternalHostname()
 
 	service := &registry.ServiceRegistration{
 		ID:      serviceID,

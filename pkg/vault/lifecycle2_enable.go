@@ -422,12 +422,26 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 			hardeningConfig.ConfigureFirewall = interaction.PromptYesNo(rc.Ctx, "Configure firewall rules?", true)
 		}
 
-		if err := ComprehensiveHardening(rc, client, hardeningConfig); err != nil {
+		// CRITICAL P1 FIX: Hardening requires privileged client (root token)
+		// Phase 14 set Agent token on client, but hardening operations like
+		// enabling audit logging require sudo capability (only root has).
+		log.Info(" [Phase 15] Getting privileged client for hardening operations")
+		privilegedClient, err := GetPrivilegedClient(rc)
+		if err != nil {
+			log.Error(" [Phase 15] Failed to get privileged client for hardening",
+				zap.Error(err),
+				zap.String("remediation", "Some hardening steps (audit logging, rate limiting) require root token"))
 			log.Warn("Comprehensive hardening failed (non-fatal)", zap.Error(err))
 			log.Info("terminal prompt: Some hardening steps failed. You can retry with: eos secure vault --comprehensive")
 		} else {
-			log.Info(" [Phase 15] Comprehensive hardening completed successfully")
-			log.Info("terminal prompt: Vault has been hardened for production use")
+			// Use privileged client for hardening
+			if err := ComprehensiveHardening(rc, privilegedClient, hardeningConfig); err != nil {
+				log.Warn("Comprehensive hardening failed (non-fatal)", zap.Error(err))
+				log.Info("terminal prompt: Some hardening steps failed. You can retry with: eos secure vault --comprehensive")
+			} else {
+				log.Info(" [Phase 15] Comprehensive hardening completed successfully")
+				log.Info("terminal prompt: Vault has been hardened for production use")
+			}
 		}
 	} else {
 		log.Info(" [Phase 15] Hardening skipped by user")
