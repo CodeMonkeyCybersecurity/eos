@@ -146,7 +146,13 @@ func (c *Client) PullModel(ctx context.Context, modelName string, progressCallba
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.http.Do(req)
+	// Use a client with no timeout for model downloads (streaming can take minutes)
+	// Context cancellation will still work, but HTTP client won't timeout mid-stream
+	pullClient := &http.Client{
+		Timeout: 0, // No timeout for streaming downloads
+	}
+
+	resp, err := pullClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to pull model: %w", err)
 	}

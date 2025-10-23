@@ -497,7 +497,12 @@ func (bgi *BionicGPTInstaller) configureEmbeddings(ctx context.Context) error {
 func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
+	logger.Info("════════════════════════════════════════════════════════════════")
 	logger.Info("=== ASSESS: Checking Ollama availability ===")
+	logger.Info("════════════════════════════════════════════════════════════════")
+	logger.Debug("Ollama check details",
+		zap.String("endpoint", "http://localhost:11434"),
+		zap.String("check_method", "preflight.CheckOllama()"))
 
 	// Use human-centric dependency checking with informed consent
 	depConfig := interaction.DependencyConfig{
@@ -513,8 +518,25 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 		CustomCheckFn: preflight.CheckOllama,
 	}
 
+	logger.Debug("Calling CheckDependencyWithPrompt for Ollama",
+		zap.Bool("auto_install", depConfig.AutoInstall),
+		zap.Bool("auto_start", depConfig.AutoStart),
+		zap.String("install_cmd", depConfig.InstallCmd),
+		zap.String("start_cmd", depConfig.StartCmd))
+
 	result, err := interaction.CheckDependencyWithPrompt(bgi.rc, depConfig)
+
+	logger.Debug("CheckDependencyWithPrompt returned",
+		zap.Bool("found", result.Found),
+		zap.Bool("running", result.Running),
+		zap.Bool("user_decline", result.UserDecline),
+		zap.String("version", result.Version),
+		zap.Error(err))
+
 	if err != nil {
+		logger.Error("Ollama dependency check failed",
+			zap.Error(err),
+			zap.String("alternative", "Use Azure OpenAI embeddings"))
 		// Add context about Azure alternative
 		return fmt.Errorf("%w\n\n"+
 			"Alternative: Use Azure OpenAI embeddings instead:\n"+
@@ -523,6 +545,8 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 	}
 
 	if !result.Found {
+		logger.Warn("Ollama not found or user declined installation",
+			zap.Bool("user_decline", result.UserDecline))
 		// User declined or dependency not available
 		return eos_err.NewUserError(
 			"Ollama is required for local embeddings.\n\n" +
@@ -530,23 +554,46 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 				"  eos create bionicgpt --azure-embeddings-deployment <deployment-name>")
 	}
 
-	logger.Info("✓ Ollama is accessible")
+	logger.Info("✓ Ollama is accessible",
+		zap.String("version", result.Version),
+		zap.Bool("running", result.Running))
 
 	// Set defaults for local embeddings
 	if bgi.config.LocalEmbeddingsModel == "" {
 		bgi.config.LocalEmbeddingsModel = DefaultLocalEmbeddingsModel
+		logger.Debug("Using default embeddings model",
+			zap.String("model", DefaultLocalEmbeddingsModel))
 	}
 	if bgi.config.OllamaEndpoint == "" {
 		bgi.config.OllamaEndpoint = DefaultOllamaEndpoint
+		logger.Debug("Using default Ollama endpoint",
+			zap.String("endpoint", DefaultOllamaEndpoint))
 	}
 
+	logger.Info("════════════════════════════════════════════════════════════════")
 	logger.Info("=== INTERVENE: Ensuring embeddings model is available ===")
+	logger.Info("════════════════════════════════════════════════════════════════")
+	logger.Debug("Model configuration",
+		zap.String("model", bgi.config.LocalEmbeddingsModel),
+		zap.String("endpoint", bgi.config.OllamaEndpoint))
 
 	// Check if model exists, pull if necessary
+	logger.Debug("Creating Ollama client",
+		zap.String("endpoint", bgi.config.OllamaEndpoint))
 	ollamaClient := ollama.NewClient(bgi.config.OllamaEndpoint)
 
+	logger.Debug("Checking if model exists",
+		zap.String("model", bgi.config.LocalEmbeddingsModel))
 	hasModel, err := ollamaClient.HasModel(ctx, bgi.config.LocalEmbeddingsModel)
+	logger.Debug("HasModel check completed",
+		zap.Bool("has_model", hasModel),
+		zap.Error(err))
+
 	if err != nil {
+		logger.Error("Failed to check for model",
+			zap.String("model", bgi.config.LocalEmbeddingsModel),
+			zap.String("endpoint", bgi.config.OllamaEndpoint),
+			zap.Error(err))
 		return fmt.Errorf("failed to check for model: %w", err)
 	}
 
@@ -554,6 +601,8 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 		logger.Info("✓ Embeddings model already available",
 			zap.String("model", bgi.config.LocalEmbeddingsModel))
 	} else {
+		logger.Info("Embeddings model not found locally, will need to download",
+			zap.String("model", bgi.config.LocalEmbeddingsModel))
 		// Get model info for size estimate
 		logger.Info("terminal prompt: Model not found, need to download")
 		logger.Info("terminal prompt:", zap.String("model", bgi.config.LocalEmbeddingsModel))
