@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"

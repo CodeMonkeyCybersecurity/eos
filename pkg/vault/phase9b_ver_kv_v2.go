@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -13,35 +14,57 @@ import (
 )
 
 // PhaseWriteBootstrapSecretAndRecheck writes a test secret and verifies Vault health.
-func PhaseWriteBootstrapSecretAndRecheck(rc *eos_io.RuntimeContext, _ *api.Client) error {
-	otelzap.Ctx(rc.Ctx).Info(" [Phase 9b] Writing bootstrap test secret and verifying Vault health")
+// CRITICAL: This function uses the client parameter passed from Phase 6 (UnsealVault)
+// which contains the root token. This must run immediately after Phase 9a (KV v2 enablement)
+// and BEFORE Phase 14 (Vault Agent setup) to ensure the root token is still valid.
+func PhaseWriteBootstrapSecretAndRecheck(rc *eos_io.RuntimeContext, client *api.Client) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info(" [Phase 9b] Writing bootstrap test secret and verifying Vault health")
 
-	//  Get privileged client (root or agent token, validated)
-	privilegedClient, err := GetPrivilegedClient(rc)
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to get privileged Vault client", zap.Error(err))
-		return err
+	// CRITICAL: Use the passed client (authenticated in Phase 6) instead of
+	// retrieving from context which may have been modified by later phases
+	if client == nil {
+		logger.Error(" [Phase 9b] Vault client is nil",
+			zap.String("remediation", "This should never happen - Phase 6 should have passed authenticated client"))
+		return fmt.Errorf("vault client cannot be nil")
 	}
-	otelzap.Ctx(rc.Ctx).Info(" Privileged Vault client ready")
 
-	//  Run privileged operations
-	if err := PhaseWriteTestSecret(rc, privilegedClient, shared.VaultTestPath, map[string]string{"example_key": "example_value"}); err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to write bootstrap test secret", zap.Error(err))
+	// Verify client has a token and log details for troubleshooting
+	token := client.Token()
+	if token == "" {
+		logger.Error(" [Phase 9b] Client has no authentication token",
+			zap.String("vault_addr", client.Address()),
+			zap.String("remediation", "Phase 6 should have set the root token"))
+		return fmt.Errorf("client has no authentication token")
+	}
+
+	// Log token type for diagnostic purposes
+	logger.Debug(" [Phase 9b] Using Vault client from Phase 6",
+		zap.String("vault_addr", client.Address()),
+		zap.Int("token_length", len(token)),
+		zap.Bool("appears_to_be_root_token", strings.HasPrefix(token, "hvs.") && len(token) > 20),
+		zap.Bool("appears_to_be_service_token", strings.HasPrefix(token, "s.")))
+
+	logger.Info(" [Phase 9b] Vault client verified, proceeding with bootstrap secret write")
+
+	//  Write bootstrap test secret using the root-authenticated client from Phase 6
+	if err := PhaseWriteTestSecret(rc, client, shared.VaultTestPath, map[string]string{"example_key": "example_value"}); err != nil {
+		logger.Error(" [Phase 9b] Failed to write bootstrap test secret", zap.Error(err))
 		return fmt.Errorf("bootstrap test secret write failed: %w", err)
 	}
 
 	//  Check Vault health after writing secret
 	healthy, err := CheckVaultHealth(rc)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Vault health check failed", zap.Error(err))
+		logger.Error(" [Phase 9b] Vault health check failed", zap.Error(err))
 		return fmt.Errorf("vault health recheck failed: %w", err)
 	}
 	if !healthy {
-		otelzap.Ctx(rc.Ctx).Error(" Vault unhealthy after bootstrap secret phase")
+		logger.Error(" [Phase 9b] Vault unhealthy after bootstrap secret phase")
 		return fmt.Errorf("vault unhealthy after bootstrap secret phase")
 	}
 
-	otelzap.Ctx(rc.Ctx).Info(" Bootstrap secret written and Vault healthy")
+	logger.Info(" [Phase 9b] Bootstrap secret written and Vault healthy")
 	return nil
 }
 

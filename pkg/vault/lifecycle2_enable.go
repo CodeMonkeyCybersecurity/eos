@@ -178,6 +178,22 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	log.Info(" [Phase 9a] KV v2 secrets engine enabled successfully",
 		zap.Duration("duration", time.Since(phaseStart)))
 
+	// Step 9b: Write bootstrap secret and verify KV v2 is working
+	// CRITICAL: This MUST run immediately after Phase 9a (KV v2 enablement)
+	// and BEFORE Phase 14 (Vault Agent setup) to ensure we use the root token
+	// from Phase 6 before any context modifications.
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 9b] Writing bootstrap secret to verify KV v2")
+	phaseStart = time.Now()
+	if err := PhaseWriteBootstrapSecretAndRecheck(rc, client); err != nil {
+		log.Error(" [Phase 9b] Failed to write bootstrap secret",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
+		return logger.LogErrAndWrap(rc, "write bootstrap secret", err)
+	}
+	log.Info(" [Phase 9b] Bootstrap secret written and verified successfully",
+		zap.Duration("duration", time.Since(phaseStart)))
+
 	// Step 9d: Enable additional secrets engines (database, PKI)
 	log.Info("───────────────────────────────────────────────────────────────")
 	log.Info(" [Phase 9d] Enabling additional secrets engines (interactive)")
@@ -390,12 +406,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Info("terminal prompt: Vault Agent not enabled. You can enable it later with manual configuration.")
 	}
 
-	// Step 15: Apply core secrets and verify readiness
-	if err := PhaseWriteBootstrapSecretAndRecheck(rc, client); err != nil {
-		return logger.LogErrAndWrap(rc, "apply core secrets", err)
-	}
-
-	// Step 16: Optional Phase 15 - Comprehensive Hardening
+	// Step 15: Optional Phase 15 - Comprehensive Hardening
 	if interaction.PromptYesNo(rc.Ctx, "Apply comprehensive security hardening (Phase 15)?", true) {
 		log.Info(" [Phase 15] Starting comprehensive hardening")
 		hardeningConfig := DefaultHardeningConfig()
