@@ -480,58 +480,110 @@ func Unseal(rc *eos_io.RuntimeContext, client *api.Client, init *api.InitRespons
 
 func ConfirmUnsealMaterialSaved(rc *eos_io.RuntimeContext, init *api.InitResponse) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("terminal prompt: Re-enter 3 unseal keys + root token to confirm you've saved them.")
-	keys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to prompt unseal keys", zap.Error(err))
-		return err
-	}
-	root, err := interaction.PromptSecrets(rc.Ctx, "Root Token", 1)
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to prompt root token", zap.Error(err))
-		return err
-	}
 
-	if crypto.HashString(root[0]) != crypto.HashString(init.RootToken) {
-		otelzap.Ctx(rc.Ctx).Error(" Root token mismatch")
-		return fmt.Errorf("root token mismatch")
-	}
+	// P1 UX IMPROVEMENT: Allow 3 attempts instead of instant fail
+	// This helps users who make typos, copy with quotes, or add extra whitespace
+	const maxAttempts = 3
 
-	match := 0
-	for _, entered := range keys {
-		// Check against both base64 keys (KeysB64) and hex keys (Keys)
-		// Users might copy either format from the JSON file
-		matched := false
-
-		// Try base64 format first (most common)
-		for _, known := range init.KeysB64 {
-			if crypto.HashString(entered) == crypto.HashString(known) {
-				match++
-				matched = true
-				break
-			}
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if attempt > 1 {
+			logger.Info("terminal prompt: ")
+			logger.Info(fmt.Sprintf("terminal prompt: Attempt %d of %d - Please try again", attempt, maxAttempts))
 		}
 
-		// If not matched in base64, try hex format
-		if !matched && len(init.Keys) > 0 {
-			for _, known := range init.Keys {
+		logger.Info("terminal prompt: Re-enter 3 unseal keys + root token to confirm you've saved them.")
+		logger.Info("terminal prompt: TIP: Copy the EXACT keys from vault_init.json")
+		logger.Info("terminal prompt:      Remove any quotes, spaces, or newlines")
+		logger.Info("terminal prompt:      Example: \"key123\" should be entered as: key123")
+
+		keys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
+		if err != nil {
+			otelzap.Ctx(rc.Ctx).Error(" Failed to prompt unseal keys", zap.Error(err))
+			return err
+		}
+
+		root, err := interaction.PromptSecrets(rc.Ctx, "Root Token", 1)
+		if err != nil {
+			otelzap.Ctx(rc.Ctx).Error(" Failed to prompt root token", zap.Error(err))
+			return err
+		}
+
+		// P1 UX IMPROVEMENT: Trim whitespace and quotes from user input
+		// This prevents failures due to copy-paste artifacts
+		for i := range keys {
+			keys[i] = strings.TrimSpace(keys[i])  // Remove leading/trailing whitespace
+			keys[i] = strings.Trim(keys[i], `"'`) // Remove quotes if present
+		}
+		rootTokenInput := strings.TrimSpace(root[0])
+		rootTokenInput = strings.Trim(rootTokenInput, `"'`)
+
+		// Verify root token
+		if crypto.HashString(rootTokenInput) != crypto.HashString(init.RootToken) {
+			if attempt < maxAttempts {
+				logger.Warn(" Root token mismatch, please try again",
+					zap.Int("attempt", attempt),
+					zap.Int("remaining", maxAttempts-attempt))
+				continue // Try again
+			}
+			otelzap.Ctx(rc.Ctx).Error(" Root token mismatch after maximum attempts",
+				zap.Int("attempts", maxAttempts))
+			return fmt.Errorf("root token mismatch after %d attempts", maxAttempts)
+		}
+
+		// Verify unseal keys
+		match := 0
+		for _, entered := range keys {
+			// Check against both base64 keys (KeysB64) and hex keys (Keys)
+			// Users might copy either format from the JSON file
+			matched := false
+
+			// Try base64 format first (most common)
+			for _, known := range init.KeysB64 {
 				if crypto.HashString(entered) == crypto.HashString(known) {
 					match++
+					matched = true
 					break
 				}
 			}
+
+			// If not matched in base64, try hex format
+			if !matched && len(init.Keys) > 0 {
+				for _, known := range init.Keys {
+					if crypto.HashString(entered) == crypto.HashString(known) {
+						match++
+						break
+					}
+				}
+			}
+		}
+
+		if match >= 3 {
+			// Success!
+			otelzap.Ctx(rc.Ctx).Info(" User confirmed unseal material backup")
+			return nil
+		}
+
+		// Not enough matches
+		if attempt < maxAttempts {
+			logger.Warn(" Credential confirmation failed, please try again",
+				zap.Int("matched", match),
+				zap.Int("required", 3),
+				zap.Int("attempt", attempt),
+				zap.Int("remaining", maxAttempts-attempt))
+			logger.Info("terminal prompt: ")
+			logger.Info(fmt.Sprintf("terminal prompt: Only %d of 3 keys matched. Double-check your keys.", match))
+		} else {
+			logger.Error(" Credential confirmation failed after maximum attempts",
+				zap.Int("attempts", maxAttempts),
+				zap.Int("last_match", match))
+			logger.Debug("Comparison details",
+				zap.Int("entered_keys", len(keys)),
+				zap.Int("available_base64_keys", len(init.KeysB64)),
+				zap.Int("available_hex_keys", len(init.Keys)))
+			return fmt.Errorf("credential confirmation failed after %d attempts (got %d matches on last attempt)", maxAttempts, match)
 		}
 	}
 
-	if match < 3 {
-		logger.Error(" Less than 3 unseal keys matched", zap.Int("matched", match))
-		logger.Debug("Comparison details",
-			zap.Int("entered_keys", len(keys)),
-			zap.Int("available_base64_keys", len(init.KeysB64)),
-			zap.Int("available_hex_keys", len(init.Keys)))
-		return fmt.Errorf("less than 3 unseal keys matched (got %d matches)", match)
-	}
-
-	otelzap.Ctx(rc.Ctx).Info(" User confirmed unseal material backup")
-	return nil
+	// Should never reach here, but just in case
+	return fmt.Errorf("unexpected error in credential confirmation")
 }

@@ -49,7 +49,19 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write server systemd unit: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info(" Validating Vault server config before starting")
+	// CRITICAL FIX (P0-1): Self-healing - ensure config exists before validation
+	// This handles cases where idempotency logic (assess()) skipped Phases 1-4
+	// because Vault service was running, but vault.hcl was missing (e.g., from
+	// failed previous install). PhaseEnsureVaultConfigExists() is idempotent:
+	// - If config exists → No-op (fast path, phase4_config.go:48)
+	// - If config missing → Regenerates with sane defaults (phase4_config.go:38-43)
+	otelzap.Ctx(rc.Ctx).Info(" Ensuring Vault config exists before starting")
+	if err := PhaseEnsureVaultConfigExists(rc); err != nil {
+		return fmt.Errorf("ensure vault config: %w", err)
+	}
+
+	// Now validate the config (will always exist after PhaseEnsureVaultConfigExists)
+	otelzap.Ctx(rc.Ctx).Info(" Validating Vault server config")
 	if err := ValidateVaultConfig(rc); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Vault config validation failed", zap.Error(err))
 		return fmt.Errorf("vault config validation failed: %w", err)
