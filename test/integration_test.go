@@ -144,10 +144,10 @@ func TestEosIntegration_ConfigurationManagement(t *testing.T) {
 		Description: "Test configuration file creation, validation, and management",
 		Setup: func(s *testutil.IntegrationTestSuite) {
 			// Create test configuration files
-			configContent := `# Eos Test Configuration
+			configContent := fmt.Sprintf(`# Eos Test Configuration
 log_level: debug
-vault_addr: http://shared.GetInternalHostname:8200
-`
+vault_addr: http://%s:8200
+`, shared.GetInternalHostname())
 			testutil.CreateTestFile(t, s.GetTempDir(), "eos/config/test.yaml", configContent, 0644)
 		},
 		Steps: []testutil.TestStep{
@@ -316,7 +316,7 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 
 					// Store vault client reference for later steps
 					rc.Attributes["vault_client_created"] = "true"
-					rc.Attributes["vault_addr"] = "http://shared.GetInternalHostname:8200"
+					rc.Attributes["vault_addr"] = fmt.Sprintf("http://%s:8200", shared.GetInternalHostname())
 
 					if vaultClient == nil {
 						return errors.New("vault client was nil")

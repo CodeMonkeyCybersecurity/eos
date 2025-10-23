@@ -160,7 +160,7 @@ log_json = true
 telemetry {
   prometheus_retention_time = "60s"
   disable_hostname = false
-  statsd_address = fmt.Sprintf("%s:8125", shared.GetInternalHostname())
+  statsd_address = "%s:8125"
 }
 
 # Connect settings (service mesh ready)
@@ -212,7 +212,7 @@ watches = [
 ]
 `, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, consulDefaultDataDir, serverConfig,
 		shared.PortConsul, portHTTP, portgRPC, portDNS, portSerfLAN, portSerfWAN, portServer,
-		iface.IP, iface.IP, iface.IP, logLevel, consulVaultHelperPath)
+		iface.IP, iface.IP, iface.IP, logLevel, shared.GetInternalHostname(), consulVaultHelperPath)
 
 	configPath := consulConfigFile
 

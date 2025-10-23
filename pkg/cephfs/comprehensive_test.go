@@ -246,7 +246,7 @@ func TestValidateConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateConfig(tt.config)
+			err := ValidateConfig(tt.config)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -311,8 +311,8 @@ func TestBuildMountArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := buildMountArgs(tt.config)
-			assert.Equal(t, tt.expected, result)
+			args := BuildMountArgs(tt.config)
+			assert.Equal(t, tt.expected, args)
 		})
 	}
 }
@@ -362,7 +362,7 @@ func TestShouldPersistMount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := shouldPersistMount(tt.config)
+			result := ShouldPersistMount(tt.config)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -710,7 +710,7 @@ func TestErrorHandling(t *testing.T) {
 		}
 
 		for i, config := range invalidConfigs {
-			err := validateConfig(config)
+			err := ValidateConfig(config)
 			assert.Error(t, err, "Config %d should be invalid", i)
 		}
 	})

@@ -15,6 +15,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"go.uber.org/zap"
@@ -77,7 +78,7 @@ func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
 	// Authenticate & rotate
 	cfg := Config{
 		Protocol:           "https",
-		FQDN:               "shared.GetInternalHostname",
+		FQDN:               shared.GetInternalHostname(),
 		Port:               "55000",
 		VerifyCertificates: false,
 	}

@@ -1,6 +1,12 @@
 // pkg/terraform/nomad_consul.go
 package terraform
 
+import (
+	"fmt"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+)
+
 // NomadConsulTemplate replaces K3s/Kubernetes Terraform templates with Nomad+Consul
 const NomadConsulTemplate = `
 terraform {
@@ -560,7 +566,7 @@ ui_config {
 }
 
 consul {
-  address = "shared.GetInternalHostname:8500"
+  address = "{{.ConsulAddress}}"
 }
 
 telemetry {
@@ -675,6 +681,9 @@ type NomadConsulConfig struct {
 
 	// External services
 	ExternalServices []ExternalService `json:"external_services"`
+
+	// Service addresses
+	ConsulAddress string `json:"consul_address"` // Consul address for Nomad integration
 }
 
 // ExternalService represents an external service to register in Consul
@@ -712,5 +721,6 @@ func GetDefaultNomadConsulConfig() *NomadConsulConfig {
 		NginxMemoryRequest: 128,
 
 		ExternalServices: []ExternalService{},
+		ConsulAddress:    fmt.Sprintf("%s:8500", shared.GetInternalHostname()),
 	}
 }

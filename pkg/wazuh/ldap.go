@@ -281,7 +281,7 @@ func RunSecurityAdmin(filename string) error {
 		"-key", "/etc/wazuh-indexer/certs/admin-key.pem",
 		"-cert", "/etc/wazuh-indexer/certs/admin.pem",
 		"-cacert", "/etc/wazuh-indexer/certs/root-ca.pem",
-		"-h", "shared.GetInternalHostname",
+		"-h", shared.GetInternalHostname(),
 		"-nhnv")
 
 	// Set JAVA_HOME environment variable

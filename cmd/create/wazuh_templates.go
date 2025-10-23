@@ -3,6 +3,8 @@
 
 package create
 
+import "strings"
+
 func getCustomIrisShellScript() string {
 	return `#!/bin/sh
 # Copyright (C) 2015, Wazuh Inc.
@@ -45,8 +47,8 @@ ${WAZUH_PATH}/${WPYTHON_BIN} ${PYTHON_SCRIPT} "$@"
 `
 }
 
-func getCustomIrisPythonScript() string {
-	return `#!/usr/bin/env python3
+func getCustomIrisPythonScript(hostname string) string {
+	template := `#!/usr/bin/env python3
 """
 Wazuh Iris Integration
 Sends Wazuh alerts to Iris webhook for AI-powered analysis
@@ -235,4 +237,6 @@ if __name__ == "__main__":
     else:
         main(sys.argv)
 `
+	// Replace the placeholder with actual hostname
+	return strings.ReplaceAll(template, "shared.GetInternalHostname", hostname)
 }

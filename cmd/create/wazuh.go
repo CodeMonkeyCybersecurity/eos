@@ -245,7 +245,7 @@ func installIntegrationScripts(rc *eos_io.RuntimeContext, config WazuhConfig) er
 	logger := otelzap.Ctx(rc.Ctx)
 
 	shellScript := getCustomIrisShellScript()
-	pythonScript := getCustomIrisPythonScript()
+	pythonScript := getCustomIrisPythonScript(shared.GetInternalHostname())
 
 	shellPath := filepath.Join(config.IntegrationsDir, config.IntegrationName)
 	pythonPath := filepath.Join(config.IntegrationsDir, config.IntegrationName+".py")

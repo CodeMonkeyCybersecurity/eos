@@ -127,7 +127,8 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		nomadConfig["vault"].(map[string]interface{})["bootstrap_expect"] = bootstrapExpect
 		nomadConfig["vault"].(map[string]interface{})["acl_enabled"] = enableACL
 		nomadConfig["vault"].(map[string]interface{})["tls_enabled"] = enableTLS
-		if consulAddress != "shared.GetInternalHostname:8500" {
+		defaultConsulAddr := fmt.Sprintf("%s:8500", shared.GetInternalHostname())
+		if consulAddress != defaultConsulAddr {
 			nomadConfig["vault"].(map[string]interface{})["consul_enabled"] = true
 			nomadConfig["vault"].(map[string]interface{})["consul_address"] = consulAddress
 		}

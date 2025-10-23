@@ -38,7 +38,7 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 
 	// Validate configuration
-	if err := validateConfig(config); err != nil {
+	if err := ValidateConfig(config); err != nil {
 		return eos_err.NewUserError("invalid configuration: %w", err)
 	}
 
@@ -150,7 +150,7 @@ func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 		zap.String("mountPoint", config.MountPoint))
 
 	// Build mount command
-	mountArgs := buildMountArgs(config)
+	mountArgs := BuildMountArgs(config)
 	mountCmd := exec.CommandContext(rc.Ctx, "mount", mountArgs...)
 
 	if output, err := mountCmd.CombinedOutput(); err != nil {
@@ -158,7 +158,7 @@ func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 
 	// Add to fstab if requested
-	if shouldPersistMount(config) {
+	if ShouldPersistMount(config) {
 		if err := addToFstab(rc, config); err != nil {
 			logger.Warn("Failed to add mount to fstab",
 				zap.Error(err))
@@ -190,7 +190,8 @@ func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 
 // Helper functions
 
-func validateConfig(config *Config) error {
+// ValidateConfig validates the provided configuration
+func ValidateConfig(config *Config) error {
 	if config.Name == "" {
 		return fmt.Errorf("volume name is required")
 	}
@@ -302,7 +303,8 @@ func isMounted(rc *eos_io.RuntimeContext, mountPoint string) bool {
 	return true
 }
 
-func buildMountArgs(config *Config) []string {
+// BuildMountArgs builds mount command arguments from config
+func BuildMountArgs(config *Config) []string {
 	args := []string{"-t", "ceph"}
 
 	// Build monitor string
@@ -326,7 +328,8 @@ func buildMountArgs(config *Config) []string {
 	return args
 }
 
-func shouldPersistMount(config *Config) bool {
+// ShouldPersistMount checks if mount should be persisted to fstab
+func ShouldPersistMount(config *Config) bool {
 	// Check if any mount option indicates persistence
 	for _, opt := range config.MountOptions {
 		if opt == "_netdev" || opt == "auto" {

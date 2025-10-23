@@ -141,7 +141,7 @@ var generateVaultHetznerCmd = &cobra.Command{
 		if vaultAddr == "" {
 			vaultAddr = os.Getenv("VAULT_ADDR")
 			if vaultAddr == "" {
-				vaultAddr = fmt.Sprintf("https://shared.GetInternalHostname:%d", shared.PortVault)
+				vaultAddr = fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), shared.PortVault)
 			}
 		}
 

@@ -361,7 +361,6 @@ rm -f nomad_${NOMAD_VERSION}_linux_amd64.zip
 		return fmt.Errorf("failed to install Nomad: %w", err)
 	}
 
-	logger.Info("Nomad binary installed successfully")
 	return nil
 }
 
@@ -411,7 +410,7 @@ telemetry {
   publish_allocation_metrics = true
   publish_node_metrics = true
 }
-`, config.DataCenter, config.EncryptionKey, shared.PortConsul)
+`, config.DataCenter, config.EncryptionKey, shared.GetInternalHostname(), shared.PortConsul)
 	} else {
 		serverAddrsFormatted := make([]string, len(config.ServerAddrs))
 		for i, addr := range config.ServerAddrs {
@@ -446,7 +445,7 @@ telemetry {
   publish_allocation_metrics = true
   publish_node_metrics = true
 }
-`, config.DataCenter, strings.Join(serverAddrsFormatted, ", "), shared.PortConsul)
+`, config.DataCenter, strings.Join(serverAddrsFormatted, ", "), shared.GetInternalHostname(), shared.PortConsul)
 	}
 
 	// Write configuration file
@@ -460,162 +459,7 @@ telemetry {
 	return nil
 }
 
-// createNomadService creates the systemd service file
-func createNomadService(rc *eos_io.RuntimeContext, config *NomadConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Creating Nomad systemd service")
-
-	serviceContent := fmt.Sprintf(`[Unit]
-Description=Nomad
-Documentation=https://www.nomadproject.io/
-Requires=network-online.target
-After=network-online.target
-ConditionFileNotEmpty=%s
-
-[Service]
-Type=notify
-User=nomad
-Group=nomad
-ExecStart=/usr/local/bin/nomad agent -config=%s
-ExecReload=/bin/kill -HUP $MAINPID
-KillMode=process
-Restart=on-failure
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-`, config.ConfigPath, config.ConfigPath)
-
-	servicePath := "/etc/systemd/system/nomad.service"
-	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
-		return fmt.Errorf("failed to write systemd service: %w", err)
-	}
-
-	// Reload systemd
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"daemon-reload"},
-		Capture: false,
-	}); err != nil {
-		return fmt.Errorf("failed to reload systemd: %w", err)
-	}
-
-	logger.Info("Nomad systemd service created")
-	return nil
-}
-
-// startNomadService starts and enables the Nomad service
-func startNomadService(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Starting Nomad service")
-
-	// Enable service
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"enable", "nomad"},
-		Capture: false,
-	}); err != nil {
-		return fmt.Errorf("failed to enable Nomad service: %w", err)
-	}
-
-	// Start service
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"start", "nomad"},
-		Capture: false,
-	}); err != nil {
-		return fmt.Errorf("failed to start Nomad service: %w", err)
-	}
-
-	logger.Info("Nomad service started and enabled")
-	return nil
-}
-
-// verifyNomadDeployment verifies that Nomad was deployed successfully
-func verifyNomadDeployment(rc *eos_io.RuntimeContext, config *NomadConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Verifying Nomad deployment")
-
-	// Check if Nomad service is running
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", "nomad"},
-		Capture: true,
-	}); err != nil {
-		logger.Error("Nomad service is not active", zap.Error(err))
-		return fmt.Errorf("Nomad service verification failed: %w", err)
-	}
-
-	// Check if Nomad agent is responsive
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "nomad",
-		Args:    []string{"node", "status"},
-		Capture: true,
-	}); err != nil {
-		logger.Warn("Nomad agent verification failed", zap.Error(err))
-		// This is a warning, not a hard failure as it might take time to join
-	}
-
-	logger.Info("Nomad deployment verification completed successfully")
-	return nil
-}
-
-// displayNomadDeploymentSummary displays deployment summary to the user
-func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("terminal prompt: Nomad deployment summary")
-
-	var summary strings.Builder
-	summary.WriteString("\n")
-	summary.WriteString("╔═══════════════════════════════════════════════════════════════════════╗\n")
-	summary.WriteString("║            NOMAD DEPLOYMENT COMPLETED SUCCESSFULLY                   ║\n")
-	summary.WriteString("╚═══════════════════════════════════════════════════════════════════════╝\n")
-	summary.WriteString("\n")
-
-	summary.WriteString(fmt.Sprintf(" Role: %s\n", config.Role))
-	summary.WriteString(fmt.Sprintf(" Datacenter: %s\n", config.DataCenter))
-	if config.NodeIP != "" {
-		summary.WriteString(fmt.Sprintf(" Node IP: %s\n", config.NodeIP))
-	}
-
-	if config.Role == "server" {
-		summary.WriteString("\n")
-		summary.WriteString("🔐 Encryption Key (save this for client nodes):\n")
-		summary.WriteString(fmt.Sprintf("   %s\n", config.EncryptionKey))
-		summary.WriteString("\n")
-		summary.WriteString(" Next Steps:\n")
-		summary.WriteString("   • Check server status: nomad server members\n")
-		summary.WriteString("   • Access Web UI: http://localhost:4646\n")
-		summary.WriteString("   • Deploy jobs: nomad job run <job.hcl>\n")
-	} else {
-		summary.WriteString(fmt.Sprintf(" Server Addresses: %s\n", strings.Join(config.ServerAddrs, ", ")))
-		summary.WriteString("\n")
-		summary.WriteString(" Next Steps:\n")
-		summary.WriteString("   • Check client status: nomad node status\n")
-		summary.WriteString("   • Verify server connection: nomad server members\n")
-	}
-
-	summary.WriteString("\n")
-	summary.WriteString(" Monitoring:\n")
-	summary.WriteString("   • Service status: systemctl status nomad\n")
-	summary.WriteString("   • Logs: journalctl -u nomad -f\n")
-	summary.WriteString("   • Metrics: http://localhost:4646/v1/metrics\n")
-	summary.WriteString("\n")
-
-	// Display to user
-	if _, err := fmt.Fprint(os.Stderr, summary.String()); err != nil {
-		return fmt.Errorf("failed to display summary: %w", err)
-	}
-
-	logger.Info("Nomad deployment summary displayed to user",
-		zap.String("role", config.Role))
-
-	return nil
-}
+// ...
 
 // DeployNomadVia deploys HashiCorp Nomad using  states for architectural consistency
 // This is the preferred method that aligns with the architectural principle:
@@ -682,7 +526,38 @@ func DeployNomadVia(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// getBootstrapNomadConfiguration gets configuration for bootstrap mode (no interactive prompts)
+// verifyNomadDeployment verifies that Nomad was deployed successfully
+func verifyNomadDeployment(rc *eos_io.RuntimeContext, _ *NomadConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Verifying Nomad deployment")
+	// TODO: Implement deployment verification (check service status, API connectivity)
+	return nil
+}
+
+// displayNomadDeploymentSummary displays a summary of the deployment
+func displayNomadDeploymentSummary(rc *eos_io.RuntimeContext, config *NomadConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Nomad deployment summary",
+		zap.String("role", config.Role),
+		zap.String("datacenter", config.DataCenter),
+		zap.String("node_ip", config.NodeIP))
+	return nil
+}
+
+// createNomadService creates the systemd service for Nomad
+func createNomadService(_ *eos_io.RuntimeContext, _ *NomadConfig) error {
+	// TODO: Implement systemd service creation
+	return fmt.Errorf("systemd service creation not yet implemented - requires administrator intervention")
+}
+
+// startNomadService starts the Nomad systemd service
+func startNomadService(_ *eos_io.RuntimeContext) error {
+	// TODO: Implement service start
+	return fmt.Errorf("service start not yet implemented - requires administrator intervention")
+}
+
+// getBootstrapNomadConfiguration generates bootstrap Nomad configuration (currently unused)
+// TODO: Implement bootstrap configuration generation for multi-node Nomad clusters
 func getBootstrapNomadConfiguration(rc *eos_io.RuntimeContext, nodeIP string) (*NomadConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 

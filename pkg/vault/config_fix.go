@@ -101,9 +101,9 @@ func FixVaultConfig(rc *eos_io.RuntimeContext, configPath string) error {
 
 	// Show what changed
 	logger.Info("Changes applied:",
-		zap.String("old_api_addr", fmt.Sprintf("https://shared.GetInternalHostname:8200")),
+		zap.String("old_api_addr", "https://shared.GetInternalHostname:8200"),
 		zap.String("new_api_addr", fmt.Sprintf("https://%s:8200", hostname)),
-		zap.String("old_cluster_addr", fmt.Sprintf("https://shared.GetInternalHostname:8201")),
+		zap.String("old_cluster_addr", "https://shared.GetInternalHostname:8201"),
 		zap.String("new_cluster_addr", fmt.Sprintf("https://%s:8201", hostname)))
 
 	logger.Info("✓ Vault configuration fixed - restart required",

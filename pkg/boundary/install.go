@@ -142,7 +142,7 @@ func (bi *BoundaryInstaller) Install() error {
 
 	// Write basic configuration
 	if bi.config.DevMode {
-		config := `disable_mlock = true
+		config := fmt.Sprintf(`disable_mlock = true
 
 controller {
   name = "dev-controller"
@@ -152,12 +152,12 @@ controller {
 }
 
 listener "tcp" {
-  address = "shared.GetInternalHostname:9200"
+  address = "%s:9200"
   purpose = "api"
 }
 
 listener "tcp" {
-  address = "shared.GetInternalHostname:9201" 
+  address = "%s:9201"
   purpose = "cluster"
 }
 
@@ -180,7 +180,7 @@ kms "aead" {
   aead_type = "aes-gcm"
   key = "8fZBjCUfN0TzjEGLQldGY4+iE9AkOvCfjh7+p0GcvFo="
   key_id = "global_recovery"
-}`
+}`, shared.GetInternalHostname(), shared.GetInternalHostname())
 		_ = os.WriteFile("/etc/boundary.d/boundary.hcl", []byte(config), 0640)
 		bi.runner.Run("chown", "boundary:boundary", "/etc/boundary.d/boundary.hcl")
 	}

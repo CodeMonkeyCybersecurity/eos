@@ -203,7 +203,7 @@ var vaultBackendCmd = &cobra.Command{
 		}
 
 		if vaultConfig.Address == "" {
-			vaultConfig.Address = fmt.Sprintf("https://shared.GetInternalHostname:%d", shared.PortVault)
+			vaultConfig.Address = fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), shared.PortVault)
 		}
 
 		return tfManager.GenerateVaultBackendConfig(rc, vaultConfig)

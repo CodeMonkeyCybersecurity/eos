@@ -199,7 +199,7 @@ func runDeleteBoundary(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	return nil
 }
 
-func displayBoundaryRemovalStatus(logger otelzap.LoggerWithCtx, status interface{}, running, failed []string) {
+func displayBoundaryRemovalStatus(logger otelzap.LoggerWithCtx, _ interface{}, running, _ []string) {
 	logger.Info("terminal prompt: Current HashiCorp Boundary Installation Status:")
 	logger.Info(fmt.Sprintf("terminal prompt:   Running instances: %d", len(running)))
 

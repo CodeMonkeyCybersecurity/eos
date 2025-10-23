@@ -1332,7 +1332,7 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 
 	// Check 3: Is vault responding to status command?
 	// For self-signed TLS certificates, we need to skip verification during health checks
-	vaultAddr := fmt.Sprintf("https://shared.GetInternalHostname:%d", vi.config.Port)
+	vaultAddr := fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), vi.config.Port)
 
 	vi.logger.Debug("Running vault status health check",
 		zap.String("binary_path", vi.config.BinaryPath),

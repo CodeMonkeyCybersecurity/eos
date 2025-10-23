@@ -277,7 +277,7 @@ func FuzzVolumeCreationSecurity(f *testing.F) {
 		}
 
 		// Test validateConfig function
-		err := validateConfig(config)
+		err := ValidateConfig(config)
 
 		// Check for path traversal attempts
 		if strings.Contains(volumeName+dataPool+metaPool+mountPoint, "../") {
@@ -355,7 +355,7 @@ func FuzzMountCommandGeneration(f *testing.F) {
 		}
 
 		// Test buildMountArgs function
-		args := buildMountArgs(config)
+		args := BuildMountArgs(config)
 
 		// Verify basic structure
 		if len(args) < 3 {
@@ -395,10 +395,10 @@ func FuzzMountCommandGeneration(f *testing.F) {
 		}
 
 		// Test shouldPersistMount function
-		persistMount := shouldPersistMount(config)
+		result := ShouldPersistMount(config)
 		if len(config.MountOptions) > 0 {
 			// Basic check that function doesn't panic
-			_ = persistMount
+			_ = result
 		}
 	})
 }
