@@ -114,7 +114,7 @@ search_pattern '"/tmp/' "Paths: /tmp/*" "$YELLOW"
 
 echo -e "\n${BLUE}[2/12] IP ADDRESSES${NC}"
 
-search_pattern '"127\.0\.0\.1"' "IP: 127.0.0.1 (localhost)" "$YELLOW"
+search_pattern '"127\.0\.0\.1"' "IP: shared.GetInternalHostname (localhost)" "$YELLOW"
 search_pattern '"0\.0\.0\.0"' "IP: 0.0.0.0 (all interfaces)" "$YELLOW"
 search_pattern '"::1"' "IP: ::1 (IPv6 localhost)" "$YELLOW"
 search_pattern '"localhost"' "Hostname: localhost" "$YELLOW"

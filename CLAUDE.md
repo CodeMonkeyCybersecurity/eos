@@ -41,7 +41,7 @@ These violations cause immediate failure:
       - Common paths: `pkg/shared/paths.go`
     - **COMPREHENSIVE list of FORBIDDEN hardcoded values**:
       - ✗ **File paths**: `"/usr/local/bin/vault"`, `"/etc/vault.d"`, `"/opt/vault"`
-      - ✗ **IP addresses**: `"127.0.0.1"`, `"0.0.0.0"`, `"localhost"`
+      - ✗ **IP addresses**: `"shared.GetInternalHostname"`, `"0.0.0.0"`, `"localhost"`
       - ✗ **Port numbers**: `8200`, `8500`, `4646`
       - ✗ **Hostnames**: `"localhost"`, `"vault"`, `"consul"`
       - ✗ **User/Group names**: `"vault"`, `"consul"`, `"root"`
@@ -49,13 +49,13 @@ These violations cause immediate failure:
       - ✗ **File permissions**: `0755`, `0644`, `0600`
       - ✗ **Environment variable names**: `"VAULT_ADDR"`, `"CONSUL_HTTP_ADDR"`
       - ✗ **Service names**: `"vault.service"`, `"consul.service"`
-      - ✗ **URLs/Endpoints**: `"https://127.0.0.1:8200"`, `"/v1/sys/health"`
+      - ✗ **URLs/Endpoints**: `"https://shared.GetInternalHostname:8200"`, `"/v1/sys/health"`
       - ✗ **Timeouts/Durations**: `5 * time.Second`, `30 * time.Minute`
       - ✗ **Retry counts**: `5`, `3`, delay values
       - ✗ **Storage paths**: `"secret/vault"`, `"service/consul/config"`
     - **Violation examples**:
       - ✗ `os.MkdirAll("/etc/vault.d", 0755)` → use `vault.VaultConfigDir, vault.VaultDirPerm`
-      - ✗ `net.Listen("tcp", "127.0.0.1:8200")` → use `vault.LocalhostIP, shared.PortVault`
+      - ✗ `net.Listen("tcp", "shared.GetInternalHostname:8200")` → use `vault.LocalhostIP, shared.PortVault`
       - ✗ `exec.Command("systemctl", "start", "vault.service")` → use `vault.VaultServiceName`
     - **Circular import exception**: Document with `// NOTE: Duplicates B.ConstName to avoid circular import`
     - **Enforcement**: Run monthly audit: `scripts/audit_hardcoded_values.sh`

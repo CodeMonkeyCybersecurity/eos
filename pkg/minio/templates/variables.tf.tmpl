@@ -51,5 +51,5 @@ variable "node_name" {
 variable "node_address" {
   description = "Node IP address for health checks"
   type        = string
-  default     = "127.0.0.1"
+  default     = shared.GetInternalHostname()
 }

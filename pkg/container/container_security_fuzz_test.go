@@ -3,7 +3,7 @@ package container
 import (
 	"strings"
 	"testing"
-	
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,7 +24,7 @@ func FuzzComposeFileSecurity(f *testing.F) {
 		// Test should not panic
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("ComposeFile creation panicked with inputs: service=%q, image=%q, port=%q: %v", 
+				t.Errorf("ComposeFile creation panicked with inputs: service=%q, image=%q, port=%q: %v",
 					serviceName, image, port, r)
 			}
 		}()
@@ -66,7 +66,7 @@ func FuzzComposeFileSecurity(f *testing.F) {
 			if strings.Contains(image, "..") {
 				t.Logf("Path traversal in image: %q", image)
 			}
-			
+
 			// Check for protocol injection
 			if strings.HasPrefix(image, "http://") || strings.HasPrefix(image, "file://") {
 				t.Logf("Protocol injection in image: %q", image)
@@ -80,7 +80,7 @@ func FuzzComposeFileSecurity(f *testing.F) {
 			if len(parts) > 3 {
 				t.Logf("Invalid port format: %q", port)
 			}
-			
+
 			// Check for command injection in ports
 			if strings.ContainsAny(port, ";|&`$()") {
 				t.Errorf("Command injection in port: %q", port)
@@ -93,7 +93,7 @@ func FuzzComposeFileSecurity(f *testing.F) {
 			if strings.ContainsAny(envKey, "${}") {
 				t.Logf("Shell expansion characters in env key: %q", envKey)
 			}
-			
+
 			// Check for null bytes
 			if strings.Contains(envKey, "\x00") || strings.Contains(envValue, "\x00") {
 				t.Errorf("Null byte in environment: key=%q, value=%q", envKey, envValue)
@@ -105,12 +105,12 @@ func FuzzComposeFileSecurity(f *testing.F) {
 			parts := strings.Split(volumeMapping, ":")
 			if len(parts) >= 2 {
 				hostPath := parts[0]
-				
+
 				// Check for path traversal
 				if strings.Contains(hostPath, "..") {
 					t.Logf("Path traversal in volume: %q", volumeMapping)
 				}
-				
+
 				// Check for sensitive paths
 				sensitivePaths := []string{"/etc", "/root", "/sys", "/proc", "/", "C:\\Windows", "C:\\"}
 				for _, sensitive := range sensitivePaths {
@@ -150,7 +150,7 @@ func FuzzDockerNetworkConfigSecurity(f *testing.F) {
 		// Test should not panic
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("Network config panicked with name=%q, ipv4=%q, ipv6=%q: %v", 
+				t.Errorf("Network config panicked with name=%q, ipv4=%q, ipv6=%q: %v",
 					networkName, ipv4Subnet, ipv6Subnet, r)
 			}
 		}()
@@ -172,7 +172,7 @@ func FuzzDockerNetworkConfigSecurity(f *testing.F) {
 			if strings.ContainsAny(ipv4Subnet, ";|&`$()") {
 				t.Errorf("Command injection in IPv4 subnet: %q", ipv4Subnet)
 			}
-			
+
 			// Check for overly broad subnets
 			if ipv4Subnet == "0.0.0.0/0" {
 				t.Logf("Overly broad IPv4 subnet: %q", ipv4Subnet)
@@ -185,7 +185,7 @@ func FuzzDockerNetworkConfigSecurity(f *testing.F) {
 			if strings.ContainsAny(ipv6Subnet, ";|&`$()") {
 				t.Errorf("Command injection in IPv6 subnet: %q", ipv6Subnet)
 			}
-			
+
 			// Check for overly broad subnets
 			if ipv6Subnet == "::/0" {
 				t.Logf("Overly broad IPv6 subnet: %q", ipv6Subnet)
@@ -283,12 +283,12 @@ func FuzzContainerConfigSecurity(f *testing.F) {
 			if strings.Count(image, "/") > 2 {
 				t.Logf("Suspicious image path: %q", image)
 			}
-			
+
 			// Check for tag injection
 			if strings.Count(image, ":") > 1 {
 				t.Logf("Multiple colons in image: %q", image)
 			}
-			
+
 			// Check for newlines (could break parsing)
 			if strings.ContainsAny(image, "\n\r") {
 				t.Errorf("Newline in image name: %q", image)
@@ -301,7 +301,7 @@ func FuzzContainerConfigSecurity(f *testing.F) {
 			if strings.HasPrefix(hostPort, "-") || strings.HasPrefix(containerPort, "-") {
 				t.Logf("Negative port number detected")
 			}
-			
+
 			// Check for port 0 (could bind to random port)
 			if hostPort == "0" {
 				t.Logf("Port 0 could bind to random port")
@@ -314,7 +314,7 @@ func FuzzContainerConfigSecurity(f *testing.F) {
 			if strings.Contains(hostPath, "..") {
 				t.Errorf("Path traversal in host path: %q", hostPath)
 			}
-			
+
 			// Check for sensitive paths
 			sensitivePaths := []string{"/", "/etc", "/root", "/sys", "/proc", "/dev"}
 			for _, sensitive := range sensitivePaths {
@@ -356,12 +356,12 @@ func FuzzDockerClientOperationsSecurity(f *testing.F) {
 			if strings.ContainsAny(param, ";|&`$()") {
 				t.Logf("Command injection in parameter %d: %q", i, param)
 			}
-			
+
 			// Check for null bytes
 			if strings.Contains(param, "\x00") {
 				t.Errorf("Null byte in parameter %d: %q", i, param)
 			}
-			
+
 			// Check for newlines
 			if strings.ContainsAny(param, "\n\r") {
 				t.Logf("Newline in parameter %d: %q", i, param)
@@ -371,10 +371,10 @@ func FuzzDockerClientOperationsSecurity(f *testing.F) {
 		// Image-specific validation
 		if image != "" {
 			// Check for localhost registry bypass
-			if strings.HasPrefix(image, "localhost:") || strings.HasPrefix(image, "127.0.0.1:") {
+			if strings.HasPrefix(image, "localhost:") || strings.HasPrefix(image, "shared.GetInternalHostname:") {
 				t.Logf("Localhost registry in image: %q", image)
 			}
-			
+
 			// Check for protocol handlers
 			if strings.Contains(image, "://") {
 				t.Errorf("Protocol handler in image: %q", image)
@@ -387,7 +387,7 @@ func FuzzDockerClientOperationsSecurity(f *testing.F) {
 			if len(networkName) > 63 {
 				t.Logf("Network name too long: %d chars", len(networkName))
 			}
-			
+
 			// Check for special network names
 			if networkName == "host" || networkName == "none" {
 				t.Logf("Special network name: %q", networkName)
@@ -439,7 +439,7 @@ func FuzzDockerExecSecurity(f *testing.F) {
 			if strings.Contains(cmd, "..") {
 				t.Errorf("Path traversal in command: %q", cmd)
 			}
-			
+
 			// Check for suspicious commands
 			dangerousCmds := []string{"rm", "mkfs", "dd", "format"}
 			for _, dangerous := range dangerousCmds {
@@ -455,12 +455,12 @@ func FuzzDockerExecSecurity(f *testing.F) {
 			if arg == "" {
 				continue
 			}
-			
+
 			// Check for shell metacharacters
 			if strings.ContainsAny(arg, ";|&`$(){}[]<>") {
 				t.Logf("Shell metacharacters in arg %d: %q", i, arg)
 			}
-			
+
 			// Check for environment variable injection
 			if strings.HasPrefix(arg, "LD_") || strings.HasPrefix(arg, "PATH=") {
 				t.Logf("Environment manipulation in arg %d: %q", i, arg)

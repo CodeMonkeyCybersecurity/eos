@@ -144,7 +144,7 @@ result, err := circuitBreaker.Execute(func() (interface{}, error) {
 ### **Secure Consul Deployment**
 ```go
 config := &EnhancedConfig{
-    Address: "127.0.0.1:8161",  // Eos standard port
+    Address: "shared.GetInternalHostname:8161",  // Eos standard port
     TLSConfig: &TLSConfig{Enabled: true},
     ACLConfig: &ACLConfig{Enabled: true, DefaultPolicy: "deny"},
     SecurityConfig: &SecurityConfig{EncryptionEnabled: true},

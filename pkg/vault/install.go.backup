@@ -64,7 +64,7 @@ type InstallConfig struct {
 	DisableMlock    bool
 
 	// Consul storage backend configuration
-	ConsulAddress string // Consul agent address (default: 127.0.0.1:8161)
+	ConsulAddress string // Consul agent address (default: shared.GetInternalHostname:8161)
 	ConsulPath    string // Path in Consul KV store (default: "vault/")
 	ConsulToken   string // Consul ACL token (optional)
 	ConsulScheme  string // http or https (default: http)
@@ -132,14 +132,14 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		if config.TLSEnabled {
 			protocol = "https"
 		}
-		config.APIAddr = fmt.Sprintf("%s://127.0.0.1:%d", protocol, shared.PortVault)
+		config.APIAddr = fmt.Sprintf("%s://shared.GetInternalHostname:%d", protocol, shared.PortVault)
 	}
 	if config.ClusterAddr == "" {
 		protocol := "http"
 		if config.TLSEnabled {
 			protocol = "https"
 		}
-		config.ClusterAddr = fmt.Sprintf("%s://127.0.0.1:%d", protocol, shared.PortVault+1)
+		config.ClusterAddr = fmt.Sprintf("%s://shared.GetInternalHostname:%d", protocol, shared.PortVault+1)
 	}
 	if config.LogLevel == "" {
 		config.LogLevel = "info"
@@ -1522,7 +1522,7 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 
 	// Check 3: Is vault responding to status command?
 	// For self-signed TLS certificates, we need to skip verification during health checks
-	vaultAddr := fmt.Sprintf("https://127.0.0.1:%d", vi.config.Port)
+	vaultAddr := fmt.Sprintf("https://shared.GetInternalHostname:%d", vi.config.Port)
 
 	vi.logger.Debug("Running vault status health check",
 		zap.String("binary_path", vi.config.BinaryPath),
@@ -1894,7 +1894,7 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 		Group:        vi.config.ServiceGroup,
 		// Initial SANs - enrichSANs() will add comprehensive list automatically
 		DNSNames:    []string{hostname, "localhost", "vault"},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses: []net.IP{net.ParseIP("shared.GetInternalHostname")},
 	}
 
 	// Generate certificate based on TLS mode

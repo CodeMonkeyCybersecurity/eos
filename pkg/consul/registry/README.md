@@ -36,7 +36,7 @@ import (
 )
 
 ctx := context.Background()
-reg, err := registry.NewServiceRegistry(ctx, "127.0.0.1:8500")
+reg, err := registry.NewServiceRegistry(ctx, "shared.GetInternalHostname:8500")
 if err != nil {
     log.Fatal(err)
 }
@@ -301,7 +301,7 @@ Replace `pkg/consul/vault/service.go`:
 
 ```go
 func RegisterVaultWithConsul(rc *eos_io.RuntimeContext, vaultAddr string) error {
-    reg, err := registry.NewServiceRegistry(rc.Ctx, "127.0.0.1:8500")
+    reg, err := registry.NewServiceRegistry(rc.Ctx, "shared.GetInternalHostname:8500")
     if err != nil {
         return err
     }

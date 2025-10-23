@@ -36,7 +36,7 @@ type VaultConfigBuilder struct {
 
 	// Storage backend
 	StorageBackend string // "consul" or "raft"
-	ConsulAddress  string // 127.0.0.1:8500
+	ConsulAddress  string // shared.GetInternalHostname:8500
 
 	// Logging
 	LogLevel  string // "info"
@@ -67,7 +67,7 @@ func NewConfigBuilder(rc *eos_io.RuntimeContext) (*VaultConfigBuilder, error) {
 		TLSCertFile:    VaultTLSCert,
 		TLSKeyFile:     VaultTLSKey,
 		StorageBackend: "consul", // Default to Consul for HA
-		ConsulAddress:  "127.0.0.1:8500",
+		ConsulAddress:  "shared.GetInternalHostname:8500",
 		LogLevel:       "info",
 		LogFormat:      "json",
 	}, nil
@@ -75,9 +75,9 @@ func NewConfigBuilder(rc *eos_io.RuntimeContext) (*VaultConfigBuilder, error) {
 
 // discoverHostname dynamically discovers the system hostname
 // Priority:
-//   1. VAULT_HOSTNAME environment variable (explicit override)
-//   2. os.Hostname() (system hostname)
-//   3. Fallback to "localhost" (last resort)
+//  1. VAULT_HOSTNAME environment variable (explicit override)
+//  2. os.Hostname() (system hostname)
+//  3. Fallback to "localhost" (last resort)
 func discoverHostname() (string, error) {
 	// Check environment variable first (allows override)
 	if envHostname := os.Getenv("VAULT_HOSTNAME"); envHostname != "" {
@@ -115,9 +115,9 @@ func (vcb *VaultConfigBuilder) GetClusterAddr() string {
 	return fmt.Sprintf("https://%s:%d", vcb.hostname, vcb.ClusterPort)
 }
 
-// GetAPIAddrLocal returns the local API address for internal use (https://127.0.0.1:8200)
+// GetAPIAddrLocal returns the local API address for internal use (https://shared.GetInternalHostname:8200)
 func (vcb *VaultConfigBuilder) GetAPIAddrLocal() string {
-	return fmt.Sprintf("https://127.0.0.1:%d", vcb.APIPort)
+	return fmt.Sprintf("https://shared.GetInternalHostname:%d", vcb.APIPort)
 }
 
 // BuildServerConfig generates the vault.hcl configuration file content
@@ -175,9 +175,9 @@ service_registration "consul" {
 
 `, vcb.APIPort, vcb.TLSCertFile, vcb.TLSKeyFile)
 
-	// CRITICAL: Use hostname for api_addr, not 127.0.0.1!
+	// CRITICAL: Use hostname for api_addr, not shared.GetInternalHostname!
 	// This fixes the web UI redirect issue
-	config += fmt.Sprintf(`# CRITICAL: api_addr must use hostname, not 127.0.0.1
+	config += fmt.Sprintf(`# CRITICAL: api_addr must use hostname, not shared.GetInternalHostname
 # This allows external access to web UI and API
 api_addr     = "%s"
 cluster_addr = "%s"

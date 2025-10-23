@@ -123,7 +123,7 @@ func TestIsSecretNotFoundEdgeCases(t *testing.T) {
 	t.Run("vault API error format", func(t *testing.T) {
 		// Simulate actual Vault API error format
 		vaultErrors := []error{
-			errors.New("Error making API request.\n\nURL: GET http://127.0.0.1:8200/v1/kv/data/test\nCode: 404. Errors:\n\n* no secret at kv/data/test"),
+			errors.New("Error making API request.\n\nURL: GET http://shared.GetInternalHostname:8200/v1/kv/data/test\nCode: 404. Errors:\n\n* no secret at kv/data/test"),
 			errors.New("Get \"http://vault:8200/v1/secret/data/app\": 404 Not Found"),
 			errors.New("error reading secret at path secret/data/test: Error making API request. Code: 404"),
 		}

@@ -29,7 +29,7 @@ func createUnauthenticatedVaultClient(rc *eos_io.RuntimeContext) (*api.Client, e
 
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if vaultAddr == "" {
-		vaultAddr = "https://127.0.0.1:8200"
+		vaultAddr = "https://shared.GetInternalHostname:8200"
 		logger.Debug(" VAULT_ADDR not set, using default",
 			zap.String("default_addr", vaultAddr))
 	} else {

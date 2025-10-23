@@ -38,8 +38,8 @@ listener "tcp" {
   tls_key_file = "/opt/vault/tls/vault.key"
 }
 
-api_addr = "https://127.0.0.1:8179"
-cluster_addr = "https://127.0.0.1:8180"
+api_addr = "https://shared.GetInternalHostname:8179"
+cluster_addr = "https://shared.GetInternalHostname:8180"
 ui = true
 `,
 			expectValid:  true,
@@ -54,7 +54,7 @@ listener "tcp" {
   tls_disable = true
 }
 
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `,
 			expectValid:  false,
 			expectErrors: 1, // Missing storage block
@@ -67,7 +67,7 @@ storage "file" {
   path = "/opt/vault/data"
 }
 
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `,
 			expectValid:  false,
 			expectErrors: 1, // Missing listener block
@@ -86,7 +86,7 @@ listener "tcp" {
   tls_cert_file = "/opt/vault/tls/vault.crt"
 }
 
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `,
 			expectValid:  false,
 			expectErrors: 1, // tls_cert_file without tls_key_file
@@ -119,7 +119,7 @@ listener "tcp" {
   tls_disable = true
 }
 
-api_addr = "http://127.0.0.1:8200"
+api_addr = "http://shared.GetInternalHostname:8200"
 `,
 			expectValid:  true, // Valid but has warnings
 			expectErrors: 0,
@@ -137,7 +137,7 @@ listener "tcp" {
   tls_disable = "true"
 }
 
-api_addr = "http://127.0.0.1:8179"
+api_addr = "http://shared.GetInternalHostname:8179"
 `,
 			expectValid:  true, // Valid but has warnings
 			expectErrors: 0,
@@ -288,7 +288,7 @@ listener "tcp" {
   tls_disable = false
 }
 
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `,
 			expectErrors:   0,
 			expectWarnings: 0,
@@ -297,7 +297,7 @@ api_addr = "https://127.0.0.1:8179"
 		{
 			name: "missing_required_blocks",
 			content: `
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `,
 			expectErrors:   2, // Missing storage and listener
 			expectWarnings: 0,
@@ -314,7 +314,7 @@ listener "tcp" {
   address = "0.0.0.0:8179"
 }
 
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `,
 			expectErrors:   0,
 			expectWarnings: 1, // Warning about missing address
@@ -331,7 +331,7 @@ listener "tcp" {
   address = "0.0.0.0:8179"
 }
 
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `,
 			expectErrors:   1, // Missing node_id
 			expectWarnings: 0,

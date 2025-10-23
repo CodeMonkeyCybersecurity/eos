@@ -17,7 +17,7 @@ import (
 // - validateURL: Check for SSRF attacks, protocol validation, hostname verification
 // - validateHTTPHeader: Prevent header injection, validate encoding, length limits
 // - validateQueryParameter: Detect SQL/XSS/command injection in query params
-// - validateIPAddress: IP validation with private network detection for SSRF protection  
+// - validateIPAddress: IP validation with private network detection for SSRF protection
 // - sanitizeNetworkConfig: Secure network configuration input handling
 // See pkg/shared/network_input_fuzz_test.go for injection attack testing
 
@@ -48,7 +48,7 @@ func ValidateRequiredStringWithLength(fieldName, value string, minLen, maxLen in
 	if err := ValidateRequiredString(fieldName, value); err != nil {
 		return err
 	}
-	
+
 	valueLen := len(strings.TrimSpace(value))
 	if valueLen < minLen {
 		return fmt.Errorf("%s must be at least %d characters long", fieldName, minLen)
@@ -64,7 +64,7 @@ func ValidateEmail(email string) error {
 	if email == "" {
 		return fmt.Errorf("email cannot be empty")
 	}
-	
+
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(email) {
 		return fmt.Errorf("invalid email format")
@@ -127,8 +127,8 @@ func ValidateURL(urlStr string) error {
 	// SECURITY: SSRF protection - validate hostname/IP is not private/internal
 	hostname := parsedURL.Hostname()
 
-	// Check for localhost aliases
-	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" || hostname == "0.0.0.0" {
+	// Check for localhost aliases	
+	if hostname == "localhost" || hostname == "shared.GetInternalHostname" || hostname == "::1" || hostname == "0.0.0.0" {
 		return fmt.Errorf("URL hostname cannot be localhost (SSRF protection)")
 	}
 
@@ -183,7 +183,7 @@ func ValidateIPAddress(ip string) error {
 	if ip == "" {
 		return fmt.Errorf("IP address cannot be empty")
 	}
-	
+
 	if net.ParseIP(ip) == nil {
 		return fmt.Errorf("invalid IP address format: %s", ip)
 	}
@@ -195,17 +195,17 @@ func ValidateHostname(hostname string) error {
 	if hostname == "" {
 		return fmt.Errorf("hostname cannot be empty")
 	}
-	
+
 	// Basic hostname validation
 	hostnameRegex := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$`)
 	if !hostnameRegex.MatchString(hostname) {
 		return fmt.Errorf("invalid hostname format: %s", hostname)
 	}
-	
+
 	if len(hostname) > 253 {
 		return fmt.Errorf("hostname too long (max 253 characters)")
 	}
-	
+
 	return nil
 }
 
@@ -214,7 +214,7 @@ func ValidatePathExists(path string) error {
 	if path == "" {
 		return fmt.Errorf("path cannot be empty")
 	}
-	
+
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("path does not exist: %s", path)
@@ -229,12 +229,12 @@ func ValidateDirectoryPath(path string) error {
 	if err := ValidatePathExists(path); err != nil {
 		return err
 	}
-	
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("failed to get file info for %s: %w", path, err)
 	}
-	
+
 	if !info.IsDir() {
 		return fmt.Errorf("path is not a directory: %s", path)
 	}
@@ -246,12 +246,12 @@ func ValidateFilePath(path string) error {
 	if err := ValidatePathExists(path); err != nil {
 		return err
 	}
-	
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("failed to get file info for %s: %w", path, err)
 	}
-	
+
 	if info.IsDir() {
 		return fmt.Errorf("path is a directory, not a file: %s", path)
 	}
@@ -263,14 +263,14 @@ func ValidateFileExtension(filename string, allowedExts []string) error {
 	if filename == "" {
 		return fmt.Errorf("filename cannot be empty")
 	}
-	
+
 	ext := strings.ToLower(filepath.Ext(filename))
 	for _, allowedExt := range allowedExts {
 		if ext == strings.ToLower(allowedExt) {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("file extension '%s' not allowed. Allowed extensions: %v", ext, allowedExts)
 }
 
@@ -279,17 +279,17 @@ func ValidateUsername(username string) error {
 	if err := ValidateRequiredString("username", username); err != nil {
 		return err
 	}
-	
+
 	// Username validation: alphanumeric, underscore, hyphen, 1-32 chars, start with letter or underscore
 	usernameRegex := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
 	if !usernameRegex.MatchString(username) {
 		return fmt.Errorf("username must start with a letter or underscore and contain only alphanumeric characters, underscores, and hyphens")
 	}
-	
+
 	if len(username) > 32 {
 		return fmt.Errorf("username must be 32 characters or less")
 	}
-	
+
 	return nil
 }
 
@@ -298,20 +298,20 @@ func ValidatePassword(password string, minLength int) error {
 	if password == "" {
 		return fmt.Errorf("password cannot be empty")
 	}
-	
+
 	if len(password) < minLength {
 		return fmt.Errorf("password must be at least %d characters long", minLength)
 	}
-	
+
 	// Check for at least one uppercase, one lowercase, one digit
 	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
 	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
 	hasDigit := regexp.MustCompile(`[0-9]`).MatchString(password)
-	
+
 	if !hasUpper || !hasLower || !hasDigit {
 		return fmt.Errorf("password must contain at least one uppercase letter, one lowercase letter, and one digit")
 	}
-	
+
 	return nil
 }
 
@@ -325,12 +325,12 @@ func ValidateStruct(v interface{}) error {
 	if v == nil {
 		return fmt.Errorf("cannot validate nil value")
 	}
-	
+
 	// If the struct implements Validator, use that
 	if validator, ok := v.(Validator); ok {
 		return validator.Validate()
 	}
-	
+
 	// Use reflection to validate required fields
 	return validateStructFields(v)
 }
@@ -344,41 +344,41 @@ func validateStructFields(v interface{}) error {
 		}
 		val = val.Elem()
 	}
-	
+
 	if val.Kind() != reflect.Struct {
 		return fmt.Errorf("can only validate struct types")
 	}
-	
+
 	typ := val.Type()
 	var validationErrors []error
-	
+
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 		fieldType := typ.Field(i)
-		
+
 		// Skip unexported fields
 		if !field.CanInterface() {
 			continue
 		}
-		
+
 		// Check for required tag
 		tag := fieldType.Tag.Get("validate")
 		if tag == "" {
 			continue
 		}
-		
+
 		fieldName := fieldType.Name
 		if jsonTag := fieldType.Tag.Get("json"); jsonTag != "" {
 			if parts := strings.Split(jsonTag, ","); len(parts) > 0 && parts[0] != "" {
 				fieldName = parts[0]
 			}
 		}
-		
+
 		if err := validateFieldByTag(fieldName, field.Interface(), tag); err != nil {
 			validationErrors = append(validationErrors, err)
 		}
 	}
-	
+
 	if len(validationErrors) > 0 {
 		multiErr := NewMultiError("struct validation failed")
 		for _, err := range validationErrors {
@@ -386,7 +386,7 @@ func validateStructFields(v interface{}) error {
 		}
 		return multiErr
 	}
-	
+
 	return nil
 }
 
@@ -456,7 +456,7 @@ func validateRequired(fieldName string, value interface{}) error {
 	if value == nil {
 		return fmt.Errorf("%s is required", fieldName)
 	}
-	
+
 	val := reflect.ValueOf(value)
 	switch val.Kind() {
 	case reflect.String:
@@ -472,7 +472,7 @@ func validateRequired(fieldName string, value interface{}) error {
 			return fmt.Errorf("%s is required", fieldName)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -483,7 +483,7 @@ func validateMinLength(_ string, _ interface{}, _ string) error {
 	return nil
 }
 
-// validateMaxLength validates maximum length for strings and slices  
+// validateMaxLength validates maximum length for strings and slices
 func validateMaxLength(_ string, _ interface{}, _ string) error {
 	// This would need proper parsing of maxStr to int
 	// Simplified for brevity
@@ -505,15 +505,15 @@ func ValidateRegex(fieldName, value, pattern string) error {
 	if value == "" {
 		return nil // Allow empty values, use required validation separately
 	}
-	
+
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return fmt.Errorf("invalid regex pattern for %s: %w", fieldName, err)
 	}
-	
+
 	if !regex.MatchString(value) {
 		return fmt.Errorf("%s format is invalid", fieldName)
 	}
-	
+
 	return nil
 }

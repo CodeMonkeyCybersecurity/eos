@@ -7,17 +7,18 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
 // ConsulProxyConfig represents the configuration stored in Consul KV for reverse proxies
 type ConsulProxyConfig struct {
-	Service     string                 `json:"service"`
-	Domain      string                 `json:"domain"`
-	Backend     ConsulBackendConfig    `json:"backend"`
-	SSL         ConsulSSLConfig        `json:"ssl"`
-	Headers     map[string]string      `json:"headers"`
-	Auth        ConsulAuthConfig       `json:"auth"`
+	Service     string                  `json:"service"`
+	Domain      string                  `json:"domain"`
+	Backend     ConsulBackendConfig     `json:"backend"`
+	SSL         ConsulSSLConfig         `json:"ssl"`
+	Headers     map[string]string       `json:"headers"`
+	Auth        ConsulAuthConfig        `json:"auth"`
 	HealthCheck ConsulHealthCheckConfig `json:"health_check"`
 }
 
@@ -51,22 +52,22 @@ type ConsulHealthCheckConfig struct {
 // registerWithConsul registers n8n services with Consul using the CLI
 func (m *Manager) registerWithConsul(ctx context.Context) error {
 	logger := zap.L().With(zap.String("context", "consul_registration"))
-	
+
 	// Register n8n main service
 	if err := m.registerConsulService(ctx, "n8n", m.config.Port, []string{"n8n", "workflow", "web"}); err != nil {
 		return fmt.Errorf("failed to register n8n service: %w", err)
 	}
-	
+
 	// Register PostgreSQL service
 	if err := m.registerConsulService(ctx, "n8n-postgres", m.config.PostgresPort, []string{"postgres", "database"}); err != nil {
 		return fmt.Errorf("failed to register postgres service: %w", err)
 	}
-	
+
 	// Register Redis service
 	if err := m.registerConsulService(ctx, "n8n-redis", m.config.RedisPort, []string{"redis", "cache"}); err != nil {
 		return fmt.Errorf("failed to register redis service: %w", err)
 	}
-	
+
 	logger.Info("All n8n services registered with Consul successfully")
 	return nil
 }
@@ -74,31 +75,31 @@ func (m *Manager) registerWithConsul(ctx context.Context) error {
 // registerConsulService registers a single service with Consul
 func (m *Manager) registerConsulService(ctx context.Context, name string, port int, tags []string) error {
 	logger := zap.L().With(zap.String("context", "consul_registration"))
-	
+
 	// Create service definition JSON
 	serviceDef := map[string]interface{}{
 		"ID":      fmt.Sprintf("%s-%s", name, m.config.Environment),
 		"Name":    name,
 		"Tags":    tags,
-		"Address": "127.0.0.1",
+		"Address": shared.GetInternalHostname(),
 		"Port":    port,
 		"Check": map[string]interface{}{
-			"HTTP":     fmt.Sprintf("http://127.0.0.1:%d/health", port),
+			"HTTP":     fmt.Sprintf("http://%s:%d/health", shared.GetInternalHostname(), port),
 			"Interval": "30s",
 			"Timeout":  "10s",
 		},
 	}
-	
+
 	// Convert to JSON
 	serviceJSON, err := json.Marshal(serviceDef)
 	if err != nil {
 		return fmt.Errorf("failed to marshal service definition: %w", err)
 	}
-	
+
 	// Execute consul command to register service
 	cmd := exec.CommandContext(ctx, "consul", "services", "register", "-")
 	cmd.Stdin = strings.NewReader(string(serviceJSON))
-	
+
 	if err := cmd.Run(); err != nil {
 		logger.Warn("Failed to register service with Consul CLI, this is expected if Consul is not running",
 			zap.String("service", name),
@@ -106,19 +107,19 @@ func (m *Manager) registerConsulService(ctx context.Context, name string, port i
 		// Don't fail the deployment if Consul registration fails
 		return nil
 	}
-	
+
 	logger.Info("Service registered with Consul",
 		zap.String("service", name),
 		zap.Int("port", port),
 		zap.Strings("tags", tags))
-	
+
 	return nil
 }
 
 // storeProxyConfig stores reverse proxy configuration in Consul KV
 func (m *Manager) storeProxyConfig(ctx context.Context) error {
 	logger := zap.L().With(zap.String("context", "consul_registration"))
-	
+
 	// Create proxy configuration
 	config := ConsulProxyConfig{
 		Service: "n8n",
@@ -151,16 +152,16 @@ func (m *Manager) storeProxyConfig(ctx context.Context) error {
 			Timeout:  "10s",
 		},
 	}
-	
+
 	// Convert to JSON
 	configJSON, err := json.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal proxy config: %w", err)
 	}
-	
+
 	// Store in Consul KV
 	kvPath := fmt.Sprintf("proxy/services/%s", m.config.Domain)
-	
+
 	cmd := exec.CommandContext(ctx, "consul", "kv", "put", kvPath, string(configJSON))
 	if err := cmd.Run(); err != nil {
 		logger.Warn("Failed to store proxy config in Consul KV, this is expected if Consul is not running",
@@ -169,11 +170,11 @@ func (m *Manager) storeProxyConfig(ctx context.Context) error {
 		// Don't fail the deployment if Consul KV storage fails
 		return nil
 	}
-	
+
 	logger.Info("Reverse proxy configuration stored in Consul KV",
 		zap.String("kv_path", kvPath),
 		zap.String("domain", m.config.Domain))
-	
+
 	return nil
 }
 
@@ -182,22 +183,22 @@ func (m *Manager) storeProxyConfig(ctx context.Context) error {
 func GetNginxConfigFromConsul(domain string) (string, error) {
 	// This would typically be called by a separate nginx configuration manager
 	// that watches Consul KV for changes
-	
+
 	kvPath := fmt.Sprintf("proxy/services/%s", domain)
-	
+
 	// Get configuration from Consul KV
 	cmd := exec.Command("consul", "kv", "get", kvPath)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get proxy config from Consul: %w", err)
 	}
-	
+
 	// Parse configuration
 	var config ConsulProxyConfig
 	if err := json.Unmarshal(output, &config); err != nil {
 		return "", fmt.Errorf("failed to parse proxy config: %w", err)
 	}
-	
+
 	// Generate nginx configuration
 	nginxConfig := fmt.Sprintf(`
 # Auto-generated nginx configuration for %s from Consul
@@ -278,7 +279,7 @@ server {
 		config.Backend.Host,
 		config.Backend.Port,
 	)
-	
+
 	return nginxConfig, nil
 }
 
@@ -286,7 +287,7 @@ func generateBasicAuthConfig(auth ConsulBasicAuthConfig) string {
 	if !auth.Enabled {
 		return "# Basic auth disabled"
 	}
-	
+
 	return fmt.Sprintf(`auth_basic "%s";
     auth_basic_user_file /etc/nginx/.htpasswd;`, auth.Realm)
 }

@@ -38,7 +38,7 @@ import (
 )
 
 ctx := context.Background()
-pm, err := acl.NewPolicyManager(ctx, "127.0.0.1:8500", "management-token")
+pm, err := acl.NewPolicyManager(ctx, "shared.GetInternalHostname:8500", "management-token")
 if err != nil {
     log.Fatal(err)
 }
@@ -64,7 +64,7 @@ fmt.Printf("Created policy: %s (ID: %s)\n", created.Name, created.ID)
 ### 3. Create a Token with Policy
 
 ```go
-tm, err := acl.NewTokenManager(ctx, "127.0.0.1:8500", "management-token")
+tm, err := acl.NewTokenManager(ctx, "shared.GetInternalHostname:8500", "management-token")
 if err != nil {
     log.Fatal(err)
 }
@@ -369,12 +369,12 @@ func setupVaultACL() error {
     ctx := context.Background()
 
     // Create managers
-    pm, err := acl.NewPolicyManager(ctx, "127.0.0.1:8500", "bootstrap-token")
+    pm, err := acl.NewPolicyManager(ctx, "shared.GetInternalHostname:8500", "bootstrap-token")
     if err != nil {
         return err
     }
 
-    tm, err := acl.NewTokenManager(ctx, "127.0.0.1:8500", "bootstrap-token")
+    tm, err := acl.NewTokenManager(ctx, "shared.GetInternalHostname:8500", "bootstrap-token")
     if err != nil {
         return err
     }
@@ -467,12 +467,12 @@ func RegisterVaultWithACL(rc *eos_io.RuntimeContext) error {
     ctx := rc.Ctx
 
     // 1. Create ACL policy
-    pm, _ := acl.NewPolicyManager(ctx, "127.0.0.1:8500", aclToken)
+    pm, _ := acl.NewPolicyManager(ctx, "shared.GetInternalHostname:8500", aclToken)
     policy := acl.BuildVaultAccessPolicy()
     createdPolicy, _ := pm.CreatePolicy(ctx, policy)
 
     // 2. Create token
-    tm, _ := acl.NewTokenManager(ctx, "127.0.0.1:8500", aclToken)
+    tm, _ := acl.NewTokenManager(ctx, "shared.GetInternalHostname:8500", aclToken)
     token := &acl.Token{
         Description: "Vault server",
         Policies:    []string{createdPolicy.ID},
@@ -480,7 +480,7 @@ func RegisterVaultWithACL(rc *eos_io.RuntimeContext) error {
     createdToken, _ := tm.CreateToken(ctx, token)
 
     // 3. Register service using registry (from P1 Task 1)
-    reg, _ := registry.NewServiceRegistry(ctx, "127.0.0.1:8500")
+    reg, _ := registry.NewServiceRegistry(ctx, "shared.GetInternalHostname:8500")
     service := &registry.ServiceRegistration{
         ID:   "vault-" + hostname,
         Name: "vault",
@@ -491,7 +491,7 @@ func RegisterVaultWithACL(rc *eos_io.RuntimeContext) error {
     // 4. Configure Vault with token
     vaultConfig := fmt.Sprintf(`
 storage "consul" {
-  address = "127.0.0.1:8500"
+  address = "shared.GetInternalHostname:8500"
   path    = "vault/"
   token   = "%s"
 }

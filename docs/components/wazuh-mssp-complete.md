@@ -1775,7 +1775,7 @@ job "wazuh-customer-[[.customer.id]]" {
           proxy {
             config {
               # Allow CCS queries from central indexer
-              local_service_address = "127.0.0.1:9200"
+              local_service_address = "shared.  GetInternalHostname:9200"
             }
           }
         }

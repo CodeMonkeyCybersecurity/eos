@@ -70,7 +70,7 @@ The following hardcoded ports were found across the codebase. These should be mi
   - Port 8200: `VaultDefaultPort` (HashiCorp standard) 
 
 - **Location**: `pkg/vault/constants.go`
-  - Port 8200: `DefaultAddress = "https://127.0.0.1:8200"` 
+  - Port 8200: `DefaultAddress = "https://shared.GetInternalHostname:8200"` 
 
 - **Location**: Multiple vault-related files
   - Port 8200: Used consistently across test files and configurations 

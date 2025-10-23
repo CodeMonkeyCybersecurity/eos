@@ -411,7 +411,7 @@ output "k3s_agent_ips" {
 
 output "kubeconfig_command" {
   description = "Command to get kubeconfig"
-  value       = "scp root@${hcloud_server.k3s_server.ipv4_address}:/etc/rancher/k3s/k3s.yaml ./kubeconfig && sed -i 's/127.0.0.1/${hcloud_server.k3s_server.ipv4_address}/g' ./kubeconfig"
+  value       = "scp root@${hcloud_server.k3s_server.ipv4_address}:/etc/rancher/k3s/k3s.yaml ./kubeconfig && sed -i 's/shared.GetInternalHostname/${hcloud_server.k3s_server.ipv4_address}/g' ./kubeconfig"
 }
 `
 

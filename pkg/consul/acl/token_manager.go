@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -36,14 +37,14 @@ type TokenManager interface {
 
 // Token represents a Consul ACL token
 type Token struct {
-	AccessorID  string    `json:"AccessorID,omitempty"`
-	SecretID    string    `json:"SecretID,omitempty"`
-	Description string    `json:"Description,omitempty"`
-	Policies    []string  `json:"Policies,omitempty"`   // Policy IDs
-	PolicyNames []string  `json:"PolicyNames,omitempty"` // Policy names
-	Local       bool      `json:"Local,omitempty"`
-	ExpirationTTL time.Duration `json:"ExpirationTTL,omitempty"`
-	ExpirationTime *time.Time  `json:"ExpirationTime,omitempty"`
+	AccessorID     string        `json:"AccessorID,omitempty"`
+	SecretID       string        `json:"SecretID,omitempty"`
+	Description    string        `json:"Description,omitempty"`
+	Policies       []string      `json:"Policies,omitempty"`    // Policy IDs
+	PolicyNames    []string      `json:"PolicyNames,omitempty"` // Policy names
+	Local          bool          `json:"Local,omitempty"`
+	ExpirationTTL  time.Duration `json:"ExpirationTTL,omitempty"`
+	ExpirationTime *time.Time    `json:"ExpirationTime,omitempty"`
 
 	// Read-only fields
 	CreateIndex uint64    `json:"CreateIndex,omitempty"`
@@ -64,7 +65,7 @@ func NewTokenManager(ctx context.Context, consulAddress, aclToken string) (Token
 	logger := otelzap.Ctx(ctx)
 
 	if consulAddress == "" {
-		consulAddress = "127.0.0.1:8500"
+		consulAddress = fmt.Sprintf("%s:8500", shared.GetInternalHostname())
 	}
 
 	logger.Info("Creating Consul ACL token manager",

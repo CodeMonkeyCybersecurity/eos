@@ -158,7 +158,7 @@ func TestContainerPortSecurity(t *testing.T) {
 		validPorts := []string{
 			"80:80",
 			"443:443",
-			"127.0.0.1:3000:3000",
+			"shared.GetInternalHostname:3000:3000",
 			"8080:80",
 			"9000:9000/tcp",
 		}

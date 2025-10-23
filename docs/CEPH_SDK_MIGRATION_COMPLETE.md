@@ -304,7 +304,7 @@ Consul tracks monitor health:
 ### Configuration
 ```bash
 # Set Consul address (optional)
-export CONSUL_HTTP_ADDR=127.0.0.1:8500
+export CONSUL_HTTP_ADDR=shared.GetInternalHostname:8500
 
 # Use Consul discovery
 eos create ceph --volume mydata --use-consul
@@ -372,7 +372,7 @@ CEPH_CONF=/etc/ceph/ceph.conf go test ./pkg/cephfs/...
 ### Quick Test Cluster
 ```bash
 # Single-node test cluster
-sudo cephadm bootstrap --mon-ip 127.0.0.1 --skip-monitoring-stack
+sudo cephadm bootstrap --mon-ip shared.GetInternalHostname --skip-monitoring-stack
 ```
 
 ---

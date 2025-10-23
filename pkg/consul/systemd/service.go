@@ -54,11 +54,11 @@ KillMode=process
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
-Environment="CONSUL_HTTP_ADDR=127.0.0.1:%d"
+Environment="CONSUL_HTTP_ADDR=%s:%d"
 TimeoutStartSec=60
 
 [Install]
-WantedBy=multi-user.target`, consulBinaryPath, consulBinaryPath, shared.PortConsul)
+WantedBy=multi-user.target`, consulBinaryPath, consulBinaryPath, shared.GetInternalHostname(), shared.PortConsul)
 
 	servicePath := "/etc/systemd/system/consul.service"
 

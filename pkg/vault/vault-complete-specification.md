@@ -180,7 +180,7 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout "$CERT_DIR/vault-key.pem" \
   -out "$CERT_DIR/vault-cert.pem" \
   -subj "/C=AU/ST=WA/L=Fremantle/O=Code Monkey Cybersecurity/CN=$HOSTNAME" \
-  -addext "subjectAltName=DNS:$HOSTNAME,DNS:localhost,IP:127.0.0.1"
+  -addext "subjectAltName=DNS:$HOSTNAME,DNS:localhost,IP:shared.GetInternalHostname"
 
 # Set correct ownership
 sudo chown vault:vault "$CERT_DIR/vault-cert.pem"
@@ -970,7 +970,7 @@ After refactoring, verify ALL of the following:
 ### TLS Certificate Tests
 
 - [ ] Auto-generated certs are valid
-- [ ] Certs have correct SANs (hostname, localhost, 127.0.0.1)
+- [ ] Certs have correct SANs (hostname, localhost, shared.GetInternalHostname)
 - [ ] Cert file permissions are 644
 - [ ] Key file permissions are 600
 - [ ] Config NEVER contains empty strings for cert paths

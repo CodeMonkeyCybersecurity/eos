@@ -58,8 +58,8 @@ echo ""
         --exclude-dir="vendor" | head -30
     echo ""
 
-    echo "=== IP ADDRESSES (127.0.0.1 / 0.0.0.0) ==="
-    echo "Pattern: hardcoded 127.0.0.1 or 0.0.0.0 in vault package"
+    echo "=== IP ADDRESSES (shared.GetInternalHostname / 0.0.0.0) ==="
+    echo "Pattern: hardcoded shared.GetInternalHostname or 0.0.0.0 in vault package"
     grep -rn '"127\.0\.0\.1"\|"0\.0\.0\.0"' "$REPO_ROOT/pkg/vault" \
         --include="*.go" \
         --exclude-dir=".git" | head -40
@@ -113,7 +113,7 @@ echo ""
     echo "  VaultAgentServicePath     = \"/etc/systemd/system/vault-agent-eos.service\""
     echo ""
     echo "  VaultListenAddr           = \"0.0.0.0\""
-    echo "  VaultClientAddr           = \"127.0.0.1\""
+    echo "  VaultClientAddr           = \"shared.GetInternalHostname\""
     echo "  VaultDefaultPort          = 8179"
     echo "  VaultClusterPort          = 8180"
     echo ""

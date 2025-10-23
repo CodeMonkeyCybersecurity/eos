@@ -336,10 +336,10 @@ func displayPortMigrationResults(logger otelzap.LoggerWithCtx, result *vault.Por
 
 	if result.PortType == "api" {
 		logger.Info("Update VAULT_ADDR environment variable:")
-		logger.Info(fmt.Sprintf("  export VAULT_ADDR=https://127.0.0.1:%d", result.NewAPIPort))
+		logger.Info(fmt.Sprintf("  export VAULT_ADDR=https://%s:%d", shared.GetInternalHostname(), result.NewAPIPort))
 		logger.Info("")
 		logger.Info("Or add to your shell profile:")
-		logger.Info(fmt.Sprintf("  echo 'export VAULT_ADDR=https://127.0.0.1:%d' >> ~/.bashrc", result.NewAPIPort))
+		logger.Info(fmt.Sprintf("  echo 'export VAULT_ADDR=https://%s:%d' >> ~/.bashrc", shared.GetInternalHostname(), result.NewAPIPort))
 		logger.Info("")
 	}
 

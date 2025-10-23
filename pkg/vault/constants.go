@@ -63,7 +63,7 @@ const (
 )
 
 var (
-	DefaultAddress = fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault)
+	DefaultAddress = fmt.Sprintf("https://shared.GetInternalHostname:%d", shared.PortVault)
 )
 
 // ============================================================================
@@ -203,11 +203,11 @@ const (
 	SnapVaultGlob = "/var/snap/vault*" // Snap install directories (glob pattern)
 
 	// === Network Endpoints ===
-	// Vault listens on 0.0.0.0 but clients connect to hostname or 127.0.0.1
-	VaultListenAddr  = "0.0.0.0"   // Bind address (all interfaces)
-	VaultClientAddr  = "127.0.0.1" // DEPRECATED: Only for local CLI. Use shared.GetInternalHostname() for service registration
-	VaultDefaultPort = 8179        // CUSTOM: Vault API port (not HashiCorp default 8200)
-	VaultClusterPort = 8180        // Raft cluster port
+	// Vault listens on 0.0.0.0 but clients connect via hostname resolution
+	VaultListenAddr = "0.0.0.0" // Bind address (all interfaces)
+	// VaultClientAddr REMOVED - use shared.GetInternalHostname() directly
+	VaultDefaultPort = 8179 // CUSTOM: Vault API port (not HashiCorp default 8200)
+	VaultClusterPort = 8180 // Raft cluster port
 
 	// === Service User/Group ===
 	VaultServiceUser  = "vault" // System user
@@ -254,10 +254,10 @@ const (
 	VaultDefaultSecretIDTTL = "24h"
 
 	// === Network Constants ===
-	LocalhostIP       = "127.0.0.1" // Localhost IPv4 address
-	LocalhostIPv6     = "::1"       // Localhost IPv6 address
-	LocalhostHostname = "localhost" // Localhost hostname
-	AllInterfacesIP   = "0.0.0.0"   // Bind to all network interfaces
+	LocalhostIP       = "shared.GetInternalHostname" // Localhost IPv4 address
+	LocalhostIPv6     = "::1"                        // Localhost IPv6 address
+	LocalhostHostname = "localhost"                  // Localhost hostname
+	AllInterfacesIP   = "0.0.0.0"                    // Bind to all network interfaces
 
 	// === Common Timeouts ===
 	ServiceStartTimeout = 10 * time.Second // systemctl start timeout

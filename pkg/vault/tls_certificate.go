@@ -44,7 +44,7 @@ type CertificateConfig struct {
 
 	// Subject Alternative Names (SANs) - CRITICAL for proper TLS validation
 	DNSNames    []string // DNS names (hostnames, FQDN, localhost, etc.)
-	IPAddresses []net.IP // IP addresses (127.0.0.1, ::1, actual host IPs)
+	IPAddresses []net.IP // IP addresses (shared.GetInternalHostname, ::1, actual host IPs)
 
 	// Certificate properties
 	ValidityDays int  // Certificate validity period (default: 3650 for 10 years)
@@ -80,7 +80,7 @@ func DefaultCertificateConfig() *CertificateConfig {
 		CertPath:     shared.TLSCrt,
 		KeyPath:      shared.TLSKey,
 		DNSNames:     []string{"localhost"},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		IPAddresses:  []net.IP{net.ParseIP("shared.GetInternalHostname")},
 		Owner:        "vault",
 		Group:        "vault",
 	}
@@ -237,9 +237,9 @@ func GenerateSelfSignedCertificate(rc *eos_io.RuntimeContext, config *Certificat
 // enrichSANs adds comprehensive SANs to the certificate configuration
 // This ensures the certificate works in all common scenarios
 func enrichSANs(config *CertificateConfig) error {
-	// Get hostname
-	hostname, err := os.Hostname()
-	if err != nil {
+	// Get hostname using intelligent resolution (hostname → Tailscale → interface IP → localhost)
+	hostname := shared.GetInternalHostname()
+	if hostname == "localhost" || hostname == "" {
 		hostname = config.CommonName
 	}
 
@@ -301,9 +301,14 @@ func enrichSANs(config *CertificateConfig) error {
 		ipSet[ip.String()] = ip
 	}
 
-	// Always include loopback
-	ipSet["127.0.0.1"] = net.ParseIP("127.0.0.1")
-	ipSet["::1"] = net.ParseIP("::1")
+	// NOTE: Loopback addresses (shared.GetInternalHostname, ::1) intentionally NOT included.
+	// Rationale: Enforces proper service discovery via hostname/Consul DNS.
+	// - Local access works via hostname: https://vhost1:8200
+	// - Remote access via Tailscale or LAN hostname
+	// - Service discovery via Consul: https://vault.service.consul:8200
+	// - Prevents localhost bypass of service discovery and auditing
+	// If shared.GetInternalHostname access is attempted, TLS validation will fail with clear error,
+	// teaching users to use proper hostname-based addressing.
 
 	// CRITICAL: Add actual host IP addresses from network interfaces
 	interfaces, err := net.Interfaces()

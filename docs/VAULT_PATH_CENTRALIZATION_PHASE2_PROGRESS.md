@@ -161,7 +161,7 @@ sed -i '' 's|"/etc/vault\.d/tls/vault\.crt"|VaultTLSCert|g' file.go
 **Manual review** for:
 - String formatting with `%s`
 - Template variables
-- Network addresses (127.0.0.1 vs 0.0.0.0)
+- Network addresses (shared.GetInternalHostname vs 0.0.0.0)
 
 ## Quality Metrics
 

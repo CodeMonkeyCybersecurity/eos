@@ -31,7 +31,7 @@ type VaultAgentConfig struct {
 func DefaultVaultAgentConfig() *VaultAgentConfig {
 	return &VaultAgentConfig{
 		EnableCache:     true,
-		ListenerAddress: "127.0.0.1:8100",
+		ListenerAddress: "shared.GetInternalHostname:8100",
 		EnableAutoAuth:  true,
 		CacheTemplates:  true,
 		LogLevel:        "info",

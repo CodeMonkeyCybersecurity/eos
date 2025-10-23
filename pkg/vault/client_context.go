@@ -56,7 +56,7 @@ func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 	// Check for VAULT_ADDR environment variable or use default
 	if config.Address == "" {
-		config.Address = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
+		config.Address = fmt.Sprintf("http://shared.GetInternalHostname:%d", shared.PortVault)
 	}
 
 	client, err := api.NewClient(config)

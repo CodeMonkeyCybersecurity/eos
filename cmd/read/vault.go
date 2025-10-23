@@ -158,7 +158,7 @@ Examples:
 		// ASSESS: Check Vault availability
 		vaultAddr := os.Getenv("VAULT_ADDR")
 		if vaultAddr == "" {
-			vaultAddr = "http://127.0.0.1:8200"
+			vaultAddr = fmt.Sprintf("http://%s:%d", shared.GetInternalHostname(), shared.PortVault)
 		}
 
 		log.Info("Checking Vault status",

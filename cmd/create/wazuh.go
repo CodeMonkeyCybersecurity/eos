@@ -445,7 +445,7 @@ func testIntegration(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 	testAlert := `{
   "timestamp": "` + time.Now().Format(time.RFC3339) + `",
   "rule": {"level": 10, "description": "Test alert from eos", "id": "999999"},
-  "agent": {"id": "000", "name": "eos-test", "ip": "127.0.0.1"},
+  "agent": {"id": "000", "name": "eos-test", "ip": "` + shared.GetInternalHostname() + `"},
   "manager": {"name": "test"},
   "data": {
     "vulnerability": {

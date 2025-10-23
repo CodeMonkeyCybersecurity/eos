@@ -15,20 +15,20 @@ import (
 
 // MeshGatewayDeployment represents a mesh gateway deployment
 type MeshGatewayDeployment struct {
-	ID                string            `json:"id"`
-	Name              string            `json:"name"`
-	Datacenter        string            `json:"datacenter"`
-	Mode              string            `json:"mode"`
-	Port              int               `json:"port"`
-	BindAddress       string            `json:"bind_address"`
-	WANAddress        string            `json:"wan_address"`
-	LANAddress        string            `json:"lan_address"`
-	Status            string            `json:"status"`
+	ID                  string                        `json:"id"`
+	Name                string                        `json:"name"`
+	Datacenter          string                        `json:"datacenter"`
+	Mode                string                        `json:"mode"`
+	Port                int                           `json:"port"`
+	BindAddress         string                        `json:"bind_address"`
+	WANAddress          string                        `json:"wan_address"`
+	LANAddress          string                        `json:"lan_address"`
+	Status              string                        `json:"status"`
 	ServiceRegistration *api.AgentServiceRegistration `json:"service_registration"`
 	ProxyRegistration   *api.AgentServiceRegistration `json:"proxy_registration"`
-	Config            map[string]interface{} `json:"config"`
-	Created           time.Time         `json:"created"`
-	Updated           time.Time         `json:"updated"`
+	Config              map[string]interface{}        `json:"config"`
+	Created             time.Time                     `json:"created"`
+	Updated             time.Time                     `json:"updated"`
 }
 
 // DeployMeshGateway deploys a mesh gateway service
@@ -264,12 +264,12 @@ func deployMeshGatewayService(rc *eos_io.RuntimeContext, deployment *MeshGateway
 
 func generateMeshGatewayConfig(deployment *MeshGatewayDeployment) map[string]interface{} {
 	config := map[string]interface{}{
-		"datacenter": deployment.Datacenter,
-		"data_dir":   fmt.Sprintf("/opt/consul/data/%s", deployment.ID),
-		"log_level":  "INFO",
-		"node_name":  fmt.Sprintf("mesh-gateway-%s", deployment.ID),
-		"bind_addr":  deployment.BindAddress,
-		"client_addr": "127.0.0.1",
+		"datacenter":  deployment.Datacenter,
+		"data_dir":    fmt.Sprintf("/opt/consul/data/%s", deployment.ID),
+		"log_level":   "INFO",
+		"node_name":   fmt.Sprintf("mesh-gateway-%s", deployment.ID),
+		"bind_addr":   deployment.BindAddress,
+		"client_addr": shared.GetInternalHostname(),
 		"ports": map[string]int{
 			"grpc": 8502,
 			"http": shared.PortConsul, // 8161
@@ -313,9 +313,9 @@ func registerMeshGatewayService(rc *eos_io.RuntimeContext, deployment *MeshGatew
 			deployment.Datacenter,
 		},
 		Meta: map[string]string{
-			"datacenter":   deployment.Datacenter,
-			"mode":         deployment.Mode,
-			"created-by":   "eos-hecate",
+			"datacenter":    deployment.Datacenter,
+			"mode":          deployment.Mode,
+			"created-by":    "eos-hecate",
 			"deployment-id": deployment.ID,
 		},
 		Kind: api.ServiceKindMeshGateway,

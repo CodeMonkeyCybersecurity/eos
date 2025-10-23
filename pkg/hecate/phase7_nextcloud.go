@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -32,7 +33,7 @@ func SetupNextcloudWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) Servi
 		},
 		{
 			Prompt:  "Enter backend IP address for Nextcloud (e.g., 192.168.0.10)",
-			Default: "127.0.0.1",
+			Default: shared.GetInternalHostname(),
 			EnvVar:  "BackendIP",
 			Reader:  reader,
 		},

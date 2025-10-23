@@ -43,8 +43,8 @@ func init() {
 	hashicorpCmd.Flags().Int("bootstrap-expect", 1, "Number of servers to expect for bootstrap")
 	hashicorpCmd.Flags().Bool("enable-acl", false, "Enable ACL system")
 	hashicorpCmd.Flags().Bool("enable-tls", false, "Enable TLS encryption")
-	hashicorpCmd.Flags().String("consul-address", "127.0.0.1:8500", "Consul address for integration")
-	hashicorpCmd.Flags().String("vault-address", fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault), "Vault address for integration")
+	hashicorpCmd.Flags().String("consul-address", fmt.Sprintf("%s:8500", shared.GetInternalHostname()), "Consul address for integration")
+	hashicorpCmd.Flags().String("vault-address", fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), shared.PortVault), "Vault address for integration")
 	hashicorpCmd.Flags().Duration("timeout", 300*time.Second, "Installation timeout")
 	hashicorpCmd.Flags().Bool("test", false, "Test mode - show what would be installed")
 
@@ -127,7 +127,7 @@ func runHashicorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		nomadConfig["vault"].(map[string]interface{})["bootstrap_expect"] = bootstrapExpect
 		nomadConfig["vault"].(map[string]interface{})["acl_enabled"] = enableACL
 		nomadConfig["vault"].(map[string]interface{})["tls_enabled"] = enableTLS
-		if consulAddress != "127.0.0.1:8500" {
+		if consulAddress != "shared.GetInternalHostname:8500" {
 			nomadConfig["vault"].(map[string]interface{})["consul_enabled"] = true
 			nomadConfig["vault"].(map[string]interface{})["consul_address"] = consulAddress
 		}

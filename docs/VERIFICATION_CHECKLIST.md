@@ -29,7 +29,7 @@ grep -n "SecureAuthenticationOrchestrator" pkg/vault/client_context.go
 
 ## 2. ✅ Consul Hostname Resolution
 
-**Claim:** Consul health check uses hostname instead of `127.0.0.1`
+**Claim:** Consul health check uses hostname instead of `shared.GetInternalHostname`
 
 **Verification:**
 ```bash
@@ -45,7 +45,7 @@ grep -n "hostname.*PortConsul" pkg/servicestatus/consul.go
 
 **Before:**
 ```go
-fmt.Sprintf("http://127.0.0.1:%d/v1/status/leader", shared.PortConsul)
+fmt.Sprintf("http://shared.GetInternalHostname:%d/v1/status/leader", shared.PortConsul)
 ```
 
 **After:**
@@ -73,7 +73,7 @@ grep -n "hostname.*Use internal hostname" pkg/servicestatus/vault.go
 
 **Before:**
 ```go
-Address: "127.0.0.1",
+Address: "shared.GetInternalHostname",
 ```
 
 **After:**
@@ -222,7 +222,7 @@ grep -A20 "authMethods :=" pkg/vault/auth_security.go | grep -E "name:|priority:
 | Service helpers added | ✅ | grep GetVaultHTTPSAddr | Lines 49-61 |
 | Missing import fixed | ✅ | grep vault import | Line 8 |
 | End-to-end test | ⏳ | User must run on vhost11 | Pending |
-| No hardcoded IPs | ✅ | grep 127.0.0.1 | Uses hostname |
+| No hardcoded IPs | ✅ | grep shared.GetInternalHostname | Uses hostname |
 | Auth priority correct | ✅ | grep priority | 1,2,3 order |
 
 **Completion:** 9/10 tasks verified ✅ (90%)

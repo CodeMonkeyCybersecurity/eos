@@ -30,7 +30,7 @@ Multiple files defined:
 ### Network Address Confusion
 
 Mixed usage of:
-- `127.0.0.1` (localhost loopback)
+- `shared.GetInternalHostname` (localhost loopback)
 - `0.0.0.0` (bind all interfaces)
 - `localhost` (hostname)
 - Hardcoded port numbers
@@ -87,7 +87,7 @@ const (
 ```go
 const (
     VaultListenAddr   = "0.0.0.0"     // Bind address (all interfaces)
-    VaultClientAddr   = "127.0.0.1"   // Client connection address (localhost)
+    VaultClientAddr   = "shared.GetInternalHostname"   // Client connection address (localhost)
     VaultDefaultPort  = 8179          // CUSTOM: Vault API port
     VaultClusterPort  = 8180          // Raft cluster port
 )
@@ -95,7 +95,7 @@ const (
 
 **Rationale**:
 - Vault **listens** on `0.0.0.0` (all interfaces) for flexibility
-- Clients **connect** to `127.0.0.1` or hostname for security
+- Clients **connect** to `shared.GetInternalHostname` or hostname for security
 - Port `8179` is Eos custom (not HashiCorp default 8200)
 
 ### File Permissions and Ownership

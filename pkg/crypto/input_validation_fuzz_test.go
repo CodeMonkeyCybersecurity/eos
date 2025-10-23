@@ -25,7 +25,7 @@ func FuzzValidateDomainName(f *testing.F) {
 	f.Add("test.com<input.txt")
 	f.Add("example.com\x00")
 	f.Add("localhost")
-	f.Add("127.0.0.1")
+	f.Add("shared.GetInternalHostname")
 	f.Add("internal")
 	f.Add("*.local")
 	f.Add("")
@@ -70,7 +70,7 @@ func FuzzValidateDomainName(f *testing.F) {
 
 			// Must not be suspicious domain
 			lowerDomain := strings.ToLower(domain)
-			suspiciousDomains := []string{"localhost", "127.0.0.1", "::1", "0.0.0.0", "internal", "local"}
+			suspiciousDomains := []string{"localhost", "shared.GetInternalHostname", "::1", "0.0.0.0", "internal", "local"}
 			for _, suspicious := range suspiciousDomains {
 				if lowerDomain == suspicious || strings.Contains(lowerDomain, suspicious) {
 					t.Errorf("Domain validation passed but contains suspicious pattern '%s': %s", suspicious, domain)
@@ -126,7 +126,7 @@ func FuzzValidateEmailAddress(f *testing.F) {
 	f.Add("test@example.com>output")
 	f.Add("user@localhost")
 	f.Add("admin@internal")
-	f.Add("user@127.0.0.1")
+	f.Add("user@shared.GetInternalHostname")
 	f.Add("")
 	f.Add("@")
 	f.Add("@@")

@@ -375,7 +375,7 @@ func checkInfraPorts(rc *eos_io.RuntimeContext) CheckResult {
 
 	for port, service := range ports {
 		// Check if port is in use
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 1*time.Second)
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", shared.GetInternalHostname(), port), 1*time.Second)
 		if err == nil {
 			conn.Close()
 			listening++

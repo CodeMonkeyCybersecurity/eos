@@ -21,7 +21,7 @@ func TestSecurityValidator_ValidateConfig(t *testing.T) {
 
 	t.Run("Secure Configuration", func(t *testing.T) {
 		config := &EnhancedConfig{
-			Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
+			Address:    fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul),
 			Datacenter: "dc1",
 			Token:      "550e8400-e29b-41d4-a716-446655440000", // Valid UUID
 			TLSConfig: &TLSConfig{
@@ -76,7 +76,7 @@ func TestSecurityValidator_ValidateConfig(t *testing.T) {
 
 	t.Run("Missing TLS Configuration", func(t *testing.T) {
 		config := &EnhancedConfig{
-			Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
+			Address:    fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul),
 			Datacenter: "dc1",
 			TLSConfig:  nil, // Missing TLS config
 		}
@@ -99,7 +99,7 @@ func TestSecurityValidator_ValidateService(t *testing.T) {
 			Name:    "secure-api",
 			Tags:    []string{"api", "production"},
 			Port:    8443,
-			Address: "127.0.0.1",
+			Address: "shared.GetInternalHostname",
 			Meta: map[string]string{
 				"version":     "1.0.0",
 				"environment": "production",
@@ -109,7 +109,7 @@ func TestSecurityValidator_ValidateService(t *testing.T) {
 					ID:       "https-health",
 					Name:     "HTTPS Health Check",
 					Type:     "https",
-					Target:   "https://127.0.0.1:8443/health",
+					Target:   "https://shared.GetInternalHostname:8443/health",
 					Interval: "10s",
 					Timeout:  "3s",
 				},
@@ -135,8 +135,8 @@ func TestSecurityValidator_ValidateService(t *testing.T) {
 				{
 					Name:          "HTTP Health",
 					Type:          "http",
-					Target:        "http://127.0.0.1:8080/health", // Insecure HTTP
-					TLSSkipVerify: true,                           // Skips TLS verification
+					Target:        "http://shared.GetInternalHostname:8080/health", // Insecure HTTP
+					TLSSkipVerify: true,                                            // Skips TLS verification
 				},
 				{
 					Name:   "Script Check",
@@ -193,13 +193,13 @@ func TestSecurityValidator_ValidateAddress(t *testing.T) {
 	}{
 		{
 			name:         "Secure Custom Port",
-			address:      fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
+			address:      fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul),
 			expectErrors: false,
 			minScore:     90,
 		},
 		{
 			name:           "Default Port Warning",
-			address:        "127.0.0.1:8500",
+			address:        "shared.GetInternalHostname:8500",
 			expectErrors:   false,
 			expectWarnings: true,
 			minScore:       85,
@@ -373,7 +373,7 @@ func BenchmarkSecurityValidation(b *testing.B) {
 	}
 
 	config := &EnhancedConfig{
-		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
+		Address:    fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul),
 		Datacenter: "dc1",
 		Token:      "550e8400-e29b-41d4-a716-446655440000",
 		TLSConfig: &TLSConfig{

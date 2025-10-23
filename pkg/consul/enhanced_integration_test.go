@@ -16,7 +16,7 @@ import (
 
 func TestNewEnhancedConsulManager(t *testing.T) {
 	config := &EnhancedConfig{
-		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul), // Use correct port 8161
+		Address:    fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul), // Use correct port 8161
 		Datacenter: "dc1",
 		Token:      "",
 		CircuitBreakerConfig: &CBConfig{
@@ -60,7 +60,7 @@ func TestAdvancedService_Creation(t *testing.T) {
 		Name:    "test-service",
 		Tags:    []string{"test", "api"},
 		Port:    8080,
-		Address: "127.0.0.1",
+		Address: "shared.GetInternalHostname",
 		Meta: map[string]string{
 			"version": "1.0.0",
 			"env":     "test",
@@ -70,7 +70,7 @@ func TestAdvancedService_Creation(t *testing.T) {
 				ID:                     "test-health-1",
 				Name:                   "HTTP Health Check",
 				Type:                   "http",
-				Target:                 "http://127.0.0.1:8080/health",
+				Target:                 "http://shared.GetInternalHostname:8080/health",
 				Interval:               "10s",
 				Timeout:                "3s",
 				SuccessBeforePassing:   2,
@@ -120,10 +120,10 @@ func TestHealthCheckTypes(t *testing.T) {
 		target    string
 		valid     bool
 	}{
-		{"HTTP Check", "http", "http://127.0.0.1:8080/health", true},
-		{"HTTPS Check", "https", "https://127.0.0.1:8443/health", true},
-		{"TCP Check", "tcp", "127.0.0.1:8080", true},
-		{"gRPC Check", "grpc", "127.0.0.1:9090", true},
+		{"HTTP Check", "http", "http://shared.GetInternalHostname:8080/health", true},
+		{"HTTPS Check", "https", "https://shared.GetInternalHostname:8443/health", true},
+		{"TCP Check", "tcp", "shared.GetInternalHostname:8080", true},
+		{"gRPC Check", "grpc", "shared.GetInternalHostname:9090", true},
 		{"Script Check", "script", "/usr/local/bin/health-check.sh", true},
 		{"Docker Check", "docker", "container-id", true},
 		{"Alias Check", "alias", "other-service", true},
@@ -145,7 +145,7 @@ func TestHealthCheckTypes(t *testing.T) {
 
 func TestEnhancedConfig_Defaults(t *testing.T) {
 	config := &EnhancedConfig{
-		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul), // Eos custom port
+		Address:    fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul), // Eos custom port
 		Datacenter: "dc1",
 		CircuitBreakerConfig: &CBConfig{
 			MaxRequests: 5,
@@ -164,7 +164,7 @@ func TestEnhancedConfig_Defaults(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, fmt.Sprintf("127.0.0.1:%d", shared.PortConsul), config.Address)
+	assert.Equal(t, fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul), config.Address)
 	assert.True(t, config.SecurityConfig.EncryptionEnabled)
 	assert.True(t, config.SecurityConfig.DenyByDefault)
 	assert.Len(t, config.SecurityConfig.AllowedCIDRs, 2)

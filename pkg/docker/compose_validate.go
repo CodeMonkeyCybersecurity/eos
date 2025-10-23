@@ -23,27 +23,27 @@ import (
 
 // ComposeConfig represents a parsed docker-compose.yml file
 type ComposeConfig struct {
-	Services map[string]Service            `yaml:"services"`
-	Networks map[string]Network            `yaml:"networks,omitempty"`
-	Volumes  map[string]Volume             `yaml:"volumes,omitempty"`
-	Configs  map[string]interface{}        `yaml:"configs,omitempty"`
-	Secrets  map[string]interface{}        `yaml:"secrets,omitempty"`
-	Version  string                        `yaml:"version,omitempty"` // Deprecated but still parsed
-	Name     string                        `yaml:"name,omitempty"`
-	Raw      map[string]interface{}        `yaml:",inline"` // Catch-all for unknown fields
+	Services map[string]Service     `yaml:"services"`
+	Networks map[string]Network     `yaml:"networks,omitempty"`
+	Volumes  map[string]Volume      `yaml:"volumes,omitempty"`
+	Configs  map[string]interface{} `yaml:"configs,omitempty"`
+	Secrets  map[string]interface{} `yaml:"secrets,omitempty"`
+	Version  string                 `yaml:"version,omitempty"` // Deprecated but still parsed
+	Name     string                 `yaml:"name,omitempty"`
+	Raw      map[string]interface{} `yaml:",inline"` // Catch-all for unknown fields
 }
 
 // Service represents a service in docker-compose.yml
 type Service struct {
 	Image         string                 `yaml:"image,omitempty"`
-	Build         interface{}            `yaml:"build,omitempty"`     // Can be string or struct
+	Build         interface{}            `yaml:"build,omitempty"` // Can be string or struct
 	ContainerName string                 `yaml:"container_name,omitempty"`
-	Command       interface{}            `yaml:"command,omitempty"`   // Can be string or []string
+	Command       interface{}            `yaml:"command,omitempty"`     // Can be string or []string
 	Environment   interface{}            `yaml:"environment,omitempty"` // Can be map[string]string or []string
-	EnvFile       interface{}            `yaml:"env_file,omitempty"`  // Can be string or []string
-	Ports         []interface{}          `yaml:"ports,omitempty"`     // Can be string or struct
+	EnvFile       interface{}            `yaml:"env_file,omitempty"`    // Can be string or []string
+	Ports         []interface{}          `yaml:"ports,omitempty"`       // Can be string or struct
 	Volumes       []interface{}          `yaml:"volumes,omitempty"`
-	Networks      interface{}            `yaml:"networks,omitempty"`  // Can be []string or map
+	Networks      interface{}            `yaml:"networks,omitempty"`   // Can be []string or map
 	DependsOn     interface{}            `yaml:"depends_on,omitempty"` // Can be []string or map
 	Restart       string                 `yaml:"restart,omitempty"`
 	Labels        map[string]string      `yaml:"labels,omitempty"`
@@ -218,7 +218,7 @@ func validateImageReference(image string) error {
 
 // validatePortMapping validates a port mapping string
 func validatePortMapping(port string) error {
-	// Examples: "80:80", "127.0.0.1:80:80", "8080:80/tcp"
+	// Examples: "80:80", "shared.GetInternalHostname:80:80", "8080:80/tcp"
 	if strings.Contains(port, "${") && strings.Contains(port, "}") {
 		return fmt.Errorf("contains unsubstituted variable: %s", port)
 	}

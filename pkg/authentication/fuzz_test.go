@@ -201,7 +201,7 @@ func FuzzValidateEmail(f *testing.F) {
 		"user@domain .com",
 		"user@кириллица.com",
 		"用户@example.com",
-		"user@127.0.0.1",
+		"user@shared.GetInternalHostname",
 		"user@[::1]",
 		"user';DROP TABLE users;--@domain.com",
 		"<script>alert('xss')</script>@domain.com",

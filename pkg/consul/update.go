@@ -357,17 +357,17 @@ func displaySuccessSummary(logger otelzap.LoggerWithCtx, portLabel string, actua
 	logger.Info("")
 	logger.Info("Consul is now listening on:")
 	if portType == "http" {
-		logger.Info(fmt.Sprintf("  • HTTP: http://127.0.0.1:%d", actualToPort))
-		logger.Info(fmt.Sprintf("  • DNS: 127.0.0.1:%d", currentDNSPort))
+		logger.Info(fmt.Sprintf("  • HTTP: http://%s:%d", shared.GetInternalHostname(), actualToPort))
+		logger.Info(fmt.Sprintf("  • DNS: %s:%d", shared.GetInternalHostname(), currentDNSPort))
 		logger.Info("")
 		logger.Info("Update CONSUL_HTTP_ADDR environment variable:")
-		logger.Info(fmt.Sprintf("  export CONSUL_HTTP_ADDR=http://127.0.0.1:%d", actualToPort))
+		logger.Info(fmt.Sprintf("  export CONSUL_HTTP_ADDR=http://%s:%d", shared.GetInternalHostname(), actualToPort))
 		logger.Info("")
 		logger.Info("Or add to your shell profile:")
-		logger.Info(fmt.Sprintf("  echo 'export CONSUL_HTTP_ADDR=http://127.0.0.1:%d' >> ~/.bashrc", actualToPort))
+		logger.Info(fmt.Sprintf("  echo 'export CONSUL_HTTP_ADDR=http://%s:%d' >> ~/.bashrc", shared.GetInternalHostname(), actualToPort))
 	} else {
-		logger.Info(fmt.Sprintf("  • HTTP: http://127.0.0.1:%d", currentHTTPPort))
-		logger.Info(fmt.Sprintf("  • DNS: 127.0.0.1:%d", actualToPort))
+		logger.Info(fmt.Sprintf("  • HTTP: http://%s:%d", shared.GetInternalHostname(), currentHTTPPort))
+		logger.Info(fmt.Sprintf("  • DNS: %s:%d", shared.GetInternalHostname(), actualToPort))
 	}
 	logger.Info("")
 	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")

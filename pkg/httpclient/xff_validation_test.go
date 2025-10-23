@@ -164,7 +164,7 @@ func TestSecurity_SpoofedXFF(t *testing.T) {
 		RemoteAddr: "203.0.113.50:12345", // Attacker's real IP (NOT trusted)
 		Header: http.Header{
 			// Attacker claims to be from localhost to bypass restrictions
-			"X-Forwarded-For": []string{"127.0.0.1"},
+			"X-Forwarded-For": []string{"shared.GetInternalHostname"},
 		},
 	}
 

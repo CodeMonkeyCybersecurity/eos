@@ -64,7 +64,7 @@ type InstallConfig struct {
 	DisableMlock    bool
 
 	// Consul storage backend configuration
-	ConsulAddress string // Consul agent address (default: 127.0.0.1:8161)
+	ConsulAddress string // Consul agent address (default: shared.GetInternalHostname:8161)
 	ConsulPath    string // Path in Consul KV store (default: "vault/")
 	ConsulToken   string // Consul ACL token (optional)
 	ConsulScheme  string // http or https (default: http)
@@ -1332,7 +1332,7 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 
 	// Check 3: Is vault responding to status command?
 	// For self-signed TLS certificates, we need to skip verification during health checks
-	vaultAddr := fmt.Sprintf("https://127.0.0.1:%d", vi.config.Port)
+	vaultAddr := fmt.Sprintf("https://shared.GetInternalHostname:%d", vi.config.Port)
 
 	vi.logger.Debug("Running vault status health check",
 		zap.String("binary_path", vi.config.BinaryPath),
@@ -1703,8 +1703,8 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 		Owner:        vi.config.ServiceUser,
 		Group:        vi.config.ServiceGroup,
 		// Initial SANs - enrichSANs() will add comprehensive list automatically
-		DNSNames:    []string{hostname, "localhost", "vault"},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:    []string{hostname, "vault"}, // enrichSANs() adds comprehensive DNS names
+		IPAddresses: []net.IP{},                  // enrichSANs() adds hostname IPs + Tailscale + interfaces (NO localhost)
 	}
 
 	// Generate certificate based on TLS mode

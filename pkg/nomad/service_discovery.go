@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -13,18 +14,18 @@ import (
 // ServiceDiscoveryManager handles service discovery for Nomad jobs
 // This replaces K3s/Kubernetes service discovery with Consul
 type ServiceDiscoveryManager struct {
-	logger otelzap.LoggerWithCtx
+	logger        otelzap.LoggerWithCtx
 	consulAddress string
 }
 
 // NewServiceDiscoveryManager creates a new service discovery manager
 func NewServiceDiscoveryManager(logger otelzap.LoggerWithCtx, consulAddress string) *ServiceDiscoveryManager {
 	if consulAddress == "" {
-		consulAddress = "127.0.0.1:8500"
+		consulAddress = fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortConsul)
 	}
-	
+
 	return &ServiceDiscoveryManager{
-		logger: logger,
+		logger:        logger,
 		consulAddress: consulAddress,
 	}
 }
@@ -41,16 +42,16 @@ type ServiceInfo struct {
 
 // HealthCheckInfo represents health check information
 type HealthCheckInfo struct {
-	Status   string `json:"status"`
-	Output   string `json:"output,omitempty"`
-	CheckID  string `json:"check_id"`
+	Status  string `json:"status"`
+	Output  string `json:"output,omitempty"`
+	CheckID string `json:"check_id"`
 }
 
 // DiscoverServices discovers services registered in Consul
 // This replaces K3s service discovery
 func (sdm *ServiceDiscoveryManager) DiscoverServices(rc *eos_io.RuntimeContext, serviceFilter string) ([]ServiceInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Discovering services via Consul",
 		zap.String("consul_address", sdm.consulAddress),
 		zap.String("service_filter", serviceFilter))
@@ -83,7 +84,7 @@ func (sdm *ServiceDiscoveryManager) DiscoverServices(rc *eos_io.RuntimeContext, 
 // This replaces K3s service registration
 func (sdm *ServiceDiscoveryManager) RegisterService(rc *eos_io.RuntimeContext, service ServiceInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Registering service with Consul",
 		zap.String("service_name", service.Name),
 		zap.String("address", service.Address),
@@ -115,7 +116,7 @@ func (sdm *ServiceDiscoveryManager) RegisterService(rc *eos_io.RuntimeContext, s
 // This replaces K3s service deletion
 func (sdm *ServiceDiscoveryManager) DeregisterService(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Deregistering service from Consul",
 		zap.String("service_name", serviceName))
 
@@ -151,7 +152,7 @@ func (sdm *ServiceDiscoveryManager) DeregisterService(rc *eos_io.RuntimeContext,
 // This replaces K3s service endpoint discovery
 func (sdm *ServiceDiscoveryManager) GetServiceEndpoints(rc *eos_io.RuntimeContext, serviceName string) ([]string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Getting service endpoints",
 		zap.String("service_name", serviceName))
 
@@ -183,7 +184,7 @@ func (sdm *ServiceDiscoveryManager) GetServiceEndpoints(rc *eos_io.RuntimeContex
 // ConvertK3sServiceToConsul converts K3s service definition to Consul service
 func (sdm *ServiceDiscoveryManager) ConvertK3sServiceToConsul(rc *eos_io.RuntimeContext, k3sService map[string]interface{}) (ServiceInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Converting K3s service to Consul service")
 
 	service := ServiceInfo{
@@ -244,24 +245,24 @@ func (sdm *ServiceDiscoveryManager) ConvertK3sServiceToConsul(rc *eos_io.Runtime
 // checkConsulHealth checks if Consul is accessible
 func (sdm *ServiceDiscoveryManager) checkConsulHealth(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Checking Consul health",
 		zap.String("consul_address", sdm.consulAddress))
-	
+
 	// This would implement actual Consul health check
 	// For now, we'll simulate success
 	logger.Debug("Consul health check passed")
-	
+
 	return nil
 }
 
 // queryConsulServices queries Consul for services
 func (sdm *ServiceDiscoveryManager) queryConsulServices(rc *eos_io.RuntimeContext, serviceFilter string) ([]ServiceInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Querying Consul for services",
 		zap.String("service_filter", serviceFilter))
-	
+
 	// This would implement actual Consul API call
 	// For now, we'll return mock data
 	services := []ServiceInfo{
@@ -272,13 +273,13 @@ func (sdm *ServiceDiscoveryManager) queryConsulServices(rc *eos_io.RuntimeContex
 			Tags:    []string{"web", "http"},
 		},
 		{
-			Name:    "api-service", 
+			Name:    "api-service",
 			Address: "10.0.0.20",
 			Port:    8090,
 			Tags:    []string{"api", "rest"},
 		},
 	}
-	
+
 	// Filter services if filter is provided
 	if serviceFilter != "" {
 		filtered := make([]ServiceInfo, 0)
@@ -289,10 +290,10 @@ func (sdm *ServiceDiscoveryManager) queryConsulServices(rc *eos_io.RuntimeContex
 		}
 		services = filtered
 	}
-	
+
 	logger.Debug("Consul services queried",
 		zap.Int("service_count", len(services)))
-	
+
 	return services, nil
 }
 
@@ -301,49 +302,49 @@ func (sdm *ServiceDiscoveryManager) validateServiceInfo(service ServiceInfo) err
 	if service.Name == "" {
 		return fmt.Errorf("service name is required")
 	}
-	
+
 	if service.Port <= 0 || service.Port > 65535 {
 		return fmt.Errorf("invalid port number: %d", service.Port)
 	}
-	
+
 	return nil
 }
 
 // consulRegisterService registers service with Consul
 func (sdm *ServiceDiscoveryManager) consulRegisterService(rc *eos_io.RuntimeContext, service ServiceInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Registering service with Consul",
 		zap.String("service_name", service.Name))
-	
+
 	// This would implement actual Consul service registration
 	// For now, we'll simulate success
 	logger.Debug("Service registration simulated")
-	
+
 	return nil
 }
 
 // verifyServiceRegistration verifies service registration
 func (sdm *ServiceDiscoveryManager) verifyServiceRegistration(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Verifying service registration",
 		zap.String("service_name", serviceName))
-	
+
 	// This would implement actual verification
 	// For now, we'll simulate success
 	logger.Debug("Service registration verification simulated")
-	
+
 	return nil
 }
 
 // serviceExists checks if service exists in Consul
 func (sdm *ServiceDiscoveryManager) serviceExists(rc *eos_io.RuntimeContext, serviceName string) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Checking if service exists",
 		zap.String("service_name", serviceName))
-	
+
 	// This would implement actual check
 	// For now, we'll simulate existence
 	return true, nil
@@ -352,47 +353,47 @@ func (sdm *ServiceDiscoveryManager) serviceExists(rc *eos_io.RuntimeContext, ser
 // consulDeregisterService deregisters service from Consul
 func (sdm *ServiceDiscoveryManager) consulDeregisterService(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Deregistering service from Consul",
 		zap.String("service_name", serviceName))
-	
+
 	// This would implement actual deregistration
 	// For now, we'll simulate success
 	logger.Debug("Service deregistration simulated")
-	
+
 	return nil
 }
 
 // verifyServiceDeregistration verifies service deregistration
 func (sdm *ServiceDiscoveryManager) verifyServiceDeregistration(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Verifying service deregistration",
 		zap.String("service_name", serviceName))
-	
+
 	// This would implement actual verification
 	// For now, we'll simulate success
 	logger.Debug("Service deregistration verification simulated")
-	
+
 	return nil
 }
 
 // getHealthyEndpoints gets healthy service endpoints
 func (sdm *ServiceDiscoveryManager) getHealthyEndpoints(rc *eos_io.RuntimeContext, serviceName string) ([]string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Debug("Getting healthy endpoints",
 		zap.String("service_name", serviceName))
-	
+
 	// This would implement actual Consul health check query
 	// For now, we'll return mock endpoints
 	endpoints := []string{
 		"10.0.0.10:8080",
 		"10.0.0.20:8080",
 	}
-	
+
 	logger.Debug("Healthy endpoints retrieved",
 		zap.Int("endpoint_count", len(endpoints)))
-	
+
 	return endpoints, nil
 }

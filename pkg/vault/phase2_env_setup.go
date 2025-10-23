@@ -31,7 +31,7 @@ import (
 
 // EnsureVaultAddr sets VAULT_ADDR if missing.
 //
-//  1. Prefer an existing HTTPS listener on 127.0.0.1:<VaultDefaultPort>
+//  1. Prefer an existing HTTPS listener on shared.GetInternalHostname:<VaultDefaultPort>
 //  2. Else try https://<internal‑hostname>:<VaultDefaultPort>
 //  3. Else fall back to the hostname form so callers have *something*
 
@@ -117,9 +117,9 @@ func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool 
 		// SECURITY: Try to load custom CA certificate for self-signed Vault servers
 		// This supports both system-trusted CAs and custom enterprise CAs
 		caPaths := []string{
-			"/etc/eos/ca.crt",              // Eos general CA
-			"/etc/vault/tls/ca.crt",        // Vault standard location
-			"/etc/ssl/certs/vault-ca.crt",  // Alternative location
+			"/etc/eos/ca.crt",             // Eos general CA
+			"/etc/vault/tls/ca.crt",       // Vault standard location
+			"/etc/ssl/certs/vault-ca.crt", // Alternative location
 		}
 
 		for _, caPath := range caPaths {

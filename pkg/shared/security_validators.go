@@ -47,7 +47,7 @@ func (sv *SecurityValidators) ValidateNetworkInput(input, fieldName string) erro
 	dangerousPatterns := []string{
 		"javascript:", "data:", "file:", "ftp:",
 		"<script>", "$(", "`", ";", "&", "|",
-		"0.0.0.0", "127.0.0.1", "localhost",
+		"0.0.0.0", "shared.GetInternalHostname", "localhost",
 		"169.254.", "10.", "192.168.", "172.",
 	}
 

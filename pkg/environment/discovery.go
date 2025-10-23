@@ -210,8 +210,6 @@ func loadExistingConfig(config *EnvironmentConfig) error {
 	return nil
 }
 
-
-
 // discoverFrom discovers configuration from  s
 func discoverFrom(config *EnvironmentConfig) error {
 	// Try to get  s
@@ -346,7 +344,7 @@ func applyDefaults(config *EnvironmentConfig) {
 
 	// Vault/Consul addresses
 	if config.VaultAddr == "" {
-		config.VaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
+		config.VaultAddr = fmt.Sprintf("http://%s:%d", shared.GetInternalHostname(), shared.PortVault)
 	}
 }
 

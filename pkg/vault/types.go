@@ -12,13 +12,12 @@ import (
 
 var (
 	EnableOpts EnableOptions
-	
+
 	// Common errors
-	ErrVaultSealed    = errors.New("vault is sealed")
-	ErrSecretNotFound = errors.New("secret not found")
+	ErrVaultSealed         = errors.New("vault is sealed")
+	ErrSecretNotFound      = errors.New("secret not found")
 	ErrVaultNotInstalled   = errors.New("vault is not installed")
 	ErrVaultNotInitialized = errors.New("vault is not initialized")
-
 )
 
 // Interfaces
@@ -82,14 +81,14 @@ type Audit struct {
 
 // Secret represents a secret with metadata and lifecycle management
 type Secret struct {
-	Key       string            `json:"key"`
-	Value     string            `json:"-"` // Never serialize the actual value
-	Metadata  map[string]string `json:"metadata,omitempty"`
-	Version   int               `json:"version,omitempty"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	ExpiresAt *time.Time        `json:"expires_at,omitempty"`
-	Path      string            `json:"path"`
+	Key       string                 `json:"key"`
+	Value     string                 `json:"-"` // Never serialize the actual value
+	Metadata  map[string]string      `json:"metadata,omitempty"`
+	Version   int                    `json:"version,omitempty"`
+	CreatedAt time.Time              `json:"created_at"`
+	UpdatedAt time.Time              `json:"updated_at"`
+	ExpiresAt *time.Time             `json:"expires_at,omitempty"`
+	Path      string                 `json:"path"`
 	Data      map[string]interface{} `json:"-"` // Don't serialize raw data
 }
 
@@ -131,16 +130,16 @@ type InitConfig struct {
 
 // InitResult represents the result of vault initialization
 type InitResult struct {
-	Keys              []string  `json:"-"` // Never serialize keys
-	KeysBase64        []string  `json:"-"` // Never serialize keys
-	RecoveryKeys      []string  `json:"-"` // Never serialize keys
-	RecoveryKeysBase64 []string `json:"-"` // Never serialize keys
-	RootToken         string    `json:"-"` // Never serialize token
-	Initialized       bool      `json:"initialized"`
-	InitTime          time.Time `json:"init_time"`
-	Timestamp         time.Time `json:"timestamp"`
-	KeyThreshold      int       `json:"key_threshold"`
-	KeyShares         int       `json:"key_shares"`
+	Keys               []string  `json:"-"` // Never serialize keys
+	KeysBase64         []string  `json:"-"` // Never serialize keys
+	RecoveryKeys       []string  `json:"-"` // Never serialize keys
+	RecoveryKeysBase64 []string  `json:"-"` // Never serialize keys
+	RootToken          string    `json:"-"` // Never serialize token
+	Initialized        bool      `json:"initialized"`
+	InitTime           time.Time `json:"init_time"`
+	Timestamp          time.Time `json:"timestamp"`
+	KeyThreshold       int       `json:"key_threshold"`
+	KeyShares          int       `json:"key_shares"`
 }
 
 // VaultStatus represents the current status of the vault
@@ -163,54 +162,54 @@ type VaultStatus struct {
 
 // AuditEvent represents a vault audit log entry
 type AuditEvent struct {
-	ID        string             `json:"id"`
-	Type      string             `json:"type"`
-	Time      time.Time          `json:"time"`
-	Timestamp time.Time          `json:"timestamp"`
-	Auth      *AuditAuth         `json:"auth,omitempty"`
-	Request   *AuditRequest      `json:"request,omitempty"`
-	Response  *AuditResponse     `json:"response,omitempty"`
-	Error     string             `json:"error,omitempty"`
-	WrapInfo  *AuditWrapInfo     `json:"wrap_info,omitempty"`
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Time      time.Time      `json:"time"`
+	Timestamp time.Time      `json:"timestamp"`
+	Auth      *AuditAuth     `json:"auth,omitempty"`
+	Request   *AuditRequest  `json:"request,omitempty"`
+	Response  *AuditResponse `json:"response,omitempty"`
+	Error     string         `json:"error,omitempty"`
+	WrapInfo  *AuditWrapInfo `json:"wrap_info,omitempty"`
 }
 
 // AuditAuth represents authentication information in audit logs
 type AuditAuth struct {
-	ClientToken     string            `json:"-"` // Never log tokens
-	Accessor        string            `json:"accessor,omitempty"`
-	DisplayName     string            `json:"display_name,omitempty"`
-	Policies        []string          `json:"policies,omitempty"`
-	TokenPolicies   []string          `json:"token_policies,omitempty"`
-	IdentityPolicies []string         `json:"identity_policies,omitempty"`
-	ExternalNamespace string          `json:"external_namespace,omitempty"`
-	Metadata        map[string]string `json:"metadata,omitempty"`
-	EntityID        string            `json:"entity_id,omitempty"`
-	TokenType       string            `json:"token_type,omitempty"`
-	TokenTTL        int64             `json:"token_ttl,omitempty"`
+	ClientToken       string            `json:"-"` // Never log tokens
+	Accessor          string            `json:"accessor,omitempty"`
+	DisplayName       string            `json:"display_name,omitempty"`
+	Policies          []string          `json:"policies,omitempty"`
+	TokenPolicies     []string          `json:"token_policies,omitempty"`
+	IdentityPolicies  []string          `json:"identity_policies,omitempty"`
+	ExternalNamespace string            `json:"external_namespace,omitempty"`
+	Metadata          map[string]string `json:"metadata,omitempty"`
+	EntityID          string            `json:"entity_id,omitempty"`
+	TokenType         string            `json:"token_type,omitempty"`
+	TokenTTL          int64             `json:"token_ttl,omitempty"`
 }
 
 // AuditRequest represents request information in audit logs
 type AuditRequest struct {
-	ID               string            `json:"id,omitempty"`
-	Operation        string            `json:"operation"`
-	ClientToken      string            `json:"-"` // Never log tokens
-	ClientTokenAccessor string         `json:"client_token_accessor,omitempty"`
-	Path             string            `json:"path"`
-	Data             map[string]interface{} `json:"-"` // Don't log sensitive data
-	PolicyOverride   bool              `json:"policy_override,omitempty"`
-	RemoteAddr       string            `json:"remote_addr,omitempty"`
-	RemoteAddress    string            `json:"remote_address,omitempty"` // Alias for compatibility
-	WrapTTL          int               `json:"wrap_ttl,omitempty"`
-	Headers          map[string][]string `json:"headers,omitempty"`
+	ID                  string                 `json:"id,omitempty"`
+	Operation           string                 `json:"operation"`
+	ClientToken         string                 `json:"-"` // Never log tokens
+	ClientTokenAccessor string                 `json:"client_token_accessor,omitempty"`
+	Path                string                 `json:"path"`
+	Data                map[string]interface{} `json:"-"` // Don't log sensitive data
+	PolicyOverride      bool                   `json:"policy_override,omitempty"`
+	RemoteAddr          string                 `json:"remote_addr,omitempty"`
+	RemoteAddress       string                 `json:"remote_address,omitempty"` // Alias for compatibility
+	WrapTTL             int                    `json:"wrap_ttl,omitempty"`
+	Headers             map[string][]string    `json:"headers,omitempty"`
 }
 
 // AuditResponse represents response information in audit logs
 type AuditResponse struct {
 	Data     map[string]interface{} `json:"-"` // Don't log sensitive response data
-	Secret   *AuditSecret          `json:"secret,omitempty"`
-	Auth     *AuditAuth            `json:"auth,omitempty"`
-	Headers  map[string][]string   `json:"headers,omitempty"`
-	WrapInfo *AuditWrapInfo        `json:"wrap_info,omitempty"`
+	Secret   *AuditSecret           `json:"secret,omitempty"`
+	Auth     *AuditAuth             `json:"auth,omitempty"`
+	Headers  map[string][]string    `json:"headers,omitempty"`
+	WrapInfo *AuditWrapInfo         `json:"wrap_info,omitempty"`
 }
 
 // AuditSecret represents secret information in audit logs (sanitized)
@@ -232,28 +231,28 @@ type AuditWrapInfo struct {
 
 // AuditFilter represents query parameters for searching audit logs
 type AuditFilter struct {
-	StartTime   *time.Time `json:"start_time,omitempty"`
-	EndTime     *time.Time `json:"end_time,omitempty"`
-	Operation   string     `json:"operation,omitempty"`
-	Path        string     `json:"path,omitempty"`
-	UserID      string     `json:"user_id,omitempty"`
-	EntityID    string     `json:"entity_id,omitempty"`
-	ClientAddr  string     `json:"client_address,omitempty"`
-	RemoteAddr  string     `json:"remote_address,omitempty"`
-	Limit       int        `json:"limit,omitempty"`
-	Offset      int        `json:"offset,omitempty"`
+	StartTime  *time.Time `json:"start_time,omitempty"`
+	EndTime    *time.Time `json:"end_time,omitempty"`
+	Operation  string     `json:"operation,omitempty"`
+	Path       string     `json:"path,omitempty"`
+	UserID     string     `json:"user_id,omitempty"`
+	EntityID   string     `json:"entity_id,omitempty"`
+	ClientAddr string     `json:"client_address,omitempty"`
+	RemoteAddr string     `json:"remote_address,omitempty"`
+	Limit      int        `json:"limit,omitempty"`
+	Offset     int        `json:"offset,omitempty"`
 }
 
 // AuditStats represents audit statistics and metrics
 type AuditStats struct {
-	TotalEvents    int64                    `json:"total_events"`
-	EventsByType   map[string]int64         `json:"events_by_type"`
-	EventsByPath   map[string]int64         `json:"events_by_path"`
-	UniqueUsers    int64                    `json:"unique_users"`
-	TimeRange      AuditTimeRange           `json:"time_range"`
-	TopPaths       []AuditPathStat          `json:"top_paths"`
-	TopUsers       []AuditUserStat          `json:"top_users"`
-	LastEvent      *time.Time               `json:"last_event,omitempty"`
+	TotalEvents  int64            `json:"total_events"`
+	EventsByType map[string]int64 `json:"events_by_type"`
+	EventsByPath map[string]int64 `json:"events_by_path"`
+	UniqueUsers  int64            `json:"unique_users"`
+	TimeRange    AuditTimeRange   `json:"time_range"`
+	TopPaths     []AuditPathStat  `json:"top_paths"`
+	TopUsers     []AuditUserStat  `json:"top_users"`
+	LastEvent    *time.Time       `json:"last_event,omitempty"`
 }
 
 // AuditTimeRange represents a time range for audit statistics
@@ -404,7 +403,7 @@ type VaultNetworkConfig struct {
 	ClusterListenAddr string // Cluster communication address
 
 	// Client connection addresses
-	ClientAddr string // Address clients use to connect (127.0.0.1 or hostname)
+	ClientAddr string // Address clients use to connect (shared.GetInternalHostname or hostname)
 
 	// Ports
 	APIPort     int // Vault API port (default: 8179)
@@ -418,13 +417,13 @@ type VaultNetworkConfig struct {
 // DefaultVaultNetwork returns standard network configuration
 func DefaultVaultNetwork(hostname string) *VaultNetworkConfig {
 	if hostname == "" {
-		hostname = VaultClientAddr // Default to localhost
+		hostname = shared.GetInternalHostname()
 	}
 
 	return &VaultNetworkConfig{
 		ListenAddr:        VaultListenAddr,  // 0.0.0.0
 		ClusterListenAddr: VaultListenAddr,  // 0.0.0.0
-		ClientAddr:        hostname,         // Provided hostname or 127.0.0.1
+		ClientAddr:        hostname,         // Hostname via intelligent resolution
 		APIPort:           VaultDefaultPort, // 8179
 		ClusterPort:       VaultClusterPort, // 8180
 		APIAddress:        fmt.Sprintf("https://%s:%d", hostname, VaultDefaultPort),
@@ -442,9 +441,10 @@ func (vnc *VaultNetworkConfig) ClusterListenAddress() string {
 	return fmt.Sprintf("%s:%d", vnc.ClusterListenAddr, vnc.ClusterPort)
 }
 
-// LocalAPIAddress returns the local client connection address (e.g., "https://127.0.0.1:8179")
+// LocalAPIAddress returns the client connection address using intelligent hostname resolution
+// Priority: hostname → Tailscale IP → primary interface IP → localhost
 func (vnc *VaultNetworkConfig) LocalAPIAddress() string {
-	return fmt.Sprintf("https://%s:%d", VaultClientAddr, vnc.APIPort)
+	return fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), vnc.APIPort)
 }
 
 // VaultServiceConfig defines systemd service parameters
@@ -493,4 +493,3 @@ func DefaultInstallConfig(hostname string) *VaultInstallConfig {
 		LogFormat: "json",
 	}
 }
-

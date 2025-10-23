@@ -58,7 +58,7 @@ aRb6WpY/8lQZd+gx109OS2I6tKn9DyYw+fwZ+k+lMMS4lF1YnJuTU5LTRTOfDrOJ
 		t.Fatalf("Failed to set VAULT_SKIP_VERIFY: %v", err)
 	}
 	// Set a test vault address without TLS
-	if err := os.Setenv(shared.VaultAddrEnv, "http://127.0.0.1:8200"); err != nil {
+	if err := os.Setenv(shared.VaultAddrEnv, "http://shared.GetInternalHostname:8200"); err != nil {
 		t.Fatalf("Failed to set %s: %v", shared.VaultAddrEnv, err)
 	}
 	// Use the mock certificate file we created

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -74,15 +75,15 @@ type ServiceInstance struct {
 
 // HealthCheck defines a service health check
 type HealthCheck struct {
-	ID                     string            // Check ID (e.g., "vault-health")
-	Name                   string            // Human-readable name
-	Type                   HealthCheckType   // HTTP, TCP, Script, TTL, Docker, gRPC
-	HTTP                   string            // HTTP endpoint (for HTTP checks)
-	TCP                    string            // TCP address (for TCP checks)
-	Script                 string            // Script path (for script checks)
-	GRPC                   string            // gRPC endpoint
-	Interval               time.Duration     // Check interval
-	Timeout                time.Duration     // Check timeout
+	ID                     string              // Check ID (e.g., "vault-health")
+	Name                   string              // Human-readable name
+	Type                   HealthCheckType     // HTTP, TCP, Script, TTL, Docker, gRPC
+	HTTP                   string              // HTTP endpoint (for HTTP checks)
+	TCP                    string              // TCP address (for TCP checks)
+	Script                 string              // Script path (for script checks)
+	GRPC                   string              // gRPC endpoint
+	Interval               time.Duration       // Check interval
+	Timeout                time.Duration       // Check timeout
 	TLSSkipVerify          bool                // Skip TLS verification
 	SuccessBeforePassing   int                 // Consecutive passes before healthy
 	FailuresBeforeCritical int                 // Consecutive fails before critical
@@ -163,7 +164,7 @@ func NewServiceRegistry(ctx context.Context, consulAddress string) (ServiceRegis
 
 	// ASSESS - Validate connection parameters
 	if consulAddress == "" {
-		consulAddress = "127.0.0.1:8500" // Default Consul address
+		consulAddress = fmt.Sprintf("%s:8500", shared.GetInternalHostname()) // Default Consul address
 	}
 
 	logger.Info("Creating Consul service registry",
@@ -346,14 +347,14 @@ func convertHealthCheck(check *HealthCheck) *api.AgentServiceCheck {
 	}
 
 	consulCheck := &api.AgentServiceCheck{
-		CheckID:                        check.ID,
-		Name:                           check.Name,
-		Interval:                       check.Interval.String(),
-		Timeout:                        check.Timeout.String(),
-		TLSSkipVerify:                  check.TLSSkipVerify,
-		SuccessBeforePassing:           check.SuccessBeforePassing,
-		FailuresBeforeCritical:         check.FailuresBeforeCritical,
-		Header:                         check.Header,
+		CheckID:                check.ID,
+		Name:                   check.Name,
+		Interval:               check.Interval.String(),
+		Timeout:                check.Timeout.String(),
+		TLSSkipVerify:          check.TLSSkipVerify,
+		SuccessBeforePassing:   check.SuccessBeforePassing,
+		FailuresBeforeCritical: check.FailuresBeforeCritical,
+		Header:                 check.Header,
 	}
 
 	// Set check-type-specific fields

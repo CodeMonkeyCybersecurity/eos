@@ -4,7 +4,7 @@
 // This module contains diagnostics for Vault network connectivity:
 // - ProcessDiagnostic: Vault process detection via pgrep
 // - PortDiagnostic: Port binding checks (API 8179, Cluster 8180) using lsof/netstat/ss
-// - HealthCheckDiagnostic: HTTP health endpoint check (http://127.0.0.1:8179/v1/sys/health)
+// - HealthCheckDiagnostic: HTTP health endpoint check (http://shared.GetInternalHostname:8179/v1/sys/health)
 
 package vault
 
@@ -156,6 +156,6 @@ func PortDiagnostic() *debug.Diagnostic {
 
 // HealthCheckDiagnostic performs HTTP health check
 func HealthCheckDiagnostic() *debug.Diagnostic {
-	healthURL := fmt.Sprintf("http://127.0.0.1:%d/v1/sys/health", shared.PortVault)
+	healthURL := fmt.Sprintf("http://"+shared.GetInternalHostname()+":%d/v1/sys/health", shared.PortVault)
 	return debug.NetworkCheck("HTTP Health Check", healthURL, 5*time.Second)
 }

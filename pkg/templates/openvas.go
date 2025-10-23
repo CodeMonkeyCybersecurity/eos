@@ -103,7 +103,7 @@ services:
     image: registry.community.greenbone.net/community/gsa:stable
     restart: on-failure
     ports:
-      - 127.0.0.1:9392:80
+      - shared.GetInternalHostname:9392:80
     volumes:
       - gvmd_socket_vol:/run/gvmd
     depends_on:

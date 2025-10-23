@@ -56,12 +56,12 @@ func NewVaultIntegration(rc *eos_io.RuntimeContext, config *IntegrationConfig) (
 		zap.String("vault_address", config.VaultAddress))
 
 	if config.ConsulAddress == "" {
-		config.ConsulAddress = "127.0.0.1:8500"
+		config.ConsulAddress = fmt.Sprintf("%s:8500", shared.GetInternalHostname())
 	}
 
 	if config.VaultAddress == "" {
 		// Use unified address resolution (env var or smart fallback)
-		config.VaultAddress = shared.GetVaultAddrWithEnv()
+		config.VaultAddress = fmt.Sprintf("%s:8200", shared.GetInternalHostname())
 	}
 
 	// INTERVENE - Create managers
@@ -400,7 +400,7 @@ func (result *VaultRegistrationResult) GetConsulToken() string {
 // GetVaultStorageConfig generates Vault storage configuration using the token
 func (result *VaultRegistrationResult) GetVaultStorageConfig(consulAddress string) string {
 	if consulAddress == "" {
-		consulAddress = "127.0.0.1:8500"
+		consulAddress = fmt.Sprintf("%s:8500", shared.GetInternalHostname())
 	}
 
 	if result.TokenSecretID == "" {

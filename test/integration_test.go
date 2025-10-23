@@ -146,7 +146,7 @@ func TestEosIntegration_ConfigurationManagement(t *testing.T) {
 			// Create test configuration files
 			configContent := `# Eos Test Configuration
 log_level: debug
-vault_addr: http://127.0.0.1:8200
+vault_addr: http://shared.GetInternalHostname:8200
 `
 			testutil.CreateTestFile(t, s.GetTempDir(), "eos/config/test.yaml", configContent, 0644)
 		},
@@ -316,7 +316,7 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 
 					// Store vault client reference for later steps
 					rc.Attributes["vault_client_created"] = "true"
-					rc.Attributes["vault_addr"] = "http://127.0.0.1:8200"
+					rc.Attributes["vault_addr"] = "http://shared.GetInternalHostname:8200"
 
 					if vaultClient == nil {
 						return errors.New("vault client was nil")

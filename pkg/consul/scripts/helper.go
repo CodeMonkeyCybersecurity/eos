@@ -38,7 +38,7 @@ case "$1" in
     
   discover)
     echo "=== Discovering Vault via DNS ==="
-    dig +short @127.0.0.1 -p 8600 vault.service.consul 2>/dev/null || echo "DNS lookup failed"
+    dig +short @shared.GetInternalHostname -p 8600 vault.service.consul 2>/dev/null || echo "DNS lookup failed"
     echo -e "\n=== Discovering Vault via API ==="
     curl -s $CONSUL_ADDR/v1/catalog/service/vault | jq -r '.[].ServiceAddress + ":" + (.[].ServicePort | tostring)' 2>/dev/null || echo "API lookup failed"
     ;;

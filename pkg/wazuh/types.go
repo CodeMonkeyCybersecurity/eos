@@ -75,7 +75,7 @@ bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh
  -key /etc/wazuh-indexer/certs/admin-key.pem \
  -cert /etc/wazuh-indexer/certs/admin.pem \
  -cacert /etc/wazuh-indexer/certs/root-ca.pem \
- -h 127.0.0.1 \
+ -h shared.GetInternalHostname \
  -nhnv
 `
 

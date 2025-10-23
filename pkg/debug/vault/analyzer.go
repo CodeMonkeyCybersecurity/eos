@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // VaultAnalysisRules returns vault-specific analysis rules
@@ -29,7 +30,7 @@ func DetectSealedVault(report *debug.Report, analysis *debug.Analysis) {
 			if strings.Contains(result.Output, `"sealed":true`) {
 				analysis.Warnings = append(analysis.Warnings, debug.Warning{
 					Message:        "Vault is sealed (this is normal after restart)",
-					Recommendation: "Unseal Vault: export VAULT_ADDR=http://127.0.0.1:8200 && vault operator unseal",
+					Recommendation: "Unseal Vault: export VAULT_ADDR=http://" + shared.GetInternalHostname() + ":8200 && vault operator unseal",
 				})
 
 				if !strings.Contains(result.Output, `"initialized":true`) {

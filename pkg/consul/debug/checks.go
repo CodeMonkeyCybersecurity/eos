@@ -197,7 +197,7 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	if clientAddr != "" {
 		result.Details = append(result.Details, fmt.Sprintf("client_addr = %s", clientAddr))
 	} else {
-		result.Details = append(result.Details, "client_addr = (not set - will use 127.0.0.1)")
+		result.Details = append(result.Details, fmt.Sprintf("client_addr = (not set - will use %s)", shared.GetInternalHostname()))
 	}
 
 	if len(retryJoin) > 0 {
@@ -661,7 +661,7 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	httpWorking := false
 	for port, desc := range ports {
-		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		addr := fmt.Sprintf("%s:%d", shared.GetInternalHostname(), port)
 		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 		if err == nil {
 			_ = conn.Close()
@@ -679,7 +679,7 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Try HTTP request to Consul API
 	if httpWorking {
 		client := &http.Client{Timeout: 5 * time.Second}
-		apiURL := fmt.Sprintf("http://127.0.0.1:%d/v1/agent/self", shared.PortConsul)
+		apiURL := fmt.Sprintf("http://%s:%d/v1/agent/self", shared.GetInternalHostname(), shared.PortConsul)
 		resp, err := client.Get(apiURL)
 		if err == nil {
 			defer func() { _ = resp.Body.Close() }()

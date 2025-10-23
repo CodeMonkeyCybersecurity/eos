@@ -122,7 +122,7 @@ var (
 func EnsureSecretsDir() error {
 	log := zap.L()
 	dir := filepath.Dir(AppRolePaths.RoleID) // /var/lib/eos/secret
-	parentDir := filepath.Dir(dir)            // /var/lib/eos
+	parentDir := filepath.Dir(dir)           // /var/lib/eos
 
 	log.Info(" [ASSESS] Starting secrets directory setup",
 		zap.String("secrets_dir", dir),
@@ -419,11 +419,11 @@ func BuildAgentTemplateData(addr string) AgentConfigData {
 		CACert:        VaultAgentCACopyPath,
 		RoleFile:      AppRolePaths.RoleID,
 		SecretFile:    AppRolePaths.SecretID,
-		SinkType:      "file",           // set explicitly
-		SinkPath:      AgentToken,       // fix: use AgentToken, not undefined VaultAgentTokenPath
-		ListenerAddr:  "127.0.0.1:8180", // fix: use different port from Vault server (8179)
-		EnableCache:   false,            // fix: disable cache to avoid listener requirement
-		TLSSkipVerify: true,             // HISTORICAL FIX: Skip TLS verification for self-signed certs (development)
+		SinkType:      "file",                            // set explicitly
+		SinkPath:      AgentToken,                        // fix: use AgentToken, not undefined VaultAgentTokenPath
+		ListenerAddr:  "shared.GetInternalHostname:8180", // fix: use different port from Vault server (8179)
+		EnableCache:   false,                             // fix: disable cache to avoid listener requirement
+		TLSSkipVerify: true,                              // HISTORICAL FIX: Skip TLS verification for self-signed certs (development)
 	}
 }
 

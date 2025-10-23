@@ -401,7 +401,7 @@ connect {
 }
 
 consul {
-  address = "127.0.0.1:%d"
+  address = "%s:%d"
 }
 
 telemetry {
@@ -436,7 +436,7 @@ client {
 }
 
 consul {
-  address = "127.0.0.1:%d"
+  address = "%s:%d"
 }
 
 telemetry {

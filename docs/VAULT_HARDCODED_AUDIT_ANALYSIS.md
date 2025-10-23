@@ -89,9 +89,9 @@ if err := os.MkdirAll(vault.VaultLogsDir, vault.VaultLogsDirPerm); err != nil { 
 **Examples**:
 ```go
 // WRONG
-ipAddresses["127.0.0.1"] = net.ParseIP("127.0.0.1")
+ipAddresses["shared.GetInternalHostname"] = net.ParseIP("shared.GetInternalHostname")
 DNSNames: []string{"localhost"}
-if strings.Contains(content, "127.0.0.1") { ... }
+if strings.Contains(content, "shared.GetInternalHostname") { ... }
 
 // CORRECT
 ipAddresses[vault.LocalhostIP] = net.ParseIP(vault.LocalhostIP)
@@ -109,7 +109,7 @@ if strings.Contains(content, vault.LocalhostIP) { ... }
 ```go
 // WRONG
 if strings.Contains(content, ":8200") { ... }
-fmt.Sprintf("https://127.0.0.1:8200")
+fmt.Sprintf("https://shared.GetInternalHostname:8200")
 
 // CORRECT
 if strings.Contains(content, fmt.Sprintf(":%d", shared.PortVault)) { ... }
@@ -180,7 +180,7 @@ os.Setenv(vault.EnvVaultToken, token)
 - [ ] Replace hardcoded paths in pkg/vault/phase*.go
 
 ### Phase 2: MEDIUM PRIORITY (70 violations) - FUNCTIONAL
-- [ ] Replace hardcoded IPs (127.0.0.1 → vault.LocalhostIP)
+- [ ] Replace hardcoded IPs (shared.GetInternalHostname → vault.LocalhostIP)
 - [ ] Add vault.LocalhostHostname constant for "localhost"
 - [ ] Replace hardcoded ports in string checks
 - [ ] Replace hardcoded service/user/group names

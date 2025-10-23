@@ -428,7 +428,7 @@ func TestNetworkSecurity(t *testing.T) {
 	t.Run("connection_security", func(t *testing.T) {
 		// Test connection security measures
 		cfg := &LDAPConfig{
-			FQDN:     "127.0.0.1",
+			FQDN:     "shared.GetInternalHostname",
 			Port:     389,
 			UseTLS:   false,
 			BindDN:   "cn=admin,dc=example,dc=com",

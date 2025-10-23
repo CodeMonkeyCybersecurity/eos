@@ -679,7 +679,7 @@ Requires=vault.service
 Type=oneshot
 ExecStart=VaultBinaryPath-snapshot.sh
 User=vault
-Environment="VAULT_ADDR=https://127.0.0.1:8200"
+Environment="VAULT_ADDR=https://shared.GetInternalHostname:8200"
 Environment="VAULT_SKIP_VERIFY=1"
 `
 

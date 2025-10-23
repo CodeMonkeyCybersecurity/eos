@@ -54,10 +54,10 @@ func NewBoundaryInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *Bou
 		}
 	}
 	if config.ClusterAddr == "" {
-		config.ClusterAddr = fmt.Sprintf("127.0.0.1:%d", shared.PortBoundary+1)
+		config.ClusterAddr = fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortBoundary+1)
 	}
 	if config.PublicAddr == "" {
-		config.PublicAddr = fmt.Sprintf("127.0.0.1:%d", shared.PortBoundary)
+		config.PublicAddr = fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortBoundary)
 	}
 	if config.RecoveryKmsType == "" {
 		config.RecoveryKmsType = "aead"
@@ -152,12 +152,12 @@ controller {
 }
 
 listener "tcp" {
-  address = "127.0.0.1:9200"
+  address = "shared.GetInternalHostname:9200"
   purpose = "api"
 }
 
 listener "tcp" {
-  address = "127.0.0.1:9201" 
+  address = "shared.GetInternalHostname:9201" 
   purpose = "cluster"
 }
 

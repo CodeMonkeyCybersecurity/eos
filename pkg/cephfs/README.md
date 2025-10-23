@@ -334,7 +334,7 @@ Use cephadm for quick test cluster:
 
 ```bash
 # Single-node test cluster
-sudo cephadm bootstrap --mon-ip 127.0.0.1 --skip-monitoring-stack
+sudo cephadm bootstrap --mon-ip shared.GetInternalHostname --skip-monitoring-stack
 
 # Run integration tests
 CEPH_CONF=/etc/ceph/ceph.conf go test ./pkg/cephfs/...

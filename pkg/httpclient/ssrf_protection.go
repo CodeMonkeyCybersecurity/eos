@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // SSRFProtection provides protection against Server-Side Request Forgery attacks
@@ -75,16 +77,16 @@ func (s *SSRFProtection) ValidateURL(urlStr string) error {
 // checkPrivateIP validates that hostname does not resolve to private/internal IP
 func (s *SSRFProtection) checkPrivateIP(hostname string) error {
 	// SECURITY: Block localhost variants
-	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
+	if hostname == "localhost" || hostname == shared.GetInternalHostname() || hostname == "::1" {
 		return fmt.Errorf("access to localhost blocked")
 	}
 
 	// SECURITY: Block cloud metadata endpoints
 	cloudMetadataHosts := []string{
-		"169.254.169.254",     // AWS, Azure, GCP metadata (IPv4)
-		"fd00:ec2::254",       // AWS metadata (IPv6)
+		"169.254.169.254",          // AWS, Azure, GCP metadata (IPv4)
+		"fd00:ec2::254",            // AWS metadata (IPv6)
 		"metadata.google.internal", // GCP metadata
-		"169.254.169.253",     // AWS IMDSv2 token endpoint
+		"169.254.169.253",          // AWS IMDSv2 token endpoint
 	}
 	for _, blocked := range cloudMetadataHosts {
 		if hostname == blocked {

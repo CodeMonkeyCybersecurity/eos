@@ -46,7 +46,7 @@ func (ci *ConsulInstaller) verify() error {
 func (ci *ConsulInstaller) isConsulReady() bool {
 	// Try to connect to the API
 	config := consulapi.DefaultConfig()
-	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
+	config.Address = fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortConsul)
 
 	client, err := consulapi.NewClient(config)
 	if err != nil {

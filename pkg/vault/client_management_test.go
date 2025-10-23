@@ -14,7 +14,7 @@ import (
 // TestVaultClientEnvironmentValidation tests environment variable validation
 func TestVaultClientEnvironmentValidation(t *testing.T) {
 	// Simple test without complex setup
-	
+
 	// Save original env vars
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
@@ -45,7 +45,7 @@ func TestVaultClientEnvironmentValidation(t *testing.T) {
 		},
 		{
 			name:        "valid_environment_setup",
-			vaultAddr:   "https://127.0.0.1:8200",
+			vaultAddr:   "https://shared.GetInternalHostname:8200",
 			vaultToken:  "test-token",
 			expectError: true, // Will fail on connection but validates configuration
 		},
@@ -83,7 +83,7 @@ func TestVaultClientEnvironmentValidation(t *testing.T) {
 // TestVaultClientCaching tests client caching functionality
 func TestVaultClientCaching(t *testing.T) {
 	// Simple test without complex setup
-	
+
 	// Save original env vars
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
@@ -93,7 +93,7 @@ func TestVaultClientCaching(t *testing.T) {
 	}()
 
 	// Setup test environment
-	_ = os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
+	_ = os.Setenv("VAULT_ADDR", "https://shared.GetInternalHostname:8200")
 	_ = os.Setenv("VAULT_TOKEN", "test-token")
 	_ = os.Setenv("VAULT_SKIP_VERIFY", "true")
 
@@ -116,7 +116,7 @@ func TestVaultClientCaching(t *testing.T) {
 // TestVaultClientCreation tests basic client creation without connection
 func TestVaultClientCreation(t *testing.T) {
 	// Simple test without complex setup
-	
+
 	// Save original env vars
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
@@ -141,7 +141,7 @@ func TestVaultClientCreation(t *testing.T) {
 	})
 
 	t.Run("address_validation", func(t *testing.T) {
-		_ = os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
+		_ = os.Setenv("VAULT_ADDR", "https://shared.GetInternalHostname:8200")
 		_ = os.Setenv("VAULT_TOKEN", "test-token")
 		_ = os.Setenv("VAULT_SKIP_VERIFY", "true")
 
@@ -155,7 +155,7 @@ func TestVaultClientCreation(t *testing.T) {
 // Benchmark test for client operations
 func BenchmarkVaultClientOperations(b *testing.B) {
 	// Simple benchmark without complex setup
-	
+
 	// Save original env vars
 	originalAddr := os.Getenv("VAULT_ADDR")
 	originalToken := os.Getenv("VAULT_TOKEN")
@@ -165,7 +165,7 @@ func BenchmarkVaultClientOperations(b *testing.B) {
 	}()
 
 	// Setup test environment
-	_ = os.Setenv("VAULT_ADDR", "https://127.0.0.1:8200")
+	_ = os.Setenv("VAULT_ADDR", "https://shared.GetInternalHostname:8200")
 	_ = os.Setenv("VAULT_TOKEN", "test-token")
 	_ = os.Setenv("VAULT_SKIP_VERIFY", "true")
 

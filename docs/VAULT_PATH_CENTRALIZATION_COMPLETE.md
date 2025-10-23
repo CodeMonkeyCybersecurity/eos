@@ -53,7 +53,7 @@ VaultSnapshotScriptPath   = "/usr/local/bin/vault-snapshot.sh"
 
 // Network Configuration
 VaultListenAddr           = "0.0.0.0"                    // Bind address
-VaultClientAddr           = "127.0.0.1"                  // Client connection
+VaultClientAddr           = "shared.GetInternalHostname"                  // Client connection
 VaultDefaultPort          = 8179                         // API port (Eos custom)
 VaultClusterPort          = 8180                         // Raft cluster port
 
@@ -92,7 +92,7 @@ func (vp *VaultPaths) AllPaths() []string  // Flat list for cleanup
 type VaultNetworkConfig struct {
     ListenAddr        string  // 0.0.0.0 (bind all interfaces)
     ClusterListenAddr string  // 0.0.0.0
-    ClientAddr        string  // 127.0.0.1 or hostname
+    ClientAddr        string  // shared.GetInternalHostname or hostname
     APIPort           int     // 8179
     ClusterPort       int     // 8180
     APIAddress        string  // Computed: https://hostname:8179
@@ -105,7 +105,7 @@ func DefaultVaultNetwork(hostname string) *VaultNetworkConfig
 // Utilities
 func (vnc *VaultNetworkConfig) APIListenAddress() string      // "0.0.0.0:8179"
 func (vnc *VaultNetworkConfig) ClusterListenAddress() string  // "0.0.0.0:8180"
-func (vnc *VaultNetworkConfig) LocalAPIAddress() string       // "https://127.0.0.1:8179"
+func (vnc *VaultNetworkConfig) LocalAPIAddress() string       // "https://shared.GetInternalHostname:8179"
 ```
 
 #### VaultServiceConfig

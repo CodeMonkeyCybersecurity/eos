@@ -21,11 +21,11 @@ import (
 
 const (
 	// File paths - duplicates consul.Consul*
-	consulConfigFile        = "/etc/consul.d/consul.hcl"
-	consulVaultHelperPath   = "/usr/local/bin/consul-vault-helper"
-	consulDefaultDataDir    = "/opt/consul"
-	consulUser              = "consul"
-	consulGroup             = "consul"
+	consulConfigFile      = "/etc/consul.d/consul.hcl"
+	consulVaultHelperPath = "/usr/local/bin/consul-vault-helper"
+	consulDefaultDataDir  = "/opt/consul"
+	consulUser            = "consul"
+	consulGroup           = "consul"
 
 	// Ports - duplicates consul.Port*
 	portServer  = 8300
@@ -160,7 +160,7 @@ log_json = true
 telemetry {
   prometheus_retention_time = "60s"
   disable_hostname = false
-  statsd_address = "127.0.0.1:8125"
+  statsd_address = fmt.Sprintf("%s:8125", shared.GetInternalHostname())
 }
 
 # Connect settings (service mesh ready)

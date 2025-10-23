@@ -385,7 +385,7 @@ This fix is part of a comprehensive authentication and authorization overhaul:
    - Uses Vault Agent token automatically
 
 2. **Hostname Resolution** ([VAULT_CONSUL_HOSTNAME_RESOLUTION.md](VAULT_CONSUL_HOSTNAME_RESOLUTION.md))
-   - Services use actual hostname instead of 127.0.0.1
+   - Services use actual hostname instead of shared.GetInternalHostname
 
 3. **Services Policy** (This Document)
    - Default policy now includes `secret/data/services/*`

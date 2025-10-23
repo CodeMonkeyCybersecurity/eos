@@ -71,7 +71,7 @@ func FuzzDatabaseOperation(f *testing.F) {
 // FuzzDatabaseConfig tests database configuration parsing with malicious inputs
 func FuzzDatabaseConfig(f *testing.F) {
 	f.Add("localhost", 5432, "testdb", "user", "pass", "disable")
-	f.Add("127.0.0.1", 3306, "mysql", "root", "", "require")
+	f.Add("shared.GetInternalHostname", 3306, "mysql", "root", "", "require")
 
 	// Malicious configuration patterns
 	f.Add("evil.com", 1337, "'; DROP DATABASE test; --", "admin", "password", "disable")

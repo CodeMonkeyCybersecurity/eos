@@ -75,7 +75,7 @@ Example:
 		}
 
 		if vaultConfig.VaultAddr == "" {
-			vaultConfig.VaultAddr = fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault)
+			vaultConfig.VaultAddr = fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), shared.PortVault)
 		}
 
 		if err := tfManager.ConfigureVaultIntegration(rc, vaultConfig); err != nil {
@@ -203,7 +203,7 @@ var vaultBackendCmd = &cobra.Command{
 		}
 
 		if vaultConfig.Address == "" {
-			vaultConfig.Address = fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault)
+			vaultConfig.Address = fmt.Sprintf("https://shared.GetInternalHostname:%d", shared.PortVault)
 		}
 
 		return tfManager.GenerateVaultBackendConfig(rc, vaultConfig)

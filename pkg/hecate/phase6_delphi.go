@@ -27,7 +27,7 @@ func SetupWazuhWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBu
 		},
 		{
 			Prompt:  "Enter backend IP address for Wazuh (e.g., 192.168.0.10)",
-			Default: "127.0.0.1",
+			Default: shared.GetInternalHostname(),
 			EnvVar:  "BackendIP",
 			Reader:  reader,
 		},

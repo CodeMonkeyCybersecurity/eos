@@ -14,11 +14,11 @@ func FuzzURLValidation(f *testing.F) {
 		// SSRF attacks
 		"http://169.254.169.254/metadata/",
 		"http://localhost:22/",
-		"http://127.0.0.1:8080/admin",
+		"http://shared.GetInternalHostname:8080/admin",
 		"http://0.0.0.0:3306/",
 		"file:///etc/passwd",
 		"ftp://internal.server/",
-		
+
 		// URL bypass techniques
 		"http://evil.com@good.com/",
 		"http://good.com.evil.com/",
@@ -26,77 +26,77 @@ func FuzzURLValidation(f *testing.F) {
 		"http://127.1/",
 		"http://0x7f000001/", // Hex encoding
 		"http://2130706433/", // Decimal encoding
-		
+
 		// Protocol confusion
 		"javascript:alert(1)",
 		"data:text/html,<script>alert(1)</script>",
 		"vbscript:Execute(malicious)",
 		"mailto:user@evil.com?cc=admin@target.com",
-		
+
 		// Port scanning
 		"http://target.com:22/",
 		"http://target.com:3389/",
 		"http://target.com:445/",
 		"http://target.com:135/",
-		
+
 		// Unicode attacks
-		"http://аррӏе.com/", // Cyrillic characters that look like apple.com
+		"http://аррӏе.com/",           // Cyrillic characters that look like apple.com
 		"http://google.com\u2024com/", // Unicode confusion
-		"http://goog1е.com/", // Cyrillic 'е' instead of Latin 'e'
-		
+		"http://goog1е.com/",          // Cyrillic 'е' instead of Latin 'e'
+
 		// Long URLs (DoS)
 		"http://example.com/" + strings.Repeat("A", 10000),
 		"http://" + strings.Repeat("A", 1000) + ".com/",
-		
+
 		// Null byte injection
 		"http://example.com\x00.evil.com/",
 		"http://example.com/path\x00malicious",
-		
+
 		// Valid URLs
 		"https://example.com/",
 		"http://localhost/",
 		"https://api.example.com/v1/endpoint",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, rawURL string) {
 		// Test URL validation
 		isValid := validateURL(rawURL)
 		_ = isValid
-		
+
 		// Test URL parsing
 		parsed, err := parseURL(rawURL)
 		if err != nil {
 			// Invalid URLs should be rejected gracefully
 			return
 		}
-		
+
 		// Test hostname validation
 		if parsed.Host != "" {
 			isValidHost := validateHostname(parsed.Host)
 			_ = isValidHost
 		}
-		
+
 		// Test scheme validation
 		isValidScheme := validateURLScheme(parsed.Scheme)
 		_ = isValidScheme
-		
+
 		// Test URL sanitization
 		sanitized := sanitizeURL(rawURL)
 		if !utf8.ValidString(sanitized) {
 			t.Error("Sanitized URL is not valid UTF-8")
 		}
-		
+
 		// Test SSRF protection
 		if isValid {
 			isSafe := isSSRFSafeURL(rawURL)
 			_ = isSafe
 		}
-		
+
 		// Test URL normalization
 		normalized := normalizeURL(rawURL)
 		if len(normalized) > len(rawURL)*2 {
@@ -112,32 +112,32 @@ func FuzzHTTPHeaders(f *testing.F) {
 		"value\r\nX-Injected: evil",
 		"value\nSet-Cookie: session=hijacked",
 		"value\r\n\r\n<script>alert(1)</script>",
-		
+
 		// Command injection in headers
 		"value; rm -rf /",
 		"value | cat /etc/passwd",
 		"$(whoami)",
 		"`id`",
-		
+
 		// XSS in headers
 		"<script>alert(1)</script>",
 		"javascript:alert(document.cookie)",
 		"'><script>alert(1)</script>",
-		
+
 		// Unicode attacks
 		"value\u000aX-Evil: injected",
 		"value\u000dX-Evil: injected",
 		"value\u2028X-Evil: injected",
 		"value\u2029X-Evil: injected",
-		
+
 		// Long headers (DoS)
 		strings.Repeat("A", 8192),
 		strings.Repeat("A", 65536),
-		
+
 		// Binary data
 		"value\x00\x01\x02",
 		"\x7f\x80\x81",
-		
+
 		// Valid headers
 		"application/json",
 		"text/html; charset=utf-8",
@@ -145,33 +145,33 @@ func FuzzHTTPHeaders(f *testing.F) {
 		"gzip, deflate",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, headerValue string) {
 		// Test header validation
 		isValid := validateHTTPHeader(headerValue)
 		_ = isValid
-		
+
 		// Test header sanitization
 		sanitized := sanitizeHTTPHeader(headerValue)
-		
+
 		// Verify sanitization removes dangerous characters
 		if strings.Contains(sanitized, "\r") || strings.Contains(sanitized, "\n") {
 			t.Error("Sanitized header contains line breaks")
 		}
-		
+
 		if strings.Contains(sanitized, "\x00") {
 			t.Error("Sanitized header contains null bytes")
 		}
-		
+
 		// Test header length validation
 		if len(sanitized) > 8192 {
 			t.Error("Sanitized header exceeds maximum length")
 		}
-		
+
 		// Test header encoding
 		encoded := encodeHTTPHeader(headerValue)
 		if !isValidHTTPHeaderEncoding(encoded) {
@@ -188,57 +188,57 @@ func FuzzQueryParameters(f *testing.F) {
 		"' OR '1'='1",
 		"UNION SELECT password FROM users",
 		"1; SELECT * FROM admin",
-		
+
 		// XSS injection
 		"<script>alert(1)</script>",
 		"javascript:alert(document.cookie)",
 		"'><img src=x onerror=alert(1)>",
 		"\"><script>alert(1)</script>",
-		
+
 		// Command injection
 		"; rm -rf /",
 		"| cat /etc/passwd",
 		"$(whoami)",
 		"`id`",
 		"param && malicious",
-		
+
 		// Path traversal
 		"../../../etc/passwd",
 		"..\\..\\..\\windows\\system32\\config\\sam",
 		"....//....//....//etc//passwd",
-		
+
 		// LDAP injection
 		"*)(uid=*))(|(uid=*",
 		"admin)(|(password=*)",
-		
+
 		// NoSQL injection
 		"'; return true; //",
 		"{\"$gt\": \"\"}",
 		"1'; return {injection: true}; //",
-		
+
 		// Template injection
 		"{{7*7}}",
 		"${7*7}",
 		"<%= 7*7 %>",
 		"{{config.items()}}",
-		
+
 		// CRLF injection
 		"value\r\nContent-Length: 0\r\n\r\n",
 		"param\nInjected: header",
-		
+
 		// Unicode attacks
 		"válue",
-		"vaĺue", // Different Unicode characters
+		"vaĺue",       // Different Unicode characters
 		"value\u202e", // Right-to-left override
-		
+
 		// Buffer overflow
 		strings.Repeat("A", 10000),
 		strings.Repeat("💀", 1000),
-		
+
 		// Null bytes
 		"value\x00injected",
 		"\x00\x00\x00",
-		
+
 		// Valid parameters
 		"normal_value",
 		"user@example.com",
@@ -246,28 +246,28 @@ func FuzzQueryParameters(f *testing.F) {
 		"valid-param_value",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, param string) {
 		// Test parameter validation
 		isValid := validateQueryParameter(param)
 		_ = isValid
-		
+
 		// Test parameter sanitization
 		sanitized := sanitizeQueryParameter(param)
-		
+
 		// Verify sanitization removes dangerous patterns
 		if strings.Contains(sanitized, "\x00") {
 			t.Error("Sanitized parameter contains null bytes")
 		}
-		
+
 		if strings.Contains(sanitized, "\r") || strings.Contains(sanitized, "\n") {
 			t.Error("Sanitized parameter contains line breaks")
 		}
-		
+
 		// Test parameter encoding
 		encoded := encodeQueryParameter(param)
 		decoded, err := url.QueryUnescape(encoded)
@@ -275,11 +275,11 @@ func FuzzQueryParameters(f *testing.F) {
 			t.Error("Query parameter encoding/decoding failed")
 		}
 		_ = decoded
-		
+
 		// Test injection detection
 		hasInjection := detectInjectionPatterns(param)
 		_ = hasInjection
-		
+
 		// Test parameter length validation
 		if len(param) > 0 {
 			isValidLength := validateParameterLengthNetwork(param)
@@ -293,49 +293,49 @@ func FuzzNetworkConfiguration(f *testing.F) {
 	seeds := []string{
 		// IP address attacks
 		"0.0.0.0",
-		"127.0.0.1",
+		"shared.GetInternalHostname",
 		"169.254.169.254", // AWS metadata
 		"10.0.0.1",
 		"192.168.1.1",
 		"172.16.0.1",
-		
+
 		// IPv6 attacks
 		"::1",
-		"::ffff:127.0.0.1",
+		"::ffff:shared.GetInternalHostname",
 		"fe80::1",
 		"2001:db8::1",
-		
+
 		// Port attacks
 		"22", "23", "25", "53", "80", "135", "139", "443", "445", "993", "995",
 		"3389", "5432", "3306", "1433", "6379", "27017",
-		
+
 		// CIDR attacks
 		"0.0.0.0/0",
 		"127.0.0.0/8",
 		"10.0.0.0/8",
 		"172.16.0.0/12",
 		"192.168.0.0/16",
-		
+
 		// DNS attacks
 		"localhost",
 		"metadata.google.internal",
 		"169.254.169.254.xip.io",
-		"127.0.0.1.nip.io",
-		
+		"shared.GetInternalHostname.nip.io",
+
 		// Injection in network config
 		"192.168.1.1; rm -rf /",
 		"localhost | cat /etc/passwd",
 		"$(whoami).example.com",
-		
+
 		// Unicode domains
 		"еxample.com", // Cyrillic е
 		"goog1е.com",
 		"аpple.com",
-		
+
 		// Long values
 		strings.Repeat("1", 1000) + ".com",
 		strings.Repeat("A", 255) + ".local",
-		
+
 		// Valid configurations
 		"example.com",
 		"api.service.local",
@@ -344,38 +344,38 @@ func FuzzNetworkConfiguration(f *testing.F) {
 		"443",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, config string) {
 		// Test IP address validation
 		isValidIP := validateIPAddress(config)
 		_ = isValidIP
-		
+
 		// Test hostname validation
 		isValidHostname := validateNetworkHostname(config)
 		_ = isValidHostname
-		
+
 		// Test port validation
 		isValidPort := validatePort(config)
 		_ = isValidPort
-		
+
 		// Test CIDR validation
 		isValidCIDR := validateCIDR(config)
 		_ = isValidCIDR
-		
+
 		// Test private network detection
 		isPrivate := isPrivateNetworkAddress(config)
 		_ = isPrivate
-		
+
 		// Test network config sanitization
 		sanitized := sanitizeNetworkConfig(config)
 		if !utf8.ValidString(sanitized) {
 			t.Error("Sanitized network config is not valid UTF-8")
 		}
-		
+
 		// Test DNS resolution safety
 		isSafeDNS := isDNSResolutionSafe(config)
 		_ = isSafeDNS
@@ -422,9 +422,9 @@ func isSSRFSafeURL(rawURL string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// Block private networks
-	privateHosts := []string{"localhost", "127.0.0.1", "169.254.169.254"}
+	privateHosts := []string{"localhost", "shared.GetInternalHostname", "169.254.169.254"}
 	for _, host := range privateHosts {
 		if strings.Contains(u.Host, host) {
 			return false

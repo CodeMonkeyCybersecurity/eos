@@ -40,7 +40,7 @@ listener "tcp" {
   tls_key_file = "/opt/vault/tls/vault.key"
 }
 
-api_addr = "https://127.0.0.1:8179"
+api_addr = "https://shared.GetInternalHostname:8179"
 `
 
 	configPath := filepath.Join(tmpDir, "vault.hcl")
@@ -146,7 +146,7 @@ listener "tcp" {
   tls_disable = true
 }
 
-api_addr = "http://127.0.0.1:8179"
+api_addr = "http://shared.GetInternalHostname:8179"
 `
 
 	configPath := filepath.Join(tmpDir, "vault.hcl")
@@ -422,7 +422,7 @@ storage "file" {
 		{
 			name: "missing_both",
 			config: `
-api_addr = "http://127.0.0.1:8179"
+api_addr = "http://shared.GetInternalHostname:8179"
 `,
 			expectErrors:  2,
 			missingBlocks: []string{"storage", "listener"},

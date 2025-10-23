@@ -104,7 +104,7 @@ func (sv *SecurityValidator) validateAddress(address string, result *ValidationR
 	// Validate IP address
 	if ip := net.ParseIP(host); ip == nil {
 		// Could be a hostname - validate it's not localhost variants
-		if host == "localhost" || host == "127.0.0.1" {
+		if host == "localhost" || host == shared.GetInternalHostname() {
 			result.Warnings = append(result.Warnings, "Localhost binding may not be suitable for production environments")
 			result.Score -= 5
 		}

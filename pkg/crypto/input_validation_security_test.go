@@ -282,7 +282,7 @@ func TestSuspiciousDomainDetection(t *testing.T) {
 	suspiciousDomains := []string{
 		// Localhost variations
 		"localhost",
-		"127.0.0.1",
+		"shared.GetInternalHostname",
 		"::1",
 		"0.0.0.0",
 

@@ -70,7 +70,7 @@ func FuzzValidateURL(f *testing.F) {
 
 func FuzzValidateIP(f *testing.F) {
 	f.Add("")
-	f.Add("127.0.0.1")
+	f.Add("shared.GetInternalHostname")
 	f.Add("256.256.256.256")
 	f.Add("::1")
 	f.Add("abcd")
@@ -142,8 +142,8 @@ func FuzzValidateEmailSecurity(f *testing.F) {
 
 	// Security-focused email tests
 	f.Add("admin@localhost")                           // Local domain
-	f.Add("root@127.0.0.1")                            // IP address
-	f.Add("test@[127.0.0.1]")                          // Bracketed IP
+	f.Add("root@shared.GetInternalHostname")           // IP address
+	f.Add("test@[shared.GetInternalHostname]")         // Bracketed IP
 	f.Add("user+tag@domain.com")                       // Plus addressing
 	f.Add("user@sub.domain.co.uk")                     // Multiple subdomains
 	f.Add("\"test\"@domain.com")                       // Quoted local part
@@ -236,7 +236,7 @@ func FuzzValidateURLSecurity(f *testing.F) {
 	f.Add("javascript:alert(1)")                          // JavaScript URL
 	f.Add("data:text/html,<script>")                      // Data URL with script
 	f.Add("http://localhost:8080")                        // Localhost
-	f.Add("http://127.0.0.1:22")                          // Localhost IP with SSH port
+	f.Add("http://shared.GetInternalHostname:22")         // Localhost IP with SSH port
 	f.Add("http://0.0.0.0")                               // All interfaces
 	f.Add("http://::1")                                   // IPv6 localhost
 	f.Add("http://[::1]:8080")                            // IPv6 with port
@@ -272,28 +272,28 @@ func FuzzValidateIPSecurity(f *testing.F) {
 	f.Add("2001:db8::1")
 
 	// Security-focused IP tests
-	f.Add("0.0.0.0")          // All interfaces
-	f.Add("127.0.0.1")        // Localhost
-	f.Add("::1")              // IPv6 localhost
-	f.Add("169.254.169.254")  // AWS metadata IP
-	f.Add("224.0.0.1")        // Multicast
-	f.Add("255.255.255.255")  // Broadcast
-	f.Add("192.168.0.1")      // Private
-	f.Add("10.255.255.255")   // Private
-	f.Add("172.31.255.255")   // Private
-	f.Add("fc00::1")          // IPv6 private
-	f.Add("fe80::1")          // IPv6 link-local
-	f.Add("ff00::1")          // IPv6 multicast
-	f.Add("256.256.256.256")  // Invalid IPv4
-	f.Add("192.168.1")        // Incomplete IPv4
-	f.Add("192.168.1.1.1")    // Too many octets
-	f.Add("192.168.01.1")     // Leading zero
-	f.Add("192.168.-1.1")     // Negative
-	f.Add("192.168.1.1\x00")  // Null byte
-	f.Add("192.168.1.1\n")    // Newline
-	f.Add("192.168.1.1/24")   // CIDR notation
-	f.Add("192.168.1.1:8080") // With port
-	f.Add("[::1]:8080")       // IPv6 with port brackets
+	f.Add("0.0.0.0")                    // All interfaces
+	f.Add("shared.GetInternalHostname") // Localhost
+	f.Add("::1")                        // IPv6 localhost
+	f.Add("169.254.169.254")            // AWS metadata IP
+	f.Add("224.0.0.1")                  // Multicast
+	f.Add("255.255.255.255")            // Broadcast
+	f.Add("192.168.0.1")                // Private
+	f.Add("10.255.255.255")             // Private
+	f.Add("172.31.255.255")             // Private
+	f.Add("fc00::1")                    // IPv6 private
+	f.Add("fe80::1")                    // IPv6 link-local
+	f.Add("ff00::1")                    // IPv6 multicast
+	f.Add("256.256.256.256")            // Invalid IPv4
+	f.Add("192.168.1")                  // Incomplete IPv4
+	f.Add("192.168.1.1.1")              // Too many octets
+	f.Add("192.168.01.1")               // Leading zero
+	f.Add("192.168.-1.1")               // Negative
+	f.Add("192.168.1.1\x00")            // Null byte
+	f.Add("192.168.1.1\n")              // Newline
+	f.Add("192.168.1.1/24")             // CIDR notation
+	f.Add("192.168.1.1:8080")           // With port
+	f.Add("[::1]:8080")                 // IPv6 with port brackets
 
 	f.Fuzz(func(t *testing.T, ip string) {
 		defer func() {

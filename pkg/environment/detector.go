@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -90,7 +91,7 @@ func detectSingleMachine() (*Environment, error) {
 		Machines: []Machine{
 			{
 				Hostname: hostname,
-				IP:       "127.0.0.1",
+				IP:       shared.GetInternalHostname(),
 				Role:     RoleMonolith,
 			},
 		},

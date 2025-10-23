@@ -27,23 +27,23 @@ type FallbackCode string
 
 const (
 	// === Environment Variables (DEPRECATED) ===
-	VaultAddrEnv = "VAULT_ADDR" // Use vault.VaultAddrEnvVar
+	VaultAddrEnv = "VAULT_ADDR"   // Use vault.VaultAddrEnvVar
 	VaultCA      = "VAULT_CACERT" // Use vault.VaultCACertEnvVar
 
 	// === Timeouts and Retry Settings (DEPRECATED) ===
 	VaultHealthTimeout = 5 * time.Second // Use vault.VaultHealthTimeout
 	TestTimeout        = 500 * time.Millisecond
-	VaultRetryCount    = 5 // Use vault.VaultRetryCount
-	VaultRetryDelay    = 2 * time.Second // Use vault.VaultRetryDelay
+	VaultRetryCount    = 5                // Use vault.VaultRetryCount
+	VaultRetryDelay    = 2 * time.Second  // Use vault.VaultRetryDelay
 	VaultMaxHealthWait = 10 * time.Second // Use vault.VaultMaxHealthWait
 
 	// === Token/Secret TTLs (DEPRECATED) ===
-	VaultDefaultTokenTTL    = "4h" // Use vault.VaultDefaultTokenTTL
+	VaultDefaultTokenTTL    = "4h"  // Use vault.VaultDefaultTokenTTL
 	VaultDefaultTokenMaxTTL = "24h" // Use vault.VaultDefaultTokenMaxTTL
 	VaultDefaultSecretIDTTL = "24h" // Use vault.VaultDefaultSecretIDTTL
 
-	// === Network Constants (DEPRECATED) ===
-	LocalhostSAN = "127.0.0.1" // Use vault.LocalhostIP
+	// === Network Constants () ===
+	LocalhostSAN = "shared.GetInternalHostname" // Use vault.LocalhostIP
 
 	// === Legacy/Compatibility ===
 	// NOTE: VaultDir, VaultConfigDirDebian, VaultConfigFileName moved to pkg/vault/constants.go
@@ -74,12 +74,12 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 
 // Computed Vault port constants - ALL derived from ports.go
 var (
-	VaultDefaultPort        = fmt.Sprintf("%d", PortVault)
-	VaultDefaultPortInt     = PortVault
-	VaultClusterPort        = fmt.Sprintf("%d", PortVaultCluster)
-	VaultClusterPortInt     = PortVaultCluster
-	VaultWebPortTCP         = VaultDefaultPort + "/tcp"
-	VaultDefaultAddr        = "https://%s:" + VaultDefaultPort
+	VaultDefaultPort    = fmt.Sprintf("%d", PortVault)
+	VaultDefaultPortInt = PortVault
+	VaultClusterPort    = fmt.Sprintf("%d", PortVaultCluster)
+	VaultClusterPortInt = PortVaultCluster
+	VaultWebPortTCP     = VaultDefaultPort + "/tcp"
+	VaultDefaultAddr    = "https://%s:" + VaultDefaultPort
 )
 
 // NOTE: All address resolution functions moved to pkg/shared/service_addresses.go
@@ -114,8 +114,8 @@ var (
 	VaultInitPath            = filepath.Join(SecretsDir, "vault_init.json")
 	WazuhFallbackSecretsPath = filepath.Join(SecretsDir, "wazuh_fallback.json")
 	EosRunDir                = "/run/eos"
-	VaultPID           = filepath.Join(EosRunDir, "vault.pid")
-	VaultTokenSinkPath = filepath.Join(EosRunDir, ".vault-token")
+	VaultPID                 = filepath.Join(EosRunDir, "vault.pid")
+	VaultTokenSinkPath       = filepath.Join(EosRunDir, ".vault-token")
 	VaultClient              *api.Client
 )
 
@@ -335,7 +335,7 @@ type VaultConfigParams struct {
 	RetryJoinNodes []RetryJoinNode
 
 	// Consul storage backend configuration
-	ConsulAddress string // Consul agent address (default: 127.0.0.1:8500 - HashiCorp standard)
+	ConsulAddress string // Consul agent address (default: shared.GetInternalHostname:8500 - HashiCorp standard)
 	ConsulPath    string // Path in Consul KV store (default: "vault/")
 	ConsulToken   string // Consul ACL token (optional)
 	ConsulScheme  string // http or https (default: http)

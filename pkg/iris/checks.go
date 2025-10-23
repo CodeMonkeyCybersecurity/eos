@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -72,7 +73,7 @@ func CheckIrisServiceHealth(rc *eos_io.RuntimeContext, config IrisConfig) []Chec
 	var results []CheckResult
 
 	// Check if we're running on the Iris machine itself
-	isLocalIris := config.IrisIP == "localhost" || config.IrisIP == "127.0.0.1" || config.IrisIP == "0.0.0.0"
+	isLocalIris := config.IrisIP == "localhost" || config.IrisIP == shared.GetInternalHostname() || config.IrisIP == "0.0.0.0"
 
 	// If local and auto-start enabled, check and start Temporal server
 	if isLocalIris && config.AutoStart {

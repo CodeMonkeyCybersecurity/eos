@@ -560,7 +560,7 @@ ui_config {
 }
 
 consul {
-  address = "127.0.0.1:8500"
+  address = "shared.GetInternalHostname:8500"
 }
 
 telemetry {
@@ -648,33 +648,33 @@ final_message: "Nomad + Consul cluster node is ready!"
 
 // NomadConsulConfig represents configuration for Nomad+Consul Terraform deployment
 type NomadConsulConfig struct {
-	CloudDeploy        bool     `json:"cloud_deploy"`
-	ClusterName        string   `json:"cluster_name"`
-	ServerType         string   `json:"server_type"`
-	Location           string   `json:"location"`
-	NodeCount          int      `json:"node_count"`
-	ServerCount        int      `json:"server_count"`
-	Datacenter         string   `json:"datacenter"`
-	Region             string   `json:"region"`
-	
+	CloudDeploy bool   `json:"cloud_deploy"`
+	ClusterName string `json:"cluster_name"`
+	ServerType  string `json:"server_type"`
+	Location    string `json:"location"`
+	NodeCount   int    `json:"node_count"`
+	ServerCount int    `json:"server_count"`
+	Datacenter  string `json:"datacenter"`
+	Region      string `json:"region"`
+
 	// Ingress configuration
-	CaddyReplicas      int      `json:"caddy_replicas"`
-	CaddyVersion       string   `json:"caddy_version"`
-	CaddyAdminEnabled  bool     `json:"caddy_admin_enabled"`
-	CaddyCPURequest    int      `json:"caddy_cpu_request"`
-	CaddyMemoryRequest int      `json:"caddy_memory_request"`
-	
+	CaddyReplicas      int    `json:"caddy_replicas"`
+	CaddyVersion       string `json:"caddy_version"`
+	CaddyAdminEnabled  bool   `json:"caddy_admin_enabled"`
+	CaddyCPURequest    int    `json:"caddy_cpu_request"`
+	CaddyMemoryRequest int    `json:"caddy_memory_request"`
+
 	// Mail proxy configuration
-	EnableMailProxy    bool     `json:"enable_mail_proxy"`
-	NginxReplicas      int      `json:"nginx_replicas"`
-	NginxVersion       string   `json:"nginx_version"`
-	MailPorts          []int    `json:"mail_ports"`
-	MailBackend        string   `json:"mail_backend"`
-	NginxCPURequest    int      `json:"nginx_cpu_request"`
-	NginxMemoryRequest int      `json:"nginx_memory_request"`
-	
+	EnableMailProxy    bool   `json:"enable_mail_proxy"`
+	NginxReplicas      int    `json:"nginx_replicas"`
+	NginxVersion       string `json:"nginx_version"`
+	MailPorts          []int  `json:"mail_ports"`
+	MailBackend        string `json:"mail_backend"`
+	NginxCPURequest    int    `json:"nginx_cpu_request"`
+	NginxMemoryRequest int    `json:"nginx_memory_request"`
+
 	// External services
-	ExternalServices   []ExternalService `json:"external_services"`
+	ExternalServices []ExternalService `json:"external_services"`
 }
 
 // ExternalService represents an external service to register in Consul
@@ -688,21 +688,21 @@ type ExternalService struct {
 // GetDefaultNomadConsulConfig returns default configuration
 func GetDefaultNomadConsulConfig() *NomadConsulConfig {
 	return &NomadConsulConfig{
-		CloudDeploy:        false,
-		ClusterName:        "nomad-consul-cluster",
-		ServerType:         "cx21",
-		Location:           "nbg1",
-		NodeCount:          3,
-		ServerCount:        3,
-		Datacenter:         "dc1",
-		Region:             "global",
-		
+		CloudDeploy: false,
+		ClusterName: "nomad-consul-cluster",
+		ServerType:  "cx21",
+		Location:    "nbg1",
+		NodeCount:   3,
+		ServerCount: 3,
+		Datacenter:  "dc1",
+		Region:      "global",
+
 		CaddyReplicas:      2,
 		CaddyVersion:       "2.7-alpine",
 		CaddyAdminEnabled:  true,
 		CaddyCPURequest:    200,
 		CaddyMemoryRequest: 256,
-		
+
 		EnableMailProxy:    false,
 		NginxReplicas:      1,
 		NginxVersion:       "1.24-alpine",
@@ -710,7 +710,7 @@ func GetDefaultNomadConsulConfig() *NomadConsulConfig {
 		MailBackend:        "stalwart-mail",
 		NginxCPURequest:    100,
 		NginxMemoryRequest: 128,
-		
-		ExternalServices:   []ExternalService{},
+
+		ExternalServices: []ExternalService{},
 	}
 }

@@ -262,8 +262,8 @@ func generateSelfSigned(rc *eos_io.RuntimeContext) error {
 		Owner:        "vault",
 		Group:        "vault",
 		// Initial SANs - enrichSANs() will add comprehensive list automatically
-		DNSNames:    []string{hostname, "localhost"},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:    []string{hostname}, // enrichSANs() adds comprehensive DNS names
+		IPAddresses: []net.IP{},         // enrichSANs() adds hostname IPs + Tailscale + interfaces (NO localhost)
 	}
 
 	// Generate certificate using consolidated module

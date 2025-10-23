@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -100,7 +101,7 @@ func RenderBundleFragments(
 
 	// === Nginx ===
 	if bundle.Nginx != nil {
-		rendered, err := RenderStreamBlocks("127.0.0.1", bundle.Nginx.StreamBlocks)
+		rendered, err := RenderStreamBlocks(shared.GetInternalHostname(), bundle.Nginx.StreamBlocks)
 		if err != nil {
 			log.Error("Failed to render Nginx stream blocks", zap.Error(err))
 			return fmt.Errorf("failed to render Nginx stream blocks: %w", err)

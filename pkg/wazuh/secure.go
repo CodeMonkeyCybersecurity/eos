@@ -77,7 +77,7 @@ func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
 	// Authenticate & rotate
 	cfg := Config{
 		Protocol:           "https",
-		FQDN:               "127.0.0.1",
+		FQDN:               "shared.GetInternalHostname",
 		Port:               "55000",
 		VerifyCertificates: false,
 	}

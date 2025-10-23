@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -354,7 +355,7 @@ func testNetworkConnectivity(server string) error {
 
 // testPortAvailable tests if a port is available for binding
 func testPortAvailable(port int) error {
-	cmd := exec.Command("nc", "-z", "127.0.0.1", fmt.Sprintf("%d", port))
+	cmd := exec.Command("nc", "-z", shared.GetInternalHostname(), fmt.Sprintf("%d", port))
 	if err := cmd.Run(); err == nil {
 		return fmt.Errorf("port %d is already in use", port)
 	}

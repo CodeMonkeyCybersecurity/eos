@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
@@ -50,8 +51,6 @@ func ExportToEosInventory(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	logger.Info("System information exported successfully")
 	return nil
 }
-
-
 
 // generateNode generates data for a specific node
 func generateNode(info *SystemInfo) string {
@@ -157,8 +156,6 @@ func generateNode(info *SystemInfo) string {
 	return builder.String()
 }
 
-
-
 // generateSystemFacts generates system facts for inventory
 func generateSystemFacts(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -198,8 +195,8 @@ func generateSystemFacts(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 		},
 		"services": info.Services,
 		"": map[string]interface{}{
-			"platform":     info.Platform,
-			"version": info.Version,
+			"platform": info.Platform,
+			"version":  info.Version,
 		},
 	}
 
@@ -657,7 +654,7 @@ func CreateInventoryBackup(rc *eos_io.RuntimeContext) error {
 
 	// Backup directories to preserve
 	backupDirs := map[string]string{
-		"/srv/":            "",
+		"/srv/":                  "",
 		"/var/lib/eos/facts":     "facts",
 		"/var/lib/eos/terraform": "terraform",
 	}
@@ -677,8 +674,6 @@ func CreateInventoryBackup(rc *eos_io.RuntimeContext) error {
 	logger.Info("Inventory backup created", zap.String("backup_path", backupPath))
 	return nil
 }
-
-
 
 // copyDirectory recursively copies a directory from src to dst
 func copyDirectory(src, dst string) error {
@@ -750,31 +745,31 @@ func copyFile(src, dst string) error {
 // generateHashiCorpData generates HashiCorp configuration data for the system
 func generateHashiCorpData(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create HashiCorp configuration directory
 	configDir := "/opt/eos/hashicorp"
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create HashiCorp config directory: %w", err)
 	}
-	
+
 	// Generate Consul node configuration
 	consulConfig := map[string]interface{}{
-		"node_name": info.Hostname,
-		"datacenter": "dc1",
-		"server": false, // Default to agent mode
-		"bind_addr": "0.0.0.0",
-		"client_addr": "127.0.0.1",
-		"ui_config": map[string]bool{"enabled": true},
+		"node_name":   info.Hostname,
+		"datacenter":  "dc1",
+		"server":      false, // Default to agent mode
+		"bind_addr":   "0.0.0.0",
+		"client_addr": shared.GetInternalHostname(),
+		"ui_config":   map[string]bool{"enabled": true},
 	}
-	
+
 	consulConfigPath := filepath.Join(configDir, "consul.json")
 	if err := writeJSONConfig(consulConfigPath, consulConfig); err != nil {
 		return fmt.Errorf("failed to write Consul config: %w", err)
 	}
-	
+
 	logger.Info("Generated HashiCorp configuration data",
 		zap.String("consul_config", consulConfigPath))
-	
+
 	return nil
 }
 
@@ -784,33 +779,33 @@ func writeJSONConfig(path string, config interface{}) error {
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(path, data, 0644)
 }
 
 // ValidateHashiCorpExport validates the exported HashiCorp configuration data
 func ValidateHashiCorpExport(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check HashiCorp configuration directory exists
 	configDir := "/opt/eos/hashicorp"
 	if _, err := os.Stat(configDir); err != nil {
 		return fmt.Errorf("HashiCorp config directory not found: %s", configDir)
 	}
-	
+
 	// Check Consul configuration file exists
 	consulConfigPath := filepath.Join(configDir, "consul.json")
 	if _, err := os.Stat(consulConfigPath); err != nil {
 		return fmt.Errorf("Consul config file not found: %s", consulConfigPath)
 	}
-	
+
 	// Validate JSON structure
 	if data, err := os.ReadFile(consulConfigPath); err == nil {
 		var consulConfig map[string]interface{}
 		if err := json.Unmarshal(data, &consulConfig); err != nil {
 			return fmt.Errorf("invalid JSON in Consul config file: %w", err)
 		}
-		
+
 		// Check required fields
 		requiredFields := []string{"node_name", "datacenter"}
 		for _, field := range requiredFields {
@@ -819,7 +814,7 @@ func ValidateHashiCorpExport(rc *eos_io.RuntimeContext, info *SystemInfo) error 
 			}
 		}
 	}
-	
+
 	logger.Info("HashiCorp configuration validation completed successfully")
 	return nil
 }

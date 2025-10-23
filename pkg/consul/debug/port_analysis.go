@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
@@ -78,7 +79,7 @@ func checkDetailedPortBindings(rc *eos_io.RuntimeContext) DiagnosticResult {
 					fmt.Sprintf("✓ Port %d (%s): LISTENING on %s", port, desc, bindAddress))
 
 				// Warn about problematic bindings
-				if strings.HasPrefix(bindAddress, "127.0.0.1") || strings.HasPrefix(bindAddress, "localhost") {
+				if strings.HasPrefix(bindAddress, shared.GetInternalHostname()) || strings.HasPrefix(bindAddress, "localhost") {
 					if port == 8301 || port == 8302 || port == 8300 {
 						result.Details = append(result.Details,
 							fmt.Sprintf("  ⚠ WARNING: %s bound to loopback - cluster communication will FAIL", desc))

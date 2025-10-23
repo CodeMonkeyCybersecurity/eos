@@ -62,7 +62,7 @@ func TestComposeFile_Structure(t *testing.T) {
 				assert.Len(t, cf.Services, 2)
 				assert.Contains(t, cf.Services, "web")
 				assert.Contains(t, cf.Services, "db")
-				
+
 				// Validate web service
 				web := cf.Services["web"]
 				assert.Equal(t, "nginx:latest", web.Image)
@@ -73,12 +73,12 @@ func TestComposeFile_Structure(t *testing.T) {
 				assert.Len(t, web.DependsOn, 2)
 				assert.Equal(t, "unless-stopped", web.Restart)
 				assert.Len(t, web.Networks, 2)
-				
+
 				// Validate volumes
 				assert.Len(t, cf.Volumes, 2)
 				assert.Contains(t, cf.Volumes, "db-data")
 				assert.Contains(t, cf.Volumes, "logs")
-				
+
 				// Validate networks
 				assert.Len(t, cf.Networks, 2)
 				assert.Contains(t, cf.Networks, "frontend")
@@ -97,7 +97,7 @@ func TestComposeFile_Structure(t *testing.T) {
 			validate: func(t *testing.T, cf *ComposeFile) {
 				assert.Len(t, cf.Services, 1)
 				assert.Contains(t, cf.Services, "app")
-				
+
 				app := cf.Services["app"]
 				assert.Equal(t, "alpine:3.14", app.Image)
 				assert.Empty(t, app.ContainerName)
@@ -107,7 +107,7 @@ func TestComposeFile_Structure(t *testing.T) {
 				assert.Empty(t, app.DependsOn)
 				assert.Empty(t, app.Restart)
 				assert.Empty(t, app.Networks)
-				
+
 				assert.Empty(t, cf.Volumes)
 				assert.Empty(t, cf.Networks)
 			},
@@ -167,12 +167,12 @@ func TestComposeFile_YAMLMarshaling(t *testing.T) {
 			data, err := yaml.Marshal(tt.compose)
 			require.NoError(t, err)
 			assert.NotEmpty(t, data)
-			
+
 			// Unmarshal back
 			var decoded ComposeFile
 			err = yaml.Unmarshal(data, &decoded)
 			require.NoError(t, err)
-			
+
 			// Verify services
 			assert.Equal(t, len(tt.compose.Services), len(decoded.Services))
 			for name, service := range tt.compose.Services {
@@ -255,7 +255,7 @@ func TestDockerConstants(t *testing.T) {
 	assert.Equal(t, "arachne-net", DockerNetworkName)
 	assert.Equal(t, "172.30.0.0/16", DockerIPv4Subnet)
 	assert.Equal(t, "fd00:dead:beef::/64", DockerIPv6Subnet)
-	
+
 	// Validate subnet formats
 	assert.Contains(t, DockerIPv4Subnet, "/")
 	assert.Contains(t, DockerIPv6Subnet, "/")
@@ -299,7 +299,7 @@ func TestComposeFile_EdgeCases(t *testing.T) {
 						Ports: []string{
 							"8080:80",
 							"9000-9005:9000-9005",
-							"127.0.0.1:3000:3000",
+							"shared.GetInternalHostname:3000:3000",
 							"[::1]:4000:4000",
 						},
 					},
@@ -393,7 +393,7 @@ func TestComposeFile_ComplexNetworks(t *testing.T) {
 	assert.Contains(t, cf.Networks, "frontend")
 	assert.Contains(t, cf.Networks, "backend")
 	assert.Contains(t, cf.Networks, "monitoring")
-	
+
 	// Check backend network is internal
 	backend := cf.Networks["backend"].(map[string]interface{})
 	assert.Equal(t, true, backend["internal"])
@@ -421,7 +421,7 @@ func TestComposeFile_ComplexVolumes(t *testing.T) {
 
 	assert.Len(t, cf.Volumes, 1)
 	assert.Contains(t, cf.Volumes, "db-data")
-	
+
 	// Check volume configuration
 	dbData := cf.Volumes["db-data"].(map[string]interface{})
 	assert.Equal(t, "local", dbData["driver"])
@@ -465,7 +465,7 @@ func TestService_EnvironmentEdgeCases(t *testing.T) {
 				Image:       "test:latest",
 				Environment: tt.env,
 			}
-			
+
 			assert.Equal(t, len(tt.env), len(s.Environment))
 			for k, v := range tt.env {
 				assert.Equal(t, v, s.Environment[k])
@@ -503,7 +503,7 @@ func TestService_Dependencies(t *testing.T) {
 				Image:     "app:latest",
 				DependsOn: tt.dependsOn,
 			}
-			
+
 			assert.Equal(t, tt.dependsOn, s.DependsOn)
 		})
 	}

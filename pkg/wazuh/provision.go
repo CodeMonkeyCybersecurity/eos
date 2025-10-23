@@ -90,7 +90,7 @@ func EnsureOpensearchRoleMapping(rc *eos_io.RuntimeContext, spec TenantSpec) err
 		return fmt.Errorf("failed to marshal role mapping: %w", err)
 	}
 
-	url := fmt.Sprintf("https://127.0.0.1:9200/_plugins/_security/api/rolesmapping/wazuh-%s-role", spec.Name)
+	url := fmt.Sprintf("https://shared.GetInternalHostname:9200/_plugins/_security/api/rolesmapping/wazuh-%s-role", spec.Name)
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -138,7 +138,7 @@ func EnsureOpensearchTenant(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("failed to marshal tenant definition: %w", err)
 	}
 
-	url := fmt.Sprintf("https://127.0.0.1:9200/_plugins/_security/api/tenants/%s", spec.Name)
+	url := fmt.Sprintf("https://shared.GetInternalHostname:9200/_plugins/_security/api/tenants/%s", spec.Name)
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("failed to create tenant request: %w", err)
@@ -194,7 +194,7 @@ func EnsureWazuhGroup(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // Replace with secure lookup
 
-	req, err := http.NewRequest("POST", "https://127.0.0.1:55000/groups?pretty=true", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", "https://shared.GetInternalHostname:55000/groups?pretty=true", bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %w", err)
 	}
@@ -247,7 +247,7 @@ func EnsureWazuhEnrollmentKey(rc *eos_io.RuntimeContext, spec TenantSpec) error 
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>"
 
-	req, err := http.NewRequest("POST", "https://127.0.0.1:55000/agents?pretty=true", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", "https://shared.GetInternalHostname:55000/agents?pretty=true", bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("failed to create enrollment request: %w", err)
 	}
@@ -303,7 +303,7 @@ func EnsureWazuhPolicy(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>"
 
-	req, err := http.NewRequest("POST", "https://127.0.0.1:55000/security/policies?pretty=true", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", "https://shared.GetInternalHostname:55000/security/policies?pretty=true", bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("failed to create policy request: %w", err)
 	}
@@ -376,7 +376,7 @@ func EnsureOpensearchRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("failed to marshal role definition: %w", err)
 	}
 
-	url := fmt.Sprintf("https://127.0.0.1:9200/_plugins/_security/api/roles/wazuh-%s-role", spec.Name)
+	url := fmt.Sprintf("https://shared.GetInternalHostname:9200/_plugins/_security/api/roles/wazuh-%s-role", spec.Name)
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -433,7 +433,7 @@ func EnsureGlobalReadonlyRole(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to marshal global readonly role: %w", err)
 	}
 
-	url := "https://127.0.0.1:9200/_plugins/_security/api/roles/wazuh-readonly-role"
+	url := "https://shared.GetInternalHostname:9200/_plugins/_security/api/roles/wazuh-readonly-role"
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -471,7 +471,7 @@ func ResolveWazuhRoleID(rc *eos_io.RuntimeContext, name string) (string, error) 
 
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: secure lookup
-	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/roles?pretty=true", nil)
+	req, err := http.NewRequest("GET", "https://shared.GetInternalHostname:55000/security/roles?pretty=true", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to build request: %w", err)
 	}
@@ -515,7 +515,7 @@ func ResolveWazuhUserID(rc *eos_io.RuntimeContext, name string) (string, error) 
 
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Retrieve from Vault
-	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/users?pretty=true", nil)
+	req, err := http.NewRequest("GET", "https://shared.GetInternalHostname:55000/security/users?pretty=true", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to build request: %w", err)
 	}
@@ -559,7 +559,7 @@ func ResolveWazuhPolicyID(rc *eos_io.RuntimeContext, name string) (string, error
 
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Retrieve from Vault
-	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/policies?pretty=true", nil)
+	req, err := http.NewRequest("GET", "https://shared.GetInternalHostname:55000/security/policies?pretty=true", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to build request: %w", err)
 	}
@@ -617,7 +617,7 @@ func AttachPolicyToRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		policyID = resolved
 	}
 
-	url := fmt.Sprintf("https://127.0.0.1:55000/security/roles/%s/policies?policy_ids=%s&pretty=true", roleID, policyID)
+	url := fmt.Sprintf("https://shared.GetInternalHostname:55000/security/roles/%s/policies?policy_ids=%s&pretty=true", roleID, policyID)
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Vault integration
 
@@ -672,7 +672,7 @@ func AssignRoleToUser(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		userID = resolved
 	}
 
-	url := fmt.Sprintf("https://127.0.0.1:55000/security/users/%s/roles?role_ids=%s&pretty=true", userID, roleID)
+	url := fmt.Sprintf("https://shared.GetInternalHostname:55000/security/users/%s/roles?role_ids=%s&pretty=true", userID, roleID)
 	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Vault integration
 

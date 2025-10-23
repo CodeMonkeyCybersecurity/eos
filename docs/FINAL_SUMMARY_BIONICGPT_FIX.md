@@ -9,7 +9,7 @@ Fixed `sudo eos create bionicgpt` failing with "403 permission denied" when stor
 **Root Causes Found:**
 1. ✅ `GetVaultClient()` wasn't calling authentication orchestrator
 2. ✅ Default Vault policy missing `secret/data/services/*` access
-3. ✅ Consul/Vault using `127.0.0.1` instead of hostname
+3. ✅ Consul/Vault using `shared.GetInternalHostname` instead of hostname
 
 **All Fixed** - See implementation details below.
 
@@ -125,7 +125,7 @@ sudo eos update vault --update-policies
 
 ### Fix 4: Hostname Resolution
 
-**Problem:** Consul and Vault status providers used `127.0.0.1` instead of actual hostname.
+**Problem:** Consul and Vault status providers used `shared.GetInternalHostname` instead of actual hostname.
 
 **Files:**
 - [pkg/servicestatus/consul.go](../pkg/servicestatus/consul.go#L288)
@@ -136,7 +136,7 @@ sudo eos update vault --update-policies
 
 **Before:**
 ```
-INFO Consul service is running {"consul_address": "127.0.0.1:8500"}
+INFO Consul service is running {"consul_address": "shared.GetInternalHostname:8500"}
 ```
 
 **After:**
@@ -243,8 +243,8 @@ User runs: sudo eos create bionicgpt
 ### Code Verification
 - [x] `GetVaultClient()` calls `SecureAuthenticationOrchestrator()` - [Verified](../pkg/vault/client_context.go#L67)
 - [x] Default policy includes `AddServiceSecrets()` - [Verified](../pkg/vault/policy_presets.go#L20)
-- [x] Consul uses `hostname` instead of `127.0.0.1` - [Verified](../pkg/servicestatus/consul.go#L288)
-- [x] Vault uses `hostname` instead of `127.0.0.1` - [Verified](../pkg/servicestatus/vault.go#L329)
+- [x] Consul uses `hostname` instead of `shared.GetInternalHostname` - [Verified](../pkg/servicestatus/consul.go#L288)
+- [x] Vault uses `hostname` instead of `shared.GetInternalHostname` - [Verified](../pkg/servicestatus/vault.go#L329)
 - [x] `--update-policies` flag added - [Verified](../cmd/update/vault.go#L79)
 
 ### End-to-End Tests (User Action Required)

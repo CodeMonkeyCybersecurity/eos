@@ -311,11 +311,11 @@ func RepairVaultAddresses(rc *eos_io.RuntimeContext, dryRun bool) (int, int, err
 	newClusterAddr := fmt.Sprintf("https://%s:%s", hostname, shared.VaultClusterPort)
 
 	// Detect current api_addr
-	if strings.Contains(content, `api_addr     = "https://127.0.0.1:`) ||
+	if strings.Contains(content, `api_addr     = "https://shared.GetInternalHostname:`) ||
 		strings.Contains(content, `api_addr     = "https://localhost:`) {
 		issuesFound++
-		if strings.Contains(content, "127.0.0.1") {
-			oldAPIAddr = fmt.Sprintf("https://127.0.0.1:%s", shared.VaultDefaultPort)
+		if strings.Contains(content, "shared.GetInternalHostname") {
+			oldAPIAddr = fmt.Sprintf("https://shared.GetInternalHostname:%s", shared.VaultDefaultPort)
 		} else {
 			oldAPIAddr = fmt.Sprintf("https://localhost:%s", shared.VaultDefaultPort)
 		}
@@ -325,11 +325,11 @@ func RepairVaultAddresses(rc *eos_io.RuntimeContext, dryRun bool) (int, int, err
 	}
 
 	// Detect current cluster_addr
-	if strings.Contains(content, `cluster_addr = "https://127.0.0.1:`) ||
+	if strings.Contains(content, `cluster_addr = "https://shared.GetInternalHostname:`) ||
 		strings.Contains(content, `cluster_addr = "https://localhost:`) {
 		issuesFound++
-		if strings.Contains(content, "127.0.0.1") {
-			oldClusterAddr = fmt.Sprintf("https://127.0.0.1:%s", shared.VaultClusterPort)
+		if strings.Contains(content, "shared.GetInternalHostname") {
+			oldClusterAddr = fmt.Sprintf("https://shared.GetInternalHostname:%s", shared.VaultClusterPort)
 		} else {
 			oldClusterAddr = fmt.Sprintf("https://localhost:%s", shared.VaultClusterPort)
 		}

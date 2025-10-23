@@ -127,7 +127,7 @@ All 5 unseal keys are stored in:
 - [ ] vault-cert.pem - 644
 - [ ] vault-key.pem - 600
 - [ ] Valid X.509 certificates
-- [ ] Correct SANs (hostname, localhost, 127.0.0.1)
+- [ ] Correct SANs (hostname, localhost, shared.GetInternalHostname)
 
 ### Phase 4: Binary
 - [ ] In `VaultBinaryPath`

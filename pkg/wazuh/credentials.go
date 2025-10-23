@@ -54,7 +54,7 @@ func ExtractWazuhUserPassword(rc *eos_io.RuntimeContext) (string, error) {
 func UpdateWazuhUserPassword(jwtToken, userID, newPass string) error {
 	payload := fmt.Sprintf(`{"password": "%s"}`, newPass)
 	cmd := exec.Command("curl", "-k", "-X", "PUT",
-		fmt.Sprintf("https://127.0.0.1:55000/security/users/%s", userID),
+		fmt.Sprintf("https://%s:55000/security/users/%s", shared.GetInternalHostname(), userID),
 		"-H", "Authorization: Bearer "+jwtToken,
 		"-H", "Content-Type: application/json",
 		"-d", payload)
@@ -91,7 +91,7 @@ func RerunPasswordTool(adminUser, newPass string) error {
 
 func FindUserID(jwtToken, username string) (string, error) {
 	cmd := exec.Command("curl", "-k", "-X", "GET",
-		"https://127.0.0.1:55000/security/users?pretty=true",
+		"https://shared.GetInternalHostname:55000/security/users?pretty=true",
 		"-H", "Authorization: Bearer "+jwtToken)
 
 	out, err := cmd.Output()

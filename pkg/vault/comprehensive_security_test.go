@@ -289,7 +289,7 @@ func TestVaultSecurity_EnvironmentValidation(t *testing.T) {
 		},
 		{
 			name:       "localhost_development",
-			vaultAddr:  "http://127.0.0.1:8200",
+			vaultAddr:  "http://shared.GetInternalHostname:8200",
 			vaultToken: "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx",
 			valid:      true,
 		},
@@ -443,7 +443,7 @@ func TestVaultSecurity_ConfigValidation(t *testing.T) {
 			name: "secure_production_config",
 			config: `
 storage "consul" {
-  address = "127.0.0.1:8500"
+  address = "shared.GetInternalHostname:8500"
   path    = "vault/"
 }
 
@@ -467,7 +467,7 @@ storage "file" {
 }
 
 listener "tcp" {
-  address     = "127.0.0.1:8200"
+  address     = "shared.GetInternalHostname:8200"
   tls_disable = 1
 }
 
@@ -479,7 +479,7 @@ ui = true
 			name: "insecure_production_no_tls",
 			config: `
 storage "consul" {
-  address = "127.0.0.1:8500"
+  address = "shared.GetInternalHostname:8500"
   path    = "vault/"
 }
 

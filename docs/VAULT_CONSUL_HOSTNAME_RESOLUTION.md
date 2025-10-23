@@ -4,11 +4,11 @@
 
 ## Issue Summary
 
-Vault and Consul services were inconsistently using hardcoded `127.0.0.1` and `localhost` addresses instead of proper hostname resolution. This caused issues when services needed to communicate across different network interfaces or when the actual hostname differed from localhost.
+Vault and Consul services were inconsistently using hardcoded `shared.GetInternalHostname` and `localhost` addresses instead of proper hostname resolution. This caused issues when services needed to communicate across different network interfaces or when the actual hostname differed from localhost.
 
 **Example of the problem:**
 ```
-INFO Consul service is running - storage backend available {"consul_address": "127.0.0.1:8500"}
+INFO Consul service is running - storage backend available {"consul_address": "shared.GetInternalHostname:8500"}
 ```
 
 But the actual system hostname was `vhost11`, and services were configured to bind to that hostname.
@@ -16,8 +16,8 @@ But the actual system hostname was `vhost11`, and services were configured to bi
 ## Root Cause
 
 Multiple files had hardcoded IP addresses:
-1. `pkg/servicestatus/consul.go` - Health check used `127.0.0.1:8500` (default port, not PortConsul)
-2. `pkg/servicestatus/vault.go` - Network info displayed `127.0.0.1` instead of hostname
+1. `pkg/servicestatus/consul.go` - Health check used `shared.GetInternalHostname:8500` (default port, not PortConsul)
+2. `pkg/servicestatus/vault.go` - Network info displayed `shared.GetInternalHostname` instead of hostname
 3. Various installation and configuration files used literal IP addresses
 
 ## Solution Implemented
@@ -60,7 +60,7 @@ func GetConsulAddr() string {
 **Before:**
 ```go
 cmd := exec.Command("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-    fmt.Sprintf("http://127.0.0.1:%d/v1/status/leader", shared.PortConsul))
+    fmt.Sprintf("http://shared.GetInternalHostname:%d/v1/status/leader", shared.PortConsul))
 ```
 
 **After:**
@@ -80,7 +80,7 @@ info := NetworkInfo{
         {
             Name:     "HTTPS API",
             Protocol: "https",
-            Address:  "127.0.0.1",  // WRONG
+            Address:  "shared.GetInternalHostname",  // WRONG
             Port:     shared.PortVault,
             Healthy:  true,
         },
@@ -88,7 +88,7 @@ info := NetworkInfo{
 }
 
 cmd := exec.Command("curl", "-s", "-k", "-o", "/dev/null", "-w", "%{http_code}",
-    fmt.Sprintf("https://127.0.0.1:%d/v1/sys/health", shared.PortVault))
+    fmt.Sprintf("https://shared.GetInternalHostname:%d/v1/sys/health", shared.PortVault))
 ```
 
 **After:**
@@ -133,7 +133,7 @@ import (
 
 ### Intentionally Preserved
 
-Some `127.0.0.1` and `localhost` references are **intentionally kept** for valid reasons:
+Some `shared.GetInternalHostname` and `localhost` references are **intentionally kept** for valid reasons:
 
 1. **Security filters** (`pkg/httpclient/ssrf_protection.go`, `pkg/crypto/input_validation.go`)
    - Block access to localhost to prevent SSRF attacks
@@ -153,7 +153,7 @@ Some `127.0.0.1` and `localhost` references are **intentionally kept** for valid
 
 5. **Flag defaults** (`cmd/create/hashicorp.go`)
    - Default flag values that users can override
-   - `--consul-address=127.0.0.1:8500` is a reasonable default
+   - `--consul-address=shared.GetInternalHostname:8500` is a reasonable default
 
 ### Should Be Reviewed (Non-Critical)
 
@@ -185,7 +185,7 @@ INFO Consul service is running - storage backend available {"consul_address": "v
 INFO Vault service is healthy {"vault_address": "vhost11:8179", "sealed": false}
 ```
 
-Both now show the actual hostname instead of `127.0.0.1`.
+Both now show the actual hostname instead of `shared.GetInternalHostname`.
 
 ## Related Issues
 

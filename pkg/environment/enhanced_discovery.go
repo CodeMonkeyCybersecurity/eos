@@ -100,10 +100,10 @@ func DiscoverEnhancedEnvironment(rc *eos_io.RuntimeContext) (*EnhancedEnvironmen
 		config.SecretBackend = determineEnhancedSecretBackend()
 	}
 	if config.VaultAddr == "" {
-		config.VaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
+		config.VaultAddr = fmt.Sprintf("http://%s:%d", shared.GetInternalHostname(), shared.PortVault)
 	}
 	if config.Master == "" {
-		config.Master = "127.0.0.1"
+		config.Master = shared.GetInternalHostname()
 	}
 
 	logger.Info("Enhanced environment discovery completed",

@@ -398,7 +398,7 @@ func (m *EnhancedConsulManager) WatchServiceHealth(rc *eos_io.RuntimeContext, se
 		// Get client address from config
 		clientAddr := m.config.Address
 		if clientAddr == "" {
-			clientAddr = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul) // Default Consul address
+			clientAddr = fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortConsul) // Default Consul address
 		}
 		if err := plan.Run(clientAddr); err != nil {
 			logger.Error("Health watch failed",

@@ -123,7 +123,7 @@ func (s *IntegrationTestSuite) setTestEnvironment() {
 		"Eos_TEST_MODE":     "true",
 		"VAULT_SKIP_VERIFY": "true",
 		"VAULT_CACERT":      filepath.Join(s.tempDir, "vault/tls/tls.crt"),
-		shared.VaultAddrEnv: "http://127.0.0.1:8200",
+		shared.VaultAddrEnv: "http://shared.GetInternalHostname:8200",
 		"Eos_DATA_DIR":      filepath.Join(s.tempDir, "eos"),
 		"Eos_LOG_LEVEL":     "debug",
 		"Eos_LOG_PATH":      filepath.Join(s.tempDir, "logs/eos.log"),

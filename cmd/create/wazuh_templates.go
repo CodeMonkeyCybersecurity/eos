@@ -217,7 +217,7 @@ if __name__ == "__main__":
         test_payload = {
             "timestamp": "2025-10-07T12:00:00.000+0800",
             "rule": {"level": 10, "description": "Test alert", "id": "999999"},
-            "agent": {"id": "000", "name": "test", "ip": "127.0.0.1"},
+            "agent": {"id": "000", "name": "test", "ip": "shared.GetInternalHostname"},
             "manager": {"name": "test"},
             "data": {
                 "vulnerability": {

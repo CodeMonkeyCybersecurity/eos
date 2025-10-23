@@ -126,7 +126,7 @@ func (lm *LifecycleManager) WaitForReady(timeout time.Duration) error {
 // IsReady checks if Consul is ready to accept requests
 func (lm *LifecycleManager) IsReady() bool {
 	config := api.DefaultConfig()
-	config.Address = fmt.Sprintf("127.0.0.1:%d", shared.PortConsul)
+	config.Address = fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortConsul)
 
 	client, err := api.NewClient(config)
 	if err != nil {

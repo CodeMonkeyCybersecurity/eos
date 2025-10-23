@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -85,7 +86,7 @@ func NewPolicyManager(ctx context.Context, consulAddress, aclToken string) (Poli
 
 	// ASSESS - Validate parameters
 	if consulAddress == "" {
-		consulAddress = "127.0.0.1:8500"
+		consulAddress = fmt.Sprintf("%s:8500", shared.GetInternalHostname())
 	}
 
 	logger.Info("Creating Consul ACL policy manager",

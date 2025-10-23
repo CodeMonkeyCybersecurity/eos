@@ -95,7 +95,7 @@ func TryDetectFromHost() *LDAPConfig {
 
 // IsPortOpen checks if a port is listening on localhost (e.g. 389 for LDAP)
 func IsPortOpen(port int) bool {
-	address := fmt.Sprintf("127.0.0.1:%d", port)
+	address := fmt.Sprintf("%s:%d", shared.GetInternalHostname(), port)
 	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 	if err != nil {
 		return false

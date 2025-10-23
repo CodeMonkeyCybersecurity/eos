@@ -217,7 +217,7 @@ func configureKubernetesFirewall(rc *eos_io.RuntimeContext) error {
 	logger.Info("Configuring firewall for Kubernetes")
 
 	// Test connectivity before opening ports
-	cmd := exec.CommandContext(ctx, "nc", "127.0.0.1", "6443", "-v")
+	cmd := exec.CommandContext(ctx, "nc", "shared.GetInternalHostname", "6443", "-v")
 	if err := cmd.Run(); err != nil {
 		logger.Debug("Port 6443 not yet accessible", zap.Error(err))
 	}
@@ -237,7 +237,7 @@ func configureKubernetesFirewall(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Test connectivity after opening ports
-	cmd = exec.CommandContext(ctx, "nc", "127.0.0.1", "6443", "-v")
+	cmd = exec.CommandContext(ctx, "nc", "shared.GetInternalHostname", "6443", "-v")
 	if err := cmd.Run(); err != nil {
 		logger.Debug("Port 6443 still not accessible after firewall change", zap.Error(err))
 	}

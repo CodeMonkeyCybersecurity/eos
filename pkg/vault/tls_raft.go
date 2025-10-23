@@ -31,16 +31,16 @@ type TLSCertificateConfig struct {
 	Organization       string
 	OrganizationalUnit string
 	CommonName         string
-	
+
 	// Subject Alternative Names (SANs) - CRITICAL for Raft
 	DNSNames    []string // All node hostnames and DNS names
 	IPAddresses []net.IP // All node IP addresses
-	
+
 	// Certificate properties
-	ValidityDays int       // Certificate validity period (default: 365)
-	KeySize      int       // RSA key size (default: 4096)
-	IsCA         bool      // Whether this is a CA certificate
-	
+	ValidityDays int  // Certificate validity period (default: 365)
+	KeySize      int  // RSA key size (default: 4096)
+	IsCA         bool // Whether this is a CA certificate
+
 	// Output paths
 	CertPath string // Path to write certificate (default: /opt/vault/tls/vault-cert.pem)
 	KeyPath  string // Path to write private key (default: /opt/vault/tls/vault-key.pem)
@@ -59,8 +59,8 @@ func DefaultTLSCertificateConfig() *TLSCertificateConfig {
 		KeySize:      4096,
 		CertPath:     shared.TLSCrt,
 		KeyPath:      shared.TLSKey,
-		DNSNames:     []string{"localhost"},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:     []string{}, // enrichSANs() adds comprehensive DNS names
+		IPAddresses:  []net.IP{}, // enrichSANs() adds hostname IPs + Tailscale + interfaces (NO localhost)
 	}
 }
 
@@ -73,13 +73,13 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 		zap.Int("dns_names", len(config.DNSNames)),
 		zap.Int("ip_addresses", len(config.IPAddresses)),
 		zap.Int("validity_days", config.ValidityDays))
-	
+
 	// Validate configuration
 	if err := validateRaftTLSConfig(config); err != nil {
 		log.Error("Invalid TLS configuration", zap.Error(err))
 		return fmt.Errorf("validate tls config: %w", err)
 	}
-	
+
 	// Generate RSA private key
 	log.Info("Generating RSA private key", zap.Int("key_size", config.KeySize))
 	privateKey, err := rsa.GenerateKey(rand.Reader, config.KeySize)
@@ -87,17 +87,17 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 		log.Error("Failed to generate private key", zap.Error(err))
 		return fmt.Errorf("generate private key: %w", err)
 	}
-	
+
 	// Create certificate template
 	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
 	if err != nil {
 		log.Error("Failed to generate serial number", zap.Error(err))
 		return fmt.Errorf("generate serial number: %w", err)
 	}
-	
+
 	notBefore := time.Now()
 	notAfter := notBefore.Add(time.Duration(config.ValidityDays) * 24 * time.Hour)
-	
+
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -116,32 +116,32 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 		DNSNames:              config.DNSNames,
 		IPAddresses:           config.IPAddresses,
 	}
-	
+
 	// If this is a CA certificate, set CA flag
 	if config.IsCA {
 		template.IsCA = true
 		template.KeyUsage |= x509.KeyUsageCertSign
 	}
-	
+
 	log.Info("Creating certificate",
 		zap.Time("not_before", notBefore),
 		zap.Time("not_after", notAfter),
 		zap.Strings("dns_names", config.DNSNames))
-	
+
 	// Create self-signed certificate
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
 		log.Error("Failed to create certificate", zap.Error(err))
 		return fmt.Errorf("create certificate: %w", err)
 	}
-	
+
 	// Ensure output directories exist
 	certDir := filepath.Dir(config.CertPath)
 	if err := os.MkdirAll(certDir, 0755); err != nil {
 		log.Error("Failed to create certificate directory", zap.String("dir", certDir), zap.Error(err))
 		return fmt.Errorf("create cert directory: %w", err)
 	}
-	
+
 	// Write certificate to file
 	log.Info("Writing certificate", zap.String("path", config.CertPath))
 	certFile, err := os.Create(config.CertPath)
@@ -150,17 +150,17 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 		return fmt.Errorf("create cert file: %w", err)
 	}
 	defer certFile.Close()
-	
+
 	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes}); err != nil {
 		log.Error("Failed to write certificate", zap.Error(err))
 		return fmt.Errorf("write certificate: %w", err)
 	}
-	
+
 	// Set certificate file permissions (world-readable)
 	if err := os.Chmod(config.CertPath, 0644); err != nil {
 		log.Warn("Failed to set certificate permissions", zap.Error(err))
 	}
-	
+
 	// Write private key to file
 	log.Info("Writing private key", zap.String("path", config.KeyPath))
 	keyFile, err := os.Create(config.KeyPath)
@@ -169,31 +169,31 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 		return fmt.Errorf("create key file: %w", err)
 	}
 	defer keyFile.Close()
-	
+
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	if err := pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}); err != nil {
 		log.Error("Failed to write private key", zap.Error(err))
 		return fmt.Errorf("write private key: %w", err)
 	}
-	
+
 	// Set private key file permissions (owner read-only for security)
 	if err := os.Chmod(config.KeyPath, 0600); err != nil {
 		log.Error("Failed to set key permissions", zap.Error(err))
 		return fmt.Errorf("set key permissions: %w", err)
 	}
-	
+
 	// Change ownership to vault:vault if running as root
 	if os.Geteuid() == 0 {
 		if err := setVaultOwnership(config.CertPath, config.KeyPath); err != nil {
 			log.Warn("Failed to set vault ownership", zap.Error(err))
 		}
 	}
-	
+
 	log.Info("TLS certificate generated successfully",
 		zap.String("cert", config.CertPath),
 		zap.String("key", config.KeyPath),
 		zap.Int("validity_days", config.ValidityDays))
-	
+
 	return nil
 }
 
@@ -203,59 +203,58 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 func GenerateMultiNodeRaftCertificate(rc *eos_io.RuntimeContext, nodes []RaftNodeInfo) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Generating multi-node Raft TLS certificate", zap.Int("node_count", len(nodes)))
-	
+
 	if len(nodes) == 0 {
 		return fmt.Errorf("no nodes provided for certificate generation")
 	}
-	
+
 	// Build comprehensive SAN list from all nodes
 	config := DefaultTLSCertificateConfig()
 	config.CommonName = nodes[0].Hostname // Use first node as CN
-	
+
 	// Collect all DNS names and IP addresses
 	dnsNames := make(map[string]bool)
 	ipAddresses := make(map[string]net.IP)
-	
-	// Always include localhost
-	dnsNames["localhost"] = true
-	ipAddresses["127.0.0.1"] = net.ParseIP("127.0.0.1")
-	
+
+	// NOTE: Localhost intentionally NOT included - enforces proper hostname-based addressing
+	// enrichSANs() will add all required hostnames and IPs automatically
+
 	for _, node := range nodes {
 		// Add hostname
 		if node.Hostname != "" {
 			dnsNames[node.Hostname] = true
 			dnsNames[node.Hostname+".local"] = true
 		}
-		
+
 		// Add IP address
 		if node.IPAddress != "" {
 			if ip := net.ParseIP(node.IPAddress); ip != nil {
 				ipAddresses[node.IPAddress] = ip
 			}
 		}
-		
+
 		// Add additional DNS names
 		for _, dns := range node.AdditionalDNS {
 			dnsNames[dns] = true
 		}
 	}
-	
+
 	// Convert maps to slices
 	config.DNSNames = make([]string, 0, len(dnsNames))
 	for dns := range dnsNames {
 		config.DNSNames = append(config.DNSNames, dns)
 	}
-	
+
 	config.IPAddresses = make([]net.IP, 0, len(ipAddresses))
 	for _, ip := range ipAddresses {
 		config.IPAddresses = append(config.IPAddresses, ip)
 	}
-	
+
 	log.Info("Certificate will include SANs",
 		zap.Int("dns_names", len(config.DNSNames)),
 		zap.Int("ip_addresses", len(config.IPAddresses)),
 		zap.Strings("dns_list", config.DNSNames))
-	
+
 	return GenerateRaftTLSCertificate(rc, config)
 }
 
@@ -271,27 +270,27 @@ func validateRaftTLSConfig(config *TLSCertificateConfig) error {
 	if config.CommonName == "" {
 		return fmt.Errorf("common_name is required")
 	}
-	
+
 	if config.ValidityDays <= 0 {
 		return fmt.Errorf("validity_days must be positive")
 	}
-	
+
 	if config.KeySize < 2048 {
 		return fmt.Errorf("key_size must be at least 2048 bits (recommended: 4096)")
 	}
-	
+
 	if len(config.DNSNames) == 0 && len(config.IPAddresses) == 0 {
 		return fmt.Errorf("at least one DNS name or IP address is required for SANs")
 	}
-	
+
 	if config.CertPath == "" {
 		return fmt.Errorf("cert_path is required")
 	}
-	
+
 	if config.KeyPath == "" {
 		return fmt.Errorf("key_path is required")
 	}
-	
+
 	return nil
 }
 
@@ -308,25 +307,25 @@ func setVaultOwnership(_certPath, _keyPath string) error {
 func VerifyTLSCertificate(rc *eos_io.RuntimeContext, certPath string, expectedSANs []string) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Verifying TLS certificate", zap.String("path", certPath))
-	
+
 	// Read certificate file
 	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
 		return fmt.Errorf("read certificate: %w", err)
 	}
-	
+
 	// Decode PEM block
 	block, _ := pem.Decode(certPEM)
 	if block == nil {
 		return fmt.Errorf("failed to decode PEM block")
 	}
-	
+
 	// Parse certificate
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		return fmt.Errorf("parse certificate: %w", err)
 	}
-	
+
 	// Check expiration
 	now := time.Now()
 	if now.Before(cert.NotBefore) {
@@ -335,7 +334,7 @@ func VerifyTLSCertificate(rc *eos_io.RuntimeContext, certPath string, expectedSA
 	if now.After(cert.NotAfter) {
 		return fmt.Errorf("certificate expired (expired: %s)", cert.NotAfter)
 	}
-	
+
 	// Log certificate details
 	log.Info("Certificate details",
 		zap.String("subject", cert.Subject.CommonName),
@@ -343,7 +342,7 @@ func VerifyTLSCertificate(rc *eos_io.RuntimeContext, certPath string, expectedSA
 		zap.Time("not_after", cert.NotAfter),
 		zap.Strings("dns_names", cert.DNSNames),
 		zap.Int("ip_addresses", len(cert.IPAddresses)))
-	
+
 	// Verify expected SANs are present
 	if len(expectedSANs) > 0 {
 		certSANs := make(map[string]bool)
@@ -353,14 +352,14 @@ func VerifyTLSCertificate(rc *eos_io.RuntimeContext, certPath string, expectedSA
 		for _, ip := range cert.IPAddresses {
 			certSANs[ip.String()] = true
 		}
-		
+
 		for _, expected := range expectedSANs {
 			if !certSANs[expected] {
 				return fmt.Errorf("certificate missing expected SAN: %s", expected)
 			}
 		}
 	}
-	
+
 	log.Info("Certificate verification successful")
 	return nil
 }

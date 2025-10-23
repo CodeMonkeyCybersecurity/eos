@@ -264,7 +264,7 @@ func validateListeners(rc *eos_io.RuntimeContext, content string, result *Config
 		// Check for address
 		if !strings.Contains(content, "address") {
 			result.Warnings = append(result.Warnings,
-				"TCP listener missing 'address' - will default to 127.0.0.1:8200")
+				"TCP listener missing 'address' - will default to shared.GetInternalHostname:8200")
 		}
 
 		// Validate TLS configuration

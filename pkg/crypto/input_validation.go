@@ -5,6 +5,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // Security constants for input validation
@@ -52,7 +54,7 @@ func ValidateDomainName(domain string) error {
 	// This takes priority over character/format validation for security
 	lowercaseDomain := strings.ToLower(domain)
 	suspiciousDomains := []string{
-		"localhost", "127.0.0.1", "::1", "0.0.0.0",
+		"localhost", shared.GetInternalHostname(), "::1", "0.0.0.0",
 		"internal", "local",
 		"*.local", "*.internal",
 	}
@@ -289,11 +291,11 @@ func SanitizeInputForCommand(input string) string {
 
 	// Remove Unicode command injection characters
 	unicodeDangerous := []string{
-		"；",  // Unicode semicolon (U+FF1B)
-		"｜",  // Unicode pipe (U+FF5C)
-		"＆",  // Unicode ampersand (U+FF06)
-		"＜",  // Unicode less-than (U+FF1C)
-		"＞",  // Unicode greater-than (U+FF1E)
+		"；", // Unicode semicolon (U+FF1B)
+		"｜", // Unicode pipe (U+FF5C)
+		"＆", // Unicode ampersand (U+FF06)
+		"＜", // Unicode less-than (U+FF1C)
+		"＞", // Unicode greater-than (U+FF1E)
 	}
 
 	// Apply all sanitization filters

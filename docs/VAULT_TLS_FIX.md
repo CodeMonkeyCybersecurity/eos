@@ -10,7 +10,7 @@ The TLS consolidation code with proper SANs was deployed, but existing Vault ins
 ```
 INFO TLS certificate already exists, skipping generation
 WARN Vault process is running but not responding as expected
-ERROR http: TLS handshake error from 127.0.0.1:xxxxx: remote error: tls: bad certificate
+ERROR http: TLS handshake error from shared.GetInternalHostname:xxxxx: remote error: tls: bad certificate
 ```
 
 ## Root Cause
@@ -92,13 +92,13 @@ sudo openssl x509 -in /etc/vault.d/tls/vault.crt -text -noout | grep -A 10 "Subj
 X509v3 Subject Alternative Name:
     DNS:vhost5, DNS:localhost, DNS:*.vhost5, DNS:vhost5.local,
     DNS:vault, DNS:vault.service.consul, DNS:*.localhost,
-    IP Address:127.0.0.1, IP Address:0:0:0:0:0:0:0:1, IP Address:10.x.x.x
+    IP Address:shared.GetInternalHostname, IP Address:0:0:0:0:0:0:0:1, IP Address:10.x.x.x
 ```
 
 **Bad Output (Old Certificate):**
 ```
 X509v3 Subject Alternative Name:
-    DNS:vhost5, DNS:localhost, IP Address:127.0.0.1, IP Address:0:0:0:0:0:0:0:1
+    DNS:vhost5, DNS:localhost, IP Address:shared.GetInternalHostname, IP Address:0:0:0:0:0:0:0:1
 ```
 (Missing: wildcards, .local, actual host IP, consul DNS)
 
@@ -130,7 +130,7 @@ sudo eos debug vault
 ### Old Certificate (Broken):
 - **Key Size:** 2048-bit RSA
 - **Validity:** 1 year
-- **SANs:** hostname, localhost, 127.0.0.1, ::1
+- **SANs:** hostname, localhost, shared.GetInternalHostname, ::1
 - **Missing:**
   - Actual host IP (e.g., 10.x.x.x)
   - Wildcard DNS (*.hostname)
@@ -142,7 +142,7 @@ sudo eos debug vault
 - **Validity:** 10 years
 - **SANs:** Comprehensive list including:
   - All DNS: hostname, localhost, vault, *.hostname, *.localhost, hostname.local, vault.service.consul
-  - All IPs: 127.0.0.1, ::1, **actual host IP from network interfaces**
+  - All IPs: shared.GetInternalHostname, ::1, **actual host IP from network interfaces**
   - FQDN and reverse DNS entries
 
 ## Why This Matters

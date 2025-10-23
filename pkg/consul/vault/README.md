@@ -41,9 +41,9 @@ func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
 ```go
 // NEW: pkg/consul/vault/integration.go
 integration, _ := vault.NewVaultIntegration(rc, &vault.IntegrationConfig{
-    ConsulAddress:    "127.0.0.1:8500",
+    ConsulAddress:    "shared.GetInternalHostname:8500",
     ConsulACLToken:   managementToken,
-    VaultAddress:     "https://127.0.0.1:8200",
+    VaultAddress:     "https://shared.GetInternalHostname:8200",
     AutoCreatePolicy: true,
     AutoCreateToken:  true,
 })
@@ -65,8 +65,8 @@ import (
 )
 
 config := &vault.IntegrationConfig{
-    ConsulAddress: "127.0.0.1:8500",
-    VaultAddress:  "https://127.0.0.1:8200",
+    ConsulAddress: "shared.GetInternalHostname:8500",
+    VaultAddress:  "https://shared.GetInternalHostname:8200",
 }
 
 integration, err := vault.NewVaultIntegration(rc, config)
@@ -86,9 +86,9 @@ log.Printf("Vault registered as service: %s\n", result.ServiceID)
 
 ```go
 config := &vault.IntegrationConfig{
-    ConsulAddress:    "127.0.0.1:8500",
+    ConsulAddress:    "shared.GetInternalHostname:8500",
     ConsulACLToken:   "management-token-here",
-    VaultAddress:     "https://127.0.0.1:8200",
+    VaultAddress:     "https://shared.GetInternalHostname:8200",
     AutoCreatePolicy: true,  // Create Vault access policy
     AutoCreateToken:  true,  // Create ACL token for Vault
     TokenTTL:         0,     // No expiration (or use 24*time.Hour)
@@ -103,7 +103,7 @@ log.Printf("Token Accessor: %s\n", result.TokenAccessorID)
 log.Printf("Token Secret: %s\n", result.TokenSecretID)
 
 // Configure Vault with the token
-vaultConfig := result.GetVaultStorageConfig("127.0.0.1:8500")
+vaultConfig := result.GetVaultStorageConfig("shared.GetInternalHostname:8500")
 log.Printf("Vault Config:\n%s\n", vaultConfig)
 ```
 
@@ -133,9 +133,9 @@ func setupVaultConsulIntegration() error {
 
     // Configure integration
     config := &vault.IntegrationConfig{
-        ConsulAddress:    "127.0.0.1:8500",
+        ConsulAddress:    "shared.GetInternalHostname:8500",
         ConsulACLToken:   consulToken,
-        VaultAddress:     "https://127.0.0.1:8200",
+        VaultAddress:     "https://shared.GetInternalHostname:8200",
         AutoCreatePolicy: true,
         AutoCreateToken:  true,
     }
@@ -163,7 +163,7 @@ func setupVaultConsulIntegration() error {
     log.Printf("   export CONSUL_HTTP_TOKEN=%s\n", result.TokenSecretID)
 
     // Generate Vault config
-    vaultConfig := result.GetVaultStorageConfig("127.0.0.1:8500")
+    vaultConfig := result.GetVaultStorageConfig("shared.GetInternalHostname:8500")
     log.Println("\n📄 Add to /etc/vault.d/vault.hcl:")
     log.Println(vaultConfig)
 
@@ -249,7 +249,7 @@ The service is registered with:
 {
   "ID": "vault-vhost5",
   "Name": "vault",
-  "Address": "127.0.0.1",
+  "Address": "shared.GetInternalHostname",
   "Port": 8200,
   "Tags": [
     "active",
@@ -269,7 +269,7 @@ The service is registered with:
   "Check": {
     "ID": "vault-health",
     "Name": "Vault HTTPS Health",
-    "HTTP": "https://127.0.0.1:8200/v1/sys/health?standbyok=true&perfstandbyok=true",
+    "HTTP": "https://shared.GetInternalHostname:8200/v1/sys/health?standbyok=true&perfstandbyok=true",
     "Interval": "10s",
     "Timeout": "5s",
     "TLSSkipVerify": true
@@ -312,7 +312,7 @@ import (
 )
 
 config := &consulvault.IntegrationConfig{
-    ConsulAddress:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
+    ConsulAddress:    fmt.Sprintf("shared.GetInternalHostname:%d", shared.PortConsul),
     ConsulACLToken:   managementToken, // If ACLs enabled
     VaultAddress:     os.Getenv("VAULT_ADDR"),
     AutoCreatePolicy: aclsEnabled,
@@ -345,7 +345,7 @@ Generate Vault storage configuration:
 result, _ := integration.RegisterVault(ctx, config)
 
 // Get storage config
-storageConfig := result.GetVaultStorageConfig("127.0.0.1:8500")
+storageConfig := result.GetVaultStorageConfig("shared.GetInternalHostname:8500")
 
 // Write to Vault config file
 configPath := "/etc/vault.d/vault.hcl"
@@ -355,7 +355,7 @@ configPath := "/etc/vault.d/vault.hcl"
 Output:
 ```hcl
 storage "consul" {
-  address = "127.0.0.1:8500"
+  address = "shared.GetInternalHostname:8500"
   path    = "vault/"
   token   = "s.abc123def456..."
 }
@@ -384,7 +384,7 @@ config := &vault.IntegrationConfig{
 **Token Rotation** (see P1 Task 4):
 ```go
 // Manually rotate token
-tm, _ := acl.NewTokenManager(ctx, "127.0.0.1:8500", managementToken)
+tm, _ := acl.NewTokenManager(ctx, "shared.GetInternalHostname:8500", managementToken)
 
 // Read current token
 oldToken, _ := tm.ReadToken(ctx, result.TokenAccessorID)

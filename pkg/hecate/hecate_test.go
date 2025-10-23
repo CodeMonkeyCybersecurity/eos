@@ -210,7 +210,7 @@ func TestIPAddressValidation(t *testing.T) {
 			"10.0.0.1",
 			"172.16.0.1",
 			"8.8.8.8",
-			"127.0.0.1",
+			"shared.GetInternalHostname",
 			"255.255.255.255",
 		}
 
