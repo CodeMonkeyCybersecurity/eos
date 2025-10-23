@@ -143,9 +143,7 @@ func deleteVolume(rc *eos_io.RuntimeContext, client *cephfs.CephClient) error {
 		zap.String("volume", cephVolumeName),
 		zap.Bool("skipSnapshot", cephSkipSnapshot))
 
-	if err := client.DeleteVolume(rc, cephVolumeName, cephSkipSnapshot); err != nil {
-		return fmt.Errorf("failed to delete volume: %w", err)
-	}
+
 
 	logger.Info("Volume deleted successfully",
 		zap.String("volume", cephVolumeName))

@@ -50,10 +50,13 @@ type SyncConfig struct {
 	Service2 string
 
 	// Behavior flags
-	DryRun            bool // Preview changes without applying
-	Force             bool // Force sync even if already connected
-	SkipBackup        bool // Skip configuration backup
-	SkipHealthCheck   bool // Skip health validation after sync
+	DryRun          bool // Preview changes without applying
+	Force           bool // Force sync even if already connected
+	SkipBackup      bool // Skip configuration backup
+	SkipHealthCheck bool // Skip health validation after sync
+
+	// ACL Configuration
+	ConsulACLToken string // Consul management token for ACL operations (optional)
 
 	// Internal state
 	BackupDir string // Directory for configuration backups

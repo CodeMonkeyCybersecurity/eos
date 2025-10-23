@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
@@ -50,6 +51,83 @@ type ServiceSecrets struct {
 	Secrets     map[string]interface{} `json:"secrets"`
 	CreatedAt   string                 `json:"created_at"`
 	Backend     string                 `json:"backend"`
+}
+
+// SecretMetadata holds custom metadata for a secret (TTL, owner, rotation policy, etc.)
+// This metadata is stored in Vault KV v2 custom_metadata and used for compliance,
+// auditing, and automated rotation policies.
+//
+// TTL Examples: "24h", "30d", "90d", "never"
+// RotateAfter Examples: "90d", "on_use", "never"
+type SecretMetadata struct {
+	TTL         string            `json:"ttl,omitempty"`          // Secret time-to-live (e.g., "24h", "30d", "never")
+	CreatedBy   string            `json:"created_by,omitempty"`   // Who/what created this secret (e.g., "eos", "user@host")
+	CreatedAt   string            `json:"created_at,omitempty"`   // ISO 8601 timestamp of creation
+	Purpose     string            `json:"purpose,omitempty"`      // Human-readable purpose (e.g., "database auth", "api integration")
+	Owner       string            `json:"owner,omitempty"`        // Owning service (e.g., "bionicgpt", "authentik")
+	RotateAfter string            `json:"rotate_after,omitempty"` // Rotation policy (e.g., "90d", "on_use", "never")
+	Custom      map[string]string `json:"custom,omitempty"`       // Arbitrary custom metadata (e.g., endpoint, model, region)
+}
+
+// GetString retrieves a secret as string (returns empty string if not found or wrong type)
+// Use GetStringOrError for strict error handling
+func (ss *ServiceSecrets) GetString(key string) string {
+	if val, ok := ss.Secrets[key].(string); ok {
+		return val
+	}
+	return ""
+}
+
+// GetStringOrError retrieves a secret as string with error handling
+func (ss *ServiceSecrets) GetStringOrError(key string) (string, error) {
+	val, exists := ss.Secrets[key]
+	if !exists {
+		return "", fmt.Errorf("secret '%s' not found in service '%s'", key, ss.ServiceName)
+	}
+	strVal, ok := val.(string)
+	if !ok {
+		return "", fmt.Errorf("secret '%s' in service '%s' is not a string (type: %T)", key, ss.ServiceName, val)
+	}
+	return strVal, nil
+}
+
+// GetInt retrieves a secret as int (returns 0 if not found or wrong type)
+func (ss *ServiceSecrets) GetInt(key string) int {
+	switch val := ss.Secrets[key].(type) {
+	case int:
+		return val
+	case float64: // JSON numbers decode as float64
+		return int(val)
+	case string:
+		// Try to parse string as int
+		var i int
+		if _, err := fmt.Sscanf(val, "%d", &i); err == nil {
+			return i
+		}
+	}
+	return 0
+}
+
+// GetBool retrieves a secret as bool (returns false if not found or wrong type)
+func (ss *ServiceSecrets) GetBool(key string) bool {
+	switch val := ss.Secrets[key].(type) {
+	case bool:
+		return val
+	case string:
+		// Parse string as bool
+		return val == "true" || val == "1" || val == "yes"
+	case int:
+		return val != 0
+	case float64:
+		return val != 0
+	}
+	return false
+}
+
+// Has checks if a secret exists (regardless of type)
+func (ss *ServiceSecrets) Has(key string) bool {
+	_, exists := ss.Secrets[key]
+	return exists
 }
 
 // NewSecretManager creates a new secret manager with automatic backend detection
@@ -162,13 +240,13 @@ func (sm *SecretManager) GetOrGenerateServiceSecrets(serviceName string, require
 	}
 
 	// Store secrets in backend
+	// P0 FIX: MUST fail if storage fails - otherwise secrets are lost on restart
 	if err := sm.backend.Store(secretPath, secrets.Secrets); err != nil {
-		logger.Error("Failed to store secrets", zap.Error(err))
-		// Don't fail - secrets are generated, just not persisted
-	} else {
-		logger.Info("Secrets stored successfully", zap.String("path", secretPath))
+		logger.Error("Failed to store secrets in backend", zap.Error(err))
+		return nil, fmt.Errorf("failed to persist secrets to backend at %s: %w", secretPath, err)
 	}
 
+	logger.Info("Secrets stored successfully", zap.String("path", secretPath))
 	return secrets, nil
 }
 
@@ -210,8 +288,415 @@ func (sm *SecretManager) generateSecret(secretType SecretType) (string, error) {
 	}
 }
 
+// StoreSecret stores a single secret for a service (idempotent, unified path format)
+// This is the recommended way to store individual secrets.
+//
+// Path format: services/{environment}/{service}
+// Secrets stored as map: {"secret_name": "value", "secret_name_type": "password"}
+//
+// Example:
+//
+//	secretManager.StoreSecret("bionicgpt", "azure_api_key", apiKey, secrets.SecretTypeAPIKey)
+func (sm *SecretManager) StoreSecret(serviceName, secretName string, value interface{}, secretType SecretType) error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	// Unified path format
+	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+
+	logger.Info("Storing secret",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName),
+		zap.String("environment", sm.env.Environment),
+		zap.String("path", secretPath),
+		zap.String("type", string(secretType)))
+
+	// ASSESS - Get existing secrets (if any)
+	existing := make(map[string]interface{})
+	if sm.backend.Exists(secretPath) {
+		var err error
+		existing, err = sm.backend.Retrieve(secretPath)
+		if err != nil {
+			logger.Warn("Could not retrieve existing secrets, will overwrite",
+				zap.Error(err),
+				zap.String("path", secretPath))
+			existing = make(map[string]interface{})
+		}
+	}
+
+	// INTERVENE - Update/add this secret
+	existing[secretName] = value
+	existing[secretName+"_type"] = string(secretType) // Store type metadata for validation
+
+	// Store back to backend
+	if err := sm.backend.Store(secretPath, existing); err != nil {
+		logger.Error("Failed to store secret",
+			zap.Error(err),
+			zap.String("service", serviceName),
+			zap.String("secret", secretName))
+		return fmt.Errorf("failed to store secret '%s' for service '%s': %w", secretName, serviceName, err)
+	}
+
+	// EVALUATE
+	logger.Info("Secret stored successfully",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName),
+		zap.String("path", secretPath))
+
+	return nil
+}
+
+// GetSecret retrieves a single secret for a service with type safety
+// Returns the secret value as a string, or error if not found/wrong type.
+//
+// Path format: services/{environment}/{service}
+//
+// Example:
+//
+//	apiKey, err := secretManager.GetSecret("bionicgpt", "azure_api_key")
+func (sm *SecretManager) GetSecret(serviceName, secretName string) (string, error) {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	// Unified path format
+	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+
+	logger.Debug("Retrieving secret",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName),
+		zap.String("environment", sm.env.Environment),
+		zap.String("path", secretPath))
+
+	// ASSESS - Check if service secrets exist
+	if !sm.backend.Exists(secretPath) {
+		return "", fmt.Errorf("no secrets found for service '%s' in environment '%s'", serviceName, sm.env.Environment)
+	}
+
+	// Retrieve all secrets for service
+	secrets, err := sm.backend.Retrieve(secretPath)
+	if err != nil {
+		logger.Error("Failed to retrieve secrets from backend",
+			zap.Error(err),
+			zap.String("path", secretPath))
+		return "", fmt.Errorf("failed to retrieve secrets for service '%s': %w", serviceName, err)
+	}
+
+	// ASSESS - Check if specific secret exists
+	value, exists := secrets[secretName]
+	if !exists {
+		return "", fmt.Errorf("secret '%s' not found for service '%s'", secretName, serviceName)
+	}
+
+	// INTERVENE - Type assertion to string
+	strValue, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("secret '%s' for service '%s' is not a string (type: %T)", secretName, serviceName, value)
+	}
+
+	// EVALUATE
+	logger.Debug("Secret retrieved successfully",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName))
+
+	return strValue, nil
+}
+
+// UpdateSecret updates an existing secret (alias to StoreSecret for clarity)
+// Returns error if secret doesn't exist - use StoreSecret to create new secrets
+func (sm *SecretManager) UpdateSecret(serviceName, secretName string, newValue interface{}, secretType SecretType) error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	// Check if secret exists first
+	_, err := sm.GetSecret(serviceName, secretName)
+	if err != nil {
+		return fmt.Errorf("cannot update non-existent secret '%s' for service '%s': %w (use StoreSecret to create)", secretName, serviceName, err)
+	}
+
+	logger.Info("Updating existing secret",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName))
+
+	// Use StoreSecret (idempotent)
+	return sm.StoreSecret(serviceName, secretName, newValue, secretType)
+}
+
+// StoreSecretWithMetadata stores a secret with custom metadata (TTL, owner, rotation policy, etc.)
+// This is the recommended method for storing secrets with compliance/audit requirements.
+//
+// Metadata is stored using Vault KV v2 custom_metadata feature (only available for Vault backend).
+// File backend silently ignores metadata (logged as debug message).
+//
+// Path format: services/{environment}/{service}
+//
+// Example:
+//
+//	metadata := &secrets.SecretMetadata{
+//		TTL:       "90d",
+//		CreatedBy: "eos create bionicgpt",
+//		Purpose:   "Azure OpenAI API integration",
+//		Owner:     "bionicgpt",
+//		Custom: map[string]string{
+//			"endpoint": "https://myazure.openai.azure.com",
+//			"model":    "gpt-4",
+//		},
+//	}
+//	err := secretManager.StoreSecretWithMetadata("bionicgpt", "azure_api_key", apiKey, secrets.SecretTypeAPIKey, metadata)
+func (sm *SecretManager) StoreSecretWithMetadata(
+	serviceName, secretName string,
+	value interface{},
+	secretType SecretType,
+	metadata *SecretMetadata,
+) error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	// Unified path format
+	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+
+	logger.Info("Storing secret with metadata",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName),
+		zap.String("environment", sm.env.Environment),
+		zap.String("path", secretPath),
+		zap.String("type", string(secretType)),
+		zap.String("ttl", metadata.TTL))
+
+	// ASSESS - Get existing secrets (if any)
+	existing := make(map[string]interface{})
+	if sm.backend.Exists(secretPath) {
+		var err error
+		existing, err = sm.backend.Retrieve(secretPath)
+		if err != nil {
+			logger.Warn("Could not retrieve existing secrets, will overwrite",
+				zap.Error(err),
+				zap.String("path", secretPath))
+			existing = make(map[string]interface{})
+		}
+	}
+
+	// INTERVENE - Update/add this secret
+	existing[secretName] = value
+	existing[secretName+"_type"] = string(secretType) // Store type metadata
+
+	// Store secret data first (KV v2 Put)
+	if err := sm.backend.Store(secretPath, existing); err != nil {
+		logger.Error("Failed to store secret",
+			zap.Error(err),
+			zap.String("service", serviceName),
+			zap.String("secret", secretName))
+		return fmt.Errorf("failed to store secret '%s' for service '%s': %w", secretName, serviceName, err)
+	}
+
+	// INTERVENE - Store metadata (ONLY for Vault backend)
+	if vaultBackend, ok := sm.backend.(*VaultBackend); ok {
+		// Add timestamp if not provided
+		if metadata.CreatedAt == "" {
+			metadata.CreatedAt = fmt.Sprintf("%d", time.Now().Unix())
+		}
+
+		if err := vaultBackend.StoreMetadata(secretPath, metadata); err != nil {
+			logger.Warn("Failed to store secret metadata (non-critical - secret data is stored)",
+				zap.Error(err),
+				zap.String("secret", secretName),
+				zap.String("service", serviceName))
+			// Don't fail - secret is stored, metadata is optional enhancement
+		} else {
+			logger.Debug("Secret metadata stored successfully",
+				zap.String("service", serviceName),
+				zap.String("secret", secretName))
+		}
+	} else {
+		logger.Debug("Skipping metadata storage (file backend doesn't support it)",
+			zap.String("backend", fmt.Sprintf("%T", sm.backend)))
+	}
+
+	// EVALUATE
+	logger.Info("Secret stored successfully",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName),
+		zap.String("path", secretPath))
+
+	return nil
+}
+
+// GetSecretWithMetadata retrieves a secret along with its metadata (if available)
+// Returns the secret value and metadata. Metadata will be empty if not available or if using file backend.
+//
+// Example:
+//
+//	value, metadata, err := secretManager.GetSecretWithMetadata("bionicgpt", "azure_api_key")
+//	if err != nil {
+//		return err
+//	}
+//	fmt.Printf("API Key TTL: %s\n", metadata.TTL)
+func (sm *SecretManager) GetSecretWithMetadata(serviceName, secretName string) (string, *SecretMetadata, error) {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	// Get the secret value first
+	value, err := sm.GetSecret(serviceName, secretName)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Try to get metadata (only works for Vault backend)
+	metadata := &SecretMetadata{}
+	if vaultBackend, ok := sm.backend.(*VaultBackend); ok {
+		secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+		retrievedMetadata, err := vaultBackend.GetMetadata(secretPath)
+		if err != nil {
+			logger.Debug("Could not retrieve secret metadata (non-critical)",
+				zap.Error(err),
+				zap.String("service", serviceName),
+				zap.String("secret", secretName))
+			// Return empty metadata, not an error
+		} else {
+			metadata = retrievedMetadata
+		}
+	}
+
+	return value, metadata, nil
+}
+
+// DeleteSecret removes a single secret from a service's secret bundle
+// This is an atomic operation - only the specified secret is removed, others are preserved.
+//
+// Example:
+//
+//	err := secretManager.DeleteSecret("bionicgpt", "old_api_key")
+func (sm *SecretManager) DeleteSecret(serviceName, secretName string) error {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+
+	logger.Info("Deleting secret",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName),
+		zap.String("environment", sm.env.Environment),
+		zap.String("path", secretPath))
+
+	// ASSESS - Check if service secrets exist
+	if !sm.backend.Exists(secretPath) {
+		return fmt.Errorf("no secrets found for service '%s' in environment '%s'", serviceName, sm.env.Environment)
+	}
+
+	// Retrieve all secrets
+	secrets, err := sm.backend.Retrieve(secretPath)
+	if err != nil {
+		logger.Error("Failed to retrieve secrets from backend",
+			zap.Error(err),
+			zap.String("path", secretPath))
+		return fmt.Errorf("failed to retrieve secrets for service '%s': %w", serviceName, err)
+	}
+
+	// ASSESS - Check if secret exists
+	if _, exists := secrets[secretName]; !exists {
+		return fmt.Errorf("secret '%s' not found in service '%s'", secretName, serviceName)
+	}
+
+	// INTERVENE - Remove this secret and its metadata
+	delete(secrets, secretName)
+	delete(secrets, secretName+"_type") // Remove type metadata too
+
+	// Store updated bundle back to backend
+	if err := sm.backend.Store(secretPath, secrets); err != nil {
+		logger.Error("Failed to update secrets after deletion",
+			zap.Error(err),
+			zap.String("service", serviceName),
+			zap.String("secret", secretName))
+		return fmt.Errorf("failed to update secrets after deleting '%s': %w", secretName, err)
+	}
+
+	// EVALUATE
+	logger.Info("Secret deleted successfully",
+		zap.String("service", serviceName),
+		zap.String("secret", secretName),
+		zap.Int("remaining_secrets", len(secrets)))
+
+	return nil
+}
+
+// ListSecrets returns all secret names for a service (without values)
+// Returns empty slice if service has no secrets.
+//
+// Example:
+//
+//	secretNames, err := secretManager.ListSecrets("bionicgpt")
+//	// Returns: ["azure_api_key", "postgres_password", "jwt_secret"]
+func (sm *SecretManager) ListSecrets(serviceName string) ([]string, error) {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+
+	logger.Debug("Listing secrets",
+		zap.String("service", serviceName),
+		zap.String("environment", sm.env.Environment),
+		zap.String("path", secretPath))
+
+	// ASSESS - Check if service secrets exist
+	if !sm.backend.Exists(secretPath) {
+		logger.Debug("No secrets found for service",
+			zap.String("service", serviceName),
+			zap.String("environment", sm.env.Environment))
+		return []string{}, nil // No secrets = empty list (not an error)
+	}
+
+	// Retrieve all secrets
+	secrets, err := sm.backend.Retrieve(secretPath)
+	if err != nil {
+		logger.Error("Failed to retrieve secrets from backend",
+			zap.Error(err),
+			zap.String("path", secretPath))
+		return nil, fmt.Errorf("failed to retrieve secrets for service '%s': %w", serviceName, err)
+	}
+
+	// INTERVENE - Extract secret names (filter out metadata keys)
+	secretNames := []string{}
+	for key := range secrets {
+		// Skip metadata keys (end with "_type")
+		if !strings.HasSuffix(key, "_type") {
+			secretNames = append(secretNames, key)
+		}
+	}
+
+	// EVALUATE
+	logger.Debug("Listed secrets",
+		zap.String("service", serviceName),
+		zap.Int("count", len(secretNames)))
+
+	return secretNames, nil
+}
+
+// SecretExists checks if a specific secret exists for a service (without retrieving it)
+// This is more efficient than GetSecret if you only need to check existence.
+//
+// Example:
+//
+//	if secretManager.SecretExists("bionicgpt", "azure_api_key") {
+//		// Secret exists, safe to update
+//	}
+func (sm *SecretManager) SecretExists(serviceName, secretName string) bool {
+	logger := otelzap.Ctx(sm.rc.Ctx)
+
+	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+
+	// Check if service has any secrets
+	if !sm.backend.Exists(secretPath) {
+		return false
+	}
+
+	// Retrieve all secrets to check for specific key
+	secrets, err := sm.backend.Retrieve(secretPath)
+	if err != nil {
+		logger.Debug("Failed to retrieve secrets while checking existence",
+			zap.Error(err),
+			zap.String("service", serviceName),
+			zap.String("secret", secretName))
+		return false
+	}
+
+	_, exists := secrets[secretName]
+	return exists
+}
+
 // GetBackend returns the secret backend for direct access (for advanced use cases)
-// Most code should use GetOrGenerateServiceSecrets instead
+// Most code should use StoreSecret/GetSecret instead
 func (sm *SecretManager) GetBackend() SecretBackend {
 	return sm.backend
 }
@@ -427,6 +912,158 @@ func (vb *VaultBackend) Exists(path string) bool {
 		return false
 	}
 	return secretData.Data != nil
+}
+
+// StoreMetadata stores custom metadata for a secret path using Vault KV v2 metadata API
+// This leverages Vault's custom_metadata feature to attach TTL, owner, rotation policies, etc.
+//
+// SECURITY NOTE: Metadata is NOT encrypted, but it's audit-logged.
+// NEVER put sensitive data in metadata - use secret data storage instead.
+//
+// Path format: Metadata is stored at secret/metadata/{path}
+// Secret data is at secret/data/{path} (handled by Store method)
+func (vb *VaultBackend) StoreMetadata(path string, metadata *SecretMetadata) error {
+	logger := otelzap.Ctx(vb.rc.Ctx)
+
+	// Convert SecretMetadata struct to map[string]string for Vault
+	customMetadata := make(map[string]string)
+	if metadata.TTL != "" {
+		customMetadata["ttl"] = metadata.TTL
+	}
+	if metadata.CreatedBy != "" {
+		customMetadata["created_by"] = metadata.CreatedBy
+	}
+	if metadata.CreatedAt != "" {
+		customMetadata["created_at"] = metadata.CreatedAt
+	}
+	if metadata.Purpose != "" {
+		customMetadata["purpose"] = metadata.Purpose
+	}
+	if metadata.Owner != "" {
+		customMetadata["owner"] = metadata.Owner
+	}
+	if metadata.RotateAfter != "" {
+		customMetadata["rotate_after"] = metadata.RotateAfter
+	}
+
+	// Add any custom fields
+	for k, v := range metadata.Custom {
+		// Prefix custom fields to avoid collision with standard fields
+		customMetadata["custom_"+k] = v
+	}
+
+	// Vault KV v2 metadata path
+	metadataPath := fmt.Sprintf("secret/metadata/%s", path)
+
+	logger.Debug("Writing secret metadata to Vault",
+		zap.String("path", metadataPath),
+		zap.Int("metadata_fields", len(customMetadata)))
+
+	// Write to Vault using logical client (metadata endpoint)
+	_, err := vb.client.Logical().WriteWithContext(vb.rc.Ctx, metadataPath, map[string]interface{}{
+		"custom_metadata": customMetadata,
+	})
+
+	if err != nil {
+		logger.Error("Failed to store secret metadata",
+			zap.Error(err),
+			zap.String("path", metadataPath))
+		return fmt.Errorf("failed to write metadata to %s: %w", metadataPath, err)
+	}
+
+	logger.Debug("Secret metadata stored successfully",
+		zap.String("path", metadataPath),
+		zap.Int("fields", len(customMetadata)))
+
+	return nil
+}
+
+// GetMetadata retrieves custom metadata for a secret path from Vault KV v2
+// Returns an empty SecretMetadata struct if no metadata exists (not an error).
+//
+// Path format: Reads from secret/metadata/{path}
+func (vb *VaultBackend) GetMetadata(path string) (*SecretMetadata, error) {
+	logger := otelzap.Ctx(vb.rc.Ctx)
+
+	// Vault KV v2 metadata path
+	metadataPath := fmt.Sprintf("secret/metadata/%s", path)
+
+	logger.Debug("Reading secret metadata from Vault",
+		zap.String("path", metadataPath))
+
+	// Read from Vault using logical client
+	resp, err := vb.client.Logical().ReadWithContext(vb.rc.Ctx, metadataPath)
+	if err != nil {
+		logger.Debug("Failed to read metadata (may not exist)",
+			zap.Error(err),
+			zap.String("path", metadataPath))
+		return &SecretMetadata{}, nil // Return empty metadata, not error
+	}
+
+	// No metadata exists - return empty struct
+	if resp == nil || resp.Data == nil {
+		logger.Debug("No metadata found at path",
+			zap.String("path", metadataPath))
+		return &SecretMetadata{}, nil
+	}
+
+	// Extract custom_metadata field
+	customMetadataRaw, ok := resp.Data["custom_metadata"]
+	if !ok {
+		logger.Debug("No custom_metadata field in response",
+			zap.String("path", metadataPath))
+		return &SecretMetadata{}, nil
+	}
+
+	// Type assert to map[string]interface{} (Vault returns this type)
+	customMetadataMap, ok := customMetadataRaw.(map[string]interface{})
+	if !ok {
+		logger.Warn("custom_metadata is not a map",
+			zap.String("path", metadataPath),
+			zap.String("type", fmt.Sprintf("%T", customMetadataRaw)))
+		return &SecretMetadata{}, nil
+	}
+
+	// Convert map to SecretMetadata struct
+	metadata := &SecretMetadata{
+		Custom: make(map[string]string),
+	}
+
+	// Extract standard fields
+	if ttl, ok := customMetadataMap["ttl"].(string); ok {
+		metadata.TTL = ttl
+	}
+	if createdBy, ok := customMetadataMap["created_by"].(string); ok {
+		metadata.CreatedBy = createdBy
+	}
+	if createdAt, ok := customMetadataMap["created_at"].(string); ok {
+		metadata.CreatedAt = createdAt
+	}
+	if purpose, ok := customMetadataMap["purpose"].(string); ok {
+		metadata.Purpose = purpose
+	}
+	if owner, ok := customMetadataMap["owner"].(string); ok {
+		metadata.Owner = owner
+	}
+	if rotateAfter, ok := customMetadataMap["rotate_after"].(string); ok {
+		metadata.RotateAfter = rotateAfter
+	}
+
+	// Extract custom fields (prefixed with "custom_")
+	for k, v := range customMetadataMap {
+		if strings.HasPrefix(k, "custom_") {
+			if strVal, ok := v.(string); ok {
+				// Remove "custom_" prefix
+				metadata.Custom[strings.TrimPrefix(k, "custom_")] = strVal
+			}
+		}
+	}
+
+	logger.Debug("Secret metadata retrieved successfully",
+		zap.String("path", metadataPath),
+		zap.Int("fields", len(customMetadataMap)))
+
+	return metadata, nil
 }
 
 // File Backend Implementation (fallback)

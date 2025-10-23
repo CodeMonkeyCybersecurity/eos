@@ -265,6 +265,7 @@ const (
 	HTTPClientTimeout   = 30 * time.Second // HTTP client default timeout
 	HTTPIdleTimeout     = 30 * time.Second // HTTP idle connection timeout
 	TLSHandshakeTimeout = 10 * time.Second // TLS handshake timeout
+	VaultReadyWaitTime  = 3 * time.Second  // Wait time after Vault restart for service to become ready
 )
 
 // ============================================================================

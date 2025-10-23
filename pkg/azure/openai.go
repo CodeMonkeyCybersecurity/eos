@@ -413,26 +413,23 @@ func (cm *ConfigManager) storeAPIKeyInVault() error {
 		return nil
 	}
 
-	// Store API key in Vault at: services/{environment}/{service}/azure_openai_api_key
-	vaultPath := fmt.Sprintf("services/%s/%s/azure_openai_api_key",
-		cm.config.Environment, cm.config.ServiceName)
+	logger.Info("Storing Azure OpenAI API key in Vault",
+		zap.String("service", cm.config.ServiceName),
+		zap.String("environment", cm.config.Environment))
 
-	logger.Info("Storing Azure OpenAI API key in Vault", zap.String("path", vaultPath))
-
-	// Store via secret manager backend
-	secretData := map[string]interface{}{
-		"value": cm.config.APIKey,
-		"type":  "azure_openai_api_key",
-	}
-
-	backend := cm.secretManager.GetBackend()
-	if err := backend.Store(vaultPath, secretData); err != nil {
+	// Use unified StoreSecret() method - handles path format automatically
+	// This replaces the old pattern of manually constructing paths
+	if err := cm.secretManager.StoreSecret(
+		cm.config.ServiceName,
+		"azure_api_key",
+		cm.config.APIKey,
+		secrets.SecretTypeAPIKey,
+	); err != nil {
 		logger.Error("Failed to store API key in Vault", zap.Error(err))
 		return fmt.Errorf("failed to store API key in Vault: %w", err)
 	}
 
-	logger.Info("✓ Azure OpenAI API key stored in Vault successfully",
-		zap.String("path", vaultPath))
+	logger.Info("✓ Azure OpenAI API key stored in Vault successfully")
 	return nil
 }
 
@@ -445,33 +442,16 @@ func (cm *ConfigManager) retrieveAPIKeyFromVault() (string, error) {
 		return "", fmt.Errorf("secret manager not initialized")
 	}
 
-	vaultPath := fmt.Sprintf("services/%s/%s/azure_openai_api_key",
-		cm.config.Environment, cm.config.ServiceName)
+	logger.Debug("Retrieving Azure OpenAI API key from Vault",
+		zap.String("service", cm.config.ServiceName),
+		zap.String("environment", cm.config.Environment))
 
-	logger.Debug("Retrieving Azure OpenAI API key from Vault", zap.String("path", vaultPath))
-
-	backend := cm.secretManager.GetBackend()
-
-	// Check if exists first (idempotent)
-	if !backend.Exists(vaultPath) {
-		logger.Warn("API key does not exist in Vault, will create fallback .env file",
-			zap.String("path", vaultPath))
-		return cm.createFallbackEnvFile()
-	}
-
-	// Retrieve via secret manager backend
-	secretData, err := backend.Retrieve(vaultPath)
+	// Use unified GetSecret() method - handles path format automatically
+	// This replaces the old pattern of manually constructing paths
+	apiKey, err := cm.secretManager.GetSecret(cm.config.ServiceName, "azure_api_key")
 	if err != nil {
 		logger.Warn("Failed to retrieve API key from Vault, will create fallback .env file",
-			zap.Error(err),
-			zap.String("path", vaultPath))
-		return cm.createFallbackEnvFile()
-	}
-
-	// Extract value
-	apiKey, ok := secretData["value"].(string)
-	if !ok {
-		logger.Warn("Invalid API key format in Vault, will create fallback .env file")
+			zap.Error(err))
 		return cm.createFallbackEnvFile()
 	}
 

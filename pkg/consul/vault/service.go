@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -13,6 +14,7 @@ import (
 )
 
 // GenerateServiceConfig creates a Consul service registration for Vault
+// DEPRECATED: Use VaultIntegration.RegisterVault() instead for SDK-based registration with ACL support
 // Migrated from cmd/create/consul.go generateVaultServiceConfig
 func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
@@ -81,13 +83,14 @@ func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
   }
 }`, hostname, vaultPort, vaultHost, hostname, vaultAddr)
 
-	servicePath := "/etc/consul.d/vault-service.json"
-	if err := os.WriteFile(servicePath, []byte(serviceConfig), 0640); err != nil {
+	servicePath := consul.ConsulVaultServiceConfig
+	if err := os.WriteFile(servicePath, []byte(serviceConfig), consul.ConsulConfigPerm); err != nil {
 		return fmt.Errorf("failed to write vault service config: %w", err)
 	}
 
 	// Set ownership
-	if err := execute.RunSimple(rc.Ctx, "chown", "consul:consul", servicePath); err != nil {
+	ownerStr := fmt.Sprintf("%s:%s", consul.ConsulUser, consul.ConsulGroup)
+	if err := execute.RunSimple(rc.Ctx, "chown", ownerStr, servicePath); err != nil {
 		return fmt.Errorf("failed to set service config ownership: %w", err)
 	}
 
@@ -99,9 +102,9 @@ func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to verify service config file: %w", err)
 	}
 
-	if info.Mode().Perm() != 0640 {
+	if info.Mode().Perm() != consul.ConsulConfigPerm {
 		log.Warn("Service config file permissions not as expected",
-			zap.String("expected", "0640"),
+			zap.String("expected", fmt.Sprintf("%04o", consul.ConsulConfigPerm)),
 			zap.String("actual", info.Mode().Perm().String()))
 	}
 

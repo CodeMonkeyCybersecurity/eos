@@ -285,20 +285,14 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		return fmt.Errorf("failed to manage secrets: %w", err)
 	}
 
-	// Use secrets from Vault (with type assertions)
-	if pw, ok := serviceSecrets.Secrets["postgres_password"].(string); ok {
-		bgi.config.PostgresPassword = pw
-	}
-	if jwt, ok := serviceSecrets.Secrets["jwt_secret"].(string); ok {
-		bgi.config.JWTSecret = jwt
-	}
-	if litellmKey, ok := serviceSecrets.Secrets["litellm_master_key"].(string); ok {
-		bgi.config.LiteLLMMasterKey = litellmKey
-	}
+	// Use secrets from Vault (with typed accessors - no manual type assertions!)
+	bgi.config.PostgresPassword = serviceSecrets.GetString("postgres_password")
+	bgi.config.JWTSecret = serviceSecrets.GetString("jwt_secret")
+	bgi.config.LiteLLMMasterKey = serviceSecrets.GetString("litellm_master_key")
+
+	// Only use Azure API key from Vault if not provided via flag
 	if bgi.config.AzureAPIKey == "" {
-		if apiKey, ok := serviceSecrets.Secrets["azure_api_key"].(string); ok {
-			bgi.config.AzureAPIKey = apiKey
-		}
+		bgi.config.AzureAPIKey = serviceSecrets.GetString("azure_api_key")
 	}
 
 	logger.Info("Secrets retrieved from Vault",
@@ -954,8 +948,8 @@ networks:
 		ImagePostgreSQL,
 		ContainerPostgres,
 		VolumePostgresData,
-		InitScriptFilename,       // Init script filename
-		InitScriptDockerPath,     // Init script mount path
+		InitScriptFilename,   // Init script filename
+		InitScriptDockerPath, // Init script mount path
 		// Migrations
 		ImageMigrations,
 		DefaultBionicGPTVersion,

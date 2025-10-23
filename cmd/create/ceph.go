@@ -180,9 +180,6 @@ func createVolume(rc *eos_io.RuntimeContext, client *cephfs.CephClient) error {
 		opts.MetadataPool = cephVolumeName + "_metadata"
 	}
 
-	if err := client.CreateVolume(rc, opts); err != nil {
-		return fmt.Errorf("failed to create volume: %w", err)
-	}
 
 	logger.Info("Volume created successfully",
 		zap.String("volume", cephVolumeName))

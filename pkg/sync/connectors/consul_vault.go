@@ -10,7 +10,10 @@ import (
 	"strings"
 	"time"
 
+	consulapi "github.com/hashicorp/consul/api"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
+	consulvault "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -205,7 +208,7 @@ func (c *ConsulVaultConnector) Backup(rc *eos_io.RuntimeContext, config *synctyp
 	}
 
 	// Backup Vault configuration
-	vaultConfigPath := "/etc/vault.d/vault.hcl"
+	vaultConfigPath := vault.VaultConfigPath
 	vaultBackupPath := filepath.Join(backupDir, "vault.hcl.backup")
 
 	if err := copyFile(vaultConfigPath, vaultBackupPath); err != nil {
@@ -221,7 +224,7 @@ func (c *ConsulVaultConnector) Backup(rc *eos_io.RuntimeContext, config *synctyp
 
 	// Note: Consul config typically doesn't need modification for Vault integration
 	// But we'll note the path for completeness
-	metadata.Service1ConfigPath = "/etc/consul.d/consul.hcl"
+	metadata.Service1ConfigPath = consul.ConsulConfigFile
 
 	logger.Info("Configuration backup completed",
 		zap.String("backup_dir", backupDir),
@@ -236,7 +239,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 	logger.Info("Connecting Consul and Vault")
 
 	// Read current Vault configuration
-	vaultConfigPath := "/etc/vault.d/vault.hcl"
+	vaultConfigPath := vault.VaultConfigPath
 	configContent, err := os.ReadFile(vaultConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to read Vault config at %s: %w", vaultConfigPath, err)
@@ -258,14 +261,14 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 					zap.String("current_storage", c.detectStorageBackend(configStr)),
 					zap.String("target_storage", "consul"))
 
-				return fmt.Errorf("cannot change storage backend on initialized Vault: this would cause data loss\n\n" +
-					"Current storage: %s\n" +
-					"Target storage: consul\n\n" +
-					"To migrate storage backends:\n" +
-					"1. Use Vault's official migration tools\n" +
-					"2. Or: Unseal Vault, export all secrets, reinitialize with new backend, import secrets\n" +
-					"3. Or: Use --force flag to override (NOT RECOMMENDED - will lose all data)\n\n" +
-					"Vault storage migration documentation:\n" +
+				return fmt.Errorf("cannot change storage backend on initialized Vault: this would cause data loss\n\n"+
+					"Current storage: %s\n"+
+					"Target storage: consul\n\n"+
+					"To migrate storage backends:\n"+
+					"1. Use Vault's official migration tools\n"+
+					"2. Or: Unseal Vault, export all secrets, reinitialize with new backend, import secrets\n"+
+					"3. Or: Use --force flag to override (NOT RECOMMENDED - will lose all data)\n\n"+
+					"Vault storage migration documentation:\n"+
 					"https://developer.hashicorp.com/vault/docs/commands/operator/migrate",
 					c.detectStorageBackend(configStr))
 			}
@@ -280,6 +283,57 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		}
 	}
 
+	// STEP 1: Create ACL policy and token if Consul ACLs are enabled
+	var vaultACLToken string
+	if config.ConsulACLToken != "" {
+		logger.Info("Consul ACLs detected, creating Vault access policy and token")
+
+		// Get Vault address
+		vaultAddress := os.Getenv("VAULT_ADDR")
+		if vaultAddress == "" {
+			vaultAddress = vault.DefaultAddress
+		}
+
+		// Create VaultIntegration to handle ACL setup
+		integration, err := consulvault.NewVaultIntegration(rc, &consulvault.IntegrationConfig{
+			ConsulAddress:    shared.ConsulDefaultAddr,
+			ConsulACLToken:   config.ConsulACLToken,
+			VaultAddress:     vaultAddress,
+			AutoCreatePolicy: true,
+			AutoCreateToken:  true,
+			TokenTTL:         0, // No expiration for infrastructure tokens
+		})
+		if err != nil {
+			logger.Warn("Could not create Vault integration for ACL setup",
+				zap.Error(err),
+				zap.String("reason", "Consul may not be accessible or ACL bootstrap not complete"))
+			logger.Warn("Proceeding without ACL token - manual token creation required")
+		} else {
+			// Register Vault and get ACL token
+			result, err := integration.RegisterVault(rc.Ctx, &consulvault.IntegrationConfig{
+				ConsulAddress:    shared.ConsulDefaultAddr,
+				ConsulACLToken:   config.ConsulACLToken,
+				VaultAddress:     vaultAddress,
+				AutoCreatePolicy: true,
+				AutoCreateToken:  true,
+				TokenTTL:         0,
+			})
+			if err != nil {
+				logger.Warn("Could not register Vault with Consul ACLs",
+					zap.Error(err))
+				logger.Warn("Proceeding without ACL token - manual token creation required")
+			} else {
+				vaultACLToken = result.TokenSecretID
+				logger.Info("Successfully created Vault ACL policy and token",
+					zap.String("policy_id", result.PolicyID),
+					zap.String("policy_name", result.PolicyName),
+					zap.String("token_accessor", result.TokenAccessorID))
+			}
+		}
+	} else {
+		logger.Debug("No Consul ACL token provided, ACLs not enabled or token not available")
+	}
+
 	// Check if already using Consul storage
 	if strings.Contains(configStr, `storage "consul"`) {
 		logger.Info("Vault config already contains Consul storage, updating address")
@@ -291,7 +345,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		if updatedConfig == configStr {
 			logger.Debug("No address change needed, config already correct")
 		} else {
-			if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), 0640); err != nil {
+			if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), vault.VaultConfigPerm); err != nil {
 				return fmt.Errorf("failed to update Vault config: %w", err)
 			}
 			logger.Info("Updated Consul address in Vault config",
@@ -304,10 +358,22 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		// Look for existing storage block (raft, file, etc.)
 		storageRegex := regexp.MustCompile(`(?s)storage "[^"]*"\s*\{[^}]*\}`)
 
-		consulStorageBlock := fmt.Sprintf(`storage "consul" {
+		// Build storage block with ACL token if available
+		var consulStorageBlock string
+		if vaultACLToken != "" {
+			consulStorageBlock = fmt.Sprintf(`storage "consul" {
   address = "%s"
-  path    = "vault/"
-}`, shared.ConsulDefaultAddr)
+  path    = "%s"
+  token   = "%s"
+}`, shared.ConsulDefaultAddr, vault.ConsulVaultStoragePrefix, vaultACLToken)
+			logger.Info("Generated Consul storage config with ACL token")
+		} else {
+			consulStorageBlock = fmt.Sprintf(`storage "consul" {
+  address = "%s"
+  path    = "%s"
+}`, shared.ConsulDefaultAddr, vault.ConsulVaultStoragePrefix)
+			logger.Debug("Generated Consul storage config without ACL token (ACLs not enabled)")
+		}
 
 		var updatedConfig string
 		if storageRegex.MatchString(configStr) {
@@ -328,7 +394,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		}
 
 		// Write updated config
-		if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), 0640); err != nil {
+		if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), vault.VaultConfigPerm); err != nil {
 			return fmt.Errorf("failed to write updated Vault config: %w", err)
 		}
 	}
@@ -340,14 +406,26 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		configContent, _ := os.ReadFile(vaultConfigPath)
 		configStr = string(configContent)
 
-		serviceRegBlock := fmt.Sprintf(`
+		// Build service registration block with ACL token if available
+		var serviceRegBlock string
+		if vaultACLToken != "" {
+			serviceRegBlock = fmt.Sprintf(`
+service_registration "consul" {
+  address = "%s"
+  token   = "%s"
+}`, shared.ConsulDefaultAddr, vaultACLToken)
+			logger.Info("Generated Consul service registration config with ACL token")
+		} else {
+			serviceRegBlock = fmt.Sprintf(`
 service_registration "consul" {
   address = "%s"
 }`, shared.ConsulDefaultAddr)
+			logger.Debug("Generated Consul service registration config without ACL token")
+		}
 
 		updatedConfig := configStr + "\n" + serviceRegBlock
 
-		if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), 0640); err != nil {
+		if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), vault.VaultConfigPerm); err != nil {
 			return fmt.Errorf("failed to add service registration: %w", err)
 		}
 		logger.Info("Added Consul service registration")
@@ -357,7 +435,7 @@ service_registration "consul" {
 	logger.Info("Restarting Vault service to apply configuration changes")
 	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"restart", "vault"},
+		Args:    []string{"restart", vault.VaultServiceName},
 		Capture: true,
 	})
 	if err != nil {
@@ -366,7 +444,7 @@ service_registration "consul" {
 
 	// Wait for Vault to come back up
 	logger.Info("Waiting for Vault to become ready")
-	time.Sleep(3 * time.Second)
+	time.Sleep(vault.VaultReadyWaitTime)
 
 	return nil
 }
@@ -379,7 +457,7 @@ func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctyp
 	// Check Vault service is active
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
-		Args:    []string{"is-active", "vault"},
+		Args:    []string{"is-active", vault.VaultServiceName},
 		Capture: true,
 	})
 	if err != nil || strings.TrimSpace(output) != "active" {
@@ -405,7 +483,7 @@ func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctyp
 	}
 
 	// Check that config actually has Consul storage
-	vaultConfigPath := "/etc/vault.d/vault.hcl"
+	vaultConfigPath := vault.VaultConfigPath
 	configContent, err := os.ReadFile(vaultConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to verify config: %w", err)
@@ -417,6 +495,29 @@ func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctyp
 
 	if !strings.Contains(string(configContent), shared.ConsulDefaultAddr) {
 		return fmt.Errorf("vault config does not contain correct Consul address: %s", shared.ConsulDefaultAddr)
+	}
+
+	// Verify Consul storage backend accessibility
+	logger.Info("Verifying Consul storage backend connectivity")
+	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
+	if err != nil {
+		logger.Warn("Could not create Consul client for storage verification",
+			zap.Error(err),
+			zap.String("reason", "Consul may not be running or accessible"))
+		logger.Info("Skipping Consul storage verification - ensure Consul is running and accessible")
+	} else {
+		// Test read access to Vault storage path
+		testKey := vault.ConsulVaultStoragePrefix + "core/test"
+		_, _, err = consulClient.KV().Get(testKey, nil)
+		if err != nil {
+			logger.Warn("Could not verify Consul storage access",
+				zap.Error(err),
+				zap.String("test_key", testKey),
+				zap.String("reason", "This is normal if Vault is not initialized yet"))
+		} else {
+			logger.Info("Verified Vault can access Consul storage backend",
+				zap.String("storage_prefix", vault.ConsulVaultStoragePrefix))
+		}
 	}
 
 	logger.Info("Connection verified successfully",
@@ -432,18 +533,18 @@ func (c *ConsulVaultConnector) Rollback(rc *eos_io.RuntimeContext, config *synct
 		zap.String("backup_dir", backup.BackupDir))
 
 	// Restore Vault configuration
-	if vaultBackup, exists := backup.BackupFiles["/etc/vault.d/vault.hcl"]; exists {
+	if vaultBackup, exists := backup.BackupFiles[vault.VaultConfigPath]; exists {
 		logger.Info("Restoring Vault configuration",
 			zap.String("backup", vaultBackup))
 
-		if err := copyFile(vaultBackup, "/etc/vault.d/vault.hcl"); err != nil {
+		if err := copyFile(vaultBackup, vault.VaultConfigPath); err != nil {
 			return fmt.Errorf("failed to restore Vault config: %w", err)
 		}
 
 		// Restart Vault to apply restored config
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
-			Args:    []string{"restart", "vault"},
+			Args:    []string{"restart", vault.VaultServiceName},
 			Capture: true,
 		})
 		if err != nil {
@@ -463,7 +564,8 @@ func copyFile(src, dst string) error {
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
-	if err := os.WriteFile(dst, data, 0640); err != nil {
+	// Use Vault config permission for Vault config files
+	if err := os.WriteFile(dst, data, vault.VaultConfigPerm); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 

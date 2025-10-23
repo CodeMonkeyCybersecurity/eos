@@ -12,7 +12,9 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 - **Sustainable innovation**: Maintainable code, comprehensive documentation, iterative improvement, response ready, incorporates recent research and best practice. Solve problems once, encode in Eos, never solve again
 - **Collaboration and listening**: adversarial collaboration, transparent decision making, ownership accountability responsibility, open source, codesign
 
-**Iterative Philosophy**: Eos is built iteratively. We build on what exists, solve complex problems once, encode them in Eos, and never solve them again. Each improvement makes the next one easier. 
+**Iterative Philosophy**: Eos is built iteratively. We build on what exists, solve complex problems once, encode them in Eos, and never solve them again. Each improvement makes the next one easier.
+
+**Code Integration Philosophy**: When writing new code, ALWAYS iterate on existing functions rather than creating new ones. Check for existing functionality in the codebase first. If similar functionality exists, enhance it rather than duplicate it. Only deprecate functions if absolutely necessary - prefer evolution over replacement. Ensure all new code is properly wired into existing systems and follows established patterns.
 
 ##  CRITICAL RULES (P0 - Breaking)
 
@@ -28,7 +30,8 @@ These violations cause immediate failure:
 8. **Evidence-based, adversarially collaborative** approach always with yourself and with me
 9. **READMEs** Put a README.md in each directory to document the purpose of the directory and how to use it.
 10. **Pre-commit validation**: ALWAYS run `go build -o /tmp/eos-build ./cmd/` before completing a task. If build fails, fix ALL errors before responding to user. Zero tolerance for compile-time errors.
-11. **Constants - SINGLE SOURCE OF TRUTH (ZERO HARDCODED VALUES - P0)**: NEVER use hardcoded literal values in code. Each value must be a named constant defined in EXACTLY ONE place.
+11. **Code Integration & Iteration (P0 - CRITICAL)**: Before writing new code, search for existing functionality. ALWAYS iterate on and enhance existing functions rather than creating duplicates. Ensure all code is properly wired into existing systems. Only deprecate when absolutely necessary - prefer evolution over replacement. Verify integration points work correctly.
+12. **Constants - SINGLE SOURCE OF TRUTH (ZERO HARDCODED VALUES - P0)**: NEVER use hardcoded literal values in code. Each value must be a named constant defined in EXACTLY ONE place.
     - **Service-specific constants**: `pkg/[service]/constants.go`
       - Vault: `pkg/vault/constants.go`
       - Consul: `pkg/consul/constants.go`
