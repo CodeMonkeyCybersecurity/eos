@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/scripts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -139,18 +140,13 @@ func assessPermissions(rc *eos_io.RuntimeContext) FixResult {
 		Details:   []string{},
 	}
 
-	paths := []string{
-		"/etc/consul.d/consul.hcl",
-		"/etc/consul.d",
-		"/var/lib/consul",
-		"/opt/consul",
-	}
+	paths := consul.GetCriticalPaths()
 
 	// Get consul user/group IDs
-	consulUser, err := user.Lookup("consul")
+	consulUser, err := user.Lookup(consul.ConsulUser)
 	if err != nil {
 		result.Success = false
-		result.Message = "consul user does not exist"
+		result.Message = fmt.Sprintf("%s user does not exist", consul.ConsulUser)
 		return result
 	}
 
@@ -175,20 +171,15 @@ func assessPermissions(rc *eos_io.RuntimeContext) FixResult {
 		ownerOK := stat.Uid == uint32(expectedUID) && stat.Gid == uint32(expectedGID)
 		permsOK := true
 
-		// Check expected permissions
-		if info.IsDir() {
-			// Directories should be 0750
-			permsOK = info.Mode().Perm() == 0750
-		} else {
-			// Files should be 0640
-			permsOK = info.Mode().Perm() == 0640
-		}
+		// Check expected permissions using centralized permission constants
+		expectedPerm := consul.GetExpectedPermission(path, info.IsDir())
+		permsOK = info.Mode().Perm() == expectedPerm
 
 		if !ownerOK || !permsOK {
 			result.Details = append(result.Details,
 				fmt.Sprintf("✗ %s: owner=%d:%d (expected %d:%d), mode=%04o (expected %04o)",
 					path, stat.Uid, stat.Gid, expectedUID, expectedGID,
-					info.Mode().Perm(), getExpectedPerms(info.IsDir())))
+					info.Mode().Perm(), expectedPerm))
 			issuesFound++
 			result.ChangesMade = true
 		} else {
@@ -217,7 +208,7 @@ func fixHelperScript(rc *eos_io.RuntimeContext) FixResult {
 		Details:   []string{},
 	}
 
-	scriptPath := "/usr/local/bin/consul-vault-helper"
+	scriptPath := consul.ConsulVaultHelperPath
 
 	// ASSESS - Check if script exists
 	if _, err := os.Stat(scriptPath); err == nil {
@@ -263,21 +254,32 @@ func fixPermissions(rc *eos_io.RuntimeContext) FixResult {
 		Details:     []string{},
 	}
 
-	paths := map[string]struct {
+	// Build paths map using centralized constants
+	pathsList := consul.GetCriticalPaths()
+	paths := make(map[string]struct {
 		isDir bool
 		perms os.FileMode
-	}{
-		"/etc/consul.d/consul.hcl": {isDir: false, perms: 0640},
-		"/etc/consul.d":            {isDir: true, perms: 0750},
-		"/var/lib/consul":          {isDir: true, perms: 0750},
-		"/opt/consul":              {isDir: true, perms: 0755},
+	})
+
+	for _, path := range pathsList {
+		info, err := os.Stat(path)
+		if err != nil {
+			continue // Skip non-existent paths
+		}
+		paths[path] = struct {
+			isDir bool
+			perms os.FileMode
+		}{
+			isDir: info.IsDir(),
+			perms: consul.GetExpectedPermission(path, info.IsDir()),
+		}
 	}
 
 	// Get consul user/group IDs
-	consulUser, err := user.Lookup("consul")
+	consulUser, err := user.Lookup(consul.ConsulUser)
 	if err != nil {
 		result.Success = false
-		result.Message = "consul user does not exist - cannot fix permissions"
+		result.Message = fmt.Sprintf("%s user does not exist - cannot fix permissions", consul.ConsulUser)
 		return result
 	}
 
@@ -453,10 +455,11 @@ func displayResults(rc *eos_io.RuntimeContext, results []FixResult, dryRun bool)
 	}
 }
 
-// getExpectedPerms returns the expected permissions for a path
+// getExpectedPerms is DEPRECATED - use consul.GetExpectedPermission() instead
+// Kept for backwards compatibility
 func getExpectedPerms(isDir bool) os.FileMode {
 	if isDir {
-		return 0750
+		return consul.ConsulConfigDirPerm
 	}
-	return 0640
+	return consul.ConsulConfigPerm
 }

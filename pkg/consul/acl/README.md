@@ -1,0 +1,564 @@
+## Consul ACL Management
+
+*Last Updated: 2025-10-23*
+
+Comprehensive ACL policy and token management for Consul, providing programmatic control over access policies and authentication tokens.
+
+## Overview
+
+The ACL management system provides:
+- **Policy Management**: Create, update, delete, and list ACL policies
+- **Token Management**: Create, update, delete, clone ACL tokens
+- **Policy Templates**: Pre-built policies for common use cases
+- **Token-Policy Binding**: Attach/detach policies to tokens
+- **Policy Validation**: Syntax validation before creating policies
+
+## Architecture
+
+```
+ACL Management
+├── PolicyManager
+│   ├── CRUD Operations (Create, Read, Update, Delete, List)
+│   ├── Template Rendering (Service, KV, Node, Operator, Vault, Monitoring)
+│   └── Validation (HCL syntax checking)
+└── TokenManager
+    ├── CRUD Operations (Create, Read, Update, Delete, List)
+    ├── Token Cloning
+    └── Policy Attachment (Attach, Detach, List)
+```
+
+## Quick Start
+
+### 1. Create a Policy Manager
+
+```go
+import (
+    "context"
+    "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
+)
+
+ctx := context.Background()
+pm, err := acl.NewPolicyManager(ctx, "127.0.0.1:8500", "management-token")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### 2. Create a Policy from Template
+
+```go
+// Create a Vault access policy
+policy, err := pm.RenderPolicyTemplate(ctx, acl.PolicyTemplateVaultAccess, nil)
+if err != nil {
+    log.Fatal(err)
+}
+
+created, err := pm.CreatePolicy(ctx, policy)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created policy: %s (ID: %s)\n", created.Name, created.ID)
+```
+
+### 3. Create a Token with Policy
+
+```go
+tm, err := acl.NewTokenManager(ctx, "127.0.0.1:8500", "management-token")
+if err != nil {
+    log.Fatal(err)
+}
+
+token := &acl.Token{
+    Description: "Vault server token",
+    Policies:    []string{created.ID},
+}
+
+createdToken, err := tm.CreateToken(ctx, token)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Token AccessorID: %s\n", createdToken.AccessorID)
+fmt.Printf("Token SecretID: %s\n", createdToken.SecretID)
+```
+
+## Policy Templates
+
+### Service Policies
+
+```go
+// Read-only service access
+policy, _ := pm.RenderPolicyTemplate(ctx,
+    acl.PolicyTemplateServiceRead,
+    map[string]string{"service_name": "vault"})
+
+// Read-write service access
+policy, _ := pm.RenderPolicyTemplate(ctx,
+    acl.PolicyTemplateServiceWrite,
+    map[string]string{"service_name": "vault"})
+
+// Or use convenience builders
+policy := acl.BuildServicePolicy("vault", true) // write=true
+```
+
+### KV Store Policies
+
+```go
+// Read-only KV access
+policy, _ := pm.RenderPolicyTemplate(ctx,
+    acl.PolicyTemplateKVRead,
+    map[string]string{"kv_path": "config/"})
+
+// Read-write KV access
+policy := acl.BuildKVPolicy("config/", true) // write=true
+```
+
+### Node Policies
+
+```go
+// Node access
+policy := acl.BuildNodePolicy("vhost5", true) // write=true
+```
+
+### Operator Policy
+
+```go
+// Full operator access
+policy := acl.BuildOperatorPolicy()
+```
+
+### Vault Integration Policy
+
+```go
+// Vault server access (storage + service registration)
+policy := acl.BuildVaultAccessPolicy()
+created, err := pm.CreatePolicy(ctx, policy)
+```
+
+Generated HCL:
+```hcl
+# Vault storage backend
+key_prefix "vault/" {
+  policy = "write"
+}
+
+# Service registration
+service "vault" {
+  policy = "write"
+}
+
+# Health checks
+agent_prefix "" {
+  policy = "read"
+}
+
+# Node catalog for HA coordination
+node_prefix "" {
+  policy = "read"
+}
+
+# Session management for HA locking
+session_prefix "" {
+  policy = "write"
+}
+```
+
+### Monitoring Agent Policy
+
+```go
+// Monitoring agent access
+policy := acl.BuildMonitoringAgentPolicy()
+```
+
+Generated HCL:
+```hcl
+# Service discovery
+service_prefix "" {
+  policy = "read"
+}
+
+# Node information
+node_prefix "" {
+  policy = "read"
+}
+
+# Agent metrics
+agent_prefix "" {
+  policy = "read"
+}
+
+# Health check status
+key_prefix "health/" {
+  policy = "read"
+}
+
+# Catalog access
+operator = "read"
+```
+
+## Policy Management
+
+### Create Custom Policy
+
+```go
+policy := acl.BuildCustomPolicy(
+    "custom-app-policy",
+    "Access for my application",
+    `
+service "my-app" {
+  policy = "write"
+}
+
+key_prefix "my-app/" {
+  policy = "write"
+}
+
+session_prefix "" {
+  policy = "write"
+}
+`,
+)
+
+created, err := pm.CreatePolicy(ctx, policy)
+```
+
+### Read Policy
+
+```go
+// By ID
+policy, err := pm.ReadPolicy(ctx, "policy-id")
+
+// By name
+policy, err := pm.ReadPolicyByName(ctx, "vault-access")
+```
+
+### Update Policy
+
+```go
+policy.Rules = `
+service "vault" {
+  policy = "write"
+}
+# Updated rules
+`
+
+updated, err := pm.UpdatePolicy(ctx, policy.ID, policy)
+```
+
+### Delete Policy
+
+```go
+err := pm.DeletePolicy(ctx, "policy-id")
+```
+
+### List All Policies
+
+```go
+policies, err := pm.ListPolicies(ctx)
+for _, policy := range policies {
+    fmt.Printf("Policy: %s (ID: %s)\n", policy.Name, policy.ID)
+}
+```
+
+## Token Management
+
+### Create Token
+
+```go
+token := &acl.Token{
+    Description: "My application token",
+    Policies:    []string{"policy-id-1", "policy-id-2"},
+    Local:       false, // Global token (replicated across datacenters)
+}
+
+created, err := tm.CreateToken(ctx, token)
+
+// Save the SecretID securely - this is the actual token!
+fmt.Printf("Secret Token: %s\n", created.SecretID)
+```
+
+### Create Token with Expiration
+
+```go
+import "time"
+
+token := &acl.Token{
+    Description:   "Temporary token",
+    Policies:      []string{"policy-id"},
+    ExpirationTTL: 24 * time.Hour,
+}
+
+created, err := tm.CreateToken(ctx, token)
+```
+
+### Read Token
+
+```go
+token, err := tm.ReadToken(ctx, "accessor-id")
+```
+
+### Update Token
+
+```go
+token.Description = "Updated description"
+token.Policies = append(token.Policies, "new-policy-id")
+
+updated, err := tm.UpdateToken(ctx, token.AccessorID, token)
+```
+
+### Delete Token
+
+```go
+err := tm.DeleteToken(ctx, "accessor-id")
+```
+
+### Clone Token
+
+```go
+cloned, err := tm.CloneToken(ctx, "source-accessor-id", "Cloned token")
+```
+
+### List All Tokens
+
+```go
+tokens, err := tm.ListTokens(ctx)
+for _, token := range tokens {
+    fmt.Printf("Token: %s (%d policies)\n",
+        token.Description, len(token.Policies))
+}
+```
+
+## Token-Policy Management
+
+### Attach Policy to Token
+
+```go
+err := tm.AttachPolicy(ctx, "token-accessor-id", "policy-id")
+```
+
+### Detach Policy from Token
+
+```go
+err := tm.DetachPolicy(ctx, "token-accessor-id", "policy-id")
+```
+
+### List Token's Policies
+
+```go
+policies, err := tm.ListTokenPolicies(ctx, "token-accessor-id")
+for _, policy := range policies {
+    fmt.Printf("Policy: %s\n  Rules:\n%s\n", policy.Name, policy.Rules)
+}
+```
+
+## Complete Example: Vault Setup
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
+)
+
+func setupVaultACL() error {
+    ctx := context.Background()
+
+    // Create managers
+    pm, err := acl.NewPolicyManager(ctx, "127.0.0.1:8500", "bootstrap-token")
+    if err != nil {
+        return err
+    }
+
+    tm, err := acl.NewTokenManager(ctx, "127.0.0.1:8500", "bootstrap-token")
+    if err != nil {
+        return err
+    }
+
+    // 1. Create Vault access policy
+    policy := acl.BuildVaultAccessPolicy()
+    createdPolicy, err := pm.CreatePolicy(ctx, policy)
+    if err != nil {
+        return fmt.Errorf("failed to create policy: %w", err)
+    }
+
+    log.Printf("Created policy: %s (ID: %s)", createdPolicy.Name, createdPolicy.ID)
+
+    // 2. Create token for Vault
+    token := &acl.Token{
+        Description: "Vault server token",
+        Policies:    []string{createdPolicy.ID},
+        Local:       false, // Replicate across datacenters
+    }
+
+    createdToken, err := tm.CreateToken(ctx, token)
+    if err != nil {
+        return fmt.Errorf("failed to create token: %w", err)
+    }
+
+    log.Printf("Created token:")
+    log.Printf("  AccessorID: %s", createdToken.AccessorID)
+    log.Printf("  SecretID: %s", createdToken.SecretID)
+    log.Printf("\nConfigure Vault with:")
+    log.Printf("  export CONSUL_HTTP_TOKEN=%s", createdToken.SecretID)
+
+    return nil
+}
+
+func main() {
+    if err := setupVaultACL(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+## Policy Validation
+
+All policies are validated before creation/update:
+
+```go
+policy := &acl.Policy{
+    Name: "test-policy",
+    Rules: `
+    service "web" {
+      policy = "read"
+    }
+    `, // Missing closing brace
+}
+
+err := pm.ValidatePolicy(ctx, policy)
+// Returns: "policy rules contain invalid HCL syntax"
+```
+
+## Error Handling
+
+All operations follow ASSESS → INTERVENE → EVALUATE pattern:
+
+```go
+policy, err := pm.CreatePolicy(ctx, policy)
+if err != nil {
+    // Errors include context
+    log.Printf("Policy creation failed: %v\n", err)
+    // Examples:
+    // - "policy validation failed: policy name is required"
+    // - "failed to create policy vault-access: ACL support disabled"
+    // - "policy xyz not found after creation" (EVALUATE failure)
+}
+```
+
+## Integration with Vault
+
+### Update vault/service.go
+
+Replace file-based Vault registration:
+
+```go
+// OLD: pkg/consul/vault/service.go
+func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
+    // Writes JSON file to /etc/consul.d/vault-service.json
+}
+
+// NEW: Use registry + ACL
+func RegisterVaultWithACL(rc *eos_io.RuntimeContext) error {
+    ctx := rc.Ctx
+
+    // 1. Create ACL policy
+    pm, _ := acl.NewPolicyManager(ctx, "127.0.0.1:8500", aclToken)
+    policy := acl.BuildVaultAccessPolicy()
+    createdPolicy, _ := pm.CreatePolicy(ctx, policy)
+
+    // 2. Create token
+    tm, _ := acl.NewTokenManager(ctx, "127.0.0.1:8500", aclToken)
+    token := &acl.Token{
+        Description: "Vault server",
+        Policies:    []string{createdPolicy.ID},
+    }
+    createdToken, _ := tm.CreateToken(ctx, token)
+
+    // 3. Register service using registry (from P1 Task 1)
+    reg, _ := registry.NewServiceRegistry(ctx, "127.0.0.1:8500")
+    service := &registry.ServiceRegistration{
+        ID:   "vault-" + hostname,
+        Name: "vault",
+        // ...
+    }
+    reg.RegisterService(ctx, service)
+
+    // 4. Configure Vault with token
+    vaultConfig := fmt.Sprintf(`
+storage "consul" {
+  address = "127.0.0.1:8500"
+  path    = "vault/"
+  token   = "%s"
+}
+`, createdToken.SecretID)
+
+    return nil
+}
+```
+
+## Testing
+
+Mockable interfaces for testing:
+
+```go
+type MockPolicyManager struct {
+    Policies map[string]*acl.Policy
+}
+
+func (m *MockPolicyManager) CreatePolicy(ctx context.Context, policy *acl.Policy) (*acl.Policy, error) {
+    policy.ID = "mock-policy-id"
+    m.Policies[policy.ID] = policy
+    return policy, nil
+}
+
+// Use in tests
+pm := &MockPolicyManager{Policies: make(map[string]*acl.Policy)}
+policy := acl.BuildVaultAccessPolicy()
+created, _ := pm.CreatePolicy(ctx, policy)
+```
+
+## Troubleshooting
+
+### ACLs Not Enabled
+
+```bash
+$ eos consul acl policy list
+Error: ACL support disabled
+```
+
+Solution: Enable ACLs in Consul configuration:
+```hcl
+acl {
+  enabled = true
+  default_policy = "deny"
+  enable_token_persistence = true
+}
+```
+
+### Token Permission Denied
+
+```bash
+Error: failed to create policy: Permission denied
+```
+
+Solution: Ensure management token has `acl = "write"` permission.
+
+### Policy Not Found After Creation
+
+This indicates a Consul cluster issue (split brain, network partition). Check:
+- Consul cluster health: `consul members`
+- Raft status: `consul operator raft list-peers`
+
+## Future Enhancements
+
+- [ ] Role management (groups of policies)
+- [ ] Auth method integration (Kubernetes, JWT, OIDC)
+- [ ] Binding rules for automatic policy attachment
+- [ ] Policy namespaces (Consul Enterprise)
+- [ ] Token self-service operations
+- [ ] Automated token rotation

@@ -15,6 +15,33 @@ import (
 	"go.uber.org/zap"
 )
 
+// NOTE: Constants duplicated from pkg/consul/constants.go to avoid circular import
+// pkg/consul/config → pkg/consul → pkg/consul/cluster → pkg/consul/config creates a cycle
+// CRITICAL: Keep in sync with pkg/consul/constants.go
+
+const (
+	// File paths - duplicates consul.Consul*
+	consulConfigFile        = "/etc/consul.d/consul.hcl"
+	consulVaultHelperPath   = "/usr/local/bin/consul-vault-helper"
+	consulDefaultDataDir    = "/opt/consul"
+	consulUser              = "consul"
+	consulGroup             = "consul"
+
+	// Ports - duplicates consul.Port*
+	portServer  = 8300
+	portSerfLAN = 8301
+	portSerfWAN = 8302
+	portHTTP    = 8500
+	portgRPC    = 8502
+	portDNS     = 8600
+
+	// Permissions - duplicates consul.Consul*Perm
+	// RATIONALE: Config files contain ACL tokens, gossip encryption keys, TLS certs
+	// SECURITY: Prevents unauthorized reads of sensitive cluster credentials
+	// THREAT MODEL: Mitigates privilege escalation via credential theft
+	consulConfigPerm = 0640
+)
+
 // Generate creates the Consul configuration file
 // Migrated from cmd/create/consul.go generateConsulConfig
 func Generate(rc *eos_io.RuntimeContext, cfg *ConsulConfig) error {
@@ -78,20 +105,20 @@ datacenter = "%s"
 node_name = "%s"
 
 # Data directory
-data_dir = "/opt/consul"
+data_dir = "%s"
 
 # Server mode configuration
 %s
 
 # Custom ports configuration for Eos
 ports {
-  http = %d      # HTTP API (Eos standard instead of 8500)
+  http = %d      # HTTP API (Eos standard instead of %d)
   https = -1       # Disabled for now
-  grpc = 8502      # Keep default for internal communication
-  dns = 8600       # Keep default DNS
-  serf_lan = 8301  # Keep default for LAN gossip
-  serf_wan = 8302  # Keep default for WAN gossip
-  server = 8300    # Keep default for RPC
+  grpc = %d      # Keep default for internal communication
+  dns = %d       # Keep default DNS
+  serf_lan = %d  # Keep default for LAN gossip
+  serf_wan = %d  # Keep default for WAN gossip
+  server = %d    # Keep default for RPC
 }
 
 # Network configuration
@@ -180,12 +207,14 @@ watches = [
   {
     type = "services"
     handler_type = "script"
-    args = ["/usr/local/bin/consul-vault-helper", "watch"]
+    args = ["%s", "watch"]
   }
 ]
-`, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, serverConfig, shared.PortConsul, iface.IP, iface.IP, iface.IP, logLevel)
+`, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, consulDefaultDataDir, serverConfig,
+		shared.PortConsul, portHTTP, portgRPC, portDNS, portSerfLAN, portSerfWAN, portServer,
+		iface.IP, iface.IP, iface.IP, logLevel, consulVaultHelperPath)
 
-	configPath := "/etc/consul.d/consul.hcl"
+	configPath := consulConfigFile
 
 	// Log first 30 lines of config for debugging (before writing)
 	configLines := strings.Split(config, "\n")
@@ -208,7 +237,7 @@ watches = [
 	tempPath := configPath + ".tmp"
 
 	// Write to temp file with sync
-	file, err := os.OpenFile(tempPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0640)
+	file, err := os.OpenFile(tempPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, consulConfigPerm)
 	if err != nil {
 		return fmt.Errorf("failed to open temp config file: %w", err)
 	}
@@ -251,7 +280,7 @@ watches = [
 	}
 
 	// Force correct permissions before rename
-	if err := os.Chmod(tempPath, 0640); err != nil {
+	if err := os.Chmod(tempPath, consulConfigPerm); err != nil {
 		return fmt.Errorf("failed to set temp config permissions: %w", err)
 	}
 
@@ -264,7 +293,7 @@ watches = [
 	writeSuccess = true // Prevent temp file cleanup
 
 	// Set ownership (after successful rename)
-	if err := execute.RunSimple(rc.Ctx, "chown", "consul:consul", configPath); err != nil {
+	if err := execute.RunSimple(rc.Ctx, "chown", fmt.Sprintf("%s:%s", consulUser, consulGroup), configPath); err != nil {
 		return fmt.Errorf("failed to set config ownership: %w", err)
 	}
 
@@ -277,9 +306,9 @@ watches = [
 		return fmt.Errorf("failed to verify config file: %w", err)
 	}
 
-	if info.Mode().Perm() != 0640 {
+	if info.Mode().Perm() != consulConfigPerm {
 		log.Warn("Config file permissions not as expected",
-			zap.String("expected", "0640"),
+			zap.String("expected", fmt.Sprintf("%04o", consulConfigPerm)),
 			zap.String("actual", info.Mode().Perm().String()))
 	}
 

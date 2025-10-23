@@ -14,13 +14,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // RunPreflightChecks performs comprehensive pre-installation validation
-func RunPreflightChecks(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
+func RunPreflightChecks(rc *eos_io.RuntimeContext, config *consul.ConsulConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	checks := []PreflightCheck{
@@ -157,7 +158,7 @@ func checkSystemRequirements(rc *eos_io.RuntimeContext) error {
 }
 
 // checkPortsAvailable verifies required ports are available
-func checkPortsAvailable(rc *eos_io.RuntimeContext, ports PortConfig) error {
+func checkPortsAvailable(rc *eos_io.RuntimeContext, ports consul.PortConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	requiredPorts := map[string]int{
@@ -380,7 +381,7 @@ func checkUserPermissions(rc *eos_io.RuntimeContext) error {
 }
 
 // checkFirewallConfiguration checks firewall configuration
-func checkFirewallConfiguration(rc *eos_io.RuntimeContext, ports PortConfig) error {
+func checkFirewallConfiguration(rc *eos_io.RuntimeContext, ports consul.PortConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if firewall is active
