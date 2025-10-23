@@ -4,7 +4,7 @@ package create
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt_nomad"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -12,168 +12,225 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO: refactor
 var (
-	bionicgptPort                      int
-	bionicgptPostgresPassword          string
-	bionicgptJWTSecret                 string
-	bionicgptAppName                   string
+	// Required flags
+	bionicgptDomain    string
+	bionicgptCloudNode string
+	bionicgptAuthURL   string
+
+	// Authentication configuration
+	bionicgptSuperadminGroup string
+	bionicgptDemoGroup       string
+	bionicgptGroupPrefix     string
+
+	// Azure OpenAI configuration
 	bionicgptAzureEndpoint             string
 	bionicgptAzureChatDeployment       string
 	bionicgptAzureEmbeddingsDeployment string
-	bionicgptAzureAPIKey               string
-	bionicgptUseLocalEmbeddings        bool
-	bionicgptLocalEmbeddingsModel      string
-	bionicgptForce                     bool
-	bionicgptSkipHealthCheck           bool
+
+	// Local embeddings configuration
+	bionicgptUseLocalEmbeddings   bool
+	bionicgptLocalEmbeddingsModel string
+
+	// Infrastructure configuration
+	bionicgptNomadAddress  string
+	bionicgptConsulAddress string
+	bionicgptNamespace     string
+
+	// Deployment options
+	bionicgptDryRun          bool
+	bionicgptForce           bool
+	bionicgptSkipHealthCheck bool
 )
 
 func init() {
 	bionicgptCmd := &cobra.Command{
 		Use:   "bionicgpt",
-		Short: "Deploy BionicGPT multi-tenant LLM platform with Azure OpenAI",
-		Long: `Deploy BionicGPT configured for multi-tenant LLM deployment with Azure OpenAI via LiteLLM proxy.
-
-BionicGPT provides an enterprise-grade ChatGPT replacement with:
-• Multi-tenant team isolation with PostgreSQL Row-Level Security
-• Azure OpenAI integration via LiteLLM translation proxy
-• Retrieval-Augmented Generation (RAG) with document processing
-• Comprehensive audit logging and governance
-• Team-based access control
-• Document chunking and embeddings pipeline
-• Vault-managed secrets for PostgreSQL, JWT, and Azure API keys
-
-The deployment includes:
-- Docker Compose setup in /opt/bionicgpt
-- PostgreSQL with pgVector for embeddings
-- LiteLLM proxy for Azure OpenAI compatibility (translates OpenAI format ↔ Azure format)
-- Azure OpenAI integration (no local LLM required)
-- Document parsing and chunking engine
-- RAG pipeline for document retrieval
-- Web interface on port 8513 (next available prime)
-- LiteLLM proxy on port 4000 (internal)
-- Comprehensive multi-tenancy validation
-- Health checks and verification
-- Persistent data storage
-- HashiCorp Vault secret management
+		Short: "Deploy BionicGPT with Nomad orchestration, Hecate reverse proxy, and Authentik SSO",
+		Long: `Deploy BionicGPT enterprise multi-tenant LLM platform using Nomad orchestration.
 
 Architecture:
-  BionicGPT (OpenAI format) → LiteLLM Proxy (translator) → Azure OpenAI → Your Credits
+  - Nomad orchestration on local node
+  - Hecate reverse proxy on cloud node (Caddy + Authentik)
+  - Consul service discovery (WAN joined)
+  - Tailscale VPN between nodes
+  - PostgreSQL with pgVector for RAG
+  - LiteLLM proxy for Azure OpenAI
+  - Ollama for local embeddings (optional)
+  - oauth2-proxy for SSO authentication
+
+Enterprise Features:
+  • Multi-tenant team isolation with PostgreSQL Row-Level Security
+  • Authentik SSO with OAuth2/OIDC
+  • Hecate reverse proxy with automatic routing
+  • Consul service discovery and health checks
+  • Vault-managed secrets
+  • Retrieval-Augmented Generation (RAG) with document processing
+  • Comprehensive audit logging and governance
 
 Examples:
-  # Interactive installation (will prompt for Azure configuration)
-  eos create bionicgpt
-
-  # Specify Azure OpenAI configuration with deployment names
+  # Basic deployment (minimal required flags)
   eos create bionicgpt \
+    --domain chat.example.com \
+    --cloud-node cloud-hecate \
+    --auth-url https://auth.example.com
+
+  # Full deployment with Azure OpenAI and local embeddings
+  eos create bionicgpt \
+    --domain chat.example.com \
+    --cloud-node cloud-hecate \
+    --auth-url https://auth.example.com \
     --azure-endpoint https://my-resource.openai.azure.com \
     --azure-chat-deployment gpt-4-deployment \
-    --azure-embeddings-deployment text-embedding-ada-002 \
-    --azure-api-key $AZURE_KEY
+    --local-embeddings
 
-  # Custom port
-  eos create bionicgpt --port 8080
+  # Dry run to check configuration
+  eos create bionicgpt \
+    --domain chat.example.com \
+    --cloud-node cloud-hecate \
+    --auth-url https://auth.example.com \
+    --dry-run
 
-  # Force reinstall
-  eos create bionicgpt --force
+Prerequisites:
+  1. Tailscale installed and connected on both nodes
+  2. Authentik API token stored in Vault
+  3. Consul accessible on cloud node
+  4. Caddy Admin API accessible on cloud node
+
+  Run 'eos create bionicgpt --help' for more details.
 
 Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 		RunE: eos.Wrap(runCreateBionicGPT),
 	}
 
-	// Configuration flags
-	bionicgptCmd.Flags().IntVar(&bionicgptPort, "port", 0,
-		"External port to expose (default: 8513)")
-	bionicgptCmd.Flags().StringVar(&bionicgptPostgresPassword, "postgres-password", "",
-		"PostgreSQL password (retrieved from Vault if not provided)")
-	bionicgptCmd.Flags().StringVar(&bionicgptJWTSecret, "jwt-secret", "",
-		"JWT secret for authentication (retrieved from Vault if not provided)")
-	bionicgptCmd.Flags().StringVar(&bionicgptAppName, "app-name", "BionicGPT",
-		"Display name for the application")
+	// Required flags
+	bionicgptCmd.Flags().StringVar(&bionicgptDomain, "domain", "",
+		"Public domain for BionicGPT (e.g., chat.example.com) [REQUIRED]")
+	bionicgptCmd.MarkFlagRequired("domain")
+
+	bionicgptCmd.Flags().StringVar(&bionicgptCloudNode, "cloud-node", "",
+		"Cloud node hostname for Hecate/Authentik (Tailscale name) [REQUIRED]")
+	bionicgptCmd.MarkFlagRequired("cloud-node")
+
+	bionicgptCmd.Flags().StringVar(&bionicgptAuthURL, "auth-url", "",
+		"Authentik URL (e.g., https://auth.example.com) [REQUIRED]")
+	bionicgptCmd.MarkFlagRequired("auth-url")
+
+	// Authentication configuration
+	bionicgptCmd.Flags().StringVar(&bionicgptSuperadminGroup, "superadmin-group", "bionicgpt-superadmin",
+		"Authentik group for superadmins")
+	bionicgptCmd.Flags().StringVar(&bionicgptDemoGroup, "demo-group", "bionicgpt-demo-tenant",
+		"Authentik group for demo tenant")
+	bionicgptCmd.Flags().StringVar(&bionicgptGroupPrefix, "group-prefix", "bionicgpt-",
+		"Prefix for BionicGPT groups in Authentik")
 
 	// Azure OpenAI configuration (via LiteLLM proxy)
 	bionicgptCmd.Flags().StringVar(&bionicgptAzureEndpoint, "azure-endpoint", "",
-		"Azure OpenAI endpoint URL (will prompt if not provided)")
+		"Azure OpenAI endpoint URL")
 	bionicgptCmd.Flags().StringVar(&bionicgptAzureChatDeployment, "azure-chat-deployment", "",
-		"Azure OpenAI chat deployment name, e.g., gpt-4-deployment (will prompt if not provided)")
+		"Azure OpenAI chat deployment name (e.g., gpt-4-deployment)")
 	bionicgptCmd.Flags().StringVar(&bionicgptAzureEmbeddingsDeployment, "azure-embeddings-deployment", "",
-		"Azure OpenAI embeddings deployment name, e.g., text-embedding-ada-002 (will prompt if not provided)")
-	bionicgptCmd.Flags().StringVar(&bionicgptAzureAPIKey, "azure-api-key", "",
-		"Azure OpenAI API key (retrieved from Vault if not provided)")
+		"Azure OpenAI embeddings deployment name (optional if using local embeddings)")
 
 	// Local embeddings configuration (Ollama)
-	bionicgptCmd.Flags().BoolVar(&bionicgptUseLocalEmbeddings, "use-local-embeddings", false,
-		"Use local embeddings via Ollama instead of Azure (FREE, requires Ollama)")
+	bionicgptCmd.Flags().BoolVar(&bionicgptUseLocalEmbeddings, "local-embeddings", true,
+		"Use local embeddings via Ollama (default: true)")
 	bionicgptCmd.Flags().StringVar(&bionicgptLocalEmbeddingsModel, "local-embeddings-model", "nomic-embed-text",
-		"Local embeddings model to use with Ollama")
+		"Local embeddings model to use")
 
-	// Installation behavior flags
+	// Infrastructure configuration
+	bionicgptCmd.Flags().StringVar(&bionicgptNomadAddress, "nomad-address", "http://localhost:4646",
+		"Nomad API address")
+	bionicgptCmd.Flags().StringVar(&bionicgptConsulAddress, "consul-address", "localhost:8500",
+		"Consul API address")
+	bionicgptCmd.Flags().StringVar(&bionicgptNamespace, "namespace", "default",
+		"Nomad namespace")
+
+	// Deployment options
+	bionicgptCmd.Flags().BoolVar(&bionicgptDryRun, "dry-run", false,
+		"Show what would be deployed without actually deploying")
 	bionicgptCmd.Flags().BoolVar(&bionicgptForce, "force", false,
-		"Force reinstall even if already installed")
+		"Force deployment even if already exists")
 	bionicgptCmd.Flags().BoolVar(&bionicgptSkipHealthCheck, "skip-health-check", false,
-		"Skip health check after installation")
+		"Skip health check after deployment")
 
 	CreateCmd.AddCommand(bionicgptCmd)
 }
 
-// TODO: refactor
 func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Starting BionicGPT deployment")
+	logger.Info("Starting BionicGPT deployment with Nomad orchestration")
 
-	// Create installation config from flags
-	config := &bionicgpt.InstallConfig{
-		Port:                      bionicgptPort,
-		PostgresPassword:          bionicgptPostgresPassword,
-		JWTSecret:                 bionicgptJWTSecret,
-		AppName:                   bionicgptAppName,
+	// Build configuration from flags
+	config := &bionicgpt_nomad.EnterpriseConfig{
+		// Core deployment
+		Domain:    bionicgptDomain,
+		CloudNode: bionicgptCloudNode,
+		Namespace: bionicgptNamespace,
+
+		// Authentication
+		AuthURL:         bionicgptAuthURL,
+		SuperadminGroup: bionicgptSuperadminGroup,
+		DemoGroup:       bionicgptDemoGroup,
+		GroupPrefix:     bionicgptGroupPrefix,
+
+		// Azure OpenAI (via LiteLLM)
 		AzureEndpoint:             bionicgptAzureEndpoint,
 		AzureChatDeployment:       bionicgptAzureChatDeployment,
 		AzureEmbeddingsDeployment: bionicgptAzureEmbeddingsDeployment,
-		AzureAPIKey:               bionicgptAzureAPIKey,
-		UseLocalEmbeddings:        bionicgptUseLocalEmbeddings,
-		LocalEmbeddingsModel:      bionicgptLocalEmbeddingsModel,
-		ForceReinstall:            bionicgptForce,
-		SkipHealthCheck:           bionicgptSkipHealthCheck,
+
+		// Local embeddings (Ollama)
+		UseLocalEmbeddings:   bionicgptUseLocalEmbeddings,
+		LocalEmbeddingsModel: bionicgptLocalEmbeddingsModel,
+
+		// Infrastructure
+		NomadAddress:  bionicgptNomadAddress,
+		ConsulAddress: bionicgptConsulAddress,
+
+		// Deployment options
+		DryRun:          bionicgptDryRun,
+		Force:           bionicgptForce,
+		SkipHealthCheck: bionicgptSkipHealthCheck,
 	}
 
-	// Create installer
-	installer := bionicgpt.NewBionicGPTInstaller(rc, config)
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		logger.Error("Configuration validation failed", zap.Error(err))
+		return err
+	}
 
-	// Run installation
+	// Create Nomad-based enterprise installer
+	installer := bionicgpt_nomad.NewEnterpriseInstaller(rc, config)
+
+	// Run 9-phase installation
 	if err := installer.Install(); err != nil {
 		logger.Error("BionicGPT deployment failed", zap.Error(err))
 		return err
 	}
 
-	// Display success message with instructions
+	// Success message
 	logger.Info("================================================================================")
-	logger.Info("BionicGPT deployment completed successfully")
+	logger.Info("BionicGPT Deployment Completed Successfully")
 	logger.Info("================================================================================")
 	logger.Info("")
 	logger.Info("Access BionicGPT",
-		zap.String("url", fmt.Sprintf("http://localhost:%d", config.Port)),
-		zap.Int("port", config.Port))
+		zap.String("url", fmt.Sprintf("https://%s", config.Domain)))
+	logger.Info("Authentik SSO",
+		zap.String("url", config.AuthURL))
 	logger.Info("")
 	logger.Info("Next steps:")
-	logger.Info(fmt.Sprintf("  1. Open your browser and go to http://localhost:%d", config.Port))
-	logger.Info("  2. Create your first team")
-	logger.Info("  3. Upload documents for RAG functionality")
-	logger.Info("  4. Start chatting with Azure OpenAI")
-	logger.Info("")
-	logger.Info("Features enabled:")
-	logger.Info("  Multi-tenant isolation with PostgreSQL RLS")
-	logger.Info("  Azure OpenAI integration")
-	logger.Info("  Document RAG pipeline with embeddings")
-	logger.Info("  Comprehensive audit logging")
-	logger.Info("  Vault-managed secrets")
+	logger.Info("  1. Navigate to your domain and log in via Authentik")
+	logger.Info(fmt.Sprintf("  2. Users in group '%s' will have superadmin access", config.SuperadminGroup))
+	logger.Info(fmt.Sprintf("  3. Users in group '%s' will have demo tenant access", config.DemoGroup))
+	logger.Info("  4. Upload documents for RAG functionality")
+	logger.Info("  5. Start chatting with your LLM")
 	logger.Info("")
 	logger.Info("Useful commands:")
-	logger.Info("  View logs:        docker compose -f /opt/bionicgpt/docker-compose.yml logs -f")
-	logger.Info("  Stop service:     docker compose -f /opt/bionicgpt/docker-compose.yml down")
-	logger.Info("  Restart service:  docker compose -f /opt/bionicgpt/docker-compose.yml restart")
-	logger.Info("  Check status:     docker compose -f /opt/bionicgpt/docker-compose.yml ps")
+	logger.Info("  Check Nomad jobs:     nomad job status bionicgpt")
+	logger.Info("  Check Consul:         consul catalog services | grep bionicgpt")
+	logger.Info("  View logs:            nomad alloc logs <ALLOC_ID>")
+	logger.Info("  Check health:         nomad job deployments bionicgpt")
 	logger.Info("")
 	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
 	logger.Info("================================================================================")

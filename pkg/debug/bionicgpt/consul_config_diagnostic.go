@@ -35,8 +35,8 @@ func ConsulConfigDiagnostic() *debug.Diagnostic {
 
 			// Expected configuration keys in Consul KV
 			expectedKeys := map[string]string{
-				"azure_endpoint":             "Azure OpenAI endpoint URL",
-				"azure_chat_deployment":      "Azure chat model deployment name",
+				"azure_endpoint":              "Azure OpenAI endpoint URL",
+				"azure_chat_deployment":       "Azure chat model deployment name",
 				"azure_embeddings_deployment": "Azure embeddings deployment name",
 				"port":                        "BionicGPT web interface port",
 				"litellm_port":                "LiteLLM proxy internal port",

@@ -1,0 +1,120 @@
+# Ollama for Local Embeddings
+# Managed by Eos - Generated from template
+
+job "{{.Namespace}}-ollama" {
+  datacenters = ["{{.Datacenter}}"]
+  namespace   = "{{.Namespace}}"
+  type        = "service"
+
+  # Constraint: Only run on nodes tagged as local
+  constraint {
+    attribute = "${meta.location}"
+    value     = "local"
+  }
+
+  group "embeddings" {
+    count = 1
+
+    # Restart policy
+    restart {
+      attempts = 3
+      delay    = "15s"
+      interval = "5m"
+      mode     = "fail"
+    }
+
+    # Persistent storage for Ollama models
+    volume "ollama_models" {
+      type      = "host"
+      source    = "ollama_models"
+      read_only = false
+    }
+
+    network {
+      mode = "host"
+      port "http" {
+        static = 11434
+      }
+    }
+
+    task "ollama" {
+      driver = "docker"
+
+      config {
+        image = "ollama/ollama:latest"
+        ports = ["http"]
+
+        force_pull = false
+      }
+
+      # Volume mount for model storage
+      volume_mount {
+        volume      = "ollama_models"
+        destination = "/root/.ollama"
+        read_only   = false
+      }
+
+      # Environment variables
+      env {
+        OLLAMA_HOST = "0.0.0.0:11434"
+      }
+
+      # Resource allocation (embeddings need good CPU/RAM)
+      resources {
+        cpu    = 2000  # 2 CPU cores
+        memory = 4096  # 4 GB RAM
+      }
+
+      # Consul service registration
+      service {
+        name = "ollama"
+        port = "http"
+
+        tags = [
+          "llm",
+          "embeddings",
+          "ollama",
+          "bionicgpt"
+        ]
+
+        meta {
+          version = "latest"
+          model   = "{{.LocalEmbeddingsModel}}"
+        }
+
+        # HTTP health check
+        check {
+          type     = "http"
+          path     = "/"
+          port     = "http"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+    }
+
+    # Post-start task to pull the embedding model
+    task "model-puller" {
+      driver = "docker"
+
+      lifecycle {
+        hook    = "poststart"
+        sidecar = false
+      }
+
+      config {
+        image   = "curlimages/curl:latest"
+        command = "sh"
+        args = [
+          "-c",
+          "sleep 10 && curl -X POST http://127.0.0.1:11434/api/pull -d '{\"name\":\"{{.LocalEmbeddingsModel}}\"}'"
+        ]
+      }
+
+      resources {
+        cpu    = 100
+        memory = 128
+      }
+    }
+  }
+}

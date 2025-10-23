@@ -1,0 +1,137 @@
+# LiteLLM Proxy for Azure OpenAI Integration
+# Managed by Eos - Generated from template
+
+job "{{.Namespace}}-litellm" {
+  datacenters = ["{{.Datacenter}}"]
+  namespace   = "{{.Namespace}}"
+  type        = "service"
+
+  # Constraint: Only run on nodes tagged as local
+  constraint {
+    attribute = "${meta.location}"
+    value     = "local"
+  }
+
+  group "llm" {
+    count = 1
+
+    # Restart policy
+    restart {
+      attempts = 3
+      delay    = "15s"
+      interval = "5m"
+      mode     = "fail"
+    }
+
+    network {
+      mode = "host"
+      port "http" {
+        static = 4000
+      }
+    }
+
+    task "litellm" {
+      driver = "docker"
+
+      config {
+        image = "ghcr.io/berriai/litellm:latest"
+        ports = ["http"]
+
+        force_pull = true
+      }
+
+      # Environment variables
+      env {
+        CONFIG_FILE = "/app/config.yaml"
+      }
+
+      # Vault integration for Azure credentials
+      vault {
+        policies      = ["bionicgpt-policy"]
+        change_mode   = "restart"
+        change_signal = "SIGTERM"
+      }
+
+      # Generate LiteLLM configuration file
+      template {
+        data = <<EOH
+model_list:
+  # Azure OpenAI for chat
+  - model_name: gpt-4
+    litellm_params:
+{{ with secret "{{.VaultAzureSecretPath}}" }}
+      model: azure/{{ .Data.data.chat_deployment }}
+      api_base: {{ .Data.data.endpoint }}
+      api_key: {{ .Data.data.api_key }}
+{{ end }}
+      api_version: "2024-02-15-preview"
+
+{{ if .UseLocalEmbeddings }}
+  # Local Ollama for embeddings
+  - model_name: text-embedding-nomic
+    litellm_params:
+      model: ollama/{{.LocalEmbeddingsModel}}
+{{ range service "ollama" }}
+      api_base: http://{{ .Address }}:{{ .Port }}
+{{ end }}
+{{ else }}
+  # Azure OpenAI for embeddings
+  - model_name: text-embedding-ada
+    litellm_params:
+{{ with secret "{{.VaultAzureSecretPath}}" }}
+      model: azure/{{ .Data.data.embeddings_deployment }}
+      api_base: {{ .Data.data.endpoint }}
+      api_key: {{ .Data.data.api_key }}
+{{ end }}
+      api_version: "2024-02-15-preview"
+{{ end }}
+
+litellm_settings:
+  drop_params: true
+  success_callback: []
+  failure_callback: []
+  set_verbose: false
+
+general_settings:
+{{ with secret "{{.VaultLiteLLMSecretPath}}" }}
+  master_key: "{{ .Data.data.master_key }}"
+{{ end }}
+  database_url: null
+EOH
+        destination = "local/litellm_config.yaml"
+      }
+
+      # Resource allocation
+      resources {
+        cpu    = 1000  # 1 CPU core
+        memory = 2048  # 2 GB RAM
+      }
+
+      # Consul service registration
+      service {
+        name = "litellm"
+        port = "http"
+
+        tags = [
+          "llm",
+          "proxy",
+          "azure-openai",
+          "bionicgpt"
+        ]
+
+        meta {
+          version = "latest"
+        }
+
+        # HTTP health check
+        check {
+          type     = "http"
+          path     = "/health"
+          port     = "http"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+    }
+  }
+}

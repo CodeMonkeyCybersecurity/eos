@@ -12,7 +12,31 @@ var deleteBionicGPTCmd = &cobra.Command{
 	Short: "Delete BionicGPT installation and optionally backup data",
 	Long: `Safely delete BionicGPT installation with optional data backup.
 
-This command will:
+DEPRECATION NOTICE:
+This command only works for Docker Compose-based BionicGPT installations.
+If you deployed BionicGPT with Nomad orchestration (default in recent versions),
+you must manually delete using Nomad commands:
+
+  # Stop Nomad jobs
+  nomad job stop default-bionicgpt
+  nomad job stop default-bionicgpt-postgres
+  nomad job stop default-litellm     # If Azure configured
+  nomad job stop default-ollama      # If local embeddings
+
+  # Purge jobs (removes from history)
+  nomad job purge default-bionicgpt
+  nomad job purge default-bionicgpt-postgres
+  nomad job purge default-litellm
+  nomad job purge default-ollama
+
+  # Remove Vault secrets
+  vault kv delete secret/bionicgpt/oauth
+  vault kv delete secret/bionicgpt/db
+  vault kv delete secret/bionicgpt/litellm
+
+  # Remove Authentik configuration manually via Authentik UI
+
+For Docker Compose deployments, this command will:
 1. Stop all BionicGPT containers
 2. Optionally backup the data volumes to /opt/bionicgpt/backups/
 3. Remove all Docker containers
