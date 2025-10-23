@@ -1268,43 +1268,33 @@ log_format = "json"
 func (vi *VaultInstaller) verify() error {
 	vi.logger.Info("Verifying Vault installation")
 
-	// Check service status
-	if !vi.systemd.IsActive() {
-		return fmt.Errorf("vault service is not active")
+	// NOTE: Service start has been moved to Phase 5 (StartVaultService).
+	// During Phases 1-4 (installer.Install()), the service is NOT started yet.
+	// We only verify that files exist and are configured correctly.
+	// Service activation check happens in Phase 5.
+
+	// Check binary exists
+	if _, err := os.Stat(vi.config.BinaryPath); err != nil {
+		return fmt.Errorf("vault binary not found at %s: %w", vi.config.BinaryPath, err)
 	}
 
-	// Check Vault status using RunWithExitCode to properly handle exit code 2 (sealed)
-	// Vault returns different exit codes:
-	// - 0: unsealed and ready
-	// - 1: error occurred
-	// - 2: sealed (expected for new installation)
-	output, exitCode, err := vi.runner.RunWithExitCode(vi.config.BinaryPath, "status")
-	if err != nil {
-		// This is an actual execution error (not just non-zero exit code)
-		return fmt.Errorf("vault is not responding to commands: %w", err)
+	// Check config exists
+	if _, err := os.Stat(vi.config.ConfigPath); err != nil {
+		return fmt.Errorf("vault config not found at %s: %w", vi.config.ConfigPath, err)
 	}
 
-	vi.logger.Debug("Vault status check completed",
-		zap.Int("exit_code", exitCode),
-		zap.String("output", output))
-
-	switch exitCode {
-	case 0:
-		vi.logger.Info("Vault is installed and unsealed")
-	case 2:
-		vi.logger.Info("Vault is installed and sealed (expected for new installation)")
-	default:
-		return fmt.Errorf("vault status returned unexpected exit code %d: %s", exitCode, output)
+	// Check data directory exists
+	if _, err := os.Stat(VaultDataDir); err != nil {
+		return fmt.Errorf("vault data directory not found at %s: %w", VaultDataDir, err)
 	}
 
-	// Log success information
 	vi.logger.Info("Vault installation verified successfully",
-		zap.String("storage_backend", vi.config.StorageBackend),
-		zap.String("api_url", vi.config.APIAddr))
+		zap.String("binary", vi.config.BinaryPath),
+		zap.String("config", vi.config.ConfigPath),
+		zap.String("data_dir", VaultDataDir),
+		zap.String("storage_backend", vi.config.StorageBackend))
 
-	// NOTE: Vault is now ready for Phase 6-15 initialization
-	// The orchestration layer (cmd/create/vault.go) will call EnableVault() next
-	// No user instructions needed here - EnableVault handles initialization automatically
+	vi.logger.Info("Phase 1-4 verification complete - ready for Phase 5 (service start)")
 
 	return nil
 }

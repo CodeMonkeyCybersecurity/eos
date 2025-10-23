@@ -595,6 +595,33 @@ func VaultCertRenewalSystemdDirectives() map[string]string {
 	}
 }
 
+// ============================================================================
+// Other Vault Systemd Services (Simple, Not Centralized)
+// ============================================================================
+//
+// The following Vault-related services have inline systemd configurations:
+//
+// 1. vault-agent-health-check.service (pkg/vault/agent_lifecycle.go:540)
+//    - Type: oneshot (runs via timer)
+//    - User: vault
+//    - Purpose: Monitors Vault Agent health
+//    - Security: Simple service, no complex directives needed
+//    - Decision: Left inline - only 5 lines, no security hardening required
+//
+// 2. vault-backup.service (pkg/vault/hardening.go:695)
+//    - Type: oneshot (runs via timer)
+//    - User: vault
+//    - Purpose: Periodic Vault data backups
+//    - Security: Simple service, no complex directives needed
+//    - Decision: Left inline - only 6 lines, no security hardening required
+//
+// RATIONALE: These services are simple oneshot tasks that don't require the
+// comprehensive security hardening of the main Vault service. Centralizing
+// them would add ~20 constants for minimal benefit. The critical security
+// configuration (main vault.service and cert renewal) is centralized above.
+//
+// If these services grow more complex in the future, consider centralizing.
+
 // FilePermission represents a file/directory with ownership and permissions
 type FilePermission struct {
 	Path  string      // Full file path
