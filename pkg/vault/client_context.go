@@ -17,6 +17,11 @@ type contextKey string
 // vaultClientKey is the context key for storing vault client
 const vaultClientKey contextKey = "vault-client"
 
+// privilegedClientKey is the context key for storing privileged (root token) vault client
+// This is used to cache the privileged client during Vault enablement to avoid
+// 30+ duplicate client initializations (each logs 9 lines = 270+ unnecessary log lines)
+const privilegedClientKey contextKey = "vault-privileged-client"
+
 // GetVaultClient retrieves the vault client from context or creates a new one
 // This function properly reads environment variables including VAULT_SKIP_VERIFY
 // for self-signed certificate support during installation.
@@ -103,4 +108,46 @@ func SetVaultClient(rc *eos_io.RuntimeContext, client *api.Client) {
 
 	logger.Debug(" Vault client stored in context successfully",
 		zap.String("context_key", string(vaultClientKey)))
+}
+
+// SetPrivilegedClient stores the privileged (root token) Vault client in the runtime context
+// This enables caching the privileged client during Vault enablement to avoid duplicate
+// initializations. Each initialization logs 9 lines and takes ~1 second.
+func SetPrivilegedClient(rc *eos_io.RuntimeContext, client *api.Client) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if client == nil {
+		logger.Warn(" Attempted to store nil privileged Vault client in context",
+			zap.String("action", "skipped"))
+		return
+	}
+
+	logger.Debug(" Storing privileged Vault client in RuntimeContext",
+		zap.String("vault_addr", client.Address()),
+		zap.Bool("has_token", client.Token() != ""))
+
+	rc.Ctx = context.WithValue(rc.Ctx, privilegedClientKey, client)
+
+	logger.Debug(" Privileged Vault client cached successfully",
+		zap.String("context_key", string(privilegedClientKey)))
+}
+
+// GetPrivilegedClient retrieves the cached privileged (root token) Vault client from context
+// Returns nil if no privileged client is cached
+func GetPrivilegedClient(rc *eos_io.RuntimeContext) *api.Client {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if client, ok := rc.Ctx.Value(privilegedClientKey).(*api.Client); ok && client != nil {
+		if client.Token() != "" {
+			logger.Debug(" Using cached privileged Vault client from context",
+				zap.String("vault_addr", client.Address()),
+				zap.Bool("has_token", true))
+			return client
+		}
+		logger.Debug(" Cached privileged client has no token")
+		return nil
+	}
+
+	logger.Debug(" No cached privileged Vault client in context")
+	return nil
 }
