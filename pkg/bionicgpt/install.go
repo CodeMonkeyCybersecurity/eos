@@ -506,10 +506,10 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 		CheckCommand:  "curl",
 		CheckArgs:     []string{"-s", "http://localhost:11434/api/version"},
 		InstallCmd:    "curl -fsSL https://ollama.ai/install.sh | sh",
-		StartCmd:      "ollama serve &",
+		StartCmd:      "systemctl enable --now ollama", // Use systemd to start Ollama service
 		Required:      true,
-		AutoInstall:   true,  // Safe to auto-install via official script
-		AutoStart:     false, // Let user start manually (daemon management varies)
+		AutoInstall:   true, // Safe to auto-install via official script
+		AutoStart:     true, // Auto-start the service (systemd manages it)
 		CustomCheckFn: preflight.CheckOllama,
 	}
 
