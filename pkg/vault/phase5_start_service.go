@@ -180,7 +180,7 @@ WantedBy=multi-user.target
 		VaultSystemdStandardError,
 	)
 
-	err := os.WriteFile(svc.ServiceName, []byte(unit), shared.FilePermStandard)
+	err := os.WriteFile(VaultServicePath, []byte(unit), shared.FilePermStandard)
 	if err != nil {
 		return fmt.Errorf("write vault server unit: %w", err)
 	}
