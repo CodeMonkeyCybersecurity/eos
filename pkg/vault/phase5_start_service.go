@@ -136,7 +136,7 @@ func waitForVaultHealth(rc *eos_io.RuntimeContext, maxWait time.Duration) error 
 			captureVaultLogsOnFailure(rc)
 			return fmt.Errorf("vault did not become healthy within %s", maxWait)
 		}
-		conn, err := net.DialTimeout("tcp", shared.GetListenerAddr(), shared.VaultRetryDelay)
+		conn, err := net.DialTimeout("tcp", shared.GetVaultHostPort(), shared.VaultRetryDelay)
 		if err == nil {
 			defer shared.SafeClose(rc.Ctx, conn)
 			otelzap.Ctx(rc.Ctx).Info(" Vault is now listening", zap.Duration("waited", time.Since(start)))

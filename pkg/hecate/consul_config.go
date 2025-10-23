@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -43,10 +44,7 @@ func NewConsulConfigManager(rc *eos_io.RuntimeContext) (*ConsulConfigManager, er
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Get Consul address from environment or use default
-	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
-	if consulAddr == "" {
-		consulAddr = "localhost:8500"
-	}
+	consulAddr := shared.GetConsulAddrWithEnv()
 
 	// Try to connect to Consul
 	config := api.DefaultConfig()

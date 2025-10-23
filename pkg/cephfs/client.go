@@ -11,7 +11,9 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/ceph/go-ceph/cephfs/admin"
 	"github.com/ceph/go-ceph/rados"
@@ -341,9 +343,11 @@ func discoverConsulMonitors(rc *eos_io.RuntimeContext, config *ClientConfig) err
 		zap.String("service", config.ConsulService))
 
 	// ASSESS: Check if Consul is available
-	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
-	if consulAddr == "" {
-		consulAddr = "127.0.0.1:8500"
+	consulAddr := shared.GetConsulHostPort() // Returns hostname:port format
+	// Note: Consul client expects host:port without protocol
+	if envAddr := os.Getenv("CONSUL_HTTP_ADDR"); envAddr != "" {
+		// If env var is set, use it (may include http://)
+		consulAddr = envAddr
 	}
 
 	logger.Debug("Connecting to Consul",

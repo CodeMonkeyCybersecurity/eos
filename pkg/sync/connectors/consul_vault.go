@@ -162,7 +162,7 @@ func (c *ConsulVaultConnector) CheckConnection(rc *eos_io.RuntimeContext, config
 		}
 	}
 
-	expectedAddr := shared.GetConsulDefaultAddr()
+	expectedAddr := shared.GetConsulHostPort()
 	correctAddress := (consulAddr == expectedAddr)
 
 	state.ConfigurationComplete = hasConsulStorage
@@ -296,7 +296,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 
 		// Create VaultIntegration to handle ACL setup
 		integration, err := consulvault.NewVaultIntegration(rc, &consulvault.IntegrationConfig{
-			ConsulAddress:    shared.GetConsulDefaultAddr(),
+			ConsulAddress:    shared.GetConsulHostPort(),
 			ConsulACLToken:   config.ConsulACLToken,
 			VaultAddress:     vaultAddress,
 			AutoCreatePolicy: true,
@@ -311,7 +311,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		} else {
 			// Register Vault and get ACL token
 			result, err := integration.RegisterVault(rc.Ctx, &consulvault.IntegrationConfig{
-				ConsulAddress:    shared.GetConsulDefaultAddr(),
+				ConsulAddress:    shared.GetConsulHostPort(),
 				ConsulACLToken:   config.ConsulACLToken,
 				VaultAddress:     vaultAddress,
 				AutoCreatePolicy: true,
@@ -340,7 +340,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 
 		// Update the address to use correct port
 		addrRegex := regexp.MustCompile(`(storage "consul"\s*\{[^}]*address\s*=\s*)"[^"]*"`)
-		updatedConfig := addrRegex.ReplaceAllString(configStr, fmt.Sprintf(`${1}"%s"`, shared.GetConsulDefaultAddr()))
+		updatedConfig := addrRegex.ReplaceAllString(configStr, fmt.Sprintf(`${1}"%s"`, shared.GetConsulHostPort()))
 
 		if updatedConfig == configStr {
 			logger.Debug("No address change needed, config already correct")
@@ -349,7 +349,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 				return fmt.Errorf("failed to update Vault config: %w", err)
 			}
 			logger.Info("Updated Consul address in Vault config",
-				zap.String("address", shared.GetConsulDefaultAddr()))
+				zap.String("address", shared.GetConsulHostPort()))
 		}
 	} else {
 		logger.Info("Adding Consul storage backend to Vault config")
@@ -365,13 +365,13 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
   address = "%s"
   path    = "%s"
   token   = "%s"
-}`, shared.GetConsulDefaultAddr(), vault.ConsulVaultStoragePrefix, vaultACLToken)
+}`, shared.GetConsulHostPort(), vault.ConsulVaultStoragePrefix, vaultACLToken)
 			logger.Info("Generated Consul storage config with ACL token")
 		} else {
 			consulStorageBlock = fmt.Sprintf(`storage "consul" {
   address = "%s"
   path    = "%s"
-}`, shared.GetConsulDefaultAddr(), vault.ConsulVaultStoragePrefix)
+}`, shared.GetConsulHostPort(), vault.ConsulVaultStoragePrefix)
 			logger.Debug("Generated Consul storage config without ACL token (ACLs not enabled)")
 		}
 
@@ -413,13 +413,13 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 service_registration "consul" {
   address = "%s"
   token   = "%s"
-}`, shared.GetConsulDefaultAddr(), vaultACLToken)
+}`, shared.GetConsulHostPort(), vaultACLToken)
 			logger.Info("Generated Consul service registration config with ACL token")
 		} else {
 			serviceRegBlock = fmt.Sprintf(`
 service_registration "consul" {
   address = "%s"
-}`, shared.GetConsulDefaultAddr())
+}`, shared.GetConsulHostPort())
 			logger.Debug("Generated Consul service registration config without ACL token")
 		}
 
@@ -493,8 +493,8 @@ func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctyp
 		return fmt.Errorf("vault config does not contain Consul storage backend")
 	}
 
-	if !strings.Contains(string(configContent), shared.GetConsulDefaultAddr()) {
-		return fmt.Errorf("vault config does not contain correct Consul address: %s", shared.GetConsulDefaultAddr())
+	if !strings.Contains(string(configContent), shared.GetConsulHostPort()) {
+		return fmt.Errorf("vault config does not contain correct Consul address: %s", shared.GetConsulHostPort())
 	}
 
 	// Verify Consul storage backend accessibility
@@ -521,7 +521,7 @@ func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctyp
 	}
 
 	logger.Info("Connection verified successfully",
-		zap.String("consul_addr", shared.GetConsulDefaultAddr()))
+		zap.String("consul_addr", shared.GetConsulHostPort()))
 
 	return nil
 }

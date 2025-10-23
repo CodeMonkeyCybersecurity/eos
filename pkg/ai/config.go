@@ -163,10 +163,7 @@ func (cm *ConfigManager) GetAPIKey(rc *eos_io.RuntimeContext) (string, error) {
 		logger.Debug("Attempting to retrieve API key from Vault", zap.String("path", cm.config.APIKeyVault))
 
 		// Get Vault address
-		vaultAddr := os.Getenv("VAULT_ADDR")
-		if vaultAddr == "" {
-			vaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
-		}
+		vaultAddr := shared.GetVaultAddrWithEnv()
 
 		// Try to get secret from Vault
 		vaultClient, err := vault.NewClient(vaultAddr, logger.Logger().Logger)

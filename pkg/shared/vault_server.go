@@ -5,7 +5,6 @@ package shared
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"path/filepath"
 	"text/template"
 	"time"
@@ -83,40 +82,15 @@ var (
 	VaultDefaultAddr        = "https://%s:" + VaultDefaultPort
 )
 
-// GetListenerAddr returns the Vault listener address using hostname resolution
-// Replaces hardcoded ListenerAddr = "127.0.0.1:8200"
-func GetListenerAddr() string {
-	hostname := GetInternalHostname()
-	return fmt.Sprintf("%s:%s", hostname, VaultDefaultPort)
-}
-
-// GetVaultDefaultLocalAddr returns the Vault local address using hostname resolution
-// Replaces hardcoded VaultDefaultLocalAddr = "https://127.0.0.1:8200"
-func GetVaultDefaultLocalAddr() string {
-	hostname := GetInternalHostname()
-	return fmt.Sprintf("https://%s:%s", hostname, VaultDefaultPort)
-}
-
-// GetVaultDefaultClusterAddr returns the Vault cluster address using hostname resolution
-// Replaces hardcoded VaultDefaultClusterAddr = "https://127.0.0.1:8201"
-func GetVaultDefaultClusterAddr() string {
-	hostname := GetInternalHostname()
-	return fmt.Sprintf("https://%s:%s", hostname, VaultClusterPort)
-}
-
-// GetConsulDefaultAddr returns the Consul address using hostname resolution
-// Replaces hardcoded ConsulDefaultAddr = "127.0.0.1:8500"
-func GetConsulDefaultAddr() string {
-	hostname := GetInternalHostname()
-	return fmt.Sprintf("%s:%d", hostname, PortConsul)
-}
-
-// GetVaultHealthEndpoint returns the Vault health check endpoint using hostname resolution
-// Replaces hardcoded VaultHealthEndpoint
-func GetVaultHealthEndpoint() string {
-	hostname := GetInternalHostname()
-	return fmt.Sprintf("https://%s/v1/sys/health", hostname)
-}
+// NOTE: All address resolution functions moved to pkg/shared/service_addresses.go
+// to eliminate duplication and provide single source of truth.
+//
+// Canonical functions:
+//   - GetConsulHostPort()        → hostname:8500 (for HCL configs)
+//   - GetConsulAddr()            → http://hostname:8500 (for Go clients)
+//   - GetVaultHostPort()         → hostname:8200 (for HCL configs)
+//   - GetVaultHTTPSAddr()        → https://hostname:8200 (for Go clients)
+//   - GetVaultClusterHostPort()  → hostname:8201 (for HCL configs)
 
 // Computed Vault directory paths
 // NOTE: Hardcoded paths to avoid circular import (pkg/shared cannot import pkg/vault)
@@ -145,12 +119,11 @@ var (
 	VaultClient              *api.Client
 )
 
-// GetVaultAddr returns VAULT_ADDR or falls back to localhost
+// GetVaultAddr returns VAULT_ADDR or falls back to hostname-based address
+// DEPRECATED: Use GetVaultAddrWithEnv() from service_addresses.go instead
+// This wrapper exists for backwards compatibility only
 func GetVaultAddr() string {
-	if addr := os.Getenv(VaultAddrEnv); addr != "" {
-		return addr
-	}
-	return fmt.Sprintf(VaultDefaultAddr, LocalhostSAN)
+	return GetVaultAddrWithEnv()
 }
 
 // Consul Storage - Single Node (Development/Production)
@@ -384,7 +357,7 @@ type RetryJoinNode struct {
 // File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
 func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, error) {
 	if addr == "" {
-		addr = GetVaultDefaultLocalAddr()
+		addr = GetVaultHTTPSAddr()
 	}
 
 	// Use Consul backend (recommended) instead of deprecated file storage
@@ -394,10 +367,10 @@ func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, 
 		TLSCrt:        TLSCrt,
 		TLSKey:        TLSKey,
 		APIAddr:       addr,
-		ClusterAddr:   GetVaultDefaultClusterAddr(),
+		ClusterAddr:   GetVaultClusterAddr(),
 		LogLevel:      logLevel,
 		LogFormat:     logFormat,
-		ConsulAddress: GetConsulDefaultAddr(),
+		ConsulAddress: GetConsulHostPort(),
 		ConsulPath:    "vault/",
 		ConsulScheme:  "http",
 	}
@@ -424,7 +397,7 @@ func RenderVaultConfigConsul(params VaultConfigParams) (string, error) {
 		params.TLSKey = TLSKey
 	}
 	if params.ConsulAddress == "" {
-		params.ConsulAddress = GetConsulDefaultAddr()
+		params.ConsulAddress = GetConsulHostPort()
 	}
 	if params.ConsulPath == "" {
 		params.ConsulPath = "vault/"

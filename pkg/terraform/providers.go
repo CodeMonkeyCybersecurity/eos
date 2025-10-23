@@ -15,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -73,10 +74,7 @@ func validateConsulProvider(rc *eos_io.RuntimeContext, validation *ProviderValid
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Check if Consul is accessible
-	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
-	if consulAddr == "" {
-		consulAddr = "http://127.0.0.1:8500" // Default
-	}
+	consulAddr := shared.GetConsulAddrWithEnv()
 
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
 	defer cancel()
@@ -111,12 +109,10 @@ func validateConsulProvider(rc *eos_io.RuntimeContext, validation *ProviderValid
 // validateVaultProvider checks Vault provider authentication and permissions
 func validateVaultProvider(rc *eos_io.RuntimeContext, validation *ProviderValidation) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Check Vault configuration
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		return eos_err.NewUserError("VAULT_ADDR environment variable not set")
-	}
+
+	// Get Vault address (env var or smart fallback)
+	vaultAddr := shared.GetVaultAddrWithEnv()
+	logger.Debug("Validating Vault provider", zap.String("addr", vaultAddr))
 
 	vaultToken := os.Getenv("VAULT_TOKEN")
 	if vaultToken == "" {

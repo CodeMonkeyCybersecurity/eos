@@ -18,6 +18,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/registry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -59,10 +60,8 @@ func NewVaultIntegration(rc *eos_io.RuntimeContext, config *IntegrationConfig) (
 	}
 
 	if config.VaultAddress == "" {
-		config.VaultAddress = os.Getenv("VAULT_ADDR")
-		if config.VaultAddress == "" {
-			return nil, fmt.Errorf("vault address not provided and VAULT_ADDR not set")
-		}
+		// Use unified address resolution (env var or smart fallback)
+		config.VaultAddress = shared.GetVaultAddrWithEnv()
 	}
 
 	// INTERVENE - Create managers

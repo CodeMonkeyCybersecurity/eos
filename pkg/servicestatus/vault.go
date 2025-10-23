@@ -358,7 +358,7 @@ func (p *VaultStatusProvider) getIntegrations() []IntegrationInfo {
 
 		if strings.Contains(configStr, `storage "consul"`) {
 			// Extract Consul address
-			consulAddr := shared.GetConsulDefaultAddr()
+			consulAddr := shared.GetConsulHostPort()
 			scanner := bufio.NewScanner(bytes.NewReader(configData))
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())

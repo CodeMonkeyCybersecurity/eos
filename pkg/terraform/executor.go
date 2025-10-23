@@ -38,10 +38,7 @@ func NewExecutor(workspaceDir string) (*Executor, error) {
 
 	// Initialize Vault client
 	logger := zap.NewNop() // TODO: Use proper logger from context
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		vaultAddr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
-	}
+	vaultAddr := shared.GetVaultAddrWithEnv()
 	vaultClient, err := vault.NewClient(vaultAddr, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Vault client: %w", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -22,10 +23,9 @@ func GenerateServiceConfig(rc *eos_io.RuntimeContext) error {
 	// ASSESS - Check prerequisites
 	log.Info("Assessing Vault service registration requirements")
 
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		return fmt.Errorf("VAULT_ADDR not set")
-	}
+	// Get Vault address (env var or smart fallback)
+	vaultAddr := shared.GetVaultAddrWithEnv()
+	log.Debug("Using Vault address", zap.String("addr", vaultAddr))
 
 	hostname := eos_unix.GetInternalHostname()
 

@@ -188,7 +188,7 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 	}
 	// Consul storage backend defaults
 	if config.ConsulAddress == "" {
-		config.ConsulAddress = shared.GetConsulDefaultAddr()
+		config.ConsulAddress = shared.GetConsulHostPort()
 	}
 	if config.ConsulPath == "" {
 		config.ConsulPath = "vault/"
@@ -1969,7 +1969,7 @@ func (vi *VaultInstaller) storeCertMetadataInConsul(certPath, keyPath string, dn
 	// Check if Consul is available
 	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
 	if consulAddr == "" {
-		consulAddr = shared.GetConsulDefaultAddr()
+		consulAddr = shared.GetConsulHostPort()
 	}
 
 	// Create Consul client

@@ -136,11 +136,11 @@ func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 		TLSCrt:        shared.TLSCrt,
 		TLSKey:        shared.TLSKey,
 		APIAddr:       vaultAddr,
-		ClusterAddr:   shared.GetVaultDefaultClusterAddr(),
+		ClusterAddr:   shared.GetVaultClusterAddr(),
 		LogLevel:      logLevel,
 		LogFormat:     logFormat,
 		// Consul backend configuration
-		ConsulAddress: shared.GetConsulDefaultAddr(),
+		ConsulAddress: shared.GetConsulHostPort(),
 		ConsulPath:    "vault/",
 		ConsulScheme:  "http",
 	}

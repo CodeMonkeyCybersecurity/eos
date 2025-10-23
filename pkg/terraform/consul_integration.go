@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -361,9 +362,8 @@ func (m *Manager) setupConsulKV(rc *eos_io.RuntimeContext, config ConsulIntegrat
 func (m *Manager) getConsulClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	config := api.DefaultConfig()
 
-	if addr := os.Getenv("CONSUL_HTTP_ADDR"); addr != "" {
-		config.Address = addr
-	}
+	// Use unified address resolution (env var → hostname fallback)
+	config.Address = shared.GetConsulAddrWithEnv()
 
 	if token := os.Getenv("CONSUL_HTTP_TOKEN"); token != "" {
 		config.Token = token

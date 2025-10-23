@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -56,10 +57,7 @@ func (sm *SecretManager) detectBackend() (SecretBackend, error) {
 
 	// First try Vault
 	logger.Debug("Checking Vault availability")
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		vaultAddr = "https://127.0.0.1:8179"
-	}
+	vaultAddr := shared.GetVaultAddrWithEnv()
 
 	// Test Vault connectivity with timeout
 	ctx, cancel := context.WithTimeout(sm.rc.Ctx, 5*time.Second)
@@ -115,10 +113,7 @@ func (sm *SecretManager) GetSecret(service, key string) (string, error) {
 func (sm *SecretManager) getVaultSecret(service, key string) (string, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
 
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		vaultAddr = "https://127.0.0.1:8179"
-	}
+	vaultAddr := shared.GetVaultAddrWithEnv()
 
 	var vaultPath, field string
 

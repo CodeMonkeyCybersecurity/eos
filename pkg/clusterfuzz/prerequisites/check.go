@@ -3,11 +3,11 @@ package prerequisites
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -53,11 +53,8 @@ func Check(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 func CheckVaultConnectivity(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check if VAULT_ADDR is set
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		return fmt.Errorf("VAULT_ADDR environment variable is not set")
-	}
+	// Get Vault address (env var or smart fallback)
+	vaultAddr := shared.GetVaultAddrWithEnv()
 
 	logger.Info("Checking Vault status",
 		zap.String("vault_addr", vaultAddr))
