@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ceph/go-ceph/cephfs/admin"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -205,13 +206,13 @@ func (c *CephClient) GetVolumeInfo(rc *eos_io.RuntimeContext, volumeName string)
 	// Extract data pool names
 	dataPools := make([]string, 0, len(volInfo.Pools.DataPool))
 	for _, pool := range volInfo.Pools.DataPool {
-		dataPools = append(dataPools, pool.PoolName)
+		dataPools = append(dataPools, pool.Name)
 	}
 
 	// Extract metadata pool names
 	metadataPools := make([]string, 0, len(volInfo.Pools.MetadataPool))
 	for _, pool := range volInfo.Pools.MetadataPool {
-		metadataPools = append(metadataPools, pool.PoolName)
+		metadataPools = append(metadataPools, pool.Name)
 	}
 
 	info := &VolumeInfo{
@@ -296,11 +297,27 @@ func (c *CephClient) UpdateVolume(rc *eos_io.RuntimeContext, volumeName string, 
 		}
 	}
 
-	// TODO: Implement quota/size updates using subvolume resize
-	// This would require knowing which subvolume to resize, or creating a default subvolume
+	// Update quota/size if requested
 	if opts.NewSize > 0 {
-		logger.Warn("Volume size updates not yet implemented",
-			zap.String("reason", "requires subvolume management"))
+		logger.Info("Updating volume quota",
+			zap.Int64("newSize", opts.NewSize))
+
+		// Get or create default subvolume
+		defaultSv, err := c.getOrCreateDefaultSubVolume(rc, volumeName)
+		if err != nil {
+			return fmt.Errorf("failed to get default subvolume for quota update: %w", err)
+		}
+
+		// Resize the subvolume using fsAdmin
+		newSizeBytes := admin.ByteCount(opts.NewSize)
+		result, err := c.fsAdmin.ResizeSubVolume(volumeName, DefaultSubVolumeGroup, defaultSv, newSizeBytes, false)
+		if err != nil {
+			return fmt.Errorf("failed to resize subvolume: %w", err)
+		}
+
+		logger.Info("Volume quota updated successfully",
+			zap.Uint64("bytesUsed", uint64(result.BytesUsed)),
+			zap.Uint64("bytesQuota", uint64(result.BytesQuota)))
 	}
 
 	logger.Info("CephFS volume updated successfully",
@@ -347,4 +364,42 @@ func (c *CephClient) setPoolReplication(rc *eos_io.RuntimeContext, poolName stri
 	logger.Debug("Pool replication update requires mon command interface (not yet implemented)")
 
 	return nil
+}
+
+// getOrCreateDefaultSubVolume gets or creates the default subvolume for a volume
+// This enables snapshot operations without requiring users to manage subvolumes explicitly
+func (c *CephClient) getOrCreateDefaultSubVolume(rc *eos_io.RuntimeContext, volumeName string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// ASSESS: Check if default subvolume exists
+	subvolumes, err := c.fsAdmin.ListSubVolumes(volumeName, DefaultSubVolumeGroup)
+	if err != nil {
+		return "", fmt.Errorf("failed to list subvolumes: %w", err)
+	}
+
+	// Check if default subvolume already exists
+	for _, sv := range subvolumes {
+		if sv == DefaultSubVolumeName {
+			logger.Debug("Default subvolume already exists",
+				zap.String("volume", volumeName),
+				zap.String("subvolume", DefaultSubVolumeName))
+			return DefaultSubVolumeName, nil
+		}
+	}
+
+	// INTERVENE: Create default subvolume
+	logger.Info("Creating default subvolume for snapshot operations",
+		zap.String("volume", volumeName),
+		zap.String("subvolume", DefaultSubVolumeName))
+
+	// Create with default options (no size limit, use volume's pool)
+	if err := c.fsAdmin.CreateSubVolume(volumeName, DefaultSubVolumeGroup, DefaultSubVolumeName, nil); err != nil {
+		return "", fmt.Errorf("failed to create default subvolume: %w", err)
+	}
+
+	logger.Info("Default subvolume created successfully",
+		zap.String("volume", volumeName),
+		zap.String("subvolume", DefaultSubVolumeName))
+
+	return DefaultSubVolumeName, nil
 }

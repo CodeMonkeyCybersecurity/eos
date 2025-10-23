@@ -407,6 +407,13 @@ const (
 
 	// DefaultReadAheadKB is the default read-ahead size in KB
 	DefaultReadAheadKB = 8192
+
+	// DefaultSubVolumeName is the default subvolume created for each volume
+	// This subvolume is used for snapshot operations when no specific subvolume is specified
+	DefaultSubVolumeName = "eos-default"
+
+	// DefaultSubVolumeGroup is the default subvolume group (empty = default group)
+	DefaultSubVolumeGroup = ""
 )
 
 // MountOptions provides recommended mount options for different use cases
