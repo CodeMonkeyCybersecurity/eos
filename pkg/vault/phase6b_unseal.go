@@ -128,23 +128,14 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		unauthClient.SetToken(initRes.RootToken)
 		logger.Info(" Root token applied to Vault client")
 
-		// Verify token works
-		logger.Debug(" Step 5: Verifying root token is valid and has correct permissions")
-		if !VerifyToken(rc, unauthClient, initRes.RootToken) {
-			logger.Error(" Root token verification failed",
-				zap.String("remediation", "Token may be expired or invalid. Check vault_init.json integrity"))
-			return nil, fmt.Errorf("root token verification failed")
-		}
-		logger.Info(" Root token verified successfully - client is authenticated")
-
-		client := unauthClient
-
-		logger.Debug(" Step 6: Checking Vault seal status")
-		sealStatus, err := client.Sys().SealStatus()
+		// P0 FIX: Check seal status BEFORE verifying token
+		// Sealed Vault returns HTTP 503 for all API calls including token verification
+		logger.Debug(" Step 5: Checking Vault seal status (must check BEFORE token verification)")
+		sealStatus, err := unauthClient.Sys().SealStatus()
 		if err != nil {
 			logger.Error(" Failed to check Vault seal status",
 				zap.Error(err),
-				zap.String("vault_addr", client.Address()),
+				zap.String("vault_addr", unauthClient.Address()),
 				zap.String("remediation", "Ensure Vault API is accessible"))
 			return nil, fmt.Errorf("check seal status: %w", err)
 		}
@@ -154,79 +145,46 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 			zap.Int("seal_shares", sealStatus.N))
 
 		if sealStatus.Sealed {
-			logger.Warn(" Vault is initialized but SEALED - unseal required",
+			logger.Warn(" Vault is initialized but SEALED - must unseal BEFORE token verification",
 				zap.Int("progress", sealStatus.Progress),
 				zap.Int("threshold", sealStatus.T))
 
-			logger.Info(" Step 7: Loading unseal keys from vault_init.json")
-			initRes, loadErr := LoadOrPromptInitResult(rc)
-			credentialsFromPrompt := false
-			if loadErr != nil {
-				logger.Warn(" Failed to load vault_init.json, falling back to interactive prompt",
-					zap.Error(loadErr),
-					zap.String("expected_path", shared.VaultInitPath))
-
-				// PROMPT user as final fallback
-				logger.Info(" Prompting user for unseal keys and root token interactively")
-				keys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
-				if err != nil {
-					logger.Error(" Failed to prompt for unseal keys", zap.Error(err))
-					return nil, fmt.Errorf("prompt unseal keys failed: %w", err)
-				}
-				root, err := interaction.PromptSecrets(rc.Ctx, "Root Token", 1)
-				if err != nil {
-					logger.Error(" Failed to prompt for root token", zap.Error(err))
-					return nil, fmt.Errorf("prompt root token failed: %w", err)
-				}
-				initRes = &api.InitResponse{
-					KeysB64:   keys,
-					RootToken: root[0],
-				}
-				credentialsFromPrompt = true
-				logger.Info(" Interactive credentials received from user")
-			}
-			logger.Info(" Unseal credentials ready",
-				zap.Int("keys_available", len(initRes.KeysB64)),
-				zap.Bool("from_prompt", credentialsFromPrompt))
-
-			logger.Info(" Step 8: Unsealing Vault with unseal keys")
-			if err := Unseal(rc, client, initRes); err != nil {
+			logger.Info(" Step 6: Unsealing Vault with unseal keys from init credentials")
+			if err := Unseal(rc, unauthClient, initRes); err != nil {
 				logger.Error(" Vault unseal operation failed",
 					zap.Error(err),
 					zap.String("remediation", "Verify unseal keys are correct"))
 				return nil, fmt.Errorf("unseal vault: %w", err)
 			}
-
-			// POST-UNSEAL CHECK
-			logger.Debug(" Verifying Vault unseal was successful")
-			status, err := client.Sys().SealStatus()
-			if err != nil {
-				logger.Warn(" Failed to verify unseal status (non-fatal)", zap.Error(err))
-			} else if status.Sealed {
-				logger.Error(" Vault remains SEALED after unseal attempt",
-					zap.Int("progress", status.Progress),
-					zap.Int("threshold", status.T),
-					zap.String("remediation", "Insufficient or incorrect unseal keys provided"))
-				return nil, fmt.Errorf("vault remains sealed after unseal attempt")
-			}
-			logger.Info(" Vault unsealed successfully")
-
-			// CRITICAL FIX P0: Save credentials if they were provided interactively
-			// This prevents infinite prompt loops when vault_init.json is missing
-			if credentialsFromPrompt {
-				otelzap.Ctx(rc.Ctx).Info(" Saving credentials from interactive prompt to prevent future prompts")
-				if err := SaveInitResult(rc, initRes); err != nil {
-					otelzap.Ctx(rc.Ctx).Warn("Failed to save credentials (non-fatal)", zap.Error(err))
-					otelzap.Ctx(rc.Ctx).Info("terminal prompt: You may be prompted for credentials again in future operations")
-					otelzap.Ctx(rc.Ctx).Info("terminal prompt: To fix this, securely save your keys and token")
-				} else {
-					otelzap.Ctx(rc.Ctx).Info(" Credentials saved successfully", zap.String("path", shared.VaultInitPath))
-					otelzap.Ctx(rc.Ctx).Info("terminal prompt: Vault credentials saved - future operations won't prompt")
-				}
-			}
+			logger.Info(" Vault unsealed successfully - now ready for token verification")
 		} else {
-			logger.Info(" Vault is already unsealed - ready for operations")
+			logger.Info(" Vault is already unsealed - proceeding to token verification")
 		}
+
+		// NOW verify token (Vault is unsealed, API will work)
+		logger.Debug(" Step 7: Verifying root token is valid and has correct permissions")
+		if !VerifyToken(rc, unauthClient, initRes.RootToken) {
+			logger.Error(" Root token verification failed",
+				zap.String("remediation", "Token may be expired or invalid. Check vault_init.json integrity"))
+			return nil, fmt.Errorf("root token verification failed")
+		}
+		logger.Info(" Root token verified successfully - client is authenticated")
+
+		client := unauthClient
+
+		// Double-check seal status after potential unseal (defensive programming)
+		logger.Debug(" Step 8: Verifying Vault is unsealed and ready")
+		finalSealStatus, err := client.Sys().SealStatus()
+		if err != nil {
+			logger.Error(" Failed to verify final seal status",
+				zap.Error(err))
+			return nil, fmt.Errorf("verify final seal status: %w", err)
+		}
+		if finalSealStatus.Sealed {
+			logger.Error(" Vault is still sealed after unseal operation - unexpected state")
+			return nil, fmt.Errorf("vault remains sealed after unseal operation")
+		}
+		logger.Info(" Vault is unsealed and authenticated - ready for use")
 
 		logger.Info(" UnsealVault completed successfully (already-initialized path)",
 			zap.Bool("was_sealed", sealStatus.Sealed))
