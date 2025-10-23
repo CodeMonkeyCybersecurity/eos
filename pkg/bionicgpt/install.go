@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/azure"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
@@ -394,68 +395,28 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 }
 
 // checkPrerequisites verifies that Docker and Docker Compose are installed
-// Following P0 human-centric pattern: offer informed consent to install, don't error out
+// Following P0 human-centric pattern: leverages pkg/container for comprehensive Docker setup
 func (bgi *BionicGPTInstaller) checkPrerequisites(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	// Check Docker with human-centric informed consent
-	logger.Debug("Checking for Docker")
-	depConfig := interaction.DependencyConfig{
-		Name:        "Docker",
-		Description: "Container runtime for running BionicGPT services",
-		CheckCommand: "docker",
-		CheckArgs:   []string{"--version"},
-		InstallCmd: "# Ubuntu/Debian:\n" +
-			"curl -fsSL https://get.docker.com -o get-docker.sh\n" +
-			"sudo sh get-docker.sh\n" +
-			"sudo usermod -aG docker $USER\n" +
-			"# Then log out and back in",
-		Required:    true,
-		AutoInstall: false, // Docker install requires user interaction (logout/login)
-		AutoStart:   false,
+	// Use existing pkg/container functionality for Docker installation
+	// This handles: checking, prompting, installing, group setup, and verification
+	logger.Info("Checking Docker installation (will offer to install if missing)")
+	if err := container.EnsureDockerInstalled(bgi.rc); err != nil {
+		return fmt.Errorf("Docker is required for BionicGPT: %w", err)
 	}
 
-	result, err := interaction.CheckDependencyWithPrompt(bgi.rc, depConfig)
-	if err != nil {
-		return fmt.Errorf("failed to check Docker dependency: %w", err)
-	}
+	logger.Info("Docker is installed and running")
 
-	if !result.Found {
-		return eos_err.NewUserError(
-			"Docker is required for BionicGPT.\n" +
-				"Please install Docker and try again:\n" +
-				"  https://docs.docker.com/get-docker/")
-	}
-
-	logger.Info("Docker is available", zap.String("version", strings.TrimSpace(result.Version)))
-
-	// Check Docker Compose (usually bundled with Docker now)
+	// Check Docker Compose (usually bundled with modern Docker)
 	logger.Debug("Checking for Docker Compose")
-	composeVersion, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"compose", "version"},
-		Capture: true,
-	})
-	if err != nil {
+	if err := container.CheckIfDockerComposeInstalled(bgi.rc); err != nil {
 		return eos_err.NewUserError(
 			"Docker Compose is not installed\n" +
+				"Docker Compose is usually included with Docker Desktop.\n" +
 				"Please install Docker Compose: https://docs.docker.com/compose/install/")
 	}
-	logger.Info("Docker Compose is available", zap.String("version", strings.TrimSpace(composeVersion)))
-
-	// Check if Docker daemon is running
-	logger.Debug("Checking if Docker daemon is running")
-	_, err = execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"ps"},
-		Capture: true,
-	})
-	if err != nil {
-		return eos_err.NewUserError(
-			"Docker daemon is not running\n" +
-				"Please start Docker: sudo systemctl start docker")
-	}
-	logger.Debug("Docker daemon is running")
+	logger.Info("Docker Compose is available")
 
 	// Check if port is available
 	logger.Debug("Checking port availability", zap.Int("port", bgi.config.Port))
