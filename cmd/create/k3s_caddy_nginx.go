@@ -6,6 +6,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/kubernetes"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +26,20 @@ Migration:
 The Nomad-based ingress provides the same Caddy + Nginx functionality but with
 simpler deployment and better resource efficiency.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		// Display deprecation warning
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("  DEPRECATION WARNING: K3s support is being removed")
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("K3s with Caddy/Nginx has been replaced with Nomad-based ingress.")
+		logger.Warn("")
+		logger.Warn("Use 'eos create nomad-ingress' instead for the same functionality")
+		logger.Warn("")
+		logger.Warn("This command will be removed in Eos v2.0.0 (approximately 6 months)")
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("")
+
 		return kubernetes.GenerateK3sCaddyNginx(rc, cmd)
 	}),
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/kubernetes"
 	// "github.com/CodeMonkeyCybersecurity/eos/pkg/container" // TODO: Uncomment when KubernetesInstallOptions is implemented
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
 )
@@ -32,6 +33,22 @@ Migration:
 For Terraform-based deployment, use:
   eos create nomad-terraform --domain=your-domain.com`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		// Display prominent deprecation warning
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("  DEPRECATION WARNING: K3s support is being removed")
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("K3s has been replaced with HashiCorp Nomad for container orchestration.")
+		logger.Warn("")
+		logger.Warn("Recommended actions:")
+		logger.Warn("  • New deployments: Use 'eos create nomad' instead")
+		logger.Warn("  • Existing clusters: Migrate with 'eos create migrate-k3s --domain=your-domain.com'")
+		logger.Warn("")
+		logger.Warn("This command will be removed in Eos v2.0.0 (approximately 6 months)")
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("")
+
 		useTerraform, _ := cmd.Flags().GetBool("terraform")
 		if useTerraform {
 			return kubernetes.GenerateK3sTerraform(rc, cmd)

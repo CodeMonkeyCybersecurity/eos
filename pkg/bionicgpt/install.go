@@ -106,27 +106,10 @@ func (bgi *BionicGPTInstaller) Install() error {
 			bgi.config.InstallDir)
 	}
 
-	// SHIFT-LEFT: Run pre-flight validation checks BEFORE starting installation
-	// This catches configuration issues early, before deployment begins
-	logger.Info("")
-	logger.Info("Running pre-deployment validation...")
-	preflightResult, err := bgi.runPreflightChecks(ctx)
-	if err != nil {
-		return fmt.Errorf("pre-flight checks failed: %w", err)
-	}
-
-	if !preflightResult.Passed {
-		return eos_err.NewUserError(
-			"Pre-deployment validation failed with %d error(s)\n"+
-				"Please fix the errors above before retrying installation",
-			len(preflightResult.Errors))
-	}
-
-	logger.Info("")
-	logger.Info("✓ Pre-deployment validation passed - safe to proceed")
-	logger.Info("")
-
 	// INTERVENE: Perform installation
+	// NOTE: Preflight checks moved inside performInstallation() so they run AFTER
+	// secrets are retrieved from Vault. This prevents false validation failures
+	// for secrets that haven't been populated yet.
 	if err := bgi.performInstallation(ctx); err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}
@@ -236,7 +219,7 @@ func (bgi *BionicGPTInstaller) assessInstallation(ctx context.Context) (*Install
 func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	// Step 1: Check prerequisites
+	// Step 1: Check prerequisites (Docker, ports) with human-centric informed consent
 	logger.Info("Checking prerequisites")
 	if err := bgi.checkPrerequisites(ctx); err != nil {
 		return err
@@ -297,6 +280,26 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 
 	logger.Info("Secrets retrieved from Vault",
 		zap.String("backend", serviceSecrets.Backend))
+
+	// Step 7: NOW run preflight validation with all config populated
+	// This validates the COMPLETE configuration, including secrets from Vault
+	logger.Info("")
+	logger.Info("Running pre-deployment validation with complete configuration...")
+	preflightResult, err := bgi.runPreflightChecks(ctx)
+	if err != nil {
+		return fmt.Errorf("pre-flight checks failed: %w", err)
+	}
+
+	if !preflightResult.Passed {
+		return eos_err.NewUserError(
+			"Pre-deployment validation failed with %d error(s)\n"+
+				"Please fix the errors above before retrying installation",
+			len(preflightResult.Errors))
+	}
+
+	logger.Info("")
+	logger.Info("✓ Pre-deployment validation passed - safe to proceed")
+	logger.Info("")
 
 	// Step 6: Create installation directory
 	logger.Info("Creating installation directory", zap.String("dir", bgi.config.InstallDir))
@@ -391,24 +394,42 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 }
 
 // checkPrerequisites verifies that Docker and Docker Compose are installed
+// Following P0 human-centric pattern: offer informed consent to install, don't error out
 func (bgi *BionicGPTInstaller) checkPrerequisites(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	// Check Docker
+	// Check Docker with human-centric informed consent
 	logger.Debug("Checking for Docker")
-	dockerVersion, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"--version"},
-		Capture: true,
-	})
-	if err != nil {
-		return eos_err.NewUserError(
-			"Docker is not installed\n" +
-				"Please install Docker: https://docs.docker.com/get-docker/")
+	depConfig := interaction.DependencyConfig{
+		Name:        "Docker",
+		Description: "Container runtime for running BionicGPT services",
+		CheckCommand: "docker",
+		CheckArgs:   []string{"--version"},
+		InstallCmd: "# Ubuntu/Debian:\n" +
+			"curl -fsSL https://get.docker.com -o get-docker.sh\n" +
+			"sudo sh get-docker.sh\n" +
+			"sudo usermod -aG docker $USER\n" +
+			"# Then log out and back in",
+		Required:    true,
+		AutoInstall: false, // Docker install requires user interaction (logout/login)
+		AutoStart:   false,
 	}
-	logger.Info("Docker is available", zap.String("version", strings.TrimSpace(dockerVersion)))
 
-	// Check Docker Compose
+	result, err := interaction.CheckDependencyWithPrompt(bgi.rc, depConfig)
+	if err != nil {
+		return fmt.Errorf("failed to check Docker dependency: %w", err)
+	}
+
+	if !result.Found {
+		return eos_err.NewUserError(
+			"Docker is required for BionicGPT.\n" +
+				"Please install Docker and try again:\n" +
+				"  https://docs.docker.com/get-docker/")
+	}
+
+	logger.Info("Docker is available", zap.String("version", strings.TrimSpace(result.Version)))
+
+	// Check Docker Compose (usually bundled with Docker now)
 	logger.Debug("Checking for Docker Compose")
 	composeVersion, err := execute.Run(ctx, execute.Options{
 		Command: "docker",

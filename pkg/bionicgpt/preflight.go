@@ -218,18 +218,19 @@ func (bgi *BionicGPTInstaller) checkPortAvailability(ctx context.Context, result
 }
 
 // checkDockerHealth verifies Docker daemon is running and healthy
+// NOTE: This runs AFTER checkPrerequisites(), so Docker should already be validated
 func (bgi *BionicGPTInstaller) checkDockerHealth(ctx context.Context, result *PreflightResult) bool {
 	logger := otelzap.Ctx(ctx)
 
-	// Check Docker is installed
+	// Check Docker is installed (quick revalidation)
 	_, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"--version"},
 		Capture: true,
 	})
 	if err != nil {
-		result.Errors = append(result.Errors, "Docker not installed")
-		logger.Error("  ✗ Docker not installed")
+		result.Warnings = append(result.Warnings, "Docker not found (should have been caught earlier)")
+		logger.Warn("  ⚠ Docker not installed")
 		return false
 	}
 	logger.Info("  ✓ Docker installed")
@@ -241,8 +242,8 @@ func (bgi *BionicGPTInstaller) checkDockerHealth(ctx context.Context, result *Pr
 		Capture: true,
 	})
 	if err != nil {
-		result.Errors = append(result.Errors, "Docker daemon not running")
-		logger.Error("  ✗ Docker daemon not running")
+		result.Warnings = append(result.Warnings, "Docker daemon not running")
+		logger.Warn("  ⚠ Docker daemon not running")
 		return false
 	}
 	logger.Info("  ✓ Docker daemon healthy")
@@ -254,8 +255,8 @@ func (bgi *BionicGPTInstaller) checkDockerHealth(ctx context.Context, result *Pr
 		Capture: true,
 	})
 	if err != nil {
-		result.Errors = append(result.Errors, "Docker Compose not available")
-		logger.Error("  ✗ Docker Compose not available")
+		result.Warnings = append(result.Warnings, "Docker Compose not available")
+		logger.Warn("  ⚠ Docker Compose not available")
 		return false
 	}
 	logger.Info("  ✓ Docker Compose available")

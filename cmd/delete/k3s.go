@@ -28,11 +28,26 @@ Migration:
 
 This command will still work but shows a deprecation warning.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		// Display deprecation warning
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("  DEPRECATION WARNING: K3s support is being removed")
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("K3s has been replaced with HashiCorp Nomad.")
+		logger.Warn("")
+		logger.Warn("Consider migrating to Nomad before uninstalling:")
+		logger.Warn("  eos create migrate-k3s --domain=your-domain.com")
+		logger.Warn("")
+		logger.Warn("This command will be removed in Eos v2.0.0 (approximately 6 months)")
+		logger.Warn("═══════════════════════════════════════════════════════════")
+		logger.Warn("")
+
 		if err := k3s.Uninstall(rc); err != nil {
-			otelzap.Ctx(rc.Ctx).Error(" Failed to uninstall K3s", zap.Error(err))
+			logger.Error(" Failed to uninstall K3s", zap.Error(err))
 			return err
 		}
-		otelzap.Ctx(rc.Ctx).Info(" K3s uninstallation completed.")
+		logger.Info(" K3s uninstallation completed.")
 		return nil
 	}),
 }
