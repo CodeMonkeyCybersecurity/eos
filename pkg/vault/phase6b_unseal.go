@@ -23,92 +23,159 @@ import (
 
 // createUnauthenticatedVaultClient creates a Vault client without authentication
 // Used to check Vault status (init/seal) before authentication is available
-func createUnauthenticatedVaultClient() (*api.Client, error) {
+func createUnauthenticatedVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug(" Creating unauthenticated Vault client for status checks")
+
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if vaultAddr == "" {
 		vaultAddr = "https://127.0.0.1:8200"
+		logger.Debug(" VAULT_ADDR not set, using default",
+			zap.String("default_addr", vaultAddr))
+	} else {
+		logger.Debug(" Using VAULT_ADDR from environment",
+			zap.String("vault_addr", vaultAddr))
 	}
 
 	config := api.DefaultConfig()
 	config.Address = vaultAddr
+	logger.Debug(" Vault client config created",
+		zap.String("address", config.Address))
 
 	// Handle self-signed certificates (common for new Vault installations)
-	if os.Getenv("VAULT_SKIP_VERIFY") == "1" {
+	skipVerify := os.Getenv("VAULT_SKIP_VERIFY")
+	if skipVerify == "1" {
+		logger.Debug(" VAULT_SKIP_VERIFY enabled - configuring TLS to skip verification",
+			zap.String("reason", "self-signed certificates during initial setup"))
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: true, // #nosec G402 - intentional for self-signed certs
 		}
 		config.HttpClient.Transport = &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
+		logger.Debug(" TLS skip verification configured successfully")
+	} else {
+		logger.Debug(" VAULT_SKIP_VERIFY not set - using standard TLS verification",
+			zap.String("skip_verify_value", skipVerify))
 	}
 
-	return api.NewClient(config)
+	client, err := api.NewClient(config)
+	if err != nil {
+		logger.Error(" Failed to create unauthenticated Vault client",
+			zap.Error(err),
+			zap.String("vault_addr", vaultAddr),
+			zap.String("skip_verify", skipVerify))
+		return nil, fmt.Errorf("create vault API client: %w", err)
+	}
+
+	logger.Info(" Unauthenticated Vault client created successfully",
+		zap.String("vault_addr", config.Address),
+		zap.Bool("skip_verify", skipVerify == "1"))
+	return client, nil
 }
 
 func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
-	otelzap.Ctx(rc.Ctx).Info(" Entering UnsealVault")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info(" Entering UnsealVault")
 
 	// CRITICAL P0: Check init status BEFORE attempting authentication
 	// Unauthenticated client is sufficient to check Vault status
-	unauthClient, err := createUnauthenticatedVaultClient()
+	logger.Debug(" Step 1: Creating unauthenticated client to check Vault init status")
+	unauthClient, err := createUnauthenticatedVaultClient(rc)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to create unauthenticated Vault client", zap.Error(err))
+		logger.Error(" Failed to create unauthenticated Vault client",
+			zap.Error(err),
+			zap.String("remediation", "Check VAULT_ADDR environment variable and network connectivity"))
 		return nil, fmt.Errorf("create unauthenticated vault client: %w", err)
 	}
+	logger.Debug(" Unauthenticated client created, proceeding to check init status")
 
+	logger.Debug(" Step 2: Checking Vault initialization status")
 	initStatus, err := unauthClient.Sys().InitStatus()
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to check init status", zap.Error(err))
+		logger.Error(" Failed to check Vault init status",
+			zap.Error(err),
+			zap.String("vault_addr", unauthClient.Address()),
+			zap.String("remediation", "Ensure Vault service is running: systemctl status vault"))
 		return nil, fmt.Errorf("check init status: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info(" InitStatus retrieved", zap.Bool("initialized", initStatus))
+	logger.Info(" Vault init status retrieved successfully",
+		zap.Bool("initialized", initStatus),
+		zap.String("vault_addr", unauthClient.Address()))
 
 	if initStatus {
-		otelzap.Ctx(rc.Ctx).Info(" Vault already initialized")
+		logger.Info(" Vault is already initialized - entering re-run/recovery path")
 
 		// CRITICAL P0: During initial setup, Vault Agent/AppRole don't exist yet
 		// Use root token from vault_init.json instead of trying fancy auth methods
-		otelzap.Ctx(rc.Ctx).Info(" Loading root token from vault_init.json for setup operations")
+		logger.Info(" Step 3: Loading root token from vault_init.json",
+			zap.String("reason", "Vault Agent/AppRole not configured yet during initial setup"),
+			zap.String("path", shared.VaultInitPath))
 		initRes, err := LoadOrPromptInitResult(rc)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Error(" Failed to load init credentials", zap.Error(err))
+			logger.Error(" Failed to load Vault init credentials",
+				zap.Error(err),
+				zap.String("expected_path", shared.VaultInitPath),
+				zap.String("remediation", "Ensure vault_init.json exists or re-enter credentials when prompted"))
 			return nil, fmt.Errorf("load vault init credentials: %w", err)
 		}
+		logger.Debug(" Init credentials loaded successfully",
+			zap.Int("unseal_keys_count", len(initRes.KeysB64)),
+			zap.Bool("has_root_token", initRes.RootToken != ""))
 
 		// Set root token on unauthenticated client
+		logger.Debug(" Step 4: Setting root token on client for authenticated operations")
 		unauthClient.SetToken(initRes.RootToken)
-		otelzap.Ctx(rc.Ctx).Info(" Root token set for setup operations")
+		logger.Info(" Root token applied to Vault client")
 
 		// Verify token works
+		logger.Debug(" Step 5: Verifying root token is valid and has correct permissions")
 		if !VerifyToken(rc, unauthClient, initRes.RootToken) {
-			otelzap.Ctx(rc.Ctx).Error(" Root token verification failed")
+			logger.Error(" Root token verification failed",
+				zap.String("remediation", "Token may be expired or invalid. Check vault_init.json integrity"))
 			return nil, fmt.Errorf("root token verification failed")
 		}
+		logger.Info(" Root token verified successfully - client is authenticated")
 
 		client := unauthClient
 
+		logger.Debug(" Step 6: Checking Vault seal status")
 		sealStatus, err := client.Sys().SealStatus()
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Error(" Failed to check seal status", zap.Error(err))
+			logger.Error(" Failed to check Vault seal status",
+				zap.Error(err),
+				zap.String("vault_addr", client.Address()),
+				zap.String("remediation", "Ensure Vault API is accessible"))
 			return nil, fmt.Errorf("check seal status: %w", err)
 		}
-		otelzap.Ctx(rc.Ctx).Info(" SealStatus retrieved", zap.Bool("sealed", sealStatus.Sealed))
+		logger.Info(" Vault seal status retrieved",
+			zap.Bool("sealed", sealStatus.Sealed),
+			zap.Int("seal_threshold", sealStatus.T),
+			zap.Int("seal_shares", sealStatus.N))
 
 		if sealStatus.Sealed {
-			otelzap.Ctx(rc.Ctx).Warn(" Vault is initialized but sealed — attempting unseal")
+			logger.Warn(" Vault is initialized but SEALED - unseal required",
+				zap.Int("progress", sealStatus.Progress),
+				zap.Int("threshold", sealStatus.T))
 
+			logger.Info(" Step 7: Loading unseal keys from vault_init.json")
 			initRes, loadErr := LoadOrPromptInitResult(rc)
 			credentialsFromPrompt := false
 			if loadErr != nil {
-				otelzap.Ctx(rc.Ctx).Warn("Failed to load init result file, falling back to manual prompt", zap.Error(loadErr))
+				logger.Warn(" Failed to load vault_init.json, falling back to interactive prompt",
+					zap.Error(loadErr),
+					zap.String("expected_path", shared.VaultInitPath))
 
 				// PROMPT user as final fallback
+				logger.Info(" Prompting user for unseal keys and root token interactively")
 				keys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
 				if err != nil {
+					logger.Error(" Failed to prompt for unseal keys", zap.Error(err))
 					return nil, fmt.Errorf("prompt unseal keys failed: %w", err)
 				}
 				root, err := interaction.PromptSecrets(rc.Ctx, "Root Token", 1)
 				if err != nil {
+					logger.Error(" Failed to prompt for root token", zap.Error(err))
 					return nil, fmt.Errorf("prompt root token failed: %w", err)
 				}
 				initRes = &api.InitResponse{
@@ -116,20 +183,33 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 					RootToken: root[0],
 				}
 				credentialsFromPrompt = true
+				logger.Info(" Interactive credentials received from user")
 			}
-			otelzap.Ctx(rc.Ctx).Info(" Init result (or manual input) loaded successfully")
+			logger.Info(" Unseal credentials ready",
+				zap.Int("keys_available", len(initRes.KeysB64)),
+				zap.Bool("from_prompt", credentialsFromPrompt))
 
+			logger.Info(" Step 8: Unsealing Vault with unseal keys")
 			if err := Unseal(rc, client, initRes); err != nil {
-				otelzap.Ctx(rc.Ctx).Error(" Unseal failed", zap.Error(err))
+				logger.Error(" Vault unseal operation failed",
+					zap.Error(err),
+					zap.String("remediation", "Verify unseal keys are correct"))
 				return nil, fmt.Errorf("unseal vault: %w", err)
 			}
 
 			// POST-UNSEAL CHECK
-			status, _ := client.Sys().SealStatus()
-			if status.Sealed {
+			logger.Debug(" Verifying Vault unseal was successful")
+			status, err := client.Sys().SealStatus()
+			if err != nil {
+				logger.Warn(" Failed to verify unseal status (non-fatal)", zap.Error(err))
+			} else if status.Sealed {
+				logger.Error(" Vault remains SEALED after unseal attempt",
+					zap.Int("progress", status.Progress),
+					zap.Int("threshold", status.T),
+					zap.String("remediation", "Insufficient or incorrect unseal keys provided"))
 				return nil, fmt.Errorf("vault remains sealed after unseal attempt")
 			}
-			otelzap.Ctx(rc.Ctx).Info(" Vault unsealed successfully")
+			logger.Info(" Vault unsealed successfully")
 
 			// CRITICAL FIX P0: Save credentials if they were provided interactively
 			// This prevents infinite prompt loops when vault_init.json is missing
@@ -145,36 +225,58 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 				}
 			}
 		} else {
-			otelzap.Ctx(rc.Ctx).Info(" Vault is already unsealed")
+			logger.Info(" Vault is already unsealed - ready for operations")
 		}
 
+		logger.Info(" UnsealVault completed successfully (already-initialized path)",
+			zap.Bool("was_sealed", sealStatus.Sealed))
 		return client, nil
 	}
 
-	otelzap.Ctx(rc.Ctx).Info(" Vault not initialized — beginning initialization sequence")
+	// Vault NOT initialized - fresh installation path
+	logger.Info(" Vault is NOT initialized - entering fresh installation path")
+	logger.Info(" Step 3: Initializing Vault for the first time",
+		zap.String("shares", "5"),
+		zap.String("threshold", "3"))
+
 	// Use unauthenticated client for initialization (no auth needed for /sys/init)
 	initRes, err := initVaultWithTimeout(rc, unauthClient)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Vault init failed", zap.Error(err))
+		logger.Error(" Vault initialization failed",
+			zap.Error(err),
+			zap.String("vault_addr", unauthClient.Address()),
+			zap.String("remediation", "Check Vault logs: journalctl -u vault -n 50"))
 		return nil, err
 	}
-	otelzap.Ctx(rc.Ctx).Info(" Vault initialized with init response", zap.Int("num_keys", len(initRes.Keys)))
+	logger.Info(" Vault initialized successfully",
+		zap.Int("unseal_keys_generated", len(initRes.Keys)),
+		zap.Int("base64_keys_generated", len(initRes.KeysB64)),
+		zap.Bool("has_root_token", initRes.RootToken != ""))
 
+	logger.Info(" Step 4: Handling initialization material (keys, token)")
 	if err := handleInitMaterial(rc, initRes); err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Handling init material failed", zap.Error(err))
+		logger.Error(" Failed to handle initialization material",
+			zap.Error(err),
+			zap.String("remediation", "Initialization succeeded but credential handling failed"))
 		return nil, err
 	}
+	logger.Info(" Initialization material handled successfully")
 
 	// Set root token on unauthenticated client to make it authenticated
+	logger.Debug(" Step 5: Setting root token on client for post-initialization operations")
 	unauthClient.SetToken(initRes.RootToken)
-	otelzap.Ctx(rc.Ctx).Info(" Root token set on client for post-init operations")
+	logger.Info(" Root token set on client - client is now authenticated")
 
+	logger.Info(" Step 6: Finalizing Vault setup (unseal + persist credentials)")
 	if err := finalizeVaultSetup(rc, unauthClient, initRes); err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Finalizing Vault setup failed", zap.Error(err))
+		logger.Error(" Failed to finalize Vault setup",
+			zap.Error(err),
+			zap.String("remediation", "Vault is initialized but finalization failed"))
 		return nil, err
 	}
+	logger.Info(" Vault setup finalized successfully")
 
-	otelzap.Ctx(rc.Ctx).Info(" Vault initialized and unsealed")
+	logger.Info(" UnsealVault completed successfully (fresh-initialization path)")
 	return unauthClient, nil
 }
 
@@ -319,18 +421,43 @@ func shouldDeleteLocalCredentials(rc *eos_io.RuntimeContext) bool {
 }
 
 func finalizeVaultSetup(rc *eos_io.RuntimeContext, client *api.Client, initRes *api.InitResponse) error {
-	otelzap.Ctx(rc.Ctx).Info(" Finalizing Vault setup")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info(" Entering finalizeVaultSetup")
+	logger.Debug(" Finalization steps: unseal → set token → store client → persist credentials")
+
+	logger.Debug(" Step 1: Unsealing Vault with initialization keys")
 	if err := Unseal(rc, client, initRes); err != nil {
-		return err
+		logger.Error(" Vault unseal failed during finalization",
+			zap.Error(err),
+			zap.String("remediation", "Check unseal keys are valid"))
+		return fmt.Errorf("unseal during finalization: %w", err)
 	}
+	logger.Info(" Vault unsealed successfully")
 
+	logger.Debug(" Step 2: Setting root token on client")
 	client.SetToken(initRes.RootToken)
-	otelzap.Ctx(rc.Ctx).Info(" Root token set on client")
+	logger.Info(" Root token set on Vault client")
 
+	// CRITICAL P0: Store client in context BEFORE calling Write()
+	// This prevents Write() from trying to re-authenticate via Vault Agent/AppRole
+	logger.Debug(" Step 3: Storing authenticated client in RuntimeContext",
+		zap.String("reason", "Prevents re-authentication attempts during Write()"))
+	SetVaultClient(rc, client)
+	logger.Info(" Vault client stored in context successfully")
+
+	logger.Debug(" Step 4: Persisting init result to Vault KV",
+		zap.String("path", "vault_init"),
+		zap.String("mount", shared.VaultMountKV))
 	if err := Write(rc, client, "vault_init", initRes); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn(" Failed to persist init result, re-unsealing may be needed next time", zap.Error(err))
+		logger.Warn(" Failed to persist init result to Vault (non-fatal)",
+			zap.Error(err),
+			zap.String("impact", "Re-unsealing may require manual credentials next time"))
+		// Non-fatal: credentials are already saved to disk by handleInitMaterial
+	} else {
+		logger.Info(" Init result persisted to Vault KV successfully")
 	}
 
+	logger.Info(" finalizeVaultSetup completed successfully")
 	return nil
 }
 

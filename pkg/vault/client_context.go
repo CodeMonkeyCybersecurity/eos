@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -28,11 +29,16 @@ func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	if client, ok := rc.Ctx.Value(vaultClientKey).(*api.Client); ok && client != nil {
 		// Verify the client still has a token
 		if client.Token() != "" {
-			logger.Debug("Using cached Vault client from context",
-				zap.String("address", client.Address()))
+			logger.Debug(" Using cached Vault client from RuntimeContext",
+				zap.String("vault_addr", client.Address()),
+				zap.String("source", "context cache"),
+				zap.Bool("has_token", true))
 			return client, nil
 		}
-		logger.Debug("Cached client has no token, re-authenticating")
+		logger.Debug(" Cached client has no token, creating new authenticated client",
+			zap.String("vault_addr", client.Address()))
+	} else {
+		logger.Debug(" No cached Vault client in context, creating new client")
 	}
 
 	// Create new client with default config
@@ -79,7 +85,22 @@ func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 // SetVaultClient stores the vault client in the runtime context
 func SetVaultClient(rc *eos_io.RuntimeContext, client *api.Client) {
-	// Note: This is a simplified implementation. In a real scenario,
-	// we'd need to create a new context with the value and update rc.Ctx
-	// For now, this is a no-op to satisfy the compilation
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL P0 FIX: Actually store the client in context
+	// This was previously a no-op which caused re-authentication on every operation!
+	if client == nil {
+		logger.Warn(" Attempted to store nil Vault client in context",
+			zap.String("action", "skipped"))
+		return
+	}
+
+	logger.Debug(" Storing Vault client in RuntimeContext",
+		zap.String("vault_addr", client.Address()),
+		zap.Bool("has_token", client.Token() != ""))
+
+	rc.Ctx = context.WithValue(rc.Ctx, vaultClientKey, client)
+
+	logger.Debug(" Vault client stored in context successfully",
+		zap.String("context_key", string(vaultClientKey)))
 }

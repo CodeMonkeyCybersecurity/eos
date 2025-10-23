@@ -49,21 +49,70 @@ func WriteToVault(rc *eos_io.RuntimeContext, path string, v interface{}) error {
 
 // WriteToVaultAt writes a serialized object to a specific Vault mount path using the KVv2 API.
 func WriteToVaultAt(rc *eos_io.RuntimeContext, mount, path string, v interface{}) error {
-	client, err := GetVaultClient(rc)
-	if err != nil {
-		return err
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug(" Entering WriteToVaultAt",
+		zap.String("mount", mount),
+		zap.String("path", path))
+
+	// CRITICAL P0: Try to get existing client from context first
+	// This prevents re-authentication during initial setup when we already have a root token
+	var client *api.Client
+	if cachedClient, ok := rc.Ctx.Value(vaultClientKey).(*api.Client); ok && cachedClient != nil && cachedClient.Token() != "" {
+		client = cachedClient
+		logger.Debug(" Using cached Vault client from RuntimeContext for write operation",
+			zap.String("vault_addr", client.Address()),
+			zap.Bool("has_token", true),
+			zap.String("source", "context cache"))
+	} else {
+		// No client in context - create authenticated one
+		logger.Debug(" No cached client in context, creating authenticated client",
+			zap.String("reason", "Will trigger authentication flow"))
+		var err error
+		client, err = GetVaultClient(rc)
+		if err != nil {
+			logger.Error(" Failed to get authenticated Vault client",
+				zap.Error(err),
+				zap.String("remediation", "Check authentication credentials"))
+			return fmt.Errorf("get vault client: %w", err)
+		}
+		logger.Debug(" Authenticated client created successfully")
 	}
 
+	logger.Debug(" Marshaling data to JSON for Vault storage")
 	data, err := json.Marshal(v)
 	if err != nil {
+		logger.Error(" Failed to marshal data to JSON",
+			zap.Error(err),
+			zap.String("path", path))
 		return fmt.Errorf("failed to marshal struct: %w", err)
 	}
+	logger.Debug(" Data marshaled successfully",
+		zap.Int("json_bytes", len(data)))
+
+	logger.Debug(" Writing data to Vault KV v2",
+		zap.String("mount", mount),
+		zap.String("path", path),
+		zap.Int("data_size_bytes", len(data)))
 
 	kv := client.KVv2(mount)
 	_, err = kv.Put(context.Background(), path, map[string]interface{}{
 		"json": string(data),
 	})
-	return err
+	if err != nil {
+		logger.Error(" Failed to write data to Vault KV",
+			zap.Error(err),
+			zap.String("mount", mount),
+			zap.String("path", path),
+			zap.String("vault_addr", client.Address()),
+			zap.String("remediation", "Check Vault permissions and KV mount exists"))
+		return fmt.Errorf("vault kv put failed at %s/%s: %w", mount, path, err)
+	}
+
+	logger.Info(" Data written to Vault KV successfully",
+		zap.String("mount", mount),
+		zap.String("path", path),
+		zap.Int("data_size_bytes", len(data)))
+	return nil
 }
 
 // WriteFallbackSecrets securely stores secrets as JSON in the XDG config directory for later retrieval.
