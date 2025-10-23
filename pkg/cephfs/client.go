@@ -11,10 +11,9 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/ceph/go-ceph/cephfs/admin"
 	"github.com/ceph/go-ceph/rados"
 	consulapi "github.com/hashicorp/consul/api"

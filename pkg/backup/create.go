@@ -5,9 +5,9 @@ package backup
 import (
 	"crypto/rand"
 	"fmt"
-	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -84,35 +84,28 @@ func CreateRepository(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	logger.Info("Storing repository password in Vault",
 		zap.String("path", vaultPath))
 
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
+	vaultAddr := shared.GetVaultAddrWithEnv()
+
+	// Try to connect to Vault
+	_, err = vault.NewClient(vaultAddr, logger.Logger().Logger)
+	if err != nil {
 		// Fall back to local storage
-		logger.Warn("VAULT_ADDR not set, storing password locally")
-		
+		logger.Warn("Vault unavailable, storing password locally",
+			zap.Error(err))
+
 		if err := storeLocalPassword(name, password); err != nil {
 			return fmt.Errorf("storing password locally: %w", err)
 		}
 	} else {
-		_, err := vault.NewClient(vaultAddr, logger.Logger().Logger)
+		secretData := map[string]interface{}{
+			"password": password,
+			"backend":  backend,
+			"url":      url,
+		}
+
+		err = vault.WriteToVault(rc, vaultPath, secretData)
 		if err != nil {
-			// Fall back to local storage
-			logger.Warn("Vault unavailable, storing password locally",
-				zap.Error(err))
-
-			if err := storeLocalPassword(name, password); err != nil {
-				return fmt.Errorf("storing password locally: %w", err)
-			}
-		} else {
-			secretData := map[string]interface{}{
-				"password": password,
-				"backend":  backend,
-				"url":      url,
-			}
-
-			err = vault.WriteToVault(rc, vaultPath, secretData)
-			if err != nil {
-				return fmt.Errorf("storing password in vault: %w", err)
-			}
+			return fmt.Errorf("storing password in vault: %w", err)
 		}
 	}
 

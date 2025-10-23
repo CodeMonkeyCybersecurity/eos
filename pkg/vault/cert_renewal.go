@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -306,11 +307,8 @@ func (cr *CertificateRenewer) reloadService() error {
 	// This is the recommended way per HashiCorp documentation
 	// https://developer.hashicorp.com/vault/api-docs/system/reload-tls
 
-	// Get Vault address from environment or default
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		vaultAddr = "https://127.0.0.1:8200"
-	}
+	// Get Vault address using unified resolver
+	vaultAddr := shared.GetVaultAddrWithEnv()
 
 	// Get Vault token from environment
 	vaultToken := os.Getenv("VAULT_TOKEN")

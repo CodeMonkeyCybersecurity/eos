@@ -288,11 +288,8 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 	if config.ConsulACLToken != "" {
 		logger.Info("Consul ACLs detected, creating Vault access policy and token")
 
-		// Get Vault address
-		vaultAddress := os.Getenv("VAULT_ADDR")
-		if vaultAddress == "" {
-			vaultAddress = vault.DefaultAddress
-		}
+		// Get Vault address using unified resolver
+		vaultAddress := shared.GetVaultAddrWithEnv()
 
 		// Create VaultIntegration to handle ACL setup
 		integration, err := consulvault.NewVaultIntegration(rc, &consulvault.IntegrationConfig{

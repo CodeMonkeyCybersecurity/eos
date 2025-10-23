@@ -1,0 +1,208 @@
+# golangci-lint configuration for Eos
+# Last Updated: 2025-10-23
+
+run:
+  # Timeout for analysis
+  timeout: 5m
+
+  # Include test files
+  tests: true
+
+  # Build tags to consider during linting
+  build-tags:
+    - !darwin  # Exclude macOS-specific build tags for Linux-only code
+
+  # Modules download mode
+  modules-download-mode: readonly
+
+  # Allow multiple parallel golangci-lint instances
+  allow-parallel-runners: true
+
+  # CGO support - CRITICAL for Ceph and libvirt
+  # This ensures linter understands CGO-enabled packages
+  skip-dirs:
+    - vendor
+    - third_party
+
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*_generated\\.go$"
+
+# Output configuration
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
+
+# Linters configuration
+linters:
+  disable-all: true
+  enable:
+    # Essential linters (always run)
+    - errcheck      # Check error returns
+    - gosimple      # Simplify code
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Go static analysis
+    - typecheck     # Type-check Go code
+    - unused        # Find unused code
+
+    # Code quality linters
+    - gofmt         # Check code formatting
+    - goimports     # Check import formatting
+    - misspell      # Find misspelled words
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Find unused function parameters
+    - gosec         # Security-focused linting
+
+    # Style linters (less strict)
+    - gocritic      # Comprehensive Go source code linter
+    - revive        # Fast, configurable, extensible linter
+
+linters-settings:
+  # govet configuration - CRITICAL for CGO
+  govet:
+    # Enable all analyzers
+    enable-all: true
+    # CGO-specific settings
+    settings:
+      shadow:
+        strict: false  # Less strict for CGO callback functions
+
+  # errcheck configuration
+  errcheck:
+    check-type-assertions: true
+    check-blank: false  # Allow _ = foo() for CGO cleanup functions
+    exclude-functions:
+      - (*os.File).Close
+      - (*database/sql.Rows).Close
+
+  # gosec security linting
+  gosec:
+    excludes:
+      - G204  # Subprocess with variable - needed for execute package
+      - G304  # File path from variable - common in config management
+    config:
+      G101:   # Look for hardcoded credentials
+        pattern: "(?i)(password|secret|key|token|apikey)"
+
+  # gofmt settings
+  gofmt:
+    simplify: true
+
+  # goimports settings
+  goimports:
+    local-prefixes: github.com/CodeMonkeyCybersecurity/eos
+
+  # gocritic settings
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+    disabled-checks:
+      - hugeParam      # Allow large structs by value for CGO interop
+      - rangeValCopy   # Allow copying in range for CGO structs
+      - unnamedResult  # Allow unnamed returns for simple functions
+
+  # revive settings
+  revive:
+    rules:
+      # Enable common rules
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+        arguments:
+          - "checkPrivateReceivers"
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+issues:
+  # Maximum issues to report (0 = unlimited)
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Show all issues
+  new: false
+
+  # Fix found issues (if possible)
+  fix: false
+
+  # Exclude rules for specific paths
+  exclude-rules:
+    # Exclude test files from certain linters
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - gocritic
+
+    # Exclude stub files (Darwin/macOS compatibility shims)
+    - path: _stub\.go
+      linters:
+        - unused
+        - deadcode
+
+    # Exclude fuzzing test files
+    - path: _fuzz_test\.go
+      linters:
+        - errcheck
+        - gosec
+
+    # Allow fmt.Print in cmd/ for user-facing output
+    # (but structured logging is still preferred)
+    - path: cmd/
+      text: "fmt\\.Print"
+      linters:
+        - forbidigo
+
+    # CGO-specific exclusions
+    - path: pkg/cephfs/
+      linters:
+        - gocritic  # Less strict for CGO interop code
+      text: "(hugeParam|rangeValCopy)"
+
+    - path: pkg/kvm/
+      linters:
+        - gocritic
+      text: "(hugeParam|rangeValCopy)"
+
+  # Exclude specific issue text patterns
+  exclude:
+    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*print(f|ln)?|os\\.(Un)?Setenv). is not checked"
+    - "exported: exported (method|function|type|const) .* should have comment or be unexported"
+
+  # Include CGO-generated code in analysis
+  exclude-use-default: false
+
+# Severity configuration
+severity:
+  default-severity: warning
+  rules:
+    - linters:
+        - errcheck
+        - gosec
+        - govet
+        - typecheck
+      severity: error

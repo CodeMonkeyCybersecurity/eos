@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -109,19 +110,9 @@ func (c *Client) getRepositoryPassword() (string, error) {
 	logger.Info("Retrieving repository password from Vault",
 		zap.String("path", vaultPath))
 
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		// Fall back to local password file if Vault not configured
-		logger.Warn("VAULT_ADDR not set, checking local password file")
-		
-		passwordFile := fmt.Sprintf("/var/lib/eos/secrets/backup/%s.password", c.repository.Name)
-		if data, err := os.ReadFile(passwordFile); err == nil {
-			return strings.TrimSpace(string(data)), nil
-		}
+	vaultAddr := shared.GetVaultAddrWithEnv()
 
-		return "", fmt.Errorf("vault not configured and no local password found")
-	}
-
+	// Try to connect to Vault
 	vClient, err := vault.NewClient(vaultAddr, logger.Logger().Logger)
 	if err != nil {
 		// Fall back to local password file if Vault unavailable

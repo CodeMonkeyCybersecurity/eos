@@ -52,6 +52,8 @@ func (vd *VaultDiscovery) DiscoverVaultAddress(ctx context.Context) (string, err
 	// ASSESS - Try multiple discovery methods in order of preference
 
 	// Method 1: Environment variable (highest priority for manual override)
+	// NOTE: For direct address resolution, use shared.GetVaultAddrWithEnv() instead.
+	// This discovery function implements more complex logic (Consul service discovery, etc.)
 	if addr := os.Getenv("VAULT_ADDR"); addr != "" {
 		logger.Debug("Using Vault address from VAULT_ADDR environment variable",
 			zap.String("address", addr))

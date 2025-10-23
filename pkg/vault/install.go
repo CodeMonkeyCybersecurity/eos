@@ -1966,11 +1966,8 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 func (vi *VaultInstaller) storeCertMetadataInConsul(certPath, keyPath string, dnsNames []string, expiryTime time.Time) error {
 	vi.logger.Debug("Storing certificate metadata in Consul KV")
 
-	// Check if Consul is available
-	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
-	if consulAddr == "" {
-		consulAddr = shared.GetConsulHostPort()
-	}
+	// Get Consul address using unified resolver
+	consulAddr := shared.GetConsulAddrWithEnv() // Returns http://hostname:8500
 
 	// Create Consul client
 	consulConfig := consulapi.DefaultConfig()

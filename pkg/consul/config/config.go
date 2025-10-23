@@ -5,9 +5,9 @@ package config
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -25,15 +25,9 @@ func NewClient(ctx context.Context) (*Client, error) {
 
 	config := api.DefaultConfig()
 
-	// Try to get Consul address from environment
-	if consulAddr := os.Getenv("CONSUL_HTTP_ADDR"); consulAddr != "" {
-		config.Address = consulAddr
-		logger.Debug("Using CONSUL_HTTP_ADDR from environment", zap.String("addr", consulAddr))
-	} else {
-		// Default to localhost:8161 (your Consul port from previous conversations)
-		config.Address = "localhost:8161"
-		logger.Debug("Using default Consul address", zap.String("addr", config.Address))
-	}
+	// Get Consul address using unified resolver (checks CONSUL_HTTP_ADDR env, falls back to hostname:8500)
+	config.Address = shared.GetConsulAddrWithEnv() // Returns http://hostname:8500
+	logger.Debug("Using Consul address", zap.String("addr", config.Address))
 
 	client, err := api.NewClient(config)
 	if err != nil {

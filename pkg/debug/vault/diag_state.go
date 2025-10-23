@@ -406,10 +406,7 @@ func OrphanedStateDiagnostic() *debug.Diagnostic {
 
 			// Check 3: Is Vault initialized? (requires Vault to be running)
 			vaultInitialized := false
-			vaultAddr := os.Getenv("VAULT_ADDR")
-			if vaultAddr == "" {
-				vaultAddr = "https://127.0.0.1:8200"
-			}
+			// Note: vault status command uses VAULT_ADDR from environment (via shared.GetVaultAddrWithEnv pattern)
 
 			// Try to check init status (this requires VAULT_SKIP_VERIFY=1 for self-signed certs)
 			initCheckCtx, initCancel := context.WithTimeout(ctx, 3*time.Second)

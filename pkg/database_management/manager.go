@@ -6,12 +6,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -274,15 +274,9 @@ func (dm *DatabaseManager) checkPrerequisites(rc *eos_io.RuntimeContext) error {
 func (dm *DatabaseManager) configureVaultConnection(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check if VAULT_ADDR is set
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		if options.Interactive {
-			logger.Info("VAULT_ADDR not set. Please configure Vault connection first")
-			return fmt.Errorf("vault configuration required")
-		}
-		return fmt.Errorf("VAULT_ADDR environment variable not set")
-	}
+	// Get Vault address (env var or smart fallback)
+	vaultAddr := shared.GetVaultAddrWithEnv()
+	logger.Debug("Using Vault address", zap.String("addr", vaultAddr))
 
 	logger.Info("Vault connection configured", zap.String("vault_addr", vaultAddr))
 	return nil
