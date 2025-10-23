@@ -252,8 +252,10 @@ func init() {
 //
 // Step 3: Phases 6-15 - Initialization and Enablement (vault.EnableVault())
 //
-//	Phase 6a: Vault initialization
-//	Phase 6b: Vault unseal
+//	Phase 6: Vault initialization and unseal (provides root-authenticated client)
+//	         CRITICAL: This phase caches the authenticated client for all subsequent phases
+//	         Authentication: Root token from vault_init.json (Agent/AppRole don't exist yet)
+//	Phase 6c: Audit device enablement (IMMEDIATE - before any other operations)
 //	Phase 7: Root token verification
 //	Phase 7a: API client verification
 //	Phase 8: Health check
@@ -261,14 +263,21 @@ func init() {
 //	Phase 9d: Additional secrets engines (Database, PKI)
 //	Phase 9e: Activity tracking enablement
 //	Phase 9b: Bootstrap secret verification
-//	Phase 10a: Userpass authentication (optional, interactive)
-//	Phase 10b: AppRole authentication (optional, interactive)
+//	Phase 10a: Userpass authentication (optional, interactive) - for future runs
+//	Phase 10b: AppRole authentication (optional, interactive) - for future runs
 //	Phase 10c: Entity and alias creation
 //	Phase 11: Policy configuration
-//	Phase 12: Audit logging
+//	Phase 12: Audit logging verification (already enabled in 6c)
 //	Phase 13: Multi-Factor Authentication (optional, interactive)
-//	Phase 14: Vault Agent service (optional, interactive)
+//	Phase 14: Vault Agent service (optional, interactive) - for future runs
 //	Phase 15: Comprehensive hardening (optional, interactive)
+//
+// Authentication Strategy:
+//   - Initial install: Root token from vault_init.json (only available auth method)
+//   - Subsequent runs: Agent token → AppRole → Root token (fallback)
+//
+// Important: Phase 6 must run FIRST because it provides the ONLY working authentication
+// during initial setup. Vault Agent (Phase 14) and AppRole (Phase 10b) don't exist yet.
 //
 // Result: Fully configured, production-ready Vault installation
 func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

@@ -133,16 +133,35 @@ func SetPrivilegedClient(rc *eos_io.RuntimeContext, client *api.Client) {
 		zap.String("context_key", string(privilegedClientKey)))
 }
 
-// GetPrivilegedClient retrieves the privileged (root token) vault client from context,
-// or creates a new one if not cached. This function is used during Vault setup to avoid
-// creating 34+ duplicate privileged clients (one per phase).
+// GetPrivilegedClient retrieves the cached privileged (root token) vault client from context.
 //
-// CRITICAL P0 FIX: This caching mechanism reduces:
-// - 34 client initializations → 1 initialization
-// - 306 log lines → 9 log lines
-// - ~30 seconds of redundant auth validation → 0 seconds
+// IMPORTANT: This function expects the client to be cached by Phase 6 (EnableVault → UnsealVault).
+// Phase 6 creates a root-authenticated client from vault_init.json and caches it via
+// SetPrivilegedClient(). All subsequent phases (6c, 7-15) use this cached client.
 //
-// Usage: Call this instead of GetRootClient() during Vault setup phases.
+// Authentication timeline:
+//   - Phase 6: UnsealVault() → Root token from vault_init.json → SetPrivilegedClient()
+//   - Phase 10b: AppRole configured (for future runs)
+//   - Phase 14: Vault Agent configured (for future runs)
+//   - Subsequent runs: Agent token → AppRole → Root token (fallback)
+//
+// Why cached client is necessary:
+//   - During initial setup, Vault Agent (Phase 14) and AppRole (Phase 10b) don't exist yet
+//   - Attempting to authenticate before Phase 6 would fail (no credentials available)
+//   - Phase 6 provides the ONLY working auth method during fresh installation
+//
+// Caching benefits:
+//   - 34 client initializations → 1 initialization
+//   - 306 log lines → 9 log lines
+//   - ~30 seconds of auth validation → 0 seconds
+//   - No 30s wait for agent token that doesn't exist yet
+//   - No confusing userpass prompt during installation
+//
+// If not cached: This function will attempt to create a new client via GetRootClient(),
+// which may trigger SecureAuthenticationOrchestrator and wait 30s for agent token.
+// This should only happen on subsequent runs where Agent/AppRole are already configured.
+//
+// Usage: Call this during Vault setup phases (after Phase 6) instead of GetRootClient().
 func GetPrivilegedClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
