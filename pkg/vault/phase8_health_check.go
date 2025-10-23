@@ -165,20 +165,37 @@ func CheckVaultHealth(rc *eos_io.RuntimeContext) (bool, error) {
 }
 
 func isVaultProcessRunning(rc *eos_io.RuntimeContext) bool {
-	otelzap.Ctx(rc.Ctx).Debug(" Checking Vault process using lsof")
-	out, err := exec.Command("lsof", "-i", shared.VaultDefaultPort).Output()
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Try systemctl first (more reliable than lsof)
+	if err := exec.Command("systemctl", "is-active", "--quiet", "vault").Run(); err == nil {
+		logger.Debug(" Vault process detected via systemctl")
+		return true
+	}
+
+	// Fallback to lsof (may not be installed)
+	logger.Debug(" Checking Vault process using lsof")
+
+	// Use port number for lsof
+	portArg := fmt.Sprintf(":%d", shared.PortVault)
+	out, err := exec.Command("lsof", "-i", portArg).Output()
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("lsof command failed (process check skipped)", zap.Error(err))
+		// lsof not installed or permission denied - this is non-critical
+		logger.Debug("lsof check skipped (command failed - non-critical)",
+			zap.Error(err),
+			zap.String("note", "Vault health will be verified via API instead"))
 		return false
 	}
+
+	// Parse lsof output for vault process
 	for _, line := range strings.Split(string(out), "\n") {
-		// Check for vault process running as vault user
-		if strings.Contains(line, "vault") && strings.Contains(line, ":"+shared.VaultDefaultPort) {
-			otelzap.Ctx(rc.Ctx).Debug(" Vault process detected in lsof output", zap.String("line", line))
+		if strings.Contains(line, "vault") {
+			logger.Debug(" Vault process detected in lsof output", zap.String("line", line))
 			return true
 		}
 	}
-	otelzap.Ctx(rc.Ctx).Warn("Vault process not found in lsof output")
+
+	logger.Debug("Vault process not found in lsof output (checking via API instead)")
 	return false
 }
 

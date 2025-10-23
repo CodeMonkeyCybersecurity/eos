@@ -305,13 +305,26 @@ func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
 		expectedGID := uint32(vaultGID)
 
 		if currentUID != expectedUID || currentGID != expectedGID {
-			otelzap.Ctx(rc.Ctx).Warn("Runtime directory not owned by vault user",
+			otelzap.Ctx(rc.Ctx).Warn("Runtime directory not owned by vault user, fixing...",
 				zap.String("path", shared.EosRunDir),
 				zap.Uint32("current_uid", currentUID),
 				zap.Uint32("current_gid", currentGID),
 				zap.Uint32("expected_uid", expectedUID),
 				zap.Uint32("expected_gid", expectedGID),
 			)
+
+			// FIX: Chown the directory to vault user
+			// This is critical for Vault Agent to write the token file
+			if err := os.Chown(shared.EosRunDir, vaultUID, vaultGID); err != nil {
+				otelzap.Ctx(rc.Ctx).Error(" Failed to fix runtime directory ownership",
+					zap.String("path", shared.EosRunDir),
+					zap.Error(err))
+				return fmt.Errorf("failed to chown runtime directory to vault user: %w", err)
+			}
+
+			otelzap.Ctx(rc.Ctx).Info(" Runtime directory ownership fixed",
+				zap.String("path", shared.EosRunDir),
+				zap.String("owner", "vault:vault"))
 		}
 	}
 

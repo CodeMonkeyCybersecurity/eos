@@ -438,24 +438,23 @@ func finalizeVaultSetup(rc *eos_io.RuntimeContext, client *api.Client, initRes *
 	client.SetToken(initRes.RootToken)
 	logger.Info(" Root token set on Vault client")
 
-	// CRITICAL P0: Store client in context BEFORE calling Write()
-	// This prevents Write() from trying to re-authenticate via Vault Agent/AppRole
+	// CRITICAL P0: Store client in context BEFORE any operations
+	// This prevents re-authentication attempts during subsequent operations
 	logger.Debug(" Step 3: Storing authenticated client in RuntimeContext",
-		zap.String("reason", "Prevents re-authentication attempts during Write()"))
+		zap.String("reason", "Prevents re-authentication attempts"))
 	SetVaultClient(rc, client)
 	logger.Info(" Vault client stored in context successfully")
 
-	logger.Debug(" Step 4: Persisting init result to Vault KV",
-		zap.String("path", "vault_init"),
-		zap.String("mount", shared.VaultMountKV))
-	if err := Write(rc, client, "vault_init", initRes); err != nil {
-		logger.Warn(" Failed to persist init result to Vault (non-fatal)",
-			zap.Error(err),
-			zap.String("impact", "Re-unsealing may require manual credentials next time"))
-		// Non-fatal: credentials are already saved to disk by handleInitMaterial
-	} else {
-		logger.Info(" Init result persisted to Vault KV successfully")
-	}
+	// NOTE: We do NOT write vault_init to Vault KV here because:
+	// 1. KV secrets engine hasn't been enabled yet (that's Phase 9a)
+	// 2. Credentials are already saved to disk in handleInitMaterial()
+	// 3. Writing to KV before Phase 9a causes "404 no handler for route" error
+	//
+	// If needed in the future, vault_init can be uploaded to KV in Phase 9b
+	// (after KV engine is enabled) using the disk-persisted copy.
+	logger.Debug(" Step 4: Init credentials saved to disk",
+		zap.String("path", "/var/lib/eos/secret/vault_init.json"),
+		zap.String("note", "Will sync to Vault KV in Phase 9b after KV engine is enabled"))
 
 	logger.Info(" finalizeVaultSetup completed successfully")
 	return nil

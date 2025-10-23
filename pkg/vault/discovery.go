@@ -154,17 +154,33 @@ func (vd *VaultDiscovery) RegisterVault(ctx context.Context, config VaultRegistr
 
 	// Also store in K/V for fallback
 	vaultAddr := fmt.Sprintf("https://%s:%d", config.Address, config.Port)
-	kvKey := fmt.Sprintf("eos/config/%s/vault_address", vd.environment)
-	pair := &api.KVPair{
-		Key:   kvKey,
-		Value: []byte(vaultAddr),
-	}
 
-	if _, err := vd.consulClient.KV().Put(pair, &api.WriteOptions{
-		Datacenter: vd.environment,
-	}); err != nil {
-		logger.Warn("Failed to store Vault address in K/V (non-critical)",
-			zap.Error(err))
+	// CRITICAL: Only store in K/V if environment is set
+	// Empty environment causes "404 Unexpected response code" in Consul
+	if vd.environment != "" {
+		kvKey := fmt.Sprintf("eos/config/%s/vault_address", vd.environment)
+		pair := &api.KVPair{
+			Key:   kvKey,
+			Value: []byte(vaultAddr),
+		}
+
+		writeOpts := &api.WriteOptions{}
+		if vd.environment != "" {
+			writeOpts.Datacenter = vd.environment
+		}
+
+		if _, err := vd.consulClient.KV().Put(pair, writeOpts); err != nil {
+			logger.Warn("Failed to store Vault address in K/V (non-critical)",
+				zap.Error(err),
+				zap.String("key", kvKey))
+		} else {
+			logger.Debug("Stored Vault address in Consul K/V for fallback discovery",
+				zap.String("key", kvKey),
+				zap.String("address", vaultAddr))
+		}
+	} else {
+		logger.Debug("Skipping Consul K/V storage (no environment specified)",
+			zap.String("note", "K/V storage requires environment to be set"))
 	}
 
 	logger.Info("Vault registered with Consul",
