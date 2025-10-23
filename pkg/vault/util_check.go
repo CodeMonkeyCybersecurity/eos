@@ -143,7 +143,7 @@ func ListVault(rc *eos_io.RuntimeContext, path string) ([]string, error) {
 	_, span := tracer.Start(context.Background(), "vault.ListVault")
 	defer span.End()
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		span.RecordError(err)
 		return nil, cerr.Wrap(err, "get root client")

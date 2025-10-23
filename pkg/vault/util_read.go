@@ -99,7 +99,7 @@ func IsNotFoundError(err error) bool {
 
 // ListUnder lists Vault KV metadata keys under a path.
 func ListUnder(rc *eos_io.RuntimeContext, path string) ([]string, error) {
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("get Vault client: %w", err)
 	}
@@ -147,7 +147,7 @@ func readSecret(rc *eos_io.RuntimeContext, path string) (*api.Secret, error) {
 }
 
 func readAndUnmarshal[T any](rc *eos_io.RuntimeContext, mount, path string) (*T, error) {
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("get root client: %w", err)
 	}

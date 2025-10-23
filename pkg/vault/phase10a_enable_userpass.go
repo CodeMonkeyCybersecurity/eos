@@ -25,10 +25,10 @@ import (
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
 func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logger, password string) error {
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error("get privileged Vault client failed", zap.Error(err))
-		return cerr.Wrap(err, "get-root-client")
+		return cerr.Wrap(err, "get-privileged-client")
 	}
 
 	if password == "" {
@@ -170,6 +170,12 @@ func EnsureUserpassUser(client *api.Client, rc *eos_io.RuntimeContext, password 
 
 	log.Info(" [EVALUATE] Eos user created successfully in userpass auth",
 		zap.String("path", shared.EosUserpassPath))
+
+	// CRITICAL UX FIX: Communicate login credentials to user
+	log.Info("terminal prompt: ✓ Vault userpass user created successfully")
+	log.Info(fmt.Sprintf("terminal prompt:   Username: %s", shared.EosID))
+	log.Info(fmt.Sprintf("terminal prompt:   Password: [saved to %s]", shared.EosUserPassPasswordFile))
+	log.Info(fmt.Sprintf("terminal prompt:   Login: vault login -method=userpass username=%s", shared.EosID))
 
 	// Verify user was created by reading it back
 	log.Info(" Verifying user creation by reading back from Vault")
@@ -315,11 +321,11 @@ func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string
 	log.Info(" Writing fallback credentials to Vault KV store",
 		zap.String("path", "secret/eos/userpass-password"))
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
-		log.Error(" Failed to get root client for KV write",
+		log.Error(" Failed to get privileged client for KV write",
 			zap.Error(err))
-		return cerr.Wrap(err, "get-root-client")
+		return cerr.Wrap(err, "get-privileged-client")
 	}
 
 	if err := WriteKVv2(rc, client, "secret", "eos/userpass-password", shared.FallbackSecretsTemplate(password)); err != nil {

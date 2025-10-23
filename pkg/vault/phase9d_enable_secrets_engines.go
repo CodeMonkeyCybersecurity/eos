@@ -26,7 +26,7 @@ func PhaseEnableSecretsEngines(rc *eos_io.RuntimeContext, client *api.Client) er
 
 	// Get privileged client
 	logger.Info(" Requesting privileged Vault client")
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		logger.Error(" Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("failed to get privileged client: %w", err)

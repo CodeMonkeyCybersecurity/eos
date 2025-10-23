@@ -199,7 +199,7 @@ func Purge(rc *eos_io.RuntimeContext, distro string) (removed []string, errs map
 
 // VaultDelete removes a secret at the given KV v2 path
 func VaultDelete(rc *eos_io.RuntimeContext, path string) error {
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		return err
 	}
@@ -209,7 +209,7 @@ func VaultDelete(rc *eos_io.RuntimeContext, path string) error {
 
 // VaultDestroy permanently deletes a secret at the given KV v2 path
 func VaultPurge(rc *eos_io.RuntimeContext, path string) error {
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		return err
 	}

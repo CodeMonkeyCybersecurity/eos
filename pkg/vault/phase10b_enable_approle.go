@@ -44,7 +44,7 @@ func PhaseEnableAppRole(
 	log.Info(" [ASSESS] Checking if AppRole is already configured")
 
 	// Get privileged client for checks
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged Vault client for AppRole setup", zap.Error(err))
 		return cerr.Wrap(err, "get privileged client")
@@ -112,20 +112,19 @@ func PhaseEnableAppRole(
 	log.Info(" AppRole auth method is enabled (or already present)")
 
 	// 3) Provision or reuse the role (using privileged client)
-	roleID, secretID, err := EnsureAppRole(rc, privilegedClient, opts)
+	roleID, _, err := EnsureAppRole(rc, privilegedClient, opts)
 	if err != nil {
 		log.Error(" Failed to ensure AppRole credentials", zap.Error(err))
 		return cerr.Wrapf(err, "ensure AppRole")
 	}
 	log.Debug("AppRole credentials obtained successfully")
 
-	// 4) Persist them to disk
-	if err := WriteAppRoleFiles(rc, roleID, secretID); err != nil {
-		log.Error("Failed to write AppRole credential files", zap.Error(err))
-		return cerr.Wrapf(err, "write AppRole files")
-	}
+	// CRITICAL P0 FIX: Removed duplicate WriteAppRoleFiles() call
+	// EnsureAppRole() already writes files at auth_approle.go:350 (with both roleID and secretID)
+	// This was causing duplicate writes (same credentials written twice)
+	// Note: secretID not needed here since EnsureAppRole already persisted it
 
-	// 5) VERIFY: Confirm Vault actually has this AppRole registered
+	// 4) VERIFY: Confirm Vault actually has this AppRole registered
 	log.Info(" Verifying AppRole exists in Vault backend",
 		zap.String("role_name", shared.AppRoleName),
 		zap.String("path", shared.AppRoleRoleIDPath))

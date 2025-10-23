@@ -17,7 +17,7 @@ func PhaseWriteBootstrapSecretAndRecheck(rc *eos_io.RuntimeContext, _ *api.Clien
 	otelzap.Ctx(rc.Ctx).Info(" [Phase 9b] Writing bootstrap test secret and verifying Vault health")
 
 	//  Get privileged client (root or agent token, validated)
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to get privileged Vault client", zap.Error(err))
 		return err

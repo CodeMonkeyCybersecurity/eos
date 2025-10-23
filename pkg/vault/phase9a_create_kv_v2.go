@@ -42,7 +42,7 @@ func PhaseEnableKVv2(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 	//  Get privileged client (root or agent token, validated)
 	log.Info(" Requesting privileged Vault client")
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged Vault client", zap.Error(err))
 		return err
@@ -91,7 +91,7 @@ func IsMountEnabled(rc *eos_io.RuntimeContext, client *api.Client, mount string)
 func UpdateVault(rc *eos_io.RuntimeContext, path string, update map[string]interface{}) error {
 	otelzap.Ctx(rc.Ctx).Info(" Updating Vault secret", zap.String("path", path))
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to get privileged Vault client", zap.Error(err))
 		return err

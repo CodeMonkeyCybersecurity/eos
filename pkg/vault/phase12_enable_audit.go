@@ -20,7 +20,7 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { //  Ignor
 	log.Info(" Starting file audit enablement process")
 
 	// Always get privileged root client
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)

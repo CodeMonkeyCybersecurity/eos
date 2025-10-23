@@ -18,7 +18,7 @@ func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
 
 	log.Info("[Phase10c] Ensuring Eos entity and aliases exist")
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)

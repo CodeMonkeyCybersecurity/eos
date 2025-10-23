@@ -198,13 +198,13 @@ func performSecurityPolicyHardening(rc *eos_io.RuntimeContext, client *api.Clien
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Applying security policy hardening")
 
-	// Enable MFA
-	if config.EnableMFA {
-		mfaConfig := DefaultMFAConfig()
-		if err := EnableMFAMethods(rc, client, mfaConfig); err != nil {
-			return fmt.Errorf("failed to enable MFA: %w", err)
-		}
-	}
+	// CRITICAL P0 FIX: Removed duplicate MFA configuration
+	// MFA is already configured in Phase 12 (lifecycle2_enable.go:326)
+	// This duplicate call was causing:
+	// - MFA method created twice
+	// - Wasted time during setup
+	// - Confusing duplicate log messages
+	// NOTE: If MFA enforcement is needed, implement in Phase 12, not here
 
 	// Revoke root token
 	if config.RevokeRootToken {
@@ -615,17 +615,26 @@ func enableRateLimiting(rc *eos_io.RuntimeContext, client *api.Client) error {
 		},
 	}
 
+	// CRITICAL P0 FIX: Track errors so we only log success when ALL quotas succeed
+	var failedQuotas []string
 	for _, quota := range quotaConfigs {
 		_, err := client.Logical().Write(fmt.Sprintf("sys/quotas/rate-limit/%s", quota.name), quota.config)
 		if err != nil {
+			failedQuotas = append(failedQuotas, quota.name)
 			log.Warn("Failed to configure rate limit quota",
 				zap.String("quota", quota.name),
 				zap.Error(err))
 		}
 	}
 
-	log.Info(" Rate limiting configured successfully")
-	return nil
+	// Only log success if ALL quotas were configured
+	if len(failedQuotas) == 0 {
+		log.Info(" Rate limiting configured successfully")
+		return nil
+	}
+
+	// Some quotas failed - return error with details
+	return fmt.Errorf("failed to configure %d rate limit quotas: %v", len(failedQuotas), failedQuotas)
 }
 
 func configureVaultBackup(rc *eos_io.RuntimeContext) error {

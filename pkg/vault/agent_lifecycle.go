@@ -122,7 +122,7 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 
 	// Get privileged client with root token for auth method listing
 	log.Info(" Getting privileged client to check AppRole auth method")
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged Vault client for prerequisites check", zap.Error(err))
 		return cerr.Wrap(err, "get privileged client for prerequisites")
@@ -181,7 +181,7 @@ func ensureAppRoleCredentials(rc *eos_io.RuntimeContext, _ *api.Client) error {
 
 	// Get privileged client with root token for AppRole operations
 	log.Info(" Getting privileged client for AppRole credential retrieval")
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged Vault client for AppRole credentials", zap.Error(err))
 		return cerr.Wrap(err, "get privileged client for AppRole credentials")

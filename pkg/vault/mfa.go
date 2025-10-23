@@ -48,7 +48,7 @@ func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFA
 
 	// Get privileged client with root token for MFA configuration
 	log.Info(" Getting privileged client for MFA setup")
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged Vault client for MFA setup", zap.Error(err))
 		return cerr.Wrap(err, "get privileged client for MFA")
@@ -173,7 +173,7 @@ func storeMFAMethodID(rc *eos_io.RuntimeContext, methodType, methodID string) er
 		},
 	}
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		return cerr.Wrap(err, "failed to get root client")
 	}
@@ -338,13 +338,111 @@ func enforceMFAForAllUsers(rc *eos_io.RuntimeContext, client *api.Client, config
 	return nil
 }
 
-// enforceIdentityMFAForUserpass creates a basic MFA enforcement for userpass auth
-func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, _ *api.Client) error {
+// enforceIdentityMFAForUserpass creates MFA login enforcement for userpass authentication
+// CRITICAL P0 FIX: This now creates an ACTUAL enforcement policy (was previously a stub)
+func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
+	log.Info(" Creating MFA login enforcement policy for userpass authentication")
 
-	// This is a simplified enforcement - in production, you'd want more sophisticated policies
-	log.Info(" MFA enforcement setup complete - method created and ready for use")
-	log.Info(" Users can now configure TOTP MFA using: vault write identity/mfa/method/totp generate=true")
+	// Step 1: Retrieve TOTP method ID from Vault KV (stored during TOTP enablement)
+	log.Info(" [ASSESS] Retrieving TOTP method ID from Vault KV")
+	methodIDSecret, err := client.Logical().Read("secret/data/eos/mfa-methods/totp")
+	if err != nil {
+		log.Error(" Failed to read TOTP method ID from Vault",
+			zap.Error(err),
+			zap.String("path", "secret/data/eos/mfa-methods/totp"))
+		return cerr.Wrap(err, "failed to read TOTP method ID")
+	}
+
+	if methodIDSecret == nil || methodIDSecret.Data == nil {
+		log.Error(" TOTP method ID not found in Vault KV")
+		return cerr.New("TOTP method ID not found - ensure TOTP MFA is enabled first")
+	}
+
+	// Extract method_id from nested data structure (KV v2 format)
+	data, ok := methodIDSecret.Data["data"].(map[string]interface{})
+	if !ok {
+		log.Error(" Invalid TOTP method data structure", zap.Any("data", methodIDSecret.Data))
+		return cerr.New("invalid TOTP method data structure")
+	}
+
+	methodID, ok := data["method_id"].(string)
+	if !ok || methodID == "" {
+		log.Error(" TOTP method_id is not a valid string", zap.Any("method_id", data["method_id"]))
+		return cerr.New("TOTP method_id is not a valid string")
+	}
+
+	log.Info(" TOTP method ID retrieved successfully", zap.String("method_id", methodID))
+
+	// Step 2: Get userpass auth accessor (needed for enforcement policy)
+	log.Info(" [ASSESS] Retrieving userpass authentication accessor")
+	authMounts, err := client.Sys().ListAuth()
+	if err != nil {
+		log.Error(" Failed to list auth methods", zap.Error(err))
+		return cerr.Wrap(err, "failed to list auth methods")
+	}
+
+	var userpassAccessor string
+	for path, mount := range authMounts {
+		if mount.Type == "userpass" || strings.HasPrefix(path, "userpass") {
+			userpassAccessor = mount.Accessor
+			log.Info(" Userpass accessor found",
+				zap.String("path", path),
+				zap.String("accessor", userpassAccessor))
+			break
+		}
+	}
+
+	if userpassAccessor == "" {
+		log.Error(" Userpass auth method not found - cannot enforce MFA")
+		return cerr.New("userpass auth method not found")
+	}
+
+	// Step 3: Create MFA login enforcement policy
+	log.Info(" [INTERVENE] Creating MFA login enforcement policy")
+	enforcementName := "eos-userpass-enforcement"
+	enforcementPath := fmt.Sprintf("identity/mfa/login-enforcement/%s", enforcementName)
+
+	enforcementConfig := map[string]interface{}{
+		"name":                   enforcementName,
+		"mfa_method_ids":         []string{methodID},
+		"auth_method_accessors":  []string{userpassAccessor},
+		"auth_method_types":      []string{"userpass"},
+	}
+
+	log.Debug("MFA enforcement policy configuration",
+		zap.String("path", enforcementPath),
+		zap.Any("config", enforcementConfig))
+
+	_, err = client.Logical().Write(enforcementPath, enforcementConfig)
+	if err != nil {
+		log.Error(" Failed to create MFA login enforcement policy",
+			zap.String("path", enforcementPath),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to create MFA enforcement policy")
+	}
+
+	// Step 4: Verify enforcement policy was created
+	log.Info(" [EVALUATE] Verifying MFA enforcement policy creation")
+	verifyResp, err := client.Logical().Read(enforcementPath)
+	if err != nil {
+		log.Warn("Failed to verify MFA enforcement policy (non-fatal)",
+			zap.Error(err))
+	} else if verifyResp == nil {
+		log.Warn("MFA enforcement policy verification returned nil (may still be active)")
+	} else {
+		log.Info(" MFA enforcement policy verified",
+			zap.String("policy_name", enforcementName),
+			zap.Int("response_keys", len(verifyResp.Data)))
+	}
+
+	// Success!
+	log.Info(" [EVALUATE] MFA login enforcement ACTIVE",
+		zap.String("enforcement_policy", enforcementName),
+		zap.String("applies_to", "userpass authentication"),
+		zap.String("requires", "TOTP MFA"))
+	log.Info("terminal prompt: ✓ MFA enforcement active - userpass login now requires TOTP")
+	log.Info("terminal prompt:   Users must configure TOTP before next login")
 
 	return nil
 }

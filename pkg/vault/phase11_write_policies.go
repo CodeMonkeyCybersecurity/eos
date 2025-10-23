@@ -14,7 +14,7 @@ import (
 func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 	otelzap.Ctx(rc.Ctx).Info(" Preparing to write all Vault policies")
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)

@@ -20,7 +20,7 @@ func IsUserpassConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, 
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Get privileged client for auth method queries (requires root permissions)
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Warn("Failed to get privileged client for auth check", zap.Error(err))
 		return false, fmt.Errorf("get privileged client: %w", err)
@@ -72,7 +72,7 @@ func IsAppRoleConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, e
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Get privileged client for auth method queries (requires root permissions)
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Warn("Failed to get privileged client for auth check", zap.Error(err))
 		return false, fmt.Errorf("get privileged client: %w", err)
@@ -140,7 +140,7 @@ func IsEntityConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, er
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Get privileged client for entity queries (requires root permissions)
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Warn("Failed to get privileged client for entity check", zap.Error(err))
 		return false, fmt.Errorf("get privileged client: %w", err)
@@ -178,7 +178,7 @@ func IsAuditConfigured(rc *eos_io.RuntimeContext, client *api.Client) (bool, err
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Get privileged client for audit queries (requires root permissions)
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Warn("Failed to get privileged client for audit check", zap.Error(err))
 		return false, fmt.Errorf("get privileged client: %w", err)
@@ -235,7 +235,7 @@ func UpdateUserpassPassword(rc *eos_io.RuntimeContext, client *api.Client, newPa
 	log.Info("Updating eos userpass password")
 
 	// Get privileged client
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		return fmt.Errorf("get privileged client: %w", err)
 	}
@@ -265,7 +265,7 @@ func RegenerateAppRoleCredentials(rc *eos_io.RuntimeContext, client *api.Client)
 	log.Info("Regenerating AppRole credentials")
 
 	// Get privileged client
-	privilegedClient, err := GetRootClient(rc)
+	privilegedClient, err := GetPrivilegedClient(rc)
 	if err != nil {
 		return fmt.Errorf("get privileged client: %w", err)
 	}

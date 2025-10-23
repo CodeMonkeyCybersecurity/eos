@@ -34,7 +34,7 @@ func PhaseEnsureVaultHealthy(rc *eos_io.RuntimeContext) error {
 		otelzap.Ctx(rc.Ctx).Info(" VAULT_ADDR resolved", zap.String("address", addr))
 	}
 
-	client, err := GetRootClient(rc)
+	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to create privileged Vault client", zap.Error(err))
 		return fmt.Errorf("could not create Vault client: %w", err)
