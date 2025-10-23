@@ -547,20 +547,26 @@ Group=vault
 	timerPath := VaultAgentHealthCheckTimerPath
 	servicePath := VaultAgentHealthCheckServicePath
 
+	// SPRINT 2 FIX: Health check monitoring is OPTIONAL - don't fail setup if it can't be configured
+	// This prevents false errors when Vault Agent monitoring isn't needed
 	log.Info(" Writing systemd timer", zap.String("path", timerPath))
 	if err := os.WriteFile(timerPath, []byte(timerContent), 0644); err != nil {
-		log.Error(" Failed to write health check timer",
+		log.Warn(" Failed to write health check timer (non-fatal)",
 			zap.String("path", timerPath),
-			zap.Error(err))
-		return cerr.Wrap(err, "failed to write health check timer")
+			zap.Error(err),
+			zap.String("note", "Vault Agent monitoring is optional"))
+		log.Debug(" Vault Agent health monitoring will not be configured")
+		return nil // Non-fatal - monitoring is optional
 	}
 
 	log.Info(" Writing systemd service", zap.String("path", servicePath))
 	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
-		log.Error(" Failed to write health check service",
+		log.Warn(" Failed to write health check service (non-fatal)",
 			zap.String("path", servicePath),
-			zap.Error(err))
-		return cerr.Wrap(err, "failed to write health check service")
+			zap.Error(err),
+			zap.String("note", "Vault Agent monitoring is optional"))
+		log.Debug(" Vault Agent health monitoring will not be configured")
+		return nil // Non-fatal - monitoring is optional
 	}
 
 	// Enable the health check timer

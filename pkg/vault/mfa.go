@@ -404,10 +404,10 @@ func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client
 	enforcementPath := fmt.Sprintf("identity/mfa/login-enforcement/%s", enforcementName)
 
 	enforcementConfig := map[string]interface{}{
-		"name":                   enforcementName,
-		"mfa_method_ids":         []string{methodID},
-		"auth_method_accessors":  []string{userpassAccessor},
-		"auth_method_types":      []string{"userpass"},
+		"name":                  enforcementName,
+		"mfa_method_ids":        []string{methodID},
+		"auth_method_accessors": []string{userpassAccessor},
+		"auth_method_types":     []string{"userpass"},
 	}
 
 	log.Debug("MFA enforcement policy configuration",

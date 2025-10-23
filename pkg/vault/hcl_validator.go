@@ -317,8 +317,10 @@ func ValidatePolicyString(rc *eos_io.RuntimeContext, policyName, policyContent s
 	for _, warning := range result.Warnings {
 		log.Warn("Policy validation warning", zap.String("warning", warning))
 	}
+	// SPRINT 2 FIX: Suggestions are optional improvements, not actionable info
+	// Changed from INFO to DEBUG to reduce noise during setup
 	for _, suggestion := range result.Suggestions {
-		log.Info("Policy validation suggestion", zap.String("suggestion", suggestion))
+		log.Debug("Policy validation suggestion", zap.String("suggestion", suggestion))
 	}
 
 	return nil
