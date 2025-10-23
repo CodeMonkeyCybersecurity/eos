@@ -338,7 +338,7 @@ func (result *CleanupResult) FormatResult() string {
 		if result.OrphansRemoved {
 			buf.WriteString("Orphaned packages removed\n")
 		} else {
-			buf.WriteString("⏭️  Orphaned packages not removed\n")
+			buf.WriteString("  Orphaned packages not removed\n")
 		}
 	} else {
 		buf.WriteString("No orphaned packages found\n")
@@ -347,7 +347,7 @@ func (result *CleanupResult) FormatResult() string {
 	if result.AutoremoveRan {
 		buf.WriteString("Autoremove completed\n")
 	} else {
-		buf.WriteString("⏭️  Autoremove skipped\n")
+		buf.WriteString("  Autoremove skipped\n")
 	}
 
 	if len(result.UnusedKernels) > 0 {
@@ -355,7 +355,7 @@ func (result *CleanupResult) FormatResult() string {
 		if result.KernelsRemoved {
 			buf.WriteString("Unused kernels removed\n")
 		} else {
-			buf.WriteString("⏭️  Unused kernels not removed\n")
+			buf.WriteString("  Unused kernels not removed\n")
 		}
 	} else {
 		buf.WriteString("🐧 No unused kernels found\n")

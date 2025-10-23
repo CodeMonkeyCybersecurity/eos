@@ -196,7 +196,7 @@ func enableDuoMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log.Info(" Enabling Duo MFA method")
 
 	if !interaction.PromptYesNo(rc.Ctx, "Do you want to configure Duo Security MFA?", false) {
-		log.Info("⏭️ Skipping Duo MFA configuration")
+		log.Info(" Skipping Duo MFA configuration")
 		return nil
 	}
 
@@ -239,7 +239,7 @@ func enablePingIDMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log.Info(" Enabling PingID MFA method")
 
 	if !interaction.PromptYesNo(rc.Ctx, "Do you want to configure PingID MFA?", false) {
-		log.Info("⏭️ Skipping PingID MFA configuration")
+		log.Info(" Skipping PingID MFA configuration")
 		return nil
 	}
 
@@ -282,7 +282,7 @@ func enableOktaMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log.Info(" Enabling Okta MFA method")
 
 	if !interaction.PromptYesNo(rc.Ctx, "Do you want to configure Okta MFA?", false) {
-		log.Info("⏭️ Skipping Okta MFA configuration")
+		log.Info(" Skipping Okta MFA configuration")
 		return nil
 	}
 

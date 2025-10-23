@@ -262,9 +262,9 @@ $ ceph fs volume ls
 ## Next Steps
 
 1. ✅ **Done**: All P0 fixes complete and macOS build passing
-2. ⏭️ **Next**: Test on Ubuntu server (vhost1) with real libcephfs
-3. ⏭️ **After**: Deploy to Ubuntu production if tests pass
-4. ⏭️ **Future**: Add P1/P2 fixes (see INTEGRATION_ANALYSIS.md)
+2.  **Next**: Test on Ubuntu server (vhost1) with real libcephfs
+3.  **After**: Deploy to Ubuntu production if tests pass
+4.  **Future**: Add P1/P2 fixes (see INTEGRATION_ANALYSIS.md)
 
 ---
 

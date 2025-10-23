@@ -416,13 +416,13 @@ func importCertificates(client *AuthentikAPIClient, certificates []Certificate, 
 		exists, existingID := client.CertificateExists(cert.Name)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing certificate: %s\n", cert.Name)
+			fmt.Printf("     Skipping existing certificate: %s\n", cert.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Certificate exists (use --update-existing to update): %s\n", cert.Name)
+			fmt.Printf("     Certificate exists (use --update-existing to update): %s\n", cert.Name)
 			result.Skipped++
 			continue
 		}
@@ -466,13 +466,13 @@ func importPropertyMappings(client *AuthentikAPIClient, mappings []PropertyMappi
 		exists, existingID := client.PropertyMappingExists(mapping.Name)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing property mapping: %s\n", mapping.Name)
+			fmt.Printf("     Skipping existing property mapping: %s\n", mapping.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Property mapping exists: %s\n", mapping.Name)
+			fmt.Printf("     Property mapping exists: %s\n", mapping.Name)
 			result.Skipped++
 			continue
 		}
@@ -515,13 +515,13 @@ func importFlows(client *AuthentikAPIClient, flows []Flow, options ImportOptions
 		exists, existingID := client.FlowExists(flow.Slug)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing flow: %s\n", flow.Name)
+			fmt.Printf("     Skipping existing flow: %s\n", flow.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Flow exists: %s\n", flow.Name)
+			fmt.Printf("     Flow exists: %s\n", flow.Name)
 			result.Skipped++
 			continue
 		}
@@ -559,13 +559,13 @@ func importProviders(client *AuthentikAPIClient, providers []Provider, options I
 		exists, existingID := client.ProviderExists(provider.Name)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing provider: %s\n", provider.Name)
+			fmt.Printf("     Skipping existing provider: %s\n", provider.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Provider exists: %s\n", provider.Name)
+			fmt.Printf("     Provider exists: %s\n", provider.Name)
 			result.Skipped++
 			continue
 		}
@@ -603,13 +603,13 @@ func importApplications(client *AuthentikAPIClient, apps []Application, options 
 		exists, existingID := client.ApplicationExists(app.Slug)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing application: %s\n", app.Name)
+			fmt.Printf("     Skipping existing application: %s\n", app.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Application exists: %s\n", app.Name)
+			fmt.Printf("     Application exists: %s\n", app.Name)
 			result.Skipped++
 			continue
 		}
@@ -670,13 +670,13 @@ func importSingleGroup(client *AuthentikAPIClient, group Group, options ImportOp
 	exists, existingID := client.GroupExists(group.Name)
 
 	if exists && options.SkipExisting {
-		fmt.Printf("   ⏭️  Skipping existing group: %s\n", group.Name)
+		fmt.Printf("     Skipping existing group: %s\n", group.Name)
 		result.Skipped++
 		return
 	}
 
 	if exists && !options.UpdateExisting {
-		fmt.Printf("   ⏭️  Group exists: %s\n", group.Name)
+		fmt.Printf("     Group exists: %s\n", group.Name)
 		result.Skipped++
 		return
 	}
@@ -713,13 +713,13 @@ func importPolicies(client *AuthentikAPIClient, policies []Policy, options Impor
 		exists, existingID := client.PolicyExists(policy.Name)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing policy: %s\n", policy.Name)
+			fmt.Printf("     Skipping existing policy: %s\n", policy.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Policy exists: %s\n", policy.Name)
+			fmt.Printf("     Policy exists: %s\n", policy.Name)
 			result.Skipped++
 			continue
 		}
@@ -758,13 +758,13 @@ func importStages(client *AuthentikAPIClient, stages []Stage, options ImportOpti
 		exists, existingID := client.StageExists(stage.Name)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing stage: %s\n", stage.Name)
+			fmt.Printf("     Skipping existing stage: %s\n", stage.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Stage exists: %s\n", stage.Name)
+			fmt.Printf("     Stage exists: %s\n", stage.Name)
 			result.Skipped++
 			continue
 		}
@@ -802,13 +802,13 @@ func importOutposts(client *AuthentikAPIClient, outposts []Outpost, options Impo
 		exists, existingID := client.OutpostExists(outpost.Name)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing outpost: %s\n", outpost.Name)
+			fmt.Printf("     Skipping existing outpost: %s\n", outpost.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Outpost exists: %s\n", outpost.Name)
+			fmt.Printf("     Outpost exists: %s\n", outpost.Name)
 			result.Skipped++
 			continue
 		}
@@ -846,13 +846,13 @@ func importTenants(client *AuthentikAPIClient, tenants []Tenant, options ImportO
 		exists, existingID := client.TenantExists(tenant.Domain)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing tenant: %s\n", tenant.Domain)
+			fmt.Printf("     Skipping existing tenant: %s\n", tenant.Domain)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Tenant exists: %s\n", tenant.Domain)
+			fmt.Printf("     Tenant exists: %s\n", tenant.Domain)
 			result.Skipped++
 			continue
 		}
@@ -890,13 +890,13 @@ func importBlueprints(client *AuthentikAPIClient, blueprints []Blueprint, option
 		exists, existingID := client.BlueprintExists(blueprint.Name)
 
 		if exists && options.SkipExisting {
-			fmt.Printf("   ⏭️  Skipping existing blueprint: %s\n", blueprint.Name)
+			fmt.Printf("     Skipping existing blueprint: %s\n", blueprint.Name)
 			result.Skipped++
 			continue
 		}
 
 		if exists && !options.UpdateExisting {
-			fmt.Printf("   ⏭️  Blueprint exists: %s\n", blueprint.Name)
+			fmt.Printf("     Blueprint exists: %s\n", blueprint.Name)
 			result.Skipped++
 			continue
 		}

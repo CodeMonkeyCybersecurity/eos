@@ -356,7 +356,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Info(" Vault Agent enabled successfully")
 		log.Info("terminal prompt: Vault Agent is now running and configured for automatic authentication")
 	} else {
-		log.Info("⏭️ Vault Agent enablement skipped by user")
+		log.Info(" Vault Agent enablement skipped by user")
 		log.Info("terminal prompt: Vault Agent not enabled. You can enable it later with manual configuration.")
 	}
 
@@ -389,7 +389,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 			log.Info("terminal prompt: Vault has been hardened for production use")
 		}
 	} else {
-		log.Info("⏭️ [Phase 15] Hardening skipped by user")
+		log.Info(" [Phase 15] Hardening skipped by user")
 		log.Info("terminal prompt: IMPORTANT: Run 'eos secure vault --comprehensive' before production use")
 	}
 

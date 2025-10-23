@@ -194,7 +194,7 @@ func InteractiveHardeningWorkflow(rc *eos_io.RuntimeContext, client *api.Client)
 	logger.Info("")
 	logger.Info("terminal prompt: Review the hardening measures above.")
 	if !interaction.PromptYesNo(rc.Ctx, "Apply recommended hardening measures?", true) {
-		logger.Info("⏭️  Hardening skipped by user")
+		logger.Info("  Hardening skipped by user")
 		logger.Info("")
 		logger.Info("IMPORTANT: You can apply hardening later with:")
 		logger.Info("  sudo eos update vault --harden")

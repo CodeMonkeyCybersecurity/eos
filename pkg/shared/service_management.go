@@ -125,7 +125,7 @@ func (sm *ServiceManager) GetEnhancedServiceStatus(ctx context.Context, serviceN
 			zap.String("service", serviceName),
 			zap.Duration("systemd_checks_duration", time.Since(systemdStart)))
 	} else {
-		logger.Debug("⏭️  Skipping systemd checks (service not installed)",
+		logger.Debug("  Skipping systemd checks (service not installed)",
 			zap.String("service", serviceName))
 	}
 
