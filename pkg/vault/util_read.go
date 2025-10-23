@@ -120,7 +120,7 @@ func ReadVaultInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
 // InspectFromDisk reads and prints fallback test-data.
 func InspectFromDisk(rc *eos_io.RuntimeContext) error {
 	path := filepath.Join(shared.SecretsDir, shared.TestDataFilename)
-	var out map[string]interface{}
+	var out map[string]any
 	if err := readJSONFile(rc, path, &out); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			otelzap.Ctx(rc.Ctx).Warn("Fallback test-data file not found", zap.String("path", path))

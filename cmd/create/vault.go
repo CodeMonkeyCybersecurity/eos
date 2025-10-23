@@ -368,8 +368,7 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		return fmt.Errorf("enable vault: %w", err)
 	}
 
-	logger.Info(" Vault creation and enablement completed successfully!")
-	logger.Info("terminal prompt: Vault is fully configured and ready to use")
+	logger.Info(" Vault enablement completed (Phases 6-15 complete)")
 
 	// Post-Installation: Migrate Consul ACL token from Consul KV to Vault (if exists)
 	// This happens after Vault is fully initialized and ready
@@ -384,6 +383,10 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 			zap.String("vault_path", "secret/consul/acl_management_token"),
 			zap.String("note", "Token removed from Consul KV and now stored securely in Vault"))
 	}
+
+	// Final success message after ALL operations complete
+	logger.Info(" Vault installation completed successfully!")
+	logger.Info("terminal prompt: Vault is fully configured and ready to use")
 
 	return nil
 }

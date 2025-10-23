@@ -27,8 +27,7 @@ import (
 //  ├── eos_unix.ReloadDaemonAndEnable()  [⚠ external]
 //  ├── ensureVaultDataDir()    [⚠ external, not defined in this file]
 //  ├── startVaultSystemdService()
-//  ├── waitForVaultHealth()
-//  └── PrintNextSteps()        [⚠ external, added from your new function]
+//  └── waitForVaultHealth()
 
 // WriteAgentSystemdUnit()
 
@@ -76,9 +75,6 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 	if err := waitForVaultHealth(rc, shared.VaultMaxHealthWait); err != nil {
 		return err
 	}
-
-	//  Print user instructions here
-	PrintNextSteps(rc)
 
 	return nil
 }

@@ -1475,20 +1475,9 @@ func (vi *VaultInstaller) verify() error {
 		zap.String("storage_backend", vi.config.StorageBackend),
 		zap.String("api_url", vi.config.APIAddr))
 
-	// Print user instructions
-	vi.logger.Info("terminal prompt: ")
-	vi.logger.Info("terminal prompt:  Vault installation completed successfully!")
-	vi.logger.Info(fmt.Sprintf("terminal prompt: Web UI available at: http://<server-ip>:%d", vi.config.Port))
-	vi.logger.Info("terminal prompt: ")
-	vi.logger.Info("terminal prompt: IMPORTANT: Vault needs to be initialized and unsealed")
-	vi.logger.Info("terminal prompt: ")
-	vi.logger.Info("terminal prompt: To initialize Vault:")
-	vi.logger.Info("terminal prompt:   vault operator init")
-	vi.logger.Info("terminal prompt: ")
-	vi.logger.Info("terminal prompt: To unseal Vault (requires 3 unseal keys):")
-	vi.logger.Info("terminal prompt:   vault operator unseal <key1>")
-	vi.logger.Info("terminal prompt:   vault operator unseal <key2>")
-	vi.logger.Info("terminal prompt:   vault operator unseal <key3>")
+	// NOTE: Vault is now ready for Phase 6-15 initialization
+	// The orchestration layer (cmd/create/vault.go) will call EnableVault() next
+	// No user instructions needed here - EnableVault handles initialization automatically
 
 	return nil
 }

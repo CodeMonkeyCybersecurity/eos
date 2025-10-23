@@ -1,415 +1,326 @@
-# VS Code Configuration for Eos CGO Development
+# VS Code Configuration for Eos Development
 
 *Last Updated: 2025-10-23*
 
-## Problem Statement
+## Overview
 
-Eos uses CGO for Ceph (`pkg/cephfs`) and libvirt (`pkg/kvm`) integration. These packages require C libraries that are only available on Linux, making it impossible to lint, build, or test them directly on macOS during development.
+Eos uses CGO for Ceph (`pkg/cephfs`) and libvirt (`pkg/kvm`) integration. To enable development on macOS (where these C libraries don't exist), we use **stub files** with build tags.
 
-## Solution: Remote Linting via SSH
+## The Stub File Pattern
 
-This VS Code configuration enables **remote linting** on your Linux server (`vhost1`) while developing locally on macOS. Errors are parsed and displayed in VS Code's Problems panel as if they were local.
+### How It Works
 
----
+**Problem:** CGO packages require C libraries that only exist on Linux.
 
-## Setup Instructions
-
-### 1. Prerequisites
-
-**On macOS (your development machine):**
-```bash
-# Install fswatch for file watching (optional, for auto-lint)
-brew install fswatch
-
-# Ensure SSH key authentication to vhost1 is configured
-ssh-copy-id vhost1  # If not already done
-ssh vhost1 exit     # Test connection
-```
-
-**On vhost1 (your Linux server):**
-```bash
-# Install golangci-lint
-curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
-
-# Verify installation
-golangci-lint --version
-```
-
-### 2. VS Code Extensions (Optional but Recommended)
-
-Install these extensions for the best experience:
-
-- **Go** (golang.go) - Essential for Go development
-- **Error Lens** (usernamehw.errorlens) - Shows errors inline in the editor
-- **Run on Save** (emeraldwalk.runonsave) - Auto-lint on file save (already configured)
-
----
-
-## Usage
-
-### Method 1: Keyboard Shortcuts (Fastest)
-
-| Shortcut | Action | Description |
-|----------|--------|-------------|
-| `Cmd+Shift+L` | Lint CGO packages remotely | Runs golangci-lint on vhost1 |
-| `Cmd+Shift+B` | Build with CGO remotely | Tests `go build` on vhost1 |
-| `Cmd+Shift+T` | Test CGO packages remotely | Runs `go test` on vhost1 |
-
-**Example:**
-1. Open `pkg/cephfs/client.go`
-2. Make a change
-3. Press `Cmd+Shift+L`
-4. Errors appear in Problems panel (Cmd+Shift+M)
-
-### Method 2: Command Palette
-
-1. Press `Cmd+Shift+P`
-2. Type "Run Task"
-3. Select one of:
-   - **Eos: Lint CGO Packages (Remote)**
-   - **Eos: Build with CGO (Remote)**
-   - **Eos: Go Vet CGO (Remote)**
-   - **Eos: Test CGO Packages (Remote)**
-   - **Eos: Full Pre-commit Check (Remote)**
-
-### Method 3: Manual Script Execution
-
-```bash
-# Lint all CGO packages
-./scripts/lint_cgo_remote.sh
-
-# Lint specific package
-./scripts/lint_cgo_remote.sh --package cephfs
-
-# Watch mode (auto-lint on file changes)
-./scripts/lint_cgo_remote.sh --watch
-
-# Verbose output
-./scripts/lint_cgo_remote.sh --verbose
-```
-
-### Method 4: Auto-lint on Save (Recommended)
-
-Already configured in [settings.json](settings.json):
-
-1. Edit any file in `pkg/cephfs/` or `pkg/kvm/`
-2. Save the file (`Cmd+S`)
-3. Script automatically runs on vhost1
-4. Results appear in Problems panel
-
-**Note:** Requires the "Run on Save" extension.
-
----
-
-## How It Works
-
-### Architecture
+**Solution:** Dual implementation with build tags:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ macOS (Development Machine)                                 │
-│                                                              │
-│  1. Edit pkg/cephfs/client.go                              │
-│  2. Press Cmd+Shift+L                                       │
-│  3. VS Code Task triggers                                   │
-│     └─> ssh vhost1 "cd /opt/eos && lint CGO packages"     │
-│                                                              │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ SSH
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│ vhost1 (Linux Server)                                       │
-│                                                              │
-│  4. Pull latest code from GitHub (or rsync from macOS)     │
-│  5. Run golangci-lint with CGO_ENABLED=1                   │
-│  6. Parse errors into line-number format                    │
-│  7. Return results to macOS                                 │
-│                                                              │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ Results
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│ macOS (VS Code Problems Panel)                              │
-│                                                              │
-│  ✗ pkg/cephfs/client.go:16:2                               │
-│    shared redeclared in this block                          │
-│                                                              │
-│  ✗ pkg/cephfs/volumes.go:123:5                             │
-│    undefined: CephContext                                   │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+pkg/cephfs/
+  ├── client.go            # Real implementation (//go:build !darwin)
+  ├── client_stub.go       # macOS stub (//go:build darwin)
+  ├── volumes.go           # Real implementation (//go:build !darwin)
+  └── ... (other files)
+
+pkg/kvm/
+  ├── libvirt.go               # Real implementation (//go:build linux)
+  ├── libvirt_stub_darwin.go   # macOS stub (//go:build darwin)
+  ├── lifecycle.go             # Real implementation (//go:build linux)
+  ├── lifecycle_stub_darwin.go # macOS stub (//go:build darwin)
+  └── ... (19 stub files total)
 ```
 
-### Problem Matchers
+**Result:**
+- ✅ Code compiles on macOS for development
+- ✅ gopls works for type checking and autocomplete
+- ✅ Local linting works with golangci-lint
+- ✅ CI/CD on Linux uses real implementations
+- ✅ Production deploys use real CGO
 
-VS Code uses **problem matchers** to parse error output and display it visually:
+### Build Tags Explained
+
+**Real implementation files:**
+```go
+//go:build linux
+// +build linux
+
+package kvm
+
+import "libvirt.org/go/libvirt"
+
+func StartDomain(ctx context.Context, vmName string) error {
+    // Real libvirt code
+}
+```
+
+**macOS stub files:**
+```go
+//go:build darwin
+// +build darwin
+
+package kvm
+
+import "fmt"
+
+const errLibvirtMacOS = "libvirt operations not available on macOS - deploy to Linux to use KVM features"
+
+func StartDomain(ctx context.Context, vmName string) error {
+    return fmt.Errorf(errLibvirtMacOS)
+}
+```
+
+**What Go sees:**
+- On macOS: Only compiles `*_stub_darwin.go` files
+- On Linux: Only compiles real implementation files
+- Both provide the same API surface
+
+## gopls Configuration
+
+[settings.json](settings.json) configures gopls to understand CGO:
 
 ```json
 {
-  "owner": "go",
-  "source": "golangci-lint",
-  "pattern": {
-    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)\\s+\\((.*)\\)$",
-    "file": 1,      // pkg/cephfs/client.go
-    "line": 2,      // 16
-    "column": 3,    // 2
-    "severity": 4,  // error
-    "message": 5,   // shared redeclared
-    "code": 6       // typecheck
+  "gopls": {
+    "build.buildFlags": [
+      "-tags=libvirt,integration"
+    ],
+    "build.env": {
+      "CGO_ENABLED": "1"
+    }
   }
 }
 ```
 
-This parses golangci-lint output:
+This tells gopls:
+- CGO is enabled (even on macOS)
+- Use the appropriate build tags
+- Provides type checking and autocomplete for stub files
+
+## Local Development Workflow
+
+### 1. Development on macOS
+
+```bash
+# Edit files normally
+vim pkg/cephfs/volumes.go
+
+# Build (uses stub files automatically)
+go build -o /tmp/eos-build ./cmd/
+
+# Lint (uses stub files)
+golangci-lint run ./pkg/cephfs/...
+
+# Test (uses stub files, will error if trying real operations)
+go test ./pkg/cephfs/...
 ```
-pkg/cephfs/client.go:16:2: error: shared redeclared in this block (typecheck)
+
+### 2. Testing on Linux (vhost1)
+
+```bash
+# On vhost1 - pull latest code
+cd /opt/eos && git pull
+
+# Build with real CGO
+CGO_ENABLED=1 go build -o /tmp/eos-build ./cmd/
+
+# Lint with real CGO
+CGO_ENABLED=1 golangci-lint run ./pkg/cephfs/... ./pkg/kvm/...
+
+# Test with real implementations
+CGO_ENABLED=1 go test ./pkg/cephfs/... ./pkg/kvm/...
 ```
 
-Into a clickable error in VS Code's Problems panel.
+### 3. CI/CD (GitHub Actions)
 
----
+CI automatically uses Linux runners with real CGO:
 
-## Files
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Ceph dependencies
+        run: sudo apt-get install -y libcephfs-dev librados-dev
 
-| File | Purpose |
-|------|---------|
-| [tasks.json](tasks.json) | VS Code task definitions for remote linting |
-| [settings.json](settings.json) | Auto-lint on save configuration |
-| [keybindings.json](keybindings.json) | Keyboard shortcuts for tasks |
-| [../scripts/lint_cgo_remote.sh](../scripts/lint_cgo_remote.sh) | Shell script that does the actual remote linting |
-| [../.golangci.yml](../.golangci.yml) | golangci-lint configuration with CGO support |
-| [../Makefile](../Makefile) | Make targets for linting and building |
+      - name: Build and test
+        run: make ci-cgo
+```
 
----
+## Linting
+
+### Local Linting (macOS)
+
+```bash
+# Uses .golangci.yml configuration
+make lint
+
+# Or directly
+golangci-lint run ./...
+```
+
+This works on macOS because it lints the stub files, which have no CGO dependencies.
+
+### Remote Linting (Linux)
+
+For full CGO validation before deployment:
+
+```bash
+# SSH to Linux server
+ssh vhost1
+
+# Navigate to Eos
+cd /opt/eos
+
+# Pull latest (or rsync from macOS)
+git pull
+
+# Lint with CGO
+make lint-cgo
+```
+
+## Makefile Targets
+
+See [../Makefile](../Makefile) for all targets:
+
+```bash
+make build          # Build on current platform
+make test           # Test with stubs (macOS) or real (Linux)
+make lint           # Lint with current platform's files
+make lint-cgo       # Lint CGO packages specifically (Linux only)
+make ci             # Full CI pipeline
+make ci-cgo         # CGO-specific CI pipeline
+```
+
+## Creating New CGO Functionality
+
+When adding new CGO functions, follow the stub pattern:
+
+### 1. Real Implementation (Linux)
+
+```go
+//go:build linux
+// pkg/kvm/new_feature.go
+
+package kvm
+
+import "libvirt.org/go/libvirt"
+
+func NewFeature(ctx context.Context, vmName string) error {
+    // Real implementation using libvirt
+    conn, err := libvirt.NewConnect("qemu:///system")
+    // ...
+}
+```
+
+### 2. macOS Stub
+
+```go
+//go:build darwin
+// pkg/kvm/new_feature_stub_darwin.go
+
+package kvm
+
+import (
+    "context"
+    "fmt"
+)
+
+func NewFeature(ctx context.Context, vmName string) error {
+    return fmt.Errorf(errLibvirtMacOS)
+}
+```
+
+### 3. Verify Build on Both Platforms
+
+```bash
+# On macOS
+go build ./pkg/kvm
+
+# On Linux (via SSH)
+ssh vhost1 "cd /opt/eos && go build ./pkg/kvm"
+```
+
+## Stub Maintenance
+
+**When to update stubs:**
+1. When adding new exported functions
+2. When changing function signatures
+3. When adding new exported types
+
+**How to check if stubs are out of sync:**
+```bash
+# On macOS - if build fails, stubs are missing
+go build ./pkg/kvm
+
+# Check for undefined functions
+go test ./pkg/kvm 2>&1 | grep "undefined:"
+```
+
+**Automated stub validation:**
+```bash
+# Compare exported symbols between platforms
+# (Future enhancement - could be added to CI)
+go doc -all ./pkg/kvm | grep "^func"
+```
 
 ## Troubleshooting
 
-### Problem: "Cannot connect to remote host: vhost1"
+### Problem: "undefined: SomeFunction" on macOS
+
+**Cause:** New function added to real implementation without stub.
 
 **Solution:**
 ```bash
-# Test SSH connection
-ssh vhost1 exit
+# Find missing function in real implementation
+grep -r "func SomeFunction" pkg/kvm/*.go | grep -v "_stub"
 
-# If it asks for a password, set up key authentication
-ssh-copy-id vhost1
-
-# Add to ~/.ssh/config for convenience:
-cat >> ~/.ssh/config <<EOF
-Host vhost1
-  HostName vhost1.local  # Or IP address
-  User henry
-  IdentityFile ~/.ssh/id_ed25519
-  ServerAliveInterval 60
-EOF
+# Create stub in appropriate *_stub_darwin.go file
 ```
 
-### Problem: "golangci-lint not found on remote"
+### Problem: Build fails on Linux but passes on macOS
+
+**Cause:** Real implementation has syntax/type errors that stub doesn't catch.
 
 **Solution:**
 ```bash
-# Install on vhost1
-ssh vhost1
-curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+# SSH to Linux and build there
+ssh vhost1 "cd /opt/eos && CGO_ENABLED=1 go build ./pkg/kvm"
 
-# Or use the automated task
-# Cmd+Shift+P -> Run Task -> "Eos: Install golangci-lint (Remote)"
+# Fix errors in real implementation files
 ```
 
-### Problem: "Code not syncing to remote"
+### Problem: gopls shows errors for CGO imports
+
+**Cause:** gopls configuration not loaded.
 
 **Solution:**
-
-The script tries two methods:
-1. **rsync** (fast, efficient) - preferred
-2. **git pull** (fallback) - requires committing changes
-
-If using git pull method:
-```bash
-# On macOS - commit and push your changes first
-git add .
-git commit -m "WIP: Testing CGO changes"
-git push
-```
-
-If using rsync method (recommended):
-```bash
-# Install rsync on macOS if not present
-brew install rsync
-
-# rsync will automatically sync your local uncommitted changes
-```
-
-### Problem: Errors not appearing in Problems panel
-
-**Check:**
-1. Open Problems panel: `Cmd+Shift+M`
-2. Check Task output: View -> Output -> Select "Tasks - Eos: Lint CGO Packages"
-3. Verify problem matcher is working:
-   ```bash
-   # Run manually to see raw output
-   ssh vhost1 "cd /opt/eos && golangci-lint run ./pkg/cephfs/..."
-   ```
-
-### Problem: Too many false positives
-
-**Solution:**
-
-Edit [../.golangci.yml](../.golangci.yml) to disable specific linters:
-
-```yaml
-linters:
-  disable:
-    - gocritic  # Too noisy for your taste
-    - revive    # Style linter
-```
-
-Or exclude specific paths:
-```yaml
-issues:
-  exclude-rules:
-    - path: pkg/cephfs/
-      linters:
-        - gosec
-      text: "G304"  # File path from variable
-```
-
----
-
-## Advanced: Watch Mode
-
-For continuous linting during active development:
-
-```bash
-# Terminal 1: Start watch mode
-./scripts/lint_cgo_remote.sh --watch
-
-# Terminal 2: Edit files normally
-# Every time you save, linting runs automatically
-```
-
-**Watch mode:**
-- Monitors `pkg/cephfs/` and `pkg/kvm/` for changes
-- Debounces rapid changes (1-second delay)
-- Syncs code to vhost1
-- Runs full lint cycle (vet + golangci-lint + build)
-- Displays results in terminal
-
----
-
-## Integration with Pre-commit Hooks
-
-To enforce linting before committing:
-
-```bash
-# Create pre-commit hook
-cat > .git/hooks/pre-commit <<'EOF'
-#!/usr/bin/env bash
-# Run CGO linting before commit
-./scripts/lint_cgo_remote.sh
-EOF
-
-chmod +x .git/hooks/pre-commit
-```
-
-Now every commit will:
-1. Sync code to vhost1
-2. Run golangci-lint
-3. Run go vet
-4. Test build
-5. Block commit if errors found
-
----
-
-## CI/CD Integration
-
-For GitHub Actions or GitLab CI:
-
-```yaml
-# .github/workflows/lint-cgo.yml
-name: Lint CGO Packages
-
-on: [push, pull_request]
-
-jobs:
-  lint-cgo:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Ceph dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcephfs-dev librados-dev
-
-      - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
-
-      - name: Lint CGO packages
-        run: |
-          make lint-cgo
-```
-
----
-
-## Performance Tips
-
-### Speed up rsync
-```bash
-# Add to ~/.ssh/config
-Host vhost1
-  Compression yes
-  ControlMaster auto
-  ControlPath ~/.ssh/control-%r@%h:%p
-  ControlPersist 10m
-```
-
-This enables SSH connection multiplexing, making repeated SSH commands much faster.
-
-### Reduce linting scope
-
-Lint only changed files:
-```bash
-# Get list of changed Go files
-git diff --name-only | grep '\.go$' | grep -E '(cephfs|kvm)'
-
-# Lint only those files
-./scripts/lint_cgo_remote.sh --package cephfs
-```
-
----
+1. Reload VS Code window: Cmd+Shift+P -> "Developer: Reload Window"
+2. Check gopls settings: Cmd+Shift+P -> "Go: Locate Configured Go Tools"
+3. Verify CGO_ENABLED=1 in [settings.json](settings.json)
 
 ## Summary
 
-| Action | Command | Keybinding |
-|--------|---------|------------|
-| **Quick lint** | `Cmd+Shift+L` | Fastest for spot-checking |
-| **Build test** | `Cmd+Shift+B` | Verify compile-time errors |
-| **Full check** | `make pre-commit-cgo` | Before committing |
-| **Watch mode** | `./scripts/lint_cgo_remote.sh -w` | Active development |
-| **Manual** | `./scripts/lint_cgo_remote.sh` | One-off checks |
+**Key Points:**
+- ✅ Stub files enable macOS development for Linux-only CGO packages
+- ✅ Build tags ensure correct files compile on each platform
+- ✅ gopls configuration provides IDE support on macOS
+- ✅ Same API surface on both platforms (stubs return errors)
+- ✅ CI/CD on Linux validates real implementations
+- ✅ No complex remote linting setup needed
 
-**Recommended workflow:**
-1. Edit files locally on macOS
-2. Save → auto-lint triggers
-3. Fix errors in Problems panel
-4. Commit when all green
-5. CI/CD validates on Linux
+**Development Flow:**
+1. Edit code on macOS (stubs compile)
+2. Commit and push to GitHub
+3. SSH to Linux to test real implementation
+4. CI/CD validates on Linux
+5. Production deploys use real CGO
 
----
-
-## Questions?
-
-- **Where is the remote code?** `/opt/eos` on vhost1
-- **How often does it sync?** Every lint run (rsync is fast)
-- **Does it commit my changes?** No, only syncs locally
-- **Can I use a different server?** Set `EOS_REMOTE_HOST=other-server`
-- **What if vhost1 is offline?** Linting will fail gracefully with error message
+**Files:**
+- [settings.json](settings.json) - gopls configuration
+- [../.golangci.yml](../.golangci.yml) - Linter configuration
+- [../Makefile](../Makefile) - Build and lint targets
+- [../pkg/cephfs/*_stub.go](../pkg/cephfs/) - Ceph stubs (3 files)
+- [../pkg/kvm/*_stub_darwin.go](../pkg/kvm/) - KVM stubs (19 files)
 
 ---
 
-**Related Documentation:**
-- [Eos CLAUDE.md](../CLAUDE.md) - P0 rules for constants and architecture
-- [golangci-lint config](../.golangci.yml) - Linter configuration
-- [Makefile](../Makefile) - Build and lint targets
+**Philosophy:** Stub files solve the real problem - enabling development on macOS while deploying to Linux - without complex workarounds or remote execution.

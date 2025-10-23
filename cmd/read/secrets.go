@@ -70,7 +70,7 @@ var InspectTestDataCmd = &cobra.Command{
 		log := otelzap.Ctx(rc.Ctx)
 
 		var client *vaultapi.Client
-		var out map[string]interface{}
+		var out map[string]any
 		var vaultReadErr error
 
 		client, err := vault.Authn(rc)
