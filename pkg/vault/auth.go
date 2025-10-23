@@ -173,7 +173,7 @@ func tryAppRole(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
 }
 
 func tryUserpassWithPrompt(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
-	if !interaction.PromptYesNo(rc.Ctx, "Is userpass authentication enabled?", false) {
+	if !interaction.PromptYesNo(rc.Ctx, "Do you want to enable userpass auth?", false) {
 		otelzap.Ctx(rc.Ctx).Info("⏭️ Skipping userpass (user chose 'no')")
 		return "", errors.New("userpass skipped by user")
 	}

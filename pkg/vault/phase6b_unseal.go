@@ -5,8 +5,10 @@ package vault
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -19,16 +21,42 @@ import (
 	"go.uber.org/zap"
 )
 
+// createUnauthenticatedVaultClient creates a Vault client without authentication
+// Used to check Vault status (init/seal) before authentication is available
+func createUnauthenticatedVaultClient() (*api.Client, error) {
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	if vaultAddr == "" {
+		vaultAddr = "https://127.0.0.1:8200"
+	}
+
+	config := api.DefaultConfig()
+	config.Address = vaultAddr
+
+	// Handle self-signed certificates (common for new Vault installations)
+	if os.Getenv("VAULT_SKIP_VERIFY") == "1" {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: true, // #nosec G402 - intentional for self-signed certs
+		}
+		config.HttpClient.Transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+	}
+
+	return api.NewClient(config)
+}
+
 func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	otelzap.Ctx(rc.Ctx).Info(" Entering UnsealVault")
 
-	client, err := GetVaultClient(rc)
+	// CRITICAL P0: Check init status BEFORE attempting authentication
+	// Unauthenticated client is sufficient to check Vault status
+	unauthClient, err := createUnauthenticatedVaultClient()
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error(" Failed to create Vault client", zap.Error(err))
-		return nil, fmt.Errorf("create vault client: %w", err)
+		otelzap.Ctx(rc.Ctx).Error(" Failed to create unauthenticated Vault client", zap.Error(err))
+		return nil, fmt.Errorf("create unauthenticated vault client: %w", err)
 	}
 
-	initStatus, err := client.Sys().InitStatus()
+	initStatus, err := unauthClient.Sys().InitStatus()
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to check init status", zap.Error(err))
 		return nil, fmt.Errorf("check init status: %w", err)
@@ -37,6 +65,27 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 	if initStatus {
 		otelzap.Ctx(rc.Ctx).Info(" Vault already initialized")
+
+		// CRITICAL P0: During initial setup, Vault Agent/AppRole don't exist yet
+		// Use root token from vault_init.json instead of trying fancy auth methods
+		otelzap.Ctx(rc.Ctx).Info(" Loading root token from vault_init.json for setup operations")
+		initRes, err := LoadOrPromptInitResult(rc)
+		if err != nil {
+			otelzap.Ctx(rc.Ctx).Error(" Failed to load init credentials", zap.Error(err))
+			return nil, fmt.Errorf("load vault init credentials: %w", err)
+		}
+
+		// Set root token on unauthenticated client
+		unauthClient.SetToken(initRes.RootToken)
+		otelzap.Ctx(rc.Ctx).Info(" Root token set for setup operations")
+
+		// Verify token works
+		if !VerifyToken(rc, unauthClient, initRes.RootToken) {
+			otelzap.Ctx(rc.Ctx).Error(" Root token verification failed")
+			return nil, fmt.Errorf("root token verification failed")
+		}
+
+		client := unauthClient
 
 		sealStatus, err := client.Sys().SealStatus()
 		if err != nil {
@@ -103,7 +152,8 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	}
 
 	otelzap.Ctx(rc.Ctx).Info(" Vault not initialized — beginning initialization sequence")
-	initRes, err := initVaultWithTimeout(rc, client)
+	// Use unauthenticated client for initialization (no auth needed for /sys/init)
+	initRes, err := initVaultWithTimeout(rc, unauthClient)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Vault init failed", zap.Error(err))
 		return nil, err
@@ -115,13 +165,17 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		return nil, err
 	}
 
-	if err := finalizeVaultSetup(rc, client, initRes); err != nil {
+	// Set root token on unauthenticated client to make it authenticated
+	unauthClient.SetToken(initRes.RootToken)
+	otelzap.Ctx(rc.Ctx).Info(" Root token set on client for post-init operations")
+
+	if err := finalizeVaultSetup(rc, unauthClient, initRes); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Finalizing Vault setup failed", zap.Error(err))
 		return nil, err
 	}
 
 	otelzap.Ctx(rc.Ctx).Info(" Vault initialized and unsealed")
-	return client, nil
+	return unauthClient, nil
 }
 
 func initVaultWithTimeout(rc *eos_io.RuntimeContext, client *api.Client) (*api.InitResponse, error) {
