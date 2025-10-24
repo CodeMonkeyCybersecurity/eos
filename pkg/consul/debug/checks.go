@@ -12,6 +12,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	consulapi "github.com/hashicorp/consul/api"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -567,9 +569,10 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 }
 
 // checkVaultConsulConnectivity checks if Vault can reach Consul (critical for Vault storage backend)
+// Uses HashiCorp SDKs for granular error detection and structured data access
 func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking Vault-Consul connectivity")
+	logger.Info("Checking Vault-Consul connectivity using SDKs")
 
 	result := DiagnosticResult{
 		CheckName: "Vault-Consul Connectivity",
@@ -577,22 +580,19 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	// STEP 1: Check /etc/hosts for hostname resolution
+	hostname := shared.GetInternalHostname()
+
+	// STEP 1: Check /etc/hosts for hostname resolution (using Go stdlib, not shell)
 	logger.Debug("Checking /etc/hosts for hostname resolution")
-	hostsCmd := execute.Options{
-		Command: "cat",
-		Args:    []string{"/etc/hosts"},
-		Capture: true,
-	}
-	hostsOutput, err := execute.Run(rc.Ctx, hostsCmd)
+	hostsContent, err := os.ReadFile("/etc/hosts")
 	if err != nil {
-		result.Details = append(result.Details, "⚠ Could not read /etc/hosts")
+		result.Details = append(result.Details, fmt.Sprintf("⚠ Could not read /etc/hosts: %v", err))
+		logger.Warn("Failed to read /etc/hosts", zap.Error(err))
 	} else {
-		hostname := shared.GetInternalHostname()
 		result.Details = append(result.Details, fmt.Sprintf("Checking hostname resolution for: %s", hostname))
 
 		// Parse /etc/hosts for the hostname
-		hostsLines := strings.Split(hostsOutput, "\n")
+		hostsLines := strings.Split(string(hostsContent), "\n")
 		foundHostname := false
 		for _, line := range hostsLines {
 			line = strings.TrimSpace(line)
@@ -626,73 +626,109 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 		}
 	}
 
-	// STEP 2: Check what addresses Consul is ACTUALLY listening on
-	logger.Debug("Checking Consul listening addresses")
-	ssCmd := execute.Options{
-		Command: "ss",
-		Args:    []string{"-tlnp"},
-		Capture: true,
-	}
-	ssOutput, err := execute.Run(rc.Ctx, ssCmd)
-	if err != nil {
-		// Fallback to netstat
-		netstatCmd := execute.Options{
-			Command: "netstat",
-			Args:    []string{"-tlnp"},
-			Capture: true,
-		}
-		ssOutput, err = execute.Run(rc.Ctx, netstatCmd)
+	// STEP 2: Check Consul configuration using SDK (not ss/netstat)
+	logger.Debug("Querying Consul agent configuration via SDK")
+	result.Details = append(result.Details, "\nConsul agent configuration (via SDK):")
+
+	// Try multiple addresses to find a working Consul connection
+	testAddresses := []string{
+		fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
+		fmt.Sprintf("127.0.1.1:%d", shared.PortConsul),
+		fmt.Sprintf("%s:%d", hostname, shared.PortConsul),
 	}
 
-	if err == nil {
-		result.Details = append(result.Details, "\nConsul port 8500 listening addresses:")
-		ssLines := strings.Split(ssOutput, "\n")
-		found8500 := false
-		for _, line := range ssLines {
-			if strings.Contains(line, ":8500") && strings.Contains(line, "LISTEN") {
-				found8500 = true
-				// Extract the local address
-				fields := strings.Fields(line)
-				if len(fields) >= 4 {
-					localAddr := fields[3]
-					result.Details = append(result.Details, fmt.Sprintf("  %s", localAddr))
-				} else {
-					result.Details = append(result.Details, fmt.Sprintf("  %s", strings.TrimSpace(line)))
+	var consulAgentInfo map[string]map[string]interface{}
+	var consulConnectedAddr string
+
+	for _, addr := range testAddresses {
+		config := consulapi.DefaultConfig()
+		config.Address = addr
+		consulClient, err := consulapi.NewClient(config)
+		if err != nil {
+			logger.Debug("Failed to create Consul client", zap.String("address", addr), zap.Error(err))
+			continue
+		}
+
+		agentInfo, err := consulClient.Agent().Self()
+		if err != nil {
+			result.Details = append(result.Details, fmt.Sprintf("  ✗ %s: %v", addr, err))
+			logger.Debug("Consul Agent().Self() failed", zap.String("address", addr), zap.Error(err))
+			continue
+		}
+
+		// Success! We got structured data from Consul
+		consulAgentInfo = agentInfo
+		consulConnectedAddr = addr
+		result.Details = append(result.Details, fmt.Sprintf("  ✓ Connected to Consul at: %s", addr))
+		logger.Info("Successfully connected to Consul via SDK", zap.String("address", addr))
+		break
+	}
+
+	// Extract structured configuration from Consul SDK response
+	if consulAgentInfo != nil {
+		if debugConfig, ok := consulAgentInfo["DebugConfig"]; ok {
+			if bindAddr, ok := debugConfig["BindAddr"].(string); ok {
+				result.Details = append(result.Details, fmt.Sprintf("  Consul BindAddr: %s", bindAddr))
+			}
+			if clientAddr, ok := debugConfig["ClientAddr"].(string); ok {
+				result.Details = append(result.Details, fmt.Sprintf("  Consul ClientAddr: %s", clientAddr))
+			}
+			if advertiseAddr, ok := debugConfig["AdvertiseAddr"].(string); ok {
+				result.Details = append(result.Details, fmt.Sprintf("  Consul AdvertiseAddr: %s", advertiseAddr))
+			}
+			if ports, ok := debugConfig["Ports"].(map[string]interface{}); ok {
+				if httpPort, ok := ports["HTTP"].(float64); ok {
+					result.Details = append(result.Details, fmt.Sprintf("  Consul HTTP Port: %.0f", httpPort))
 				}
 			}
 		}
-		if !found8500 {
-			result.Success = false
-			result.Details = append(result.Details, "  ✗ Consul port 8500 is NOT listening!")
-			result.Details = append(result.Details, "    This is why Vault cannot connect to Consul")
-		}
+	} else {
+		result.Success = false
+		result.Details = append(result.Details, "  ✗ Could not connect to Consul on any address")
+		result.Details = append(result.Details, "    Consul may not be running or accessible")
 	}
 
-	// STEP 3: Check Vault configuration for Consul address
-	logger.Debug("Checking Vault configuration for Consul backend")
+	// STEP 3: Check Vault configuration for Consul address (using Go stdlib, not grep)
+	logger.Debug("Reading Vault configuration file")
 	vaultConfigPath := "/etc/vault.d/vault.hcl"
+	vaultConsulAddr := ""
+
 	if _, err := os.Stat(vaultConfigPath); err == nil {
-		vaultConfigCmd := execute.Options{
-			Command: "grep",
-			Args:    []string{"-A", "5", `storage "consul"`, vaultConfigPath},
-			Capture: true,
-		}
-		vaultConfigOutput, err := execute.Run(rc.Ctx, vaultConfigCmd)
-		if err == nil {
+		vaultConfigContent, err := os.ReadFile(vaultConfigPath)
+		if err != nil {
+			result.Details = append(result.Details, fmt.Sprintf("\n⚠ Could not read Vault config: %v", err))
+			logger.Warn("Failed to read Vault config", zap.Error(err))
+		} else {
 			result.Details = append(result.Details, "\nVault storage backend configuration:")
-			configLines := strings.Split(vaultConfigOutput, "\n")
+			configLines := strings.Split(string(vaultConfigContent), "\n")
+
+			// Simple parsing for storage "consul" block
+			inConsulBlock := false
 			for _, line := range configLines {
 				trimmed := strings.TrimSpace(line)
-				if strings.Contains(trimmed, "address") {
-					result.Details = append(result.Details, fmt.Sprintf("  %s", trimmed))
 
-					// Extract the address value
-					if strings.Contains(trimmed, "=") {
+				if strings.Contains(trimmed, `storage "consul"`) {
+					inConsulBlock = true
+					result.Details = append(result.Details, "  Found: storage \"consul\" {")
+					continue
+				}
+
+				if inConsulBlock {
+					if trimmed == "}" {
+						inConsulBlock = false
+						break
+					}
+
+					if strings.Contains(trimmed, "address") && strings.Contains(trimmed, "=") {
+						result.Details = append(result.Details, fmt.Sprintf("    %s", trimmed))
+
+						// Extract address value
 						parts := strings.Split(trimmed, "=")
 						if len(parts) == 2 {
 							addr := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+							vaultConsulAddr = addr
 							result.Details = append(result.Details,
-								fmt.Sprintf("  → Vault will try to connect to: %s", addr))
+								fmt.Sprintf("  → Vault will connect to Consul at: %s", addr))
 						}
 					}
 				}
@@ -700,42 +736,71 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 		}
 	} else {
 		result.Details = append(result.Details, "\n⚠ Vault config not found at /etc/vault.d/vault.hcl")
+		logger.Warn("Vault config file not found", zap.String("path", vaultConfigPath))
 	}
 
-	// STEP 4: Test actual connectivity from Vault's perspective
-	logger.Debug("Testing Consul connectivity")
-	hostname := shared.GetInternalHostname()
-	testAddresses := []string{
-		fmt.Sprintf("http://127.0.0.1:%d", shared.PortConsul),
-		fmt.Sprintf("http://127.0.1.1:%d", shared.PortConsul),
-		fmt.Sprintf("http://%s:%d", hostname, shared.PortConsul),
-	}
+	// STEP 4: Try Vault SDK health check to detect storage backend errors
+	logger.Debug("Checking Vault health via SDK")
+	result.Details = append(result.Details, "\nVault health check (via SDK):")
 
-	result.Details = append(result.Details, "\nTesting Consul connectivity from different addresses:")
-	anySuccess := false
-	for _, addr := range testAddresses {
-		client := &http.Client{Timeout: 2 * time.Second}
-		apiURL := fmt.Sprintf("%s/v1/agent/self", addr)
-		resp, err := client.Get(apiURL)
-		if err == nil {
-			defer func() { _ = resp.Body.Close() }()
-			result.Details = append(result.Details, fmt.Sprintf("  ✓ %s: REACHABLE", addr))
-			anySuccess = true
+	vaultConfig := vaultapi.DefaultConfig()
+	vaultConfig.Address = fmt.Sprintf("https://%s:8200", hostname)
+	vaultClient, err := vaultapi.NewClient(vaultConfig)
+	if err != nil {
+		result.Details = append(result.Details, fmt.Sprintf("  ⚠ Could not create Vault client: %v", err))
+		logger.Warn("Failed to create Vault client", zap.Error(err))
+	} else {
+		health, err := vaultClient.Sys().Health()
+		if err != nil {
+			result.Details = append(result.Details, fmt.Sprintf("  ✗ Vault health check failed: %v", err))
+			logger.Debug("Vault health check error", zap.Error(err))
+
+			// Check if error is related to Consul storage backend
+			if strings.Contains(err.Error(), "connection refused") || strings.Contains(err.Error(), "8500") {
+				result.Success = false
+				result.Details = append(result.Details, "  ⚠ Error suggests Vault cannot reach Consul storage backend!")
+			}
 		} else {
-			result.Details = append(result.Details, fmt.Sprintf("  ✗ %s: %v", addr, err))
+			result.Details = append(result.Details, fmt.Sprintf("  ✓ Vault responding (initialized: %v, sealed: %v)",
+				health.Initialized, health.Sealed))
+			logger.Info("Vault health check successful", zap.Bool("initialized", health.Initialized), zap.Bool("sealed", health.Sealed))
+
+			if health.Sealed {
+				result.Details = append(result.Details, "  Note: Vault is sealed (expected after restart)")
+			}
+		}
+	}
+
+	// STEP 5: Connectivity summary and diagnosis
+	result.Details = append(result.Details, "\nConnectivity Summary:")
+	if consulConnectedAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("  ✓ Consul reachable at: %s", consulConnectedAddr))
+	} else {
+		result.Success = false
+		result.Details = append(result.Details, "  ✗ Consul NOT reachable on any tested address")
+	}
+
+	if vaultConsulAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("  Vault configured to use: %s", vaultConsulAddr))
+
+		// Check for mismatch
+		if consulConnectedAddr != "" && !strings.Contains(vaultConsulAddr, consulConnectedAddr) {
+			result.Success = false
+			result.Details = append(result.Details, "\n  ⚠ MISMATCH DETECTED:")
+			result.Details = append(result.Details, fmt.Sprintf("    Vault expects: %s", vaultConsulAddr))
+			result.Details = append(result.Details, fmt.Sprintf("    Consul reachable at: %s", consulConnectedAddr))
+			result.Details = append(result.Details, "    This is likely why Vault cannot connect!")
 		}
 	}
 
 	// EVALUATE
-	if !anySuccess {
-		result.Success = false
-		result.Message = "Consul is NOT reachable - Vault storage backend will fail"
-		result.Details = append(result.Details, "\n⚠ CRITICAL: Vault cannot connect to Consul storage backend")
-		result.Details = append(result.Details, "  This is why 'eos sync consul' authentication fails!")
+	if !result.Success {
+		result.Message = "Consul connectivity issues detected - Vault storage backend may fail"
 		result.Details = append(result.Details, "\nRemediation:")
 		result.Details = append(result.Details, "  1. Ensure Consul is running: sudo systemctl start consul")
 		result.Details = append(result.Details, "  2. Check Consul is listening on correct address")
-		result.Details = append(result.Details, "  3. Verify Vault config points to correct Consul address")
+		result.Details = append(result.Details, "  3. Verify Vault config matches Consul's actual address")
+		result.Details = append(result.Details, "  4. Check /etc/hosts for hostname resolution issues")
 	} else {
 		result.Message = "Consul is reachable for Vault storage backend"
 	}
