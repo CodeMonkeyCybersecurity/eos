@@ -51,21 +51,19 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) error {
 	permResult := assessPermissions(rc)
 	results = append(results, permResult)
 
+	// Run diagnostic assessment to check configuration (no output/fixes)
+	var assessment *debug.AssessmentResults
 	configIssues := false
 	if !config.PermissionsOnly {
-		// Run debug diagnostics to assess configuration
-		debugConfig := &debug.Config{
-			AutoFix:       false, // We'll handle fixes ourselves
-			KillProcesses: false,
-			TestStart:     false,
-			MinimalConfig: false,
-			LogLines:      50,
-		}
-
-		// Run diagnostics to assess state (but don't apply fixes yet)
-		if err := debug.RunDiagnostics(rc, debugConfig); err != nil {
-			logger.Warn("Diagnostics found issues",
+		var err error
+		assessment, err = debug.RunAssessment(rc)
+		if err != nil {
+			logger.Warn("Failed to run diagnostic assessment",
 				zap.Error(err))
+			configIssues = true
+		} else if assessment.ConfigIssues {
+			logger.Info("Configuration issues detected",
+				zap.Int("total_checks", len(assessment.Checks)))
 			configIssues = true
 		}
 	}
@@ -85,8 +83,8 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) error {
 		results = append(results, helperResult)
 
 		// Fix configuration issues if not permissions-only mode
-		if !config.PermissionsOnly && configIssues {
-			fixConfigResult := fixConfiguration(rc)
+		if !config.PermissionsOnly && configIssues && assessment != nil {
+			fixConfigResult := fixConfiguration(rc, assessment)
 			results = append(results, fixConfigResult)
 		}
 
@@ -336,8 +334,9 @@ func fixPermissions(rc *eos_io.RuntimeContext) FixResult {
 	return result
 }
 
-// fixConfiguration applies configuration fixes from debug package
-func fixConfiguration(rc *eos_io.RuntimeContext) FixResult {
+// fixConfiguration applies configuration fixes using the assessment results
+// This avoids running diagnostics a second time (performance optimization)
+func fixConfiguration(rc *eos_io.RuntimeContext, assessment *debug.AssessmentResults) FixResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Fixing Consul configuration")
 
@@ -348,23 +347,33 @@ func fixConfiguration(rc *eos_io.RuntimeContext) FixResult {
 		Details:     []string{},
 	}
 
-	// Run debug with AutoFix enabled
-	debugConfig := &debug.Config{
-		AutoFix:       true,
-		KillProcesses: false,
-		TestStart:     false,
-		MinimalConfig: false,
-		LogLines:      50,
+	// Find the configuration check result
+	configResult := debug.FindCheckResult(assessment.Checks, "Configuration Analysis")
+	if configResult == nil {
+		result.Success = false
+		result.ChangesMade = false
+		result.Message = "Configuration check not found in assessment"
+		return result
 	}
 
-	if err := debug.RunDiagnostics(rc, debugConfig); err != nil {
-		result.Success = false
-		result.Message = "Configuration fixes failed"
-		result.Details = append(result.Details, err.Error())
-	} else {
-		result.Message = "Configuration fixes applied"
-		result.Details = append(result.Details, "Applied fixes from debug diagnostics")
+	if configResult.Success {
+		result.ChangesMade = false
+		result.Message = "No configuration issues found"
+		return result
 	}
+
+	// Apply configuration fixes directly using debug package
+	// This avoids re-running all 13 diagnostics (performance optimization)
+	fixResult := debug.FixConfiguration(rc, *configResult)
+
+	// Convert DiagnosticResult to FixResult
+	result.Success = fixResult.Success
+	result.ChangesMade = fixResult.FixApplied
+	result.Message = fixResult.Message
+	if fixResult.FixApplied {
+		result.Details = append(result.Details, fixResult.FixMessage)
+	}
+	result.Details = append(result.Details, fixResult.Details...)
 
 	return result
 }

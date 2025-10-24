@@ -73,8 +73,9 @@ func killLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 	return result
 }
 
-// fixConfiguration attempts to fix common configuration issues
-func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) DiagnosticResult {
+// FixConfiguration attempts to fix common configuration issues
+// Exported for use by pkg/consul/fix to avoid recursive diagnostics
+func FixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Applying configuration fixes")
 

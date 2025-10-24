@@ -49,20 +49,35 @@ type DiagnosticResult struct {
 	Severity   Severity // How critical is this failure (only relevant if Success = false)
 }
 
-// RunDiagnostics performs comprehensive Consul debugging following Assess → Intervene → Evaluate pattern
-func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
-	logger := otelzap.Ctx(rc.Ctx)
+// AssessmentResults holds the raw results of diagnostic assessment
+// without any display or evaluation logic.
+// Used by fix.go to run diagnostics without terminal output.
+type AssessmentResults struct {
+	Checks         []DiagnosticResult // All check results
+	ConfigIssues   bool               // Whether config analysis failed
+	RetryJoinAddrs []string           // Extracted retry_join addresses
+}
 
-	logger.Info("Starting Consul debug diagnostics",
-		zap.Bool("auto_fix", config.AutoFix),
-		zap.Bool("kill_processes", config.KillProcesses),
-		zap.Bool("test_start", config.TestStart))
+// RunAssessment performs ONLY the diagnostic checks (ASSESS phase)
+// without any display, evaluation, or fixes (INTERVENE/EVALUATE phases).
+// This is used by fix.go to gather diagnostic data without user-facing output.
+//
+// Returns:
+//   - AssessmentResults containing all check results and extracted config data
+//   - error if assessment could not be performed (nil otherwise)
+//
+// Note: Unlike RunDiagnostics(), this function:
+//   - Does NOT display results to the user
+//   - Does NOT apply fixes
+//   - Does NOT exit with error codes based on severity
+//   - ONLY collects diagnostic data for programmatic use
+func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Running diagnostic assessment (data collection only)")
 
 	results := []DiagnosticResult{}
 
-	// ASSESS - Run all diagnostic checks
-	logger.Info("=== ASSESS PHASE: Running diagnostic checks ===")
-
+	// ASSESS - Run all diagnostic checks (same as RunDiagnostics)
 	// 1. Check Consul binary
 	binaryResult := checkConsulBinary(rc)
 	results = append(results, binaryResult)
@@ -96,7 +111,7 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	results = append(results, portConflictResult)
 
 	// 9. Analyze logs
-	logResult := analyzeLogs(rc, config.LogLines)
+	logResult := analyzeLogs(rc, 100) // Default log lines
 	results = append(results, logResult)
 
 	// 10. Detailed port binding analysis
@@ -108,9 +123,9 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	results = append(results, clusterResult)
 
 	// 12. Check retry_join targets (if configured)
+	var retryJoinAddrs []string
 	if configResult.Success {
-		// Extract retry_join from config for validation
-		retryJoinAddrs := extractRetryJoinFromConfig(rc)
+		retryJoinAddrs = extractRetryJoinFromConfig(rc)
 		if len(retryJoinAddrs) > 0 {
 			retryJoinResult := checkRetryJoinTargets(rc, retryJoinAddrs)
 			results = append(results, retryJoinResult)
@@ -121,19 +136,54 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	vaultConsulResult := checkVaultConsulConnectivity(rc)
 	results = append(results, vaultConsulResult)
 
+	logger.Debug("Diagnostic assessment completed",
+		zap.Int("total_checks", len(results)),
+		zap.Int("retry_join_addrs", len(retryJoinAddrs)))
+
+	return &AssessmentResults{
+		Checks:         results,
+		ConfigIssues:   !configResult.Success,
+		RetryJoinAddrs: retryJoinAddrs,
+	}, nil
+}
+
+// RunDiagnostics performs comprehensive Consul debugging following Assess → Intervene → Evaluate pattern
+func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Starting Consul debug diagnostics",
+		zap.Bool("auto_fix", config.AutoFix),
+		zap.Bool("kill_processes", config.KillProcesses),
+		zap.Bool("test_start", config.TestStart))
+
+	// ASSESS - Run all diagnostic checks
+	logger.Info("=== ASSESS PHASE: Running diagnostic checks ===")
+
+	assessment, err := RunAssessment(rc)
+	if err != nil {
+		return fmt.Errorf("failed to run diagnostic assessment: %w", err)
+	}
+
+	// Start with assessment results
+	results := assessment.Checks
+
 	// INTERVENE - Apply fixes if requested
 	if config.AutoFix || config.KillProcesses {
 		logger.Info("=== INTERVENE PHASE: Applying fixes ===")
 
-		if config.KillProcesses && !processResult.Success {
+		// Find specific check results for conditional fixes
+		processResult := FindCheckResult(assessment.Checks, "Lingering Processes")
+		configResult := FindCheckResult(assessment.Checks, "Configuration Analysis")
+
+		if config.KillProcesses && processResult != nil && !processResult.Success {
 			killResult := killLingeringProcesses(rc)
 			results = append(results, killResult)
 		}
 
 		if config.AutoFix {
 			// Apply configuration fixes
-			if !configResult.Success {
-				fixResult := fixConfiguration(rc, configResult)
+			if configResult != nil && !configResult.Success {
+				fixResult := FixConfiguration(rc, *configResult)
 				results = append(results, fixResult)
 			}
 		}
@@ -294,4 +344,69 @@ func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResul
 			fmt.Println(rec)
 		}
 	}
+}
+
+// FindCheckResult searches for a specific check result by name.
+// Returns nil if the check was not found.
+//
+// Example:
+//
+//	configResult := FindCheckResult(assessment.Checks, "Configuration Analysis")
+//	if configResult != nil && !configResult.Success {
+//	    // Handle config failure
+//	}
+func FindCheckResult(checks []DiagnosticResult, checkName string) *DiagnosticResult {
+	for i := range checks {
+		if checks[i].CheckName == checkName {
+			return &checks[i]
+		}
+	}
+	return nil
+}
+
+// HasCriticalIssues checks if any diagnostic results have critical severity failures.
+// Returns true if at least one check failed with SeverityCritical.
+//
+// Example:
+//
+//	if HasCriticalIssues(assessment.Checks) {
+//	    return fmt.Errorf("cannot proceed - critical issues detected")
+//	}
+func HasCriticalIssues(checks []DiagnosticResult) bool {
+	for _, check := range checks {
+		if !check.Success && check.Severity == SeverityCritical {
+			return true
+		}
+	}
+	return false
+}
+
+// GetFailedChecks returns all failed diagnostic results grouped by severity.
+// Useful for prioritizing fixes and reporting.
+//
+// Returns:
+//   - critical: All failed checks with SeverityCritical
+//   - warnings: All failed checks with SeverityWarning
+//   - info: All failed checks with SeverityInfo
+//
+// Example:
+//
+//	critical, warnings, info := GetFailedChecks(assessment.Checks)
+//	if len(critical) > 0 {
+//	    logger.Error("Critical issues found", zap.Int("count", len(critical)))
+//	}
+func GetFailedChecks(checks []DiagnosticResult) (critical, warnings, info []DiagnosticResult) {
+	for _, check := range checks {
+		if !check.Success {
+			switch check.Severity {
+			case SeverityCritical:
+				critical = append(critical, check)
+			case SeverityWarning:
+				warnings = append(warnings, check)
+			case SeverityInfo:
+				info = append(info, check)
+			}
+		}
+	}
+	return critical, warnings, info
 }
