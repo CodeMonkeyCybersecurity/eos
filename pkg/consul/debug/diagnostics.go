@@ -154,12 +154,17 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 }
 
 // displayResults shows a formatted summary of all diagnostic results
+// NOTE: Uses fmt.Println for user-facing output (not logger) so output is visible on terminal
 func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("========================================")
-	logger.Info("CONSUL DEBUG DIAGNOSTIC SUMMARY")
-	logger.Info("========================================")
+	// Log to structured logs for forensics
+	logger.Info("Displaying diagnostic results")
+
+	// Print to stdout for user visibility
+	fmt.Println("========================================")
+	fmt.Println("CONSUL DEBUG DIAGNOSTIC SUMMARY")
+	fmt.Println("========================================")
 
 	for _, result := range results {
 		// Use simple text symbols for maximum compatibility
@@ -170,33 +175,35 @@ func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 			status = "[FAIL]"
 		}
 
-		logger.Info(fmt.Sprintf("%s %s", status, result.CheckName))
-		logger.Info(fmt.Sprintf("      %s", result.Message))
+		fmt.Printf("%s %s\n", status, result.CheckName)
+		fmt.Printf("      %s\n", result.Message)
 
 		if len(result.Details) > 0 {
 			for _, detail := range result.Details {
-				logger.Info("      " + detail)
+				fmt.Println("      " + detail)
 			}
 		}
 
 		if result.FixApplied {
-			logger.Info(fmt.Sprintf("      [FIX APPLIED] %s", result.FixMessage))
+			fmt.Printf("      [FIX APPLIED] %s\n", result.FixMessage)
 		}
 
-		logger.Info("") // Blank line between checks
+		fmt.Println("") // Blank line between checks
 	}
 
-	logger.Info("========================================")
+	fmt.Println("========================================")
 
 	// Provide recommendations
 	provideRecommendations(rc, results)
 }
 
 // provideRecommendations gives actionable advice based on diagnostic results
+// NOTE: Uses fmt.Println for user-facing output (not logger) so output is visible on terminal
 func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Providing recommendations")
 
-	logger.Info("RECOMMENDATIONS:")
+	fmt.Println("RECOMMENDATIONS:")
 
 	recommendations := []string{}
 
@@ -224,11 +231,11 @@ func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResul
 	}
 
 	if len(recommendations) == 0 {
-		logger.Info("  ✓ No issues found - Consul should be ready to start")
-		logger.Info("  → Try: sudo systemctl start consul")
+		fmt.Println("  ✓ No issues found - Consul should be ready to start")
+		fmt.Println("  → Try: sudo systemctl start consul")
 	} else {
 		for _, rec := range recommendations {
-			logger.Info(rec)
+			fmt.Println(rec)
 		}
 	}
 }

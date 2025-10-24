@@ -4,12 +4,11 @@ package eos_cli
 
 import (
 	"context"
-	"os"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -176,24 +175,18 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 	}
 }
 
-// WrapDebug is like Wrap but also automatically captures debug command output to ~/.eos/debug/
-// This should be used for all `eos debug ...` commands to enable automatic forensic logging.
+// WrapDebug is DEPRECATED: Use eos_cli.Wrap() and cmd/debug.saveDebugOutput() instead.
+// This function remains for backward compatibility but will be removed in a future version.
+//
+// Migration guide:
+//   Old: RunE: eos_cli.WrapDebug("service", runDebugService)
+//   New: RunE: eos_cli.Wrap(runDebugService)
+//        Then in runDebugService, capture output and call saveDebugOutput()
+//
+// See cmd/debug/consul.go for the reference implementation.
 func WrapDebug(serviceName string, fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
-	// First wrap with standard Wrap() to get all the normal functionality
-	wrapped := Wrap(fn)
-
-	// Then add debug capture wrapper
-	return func(cmd *cobra.Command, args []string) error {
-		// We need to create a minimal context just for capture
-		// The real context will be created by Wrap()
-		ctx := context.Background()
-		rc := &eos_io.RuntimeContext{Ctx: ctx}
-
-		// Use CaptureStdoutFunc to wrap the execution and save output
-		return debug.CaptureStdoutFunc(rc, serviceName, func() error {
-			return wrapped(cmd, args)
-		})
-	}
+	// Just use standard Wrap for now - deprecated functionality
+	return Wrap(fn)
 }
 
 // sanitizeCommandInputs sanitizes command arguments and flag values for security

@@ -1,10 +1,14 @@
 package debug
 
 import (
-	"github.com/spf13/cobra"
+	"bytes"
+	"io"
+	"os"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/spf13/cobra"
 )
 
 var consulCmd = &cobra.Command{
@@ -40,7 +44,7 @@ Example:
   eos debug consul --kill-processes --test-start
 
 Output is automatically saved to ~/.eos/debug/eos-debug-consul-{timestamp}.txt`,
-	RunE: eos_cli.WrapDebug("consul", runDebugConsul),
+	RunE: eos_cli.Wrap(runDebugConsul),
 }
 
 func init() {
@@ -55,6 +59,19 @@ func init() {
 }
 
 func runDebugConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// Capture stdout to save diagnostic output to file
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Buffer to capture output
+	outputChan := make(chan string)
+	go func() {
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
+		outputChan <- buf.String()
+	}()
+
 	// Parse flags
 	config := &debug.Config{
 		AutoFix:        cmd.Flag("fix").Value.String() == "true",
@@ -63,12 +80,22 @@ func runDebugConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		MinimalConfig:  cmd.Flag("minimal-config").Value.String() == "true",
 		LogLines:       100, // Default, will parse from flag
 	}
-	
+
 	// Parse log lines
 	if logLines, err := cmd.Flags().GetInt("log-lines"); err == nil {
 		config.LogLines = logLines
 	}
-	
+
 	// Run debug diagnostics
-	return debug.RunDiagnostics(rc, config)
+	err := debug.RunDiagnostics(rc, config)
+
+	// Restore stdout and get captured output
+	w.Close()
+	os.Stdout = oldStdout
+	capturedOutput := <-outputChan
+
+	// Save captured output to file
+	saveDebugOutput(rc, "consul", capturedOutput)
+
+	return err
 }

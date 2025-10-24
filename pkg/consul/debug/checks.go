@@ -608,14 +608,16 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 						result.Details = append(result.Details,
 							fmt.Sprintf("  /etc/hosts: %s → %s", hostname, ip))
 
-						// Check for suspicious 127.0.1.1 mapping
+						// Check for suspicious 127.0.1.1 mapping (Ubuntu default)
 						if ip == "127.0.1.1" {
 							result.Details = append(result.Details,
 								"  ⚠ WARNING: Hostname maps to 127.0.1.1 (Ubuntu default)")
 							result.Details = append(result.Details,
-								"    This can cause Vault-Consul connection issues!")
+								"    This causes issues when Vault uses hostname for Consul address")
 							result.Details = append(result.Details,
-								"    Consul might be listening on 127.0.0.1, but Vault resolves to 127.0.1.1")
+								fmt.Sprintf("    Consul binds to: %s (Tailscale IP)", shared.GetInternalHostname()))
+							result.Details = append(result.Details,
+								"    But Vault resolves hostname to: 127.0.1.1")
 						}
 					}
 				}
@@ -631,10 +633,13 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 	result.Details = append(result.Details, "\nConsul agent configuration (via SDK):")
 
 	// Try multiple addresses to find a working Consul connection
+	// NOTE: Consul binds to actual network interface (Tailscale IP), not localhost
+	// We test localhost as fallback only for troubleshooting misconfigurations
 	testAddresses := []string{
-		fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
-		fmt.Sprintf("127.0.1.1:%d", shared.PortConsul),
-		fmt.Sprintf("%s:%d", hostname, shared.PortConsul),
+		fmt.Sprintf("%s:%d", hostname, shared.PortConsul),                      // Primary: hostname (should resolve to Tailscale/actual IP)
+		fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortConsul),  // Fallback: explicit internal hostname
+		fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),                          // Fallback: IPv4 localhost (diagnoses client_addr misconfiguration)
+		fmt.Sprintf("127.0.1.1:%d", shared.PortConsul),                          // Fallback: Ubuntu default (diagnoses /etc/hosts issues)
 	}
 
 	var consulAgentInfo map[string]map[string]interface{}
