@@ -135,11 +135,12 @@ func ParsePortMigrationSyntax(portsArg string) (*PortMigration, error) {
 	var toPort int
 	if toStr == "default" {
 		// Determine which default based on FROM port
-		if fromPort == 8161 || fromPort == 8500 {
+		switch fromPort {
+		case 8161, 8500:
 			toPort = shared.PortConsul // HTTP default
-		} else if fromPort == 8389 || fromPort == 8600 {
+		case 8389, 8600:
 			toPort = shared.PortConsulDNS // DNS default
-		} else {
+		default:
 			// Default to HTTP port if ambiguous
 			toPort = shared.PortConsul
 		}

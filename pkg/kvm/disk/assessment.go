@@ -264,7 +264,7 @@ func (a *Assessment) checkBackups(ctx context.Context) {
 	backupDirs := []string{
 		"/var/lib/eos/backups/kvm",
 		"/backups",
-		fmt.Sprintf("/var/lib/libvirt/images/backups"),
+		"/var/lib/libvirt/images/backups",
 	}
 
 	for _, dir := range backupDirs {

@@ -97,9 +97,10 @@ func runListAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 
 		for _, comp := range tracker.Components {
 			status := comp.Status
-			if status == "active" {
+			switch status {
+			case "active":
 				status = "✓ " + status
-			} else if status == "inactive" {
+			case "inactive":
 				status = "✗ " + status
 			}
 

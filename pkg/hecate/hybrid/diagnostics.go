@@ -635,9 +635,10 @@ func (ds *DiagnosticSuite) DetermineOverallStatus(results *DiagnosticResults) st
 	warningCount := 0
 
 	for _, err := range results.Errors {
-		if err.Severity == "error" {
+		switch err.Severity {
+		case "error":
 			errorCount++
-		} else if err.Severity == "warning" {
+		case "warning":
 			warningCount++
 		}
 	}
@@ -655,16 +656,16 @@ func (ds *DiagnosticSuite) DetermineOverallStatus(results *DiagnosticResults) st
 
 func (ds *DiagnosticSuite) testLocalReachability() error {
 	logger := otelzap.Ctx(ds.rc.Ctx)
-	
+
 	logger.Debug("Testing local reachability",
 		zap.String("address", ds.backend.LocalAddress))
-	
+
 	// Parse address to get host and port
 	host, port, err := net.SplitHostPort(ds.backend.LocalAddress)
 	if err != nil {
 		return fmt.Errorf("invalid address format: %w", err)
 	}
-	
+
 	// Test TCP connection
 	timeout := 5 * time.Second
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
@@ -672,38 +673,38 @@ func (ds *DiagnosticSuite) testLocalReachability() error {
 		return fmt.Errorf("failed to connect to %s: %w", ds.backend.LocalAddress, err)
 	}
 	defer func() { _ = conn.Close() }()
-	
+
 	logger.Debug("Local service is reachable")
 	return nil
 }
 
 func (ds *DiagnosticSuite) testFrontendReachability() error {
 	logger := otelzap.Ctx(ds.rc.Ctx)
-	
+
 	logger.Debug("Testing frontend reachability",
 		zap.String("domain", ds.backend.PublicDomain))
-	
+
 	// Test HTTPS connection to public domain
 	url := fmt.Sprintf("https://%s", ds.backend.PublicDomain)
-	
+
 	ctx, cancel := context.WithTimeout(ds.rc.Ctx, 10*time.Second)
 	defer cancel()
-	
+
 	req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	resp, err := ds.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to reach frontend %s: %w", url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	
+
 	logger.Debug("Frontend is reachable",
 		zap.String("url", url),
 		zap.Int("status", resp.StatusCode))
-	
+
 	return nil
 }
 
@@ -724,44 +725,44 @@ func (ds *DiagnosticSuite) measureBandwidth() int64 {
 
 func (ds *DiagnosticSuite) testLocalDNS() error {
 	logger := otelzap.Ctx(ds.rc.Ctx)
-	
+
 	logger.Debug("Testing local DNS resolution")
-	
+
 	// Test resolution of a known domain
 	testDomains := []string{"google.com", "cloudflare.com", "8.8.8.8"}
-	
+
 	for _, domain := range testDomains {
 		_, err := net.LookupHost(domain)
 		if err != nil {
 			return fmt.Errorf("failed to resolve test domain %s: %w", domain, err)
 		}
 	}
-	
+
 	logger.Debug("Local DNS resolution is working")
 	return nil
 }
 
 func (ds *DiagnosticSuite) getNameservers() []string {
 	logger := otelzap.Ctx(ds.rc.Ctx)
-	
+
 	// Get system nameservers from resolv.conf on Unix systems
 	//TODO: This would need to read /etc/resolv.conf or use system DNS config
 	// For now, return common public DNS servers
 	nameservers := []string{"8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1"}
-	
+
 	logger.Debug("Using default nameservers",
 		zap.Strings("nameservers", nameservers))
-	
+
 	return nameservers
 }
 
 func (ds *DiagnosticSuite) testRecordType(domain, recordType string) bool {
 	logger := otelzap.Ctx(ds.rc.Ctx)
-	
+
 	logger.Debug("Testing DNS record type",
 		zap.String("domain", domain),
 		zap.String("record_type", recordType))
-	
+
 	switch recordType {
 	case "A":
 		ips, err := net.LookupIP(domain)
@@ -775,7 +776,7 @@ func (ds *DiagnosticSuite) testRecordType(domain, recordType string) bool {
 			}
 		}
 		return false
-		
+
 	case "AAAA":
 		ips, err := net.LookupIP(domain)
 		if err != nil {
@@ -788,11 +789,11 @@ func (ds *DiagnosticSuite) testRecordType(domain, recordType string) bool {
 			}
 		}
 		return false
-		
+
 	case "CNAME":
 		cname, err := net.LookupCNAME(domain)
 		return err == nil && cname != domain
-		
+
 	default:
 		logger.Warn("Unsupported record type", zap.String("type", recordType))
 		return false
@@ -821,30 +822,30 @@ func (ds *DiagnosticSuite) measureStability() float64 {
 
 func (ds *DiagnosticSuite) measureLatencies(count int) []time.Duration {
 	logger := otelzap.Ctx(ds.rc.Ctx)
-	
+
 	logger.Debug("Measuring latencies",
 		zap.Int("count", count),
 		zap.String("target", ds.backend.LocalAddress))
-	
+
 	latencies := make([]time.Duration, 0, count)
-	
+
 	// Test latency by making HTTP HEAD requests
 	url := fmt.Sprintf("http://%s%s", ds.backend.LocalAddress, ds.backend.HealthCheck.HTTP)
 	if ds.backend.HealthCheck.HTTP == "" {
 		// Fallback to root path
 		url = fmt.Sprintf("http://%s/", ds.backend.LocalAddress)
 	}
-	
+
 	for i := 0; i < count; i++ {
 		start := time.Now()
-		
+
 		ctx, cancel := context.WithTimeout(ds.rc.Ctx, 5*time.Second)
 		req, err := http.NewRequestWithContext(ctx, "HEAD", url, nil)
 		if err != nil {
 			cancel()
 			continue
 		}
-		
+
 		resp, err := ds.httpClient.Do(req)
 		if err != nil {
 			cancel()
@@ -852,17 +853,17 @@ func (ds *DiagnosticSuite) measureLatencies(count int) []time.Duration {
 		}
 		resp.Body.Close()
 		cancel()
-		
+
 		latency := time.Since(start)
 		latencies = append(latencies, latency)
-		
+
 		// Small delay between requests
 		time.Sleep(100 * time.Millisecond)
 	}
-	
+
 	logger.Debug("Latency measurement completed",
 		zap.Int("successful_measurements", len(latencies)))
-	
+
 	return latencies
 }
 
@@ -870,12 +871,12 @@ func (ds *DiagnosticSuite) calculateAverage(latencies []time.Duration) time.Dura
 	if len(latencies) == 0 {
 		return 0
 	}
-	
+
 	var total time.Duration
 	for _, latency := range latencies {
 		total += latency
 	}
-	
+
 	return total / time.Duration(len(latencies))
 }
 
@@ -883,11 +884,11 @@ func (ds *DiagnosticSuite) calculateP95(latencies []time.Duration) time.Duration
 	if len(latencies) == 0 {
 		return 0
 	}
-	
+
 	// Sort latencies
 	sorted := make([]time.Duration, len(latencies))
 	copy(sorted, latencies)
-	
+
 	// Simple sort implementation
 	for i := 0; i < len(sorted); i++ {
 		for j := i + 1; j < len(sorted); j++ {
@@ -896,13 +897,13 @@ func (ds *DiagnosticSuite) calculateP95(latencies []time.Duration) time.Duration
 			}
 		}
 	}
-	
+
 	// Calculate 95th percentile index
 	p95Index := int(float64(len(sorted)) * 0.95)
 	if p95Index >= len(sorted) {
 		p95Index = len(sorted) - 1
 	}
-	
+
 	return sorted[p95Index]
 }
 

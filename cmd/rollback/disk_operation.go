@@ -203,10 +203,11 @@ func getRollbackConfirmation(plan *storage.RollbackPlan) error {
 	fmt.Printf("This will rollback the operation using: %s\n", string(plan.Method))
 	fmt.Printf("Estimated time: %s\n", plan.EstimatedTime.Round(time.Second))
 
-	if plan.Method == storage.RollbackSnapshot {
+	switch plan.Method {
+	case storage.RollbackSnapshot:
 		fmt.Printf("\nWARNING: Snapshot rollback will restore the volume to its\n")
 		fmt.Printf("previous state, potentially losing any changes made after the snapshot.\n")
-	} else if plan.Method == storage.RollbackReverse {
+	case storage.RollbackReverse:
 		fmt.Printf("\nWARNING: Reverse operations will attempt to undo the changes.\n")
 		fmt.Printf("This may involve shrinking volumes or removing created resources.\n")
 	}

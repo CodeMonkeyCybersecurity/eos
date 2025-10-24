@@ -61,28 +61,28 @@ func (c *AuthentikWazuhConnector) PreflightCheck(rc *eos_io.RuntimeContext, conf
 		// Provide helpful error if running on wrong server
 		if serverRole.IsHecateServer && !serverRole.IsWazuhServer {
 			return eos_err.NewUserError(
-				"This command must be run on the Wazuh backend server.\n\n" +
-					"Current server: " + serverRole.Hostname + "\n" +
-					"Detected as: Hecate reverse proxy server\n" +
-					"Detected services: " + serverRole.DescribeRoles() + "\n\n" +
-					"Wazuh SSO configuration requires:\n" +
-					"  1. Direct access to Wazuh config files (/etc/wazuh-indexer/)\n" +
-					"  2. Ability to restart Wazuh services\n" +
-					"  3. Network access to Authentik API\n\n" +
-					"Please SSH to your Wazuh backend server and run:\n" +
-					"  export AUTHENTIK_URL=https://hera.yourdomain.com\n" +
-					"  export AUTHENTIK_TOKEN=<your-token>\n" +
-					"  export WAZUH_URL=https://wazuh.yourdomain.com\n" +
+				"%s", "This command must be run on the Wazuh backend server.\n\n"+
+					"Current server: "+serverRole.Hostname+"\n"+
+					"Detected as: Hecate reverse proxy server\n"+
+					"Detected services: "+serverRole.DescribeRoles()+"\n\n"+
+					"Wazuh SSO configuration requires:\n"+
+					"  1. Direct access to Wazuh config files (/etc/wazuh-indexer/)\n"+
+					"  2. Ability to restart Wazuh services\n"+
+					"  3. Network access to Authentik API\n\n"+
+					"Please SSH to your Wazuh backend server and run:\n"+
+					"  export AUTHENTIK_URL=https://hera.yourdomain.com\n"+
+					"  export AUTHENTIK_TOKEN=<your-token>\n"+
+					"  export WAZUH_URL=https://wazuh.yourdomain.com\n"+
 					"  eos sync --authentik --wazuh")
 		}
 
 		if !serverRole.IsWazuhServer {
 			return eos_err.NewUserError(
-				"Wazuh not detected on this server.\n\n" +
-					"Current server: " + serverRole.Hostname + "\n" +
-					"Detected services: " + serverRole.DescribeRoles() + "\n\n" +
-					"This command requires Wazuh to be installed locally.\n" +
-					"If Wazuh is on a different server, please SSH there first.\n\n" +
+				"%s", "Wazuh not detected on this server.\n\n"+
+					"Current server: "+serverRole.Hostname+"\n"+
+					"Detected services: "+serverRole.DescribeRoles()+"\n\n"+
+					"This command requires Wazuh to be installed locally.\n"+
+					"If Wazuh is on a different server, please SSH there first.\n\n"+
 					"To install Wazuh: eos create wazuh")
 		}
 	}
@@ -100,8 +100,8 @@ func (c *AuthentikWazuhConnector) PreflightCheck(rc *eos_io.RuntimeContext, conf
 
 	if authentikToken == "" {
 		return eos_err.NewUserError(
-			"AUTHENTIK_TOKEN environment variable required.\n" +
-				"Get your API token from: " + authentikURL + "/if/admin/#/core/tokens")
+			"%s", "AUTHENTIK_TOKEN environment variable required.\n"+
+				"Get your API token from: "+authentikURL+"/if/admin/#/core/tokens")
 	}
 
 	if wazuhURL == "" {
@@ -138,8 +138,8 @@ func (c *AuthentikWazuhConnector) PreflightCheck(rc *eos_io.RuntimeContext, conf
 	wazuhConfigPath := "/etc/wazuh-indexer/opensearch-security/config.yml"
 	if _, err := os.Stat(wazuhConfigPath); os.IsNotExist(err) {
 		return eos_err.NewUserError(
-			"Wazuh indexer not found. Please install Wazuh first:\n" +
-				"  Expected config at: " + wazuhConfigPath + "\n" +
+			"%s", "Wazuh indexer not found. Please install Wazuh first:\n"+
+				"  Expected config at: "+wazuhConfigPath+"\n"+
 				"  Install guide: https://documentation.wazuh.com/current/installation-guide/")
 	}
 

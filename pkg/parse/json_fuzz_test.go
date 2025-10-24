@@ -209,12 +209,13 @@ func countMaxNesting(jsonStr string) int {
 		}
 
 		if !inString {
-			if char == '{' || char == '[' {
+			switch char {
+			case '{', '[':
 				currentDepth++
 				if currentDepth > maxDepth {
 					maxDepth = currentDepth
 				}
-			} else if char == '}' || char == ']' {
+			case '}', ']':
 				currentDepth--
 			}
 		}

@@ -169,7 +169,7 @@ func AuthenticateGitHub(rc *eos_io.RuntimeContext, config *Config) error {
 	// Verify authentication
 	fmt.Println("\nVerifying authentication...")
 
-	verifyCmdStr := fmt.Sprintf("gh auth status")
+	verifyCmdStr := "gh auth status"
 	if config.User != "" && config.User != "root" {
 		verifyCmdStr = fmt.Sprintf("sudo -u %s gh auth status", config.User)
 	}

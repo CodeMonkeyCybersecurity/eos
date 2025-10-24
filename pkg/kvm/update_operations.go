@@ -275,7 +275,7 @@ func ShowImpactSummary(rc *eos_io.RuntimeContext, vmsNeedingUpdate []string, bat
 	logger.Info("╔═══════════════════════════════════════════════════════════════╗")
 	logger.Info("║                    OPERATION SUMMARY                          ║")
 	logger.Info("╠═══════════════════════════════════════════════════════════════╣")
-	logger.Info(fmt.Sprintf("║ Operation: Add QEMU Guest Agent Channel                       ║"))
+	logger.Info("║ Operation: Add QEMU Guest Agent Channel                       ║")
 	logger.Info(fmt.Sprintf("║ Total VMs to update: %-41d║", len(vmsNeedingUpdate)))
 	logger.Info(fmt.Sprintf("║ Running VMs (may need restart): %-26d║", runningCount))
 	logger.Info(fmt.Sprintf("║ Batch size: %-50d║", batchSize))

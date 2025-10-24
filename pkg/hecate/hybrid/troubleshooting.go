@@ -419,9 +419,10 @@ func (tg *TroubleshootingGuide) DetermineOverallStatus(issues []TroubleshootingI
 	warningCount := 0
 
 	for _, issue := range issues {
-		if issue.Severity == "high" {
+		switch issue.Severity {
+		case "high":
 			errorCount++
-		} else if issue.Severity == "medium" {
+		case "medium":
 			warningCount++
 		}
 	}

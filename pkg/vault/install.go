@@ -1381,7 +1381,8 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 				zap.String("stderr", string(exitErr.Stderr)))
 
 			// Exit code 2 means sealed (this is NORMAL for new installs)
-			if exitCode == 2 {
+			switch exitCode {
+			case 2:
 				vi.logger.Info("Vault is sealed (normal for new installations)",
 					zap.Int("exit_code", exitCode))
 				readiness.Responding = true
@@ -1408,7 +1409,7 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 					vi.logger.Warn("Could not parse initialization status from vault output")
 				}
 				return readiness
-			} else if exitCode == 1 {
+			case 1:
 				// Exit code 1 typically means vault is having issues or TLS problems
 				vi.logger.Error("Vault status returned exit code 1",
 					zap.Int("exit_code", exitCode),
@@ -1416,7 +1417,7 @@ func (vi *VaultInstaller) checkVaultReadiness() *VaultReadiness {
 				readiness.Responding = false
 				readiness.Message = fmt.Sprintf("vault returned error (exit code 1): %s", statusOutput)
 				return readiness
-			} else {
+			default:
 				// Unexpected exit code
 				vi.logger.Error("Vault status returned unexpected exit code",
 					zap.Int("exit_code", exitCode),

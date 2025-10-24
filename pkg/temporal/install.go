@@ -81,7 +81,7 @@ func installPostgreSQL(ctx context.Context, config *TemporalConfig) error {
 
 	// Add repository
 	exec.CommandContext(ctx, "sh", "-c", "wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -").Run()
-	exec.CommandContext(ctx, "sh", "-c", fmt.Sprintf("echo 'deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main' > /etc/apt/sources.list.d/pgdg.list")).Run()
+	exec.CommandContext(ctx, "sh", "-c", "echo 'deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main' > /etc/apt/sources.list.d/pgdg.list").Run()
 	exec.CommandContext(ctx, "apt-get", "update", "-qq").Run()
 
 	// Install

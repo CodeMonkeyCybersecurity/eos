@@ -175,7 +175,7 @@ func handleAddOperation(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Show impact and get confirmation (unless --yes or --force)
-	if !(kvmYes || kvmForce) && !kvmDryRun {
+	if (!kvmYes && !kvmForce) && !kvmDryRun {
 		kvm.ShowImpactSummary(rc, targetVMs, kvmBatchSize, kvmWaitBetween)
 		logger.Info("terminal prompt: Type 'yes' to continue")
 		if !kvm.PromptConfirmation(rc, "Do you want to proceed?") {

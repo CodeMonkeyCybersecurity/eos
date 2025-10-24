@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	
+
 	"golang.org/x/crypto/ssh"
 )
 
 // SSHClient wraps the SSH connection with helper methods
 type SSHClient struct {
-	client   *ssh.Client
-	config   *Config
+	client *ssh.Client
+	config *Config
 }
 
 // NewSSHClient creates a new SSH client with standard connection strategies
@@ -21,7 +21,7 @@ func NewSSHClient(config *Config) (*SSHClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &SSHClient{
 		client: client,
 		config: config,
@@ -31,7 +31,7 @@ func NewSSHClient(config *Config) (*SSHClient, error) {
 // NewEmergencySSHClient tries emergency connection strategies for problematic servers
 func NewEmergencySSHClient(config *Config) (*SSHClient, error) {
 	strategies := []string{"no-pty", "minimal", "bare"}
-	
+
 	var lastErr error
 	for _, strategy := range strategies {
 		client, err := createSSHConnection(config, strategy)
@@ -43,7 +43,7 @@ func NewEmergencySSHClient(config *Config) (*SSHClient, error) {
 		}
 		lastErr = err
 	}
-	
+
 	return nil, fmt.Errorf("all emergency strategies failed: %w", lastErr)
 }
 
@@ -51,7 +51,7 @@ func NewEmergencySSHClient(config *Config) (*SSHClient, error) {
 func createSSHConnection(config *Config, strategy string) (*ssh.Client, error) {
 	// Build auth methods
 	var authMethods []ssh.AuthMethod
-	
+
 	// Try SSH key first if provided
 	if config.KeyPath != "" {
 		key, err := os.ReadFile(config.KeyPath)
@@ -62,16 +62,16 @@ func createSSHConnection(config *Config, strategy string) (*ssh.Client, error) {
 			}
 		}
 	}
-	
+
 	// Add password auth if provided
 	if config.Password != "" {
 		authMethods = append(authMethods, ssh.Password(config.Password))
 	}
-	
+
 	if len(authMethods) == 0 {
 		return nil, fmt.Errorf("no authentication methods available")
 	}
-	
+
 	// Create SSH client config
 	clientConfig := &ssh.ClientConfig{
 		User:            config.User,
@@ -79,22 +79,22 @@ func createSSHConnection(config *Config, strategy string) (*ssh.Client, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: In production, use proper host key verification
 		Timeout:         config.Timeout,
 	}
-	
+
 	// Apply strategy-specific settings
 	switch strategy {
 	case "no-pty":
 		// No special config needed, handled in command execution
 	case "minimal":
 		// Use minimal cipher set
-		clientConfig.Config.Ciphers = []string{"aes128-ctr"}
-		clientConfig.Config.MACs = []string{"hmac-sha1"}
+		clientConfig.Ciphers = []string{"aes128-ctr"}
+		clientConfig.MACs = []string{"hmac-sha1"}
 	case "bare":
 		// Most minimal settings
-		clientConfig.Config.Ciphers = []string{"aes128-ctr"}
-		clientConfig.Config.MACs = []string{"hmac-sha1"}
-		clientConfig.Config.KeyExchanges = []string{"diffie-hellman-group14-sha1"}
+		clientConfig.Ciphers = []string{"aes128-ctr"}
+		clientConfig.MACs = []string{"hmac-sha1"}
+		clientConfig.KeyExchanges = []string{"diffie-hellman-group14-sha1"}
 	}
-	
+
 	// Connect
 	addr := fmt.Sprintf("%s:%s", config.Host, config.Port)
 	return ssh.Dial("tcp", addr, clientConfig)
@@ -130,7 +130,7 @@ func (c *SSHClient) ExecuteCommand(cmd string, useSudo bool) (string, error) {
 		}
 		lastErr = err
 	}
-	
+
 	return "", fmt.Errorf("all execution strategies failed: %w", lastErr)
 }
 
@@ -141,25 +141,25 @@ func (c *SSHClient) executeWithPTY(cmd string) (string, error) {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 	defer func() { _ = session.Close() }()
-	
+
 	// Request PTY
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          0,
 		ssh.TTY_OP_ISPEED: 14400,
 		ssh.TTY_OP_OSPEED: 14400,
 	}
-	
+
 	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
 		return "", fmt.Errorf("failed to request PTY: %w", err)
 	}
-	
+
 	var stdout bytes.Buffer
 	session.Stdout = &stdout
-	
+
 	if err := session.Run(cmd); err != nil {
 		return stdout.String(), fmt.Errorf("command failed: %w", err)
 	}
-	
+
 	return stdout.String(), nil
 }
 
@@ -170,13 +170,13 @@ func (c *SSHClient) executeNoPTY(cmd string) (string, error) {
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 	defer func() { _ = session.Close() }()
-	
+
 	// Don't request PTY
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
 		return string(output), fmt.Errorf("command failed: %w", err)
 	}
-	
+
 	return string(output), nil
 }
 
@@ -221,7 +221,7 @@ func (c *SSHClient) IsConnected() bool {
 	if c.client == nil {
 		return false
 	}
-	
+
 	// Try to create a session as a connectivity check
 	session, err := c.client.NewSession()
 	if err != nil {

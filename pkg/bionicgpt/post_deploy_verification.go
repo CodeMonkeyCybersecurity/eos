@@ -4,12 +4,12 @@
 // Following shift-left principles: verify immediately, report comprehensively, fail clearly.
 //
 // Verification Checks:
-//   1. All containers running
-//   2. Database user creation succeeded
-//   3. LiteLLM proxy responding
-//   4. Application web interface accessible
-//   5. Health endpoints working
-//   6. Log files for errors
+//  1. All containers running
+//  2. Database user creation succeeded
+//  3. LiteLLM proxy responding
+//  4. Application web interface accessible
+//  5. Health endpoints working
+//  6. Log files for errors
 //
 // Code Monkey Cybersecurity - "Cybersecurity. With humans."
 package bionicgpt
@@ -27,14 +27,14 @@ import (
 
 // PostDeploymentVerification performs comprehensive checks after deployment
 type PostDeploymentVerification struct {
-	ContainersRunning       bool
-	DatabaseUserExists      bool
-	LiteLLMResponding       bool
-	AppWebInterfaceUp       bool
-	HealthEndpointsWorking  bool
-	NoErrorsInLogs          bool
-	Issues                  []string
-	Warnings                []string
+	ContainersRunning      bool
+	DatabaseUserExists     bool
+	LiteLLMResponding      bool
+	AppWebInterfaceUp      bool
+	HealthEndpointsWorking bool
+	NoErrorsInLogs         bool
+	Issues                 []string
+	Warnings               []string
 }
 
 // runPostDeploymentVerification performs comprehensive verification after deployment
@@ -192,7 +192,7 @@ func (bgi *BionicGPTInstaller) verifyLiteLLMProxy(ctx context.Context, v *PostDe
 	})
 
 	if err != nil {
-		logger.Warn(fmt.Sprintf("  ⚠ LiteLLM health endpoint not responding (this may be normal during startup)"))
+		logger.Warn("  ⚠ LiteLLM health endpoint not responding (this may be normal during startup)")
 		v.Warnings = append(v.Warnings, "LiteLLM proxy not responding to health checks yet")
 		return false
 	}
@@ -247,12 +247,13 @@ func (bgi *BionicGPTInstaller) verifyHealthEndpoints(ctx context.Context, v *Pos
 			continue
 		}
 
-		if healthStatus == "healthy" {
+		switch healthStatus {
+		case "healthy":
 			logger.Info(fmt.Sprintf("  ✓ %s: healthy", container))
-		} else if healthStatus == "starting" {
+		case "starting":
 			logger.Info(fmt.Sprintf("  ⏳ %s: still starting", container))
 			v.Warnings = append(v.Warnings, fmt.Sprintf("%s still starting", container))
-		} else {
+		default:
 			logger.Warn(fmt.Sprintf("  ⚠ %s: %s", container, healthStatus))
 			v.Warnings = append(v.Warnings, fmt.Sprintf("%s health check: %s", container, healthStatus))
 			allHealthy = false

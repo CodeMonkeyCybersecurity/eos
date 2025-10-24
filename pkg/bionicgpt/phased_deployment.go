@@ -4,12 +4,13 @@
 // Following shift-left principles: start services in dependency order, verify each phase.
 //
 // Deployment Phases:
-//   Phase 1: Database (postgres) - Foundation layer
-//   Phase 2: Migrations - Schema setup
-//   Phase 3: Supporting Services (embeddings, chunking) - Processing layer
-//   Phase 4: LiteLLM Proxy - Translation layer
-//   Phase 5: RAG Engine - Document processing
-//   Phase 6: Application - User interface
+//
+//	Phase 1: Database (postgres) - Foundation layer
+//	Phase 2: Migrations - Schema setup
+//	Phase 3: Supporting Services (embeddings, chunking) - Processing layer
+//	Phase 4: LiteLLM Proxy - Translation layer
+//	Phase 5: RAG Engine - Document processing
+//	Phase 6: Application - User interface
 //
 // Benefits:
 //   - Catches failures early (database issues before app starts)
@@ -97,14 +98,14 @@ func (bgi *BionicGPTInstaller) phasedDeployment(ctx context.Context) error {
 
 	for i, phase := range phases {
 		logger.Info("")
-		logger.Info(fmt.Sprintf("──────────────────────────────────────────────────────────────"))
+		logger.Info("──────────────────────────────────────────────────────────────")
 		logger.Info(fmt.Sprintf("%s (%d/%d)", phase.Name, i+1, len(phases)))
-		logger.Info(fmt.Sprintf("──────────────────────────────────────────────────────────────"))
+		logger.Info("──────────────────────────────────────────────────────────────")
 
 		// Start services for this phase
 		if err := bgi.startPhaseServices(ctx, phase); err != nil {
 			if phase.Optional {
-				logger.Warn(fmt.Sprintf("Phase failed but is optional, continuing"),
+				logger.Warn("Phase failed but is optional, continuing",
 					zap.Error(err))
 				continue
 			}
@@ -211,9 +212,10 @@ func (bgi *BionicGPTInstaller) verifyPhaseHealth(ctx context.Context, phase Depl
 		}
 
 		// Container has health check - verify it's healthy
-		if healthStatus == "healthy" {
+		switch healthStatus {
+		case "healthy":
 			logger.Info(fmt.Sprintf("  ✓ %s: healthy", service))
-		} else if healthStatus == "starting" {
+		case "starting":
 			logger.Info(fmt.Sprintf("  ⏳ %s: still starting (status: %s)", service, healthStatus))
 			// Give it more time
 			logger.Info(fmt.Sprintf("Waiting additional 30s for %s to become healthy...", service))
@@ -233,7 +235,7 @@ func (bgi *BionicGPTInstaller) verifyPhaseHealth(ctx context.Context, phase Depl
 				logger.Warn(fmt.Sprintf("  ⚠ %s: still not healthy (status: %s), but continuing", service, healthStatus2))
 				// Don't fail - service might become healthy later
 			}
-		} else {
+		default:
 			logger.Warn(fmt.Sprintf("  ⚠ %s: unhealthy (status: %s), but continuing", service, healthStatus))
 			// Show last few log lines for debugging
 			logs, _ := execute.Run(ctx, execute.Options{

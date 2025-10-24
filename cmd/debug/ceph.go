@@ -93,9 +93,10 @@ func runCephDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 	for _, result := range results {
 		for _, issue := range result.Issues {
-			if issue.Severity == "critical" {
+			switch issue.Severity {
+			case "critical":
 				criticalIssues = append(criticalIssues, issue)
-			} else if issue.Severity == "warning" {
+			case "warning":
 				warnings = append(warnings, issue)
 			}
 		}

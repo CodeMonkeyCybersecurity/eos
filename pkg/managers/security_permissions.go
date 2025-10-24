@@ -118,7 +118,7 @@ func (spm *SecurityPermissionsManager) Update(ctx context.Context, resource Secu
 	}
 
 	duration := time.Since(start)
-	message := fmt.Sprintf("Successfully updated security permission configuration")
+	message := "Successfully updated security permission configuration"
 
 	return spm.CreateOperationResult(true, message, duration, nil), nil
 }

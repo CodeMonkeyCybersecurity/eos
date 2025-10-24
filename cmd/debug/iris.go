@@ -683,11 +683,12 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			"Check if systemd service exists: systemctl list-unit-files temporal.service",
 		}
 
-		if systemdStatus == "inactive" || systemdStatus == "failed" {
+		switch systemdStatus {
+		case "inactive", "failed":
 			remediation = append(remediation,
 				"Service exists but not running: sudo systemctl start temporal",
 				"Check logs: sudo journalctl -u temporal -n 50")
-		} else if systemdStatus == "" {
+		case "":
 			remediation = append(remediation,
 				"Service not installed: eos create iris or eos repair iris",
 				"Or start manually: temporal server start-dev")

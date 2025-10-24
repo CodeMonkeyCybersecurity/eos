@@ -178,9 +178,10 @@ Examples:
 		approvedCount := 0
 		rejectedCount := 0
 		for _, approval := range existingApprovals {
-			if approval.Status == "approved" {
+			switch approval.Status {
+			case "approved":
 				approvedCount++
-			} else if approval.Status == "rejected" {
+			case "rejected":
 				rejectedCount++
 			}
 		}

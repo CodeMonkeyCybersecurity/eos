@@ -131,7 +131,7 @@ func checkAppLogs(ctx context.Context, output *strings.Builder) int {
 	cmd := exec.CommandContext(ctx, "docker", "logs", bionicgpt.ContainerApp, "--tail", "50")
 	logs, err := cmd.CombinedOutput()
 	if err != nil {
-		output.WriteString(fmt.Sprintf("ERROR: Could not retrieve app logs: %v\n", err))
+		fmt.Fprintf(output, "ERROR: Could not retrieve app logs: %v\n", err)
 		return 1
 	}
 
@@ -159,7 +159,7 @@ func checkFirstRun(ctx context.Context, output *strings.Builder, result *debug.R
 		"-c", "SELECT COUNT(*) as user_count FROM users;")
 	userCheckOutput, err := cmd.CombinedOutput()
 	if err != nil {
-		output.WriteString(fmt.Sprintf("Could not query users table: %v\n", err))
+		fmt.Fprintf(output, "Could not query users table: %v\n", err)
 		output.WriteString(string(userCheckOutput))
 		output.WriteString("⚠ Database might not be initialized or users table doesn't exist\n")
 		return 1
@@ -183,7 +183,7 @@ func checkAuthConfig(ctx context.Context, output *strings.Builder) int {
 
 	envData, err := os.ReadFile(DefaultEnvFile)
 	if err != nil {
-		output.WriteString(fmt.Sprintf("ERROR: Could not read .env file: %v\n", err))
+		fmt.Fprintf(output, "ERROR: Could not read .env file: %v\n", err)
 		return 1
 	}
 
@@ -235,10 +235,10 @@ func checkAppRoutes(ctx context.Context, output *strings.Builder) int {
 		statusOutput, err := cmd.CombinedOutput()
 		status := strings.TrimSpace(string(statusOutput))
 		if err != nil {
-			output.WriteString(fmt.Sprintf("%s: ERROR (could not connect)\n", name))
+			fmt.Fprintf(output, "%s: ERROR (could not connect)\n", name)
 			errorCount++
 		} else {
-			output.WriteString(fmt.Sprintf("%s: HTTP %s\n", name, status))
+			fmt.Fprintf(output, "%s: HTTP %s\n", name, status)
 			if status == "404" || status == "500" {
 				errorCount++
 			}
@@ -302,7 +302,7 @@ func checkInitialSetup(ctx context.Context, output *strings.Builder) int {
 		"psql", "-U", "bionic_application", "-d", "bionic-gpt", "-c", "\\dt")
 	tablesOutput, err := cmd.CombinedOutput()
 	if err != nil {
-		output.WriteString(fmt.Sprintf("Could not list tables: %v\n", err))
+		fmt.Fprintf(output, "Could not list tables: %v\n", err)
 		return 1
 	}
 
@@ -381,7 +381,7 @@ func checkAddressInUseErrors(ctx context.Context, output *strings.Builder) int {
 	cmd := exec.CommandContext(ctx, "docker", "logs", bionicgpt.ContainerApp, "--tail", "100")
 	logs, err := cmd.CombinedOutput()
 	if err != nil {
-		output.WriteString(fmt.Sprintf("Could not retrieve app logs: %v\n", err))
+		fmt.Fprintf(output, "Could not retrieve app logs: %v\n", err)
 		return 0
 	}
 
@@ -410,7 +410,7 @@ func checkAddressInUseErrors(ctx context.Context, output *strings.Builder) int {
 				start = len(errorLines) - 10
 			}
 			for i := start; i < len(errorLines); i++ {
-				output.WriteString(fmt.Sprintf("  %s\n", errorLines[i]))
+				fmt.Fprintf(output, "  %s\n", errorLines[i])
 			}
 		}
 
@@ -438,7 +438,7 @@ func checkUsersTableStructure(ctx context.Context, output *strings.Builder) {
 	tableOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
-		output.WriteString(fmt.Sprintf("✗ Could not describe users table: %v\n", err))
+		fmt.Fprintf(output, "✗ Could not describe users table: %v\n", err)
 		output.WriteString(string(tableOutput))
 		output.WriteString("\nThis likely means migrations haven't run or failed.\n")
 		output.WriteString("Check migrations container logs: docker logs bionicgpt-db-migrations\n\n")
@@ -460,7 +460,7 @@ func checkUsersTableStructure(ctx context.Context, output *strings.Builder) {
 	}
 
 	if len(missingColumns) > 0 {
-		output.WriteString(fmt.Sprintf("⚠ Missing expected columns: %v\n", missingColumns))
+		fmt.Fprintf(output, "⚠ Missing expected columns: %v\n", missingColumns)
 		output.WriteString("Database schema may be incomplete or migrations failed.\n")
 	} else {
 		output.WriteString("✓ All expected columns present in users table\n")

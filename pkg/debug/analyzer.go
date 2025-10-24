@@ -267,8 +267,8 @@ type QuickSummaryItem struct {
 // GenerateQuickSummary creates a quick summary from analysis
 func GenerateQuickSummary(report *Report, analysis *Analysis) *QuickSummary {
 	summary := &QuickSummary{
-		Items:      make([]QuickSummaryItem, 0),
-		NextSteps:  make([]string, 0),
+		Items:     make([]QuickSummaryItem, 0),
+		NextSteps: make([]string, 0),
 	}
 
 	// Analyze results to build summary items
@@ -295,9 +295,10 @@ func GenerateQuickSummary(report *Report, analysis *Analysis) *QuickSummary {
 		summary.NextSteps = analysis.Recommendations
 	} else {
 		// Default next steps based on health
-		if analysis.OverallHealth == HealthFailed {
+		switch analysis.OverallHealth {
+		case HealthFailed:
 			summary.NextSteps = append(summary.NextSteps, "Address critical issues listed above")
-		} else if analysis.OverallHealth == HealthHealthy {
+		case HealthHealthy:
 			summary.NextSteps = append(summary.NextSteps, fmt.Sprintf("%s is healthy - no action required", report.ServiceName))
 		}
 	}

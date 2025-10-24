@@ -348,7 +348,7 @@ func checkVolumePermissions(rc *eos_io.RuntimeContext, config *Config, result *D
 
 	if permissionIssues > 0 {
 		result.Recommendations = append(result.Recommendations,
-			fmt.Sprintf("Run 'sudo eos fix mattermost' to automatically fix all permission issues"))
+			"Run 'sudo eos fix mattermost' to automatically fix all permission issues")
 	}
 
 	return nil

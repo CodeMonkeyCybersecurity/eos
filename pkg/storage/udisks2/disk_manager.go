@@ -28,15 +28,15 @@ type DiskHealth = storage.DiskHealth
 
 // VolumeRequest represents a volume creation request
 type VolumeRequest struct {
-	Device      string            `json:"device"`
-	Size        uint64            `json:"size"`        // 0 means use entire device
-	Filesystem  string            `json:"filesystem"`  // ext4, xfs, btrfs
-	Label       string            `json:"label"`
-	MountPoint  string            `json:"mount_point"`
-	Encrypted   bool              `json:"encrypted"`
-	Passphrase  string            `json:"passphrase,omitempty"`
-	Options     []string          `json:"options"`     // mount options
-	Metadata    map[string]string `json:"metadata"`
+	Device     string            `json:"device"`
+	Size       uint64            `json:"size"`       // 0 means use entire device
+	Filesystem string            `json:"filesystem"` // ext4, xfs, btrfs
+	Label      string            `json:"label"`
+	MountPoint string            `json:"mount_point"`
+	Encrypted  bool              `json:"encrypted"`
+	Passphrase string            `json:"passphrase,omitempty"`
+	Options    []string          `json:"options"` // mount options
+	Metadata   map[string]string `json:"metadata"`
 }
 
 // VolumeInfo represents created volume information
@@ -56,7 +56,7 @@ type VolumeInfo struct {
 // NewDiskManager creates a new disk manager using D-Bus/udisks2
 func NewDiskManager(rc *eos_io.RuntimeContext) (*DiskManager, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Connect to system D-Bus
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
@@ -66,7 +66,7 @@ func NewDiskManager(rc *eos_io.RuntimeContext) (*DiskManager, error) {
 	// Test udisks2 availability
 	obj := conn.Object("org.freedesktop.UDisks2", "/org/freedesktop/UDisks2/Manager")
 	var version string
-	err = obj.Call("org.freedesktop.DBus.Properties.Get", 0, 
+	err = obj.Call("org.freedesktop.DBus.Properties.Get", 0,
 		"org.freedesktop.UDisks2.Manager", "Version").Store(&version)
 	if err != nil {
 		conn.Close()
@@ -97,8 +97,8 @@ func (dm *DiskManager) DiscoverDisks(ctx context.Context) ([]*DiskInfo, error) {
 	// Get all block devices
 	obj := dm.conn.Object("org.freedesktop.UDisks2", "/org/freedesktop/UDisks2/Manager")
 	var blockDevices []dbus.ObjectPath
-	
-	err := obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Manager.GetBlockDevices", 0, 
+
+	err := obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Manager.GetBlockDevices", 0,
 		map[string]dbus.Variant{}).Store(&blockDevices)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get block devices: %w", err)
@@ -108,15 +108,15 @@ func (dm *DiskManager) DiscoverDisks(ctx context.Context) ([]*DiskInfo, error) {
 	for _, devicePath := range blockDevices {
 		diskInfo, err := dm.getDiskInfo(ctx, devicePath)
 		if err != nil {
-			dm.logger.Warn("Failed to get disk info", 
-				zap.String("device", string(devicePath)), 
+			dm.logger.Warn("Failed to get disk info",
+				zap.String("device", string(devicePath)),
 				zap.Error(err))
 			continue
 		}
-		
+
 		// Only include physical drives (not partitions)
-		if diskInfo != nil && !strings.Contains(diskInfo.Device, "p") && 
-		   !strings.Contains(diskInfo.Device, "1") {
+		if diskInfo != nil && !strings.Contains(diskInfo.Device, "p") &&
+			!strings.Contains(diskInfo.Device, "1") {
 			disks = append(disks, diskInfo)
 		}
 	}
@@ -127,7 +127,7 @@ func (dm *DiskManager) DiscoverDisks(ctx context.Context) ([]*DiskInfo, error) {
 
 // CreateVolume creates a new volume on the specified device
 func (dm *DiskManager) CreateVolume(ctx context.Context, req *VolumeRequest) (*VolumeInfo, error) {
-	dm.logger.Info("Creating volume", 
+	dm.logger.Info("Creating volume",
 		zap.String("device", req.Device),
 		zap.String("filesystem", req.Filesystem),
 		zap.Uint64("size", req.Size))
@@ -155,7 +155,7 @@ func (dm *DiskManager) CreateVolume(ctx context.Context, req *VolumeRequest) (*V
 	}
 
 	// Setup encryption if requested
-	var finalDevicePath dbus.ObjectPath = partitionPath
+	var finalDevicePath = partitionPath
 	if req.Encrypted {
 		encryptedPath, err := dm.setupEncryption(ctx, partitionPath, req.Passphrase)
 		if err != nil {
@@ -188,7 +188,7 @@ func (dm *DiskManager) CreateVolume(ctx context.Context, req *VolumeRequest) (*V
 	volumeInfo.CreatedAt = time.Now()
 	volumeInfo.Metadata = req.Metadata
 
-	dm.logger.Info("Volume created successfully", 
+	dm.logger.Info("Volume created successfully",
 		zap.String("device", volumeInfo.Device),
 		zap.String("uuid", volumeInfo.UUID))
 
@@ -205,12 +205,12 @@ func (dm *DiskManager) GetDiskHealth(ctx context.Context, device string) (*DiskH
 	}
 
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	// Get SMART data
 	var smartData map[string]dbus.Variant
-	err = obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Drive.Ata.SmartGetAttributes", 0, 
+	err = obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Drive.Ata.SmartGetAttributes", 0,
 		map[string]dbus.Variant{}).Store(&smartData)
-	
+
 	health := &DiskHealth{
 		Status:    "unknown",
 		SmartData: make(map[string]string),
@@ -222,7 +222,7 @@ func (dm *DiskManager) GetDiskHealth(ctx context.Context, device string) (*DiskH
 		for key, value := range smartData {
 			health.SmartData[key] = fmt.Sprintf("%v", value.Value())
 		}
-		
+
 		// Determine health status based on SMART data
 		health.Status = dm.evaluateHealthStatus(health.SmartData)
 	}
@@ -242,7 +242,7 @@ func (dm *DiskManager) GetDiskHealth(ctx context.Context, device string) (*DiskH
 
 // ResizeVolume resizes an existing volume
 func (dm *DiskManager) ResizeVolume(ctx context.Context, device string, newSize uint64) error {
-	dm.logger.Info("Resizing volume", 
+	dm.logger.Info("Resizing volume",
 		zap.String("device", device),
 		zap.Uint64("new_size", newSize))
 
@@ -252,7 +252,7 @@ func (dm *DiskManager) ResizeVolume(ctx context.Context, device string, newSize 
 	}
 
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	// Resize partition
 	err = obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Partition.Resize", 0,
 		newSize, map[string]dbus.Variant{}).Err
@@ -273,7 +273,7 @@ func (dm *DiskManager) ResizeVolume(ctx context.Context, device string, newSize 
 
 // MountVolume mounts a volume at the specified mount point
 func (dm *DiskManager) MountVolume(ctx context.Context, device, mountPoint string, options []string) error {
-	dm.logger.Info("Mounting volume", 
+	dm.logger.Info("Mounting volume",
 		zap.String("device", device),
 		zap.String("mount_point", mountPoint))
 
@@ -296,7 +296,7 @@ func (dm *DiskManager) UnmountVolume(ctx context.Context, device string) error {
 	}
 
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	err = obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Filesystem.Unmount", 0,
 		map[string]dbus.Variant{}).Err
 	if err != nil {
@@ -311,12 +311,12 @@ func (dm *DiskManager) UnmountVolume(ctx context.Context, device string) error {
 
 func (dm *DiskManager) getDiskInfo(ctx context.Context, devicePath dbus.ObjectPath) (*DiskInfo, error) {
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	// Get device properties
 	var device, model, serial, vendor, mediaType, connectionBus string
 	var size uint64
 	var removable bool
-	
+
 	// Get device name
 	var deviceVar dbus.Variant
 	err := obj.Call("org.freedesktop.DBus.Properties.Get", 0,
@@ -344,7 +344,7 @@ func (dm *DiskManager) getDiskInfo(ctx context.Context, devicePath dbus.ObjectPa
 	if err == nil {
 		if drivePath, ok := driveVar.Value().(dbus.ObjectPath); ok && drivePath != "/" {
 			driveObj := dm.conn.Object("org.freedesktop.UDisks2", drivePath)
-			
+
 			// Get model
 			var modelVar dbus.Variant
 			err = driveObj.Call("org.freedesktop.DBus.Properties.Get", 0,
@@ -432,7 +432,7 @@ func (dm *DiskManager) validateDevice(ctx context.Context, device string) error 
 	}
 
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	// Check if device is mounted
 	var mountPoints dbus.Variant
 	err = obj.Call("org.freedesktop.DBus.Properties.Get", 0,
@@ -450,14 +450,14 @@ func (dm *DiskManager) getDeviceObjectPath(device string) (dbus.ObjectPath, erro
 	// Convert device name to object path
 	// This is a simplified implementation - in practice you'd query udisks2
 	deviceName := strings.TrimPrefix(device, "/dev/")
-	objectPath := fmt.Sprintf("/org/freedesktop/UDisks2/block_devices/%s", 
+	objectPath := fmt.Sprintf("/org/freedesktop/UDisks2/block_devices/%s",
 		strings.ReplaceAll(deviceName, "/", "_"))
 	return dbus.ObjectPath(objectPath), nil
 }
 
 func (dm *DiskManager) createPartitionTable(ctx context.Context, devicePath dbus.ObjectPath) error {
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	err := obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Block.Format", 0,
 		"gpt", map[string]dbus.Variant{}).Err
 	if err != nil {
@@ -469,7 +469,7 @@ func (dm *DiskManager) createPartitionTable(ctx context.Context, devicePath dbus
 
 func (dm *DiskManager) createPartition(ctx context.Context, devicePath dbus.ObjectPath, size uint64) (dbus.ObjectPath, error) {
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	var partitionPath dbus.ObjectPath
 	err := obj.CallWithContext(ctx, "org.freedesktop.UDisks2.PartitionTable.CreatePartition", 0,
 		uint64(0), size, "", "", map[string]dbus.Variant{}).Store(&partitionPath)
@@ -482,7 +482,7 @@ func (dm *DiskManager) createPartition(ctx context.Context, devicePath dbus.Obje
 
 func (dm *DiskManager) setupEncryption(ctx context.Context, devicePath dbus.ObjectPath, passphrase string) (dbus.ObjectPath, error) {
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	var encryptedPath dbus.ObjectPath
 	err := obj.CallWithContext(ctx, "org.freedesktop.UDisks2.Block.Format", 0,
 		"crypto_LUKS", map[string]dbus.Variant{
@@ -505,7 +505,7 @@ func (dm *DiskManager) setupEncryption(ctx context.Context, devicePath dbus.Obje
 
 func (dm *DiskManager) createFilesystem(ctx context.Context, devicePath dbus.ObjectPath, fsType, label string) error {
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	options := map[string]dbus.Variant{}
 	if label != "" {
 		options["label"] = dbus.MakeVariant(label)
@@ -522,7 +522,7 @@ func (dm *DiskManager) createFilesystem(ctx context.Context, devicePath dbus.Obj
 
 func (dm *DiskManager) mountVolume(ctx context.Context, devicePath dbus.ObjectPath, mountPoint string, options []string) (string, error) {
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	mountOptions := map[string]dbus.Variant{}
 	if mountPoint != "" {
 		mountOptions["dir"] = dbus.MakeVariant(mountPoint)
@@ -543,10 +543,10 @@ func (dm *DiskManager) mountVolume(ctx context.Context, devicePath dbus.ObjectPa
 
 func (dm *DiskManager) getVolumeInfo(ctx context.Context, devicePath dbus.ObjectPath) (*VolumeInfo, error) {
 	obj := dm.conn.Object("org.freedesktop.UDisks2", devicePath)
-	
+
 	var device, uuid, fsType, label string
 	var size uint64
-	
+
 	// Get device name
 	var deviceVar dbus.Variant
 	err := obj.Call("org.freedesktop.DBus.Properties.Get", 0,
@@ -611,24 +611,24 @@ func (dm *DiskManager) getVolumeInfo(ctx context.Context, devicePath dbus.Object
 func (dm *DiskManager) evaluateHealthStatus(smartData map[string]string) string {
 	// Simple health evaluation based on common SMART attributes
 	// In production, this would be more sophisticated
-	
+
 	if temp, exists := smartData["temperature"]; exists {
 		if tempVal, err := strconv.Atoi(temp); err == nil && tempVal > 60 {
 			return "warning"
 		}
 	}
-	
+
 	if reallocated, exists := smartData["reallocated_sector_count"]; exists {
 		if count, err := strconv.Atoi(reallocated); err == nil && count > 0 {
 			return "warning"
 		}
 	}
-	
+
 	if pending, exists := smartData["current_pending_sector_count"]; exists {
 		if count, err := strconv.Atoi(pending); err == nil && count > 0 {
 			return "critical"
 		}
 	}
-	
+
 	return "healthy"
 }

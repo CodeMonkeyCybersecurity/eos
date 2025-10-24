@@ -75,14 +75,15 @@ func GenerateAgentHCL(rc *eos_io.RuntimeContext, config AgentConfig) (string, er
 	hcl.WriteString(fmt.Sprintf("log_level  = \"%s\"\n\n", config.LogLevel))
 
 	// Server/Client mode
-	if config.Mode == ModeServer {
+	switch config.Mode {
+	case ModeServer:
 		hcl.WriteString("server = true\n")
 		if config.BootstrapExpect > 0 {
 			hcl.WriteString(fmt.Sprintf("bootstrap_expect = %d\n\n", config.BootstrapExpect))
 		}
-	} else if config.Mode == ModeClient {
+	case ModeClient:
 		hcl.WriteString("server = false\n\n")
-	} else if config.Mode == ModeDev {
+	case ModeDev:
 		hcl.WriteString("server = true\n")
 		hcl.WriteString("bootstrap_expect = 1\n")
 		hcl.WriteString("ui_config {\n")

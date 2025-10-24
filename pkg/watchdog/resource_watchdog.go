@@ -228,7 +228,7 @@ func (tl *TraceLogger) writeToAll(format string, args ...interface{}) {
 
 	// Write to main log file
 	if writer, ok := tl.fileWriters["main"]; ok {
-		writer.WriteString(fmt.Sprintf("[%s] %s", timestamp, message))
+		fmt.Fprintf(writer, "[%s] %s", timestamp, message)
 		writer.Flush()
 	}
 }

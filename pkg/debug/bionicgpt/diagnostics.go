@@ -36,8 +36,8 @@ func AllDiagnostics() []*debug.Diagnostic {
 		EnvFileDiagnostic(),
 		EnvFileContentDiagnostic(),
 		SrHDVariableCheckDiagnostic(),
-		VaultConfigDiagnostic(),          // NEW: Verify secrets in Vault
-		ConsulConfigDiagnostic(),         // NEW: Verify config in Consul KV
+		VaultConfigDiagnostic(),  // NEW: Verify secrets in Vault
+		ConsulConfigDiagnostic(), // NEW: Verify config in Consul KV
 		DockerDaemonDiagnostic(),
 		ContainerStatusDiagnostic(),
 		PostgresContainerDiagnostic(),
@@ -785,13 +785,14 @@ func LiteLLMHealthCheckDiagnostic() *debug.Diagnostic {
 				healthStatus := strings.TrimSpace(string(healthOutput))
 				outputParts = append(outputParts, fmt.Sprintf("Health Status: %s", healthStatus))
 
-				if healthStatus == "healthy" {
+				switch healthStatus {
+				case "healthy":
 					result.Status = debug.StatusOK
 					result.Message = "LiteLLM proxy is healthy"
-				} else if healthStatus == "starting" {
+				case "starting":
 					result.Status = debug.StatusWarning
 					result.Message = "LiteLLM proxy is still starting"
-				} else {
+				default:
 					result.Status = debug.StatusError
 					result.Message = fmt.Sprintf("LiteLLM proxy is unhealthy: %s", healthStatus)
 					result.Remediation = "Check litellm_config.yaml and Azure OpenAI credentials. View logs: docker logs bionicgpt-litellm"

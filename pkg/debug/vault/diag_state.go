@@ -329,16 +329,17 @@ func IdempotencyStatusDiagnostic() *debug.Diagnostic {
 			result.Metadata["installation_percentage"] = percentage
 
 			output.WriteString("\n=== Idempotency Behavior ===\n")
-			if existingCount == 0 {
+			switch existingCount {
+			case 0:
 				output.WriteString("✓ Clean system - 'eos create vault' will perform full installation\n")
 				result.Status = debug.StatusOK
 				result.Message = "Clean system ready for installation"
-			} else if existingCount == componentCount {
+			case componentCount:
 				output.WriteString("✓ Fully installed - 'eos create vault' will verify and update configuration\n")
 				output.WriteString("  Eos will check existing components and update if needed (idempotent)\n")
 				result.Status = debug.StatusOK
 				result.Message = "Vault fully installed - operations are idempotent"
-			} else {
+			default:
 				output.WriteString(fmt.Sprintf("⚠ Partial installation (%d%%) - 'eos create vault' will complete missing components\n", percentage))
 				output.WriteString("  Existing components will be verified, missing ones will be created\n")
 				result.Status = debug.StatusWarning

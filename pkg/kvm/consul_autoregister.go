@@ -20,14 +20,14 @@ import (
 
 // ConsulAutoRegisterConfig holds configuration for automatic Consul registration
 type ConsulAutoRegisterConfig struct {
-	VMName         string
-	Environment    string   // dev, staging, production
-	ConsulServers  []string // IP addresses of Consul servers to join
-	Datacenter     string   // Consul datacenter name
-	NodeName       string   // Consul node name (defaults to VMName)
-	Tags           []string // Service tags
-	EnableConnect  bool     // Enable Consul Connect
-	TokenPath      string   // Optional: Path to Consul ACL token
+	VMName        string
+	Environment   string   // dev, staging, production
+	ConsulServers []string // IP addresses of Consul servers to join
+	Datacenter    string   // Consul datacenter name
+	NodeName      string   // Consul node name (defaults to VMName)
+	Tags          []string // Service tags
+	EnableConnect bool     // Enable Consul Connect
+	TokenPath     string   // Optional: Path to Consul ACL token
 }
 
 // GenerateConsulCloudInit generates cloud-init configuration for Consul auto-registration
@@ -383,7 +383,7 @@ func formatRetryJoin(servers []string) string {
 	for i, server := range servers {
 		quoted[i] = fmt.Sprintf(`"%s"`, server)
 	}
-	return fmt.Sprintf("%s", joinStrings(quoted, ", "))
+	return joinStrings(quoted, ", ")
 }
 
 func formatTags(tags []string) string {

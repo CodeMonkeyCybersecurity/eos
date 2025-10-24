@@ -92,11 +92,12 @@ func (bi *BinaryInstaller) Install(version string) error {
 
 	// Determine architecture
 	arch := runtime.GOARCH
-	if arch == "amd64" {
+	switch arch {
+	case "amd64":
 		arch = "amd64"
-	} else if arch == "arm64" {
+	case "arm64":
 		arch = "arm64"
-	} else {
+	default:
 		return fmt.Errorf("unsupported architecture: %s", arch)
 	}
 
@@ -259,9 +260,10 @@ func (ci *ConsulInstaller) installViaBinary() error {
 
 	// Construct download URL
 	arch := runtime.GOARCH
-	if arch == "amd64" {
+	switch arch {
+	case "amd64":
 		arch = "amd64"
-	} else if arch == "arm64" {
+	case "arm64":
 		arch = "arm64"
 	}
 

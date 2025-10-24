@@ -373,22 +373,24 @@ func (jg *JobGenerator) ConvertK3sToNomadConfig(rc *eos_io.RuntimeContext, k3sCo
 		if requests, ok := resources["requests"].(map[string]interface{}); ok {
 			if cpu, ok := requests["cpu"].(string); ok {
 				// Convert K3s CPU format (e.g., "100m") to Nomad MHz
-				if cpu == "100m" {
+				switch cpu {
+				case "100m":
 					config.Resources.CPU = 100
-				} else if cpu == "200m" {
+				case "200m":
 					config.Resources.CPU = 200
-				} else {
+				default:
 					config.Resources.CPU = DefaultCaddyCPU
 				}
 			}
 
 			if memory, ok := requests["memory"].(string); ok {
 				// Convert K3s memory format (e.g., "128Mi") to Nomad MB
-				if memory == "128Mi" {
+				switch memory {
+				case "128Mi":
 					config.Resources.Memory = 128
-				} else if memory == "256Mi" {
+				case "256Mi":
 					config.Resources.Memory = 256
-				} else {
+				default:
 					config.Resources.Memory = DefaultCaddyMemory
 				}
 			}

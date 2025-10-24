@@ -12,25 +12,25 @@ import (
 type ServiceProfileType string
 
 const (
-	ServiceProfileTypeHecate      ServiceProfileType = "hecate"
-	ServiceProfileTypeVault       ServiceProfileType = "vault"
-	ServiceProfileTypeConsul      ServiceProfileType = "consul"
-	ServiceProfileTypeNomad       ServiceProfileType = "nomad"
-	ServiceProfileTypeMinIO       ServiceProfileType = "minio"
-	ServiceProfileTypeDatabase    ServiceProfileType = "database"
-	ServiceProfileTypeMonitoring  ServiceProfileType = "monitoring"
+	ServiceProfileTypeHecate     ServiceProfileType = "hecate"
+	ServiceProfileTypeVault      ServiceProfileType = "vault"
+	ServiceProfileTypeConsul     ServiceProfileType = "consul"
+	ServiceProfileTypeNomad      ServiceProfileType = "nomad"
+	ServiceProfileTypeMinIO      ServiceProfileType = "minio"
+	ServiceProfileTypeDatabase   ServiceProfileType = "database"
+	ServiceProfileTypeMonitoring ServiceProfileType = "monitoring"
 )
 
 // ServiceProfile represents a deployable Eos service with its components and requirements
 type ServiceProfile struct {
-	Name            string                    `json:"name"`
-	Type            ServiceProfileType        `json:"type"`
-	Description     string                    `json:"description"`
-	Components      []string                  `json:"components"`
-	Dependencies    []ServiceProfileType      `json:"dependencies,omitempty"`
-	Variants        map[string]ServiceVariant `json:"variants"`
-	DefaultVariant  string                    `json:"default_variant"`
-	Documentation   string                    `json:"documentation,omitempty"`
+	Name           string                    `json:"name"`
+	Type           ServiceProfileType        `json:"type"`
+	Description    string                    `json:"description"`
+	Components     []string                  `json:"components"`
+	Dependencies   []ServiceProfileType      `json:"dependencies,omitempty"`
+	Variants       map[string]ServiceVariant `json:"variants"`
+	DefaultVariant string                    `json:"default_variant"`
+	Documentation  string                    `json:"documentation,omitempty"`
 }
 
 // ServiceVariant represents different deployment sizes/configurations for a service
@@ -247,7 +247,7 @@ var ServiceProfileRegistry = map[ServiceProfileType]ServiceProfile{
 // CalculateServiceRequirements calculates requirements for any registered service
 func CalculateServiceRequirements(rc *eos_io.RuntimeContext, serviceType ServiceProfileType, variant string) (*CalculationBreakdown, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	profile, exists := ServiceProfileRegistry[serviceType]
 	if !exists {
 		return nil, fmt.Errorf("service profile %s not found", serviceType)
@@ -338,7 +338,7 @@ func GetServiceVariants(serviceType ServiceProfileType) (map[string]ServiceVaria
 // ValidateServiceDependencies checks if required dependencies are met
 func ValidateServiceDependencies(serviceType ServiceProfileType, availableServices []ServiceProfileType) []ValidationError {
 	var errors []ValidationError
-	
+
 	profile, exists := ServiceProfileRegistry[serviceType]
 	if !exists {
 		errors = append(errors, ValidationError{
@@ -375,7 +375,7 @@ func GenerateServiceReport(rc *eos_io.RuntimeContext, serviceType ServiceProfile
 		return "", fmt.Errorf("failed to calculate requirements: %w", err)
 	}
 
-	profile, _ := ServiceProfileRegistry[serviceType]
+	profile := ServiceProfileRegistry[serviceType]
 	serviceVariant := profile.Variants[variant]
 
 	calc := &CalculatorV2{

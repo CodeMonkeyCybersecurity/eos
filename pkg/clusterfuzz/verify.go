@@ -143,7 +143,7 @@ func verifyWebUI(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if web UI is accessible
-	webURL := fmt.Sprintf("http://localhost:9000")
+	webURL := "http://localhost:9000"
 	logger.Debug("Verifying web UI accessibility", zap.String("url", webURL))
 
 	_, err := execute.Run(rc.Ctx, execute.Options{

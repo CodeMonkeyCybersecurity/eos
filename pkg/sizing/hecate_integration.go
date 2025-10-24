@@ -10,15 +10,15 @@ import (
 
 // HecateDeploymentProfile represents common Hecate deployment scenarios
 type HecateDeploymentProfile struct {
-	Name                string               `json:"name"`
-	Description         string               `json:"description"`
-	Components          []string             `json:"components"`
-	WorkloadType        WorkloadType         `json:"workload_type"`
-	Environment         string               `json:"environment"`
-	ExpectedUsers       int                  `json:"expected_users"`
-	ExpectedRPS         int                  `json:"expected_rps"`
-	ExpectedDataGrowth  float64              `json:"expected_data_growth_gb"`
-	CustomFactors       map[string]ScalingFactors `json:"custom_factors,omitempty"`
+	Name               string                    `json:"name"`
+	Description        string                    `json:"description"`
+	Components         []string                  `json:"components"`
+	WorkloadType       WorkloadType              `json:"workload_type"`
+	Environment        string                    `json:"environment"`
+	ExpectedUsers      int                       `json:"expected_users"`
+	ExpectedRPS        int                       `json:"expected_rps"`
+	ExpectedDataGrowth float64                   `json:"expected_data_growth_gb"`
+	CustomFactors      map[string]ScalingFactors `json:"custom_factors,omitempty"`
 }
 
 // Predefined Hecate deployment profiles
@@ -85,8 +85,8 @@ var HecateProfiles = map[string]HecateDeploymentProfile{
 				UserScaling:    0.015, // Higher scaling for large deployments
 				RequestScaling: 0.002,
 				DataScaling:    1.0,
-				LoadMultiplier: 2.5,   // Higher load multiplier for production
-				SafetyMargin:   1.8,   // Higher safety margin
+				LoadMultiplier: 2.5, // Higher load multiplier for production
+				SafetyMargin:   1.8, // Higher safety margin
 			},
 		},
 	},
@@ -95,7 +95,7 @@ var HecateProfiles = map[string]HecateDeploymentProfile{
 // CalculateHecateRequirements performs systematic calculation for Hecate deployments
 func CalculateHecateRequirements(rc *eos_io.RuntimeContext, profileName string) (*CalculationBreakdown, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	profile, exists := HecateProfiles[profileName]
 	if !exists {
 		return nil, fmt.Errorf("Hecate profile %s not found", profileName)
@@ -154,7 +154,7 @@ func CalculateHecateRequirements(rc *eos_io.RuntimeContext, profileName string) 
 // ValidateHecateRequirements validates that current system meets Hecate requirements
 func ValidateHecateRequirements(rc *eos_io.RuntimeContext, profileName string, currentSpecs NodeSpecification) ([]ValidationError, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Calculate required specifications
 	breakdown, err := CalculateHecateRequirements(rc, profileName)
 	if err != nil {
@@ -168,7 +168,7 @@ func ValidateHecateRequirements(rc *eos_io.RuntimeContext, profileName string, c
 	// Validate CPU
 	totalRequiredCPU := float64(required.CPUCores * recommendedNodes)
 	totalAvailableCPU := float64(currentSpecs.CPUCores)
-	
+
 	if totalAvailableCPU < totalRequiredCPU {
 		errors = append(errors, ValidationError{
 			Field: "cpu_cores",
@@ -180,7 +180,7 @@ func ValidateHecateRequirements(rc *eos_io.RuntimeContext, profileName string, c
 	// Validate Memory
 	totalRequiredMemory := float64(required.MemoryGB * recommendedNodes)
 	totalAvailableMemory := float64(currentSpecs.MemoryGB)
-	
+
 	if totalAvailableMemory < totalRequiredMemory {
 		errors = append(errors, ValidationError{
 			Field: "memory_gb",
@@ -192,7 +192,7 @@ func ValidateHecateRequirements(rc *eos_io.RuntimeContext, profileName string, c
 	// Validate Storage
 	totalRequiredStorage := float64(required.DiskGB * recommendedNodes)
 	totalAvailableStorage := float64(currentSpecs.DiskGB)
-	
+
 	if totalAvailableStorage < totalRequiredStorage {
 		errors = append(errors, ValidationError{
 			Field: "disk_gb",
@@ -204,7 +204,7 @@ func ValidateHecateRequirements(rc *eos_io.RuntimeContext, profileName string, c
 	// Validate storage type
 	if currentSpecs.DiskType != "ssd" && currentSpecs.DiskType != "nvme" {
 		errors = append(errors, ValidationError{
-			Field: "disk_type",
+			Field:   "disk_type",
 			Message: "SSD or NVMe storage required for Hecate production deployment",
 		})
 	}
@@ -249,13 +249,13 @@ func GetHecateProfile(name string) (HecateDeploymentProfile, bool) {
 // GenerateHecateRecommendationReport creates a human-readable report for Hecate deployment
 func GenerateHecateRecommendationReport(rc *eos_io.RuntimeContext, profileName string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	breakdown, err := CalculateHecateRequirements(rc, profileName)
 	if err != nil {
 		return "", fmt.Errorf("failed to calculate requirements: %w", err)
 	}
 
-	profile, _ := HecateProfiles[profileName]
+	profile := HecateProfiles[profileName]
 	calc := &CalculatorV2{
 		workloadType: profile.WorkloadType,
 		environment:  profile.Environment,
@@ -273,7 +273,7 @@ func GenerateHecateRecommendationReport(rc *eos_io.RuntimeContext, profileName s
 
 	// Add Hecate-specific recommendations
 	report += "\n=== HECATE-SPECIFIC RECOMMENDATIONS ===\n\n"
-	
+
 	if profile.Environment == "production" {
 		report += "PRODUCTION DEPLOYMENT:\n"
 		report += "• Use TLS/SSL for all connections\n"

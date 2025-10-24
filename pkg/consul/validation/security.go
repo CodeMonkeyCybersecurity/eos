@@ -44,7 +44,8 @@ func (sv *SecurityValidator) checkSELinux() {
 	}
 
 	mode := strings.ToLower(strings.TrimSpace(string(output)))
-	if mode == "enforcing" {
+	switch mode {
+	case "enforcing":
 		sv.logger.Warn("SELinux is in enforcing mode - may block Consul operations",
 			zap.String("selinux_mode", mode),
 			zap.String("remediation", "If Consul fails, check: ausearch -m AVC -ts recent | grep consul"))
@@ -57,7 +58,7 @@ func (sv *SecurityValidator) checkSELinux() {
 				zap.String("recent_denials", string(denials)),
 				zap.String("fix", "Run: setenforce 0 (temporarily) or create SELinux policy"))
 		}
-	} else if mode == "permissive" {
+	case "permissive":
 		sv.logger.Info("SELinux is in permissive mode (will log but not block)")
 	}
 }

@@ -226,9 +226,10 @@ func (di *DiskInspector) GenerateASCIIDiagram(report *InspectionReport) string {
 		diagram.WriteString(" Health Alerts\n")
 		for _, alert := range report.HealthAlerts {
 			icon := ""
-			if alert.Level == "warning" {
+			switch alert.Level {
+			case "warning":
 				icon = ""
-			} else if alert.Level == "critical" {
+			case "critical":
 				icon = "🔴"
 			}
 

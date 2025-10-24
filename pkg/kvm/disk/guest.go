@@ -44,10 +44,10 @@ func (gm *GuestManager) ResizeFilesystem(ctx context.Context, assessment *Assess
 		zap.String("vm", assessment.VMName),
 		zap.String("os", guestOS))
 
-	switch {
-	case guestOS == "linux" || guestOS == "":
+	switch guestOS {
+	case "linux", "":
 		return gm.resizeLinuxFilesystem(ctx, domain, assessment)
-	case guestOS == "windows":
+	case "windows":
 		return fmt.Errorf("Windows filesystem resize not yet implemented - manual steps required")
 	default:
 		return fmt.Errorf("unsupported guest OS: %s", guestOS)

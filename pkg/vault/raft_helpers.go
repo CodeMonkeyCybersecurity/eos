@@ -28,21 +28,21 @@ type RaftConfig struct {
 	NodeID      string // Unique identifier for this node (e.g., "eos-vault-node1-az1")
 	APIAddr     string // This node's API address (e.g., "https://10.0.1.10:8179")
 	ClusterAddr string // This node's cluster address (e.g., "https://10.0.1.10:8180")
-	
+
 	// Storage configuration
 	DataPath string // Path for Raft data storage (default: /opt/vault/data)
-	
+
 	// TLS configuration
 	TLSCertPath string // Path to TLS certificate
 	TLSKeyPath  string // Path to TLS private key
-	
+
 	// Multi-node cluster configuration
 	RetryJoinNodes []shared.RetryJoinNode // Other nodes to join
-	
+
 	// Auto-unseal configuration
 	AutoUnseal       bool
 	AutoUnsealConfig string // HCL block for seal configuration
-	
+
 	// Operational settings
 	PerformanceMultiplier int  // Performance tuning (default: 1)
 	EnableTelemetry       bool // Enable Prometheus telemetry
@@ -132,7 +132,7 @@ func generateAzureKeyVaultConfig(rc *eos_io.RuntimeContext, config *InstallConfi
   vault_name     = "%s"
   key_name       = "%s"
 }`, config.AzureTenantID, config.AzureClientID, config.AzureClientSecret,
-	config.AzureVaultName, config.AzureKeyName), nil
+		config.AzureVaultName, config.AzureKeyName), nil
 }
 
 // generateGCPCKMSConfig generates GCP Cloud KMS auto-unseal configuration
@@ -174,7 +174,7 @@ func generateGCPCKMSConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (st
   key_ring    = "%s"
   crypto_key  = "%s"%s
 }`, config.GCPProject, config.GCPLocation, config.GCPKeyRing,
-	config.GCPCryptoKey, credentialsLine), nil
+		config.GCPCryptoKey, credentialsLine), nil
 }
 
 // DEPRECATED: RenderRaftConfig generates Vault configuration for Raft deployment
@@ -186,7 +186,7 @@ func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string,
 		zap.String("node_id", config.NodeID),
 		zap.String("storage_backend", config.StorageBackend),
 		zap.Bool("auto_unseal", config.AutoUnseal))
-	
+
 	// Set defaults
 	if config.NodeID == "" {
 		config.NodeID = "eos-vault-node1"
@@ -200,7 +200,7 @@ func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string,
 	if config.LogLevel == "" {
 		config.LogLevel = "info"
 	}
-	
+
 	// Generate auto-unseal configuration if enabled
 	autoUnsealConfig := ""
 	if config.AutoUnseal {
@@ -212,7 +212,7 @@ func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string,
 		}
 		log.Info("Auto-unseal configuration generated", zap.String("type", config.AutoUnsealType))
 	}
-	
+
 	// Build configuration parameters
 	params := shared.VaultConfigParams{
 		Port:             fmt.Sprintf("%d", shared.PortVault),
@@ -229,18 +229,18 @@ func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string,
 		AutoUnseal:       config.AutoUnseal,
 		AutoUnsealConfig: autoUnsealConfig,
 	}
-	
+
 	// Render configuration
 	hcl, err := shared.RenderVaultConfigRaft(params)
 	if err != nil {
 		log.Error("Failed to render Raft configuration", zap.Error(err))
 		return "", fmt.Errorf("render raft config: %w", err)
 	}
-	
+
 	log.Info("Raft configuration generated successfully",
 		zap.Int("config_size", len(hcl)),
 		zap.Int("retry_join_nodes", len(config.RetryJoinNodes)))
-	
+
 	return hcl, nil
 }
 
@@ -249,33 +249,33 @@ func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string,
 func ValidateRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Validating Raft configuration")
-	
+
 	// Node ID is required for Raft
 	if config.NodeID == "" {
 		return fmt.Errorf("node_id is required for Raft storage backend")
 	}
-	
+
 	// Validate node ID format (alphanumeric, hyphens, underscores)
 	if !isValidNodeID(config.NodeID) {
 		return fmt.Errorf("invalid node_id format: %s (must be alphanumeric with hyphens/underscores)", config.NodeID)
 	}
-	
+
 	// API address is required
 	if config.APIAddr == "" {
 		return fmt.Errorf("api_addr is required for Raft storage backend")
 	}
-	
+
 	// Cluster address is required for multi-node
 	if len(config.RetryJoinNodes) > 0 && config.ClusterAddr == "" {
 		return fmt.Errorf("cluster_addr is required for multi-node Raft cluster")
 	}
-	
+
 	// Validate auto-unseal configuration
 	if config.AutoUnseal {
 		if config.AutoUnsealType == "" {
 			return fmt.Errorf("auto_unseal_type is required when auto_unseal is enabled")
 		}
-		
+
 		// Validate type-specific requirements
 		switch strings.ToLower(config.AutoUnsealType) {
 		case "awskms", "aws":
@@ -283,9 +283,9 @@ func ValidateRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) error 
 				return fmt.Errorf("kms_key_id is required for AWS KMS auto-unseal")
 			}
 		case "azurekeyvault", "azure":
-			if config.AzureTenantID == "" || config.AzureClientID == "" || 
-			   config.AzureClientSecret == "" || config.AzureVaultName == "" || 
-			   config.AzureKeyName == "" {
+			if config.AzureTenantID == "" || config.AzureClientID == "" ||
+				config.AzureClientSecret == "" || config.AzureVaultName == "" ||
+				config.AzureKeyName == "" {
 				return fmt.Errorf("Azure Key Vault auto-unseal requires tenant_id, client_id, client_secret, vault_name, and key_name")
 			}
 		case "gcpckms", "gcp":
@@ -296,7 +296,7 @@ func ValidateRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) error 
 			return fmt.Errorf("unsupported auto_unseal_type: %s", config.AutoUnsealType)
 		}
 	}
-	
+
 	// Validate retry join nodes
 	for i, node := range config.RetryJoinNodes {
 		if node.APIAddr == "" {
@@ -306,7 +306,7 @@ func ValidateRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) error 
 			return fmt.Errorf("retry_join_nodes[%d]: hostname is required", i)
 		}
 	}
-	
+
 	log.Info("Raft configuration validated successfully")
 	return nil
 }
@@ -317,8 +317,8 @@ func isValidNodeID(nodeID string) bool {
 		return false
 	}
 	for _, c := range nodeID {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || 
-		     (c >= '0' && c <= '9') || c == '-' || c == '_') {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '-' || c == '_') {
 			return false
 		}
 	}
@@ -330,10 +330,10 @@ func isValidNodeID(nodeID string) bool {
 func GetRaftPeerList(rc *eos_io.RuntimeContext) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Retrieving Raft peer list")
-	
+
 	// TODO: Implement using Vault API client
 	// vault operator raft list-peers
-	
+
 	return "", fmt.Errorf("not yet implemented")
 }
 
@@ -342,13 +342,13 @@ func GetRaftPeerList(rc *eos_io.RuntimeContext) (string, error) {
 func ConfigureAutopilot(rc *eos_io.RuntimeContext, minQuorum int) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Configuring Autopilot", zap.Int("min_quorum", minQuorum))
-	
+
 	// TODO: Implement using Vault API client
 	// vault operator raft autopilot set-config \
 	//   -cleanup-dead-servers=true \
 	//   -dead-server-last-contact-threshold=10m \
 	//   -min-quorum=3 \
 	//   -server-stabilization-time=10s
-	
+
 	return fmt.Errorf("not yet implemented")
 }
