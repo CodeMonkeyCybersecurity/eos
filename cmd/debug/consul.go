@@ -1,10 +1,6 @@
 package debug
 
 import (
-	"bytes"
-	"io"
-	"os"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -59,19 +55,6 @@ func init() {
 }
 
 func runDebugConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// Capture stdout to save diagnostic output to file
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Buffer to capture output
-	outputChan := make(chan string)
-	go func() {
-		var buf bytes.Buffer
-		io.Copy(&buf, r)
-		outputChan <- buf.String()
-	}()
-
 	// Parse flags
 	config := &debug.Config{
 		AutoFix:        cmd.Flag("fix").Value.String() == "true",
@@ -87,15 +70,11 @@ func runDebugConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	}
 
 	// Run debug diagnostics
-	err := debug.RunDiagnostics(rc, config)
-
-	// Restore stdout and get captured output
-	w.Close()
-	os.Stdout = oldStdout
-	capturedOutput := <-outputChan
-
-	// Save captured output to file
-	saveDebugOutput(rc, "consul", capturedOutput)
-
-	return err
+	// Note: Output capture removed due to race condition with structured logging.
+	// The debug package writes directly to the logger, which cannot be easily captured
+	// without interfering with the logging infrastructure.
+	//
+	// TODO: Refactor debug.RunDiagnostics() to return structured results that can be
+	// formatted and saved separately, rather than logging directly.
+	return debug.RunDiagnostics(rc, config)
 }
