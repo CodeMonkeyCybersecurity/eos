@@ -108,7 +108,7 @@ func InstallClientAgent(rc *eos_io.RuntimeContext, config ClientAgentConfig) err
 				config.Datacenter = envConfig.Datacenter
 			}
 			if len(config.RetryJoin) == 0 {
-				config.RetryJoin = envConfig.Consul.RetryJoin
+				config.RetryJoin = envConfig.ClusterNodes
 			}
 
 			logger.Info("Environment discovered",
