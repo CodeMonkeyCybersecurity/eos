@@ -70,6 +70,7 @@ func checkPortConflicts(rc *eos_io.RuntimeContext) DiagnosticResult {
 			} else {
 				// Another process owns the port - this is a CONFLICT
 				result.Success = false
+				result.Severity = SeverityWarning // WARNING: Port conflict may prevent startup
 				result.Details = append(result.Details,
 					fmt.Sprintf("✗ Port %d (%s): In use by conflicting process", port, name))
 
@@ -147,6 +148,7 @@ func checkLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	if len(consulProcesses) > 0 {
 		result.Success = false
+		result.Severity = SeverityWarning // WARNING: Should clean up but doesn't block startup
 		result.Message = fmt.Sprintf("Found %d lingering Consul process(es)", len(consulProcesses))
 		result.Details = consulProcesses
 	} else {
@@ -174,6 +176,7 @@ func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
 	info, err := os.Stat(binPath)
 	if err != nil {
 		result.Success = false
+		result.Severity = SeverityCritical // CRITICAL: Can't start without binary
 		result.Message = "Consul binary not found"
 		result.Details = append(result.Details, fmt.Sprintf("Searched: %s and %s",
 			consul.ConsulBinaryPath, consul.ConsulBinaryPathAlt))
@@ -185,6 +188,7 @@ func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
 	mode := info.Mode()
 	if mode&0111 == 0 {
 		result.Success = false
+		result.Severity = SeverityCritical // CRITICAL: Binary exists but can't execute
 		result.Message = "Consul binary is not executable"
 		result.Details = append(result.Details,
 			fmt.Sprintf("Current permissions: %s", mode))
@@ -231,6 +235,7 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 	var expectedUID, expectedGID int
 	if err != nil {
 		result.Success = false
+		result.Severity = SeverityCritical // CRITICAL: No consul user = can't run consul service
 		result.Message = "consul user does not exist"
 		result.Details = append(result.Details, "✗ consul system user not found - run 'eos create consul' first")
 		return result
@@ -242,6 +247,7 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 	pathsToCheck := consul.GetAllPathChecks()
 
 	issuesFound := 0
+	criticalIssues := 0
 	for _, check := range pathsToCheck {
 		info, err := os.Stat(check.Path)
 		if err != nil {
@@ -250,6 +256,7 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 				result.Details = append(result.Details,
 					fmt.Sprintf("✗ %s (%s): MISSING (CRITICAL)", check.Description, check.Path))
 				issuesFound++
+				criticalIssues++
 			} else {
 				result.Details = append(result.Details,
 					fmt.Sprintf("⊘ %s (%s): Does not exist (optional)", check.Description, check.Path))
@@ -291,6 +298,7 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 		} else {
 			if check.Critical {
 				result.Success = false
+				criticalIssues++
 			}
 
 			details := fmt.Sprintf("✗ %s (%s):", check.Description, check.Path)
@@ -311,6 +319,13 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 			result.Details = append(result.Details, details)
 			issuesFound++
 		}
+	}
+
+	// Set severity based on whether critical files are affected
+	if criticalIssues > 0 {
+		result.Severity = SeverityCritical // Critical config files unreadable/missing
+	} else if issuesFound > 0 {
+		result.Severity = SeverityWarning // Only non-critical permission issues
 	}
 
 	// Summary message
@@ -341,6 +356,7 @@ func checkSystemdService(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Check if service file exists
 	if _, err := os.Stat(servicePath); err != nil {
 		result.Success = false
+		result.Severity = SeverityWarning // WARNING: Service file missing, should regenerate
 		result.Message = "Systemd service file not found"
 		result.Details = append(result.Details,
 			fmt.Sprintf("Expected path: %s", servicePath))
@@ -434,6 +450,7 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 
 	if len(foundIssues) > 0 {
 		result.Success = false
+		result.Severity = SeverityInfo // INFO: Log issues are informational, not blocking
 		result.Message = fmt.Sprintf("Found %d issue(s) in logs", len(foundIssues))
 
 		// Preserve actual log lines captured above
@@ -468,6 +485,7 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); err != nil {
 		result.Success = false
+		result.Severity = SeverityCritical // CRITICAL: No config = can't start
 		result.Message = "Consul configuration file not found"
 		result.Details = append(result.Details, configPath+" does not exist")
 		return result
@@ -544,6 +562,7 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	if len(issues) > 0 {
 		result.Success = false
+		result.Severity = SeverityCritical // CRITICAL: Invalid config prevents startup
 		result.Message = fmt.Sprintf("Found %d configuration issue(s)", len(issues))
 		for _, issue := range issues {
 			result.Details = append(result.Details, "• "+issue)
@@ -674,7 +693,8 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	httpWorking := false
 	for port, desc := range ports {
-		addr := fmt.Sprintf("%s:%d", shared.GetInternalHostname(), port)
+		// Use net.JoinHostPort for IPv6 compatibility (handles [::1]:port syntax)
+		addr := net.JoinHostPort(shared.GetInternalHostname(), strconv.Itoa(port))
 		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 		if err == nil {
 			_ = conn.Close()
@@ -692,7 +712,9 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Try HTTP request to Consul API
 	if httpWorking {
 		client := &http.Client{Timeout: 5 * time.Second}
-		apiURL := fmt.Sprintf("http://%s:%d/v1/agent/self", shared.GetInternalHostname(), shared.PortConsul)
+		// Build URL with net.JoinHostPort for IPv6 compatibility
+		hostPort := net.JoinHostPort(shared.GetInternalHostname(), strconv.Itoa(shared.PortConsul))
+		apiURL := fmt.Sprintf("http://%s/v1/agent/self", hostPort)
 		resp, err := client.Get(apiURL)
 		if err == nil {
 			defer func() { _ = resp.Body.Close() }()
@@ -707,6 +729,7 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 		}
 	} else {
 		result.Success = false
+		result.Severity = SeverityInfo // INFO: Port not listening is expected if Consul not running
 		result.Message = "Consul HTTP API port not listening"
 	}
 

@@ -415,6 +415,7 @@ func restartConsulService(rc *eos_io.RuntimeContext) FixResult {
 }
 
 // displayResults shows a formatted summary of all fix results
+// NOTE: Uses logger.Info for ALL output - structured logging goes to terminal
 func displayResults(rc *eos_io.RuntimeContext, results []FixResult, dryRun bool) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -455,7 +456,7 @@ func displayResults(rc *eos_io.RuntimeContext, results []FixResult, dryRun bool)
 	// Provide next steps
 	if dryRun {
 		logger.Info("NEXT STEPS:")
-		logger.Info("  • Run without --dry-run to apply fixes: sudo eos fix consul")
+		logger.Info("  • Run without --dry-run to apply fixes: sudo eos update consul --fix")
 	} else {
 		logger.Info("VERIFICATION:")
 		logger.Info("  • Check Consul status: sudo systemctl status consul")

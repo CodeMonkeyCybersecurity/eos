@@ -18,6 +18,26 @@ type Config struct {
 	LogLines      int
 }
 
+// Severity indicates how critical a diagnostic failure is
+type Severity int
+
+const (
+	// SeverityInfo - Informational only, doesn't affect Consul functionality
+	// Examples: optional log file missing, non-critical warnings
+	// Impact: User should know, but Consul works fine
+	SeverityInfo Severity = 0
+
+	// SeverityWarning - Should be fixed but doesn't block Consul operations
+	// Examples: lingering processes, suboptimal config, permission warnings
+	// Impact: May cause issues later, should address soon
+	SeverityWarning Severity = 1
+
+	// SeverityCritical - Blocks Consul from starting or functioning correctly
+	// Examples: binary missing, config invalid, critical files unreadable
+	// Impact: Consul cannot start or will fail immediately
+	SeverityCritical Severity = 2
+)
+
 // DiagnosticResult holds the results of a diagnostic check
 type DiagnosticResult struct {
 	CheckName  string
@@ -26,6 +46,7 @@ type DiagnosticResult struct {
 	Details    []string
 	FixApplied bool
 	FixMessage string
+	Severity   Severity // How critical is this failure (only relevant if Success = false)
 }
 
 // RunDiagnostics performs comprehensive Consul debugging following Assess → Intervene → Evaluate pattern
@@ -135,21 +156,56 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("=== EVALUATE PHASE: Diagnostic Summary ===")
 	displayResults(rc, results)
 
-	// Check if any critical issues remain
-	hasErrors := false
+	// Intelligent exit code based on severity
+	// Critical = exit 1 (Consul cannot function)
+	// Warning = exit 0 (Consul works but should be addressed)
+	// Info = exit 0 (informational only)
+	hasCritical := false
+	warningCount := 0
+	infoCount := 0
+
 	for _, result := range results {
-		if !result.Success && result.CheckName != "Manual Start Test" {
-			hasErrors = true
-			break
+		if !result.Success {
+			// Skip test-only checks from severity evaluation
+			if result.CheckName == "Manual Start Test" || result.CheckName == "Minimal Configuration Test" {
+				continue
+			}
+
+			switch result.Severity {
+			case SeverityCritical:
+				hasCritical = true
+			case SeverityWarning:
+				warningCount++
+			case SeverityInfo:
+				infoCount++
+			}
 		}
 	}
 
-	if hasErrors {
-		logger.Warn("Consul debugging completed with issues found")
-		return fmt.Errorf("consul debugging found issues that need attention")
+	// Exit with appropriate code and message
+	if hasCritical {
+		logger.Error("Consul debugging found CRITICAL issues - Consul cannot function properly",
+			zap.Int("warning_count", warningCount),
+			zap.Int("info_count", infoCount))
+		return fmt.Errorf("critical issues prevent Consul from functioning - see details above")
 	}
 
-	logger.Info("Consul debugging completed successfully")
+	if warningCount > 0 {
+		logger.Warn("Consul debugging found warnings - Consul works but issues should be addressed",
+			zap.Int("warning_count", warningCount),
+			zap.Int("info_count", infoCount))
+		// Return nil (exit 0) but warn user
+		fmt.Println("\n⚠️  Warnings found - Consul functional but should address issues above")
+		return nil
+	}
+
+	if infoCount > 0 {
+		logger.Info("Consul debugging found informational items only",
+			zap.Int("info_count", infoCount))
+		fmt.Printf("\nℹ️  %d informational item(s) - no action required\n", infoCount)
+	}
+
+	logger.Info("Consul debugging completed successfully - no issues found")
 	return nil
 }
 

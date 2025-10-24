@@ -102,6 +102,7 @@ func checkDetailedPortBindings(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	if foundPorts == 0 {
 		result.Success = false
+		result.Severity = SeverityInfo // INFO: Expected if Consul not running
 		result.Message = "No Consul ports are listening"
 	} else if len(notFoundPorts) > 0 {
 		result.Message = fmt.Sprintf("%d/%d ports listening (missing: %s)",
@@ -140,6 +141,7 @@ func checkClusterState(rc *eos_io.RuntimeContext) DiagnosticResult {
 	output, err := execute.Run(rc.Ctx, cmd)
 	if err != nil {
 		result.Success = false
+		result.Severity = SeverityInfo // INFO: Expected if Consul not running
 		result.Message = "Failed to retrieve cluster members"
 		result.Details = append(result.Details, fmt.Sprintf("Error: %v", err))
 		result.Details = append(result.Details, "Output: "+output)
@@ -172,6 +174,7 @@ func checkClusterState(rc *eos_io.RuntimeContext) DiagnosticResult {
 	switch memberCount {
 	case 0:
 		result.Success = false
+		result.Severity = SeverityInfo // INFO: Expected if Consul not running
 		result.Message = "No cluster members found (Consul may not be running)"
 	case 1:
 		result.Message = "Single-node cluster (no peers joined)"

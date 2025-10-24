@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-01-22*
+*Last Updated: 2025-01-24*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -21,6 +21,11 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 These violations cause immediate failure:
 
 1. **Logging**: ONLY use `otelzap.Ctx(rc.Ctx)` - NEVER `fmt.Print*/Println`
+   - **CRITICAL**: Structured logging (`logger.Info/Warn/Error`) goes to BOTH terminal AND telemetry
+   - User sees ALL logger output on their terminal in real-time
+   - `fmt.Println` is unstructured - breaks telemetry, forensics, and debugging
+   - This is a dev tool - verbose structured output is fine and helps debugging
+   - **NO EXCEPTIONS**: Always use logger, even for user-facing output
 2. **Architecture**: Business logic in `pkg/`, orchestration ONLY in `cmd/` (see Architecture Enforcement below). Use official and well supported SDKs and APIs where possible.
 3. **Pattern**: ALWAYS follow Assess → Intervene → Evaluate in helpers
 4. **Context**: Always use `*eos_io.RuntimeContext` for all operations
