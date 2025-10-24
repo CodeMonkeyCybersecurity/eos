@@ -174,6 +174,251 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 	return nil
 }
 
+// CreateUbuntuVMWithConsul creates an Ubuntu VM with Consul agent pre-installed.
+//
+// This is the DEFAULT behavior for VM creation. Consul agent is deployed
+// automatically to enable seamless service discovery.
+//
+// This function:
+//  1. Generates base cloud-init (security hardening)
+//  2. Generates Consul agent cloud-init
+//  3. Merges both configurations intelligently
+//  4. Creates VM with merged cloud-init
+//  5. Waits for VM to boot
+//  6. Consul agent auto-registers with cluster
+//
+// Graceful degradation:
+//   - If Consul cloud-init generation fails → deploy VM without Consul (warn)
+//   - If cloud-init merge fails → deploy VM with base config only (warn)
+//   - If Consul servers unavailable → agent deploys with empty retry_join (warn)
+//
+// Parameters:
+//   - rc: RuntimeContext for logging
+//   - vmName: Name for the VM
+//
+// Returns:
+//   - error: Any VM creation error (Consul failures are non-fatal warnings)
+//
+// Example:
+//
+//	err := CreateUbuntuVMWithConsul(rc, "web-server-01")
+//	// VM created with Consul agent for seamless service discovery
+func CreateUbuntuVMWithConsul(rc *eos_io.RuntimeContext, vmName string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Creating Ubuntu VM with Consul agent for seamless service discovery",
+		zap.String("vm_name", vmName))
+
+	// ASSESS - Generate base cloud-init (security hardening, SSH keys, qemu-guest-agent)
+	baseCloudInit, err := generateBaseCloudInit(rc, vmName)
+	if err != nil {
+		return fmt.Errorf("failed to generate base cloud-init: %w", err)
+	}
+
+	// ASSESS - Generate Consul agent cloud-init
+	consulCloudInit, err := EnableConsulAutoRegistrationForVM(rc, vmName)
+	if err != nil {
+		logger.Warn("Failed to generate Consul cloud-init, deploying VM without Consul agent",
+			zap.Error(err),
+			zap.String("vm_name", vmName),
+			zap.String("impact", "VM will not auto-register with Consul cluster"),
+			zap.String("remediation", "Manually install Consul or use --disable-consul to suppress this warning"))
+
+		// Graceful degradation - create VM without Consul
+		return CreateSimpleUbuntuVM(rc, vmName)
+	}
+
+	// INTERVENE - Merge cloud-init configs
+	mergedCloudInit, err := MergeCloudInitConfigs(rc, baseCloudInit, consulCloudInit)
+	if err != nil {
+		logger.Warn("Failed to merge cloud-init configs, deploying with base config only",
+			zap.Error(err),
+			zap.String("vm_name", vmName))
+
+		// Graceful degradation - create VM with base config
+		return CreateSimpleUbuntuVM(rc, vmName)
+	}
+
+	// INTERVENE - Create VM with merged cloud-init
+	if err := createVMWithMergedCloudInit(rc, vmName, mergedCloudInit); err != nil {
+		return fmt.Errorf("failed to create VM with merged cloud-init: %w", err)
+	}
+
+	// EVALUATE - Report success
+	logger.Info("VM created successfully with Consul agent",
+		zap.String("vm_name", vmName),
+		zap.String("consul_status", "agent will auto-register on first boot"),
+		zap.String("service_discovery", "enabled"))
+
+	return nil
+}
+
+// generateBaseCloudInit creates the base cloud-init configuration for a VM.
+//
+// This includes:
+//   - Hostname configuration
+//   - Ubuntu user with SSH keys
+//   - Qemu guest agent installation
+//   - Package updates
+//   - SSH hardening (disable password auth, disable root)
+//
+// Parameters:
+//   - rc: RuntimeContext
+//   - vmName: VM name (used as hostname)
+//
+// Returns:
+//   - string: Base cloud-init YAML
+//   - error: Any generation error
+func generateBaseCloudInit(rc *eos_io.RuntimeContext, vmName string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Find existing SSH keys
+	sshKeys := findSSHKeys()
+	if len(sshKeys) == 0 {
+		logger.Warn("No SSH keys found - VM will not be accessible via SSH",
+			zap.String("remediation", "Place SSH public key in ~/.ssh/ before creating VMs"))
+	}
+
+	logger.Debug("Generating base cloud-init",
+		zap.String("vm_name", vmName),
+		zap.Int("ssh_key_count", len(sshKeys)))
+
+	baseCloudInit := fmt.Sprintf(`#cloud-config
+hostname: %s
+manage_etc_hosts: true
+users:
+  - name: ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+%s
+
+package_update: true
+packages:
+  - qemu-guest-agent
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+
+ssh_pwauth: false
+disable_root: true
+`, vmName, formatSSHKeys(sshKeys))
+
+	return baseCloudInit, nil
+}
+
+// createVMWithMergedCloudInit creates a VM using the merged cloud-init configuration.
+//
+// This is similar to CreateSimpleUbuntuVM but uses a pre-generated cloud-init
+// instead of generating it inline.
+//
+// Parameters:
+//   - rc: RuntimeContext
+//   - vmName: VM name
+//   - cloudInit: Merged cloud-init YAML
+//
+// Returns:
+//   - error: Any VM creation error
+func createVMWithMergedCloudInit(rc *eos_io.RuntimeContext, vmName string, cloudInit string) error {
+	// Lock entire VM creation to prevent race conditions
+	vmCreationMutex.Lock()
+	defer vmCreationMutex.Unlock()
+
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check prerequisites
+	logger.Info("Checking KVM/libvirt prerequisites...")
+	if err := checkPrerequisites(); err != nil {
+		return fmt.Errorf("prerequisite check failed: %w", err)
+	}
+
+	// Create VM configuration with defaults
+	config := SimpleVMConfig{
+		Name:     vmName,
+		Memory:   "4096",
+		VCPUs:    "2",
+		DiskSize: "40",
+		Network:  "default",
+	}
+
+	// Input validation
+	if err := validateSimpleVMConfig(&config); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
+	}
+
+	// Clean up any existing domain with same name for idempotency
+	logger.Info("Cleaning up potential domain conflicts", zap.String("vm_name", config.Name))
+	cleanupExistingDomain(config.Name, &logger)
+
+	// Create working directory
+	seedDir := filepath.Join(isoDir, config.Name)
+	if err := os.MkdirAll(seedDir, 0755); err != nil {
+		return fmt.Errorf("failed to create seed directory: %w", err)
+	}
+
+	logger.Info("Creating Ubuntu 24.04 VM with merged cloud-init", zap.String("name", config.Name))
+
+	// Write merged cloud-init to user-data
+	userDataPath := filepath.Join(seedDir, "user-data")
+	if err := os.WriteFile(userDataPath, []byte(cloudInit), 0644); err != nil {
+		return fmt.Errorf("failed to write merged user-data: %w", err)
+	}
+
+	// Create meta-data
+	metaData := fmt.Sprintf(`instance-id: %s
+local-hostname: %s
+`, config.Name, config.Name)
+
+	metaDataPath := filepath.Join(seedDir, "meta-data")
+	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+		return fmt.Errorf("failed to write meta-data: %w", err)
+	}
+
+	// Generate seed.img
+	seedImgPath := filepath.Join(seedDir, "seed.img")
+	if err := generateSeedImage(seedDir, seedImgPath); err != nil {
+		return fmt.Errorf("failed to generate seed image: %w", err)
+	}
+
+	// Download or copy base image
+	baseImagePath := filepath.Join(isoDir, "ubuntu-24.04-base.img")
+	if _, err := os.Stat(baseImagePath); os.IsNotExist(err) {
+		logger.Info("Downloading Ubuntu base image")
+		if err := downloadBaseImage(baseImagePath, &logger); err != nil {
+			return fmt.Errorf("failed to get base image: %w", err)
+		}
+	} else {
+		logger.Info("Using existing base image", zap.String("path", baseImagePath))
+	}
+
+	// Create VM disk from base
+	vmDiskPath := filepath.Join(isoDir, config.Name+".qcow2")
+	if err := createVMDisk(baseImagePath, vmDiskPath, config.DiskSize, &logger); err != nil {
+		return fmt.Errorf("failed to create VM disk: %w", err)
+	}
+
+	// Launch VM with virt-install
+	if err := launchVM(config, vmDiskPath, seedImgPath, &logger); err != nil {
+		return fmt.Errorf("failed to launch VM: %w", err)
+	}
+
+	// Get VM IP
+	ip, _ := waitForVMIP(config.Name, 30, &logger)
+
+	logger.Info("VM created successfully with merged cloud-init",
+		zap.String("name", config.Name),
+		zap.String("ip", ip))
+
+	// Attempt Consul registration (non-critical)
+	if err := RegisterVMWithConsul(rc, config.Name, ip); err != nil {
+		logger.Debug("Consul registration failed (non-critical)",
+			zap.Error(err))
+	}
+
+	return nil
+}
+
 func checkPrerequisites() error {
 	// Check required commands
 	requiredCmds := []string{"virsh", "virt-install", "qemu-img", "cloud-localds", "wget"}

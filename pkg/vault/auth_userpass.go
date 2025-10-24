@@ -13,6 +13,7 @@ import (
 )
 
 // EnableVaultUserpass sets up userpass auth, creates the "eos" user, and verifies login.
+// This is called during 'eos create vault --enable-userpass' setup flow
 func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	// 1) Build a Vault API client
 	client, err := GetVaultClient(rc)
@@ -35,7 +36,7 @@ func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	}
 	rc.Log.Info(" Eos policy ensured")
 
-	// 4) Prompt for the Eos user’s password
+	// 4) Prompt for the Eos user's password
 	pass, err := crypto.PromptPassword(rc, "Enter password for Vault 'eos' user: ")
 	if err != nil {
 		return cerr.Wrap(err, "prompt Eos password")
@@ -53,7 +54,9 @@ func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	}
 	rc.Log.Info(" Eos user created", zap.String("path", writePath))
 
-	// 6) Validate by logging in as that user
+	// 6) Validate by logging in as that user using the userpass SDK
+	// NOTE: We use the SDK here for consistency with Vault's official patterns
+	// This is different from the interactive auth flow which uses auth_interactive.go
 	upAuth, err := userpass.NewUserpassAuth(
 		"eos",
 		&userpass.Password{FromString: pass},

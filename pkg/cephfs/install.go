@@ -171,6 +171,33 @@ func validateConfiguration(rc *eos_io.RuntimeContext, config *Config) error {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("cluster network must be in CIDR format (e.g., 10.1.0.0/24)"))
 	}
 
+	// Security validation: Check for control characters and injection patterns
+	dangerousChars := []string{"\x00", "\n", "\r", "\t"}
+	fields := map[string]string{
+		"admin host":      config.AdminHost,
+		"public network":  config.PublicNetwork,
+		"cluster network": config.ClusterNetwork,
+		"cluster FSID":    config.ClusterFSID,
+	}
+
+	for fieldName, fieldValue := range fields {
+		for _, char := range dangerousChars {
+			if strings.Contains(fieldValue, char) {
+				return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("%s contains invalid control characters", fieldName))
+			}
+		}
+	}
+
+	// Check for command injection patterns
+	injectionPatterns := []string{";", "&&", "||", "|", "`", "$(", "${"}
+	for fieldName, fieldValue := range fields {
+		for _, pattern := range injectionPatterns {
+			if strings.Contains(fieldValue, pattern) {
+				return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("%s contains potentially dangerous pattern: %s", fieldName, pattern))
+			}
+		}
+	}
+
 	logger.Debug("Configuration validation passed")
 	return nil
 }

@@ -78,7 +78,10 @@ Examples:
   eos create kvm ubuntu secure-vm --security-level paranoid
 
   # Create VM with all security features
-  eos create kvm ubuntu fortress --enable-all-security`,
+  eos create kvm ubuntu fortress --enable-all-security
+
+  # Create VM without Consul agent (opt-out of service discovery)
+  eos create kvm ubuntu standalone --disable-consul`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(createSecureUbuntuVM),
 }
@@ -130,6 +133,10 @@ func setupKVMUbuntuFlags(cmd *cobra.Command) {
 
 	// VM name flag (for consistency)
 	cmd.Flags().StringP("name", "N", "", "Custom name for the VM (default: auto-generated)")
+
+	// Consul integration (enabled by default for seamless service discovery)
+	cmd.Flags().Bool("disable-consul", false, "Skip Consul agent deployment (default: false, agent deploys automatically)")
+	cmd.Flags().String("consul-datacenter", "", "Consul datacenter (auto-detected if empty)")
 
 	// Additional options
 	cmd.Flags().Bool("auto-start", false, "Auto-start VM on host boot")

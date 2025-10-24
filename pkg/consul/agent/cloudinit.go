@@ -1,63 +1,78 @@
-//go:build linux
+// pkg/consul/agent/cloudinit.go
+//
+// Cloud-init generation for Consul agent deployment in VMs.
+// Migrated from pkg/kvm/consul_autoregister.go with improvements.
+//
+// Last Updated: 2025-01-24
 
-// pkg/kvm/consul_autoregister.go
-// Automatic Consul agent installation and registration for KVM guests
-
-package kvm
+package agent
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// ConsulAutoRegisterConfig holds configuration for automatic Consul registration
-type ConsulAutoRegisterConfig struct {
-	VMName         string
-	Environment    string   // dev, staging, production
-	ConsulServers  []string // IP addresses of Consul servers to join
-	Datacenter     string   // Consul datacenter name
-	NodeName       string   // Consul node name (defaults to VMName)
-	Tags           []string // Service tags
-	EnableConnect  bool     // Enable Consul Connect
-	TokenPath      string   // Optional: Path to Consul ACL token
-}
-
-// GenerateConsulCloudInit generates cloud-init configuration for Consul auto-registration
-// This is idempotent - VM will install Consul and join cluster on first boot
-func GenerateConsulCloudInit(rc *eos_io.RuntimeContext, config ConsulAutoRegisterConfig) (string, error) {
+// GenerateCloudInit creates cloud-init YAML configuration for Consul agent deployment.
+//
+// This function generates a complete cloud-init configuration that:
+//   - Installs Consul binary from HashiCorp releases
+//   - Creates system user and directories with correct permissions
+//   - Generates HCL configuration file
+//   - Sets up systemd service
+//   - Configures service registration
+//   - Stores metadata in Consul K/V
+//
+// The generated cloud-init is standalone and can be:
+//   - Written to user-data for cloud-init ISO
+//   - Merged with existing cloud-init configurations
+//   - Used in cloud platforms (AWS, GCP, Azure)
+//
+// All values use centralized constants from pkg/consul/constants.go
+// No hardcoded paths, ports, or permissions.
+//
+// Parameters:
+//   - rc: RuntimeContext for logging
+//   - config: Agent configuration
+//
+// Returns:
+//   - string: Complete cloud-init YAML
+//   - error: Any generation error
+func GenerateCloudInit(rc *eos_io.RuntimeContext, config AgentConfig) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// ASSESS - Validate configuration
-	if len(config.ConsulServers) == 0 {
-		return "", fmt.Errorf("no Consul servers specified")
-	}
-
-	if config.Datacenter == "" {
-		config.Datacenter = config.Environment
-	}
-
+	// Validate required fields
 	if config.NodeName == "" {
-		config.NodeName = config.VMName
+		return "", fmt.Errorf("node_name is required")
+	}
+	if config.Datacenter == "" {
+		return "", fmt.Errorf("datacenter is required")
 	}
 
-	logger.Info("Generating Consul cloud-init config",
-		zap.String("vm_name", config.VMName),
+	logger.Info("Generating cloud-init for Consul agent",
+		zap.String("node_name", config.NodeName),
 		zap.String("datacenter", config.Datacenter),
-		zap.Strings("consul_servers", config.ConsulServers))
+		zap.String("mode", string(config.Mode)))
 
-	// INTERVENE - Generate cloud-init YAML
-	// Calculate directory path for binary extraction
+	// Set defaults
+	if config.LogLevel == "" {
+		config.LogLevel = "INFO"
+	}
+	if config.Environment == "" {
+		config.Environment = "default"
+	}
+
+	// Calculate paths
 	binaryDir := filepath.Dir(consul.ConsulBinaryPath)
 	servicesHCLPath := filepath.Join(consul.ConsulConfigDir, "services.hcl")
 
+	// Generate cloud-init template
 	cloudInit := fmt.Sprintf(`#cloud-config
 
 # Hostname configuration
@@ -106,7 +121,7 @@ write_files:
       datacenter = "%%s"
       data_dir = "%s"
       log_file = "%s"
-      log_level = "INFO"
+      log_level = "%s"
 
       # Client configuration
       client_addr = "0.0.0.0"
@@ -262,6 +277,7 @@ power_state:
 		consul.ConsulConfigPerm,
 		consul.ConsulOptDir,
 		consul.ConsulLogDir,
+		config.LogLevel,
 
 		// Systemd service (6 args)
 		consul.ConsulServiceName,
@@ -292,22 +308,22 @@ power_state:
 	// Now format the cloud-init with dynamic values
 	cloudInit = fmt.Sprintf(cloudInit,
 		// Consul config HCL content placeholders
-		config.VMName,
+		config.NodeName,
 		config.Environment,
 		config.Datacenter,
 		config.Datacenter,
-		formatRetryJoin(config.ConsulServers),
+		formatRetryJoin(config.RetryJoin),
 		config.NodeName,
-		config.VMName,
+		config.NodeName,
 		config.Environment,
 
 		// Consul Connect configuration (optional)
 		generateConsulConnectConfig(config.EnableConnect),
 
 		// Service registration content placeholders
-		config.VMName,
+		config.NodeName,
 		formatTags(config.Tags),
-		config.VMName,
+		config.NodeName,
 		config.Environment,
 
 		// K/V storage
@@ -325,65 +341,17 @@ power_state:
 	return cloudInit, nil
 }
 
-// WriteConsulCloudInitISO writes the cloud-init config to an ISO file
-// This is idempotent - safe to call multiple times
-func WriteConsulCloudInitISO(rc *eos_io.RuntimeContext, vmName string, cloudInit string) (string, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// ASSESS - Create ISO directory structure
-	isoDir := filepath.Join("/srv/iso", vmName)
-	if err := os.MkdirAll(isoDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create ISO directory: %w", err)
-	}
-
-	// Write user-data
-	userDataPath := filepath.Join(isoDir, "user-data")
-	if err := os.WriteFile(userDataPath, []byte(cloudInit), 0644); err != nil {
-		return "", fmt.Errorf("failed to write user-data: %w", err)
-	}
-
-	// Write meta-data
-	metaData := fmt.Sprintf("instance-id: %s\nlocal-hostname: %s\n", vmName, vmName)
-	metaDataPath := filepath.Join(isoDir, "meta-data")
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
-		return "", fmt.Errorf("failed to write meta-data: %w", err)
-	}
-
-	// Generate ISO
-	isoPath := filepath.Join(isoDir, "cloud-init.iso")
-
-	logger.Info("Generating cloud-init ISO",
-		zap.String("iso_path", isoPath))
-
-	if output, err := executeCommand(rc, "genisoimage",
-		"-output", isoPath,
-		"-volid", "cidata",
-		"-joliet",
-		"-rock",
-		userDataPath,
-		metaDataPath); err != nil {
-		return "", fmt.Errorf("failed to generate ISO: %w\nOutput: %s", err, output)
-	}
-
-	// EVALUATE - Verify ISO was created
-	if _, err := os.Stat(isoPath); err != nil {
-		return "", fmt.Errorf("ISO file not created: %w", err)
-	}
-
-	logger.Info("Cloud-init ISO created successfully",
-		zap.String("iso_path", isoPath))
-
-	return isoPath, nil
-}
-
 // Helper functions
 
 func formatRetryJoin(servers []string) string {
+	if len(servers) == 0 {
+		return ""
+	}
 	quoted := make([]string, len(servers))
 	for i, server := range servers {
 		quoted[i] = fmt.Sprintf(`"%s"`, server)
 	}
-	return fmt.Sprintf("%s", joinStrings(quoted, ", "))
+	return strings.Join(quoted, ", ")
 }
 
 func formatTags(tags []string) string {
@@ -394,7 +362,7 @@ func formatTags(tags []string) string {
 	for i, tag := range tags {
 		quoted[i] = fmt.Sprintf(`"%s"`, tag)
 	}
-	return joinStrings(quoted, ", ")
+	return strings.Join(quoted, ", ")
 }
 
 func generateConsulConnectConfig(enabled bool) string {
@@ -411,23 +379,4 @@ func generateConsulConnectConfig(enabled bool) string {
     grpc = %d
   }
 `, consul.PortgRPC)
-}
-
-func joinStrings(strs []string, sep string) string {
-	result := ""
-	for i, s := range strs {
-		if i > 0 {
-			result += sep
-		}
-		result += s
-	}
-	return result
-}
-
-func executeCommand(rc *eos_io.RuntimeContext, cmd string, args ...string) (string, error) {
-	return execute.Run(rc.Ctx, execute.Options{
-		Command: cmd,
-		Args:    args,
-		Capture: true,
-	})
 }

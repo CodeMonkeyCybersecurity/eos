@@ -809,3 +809,717 @@ func GetTailscalePeers(rc *eos_io.RuntimeContext) ([]string, error) {
 
 	return peers, nil
 }
+
+// SSHDiagnosticResult represents the result of a single diagnostic check
+type SSHDiagnosticResult struct {
+	Name    string // Name of the check
+	Status  string // "pass", "fail", "warn", "skip"
+	Message string // Detailed message
+	Details string // Additional details or output
+}
+
+// SSHDiagnosticReport contains all diagnostic results
+type SSHDiagnosticReport struct {
+	ClientResults []SSHDiagnosticResult
+	ServerResults []SSHDiagnosticResult
+	Timestamp     time.Time
+	TargetHost    string // Empty for client-only diagnostics
+}
+
+// CheckClientSSHKeys checks if ED25519 SSH keys exist
+func CheckClientSSHKeys(rc *eos_io.RuntimeContext) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckClientSSHKeys")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Checking client SSH keys")
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Existence",
+			Status:  "fail",
+			Message: "Failed to get user home directory",
+			Details: err.Error(),
+		}
+	}
+
+	sshDir := filepath.Join(homeDir, ".ssh")
+	keyPatterns := []string{
+		filepath.Join(sshDir, "id_ed25519"),
+		filepath.Join(sshDir, "id_rsa"),
+		filepath.Join(sshDir, "id_ecdsa"),
+	}
+
+	var foundKeys []string
+	var keyDetails strings.Builder
+
+	for _, keyPath := range keyPatterns {
+		if info, err := os.Stat(keyPath); err == nil {
+			foundKeys = append(foundKeys, keyPath)
+			pubKeyPath := keyPath + ".pub"
+			keyDetails.WriteString(fmt.Sprintf("%s: %s (%o)\n", filepath.Base(keyPath), keyPath, info.Mode().Perm()))
+
+			if pubInfo, pubErr := os.Stat(pubKeyPath); pubErr == nil {
+				keyDetails.WriteString(fmt.Sprintf("%s.pub: %s (%o)\n", filepath.Base(keyPath), pubKeyPath, pubInfo.Mode().Perm()))
+			}
+		}
+	}
+
+	if len(foundKeys) == 0 {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Existence",
+			Status:  "fail",
+			Message: "No SSH keys found",
+			Details: "Generate a key with: ssh-keygen -t ed25519 -C 'your_email@example.com'",
+		}
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Key Existence",
+		Status:  "pass",
+		Message: fmt.Sprintf("Found %d SSH key(s)", len(foundKeys)),
+		Details: keyDetails.String(),
+	}
+}
+
+// GetSSHKeyFingerprint gets the fingerprint of an SSH public key
+func GetSSHKeyFingerprint(rc *eos_io.RuntimeContext, pubKeyPath string) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.GetSSHKeyFingerprint")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Getting SSH key fingerprint", zap.String("path", pubKeyPath))
+
+	cmd := exec.CommandContext(ctx, "ssh-keygen", "-lf", pubKeyPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Fingerprint",
+			Status:  "fail",
+			Message: "Failed to get fingerprint",
+			Details: fmt.Sprintf("Error: %v\nOutput: %s", err, string(output)),
+		}
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Key Fingerprint",
+		Status:  "pass",
+		Message: "Fingerprint retrieved",
+		Details: strings.TrimSpace(string(output)),
+	}
+}
+
+// CheckSSHAgent checks if SSH agent has keys loaded
+func CheckSSHAgent(rc *eos_io.RuntimeContext) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHAgent")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Checking SSH agent")
+
+	cmd := exec.CommandContext(ctx, "ssh-add", "-l")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		// ssh-add -l returns 1 if agent has no identities, 2 if agent not running
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				return SSHDiagnosticResult{
+					Name:    "SSH Agent Status",
+					Status:  "warn",
+					Message: "SSH agent has no identities",
+					Details: "Load your key with: ssh-add ~/.ssh/id_ed25519",
+				}
+			}
+			if exitErr.ExitCode() == 2 {
+				return SSHDiagnosticResult{
+					Name:    "SSH Agent Status",
+					Status:  "warn",
+					Message: "SSH agent not running",
+					Details: "Start agent with: eval $(ssh-agent)",
+				}
+			}
+		}
+		return SSHDiagnosticResult{
+			Name:    "SSH Agent Status",
+			Status:  "fail",
+			Message: "Failed to check SSH agent",
+			Details: fmt.Sprintf("Error: %v\nOutput: %s", err, string(output)),
+		}
+	}
+
+	// Count number of keys
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	keyCount := len(lines)
+	if keyCount == 1 && lines[0] == "" {
+		keyCount = 0
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Agent Status",
+		Status:  "pass",
+		Message: fmt.Sprintf("SSH agent running with %d key(s)", keyCount),
+		Details: strings.TrimSpace(string(output)),
+	}
+}
+
+// GetSSHPublicKeyContent reads the public key content
+func GetSSHPublicKeyContent(rc *eos_io.RuntimeContext, pubKeyPath string) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.GetSSHPublicKeyContent")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Reading SSH public key content", zap.String("path", pubKeyPath))
+
+	content, err := os.ReadFile(pubKeyPath)
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "SSH Public Key Content",
+			Status:  "fail",
+			Message: "Failed to read public key",
+			Details: err.Error(),
+		}
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Public Key Content",
+		Status:  "pass",
+		Message: "Public key content available for copying to server",
+		Details: strings.TrimSpace(string(content)),
+	}
+}
+
+// CheckAllSSHKeys discovers all SSH keys in ~/.ssh directory
+func CheckAllSSHKeys(rc *eos_io.RuntimeContext) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckAllSSHKeys")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Discovering all SSH keys")
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Discovery",
+			Status:  "fail",
+			Message: "Failed to get user home directory",
+			Details: err.Error(),
+		}
+	}
+
+	sshDir := filepath.Join(homeDir, ".ssh")
+
+	// Find all id_* files (both private keys and public keys)
+	cmd := exec.CommandContext(ctx, "ls", "-la", sshDir+"/id_*")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Discovery",
+			Status:  "warn",
+			Message: "No SSH keys found",
+			Details: "No id_* files found in ~/.ssh/",
+		}
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Key Discovery",
+		Status:  "pass",
+		Message: "Found SSH keys in ~/.ssh/",
+		Details: strings.TrimSpace(string(output)),
+	}
+}
+
+// CheckSSHSymlinks checks for symlinks or aliases in SSH key files
+func CheckSSHSymlinks(rc *eos_io.RuntimeContext) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHSymlinks")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Checking for SSH key symlinks")
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Symlinks",
+			Status:  "fail",
+			Message: "Failed to get user home directory",
+			Details: err.Error(),
+		}
+	}
+
+	sshDir := filepath.Join(homeDir, ".ssh")
+
+	// Check for id_rsa* files specifically (what ssh-copy-id looks for by default)
+	cmd := exec.CommandContext(ctx, "ls", "-laL", sshDir+"/id_rsa*")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Symlinks",
+			Status:  "pass",
+			Message: "No id_rsa* files or symlinks found",
+			Details: "ssh-copy-id will not default to RSA keys",
+		}
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Key Symlinks",
+		Status:  "warn",
+		Message: "Found id_rsa* files (ssh-copy-id defaults)",
+		Details: strings.TrimSpace(string(output)),
+	}
+}
+
+// CheckDefaultSSHKey checks if default id_rsa key exists (what ssh-copy-id uses)
+func CheckDefaultSSHKey(rc *eos_io.RuntimeContext) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckDefaultSSHKey")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Checking for default id_rsa key")
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return SSHDiagnosticResult{
+			Name:    "Default SSH Key (id_rsa)",
+			Status:  "fail",
+			Message: "Failed to get user home directory",
+			Details: err.Error(),
+		}
+	}
+
+	sshDir := filepath.Join(homeDir, ".ssh")
+	rsaKeyPath := filepath.Join(sshDir, "id_rsa")
+
+	if _, err := os.Stat(rsaKeyPath); os.IsNotExist(err) {
+		return SSHDiagnosticResult{
+			Name:    "Default SSH Key (id_rsa)",
+			Status:  "pass",
+			Message: "No id_rsa file exists",
+			Details: "ssh-copy-id will not default to RSA key",
+		}
+	}
+
+	// Get file type information
+	cmd := exec.CommandContext(ctx, "file", rsaKeyPath)
+	fileOutput, fileErr := cmd.CombinedOutput()
+
+	// Get file listing
+	cmd2 := exec.CommandContext(ctx, "ls", "-la", rsaKeyPath+"*")
+	lsOutput, lsErr := cmd2.CombinedOutput()
+
+	var details strings.Builder
+	if fileErr == nil {
+		details.WriteString("File type: " + strings.TrimSpace(string(fileOutput)) + "\n")
+	}
+	if lsErr == nil {
+		details.WriteString("Listing:\n" + strings.TrimSpace(string(lsOutput)))
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "Default SSH Key (id_rsa)",
+		Status:  "warn",
+		Message: "id_rsa exists (ssh-copy-id will prefer this)",
+		Details: details.String(),
+	}
+}
+
+// CheckSSHConfigIncludes checks /etc/ssh/ssh_config.d/ for custom configurations
+func CheckSSHConfigIncludes(rc *eos_io.RuntimeContext) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHConfigIncludes")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Checking SSH config includes")
+
+	configDir := "/etc/ssh/ssh_config.d"
+
+	// Check if directory exists
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		return SSHDiagnosticResult{
+			Name:    "SSH Config Includes",
+			Status:  "skip",
+			Message: "Directory doesn't exist",
+			Details: configDir + " not found",
+		}
+	}
+
+	// List directory contents
+	cmd := exec.CommandContext(ctx, "ls", "-la", configDir)
+	lsOutput, lsErr := cmd.CombinedOutput()
+
+	var details strings.Builder
+	if lsErr == nil {
+		details.WriteString("Directory listing:\n")
+		details.WriteString(strings.TrimSpace(string(lsOutput)) + "\n\n")
+	}
+
+	// Read contents of any config files
+	files, err := filepath.Glob(filepath.Join(configDir, "*"))
+	if err == nil && len(files) > 0 {
+		details.WriteString("Config file contents:\n")
+		for _, file := range files {
+			info, err := os.Stat(file)
+			if err == nil && info.Mode().IsRegular() {
+				content, err := os.ReadFile(file)
+				if err == nil {
+					details.WriteString(fmt.Sprintf("\n--- %s ---\n", filepath.Base(file)))
+					details.WriteString(string(content))
+					details.WriteString("\n")
+				}
+			}
+		}
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Config Includes",
+		Status:  "pass",
+		Message: "Checked /etc/ssh/ssh_config.d/",
+		Details: details.String(),
+	}
+}
+
+// CheckSSHKeySelectionOrder tests what SSH would actually use
+func CheckSSHKeySelectionOrder(rc *eos_io.RuntimeContext) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHKeySelectionOrder")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Checking SSH key selection order")
+
+	// Use ssh -v to see which keys SSH will attempt
+	cmd := exec.CommandContext(ctx, "ssh", "-v", "-o", "PreferredAuthentications=publickey", "localhost", "exit")
+	output, _ := cmd.CombinedOutput() // Ignore error, we're just parsing verbose output
+
+	// Extract "Will attempt key" lines
+	var keyAttempts []string
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Will attempt key") {
+			keyAttempts = append(keyAttempts, strings.TrimSpace(line))
+		}
+	}
+
+	if len(keyAttempts) == 0 {
+		return SSHDiagnosticResult{
+			Name:    "SSH Key Selection Order",
+			Status:  "warn",
+			Message: "Could not determine key order",
+			Details: "No 'Will attempt key' lines found in ssh -v output",
+		}
+	}
+
+	// Limit to first 10 keys
+	if len(keyAttempts) > 10 {
+		keyAttempts = keyAttempts[:10]
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "SSH Key Selection Order",
+		Status:  "pass",
+		Message: fmt.Sprintf("SSH will try %d key(s) in order", len(keyAttempts)),
+		Details: strings.Join(keyAttempts, "\n"),
+	}
+}
+
+// CheckSSHCopyIDKeySelection checks what ssh-copy-id would use
+func CheckSSHCopyIDKeySelection(rc *eos_io.RuntimeContext, target string) SSHDiagnosticResult {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.CheckSSHCopyIDKeySelection")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("Checking ssh-copy-id key selection", zap.String("target", target))
+
+	if target == "" {
+		return SSHDiagnosticResult{
+			Name:    "ssh-copy-id Key Selection",
+			Status:  "skip",
+			Message: "No target specified",
+			Details: "Provide target (user@host) to test ssh-copy-id key selection",
+		}
+	}
+
+	// Use ssh-copy-id -n (dry-run) to see what key it would use
+	cmd := exec.CommandContext(ctx, "ssh-copy-id", "-n", target)
+	output, _ := cmd.CombinedOutput() // Ignore error, we're just parsing output
+
+	// Extract "Source of key" or similar lines
+	var keySource string
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Source of key") || strings.Contains(line, "key") {
+			keySource += strings.TrimSpace(line) + "\n"
+		}
+	}
+
+	if keySource == "" {
+		keySource = string(output) // Include all output if we can't find specific lines
+	}
+
+	return SSHDiagnosticResult{
+		Name:    "ssh-copy-id Key Selection",
+		Status:  "pass",
+		Message: "Tested ssh-copy-id key selection",
+		Details: strings.TrimSpace(keySource),
+	}
+}
+
+// RunClientDiagnostics runs all client-side SSH diagnostics
+func RunClientDiagnostics(rc *eos_io.RuntimeContext) ([]SSHDiagnosticResult, error) {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.RunClientDiagnostics")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Running client-side SSH diagnostics")
+
+	var results []SSHDiagnosticResult
+
+	// Check for SSH keys
+	keyCheck := CheckClientSSHKeys(rc)
+	results = append(results, keyCheck)
+
+	// If keys exist, get fingerprint and content
+	if keyCheck.Status == "pass" {
+		homeDir, _ := os.UserHomeDir()
+		sshDir := filepath.Join(homeDir, ".ssh")
+
+		// Try ED25519 first, fall back to RSA
+		pubKeyPaths := []string{
+			filepath.Join(sshDir, "id_ed25519.pub"),
+			filepath.Join(sshDir, "id_rsa.pub"),
+			filepath.Join(sshDir, "id_ecdsa.pub"),
+		}
+
+		for _, pubKeyPath := range pubKeyPaths {
+			if _, err := os.Stat(pubKeyPath); err == nil {
+				results = append(results, GetSSHKeyFingerprint(rc, pubKeyPath))
+				results = append(results, GetSSHPublicKeyContent(rc, pubKeyPath))
+				break // Only process the first found key
+			}
+		}
+	}
+
+	// Check SSH agent
+	results = append(results, CheckSSHAgent(rc))
+
+	// SSH Key Discovery diagnostics
+	results = append(results, CheckAllSSHKeys(rc))
+	results = append(results, CheckSSHSymlinks(rc))
+	results = append(results, CheckDefaultSSHKey(rc))
+	results = append(results, CheckSSHConfigIncludes(rc))
+	results = append(results, CheckSSHKeySelectionOrder(rc))
+
+	logger.Info("Client-side diagnostics completed", zap.Int("results", len(results)))
+	return results, nil
+}
+
+// RunClientDiagnosticsWithTarget runs client diagnostics including ssh-copy-id test
+func RunClientDiagnosticsWithTarget(rc *eos_io.RuntimeContext, target string) ([]SSHDiagnosticResult, error) {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.RunClientDiagnosticsWithTarget")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Running client-side SSH diagnostics with target", zap.String("target", target))
+
+	// Run standard client diagnostics
+	results, err := RunClientDiagnostics(rc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add ssh-copy-id key selection check if target provided
+	if target != "" {
+		results = append(results, CheckSSHCopyIDKeySelection(rc, target))
+	}
+
+	logger.Info("Client-side diagnostics with target completed", zap.Int("results", len(results)))
+	return results, nil
+}
+
+// RunServerDiagnostics runs server-side SSH diagnostics over SSH
+func RunServerDiagnostics(rc *eos_io.RuntimeContext, creds *SSHCredentials) ([]SSHDiagnosticResult, error) {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.RunServerDiagnostics")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Running server-side SSH diagnostics",
+		zap.String("host", creds.Host),
+		zap.String("user", creds.User))
+
+	var results []SSHDiagnosticResult
+
+	// Helper function to run SSH command
+	runSSHCommand := func(name, description, command string) SSHDiagnosticResult {
+		args := []string{
+			"-o", "BatchMode=yes",
+			"-o", "ConnectTimeout=5",
+			"-o", "StrictHostKeyChecking=no",
+			"-p", creds.Port,
+		}
+
+		if creds.KeyPath != "" {
+			args = append(args, "-i", creds.KeyPath)
+		}
+
+		target := fmt.Sprintf("%s@%s", creds.User, creds.Host)
+		args = append(args, target, command)
+
+		cmd := exec.CommandContext(ctx, "ssh", args...)
+		output, err := cmd.CombinedOutput()
+
+		if err != nil {
+			return SSHDiagnosticResult{
+				Name:    name,
+				Status:  "fail",
+				Message: description + " - Failed",
+				Details: fmt.Sprintf("Command: %s\nError: %v\nOutput: %s", command, err, string(output)),
+			}
+		}
+
+		return SSHDiagnosticResult{
+			Name:    name,
+			Status:  "pass",
+			Message: description + " - OK",
+			Details: strings.TrimSpace(string(output)),
+		}
+	}
+
+	// Check ~/.ssh directory permissions
+	results = append(results, runSSHCommand(
+		"SSH Directory Permissions",
+		"~/.ssh directory permissions",
+		"ls -ld ~/.ssh",
+	))
+
+	// Check authorized_keys permissions
+	results = append(results, runSSHCommand(
+		"Authorized Keys Permissions",
+		"~/.ssh/authorized_keys permissions",
+		"ls -l ~/.ssh/authorized_keys",
+	))
+
+	// Check ownership
+	results = append(results, runSSHCommand(
+		"SSH Directory Ownership",
+		"~/.ssh directory and authorized_keys ownership",
+		"ls -ln ~/.ssh ~/.ssh/authorized_keys",
+	))
+
+	// Check home directory permissions
+	results = append(results, runSSHCommand(
+		"Home Directory Permissions",
+		"Home directory permissions",
+		"ls -ld ~/",
+	))
+
+	// Check authorized_keys content (count keys)
+	results = append(results, runSSHCommand(
+		"Authorized Keys Count",
+		"Number of keys in authorized_keys",
+		"wc -l ~/.ssh/authorized_keys 2>/dev/null || echo '0 (file not found)'",
+	))
+
+	// Check authorized_keys first key fingerprint
+	results = append(results, runSSHCommand(
+		"Authorized Keys Fingerprint",
+		"First key fingerprint in authorized_keys",
+		"ssh-keygen -lf ~/.ssh/authorized_keys 2>/dev/null | head -1 || echo 'No keys or file not found'",
+	))
+
+	// Check sshd_config for PubkeyAuthentication
+	results = append(results, runSSHCommand(
+		"PubkeyAuthentication Setting",
+		"SSH daemon PubkeyAuthentication setting",
+		"sudo grep -i '^PubkeyAuthentication' /etc/ssh/sshd_config || echo 'Not set (default: yes)'",
+	))
+
+	// Check sshd_config for AuthorizedKeysFile
+	results = append(results, runSSHCommand(
+		"AuthorizedKeysFile Setting",
+		"SSH daemon AuthorizedKeysFile setting",
+		"sudo grep -i '^AuthorizedKeysFile' /etc/ssh/sshd_config || echo 'Not set (default: .ssh/authorized_keys)'",
+	))
+
+	// Get recent SSH logs (try both journalctl and /var/log/auth.log)
+	sshLogsResult := runSSHCommand(
+		"Recent SSH Logs",
+		"Recent SSH authentication logs",
+		"sudo journalctl -u ssh -n 50 --no-pager 2>/dev/null || sudo tail -50 /var/log/auth.log 2>/dev/null | grep -i ssh || echo 'Logs not accessible'",
+	)
+	results = append(results, sshLogsResult)
+
+	logger.Info("Server-side diagnostics completed", zap.Int("results", len(results)))
+	return results, nil
+}
+
+// RunFullSSHDiagnostics runs both client and server diagnostics
+func RunFullSSHDiagnostics(rc *eos_io.RuntimeContext, sshPath string, keyPath string) (*SSHDiagnosticReport, error) {
+	ctx, span := telemetry.Start(rc.Ctx, "ssh.RunFullSSHDiagnostics")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Running full SSH diagnostics", zap.String("target", sshPath))
+
+	report := &SSHDiagnosticReport{
+		Timestamp:  time.Now(),
+		TargetHost: sshPath,
+	}
+
+	// Run client diagnostics with target (includes ssh-copy-id key selection)
+	clientResults, err := RunClientDiagnosticsWithTarget(rc, sshPath)
+	if err != nil {
+		return nil, fmt.Errorf("client diagnostics failed: %w", err)
+	}
+	report.ClientResults = clientResults
+
+	// If SSH path provided, run server diagnostics
+	if sshPath != "" {
+		creds, err := ParseSSHPath(sshPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid SSH path: %w", err)
+		}
+
+		// Use provided key path or select one
+		if keyPath != "" {
+			creds.KeyPath = keyPath
+		} else {
+			// Try to find a key automatically
+			homeDir, _ := os.UserHomeDir()
+			sshDir := filepath.Join(homeDir, ".ssh")
+			keyPaths := []string{
+				filepath.Join(sshDir, "id_ed25519"),
+				filepath.Join(sshDir, "id_rsa"),
+				filepath.Join(sshDir, "id_ecdsa"),
+			}
+
+			for _, kp := range keyPaths {
+				if _, err := os.Stat(kp); err == nil {
+					creds.KeyPath = kp
+					break
+				}
+			}
+		}
+
+		serverResults, err := RunServerDiagnostics(rc, creds)
+		if err != nil {
+			logger.Warn("Server diagnostics failed", zap.Error(err))
+			// Don't fail the entire operation, just report the error
+			report.ServerResults = []SSHDiagnosticResult{{
+				Name:    "Server Diagnostics",
+				Status:  "fail",
+				Message: "Failed to connect to server",
+				Details: err.Error(),
+			}}
+		} else {
+			report.ServerResults = serverResults
+		}
+	}
+
+	logger.Info("Full SSH diagnostics completed",
+		zap.Int("client_results", len(report.ClientResults)),
+		zap.Int("server_results", len(report.ServerResults)))
+
+	return report, nil
+}

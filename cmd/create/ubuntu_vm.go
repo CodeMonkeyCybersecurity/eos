@@ -3,6 +3,8 @@
 package create
 
 import (
+	"fmt"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/kvm"
@@ -30,15 +32,55 @@ func init() {
 	CreateCmd.AddCommand(NewSecureUbuntuVMCmd)
 }
 
-// createSecureUbuntuVM - SIMPLIFIED to just create a basic VM
+// createSecureUbuntuVM - Create VM with Consul agent by default (enable-by-default philosophy)
 func createSecureUbuntuVM(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// Generate VM name
-	vmName := kvm.GenerateVMName("eos-kvm")
-
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Creating Ubuntu VM with defaults (4GB RAM, 2 vCPUs, 40GB disk)",
-		zap.String("name", vmName))
 
-	// Just create the VM with hardcoded defaults
-	return kvm.CreateSimpleUbuntuVM(rc, vmName)
+	// Check if Consul is disabled (default: false = Consul enabled)
+	disableConsul, _ := cmd.Flags().GetBool("disable-consul")
+
+	// Generate VM name
+	// Check for --name/-N flag first
+	customName, _ := cmd.Flags().GetString("name")
+	var vmName string
+	if customName != "" {
+		vmName = customName
+	} else {
+		// Check if positional argument provided
+		if len(args) > 0 {
+			vmName = args[0]
+		} else {
+			// Auto-generate name
+			vmName = kvm.GenerateVMName("eos-kvm")
+		}
+	}
+
+	logger.Info("Creating Ubuntu VM with defaults (4GB RAM, 2 vCPUs, 40GB disk)",
+		zap.String("name", vmName),
+		zap.Bool("consul_enabled", !disableConsul))
+
+	// ASSESS - Should we deploy Consul?
+	if disableConsul {
+		logger.Info("Consul agent deployment disabled by user",
+			zap.String("vm_name", vmName),
+			zap.String("impact", "Manual service discovery required"))
+
+		// Create VM without Consul
+		if err := kvm.CreateSimpleUbuntuVM(rc, vmName); err != nil {
+			return fmt.Errorf("failed to create VM: %w", err)
+		}
+		return nil
+	}
+
+	// INTERVENE - Create VM with Consul agent (default behavior)
+	logger.Info("Deploying VM with Consul agent for seamless service discovery (default behavior)",
+		zap.String("vm_name", vmName),
+		zap.String("disable_with", "Use --disable-consul to skip Consul deployment"))
+
+	// Call the new CreateUbuntuVMWithConsul function (to be implemented)
+	if err := kvm.CreateUbuntuVMWithConsul(rc, vmName); err != nil {
+		return fmt.Errorf("failed to create VM with Consul: %w", err)
+	}
+
+	return nil
 }

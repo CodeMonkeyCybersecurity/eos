@@ -62,22 +62,42 @@ func RegisterVMWithConsul(rc *eos_io.RuntimeContext, vmName, ipAddress string) e
 
 // EnableConsulAutoRegistrationForVM generates cloud-init with Consul agent
 // This should be called BEFORE VM creation to bake Consul into the VM
-func EnableConsulAutoRegistrationForVM(rc *eos_io.RuntimeContext, vmName string, env *environment.DeploymentEnvironment) (string, error) {
+func EnableConsulAutoRegistrationForVM(rc *eos_io.RuntimeContext, vmName string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Generating Consul auto-registration cloud-init",
-		zap.String("vm_name", vmName),
-		zap.String("environment", env.Name))
+	logger.Info("Enabling Consul auto-registration for VM",
+		zap.String("vm_name", vmName))
 
-	// Generate Consul cloud-init configuration
+	// ASSESS - Discover current environment
+	envMgr, err := environment.NewEnvironmentManager(rc)
+	if err != nil {
+		logger.Warn("Could not create environment manager, attempting fallback discovery",
+			zap.Error(err))
+		// Fallback to basic discovery
+		return enableConsulWithFallback(rc, vmName)
+	}
+
+	env, err := envMgr.DetectCurrentEnvironment(rc.Ctx)
+	if err != nil {
+		logger.Warn("Could not detect environment, attempting fallback discovery",
+			zap.Error(err))
+		return enableConsulWithFallback(rc, vmName)
+	}
+
+	logger.Info("Detected environment for VM Consul registration",
+		zap.String("environment", env.Name),
+		zap.String("datacenter", env.Datacenter),
+		zap.Strings("consul_servers", env.Consul.RetryJoin))
+
+	// INTERVENE - Generate Consul cloud-init configuration
 	config := ConsulAutoRegisterConfig{
 		VMName:        vmName,
 		Environment:   env.Name,
 		ConsulServers: env.Consul.RetryJoin,
 		Datacenter:    env.Datacenter,
 		NodeName:      vmName,
-		Tags:          []string{"kvm-guest", "eos-managed"},
-		EnableConnect: false, // Can be enabled later
+		Tags:          []string{"kvm-guest", "eos-managed", env.Name},
+		EnableConnect: false, // Can be enabled later if needed
 	}
 
 	cloudInit, err := GenerateConsulCloudInit(rc, config)
@@ -87,7 +107,38 @@ func EnableConsulAutoRegistrationForVM(rc *eos_io.RuntimeContext, vmName string,
 
 	logger.Info("Generated Consul auto-registration cloud-init",
 		zap.String("vm_name", vmName),
+		zap.String("datacenter", config.Datacenter),
 		zap.Int("size_bytes", len(cloudInit)))
+
+	return cloudInit, nil
+}
+
+// enableConsulWithFallback attempts basic Consul setup when environment discovery fails
+func enableConsulWithFallback(rc *eos_io.RuntimeContext, vmName string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Warn("Using fallback Consul configuration (environment not bootstrapped)",
+		zap.String("vm_name", vmName))
+
+	// Provide minimal config that allows manual configuration later
+	config := ConsulAutoRegisterConfig{
+		VMName:        vmName,
+		Environment:   "default",
+		ConsulServers: []string{}, // Empty - VM won't join cluster automatically
+		Datacenter:    "dc1",
+		NodeName:      vmName,
+		Tags:          []string{"kvm-guest", "eos-managed", "unconfigured"},
+		EnableConnect: false,
+	}
+
+	cloudInit, err := GenerateConsulCloudInit(rc, config)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate fallback Consul cloud-init: %w", err)
+	}
+
+	logger.Info("Generated fallback Consul cloud-init (agent will not auto-join cluster)",
+		zap.String("vm_name", vmName),
+		zap.String("remediation", "Configure retry_join manually in /etc/consul.d/consul.hcl after VM creation"))
 
 	return cloudInit, nil
 }

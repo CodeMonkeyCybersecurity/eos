@@ -1,13 +1,13 @@
 package vault
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
@@ -155,119 +155,126 @@ func readTokenFile(rc *eos_io.RuntimeContext, path string) func(*api.Client) (st
 	}
 }
 
+// DEPRECATED: This function is replaced by tryAppRoleInteractive in auth_interactive.go
+// Kept for backward compatibility with existing code that may still call it directly
+// TODO: Remove after migrating all callers to use tryAppRoleInteractive
 func tryAppRole(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
-	roleID, secretID, err := readAppRoleCredsFromDisk(rc, client)
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn(" Failed to read AppRole credentials", zap.Error(err))
-		return "", fmt.Errorf("read AppRole creds: %w", err)
-	}
-	secret, err := client.Logical().Write("auth/approle/login", map[string]interface{}{
-		"role_id": roleID, "secret_id": secretID,
-	})
-	if err != nil || secret == nil || secret.Auth == nil {
-		otelzap.Ctx(rc.Ctx).Warn(" AppRole login failed", zap.Error(err))
-		return "", fmt.Errorf("approle login failed") // Don't leak the underlying error
-	}
-	otelzap.Ctx(rc.Ctx).Debug(" AppRole login successful")
-	return secret.Auth.ClientToken, nil
+	return coreAppRoleAuth(rc, client)
 }
 
+// DEPRECATED: This function is replaced by tryUserpassInteractive in auth_interactive.go
+// The old prompt "Do you want to enable userpass auth?" was confusing in non-setup contexts
+// New code should use tryUserpassInteractive with appropriate AuthContext
+// TODO: Remove after migrating all callers to use tryUserpassInteractive
 func tryUserpassWithPrompt(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
-	if !interaction.PromptYesNo(rc.Ctx, "Do you want to enable userpass auth?", false) {
-		otelzap.Ctx(rc.Ctx).Info(" Skipping userpass (user chose 'no')")
-		return "", errors.New("userpass skipped by user")
-	}
-	return tryUserpass(rc, client)
+	// Use runtime context by default (preserves old behavior but with better UX)
+	return tryUserpassInteractive(rc, client, AuthContextRuntime)
 }
 
+// DEPRECATED: This function is replaced by coreUserpassAuth + promptAndAuthenticateUserpass
+// Kept for backward compatibility
+// TODO: Remove after migrating all callers
 func tryUserpass(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
-	usernames, err := interaction.PromptSecrets(rc.Ctx, "Username", 1)
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn(" Failed to prompt username", zap.Error(err))
-		return "", fmt.Errorf("prompt username: %w", err)
-	}
-	passwords, err := interaction.PromptSecrets(rc.Ctx, "Password", 1)
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn(" Failed to prompt password", zap.Error(err))
-		return "", fmt.Errorf("prompt password: %w", err)
-	}
-	username, password := usernames[0], passwords[0]
-	secret, err := client.Logical().Write(fmt.Sprintf("auth/userpass/login/%s", username),
-		map[string]interface{}{"password": password})
-	if err != nil || secret == nil || secret.Auth == nil {
-		otelzap.Ctx(rc.Ctx).Warn(" Userpass login failed", zap.String("username", username), zap.Error(err))
-		return "", fmt.Errorf("userpass login failed: %w", err)
-	}
-	otelzap.Ctx(rc.Ctx).Debug(" Userpass login successful", zap.String("username", username))
-	return secret.Auth.ClientToken, nil
+	return promptAndAuthenticateUserpass(rc, client)
 }
 
-func tryRootToken(rc *eos_io.RuntimeContext, _ *api.Client) (string, error) {
+// tryRootToken loads root token from vault_init.json and validates it
+// This wraps coreRootTokenAuth with disk I/O logic
+// NOTE: This function includes prompting logic (LoadOrPromptInitResult) which may be interactive
+func tryRootToken(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Debug("Loading root token from vault_init.json")
+
+	// Load from disk (may prompt if file is missing/invalid)
 	initRes, err := LoadOrPromptInitResult(rc)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn(" Failed to load or prompt init result", zap.Error(err))
+		log.Warn("Failed to load or prompt init result", zap.Error(err))
 		return "", fmt.Errorf("load or prompt init result: %w", err)
 	}
-	if strings.TrimSpace(initRes.RootToken) == "" {
-		errMsg := "root token is missing in init result"
-		otelzap.Ctx(rc.Ctx).Warn(errMsg)
-		return "", errors.New(errMsg)
+
+	// Use core validation (no disk I/O, pure validation)
+	token, err := coreRootTokenAuth(rc, client, initRes.RootToken)
+	if err != nil {
+		log.Warn("Root token validation failed", zap.Error(err))
+		return "", fmt.Errorf("root token validation: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Debug(" Root token loaded successfully")
-	return initRes.RootToken, nil
+
+	log.Debug("Root token loaded and validated successfully")
+	return token, nil
 }
 
-// Global circuit breaker to prevent infinite prompting loops
-var (
-	promptAttemptCount    = 0
-	maxPromptAttempts     = 1 // Only allow ONE manual prompt per process
-	lastPromptAttemptTime time.Time
-)
+// authStateKey is a context key for storing authentication state
+// This prevents global mutable state and enables testing
+type authStateKey struct{}
+
+// AuthState tracks authentication attempt state within a context
+// Prevents infinite prompting loops without using global variables
+type AuthState struct {
+	PromptAttemptCount int
+	LastPromptTime     time.Time
+}
+
+const maxPromptAttempts = 1 // Only allow ONE manual prompt per context
+
+// getAuthState retrieves or initializes auth state from context
+// This ensures state is isolated per request/command execution
+func getAuthState(rc *eos_io.RuntimeContext) *AuthState {
+	if state, ok := rc.Ctx.Value(authStateKey{}).(*AuthState); ok {
+		return state
+	}
+	// Initialize on first access
+	state := &AuthState{}
+	rc.Ctx = context.WithValue(rc.Ctx, authStateKey{}, state)
+	return state
+}
 
 func LoadOrPromptInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
-	// CIRCUIT BREAKER P0: Prevent infinite prompt loops
+	// CIRCUIT BREAKER P0: Prevent infinite prompt loops (context-based, not global)
 	// This addresses the bug where each phase prompts independently
-	if promptAttemptCount >= maxPromptAttempts {
+	authState := getAuthState(rc)
+
+	if authState.PromptAttemptCount >= maxPromptAttempts {
 		log.Error(" Circuit breaker activated: manual prompt limit exceeded",
-			zap.Int("attempts", promptAttemptCount),
+			zap.Int("attempts", authState.PromptAttemptCount),
 			zap.Int("max_attempts", maxPromptAttempts),
-			zap.Time("last_attempt", lastPromptAttemptTime))
+			zap.Time("last_attempt", authState.LastPromptTime))
 		log.Error("This indicates vault_init.json is missing or invalid")
 		log.Info("Recovery options:")
 		log.Info("  1. Run: sudo eos read vault-init --status-only")
 		log.Info("  2. Check if /var/lib/eos/secret/vault_init.json exists")
 		log.Info("  3. Run: sudo eos create vault (will detect and offer recovery)")
-		return nil, fmt.Errorf("authentication prompt limit exceeded (%d attempts): vault_init.json missing or invalid", promptAttemptCount)
+		return nil, fmt.Errorf("authentication prompt limit exceeded (%d attempts): vault_init.json missing or invalid", authState.PromptAttemptCount)
 	}
 
 	var res api.InitResponse
 	if err := ReadFallbackJSON(rc, shared.VaultInitPath, &res); err != nil {
 		log.Warn("Fallback file missing, prompting user once only",
 			zap.Error(err),
-			zap.Int("attempt_count", promptAttemptCount+1))
+			zap.Int("attempt_count", authState.PromptAttemptCount+1))
 
 		// Increment attempt counter BEFORE prompting
-		promptAttemptCount++
-		lastPromptAttemptTime = time.Now()
+		authState.PromptAttemptCount++
+		authState.LastPromptTime = time.Now()
 
 		return PromptForInitResult(rc)
 	}
 	if err := VerifyInitResult(rc, &res); err != nil {
 		log.Warn("Loaded init result invalid, prompting user once only",
 			zap.Error(err),
-			zap.Int("attempt_count", promptAttemptCount+1))
+			zap.Int("attempt_count", authState.PromptAttemptCount+1))
 
 		// Increment attempt counter BEFORE prompting
-		promptAttemptCount++
-		lastPromptAttemptTime = time.Now()
+		authState.PromptAttemptCount++
+		authState.LastPromptTime = time.Now()
 
 		return PromptForInitResult(rc)
 	}
 
 	// Reset counter on successful load
-	promptAttemptCount = 0
+	authState.PromptAttemptCount = 0
 	return &res, nil
 }
 

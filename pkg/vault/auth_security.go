@@ -3,10 +3,12 @@ package vault
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -53,19 +55,25 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 	}{
 		{
 			name:      "vault-agent-token",
-			fn:        readTokenFile(rc, "/run/eos/vault_agent_eos.token"), // More secure runtime location
+			fn:        func(client *api.Client) (string, error) {
+				return tryAgentTokenInteractive(rc, client, VaultAgentTokenPath, AuthContextRuntime)
+			},
 			sensitive: true,
 			priority:  1,
 		},
 		{
 			name:      "approle-auth",
-			fn:        func(client *api.Client) (string, error) { return tryAppRole(rc, client) },
+			fn:        func(client *api.Client) (string, error) {
+				return tryAppRoleInteractive(rc, client, AuthContextRuntime)
+			},
 			sensitive: true,
 			priority:  2,
 		},
 		{
 			name:      "interactive-userpass",
-			fn:        func(client *api.Client) (string, error) { return tryUserpassWithPrompt(rc, client) },
+			fn:        func(client *api.Client) (string, error) {
+				return tryUserpassInteractive(rc, client, AuthContextRuntime)
+			},
 			sensitive: false,
 			priority:  3,
 		},
@@ -93,6 +101,47 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 			attempt.Success = false
 			attempt.ErrorType = categorizeAuthError(err)
 			session.Attempts = append(session.Attempts, attempt)
+
+			// CRITICAL P0 FIX: Fail fast on permission errors for sensitive methods
+			// When running without sudo, vault-agent token and AppRole files are unreadable
+			// Cascading to userpass prompt is confusing - fail immediately with clear error
+			if method.sensitive && attempt.ErrorType == "permission_denied" {
+				// Get current username for error message (use $USER env var as fallback)
+				username := os.Getenv("USER")
+				if username == "" {
+					username = "your-username"
+				}
+
+				log.Error("")
+				log.Error("═══════════════════════════════════════════════════════════")
+				log.Error("Vault authentication failed: Permission Denied")
+				log.Error("═══════════════════════════════════════════════════════════")
+				log.Error("")
+				log.Error("This command requires elevated privileges to access Vault credentials")
+				log.Error("")
+				log.Error("CAUSE:")
+				log.Error("  Authentication method failed due to permission denied",
+					zap.String("method", method.name))
+				log.Error("  Vault Agent token and AppRole credentials require root access")
+				log.Error("")
+				log.Error("REMEDIATION:")
+				log.Error("  Option 1 (Recommended):")
+				log.Error("    Run this command with sudo:")
+				log.Error("      sudo eos [command]")
+				log.Error("")
+				log.Error("  Option 2 (Alternative):")
+				log.Error("    Fix file permissions (may violate security model):")
+				log.Error(fmt.Sprintf("      sudo chown %s:%s %s", username, username, VaultAgentTokenPath))
+				log.Error(fmt.Sprintf("      sudo chown %s:%s %s", username, username, shared.AppRolePaths.RoleID))
+				log.Error(fmt.Sprintf("      sudo chown %s:%s %s", username, username, shared.AppRolePaths.SecretID))
+				log.Error("")
+				log.Error("  Option 3 (If userpass is enabled):")
+				log.Error("    Set up Vault userpass authentication:")
+				log.Error("      sudo eos create vault --enable-userpass")
+				log.Error("")
+
+				return fmt.Errorf("vault authentication failed: permission denied on %s credentials (run with sudo)", method.name)
+			}
 
 			// Log failure without sensitive information
 			log.Warn("Authentication method failed",

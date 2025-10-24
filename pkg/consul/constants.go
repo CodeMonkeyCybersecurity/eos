@@ -238,6 +238,20 @@ const (
 )
 
 // ============================================================================
+// Version Information
+// ============================================================================
+
+const (
+	// ConsulDefaultVersion is the default Consul version to install
+	// RATIONALE: Centralized version management for consistent deployments
+	// SECURITY: Using stable LTS version with security patches
+	// THREAT MODEL: Prevents version drift across nodes
+	// Used by: Cloud-init generation, binary downloads, Docker images
+	// NOTE: Distinct from ConsulVersion variable in cli_vars.go which holds user-specified version
+	ConsulDefaultVersion = "1.19.2"
+)
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
