@@ -87,7 +87,7 @@ func init() {
 	NewKVMPoolCmd.Flags().StringVar(&nomadAddr, "nomad-addr", "", "Nomad server address")
 
 	// Mark required flags
-	NewKVMPoolCmd.MarkFlagRequired("name")
+	_ = NewKVMPoolCmd.MarkFlagRequired("name")
 }
 
 // createOrchestratedKVM creates an orchestrated KVM VM

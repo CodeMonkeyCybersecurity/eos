@@ -149,7 +149,7 @@ func (sim *ServiceInstallationManager) installGrafana(rc *eos_io.RuntimeContext,
 	}
 
 	// Remove existing container if it exists
-	exec.Command("docker", "rm", "-f", containerName).Run()
+	_ = exec.Command("docker", "rm", "-f", containerName).Run()
 
 	// Build docker run command
 	args := []string{

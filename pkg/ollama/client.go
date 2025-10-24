@@ -156,7 +156,7 @@ func (c *Client) PullModel(ctx context.Context, modelName string, progressCallba
 	if err != nil {
 		return fmt.Errorf("failed to pull model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -212,7 +212,7 @@ func (c *Client) TestConnection(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("Ollama not accessible at %s: %w", c.endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Ollama API returned status %d", resp.StatusCode)

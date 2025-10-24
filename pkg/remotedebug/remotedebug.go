@@ -182,7 +182,7 @@ func (rd *RemoteDebugger) connect() error {
 // disconnect closes SSH connection
 func (rd *RemoteDebugger) disconnect() {
 	if rd.client != nil {
-		rd.client.Close()
+		_ = rd.client.Close()
 		rd.client = nil
 	}
 }

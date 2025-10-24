@@ -48,7 +48,7 @@ func (no *NomadOrchestrator) DeployJob(config *JobConfig) (*DeploymentResult, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate job file: %w", err)
 	}
-	defer os.Remove(jobFile) // Cleanup temporary file
+	defer func() { _ = os.Remove(jobFile) }() // Cleanup temporary file
 
 	// Deploy job
 	if err := no.deployJobFile(jobFile); err != nil {

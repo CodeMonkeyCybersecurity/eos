@@ -306,8 +306,8 @@ func (vu *VaultUninstaller) Stop() error {
 	}
 
 	// Reset failed state to clean up systemd completely
-	exec.Command("systemctl", "reset-failed", "vault.service").Run()
-	exec.Command("systemctl", "reset-failed", "vault-agent.service").Run()
+	_ = exec.Command("systemctl", "reset-failed", "vault.service").Run()
+	_ = exec.Command("systemctl", "reset-failed", "vault-agent.service").Run()
 
 	vu.logger.Info("Vault services stopped and cleaned")
 	return nil
@@ -370,7 +370,7 @@ func (vu *VaultUninstaller) RemovePackage() error {
 
 	// Autoremove on Debian-based systems
 	if vu.config.Distro == "debian" {
-		exec.Command("apt-get", "autoremove", "-y").Run()
+		_ = exec.Command("apt-get", "autoremove", "-y").Run()
 	}
 
 	return nil

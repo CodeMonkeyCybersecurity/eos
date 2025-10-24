@@ -37,10 +37,10 @@ func Acquire() (*Lock, error) {
 		if err == nil {
 			// Lock acquired
 			// Write PID for debugging
-			file.Truncate(0)
-			file.Seek(0, 0)
-			fmt.Fprintf(file, "%d\n", os.Getpid())
-			file.Sync()
+			_ = file.Truncate(0)
+			_, _ = file.Seek(0, 0)
+			_, _ = fmt.Fprintf(file, "%d\n", os.Getpid())
+			_ = file.Sync()
 
 			return &Lock{
 				file: file,
@@ -52,7 +52,7 @@ func Acquire() (*Lock, error) {
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	file.Close()
+	_ = file.Close()
 
 	// Read PID of lock holder
 	lockData, _ := os.ReadFile(lockFilePath)

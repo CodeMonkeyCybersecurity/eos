@@ -69,7 +69,7 @@ func UnjoinNodes(rc *eos_io.RuntimeContext, cfg *NodeUnjoinConfig) (*NodeUnjoinR
 		if err != nil {
 			return nil, err
 		}
-		defer syncLock.Release()
+		defer func() { _ = syncLock.Release() }()
 		logger.Debug("Lock acquired")
 	} else {
 		logger.Info("[1/10] Skipping lock (dry-run mode)")
@@ -281,7 +281,7 @@ func UnjoinNodes(rc *eos_io.RuntimeContext, cfg *NodeUnjoinConfig) (*NodeUnjoinR
 		// Validation failed - restore backup
 		if backupPath != "" {
 			logger.Error("Configuration validation failed, restoring backup")
-			os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
+			_ = os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
 		}
 		return nil, err
 	}

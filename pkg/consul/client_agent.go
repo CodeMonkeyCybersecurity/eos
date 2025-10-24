@@ -255,7 +255,7 @@ func downloadAndInstallConsulBinary(rc *eos_io.RuntimeContext, version string) e
 	}
 
 	// Cleanup
-	os.Remove(tmpFile)
+	_ = os.Remove(tmpFile)
 
 	logger.Info("Consul binary installed successfully",
 		zap.String("version", version))

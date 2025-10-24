@@ -463,7 +463,7 @@ func (sm *StateManager) RestoreState(rc *eos_io.RuntimeContext, backupPath strin
 	if _, err := tmpFile.Write(data); err != nil {
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Import into Consul
 	output, err := execute.Run(rc.Ctx, execute.Options{

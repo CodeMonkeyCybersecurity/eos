@@ -66,7 +66,7 @@ func init() {
 	vmLibvirtCmd.Flags().BoolVar(&vmDryRun, "dry-run", false, "Show what would be done without executing")
 	vmLibvirtCmd.Flags().StringVar(&vmStoragePool, "storage-pool", "default", "Storage pool for VM disks")
 
-	vmLibvirtCmd.MarkFlagRequired("name")
+	_ = vmLibvirtCmd.MarkFlagRequired("name")
 }
 
 func createVMLibvirt(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

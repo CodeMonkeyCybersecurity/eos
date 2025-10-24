@@ -522,7 +522,7 @@ func (n *NetworkHelper) GetWithRetry(ctx context.Context, url string) (*http.Res
 		}
 
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		lastErr = err

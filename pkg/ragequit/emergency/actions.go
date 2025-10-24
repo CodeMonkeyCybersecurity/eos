@@ -159,7 +159,7 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 		// Send email using direct command execution (no shell)
 		emailCmd := exec.Command("mail", "-s", fmt.Sprintf("RAGEQUIT: %s", hostname), "root")
 		emailCmd.Stdin = strings.NewReader(message)
-		emailCmd.Run() // Errors logged below
+		_ = emailCmd.Run() // Errors logged below
 	} else if system.CommandExists("sendmail") {
 		// Fallback to sendmail
 		emailCmd := exec.Command("sendmail", "root")

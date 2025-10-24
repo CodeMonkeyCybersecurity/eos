@@ -410,7 +410,7 @@ func stopNomadJobs(rc *eos_io.RuntimeContext) error {
 		if len(fields) > 0 {
 			jobName := fields[0]
 			logger.Info("Stopping Nomad job", zap.String("job", jobName))
-			cli.ExecToSuccess("nomad", "job", "stop", "-purge", jobName)
+			_ = cli.ExecToSuccess("nomad", "job", "stop", "-purge", jobName)
 		}
 	}
 
@@ -480,7 +480,7 @@ func cleanupSystemdServices(rc *eos_io.RuntimeContext) {
 	// All systemd files are now handled by their respective lifecycle managers
 	// Just reload systemd to ensure any removed services are cleaned up
 	cli := eos_cli.New(rc)
-	cli.ExecToSuccess("systemctl", "daemon-reload")
+	_ = cli.ExecToSuccess("systemctl", "daemon-reload")
 }
 
 // cleanupAPTSources is now obsolete as all components handle their own APT sources
@@ -496,7 +496,7 @@ func cleanupAPTSources(rc *eos_io.RuntimeContext) {
 // cleanupAPTPackages delegates to the system package lifecycle manager
 func cleanupAPTPackages(rc *eos_io.RuntimeContext, cli *eos_cli.CLI) {
 	// Delegate to the system package for proper APT cleanup
-	system.CleanupAPTPackages(rc)
+	_ = system.CleanupAPTPackages(rc)
 }
 
 func fileExists(path string) bool {

@@ -351,12 +351,12 @@ func createTempScriptFile(content string) (string, error) {
 
 	_, err = tmpFile.WriteString(content)
 	if err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		_ = os.Remove(tmpFile.Name())
 		return "", err
 	}
 
-	tmpFile.Close()
+	_ = tmpFile.Close()
 	return tmpFile.Name(), nil
 }
 

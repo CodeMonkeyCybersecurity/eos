@@ -111,7 +111,7 @@ func NewCephClient(rc *eos_io.RuntimeContext, config *ClientConfig) (*CephClient
 	// EVALUATE: Verify connection
 	logger.Info("Verifying Ceph connection")
 	if err := client.verifyConnection(); err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, fmt.Errorf("connection verification failed: %w", err)
 	}
 

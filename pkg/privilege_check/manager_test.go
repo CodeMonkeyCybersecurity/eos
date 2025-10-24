@@ -393,7 +393,7 @@ func TestOutputColoredMessage(t *testing.T) {
 		})
 	}
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 }
 

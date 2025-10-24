@@ -287,7 +287,7 @@ func generatePasswordHash(password string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create secure temp dir: %w", err)
 	}
-	defer os.RemoveAll(secureDir)
+	defer func() { _ = os.RemoveAll(secureDir) }()
 
 	// Create temp file in secure directory
 	tmpFile, err := os.CreateTemp(secureDir, "eos-pass-*")
@@ -299,7 +299,7 @@ func generatePasswordHash(password string) (string, error) {
 	// Permissions already 0600 from CreateTemp, but directory is 0700 so only owner can list
 
 	if _, err := tmpFile.WriteString(password); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return "", fmt.Errorf("failed to write password: %w", err)
 	}
 	_ = tmpFile.Close()

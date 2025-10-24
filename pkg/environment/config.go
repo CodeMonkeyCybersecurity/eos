@@ -302,7 +302,7 @@ func (em *EnvironmentManager) storeInConsul(ctx context.Context, env *Deployment
 			Key:   key,
 			Value: []byte(value),
 		}
-		em.consulClient.KV().Put(pair, nil)
+		_, _ = em.consulClient.KV().Put(pair, nil)
 	}
 
 	return nil

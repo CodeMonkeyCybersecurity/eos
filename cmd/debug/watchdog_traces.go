@@ -276,7 +276,7 @@ func showSessionDetail(rc *eos_io.RuntimeContext, traceDir, sessionID string) er
 
 func countWarnings(sessionPath string) int {
 	count := 0
-	filepath.Walk(sessionPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(sessionPath, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() && strings.HasPrefix(info.Name(), "warning-") {
 			count++
 		}
@@ -309,7 +309,7 @@ func getSessionSummary(sessionPath string) string {
 
 func getDirectorySize(path string) int64 {
 	var size int64
-	filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			size += info.Size()
 		}

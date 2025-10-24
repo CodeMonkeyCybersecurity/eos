@@ -29,7 +29,7 @@ func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeManagementC
 		logger.Error("Failed to create Docker manager", zap.Error(err))
 		return nil, fmt.Errorf("failed to create docker manager: %w", err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// List running containers using SDK
 	containers, err := manager.ListRunning(rc.Ctx)

@@ -71,7 +71,7 @@ func TestAPITokenSecurity(t *testing.T) {
 
 		// Simulate token usage
 		_ = os.Setenv("HCLOUD_TOKEN", testToken)
-		defer os.Unsetenv("HCLOUD_TOKEN")
+		defer func() { _ = os.Unsetenv("HCLOUD_TOKEN") }()
 
 		// Token should not appear in string representations
 		tokenValue := os.Getenv("HCLOUD_TOKEN")

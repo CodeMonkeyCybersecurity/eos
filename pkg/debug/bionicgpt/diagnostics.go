@@ -1009,7 +1009,7 @@ func LiteLLMErrorLogsDiagnostic() *debug.Diagnostic {
 				logger.Error("Failed to create Docker manager", zap.Error(err))
 				return result, nil
 			}
-			defer mgr.Close()
+			defer func() { _ = mgr.Close() }()
 
 			// Get logs from litellm container via SDK
 			logReader, err := mgr.Logs(ctx, bionicgpt.ContainerLiteLLM, container.LogOptions{
@@ -1026,7 +1026,7 @@ func LiteLLMErrorLogsDiagnostic() *debug.Diagnostic {
 				logger.Error("Failed to get litellm logs", zap.Error(err))
 				return result, nil
 			}
-			defer logReader.Close()
+			defer func() { _ = logReader.Close() }()
 
 			// Filter logs for error patterns
 			errorLines := filterLogsForErrors(logReader, 20)
@@ -1098,7 +1098,7 @@ func getContainerLogs(ctx context.Context, containerName string, tail string) (s
 		logger.Error("Failed to create Docker manager", zap.Error(err))
 		return "", fmt.Errorf("failed to initialize Docker SDK: %w", err)
 	}
-	defer mgr.Close()
+	defer func() { _ = mgr.Close() }()
 
 	// Get logs via SDK
 	logReader, err := mgr.Logs(ctx, containerName, container.LogOptions{
@@ -1113,7 +1113,7 @@ func getContainerLogs(ctx context.Context, containerName string, tail string) (s
 			zap.Error(err))
 		return "", fmt.Errorf("failed to get logs for %s: %w", containerName, err)
 	}
-	defer logReader.Close()
+	defer func() { _ = logReader.Close() }()
 
 	// Read all log content
 	logBytes, err := io.ReadAll(logReader)

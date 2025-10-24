@@ -39,7 +39,7 @@ func PreflightCheck(rc *eos_io.RuntimeContext, services []ServiceType, workload 
 
 	// Add services to calculator
 	for _, svcType := range services {
-		calculator.AddService(svcType)
+		_ = calculator.AddService(svcType)
 	}
 
 	result, err := calculator.Calculate(rc)

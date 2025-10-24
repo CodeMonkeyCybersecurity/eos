@@ -368,7 +368,7 @@ func runCreateVaultNative(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		logger.Error("Failed to create logger for vault enablement", zap.Error(err))
 		return fmt.Errorf("create logger: %w", err)
 	}
-	defer zapLogger.Sync()
+	defer func() { _ = zapLogger.Sync() }()
 
 	if err := vault.EnableVault(rc, nil, zapLogger); err != nil {
 		logger.Error("Failed to enable Vault", zap.Error(err))

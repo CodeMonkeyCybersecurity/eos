@@ -163,7 +163,7 @@ func runInteractiveCephCreate(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 		if replStr == "" {
 			cephVolumeReplication = 3
 		} else {
-			fmt.Sscanf(replStr, "%d", &cephVolumeReplication)
+			_, _ = fmt.Sscanf(replStr, "%d", &cephVolumeReplication)
 		}
 
 		// Set defaults for pools
@@ -206,7 +206,7 @@ func runInteractiveCephCreate(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 		if pgStr == "" {
 			cephPoolPGNum = 128
 		} else {
-			fmt.Sscanf(pgStr, "%d", &cephPoolPGNum)
+			_, _ = fmt.Sscanf(pgStr, "%d", &cephPoolPGNum)
 		}
 
 		sizeStr, err := eos_io.PromptInput(rc, "Replication size [3]: ", "replication_size")
@@ -216,7 +216,7 @@ func runInteractiveCephCreate(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 		if sizeStr == "" {
 			cephPoolSize = 3
 		} else {
-			fmt.Sscanf(sizeStr, "%d", &cephPoolSize)
+			_, _ = fmt.Sscanf(sizeStr, "%d", &cephPoolSize)
 		}
 
 		cephPoolType, err = eos_io.PromptInput(rc, "Pool type (replicated/erasure) [replicated]: ", "pool_type")
@@ -265,7 +265,7 @@ func runCephCreate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Ceph client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Execute requested operation
 	if cephVolumeName != "" {

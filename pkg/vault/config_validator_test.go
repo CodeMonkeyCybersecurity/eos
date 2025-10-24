@@ -349,7 +349,7 @@ api_addr = "https://shared.GetInternalHostname:8179"
 			}
 
 			// Use the new structured validation via validateParsedConfig
-			validateParsedConfig(rc, tt.content, result)
+			_ = validateParsedConfig(rc, tt.content, result)
 
 			if len(result.Errors) != tt.expectErrors {
 				t.Errorf("Expected %d errors, got %d: %v",

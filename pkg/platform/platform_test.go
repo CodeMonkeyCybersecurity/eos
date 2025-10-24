@@ -244,7 +244,7 @@ func TestGetShellType(t *testing.T) {
 
 			// Save original environment
 			originalShell := os.Getenv("SHELL")
-			defer os.Setenv("SHELL", originalShell)
+			defer func() { _ = os.Setenv("SHELL", originalShell) }()
 
 			// Set test environment
 			_ = os.Setenv("SHELL", tt.Input.shellEnv)
@@ -290,7 +290,7 @@ func TestGetHomeDir(t *testing.T) {
 
 			// Save original environment
 			originalHome := os.Getenv("HOME")
-			defer os.Setenv("HOME", originalHome)
+			defer func() { _ = os.Setenv("HOME", originalHome) }()
 
 			// Set test environment
 			if tt.Input.homeEnv != "" {

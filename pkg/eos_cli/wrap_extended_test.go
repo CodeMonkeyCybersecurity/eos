@@ -175,7 +175,7 @@ func TestSanitizeCommandInputsExtended(t *testing.T) {
 			args:    []string{},
 			setupFlags: func(cmd *cobra.Command) {
 				cmd.Flags().String("file", "", "file path")
-				cmd.Flags().Set("file", "../../sensitive/file")
+				_ = cmd.Flags().Set("file", "../../sensitive/file")
 			},
 			expectError: true,
 			errorMsg:    "path traversal",

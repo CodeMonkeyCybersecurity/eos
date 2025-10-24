@@ -44,7 +44,7 @@ func FixMattermostPermissions(rc *eos_io.RuntimeContext, config *Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// Step 1: ASSESS - Check if container exists and is running
 	logger.Info("Step 1: Checking Mattermost container status")
@@ -348,7 +348,7 @@ func watchContainerLogs(rc *eos_io.RuntimeContext, cli *client.Client, container
 	if err != nil {
 		return fmt.Errorf("failed to get container logs: %w", err)
 	}
-	defer logs.Close()
+	defer func() { _ = logs.Close() }()
 
 	logger.Info("Watching container logs",
 		zap.String("container_id", containerID[:12]),

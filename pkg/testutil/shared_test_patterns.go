@@ -82,7 +82,7 @@ func (tsm *TestServiceManager) CreateTestService(t *testing.T, config *shared.Se
 	
 	// Register cleanup function
 	t.Cleanup(func() {
-		tsm.serviceManager.RemoveService(config.Name)
+		_ = tsm.serviceManager.RemoveService(config.Name)
 	})
 	
 	return nil
@@ -102,7 +102,7 @@ func (tsm *TestServiceManager) RunServiceTests(t *testing.T, testCases []Service
 			// Cleanup
 			if tc.CleanupFunc != nil {
 				t.Cleanup(func() {
-					tc.CleanupFunc(t)
+					_ = tc.CleanupFunc(t)
 				})
 			}
 			

@@ -227,7 +227,7 @@ func (c *SSHClient) IsConnected() bool {
 	if err != nil {
 		return false
 	}
-	session.Close()
+	_ = session.Close()
 	return true
 }
 

@@ -106,15 +106,15 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 	// Required flags
 	bionicgptCmd.Flags().StringVar(&bionicgptDomain, "domain", "",
 		"Public domain for BionicGPT (e.g., chat.example.com) [REQUIRED]")
-	bionicgptCmd.MarkFlagRequired("domain")
+	_ = bionicgptCmd.MarkFlagRequired("domain")
 
 	bionicgptCmd.Flags().StringVar(&bionicgptCloudNode, "cloud-node", "",
 		"Cloud node hostname for Hecate/Authentik (Tailscale name) [REQUIRED]")
-	bionicgptCmd.MarkFlagRequired("cloud-node")
+	_ = bionicgptCmd.MarkFlagRequired("cloud-node")
 
 	bionicgptCmd.Flags().StringVar(&bionicgptAuthURL, "auth-url", "",
 		"Authentik URL (e.g., https://auth.example.com) [REQUIRED]")
-	bionicgptCmd.MarkFlagRequired("auth-url")
+	_ = bionicgptCmd.MarkFlagRequired("auth-url")
 
 	// Authentication configuration
 	bionicgptCmd.Flags().StringVar(&bionicgptSuperadminGroup, "superadmin-group", "bionicgpt-superadmin",

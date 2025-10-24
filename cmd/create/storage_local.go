@@ -38,7 +38,7 @@ func init() {
 	StorageLocalCmd.Flags().StringSliceVar(&localOptions, "options", []string{}, "Mount options")
 	StorageLocalCmd.Flags().BoolVar(&forceFormat, "force", false, "Force format even if device has data")
 
-	StorageLocalCmd.MarkFlagRequired("mount")
+	_ = StorageLocalCmd.MarkFlagRequired("mount")
 }
 
 func runCreateStorageLocal(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

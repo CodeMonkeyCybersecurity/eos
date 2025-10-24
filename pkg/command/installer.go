@@ -232,7 +232,7 @@ func (ci *CommandInstaller) writeWithSudo(ctx context.Context, path, content str
 	if err != nil {
 		return fmt.Errorf("failed to create secure temp dir: %w", err)
 	}
-	defer os.RemoveAll(secureDir)
+	defer func() { _ = os.RemoveAll(secureDir) }()
 
 	// Create temporary file in secure directory
 	tmpFile, err := os.CreateTemp(secureDir, "eos-cmd-*")
@@ -243,7 +243,7 @@ func (ci *CommandInstaller) writeWithSudo(ctx context.Context, path, content str
 
 	// Write content to temp file
 	if _, err := tmpFile.WriteString(content); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 	tmpFile.Close()

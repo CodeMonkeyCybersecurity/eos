@@ -196,7 +196,7 @@ func (ei *EnterpriseInstaller) checkHTTPEndpoint(deadline time.Time) error {
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusSeeOther {
 			logger.Debug("HTTP endpoint responding", zap.Int("status_code", resp.StatusCode))

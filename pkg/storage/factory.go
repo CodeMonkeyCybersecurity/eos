@@ -88,7 +88,7 @@ func (r *DriverRegistry) registerDefaultDrivers() {
 
 
 	// Register Docker Volume driver
-	r.Register(StorageType("docker"), &DockerVolumeDriverFactory{})
+	_ = r.Register(StorageType("docker"), &DockerVolumeDriverFactory{})
 }
 
 // LVMDriverFactory creates LVM storage drivers

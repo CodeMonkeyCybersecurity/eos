@@ -106,7 +106,7 @@ func (bi *BoundaryInstaller) Install() error {
 
 	tmpDir := "/tmp/boundary-install"
 	_ = os.MkdirAll(tmpDir, 0755)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download and extract
 	if err := bi.runner.Run("wget", "-O", tmpDir+"/boundary.zip", downloadURL); err != nil {
@@ -137,8 +137,8 @@ func (bi *BoundaryInstaller) Install() error {
 	_ = os.MkdirAll("/etc/boundary.d", 0755)
 	_ = os.MkdirAll("/var/lib/boundary", 0700)
 	_ = os.MkdirAll("/var/log/boundary", 0755)
-	bi.runner.Run("chown", "-R", "boundary:boundary", "/var/lib/boundary")
-	bi.runner.Run("chown", "-R", "boundary:boundary", "/var/log/boundary")
+	_ = bi.runner.Run("chown", "-R", "boundary:boundary", "/var/lib/boundary")
+	_ = bi.runner.Run("chown", "-R", "boundary:boundary", "/var/log/boundary")
 
 	// Write basic configuration
 	if bi.config.DevMode {
@@ -182,7 +182,7 @@ kms "aead" {
   key_id = "global_recovery"
 }`, shared.GetInternalHostname(), shared.GetInternalHostname())
 		_ = os.WriteFile("/etc/boundary.d/boundary.hcl", []byte(config), 0640)
-		bi.runner.Run("chown", "boundary:boundary", "/etc/boundary.d/boundary.hcl")
+		_ = bi.runner.Run("chown", "boundary:boundary", "/etc/boundary.d/boundary.hcl")
 	}
 
 	// Setup systemd service

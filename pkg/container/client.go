@@ -39,7 +39,7 @@ func NewManager(rc *eos_io.RuntimeContext) (*Manager, error) {
 	// Verify connection by pinging Docker daemon
 	_, err = cli.Ping(rc.Ctx)
 	if err != nil {
-		cli.Close()
+		_ = cli.Close()
 		return nil, fmt.Errorf("failed to connect to docker daemon: %w", err)
 	}
 

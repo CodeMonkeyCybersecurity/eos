@@ -80,9 +80,9 @@ func installPostgreSQL(ctx context.Context, config *TemporalConfig) error {
 	logger.Info("Installing PostgreSQL")
 
 	// Add repository
-	exec.CommandContext(ctx, "sh", "-c", "wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -").Run()
-	exec.CommandContext(ctx, "sh", "-c", "echo 'deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main' > /etc/apt/sources.list.d/pgdg.list").Run()
-	exec.CommandContext(ctx, "apt-get", "update", "-qq").Run()
+	_ = exec.CommandContext(ctx, "sh", "-c", "wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -").Run()
+	_ = exec.CommandContext(ctx, "sh", "-c", "echo 'deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main' > /etc/apt/sources.list.d/pgdg.list").Run()
+	_ = exec.CommandContext(ctx, "apt-get", "update", "-qq").Run()
 
 	// Install
 	pkgName := fmt.Sprintf("postgresql-%s", config.PostgreSQLVersion)
@@ -133,11 +133,11 @@ func installTemporalCLI(ctx context.Context, config *TemporalConfig) error {
 
 	cmd := exec.CommandContext(ctx, "tar", "xzf", tarFile)
 	cmd.Dir = "/tmp"
-	cmd.Run()
+	_ = cmd.Run()
 
 	exec.CommandContext(ctx, "mv", "/tmp/temporal", "/usr/local/bin/temporal").Run()
 	exec.CommandContext(ctx, "chmod", "+x", "/usr/local/bin/temporal").Run()
-	os.Remove(tmpPath)
+	_ = os.Remove(tmpPath)
 
 	logger.Info("Temporal CLI installed")
 	return nil
@@ -146,16 +146,16 @@ func installTemporalCLI(ctx context.Context, config *TemporalConfig) error {
 func createConfiguration(ctx context.Context, config *TemporalConfig) error {
 	logger := otelzap.Ctx(ctx)
 
-	os.MkdirAll(config.InstallDir, 0755)
+	_ = os.MkdirAll(config.InstallDir, 0755)
 	configDir := filepath.Join(config.InstallDir, "config")
-	os.MkdirAll(configDir, 0755)
-	os.MkdirAll(config.DataDir, 0755)
+	_ = os.MkdirAll(configDir, 0755)
+	_ = os.MkdirAll(config.DataDir, 0755)
 
 	configYAML := generateConfigYAML(config)
-	os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configYAML), 0644)
+	_ = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configYAML), 0644)
 
 	dynamicYAML := generateDynamicConfigYAML(config)
-	os.WriteFile(filepath.Join(configDir, "dynamic_config.yaml"), []byte(dynamicYAML), 0644)
+	_ = os.WriteFile(filepath.Join(configDir, "dynamic_config.yaml"), []byte(dynamicYAML), 0644)
 
 	logger.Info("Configuration files created")
 	return nil
@@ -223,7 +223,7 @@ SyslogIdentifier=temporal-iris
 WantedBy=multi-user.target
 `, config.InstallDir, config.InstallDir, config.UIPort)
 
-	os.WriteFile("/etc/systemd/system/temporal-iris.service", []byte(serviceContent), 0644)
+	_ = os.WriteFile("/etc/systemd/system/temporal-iris.service", []byte(serviceContent), 0644)
 	exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
 
 	logger.Info("Systemd service created")

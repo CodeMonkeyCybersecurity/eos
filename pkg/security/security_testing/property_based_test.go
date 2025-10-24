@@ -278,7 +278,7 @@ func generateRandomInput() string {
 
 	// Sometimes inject known dangerous patterns (30% chance)
 	randBytes := make([]byte, 4)
-	rand.Read(randBytes)
+	_, _ = rand.Read(randBytes)
 	shouldInject := binary.BigEndian.Uint32(randBytes)%100 < 30
 
 	if shouldInject && result.Len() > 0 {

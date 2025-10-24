@@ -68,7 +68,7 @@ func init() {
 	storageUnifiedCmd.Flags().BoolVar(&unifiedDryRun, "dry-run", false, "Show what would be done")
 	storageUnifiedCmd.Flags().BoolVar(&unifiedForce, "force", false, "Force operation")
 
-	storageUnifiedCmd.MarkFlagRequired("name")
+	_ = storageUnifiedCmd.MarkFlagRequired("name")
 }
 
 func createStorageUnified(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

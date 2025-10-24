@@ -122,12 +122,12 @@ func CaptureStdoutFunc(rc *eos_io.RuntimeContext, serviceName string, fn func() 
 	fnErr := fn()
 
 	// Restore original stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = originalStdout
 
 	// Wait for copy to finish
 	<-done
-	r.Close()
+	_ = r.Close()
 
 	// Get captured output
 	output := buf.String()

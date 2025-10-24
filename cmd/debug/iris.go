@@ -578,7 +578,7 @@ func checkPortStatusWithResult(rc *eos_io.RuntimeContext, config *IrisConfig) ch
 				zap.String("service", p.service))
 			continue
 		}
-		conn.Close()
+		_ = conn.Close()
 
 		// Get process info using lsof
 		cmd := exec.CommandContext(rc.Ctx, "lsof", "-i", fmt.Sprintf(":%d", p.port), "-t")

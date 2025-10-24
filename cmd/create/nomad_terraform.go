@@ -277,7 +277,7 @@ func init() {
 	CreateNomadTerraformCmd.Flags().String("domain", "", "Primary domain for the cluster")
 	CreateNomadTerraformCmd.Flags().String("output-dir", "./nomad-consul-terraform", "Output directory for Terraform files")
 	CreateNomadTerraformCmd.Flags().String("cluster-name", "nomad-consul-cluster", "Name for the cluster")
-	CreateNomadTerraformCmd.MarkFlagRequired("domain")
+	_ = CreateNomadTerraformCmd.MarkFlagRequired("domain")
 
 	// Cloud deployment
 	CreateNomadTerraformCmd.Flags().Bool("cloud", false, "Deploy to cloud infrastructure")

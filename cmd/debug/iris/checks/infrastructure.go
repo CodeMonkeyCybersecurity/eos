@@ -207,7 +207,7 @@ func CheckPortStatusWithResult(rc *eos_io.RuntimeContext) iris.CheckResult {
 				zap.String("service", p.service))
 			continue
 		}
-		conn.Close()
+		_ = conn.Close()
 
 		// Get process info using lsof
 		cmd := exec.CommandContext(rc.Ctx, "lsof", "-i", fmt.Sprintf(":%d", p.port), "-t")
@@ -331,7 +331,7 @@ func CheckTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			Details:     fmt.Sprintf("systemd status: %s", systemdStatus),
 		}
 	}
-	conn.Close()
+	_ = conn.Close()
 	logger.Debug("Temporal gRPC port listening", zap.String("hostPort", hostPort))
 	healthDetails = append(healthDetails, fmt.Sprintf("✓ gRPC port %s listening", hostPort))
 
@@ -353,7 +353,7 @@ func CheckTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			logger.Warn("Temporal UI not reachable", zap.String("url", healthURL), zap.Error(err))
 			healthDetails = append(healthDetails, fmt.Sprintf("✗ UI not reachable at %s", httpPort))
 		} else {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			logger.Debug("Temporal UI reachable", zap.String("url", healthURL), zap.Int("status", resp.StatusCode))
 			healthDetails = append(healthDetails, fmt.Sprintf("✓ UI reachable at %s", httpPort))
 		}

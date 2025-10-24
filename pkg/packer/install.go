@@ -80,7 +80,7 @@ func (pi *PackerInstaller) Install() error {
 
 	tmpDir := "/tmp/packer-install"
 	_ = os.MkdirAll(tmpDir, 0755)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download and extract
 	if err := pi.runner.Run("wget", "-O", tmpDir+"/packer.zip", downloadURL); err != nil {

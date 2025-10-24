@@ -146,7 +146,7 @@ Examples:
 			if err := os.WriteFile(tempYAMLPath, yamlData, 0644); err != nil {
 				return fmt.Errorf("failed to write temp config: %w", err)
 			}
-			defer os.Remove(tempYAMLPath)
+			defer func() { _ = os.Remove(tempYAMLPath) }()
 
 			config, err = hecate.LoadYAMLConfig(rc, tempYAMLPath)
 			if err != nil {

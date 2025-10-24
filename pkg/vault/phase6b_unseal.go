@@ -285,7 +285,7 @@ func handleInitMaterial(rc *eos_io.RuntimeContext, initRes *api.InitResponse) er
 	// STEP 3: Wait for user to confirm they've saved the credentials
 	logger.Info("terminal prompt: Press ENTER after you have SAVED the credentials to your password manager...")
 	fmt.Fprintf(os.Stderr, "Press ENTER to continue...")
-	bufio.NewReader(os.Stdin).ReadBytes('\n')
+	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 
 	// STEP 4: Verify they saved it by re-entering credentials
 	if err := ConfirmUnsealMaterialSaved(rc, initRes); err != nil {

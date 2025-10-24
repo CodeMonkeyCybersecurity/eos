@@ -184,7 +184,7 @@ func GenerateSelfSignedCertificate(rc *eos_io.RuntimeContext, config *Certificat
 		log.Error("Failed to create certificate file", zap.Error(err))
 		return fmt.Errorf("create cert file: %w", err)
 	}
-	defer certFile.Close()
+	defer func() { _ = certFile.Close() }()
 
 	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes}); err != nil {
 		log.Error("Failed to write certificate", zap.Error(err))
@@ -203,7 +203,7 @@ func GenerateSelfSignedCertificate(rc *eos_io.RuntimeContext, config *Certificat
 		log.Error("Failed to create key file", zap.Error(err))
 		return fmt.Errorf("create key file: %w", err)
 	}
-	defer keyFile.Close()
+	defer func() { _ = keyFile.Close() }()
 
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	if err := pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateKeyBytes}); err != nil {

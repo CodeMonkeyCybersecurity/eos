@@ -86,7 +86,7 @@ func init() {
 	cephSnapshotsCmd.Flags().BoolVar(&cephUseConsul, "use-consul", false, "Discover monitors from Consul")
 	cephSnapshotsCmd.Flags().StringVar(&cephVolumeName, "volume", "", "Volume to list snapshots for (required)")
 	cephSnapshotsCmd.Flags().StringVarP(&cephOutputFormat, "format", "f", "text", "Output format: text, json, yaml")
-	cephSnapshotsCmd.MarkFlagRequired("volume")
+	_ = cephSnapshotsCmd.MarkFlagRequired("volume")
 
 	// Pools subcommand flags
 	cephPoolsCmd.Flags().StringSliceVar(&cephMonHosts, "monitors", []string{}, "Ceph monitor addresses")
@@ -164,7 +164,7 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to initialize Ceph client: %w", err)
 		}
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 
 		// List volumes
 		volumes, err := client.ListVolumes(rc)
@@ -219,7 +219,7 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to initialize Ceph client: %w", err)
 		}
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 
 		// List snapshots
 		snapshots, err := client.ListSnapshots(rc, cephVolumeName, "")

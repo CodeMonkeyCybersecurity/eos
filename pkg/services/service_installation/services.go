@@ -426,7 +426,7 @@ func isPortAvailable(port int) bool {
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 
@@ -472,7 +472,7 @@ func checkServicePort(port int) HealthCheck {
 
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), 5*time.Second)
 	if err == nil {
-		conn.Close()
+		_ = conn.Close()
 		check.Status = "healthy"
 		check.Message = fmt.Sprintf("Port %d is responding", port)
 	}

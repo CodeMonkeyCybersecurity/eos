@@ -60,7 +60,7 @@ func init() {
 	storageUdisks2Cmd.Flags().BoolVar(&udisks2Force, "force", false, "Force operation even if device has existing data")
 	storageUdisks2Cmd.Flags().BoolVar(&udisks2DryRun, "dry-run", false, "Show what would be done without executing")
 
-	storageUdisks2Cmd.MarkFlagRequired("device")
+	_ = storageUdisks2Cmd.MarkFlagRequired("device")
 }
 
 func createStorageUdisks2(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

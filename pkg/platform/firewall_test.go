@@ -357,6 +357,6 @@ func BenchmarkAllowPorts(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		AllowPorts(rc, ports)
+		_ = AllowPorts(rc, ports)
 	}
 }

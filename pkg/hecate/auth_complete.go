@@ -106,7 +106,7 @@ func (c *AuthentikClient) CreateFlow(rc *eos_io.RuntimeContext, flow *AuthFlow) 
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		return fmt.Errorf("API error %d: %v", resp.StatusCode, errResp)
 	}
 	
@@ -207,7 +207,7 @@ func (c *AuthentikClient) CreateProvider(rc *eos_io.RuntimeContext, provider *Au
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		return fmt.Errorf("API error %d: %v", resp.StatusCode, errResp)
 	}
 	
@@ -269,7 +269,7 @@ func (c *AuthentikClient) CreateApplication(rc *eos_io.RuntimeContext, app *Auth
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		return fmt.Errorf("API error %d: %v", resp.StatusCode, errResp)
 	}
 	

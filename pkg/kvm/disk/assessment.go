@@ -42,7 +42,7 @@ func Assess(ctx context.Context, vmName string, change *SizeChange) (*Assessment
 	if err != nil {
 		return nil, fmt.Errorf("VM not found: %w", err)
 	}
-	defer domain.Free()
+	defer func() { _ = domain.Free() }()
 
 	// Check VM state
 	if err := a.checkVMState(ctx, domain); err != nil {
@@ -182,7 +182,7 @@ func (a *Assessment) checkSnapshots(ctx context.Context, domain *libvirt.Domain)
 
 	// Free snapshot handles
 	for _, snap := range snapshots {
-		snap.Free()
+		_ = snap.Free()
 	}
 
 	if a.HasSnapshots {

@@ -37,19 +37,19 @@ Examples:
 			if subCmd.Name() == "nuke" {
 				// Copy flag values
 				if cmd.Flags().Changed("all") {
-					subCmd.Flags().Set("all", cmd.Flag("all").Value.String())
+					_ = subCmd.Flags().Set("all", cmd.Flag("all").Value.String())
 				}
 				if cmd.Flags().Changed("force") {
-					subCmd.Flags().Set("force", cmd.Flag("force").Value.String())
+					_ = subCmd.Flags().Set("force", cmd.Flag("force").Value.String())
 				}
 				if cmd.Flags().Changed("keep-data") {
-					subCmd.Flags().Set("keep-data", cmd.Flag("keep-data").Value.String())
+					_ = subCmd.Flags().Set("keep-data", cmd.Flag("keep-data").Value.String())
 				}
 				if cmd.Flags().Changed("exclude") {
-					subCmd.Flags().Set("exclude", cmd.Flag("exclude").Value.String())
+					_ = subCmd.Flags().Set("exclude", cmd.Flag("exclude").Value.String())
 				}
 				if cmd.Flags().Changed("dev") {
-					subCmd.Flags().Set("dev", cmd.Flag("dev").Value.String())
+					_ = subCmd.Flags().Set("dev", cmd.Flag("dev").Value.String())
 				}
 
 				// Execute the actual command

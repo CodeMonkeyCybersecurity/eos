@@ -24,8 +24,8 @@ func WriteConfigAtomic(configPath string, content []byte) error {
 	// Ensure cleanup on failure
 	defer func() {
 		if tempFile != nil {
-			tempFile.Close()
-			os.Remove(tempPath)
+			_ = tempFile.Close()
+			_ = os.Remove(tempPath)
 		}
 	}()
 

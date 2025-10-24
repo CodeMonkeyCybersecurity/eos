@@ -41,7 +41,7 @@ func (tl *TransactionLog) Begin(vmName string, changeBytes int64) *Transaction {
 	}
 
 	tl.transactions[tx.ID] = tx
-	tl.Save(tx) // Save initial state
+	_ = tl.Save(tx) // Save initial state
 
 	return tx
 }

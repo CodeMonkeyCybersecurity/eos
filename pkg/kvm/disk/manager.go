@@ -60,7 +60,7 @@ func (m *Manager) Resize(ctx context.Context, req *ResizeRequest) error {
 
 	// Start transaction
 	tx := m.transactionLog.Begin(req.VMName, change.Bytes)
-	defer m.transactionLog.Save(tx)
+	defer func() { _ = m.transactionLog.Save(tx) }()
 
 	// Phase 2: INTERVENE
 	logger.Info("Phase 2: INTERVENE - Applying changes")
@@ -238,7 +238,7 @@ func (m *Manager) Rollback(ctx context.Context, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("VM not found: %w", err)
 	}
-	defer domain.Free()
+	defer func() { _ = domain.Free() }()
 
 	// Get current disk path (simplified)
 	xmlDesc, err := domain.GetXMLDesc(0)

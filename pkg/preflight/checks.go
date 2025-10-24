@@ -127,7 +127,7 @@ func CheckPort(port int) func(context.Context) error {
 				"Or choose a different port with --port",
 				port, port)
 		}
-		ln.Close()
+		_ = ln.Close()
 		return nil
 	}
 }

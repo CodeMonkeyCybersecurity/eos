@@ -109,7 +109,7 @@ func AssessVMsForGuestAgent(ctx context.Context, vmNames []string) (needsUpdate,
 		}
 
 		xmlDesc, err := domain.GetXMLDesc(0)
-		domain.Free()
+		_ = domain.Free()
 
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get XML for %s: %w", vmName, err)
@@ -137,7 +137,7 @@ func IsVMRunning(ctx context.Context, vmName string) bool {
 	if err != nil {
 		return false
 	}
-	defer domain.Free()
+	defer func() { _ = domain.Free() }()
 
 	state, _, err := domain.GetState()
 	if err != nil {

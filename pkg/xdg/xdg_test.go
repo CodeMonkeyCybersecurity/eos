@@ -497,7 +497,7 @@ func TestEdgeCases(t *testing.T) {
 		origHome := os.Getenv("HOME")
 		_ = os.Unsetenv("HOME")
 		_ = os.Unsetenv("XDG_CONFIG_HOME")
-		defer os.Setenv("HOME", origHome)
+		defer func() { _ = os.Setenv("HOME", origHome) }()
 
 		// Should still work but with empty base
 		result := XDGConfigPath("app", "config")

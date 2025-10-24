@@ -140,9 +140,9 @@ func ExampleValidation(rc *eos_io.RuntimeContext) error {
 	workload := DefaultWorkloadProfiles["large"]
 	
 	calc := NewCalculator(config, workload)
-	calc.AddService(ServiceTypeWebServer)
-	calc.AddService(ServiceTypeDatabase)
-	calc.AddService(ServiceTypeCache)
+	_ = calc.AddService(ServiceTypeWebServer)
+	_ = calc.AddService(ServiceTypeDatabase)
+	_ = calc.AddService(ServiceTypeCache)
 	
 	result, err := calc.Calculate(rc)
 	if err != nil {

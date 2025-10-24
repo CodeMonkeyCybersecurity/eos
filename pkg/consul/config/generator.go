@@ -244,7 +244,7 @@ watches = [
 	// Ensure temp file is cleaned up on error
 	var writeSuccess bool
 	defer func() {
-		file.Close()
+		_ = file.Close()
 		if !writeSuccess {
 			_ = os.Remove(tempPath)
 		}

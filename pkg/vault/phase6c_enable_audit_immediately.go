@@ -123,7 +123,7 @@ func assessAuditPrerequisites(rc *eos_io.RuntimeContext) error {
 	if err := os.WriteFile(testFile, []byte("test"), 0640); err != nil {
 		return fmt.Errorf("audit directory is not writable: %w\nPath: %s", err, auditDir)
 	}
-	os.Remove(testFile)
+	_ = os.Remove(testFile)
 
 	// Check disk space (need at least 1GB free for audit logs)
 	// Note: This is a best-effort check

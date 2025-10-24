@@ -93,7 +93,7 @@ func JoinNodesV2(rc *eos_io.RuntimeContext, cfg *NodeJoinConfigV2) (*NodeJoinRes
 		if err != nil {
 			return nil, err
 		}
-		defer syncLock.Release()
+		defer func() { _ = syncLock.Release() }()
 		logger.Debug("Lock acquired")
 	} else {
 		logger.Info("[1/12] Skipping lock (dry-run mode)")
@@ -378,7 +378,7 @@ func JoinNodesV2(rc *eos_io.RuntimeContext, cfg *NodeJoinConfigV2) (*NodeJoinRes
 			// Validation failed - restore backup
 			if backupPath != "" {
 				logger.Error("Configuration validation failed, restoring backup")
-				os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
+				_ = os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
 			}
 			return nil, err
 		}

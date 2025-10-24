@@ -329,7 +329,7 @@ func connectToPostgreSQL(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 
 	// Test connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 

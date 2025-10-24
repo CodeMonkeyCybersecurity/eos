@@ -129,7 +129,7 @@ func checkAgentHealth(ctx context.Context, agentAddr string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("health check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode == http.StatusOK {

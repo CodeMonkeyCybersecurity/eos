@@ -64,7 +64,7 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 	publicKeyPath, privateKeyPath, err := kvm.GenerateEd25519Keys(sshDir)
 	if err != nil {
 		// Release IP on failure
-		om.consul.ReleaseIP(vmName)
+		_ = om.consul.ReleaseIP(vmName)
 		return fmt.Errorf("failed to generate SSH keys: %w", err)
 	}
 
@@ -74,7 +74,7 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 	// Step 4: Create the VM with virsh
 	if err := om.createVMWithVirsh(vmName, ip, cloudInitConfig); err != nil {
 		// Cleanup on failure
-		om.consul.ReleaseIP(vmName)
+		_ = om.consul.ReleaseIP(vmName)
 		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
@@ -331,7 +331,7 @@ func (om *OrchestratedVMManager) DestroyOrchestratedVM(vmName string) error {
 	// Destroy the VM with virsh
 	// First stop it
 	stopCmd := exec.Command("virsh", "destroy", vmName)
-	stopCmd.Run() // Ignore error if already stopped
+	_ = stopCmd.Run() // Ignore error if already stopped
 
 	// Then undefine it
 	undefineCmd := exec.Command("virsh", "undefine", vmName, "--nvram")

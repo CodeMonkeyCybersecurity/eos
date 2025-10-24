@@ -65,7 +65,7 @@ func FuzzRun(f *testing.F) {
 		}
 
 		// Execute command - expect most to fail, we're testing for crashes/hangs
-		Run(ctx, options)
+		_, _ = Run(ctx, options)
 	})
 }
 
@@ -112,6 +112,6 @@ func FuzzShellMode(f *testing.F) {
 			Timeout: 1 * time.Second,
 		}
 
-		Run(ctx, options)
+		_, _ = Run(ctx, options)
 	})
 }

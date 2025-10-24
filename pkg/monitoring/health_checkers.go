@@ -144,7 +144,7 @@ func (t *TCPHealthChecker) Check(target string, config map[string]interface{}) (
 	}
 	
 	// Connection successful
-	conn.Close()
+	_ = conn.Close()
 	
 	result.Healthy = true
 	result.Status = HealthStatusHealthy

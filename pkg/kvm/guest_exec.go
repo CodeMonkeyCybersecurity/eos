@@ -115,7 +115,7 @@ func assessGuestExec(rc *eos_io.RuntimeContext, vmName string) (*libvirt.Connect
 	// Get domain
 	domain, err := conn.LookupDomainByName(vmName)
 	if err != nil {
-		conn.Close()
+		_, _ = conn.Close()
 		return nil, nil, fmt.Errorf("VM not found: %w", err)
 	}
 

@@ -93,7 +93,7 @@ func (sm *StreamManager) CreateStream(ctx context.Context, req *CreateStreamRequ
 
 	// Update status
 	stream.Status = "active"
-	sm.storeStream(ctx, stream)
+	_ = sm.storeStream(ctx, stream)
 
 	logger.Info("Stream proxy created successfully",
 		zap.String("name", stream.Name),

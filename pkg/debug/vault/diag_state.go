@@ -412,7 +412,7 @@ func OrphanedStateDiagnostic() *debug.Diagnostic {
 			// Try to check init status (this requires VAULT_SKIP_VERIFY=1 for self-signed certs)
 			initCheckCtx, initCancel := context.WithTimeout(ctx, 3*time.Second)
 			defer initCancel()
-			os.Setenv("VAULT_SKIP_VERIFY", "1")
+			_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
 			initCmd := exec.CommandContext(initCheckCtx, "vault", "status", "-format=json")
 			initOutput, err := initCmd.CombinedOutput()
 			if err == nil {

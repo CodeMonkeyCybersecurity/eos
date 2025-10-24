@@ -354,7 +354,7 @@ func (cr *CertificateRenewer) reloadService() error {
 		// Fallback to systemctl reload as last resort
 		return cr.reloadViaSystemctl()
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 && resp.StatusCode != 204 {
 		logger.Warn("TLS reload API returned non-success status, falling back to systemctl",

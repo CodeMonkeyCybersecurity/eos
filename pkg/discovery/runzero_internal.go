@@ -523,7 +523,7 @@ func (m *InternalDiscoveryManager) getMACAddress(ip string) (string, error) {
 
 func (m *InternalDiscoveryManager) grabBanner(conn net.Conn) string {
 	// Set read timeout
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)

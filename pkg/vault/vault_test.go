@@ -468,7 +468,7 @@ func BenchmarkGet(b *testing.B) {
 	key := "benchmark-key"
 	envVar := "Eos_SECRET_" + sanitizeKey(key)
 	_ = os.Setenv(envVar, "benchmark-value")
-	defer os.Unsetenv(envVar)
+	defer func() { _ = os.Unsetenv(envVar) }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

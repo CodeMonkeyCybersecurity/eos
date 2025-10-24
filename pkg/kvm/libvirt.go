@@ -23,7 +23,7 @@ func SetLibvirtDefaultNetworkAutostart() error {
 	if err != nil {
 		return fmt.Errorf("failed to lookup default network: %w", err)
 	}
-	defer network.Free()
+	defer func() { _ = network.Free() }()
 
 	// Start network if not already active
 	isActive, err := network.IsActive()

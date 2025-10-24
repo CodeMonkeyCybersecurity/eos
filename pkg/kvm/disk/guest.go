@@ -32,7 +32,7 @@ func (gm *GuestManager) ResizeFilesystem(ctx context.Context, assessment *Assess
 	if err != nil {
 		return fmt.Errorf("VM not found: %w", err)
 	}
-	defer domain.Free()
+	defer func() { _ = domain.Free() }()
 
 	// Detect guest OS type
 	guestOS := assessment.GuestOS

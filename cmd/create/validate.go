@@ -243,7 +243,7 @@ func displayValidationResultsTable(results []*build.ValidationResult, strict boo
 				}
 				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", check.Name, status, check.Description)
 			}
-			w.Flush()
+			_ = w.Flush()
 			fmt.Printf("\n")
 		}
 

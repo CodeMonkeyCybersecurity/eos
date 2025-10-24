@@ -179,11 +179,11 @@ func (b *BaseInstaller) CleanExistingInstallation(config *InstallConfig) error {
 		zap.String("product", string(b.product)))
 
 	// Stop and disable service
-	b.systemd.StopService(config.ServiceName)
-	b.systemd.DisableService(config.ServiceName)
+	_ = b.systemd.StopService(config.ServiceName)
+	_ = b.systemd.DisableService(config.ServiceName)
 
 	// Kill any remaining processes
-	b.runner.RunQuiet("pkill", "-f", string(b.product))
+	_ = b.runner.RunQuiet("pkill", "-f", string(b.product))
 
 	// Remove directories
 	dirs := []string{
@@ -212,7 +212,7 @@ func (b *BaseInstaller) CleanExistingInstallation(config *InstallConfig) error {
 	_ = os.Remove(servicePath)
 
 	// Reload systemd
-	b.systemd.ReloadDaemon()
+	_ = b.systemd.ReloadDaemon()
 
 	return nil
 }
@@ -252,7 +252,7 @@ func (b *BaseInstaller) InstallBinary(config *InstallConfig) error {
 	if err := b.network.DownloadFile(downloadURL, zipPath); err != nil {
 		return fmt.Errorf("failed to download %s: %w", b.product, err)
 	}
-	defer os.Remove(zipPath)
+	defer func() { _ = os.Remove(zipPath) }()
 
 	// Verify checksum
 	if !config.SkipVerify {
@@ -466,7 +466,7 @@ func (b *BaseInstaller) verifyChecksum(filepath, version string) error {
 	if err := b.network.DownloadFile(checksumURL, checksumPath); err != nil {
 		return fmt.Errorf("failed to download checksums: %w", err)
 	}
-	defer os.Remove(checksumPath)
+	defer func() { _ = os.Remove(checksumPath) }()
 
 	// Read checksum file
 	checksumData, err := os.ReadFile(checksumPath)

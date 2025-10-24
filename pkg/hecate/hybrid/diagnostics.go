@@ -851,7 +851,7 @@ func (ds *DiagnosticSuite) measureLatencies(count int) []time.Duration {
 			cancel()
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		cancel()
 
 		latency := time.Since(start)

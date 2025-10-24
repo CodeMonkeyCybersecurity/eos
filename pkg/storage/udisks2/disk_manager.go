@@ -69,7 +69,7 @@ func NewDiskManager(rc *eos_io.RuntimeContext) (*DiskManager, error) {
 	err = obj.Call("org.freedesktop.DBus.Properties.Get", 0,
 		"org.freedesktop.UDisks2.Manager", "Version").Store(&version)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("udisks2 not available: %w", err)
 	}
 

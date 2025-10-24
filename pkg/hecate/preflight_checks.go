@@ -386,7 +386,7 @@ func isPortInUse(port int) bool {
 	if err != nil {
 		return true
 	}
-	listener.Close()
+	_ = listener.Close()
 	return false
 }
 

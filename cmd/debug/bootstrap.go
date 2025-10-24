@@ -377,7 +377,7 @@ func checkInfraPorts(rc *eos_io.RuntimeContext) CheckResult {
 		// Check if port is in use
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", shared.GetInternalHostname(), port), 1*time.Second)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			listening++
 
 			// Find what's using it

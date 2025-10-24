@@ -51,7 +51,7 @@ func OutputTable(vms []VMInfo, showDrift, showUsage, detailed bool) error {
 		renderStandardTable(table, vms)
 	}
 
-	table.Render()
+	_ = table.Render()
 	printSummary(vms, showDrift)
 
 	return nil

@@ -181,7 +181,7 @@ func parseRetentionDays(retention string) int {
 	// Simple parser for "XXXh" format
 	retention = strings.TrimSuffix(retention, "h")
 	var hours int
-	fmt.Sscanf(retention, "%d", &hours)
+	_, _ = fmt.Sscanf(retention, "%d", &hours)
 	if hours == 0 {
 		hours = 168 // Default 7 days
 	}

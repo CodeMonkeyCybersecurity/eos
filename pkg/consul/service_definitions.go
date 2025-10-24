@@ -91,7 +91,7 @@ func GenerateDockerServiceDefinition(
 	if err != nil {
 		return "", fmt.Errorf("failed to create container manager: %w", err)
 	}
-	defer containerManager.Close()
+	defer func() { _ = containerManager.Close() }()
 
 	containerInfo, err := containerManager.InspectRaw(rc.Ctx, containerNameOrID)
 	if err != nil {
@@ -213,7 +213,7 @@ func extractServiceInfo(
 	if overrides != nil && overrides.Port > 0 {
 		service.Port = overrides.Port
 	} else if labelPort, ok := labels["consul.service.port"]; ok {
-		fmt.Sscanf(labelPort, "%d", &service.Port)
+		_, _ = fmt.Sscanf(labelPort, "%d", &service.Port)
 	} else {
 		// Auto-detect from first exposed port
 		for portProto := range containerInfo.Config.ExposedPorts {
@@ -480,7 +480,7 @@ func GetContainersFromComposeFile(rc *eos_io.RuntimeContext, composeFilePath str
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container manager: %w", err)
 	}
-	defer containerManager.Close()
+	defer func() { _ = containerManager.Close() }()
 
 	// List all containers (including stopped ones)
 	containers, err := containerManager.ListAll(rc.Ctx)

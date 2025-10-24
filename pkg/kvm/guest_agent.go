@@ -52,7 +52,7 @@ func auditGuestExecChange(vmName, action, method, result string) {
 	}
 	defer func() { _ = f.Close() }()
 
-	f.WriteString(entry)
+	_, _ = f.WriteString(entry)
 }
 
 // EnableGuestExec enables guest-exec commands in QEMU guest agent
@@ -75,7 +75,7 @@ func EnableGuestExec(rc *eos_io.RuntimeContext, vmName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to find VM: %w", err)
 	}
-	defer domain.Free()
+	defer func() { _ = domain.Free() }()
 
 	// Check if VM is running
 	state, _, err := domain.GetState()
@@ -273,7 +273,7 @@ func writeGuestFile(domain *libvirt.Domain, path, content string) error {
 	if err != nil {
 		// Try to close handle before returning error
 		closeCmd := fmt.Sprintf(`{"execute":"guest-file-close","arguments":{"handle":%d}}`, handle)
-		domain.QemuAgentCommand(closeCmd,
+		_, _ = domain.QemuAgentCommand(closeCmd,
 			libvirt.DomainQemuAgentCommandTimeout(libvirt.DOMAIN_QEMU_AGENT_COMMAND_DEFAULT), 0)
 		return fmt.Errorf("failed to write file: %w", err)
 	}

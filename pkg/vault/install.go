@@ -784,7 +784,7 @@ func (vi *VaultInstaller) installViaBinary() error {
 	if err := vi.createDirectory(tmpDir, 0755); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	zipPath := filepath.Join(tmpDir, "vault.zip")
 	if err := vi.downloadFile(downloadURL, zipPath); err != nil {

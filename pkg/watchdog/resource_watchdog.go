@@ -223,13 +223,13 @@ func (tl *TraceLogger) writeToAll(format string, args ...interface{}) {
 
 	// Write to terminal
 	if tl.terminalWriter != nil {
-		fmt.Fprint(tl.terminalWriter, terminalMsg)
+		_, _ = fmt.Fprint(tl.terminalWriter, terminalMsg)
 	}
 
 	// Write to main log file
 	if writer, ok := tl.fileWriters["main"]; ok {
-		fmt.Fprintf(writer, "[%s] %s", timestamp, message)
-		writer.Flush()
+		_, _ = fmt.Fprintf(writer, "[%s] %s", timestamp, message)
+		_ = writer.Flush()
 	}
 }
 
@@ -537,14 +537,14 @@ func (rw *ResourceWatchdog) captureRuntimeProfiles(dir string) {
 			time.Sleep(2 * time.Second)
 			pprof.StopCPUProfile()
 		}
-		cpuFile.Close()
+		_ = cpuFile.Close()
 	}
 
 	// Memory profile
 	memFile, err := os.Create(filepath.Join(dir, "mem.prof"))
 	if err == nil {
 		runtime.GC()
-		pprof.WriteHeapProfile(memFile)
+		_ = pprof.WriteHeapProfile(memFile)
 		memFile.Close()
 	}
 

@@ -600,7 +600,7 @@ func BenchmarkRun(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Run(ctx, opts)
+		_, _ = Run(ctx, opts)
 	}
 }
 

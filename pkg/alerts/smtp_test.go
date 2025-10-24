@@ -377,7 +377,7 @@ func TestDialerTimeout(t *testing.T) {
 	// Try to connect to a non-routable IP (should timeout)
 	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", "192.0.2.1:25")
 	if conn != nil {
-		conn.Close()
+		_ = conn.Close()
 	}
 	assert.Error(t, err)
 }

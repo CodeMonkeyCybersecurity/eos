@@ -18,7 +18,7 @@ func TestConfigManagerSecurity(t *testing.T) {
 	// Create temporary directory for test configs
 	tempDir, err := os.MkdirTemp("", "eos-ai-config-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	t.Run("config_file_creation_security", func(t *testing.T) {
 		// Create config manager with temporary path
@@ -168,7 +168,7 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 	// Create temporary directory for test configs
 	tempDir, err := os.MkdirTemp("", "eos-ai-apikey-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	t.Run("api_key_environment_precedence", func(t *testing.T) {
 		configManager := &ConfigManager{
@@ -181,7 +181,7 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 
 		// Environment variable should take precedence over config file
 		_ = os.Setenv("ANTHROPIC_API_KEY", "env-var-key")
-		defer os.Unsetenv("ANTHROPIC_API_KEY")
+		defer func() { _ = os.Unsetenv("ANTHROPIC_API_KEY") }()
 
 		apiKey, err := configManager.GetAPIKey(rc)
 		require.NoError(t, err)
@@ -235,7 +235,7 @@ func TestAPIKeyManagementSecurity(t *testing.T) {
 
 		// Set generic AI_API_KEY
 		_ = os.Setenv("AI_API_KEY", "generic-api-key")
-		defer os.Unsetenv("AI_API_KEY")
+		defer func() { _ = os.Unsetenv("AI_API_KEY") }()
 
 		configManager := &ConfigManager{
 			configPath: filepath.Join(tempDir, "generic-test-config.yaml"),
@@ -467,7 +467,7 @@ func TestConfigurationValidation(t *testing.T) {
 func TestConfigurationUpdateSecurity(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "eos-ai-update-test")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	t.Run("update_config_type_safety", func(t *testing.T) {
 		configManager := &ConfigManager{

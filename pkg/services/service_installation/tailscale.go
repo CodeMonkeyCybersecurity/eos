@@ -66,17 +66,17 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 		result.Steps = append(result.Steps, step1)
 		return err
 	}
-	defer os.Remove(tmpScript.Name())
+	defer func() { _ = os.Remove(tmpScript.Name()) }()
 
 	if _, err := io.Copy(tmpScript, resp.Body); err != nil {
 		step1.Status = "failed"
 		step1.Error = fmt.Sprintf("Failed to write install script: %v", err)
 		step1.Duration = time.Since(step1Start)
 		result.Steps = append(result.Steps, step1)
-		tmpScript.Close()
+		_ = tmpScript.Close()
 		return err
 	}
-	tmpScript.Close()
+	_ = tmpScript.Close()
 
 	// Make executable
 	if err := os.Chmod(tmpScript.Name(), 0700); err != nil {

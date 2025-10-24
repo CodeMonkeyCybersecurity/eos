@@ -79,7 +79,7 @@ func NewUnifiedStorageManager(rc *eos_io.RuntimeContext) (*UnifiedStorageManager
 	// Initialize KVM manager
 	kvmMgr, err := kvm.NewKVMManager(rc, "")
 	if err != nil {
-		diskMgr.Close()
+		_ = diskMgr.Close()
 		return nil, fmt.Errorf("failed to initialize KVM manager: %w", err)
 	}
 

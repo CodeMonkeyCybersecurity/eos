@@ -44,7 +44,7 @@ func InstallCodeServer(rc *eos_io.RuntimeContext, config *Config) error {
 	}); err != nil {
 		return fmt.Errorf("failed to download code-server: %w", err)
 	}
-	defer os.Remove(debFile)
+	defer func() { _ = os.Remove(debFile) }()
 
 	// Install the deb package
 	logger.Info("Installing code-server package")

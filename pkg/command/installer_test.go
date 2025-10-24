@@ -156,6 +156,6 @@ func FuzzValidateCommandName(f *testing.F) {
 		ci := NewCommandInstaller(rc)
 
 		// Should not panic
-		ci.validateCommandName(name)
+		_ = ci.validateCommandName(name)
 	})
 }

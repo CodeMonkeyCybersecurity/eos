@@ -73,7 +73,7 @@ func FuzzDSNParsing(f *testing.F) {
 
 		db, err := Open(ctx, dsn)
 		if db != nil {
-			db.Close()
+			_ = db.Close()
 		}
 
 		// Verify no panic occurred (caught by fuzzer)
@@ -149,7 +149,7 @@ func FuzzHashOperations(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		store := &pgHashStore{db: db}
 
@@ -224,7 +224,7 @@ func FuzzKVOperations(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		ctx := context.Background()
 
@@ -336,7 +336,7 @@ func FuzzEnvironmentDSN(f *testing.F) {
 
 		// Save original env
 		original := os.Getenv("POSTGRES_DSN")
-		defer os.Setenv("POSTGRES_DSN", original)
+		defer func() { _ = os.Setenv("POSTGRES_DSN", original) }()
 
 		// Set fuzzed DSN
 		_ = os.Setenv("POSTGRES_DSN", dsn)

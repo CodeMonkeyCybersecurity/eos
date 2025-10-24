@@ -269,7 +269,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		isEos := ci.isEosCommand(tmpFile)
 		assert.True(t, isEos)

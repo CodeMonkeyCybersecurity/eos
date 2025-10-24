@@ -460,7 +460,7 @@ func testIntegration(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 	if err := os.WriteFile(testFile, []byte(testAlert), 0644); err != nil {
 		return fmt.Errorf("failed to create test alert: %w", err)
 	}
-	defer os.Remove(testFile)
+	defer func() { _ = os.Remove(testFile) }()
 
 	// Test integration script
 	integrationPath := filepath.Join(config.IntegrationsDir, config.IntegrationName)

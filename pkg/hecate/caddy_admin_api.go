@@ -52,7 +52,7 @@ func (c *CaddyAdminClient) LoadConfig(ctx context.Context, config interface{}) e
 	if err != nil {
 		return fmt.Errorf("config load request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
@@ -76,7 +76,7 @@ func (c *CaddyAdminClient) AdaptCaddyfile(ctx context.Context, caddyfile string)
 	if err != nil {
 		return nil, fmt.Errorf("adapt request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))

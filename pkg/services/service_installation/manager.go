@@ -485,7 +485,7 @@ func (sim *ServiceInstallationManager) isPortAvailable(port int) bool {
 	if err != nil {
 		return false
 	}
-	ln.Close()
+	_ = ln.Close()
 	return true
 }
 
@@ -540,7 +540,7 @@ func (sim *ServiceInstallationManager) checkServicePort(port int) HealthCheck {
 		check.Status = "FAILED"
 		check.Message = fmt.Sprintf("Port %d is not accessible", port)
 	} else {
-		conn.Close()
+		_ = conn.Close()
 		check.Status = "PASSED"
 		check.Message = fmt.Sprintf("Port %d is accessible", port)
 	}

@@ -147,8 +147,8 @@ func (ni *NomadInstaller) Install() error {
 	_ = os.MkdirAll("/etc/nomad.d", 0755)
 	_ = os.MkdirAll("/opt/nomad/data", 0755)
 	_ = os.MkdirAll("/var/log/nomad", 0755)
-	ni.runner.Run("chown", "-R", "nomad:nomad", "/opt/nomad")
-	ni.runner.Run("chown", "-R", "nomad:nomad", "/var/log/nomad")
+	_ = ni.runner.Run("chown", "-R", "nomad:nomad", "/opt/nomad")
+	_ = ni.runner.Run("chown", "-R", "nomad:nomad", "/var/log/nomad")
 
 	// Write configuration
 	ni.writeConfiguration()
@@ -207,7 +207,7 @@ ports {
 	if err := os.WriteFile("/etc/nomad.d/nomad.hcl", []byte(config), 0640); err != nil {
 		panic(fmt.Sprintf("FATAL: Failed to write Nomad config: %v", err))
 	}
-	ni.runner.Run("chown", "nomad:nomad", "/etc/nomad.d/nomad.hcl")
+	_ = ni.runner.Run("chown", "nomad:nomad", "/etc/nomad.d/nomad.hcl")
 }
 
 func (ni *NomadInstaller) setupSystemdService() {

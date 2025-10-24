@@ -110,7 +110,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 		if r := recover(); r != nil {
 			m.logger.Error(" Panic during MFA implementation",
 				zap.Any("panic", r))
-			m.rollback()
+			_ = m.rollback()
 		}
 	}()
 
@@ -133,7 +133,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	// Phase 3: Install and configure MFA packages
 	m.logger.Info(" Phase 3: Installing MFA packages")
 	if err := m.installMFAPackages(); err != nil {
-		m.rollback()
+		_ = m.rollback()
 		return fmt.Errorf("package installation failed: %w", err)
 	}
 
@@ -141,19 +141,19 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	m.logger.Info(" Phase 4: Identifying and configuring users")
 	users, err := m.identifyAllSudoUsers()
 	if err != nil {
-		m.rollback()
+		_ = m.rollback()
 		return fmt.Errorf("user identification failed: %w", err)
 	}
 
 	if err := m.setupMFAForUsers(users); err != nil {
-		m.rollback()
+		_ = m.rollback()
 		return fmt.Errorf("MFA setup failed: %w", err)
 	}
 
 	// Phase 5: Configure PAM safely
 	m.logger.Info(" Phase 5: Configuring PAM authentication")
 	if err := m.configurePAMSafely(); err != nil {
-		m.rollback()
+		_ = m.rollback()
 		return fmt.Errorf("PAM configuration failed: %w", err)
 	}
 
@@ -161,7 +161,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	if m.config.TestBeforeEnforce {
 		m.logger.Info(" Phase 6: Testing configuration")
 		if err := m.testConfiguration(); err != nil {
-			m.rollback()
+			_ = m.rollback()
 			return fmt.Errorf("configuration test failed: %w", err)
 		}
 	}
