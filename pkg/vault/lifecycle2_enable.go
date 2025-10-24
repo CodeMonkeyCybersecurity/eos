@@ -46,6 +46,7 @@ func VaultAddress() string {
 //	  Phase 9a: KV v2 secrets engine (PhaseEnableKVv2)
 //	  Phase 9d: Additional secrets engines - Database, PKI (PhaseEnableSecretsEngines)
 //	  Phase 9e: Activity tracking enablement (PhaseEnableTracking)
+//	  Phase 9f: Consul secrets engine enablement (PhaseEnableConsulSecretsEngine) - NEW in Phase 1
 //	  Phase 9b: Bootstrap secret verification (PhaseWriteBootstrapSecretAndRecheck)
 //	  Phase 10a: Userpass authentication (PhaseEnableUserpass) - optional, interactive, for future runs
 //	  Phase 10b: AppRole authentication (PhaseEnableAppRole) - optional, interactive, for future runs
@@ -219,6 +220,21 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Info("terminal prompt: You can enable it later with: vault write sys/internal/counters/config enabled=enable")
 	} else {
 		log.Info(" [Phase 9e] Activity tracking enabled successfully",
+			zap.Duration("duration", time.Since(phaseStart)))
+	}
+
+	// Step 9f: Enable Consul secrets engine (Phase 1 - NEW)
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 9f] Enabling Consul secrets engine for dynamic token generation")
+	phaseStart = time.Now()
+	if err := PhaseEnableConsulSecretsEngine(rc, client); err != nil {
+		log.Warn(" [Phase 9f] Failed to enable Consul secrets engine (non-fatal)",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
+		log.Info("terminal prompt: Consul secrets engine could not be enabled automatically")
+		log.Info("terminal prompt: You can enable it later with: eos update vault --enable-consul-secrets")
+	} else {
+		log.Info(" [Phase 9f] Consul secrets engine enabled successfully",
 			zap.Duration("duration", time.Since(phaseStart)))
 	}
 

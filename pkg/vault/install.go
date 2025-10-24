@@ -54,7 +54,7 @@ type InstallConfig struct {
 	// Vault configuration
 	UIEnabled       bool
 	ClusterName     string
-	StorageBackend  string // "consul" (recommended), "raft" (deprecated), "file" (not supported)
+	StorageBackend  string // "raft" (recommended), "consul" (legacy), "file" (not supported)
 	ListenerAddress string
 	BindAddr        string // Specific IP to bind to (for Consul registration)
 	APIAddr         string
@@ -88,6 +88,10 @@ type InstallConfig struct {
 	LogLevel   string
 	Datacenter string // Consul datacenter for service registration
 
+	// Consul Secrets Engine configuration (Phase 1)
+	EnableConsulSecretsEngine bool   // Enable Vault Consul secrets engine for dynamic token generation
+	ConsulManagementToken     string // Consul management token for Vault to use (stored in Vault after setup)
+
 	// Multi-node Raft cluster configuration
 	RaftMode       string // "create" (default) or "join" - determines if this is a new cluster or joining existing
 	RetryJoinNodes []shared.RetryJoinNode
@@ -118,11 +122,12 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		config.Version = "latest"
 	}
 	if config.StorageBackend == "" {
-		// Default to Consul storage backend (recommended)
-		// Provides HA without Raft complexity
+		// Default to Raft storage backend (recommended by HashiCorp 2020+)
+		// Provides HA with integrated storage, no external dependencies
+		// Eliminates circular dependency with Consul
 		// File storage is NOT SUPPORTED in Vault Enterprise 1.12.0+
-		// Raft storage is DEPRECATED - use Consul instead
-		config.StorageBackend = "consul"
+		// Consul storage is legacy (pre-2020) and creates architectural complexity
+		config.StorageBackend = "raft"
 	}
 	if config.ListenerAddress == "" {
 		config.ListenerAddress = fmt.Sprintf("0.0.0.0:%d", shared.PortVault)
@@ -175,7 +180,7 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		config.TLSEnabled = false
 	}
 	if config.NodeID == "" {
-		// DEPRECATED: Default node ID to hostname (only used for Raft)
+		// Default node ID to hostname (used for Raft clusters)
 		hostname, err := os.Hostname()
 		if err != nil {
 			hostname = "vault-node-1"
@@ -183,10 +188,10 @@ func NewVaultInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) *VaultI
 		config.NodeID = hostname
 	}
 	if config.RaftMode == "" {
-		// DEPRECATED: Default to create mode (only used for Raft)
+		// Default to create mode (for Raft multi-node clusters)
 		config.RaftMode = "create"
 	}
-	// Consul storage backend defaults
+	// Consul storage backend defaults (legacy - only used if StorageBackend="consul")
 	if config.ConsulAddress == "" {
 		config.ConsulAddress = shared.GetConsulHostPort()
 	}
@@ -1066,37 +1071,12 @@ func (vi *VaultInstaller) configure() error {
 		// EXPLICITLY NOT SUPPORTED
 		return fmt.Errorf("file storage backend is NOT SUPPORTED in Vault Enterprise 1.12.0+\n" +
 			"Supported backends:\n" +
-			"  • consul (recommended) - HA storage with Consul\n" +
-			"  • raft (deprecated)    - Integrated storage\n" +
-			"Use: sudo eos create vault --storage-backend=consul")
+			"  • raft (recommended)   - Integrated storage with HA support\n" +
+			"  • consul (legacy)      - External storage via Consul KV\n" +
+			"Use: sudo eos create vault --storage-backend=raft")
 
-	case "consul", "": // Default to Consul if not specified
-		// Consul storage backend (RECOMMENDED)
-		consulToken := ""
-		if vi.config.ConsulToken != "" {
-			consulToken = fmt.Sprintf(`
-  token   = "%s"`, vi.config.ConsulToken)
-		}
-		storageConfig = fmt.Sprintf(`storage "consul" {
-  address = "%s"
-  path    = "%s"
-  scheme  = "%s"%s
-}
-
-# Service registration with Consul
-service_registration "consul" {
-  address = "%s"%s
-}`, vi.config.ConsulAddress, vi.config.ConsulPath, vi.config.ConsulScheme, consulToken,
-			vi.config.ConsulAddress, consulToken)
-
-		vi.logger.Info("Configured Consul storage backend",
-			zap.String("consul_address", vi.config.ConsulAddress),
-			zap.String("consul_path", vi.config.ConsulPath))
-
-	case "raft":
-		// DEPRECATED: Raft Integrated Storage
-		vi.logger.Warn("Raft storage backend is deprecated. Please use Consul storage instead.",
-			zap.String("recommendation", "Use --storage-backend=consul"))
+	case "raft", "": // Default to Raft if not specified
+		// Raft Integrated Storage (RECOMMENDED)
 
 		// Build Raft configuration based on cluster mode
 		var raftConfig string
@@ -1130,8 +1110,35 @@ service_registration "consul" {
 		}
 		storageConfig = raftConfig
 
+	case "consul":
+		// Consul storage backend (LEGACY - creates circular dependency)
+		vi.logger.Warn("Consul storage backend is legacy. Modern deployments should use Raft storage.",
+			zap.String("recommendation", "Use --storage-backend=raft to eliminate Consul dependency"))
+
+		consulToken := ""
+		if vi.config.ConsulToken != "" {
+			consulToken = fmt.Sprintf(`
+  token   = "%s"`, vi.config.ConsulToken)
+		}
+		storageConfig = fmt.Sprintf(`storage "consul" {
+  address = "%s"
+  path    = "%s"
+  scheme  = "%s"%s
+}
+
+# Service registration with Consul
+service_registration "consul" {
+  address = "%s"%s
+}`, vi.config.ConsulAddress, vi.config.ConsulPath, vi.config.ConsulScheme, consulToken,
+			vi.config.ConsulAddress, consulToken)
+
+		vi.logger.Info("Configured Consul storage backend (legacy)",
+			zap.String("consul_address", vi.config.ConsulAddress),
+			zap.String("consul_path", vi.config.ConsulPath),
+			zap.String("warning", "Consider migrating to Raft storage"))
+
 	default:
-		return fmt.Errorf("unsupported storage backend: %s (supported: consul, raft)", vi.config.StorageBackend)
+		return fmt.Errorf("unsupported storage backend: %s (supported: raft, consul)", vi.config.StorageBackend)
 	}
 
 	// Generate seal configuration

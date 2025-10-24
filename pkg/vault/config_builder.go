@@ -35,7 +35,7 @@ type VaultConfigBuilder struct {
 	TLSKeyFile  string // /etc/vault.d/tls/vault.key
 
 	// Storage backend
-	StorageBackend string // "consul" or "raft"
+	StorageBackend string // "raft" (recommended) or "consul" (legacy)
 	ConsulAddress  string // shared.GetInternalHostname:8500
 
 	// Logging
@@ -66,7 +66,7 @@ func NewConfigBuilder(rc *eos_io.RuntimeContext) (*VaultConfigBuilder, error) {
 		ClusterPort:    VaultClusterPort,
 		TLSCertFile:    VaultTLSCert,
 		TLSKeyFile:     VaultTLSKey,
-		StorageBackend: "consul", // Default to Consul for HA
+		StorageBackend: "raft", // Default to Raft (recommended)
 		ConsulAddress:  "shared.GetInternalHostname:8500",
 		LogLevel:       "info",
 		LogFormat:      "json",
@@ -138,6 +138,17 @@ func (vcb *VaultConfigBuilder) BuildServerConfig() string {
 
 	// Storage backend
 	switch vcb.StorageBackend {
+	case "raft":
+		config += fmt.Sprintf(`storage "raft" {
+  path    = "%s"
+  node_id = "%s"
+}
+
+service_registration "consul" {
+  address = "%s"
+}
+
+`, vcb.DataDir, vcb.hostname, vcb.ConsulAddress)
 	case "consul":
 		config += fmt.Sprintf(`storage "consul" {
   address          = "%s"
@@ -152,17 +163,6 @@ service_registration "consul" {
 }
 
 `, vcb.ConsulAddress, vcb.ConsulAddress)
-	case "raft":
-		config += fmt.Sprintf(`storage "raft" {
-  path    = "%s"
-  node_id = "%s"
-}
-
-service_registration "consul" {
-  address = "%s"
-}
-
-`, vcb.DataDir, vcb.hostname, vcb.ConsulAddress)
 	}
 
 	// Listener configuration

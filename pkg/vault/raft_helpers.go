@@ -1,12 +1,12 @@
 // pkg/vault/raft_helpers.go
 //
-// DEPRECATED: This file contains Raft Integrated Storage helpers.
-// Vault is transitioning to Consul storage backend as the recommended approach.
-// These functions are maintained for backward compatibility but should not be
-// used for new deployments.
+// This file contains Raft Integrated Storage helpers (RECOMMENDED).
+// Raft is the modern recommended storage backend for Vault (2020+).
+// It provides HA with integrated storage and no external dependencies.
 //
-// For new deployments, use Consul storage backend instead.
-// See: https://developer.hashicorp.com/vault/docs/configuration/storage/consul
+// Raft eliminates the circular dependency that exists with Consul storage.
+// For new deployments, use Raft storage backend (default).
+// See: https://developer.hashicorp.com/vault/docs/configuration/storage/raft
 
 package vault
 
@@ -20,8 +20,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// DEPRECATED: RaftConfig contains configuration for Raft Integrated Storage deployment
-// Use Consul storage backend instead for new deployments.
+// RaftConfig contains configuration for Raft Integrated Storage deployment (RECOMMENDED)
+// Raft is the modern recommended storage backend for Vault.
 // Reference: vault-complete-specification-v1.0-raft-integrated.md
 type RaftConfig struct {
 	// Node configuration
@@ -177,9 +177,9 @@ func generateGCPCKMSConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (st
 		config.GCPCryptoKey, credentialsLine), nil
 }
 
-// DEPRECATED: RenderRaftConfig generates Vault configuration for Raft deployment
+// RenderRaftConfig generates Vault configuration for Raft deployment (RECOMMENDED)
 // This is a convenience wrapper around shared.RenderVaultConfigRaft
-// Use Consul storage backend instead for new deployments.
+// Raft is the recommended storage backend for new Vault deployments.
 func RenderRaftConfig(rc *eos_io.RuntimeContext, config *InstallConfig) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Generating Raft configuration",
