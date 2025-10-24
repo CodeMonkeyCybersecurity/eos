@@ -191,11 +191,6 @@ func GenerateSelfSignedCertificate(rc *eos_io.RuntimeContext, config *Certificat
 		return fmt.Errorf("write certificate: %w", err)
 	}
 
-	// Set certificate file permissions (world-readable for clients)
-	if err := os.Chmod(config.CertPath, 0644); err != nil {
-		log.Warn("Failed to set certificate permissions", zap.Error(err))
-	}
-
 	// Write private key to file
 	log.Debug("Writing private key", zap.String("path", config.KeyPath))
 	keyFile, err := os.Create(config.KeyPath)
@@ -211,18 +206,27 @@ func GenerateSelfSignedCertificate(rc *eos_io.RuntimeContext, config *Certificat
 		return fmt.Errorf("write private key: %w", err)
 	}
 
-	// Set private key file permissions (owner read-only for security)
+	// CRITICAL: Set ownership BEFORE permissions to avoid race condition
+	// If Vault service starts after files are created but before ownership is set,
+	// it will fail with "permission denied" because files are owned by root:root.
+	// By setting ownership first, the vault user can always read the files.
+	if os.Geteuid() == 0 {
+		if err := setFileOwnership(rc, config.CertPath, config.KeyPath, config.Owner, config.Group); err != nil {
+			log.Error("Failed to set vault ownership - Vault service will fail to start", zap.Error(err))
+			return fmt.Errorf("set file ownership: %w", err)
+		}
+	}
+
+	// Now set permissions (after ownership is correct)
+	// Certificate: world-readable for clients (0644)
+	if err := os.Chmod(config.CertPath, 0644); err != nil {
+		log.Warn("Failed to set certificate permissions", zap.Error(err))
+	}
+
+	// Private key: owner read-only for security (0600)
 	if err := os.Chmod(config.KeyPath, 0600); err != nil {
 		log.Error("Failed to set key permissions", zap.Error(err))
 		return fmt.Errorf("set key permissions: %w", err)
-	}
-
-	// Change ownership to vault:vault if running as root
-	if os.Geteuid() == 0 {
-		if err := setFileOwnership(rc, config.CertPath, config.KeyPath, config.Owner, config.Group); err != nil {
-			log.Warn("Failed to set vault ownership", zap.Error(err))
-			// Don't fail - permissions are still correct for root
-		}
 	}
 
 	log.Info("TLS certificate generated successfully",
