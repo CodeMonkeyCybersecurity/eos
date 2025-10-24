@@ -29,11 +29,9 @@ type AtomicMFAConfig struct {
 	rc                *eos_io.RuntimeContext
 	logger            otelzap.LoggerWithCtx
 	backupDir         string
-	originalConfigs   PAMConfigSet
 	newConfigs        PAMConfigSet
 	configFiles       map[string]string
 	transactionActive bool
-	testUser          string
 }
 
 // NewAtomicMFAConfig creates a new atomic MFA configuration manager

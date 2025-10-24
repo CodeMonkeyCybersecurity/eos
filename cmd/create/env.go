@@ -4,7 +4,6 @@ package create
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
@@ -99,7 +98,12 @@ Examples:
 		if displayName != "" {
 			env.DisplayName = displayName
 		} else if env.DisplayName == "" || env.DisplayName == "Development" {
-			env.DisplayName = strings.Title(envName)
+			// Capitalize first letter only (strings.Title is deprecated)
+		if len(envName) > 0 && envName[0] >= 'a' && envName[0] <= 'z' {
+			env.DisplayName = string(envName[0]-32) + envName[1:]
+		} else {
+			env.DisplayName = envName
+		}
 		}
 
 		if description != "" {

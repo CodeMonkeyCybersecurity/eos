@@ -336,15 +336,15 @@ func (am *AlertManager) formatAlertMessage(rule AlertRule, target *MonitoringTar
 }
 
 func (am *AlertManager) formatNotificationMessage(alert *Alert) string {
-	template, exists := am.config.Templates["default"]
+	msgTemplate, exists := am.config.Templates["default"]
 	if !exists {
-		template = "{{ .Target }} alert: {{ .Message }}"
+		msgTemplate = "{{ .Target }} alert: {{ .Message }}"
 	}
+	_ = msgTemplate // Template will be used for proper templating in the future
 
 	// Simple template substitution - in reality, would use proper templating
-	message := template
-	message = fmt.Sprintf("%s is %s: %s", alert.Target, alert.Status, alert.Message)
-	
+	message := fmt.Sprintf("%s is %s: %s", alert.Target, alert.Status, alert.Message)
+
 	return message
 }
 

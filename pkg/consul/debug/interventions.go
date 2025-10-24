@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -195,8 +196,8 @@ func fixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 
 		// Validate the new configuration
 		validateCmd := execute.Options{
-			Command: "/usr/local/bin/consul",
-			Args:    []string{"validate", "/etc/consul.d/"},
+			Command: consul.GetConsulBinaryPath(),
+			Args:    []string{"validate", consul.ConsulConfigDir},
 			Capture: true,
 		}
 
@@ -238,7 +239,7 @@ func testManualStart(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Run consul manually as consul user
 	cmd := execute.Options{
 		Command: "sudo",
-		Args:    []string{"-u", "consul", "/usr/local/bin/consul", "agent", "-config-dir=/etc/consul.d/"},
+		Args:    []string{"-u", consul.ConsulUser, consul.GetConsulBinaryPath(), "agent", "-config-dir=" + consul.ConsulConfigDir},
 		Capture: true,
 		Timeout: 10000, // 10 seconds
 	}
@@ -338,7 +339,7 @@ ports {
 
 	cmd := execute.Options{
 		Command: "sudo",
-		Args:    []string{"-u", "consul", "/usr/local/bin/consul", "agent", "-config-file=" + minimalPath},
+		Args:    []string{"-u", consul.ConsulUser, consul.GetConsulBinaryPath(), "agent", "-config-file=" + minimalPath},
 		Capture: true,
 		Timeout: 10000,
 	}

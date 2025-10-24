@@ -85,7 +85,7 @@ func FuzzAllEosCommands(f *testing.F) {
 
 		// Also test parsing flags if we have dashes
 		if len(args) > 0 && strings.HasPrefix(args[0], "-") {
-			rootCmd.ParseFlags(args)
+			_ = rootCmd.ParseFlags(args)
 		}
 	})
 }
@@ -125,7 +125,7 @@ func FuzzEosCommandFlags(f *testing.F) {
 		}
 
 		rootCmd.SetArgs(args)
-		rootCmd.ParseFlags(args)
+		_ = rootCmd.ParseFlags(args)
 	})
 }
 

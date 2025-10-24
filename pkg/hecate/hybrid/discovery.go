@@ -239,19 +239,6 @@ func getLocalConsulClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	return client, nil
 }
 
-func getFrontendConsulClient(rc *eos_io.RuntimeContext, frontendDC string) (*api.Client, error) {
-	config := api.DefaultConfig()
-	// TODO: Make this configurable based on frontendDC
-	config.Address = fmt.Sprintf("frontend-consul.example.com:%d", shared.PortConsul)
-	config.Datacenter = frontendDC
-
-	client, err := api.NewClient(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create frontend Consul client: %w", err)
-	}
-
-	return client, nil
-}
 
 func createCrossDCQuery(rc *eos_io.RuntimeContext, backend *Backend) error {
 	logger := otelzap.Ctx(rc.Ctx)

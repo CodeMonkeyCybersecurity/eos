@@ -128,19 +128,6 @@ func TestUpdateConfigPorts(t *testing.T) {
 				t.Fatalf("Failed to extract ports from updated config: %v", err)
 			}
 
-			// Verify API port
-			expectedAPIPort := tt.apiPort
-			if expectedAPIPort == 0 {
-				// Parse from wantAPI
-				expectedAPIPort = 8200 // This comes from the original config in test
-			}
-
-			// Verify cluster port
-			expectedClusterPort := tt.clusterPort
-			if expectedClusterPort == 0 {
-				expectedClusterPort = 8180 // Original values from test configs
-			}
-
 			if tt.apiPort > 0 && ports.APIPort != tt.apiPort {
 				t.Errorf("UpdateConfigPorts() API port = %v, want %v", ports.APIPort, tt.apiPort)
 			}

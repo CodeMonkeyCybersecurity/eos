@@ -24,7 +24,7 @@ func Example_basicUsage() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// List all containers
 	containers, err := manager.ListAll(rc.Ctx)
@@ -48,7 +48,7 @@ func Example_composeDiscovery() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// Find Mattermost service (works with Compose v1 and v2)
 	containers, err := manager.FindByService(rc.Ctx, "mattermost")
@@ -80,7 +80,7 @@ func Example_containerLifecycle() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// Find container by name
 	c, err := manager.FindByName(rc.Ctx, "mattermost")
@@ -117,7 +117,7 @@ func Example_projectDiscovery() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// Find all containers in the "docker" project
 	containers, err := manager.FindByProject(rc.Ctx, "docker")
@@ -141,7 +141,7 @@ func Example_logs() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// Find container
 	c, err := manager.FindByName(rc.Ctx, "mattermost")
@@ -161,7 +161,7 @@ func Example_logs() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer logs.Close()
+	defer func() { _ = logs.Close() }()
 
 	fmt.Println("Container logs retrieved successfully")
 }
@@ -176,7 +176,7 @@ func Example_labelBasedDiscovery() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// Find containers with custom labels
 	labels := map[string]string{
@@ -202,7 +202,7 @@ func Example_dockerInfo() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer manager.Close()
+	defer func() { _ = manager.Close() }()
 
 	// Get Docker system info
 	info, err := manager.Info(rc.Ctx)

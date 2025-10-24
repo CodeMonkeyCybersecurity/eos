@@ -60,10 +60,7 @@ func RestartWithRollback(ctx context.Context, configPath string, backupContent [
 			}
 
 			logger.Info("Rollback successful - Consul restored to previous configuration")
-			return fmt.Errorf("restart failed (rolled back successfully): %s\n"+
-				"Configuration has been restored to previous version.\n"+
-				"Fix the issue and try again.",
-				output)
+			return fmt.Errorf("restart failed (rolled back successfully): %s\nConfiguration has been restored to previous version. Fix the issue and try again", output)
 		}
 
 		return fmt.Errorf("failed to restart Consul: %s\n"+

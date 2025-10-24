@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -561,7 +562,8 @@ func checkBootstrapPhases(rc *eos_io.RuntimeContext) CheckResult {
 			"Phase 1: Consul",
 			"consul",
 			func() string {
-				if _, err := os.Stat("/usr/bin/consul"); err == nil {
+				binPath := consul.GetConsulBinaryPath()
+				if _, err := os.Stat(binPath); err == nil {
 					if out, err := exec.CommandContext(rc.Ctx, "systemctl", "is-active", "consul").Output(); err == nil {
 						if strings.TrimSpace(string(out)) == "active" {
 							return "COMPLETE"
@@ -831,7 +833,7 @@ func generateBootstrapSummary(result BootstrapDebugResult) string {
 		summary.WriteString("1. Run detailed Consul diagnostics:\n")
 		summary.WriteString("   sudo eos debug consul\n\n")
 		summary.WriteString("2. Try manual Consul start to see exact error:\n")
-		summary.WriteString("   sudo -u consul /usr/bin/consul agent -config-dir=/etc/consul.d\n\n")
+		summary.WriteString(fmt.Sprintf("   sudo -u consul %s agent -config-dir=/etc/consul.d\n\n", consul.GetConsulBinaryPath()))
 		summary.WriteString("3. Check system logs:\n")
 		summary.WriteString("   sudo journalctl -u consul -f\n\n")
 		summary.WriteString("4. If persistent, try bootstrap with verbose logging:\n")

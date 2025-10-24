@@ -491,8 +491,8 @@ func createIntention(rc *eos_io.RuntimeContext, intention *api.Intention) error 
 		return fmt.Errorf("failed to create Consul client: %w", err)
 	}
 
-	// Create intention
-	_, _, err = client.Connect().IntentionCreate(intention, nil)
+	// Create intention (using IntentionUpsert instead of deprecated IntentionCreate)
+	_, err = client.Connect().IntentionUpsert(intention, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create intention: %w", err)
 	}

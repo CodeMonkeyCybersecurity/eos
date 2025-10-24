@@ -694,7 +694,7 @@ func verifyConsulRemoval(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Check if user still exists
-	output, err = execute.Run(rc.Ctx, execute.Options{
+	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "id",
 		Args:    []string{"consul"},
 		Capture: true,

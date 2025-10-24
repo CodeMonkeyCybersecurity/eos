@@ -199,7 +199,7 @@ func (c *Calculator) calculateServiceRequirements(service *ServiceDefinition) Se
 
 // calculateScalingMultiplier calculates the scaling multiplier based on workload
 func (c *Calculator) calculateScalingMultiplier(service *ServiceDefinition) float64 {
-	baseMultiplier := 1.0
+	var baseMultiplier float64
 
 	switch service.Type {
 	case ServiceTypeWebServer, ServiceTypeProxy:

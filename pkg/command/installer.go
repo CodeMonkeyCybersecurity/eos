@@ -246,7 +246,7 @@ func (ci *CommandInstaller) writeWithSudo(ctx context.Context, path, content str
 		_ = tmpFile.Close()
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// Copy with sudo
 	copyCmd := exec.CommandContext(ctx, "sudo", "cp", tmpPath, path)

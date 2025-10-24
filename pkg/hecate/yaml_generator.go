@@ -680,10 +680,10 @@ func generateYAMLNginxConfig(config *YAMLHecateConfig, outputDir string) error {
 		}
 
 		if err := tmpl.Execute(f, data); err != nil {
-			f.Close()
+			_ = f.Close()
 			return fmt.Errorf("failed to execute template: %w", err)
 		}
-		f.Close()
+		_ = f.Close()
 	}
 
 	return nil

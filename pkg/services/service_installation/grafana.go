@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var interactive bool
 
 func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
 	fmt.Printf("Interactive Grafana Setup\n")

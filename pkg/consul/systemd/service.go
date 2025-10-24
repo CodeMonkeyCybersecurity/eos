@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -22,15 +23,13 @@ func CreateService(rc *eos_io.RuntimeContext) error {
 	// ASSESS - Prepare service configuration
 	log.Info("Assessing Consul systemd service requirements")
 
-	// CRITICAL: Detect actual Consul binary path
-	// APT install uses /usr/bin/consul, direct download uses /usr/bin/consul
-	// Don't hardcode - detect where binary actually is
-	consulBinaryPath := detectConsulBinaryPath(rc)
-	if consulBinaryPath == "" {
-		return fmt.Errorf("consul binary not found in standard locations (/usr/bin/consul, /usr/local/bin/consul)")
+	// Use centralized binary path detection
+	consulBinaryPath := consul.GetConsulBinaryPath()
+	if _, err := os.Stat(consulBinaryPath); err != nil {
+		return fmt.Errorf("consul binary not found at %s: %w", consulBinaryPath, err)
 	}
 
-	log.Info("Detected Consul binary path for systemd service",
+	log.Info("Using Consul binary path for systemd service",
 		zap.String("binary_path", consulBinaryPath))
 
 	// INTERVENE - Create systemd service file
@@ -176,50 +175,6 @@ WantedBy=multi-user.target`, consulBinaryPath, consulBinaryPath, shared.GetInter
 	return nil
 }
 
-// detectConsulBinaryPath finds the actual installed Consul binary path
-// Checks standard locations in order of preference
-func detectConsulBinaryPath(rc *eos_io.RuntimeContext) string {
-	log := otelzap.Ctx(rc.Ctx)
-
-	// Check common installation paths in order
-	// 1. APT/repository installs typically use /usr/bin
-	// 2. Manual installs often use /usr/local/bin
-	paths := []string{
-		"/usr/bin/consul",
-		"/usr/local/bin/consul",
-	}
-
-	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			// Binary exists, verify it's executable
-			if info, err := os.Stat(path); err == nil {
-				if info.Mode()&0111 != 0 {
-					log.Debug("Found executable Consul binary",
-						zap.String("path", path))
-					return path
-				}
-				log.Warn("Consul binary found but not executable",
-					zap.String("path", path),
-					zap.String("permissions", info.Mode().String()))
-			}
-		}
-	}
-
-	// Fallback: try to find via PATH
-	if output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "which",
-		Args:    []string{"consul"},
-		Capture: true,
-	}); err == nil && output != "" {
-		path := strings.TrimSpace(output)
-		log.Debug("Found Consul binary via which",
-			zap.String("path", path))
-		return path
-	}
-
-	log.Error("Consul binary not found in any standard location")
-	return ""
-}
 
 // backupFile creates a copy of a file
 func backupFile(src, dst string) error {

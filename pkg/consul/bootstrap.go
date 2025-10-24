@@ -129,7 +129,8 @@ func checkBootstrapStatus(rc *eos_io.RuntimeContext, config *ConsulConfig) (*Boo
 
 	// Check ACL status
 	if config.EnableACL {
-		if aclStatus, _, err := client.ACL().Info("master", nil); err == nil && aclStatus != nil {
+		// Use TokenRead instead of deprecated Info
+		if aclToken, _, err := client.ACL().TokenRead("master", nil); err == nil && aclToken != nil {
 			status.ACLBootstrapped = true
 		}
 	}

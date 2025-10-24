@@ -210,20 +210,6 @@ func (p *pipeline) Deploy(ctx context.Context, component Component) (*Deployment
 	return deployment, nil
 }
 
-// rollback attempts to rollback changes
-func (p *pipeline) rollback(ctx context.Context, deployment *Deployment) error {
-	logger := otelzap.Ctx(p.rc.Ctx)
-	logger.Info("Attempting rollback",
-		zap.String("deployment_id", deployment.ID))
-	
-	// TODO: Implement actual rollback logic using terraform and nomad
-	// For now, just log the attempt
-	logger.Info("Rollback completed",
-		zap.String("deployment_id", deployment.ID))
-	
-	return nil
-}
-
 // WaitForHealthy waits for a deployment to become healthy
 func (p *pipeline) WaitForHealthy(ctx context.Context, deployment *Deployment, timeout time.Duration) error {
 	logger := otelzap.Ctx(p.rc.Ctx)

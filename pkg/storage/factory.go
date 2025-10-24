@@ -180,7 +180,7 @@ type UnifiedStorageManager struct {
 	registry    *DriverRegistry
 	diskManager *DiskManagerImpl
 	drivers     map[StorageType]StorageDriver
-	mu          sync.RWMutex
+	_           sync.RWMutex
 }
 
 // NewUnifiedStorageManager creates a new unified storage manager

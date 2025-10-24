@@ -2,13 +2,11 @@
 package environment
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -79,49 +77,6 @@ func Detect(rc *eos_io.RuntimeContext) (*Environment, error) {
 	return env, nil
 }
 
-// detectSingleMachine returns environment for a single machine setup
-func detectSingleMachine() (*Environment, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get hostname: %w", err)
-	}
-
-	return &Environment{
-		MachineCount: 1,
-		Machines: []Machine{
-			{
-				Hostname: hostname,
-				IP:       shared.GetInternalHostname(),
-				Role:     RoleMonolith,
-			},
-		},
-		MyRole:     RoleMonolith,
-		MyHostname: hostname,
-	}, nil
-}
-
-// parseOutput parses the JSON output from
-func parseOutput(output string) ([]Machine, error) {
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	// Extract machines from  response
-	var machines []Machine
-	if local, ok := result["local"].(map[string]interface{}); ok {
-		for hostname := range local {
-			if hostname != "_stamp" { // Skip metadata fields
-				machines = append(machines, Machine{
-					Hostname: hostname,
-					// IP and Role will be determined later
-				})
-			}
-		}
-	}
-
-	return machines, nil
-}
 
 // assignRoles determines the role of each machine based on count and naming
 func (e *Environment) assignRoles() error {

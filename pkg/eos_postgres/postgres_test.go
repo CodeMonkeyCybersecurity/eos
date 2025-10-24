@@ -55,7 +55,7 @@ func TestOpen(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, db)
 				if db != nil {
-					db.Close()
+					_ = db.Close()
 				}
 			}
 		})
@@ -88,7 +88,7 @@ func TestConnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original env var
 			original := os.Getenv("POSTGRES_DSN")
-			defer os.Setenv("POSTGRES_DSN", original)
+			defer func() { _ = os.Setenv("POSTGRES_DSN", original) }()
 
 			// Set test env var
 			if tt.envVar == "" {
@@ -116,7 +116,7 @@ func TestConnect(t *testing.T) {
 func TestHealth(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	tests := []struct {
 		name    string
@@ -157,7 +157,7 @@ func TestHealth(t *testing.T) {
 func TestWithTx(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	tests := []struct {
 		name    string
@@ -222,7 +222,7 @@ func TestWithTx(t *testing.T) {
 func TestHashStore(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Test NewHashStore
 	t.Run("NewHashStore", func(t *testing.T) {
@@ -288,7 +288,7 @@ func TestHashStore(t *testing.T) {
 func TestKVOperations(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
 
@@ -315,7 +315,7 @@ func TestKVOperations(t *testing.T) {
 		mock.ExpectQuery("select val from kvm").
 			WithArgs("error").
 			WillReturnError(errors.New("database error"))
-		val, err = GetKV(ctx, db, "error")
+		_, err = GetKV(ctx, db, "error")
 		assert.Error(t, err)
 		assert.NotErrorIs(t, err, ErrNotFound)
 
@@ -344,7 +344,7 @@ func TestKVOperations(t *testing.T) {
 func TestNewPGHashStore(t *testing.T) {
 	// Save original env var
 	original := os.Getenv("POSTGRES_DSN")
-	defer os.Setenv("POSTGRES_DSN", original)
+	defer func() { _ = os.Setenv("POSTGRES_DSN", original) }()
 
 	// Test missing POSTGRES_DSN
 	_ = os.Unsetenv("POSTGRES_DSN")
@@ -365,7 +365,7 @@ func TestNewPGHashStore(t *testing.T) {
 func TestConcurrentHashStore(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create store
 	mock.ExpectExec("create table if not exists sent_alerts").

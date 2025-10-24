@@ -139,7 +139,7 @@ func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 		
 		// Update last trigger time
 		webhookConfig.LastTrigger = time.Now()
-		updateWebhookConfig(rc, environment, webhookConfig)
+		_ = updateWebhookConfig(rc, environment, webhookConfig)
 		
 		// Return success
 		w.WriteHeader(http.StatusOK)
@@ -264,7 +264,7 @@ func triggerDeployment(rc *eos_io.RuntimeContext, environment string, payload *W
 	logger.Info("Waiting for deployment to be healthy")
 	if err := WaitForGhostHealthy(rc, ghostConfig); err != nil {
 		logger.Error("Health check failed, rolling back", zap.Error(err))
-		rollbackDeployment(rc, ghostConfig, deployCtx)
+		_ = rollbackDeployment(rc, ghostConfig, deployCtx)
 		return fmt.Errorf("deployment health check failed: %w", err)
 	}
 	
@@ -281,8 +281,8 @@ func triggerDeployment(rc *eos_io.RuntimeContext, environment string, payload *W
 		zap.Duration("duration", time.Since(deployCtx.Timestamp)))
 	
 	// Store deployment record
-	storeDeploymentRecord(rc, deployCtx)
-	
+	_ = storeDeploymentRecord(rc, deployCtx)
+
 	return nil
 }
 
@@ -411,8 +411,8 @@ func rollbackDeployment(rc *eos_io.RuntimeContext, config *GhostConfig, ctx *Dep
 	}
 	
 	ctx.Status = "rolled_back"
-	storeDeploymentRecord(rc, ctx)
-	
+	_ = storeDeploymentRecord(rc, ctx)
+
 	return nil
 }
 

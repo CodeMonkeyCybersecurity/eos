@@ -374,7 +374,7 @@ func canReachInternet(rc *eos_io.RuntimeContext) bool {
 	for _, host := range testHosts {
 		conn, err := net.DialTimeout("tcp", host, 3*time.Second)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			return true
 		}
 	}

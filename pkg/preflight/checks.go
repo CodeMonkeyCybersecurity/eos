@@ -91,12 +91,7 @@ func CheckDocker(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "info")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Docker is not running or not accessible: %w\n"+
-			"Output: %s\n"+
-			"Fix: Install Docker or start the Docker daemon:\n"+
-			"  Ubuntu: sudo systemctl start docker\n"+
-			"  Or visit: https://docs.docker.com/engine/install/ubuntu/",
-			err, string(output))
+		return fmt.Errorf("docker is not running or not accessible: %w\nOutput: %s\nFix: Install Docker or start the Docker daemon:\n  Ubuntu: sudo systemctl start docker\n  Or visit: https://docs.docker.com/engine/install/ubuntu/", err, string(output))
 	}
 	return nil
 }
@@ -106,11 +101,7 @@ func CheckDockerCompose(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "docker", "compose", "version")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Docker Compose is not available: %w\n"+
-			"Output: %s\n"+
-			"Fix: Install Docker Compose V2:\n"+
-			"  Ubuntu: sudo apt install docker-compose-plugin",
-			err, string(output))
+		return fmt.Errorf("docker compose is not available: %w\nOutput: %s\nFix: Install Docker Compose V2:\n  Ubuntu: sudo apt install docker-compose-plugin", err, string(output))
 	}
 	return nil
 }
@@ -167,11 +158,7 @@ func CheckOllama(ctx context.Context) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("Ollama is not running at localhost:11434\n"+
-			"Fix: Install and start Ollama:\n"+
-			"  curl -fsSL https://ollama.ai/install.sh | sh\n"+
-			"  ollama serve\n"+
-			"Error: %w", err)
+		return fmt.Errorf("ollama is not running at localhost:11434\nFix: Install and start Ollama:\n  curl -fsSL https://ollama.ai/install.sh | sh\n  ollama serve\nError: %w", err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {

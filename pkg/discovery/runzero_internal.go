@@ -43,8 +43,6 @@ type InternalExplorer struct {
 	location   ExplorerLocation
 	lastScan   time.Time
 	baseline   map[string]*Asset
-	violations []ComplianceViolation
-	shadowIT   []Asset
 	logger     *zap.Logger
 }
 
@@ -413,7 +411,7 @@ func (m *InternalDiscoveryManager) isHostResponsive(ip string) bool {
 	// For now, simplified check
 	conn, err := net.DialTimeout("tcp", ip+":80", 1*time.Second)
 	if err == nil {
-		conn.Close()
+		_ = conn.Close()
 		return true
 	}
 
@@ -422,7 +420,7 @@ func (m *InternalDiscoveryManager) isHostResponsive(ip string) bool {
 	for _, port := range commonPorts {
 		conn, err := net.DialTimeout("tcp", ip+":"+port, 500*time.Millisecond)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			return true
 		}
 	}

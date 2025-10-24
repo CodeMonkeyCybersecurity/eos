@@ -558,20 +558,3 @@ func startNomadService(_ *eos_io.RuntimeContext) error {
 
 // getBootstrapNomadConfiguration generates bootstrap Nomad configuration (currently unused)
 // TODO: Implement bootstrap configuration generation for multi-node Nomad clusters
-func getBootstrapNomadConfiguration(rc *eos_io.RuntimeContext, nodeIP string) (*NomadConfig, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Create default bootstrap configuration
-	config := &NomadConfig{
-		Role:       "server", // Bootstrap mode runs as server
-		DataCenter: "dc1",
-		NodeIP:     nodeIP,
-	}
-
-	logger.Info("Using bootstrap defaults for Nomad configuration",
-		zap.String("role", config.Role),
-		zap.String("datacenter", config.DataCenter),
-		zap.String("node_ip", config.NodeIP))
-
-	return config, nil
-}

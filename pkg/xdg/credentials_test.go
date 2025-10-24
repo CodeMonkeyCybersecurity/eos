@@ -402,7 +402,7 @@ func TestErrorScenarios(t *testing.T) {
 	t.Run("invalid_filename_characters", func(t *testing.T) {
 		tempDir := t.TempDir()
 		_ = os.Setenv("XDG_CONFIG_HOME", tempDir)
-		defer os.Unsetenv("XDG_CONFIG_HOME")
+		defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 		// Test with null byte in username
 		if strings.Contains("\x00", "") {

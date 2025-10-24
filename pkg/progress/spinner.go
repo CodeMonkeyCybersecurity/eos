@@ -207,14 +207,12 @@ func NewStages(ctx context.Context, stages []string) *Stages {
 // Start begins a stage
 func (s *Stages) Start(index int) {
 	s.current = index
-	status := "⟳"
 	for i, stage := range s.stages {
+		status := "○"
 		if i < index {
 			status = "✓"
 		} else if i == index {
 			status = "⟳"
-		} else {
-			status = "○"
 		}
 		s.logger.Info(fmt.Sprintf("  %s %d/%d %s",
 			status,

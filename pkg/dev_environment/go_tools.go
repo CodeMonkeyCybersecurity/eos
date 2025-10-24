@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -146,12 +145,6 @@ func installGolangciLint(rc *eos_io.RuntimeContext) error {
 
 	fmt.Println("Installing golangci-lint...")
 
-	// Detect architecture
-	arch := runtime.GOARCH
-	if arch == "amd64" {
-		arch = "x86_64"
-	}
-
 	// Download and install using the official installer script
 	installerURL := "https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh"
 
@@ -165,7 +158,7 @@ func installGolangciLint(rc *eos_io.RuntimeContext) error {
 	}); err != nil {
 		return fmt.Errorf("failed to download golangci-lint installer: %w", err)
 	}
-	defer os.Remove(tmpScript)
+	defer func() { _ = os.Remove(tmpScript) }()
 
 	// Make it executable
 	if err := os.Chmod(tmpScript, 0755); err != nil {

@@ -61,14 +61,6 @@ This helps identify differences before migration or to audit changes.`,
 	RunE: runCompare,
 }
 
-// validateCmd validates a configuration file
-var validateCmd = &cobra.Command{
-	Use:   "validate <config-file>",
-	Short: "Validate an Authentik configuration file",
-	Long:  `Validate the structure and content of an Authentik configuration file.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runValidate,
-}
 
 func init() {
 	// Import command flags
@@ -84,8 +76,8 @@ func init() {
 	importCmd.Flags().Bool("force", false, "Force import even with warnings")
 	importCmd.Flags().Bool("create-backup", true, "Create backup before importing")
 
-	importCmd.MarkFlagRequired("url")
-	importCmd.MarkFlagRequired("token")
+	_ = importCmd.MarkFlagRequired("url")
+	_ = importCmd.MarkFlagRequired("token")
 
 	// Compare command flags
 	compareCmd.Flags().String("source", "", "Source (URL or file)")
@@ -95,8 +87,8 @@ func init() {
 	compareCmd.Flags().String("output", "", "Output comparison to file")
 	compareCmd.Flags().Bool("detailed", false, "Show detailed differences")
 
-	compareCmd.MarkFlagRequired("source")
-	compareCmd.MarkFlagRequired("target")
+	_ = compareCmd.MarkFlagRequired("source")
+	_ = compareCmd.MarkFlagRequired("target")
 }
 
 func runImport(cmd *cobra.Command, args []string) error {
@@ -361,43 +353,6 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	} else {
 		// Print to console
 		printComparison(comparison)
-	}
-
-	return nil
-}
-
-func runValidate(cmd *cobra.Command, args []string) error {
-	configFile := args[0]
-
-	fmt.Printf(" Validating configuration file: %s\n\n", configFile)
-
-	// Load configuration
-	config, err := loadConfigFile(configFile)
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
-	}
-
-	// Validate
-	warnings, errors := validateConfig(config)
-
-	if len(errors) == 0 && len(warnings) == 0 {
-		fmt.Println(" Configuration is valid!")
-		return nil
-	}
-
-	if len(warnings) > 0 {
-		fmt.Println("Warnings found:")
-		for _, warn := range warnings {
-			fmt.Printf("   • %s\n", warn)
-		}
-	}
-
-	if len(errors) > 0 {
-		fmt.Println("\n Errors found:")
-		for _, err := range errors {
-			fmt.Printf("   • %s\n", err)
-		}
-		return fmt.Errorf("validation failed with %d errors", len(errors))
 	}
 
 	return nil

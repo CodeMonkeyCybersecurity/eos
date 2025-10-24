@@ -118,7 +118,7 @@ func (ni *NomadInstaller) Install() error {
 
 	tmpDir := "/tmp/nomad-install"
 	_ = os.MkdirAll(tmpDir, 0755)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	if err := ni.runner.Run("wget", "-O", tmpDir+"/nomad.zip", downloadURL); err != nil {
 		if ni.config.Version == "latest" {
@@ -235,7 +235,7 @@ WantedBy=multi-user.target`
 	if err := os.WriteFile("/etc/systemd/system/nomad.service", []byte(serviceContent), 0640); err != nil {
 		panic(fmt.Sprintf("FATAL: Failed to write Nomad service file: %v", err))
 	}
-	ni.runner.Run("systemctl", "daemon-reload")
-	ni.runner.Run("systemctl", "enable", "nomad")
-	ni.runner.Run("systemctl", "start", "nomad")
+	_ = ni.runner.Run("systemctl", "daemon-reload")
+	_ = ni.runner.Run("systemctl", "enable", "nomad")
+	_ = ni.runner.Run("systemctl", "start", "nomad")
 }

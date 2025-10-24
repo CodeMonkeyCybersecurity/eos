@@ -20,7 +20,7 @@ type MFATestFramework struct {
 	logger         otelzap.LoggerWithCtx
 	testUser       string
 	hasGoogleAuth  bool
-	emergencyToken string
+	_              string
 }
 
 // NewMFATestFramework creates a new MFA testing framework

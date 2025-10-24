@@ -162,7 +162,12 @@ func InstallToolVia(rc *eos_io.RuntimeContext, tool string) error {
 
 	// Ask for user consent before proceeding
 	toolDescription := getToolDescription(tool)
-	consent, err := eos_io.PromptForInstallation(rc, fmt.Sprintf("HashiCorp %s", strings.Title(tool)), toolDescription)
+	// Capitalize first letter only (strings.Title is deprecated)
+	toolCapitalized := tool
+	if len(tool) > 0 && tool[0] >= 'a' && tool[0] <= 'z' {
+		toolCapitalized = string(tool[0]-32) + tool[1:]
+	}
+	consent, err := eos_io.PromptForInstallation(rc, fmt.Sprintf("HashiCorp %s", toolCapitalized), toolDescription)
 	if err != nil {
 		return fmt.Errorf("failed to get user consent: %w", err)
 	}

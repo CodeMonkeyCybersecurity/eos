@@ -242,6 +242,8 @@ func (v *Validator) validatePlacementStrategy(serviceReq ServiceRequirements, no
 		if len(nodes) > 0 && serviceReq.Service.RedundancyFactor == 1 {
 			// For single instance services, warn if sharing nodes with critical services
 			// This would require additional context about what else is on the nodes
+			// TODO: Implement node sharing checks
+			_ = nodes
 		}
 
 	case "edge":

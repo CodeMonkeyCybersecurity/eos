@@ -74,12 +74,12 @@ func FindComposeProjects(rc *eos_io.RuntimeContext, config *ComposeConfig, searc
 // ListRunningContainers lists all running Docker containers following Assess → Intervene → Evaluate pattern
 func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeConfig) (*ContainerListResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
-		config = DefaultComposeConfig()
+		_ = DefaultComposeConfig()
 	}
-	
+
 	logger.Info("Assessing container listing request")
 
 	// Check if Docker is available
@@ -202,9 +202,10 @@ func StopAllComposeProjects(rc *eos_io.RuntimeContext, config *ComposeConfig, op
 // StopComposeProject stops a specific Docker Compose project following Assess → Intervene → Evaluate pattern
 func StopComposeProject(rc *eos_io.RuntimeContext, config *ComposeConfig, project ComposeProject, options *ComposeStopOptions) (*ComposeOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
+		_ = config // Prevent ineffassign warning
 		config = DefaultComposeConfig()
 	}
 	

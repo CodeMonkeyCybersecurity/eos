@@ -183,7 +183,6 @@ type TerraformConfig struct {
 type Config struct {
 	Targets []string `yaml:"targets" json:"targets"`
 	States  []string `yaml:"states" json:"states"`
-	string  `yaml:"" json:""`
 }
 
 // PipelineSettings holds pipeline behavior settings
@@ -300,7 +299,6 @@ type ArtifactInfo struct {
 type PipelineOrchestrator struct {
 	config          *PipelineConfig
 	execution       *PipelineExecution
-	currentStage    int
 	Client          Client
 	terraformClient TerraformClient
 	nomadClient     NomadClient

@@ -134,7 +134,7 @@ func (eu *EosUpdater) Update() error {
 	if err != nil {
 		return fmt.Errorf("failed to build binary: %w", err)
 	}
-	defer os.Remove(tempBinary)
+	defer func() { _ = os.Remove(tempBinary) }()
 
 	// EVALUATE - Validate and install
 	if !eu.config.SkipValidation {

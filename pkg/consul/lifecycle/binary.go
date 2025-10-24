@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -62,7 +63,7 @@ func Binary(rc *eos_io.RuntimeContext) error {
 		},
 		{Command: "unzip", Args: []string{"-o", "/tmp/consul.zip", "-d", "/tmp/"}},
 		{Command: "chmod", Args: []string{"+x", "/tmp/consul"}},
-		{Command: "mv", Args: []string{"/tmp/consul", "/usr/local/bin/consul"}},
+		{Command: "mv", Args: []string{"/tmp/consul", consul.ConsulBinaryPath}},
 		{Command: "rm", Args: []string{"-f", "/tmp/consul.zip"}},
 	}
 
@@ -286,7 +287,7 @@ func (ci *ConsulInstaller) installViaBinary() error {
 	}
 
 	// Set permissions
-	if err := os.Chmod("/usr/local/bin/consul", 0755); err != nil {
+	if err := os.Chmod(consul.ConsulBinaryPath, 0755); err != nil {
 		return fmt.Errorf("failed to set permissions: %w", err)
 	}
 
@@ -294,7 +295,7 @@ func (ci *ConsulInstaller) installViaBinary() error {
 	_ = os.Remove(zipPath)
 
 	ci.logger.Info("Consul binary installed successfully",
-		zap.String("path", "/usr/local/bin/consul"),
+		zap.String("path", consul.ConsulBinaryPath),
 		zap.String("version", version))
 
 	return nil
@@ -371,7 +372,7 @@ func (ci *ConsulInstaller) cleanExistingInstallation() error {
 	}
 
 	// Remove binary if installed via direct download
-	binaryPath := "/usr/local/bin/consul"
+	binaryPath := consul.ConsulBinaryPath
 	if ci.fileExists(binaryPath) {
 		ci.logger.Info("Removing binary", zap.String("path", binaryPath))
 		if err := os.Remove(binaryPath); err != nil {
@@ -395,7 +396,7 @@ type BinaryInstaller struct {
 // NewBinaryInstaller creates a new binary installer instance
 func NewBinaryInstaller(rc *eos_io.RuntimeContext, binaryPath string) *BinaryInstaller {
 	if binaryPath == "" {
-		binaryPath = "/usr/bin/consul"
+		binaryPath = consul.GetConsulBinaryPath()
 	}
 
 	return &BinaryInstaller{
@@ -415,24 +416,3 @@ func getUbuntuCodename() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// getConsulBinaryPath returns the path to the Consul binary
-func getConsulBinaryPath() string {
-	// Check common locations
-	paths := []string{
-		"/usr/bin/consul",
-		"/usr/local/bin/consul",
-	}
-
-	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	// Fallback to PATH lookup
-	if path, err := exec.LookPath("consul"); err == nil {
-		return path
-	}
-
-	return "/usr/bin/consul" // Default
-}

@@ -19,7 +19,6 @@ import (
 type DiagnosticSuite struct {
 	rc           *eos_io.RuntimeContext
 	backend      *Backend
-	results      *DiagnosticResults
 	httpClient   *http.Client
 	consulClient *api.Client
 }

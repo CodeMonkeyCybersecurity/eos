@@ -59,27 +59,38 @@ func checkPortConflicts(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 		portStr := fmt.Sprintf(":%d", port)
 		if strings.Contains(output, portStr) {
-			result.Success = false
-			result.Details = append(result.Details,
-				fmt.Sprintf("Port %d (%s) is already in use", port, name))
+			// Port is in use - check WHO owns it
+			// ss/netstat output format: users:(("consul",pid=274995,fd=22))
+			isConsulOwned := strings.Contains(output, `"consul"`) || strings.Contains(output, "consul,pid=")
 
-			// Try to identify what's using the port
-			lines := strings.Split(output, "\n")
-			for _, line := range lines {
-				if strings.Contains(line, portStr) {
-					result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+			if isConsulOwned {
+				// Consul owns its own ports - this is GOOD
+				result.Details = append(result.Details,
+					fmt.Sprintf("✓ Port %d (%s): Correctly bound by Consul", port, name))
+			} else {
+				// Another process owns the port - this is a CONFLICT
+				result.Success = false
+				result.Details = append(result.Details,
+					fmt.Sprintf("✗ Port %d (%s): In use by conflicting process", port, name))
+
+				// Show which process owns it
+				lines := strings.Split(output, "\n")
+				for _, line := range lines {
+					if strings.Contains(line, portStr) {
+						result.Details = append(result.Details, "  Conflict: "+strings.TrimSpace(line))
+					}
 				}
 			}
 		} else {
 			result.Details = append(result.Details,
-				fmt.Sprintf("Port %d (%s) is available", port, name))
+				fmt.Sprintf("✓ Port %d (%s): Available (not in use)", port, name))
 		}
 	}
 
 	if result.Success {
-		result.Message = "All Consul ports are available"
+		result.Message = "All Consul ports are available or correctly bound"
 	} else {
-		result.Message = "One or more Consul ports are already in use"
+		result.Message = "One or more Consul ports have conflicts"
 	}
 
 	return result
@@ -96,27 +107,42 @@ func checkLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	// Check for any consul processes
+	// Use pgrep for accurate process matching (matches command name, not username)
 	cmd := execute.Options{
-		Command: "ps",
-		Args:    []string{"aux"},
+		Command: "pgrep",
+		Args:    []string{"-a", "consul"}, // -a shows full command line
 		Capture: true,
 	}
 
 	output, err := execute.Run(rc.Ctx, cmd)
 	if err != nil {
+		// pgrep returns exit code 1 when no processes found - this is normal
+		if strings.TrimSpace(output) == "" {
+			result.Message = "No lingering Consul processes found"
+			return result
+		}
+		// Other errors
 		result.Message = "Could not check for processes"
 		return result
 	}
 
-	// Look for consul processes
+	// Parse pgrep output: "PID COMMAND LINE"
+	// Example: "274995 /usr/bin/consul agent -config-dir=/etc/consul.d/"
 	lines := strings.Split(output, "\n")
 	consulProcesses := []string{}
 
 	for _, line := range lines {
-		if strings.Contains(line, "consul") && !strings.Contains(line, "grep") {
-			consulProcesses = append(consulProcesses, strings.TrimSpace(line))
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
 		}
+
+		// Filter out processes that are this debug command itself
+		if strings.Contains(line, "eos debug consul") || strings.Contains(line, "eos update consul") {
+			continue
+		}
+
+		consulProcesses = append(consulProcesses, line)
 	}
 
 	if len(consulProcesses) > 0 {
@@ -141,14 +167,17 @@ func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	binPath := "/usr/local/bin/consul"
+	// Use centralized binary path lookup (checks both /usr/local/bin and /usr/bin)
+	binPath := consul.GetConsulBinaryPath()
 
-	// Check if binary exists
+	// Check if binary exists at detected path
 	info, err := os.Stat(binPath)
 	if err != nil {
 		result.Success = false
 		result.Message = "Consul binary not found"
-		result.Details = append(result.Details, fmt.Sprintf("Expected path: %s", binPath))
+		result.Details = append(result.Details, fmt.Sprintf("Searched: %s and %s",
+			consul.ConsulBinaryPath, consul.ConsulBinaryPathAlt))
+		result.Details = append(result.Details, "Install with: eos create consul")
 		return result
 	}
 
@@ -434,7 +463,7 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	configPath := "/etc/consul.d/consul.hcl"
+	configPath := consul.ConsulConfigFile
 
 	// Check if config file exists
 	if _, err := os.Stat(configPath); err != nil {
@@ -522,19 +551,48 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	} else {
 		result.Message = "Configuration appears valid"
 
-		// Run consul validate for additional checks
-		validateCmd := execute.Options{
-			Command: "/usr/local/bin/consul",
-			Args:    []string{"validate", "/etc/consul.d/"},
-			Capture: true,
+		// Validation strategy:
+		// 1. Try SDK validation (if Consul is running)
+		// 2. Fallback to CLI validation (if binary exists)
+		validated := false
+
+		// Try SDK validation first
+		client, err := consulapi.NewClient(consulapi.DefaultConfig())
+		if err == nil {
+			if _, err := client.Agent().Self(); err == nil {
+				result.Details = append(result.Details, "✓ SDK validation: Consul agent responding")
+				validated = true
+			} else {
+				logger.Debug("SDK validation failed - Consul may not be running",
+					zap.Error(err))
+			}
 		}
 
-		output, err := execute.Run(rc.Ctx, validateCmd)
-		if err != nil {
-			result.Success = false
-			result.Details = append(result.Details, "Consul validate failed: "+output)
-		} else {
-			result.Details = append(result.Details, "Consul validate passed")
+		// Fallback to CLI validation if SDK failed
+		if !validated {
+			binPath := consul.GetConsulBinaryPath()
+			if _, err := os.Stat(binPath); err == nil {
+				validateCmd := execute.Options{
+					Command: binPath,
+					Args:    []string{"validate", consul.ConsulConfigDir},
+					Capture: true,
+				}
+
+				output, err := execute.Run(rc.Ctx, validateCmd)
+				if err != nil {
+					result.Success = false
+					result.Details = append(result.Details, fmt.Sprintf("✗ CLI validation failed: %s", output))
+					result.Details = append(result.Details, fmt.Sprintf("   Command: %s validate %s", binPath, consul.ConsulConfigDir))
+				} else {
+					result.Details = append(result.Details, "✓ CLI validation passed")
+					_ = validated // Mark as validated
+					validated = true
+				}
+			} else {
+				result.Details = append(result.Details, "⚠ Cannot validate: Consul binary not found and agent not running")
+				logger.Warn("Cannot validate configuration - binary not found",
+					zap.String("searched_paths", fmt.Sprintf("%s, %s", consul.ConsulBinaryPath, consul.ConsulBinaryPathAlt)))
+			}
 		}
 	}
 
@@ -807,7 +865,6 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 				if inConsulBlock {
 					if trimmed == "}" {
-						inConsulBlock = false
 						break
 					}
 

@@ -433,7 +433,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	// If no specific type, show summary
 	if listType == "" {
-		showSummary(client)
+		_ = showSummary(client)
 		return nil
 	}
 

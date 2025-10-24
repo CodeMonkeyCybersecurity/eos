@@ -40,9 +40,6 @@ type CleanupOptions struct {
 
 // DiskManagerService provides high-level disk management operations
 type DiskManagerService struct {
-	diskManager DiskManager // Interface for disk management operations
-	logger      otelzap.LoggerWithCtx
-	rc          *eos_io.RuntimeContext
 }
 
 // NewDiskManagerService creates a new disk manager service
@@ -109,44 +106,9 @@ func (dms *DiskManagerService) MonitorDiskGrowth(ctx context.Context, target str
 
 // loadGrowthMetrics - REMOVED: Method no longer used
 // TODO: Restore when growth metrics loading is needed
-func (dms *DiskManagerService) loadGrowthMetrics(ctx context.Context, target, path string) (*GrowthMetrics, error) {
-	_ = ctx    // Suppress unused parameter warning
-	_ = target // Suppress unused parameter warning
-	// This would integrate with the existing growth tracking functionality
-	// For now, return a placeholder implementation
-	return &GrowthMetrics{
-		Path:       path,
-		TimeWindow: 24 * time.Hour,
-	}, nil
-}
 
-func (dms *DiskManagerService) calculateTotalCapacity(usage []DiskUsage) int64 {
-	var total int64
-	for _, u := range usage {
-		total += u.TotalSize
-	}
-	return total
-}
 
-func (dms *DiskManagerService) calculateTotalUsed(usage []DiskUsage) int64 {
-	var total int64
-	for _, u := range usage {
-		total += u.UsedSize
-	}
-	return total
-}
 
-func (dms *DiskManagerService) calculateAverageUsage(usage []DiskUsage) float64 {
-	if len(usage) == 0 {
-		return 0
-	}
-
-	var total float64
-	for _, u := range usage {
-		total += u.UsedPercent
-	}
-	return total / float64(len(usage))
-}
 
 // Report types for comprehensive disk management operations
 

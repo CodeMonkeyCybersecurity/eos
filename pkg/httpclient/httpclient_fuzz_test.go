@@ -92,7 +92,7 @@ func FuzzURLParsing(f *testing.F) {
 		// Try to make a request with the fuzzed URL
 		resp, err := client.Get(ctx, rawURL)
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		// Check for security issues in URL handling
@@ -212,7 +212,7 @@ func FuzzHeaderInjection(f *testing.F) {
 		if err != nil {
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// Additional validation could be done here
 	})
@@ -310,7 +310,7 @@ func FuzzAuthenticationBypass(f *testing.F) {
 		if err != nil {
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// Check if bypass succeeded when it shouldn't
 		if resp.StatusCode == http.StatusOK {
@@ -336,7 +336,7 @@ func FuzzTLSConfig(f *testing.F) {
 	}{
 		{tls.VersionTLS12, tls.VersionTLS13, false, nil},
 		{tls.VersionTLS10, tls.VersionTLS13, false, nil}, // weak TLS
-		{tls.VersionSSL30, tls.VersionTLS13, false, nil}, // very weak
+		// Note: SSLv3 (tls.VersionSSL30) removed as it's deprecated and cryptographically broken
 		{tls.VersionTLS13, tls.VersionTLS12, false, nil}, // min > max
 		{0, 0, true, nil}, // insecure
 		{tls.VersionTLS12, tls.VersionTLS13, false, []uint16{

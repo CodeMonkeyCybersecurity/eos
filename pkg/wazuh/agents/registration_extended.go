@@ -71,7 +71,6 @@ type AgentRegistrationSummary struct {
 // AgentRegistrationManager handles Wazuh agent re-registration operations
 type AgentRegistrationManager struct {
 	config *AgentRegistrationConfig
-	logger *zap.Logger
 }
 
 // NewAgentRegistrationManager creates a new agent registration manager

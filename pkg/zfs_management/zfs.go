@@ -46,9 +46,9 @@ func ListZFSPools(rc *eos_io.RuntimeContext, config *ZFSConfig) (*ZFSListResult,
 
 	// ASSESS
 	logger.Info("Assessing ZFS pool listing request")
-	
+
 	if config == nil {
-		config = DefaultZFSConfig()
+		_ = DefaultZFSConfig()
 	}
 
 	if err := CheckZFSAvailable(rc); err != nil {
@@ -122,9 +122,9 @@ func ListZFSFilesystems(rc *eos_io.RuntimeContext, config *ZFSConfig) (*ZFSListR
 
 	// ASSESS
 	logger.Info("Assessing ZFS filesystem listing request")
-	
+
 	if config == nil {
-		config = DefaultZFSConfig()
+		_ = DefaultZFSConfig()
 	}
 
 	if err := CheckZFSAvailable(rc); err != nil {

@@ -427,7 +427,7 @@ func (cm *CronManager) validateCronExpression(expr string) error {
 		}
 
 		// Simple numeric validation
-		if match, _ := regexp.MatchString(`^\d+$`, part); !match {
+		if isNumeric, _ := regexp.MatchString(`^\d+$`, part); !isNumeric {
 			continue // Skip for now
 		}
 	}

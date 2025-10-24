@@ -59,7 +59,7 @@ func TestGetEnvOrDefault(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up any existing env var
 			_ = os.Unsetenv(tt.envVar)
-			defer os.Unsetenv(tt.envVar)
+			defer func() { _ = os.Unsetenv(tt.envVar) }()
 
 			if tt.shouldSetEnv {
 				_ = os.Setenv(tt.envVar, tt.envValue)
@@ -388,7 +388,7 @@ func TestXDGRuntimePath(t *testing.T) {
 func TestPathTraversalPrevention(t *testing.T) {
 	// Set up test environment
 	_ = os.Setenv("XDG_CONFIG_HOME", "/safe/config")
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 	tests := []struct {
 		name     string
@@ -506,7 +506,7 @@ func TestEdgeCases(t *testing.T) {
 
 	t.Run("special_characters_in_paths", func(t *testing.T) {
 		_ = os.Setenv("XDG_CONFIG_HOME", "/config")
-		defer os.Unsetenv("XDG_CONFIG_HOME")
+		defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 		specialCases := []struct {
 			app  string
@@ -529,7 +529,7 @@ func TestEdgeCases(t *testing.T) {
 
 	t.Run("very_long_paths", func(t *testing.T) {
 		_ = os.Setenv("XDG_CONFIG_HOME", "/config")
-		defer os.Unsetenv("XDG_CONFIG_HOME")
+		defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 		// Test with very long app and file names
 		longApp := strings.Repeat("a", 255)
@@ -567,7 +567,7 @@ func BenchmarkXDGPaths(b *testing.B) {
 
 	b.Run("RuntimePath", func(b *testing.B) {
 		_ = os.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
-		defer os.Unsetenv("XDG_RUNTIME_DIR")
+		defer func() { _ = os.Unsetenv("XDG_RUNTIME_DIR") }()
 
 		for i := 0; i < b.N; i++ {
 			_, _ = XDGRuntimePath("benchapp", "socket")

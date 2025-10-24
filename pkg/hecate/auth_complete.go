@@ -324,7 +324,7 @@ func (c *AuthentikClient) CreateOutpost(rc *eos_io.RuntimeContext, outpost *Auth
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		return fmt.Errorf("API error %d: %v", resp.StatusCode, errResp)
 	}
 	
@@ -360,7 +360,7 @@ func (c *AuthentikClient) ListPolicies(rc *eos_io.RuntimeContext) ([]map[string]
 	
 	if resp.StatusCode >= 400 {
 		var errResp map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&errResp)
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		return nil, fmt.Errorf("API error %d: %v", resp.StatusCode, errResp)
 	}
 	

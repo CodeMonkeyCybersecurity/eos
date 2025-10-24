@@ -735,31 +735,6 @@ func RunUpdateUserPassword(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 	return ChangeUserPassword(rc, username, newPassword)
 }
 
-func runUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	otelzap.Ctx(rc.Ctx).Info("Starting SSH access grant")
-
-	var username string
-	if len(args) > 0 {
-		username = strings.TrimSpace(args[0])
-	}
-
-	// If no username provided, prompt for it
-	if username == "" {
-		var err error
-		username, err = interaction.PromptUser(rc, "Enter username to grant SSH access: ")
-		if err != nil {
-			return fmt.Errorf("failed to get username: %w", err)
-		}
-		username = strings.TrimSpace(username)
-	}
-
-	if username == "" {
-		otelzap.Ctx(rc.Ctx).Error("No username provided")
-		return fmt.Errorf("username cannot be empty")
-	}
-
-	return GrantSSHAccess(rc, username)
-}
 
 // RunUpdateUserSSHAccess handles SSH access grant operations
 func RunUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

@@ -458,7 +458,7 @@ func (sm *StateManager) RestoreState(rc *eos_io.RuntimeContext, backupPath strin
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.Write(data); err != nil {
 		return fmt.Errorf("failed to write temp file: %w", err)

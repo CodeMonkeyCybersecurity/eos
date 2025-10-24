@@ -234,7 +234,7 @@ func TestCommandExists(t *testing.T) {
 	// Create temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "test-commands-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create installer with custom target directory
 	ci := NewCommandInstaller(rc)
@@ -282,7 +282,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		isEos := ci.isEosCommand(tmpFile)
 		assert.False(t, isEos)
@@ -298,7 +298,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		isEos := ci.isEosCommand(tmpFile)
 		assert.True(t, isEos)
@@ -317,7 +317,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content.String())
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		isEos := ci.isEosCommand(tmpFile)
 		assert.False(t, isEos) // Should not find marker beyond line limit
@@ -340,7 +340,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		desc, err := ci.extractDescription(tmpFile)
 		assert.NoError(t, err)
@@ -354,7 +354,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		desc, err := ci.extractDescription(tmpFile)
 		assert.NoError(t, err)
@@ -370,7 +370,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		desc, err := ci.extractDescription(tmpFile)
 		assert.NoError(t, err)
@@ -388,7 +388,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		_, err = ci.extractDescription(tmpFile)
 		assert.Error(t, err)
@@ -402,7 +402,7 @@ echo hello`
 
 		tmpFile, err := createTempScript(content)
 		require.NoError(t, err)
-		defer os.Remove(tmpFile)
+		defer func() { _ = os.Remove(tmpFile) }()
 
 		desc, err := ci.extractDescription(tmpFile)
 		assert.NoError(t, err)
@@ -422,7 +422,7 @@ func TestListCustomCommands(t *testing.T) {
 	// Create temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "test-commands-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create installer with custom target directory
 	ci := NewCommandInstaller(rc)
@@ -532,11 +532,11 @@ func createTempScript(content string) (string, error) {
 
 	_, err = tmpFile.WriteString(content)
 	if err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		_ = os.Remove(tmpFile.Name())
 		return "", err
 	}
 
-	tmpFile.Close()
+	_ = tmpFile.Close()
 	return tmpFile.Name(), nil
 }

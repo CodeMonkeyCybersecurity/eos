@@ -56,7 +56,7 @@ func (c *APIClient) CreateGroup(ctx context.Context, name string, attributes map
 	if err != nil {
 		return nil, fmt.Errorf("group creation request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -88,7 +88,7 @@ func (c *APIClient) GetGroupByName(ctx context.Context, name string) (*GroupResp
 	if err != nil {
 		return nil, fmt.Errorf("group fetch request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -129,7 +129,7 @@ func (c *APIClient) ListGroups(ctx context.Context, namePrefix string) ([]GroupR
 	if err != nil {
 		return nil, fmt.Errorf("groups list request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -162,7 +162,7 @@ func (c *APIClient) DeleteGroup(ctx context.Context, pk string) error {
 	if err != nil {
 		return fmt.Errorf("group deletion request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))

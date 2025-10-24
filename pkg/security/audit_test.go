@@ -131,6 +131,7 @@ func TestNewAuditLogger(t *testing.T) {
 			if !tt.wantErr {
 				if auditLogger == nil {
 					t.Error("AuditLogger should not be nil")
+					return
 				}
 				if auditLogger.logDir != tt.logDir {
 					t.Errorf("LogDir = %v, want %v", auditLogger.logDir, tt.logDir)

@@ -4,7 +4,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestLoadConfig tests configuration loading from various file formats
+// TestLoadConfig tests configuratosn loading from various file formats
 func TestLoadConfig(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -89,7 +88,7 @@ user = "testuser"
 			// Create temporary config file
 			tmpDir := t.TempDir()
 			configFile := filepath.Join(tmpDir, "config"+tt.fileExt)
-			err := ioutil.WriteFile(configFile, []byte(tt.configData), 0644)
+			err := os.WriteFile(configFile, []byte(tt.configData), 0644)
 			require.NoError(t, err)
 
 			// Test loading
@@ -113,7 +112,7 @@ func TestMustLoadConfig(t *testing.T) {
 
 		tmpDir := t.TempDir()
 		configFile := filepath.Join(tmpDir, "config.yaml")
-		err := ioutil.WriteFile(configFile, []byte("test: value"), 0644)
+		err := os.WriteFile(configFile, []byte("test: value"), 0644)
 		require.NoError(t, err)
 
 		assert.NotPanics(t, func() {
@@ -149,7 +148,7 @@ database:
   host: prod-host
   port: 5432
 `
-	err := ioutil.WriteFile(configFile, []byte(configData), 0644)
+	err := os.WriteFile(configFile, []byte(configData), 0644)
 	require.NoError(t, err)
 
 	// Load with defaults
@@ -210,7 +209,7 @@ func TestBindEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
 			_ = os.Setenv(tt.envVar, tt.value)
-			defer os.Unsetenv(tt.envVar)
+			defer func() { _ = os.Unsetenv(tt.envVar) }()
 
 			// Bind and check
 			err := BindEnv(tt.key, tt.envVar)
@@ -265,7 +264,7 @@ func TestWatchConfig(t *testing.T) {
 
 	// Write initial config
 	initialData := "test_key: initial_value"
-	err := ioutil.WriteFile(configFile, []byte(initialData), 0644)
+	err := os.WriteFile(configFile, []byte(initialData), 0644)
 	require.NoError(t, err)
 
 	// Load config
@@ -283,7 +282,7 @@ func TestWatchConfig(t *testing.T) {
 	// Update config file
 	time.Sleep(100 * time.Millisecond) // Give watcher time to start
 	updatedData := "test_key: updated_value"
-	err = ioutil.WriteFile(configFile, []byte(updatedData), 0644)
+	err = os.WriteFile(configFile, []byte(updatedData), 0644)
 	require.NoError(t, err)
 
 	// Wait for change notification
@@ -555,7 +554,7 @@ func TestWatchAndHotReload(t *testing.T) {
 
 	// Write initial config
 	initialData := "test_key: initial_value"
-	err := ioutil.WriteFile(configFile, []byte(initialData), 0644)
+	err := os.WriteFile(configFile, []byte(initialData), 0644)
 	require.NoError(t, err)
 
 	// Load config
@@ -574,7 +573,7 @@ func TestWatchAndHotReload(t *testing.T) {
 
 	// Update config file
 	updatedData := "test_key: updated_value"
-	err = ioutil.WriteFile(configFile, []byte(updatedData), 0644)
+	err = os.WriteFile(configFile, []byte(updatedData), 0644)
 	require.NoError(t, err)
 
 	// Wait for reload
@@ -596,7 +595,7 @@ func TestReload(t *testing.T) {
 
 	// Write initial config
 	initialData := "test_key: initial_value"
-	err := ioutil.WriteFile(configFile, []byte(initialData), 0644)
+	err := os.WriteFile(configFile, []byte(initialData), 0644)
 	require.NoError(t, err)
 
 	// Load config
@@ -606,7 +605,7 @@ func TestReload(t *testing.T) {
 
 	// Update config file
 	updatedData := "test_key: updated_value"
-	err = ioutil.WriteFile(configFile, []byte(updatedData), 0644)
+	err = os.WriteFile(configFile, []byte(updatedData), 0644)
 	require.NoError(t, err)
 
 	// Reload
@@ -624,7 +623,7 @@ func TestSetDefaultEnvPrefix(t *testing.T) {
 
 	// Set environment variable
 	_ = os.Setenv("EOS_TEST_KEY", "env_value")
-	defer os.Unsetenv("EOS_TEST_KEY")
+	defer func() { _ = os.Unsetenv("EOS_TEST_KEY") }()
 
 	// Set prefix
 	SetDefaultEnvPrefix("EOS")

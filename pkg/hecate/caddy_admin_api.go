@@ -119,7 +119,7 @@ func (c *CaddyAdminClient) GetConfig(ctx context.Context) (map[string]interface{
 	if err != nil {
 		return nil, fmt.Errorf("get config request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -146,7 +146,7 @@ func (c *CaddyAdminClient) Health(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("caddy admin API not responding: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("caddy admin API returned status %d", resp.StatusCode)
@@ -167,7 +167,7 @@ func (c *CaddyAdminClient) Stop(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("stop request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))

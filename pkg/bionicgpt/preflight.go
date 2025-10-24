@@ -9,7 +9,6 @@ package bionicgpt
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -352,29 +351,3 @@ func (bgi *BionicGPTInstaller) checkAzureConfiguration(ctx context.Context, resu
 	return allOK
 }
 
-// checkExistingDeployment checks if BionicGPT is already deployed
-func (bgi *BionicGPTInstaller) checkExistingDeployment(ctx context.Context, result *PreflightResult) {
-	logger := otelzap.Ctx(ctx)
-
-	// Check if installation directory exists
-	if _, err := os.Stat(bgi.config.InstallDir); err == nil {
-		logger.Info(fmt.Sprintf("  ⚠ Installation directory exists: %s", bgi.config.InstallDir))
-		result.Warnings = append(result.Warnings, "Installation directory already exists")
-	}
-
-	// Check if containers exist
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    []string{"ps", "-a", "--filter", fmt.Sprintf("name=%s", ContainerApp), "--format", "{{.Status}}"},
-		Capture: true,
-	})
-
-	if err == nil && strings.TrimSpace(output) != "" {
-		logger.Info(fmt.Sprintf("  ⚠ BionicGPT container exists: %s", strings.TrimSpace(output)))
-		result.Warnings = append(result.Warnings, "BionicGPT containers already exist")
-
-		if !bgi.config.ForceReinstall {
-			result.Errors = append(result.Errors, "BionicGPT already installed (use --force to reinstall)")
-		}
-	}
-}

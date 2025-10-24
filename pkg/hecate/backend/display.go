@@ -173,7 +173,7 @@ func DisplayBackendsJSON(backends []BackendSummary) error {
 // DisplayBackendsYAML displays backends in YAML format
 func DisplayBackendsYAML(backends []BackendSummary) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(backends)
 }
 
@@ -187,7 +187,7 @@ func DisplayBackendJSON(backend *BackendDetails) error {
 // DisplayBackendYAML displays backend details in YAML format
 func DisplayBackendYAML(backend *BackendDetails) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(backend)
 }
 
@@ -201,7 +201,7 @@ func DisplayHealthJSON(status *hybrid.ConnectionStatus) error {
 // DisplayHealthYAML displays health status in YAML format
 func DisplayHealthYAML(status *hybrid.ConnectionStatus) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(status)
 }
 
@@ -215,7 +215,7 @@ func DisplayDiagnosticsJSON(diagnostics *BackendDiagnostics) error {
 // DisplayDiagnosticsYAML displays diagnostics in YAML format
 func DisplayDiagnosticsYAML(diagnostics *BackendDiagnostics) error {
 	encoder := yaml.NewEncoder(os.Stdout)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 	return encoder.Encode(diagnostics)
 }
 

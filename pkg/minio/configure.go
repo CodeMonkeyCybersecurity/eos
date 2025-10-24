@@ -76,7 +76,7 @@ func ConfigureVaultSecrets(rc *eos_io.RuntimeContext, config *Config) error {
 	// EVALUATE - Verify the secret was stored
 	logger.Info("Verifying credentials were stored successfully")
 
-	output, err = execute.Run(rc.Ctx, execute.Options{
+	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "vault",
 		Args:    []string{"kv", "get", "-format=json", VaultMinIOPath},
 		Timeout: HealthCheckTimeout,
@@ -118,7 +118,7 @@ path "kv/data/minio/users/*" {
 	if err := os.WriteFile(tmpFile, []byte(policyContent), 0600); err != nil {
 		return fmt.Errorf("failed to write policy file: %w", err)
 	}
-	defer os.Remove(tmpFile)
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	// Apply the policy
 	output, err := execute.Run(rc.Ctx, execute.Options{

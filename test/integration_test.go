@@ -343,11 +343,8 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 					// TODO: Fix this - GetAuthenticationStatus expects *api.Client, not *vault.Client
 					// status := vault.GetAuthenticationStatus(rc, vaultClient)
 					status := map[string]interface{}{"authenticated": false}
-					if status == nil {
-						return errors.New("authentication status was nil")
-					}
 
-					// Verify status structure
+					// Verify status structure (status is never nil since we just created it)
 					if _, ok := status["authenticated"]; !ok {
 						return errors.New("authentication status missing 'authenticated' field")
 					}
@@ -381,9 +378,8 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 					// TODO: Fix this - GetAuthenticationStatus expects *api.Client, not *vault.Client
 					// status := vault.GetAuthenticationStatus(rc, vaultClient)
 					status := map[string]interface{}{"authenticated": false}
-					if status == nil {
-						return errors.New("system became non-functional after auth failure")
-					}
+					// Note: status is never nil since we just created it above
+					_ = status
 
 					return nil
 				},

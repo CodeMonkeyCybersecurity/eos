@@ -59,14 +59,6 @@ func InstallServer(ctx context.Context, postgresPassword string) error {
 	return nil
 }
 
-func checkPrerequisites(ctx context.Context) error {
-	for _, cmd := range []string{"systemctl", "wget", "curl"} {
-		if _, err := exec.LookPath(cmd); err != nil {
-			return fmt.Errorf("missing required command: %s", cmd)
-		}
-	}
-	return nil
-}
 
 func installPostgreSQL(ctx context.Context, config *TemporalConfig) error {
 	logger := otelzap.Ctx(ctx)
@@ -91,8 +83,8 @@ func installPostgreSQL(ctx context.Context, config *TemporalConfig) error {
 		return fmt.Errorf("failed to install PostgreSQL: %w", err)
 	}
 
-	exec.CommandContext(ctx, "systemctl", "start", "postgresql").Run()
-	exec.CommandContext(ctx, "systemctl", "enable", "postgresql").Run()
+	_ = exec.CommandContext(ctx, "systemctl", "start", "postgresql").Run()
+	_ = exec.CommandContext(ctx, "systemctl", "enable", "postgresql").Run()
 
 	logger.Info("PostgreSQL installed")
 	return nil
@@ -109,7 +101,7 @@ GRANT ALL PRIVILEGES ON DATABASE temporal TO temporal;
 GRANT ALL PRIVILEGES ON DATABASE temporal_visibility TO temporal;
 `, config.PostgreSQLPassword)
 
-	exec.CommandContext(ctx, "sudo", "-u", "postgres", "psql", "-c", sqlCmd).Run()
+	_ = exec.CommandContext(ctx, "sudo", "-u", "postgres", "psql", "-c", sqlCmd).Run()
 	logger.Info("Databases created")
 	return nil
 }
@@ -135,8 +127,8 @@ func installTemporalCLI(ctx context.Context, config *TemporalConfig) error {
 	cmd.Dir = "/tmp"
 	_ = cmd.Run()
 
-	exec.CommandContext(ctx, "mv", "/tmp/temporal", "/usr/local/bin/temporal").Run()
-	exec.CommandContext(ctx, "chmod", "+x", "/usr/local/bin/temporal").Run()
+	_ = exec.CommandContext(ctx, "mv", "/tmp/temporal", "/usr/local/bin/temporal").Run()
+	_ = exec.CommandContext(ctx, "chmod", "+x", "/usr/local/bin/temporal").Run()
 	_ = os.Remove(tmpPath)
 
 	logger.Info("Temporal CLI installed")
@@ -164,11 +156,11 @@ func createConfiguration(ctx context.Context, config *TemporalConfig) error {
 func initializeSchema(ctx context.Context, config *TemporalConfig) error {
 	logger := otelzap.Ctx(ctx)
 
-	os.Setenv("PGPASSWORD", config.PostgreSQLPassword)
-	defer os.Unsetenv("PGPASSWORD")
+	_ = os.Setenv("PGPASSWORD", config.PostgreSQLPassword)
+	defer func() { _ = os.Unsetenv("PGPASSWORD") }()
 
 	// Main schema
-	exec.CommandContext(ctx, "temporal", "server", "start-database",
+	_ = exec.CommandContext(ctx, "temporal", "server", "start-database",
 		"--db-port", "5432",
 		"--db", "postgres12",
 		"--database", "temporal",
@@ -177,7 +169,7 @@ func initializeSchema(ctx context.Context, config *TemporalConfig) error {
 		"--password", config.PostgreSQLPassword).Run()
 
 	// Visibility schema
-	exec.CommandContext(ctx, "temporal", "server", "start-database",
+	_ = exec.CommandContext(ctx, "temporal", "server", "start-database",
 		"--db-port", "5432",
 		"--db", "postgres12",
 		"--database", "temporal_visibility",
@@ -224,7 +216,7 @@ WantedBy=multi-user.target
 `, config.InstallDir, config.InstallDir, config.UIPort)
 
 	_ = os.WriteFile("/etc/systemd/system/temporal-iris.service", []byte(serviceContent), 0644)
-	exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
+	_ = exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
 
 	logger.Info("Systemd service created")
 	return nil
@@ -246,7 +238,7 @@ DATABASE_URL=postgresql://temporal:%s@localhost:5432/temporal
 		config.Host, config.Port, config.Host, config.UIPort, config.PostgreSQLPassword)
 
 	credPath := filepath.Join(config.InstallDir, ".credentials")
-	os.WriteFile(credPath, []byte(credContent), 0600)
+	_ = os.WriteFile(credPath, []byte(credContent), 0600)
 
 	logger.Info("Credentials saved", zap.String("path", credPath))
 	return nil
@@ -255,7 +247,7 @@ DATABASE_URL=postgresql://temporal:%s@localhost:5432/temporal
 func startService(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
-	exec.CommandContext(ctx, "systemctl", "enable", ServiceName).Run()
+	_ = exec.CommandContext(ctx, "systemctl", "enable", ServiceName).Run()
 	if err := exec.CommandContext(ctx, "systemctl", "start", ServiceName).Run(); err != nil {
 		return fmt.Errorf("failed to start service: %w", err)
 	}

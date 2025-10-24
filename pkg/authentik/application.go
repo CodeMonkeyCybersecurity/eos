@@ -140,7 +140,7 @@ func (c *APIClient) ListApplications(ctx context.Context) ([]ApplicationResponse
 	if err != nil {
 		return nil, fmt.Errorf("applications list request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -173,7 +173,7 @@ func (c *APIClient) DeleteApplication(ctx context.Context, slug string) error {
 	if err != nil {
 		return fmt.Errorf("application deletion request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))

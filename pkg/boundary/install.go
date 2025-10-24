@@ -204,14 +204,14 @@ LimitNOFILE=65536
 WantedBy=multi-user.target`
 
 	_ = os.WriteFile("/etc/systemd/system/boundary.service", []byte(serviceContent), 0644)
-	bi.runner.Run("systemctl", "daemon-reload")
+	_ = bi.runner.Run("systemctl", "daemon-reload")
 
 	if !bi.config.DevMode {
 		// In production mode, don't start automatically
 		bi.logger.Info("Boundary installed. Configure /etc/boundary.d/boundary.hcl before starting")
 	} else {
 		// In dev mode, can try to start
-		bi.runner.Run("systemctl", "enable", "boundary")
+		_ = bi.runner.Run("systemctl", "enable", "boundary")
 		if err := bi.runner.Run("systemctl", "start", "boundary"); err != nil {
 			bi.logger.Warn("Failed to start Boundary service", zap.Error(err))
 		}

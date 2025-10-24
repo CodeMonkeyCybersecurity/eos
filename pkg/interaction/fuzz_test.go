@@ -302,6 +302,6 @@ func FuzzValidateIPSecurity(f *testing.F) {
 			}
 		}()
 
-		ValidateIP(ip)
+		_ = ValidateIP(ip)
 	})
 }

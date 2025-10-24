@@ -145,8 +145,3 @@ echo "════════════════════════�
 	)
 }
 
-// updateComposeForInitScript returns the volume mount for the init script
-// This should be added to the postgres service volumes in docker-compose.yml
-func (bgi *BionicGPTInstaller) getInitScriptVolumeMount() string {
-	return fmt.Sprintf("./%s:%s:ro", InitScriptFilename, InitScriptDockerPath)
-}

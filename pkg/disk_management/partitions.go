@@ -19,15 +19,16 @@ func CreatePartition(rc *eos_io.RuntimeContext, device string, options *Partitio
 	logger := otelzap.Ctx(rc.Ctx)
 	startTime := time.Now()
 
+	// Check for nil options first to avoid nil pointer dereference
+	if options == nil {
+		options = DefaultPartitionOptions()
+	}
+
 	// ASSESS
 	logger.Info("Assessing partition creation requirements",
 		zap.String("device", device),
 		zap.String("type", options.PartitionType),
 		zap.Bool("dry_run", options.DryRun))
-
-	if options == nil {
-		options = DefaultPartitionOptions()
-	}
 
 	operation := &PartitionOperation{
 		Operation: "create",

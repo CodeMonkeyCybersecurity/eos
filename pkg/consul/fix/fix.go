@@ -464,11 +464,3 @@ func displayResults(rc *eos_io.RuntimeContext, results []FixResult, dryRun bool)
 	}
 }
 
-// getExpectedPerms is DEPRECATED - use consul.GetExpectedPermission() instead
-// Kept for backwards compatibility
-func getExpectedPerms(isDir bool) os.FileMode {
-	if isDir {
-		return consul.ConsulConfigDirPerm
-	}
-	return consul.ConsulConfigPerm
-}

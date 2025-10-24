@@ -283,7 +283,7 @@ func FuzzTransactionIsolation(f *testing.F) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		ctx := context.Background()
 

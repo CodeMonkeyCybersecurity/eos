@@ -176,7 +176,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	// Phase 8: Finalize
 	m.logger.Info(" Phase 8: Finalizing configuration")
 	if err := m.finalizeConfiguration(); err != nil {
-		m.rollback()
+		_ = m.rollback()
 		return fmt.Errorf("finalization failed: %w", err)
 	}
 

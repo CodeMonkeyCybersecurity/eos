@@ -215,7 +215,7 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 					for _, line := range lines {
 						fields := strings.Fields(line)
 						if len(fields) > 0 && strings.HasPrefix(fields[0], "code-server@") {
-							stopAndDisableService(rc, fields[0])
+							_ = stopAndDisableService(rc, fields[0])
 						}
 					}
 				}

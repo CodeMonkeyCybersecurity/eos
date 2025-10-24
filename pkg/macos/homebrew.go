@@ -120,7 +120,7 @@ func runHomebrewInstaller() error {
 	if err := os.WriteFile(installerPath, installerContent, 0700); err != nil {
 		return fmt.Errorf("failed to write installer: %w", err)
 	}
-	defer os.Remove(installerPath)
+	defer func() { _ = os.Remove(installerPath) }()
 
 	// Calculate and log checksum for forensics
 	checksum := sha256.Sum256(installerContent)

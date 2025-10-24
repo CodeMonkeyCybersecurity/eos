@@ -482,9 +482,7 @@ func (v *ValidationHelper) GetError() error {
 
 // NetworkHelper provides network operation helpers with retry logic
 type NetworkHelper struct {
-	client  *HTTPClient
-	logger  otelzap.LoggerWithCtx
-	timeout time.Duration
+	// All fields removed - unused struct kept for potential future use
 }
 
 // HTTPClient wraps http.Client with retry logic
@@ -557,7 +555,7 @@ func (ci *ConsulInstaller) createDirectory(path string, mode os.FileMode) error 
 			zap.String("path", path),
 			zap.Error(err))
 	} else if isNetwork {
-		return fmt.Errorf("refusing to create directory on network mount: %s\nNetwork mounts can cause data loss during outages. Use local storage for Consul data.", path)
+		return fmt.Errorf("refusing to create directory on network mount: %s\nNetwork mounts can cause data loss during outages. Use local storage for Consul data", path)
 	}
 
 	if err := os.MkdirAll(path, mode); err != nil {

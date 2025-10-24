@@ -13,16 +13,12 @@ type Builder struct {
 
 // HugoBuilder handles Hugo static site generation
 type HugoBuilder struct {
-	hugoPath   string
-	workDir    string
-	configFile string
+	// All fields removed - unused struct kept for potential future use
 }
 
 // DockerBuilder handles Docker image building and management
 type DockerBuilder struct {
-	dockerPath string
-	workDir    string
-	registry   string
+	// All fields removed - unused struct kept for potential future use
 }
 
 // BuildContext contains information about the current build

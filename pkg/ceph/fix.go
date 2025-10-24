@@ -274,7 +274,7 @@ func (f *FixEngine) bootstrapMonitor() {
 	f.logger.Info("  Enabling monitor service...")
 	serviceName := fmt.Sprintf("ceph-mon@%s", hostname)
 	cmd = exec.Command("systemctl", "enable", serviceName)
-	output, err = cmd.CombinedOutput()
+	_, err = cmd.CombinedOutput()
 	result.CommandsRun = append(result.CommandsRun, cmd.String())
 	if err != nil {
 		f.logger.Warn("Failed to enable service (may already be enabled)", zap.Error(err))

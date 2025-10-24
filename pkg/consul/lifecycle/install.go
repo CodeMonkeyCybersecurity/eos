@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -82,7 +83,7 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 
 	// Set binary path based on installation method
 	if config.BinaryPath == "" {
-		config.BinaryPath = getConsulBinaryPath()
+		config.BinaryPath = consul.GetConsulBinaryPath()
 	}
 
 	runner := NewCommandRunner(rc)

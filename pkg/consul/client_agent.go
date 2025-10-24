@@ -238,11 +238,11 @@ func downloadAndInstallConsulBinary(rc *eos_io.RuntimeContext, version string) e
 		return fmt.Errorf("failed to unzip Consul: %s: %w", output, err)
 	}
 
-	// Move to /usr/local/bin
-	logger.Info("Installing Consul to /usr/local/bin/consul")
+	// Move to target installation path
+	logger.Info("Installing Consul binary", zap.String("target_path", ConsulBinaryPath))
 	output, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "mv",
-		Args:    []string{"/tmp/consul", "/usr/local/bin/consul"},
+		Args:    []string{"/tmp/consul", ConsulBinaryPath},
 		Capture: true,
 	})
 	if err != nil {
@@ -250,7 +250,7 @@ func downloadAndInstallConsulBinary(rc *eos_io.RuntimeContext, version string) e
 	}
 
 	// Make executable
-	if err := os.Chmod("/usr/local/bin/consul", 0755); err != nil {
+	if err := os.Chmod(ConsulBinaryPath, 0755); err != nil {
 		return fmt.Errorf("failed to make Consul executable: %w", err)
 	}
 
@@ -279,7 +279,7 @@ Wants=network-online.target
 Type=notify
 User=root
 Group=root
-ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
+ExecStart=` + ConsulBinaryPath + ` agent -config-dir=/etc/consul.d
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 KillSignal=SIGTERM

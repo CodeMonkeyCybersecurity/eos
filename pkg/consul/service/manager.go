@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -11,14 +12,38 @@ import (
 	"go.uber.org/zap"
 )
 
+// getConsulBinaryPath returns the path to the Consul binary
+// NOTE: Duplicates consul.GetConsulBinaryPath() to avoid circular import
+// (pkg/consul/service cannot import parent pkg/consul)
+func getConsulBinaryPath() string {
+	// Check common locations
+	paths := []string{
+		"/usr/local/bin/consul", // Manual install (preferred)
+		"/usr/bin/consul",       // APT package install
+	}
+
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	// Fallback to PATH lookup
+	if path, err := exec.LookPath("consul"); err == nil {
+		return path
+	}
+
+	return "/usr/local/bin/consul" // Default fallback
+}
+
 // validateConsulConfig validates the Consul configuration before starting the service
 func validateConsulConfig(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	log.Info("Validating Consul configuration before service start")
-	
+
 	// Check if Consul binary exists
-	consulBinary := "/usr/local/bin/consul"
+	consulBinary := getConsulBinaryPath()
 	if _, err := os.Stat(consulBinary); err != nil {
 		return fmt.Errorf("consul binary not found at %s: %w", consulBinary, err)
 	}

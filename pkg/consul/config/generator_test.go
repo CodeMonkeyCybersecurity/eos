@@ -162,7 +162,7 @@ func TestGenerateWithNilConfig(t *testing.T) {
 			t.Error("Expected Generate to panic with nil config, but it did not")
 		}
 	}()
-	
+
 	// This will currently panic - should be fixed to return error instead
-	Generate(rc, nil)
+	_ = Generate(rc, nil)
 }

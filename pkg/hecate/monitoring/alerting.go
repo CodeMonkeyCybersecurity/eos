@@ -28,7 +28,7 @@ type AlertManager struct {
 
 // AlertEvaluator evaluates alert conditions against metrics
 type AlertEvaluator struct {
-	rc *eos_io.RuntimeContext
+	_  *eos_io.RuntimeContext
 }
 
 // NotificationChannel represents a notification channel configuration

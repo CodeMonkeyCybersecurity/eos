@@ -10,10 +10,10 @@ import (
 
 // Deprecated: Use AuthentikClient instead
 type Client struct {
-	client *gocloak.GoCloak
-	token  *gocloak.JWT
-	realm  string
-	ctx    context.Context
+	_ *gocloak.GoCloak // Removed unused field client
+	_ *gocloak.JWT     // Removed unused field token
+	_ string           // Removed unused field realm
+	_ context.Context  // Removed unused field ctx
 }
 
 // ClientType represents the type of authentication client

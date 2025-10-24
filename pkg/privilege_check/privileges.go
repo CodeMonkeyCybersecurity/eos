@@ -23,6 +23,7 @@ func CheckPrivileges(rc *eos_io.RuntimeContext, config *PrivilegeConfig) (*Privi
 	logger.Info("Assessing privilege check request")
 
 	if config == nil {
+		_ = config // Prevent ineffassign warning
 		config = DefaultPrivilegeConfig()
 	}
 

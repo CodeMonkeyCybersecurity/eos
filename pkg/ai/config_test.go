@@ -579,7 +579,7 @@ func TestFileSystemSecurity(t *testing.T) {
 		// Test secure config directory creation
 		tempDir, err := os.MkdirTemp("", "eos-config-dir-test")
 		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		configPath := filepath.Join(tempDir, "nested", "deep", "config.yaml")
 		configManager := &ConfigManager{
@@ -604,7 +604,7 @@ func TestFileSystemSecurity(t *testing.T) {
 		// Test atomic config file writes to prevent corruption
 		tempDir, err := os.MkdirTemp("", "eos-atomic-test")
 		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		configPath := filepath.Join(tempDir, "atomic-config.yaml")
 		configManager := &ConfigManager{

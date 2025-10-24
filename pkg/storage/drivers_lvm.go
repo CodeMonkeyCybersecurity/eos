@@ -13,7 +13,6 @@ import (
 // LVMDriver implements StorageDriver for LVM volumes
 type LVMDriver struct {
 	rc  *eos_io.RuntimeContext
-	lvm interface{} // TODO: Replace with proper LVM manager interface
 }
 
 // Type returns the storage type this driver handles

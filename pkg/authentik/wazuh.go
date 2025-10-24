@@ -82,9 +82,9 @@ func init() {
 	setupWazuhCmd.Flags().String("api-key", "", "Authentik API key")
 	setupWazuhCmd.Flags().String("wazuh-url", "", "Wazuh dashboard URL")
 	setupWazuhCmd.Flags().String("entity-id", "wazuh-saml", "SAML Entity ID")
-	setupWazuhCmd.MarkFlagRequired("authentik-url")
-	setupWazuhCmd.MarkFlagRequired("api-key")
-	setupWazuhCmd.MarkFlagRequired("wazuh-url")
+	_ = setupWazuhCmd.MarkFlagRequired("authentik-url")
+	_ = setupWazuhCmd.MarkFlagRequired("api-key")
+	_ = setupWazuhCmd.MarkFlagRequired("wazuh-url")
 }
 
 func setupAuthentikForWazuh(cmd *cobra.Command, args []string) error {

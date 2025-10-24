@@ -6,6 +6,7 @@ package lifecycle
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/helpers"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/rollback"
@@ -43,7 +44,7 @@ func NewOrchestrator(rc *eos_io.RuntimeContext, cfg *InstallConfig) (*Orchestrat
 		cfg.Datacenter = "dc1"
 	}
 	if cfg.BinaryPath == "" {
-		cfg.BinaryPath = "/usr/bin/consul"
+		cfg.BinaryPath = consul.GetConsulBinaryPath()
 	}
 	if cfg.ClientAddr == "" {
 		cfg.ClientAddr = "0.0.0.0"

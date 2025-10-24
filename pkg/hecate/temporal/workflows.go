@@ -274,6 +274,8 @@ func rollbackRouteCreation(rc *eos_io.RuntimeContext, state RouteCreationState) 
 
 	if state.CertificateCreated {
 		// TODO: Clean up certificate
+		// Placeholder for future implementation
+		_ = state
 	}
 
 	if state.DNSCreated {

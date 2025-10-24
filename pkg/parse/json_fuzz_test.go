@@ -129,7 +129,7 @@ func FuzzJSONNumbers(f *testing.F) {
 			}
 		}()
 
-		ExtractJSONMap(jsonInput)
+		_, _ = ExtractJSONMap(jsonInput)
 	})
 }
 

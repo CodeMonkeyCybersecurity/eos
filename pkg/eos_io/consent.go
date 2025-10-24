@@ -95,7 +95,12 @@ func PromptForServiceAction(rc *RuntimeContext, service, action string) (bool, e
 	
 	logger.Info("terminal prompt: " + prompt)
 	
-	return PromptForConsent(rc, fmt.Sprintf("%s %s service?", strings.Title(action), service), false)
+	// Capitalize first letter only (strings.Title is deprecated)
+	actionCapitalized := action
+	if len(action) > 0 && action[0] >= 'a' && action[0] <= 'z' {
+		actionCapitalized = string(action[0]-32) + action[1:]
+	}
+	return PromptForConsent(rc, fmt.Sprintf("%s %s service?", actionCapitalized, service), false)
 }
 
 // PromptToContinueDespiteErrors asks if user wants to continue despite errors

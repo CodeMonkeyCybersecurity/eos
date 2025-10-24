@@ -42,8 +42,6 @@ const (
 	WazuhPasswdToolPath = "/usr/local/bin/wazuh-passwords-tool.sh"
 )
 
-const configFile = ".wazuh.json"
-
 // Config represents the configuration stored in wazuh.json
 type Config struct {
 	APIUser            string `json:"API_User"`

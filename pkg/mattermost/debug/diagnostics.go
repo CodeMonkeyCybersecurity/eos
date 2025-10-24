@@ -143,7 +143,7 @@ func checkMattermostLogs(rc *eos_io.RuntimeContext, config *Config, result *Diag
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// INTERVENE - Get container logs
 	options := container.LogsOptions{
@@ -156,7 +156,7 @@ func checkMattermostLogs(rc *eos_io.RuntimeContext, config *Config, result *Diag
 	if err != nil {
 		return fmt.Errorf("failed to get Mattermost container logs: %w", err)
 	}
-	defer logs.Close()
+	defer func() { _ = logs.Close() }()
 
 	// Read logs
 	logData, err := io.ReadAll(logs)
@@ -191,7 +191,7 @@ func checkPostgresLogs(rc *eos_io.RuntimeContext, config *Config, result *Diagno
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// INTERVENE - Get container logs
 	options := container.LogsOptions{
@@ -204,7 +204,7 @@ func checkPostgresLogs(rc *eos_io.RuntimeContext, config *Config, result *Diagno
 	if err != nil {
 		return fmt.Errorf("failed to get Postgres container logs: %w", err)
 	}
-	defer logs.Close()
+	defer func() { _ = logs.Close() }()
 
 	// Read logs
 	logData, err := io.ReadAll(logs)
@@ -365,7 +365,7 @@ func checkPostgresAccessibility(rc *eos_io.RuntimeContext, config *Config, resul
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// Create exec instance to run pg_isready
 	execConfig := container.ExecOptions{
@@ -430,7 +430,7 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, config *Config, result 
 	if err != nil {
 		return fmt.Errorf("failed to create docker client: %w", err)
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// List networks
 	networks, err := cli.NetworkList(rc.Ctx, network.ListOptions{})

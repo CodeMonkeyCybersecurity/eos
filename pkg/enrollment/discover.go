@@ -422,81 +422,6 @@ func parseDockerVersion(output string) string {
 	return ""
 }
 
-// selectBestMaster selects the best master from available options
-func selectBestMaster(rc *eos_io.RuntimeContext, masters []MasterInfo, info *SystemInfo) *MasterInfo {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	if len(masters) == 0 {
-		return nil
-	}
-
-	// Score each master based on multiple factors
-	var bestMaster *MasterInfo
-	bestScore := -1
-
-	for _, master := range masters {
-		score := scoreMaster(rc, &master, info)
-
-		logger.Debug("Scored master candidate",
-			zap.String("address", master.Address),
-			zap.String("datacenter", master.Datacenter),
-			zap.Int("score", score))
-
-		if score > bestScore {
-			bestScore = score
-			bestMaster = &master
-		}
-	}
-
-	if bestMaster != nil {
-		logger.Info("Selected best master",
-			zap.String("address", bestMaster.Address),
-			zap.String("datacenter", bestMaster.Datacenter),
-			zap.Int("score", bestScore))
-	}
-
-	return bestMaster
-}
-
-// scoreMaster scores a master based on multiple factors
-func scoreMaster(rc *eos_io.RuntimeContext, master *MasterInfo, info *SystemInfo) int {
-	score := 0
-
-	// Base score from priority
-	score += master.Priority
-
-	// Datacenter locality bonus
-	if master.Datacenter != "" && master.Datacenter != "default" {
-		score += 10 // Bonus for defined datacenter
-	}
-
-	// Network connectivity test
-	if err := testMasterConnectivity(rc, master.Address); err == nil {
-		score += 20 // Bonus for reachable master
-	} else {
-		score -= 50 // Penalty for unreachable master
-	}
-
-	// Resource availability check
-	if info.HasSufficientResources() {
-		score += 5 // Bonus if this system has resources to be a good minion
-	}
-
-	// Discovery method bonus
-	switch master.Status {
-	case "config":
-		score += 15 // Configured masters get highest bonus
-	case "consul":
-		score += 10 // Consul-discovered masters get medium bonus
-	case "dns":
-		score += 5 // DNS-discovered masters get small bonus
-	case "network":
-		score += 0 // Network-discovered masters get no bonus
-	}
-
-	return score
-}
-
 // testOsqueryConnectivity tests if osquery is working properly
 func testOsqueryConnectivity(rc *eos_io.RuntimeContext) error {
 	cmd := exec.Command("osqueryi", "--json", "SELECT version FROM osquery_info LIMIT 1;")
@@ -756,19 +681,6 @@ func discoverConfiguration(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	// TODO: Implement HashiCorp configuration discovery
 	// This replaces SaltStack configuration discovery with Consul/Nomad/Vault discovery
 	logger.Info("HashiCorp configuration discovery requires administrator intervention")
-
-	return nil
-}
-
-// testMasterConnectivity tests connectivity to HashiCorp cluster (replacing SaltStack master connectivity)
-func testMasterConnectivity(rc *eos_io.RuntimeContext, masterAddr string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Testing HashiCorp cluster connectivity",
-		zap.String("cluster_addr", masterAddr))
-
-	// TODO: Implement HashiCorp cluster connectivity test
-	// This replaces SaltStack master connectivity with Consul cluster connectivity
-	logger.Info("HashiCorp cluster connectivity test requires administrator intervention")
 
 	return nil
 }

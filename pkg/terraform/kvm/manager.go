@@ -120,12 +120,6 @@ func NewKVMManager(rc *eos_io.RuntimeContext, workingDir string) (*KVMManager, e
 
 // CreateVM creates a new KVM virtual machine
 func (km *KVMManager) CreateVM(ctx context.Context, config *VMConfig) (*VMInfo, error) {
-	// Defensive check for nil context
-	if ctx == nil {
-		km.logger.Warn("CreateVM received nil context, using background context")
-		ctx = context.Background()
-	}
-
 	km.logger.Info("Creating VM using terraform-exec")
 	if err := km.execMgr.CreateVMDirect(config); err != nil {
 		return nil, fmt.Errorf("failed to create VM: %w", err)

@@ -57,7 +57,7 @@ func gitPull(rc *eos_io.RuntimeContext, path, branch string) error {
 	if err := os.Chdir(path); err != nil {
 		return fmt.Errorf("failed to change directory: %w", err)
 	}
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 	
 	// Checkout branch
 	cmd := exec.CommandContext(rc.Ctx, "git", "checkout", branch)
@@ -204,21 +204,6 @@ func nomadRunJob(rc *eos_io.RuntimeContext, jobFile string) error {
 		return fmt.Errorf("nomad job run failed: %w, output: %s", err, string(output))
 	}
 	
-	return nil
-}
-
-// Hecate integration wrappers
-
-// hecateCreateRoute creates a route in Hecate
-func hecateCreateRoute(rc *eos_io.RuntimeContext, config *RouteConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	logger.Info("Creating Hecate route",
-		zap.String("domain", config.Domain),
-		zap.String("service", config.Service))
-	
-	// This would use the Hecate API or configuration management
-	// For now, it's a placeholder
 	return nil
 }
 

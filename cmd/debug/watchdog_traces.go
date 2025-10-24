@@ -4,7 +4,6 @@ package debug
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -68,13 +67,13 @@ func runWatchdogTraces(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	}
 
 	// List all sessions
-	sessions, err := ioutil.ReadDir(traceDir)
+	sessions, err := os.ReadDir(traceDir)
 	if err != nil {
 		return fmt.Errorf("failed to read trace directory: %w", err)
 	}
 
-	// Filter and sort sessions
-	var watchdogSessions []os.FileInfo
+	// Filter sessions
+	var watchdogSessions []os.DirEntry
 	for _, session := range sessions {
 		if session.IsDir() && strings.HasPrefix(session.Name(), "eos-watchdog-") {
 			// Skip if critical-only flag is set and session has no critical events
@@ -90,7 +89,12 @@ func runWatchdogTraces(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	// Sort by modification time (newest first)
 	sort.Slice(watchdogSessions, func(i, j int) bool {
-		return watchdogSessions[i].ModTime().After(watchdogSessions[j].ModTime())
+		iInfo, _ := watchdogSessions[i].Info()
+		jInfo, _ := watchdogSessions[j].Info()
+		if iInfo == nil || jInfo == nil {
+			return false
+		}
+		return iInfo.ModTime().After(jInfo.ModTime())
 	})
 
 	if len(watchdogSessions) == 0 {
@@ -108,13 +112,18 @@ func runWatchdogTraces(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		fmt.Printf("%d. %s ", i+1, session.Name())
 
 		// Show age
-		age := time.Since(session.ModTime())
-		if age < time.Hour {
-			fmt.Printf("(%.0f minutes ago)\n", age.Minutes())
-		} else if age < 24*time.Hour {
-			fmt.Printf("(%.1f hours ago)\n", age.Hours())
+		info, _ := session.Info()
+		if info != nil {
+			age := time.Since(info.ModTime())
+			if age < time.Hour {
+				fmt.Printf("(%.0f minutes ago)\n", age.Minutes())
+			} else if age < 24*time.Hour {
+				fmt.Printf("(%.1f hours ago)\n", age.Hours())
+			} else {
+				fmt.Printf("(%.0f days ago)\n", age.Hours()/24)
+			}
 		} else {
-			fmt.Printf("(%.0f days ago)\n", age.Hours()/24)
+			fmt.Printf("\n")
 		}
 
 		// Check for critical events
@@ -163,7 +172,7 @@ func showSessionDetail(rc *eos_io.RuntimeContext, traceDir, sessionID string) er
 
 	// Read main log
 	mainLog := filepath.Join(sessionPath, "watchdog.log")
-	if logData, err := ioutil.ReadFile(mainLog); err == nil {
+	if logData, err := os.ReadFile(mainLog); err == nil {
 		lines := strings.Split(string(logData), "\n")
 
 		// Extract key events
@@ -216,7 +225,7 @@ func showSessionDetail(rc *eos_io.RuntimeContext, traceDir, sessionID string) er
 
 	// Show system info if available
 	sysInfo := filepath.Join(sessionPath, "system", "info.txt")
-	if data, err := ioutil.ReadFile(sysInfo); err == nil {
+	if data, err := os.ReadFile(sysInfo); err == nil {
 		fmt.Printf("🖥️  System Information:\n")
 		lines := strings.Split(string(data), "\n")
 		for _, line := range lines {
@@ -236,13 +245,18 @@ func showSessionDetail(rc *eos_io.RuntimeContext, traceDir, sessionID string) er
 		fmt.Printf(" Critical Diagnostics Available:\n")
 
 		// List files in critical directory
-		if files, err := ioutil.ReadDir(criticalDir); err == nil {
+		if files, err := os.ReadDir(criticalDir); err == nil {
 			for _, file := range files {
-				fmt.Printf("   • %s (%s)\n", file.Name(), formatBytes(file.Size()))
+				info, _ := file.Info()
+				size := int64(0)
+				if info != nil {
+					size = info.Size()
+				}
+				fmt.Printf("   • %s (%s)\n", file.Name(), formatBytes(size))
 
 				// Show preview of process details
 				if file.Name() == "processes-detailed.txt" && detailFlag {
-					if data, err := ioutil.ReadFile(filepath.Join(criticalDir, file.Name())); err == nil {
+					if data, err := os.ReadFile(filepath.Join(criticalDir, file.Name())); err == nil {
 						lines := strings.Split(string(data), "\n")
 						fmt.Printf("\n     Process Details Preview:\n")
 						for i, line := range lines {
@@ -287,7 +301,7 @@ func countWarnings(sessionPath string) int {
 
 func getSessionSummary(sessionPath string) string {
 	mainLog := filepath.Join(sessionPath, "watchdog.log")
-	if data, err := ioutil.ReadFile(mainLog); err == nil {
+	if data, err := os.ReadFile(mainLog); err == nil {
 		lines := strings.Split(string(data), "\n")
 		// Find last significant event
 		for i := len(lines) - 1; i >= 0; i-- {

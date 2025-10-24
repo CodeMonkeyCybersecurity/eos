@@ -211,34 +211,6 @@ func loadExistingConfig(config *EnvironmentConfig) error {
 }
 
 // discoverFrom discovers configuration from  s
-func discoverFrom(config *EnvironmentConfig) error {
-	// Try to get  s
-	output, err := executeCommand("-call", "--local", "s.items", "--output=json")
-	if err != nil {
-		return fmt.Errorf("failed to get  s: %w", err)
-	}
-
-	var s map[string]interface{}
-	if err := json.Unmarshal([]byte(output), &s); err != nil {
-		return fmt.Errorf("failed to parse  s: %w", err)
-	}
-
-	// Extract environment information from s
-	if local, ok := s["local"].(map[string]interface{}); ok {
-		if env, ok := local["environment"].(string); ok {
-			config.Environment = env
-		}
-		if dc, ok := local["datacenter"].(string); ok {
-			config.Datacenter = dc
-		}
-		if role, ok := local["node_role"].(string); ok {
-			config.NodeRole = role
-		}
-	}
-
-	return nil
-}
-
 // discoverFromCloud discovers configuration from cloud metadata
 func discoverFromCloud(config *EnvironmentConfig) error {
 	// Try different cloud providers

@@ -619,14 +619,3 @@ func updateStateFingerprints(rc *eos_io.RuntimeContext, state *hecate.State) err
 	// TODO: Store fingerprint in Consul
 	return nil
 }
-
-func routeToUpdateMap(route *hecate.Route) map[string]interface{} {
-	return map[string]interface{}{
-		"upstream":     route.Upstream,
-		"auth_policy":  route.AuthPolicy,
-		"headers":      route.Headers,
-		"tls":          route.TLS,
-		"rate_limit":   route.RateLimit,
-		"health_check": route.HealthCheck,
-	}
-}

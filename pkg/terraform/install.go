@@ -78,7 +78,7 @@ func (ti *TerraformInstaller) Install() error {
 
 	tmpDir := "/tmp/terraform-install"
 	_ = os.MkdirAll(tmpDir, 0755)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download and extract
 	if err := ti.runner.Run("wget", "-O", tmpDir+"/terraform.zip", downloadURL); err != nil {

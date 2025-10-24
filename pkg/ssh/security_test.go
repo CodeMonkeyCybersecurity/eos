@@ -17,7 +17,7 @@ func TestSSHConfigModification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	tests := []struct {
 		name           string
@@ -95,7 +95,7 @@ func TestSSHConfigBackup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	t.Run("backup creation", func(t *testing.T) {
 		configFile := filepath.Join(tmpDir, "sshd_config")
