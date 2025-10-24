@@ -545,21 +545,21 @@ func (rw *ResourceWatchdog) captureRuntimeProfiles(dir string) {
 	if err == nil {
 		runtime.GC()
 		_ = pprof.WriteHeapProfile(memFile)
-		memFile.Close()
+		_ = memFile.Close()
 	}
 
 	// Goroutine profile
 	goroutineFile, err := os.Create(filepath.Join(dir, "goroutines.txt"))
 	if err == nil {
-		pprof.Lookup("goroutine").WriteTo(goroutineFile, 2)
-		goroutineFile.Close()
+		_ = pprof.Lookup("goroutine").WriteTo(goroutineFile, 2)
+		_ = goroutineFile.Close()
 	}
 
 	// Stack trace
 	stackFile, err := os.Create(filepath.Join(dir, "stack.txt"))
 	if err == nil {
-		stackFile.Write(debug.Stack())
-		stackFile.Close()
+		_, _ = stackFile.Write(debug.Stack())
+		_ = stackFile.Close()
 	}
 }
 
@@ -708,7 +708,7 @@ func (rw *ResourceWatchdog) captureTrace(status ResourceStatus) {
 			time.Sleep(2 * time.Second)
 			pprof.StopCPUProfile()
 		}
-		cpuFile.Close()
+		_ = cpuFile.Close()
 	}
 
 	// Capture memory profile
@@ -718,7 +718,7 @@ func (rw *ResourceWatchdog) captureTrace(status ResourceStatus) {
 		if err := pprof.WriteHeapProfile(memFile); err != nil {
 			rw.logger.Error("Failed to write heap profile", zap.Error(err))
 		}
-		memFile.Close()
+		_ = memFile.Close()
 	}
 
 	// Capture goroutine dump
@@ -727,7 +727,7 @@ func (rw *ResourceWatchdog) captureTrace(status ResourceStatus) {
 		if err := pprof.Lookup("goroutine").WriteTo(goroutineFile, 2); err != nil {
 			rw.logger.Error("Failed to write goroutine profile", zap.Error(err))
 		}
-		goroutineFile.Close()
+		_ = goroutineFile.Close()
 	}
 
 	// Capture process tree
@@ -737,14 +737,14 @@ func (rw *ResourceWatchdog) captureTrace(status ResourceStatus) {
 			_, _ = fmt.Fprintf(processFile, "PID: %d, Name: %s, CPU: %.2f%%, Mem: %.2fMB, Created: %s, Cmd: %s\n",
 				p.PID, p.Name, p.CPUPercent, p.MemoryMB, p.CreateTime.Format(time.RFC3339), p.CommandLine)
 		}
-		processFile.Close()
+		_ = processFile.Close()
 	}
 
 	// Capture stack trace
 	stackFile, err := os.Create(fmt.Sprintf("%s/stack.txt", traceDir))
 	if err == nil {
-		stackFile.Write(debug.Stack())
-		stackFile.Close()
+		_, _ = stackFile.Write(debug.Stack())
+		_ = stackFile.Close()
 	}
 
 	rw.logger.Info("Diagnostic trace captured", zap.String("path", traceDir))
@@ -957,7 +957,7 @@ func (rw *ResourceWatchdog) CapturePanic(panicInfo interface{}) {
 		_, _ = fmt.Fprintf(f, "Panic Time: %s\n", time.Now().Format(time.RFC3339))
 		_, _ = fmt.Fprintf(f, "Panic Info: %v\n\n", panicInfo)
 		_, _ = fmt.Fprintf(f, "Stack Trace:\n%s\n", debug.Stack())
-		f.Close()
+		_ = f.Close()
 	}
 
 	// Capture current resource state

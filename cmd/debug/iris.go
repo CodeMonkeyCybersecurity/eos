@@ -706,7 +706,7 @@ func checkTemporalServerHealthDeepWithResult(rc *eos_io.RuntimeContext, config *
 			details:     fmt.Sprintf("systemd status: %s", systemdStatus),
 		}
 	}
-	conn.Close()
+	_ = conn.Close()
 	logger.Debug("Temporal gRPC port listening", zap.String("hostPort", hostPort))
 	healthDetails = append(healthDetails, fmt.Sprintf("  ✓ gRPC port %s: listening", hostPort))
 

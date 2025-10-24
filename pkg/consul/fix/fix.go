@@ -130,6 +130,7 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) error {
 }
 
 // assessPermissions checks if permissions need fixing
+// Uses centralized path checks from pkg/consul/constants.go (single source of truth)
 func assessPermissions(rc *eos_io.RuntimeContext) FixResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Assessing file permissions")
@@ -140,7 +141,8 @@ func assessPermissions(rc *eos_io.RuntimeContext) FixResult {
 		Details:   []string{},
 	}
 
-	paths := consul.GetCriticalPaths()
+	// Get centralized path checks (single source of truth)
+	pathChecks := consul.GetAllPathChecks()
 
 	// Get consul user/group IDs
 	consulUser, err := user.Lookup(consul.ConsulUser)
@@ -154,12 +156,15 @@ func assessPermissions(rc *eos_io.RuntimeContext) FixResult {
 	expectedGID, _ := strconv.Atoi(consulUser.Gid)
 
 	issuesFound := 0
-	for _, path := range paths {
-		info, err := os.Stat(path)
+	for _, check := range pathChecks {
+		info, err := os.Stat(check.Path)
 		if err != nil {
-			result.Details = append(result.Details,
-				fmt.Sprintf("✗ %s: NOT FOUND", path))
-			issuesFound++
+			// Only report missing files if they're critical
+			if check.Critical {
+				result.Details = append(result.Details,
+					fmt.Sprintf("✗ %s (%s): NOT FOUND [CRITICAL]", check.Description, check.Path))
+				issuesFound++
+			}
 			continue
 		}
 
@@ -168,23 +173,32 @@ func assessPermissions(rc *eos_io.RuntimeContext) FixResult {
 			continue
 		}
 
-		ownerOK := stat.Uid == uint32(expectedUID) && stat.Gid == uint32(expectedGID)
-		permsOK := true
+		// Determine expected UID/GID based on expected user
+		var checkUID, checkGID int
+		if check.ExpectedUser == "root" {
+			checkUID = 0
+			checkGID = 0
+		} else {
+			checkUID = expectedUID
+			checkGID = expectedGID
+		}
 
-		// Check expected permissions using centralized permission constants
-		expectedPerm := consul.GetExpectedPermission(path, info.IsDir())
-		permsOK = info.Mode().Perm() == expectedPerm
+		ownerOK := stat.Uid == uint32(checkUID) && stat.Gid == uint32(checkGID)
+		permsOK := info.Mode().Perm() == check.ExpectedPerm
 
 		if !ownerOK || !permsOK {
 			result.Details = append(result.Details,
-				fmt.Sprintf("✗ %s: owner=%d:%d (expected %d:%d), mode=%04o (expected %04o)",
-					path, stat.Uid, stat.Gid, expectedUID, expectedGID,
-					info.Mode().Perm(), expectedPerm))
+				fmt.Sprintf("✗ %s (%s): owner=%d:%d (expected %s:%s=%d:%d), mode=%04o (expected %04o)",
+					check.Description, check.Path,
+					stat.Uid, stat.Gid,
+					check.ExpectedUser, check.ExpectedGroup,
+					checkUID, checkGID,
+					info.Mode().Perm(), check.ExpectedPerm))
 			issuesFound++
 			result.ChangesMade = true
 		} else {
 			result.Details = append(result.Details,
-				fmt.Sprintf("✓ %s: OK", path))
+				fmt.Sprintf("✓ %s (%s): OK", check.Description, check.Path))
 		}
 	}
 
@@ -243,6 +257,7 @@ func fixHelperScript(rc *eos_io.RuntimeContext) FixResult {
 }
 
 // fixPermissions repairs file and directory permissions
+// Uses centralized path checks from pkg/consul/constants.go (single source of truth)
 func fixPermissions(rc *eos_io.RuntimeContext) FixResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Fixing file permissions and ownership")
@@ -254,26 +269,8 @@ func fixPermissions(rc *eos_io.RuntimeContext) FixResult {
 		Details:     []string{},
 	}
 
-	// Build paths map using centralized constants
-	pathsList := consul.GetCriticalPaths()
-	paths := make(map[string]struct {
-		isDir bool
-		perms os.FileMode
-	})
-
-	for _, path := range pathsList {
-		info, err := os.Stat(path)
-		if err != nil {
-			continue // Skip non-existent paths
-		}
-		paths[path] = struct {
-			isDir bool
-			perms os.FileMode
-		}{
-			isDir: info.IsDir(),
-			perms: consul.GetExpectedPermission(path, info.IsDir()),
-		}
-	}
+	// Get centralized path checks (single source of truth)
+	pathChecks := consul.GetAllPathChecks()
 
 	// Get consul user/group IDs
 	consulUser, err := user.Lookup(consul.ConsulUser)
@@ -283,37 +280,49 @@ func fixPermissions(rc *eos_io.RuntimeContext) FixResult {
 		return result
 	}
 
-	uid, _ := strconv.Atoi(consulUser.Uid)
-	gid, _ := strconv.Atoi(consulUser.Gid)
+	consulUID, _ := strconv.Atoi(consulUser.Uid)
+	consulGID, _ := strconv.Atoi(consulUser.Gid)
 
 	fixCount := 0
-	for path, config := range paths {
+	for _, check := range pathChecks {
 		// Check if path exists
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			result.Details = append(result.Details,
-				fmt.Sprintf("⊘ %s: skipped (does not exist)", path))
+		if _, err := os.Stat(check.Path); os.IsNotExist(err) {
+			if check.Critical {
+				result.Details = append(result.Details,
+					fmt.Sprintf("⊘ %s (%s): skipped - does not exist [CRITICAL]", check.Description, check.Path))
+			}
 			continue
 		}
 
+		// Determine correct UID/GID based on expected user
+		var uid, gid int
+		if check.ExpectedUser == "root" {
+			uid = 0
+			gid = 0
+		} else {
+			uid = consulUID
+			gid = consulGID
+		}
+
 		// Fix ownership
-		if err := os.Chown(path, uid, gid); err != nil {
+		if err := os.Chown(check.Path, uid, gid); err != nil {
 			result.Success = false
 			result.Details = append(result.Details,
-				fmt.Sprintf("✗ %s: failed to fix ownership: %v", path, err))
+				fmt.Sprintf("✗ %s (%s): failed to fix ownership: %v", check.Description, check.Path, err))
 			continue
 		}
 
 		// Fix permissions
-		if err := os.Chmod(path, config.perms); err != nil {
+		if err := os.Chmod(check.Path, check.ExpectedPerm); err != nil {
 			result.Success = false
 			result.Details = append(result.Details,
-				fmt.Sprintf("✗ %s: failed to fix permissions: %v", path, err))
+				fmt.Sprintf("✗ %s (%s): failed to fix permissions: %v", check.Description, check.Path, err))
 			continue
 		}
 
 		result.Details = append(result.Details,
-			fmt.Sprintf("✓ %s: fixed ownership to consul:consul and permissions to %04o",
-				path, config.perms))
+			fmt.Sprintf("✓ %s (%s): fixed ownership to %s:%s and permissions to %04o",
+				check.Description, check.Path, check.ExpectedUser, check.ExpectedGroup, check.ExpectedPerm))
 		fixCount++
 	}
 

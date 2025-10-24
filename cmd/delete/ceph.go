@@ -118,7 +118,7 @@ func runCephDelete(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Ceph client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Execute requested operation
 	if cephVolumeName != "" {

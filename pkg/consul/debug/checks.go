@@ -186,7 +186,7 @@ func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
 }
 
 // checkConsulPermissions verifies file permissions for Consul directories and files
-// Comprehensive check following CLAUDE.md shift-left security principles
+// Uses centralized path checks from pkg/consul/constants.go (single source of truth)
 func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking Consul file permissions")
@@ -209,41 +209,8 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 	expectedUID, _ = strconv.Atoi(consulUser.Uid)
 	expectedGID, _ = strconv.Atoi(consulUser.Gid)
 
-	// Define comprehensive path checks with expected ownership
-	type PathCheck struct {
-		Path          string
-		Description   string
-		ExpectedPerm  os.FileMode
-		ExpectedUser  string
-		ExpectedGroup string
-		Critical      bool // If false, warn but don't fail
-	}
-
-	pathsToCheck := []PathCheck{
-		// Config directory and files (CRITICAL - permission denied errors happen here)
-		{consul.ConsulConfigDir, "config directory", consul.ConsulConfigDirPerm, "consul", "consul", true},
-		{consul.ConsulConfigFile, "main config file", consul.ConsulConfigPerm, "consul", "consul", true},
-		{consul.ConsulConfigMinimal, "minimal config file", consul.ConsulConfigPerm, "consul", "consul", false},
-
-		// Data directories (CRITICAL)
-		{consul.ConsulDataDir, "data directory", consul.ConsulDataDirPerm, "consul", "consul", true},
-		{consul.ConsulOptDir, "operational data directory", consul.ConsulOptDirPerm, "consul", "consul", true},
-
-		// Log directory (IMPORTANT)
-		{consul.ConsulLogDir, "log directory", consul.ConsulLogDirPerm, "consul", "consul", false},
-
-		// Binary (CRITICAL)
-		{consul.ConsulBinaryPath, "consul binary", consul.ConsulBinaryPerm, "root", "root", true},
-
-		// Helper script (IMPORTANT - causes watch handler errors if missing/wrong perms)
-		{consul.ConsulVaultHelperPath, "vault helper script", consul.ConsulBinaryPerm, "root", "root", false},
-
-		// Optional: ACL token if exists
-		{consul.ConsulACLTokenPath, "ACL token file", consul.ConsulConfigPerm, "consul", "consul", false},
-
-		// Optional: Vault service config if exists
-		{consul.ConsulVaultServiceConfig, "Vault service registration", consul.ConsulConfigPerm, "consul", "consul", false},
-	}
+	// Get centralized path checks (single source of truth)
+	pathsToCheck := consul.GetAllPathChecks()
 
 	issuesFound := 0
 	for _, check := range pathsToCheck {
@@ -321,7 +288,7 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 	if issuesFound > 0 {
 		result.Message = fmt.Sprintf("Found %d permission/ownership issue(s)", issuesFound)
 		result.Details = append(result.Details, "")
-		result.Details = append(result.Details, "Fix with: sudo eos debug consul --fix")
+		result.Details = append(result.Details, "Fix with: sudo eos update consul --fix")
 	} else {
 		result.Message = "All permissions and ownership are correct"
 	}

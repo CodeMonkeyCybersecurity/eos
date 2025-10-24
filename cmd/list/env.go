@@ -198,7 +198,7 @@ func displayEnvironmentsTable(envs map[string]environments.Environment, currentE
 		}
 	}
 
-	w.Flush()
+	_ = w.Flush()
 
 	// Show current environment info
 	if currentEnv != nil {

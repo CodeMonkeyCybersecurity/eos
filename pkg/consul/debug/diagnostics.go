@@ -218,7 +218,7 @@ func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResul
 					"• Run 'eos debug consul --kill-processes' to clean up")
 			case "Configuration Analysis":
 				recommendations = append(recommendations,
-					"• Run 'eos debug consul --fix' to apply configuration fixes",
+					"• Run 'eos update consul --fix' to apply configuration fixes",
 					"• Review and adjust /etc/consul.d/consul.hcl manually if needed")
 			case "Systemd Service":
 				recommendations = append(recommendations,

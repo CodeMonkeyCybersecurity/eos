@@ -315,11 +315,11 @@ func GetCriticalPaths() []string {
 // GetAllPortsForValidation returns all Consul ports for port availability checks
 func GetAllPortsForValidation() []int {
 	return []int{
-		PortServer,   // 8300
-		PortSerfLAN,  // 8301
-		PortSerfWAN,  // 8302
-		PortgRPC,     // 8502
-		PortDNS,      // 8600
+		PortServer,  // 8300
+		PortSerfLAN, // 8301
+		PortSerfWAN, // 8302
+		PortgRPC,    // 8502
+		PortDNS,     // 8600
 		// NOTE: HTTP port (8500 or custom) is NOT included here
 		// It comes from shared.PortConsul which may be customized
 	}
@@ -348,5 +348,153 @@ func GetPortName(port int) string {
 		return "Legacy DNS (pre-Eos)"
 	default:
 		return "Unknown"
+	}
+}
+
+// ============================================================================
+// Comprehensive Path Checks (Single Source of Truth)
+// ============================================================================
+
+// PathCheck defines a comprehensive path verification configuration
+// Used by debug, fix, and validation operations
+type PathCheck struct {
+	Path          string      // Absolute path to check
+	Description   string      // Human-readable description
+	ExpectedPerm  os.FileMode // Expected file/directory permissions
+	ExpectedUser  string      // Expected owner username
+	ExpectedGroup string      // Expected group name
+	Critical      bool        // If true, failure blocks operations
+	IsDir         bool        // True if directory, false if file
+}
+
+// GetAllPathChecks returns comprehensive path checks for ALL Consul files and directories
+// This is the SINGLE SOURCE OF TRUTH for what should be checked/fixed
+//
+// Usage:
+//   - debug operations: iterate and report status
+//   - fix operations: iterate and repair permissions/ownership
+//   - install operations: reference for initial setup
+//   - update operations: reference for drift correction
+//
+// CRITICAL: When adding new Consul files/directories, add them HERE
+func GetAllPathChecks() []PathCheck {
+	return []PathCheck{
+		// ====================================================================
+		// Configuration directory and files (CRITICAL)
+		// ====================================================================
+		{
+			Path:          ConsulConfigDir,
+			Description:   "config directory",
+			ExpectedPerm:  ConsulConfigDirPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      true,
+			IsDir:         true,
+		},
+		{
+			Path:          ConsulConfigFile,
+			Description:   "main config file",
+			ExpectedPerm:  ConsulConfigPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      true,
+			IsDir:         false,
+		},
+		{
+			Path:          ConsulConfigMinimal,
+			Description:   "minimal config file",
+			ExpectedPerm:  ConsulConfigPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      false, // Optional fallback config
+			IsDir:         false,
+		},
+
+		// ====================================================================
+		// Data directories (CRITICAL)
+		// ====================================================================
+		{
+			Path:          ConsulDataDir,
+			Description:   "data directory",
+			ExpectedPerm:  ConsulDataDirPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      true,
+			IsDir:         true,
+		},
+		{
+			Path:          ConsulOptDir,
+			Description:   "operational data directory",
+			ExpectedPerm:  ConsulOptDirPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      true,
+			IsDir:         true,
+		},
+
+		// ====================================================================
+		// Log directory (IMPORTANT)
+		// ====================================================================
+		{
+			Path:          ConsulLogDir,
+			Description:   "log directory",
+			ExpectedPerm:  ConsulLogDirPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      false, // Consul uses journald, this is optional
+			IsDir:         true,
+		},
+
+		// ====================================================================
+		// Binaries (CRITICAL)
+		// ====================================================================
+		{
+			Path:          ConsulBinaryPath,
+			Description:   "consul binary",
+			ExpectedPerm:  ConsulBinaryPerm,
+			ExpectedUser:  "root",
+			ExpectedGroup: "root",
+			Critical:      true,
+			IsDir:         false,
+		},
+
+		// ====================================================================
+		// Helper scripts (IMPORTANT - prevents watch handler errors)
+		// ====================================================================
+		{
+			Path:          ConsulVaultHelperPath,
+			Description:   "vault helper script",
+			ExpectedPerm:  ConsulBinaryPerm,
+			ExpectedUser:  "root",
+			ExpectedGroup: "root",
+			Critical:      false, // Only needed if Vault integration enabled
+			IsDir:         false,
+		},
+
+		// ====================================================================
+		// Optional: ACL token (if ACLs enabled)
+		// ====================================================================
+		{
+			Path:          ConsulACLTokenPath,
+			Description:   "ACL token file",
+			ExpectedPerm:  ConsulConfigPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      false, // Only exists if ACLs enabled
+			IsDir:         false,
+		},
+
+		// ====================================================================
+		// Optional: Vault service registration (if Vault enabled)
+		// ====================================================================
+		{
+			Path:          ConsulVaultServiceConfig,
+			Description:   "Vault service registration",
+			ExpectedPerm:  ConsulConfigPerm,
+			ExpectedUser:  ConsulUser,
+			ExpectedGroup: ConsulGroup,
+			Critical:      false, // Only exists if Vault integration enabled
+			IsDir:         false,
+		},
 	}
 }

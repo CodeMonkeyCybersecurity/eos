@@ -276,7 +276,7 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to initialize Ceph client: %w", err)
 		}
-		defer client.Close()
+		defer func() { _ = client.Close() }()
 
 		// List pools
 		pools, err := client.ListPools(rc)

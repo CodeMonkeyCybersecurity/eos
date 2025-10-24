@@ -180,8 +180,8 @@ func init() {
 	extractCmd.Flags().StringSlice("providers", []string{}, "Specific providers to export (by name)")
 	extractCmd.Flags().Bool("dry-run", false, "Show what would be exported without actually exporting")
 
-	extractCmd.MarkFlagRequired("url")
-	extractCmd.MarkFlagRequired("token")
+	_ = extractCmd.MarkFlagRequired("url")
+	_ = extractCmd.MarkFlagRequired("token")
 
 	// List command flags
 	listCmd.Flags().String("url", "", "Authentik API URL (required)")
@@ -189,8 +189,8 @@ func init() {
 	listCmd.Flags().String("type", "", "List specific type (providers/applications/flows/groups/policies)")
 	listCmd.Flags().Bool("detailed", false, "Show detailed information")
 
-	listCmd.MarkFlagRequired("url")
-	listCmd.MarkFlagRequired("token")
+	_ = listCmd.MarkFlagRequired("url")
+	_ = listCmd.MarkFlagRequired("token")
 }
 
 func runExtract(cmd *cobra.Command, args []string) error {
