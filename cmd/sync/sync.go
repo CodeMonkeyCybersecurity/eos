@@ -15,6 +15,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO: refactor
 var (
 	syncDryRun          bool
@@ -22,11 +23,11 @@ var (
 	syncSkipBackup      bool
 	syncSkipHealthCheck bool
 	// Service flags
-	syncConsul     bool
-	syncVault      bool
-	syncTailscale  bool
-	syncAuthentik  bool
-	syncWazuh      bool
+	syncConsul    bool
+	syncVault     bool
+	syncTailscale bool
+	syncAuthentik bool
+	syncWazuh     bool
 )
 
 func init() {
@@ -36,7 +37,7 @@ func init() {
 	sync.RegisterConnector(connectors.NewAuthentikWazuhConnector())
 }
 
-	// SyncCmd is the root command for service synchronization
+// SyncCmd is the root command for service synchronization
 var SyncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Connect and synchronize two services",
@@ -47,8 +48,8 @@ to work together using service flags. The command automatically detects the
 correct connector to use based on which services are specified.
 
 Currently supported service pairs:
-  - --consul --vault: Configure Vault to use Consul as storage backend,
-                      register Vault in Consul service catalog
+  - --consul --vault: Enable Vault Consul secrets engine for dynamic token generation,
+                      register Vault in Consul service catalog (Pattern 3: Raft + Secrets Engine)
   - --consul --tailscale: Configure local Consul to bind to Tailscale IP
   - --authentik --wazuh: Configure Wazuh SSO integration with Authentik
 
@@ -144,15 +145,15 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	}
 	if len(selectedServices) == 1 {
 		return eos_err.NewUserError(
-			"Only one service specified (%s). Please specify exactly 2 services to sync.\n\n" +
-				"Examples:\n" +
-				"  eos sync --consul --vault\n" +
+			"Only one service specified (%s). Please specify exactly 2 services to sync.\n\n"+
+				"Examples:\n"+
+				"  eos sync --consul --vault\n"+
 				"  eos sync --authentik --wazuh",
 			selectedServices[0])
 	}
 	if len(selectedServices) > 2 {
 		return eos_err.NewUserError(
-			"Too many services specified (%d). Please specify exactly 2 services to sync.\n\n" +
+			"Too many services specified (%d). Please specify exactly 2 services to sync.\n\n"+
 				"You specified: %s",
 			len(selectedServices), strings.Join(selectedServices, ", "))
 	}
@@ -218,6 +219,7 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 
 	return nil
 }
+
 // TODO: refactor
 // normalizeServicePair creates a consistent service pair identifier
 // by sorting services alphabetically. This allows order-independent lookup.

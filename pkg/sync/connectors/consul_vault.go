@@ -6,17 +6,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
-	consulvault "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/vault"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/prompt"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/synctypes"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -39,7 +39,7 @@ func (c *ConsulVaultConnector) Name() string {
 
 // Description returns a human-readable description
 func (c *ConsulVaultConnector) Description() string {
-	return "Connects Consul and Vault: configures Vault to use Consul as storage backend and registers Vault in Consul service catalog"
+	return "Connects Consul and Vault: enables Vault Consul secrets engine for dynamic Consul ACL token generation and registers Vault in Consul service catalog"
 }
 
 // ServicePair returns the normalized service pair identifier
@@ -113,7 +113,7 @@ func (c *ConsulVaultConnector) CheckConnection(rc *eos_io.RuntimeContext, config
 
 	state := &synctypes.SyncState{}
 
-	// Check Consul status
+	// ASSESS - Check Consul status
 	consulStatus, err := consul.CheckStatus(rc)
 	if err != nil {
 		return state, fmt.Errorf("failed to check Consul status: %w", err)
@@ -122,7 +122,7 @@ func (c *ConsulVaultConnector) CheckConnection(rc *eos_io.RuntimeContext, config
 	state.Service1Running = consulStatus.Running
 	state.Service1Healthy = consulStatus.Running && consulStatus.ConfigValid
 
-	// Check Vault status
+	// ASSESS - Check Vault status
 	vaultBinary, err := exec.LookPath("vault")
 	state.Service2Installed = (err == nil && vaultBinary != "")
 
@@ -136,46 +136,79 @@ func (c *ConsulVaultConnector) CheckConnection(rc *eos_io.RuntimeContext, config
 		state.Service2Healthy = state.Service2Running
 	}
 
-	// Check if Vault config uses Consul storage
-	vaultConfigPath := "/etc/vault.d/vault.hcl"
-	configContent, err := os.ReadFile(vaultConfigPath)
+	// ASSESS - Check if Vault Consul secrets engine is configured (Pattern 3)
+	if !state.Service2Running {
+		state.ConfigurationComplete = false
+		state.ConfigurationValid = false
+		state.Connected = false
+		state.Reason = "Vault is not running"
+		return state, nil
+	}
+
+	// Get Vault client to check secrets engine configuration
+	vaultClient, err := vault.GetVaultClient(rc)
 	if err != nil {
-		logger.Warn("Could not read Vault config",
-			zap.String("path", vaultConfigPath),
+		logger.Warn("Could not get Vault client",
 			zap.Error(err))
 		state.ConfigurationComplete = false
 		state.ConfigurationValid = false
 		state.Connected = false
-		state.Reason = "Cannot read Vault configuration"
+		state.Reason = "Cannot connect to Vault"
 		return state, nil
 	}
 
-	// Check for Consul storage backend in config
-	hasConsulStorage := strings.Contains(string(configContent), `storage "consul"`)
+	// Check if Consul secrets engine is enabled
+	mounts, err := vaultClient.Sys().ListMounts()
+	if err != nil {
+		logger.Warn("Could not list Vault mounts",
+			zap.Error(err))
+		state.ConfigurationComplete = false
+		state.ConfigurationValid = false
+		state.Connected = false
+		state.Reason = "Cannot check Vault secrets engines (Vault may be sealed)"
+		return state, nil
+	}
 
-	// Extract Consul address from config if present
-	var consulAddr string
-	if hasConsulStorage {
-		addrRegex := regexp.MustCompile(`address\s*=\s*"([^"]+)"`)
-		if matches := addrRegex.FindStringSubmatch(string(configContent)); len(matches) > 1 {
-			consulAddr = matches[1]
+	hasConsulEngine := false
+	if _, exists := mounts["consul/"]; exists {
+		hasConsulEngine = true
+	}
+
+	// Check if Consul secrets engine is configured
+	engineConfigured := false
+	if hasConsulEngine {
+		secret, err := vaultClient.Logical().Read("consul/config/access")
+		if err == nil && secret != nil && secret.Data != nil {
+			if addr, ok := secret.Data["address"]; ok && addr != nil {
+				engineConfigured = true
+			}
 		}
 	}
 
-	expectedAddr := shared.GetConsulHostPort()
-	correctAddress := (consulAddr == expectedAddr)
+	// Check if roles exist
+	rolesConfigured := false
+	if hasConsulEngine && engineConfigured {
+		roles, err := vaultClient.Logical().List("consul/roles")
+		if err == nil && roles != nil && roles.Data != nil {
+			if keys, ok := roles.Data["keys"].([]interface{}); ok && len(keys) > 0 {
+				rolesConfigured = true
+			}
+		}
+	}
 
-	state.ConfigurationComplete = hasConsulStorage
-	state.ConfigurationValid = hasConsulStorage && correctAddress
-	state.Connected = state.ConfigurationComplete && state.ConfigurationValid && state.Service1Healthy && state.Service2Healthy
+	state.ConfigurationComplete = hasConsulEngine && engineConfigured && rolesConfigured
+	state.ConfigurationValid = state.ConfigurationComplete
+	state.Connected = state.ConfigurationComplete && state.Service1Healthy && state.Service2Healthy
 
 	if state.Connected {
 		state.Healthy = true
-		state.Reason = fmt.Sprintf("Vault configured to use Consul storage at %s", expectedAddr)
-	} else if hasConsulStorage && !correctAddress {
-		state.Reason = fmt.Sprintf("Vault uses Consul storage but incorrect address (found: %s, expected: %s)", consulAddr, expectedAddr)
-	} else if !hasConsulStorage {
-		state.Reason = "Vault is not configured to use Consul storage"
+		state.Reason = "Vault Consul secrets engine enabled and configured"
+	} else if !hasConsulEngine {
+		state.Reason = "Vault Consul secrets engine not enabled"
+	} else if !engineConfigured {
+		state.Reason = "Vault Consul secrets engine enabled but not configured"
+	} else if !rolesConfigured {
+		state.Reason = "Vault Consul secrets engine configured but no roles defined"
 	} else {
 		state.Reason = "Configuration incomplete or services unhealthy"
 	}
@@ -233,292 +266,277 @@ func (c *ConsulVaultConnector) Backup(rc *eos_io.RuntimeContext, config *synctyp
 	return metadata, nil
 }
 
-// Connect establishes the connection between Consul and Vault
+// Connect establishes the connection between Consul and Vault (Pattern 3: Consul Secrets Engine)
 func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *synctypes.SyncConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Connecting Consul and Vault")
+	logger.Info("Connecting Consul and Vault (Pattern 3: Consul Secrets Engine)")
 
-	// Read current Vault configuration
+	// ASSESS - Get Vault and Consul clients
+	logger.Info(" [ASSESS] Connecting to Vault and Consul")
+
+	vaultClient, err := vault.GetVaultClient(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get Vault client: %w", err)
+	}
+
+	consulConfig := consulapi.DefaultConfig()
+	consulConfig.Address = shared.GetConsulHostPort()
+	consulClient, err := consulapi.NewClient(consulConfig)
+	if err != nil {
+		return fmt.Errorf("failed to get Consul client: %w", err)
+	}
+
+	// ASSESS - Check Vault is initialized and unsealed
+	logger.Info(" [ASSESS] Checking Vault status")
+
+	initialized, err := vault.IsVaultInitialized(rc, vaultClient)
+	if err != nil {
+		return fmt.Errorf("failed to check Vault initialization status: %w", err)
+	}
+	if !initialized {
+		return eos_err.NewUserError("Vault must be initialized first:\n" +
+			"  sudo eos init vault")
+	}
+
+	sealStatus, err := vaultClient.Sys().SealStatus()
+	if err != nil {
+		return fmt.Errorf("failed to check Vault seal status: %w", err)
+	}
+	if sealStatus.Sealed {
+		return eos_err.NewUserError("Vault is sealed - unseal it first:\n" +
+			"  vault operator unseal")
+	}
+
+	logger.Info("Vault is initialized and unsealed")
+
+	// SAFETY CHECK: Warn if Vault is using Consul storage (Pattern 1)
 	vaultConfigPath := vault.VaultConfigPath
 	configContent, err := os.ReadFile(vaultConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to read Vault config at %s: %w", vaultConfigPath, err)
-	}
+	if err == nil {
+		configStr := string(configContent)
+		if strings.Contains(configStr, `storage "consul"`) {
+			logger.Warn("NOTICE: Vault is using Consul storage backend (Pattern 1)")
+			logger.Warn("This command configures Consul SECRETS ENGINE (Pattern 3), not storage")
+			logger.Warn("Your existing Consul storage configuration will NOT be modified")
+			logger.Warn("Both patterns can coexist, but you may want to migrate storage to Raft")
+			logger.Warn("For more info: https://developer.hashicorp.com/vault/docs/commands/operator/migrate")
 
-	configStr := string(configContent)
-
-	// CRITICAL SAFETY CHECK: Don't change storage backend if Vault is initialized
-	// Changing storage backend on initialized Vault will lose all data!
-	if !strings.Contains(configStr, `storage "consul"`) {
-		logger.Warn("Vault is not currently using Consul storage backend")
-
-		// Check if Vault is initialized
-		client, err := vault.GetVaultClient(rc)
-		if err == nil {
-			initialized, err := vault.IsVaultInitialized(rc, client)
-			if err == nil && initialized {
-				logger.Error("SAFETY CHECK FAILED: Cannot change storage backend on initialized Vault",
-					zap.String("current_storage", c.detectStorageBackend(configStr)),
-					zap.String("target_storage", "consul"))
-
-				return fmt.Errorf("cannot change storage backend on initialized Vault: this would cause data loss\n\n"+
-					"Current storage: %s\n"+
-					"Target storage: consul\n\n"+
-					"To migrate storage backends:\n"+
-					"1. Use Vault's official migration tools\n"+
-					"2. Or: Unseal Vault, export all secrets, reinitialize with new backend, import secrets\n"+
-					"3. Or: Use --force flag to override (NOT RECOMMENDED - will lose all data)\n\n"+
-					"Vault storage migration documentation:\n"+
-					"https://developer.hashicorp.com/vault/docs/commands/operator/migrate",
-					c.detectStorageBackend(configStr))
+			if !config.Force {
+				proceed, err := prompt.YesNo(rc, "Continue with Consul secrets engine setup?", false)
+				if err != nil || !proceed {
+					return eos_err.NewUserError("Operation cancelled by user")
+				}
 			}
 		}
-
-		// If we get here, Vault is either not initialized or we couldn't check
-		// Proceed with caution
-		if !config.Force {
-			logger.Warn("Proceeding with storage backend change on uninitialized/inaccessible Vault")
-		} else {
-			logger.Warn("FORCE flag set - changing storage backend despite risks")
-		}
 	}
 
-	// STEP 1: Create ACL policy and token if Consul ACLs are enabled
-	var vaultACLToken string
-	if config.ConsulACLToken != "" {
-		logger.Info("Consul ACLs detected, creating Vault access policy and token")
+	// STEP 1: Bootstrap Consul ACLs (if not already done)
+	logger.Info(" [STEP 1/7] Bootstrapping Consul ACL system")
 
-		// Get Vault address using unified resolver
-		vaultAddress := shared.GetVaultAddrWithEnv()
+	bootstrapResult, err := acl.BootstrapConsulACLs(rc, consulClient, vaultClient, true)
+	if err != nil {
+		return fmt.Errorf("failed to bootstrap Consul ACLs: %w", err)
+	}
 
-		// Create VaultIntegration to handle ACL setup
-		integration, err := consulvault.NewVaultIntegration(rc, &consulvault.IntegrationConfig{
-			ConsulAddress:    shared.GetConsulHostPort(),
-			ConsulACLToken:   config.ConsulACLToken,
-			VaultAddress:     vaultAddress,
-			AutoCreatePolicy: true,
-			AutoCreateToken:  true,
-			TokenTTL:         0, // No expiration for infrastructure tokens
-		})
+	masterToken := ""
+	if bootstrapResult.AlreadyDone {
+		logger.Info("Consul ACLs already bootstrapped, retrieving master token from Vault")
+		masterToken, err = acl.GetBootstrapTokenFromVault(rc, vaultClient)
 		if err != nil {
-			logger.Warn("Could not create Vault integration for ACL setup",
-				zap.Error(err),
-				zap.String("reason", "Consul may not be accessible or ACL bootstrap not complete"))
-			logger.Warn("Proceeding without ACL token - manual token creation required")
-		} else {
-			// Register Vault and get ACL token
-			result, err := integration.RegisterVault(rc.Ctx, &consulvault.IntegrationConfig{
-				ConsulAddress:    shared.GetConsulHostPort(),
-				ConsulACLToken:   config.ConsulACLToken,
-				VaultAddress:     vaultAddress,
-				AutoCreatePolicy: true,
-				AutoCreateToken:  true,
-				TokenTTL:         0,
-			})
-			if err != nil {
-				logger.Warn("Could not register Vault with Consul ACLs",
-					zap.Error(err))
-				logger.Warn("Proceeding without ACL token - manual token creation required")
-			} else {
-				vaultACLToken = result.TokenSecretID
-				logger.Info("Successfully created Vault ACL policy and token",
-					zap.String("policy_id", result.PolicyID),
-					zap.String("policy_name", result.PolicyName),
-					zap.String("token_accessor", result.TokenAccessorID))
-			}
+			return fmt.Errorf("failed to retrieve Consul bootstrap token from Vault: %w", err)
 		}
 	} else {
-		logger.Debug("No Consul ACL token provided, ACLs not enabled or token not available")
+		masterToken = bootstrapResult.MasterToken
+		logger.Info("Consul ACLs bootstrapped successfully",
+			zap.String("accessor", bootstrapResult.Accessor))
 	}
 
-	// Check if already using Consul storage
-	if strings.Contains(configStr, `storage "consul"`) {
-		logger.Info("Vault config already contains Consul storage, updating address")
-
-		// Update the address to use correct port
-		addrRegex := regexp.MustCompile(`(storage "consul"\s*\{[^}]*address\s*=\s*)"[^"]*"`)
-		updatedConfig := addrRegex.ReplaceAllString(configStr, fmt.Sprintf(`${1}"%s"`, shared.GetConsulHostPort()))
-
-		if updatedConfig == configStr {
-			logger.Debug("No address change needed, config already correct")
-		} else {
-			if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), vault.VaultConfigPerm); err != nil {
-				return fmt.Errorf("failed to update Vault config: %w", err)
-			}
-			logger.Info("Updated Consul address in Vault config",
-				zap.String("address", shared.GetConsulHostPort()))
-		}
-	} else {
-		logger.Info("Adding Consul storage backend to Vault config")
-
-		// Find and replace storage backend
-		// Look for existing storage block (raft, file, etc.)
-		storageRegex := regexp.MustCompile(`(?s)storage "[^"]*"\s*\{[^}]*\}`)
-
-		// Build storage block with ACL token if available
-		var consulStorageBlock string
-		if vaultACLToken != "" {
-			consulStorageBlock = fmt.Sprintf(`storage "consul" {
-  address = "%s"
-  path    = "%s"
-  token   = "%s"
-}`, shared.GetConsulHostPort(), vault.ConsulVaultStoragePrefix, vaultACLToken)
-			logger.Info("Generated Consul storage config with ACL token")
-		} else {
-			consulStorageBlock = fmt.Sprintf(`storage "consul" {
-  address = "%s"
-  path    = "%s"
-}`, shared.GetConsulHostPort(), vault.ConsulVaultStoragePrefix)
-			logger.Debug("Generated Consul storage config without ACL token (ACLs not enabled)")
-		}
-
-		var updatedConfig string
-		if storageRegex.MatchString(configStr) {
-			// Replace existing storage backend
-			updatedConfig = storageRegex.ReplaceAllString(configStr, consulStorageBlock)
-			logger.Info("Replaced existing storage backend with Consul")
-		} else {
-			// Insert before listener block
-			listenerRegex := regexp.MustCompile(`(listener "tcp"\s*\{)`)
-			if listenerRegex.MatchString(configStr) {
-				updatedConfig = listenerRegex.ReplaceAllString(configStr, consulStorageBlock+"\n\n${1}")
-				logger.Info("Inserted Consul storage backend before listener")
-			} else {
-				// Just prepend if no listener found
-				updatedConfig = consulStorageBlock + "\n\n" + configStr
-				logger.Info("Prepended Consul storage backend to config")
-			}
-		}
-
-		// Write updated config
-		if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), vault.VaultConfigPerm); err != nil {
-			return fmt.Errorf("failed to write updated Vault config: %w", err)
-		}
-	}
-
-	// Add service_registration block if not present
-	if !strings.Contains(configStr, `service_registration "consul"`) {
-		logger.Info("Adding Consul service registration to Vault config")
-
-		configContent, _ := os.ReadFile(vaultConfigPath)
-		configStr = string(configContent)
-
-		// Build service registration block with ACL token if available
-		var serviceRegBlock string
-		if vaultACLToken != "" {
-			serviceRegBlock = fmt.Sprintf(`
-service_registration "consul" {
-  address = "%s"
-  token   = "%s"
-}`, shared.GetConsulHostPort(), vaultACLToken)
-			logger.Info("Generated Consul service registration config with ACL token")
-		} else {
-			serviceRegBlock = fmt.Sprintf(`
-service_registration "consul" {
-  address = "%s"
-}`, shared.GetConsulHostPort())
-			logger.Debug("Generated Consul service registration config without ACL token")
-		}
-
-		updatedConfig := configStr + "\n" + serviceRegBlock
-
-		if err := os.WriteFile(vaultConfigPath, []byte(updatedConfig), vault.VaultConfigPerm); err != nil {
-			return fmt.Errorf("failed to add service registration: %w", err)
-		}
-		logger.Info("Added Consul service registration")
-	}
-
-	// Restart Vault service to apply changes
-	logger.Info("Restarting Vault service to apply configuration changes")
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"restart", vault.VaultServiceName},
-		Capture: true,
-	})
+	// Use master token for subsequent Consul operations
+	// Recreate Consul client with master token
+	consulConfig.Token = masterToken
+	consulClient, err = consulapi.NewClient(consulConfig)
 	if err != nil {
-		return fmt.Errorf("failed to restart Vault service: %w", err)
+		return fmt.Errorf("failed to create Consul client with master token: %w", err)
 	}
 
-	// Wait for Vault to come back up
-	logger.Info("Waiting for Vault to become ready")
-	time.Sleep(vault.VaultReadyWaitTime)
+	// STEP 2: Create Consul ACL policies
+	logger.Info(" [STEP 2/7] Creating Consul ACL policies")
+
+	policies, err := acl.CreateDefaultPolicies(rc, consulClient)
+	if err != nil {
+		return fmt.Errorf("failed to create Consul ACL policies: %w", err)
+	}
+	logger.Info("Created Consul ACL policies",
+		zap.Strings("policies", policies))
+
+	// STEP 3: Create Vault management token in Consul
+	logger.Info(" [STEP 3/7] Creating Vault management token in Consul")
+
+	tokenInfo, err := acl.CreateManagementToken(rc, consulClient,
+		"Vault Consul Secrets Engine",
+		[]string{"vault-mgmt-policy"})
+	if err != nil {
+		return fmt.Errorf("failed to create Vault management token: %w", err)
+	}
+	logger.Info("Created Vault management token",
+		zap.String("accessor", tokenInfo.Accessor))
+
+	// STEP 4: Enable Vault Consul secrets engine
+	logger.Info(" [STEP 4/7] Enabling Vault Consul secrets engine")
+
+	manager := vault.NewConsulSecretsEngineManager(rc, vaultClient, consulClient)
+
+	engineConfig := &vault.ConsulSecretsEngineConfig{
+		ConsulAddress: shared.GetConsulHostPort(),
+		ConsulScheme:  "http",
+		ConsulToken:   tokenInfo.Token,
+		Roles:         vault.CreateDefaultConsulRoles(),
+		DefaultTTL:    "1h",
+		MaxTTL:        "24h",
+	}
+
+	if err := manager.EnableConsulSecretsEngine(engineConfig); err != nil {
+		return fmt.Errorf("failed to enable Consul secrets engine: %w", err)
+	}
+	logger.Info("Consul secrets engine enabled and configured")
+
+	// STEP 5: Test dynamic token generation
+	logger.Info(" [STEP 5/7] Testing dynamic Consul token generation")
+
+	testToken, err := manager.TestTokenGeneration("eos-role")
+	if err != nil {
+		return fmt.Errorf("failed to test token generation: %w", err)
+	}
+	logger.Info("Test token generated successfully",
+		zap.String("accessor", testToken.Accessor),
+		zap.Duration("ttl", testToken.LeaseDuration))
+
+	// STEP 6: Register Vault in Consul service catalog (if not already registered)
+	logger.Info(" [STEP 6/7] Registering Vault in Consul service catalog")
+
+	// Check if Vault service is already registered
+	services, _, err := consulClient.Catalog().Service("vault", "", nil)
+	if err != nil {
+		logger.Warn("Could not check if Vault is registered in Consul",
+			zap.Error(err))
+	} else if len(services) > 0 {
+		logger.Info("Vault already registered in Consul service catalog")
+	} else {
+		logger.Info("Vault service registration will be handled by vault.hcl service_registration block")
+	}
+
+	// STEP 7: Verify end-to-end
+	logger.Info(" [STEP 7/7] Verifying integration")
+
+	if err := c.Verify(rc, config); err != nil {
+		return fmt.Errorf("integration verification failed: %w", err)
+	}
+
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: ✓ Consul and Vault connected successfully (Pattern 3)")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Consul secrets engine enabled at: consul/")
+	logger.Info("terminal prompt: Available roles:")
+	logger.Info("terminal prompt:   - eos-role (1h TTL, eos-policy)")
+	logger.Info("terminal prompt:   - service-role (2h TTL, service-policy)")
+	logger.Info("terminal prompt:   - readonly-role (8h TTL, readonly-policy)")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Generate dynamic Consul tokens:")
+	logger.Info("terminal prompt:   vault read consul/creds/eos-role")
+	logger.Info("terminal prompt: ")
 
 	return nil
 }
 
-// Verify validates the connection is working correctly
+// Verify validates the connection is working correctly (Pattern 3: Consul Secrets Engine)
 func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctypes.SyncConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Verifying Consul-Vault connection")
+	logger.Info(" [EVALUATE] Verifying Consul-Vault connection (Pattern 3)")
 
-	// Check Vault service is active
+	// EVALUATE - Check Vault service is active
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"is-active", vault.VaultServiceName},
 		Capture: true,
 	})
 	if err != nil || strings.TrimSpace(output) != "active" {
-		return fmt.Errorf("vault service is not active after restart")
+		return fmt.Errorf("vault service is not active")
 	}
 	logger.Info("Vault service is active")
 
-	// Verify Vault health
-	client, err := vault.GetVaultClient(rc)
+	// EVALUATE - Verify Vault health
+	vaultClient, err := vault.GetVaultClient(rc)
 	if err != nil {
 		return fmt.Errorf("failed to get Vault client: %w", err)
 	}
 
-	health, err := client.Sys().Health()
+	health, err := vaultClient.Sys().Health()
 	if err != nil {
 		logger.Warn("Vault health check returned error (may be sealed)", zap.Error(err))
-		// Note: Sealed vault is expected if not yet initialized/unsealed
-		// This is not necessarily a failure condition
 	} else {
 		logger.Info("Vault health check passed",
 			zap.Bool("initialized", health.Initialized),
 			zap.Bool("sealed", health.Sealed))
 	}
 
-	// Check that config actually has Consul storage
-	vaultConfigPath := vault.VaultConfigPath
-	configContent, err := os.ReadFile(vaultConfigPath)
+	// EVALUATE - Check Consul secrets engine is enabled
+	mounts, err := vaultClient.Sys().ListMounts()
 	if err != nil {
-		return fmt.Errorf("failed to verify config: %w", err)
+		return fmt.Errorf("failed to list Vault mounts: %w", err)
 	}
 
-	if !strings.Contains(string(configContent), `storage "consul"`) {
-		return fmt.Errorf("vault config does not contain Consul storage backend")
+	if _, exists := mounts["consul/"]; !exists {
+		return fmt.Errorf("Consul secrets engine is not enabled")
 	}
+	logger.Info("Consul secrets engine is enabled")
 
-	if !strings.Contains(string(configContent), shared.GetConsulHostPort()) {
-		return fmt.Errorf("vault config does not contain correct Consul address: %s", shared.GetConsulHostPort())
-	}
-
-	// Verify Consul storage backend accessibility
-	logger.Info("Verifying Consul storage backend connectivity")
-	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
+	// EVALUATE - Check Consul secrets engine is configured
+	secret, err := vaultClient.Logical().Read("consul/config/access")
 	if err != nil {
-		logger.Warn("Could not create Consul client for storage verification",
-			zap.Error(err),
-			zap.String("reason", "Consul may not be running or accessible"))
-		logger.Info("Skipping Consul storage verification - ensure Consul is running and accessible")
-	} else {
-		// Test read access to Vault storage path
-		testKey := vault.ConsulVaultStoragePrefix + "core/test"
-		_, _, err = consulClient.KV().Get(testKey, nil)
-		if err != nil {
-			logger.Warn("Could not verify Consul storage access",
-				zap.Error(err),
-				zap.String("test_key", testKey),
-				zap.String("reason", "This is normal if Vault is not initialized yet"))
-		} else {
-			logger.Info("Verified Vault can access Consul storage backend",
-				zap.String("storage_prefix", vault.ConsulVaultStoragePrefix))
-		}
+		return fmt.Errorf("failed to read Consul secrets engine config: %w", err)
+	}
+	if secret == nil || secret.Data == nil {
+		return fmt.Errorf("Consul secrets engine is not configured")
+	}
+	logger.Info("Consul secrets engine is configured",
+		zap.String("consul_address", secret.Data["address"].(string)))
+
+	// EVALUATE - Check roles exist
+	roles, err := vaultClient.Logical().List("consul/roles")
+	if err != nil {
+		return fmt.Errorf("failed to list Consul roles: %w", err)
+	}
+	if roles == nil || roles.Data == nil {
+		return fmt.Errorf("no Consul roles configured")
 	}
 
-	logger.Info("Connection verified successfully",
-		zap.String("consul_addr", shared.GetConsulHostPort()))
+	roleKeys, ok := roles.Data["keys"].([]interface{})
+	if !ok || len(roleKeys) == 0 {
+		return fmt.Errorf("no Consul roles configured")
+	}
+	logger.Info("Consul roles configured",
+		zap.Int("role_count", len(roleKeys)))
+
+	// EVALUATE - Test token generation
+	logger.Info("Testing dynamic token generation")
+
+	consulConfig := consulapi.DefaultConfig()
+	consulConfig.Address = shared.GetConsulHostPort()
+	consulClient, err := consulapi.NewClient(consulConfig)
+	if err != nil {
+		return fmt.Errorf("failed to get Consul client: %w", err)
+	}
+
+	manager := vault.NewConsulSecretsEngineManager(rc, vaultClient, consulClient)
+	testToken, err := manager.TestTokenGeneration("eos-role")
+	if err != nil {
+		return fmt.Errorf("failed to generate test token: %w", err)
+	}
+	logger.Info("Successfully generated test token",
+		zap.String("accessor", testToken.Accessor),
+		zap.Duration("ttl", testToken.LeaseDuration))
+
+	logger.Info("Connection verified successfully (Pattern 3)")
 
 	return nil
 }
@@ -567,14 +585,4 @@ func copyFile(src, dst string) error {
 	}
 
 	return nil
-}
-
-// detectStorageBackend extracts the storage backend type from Vault config
-func (c *ConsulVaultConnector) detectStorageBackend(configStr string) string {
-	storageRegex := regexp.MustCompile(`storage "([^"]*)"`)
-	matches := storageRegex.FindStringSubmatch(configStr)
-	if len(matches) > 1 {
-		return matches[1]
-	}
-	return "unknown"
 }
