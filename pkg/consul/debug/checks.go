@@ -5,10 +5,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -182,7 +185,8 @@ func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
 	return result
 }
 
-// checkConsulPermissions verifies file permissions for Consul directories
+// checkConsulPermissions verifies file permissions for Consul directories and files
+// Comprehensive check following CLAUDE.md shift-left security principles
 func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking Consul file permissions")
@@ -193,27 +197,135 @@ func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	// Paths to check
-	paths := map[string]string{
-		"/etc/consul.d":       "config directory",
-		"/opt/consul":         "data directory",
-		"/var/log/consul.log": "log file",
+	// Get consul user for ownership verification
+	consulUser, err := user.Lookup("consul")
+	var expectedUID, expectedGID int
+	if err != nil {
+		result.Success = false
+		result.Message = "consul user does not exist"
+		result.Details = append(result.Details, "✗ consul system user not found - run 'eos create consul' first")
+		return result
+	}
+	expectedUID, _ = strconv.Atoi(consulUser.Uid)
+	expectedGID, _ = strconv.Atoi(consulUser.Gid)
+
+	// Define comprehensive path checks with expected ownership
+	type PathCheck struct {
+		Path          string
+		Description   string
+		ExpectedPerm  os.FileMode
+		ExpectedUser  string
+		ExpectedGroup string
+		Critical      bool // If false, warn but don't fail
 	}
 
-	for path, description := range paths {
-		info, err := os.Stat(path)
+	pathsToCheck := []PathCheck{
+		// Config directory and files (CRITICAL - permission denied errors happen here)
+		{consul.ConsulConfigDir, "config directory", consul.ConsulConfigDirPerm, "consul", "consul", true},
+		{consul.ConsulConfigFile, "main config file", consul.ConsulConfigPerm, "consul", "consul", true},
+		{consul.ConsulConfigMinimal, "minimal config file", consul.ConsulConfigPerm, "consul", "consul", false},
+
+		// Data directories (CRITICAL)
+		{consul.ConsulDataDir, "data directory", consul.ConsulDataDirPerm, "consul", "consul", true},
+		{consul.ConsulOptDir, "operational data directory", consul.ConsulOptDirPerm, "consul", "consul", true},
+
+		// Log directory (IMPORTANT)
+		{consul.ConsulLogDir, "log directory", consul.ConsulLogDirPerm, "consul", "consul", false},
+
+		// Binary (CRITICAL)
+		{consul.ConsulBinaryPath, "consul binary", consul.ConsulBinaryPerm, "root", "root", true},
+
+		// Helper script (IMPORTANT - causes watch handler errors if missing/wrong perms)
+		{consul.ConsulVaultHelperPath, "vault helper script", consul.ConsulBinaryPerm, "root", "root", false},
+
+		// Optional: ACL token if exists
+		{consul.ConsulACLTokenPath, "ACL token file", consul.ConsulConfigPerm, "consul", "consul", false},
+
+		// Optional: Vault service config if exists
+		{consul.ConsulVaultServiceConfig, "Vault service registration", consul.ConsulConfigPerm, "consul", "consul", false},
+	}
+
+	issuesFound := 0
+	for _, check := range pathsToCheck {
+		info, err := os.Stat(check.Path)
 		if err != nil {
-			result.Details = append(result.Details,
-				fmt.Sprintf("✗ %s (%s): Does not exist", description, path))
+			if check.Critical {
+				result.Success = false
+				result.Details = append(result.Details,
+					fmt.Sprintf("✗ %s (%s): MISSING (CRITICAL)", check.Description, check.Path))
+				issuesFound++
+			} else {
+				result.Details = append(result.Details,
+					fmt.Sprintf("⊘ %s (%s): Does not exist (optional)", check.Description, check.Path))
+			}
 			continue
 		}
 
-		mode := info.Mode()
-		result.Details = append(result.Details,
-			fmt.Sprintf("✓ %s (%s): %s", description, path, mode))
+		// Get file ownership
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			result.Details = append(result.Details,
+				fmt.Sprintf("⚠ %s (%s): Cannot read ownership info", check.Description, check.Path))
+			continue
+		}
+
+		// Determine expected UID/GID based on expected user
+		var checkUID, checkGID int
+		if check.ExpectedUser == "root" {
+			checkUID = 0
+			checkGID = 0
+		} else {
+			checkUID = expectedUID
+			checkGID = expectedGID
+		}
+
+		// Verify ownership
+		ownershipOK := stat.Uid == uint32(checkUID) && stat.Gid == uint32(checkGID)
+
+		// Verify permissions
+		actualPerm := info.Mode().Perm()
+		permissionsOK := actualPerm == check.ExpectedPerm
+
+		// Report results
+		if ownershipOK && permissionsOK {
+			result.Details = append(result.Details,
+				fmt.Sprintf("✓ %s (%s): %s %s:%s OK",
+					check.Description, check.Path, actualPerm,
+					check.ExpectedUser, check.ExpectedGroup))
+		} else {
+			if check.Critical {
+				result.Success = false
+			}
+
+			details := fmt.Sprintf("✗ %s (%s):", check.Description, check.Path)
+			if !ownershipOK {
+				details += fmt.Sprintf(" owner=%d:%d (expected %s:%s=%d:%d)",
+					stat.Uid, stat.Gid,
+					check.ExpectedUser, check.ExpectedGroup,
+					checkUID, checkGID)
+			}
+			if !permissionsOK {
+				details += fmt.Sprintf(" mode=%04o (expected %04o)",
+					actualPerm, check.ExpectedPerm)
+			}
+			if check.Critical {
+				details += " [CRITICAL]"
+			}
+
+			result.Details = append(result.Details, details)
+			issuesFound++
+		}
 	}
 
-	result.Message = "File permission check completed"
+	// Summary message
+	if issuesFound > 0 {
+		result.Message = fmt.Sprintf("Found %d permission/ownership issue(s)", issuesFound)
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Fix with: sudo eos debug consul --fix")
+	} else {
+		result.Message = "All permissions and ownership are correct"
+	}
+
 	return result
 }
 
@@ -334,7 +446,7 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 		// Build summary with both descriptions AND actual log lines
 		result.Details = []string{"Issues detected:"}
 		result.Details = append(result.Details, foundIssues...)
-		result.Details = append(result.Details, "")  // Blank line for readability
+		result.Details = append(result.Details, "") // Blank line for readability
 		result.Details = append(result.Details, logDetails...)
 	} else {
 		result.Message = "No critical issues found in recent logs"
@@ -644,10 +756,10 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// NOTE: Consul binds to actual network interface (Tailscale IP), not localhost
 	// We test localhost as fallback only for troubleshooting misconfigurations
 	testAddresses := []string{
-		fmt.Sprintf("%s:%d", hostname, shared.PortConsul),                      // Primary: hostname (should resolve to Tailscale/actual IP)
-		fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortConsul),  // Fallback: explicit internal hostname
-		fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),                          // Fallback: IPv4 localhost (diagnoses client_addr misconfiguration)
-		fmt.Sprintf("127.0.1.1:%d", shared.PortConsul),                          // Fallback: Ubuntu default (diagnoses /etc/hosts issues)
+		fmt.Sprintf("%s:%d", hostname, shared.PortConsul),                     // Primary: hostname (should resolve to Tailscale/actual IP)
+		fmt.Sprintf("%s:%d", shared.GetInternalHostname(), shared.PortConsul), // Fallback: explicit internal hostname
+		fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),                        // Fallback: IPv4 localhost (diagnoses client_addr misconfiguration)
+		fmt.Sprintf("127.0.1.1:%d", shared.PortConsul),                        // Fallback: Ubuntu default (diagnoses /etc/hosts issues)
 	}
 
 	var consulAgentInfo map[string]map[string]interface{}
