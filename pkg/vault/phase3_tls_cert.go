@@ -251,10 +251,9 @@ func removeTLSFiles() error {
 
 // generateSelfSigned generates a self-signed cert using the consolidated TLS module
 func generateSelfSigned(rc *eos_io.RuntimeContext) error {
-	// Ensure TLS directory exists
-	if err := os.MkdirAll(shared.TLSDir, 0o755); err != nil {
-		return cerr.Wrapf(err, "create TLS directory %s", shared.TLSDir)
-	}
+	// NOTE: TLS directory will be created by GenerateSelfSignedCertificate()
+	// with correct ownership. We don't create it here as root:root because that
+	// would cause ownership issues (see tls_certificate.go:174-178 and :404-407).
 
 	// Get hostname for certificate
 	hostname, err := os.Hostname()

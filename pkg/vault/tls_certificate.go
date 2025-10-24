@@ -212,9 +212,17 @@ func GenerateSelfSignedCertificate(rc *eos_io.RuntimeContext, config *Certificat
 	// By setting ownership first, the vault user can always read the files.
 	if os.Geteuid() == 0 {
 		if err := setFileOwnership(rc, config.CertPath, config.KeyPath, config.Owner, config.Group); err != nil {
-			log.Error("Failed to set vault ownership - Vault service will fail to start", zap.Error(err))
+			log.Error("CRITICAL: Failed to set vault ownership - Vault service will fail to start",
+				zap.Error(err),
+				zap.Int("euid", os.Geteuid()),
+				zap.Int("uid", os.Getuid()))
 			return fmt.Errorf("set file ownership: %w", err)
 		}
+	} else {
+		log.Warn("Not running as root - TLS files will be owned by current user (Vault service may fail)",
+			zap.Int("euid", os.Geteuid()),
+			zap.Int("uid", os.Getuid()),
+			zap.String("owner_requested", config.Owner))
 	}
 
 	// Now set permissions (after ownership is correct)
@@ -398,6 +406,14 @@ func setFileOwnership(rc *eos_io.RuntimeContext, certPath, keyPath, owner, _grou
 		return fmt.Errorf("lookup user %s: %w", owner, err)
 	}
 
+	// CRITICAL: Set ownership on TLS directory FIRST
+	// The directory is created by os.MkdirAll() as root:root, which would prevent
+	// the vault user from accessing the certificate files inside it.
+	certDir := filepath.Dir(certPath)
+	if err := os.Chown(certDir, uid, gid); err != nil {
+		return fmt.Errorf("chown directory %s: %w", certDir, err)
+	}
+
 	// Set ownership on certificate file
 	if err := os.Chown(certPath, uid, gid); err != nil {
 		return fmt.Errorf("chown %s: %w", certPath, err)
@@ -408,10 +424,12 @@ func setFileOwnership(rc *eos_io.RuntimeContext, certPath, keyPath, owner, _grou
 		return fmt.Errorf("chown %s: %w", keyPath, err)
 	}
 
-	log.Debug("Set certificate file ownership",
+	// Use Info instead of Debug so this appears in default logs (helps debugging)
+	log.Info("Set certificate ownership successfully",
 		zap.String("owner", owner),
 		zap.Int("uid", uid),
 		zap.Int("gid", gid),
+		zap.String("directory", certDir),
 		zap.String("cert", certPath),
 		zap.String("key", keyPath))
 
