@@ -23,6 +23,96 @@ import (
 // - Proper RuntimeContext usage throughout
 // - Enhanced error handling
 
+// Systemctl Exit Codes
+// Reference: systemctl(1) man page
+// Different systemctl subcommands return different exit codes with different meanings
+const (
+	// Generic exit codes (all commands)
+	ExitSuccess     = 0 // Success
+	ExitGenericFail = 1 // Generic failure
+
+	// is-active, is-enabled, is-failed exit codes
+	ExitInactive  = 3 // Service is inactive/dead/failed
+	ExitUnknown   = 4 // Service state is unknown
+	ExitNotLoaded = 5 // Unit file is not loaded
+
+	// start, stop, reload, restart exit codes
+	ExitStartFailed = 3 // Start operation failed
+)
+
+// SystemctlCommand represents different systemctl subcommands
+type SystemctlCommand string
+
+const (
+	CmdIsActive      SystemctlCommand = "is-active"
+	CmdIsEnabled     SystemctlCommand = "is-enabled"
+	CmdIsFailed      SystemctlCommand = "is-failed"
+	CmdStart         SystemctlCommand = "start"
+	CmdStop          SystemctlCommand = "stop"
+	CmdRestart       SystemctlCommand = "restart"
+	CmdReload        SystemctlCommand = "reload"
+	CmdEnable        SystemctlCommand = "enable"
+	CmdDisable       SystemctlCommand = "disable"
+	CmdStatus        SystemctlCommand = "status"
+	CmdListUnitFiles SystemctlCommand = "list-unit-files"
+	CmdDaemonReload  SystemctlCommand = "daemon-reload"
+)
+
+// InterpretSystemctlExitCode interprets exit codes based on the systemctl command
+func InterpretSystemctlExitCode(cmd SystemctlCommand, exitCode int) string {
+	switch cmd {
+	case CmdIsActive:
+		switch exitCode {
+		case ExitSuccess:
+			return "active"
+		case ExitInactive:
+			return "inactive"
+		case ExitUnknown:
+			return "unknown"
+		case ExitNotLoaded:
+			return "not loaded"
+		default:
+			return fmt.Sprintf("unknown exit code %d", exitCode)
+		}
+
+	case CmdIsEnabled:
+		switch exitCode {
+		case ExitSuccess:
+			return "enabled"
+		case ExitGenericFail:
+			return "disabled"
+		default:
+			return fmt.Sprintf("unknown exit code %d", exitCode)
+		}
+
+	case CmdStart, CmdRestart, CmdReload:
+		switch exitCode {
+		case ExitSuccess:
+			return "success"
+		case ExitStartFailed:
+			return "operation failed"
+		default:
+			return fmt.Sprintf("failed with exit code %d", exitCode)
+		}
+
+	case CmdListUnitFiles:
+		switch exitCode {
+		case ExitSuccess:
+			return "unit files found"
+		case ExitGenericFail:
+			return "no unit files matched"
+		default:
+			return fmt.Sprintf("unknown exit code %d", exitCode)
+		}
+
+	default:
+		if exitCode == ExitSuccess {
+			return "success"
+		}
+		return fmt.Sprintf("failed with exit code %d", exitCode)
+	}
+}
+
 // ReloadDaemonAndEnable reloads systemd, then enables & starts the given unit.
 // It returns an error if either step fails.
 func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
@@ -52,15 +142,27 @@ func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 	logger.Info("Enabling and starting systemd unit",
 		zap.String("unit", unit))
 
-	if _, err := execute.Run(ctx, execute.Options{
+	enableOutput, enableErr := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"enable", "--now", unit},
 		Capture: true,
-	}); err != nil {
-		logger.Warn("failed to enable/start service",
+	})
+	if enableErr != nil {
+		// Capture detailed diagnostics on failure
+		diagnostics := captureServiceDiagnostics(ctx, unit)
+
+		logger.Error("failed to enable/start service",
 			zap.String("unit", unit),
-			zap.Error(err))
-		return fmt.Errorf("enable --now %s: %w", unit, err)
+			zap.Error(enableErr),
+			zap.String("enable_output", enableOutput),
+			zap.String("status_output", diagnostics.StatusOutput),
+			zap.String("journal_output", diagnostics.JournalOutput))
+
+		return fmt.Errorf("enable --now %s failed: %s\n"+
+			"Status: %s\n"+
+			"Recent logs:\n%s\n"+
+			"Remediation: Run 'systemctl status %s' and 'journalctl -u %s -n 50' for details",
+			unit, enableOutput, diagnostics.StatusOutput, diagnostics.JournalOutput, unit, unit)
 	}
 
 	// EVALUATE - Verify service is active
@@ -68,10 +170,20 @@ func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 		zap.String("unit", unit))
 
 	if err := CheckServiceStatus(ctx, unit); err != nil {
+		// Capture detailed diagnostics on status check failure
+		diagnostics := captureServiceDiagnostics(ctx, unit)
+
 		logger.Error("Service is not active after enable",
 			zap.String("unit", unit),
-			zap.Error(err))
-		return err
+			zap.Error(err),
+			zap.String("status_output", diagnostics.StatusOutput),
+			zap.String("journal_output", diagnostics.JournalOutput))
+
+		return fmt.Errorf("%w\n"+
+			"Status: %s\n"+
+			"Recent logs:\n%s\n"+
+			"Remediation: Check 'systemctl status %s' and 'journalctl -u %s -n 50'",
+			err, diagnostics.StatusOutput, diagnostics.JournalOutput, unit, unit)
 	}
 
 	logger.Info("systemd unit enabled & started",
@@ -265,6 +377,50 @@ func ServiceExists(ctx context.Context, unit string) bool {
 		zap.Bool("exists", exists))
 
 	return exists
+}
+
+// ServiceDiagnostics contains diagnostic information about a service failure
+type ServiceDiagnostics struct {
+	StatusOutput  string
+	JournalOutput string
+}
+
+// captureServiceDiagnostics captures detailed diagnostics for a failed service
+func captureServiceDiagnostics(ctx context.Context, unit string) ServiceDiagnostics {
+	logger := otelzap.Ctx(ctx)
+	diag := ServiceDiagnostics{}
+
+	// Capture systemctl status output
+	statusOutput, err := execute.Run(ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"status", unit, "-l", "--no-pager"},
+		Capture: true,
+	})
+	if err != nil {
+		// Status command may fail if service is failed/inactive, but we still want the output
+		diag.StatusOutput = statusOutput
+		logger.Debug("systemctl status captured (command exited with error, which is expected for failed services)",
+			zap.String("unit", unit))
+	} else {
+		diag.StatusOutput = statusOutput
+	}
+
+	// Capture recent journal entries
+	journalOutput, err := execute.Run(ctx, execute.Options{
+		Command: "journalctl",
+		Args:    []string{"-u", unit, "-n", "50", "--no-pager"},
+		Capture: true,
+	})
+	if err != nil {
+		logger.Debug("journalctl capture failed (may not have logs yet)",
+			zap.String("unit", unit),
+			zap.Error(err))
+		diag.JournalOutput = fmt.Sprintf("(journalctl failed: %v)", err)
+	} else {
+		diag.JournalOutput = journalOutput
+	}
+
+	return diag
 }
 
 // CheckServiceStatus checks if a systemd service is active

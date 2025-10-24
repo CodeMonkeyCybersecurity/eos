@@ -358,11 +358,47 @@ func interpretRemovalExitCode(command string, exitCode int, output string) LogLe
 
 // interpretVerifyExitCode interprets exit codes during verification
 func interpretVerifyExitCode(command string, exitCode int, output string) LogLevel {
-	// During verification, "not found" is usually what we want
-	if exitCode == 1 && (strings.Contains(output, "does not exist") ||
-		strings.Contains(output, "not found") ||
-		strings.Contains(output, "not loaded")) {
-		return LogLevelDebug // Successfully verified removal
+	// Systemctl list-unit-files: exit 1 with header-only output = not found (SUCCESS)
+	if strings.Contains(command, "systemctl") && strings.Contains(command, "list-unit-files") {
+		if exitCode == 1 {
+			// Exit 1 means no units matched the pattern
+			// Output will be "UNIT FILE STATE PRESET" (header only) if nothing found
+			return LogLevelDebug // Successfully verified removal - unit doesn't exist
+		}
+		if exitCode == 0 {
+			// Exit 0 means unit file was found - might be a problem during removal verification
+			return LogLevelWarn
+		}
+	}
+
+	// pgrep: exit 1 = no processes found (SUCCESS during removal verification)
+	if strings.Contains(command, "pgrep") && exitCode == 1 {
+		return LogLevelDebug // Successfully verified - no processes running
+	}
+
+	// id command: exit 1 = user doesn't exist (SUCCESS)
+	// PRIMARY signal: exit code 1 (locale-independent)
+	// Note: Error message is locale-dependent ("no such user" in English, "Benutzer existiert nicht" in German)
+	// We trust the exit code alone
+	if strings.Contains(command, "id") && exitCode == 1 {
+		return LogLevelDebug // Successfully verified - user removed
+	}
+
+	// Generic "not found" patterns (fallback for other commands)
+	// PRIMARY signal: exit code 1
+	// SECONDARY signal: output strings (locale-dependent, use as hint only)
+	if exitCode == 1 {
+		// Many commands use exit 1 for "not found"
+		// Check output for confirmation, but accept exit code alone
+		if strings.Contains(output, "does not exist") ||
+			strings.Contains(output, "not found") ||
+			strings.Contains(output, "not loaded") ||
+			len(strings.TrimSpace(output)) == 0 { // Empty output often means "not found"
+			return LogLevelDebug // Successfully verified removal
+		}
+		// Exit 1 but with unexpected output - might be an error
+		// Log at INFO level instead of ERROR (not critical during verification)
+		return LogLevelInfo
 	}
 
 	if exitCode == 0 {

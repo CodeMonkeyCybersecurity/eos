@@ -260,7 +260,7 @@ func DisplayPostInstallSecurityChecklist(rc *eos_io.RuntimeContext) {
 
 	_, _ = fmt.Fprintln(os.Stderr, "")
 	_, _ = fmt.Fprintln(os.Stderr, "╔═══════════════════════════════════════════════════════════════════════════════╗")
-	_, _ = fmt.Fprintln(os.Stderr, "║                    POST-INSTALLATION SECURITY CHECKLIST                    ║")
+	_, _ = fmt.Fprintln(os.Stderr, "║                    POST-INSTALLATION SECURITY CHECKLIST                       ║")
 	_, _ = fmt.Fprintln(os.Stderr, "╚═══════════════════════════════════════════════════════════════════════════════╝")
 	_, _ = fmt.Fprintln(os.Stderr, "")
 	_, _ = fmt.Fprintln(os.Stderr, "Before using Vault in production, complete these steps:")
