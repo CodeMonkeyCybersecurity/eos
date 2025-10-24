@@ -116,8 +116,10 @@ const (
 	DefaultGroupPrefix     = "bionicgpt-"
 
 	// Default infrastructure settings
+	// NOTE: For runtime addresses, use shared.GetConsulHTTPAddr() instead
+	// These constants are only for documentation/examples
 	DefaultNomadAddress  = "http://localhost:4646"
-	DefaultConsulAddress = "localhost:8500"
+	DefaultConsulAddress = "localhost:8500" // Use shared.GetConsulHTTPAddr() at runtime
 	DefaultNamespace     = "default"
 
 	// Default Ollama settings

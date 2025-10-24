@@ -9,6 +9,26 @@ import (
 	"go.uber.org/zap"
 )
 
+// ExecutionContext tells execute.Run() how to interpret exit codes
+// Different operations have different semantics for the same exit code.
+// Example: During removal, "service not found" (exit 5) is SUCCESS, not ERROR.
+type ExecutionContext string
+
+const (
+	// ContextNormal - Standard execution (any non-zero exit = ERROR)
+	ContextNormal ExecutionContext = ""
+
+	// ContextRemoval - Removal operation ("not found" = DEBUG, actual failure = ERROR)
+	// Use when: Removing packages, stopping services, deleting users
+	// Behavior: exit 5/6/1 (not found) → DEBUG, other errors → ERROR
+	ContextRemoval ExecutionContext = "removal"
+
+	// ContextVerify - Verification operation (may invert success logic)
+	// Use when: Checking that something was removed successfully
+	// Behavior: exit 0 (found) may be ERROR, exit 1 (not found) may be INFO
+	ContextVerify ExecutionContext = "verify"
+)
+
 type Options struct {
 	Ctx         context.Context // Required
 	Command     string          // Required
@@ -29,6 +49,7 @@ type Options struct {
 	SchemaPath  string      // optional CUE schema
 	YAMLPath    string      // optional YAML file
 	TelemetryOp string      // optional span name override
+	Context     ExecutionContext // Execution context for smart exit code interpretation
 }
 
 // Settable globals (optional, but encouraged to override per-call)

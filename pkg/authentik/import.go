@@ -177,12 +177,14 @@ func runImport(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 
 	// Load mapping rules if provided
 	if options.MapFile != "" {
-		fmt.Printf("\n Loading mapping rules from: %s\n", options.MapFile)
+		logger.Info("Loading mapping rules",
+			zap.String("map_file", options.MapFile))
 		options.MappingRules, err = loadMappingRules(options.MapFile)
 		if err != nil {
 			return fmt.Errorf("failed to load mapping rules: %w", err)
 		}
-		fmt.Printf("   Loaded %d mapping rules\n", len(options.MappingRules))
+		logger.Info("  Loaded mapping rules",
+			zap.Int("rule_count", len(options.MappingRules)))
 	}
 
 	// Create API client
@@ -195,12 +197,15 @@ func runImport(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	// Check target version compatibility
 	targetVersion, err := client.GetVersion()
 	if err != nil {
-		fmt.Printf("Warning: Could not check target version: %v\n", err)
+		logger.Warn("Could not check target version",
+			zap.Error(err))
 	} else {
-		fmt.Printf("\n Target Authentik version: %s\n", targetVersion)
+		logger.Info("Target Authentik version",
+			zap.String("target_version", targetVersion))
 		if !isVersionCompatible(config.Metadata.AuthentikVersion, targetVersion) {
-			fmt.Printf("Warning: Version mismatch (source: %s, target: %s)\n",
-				config.Metadata.AuthentikVersion, targetVersion)
+			logger.Warn("Version mismatch detected",
+				zap.String("source_version", config.Metadata.AuthentikVersion),
+				zap.String("target_version", targetVersion))
 			if !options.Force {
 				return fmt.Errorf("version incompatibility detected, use --force to continue")
 			}
@@ -208,9 +213,10 @@ func runImport(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	}
 
 	// Start import process
-	fmt.Println("\n Starting import process...")
+	logger.Info("Starting import process")
 	if options.DryRun {
-		fmt.Println("   🔸 DRY RUN MODE - No changes will be made")
+		logger.Info("  DRY RUN MODE - No changes will be made",
+			zap.Bool("dry_run", true))
 	}
 
 	result := &ImportResult{
@@ -242,7 +248,8 @@ func runImport(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 			continue
 		}
 
-		fmt.Printf("\n Importing %s...\n", resourceType)
+		logger.Info("Importing resource type",
+			zap.String("resource_type", resourceType))
 
 		switch resourceType {
 		case "certificates":
@@ -271,31 +278,39 @@ func runImport(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	}
 
 	// Show import summary
-	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Println(" Import Summary:")
-	fmt.Printf("   Created: %d\n", result.Created)
-	fmt.Printf("   Updated: %d\n", result.Updated)
-	fmt.Printf("   Skipped: %d\n", result.Skipped)
-	fmt.Printf("   Failed:  %d\n", result.Failed)
+	logger.Info("Import Summary",
+		zap.Int("created", result.Created),
+		zap.Int("updated", result.Updated),
+		zap.Int("skipped", result.Skipped),
+		zap.Int("failed", result.Failed))
+
+	logger.Info("=" + strings.Repeat("=", 49))
+	logger.Info("  Created: " + fmt.Sprintf("%d", result.Created))
+	logger.Info("  Updated: " + fmt.Sprintf("%d", result.Updated))
+	logger.Info("  Skipped: " + fmt.Sprintf("%d", result.Skipped))
+	logger.Info("  Failed:  " + fmt.Sprintf("%d", result.Failed))
 
 	if len(result.Errors) > 0 {
-		fmt.Println("\n Errors encountered:")
+		logger.Error("Errors encountered during import",
+			zap.Int("error_count", len(result.Errors)))
 		for _, err := range result.Errors {
-			fmt.Printf("   • %s\n", err)
+			logger.Error("  • " + err)
 		}
 	}
 
 	if len(result.Warnings) > 0 {
-		fmt.Println("\nWarnings:")
+		logger.Warn("Warnings encountered",
+			zap.Int("warning_count", len(result.Warnings)))
 		for _, warn := range result.Warnings {
-			fmt.Printf("   • %s\n", warn)
+			logger.Warn("  • " + warn)
 		}
 	}
 
 	if result.Failed == 0 {
-		fmt.Println("\n Import completed successfully!")
+		logger.Info("Import completed successfully!")
 	} else {
-		fmt.Printf("\nImport completed with %d failures\n", result.Failed)
+		logger.Error("Import completed with failures",
+			zap.Int("failure_count", result.Failed))
 	}
 
 	return nil

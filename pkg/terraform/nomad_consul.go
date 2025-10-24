@@ -305,7 +305,7 @@ provider "consul" {
   {{if .CloudDeploy}}
   address = "${hcloud_load_balancer.nomad_consul_lb.ipv4}:8500"
   {{else}}
-  address = "localhost:8500"
+  address = "{{.ConsulAddress}}"
   {{end}}
 }
 

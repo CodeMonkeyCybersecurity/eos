@@ -495,7 +495,7 @@ func validateStorageDetailed(rc *eos_io.RuntimeContext, content string, result *
 
 		if !strings.Contains(content, "address") {
 			result.Warnings = append(result.Warnings,
-				"Consul storage should specify 'address' (defaults to localhost:8500)")
+				"Consul storage should specify 'address' (defaults to localhost:8500 or use shared.GetConsulAddress())")
 		}
 
 		result.Suggestions = append(result.Suggestions,

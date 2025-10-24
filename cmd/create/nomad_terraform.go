@@ -8,6 +8,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -79,6 +80,7 @@ func runCreateNomadTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	config.Location = location
 	config.EnableMailProxy = enableMail
 	config.MailBackend = mailBackend
+	config.ConsulAddress = shared.GetConsulHTTPAddr() // Dynamic Consul address
 
 	logger.Info("Generating Terraform configuration",
 		zap.String("domain", domain),

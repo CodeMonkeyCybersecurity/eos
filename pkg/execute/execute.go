@@ -138,12 +138,40 @@ func Run(ctx context.Context, opts Options) (string, error) {
 
 		summary := eos_err.ExtractSummary(ctx, output, 2)
 		span.RecordError(err)
-		logError(logger, "Execution failed", err,
-			zap.Int("attempt", i),
-			zap.Int("max_attempts", maxRetries),
-			zap.String("command", cmdStr),
-			zap.String("summary", summary),
-		)
+
+		// Context-aware error logging
+		exitCode := getExitCode(err)
+		logLevel := determineLogLevel(opts.Context, cmdStr, exitCode, summary)
+		contextMsg := getContextMessage(opts.Context, cmdStr, exitCode, summary)
+
+		// Log at appropriate level based on context
+		switch logLevel {
+		case LogLevelDebug:
+			logger.Debug(contextMsg,
+				zap.Int("attempt", i),
+				zap.String("command", cmdStr),
+				zap.Int("exit_code", exitCode),
+				zap.String("output", summary))
+		case LogLevelInfo:
+			logger.Info(contextMsg,
+				zap.Int("attempt", i),
+				zap.String("command", cmdStr),
+				zap.Int("exit_code", exitCode))
+		case LogLevelWarn:
+			logger.Warn(contextMsg,
+				zap.Int("attempt", i),
+				zap.String("command", cmdStr),
+				zap.Int("exit_code", exitCode),
+				zap.String("output", summary))
+		case LogLevelError:
+			logError(logger, "Execution failed", err,
+				zap.Int("attempt", i),
+				zap.Int("max_attempts", maxRetries),
+				zap.String("command", cmdStr),
+				zap.Int("exit_code", exitCode),
+				zap.String("summary", summary),
+			)
+		}
 
 		if i < maxRetries {
 			// Calculate delay with exponential backoff and jitter
@@ -235,6 +263,139 @@ func RunSimple(ctx context.Context, cmd string, args ...string) error {
 		Capture: false,
 	})
 	return err
+}
+
+// getExitCode extracts numeric exit code from error
+func getExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return exitErr.ExitCode()
+	}
+	return -1 // Unknown error type
+}
+
+// LogLevel represents logging severity
+type LogLevel int
+
+const (
+	LogLevelDebug LogLevel = iota
+	LogLevelInfo
+	LogLevelWarn
+	LogLevelError
+)
+
+// determineLogLevel decides what log level to use based on execution context
+func determineLogLevel(ctx ExecutionContext, command string, exitCode int, output string) LogLevel {
+	// Success - always INFO
+	if exitCode == 0 {
+		return LogLevelInfo
+	}
+
+	// Context-specific interpretation
+	switch ctx {
+	case ContextRemoval:
+		return interpretRemovalExitCode(command, exitCode, output)
+	case ContextVerify:
+		return interpretVerifyExitCode(command, exitCode, output)
+	default:
+		// ContextNormal: any error is ERROR
+		return LogLevelError
+	}
+}
+
+// interpretRemovalExitCode interprets exit codes during removal operations
+func interpretRemovalExitCode(command string, exitCode int, output string) LogLevel {
+	// Systemd commands during removal
+	if strings.Contains(command, "systemctl") {
+		switch exitCode {
+		case 5:
+			// Unit not loaded → EXPECTED during removal
+			return LogLevelDebug
+		case 6:
+			// Unit not active → EXPECTED during removal
+			return LogLevelDebug
+		case 1:
+			// Generic failure → Check output for specifics
+			if strings.Contains(output, "does not exist") || strings.Contains(output, "not loaded") {
+				return LogLevelDebug // Not found is good during removal
+			}
+			return LogLevelError
+		default:
+			return LogLevelError
+		}
+	}
+
+	// User/group management during removal
+	if strings.Contains(command, "userdel") || strings.Contains(command, "groupdel") {
+		if exitCode == 6 {
+			// User/group doesn't exist → EXPECTED during removal
+			return LogLevelDebug
+		}
+		return LogLevelError
+	}
+
+	// Process management during removal
+	if strings.Contains(command, "pkill") || strings.Contains(command, "pgrep") {
+		if exitCode == 1 {
+			// No processes found → EXPECTED during removal
+			return LogLevelDebug
+		}
+		if exitCode == 2 {
+			// Check for "invalid user" (user already removed)
+			if strings.Contains(output, "invalid user") {
+				return LogLevelDebug
+			}
+			return LogLevelError
+		}
+		return LogLevelError
+	}
+
+	// Default: treat as error
+	return LogLevelError
+}
+
+// interpretVerifyExitCode interprets exit codes during verification
+func interpretVerifyExitCode(command string, exitCode int, output string) LogLevel {
+	// During verification, "not found" is usually what we want
+	if exitCode == 1 && (strings.Contains(output, "does not exist") ||
+		strings.Contains(output, "not found") ||
+		strings.Contains(output, "not loaded")) {
+		return LogLevelDebug // Successfully verified removal
+	}
+
+	if exitCode == 0 {
+		// Found something that should be removed - might be a problem
+		return LogLevelWarn
+	}
+
+	return LogLevelError
+}
+
+// getContextMessage returns human-readable context for log message
+func getContextMessage(ctx ExecutionContext, command string, exitCode int, output string) string {
+	if ctx == ContextRemoval {
+		if strings.Contains(command, "systemctl") && exitCode == 5 {
+			return "Service already stopped or never installed (expected during removal)"
+		}
+		if strings.Contains(command, "systemctl") && exitCode == 6 {
+			return "Service not active (expected during removal)"
+		}
+		if strings.Contains(command, "userdel") && exitCode == 6 {
+			return "User already removed (expected during removal)"
+		}
+		if strings.Contains(command, "groupdel") && exitCode == 6 {
+			return "Group already removed (expected during removal)"
+		}
+		if (strings.Contains(command, "pkill") || strings.Contains(command, "pgrep")) && exitCode == 1 {
+			return "No processes found (expected during removal)"
+		}
+		if strings.Contains(command, "pkill") && exitCode == 2 && strings.Contains(output, "invalid user") {
+			return "User already removed (expected during removal)"
+		}
+	}
+	return "Command completed with non-zero exit code"
 }
 
 // joinArgs joins command arguments with proper quoting for logging

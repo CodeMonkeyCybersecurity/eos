@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func TestTerraformBasedHecateIntegration(t *testing.T) {
@@ -20,7 +21,7 @@ func TestTerraformBasedHecateIntegration(t *testing.T) {
 	// Test client configuration
 	config := &ClientConfig{
 		CaddyAdminAddr:     "http://localhost:2019",
-		ConsulAddr:         "localhost:8500",
+		ConsulAddr:         shared.GetConsulHTTPAddr(),
 		VaultAddr:          "http://localhost:8200",
 		TerraformWorkspace: "/tmp/hecate-test",
 	}
