@@ -347,7 +347,7 @@ func (em *EnvironmentManager) UpdateEnvironment(rc *eos_io.RuntimeContext, env *
 	env.Status = EnvironmentStatusActive
 	env.UpdatedAt = time.Now()
 	em.context.Environments[env.Name] = *env
-	em.saveContext()
+	_ = em.saveContext()
 
 	// Clear cache
 	delete(em.cache, env.Name)

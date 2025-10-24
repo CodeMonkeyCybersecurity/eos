@@ -529,7 +529,7 @@ func executeTransaction(db *sql.DB, operation *DatabaseOperation, start time.Tim
 
 	execResult, err := tx.Exec(operation.Query)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		result.Error = err.Error()
 		result.Duration = time.Since(start)
 		return result, err

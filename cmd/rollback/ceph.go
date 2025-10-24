@@ -80,8 +80,8 @@ func init() {
 	rollbackCephCmd.Flags().StringVar(&cephSubVolume, "subvolume", "", "Specific subvolume to rollback")
 
 	// Mark required flags
-	rollbackCephCmd.MarkFlagRequired("snapshot")
-	rollbackCephCmd.MarkFlagRequired("snapshot-volume")
+	_ = rollbackCephCmd.MarkFlagRequired("snapshot")       // Error only if flag doesn't exist (build-time error)
+	_ = rollbackCephCmd.MarkFlagRequired("snapshot-volume") // Error only if flag doesn't exist (build-time error)
 
 	RollbackCmd.AddCommand(rollbackCephCmd)
 }
@@ -107,7 +107,7 @@ func runCephRollback(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	if err != nil {
 		return fmt.Errorf("failed to initialize Ceph client: %w", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Perform rollback
 	if err := client.RollbackToSnapshot(rc, cephSnapshotVolume, cephSnapshotName, cephSubVolume); err != nil {

@@ -173,7 +173,11 @@ func CheckOllama(ctx context.Context) error {
 			"  ollama serve\n"+
 			"Error: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Ollama API returned unexpected status: %d\n"+

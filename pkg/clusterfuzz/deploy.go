@@ -153,7 +153,7 @@ func WaitForService(ctx context.Context, host string, port int) error {
 		case <-ticker.C:
 			conn, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 			if err == nil {
-				conn.Close()
+				_ = conn.Close()
 				return nil
 			}
 		}

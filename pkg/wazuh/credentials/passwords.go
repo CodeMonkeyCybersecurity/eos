@@ -302,7 +302,7 @@ func generatePasswordHash(password string) (string, error) {
 		tmpFile.Close()
 		return "", fmt.Errorf("failed to write password: %w", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	// SECURITY: Mount temp file as read-only volume - password never in process args or environment
 	cmd := exec.Command("docker", "run", "--rm",

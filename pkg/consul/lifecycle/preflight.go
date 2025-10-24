@@ -187,7 +187,7 @@ func checkPortsAvailable(rc *eos_io.RuntimeContext, ports consul.PortConfig) err
 			unavailablePorts = append(unavailablePorts, fmt.Sprintf("%s:%d", name, port))
 			continue
 		}
-		ln.Close()
+		_ = ln.Close()
 	}
 
 	if len(unavailablePorts) > 0 {
@@ -261,7 +261,7 @@ func checkNetworkConnectivity(rc *eos_io.RuntimeContext, joinAddresses []string)
 			unreachable = append(unreachable, addr)
 			continue
 		}
-		conn.Close()
+		_ = conn.Close()
 	}
 
 	if len(unreachable) > 0 {

@@ -260,7 +260,7 @@ func PullImageWithProgress(rc *eos_io.RuntimeContext, imageName string) error {
 		tracker.Fail(err)
 		return fmt.Errorf("failed to pull image: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Parse progress events
 	scanner := bufio.NewScanner(reader)

@@ -579,7 +579,7 @@ func generateYAMLDockerCompose(config *YAMLHecateConfig, outputDir string, cotur
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err := tmpl.Execute(f, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -600,7 +600,7 @@ func generateYAMLCaddyfile(config *YAMLHecateConfig, outputDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err := tmpl.Execute(f, config); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)

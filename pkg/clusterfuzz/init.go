@@ -53,8 +53,8 @@ func initializeDatabase(rc *eos_io.RuntimeContext, config *Config, scriptPath st
 		if err := os.Setenv("PGPASSWORD", config.DatabaseConfig.Password); err != nil {
 			return fmt.Errorf("failed to set PGPASSWORD: %w", err)
 		}
-		defer os.Unsetenv("PGPASSWORD")
-		
+		defer func() { _ = os.Unsetenv("PGPASSWORD") }()
+
 		// Execute initialization script
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "psql",

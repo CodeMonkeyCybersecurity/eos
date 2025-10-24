@@ -970,7 +970,7 @@ func (dbm *DatabaseBackupManager) restoreMongoDBBackup(rc *eos_io.RuntimeContext
 		}
 
 		// SECURITY P2 #7: Clean up temp directory on exit
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		// SECURITY P2 #7: Validate backupPath doesn't contain traversal before extraction
 		if strings.Contains(backupPath, "..") {

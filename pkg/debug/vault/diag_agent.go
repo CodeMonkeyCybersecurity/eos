@@ -538,9 +538,9 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 			output.WriteString("\n")
 
 			// Set environment variables for vault CLI
-			os.Setenv("VAULT_ADDR", vaultAddr)
-			os.Setenv("VAULT_SKIP_VERIFY", "1")
-			os.Setenv("VAULT_TOKEN", token)
+			_ = os.Setenv("VAULT_ADDR", vaultAddr)
+			_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
+			_ = os.Setenv("VAULT_TOKEN", token)
 
 			// 2. Token Lookup
 			output.WriteString("2. Token Lookup (full details)\n")

@@ -96,7 +96,7 @@ func (o *Orchestrator) Install() error {
 	defer func() {
 		if !installComplete {
 			o.logger.Warn("Installation failed, attempting rollback")
-			o.rollbackMgr.RollbackPartialInstall(state)
+			_ = o.rollbackMgr.RollbackPartialInstall(state)
 		}
 	}()
 

@@ -384,7 +384,7 @@ func RunCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		logger.Info("terminal prompt: Type 'yes' to confirm or Ctrl+C to cancel: ")
 
 		var confirmation string
-		fmt.Scanln(&confirmation)
+		_, _ = fmt.Scanln(&confirmation)
 		if strings.ToLower(strings.TrimSpace(confirmation)) != "yes" {
 			return eos_err.NewUserError("clean install cancelled by user")
 		}

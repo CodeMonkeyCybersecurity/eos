@@ -35,7 +35,7 @@ func TestPromptSecurePassword(t *testing.T) {
 				r, w, _ := os.Pipe()
 				os.Stdin = r
 				_, _ = w.Write([]byte("\n"))
-				w.Close()
+				_ = w.Close()
 				return func() { os.Stdin = oldStdin }
 			},
 			expectError: true,
@@ -72,12 +72,12 @@ func TestPromptSecurePassword(t *testing.T) {
 			_, err := PromptSecurePassword(rc, tt.prompt)
 
 			// Restore stdout
-			w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 
 			// Read captured output
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -128,7 +128,7 @@ func TestPromptSecurePasswordEdgeCases(t *testing.T) {
 			os.Stdin = r
 			defer func() {
 				os.Stdin = oldStdin
-				r.Close()
+				_ = r.Close()
 			}()
 
 			_, err := PromptSecurePassword(rc, prompt)

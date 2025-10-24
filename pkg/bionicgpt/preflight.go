@@ -298,7 +298,7 @@ func (bgi *BionicGPTInstaller) checkDiskSpace(ctx context.Context, result *Prefl
 
 	availableStr := strings.TrimSuffix(fields[3], "G")
 	var available int
-	fmt.Sscanf(availableStr, "%d", &available)
+	_, _ = fmt.Sscanf(availableStr, "%d", &available)
 
 	const minDiskSpaceGB = 10
 	if available < minDiskSpaceGB {

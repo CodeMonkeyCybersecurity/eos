@@ -1062,7 +1062,7 @@ func (bgi *BionicGPTInstaller) verifyInstallation(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create validator: %w", err)
 	}
-	defer validator.Close()
+	defer func() { _ = validator.Close() }()
 
 	// Run comprehensive validation
 	result, err := validator.ValidateDeployment(ctx)

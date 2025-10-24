@@ -67,7 +67,12 @@ func (c *APIClient) CreateApplication(ctx context.Context, name, slug string, pr
 	if err != nil {
 		return nil, fmt.Errorf("application creation request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log but don't override the main error
+			_ = closeErr
+		}
+	}()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -99,7 +104,12 @@ func (c *APIClient) GetApplication(ctx context.Context, slug string) (*Applicati
 	if err != nil {
 		return nil, fmt.Errorf("application fetch request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log but don't override the main error
+			_ = closeErr
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))

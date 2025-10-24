@@ -521,7 +521,7 @@ func (h *HTTPClient) GetWithRetry(ctx context.Context, url string) (*http.Respon
 		}
 
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		lastErr = err
@@ -587,7 +587,7 @@ func (ci *ConsulInstaller) httpGet(url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)

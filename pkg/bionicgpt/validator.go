@@ -358,7 +358,7 @@ func (v *Validator) CheckPostgreSQL(ctx context.Context) (*PostgreSQLCheckResult
 		result.Issues = append(result.Issues, fmt.Sprintf("Failed to create connection: %v", err))
 		return result, nil
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Set connection timeout
 	connectCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -403,7 +403,7 @@ func (v *Validator) CheckPostgreSQL(ctx context.Context) (*PostgreSQLCheckResult
 		result.Issues = append(result.Issues, fmt.Sprintf("Failed to query RLS policies: %v", err))
 		return result, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var schema, table, policy string
@@ -450,7 +450,7 @@ func (v *Validator) CheckMultiTenancy(ctx context.Context) (*MultiTenancyCheckRe
 		result.Issues = append(result.Issues, fmt.Sprintf("Failed to connect: %v", err))
 		return result, nil
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Check if teams table exists
 	err = db.QueryRowContext(ctx,
@@ -519,7 +519,7 @@ func (v *Validator) CheckAuditLog(ctx context.Context) (*AuditLogCheckResult, er
 		result.Issues = append(result.Issues, fmt.Sprintf("Failed to connect: %v", err))
 		return result, nil
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Check if audit_log table exists
 	err = db.QueryRowContext(ctx,

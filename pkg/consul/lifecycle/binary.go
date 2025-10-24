@@ -115,7 +115,7 @@ func (bi *BinaryInstaller) Install(version string) error {
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download binary
 	zipPath := filepath.Join(tmpDir, "consul.zip")
@@ -291,7 +291,7 @@ func (ci *ConsulInstaller) installViaBinary() error {
 	}
 
 	// Clean up
-	os.Remove(zipPath)
+	_ = os.Remove(zipPath)
 
 	ci.logger.Info("Consul binary installed successfully",
 		zap.String("path", "/usr/local/bin/consul"),
