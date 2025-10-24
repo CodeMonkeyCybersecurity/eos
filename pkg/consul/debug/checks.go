@@ -327,7 +327,15 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 	if len(foundIssues) > 0 {
 		result.Success = false
 		result.Message = fmt.Sprintf("Found %d issue(s) in logs", len(foundIssues))
-		result.Details = append([]string{"Issues detected:"}, foundIssues...)
+
+		// Preserve actual log lines captured above
+		logDetails := result.Details
+
+		// Build summary with both descriptions AND actual log lines
+		result.Details = []string{"Issues detected:"}
+		result.Details = append(result.Details, foundIssues...)
+		result.Details = append(result.Details, "")  // Blank line for readability
+		result.Details = append(result.Details, logDetails...)
 	} else {
 		result.Message = "No critical issues found in recent logs"
 		result.Details = append(result.Details, "Recent logs look clean")
