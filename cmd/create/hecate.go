@@ -256,14 +256,24 @@ Examples:
 		log.Info("terminal prompt: ")
 		log.Info("terminal prompt: Next steps:")
 		log.Info("terminal prompt:   1. Review generated files in " + outputDir)
+		stepNum := 2
 		if config.HasAuthentik {
 			log.Info("terminal prompt:   2. Check .env file for Authentik bootstrap credentials")
-			log.Info("terminal prompt:   3. Start services: cd " + outputDir + " && docker compose up -d")
-		} else {
-			log.Info("terminal prompt:   2. Start services: cd " + outputDir + " && docker compose up -d")
+			stepNum = 3
 		}
-		log.Info("terminal prompt:   4. Check status: docker compose ps")
-		log.Info("terminal prompt:   5. View logs: docker compose logs -f")
+		log.Info(fmt.Sprintf("terminal prompt:   %d. Start services: cd %s && docker compose up -d", stepNum, outputDir))
+		stepNum++
+		log.Info(fmt.Sprintf("terminal prompt:   %d. Check status: docker compose ps", stepNum))
+		stepNum++
+
+		// Consul registration step (only if not disabled)
+		disableConsul, _ := cmd.Flags().GetBool("disable-consul")
+		if !disableConsul {
+			log.Info(fmt.Sprintf("terminal prompt:   %d. Register with Consul: sudo eos read consul services-docker --compose-file %s/docker-compose.yml", stepNum, outputDir))
+			stepNum++
+		}
+
+		log.Info(fmt.Sprintf("terminal prompt:   %d. View logs: docker compose logs -f", stepNum))
 
 		return nil
 	}),
@@ -273,6 +283,9 @@ func init() {
 	// Add flags
 	CreateHecateCmd.Flags().StringVarP(&configFile, "config", "c", "", "Path to YAML configuration file")
 	CreateHecateCmd.Flags().StringVarP(&outputDir, "output", "o", "/opt/hecate", "Output directory for generated files")
+
+	// Consul integration (enabled by default for seamless service discovery)
+	CreateHecateCmd.Flags().Bool("disable-consul", false, "Skip Consul agent deployment (default: false, agent deploys automatically)")
 }
 
 // CreateCaddyCmd installs Caddy web server

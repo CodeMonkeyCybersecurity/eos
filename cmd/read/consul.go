@@ -518,5 +518,7 @@ func init() {
 	ConsulCmd.Flags().BoolVar(&consulServices, "services", false, "Show only registered services")
 	ConsulCmd.Flags().BoolVar(&consulHealth, "health", false, "Run comprehensive cluster health check")
 
+	// Note: services-docker subcommand is registered in consul_services_docker_linux.go (Linux only)
+
 	ReadCmd.AddCommand(ConsulCmd)
 }

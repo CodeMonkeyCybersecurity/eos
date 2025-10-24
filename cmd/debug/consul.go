@@ -25,6 +25,7 @@ Diagnostic checks performed:
 10. Detailed port binding analysis (which addresses ports are bound to)
 11. Cluster state (members, leader, raft peers)
 12. Retry join target connectivity (reachability of join targets)
+13. Vault-Consul connectivity (critical for Vault storage backend)
 
 Flags:
   --fix              Automatically fix common issues

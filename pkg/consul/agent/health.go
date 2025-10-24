@@ -65,10 +65,12 @@ func WaitForAgentReady(rc *eos_io.RuntimeContext, agentAddr string, timeout time
 			// Check agent health
 			healthy, err := checkAgentHealth(ctx, agentAddr)
 			if err == nil && healthy {
+				deadline, _ := ctx.Deadline()
+				elapsed := time.Since(time.Now().Add(-time.Until(deadline)))
 				logger.Info("Agent is ready",
 					zap.String("address", agentAddr),
 					zap.Int("attempts", attempt),
-					zap.Duration("elapsed", timeout-time.Until(ctx.Deadline())))
+					zap.Duration("elapsed", elapsed))
 				return nil
 			}
 

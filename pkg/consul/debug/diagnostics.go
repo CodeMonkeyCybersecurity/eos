@@ -96,6 +96,10 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 		}
 	}
 
+	// 13. Check Vault-Consul connectivity (critical for Vault backend)
+	vaultConsulResult := checkVaultConsulConnectivity(rc)
+	results = append(results, vaultConsulResult)
+
 	// INTERVENE - Apply fixes if requested
 	if config.AutoFix || config.KillProcesses {
 		logger.Info("=== INTERVENE PHASE: Applying fixes ===")

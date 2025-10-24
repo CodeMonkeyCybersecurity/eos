@@ -100,43 +100,24 @@ func checkLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	output, err := execute.Run(rc.Ctx, cmd)
 	if err != nil {
-		result.Message = "Failed to check for processes"
-		result.Success = false
+		result.Message = "Could not check for processes"
 		return result
 	}
 
+	// Look for consul processes
 	lines := strings.Split(output, "\n")
 	consulProcesses := []string{}
 
 	for _, line := range lines {
-		// Filter out:
-		// - grep commands
-		// - eos debug consul (the command we're running now)
-		// - eos create/update/list/etc consul (other eos commands)
-		if strings.Contains(line, "consul") &&
-			!strings.Contains(line, "grep") &&
-			!strings.Contains(line, "eos debug consul") &&
-			!strings.Contains(line, "eos create consul") &&
-			!strings.Contains(line, "eos update consul") &&
-			!strings.Contains(line, "eos list consul") {
-			// Only report actual consul daemon processes
-			// The consul daemon process will have "/usr/bin/consul" or just "consul agent"
-			if strings.Contains(line, "/usr/bin/consul") || strings.Contains(line, "/usr/local/bin/consul") || strings.Contains(line, "consul agent") {
-				consulProcesses = append(consulProcesses, strings.TrimSpace(line))
-			}
+		if strings.Contains(line, "consul") && !strings.Contains(line, "grep") {
+			consulProcesses = append(consulProcesses, strings.TrimSpace(line))
 		}
 	}
 
 	if len(consulProcesses) > 0 {
 		result.Success = false
 		result.Message = fmt.Sprintf("Found %d lingering Consul process(es)", len(consulProcesses))
-		for _, proc := range consulProcesses {
-			// Extract PID from the process line
-			fields := strings.Fields(proc)
-			if len(fields) > 1 {
-				result.Details = append(result.Details, fmt.Sprintf("PID %s: %s", fields[1], proc))
-			}
-		}
+		result.Details = consulProcesses
 	} else {
 		result.Message = "No lingering Consul processes found"
 	}
@@ -144,135 +125,97 @@ func checkLingeringProcesses(rc *eos_io.RuntimeContext) DiagnosticResult {
 	return result
 }
 
-// analyzeConfiguration checks the Consul configuration for common issues
-func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
+// checkConsulBinary verifies the Consul binary exists and has correct permissions
+func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Analyzing Consul configuration")
+	logger.Info("Checking Consul binary")
 
 	result := DiagnosticResult{
-		CheckName: "Configuration Analysis",
+		CheckName: "Consul Binary",
 		Success:   true,
 		Details:   []string{},
 	}
 
-	configPath := "/etc/consul.d/consul.hcl"
+	binPath := "/usr/local/bin/consul"
 
-	// Check if config file exists
-	if _, err := os.Stat(configPath); err != nil {
-		result.Success = false
-		result.Message = "Consul configuration file not found"
-		result.Details = append(result.Details, configPath+" does not exist")
-		return result
-	}
-
-	// Read configuration
-	content, err := os.ReadFile(configPath)
+	// Check if binary exists
+	info, err := os.Stat(binPath)
 	if err != nil {
 		result.Success = false
-		result.Message = "Failed to read configuration file"
+		result.Message = "Consul binary not found"
+		result.Details = append(result.Details, fmt.Sprintf("Expected path: %s", binPath))
 		return result
 	}
 
-	configStr := string(content)
-
-	// Extract key configuration values
-	bindAddr := extractConfigValue(configStr, "bind_addr")
-	advertiseAddr := extractConfigValue(configStr, "advertise_addr")
-	clientAddr := extractConfigValue(configStr, "client_addr")
-	retryJoin := extractConfigArray(configStr, "retry_join")
-
-	// Report extracted configuration
-	result.Details = append(result.Details, "")
-	result.Details = append(result.Details, "=== Configuration Values ===")
-	if bindAddr != "" {
-		result.Details = append(result.Details, fmt.Sprintf("bind_addr = %s", bindAddr))
-	} else {
-		result.Details = append(result.Details, "bind_addr = (not set - will use default interface)")
-	}
-
-	if advertiseAddr != "" {
-		result.Details = append(result.Details, fmt.Sprintf("advertise_addr = %s", advertiseAddr))
-	}
-
-	if clientAddr != "" {
-		result.Details = append(result.Details, fmt.Sprintf("client_addr = %s", clientAddr))
-	} else {
-		result.Details = append(result.Details, fmt.Sprintf("client_addr = (not set - will use %s)", shared.GetInternalHostname()))
-	}
-
-	if len(retryJoin) > 0 {
-		result.Details = append(result.Details, fmt.Sprintf("retry_join = [%s]", strings.Join(retryJoin, ", ")))
-	} else {
-		result.Details = append(result.Details, "retry_join = (not set - single node or manual join)")
-	}
-	result.Details = append(result.Details, "")
-
-	// Check for common configuration issues
-	issues := []string{}
-
-	// P0 - Critical: Check for bind_addr vs advertise_addr mismatch
-	// This causes cluster join failures when using Tailscale
-	if bindAddr != "" && advertiseAddr != "" && bindAddr != advertiseAddr {
-		issues = append(issues, fmt.Sprintf("bind_addr (%s) differs from advertise_addr (%s) - cluster join will fail", bindAddr, advertiseAddr))
-		result.Details = append(result.Details, "Fix: Set advertise_addr = bind_addr or run 'eos fix consul'")
-		result.Details = append(result.Details, fmt.Sprintf("  Current bind_addr:      %s", bindAddr))
-		result.Details = append(result.Details, fmt.Sprintf("  Current advertise_addr: %s", advertiseAddr))
-		result.Details = append(result.Details, fmt.Sprintf("  Should be:              %s", bindAddr))
-	}
-
-	// Bootstrap configuration check
-	if strings.Contains(configStr, "bootstrap = true") && strings.Contains(configStr, "bootstrap_expect") {
-		issues = append(issues, "Both 'bootstrap' and 'bootstrap_expect' are set - use only one")
-		result.Details = append(result.Details, "Fix: Remove 'bootstrap_expect' for single-node setup")
-	}
-
-	// Script checks warning
-	if strings.Contains(configStr, "enable_script_checks = true") {
-		issues = append(issues, "Using 'enable_script_checks' without ACLs is dangerous")
-		result.Details = append(result.Details, "Fix: Change to 'enable_local_script_checks = true'")
-	}
-
-	// Bind address check
-	if !strings.Contains(configStr, "bind_addr") && !strings.Contains(configStr, "client_addr") {
-		issues = append(issues, "No bind addresses specified")
-		result.Details = append(result.Details, "Consider adding: bind_addr = \"0.0.0.0\"")
-	}
-
-	// Data directory check
-	if !strings.Contains(configStr, "data_dir") {
-		issues = append(issues, "No data directory specified")
-		result.Details = append(result.Details, "Fix: Add 'data_dir = \"/opt/consul\"'")
-	}
-
-	if len(issues) > 0 {
+	// Check permissions
+	mode := info.Mode()
+	if mode&0111 == 0 {
 		result.Success = false
-		result.Message = fmt.Sprintf("Found %d configuration issue(s)", len(issues))
-		for _, issue := range issues {
-			result.Details = append(result.Details, "• "+issue)
-		}
+		result.Message = "Consul binary is not executable"
+		result.Details = append(result.Details,
+			fmt.Sprintf("Current permissions: %s", mode))
 	} else {
-		result.Message = "Configuration appears valid"
+		result.Details = append(result.Details,
+			fmt.Sprintf("Binary found at %s", binPath))
+		result.Details = append(result.Details,
+			fmt.Sprintf("Permissions: %s", mode))
 
-		// Run consul validate for additional checks
-		validateCmd := execute.Options{
-			Command: "/usr/local/bin/consul",
-			Args:    []string{"validate", "/etc/consul.d/"},
+		// Try to get version
+		cmd := execute.Options{
+			Command: binPath,
+			Args:    []string{"version"},
 			Capture: true,
 		}
 
-		output, err := execute.Run(rc.Ctx, validateCmd)
-		if err != nil {
-			result.Success = false
-			result.Details = append(result.Details, "Consul validate failed: "+output)
-		} else {
-			result.Details = append(result.Details, "Consul validate passed")
+		output, err := execute.Run(rc.Ctx, cmd)
+		if err == nil {
+			versionLine := strings.Split(output, "\n")[0]
+			result.Details = append(result.Details,
+				fmt.Sprintf("Version: %s", versionLine))
 		}
+
+		result.Message = "Consul binary is valid"
 	}
 
 	return result
 }
 
-// checkSystemdService examines the systemd service configuration
+// checkConsulPermissions verifies file permissions for Consul directories
+func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking Consul file permissions")
+
+	result := DiagnosticResult{
+		CheckName: "File Permissions",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// Paths to check
+	paths := map[string]string{
+		"/etc/consul.d":       "config directory",
+		"/opt/consul":         "data directory",
+		"/var/log/consul.log": "log file",
+	}
+
+	for path, description := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			result.Details = append(result.Details,
+				fmt.Sprintf("✗ %s (%s): Does not exist", description, path))
+			continue
+		}
+
+		mode := info.Mode()
+		result.Details = append(result.Details,
+			fmt.Sprintf("✓ %s (%s): %s", description, path, mode))
+	}
+
+	result.Message = "File permission check completed"
+	return result
+}
+
+// checkSystemdService verifies the systemd service configuration
 func checkSystemdService(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking systemd service configuration")
@@ -288,119 +231,46 @@ func checkSystemdService(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Check if service file exists
 	if _, err := os.Stat(servicePath); err != nil {
 		result.Success = false
-		result.Message = "Consul service file not found"
-		result.Details = append(result.Details, "Service file missing: "+servicePath)
+		result.Message = "Systemd service file not found"
+		result.Details = append(result.Details,
+			fmt.Sprintf("Expected path: %s", servicePath))
 		return result
 	}
 
-	result.Details = append(result.Details, "Service file exists: "+servicePath)
+	result.Details = append(result.Details,
+		fmt.Sprintf("Service file exists: %s", servicePath))
 
-	// Read service file
-	content, err := os.ReadFile(servicePath)
-	if err != nil {
-		result.Success = false
-		result.Message = "Failed to read service file"
-		return result
-	}
-
-	serviceStr := string(content)
-
-	// Check for common service issues
-	if strings.Contains(serviceStr, "Type=notify") {
-		result.Details = append(result.Details,
-			"NOTICE: Service uses Type=notify - may cause startup issues with some Consul versions")
-	}
-
-	if !strings.Contains(serviceStr, "TimeoutStartSec") {
-		result.Details = append(result.Details,
-			"NOTICE: No TimeoutStartSec specified - using systemd default (90s)")
-	}
-
-	// Check if service is enabled
+	// Check service status
 	cmd := execute.Options{
 		Command: "systemctl",
-		Args:    []string{"is-enabled", "consul"},
+		Args:    []string{"status", "consul.service", "--no-pager"},
 		Capture: true,
 	}
 
 	output, _ := execute.Run(rc.Ctx, cmd)
-	enabled := strings.TrimSpace(output) == "enabled"
 
-	if enabled {
-		result.Details = append(result.Details, "Service is enabled (will start on boot)")
-	} else {
-		result.Details = append(result.Details, "Service is NOT enabled (will not start on boot)")
+	// Parse output for key information
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Active:") ||
+			strings.Contains(line, "Loaded:") ||
+			strings.Contains(line, "Main PID:") {
+			result.Details = append(result.Details, strings.TrimSpace(line))
+		}
 	}
 
-	// CRITICAL: Get detailed service status
-	statusCmd := execute.Options{
+	// Check if enabled
+	enabledCmd := execute.Options{
 		Command: "systemctl",
-		Args:    []string{"status", "consul", "--no-pager"},
+		Args:    []string{"is-enabled", "consul.service"},
 		Capture: true,
 	}
 
-	statusOutput, _ := execute.Run(rc.Ctx, statusCmd)
+	enabledOutput, _ := execute.Run(rc.Ctx, enabledCmd)
+	result.Details = append(result.Details,
+		fmt.Sprintf("Enabled: %s", strings.TrimSpace(enabledOutput)))
 
-	// Parse service state
-	isActive := strings.Contains(statusOutput, "Active: active")
-	isFailed := strings.Contains(statusOutput, "Active: failed")
-	isInactive := strings.Contains(statusOutput, "Active: inactive")
-	isActivating := strings.Contains(statusOutput, "Active: activating")
-
-	if isActive {
-		result.Details = append(result.Details, "Service Status: ACTIVE (running)")
-
-		// Get MainPID
-		for _, line := range strings.Split(statusOutput, "\n") {
-			if strings.Contains(line, "Main PID:") {
-				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
-			}
-			if strings.Contains(line, "Tasks:") {
-				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
-			}
-			if strings.Contains(line, "Memory:") {
-				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
-			}
-		}
-	} else if isFailed {
-		result.Success = false
-		result.Message = "Service is in FAILED state"
-		result.Details = append(result.Details, "Service Status: FAILED")
-
-		// Extract failure reason
-		for _, line := range strings.Split(statusOutput, "\n") {
-			if strings.Contains(line, "Process:") || strings.Contains(line, "code=") {
-				result.Details = append(result.Details, "  "+strings.TrimSpace(line))
-			}
-		}
-	} else if isInactive {
-		result.Details = append(result.Details, "Service Status: INACTIVE (not running)")
-	} else if isActivating {
-		result.Details = append(result.Details, "Service Status: ACTIVATING (starting up)")
-	} else {
-		result.Details = append(result.Details, "Service Status: UNKNOWN")
-	}
-
-	// Check for recent restarts/crashes
-	showCmd := execute.Options{
-		Command: "systemctl",
-		Args:    []string{"show", "consul", "--property=NRestarts"},
-		Capture: true,
-	}
-
-	if showOutput, err := execute.Run(rc.Ctx, showCmd); err == nil {
-		restarts := strings.TrimSpace(strings.TrimPrefix(showOutput, "NRestarts="))
-		if restarts != "0" && restarts != "" {
-			result.Details = append(result.Details, "WARNING: Service has restarted "+restarts+" times")
-			if !result.Success {
-				result.Message = "Service has crashed/restarted " + restarts + " times"
-			}
-		}
-	}
-
-	if result.Success {
-		result.Message = "Systemd service configuration is valid"
-	}
+	result.Message = "Systemd service configuration is valid"
 
 	return result
 }
@@ -455,128 +325,134 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 	if len(foundIssues) > 0 {
 		result.Success = false
 		result.Message = fmt.Sprintf("Found %d issue(s) in logs", len(foundIssues))
-		for _, issue := range foundIssues {
-			result.Details = append(result.Details, "• "+issue)
-		}
+		result.Details = append([]string{"Issues detected:"}, foundIssues...)
 	} else {
 		result.Message = "No critical issues found in recent logs"
-
-		// Check if Consul started successfully at some point
-		for _, line := range logLines {
-			if strings.Contains(line, "Consul agent running!") ||
-				strings.Contains(line, "cluster leadership acquired") {
-				result.Details = append(result.Details, "✓ Consul started successfully previously")
-				break
-			}
-		}
+		result.Details = append(result.Details, "Recent logs look clean")
 	}
 
 	return result
 }
 
-// checkConsulBinary verifies Consul binary exists and is executable
-func checkConsulBinary(rc *eos_io.RuntimeContext) DiagnosticResult {
+// analyzeConfiguration analyzes the Consul configuration file
+func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking Consul binary")
+	logger.Info("Analyzing Consul configuration")
 
 	result := DiagnosticResult{
-		CheckName: "Consul Binary",
+		CheckName: "Configuration Analysis",
 		Success:   true,
 		Details:   []string{},
 	}
 
-	binaryPath := "/usr/bin/consul"
+	configPath := "/etc/consul.d/consul.hcl"
 
-	// Check if binary exists
-	info, err := os.Stat(binaryPath)
-	if os.IsNotExist(err) {
-		// Try alternate location
-		binaryPath = "/usr/local/bin/consul"
-		info, err = os.Stat(binaryPath)
-		if err != nil {
-			result.Success = false
-			result.Message = "Consul binary not found"
-			result.Details = append(result.Details, "Checked: /usr/bin/consul and /usr/local/bin/consul")
-			return result
-		}
-	}
-
-	result.Details = append(result.Details, fmt.Sprintf("Binary found at: %s", binaryPath))
-
-	// Check if executable
-	mode := info.Mode()
-	if mode&0111 == 0 {
+	// Check if config file exists
+	if _, err := os.Stat(configPath); err != nil {
 		result.Success = false
-		result.Message = "Binary is not executable"
-		result.Details = append(result.Details, fmt.Sprintf("Permissions: %s", mode))
+		result.Message = "Consul configuration file not found"
+		result.Details = append(result.Details, configPath+" does not exist")
 		return result
 	}
 
-	result.Details = append(result.Details, fmt.Sprintf("Permissions: %s", mode))
-
-	// Check version
-	cmd := execute.Options{
-		Command: binaryPath,
-		Args:    []string{"version"},
-		Capture: true,
-	}
-
-	output, err := execute.Run(rc.Ctx, cmd)
+	// Read configuration
+	content, err := os.ReadFile(configPath)
 	if err != nil {
 		result.Success = false
-		result.Message = "Could not get Consul version"
-		result.Details = append(result.Details, output)
+		result.Message = "Failed to read configuration file"
+		return result
+	}
+
+	configStr := string(content)
+
+	// Extract key configuration values
+	bindAddr := extractConfigValue(configStr, "bind_addr")
+	advertiseAddr := extractConfigValue(configStr, "advertise_addr")
+	clientAddr := extractConfigValue(configStr, "client_addr")
+	retryJoin := extractConfigArray(configStr, "retry_join")
+
+	// Report extracted configuration
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "=== Configuration Values ===")
+	if bindAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("bind_addr = %s", bindAddr))
 	} else {
-		result.Message = "Binary is valid and executable"
-		result.Details = append(result.Details, "Version: "+strings.TrimSpace(output))
+		result.Details = append(result.Details, "bind_addr = (not set - will use default interface)")
 	}
 
-	return result
-}
-
-// checkConsulPermissions verifies file and directory permissions
-func checkConsulPermissions(rc *eos_io.RuntimeContext) DiagnosticResult {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking file permissions")
-
-	result := DiagnosticResult{
-		CheckName: "File Permissions",
-		Success:   true,
-		Details:   []string{},
+	if advertiseAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("advertise_addr = %s", advertiseAddr))
 	}
 
-	paths := map[string]string{
-		"/etc/consul.d":   "config directory",
-		"/var/lib/consul": "data directory",
-		"/opt/consul":     "opt directory",
+	if clientAddr != "" {
+		result.Details = append(result.Details, fmt.Sprintf("client_addr = %s", clientAddr))
+	} else {
+		result.Details = append(result.Details, "client_addr = (not set - will use 127.0.0.1)")
 	}
 
-	allGood := true
-	for path, desc := range paths {
-		info, err := os.Stat(path)
-		if os.IsNotExist(err) {
-			result.Details = append(result.Details, fmt.Sprintf("✗ %s (%s): NOT FOUND", desc, path))
-			if desc == "config directory" || desc == "data directory" {
-				allGood = false
-			}
-			continue
+	if len(retryJoin) > 0 {
+		result.Details = append(result.Details, fmt.Sprintf("retry_join = [%s]", strings.Join(retryJoin, ", ")))
+	} else {
+		result.Details = append(result.Details, "retry_join = (not set - single node or manual join)")
+	}
+	result.Details = append(result.Details, "")
+
+	// Check for common configuration issues
+	issues := []string{}
+
+	// Bootstrap configuration check
+	if strings.Contains(configStr, "bootstrap = true") && strings.Contains(configStr, "bootstrap_expect") {
+		issues = append(issues, "Both 'bootstrap' and 'bootstrap_expect' are set - use only one")
+		result.Details = append(result.Details, "Fix: Remove 'bootstrap_expect' for single-node setup")
+	}
+
+	// Script checks warning
+	if strings.Contains(configStr, "enable_script_checks = true") {
+		issues = append(issues, "Using 'enable_script_checks' without ACLs is dangerous")
+		result.Details = append(result.Details, "Fix: Change to 'enable_local_script_checks = true'")
+	}
+
+	// Bind address check
+	if !strings.Contains(configStr, "bind_addr") && !strings.Contains(configStr, "client_addr") {
+		issues = append(issues, "No bind addresses specified")
+		result.Details = append(result.Details, "Consider adding: bind_addr = \"0.0.0.0\"")
+	}
+
+	// Data directory check
+	if !strings.Contains(configStr, "data_dir") {
+		issues = append(issues, "No data directory specified")
+		result.Details = append(result.Details, "Fix: Add 'data_dir = \"/opt/consul\"'")
+	}
+
+	if len(issues) > 0 {
+		result.Success = false
+		result.Message = fmt.Sprintf("Found %d configuration issue(s)", len(issues))
+		for _, issue := range issues {
+			result.Details = append(result.Details, "• "+issue)
+		}
+	} else {
+		result.Message = "Configuration appears valid"
+
+		// Run consul validate for additional checks
+		validateCmd := execute.Options{
+			Command: "/usr/local/bin/consul",
+			Args:    []string{"validate", "/etc/consul.d/"},
+			Capture: true,
 		}
 
-		result.Details = append(result.Details,
-			fmt.Sprintf("✓ %s (%s): exists, mode=%s", desc, path, info.Mode()))
-	}
-
-	if allGood {
-		result.Message = "All required directories exist with proper permissions"
-	} else {
-		result.Success = false
-		result.Message = "Some critical directories are missing"
+		output, err := execute.Run(rc.Ctx, validateCmd)
+		if err != nil {
+			result.Success = false
+			result.Details = append(result.Details, "Consul validate failed: "+output)
+		} else {
+			result.Details = append(result.Details, "Consul validate passed")
+		}
 	}
 
 	return result
 }
 
-// checkConsulNetwork verifies network configuration
+// checkConsulNetwork checks network configuration
 func checkConsulNetwork(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking network configuration")
@@ -587,59 +463,49 @@ func checkConsulNetwork(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	// Get all network interfaces
-	ifaces, err := net.Interfaces()
+	// Get network interfaces
+	cmd := execute.Options{
+		Command: "ip",
+		Args:    []string{"addr", "show"},
+		Capture: true,
+	}
+
+	output, err := execute.Run(rc.Ctx, cmd)
 	if err != nil {
-		result.Success = false
-		result.Message = "Failed to get network interfaces"
+		result.Message = "Could not retrieve network information"
 		return result
 	}
 
-	hasValidInterface := false
-	for _, iface := range ifaces {
-		// Skip loopback
-		if iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
+	// Parse output for IP addresses
+	lines := strings.Split(output, "\n")
+	ipAddresses := []string{}
 
-		// Skip interfaces that are down
-		if iface.Flags&net.FlagUp == 0 {
-			continue
-		}
-
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-
-		for _, addr := range addrs {
-			ipNet, ok := addr.(*net.IPNet)
-			if !ok {
-				continue
+	for _, line := range lines {
+		if strings.Contains(line, "inet ") && !strings.Contains(line, "inet6") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				ipAddresses = append(ipAddresses, fields[1])
 			}
-
-			// Skip IPv6 and loopback
-			if ipNet.IP.To4() == nil || ipNet.IP.IsLoopback() {
-				continue
-			}
-
-			hasValidInterface = true
-			result.Details = append(result.Details,
-				fmt.Sprintf("Interface: %s, IP: %s", iface.Name, ipNet.IP.String()))
 		}
 	}
 
-	if !hasValidInterface {
-		result.Success = false
-		result.Message = "No valid network interface found"
-	} else {
-		result.Message = "Network interface configured correctly"
+	result.Details = append(result.Details, "Network interfaces:")
+	for _, ip := range ipAddresses {
+		result.Details = append(result.Details, "  "+ip)
 	}
 
+	if len(ipAddresses) > 1 {
+		result.Details = append(result.Details,
+			"\nNote: Multiple network interfaces detected")
+		result.Details = append(result.Details,
+			"Ensure Consul bind_addr is set correctly in configuration")
+	}
+
+	result.Message = fmt.Sprintf("Found %d network interface(s)", len(ipAddresses))
 	return result
 }
 
-// checkConsulPorts performs comprehensive port connectivity checks
+// checkConsulPorts checks if Consul ports are accessible
 func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking Consul port connectivity")
@@ -695,6 +561,183 @@ func checkConsulPorts(rc *eos_io.RuntimeContext) DiagnosticResult {
 	} else {
 		result.Success = false
 		result.Message = "Consul HTTP API port not listening"
+	}
+
+	return result
+}
+
+// checkVaultConsulConnectivity checks if Vault can reach Consul (critical for Vault storage backend)
+func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking Vault-Consul connectivity")
+
+	result := DiagnosticResult{
+		CheckName: "Vault-Consul Connectivity",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// STEP 1: Check /etc/hosts for hostname resolution
+	logger.Debug("Checking /etc/hosts for hostname resolution")
+	hostsCmd := execute.Options{
+		Command: "cat",
+		Args:    []string{"/etc/hosts"},
+		Capture: true,
+	}
+	hostsOutput, err := execute.Run(rc.Ctx, hostsCmd)
+	if err != nil {
+		result.Details = append(result.Details, "⚠ Could not read /etc/hosts")
+	} else {
+		hostname := shared.GetInternalHostname()
+		result.Details = append(result.Details, fmt.Sprintf("Checking hostname resolution for: %s", hostname))
+
+		// Parse /etc/hosts for the hostname
+		hostsLines := strings.Split(hostsOutput, "\n")
+		foundHostname := false
+		for _, line := range hostsLines {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				ip := fields[0]
+				for _, host := range fields[1:] {
+					if host == hostname {
+						foundHostname = true
+						result.Details = append(result.Details,
+							fmt.Sprintf("  /etc/hosts: %s → %s", hostname, ip))
+
+						// Check for suspicious 127.0.1.1 mapping
+						if ip == "127.0.1.1" {
+							result.Details = append(result.Details,
+								"  ⚠ WARNING: Hostname maps to 127.0.1.1 (Ubuntu default)")
+							result.Details = append(result.Details,
+								"    This can cause Vault-Consul connection issues!")
+							result.Details = append(result.Details,
+								"    Consul might be listening on 127.0.0.1, but Vault resolves to 127.0.1.1")
+						}
+					}
+				}
+			}
+		}
+		if !foundHostname {
+			result.Details = append(result.Details, fmt.Sprintf("  ⚠ %s not found in /etc/hosts", hostname))
+		}
+	}
+
+	// STEP 2: Check what addresses Consul is ACTUALLY listening on
+	logger.Debug("Checking Consul listening addresses")
+	ssCmd := execute.Options{
+		Command: "ss",
+		Args:    []string{"-tlnp"},
+		Capture: true,
+	}
+	ssOutput, err := execute.Run(rc.Ctx, ssCmd)
+	if err != nil {
+		// Fallback to netstat
+		netstatCmd := execute.Options{
+			Command: "netstat",
+			Args:    []string{"-tlnp"},
+			Capture: true,
+		}
+		ssOutput, err = execute.Run(rc.Ctx, netstatCmd)
+	}
+
+	if err == nil {
+		result.Details = append(result.Details, "\nConsul port 8500 listening addresses:")
+		ssLines := strings.Split(ssOutput, "\n")
+		found8500 := false
+		for _, line := range ssLines {
+			if strings.Contains(line, ":8500") && strings.Contains(line, "LISTEN") {
+				found8500 = true
+				// Extract the local address
+				fields := strings.Fields(line)
+				if len(fields) >= 4 {
+					localAddr := fields[3]
+					result.Details = append(result.Details, fmt.Sprintf("  %s", localAddr))
+				} else {
+					result.Details = append(result.Details, fmt.Sprintf("  %s", strings.TrimSpace(line)))
+				}
+			}
+		}
+		if !found8500 {
+			result.Success = false
+			result.Details = append(result.Details, "  ✗ Consul port 8500 is NOT listening!")
+			result.Details = append(result.Details, "    This is why Vault cannot connect to Consul")
+		}
+	}
+
+	// STEP 3: Check Vault configuration for Consul address
+	logger.Debug("Checking Vault configuration for Consul backend")
+	vaultConfigPath := "/etc/vault.d/vault.hcl"
+	if _, err := os.Stat(vaultConfigPath); err == nil {
+		vaultConfigCmd := execute.Options{
+			Command: "grep",
+			Args:    []string{"-A", "5", `storage "consul"`, vaultConfigPath},
+			Capture: true,
+		}
+		vaultConfigOutput, err := execute.Run(rc.Ctx, vaultConfigCmd)
+		if err == nil {
+			result.Details = append(result.Details, "\nVault storage backend configuration:")
+			configLines := strings.Split(vaultConfigOutput, "\n")
+			for _, line := range configLines {
+				trimmed := strings.TrimSpace(line)
+				if strings.Contains(trimmed, "address") {
+					result.Details = append(result.Details, fmt.Sprintf("  %s", trimmed))
+
+					// Extract the address value
+					if strings.Contains(trimmed, "=") {
+						parts := strings.Split(trimmed, "=")
+						if len(parts) == 2 {
+							addr := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+							result.Details = append(result.Details,
+								fmt.Sprintf("  → Vault will try to connect to: %s", addr))
+						}
+					}
+				}
+			}
+		}
+	} else {
+		result.Details = append(result.Details, "\n⚠ Vault config not found at /etc/vault.d/vault.hcl")
+	}
+
+	// STEP 4: Test actual connectivity from Vault's perspective
+	logger.Debug("Testing Consul connectivity")
+	hostname := shared.GetInternalHostname()
+	testAddresses := []string{
+		fmt.Sprintf("http://127.0.0.1:%d", shared.PortConsul),
+		fmt.Sprintf("http://127.0.1.1:%d", shared.PortConsul),
+		fmt.Sprintf("http://%s:%d", hostname, shared.PortConsul),
+	}
+
+	result.Details = append(result.Details, "\nTesting Consul connectivity from different addresses:")
+	anySuccess := false
+	for _, addr := range testAddresses {
+		client := &http.Client{Timeout: 2 * time.Second}
+		apiURL := fmt.Sprintf("%s/v1/agent/self", addr)
+		resp, err := client.Get(apiURL)
+		if err == nil {
+			defer func() { _ = resp.Body.Close() }()
+			result.Details = append(result.Details, fmt.Sprintf("  ✓ %s: REACHABLE", addr))
+			anySuccess = true
+		} else {
+			result.Details = append(result.Details, fmt.Sprintf("  ✗ %s: %v", addr, err))
+		}
+	}
+
+	// EVALUATE
+	if !anySuccess {
+		result.Success = false
+		result.Message = "Consul is NOT reachable - Vault storage backend will fail"
+		result.Details = append(result.Details, "\n⚠ CRITICAL: Vault cannot connect to Consul storage backend")
+		result.Details = append(result.Details, "  This is why 'eos sync consul' authentication fails!")
+		result.Details = append(result.Details, "\nRemediation:")
+		result.Details = append(result.Details, "  1. Ensure Consul is running: sudo systemctl start consul")
+		result.Details = append(result.Details, "  2. Check Consul is listening on correct address")
+		result.Details = append(result.Details, "  3. Verify Vault config points to correct Consul address")
+	} else {
+		result.Message = "Consul is reachable for Vault storage backend"
 	}
 
 	return result
