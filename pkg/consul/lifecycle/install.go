@@ -5,6 +5,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
@@ -83,7 +84,28 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 
 	// Set binary path based on installation method
 	if config.BinaryPath == "" {
+		// Check current filesystem state for logging
+		primaryExists := false
+		altExists := false
+
+		if _, err := os.Stat(consul.ConsulBinaryPath); err == nil {
+			primaryExists = true
+		}
+		if _, err := os.Stat(consul.ConsulBinaryPathAlt); err == nil {
+			altExists = true
+		}
+
+		// Detect binary path (may be stale if called before installation)
 		config.BinaryPath = consul.GetConsulBinaryPath()
+
+		logger.Info("Binary path selection",
+			zap.String("primary_path", consul.ConsulBinaryPath),
+			zap.Bool("primary_exists", primaryExists),
+			zap.String("alt_path", consul.ConsulBinaryPathAlt),
+			zap.Bool("alt_exists", altExists),
+			zap.String("selected", config.BinaryPath),
+			zap.String("install_method", map[bool]string{true: "repository", false: "binary"}[config.UseRepository]),
+			zap.String("note", "Path may be re-detected after installation"))
 	}
 
 	runner := NewCommandRunner(rc)

@@ -258,7 +258,25 @@ func (ci *ConsulInstaller) configure() error {
 	}
 
 	// Validate configuration
-	ci.logger.Info("Validating Consul configuration")
+	ci.logger.Info("Validating Consul configuration",
+		zap.String("binary_path", ci.config.BinaryPath),
+		zap.String("config_dir", "/etc/consul.d"))
+
+	// CRITICAL: Verify binary exists before attempting validation
+	// This provides actionable error instead of cryptic "fork/exec: no such file"
+	if _, err := os.Stat(ci.config.BinaryPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("consul binary not found at %s after installation\n"+
+				"This indicates binary path detection failed.\n"+
+				"Expected locations:\n"+
+				"  - /usr/bin/consul (APT repository installation)\n"+
+				"  - /usr/local/bin/consul (direct binary installation)\n"+
+				"Please run: ls -la /usr/bin/consul /usr/local/bin/consul\n"+
+				"Original error: %w", ci.config.BinaryPath, err)
+		}
+		return fmt.Errorf("failed to check binary at %s: %w", ci.config.BinaryPath, err)
+	}
+
 	output, err := ci.runner.RunOutput(ci.config.BinaryPath, "validate", "/etc/consul.d")
 	if err != nil {
 		return fmt.Errorf("configuration validation failed: %w (output: %s)", err, output)
@@ -344,11 +362,31 @@ func (ci *ConsulInstaller) rollbackPartialInstall(binaryInstalled, configCreated
 		}
 	}
 
-	// Remove binary if installed via direct download
-	if binaryInstalled && !ci.config.UseRepository {
-		ci.logger.Info("Removing binary installed during failed installation")
-		if err := os.Remove(ci.config.BinaryPath); err != nil {
-			ci.logger.Warn("Failed to remove binary", zap.Error(err))
+	// Remove binary or APT package based on installation method
+	if binaryInstalled {
+		if ci.config.UseRepository {
+			// APT installation - remove package and cleanup repository artifacts
+			ci.logger.Info("Removing Consul APT package and repository artifacts")
+
+			// Remove the Consul package
+			if err := ci.runner.RunQuiet("apt-get", "remove", "-y", "consul"); err != nil {
+				ci.logger.Warn("Failed to remove Consul package", zap.Error(err))
+			}
+
+			// Autoremove dependencies
+			if err := ci.runner.RunQuiet("apt-get", "autoremove", "-y"); err != nil {
+				ci.logger.Warn("Failed to autoremove dependencies", zap.Error(err))
+			}
+
+			// Note: We don't remove /etc/apt/sources.list.d/hashicorp.list or GPG key
+			// as other HashiCorp tools (Vault, Nomad) may use the same repository
+			ci.logger.Info("HashiCorp APT repository retained for other tools")
+		} else {
+			// Direct binary installation - remove the binary file
+			ci.logger.Info("Removing binary installed during failed installation")
+			if err := os.Remove(ci.config.BinaryPath); err != nil {
+				ci.logger.Warn("Failed to remove binary", zap.Error(err))
+			}
 		}
 	}
 

@@ -241,6 +241,22 @@ func (ci *ConsulInstaller) installViaRepository() error {
 	}
 
 	ci.logger.Info("Consul installed successfully via APT")
+
+	// CRITICAL: Re-detect binary path after APT installation
+	// APT installs to /usr/bin/consul, but constructor may have set /usr/local/bin/consul
+	// This ensures validation uses the correct path
+	oldPath := ci.config.BinaryPath
+	ci.config.BinaryPath = consul.GetConsulBinaryPath()
+
+	if oldPath != ci.config.BinaryPath {
+		ci.logger.Info("Binary path updated after APT installation",
+			zap.String("old_path", oldPath),
+			zap.String("new_path", ci.config.BinaryPath))
+	} else {
+		ci.logger.Info("Binary path confirmed after APT installation",
+			zap.String("binary_path", ci.config.BinaryPath))
+	}
+
 	return nil
 }
 

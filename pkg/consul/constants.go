@@ -255,8 +255,23 @@ const (
 // Helper Functions
 // ============================================================================
 
+// GetExpectedBinaryPathForMethod returns the expected binary path based on installation method
+// RATIONALE: Different installation methods install to different locations:
+//   - APT repository: Always installs to /usr/bin/consul (package manager standard)
+//   - Direct binary: Always installs to /usr/local/bin/consul (manual install standard)
+// This encodes our knowledge of how package managers work instead of guessing.
+func GetExpectedBinaryPathForMethod(useRepository bool) string {
+	if useRepository {
+		// APT packages install to /usr/bin
+		return ConsulBinaryPathAlt // /usr/bin/consul
+	}
+	// Direct downloads install to /usr/local/bin
+	return ConsulBinaryPath // /usr/local/bin/consul
+}
+
 // GetConsulBinaryPath returns the path to the consul binary
 // Checks standard locations and returns the first one found
+// NOTE: Prefer GetExpectedBinaryPathForMethod() when installation method is known
 func GetConsulBinaryPath() string {
 	if _, err := os.Stat(ConsulBinaryPath); err == nil {
 		return ConsulBinaryPath
