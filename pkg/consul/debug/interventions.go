@@ -181,7 +181,7 @@ func FixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 	if fixCount > 0 {
 		// Backup original
 		backupPath := configPath + ".backup." + time.Now().Format("20060102-150405")
-		if err := os.WriteFile(backupPath, []byte(original), 0644); err != nil {
+		if err := os.WriteFile(backupPath, []byte(original), consul.ConsulConfigPerm); err != nil {
 			result.Success = false
 			result.Message = "Failed to create backup"
 			return result
@@ -189,7 +189,7 @@ func FixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 		result.Details = append(result.Details, "Created backup: "+backupPath)
 
 		// Write modified configuration
-		if err := os.WriteFile(configPath, []byte(modified), 0644); err != nil {
+		if err := os.WriteFile(configPath, []byte(modified), consul.ConsulConfigPerm); err != nil {
 			result.Success = false
 			result.Message = "Failed to write fixed configuration"
 			return result
@@ -205,7 +205,7 @@ func FixConfiguration(rc *eos_io.RuntimeContext, configResult DiagnosticResult) 
 		output, err := execute.Run(rc.Ctx, validateCmd)
 		if err != nil {
 			// Restore backup
-			_ = os.WriteFile(configPath, []byte(original), 0644)
+			_ = os.WriteFile(configPath, []byte(original), consul.ConsulConfigPerm)
 			result.Success = false
 			result.Message = "Fixed configuration failed validation, restored backup"
 			result.Details = append(result.Details, "Validation error: "+output)
@@ -303,7 +303,7 @@ func testMinimalConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	if _, err := os.Stat(currentConfig); err == nil {
 		content, _ := os.ReadFile(currentConfig)
-		_ = os.WriteFile(backupPath, content, 0644)
+		_ = os.WriteFile(backupPath, content, consul.ConsulConfigPerm)
 		result.Details = append(result.Details, "Backed up current config to: "+backupPath)
 	}
 
@@ -326,7 +326,7 @@ ports {
 `, shared.PortConsul)
 
 	minimalPath := "/etc/consul.d/consul-minimal.hcl"
-	if err := os.WriteFile(minimalPath, []byte(minimalConfig), 0644); err != nil {
+	if err := os.WriteFile(minimalPath, []byte(minimalConfig), consul.ConsulConfigPerm); err != nil {
 		result.Success = false
 		result.Message = "Failed to create minimal configuration"
 		return result

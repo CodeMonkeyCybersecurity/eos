@@ -378,7 +378,7 @@ func JoinNodesV2(rc *eos_io.RuntimeContext, cfg *NodeJoinConfigV2) (*NodeJoinRes
 			// Validation failed - restore backup
 			if backupPath != "" {
 				logger.Error("Configuration validation failed, restoring backup")
-				_ = os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
+				_ = os.WriteFile(cfg.ConfigPath, existingConfigData, ConsulConfigPerm)
 			}
 			return nil, err
 		}
@@ -475,5 +475,5 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0640)
+	return os.WriteFile(dst, data, ConsulConfigPerm)
 }

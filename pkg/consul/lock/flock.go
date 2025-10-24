@@ -13,6 +13,13 @@ import (
 const (
 	lockFilePath = "/var/run/eos-consul-sync.lock"
 	lockTimeout  = 30 * time.Second
+
+	// NOTE: Duplicates consul.ConsulConfigPerm to avoid circular import
+	// (pkg/consul imports pkg/consul/lock, so lock cannot import consul)
+	// RATIONALE: Lock file protects against concurrent configuration writes
+	// SECURITY: Readable by consul user/group only, prevents unauthorized modification
+	// THREAT MODEL: Prevents race conditions in config updates, protects file integrity
+	consulConfigPerm = 0640
 )
 
 // Lock represents a file lock
@@ -25,7 +32,7 @@ type Lock struct {
 // Prevents concurrent sync operations
 func Acquire() (*Lock, error) {
 	// Try to create/open lock file
-	file, err := os.OpenFile(lockFilePath, os.O_CREATE|os.O_RDWR, 0644)
+	file, err := os.OpenFile(lockFilePath, os.O_CREATE|os.O_RDWR, consulConfigPerm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}

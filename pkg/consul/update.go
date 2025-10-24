@@ -266,7 +266,7 @@ func applyPortChanges(rc *eos_io.RuntimeContext, configPath string, currentConfi
 	// INTERVENE: Backup current configuration
 	logger.Info("Backing up current configuration")
 	backupPath := fmt.Sprintf("%s.backup.%d", configPath, os.Getpid())
-	if err := os.WriteFile(backupPath, currentConfig, 0640); err != nil {
+	if err := os.WriteFile(backupPath, currentConfig, ConsulConfigPerm); err != nil {
 		logger.Warn("Failed to create backup", zap.Error(err))
 	} else {
 		logger.Info("Configuration backed up", zap.String("backup", backupPath))
@@ -281,7 +281,7 @@ func applyPortChanges(rc *eos_io.RuntimeContext, configPath string, currentConfi
 		newConfig = UpdatePortsInConfig(string(currentConfig), 0, actualToPort)
 	}
 
-	if err := os.WriteFile(configPath, []byte(newConfig), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte(newConfig), ConsulConfigPerm); err != nil {
 		return fmt.Errorf("failed to write updated configuration: %w", err)
 	}
 
@@ -298,7 +298,7 @@ func applyPortChanges(rc *eos_io.RuntimeContext, configPath string, currentConfi
 	if err != nil {
 		logger.Error("Failed to restart Consul", zap.String("output", output))
 		logger.Info("Attempting to restore backup", zap.String("backup", backupPath))
-		_ = os.WriteFile(configPath, currentConfig, 0640)
+		_ = os.WriteFile(configPath, currentConfig, ConsulConfigPerm)
 		return fmt.Errorf("failed to restart Consul service: %w\nOutput: %s\n"+
 			"Remediation:\n"+
 			"  1. Check configuration syntax: consul validate %s\n"+

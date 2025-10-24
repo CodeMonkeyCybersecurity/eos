@@ -245,14 +245,14 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 			zap.Int("warning_count", warningCount),
 			zap.Int("info_count", infoCount))
 		// Return nil (exit 0) but warn user
-		fmt.Println("\n⚠️  Warnings found - Consul functional but should address issues above")
+		logger.Warn("\n⚠️  Warnings found - Consul functional but should address issues above")
 		return nil
 	}
 
 	if infoCount > 0 {
 		logger.Info("Consul debugging found informational items only",
-			zap.Int("info_count", infoCount))
-		fmt.Printf("\nℹ️  %d informational item(s) - no action required\n", infoCount)
+			zap.Int("info_count", infoCount),
+			zap.String("message", fmt.Sprintf("ℹ️  %d informational item(s) - no action required", infoCount)))
 	}
 
 	logger.Info("Consul debugging completed successfully - no issues found")
@@ -260,56 +260,58 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 }
 
 // displayResults shows a formatted summary of all diagnostic results
-// NOTE: Uses fmt.Println for user-facing output (not logger) so output is visible on terminal
+// NOTE: Uses structured logging (logger.Info/Warn/Error) which goes to BOTH terminal AND telemetry
 func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Log to structured logs for forensics
-	logger.Info("Displaying diagnostic results")
-
-	// Print to stdout for user visibility
-	fmt.Println("========================================")
-	fmt.Println("CONSUL DEBUG DIAGNOSTIC SUMMARY")
-	fmt.Println("========================================")
+	// Display results via structured logging (user sees this on terminal + telemetry captures it)
+	logger.Info("========================================")
+	logger.Info("CONSUL DEBUG DIAGNOSTIC SUMMARY")
+	logger.Info("========================================")
 
 	for _, result := range results {
-		// Use simple text symbols for maximum compatibility
-		var status string
+		// Use structured logging for both terminal display AND telemetry
 		if result.Success {
-			status = "[PASS]"
+			logger.Info("[PASS] "+result.CheckName,
+				zap.String("check", result.CheckName),
+				zap.String("message", result.Message),
+				zap.Strings("details", result.Details),
+				zap.Bool("success", true))
+			logger.Info("      "+result.Message)
 		} else {
-			status = "[FAIL]"
+			logger.Error("[FAIL] "+result.CheckName,
+				zap.String("check", result.CheckName),
+				zap.String("message", result.Message),
+				zap.Strings("details", result.Details),
+				zap.Bool("success", false))
+			logger.Error("      "+result.Message)
 		}
-
-		fmt.Printf("%s %s\n", status, result.CheckName)
-		fmt.Printf("      %s\n", result.Message)
 
 		if len(result.Details) > 0 {
 			for _, detail := range result.Details {
-				fmt.Println("      " + detail)
+				logger.Info("      " + detail)
 			}
 		}
 
 		if result.FixApplied {
-			fmt.Printf("      [FIX APPLIED] %s\n", result.FixMessage)
+			logger.Info("      [FIX APPLIED] "+result.FixMessage,
+				zap.String("fix_message", result.FixMessage),
+				zap.Bool("fix_applied", true))
 		}
 
-		fmt.Println("") // Blank line between checks
+		logger.Info("") // Blank line between checks
 	}
 
-	fmt.Println("========================================")
+	logger.Info("========================================")
 
 	// Provide recommendations
 	provideRecommendations(rc, results)
 }
 
 // provideRecommendations gives actionable advice based on diagnostic results
-// NOTE: Uses fmt.Println for user-facing output (not logger) so output is visible on terminal
 func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Providing recommendations")
-
-	fmt.Println("RECOMMENDATIONS:")
+	logger.Info("RECOMMENDATIONS:")
 
 	recommendations := []string{}
 
@@ -337,11 +339,11 @@ func provideRecommendations(rc *eos_io.RuntimeContext, results []DiagnosticResul
 	}
 
 	if len(recommendations) == 0 {
-		fmt.Println("  ✓ No issues found - Consul should be ready to start")
-		fmt.Println("  → Try: sudo systemctl start consul")
+		logger.Info("  ✓ No issues found - Consul should be ready to start")
+		logger.Info("  → Try: sudo systemctl start consul")
 	} else {
 		for _, rec := range recommendations {
-			fmt.Println(rec)
+			logger.Info(rec)
 		}
 	}
 }

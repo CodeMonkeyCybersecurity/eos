@@ -227,7 +227,7 @@ func SaveInitResult(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error 
 		return fmt.Errorf("marshal init result: %w", err)
 	}
 
-	if err := os.WriteFile(path, b, 0600); err != nil {
+	if err := os.WriteFile(path, b, VaultSecretFilePerm); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to write Vault init file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("write init result: %w", err)
 	}

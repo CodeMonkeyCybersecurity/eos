@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -315,7 +316,7 @@ func deployViaDocker(rc *eos_io.RuntimeContext, config AgentConfig, secretManage
 	return &DeploymentResult{
 		Success:      true,
 		AgentID:      config.NodeName,
-		AgentAddress: "http://localhost:8500", // TODO: Get actual address
+		AgentAddress: shared.GetConsulAddress(),
 		Message:      "Docker Compose sidecar configuration generated (deployment not yet implemented)",
 		Warnings:     []string{"Docker deployment implementation pending"},
 	}, nil

@@ -124,7 +124,7 @@ func generateEncryptedKeyFiles(rc *eos_io.RuntimeContext, initRes *api.InitRespo
 
 		// Write encrypted key file
 		filename := filepath.Join(outputDir, fmt.Sprintf("unseal-key-%d.enc", i+1))
-		if err := os.WriteFile(filename, encrypted, 0600); err != nil {
+		if err := os.WriteFile(filename, encrypted, VaultSecretFilePerm); err != nil {
 			return fmt.Errorf("write key file %d: %w", i+1, err)
 		}
 

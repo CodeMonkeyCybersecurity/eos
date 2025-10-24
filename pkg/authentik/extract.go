@@ -12,7 +12,12 @@ import (
 	"strings"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -157,7 +162,7 @@ var extractCmd = &cobra.Command{
 
 This command connects to an Authentik instance via API and extracts all
 configuration including providers, applications, flows, policies, etc.`,
-	RunE: runExtract,
+	RunE: eos.Wrap(runExtract),
 }
 
 // listCmd lists available configurations
@@ -193,7 +198,9 @@ func init() {
 	_ = listCmd.MarkFlagRequired("token")
 }
 
-func runExtract(cmd *cobra.Command, args []string) error {
+func runExtract(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	url, _ := cmd.Flags().GetString("url")
 	token, _ := cmd.Flags().GetString("token")
 	outputPath, _ := cmd.Flags().GetString("output")
@@ -211,8 +218,9 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		Client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
-	fmt.Println(" Extracting Authentik configuration...")
-	fmt.Printf("   Source: %s\n", url)
+	logger.Info("Extracting Authentik configuration",
+		zap.String("source_url", url))
+	logger.Info("  Source: " + url)
 
 	// Initialize config
 	config := &AuthentikConfig{
@@ -227,10 +235,12 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	// Get Authentik version
 	version, err := client.GetVersion()
 	if err != nil {
-		fmt.Printf("Warning: Could not get Authentik version: %v\n", err)
+		logger.Warn("Could not get Authentik version",
+			zap.Error(err))
 	} else {
 		config.Metadata.AuthentikVersion = version
-		fmt.Printf("   Version: %s\n", version)
+		logger.Info("  Version: " + version,
+			zap.String("authentik_version", version))
 	}
 
 	// Determine what to export
@@ -242,15 +252,20 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	}
 
 	if dryRun {
-		fmt.Println("\n Dry run - would export:")
+		logger.Info("Dry run - would export:",
+			zap.Strings("export_types", exportTypes),
+			zap.Bool("dry_run", true))
 		for _, t := range exportTypes {
-			fmt.Printf("   - %s\n", t)
+			logger.Info("  - " + t,
+				zap.String("resource_type", t))
 		}
 		if len(apps) > 0 {
-			fmt.Printf("   Applications filter: %v\n", apps)
+			logger.Info("  Applications filter applied",
+				zap.Strings("apps", apps))
 		}
 		if len(providers) > 0 {
-			fmt.Printf("   Providers filter: %v\n", providers)
+			logger.Info("  Providers filter applied",
+				zap.Strings("providers", providers))
 		}
 		return nil
 	}
@@ -259,103 +274,125 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	for _, exportType := range exportTypes {
 		switch exportType {
 		case "providers":
-			fmt.Print("   Extracting providers... ")
+			logger.Info("  Extracting providers",
+				zap.String("resource_type", "providers"))
 			items, err := client.GetProviders(providers)
 			if err != nil {
 				return fmt.Errorf("failed to get providers: %w", err)
 			}
 			config.Providers = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Providers extracted",
+				zap.Int("count", len(items)))
 
 		case "applications":
-			fmt.Print("   Extracting applications... ")
+			logger.Info("  Extracting applications",
+				zap.String("resource_type", "applications"))
 			items, err := client.GetApplications(apps)
 			if err != nil {
 				return fmt.Errorf("failed to get applications: %w", err)
 			}
 			config.Applications = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Applications extracted",
+				zap.Int("count", len(items)))
 
 		case "property_mappings":
-			fmt.Print("   Extracting property mappings... ")
+			logger.Info("  Extracting property mappings",
+				zap.String("resource_type", "property_mappings"))
 			items, err := client.GetPropertyMappings()
 			if err != nil {
 				return fmt.Errorf("failed to get property mappings: %w", err)
 			}
 			config.PropertyMappings = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Property mappings extracted",
+				zap.Int("count", len(items)))
 
 		case "flows":
-			fmt.Print("   Extracting flows... ")
+			logger.Info("  Extracting flows",
+				zap.String("resource_type", "flows"))
 			items, err := client.GetFlows()
 			if err != nil {
 				return fmt.Errorf("failed to get flows: %w", err)
 			}
 			config.Flows = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Flows extracted",
+				zap.Int("count", len(items)))
 
 		case "stages":
-			fmt.Print("   Extracting stages... ")
+			logger.Info("  Extracting stages",
+				zap.String("resource_type", "stages"))
 			items, err := client.GetStages()
 			if err != nil {
 				return fmt.Errorf("failed to get stages: %w", err)
 			}
 			config.Stages = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Stages extracted",
+				zap.Int("count", len(items)))
 
 		case "groups":
-			fmt.Print("   Extracting groups... ")
+			logger.Info("  Extracting groups",
+				zap.String("resource_type", "groups"))
 			items, err := client.GetGroups()
 			if err != nil {
 				return fmt.Errorf("failed to get groups: %w", err)
 			}
 			config.Groups = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Groups extracted",
+				zap.Int("count", len(items)))
 
 		case "policies":
-			fmt.Print("   Extracting policies... ")
+			logger.Info("  Extracting policies",
+				zap.String("resource_type", "policies"))
 			items, err := client.GetPolicies()
 			if err != nil {
 				return fmt.Errorf("failed to get policies: %w", err)
 			}
 			config.Policies = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Policies extracted",
+				zap.Int("count", len(items)))
 
 		case "certificates":
-			fmt.Print("   Extracting certificates... ")
+			logger.Info("  Extracting certificates",
+				zap.String("resource_type", "certificates"))
 			items, err := client.GetCertificates(includeSecrets)
 			if err != nil {
 				return fmt.Errorf("failed to get certificates: %w", err)
 			}
 			config.Certificates = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Certificates extracted",
+				zap.Int("count", len(items)))
 
 		case "outposts":
-			fmt.Print("   Extracting outposts... ")
+			logger.Info("  Extracting outposts",
+				zap.String("resource_type", "outposts"))
 			items, err := client.GetOutposts()
 			if err != nil {
 				return fmt.Errorf("failed to get outposts: %w", err)
 			}
 			config.Outposts = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Outposts extracted",
+				zap.Int("count", len(items)))
 
 		case "tenants":
-			fmt.Print("   Extracting tenants... ")
+			logger.Info("  Extracting tenants",
+				zap.String("resource_type", "tenants"))
 			items, err := client.GetTenants()
 			if err != nil {
 				return fmt.Errorf("failed to get tenants: %w", err)
 			}
 			config.Tenants = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Tenants extracted",
+				zap.Int("count", len(items)))
 
 		case "blueprints":
-			fmt.Print("   Extracting blueprints... ")
+			logger.Info("  Extracting blueprints",
+				zap.String("resource_type", "blueprints"))
 			items, err := client.GetBlueprints()
 			if err != nil {
 				return fmt.Errorf("failed to get blueprints: %w", err)
 			}
 			config.Blueprints = items
-			fmt.Printf(" (%d found)\n", len(items))
+			logger.Info("  Blueprints extracted",
+				zap.Int("count", len(items)))
 		}
 	}
 
@@ -387,31 +424,44 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 
-	// Write to file with secure permissions (0600 - owner read/write only)
-	if err := os.WriteFile(outputPath, data, 0600); err != nil {
+	// Write to file with secure permissions (VaultSecretFilePerm = 0600 - owner read/write only)
+	if err := os.WriteFile(outputPath, data, vault.VaultSecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
 
-	fmt.Printf("\n Configuration exported to: %s\n", outputPath)
-	fmt.Printf("   Total size: %.2f KB\n", float64(len(data))/1024)
+	logger.Info("Configuration exported successfully",
+		zap.String("output_path", outputPath),
+		zap.Float64("size_kb", float64(len(data))/1024))
 
 	// Show summary
-	fmt.Println("\n Export Summary:")
-	fmt.Printf("   Providers:         %d\n", len(config.Providers))
-	fmt.Printf("   Applications:      %d\n", len(config.Applications))
-	fmt.Printf("   Property Mappings: %d\n", len(config.PropertyMappings))
-	fmt.Printf("   Flows:            %d\n", len(config.Flows))
-	fmt.Printf("   Stages:           %d\n", len(config.Stages))
-	fmt.Printf("   Groups:           %d\n", len(config.Groups))
-	fmt.Printf("   Policies:         %d\n", len(config.Policies))
-	fmt.Printf("   Certificates:     %d\n", len(config.Certificates))
-	fmt.Printf("   Outposts:         %d\n", len(config.Outposts))
-	fmt.Printf("   Tenants:          %d\n", len(config.Tenants))
-	fmt.Printf("   Blueprints:       %d\n", len(config.Blueprints))
+	logger.Info("Export Summary:",
+		zap.Int("providers", len(config.Providers)),
+		zap.Int("applications", len(config.Applications)),
+		zap.Int("property_mappings", len(config.PropertyMappings)),
+		zap.Int("flows", len(config.Flows)),
+		zap.Int("stages", len(config.Stages)),
+		zap.Int("groups", len(config.Groups)),
+		zap.Int("policies", len(config.Policies)),
+		zap.Int("certificates", len(config.Certificates)),
+		zap.Int("outposts", len(config.Outposts)),
+		zap.Int("tenants", len(config.Tenants)),
+		zap.Int("blueprints", len(config.Blueprints)))
+
+	logger.Info("  Providers:         " + fmt.Sprintf("%d", len(config.Providers)))
+	logger.Info("  Applications:      " + fmt.Sprintf("%d", len(config.Applications)))
+	logger.Info("  Property Mappings: " + fmt.Sprintf("%d", len(config.PropertyMappings)))
+	logger.Info("  Flows:             " + fmt.Sprintf("%d", len(config.Flows)))
+	logger.Info("  Stages:            " + fmt.Sprintf("%d", len(config.Stages)))
+	logger.Info("  Groups:            " + fmt.Sprintf("%d", len(config.Groups)))
+	logger.Info("  Policies:          " + fmt.Sprintf("%d", len(config.Policies)))
+	logger.Info("  Certificates:      " + fmt.Sprintf("%d", len(config.Certificates)))
+	logger.Info("  Outposts:          " + fmt.Sprintf("%d", len(config.Outposts)))
+	logger.Info("  Tenants:           " + fmt.Sprintf("%d", len(config.Tenants)))
+	logger.Info("  Blueprints:        " + fmt.Sprintf("%d", len(config.Blueprints)))
 
 	if !includeSecrets {
-		fmt.Println("\nNote: Sensitive data (private keys, secrets) was excluded.")
-		fmt.Println("   Use --include-secrets flag to include sensitive data.")
+		logger.Info("Note: Sensitive data (private keys, secrets) was excluded",
+			zap.String("hint", "Use --include-secrets flag to include sensitive data"))
 	}
 
 	return nil

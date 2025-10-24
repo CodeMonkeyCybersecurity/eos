@@ -226,3 +226,16 @@ type NginxStreamBlock struct {
 	BackendPort  string
 	ListenPort   string
 }
+
+// GetConsulAddress returns the full Consul HTTP API address
+// Uses GetInternalHostname() for dynamic hostname resolution
+// Format: http://<hostname>:<port>
+func GetConsulAddress() string {
+	return fmt.Sprintf("http://%s:%d", GetInternalHostname(), PortConsul)
+}
+
+// GetConsulHTTPAddr returns just the host:port portion for CONSUL_HTTP_ADDR env var
+// Format: <hostname>:<port>
+func GetConsulHTTPAddr() string {
+	return fmt.Sprintf("%s:%d", GetInternalHostname(), PortConsul)
+}

@@ -504,18 +504,18 @@ WantedBy=timers.target
 `
 
 	// Write service unit
-	if err := os.WriteFile(VaultCertRenewalServicePath, []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile(VaultCertRenewalServicePath, []byte(serviceContent), VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write service unit: %w", err)
 	}
 
 	// Write timer unit
-	if err := os.WriteFile(VaultCertRenewalTimerPath, []byte(timerContent), 0644); err != nil {
+	if err := os.WriteFile(VaultCertRenewalTimerPath, []byte(timerContent), VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write timer unit: %w", err)
 	}
 
 	// Reload systemd daemon to pick up new units
 	// Silently ignore errors - if this fails, user can run manually
-	_ = os.WriteFile("/tmp/eos-systemd-reload", []byte("systemctl daemon-reload\n"), 0644)
+	_ = os.WriteFile("/tmp/eos-systemd-reload", []byte("systemctl daemon-reload\n"), VaultTLSCertPerm)
 
 	fmt.Println("Systemd timer installed successfully")
 	fmt.Println("Enabling timer automatically...")

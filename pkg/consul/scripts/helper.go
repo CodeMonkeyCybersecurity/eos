@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -103,7 +104,7 @@ EOF
 esac`, shared.PortConsul)
 
 	scriptPath := "/usr/local/bin/consul-vault-helper"
-	if err := os.WriteFile(scriptPath, []byte(helperScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(helperScript), consul.ConsulBinaryPerm); err != nil {
 		return fmt.Errorf("failed to write helper script: %w", err)
 	}
 
@@ -116,8 +117,8 @@ esac`, shared.PortConsul)
 		return fmt.Errorf("failed to verify helper script: %w", err)
 	}
 
-	if info.Mode().Perm() != 0755 {
-		return fmt.Errorf("helper script has incorrect permissions: expected 0755, got %s", info.Mode().Perm())
+	if info.Mode().Perm() != consul.ConsulBinaryPerm {
+		return fmt.Errorf("helper script has incorrect permissions: expected %#o, got %#o", consul.ConsulBinaryPerm, info.Mode().Perm())
 	}
 
 	// Verify script is executable

@@ -128,9 +128,12 @@ const (
 // Connection defaults
 const (
 	// DefaultConsulAddr is the default Consul address
-	DefaultConsulAddr = "http://localhost:8500"
+	// NOTE: For runtime addresses, use shared.GetConsulAddress() instead
+	// This constant is only for documentation/examples
+	DefaultConsulAddr = "http://localhost:8500" // Use shared.GetConsulAddress() at runtime
 
 	// DefaultVaultAddr is the default Vault address
+	// NOTE: For runtime addresses, use shared.GetVaultAddress() instead
 	DefaultVaultAddr = "https://localhost:8200"
 
 	// DefaultVaultTokenPath is the default path to Vault token

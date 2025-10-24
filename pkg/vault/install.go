@@ -729,7 +729,7 @@ func (vi *VaultInstaller) installViaRepository() error {
 	repoLine := fmt.Sprintf("deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com %s main",
 		getUbuntuCodename())
 
-	if err := vi.writeFile("/etc/apt/sources.list.d/hashicorp.list", []byte(repoLine), 0644); err != nil {
+	if err := vi.writeFile("/etc/apt/sources.list.d/hashicorp.list", []byte(repoLine), VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to add repository: %w", err)
 	}
 
@@ -786,7 +786,7 @@ func (vi *VaultInstaller) installViaBinary() error {
 		zap.String("url", downloadURL))
 
 	tmpDir := "/tmp/vault-install"
-	if err := vi.createDirectory(tmpDir, 0755); err != nil {
+	if err := vi.createDirectory(tmpDir, VaultBinaryPerm); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
@@ -840,7 +840,7 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 		mode  os.FileMode
 		owner string
 	}{
-		{"/opt/vault", 0755, vi.config.ServiceUser}, // Parent must be traversable (0755)
+		{"/opt/vault", VaultBaseDirPerm, vi.config.ServiceUser}, // Parent must be traversable
 	}
 
 	for _, dir := range parentDirs {
@@ -989,10 +989,10 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 		mode  os.FileMode
 		owner string
 	}{
-		{vi.config.ConfigPath, 0755, vi.config.ServiceUser},
-		{vi.config.DataPath, 0700, vi.config.ServiceUser},
-		{vi.config.LogPath, 0755, vi.config.ServiceUser},
-		{filepath.Join(vi.config.DataPath, "raft"), 0700, vi.config.ServiceUser},
+		{vi.config.ConfigPath, VaultDirPerm, vi.config.ServiceUser},
+		{vi.config.DataPath, VaultDataDirPerm, vi.config.ServiceUser},
+		{vi.config.LogPath, VaultLogsDirPerm, vi.config.ServiceUser},
+		{filepath.Join(vi.config.DataPath, "raft"), VaultDataDirPerm, vi.config.ServiceUser},
 	}
 
 	for _, dir := range directories {
@@ -1213,7 +1213,7 @@ log_format = "json"
 		vi.config.UIEnabled, vi.config.DisableMlock, vi.config.LogLevel)
 
 	// Write configuration
-	if err := vi.writeFile(configPath, []byte(config), 0640); err != nil {
+	if err := vi.writeFile(configPath, []byte(config), VaultConfigPerm); err != nil {
 		return fmt.Errorf("failed to write configuration: %w", err)
 	}
 
@@ -1659,7 +1659,7 @@ func (vi *VaultInstaller) generateTLSCertificate() error {
 
 	// Create TLS directory
 	tlsDir := filepath.Join(vi.config.ConfigPath, "tls")
-	if err := vi.createDirectory(tlsDir, 0755); err != nil {
+	if err := vi.createDirectory(tlsDir, VaultTLSDirPerm); err != nil {
 		return fmt.Errorf("failed to create TLS directory: %w", err)
 	}
 

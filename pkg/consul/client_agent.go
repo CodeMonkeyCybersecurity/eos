@@ -250,7 +250,7 @@ func downloadAndInstallConsulBinary(rc *eos_io.RuntimeContext, version string) e
 	}
 
 	// Make executable
-	if err := os.Chmod(ConsulBinaryPath, 0755); err != nil {
+	if err := os.Chmod(ConsulBinaryPath, ConsulBinaryPerm); err != nil {
 		return fmt.Errorf("failed to make Consul executable: %w", err)
 	}
 
@@ -291,7 +291,7 @@ WantedBy=multi-user.target
 `
 
 	servicePath := "/etc/systemd/system/consul.service"
-	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile(servicePath, []byte(serviceContent), ConsulConfigPerm); err != nil {
 		return fmt.Errorf("failed to write systemd service: %w", err)
 	}
 

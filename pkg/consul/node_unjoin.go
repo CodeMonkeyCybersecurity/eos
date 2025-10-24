@@ -281,7 +281,7 @@ func UnjoinNodes(rc *eos_io.RuntimeContext, cfg *NodeUnjoinConfig) (*NodeUnjoinR
 		// Validation failed - restore backup
 		if backupPath != "" {
 			logger.Error("Configuration validation failed, restoring backup")
-			_ = os.WriteFile(cfg.ConfigPath, existingConfigData, 0640)
+			_ = os.WriteFile(cfg.ConfigPath, existingConfigData, ConsulConfigPerm)
 		}
 		return nil, err
 	}

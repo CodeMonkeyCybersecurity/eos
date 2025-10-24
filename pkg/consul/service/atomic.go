@@ -9,6 +9,15 @@ import (
 	"path/filepath"
 )
 
+const (
+	// NOTE: Duplicates consul.ConsulConfigPerm to avoid circular import
+	// (pkg/consul imports pkg/consul/service, so service cannot import consul)
+	// RATIONALE: Config files contain sensitive ACL tokens and bootstrap data
+	// SECURITY: Readable by consul user/group only (0640), prevents unauthorized access
+	// THREAT MODEL: Protects against local privilege escalation via config tampering
+	consulConfigPerm = 0640
+)
+
 // WriteConfigAtomic writes configuration atomically using temp file + rename
 // This prevents corruption if process crashes mid-write
 func WriteConfigAtomic(configPath string, content []byte) error {
@@ -45,7 +54,7 @@ func WriteConfigAtomic(configPath string, content []byte) error {
 	}
 
 	// Set correct permissions
-	if err := os.Chmod(tempPath, 0640); err != nil {
+	if err := os.Chmod(tempPath, consulConfigPerm); err != nil {
 		return fmt.Errorf("failed to set permissions: %w", err)
 	}
 

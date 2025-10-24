@@ -348,18 +348,18 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 			zap.String("mode", stat.Mode().String()),
 			zap.Int64("size", stat.Size()))
 
-		// SECURITY: Enforce 0600 permissions on token file
+		// SECURITY: Enforce VaultSecretFilePerm permissions on token file
 		actualPerms := stat.Mode().Perm()
-		expectedPerms := os.FileMode(0600)
+		expectedPerms := os.FileMode(VaultSecretFilePerm)
 		if actualPerms != expectedPerms {
 			log.Error(" Agent token file has insecure permissions",
 				zap.String("path", tokenPath),
 				zap.String("actual", fmt.Sprintf("%04o", actualPerms)),
 				zap.String("expected", fmt.Sprintf("%04o", expectedPerms)))
-			return cerr.Newf("agent token file has insecure permissions: %04o (expected 0600). "+
-				"This is a security violation. Fix with: chmod 600 %s", actualPerms, tokenPath)
+			return cerr.Newf("agent token file has insecure permissions: %04o (expected %04o). "+
+				"This is a security violation. Fix with: chmod %04o %s", actualPerms, expectedPerms, expectedPerms, tokenPath)
 		}
-		log.Debug(" Agent token file has secure permissions (0600)")
+		log.Debug(" Agent token file has secure permissions", zap.String("perms", fmt.Sprintf("%04o", expectedPerms)))
 	}
 
 	// Read the token
@@ -513,7 +513,7 @@ exit 0
 
 	healthCheckPath := VaultAgentHealthCheckPath
 	log.Info(" Writing health check script", zap.String("path", healthCheckPath))
-	if err := os.WriteFile(healthCheckPath, []byte(healthCheckScript), 0755); err != nil {
+	if err := os.WriteFile(healthCheckPath, []byte(healthCheckScript), VaultBinaryPerm); err != nil {
 		log.Error(" Failed to write health check script",
 			zap.String("path", healthCheckPath),
 			zap.Error(err))
@@ -551,7 +551,7 @@ Group=vault
 	// SPRINT 2 FIX: Health check monitoring is OPTIONAL - don't fail setup if it can't be configured
 	// This prevents false errors when Vault Agent monitoring isn't needed
 	log.Info(" Writing systemd timer", zap.String("path", timerPath))
-	if err := os.WriteFile(timerPath, []byte(timerContent), 0644); err != nil {
+	if err := os.WriteFile(timerPath, []byte(timerContent), VaultTLSCertPerm); err != nil {
 		log.Warn(" Failed to write health check timer (non-fatal)",
 			zap.String("path", timerPath),
 			zap.Error(err),
@@ -561,7 +561,7 @@ Group=vault
 	}
 
 	log.Info(" Writing systemd service", zap.String("path", servicePath))
-	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile(servicePath, []byte(serviceContent), VaultTLSCertPerm); err != nil {
 		log.Warn(" Failed to write health check service (non-fatal)",
 			zap.String("path", servicePath),
 			zap.Error(err),

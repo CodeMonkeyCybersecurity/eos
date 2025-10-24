@@ -10,7 +10,11 @@ import (
 	"strings"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -48,7 +52,7 @@ This command reads a configuration file created by 'eos authentik extract' and
 imports it into a target Authentik instance. It supports selective import,
 conflict resolution, and validation.`,
 	Args: cobra.ExactArgs(1),
-	RunE: runImport,
+	RunE: eos.Wrap(runImport),
 }
 
 // compareCmd compares two Authentik instances or configs
@@ -91,7 +95,9 @@ func init() {
 	_ = compareCmd.MarkFlagRequired("target")
 }
 
-func runImport(cmd *cobra.Command, args []string) error {
+func runImport(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	configFile := args[0]
 	url, _ := cmd.Flags().GetString("url")
 	token, _ := cmd.Flags().GetString("token")
@@ -109,49 +115,50 @@ func runImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load configuration file
-	fmt.Printf("📂 Loading configuration from: %s\n", configFile)
+	logger.Info("Loading configuration file",
+		zap.String("config_file", configFile))
 	config, err := loadConfigFile(configFile)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	fmt.Printf("   Source: %s\n", config.Metadata.SourceURL)
-	fmt.Printf("   Exported: %s\n", config.Metadata.ExportedAt.Format(time.RFC3339))
-	fmt.Printf("   Version: %s\n", config.Metadata.AuthentikVersion)
+	logger.Info("Configuration loaded successfully",
+		zap.String("source_url", config.Metadata.SourceURL),
+		zap.String("exported_at", config.Metadata.ExportedAt.Format(time.RFC3339)),
+		zap.String("authentik_version", config.Metadata.AuthentikVersion))
 
 	// Validate configuration
-	fmt.Print("\n Validating configuration... ")
+	logger.Info("Validating configuration")
 	warnings, errors := validateConfig(config)
 
 	if len(errors) > 0 {
-		fmt.Println("")
-		fmt.Println("\nValidation errors:")
+		logger.Error("Validation errors found",
+			zap.Int("error_count", len(errors)))
 		for _, err := range errors {
-			fmt.Printf("   • %s\n", err)
+			logger.Error("  • " + err)
 		}
 		if !options.Force {
 			return fmt.Errorf("validation failed, use --force to continue anyway")
 		}
-		fmt.Println("   Continuing with --force flag")
-	} else {
-		fmt.Println("")
+		logger.Warn("Continuing with --force flag")
 	}
 
 	if len(warnings) > 0 {
-		fmt.Println("\nValidation warnings:")
+		logger.Warn("Validation warnings found",
+			zap.Int("warning_count", len(warnings)))
 		for _, warn := range warnings {
-			fmt.Printf("   • %s\n", warn)
+			logger.Warn("  • " + warn)
 		}
 	}
 
 	if options.ValidateOnly {
-		fmt.Println("\n Validation complete (--validate-only flag set)")
+		logger.Info("Validation complete (--validate-only flag set)")
 		return nil
 	}
 
 	// Create backup if requested
 	if options.CreateBackup && !options.DryRun {
-		fmt.Print("\n Creating backup of target instance... ")
+		logger.Info("Creating backup of target instance")
 		backupFile := fmt.Sprintf("authentik-backup-%s.yaml", time.Now().Format("20060102-150405"))
 		extractCmd := &cobra.Command{}
 		extractCmd.Flags().String("url", url, "")
@@ -159,10 +166,12 @@ func runImport(cmd *cobra.Command, args []string) error {
 		extractCmd.Flags().String("output", backupFile, "")
 		extractCmd.Flags().String("format", "yaml", "")
 
-		if err := runExtract(extractCmd, []string{}); err != nil {
-			fmt.Printf("Warning: Could not create backup: %v\n", err)
+		if err := runExtract(rc, extractCmd, []string{}); err != nil {
+			logger.Warn("Could not create backup",
+				zap.Error(err))
 		} else {
-			fmt.Printf(" Saved to %s\n", backupFile)
+			logger.Info("Backup saved",
+				zap.String("backup_file", backupFile))
 		}
 	}
 
