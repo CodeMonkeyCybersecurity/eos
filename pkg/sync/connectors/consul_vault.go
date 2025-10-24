@@ -354,7 +354,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		return eos_err.NewUserError("Vault is sealed - unseal it first:\n" +
 			"  vault operator unseal\n\n" +
 			"Or use automatic unsealing:\n" +
-			"  sudo eos unseal vault")
+			"  sudo eos update vault --unseal")
 	}
 
 	logger.Info("Vault is initialized and unsealed")
