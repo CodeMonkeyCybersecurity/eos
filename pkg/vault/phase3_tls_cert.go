@@ -56,7 +56,21 @@ func GenerateTLS(rc *eos_io.RuntimeContext) error {
 	if err := EnsureVaultAgentCAExists(rc); err != nil {
 		return cerr.Wrap(err, "ensure Vault Agent CA")
 	}
-	return secureOwnership(rc)
+
+	// REMOVED: secureOwnership(rc) call
+	// RATIONALE: GenerateSelfSignedCertificate() already sets correct ownership+permissions
+	// in tls_certificate.go:209-230. The secureOwnership() function was redundant and
+	// DESTRUCTIVE - it used ChmodR(shared.DirPermStandard) which set everything to 0755,
+	// including the private key (should be 0600). This caused Vault to refuse loading the
+	// certificate with "permission denied" because Vault enforces security by rejecting
+	// world-readable private keys.
+	//
+	// Historical context: This was a duplicate permission-setting code path that predated
+	// the unified GenerateSelfSignedCertificate() function. Now that the unified function
+	// handles ownership+permissions correctly (ownership FIRST to avoid race condition,
+	// then file-specific permissions), this call is both unnecessary and harmful.
+
+	return nil
 }
 
 // ensureTLS checks/generates cert+key.
