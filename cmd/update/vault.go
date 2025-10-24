@@ -22,6 +22,7 @@ var (
 	vaultDryRun         bool
 	vaultUpdatePolicies bool
 	vaultFix            bool
+	vaultUnseal         bool
 )
 
 // VaultCmd updates Vault configuration
@@ -35,8 +36,15 @@ The command intelligently updates:
 2. Vault HCL configuration file ports (--ports)
 3. Vault policies to latest version (--update-policies)
 4. Configuration drift correction (--fix)
-5. Restarts Vault service to apply changes (ports only)
-6. Verifies new configuration is accessible
+5. Vault seal status (--unseal)
+6. Restarts Vault service to apply changes (ports only)
+7. Verifies new configuration is accessible
+
+Unseal Vault:
+  --unseal     Unseal Vault using stored unseal keys
+               Loads unseal keys from /run/eos/vault_init_output.json
+               Automatically unseals if Vault is sealed
+               Idempotent: safe to run multiple times
 
 Configuration Drift Correction:
   --fix        Detect and correct drift from canonical state
@@ -52,6 +60,9 @@ Configuration Drift Correction:
   Like combing through the configuration to correct any settings that drifted.
 
 Examples:
+  # Unseal Vault (recommended after seal or reboot)
+  eos update vault --unseal
+
   # Detect and fix all configuration drift
   eos update vault --fix
 
@@ -104,6 +115,8 @@ func init() {
 		"Update Vault policies to latest version (requires root token)")
 	VaultCmd.Flags().BoolVar(&vaultFix, "fix", false,
 		"Fix configuration drift from canonical state (use --dry-run to preview)")
+	VaultCmd.Flags().BoolVar(&vaultUnseal, "unseal", false,
+		"Unseal Vault using stored unseal keys from initialization")
 }
 
 func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -125,22 +138,32 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	if vaultPorts != "" {
 		operationCount++
 	}
+	if vaultUnseal {
+		operationCount++
+	}
 
 	// CRITICAL: Only allow ONE operation at a time
 	if operationCount > 1 {
 		return eos_err.NewUserError(
 			"Cannot specify multiple operations simultaneously.\n\n" +
 				"Choose ONE of:\n" +
+				"  --unseal          Unseal Vault\n" +
 				"  --fix             Fix configuration drift\n" +
 				"  --address         Update Vault address\n" +
 				"  --ports           Migrate ports\n" +
 				"  --update-policies Update policies\n\n" +
 				"Use --dry-run to preview changes for any operation.\n\n" +
 				"Examples:\n" +
+				"  eos update vault --unseal\n" +
 				"  eos update vault --fix\n" +
 				"  eos update vault --fix --dry-run\n" +
 				"  eos update vault --address vhost5\n" +
 				"  eos update vault --ports 8179 -> default --dry-run")
+	}
+
+	// Handle --unseal flag first (most common operation)
+	if vaultUnseal {
+		return runVaultUnseal(rc)
 	}
 
 	// Handle --fix flag (configuration drift correction)
@@ -183,7 +206,9 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	if vaultAddress == "" && vaultPorts == "" {
 		return eos_err.NewUserError(
-			"Must specify either --address, --ports, --update-policies, or --fix.\n\n" +
+			"Must specify one of: --unseal, --address, --ports, --update-policies, or --fix.\n\n" +
+				"Unseal Vault (after reboot or seal):\n" +
+				"  eos update vault --unseal\n\n" +
 				"Fix configuration drift:\n" +
 				"  eos update vault --fix\n" +
 				"  eos update vault --fix --dry-run  (preview without applying)\n\n" +
@@ -431,4 +456,104 @@ func displayFixSummary(rc *eos_io.RuntimeContext, result *vaultfix.RepairResult,
 	}
 
 	logger.Info("================================================================================")
+}
+
+// runVaultUnseal unseals Vault using stored unseal keys
+func runVaultUnseal(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("================================================================================")
+	logger.Info("Unsealing Vault")
+	logger.Info("================================================================================")
+	logger.Info("")
+
+	// ASSESS - Check if Vault is running
+	logger.Info("[ASSESS] Checking Vault status")
+
+	// Use unauthenticated client to check seal status
+	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+	if err != nil {
+		return fmt.Errorf("failed to check Vault status: %w\n\n"+
+			"Ensure Vault service is running:\n"+
+			"  systemctl status vault", err)
+	}
+
+	if !initialized {
+		return eos_err.NewUserError(
+			"Vault is not initialized.\n\n" +
+				"Initialize Vault first:\n" +
+				"  sudo eos create vault")
+	}
+
+	if !sealed {
+		logger.Info("✓ Vault is already unsealed")
+		logger.Info("")
+		logger.Info("No action needed - Vault is ready to use.")
+		logger.Info("================================================================================")
+		return nil
+	}
+
+	logger.Info("Vault is sealed - proceeding with unseal operation")
+	logger.Info("")
+
+	// INTERVENE - Unseal Vault
+	logger.Info("[INTERVENE] Unsealing Vault with stored unseal keys")
+
+	// Create unauthenticated client for unseal operation
+	client, err := vault.GetVaultClient(rc)
+	if err != nil {
+		return fmt.Errorf("failed to create Vault client: %w", err)
+	}
+
+	// Use existing unseal infrastructure
+	unsealed, err := vault.UnsealVaultIfNeeded(rc, client)
+	if err != nil {
+		return fmt.Errorf("unseal operation failed: %w\n\n"+
+			"Common causes:\n"+
+			"  • Unseal keys not found in /run/eos/vault_init_output.json\n"+
+			"  • Insufficient unseal keys provided\n"+
+			"  • Vault service not responding\n\n"+
+			"Manual unseal:\n"+
+			"  vault operator unseal", err)
+	}
+
+	if !unsealed {
+		logger.Warn("Vault was already unsealed (no operation performed)")
+	} else {
+		logger.Info("✓ Vault unsealed successfully")
+	}
+
+	// EVALUATE - Verify Vault is operational
+	logger.Info("")
+	logger.Info("[EVALUATE] Verifying Vault is operational")
+
+	finalInitialized, finalSealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+	if err != nil {
+		logger.Warn("Could not verify final seal status", zap.Error(err))
+	} else if finalSealed {
+		return fmt.Errorf("vault is still sealed after unseal operation\n\n" +
+			"This should not happen - please check Vault logs:\n" +
+			"  journalctl -u vault -n 50")
+	} else if !finalInitialized {
+		return fmt.Errorf("vault is not initialized - unexpected state")
+	} else {
+		logger.Info("✓ Vault is unsealed and operational")
+	}
+
+	logger.Info("")
+	logger.Info("================================================================================")
+	logger.Info("✓ Unseal Complete")
+	logger.Info("================================================================================")
+	logger.Info("")
+	logger.Info("Vault is now unsealed and ready for use.")
+	logger.Info("")
+	logger.Info("Next steps:")
+	logger.Info("  • Verify Vault health: vault status")
+	logger.Info("  • Check authentication: vault token lookup")
+	logger.Info("  • List secrets engines: vault secrets list")
+	logger.Info("")
+	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
+	logger.Info("================================================================================")
+
+	return nil
 }

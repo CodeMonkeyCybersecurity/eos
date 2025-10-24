@@ -121,7 +121,7 @@ func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config 
 				"Vault is sealed. Please unseal Vault first:\n" +
 					"  vault operator unseal\n\n" +
 					"Or use automatic unsealing:\n" +
-					"  sudo eos unseal vault")
+					"  sudo eos update vault --unseal")
 		}
 
 		logger.Info("Vault is initialized and unsealed")
@@ -196,7 +196,7 @@ func (c *ConsulVaultConnector) CheckConnection(rc *eos_io.RuntimeContext, config
 		state.ConfigurationComplete = false
 		state.ConfigurationValid = false
 		state.Connected = false
-		state.Reason = "Vault is sealed - run: vault operator unseal OR sudo eos unseal vault"
+		state.Reason = "Vault is sealed - run: vault operator unseal OR sudo eos update vault --unseal"
 		return state, nil
 	}
 
