@@ -135,6 +135,65 @@ func IsVaultSealed(rc *eos_io.RuntimeContext, client *api.Client) bool {
 	return status.Sealed
 }
 
+// CheckVaultSealStatusUnauthenticated checks Vault seal status without authentication
+// This is used for preflight checks and early failure detection to avoid wasting time
+// on authentication when Vault is sealed or uninitialized.
+//
+// The /v1/sys/seal-status endpoint is UNAUTHENTICATED in Vault, making it perfect
+// for fast health checks before attempting authentication.
+//
+// Returns (initialized, sealed, error):
+//   - initialized: true if Vault has been initialized
+//   - sealed: true if Vault is sealed (requires unseal operation)
+//   - error: non-nil if unable to check status (network, API errors)
+//
+// Example usage:
+//
+//	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+//	if err != nil {
+//	    return fmt.Errorf("failed to check Vault: %w", err)
+//	}
+//	if !initialized {
+//	    return eos_err.NewUserError("Vault not initialized: sudo eos init vault")
+//	}
+//	if sealed {
+//	    return eos_err.NewUserError("Vault is sealed: vault operator unseal")
+//	}
+func CheckVaultSealStatusUnauthenticated(rc *eos_io.RuntimeContext) (bool, bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault seal status (unauthenticated)")
+
+	// Create unauthenticated client
+	vaultAddr := shared.GetVaultAddrWithEnv()
+	config := api.DefaultConfig()
+	config.Address = vaultAddr
+
+	// Read environment for VAULT_SKIP_VERIFY and other settings
+	if err := config.ReadEnvironment(); err != nil {
+		logger.Warn("Failed to read Vault environment config", zap.Error(err))
+		// Continue anyway - ReadEnvironment is best-effort
+	}
+
+	client, err := api.NewClient(config)
+	if err != nil {
+		return false, false, fmt.Errorf("create unauthenticated vault client: %w", err)
+	}
+
+	// Call unauthenticated seal-status endpoint
+	// This endpoint does NOT require authentication, making it perfect for preflight checks
+	sealStatus, err := client.Sys().SealStatus()
+	if err != nil {
+		return false, false, fmt.Errorf("check seal status: %w", err)
+	}
+
+	logger.Debug("Vault seal status checked",
+		zap.Bool("initialized", sealStatus.Initialized),
+		zap.Bool("sealed", sealStatus.Sealed),
+		zap.String("vault_addr", vaultAddr))
+
+	return sealStatus.Initialized, sealStatus.Sealed, nil
+}
+
 func IsAlreadyInitialized(err error) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }

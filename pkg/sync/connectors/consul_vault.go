@@ -101,6 +101,32 @@ func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config 
 				"  sudo systemctl start vault")
 	}
 
+	// CRITICAL: Check Vault seal status BEFORE attempting authentication
+	// This unauthenticated check prevents wasting 70+ seconds on futile auth attempts
+	logger.Debug("Checking Vault seal status")
+
+	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+	if err != nil {
+		logger.Warn("Could not check Vault seal status", zap.Error(err))
+		// Continue - will fail later with clearer error
+	} else {
+		if !initialized {
+			return eos_err.NewUserError(
+				"Vault is not initialized. Please initialize Vault first:\n" +
+					"  sudo eos init vault")
+		}
+
+		if sealed {
+			return eos_err.NewUserError(
+				"Vault is sealed. Please unseal Vault first:\n" +
+					"  vault operator unseal\n\n" +
+					"Or use automatic unsealing:\n" +
+					"  sudo eos unseal vault")
+		}
+
+		logger.Info("Vault is initialized and unsealed")
+	}
+
 	logger.Info("Vault pre-flight check passed")
 
 	return nil
@@ -145,7 +171,36 @@ func (c *ConsulVaultConnector) CheckConnection(rc *eos_io.RuntimeContext, config
 		return state, nil
 	}
 
-	// Get Vault client to check secrets engine configuration
+	// ASSESS - Check Vault seal status BEFORE authentication (fast check)
+	// CRITICAL: Prevents wasting 40+ seconds on authentication when Vault is sealed
+	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+	if err != nil {
+		logger.Warn("Could not check Vault seal status",
+			zap.Error(err))
+		state.ConfigurationComplete = false
+		state.ConfigurationValid = false
+		state.Connected = false
+		state.Reason = "Cannot connect to Vault API"
+		return state, nil
+	}
+
+	if !initialized {
+		state.ConfigurationComplete = false
+		state.ConfigurationValid = false
+		state.Connected = false
+		state.Reason = "Vault is not initialized - run: sudo eos init vault"
+		return state, nil
+	}
+
+	if sealed {
+		state.ConfigurationComplete = false
+		state.ConfigurationValid = false
+		state.Connected = false
+		state.Reason = "Vault is sealed - run: vault operator unseal OR sudo eos unseal vault"
+		return state, nil
+	}
+
+	// Get Vault client to check secrets engine configuration (seal check passed)
 	vaultClient, err := vault.GetVaultClient(rc)
 	if err != nil {
 		logger.Warn("Could not get Vault client",
@@ -153,7 +208,7 @@ func (c *ConsulVaultConnector) CheckConnection(rc *eos_io.RuntimeContext, config
 		state.ConfigurationComplete = false
 		state.ConfigurationValid = false
 		state.Connected = false
-		state.Reason = "Cannot connect to Vault"
+		state.Reason = "Cannot authenticate to Vault"
 		return state, nil
 	}
 
@@ -271,13 +326,8 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Connecting Consul and Vault (Pattern 3: Consul Secrets Engine)")
 
-	// ASSESS - Get Vault and Consul clients
-	logger.Info(" [ASSESS] Connecting to Vault and Consul")
-
-	vaultClient, err := vault.GetVaultClient(rc)
-	if err != nil {
-		return fmt.Errorf("failed to get Vault client: %w", err)
-	}
+	// ASSESS - Get Consul client (no auth required)
+	logger.Info(" [ASSESS] Connecting to Consul")
 
 	consulConfig := consulapi.DefaultConfig()
 	consulConfig.Address = shared.GetConsulHostPort()
@@ -286,28 +336,36 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		return fmt.Errorf("failed to get Consul client: %w", err)
 	}
 
-	// ASSESS - Check Vault is initialized and unsealed
-	logger.Info(" [ASSESS] Checking Vault status")
+	// ASSESS - Check Vault seal status BEFORE authentication (unauthenticated check)
+	// CRITICAL: Prevents wasting 70+ seconds on authentication when Vault is sealed
+	logger.Info(" [ASSESS] Checking Vault status (before authentication)")
 
-	initialized, err := vault.IsVaultInitialized(rc, vaultClient)
+	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
 	if err != nil {
-		return fmt.Errorf("failed to check Vault initialization status: %w", err)
+		return fmt.Errorf("failed to check Vault seal status: %w", err)
 	}
+
 	if !initialized {
 		return eos_err.NewUserError("Vault must be initialized first:\n" +
 			"  sudo eos init vault")
 	}
 
-	sealStatus, err := vaultClient.Sys().SealStatus()
-	if err != nil {
-		return fmt.Errorf("failed to check Vault seal status: %w", err)
-	}
-	if sealStatus.Sealed {
+	if sealed {
 		return eos_err.NewUserError("Vault is sealed - unseal it first:\n" +
-			"  vault operator unseal")
+			"  vault operator unseal\n\n" +
+			"Or use automatic unsealing:\n" +
+			"  sudo eos unseal vault")
 	}
 
 	logger.Info("Vault is initialized and unsealed")
+
+	// NOW get authenticated Vault client (seal check passed)
+	logger.Info(" [ASSESS] Connecting to Vault (authenticated)")
+
+	vaultClient, err := vault.GetVaultClient(rc)
+	if err != nil {
+		return fmt.Errorf("failed to get authenticated Vault client: %w", err)
+	}
 
 	// SAFETY CHECK: Warn if Vault is using Consul storage (Pattern 1)
 	vaultConfigPath := vault.VaultConfigPath
@@ -464,7 +522,20 @@ func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctyp
 	}
 	logger.Info("Vault service is active")
 
-	// EVALUATE - Verify Vault health
+	// EVALUATE - Check Vault seal status (defensive check)
+	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+	if err != nil {
+		return fmt.Errorf("failed to check Vault seal status: %w", err)
+	}
+	if !initialized {
+		return fmt.Errorf("vault is not initialized")
+	}
+	if sealed {
+		return fmt.Errorf("vault is sealed")
+	}
+	logger.Info("Vault is initialized and unsealed")
+
+	// EVALUATE - Verify Vault health (get authenticated client)
 	vaultClient, err := vault.GetVaultClient(rc)
 	if err != nil {
 		return fmt.Errorf("failed to get Vault client: %w", err)
