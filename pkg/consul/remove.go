@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -124,7 +125,7 @@ func RemoveConsul(rc *eos_io.RuntimeContext) error {
 
 	// EVALUATE - Verify removal
 	if err := verifyConsulRemoval(rc); err != nil {
-		return fmt.Errorf("Consul removal verification failed: %w", err)
+		return fmt.Errorf("consul removal verification failed: %w", err)
 	}
 
 	logger.Info("Consul removal completed successfully")
@@ -604,6 +605,39 @@ func removeConsulUser(rc *eos_io.RuntimeContext) error {
 
 	logger.Info("Removing Consul user and group")
 
+	// CRITICAL FIX: Kill all processes owned by consul user BEFORE deleting user
+	// This prevents "user is currently used by process" errors
+	logger.Info("Killing any remaining processes owned by consul user")
+	killOutput, killErr := execute.Run(rc.Ctx, execute.Options{
+		Command: "pkill",
+		Args:    []string{"-9", "-u", "consul"},
+		Capture: true,
+		Logger:  logger.ZapLogger(),
+	})
+	if killErr != nil {
+		logger.Debug("pkill returned non-zero (no processes or user doesn't exist)",
+			zap.Error(killErr),
+			zap.String("output", killOutput))
+		// This is OK - means no processes were found or user doesn't exist
+	} else {
+		logger.Info("Killed processes owned by consul user")
+	}
+
+	// Also try killing by process name as fallback
+	killOutput, killErr = execute.Run(rc.Ctx, execute.Options{
+		Command: "pkill",
+		Args:    []string{"-9", "-f", "consul agent"},
+		Capture: true,
+		Logger:  logger.ZapLogger(),
+	})
+	if killErr != nil {
+		logger.Debug("No consul agent processes found", zap.String("output", killOutput))
+	}
+
+	// Give processes time to terminate
+	logger.Debug("Waiting for processes to terminate")
+	time.Sleep(1 * time.Second)
+
 	// Remove the consul user (this will also remove the primary group)
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "userdel",
@@ -612,10 +646,15 @@ func removeConsulUser(rc *eos_io.RuntimeContext) error {
 		Logger:  logger.ZapLogger(),
 	})
 	if err != nil {
-		logger.Debug("Failed to remove consul user (may not exist)",
-			zap.Error(err),
-			zap.String("output", output))
-		// User might not exist, not critical
+		// Check if error is because user doesn't exist
+		if strings.Contains(output, "does not exist") {
+			logger.Debug("Consul user does not exist (already removed)", zap.String("output", output))
+		} else {
+			logger.Debug("Failed to remove consul user",
+				zap.Error(err),
+				zap.String("output", output))
+			// Not critical - continue
+		}
 	} else {
 		logger.Info("Successfully removed consul user")
 	}
@@ -693,26 +732,35 @@ func verifyConsulRemoval(rc *eos_io.RuntimeContext) error {
 		issues = append(issues, "Internal CA certificate still in system trust store")
 	}
 
-	// Check if user still exists
-	_, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "id",
-		Args:    []string{"consul"},
-		Capture: true,
-		Logger:  logger.ZapLogger(),
-	})
-	if err == nil {
-		issues = append(issues, "Consul user still exists")
-	}
-
-	// Check for lingering processes
-	output, err = execute.Run(rc.Ctx, execute.Options{
+	// Check for lingering processes (CRITICAL)
+	processOutput, processErr := execute.Run(rc.Ctx, execute.Options{
 		Command: "pgrep",
 		Args:    []string{"-f", "consul agent"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
 	})
-	if err == nil && strings.TrimSpace(output) != "" {
+	hasRunningProcesses := (processErr == nil && strings.TrimSpace(processOutput) != "")
+
+	if hasRunningProcesses {
 		issues = append(issues, "Consul agent processes still running")
+	}
+
+	// Check if user still exists - only flag as issue if processes are also running
+	_, userErr := execute.Run(rc.Ctx, execute.Options{
+		Command: "id",
+		Args:    []string{"consul"},
+		Capture: true,
+		Logger:  logger.ZapLogger(),
+	})
+	userExists := (userErr == nil)
+
+	if userExists && hasRunningProcesses {
+		// User exists AND processes running - critical issue
+		issues = append(issues, "Consul user still exists with running processes")
+	} else if userExists && !hasRunningProcesses {
+		// User exists but no processes - just warn, not critical
+		logger.Info("Consul user still exists but no processes running - this is acceptable",
+			zap.String("note", "User can be manually removed later with: sudo userdel -r consul"))
 	}
 
 	if len(issues) > 0 {
