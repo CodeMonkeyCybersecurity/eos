@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared/system"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -282,47 +283,44 @@ func stopConsulService(rc *eos_io.RuntimeContext) error {
 
 	logger.Info("Stopping Consul service")
 
-	// Stop the service
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"stop", "consul"},
-		Capture: true,
-		Logger:  logger.ZapLogger(),
-	})
-	if err != nil {
-		logger.Warn("Failed to stop Consul service",
-			zap.Error(err),
-			zap.String("output", output),
-			zap.String("remediation", "Try manually: sudo systemctl stop consul"))
-	}
+	// Check if service exists before trying to stop it
+	if system.SystemdUnitExists(rc.Ctx, "consul.service") {
+		logger.Debug("Consul service unit exists, stopping it")
 
-	// Disable the service
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"disable", "consul"},
-		Capture: true,
-		Logger:  logger.ZapLogger(),
-	})
-	if err != nil {
-		logger.Warn("Failed to disable Consul service",
-			zap.Error(err),
-			zap.String("output", output))
-	}
+		// Stop the service
+		execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"stop", "consul"},
+			Capture: true,
+			Logger:  logger.ZapLogger(),
+			Context: execute.ContextRemoval,
+		})
 
-	// Kill any remaining consul processes - be very specific to avoid killing wrong processes
-	// Only target actual consul agent processes, not other tools
-	logger.Debug("Checking for remaining Consul agent processes")
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "pkill",
-		Args:    []string{"-9", "-f", "consul agent"},
-		Capture: true,
-		Logger:  logger.ZapLogger(),
-	})
-	if err != nil {
-		logger.Debug("No Consul agent processes to kill (expected if clean shutdown)",
-			zap.String("output", output))
+		// Disable the service
+		execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"disable", "consul"},
+			Capture: true,
+			Logger:  logger.ZapLogger(),
+			Context: execute.ContextRemoval,
+		})
 	} else {
-		logger.Info("Killed remaining Consul agent processes")
+		logger.Debug("Consul service unit does not exist, skipping stop/disable")
+	}
+
+	// Check if consul processes are running before trying to kill them
+	if system.ProcessesExist(rc.Ctx, "consul agent") {
+		logger.Debug("Consul agent processes found, killing them")
+
+		execute.Run(rc.Ctx, execute.Options{
+			Command: "pkill",
+			Args:    []string{"-9", "-f", "consul agent"},
+			Capture: true,
+			Logger:  logger.ZapLogger(),
+			Context: execute.ContextRemoval,
+		})
+	} else {
+		logger.Debug("No consul agent processes found, skipping kill")
 	}
 
 	return nil
@@ -334,19 +332,13 @@ func removeConsulPackage(rc *eos_io.RuntimeContext) error {
 	logger.Info("Removing Consul package")
 
 	// Try to remove via apt
-	output, err := execute.Run(rc.Ctx, execute.Options{
+	execute.Run(rc.Ctx, execute.Options{
 		Command: "apt-get",
 		Args:    []string{"remove", "--purge", "-y", "consul"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
+		Context: execute.ContextRemoval,
 	})
-	if err != nil {
-		logger.Debug("Package removal output (package may not be installed via apt)",
-			zap.String("output", output))
-		// Package might not be installed via apt, continue
-	} else {
-		logger.Info("Successfully removed Consul package via apt-get")
-	}
 
 	// Remove the binary if it still exists
 	consulPaths := []string{
@@ -540,30 +532,22 @@ func cleanupSystemdTimers(rc *eos_io.RuntimeContext) error {
 
 	for _, unit := range timerFiles {
 		// Stop the unit
-		output, err := execute.Run(rc.Ctx, execute.Options{
+		execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"stop", unit},
 			Capture: true,
 			Logger:  logger.ZapLogger(),
+			Context: execute.ContextRemoval,
 		})
-		if err != nil {
-			logger.Debug("Failed to stop systemd unit (may not exist)",
-				zap.String("unit", unit),
-				zap.String("output", output))
-		}
 
 		// Disable the unit
-		output, err = execute.Run(rc.Ctx, execute.Options{
+		execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"disable", unit},
 			Capture: true,
 			Logger:  logger.ZapLogger(),
+			Context: execute.ContextRemoval,
 		})
-		if err != nil {
-			logger.Debug("Failed to disable systemd unit (may not exist)",
-				zap.String("unit", unit),
-				zap.String("output", output))
-		}
 	}
 
 	// Remove systemd unit files
@@ -605,75 +589,60 @@ func removeConsulUser(rc *eos_io.RuntimeContext) error {
 
 	logger.Info("Removing Consul user and group")
 
+	// Check if consul user exists before attempting removal
+	if !system.UserExists("consul") {
+		logger.Debug("Consul user does not exist, skipping user removal")
+		return nil
+	}
+
+	logger.Debug("Consul user exists, proceeding with removal")
+
 	// CRITICAL FIX: Kill all processes owned by consul user BEFORE deleting user
 	// This prevents "user is currently used by process" errors
-	logger.Info("Killing any remaining processes owned by consul user")
-	killOutput, killErr := execute.Run(rc.Ctx, execute.Options{
-		Command: "pkill",
-		Args:    []string{"-9", "-u", "consul"},
-		Capture: true,
-		Logger:  logger.ZapLogger(),
-	})
-	if killErr != nil {
-		logger.Debug("pkill returned non-zero (no processes or user doesn't exist)",
-			zap.Error(killErr),
-			zap.String("output", killOutput))
-		// This is OK - means no processes were found or user doesn't exist
+	if system.ProcessesExist(rc.Ctx, "consul") {
+		logger.Info("Killing processes owned by consul user")
+
+		execute.Run(rc.Ctx, execute.Options{
+			Command: "pkill",
+			Args:    []string{"-9", "-u", "consul"},
+			Capture: true,
+			Logger:  logger.ZapLogger(),
+			Context: execute.ContextRemoval,
+		})
+
+		// Also try killing by process name as fallback
+		execute.Run(rc.Ctx, execute.Options{
+			Command: "pkill",
+			Args:    []string{"-9", "-f", "consul agent"},
+			Capture: true,
+			Logger:  logger.ZapLogger(),
+			Context: execute.ContextRemoval,
+		})
+
+		// Give processes time to terminate
+		logger.Debug("Waiting for processes to terminate")
+		time.Sleep(1 * time.Second)
 	} else {
-		logger.Info("Killed processes owned by consul user")
+		logger.Debug("No consul processes found, skipping process kill")
 	}
-
-	// Also try killing by process name as fallback
-	killOutput, killErr = execute.Run(rc.Ctx, execute.Options{
-		Command: "pkill",
-		Args:    []string{"-9", "-f", "consul agent"},
-		Capture: true,
-		Logger:  logger.ZapLogger(),
-	})
-	if killErr != nil {
-		logger.Debug("No consul agent processes found", zap.String("output", killOutput))
-	}
-
-	// Give processes time to terminate
-	logger.Debug("Waiting for processes to terminate")
-	time.Sleep(1 * time.Second)
 
 	// Remove the consul user (this will also remove the primary group)
-	output, err := execute.Run(rc.Ctx, execute.Options{
+	execute.Run(rc.Ctx, execute.Options{
 		Command: "userdel",
 		Args:    []string{"-r", "consul"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
+		Context: execute.ContextRemoval,
 	})
-	if err != nil {
-		// Check if error is because user doesn't exist
-		if strings.Contains(output, "does not exist") {
-			logger.Debug("Consul user does not exist (already removed)", zap.String("output", output))
-		} else {
-			logger.Debug("Failed to remove consul user",
-				zap.Error(err),
-				zap.String("output", output))
-			// Not critical - continue
-		}
-	} else {
-		logger.Info("Successfully removed consul user")
-	}
 
-	// Ensure the group is also removed
-	output, err = execute.Run(rc.Ctx, execute.Options{
+	// Ensure the group is also removed (may already be removed with user)
+	execute.Run(rc.Ctx, execute.Options{
 		Command: "groupdel",
 		Args:    []string{"consul"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
+		Context: execute.ContextRemoval,
 	})
-	if err != nil {
-		logger.Debug("Failed to remove consul group (may not exist or already removed with user)",
-			zap.Error(err),
-			zap.String("output", output))
-		// Group might not exist or be removed with user, not critical
-	} else {
-		logger.Info("Successfully removed consul group")
-	}
 
 	return nil
 }
@@ -696,6 +665,7 @@ func verifyConsulRemoval(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"list-unit-files", "consul.service"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
+		Context: execute.ContextVerify,
 	})
 	if err == nil && strings.Contains(output, "consul.service") {
 		issues = append(issues, "Consul service file still exists")
@@ -707,6 +677,7 @@ func verifyConsulRemoval(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"list-unit-files", "vault-cert-renewal.*"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
+		Context: execute.ContextVerify,
 	})
 	if err == nil && strings.Contains(output, "vault-cert-renewal") {
 		issues = append(issues, "Vault cert renewal timer still exists")
@@ -738,6 +709,7 @@ func verifyConsulRemoval(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"-f", "consul agent"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
+		Context: execute.ContextVerify,
 	})
 	hasRunningProcesses := (processErr == nil && strings.TrimSpace(processOutput) != "")
 
@@ -751,6 +723,7 @@ func verifyConsulRemoval(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"consul"},
 		Capture: true,
 		Logger:  logger.ZapLogger(),
+		Context: execute.ContextVerify,
 	})
 	userExists := (userErr == nil)
 
