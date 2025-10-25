@@ -70,7 +70,7 @@ func VaultAgentServiceDiagnostic() *debug.Diagnostic {
 			} else {
 				result.Status = debug.StatusError
 				result.Message = "Service not found or failed to query"
-				result.Remediation = "Install Vault Agent: eos enable vault agent"
+				result.Remediation = "Install Vault Agent during Vault setup: sudo eos create vault (or sudo eos update vault --enable-agent if Vault is already installed)"
 			}
 
 			return result, nil
@@ -104,7 +104,7 @@ func VaultAgentConfigDiagnostic() *debug.Diagnostic {
 				result.Status = debug.StatusError
 				result.Message = "Configuration file not found"
 				result.Output = fmt.Sprintf("File does not exist: %s", configPath)
-				result.Remediation = "Configure Vault Agent: eos enable vault agent"
+				result.Remediation = "Configure Vault Agent during Vault setup: sudo eos create vault (or sudo eos update vault --enable-agent if Vault is already installed)"
 				return result, nil
 			} else if err != nil {
 				result.Status = debug.StatusError
@@ -278,7 +278,7 @@ func VaultAgentCredentialsDiagnostic() *debug.Diagnostic {
 			} else {
 				result.Status = debug.StatusError
 				result.Message = "AppRole credentials missing"
-				result.Remediation = "Enable AppRole auth: eos enable vault approle"
+				result.Remediation = "Enable AppRole auth during Vault setup: sudo eos create vault (or sudo eos update vault --enable-approle if Vault is already installed)"
 			}
 
 			logger.Info("Vault Agent credentials check complete",

@@ -383,14 +383,75 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		zap.Duration("duration", time.Since(phaseStart)))
 
 	// Step 13: Configure Multi-Factor Authentication
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 13] Configuring Multi-Factor Authentication (interactive)")
+	phaseStart = time.Now()
+
 	if interaction.PromptYesNo(rc.Ctx, "Enable Multi-Factor Authentication (MFA)?", true) {
+		log.Info(" [INTERVENE] Enabling MFA methods")
 		mfaConfig := DefaultMFAConfig()
 		if err := EnableMFAMethods(rc, client, mfaConfig); err != nil {
+			log.Error(" [Phase 13] Failed to enable MFA methods",
+				zap.Error(err),
+				zap.Duration("duration", time.Since(phaseStart)))
 			return logger.LogErrAndWrap(rc, "enable MFA", err)
 		}
-		log.Info(" MFA configuration completed")
+		log.Info(" [EVALUATE] MFA methods enabled successfully")
+
+		// CRITICAL P0 FIX: Provision TOTP for the eos user
+		// Without this, users cannot authenticate because MFA is enforced but they don't have TOTP configured
+		log.Info("")
+		log.Info(" [INTERVENE] Provisioning TOTP for eos user")
+		log.Info("")
+		log.Info("IMPORTANT: You enabled MFA, so the 'eos' user needs a TOTP secret.")
+		log.Info("This is required for authentication from this point forward.")
+		log.Info("")
+
+		// Check if userpass is configured (eos user exists)
+		userpassConfigured, err := IsUserpassConfigured(rc, client)
+		if err != nil {
+			log.Warn("Could not check if userpass is configured", zap.Error(err))
+			userpassConfigured = false
+		}
+
+		if userpassConfigured {
+			// Set up TOTP for the eos user
+			if err := SetupUserTOTP(rc, client, "eos"); err != nil {
+				log.Error(" [Phase 13] CRITICAL: Failed to set up TOTP for eos user",
+					zap.Error(err),
+					zap.Duration("duration", time.Since(phaseStart)))
+				log.Error("")
+				log.Error("⚠️  MFA is enabled but eos user does NOT have TOTP configured!")
+				log.Error("⚠️  You will NOT be able to authenticate with userpass until TOTP is set up.")
+				log.Error("")
+				log.Error("To fix: Run 'eos update vault --setup-mfa-user eos'")
+				log.Error("")
+				return logger.LogErrAndWrap(rc, "setup TOTP for eos user", err)
+			}
+			log.Info(" [EVALUATE] TOTP provisioned successfully for eos user")
+		} else {
+			log.Warn("")
+			log.Warn("⚠️  Userpass authentication is not configured yet.")
+			log.Warn("⚠️  MFA enforcement applies to userpass, but no userpass user exists.")
+			log.Warn("")
+			log.Warn("If you enable userpass later, you MUST configure TOTP:")
+			log.Warn("  eos update vault --setup-mfa-user <username>")
+			log.Warn("")
+		}
+
+		log.Info(" [Phase 13] MFA configuration completed",
+			zap.Duration("duration", time.Since(phaseStart)))
 	} else {
-		log.Warn("MFA was not enabled - this reduces security")
+		log.Warn(" [Phase 13] MFA was not enabled - this reduces security",
+			zap.Duration("duration", time.Since(phaseStart)))
+		log.Warn("")
+		log.Warn("⚠️  SECURITY WARNING: MFA provides critical protection against:")
+		log.Warn("   • Stolen passwords")
+		log.Warn("   • Brute force attacks")
+		log.Warn("   • Credential stuffing")
+		log.Warn("")
+		log.Warn("You can enable MFA later with: eos update vault --enable-mfa")
+		log.Warn("")
 	}
 
 	// Step 14: Vault Agent comprehensive enablement

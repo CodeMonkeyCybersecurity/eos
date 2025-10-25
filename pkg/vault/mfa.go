@@ -530,85 +530,178 @@ func promptOktaConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error)
 	}, nil
 }
 
-// SetupUserTOTP helps a user set up TOTP MFA
+// SetupUserTOTP helps a user set up TOTP MFA for Identity-based MFA
+// This function generates a user-specific TOTP secret and displays it for enrollment
+//
+// CRITICAL: Must be called AFTER EnableMFAMethods() creates the TOTP MFA method
+// CRITICAL: User MUST save the QR code/URL/key before continuing - they cannot retrieve it later
 func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Setting up TOTP MFA for user", zap.String("username", username))
 
-	// Generate TOTP key for user
-	keyData := map[string]interface{}{
-		"generate":     true,
-		"issuer":       "Vault - Eos Infrastructure",
-		"account_name": username,
+	log.Info("")
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info(" Setting up TOTP MFA for user: " + username)
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info("")
+
+	// Step 1: Retrieve the TOTP method ID that was created during EnableMFAMethods
+	log.Info(" [ASSESS] Retrieving TOTP MFA method configuration")
+	methodIDSecret, err := client.Logical().Read("secret/data/eos/mfa-methods/totp")
+	if err != nil {
+		log.Error(" Failed to read TOTP method ID from Vault",
+			zap.Error(err))
+		log.Error("")
+		log.Error("This usually means MFA was not enabled during Vault setup.")
+		log.Error("To fix: Run 'eos update vault --enable-mfa'")
+		log.Error("")
+		return cerr.Wrap(err, "failed to read TOTP method ID - MFA not configured")
 	}
 
-	secret, err := client.Logical().Write(fmt.Sprintf("auth/totp/keys/%s", username), keyData)
+	if methodIDSecret == nil || methodIDSecret.Data == nil {
+		log.Error(" TOTP MFA method not found - MFA may not be enabled")
+		return cerr.New("TOTP MFA method not found in Vault KV")
+	}
+
+	data, ok := methodIDSecret.Data["data"].(map[string]interface{})
+	if !ok {
+		log.Error(" Invalid TOTP method data structure")
+		return cerr.New("invalid TOTP method data structure")
+	}
+
+	methodID, ok := data["method_id"].(string)
+	if !ok || methodID == "" {
+		log.Error(" TOTP method_id is not valid")
+		return cerr.New("TOTP method_id is not valid")
+	}
+
+	log.Info(" ✓ TOTP MFA method found", zap.String("method_id", methodID))
+
+	// Step 2: Generate TOTP secret for this specific user
+	log.Info(" [INTERVENE] Generating TOTP secret for user")
+
+	generatePath := fmt.Sprintf("identity/mfa/method/totp/generate")
+	generateData := map[string]interface{}{
+		"method_id": methodID,
+	}
+
+	secret, err := client.Logical().Write(generatePath, generateData)
 	if err != nil {
-		log.Error(" Failed to generate TOTP key",
+		log.Error(" Failed to generate TOTP secret",
 			zap.Error(err),
-			zap.String("username", username))
-		return cerr.Wrap(err, "failed to generate TOTP key")
+			zap.String("username", username),
+			zap.String("path", generatePath))
+		return cerr.Wrap(err, "failed to generate TOTP secret")
 	}
 
 	if secret == nil || secret.Data == nil {
-		log.Error(" No TOTP key data returned from Vault", zap.String("username", username))
-		return cerr.New("no TOTP key data returned")
+		log.Error(" No TOTP secret data returned from Vault")
+		return cerr.New("no TOTP secret data returned")
 	}
 
-	// Display QR code and backup key
-	qrCode, ok := secret.Data["qr_code"].(string)
-	if ok && qrCode != "" {
-		log.Info(" QR code available for authenticator app")
-		log.Info("terminal prompt: QR code available for authenticator app setup")
-		// SECURITY: QR codes contain sensitive secrets - use secure display method
-		// TODO: Implement secure QR code display mechanism
+	log.Info(" ✓ TOTP secret generated successfully")
+	log.Info("")
+
+	// Step 3: Display the secret to the user (CRITICAL - they can't retrieve this later)
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info(" ⚠️  IMPORTANT: Save this information NOW")
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info("")
+	log.Info("You MUST add this TOTP configuration to your authenticator app")
+	log.Info("(Google Authenticator, Authy, 1Password, etc.)")
+	log.Info("")
+	log.Info("This information will NOT be shown again!")
+	log.Info("")
+
+	// Extract and display URL (for manual entry)
+	if url, ok := secret.Data["url"].(string); ok && url != "" {
+		log.Info("Option 1: Scan QR code (if terminal supports it)")
+		log.Info("─────────────────────────────────────────────────────────")
+		log.Info("Open your authenticator app and scan this QR code:")
+		log.Info("")
+		log.Info(url) // The URL can be used to generate QR code
+		log.Info("")
 	}
 
-	url, ok := secret.Data["url"].(string)
-	if ok && url != "" {
-		log.Info(" Manual URL available for authenticator app")
-		log.Info("terminal prompt: Manual URL available for authenticator app setup")
-		// SECURITY: URLs contain sensitive secrets - use secure display method
-		// TODO: Implement secure URL display mechanism
+	// Extract and display barcode (base64 encoded PNG QR code)
+	if barcode, ok := secret.Data["barcode"].(string); ok && barcode != "" {
+		log.Info("QR Code available (base64-encoded PNG)")
+		log.Info("You can decode and display this with: echo '<barcode>' | base64 -d > qr.png")
+		log.Info("")
 	}
 
-	key, ok := secret.Data["key"].(string)
-	if ok && key != "" {
-		log.Info(" Backup key generated for TOTP")
-		log.Info("terminal prompt: Backup key generated - store securely")
-		// SECURITY: Backup keys are sensitive secrets - use secure display method
-		// TODO: Implement secure backup key display mechanism
+	// Extract and display backup key (for manual entry)
+	log.Info("Option 2: Manual entry")
+	log.Info("─────────────────────────────────────────────────────────")
+
+	if key, ok := secret.Data["secret"].(string); ok && key != "" {
+		log.Info("Backup Key (enter this manually if QR code doesn't work):")
+		log.Info("")
+		log.Info("  " + key)
+		log.Info("")
+		log.Info("Account: Vault - Eos Infrastructure (" + username + ")")
+		log.Info("Type: Time-based (TOTP)")
+		log.Info("Digits: 6")
+		log.Info("Period: 30 seconds")
+		log.Info("")
 	}
 
-	log.Info(" TOTP MFA setup completed - prompting for test code")
-	log.Info("terminal prompt: TOTP MFA setup completed!")
-	log.Info("terminal prompt: Please test your TOTP code before completing the setup")
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info("")
 
-	// Prompt for test code
-	if interaction.PromptYesNo(rc.Ctx, "Do you want to test your TOTP code now?", true) {
-		testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter TOTP code from your authenticator app", 1)
-		if err != nil {
-			log.Error(" Failed to get test code from user", zap.Error(err))
-			return cerr.Wrap(err, "failed to get test code")
-		}
+	// Step 4: Prompt user to test TOTP code
+	log.Info("Now please test your TOTP code to verify it works.")
+	log.Info("")
 
-		// Verify the test code
-		verifyData := map[string]interface{}{
-			"code": testCodes[0],
-		}
-
-		_, err = client.Logical().Write(fmt.Sprintf("auth/totp/code/%s", username), verifyData)
-		if err != nil {
-			log.Warn("TOTP code verification failed", zap.Error(err))
-			log.Error(" TOTP code verification failed - user needs to check authenticator app")
-			// Error already logged above with structured logging
-			return cerr.Wrap(err, "TOTP verification failed")
-		}
-
-		log.Info(" TOTP code verified successfully")
-		// Success already logged above with structured logging
+	// Wait for user to confirm they've saved the secret
+	if !interaction.PromptYesNo(rc.Ctx, "Have you saved the TOTP secret in your authenticator app?", true) {
+		log.Warn("User declined to save TOTP secret")
+		log.Warn("WARNING: User will NOT be able to authenticate with MFA until they configure TOTP")
+		return cerr.New("user did not save TOTP secret")
 	}
 
-	log.Info(" TOTP MFA setup completed for user", zap.String("username", username))
+	// Test the TOTP code
+	log.Info("")
+	log.Info("Testing TOTP code...")
+
+	testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter the 6-digit TOTP code from your authenticator app", 1)
+	if err != nil {
+		log.Error(" Failed to get test code from user", zap.Error(err))
+		return cerr.Wrap(err, "failed to get test code")
+	}
+
+	// Validate using MFA validation endpoint
+	mfaPayload := map[string]interface{}{
+		"method_id": methodID,
+		"payload": []string{
+			testCodes[0],
+		},
+	}
+
+	_, err = client.Logical().Write("identity/mfa/method/totp/admin-generate", mfaPayload)
+	if err != nil {
+		log.Warn("TOTP code verification failed", zap.Error(err))
+		log.Error("")
+		log.Error(" ✗ TOTP code verification FAILED")
+		log.Error("")
+		log.Error("Common causes:")
+		log.Error("  • Code expired (TOTP codes are valid for 30 seconds)")
+		log.Error("  • Incorrect manual entry of backup key")
+		log.Error("  • Device clock not synchronized")
+		log.Error("")
+		log.Error("Please try again or check your authenticator app configuration.")
+		return cerr.Wrap(err, "TOTP verification failed")
+	}
+
+	log.Info("")
+	log.Info(" ✓ TOTP code verified successfully!")
+	log.Info("")
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info(" TOTP MFA setup complete for user: " + username)
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info("")
+	log.Info("You will now be prompted for a TOTP code every time you")
+	log.Info("authenticate to Vault with your username and password.")
+	log.Info("")
+
 	return nil
 }

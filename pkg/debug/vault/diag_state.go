@@ -456,8 +456,8 @@ func OrphanedStateDiagnostic() *debug.Diagnostic {
 				output.WriteString("    $ sudo eos delete vault --purge --yes\n")
 				output.WriteString("    $ sudo eos create vault\n\n")
 				output.WriteString("  Option 2: If you have the unseal keys and root token saved elsewhere\n")
-				output.WriteString("    $ sudo eos enable vault\n")
-				output.WriteString("    (You will be prompted to enter credentials manually)\n\n")
+				output.WriteString("    $ sudo eos update vault --unseal\n")
+				output.WriteString("    (Unseals Vault using stored unseal keys)\n\n")
 				output.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 
 				result.Status = debug.StatusError
