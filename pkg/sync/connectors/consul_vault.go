@@ -16,6 +16,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	consulconfig "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
+	consulenv "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/environment"
 	consulsecrets "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -517,10 +518,27 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		}
 	}
 
+	// Discover environment from Consul (required for Vault paths)
+	env, err := consulenv.DiscoverFromConsul(rc)
+	if err != nil {
+		return fmt.Errorf("failed to discover environment: %w\n\n"+
+			"Consul-Vault integration requires knowing the environment.\n"+
+			"Consul is the authoritative source for environment configuration.\n\n"+
+			"Remediation:\n"+
+			"  1. Ensure Consul is running: systemctl status consul\n"+
+			"  2. Set environment: eos update consul --environment <env>\n"+
+			"  3. Emergency override (Consul unavailable):\n"+
+			"     CONSUL_EMERGENCY_OVERRIDE=true eos sync consul vault --environment <env>",
+			err)
+	}
+
+	logger.Info("Using environment for Vault secret paths",
+		zap.String("environment", string(env)))
+
 	// STEP 1: Bootstrap Consul ACLs (if not already done)
 	logger.Info(" [STEP 1/7] Bootstrapping Consul ACL system")
 
-	bootstrapResult, err := acl.BootstrapConsulACLs(rc, consulClient, vaultClient, true)
+	bootstrapResult, err := acl.BootstrapConsulACLs(rc, consulClient, vaultClient, env, true)
 	if err != nil {
 		return fmt.Errorf("failed to bootstrap Consul ACLs: %w", err)
 	}
@@ -528,14 +546,14 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 	masterToken := ""
 	if bootstrapResult.AlreadyDone {
 		logger.Info("Consul ACLs already bootstrapped, retrieving master token from Vault")
-		masterToken, err = acl.GetBootstrapTokenFromVault(rc, vaultClient)
+		masterToken, err = acl.GetBootstrapTokenFromVault(rc, vaultClient, env)
 		if err != nil {
 			// Token not in Vault - need to prompt user for it
 			logger.Warn("Bootstrap token not found in Vault, prompting user for recovery",
 				zap.Error(err))
 
 			// Use recovery flow: prompt user for token and store it
-			recoveryResult, recoveryErr := acl.PromptAndStoreBootstrapToken(rc, vaultClient)
+			recoveryResult, recoveryErr := acl.PromptAndStoreBootstrapToken(rc, vaultClient, env)
 			if recoveryErr != nil {
 				return fmt.Errorf("failed to recover bootstrap token: %w\n\n"+
 					"Consul ACLs are already initialized but the bootstrap token is not in Vault.\n"+

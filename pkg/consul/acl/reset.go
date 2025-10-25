@@ -29,14 +29,15 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	sharedvault "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	consulapi "github.com/hashicorp/consul/api"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// NOTE: Vault path constants (vaultConsulBootstrapTokenPath, vaultConsulBootstrapTokenFullPath)
-// are defined in bootstrap.go and shared across the acl package.
+// NOTE: Vault path functions are defined below to avoid circular import.
+// These duplicate the logic from pkg/consul/constants.go but use environment-aware paths.
 
 const (
 	// ConsulACLResetFilename is the ACL bootstrap reset index file
@@ -55,10 +56,27 @@ const (
 	consulDataDir = "/var/lib/consul"
 )
 
+// getConsulBootstrapTokenPath returns the environment-aware Vault KV v2 path for bootstrap token
+// NOTE: Duplicates logic from pkg/consul.GetConsulBootstrapTokenPath to avoid circular import
+func getConsulBootstrapTokenPath(env sharedvault.Environment) string {
+	basePath := sharedvault.SecretPath(env, sharedvault.ServiceConsul)
+	return basePath + "/bootstrap-token"
+}
+
+// getConsulBootstrapTokenFullPath returns the FULL Vault Logical API path for bootstrap token
+// NOTE: Duplicates logic from pkg/consul.GetConsulBootstrapTokenFullPath to avoid circular import
+func getConsulBootstrapTokenFullPath(env sharedvault.Environment) string {
+	return sharedvault.SecretDataPath("secret", env, sharedvault.ServiceConsul) + "/bootstrap-token"
+}
+
 // ResetConfig holds configuration for ACL bootstrap reset operation
 type ResetConfig struct {
 	// VaultClient is required for storing the new bootstrap token
 	VaultClient *vaultapi.Client
+
+	// Environment is required for determining Vault secret path
+	// This should be auto-detected from Consul KV via pkg/consul/environment
+	Environment sharedvault.Environment
 
 	// Force skips confirmation prompts (for automation)
 	Force bool
@@ -158,7 +176,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 		}
 
 		if !config.DryRun {
-			if err := storeBootstrapTokenInVault(rc, config.VaultClient, result); err != nil {
+			if err := storeBootstrapTokenInVault(rc, config.VaultClient, config.Environment, result); err != nil {
 				logger.Warn("Bootstrap succeeded but failed to store token in Vault",
 					zap.Error(err),
 					zap.String("note", "Token is available in result, but not persisted"))
@@ -223,10 +241,10 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 
 	logger.Info("Checking if bootstrap token already exists in Vault")
 
-	existingToken, err := GetBootstrapTokenFromVault(rc, config.VaultClient)
+	existingToken, err := GetBootstrapTokenFromVault(rc, config.VaultClient, config.Environment)
 	if err == nil && existingToken != "" {
 		logger.Info("Bootstrap token found in Vault - no reset needed",
-			zap.String("vault_path", vaultConsulBootstrapTokenFullPath))
+			zap.String("vault_path", getConsulBootstrapTokenFullPath(config.Environment)))
 
 		// Verify token still works
 		testConfig := consulapi.DefaultConfig()
@@ -245,7 +263,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 					Accessor:      selfToken.AccessorID,
 					AlreadyDone:   true,
 					StoredInVault: true,
-					VaultPath:     vaultConsulBootstrapTokenFullPath,
+					VaultPath:     getConsulBootstrapTokenFullPath(config.Environment),
 				}, nil
 			}
 			logger.Warn("Existing token in Vault is invalid, proceeding with reset",
@@ -787,7 +805,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			"  3. Remove ACL state: rm -rf %s/raft/\n"+
 			"  4. Start Consul: systemctl start consul\n"+
 			"  5. Bootstrap fresh: consul acl bootstrap\n"+
-			"  6. Store in Vault: vault kv put "+vaultConsulBootstrapTokenFullPath+" token=<new-token>",
+			"  6. Store in Vault: vault kv put "+getConsulBootstrapTokenFullPath(config.Environment)+" token=<new-token>",
 			maxRetries, lastErr, resetFilePath, resetIndex, lastErr, dataDir, dataDir, dataDir)
 	}
 
@@ -804,7 +822,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 
 	logger.Info("Storing new bootstrap token in Vault for secure persistence")
 
-	if err := storeBootstrapTokenInVault(rc, config.VaultClient, result); err != nil {
+	if err := storeBootstrapTokenInVault(rc, config.VaultClient, config.Environment, result); err != nil {
 		logger.Error("Failed to store bootstrap token in Vault",
 			zap.Error(err),
 			zap.String("note", "Bootstrap succeeded, but token not persisted to Vault"))
@@ -818,14 +836,14 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 		logger.Info("terminal prompt: Accessor ID: " + result.Accessor)
 		logger.Info("terminal prompt: ")
 		logger.Info("terminal prompt: To store manually in Vault:")
-		logger.Info("terminal prompt:   vault kv put " + vaultConsulBootstrapTokenFullPath + " token=" + result.MasterToken)
+		logger.Info("terminal prompt:   vault kv put " + getConsulBootstrapTokenFullPath(config.Environment) + " token=" + result.MasterToken)
 		logger.Info("terminal prompt: ")
 
 		return result, fmt.Errorf("bootstrap succeeded but Vault storage failed: %w", err)
 	}
 
 	result.StoredInVault = true
-	result.VaultPath = vaultConsulBootstrapTokenFullPath
+	result.VaultPath = getConsulBootstrapTokenFullPath(config.Environment)
 
 	// ========================================================================
 	// EVALUATE - Verify token works
@@ -869,7 +887,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	}
 
 	// Verify token is retrievable from Vault
-	retrievedToken, err := GetBootstrapTokenFromVault(rc, config.VaultClient)
+	retrievedToken, err := GetBootstrapTokenFromVault(rc, config.VaultClient, config.Environment)
 	if err != nil {
 		logger.Warn("Failed to retrieve token from Vault for verification",
 			zap.Error(err))
@@ -892,7 +910,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			zap.Error(err),
 			zap.String("note", "This is non-fatal, but daemon will log ACL permission errors"))
 		logger.Warn("To fix manually:")
-		logger.Warn("  1. Get bootstrap token: export CONSUL_HTTP_TOKEN=$(vault kv get -field=token " + vaultConsulBootstrapTokenFullPath + ")")
+		logger.Warn("  1. Get bootstrap token: export CONSUL_HTTP_TOKEN=$(vault kv get -field=token " + getConsulBootstrapTokenFullPath(config.Environment) + ")")
 		logger.Warn("  2. Create agent token: consul acl token create -description='Agent token' -node-identity='$(hostname):dc1'")
 		logger.Warn("  3. Configure daemon: consul acl set-agent-token agent <token-id>")
 	} else {
@@ -905,7 +923,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ✓ ACL bootstrap reset completed successfully")
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: Bootstrap token stored in Vault at: " + vaultConsulBootstrapTokenFullPath)
+	logger.Info("terminal prompt: Bootstrap token stored in Vault at: " + getConsulBootstrapTokenFullPath(config.Environment))
 	logger.Info("terminal prompt: Token Accessor: " + result.Accessor)
 	logger.Info("terminal prompt: ")
 	if agentTokenResult != nil {
@@ -1190,9 +1208,13 @@ func getTailscaleIPForHostname(rc *eos_io.RuntimeContext, hostname string) strin
 	return ""
 }
 
-// storeBootstrapTokenInVault stores the bootstrap token in Vault
-func storeBootstrapTokenInVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi.Client, result *BootstrapResult) error {
+// storeBootstrapTokenInVault stores the bootstrap token in Vault using environment-aware paths
+func storeBootstrapTokenInVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi.Client, env sharedvault.Environment, result *BootstrapResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// Get environment-aware paths
+	kvPath := getConsulBootstrapTokenPath(env)
+	fullPath := getConsulBootstrapTokenFullPath(env)
 
 	data := map[string]interface{}{
 		"token":          result.MasterToken,
@@ -1200,24 +1222,27 @@ func storeBootstrapTokenInVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi
 		"description":    "Consul ACL bootstrap token (global-management)",
 		"created_by":     "eos update consul --bootstrap-token",
 		"policies":       []string{"global-management"},
+		"environment":    string(env),
 		"warning":        "This is the Consul master token - protect it carefully!",
-		"recovery_steps": "To retrieve: vault kv get -field=token " + vaultConsulBootstrapTokenFullPath,
+		"recovery_steps": "To retrieve: vault kv get -field=token " + fullPath,
 	}
 
-	// Write to Vault KV v2 (uses constant, SDK adds secret/data/ prefix automatically)
-	_, err := vaultClient.KVv2("secret").Put(rc.Ctx, vaultConsulBootstrapTokenPath, data)
+	// Write to Vault KV v2 (uses environment-aware path, SDK adds secret/data/ prefix automatically)
+	_, err := vaultClient.KVv2("secret").Put(rc.Ctx, kvPath, data)
 	if err != nil {
 		return fmt.Errorf("failed to store bootstrap token in Vault: %w\n"+
 			"Vault path: %s\n"+
+			"Environment: %s\n"+
 			"Remediation:\n"+
 			"  - Check Vault is unsealed: vault status\n"+
-			"  - Verify Vault token has write permissions to secret/consul/*\n"+
+			"  - Verify Vault token has write permissions to secret/data/services/%s/consul/*\n"+
 			"  - Check Vault logs: journalctl -u vault -n 50",
-			err, vaultConsulBootstrapTokenFullPath)
+			err, fullPath, env, env)
 	}
 
 	logger.Info("Bootstrap token stored in Vault successfully",
-		zap.String("vault_path", vaultConsulBootstrapTokenFullPath))
+		zap.String("vault_path", fullPath),
+		zap.String("environment", string(env)))
 
 	return nil
 }

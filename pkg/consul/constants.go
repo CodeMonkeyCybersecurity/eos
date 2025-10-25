@@ -7,7 +7,11 @@
 
 package consul
 
-import "os"
+import (
+	"os"
+
+	sharedvault "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
+)
 
 // ============================================================================
 // File Paths
@@ -273,46 +277,147 @@ const (
 //
 // Reference: https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2#usage
 
+// DEPRECATED: Old non-environment-aware paths (kept for backward compatibility)
+// These constants are deprecated in favor of environment-aware paths using
+// pkg/shared/vault path helpers. Use GetConsulBootstrapTokenPath(env) instead.
 const (
-	// VaultConsulBootstrapTokenPath is the Vault KV v2 path for the Consul ACL bootstrap token
-	// USAGE: Created by 'eos update consul --bootstrap-token'
-	// POLICY: Requires 'create' and 'update' capabilities on secret/data/consul/bootstrap-token
-	// SECURITY: This is the master token with global-management privileges
-	// ROTATION: Bootstrap tokens are NOT rotated (but can be reset via ACL reset)
-	// Retrieved by: GetBootstrapTokenFromVault(), pkg/consul/auth.go
+	// VaultConsulBootstrapTokenPath is DEPRECATED - use GetConsulBootstrapTokenPath(env) instead
+	// MIGRATION: Legacy path "consul/bootstrap-token" → "services/{env}/consul/bootstrap-token"
 	VaultConsulBootstrapTokenPath = "consul/bootstrap-token"
 
-	// VaultConsulManagementTokenPath is the Vault KV v2 path for day-to-day management tokens
-	// USAGE: Created from bootstrap token via Consul ACL API
-	// POLICY: Requires 'create' and 'update' capabilities on secret/data/consul/management-token
-	// SECURITY: Limited privileges (specific to EOS needs, NOT global-management)
-	// ROTATION: Management tokens SHOULD be rotated periodically (every 90 days recommended)
-	// Retrieved by: debug commands, normal operations (NOT bootstrap operations)
-	// NOTE: This path is currently unused in the codebase, reserved for future management token implementation
+	// VaultConsulManagementTokenPath is DEPRECATED - use GetConsulManagementTokenPath(env) instead
+	// MIGRATION: Legacy path "consul/management-token" → "services/{env}/consul/management-token"
 	VaultConsulManagementTokenPath = "consul/management-token"
 
-	// VaultConsulEncryptionKeyPath is the Vault KV v2 path for Consul gossip encryption key
-	// USAGE: Gossip encryption key for Serf communication
-	// POLICY: Requires 'create' and 'update' capabilities on secret/data/consul/encryption-key
-	// SECURITY: Symmetric key for cluster gossip protocol
-	// ROTATION: Encryption keys CAN be rotated via Consul's key rotation feature
-	// NOTE: This path is currently unused in the codebase, reserved for future encryption key management
+	// VaultConsulEncryptionKeyPath is DEPRECATED - use GetConsulEncryptionKeyPath(env) instead
+	// MIGRATION: Legacy path "consul/encryption-key" → "services/{env}/consul/encryption-key"
 	VaultConsulEncryptionKeyPath = "consul/encryption-key"
 )
 
-// GetVaultConsulBootstrapTokenFullPath returns the FULL Vault API path for bootstrap token
-// This includes the /secret/data/ prefix required for KV v2 API calls via Logical client
+// GetConsulBootstrapTokenPath returns the environment-aware Vault KV v2 path for Consul ACL bootstrap token
+//
+// NEW STANDARDIZED PATH: services/{environment}/consul/bootstrap-token
+//
+// This function uses the centralized path helpers from pkg/shared/vault to ensure
+// consistent path structure across all services.
+//
+// USAGE: Created by 'eos update consul --bootstrap-token'
+// POLICY: Requires 'create' and 'update' capabilities on secret/data/services/{env}/consul/*
+// SECURITY: This is the master token with global-management privileges
+// ROTATION: Bootstrap tokens are NOT rotated (but can be reset via ACL reset)
+//
+// Parameters:
+//   - env: Environment (production, staging, development, review)
+//
+// Returns:
+//   - KV v2 path WITHOUT "secret/data/" prefix (e.g., "services/production/consul/bootstrap-token")
+//   - Use with: vaultClient.KVv2("secret").Get(ctx, path)
+//   - For Logical API, use GetConsulBootstrapTokenFullPath(env) instead
+//
+// Example:
+//
+//	path := consul.GetConsulBootstrapTokenPath(sharedvault.EnvironmentProduction)
+//	// Returns: "services/production/consul/bootstrap-token"
+func GetConsulBootstrapTokenPath(env sharedvault.Environment) string {
+	basePath := sharedvault.SecretPath(env, sharedvault.ServiceConsul)
+	return basePath + "/bootstrap-token"
+}
+
+// GetConsulBootstrapTokenFullPath returns the FULL Vault Logical API path for bootstrap token
+//
+// This includes the "secret/data/" prefix required for KV v2 API calls via Logical client.
+//
+// NEW STANDARDIZED PATH: secret/data/services/{environment}/consul/bootstrap-token
 //
 // USAGE:
-//   - Direct Vault Logical API calls: vaultClient.Logical().Read(GetVaultConsulBootstrapTokenFullPath())
-//   - KV v2 SDK calls: vaultClient.KVv2("secret").Get(ctx, VaultConsulBootstrapTokenPath) [NO prefix needed]
+//   - Direct Vault Logical API calls: vaultClient.Logical().Read(GetConsulBootstrapTokenFullPath(env))
+//   - KV v2 SDK calls: use GetConsulBootstrapTokenPath(env) WITHOUT this prefix
 //
-// RATIONALE: KV v2 API has two paths:
-//   - secret/data/{path} - for reading/writing secret data (Logical API)
-//   - secret/metadata/{path} - for managing secret metadata (Logical API)
-//   - {path} - when using KVv2() SDK method (SDK adds /data/ automatically)
+// Parameters:
+//   - env: Environment (production, staging, development, review)
+//
+// Returns:
+//   - Full path WITH "secret/data/" prefix for Logical API
+//
+// Example:
+//
+//	path := consul.GetConsulBootstrapTokenFullPath(sharedvault.EnvironmentProduction)
+//	// Returns: "secret/data/services/production/consul/bootstrap-token"
+func GetConsulBootstrapTokenFullPath(env sharedvault.Environment) string {
+	return sharedvault.SecretDataPath("secret", env, sharedvault.ServiceConsul) + "/bootstrap-token"
+}
+
+// DEPRECATED: GetVaultConsulBootstrapTokenFullPath is deprecated - use GetConsulBootstrapTokenFullPath(env) instead
+// This function uses the OLD non-environment-aware path format.
+// Kept for backward compatibility during migration period.
 func GetVaultConsulBootstrapTokenFullPath() string {
 	return "secret/data/" + VaultConsulBootstrapTokenPath
+}
+
+// GetConsulManagementTokenPath returns the environment-aware Vault KV v2 path for Consul management token
+//
+// NEW STANDARDIZED PATH: services/{environment}/consul/management-token
+//
+// USAGE: Created by Consul ACL system for service operations
+// POLICY: Requires 'create' and 'update' capabilities on secret/data/services/{env}/consul/*
+// SECURITY: Management-level access token for automated operations
+// ROTATION: Should be rotated regularly via Consul ACL system
+//
+// Parameters:
+//   - env: Environment (production, staging, development, review)
+//
+// Returns:
+//   - KV v2 path WITHOUT "secret/data/" prefix
+//   - Use with: vaultClient.KVv2("secret").Get(ctx, path)
+func GetConsulManagementTokenPath(env sharedvault.Environment) string {
+	basePath := sharedvault.SecretPath(env, sharedvault.ServiceConsul)
+	return basePath + "/management-token"
+}
+
+// GetConsulManagementTokenFullPath returns the FULL Vault Logical API path for management token
+//
+// NEW STANDARDIZED PATH: secret/data/services/{environment}/consul/management-token
+//
+// Parameters:
+//   - env: Environment (production, staging, development, review)
+//
+// Returns:
+//   - Full path WITH "secret/data/" prefix for Logical API
+func GetConsulManagementTokenFullPath(env sharedvault.Environment) string {
+	return sharedvault.SecretDataPath("secret", env, sharedvault.ServiceConsul) + "/management-token"
+}
+
+// GetConsulEncryptionKeyPath returns the environment-aware Vault KV v2 path for Consul gossip encryption key
+//
+// NEW STANDARDIZED PATH: services/{environment}/consul/encryption-key
+//
+// USAGE: Created during Consul cluster bootstrap
+// POLICY: Requires 'read' capability on secret/data/services/{env}/consul/encryption-key
+// SECURITY: Base64-encoded 32-byte symmetric key for gossip protocol encryption
+// ROTATION: Should be rotated via Consul's keyring rotation mechanism
+//
+// Parameters:
+//   - env: Environment (production, staging, development, review)
+//
+// Returns:
+//   - KV v2 path WITHOUT "secret/data/" prefix
+//   - Use with: vaultClient.KVv2("secret").Get(ctx, path)
+func GetConsulEncryptionKeyPath(env sharedvault.Environment) string {
+	basePath := sharedvault.SecretPath(env, sharedvault.ServiceConsul)
+	return basePath + "/encryption-key"
+}
+
+// GetConsulEncryptionKeyFullPath returns the FULL Vault Logical API path for encryption key
+//
+// NEW STANDARDIZED PATH: secret/data/services/{environment}/consul/encryption-key
+//
+// Parameters:
+//   - env: Environment (production, staging, development, review)
+//
+// Returns:
+//   - Full path WITH "secret/data/" prefix for Logical API
+func GetConsulEncryptionKeyFullPath(env sharedvault.Environment) string {
+	return sharedvault.SecretDataPath("secret", env, sharedvault.ServiceConsul) + "/encryption-key"
 }
 
 // ============================================================================

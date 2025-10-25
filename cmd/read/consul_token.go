@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	consulacl "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
+	consulenv "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -91,10 +92,27 @@ func runConsulTokenRead(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 				fmt.Sprintf("Error: %v", err))
 	}
 
+	// Discover environment from Consul (required for Vault path)
+	env, err := consulenv.DiscoverFromConsul(rc)
+	if err != nil {
+		return fmt.Errorf("failed to discover environment: %w\n\n"+
+			"Token retrieval requires knowing the environment.\n"+
+			"Consul is the authoritative source for environment configuration.\n\n"+
+			"Remediation:\n"+
+			"  1. Ensure Consul is running: systemctl status consul\n"+
+			"  2. Set environment: eos update consul --environment <env>\n"+
+			"  3. Emergency override (Consul unavailable):\n"+
+			"     CONSUL_EMERGENCY_OVERRIDE=true eos read consul-token --environment <env>",
+			err)
+	}
+
+	logger.Info("Using environment for Vault secret path",
+		zap.String("environment", string(env)))
+
 	// ASSESS - Retrieve token from Vault
 	logger.Info("Retrieving Consul bootstrap token from Vault")
 
-	token, err := consulacl.GetBootstrapTokenFromVault(rc, vaultClient)
+	token, err := consulacl.GetBootstrapTokenFromVault(rc, vaultClient, env)
 	if err != nil {
 		return eos_err.NewUserError(
 			"Failed to retrieve Consul bootstrap token from Vault.\n\n" +

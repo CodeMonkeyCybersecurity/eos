@@ -620,6 +620,9 @@ func getBootstrapTokenFromVault(rc *eos_io.RuntimeContext) (string, error) {
 	vaultClient.SetToken(vaultToken)
 
 	// Try to read bootstrap token from Vault KV v2
+	// TODO: This uses the OLD deprecated path (secret/data/consul/bootstrap-token).
+	// Cannot use new environment-aware paths due to circular import (pkg/consul/debug -> pkg/consul/environment).
+	// Acceptable for diagnostic/debug code - reports path issues to help user troubleshoot.
 	secret, err := vaultClient.Logical().Read("secret/data/consul/bootstrap-token")
 	if err != nil {
 		return "", fmt.Errorf("cannot read secret/consul/bootstrap-token: %w", err)

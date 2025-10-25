@@ -18,6 +18,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	sharedvault "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	consulapi "github.com/hashicorp/consul/api"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -25,26 +26,14 @@ import (
 )
 
 // ============================================================================
-// Vault Path Constants (DUPLICATED from pkg/consul/constants.go)
+// Vault Path Functions
 // ============================================================================
-// NOTE: These constants duplicate consul.VaultConsulBootstrapTokenPath to avoid circular import.
-// The pkg/consul/acl package is a sub-package of pkg/consul, so it cannot import pkg/consul.
+// NOTE: Path functions are defined in reset.go and shared across the acl package.
+// They use environment-aware paths from pkg/shared/vault to support multi-environment deployments.
 //
-// CRITICAL: These values MUST match pkg/consul/constants.go exactly.
-// Any changes to Vault paths must be synchronized across both files.
-//
-// TODO: Consider refactoring to pkg/consul/vaultpaths to break circular dependency.
-
-const (
-	// vaultConsulBootstrapTokenPath is the Vault KV v2 path for Consul bootstrap token
-	// NOTE: Duplicates consul.VaultConsulBootstrapTokenPath to avoid circular import
-	// Path: consul/bootstrap-token (KVv2 SDK automatically adds secret/data/ prefix)
-	vaultConsulBootstrapTokenPath = "consul/bootstrap-token"
-
-	// vaultConsulBootstrapTokenFullPath is the full Vault path including secret/data/ prefix
-	// Used for display/logging purposes only (Logical API format)
-	vaultConsulBootstrapTokenFullPath = "secret/data/consul/bootstrap-token"
-)
+// Functions available:
+// - getConsulBootstrapTokenPath(env) - Returns KV v2 path without secret/data/ prefix
+// - getConsulBootstrapTokenFullPath(env) - Returns full path with secret/data/ prefix
 
 // BootstrapResult contains the result of ACL bootstrap operation
 type BootstrapResult struct {
@@ -89,6 +78,7 @@ func BootstrapConsulACLs(
 	rc *eos_io.RuntimeContext,
 	consulClient *consulapi.Client,
 	vaultClient *vaultapi.Client,
+	env sharedvault.Environment,
 	storeInVault bool,
 ) (*BootstrapResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -141,7 +131,12 @@ func BootstrapConsulACLs(
 
 	// INTERVENE - Store master token in Vault (if requested and client provided)
 	if storeInVault && vaultClient != nil {
-		logger.Info("Storing Consul master token in Vault")
+		logger.Info("Storing Consul master token in Vault",
+			zap.String("environment", string(env)))
+
+		// Get environment-aware paths
+		kvPath := getConsulBootstrapTokenPath(env)
+		fullPath := getConsulBootstrapTokenFullPath(env)
 
 		data := map[string]interface{}{
 			"token":          bootstrapToken.SecretID,
@@ -149,13 +144,14 @@ func BootstrapConsulACLs(
 			"description":    bootstrapToken.Description,
 			"created_at":     time.Now().Format(time.RFC3339),
 			"policies":       []string{"global-management"},
+			"environment":    string(env),
 			"warning":        "This is the Consul master token - protect it carefully!",
-			"recovery_steps": "To retrieve: vault kv get -field=token " + vaultConsulBootstrapTokenFullPath,
+			"recovery_steps": "To retrieve: vault kv get -field=token " + fullPath,
 		}
 
 		// Write to Vault KV v2 (secret/)
-		// Path uses KVv2 SDK constant (automatically adds secret/data/ prefix)
-		_, err := vaultClient.KVv2("secret").Put(rc.Ctx, vaultConsulBootstrapTokenPath, data)
+		// Path uses environment-aware KVv2 SDK path (automatically adds secret/data/ prefix)
+		_, err := vaultClient.KVv2("secret").Put(rc.Ctx, kvPath, data)
 		if err != nil {
 			logger.Warn("Failed to store bootstrap token in Vault",
 				zap.Error(err),
@@ -163,9 +159,10 @@ func BootstrapConsulACLs(
 			// Don't fail - bootstrap succeeded, just storage failed
 		} else {
 			logger.Info("Consul master token stored in Vault",
-				zap.String("vault_path", vaultConsulBootstrapTokenFullPath))
+				zap.String("vault_path", fullPath),
+				zap.String("environment", string(env)))
 			result.StoredInVault = true
-			result.VaultPath = vaultConsulBootstrapTokenFullPath
+			result.VaultPath = fullPath
 		}
 	}
 
@@ -214,24 +211,31 @@ func BootstrapConsulACLs(
 //	    return fmt.Errorf("failed to retrieve Consul bootstrap token: %w", err)
 //	}
 //	consulClient.SetToken(token)
-func GetBootstrapTokenFromVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi.Client) (string, error) {
+func GetBootstrapTokenFromVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi.Client, env sharedvault.Environment) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Retrieving Consul bootstrap token from Vault")
+	logger.Info("Retrieving Consul bootstrap token from Vault",
+		zap.String("environment", string(env)))
 
-	// Read from Vault KV v2 (uses constant, SDK adds secret/data/ prefix automatically)
-	secret, err := vaultClient.KVv2("secret").Get(rc.Ctx, vaultConsulBootstrapTokenPath)
+	// Get environment-aware paths
+	kvPath := getConsulBootstrapTokenPath(env)
+	fullPath := getConsulBootstrapTokenFullPath(env)
+
+	// Read from Vault KV v2 (uses environment-aware path, SDK adds secret/data/ prefix automatically)
+	secret, err := vaultClient.KVv2("secret").Get(rc.Ctx, kvPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read Consul bootstrap token from Vault: %w\n"+
+			"Vault path: %s\n"+
+			"Environment: %s\n"+
 			"Remediation:\n"+
 			"  - Check Vault is unsealed: vault status\n"+
 			"  - Verify secret exists: vault kv get %s\n"+
-			"  - Check Vault token has read permissions to secret/consul/*",
-			err, vaultConsulBootstrapTokenFullPath)
+			"  - Check Vault token has read permissions to secret/data/services/%s/consul/*",
+			err, fullPath, env, fullPath, env)
 	}
 
 	if secret == nil || secret.Data == nil {
-		return "", fmt.Errorf("Consul bootstrap token not found in Vault at %s", vaultConsulBootstrapTokenFullPath)
+		return "", fmt.Errorf("Consul bootstrap token not found in Vault at %s", fullPath)
 	}
 
 	token, ok := secret.Data["token"].(string)
@@ -239,7 +243,9 @@ func GetBootstrapTokenFromVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi
 		return "", fmt.Errorf("invalid token format in Vault (expected string)")
 	}
 
-	logger.Info("Retrieved Consul bootstrap token from Vault")
+	logger.Info("Retrieved Consul bootstrap token from Vault",
+		zap.String("vault_path", fullPath),
+		zap.String("environment", string(env)))
 
 	return token, nil
 }
@@ -269,8 +275,12 @@ func GetBootstrapTokenFromVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi
 func PromptAndStoreBootstrapToken(
 	rc *eos_io.RuntimeContext,
 	vaultClient *vaultapi.Client,
+	env sharedvault.Environment,
 ) (*BootstrapResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// Get environment-aware paths
+	fullPath := getConsulBootstrapTokenFullPath(env)
 
 	logger.Info("Consul ACLs already bootstrapped, but token not found in Vault")
 	logger.Info("terminal prompt: ")
@@ -292,7 +302,8 @@ func PromptAndStoreBootstrapToken(
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: SECURITY NOTE:")
 	logger.Info("terminal prompt:   - This token will be securely stored in Vault")
-	logger.Info("terminal prompt:   - Path: " + vaultConsulBootstrapTokenFullPath)
+	logger.Info("terminal prompt:   - Path: " + fullPath)
+	logger.Info("terminal prompt:   - Environment: " + string(env))
 	logger.Info("terminal prompt:   - Once stored, you won't need to provide it again")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════════")
@@ -375,30 +386,37 @@ func PromptAndStoreBootstrapToken(
 	// INTERVENE - Store the token in Vault
 	logger.Info("Storing bootstrap token in Vault for future use")
 
+	// Get environment-aware paths
+	kvPath := getConsulBootstrapTokenPath(env)
+
 	data := map[string]interface{}{
 		"token":          token,
 		"accessor":       selfToken.AccessorID,
 		"description":    selfToken.Description,
 		"recovered_at":   time.Now().Format(time.RFC3339),
 		"policies":       []string{"global-management"},
+		"environment":    string(env),
 		"warning":        "This is the Consul master token - protect it carefully!",
-		"recovery_steps": "To retrieve: vault kv get -field=token " + vaultConsulBootstrapTokenFullPath,
+		"recovery_steps": "To retrieve: vault kv get -field=token " + fullPath,
 		"source":         "user-provided (eos sync recovery)",
 	}
 
-	// Write to Vault KV v2 (uses constant, SDK adds secret/data/ prefix automatically)
-	_, err = vaultClient.KVv2("secret").Put(rc.Ctx, vaultConsulBootstrapTokenPath, data)
+	// Write to Vault KV v2 (uses environment-aware path, SDK adds secret/data/ prefix automatically)
+	_, err = vaultClient.KVv2("secret").Put(rc.Ctx, kvPath, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store bootstrap token in Vault: %w\n"+
+			"Vault path: %s\n"+
+			"Environment: %s\n"+
 			"Remediation:\n"+
 			"  - Check Vault is unsealed: vault status\n"+
-			"  - Verify Vault token has write permissions to secret/consul/*\n"+
+			"  - Verify Vault token has write permissions to secret/data/services/%s/consul/*\n"+
 			"  - Check Vault logs for errors",
-			err)
+			err, fullPath, env, env)
 	}
 
 	logger.Info("Bootstrap token stored in Vault successfully",
-		zap.String("vault_path", vaultConsulBootstrapTokenFullPath))
+		zap.String("vault_path", fullPath),
+		zap.String("environment", string(env)))
 
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ✓ Bootstrap token verified and stored in Vault")
@@ -410,7 +428,7 @@ func PromptAndStoreBootstrapToken(
 		AlreadyDone:   true,
 		BootstrapTime: time.Now(),
 		StoredInVault: true,
-		VaultPath:     vaultConsulBootstrapTokenFullPath,
+		VaultPath:     fullPath,
 	}
 
 	return result, nil

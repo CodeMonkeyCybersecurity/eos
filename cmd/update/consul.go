@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	consulacl "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	consulconfig "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
+	consulenv "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/environment"
 	consulfix "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/fix"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
@@ -328,6 +329,23 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		logger.Info("Running ACL bootstrap token reset and recovery",
 			zap.Bool("dry_run", consulDryRun))
 
+		// Discover environment from Consul (required for Vault path)
+		env, err := consulenv.DiscoverFromConsul(rc)
+		if err != nil {
+			return fmt.Errorf("failed to discover environment: %w\n\n"+
+				"Bootstrap token storage requires knowing the environment.\n"+
+				"Consul is the authoritative source for environment configuration.\n\n"+
+				"Remediation:\n"+
+				"  1. Ensure Consul is running: systemctl status consul\n"+
+				"  2. Set environment: eos update consul --environment <env>\n"+
+				"  3. Emergency override (Consul unavailable):\n"+
+				"     CONSUL_EMERGENCY_OVERRIDE=true eos update consul --bootstrap-token --environment <env>",
+				err)
+		}
+
+		logger.Info("Using environment for Vault secret storage",
+			zap.String("environment", string(env)))
+
 		// Need Vault client to store the bootstrap token
 		vaultClient, err := vault.GetVaultClient(rc)
 		if err != nil {
@@ -344,6 +362,7 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		// Delegate to pkg/consul/acl/reset.go
 		resetConfig := &consulacl.ResetConfig{
 			VaultClient: vaultClient,
+			Environment: env,
 			Force:       false,
 			DryRun:      consulDryRun,
 			DataDir:     consulDataDir, // User-provided or empty for auto-detection

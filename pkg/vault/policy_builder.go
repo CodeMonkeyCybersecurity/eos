@@ -278,13 +278,24 @@ func (pb *PolicyBuilder) AddServiceSecrets() *PolicyBuilder {
 
 // AddConsulIntegrationSecrets adds access to Consul integration metadata storage
 // RATIONALE: Consul-Vault integration requires storing bootstrap tokens and management tokens
-// SECURITY: Scoped to secret/data/consul/* - isolated from user and service secrets
-// THREAT MODEL: Prevents privilege escalation - users can't modify other integration secrets
+// SECURITY: Scoped to services/{env}/consul/* paths - environment-isolated secrets
+// THREAT MODEL: Prevents privilege escalation - users can't access other environment secrets
+//
+// PATHS: secret/data/services/{environment}/consul/* (production, staging, development, review)
+//
+// Each environment has isolated Consul secrets:
+//   - secret/data/services/production/consul/bootstrap-token
+//   - secret/data/services/production/consul/management-token
+//   - secret/data/services/development/consul/bootstrap-token
+//   - etc.
 func (pb *PolicyBuilder) AddConsulIntegrationSecrets() *PolicyBuilder {
 	pb.AddSection("Consul Integration Secrets")
 	pb.AddComment("Store Consul bootstrap tokens and metadata for service integration")
-	pb.AddPath("secret/data/consul/*", "create", "read", "update", "delete", "list")
-	pb.AddPath("secret/metadata/consul/*", "read", "list", "delete")
+
+	// Environment-aware paths (legacy paths removed - data migrated to new structure)
+	pb.AddPath("secret/data/services/*/consul/*", "create", "read", "update", "delete", "list")
+	pb.AddPath("secret/metadata/services/*/consul/*", "read", "list", "delete")
+
 	return pb
 }
 

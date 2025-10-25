@@ -33,6 +33,12 @@ import (
 const (
 	// GossipKeyVaultPath is the Vault KV path for Consul gossip encryption key
 	// HashiCorp best practice: consul/secret/gossip
+	//
+	// TODO: This uses the OLD deprecated path (consul/secret/gossip).
+	// Should be migrated to environment-aware path: services/{env}/consul/gossip-key
+	// Cannot be updated due to circular import: pkg/consul/secrets cannot import pkg/consul/environment.
+	// Each environment should have its own gossip key for its Consul cluster.
+	// FUTURE: Refactor to eliminate circular dependency or pass environment as parameter.
 	GossipKeyVaultPath = "consul/secret/gossip"
 
 	// GossipKeyLength is the required key length for Consul (32 bytes = 256 bits)

@@ -163,6 +163,15 @@ func getTokenFromVault(rc *eos_io.RuntimeContext) (string, string, error) {
 		return "", "", fmt.Errorf("vault not available")
 	}
 
+	// TODO: This function uses the OLD deprecated Vault path (secret/consul/bootstrap-token)
+	// instead of the new environment-aware path (secret/services/{env}/consul/bootstrap-token).
+	// Cannot be updated due to circular import: pkg/consul cannot import pkg/consul/environment.
+	// This is acceptable because:
+	// 1. This is a fallback mechanism in the auth cascade
+	// 2. Failures here gracefully fall through to other auth methods
+	// 3. Primary auth flows (eos update consul, eos read consul-token) use new paths
+	// FUTURE: Consider refactoring to eliminate circular dependency
+
 	// Create Vault client (use centralized client creation)
 	config := vaultapi.DefaultConfig()
 	config.Address = envConfig.VaultAddr
