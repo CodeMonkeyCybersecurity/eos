@@ -676,7 +676,9 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 }
 
 // analyzeConfiguration analyzes the Consul configuration file
-func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
+// analyzeConfiguration parses the Consul config and checks for common issues
+// Accepts optional authenticated Consul client for validation (pass nil if client creation failed)
+func analyzeConfiguration(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Analyzing Consul configuration")
 
@@ -777,20 +779,24 @@ func analyzeConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
 		result.Message = "Configuration appears valid"
 
 		// Validation strategy:
-		// 1. Try SDK validation (if Consul is running)
+		// 1. Try SDK validation with authenticated client (if available and Consul is running)
 		// 2. Fallback to CLI validation (if binary exists)
 		validated := false
 
-		// Try SDK validation first
-		client, err := consulapi.NewClient(consulapi.DefaultConfig())
-		if err == nil {
-			if _, err := client.Agent().Self(); err == nil {
-				result.Details = append(result.Details, "✓ SDK validation: Consul agent responding")
+		// Try SDK validation first using the provided authenticated client
+		if consulClient != nil && clientErr == nil {
+			if _, err := consulClient.Agent().Self(); err == nil {
+				result.Details = append(result.Details, "✓ SDK validation: Consul agent responding (authenticated)")
 				validated = true
 			} else {
-				logger.Debug("SDK validation failed - Consul may not be running",
-					zap.Error(err))
+				logger.Debug("SDK validation failed - Consul may not be running or ACLs blocking",
+					zap.Error(err),
+					zap.String("remediation", "Run: eos update consul --bootstrap-token"))
 			}
+		} else if clientErr != nil {
+			logger.Debug("Skipping SDK validation - authenticated client not available",
+				zap.Error(clientErr),
+				zap.String("note", "ACL authentication required"))
 		}
 
 		// Fallback to CLI validation if SDK failed
@@ -1327,7 +1333,9 @@ func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
 //   - SUCCESS: Config matches actual, no orphaned files
 //   - WARNING: Multiple sources disagree, but no active mismatch
 //   - CRITICAL: Config doesn't match actual (ACL operations will fail)
-func checkDataDirectoryConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
+// checkDataDirectoryConfiguration verifies data directory config matches actual usage
+// Accepts optional authenticated Consul client for API queries (pass nil if client creation failed)
+func checkDataDirectoryConfiguration(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking data directory configuration vs. actual usage")
 
@@ -1385,21 +1393,27 @@ func checkDataDirectoryConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult
 		result.Details = append(result.Details, "Process arguments (ps aux): UNAVAILABLE")
 	}
 
-	// Source 3: Consul API
+	// Source 3: Consul API (using authenticated client if available)
 	var apiDataDir string
-	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
-	if err == nil {
+	if consulClient != nil && clientErr == nil {
 		if agentSelf, err := consulClient.Agent().Self(); err == nil {
 			if configMap, ok := agentSelf["Config"]; ok {
 				if dataDir, ok := configMap["DataDir"].(string); ok && dataDir != "" {
 					apiDataDir = dataDir
-					result.Details = append(result.Details, fmt.Sprintf("API query (/v1/agent/self): %s", apiDataDir))
+					result.Details = append(result.Details, fmt.Sprintf("API query (/v1/agent/self): %s (authenticated)", apiDataDir))
 				}
 			}
+		} else {
+			logger.Debug("API query failed", zap.Error(err))
 		}
 	}
 	if apiDataDir == "" {
-		result.Details = append(result.Details, "API query (/v1/agent/self): UNAVAILABLE (expected if ACLs locked)")
+		if clientErr != nil {
+			result.Details = append(result.Details, "API query (/v1/agent/self): UNAVAILABLE (ACL authentication required)")
+			result.Details = append(result.Details, "  Remediation: Run 'eos update consul --bootstrap-token'")
+		} else {
+			result.Details = append(result.Details, "API query (/v1/agent/self): UNAVAILABLE (Consul not running or API error)")
+		}
 	}
 
 	// Source 4: Systemd service file

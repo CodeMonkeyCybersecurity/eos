@@ -925,7 +925,9 @@ func min(a, b int) int {
 //   - SUCCESS: Raft state accessible and shows current index
 //   - WARNING: Raft state inaccessible, using fallback methods
 //   - INFO: Raft inspection not available (expected without token)
-func checkRaftBootstrapState(rc *eos_io.RuntimeContext) DiagnosticResult {
+// checkRaftBootstrapState inspects Raft state for ACL bootstrap information
+// Accepts optional authenticated Consul client (pass nil if client creation failed)
+func checkRaftBootstrapState(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Inspecting Raft state for ACL bootstrap reset index")
 
@@ -969,13 +971,16 @@ func checkRaftBootstrapState(rc *eos_io.RuntimeContext) DiagnosticResult {
 	result.Details = append(result.Details, "")
 
 	// ASSESS - Try to bootstrap to get current reset index from error
-	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
-	if err != nil {
-		result.Details = append(result.Details, "Cannot create Consul client to check bootstrap state")
-		result.Details = append(result.Details, fmt.Sprintf("Error: %v", err))
+	// Use the provided authenticated client (bootstrap check doesn't require auth, but better to be consistent)
+	if consulClient == nil || clientErr != nil {
+		result.Details = append(result.Details, "Cannot inspect ACL bootstrap state - authenticated client not available")
+		if clientErr != nil {
+			result.Details = append(result.Details, fmt.Sprintf("Client error: %v", clientErr))
+			result.Details = append(result.Details, "Remediation: Run 'eos update consul --bootstrap-token'")
+		}
 		result.Success = false
-		result.Severity = SeverityWarning
-		result.Message = "Cannot inspect ACL bootstrap state"
+		result.Severity = SeverityInfo // INFO: Expected if ACLs locked down
+		result.Message = "ACL bootstrap state inspection unavailable (authentication required)"
 		return result
 	}
 
@@ -1049,7 +1054,9 @@ func checkRaftBootstrapState(rc *eos_io.RuntimeContext) DiagnosticResult {
 //   - SUCCESS: Service registration/discovery working
 //   - WARNING: Service operations failing (check ACL permissions)
 //   - CRITICAL: Consul catalog unavailable (severe)
-func checkConsulServiceDiscovery(rc *eos_io.RuntimeContext) DiagnosticResult {
+// checkConsulServiceDiscovery tests service registration and discovery
+// Accepts authenticated Consul client (required for ACL-protected catalog operations)
+func checkConsulServiceDiscovery(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Testing Consul service registration and discovery")
 
@@ -1059,13 +1066,16 @@ func checkConsulServiceDiscovery(rc *eos_io.RuntimeContext) DiagnosticResult {
 		Details:   []string{},
 	}
 
-	// Create unauthenticated client
-	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
-	if err != nil {
+	// Use the provided authenticated client (required for service catalog with ACLs)
+	if consulClient == nil || clientErr != nil {
 		result.Success = false
-		result.Severity = SeverityCritical
-		result.Message = "Cannot create Consul client"
-		result.Details = append(result.Details, fmt.Sprintf("Error: %v", err))
+		result.Severity = SeverityWarning // WARNING: Catalog check requires auth
+		result.Message = "Cannot test service discovery - authenticated client not available"
+		if clientErr != nil {
+			result.Details = append(result.Details, fmt.Sprintf("Client error: %v", clientErr))
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "Remediation: Run 'eos update consul --bootstrap-token'")
+		}
 		return result
 	}
 

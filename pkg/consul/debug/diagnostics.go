@@ -121,8 +121,8 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	permissionsResult := checkConsulPermissions(rc)
 	results = append(results, permissionsResult)
 
-	// 3. Analyze configuration
-	configResult := analyzeConfiguration(rc)
+	// 3. Analyze configuration (now with authenticated client for validation)
+	configResult := analyzeConfiguration(rc, consulClient, consulClientErr)
 	results = append(results, configResult)
 
 	// 4. Check systemd service
@@ -185,8 +185,8 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	agentTokenResult := checkAgentACLToken(rc)
 	results = append(results, agentTokenResult)
 
-	// 17. Check data directory configuration (critical for ACL bootstrap)
-	dataDirResult := checkDataDirectoryConfiguration(rc)
+	// 17. Check data directory configuration (critical for ACL bootstrap, now authenticated)
+	dataDirResult := checkDataDirectoryConfiguration(rc, consulClient, consulClientErr)
 	results = append(results, dataDirResult)
 
 	// 18. Check data directory filesystem state (verify directory exists and list contents)
@@ -201,12 +201,12 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	aclBootstrapLogResult := checkRecentACLBootstrapActivity(rc)
 	results = append(results, aclBootstrapLogResult)
 
-	// 21. Check Raft ACL bootstrap state (advanced - shows actual reset index)
-	raftBootstrapResult := checkRaftBootstrapState(rc)
+	// 21. Check Raft ACL bootstrap state (advanced - shows actual reset index, now authenticated)
+	raftBootstrapResult := checkRaftBootstrapState(rc, consulClient, consulClientErr)
 	results = append(results, raftBootstrapResult)
 
-	// 22. Check Consul service discovery (critical for Vault-Consul integration)
-	serviceDiscoveryResult := checkConsulServiceDiscovery(rc)
+	// 22. Check Consul service discovery (critical for Vault-Consul integration, now authenticated)
+	serviceDiscoveryResult := checkConsulServiceDiscovery(rc, consulClient, consulClientErr)
 	results = append(results, serviceDiscoveryResult)
 
 	// 23. Check systemd unit status for Consul and dependencies

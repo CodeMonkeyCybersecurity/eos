@@ -44,12 +44,21 @@ type RaftDiagnosticResults struct {
 }
 
 // RunRaftDiagnostics performs comprehensive Raft state diagnostics
+// Now accepts authenticated Consul client for ACL-protected operations
 func RunRaftDiagnostics(rc *eos_io.RuntimeContext, config *RaftDiagnosticConfig) (*RaftDiagnosticResults, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Running Consul Raft diagnostics")
 
 	results := &RaftDiagnosticResults{
 		Checks: []DiagnosticResult{},
+	}
+
+	// Get authenticated Consul client for ACL-protected operations
+	consulClient, consulClientErr := consul.GetAuthenticatedConsulClientForDiagnostics(rc, "")
+	if consulClientErr != nil {
+		logger.Warn("Authenticated Consul client not available, some checks may fail",
+			zap.Error(consulClientErr),
+			zap.String("remediation", "Run: eos update consul --bootstrap-token"))
 	}
 
 	// Determine which checks to run
@@ -79,15 +88,15 @@ func RunRaftDiagnostics(rc *eos_io.RuntimeContext, config *RaftDiagnosticConfig)
 		results.Checks = append(results.Checks, raftPeersResult)
 	}
 
-	// ASSESS - ACL bootstrap reset state
+	// ASSESS - ACL bootstrap reset state (now with authenticated client)
 	if runAll || config.ShowResetState {
-		resetStateResult := checkACLBootstrapResetState(rc)
+		resetStateResult := checkACLBootstrapResetState(rc, consulClient, consulClientErr)
 		results.Checks = append(results.Checks, resetStateResult)
 	}
 
-	// INTERVENE - Simulate reset file write (dry-run)
+	// INTERVENE - Simulate reset file write (dry-run, now with authenticated client)
 	if config.SimulateReset {
-		simulateResult := simulateResetFileWrite(rc)
+		simulateResult := simulateResetFileWrite(rc, consulClient, consulClientErr)
 		results.Checks = append(results.Checks, simulateResult)
 	}
 
@@ -531,7 +540,9 @@ func checkRaftClusterPeers(rc *eos_io.RuntimeContext) DiagnosticResult {
 }
 
 // checkACLBootstrapResetState shows current ACL bootstrap reset state
-func checkACLBootstrapResetState(rc *eos_io.RuntimeContext) DiagnosticResult {
+// checkACLBootstrapResetState checks ACL bootstrap reset state
+// Accepts authenticated Consul client (bootstrap check works without auth, but consistency is better)
+func checkACLBootstrapResetState(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking ACL bootstrap reset state")
 
@@ -544,12 +555,14 @@ func checkACLBootstrapResetState(rc *eos_io.RuntimeContext) DiagnosticResult {
 	result.Details = append(result.Details, "=== ACL Bootstrap Reset State ===")
 	result.Details = append(result.Details, "")
 
-	// Try to bootstrap (will fail if already done, but error contains reset index)
-	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
-	if err != nil {
+	// Use the provided client (bootstrap check doesn't strictly require auth, but better to use authenticated client)
+	if consulClient == nil || clientErr != nil {
 		result.Success = false
-		result.Message = "Cannot create Consul client"
-		result.Details = append(result.Details, fmt.Sprintf("Error: %v", err))
+		result.Severity = SeverityInfo // INFO: Expected if client unavailable
+		result.Message = "Cannot check ACL bootstrap state - client not available"
+		if clientErr != nil {
+			result.Details = append(result.Details, fmt.Sprintf("Client error: %v", clientErr))
+		}
 		return result
 	}
 
@@ -600,7 +613,8 @@ func checkACLBootstrapResetState(rc *eos_io.RuntimeContext) DiagnosticResult {
 }
 
 // simulateResetFileWrite simulates ACL reset file write (dry-run)
-func simulateResetFileWrite(rc *eos_io.RuntimeContext) DiagnosticResult {
+// Accepts authenticated Consul client for bootstrap check
+func simulateResetFileWrite(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Simulating ACL reset file write (dry-run)")
 
@@ -615,8 +629,18 @@ func simulateResetFileWrite(rc *eos_io.RuntimeContext) DiagnosticResult {
 	result.Details = append(result.Details, "This is a DRY-RUN - NO files will be written")
 	result.Details = append(result.Details, "")
 
+	// Use the provided client for bootstrap check
+	if consulClient == nil || clientErr != nil {
+		result.Success = false
+		result.Severity = SeverityInfo
+		result.Message = "Cannot simulate reset - client not available"
+		if clientErr != nil {
+			result.Details = append(result.Details, fmt.Sprintf("Client error: %v", clientErr))
+		}
+		return result
+	}
+
 	// Get reset index
-	consulClient, _ := consulapi.NewClient(consulapi.DefaultConfig())
 	_, _, bootstrapErr := consulClient.ACL().Bootstrap()
 
 	var nextIndex int
