@@ -25,6 +25,9 @@ import (
 //--------------------------------------------------------------------
 
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
+//
+// Idempotency: Safe to re-run. If user exists, updates password and refreshes bootstrap secret.
+// This allows recovery from partial failures where user was created but secret wasn't persisted.
 func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logger, password string) error {
 
 	client, err := GetPrivilegedClient(rc)
@@ -354,30 +357,91 @@ func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string
 		zap.String("lifecycle", "ephemeral - will be deleted after MFA setup"))
 
 	// Verify KV write by reading it back
+	// CRITICAL P0: This verification MUST fail the function if secret wasn't persisted.
+	// Previously this only logged warnings and returned success, causing silent failures
+	// that weren't detected until Phase 13 MFA setup tried to read the secret.
 	log.Info(" Verifying KV write by reading back from Vault")
 	verifySecret, verifyErr := client.Logical().Read(vaultpaths.UserpassBootstrapPasswordKVPath)
 	if verifyErr != nil {
-		log.Warn("Failed to verify KV write", zap.Error(verifyErr))
-	} else if verifySecret == nil {
-		log.Warn("KV verification returned nil - secret may not have been written properly")
-	} else {
-		// Verify the data structure is correct
-		if verifySecret.Data != nil {
-			if dataMap, ok := verifySecret.Data["data"].(map[string]interface{}); ok {
-				if _, hasPassword := dataMap[vaultpaths.UserpassBootstrapPasswordKVField]; hasPassword {
-					log.Info(" KV write verification successful",
-						zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-						zap.String("field_verified", vaultpaths.UserpassBootstrapPasswordKVField))
-				} else {
-					log.Warn("KV write verification failed - password field missing",
-						zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
-						zap.Any("actual_fields", getMapKeys(dataMap)))
-				}
-			} else {
-				log.Warn("KV write verification failed - invalid data structure")
-			}
-		}
+		log.Error(" Bootstrap password write verification failed - read error",
+			zap.Error(verifyErr),
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Error("")
+		log.Error("  This indicates the secret was not successfully written to Vault storage.")
+		log.Error("  Possible causes:")
+		log.Error("    • Vault storage backend is unavailable or read-only")
+		log.Error("    • Network partition between Eos and Vault")
+		log.Error("    • Insufficient permissions on the secret path")
+		log.Error("")
+		return cerr.Wrap(verifyErr, "failed to verify bootstrap password write - read error")
 	}
+
+	if verifySecret == nil {
+		log.Error(" Bootstrap password write verification failed - secret not found",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Error("")
+		log.Error("  The write operation reported success, but the secret does not exist.")
+		log.Error("  This indicates a Vault storage backend failure.")
+		log.Error("")
+		log.Error("  Diagnostic steps:")
+		log.Error("    1. Check Vault storage health: vault status")
+		log.Error("    2. Check Vault logs: journalctl -u vault -n 100")
+		log.Error("    3. Verify storage backend configuration in /etc/vault.d/vault.hcl")
+		log.Error("")
+		return cerr.New("bootstrap password secret not found after write - storage may have failed")
+	}
+
+	// Verify the data structure is correct (KV v2 format)
+	if verifySecret.Data == nil {
+		log.Error(" Bootstrap password write verification failed - response has no data",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		return cerr.New("bootstrap password verification failed - Vault response has no data")
+	}
+
+	dataMap, ok := verifySecret.Data["data"].(map[string]interface{})
+	if !ok {
+		log.Error(" Bootstrap password write verification failed - invalid KV v2 structure",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.Any("response_structure", verifySecret.Data))
+		log.Error("")
+		log.Error("  Expected KV v2 structure: { \"data\": { \"password\": \"...\" }, \"metadata\": {...} }")
+		log.Error("  Actual structure does not have a 'data' field as map[string]interface{}")
+		log.Error("")
+		log.Error("  Possible causes:")
+		log.Error("    • KV engine at 'secret' is not version 2 (check: vault secrets list)")
+		log.Error("    • Secret was written to wrong mount point")
+		log.Error("    • Vault API version mismatch")
+		log.Error("")
+		return cerr.New("bootstrap password verification failed - secret has invalid KV v2 structure")
+	}
+
+	// Verify the password field exists in the data
+	if _, hasPassword := dataMap[vaultpaths.UserpassBootstrapPasswordKVField]; !hasPassword {
+		log.Error(" Bootstrap password write verification failed - password field missing",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
+			zap.Any("actual_fields", getMapKeys(dataMap)))
+		log.Error("")
+		log.Error("  The secret exists but does not contain the required password field.")
+		log.Error("  This indicates a bug in the secret write logic.")
+		log.Error("")
+		return cerr.Newf("bootstrap password verification failed - field '%s' not in written secret",
+			vaultpaths.UserpassBootstrapPasswordKVField)
+	}
+
+	// SUCCESS: All verification checks passed
+	log.Info(" [EVALUATE] Bootstrap password write verification successful",
+		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+		zap.String("field_verified", vaultpaths.UserpassBootstrapPasswordKVField))
+
+	// State transition logging for forensic analysis
+	log.Info("Phase 10a State Transition",
+		zap.String("phase", "10a"),
+		zap.String("from_state", "userpass_user_created"),
+		zap.String("to_state", "bootstrap_password_persisted"),
+		zap.String("secret_path", vaultpaths.UserpassBootstrapPasswordKVPath),
+		zap.String("completion_status", "success"),
+		zap.Time("completed_at", time.Now()))
 
 	return nil
 }

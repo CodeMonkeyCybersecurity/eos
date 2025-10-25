@@ -676,6 +676,51 @@ func VerifyMFAPrerequisites(rc *eos_io.RuntimeContext, client *api.Client, usern
 			zap.String("mount_accessor", userpassMount.Accessor))
 	}
 
+	// Check 4: Bootstrap password exists (Phase 10a completion proof)
+	// CRITICAL P1: This is defense-in-depth verification. Even though Phase 10a now fails
+	// properly if the secret isn't persisted (P0 fix), this early check provides:
+	// - Fail-fast behavior (before generating TOTP secrets)
+	// - Better UX (clear error message about what's missing)
+	// - Protection against edge cases (secret deleted between Phase 10a and Phase 13)
+	log.Info("   Checking bootstrap password secret exists (Phase 10a completion)")
+	bootstrapExists, err := checkSecretExistsKVv2(
+		rc.Ctx,
+		client,
+		"secret",       // mount
+		"eos/bootstrap", // semantic path
+	)
+	if err != nil {
+		log.Error("   ✗ Failed to check bootstrap password existence",
+			zap.Error(err),
+			zap.String("semantic_path", "eos/bootstrap"))
+		return cerr.Wrap(err, "failed to verify Phase 10a completion")
+	}
+
+	if !bootstrapExists {
+		log.Error("   ✗ Bootstrap password secret not found",
+			zap.String("semantic_path", "eos/bootstrap"),
+			zap.String("full_path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Error("")
+		log.Error("═══════════════════════════════════════════════════════════")
+		log.Error(" Phase 10a Incomplete: Bootstrap Password Missing")
+		log.Error("═══════════════════════════════════════════════════════════")
+		log.Error("")
+		log.Error("This indicates Phase 10a (userpass authentication setup) did not complete successfully.")
+		log.Error("")
+		log.Error("Diagnostic Steps:")
+		log.Error("  1. Check Phase 10a logs: grep 'Phase 10a' /var/log/eos/*.log")
+		log.Error("  2. Verify Vault storage health: vault status")
+		log.Error("  3. Check secret directly: vault kv get -mount=secret eos/bootstrap")
+		log.Error("")
+		log.Error("Recovery:")
+		log.Error("  Re-run userpass setup: eos update vault --enable-userpass")
+		log.Error("  Or full vault setup: eos create vault")
+		log.Error("")
+		return cerr.New("Phase 10a incomplete: bootstrap password not found")
+	}
+
+	log.Info("   ✓ Bootstrap password secret exists (Phase 10a verified complete)")
+
 	log.Info(" [PRE-MFA VERIFICATION] All prerequisites verified successfully")
 	return nil
 }
@@ -1134,16 +1179,42 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	}
 
 	if passwordSecret == nil {
-		log.Error(" Bootstrap password secret returned nil from Vault",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
 		log.Error("")
-		log.Error("This indicates the secret does not exist at the expected path.")
-		log.Error(fmt.Sprintf("Expected path: %s", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Error("═══════════════════════════════════════════════════════════")
+		log.Error(" CRITICAL: Bootstrap Password Secret Not Found")
+		log.Error("═══════════════════════════════════════════════════════════")
 		log.Error("")
-		log.Error("Remediation:")
-		log.Error("  • Re-run Phase 10a: eos update vault --setup-userpass")
+		log.Error("Expected path:", zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
 		log.Error("")
-		return cerr.New("bootstrap password secret not found - Phase 10a may not have completed")
+		log.Error("Root Cause Analysis:")
+		log.Error("  Phase 10a (userpass bootstrap) did not successfully persist credentials to Vault.")
+		log.Error("")
+		log.Error("Possible Reasons:")
+		log.Error("  1. Phase 10a write succeeded but verification failed (storage backend issue)")
+		log.Error("  2. Vault storage backend became unavailable during Phase 10a")
+		log.Error("  3. Network partition between Eos and Vault during write")
+		log.Error("  4. Insufficient Vault token permissions (unlikely with root token)")
+		log.Error("  5. KV v2 engine not mounted at 'secret'")
+		log.Error("  6. Secret was deleted after Phase 10a but before MFA setup")
+		log.Error("")
+		log.Error("Diagnostic Commands:")
+		log.Error("  1. Check if secret exists: vault kv get -mount=secret eos/bootstrap")
+		log.Error("  2. Verify KV v2 mount: vault secrets list | grep secret")
+		log.Error("  3. Check storage health: vault status")
+		log.Error("  4. Review Phase 10a logs: grep 'Phase 10a' /var/log/eos/*.log")
+		log.Error("  5. Check for Phase 10a errors: grep 'Phase 10a.*ERROR' /var/log/eos/*.log")
+		log.Error("")
+		log.Error("Recovery Steps:")
+		log.Error("  1. Re-run userpass setup: eos update vault --enable-userpass")
+		log.Error("  2. Verify bootstrap password appears: vault kv get -mount=secret eos/bootstrap")
+		log.Error("  3. Retry MFA setup: eos update vault --setup-mfa-user eos")
+		log.Error("")
+		log.Error("Or run full vault enablement: eos create vault")
+		log.Error("")
+		return cerr.Errorf(
+			"bootstrap password not found at %s: Phase 10a did not complete successfully (see logs above for details)",
+			vaultpaths.UserpassBootstrapPasswordKVPath,
+		)
 	}
 
 	if passwordSecret.Data == nil {

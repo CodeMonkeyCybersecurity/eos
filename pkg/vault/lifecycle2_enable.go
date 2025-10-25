@@ -417,7 +417,16 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 
 		if userpassConfigured {
 			// Verify all MFA prerequisites before attempting TOTP setup
-			log.Info(" [ASSESS] Verifying MFA prerequisites")
+			// CRITICAL P1: This early verification provides fail-fast behavior and
+			// prevents generating TOTP secrets if prerequisites are missing.
+			log.Info(" [ASSESS] Verifying MFA prerequisites before setup")
+			log.Info("   Prerequisites being checked:")
+			log.Info("     1. Userpass user exists")
+			log.Info("     2. Entity exists (by name or alias)")
+			log.Info("     3. Entity alias exists for userpass mount")
+			log.Info("     4. Bootstrap password secret exists (Phase 10a completion)")
+			log.Info("")
+
 			if err := VerifyMFAPrerequisites(rc, client, "eos"); err != nil {
 				log.Error(" [Phase 13] MFA prerequisites check failed",
 					zap.Error(err))
@@ -427,7 +436,13 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 				log.Error("")
 				return logger.LogErrAndWrap(rc, "verify MFA prerequisites", err)
 			}
-			log.Info(" [EVALUATE] MFA prerequisites verified successfully")
+
+			log.Info("")
+			log.Info(" [EVALUATE] All MFA prerequisites verified successfully")
+			log.Info("   ✓ Userpass user exists")
+			log.Info("   ✓ Entity exists and is properly configured")
+			log.Info("   ✓ Bootstrap password available for TOTP setup")
+			log.Info("")
 
 			// Set up TOTP for the eos user
 			if err := SetupUserTOTP(rc, client, "eos"); err != nil {
