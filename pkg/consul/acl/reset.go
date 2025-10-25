@@ -10,7 +10,7 @@
 // token is lost or not stored in Vault. This allows re-bootstrapping
 // without destroying cluster data.
 //
-// Last Updated: 2025-01-25
+// Last Updated: 2025-10-25
 
 package acl
 
@@ -27,6 +27,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/validation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	consulapi "github.com/hashicorp/consul/api"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -198,8 +199,21 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			err, bootstrapErr.Error())
 	}
 
-	logger.Info("Reset index detected",
-		zap.Int("reset_index", resetIndex))
+	// CRITICAL FIX (P0): Consul error reports the LAST CONSUMED reset index,
+	// not the NEXT required index. We must increment by 1 to get the correct
+	// index for the reset file.
+	//
+	// Example: Error says "reset index: 3117" means:
+	//   - Index 3117 was already consumed by a previous bootstrap
+	//   - We must write index 3118 to the reset file for the reset to work
+	//
+	// This fixes the off-by-one bug where the code was stuck writing the same
+	// index repeatedly (3117, 3117, 3117...) instead of incrementing to 3118.
+	resetIndex += 1
+
+	logger.Info("Reset index determined",
+		zap.Int("consul_last_consumed", resetIndex-1),
+		zap.Int("next_reset_index", resetIndex))
 
 	// ========================================================================
 	// ASSESS - Check if token already exists in Vault
@@ -354,12 +368,53 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 				attempt, err, resetFilePath, dataDir)
 		}
 
-		logger.Debug("Reset file written, calling Bootstrap() immediately",
+		logger.Info("Reset file written, restarting Consul to process it",
 			zap.String("file", resetFilePath),
 			zap.Int("index", resetIndex),
 			zap.Int("attempt", attempt))
 
-		// IMMEDIATELY call Bootstrap() to minimize race window
+		// CRITICAL FIX (P0): Restart Consul to force it to read the reset file.
+		//
+		// Consul's leader goroutine only checks for the reset file on startup
+		// and periodically (every 5 seconds by default), NOT on every Bootstrap()
+		// API call. This creates a race condition where:
+		//   1. We write the reset file
+		//   2. Bootstrap() API call arrives before Consul's leader detects file
+		//   3. Consul responds with "403 Permission denied" (file not yet consumed)
+		//
+		// Restarting Consul ensures the leader goroutine reads the file immediately
+		// on startup, eliminating the race window.
+		//
+		// Service disruption: ~15 seconds (acceptable for rare bootstrap reset operation)
+		restartOutput, restartErr := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"restart", "consul"},
+			Capture: true,
+		})
+		if restartErr != nil {
+			logger.Warn("Failed to restart Consul, continuing anyway",
+				zap.Error(restartErr),
+				zap.String("output", restartOutput),
+				zap.String("note", "Bootstrap may still succeed if Consul detects file periodically"))
+			// Don't fail - Consul might detect file on its next periodic check
+		} else {
+			logger.Debug("Consul restarted successfully, waiting for stabilization")
+
+			// Wait for Consul to stabilize after restart.
+			// This gives the leader goroutine time to:
+			//   1. Start up and initialize
+			//   2. Read the reset file from data directory
+			//   3. Process the reset index
+			//   4. Prepare ACL system for bootstrap API call
+			//
+			// 15 seconds is conservative - most Consul instances stabilize in 5-10 seconds
+			time.Sleep(15 * time.Second)
+		}
+
+		logger.Debug("Calling Bootstrap() API after Consul restart",
+			zap.Int("attempt", attempt))
+
+		// Call Bootstrap() API
 		var bootstrapErr error
 		newBootstrapToken, _, bootstrapErr = consulClient.ACL().Bootstrap()
 
@@ -383,61 +438,85 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			break // Exit retry loop
 		}
 
-		// Bootstrap failed - check if it's a race condition
+		// Bootstrap failed - analyze error and determine retry strategy
 		lastErr = bootstrapErr
 
-		// Check if race condition occurred (file consumed but API call arrived late)
+		// Check if error is due to ACL bootstrap being locked
 		if strings.Contains(bootstrapErr.Error(), "ACL bootstrap no longer allowed") {
-			// Try to extract new reset index from error
+			// Try to extract reset index from error message
 			newResetIndex, extractErr := extractResetIndex(bootstrapErr.Error())
 
-			if extractErr == nil && newResetIndex > resetIndex {
-				// Race condition detected - Consul consumed file before API call
-				logger.Warn("Race condition detected: reset file consumed before Bootstrap() API call",
-					zap.Int("attempt", attempt),
-					zap.Int("old_reset_index", resetIndex),
-					zap.Int("new_reset_index", newResetIndex),
-					zap.Duration("retry_delay", retryDelay),
-					zap.String("note", "Will retry with updated index"))
+			if extractErr == nil {
+				// CRITICAL FIX (P0): Consul reports the LAST CONSUMED reset index
+				// in the error message, not the NEXT required index.
+				// We must always increment by 1 to get the next index to attempt.
+				nextIndex := newResetIndex + 1
 
-				// Update reset index for next attempt
-				resetIndex = newResetIndex
+				if nextIndex != resetIndex {
+					// Consul consumed a different index than we attempted.
+					// This can happen if:
+					//   1. Another process wrote a reset file concurrently
+					//   2. Consul's internal state advanced since our last attempt
+					//   3. Our reset file was consumed but we're seeing a stale error
+					logger.Warn("Consul consumed different reset index than attempted",
+						zap.Int("attempt", attempt),
+						zap.Int("our_index", resetIndex),
+						zap.Int("consul_consumed", newResetIndex),
+						zap.Int("next_index", nextIndex),
+						zap.String("note", "Will retry with Consul's reported index + 1"))
+
+					resetIndex = nextIndex
+				} else {
+					// Consul reported same index we wrote.
+					// This means our reset file WAS consumed, but bootstrap still failed.
+					// Possible causes:
+					//   1. Consul consumed file but internal state not yet ready
+					//   2. Timing issue during Consul restart
+					//   3. Transient error during ACL system initialization
+					//
+					// Increment for next retry.
+					logger.Warn("Reset file consumed but bootstrap failed, incrementing for retry",
+						zap.Int("attempt", attempt),
+						zap.Int("current_index", resetIndex),
+						zap.Int("next_index", resetIndex+1))
+					resetIndex += 1
+				}
 
 				if attempt < maxRetries {
 					// Wait before retry (give Consul time to stabilize)
 					time.Sleep(retryDelay)
-					continue // Retry with new index
+					continue // Retry with updated index
 				}
 
-				// Max retries reached with race condition
-				logger.Error("Race condition persisted after max retries",
+				// Max retries reached
+				logger.Error("Failed to bootstrap after max retries",
 					zap.Int("max_retries", maxRetries),
 					zap.Int("final_reset_index", resetIndex))
 
 				// Clean up reset file
 				_ = os.Remove(resetFilePath)
 
-				return nil, fmt.Errorf("failed to re-bootstrap ACL system after %d attempts due to race condition\n"+
-					"Final reset index: %d\n"+
-					"This indicates Consul's leader is consuming the reset file faster than the API can respond.\n"+
+				return nil, fmt.Errorf("failed to re-bootstrap ACL system after %d attempts\n"+
+					"Final reset index attempted: %d\n"+
+					"Consul reported index: %d\n"+
 					"Remediation:\n"+
 					"  - Check if this node is the cluster leader: consul operator raft list-peers\n"+
+					"  - Verify Consul service is running: systemctl status consul\n"+
+					"  - Check Consul logs for errors: journalctl -u consul -n 100\n"+
 					"  - Verify cluster health: consul members\n"+
-					"  - Check Consul logs: journalctl -u consul -n 50\n"+
-					"  - If cluster is unstable, wait for leader election to complete\n"+
 					"  - Try running again: sudo eos update consul --bootstrap-token",
-					maxRetries, resetIndex)
+					maxRetries, resetIndex, newResetIndex)
 			}
 
-			// Reset index didn't change or extraction failed - not a simple race
-			logger.Warn("Bootstrap failed with 'no longer allowed' error but reset index unchanged",
+			// Failed to extract reset index from error - log and continue
+			logger.Warn("Bootstrap failed but could not extract reset index from error",
 				zap.Int("attempt", attempt),
-				zap.Int("reset_index", resetIndex),
-				zap.Error(extractErr))
+				zap.Error(extractErr),
+				zap.String("error_message", bootstrapErr.Error()))
 		}
 
-		// Some other error occurred (not race condition)
-		logger.Warn("Bootstrap attempt failed with non-race error",
+		// Some other error occurred (not "ACL bootstrap no longer allowed")
+		logger.Warn("Bootstrap attempt failed with non-ACL error",
 			zap.Int("attempt", attempt),
 			zap.Error(bootstrapErr))
 
@@ -458,14 +537,22 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 
 		return nil, fmt.Errorf("failed to re-bootstrap ACL system after %d attempts: %w\n"+
 			"Reset file was: %s\n"+
-			"Final reset index: %d\n"+
+			"Final reset index attempted: %d\n"+
+			"Last error: %v\n\n"+
 			"Remediation:\n"+
 			"  - Check if this node is the cluster leader: consul operator raft list-peers\n"+
-			"  - Verify reset index is correct: consul acl bootstrap (look for reset index in error)\n"+
-			"  - Check Consul logs: journalctl -u consul -n 50\n"+
+			"  - Verify Consul service is running: systemctl status consul\n"+
+			"  - Check Consul logs for errors: journalctl -u consul -n 100\n"+
 			"  - Verify cluster health: consul members\n"+
-			"  - Try running again (reset file has been cleaned up)",
-			maxRetries, lastErr, resetFilePath, resetIndex)
+			"  - Try running again (reset file has been cleaned up)\n\n"+
+			"If problem persists, consider manual reset (DESTRUCTIVE):\n"+
+			"  1. Stop Consul: systemctl stop consul\n"+
+			"  2. Backup data: cp -r %s %s.backup.$(date +%%s)\n"+
+			"  3. Remove ACL state: rm -rf %s/raft/\n"+
+			"  4. Start Consul: systemctl start consul\n"+
+			"  5. Bootstrap fresh: consul acl bootstrap\n"+
+			"  6. Store in Vault: vault kv put secret/consul/bootstrap-token token=<new-token>",
+			maxRetries, lastErr, resetFilePath, resetIndex, lastErr, dataDir, dataDir, dataDir)
 	}
 
 	result := &BootstrapResult{

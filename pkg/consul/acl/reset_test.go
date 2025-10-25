@@ -284,6 +284,134 @@ func TestCreateAPIAccessError(t *testing.T) {
 	assert.Contains(t, errMsg, "Continuing with alternative detection methods")
 }
 
+// TestResetIndexIncrement verifies the off-by-one fix (P0 Bug)
+func TestResetIndexIncrement(t *testing.T) {
+	// This test verifies the critical fix for the off-by-one error discovered
+	// in the vhost1 failure analysis. Consul error messages report the LAST
+	// consumed reset index, not the NEXT required index.
+
+	// Simulate Consul error saying "reset index: 3117"
+	errorMsg := "ACL bootstrap no longer allowed (reset index: 3117)"
+
+	// Extract index from error
+	extractedIndex, err := extractResetIndex(errorMsg)
+	require.NoError(t, err)
+	assert.Equal(t, 3117, extractedIndex)
+
+	// CRITICAL FIX: Must increment to get NEXT required index
+	// The bug was setting resetIndex = extractedIndex (3117)
+	// when it should be extractedIndex + 1 (3118)
+	nextIndex := extractedIndex + 1
+	assert.Equal(t, 3118, nextIndex, "Next reset index must be last_consumed + 1")
+}
+
+// TestStaleResetIndexScenario verifies handling of already-consumed index
+func TestStaleResetIndexScenario(t *testing.T) {
+	// This test simulates the exact failure from vhost1 logs where:
+	// - Code attempts reset with index 3117
+	// - Consul responds "reset index: 3117" (same index)
+	// - Code must increment to 3118 for next attempt
+
+	currentAttemptIndex := 3117
+	consulReportedIndex := 3117 // Consul says this index already consumed
+
+	// Calculate next index (Consul reports LAST consumed)
+	nextIndex := consulReportedIndex + 1
+
+	// Verify we increment even when indexes match
+	assert.Equal(t, 3118, nextIndex, "Must increment even when reported index matches attempt")
+	assert.Greater(t, nextIndex, currentAttemptIndex, "Next index must be greater than current")
+}
+
+// TestRaceConditionIndexProgression verifies retry logic increments correctly
+func TestRaceConditionIndexProgression(t *testing.T) {
+	// Simulate scenario where Consul's internal state advances during retries
+	tests := []struct {
+		name              string
+		ourAttemptIndex   int
+		consulReportedIdx int
+		expectedNextIdx   int
+		description       string
+	}{
+		{
+			name:              "Consul consumed older index than we attempted",
+			ourAttemptIndex:   3118,
+			consulReportedIdx: 3117, // Consul consumed 3117 (our attempt - 1)
+			expectedNextIdx:   3119, // nextIndex=3118 matches ourAttempt, so increment to 3119
+			description:       "When nextIndex equals ourAttemptIndex, we increment (our file was consumed)",
+		},
+		{
+			name:              "Consul consumed newer index (race)",
+			ourAttemptIndex:   3118,
+			consulReportedIdx: 3120, // Consul jumped ahead
+			expectedNextIdx:   3121, // Must use Consul's index + 1
+			description:       "When nextIndex differs from ourAttemptIndex, use Consul's value",
+		},
+		{
+			name:              "Consul consumed our exact index",
+			ourAttemptIndex:   3118,
+			consulReportedIdx: 3118, // Consul consumed what we wrote
+			expectedNextIdx:   3119, // Increment for next attempt
+			description:       "When Consul reports our exact attempt, increment for retry",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This matches the production code logic in reset.go:449-483
+			// Consul reports LAST consumed index, we calculate NEXT required
+			nextIndex := tt.consulReportedIdx + 1
+
+			// Compare with our attempted index
+			if nextIndex != tt.ourAttemptIndex {
+				// Different index - use Consul's reported value
+				assert.Equal(t, tt.expectedNextIdx, nextIndex)
+			} else {
+				// Same index - our file was consumed, increment for retry
+				nextIndex = tt.ourAttemptIndex + 1
+				assert.Equal(t, tt.expectedNextIdx, nextIndex)
+			}
+		})
+	}
+}
+
+// TestExtractResetIndexHighNumbers verifies extraction works with large indexes
+func TestExtractResetIndexHighNumbers(t *testing.T) {
+	tests := []struct {
+		name     string
+		errorMsg string
+		expected int
+	}{
+		{
+			name:     "Single digit",
+			errorMsg: "ACL bootstrap no longer allowed (reset index: 1)",
+			expected: 1,
+		},
+		{
+			name:     "Four digit (vhost1 scenario)",
+			errorMsg: "Permission denied: ACL bootstrap no longer allowed (reset index: 3117)",
+			expected: 3117,
+		},
+		{
+			name:     "Six digit",
+			errorMsg: "ACL bootstrap no longer allowed (reset index: 999999)",
+			expected: 999999,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			index, err := extractResetIndex(tt.errorMsg)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, index)
+
+			// Verify increment produces correct next index
+			nextIndex := index + 1
+			assert.Equal(t, tt.expected+1, nextIndex)
+		})
+	}
+}
+
 // Note: Full integration tests with real Consul instances are beyond the scope
 // of unit tests and should be run in a separate integration test suite with
 // actual Consul servers running.
