@@ -415,6 +415,19 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		}
 
 		if userpassConfigured {
+			// Verify all MFA prerequisites before attempting TOTP setup
+			log.Info(" [ASSESS] Verifying MFA prerequisites")
+			if err := VerifyMFAPrerequisites(rc, client, "eos"); err != nil {
+				log.Error(" [Phase 13] MFA prerequisites check failed",
+					zap.Error(err))
+				log.Error("")
+				log.Error("  MFA setup cannot proceed because prerequisites are missing.")
+				log.Error("  Run 'sudo eos debug vault --identities' for detailed diagnostics.")
+				log.Error("")
+				return logger.LogErrAndWrap(rc, "verify MFA prerequisites", err)
+			}
+			log.Info(" [EVALUATE] MFA prerequisites verified successfully")
+
 			// Set up TOTP for the eos user
 			if err := SetupUserTOTP(rc, client, "eos"); err != nil {
 				log.Error(" [Phase 13] CRITICAL: Failed to set up TOTP for eos user",

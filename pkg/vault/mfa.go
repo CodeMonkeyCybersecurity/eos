@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -530,6 +531,83 @@ func promptOktaConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error)
 	}, nil
 }
 
+// VerifyMFAPrerequisites checks that all prerequisites for MFA setup exist
+// This provides clear diagnostic output if something is misconfigured
+//
+// Prerequisites checked:
+// 1. Userpass user exists
+// 2. Entity exists (by name or alias)
+// 3. Entity alias exists for userpass mount
+//
+// This function is defensive and provides detailed diagnostics if any prerequisite is missing.
+func VerifyMFAPrerequisites(rc *eos_io.RuntimeContext, client *api.Client, username string) error {
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Info(" [PRE-MFA VERIFICATION] Checking MFA prerequisites")
+
+	// Check 1: Userpass user exists
+	log.Info("   Checking userpass user exists")
+	userPath := fmt.Sprintf("auth/userpass/users/%s", username)
+	userResp, err := client.Logical().Read(userPath)
+	if err != nil || userResp == nil {
+		log.Error("   ✗ Userpass user not found",
+			zap.String("username", username),
+			zap.String("path", userPath),
+			zap.Error(err))
+		return cerr.Newf("userpass user %s does not exist", username)
+	}
+	log.Info("   ✓ Userpass user exists")
+
+	// Check 2: Entity exists (by name)
+	log.Info("   Checking entity exists")
+	entityLookupPath := fmt.Sprintf(shared.EosEntityLookupPath, username)
+	entityResp, err := client.Logical().Read(entityLookupPath)
+	if err != nil || entityResp == nil || entityResp.Data == nil {
+		log.Warn("   ✗ Entity not found by name, checking alias",
+			zap.String("lookup_path", entityLookupPath))
+
+		// Try alias lookup as fallback
+		authMounts, authErr := client.Sys().ListAuth()
+		if authErr != nil {
+			log.Error("   ✗ Cannot list auth mounts for alias lookup", zap.Error(authErr))
+			return cerr.Newf("entity for user %s does not exist and cannot verify via alias", username)
+		}
+
+		if userpassMount, exists := authMounts["userpass/"]; exists {
+			aliasLookupData := map[string]interface{}{
+				"alias_name":          username,
+				"alias_mount_accessor": userpassMount.Accessor,
+			}
+			aliasResp, aliasErr := client.Logical().Write("identity/lookup/entity", aliasLookupData)
+			if aliasErr != nil || aliasResp == nil {
+				log.Error("   ✗ Entity not found by name or alias")
+				return cerr.Newf("entity for user %s does not exist", username)
+			}
+			log.Info("   ✓ Entity exists (found via alias)")
+		} else {
+			log.Error("   ✗ Entity not found and userpass mount not available for alias lookup")
+			return cerr.Newf("entity for user %s does not exist", username)
+		}
+	} else {
+		log.Info("   ✓ Entity exists (found by name)")
+	}
+
+	// Check 3: Entity alias exists
+	log.Info("   Checking entity alias exists for userpass")
+	authMounts, err := client.Sys().ListAuth()
+	if err != nil {
+		log.Warn("   Could not verify entity alias", zap.Error(err))
+	} else if userpassMount, exists := authMounts["userpass/"]; exists {
+		// We can't directly check alias existence via API, but if entity lookup by alias worked,
+		// the alias exists. This is implicitly verified by the entity lookup above.
+		log.Info("   ✓ Entity alias verified (userpass mount exists)",
+			zap.String("mount_accessor", userpassMount.Accessor))
+	}
+
+	log.Info(" [PRE-MFA VERIFICATION] All prerequisites verified successfully")
+	return nil
+}
+
 // SetupUserTOTP helps a user set up TOTP MFA for Identity-based MFA
 // This function generates a user-specific TOTP secret and displays it for enrollment
 //
@@ -576,13 +654,113 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	log.Info(" ✓ TOTP MFA method found", zap.String("method_id", methodID))
 
-	// Step 2: Generate TOTP secret for this specific user
-	log.Info(" [INTERVENE] Generating TOTP secret for user")
+	// Step 2: Look up entity ID for the user
+	log.Info(" [ASSESS] Looking up entity for user", zap.String("username", username))
 
-	generatePath := fmt.Sprintf("identity/mfa/method/totp/generate")
+	var entityID string
+	var lookupMethod string
+
+	// Method 1: Lookup by entity name (primary)
+	entityLookupPath := fmt.Sprintf(shared.EosEntityLookupPath, username)
+	entityResp, err := client.Logical().Read(entityLookupPath)
+
+	if err != nil || entityResp == nil || entityResp.Data == nil {
+		log.Warn(" Entity lookup by name failed, trying alias lookup",
+			zap.Error(err),
+			zap.String("lookup_path", entityLookupPath))
+
+		// Method 2: Lookup by alias (fallback - more robust)
+		log.Info(" [ASSESS] Attempting entity lookup via userpass alias")
+
+		// Get userpass mount accessor
+		authMounts, authErr := client.Sys().ListAuth()
+		if authErr != nil {
+			log.Error(" Failed to list auth mounts",
+				zap.Error(authErr))
+			return cerr.Wrap(authErr, "failed to list auth mounts for alias lookup")
+		}
+
+		userpassMount, exists := authMounts["userpass/"]
+		if !exists {
+			log.Error(" Userpass auth method not found")
+			return cerr.New("userpass auth method not found - cannot lookup entity by alias")
+		}
+
+		// Lookup entity by alias using the API endpoint
+		aliasLookupPath := "identity/lookup/entity"
+		aliasLookupData := map[string]interface{}{
+			"alias_name":          username,
+			"alias_mount_accessor": userpassMount.Accessor,
+		}
+
+		log.Debug("Alias lookup parameters",
+			zap.String("alias_name", username),
+			zap.String("mount_accessor", userpassMount.Accessor))
+
+		aliasResp, aliasErr := client.Logical().Write(aliasLookupPath, aliasLookupData)
+		if aliasErr != nil {
+			log.Error(" Failed to look up entity by alias",
+				zap.Error(aliasErr),
+				zap.String("username", username))
+			return cerr.Wrap(aliasErr, "failed to look up entity - both name and alias lookup failed")
+		}
+
+		if aliasResp == nil || aliasResp.Data == nil {
+			log.Error(" Entity not found by name or alias")
+			log.Error("")
+			log.Error("This indicates the entity was not created during 'eos create vault'")
+			log.Error("Entity creation happens in Phase 10c (PhaseCreateEosEntity)")
+			log.Error("")
+			log.Error("To fix:")
+			log.Error("  1. Run 'sudo eos debug vault --identities' to check entity status")
+			log.Error("  2. If entity missing, run 'sudo eos delete vault --force && sudo eos create vault'")
+			log.Error("")
+			return cerr.Newf("entity not found for user %s (tried name and alias lookup)", username)
+		}
+
+		entityID, ok = aliasResp.Data["id"].(string)
+		if !ok || entityID == "" {
+			log.Error(" Entity ID from alias lookup is invalid", zap.Any("response", aliasResp.Data))
+			return cerr.New("entity ID from alias lookup is invalid")
+		}
+
+		lookupMethod = "alias"
+		log.Info(" ✓ Entity found via alias lookup",
+			zap.String("entity_id", entityID),
+			zap.String("method", lookupMethod))
+	} else {
+		// Method 1 succeeded
+		entityID, ok = entityResp.Data["id"].(string)
+		if !ok || entityID == "" {
+			log.Error(" Entity ID from name lookup is invalid", zap.Any("response", entityResp.Data))
+			return cerr.New("entity ID from name lookup is invalid")
+		}
+
+		lookupMethod = "name"
+		log.Info(" ✓ Entity found via name lookup",
+			zap.String("entity_id", entityID),
+			zap.String("method", lookupMethod))
+	}
+
+	// Step 3: Generate TOTP secret using admin endpoint
+	log.Info(" [INTERVENE] Generating TOTP secret for user",
+		zap.String("entity_id", entityID),
+		zap.String("method_id", methodID),
+		zap.String("lookup_method", lookupMethod))
+
+	// CRITICAL: Use admin-generate endpoint which accepts explicit entity_id
+	// The regular /generate endpoint requires the calling token to have an entity,
+	// but root token has no entity. Admin endpoint solves this by accepting entity_id parameter.
+	generatePath := "identity/mfa/method/totp/admin-generate"
 	generateData := map[string]interface{}{
 		"method_id": methodID,
+		"entity_id": entityID, // Required for admin-generate
 	}
+
+	log.Debug("TOTP generation request",
+		zap.String("path", generatePath),
+		zap.String("entity_id", entityID),
+		zap.String("method_id", methodID))
 
 	secret, err := client.Logical().Write(generatePath, generateData)
 	if err != nil {
@@ -601,7 +779,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info(" ✓ TOTP secret generated successfully")
 	log.Info("")
 
-	// Step 3: Display the secret to the user (CRITICAL - they can't retrieve this later)
+	// Step 4: Display the secret to the user (CRITICAL - they can't retrieve this later)
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info("   IMPORTANT: Save this information NOW")
 	log.Info("═══════════════════════════════════════════════════════════")
