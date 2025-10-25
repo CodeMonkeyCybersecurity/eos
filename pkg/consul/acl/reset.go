@@ -547,12 +547,16 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 
 			for time.Since(pollStartTime) < pollMaxDuration {
 				// Try bootstrap to check current reset index
-				_, _, pollErr := consulClient.ACL().Bootstrap()
+				pollBootstrapToken, _, pollErr := consulClient.ACL().Bootstrap()
 
 				if pollErr == nil {
 					// Bootstrap succeeded! Reset was consumed
+					// CRITICAL: Capture the token now - this is the successful bootstrap!
+					newBootstrapToken = pollBootstrapToken
 					logger.Info("Reset file consumed - bootstrap succeeded during polling",
-						zap.Duration("wait_time", time.Since(pollStartTime)))
+						zap.Duration("wait_time", time.Since(pollStartTime)),
+						zap.String("accessor", newBootstrapToken.AccessorID),
+						zap.String("note", "Bootstrap token captured from polling attempt"))
 					resetFileConsumed = true
 					break
 				}
@@ -603,22 +607,32 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 				zap.String("output", statusFinalOutput))
 		}
 
-		logger.Info("Calling Bootstrap() API after Consul restart",
-			zap.Int("attempt", attempt),
-			zap.String("consul_api", "ACL().Bootstrap()"))
-
-		// Call Bootstrap() API
+		// Check if bootstrap already succeeded during polling
 		var bootstrapErr error
-		newBootstrapToken, _, bootstrapErr = consulClient.ACL().Bootstrap()
+		if newBootstrapToken != nil {
+			// Bootstrap already succeeded during polling - skip the second attempt
+			logger.Info("Bootstrap already succeeded during polling, skipping redundant API call",
+				zap.String("accessor", newBootstrapToken.AccessorID))
+			bootstrapErr = nil // Mark as success
+		} else {
+			// Bootstrap not yet successful - try the API call now
+			logger.Info("Calling Bootstrap() API after Consul restart",
+				zap.Int("attempt", attempt),
+				zap.String("consul_api", "ACL().Bootstrap()"))
+
+			newBootstrapToken, _, bootstrapErr = consulClient.ACL().Bootstrap()
+
+			if bootstrapErr == nil {
+				// SUCCESS! Bootstrap completed
+				logger.Info("ACL re-bootstrap successful",
+					zap.String("accessor", newBootstrapToken.AccessorID),
+					zap.String("token_preview", newBootstrapToken.SecretID[:8]+"..."),
+					zap.Int("attempt", attempt),
+					zap.String("note", "New bootstrap token generated"))
+			}
+		}
 
 		if bootstrapErr == nil {
-			// SUCCESS! Bootstrap completed
-			logger.Info("ACL re-bootstrap successful",
-				zap.String("accessor", newBootstrapToken.AccessorID),
-				zap.String("token_preview", newBootstrapToken.SecretID[:8]+"..."),
-				zap.Int("attempt", attempt),
-				zap.String("note", "New bootstrap token generated"))
-
 			// Clean up reset file after successful bootstrap
 			if err := os.Remove(resetFilePath); err != nil {
 				logger.Warn("Failed to remove reset file after successful bootstrap",
