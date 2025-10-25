@@ -282,15 +282,36 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 				"  - Check server logs: journalctl -u consul -n 100")
 	}
 
-	// Try to resolve leader IP to hostname for better user experience
+	// Try to resolve leader IP to hostname and Tailscale IP for better user experience
 	leaderDisplayName := leaderAddr
+	leaderHostname := ""
+	leaderPort := ""
+
 	if leaderIP := strings.Split(leaderAddr, ":")[0]; leaderIP != "" {
+		// Extract port from leader address
+		parts := strings.Split(leaderAddr, ":")
+		if len(parts) == 2 {
+			leaderPort = parts[1]
+		}
+
 		// Try to resolve to hostname
 		// This helps users identify which physical machine is the leader
 		if hostnames, err := net.LookupAddr(leaderIP); err == nil && len(hostnames) > 0 {
 			// Use first hostname and strip trailing dot
-			hostname := strings.TrimSuffix(hostnames[0], ".")
-			leaderDisplayName = hostname + " (" + leaderAddr + ")"
+			leaderHostname = strings.TrimSuffix(hostnames[0], ".")
+
+			// Try to get Tailscale IP for this hostname
+			if tailscaleIP := getTailscaleIPForHostname(rc, leaderHostname); tailscaleIP != "" {
+				// Prefer Tailscale IP for display (more stable, works across networks)
+				if leaderPort != "" {
+					leaderDisplayName = leaderHostname + " (" + tailscaleIP + ":" + leaderPort + " via Tailscale)"
+				} else {
+					leaderDisplayName = leaderHostname + " (" + tailscaleIP + " via Tailscale)"
+				}
+			} else {
+				// Fall back to standard display with local IP
+				leaderDisplayName = leaderHostname + " (" + leaderAddr + ")"
+			}
 		}
 	}
 
@@ -1089,6 +1110,84 @@ func extractResetIndex(errorMsg string) (int, error) {
 	}
 
 	return resetIndex, nil
+}
+
+// getTailscaleIPForHostname attempts to resolve a hostname to its Tailscale IP address
+// This helps display Tailscale IPs in the UI for better cross-network accessibility
+//
+// Parameters:
+//   - rc: Runtime context
+//   - hostname: The hostname to resolve (e.g., "vhost1")
+//
+// Returns:
+//   - string: Tailscale IPv4 address if found, empty string otherwise
+//
+// Example:
+//   tailscaleIP := getTailscaleIPForHostname(rc, "vhost1")
+//   // Returns: "100.64.x.x" if vhost1 has a Tailscale IP
+func getTailscaleIPForHostname(rc *eos_io.RuntimeContext, hostname string) string {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// If hostname matches this machine, get local Tailscale IP directly
+	if localHostname, err := os.Hostname(); err == nil {
+		if hostname == localHostname || hostname == strings.Split(localHostname, ".")[0] {
+			output, err := execute.Run(rc.Ctx, execute.Options{
+				Command: "tailscale",
+				Args:    []string{"ip", "-4"},
+				Capture: true,
+			})
+			if err == nil {
+				ip := strings.TrimSpace(output)
+				if net.ParseIP(ip) != nil {
+					logger.Debug("Found local Tailscale IP",
+						zap.String("hostname", hostname),
+						zap.String("tailscale_ip", ip))
+					return ip
+				}
+			}
+		}
+	}
+
+	// For remote machines, try to resolve via Tailscale status
+	// This requires Tailscale to be running and connected
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "tailscale",
+		Args:    []string{"status", "--json"},
+		Capture: true,
+	})
+	if err != nil {
+		logger.Debug("Tailscale status check failed (Tailscale may not be running)",
+			zap.Error(err))
+		return ""
+	}
+
+	// Parse JSON to find the hostname's Tailscale IP
+	// Simple string search for the hostname in the JSON
+	// Example format: "HostName":"vhost1","TailscaleIPs":["100.64.x.x"]
+	lines := strings.Split(output, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, `"`+hostname+`"`) || strings.Contains(line, `"`+hostname+`.`) {
+			// Look for TailscaleIPs in nearby lines
+			for j := i; j < len(lines) && j < i+10; j++ {
+				if strings.Contains(lines[j], "TailscaleIPs") {
+					// Extract IP using regex
+					re := regexp.MustCompile(`"([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})"`)
+					matches := re.FindStringSubmatch(lines[j])
+					if len(matches) > 1 {
+						ip := matches[1]
+						logger.Debug("Found remote Tailscale IP via status",
+							zap.String("hostname", hostname),
+							zap.String("tailscale_ip", ip))
+						return ip
+					}
+				}
+			}
+		}
+	}
+
+	logger.Debug("No Tailscale IP found for hostname",
+		zap.String("hostname", hostname))
+	return ""
 }
 
 // storeBootstrapTokenInVault stores the bootstrap token in Vault
