@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -36,18 +37,28 @@ type RepairResult struct {
 func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Starting Vault repair",
-		zap.Bool("dry_run", config.DryRun))
-
-	if config.DryRun {
-		logger.Info("DRY-RUN MODE: No changes will be made")
-	}
+	// Initialize operation context for tracking
+	rc.Operation = eos_io.NewOperationContext("fix", "vault")
+	startTime := rc.Operation.StartTime
 
 	// Default: run all repairs if no specific flag is set
 	runBinaries := config.CleanupBinaries || config.All || (!config.CleanupBinaries && !config.FixPermissions && !config.RepairConfig && !config.FixAddresses)
 	runPermissions := config.FixPermissions || config.All
 	runConfig := config.RepairConfig || config.All
 	runAddresses := config.FixAddresses || config.All
+
+	logger.Info("Vault repair operation initialized",
+		zap.String("operation_id", rc.Operation.OperationID),
+		zap.Bool("dry_run", config.DryRun),
+		zap.Bool("cleanup_binaries", runBinaries),
+		zap.Bool("fix_permissions", runPermissions),
+		zap.Bool("repair_config", runConfig),
+		zap.Bool("fix_addresses", runAddresses))
+
+	if config.DryRun {
+		logger.Info("DRY-RUN MODE: No changes will be made",
+			zap.String("operation_id", rc.Operation.OperationID))
+	}
 
 	result := &RepairResult{
 		IssuesFound: 0,
@@ -56,8 +67,10 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 	}
 
 	// ASSESS & INTERVENE: Cleanup duplicate binaries
+	rc.Operation.SetPhase(rc, "ASSESS")
+
 	if runBinaries {
-		logger.Info("Checking for duplicate vault binaries")
+		logger.Info("[ASSESS] Checking for duplicate vault binaries")
 		found, fixed, err := RepairDuplicateBinaries(rc, config.DryRun)
 		result.IssuesFound += found
 		result.IssuesFixed += fixed
@@ -69,7 +82,10 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 
 	// ASSESS & INTERVENE: Fix permissions
 	if runPermissions {
-		logger.Info("Checking file permissions")
+		logger.Info("[ASSESS] Checking file permissions",
+			zap.String("config_path", vault.VaultConfigPath),
+			zap.String("data_dir", vault.VaultDataDir),
+			zap.String("tls_dir", vault.VaultTLSDir))
 		found, fixed, err := RepairFilePermissions(rc, config.DryRun)
 		result.IssuesFound += found
 		result.IssuesFixed += fixed
@@ -81,7 +97,8 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 
 	// ASSESS & INTERVENE: Fix configuration
 	if runConfig {
-		logger.Info("Checking configuration files")
+		logger.Info("[ASSESS] Checking configuration files",
+			zap.String("config_file", vault.VaultConfigPath))
 		found, fixed, err := RepairConfiguration(rc, config.DryRun)
 		result.IssuesFound += found
 		result.IssuesFixed += fixed
@@ -93,7 +110,7 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 
 	// ASSESS & INTERVENE: Fix API and cluster addresses
 	if runAddresses {
-		logger.Info("Checking API and cluster addresses")
+		logger.Info("[ASSESS] Checking API and cluster addresses")
 		found, fixed, err := RepairVaultAddresses(rc, config.DryRun)
 		result.IssuesFound += found
 		result.IssuesFixed += fixed
@@ -104,10 +121,17 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 	}
 
 	// EVALUATE
-	logger.Info("Vault repair completed",
+	rc.Operation.SetPhase(rc, "EVALUATE")
+
+	logger.Info("Vault repair operation completed",
+		zap.String("operation_id", rc.Operation.OperationID),
+		zap.Duration("total_elapsed", time.Since(startTime)),
 		zap.Int("issues_found", result.IssuesFound),
 		zap.Int("issues_fixed", result.IssuesFixed),
+		zap.Int("errors_count", len(result.Errors)),
 		zap.Bool("dry_run", config.DryRun))
+
+	rc.Operation.LogCompletion(rc, true, "Vault repair completed")
 
 	return result, nil
 }

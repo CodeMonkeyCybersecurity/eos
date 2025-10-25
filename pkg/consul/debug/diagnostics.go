@@ -144,6 +144,30 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	dataDirResult := checkDataDirectoryConfiguration(rc)
 	results = append(results, dataDirResult)
 
+	// 16. Check data directory filesystem state (verify directory exists and list contents)
+	dataDirFSResult := checkDataDirectoryFileSystem(rc)
+	results = append(results, dataDirFSResult)
+
+	// 17. Check Raft database location (find active raft.db across filesystem)
+	raftDBResult := checkRaftDatabase(rc)
+	results = append(results, raftDBResult)
+
+	// 18. Check recent ACL bootstrap activity in logs
+	aclBootstrapLogResult := checkRecentACLBootstrapActivity(rc)
+	results = append(results, aclBootstrapLogResult)
+
+	// 19. Check Raft ACL bootstrap state (advanced - shows actual reset index)
+	raftBootstrapResult := checkRaftBootstrapState(rc)
+	results = append(results, raftBootstrapResult)
+
+	// 20. Check Consul service discovery (critical for Vault-Consul integration)
+	serviceDiscoveryResult := checkConsulServiceDiscovery(rc)
+	results = append(results, serviceDiscoveryResult)
+
+	// 21. Check systemd unit status for Consul and dependencies
+	systemdResult := checkSystemdUnitStatus(rc)
+	results = append(results, systemdResult)
+
 	logger.Debug("Diagnostic assessment completed",
 		zap.Int("total_checks", len(results)),
 		zap.Int("retry_join_addrs", len(retryJoinAddrs)))
@@ -285,14 +309,14 @@ func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 				zap.String("message", result.Message),
 				zap.Strings("details", result.Details),
 				zap.Bool("success", true))
-			logger.Info("      "+result.Message)
+			logger.Info("      " + result.Message)
 		} else {
 			logger.Error("[FAIL] "+result.CheckName,
 				zap.String("check", result.CheckName),
 				zap.String("message", result.Message),
 				zap.Strings("details", result.Details),
 				zap.Bool("success", false))
-			logger.Error("      "+result.Message)
+			logger.Error("      " + result.Message)
 		}
 
 		if len(result.Details) > 0 {

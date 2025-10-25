@@ -31,6 +31,7 @@ type RuntimeContext struct {
 	Component  string
 	Attributes map[string]string
 	Validate   *verify.WrapValidation
+	Operation  *OperationContext // Operation context for structured logging and tracking
 }
 
 // NewContext sets up tracing, logging and validation hooks.

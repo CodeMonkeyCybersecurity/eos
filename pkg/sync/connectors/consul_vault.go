@@ -54,10 +54,14 @@ func (c *ConsulVaultConnector) ServicePair() string {
 // PreflightCheck verifies both services are installed and running
 func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config *synctypes.SyncConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Running pre-flight checks for Consul and Vault")
+
+	logger.Info("[ASSESS] Pre-operation environment scan",
+		zap.String("phase", "preflight"),
+		zap.String("operation_type", "consul_vault_sync"),
+		zap.String("connector", c.Name()))
 
 	// Check Consul status
-	logger.Debug("Checking Consul status")
+	logger.Info("[ASSESS] Checking Consul service state")
 	consulStatus, err := consul.CheckStatus(rc)
 	if err != nil {
 		return fmt.Errorf("failed to check Consul status: %w", err)
@@ -75,9 +79,11 @@ func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config 
 				"  sudo systemctl start consul")
 	}
 
-	logger.Info("Consul pre-flight check passed",
+	logger.Info("[ASSESS] Consul service state verified",
 		zap.String("version", consulStatus.Version),
-		zap.String("status", consulStatus.ServiceStatus))
+		zap.String("status", consulStatus.ServiceStatus),
+		zap.Bool("installed", consulStatus.Installed),
+		zap.Bool("running", consulStatus.Running))
 
 	// CRITICAL: Check if Consul ACLs are enabled (required for Vault integration)
 	// This fast-fail check prevents attempting ACL bootstrap on disabled ACL system
@@ -219,7 +225,7 @@ func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config 
 
 	// CRITICAL: Check Vault seal status BEFORE attempting authentication
 	// This unauthenticated check prevents wasting 70+ seconds on futile auth attempts
-	logger.Debug("Checking Vault seal status")
+	logger.Info("[ASSESS] Checking Vault seal status")
 
 	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
 	if err != nil {
@@ -240,10 +246,17 @@ func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config 
 					"  sudo eos update vault --unseal")
 		}
 
-		logger.Info("Vault is initialized and unsealed")
+		logger.Info("[ASSESS] Vault service state verified",
+			zap.Bool("initialized", initialized),
+			zap.Bool("sealed", sealed),
+			zap.String("vault_addr", os.Getenv("VAULT_ADDR")))
 	}
 
-	logger.Info("Vault pre-flight check passed")
+	logger.Info("[ASSESS] Pre-flight checks completed successfully",
+		zap.String("consul_version", consulStatus.Version),
+		zap.Bool("consul_running", consulStatus.Running),
+		zap.Bool("vault_initialized", initialized),
+		zap.Bool("vault_unsealed", !sealed))
 
 	return nil
 }

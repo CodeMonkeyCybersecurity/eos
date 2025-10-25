@@ -1395,8 +1395,8 @@ func checkDataDirectoryConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult
 			result.Details = append(result.Details, "")
 			result.Details = append(result.Details, "IMPACT:")
 			result.Details = append(result.Details, "  - ACL bootstrap reset will FAIL (writes to wrong directory)")
-			result.Details = append(result.Details, "  - Consul reads from: " + activeDataDir)
-			result.Details = append(result.Details, "  - Reset file written to: " + configuredPath)
+			result.Details = append(result.Details, "  - Consul reads from: "+activeDataDir)
+			result.Details = append(result.Details, "  - Reset file written to: "+configuredPath)
 			result.Details = append(result.Details, "  - Consul never sees the file → bootstrap fails")
 
 			result.Success = false
@@ -1489,4 +1489,544 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// checkDataDirectoryFileSystem verifies the actual data directory exists on the filesystem
+// and lists its contents. This provides evidence of whether Consul has initialized the
+// data directory and what files it contains.
+//
+// CRITICAL for debugging ACL bootstrap reset failures:
+//   - Confirms data directory actually exists on disk (not just in config)
+//   - Shows if raft/ subdirectory exists (required for Consul to start)
+//   - Shows if acl-bootstrap-reset file exists (orphaned reset attempts)
+//   - Shows if raft.db exists (Raft state database)
+//
+// Returns:
+//   - SUCCESS: Data directory exists and contains expected structure
+//   - WARNING: Data directory exists but missing expected files
+//   - CRITICAL: Data directory doesn't exist on filesystem
+func checkDataDirectoryFileSystem(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking actual data directory filesystem state")
+
+	result := DiagnosticResult{
+		CheckName: "Data Directory FileSystem",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// ASSESS - Try to determine data directory from config
+	configPath := consul.ConsulConfigFile
+	var configuredDataDir string
+
+	if content, err := os.ReadFile(configPath); err == nil {
+		configStr := string(content)
+		if matches := regexp.MustCompile(`data_dir\s*=\s*"([^"]+)"`).FindStringSubmatch(configStr); len(matches) > 1 {
+			configuredDataDir = matches[1]
+			result.Details = append(result.Details, fmt.Sprintf("Configured data_dir: %s", configuredDataDir))
+		}
+	}
+
+	// Fallback to default if not configured
+	if configuredDataDir == "" {
+		configuredDataDir = "/opt/consul"
+		result.Details = append(result.Details, "No data_dir in config, using default: /opt/consul")
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Check if directory exists
+	dirInfo, err := os.Stat(configuredDataDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			result.Success = false
+			result.Severity = SeverityCritical
+			result.Message = "Data directory does not exist on filesystem"
+			result.Details = append(result.Details, fmt.Sprintf("✗ Directory not found: %s", configuredDataDir))
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "IMPACT:")
+			result.Details = append(result.Details, "  - Consul cannot start without data directory")
+			result.Details = append(result.Details, "  - ACL bootstrap reset will fail")
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "REMEDIATION:")
+			result.Details = append(result.Details, fmt.Sprintf("  sudo mkdir -p %s", configuredDataDir))
+			result.Details = append(result.Details, "  sudo chown consul:consul "+configuredDataDir)
+			result.Details = append(result.Details, "  sudo chmod 0750 "+configuredDataDir)
+			return result
+		}
+		result.Success = false
+		result.Message = fmt.Sprintf("Cannot access data directory: %v", err)
+		result.Details = append(result.Details, fmt.Sprintf("✗ Error accessing %s: %v", configuredDataDir, err))
+		return result
+	}
+
+	// Verify it's a directory
+	if !dirInfo.IsDir() {
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Data directory path exists but is not a directory"
+		result.Details = append(result.Details, fmt.Sprintf("✗ %s exists but is a FILE, not a directory", configuredDataDir))
+		return result
+	}
+
+	result.Details = append(result.Details, fmt.Sprintf("✓ Data directory exists: %s", configuredDataDir))
+
+	// Show permissions and ownership
+	stat, ok := dirInfo.Sys().(*syscall.Stat_t)
+	if ok {
+		result.Details = append(result.Details, fmt.Sprintf("  Permissions: %04o", dirInfo.Mode().Perm()))
+		result.Details = append(result.Details, fmt.Sprintf("  Owner UID/GID: %d:%d", stat.Uid, stat.Gid))
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ASSESS - List directory contents
+	result.Details = append(result.Details, "Directory contents:")
+
+	entries, err := os.ReadDir(configuredDataDir)
+	if err != nil {
+		result.Details = append(result.Details, fmt.Sprintf("✗ Cannot read directory: %v", err))
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Data directory exists but cannot read contents"
+		return result
+	}
+
+	if len(entries) == 0 {
+		result.Details = append(result.Details, "  (empty directory)")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "⚠ Data directory is empty - Consul has not initialized yet")
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Data directory is empty (Consul not initialized)"
+		return result
+	}
+
+	// List all entries with details
+	hasRaftDir := false
+	hasRaftDB := false
+	hasACLResetFile := false
+	aclResetFilePath := ""
+
+	for _, entry := range entries {
+		entryPath := filepath.Join(configuredDataDir, entry.Name())
+		entryInfo, err := entry.Info()
+		if err != nil {
+			result.Details = append(result.Details, fmt.Sprintf("  %s (cannot stat)", entry.Name()))
+			continue
+		}
+
+		entryType := "file"
+		if entry.IsDir() {
+			entryType = "dir"
+		}
+
+		result.Details = append(result.Details,
+			fmt.Sprintf("  %s (%s, %d bytes, mtime=%s)",
+				entry.Name(),
+				entryType,
+				entryInfo.Size(),
+				entryInfo.ModTime().Format("2006-01-02 15:04:05")))
+
+		// Track important files/directories
+		if entry.Name() == "raft" && entry.IsDir() {
+			hasRaftDir = true
+		}
+		if entry.Name() == "acl-bootstrap-reset" {
+			hasACLResetFile = true
+			aclResetFilePath = entryPath
+		}
+	}
+
+	// Check for raft.db inside raft/ subdirectory
+	if hasRaftDir {
+		raftDBPath := filepath.Join(configuredDataDir, "raft", "raft.db")
+		if _, err := os.Stat(raftDBPath); err == nil {
+			hasRaftDB = true
+			result.Details = append(result.Details, "  raft/raft.db (Raft state database found)")
+		}
+	}
+
+	result.Details = append(result.Details, "")
+
+	// EVALUATE - Check for expected structure
+	if !hasRaftDir {
+		result.Details = append(result.Details, "⚠ Missing raft/ subdirectory")
+		result.Details = append(result.Details, "  Consul may not have started successfully yet")
+		result.Success = false
+		result.Severity = SeverityWarning
+	}
+
+	if hasRaftDir && !hasRaftDB {
+		result.Details = append(result.Details, "⚠ raft/ directory exists but raft.db is missing")
+		result.Details = append(result.Details, "  Consul Raft database not initialized")
+		result.Success = false
+		result.Severity = SeverityWarning
+	}
+
+	if hasACLResetFile {
+		result.Details = append(result.Details, "✗ ORPHANED acl-bootstrap-reset file detected!")
+		// Read contents
+		if content, err := os.ReadFile(aclResetFilePath); err == nil {
+			result.Details = append(result.Details, fmt.Sprintf("  Contents: %s", strings.TrimSpace(string(content))))
+		}
+		result.Details = append(result.Details, "  This file should have been consumed by Consul")
+		result.Details = append(result.Details, "  Consul deletes this file after reading it")
+		result.Details = append(result.Details, "  Presence indicates Consul NEVER SAW this file")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, fmt.Sprintf("  sudo rm %s", aclResetFilePath))
+		result.Success = false
+		result.Severity = SeverityWarning
+	}
+
+	// Set message based on findings
+	if result.Success {
+		result.Message = "Data directory exists and contains expected structure"
+	}
+
+	return result
+}
+
+// checkRaftDatabase searches for all raft.db files on the system to detect
+// potential data directory mismatches or multiple Consul instances.
+//
+// CRITICAL for debugging ACL bootstrap reset failures:
+//   - Finds the ACTUAL active raft.db (most recently modified)
+//   - Detects stale/orphaned raft.db files from previous installations
+//   - Confirms which data directory Consul is REALLY using
+//   - Evidence: If configured data_dir has no raft.db, config is wrong
+//
+// Returns:
+//   - SUCCESS: Found exactly one active raft.db matching config
+//   - WARNING: Found multiple raft.db files (stale installations)
+//   - CRITICAL: No raft.db found anywhere (Consul never started)
+func checkRaftDatabase(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Searching for Raft database files across filesystem")
+
+	result := DiagnosticResult{
+		CheckName: "Raft Database Location",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// ASSESS - Get configured data directory
+	configPath := consul.ConsulConfigFile
+	var configuredDataDir string
+
+	if content, err := os.ReadFile(configPath); err == nil {
+		configStr := string(content)
+		if matches := regexp.MustCompile(`data_dir\s*=\s*"([^"]+)"`).FindStringSubmatch(configStr); len(matches) > 1 {
+			configuredDataDir = matches[1]
+		}
+	}
+
+	if configuredDataDir == "" {
+		configuredDataDir = "/opt/consul"
+	}
+
+	result.Details = append(result.Details, fmt.Sprintf("Configured data_dir: %s", configuredDataDir))
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "Searching for raft.db files...")
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Search common locations for raft.db
+	searchPaths := []string{
+		"/opt/consul",
+		"/var/lib/consul",
+		"/data/consul",
+		"/consul/data",
+		"/tmp/consul", // Sometimes used for testing
+	}
+
+	// Add configured path if different
+	if !contains(searchPaths, configuredDataDir) {
+		searchPaths = append(searchPaths, configuredDataDir)
+	}
+
+	type raftDBInfo struct {
+		path          string
+		size          int64
+		mtime         time.Time
+		ageHours      float64
+		isActive      bool
+		matchesConfig bool
+	}
+
+	var foundRaftDBs []raftDBInfo
+
+	for _, basePath := range searchPaths {
+		raftPath := filepath.Join(basePath, "raft", "raft.db")
+		info, err := os.Stat(raftPath)
+		if err != nil {
+			continue // File doesn't exist, skip
+		}
+
+		age := time.Since(info.ModTime())
+		isActive := age.Hours() < 1.0 // Modified within last hour = likely active
+		matchesConfig := (basePath == configuredDataDir)
+
+		foundRaftDBs = append(foundRaftDBs, raftDBInfo{
+			path:          raftPath,
+			size:          info.Size(),
+			mtime:         info.ModTime(),
+			ageHours:      age.Hours(),
+			isActive:      isActive,
+			matchesConfig: matchesConfig,
+		})
+	}
+
+	// EVALUATE - Analyze findings
+	if len(foundRaftDBs) == 0 {
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "No raft.db found anywhere on filesystem"
+		result.Details = append(result.Details, "✗ No raft.db files found in any common location")
+		result.Details = append(result.Details, fmt.Sprintf("  Searched: %v", searchPaths))
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "IMPACT:")
+		result.Details = append(result.Details, "  - Consul has never successfully started")
+		result.Details = append(result.Details, "  - Raft consensus database not initialized")
+		result.Details = append(result.Details, "  - Cannot bootstrap ACLs without Raft")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  1. Check Consul is running: sudo systemctl status consul")
+		result.Details = append(result.Details, "  2. Check Consul logs: sudo journalctl -u consul -n 100")
+		result.Details = append(result.Details, "  3. Fix startup issues, then Consul will create raft.db")
+		return result
+	}
+
+	// Report all found raft.db files
+	result.Details = append(result.Details, fmt.Sprintf("Found %d raft.db file(s):", len(foundRaftDBs)))
+	result.Details = append(result.Details, "")
+
+	var activeDB *raftDBInfo
+	configMatchDB := false
+
+	for i := range foundRaftDBs {
+		db := &foundRaftDBs[i]
+
+		status := ""
+		if db.isActive {
+			status = "ACTIVE (modified < 1 hour ago)"
+			activeDB = db
+		} else if db.ageHours < 24 {
+			status = fmt.Sprintf("Recent (%.1fh ago)", db.ageHours)
+		} else {
+			status = fmt.Sprintf("STALE (%.0fh ago)", db.ageHours)
+		}
+
+		configMarker := ""
+		if db.matchesConfig {
+			configMarker = " ← Matches configured data_dir"
+			configMatchDB = true
+		}
+
+		result.Details = append(result.Details,
+			fmt.Sprintf("  %s", db.path))
+		result.Details = append(result.Details,
+			fmt.Sprintf("    Size: %d bytes", db.size))
+		result.Details = append(result.Details,
+			fmt.Sprintf("    Modified: %s (%s)%s",
+				db.mtime.Format("2006-01-02 15:04:05"),
+				status,
+				configMarker))
+		result.Details = append(result.Details, "")
+	}
+
+	// EVALUATE - Check for issues
+	if len(foundRaftDBs) > 1 {
+		result.Details = append(result.Details, "⚠ WARNING: Multiple raft.db files found")
+		result.Details = append(result.Details, "  This suggests:")
+		result.Details = append(result.Details, "    - Previous Consul installations not cleaned up")
+		result.Details = append(result.Details, "    - OR data_dir was changed and old data remains")
+		result.Details = append(result.Details, "")
+		result.Success = false
+		result.Severity = SeverityWarning
+	}
+
+	if activeDB != nil && !activeDB.matchesConfig {
+		result.Details = append(result.Details, "✗ CRITICAL: Active raft.db DOES NOT match configured data_dir!")
+		result.Details = append(result.Details, fmt.Sprintf("  Active raft.db: %s", activeDB.path))
+		result.Details = append(result.Details, fmt.Sprintf("  Configured:     %s/raft/raft.db", configuredDataDir))
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "IMPACT:")
+		result.Details = append(result.Details, "  - Consul is reading from: "+filepath.Dir(filepath.Dir(activeDB.path)))
+		result.Details = append(result.Details, "  - Config says to use:     "+configuredDataDir)
+		result.Details = append(result.Details, "  - ACL reset file written to WRONG directory")
+		result.Details = append(result.Details, "  - Consul never sees reset file → bootstrap fails")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		actualDataDir := filepath.Dir(filepath.Dir(activeDB.path))
+		result.Details = append(result.Details, fmt.Sprintf("  Option 1: Update config to match actual data_dir:"))
+		result.Details = append(result.Details, fmt.Sprintf("    Edit %s", consul.ConsulConfigFile))
+		result.Details = append(result.Details, fmt.Sprintf("    Set: data_dir = \"%s\"", actualDataDir))
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "  Option 2: Use explicit --data-dir flag:")
+		result.Details = append(result.Details, fmt.Sprintf("    sudo eos update consul --bootstrap-token --data-dir %s", actualDataDir))
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Active raft.db does not match configured data directory"
+		return result
+	}
+
+	if !configMatchDB {
+		result.Details = append(result.Details, "⚠ No raft.db found in configured data_dir")
+		result.Details = append(result.Details, fmt.Sprintf("  Expected: %s/raft/raft.db", configuredDataDir))
+		result.Details = append(result.Details, "  This suggests Consul is NOT using the configured data_dir")
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "No raft.db in configured data directory"
+		return result
+	}
+
+	// SUCCESS
+	result.Message = "Raft database found and matches configuration"
+	if activeDB != nil {
+		result.Details = append(result.Details, "✓ Active raft.db matches configured data_dir")
+		result.Details = append(result.Details, "  ACL bootstrap reset will write to correct location")
+	}
+
+	return result
+}
+
+// checkRecentACLBootstrapActivity checks journalctl logs for recent ACL bootstrap
+// attempts, errors, and reset activity.
+//
+// CRITICAL for debugging ACL bootstrap reset failures:
+//   - Shows if Consul saw the acl-bootstrap-reset file
+//   - Shows if Consul consumed the reset file
+//   - Shows ACL bootstrap errors (invalid reset index, permission denied, etc.)
+//   - Shows if bootstrap succeeded and what the reset index was
+//
+// Returns:
+//   - SUCCESS: Logs show clean bootstrap history
+//   - WARNING: Found bootstrap errors in logs
+//   - INFO: Recent bootstrap attempts detected (informational)
+func checkRecentACLBootstrapActivity(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking recent ACL bootstrap activity in Consul logs")
+
+	result := DiagnosticResult{
+		CheckName: "ACL Bootstrap Log Activity",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// ASSESS - Get recent Consul logs
+	cmd := execute.Options{
+		Command: "journalctl",
+		Args:    []string{"-u", "consul", "--since", "5 minutes ago", "--no-pager"},
+		Capture: true,
+	}
+
+	output, err := execute.Run(rc.Ctx, cmd)
+	if err != nil {
+		result.Message = "Cannot access Consul logs via journalctl"
+		result.Details = append(result.Details, fmt.Sprintf("Error: %v", err))
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  Check if running as root: sudo eos debug consul")
+		result.Details = append(result.Details, "  Or check journald permissions")
+		result.Success = false
+		result.Severity = SeverityWarning
+		return result
+	}
+
+	if strings.TrimSpace(output) == "" {
+		result.Message = "No recent Consul logs found (last 5 minutes)"
+		result.Details = append(result.Details, "Consul may not have been active recently")
+		result.Details = append(result.Details, "Extend time range: journalctl -u consul --since '1 hour ago'")
+		return result
+	}
+
+	// ASSESS - Search for ACL-related log patterns
+	patterns := map[string]string{
+		"bootstrap":           "ACL bootstrap attempts",
+		"acl-bootstrap-reset": "ACL reset file activity",
+		"reset index":         "Reset index operations",
+		"Invalid bootstrap":   "Bootstrap errors",
+		"ACL replication":     "ACL replication activity",
+		"Permission denied":   "ACL permission errors",
+	}
+
+	foundPatterns := make(map[string][]string) // pattern -> matching log lines
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		lineLower := strings.ToLower(line)
+		for pattern, description := range patterns {
+			if strings.Contains(lineLower, strings.ToLower(pattern)) {
+				foundPatterns[description] = append(foundPatterns[description], strings.TrimSpace(line))
+			}
+		}
+	}
+
+	result.Details = append(result.Details, "Recent Consul logs (last 5 minutes):")
+	result.Details = append(result.Details, "")
+
+	if len(foundPatterns) == 0 {
+		result.Message = "No ACL bootstrap activity found in recent logs"
+		result.Details = append(result.Details, "✓ No ACL-related log entries in the last 5 minutes")
+		result.Details = append(result.Details, "  This is normal if ACL operations haven't been performed recently")
+		return result
+	}
+
+	// EVALUATE - Report findings
+	hasErrors := false
+	for description, logLines := range foundPatterns {
+		result.Details = append(result.Details, fmt.Sprintf("=== %s ===", description))
+
+		// Show up to 10 most recent lines per pattern
+		displayCount := len(logLines)
+		if displayCount > 10 {
+			displayCount = 10
+		}
+
+		for i := 0; i < displayCount; i++ {
+			result.Details = append(result.Details, logLines[i])
+		}
+
+		if len(logLines) > 10 {
+			result.Details = append(result.Details, fmt.Sprintf("  ... and %d more lines", len(logLines)-10))
+		}
+
+		result.Details = append(result.Details, "")
+
+		// Check if this pattern indicates an error
+		if strings.Contains(description, "error") || strings.Contains(description, "denied") {
+			hasErrors = true
+		}
+	}
+
+	// EVALUATE - Set severity based on findings
+	if hasErrors {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Found ACL bootstrap errors in recent logs"
+	} else {
+		result.Message = "Found ACL bootstrap activity in recent logs"
+		result.Severity = SeverityInfo // Informational, not an error
+	}
+
+	// EVALUATE - Provide context
+	result.Details = append(result.Details, "ANALYSIS:")
+
+	if logs, ok := foundPatterns["ACL reset file activity"]; ok && len(logs) > 0 {
+		result.Details = append(result.Details, "  ✓ Consul saw the acl-bootstrap-reset file")
+		result.Details = append(result.Details, "    (logs mention acl-bootstrap-reset)")
+	}
+
+	if logs, ok := foundPatterns["Reset index operations"]; ok && len(logs) > 0 {
+		result.Details = append(result.Details, "  ✓ Consul processed reset index")
+		result.Details = append(result.Details, "    (logs mention 'reset index')")
+	}
+
+	if logs, ok := foundPatterns["Bootstrap errors"]; ok && len(logs) > 0 {
+		result.Details = append(result.Details, "  ✗ Bootstrap failed with errors")
+		result.Details = append(result.Details, "    Check 'Invalid bootstrap' section above for details")
+	}
+
+	return result
 }
