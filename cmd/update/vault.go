@@ -413,12 +413,16 @@ func runVaultPolicyUpdate(rc *eos_io.RuntimeContext) error {
 
 	// ASSESS - Get root client
 	logger.Info("Authenticating to Vault (requires root token)...")
-	_, err = vault.GetRootClient(rc)
+	rootClient, err := vault.GetRootClient(rc)
 	if err != nil {
 		return fmt.Errorf("failed to get root client: %w\n\n"+
 			"This operation requires root token access.\n"+
 			"The root token is stored in: %s", err, shared.VaultInitPath)
 	}
+
+	// CRITICAL: Cache the root client so EnsurePolicy() can reuse it
+	// Without this, EnsurePolicy() → GetPrivilegedClient() → GetRootClient() → triggers circuit breaker
+	vault.SetPrivilegedClient(rc, rootClient)
 
 	logger.Info("✓ Authenticated with root token")
 	logger.Info("")
