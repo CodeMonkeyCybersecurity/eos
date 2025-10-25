@@ -199,21 +199,19 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			err, bootstrapErr.Error())
 	}
 
-	// CRITICAL FIX (P0): Consul error reports the LAST CONSUMED reset index,
-	// not the NEXT required index. We must increment by 1 to get the correct
-	// index for the reset file.
+	// Extract the LAST CONSUMED reset index from Consul error.
+	// We will compute the NEXT required index in the retry loop below.
 	//
 	// Example: Error says "reset index: 3117" means:
 	//   - Index 3117 was already consumed by a previous bootstrap
-	//   - We must write index 3118 to the reset file for the reset to work
+	//   - We need to write index 3118 to the reset file (computed as 3117 + 1)
 	//
-	// This fixes the off-by-one bug where the code was stuck writing the same
-	// index repeatedly (3117, 3117, 3117...) instead of incrementing to 3118.
-	resetIndex += 1
+	// NOTE: We do NOT increment here anymore. The retry loop will handle
+	// incrementing correctly based on Consul's responses.
+	lastConsumedIndex := resetIndex
 
-	logger.Info("Reset index determined",
-		zap.Int("consul_last_consumed", resetIndex-1),
-		zap.Int("next_reset_index", resetIndex))
+	logger.Info("Reset index extracted from Consul error",
+		zap.Int("consul_last_consumed", lastConsumedIndex))
 
 	// ========================================================================
 	// ASSESS - Check if token already exists in Vault
@@ -350,6 +348,11 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	var newBootstrapToken *consulapi.ACLToken
 	var lastErr error
 
+	// CRITICAL FIX (P0): Start with next_index = last_consumed + 1
+	// Consul requires us to write the NEXT index after the last consumed one.
+	// If Consul says "consumed 3117", we write "3118".
+	resetIndex = lastConsumedIndex + 1
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		logger.Debug("Bootstrap attempt",
 			zap.Int("attempt", attempt),
@@ -464,58 +467,64 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 		// Bootstrap failed - analyze error and determine retry strategy
 		lastErr = bootstrapErr
 
-		// CRITICAL (P0): After the FIRST attempt, the error message "reset index: X" becomes
-		// STALE and unreliable. The index in the error reflects the LAST CONSUMED index from
-		// a previous operation (possibly days/weeks ago), NOT the index we just wrote.
+		// CRITICAL FIX (P0): Correct retry strategy for ACL bootstrap reset
 		//
-		// Consul only updates this error message AFTER:
-		//   1. Detecting the reset file (5-second polling interval)
-		//   2. Consuming the file
-		//   3. Processing the new index
+		// The error "Invalid bootstrap reset index (specified X, reset index: Y)" means:
+		//   - X = the index we wrote to the reset file
+		//   - Y = the index Consul currently knows about (last consumed)
 		//
-		// Since we restart Consul and immediately call Bootstrap(), the error message still
-		// shows the old index. We MUST increment monotonically instead of trusting the error.
+		// There are two possible scenarios:
+		//   1. Consul consumed our file (Y moved forward) → increment and retry
+		//   2. Consul did NOT consume our file (Y unchanged) → DON'T increment, retry same
 		//
-		// Example bug scenario:
-		//   - Attempt 1: Write 3118, error says "reset index: 3117" (stale)
-		//   - Code sees 3117, increments to 3118, retries
-		//   - Attempt 2: Write 3118, error STILL says "reset index: 3117" (file not consumed yet)
-		//   - Code sees 3117, increments to 3118, infinite loop!
+		// Strategy:
+		//   - Extract Y from error message (Consul's current last consumed index)
+		//   - If Y >= our resetIndex, Consul consumed our file → increment
+		//   - If Y < our resetIndex, Consul did NOT consume our file → retry same index
 		//
-		// Fix: Only trust error message on FIRST attempt. After that, just increment.
+		// This prevents the monotonic increment bug where we write 3118, 3119, 3120...
+		// when Consul never consumed any of them and still expects 3118.
 
-		if attempt == 1 {
-			// First attempt - error message is reliable (no reset files written yet)
-			if strings.Contains(bootstrapErr.Error(), "ACL bootstrap no longer allowed") {
-				// Try to extract reset index from error message
-				newResetIndex, extractErr := extractResetIndex(bootstrapErr.Error())
+		// Try to extract Consul's CURRENT last consumed index from error
+		if strings.Contains(bootstrapErr.Error(), "ACL bootstrap no longer allowed") ||
+			strings.Contains(bootstrapErr.Error(), "Invalid bootstrap reset index") {
 
-				if extractErr == nil {
-					// Consul reports LAST CONSUMED index, we need NEXT index
-					nextIndex := newResetIndex + 1
+			// Try to extract reset index from error message
+			consulLastConsumed, extractErr := extractResetIndex(bootstrapErr.Error())
 
-					if nextIndex != resetIndex {
-						// Our initial index calculation was wrong, use Consul's reported index
-						logger.Warn("Adjusting reset index based on Consul error (first attempt only)",
-							zap.Int("attempt", attempt),
-							zap.Int("our_initial_index", resetIndex),
-							zap.Int("consul_last_consumed", newResetIndex),
-							zap.Int("corrected_next_index", nextIndex))
-
-						resetIndex = nextIndex
-					}
+			if extractErr == nil {
+				// Compare Consul's last consumed index with what we wrote
+				if consulLastConsumed >= resetIndex {
+					// Consul consumed our reset file! Increment for next attempt.
+					logger.Info("Consul consumed reset file, incrementing index",
+						zap.Int("attempt", attempt),
+						zap.Int("consul_consumed", consulLastConsumed),
+						zap.Int("we_wrote", resetIndex),
+						zap.Int("next_index", consulLastConsumed+2))
+					resetIndex = consulLastConsumed + 2 // Consul consumed our index, try next
+				} else {
+					// Consul did NOT consume our reset file. Retry same index.
+					logger.Warn("Consul did not consume reset file, retrying same index",
+						zap.Int("attempt", attempt),
+						zap.Int("consul_last_consumed", consulLastConsumed),
+						zap.Int("we_wrote", resetIndex),
+						zap.String("reason", "File may not be readable or Consul not fully restarted"))
+					// Keep resetIndex the same - retry with same value
 				}
+			} else {
+				// Failed to parse error - fallback to simple increment
+				logger.Warn("Failed to parse Consul error, incrementing index",
+					zap.Int("attempt", attempt),
+					zap.Error(extractErr))
+				resetIndex += 1
 			}
+		} else {
+			// Different error (not bootstrap-related) - just increment and retry
+			logger.Warn("Non-bootstrap error, incrementing index",
+				zap.Int("attempt", attempt),
+				zap.String("error", bootstrapErr.Error()))
+			resetIndex += 1
 		}
-
-		// For ALL attempts (including first retry onwards), just increment monotonically.
-		// Do NOT parse error message - it's stale after first attempt.
-		logger.Info("Bootstrap failed, incrementing reset index for retry",
-			zap.Int("attempt", attempt),
-			zap.Int("current_index", resetIndex),
-			zap.Int("next_index", resetIndex+1))
-
-		resetIndex += 1
 
 		if attempt < maxRetries {
 			// Wait before retry (give Consul time to stabilize)
