@@ -16,6 +16,7 @@ package acl
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -281,15 +282,28 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 				"  - Check server logs: journalctl -u consul -n 100")
 	}
 
+	// Try to resolve leader IP to hostname for better user experience
+	leaderDisplayName := leaderAddr
+	if leaderIP := strings.Split(leaderAddr, ":")[0]; leaderIP != "" {
+		// Try to resolve to hostname
+		// This helps users identify which physical machine is the leader
+		if hostnames, err := net.LookupAddr(leaderIP); err == nil && len(hostnames) > 0 {
+			// Use first hostname and strip trailing dot
+			hostname := strings.TrimSuffix(hostnames[0], ".")
+			leaderDisplayName = hostname + " (" + leaderAddr + ")"
+		}
+	}
+
 	logger.Info("Cluster leader found",
-		zap.String("leader", leaderAddr))
+		zap.String("leader", leaderAddr),
+		zap.String("display_name", leaderDisplayName))
 
 	// Note: We assume this node is the leader or can write to the leader's data dir
 	// In a multi-node cluster, user may need to run this on the actual leader node
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ⚠️  ACL reset must be performed on the cluster leader")
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: Cluster leader: " + leaderAddr)
+	logger.Info("terminal prompt: Cluster leader: " + leaderDisplayName)
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: If this is not the leader, run this command on the leader node.")
 	logger.Info("terminal prompt: ")
@@ -351,10 +365,11 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	var newBootstrapToken *consulapi.ACLToken
 	var lastErr error
 
-	// CRITICAL FIX (P0): Start with next_index = last_consumed + 1
-	// Consul requires us to write the NEXT index after the last consumed one.
-	// If Consul says "consumed 3117", we write "3118".
-	resetIndex = lastConsumedIndex + 1
+	// CRITICAL FIX (P0): Use the EXACT reset index from Consul's error message.
+	// When Consul says "reset index: 3117", it means "write 3117 to the file".
+	// Consul will increment its internal counter AFTER successfully consuming the file.
+	// DO NOT add +1 here - that was the bug!
+	resetIndex = lastConsumedIndex
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		logger.Debug("Bootstrap attempt",
@@ -368,6 +383,12 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 		// CRITICAL (P0): File must be readable by Consul process (running as 'consul' user).
 		// Write as root (0644) so Consul can read it, then chown to consul:consul.
 		// Previous bug: File written as 0600 root:root → Consul gets "permission denied"
+		logger.Info("Writing ACL reset file",
+			zap.String("file", resetFilePath),
+			zap.Int("index", resetIndex),
+			zap.String("content", resetIndexStr),
+			zap.String("permissions", "0644"))
+
 		if err := os.WriteFile(resetFilePath, []byte(resetIndexStr), 0644); err != nil {
 			return nil, fmt.Errorf("failed to write reset index file on attempt %d: %w\n"+
 				"File: %s\n"+
@@ -378,9 +399,29 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 				attempt, err, resetFilePath, dataDir)
 		}
 
+		// Verify file was written successfully
+		if writtenContent, err := os.ReadFile(resetFilePath); err != nil {
+			logger.Error("Failed to verify reset file after writing",
+				zap.Error(err),
+				zap.String("file", resetFilePath))
+		} else {
+			logger.Info("Reset file written and verified",
+				zap.String("file", resetFilePath),
+				zap.String("written_content", strings.TrimSpace(string(writtenContent))),
+				zap.Int("expected_index", resetIndex))
+		}
+
+		// Check file permissions before chown
+		if fileInfo, err := os.Stat(resetFilePath); err == nil {
+			logger.Info("Reset file permissions before chown",
+				zap.String("file", resetFilePath),
+				zap.String("mode", fileInfo.Mode().String()),
+				zap.Int64("size", fileInfo.Size()))
+		}
+
 		// CRITICAL (P0): Change ownership to consul:consul so Consul process can read it.
 		// Data directory is owned by consul:consul, reset file must match.
-		logger.Debug("Changing reset file ownership to consul:consul",
+		logger.Info("Changing reset file ownership to consul:consul",
 			zap.String("file", resetFilePath))
 
 		chownOutput, chownErr := execute.Run(rc.Ctx, execute.Options{
@@ -389,12 +430,35 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			Capture: true,
 		})
 		if chownErr != nil {
-			logger.Warn("Failed to chown reset file to consul:consul, Consul may not be able to read it",
+			logger.Error("Failed to chown reset file to consul:consul",
 				zap.Error(chownErr),
 				zap.String("output", chownOutput),
-				zap.String("file", resetFilePath),
-				zap.String("note", "This may cause 'permission denied' errors"))
-			// Don't fail - maybe Consul is running as root or file is in root-owned directory
+				zap.String("file", resetFilePath))
+
+			// Try to get current ownership
+			lsOutput, lsErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "ls",
+				Args:    []string{"-la", resetFilePath},
+				Capture: true,
+			})
+			logger.Error("Current file ownership",
+				zap.Error(lsErr),
+				zap.String("ls_output", lsOutput),
+				zap.String("note", "Consul may not be able to read this file"))
+		} else {
+			logger.Info("Reset file ownership changed successfully",
+				zap.String("output", chownOutput))
+
+			// Verify ownership was changed
+			lsOutput, lsErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "ls",
+				Args:    []string{"-la", resetFilePath},
+				Capture: true,
+			})
+			if lsErr == nil {
+				logger.Info("Verified reset file ownership",
+					zap.String("ls_output", lsOutput))
+			}
 		}
 
 		logger.Info("Reset file written, restarting Consul to process it",
@@ -415,33 +479,133 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 		// on startup, eliminating the race window.
 		//
 		// Service disruption: ~15 seconds (acceptable for rare bootstrap reset operation)
+		logger.Info("Restarting Consul service to force reset file processing")
+
+		// First, check Consul status before restart
+		statusBeforeOutput, statusBeforeErr := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"status", "consul"},
+			Capture: true,
+		})
+		logger.Info("Consul status before restart",
+			zap.Error(statusBeforeErr),
+			zap.String("output", statusBeforeOutput))
+
 		restartOutput, restartErr := execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
 			Args:    []string{"restart", "consul"},
 			Capture: true,
 		})
 		if restartErr != nil {
-			logger.Warn("Failed to restart Consul, continuing anyway",
+			logger.Error("Failed to restart Consul service",
 				zap.Error(restartErr),
-				zap.String("output", restartOutput),
+				zap.String("output", restartOutput))
+
+			// Check if Consul is even installed as a service
+			isActiveOutput, isActiveErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "systemctl",
+				Args:    []string{"is-active", "consul"},
+				Capture: true,
+			})
+			logger.Error("Consul service status check",
+				zap.Error(isActiveErr),
+				zap.String("output", isActiveOutput))
+
+			logger.Warn("Consul restart failed, continuing anyway",
 				zap.String("note", "Bootstrap may still succeed if Consul detects file periodically"))
 			// Don't fail - Consul might detect file on its next periodic check
 		} else {
-			logger.Debug("Consul restarted successfully, waiting for stabilization")
+			logger.Info("Consul service restart command succeeded",
+				zap.String("output", restartOutput))
 
-			// Wait for Consul to stabilize after restart.
-			// This gives the leader goroutine time to:
-			//   1. Start up and initialize
-			//   2. Read the reset file from data directory
-			//   3. Process the reset index
-			//   4. Prepare ACL system for bootstrap API call
+			// Wait a moment for restart to begin
+			time.Sleep(2 * time.Second)
+
+			// Check Consul status after restart
+			statusAfterOutput, statusAfterErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "systemctl",
+				Args:    []string{"status", "consul"},
+				Capture: true,
+			})
+			logger.Info("Consul status after restart (initial check)",
+				zap.Error(statusAfterErr),
+				zap.String("output", statusAfterOutput))
+
+			logger.Info("Waiting for Consul to stabilize and process reset file",
+				zap.Int("expected_index", resetIndex),
+				zap.Duration("max_wait", 60*time.Second))
+
+			// CRITICAL FIX: Poll Consul to verify it has actually consumed the reset file
+			// Instead of blindly waiting 15 seconds, actively check if Consul's reset index updated
 			//
-			// 15 seconds is conservative - most Consul instances stabilize in 5-10 seconds
-			time.Sleep(15 * time.Second)
+			// The problem: Consul may read the file but not commit to Raft immediately.
+			// We need to wait for Consul's internal state to reflect the new reset index.
+			resetFileConsumed := false
+			pollStartTime := time.Now()
+			pollMaxDuration := 60 * time.Second
+			pollInterval := 3 * time.Second
+
+			for time.Since(pollStartTime) < pollMaxDuration {
+				// Try bootstrap to check current reset index
+				_, _, pollErr := consulClient.ACL().Bootstrap()
+
+				if pollErr == nil {
+					// Bootstrap succeeded! Reset was consumed
+					logger.Info("Reset file consumed - bootstrap succeeded during polling",
+						zap.Duration("wait_time", time.Since(pollStartTime)))
+					resetFileConsumed = true
+					break
+				}
+
+				// Parse error to see if reset index updated
+				pollErrMsg := pollErr.Error()
+				if strings.Contains(pollErrMsg, "Invalid bootstrap reset index") ||
+					strings.Contains(pollErrMsg, "ACL bootstrap no longer allowed") {
+
+					currentIndex, extractErr := extractResetIndex(pollErrMsg)
+					if extractErr == nil {
+						logger.Debug("Polling Consul reset index",
+							zap.Int("current_index", currentIndex),
+							zap.Int("expected_index", resetIndex),
+							zap.Duration("elapsed", time.Since(pollStartTime)))
+
+						if currentIndex >= resetIndex {
+							// Consul consumed our reset file!
+							logger.Info("Reset file consumed by Consul",
+								zap.Int("consul_index", currentIndex),
+								zap.Int("we_wrote", resetIndex),
+								zap.Duration("wait_time", time.Since(pollStartTime)))
+							resetFileConsumed = true
+							break
+						}
+					}
+				}
+
+				// Wait before next poll
+				time.Sleep(pollInterval)
+			}
+
+			if !resetFileConsumed {
+				logger.Warn("Timeout waiting for Consul to consume reset file",
+					zap.Duration("waited", time.Since(pollStartTime)),
+					zap.Int("expected_index", resetIndex),
+					zap.String("note", "Will attempt bootstrap anyway"))
+			}
+
+			// Final status check
+			statusFinalOutput, statusFinalErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "systemctl",
+				Args:    []string{"status", "consul"},
+				Capture: true,
+			})
+			logger.Info("Consul status after stabilization wait",
+				zap.Error(statusFinalErr),
+				zap.String("output", statusFinalOutput))
 		}
 
-		logger.Debug("Calling Bootstrap() API after Consul restart",
-			zap.Int("attempt", attempt))
+		logger.Info("Calling Bootstrap() API after Consul restart",
+			zap.Int("attempt", attempt),
+			zap.String("consul_api", "ACL().Bootstrap()"))
 
 		// Call Bootstrap() API
 		var bootstrapErr error
@@ -451,6 +615,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			// SUCCESS! Bootstrap completed
 			logger.Info("ACL re-bootstrap successful",
 				zap.String("accessor", newBootstrapToken.AccessorID),
+				zap.String("token_preview", newBootstrapToken.SecretID[:8]+"..."),
 				zap.Int("attempt", attempt),
 				zap.String("note", "New bootstrap token generated"))
 
@@ -469,6 +634,11 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 
 		// Bootstrap failed - analyze error and determine retry strategy
 		lastErr = bootstrapErr
+
+		logger.Warn("Bootstrap attempt failed, analyzing error",
+			zap.Int("attempt", attempt),
+			zap.Error(bootstrapErr),
+			zap.String("error_message", bootstrapErr.Error()))
 
 		// CRITICAL FIX (P0): Correct retry strategy for ACL bootstrap reset
 		//
@@ -495,16 +665,22 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			// Try to extract reset index from error message
 			consulLastConsumed, extractErr := extractResetIndex(bootstrapErr.Error())
 
+			logger.Info("Extracted reset index from Consul error",
+				zap.Int("consul_last_consumed", consulLastConsumed),
+				zap.Int("we_wrote", resetIndex),
+				zap.Bool("file_consumed", consulLastConsumed >= resetIndex),
+				zap.Error(extractErr))
+
 			if extractErr == nil {
 				// Compare Consul's last consumed index with what we wrote
 				if consulLastConsumed >= resetIndex {
-					// Consul consumed our reset file! Increment for next attempt.
-					logger.Info("Consul consumed reset file, incrementing index",
+					// Consul consumed our reset file! Use the EXACT index from Consul's new error.
+					// When Consul says "reset index: X", we write X to the file.
+					logger.Info("Consul consumed reset file, using new reset index from error",
 						zap.Int("attempt", attempt),
-						zap.Int("consul_consumed", consulLastConsumed),
-						zap.Int("we_wrote", resetIndex),
-						zap.Int("next_index", consulLastConsumed+2))
-					resetIndex = consulLastConsumed + 2 // Consul consumed our index, try next
+						zap.Int("consul_new_reset_index", consulLastConsumed),
+						zap.Int("we_wrote", resetIndex))
+					resetIndex = consulLastConsumed // Use exact value from Consul's error
 				} else {
 					// Consul did NOT consume our reset file. Retry same index.
 					logger.Warn("Consul did not consume reset file, retrying same index",
