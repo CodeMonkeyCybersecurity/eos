@@ -5,13 +5,14 @@ package debug
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
+	consulenv "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	sharedvault "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
@@ -74,6 +75,7 @@ func addServiceFlagsToDebug(cmd *cobra.Command) {
 	cmd.Flags().Bool("bionicgpt", false, "Debug BionicGPT secrets")
 	cmd.Flags().Bool("wazuh", false, "Debug Wazuh secrets")
 	cmd.Flags().Bool("all", false, "Debug secrets for all services")
+	cmd.Flags().String("environment", "", "Override environment (requires CONSUL_EMERGENCY_OVERRIDE=true)")
 	cmd.MarkFlagsMutuallyExclusive("consul", "authentik", "bionicgpt", "wazuh", "all")
 }
 
@@ -111,6 +113,68 @@ func getSelectedServicesForDebug(cmd *cobra.Command) ([]string, error) {
 	return selected, nil
 }
 
+// resolveEnvironment resolves the environment using correct precedence: Consul authoritative, flag for emergency override.
+// Implements fail-closed security: blocks operations when environment cannot be determined.
+func resolveEnvironmentDebug(rc *eos_io.RuntimeContext, flagEnv string) (sharedvault.Environment, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// 1. Check emergency override
+	if os.Getenv("CONSUL_EMERGENCY_OVERRIDE") == "true" {
+		if flagEnv == "" {
+			return "", fmt.Errorf("CONSUL_EMERGENCY_OVERRIDE requires --environment flag\n\n" +
+				"Emergency override allows bypassing Consul when it's unavailable.\n" +
+				"You MUST specify --environment flag to use emergency override.\n\n" +
+				"Example:\n" +
+				"  CONSUL_EMERGENCY_OVERRIDE=true eos debug secrets --consul --environment development --show")
+		}
+
+		// Validate emergency override environment
+		if err := sharedvault.ValidateEnvironment(flagEnv); err != nil {
+			return "", fmt.Errorf("invalid --environment flag: %w", err)
+		}
+
+		logger.Warn("Using emergency override - Consul bypassed",
+			zap.String("environment", flagEnv),
+			zap.String("reason", "CONSUL_EMERGENCY_OVERRIDE=true"),
+			zap.String("audit", "emergency_override"))
+
+		return sharedvault.Environment(flagEnv), nil
+	}
+
+	// 2. Query Consul (authoritative)
+	consulEnv, err := consulenv.DiscoverFromConsul(rc)
+	if err != nil {
+		// FAIL-CLOSED: No fallback to development
+		return "", fmt.Errorf("cannot determine environment from Consul: %w\n\n"+
+			"Consul is the authoritative source for environment configuration.\n"+
+			"This system fails-closed for security (no fallback to development).\n\n"+
+			"Remediation:\n"+
+			"1. Ensure Consul is running: systemctl status consul\n"+
+			"2. Set environment: eos update consul --environment <env>\n"+
+			"3. Emergency override (Consul unavailable): CONSUL_EMERGENCY_OVERRIDE=true eos debug secrets --consul --environment <env> --show",
+			err)
+	}
+
+	// 3. Verify flag matches Consul (if provided)
+	if flagEnv != "" && flagEnv != string(consulEnv) {
+		return "", fmt.Errorf("--environment flag (%s) does not match Consul environment (%s)\n\n"+
+			"Consul is authoritative. The --environment flag is rejected when it conflicts.\n"+
+			"This prevents accidental exposure of wrong environment secrets.\n\n"+
+			"Choose ONE of:\n"+
+			"1. Remove --environment flag to use Consul value: %s\n"+
+			"2. Update Consul: eos update consul --environment %s\n"+
+			"3. Emergency override (bypass Consul): CONSUL_EMERGENCY_OVERRIDE=true eos debug secrets --consul --environment %s --show",
+			flagEnv, consulEnv, consulEnv, flagEnv, flagEnv)
+	}
+
+	logger.Info("Using environment from Consul",
+		zap.String("environment", string(consulEnv)),
+		zap.String("source", "consul"),
+		zap.String("audit", "environment_resolution"))
+
+	return consulEnv, nil
+}
+
 // runDebugSecrets orchestrates comprehensive secret diagnostics.
 // Follows Assess → Intervene → Evaluate pattern.
 func runDebugSecrets(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -135,120 +199,122 @@ func runDebugSecrets(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.Strings("services", services),
 		zap.Bool("show_plaintext", showPlaintext))
 
-	// ASSESS - Discover environment and initialize secret manager
-	envConfig, err := environment.DiscoverEnvironment(rc)
+	// ASSESS - Resolve environment (Consul authoritative, fail-closed)
+	flagEnv, _ := cmd.Flags().GetString("environment")
+	env, err := resolveEnvironmentDebug(rc, flagEnv)
 	if err != nil {
-		return fmt.Errorf("failed to discover environment: %w\n"+
-			"Fix: Ensure Vault or secret backend is properly configured", err)
+		return err
 	}
 
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
-	if err != nil {
-		return fmt.Errorf("failed to initialize secret manager: %w\n"+
-			"Fix: Ensure Vault is accessible and properly configured", err)
-	}
+	logger.Info("Resolved environment",
+		zap.String("environment", string(env)))
 
 	// Get Vault client for metadata access (uses SDK, not shell commands)
 	vaultClient, err := vault.GetVaultClient(rc)
 	if err != nil {
-		logger.Warn("Failed to get Vault client, some metadata may be unavailable",
-			zap.Error(err))
-		vaultClient = nil
+		return fmt.Errorf("failed to get Vault client: %w\n\n"+
+			"Remediation:\n"+
+			"  - Ensure Vault is running: systemctl status vault\n"+
+			"  - Check Vault status: vault status\n"+
+			"  - Ensure Vault agent is running: systemctl status vault-agent-eos", err)
 	}
 
+	secretMgr := vault.NewVaultSecretManager(rc, vaultClient)
+
 	logger.Info("=== ENVIRONMENT INFORMATION ===")
-	logger.Info(fmt.Sprintf("Environment: %s", envConfig.Environment))
-	logger.Info(fmt.Sprintf("Vault Address: %s", envConfig.VaultAddr))
+	logger.Info(fmt.Sprintf("Environment: %s", env))
+	logger.Info(fmt.Sprintf("Environment Source: Consul KV"))
 	logger.Info("")
 
 	// INTERVENE - Process each service
 	hasSecrets := false
-	for _, service := range services {
-		logger.Info(fmt.Sprintf("\n=== %s SECRETS DEBUG ===", strings.ToUpper(service)))
+	for _, serviceName := range services {
+		logger.Info(fmt.Sprintf("\n=== %s SECRETS DEBUG (%s) ===", strings.ToUpper(serviceName), strings.ToUpper(string(env))))
 
-		// List secrets for this service using SDK methods
-		secretNames, err := secretManager.ListSecrets(service)
-		if err != nil {
-			logger.Error("Failed to list secrets",
-				zap.String("service", service),
-				zap.Error(err))
-			return fmt.Errorf("failed to list secrets for service '%s': %w\n"+
-				"Fix: Ensure service exists in Vault and has proper permissions", service, err)
+		// Convert service name to Service type
+		service := sharedvault.Service(serviceName)
+		if err := sharedvault.ValidateService(serviceName); err != nil {
+			logger.Warn("Skipping invalid service", zap.String("service", serviceName), zap.Error(err))
+			continue
 		}
 
-		if len(secretNames) == 0 {
-			logger.Info(fmt.Sprintf("No secrets found for service '%s'", service))
-			logger.Info(fmt.Sprintf("Tip: Deploy the service with 'eos create %s' to generate secrets", service))
+		// Get service metadata
+		metadata, err := secretMgr.GetServiceMetadata(rc.Ctx, env, service)
+		if err != nil {
+			logger.Warn("Failed to get metadata for service",
+				zap.String("service", serviceName),
+				zap.String("environment", string(env)),
+				zap.Error(err))
+			continue
+		}
+
+		if len(metadata.Keys) == 0 {
+			logger.Info(fmt.Sprintf("No secrets found for service '%s' in environment '%s'", serviceName, env))
+			logger.Info(fmt.Sprintf("Tip: Deploy the service with 'eos create %s' to generate secrets", serviceName))
 			continue
 		}
 
 		hasSecrets = true
-		logger.Info(fmt.Sprintf("Total Secrets: %d", len(secretNames)))
+		logger.Info(fmt.Sprintf("Total Secrets: %d", len(metadata.Keys)))
+		logger.Info(fmt.Sprintf("Current Version: %d", metadata.CurrentVersion))
+		logger.Info(fmt.Sprintf("Created: %s", metadata.CreatedTime.Format(time.RFC3339)))
+		logger.Info(fmt.Sprintf("Updated: %s", metadata.UpdatedTime.Format(time.RFC3339)))
+		logger.Info(fmt.Sprintf("Path: %s", metadata.Path))
 		logger.Info("")
 
+		// Get service secrets
+		secretsData, err := secretMgr.GetServiceSecrets(rc.Ctx, env, service)
+		if err != nil {
+			logger.Warn("Failed to get secrets for service",
+				zap.String("service", serviceName),
+				zap.Error(err))
+			continue
+		}
+
 		// Debug each secret
-		for idx, secretName := range secretNames {
-			logger.Info(fmt.Sprintf("--- Secret %d/%d: %s ---", idx+1, len(secretNames), secretName))
+		idx := 0
+		for secretName, secretValue := range secretsData {
+			idx++
+			logger.Info(fmt.Sprintf("--- Secret %d/%d: %s ---", idx, len(secretsData), secretName))
 
-			// Get secret path for metadata
-			secretPath := fmt.Sprintf("services/%s/%s", envConfig.Environment, service)
-			logger.Debug("Secret path", zap.String("path", secretPath))
-
-			// Try to get metadata if Vault client is available
-			if vaultClient != nil {
-				displayVaultMetadata(rc, vaultClient, secretPath, secretName)
-			}
-
-			// Get secret value using SDK methods
-			secretValue, err := secretManager.GetSecret(service, secretName)
-			if err != nil {
-				logger.Warn("Failed to read secret value",
-					zap.String("service", service),
-					zap.String("secret", secretName),
-					zap.Error(err))
-				logger.Info("VALUE: ERROR (failed to read)")
+			// Display value (redacted or plaintext based on --show flag)
+			logger.Info("VALUE:")
+			if !showPlaintext {
+				logger.Info("  ***REDACTED*** (use --show to display)")
 			} else {
-				// Display value (redacted or plaintext based on --show flag)
-				logger.Info("VALUE:")
-				if !showPlaintext {
-					logger.Info("  ***REDACTED*** (use --show to display)")
-				} else {
-					logger.Info(fmt.Sprintf("  %q", secretValue))
+				// Convert to string
+				valueStr, ok := secretValue.(string)
+				if !ok {
+					valueStr = fmt.Sprintf("%v", secretValue)
 				}
+				logger.Info(fmt.Sprintf("  %q", valueStr))
 			}
 
-			// Try to get custom metadata using SDK
-			if backend, ok := secretManager.GetBackend().(*secrets.VaultBackend); ok {
-				customMetadata, err := backend.GetMetadata(secretPath)
-				if err == nil && customMetadata != nil {
-					logger.Info("CUSTOM METADATA:")
-					if customMetadata.TTL != "" {
-						logger.Info(fmt.Sprintf("  TTL: %s", customMetadata.TTL))
-					}
-					if customMetadata.CreatedBy != "" {
-						logger.Info(fmt.Sprintf("  Created By: %s", customMetadata.CreatedBy))
-					}
-					if customMetadata.CreatedAt != "" {
-						logger.Info(fmt.Sprintf("  Created At: %s", customMetadata.CreatedAt))
-					}
-					if customMetadata.Purpose != "" {
-						logger.Info(fmt.Sprintf("  Purpose: %s", customMetadata.Purpose))
-					}
-					if customMetadata.Owner != "" {
-						logger.Info(fmt.Sprintf("  Owner: %s", customMetadata.Owner))
-					}
-					if customMetadata.RotateAfter != "" {
-						logger.Info(fmt.Sprintf("  Rotate After: %s", customMetadata.RotateAfter))
-					}
-					if len(customMetadata.Custom) > 0 {
-						logger.Info("  Custom Fields:")
-						for k, v := range customMetadata.Custom {
-							logger.Info(fmt.Sprintf("    %s: %s", k, v))
-						}
-					}
-				}
-			}
+			logger.Info("")
+		}
 
+		// Display custom metadata if available
+		if len(metadata.CustomMetadata) > 0 {
+			logger.Info("CUSTOM METADATA:")
+			for key, value := range metadata.CustomMetadata {
+				logger.Info(fmt.Sprintf("  %s: %s", key, value))
+			}
+			logger.Info("")
+		}
+
+		// Display version history
+		if len(metadata.Versions) > 0 {
+			logger.Info("VERSION HISTORY:")
+			for versionNum, versionInfo := range metadata.Versions {
+				status := "active"
+				if versionInfo.Destroyed {
+					status = "destroyed"
+				} else if versionInfo.DeletedTime != nil {
+					status = "deleted"
+				}
+				logger.Info(fmt.Sprintf("  Version %d: %s (created: %s)",
+					versionNum, status, versionInfo.CreatedTime.Format(time.RFC3339)))
+			}
 			logger.Info("")
 		}
 	}

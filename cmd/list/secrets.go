@@ -5,13 +5,15 @@ package list
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
+	consulenv "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/output"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
+	sharedvault "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -62,6 +64,7 @@ func addServiceFlagsToList(cmd *cobra.Command) {
 	cmd.Flags().Bool("bionicgpt", false, "List BionicGPT secrets")
 	cmd.Flags().Bool("wazuh", false, "List Wazuh secrets")
 	cmd.Flags().Bool("all", false, "List secrets for all services")
+	cmd.Flags().String("environment", "", "Override environment (requires CONSUL_EMERGENCY_OVERRIDE=true)")
 	cmd.MarkFlagsMutuallyExclusive("consul", "authentik", "bionicgpt", "wazuh", "all")
 }
 
@@ -99,6 +102,68 @@ func getSelectedServicesForList(cmd *cobra.Command) ([]string, error) {
 	return selected, nil
 }
 
+// resolveEnvironment resolves the environment using correct precedence: Consul authoritative, flag for emergency override.
+// Implements fail-closed security: blocks operations when environment cannot be determined.
+func resolveEnvironment(rc *eos_io.RuntimeContext, flagEnv string) (sharedvault.Environment, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// 1. Check emergency override
+	if os.Getenv("CONSUL_EMERGENCY_OVERRIDE") == "true" {
+		if flagEnv == "" {
+			return "", fmt.Errorf("CONSUL_EMERGENCY_OVERRIDE requires --environment flag\n\n" +
+				"Emergency override allows bypassing Consul when it's unavailable.\n" +
+				"You MUST specify --environment flag to use emergency override.\n\n" +
+				"Example:\n" +
+				"  CONSUL_EMERGENCY_OVERRIDE=true eos list secrets --consul --environment development")
+		}
+
+		// Validate emergency override environment
+		if err := sharedvault.ValidateEnvironment(flagEnv); err != nil {
+			return "", fmt.Errorf("invalid --environment flag: %w", err)
+		}
+
+		logger.Warn("Using emergency override - Consul bypassed",
+			zap.String("environment", flagEnv),
+			zap.String("reason", "CONSUL_EMERGENCY_OVERRIDE=true"),
+			zap.String("audit", "emergency_override"))
+
+		return sharedvault.Environment(flagEnv), nil
+	}
+
+	// 2. Query Consul (authoritative)
+	consulEnv, err := consulenv.DiscoverFromConsul(rc)
+	if err != nil {
+		// FAIL-CLOSED: No fallback to development
+		return "", fmt.Errorf("cannot determine environment from Consul: %w\n\n"+
+			"Consul is the authoritative source for environment configuration.\n"+
+			"This system fails-closed for security (no fallback to development).\n\n"+
+			"Remediation:\n"+
+			"1. Ensure Consul is running: systemctl status consul\n"+
+			"2. Set environment: eos update consul --environment <env>\n"+
+			"3. Emergency override (Consul unavailable): CONSUL_EMERGENCY_OVERRIDE=true eos list secrets --consul --environment <env>",
+			err)
+	}
+
+	// 3. Verify flag matches Consul (if provided)
+	if flagEnv != "" && flagEnv != string(consulEnv) {
+		return "", fmt.Errorf("--environment flag (%s) does not match Consul environment (%s)\n\n"+
+			"Consul is authoritative. The --environment flag is rejected when it conflicts.\n"+
+			"This prevents accidental exposure of wrong environment secrets.\n\n"+
+			"Choose ONE of:\n"+
+			"1. Remove --environment flag to use Consul value: %s\n"+
+			"2. Update Consul: eos update consul --environment %s\n"+
+			"3. Emergency override (bypass Consul): CONSUL_EMERGENCY_OVERRIDE=true eos list secrets --consul --environment %s",
+			flagEnv, consulEnv, consulEnv, flagEnv, flagEnv)
+	}
+
+	logger.Info("Using environment from Consul",
+		zap.String("environment", string(consulEnv)),
+		zap.String("source", "consul"),
+		zap.String("audit", "environment_resolution"))
+
+	return consulEnv, nil
+}
+
 // runListSecrets orchestrates secret listing with metadata display.
 // Follows Assess → Intervene → Evaluate pattern.
 func runListSecrets(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -113,54 +178,76 @@ func runListSecrets(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	logger.Info("Listing secrets", zap.Strings("services", services))
 
-	// ASSESS - Discover environment and initialize secret manager
-	envConfig, err := environment.DiscoverEnvironment(rc)
+	// ASSESS - Resolve environment (Consul authoritative, fail-closed)
+	flagEnv, _ := cmd.Flags().GetString("environment")
+	env, err := resolveEnvironment(rc, flagEnv)
 	if err != nil {
-		return fmt.Errorf("failed to discover environment: %w\n"+
-			"Fix: Ensure Vault or secret backend is properly configured", err)
+		return err
 	}
 
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	logger.Info("Resolved environment",
+		zap.String("environment", string(env)))
+
+	// ASSESS - Initialize Vault client and secret manager
+	vaultClient, err := vault.GetVaultClient(rc)
 	if err != nil {
-		return fmt.Errorf("failed to initialize secret manager: %w\n"+
-			"Fix: Ensure Vault is accessible and properly configured", err)
+		return fmt.Errorf("failed to get Vault client: %w\n\n"+
+			"Remediation:\n"+
+			"  - Ensure Vault is running: systemctl status vault\n"+
+			"  - Check Vault status: vault status\n"+
+			"  - Ensure Vault agent is running: systemctl status vault-agent-eos", err)
 	}
 
-	logger.Debug("Initialized secret manager",
-		zap.String("environment", envConfig.Environment))
+	secretMgr := vault.NewVaultSecretManager(rc, vaultClient)
 
 	// INTERVENE - Process each service
 	hasSecrets := false
-	for _, service := range services {
-		logger.Debug("Listing secrets for service", zap.String("service", service))
+	for _, serviceName := range services {
+		logger.Debug("Listing secrets for service",
+			zap.String("service", serviceName),
+			zap.String("environment", string(env)))
 
-		// List secrets for this service using SDK methods
-		secretNames, err := secretManager.ListSecrets(service)
-		if err != nil {
-			logger.Error("Failed to list secrets",
-				zap.String("service", service),
-				zap.Error(err))
-			return fmt.Errorf("failed to list secrets for service '%s': %w\n"+
-				"Fix: Ensure service exists in Vault and has proper permissions", service, err)
+		// Convert service name to Service type
+		service := sharedvault.Service(serviceName)
+		if err := sharedvault.ValidateService(serviceName); err != nil {
+			logger.Warn("Skipping invalid service", zap.String("service", serviceName), zap.Error(err))
+			continue
 		}
 
-		if len(secretNames) == 0 {
-			logger.Info("No secrets found for service", zap.String("service", service))
+		// Get service metadata
+		metadata, err := secretMgr.GetServiceMetadata(rc.Ctx, env, service)
+		if err != nil {
+			logger.Warn("Failed to get metadata for service",
+				zap.String("service", serviceName),
+				zap.String("environment", string(env)),
+				zap.Error(err))
+			continue
+		}
+
+		if len(metadata.Keys) == 0 {
+			logger.Info("No secrets found for service",
+				zap.String("service", serviceName),
+				zap.String("environment", string(env)))
 			continue
 		}
 
 		hasSecrets = true
 
 		// EVALUATE - Display header for this service
-		logger.Info(fmt.Sprintf("\n%s SECRETS:", strings.ToUpper(service)))
-		logger.Info(fmt.Sprintf("Found %d secret(s) for service '%s'", len(secretNames), service))
+		logger.Info(fmt.Sprintf("\n%s SECRETS (%s):", strings.ToUpper(serviceName), strings.ToUpper(string(env))))
+		logger.Info(fmt.Sprintf("Found %d secret(s) for service '%s' in environment '%s'",
+			len(metadata.Keys), serviceName, env))
 
 		// Build table data
 		table := output.NewTable().
-			WithHeaders("Service", "Secret Name", "Count")
+			WithHeaders("Service", "Environment", "Secret Name", "Version")
 
-		for _, secretName := range secretNames {
-			table.AddRow(service, secretName, "1") // Count is always 1 per secret name
+		for _, secretName := range metadata.Keys {
+			table.AddRow(
+				serviceName,
+				string(env),
+				secretName,
+				fmt.Sprintf("%d", metadata.CurrentVersion))
 		}
 
 		// Display table

@@ -14,6 +14,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	sharedvault "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	consulapi "github.com/hashicorp/consul/api"

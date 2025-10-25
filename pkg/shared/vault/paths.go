@@ -1,0 +1,312 @@
+// Package vault provides centralized Vault secret path management for EOS.
+//
+// This package implements the standardized secret path structure:
+//   services/{environment}/{service}
+//
+// Example paths:
+//   services/production/consul
+//   services/staging/authentik
+//   services/development/bionicgpt
+//
+// All Vault secret path construction MUST use the helpers in this package.
+// Direct path string construction is forbidden (see CLAUDE.md P0 rule #13).
+package vault
+
+import (
+	"fmt"
+	"path"
+	"strings"
+)
+
+// Constants for path construction
+const (
+	// DefaultMount is the standard KV v2 mount point for application secrets
+	DefaultMount = "secret"
+
+	// ServicesPrefix is the namespace for all service secrets
+	// All service secrets are stored under: {mount}/services/{environment}/{service}
+	ServicesPrefix = "services"
+)
+
+// Environment represents a deployment environment.
+// Use these constants rather than string literals for type safety and validation.
+type Environment string
+
+const (
+	EnvironmentProduction  Environment = "production"
+	EnvironmentStaging     Environment = "staging"
+	EnvironmentDevelopment Environment = "development"
+	EnvironmentReview      Environment = "review"
+)
+
+// String returns the string representation of the environment
+func (e Environment) String() string {
+	return string(e)
+}
+
+// Service represents a service name.
+// Use these constants rather than string literals for type safety and validation.
+type Service string
+
+const (
+	ServiceConsul    Service = "consul"
+	ServiceAuthentik Service = "authentik"
+	ServiceBionicGPT Service = "bionicgpt"
+	ServiceWazuh     Service = "wazuh"
+	ServiceHecate    Service = "hecate"
+	ServiceHelen     Service = "helen"
+)
+
+// String returns the string representation of the service
+func (s Service) String() string {
+	return string(s)
+}
+
+// AllServices returns all known services.
+// This list should be updated as new services are added to EOS.
+func AllServices() []Service {
+	return []Service{
+		ServiceConsul,
+		ServiceAuthentik,
+		ServiceBionicGPT,
+		ServiceWazuh,
+		ServiceHecate,
+		ServiceHelen,
+	}
+}
+
+// AllEnvironments returns all known environments.
+func AllEnvironments() []Environment {
+	return []Environment{
+		EnvironmentProduction,
+		EnvironmentStaging,
+		EnvironmentDevelopment,
+		EnvironmentReview,
+	}
+}
+
+// SecretPath constructs the base secret path for a service in an environment.
+//
+// Format: services/{environment}/{service}
+//
+// Example:
+//   SecretPath(EnvironmentProduction, ServiceConsul)
+//   → "services/production/consul"
+//
+// This is the canonical path format used throughout EOS.
+// All service secrets are stored at this path as a single KV v2 entry
+// containing multiple key-value pairs.
+func SecretPath(env Environment, svc Service) string {
+	return path.Join(ServicesPrefix, string(env), string(svc))
+}
+
+// SecretDataPath constructs the full Vault API data path for reading/writing secrets.
+//
+// Format: {mount}/data/services/{environment}/{service}
+//
+// Example:
+//   SecretDataPath("", EnvironmentProduction, ServiceConsul)
+//   → "secret/data/services/production/consul"
+//
+// This path is used with the Vault Logical API client.Logical().Read()
+// for direct KV v2 data access.
+//
+// The KV v2 SDK client.KVv2(mount).Get() automatically adds the /data/ prefix,
+// so use SecretPath() for SDK methods.
+//
+// Parameters:
+//   mount - KV v2 mount point (use "" for default "secret")
+//   env   - Target environment
+//   svc   - Target service
+func SecretDataPath(mount string, env Environment, svc Service) string {
+	if mount == "" {
+		mount = DefaultMount
+	}
+	return path.Join(mount, "data", SecretPath(env, svc))
+}
+
+// SecretMetadataPath constructs the full Vault API metadata path.
+//
+// Format: {mount}/metadata/services/{environment}/{service}
+//
+// Example:
+//   SecretMetadataPath("", EnvironmentProduction, ServiceConsul)
+//   → "secret/metadata/services/production/consul"
+//
+// This path is used to access KV v2 metadata (version history, timestamps, etc.)
+// via client.Logical().Read() or LIST operations.
+//
+// Parameters:
+//   mount - KV v2 mount point (use "" for default "secret")
+//   env   - Target environment
+//   svc   - Target service
+func SecretMetadataPath(mount string, env Environment, svc Service) string {
+	if mount == "" {
+		mount = DefaultMount
+	}
+	return path.Join(mount, "metadata", SecretPath(env, svc))
+}
+
+// SecretListPath constructs the path for listing all services in an environment.
+//
+// Format: {mount}/metadata/services/{environment}
+//
+// Example:
+//   SecretListPath("", EnvironmentProduction)
+//   → "secret/metadata/services/production"
+//
+// Use this with Vault LIST operation to discover all services with secrets
+// in a given environment.
+//
+// Parameters:
+//   mount - KV v2 mount point (use "" for default "secret")
+//   env   - Target environment
+func SecretListPath(mount string, env Environment) string {
+	if mount == "" {
+		mount = DefaultMount
+	}
+	return path.Join(mount, "metadata", ServicesPrefix, string(env))
+}
+
+// CLIPath constructs the CLI-style path (without mount/data/metadata prefixes).
+//
+// Format: services/{environment}/{service}
+//
+// Example:
+//   CLIPath(EnvironmentProduction, ServiceConsul)
+//   → "services/production/consul"
+//
+// This is identical to SecretPath() and provided for clarity in CLI contexts.
+func CLIPath(env Environment, svc Service) string {
+	return SecretPath(env, svc)
+}
+
+// ParseSecretPath parses a secret path and extracts environment and service.
+//
+// Expected format: services/{environment}/{service}
+//
+// Example:
+//   ParseSecretPath("services/production/consul")
+//   → (EnvironmentProduction, ServiceConsul, nil)
+//
+// Returns error if:
+//   - Path doesn't have exactly 3 components
+//   - First component is not "services"
+//   - Environment or service is invalid
+//
+// Use this to reverse-engineer paths received from Vault LIST operations
+// or validate user-provided paths.
+func ParseSecretPath(secretPath string) (Environment, Service, error) {
+	// Expected: services/{environment}/{service}
+	parts := strings.Split(strings.TrimPrefix(secretPath, "/"), "/")
+
+	if len(parts) != 3 {
+		return "", "", fmt.Errorf("invalid secret path format: expected 3 parts (services/env/service), got %d parts in '%s'",
+			len(parts), secretPath)
+	}
+
+	if parts[0] != ServicesPrefix {
+		return "", "", fmt.Errorf("invalid secret path: must start with '%s', got '%s' in path '%s'",
+			ServicesPrefix, parts[0], secretPath)
+	}
+
+	env := Environment(parts[1])
+	svc := Service(parts[2])
+
+	// Validate environment and service
+	if err := ValidateEnvironment(string(env)); err != nil {
+		return "", "", fmt.Errorf("invalid environment in path '%s': %w", secretPath, err)
+	}
+
+	if err := ValidateService(string(svc)); err != nil {
+		return "", "", fmt.Errorf("invalid service in path '%s': %w", secretPath, err)
+	}
+
+	return env, svc, nil
+}
+
+// ValidateEnvironment checks if an environment string is valid.
+//
+// Valid environments: production, staging, development, review
+//
+// Returns error if environment is not recognized.
+//
+// Example:
+//   ValidateEnvironment("production")  → nil
+//   ValidateEnvironment("invalid")     → error
+func ValidateEnvironment(env string) error {
+	validEnvs := map[string]bool{
+		string(EnvironmentProduction):  true,
+		string(EnvironmentStaging):     true,
+		string(EnvironmentDevelopment): true,
+		string(EnvironmentReview):      true,
+	}
+
+	if !validEnvs[env] {
+		return fmt.Errorf("invalid environment: '%s' (valid: production, staging, development, review)", env)
+	}
+
+	return nil
+}
+
+// ValidateService checks if a service string is valid.
+//
+// Valid services: consul, authentik, bionicgpt, wazuh, hecate, helen
+//
+// Returns error if service is not recognized.
+//
+// Example:
+//   ValidateService("consul")  → nil
+//   ValidateService("invalid") → error
+func ValidateService(svc string) error {
+	validSvcs := map[string]bool{
+		string(ServiceConsul):    true,
+		string(ServiceAuthentik): true,
+		string(ServiceBionicGPT): true,
+		string(ServiceWazuh):     true,
+		string(ServiceHecate):    true,
+		string(ServiceHelen):     true,
+	}
+
+	if !validSvcs[svc] {
+		return fmt.Errorf("invalid service: '%s' (valid: consul, authentik, bionicgpt, wazuh, hecate, helen)", svc)
+	}
+
+	return nil
+}
+
+// LegacyConsulPath returns the legacy Consul secret path for backward compatibility.
+//
+// DEPRECATED: This is only for migration support. New code should use SecretPath().
+//
+// Legacy path: consul/bootstrap-token
+// New path:    services/{env}/consul (with key: bootstrap-token)
+//
+// This will be removed after migration is complete (approximately 6 months).
+func LegacyConsulPath(secretKey string) string {
+	return path.Join("consul", secretKey)
+}
+
+// LegacyBionicGPTPath returns the legacy BionicGPT secret path for backward compatibility.
+//
+// DEPRECATED: This is only for migration support. New code should use SecretPath().
+//
+// Legacy path: secret/bionicgpt/{key}
+// New path:    services/{env}/bionicgpt (with multiple keys)
+//
+// This will be removed after migration is complete (approximately 6 months).
+func LegacyBionicGPTPath(secretKey string) string {
+	return path.Join("secret", "bionicgpt", secretKey)
+}
+
+// LegacyHecatePath returns the legacy Hecate secret path for backward compatibility.
+//
+// DEPRECATED: This is only for migration support. New code should use SecretPath().
+//
+// Legacy path: secret/hecate/{subsystem}/{key}
+// New path:    services/{env}/hecate (with multiple keys)
+//
+// This will be removed after migration is complete (approximately 6 months).
+func LegacyHecatePath(subsystem, secretKey string) string {
+	return path.Join("secret", "hecate", subsystem, secretKey)
+}

@@ -3,9 +3,7 @@ package update
 
 import (
 	"fmt"
-	"bufio"
 	"os"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	consulacl "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
@@ -262,7 +260,7 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		}
 
 		// Connect to Consul
-		consulClient, err := consul.ConfigureConsulClient(rc, "")
+		consulClient, err := consul.GetConsulClient(rc)
 		if err != nil {
 			return fmt.Errorf("failed to connect to Consul: %w\n\n"+
 				"Remediation:\n"+
@@ -298,7 +296,7 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 			logger.Info("This node will have access to PRODUCTION secrets in Vault")
 			logger.Info("Ensure this is correct before proceeding")
 
-			confirmed := promptConfirm("Set environment to PRODUCTION? (y/N): ")
+			confirmed := eos_io.PromptConfirm(rc, "Set environment to PRODUCTION?", false)
 			if !confirmed {
 				return eos_err.NewUserError("Operation cancelled by user")
 			}
@@ -477,15 +475,4 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	// Delegate to business logic in pkg/consul
 	return consul.UpdateConsulPorts(rc, updateConfig)
-}
-
-// promptConfirm prompts the user for yes/no confirmation
-func promptConfirm(prompt string) bool {
-	fmt.Print(prompt)
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		response := strings.ToLower(strings.TrimSpace(scanner.Text()))
-		return response == "y" || response == "yes"
-	}
-	return false
 }
