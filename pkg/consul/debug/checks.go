@@ -501,10 +501,69 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 		return result
 	}
 
-	// Analyze logs for common error patterns
-	errorPatterns := map[string]string{
+	// Define ACL-specific error patterns (high priority)
+	aclErrorPatterns := map[string]ACLErrorPattern{
+		"permission denied": {
+			Category:     "ACL_PERMISSION",
+			Description:  "ACL permission denied",
+			Severity:     SeverityCritical,
+			Remediation:  "Check token has required policy permissions",
+			RelatedTerms: []string{"acl", "token", "policy"},
+		},
+		"acl not found": {
+			Category:     "ACL_TOKEN_INVALID",
+			Description:  "ACL token doesn't exist",
+			Severity:     SeverityCritical,
+			Remediation:  "Verify token in Vault: vault kv get secret/consul/bootstrap-token",
+			RelatedTerms: []string{"token", "bootstrap"},
+		},
+		"blocked by acls": {
+			Category:     "ACL_BLOCKED",
+			Description:  "Operation blocked by ACL policy",
+			Severity:     SeverityWarning,
+			Remediation:  "Review ACL policies: consul acl policy list",
+			RelatedTerms: []string{"policy", "rule"},
+		},
+		"rpc error: permission denied": {
+			Category:     "ACL_RPC_BLOCKED",
+			Description:  "Agent RPC blocked by ACLs",
+			Severity:     SeverityCritical,
+			Remediation:  "Agent token lacks required permissions - check acl.tokens.agent in config",
+			RelatedTerms: []string{"agent", "token", "rpc"},
+		},
+		"failed to resolve token": {
+			Category:     "ACL_TOKEN_RESOLUTION",
+			Description:  "Token resolution failed",
+			Severity:     SeverityWarning,
+			Remediation:  "Token may be invalid or ACL system unavailable",
+			RelatedTerms: []string{"token", "acl"},
+		},
+		"invalid acl token": {
+			Category:     "ACL_TOKEN_FORMAT",
+			Description:  "Token format invalid",
+			Severity:     SeverityWarning,
+			Remediation:  "Token must be valid UUID format",
+			RelatedTerms: []string{"token", "uuid"},
+		},
+		"anonymous token lacks permission": {
+			Category:     "ACL_ANONYMOUS",
+			Description:  "Anonymous policy too restrictive",
+			Severity:     SeverityInfo,
+			Remediation:  "Update anonymous token policy for read access if needed",
+			RelatedTerms: []string{"anonymous", "policy"},
+		},
+		"acl support disabled": {
+			Category:     "ACL_DISABLED",
+			Description:  "ACL system is disabled",
+			Severity:     SeverityInfo,
+			Remediation:  "Enable ACLs: set acl.enabled = true in config",
+			RelatedTerms: []string{"acl", "enabled"},
+		},
+	}
+
+	// Define general error patterns (lower priority)
+	generalErrorPatterns := map[string]string{
 		"bind: address already in use": "Port binding conflict detected",
-		"permission denied":            "Permission issues detected",
 		"no such file or directory":    "Missing files or directories",
 		"signal: killed":               "Process was killed (likely timeout)",
 		"failed to join":               "Cluster join issues",
@@ -512,21 +571,92 @@ func analyzeLogs(rc *eos_io.RuntimeContext, lines int) DiagnosticResult {
 	}
 
 	foundIssues := []string{}
+	aclErrors := []ACLLogError{}
 	logLines := strings.Split(output, "\n")
 
-	for pattern, description := range errorPatterns {
-		for _, line := range logLines {
-			if strings.Contains(strings.ToLower(line), pattern) {
-				foundIssues = append(foundIssues, description)
-				result.Details = append(result.Details, "Found: "+line)
-				break
+	// PASS 1: Search for ACL-specific errors (with context)
+	for i, line := range logLines {
+		lineLower := strings.ToLower(line)
+		for pattern, errorInfo := range aclErrorPatterns {
+			if strings.Contains(lineLower, pattern) {
+				// Extract timestamp from log line (journalctl format)
+				timestamp := extractTimestamp(line)
+
+				// Gather context (3 lines before and after)
+				contextLines := []string{}
+				for j := max(0, i-3); j < min(len(logLines), i+4); j++ {
+					if j != i {
+						contextLines = append(contextLines, logLines[j])
+					}
+				}
+
+				aclError := ACLLogError{
+					Timestamp: timestamp,
+					Pattern:   pattern,
+					ErrorInfo: errorInfo,
+					LogLine:   line,
+					Context:   contextLines,
+				}
+				aclErrors = append(aclErrors, aclError)
+
+				// Mark as issue
+				foundIssues = append(foundIssues, errorInfo.Description)
+				break // Only match first pattern per line
 			}
 		}
 	}
 
-	if len(foundIssues) > 0 {
+	// PASS 2: Search for general errors (if no ACL errors found)
+	if len(aclErrors) == 0 {
+		for pattern, description := range generalErrorPatterns {
+			for _, line := range logLines {
+				if strings.Contains(strings.ToLower(line), pattern) {
+					foundIssues = append(foundIssues, description)
+					result.Details = append(result.Details, "Found: "+line)
+					break
+				}
+			}
+		}
+	}
+
+	// Display ACL errors with enhanced formatting
+	if len(aclErrors) > 0 {
 		result.Success = false
-		result.Severity = SeverityInfo // INFO: Log issues are informational, not blocking
+		result.Severity = SeverityCritical // ACL errors are critical
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, fmt.Sprintf("=== ACL ERRORS DETECTED (%d) ===", len(aclErrors)))
+		result.Details = append(result.Details, "")
+
+		// Group errors by category
+		errorsByCategory := make(map[string][]ACLLogError)
+		for _, aclErr := range aclErrors {
+			errorsByCategory[aclErr.ErrorInfo.Category] = append(errorsByCategory[aclErr.ErrorInfo.Category], aclErr)
+		}
+
+		// Display grouped errors
+		for category, errors := range errorsByCategory {
+			result.Details = append(result.Details, fmt.Sprintf("Category: %s (%d occurrences)", category, len(errors)))
+			result.Details = append(result.Details, "")
+
+			// Show first 3 errors in this category
+			for i, aclErr := range errors {
+				if i >= 3 {
+					result.Details = append(result.Details, fmt.Sprintf("  ... and %d more %s errors", len(errors)-3, category))
+					break
+				}
+
+				result.Details = append(result.Details, fmt.Sprintf("  [%s] %s", aclErr.Timestamp, aclErr.ErrorInfo.Description))
+				result.Details = append(result.Details, fmt.Sprintf("    Pattern matched: %s", aclErr.Pattern))
+				result.Details = append(result.Details, fmt.Sprintf("    Log line: %s", truncateLogLine(aclErr.LogLine, 120)))
+				result.Details = append(result.Details, fmt.Sprintf("    Remediation: %s", aclErr.ErrorInfo.Remediation))
+				result.Details = append(result.Details, "")
+			}
+		}
+
+		result.Message = fmt.Sprintf("Found %d ACL-related errors in logs", len(aclErrors))
+	} else if len(foundIssues) > 0 {
+		result.Success = false
+		result.Severity = SeverityInfo // INFO: General log issues are informational, not blocking
 		result.Message = fmt.Sprintf("Found %d issue(s) in logs", len(foundIssues))
 
 		// Preserve actual log lines captured above
@@ -2120,4 +2250,36 @@ func checkRecentACLBootstrapActivity(rc *eos_io.RuntimeContext) DiagnosticResult
 	}
 
 	return result
+}
+
+// extractTimestamp extracts the timestamp from a journalctl log line
+// Format: "Jan 25 14:30:15" or "2025-01-25T14:30:15+08:00"
+func extractTimestamp(logLine string) string {
+	// Try to extract timestamp from beginning of line
+	// journalctl format: "Jan 25 14:30:15 hostname consul[12345]: message"
+	parts := strings.Fields(logLine)
+	if len(parts) >= 3 {
+		// First 3 fields are usually: Month Day Time
+		timestamp := strings.Join(parts[0:3], " ")
+		// Remove any ANSI codes if present
+		timestamp = strings.TrimSpace(timestamp)
+		return timestamp
+	}
+	return "unknown"
+}
+
+// truncateLogLine truncates a log line to maxLen characters, adding "..." if truncated
+func truncateLogLine(line string, maxLen int) string {
+	if len(line) <= maxLen {
+		return line
+	}
+	return line[:maxLen-3] + "..."
+}
+
+// max returns the maximum of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

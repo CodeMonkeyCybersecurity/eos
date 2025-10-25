@@ -49,6 +49,24 @@ type DiagnosticResult struct {
 	Severity   Severity // How critical is this failure (only relevant if Success = false)
 }
 
+// ACLErrorPattern defines a specific ACL-related error pattern for log parsing
+type ACLErrorPattern struct {
+	Category     string   // Error category (e.g., "ACL_PERMISSION", "ACL_TOKEN_INVALID")
+	Description  string   // Human-readable description
+	Severity     Severity // How critical this error is
+	Remediation  string   // How to fix this issue
+	RelatedTerms []string // Related patterns to search for context
+}
+
+// ACLLogError represents a detected ACL error from logs
+type ACLLogError struct {
+	Timestamp   string   // When the error occurred
+	Pattern     string   // Which pattern matched
+	ErrorInfo   ACLErrorPattern
+	LogLine     string   // The actual log line
+	Context     []string // Surrounding log lines for context
+}
+
 // AssessmentResults holds the raw results of diagnostic assessment
 // without any display or evaluation logic.
 // Used by fix.go to run diagnostics without terminal output.
@@ -155,31 +173,36 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	aclAuthResult := checkACLAuthentication(rc)
 	results = append(results, aclAuthResult)
 
-	// 16. Check data directory configuration (critical for ACL bootstrap)
+	// 16. Check agent ACL token configuration - NEW P0 CHECK
+	// Verifies agent has token to authenticate internal operations
+	agentTokenResult := checkAgentACLToken(rc)
+	results = append(results, agentTokenResult)
+
+	// 17. Check data directory configuration (critical for ACL bootstrap)
 	dataDirResult := checkDataDirectoryConfiguration(rc)
 	results = append(results, dataDirResult)
 
-	// 17. Check data directory filesystem state (verify directory exists and list contents)
+	// 18. Check data directory filesystem state (verify directory exists and list contents)
 	dataDirFSResult := checkDataDirectoryFileSystem(rc)
 	results = append(results, dataDirFSResult)
 
-	// 18. Check Raft database location (find active raft.db across filesystem)
+	// 19. Check Raft database location (find active raft.db across filesystem)
 	raftDBResult := checkRaftDatabase(rc)
 	results = append(results, raftDBResult)
 
-	// 19. Check recent ACL bootstrap activity in logs
+	// 20. Check recent ACL bootstrap activity in logs
 	aclBootstrapLogResult := checkRecentACLBootstrapActivity(rc)
 	results = append(results, aclBootstrapLogResult)
 
-	// 20. Check Raft ACL bootstrap state (advanced - shows actual reset index)
+	// 21. Check Raft ACL bootstrap state (advanced - shows actual reset index)
 	raftBootstrapResult := checkRaftBootstrapState(rc)
 	results = append(results, raftBootstrapResult)
 
-	// 21. Check Consul service discovery (critical for Vault-Consul integration)
+	// 22. Check Consul service discovery (critical for Vault-Consul integration)
 	serviceDiscoveryResult := checkConsulServiceDiscovery(rc)
 	results = append(results, serviceDiscoveryResult)
 
-	// 22. Check systemd unit status for Consul and dependencies
+	// 23. Check systemd unit status for Consul and dependencies
 	systemdResult := checkSystemdUnitStatus(rc)
 	results = append(results, systemdResult)
 
@@ -310,6 +333,19 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 // NOTE: Uses structured logging (logger.Info/Warn/Error) which goes to BOTH terminal AND telemetry
 func displayResults(rc *eos_io.RuntimeContext, results []DiagnosticResult) {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// ========================================================================
+	// ROOT CAUSE ANALYSIS - Show root causes FIRST, then detailed results
+	// ========================================================================
+
+	rootCauses := AnalyzeResults(results)
+	if len(rootCauses) > 0 {
+		// Display root cause analysis prominently
+		logger.Info("")
+		for _, line := range FormatMultipleRootCauses(rootCauses) {
+			logger.Info(line)
+		}
+	}
 
 	// Display results via structured logging (user sees this on terminal + telemetry captures it)
 	logger.Info("========================================")

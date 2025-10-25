@@ -657,12 +657,40 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 		logger.Info("Token verified in Vault ✓")
 	}
 
+	// ========================================================================
+	// INTERVENE - Create and configure agent token (RECOMMENDED)
+	// ========================================================================
+
+	logger.Info("Creating agent token for Consul daemon (prevents ACL permission errors)")
+
+	agentTokenResult, err := CreateAndConfigureAgentToken(rc, result.MasterToken, "")
+	if err != nil {
+		logger.Warn("Failed to create agent token for Consul daemon",
+			zap.Error(err),
+			zap.String("note", "This is non-fatal, but daemon will log ACL permission errors"))
+		logger.Warn("To fix manually:")
+		logger.Warn("  1. Get bootstrap token: export CONSUL_HTTP_TOKEN=$(vault kv get -field=token secret/consul/bootstrap-token)")
+		logger.Warn("  2. Create agent token: consul acl token create -description='Agent token' -node-identity='$(hostname):dc1'")
+		logger.Warn("  3. Configure daemon: consul acl set-agent-token agent <token-id>")
+	} else {
+		logger.Info("Agent token created and configured successfully",
+			zap.String("accessor", agentTokenResult.AccessorID),
+			zap.String("node", agentTokenResult.NodeName))
+		logger.Info("Consul daemon will no longer log 'Coordinate update blocked by ACLs' errors")
+	}
+
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ✓ ACL bootstrap reset completed successfully")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Bootstrap token stored in Vault at: secret/consul/bootstrap-token")
 	logger.Info("terminal prompt: Token Accessor: " + result.Accessor)
 	logger.Info("terminal prompt: ")
+	if agentTokenResult != nil {
+		logger.Info("terminal prompt: ✓ Agent token created for Consul daemon")
+		logger.Info("terminal prompt:   Node: " + agentTokenResult.NodeName)
+		logger.Info("terminal prompt:   Accessor: " + agentTokenResult.AccessorID)
+		logger.Info("terminal prompt: ")
+	}
 	logger.Info("terminal prompt: You can now run 'eos sync --vault --consul' to complete Vault-Consul integration.")
 	logger.Info("terminal prompt: ")
 

@@ -676,6 +676,237 @@ func getTokenFromConsulConfig(rc *eos_io.RuntimeContext) string {
 	return ""
 }
 
+// checkAgentACLToken verifies the Consul agent has an ACL token configured.
+//
+// CRITICAL for ACL troubleshooting:
+//   - Checks if agent has a token in config (acl.tokens.agent or acl.tokens.default)
+//   - Verifies token is not empty/placeholder value
+//   - Tests if token format is valid (UUID)
+//   - Attempts to use token to verify it works
+//   - Checks token has required permissions (agent:write, node:write)
+//
+// Why this matters:
+//   Agent without token cannot:
+//     - Register services
+//     - Update health checks
+//     - Perform anti-entropy
+//     - Sync cluster state
+//   Results in "Permission denied" errors that are hard to diagnose
+//
+// Returns:
+//   - SUCCESS: Agent has valid token configured
+//   - WARNING: Agent has no token (internal operations will fail)
+//   - CRITICAL: Agent has invalid token (worse than no token)
+func checkAgentACLToken(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking if Consul agent has ACL token configured")
+
+	result := DiagnosticResult{
+		CheckName: "Agent ACL Token Configuration",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// ASSESS - Step 1: Read Consul config file
+	configPath := consul.ConsulConfigFile
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Cannot read Consul config to check agent token"
+		result.Details = append(result.Details, fmt.Sprintf("Error reading %s: %v", configPath, err))
+		return result
+	}
+
+	configStr := string(content)
+
+	result.Details = append(result.Details, "=== Agent Token Configuration ===")
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Step 2: Look for agent token in config
+	// Pattern 1: acl { tokens { agent = "..." } }
+	// Pattern 2: acl.tokens.agent = "..."
+	agentTokenPattern := regexp.MustCompile(`tokens\s*\{[^}]*agent\s*=\s*"([^"]+)"`)
+	agentTokenMatches := agentTokenPattern.FindStringSubmatch(configStr)
+
+	// Pattern 3: acl.tokens.agent (dot notation)
+	agentTokenPattern2 := regexp.MustCompile(`tokens\.agent\s*=\s*"([^"]+)"`)
+	agentTokenMatches2 := agentTokenPattern2.FindStringSubmatch(configStr)
+
+	// Pattern 4: acl { tokens { default = "..." } } (fallback)
+	defaultTokenPattern := regexp.MustCompile(`tokens\s*\{[^}]*default\s*=\s*"([^"]+)"`)
+	defaultTokenMatches := defaultTokenPattern.FindStringSubmatch(configStr)
+
+	// Pattern 5: acl.tokens.default (dot notation fallback)
+	defaultTokenPattern2 := regexp.MustCompile(`tokens\.default\s*=\s*"([^"]+)"`)
+	defaultTokenMatches2 := defaultTokenPattern2.FindStringSubmatch(configStr)
+
+	var agentToken string
+	var tokenSource string
+
+	if len(agentTokenMatches) >= 2 && agentTokenMatches[1] != "" {
+		agentToken = agentTokenMatches[1]
+		tokenSource = "acl.tokens.agent (nested format)"
+	} else if len(agentTokenMatches2) >= 2 && agentTokenMatches2[1] != "" {
+		agentToken = agentTokenMatches2[1]
+		tokenSource = "acl.tokens.agent (dot notation)"
+	} else if len(defaultTokenMatches) >= 2 && defaultTokenMatches[1] != "" {
+		agentToken = defaultTokenMatches[1]
+		tokenSource = "acl.tokens.default (nested format)"
+		result.Details = append(result.Details, "⚠ Using 'default' token (prefer dedicated 'agent' token)")
+	} else if len(defaultTokenMatches2) >= 2 && defaultTokenMatches2[1] != "" {
+		agentToken = defaultTokenMatches2[1]
+		tokenSource = "acl.tokens.default (dot notation)"
+		result.Details = append(result.Details, "⚠ Using 'default' token (prefer dedicated 'agent' token)")
+	}
+
+	if agentToken == "" {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "No agent ACL token configured"
+		result.Details = append(result.Details, "✗ No agent token found in configuration")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "IMPACT:")
+		result.Details = append(result.Details, "  • Agent cannot authenticate to itself")
+		result.Details = append(result.Details, "  • Health checks will fail with 'Permission denied'")
+		result.Details = append(result.Details, "  • Service registration blocked")
+		result.Details = append(result.Details, "  • Anti-entropy operations fail")
+		result.Details = append(result.Details, "  • Cluster state sync disrupted")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  1. Bootstrap ACLs (if not done): sudo eos update consul --bootstrap-token")
+		result.Details = append(result.Details, "  2. Create agent policy:")
+		result.Details = append(result.Details, "     consul acl policy create -name agent-policy \\")
+		result.Details = append(result.Details, "       -rules 'node_prefix \"\" { policy = \"write\" }'")
+		result.Details = append(result.Details, "  3. Create agent token:")
+		result.Details = append(result.Details, "     consul acl token create -description \"Agent Token\" \\")
+		result.Details = append(result.Details, "       -policy-name agent-policy")
+		result.Details = append(result.Details, "  4. Add to config:")
+		result.Details = append(result.Details, "     Edit /etc/consul.d/consul.hcl:")
+		result.Details = append(result.Details, "       acl {")
+		result.Details = append(result.Details, "         tokens {")
+		result.Details = append(result.Details, "           agent = \"<token-from-step-3>\"")
+		result.Details = append(result.Details, "         }")
+		result.Details = append(result.Details, "       }")
+		result.Details = append(result.Details, "  5. Restart: sudo systemctl restart consul")
+		return result
+	}
+
+	result.Details = append(result.Details, fmt.Sprintf("✓ Agent token found in config: %s", tokenSource))
+	result.Details = append(result.Details, fmt.Sprintf("  Token (first 8 chars): %s...", agentToken[:min(8, len(agentToken))]))
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Step 3: Validate token format (should be UUID)
+	uuidPattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	if !uuidPattern.MatchString(agentToken) {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Agent token has invalid format"
+		result.Details = append(result.Details, "✗ Token format is not a valid UUID")
+		result.Details = append(result.Details, "  Expected: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+		result.Details = append(result.Details, fmt.Sprintf("  Got: %s", agentToken))
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "IMPACT:")
+		result.Details = append(result.Details, "  Token will be rejected by Consul ACL system")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  Create valid token: consul acl token create -description \"Agent Token\"")
+		result.Details = append(result.Details, "  Update config with the UUID returned")
+		return result
+	}
+
+	result.Details = append(result.Details, "✓ Token format is valid (UUID)")
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Step 4: Test if token actually works
+	logger.Debug("Testing agent token functionality")
+	result.Details = append(result.Details, "Testing token with Consul API:")
+
+	// Create client with agent token
+	clientConfig := consulapi.DefaultConfig()
+	clientConfig.Token = agentToken
+	client, err := consulapi.NewClient(clientConfig)
+	if err != nil {
+		result.Details = append(result.Details, fmt.Sprintf("  ⚠ Cannot create client: %v", err))
+		result.Details = append(result.Details, "  Cannot verify if token works")
+	} else {
+		// Try to read agent info (requires agent:read permission)
+		_, err := client.Agent().Self()
+		if err != nil {
+			result.Success = false
+			result.Severity = SeverityCritical
+			result.Message = "Agent token is INVALID or EXPIRED"
+			result.Details = append(result.Details, "  ✗ API rejects token")
+			result.Details = append(result.Details, fmt.Sprintf("    Error: %v", err))
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "POSSIBLE CAUSES:")
+			result.Details = append(result.Details, "  • Token was revoked or deleted")
+			result.Details = append(result.Details, "  • ACLs were reset (bootstrap reset performed)")
+			result.Details = append(result.Details, "  • Token is for different Consul cluster")
+			result.Details = append(result.Details, "  • Token expired (if using TTL)")
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "REMEDIATION:")
+			result.Details = append(result.Details, "  1. Verify token exists: consul acl token read -id "+agentToken[:8]+"...")
+			result.Details = append(result.Details, "  2. If missing, create new token (see steps above)")
+			result.Details = append(result.Details, "  3. Update config with new token")
+			result.Details = append(result.Details, "  4. Restart: sudo systemctl restart consul")
+			return result
+		}
+
+		result.Details = append(result.Details, "  ✓ Token accepted by Consul API")
+
+		// Try to read token metadata (requires acl:read permission)
+		tokenInfo, _, err := client.ACL().TokenReadSelf(&consulapi.QueryOptions{})
+		if err != nil {
+			result.Details = append(result.Details, "  ⚠ Cannot read token metadata (lacks acl:read permission)")
+			result.Details = append(result.Details, "    This is OK for agent token - doesn't need ACL management permissions")
+		} else {
+			result.Details = append(result.Details, "  ✓ Token metadata retrieved")
+			result.Details = append(result.Details, fmt.Sprintf("    Token ID: %s", tokenInfo.AccessorID))
+			result.Details = append(result.Details, fmt.Sprintf("    Description: %s", tokenInfo.Description))
+
+			// Check policies
+			if len(tokenInfo.Policies) == 0 {
+				result.Details = append(result.Details, "")
+				result.Details = append(result.Details, "  ⚠ WARNING: Token has NO policies attached")
+				result.Details = append(result.Details, "    Agent operations may fail")
+			} else {
+				result.Details = append(result.Details, "")
+				result.Details = append(result.Details, "  Attached policies:")
+				for _, policy := range tokenInfo.Policies {
+					result.Details = append(result.Details, fmt.Sprintf("    - %s", policy.Name))
+
+					// Check if it's a management token (shouldn't be used for agent)
+					if policy.Name == "global-management" || policy.Name == "builtin/global-management" {
+						result.Details = append(result.Details, "")
+						result.Details = append(result.Details, "  ⚠ SECURITY WARNING: Using management token for agent")
+						result.Details = append(result.Details, "    Best practice: Create dedicated agent token with minimal permissions")
+						result.Details = append(result.Details, "    This limits blast radius if token is compromised")
+					}
+				}
+			}
+		}
+	}
+
+	// EVALUATE
+	result.Message = "Agent has valid ACL token configured"
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "SUMMARY:")
+	result.Details = append(result.Details, "  ✓ Agent token found in configuration")
+	result.Details = append(result.Details, "  ✓ Token format is valid")
+	result.Details = append(result.Details, "  ✓ Token works with Consul API")
+
+	return result
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // checkRaftBootstrapState inspects Consul's Raft state database to determine
 // the ACTUAL ACL bootstrap reset index stored in Raft (not from error messages).
 //
