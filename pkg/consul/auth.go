@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/hashicorp/consul/api"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -123,6 +124,9 @@ func GetConsulACLToken(rc *eos_io.RuntimeContext, flagToken string) (*TokenResul
 }
 
 // getTokenFromVault retrieves token from Vault (if Vault is installed)
+// Checks TWO locations for backward compatibility:
+//  1. secret/consul/bootstrap-token (NEW - created by eos update consul --bootstrap-token)
+//  2. secret/consul/acl_management_token (OLD - legacy path from secretManager)
 func getTokenFromVault(rc *eos_io.RuntimeContext) (string, string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -144,8 +148,44 @@ func getTokenFromVault(rc *eos_io.RuntimeContext) (string, string, error) {
 		return "", "", fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
 
-	// Try to get token from Vault using GetOrGenerateServiceSecrets
-	// We pass an empty requiredSecrets map since we're only retrieving, not generating
+	// Try NEW path first: secret/consul/bootstrap-token (created by eos update consul --bootstrap-token)
+	// Need to create Vault client directly to access KV v2 API
+	vaultAddr := envConfig.VaultAddr
+	if vaultAddr != "" {
+		config := vaultapi.DefaultConfig()
+		config.Address = vaultAddr
+
+		// Handle self-signed certificates
+		tlsConfig := &vaultapi.TLSConfig{
+			Insecure: true,
+		}
+		_ = config.ConfigureTLS(tlsConfig)
+
+		vaultClient, err := vaultapi.NewClient(config)
+		if err == nil {
+			// Try to get token from Vault agent token file
+			agentTokenPath := "/run/eos/vault_agent_eos.token"
+			if tokenData, err := os.ReadFile(agentTokenPath); err == nil {
+				vaultClient.SetToken(strings.TrimSpace(string(tokenData)))
+
+				// Try to read bootstrap token
+				secret, err := vaultClient.KVv2("secret").Get(rc.Ctx, "consul/bootstrap-token")
+				if err == nil && secret != nil && secret.Data != nil {
+					if tokenRaw, ok := secret.Data["token"]; ok {
+						if token, ok := tokenRaw.(string); ok && token != "" {
+							logger.Debug("Retrieved Consul ACL token from Vault bootstrap path")
+							return token, "secret/consul/bootstrap-token", nil
+						}
+					}
+				} else {
+					logger.Debug("Bootstrap token not found in Vault (this is OK if using legacy path)",
+						zap.Error(err))
+				}
+			}
+		}
+	}
+
+	// Try LEGACY path: secret/consul/acl_management_token (old secretManager path)
 	requiredSecrets := map[string]secrets.SecretType{
 		"acl_management_token": secrets.SecretTypeToken,
 	}
@@ -171,6 +211,7 @@ func getTokenFromVault(rc *eos_io.RuntimeContext) (string, string, error) {
 	}
 
 	vaultPath := "secret/data/consul/acl_management_token"
+	logger.Debug("Retrieved Consul ACL token from Vault legacy path", zap.String("path", vaultPath))
 	return token, vaultPath, nil
 }
 
@@ -347,4 +388,97 @@ func MigrateTokenToVault(rc *eos_io.RuntimeContext) error {
 	// logger.Info("Removed ACL token from Consul KV after migration")
 
 	return nil
+}
+
+// GetAuthenticatedConsulClientForDiagnostics creates a Consul client with ACL token for diagnostic operations
+//
+// This function provides the comprehensive authentication strategy for all Consul interactions:
+//
+// Authentication Sources (priority order):
+//  1. Flag (--acl-token) - Explicit user override
+//  2. Environment (CONSUL_HTTP_TOKEN) - Session-specific
+//  3. Vault (secret/consul/bootstrap-token) - Secure storage from bootstrap
+//  4. Consul KV (eos/consul/acl_token) - Bootstrap fallback
+//  5. File (/etc/consul.d/acl-token) - Legacy compatibility
+//
+// Error Handling Strategy:
+//  - If ACLs NOT enabled → Returns anonymous client (no error)
+//  - If ACLs enabled + token found → Returns authenticated client
+//  - If ACLs enabled + no token → Returns user-friendly error with remediation
+//  - If Vault unavailable → Gracefully falls back to other sources
+//
+// User-Friendly Remediation:
+//  - Detects if token missing from Vault
+//  - Guides user to run: eos update consul --bootstrap-token
+//  - Explains how to retrieve token from Consul if already bootstrapped
+//  - Distinguishes Vault auth failures from missing tokens
+//
+// Example:
+//
+//	client, err := consul.GetAuthenticatedConsulClientForDiagnostics(rc, "")
+//	if err != nil {
+//	    return fmt.Errorf("failed to create Consul client: %w", err)
+//	}
+//	// Use client for diagnostic operations
+//	members, err := client.Agent().Members(false)
+func GetAuthenticatedConsulClientForDiagnostics(rc *eos_io.RuntimeContext, flagToken string) (*api.Client, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Debug("Creating authenticated Consul client for diagnostics")
+
+	// Use existing ConfigureConsulClient which handles:
+	// - Token discovery from all sources (flag > env > vault > consul-kv > file)
+	// - ACL enablement detection (tries anonymous if ACLs not enabled)
+	// - Token verification
+	client, err := ConfigureConsulClient(rc, flagToken)
+	if err != nil {
+		// Check if error is about missing token
+		if strings.Contains(err.Error(), "ACL token not found") {
+			// ACLs are enabled but no token found - provide helpful guidance
+			logger.Error("Consul ACLs enabled but no token available",
+				zap.String("remediation", "Run: eos update consul --bootstrap-token"))
+
+			return nil, eos_err.NewUserError(
+				"Consul ACL token not found\n\n" +
+					"Consul has ACLs enabled, but no authentication token was found.\n\n" +
+					"OPTION 1: Bootstrap ACLs and store token in Vault (RECOMMENDED)\n" +
+					"  eos update consul --bootstrap-token\n\n" +
+					"This will:\n" +
+					"  - Reset Consul ACL bootstrap (safe operation)\n" +
+					"  - Generate new bootstrap token\n" +
+					"  - Store token securely in Vault at secret/consul/bootstrap-token\n" +
+					"  - Future commands will automatically retrieve from Vault\n\n" +
+					"OPTION 2: If ACLs already bootstrapped, retrieve existing token\n" +
+					"  1. Get bootstrap token from your Consul setup documentation\n" +
+					"  2. Store in Vault manually:\n" +
+					"     vault kv put secret/consul/bootstrap-token token=<your-token>\n" +
+					"  3. OR set environment variable:\n" +
+					"     export CONSUL_HTTP_TOKEN=<your-token>\n\n" +
+					"OPTION 3: Disable ACLs temporarily (NOT RECOMMENDED for production)\n" +
+					"  - Edit /etc/consul.d/consul.hcl\n" +
+					"  - Set acl.enabled = false\n" +
+					"  - Restart Consul: systemctl restart consul\n\n" +
+					"Original error: " + err.Error())
+		}
+
+		// Some other authentication error (Vault sealed, network issue, etc.)
+		logger.Error("Failed to create authenticated Consul client",
+			zap.Error(err))
+
+		return nil, fmt.Errorf("failed to create Consul client: %w\n\n"+
+			"Possible causes:\n"+
+			"  - Vault is sealed or unavailable (check: vault status)\n"+
+			"  - Consul is not running (check: systemctl status consul)\n"+
+			"  - Network connectivity issues\n"+
+			"  - Invalid token stored in Vault or environment\n\n"+
+			"Debug steps:\n"+
+			"  1. Check Consul status: consul members\n"+
+			"  2. Check Vault status: vault status\n"+
+			"  3. Check if token exists: vault kv get secret/consul/bootstrap-token\n"+
+			"  4. Try manual authentication: export CONSUL_HTTP_TOKEN=<token> && consul members",
+			err)
+	}
+
+	logger.Debug("Successfully created authenticated Consul client")
+	return client, nil
 }

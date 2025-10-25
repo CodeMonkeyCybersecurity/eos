@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
@@ -118,7 +119,7 @@ func checkDetailedPortBindings(rc *eos_io.RuntimeContext) DiagnosticResult {
 }
 
 // checkClusterState inspects Consul cluster membership and health
-func checkClusterState(rc *eos_io.RuntimeContext) DiagnosticResult {
+func checkClusterState(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking Consul cluster state")
 
@@ -131,40 +132,53 @@ func checkClusterState(rc *eos_io.RuntimeContext) DiagnosticResult {
 	result.Details = append(result.Details, "")
 	result.Details = append(result.Details, "=== Cluster Membership ===")
 
-	// Try to get cluster members
-	cmd := execute.Options{
-		Command: "consul",
-		Args:    []string{"members"},
-		Capture: true,
+	// If client creation failed (ACLs enabled but no token), report that
+	if clientErr != nil {
+		result.Success = false
+		result.Severity = SeverityWarning // WARNING: Consul works, but ACL token needed for diagnostics
+		result.Message = "Cannot check cluster state - ACL authentication required"
+		result.Details = append(result.Details, fmt.Sprintf("Error: %v", clientErr))
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Remediation: Run 'eos update consul --bootstrap-token'")
+		return result
 	}
 
-	output, err := execute.Run(rc.Ctx, cmd)
+	// Use SDK to get cluster members (properly authenticated)
+	members, err := consulClient.Agent().Members(false)
 	if err != nil {
 		result.Success = false
 		result.Severity = SeverityInfo // INFO: Expected if Consul not running
 		result.Message = "Failed to retrieve cluster members"
 		result.Details = append(result.Details, fmt.Sprintf("Error: %v", err))
-		result.Details = append(result.Details, "Output: "+output)
 		return result
 	}
 
-	// Parse members output
-	lines := strings.Split(output, "\n")
-	memberCount := 0
+	// Parse SDK members response
+	memberCount := len(members)
 	leaderFound := false
 
 	result.Details = append(result.Details, "")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "Node") {
-			continue
+	for _, member := range members {
+		// Format similar to CLI output
+		status := "alive"
+		if member.Status != 1 {
+			status = "failed"
 		}
+		memberLine := fmt.Sprintf("%s  %s:%d  %s  %s",
+			member.Name,
+			member.Addr,
+			member.Port,
+			status,
+			member.Tags["role"])
 
-		memberCount++
-		result.Details = append(result.Details, line)
+		result.Details = append(result.Details, memberLine)
 
-		if strings.Contains(line, "leader") {
-			leaderFound = true
+		// Check if this member has leader tag
+		if tags := member.Tags; tags != nil {
+			if tags["role"] == "consul" {
+				// In Consul, servers can be leaders
+				leaderFound = true
+			}
 		}
 	}
 
@@ -187,19 +201,20 @@ func checkClusterState(rc *eos_io.RuntimeContext) DiagnosticResult {
 		}
 	}
 
-	// Get raft peer information
+	// Get raft peer information using SDK
 	result.Details = append(result.Details, "")
 	result.Details = append(result.Details, "=== Raft Peers ===")
 
-	raftCmd := execute.Options{
-		Command: "consul",
-		Args:    []string{"operator", "raft", "list-peers"},
-		Capture: true,
-	}
-
-	raftOutput, raftErr := execute.Run(rc.Ctx, raftCmd)
-	if raftErr == nil {
-		result.Details = append(result.Details, raftOutput)
+	raftConfig, raftErr := consulClient.Operator().RaftGetConfiguration(nil)
+	if raftErr == nil && raftConfig != nil {
+		for _, server := range raftConfig.Servers {
+			peerLine := fmt.Sprintf("%s  %s  %s  %t",
+				server.ID,
+				server.Node,
+				server.Address,
+				server.Leader)
+			result.Details = append(result.Details, peerLine)
+		}
 	} else {
 		result.Details = append(result.Details, fmt.Sprintf("Could not retrieve raft peers: %v", raftErr))
 	}

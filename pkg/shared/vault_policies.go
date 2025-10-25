@@ -62,7 +62,7 @@ path "secret/data/emergency/*" {
 }
 
 # Self-service user management (limited)
-path "auth/userpass/users/{{"{{"}}identity.entity.name{{"}}"}}" { 
+path "auth/userpass/users/{{"{{"}}identity.entity.name{{"}}"}}" {
   capabilities = ["read", "update"]
   denied_parameters = {
     "policies" = []
@@ -75,6 +75,15 @@ path "auth/userpass/users/{{"{{"}}identity.entity.name{{"}}"}}" {
 # MFA management
 path "auth/totp/keys/{{"{{"}}identity.entity.name{{"}}"}}" { capabilities = ["create", "read", "update", "delete"] }
 path "auth/totp/code/{{"{{"}}identity.entity.name{{"}}"}}" { capabilities = ["update"] }
+
+# Self-inspection for diagnostics (read-only)
+# Allows tokens to verify their own policy and AppRole configuration
+# Required for: sudo eos debug vault
+path "sys/policies/acl/eos-default-policy" { capabilities = ["read"] }
+path "sys/policies/acl/eos-admin-policy" { capabilities = ["read"] }
+path "sys/policies/acl/eos-emergency-policy" { capabilities = ["read"] }
+path "sys/policies/acl/eos-readonly-policy" { capabilities = ["read"] }
+path "auth/approle/role/eos-approle" { capabilities = ["read"] }
 
 # Deny dangerous operations
 path "sys/raw/*" { capabilities = ["deny"] }

@@ -13,6 +13,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -537,26 +539,32 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 			output.WriteString(fmt.Sprintf("   Token (first 8 chars): %s...\n", token[:min(8, len(token))]))
 			output.WriteString("\n")
 
-			// Set environment variables for vault CLI
-			_ = os.Setenv("VAULT_ADDR", vaultAddr)
-			_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
-			_ = os.Setenv("VAULT_TOKEN", token)
+			// Create Vault API client (replaces vault CLI)
+			vaultClient, err := createVaultClientFromToken(ctx, vaultAddr, token)
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to create Vault client"
+				result.Remediation = "Check Vault connectivity and token validity"
+				output.WriteString(fmt.Sprintf("❌ ERROR: Cannot create Vault client: %v\n", err))
+				result.Output = output.String()
+				return result, nil
+			}
 
-			// 2. Token Lookup
+			// 2. Token Lookup (using SDK)
 			output.WriteString("2. Token Lookup (full details)\n")
 			output.WriteString("───────────────────────────────────────────────────────────────\n")
 
-			cmd := exec.Command("vault", "token", "lookup", "-format=json")
-			lookupOutput, err := cmd.CombinedOutput()
+			tokenLookup, err := vaultClient.Auth().Token().LookupSelf()
 			if err != nil {
 				output.WriteString(fmt.Sprintf("❌ Failed to lookup token: %v\n", err))
-				output.WriteString(fmt.Sprintf("   Output: %s\n", string(lookupOutput)))
 				result.Status = debug.StatusError
 				result.Message = "Token lookup failed"
 				result.Remediation = "Token may be expired or invalid. Restart Vault Agent."
 			} else {
-				output.WriteString(fmt.Sprintf("   %s\n", string(lookupOutput)))
-				result.Metadata["token_lookup"] = string(lookupOutput)
+				// Pretty-print the JSON response
+				lookupJSON, _ := json.MarshalIndent(tokenLookup, "   ", "  ")
+				output.WriteString(fmt.Sprintf("   %s\n", string(lookupJSON)))
+				result.Metadata["token_lookup"] = string(lookupJSON)
 			}
 			output.WriteString("\n")
 
@@ -574,19 +582,23 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 			for _, testPath := range testPaths {
 				output.WriteString(fmt.Sprintf("   Testing path: %s\n", testPath))
 
-				cmd = exec.Command("vault", "token", "capabilities", testPath)
-				capsOutput, err := cmd.CombinedOutput()
+				// Use SDK to check capabilities
+				caps, err := vaultClient.Sys().CapabilitiesSelf(testPath)
 				if err != nil {
 					output.WriteString(fmt.Sprintf("   ❌ Failed to check capabilities: %v\n", err))
 				} else {
-					caps := strings.TrimSpace(string(capsOutput))
-					output.WriteString(fmt.Sprintf("   Capabilities: %s\n", caps))
+					capsStr := strings.Join(caps, ", ")
+					output.WriteString(fmt.Sprintf("   Capabilities: %s\n", capsStr))
 
-					if strings.Contains(caps, "create") || strings.Contains(caps, "update") {
-						output.WriteString("   ✓ Token has write permissions\n")
-						hasCreateOrUpdate = true
-					} else if strings.Contains(caps, "deny") {
-						output.WriteString("   ❌ Token is DENIED access\n")
+					for _, cap := range caps {
+						if cap == "create" || cap == "update" {
+							output.WriteString("   ✓ Token has write permissions\n")
+							hasCreateOrUpdate = true
+							break
+						} else if cap == "deny" {
+							output.WriteString("   ❌ Token is DENIED access\n")
+							break
+						}
 					}
 				}
 				output.WriteString("\n")
@@ -598,17 +610,14 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 				result.Remediation = "Update policy: sudo eos update vault --policies && sudo systemctl restart vault-agent-eos"
 			}
 
-			// 4. Check eos-default-policy content
+			// 4. Check eos-default-policy content (using SDK)
 			output.WriteString("4. eos-default-policy Content\n")
 			output.WriteString("───────────────────────────────────────────────────────────────\n")
 
-			cmd = exec.Command("vault", "policy", "read", "eos-default-policy")
-			policyOutput, err := cmd.CombinedOutput()
+			policyContent, err := vaultClient.Sys().GetPolicy("eos-default-policy")
 			if err != nil {
 				output.WriteString(fmt.Sprintf("❌ Failed to read policy: %v\n", err))
 			} else {
-				policyContent := string(policyOutput)
-
 				// Check if services/* path is in policy
 				if strings.Contains(policyContent, "secret/data/services") {
 					output.WriteString("✓ Policy includes services/* path\n\n")
@@ -645,13 +654,16 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 			output.WriteString("5. AppRole Configuration\n")
 			output.WriteString("───────────────────────────────────────────────────────────────\n")
 
-			cmd = exec.Command("vault", "read", "auth/approle/role/eos-approle", "-format=json")
-			appRoleOutput, err := cmd.CombinedOutput()
+			// Use SDK to read AppRole configuration
+			appRoleResp, err := vaultClient.Logical().Read("auth/approle/role/eos-approle")
 			if err != nil {
 				output.WriteString(fmt.Sprintf("❌ Failed to read AppRole: %v\n", err))
+			} else if appRoleResp != nil {
+				appRoleJSON, _ := json.MarshalIndent(appRoleResp.Data, "   ", "  ")
+				output.WriteString(fmt.Sprintf("   %s\n", string(appRoleJSON)))
+				result.Metadata["approle_config"] = string(appRoleJSON)
 			} else {
-				output.WriteString(fmt.Sprintf("   %s\n", string(appRoleOutput)))
-				result.Metadata["approle_config"] = string(appRoleOutput)
+				output.WriteString("❌ AppRole not found\n")
 			}
 			output.WriteString("\n")
 
@@ -659,8 +671,8 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 			output.WriteString("6. Vault Agent Service Status\n")
 			output.WriteString("───────────────────────────────────────────────────────────────\n")
 
-			cmd = exec.Command("systemctl", "status", "vault-agent-eos", "--no-pager")
-			statusOutput, err := cmd.CombinedOutput()
+			statusCmd := exec.Command("systemctl", "status", "vault-agent-eos", "--no-pager")
+			statusOutput, err := statusCmd.CombinedOutput()
 			if err == nil {
 				// Just show first 20 lines
 				lines := strings.Split(string(statusOutput), "\n")
@@ -705,4 +717,35 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// createVaultClientFromToken creates a Vault API client with the given token
+// This replaces shell-out to vault CLI commands
+func createVaultClientFromToken(ctx context.Context, vaultAddr, token string) (*vaultapi.Client, error) {
+	logger := otelzap.Ctx(ctx)
+
+	// Create Vault API client config
+	config := vaultapi.DefaultConfig()
+	config.Address = vaultAddr
+
+	// Handle self-signed certificates
+	tlsConfig := &vaultapi.TLSConfig{
+		Insecure: true,
+	}
+	if err := config.ConfigureTLS(tlsConfig); err != nil {
+		logger.Debug("Failed to configure TLS", zap.Error(err))
+		return nil, fmt.Errorf("failed to configure TLS: %w", err)
+	}
+
+	// Create client
+	client, err := vaultapi.NewClient(config)
+	if err != nil {
+		logger.Debug("Failed to create Vault client", zap.Error(err))
+		return nil, fmt.Errorf("failed to create vault client: %w", err)
+	}
+
+	// Set token
+	client.SetToken(token)
+
+	return client, nil
 }

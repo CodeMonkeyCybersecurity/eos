@@ -4,6 +4,7 @@ package debug
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -95,6 +96,12 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 
 	results := []DiagnosticResult{}
 
+	// CRITICAL: Get authenticated Consul client for checks that need it
+	// This handles ACL token discovery from: flag > env > vault > consul-kv > file
+	// If ACLs are disabled, returns anonymous client (no error)
+	// If ACLs enabled but no token, user gets clear remediation guidance
+	consulClient, consulClientErr := consul.GetAuthenticatedConsulClientForDiagnostics(rc, "")
+
 	// ASSESS - Run all diagnostic checks (same as RunDiagnostics)
 
 	// 0. CHECK IF CONSUL IS RUNNING (P0 - MUST BE FIRST!)
@@ -146,8 +153,8 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	portBindingsResult := checkDetailedPortBindings(rc)
 	results = append(results, portBindingsResult)
 
-	// 11. Check cluster state
-	clusterResult := checkClusterState(rc)
+	// 11. Check cluster state (requires authenticated client if ACLs enabled)
+	clusterResult := checkClusterState(rc, consulClient, consulClientErr)
 	results = append(results, clusterResult)
 
 	// 12. Check retry_join targets (if configured)
