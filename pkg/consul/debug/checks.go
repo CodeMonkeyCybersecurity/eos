@@ -979,3 +979,108 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	return result
 }
+
+// checkACLEnabled verifies ACLs are enabled in Consul configuration
+// P0: ACLs are enabled by default in 'eos create consul' for security-by-default
+// This check detects if ACLs were manually disabled (drift from canonical state)
+func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking ACL system status")
+
+	result := DiagnosticResult{
+		CheckName: "ACL System Status",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	configPath := consul.ConsulConfigFile
+
+	// ASSESS - Check if config file exists
+	if _, err := os.Stat(configPath); err != nil {
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Cannot check ACL status - configuration file not found"
+		result.Details = append(result.Details, fmt.Sprintf("Config file missing: %s", configPath))
+		return result
+	}
+
+	// ASSESS - Read configuration
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Failed to read configuration file for ACL check"
+		result.Details = append(result.Details, fmt.Sprintf("Error: %v", err))
+		return result
+	}
+
+	configStr := string(content)
+
+	// ASSESS - Check if ACL block exists and is enabled
+	// Look for: acl { enabled = true } or acl = { enabled = true }
+	hasACLBlock := strings.Contains(configStr, "acl") && (strings.Contains(configStr, "acl {") || strings.Contains(configStr, "acl ="))
+	aclEnabled := strings.Contains(configStr, "enabled = true") && hasACLBlock
+
+	if !hasACLBlock {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "ACL block missing from configuration"
+		result.Details = append(result.Details, "Consul is running WITHOUT access control lists")
+		result.Details = append(result.Details, "This is NOT secure for production use")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Expected ACL block:")
+		result.Details = append(result.Details, "  acl = {")
+		result.Details = append(result.Details, "    enabled = true")
+		result.Details = append(result.Details, "    default_policy = \"deny\"")
+		result.Details = append(result.Details, "    enable_token_persistence = true")
+		result.Details = append(result.Details, "  }")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Fix: eos update consul --enable-acls")
+		return result
+	}
+
+	if !aclEnabled {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "ACLs are DISABLED in configuration"
+		result.Details = append(result.Details, "ACL block exists but enabled = false (or not set)")
+		result.Details = append(result.Details, "Consul is running in OPEN MODE - anyone can do anything")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Security Impact:")
+		result.Details = append(result.Details, "  • No authentication required for API operations")
+		result.Details = append(result.Details, "  • No authorization checks")
+		result.Details = append(result.Details, "  • Any client can read/write ANY data")
+		result.Details = append(result.Details, "  • Service registration/deregistration unprotected")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Fix: eos update consul --enable-acls")
+		return result
+	}
+
+	// SUCCESS - ACLs are enabled
+	result.Message = "ACLs are enabled in configuration"
+	result.Details = append(result.Details, "✓ ACL system is enabled")
+
+	// Extract default_policy
+	defaultPolicy := extractConfigValue(configStr, "default_policy")
+	if defaultPolicy != "" {
+		result.Details = append(result.Details, fmt.Sprintf("✓ Default policy: %s", defaultPolicy))
+		if defaultPolicy == "deny" {
+			result.Details = append(result.Details, "  (secure: deny-by-default)")
+		} else if defaultPolicy == "allow" {
+			result.Details = append(result.Details, "  (warning: allow-by-default is less secure)")
+		}
+	}
+
+	// Check for token persistence
+	if strings.Contains(configStr, "enable_token_persistence = true") {
+		result.Details = append(result.Details, "✓ Token persistence enabled")
+	}
+
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "Next steps:")
+	result.Details = append(result.Details, "  1. Bootstrap ACLs: eos update consul --bootstrap-token")
+	result.Details = append(result.Details, "  2. Create policies: consul acl policy create ...")
+	result.Details = append(result.Details, "  3. Create tokens: consul acl token create ...")
+
+	return result
+}

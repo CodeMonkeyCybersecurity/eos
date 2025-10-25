@@ -343,13 +343,39 @@ func fixConfiguration(rc *eos_io.RuntimeContext, assessment *debug.AssessmentRes
 	result := FixResult{
 		Operation:   "Configuration Fix",
 		Success:     true,
-		ChangesMade: true,
+		ChangesMade: false,
 		Details:     []string{},
 	}
 
-	// Find the configuration check result
+	// Check for ACL system issues (security-critical)
+	aclResult := debug.FindCheckResult(assessment.Checks, "ACL System Status")
+	if aclResult != nil && !aclResult.Success {
+		logger.Info("Detected ACL system disabled - applying fix")
+
+		// Apply ACL enablement fix
+		fixedACL := debug.FixACLDisabled(rc, *aclResult)
+
+		if fixedACL.FixApplied {
+			result.ChangesMade = true
+			result.Details = append(result.Details, "✓ ACL System: Enabled ACLs in configuration")
+			result.Details = append(result.Details, fmt.Sprintf("  Backup: %s", fixedACL.FixMessage))
+			result.Details = append(result.Details, "  Set default_policy = deny (secure by default)")
+		} else if !fixedACL.Success {
+			result.Success = false
+			result.Details = append(result.Details, "✗ ACL System: Failed to enable ACLs")
+			result.Details = append(result.Details, fmt.Sprintf("  Error: %s", fixedACL.Message))
+		}
+	}
+
+	// Find the general configuration check result
 	configResult := debug.FindCheckResult(assessment.Checks, "Configuration Analysis")
 	if configResult == nil {
+		// If only ACL fix was needed, that's OK
+		if result.ChangesMade {
+			result.Message = "ACL system configuration fixed"
+			return result
+		}
+
 		result.Success = false
 		result.ChangesMade = false
 		result.Message = "Configuration check not found in assessment"
@@ -357,23 +383,34 @@ func fixConfiguration(rc *eos_io.RuntimeContext, assessment *debug.AssessmentRes
 	}
 
 	if configResult.Success {
-		result.ChangesMade = false
-		result.Message = "No configuration issues found"
+		// Config is good, check if we fixed ACLs
+		if result.ChangesMade {
+			result.Message = "ACL system configuration fixed"
+		} else {
+			result.ChangesMade = false
+			result.Message = "No configuration issues found"
+		}
 		return result
 	}
 
-	// Apply configuration fixes directly using debug package
-	// This avoids re-running all 13 diagnostics (performance optimization)
+	// Apply general configuration fixes using debug package
+	// This avoids re-running all 14 diagnostics (performance optimization)
 	fixResult := debug.FixConfiguration(rc, *configResult)
 
-	// Convert DiagnosticResult to FixResult
-	result.Success = fixResult.Success
-	result.ChangesMade = fixResult.FixApplied
-	result.Message = fixResult.Message
+	// Merge results
+	result.Success = result.Success && fixResult.Success
+	result.ChangesMade = result.ChangesMade || fixResult.FixApplied
+
 	if fixResult.FixApplied {
-		result.Details = append(result.Details, fixResult.FixMessage)
+		result.Details = append(result.Details, "✓ Configuration: "+fixResult.FixMessage)
 	}
 	result.Details = append(result.Details, fixResult.Details...)
+
+	if result.ChangesMade {
+		result.Message = "Configuration issues fixed"
+	} else {
+		result.Message = fixResult.Message
+	}
 
 	return result
 }

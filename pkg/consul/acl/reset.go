@@ -21,6 +21,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/process"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/validation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	consulapi "github.com/hashicorp/consul/api"
@@ -34,6 +37,16 @@ const (
 	// NOTE: Duplicates consul.ConsulACLResetFilename to avoid circular import
 	// This constant MUST match the value in pkg/consul/constants.go
 	consulACLResetFilename = "acl-bootstrap-reset"
+
+	// ConsulOptDir is the optional data directory
+	// NOTE: Duplicates consul.ConsulOptDir to avoid circular import
+	// This constant MUST match the value in pkg/consul/constants.go
+	consulOptDir = "/opt/consul"
+
+	// ConsulDataDir is the persistent data directory
+	// NOTE: Duplicates consul.ConsulDataDir to avoid circular import
+	// This constant MUST match the value in pkg/consul/constants.go
+	consulDataDir = "/var/lib/consul"
 )
 
 // ResetConfig holds configuration for ACL bootstrap reset operation
@@ -46,6 +59,11 @@ type ResetConfig struct {
 
 	// DryRun shows what would be done without making changes
 	DryRun bool
+
+	// DataDir is the user-provided Consul data directory override
+	// If empty, auto-detection via multiple methods is attempted
+	// If specified, this path is validated and used (highest priority)
+	DataDir string
 }
 
 // ResetACLBootstrap performs ACL bootstrap reset and token recovery
@@ -261,14 +279,14 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	logger.Info("terminal prompt: ")
 
 	// ========================================================================
-	// ASSESS - Get Consul data directory from running config
+	// ASSESS - Get Consul data directory (6-layer fallback)
 	// ========================================================================
 
-	logger.Info("Determining Consul data directory from running configuration")
+	logger.Info("Determining Consul data directory via multi-layer detection")
 
-	dataDir, err := getConsulDataDir(rc, consulClient)
+	dataDir, err := getConsulDataDir(rc, consulClient, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to determine Consul data directory: %w", err)
+		return nil, err // Error already formatted by getConsulDataDir
 	}
 
 	logger.Info("Consul data directory identified",
@@ -451,39 +469,173 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	return result, nil
 }
 
-// getConsulDataDir retrieves the Consul data directory from the running configuration
-func getConsulDataDir(rc *eos_io.RuntimeContext, client *consulapi.Client) (string, error) {
+// getConsulDataDir determines the Consul data directory using a 6-layer fallback strategy.
+//
+// This function implements defense-in-depth for data directory discovery, especially
+// critical during ACL bootstrap token recovery when API access may be unavailable.
+//
+// Fallback layers (in priority order):
+//  1. User-provided --data-dir flag (highest priority, manual override)
+//  2. Running process inspection (ps aux, systemd service file)
+//  3. Config file parsing (/etc/consul.d/*.hcl, *.json)
+//  4. Consul API query (may fail with 403 if ACLs locked down)
+//  5. Well-known paths (/opt/consul, /var/lib/consul)
+//  6. Actionable error guidance (all methods exhausted)
+//
+// Each layer validates the discovered path contains a valid Consul data directory
+// (must have raft/ subdirectory) before accepting it.
+//
+// Parameters:
+//   - rc: Runtime context
+//   - client: Consul API client (unauthenticated, may fail)
+//   - resetConfig: Reset configuration including optional DataDir override
+//
+// Returns:
+//   - string: Validated Consul data directory path
+//   - error: If all detection methods fail (with actionable guidance)
+func getConsulDataDir(rc *eos_io.RuntimeContext, client *consulapi.Client, resetConfig *ResetConfig) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Debug("Retrieving Consul agent configuration to determine data directory")
+	var detectionErrors []error
 
-	// Get agent self information which includes configuration
+	// ========================================================================
+	// Layer 1: User-provided --data-dir flag (HIGHEST PRIORITY)
+	// ========================================================================
+
+	if resetConfig.DataDir != "" {
+		logger.Info("Using user-provided data directory",
+			zap.String("data_dir", resetConfig.DataDir))
+
+		if err := validation.ValidateConsulDataDir(rc, resetConfig.DataDir); err != nil {
+			// User explicitly provided path, but it's invalid - fail with clear error
+			return "", createDataDirValidationError(resetConfig.DataDir, err)
+		}
+
+		logger.Info("User-provided data directory validated successfully",
+			zap.String("data_dir", resetConfig.DataDir))
+		return resetConfig.DataDir, nil
+	}
+
+	logger.Debug("No user-provided data directory, attempting auto-detection")
+
+	// ========================================================================
+	// Layer 2: Running process inspection (no auth required, high reliability)
+	// ========================================================================
+
+	logger.Debug("Attempting data directory extraction from running process")
+
+	processDataDir, err := process.GetDataDirFromRunningProcess(rc)
+	if err == nil {
+		if err := validation.ValidateConsulDataDir(rc, processDataDir); err == nil {
+			logger.Info("Data directory extracted from running process",
+				zap.String("data_dir", processDataDir),
+				zap.String("method", "process_inspection"))
+			return processDataDir, nil
+		} else {
+			detectionErrors = append(detectionErrors,
+				fmt.Errorf("process inspection returned invalid path: %w", err))
+		}
+	} else {
+		detectionErrors = append(detectionErrors,
+			fmt.Errorf("process inspection failed: %w", err))
+	}
+
+	// ========================================================================
+	// Layer 3: Config file parsing (no auth required, filesystem-based)
+	// ========================================================================
+
+	logger.Debug("Attempting data directory extraction from config files")
+
+	configDataDir, err := config.ParseDataDirFromConfigFile(rc, nil) // nil = use defaults
+	if err == nil {
+		if err := validation.ValidateConsulDataDir(rc, configDataDir); err == nil {
+			logger.Info("Data directory extracted from config file",
+				zap.String("data_dir", configDataDir),
+				zap.String("method", "config_file_parsing"))
+			return configDataDir, nil
+		} else {
+			detectionErrors = append(detectionErrors,
+				fmt.Errorf("config file parsing returned invalid path: %w", err))
+		}
+	} else {
+		detectionErrors = append(detectionErrors,
+			fmt.Errorf("config file parsing failed: %w", err))
+	}
+
+	// ========================================================================
+	// Layer 4: Consul API query (may fail with 403 - that's expected)
+	// ========================================================================
+
+	logger.Debug("Attempting data directory extraction from Consul API")
+
 	agentSelf, err := client.Agent().Self()
-	if err != nil {
-		return "", fmt.Errorf("failed to get agent configuration: %w", err)
+	if err == nil {
+		if configMap, ok := agentSelf["Config"]; ok {
+			if apiDataDir, ok := configMap["DataDir"].(string); ok && apiDataDir != "" {
+				if err := validation.ValidateConsulDataDir(rc, apiDataDir); err == nil {
+					logger.Info("Data directory extracted from Consul API",
+						zap.String("data_dir", apiDataDir),
+						zap.String("method", "api_query"))
+					return apiDataDir, nil
+				} else {
+					detectionErrors = append(detectionErrors,
+						fmt.Errorf("API query returned invalid path: %w", err))
+				}
+			} else {
+				detectionErrors = append(detectionErrors,
+					fmt.Errorf("API query succeeded but DataDir not found in response"))
+			}
+		} else {
+			detectionErrors = append(detectionErrors,
+				fmt.Errorf("API query succeeded but Config section missing"))
+		}
+	} else {
+		// API failure is EXPECTED when ACLs are locked down (403)
+		apiErr := createAPIAccessError(err)
+		logger.Debug("Consul API query failed (expected during ACL recovery)",
+			zap.Error(apiErr))
+		detectionErrors = append(detectionErrors, apiErr)
 	}
 
-	// Extract data directory from config
-	// The structure is: agentSelf["Config"]["DataDir"]
-	configMap, ok := agentSelf["Config"]
-	if !ok {
-		return "", fmt.Errorf("no Config section in agent self response")
+	// ========================================================================
+	// Layer 5: Well-known paths (validate they contain Raft data)
+	// ========================================================================
+
+	logger.Debug("Attempting data directory detection from well-known paths")
+
+	knownPaths := []string{
+		consulOptDir,       // /opt/consul (Eos default)
+		consulDataDir,      // /var/lib/consul (Consul default)
+		"/var/consul/data", // Alternative location
 	}
 
-	dataDir, ok := configMap["DataDir"].(string)
-	if !ok || dataDir == "" {
-		return "", fmt.Errorf("DataDir not found in agent configuration")
+	for _, knownPath := range knownPaths {
+		logger.Debug("Checking well-known path", zap.String("path", knownPath))
+
+		if err := validation.ValidateConsulDataDir(rc, knownPath); err == nil {
+			logger.Warn("Using well-known path fallback (auto-detection methods failed)",
+				zap.String("data_dir", knownPath),
+				zap.String("method", "well_known_paths"),
+				zap.String("note", "Consider specifying --data-dir explicitly"))
+			return knownPath, nil
+		} else {
+			logger.Debug("Well-known path validation failed",
+				zap.String("path", knownPath),
+				zap.Error(err))
+		}
 	}
 
-	// Verify directory exists
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		return "", fmt.Errorf("data directory does not exist: %s", dataDir)
-	}
+	detectionErrors = append(detectionErrors,
+		fmt.Errorf("no well-known paths contain valid Consul data directory"))
 
-	logger.Debug("Data directory retrieved from agent config",
-		zap.String("data_dir", dataDir))
+	// ========================================================================
+	// Layer 6: All fallbacks exhausted - provide actionable guidance
+	// ========================================================================
 
-	return dataDir, nil
+	logger.Error("All data directory detection methods failed",
+		zap.Int("methods_attempted", len(detectionErrors)))
+
+	return "", createDataDirNotFoundError(detectionErrors)
 }
 
 // extractResetIndex parses the reset index from Consul bootstrap error message

@@ -1,6 +1,6 @@
 ## Consul ACL Management
 
-*Last Updated: 2025-10-23*
+*Last Updated: 2025-10-25*
 
 Comprehensive ACL policy and token management for Consul, providing programmatic control over access policies and authentication tokens.
 
@@ -554,10 +554,235 @@ This indicates a Consul cluster issue (split brain, network partition). Check:
 - Consul cluster health: `consul members`
 - Raft status: `consul operator raft list-peers`
 
+## Authentication Methods (Not Yet Implemented)
+
+**Status**: Infrastructure ready, implementation planned for future release
+
+### What Are Authentication Methods?
+
+Authentication methods are **alternative ways to obtain Consul ACL tokens** without manually creating and distributing them. They enable automated, secure token acquisition for services and humans.
+
+### Why Are They Grayed Out in the Consul UI?
+
+When you see "Access Controls", "Policies", "Roles", and "Auth Methods" grayed out in the Consul UI, it means **ACLs are not enabled**. Consul runs in "open mode" by default where anyone can do anything.
+
+**Good news**: In Eos, ACLs are **ENABLED BY DEFAULT** with secure settings:
+```hcl
+acl {
+  enabled = true
+  default_policy = "deny"  # Secure by default
+  enable_token_persistence = true
+}
+```
+
+After `eos create consul`, all ACL features should be active in the UI.
+
+### Three Types of Authentication Methods
+
+#### 1. Kubernetes Auth Method
+**Use case**: Automatically authenticate Kubernetes Pods using service account tokens
+
+**How it works**:
+- Consul validates Kubernetes JWT tokens via the TokenReview API
+- Service account metadata (namespace, name, UID) becomes trusted identity
+- Binding rules map K8s identities to Consul roles/policies
+
+**Benefits**:
+- No manual token distribution to containers
+- Tokens rotate automatically with K8s service accounts
+- Integrates with existing K8s RBAC
+
+**Example workflow**:
+```bash
+# 1. Create auth method (admin operation)
+consul acl auth-method create \
+  -type kubernetes \
+  -name k8s-cluster \
+  -config @k8s-config.json
+
+# 2. Create binding rule (admin operation)
+consul acl binding-rule create \
+  -method k8s-cluster \
+  -bind-type service \
+  -bind-name vault \
+  -selector 'serviceaccount.name==vault'
+
+# 3. Pod authenticates automatically (no manual tokens!)
+# K8s service account JWT → Consul validates → Returns Consul token
+```
+
+**Current Eos status**: ❌ Not implemented (future enhancement)
+
+#### 2. JWT Auth Method
+**Use case**: Machine-to-machine authentication with pre-existing JWTs
+
+**How it works**:
+- Consul validates JWTs using local keys or OIDC Discovery
+- Claims in JWT are mapped to Consul roles/policies
+- Headless authentication (no browser required)
+
+**Benefits**:
+- Integrates with existing identity systems (Keycloak, Auth0, etc.)
+- No Consul-specific credential distribution
+- Automated token issuance for CI/CD pipelines
+
+**Example workflow**:
+```bash
+# 1. Create JWT auth method
+consul acl auth-method create \
+  -type jwt \
+  -name ci-pipeline \
+  -config @jwt-config.json
+
+# 2. CI system gets JWT from identity provider
+# 3. CI exchanges JWT for Consul token
+consul login -method=ci-pipeline -bearer-token-file=jwt.token
+```
+
+**Current Eos status**: ❌ Not implemented (future enhancement)
+
+#### 3. OIDC Auth Method (Consul Enterprise only)
+**Use case**: Human operators logging in via SSO (Okta, Azure AD, Google Workspace)
+
+**How it works**:
+- Browser-based OAuth2/OIDC flow
+- Operators authenticate with corporate SSO
+- OIDC claims map to Consul roles/policies
+
+**Benefits**:
+- No manual Consul token distribution to staff
+- Leverage existing SSO/MFA infrastructure
+- Centralized user management
+
+**Example workflow**:
+```bash
+# 1. Create OIDC auth method (admin operation)
+consul acl auth-method create \
+  -type oidc \
+  -name corporate-sso \
+  -config @oidc-config.json
+
+# 2. User logs in via browser
+consul login -method=corporate-sso
+# Opens browser, redirects to Okta, returns with Consul token
+```
+
+**Current Eos status**: ❌ Not implemented (requires Consul Enterprise)
+
+### Why Doesn't Eos Implement These Yet?
+
+**Short answer**: Complexity and use case prioritization
+
+**Long answer**:
+1. **Kubernetes auth method**: Requires K8s cluster integration
+   - Need to detect K8s API server endpoint
+   - Manage K8s service account for Consul
+   - Configure TokenReview permissions
+   - Handle multiple K8s clusters
+   - **Complexity**: Medium-High
+
+2. **JWT auth method**: Requires identity provider integration
+   - Need to configure JWT verification keys
+   - Support OIDC Discovery or manual key configuration
+   - Manage claim mappings
+   - Handle key rotation
+   - **Complexity**: Medium
+
+3. **OIDC auth method**: Requires Consul Enterprise + SSO setup
+   - Consul Enterprise license required
+   - SSO provider configuration (Okta, Azure AD, etc.)
+   - OAuth2 callback URL configuration
+   - Browser-based flow (not CLI-friendly)
+   - **Complexity**: High
+
+**Current Eos philosophy**: Focus on foundational ACL system first
+- ✅ ACL enablement by default
+- ✅ Bootstrap token management
+- ✅ Policy and token CRUD operations
+- ✅ Vault integration for secure token storage
+- ⏳ Auth methods coming in future releases
+
+### Workaround: Manual Auth Method Setup
+
+If you need auth methods NOW, you can configure them manually:
+
+```bash
+# Example: Kubernetes auth method
+consul acl auth-method create \
+  -type kubernetes \
+  -name k8s-prod \
+  -description "Production K8s cluster" \
+  -kubernetes-host "https://k8s-api:6443" \
+  -kubernetes-ca-cert @ca.crt \
+  -kubernetes-service-account-jwt @sa-token.jwt
+
+# Create binding rule
+consul acl binding-rule create \
+  -method k8s-prod \
+  -bind-type service \
+  -bind-name "web-\${serviceaccount.name}" \
+  -selector 'serviceaccount.namespace==production'
+```
+
+See [Consul Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods) for details.
+
+### Roadmap: When Will Eos Support Auth Methods?
+
+**Planned implementation order**:
+1. **Phase 1** (Current): Basic ACL system
+   - ✅ Policy management
+   - ✅ Token management
+   - ✅ Bootstrap token recovery
+   - ✅ Vault integration
+
+2. **Phase 2** (Q2 2025): JWT auth method
+   - Auto-detect Vault JWT backend
+   - Configure Consul JWT auth method
+   - Map Vault roles to Consul policies
+   - **Use case**: Vault-authenticated services get Consul tokens
+
+3. **Phase 3** (Q3 2025): Kubernetes auth method
+   - Detect if running in K8s cluster
+   - Auto-configure K8s auth method
+   - Create binding rules for common patterns
+   - **Use case**: K8s Pods get Consul tokens automatically
+
+4. **Phase 4** (Future): OIDC auth method
+   - Consul Enterprise detection
+   - Interactive OIDC provider configuration
+   - CLI-based login flow
+   - **Use case**: Operators log in with SSO
+
+### How to Know When Auth Methods Are Available
+
+**In Consul UI**: After ACLs are enabled, you'll see:
+- ✅ Access Controls (active)
+- ✅ Tokens (active)
+- ✅ Policies (active)
+- ✅ Roles (active)
+- ⚠️ Auth Methods (active but empty if none configured)
+
+**In Eos**: Check for new commands:
+```bash
+# Future commands (not yet available)
+eos consul acl auth-method create --type kubernetes
+eos consul acl auth-method list
+eos consul acl binding-rule create
+```
+
+**Sign up for updates**: Follow [Eos GitHub](https://github.com/CodeMonkeyCybersecurity/eos) for release announcements
+
+### References
+
+- [Consul Auth Methods Overview](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods)
+- [Kubernetes Auth Method](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes)
+- [JWT Auth Method](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/jwt)
+- [OIDC Auth Method](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/oidc)
+
 ## Future Enhancements
 
 - [ ] Role management (groups of policies)
-- [ ] Auth method integration (Kubernetes, JWT, OIDC)
+- [ ] Auth method integration (Kubernetes, JWT, OIDC) - See "Authentication Methods" section above
 - [ ] Binding rules for automatic policy attachment
 - [ ] Policy namespaces (Consul Enterprise)
 - [ ] Token self-service operations

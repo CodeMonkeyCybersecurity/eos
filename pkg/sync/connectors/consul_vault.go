@@ -6,14 +6,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
+	vaultapi "github.com/hashicorp/vault/api"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	consulconfig "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
+	consulsecrets "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -600,8 +603,18 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		zap.String("accessor", testToken.Accessor),
 		zap.Duration("ttl", testToken.LeaseDuration))
 
-	// STEP 6: Register Vault in Consul service catalog (if not already registered)
-	logger.Info(" [STEP 6/7] Registering Vault in Consul service catalog")
+	// STEP 6: Store Consul gossip encryption key in Vault (if exists)
+	logger.Info(" [STEP 6/8] Storing Consul secrets in Vault (gossip key, TLS certs)")
+
+	if err := c.storeConsulSecretsInVault(rc, consulClient, vaultClient); err != nil {
+		logger.Warn("Failed to store Consul secrets in Vault",
+			zap.Error(err),
+			zap.String("note", "This is non-fatal, but recommended for production"))
+		// Non-fatal - continue with integration
+	}
+
+	// STEP 7: Register Vault in Consul service catalog (if not already registered)
+	logger.Info(" [STEP 7/8] Registering Vault in Consul service catalog")
 
 	// Check if Vault service is already registered
 	services, _, err := consulClient.Catalog().Service("vault", "", nil)
@@ -614,8 +627,8 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		logger.Info("Vault service registration will be handled by vault.hcl service_registration block")
 	}
 
-	// STEP 7: Verify end-to-end
-	logger.Info(" [STEP 7/7] Verifying integration")
+	// STEP 8: Verify end-to-end
+	logger.Info(" [STEP 8/8] Verifying integration")
 
 	if err := c.Verify(rc, config); err != nil {
 		return fmt.Errorf("integration verification failed: %w", err)
@@ -739,6 +752,122 @@ func (c *ConsulVaultConnector) Verify(rc *eos_io.RuntimeContext, config *synctyp
 		zap.Duration("ttl", testToken.LeaseDuration))
 
 	logger.Info("Connection verified successfully (Pattern 3)")
+
+	return nil
+}
+
+// storeConsulSecretsInVault stores Consul secrets (gossip key, TLS certs) in Vault
+//
+// This implements HashiCorp best practices for Pattern 3 integration by storing
+// Consul-specific secrets in Vault for centralized management and rotation.
+//
+// Secrets stored:
+// 1. Gossip encryption key (if configured in Consul)
+// 2. TLS certificates (future enhancement)
+//
+// Reference: https://developer.hashicorp.com/consul/tutorials/vault-secure/vault-kv-consul-secure-gossip
+func (c *ConsulVaultConnector) storeConsulSecretsInVault(
+	rc *eos_io.RuntimeContext,
+	consulClient *consulapi.Client,
+	vaultClient *vaultapi.Client,
+) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Migrating Consul secrets to Vault for centralized management")
+
+	// STEP 1: Enable KV v2 engine at consul/ mount (if not already enabled)
+	logger.Debug("Ensuring Vault KV v2 engine is enabled for Consul secrets")
+
+	if err := consulsecrets.EnableGossipKeyRotation(rc, vaultClient); err != nil {
+		return fmt.Errorf("failed to enable KV engine for Consul secrets: %w", err)
+	}
+
+	// STEP 2: Read gossip encryption key from Consul configuration
+	logger.Debug("Reading gossip encryption key from Consul configuration")
+
+	// Read Consul config file to extract gossip key
+	consulConfigPath := consul.ConsulConfigFile // /etc/consul.d/consul.hcl
+	configContent, err := os.ReadFile(consulConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read Consul configuration: %w", err)
+	}
+
+	// Parse gossip key from config using regex
+	// Match: encrypt = "base64-key-here"
+	configStr := string(configContent)
+	gossipKeyRegex := regexp.MustCompile(`encrypt\s*=\s*"([^"]+)"`)
+	matches := gossipKeyRegex.FindStringSubmatch(configStr)
+
+	if len(matches) < 2 {
+		logger.Info("No gossip encryption key found in Consul configuration")
+		logger.Info("Gossip encryption is optional but recommended for production")
+		logger.Info("To enable: generate key with 'consul keygen' and add to config")
+		// Not an error - gossip encryption is optional
+		return nil
+	}
+
+	gossipKey := matches[1]
+	logger.Info("Found gossip encryption key in Consul configuration")
+
+	// Validate key format
+	if err := consulsecrets.ValidateGossipKey(gossipKey); err != nil {
+		logger.Warn("Gossip key validation failed",
+			zap.Error(err),
+			zap.String("note", "Key may be invalid or corrupted"))
+		return fmt.Errorf("invalid gossip key in Consul config: %w", err)
+	}
+
+	// STEP 3: Check if gossip key already exists in Vault
+	logger.Debug("Checking if gossip key is already stored in Vault")
+
+	existingKey, err := consulsecrets.GetGossipKeyFromVault(rc.Ctx, vaultClient)
+	if err == nil && existingKey != nil {
+		// Key already in Vault - check if it matches
+		if existingKey.Key == gossipKey {
+			logger.Info("Gossip key already stored in Vault and matches Consul config",
+				zap.String("vault_path", consulsecrets.GossipKeyVaultPath),
+				zap.Int("rotation_index", existingKey.RotationIndex))
+			return nil
+		}
+
+		// Keys don't match - this is a problem
+		logger.Warn("Gossip key in Vault does not match Consul configuration",
+			zap.String("note", "This may indicate key rotation or configuration drift"))
+		// We'll update the key in Vault to match current Consul config
+	}
+
+	// STEP 4: Store gossip key in Vault
+	logger.Info("Storing gossip encryption key in Vault")
+
+	metadata := &consulsecrets.GossipKeyMetadata{
+		Key:           gossipKey,
+		GeneratedAt:   time.Now(),
+		GeneratedBy:   "eos sync --vault --consul (migrated from config)",
+		RotationDue:   time.Now().Add(consulsecrets.GossipKeyRotationTTL),
+		Primary:       true,
+		RotationIndex: 1,
+		VaultPath:     consulsecrets.GossipKeyVaultPath,
+	}
+
+	if err := consulsecrets.StoreGossipKeyInVault(rc, vaultClient, gossipKey, metadata); err != nil {
+		return fmt.Errorf("failed to store gossip key in Vault: %w", err)
+	}
+
+	logger.Info("Gossip encryption key stored in Vault successfully",
+		zap.String("vault_path", consulsecrets.GossipKeyVaultPath),
+		zap.Time("rotation_due", metadata.RotationDue))
+
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: ✓ Consul gossip encryption key stored in Vault")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Key location: " + consulsecrets.GossipKeyVaultPath)
+	logger.Info("terminal prompt: Rotation recommended: " + metadata.RotationDue.Format("2006-01-02"))
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: To enable automatic key rotation:")
+	logger.Info("terminal prompt:   1. Configure Consul Template for gossip key retrieval")
+	logger.Info("terminal prompt:   2. Set up rotation schedule in Vault")
+	logger.Info("terminal prompt:   3. See: https://developer.hashicorp.com/consul/tutorials/vault-secure/vault-kv-consul-secure-gossip")
+	logger.Info("terminal prompt: ")
 
 	return nil
 }

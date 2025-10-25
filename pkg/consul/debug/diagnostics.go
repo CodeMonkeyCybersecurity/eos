@@ -136,6 +136,10 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	vaultConsulResult := checkVaultConsulConnectivity(rc)
 	results = append(results, vaultConsulResult)
 
+	// 14. Check ACL system status (security-critical)
+	aclResult := checkACLEnabled(rc)
+	results = append(results, aclResult)
+
 	logger.Debug("Diagnostic assessment completed",
 		zap.Int("total_checks", len(results)),
 		zap.Int("retry_join_addrs", len(retryJoinAddrs)))
