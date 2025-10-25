@@ -23,6 +23,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// OperationContext tracks operation lifecycle for structured logging and correlation
+type OperationContext struct {
+	OperationID   string
+	OperationType string
+	Service       string
+	Service1      string // For sync operations
+	Service2      string // For sync operations
+	StartTime     time.Time
+	CurrentPhase  string
+	Timings       map[string]time.Duration
+	Errors        []error
+}
+
 type RuntimeContext struct {
 	Ctx        context.Context
 	Log        *zap.Logger
@@ -278,4 +291,88 @@ func getCallContext(skip int) (component, action string, err error) {
 	action = funcParts[len(funcParts)-1]
 
 	return component, action, nil
+}
+
+// ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+// OperationContext constructors and methods
+// ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+
+// NewOperationContext creates a new operation context for tracking operation lifecycle
+func NewOperationContext(operationType, service string) *OperationContext {
+	return &OperationContext{
+		OperationID:   generateOperationID(),
+		OperationType: operationType,
+		Service:       service,
+		StartTime:     time.Now(),
+		CurrentPhase:  "INIT",
+		Timings:       make(map[string]time.Duration),
+		Errors:        []error{},
+	}
+}
+
+// NewSyncOperationContext creates an operation context for sync operations between two services
+func NewSyncOperationContext(service1, service2 string) *OperationContext {
+	return &OperationContext{
+		OperationID:   generateOperationID(),
+		OperationType: "sync",
+		Service1:      service1,
+		Service2:      service2,
+		StartTime:     time.Now(),
+		CurrentPhase:  "INIT",
+		Timings:       make(map[string]time.Duration),
+		Errors:        []error{},
+	}
+}
+
+// SetPhase updates the current phase of the operation and logs it
+func (oc *OperationContext) SetPhase(rc *RuntimeContext, phase string) {
+	oc.CurrentPhase = phase
+	otelzap.Ctx(rc.Ctx).Info("Operation phase transition",
+		zap.String("operation_id", oc.OperationID),
+		zap.String("phase", phase))
+}
+
+// LogError records an error and logs it with context
+func (oc *OperationContext) LogError(rc *RuntimeContext, err error, operation string) {
+	oc.Errors = append(oc.Errors, err)
+	otelzap.Ctx(rc.Ctx).Error("Operation error",
+		zap.String("operation_id", oc.OperationID),
+		zap.String("phase", oc.CurrentPhase),
+		zap.String("operation", operation),
+		zap.Error(err))
+}
+
+// LogTiming records the duration of a specific operation step
+func (oc *OperationContext) LogTiming(rc *RuntimeContext, step string, startTime time.Time) {
+	duration := time.Since(startTime)
+	oc.Timings[step] = duration
+	otelzap.Ctx(rc.Ctx).Debug("Operation timing",
+		zap.String("operation_id", oc.OperationID),
+		zap.String("step", step),
+		zap.Duration("duration", duration))
+}
+
+// LogCompletion logs the final completion status of the operation
+func (oc *OperationContext) LogCompletion(rc *RuntimeContext, success bool, message string) {
+	totalDuration := time.Since(oc.StartTime)
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if success {
+		logger.Info("Operation completed successfully",
+			zap.String("operation_id", oc.OperationID),
+			zap.String("message", message),
+			zap.Duration("total_duration", totalDuration),
+			zap.Int("error_count", len(oc.Errors)))
+	} else {
+		logger.Error("Operation failed",
+			zap.String("operation_id", oc.OperationID),
+			zap.String("message", message),
+			zap.Duration("total_duration", totalDuration),
+			zap.Int("error_count", len(oc.Errors)))
+	}
+}
+
+// generateOperationID creates a unique operation ID for tracking
+func generateOperationID() string {
+	return fmt.Sprintf("op-%d-%d", time.Now().Unix(), time.Now().UnixNano()%1000000)
 }

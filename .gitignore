@@ -62,7 +62,8 @@ apps/mattermost/docker*
 # Other 
 *.deb
 *.rpm
-*eos*
+/eos
+eos.exe
 
 # tests
 coverage.*
