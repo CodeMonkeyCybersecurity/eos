@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/process"
@@ -313,59 +314,158 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	}
 
 	// ========================================================================
-	// INTERVENE - Write reset index file
+	// INTERVENE - Write reset file and immediately bootstrap (race mitigation)
 	// ========================================================================
 
-	logger.Info("Phase 2: INTERVENE - Writing ACL bootstrap reset index file")
+	logger.Info("Phase 2: INTERVENE - Writing ACL bootstrap reset index file and re-bootstrapping")
 
-	resetIndexStr := fmt.Sprintf("%d", resetIndex)
-	if err := os.WriteFile(resetFilePath, []byte(resetIndexStr), 0600); err != nil {
-		return nil, fmt.Errorf("failed to write reset index file: %w\n"+
-			"File: %s\n"+
-			"Remediation:\n"+
-			"  - Check file permissions on data directory: ls -la %s\n"+
-			"  - Verify this process has write access\n"+
-			"  - Ensure running as root or consul user",
-			err, resetFilePath, dataDir)
+	// RACE CONDITION MITIGATION:
+	// Consul's leader goroutine consumes the reset file IMMEDIATELY when detected,
+	// not when the Bootstrap() API call arrives. This creates a race where:
+	//   1. Code writes reset file
+	//   2. Consul leader reads file and increments internal counter
+	//   3. Code calls Bootstrap() API
+	//   4. Consul responds "403 Permission denied" (file already consumed)
+	//
+	// Solution: Write file and call Bootstrap() in tight loop with minimal delay.
+	// Retry if race detected (reset index incremented since last attempt).
+
+	const maxRetries = 5
+	const retryDelay = 500 * time.Millisecond
+
+	var newBootstrapToken *consulapi.ACLToken
+	var lastErr error
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		logger.Debug("Bootstrap attempt",
+			zap.Int("attempt", attempt),
+			zap.Int("max_retries", maxRetries),
+			zap.Int("reset_index", resetIndex))
+
+		// Write reset file
+		resetIndexStr := fmt.Sprintf("%d", resetIndex)
+		if err := os.WriteFile(resetFilePath, []byte(resetIndexStr), 0600); err != nil {
+			return nil, fmt.Errorf("failed to write reset index file on attempt %d: %w\n"+
+				"File: %s\n"+
+				"Remediation:\n"+
+				"  - Check file permissions on data directory: ls -la %s\n"+
+				"  - Verify this process has write access\n"+
+				"  - Ensure running as root or consul user",
+				attempt, err, resetFilePath, dataDir)
+		}
+
+		logger.Debug("Reset file written, calling Bootstrap() immediately",
+			zap.String("file", resetFilePath),
+			zap.Int("index", resetIndex),
+			zap.Int("attempt", attempt))
+
+		// IMMEDIATELY call Bootstrap() to minimize race window
+		var bootstrapErr error
+		newBootstrapToken, _, bootstrapErr = consulClient.ACL().Bootstrap()
+
+		if bootstrapErr == nil {
+			// SUCCESS! Bootstrap completed
+			logger.Info("ACL re-bootstrap successful",
+				zap.String("accessor", newBootstrapToken.AccessorID),
+				zap.Int("attempt", attempt),
+				zap.String("note", "New bootstrap token generated"))
+
+			// Clean up reset file after successful bootstrap
+			if err := os.Remove(resetFilePath); err != nil {
+				logger.Warn("Failed to remove reset file after successful bootstrap",
+					zap.Error(err),
+					zap.String("file", resetFilePath),
+					zap.String("note", "This is non-fatal, file can be removed manually"))
+			} else {
+				logger.Debug("Reset file removed successfully")
+			}
+
+			break // Exit retry loop
+		}
+
+		// Bootstrap failed - check if it's a race condition
+		lastErr = bootstrapErr
+
+		// Check if race condition occurred (file consumed but API call arrived late)
+		if strings.Contains(bootstrapErr.Error(), "ACL bootstrap no longer allowed") {
+			// Try to extract new reset index from error
+			newResetIndex, extractErr := extractResetIndex(bootstrapErr.Error())
+
+			if extractErr == nil && newResetIndex > resetIndex {
+				// Race condition detected - Consul consumed file before API call
+				logger.Warn("Race condition detected: reset file consumed before Bootstrap() API call",
+					zap.Int("attempt", attempt),
+					zap.Int("old_reset_index", resetIndex),
+					zap.Int("new_reset_index", newResetIndex),
+					zap.Duration("retry_delay", retryDelay),
+					zap.String("note", "Will retry with updated index"))
+
+				// Update reset index for next attempt
+				resetIndex = newResetIndex
+
+				if attempt < maxRetries {
+					// Wait before retry (give Consul time to stabilize)
+					time.Sleep(retryDelay)
+					continue // Retry with new index
+				}
+
+				// Max retries reached with race condition
+				logger.Error("Race condition persisted after max retries",
+					zap.Int("max_retries", maxRetries),
+					zap.Int("final_reset_index", resetIndex))
+
+				// Clean up reset file
+				_ = os.Remove(resetFilePath)
+
+				return nil, fmt.Errorf("failed to re-bootstrap ACL system after %d attempts due to race condition\n"+
+					"Final reset index: %d\n"+
+					"This indicates Consul's leader is consuming the reset file faster than the API can respond.\n"+
+					"Remediation:\n"+
+					"  - Check if this node is the cluster leader: consul operator raft list-peers\n"+
+					"  - Verify cluster health: consul members\n"+
+					"  - Check Consul logs: journalctl -u consul -n 50\n"+
+					"  - If cluster is unstable, wait for leader election to complete\n"+
+					"  - Try running again: sudo eos update consul --bootstrap-token",
+					maxRetries, resetIndex)
+			}
+
+			// Reset index didn't change or extraction failed - not a simple race
+			logger.Warn("Bootstrap failed with 'no longer allowed' error but reset index unchanged",
+				zap.Int("attempt", attempt),
+				zap.Int("reset_index", resetIndex),
+				zap.Error(extractErr))
+		}
+
+		// Some other error occurred (not race condition)
+		logger.Warn("Bootstrap attempt failed with non-race error",
+			zap.Int("attempt", attempt),
+			zap.Error(bootstrapErr))
+
+		if attempt < maxRetries {
+			// Retry for other errors too (may be transient)
+			time.Sleep(retryDelay)
+			continue
+		}
+
+		// Max retries reached with persistent error
+		break
 	}
 
-	logger.Info("Reset index file written successfully",
-		zap.String("file", resetFilePath),
-		zap.Int("index", resetIndex))
-
-	// ========================================================================
-	// INTERVENE - Re-bootstrap ACL system
-	// ========================================================================
-
-	logger.Info("Re-bootstrapping Consul ACL system via SDK")
-
-	newBootstrapToken, _, err := consulClient.ACL().Bootstrap()
-	if err != nil {
-		// Clean up reset file on failure
+	// Check if all retries exhausted
+	if newBootstrapToken == nil {
+		// Clean up reset file on final failure
 		_ = os.Remove(resetFilePath)
 
-		return nil, fmt.Errorf("failed to re-bootstrap ACL system: %w\n"+
+		return nil, fmt.Errorf("failed to re-bootstrap ACL system after %d attempts: %w\n"+
 			"Reset file was: %s\n"+
+			"Final reset index: %d\n"+
 			"Remediation:\n"+
 			"  - Check if this node is the cluster leader: consul operator raft list-peers\n"+
-			"  - Verify reset index was correct: %d\n"+
+			"  - Verify reset index is correct: consul acl bootstrap (look for reset index in error)\n"+
 			"  - Check Consul logs: journalctl -u consul -n 50\n"+
+			"  - Verify cluster health: consul members\n"+
 			"  - Try running again (reset file has been cleaned up)",
-			err, resetFilePath, resetIndex)
-	}
-
-	logger.Info("ACL re-bootstrap successful",
-		zap.String("accessor", newBootstrapToken.AccessorID),
-		zap.String("note", "New bootstrap token generated"))
-
-	// Clean up reset file after successful bootstrap
-	if err := os.Remove(resetFilePath); err != nil {
-		logger.Warn("Failed to remove reset file after successful bootstrap",
-			zap.Error(err),
-			zap.String("file", resetFilePath),
-			zap.String("note", "This is non-fatal, file can be removed manually"))
-	} else {
-		logger.Debug("Reset file removed successfully")
+			maxRetries, lastErr, resetFilePath, resetIndex)
 	}
 
 	result := &BootstrapResult{
