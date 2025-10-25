@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	vaultfix "github.com/CodeMonkeyCybersecurity/eos/pkg/vault/fix"
+	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -496,14 +497,31 @@ func runVaultUnseal(rc *eos_io.RuntimeContext) error {
 	logger.Info("Vault is sealed - proceeding with unseal operation")
 	logger.Info("")
 
-	// INTERVENE - Unseal Vault
+	// INTERVENE - Unseal Vault (UNAUTHENTICATED operation)
 	logger.Info("[INTERVENE] Unsealing Vault with stored unseal keys")
+	logger.Debug("Unsealing is an unauthenticated operation - no token required")
 
-	// Create unauthenticated client for unseal operation
-	client, err := vault.GetVaultClient(rc)
-	if err != nil {
-		return fmt.Errorf("failed to create Vault client: %w", err)
+	// Create UNAUTHENTICATED client for unseal operation
+	// CRITICAL: Unsealing does NOT require authentication by design
+	// The /v1/sys/seal-status and /v1/sys/unseal endpoints are unauthenticated
+	vaultAddr := shared.GetVaultAddrWithEnv()
+	config := api.DefaultConfig()
+	config.Address = vaultAddr
+
+	// Read environment for VAULT_SKIP_VERIFY and other settings
+	if err := config.ReadEnvironment(); err != nil {
+		logger.Warn("Failed to read Vault environment config", zap.Error(err))
+		// Continue anyway - ReadEnvironment is best-effort
 	}
+
+	client, err := api.NewClient(config)
+	if err != nil {
+		return fmt.Errorf("failed to create unauthenticated Vault client: %w", err)
+	}
+	// No token set - this is intentional, unsealing doesn't need authentication
+
+	logger.Debug("Unauthenticated client created",
+		zap.String("vault_addr", vaultAddr))
 
 	// Use existing unseal infrastructure
 	unsealed, err := vault.UnsealVaultIfNeeded(rc, client)

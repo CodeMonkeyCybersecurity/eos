@@ -39,6 +39,15 @@ import (
 func coreUserpassAuth(rc *eos_io.RuntimeContext, client *api.Client, username, password string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
+	// FAST-FAIL P2: Check if Vault is sealed BEFORE attempting authentication
+	// This prevents 60s+ timeouts when Vault is sealed (HTTP 503 errors)
+	sealStatus, err := client.Sys().SealStatus()
+	if err == nil && sealStatus.Sealed {
+		log.Debug("Cannot authenticate: Vault is sealed",
+			zap.String("username", username))
+		return "", fmt.Errorf("cannot authenticate to sealed Vault (unseal it first with 'sudo eos update vault --unseal')")
+	}
+
 	log.Debug("Attempting userpass authentication",
 		zap.String("username", username),
 		zap.String("auth_path", "auth/userpass/login"))
@@ -92,6 +101,14 @@ func coreUserpassAuth(rc *eos_io.RuntimeContext, client *api.Client, username, p
 // Reads credentials from /var/lib/eos/secret/role_id and secret_id
 func coreAppRoleAuth(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
+
+	// FAST-FAIL P2: Check if Vault is sealed BEFORE attempting authentication
+	// This prevents 60s+ timeouts when Vault is sealed (HTTP 503 errors)
+	sealStatus, err := client.Sys().SealStatus()
+	if err == nil && sealStatus.Sealed {
+		log.Debug("Cannot authenticate: Vault is sealed")
+		return "", fmt.Errorf("cannot authenticate to sealed Vault (unseal it first with 'sudo eos update vault --unseal')")
+	}
 
 	log.Debug("Reading AppRole credentials from disk",
 		zap.String("role_id_path", shared.AppRolePaths.RoleID),

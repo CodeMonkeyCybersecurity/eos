@@ -249,10 +249,36 @@ func LoadOrPromptInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error
 		return nil, fmt.Errorf("authentication prompt limit exceeded (%d attempts): vault_init.json missing or invalid", authState.PromptAttemptCount)
 	}
 
+	// Try multiple paths for vault_init.json (new location + legacy fallback)
+	initPaths := []string{
+		"/run/eos/vault_init_output.json", // New location (tmpfs, faster, survives restarts via systemd)
+		shared.VaultInitPath,               // Legacy: /var/lib/eos/secret/vault_init.json
+	}
+
 	var res api.InitResponse
-	if err := ReadFallbackJSON(rc, shared.VaultInitPath, &res); err != nil {
-		log.Warn("Fallback file missing, prompting user once only",
-			zap.Error(err),
+	var lastErr error
+	var foundPath string
+
+	for _, path := range initPaths {
+		if err := ReadFallbackJSON(rc, path, &res); err == nil {
+			// Success! Found valid init data
+			foundPath = path
+			log.Debug("Loaded vault init data from disk",
+				zap.String("path", path))
+			break
+		} else {
+			lastErr = err
+			log.Debug("Vault init data not found at path",
+				zap.String("path", path),
+				zap.Error(err))
+		}
+	}
+
+	// All paths failed - need to prompt user
+	if foundPath == "" {
+		log.Warn("Fallback file missing from all locations, prompting user once only",
+			zap.Error(lastErr),
+			zap.Strings("paths_checked", initPaths),
 			zap.Int("attempt_count", authState.PromptAttemptCount+1))
 
 		// Increment attempt counter BEFORE prompting
@@ -261,6 +287,8 @@ func LoadOrPromptInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error
 
 		return PromptForInitResult(rc)
 	}
+
+	// Verify the loaded init result
 	if err := VerifyInitResult(rc, &res); err != nil {
 		log.Warn("Loaded init result invalid, prompting user once only",
 			zap.Error(err),
