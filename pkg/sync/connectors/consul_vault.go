@@ -13,6 +13,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
+	consulconfig "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -74,6 +75,118 @@ func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config 
 	logger.Info("Consul pre-flight check passed",
 		zap.String("version", consulStatus.Version),
 		zap.String("status", consulStatus.ServiceStatus))
+
+	// CRITICAL: Check if Consul ACLs are enabled (required for Vault integration)
+	// This fast-fail check prevents attempting ACL bootstrap on disabled ACL system
+	logger.Debug("Checking if Consul ACLs are enabled")
+
+	aclsEnabled, err := acl.DetectACLMode(rc.Ctx)
+	if err != nil {
+		logger.Warn("Could not detect Consul ACL mode (may indicate configuration issues)",
+			zap.Error(err))
+		// Continue - will fail with better error during bootstrap attempt
+	} else if !aclsEnabled {
+		// ACLs are disabled - offer to enable them automatically
+		logger.Warn("Consul ACLs are disabled",
+			zap.String("config_file", consul.ConsulConfigFile))
+
+		// If --force flag is set, enable ACLs automatically without prompting
+		// Otherwise, prompt the user for consent
+		autoEnable := config.Force
+
+		if !config.Force {
+			logger.Info("terminal prompt: ")
+			logger.Info("terminal prompt: Consul ACLs are currently DISABLED")
+			logger.Info("terminal prompt: ")
+			logger.Info("terminal prompt: Vault-Consul integration requires ACLs to be enabled for secure")
+			logger.Info("terminal prompt: token management and access control.")
+			logger.Info("terminal prompt: ")
+			logger.Info("terminal prompt: This operation will:")
+			logger.Info("terminal prompt:   1. Backup current configuration to /etc/consul.d/consul.hcl.backup.TIMESTAMP")
+			logger.Info("terminal prompt:   2. Modify /etc/consul.d/consul.hcl to enable ACLs")
+			logger.Info("terminal prompt:   3. Restart Consul service (brief downtime)")
+			logger.Info("terminal prompt:   4. Continue with Vault-Consul sync")
+			logger.Info("terminal prompt: ")
+
+			proceed, err := prompt.YesNo(rc, "Enable Consul ACLs automatically?", false)
+			if err != nil {
+				return fmt.Errorf("failed to get user input: %w", err)
+			}
+			autoEnable = proceed
+		}
+
+		if !autoEnable {
+			// User declined auto-enablement - provide manual instructions
+			return eos_err.NewUserError(
+				"Consul ACLs are not enabled\n\n" +
+					"Vault-Consul integration requires Consul ACLs to be enabled for secure\n" +
+					"token management and access control.\n\n" +
+					"Current configuration: acl { enabled = false }\n" +
+					"Required configuration: acl { enabled = true }\n\n" +
+					"MANUAL REMEDIATION STEPS:\n\n" +
+					"  1. Edit Consul configuration:\n" +
+					"       sudo nano /etc/consul.d/consul.hcl\n\n" +
+					"  2. Change the ACL block to:\n" +
+					"       acl {\n" +
+					"         enabled = true\n" +
+					"         default_policy = \"deny\"  # Recommended for security\n" +
+					"         enable_token_persistence = true\n" +
+					"       }\n\n" +
+					"  3. Restart Consul to apply changes:\n" +
+					"       sudo systemctl restart consul\n\n" +
+					"  4. Verify Consul is healthy:\n" +
+					"       consul members\n\n" +
+					"  5. Retry this command:\n" +
+					"       sudo eos sync --vault --consul\n\n" +
+					"Or run with --force to enable ACLs automatically:\n" +
+					"  sudo eos sync --vault --consul --force\n\n" +
+					"Documentation:\n" +
+					"  https://developer.hashicorp.com/consul/docs/security/acl")
+		}
+
+		// Auto-enable ACLs
+		logger.Info("Enabling Consul ACLs automatically")
+
+		aclConfig := &consulconfig.ACLEnablementConfig{
+			ConfigPath:     consul.ConsulConfigFile,
+			BackupEnabled:  true,
+			ValidateSyntax: true,
+			DefaultPolicy:  "deny", // More secure default
+		}
+
+		result, err := consulconfig.EnableACLsInConfig(rc, aclConfig)
+		if err != nil {
+			return fmt.Errorf("failed to enable ACLs in Consul configuration: %w\n\n"+
+				"Remediation: Enable ACLs manually following the steps above", err)
+		}
+
+		logger.Info("ACL configuration updated",
+			zap.Bool("config_changed", result.ConfigChanged),
+			zap.String("backup_path", result.BackupPath))
+
+		// Restart Consul service
+		logger.Info("Restarting Consul service to apply ACL configuration...")
+
+		if err := consulconfig.RestartConsulService(rc); err != nil {
+			// Restart failed - restore backup
+			logger.Error("Consul restart failed after ACL enablement",
+				zap.Error(err))
+
+			return fmt.Errorf("failed to restart Consul after enabling ACLs: %w\n\n"+
+				"Your original configuration has been backed up to: %s\n"+
+				"To restore manually:\n"+
+				"  sudo cp %s %s\n"+
+				"  sudo systemctl restart consul",
+				err, result.BackupPath, result.BackupPath, consul.ConsulConfigFile)
+		}
+
+		logger.Info("Consul service restarted successfully with ACLs enabled")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: ✓ Consul ACLs enabled successfully")
+		logger.Info("terminal prompt: ")
+	}
+
+	logger.Info("Consul ACLs are enabled")
 
 	// Check Vault status
 	logger.Debug("Checking Vault status")

@@ -1,19 +1,20 @@
 # Consul + Vault Integration Guide
 
-*Last Updated: 2025-01-24*
+*Last Updated: 2025-10-25*
 
 Complete guide to the integrated Consul + Vault architecture in EOS, following HashiCorp best practices.
 
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Phase 0: Vault with Raft Storage](#phase-0-vault-with-raft-storage)
-3. [Phase 1: Consul Secrets Engine](#phase-1-consul-secrets-engine)
-4. [Phase 2: Consul KV Configuration Store](#phase-2-consul-kv-configuration-store)
-5. [Phase 3: Consul Template Service](#phase-3-consul-template-service)
-6. [Phase 4: Service Discovery](#phase-4-service-discovery)
-7. [Integration Patterns](#integration-patterns)
-8. [Troubleshooting](#troubleshooting)
+2. [ACL Configuration](#acl-configuration)
+3. [Phase 0: Vault with Raft Storage](#phase-0-vault-with-raft-storage)
+4. [Phase 1: Consul Secrets Engine](#phase-1-consul-secrets-engine)
+5. [Phase 2: Consul KV Configuration Store](#phase-2-consul-kv-configuration-store)
+6. [Phase 3: Consul Template Service](#phase-3-consul-template-service)
+7. [Phase 4: Service Discovery](#phase-4-service-discovery)
+8. [Integration Patterns](#integration-patterns)
+9. [Troubleshooting](#troubleshooting)
 
 ## Architecture Overview
 
@@ -45,6 +46,212 @@ Complete guide to the integrated Consul + Vault architecture in EOS, following H
 3. **No Circular Dependencies**: Vault uses Raft, not Consul storage
 4. **Dynamic Tokens**: Vault generates short-lived Consul tokens
 5. **Automated Rendering**: Consul Template combines both sources
+
+## ACL Configuration
+
+### Overview
+
+**As of Eos v2.0 (2025-10-25)**, Consul ACLs are **enabled by default** for all new installations. This change improves security and enables seamless Vault-Consul integration.
+
+### What Changed
+
+**Before v2.0:**
+```hcl
+acl = {
+  enabled = false
+  default_policy = "allow"
+}
+```
+
+**After v2.0:**
+```hcl
+acl = {
+  enabled = true
+  default_policy = "deny"  # Secure default: deny-by-default
+  enable_token_persistence = true
+}
+```
+
+### Why ACLs Are Required
+
+Vault-Consul integration (`sudo eos sync --vault --consul`) requires Consul ACLs for:
+
+1. **Secure Token Management**: Vault generates dynamic, short-lived Consul ACL tokens
+2. **Access Control**: Services get minimal permissions via token-based policies
+3. **Audit Trail**: Track which service accessed which Consul resources
+4. **Compliance**: SOC2, PCI-DSS, HIPAA require access controls
+
+### For New Installations
+
+If you install Consul with Eos v2.0+, ACLs are enabled automatically:
+
+```bash
+sudo eos create consul
+# ACLs: enabled = true (automatic)
+
+sudo eos sync --vault --consul
+# ACL bootstrap happens automatically
+```
+
+### For Existing Installations
+
+If you have Consul already installed with ACLs disabled, you have two options:
+
+#### Option 1: Automatic Enablement (Recommended)
+
+Run the sync command - it will prompt you to enable ACLs:
+
+```bash
+sudo eos sync --vault --consul
+
+# You'll see:
+# Consul ACLs are currently DISABLED
+#
+# This operation will:
+#   1. Backup current configuration to /etc/consul.d/consul.hcl.backup.TIMESTAMP
+#   2. Modify /etc/consul.d/consul.hcl to enable ACLs
+#   3. Restart Consul service (brief downtime)
+#   4. Continue with Vault-Consul sync
+#
+# Enable Consul ACLs automatically? [y/N]
+```
+
+Answer **y** to enable ACLs automatically. Your original configuration will be backed up.
+
+#### Option 2: Manual Enablement
+
+Edit the configuration manually:
+
+```bash
+# 1. Edit Consul configuration
+sudo nano /etc/consul.d/consul.hcl
+
+# 2. Change the ACL block to:
+acl = {
+  enabled = true
+  default_policy = "deny"  # Recommended for security
+  enable_token_persistence = true
+}
+
+# 3. Restart Consul
+sudo systemctl restart consul
+
+# 4. Verify Consul is healthy
+consul members
+
+# 5. Continue with sync
+sudo eos sync --vault --consul
+```
+
+#### Option 3: Force Flag (No Prompts)
+
+Use `--force` to enable ACLs without prompting:
+
+```bash
+sudo eos sync --vault --consul --force
+# Automatically enables ACLs, restarts Consul, continues sync
+```
+
+### ACL Bootstrap Process
+
+When you run `sudo eos sync --vault --consul`, the following happens:
+
+1. **Check ACLs Enabled**: Preflight check verifies `acl.enabled = true`
+2. **Bootstrap ACL System**: Creates the initial management token
+3. **Store Token in Vault**: Master token stored at `secret/consul/bootstrap-token`
+4. **Create Policies**: Default policies for Vault, services, read-only access
+5. **Create Management Token**: Vault gets a Consul management token
+6. **Enable Secrets Engine**: Vault Consul secrets engine configured
+7. **Test Token Generation**: Verify dynamic token generation works
+
+### Security Considerations
+
+**default_policy = "deny"** means:
+
+- **More Secure**: Services without tokens cannot access Consul
+- **Explicit Permissions**: Each service gets a token with minimal permissions
+- **Zero Trust**: Default deny, explicit allow
+
+**default_policy = "allow"** (deprecated):
+
+- **Less Secure**: Services can access Consul without tokens
+- **Not Recommended**: Only use for development/testing
+
+### Migration Path
+
+**Existing installations** with ACLs disabled:
+
+1. ✅ Eos will prompt you before making changes
+2. ✅ Backup created automatically
+3. ✅ Rollback available if Consul fails to restart
+4. ✅ No data loss (KV data preserved)
+5. ✅ Services continue working (anonymous policy)
+
+**After enabling ACLs**, you may need to update services to use tokens:
+
+```bash
+# Get a token for a service
+vault read consul/creds/eos-role
+
+# Use the token
+export CONSUL_HTTP_TOKEN=<token>
+consul kv get config/myservice/log_level
+```
+
+### Rollback (If Needed)
+
+If Consul fails to start after enabling ACLs:
+
+```bash
+# 1. Find your backup
+ls -lh /etc/consul.d/consul.hcl.backup.*
+
+# 2. Restore it
+sudo cp /etc/consul.d/consul.hcl.backup.TIMESTAMP /etc/consul.d/consul.hcl
+
+# 3. Restart Consul
+sudo systemctl restart consul
+
+# 4. Verify
+consul members
+```
+
+### Troubleshooting
+
+**Error: "ACL support disabled"**
+
+This means ACLs are not enabled in your Consul configuration. Follow the enablement steps above.
+
+**Error: "Permission denied"**
+
+You need a valid Consul ACL token:
+
+```bash
+# Get the bootstrap token from Vault
+VAULT_TOKEN=$(cat /run/eos/vault_agent_eos.token)
+export CONSUL_HTTP_TOKEN=$(vault kv get -field=value secret/consul/bootstrap-token)
+
+# Or generate a new token
+export CONSUL_HTTP_TOKEN=$(vault read -field=token consul/creds/eos-role)
+```
+
+**Consul won't start after enabling ACLs**
+
+Check logs for errors:
+
+```bash
+journalctl -u consul -n 50
+```
+
+Common issues:
+- Syntax error in consul.hcl (restore backup)
+- Port conflict (check with `ss -tlnp | grep 8500`)
+
+### Documentation
+
+- [Consul ACL System](https://developer.hashicorp.com/consul/docs/security/acl)
+- [ACL Token Management](https://developer.hashicorp.com/consul/tutorials/security/access-control-setup-production)
+- [ACL Policies](https://developer.hashicorp.com/consul/docs/security/acl/acl-policies)
 
 ## Phase 0: Vault with Raft Storage
 

@@ -181,10 +181,13 @@ autopilot {
 enable_local_script_checks = true
 
 # Security settings
+# ACLs enabled by default for secure token management and Vault integration
+# Will be bootstrapped during 'sudo eos sync --vault --consul'
 acl = {
-  enabled = false
-  default_policy = "allow"
-  # Prepared for future ACL enablement
+  enabled = true
+  default_policy = "deny"  # Secure default: deny-by-default
+  enable_token_persistence = true
+  # For manual ACL management: https://developer.hashicorp.com/consul/docs/security/acl
 }
 
 # Encryption settings (prepared for production)
