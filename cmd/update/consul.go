@@ -2,20 +2,25 @@
 package update
 
 import (
+	"fmt"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
+	consulacl "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/acl"
 	consulfix "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/fix"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 var (
-	consulPorts  string
-	consulDryRun bool
-	consulFix    bool
+	consulPorts          string
+	consulDryRun         bool
+	consulFix            bool
+	consulBootstrapToken bool
 )
 
 // ConsulCmd updates Consul configuration
@@ -32,7 +37,7 @@ The command intelligently updates:
 
 Configuration Drift Correction:
   --fix       Detect and correct drift from canonical state
-  --dry-run   Preview changes without applying (works with --fix and --ports)
+  --dry-run   Preview changes without applying (works with --fix, --ports, --bootstrap-token)
 
   The --fix flag compares current Consul installation against the canonical
   state from 'eos create consul' and automatically corrects:
@@ -43,12 +48,30 @@ Configuration Drift Correction:
 
   Like combing through the configuration to correct any settings that drifted.
 
+ACL Bootstrap Token Recovery:
+  --bootstrap-token   Reset ACL bootstrap and recover/generate bootstrap token
+
+  The --bootstrap-token flag performs Consul ACL bootstrap reset when the
+  bootstrap token is lost or not stored in Vault. It:
+  - Detects current ACL bootstrap state via SDK
+  - Writes reset index file to Consul data directory
+  - Re-bootstraps ACL system (generates new token)
+  - Stores token securely in Vault at secret/consul/bootstrap-token
+
+  This solves the "lost bootstrap token" problem without destroying cluster data.
+
 Examples:
   # Detect and fix all configuration drift
   eos update consul --fix
 
   # Show what would be fixed (dry-run)
   eos update consul --fix --dry-run
+
+  # Recover lost ACL bootstrap token
+  eos update consul --bootstrap-token
+
+  # Preview bootstrap token recovery (dry-run)
+  eos update consul --bootstrap-token --dry-run
 
   # Change HTTP port from current to HashiCorp default
   eos update consul --ports 8161 -> default
@@ -79,9 +102,11 @@ func init() {
 	ConsulCmd.Flags().StringVar(&consulPorts, "ports", "",
 		"Port migration in format: FROM -> TO (e.g., '8161 -> default' or '8161 -> 8500')")
 	ConsulCmd.Flags().BoolVar(&consulDryRun, "dry-run", false,
-		"Preview changes without applying them (works with --fix and --ports)")
+		"Preview changes without applying them (works with --fix, --ports, --bootstrap-token)")
 	ConsulCmd.Flags().BoolVar(&consulFix, "fix", false,
 		"Fix configuration drift from canonical state (use --dry-run to preview)")
+	ConsulCmd.Flags().BoolVar(&consulBootstrapToken, "bootstrap-token", false,
+		"Reset ACL bootstrap and recover/generate bootstrap token (stores in Vault)")
 }
 
 func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -95,19 +120,62 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	if consulPorts != "" {
 		operationCount++
 	}
+	if consulBootstrapToken {
+		operationCount++
+	}
 
 	// Only allow ONE operation at a time
 	if operationCount > 1 {
 		return eos_err.NewUserError(
 			"Cannot specify multiple operations simultaneously.\n\n" +
 				"Choose ONE of:\n" +
-				"  --fix     Fix configuration drift\n" +
-				"  --ports   Migrate ports\n\n" +
+				"  --fix              Fix configuration drift\n" +
+				"  --ports            Migrate ports\n" +
+				"  --bootstrap-token  Reset ACL bootstrap and recover token\n\n" +
 				"Use --dry-run to preview changes for any operation.\n\n" +
 				"Examples:\n" +
 				"  eos update consul --fix\n" +
 				"  eos update consul --fix --dry-run\n" +
+				"  eos update consul --bootstrap-token\n" +
 				"  eos update consul --ports 8161 -> default --dry-run")
+	}
+
+	// Handle --bootstrap-token flag (ACL bootstrap reset and recovery)
+	if consulBootstrapToken {
+		logger.Info("Running ACL bootstrap token reset and recovery",
+			zap.Bool("dry_run", consulDryRun))
+
+		// Need Vault client to store the bootstrap token
+		vaultClient, err := vault.GetVaultClient(rc)
+		if err != nil {
+			return fmt.Errorf("failed to get Vault client: %w\n\n"+
+				"ACL bootstrap token must be stored securely in Vault.\n"+
+				"Vault client is required to store the token.\n\n"+
+				"Remediation:\n"+
+				"  - Ensure Vault is installed: eos create vault\n"+
+				"  - Ensure Vault is unsealed: vault status\n"+
+				"  - Check Vault agent is running: systemctl status vault-agent-eos",
+				err)
+		}
+
+		// Delegate to pkg/consul/acl/reset.go
+		resetConfig := &consulacl.ResetConfig{
+			VaultClient: vaultClient,
+			Force:       false,
+			DryRun:      consulDryRun,
+		}
+
+		result, err := consulacl.ResetACLBootstrap(rc, resetConfig)
+		if err != nil {
+			return err
+		}
+
+		logger.Info("ACL bootstrap reset completed",
+			zap.Bool("already_done", result.AlreadyDone),
+			zap.Bool("stored_in_vault", result.StoredInVault),
+			zap.String("accessor", result.Accessor))
+
+		return nil
 	}
 
 	// Handle --fix flag (configuration drift correction)
@@ -128,10 +196,13 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// Validate ports flag is specified
 	if consulPorts == "" {
 		return eos_err.NewUserError(
-			"Must specify either --ports or --fix.\n\n" +
+			"Must specify one of: --ports, --fix, or --bootstrap-token.\n\n" +
 				"Fix configuration drift:\n" +
 				"  eos update consul --fix\n" +
 				"  eos update consul --fix --dry-run  (preview without applying)\n\n" +
+				"Reset ACL bootstrap token:\n" +
+				"  eos update consul --bootstrap-token\n" +
+				"  eos update consul --bootstrap-token --dry-run\n\n" +
 				"Port migration:\n" +
 				"  eos update consul --ports 8161 -> default\n" +
 				"  eos update consul --ports 8161 -> 8500 --dry-run\n" +

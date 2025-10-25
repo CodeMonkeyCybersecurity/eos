@@ -208,12 +208,53 @@ node_prefix "" {
 `
 }
 
+// GetDefaultServicePolicy returns a policy for general service operations
+// This policy allows services to register themselves and manage their own configuration
+// while maintaining security boundaries
+func GetDefaultServicePolicy() string {
+	return `# Service Policy
+# Allows services to register themselves and manage their own config
+
+# Allow services to register/deregister themselves
+service_prefix "" {
+  policy = "write"
+}
+
+# Allow services to read config
+key_prefix "config/" {
+  policy = "read"
+}
+
+# Allow services to write their own config
+key_prefix "config/service/" {
+  policy = "write"
+}
+
+# Allow services to read service catalog (for service discovery)
+service_prefix "" {
+  policy = "read"
+  intentions = "read"
+}
+
+# Allow services to perform health checks
+agent_prefix "" {
+  policy = "read"
+}
+
+# Allow services to read node information
+node_prefix "" {
+  policy = "read"
+}
+`
+}
+
 // CreateDefaultPolicies creates all default EOS policies in Consul
 //
 // This creates:
 //   - eos-policy: For EOS orchestration
 //   - vault-mgmt-policy: For Vault to manage tokens
 //   - readonly-policy: For read-only applications
+//   - service-policy: For general service operations
 //
 // Example:
 //
@@ -246,6 +287,11 @@ func CreateDefaultPolicies(rc *eos_io.RuntimeContext, consulClient *consulapi.Cl
 			Name:        "readonly-policy",
 			Description: "Read-only policy for applications",
 			Rules:       GetDefaultReadOnlyPolicy(),
+		},
+		{
+			Name:        "service-policy",
+			Description: "Policy for general service operations",
+			Rules:       GetDefaultServicePolicy(),
 		},
 	}
 

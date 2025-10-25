@@ -118,12 +118,18 @@ func (m *ConsulSecretsEngineManager) EnableConsulSecretsEngine(config *ConsulSec
 	m.logger.Info("Consul connection configured")
 
 	// INTERVENE - Create roles
+	var successfulRoles []string
+	var failedRoles []string
+
 	for _, role := range config.Roles {
 		if err := m.createRole(role); err != nil {
 			m.logger.Warn("Failed to create Consul role",
 				zap.String("role", role.Name),
 				zap.Error(err))
+			failedRoles = append(failedRoles, role.Name)
 			// Continue with other roles
+		} else {
+			successfulRoles = append(successfulRoles, role.Name)
 		}
 	}
 
@@ -133,7 +139,16 @@ func (m *ConsulSecretsEngineManager) EnableConsulSecretsEngine(config *ConsulSec
 	}
 
 	m.logger.Info("Consul secrets engine configuration complete",
-		zap.Int("roles_created", len(config.Roles)))
+		zap.Int("roles_requested", len(config.Roles)),
+		zap.Int("roles_created", len(successfulRoles)),
+		zap.Strings("successful_roles", successfulRoles))
+
+	// Warn if any roles failed
+	if len(failedRoles) > 0 {
+		m.logger.Warn("Some Consul roles failed to create",
+			zap.Int("failed_count", len(failedRoles)),
+			zap.Strings("failed_roles", failedRoles))
+	}
 
 	return nil
 }
@@ -205,10 +220,10 @@ func (m *ConsulSecretsEngineManager) TestTokenGeneration(roleName string) (*Cons
 	accessor, _ := secret.Data["accessor"].(string)
 
 	tokenInfo := &ConsulTokenInfo{
-		Token:     token,
-		Accessor:  accessor,
+		Token:         token,
+		Accessor:      accessor,
 		LeaseDuration: time.Duration(secret.LeaseDuration) * time.Second,
-		Renewable: secret.Renewable,
+		Renewable:     secret.Renewable,
 	}
 
 	m.logger.Info("Consul token generated successfully",

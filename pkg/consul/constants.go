@@ -49,6 +49,14 @@ const (
 
 	// ConsulVaultServiceConfig is the Vault service registration file
 	ConsulVaultServiceConfig = "/etc/consul.d/vault-service.json"
+
+	// ConsulACLResetFilename is the ACL bootstrap reset index file
+	// Location: <data_dir>/acl-bootstrap-reset (e.g., /opt/consul/acl-bootstrap-reset)
+	// RATIONALE: Enables re-bootstrapping ACL system after token loss recovery
+	// SECURITY: Only works on cluster leader, prevents unauthorized reset attempts
+	// THREAT MODEL: Mitigates lost bootstrap token scenario without compromising cluster
+	// Reference: https://developer.hashicorp.com/consul/docs/secure/acl/troubleshoot
+	ConsulACLResetFilename = "acl-bootstrap-reset"
 )
 
 // ============================================================================
@@ -259,6 +267,7 @@ const (
 // RATIONALE: Different installation methods install to different locations:
 //   - APT repository: Always installs to /usr/bin/consul (package manager standard)
 //   - Direct binary: Always installs to /usr/local/bin/consul (manual install standard)
+//
 // This encodes our knowledge of how package managers work instead of guessing.
 func GetExpectedBinaryPathForMethod(useRepository bool) string {
 	if useRepository {
