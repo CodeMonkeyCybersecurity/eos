@@ -10,6 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -198,25 +201,65 @@ func BackupConfig(rc *eos_io.RuntimeContext, configPath string) (string, error) 
 	return backupPath, nil
 }
 
-// ValidateConfigSyntax validates Consul HCL configuration syntax
+// ValidateConfigSyntax validates Consul HCL configuration syntax using the official HCL parser
+//
+// This function uses the HashiCorp HCL parser library to validate configuration syntax
+// without relying on the `consul validate` CLI command.
+//
+// Benefits over CLI approach:
+//   - No consul binary dependency
+//   - Better error messages with line/column numbers
+//   - Faster (no subprocess spawning)
+//   - Works offline
+//
+// Implementation Note:
+//   - Migrated from `consul validate` CLI command to HCL parser in v2.0
+//   - Provides detailed syntax error reporting with precise line numbers
+//   - Only validates HCL syntax, not Consul-specific semantic validation
 func ValidateConfigSyntax(rc *eos_io.RuntimeContext, configPath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Debug("Validating Consul configuration syntax",
+	logger.Debug("Validating Consul configuration syntax using HCL parser",
 		zap.String("config_path", configPath))
 
-	// Use 'consul validate' command
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"validate", configPath},
-		Capture: true,
-	})
-
+	// ASSESS - Read config file
+	content, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("configuration validation failed: %s\nOutput: %s", err, output)
+		return fmt.Errorf("failed to read config file %s: %w", configPath, err)
 	}
 
-	logger.Debug("Configuration syntax is valid")
+	// ASSESS - Parse HCL syntax using official HashiCorp parser
+	// This validates syntax but not semantic correctness (Consul-specific rules)
+	_, diags := hclsyntax.ParseConfig(content, configPath, hcl.Pos{Line: 1, Column: 1})
+
+	if diags.HasErrors() {
+		// EVALUATE - Build detailed error message with line numbers
+		var errMsgs []string
+		for _, diag := range diags {
+			if diag.Severity == hcl.DiagError {
+				// Include file:line:column for easy navigation
+				location := "(unknown location)"
+				if diag.Subject != nil {
+					location = fmt.Sprintf("%s:%d:%d",
+						configPath,
+						diag.Subject.Start.Line,
+						diag.Subject.Start.Column)
+				}
+
+				errMsgs = append(errMsgs, fmt.Sprintf("%s: %s", location, diag.Summary))
+
+				// Add detail if available
+				if diag.Detail != "" {
+					errMsgs = append(errMsgs, fmt.Sprintf("  Detail: %s", diag.Detail))
+				}
+			}
+		}
+
+		return fmt.Errorf("HCL syntax validation failed:\n%s", strings.Join(errMsgs, "\n"))
+	}
+
+	// EVALUATE - Success
+	logger.Debug("Configuration syntax is valid (HCL parser)")
 	return nil
 }
 

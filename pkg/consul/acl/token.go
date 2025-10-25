@@ -9,7 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	consulapi "github.com/hashicorp/consul/api"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -21,30 +23,72 @@ type TokenConfig struct {
 	AutoDetect bool
 }
 
-// DetectACLMode checks if Consul has ACLs enabled
+// DetectACLMode checks if Consul has ACLs enabled using the official Consul SDK
+//
+// This function uses the Consul SDK to make an unauthenticated API call to determine
+// ACL status without relying on CLI command parsing.
+//
+// The function attempts to list ACL policies, which is a read-only operation that will:
+//   - Return HTTP 401 "ACL support disabled" if ACLs are disabled
+//   - Return HTTP 403 "Permission denied" if ACLs are enabled but we lack a token
+//   - Return HTTP 200 with data if ACLs are enabled and we have a valid token
+//
+// Returns:
+//   - true if ACLs are enabled
+//   - false if ACLs are disabled
+//   - error if detection fails (network issues, Consul down, etc.)
+//
+// Implementation Note:
+//   - Migrated from CLI command (`consul acl bootstrap --dry-run`) to SDK in v2.0
+//   - Fail-safe: assumes ACLs are disabled if detection is uncertain
+//   - This allows auto-enablement prompt rather than silently skipping
 func DetectACLMode(ctx context.Context) (bool, error) {
 	logger := otelzap.Ctx(ctx)
 
-	// Try to run a command that requires ACL permissions
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"acl", "bootstrap", "-dry-run"},
-		Capture: true,
-	})
+	// ASSESS - Create Consul client (no token needed for detection)
+	config := consulapi.DefaultConfig()
+	config.Address = shared.GetConsulHostPort() // Usually localhost:8500
 
-	// If ACLs are enabled, this will error with "ACL bootstrap no longer allowed"
-	// If ACLs are disabled, it will error with "ACL support disabled"
+	client, err := consulapi.NewClient(config)
 	if err != nil {
-		if strings.Contains(output, "ACL support disabled") {
-			logger.Debug("ACL mode: disabled")
-			return false, nil
-		}
-		// Enabled but might already be bootstrapped
-		logger.Debug("ACL mode: enabled")
-		return true, nil
+		return false, fmt.Errorf("failed to create Consul client for ACL detection: %w", err)
 	}
 
-	logger.Debug("ACL mode: enabled (not yet bootstrapped)")
+	// ASSESS - Attempt to list ACL policies (read-only operation)
+	// This will reveal ACL status through the HTTP status code
+	_, _, err = client.ACL().PolicyList(nil)
+
+	if err != nil {
+		// Check error message for specific ACL states
+		errMsg := err.Error()
+
+		// HTTP 401: ACLs are explicitly disabled
+		if strings.Contains(errMsg, "ACL support disabled") {
+			logger.Debug("ACL mode: disabled (PolicyList returned 'ACL support disabled')")
+			return false, nil
+		}
+
+		// HTTP 403: ACLs are enabled, but we don't have a valid token
+		// This is expected when checking ACL status without authentication
+		if strings.Contains(errMsg, "Permission denied") ||
+			strings.Contains(errMsg, "403") {
+			logger.Debug("ACL mode: enabled (PolicyList returned permission denied)")
+			return true, nil
+		}
+
+		// Unexpected error (network failure, Consul down, etc.)
+		// FAIL-SAFE: Assume ACLs are disabled so we offer to enable them
+		// Better to prompt unnecessarily than skip enablement
+		logger.Warn("Could not detect ACL mode definitively",
+			zap.Error(err),
+			zap.String("error_message", errMsg),
+			zap.String("note", "Assuming ACLs disabled (fail-safe default)"))
+
+		return false, nil
+	}
+
+	// Success: ACLs are enabled AND we have a valid token
+	logger.Debug("ACL mode: enabled (PolicyList succeeded with valid token)")
 	return true, nil
 }
 
