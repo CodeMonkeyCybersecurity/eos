@@ -310,3 +310,61 @@ func LegacyBionicGPTPath(secretKey string) string {
 func LegacyHecatePath(subsystem, secretKey string) string {
 	return path.Join("secret", "hecate", subsystem, secretKey)
 }
+
+// ============================================================================
+// Vault Bootstrap and Internal Paths (SINGLE SOURCE OF TRUTH)
+// ============================================================================
+// These paths are used internally by Eos during Vault setup and operation.
+// DO NOT use these for application secrets - use SecretPath() instead.
+
+const (
+	// === Bootstrap Secrets (Ephemeral - Deleted After Use) ===
+	// These secrets are only used during initial Vault setup and are deleted
+	// after successful initialization to minimize the window of exposure.
+
+	// UserpassBootstrapPasswordKVPath is the temporary storage location for the
+	// userpass admin password during Vault initialization.
+	//
+	// Purpose:     Temporary storage for userpass password during Vault initialization
+	// Lifecycle:   Created in Phase 10a, read in Phase 13 (MFA setup), deleted after successful TOTP verification
+	// Security:    Contains plaintext password, MUST be deleted ASAP after use
+	// Access:      Only root token and vault admin policy can read
+	// Path format: secret/data/eos/bootstrap (KV v2 data path)
+	// CLI path:    secret/eos/bootstrap (vault CLI path without /data/ prefix)
+	//
+	// Example usage:
+	//   Write: client.Logical().Write("secret/data/eos/bootstrap", data)
+	//   Read:  client.Logical().Read("secret/data/eos/bootstrap")
+	//   Delete: client.Logical().Delete("secret/data/eos/bootstrap")
+	UserpassBootstrapPasswordKVPath = "secret/data/eos/bootstrap"
+
+	// UserpassBootstrapPasswordKVField is the field name within the bootstrap secret
+	// that contains the actual password value.
+	UserpassBootstrapPasswordKVField = "password"
+
+	// UserpassBootstrapPasswordCLIPath is the CLI-friendly path (without /data/ prefix)
+	// for use with vault kv commands.
+	UserpassBootstrapPasswordCLIPath = "secret/eos/bootstrap"
+
+	// === MFA Method Storage ===
+	// Storage location for MFA method metadata (method IDs, configuration, etc.)
+
+	// MFAMethodStoragePrefix is the base path for storing MFA method metadata.
+	// Individual methods are stored at: secret/data/eos/mfa-methods/{method-type}
+	MFAMethodStoragePrefix = "secret/data/eos/mfa-methods/"
+
+	// TOTPMethodStorageKVPath is the storage location for TOTP MFA method metadata.
+	// Contains: method_id, method_type, created_at, created_by
+	TOTPMethodStorageKVPath = "secret/data/eos/mfa-methods/totp"
+
+	// TOTPMethodStorageCLIPath is the CLI-friendly path for TOTP method metadata.
+	TOTPMethodStorageCLIPath = "secret/eos/mfa-methods/totp"
+
+	// === Legacy Bootstrap Paths (DEPRECATED) ===
+	// Old path used before standardization. Kept for migration support only.
+
+	// UserpassPasswordKVPathLegacy is the old bootstrap password path.
+	// DEPRECATED: Use UserpassBootstrapPasswordKVPath instead.
+	// This will be removed after migration is complete (approximately 6 months).
+	UserpassPasswordKVPathLegacy = "secret/data/eos/userpass-password"
+)

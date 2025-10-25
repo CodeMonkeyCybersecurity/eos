@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	vaultpaths "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -328,27 +330,53 @@ func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string
 		return cerr.Wrap(err, "get-privileged-client")
 	}
 
-	if err := WriteKVv2(rc, client, "secret", "eos/userpass-password", shared.FallbackSecretsTemplate(password)); err != nil {
-		log.Error(" Failed to write fallback credentials to Vault KV",
-			zap.String("path", "secret/eos/userpass-password"),
-			zap.Error(err))
-		return cerr.Wrap(err, "write-kv-v2")
+	// Write bootstrap password to Vault KV using standardized path and format
+	// NOTE: This is a temporary bootstrap password for initial setup only.
+	// It will be deleted after successful TOTP verification in Phase 13.
+	bootstrapData := map[string]interface{}{
+		vaultpaths.UserpassBootstrapPasswordKVField: password,
+		"created_at":  time.Now().UTC().Format(time.RFC3339),
+		"purpose":     "initial-setup-verification",
+		"lifecycle":   "ephemeral - deleted after first use",
+		"created_by":  "eos-phase-10a",
 	}
 
-	log.Info(" [EVALUATE] Fallback credentials written to Vault KV successfully",
-		zap.String("path", "secret/eos/userpass-password"))
+	if err := WriteKVv2(rc, client, "secret", "eos/bootstrap", bootstrapData); err != nil {
+		log.Error(" Failed to write bootstrap credentials to Vault KV",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.Error(err))
+		return cerr.Wrap(err, "write-bootstrap-password-kv")
+	}
+
+	log.Info(" [EVALUATE] Bootstrap credentials written to Vault KV successfully",
+		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+		zap.String("purpose", "initial-setup-verification"),
+		zap.String("lifecycle", "ephemeral - will be deleted after MFA setup"))
 
 	// Verify KV write by reading it back
 	log.Info(" Verifying KV write by reading back from Vault")
-	verifySecret, verifyErr := client.Logical().Read("secret/data/eos/userpass-password")
+	verifySecret, verifyErr := client.Logical().Read(vaultpaths.UserpassBootstrapPasswordKVPath)
 	if verifyErr != nil {
 		log.Warn("Failed to verify KV write", zap.Error(verifyErr))
 	} else if verifySecret == nil {
 		log.Warn("KV verification returned nil - secret may not have been written properly")
 	} else {
-		log.Info(" KV write verification successful",
-			zap.String("path", "secret/eos/userpass-password"),
-			zap.Any("metadata_keys", getSecretDataKeys(verifySecret)))
+		// Verify the data structure is correct
+		if verifySecret.Data != nil {
+			if dataMap, ok := verifySecret.Data["data"].(map[string]interface{}); ok {
+				if _, hasPassword := dataMap[vaultpaths.UserpassBootstrapPasswordKVField]; hasPassword {
+					log.Info(" KV write verification successful",
+						zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+						zap.String("field_verified", vaultpaths.UserpassBootstrapPasswordKVField))
+				} else {
+					log.Warn("KV write verification failed - password field missing",
+						zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
+						zap.Any("actual_fields", getMapKeys(dataMap)))
+				}
+			} else {
+				log.Warn("KV write verification failed - invalid data structure")
+			}
+		}
 	}
 
 	return nil

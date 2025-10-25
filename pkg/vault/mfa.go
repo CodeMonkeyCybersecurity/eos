@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	vaultpaths "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -38,10 +39,19 @@ func DefaultMFAConfig() *MFAConfig {
 	}
 }
 
-// EnableMFAMethods enables and configures MFA methods in Vault
-func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
+// CreateMFAMethodsOnly creates MFA methods WITHOUT enforcement
+// Extracted from EnableMFAMethods to allow verification before enforcement
+//
+// CRITICAL: This function ONLY creates MFA methods (e.g., TOTP, Duo, etc.).
+// It does NOT apply enforcement policies. Enforcement must be done separately
+// via EnforceMFAPolicyOnly() AFTER verifying that users can successfully
+// use the MFA methods.
+//
+// This split prevents lockout scenarios where MFA is enforced but users
+// haven't configured their TOTP secrets yet.
+func CreateMFAMethodsOnly(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Configuring Multi-Factor Authentication for Vault")
+	log.Info(" Creating MFA methods (enforcement deferred)")
 
 	if config == nil {
 		config = DefaultMFAConfig()
@@ -60,53 +70,115 @@ func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFA
 		log.Info(" Using privileged client for MFA operations")
 	}
 
-	// Enable TOTP MFA if requested
+	// Enable TOTP MFA if requested (method creation only, no enforcement)
 	if config.TOTPEnabled {
-		log.Info(" Enabling TOTP MFA")
+		log.Info(" Creating TOTP MFA method")
 		if err := enableTOTPMFA(rc, privilegedClient); err != nil {
-			log.Error(" Failed to enable TOTP MFA", zap.Error(err))
-			return cerr.Wrap(err, "failed to enable TOTP MFA")
+			log.Error(" Failed to create TOTP MFA method", zap.Error(err))
+			return cerr.Wrap(err, "failed to create TOTP MFA method")
 		}
 	}
 
 	// Enable Duo MFA if requested
 	if config.DuoEnabled {
-		log.Info(" Enabling Duo MFA")
+		log.Info(" Creating Duo MFA method")
 		if err := enableDuoMFA(rc, privilegedClient); err != nil {
-			log.Error(" Failed to enable Duo MFA", zap.Error(err))
-			return cerr.Wrap(err, "failed to enable Duo MFA")
+			log.Error(" Failed to create Duo MFA method", zap.Error(err))
+			return cerr.Wrap(err, "failed to create Duo MFA method")
 		}
 	}
 
 	// Enable PingID MFA if requested
 	if config.PingIDEnabled {
-		log.Info(" Enabling PingID MFA")
+		log.Info(" Creating PingID MFA method")
 		if err := enablePingIDMFA(rc, privilegedClient); err != nil {
-			log.Error(" Failed to enable PingID MFA", zap.Error(err))
-			return cerr.Wrap(err, "failed to enable PingID MFA")
+			log.Error(" Failed to create PingID MFA method", zap.Error(err))
+			return cerr.Wrap(err, "failed to create PingID MFA method")
 		}
 	}
 
 	// Enable Okta MFA if requested
 	if config.OktaEnabled {
-		log.Info(" Enabling Okta MFA")
+		log.Info(" Creating Okta MFA method")
 		if err := enableOktaMFA(rc, privilegedClient); err != nil {
-			log.Error(" Failed to enable Okta MFA", zap.Error(err))
-			return cerr.Wrap(err, "failed to enable Okta MFA")
+			log.Error(" Failed to create Okta MFA method", zap.Error(err))
+			return cerr.Wrap(err, "failed to create Okta MFA method")
 		}
 	}
 
-	// Apply MFA enforcement policies
+	// NOTE: Does NOT call enforceMFAForAllUsers() - that's done in EnforceMFAPolicyOnly()
+
+	log.Info(" MFA methods created successfully (not yet enforced)")
+	log.Info("MFA Setup State Transition",
+		zap.String("from_state", "no_mfa"),
+		zap.String("to_state", "methods_created"),
+		zap.String("note", "Awaiting TOTP setup and verification"))
+	return nil
+}
+
+// EnforceMFAPolicyOnly applies MFA enforcement AFTER methods are verified
+//
+// CRITICAL: Must only be called AFTER SetupUserTOTP() succeeds for at least
+// one user. This ensures users can actually authenticate with MFA before
+// enforcement is active.
+//
+// If this function is called before TOTP setup, users will be locked out
+// because they won't have TOTP secrets configured yet.
+func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info(" Applying MFA enforcement policy")
+	log.Info("MFA Setup State Transition",
+		zap.String("from_state", "totp_verified"),
+		zap.String("to_state", "mfa_enforced"),
+		zap.String("note", "MFA now required for all logins"))
+
+	if config == nil {
+		config = DefaultMFAConfig()
+	}
+
+	// Get privileged client
+	privilegedClient, err := GetPrivilegedClient(rc)
+	if err != nil {
+		log.Error(" Failed to get privileged Vault client for MFA enforcement", zap.Error(err))
+		return cerr.Wrap(err, "get privileged client for MFA")
+	}
+
+	// Apply enforcement policies
 	if config.EnforceForAll {
-		log.Info(" Enforcing MFA for all users")
+		log.Info(" Enforcing MFA for all authentication methods")
 		if err := enforceMFAForAllUsers(rc, privilegedClient, config); err != nil {
 			log.Error(" Failed to enforce MFA for all users", zap.Error(err))
 			return cerr.Wrap(err, "failed to enforce MFA for all users")
 		}
 	}
 
-	log.Info(" MFA configuration completed successfully")
+	log.Info(" MFA enforcement active")
+	log.Info("MFA Setup State Transition",
+		zap.String("from_state", "mfa_enforced"),
+		zap.String("to_state", "fully_operational"),
+		zap.String("note", "MFA setup complete"))
 	return nil
+}
+
+// EnableMFAMethods enables and configures MFA methods in Vault
+//
+// DEPRECATED: Use CreateMFAMethodsOnly() + SetupUserTOTP() + EnforceMFAPolicyOnly()
+// for better error recovery and idempotency.
+//
+// This function combines method creation and enforcement in one operation,
+// which can lead to lockout if TOTP setup fails.
+func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
+	log := otelzap.Ctx(rc.Ctx)
+	log.Warn(" DEPRECATED: Using legacy EnableMFAMethods (combines creation + enforcement)")
+	log.Warn(" Consider using CreateMFAMethodsOnly + EnforceMFAPolicyOnly for better safety")
+
+	// Call new functions in sequence (legacy behavior)
+	if err := CreateMFAMethodsOnly(rc, client, config); err != nil {
+		return err
+	}
+
+	// Immediately enforce (this is the old behavior that can cause lockout)
+	return EnforceMFAPolicyOnly(rc, client, config)
 }
 
 // enableTOTPMFA enables Time-based One-Time Password MFA using Identity-based MFA
@@ -608,11 +680,128 @@ func VerifyMFAPrerequisites(rc *eos_io.RuntimeContext, client *api.Client, usern
 	return nil
 }
 
+// deleteEntityTOTPSecret deletes the TOTP secret for an entity
+// This is used during cleanup when TOTP verification fails
+//
+// Parameters:
+//   - rc: Runtime context
+//   - client: Authenticated Vault client
+//   - entityID: The entity ID whose TOTP secret should be deleted
+//   - methodID: The TOTP method ID
+//
+// Returns:
+//   - error: nil on success, error if deletion fails
+func deleteEntityTOTPSecret(rc *eos_io.RuntimeContext, client *api.Client, entityID, methodID string) error {
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Info(" [CLEANUP] Deleting orphaned TOTP secret",
+		zap.String("entity_id", entityID),
+		zap.String("method_id", methodID))
+
+	// Use admin-destroy endpoint to delete TOTP secret for an entity
+	destroyPath := "identity/mfa/method/totp/admin-destroy"
+	destroyData := map[string]interface{}{
+		"entity_id": entityID,
+		"method_id": methodID,
+	}
+
+	_, err := client.Logical().Write(destroyPath, destroyData)
+	if err != nil {
+		log.Warn(" Failed to delete TOTP secret (may not exist)",
+			zap.String("entity_id", entityID),
+			zap.String("method_id", methodID),
+			zap.Error(err))
+		// Don't return error - cleanup is best-effort
+		return nil
+	}
+
+	log.Info(" ✓ [CLEANUP] TOTP secret deleted successfully")
+	return nil
+}
+
+// checkEntityHasTOTP checks if an entity already has TOTP configured
+// Returns true if TOTP secret exists for the entity, false otherwise
+//
+// This is used for idempotency - we should not generate a new TOTP secret
+// if one already exists, as this would create duplicate entries in the user's
+// authenticator app and they wouldn't know which code to use.
+//
+// Parameters:
+//   - rc: Runtime context
+//   - client: Authenticated Vault client
+//   - entityID: The entity ID to check
+//   - methodID: The TOTP method ID to check against
+//
+// Returns:
+//   - bool: true if TOTP is configured, false otherwise
+//   - error: nil on success, error if check fails
+func checkEntityHasTOTP(rc *eos_io.RuntimeContext, client *api.Client, entityID, methodID string) (bool, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Debug("Checking if entity has TOTP configured",
+		zap.String("entity_id", entityID),
+		zap.String("method_id", methodID))
+
+	// Try to read the entity's MFA credentials for this method
+	// Path: identity/mfa/method/totp/admin-generate (this endpoint is also used to check existing secrets)
+	// If a secret already exists, Vault will return an error indicating it
+
+	// Alternative approach: Try to list MFA secrets for the entity
+	// Path: identity/entity/id/{entity_id}
+	// Check if the entity has any MFA methods configured
+
+	entityPath := fmt.Sprintf("identity/entity/id/%s", entityID)
+	entityResp, err := client.Logical().Read(entityPath)
+	if err != nil {
+		log.Warn("Failed to read entity for TOTP check",
+			zap.String("entity_id", entityID),
+			zap.Error(err))
+		// If we can't check, assume not configured (fail open for setup)
+		return false, nil
+	}
+
+	if entityResp == nil || entityResp.Data == nil {
+		log.Debug("Entity has no data - TOTP not configured")
+		return false, nil
+	}
+
+	// Check if entity has MFA methods configured
+	// The entity response includes mfa_secrets field if any MFA is configured
+	if mfaSecrets, ok := entityResp.Data["mfa_secrets"].(map[string]interface{}); ok && len(mfaSecrets) > 0 {
+		log.Debug("Entity has MFA secrets configured",
+			zap.String("entity_id", entityID),
+			zap.Int("mfa_secret_count", len(mfaSecrets)))
+
+		// Check if any of the MFA secrets match our TOTP method ID
+		for secretID, secretData := range mfaSecrets {
+			if secretMap, ok := secretData.(map[string]interface{}); ok {
+				if secretMethodID, ok := secretMap["method_id"].(string); ok {
+					if secretMethodID == methodID {
+						log.Info("Entity already has TOTP configured for this method",
+							zap.String("entity_id", entityID),
+							zap.String("method_id", methodID),
+							zap.String("secret_id", secretID))
+						return true, nil
+					}
+				}
+			}
+		}
+	}
+
+	log.Debug("Entity does not have TOTP configured for this method",
+		zap.String("entity_id", entityID),
+		zap.String("method_id", methodID))
+	return false, nil
+}
+
 // SetupUserTOTP helps a user set up TOTP MFA for Identity-based MFA
 // This function generates a user-specific TOTP secret and displays it for enrollment
 //
 // CRITICAL: Must be called AFTER EnableMFAMethods() creates the TOTP MFA method
 // CRITICAL: User MUST save the QR code/URL/key before continuing - they cannot retrieve it later
+//
+// IDEMPOTENCY: This function checks if TOTP is already configured before proceeding.
+// If TOTP already exists, it will skip setup and inform the user how to reset if needed.
 func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
@@ -742,6 +931,44 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 			zap.String("method", lookupMethod))
 	}
 
+	// State transition: Entity lookup complete
+	log.Info("MFA Setup State Transition",
+		zap.String("from_state", "methods_created"),
+		zap.String("to_state", "entity_lookup_complete"),
+		zap.String("entity_id", entityID),
+		zap.String("lookup_method", lookupMethod))
+
+	// Step 2.5: IDEMPOTENCY CHECK - Check if TOTP is already configured
+	// This prevents creating duplicate TOTP entries in the user's authenticator app
+	log.Info(" [IDEMPOTENCY] Checking if TOTP is already configured for this user")
+	hasTOTP, checkErr := checkEntityHasTOTP(rc, client, entityID, methodID)
+	if checkErr != nil {
+		log.Warn("Failed to check if TOTP exists - proceeding with setup anyway",
+			zap.Error(checkErr))
+		// Don't fail here - if check fails, proceed with setup (fail open)
+	} else if hasTOTP {
+		log.Info("")
+		log.Info("═══════════════════════════════════════════════════════════")
+		log.Info(" ✓ TOTP is already configured for this user")
+		log.Info("═══════════════════════════════════════════════════════════")
+		log.Info("")
+		log.Info(fmt.Sprintf("TOTP MFA is already set up for user '%s'.", username))
+		log.Info("The user already has a TOTP secret in their authenticator app.")
+		log.Info("")
+		log.Info("If you need to reconfigure TOTP (e.g., lost authenticator device):")
+		log.Info("  1. Delete the existing TOTP secret:")
+		log.Info(fmt.Sprintf("     vault write identity/mfa/method/totp/admin-destroy entity_id=%s method_id=%s", entityID, methodID))
+		log.Info("  2. Re-run TOTP setup:")
+		log.Info(fmt.Sprintf("     eos update vault --setup-mfa-user %s", username))
+		log.Info("")
+		log.Info("IMPORTANT: Deleting the TOTP secret will lock the user out until")
+		log.Info("they complete TOTP setup again with a new QR code.")
+		log.Info("")
+		return nil // Success - already configured (idempotent)
+	}
+
+	log.Info(" ✓ [IDEMPOTENCY] TOTP not yet configured - proceeding with setup")
+
 	// Step 3: Generate TOTP secret using admin endpoint
 	log.Info(" [INTERVENE] Generating TOTP secret for user",
 		zap.String("entity_id", entityID),
@@ -777,6 +1004,37 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	}
 
 	log.Info(" ✓ TOTP secret generated successfully")
+
+	// State transition: TOTP secret generated
+	log.Info("MFA Setup State Transition",
+		zap.String("from_state", "entity_lookup_complete"),
+		zap.String("to_state", "totp_secret_generated"),
+		zap.String("entity_id", entityID))
+
+	// CRITICAL: Setup cleanup defer pattern to delete orphaned TOTP secret on failure
+	// This prevents leaving orphaned secrets that would cause duplicate entries in authenticator apps
+	var verificationSucceeded bool
+	defer func() {
+		if !verificationSucceeded {
+			log.Warn("")
+			log.Warn("═══════════════════════════════════════════════════════════")
+			log.Warn(" TOTP verification failed - cleaning up orphaned secret")
+			log.Warn("═══════════════════════════════════════════════════════════")
+			log.Warn("")
+			log.Warn("The TOTP secret was generated but verification did not complete successfully.")
+			log.Warn("Deleting the orphaned secret so you can retry without duplicates.")
+			log.Warn("")
+
+			if cleanupErr := deleteEntityTOTPSecret(rc, client, entityID, methodID); cleanupErr != nil {
+				log.Error(" Cleanup failed - you may have an orphaned TOTP secret",
+					zap.Error(cleanupErr))
+				log.Error("Manual cleanup command:")
+				log.Error(fmt.Sprintf("  vault write identity/mfa/method/totp/admin-destroy entity_id=%s method_id=%s",
+					entityID, methodID))
+			}
+		}
+	}()
+
 	log.Info("")
 
 	// Step 4: Display the secret to the user (CRITICAL - they can't retrieve this later)
@@ -850,37 +1108,112 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	totpCode := testCodes[0]
 
-	// Step 1: Read userpass password from Vault KV (stored during Phase 10a)
-	log.Info(" [VERIFICATION] Reading userpass password from Vault KV")
-	kvPath := "secret/data/eos/userpass-password"
-	passwordSecret, err := client.Logical().Read(kvPath)
+	// Step 1: Read bootstrap password from Vault KV (stored during Phase 10a)
+	// This is the temporary bootstrap password that will be deleted after successful TOTP verification
+	log.Info(" [VERIFICATION] Reading bootstrap password from Vault KV",
+		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+
+	passwordSecret, err := client.Logical().Read(vaultpaths.UserpassBootstrapPasswordKVPath)
 	if err != nil {
-		log.Error(" Failed to read userpass password from KV",
-			zap.String("path", kvPath),
-			zap.Error(err))
-		return cerr.Wrap(err, "failed to read userpass password - should have been stored in Phase 10a")
+		log.Error(" Failed to read bootstrap password from KV",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.Error(err),
+			zap.String("phase_context", "Should have been created in Phase 10a"))
+		log.Error("")
+		log.Error("Possible causes:")
+		log.Error("  • Phase 10a (userpass setup) did not complete successfully")
+		log.Error("  • Bootstrap password was already deleted (if retrying after success)")
+		log.Error("  • Network/connection issue with Vault")
+		log.Error("")
+		log.Error("Remediation:")
+		log.Error("  1. Check Phase 10a logs for password write confirmation")
+		log.Error("  2. Verify path exists: vault kv get secret/eos/bootstrap")
+		log.Error("  3. If missing, re-run: eos update vault --setup-userpass")
+		log.Error("")
+		return cerr.Wrap(err, "failed to read bootstrap password from KV - Phase 10a may not have completed")
 	}
 
-	if passwordSecret == nil || passwordSecret.Data == nil {
-		log.Error(" Password not found in Vault KV",
-			zap.String("path", kvPath))
-		return cerr.New("password not found in KV - should have been stored in Phase 10a")
+	if passwordSecret == nil {
+		log.Error(" Bootstrap password secret returned nil from Vault",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Error("")
+		log.Error("This indicates the secret does not exist at the expected path.")
+		log.Error(fmt.Sprintf("Expected path: %s", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Error("")
+		log.Error("Remediation:")
+		log.Error("  • Re-run Phase 10a: eos update vault --setup-userpass")
+		log.Error("")
+		return cerr.New("bootstrap password secret not found - Phase 10a may not have completed")
 	}
 
-	// KV v2 wraps data in a "data" field
+	if passwordSecret.Data == nil {
+		log.Error(" Bootstrap password secret exists but Data field is nil",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Error("")
+		log.Error("This is an unexpected Vault response structure.")
+		log.Error("The secret exists but contains no data.")
+		log.Error("")
+		return cerr.New("bootstrap password secret has nil Data field - unexpected Vault response")
+	}
+
+	// KV v2 wraps actual data in a "data" field
+	// Structure: { "data": { "password": "...", "created_at": "...", ... }, "metadata": {...} }
 	kvData, ok := passwordSecret.Data["data"].(map[string]interface{})
 	if !ok {
-		log.Error(" Invalid KV data structure")
-		return cerr.New("invalid KV v2 data structure")
+		log.Error(" Invalid KV v2 data structure - 'data' field missing or wrong type",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.Any("response_structure", passwordSecret.Data))
+		log.Error("")
+		log.Error("Expected KV v2 structure: { \"data\": { \"password\": \"...\" }, \"metadata\": {...} }")
+		log.Error("Actual structure does not have a 'data' field as map[string]interface{}")
+		log.Error("")
+		log.Error("Possible causes:")
+		log.Error("  • Secret was written with wrong structure (not KV v2 format)")
+		log.Error("  • Secret was written to wrong mount point")
+		log.Error("  • KV engine is not v2 (check: vault secrets list)")
+		log.Error("")
+		log.Error("Diagnostic command:")
+		log.Error("  vault kv get -format=json secret/eos/bootstrap | jq")
+		log.Error("")
+		return cerr.New("invalid KV v2 data structure - 'data' field missing or wrong type")
 	}
 
-	password, ok := kvData["password"].(string)
-	if !ok || password == "" {
-		log.Error(" Password field missing or invalid")
-		return cerr.New("password field missing or invalid in KV")
+	// Extract password field from the data map
+	password, ok := kvData[vaultpaths.UserpassBootstrapPasswordKVField].(string)
+	if !ok {
+		log.Error(" Password field missing or not a string",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
+			zap.Any("available_fields", getMapKeys(kvData)))
+		log.Error("")
+		log.Error(fmt.Sprintf("Expected field: '%s' (type: string)", vaultpaths.UserpassBootstrapPasswordKVField))
+		log.Error(fmt.Sprintf("Available fields in data: %v", getMapKeys(kvData)))
+		log.Error("")
+		log.Error("Possible causes:")
+		log.Error("  • Phase 10a used different field name (check constants match)")
+		log.Error("  • Field exists but is not a string type")
+		log.Error("  • Secret was manually modified")
+		log.Error("")
+		log.Error("Diagnostic command:")
+		log.Error("  vault kv get -format=json secret/eos/bootstrap | jq '.data.data'")
+		log.Error("")
+		return cerr.Newf("password field '%s' missing or invalid in KV data", vaultpaths.UserpassBootstrapPasswordKVField)
 	}
 
-	log.Info(" ✓ [VERIFICATION] Password retrieved from KV")
+	if password == "" {
+		log.Error(" Password field is empty string",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.String("field", vaultpaths.UserpassBootstrapPasswordKVField))
+		log.Error("")
+		log.Error("Password field exists but contains an empty string.")
+		log.Error("This should never happen - Phase 10a should generate a non-empty password.")
+		log.Error("")
+		return cerr.New("password field is empty - invalid state")
+	}
+
+	log.Info(" ✓ [VERIFICATION] Bootstrap password retrieved successfully from KV",
+		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+		zap.Int("password_length", len(password)))
 
 	// Step 2: Perform userpass login to trigger MFA challenge
 	log.Info(" [VERIFICATION] Attempting userpass login (will trigger MFA challenge)")
@@ -984,6 +1317,36 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info("")
 	log.Info(" ✓ TOTP code verified successfully via test login!")
 	log.Info("")
+
+	// Mark verification as succeeded to prevent cleanup defer from deleting the secret
+	verificationSucceeded = true
+
+	// State transition: TOTP verification succeeded
+	log.Info("MFA Setup State Transition",
+		zap.String("from_state", "totp_secret_generated"),
+		zap.String("to_state", "totp_verified"),
+		zap.String("entity_id", entityID),
+		zap.String("note", "Ready for MFA enforcement"))
+
+	// CRITICAL: Delete bootstrap password now that TOTP verification succeeded
+	// This password was only needed for initial setup and should not persist
+	log.Info(" [CLEANUP] Deleting ephemeral bootstrap password from Vault KV")
+	_, deleteErr := client.Logical().Delete(vaultpaths.UserpassBootstrapPasswordKVPath)
+	if deleteErr != nil {
+		log.Warn(" Failed to delete bootstrap password (non-fatal)",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.Error(deleteErr))
+		log.Warn("")
+		log.Warn(fmt.Sprintf("The bootstrap password still exists at: %s", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Warn("This password is no longer needed and should be deleted manually:")
+		log.Warn(fmt.Sprintf("  vault kv delete %s", vaultpaths.UserpassBootstrapPasswordCLIPath))
+		log.Warn("")
+	} else {
+		log.Info(" ✓ [CLEANUP] Bootstrap password deleted successfully",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+	}
+
+	log.Info("")
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info(" TOTP MFA setup complete for user: " + username)
 	log.Info("═══════════════════════════════════════════════════════════")
@@ -993,6 +1356,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info("  ✓ MFA challenge triggered correctly")
 	log.Info("  ✓ TOTP code validated successfully")
 	log.Info("  ✓ Complete authentication flow verified")
+	log.Info("  ✓ Bootstrap password cleaned up")
 	log.Info("")
 	log.Info("You will now be prompted for a TOTP code every time you")
 	log.Info("authenticate to Vault with your username and password.")
