@@ -1,3 +1,10 @@
+// pkg/hecate/secret_manager.go
+//
+// Hecate secret management using Vault and Consul SDK.
+// Migrated from shell commands to SDK calls for improved reliability.
+//
+// Last Updated: 2025-01-25
+
 package hecate
 
 import (
@@ -9,9 +16,13 @@ import (
 	"strings"
 	"time"
 
+	consulsdk "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/sdk"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	vaultsdk "github.com/CodeMonkeyCybersecurity/eos/pkg/vault/sdk"
+	consulapi "github.com/hashicorp/consul/api"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -27,8 +38,10 @@ const (
 
 // SecretManager provides a unified interface for secret management
 type SecretManager struct {
-	backend SecretBackend
-	rc      *eos_io.RuntimeContext
+	backend      SecretBackend
+	rc           *eos_io.RuntimeContext
+	vaultClient  *vaultapi.Client
+	consulClient *consulapi.Client
 }
 
 // NewSecretManager creates a new secret manager with automatic backend detection
@@ -46,6 +59,23 @@ func NewSecretManager(rc *eos_io.RuntimeContext) (*SecretManager, error) {
 	}
 
 	sm.backend = backend
+
+	// Initialize SDK clients based on backend
+	if backend == SecretBackendVault {
+		vaultClient, err := vaultsdk.NewClient()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Vault client: %w", err)
+		}
+		sm.vaultClient = vaultClient
+	}
+
+	// Always create Consul client as it may be used for fallback
+	consulClient, err := consulsdk.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+	}
+	sm.consulClient = consulClient
+
 	logger.Info("Secret manager initialized", zap.String("backend", string(backend)))
 
 	return sm, nil
@@ -59,10 +89,6 @@ func (sm *SecretManager) detectBackend() (SecretBackend, error) {
 	logger.Debug("Checking Vault availability")
 	vaultAddr := shared.GetVaultAddrWithEnv()
 
-	// Test Vault connectivity with timeout
-	ctx, cancel := context.WithTimeout(sm.rc.Ctx, 5*time.Second)
-	defer cancel()
-
 	// Set environment variable for Vault
 	oldVaultAddr := os.Getenv("VAULT_ADDR")
 	_ = os.Setenv("VAULT_ADDR", vaultAddr)
@@ -74,18 +100,24 @@ func (sm *SecretManager) detectBackend() (SecretBackend, error) {
 		}
 	}()
 
-	_, err := execute.Run(ctx, execute.Options{
-		Command: "vault",
-		Args:    []string{"status"},
-		Capture: true,
-	})
+	// Try to create Vault client and check health using SDK with timeout
+	ctx, cancel := context.WithTimeout(sm.rc.Ctx, 5*time.Second)
+	defer cancel()
 
+	vaultClient, err := vaultsdk.NewClient()
 	if err == nil {
-		logger.Debug("Vault is available and accessible")
-		return SecretBackendVault, nil
+		// Check if Vault is reachable
+		_, err = vaultClient.Sys().HealthWithContext(ctx)
+		if err == nil {
+			logger.Debug("Vault is available and accessible")
+			return SecretBackendVault, nil
+		}
+		logger.Debug("Vault client created but health check failed", zap.Error(err))
+	} else {
+		logger.Debug("Failed to create Vault client", zap.Error(err))
 	}
 
-	logger.Debug("Vault not available, using Consul KV fallback", zap.Error(err))
+	logger.Debug("Vault not available, using Consul KV fallback")
 
 	// Use Consul KV as fallback for HashiCorp integration
 	return SecretBackendConsul, nil
@@ -109,11 +141,9 @@ func (sm *SecretManager) GetSecret(service, key string) (string, error) {
 	}
 }
 
-// getVaultSecret retrieves a secret from Vault
+// getVaultSecret retrieves a secret from Vault using SDK
 func (sm *SecretManager) getVaultSecret(service, key string) (string, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
-
-	vaultAddr := shared.GetVaultAddrWithEnv()
 
 	var vaultPath, field string
 
@@ -163,31 +193,20 @@ func (sm *SecretManager) getVaultSecret(service, key string) (string, error) {
 		zap.String("path", vaultPath),
 		zap.String("field", field))
 
-	// Set environment variable for Vault
-	oldVaultAddr := os.Getenv("VAULT_ADDR")
-	_ = os.Setenv("VAULT_ADDR", vaultAddr)
-	defer func() {
-		if oldVaultAddr != "" {
-			_ = os.Setenv("VAULT_ADDR", oldVaultAddr)
-		} else {
-			_ = os.Unsetenv("VAULT_ADDR")
-		}
-	}()
-
-	output, err := execute.Run(sm.rc.Ctx, execute.Options{
-		Command: "vault",
-		Args:    []string{"kv", "get", "-field=" + field, vaultPath},
-		Capture: true,
-	})
-
+	// Use SDK to get the secret field
+	value, err := vaultsdk.KVGetField(sm.rc.Ctx, sm.vaultClient, vaultPath, field)
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret from Vault: %w", err)
 	}
 
-	return strings.TrimSpace(output), nil
+	if value == "" {
+		return "", fmt.Errorf("secret field %s not found at %s", field, vaultPath)
+	}
+
+	return strings.TrimSpace(value), nil
 }
 
-// getConsulSecret retrieves a secret from HashiCorp Consul KV store
+// getConsulSecret retrieves a secret from HashiCorp Consul KV store using SDK
 func (sm *SecretManager) getConsulSecret(service, key string) (string, error) {
 	logger := otelzap.Ctx(sm.rc.Ctx)
 
@@ -199,22 +218,20 @@ func (sm *SecretManager) getConsulSecret(service, key string) (string, error) {
 		zap.String("service", service),
 		zap.String("key", key))
 
-	// Use consul command to retrieve the secret
-	output, err := execute.Run(sm.rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"kv", "get", consulPath},
-		Capture: true,
-	})
-
+	// Use SDK to retrieve the secret
+	data, err := consulsdk.KVGet(sm.rc.Ctx, sm.consulClient, consulPath)
 	if err != nil {
+		return "", fmt.Errorf("failed to get secret from Consul KV: %w", err)
+	}
+
+	if data == nil {
 		// If secret doesn't exist in Consul, provide helpful error message
 		logger.Debug("Secret not found in Consul KV, may need to be stored by administrator",
-			zap.String("path", consulPath),
-			zap.Error(err))
+			zap.String("path", consulPath))
 		return "", fmt.Errorf("secret not found in Consul KV at %s - administrator may need to store this secret using: consul kv put %s <value>", consulPath, consulPath)
 	}
 
-	secretValue := strings.TrimSpace(output)
+	secretValue := strings.TrimSpace(string(data))
 	if secretValue == "" {
 		return "", fmt.Errorf("empty secret value found in Consul KV at %s", consulPath)
 	}
@@ -270,7 +287,7 @@ func (sm *SecretManager) generateVaultSecrets() error {
 	return nil
 }
 
-// generateConsulSecrets creates secrets using HashiCorp Consul KV
+// generateConsulSecrets creates secrets using HashiCorp Consul KV SDK
 func (sm *SecretManager) generateConsulSecrets() error {
 	logger := otelzap.Ctx(sm.rc.Ctx)
 	logger.Info("Generating secrets using HashiCorp Consul KV")
@@ -284,14 +301,9 @@ func (sm *SecretManager) generateConsulSecrets() error {
 		"hecate/secrets/authentik/admin_password": sm.generateRandomSecret(16),
 	}
 
-	// Store each secret in Consul KV
+	// Store each secret in Consul KV using SDK
 	for path, value := range secrets {
-		_, err := execute.Run(sm.rc.Ctx, execute.Options{
-			Command: "consul",
-			Args:    []string{"kv", "put", path, value},
-			Capture: true,
-		})
-
+		err := consulsdk.KVPut(sm.rc.Ctx, sm.consulClient, path, []byte(value))
 		if err != nil {
 			logger.Error("Failed to store secret in Consul KV",
 				zap.String("path", path),
