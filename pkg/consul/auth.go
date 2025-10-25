@@ -10,7 +10,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/hashicorp/consul/api"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -37,12 +36,21 @@ type TokenResult struct {
 }
 
 // GetConsulACLToken retrieves Consul ACL token from multiple sources with priority
+//
+// TOKEN ARCHITECTURE:
+// Consul tokens must be created via Consul's ACL API (consul.ACL().Bootstrap() or consul.ACL().TokenCreate()).
+// We NEVER generate random UUIDs locally and call them Consul tokens.
+//
+// Bootstrap token path: secret/consul/bootstrap-token (created by 'eos update consul --bootstrap-token')
+//
 // Priority order:
 //  1. Flag (--acl-token) - Explicit user override
 //  2. Environment (CONSUL_HTTP_TOKEN) - Session-specific
-//  3. Vault (secrets/consul/acl_management_token) - Secure storage (if Vault available)
+//  3. Vault (secret/consul/bootstrap-token) - Secure storage (if Vault available)
 //  4. Consul KV (eos/consul/acl_token) - Bootstrap fallback (stored during consul creation)
 //  5. File (/etc/consul.d/acl-token) - Legacy/backward compatibility
+//
+// If no token found, user must run: eos update consul --bootstrap-token
 func GetConsulACLToken(rc *eos_io.RuntimeContext, flagToken string) (*TokenResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -123,14 +131,27 @@ func GetConsulACLToken(rc *eos_io.RuntimeContext, flagToken string) (*TokenResul
 			"Get token: consul acl token list")
 }
 
-// getTokenFromVault retrieves token from Vault (if Vault is installed)
-// Checks TWO locations for backward compatibility:
-//  1. secret/consul/bootstrap-token (NEW - created by eos update consul --bootstrap-token)
-//  2. secret/consul/acl_management_token (OLD - legacy path from secretManager)
+// getTokenFromVault retrieves Consul ACL token from Vault
+//
+// TOKEN LIFECYCLE (CORRECT PATTERN):
+//  1. User runs: eos update consul --bootstrap-token
+//  2. Eos calls Consul API: consul.ACL().Bootstrap()
+//  3. Consul creates real bootstrap token with global-management policy
+//  4. Eos stores token in Vault at: secret/consul/bootstrap-token
+//  5. Future operations retrieve token from Vault
+//
+// This retrieves EXISTING tokens created by Consul's ACL system.
+// We NEVER generate random UUIDs and call them "Consul tokens".
+//
+// Path: secret/consul/bootstrap-token (uses consul.VaultConsulBootstrapTokenPath constant)
+//
+// If token not found, returns error. User must run:
+//
+//	eos update consul --bootstrap-token
 func getTokenFromVault(rc *eos_io.RuntimeContext) (string, string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Discover environment to initialize SecretManager
+	// Discover environment to get Vault address
 	envConfig, err := environment.DiscoverEnvironment(rc)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to discover environment: %w", err)
@@ -142,77 +163,64 @@ func getTokenFromVault(rc *eos_io.RuntimeContext) (string, string, error) {
 		return "", "", fmt.Errorf("vault not available")
 	}
 
-	// Initialize SecretManager
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	// Create Vault client (use centralized client creation)
+	config := vaultapi.DefaultConfig()
+	config.Address = envConfig.VaultAddr
+
+	// Handle self-signed certificates (VAULT_SKIP_VERIFY)
+	tlsConfig := &vaultapi.TLSConfig{
+		Insecure: true,
+	}
+	_ = config.ConfigureTLS(tlsConfig)
+
+	vaultClient, err := vaultapi.NewClient(config)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to initialize secret manager: %w", err)
+		return "", "", fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
-	// Try NEW path first: secret/consul/bootstrap-token (created by eos update consul --bootstrap-token)
-	// Need to create Vault client directly to access KV v2 API
-	vaultAddr := envConfig.VaultAddr
-	if vaultAddr != "" {
-		config := vaultapi.DefaultConfig()
-		config.Address = vaultAddr
-
-		// Handle self-signed certificates
-		tlsConfig := &vaultapi.TLSConfig{
-			Insecure: true,
-		}
-		_ = config.ConfigureTLS(tlsConfig)
-
-		vaultClient, err := vaultapi.NewClient(config)
-		if err == nil {
-			// Try to get token from Vault agent token file
-			agentTokenPath := "/run/eos/vault_agent_eos.token"
-			if tokenData, err := os.ReadFile(agentTokenPath); err == nil {
-				vaultClient.SetToken(strings.TrimSpace(string(tokenData)))
-
-				// Try to read bootstrap token
-				secret, err := vaultClient.KVv2("secret").Get(rc.Ctx, "consul/bootstrap-token")
-				if err == nil && secret != nil && secret.Data != nil {
-					if tokenRaw, ok := secret.Data["token"]; ok {
-						if token, ok := tokenRaw.(string); ok && token != "" {
-							logger.Debug("Retrieved Consul ACL token from Vault bootstrap path")
-							return token, "secret/consul/bootstrap-token", nil
-						}
-					}
-				} else {
-					logger.Debug("Bootstrap token not found in Vault (this is OK if using legacy path)",
-						zap.Error(err))
-				}
-			}
-		}
-	}
-
-	// Try LEGACY path: secret/consul/acl_management_token (old secretManager path)
-	requiredSecrets := map[string]secrets.SecretType{
-		"acl_management_token": secrets.SecretTypeToken,
-	}
-
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("consul", requiredSecrets)
+	// Get token from Vault agent token file
+	agentTokenPath := "/run/eos/vault_agent_eos.token"
+	tokenData, err := os.ReadFile(agentTokenPath)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to retrieve from vault: %w", err)
+		return "", "", fmt.Errorf("failed to read Vault agent token: %w", err)
+	}
+	vaultClient.SetToken(strings.TrimSpace(string(tokenData)))
+
+	// Read bootstrap token from Vault (uses constant from consul package)
+	// Path: consul/bootstrap-token (KVv2 SDK adds secret/data/ prefix automatically)
+	secret, err := vaultClient.KVv2("secret").Get(rc.Ctx, VaultConsulBootstrapTokenPath)
+	if err != nil {
+		logger.Debug("Bootstrap token not found in Vault",
+			zap.String("path", VaultConsulBootstrapTokenPath),
+			zap.Error(err))
+		return "", "", fmt.Errorf("bootstrap token not found in Vault at %s: %w", VaultConsulBootstrapTokenPath, err)
 	}
 
-	// Extract the token from the secrets map
-	tokenInterface, ok := serviceSecrets.Secrets["acl_management_token"]
-	if !ok {
-		return "", "", fmt.Errorf("acl_management_token not found in secrets")
+	if secret == nil || secret.Data == nil {
+		return "", "", fmt.Errorf("bootstrap token secret is empty at %s", VaultConsulBootstrapTokenPath)
 	}
 
-	token, ok := tokenInterface.(string)
+	// Extract token field
+	tokenRaw, ok := secret.Data["token"]
 	if !ok {
-		return "", "", fmt.Errorf("acl_management_token is not a string")
+		return "", "", fmt.Errorf("'token' field not found in Vault secret at %s", VaultConsulBootstrapTokenPath)
+	}
+
+	token, ok := tokenRaw.(string)
+	if !ok {
+		return "", "", fmt.Errorf("'token' field is not a string at %s", VaultConsulBootstrapTokenPath)
 	}
 
 	if token == "" {
-		return "", "", fmt.Errorf("token exists but is empty")
+		return "", "", fmt.Errorf("bootstrap token is empty at %s", VaultConsulBootstrapTokenPath)
 	}
 
-	vaultPath := "secret/data/consul/acl_management_token"
-	logger.Debug("Retrieved Consul ACL token from Vault legacy path", zap.String("path", vaultPath))
-	return token, vaultPath, nil
+	// Return full path for logging (includes secret/data/ prefix)
+	fullPath := GetVaultConsulBootstrapTokenFullPath()
+	logger.Debug("Retrieved Consul ACL bootstrap token from Vault",
+		zap.String("path", fullPath))
+
+	return token, fullPath, nil
 }
 
 // getTokenFromConsulKV retrieves token from Consul's own KV store
@@ -392,26 +400,30 @@ func MigrateTokenToVault(rc *eos_io.RuntimeContext) error {
 
 // GetAuthenticatedConsulClientForDiagnostics creates a Consul client with ACL token for diagnostic operations
 //
+// TOKEN ARCHITECTURE (CORRECT PATTERN):
+// Consul tokens are created via Consul's ACL API (consul.ACL().Bootstrap()), NOT by generating random UUIDs.
+// The bootstrap token is stored in Vault at: secret/consul/bootstrap-token
+//
 // This function provides the comprehensive authentication strategy for all Consul interactions:
 //
 // Authentication Sources (priority order):
 //  1. Flag (--acl-token) - Explicit user override
 //  2. Environment (CONSUL_HTTP_TOKEN) - Session-specific
-//  3. Vault (secret/consul/bootstrap-token) - Secure storage from bootstrap
+//  3. Vault (secret/consul/bootstrap-token) - Secure storage from bootstrap (RECOMMENDED)
 //  4. Consul KV (eos/consul/acl_token) - Bootstrap fallback
 //  5. File (/etc/consul.d/acl-token) - Legacy compatibility
 //
 // Error Handling Strategy:
-//  - If ACLs NOT enabled → Returns anonymous client (no error)
-//  - If ACLs enabled + token found → Returns authenticated client
-//  - If ACLs enabled + no token → Returns user-friendly error with remediation
-//  - If Vault unavailable → Gracefully falls back to other sources
+//   - If ACLs NOT enabled → Returns anonymous client (no error)
+//   - If ACLs enabled + token found → Returns authenticated client
+//   - If ACLs enabled + no token → Returns user-friendly error with remediation
+//   - If Vault unavailable → Gracefully falls back to other sources
 //
 // User-Friendly Remediation:
-//  - Detects if token missing from Vault
-//  - Guides user to run: eos update consul --bootstrap-token
-//  - Explains how to retrieve token from Consul if already bootstrapped
-//  - Distinguishes Vault auth failures from missing tokens
+//   - Detects if token missing from Vault
+//   - Guides user to run: eos update consul --bootstrap-token
+//   - Explains how to retrieve token from Consul if already bootstrapped
+//   - Distinguishes Vault auth failures from missing tokens
 //
 // Example:
 //
@@ -438,27 +450,31 @@ func GetAuthenticatedConsulClientForDiagnostics(rc *eos_io.RuntimeContext, flagT
 			logger.Error("Consul ACLs enabled but no token available",
 				zap.String("remediation", "Run: eos update consul --bootstrap-token"))
 
+			// NewUserError accepts format strings like fmt.Sprintf
 			return nil, eos_err.NewUserError(
-				"Consul ACL token not found\n\n" +
-					"Consul has ACLs enabled, but no authentication token was found.\n\n" +
-					"OPTION 1: Bootstrap ACLs and store token in Vault (RECOMMENDED)\n" +
-					"  eos update consul --bootstrap-token\n\n" +
-					"This will:\n" +
-					"  - Reset Consul ACL bootstrap (safe operation)\n" +
-					"  - Generate new bootstrap token\n" +
-					"  - Store token securely in Vault at secret/consul/bootstrap-token\n" +
-					"  - Future commands will automatically retrieve from Vault\n\n" +
-					"OPTION 2: If ACLs already bootstrapped, retrieve existing token\n" +
-					"  1. Get bootstrap token from your Consul setup documentation\n" +
-					"  2. Store in Vault manually:\n" +
-					"     vault kv put secret/consul/bootstrap-token token=<your-token>\n" +
-					"  3. OR set environment variable:\n" +
-					"     export CONSUL_HTTP_TOKEN=<your-token>\n\n" +
-					"OPTION 3: Disable ACLs temporarily (NOT RECOMMENDED for production)\n" +
-					"  - Edit /etc/consul.d/consul.hcl\n" +
-					"  - Set acl.enabled = false\n" +
-					"  - Restart Consul: systemctl restart consul\n\n" +
-					"Original error: " + err.Error())
+				"Consul ACL token not found\n\n"+
+					"Consul has ACLs enabled, but no authentication token was found.\n\n"+
+					"OPTION 1: Bootstrap ACLs and store token in Vault (RECOMMENDED)\n"+
+					"  eos update consul --bootstrap-token\n\n"+
+					"This will:\n"+
+					"  - Reset Consul ACL bootstrap (safe operation)\n"+
+					"  - Generate new bootstrap token\n"+
+					"  - Store token securely in Vault at %s\n"+
+					"  - Future commands will automatically retrieve from Vault\n\n"+
+					"OPTION 2: If ACLs already bootstrapped, retrieve existing token\n"+
+					"  1. Get bootstrap token from your Consul setup documentation\n"+
+					"  2. Store in Vault manually:\n"+
+					"     vault kv put %s token=<your-token>\n"+
+					"  3. OR set environment variable:\n"+
+					"     export CONSUL_HTTP_TOKEN=<your-token>\n\n"+
+					"OPTION 3: Disable ACLs temporarily (NOT RECOMMENDED for production)\n"+
+					"  - Edit /etc/consul.d/consul.hcl\n"+
+					"  - Set acl.enabled = false\n"+
+					"  - Restart Consul: systemctl restart consul\n\n"+
+					"Original error: %v",
+				GetVaultConsulBootstrapTokenFullPath(),
+				GetVaultConsulBootstrapTokenFullPath(),
+				err)
 		}
 
 		// Some other authentication error (Vault sealed, network issue, etc.)

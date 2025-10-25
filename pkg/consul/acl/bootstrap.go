@@ -24,6 +24,28 @@ import (
 	"go.uber.org/zap"
 )
 
+// ============================================================================
+// Vault Path Constants (DUPLICATED from pkg/consul/constants.go)
+// ============================================================================
+// NOTE: These constants duplicate consul.VaultConsulBootstrapTokenPath to avoid circular import.
+// The pkg/consul/acl package is a sub-package of pkg/consul, so it cannot import pkg/consul.
+//
+// CRITICAL: These values MUST match pkg/consul/constants.go exactly.
+// Any changes to Vault paths must be synchronized across both files.
+//
+// TODO: Consider refactoring to pkg/consul/vaultpaths to break circular dependency.
+
+const (
+	// vaultConsulBootstrapTokenPath is the Vault KV v2 path for Consul bootstrap token
+	// NOTE: Duplicates consul.VaultConsulBootstrapTokenPath to avoid circular import
+	// Path: consul/bootstrap-token (KVv2 SDK automatically adds secret/data/ prefix)
+	vaultConsulBootstrapTokenPath = "consul/bootstrap-token"
+
+	// vaultConsulBootstrapTokenFullPath is the full Vault path including secret/data/ prefix
+	// Used for display/logging purposes only (Logical API format)
+	vaultConsulBootstrapTokenFullPath = "secret/data/consul/bootstrap-token"
+)
+
 // BootstrapResult contains the result of ACL bootstrap operation
 type BootstrapResult struct {
 	MasterToken   string    // The bootstrap/master token (global-management)
@@ -121,7 +143,6 @@ func BootstrapConsulACLs(
 	if storeInVault && vaultClient != nil {
 		logger.Info("Storing Consul master token in Vault")
 
-		vaultPath := "secret/consul/bootstrap-token"
 		data := map[string]interface{}{
 			"token":          bootstrapToken.SecretID,
 			"accessor":       bootstrapToken.AccessorID,
@@ -129,11 +150,12 @@ func BootstrapConsulACLs(
 			"created_at":     time.Now().Format(time.RFC3339),
 			"policies":       []string{"global-management"},
 			"warning":        "This is the Consul master token - protect it carefully!",
-			"recovery_steps": "To retrieve: vault kv get -field=token secret/consul/bootstrap-token",
+			"recovery_steps": "To retrieve: vault kv get -field=token " + vaultConsulBootstrapTokenFullPath,
 		}
 
 		// Write to Vault KV v2 (secret/)
-		_, err := vaultClient.KVv2("secret").Put(rc.Ctx, "consul/bootstrap-token", data)
+		// Path uses KVv2 SDK constant (automatically adds secret/data/ prefix)
+		_, err := vaultClient.KVv2("secret").Put(rc.Ctx, vaultConsulBootstrapTokenPath, data)
 		if err != nil {
 			logger.Warn("Failed to store bootstrap token in Vault",
 				zap.Error(err),
@@ -141,9 +163,9 @@ func BootstrapConsulACLs(
 			// Don't fail - bootstrap succeeded, just storage failed
 		} else {
 			logger.Info("Consul master token stored in Vault",
-				zap.String("vault_path", vaultPath))
+				zap.String("vault_path", vaultConsulBootstrapTokenFullPath))
 			result.StoredInVault = true
-			result.VaultPath = vaultPath
+			result.VaultPath = vaultConsulBootstrapTokenFullPath
 		}
 	}
 
@@ -197,19 +219,19 @@ func GetBootstrapTokenFromVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi
 
 	logger.Info("Retrieving Consul bootstrap token from Vault")
 
-	// Read from Vault KV v2
-	secret, err := vaultClient.KVv2("secret").Get(rc.Ctx, "consul/bootstrap-token")
+	// Read from Vault KV v2 (uses constant, SDK adds secret/data/ prefix automatically)
+	secret, err := vaultClient.KVv2("secret").Get(rc.Ctx, vaultConsulBootstrapTokenPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read Consul bootstrap token from Vault: %w\n"+
 			"Remediation:\n"+
 			"  - Check Vault is unsealed: vault status\n"+
-			"  - Verify secret exists: vault kv get secret/consul/bootstrap-token\n"+
+			"  - Verify secret exists: vault kv get %s\n"+
 			"  - Check Vault token has read permissions to secret/consul/*",
-			err)
+			err, vaultConsulBootstrapTokenFullPath)
 	}
 
 	if secret == nil || secret.Data == nil {
-		return "", fmt.Errorf("Consul bootstrap token not found in Vault at secret/consul/bootstrap-token")
+		return "", fmt.Errorf("Consul bootstrap token not found in Vault at %s", vaultConsulBootstrapTokenFullPath)
 	}
 
 	token, ok := secret.Data["token"].(string)
@@ -270,7 +292,7 @@ func PromptAndStoreBootstrapToken(
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: SECURITY NOTE:")
 	logger.Info("terminal prompt:   - This token will be securely stored in Vault")
-	logger.Info("terminal prompt:   - Path: secret/consul/bootstrap-token")
+	logger.Info("terminal prompt:   - Path: " + vaultConsulBootstrapTokenFullPath)
 	logger.Info("terminal prompt:   - Once stored, you won't need to provide it again")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════════")
@@ -353,7 +375,6 @@ func PromptAndStoreBootstrapToken(
 	// INTERVENE - Store the token in Vault
 	logger.Info("Storing bootstrap token in Vault for future use")
 
-	vaultPath := "secret/consul/bootstrap-token"
 	data := map[string]interface{}{
 		"token":          token,
 		"accessor":       selfToken.AccessorID,
@@ -361,11 +382,12 @@ func PromptAndStoreBootstrapToken(
 		"recovered_at":   time.Now().Format(time.RFC3339),
 		"policies":       []string{"global-management"},
 		"warning":        "This is the Consul master token - protect it carefully!",
-		"recovery_steps": "To retrieve: vault kv get -field=token secret/consul/bootstrap-token",
+		"recovery_steps": "To retrieve: vault kv get -field=token " + vaultConsulBootstrapTokenFullPath,
 		"source":         "user-provided (eos sync recovery)",
 	}
 
-	_, err = vaultClient.KVv2("secret").Put(rc.Ctx, "consul/bootstrap-token", data)
+	// Write to Vault KV v2 (uses constant, SDK adds secret/data/ prefix automatically)
+	_, err = vaultClient.KVv2("secret").Put(rc.Ctx, vaultConsulBootstrapTokenPath, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store bootstrap token in Vault: %w\n"+
 			"Remediation:\n"+
@@ -376,7 +398,7 @@ func PromptAndStoreBootstrapToken(
 	}
 
 	logger.Info("Bootstrap token stored in Vault successfully",
-		zap.String("vault_path", vaultPath))
+		zap.String("vault_path", vaultConsulBootstrapTokenFullPath))
 
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: ✓ Bootstrap token verified and stored in Vault")
@@ -388,7 +410,7 @@ func PromptAndStoreBootstrapToken(
 		AlreadyDone:   true,
 		BootstrapTime: time.Now(),
 		StoredInVault: true,
-		VaultPath:     vaultPath,
+		VaultPath:     vaultConsulBootstrapTokenFullPath,
 	}
 
 	return result, nil

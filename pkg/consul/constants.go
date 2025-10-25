@@ -260,6 +260,62 @@ const (
 )
 
 // ============================================================================
+// Vault Integration Paths (SINGLE SOURCE OF TRUTH - P0)
+// ============================================================================
+// CRITICAL: These paths are the ONLY locations where Consul secrets are stored in Vault.
+// DO NOT hardcode these paths elsewhere. Import from this package.
+//
+// RATIONALE (HashiCorp Best Practices):
+//   - Flat path structure (secret/consul/*) preferred over deep hierarchies
+//   - Environment-based paths (services/production/consul) are ANTI-PATTERN
+//   - Granular policy control at path level, not directory structure
+//   - Simplifies secret rotation, access control, and auditing
+//
+// Reference: https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v2#usage
+
+const (
+	// VaultConsulBootstrapTokenPath is the Vault KV v2 path for the Consul ACL bootstrap token
+	// USAGE: Created by 'eos update consul --bootstrap-token'
+	// POLICY: Requires 'create' and 'update' capabilities on secret/data/consul/bootstrap-token
+	// SECURITY: This is the master token with global-management privileges
+	// ROTATION: Bootstrap tokens are NOT rotated (but can be reset via ACL reset)
+	// Retrieved by: GetBootstrapTokenFromVault(), pkg/consul/auth.go
+	VaultConsulBootstrapTokenPath = "consul/bootstrap-token"
+
+	// VaultConsulManagementTokenPath is the Vault KV v2 path for day-to-day management tokens
+	// USAGE: Created from bootstrap token via Consul ACL API
+	// POLICY: Requires 'create' and 'update' capabilities on secret/data/consul/management-token
+	// SECURITY: Limited privileges (specific to EOS needs, NOT global-management)
+	// ROTATION: Management tokens SHOULD be rotated periodically (every 90 days recommended)
+	// Retrieved by: debug commands, normal operations (NOT bootstrap operations)
+	// NOTE: This path is currently unused in the codebase, reserved for future management token implementation
+	VaultConsulManagementTokenPath = "consul/management-token"
+
+	// VaultConsulEncryptionKeyPath is the Vault KV v2 path for Consul gossip encryption key
+	// USAGE: Gossip encryption key for Serf communication
+	// POLICY: Requires 'create' and 'update' capabilities on secret/data/consul/encryption-key
+	// SECURITY: Symmetric key for cluster gossip protocol
+	// ROTATION: Encryption keys CAN be rotated via Consul's key rotation feature
+	// NOTE: This path is currently unused in the codebase, reserved for future encryption key management
+	VaultConsulEncryptionKeyPath = "consul/encryption-key"
+)
+
+// GetVaultConsulBootstrapTokenFullPath returns the FULL Vault API path for bootstrap token
+// This includes the /secret/data/ prefix required for KV v2 API calls via Logical client
+//
+// USAGE:
+//   - Direct Vault Logical API calls: vaultClient.Logical().Read(GetVaultConsulBootstrapTokenFullPath())
+//   - KV v2 SDK calls: vaultClient.KVv2("secret").Get(ctx, VaultConsulBootstrapTokenPath) [NO prefix needed]
+//
+// RATIONALE: KV v2 API has two paths:
+//   - secret/data/{path} - for reading/writing secret data (Logical API)
+//   - secret/metadata/{path} - for managing secret metadata (Logical API)
+//   - {path} - when using KVv2() SDK method (SDK adds /data/ automatically)
+func GetVaultConsulBootstrapTokenFullPath() string {
+	return "secret/data/" + VaultConsulBootstrapTokenPath
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
