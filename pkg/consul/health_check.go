@@ -1,28 +1,33 @@
 // pkg/consul/health_check.go
-// Business logic for Consul cluster health checks
+//
+// Business logic for Consul cluster health checks using Consul SDK.
+// Migrated from shell commands to SDK calls for improved reliability.
+//
+// Last Updated: 2025-01-25
 
 package consul
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	consulsdk "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/sdk"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // HealthCheckResult contains the comprehensive health status of Consul
 type HealthCheckResult struct {
-	Timestamp      time.Time
-	Overall        HealthStatus
-	Agent          AgentHealth
-	Cluster        ClusterHealth
-	Services       ServicesHealth
-	KV             KVHealth
+	Timestamp       time.Time
+	Overall         HealthStatus
+	Agent           AgentHealth
+	Cluster         ClusterHealth
+	Services        ServicesHealth
+	KV              KVHealth
 	Recommendations []string
 }
 
@@ -52,15 +57,15 @@ type AgentHealth struct {
 
 // ClusterHealth represents the cluster's health
 type ClusterHealth struct {
-	Status         HealthStatus
-	MemberCount    int
-	Members        []ClusterMemberHealth
-	LeaderPresent  bool
-	Leader         string
-	RaftHealth     string
-	QuorumSize     int
-	ConsensusOK    bool
-	Issues         []string
+	Status        HealthStatus
+	MemberCount   int
+	Members       []ClusterMemberHealth
+	LeaderPresent bool
+	Leader        string
+	RaftHealth    string
+	QuorumSize    int
+	ConsensusOK   bool
+	Issues        []string
 }
 
 // ClusterMemberHealth represents a single cluster member's health
@@ -75,20 +80,20 @@ type ClusterMemberHealth struct {
 
 // ServicesHealth represents the health of registered services
 type ServicesHealth struct {
-	Status         HealthStatus
-	TotalServices  int
+	Status          HealthStatus
+	TotalServices   int
 	HealthyServices int
-	Services       []ServiceHealth
-	Issues         []string
+	Services        []ServiceHealth
+	Issues          []string
 }
 
 // ServiceHealth represents a single service's health
 type ServiceHealth struct {
-	Name    string
-	Healthy bool
-	Checks  int
-	Passing int
-	Warning int
+	Name     string
+	Healthy  bool
+	Checks   int
+	Passing  int
+	Warning  int
 	Critical int
 }
 
@@ -170,7 +175,7 @@ func CheckHealth(rc *eos_io.RuntimeContext) (*HealthCheckResult, error) {
 	return result, nil
 }
 
-// checkAgentHealth checks the local Consul agent's health
+// checkAgentHealth checks the local Consul agent's health using SDK
 func checkAgentHealth(rc *eos_io.RuntimeContext) (*AgentHealth, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	health := &AgentHealth{
@@ -195,13 +200,17 @@ func checkAgentHealth(rc *eos_io.RuntimeContext) (*AgentHealth, error) {
 
 	health.Running = strings.TrimSpace(output) == "active"
 
-	// Try to get agent info
-	infoOutput, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"info"},
-		Capture: true,
-	})
+	// Create SDK client
+	client, err := consulsdk.NewClient()
+	if err != nil {
+		health.Reachable = false
+		health.Status = HealthStatusUnhealthy
+		health.Issues = append(health.Issues, fmt.Sprintf("Failed to create Consul client: %v", err))
+		return health, nil
+	}
 
+	// Try to get agent info using SDK
+	info, err := consulsdk.AgentSelf(rc.Ctx, client)
 	if err != nil {
 		health.Reachable = false
 		health.Status = HealthStatusUnhealthy
@@ -211,22 +220,44 @@ func checkAgentHealth(rc *eos_io.RuntimeContext) (*AgentHealth, error) {
 
 	health.Reachable = true
 
-	// Parse agent info
-	info := parseConsulInfo(infoOutput)
-
-	if agent, ok := info["agent"].(map[string]string); ok {
-		health.Mode = agent["server"]
-		health.NodeName = agent["node"]
-		health.Datacenter = agent["datacenter"]
+	// Parse agent info from SDK response
+	if configSection, ok := info["Config"]; ok {
+		if datacenter, ok := configSection["Datacenter"].(string); ok {
+			health.Datacenter = datacenter
+		}
+		if nodeName, ok := configSection["NodeName"].(string); ok {
+			health.NodeName = nodeName
+		}
+		if server, ok := configSection["Server"].(bool); ok {
+			if server {
+				health.Mode = "server"
+			} else {
+				health.Mode = "client"
+			}
+		}
 	}
 
-	if build, ok := info["build"].(map[string]string); ok {
-		health.Version = build["version"]
+	if statsSection, ok := info["Stats"]; ok {
+		if raft, ok := statsSection["raft"].(map[string]interface{}); ok {
+			if state, ok := raft["state"].(string); ok {
+				if state != "Leader" && state != "Follower" && state != "" {
+					health.Issues = append(health.Issues, fmt.Sprintf("Raft state unusual: %s", state))
+				}
+			}
+		}
 	}
 
-	if raft, ok := info["raft"].(map[string]string); ok {
-		if state, ok := raft["state"]; ok && state != "Leader" && state != "Follower" {
-			health.Issues = append(health.Issues, fmt.Sprintf("Raft state unusual: %s", state))
+	// Get version from agent member info
+	members, err := consulsdk.AgentMembers(rc.Ctx, client, false)
+	if err == nil && len(members) > 0 {
+		// Find ourselves in the member list
+		for _, member := range members {
+			if member.Name == health.NodeName {
+				if version, ok := member.Tags["build"]; ok {
+					health.Version = version
+				}
+				break
+			}
 		}
 	}
 
@@ -242,7 +273,7 @@ func checkAgentHealth(rc *eos_io.RuntimeContext) (*AgentHealth, error) {
 	return health, nil
 }
 
-// checkClusterHealth checks the health of the Consul cluster
+// checkClusterHealth checks the health of the Consul cluster using SDK
 func checkClusterHealth(rc *eos_io.RuntimeContext) (*ClusterHealth, error) {
 	health := &ClusterHealth{
 		Status:  HealthStatusUnknown,
@@ -250,46 +281,63 @@ func checkClusterHealth(rc *eos_io.RuntimeContext) (*ClusterHealth, error) {
 		Issues:  make([]string, 0),
 	}
 
-	// Get cluster members
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"members", "-detailed"},
-		Capture: true,
-	})
+	// Create SDK client
+	client, err := consulsdk.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+	}
 
+	// Get cluster members using SDK
+	members, err := consulsdk.AgentMembers(rc.Ctx, client, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster members: %w", err)
 	}
 
-	// Parse members
-	lines := strings.Split(output, "\n")
+	// Convert SDK members to our health structure
 	aliveCount := 0
-
-	for i, line := range lines {
-		if i == 0 || strings.TrimSpace(line) == "" {
-			continue // Skip header and empty lines
+	for _, member := range members {
+		memberHealth := ClusterMemberHealth{
+			Name:    member.Name,
+			Address: member.Addr,
+			Status:  fmt.Sprintf("%d", member.Status), // Status is int in SDK
+			Tags:    member.Tags,
 		}
 
-		member := parseClusterMember(line)
-		if member != nil {
-			health.Members = append(health.Members, *member)
-			if member.Status == "alive" {
-				aliveCount++
-			}
+		// Determine status string from SDK status code
+		// SDK uses: 1=alive, 2=left, 3=failed
+		switch member.Status {
+		case 1:
+			memberHealth.Status = "alive"
+			aliveCount++
+		case 2:
+			memberHealth.Status = "left"
+		case 3:
+			memberHealth.Status = "failed"
+		default:
+			memberHealth.Status = "unknown"
 		}
+
+		// Get role from tags
+		if role, ok := member.Tags["role"]; ok {
+			memberHealth.Role = role
+		}
+
+		health.Members = append(health.Members, memberHealth)
 	}
 
 	health.MemberCount = len(health.Members)
 
-	// Check for leader
-	leaderOutput, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"operator", "raft", "list-peers"},
-		Capture: true,
-	})
-
+	// Check for leader using SDK
+	raftConfig, err := consulsdk.OperatorRaftGetConfiguration(rc.Ctx, client)
 	if err == nil {
-		health.LeaderPresent, health.Leader = parseLeaderInfo(leaderOutput)
+		// Find the leader in the raft configuration
+		for _, server := range raftConfig.Servers {
+			if server.Leader {
+				health.LeaderPresent = true
+				health.Leader = server.Address
+				break
+			}
+		}
 	}
 
 	// Evaluate cluster health
@@ -310,7 +358,7 @@ func checkClusterHealth(rc *eos_io.RuntimeContext) (*ClusterHealth, error) {
 	return health, nil
 }
 
-// checkServicesHealth checks the health of registered services
+// checkServicesHealth checks the health of registered services using SDK
 func checkServicesHealth(rc *eos_io.RuntimeContext) (*ServicesHealth, error) {
 	health := &ServicesHealth{
 		Status:   HealthStatusUnknown,
@@ -318,28 +366,27 @@ func checkServicesHealth(rc *eos_io.RuntimeContext) (*ServicesHealth, error) {
 		Issues:   make([]string, 0),
 	}
 
-	// Get list of services
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"catalog", "services"},
-		Capture: true,
-	})
+	// Create SDK client
+	client, err := consulsdk.NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+	}
 
+	// Get list of services using SDK
+	services, err := consulsdk.CatalogServices(rc.Ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list services: %w", err)
 	}
 
-	serviceNames := strings.Split(strings.TrimSpace(output), "\n")
-	health.TotalServices = len(serviceNames)
+	health.TotalServices = len(services)
 
 	// Check health of each service
-	for _, serviceName := range serviceNames {
-		serviceName = strings.TrimSpace(serviceName)
+	for serviceName := range services {
 		if serviceName == "" || serviceName == "consul" {
 			continue // Skip empty and consul service itself
 		}
 
-		serviceHealth := checkServiceHealth(rc, serviceName)
+		serviceHealth := checkServiceHealth(rc, client, serviceName)
 		health.Services = append(health.Services, serviceHealth)
 
 		if serviceHealth.Healthy {
@@ -364,45 +411,31 @@ func checkServicesHealth(rc *eos_io.RuntimeContext) (*ServicesHealth, error) {
 	return health, nil
 }
 
-// checkServiceHealth checks the health of a single service
-func checkServiceHealth(rc *eos_io.RuntimeContext, serviceName string) ServiceHealth {
+// checkServiceHealth checks the health of a single service using SDK
+func checkServiceHealth(rc *eos_io.RuntimeContext, client *consulapi.Client, serviceName string) ServiceHealth {
 	health := ServiceHealth{
 		Name:    serviceName,
 		Healthy: false,
 	}
 
-	// Get service health checks
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"health", "service", serviceName, "-format=json"},
-		Capture: true,
-	})
-
+	// Get service health checks using SDK
+	entries, err := consulsdk.HealthService(rc.Ctx, client, serviceName, "", false)
 	if err != nil {
 		return health
 	}
 
-	// Parse JSON
-	var checks []map[string]interface{}
-	if err := json.Unmarshal([]byte(output), &checks); err != nil {
-		return health
-	}
-
-	health.Checks = len(checks)
-
-	for _, check := range checks {
-		if checksList, ok := check["Checks"].([]interface{}); ok {
-			for _, c := range checksList {
-				if checkData, ok := c.(map[string]interface{}); ok {
-					status := checkData["Status"].(string)
-					switch status {
-					case "passing":
-						health.Passing++
-					case "warning":
-						health.Warning++
-					case "critical":
-						health.Critical++
-					}
+	// Count health check statuses
+	for _, entry := range entries {
+		if entry.Checks != nil {
+			for _, check := range entry.Checks {
+				health.Checks++
+				switch check.Status {
+				case "passing":
+					health.Passing++
+				case "warning":
+					health.Warning++
+				case "critical":
+					health.Critical++
 				}
 			}
 		}
@@ -413,23 +446,28 @@ func checkServiceHealth(rc *eos_io.RuntimeContext, serviceName string) ServiceHe
 	return health
 }
 
-// checkKVHealth checks the health of the KV store
+// checkKVHealth checks the health of the KV store using SDK
 func checkKVHealth(rc *eos_io.RuntimeContext) (*KVHealth, error) {
 	health := &KVHealth{
 		Status: HealthStatusUnknown,
 		Issues: make([]string, 0),
 	}
 
+	// Create SDK client
+	client, err := consulsdk.NewClient()
+	if err != nil {
+		health.Accessible = false
+		health.Writeable = false
+		health.Status = HealthStatusUnhealthy
+		health.Issues = append(health.Issues, fmt.Sprintf("Failed to create Consul client: %v", err))
+		return health, nil
+	}
+
 	testKey := "eos/health/check/" + fmt.Sprintf("%d", time.Now().Unix())
-	testValue := "health-check-test"
+	testValue := []byte("health-check-test")
 
-	// Try to write
-	_, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"kv", "put", testKey, testValue},
-		Capture: true,
-	})
-
+	// Try to write using SDK
+	err = consulsdk.KVPut(rc.Ctx, client, testKey, testValue)
 	if err != nil {
 		health.Accessible = false
 		health.Writeable = false
@@ -440,14 +478,9 @@ func checkKVHealth(rc *eos_io.RuntimeContext) (*KVHealth, error) {
 
 	health.Writeable = true
 
-	// Try to read
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"kv", "get", testKey},
-		Capture: true,
-	})
-
-	if err != nil || strings.TrimSpace(output) != testValue {
+	// Try to read using SDK
+	readValue, err := consulsdk.KVGet(rc.Ctx, client, testKey)
+	if err != nil || string(readValue) != string(testValue) {
 		health.Accessible = false
 		health.Status = HealthStatusDegraded
 		health.Issues = append(health.Issues, "KV store read failed")
@@ -456,103 +489,15 @@ func checkKVHealth(rc *eos_io.RuntimeContext) (*KVHealth, error) {
 		health.Status = HealthStatusHealthy
 	}
 
-	// Clean up test key
-	_, _ = execute.Run(rc.Ctx, execute.Options{
-		Command: "consul",
-		Args:    []string{"kv", "delete", testKey},
-		Capture: true,
-	})
+	// Clean up test key using SDK
+	_ = consulsdk.KVDelete(rc.Ctx, client, testKey)
 
 	return health, nil
 }
 
 // Helper functions
-
-func parseConsulInfo(output string) map[string]interface{} {
-	info := make(map[string]interface{})
-	lines := strings.Split(output, "\n")
-
-	currentSection := ""
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		// Section headers
-		if !strings.Contains(line, "=") && !strings.Contains(line, ":") {
-			currentSection = line
-			info[currentSection] = make(map[string]string)
-			continue
-		}
-
-		// Key-value pairs
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-
-			if currentSection != "" {
-				if sectionMap, ok := info[currentSection].(map[string]string); ok {
-					sectionMap[key] = value
-				}
-			} else {
-				info[key] = value
-			}
-		}
-	}
-
-	return info
-}
-
-func parseClusterMember(line string) *ClusterMemberHealth {
-	fields := strings.Fields(line)
-	if len(fields) < 4 {
-		return nil
-	}
-
-	member := &ClusterMemberHealth{
-		Name:    fields[0],
-		Address: fields[1],
-		Status:  fields[2],
-		Tags:    make(map[string]string),
-	}
-
-	// Parse tags (dc=dc1,role=node,...)
-	if len(fields) > 4 {
-		tagsPart := strings.Join(fields[4:], " ")
-		tags := strings.Split(tagsPart, ",")
-		for _, tag := range tags {
-			parts := strings.SplitN(tag, "=", 2)
-			if len(parts) == 2 {
-				member.Tags[parts[0]] = parts[1]
-			}
-		}
-
-		if role, ok := member.Tags["role"]; ok {
-			member.Role = role
-		}
-	}
-
-	return member
-}
-
-func parseLeaderInfo(output string) (bool, string) {
-	lines := strings.Split(output, "\n")
-	for i, line := range lines {
-		if i == 0 || strings.TrimSpace(line) == "" {
-			continue
-		}
-
-		if strings.Contains(line, "leader") {
-			fields := strings.Fields(line)
-			if len(fields) > 0 {
-				return true, fields[0]
-			}
-		}
-	}
-	return false, ""
-}
+// NOTE: parseConsulInfo, parseClusterMember, and parseLeaderInfo have been removed
+// as they are no longer needed after migration to Consul SDK.
 
 func calculateOverallHealth(result *HealthCheckResult) HealthStatus {
 	// If agent is down, overall is unhealthy

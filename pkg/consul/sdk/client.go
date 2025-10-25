@@ -194,3 +194,98 @@ func KVDeleteTree(ctx context.Context, client *consulapi.Client, prefix string) 
 	logger.Debug("Key tree deleted successfully", zap.String("prefix", prefix))
 	return nil
 }
+
+// ============================================================================
+// Cluster Operations - Agent, Members, Catalog, Health
+// ============================================================================
+
+// AgentSelf retrieves the local agent's information.
+// Replaces: consul info (partial - consul info has more detail but this is SDK equivalent)
+func AgentSelf(ctx context.Context, client *consulapi.Client) (map[string]map[string]interface{}, error) {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Retrieving agent information")
+
+	self, err := client.Agent().Self()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent info: %w", err)
+	}
+
+	logger.Debug("Agent information retrieved successfully")
+
+	return self, nil
+}
+
+// AgentMembers retrieves cluster member information.
+// Replaces: consul members [-detailed]
+func AgentMembers(ctx context.Context, client *consulapi.Client, wan bool) ([]*consulapi.AgentMember, error) {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Retrieving cluster members", zap.Bool("wan", wan))
+
+	members, err := client.Agent().Members(wan)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster members: %w", err)
+	}
+
+	logger.Debug("Cluster members retrieved successfully", zap.Int("count", len(members)))
+
+	return members, nil
+}
+
+// OperatorRaftGetConfiguration retrieves the raft peer configuration.
+// Replaces: consul operator raft list-peers
+func OperatorRaftGetConfiguration(ctx context.Context, client *consulapi.Client) (*consulapi.RaftConfiguration, error) {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Retrieving raft configuration")
+
+	raftConfig, err := client.Operator().RaftGetConfiguration(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get raft configuration: %w", err)
+	}
+
+	logger.Debug("Raft configuration retrieved successfully",
+		zap.Int("server_count", len(raftConfig.Servers)))
+
+	return raftConfig, nil
+}
+
+// CatalogServices lists all services in the catalog.
+// Replaces: consul catalog services
+func CatalogServices(ctx context.Context, client *consulapi.Client) (map[string][]string, error) {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Listing catalog services")
+
+	services, _, err := client.Catalog().Services(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list catalog services: %w", err)
+	}
+
+	logger.Debug("Catalog services listed successfully", zap.Int("count", len(services)))
+
+	return services, nil
+}
+
+// HealthService retrieves health information for a specific service.
+// Replaces: consul health service <name> [-format=json]
+func HealthService(ctx context.Context, client *consulapi.Client, serviceName string, tag string, passingOnly bool) ([]*consulapi.ServiceEntry, error) {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Retrieving service health",
+		zap.String("service", serviceName),
+		zap.String("tag", tag),
+		zap.Bool("passing_only", passingOnly))
+
+	entries, _, err := client.Health().Service(serviceName, tag, passingOnly, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service health for %s: %w", serviceName, err)
+	}
+
+	logger.Debug("Service health retrieved successfully",
+		zap.String("service", serviceName),
+		zap.Int("entries", len(entries)))
+
+	return entries, nil
+}
