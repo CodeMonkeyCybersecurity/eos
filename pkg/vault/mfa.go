@@ -837,9 +837,10 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 		return cerr.New("user did not save TOTP secret")
 	}
 
-	// Test the TOTP code
+	// Verify TOTP setup by performing an actual login test
 	log.Info("")
-	log.Info("Testing TOTP code...")
+	log.Info("Testing TOTP code via actual authentication...")
+	log.Info("")
 
 	testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter the 6-digit TOTP code from your authenticator app", 1)
 	if err != nil {
@@ -847,35 +848,151 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 		return cerr.Wrap(err, "failed to get test code")
 	}
 
-	// Validate using MFA validation endpoint
+	totpCode := testCodes[0]
+
+	// Step 1: Read userpass password from Vault KV (stored during Phase 10a)
+	log.Info(" [VERIFICATION] Reading userpass password from Vault KV")
+	kvPath := "secret/data/eos/userpass-password"
+	passwordSecret, err := client.Logical().Read(kvPath)
+	if err != nil {
+		log.Error(" Failed to read userpass password from KV",
+			zap.String("path", kvPath),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to read userpass password - should have been stored in Phase 10a")
+	}
+
+	if passwordSecret == nil || passwordSecret.Data == nil {
+		log.Error(" Password not found in Vault KV",
+			zap.String("path", kvPath))
+		return cerr.New("password not found in KV - should have been stored in Phase 10a")
+	}
+
+	// KV v2 wraps data in a "data" field
+	kvData, ok := passwordSecret.Data["data"].(map[string]interface{})
+	if !ok {
+		log.Error(" Invalid KV data structure")
+		return cerr.New("invalid KV v2 data structure")
+	}
+
+	password, ok := kvData["password"].(string)
+	if !ok || password == "" {
+		log.Error(" Password field missing or invalid")
+		return cerr.New("password field missing or invalid in KV")
+	}
+
+	log.Info(" ✓ [VERIFICATION] Password retrieved from KV")
+
+	// Step 2: Perform userpass login to trigger MFA challenge
+	log.Info(" [VERIFICATION] Attempting userpass login (will trigger MFA challenge)")
+	loginPath := fmt.Sprintf("auth/userpass/login/%s", username)
+	loginData := map[string]interface{}{"password": password}
+
+	loginResp, err := client.Logical().Write(loginPath, loginData)
+	if err != nil {
+		log.Error(" [VERIFICATION] Userpass login failed",
+			zap.String("username", username),
+			zap.Error(err))
+		return cerr.Wrap(err, "userpass login failed during TOTP verification")
+	}
+
+	if loginResp == nil {
+		log.Error(" [VERIFICATION] Userpass login returned nil response")
+		return cerr.New("userpass login returned nil response")
+	}
+
+	// Step 3: Extract MFA challenge
+	log.Info(" [VERIFICATION] MFA challenge received - validating TOTP code")
+	if loginResp.Auth != nil {
+		// No MFA challenge - this shouldn't happen if MFA is enabled
+		log.Warn(" [VERIFICATION] No MFA challenge received - MFA may not be enforced",
+			zap.String("username", username))
+		return cerr.New("expected MFA challenge but got direct authentication - MFA not enforced?")
+	}
+
+	// MFA challenge is in Data field
+	if loginResp.Data == nil {
+		log.Error(" [VERIFICATION] Login response missing data field")
+		return cerr.New("login response missing data field")
+	}
+
+	mfaRequestID, ok := loginResp.Data["mfa_request_id"].(string)
+	if !ok || mfaRequestID == "" {
+		log.Error(" [VERIFICATION] No MFA request ID in response",
+			zap.Any("response_data", loginResp.Data))
+		return cerr.New("no mfa_request_id in login response - MFA may not be configured correctly")
+	}
+
+	log.Info(" [VERIFICATION] MFA challenge ID received",
+		zap.String("mfa_request_id", mfaRequestID))
+
+	// Step 4: Validate TOTP code
+	log.Info(" [VERIFICATION] Submitting TOTP code for validation")
 	mfaPayload := map[string]interface{}{
-		"method_id": methodID,
-		"payload": []string{
-			testCodes[0],
+		"mfa_request_id": mfaRequestID,
+		"mfa_payload": map[string][]string{
+			"totp": {totpCode},
 		},
 	}
 
-	_, err = client.Logical().Write("identity/mfa/method/totp/admin-generate", mfaPayload)
+	mfaResp, err := client.Logical().Write("sys/mfa/validate", mfaPayload)
 	if err != nil {
-		log.Warn("TOTP code verification failed", zap.Error(err))
+		log.Error(" [VERIFICATION] TOTP code validation failed",
+			zap.Error(err),
+			zap.String("mfa_request_id", mfaRequestID))
 		log.Error("")
 		log.Error(" ✗ TOTP code verification FAILED")
 		log.Error("")
 		log.Error("Common causes:")
 		log.Error("  • Code expired (TOTP codes are valid for 30 seconds)")
 		log.Error("  • Incorrect manual entry of backup key")
-		log.Error("  • Device clock not synchronized")
+		log.Error("  • Device clock not synchronized with server")
+		log.Error("  • Authenticator app time drift")
 		log.Error("")
-		log.Error("Please try again or check your authenticator app configuration.")
-		return cerr.Wrap(err, "TOTP verification failed")
+		log.Error("Please try again with a fresh TOTP code.")
+		return cerr.Wrap(err, "TOTP validation failed during test login")
 	}
 
+	if mfaResp == nil || mfaResp.Auth == nil {
+		log.Error(" [VERIFICATION] MFA validation returned invalid response")
+		return cerr.New("MFA validation returned nil auth")
+	}
+
+	// Step 5: Extract and clean up test token
+	testToken := mfaResp.Auth.ClientToken
+	log.Info(" ✓ [VERIFICATION] Test login successful!",
+		zap.String("test_token_accessor", mfaResp.Auth.Accessor))
+
+	// Clean up: Revoke the test token immediately (we don't need it)
+	defer func() {
+		if testToken != "" {
+			log.Debug(" [VERIFICATION] Revoking test token",
+				zap.String("accessor", mfaResp.Auth.Accessor))
+			// Create a new client with the test token to revoke itself
+			testClient, cloneErr := client.Clone()
+			if cloneErr == nil {
+				testClient.SetToken(testToken)
+				if revokeErr := testClient.Auth().Token().RevokeSelf(""); revokeErr != nil {
+					log.Warn(" [VERIFICATION] Failed to revoke test token (non-fatal)",
+						zap.Error(revokeErr))
+				} else {
+					log.Debug(" [VERIFICATION] Test token revoked successfully")
+				}
+			}
+		}
+	}()
+
 	log.Info("")
-	log.Info(" ✓ TOTP code verified successfully!")
+	log.Info(" ✓ TOTP code verified successfully via test login!")
 	log.Info("")
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info(" TOTP MFA setup complete for user: " + username)
 	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info("")
+	log.Info("Verification summary:")
+	log.Info("  ✓ Userpass authentication successful")
+	log.Info("  ✓ MFA challenge triggered correctly")
+	log.Info("  ✓ TOTP code validated successfully")
+	log.Info("  ✓ Complete authentication flow verified")
 	log.Info("")
 	log.Info("You will now be prompted for a TOTP code every time you")
 	log.Info("authenticate to Vault with your username and password.")
