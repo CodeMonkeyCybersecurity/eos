@@ -10,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
+	"github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -24,20 +25,18 @@ func ConfigFileDiagnostic() *debug.Diagnostic {
 	return debug.FileCheck("Configuration File", DefaultConfigPath, true)
 }
 
-// ConfigValidationDiagnostic validates the configuration file
+// ConfigValidationDiagnostic validates the configuration file using HCL parser
 func ConfigValidationDiagnostic() *debug.Diagnostic {
 	return &debug.Diagnostic{
 		Name:        "Configuration Validation",
 		Category:    "Configuration",
-		Description: "Validate vault.hcl configuration",
+		Description: "Validate vault.hcl HCL syntax",
 		Condition: func(ctx context.Context) bool {
 			logger := otelzap.Ctx(ctx)
-			// Only run if binary and config exist
-			_, binErr := os.Stat(DefaultBinaryPath)
+			// Only run if config exists
 			_, cfgErr := os.Stat(DefaultConfigPath)
-			canRun := binErr == nil && cfgErr == nil
+			canRun := cfgErr == nil
 			logger.Debug("Checking config validation prerequisites",
-				zap.Bool("binary_exists", binErr == nil),
 				zap.Bool("config_exists", cfgErr == nil),
 				zap.Bool("will_run", canRun))
 			return canRun
@@ -51,25 +50,46 @@ func ConfigValidationDiagnostic() *debug.Diagnostic {
 				Metadata: make(map[string]interface{}),
 			}
 
-			cmd := exec.CommandContext(ctx, DefaultBinaryPath, "validate", DefaultConfigPath)
-			output, err := cmd.CombinedOutput()
-
-			result.Output = string(output)
-			result.Metadata["config_path"] = DefaultConfigPath
-
+			// Read the config file
+			configData, err := os.ReadFile(DefaultConfigPath)
 			if err != nil {
-				logger.Error("Configuration validation failed",
+				logger.Error("Failed to read config file",
 					zap.String("config_path", DefaultConfigPath),
-					zap.String("output", string(output)),
 					zap.Error(err))
 				result.Status = debug.StatusError
-				result.Message = "Configuration validation failed"
-				result.Remediation = fmt.Sprintf("Fix configuration errors in %s", DefaultConfigPath)
+				result.Message = "Cannot read configuration file"
+				result.Remediation = fmt.Sprintf("Check file permissions: %s", DefaultConfigPath)
+				return result, nil
+			}
+
+			result.Metadata["config_path"] = DefaultConfigPath
+			result.Metadata["config_size"] = len(configData)
+
+			// Define a basic structure to parse Vault config
+			// We're just validating HCL syntax, not semantic correctness
+			type VaultConfig struct {
+				Storage  map[string]interface{} `hcl:"storage,optional"`
+				Listener map[string]interface{} `hcl:"listener,optional"`
+				UI       *bool                  `hcl:"ui,optional"`
+			}
+
+			var config VaultConfig
+			err = hclsimple.Decode(DefaultConfigPath, configData, nil, &config)
+
+			if err != nil {
+				logger.Error("HCL syntax validation failed",
+					zap.String("config_path", DefaultConfigPath),
+					zap.Error(err))
+				result.Status = debug.StatusError
+				result.Message = "HCL syntax error in configuration"
+				result.Output = fmt.Sprintf("HCL Parse Error:\n%v", err)
+				result.Remediation = fmt.Sprintf("Fix HCL syntax errors in %s", DefaultConfigPath)
 			} else {
-				logger.Info("Configuration validation successful",
+				logger.Info("Configuration HCL syntax valid",
 					zap.String("config_path", DefaultConfigPath))
 				result.Status = debug.StatusOK
-				result.Message = "Configuration is valid"
+				result.Message = "HCL syntax is valid"
+				result.Output = fmt.Sprintf("✓ HCL syntax valid (%d bytes)\n✓ Successfully parsed Vault configuration", len(configData))
 			}
 
 			return result, nil

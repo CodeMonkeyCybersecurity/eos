@@ -206,13 +206,11 @@ func IdempotencyStatusDiagnostic() *debug.Diagnostic {
 				result.Metadata["binary_exists"] = true
 				result.Metadata["binary_path"] = binaryPath
 
-				// Get version
-				if versionCmd := exec.CommandContext(ctx, "vault", "version"); versionCmd != nil {
-					if versionOut, err := versionCmd.Output(); err == nil {
-						version := strings.TrimSpace(string(versionOut))
-						output.WriteString(fmt.Sprintf("  └─ Version: %s\n", version))
-						result.Metadata["binary_version"] = version
-					}
+				// Get version using Vault API client (reads version from binary metadata)
+				// This is better than shelling out to 'vault version'
+				if versionInfo, err := getVaultBinaryVersion(ctx, binaryPath); err == nil {
+					output.WriteString(fmt.Sprintf("  └─ Version: %s\n", versionInfo))
+					result.Metadata["binary_version"] = versionInfo
 				}
 			} else {
 				output.WriteString("✗ Vault Binary: NOT FOUND\n")
@@ -407,19 +405,13 @@ func OrphanedStateDiagnostic() *debug.Diagnostic {
 
 			// Check 3: Is Vault initialized? (requires Vault to be running)
 			vaultInitialized := false
-			// Note: vault status command uses VAULT_ADDR from environment (via shared.GetVaultAddrWithEnv pattern)
 
-			// Try to check init status (this requires VAULT_SKIP_VERIFY=1 for self-signed certs)
+			// Use Vault API client to check initialization status
 			initCheckCtx, initCancel := context.WithTimeout(ctx, 3*time.Second)
 			defer initCancel()
-			_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
-			initCmd := exec.CommandContext(initCheckCtx, "vault", "status", "-format=json")
-			initOutput, err := initCmd.CombinedOutput()
-			if err == nil {
-				// Parse for initialized field (simple string search)
-				if strings.Contains(string(initOutput), `"initialized":true`) {
-					vaultInitialized = true
-				}
+
+			if initialized, err := checkVaultInitialized(initCheckCtx); err == nil {
+				vaultInitialized = initialized
 			}
 
 			// Store findings
