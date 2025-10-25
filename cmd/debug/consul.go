@@ -27,6 +27,8 @@ Diagnostic checks performed:
 11. Cluster state (members, leader, raft peers)
 12. Retry join target connectivity (reachability of join targets)
 13. Vault-Consul connectivity (critical for Vault storage backend)
+14. ACL system status (configuration, enablement)
+15. Data directory verification (configured vs. actual, orphaned reset files)
 
 Flags:
   --fix              [DEPRECATED] Use 'eos update consul --fix' instead

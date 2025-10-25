@@ -140,6 +140,10 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	aclResult := checkACLEnabled(rc)
 	results = append(results, aclResult)
 
+	// 15. Check data directory configuration (critical for ACL bootstrap)
+	dataDirResult := checkDataDirectoryConfiguration(rc)
+	results = append(results, dataDirResult)
+
 	logger.Debug("Diagnostic assessment completed",
 		zap.Int("total_checks", len(results)),
 		zap.Int("retry_join_addrs", len(retryJoinAddrs)))

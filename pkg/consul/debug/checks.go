@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/user"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -1083,4 +1085,408 @@ func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
 	result.Details = append(result.Details, "  3. Create tokens: consul acl token create ...")
 
 	return result
+}
+
+// checkDataDirectoryConfiguration verifies that the configured data directory
+// matches the actual data directory where Consul is storing Raft state.
+//
+// This check is CRITICAL for ACL bootstrap reset operations, which write
+// acl-bootstrap-reset files to the data directory. If the configured path
+// doesn't match the actual path, Consul never sees the reset file and
+// bootstrap fails.
+//
+// Evidence gathered:
+//  1. Configured data_dir from config file
+//  2. Configured data_dir from process arguments
+//  3. Configured data_dir from Consul API
+//  4. Actual data_dir by finding active raft/raft.db file
+//  5. Orphaned ACL reset files (proof Consul didn't consume them)
+//
+// Returns:
+//   - SUCCESS: Config matches actual, no orphaned files
+//   - WARNING: Multiple sources disagree, but no active mismatch
+//   - CRITICAL: Config doesn't match actual (ACL operations will fail)
+func checkDataDirectoryConfiguration(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking data directory configuration vs. actual usage")
+
+	result := DiagnosticResult{
+		CheckName: "Data Directory Configuration",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// ========================================================================
+	// ASSESS - Detect CONFIGURED data directory from multiple sources
+	// ========================================================================
+
+	result.Details = append(result.Details, "=== Configured Data Directory (from various sources) ===")
+
+	// Source 1: Config file
+	var configDataDir string
+	configPath := consul.ConsulConfigFile
+	if content, err := os.ReadFile(configPath); err == nil {
+		configStr := string(content)
+		// Parse: data_dir = "/path/to/dir"
+		if matches := regexp.MustCompile(`data_dir\s*=\s*"([^"]+)"`).FindStringSubmatch(configStr); len(matches) > 1 {
+			configDataDir = matches[1]
+			result.Details = append(result.Details, fmt.Sprintf("Config file (%s): %s", configPath, configDataDir))
+		} else {
+			result.Details = append(result.Details, fmt.Sprintf("Config file (%s): NOT SPECIFIED", configPath))
+		}
+	} else {
+		result.Details = append(result.Details, fmt.Sprintf("Config file (%s): UNREADABLE", configPath))
+	}
+
+	// Source 2: Process arguments
+	var processDataDir string
+	cmd := execute.Options{
+		Command: "ps",
+		Args:    []string{"aux"},
+		Capture: true,
+	}
+	if output, err := execute.Run(rc.Ctx, cmd); err == nil {
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "consul agent") && !strings.Contains(line, "grep") {
+				// Extract -data-dir flag
+				if matches := regexp.MustCompile(`-data-dir[= ]([^\s]+)`).FindStringSubmatch(line); len(matches) > 1 {
+					processDataDir = strings.Trim(matches[1], `"'`)
+					result.Details = append(result.Details, fmt.Sprintf("Process arguments (ps aux): %s", processDataDir))
+					break
+				}
+			}
+		}
+		if processDataDir == "" {
+			result.Details = append(result.Details, "Process arguments (ps aux): NOT SPECIFIED")
+		}
+	} else {
+		result.Details = append(result.Details, "Process arguments (ps aux): UNAVAILABLE")
+	}
+
+	// Source 3: Consul API
+	var apiDataDir string
+	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
+	if err == nil {
+		if agentSelf, err := consulClient.Agent().Self(); err == nil {
+			if configMap, ok := agentSelf["Config"]; ok {
+				if dataDir, ok := configMap["DataDir"].(string); ok && dataDir != "" {
+					apiDataDir = dataDir
+					result.Details = append(result.Details, fmt.Sprintf("API query (/v1/agent/self): %s", apiDataDir))
+				}
+			}
+		}
+	}
+	if apiDataDir == "" {
+		result.Details = append(result.Details, "API query (/v1/agent/self): UNAVAILABLE (expected if ACLs locked)")
+	}
+
+	// Source 4: Systemd service file
+	var systemdDataDir string
+	serviceFile := "/etc/systemd/system/consul.service"
+	if content, err := os.ReadFile(serviceFile); err == nil {
+		serviceStr := string(content)
+		if matches := regexp.MustCompile(`-data-dir[= ]([^\s]+)`).FindStringSubmatch(serviceStr); len(matches) > 1 {
+			systemdDataDir = strings.Trim(matches[1], `"'`)
+			result.Details = append(result.Details, fmt.Sprintf("Systemd service (%s): %s", serviceFile, systemdDataDir))
+		}
+	}
+	if systemdDataDir == "" {
+		result.Details = append(result.Details, fmt.Sprintf("Systemd service (%s): NOT SPECIFIED", serviceFile))
+	}
+
+	// Source 5: Journalctl logs
+	var logDataDir string
+	logCmd := execute.Options{
+		Command: "journalctl",
+		Args:    []string{"-u", "consul", "--no-pager", "--since", "24 hours ago"},
+		Capture: true,
+	}
+	if logOutput, err := execute.Run(rc.Ctx, logCmd); err == nil {
+		// Look for startup messages mentioning data_dir
+		if matches := regexp.MustCompile(`data.dir[=:]?\s*([^\s,]+)`).FindStringSubmatch(logOutput); len(matches) > 1 {
+			logDataDir = strings.Trim(matches[1], `"'`)
+			result.Details = append(result.Details, fmt.Sprintf("Consul logs (journalctl): %s", logDataDir))
+		}
+	}
+	if logDataDir == "" {
+		result.Details = append(result.Details, "Consul logs (journalctl): NOT FOUND")
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ========================================================================
+	// ASSESS - Detect ACTUAL data directory by finding active raft.db
+	// ========================================================================
+
+	result.Details = append(result.Details, "=== Actual Data Directory (active Raft database) ===")
+
+	type raftInfo struct {
+		path     string
+		size     int64
+		mtime    time.Time
+		ageHours float64
+	}
+
+	var raftDBs []raftInfo
+
+	// Check common paths for active raft.db
+	candidatePaths := []string{
+		"/opt/consul",
+		"/var/lib/consul",
+		"/data/consul",
+		"/consul/data",
+	}
+
+	// Also add configured paths if they're different
+	if configDataDir != "" && !contains(candidatePaths, configDataDir) {
+		candidatePaths = append(candidatePaths, configDataDir)
+	}
+	if processDataDir != "" && !contains(candidatePaths, processDataDir) {
+		candidatePaths = append(candidatePaths, processDataDir)
+	}
+	if apiDataDir != "" && !contains(candidatePaths, apiDataDir) {
+		candidatePaths = append(candidatePaths, apiDataDir)
+	}
+
+	for _, basePath := range candidatePaths {
+		raftDBPath := filepath.Join(basePath, "raft", "raft.db")
+		if info, err := os.Stat(raftDBPath); err == nil {
+			age := time.Since(info.ModTime())
+			raftDBs = append(raftDBs, raftInfo{
+				path:     raftDBPath,
+				size:     info.Size(),
+				mtime:    info.ModTime(),
+				ageHours: age.Hours(),
+			})
+		}
+	}
+
+	var activeDataDir string
+	if len(raftDBs) == 0 {
+		result.Details = append(result.Details, "✗ No raft.db found in any checked location")
+		result.Details = append(result.Details, fmt.Sprintf("  Checked: %v", candidatePaths))
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Cannot locate Consul's active data directory"
+		return result
+	}
+
+	// Find the most recently modified raft.db (the active one)
+	var mostRecent raftInfo
+	for _, db := range raftDBs {
+		if mostRecent.path == "" || db.mtime.After(mostRecent.mtime) {
+			mostRecent = db
+		}
+
+		// Report all found raft.db files
+		activeMarker := ""
+		if db.ageHours < 1.0 {
+			activeMarker = " (ACTIVE - modified within 1 hour)"
+		} else if db.ageHours < 24.0 {
+			activeMarker = fmt.Sprintf(" (modified %.1f hours ago)", db.ageHours)
+		} else {
+			activeMarker = fmt.Sprintf(" (STALE - modified %.1f hours ago)", db.ageHours)
+		}
+		result.Details = append(result.Details,
+			fmt.Sprintf("  %s: %d bytes, mtime=%s%s",
+				db.path,
+				db.size,
+				db.mtime.Format("2006-01-02 15:04:05"),
+				activeMarker))
+	}
+
+	// Determine active data directory from most recent raft.db
+	activeDataDir = filepath.Dir(filepath.Dir(mostRecent.path)) // /path/to/consul/raft/raft.db → /path/to/consul
+
+	if mostRecent.ageHours < 1.0 {
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, fmt.Sprintf("✓ Active data directory: %s", activeDataDir))
+	} else {
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, fmt.Sprintf("⚠ Likely data directory: %s (raft.db is stale)", activeDataDir))
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ========================================================================
+	// ASSESS - Check for orphaned ACL reset files
+	// ========================================================================
+
+	result.Details = append(result.Details, "=== ACL Bootstrap Reset File Status ===")
+
+	orphanedResetFiles := []string{}
+	for _, basePath := range candidatePaths {
+		resetFilePath := filepath.Join(basePath, "acl-bootstrap-reset")
+		if info, err := os.Stat(resetFilePath); err == nil {
+			// File exists!
+			age := time.Since(info.ModTime())
+			orphanedResetFiles = append(orphanedResetFiles, resetFilePath)
+
+			// Read contents
+			if content, err := os.ReadFile(resetFilePath); err == nil {
+				result.Details = append(result.Details,
+					fmt.Sprintf("✗ ORPHANED reset file found: %s", resetFilePath))
+				result.Details = append(result.Details,
+					fmt.Sprintf("  Contents: %s", strings.TrimSpace(string(content))))
+				result.Details = append(result.Details,
+					fmt.Sprintf("  Age: %.1f hours", age.Hours()))
+				result.Details = append(result.Details,
+					"  This file was written but Consul NEVER consumed it")
+				result.Details = append(result.Details,
+					"  Proof: If Consul had consumed it, the file would be deleted")
+			}
+		}
+	}
+
+	if len(orphanedResetFiles) == 0 {
+		result.Details = append(result.Details, "✓ No orphaned ACL reset files found")
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ========================================================================
+	// EVALUATE - Compare configured vs. actual and report mismatches
+	// ========================================================================
+
+	result.Details = append(result.Details, "=== Configuration Analysis ===")
+
+	// Collect all non-empty configured paths
+	configuredPaths := make(map[string][]string) // path -> sources
+	if configDataDir != "" {
+		configuredPaths[configDataDir] = append(configuredPaths[configDataDir], "config_file")
+	}
+	if processDataDir != "" {
+		configuredPaths[processDataDir] = append(configuredPaths[processDataDir], "process_args")
+	}
+	if apiDataDir != "" {
+		configuredPaths[apiDataDir] = append(configuredPaths[apiDataDir], "api")
+	}
+	if systemdDataDir != "" {
+		configuredPaths[systemdDataDir] = append(configuredPaths[systemdDataDir], "systemd")
+	}
+	if logDataDir != "" {
+		configuredPaths[logDataDir] = append(configuredPaths[logDataDir], "logs")
+	}
+
+	// Check if all sources agree
+	if len(configuredPaths) == 0 {
+		result.Details = append(result.Details, "⚠ WARNING: No data directory configured anywhere")
+		result.Details = append(result.Details, "  Consul is likely using compiled-in defaults")
+		result.Success = false
+		result.Severity = SeverityWarning
+	} else if len(configuredPaths) == 1 {
+		// All sources agree - check if it matches actual
+		var configuredPath string
+		var sources []string
+		for path, srcs := range configuredPaths {
+			configuredPath = path
+			sources = srcs
+		}
+
+		if configuredPath == activeDataDir {
+			result.Details = append(result.Details, "✓ SUCCESS: Configuration matches actual data directory")
+			result.Details = append(result.Details, fmt.Sprintf("  Path: %s", activeDataDir))
+			result.Details = append(result.Details, fmt.Sprintf("  Sources agree: %v", sources))
+		} else {
+			result.Details = append(result.Details, "✗ CRITICAL MISMATCH DETECTED")
+			result.Details = append(result.Details, fmt.Sprintf("  Configured: %s (from %v)", configuredPath, sources))
+			result.Details = append(result.Details, fmt.Sprintf("  Actual:     %s (active raft.db location)", activeDataDir))
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "IMPACT:")
+			result.Details = append(result.Details, "  - ACL bootstrap reset will FAIL (writes to wrong directory)")
+			result.Details = append(result.Details, "  - Consul reads from: " + activeDataDir)
+			result.Details = append(result.Details, "  - Reset file written to: " + configuredPath)
+			result.Details = append(result.Details, "  - Consul never sees the file → bootstrap fails")
+
+			result.Success = false
+			result.Severity = SeverityCritical
+			result.Message = "Data directory configuration doesn't match actual usage"
+		}
+	} else {
+		// Multiple different paths configured - this is confusing
+		result.Details = append(result.Details, "⚠ WARNING: Multiple sources specify DIFFERENT data directories")
+		for path, sources := range configuredPaths {
+			matchMarker := ""
+			if path == activeDataDir {
+				matchMarker = " ← MATCHES ACTUAL"
+			}
+			result.Details = append(result.Details, fmt.Sprintf("  %s: %v%s", path, sources, matchMarker))
+		}
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, fmt.Sprintf("Active data directory (raft.db): %s", activeDataDir))
+
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Inconsistent data directory configuration across sources"
+	}
+
+	// If orphaned files exist, definitely a problem
+	if len(orphanedResetFiles) > 0 {
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "✗ ORPHANED ACL RESET FILES DETECTED")
+		result.Details = append(result.Details, "  These files were written but Consul never consumed them.")
+		result.Details = append(result.Details, "  This is PROOF that the reset file was written to the WRONG directory.")
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Data directory mismatch confirmed by orphaned reset files"
+	}
+
+	// ========================================================================
+	// EVALUATE - Provide remediation guidance
+	// ========================================================================
+
+	if !result.Success {
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+
+		if len(orphanedResetFiles) > 0 {
+			result.Details = append(result.Details, "  1. Clean up orphaned reset files:")
+			for _, file := range orphanedResetFiles {
+				result.Details = append(result.Details, fmt.Sprintf("       sudo rm %s", file))
+			}
+			result.Details = append(result.Details, "")
+		}
+
+		if result.Severity == SeverityCritical {
+			// Provide specific fix for mismatch
+			var wrongPath string
+			for path := range configuredPaths {
+				if path != activeDataDir {
+					wrongPath = path
+					break
+				}
+			}
+
+			if wrongPath != "" && configDataDir != "" && configDataDir != activeDataDir {
+				result.Details = append(result.Details, fmt.Sprintf("  2. Fix config file to use actual data directory:"))
+				result.Details = append(result.Details, fmt.Sprintf("       Edit: %s", consul.ConsulConfigFile))
+				result.Details = append(result.Details, fmt.Sprintf("       Change: data_dir = \"%s\"", configDataDir))
+				result.Details = append(result.Details, fmt.Sprintf("       To:     data_dir = \"%s\"", activeDataDir))
+				result.Details = append(result.Details, "")
+				result.Details = append(result.Details, "  3. Restart Consul:")
+				result.Details = append(result.Details, "       sudo systemctl restart consul")
+			}
+
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "  4. Use explicit --data-dir when running ACL bootstrap:")
+			result.Details = append(result.Details, fmt.Sprintf("       sudo eos update consul --bootstrap-token --data-dir %s", activeDataDir))
+		}
+	}
+
+	if result.Success {
+		result.Message = "Data directory configuration is correct"
+	}
+
+	return result
+}
+
+// contains checks if a string slice contains a specific string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
