@@ -26,8 +26,9 @@ import (
 
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
 //
-// Idempotency: Safe to re-run. If user exists, updates password and refreshes bootstrap secret.
+// Idempotency: Safe to re-run. If user exists, skips creation and ensures bootstrap secret exists.
 // This allows recovery from partial failures where user was created but secret wasn't persisted.
+// Note: Does not update existing user's password - that requires explicit password change operation.
 func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logger, password string) error {
 
 	client, err := GetPrivilegedClient(rc)

@@ -603,22 +603,48 @@ func promptOktaConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error)
 	}, nil
 }
 
-// VerifyMFAPrerequisites checks that all prerequisites for MFA setup exist
-// This provides clear diagnostic output if something is misconfigured
+// VerifyAndFetchMFAPrerequisites atomically verifies all MFA prerequisites AND fetches
+// the bootstrap password needed for TOTP setup. This eliminates TOCTOU races by reading
+// the password once during verification instead of checking existence then reading later.
 //
-// Prerequisites checked:
-// 1. Userpass user exists
-// 2. Entity exists (by name or alias)
-// 3. Entity alias exists for userpass mount
+// Prerequisites verified:
+//   1. Userpass user exists
+//   2. Entity exists (by name or alias)
+//   3. Entity alias exists for userpass mount
+//   4. Bootstrap password exists and is readable
 //
-// This function is defensive and provides detailed diagnostics if any prerequisite is missing.
-func VerifyMFAPrerequisites(rc *eos_io.RuntimeContext, client *api.Client, username string) error {
+// Returns MFABootstrapData containing the password and metadata, or error if any
+// prerequisite fails.
+//
+// This function should be called once before MFA setup. Pass the returned data to
+// SetupUserTOTP() to avoid re-reading the password from Vault.
+//
+// Eliminates TOCTOU: By reading the password during verification instead of just checking
+// existence, we avoid the race condition where:
+//   T0: Check if password exists → TRUE
+//   T1: [Password gets deleted/rotated]
+//   T2: Try to read password → FAIL
+//
+// Example:
+//
+//	bootstrapData, err := VerifyAndFetchMFAPrerequisites(rc, client, "eos")
+//	if err != nil {
+//	    return err
+//	}
+//	err = SetupUserTOTP(rc, client, "eos", bootstrapData)
+func VerifyAndFetchMFAPrerequisites(
+	rc *eos_io.RuntimeContext,
+	client *api.Client,
+	username string,
+) (*MFABootstrapData, error) {
 	log := otelzap.Ctx(rc.Ctx)
+	startTime := time.Now()
 
-	log.Info(" [PRE-MFA VERIFICATION] Checking MFA prerequisites")
+	log.Info(" [PRE-MFA VERIFICATION] Verifying prerequisites and fetching bootstrap data",
+		zap.String("username", username))
 
 	// Check 1: Userpass user exists
-	log.Info("   Checking userpass user exists")
+	log.Info("   Check 1: Userpass user exists")
 	userPath := fmt.Sprintf("auth/userpass/users/%s", username)
 	userResp, err := client.Logical().Read(userPath)
 	if err != nil || userResp == nil {
@@ -626,103 +652,187 @@ func VerifyMFAPrerequisites(rc *eos_io.RuntimeContext, client *api.Client, usern
 			zap.String("username", username),
 			zap.String("path", userPath),
 			zap.Error(err))
-		return cerr.Newf("userpass user %s does not exist", username)
+		return nil, cerr.Newf("userpass user %s does not exist", username)
 	}
 	log.Info("   ✓ Userpass user exists")
 
-	// Check 2: Entity exists (by name)
-	log.Info("   Checking entity exists")
+	// Check 2: Entity exists (by name or alias)
+	log.Info("   Check 2: Entity exists")
 	entityLookupPath := fmt.Sprintf(shared.EosEntityLookupPath, username)
 	entityResp, err := client.Logical().Read(entityLookupPath)
+
+	var entityID string
+	var lookupMethod string
+
 	if err != nil || entityResp == nil || entityResp.Data == nil {
-		log.Warn("   ✗ Entity not found by name, checking alias",
+		log.Warn("   Entity not found by name, trying alias lookup",
 			zap.String("lookup_path", entityLookupPath))
 
 		// Try alias lookup as fallback
 		authMounts, authErr := client.Sys().ListAuth()
 		if authErr != nil {
 			log.Error("   ✗ Cannot list auth mounts for alias lookup", zap.Error(authErr))
-			return cerr.Newf("entity for user %s does not exist and cannot verify via alias", username)
+			return nil, cerr.Newf("entity for user %s does not exist and cannot verify via alias", username)
 		}
 
 		if userpassMount, exists := authMounts["userpass/"]; exists {
 			aliasLookupData := map[string]interface{}{
-				"alias_name":          username,
+				"alias_name":           username,
 				"alias_mount_accessor": userpassMount.Accessor,
 			}
 			aliasResp, aliasErr := client.Logical().Write("identity/lookup/entity", aliasLookupData)
-			if aliasErr != nil || aliasResp == nil {
+			if aliasErr != nil || aliasResp == nil || aliasResp.Data == nil {
 				log.Error("   ✗ Entity not found by name or alias")
-				return cerr.Newf("entity for user %s does not exist", username)
+				return nil, cerr.Newf("entity for user %s does not exist", username)
 			}
-			log.Info("   ✓ Entity exists (found via alias)")
+
+			// Extract entity ID from alias response
+			var ok bool
+			entityID, ok = aliasResp.Data["id"].(string)
+			if !ok || entityID == "" {
+				log.Error("   ✗ Entity ID not found in alias response")
+				return nil, cerr.New("entity ID missing from alias lookup response")
+			}
+			lookupMethod = "alias"
+			log.Info("   ✓ Entity exists (found via alias)",
+				zap.String("entity_id", entityID))
 		} else {
 			log.Error("   ✗ Entity not found and userpass mount not available for alias lookup")
-			return cerr.Newf("entity for user %s does not exist", username)
+			return nil, cerr.Newf("entity for user %s does not exist", username)
 		}
 	} else {
-		log.Info("   ✓ Entity exists (found by name)")
+		// Extract entity ID from name-based response
+		var ok bool
+		entityID, ok = entityResp.Data["id"].(string)
+		if !ok || entityID == "" {
+			log.Error("   ✗ Entity ID not found in name lookup response")
+			return nil, cerr.New("entity ID missing from name lookup response")
+		}
+		lookupMethod = "name"
+		log.Info("   ✓ Entity exists (found by name)",
+			zap.String("entity_id", entityID))
 	}
 
-	// Check 3: Entity alias exists
-	log.Info("   Checking entity alias exists for userpass")
+	// Check 3: Entity alias exists for userpass
+	log.Info("   Check 3: Entity alias exists for userpass")
 	authMounts, err := client.Sys().ListAuth()
 	if err != nil {
 		log.Warn("   Could not verify entity alias", zap.Error(err))
 	} else if userpassMount, exists := authMounts["userpass/"]; exists {
-		// We can't directly check alias existence via API, but if entity lookup by alias worked,
-		// the alias exists. This is implicitly verified by the entity lookup above.
 		log.Info("   ✓ Entity alias verified (userpass mount exists)",
 			zap.String("mount_accessor", userpassMount.Accessor))
 	}
 
-	// Check 4: Bootstrap password exists (Phase 10a completion proof)
-	// CRITICAL P1: This is defense-in-depth verification. Even though Phase 10a now fails
-	// properly if the secret isn't persisted (P0 fix), this early check provides:
-	// - Fail-fast behavior (before generating TOTP secrets)
-	// - Better UX (clear error message about what's missing)
-	// - Protection against edge cases (secret deleted between Phase 10a and Phase 13)
-	log.Info("   Checking bootstrap password secret exists (Phase 10a completion)")
-	bootstrapExists, err := checkSecretExistsKVv2(
-		rc.Ctx,
-		client,
-		"secret",       // mount
-		"eos/bootstrap", // semantic path
-	)
+	// Check 4: ATOMICALLY read bootstrap password (REPLACES existence check)
+	// This is the key change - we READ instead of just checking existence
+	log.Info("   Check 4: Reading bootstrap password (Phase 10a completion proof)")
+	log.Info("     Path being read:", zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+
+	passwordSecret, err := client.Logical().Read(vaultpaths.UserpassBootstrapPasswordKVPath)
 	if err != nil {
-		log.Error("   ✗ Failed to check bootstrap password existence",
+		// Check if it's a 404 (not found)
+		if respErr, ok := err.(*api.ResponseError); ok && respErr.StatusCode == 404 {
+			log.Error("   ✗ Bootstrap password not found (404)",
+				zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+			log.Error("")
+			log.Error("═══════════════════════════════════════════════════════════")
+			log.Error(" Phase 10a Incomplete: Bootstrap Password Not Found")
+			log.Error("═══════════════════════════════════════════════════════════")
+			log.Error("")
+			log.Error("Expected path:", zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+			log.Error("")
+			log.Error("Diagnostic Commands:")
+			log.Error("  1. Check if secret exists: vault kv get -mount=secret eos/bootstrap")
+			log.Error("  2. List all secrets: vault kv list secret/")
+			log.Error("  3. Check Vault logs: journalctl -u vault -n 100")
+			log.Error("")
+			log.Error("Recovery:")
+			log.Error("  Re-run: sudo eos update vault --enable-userpass")
+			log.Error("")
+			return nil, cerr.Errorf(
+				"Phase 10a incomplete: bootstrap password not found at %s",
+				vaultpaths.UserpassBootstrapPasswordKVPath)
+		}
+
+		// Other error (network, permissions, etc.)
+		log.Error("   ✗ Failed to read bootstrap password",
 			zap.Error(err),
-			zap.String("semantic_path", "eos/bootstrap"))
-		return cerr.Wrap(err, "failed to verify Phase 10a completion")
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		return nil, cerr.Wrap(err, "failed to read bootstrap password")
 	}
 
-	if !bootstrapExists {
-		log.Error("   ✗ Bootstrap password secret not found",
-			zap.String("semantic_path", "eos/bootstrap"),
-			zap.String("full_path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		log.Error("")
-		log.Error("═══════════════════════════════════════════════════════════")
-		log.Error(" Phase 10a Incomplete: Bootstrap Password Missing")
-		log.Error("═══════════════════════════════════════════════════════════")
-		log.Error("")
-		log.Error("This indicates Phase 10a (userpass authentication setup) did not complete successfully.")
-		log.Error("")
-		log.Error("Diagnostic Steps:")
-		log.Error("  1. Check Phase 10a logs: grep 'Phase 10a' /var/log/eos/*.log")
-		log.Error("  2. Verify Vault storage health: vault status")
-		log.Error("  3. Check secret directly: vault kv get -mount=secret eos/bootstrap")
-		log.Error("")
-		log.Error("Recovery:")
-		log.Error("  Re-run userpass setup: eos update vault --enable-userpass")
-		log.Error("  Or full vault setup: eos create vault")
-		log.Error("")
-		return cerr.New("Phase 10a incomplete: bootstrap password not found")
+	// Validate response structure
+	if passwordSecret == nil || passwordSecret.Data == nil {
+		log.Error("   ✗ Bootstrap password returned nil or has no data",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		return nil, cerr.New("Phase 10a incomplete: bootstrap password has invalid structure")
 	}
 
-	log.Info("   ✓ Bootstrap password secret exists (Phase 10a verified complete)")
+	// Extract password from KV v2 structure
+	kvData, ok := passwordSecret.Data["data"].(map[string]interface{})
+	if !ok {
+		log.Error("   ✗ Invalid KV v2 structure",
+			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.Any("structure", passwordSecret.Data))
+		return nil, cerr.New("bootstrap password has invalid KV v2 structure")
+	}
 
-	log.Info(" [PRE-MFA VERIFICATION] All prerequisites verified successfully")
-	return nil
+	password, ok := kvData[vaultpaths.UserpassBootstrapPasswordKVField].(string)
+	if !ok || password == "" {
+		log.Error("   ✗ Password field missing or empty",
+			zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
+			zap.Any("available_fields", getMapKeys(kvData)))
+		return nil, cerr.Newf("password field '%s' missing or invalid",
+			vaultpaths.UserpassBootstrapPasswordKVField)
+	}
+
+	log.Info("   ✓ Bootstrap password retrieved successfully",
+		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+		zap.Int("password_length", len(password)))
+
+	// Build return data
+	bootstrapData := &MFABootstrapData{
+		Username:   username,
+		Password:   password,
+		EntityID:   entityID,
+		SecretPath: vaultpaths.UserpassBootstrapPasswordKVPath,
+		FetchedAt:  time.Now(),
+	}
+
+	log.Info(" [PRE-MFA VERIFICATION] All prerequisites verified successfully",
+		zap.String("username", username),
+		zap.String("entity_id", entityID),
+		zap.String("entity_lookup_method", lookupMethod),
+		zap.Duration("duration", time.Since(startTime)))
+	log.Info("   ✓ Userpass user exists")
+	log.Info("   ✓ Entity exists and is configured")
+	log.Info("   ✓ Bootstrap password fetched and cached")
+
+	return bootstrapData, nil
+}
+
+// VerifyMFAPrerequisites checks that all prerequisites for MFA setup exist
+// This provides clear diagnostic output if something is misconfigured
+//
+// DEPRECATED: Use VerifyAndFetchMFAPrerequisites() instead.
+// This function only verifies existence without fetching the bootstrap password,
+// which creates a TOCTOU vulnerability (check at T0, read at T1).
+//
+// This function is kept for backwards compatibility but will be removed in future versions.
+// It's now implemented as a simple wrapper that calls VerifyAndFetchMFAPrerequisites
+// and discards the returned bootstrap data.
+//
+// Prerequisites checked:
+// 1. Userpass user exists
+// 2. Entity exists (by name or alias)
+// 3. Entity alias exists for userpass mount
+// 4. Bootstrap password exists (via the new function)
+//
+// This function is defensive and provides detailed diagnostics if any prerequisite is missing.
+func VerifyMFAPrerequisites(rc *eos_io.RuntimeContext, client *api.Client, username string) error {
+	// Delegate to the new function and discard the bootstrap data
+	_, err := VerifyAndFetchMFAPrerequisites(rc, client, username)
+	return err
 }
 
 // deleteEntityTOTPSecret deletes the TOTP secret for an entity
@@ -842,12 +952,33 @@ func checkEntityHasTOTP(rc *eos_io.RuntimeContext, client *api.Client, entityID,
 // SetupUserTOTP helps a user set up TOTP MFA for Identity-based MFA
 // This function generates a user-specific TOTP secret and displays it for enrollment
 //
-// CRITICAL: Must be called AFTER EnableMFAMethods() creates the TOTP MFA method
+// CRITICAL: Must be called AFTER:
+//   - EnableMFAMethods() creates the TOTP MFA method
+//   - VerifyAndFetchMFAPrerequisites() verifies setup and fetches bootstrap data
+//
 // CRITICAL: User MUST save the QR code/URL/key before continuing - they cannot retrieve it later
 //
 // IDEMPOTENCY: This function checks if TOTP is already configured before proceeding.
 // If TOTP already exists, it will skip setup and inform the user how to reset if needed.
-func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username string) error {
+//
+// Parameters:
+//   - rc: Runtime context
+//   - client: Authenticated Vault client
+//   - username: Username to set up TOTP for (e.g., "eos")
+//   - bootstrapData: Cached bootstrap data from VerifyAndFetchMFAPrerequisites()
+//     Contains entity ID and password needed for TOTP verification
+//
+// Returns:
+//   - error: nil on success, error if setup fails
+//
+// The function will:
+//  1. Check staleness of cached bootstrap data (warns if >5 minutes old)
+//  2. Use cached entity ID (no redundant lookup)
+//  3. Check if TOTP already configured (idempotency)
+//  4. Generate TOTP secret and display QR code
+//  5. Verify TOTP setup with cached bootstrap password (no redundant read)
+//  6. Clean up orphaned secrets on verification failure
+func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username string, bootstrapData *MFABootstrapData) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("")
@@ -855,6 +986,20 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info(" Setting up TOTP MFA for user: " + username)
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info("")
+
+	// STALENESS CHECK: Warn if cached bootstrap data is old
+	dataAge := bootstrapData.Age()
+	if dataAge > 5*time.Minute {
+		log.Warn("Bootstrap data is older than 5 minutes",
+			zap.Duration("age", dataAge),
+			zap.Time("fetched_at", bootstrapData.FetchedAt),
+			zap.String("warning", "password may have been rotated since verification"))
+		log.Warn("If TOTP verification fails below, this staleness may be the cause")
+	} else {
+		log.Debug("Using cached bootstrap data",
+			zap.Duration("age", dataAge),
+			zap.Time("fetched_at", bootstrapData.FetchedAt))
+	}
 
 	// Step 1: Retrieve the TOTP method ID that was created during EnableMFAMethods
 	log.Info(" [ASSESS] Retrieving TOTP MFA method configuration")
@@ -888,100 +1033,19 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	log.Info(" ✓ TOTP MFA method found", zap.String("method_id", methodID))
 
-	// Step 2: Look up entity ID for the user
-	log.Info(" [ASSESS] Looking up entity for user", zap.String("username", username))
+	// Step 2: Use cached entity ID from bootstrap data
+	// Entity lookup was already performed in VerifyAndFetchMFAPrerequisites()
+	entityID := bootstrapData.EntityID
+	log.Info(" [CACHED] Using entity ID from bootstrap data",
+		zap.String("entity_id", entityID),
+		zap.String("username", username))
 
-	var entityID string
-	var lookupMethod string
-
-	// Method 1: Lookup by entity name (primary)
-	entityLookupPath := fmt.Sprintf(shared.EosEntityLookupPath, username)
-	entityResp, err := client.Logical().Read(entityLookupPath)
-
-	if err != nil || entityResp == nil || entityResp.Data == nil {
-		log.Warn(" Entity lookup by name failed, trying alias lookup",
-			zap.Error(err),
-			zap.String("lookup_path", entityLookupPath))
-
-		// Method 2: Lookup by alias (fallback - more robust)
-		log.Info(" [ASSESS] Attempting entity lookup via userpass alias")
-
-		// Get userpass mount accessor
-		authMounts, authErr := client.Sys().ListAuth()
-		if authErr != nil {
-			log.Error(" Failed to list auth mounts",
-				zap.Error(authErr))
-			return cerr.Wrap(authErr, "failed to list auth mounts for alias lookup")
-		}
-
-		userpassMount, exists := authMounts["userpass/"]
-		if !exists {
-			log.Error(" Userpass auth method not found")
-			return cerr.New("userpass auth method not found - cannot lookup entity by alias")
-		}
-
-		// Lookup entity by alias using the API endpoint
-		aliasLookupPath := "identity/lookup/entity"
-		aliasLookupData := map[string]interface{}{
-			"alias_name":          username,
-			"alias_mount_accessor": userpassMount.Accessor,
-		}
-
-		log.Debug("Alias lookup parameters",
-			zap.String("alias_name", username),
-			zap.String("mount_accessor", userpassMount.Accessor))
-
-		aliasResp, aliasErr := client.Logical().Write(aliasLookupPath, aliasLookupData)
-		if aliasErr != nil {
-			log.Error(" Failed to look up entity by alias",
-				zap.Error(aliasErr),
-				zap.String("username", username))
-			return cerr.Wrap(aliasErr, "failed to look up entity - both name and alias lookup failed")
-		}
-
-		if aliasResp == nil || aliasResp.Data == nil {
-			log.Error(" Entity not found by name or alias")
-			log.Error("")
-			log.Error("This indicates the entity was not created during 'eos create vault'")
-			log.Error("Entity creation happens in Phase 10c (PhaseCreateEosEntity)")
-			log.Error("")
-			log.Error("To fix:")
-			log.Error("  1. Run 'sudo eos debug vault --identities' to check entity status")
-			log.Error("  2. If entity missing, run 'sudo eos delete vault --force && sudo eos create vault'")
-			log.Error("")
-			return cerr.Newf("entity not found for user %s (tried name and alias lookup)", username)
-		}
-
-		entityID, ok = aliasResp.Data["id"].(string)
-		if !ok || entityID == "" {
-			log.Error(" Entity ID from alias lookup is invalid", zap.Any("response", aliasResp.Data))
-			return cerr.New("entity ID from alias lookup is invalid")
-		}
-
-		lookupMethod = "alias"
-		log.Info(" ✓ Entity found via alias lookup",
-			zap.String("entity_id", entityID),
-			zap.String("method", lookupMethod))
-	} else {
-		// Method 1 succeeded
-		entityID, ok = entityResp.Data["id"].(string)
-		if !ok || entityID == "" {
-			log.Error(" Entity ID from name lookup is invalid", zap.Any("response", entityResp.Data))
-			return cerr.New("entity ID from name lookup is invalid")
-		}
-
-		lookupMethod = "name"
-		log.Info(" ✓ Entity found via name lookup",
-			zap.String("entity_id", entityID),
-			zap.String("method", lookupMethod))
-	}
-
-	// State transition: Entity lookup complete
+	// State transition: Entity lookup complete (from cache)
 	log.Info("MFA Setup State Transition",
 		zap.String("from_state", "methods_created"),
 		zap.String("to_state", "entity_lookup_complete"),
 		zap.String("entity_id", entityID),
-		zap.String("lookup_method", lookupMethod))
+		zap.String("method", "cached"))
 
 	// Step 2.5: IDEMPOTENCY CHECK - Check if TOTP is already configured
 	// This prevents creating duplicate TOTP entries in the user's authenticator app
@@ -1017,8 +1081,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	// Step 3: Generate TOTP secret using admin endpoint
 	log.Info(" [INTERVENE] Generating TOTP secret for user",
 		zap.String("entity_id", entityID),
-		zap.String("method_id", methodID),
-		zap.String("lookup_method", lookupMethod))
+		zap.String("method_id", methodID))
 
 	// CRITICAL: Use admin-generate endpoint which accepts explicit entity_id
 	// The regular /generate endpoint requires the calling token to have an entity,
@@ -1153,138 +1216,13 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	totpCode := testCodes[0]
 
-	// Step 1: Read bootstrap password from Vault KV (stored during Phase 10a)
-	// This is the temporary bootstrap password that will be deleted after successful TOTP verification
-	log.Info(" [VERIFICATION] Reading bootstrap password from Vault KV",
-		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-
-	passwordSecret, err := client.Logical().Read(vaultpaths.UserpassBootstrapPasswordKVPath)
-	if err != nil {
-		log.Error(" Failed to read bootstrap password from KV",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.Error(err),
-			zap.String("phase_context", "Should have been created in Phase 10a"))
-		log.Error("")
-		log.Error("Possible causes:")
-		log.Error("  • Phase 10a (userpass setup) did not complete successfully")
-		log.Error("  • Bootstrap password was already deleted (if retrying after success)")
-		log.Error("  • Network/connection issue with Vault")
-		log.Error("")
-		log.Error("Remediation:")
-		log.Error("  1. Check Phase 10a logs for password write confirmation")
-		log.Error("  2. Verify path exists: vault kv get secret/eos/bootstrap")
-		log.Error("  3. If missing, re-run: eos update vault --setup-userpass")
-		log.Error("")
-		return cerr.Wrap(err, "failed to read bootstrap password from KV - Phase 10a may not have completed")
-	}
-
-	if passwordSecret == nil {
-		log.Error("")
-		log.Error("═══════════════════════════════════════════════════════════")
-		log.Error(" CRITICAL: Bootstrap Password Secret Not Found")
-		log.Error("═══════════════════════════════════════════════════════════")
-		log.Error("")
-		log.Error("Expected path:", zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		log.Error("")
-		log.Error("Root Cause Analysis:")
-		log.Error("  Phase 10a (userpass bootstrap) did not successfully persist credentials to Vault.")
-		log.Error("")
-		log.Error("Possible Reasons:")
-		log.Error("  1. Phase 10a write succeeded but verification failed (storage backend issue)")
-		log.Error("  2. Vault storage backend became unavailable during Phase 10a")
-		log.Error("  3. Network partition between Eos and Vault during write")
-		log.Error("  4. Insufficient Vault token permissions (unlikely with root token)")
-		log.Error("  5. KV v2 engine not mounted at 'secret'")
-		log.Error("  6. Secret was deleted after Phase 10a but before MFA setup")
-		log.Error("")
-		log.Error("Diagnostic Commands:")
-		log.Error("  1. Check if secret exists: vault kv get -mount=secret eos/bootstrap")
-		log.Error("  2. Verify KV v2 mount: vault secrets list | grep secret")
-		log.Error("  3. Check storage health: vault status")
-		log.Error("  4. Review Phase 10a logs: grep 'Phase 10a' /var/log/eos/*.log")
-		log.Error("  5. Check for Phase 10a errors: grep 'Phase 10a.*ERROR' /var/log/eos/*.log")
-		log.Error("")
-		log.Error("Recovery Steps:")
-		log.Error("  1. Re-run userpass setup: eos update vault --enable-userpass")
-		log.Error("  2. Verify bootstrap password appears: vault kv get -mount=secret eos/bootstrap")
-		log.Error("  3. Retry MFA setup: eos update vault --setup-mfa-user eos")
-		log.Error("")
-		log.Error("Or run full vault enablement: eos create vault")
-		log.Error("")
-		return cerr.Errorf(
-			"bootstrap password not found at %s: Phase 10a did not complete successfully (see logs above for details)",
-			vaultpaths.UserpassBootstrapPasswordKVPath,
-		)
-	}
-
-	if passwordSecret.Data == nil {
-		log.Error(" Bootstrap password secret exists but Data field is nil",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		log.Error("")
-		log.Error("This is an unexpected Vault response structure.")
-		log.Error("The secret exists but contains no data.")
-		log.Error("")
-		return cerr.New("bootstrap password secret has nil Data field - unexpected Vault response")
-	}
-
-	// KV v2 wraps actual data in a "data" field
-	// Structure: { "data": { "password": "...", "created_at": "...", ... }, "metadata": {...} }
-	kvData, ok := passwordSecret.Data["data"].(map[string]interface{})
-	if !ok {
-		log.Error(" Invalid KV v2 data structure - 'data' field missing or wrong type",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.Any("response_structure", passwordSecret.Data))
-		log.Error("")
-		log.Error("Expected KV v2 structure: { \"data\": { \"password\": \"...\" }, \"metadata\": {...} }")
-		log.Error("Actual structure does not have a 'data' field as map[string]interface{}")
-		log.Error("")
-		log.Error("Possible causes:")
-		log.Error("  • Secret was written with wrong structure (not KV v2 format)")
-		log.Error("  • Secret was written to wrong mount point")
-		log.Error("  • KV engine is not v2 (check: vault secrets list)")
-		log.Error("")
-		log.Error("Diagnostic command:")
-		log.Error("  vault kv get -format=json secret/eos/bootstrap | jq")
-		log.Error("")
-		return cerr.New("invalid KV v2 data structure - 'data' field missing or wrong type")
-	}
-
-	// Extract password field from the data map
-	password, ok := kvData[vaultpaths.UserpassBootstrapPasswordKVField].(string)
-	if !ok {
-		log.Error(" Password field missing or not a string",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
-			zap.Any("available_fields", getMapKeys(kvData)))
-		log.Error("")
-		log.Error(fmt.Sprintf("Expected field: '%s' (type: string)", vaultpaths.UserpassBootstrapPasswordKVField))
-		log.Error(fmt.Sprintf("Available fields in data: %v", getMapKeys(kvData)))
-		log.Error("")
-		log.Error("Possible causes:")
-		log.Error("  • Phase 10a used different field name (check constants match)")
-		log.Error("  • Field exists but is not a string type")
-		log.Error("  • Secret was manually modified")
-		log.Error("")
-		log.Error("Diagnostic command:")
-		log.Error("  vault kv get -format=json secret/eos/bootstrap | jq '.data.data'")
-		log.Error("")
-		return cerr.Newf("password field '%s' missing or invalid in KV data", vaultpaths.UserpassBootstrapPasswordKVField)
-	}
-
-	if password == "" {
-		log.Error(" Password field is empty string",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.String("field", vaultpaths.UserpassBootstrapPasswordKVField))
-		log.Error("")
-		log.Error("Password field exists but contains an empty string.")
-		log.Error("This should never happen - Phase 10a should generate a non-empty password.")
-		log.Error("")
-		return cerr.New("password field is empty - invalid state")
-	}
-
-	log.Info(" ✓ [VERIFICATION] Bootstrap password retrieved successfully from KV",
-		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-		zap.Int("password_length", len(password)))
+	// Step 1: Use cached bootstrap password from MFABootstrapData
+	// This password was already read and verified in VerifyAndFetchMFAPrerequisites()
+	password := bootstrapData.Password
+	log.Info(" [CACHED] Using bootstrap password from cached data",
+		zap.String("source_path", bootstrapData.SecretPath),
+		zap.Int("password_length", len(password)),
+		zap.Duration("cache_age", bootstrapData.Age()))
 
 	// Step 2: Perform userpass login to trigger MFA challenge
 	log.Info(" [VERIFICATION] Attempting userpass login (will trigger MFA challenge)")

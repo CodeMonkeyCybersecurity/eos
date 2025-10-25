@@ -13,13 +13,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// checkSecretExistsKVv2 checks if a KV v2 secret exists at the given semantic path.
+// checkSecretExistsKVv2 checks if a KV v2 secret exists and is not deleted.
 //
 // This function implements efficient secret existence checking by querying the metadata
 // endpoint instead of reading the actual secret data. This approach:
 // - Avoids transferring sensitive data unnecessarily
 // - Reduces network bandwidth
 // - Works even if the caller doesn't have read permissions on the data
+// - Detects soft-deleted secrets (checks deletion_time field)
+//
+// IMPORTANT Limitation: The metadata endpoint returns success even for DELETED secrets
+// (they're marked as deleted, not removed). This function checks the deletion_time field
+// and returns false for soft-deleted secrets.
 //
 // Parameters:
 //   - ctx: Context for the operation (used for logging and cancellation)
@@ -28,7 +33,7 @@ import (
 //   - semanticPath: Semantic path WITHOUT /data/ or /metadata/ prefix (e.g., "eos/bootstrap")
 //
 // Returns:
-//   - exists: true if secret exists, false if 404 or not found
+//   - exists: true if secret exists AND is not deleted, false otherwise
 //   - err: non-nil if error checking (not a 404)
 //
 // Path Resolution:
@@ -39,10 +44,15 @@ import (
 //   - 404 errors are expected (secret doesn't exist) → returns (false, nil)
 //   - Other errors indicate problems → returns (false, error)
 //   - nil response treated as not found → returns (false, nil)
+//   - Secrets with deletion_time set → returns (false, nil)
 //
-// This eliminates TOCTOU (Time-of-Check to Time-of-Use) vulnerabilities by making
-// the check and use separate atomic operations. The early check provides fail-fast
-// behavior, while the actual read should still handle not-found errors gracefully.
+// Use Cases:
+//   - Conditional operations: "if backup exists, use it; else create new"
+//   - Health checks: "verify critical secrets exist"
+//   - Cleanup: "delete only if exists"
+//
+// For MFA setup, prefer VerifyAndFetchMFAPrerequisites() which reads the secret once
+// and caches it, eliminating TOCTOU races and reducing Vault API calls.
 //
 // Example:
 //
@@ -51,7 +61,7 @@ import (
 //	    return fmt.Errorf("failed to check secret existence: %w", err)
 //	}
 //	if !exists {
-//	    return fmt.Errorf("required secret not found")
+//	    return fmt.Errorf("required secret not found or deleted")
 //	}
 func checkSecretExistsKVv2(
 	ctx context.Context,
@@ -99,7 +109,21 @@ func checkSecretExistsKVv2(
 
 	// Secret exists if we got a non-nil response with data
 	if secret != nil && secret.Data != nil {
-		log.Debug("Secret exists",
+		// CRITICAL: Check if the secret is soft-deleted in KV v2
+		// The metadata endpoint returns success even for deleted secrets,
+		// so we must check the deletion_time field explicitly.
+		//
+		// From Vault docs: "The metadata endpoint returns metadata about a secret,
+		// including deletion and version information. A deleted secret still has metadata."
+		if deletionTime, ok := secret.Data["deletion_time"].(string); ok && deletionTime != "" {
+			log.Warn("Secret exists in metadata but is marked as deleted",
+				zap.String("semantic_path", semanticPath),
+				zap.String("metadata_path", metadataPath),
+				zap.String("deletion_time", deletionTime))
+			return false, nil // Treat deleted secrets as not existing
+		}
+
+		log.Debug("Secret exists and is not deleted",
 			zap.String("semantic_path", semanticPath),
 			zap.String("metadata_path", metadataPath),
 			zap.Any("metadata_keys", getMapKeys(secret.Data)))

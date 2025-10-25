@@ -416,36 +416,44 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		}
 
 		if userpassConfigured {
-			// Verify all MFA prerequisites before attempting TOTP setup
+			// Verify all MFA prerequisites and fetch bootstrap data atomically
 			// CRITICAL P1: This early verification provides fail-fast behavior and
 			// prevents generating TOTP secrets if prerequisites are missing.
-			log.Info(" [ASSESS] Verifying MFA prerequisites before setup")
+			// CRITICAL P2: Atomic read eliminates TOCTOU within process (bootstrap password
+			// read once during verification, cached for later use in SetupUserTOTP).
+			log.Info(" [ASSESS] Verifying MFA prerequisites and fetching bootstrap data")
 			log.Info("   Prerequisites being checked:")
 			log.Info("     1. Userpass user exists")
 			log.Info("     2. Entity exists (by name or alias)")
 			log.Info("     3. Entity alias exists for userpass mount")
-			log.Info("     4. Bootstrap password secret exists (Phase 10a completion)")
+			log.Info("     4. Bootstrap password secret exists AND readable (Phase 10a completion)")
 			log.Info("")
 
-			if err := VerifyMFAPrerequisites(rc, client, "eos"); err != nil {
+			bootstrapData, err := VerifyAndFetchMFAPrerequisites(rc, client, "eos")
+			if err != nil {
 				log.Error(" [Phase 13] MFA prerequisites check failed",
 					zap.Error(err))
 				log.Error("")
 				log.Error("  MFA setup cannot proceed because prerequisites are missing.")
 				log.Error("  Run 'sudo eos debug vault --identities' for detailed diagnostics.")
 				log.Error("")
-				return logger.LogErrAndWrap(rc, "verify MFA prerequisites", err)
+				return logger.LogErrAndWrap(rc, "verify and fetch MFA prerequisites", err)
 			}
 
 			log.Info("")
 			log.Info(" [EVALUATE] All MFA prerequisites verified successfully")
 			log.Info("   ✓ Userpass user exists")
 			log.Info("   ✓ Entity exists and is properly configured")
-			log.Info("   ✓ Bootstrap password available for TOTP setup")
+			log.Info("   ✓ Bootstrap password retrieved and cached for TOTP setup")
 			log.Info("")
+			log.Debug("Bootstrap data cached",
+				zap.String("entity_id", bootstrapData.EntityID),
+				zap.String("username", bootstrapData.Username),
+				zap.String("secret_path", bootstrapData.SecretPath),
+				zap.Time("fetched_at", bootstrapData.FetchedAt))
 
-			// Set up TOTP for the eos user
-			if err := SetupUserTOTP(rc, client, "eos"); err != nil {
+			// Set up TOTP for the eos user using cached bootstrap data
+			if err := SetupUserTOTP(rc, client, "eos", bootstrapData); err != nil {
 				log.Error(" [Phase 13] CRITICAL: Failed to set up TOTP for eos user",
 					zap.Error(err),
 					zap.Duration("duration", time.Since(phaseStart)))
