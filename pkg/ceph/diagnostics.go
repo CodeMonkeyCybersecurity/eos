@@ -124,7 +124,7 @@ func RunFullDiagnostics(logger otelzap.LoggerWithCtx, opts DiagnosticOptions) ([
 		result = CheckClockSync(logger)
 		results = append(results, result)
 	} else {
-		logger.Warn("⚠️  Skipping cluster-level checks (cluster not reachable)")
+		logger.Warn("  Skipping cluster-level checks (cluster not reachable)")
 		logger.Info("")
 	}
 

@@ -28,7 +28,7 @@ func CheckMonitorBootstrap(logger otelzap.LoggerWithCtx, verbose bool) Diagnosti
 	// Get hostname
 	hostname, err := os.Hostname()
 	if err != nil {
-		logger.Warn("⚠️  Could not determine hostname", zap.Error(err))
+		logger.Warn("  Could not determine hostname", zap.Error(err))
 		hostname = "unknown"
 	}
 
@@ -80,7 +80,7 @@ func CheckMonitorBootstrap(logger otelzap.LoggerWithCtx, verbose bool) Diagnosti
 	// Check directory contents
 	entries, err := os.ReadDir(monDataDir)
 	if err != nil {
-		logger.Warn("⚠️  Cannot read monitor directory", zap.Error(err))
+		logger.Warn("  Cannot read monitor directory", zap.Error(err))
 		result.Issues = append(result.Issues, Issue{
 			Component:   "ceph-mon",
 			Severity:    "warning",
@@ -103,7 +103,7 @@ func CheckMonitorBootstrap(logger otelzap.LoggerWithCtx, verbose bool) Diagnosti
 			if _, err := os.Stat(keyPath); err == nil {
 				logger.Info(fmt.Sprintf("    ✓ %s exists", keyFile))
 			} else {
-				logger.Warn(fmt.Sprintf("    ⚠️  %s missing", keyFile))
+				logger.Warn(fmt.Sprintf("      %s missing", keyFile))
 				missingFiles = append(missingFiles, keyFile)
 			}
 		}
@@ -158,7 +158,7 @@ func CheckMonitorBootstrap(logger otelzap.LoggerWithCtx, verbose bool) Diagnosti
 		if errorCount == 0 {
 			logger.Info("  ✓ No recent error messages in journal")
 		} else {
-			logger.Warn(fmt.Sprintf("  ⚠️  Found %d error message(s) - showing first 5:", errorCount))
+			logger.Warn(fmt.Sprintf("    Found %d error message(s) - showing first 5:", errorCount))
 			for _, line := range errorLines {
 				logger.Warn("    " + line)
 			}
@@ -229,7 +229,7 @@ func CheckMonitorBootstrap(logger otelzap.LoggerWithCtx, verbose bool) Diagnosti
 	}
 
 	if enabled != "enabled" {
-		logger.Warn("  ⚠️  Monitor service is not enabled (won't start on boot)")
+		logger.Warn("    Monitor service is not enabled (won't start on boot)")
 		logger.Info("  → Try: systemctl enable " + serviceName)
 
 		result.Issues = append(result.Issues, Issue{

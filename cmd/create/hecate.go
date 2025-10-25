@@ -210,7 +210,7 @@ Examples:
 
 			if !allValid {
 				log.Info("terminal prompt: ")
-				log.Info("terminal prompt: ⚠️  WARNING: Some DNS records are not configured correctly")
+				log.Info("terminal prompt:   WARNING: Some DNS records are not configured correctly")
 				log.Info("terminal prompt:    Caddy will not be able to issue TLS certificates until DNS is fixed")
 				log.Info("terminal prompt:    You can continue deployment, but services may not be accessible")
 				log.Info("terminal prompt: ")
@@ -232,7 +232,7 @@ Examples:
 		log.Info("terminal prompt: ")
 		log.Info("terminal prompt: ✓ Hecate infrastructure generated successfully!")
 		log.Info("terminal prompt: ")
-		log.Info("terminal prompt: ⚠️  PREREQUISITES:")
+		log.Info("terminal prompt:   PREREQUISITES:")
 		log.Info("terminal prompt:   • DNS records must point to this server:")
 
 		// Deduplicate domains for display

@@ -41,7 +41,7 @@ Example:
   eos debug consul
   eos debug consul --kill-processes --test-start
 
-⚠️  DEPRECATION NOTICE:
+  DEPRECATION NOTICE:
   The --fix flag is deprecated. Use 'eos update consul --fix' instead.
   This flag will be removed in Eos v2.0.0 (approximately 6 months from now).
 
@@ -68,7 +68,7 @@ func runDebugConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	// Show deprecation warning if --fix is used
 	if autoFix {
-		logger.Warn("⚠️  DEPRECATION WARNING: 'eos debug consul --fix' is deprecated")
+		logger.Warn("  DEPRECATION WARNING: 'eos debug consul --fix' is deprecated")
 		logger.Warn("   Use 'eos update consul --fix' instead")
 		logger.Warn("   This flag will be removed in Eos v2.0.0 (approximately 6 months from now)")
 		logger.Info("")

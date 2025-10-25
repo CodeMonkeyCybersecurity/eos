@@ -160,7 +160,7 @@ D. Consul Connect service mesh
 
 | Option | Pros | Cons | Recommended? |
 |--------|------|------|--------------|
-| Public endpoint | Simple, fast | Security risk, need port forward | ⚠️ Dev only |
+| Public endpoint | Simple, fast | Security risk, need port forward |  Dev only |
 | VPN tunnel | Secure, private network | Setup complexity, latency overhead | ✅ Recommended |
 | Cloudflare Tunnel | No port forward, free tier | Dependency on Cloudflare | ✅ Alternative |
 | Consul Connect | Native to stack, mTLS | Most complex, learning curve | 🔄 Future |

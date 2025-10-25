@@ -326,7 +326,7 @@ This file contains:
 - ✅ Logging patterns
 - ✅ Testing checklist
 
-### Needs Your Input Before Implementation ⚠️
+### Needs Your Input Before Implementation 
 
 1. **VPN Setup Method** - Which VPN solution?
 2. **Remote Hecate Access** - How to update Caddyfile remotely?
@@ -377,7 +377,7 @@ Provide:
 
 **Total: 18-25 hours of development time**
 
-**Complexity Level: High** ⚠️
+**Complexity Level: High** 
 - Multiple distributed systems
 - Network complexity (VPN)
 - Service discovery
@@ -460,7 +460,7 @@ Before you give this to Claude Code, please clarify:
 - Follows your eos CLI patterns
 - Production-ready error handling
 
-**Open Questions:** 3-4 items ⚠️
+**Open Questions:** 3-4 items 
 - Need your input on VPN, remote access, Authentik API
 - Not blockers, just need decisions
 

@@ -2,8 +2,8 @@
 package update
 
 import (
-	"fmt"
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 
@@ -250,7 +250,7 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		// Validate environment name
 		if err := sharedvault.ValidateEnvironment(consulEnvironment); err != nil {
 			return fmt.Errorf("invalid environment: %w\n\n"+
-				"Valid environments: production, staging, development, review\n\n"+
+				"Valid environments: production, staging, development, admin\n\n"+
 				"Examples:\n"+
 				"  eos update consul --environment development\n"+
 				"  eos update consul --environment production", err)
@@ -293,7 +293,7 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 		// Confirm production changes
 		if consulEnvironment == string(sharedvault.EnvironmentProduction) {
-			logger.Warn("⚠️  Setting environment to PRODUCTION",
+			logger.Warn("  Setting environment to PRODUCTION",
 				zap.String("hostname", hostname),
 				zap.String("consul_path", kvPath))
 			logger.Info("This node will have access to PRODUCTION secrets in Vault")

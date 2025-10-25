@@ -113,7 +113,7 @@ func runCephDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		if len(criticalIssues) > 0 {
 			logger.Warn(fmt.Sprintf("❌ Found %d critical issue(s) requiring attention", len(criticalIssues)))
 			logger.Info("")
-			logger.Info("⚠️  CRITICAL ISSUES:")
+			logger.Info("  CRITICAL ISSUES:")
 			for i, issue := range criticalIssues {
 				logger.Info(fmt.Sprintf("  %d. %s: %s", i+1, issue.Component, issue.Description))
 				if issue.Impact != "" {
@@ -124,7 +124,7 @@ func runCephDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 		if len(warnings) > 0 {
 			logger.Info("")
-			logger.Info("⚠️  WARNINGS:")
+			logger.Info("  WARNINGS:")
 			for i, issue := range warnings {
 				logger.Info(fmt.Sprintf("  %d. %s: %s", i+1, issue.Component, issue.Description))
 			}

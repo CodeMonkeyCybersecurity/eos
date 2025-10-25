@@ -340,7 +340,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 	// Note: We assume this node is the leader or can write to the leader's data dir
 	// In a multi-node cluster, user may need to run this on the actual leader node
 	logger.Info("terminal prompt: ")
-	logger.Info("terminal prompt: ⚠️  ACL reset must be performed on the cluster leader")
+	logger.Info("terminal prompt:   ACL reset must be performed on the cluster leader")
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Cluster leader: " + leaderDisplayName)
 	logger.Info("terminal prompt: ")
@@ -828,7 +828,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			zap.String("note", "Bootstrap succeeded, but token not persisted to Vault"))
 
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: ⚠️  CRITICAL: Bootstrap token generated but NOT stored in Vault")
+		logger.Info("terminal prompt:   CRITICAL: Bootstrap token generated but NOT stored in Vault")
 		logger.Info("terminal prompt: ")
 		logger.Info("terminal prompt: Bootstrap Token (save this securely):")
 		logger.Info("terminal prompt: " + result.MasterToken)
@@ -1141,8 +1141,9 @@ func extractResetIndex(errorMsg string) (int, error) {
 //   - string: Tailscale IPv4 address if found, empty string otherwise
 //
 // Example:
-//   tailscaleIP := getTailscaleIPForHostname(rc, "vhost1")
-//   // Returns: "100.64.x.x" if vhost1 has a Tailscale IP
+//
+//	tailscaleIP := getTailscaleIPForHostname(rc, "vhost1")
+//	// Returns: "100.64.x.x" if vhost1 has a Tailscale IP
 func getTailscaleIPForHostname(rc *eos_io.RuntimeContext, hostname string) string {
 	logger := otelzap.Ctx(rc.Ctx)
 

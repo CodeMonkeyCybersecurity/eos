@@ -71,7 +71,7 @@ $ go build -o /tmp/eos-build ./cmd/
 Build successful!
 ```
 
-### Linting Status ⚠️ (Minor issues only)
+### Linting Status  (Minor issues only)
 ```bash
 $ golangci-lint run ./pkg/cephfs/... ./pkg/kvm/...
 7 issues:

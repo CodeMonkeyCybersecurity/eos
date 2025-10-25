@@ -33,7 +33,7 @@ jobs:
           # Check if any emojis were found
           if grep -q "Files with emojis found: [1-9]" emoji-check.log; then
             echo "emojis_found=true" >> $GITHUB_OUTPUT
-            echo "## ⚠️ Emojis Found" >> $GITHUB_STEP_SUMMARY
+            echo "##  Emojis Found" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "The following files contain emojis that should be removed:" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -66,7 +66,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## ⚠️ Emojis Detected
+              body: `##  Emojis Detected
 
               Your PR contains emojis in non-test files. According to Eos project standards (CLAUDE.md), emojis should not be used in production code.
 

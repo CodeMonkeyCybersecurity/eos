@@ -18,7 +18,7 @@ func CheckNetwork(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	cmd := exec.Command("grep", "mon_host", "/etc/ceph/ceph.conf")
 	output, err := cmd.Output()
 	if err != nil {
-		logger.Warn("⚠️  Cannot find mon_host in config")
+		logger.Warn("  Cannot find mon_host in config")
 		return DiagnosticResult{
 			CheckName: "Network",
 			Passed:    false,
@@ -75,7 +75,7 @@ func CheckNetwork(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	}
 
 	if len(uniqueIPs) == 0 {
-		logger.Warn("⚠️  Could not extract monitor IPs from config")
+		logger.Warn("  Could not extract monitor IPs from config")
 		uniqueIPs[monHosts] = true // Try the raw value as fallback
 	}
 

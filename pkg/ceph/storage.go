@@ -17,7 +17,7 @@ func CheckStorage(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	cmd := exec.Command("ls", "-lah", "/var/lib/ceph/osd/")
 	output, err := cmd.Output()
 	if err != nil {
-		logger.Warn("⚠️  Cannot access /var/lib/ceph/osd/")
+		logger.Warn("  Cannot access /var/lib/ceph/osd/")
 		return DiagnosticResult{
 			CheckName: "Storage",
 			Passed:    false,
@@ -37,7 +37,7 @@ func CheckStorage(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult {
 	}
 
 	if osdCount == 0 {
-		logger.Warn("⚠️  No OSD directories found")
+		logger.Warn("  No OSD directories found")
 		logger.Info("  → OSDs may not be configured")
 	} else {
 		logger.Info(fmt.Sprintf("Found %d OSD directories", osdCount))

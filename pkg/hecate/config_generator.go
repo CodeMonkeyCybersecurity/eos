@@ -316,7 +316,7 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 					zap.String("domain", app.Domain),
 					zap.String("existing_app", existingAppName),
 					zap.String("new_app", appName))
-				logger.Info(fmt.Sprintf("terminal prompt: ⚠️  Warning: '%s' and '%s' both use domain: %s", existingAppName, appName, app.Domain))
+				logger.Info(fmt.Sprintf("terminal prompt:   Warning: '%s' and '%s' both use domain: %s", existingAppName, appName, app.Domain))
 				logger.Info("terminal prompt: Each app should have a unique domain (e.g., use subdomains)")
 				logger.Info(fmt.Sprintf("terminal prompt: Consider: %s.yourdomain.com and %s.yourdomain.com", existingAppName, appName))
 			}
@@ -360,7 +360,7 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 	// BLOCKING: Force Authentik configuration if SSO is enabled
 	if len(appsRequiringSSO) > 0 && !hasAuthentik {
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: ⚠️  SSO Configuration Required")
+		logger.Info("terminal prompt:   SSO Configuration Required")
 		logger.Info("terminal prompt: ")
 		logger.Info("terminal prompt: The following apps have SSO enabled:")
 		for _, appName := range appsRequiringSSO {

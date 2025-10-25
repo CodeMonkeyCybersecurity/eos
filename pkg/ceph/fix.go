@@ -484,7 +484,7 @@ func (f *FixEngine) verifyFixes() {
 	if criticalIssues == 0 {
 		f.logger.Info("✓ Verification passed: No critical issues remaining")
 	} else {
-		f.logger.Warn(fmt.Sprintf("⚠️  Verification: %d critical issue(s) still remain", criticalIssues))
+		f.logger.Warn(fmt.Sprintf("  Verification: %d critical issue(s) still remain", criticalIssues))
 		f.logger.Info("  → Some issues may require manual intervention")
 		f.logger.Info("  → Run 'eos debug ceph' for detailed diagnostics")
 	}

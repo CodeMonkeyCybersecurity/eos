@@ -318,7 +318,7 @@ path "secret/data/services/*" {
 - ✅ Cannot access user secrets (`secret/data/eos/*`)
 - ✅ Cannot access shared secrets (`secret/data/shared/*`)
 - ✅ Cannot access system paths (`sys/*`, `auth/*`)
-- ⚠️ CAN access other services' secrets (`secret/data/services/*`)
+-  CAN access other services' secrets (`secret/data/services/*`)
 
 **Mitigation:**
 - Services are trusted (deployed by admin)

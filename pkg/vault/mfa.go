@@ -603,7 +603,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	// Step 3: Display the secret to the user (CRITICAL - they can't retrieve this later)
 	log.Info("═══════════════════════════════════════════════════════════")
-	log.Info(" ⚠️  IMPORTANT: Save this information NOW")
+	log.Info("   IMPORTANT: Save this information NOW")
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info("")
 	log.Info("You MUST add this TOTP configuration to your authenticator app")

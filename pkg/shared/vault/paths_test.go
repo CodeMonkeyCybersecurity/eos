@@ -31,10 +31,10 @@ func TestSecretPath(t *testing.T) {
 			expected: "services/development/bionicgpt",
 		},
 		{
-			name:     "review wazuh",
-			env:      EnvironmentReview,
+			name:     "admin wazuh",
+			env:      EnvironmentAdmin,
 			svc:      ServiceWazuh,
-			expected: "services/review/wazuh",
+			expected: "services/admin/wazuh",
 		},
 	}
 
@@ -261,7 +261,8 @@ func TestValidateEnvironment(t *testing.T) {
 		{name: "valid production", env: "production", wantErr: false},
 		{name: "valid staging", env: "staging", wantErr: false},
 		{name: "valid development", env: "development", wantErr: false},
-		{name: "valid review", env: "review", wantErr: false},
+		{name: "valid admin", env: "admin", wantErr: false},
+		{name: "invalid review", env: "review", wantErr: true},
 		{name: "invalid empty", env: "", wantErr: true},
 		{name: "invalid unknown", env: "unknown", wantErr: true},
 		{name: "invalid mixed case", env: "Production", wantErr: true},
@@ -337,7 +338,7 @@ func TestAllEnvironments(t *testing.T) {
 		EnvironmentProduction,
 		EnvironmentStaging,
 		EnvironmentDevelopment,
-		EnvironmentReview,
+		EnvironmentAdmin,
 	}
 
 	if len(envs) != len(expectedEnvs) {

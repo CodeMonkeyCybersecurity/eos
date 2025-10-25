@@ -50,7 +50,7 @@ func CheckConfiguration(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRe
 		}
 
 		if !keyringFound {
-			logger.Warn("⚠️  No keyring files found in /etc/ceph/")
+			logger.Warn("  No keyring files found in /etc/ceph/")
 			logger.Info("  → Authentication may fail")
 			return DiagnosticResult{
 				CheckName: "Configuration",

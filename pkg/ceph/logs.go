@@ -20,7 +20,7 @@ func AnalyzeLogsDeep(logger otelzap.LoggerWithCtx, lines int, verbose bool) Diag
 	if output, err := cmd.Output(); err == nil {
 		logStr := string(output)
 		if len(strings.TrimSpace(logStr)) == 0 {
-			logger.Warn("⚠️  No systemd journal entries found for Ceph services")
+			logger.Warn("  No systemd journal entries found for Ceph services")
 			logger.Info("  → This suggests Ceph services have never started or are not configured")
 			errorsFound = true
 		} else {
@@ -33,7 +33,7 @@ func AnalyzeLogsDeep(logger otelzap.LoggerWithCtx, lines int, verbose bool) Diag
 				}
 			}
 			if strings.Contains(logStr, "ERROR") || strings.Contains(logStr, "CRITICAL") || strings.Contains(logStr, "failed") {
-				logger.Warn("⚠️  Errors found in systemd logs")
+				logger.Warn("  Errors found in systemd logs")
 				errorsFound = true
 			}
 		}
@@ -60,7 +60,7 @@ func AnalyzeLogsDeep(logger otelzap.LoggerWithCtx, lines int, verbose bool) Diag
 		if output, err := cmd.Output(); err == nil {
 			files := strings.TrimSpace(string(output))
 			if files == "" {
-				logger.Warn("⚠️  No recent log files (modified in last 24h)")
+				logger.Warn("  No recent log files (modified in last 24h)")
 				logger.Info("  → Ceph daemons may not be running")
 				errorsFound = true
 			} else {
@@ -86,7 +86,7 @@ func AnalyzeLogsDeep(logger otelzap.LoggerWithCtx, lines int, verbose bool) Diag
 			}
 		}
 	} else {
-		logger.Warn("⚠️  Cannot access /var/log/ceph/", zap.Error(err))
+		logger.Warn("  Cannot access /var/log/ceph/", zap.Error(err))
 		logger.Info("  → Directory may not exist or insufficient permissions")
 		errorsFound = true
 	}
@@ -99,7 +99,7 @@ func AnalyzeLogsDeep(logger otelzap.LoggerWithCtx, lines int, verbose bool) Diag
 		if strings.Contains(logStr, "total 0") || len(strings.Split(logStr, "\n")) <= 3 {
 			logger.Info("✓ No crash dumps found")
 		} else {
-			logger.Warn("⚠️  Crash dumps detected:")
+			logger.Warn("  Crash dumps detected:")
 			for _, line := range strings.Split(logStr, "\n") {
 				if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, "total") {
 					logger.Warn("  " + line)

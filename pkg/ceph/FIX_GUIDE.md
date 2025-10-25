@@ -307,7 +307,7 @@ Then apply manual remediation from diagnostics output.
 ### Verification Still Shows Issues
 
 ```
-⚠️  Verification: 1 critical issue(s) still remain
+  Verification: 1 critical issue(s) still remain
   → Some issues may require manual intervention
 ```
 

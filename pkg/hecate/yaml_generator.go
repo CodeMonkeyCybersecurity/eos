@@ -752,7 +752,7 @@ COMPOSE_PORT_HTTPS=%s
 	if _, err := os.Stat(envPath); err == nil {
 		logger.Warn(".env file already exists, will overwrite",
 			zap.String("path", envPath))
-		logger.Info("terminal prompt: ⚠️  Overwriting existing .env file with new secrets")
+		logger.Info("terminal prompt:   Overwriting existing .env file with new secrets")
 	}
 
 	// Write with restricted permissions (0600 = owner read/write only)
@@ -764,7 +764,7 @@ COMPOSE_PORT_HTTPS=%s
 	logger.Info(".env file created with secure permissions",
 		zap.String("path", envPath),
 		zap.String("permissions", "0600"))
-	logger.Info("terminal prompt: ⚠️  IMPORTANT: Authentik bootstrap credentials saved in .env file")
+	logger.Info("terminal prompt:   IMPORTANT: Authentik bootstrap credentials saved in .env file")
 	logger.Info("terminal prompt:    Email: " + hecateSecrets.AuthentikBootstrapEmail)
 	logger.Info("terminal prompt:    Password: " + hecateSecrets.AuthentikBootstrapPassword)
 

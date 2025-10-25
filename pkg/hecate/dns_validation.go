@@ -90,7 +90,7 @@ func ValidateDNSRecords(rc *eos_io.RuntimeContext, config *YAMLHecateConfig) ([]
 					result.Message = fmt.Sprintf("✓ Points to this server (%s)", localIP)
 				} else {
 					result.IsValid = false
-					result.Message = fmt.Sprintf("⚠️  Points to %s (this server is %s)",
+					result.Message = fmt.Sprintf("  Points to %s (this server is %s)",
 						strings.Join(result.ResolvedIPs, ", "), localIP)
 				}
 			} else {

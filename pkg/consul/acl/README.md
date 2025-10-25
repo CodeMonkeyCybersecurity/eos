@@ -760,7 +760,7 @@ See [Consul Auth Method documentation](https://developer.hashicorp.com/consul/do
 - ✅ Tokens (active)
 - ✅ Policies (active)
 - ✅ Roles (active)
-- ⚠️ Auth Methods (active but empty if none configured)
+-  Auth Methods (active but empty if none configured)
 
 **In Eos**: Check for new commands:
 ```bash

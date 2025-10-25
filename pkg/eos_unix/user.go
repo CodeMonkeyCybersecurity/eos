@@ -327,7 +327,7 @@ func HandleInterrupt(rc *eos_io.RuntimeContext) {
 		<-c
 		logger.Info("Received interrupt signal")
 
-		if _, err := fmt.Fprintln(os.Stderr, "\n⚠️  Operation canceled."); err != nil {
+		if _, err := fmt.Fprintln(os.Stderr, "\n  Operation canceled."); err != nil {
 			logger.Error("Failed to write cancellation message", zap.Error(err))
 		}
 
@@ -456,7 +456,7 @@ func SetupSignalHandler() {
 
 	go func() {
 		<-c
-		_, _ = fmt.Fprintln(os.Stderr, "\n⚠️  Operation canceled.")
+		_, _ = fmt.Fprintln(os.Stderr, "\n  Operation canceled.")
 		os.Exit(1)
 	}()
 }

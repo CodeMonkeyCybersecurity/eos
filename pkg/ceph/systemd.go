@@ -199,13 +199,13 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 	}
 
 	if len(mgrInstances) == 0 {
-		logger.Warn("⚠️  No ceph-mgr instances found in systemd")
+		logger.Warn("  No ceph-mgr instances found in systemd")
 	} else {
 		logger.Info(fmt.Sprintf("Found %d mgr instance(s): %v", len(mgrInstances), mgrInstances))
 	}
 
 	if len(osdInstances) == 0 {
-		logger.Warn("⚠️  No ceph-osd instances found in systemd")
+		logger.Warn("  No ceph-osd instances found in systemd")
 		logger.Info("  → OSDs must be created with: ceph-volume lvm create")
 	} else {
 		logger.Info(fmt.Sprintf("Found %d osd instance(s): %v", len(osdInstances), osdInstances))
@@ -228,7 +228,7 @@ func CheckSystemdUnits(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 	}
 
 	if activeCount == 0 {
-		logger.Warn("⚠️  No active Ceph units")
+		logger.Warn("  No active Ceph units")
 		logger.Info("  → Try: systemctl start ceph.target")
 		result.Passed = false
 		result.Error = fmt.Errorf("no active ceph units")

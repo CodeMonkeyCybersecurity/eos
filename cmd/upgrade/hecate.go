@@ -315,7 +315,7 @@ func waitForActiveTasks(rc *eos_io.RuntimeContext) error {
 	isEmpty := strings.Contains(string(output), "empty")
 
 	if !isEmpty {
-		fmt.Println("⚠️  There are active tasks in the queue")
+		fmt.Println("  There are active tasks in the queue")
 		fmt.Print("Wait for tasks to complete? (y/n): ")
 
 		var response string

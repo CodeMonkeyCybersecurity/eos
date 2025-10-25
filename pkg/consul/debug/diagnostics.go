@@ -61,11 +61,11 @@ type ACLErrorPattern struct {
 
 // ACLLogError represents a detected ACL error from logs
 type ACLLogError struct {
-	Timestamp   string   // When the error occurred
-	Pattern     string   // Which pattern matched
-	ErrorInfo   ACLErrorPattern
-	LogLine     string   // The actual log line
-	Context     []string // Surrounding log lines for context
+	Timestamp string // When the error occurred
+	Pattern   string // Which pattern matched
+	ErrorInfo ACLErrorPattern
+	LogLine   string   // The actual log line
+	Context   []string // Surrounding log lines for context
 }
 
 // AssessmentResults holds the raw results of diagnostic assessment
@@ -322,7 +322,7 @@ func RunDiagnostics(rc *eos_io.RuntimeContext, config *Config) error {
 			zap.Int("warning_count", warningCount),
 			zap.Int("info_count", infoCount))
 		// Return nil (exit 0) but warn user
-		logger.Warn("\n⚠️  Warnings found - Consul functional but should address issues above")
+		logger.Warn("\n  Warnings found - Consul functional but should address issues above")
 		return nil
 	}
 

@@ -79,7 +79,7 @@ This allows Hecate to:
 Unless `--force` is specified, the command shows a warning and requires confirmation:
 
 ```
-⚠️  WARNING: This will delete:
+  WARNING: This will delete:
   - All Docker containers and volumes
   - Configuration files in /opt/hecate
   - All Consul KV data (routes, DNS, auth policies, etc.)
@@ -121,7 +121,7 @@ The `--keep-data` flag allows you to:
 $ sudo eos delete hecate
 INFO Starting Hecate deletion process
 
-⚠️  WARNING: This will delete:
+  WARNING: This will delete:
   - All Docker containers and volumes
   - Configuration files in /opt/hecate
   - All Consul KV data (routes, DNS, auth policies, etc.)

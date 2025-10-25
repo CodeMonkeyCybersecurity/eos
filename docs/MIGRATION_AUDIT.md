@@ -699,7 +699,7 @@ return hex.EncodeToString(key), nil
 
 ---
 
-## What's Not Great ⚠️
+## What's Not Great 
 
 1. **Configuration method changed** - From flags to environment variables
    - **Mitigation**: Environment variables are actually MORE secure

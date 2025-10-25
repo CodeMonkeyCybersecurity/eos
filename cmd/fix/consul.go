@@ -13,7 +13,7 @@ import (
 var consulFixCmd = &cobra.Command{
 	Use:   "consul",
 	Short: "[DEPRECATED] Fix common Consul service issues - use 'eos update consul --fix'",
-	Long: `⚠️  DEPRECATION WARNING:
+	Long: `  DEPRECATION WARNING:
 This command is deprecated and will be removed in Eos v2.0.0 (approximately 6 months from now).
 
 Use 'eos update consul --fix' instead for configuration drift correction.
@@ -58,7 +58,7 @@ func runConsulFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Print deprecation warning
-	logger.Warn("⚠️  DEPRECATION WARNING: 'eos fix consul' is deprecated")
+	logger.Warn("  DEPRECATION WARNING: 'eos fix consul' is deprecated")
 	logger.Warn("   Use 'eos update consul --fix' instead")
 	logger.Warn("   This command will be removed in Eos v2.0.0 (approximately 6 months from now)")
 	logger.Info("")

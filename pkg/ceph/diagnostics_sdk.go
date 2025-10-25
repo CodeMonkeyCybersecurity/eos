@@ -273,7 +273,7 @@ func CheckHealthSDK(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 		result.Details = fmt.Sprintf("OSDs: %d, PGs: %d, Storage: %d/%d bytes used",
 			health.NumOSDs, health.NumPGs, health.UsedBytes, health.TotalBytes)
 	} else {
-		logger.Warn("⚠️  Cluster has health warnings")
+		logger.Warn("  Cluster has health warnings")
 		result.Details = "Cluster is not in HEALTH_OK state"
 		result.Issues = append(result.Issues, Issue{
 			Component:   "cluster",

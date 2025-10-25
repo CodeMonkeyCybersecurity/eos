@@ -95,9 +95,9 @@ Comprehensive analysis of `pkg/kvm` and `pkg/cephfs` integration with the `cmd/`
 
 ### Recommendations for pkg/kvm
 
-1. ⚠️ **Consider exposing**: `GetVMByName()`, `FilterVMsWithDrift()` for future `eos vm` commands
-2. ⚠️ **Document**: The three internal restart functions as the "core API"
-3. ⚠️ **Consider deprecating**: Unused file transfer functions (CopyIn/Out) or expose them
+1.  **Consider exposing**: `GetVMByName()`, `FilterVMsWithDrift()` for future `eos vm` commands
+2.  **Document**: The three internal restart functions as the "core API"
+3.  **Consider deprecating**: Unused file transfer functions (CopyIn/Out) or expose them
 4. ✅ **No immediate action needed**: Core functionality is solid
 
 ---
@@ -109,14 +109,14 @@ Comprehensive analysis of `pkg/kvm` and `pkg/cephfs` integration with the `cmd/`
 **Working Commands** ✅:
 - `eos create ceph` - ✅ Working (volumes, snapshots, pools)
 - `eos read ceph` - ✅ Working (lists volumes, snapshots, pools)
-- `eos update ceph` - ⚠️ Mostly working (some gaps)
+- `eos update ceph` -  Mostly working (some gaps)
 - `eos rollback ceph` - ✅ Working (snapshot rollback)
 
 **Broken Commands** ❌:
 - `eos delete ceph` - ❌ BROKEN (silent no-op)
 - `eos create storage-cephfs` - ❌ BROKEN (missing functions)
 
-**Duplicate Commands** ⚠️:
+**Duplicate Commands** :
 - `eos list ceph` - Duplicates `eos read ceph` (marked with TODO)
 
 ### Critical Issues (P0 - Breaking)
@@ -272,7 +272,7 @@ func (c *CephClient) setPoolReplication(rc *eos_io.RuntimeContext, poolName stri
 | `client_stub.go` | ✅ Good | None |
 | `pools_stub.go` | ❌ Broken | GetPool vs GetPoolInfo, pointer mismatch |
 | `snapshots_stub.go` | ❌ Broken | Pointer mismatch in return type |
-| `volumes_stub.go` | ⚠️ Incomplete | Missing UpdateVolume, GetVolumeInfo |
+| `volumes_stub.go` |  Incomplete | Missing UpdateVolume, GetVolumeInfo |
 
 ### Recommendations for pkg/cephfs (Prioritized)
 
@@ -282,7 +282,7 @@ func (c *CephClient) setPoolReplication(rc *eos_io.RuntimeContext, poolName stri
 3. **Fix type signature mismatches** - ListSnapshots, ListPools pointer types
 4. **Rename stub** - GetPool → GetPoolInfo
 
-**P1 - High Priority** ⚠️:
+**P1 - High Priority** :
 5. **Add missing stubs** - UpdateVolume, GetVolumeInfo
 6. **Refactor duplicate commands** - Merge list/read
 7. **Remove or document dead code** - setPoolReplication

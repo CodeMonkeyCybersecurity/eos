@@ -36,7 +36,7 @@ const (
 	EnvironmentProduction  Environment = "production"
 	EnvironmentStaging     Environment = "staging"
 	EnvironmentDevelopment Environment = "development"
-	EnvironmentReview      Environment = "review"
+	EnvironmentAdmin       Environment = "admin"
 )
 
 // String returns the string representation of the environment
@@ -81,7 +81,7 @@ func AllEnvironments() []Environment {
 		EnvironmentProduction,
 		EnvironmentStaging,
 		EnvironmentDevelopment,
-		EnvironmentReview,
+		EnvironmentAdmin,
 	}
 }
 
@@ -227,7 +227,7 @@ func ParseSecretPath(secretPath string) (Environment, Service, error) {
 
 // ValidateEnvironment checks if an environment string is valid.
 //
-// Valid environments: production, staging, development, review
+// Valid environments: production, staging, development, admin
 //
 // Returns error if environment is not recognized.
 //
@@ -239,11 +239,11 @@ func ValidateEnvironment(env string) error {
 		string(EnvironmentProduction):  true,
 		string(EnvironmentStaging):     true,
 		string(EnvironmentDevelopment): true,
-		string(EnvironmentReview):      true,
+		string(EnvironmentAdmin):       true,
 	}
 
 	if !validEnvs[env] {
-		return fmt.Errorf("invalid environment: '%s' (valid: production, staging, development, review)", env)
+		return fmt.Errorf("invalid environment: '%s' (valid: production, staging, development, admin)", env)
 	}
 
 	return nil

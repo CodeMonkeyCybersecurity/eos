@@ -13,7 +13,7 @@ import (
 var FixCmd = &cobra.Command{
 	Use:   "fix",
 	Short: "[DEPRECATED] Fix and repair common issues - use 'eos update <service> --fix'",
-	Long: `⚠️  DEPRECATION WARNING:
+	Long: `  DEPRECATION WARNING:
 The 'eos fix' command family is deprecated in favor of 'eos update <service> --fix'.
 
 These commands will be removed in Eos v2.0.0 (approximately 6 months from now).
@@ -48,7 +48,7 @@ EXAMPLES (DEPRECATED - use 'eos update <service> --fix' instead):
 
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Warn("⚠️  DEPRECATION WARNING: The 'eos fix' command is deprecated")
+		logger.Warn("  DEPRECATION WARNING: The 'eos fix' command is deprecated")
 		logger.Warn("   Use 'eos update <service> --fix' instead")
 		logger.Warn("   These commands will be removed in Eos v2.0.0")
 		logger.Info("")

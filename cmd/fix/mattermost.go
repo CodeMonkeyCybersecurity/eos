@@ -21,7 +21,7 @@ var (
 var mattermostFixCmd = &cobra.Command{
 	Use:   "mattermost",
 	Short: "[DEPRECATED] Fix Mattermost container permission issues - use 'eos update mattermost --fix'",
-	Long: `⚠️  DEPRECATION WARNING:
+	Long: `  DEPRECATION WARNING:
 This command is deprecated and will be removed in Eos v2.0.0 (approximately 6 months from now).
 
 Use 'eos update mattermost --fix' instead for configuration drift correction.
@@ -69,7 +69,7 @@ func runMattermostFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Print deprecation warning
-	logger.Warn("⚠️  DEPRECATION WARNING: 'eos fix mattermost' is deprecated")
+	logger.Warn("  DEPRECATION WARNING: 'eos fix mattermost' is deprecated")
 	logger.Warn("   Use 'eos update mattermost --fix' instead")
 	logger.Warn("   This command will be removed in Eos v2.0.0 (approximately 6 months from now)")
 	logger.Info("")

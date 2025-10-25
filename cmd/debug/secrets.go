@@ -191,7 +191,7 @@ func runDebugSecrets(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	showPlaintext, _ := cmd.Flags().GetBool("show")
 
 	if showPlaintext {
-		logger.Warn("⚠️  WARNING: Displaying plaintext secret values")
+		logger.Warn("  WARNING: Displaying plaintext secret values")
 		logger.Warn("Ensure your terminal is secure and no screen sharing is active")
 	}
 

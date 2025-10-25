@@ -456,7 +456,7 @@ func displayHecateResults(results []HecateCheckResult) {
 		icon := "✅"
 		if !result.Passed {
 			if result.Warning {
-				icon = "⚠️ "
+				icon = " "
 			} else {
 				icon = "❌"
 			}
@@ -531,7 +531,7 @@ func displayHecateConfigFiles(rc *eos_io.RuntimeContext, hecatePath string) []He
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				fmt.Printf("   ⚠️  File not found: %s\n", filePath)
+				fmt.Printf("     File not found: %s\n", filePath)
 				results = append(results, HecateCheckResult{
 					Component:   HecateComponentCaddy,
 					CheckName:   fmt.Sprintf("Display %s", filename),
@@ -641,7 +641,7 @@ func displayConsulKVConfig(rc *eos_io.RuntimeContext) []HecateCheckResult {
 	// ASSESS: Try to connect to Consul
 	configStorage, err := NewConfigStorage(rc)
 	if err != nil {
-		fmt.Printf("   ⚠️  Cannot connect to Consul: %v\n", err)
+		fmt.Printf("     Cannot connect to Consul: %v\n", err)
 		fmt.Println("   Consul KV configuration not available")
 		results = append(results, HecateCheckResult{
 			Component: HecateComponentCaddy,
@@ -661,7 +661,7 @@ func displayConsulKVConfig(rc *eos_io.RuntimeContext) []HecateCheckResult {
 	// INTERVENE: Load configuration from Consul KV
 	rawConfig, err := configStorage.LoadConfig(rc)
 	if err != nil {
-		fmt.Printf("   ⚠️  Cannot load config from Consul: %v\n", err)
+		fmt.Printf("     Cannot load config from Consul: %v\n", err)
 		results = append(results, HecateCheckResult{
 			Component: HecateComponentCaddy,
 			CheckName: "Consul KV Config",
@@ -748,7 +748,7 @@ func displayContainerStatus(rc *eos_io.RuntimeContext, hecatePath string) []Heca
 	// ASSESS: Check if docker-compose.yml exists
 	composeFile := filepath.Join(hecatePath, "docker-compose.yml")
 	if _, err := os.Stat(composeFile); os.IsNotExist(err) {
-		fmt.Printf("   ⚠️  No docker-compose.yml found at %s\n", composeFile)
+		fmt.Printf("     No docker-compose.yml found at %s\n", composeFile)
 		results = append(results, HecateCheckResult{
 			Component: HecateComponentCaddy,
 			CheckName: "Container Status",
@@ -803,7 +803,7 @@ func displayContainerStatus(rc *eos_io.RuntimeContext, hecatePath string) []Heca
 	logOutput, err := logCmd.CombinedOutput()
 
 	if err != nil {
-		fmt.Printf("   ⚠️  Could not retrieve logs: %v\n", err)
+		fmt.Printf("     Could not retrieve logs: %v\n", err)
 	} else {
 		fmt.Printf("%s\n", string(logOutput))
 	}

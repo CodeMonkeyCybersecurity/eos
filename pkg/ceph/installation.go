@@ -38,7 +38,7 @@ func CheckInstallation(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 	}
 
 	if len(cephPackages) == 0 {
-		logger.Warn("⚠️  No Ceph packages found")
+		logger.Warn("  No Ceph packages found")
 		return DiagnosticResult{
 			CheckName: "Installation",
 			Passed:    false,
@@ -64,7 +64,7 @@ func CheckInstallation(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticRes
 	if output, err := cmd.Output(); err == nil {
 		logger.Info("Ceph user: " + strings.TrimSpace(string(output)))
 	} else {
-		logger.Warn("⚠️  Ceph user not found")
+		logger.Warn("  Ceph user not found")
 		// Check UID 64045 (common Ceph UID)
 		cmd = exec.Command("id", "64045")
 		if output, err := cmd.Output(); err == nil {

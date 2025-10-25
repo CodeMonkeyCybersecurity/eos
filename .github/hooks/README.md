@@ -116,7 +116,7 @@ The emoji check is also enforced in GitHub Actions via `.github/workflows/emoji-
 
 **Example PR comment:**
 ```markdown
-## ⚠️ Emojis Detected
+##  Emojis Detected
 
 Your PR contains emojis in non-test files. According to Eos project
 standards (CLAUDE.md), emojis should not be used in production code.

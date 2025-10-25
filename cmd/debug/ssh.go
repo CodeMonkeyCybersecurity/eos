@@ -327,7 +327,7 @@ func getStatusEmoji(status string) string {
 	case "fail":
 		return "❌"
 	case "warn":
-		return "⚠️"
+		return ""
 	case "skip":
 		return "⏭️"
 	default:

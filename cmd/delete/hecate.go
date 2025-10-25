@@ -52,7 +52,7 @@ func runDeleteHecate(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) er
 	// Confirmation prompt unless --force
 	if !forceDelete {
 		logger.Info("")
-		logger.Info("terminal prompt: ⚠️  WARNING: This will delete:")
+		logger.Info("terminal prompt:   WARNING: This will delete:")
 		logger.Info("terminal prompt:   - All Docker containers and volumes")
 		logger.Info("terminal prompt:   - Configuration files in /opt/hecate")
 		if !keepData {

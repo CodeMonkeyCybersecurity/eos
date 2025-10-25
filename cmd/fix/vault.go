@@ -16,7 +16,7 @@ import (
 var vaultFixCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "[DEPRECATED] Fix common Vault installation issues - use 'eos update vault --fix'",
-	Long: `⚠️  DEPRECATION WARNING:
+	Long: `  DEPRECATION WARNING:
 This command is deprecated and will be removed in Eos v2.0.0 (approximately 6 months from now).
 
 Use 'eos update vault --fix' instead for configuration drift correction.
@@ -71,7 +71,7 @@ func runVaultFix(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Print deprecation warning
-	logger.Warn("⚠️  DEPRECATION WARNING: 'eos fix vault' is deprecated")
+	logger.Warn("  DEPRECATION WARNING: 'eos fix vault' is deprecated")
 	logger.Warn("   Use 'eos update vault --fix' instead")
 	logger.Warn("   This command will be removed in Eos v2.0.0 (approximately 6 months from now)")
 	logger.Info("")

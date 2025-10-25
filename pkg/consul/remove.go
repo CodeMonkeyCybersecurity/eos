@@ -35,7 +35,7 @@ func RemoveConsul(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		logger.Debug("Could not check registered services (Consul may not be running)", zap.Error(err))
 	} else if len(services) > 0 {
-		logger.Warn("⚠️  Found registered services in Consul",
+		logger.Warn("  Found registered services in Consul",
 			zap.Int("service_count", len(services)),
 			zap.Strings("services", services))
 		logger.Info("These services will lose Consul-based service discovery after deletion")
@@ -61,7 +61,7 @@ func RemoveConsul(rc *eos_io.RuntimeContext) error {
 		// Warn about quorum risks
 		if clusterInfo.IsServer {
 			if clusterInfo.MemberCount <= 3 {
-				logger.Warn("⚠️  CRITICAL: Removing a server from a 3-node cluster will break quorum!",
+				logger.Warn("  CRITICAL: Removing a server from a 3-node cluster will break quorum!",
 					zap.Int("current_servers", clusterInfo.MemberCount),
 					zap.String("impact", "Cluster will become read-only and unable to elect a leader"))
 
@@ -76,7 +76,7 @@ func RemoveConsul(rc *eos_io.RuntimeContext) error {
 					return nil
 				}
 			} else if clusterInfo.MemberCount == 5 {
-				logger.Warn("⚠️  WARNING: Removing a server from a 5-node cluster reduces fault tolerance",
+				logger.Warn("  WARNING: Removing a server from a 5-node cluster reduces fault tolerance",
 					zap.String("current_tolerance", "2 server failures"),
 					zap.String("after_removal", "1 server failure"))
 			}

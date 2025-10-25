@@ -239,7 +239,7 @@ func CheckProcesses(logger otelzap.LoggerWithCtx, verbose bool) DiagnosticResult
 	}
 
 	if processCounts["ceph-mgr"] == 0 {
-		logger.Warn("  ⚠️  WARNING: No ceph-mgr processes found")
+		logger.Warn("    WARNING: No ceph-mgr processes found")
 		logger.Info("    → Manager daemon is required for modern Ceph")
 		logger.Info("    → Try: systemctl start ceph-mgr.target")
 

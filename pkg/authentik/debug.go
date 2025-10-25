@@ -794,7 +794,7 @@ func displayResults(results []AuthentikCheckResult) {
 		icon := "✅"
 		if !result.Passed {
 			if result.Warning {
-				icon = "⚠️ "
+				icon = " "
 			} else {
 				icon = "❌"
 			}
@@ -842,10 +842,10 @@ func displayPreUpgradeSummary(results []AuthentikCheckResult) {
 	warnings := countWarnings(results)
 
 	if criticalIssues > 0 {
-		fmt.Printf("⚠️  Found %d critical issue(s) that must be addressed\n", criticalIssues)
+		fmt.Printf("  Found %d critical issue(s) that must be addressed\n", criticalIssues)
 	}
 	if warnings > 0 {
-		fmt.Printf("⚠️  Found %d warning(s) to review\n", warnings)
+		fmt.Printf("  Found %d warning(s) to review\n", warnings)
 	}
 	if criticalIssues == 0 && warnings == 0 {
 		fmt.Println("✅ All checks passed! System is ready for upgrade.")
