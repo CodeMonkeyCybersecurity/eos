@@ -377,13 +377,33 @@ func checkSystemdService(rc *eos_io.RuntimeContext) DiagnosticResult {
 
 	output, _ := execute.Run(rc.Ctx, cmd)
 
-	// Parse output for key information
+	// Parse output for key information and detect state
 	lines := strings.Split(output, "\n")
+	var activeState string
 	for _, line := range lines {
 		if strings.Contains(line, "Active:") ||
 			strings.Contains(line, "Loaded:") ||
 			strings.Contains(line, "Main PID:") {
 			result.Details = append(result.Details, strings.TrimSpace(line))
+
+			// Extract state from Active line
+			if strings.Contains(line, "Active:") {
+				// Parse: "Active: active (running) since ..."
+				//    or: "Active: failed (Result: exit-code) since ..."
+				//    or: "Active: inactive (dead)"
+				if strings.Contains(line, "active (running)") {
+					activeState = "running"
+				} else if strings.Contains(line, "inactive") || strings.Contains(line, "dead") {
+					activeState = "inactive"
+				} else if strings.Contains(line, "failed") {
+					activeState = "failed"
+				} else if strings.Contains(line, "activating") {
+					activeState = "activating"
+				} else {
+					// Unknown or can't parse - this is suspicious
+					activeState = "unknown"
+				}
+			}
 		}
 	}
 
@@ -398,7 +418,61 @@ func checkSystemdService(rc *eos_io.RuntimeContext) DiagnosticResult {
 	result.Details = append(result.Details,
 		fmt.Sprintf("Enabled: %s", strings.TrimSpace(enabledOutput)))
 
-	result.Message = "Systemd service configuration is valid"
+	result.Details = append(result.Details, "")
+
+	// EVALUATE - Assess state
+	switch activeState {
+	case "running":
+		result.Message = "Systemd service is running"
+		result.Details = append(result.Details, "✓ Service state: active (running)")
+	case "inactive":
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Systemd service is NOT running"
+		result.Details = append(result.Details, "✗ Service state: inactive (dead)")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  Start service: sudo systemctl start consul")
+	case "failed":
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Systemd service has FAILED"
+		result.Details = append(result.Details, "✗ Service state: failed")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  1. Check logs: sudo journalctl -xeu consul -n 100")
+		result.Details = append(result.Details, "  2. Fix the issue causing failure")
+		result.Details = append(result.Details, "  3. Restart: sudo systemctl restart consul")
+	case "activating":
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Systemd service is still starting"
+		result.Details = append(result.Details, "⚠ Service state: activating (startup in progress)")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Wait a few seconds and check again: systemctl status consul")
+	case "unknown":
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Systemd service state is UNKNOWN"
+		result.Details = append(result.Details, "✗ Service state: unknown")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "IMPACT:")
+		result.Details = append(result.Details, "  Cannot determine if service is running")
+		result.Details = append(result.Details, "  This usually indicates:")
+		result.Details = append(result.Details, "    - Service crashed and systemd lost track")
+		result.Details = append(result.Details, "    - Service definition is invalid")
+		result.Details = append(result.Details, "    - Permissions issue reading systemd state")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  1. Check logs: sudo journalctl -xeu consul -n 100")
+		result.Details = append(result.Details, "  2. Try restarting: sudo systemctl restart consul")
+		result.Details = append(result.Details, "  3. Check service file: sudo systemctl cat consul")
+	default:
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Cannot determine systemd service state"
+		result.Details = append(result.Details, "⚠ Could not parse service state from systemctl output")
+	}
 
 	return result
 }
@@ -985,12 +1059,18 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 // checkACLEnabled verifies ACLs are enabled in Consul configuration
 // P0: ACLs are enabled by default in 'eos create consul' for security-by-default
 // This check detects if ACLs were manually disabled (drift from canonical state)
+//
+// IMPORTANT: This check ONLY reads the config file. It CANNOT verify that:
+//   - Consul is actually running with ACLs enabled
+//   - ACL tokens are working
+//   - ACL bootstrap has been performed
+// To verify actual ACL status, Consul API must be accessible (requires running service)
 func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Checking ACL system status")
+	logger.Info("Checking ACL system configuration (file-based check)")
 
 	result := DiagnosticResult{
-		CheckName: "ACL System Status",
+		CheckName: "ACL System Configuration",
 		Success:   true,
 		Details:   []string{},
 	}
@@ -1022,6 +1102,11 @@ func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
 	// Look for: acl { enabled = true } or acl = { enabled = true }
 	hasACLBlock := strings.Contains(configStr, "acl") && (strings.Contains(configStr, "acl {") || strings.Contains(configStr, "acl ="))
 	aclEnabled := strings.Contains(configStr, "enabled = true") && hasACLBlock
+
+	// Add disclaimer about what this check can verify
+	result.Details = append(result.Details, "NOTE: This check ONLY verifies the config file.")
+	result.Details = append(result.Details, "Cannot verify actual ACL status without API access.")
+	result.Details = append(result.Details, "")
 
 	if !hasACLBlock {
 		result.Success = false
@@ -1058,9 +1143,15 @@ func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
 		return result
 	}
 
-	// SUCCESS - ACLs are enabled
-	result.Message = "ACLs are enabled in configuration"
-	result.Details = append(result.Details, "✓ ACL system is enabled")
+	// SUCCESS - ACLs are enabled in config
+	result.Message = "ACLs are enabled in config file (actual status unknown)"
+	result.Details = append(result.Details, "✓ ACL system is enabled in configuration")
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "LIMITATIONS:")
+	result.Details = append(result.Details, "  This check reads /etc/consul.d/consul.hcl only")
+	result.Details = append(result.Details, "  Cannot confirm Consul is ACTUALLY running with ACLs")
+	result.Details = append(result.Details, "  Requires API access to verify runtime ACL status")
+	result.Details = append(result.Details, "")
 
 	// Extract default_policy
 	defaultPolicy := extractConfigValue(configStr, "default_policy")

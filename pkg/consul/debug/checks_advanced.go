@@ -10,14 +10,671 @@ package debug
 
 import (
 	"fmt"
+	"net"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	consulapi "github.com/hashicorp/consul/api"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
+
+// checkConsulProcessRunning is THE FIRST diagnostic check - verifies Consul process exists.
+//
+// CRITICAL P0 CHECK - MUST RUN FIRST:
+//   - Confirms Consul binary is actually running (not just installed)
+//   - Shows PID, user, command line, uptime
+//   - Distinguishes "not running" from "running but broken"
+//   - If this fails, ALL other checks are meaningless
+//
+// Methodology:
+//   1. Check if `consul` process exists (pgrep)
+//   2. Show process details (ps aux)
+//   3. Verify process is Consul agent (not just `consul` command)
+//   4. Show listening ports (lsof/ss) to confirm service is active
+//
+// Returns:
+//   - SUCCESS: Consul process running and appears healthy
+//   - CRITICAL: Consul process NOT running (explains ALL other failures)
+//   - WARNING: Consul process exists but appears unhealthy
+func checkConsulProcessRunning(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking if Consul process is running (P0 CRITICAL CHECK)")
+
+	result := DiagnosticResult{
+		CheckName: "Consul Process Running",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// ASSESS - Step 1: Check if consul process exists
+	logger.Debug("Checking for consul process via pgrep")
+	cmd := execute.Options{
+		Command: "pgrep",
+		Args:    []string{"-a", "consul"}, // -a shows full command line
+		Capture: true,
+	}
+
+	output, err := execute.Run(rc.Ctx, cmd)
+	if err != nil {
+		// pgrep returns exit code 1 when no processes found
+		if strings.TrimSpace(output) == "" {
+			result.Success = false
+			result.Severity = SeverityCritical
+			result.Message = "Consul process is NOT RUNNING"
+			result.Details = append(result.Details, "✗ CRITICAL: No consul process found")
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "THIS EXPLAINS ALL OTHER FAILURES:")
+			result.Details = append(result.Details, "  • API unreachable → Consul is not running")
+			result.Details = append(result.Details, "  • Ports not listening → Consul is not running")
+			result.Details = append(result.Details, "  • No raft.db found → Consul never started")
+			result.Details = append(result.Details, "  • ACLs cannot be verified → Consul is not running")
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "IMMEDIATE NEXT STEPS:")
+			result.Details = append(result.Details, "  1. Check systemd status: systemctl status consul")
+			result.Details = append(result.Details, "  2. Check why it's not running: journalctl -xeu consul -n 100")
+			result.Details = append(result.Details, "  3. Common causes:")
+			result.Details = append(result.Details, "       - Service never started: sudo systemctl start consul")
+			result.Details = append(result.Details, "       - Failed at startup: check journal logs for errors")
+			result.Details = append(result.Details, "       - Crashed: check for panic/segfault in logs")
+			result.Details = append(result.Details, "       - Port conflict: another process using port "+strconv.Itoa(shared.PortConsul))
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "DO NOT PROCEED with other diagnostics until Consul is running.")
+
+			return result
+		}
+
+		// Other errors
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Cannot determine if Consul is running"
+		result.Details = append(result.Details, fmt.Sprintf("⚠ pgrep command failed: %v", err))
+		result.Details = append(result.Details, "Trying fallback method...")
+
+		// Fallback: Try ps aux | grep consul
+		psCmd := execute.Options{
+			Command: "ps",
+			Args:    []string{"aux"},
+			Capture: true,
+		}
+
+		psOutput, psErr := execute.Run(rc.Ctx, psCmd)
+		if psErr == nil {
+			found := false
+			lines := strings.Split(psOutput, "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "consul agent") && !strings.Contains(line, "grep") {
+					result.Success = true
+					result.Details = append(result.Details, "✓ Found via ps aux:")
+					result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				result.Success = false
+				result.Severity = SeverityCritical
+				result.Message = "Consul process is NOT RUNNING (verified via ps)"
+				result.Details = append(result.Details, "✗ No 'consul agent' process found in ps aux output")
+				return result
+			}
+		}
+
+		if !result.Success {
+			return result
+		}
+	}
+
+	// ASSESS - Step 2: Parse pgrep output to verify it's actually Consul agent
+	logger.Debug("Parsing process information")
+	result.Details = append(result.Details, "✓ Consul process is RUNNING")
+	result.Details = append(result.Details, "")
+
+	lines := strings.Split(output, "\n")
+	consulProcesses := []string{}
+	var consulAgentPID string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Filter out:
+		// - This debug command itself
+		// - grep commands
+		// - Other non-agent consul commands
+		if strings.Contains(line, "eos debug consul") ||
+			strings.Contains(line, "eos update consul") ||
+			strings.Contains(line, "grep consul") {
+			continue
+		}
+
+		consulProcesses = append(consulProcesses, line)
+
+		// Extract PID of the consul agent
+		if strings.Contains(line, "consul agent") {
+			fields := strings.Fields(line)
+			if len(fields) > 0 {
+				consulAgentPID = fields[0]
+			}
+		}
+	}
+
+	if len(consulProcesses) == 0 {
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "Found consul process but it's not the agent"
+		result.Details = append(result.Details, "⚠ Found 'consul' process but no 'consul agent'")
+		result.Details = append(result.Details, "  This might be:")
+		result.Details = append(result.Details, "    - A consul CLI command (e.g., 'consul members')")
+		result.Details = append(result.Details, "    - A short-lived consul operation")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "Expected: A long-running 'consul agent' process")
+		return result
+	}
+
+	// Show all consul processes found
+	result.Details = append(result.Details, "Process details:")
+	for _, proc := range consulProcesses {
+		result.Details = append(result.Details, "  "+proc)
+	}
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Step 3: Get detailed process information
+	if consulAgentPID != "" {
+		logger.Debug("Gathering detailed process information", zap.String("pid", consulAgentPID))
+
+		// Get process user, start time, uptime
+		psCmd := execute.Options{
+			Command: "ps",
+			Args:    []string{"-p", consulAgentPID, "-o", "user,pid,start,etime,rss,command"},
+			Capture: true,
+		}
+
+		psOutput, psErr := execute.Run(rc.Ctx, psCmd)
+		if psErr == nil {
+			result.Details = append(result.Details, "Detailed process information:")
+			psLines := strings.Split(psOutput, "\n")
+			for i, line := range psLines {
+				if i < 2 && strings.TrimSpace(line) != "" { // Header + first data line
+					result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+				}
+			}
+			result.Details = append(result.Details, "")
+		}
+
+		// ASSESS - Step 4: Check listening ports (confirms service is actually working)
+		logger.Debug("Checking listening ports for consul process")
+		result.Details = append(result.Details, "Listening ports (confirms service is active):")
+
+		// Try lsof first (more detailed)
+		lsofCmd := execute.Options{
+			Command: "lsof",
+			Args:    []string{"-p", consulAgentPID, "-a", "-iTCP", "-sTCP:LISTEN", "-P", "-n"},
+			Capture: true,
+		}
+
+		lsofOutput, lsofErr := execute.Run(rc.Ctx, lsofCmd)
+		if lsofErr == nil && strings.TrimSpace(lsofOutput) != "" {
+			lsofLines := strings.Split(lsofOutput, "\n")
+			for _, line := range lsofLines {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "COMMAND") {
+					continue
+				}
+
+				// Parse lsof output to extract ports
+				// Format: consul 12345 user TCP *:8500 (LISTEN)
+				fields := strings.Fields(line)
+				if len(fields) >= 9 {
+					portInfo := fields[8] // e.g., "*:8500"
+					parts := strings.Split(portInfo, ":")
+					if len(parts) == 2 {
+						port := parts[1]
+						portNum, err := strconv.Atoi(port)
+						if err == nil {
+							// Identify the port by its number
+							portDesc := identifyConsulPort(portNum)
+							result.Details = append(result.Details,
+								fmt.Sprintf("  ✓ Port %s listening (%s)", port, portDesc))
+						}
+					}
+				}
+			}
+		} else {
+			// Fallback: Use ss or netstat
+			ssCmd := execute.Options{
+				Command: "ss",
+				Args:    []string{"-tlnp"},
+				Capture: true,
+			}
+
+			ssOutput, ssErr := execute.Run(rc.Ctx, ssCmd)
+			if ssErr == nil {
+				ssLines := strings.Split(ssOutput, "\n")
+				for _, line := range ssLines {
+					if strings.Contains(line, consulAgentPID) {
+						result.Details = append(result.Details, "  "+strings.TrimSpace(line))
+					}
+				}
+			} else {
+				result.Details = append(result.Details, "  ⚠ Cannot check listening ports (lsof/ss unavailable)")
+			}
+		}
+
+		result.Details = append(result.Details, "")
+
+		// ASSESS - Step 5: Verify Consul is actually responsive (quick API check)
+		logger.Debug("Testing Consul API responsiveness")
+		result.Details = append(result.Details, "API Responsiveness Check:")
+
+		// Use net.DialTimeout for quick TCP connection test (don't wait for full HTTP)
+		addr := net.JoinHostPort(shared.GetInternalHostname(), strconv.Itoa(shared.PortConsul))
+		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+		if err != nil {
+			result.Details = append(result.Details, fmt.Sprintf("  ⚠ Port %d not accepting connections: %v", shared.PortConsul, err))
+			result.Details = append(result.Details, "    Process is running but API may not be ready yet")
+			result.Success = false
+			result.Severity = SeverityWarning
+		} else {
+			conn.Close()
+			result.Details = append(result.Details, fmt.Sprintf("  ✓ Port %d is accepting connections", shared.PortConsul))
+		}
+	}
+
+	// EVALUATE
+	if result.Success {
+		result.Message = "Consul agent process is running and responding"
+	} else {
+		result.Message = "Consul process issues detected"
+	}
+
+	return result
+}
+
+// identifyConsulPort returns a human-readable description for known Consul ports
+func identifyConsulPort(port int) string {
+	portDescriptions := map[int]string{
+		shared.PortConsul: "HTTP API",
+		8502:              "gRPC API",
+		8600:              "DNS",
+		8301:              "Serf LAN gossip",
+		8302:              "Serf WAN gossip",
+		8300:              "Server RPC",
+	}
+
+	if desc, ok := portDescriptions[port]; ok {
+		return desc
+	}
+
+	// Check if it's the configured Consul port (might not be 8500)
+	if port == shared.PortConsul {
+		return "HTTP API (custom port)"
+	}
+
+	return "unknown purpose"
+}
+
+// checkACLAuthentication tests Consul API authentication with and without tokens.
+//
+// CRITICAL for debugging ACL issues:
+//   - Distinguishes "API unreachable" from "API rejecting due to ACLs"
+//   - Tests unauthenticated access (should fail if ACLs enabled)
+//   - Tests authenticated access with token from environment/Vault
+//   - Validates token format and permissions
+//   - Shows which operations are blocked vs. allowed
+//
+// Methodology:
+//   1. Test API without token (baseline - should fail with "Permission denied" if ACLs on)
+//   2. Try to get token from CONSUL_HTTP_TOKEN environment variable
+//   3. Try to get token from Vault at secret/consul/bootstrap-token
+//   4. Test API with token (should succeed if token valid)
+//   5. Verify token permissions by reading token metadata
+//
+// Returns:
+//   - SUCCESS: API accessible with valid token
+//   - WARNING: API works without token (ACLs not enforced)
+//   - CRITICAL: API rejects token (invalid/expired)
+func checkACLAuthentication(rc *eos_io.RuntimeContext) DiagnosticResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Testing Consul API authentication (with and without ACL token)")
+
+	result := DiagnosticResult{
+		CheckName: "ACL Authentication",
+		Success:   true,
+		Details:   []string{},
+	}
+
+	// ASSESS - Step 1: Test API without token (unauthenticated)
+	logger.Debug("Testing unauthenticated API access")
+	result.Details = append(result.Details, "=== Unauthenticated Access Test ===")
+	result.Details = append(result.Details, "")
+
+	unauthConfig := consulapi.DefaultConfig()
+	unauthConfig.Token = "" // Explicitly no token
+	unauthClient, err := consulapi.NewClient(unauthConfig)
+	if err != nil {
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Cannot create Consul client"
+		result.Details = append(result.Details, fmt.Sprintf("✗ Client creation failed: %v", err))
+		return result
+	}
+
+	// Try a basic API call that requires minimal permissions
+	_, err = unauthClient.Agent().Self()
+	unauthSuccess := (err == nil)
+
+	if unauthSuccess {
+		result.Details = append(result.Details, "⚠ WARNING: API accepts requests WITHOUT token")
+		result.Details = append(result.Details, "  This indicates ACLs are NOT enforced")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "SECURITY RISK:")
+		result.Details = append(result.Details, "  • Anyone can access Consul API")
+		result.Details = append(result.Details, "  • No authentication required")
+		result.Details = append(result.Details, "  • Data is unprotected")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  1. Enable ACLs: Edit /etc/consul.d/consul.hcl")
+		result.Details = append(result.Details, "     acl = { enabled = true, default_policy = \"deny\" }")
+		result.Details = append(result.Details, "  2. Bootstrap: sudo eos update consul --bootstrap-token")
+		result.Details = append(result.Details, "  3. Restart: sudo systemctl restart consul")
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "ACLs not enforced - API accepts unauthenticated requests"
+		return result
+	}
+
+	// Check error type - is it ACL-related?
+	if err != nil {
+		errStr := err.Error()
+		isACLError := strings.Contains(errStr, "Permission denied") ||
+			strings.Contains(errStr, "ACL not found") ||
+			strings.Contains(errStr, "Forbidden") ||
+			strings.Contains(strings.ToLower(errStr), "403")
+
+		if isACLError {
+			result.Details = append(result.Details, "✓ API correctly rejects unauthenticated requests")
+			result.Details = append(result.Details, fmt.Sprintf("  Error: %s", errStr))
+			result.Details = append(result.Details, "  This confirms ACLs are enforced")
+		} else {
+			// Different error - might be connection issue
+			result.Details = append(result.Details, "✗ API unreachable (not an ACL issue)")
+			result.Details = append(result.Details, fmt.Sprintf("  Error: %s", errStr))
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "Possible causes:")
+			result.Details = append(result.Details, "  • Consul not running")
+			result.Details = append(result.Details, "  • Network connectivity issue")
+			result.Details = append(result.Details, "  • Firewall blocking connection")
+			result.Success = false
+			result.Severity = SeverityCritical
+			result.Message = "Cannot connect to Consul API"
+			return result
+		}
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Step 2: Try to find ACL token from various sources
+	logger.Debug("Searching for ACL token in environment and Vault")
+	result.Details = append(result.Details, "=== Authenticated Access Test ===")
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "Searching for ACL token:")
+
+	var token string
+	var tokenSource string
+
+	// Source 1: Environment variable
+	if envToken := os.Getenv("CONSUL_HTTP_TOKEN"); envToken != "" {
+		token = envToken
+		tokenSource = "CONSUL_HTTP_TOKEN environment variable"
+		result.Details = append(result.Details, "  ✓ Found in: "+tokenSource)
+	}
+
+	// Source 2: Vault (if no env token)
+	if token == "" {
+		vaultToken, err := getBootstrapTokenFromVault(rc)
+		if err == nil && vaultToken != "" {
+			token = vaultToken
+			tokenSource = "Vault (secret/consul/bootstrap-token)"
+			result.Details = append(result.Details, "  ✓ Found in: "+tokenSource)
+		} else if err != nil {
+			result.Details = append(result.Details, fmt.Sprintf("  ⚠ Vault check failed: %v", err))
+		} else {
+			result.Details = append(result.Details, "  ✗ Not found in: Vault (secret/consul/bootstrap-token)")
+		}
+	}
+
+	// Source 3: Agent config file (fallback)
+	if token == "" {
+		configToken := getTokenFromConsulConfig(rc)
+		if configToken != "" {
+			token = configToken
+			tokenSource = "Consul config file (acl.tokens.default)"
+			result.Details = append(result.Details, "  ⚠ Found in: "+tokenSource)
+			result.Details = append(result.Details, "    WARNING: Tokens in config files are less secure than Vault")
+		}
+	}
+
+	if token == "" {
+		result.Details = append(result.Details, "  ✗ No ACL token found in any location")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "IMPACT:")
+		result.Details = append(result.Details, "  Cannot verify authenticated access works")
+		result.Details = append(result.Details, "  Cannot determine if bootstrap token is valid")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  1. Bootstrap ACLs: sudo eos update consul --bootstrap-token")
+		result.Details = append(result.Details, "  2. Store token in Vault (done automatically by step 1)")
+		result.Details = append(result.Details, "  3. OR set env var: export CONSUL_HTTP_TOKEN=<token>")
+		result.Success = false
+		result.Severity = SeverityWarning
+		result.Message = "ACLs enforced but no token available for testing"
+		return result
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Step 3: Test API with token
+	logger.Debug("Testing authenticated API access", zap.String("source", tokenSource))
+	result.Details = append(result.Details, "Testing authenticated access:")
+
+	authConfig := consulapi.DefaultConfig()
+	authConfig.Token = token
+	authClient, err := consulapi.NewClient(authConfig)
+	if err != nil {
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Cannot create authenticated Consul client"
+		result.Details = append(result.Details, fmt.Sprintf("✗ Client creation failed: %v", err))
+		return result
+	}
+
+	// Try basic API call with token
+	agentInfo, err := authClient.Agent().Self()
+	if err != nil {
+		result.Success = false
+		result.Severity = SeverityCritical
+		result.Message = "Token rejected by Consul API"
+		result.Details = append(result.Details, "✗ API rejects authenticated request")
+		result.Details = append(result.Details, fmt.Sprintf("  Error: %v", err))
+		result.Details = append(result.Details, fmt.Sprintf("  Token source: %s", tokenSource))
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "POSSIBLE CAUSES:")
+		result.Details = append(result.Details, "  • Token is invalid or expired")
+		result.Details = append(result.Details, "  • Token was revoked")
+		result.Details = append(result.Details, "  • ACLs were reset (bootstrap reset performed)")
+		result.Details = append(result.Details, "  • Token is for different Consul cluster")
+		result.Details = append(result.Details, "")
+		result.Details = append(result.Details, "REMEDIATION:")
+		result.Details = append(result.Details, "  1. Re-bootstrap ACLs: sudo eos update consul --bootstrap-token")
+		result.Details = append(result.Details, "  2. This will create a new bootstrap token")
+		result.Details = append(result.Details, "  3. Store new token: automatically saved to Vault")
+		return result
+	}
+
+	result.Details = append(result.Details, "  ✓ API accepts authenticated requests")
+	result.Details = append(result.Details, fmt.Sprintf("    Token source: %s", tokenSource))
+
+	// Extract agent name to show we got real data
+	if configMap, ok := agentInfo["Config"]; ok {
+		if nodeName, ok := configMap["NodeName"].(string); ok {
+			result.Details = append(result.Details, fmt.Sprintf("    Connected to node: %s", nodeName))
+		}
+	}
+
+	result.Details = append(result.Details, "")
+
+	// ASSESS - Step 4: Verify token permissions by reading token metadata
+	logger.Debug("Verifying token permissions")
+	result.Details = append(result.Details, "Token Validation:")
+
+	aclToken, _, err := authClient.ACL().TokenReadSelf(&consulapi.QueryOptions{})
+	if err != nil {
+		result.Details = append(result.Details, "  ⚠ Cannot read token metadata")
+		result.Details = append(result.Details, fmt.Sprintf("    Error: %v", err))
+		result.Details = append(result.Details, "    Token works but lacks 'acl:read' permission")
+	} else {
+		result.Details = append(result.Details, "  ✓ Token metadata retrieved")
+		result.Details = append(result.Details, fmt.Sprintf("    Token ID: %s", aclToken.AccessorID))
+		result.Details = append(result.Details, fmt.Sprintf("    Description: %s", aclToken.Description))
+
+		// Check if it's a management token
+		isManagement := false
+		for _, policy := range aclToken.Policies {
+			result.Details = append(result.Details, fmt.Sprintf("    Policy: %s", policy.Name))
+			if policy.Name == "global-management" || policy.Name == "builtin/global-management" {
+				isManagement = true
+			}
+		}
+
+		if isManagement {
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "  ✓ Token has MANAGEMENT permissions")
+			result.Details = append(result.Details, "    This is the bootstrap/root token with full cluster access")
+		} else {
+			result.Details = append(result.Details, "")
+			result.Details = append(result.Details, "  ⚠ Token has LIMITED permissions")
+			result.Details = append(result.Details, "    This is not the bootstrap token")
+			result.Details = append(result.Details, "    Some operations may be restricted")
+		}
+	}
+
+	// EVALUATE
+	result.Message = "ACLs enforced and authentication working"
+	result.Details = append(result.Details, "")
+	result.Details = append(result.Details, "SUMMARY:")
+	result.Details = append(result.Details, "  ✓ ACLs are properly enforced")
+	result.Details = append(result.Details, "  ✓ Unauthenticated requests blocked")
+	result.Details = append(result.Details, "  ✓ Authenticated requests work")
+	result.Details = append(result.Details, fmt.Sprintf("  ✓ Token available from: %s", tokenSource))
+
+	return result
+}
+
+// getBootstrapTokenFromVault attempts to retrieve the Consul bootstrap token from Vault
+func getBootstrapTokenFromVault(rc *eos_io.RuntimeContext) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Attempting to read Consul bootstrap token from Vault")
+
+	// Check if VAULT_ADDR is set (indicates Vault is available)
+	vaultAddr := os.Getenv("VAULT_ADDR")
+	if vaultAddr == "" {
+		vaultAddr = "https://" + shared.GetInternalHostname() + ":8200"
+	}
+
+	// Check if VAULT_TOKEN is set (needed to read from Vault)
+	vaultToken := os.Getenv("VAULT_TOKEN")
+	if vaultToken == "" {
+		// Try to read token from Vault Agent token file
+		tokenPath := "/run/eos/vault_agent_eos.token"
+		tokenBytes, err := os.ReadFile(tokenPath)
+		if err != nil {
+			return "", fmt.Errorf("no VAULT_TOKEN env var and cannot read %s: %w", tokenPath, err)
+		}
+		vaultToken = strings.TrimSpace(string(tokenBytes))
+	}
+
+	if vaultToken == "" {
+		return "", fmt.Errorf("no Vault token available (VAULT_TOKEN not set and agent token file not found)")
+	}
+
+	// Create Vault client
+	vaultConfig := vaultapi.DefaultConfig()
+	vaultConfig.Address = vaultAddr
+	vaultClient, err := vaultapi.NewClient(vaultConfig)
+	if err != nil {
+		return "", fmt.Errorf("cannot create Vault client: %w", err)
+	}
+
+	vaultClient.SetToken(vaultToken)
+
+	// Try to read bootstrap token from Vault KV v2
+	secret, err := vaultClient.Logical().Read("secret/data/consul/bootstrap-token")
+	if err != nil {
+		return "", fmt.Errorf("cannot read secret/consul/bootstrap-token: %w", err)
+	}
+
+	if secret == nil || secret.Data == nil {
+		return "", fmt.Errorf("secret exists but has no data")
+	}
+
+	// KV v2 stores data in secret.Data["data"]
+	data, ok := secret.Data["data"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("secret data has unexpected format")
+	}
+
+	tokenValue, ok := data["value"].(string)
+	if !ok || tokenValue == "" {
+		return "", fmt.Errorf("secret has no 'value' field or it's empty")
+	}
+
+	logger.Debug("Successfully retrieved Consul bootstrap token from Vault")
+	return tokenValue, nil
+}
+
+// getTokenFromConsulConfig attempts to extract ACL token from Consul config file
+func getTokenFromConsulConfig(rc *eos_io.RuntimeContext) string {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Attempting to read ACL token from Consul config file")
+
+	configPath := consul.ConsulConfigFile
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		logger.Debug("Cannot read Consul config", zap.Error(err))
+		return ""
+	}
+
+	configStr := string(content)
+
+	// Look for: acl { tokens { default = "..." } }
+	// This is a simple pattern match, not full HCL parsing
+	re := regexp.MustCompile(`tokens\s*\{[^}]*default\s*=\s*"([^"]+)"`)
+	matches := re.FindStringSubmatch(configStr)
+	if len(matches) >= 2 {
+		return matches[1]
+	}
+
+	// Alternative format: acl.tokens.default = "..."
+	re2 := regexp.MustCompile(`tokens\.default\s*=\s*"([^"]+)"`)
+	matches2 := re2.FindStringSubmatch(configStr)
+	if len(matches2) >= 2 {
+		return matches2[1]
+	}
+
+	return ""
+}
 
 // checkRaftBootstrapState inspects Consul's Raft state database to determine
 // the ACTUAL ACL bootstrap reset index stored in Raft (not from error messages).

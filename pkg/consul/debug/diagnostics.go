@@ -78,6 +78,16 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	results := []DiagnosticResult{}
 
 	// ASSESS - Run all diagnostic checks (same as RunDiagnostics)
+
+	// 0. CHECK IF CONSUL IS RUNNING (P0 - MUST BE FIRST!)
+	// If this fails, ALL other checks are meaningless
+	processResult := checkConsulProcessRunning(rc)
+	results = append(results, processResult)
+
+	// If Consul is not running, other checks will produce misleading results
+	// (e.g., "ACLs enabled" reads config file but can't verify actual state)
+	// Still run them for completeness, but user should fix process first
+
 	// 1. Check Consul binary
 	binaryResult := checkConsulBinary(rc)
 	results = append(results, binaryResult)
@@ -95,8 +105,8 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	results = append(results, serviceResult)
 
 	// 5. Check for lingering processes
-	processResult := checkLingeringProcesses(rc)
-	results = append(results, processResult)
+	lingeringResult := checkLingeringProcesses(rc)
+	results = append(results, lingeringResult)
 
 	// 6. Check network configuration
 	networkResult := checkConsulNetwork(rc)
@@ -140,31 +150,36 @@ func RunAssessment(rc *eos_io.RuntimeContext) (*AssessmentResults, error) {
 	aclResult := checkACLEnabled(rc)
 	results = append(results, aclResult)
 
-	// 15. Check data directory configuration (critical for ACL bootstrap)
+	// 15. Check ACL authentication (with/without token) - NEW P0 CHECK
+	// Tests if ACLs are actually enforced and if tokens work
+	aclAuthResult := checkACLAuthentication(rc)
+	results = append(results, aclAuthResult)
+
+	// 16. Check data directory configuration (critical for ACL bootstrap)
 	dataDirResult := checkDataDirectoryConfiguration(rc)
 	results = append(results, dataDirResult)
 
-	// 16. Check data directory filesystem state (verify directory exists and list contents)
+	// 17. Check data directory filesystem state (verify directory exists and list contents)
 	dataDirFSResult := checkDataDirectoryFileSystem(rc)
 	results = append(results, dataDirFSResult)
 
-	// 17. Check Raft database location (find active raft.db across filesystem)
+	// 18. Check Raft database location (find active raft.db across filesystem)
 	raftDBResult := checkRaftDatabase(rc)
 	results = append(results, raftDBResult)
 
-	// 18. Check recent ACL bootstrap activity in logs
+	// 19. Check recent ACL bootstrap activity in logs
 	aclBootstrapLogResult := checkRecentACLBootstrapActivity(rc)
 	results = append(results, aclBootstrapLogResult)
 
-	// 19. Check Raft ACL bootstrap state (advanced - shows actual reset index)
+	// 20. Check Raft ACL bootstrap state (advanced - shows actual reset index)
 	raftBootstrapResult := checkRaftBootstrapState(rc)
 	results = append(results, raftBootstrapResult)
 
-	// 20. Check Consul service discovery (critical for Vault-Consul integration)
+	// 21. Check Consul service discovery (critical for Vault-Consul integration)
 	serviceDiscoveryResult := checkConsulServiceDiscovery(rc)
 	results = append(results, serviceDiscoveryResult)
 
-	// 21. Check systemd unit status for Consul and dependencies
+	// 22. Check systemd unit status for Consul and dependencies
 	systemdResult := checkSystemdUnitStatus(rc)
 	results = append(results, systemdResult)
 
