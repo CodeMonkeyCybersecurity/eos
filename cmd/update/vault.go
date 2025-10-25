@@ -382,9 +382,38 @@ func runVaultPolicyUpdate(rc *eos_io.RuntimeContext) error {
 	logger.Info("================================================================================")
 	logger.Info("")
 
+	// ASSESS - Check Vault seal status BEFORE attempting authentication
+	// This provides clear, actionable errors instead of cryptic 503 responses
+	logger.Info("Checking Vault status...")
+	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+	if err != nil {
+		return fmt.Errorf("failed to check Vault status: %w\n\n"+
+			"Ensure Vault service is running:\n"+
+			"  sudo systemctl status vault", err)
+	}
+
+	if !initialized {
+		return eos_err.NewUserError(
+			"Vault is not initialized.\n\n" +
+				"Initialize Vault first:\n" +
+				"  sudo eos create vault")
+	}
+
+	if sealed {
+		return eos_err.NewUserError(
+			"Vault is sealed. Unseal it first:\n\n" +
+				"Automatic unsealing:\n" +
+				"  sudo eos update vault --unseal\n\n" +
+				"Manual unsealing:\n" +
+				"  vault operator unseal")
+	}
+
+	logger.Info("✓ Vault is unsealed and ready")
+	logger.Info("")
+
 	// ASSESS - Get root client
 	logger.Info("Authenticating to Vault (requires root token)...")
-	_, err := vault.GetRootClient(rc)
+	_, err = vault.GetRootClient(rc)
 	if err != nil {
 		return fmt.Errorf("failed to get root client: %w\n\n"+
 			"This operation requires root token access.\n"+
@@ -406,13 +435,21 @@ func runVaultPolicyUpdate(rc *eos_io.RuntimeContext) error {
 	logger.Info("================================================================================")
 	logger.Info("")
 	logger.Info("Updated policies:")
-	logger.Info("  • eos-policy (default) - Now includes secret/data/services/* access")
-	logger.Info("  • eos-admin")
-	logger.Info("  • eos-emergency")
-	logger.Info("  • eos-readonly")
+	logger.Info("  • eos-default-policy - Standard user access")
+	logger.Info("    ├─ Service secrets: secret/data/services/*")
+	logger.Info("    ├─ Consul integration: secret/data/consul/*")
+	logger.Info("    ├─ Secrets engine management: sys/mounts (read/list)")
+	logger.Info("    ├─ Secrets engine enablement: sys/mounts/{consul,database,pki}")
+	logger.Info("    └─ Consul secrets engine: consul/* (dynamic token generation)")
+	logger.Info("  • eos-admin-policy - Infrastructure management")
+	logger.Info("  • eos-emergency-policy - Emergency response")
+	logger.Info("  • eos-readonly-policy - Monitoring and auditing")
 	logger.Info("")
 	logger.Info("All tokens using these policies now have the updated permissions.")
 	logger.Info("No restart or re-authentication required - changes are immediate.")
+	logger.Info("")
+	logger.Info("Vault-Consul integration now enabled:")
+	logger.Info("  • Run: sudo eos sync --vault --consul")
 	logger.Info("")
 	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
 	logger.Info("================================================================================")

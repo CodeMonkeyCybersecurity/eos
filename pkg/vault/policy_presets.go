@@ -17,7 +17,10 @@ func BuildEosDefaultPolicy(rc *eos_io.RuntimeContext) (string, error) {
 		AddCubbyholeAccess().
 		AddUserSecrets().
 		AddSharedSecretsReadOnly().
-		AddServiceSecrets(). // CRITICAL P0: Allow service deployments to store secrets
+		AddServiceSecrets().           // CRITICAL P0: Allow service deployments to store secrets
+		AddConsulIntegrationSecrets(). // CRITICAL P0: Store Consul bootstrap tokens for Vault-Consul integration
+		AddSecretsEngineManagement().  // CRITICAL P0: Enable Consul/Database/PKI secrets engines for integrations
+		AddConsulSecretsEngine().      // CRITICAL P0: Configure and use Consul secrets engine
 		AddSelfServiceUserpass().
 		AddMFAManagement().
 		AddSection("Essential Tools").

@@ -85,6 +85,12 @@ func CreatePolicy(
 			return "", fmt.Errorf("failed to read existing policy: %w", err)
 		}
 
+		// SECURITY P0: Defensive check against Consul SDK returning nil policy with nil error
+		// This prevents nil pointer dereference when SDK has unexpected behavior
+		if policy == nil {
+			return "", fmt.Errorf("policy %s exists but API returned nil (possible Consul SDK bug)", name)
+		}
+
 		return policy.ID, nil
 	}
 

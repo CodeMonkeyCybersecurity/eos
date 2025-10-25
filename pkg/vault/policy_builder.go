@@ -276,6 +276,43 @@ func (pb *PolicyBuilder) AddServiceSecrets() *PolicyBuilder {
 	return pb
 }
 
+// AddConsulIntegrationSecrets adds access to Consul integration metadata storage
+// RATIONALE: Consul-Vault integration requires storing bootstrap tokens and management tokens
+// SECURITY: Scoped to secret/data/consul/* - isolated from user and service secrets
+// THREAT MODEL: Prevents privilege escalation - users can't modify other integration secrets
+func (pb *PolicyBuilder) AddConsulIntegrationSecrets() *PolicyBuilder {
+	pb.AddSection("Consul Integration Secrets")
+	pb.AddComment("Store Consul bootstrap tokens and metadata for service integration")
+	pb.AddPath("secret/data/consul/*", "create", "read", "update", "delete", "list")
+	pb.AddPath("secret/metadata/consul/*", "read", "list", "delete")
+	return pb
+}
+
+// AddSecretsEngineManagement adds limited secrets engine management capabilities
+// RATIONALE: Eos needs to enable secrets engines for service integrations (Consul, DB, PKI)
+// SECURITY: Scoped to specific mount paths - cannot disable core KV engine or create arbitrary engines
+// THREAT MODEL: Prevents accidental/malicious destruction of core secrets infrastructure
+func (pb *PolicyBuilder) AddSecretsEngineManagement() *PolicyBuilder {
+	pb.AddSection("Secrets Engine Management (Limited)")
+	pb.AddComment("Allow Eos to integrate services with Vault secrets engines")
+	pb.AddPath("sys/mounts", "read", "list")
+	pb.AddPath("sys/mounts/consul", "create", "read", "update")
+	pb.AddPath("sys/mounts/database", "create", "read", "update")
+	pb.AddPath("sys/mounts/pki", "create", "read", "update")
+	return pb
+}
+
+// AddConsulSecretsEngine adds full access to Consul secrets engine
+// RATIONALE: Configure Consul secrets engine for dynamic token generation
+// SECURITY: Only accessible after secrets engine is enabled, tokens are time-limited (1h-24h TTL)
+// THREAT MODEL: Consul ACL policies still enforced on generated tokens - Vault doesn't bypass Consul security
+func (pb *PolicyBuilder) AddConsulSecretsEngine() *PolicyBuilder {
+	pb.AddSection("Consul Secrets Engine (Full Access)")
+	pb.AddComment("Configure and use Consul secrets engine for dynamic token generation")
+	pb.AddPath("consul/*", "create", "read", "update", "delete", "list")
+	return pb
+}
+
 // AddSelfServiceUserpass adds self-service userpass management with restrictions
 func (pb *PolicyBuilder) AddSelfServiceUserpass() *PolicyBuilder {
 	pb.AddSection("Self-Service User Management")
