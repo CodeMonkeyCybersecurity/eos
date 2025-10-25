@@ -112,7 +112,7 @@ func init() {
 		"Port migration in format: FROM -> TO (e.g., '8179 -> default' or '8179 -> 8200')")
 	VaultCmd.Flags().BoolVar(&vaultDryRun, "dry-run", false,
 		"Preview changes without applying them (works with --fix, --ports, --address)")
-	VaultCmd.Flags().BoolVar(&vaultUpdatePolicies, "update-policies", false,
+	VaultCmd.Flags().BoolVar(&vaultUpdatePolicies, "policies", false,
 		"Update Vault policies to latest version (requires root token)")
 	VaultCmd.Flags().BoolVar(&vaultFix, "fix", false,
 		"Fix configuration drift from canonical state (use --dry-run to preview)")
